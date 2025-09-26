@@ -42,13 +42,12 @@ const createMainWindow = () => {
     // 關閉主窗口時也關閉投影窗口
     if (projectionWindow && !projectionWindow.isDestroyed()) {
       projectionWindow.close()
+      projectionWindow = null
     }
     mainWindow = null
 
-    // 確保在 macOS 上主窗口關閉時完全退出應用程式
-    if (process.platform === 'darwin') {
-      app.quit()
-    }
+    // 在所有平台上主窗口關閉時都退出應用程式
+    app.quit()
   })
 }
 
@@ -228,10 +227,22 @@ app.on('window-all-closed', () => {
   // 確保所有窗口都已關閉，包括投影窗口
   if (projectionWindow && !projectionWindow.isDestroyed()) {
     projectionWindow.close()
+    projectionWindow = null
   }
 
-  // 在非 macOS 平台上退出應用程式
-  if (process.platform !== 'darwin') {
-    app.quit()
+  // 在所有平台上都退出應用程式
+  app.quit()
+})
+
+// 應用程式退出前的清理
+app.on('before-quit', () => {
+  // 強制關閉所有窗口
+  if (projectionWindow && !projectionWindow.isDestroyed()) {
+    projectionWindow.destroy()
+    projectionWindow = null
+  }
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.destroy()
+    mainWindow = null
   }
 })
