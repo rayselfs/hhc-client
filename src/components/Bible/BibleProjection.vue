@@ -21,6 +21,18 @@ defineProps<Props>()
   text-align: center;
   color: white;
   font-size: 2rem;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.bible-projection::-webkit-scrollbar {
+  display: none;
 }
 
 .content {

@@ -12,25 +12,7 @@ const config: ForgeConfig = {
     asar: true,
   },
   rebuildConfig: {},
-  makers: [
-    new MakerSquirrel({
-      name: 'bible-client',
-      setupExe: 'bible-client-setup.exe',
-      setupIcon: './src/assets/media/hhc-icon.png',
-      authors: 'Ray',
-      description: 'HHC Bible Client - 投影控制應用程式',
-      exe: 'bible-client.exe',
-      iconUrl: './src/assets/media/hhc-icon.png',
-      loadingGif: './src/assets/media/hhc-icon.png',
-      noMsi: true,
-      setupMsi: 'bible-client-setup.msi',
-      certificateFile: undefined, // 如果有代碼簽名證書，請指定路徑
-      certificatePassword: undefined,
-    }),
-    new MakerZIP({}, ['darwin']),
-    new MakerRpm({}),
-    new MakerDeb({}),
-  ],
+  makers: [new MakerSquirrel(), new MakerZIP({}, ['darwin']), new MakerRpm({}), new MakerDeb({})],
   plugins: [
     new VitePlugin({
       // `build` can specify multiple entry builds, which can be Main process, Preload scripts, Worker process, etc.

@@ -1,7 +1,7 @@
 <template>
   <v-app class="projection-app">
     <v-main class="projection-main">
-      <v-container fluid class="pa-0 fill-height">
+      <v-container fluid class="pa-0 fill-height projection-container">
         <!-- 預設內容 -->
         <transition name="fade" mode="out-in">
           <DefaultProjection v-if="projectionStore.isShowingDefault" key="default" />

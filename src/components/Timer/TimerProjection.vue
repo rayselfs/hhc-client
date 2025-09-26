@@ -34,7 +34,15 @@
 
     <div v-else-if="timerMode === 'clock'" class="single-mode clock-only">
       <div class="clock-display">
-        <div class="time-text">{{ clockFormattedTime }}</div>
+        <div
+          class="time-text"
+          :style="{
+            fontSize: clockTextSize + 'rem',
+            letterSpacing: clockTextSize * 0.5 + 'px',
+          }"
+        >
+          {{ clockFormattedTime }}
+        </div>
       </div>
     </div>
 
@@ -133,10 +141,10 @@ const circleSize = computed(() => {
 const strokeWidth = computed(() => {
   if (props.timerMode === 'both') {
     // 在分割模式下，使用固定線條寬度
-    return 12
+    return 18
   } else if (props.timerMode === 'timer') {
     // 純計時模式，使用更粗的線條
-    return 20
+    return 22
   }
   return 18 // 默認線條寬度（clock 模式）
 })
@@ -164,9 +172,9 @@ const timerTextSize = computed(() => {
     if (screenHeight <= 768) {
       return 7 // 1366x768
     } else if (screenHeight <= 900) {
-      return 8 // 1600x900
+      return 9 // 1600x900
     } else {
-      return 12 // 1920x1080 或更高
+      return 13 // 1920x1080 或更高
     }
   } else if (props.timerMode === 'timer') {
     // 純計時模式，使用更大的文字
@@ -190,12 +198,12 @@ const clockTextSize = computed(() => {
     if (screenHeight <= 768) {
       return 6 // 1366x768
     } else if (screenHeight <= 900) {
-      return 7 // 1600x900
+      return 8 // 1600x900
     } else {
-      return 9 // 1920x1080 或更高
+      return 10 // 1920x1080 或更高
     }
   }
-  return 12 // 單一模式使用12rem
+  return 16 // 單一模式使用12rem
 })
 
 // 時區文字大小計算已移除
@@ -209,8 +217,16 @@ const isNearEnd = computed(() => {
 <style scoped>
 .timer-projection {
   height: 100vh;
+  width: 100vw;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.timer-projection::-webkit-scrollbar {
+  display: none;
 }
 
 /* 單一模式 */
@@ -248,8 +264,7 @@ const isNearEnd = computed(() => {
 }
 
 .progress-ring-circle-bg {
-  stroke: rgba(255, 255, 255, 0.1);
-  stroke-width: 2;
+  stroke: var(--timer-progress-ring-bg);
 }
 
 .progress-ring-circle {
@@ -320,9 +335,9 @@ const isNearEnd = computed(() => {
 
 /* 分割線樣式 */
 .split-divider {
-  width: 2px;
+  width: 8px;
   height: 100vh;
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--timer-split-divider-color);
   position: absolute;
   left: 40%;
   top: 0;

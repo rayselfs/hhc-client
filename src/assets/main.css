@@ -9,5 +9,45 @@
   --projection-background-color: #000000;
   --projection-text-color: #ffffff;
 
+  --timer-progress-ring-bg: #222222;
   --timer-progress-ring-color: #a8c7fa;
+  --timer-split-divider-color: #444444;
+}
+
+/* 隱藏滾動條 - 適用於所有瀏覽器 */
+* {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* Internet Explorer 10+ */
+}
+
+*::-webkit-scrollbar {
+  display: none; /* WebKit browsers (Chrome, Safari, Edge) */
+}
+
+/* 投影窗口特定樣式 */
+.projection-app,
+.projection-main,
+.projection-content {
+  overflow: hidden !important;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+.projection-app::-webkit-scrollbar,
+.projection-main::-webkit-scrollbar,
+.projection-content::-webkit-scrollbar {
+  display: none !important;
+}
+
+/* 確保投影窗口容器不顯示滾動條 */
+.v-application.projection-app {
+  overflow: hidden !important;
+}
+
+.v-main.projection-main {
+  overflow: hidden !important;
+}
+
+.v-container.projection-container {
+  overflow: hidden !important;
 }

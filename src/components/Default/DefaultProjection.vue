@@ -13,6 +13,13 @@
   position: relative;
   height: 100vh;
   width: 100vw;
+  overflow: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.default-projection::-webkit-scrollbar {
+  display: none;
 }
 
 .logo-container {

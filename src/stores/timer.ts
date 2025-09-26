@@ -190,9 +190,9 @@ export const useTimerStore = defineStore('timer', () => {
 
     presets.value.unshift(newPreset)
 
-    // 只保留最近3個預設
-    if (presets.value.length > 3) {
-      presets.value = presets.value.slice(0, 3)
+    // 只保留最近5個預設
+    if (presets.value.length > 5) {
+      presets.value = presets.value.slice(0, 5)
     }
 
     // 保存到 localStorage
