@@ -203,10 +203,8 @@ const clockTextSize = computed(() => {
       return 10 // 1920x1080 或更高
     }
   }
-  return 16 // 單一模式使用12rem
+  return 16 // 單一模式
 })
-
-// 時區文字大小計算已移除
 
 // 判斷是否接近計時結束
 const isNearEnd = computed(() => {

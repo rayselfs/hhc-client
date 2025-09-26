@@ -1,7 +1,7 @@
 :root {
   --font-family-base:
     'Noto Sans TC', 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB',
-    'Microsoft YaHei', '微软雅黑', Arial, sans-serif;
+    'Microsoft YaHei', '微软雅黑', 'Roboto', Arial, sans-serif;
 
   /* 標題字型 (如果需要) */
   --font-family-heading: 'Roboto', sans-serif;
@@ -11,7 +11,7 @@
 
   --timer-progress-ring-bg: #222222;
   --timer-progress-ring-color: #a8c7fa;
-  --timer-split-divider-color: #444444;
+  --timer-split-divider-color: #222222;
 }
 
 /* 隱藏滾動條 - 適用於所有瀏覽器 */
