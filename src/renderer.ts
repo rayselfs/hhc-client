@@ -4,7 +4,10 @@ import i18n from './plugins/i18n'
 import vuetify from './plugins/vuetify'
 import errorHandler from './composables/useErrorHandler'
 
-import './index.css'
+import 'normalize.css'
+import './assets/main.css'
+
+import './assets/fonts/DigitalNumbers/style.css'
 
 import App from './App.vue'
 import router from './router'

@@ -1,0 +1,561 @@
+<template>
+  <v-container>
+    <v-row>
+      <!-- 左側：控制計時區 -->
+      <v-col cols="6">
+        <v-card class="control-card">
+          <v-card-text>
+            <!-- 模式選擇 -->
+            <v-row class="mb-4">
+              <v-col cols="12">
+                <v-label class="text-subtitle-1 mb-3 d-block">{{ $t('displayMode') }}</v-label>
+                <v-btn-toggle
+                  v-model="timerStore.settings.mode"
+                  color="primary"
+                  variant="outlined"
+                  mandatory
+                  @update:model-value="handleModeChange"
+                >
+                  <v-btn value="timer">
+                    <v-icon icon="mdi-timer" class="mr-2"></v-icon>
+                    {{ $t('timerMode') }}
+                  </v-btn>
+                  <v-btn value="clock">
+                    <v-icon icon="mdi-clock" class="mr-2"></v-icon>
+                    {{ $t('clockMode') }}
+                  </v-btn>
+                  <v-btn value="both">
+                    <v-icon icon="mdi-view-split-horizontal" class="mr-2"></v-icon>
+                    {{ $t('bothMode') }}
+                  </v-btn>
+                </v-btn-toggle>
+              </v-col>
+            </v-row>
+
+            <!-- 計時器設定 -->
+            <v-row
+              v-if="timerStore.settings.mode === 'timer' || timerStore.settings.mode === 'both'"
+            >
+              <v-col cols="12">
+                <div class="time-input-container">
+                  <v-text-field
+                    v-model.number="minutes"
+                    :label="$t('minutes')"
+                    type="number"
+                    min="0"
+                    max="59"
+                    variant="outlined"
+                    density="compact"
+                    class="time-input"
+                    @keyup.enter="handleTimeInput"
+                    @blur="handleTimeInput"
+                  ></v-text-field>
+                  <v-text-field
+                    v-model.number="seconds"
+                    :label="$t('seconds')"
+                    type="number"
+                    min="0"
+                    max="59"
+                    variant="outlined"
+                    density="compact"
+                    class="time-input"
+                    @keyup.enter="handleTimeInput"
+                    @blur="handleTimeInput"
+                  ></v-text-field>
+                </div>
+              </v-col>
+            </v-row>
+
+            <!-- 按鈕區域（保存預設或快捷按鈕） -->
+            <v-row
+              v-if="timerStore.settings.mode === 'timer' || timerStore.settings.mode === 'both'"
+              class="mb-4"
+            >
+              <v-col cols="12">
+                <!-- 保存按鈕（只在未開始時顯示） -->
+                <div
+                  v-if="
+                    !timerStore.settings.isRunning && (timerStore.settings.pausedTime ?? 0) === 0
+                  "
+                  class="save-button-container"
+                >
+                  <v-btn
+                    class="save-button"
+                    color="primary"
+                    variant="outlined"
+                    @click="saveTimerPreset"
+                  >
+                    <v-icon icon="mdi-bookmark-plus" class="mr-2"></v-icon>
+                    {{ $t('savePreset') }}
+                  </v-btn>
+                </div>
+
+                <!-- 快捷按鈕（開始計時後顯示） -->
+                <div
+                  v-else-if="
+                    timerStore.settings.isRunning || (timerStore.settings.pausedTime ?? 0) > 0
+                  "
+                  class="quick-buttons"
+                >
+                  <v-btn
+                    class="quick-button"
+                    color="primary"
+                    variant="outlined"
+                    size="small"
+                    @click="addTime(10)"
+                  >
+                    +0:10
+                  </v-btn>
+                  <v-btn
+                    class="quick-button"
+                    color="primary"
+                    variant="outlined"
+                    size="small"
+                    @click="addTime(30)"
+                  >
+                    +0:30
+                  </v-btn>
+                  <v-btn
+                    class="quick-button"
+                    color="primary"
+                    variant="outlined"
+                    size="small"
+                    @click="addTime(60)"
+                  >
+                    +1:00
+                  </v-btn>
+                </div>
+              </v-col>
+            </v-row>
+
+            <!-- 主要控制按鈕（移到卡片底部） -->
+            <v-row
+              v-if="timerStore.settings.mode === 'timer' || timerStore.settings.mode === 'both'"
+              class="mt-auto"
+            >
+              <v-col cols="12">
+                <!-- 開始按鈕（未開始時） -->
+                <div
+                  v-if="
+                    !timerStore.settings.isRunning && (timerStore.settings.pausedTime ?? 0) === 0
+                  "
+                  class="start-button-container"
+                >
+                  <v-btn class="start-button" color="primary" size="x-large" @click="startTimer">
+                    <v-icon icon="mdi-play" size="large"></v-icon>
+                  </v-btn>
+                </div>
+
+                <!-- 暫停/繼續和重置按鈕（開始後） -->
+                <!-- :class="{ 'paused-button': !timerStore.settings.isRunning }" -->
+                <div v-else class="control-buttons-container">
+                  <div class="control-buttons">
+                    <v-btn
+                      class="control-button left-button"
+                      :color="timerStore.settings.isRunning ? 'primary' : 'warning'"
+                      size="x-large"
+                      @click="timerStore.settings.isRunning ? pauseTimer() : resumeTimer()"
+                    >
+                      <v-icon
+                        :icon="timerStore.settings.isRunning ? 'mdi-pause' : 'mdi-play'"
+                      ></v-icon>
+                    </v-btn>
+                    <v-btn
+                      class="control-button right-button"
+                      :color="timerStore.settings.isRunning ? 'primary' : 'warning'"
+                      size="x-large"
+                      @click="resetTimer"
+                    >
+                      <v-icon icon="mdi-refresh"></v-icon>
+                    </v-btn>
+                  </div>
+                </div>
+              </v-col>
+            </v-row>
+          </v-card-text>
+        </v-card>
+      </v-col>
+
+      <!-- 右側：Timer History -->
+      <v-col cols="6">
+        <v-card class="history-card">
+          <v-card-text>
+            <v-label class="text-subtitle-1 mb-2">{{ $t('timerPresets') }}</v-label>
+            <div v-if="timerStore.presets.length === 0" class="text-center text-grey">
+              {{ $t('noPresets') }}
+            </div>
+            <v-list v-else density="compact">
+              <v-list-item v-for="item in timerStore.presets" :key="item.id" class="px-0">
+                <template #prepend>
+                  <v-icon icon="mdi-history"></v-icon>
+                </template>
+
+                <v-list-item-title>
+                  {{ formatDuration(item.duration) }}
+                </v-list-item-title>
+
+                <template #append>
+                  <v-btn
+                    icon="mdi-play"
+                    size="small"
+                    variant="text"
+                    @click="applyPreset(item)"
+                  ></v-btn>
+                  <v-btn
+                    icon="mdi-delete"
+                    size="small"
+                    variant="text"
+                    @click="deletePreset(item.id)"
+                  ></v-btn>
+                </template>
+              </v-list-item>
+            </v-list>
+          </v-card-text>
+        </v-card>
+      </v-col>
+    </v-row>
+  </v-container>
+</template>
+
+<script setup lang="ts">
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useTimerStore } from '@/stores/timer'
+import { useProjectionStore } from '@/stores/projection'
+import { useElectron } from '@/composables/useElectron'
+import { MessageType, ViewType, TimerMode } from '@/types/common'
+
+const timerStore = useTimerStore()
+const projectionStore = useProjectionStore()
+const { t: $t } = useI18n()
+
+// Electron composable
+const { isElectron, sendToProjection: electronSendToProjection } = useElectron()
+
+// 時間輸入
+const minutes = ref(5)
+const seconds = ref(0)
+
+// 計時器
+let timerInterval: number | undefined
+
+// 狀態追蹤 - 用於優化投影更新
+let lastProjectionState: {
+  mode: string
+  timerDuration: number
+  timezone: string
+  isRunning: boolean
+  remainingTime: number
+  formattedTime: string
+  progress: number
+} | null = null
+
+// 計算屬性
+const currentDuration = computed(() => {
+  return minutes.value * 60 + seconds.value
+})
+
+// 方法
+const updateDuration = () => {
+  const duration = currentDuration.value
+  timerStore.setTimerDuration(duration)
+}
+
+// 處理時間輸入（按 Enter 鍵）
+const handleTimeInput = () => {
+  updateDuration()
+  // 立即重置投影上的計時器
+  timerStore.resetTimer()
+  sendToProjection(true) // 強制更新，因為時間設定改變了
+}
+
+// 添加時間（快捷按鈕）
+const addTime = (secondsToAdd: number) => {
+  timerStore.addTime(secondsToAdd)
+  sendToProjection(true) // 強制更新，因為時間被修改了
+}
+
+const handleModeChange = (mode: TimerMode) => {
+  timerStore.setMode(mode)
+  sendToProjection(true) // 強制更新，因為模式改變了
+}
+
+const startTimer = () => {
+  timerStore.startTimer()
+
+  // 自動顯示投影並切換到計時器視圖
+  if (isElectron()) {
+    // 更新投影 store 狀態
+    projectionStore.setCurrentView('timer')
+    projectionStore.setShowingDefault(false)
+
+    // 切換到計時器視圖
+    electronSendToProjection({
+      type: MessageType.CHANGE_VIEW,
+      data: { view: ViewType.TIMER },
+    })
+
+    // 確保顯示內容而不是預設畫面
+    electronSendToProjection({
+      type: MessageType.TOGGLE_PROJECTION_CONTENT,
+      data: { showDefault: false },
+    })
+  }
+
+  sendToProjection(true) // 強制更新，因為計時器開始了
+}
+
+const pauseTimer = () => {
+  timerStore.pauseTimer()
+  sendToProjection(true) // 強制更新，因為計時器暫停了
+}
+
+const resetTimer = () => {
+  timerStore.resetTimer()
+  sendToProjection(true) // 強制更新，因為計時器重置了
+}
+
+const resumeTimer = () => {
+  timerStore.resumeTimer()
+  sendToProjection(true) // 強制更新，因為計時器恢復了
+}
+
+const applyPreset = (item: { id: string; duration: number }) => {
+  timerStore.applyPreset(item)
+  // 更新輸入欄位
+  const duration = item.duration
+  minutes.value = Math.floor((duration % 3600) / 60)
+  seconds.value = duration % 60
+  sendToProjection(true) // 強制更新，因為應用了預設
+}
+
+const deletePreset = (id: string) => {
+  timerStore.deletePreset(id)
+}
+
+// 保存計時器預設
+const saveTimerPreset = () => {
+  const duration = currentDuration.value
+  timerStore.addToPresets(duration)
+}
+
+const formatDuration = (seconds: number) => {
+  const h = Math.floor(seconds / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  const s = seconds % 60
+
+  if (h > 0) {
+    return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+  }
+  return `${m}:${s.toString().padStart(2, '0')}`
+}
+
+// 智能投影更新 - 只在狀態真正改變時發送
+const sendToProjection = (forceUpdate = false) => {
+  if (!isElectron()) return
+
+  const currentState = {
+    mode: timerStore.settings.mode,
+    timerDuration: timerStore.settings.timerDuration,
+    timezone: timerStore.settings.timezone,
+    isRunning: timerStore.settings.isRunning,
+    remainingTime: timerStore.settings.remainingTime,
+    formattedTime: timerStore.formattedTime,
+    progress: timerStore.progress,
+  }
+
+  // 檢查狀態是否真的改變了
+  const hasStateChanged =
+    !lastProjectionState ||
+    lastProjectionState.mode !== currentState.mode ||
+    lastProjectionState.timerDuration !== currentState.timerDuration ||
+    lastProjectionState.timezone !== currentState.timezone ||
+    lastProjectionState.isRunning !== currentState.isRunning ||
+    lastProjectionState.remainingTime !== currentState.remainingTime ||
+    lastProjectionState.formattedTime !== currentState.formattedTime ||
+    Math.abs(lastProjectionState.progress - currentState.progress) > 0.1 // 進度變化超過 0.1%
+
+  // 只在狀態改變或強制更新時發送
+  if (hasStateChanged || forceUpdate) {
+    electronSendToProjection({
+      type: MessageType.UPDATE_TIMER,
+      data: currentState,
+    })
+
+    // 更新最後狀態
+    lastProjectionState = { ...currentState }
+  }
+}
+
+// 生命週期
+onMounted(() => {
+  // 初始化時間輸入
+  const duration = timerStore.settings.timerDuration
+  minutes.value = Math.floor(duration / 60)
+  seconds.value = duration % 60
+
+  // 初始化時發送一次投影更新
+  sendToProjection(true)
+
+  // 啟動計時器
+  timerInterval = window.setInterval(() => {
+    const wasRunning = timerStore.settings.isRunning
+    const wasRemainingTime = timerStore.settings.remainingTime
+
+    timerStore.tick()
+
+    // 只在以下情況發送投影更新：
+    // 1. 計時器正在運行且時間有變化
+    // 2. 計時器剛結束（從運行變為停止）
+    // 3. 剩餘時間為 0（確保結束狀態被發送）
+    const shouldUpdate =
+      (wasRunning && timerStore.settings.remainingTime !== wasRemainingTime) ||
+      (wasRunning && !timerStore.settings.isRunning) ||
+      (timerStore.settings.remainingTime === 0 && wasRemainingTime > 0)
+
+    if (shouldUpdate) {
+      sendToProjection() // 使用智能更新，不強制
+    }
+  }, 1000)
+})
+
+onBeforeUnmount(() => {
+  if (timerInterval) {
+    clearInterval(timerInterval)
+  }
+})
+</script>
+
+<style scoped>
+/* 卡片樣式 */
+.control-card,
+.history-card {
+  height: 100%;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.control-card :deep(.v-card-text) {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 24px;
+}
+/*
+.control-card :deep(.text-subtitle-1) {
+  font-size: 1.2rem !important;
+}
+
+.history-card :deep(.text-subtitle-1) {
+  font-size: 1.2rem !important;
+} */
+
+/* 開始按鈕容器 */
+.start-button-container {
+  display: flex;
+  justify-content: center;
+  margin: 20px 0 0 0;
+  padding: 0 5px;
+}
+
+.start-button {
+  width: calc(100% - 10px);
+  height: 50px;
+  border-radius: 25px;
+}
+
+/* 控制按鈕容器 */
+.control-buttons-container {
+  margin: 20px 0 0 0;
+  padding: 0 5px;
+}
+
+.control-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  width: calc(100% - 10px);
+}
+
+.control-button {
+  width: calc(50% - 10px);
+  height: 50px;
+  border-radius: 25px;
+  flex: 1;
+}
+
+/* 快捷按鈕 */
+.quick-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin: 15px 0;
+  min-height: 40px; /* 確保與保存按鈕相同高度 */
+  align-items: center;
+}
+
+.quick-button {
+  min-width: 60px;
+  height: 36px; /* 與保存按鈕相同高度 */
+}
+
+/* 時間輸入容器 */
+.time-input-container {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  padding: 0 5px;
+  width: calc(100% - 10px);
+}
+
+.time-input {
+  width: calc(50% - 10px);
+  flex: 1;
+}
+
+/* 保存按鈕容器 */
+.save-button-container {
+  display: flex;
+  justify-content: center;
+  margin: 15px 0; /* 與快捷按鈕相同的間距 */
+  padding: 0 5px;
+  min-height: 40px; /* 確保與快捷按鈕相同高度 */
+  align-items: center;
+}
+
+.save-button {
+  min-width: 120px;
+  height: 36px; /* 與快捷按鈕相同高度 */
+}
+
+/* 響應式設計 */
+@media (max-width: 768px) {
+  .control-buttons {
+    gap: 15px;
+  }
+
+  .control-button {
+    height: 50px;
+  }
+
+  .start-button {
+    width: 70px;
+    height: 70px;
+  }
+
+  .quick-buttons {
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .time-input-container {
+    gap: 15px;
+  }
+
+  .time-input {
+    max-width: 100px;
+  }
+}
+</style>

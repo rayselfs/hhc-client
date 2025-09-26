@@ -28,5 +28,7 @@
   "noPresets": "No timer presets",
   "clearHistory": "Clear History",
   "savePreset": "Save Preset",
-  "resume": "Resume"
+  "resume": "Resume",
+  "themeSettings": "Theme Settings",
+  "darkMode": "Dark Mode"
 }

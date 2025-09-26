@@ -1,0 +1,13 @@
+:root {
+  --font-family-base:
+    'Noto Sans TC', 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei', '微软雅黑', Arial, sans-serif;
+
+  /* 標題字型 (如果需要) */
+  --font-family-heading: 'Roboto', sans-serif;
+
+  --projection-background-color: #000000;
+  --projection-text-color: #ffffff;
+
+  --timer-progress-ring-color: #a8c7fa;
+}

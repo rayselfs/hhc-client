@@ -1,6 +1,6 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
-import Home from '../views/Home.vue'
-// import Projection from '../views/ProjectionView.vue'
+import Home from '../views/HomePage.vue'
+import Projection from '../views/ProjectionView.vue'
 
 const routes = [
   {
@@ -8,11 +8,11 @@ const routes = [
     name: 'Home',
     component: Home,
   },
-  // {
-  //   path: '/projection',
-  //   name: 'Projection',
-  //   component: Projection,
-  // },
+  {
+    path: '/projection',
+    name: 'Projection',
+    component: Projection,
+  },
 ]
 
 const router = createRouter({

@@ -28,5 +28,7 @@
   "noPresets": "尚無計時預設",
   "clearHistory": "清除歷史",
   "savePreset": "儲存預設",
-  "resume": "繼續"
+  "resume": "繼續",
+  "themeSettings": "主題設定",
+  "darkMode": "深色模式"
 }
