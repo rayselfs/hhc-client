@@ -497,34 +497,6 @@ const sendToProjection = (forceUpdate = false) => {
   }
 }
 
-// 鍵盤事件處理
-const handleKeydown = (event: KeyboardEvent) => {
-  // 避免在輸入框中觸發快捷鍵
-  if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
-    return
-  }
-
-  switch (event.code) {
-    case 'Space':
-      event.preventDefault()
-      if (timerStore.settings.isRunning) {
-        // 正在運行 → 暫停
-        pauseTimer()
-      } else if (timerStore.settings.pausedTime && timerStore.settings.pausedTime > 0) {
-        // 已暫停 → 繼續
-        resumeTimer()
-      } else {
-        // 未開始 → 開始
-        startTimer()
-      }
-      break
-    case 'KeyR':
-      event.preventDefault()
-      resetTimer()
-      break
-  }
-}
-
 // 生命週期
 onMounted(() => {
   // 初始化時間輸入
@@ -555,18 +527,12 @@ onMounted(() => {
       sendToProjection() // 使用智能更新，不強制
     }
   }, 1000)
-
-  // 添加鍵盤事件監聽器
-  document.addEventListener('keydown', handleKeydown)
 })
 
 onBeforeUnmount(() => {
   if (timerInterval) {
     clearInterval(timerInterval)
   }
-
-  // 移除鍵盤事件監聽器
-  document.removeEventListener('keydown', handleKeydown)
 })
 </script>
 

@@ -36,6 +36,7 @@ import ExtendedToolbar from '@/components/ExtendedToolbar.vue'
 import BibleViewer from '@/components/Bible/BibleViewer.vue'
 import TimerControl from '@/components/Timer/TimerControl.vue'
 import { useElectron } from '@/composables/useElectron'
+import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { MessageType, ViewType, type AppMessage } from '@/types/common'
 
 // i18n
@@ -51,6 +52,9 @@ const {
   ensureProjectionWindow,
   removeAllListeners,
 } = useElectron()
+
+// 鍵盤快捷鍵
+useKeyboardShortcuts(currentView)
 
 // 控制 navigation-drawer 的開關狀態，預設為關閉 (false)
 const drawer = ref(false)
