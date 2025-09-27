@@ -7,26 +7,26 @@
           <v-card-text>
             <!-- 模式選擇 -->
             <v-row class="mb-4">
-              <v-col cols="12">
-                <v-label class="text-subtitle-1 mb-3 d-block">{{ $t('displayMode') }}</v-label>
+              <v-col cols="12" class="d-flex justify-center">
                 <v-btn-toggle
                   v-model="timerStore.settings.mode"
                   color="primary"
                   variant="outlined"
                   mandatory
+                  class="mode-toggle"
                   @update:model-value="handleModeChange"
                 >
                   <v-btn value="timer">
                     <v-icon icon="mdi-timer" class="mr-2"></v-icon>
                     {{ $t('timerMode') }}
                   </v-btn>
-                  <v-btn value="clock">
-                    <v-icon icon="mdi-clock" class="mr-2"></v-icon>
-                    {{ $t('clockMode') }}
-                  </v-btn>
                   <v-btn value="both">
                     <v-icon icon="mdi-view-split-horizontal" class="mr-2"></v-icon>
                     {{ $t('bothMode') }}
+                  </v-btn>
+                  <v-btn value="clock">
+                    <v-icon icon="mdi-clock" class="mr-2"></v-icon>
+                    {{ $t('clockMode') }}
                   </v-btn>
                 </v-btn-toggle>
               </v-col>
