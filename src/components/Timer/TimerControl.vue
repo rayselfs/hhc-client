@@ -49,6 +49,8 @@
                     class="time-input"
                     @keyup.enter="handleTimeInput"
                     @blur="handleTimeInput"
+                    @input="validateMinutesInput"
+                    @keydown="preventNonNumeric"
                   ></v-text-field>
                   <v-text-field
                     v-model.number="seconds"
@@ -61,6 +63,8 @@
                     class="time-input"
                     @keyup.enter="handleTimeInput"
                     @blur="handleTimeInput"
+                    @input="validateSecondsInput"
+                    @keydown="preventNonNumeric"
                   ></v-text-field>
                 </div>
               </v-col>
@@ -261,8 +265,114 @@ const updateDuration = () => {
   timerStore.setTimerDuration(duration)
 }
 
+// 處理時間輸入驗證和限制
+const validateAndNormalizeTime = () => {
+  // 確保輸入的是數字
+  if (isNaN(minutes.value) || minutes.value < 0) {
+    minutes.value = 0
+  }
+  if (isNaN(seconds.value) || seconds.value < 0) {
+    seconds.value = 0
+  }
+
+  // 規則1: 秒數大於60時進位到分鐘
+  if (seconds.value >= 60) {
+    const extraMinutes = Math.floor(seconds.value / 60)
+    minutes.value += extraMinutes
+    seconds.value = seconds.value % 60
+  }
+
+  // 規則2: 限制最大時間為59分59秒
+  if (minutes.value >= 60) {
+    minutes.value = 59
+    seconds.value = 59
+  }
+
+  // 規則3: 時間為0:0時限制為0分30秒
+  if (minutes.value === 0 && seconds.value === 0) {
+    minutes.value = 0
+    seconds.value = 30
+  }
+
+  // 確保分鐘和秒數都是整數
+  minutes.value = Math.floor(minutes.value)
+  seconds.value = Math.floor(seconds.value)
+}
+
+// 防止非數字輸入
+const preventNonNumeric = (event: KeyboardEvent) => {
+  // 允許的按鍵：數字、退格、刪除、Tab、Enter、箭頭鍵
+  const allowedKeys = [
+    'Backspace',
+    'Delete',
+    'Tab',
+    'Enter',
+    'ArrowLeft',
+    'ArrowRight',
+    'ArrowUp',
+    'ArrowDown',
+  ]
+
+  if (allowedKeys.includes(event.key)) {
+    return
+  }
+
+  // 只允許數字輸入
+  if (!/^\d$/.test(event.key)) {
+    event.preventDefault()
+  }
+}
+
+// 實時驗證分鐘輸入
+const validateMinutesInput = () => {
+  if (isNaN(minutes.value) || minutes.value < 0) {
+    minutes.value = 0
+  }
+
+  // 限制最大分鐘數為59
+  if (minutes.value >= 60) {
+    minutes.value = 59
+    // 如果分鐘達到上限，將秒數設為59
+    if (seconds.value < 59) {
+      seconds.value = 59
+    }
+  }
+
+  minutes.value = Math.floor(minutes.value)
+  updateDuration()
+}
+
+// 實時驗證秒數輸入
+const validateSecondsInput = () => {
+  if (isNaN(seconds.value) || seconds.value < 0) {
+    seconds.value = 0
+  }
+
+  // 秒數大於60時自動進位
+  if (seconds.value >= 60) {
+    const extraMinutes = Math.floor(seconds.value / 60)
+    minutes.value += extraMinutes
+    seconds.value = seconds.value % 60
+
+    // 檢查分鐘是否超過限制
+    if (minutes.value >= 60) {
+      minutes.value = 59
+      seconds.value = 59
+    }
+  }
+
+  // 如果總時間為0:0，設為0:30
+  if (minutes.value === 0 && seconds.value === 0) {
+    seconds.value = 30
+  }
+
+  seconds.value = Math.floor(seconds.value)
+  updateDuration()
+}
+
 // 處理時間輸入（按 Enter 鍵）
 const handleTimeInput = () => {
+  validateAndNormalizeTime()
   updateDuration()
   // 立即重置投影上的計時器
   timerStore.resetTimer()
@@ -476,14 +586,6 @@ onBeforeUnmount(() => {
   height: 100%;
   padding: 24px;
 }
-/*
-.control-card :deep(.text-subtitle-1) {
-  font-size: 1.2rem !important;
-}
-
-.history-card :deep(.text-subtitle-1) {
-  font-size: 1.2rem !important;
-} */
 
 /* 開始按鈕容器 */
 .start-button-container {
