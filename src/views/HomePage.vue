@@ -53,14 +53,14 @@ const {
   removeAllListeners,
 } = useElectron()
 
-// 鍵盤快捷鍵
-useKeyboardShortcuts(currentView)
-
 // 控制 navigation-drawer 的開關狀態，預設為關閉 (false)
 const drawer = ref(false)
 
 // 當前選中的視圖
 const currentView = ref('bible') // 預設使用聖經
+
+// 鍵盤快捷鍵
+useKeyboardShortcuts(currentView)
 
 // 選單項目配置
 const menuItems = ref([
