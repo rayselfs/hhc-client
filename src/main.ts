@@ -26,7 +26,7 @@ const createMainWindow = () => {
       experimentalFeatures: false,
       preload: path.join(__dirname, 'preload.js'),
     },
-    title: 'Bible Client - 主控制台',
+    title: '主控台',
   })
 
   // and load the index.html of the app.
@@ -78,7 +78,7 @@ const createProjectionWindow = () => {
       experimentalFeatures: false,
       preload: path.join(__dirname, 'preload.js'),
     },
-    title: 'Bible Client - 投影模式',
+    title: '投影',
   })
 
   // 如果沒有第二螢幕，通知主窗口顯示提示

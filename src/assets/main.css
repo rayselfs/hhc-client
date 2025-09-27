@@ -1,11 +1,4 @@
 :root {
-  --font-family-base:
-    'Noto Sans TC', 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB',
-    'Microsoft YaHei', '微软雅黑', 'Roboto', Arial, sans-serif;
-
-  /* 標題字型 (如果需要) */
-  --font-family-heading: 'Roboto', sans-serif;
-
   --projection-background-color: #000000;
   --projection-text-color: #ffffff;
 
@@ -22,6 +15,12 @@
 
 *::-webkit-scrollbar {
   display: none; /* WebKit browsers (Chrome, Safari, Edge) */
+}
+
+html {
+  font-family:
+    'Open Sans Variable', 'Noto Sans TC Variable', 'Roboto Variable', 'Microsoft JhengHei',
+    sans-serif;
 }
 
 /* 投影窗口特定樣式 */

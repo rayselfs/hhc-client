@@ -7,7 +7,9 @@ import errorHandler from './composables/useErrorHandler'
 import 'normalize.css'
 import './assets/main.css'
 
-import './assets/fonts/DigitalNumbers/style.css'
+import '@fontsource-variable/open-sans'
+import '@fontsource-variable/noto-sans-tc'
+import '@fontsource-variable/roboto'
 
 import App from './App.vue'
 import router from './router'
