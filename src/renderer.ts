@@ -4,9 +4,11 @@ import i18n from './plugins/i18n'
 import vuetify from './plugins/vuetify'
 import errorHandler from './composables/useErrorHandler'
 
+// css
 import 'normalize.css'
 import './assets/main.css'
 
+// font
 import '@fontsource-variable/open-sans'
 import '@fontsource-variable/noto-sans-tc'
 import '@fontsource-variable/roboto'

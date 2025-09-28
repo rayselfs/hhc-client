@@ -1,8 +1,8 @@
 {
-  "name": "bible-client",
-  "productName": "bible-client",
+  "name": "hhc-client",
+  "productName": "hhc-client",
   "version": "1.0.0",
-  "description": "HHC Bible Client - 投影控制應用程式",
+  "description": "HHC Client - 投影控制應用程式",
   "main": ".vite/build/main.js",
   "scripts": {
     "start": "electron-forge start",

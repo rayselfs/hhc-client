@@ -1,11 +1,10 @@
-import '@mdi/font/css/materialdesignicons.css' // MDI Icons
-import 'vuetify/styles' // Vuetify Core CSS
+import '@mdi/font/css/materialdesignicons.css'
+import 'vuetify/styles'
 
 // Composables
 import { createVuetify } from 'vuetify'
 
-// 主題配置
-// export default createVuetify({})
+// Theme configuration
 const lightTheme = {
   dark: false,
   colors: {

@@ -14,8 +14,8 @@ if (started) {
 let mainWindow: BrowserWindow | null = null
 let projectionWindow: BrowserWindow | null = null
 
+// Create main window
 const createMainWindow = () => {
-  // 創建主窗口
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -39,30 +39,30 @@ const createMainWindow = () => {
   }
 
   mainWindow.on('closed', () => {
-    // 關閉主窗口時也關閉投影窗口
+    // Close projection window when main window is closed
     if (projectionWindow && !projectionWindow.isDestroyed()) {
       projectionWindow.close()
       projectionWindow = null
     }
     mainWindow = null
 
-    // 在所有平台上主窗口關閉時都退出應用程式
+    // Exit application when main window is closed on all platforms
     app.quit()
   })
 }
 
 const createProjectionWindow = () => {
-  // 獲取所有顯示器
+  // Get all displays
   const displays = screen.getAllDisplays()
   const externalDisplay = displays.find(
     (display) => display.bounds.x !== 0 || display.bounds.y !== 0,
   )
 
-  // 檢查是否有第二螢幕
+  // Check if there is a second screen
   const hasSecondScreen = externalDisplay !== undefined
   const targetDisplay = externalDisplay || displays[0]
 
-  // 創建投影窗口
+  // Create projection window
   projectionWindow = new BrowserWindow({
     width: targetDisplay.bounds.width,
     height: targetDisplay.bounds.height,
@@ -81,19 +81,19 @@ const createProjectionWindow = () => {
     title: '投影',
   })
 
-  // 如果沒有第二螢幕，通知主窗口顯示提示
+  // If there is no second screen, notify the main window to display a prompt
   if (!hasSecondScreen && mainWindow) {
     mainWindow.webContents.send('no-second-screen-detected')
   }
 
-  // 載入投影頁面
+  // Load projection page
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     projectionWindow.loadURL(`${MAIN_WINDOW_VITE_DEV_SERVER_URL}/#/projection`)
   } else {
-    // 生產模式：直接載入投影頁面
+    // Production mode: load projection page directly
     const projectionPath = path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`)
 
-    // 使用更穩定的方式載入投影頁面
+    // Load projection page using a more stable method
     projectionWindow
       .loadFile(projectionPath, { hash: 'projection' })
       .then(() => {
@@ -101,11 +101,11 @@ const createProjectionWindow = () => {
       })
       .catch((error) => {
         console.error('Failed to load projection window:', error)
-        // 如果直接載入失敗，嘗試備用方案
+        // If direct loading fails, try the backup solution
         projectionWindow
           .loadFile(projectionPath)
           .then(() => {
-            // 等待頁面載入完成後導航到投影頁面
+            // Wait for the page to load and then navigate to the projection page
             projectionWindow.webContents.once('did-finish-load', () => {
               try {
                 projectionWindow.webContents.executeJavaScript(`
@@ -115,7 +115,7 @@ const createProjectionWindow = () => {
                 `)
               } catch (jsError) {
                 console.error('Failed to navigate to projection page:', jsError)
-                // 最後的備用方案：重新載入
+                // The last backup solution: reload
                 projectionWindow.loadURL(`file://${projectionPath}#projection`)
               }
             })
@@ -126,38 +126,38 @@ const createProjectionWindow = () => {
       })
   }
 
-  // 窗口關閉時清理
+  // Clean up when the window is closed
   projectionWindow.on('closed', () => {
-    // 通知主窗口投影已關閉
+    // Notify the main window that the projection has been closed
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('projection-closed')
     }
     projectionWindow = null
   })
 
-  // 監聽來自投影窗口的消息
+  // Listen for messages from the projection window
   projectionWindow.webContents.on('did-finish-load', () => {
-    // 發送當前狀態到投影窗口
+    // Send the current state to the projection window
     if (mainWindow) {
       mainWindow.webContents.send('get-current-state')
     }
 
-    // 通知主窗口投影已開啟
+    // Notify the main window that the projection has been opened
     if (mainWindow) {
       mainWindow.webContents.send('projection-opened')
     }
   })
 }
 
-// IPC 處理器
-// 檢查投影窗口是否存在
+// IPC handlers
+// Check if the projection window exists
 ipcMain.handle('check-projection-window', async () => {
   return (
     projectionWindow !== null && projectionWindow !== undefined && !projectionWindow.isDestroyed()
   )
 })
 
-// 確保投影窗口存在
+// Ensure the projection window exists
 ipcMain.handle('ensure-projection-window', async () => {
   if (!projectionWindow || projectionWindow.isDestroyed()) {
     createProjectionWindow()
@@ -183,28 +183,28 @@ ipcMain.handle('get-displays', async () => {
   }
 })
 
-// 轉發消息到投影窗口
+// Forward messages to the projection window
 ipcMain.on('send-to-projection', (event, data) => {
   if (projectionWindow) {
     projectionWindow.webContents.send('projection-message', data)
   }
 })
 
-// 轉發消息到主窗口
+// Forward messages to the main window
 ipcMain.on('send-to-main', (event, data) => {
   if (mainWindow) {
     mainWindow.webContents.send('main-message', data)
   }
 })
 
-// 應用事件
+// Application events
 app.whenReady().then(() => {
-  // 設置安全策略
+  // Set security policy
   app.commandLine.appendSwitch('--disable-features', 'VizDisplayCompositor')
 
   createMainWindow()
 
-  // 自動偵測第二螢幕並開啟投影窗口（但顯示預設內容）
+  // Automatically detect the second screen and open the projection window (but display the default content)
   setTimeout(() => {
     const displays = screen.getAllDisplays()
     const hasExternalDisplay = displays.some(
@@ -214,7 +214,7 @@ app.whenReady().then(() => {
     if (hasExternalDisplay) {
       createProjectionWindow()
     }
-  }, 500) // 延遲0.5秒確保主窗口已載入
+  }, 500) // Delay 0.5 seconds to ensure the main window has loaded
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -224,19 +224,19 @@ app.whenReady().then(() => {
 })
 
 app.on('window-all-closed', () => {
-  // 確保所有窗口都已關閉，包括投影窗口
+  // Ensure all windows are closed, including the projection window
   if (projectionWindow && !projectionWindow.isDestroyed()) {
     projectionWindow.close()
     projectionWindow = null
   }
 
-  // 在所有平台上都退出應用程式
+  // Exit the application on all platforms
   app.quit()
 })
 
-// 應用程式退出前的清理
+// Clean up before the application quits
 app.on('before-quit', () => {
-  // 強制關閉所有窗口
+  // Force close all windows
   if (projectionWindow && !projectionWindow.isDestroyed()) {
     projectionWindow.destroy()
     projectionWindow = null

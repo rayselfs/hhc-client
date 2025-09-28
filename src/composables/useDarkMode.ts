@@ -12,15 +12,14 @@ export function useDarkMode() {
 
   const toggleDark = useToggle(isDark)
 
-  // 監聽主題變化並更新 Vuetify
   const updateVuetifyTheme = () => {
     theme.change(isDark.value ? 'dark' : 'light')
   }
 
-  // 初始化時設置主題
+  // Initialize the theme
   updateVuetifyTheme()
 
-  // 監聽主題變化
+  // Listen for theme changes
   watch(isDark, () => {
     updateVuetifyTheme()
   })

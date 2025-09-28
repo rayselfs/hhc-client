@@ -19,11 +19,11 @@ export const useProjectionStore = defineStore('projection', () => {
   }
 
   return {
-    // 狀態
+    // States
     isShowingDefault,
     currentView,
 
-    // 方法
+    // Methods
     setShowingDefault,
     setCurrentView,
     toggleProjectionContent,
