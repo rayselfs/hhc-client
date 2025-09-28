@@ -1,7 +1,7 @@
 <template>
   <div class="projection-content timer-projection">
-    <!-- 單一模式顯示 -->
-    <div v-if="timerMode === 'timer'" class="single-mode timer-only">
+    <!-- Single mode display -->
+    <div v-if="timerMode === TimerMode.TIMER" class="single-mode timer-only">
       <div class="timer-display">
         <CountdownTimer
           :progress="timerProgress"
@@ -11,7 +11,7 @@
       </div>
     </div>
 
-    <div v-else-if="timerMode === 'clock'" class="single-mode clock-only">
+    <div v-else-if="timerMode === TimerMode.CLOCK" class="single-mode clock-only">
       <div class="clock-display">
         <div class="clock-text">
           {{ clockFormattedTime }}
@@ -19,8 +19,8 @@
       </div>
     </div>
 
-    <!-- 同時顯示模式 -->
-    <div v-else-if="timerMode === 'both'" class="split-mode">
+    <!-- Split mode display -->
+    <div v-else-if="timerMode === TimerMode.BOTH" class="split-mode">
       <div class="split-container">
         <div class="split-pane timer-pane" style="width: 40%">
           <div class="timer-display">
@@ -48,9 +48,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import CountdownTimer from './CountdownTimer.vue'
+import { TimerMode } from '@/types/common'
 
 interface Props {
-  timerMode: 'timer' | 'clock' | 'both'
+  timerMode: TimerMode
   timerFormattedTime: string
   clockFormattedTime: string
   selectedTimezone: string
@@ -59,30 +60,30 @@ interface Props {
 
 const props = defineProps<Props>()
 
-// 根據 timerMode 計算圓圈大小
+// Calculate the circle size based on the timerMode
 const circleSize = computed(() => {
-  if (props.timerMode === 'both') {
-    // 在分割模式下，根據螢幕高度動態調整大小
+  if (props.timerMode === TimerMode.BOTH) {
+    // In split mode, dynamically adjust the size based on the screen height
     const screenHeight = window.innerHeight
     if (screenHeight <= 768) {
       return 450 // 1366x768
     } else if (screenHeight <= 900) {
       return 550 // 1600x900
     } else {
-      return 650 // 1920x1080 或更高
+      return 650 // 1920x1080
     }
-  } else if (props.timerMode === 'timer') {
-    // 純計時模式，使用更大的尺寸
+  } else if (props.timerMode === TimerMode.TIMER) {
+    // Pure timer mode, use a larger size
     const screenHeight = window.innerHeight
     if (screenHeight <= 768) {
       return 600 // 1366x768
     } else if (screenHeight <= 900) {
       return 750 // 1600x900
     } else {
-      return 1050 // 1920x1080 或更高
+      return 1050 // 1920x1080
     }
   }
-  return 600 // 默認大小（clock 模式）
+  return 600
 })
 </script>
 

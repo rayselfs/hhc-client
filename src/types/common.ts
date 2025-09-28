@@ -30,9 +30,6 @@ export enum ViewType {
  * 計時器模式枚舉
  */
 export enum TimerMode {
-  COUNTDOWN = 'countdown',
-  COUNTUP = 'countup',
-  STOPWATCH = 'stopwatch',
   TIMER = 'timer',
   CLOCK = 'clock',
   BOTH = 'both',

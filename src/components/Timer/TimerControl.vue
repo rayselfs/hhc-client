@@ -34,7 +34,10 @@
 
             <!-- 計時器設定 -->
             <v-row
-              v-if="timerStore.settings.mode === 'timer' || timerStore.settings.mode === 'both'"
+              v-if="
+                timerStore.settings.mode === TimerMode.TIMER ||
+                timerStore.settings.mode === TimerMode.BOTH
+              "
             >
               <v-col cols="12">
                 <div class="time-input-container">
@@ -72,7 +75,10 @@
 
             <!-- 按鈕區域（保存預設或快捷按鈕） -->
             <v-row
-              v-if="timerStore.settings.mode === 'timer' || timerStore.settings.mode === 'both'"
+              v-if="
+                timerStore.settings.mode === TimerMode.TIMER ||
+                timerStore.settings.mode === TimerMode.BOTH
+              "
               class="mb-4"
             >
               <v-col cols="12">
@@ -134,7 +140,10 @@
 
             <!-- 主要控制按鈕（移到卡片底部） -->
             <v-row
-              v-if="timerStore.settings.mode === 'timer' || timerStore.settings.mode === 'both'"
+              v-if="
+                timerStore.settings.mode === TimerMode.TIMER ||
+                timerStore.settings.mode === TimerMode.BOTH
+              "
               class="mt-auto"
             >
               <v-col cols="12">
@@ -629,35 +638,5 @@ onBeforeUnmount(() => {
 .save-button {
   min-width: 120px;
   height: 36px; /* 與快捷按鈕相同高度 */
-}
-
-/* 響應式設計 */
-@media (max-width: 768px) {
-  .control-buttons {
-    gap: 15px;
-  }
-
-  .control-button {
-    height: 50px;
-  }
-
-  .start-button {
-    width: 70px;
-    height: 70px;
-  }
-
-  .quick-buttons {
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .time-input-container {
-    gap: 15px;
-  }
-
-  .time-input {
-    max-width: 100px;
-  }
 }
 </style>
