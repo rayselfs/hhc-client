@@ -1,21 +1,17 @@
 <template>
   <div class="countdown-timer-container">
     <div class="timer-circle">
-      <div
-        class="progress-ring-container"
-        :style="{ width: circleSize + 'px', height: circleSize + 'px' }"
-      >
+      <div class="progress-ring-container" :style="{ width: size + 'px', height: size + 'px' }">
         <v-progress-circular
-          :size="circleSize"
+          :size="size"
           :width="strokeWidth"
           :model-value="invertedProgress"
           color="blue-lighten-3"
           class="progress-ring"
           :bg-color="backgroundColor"
-        />
-      </div>
-      <div class="timer-text" :class="{ 'split-mode': timerMode === 'both' }">
-        {{ timerFormattedTime }}
+        >
+          <span class="timer-text" :style="{ fontSize }">{{ timerFormattedTime }}</span>
+        </v-progress-circular>
       </div>
     </div>
   </div>
@@ -26,48 +22,16 @@ import { computed } from 'vue'
 
 interface Props {
   progress: number
-  timerMode: 'timer' | 'clock' | 'both'
   timerFormattedTime: string
+  size: number
 }
 
 const props = defineProps<Props>()
 
-// 根據 timerMode 計算圓圈大小
-const circleSize = computed(() => {
-  if (props.timerMode === 'both') {
-    // 在分割模式下，根據螢幕高度動態調整大小
-    const screenHeight = window.innerHeight
-    if (screenHeight <= 768) {
-      return 450 // 1366x768
-    } else if (screenHeight <= 900) {
-      return 550 // 1600x900
-    } else {
-      return 650 // 1920x1080 或更高
-    }
-  } else if (props.timerMode === 'timer') {
-    // 純計時模式，使用更大的尺寸
-    const screenHeight = window.innerHeight
-    if (screenHeight <= 768) {
-      return 600 // 1366x768
-    } else if (screenHeight <= 900) {
-      return 750 // 1600x900
-    } else {
-      return 1000 // 1920x1080 或更高
-    }
-  }
-  return 600 // 默認大小（clock 模式）
-})
-
-// 根據 timerMode 計算線條寬度
+// 根據 size 計算線條寬度
 const strokeWidth = computed(() => {
-  if (props.timerMode === 'both') {
-    // 在分割模式下，使用固定線條寬度
-    return 18
-  } else if (props.timerMode === 'timer') {
-    // 純計時模式，使用更粗的線條
-    return 26
-  }
-  return 18 // 默認線條寬度（clock 模式）
+  // 基於 size 計算線條寬度，保持比例
+  return Math.round(props.size * 0.026) // 約為 size 的 2.6%
 })
 
 // 倒數進度：從 100% 到 0%
@@ -77,6 +41,19 @@ const invertedProgress = computed(() => {
 
 const backgroundColor = computed(() => {
   return 'var(--timer-progress-ring-bg)'
+})
+
+// 根據 size 計算字體大小
+const fontSize = computed(() => {
+  // 基於 size 計算字體大小
+  // 當 size = 1000 時，fontSize = 320px
+  // 當 size = 650 時，fontSize = 208px
+  // 使用線性插值計算
+  const ratio = props.size / 1000
+  const baseFontSize = 320 // px
+  const calculatedFontSize = baseFontSize * ratio
+
+  return `${calculatedFontSize}px`
 })
 </script>
 
@@ -102,19 +79,17 @@ const backgroundColor = computed(() => {
 }
 
 .timer-text {
-  position: absolute;
-  font-size: 20rem;
   font-weight: 600;
   color: var(--projection-text-color);
 }
 
 /* 分割模式下的時間文字樣式 */
-.timer-text.split-mode {
-  font-size: 13rem;
-}
+/* .timer-text.split-mode {
+  font-size: 208px;
+} */
 
 /* 1600x900 解析度 */
-@media (max-width: 1600px) and (max-height: 900px) {
+/* @media (max-width: 1600px) and (max-height: 900px) {
   .timer-text {
     font-size: 15rem;
   }
@@ -122,10 +97,10 @@ const backgroundColor = computed(() => {
   .timer-text.split-mode {
     font-size: 11rem;
   }
-}
+} */
 
 /* 1366x768 解析度 */
-@media (max-width: 1366px) and (max-height: 768px) {
+/* @media (max-width: 1366px) and (max-height: 768px) {
   .timer-text {
     font-size: 12rem;
   }
@@ -133,5 +108,5 @@ const backgroundColor = computed(() => {
   .timer-text.split-mode {
     font-size: 9rem;
   }
-}
+} */
 </style>

@@ -5,8 +5,8 @@
       <div class="timer-display">
         <CountdownTimer
           :progress="timerProgress"
-          :timer-mode="timerMode"
           :timer-formatted-time="timerFormattedTime"
+          :size="circleSize"
         />
       </div>
     </div>
@@ -26,8 +26,8 @@
           <div class="timer-display">
             <CountdownTimer
               :progress="timerProgress"
-              :timer-mode="timerMode"
               :timer-formatted-time="timerFormattedTime"
+              :size="circleSize"
             />
           </div>
         </div>
@@ -58,6 +58,32 @@ interface Props {
 }
 
 const props = defineProps<Props>()
+
+// 根據 timerMode 計算圓圈大小
+const circleSize = computed(() => {
+  if (props.timerMode === 'both') {
+    // 在分割模式下，根據螢幕高度動態調整大小
+    const screenHeight = window.innerHeight
+    if (screenHeight <= 768) {
+      return 450 // 1366x768
+    } else if (screenHeight <= 900) {
+      return 550 // 1600x900
+    } else {
+      return 650 // 1920x1080 或更高
+    }
+  } else if (props.timerMode === 'timer') {
+    // 純計時模式，使用更大的尺寸
+    const screenHeight = window.innerHeight
+    if (screenHeight <= 768) {
+      return 600 // 1366x768
+    } else if (screenHeight <= 900) {
+      return 750 // 1600x900
+    } else {
+      return 1050 // 1920x1080 或更高
+    }
+  }
+  return 600 // 默認大小（clock 模式）
+})
 </script>
 
 <style scoped>
@@ -98,7 +124,7 @@ const props = defineProps<Props>()
 }
 
 .clock-text {
-  font-size: 25rem;
+  font-size: 400px;
   font-weight: 600;
 }
 
@@ -137,6 +163,6 @@ const props = defineProps<Props>()
 }
 
 .split-mode .clock-text {
-  font-size: 16rem;
+  font-size: 256px;
 }
 </style>
