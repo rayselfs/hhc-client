@@ -1,20 +1,14 @@
 <template>
-  <div class="countdown-timer-container">
-    <div class="timer-circle">
-      <div class="progress-ring-container" :style="{ width: size + 'px', height: size + 'px' }">
-        <v-progress-circular
-          :size="size"
-          :width="strokeWidth"
-          :model-value="invertedProgress"
-          color="blue-lighten-3"
-          class="progress-ring"
-          :bg-color="backgroundColor"
-        >
-          <span class="timer-text" :style="{ fontSize }">{{ timerFormattedTime }}</span>
-        </v-progress-circular>
-      </div>
-    </div>
-  </div>
+  <v-progress-circular
+    :size="size"
+    :width="strokeWidth"
+    :model-value="invertedProgress"
+    color="blue-lighten-3"
+    class="progress-ring"
+    :bg-color="backgroundColor"
+  >
+    <span class="text-white" :style="{ fontSize }">{{ timerFormattedTime }}</span>
+  </v-progress-circular>
 </template>
 
 <script setup lang="ts">
@@ -30,7 +24,7 @@ const props = defineProps<Props>()
 
 // Calculate the stroke width based on the size
 const strokeWidth = computed(() => {
-  return Math.round(props.size * 0.026)
+  return Math.round(props.size * 0.018)
 })
 
 // Inverted progress: from 100% to 0%
@@ -45,7 +39,7 @@ const backgroundColor = computed(() => {
 // Calculate the font size based on the size
 const fontSize = computed(() => {
   const ratio = props.size / 1000
-  const baseFontSize = 320 // px
+  const baseFontSize = 340 // px
   const calculatedFontSize = baseFontSize * ratio
 
   return `${calculatedFontSize}px`
@@ -53,28 +47,7 @@ const fontSize = computed(() => {
 </script>
 
 <style scoped>
-.countdown-timer-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Timer circle */
-.timer-circle {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.progress-ring-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
 .timer-text {
   font-weight: 600;
-  color: var(--projection-text-color);
 }
 </style>

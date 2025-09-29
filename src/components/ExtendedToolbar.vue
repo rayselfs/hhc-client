@@ -6,7 +6,7 @@
 
     <v-slide-x-reverse-transition>
       <v-text-field
-        v-if="isSearching"
+        v-if="isSearching && showSearch"
         v-model="searchQuery"
         autofocus
         variant="solo-inverted"
@@ -19,11 +19,11 @@
       />
     </v-slide-x-reverse-transition>
 
-    <v-btn v-if="!isSearching" icon @click="isSearching = true">
+    <v-btn v-if="!isSearching && showSearch" icon @click="isSearching = true">
       <v-icon>mdi-magnify</v-icon>
     </v-btn>
 
-    <v-btn v-else icon @click="closeSearch">
+    <v-btn v-else-if="isSearching && showSearch" icon @click="closeSearch">
       <v-icon>mdi-close</v-icon>
     </v-btn>
 
@@ -149,6 +149,11 @@ const toolbarTitle = computed(() => {
     default:
       return 'HHC Project Client'
   }
+})
+
+// 是否顯示搜尋功能（計時器頁面時隱藏）
+const showSearch = computed(() => {
+  return props.currentView !== 'timer'
 })
 
 const emitToggleDrawer = () => {

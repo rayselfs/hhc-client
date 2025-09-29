@@ -1,33 +1,9 @@
 <template>
-  <v-app class="projection-app">
-    <v-main class="projection-main">
-      <v-container fluid class="pa-0 fill-height projection-container">
-        <!-- 預設內容 -->
-        <transition name="fade" mode="out-in">
-          <DefaultProjection v-if="projectionStore.isShowingDefault" key="default" />
-
-          <!-- 聖經投影內容 -->
-          <BibleProjection
-            v-else-if="projectionStore.currentView === 'bible'"
-            key="bible"
-            :selected-book="selectedBook"
-            :selected-chapter="selectedChapter"
-            :bible-content="bibleContent"
-          />
-
-          <!-- 計時器投影內容 -->
-          <TimerProjection
-            v-else-if="projectionStore.currentView === 'timer'"
-            key="timer"
-            :timer-mode="timerMode"
-            :timer-formatted-time="timerFormattedTime"
-            :clock-formatted-time="clockFormattedTime"
-            :selected-timezone="selectedTimezone"
-            :timer-progress="timerProgress"
-          />
-
-          <!-- 其他內容預設顯示 DefaultProjection -->
-          <DefaultProjection v-else key="fallback" />
+  <v-app>
+    <v-main class="fill-height no-scrollbar">
+      <v-container fluid class="fill-height pa-0 bg-black text-white">
+        <transition name="fade-transition" mode="out-in">
+          <component :is="currentComponent" :key="componentKey" v-bind="componentProps" />
         </transition>
       </v-container>
     </v-main>
@@ -35,18 +11,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import DefaultProjection from '@/layouts/projection/DefaultProjection.vue'
 import BibleProjection from '@/components/Bible/BibleProjection.vue'
-import TimerProjection from '@/components/Timer/TimerProjection.vue'
-import DefaultProjection from '@/components/Default/DefaultProjection.vue'
+import TimerProjection from '@/layouts/projection/TimerProjection.vue'
 import { useProjectionStore } from '@/stores/projection'
 import { useProjectionElectron } from '@/composables/useElectron'
-import type { AppMessage } from '@/types/common'
+import { TimerMode, type AppMessage } from '@/types/common'
 
-// 使用 projection store
 const projectionStore = useProjectionStore()
 
-// 使用投影專用的 Electron composable
 const {
   isElectron,
   handleMessage: setupMessageHandler,
@@ -60,14 +34,57 @@ const selectedChapter = ref(1)
 const bibleContent = ref('')
 
 // 計時器相關
-const timerMode = ref<'timer' | 'clock' | 'both'>('both')
+const timerMode = ref(TimerMode.BOTH)
 const timerFormattedTime = ref('05:00')
-const clockFormattedTime = ref('12:00:00')
 const selectedTimezone = ref('Asia/Taipei')
 const timerProgress = ref(0)
 
-// 計時器
-let timer: number | undefined
+// 動態組件配置
+const currentComponent = computed(() => {
+  if (projectionStore.isShowingDefault) {
+    return DefaultProjection
+  }
+
+  switch (projectionStore.currentView) {
+    case 'bible':
+      return BibleProjection
+    case 'timer':
+      return TimerProjection
+    default:
+      return DefaultProjection
+  }
+})
+
+const componentKey = computed(() => {
+  if (projectionStore.isShowingDefault) {
+    return 'default'
+  }
+  return projectionStore.currentView || 'fallback'
+})
+
+const componentProps = computed(() => {
+  if (projectionStore.isShowingDefault) {
+    return {}
+  }
+
+  switch (projectionStore.currentView) {
+    case 'bible':
+      return {
+        selectedBook: selectedBook.value,
+        selectedChapter: selectedChapter.value,
+        bibleContent: bibleContent.value,
+      }
+    case 'timer':
+      return {
+        timerMode: timerMode.value,
+        timerFormattedTime: timerFormattedTime.value,
+        selectedTimezone: selectedTimezone.value,
+        timerProgress: timerProgress.value,
+      }
+    default:
+      return {}
+  }
+})
 
 // 監聽來自主窗口的消息
 const handleMessage = (data: AppMessage) => {
@@ -83,14 +100,10 @@ const handleMessage = (data: AppMessage) => {
       bibleContent.value = messageData.content as string
       break
     case 'UPDATE_TIMER':
-      timerMode.value = messageData.mode as 'timer' | 'clock' | 'both'
+      timerMode.value = messageData.mode as TimerMode
       timerFormattedTime.value = messageData.formattedTime as string
       selectedTimezone.value = messageData.timezone as string
       timerProgress.value = (messageData.progress as number) || 0
-      // 更新時鐘時間
-      if (messageData.clockFormattedTime) {
-        clockFormattedTime.value = messageData.clockFormattedTime as string
-      }
       break
     case 'TOGGLE_PROJECTION_CONTENT':
       projectionStore.setShowingDefault(messageData.showDefault as boolean)
@@ -103,18 +116,6 @@ onMounted(() => {
   // 監聽消息
   setupMessageHandler(handleMessage)
 
-  // 啟動計時器
-  timer = window.setInterval(() => {
-    const now = new Date()
-    clockFormattedTime.value = now.toLocaleTimeString('en-US', {
-      timeZone: selectedTimezone.value,
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false,
-    })
-  }, 1000)
-
   // 請求當前狀態
   requestCurrentState()
 })
@@ -124,36 +125,7 @@ onBeforeUnmount(() => {
   if (isElectron()) {
     removeAllListeners('projection-message')
   }
-
-  if (timer) {
-    clearInterval(timer)
-  }
 })
 </script>
 
-<style scoped>
-.projection-app {
-  background: var(--projection-background-color);
-  color: var(--projection-text-color);
-}
-
-.projection-main {
-  background: transparent;
-}
-
-/* 淡入淡出動畫 */
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.2s ease;
-}
-
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
-
-.fade-enter-to,
-.fade-leave-from {
-  opacity: 1;
-}
-</style>
+<style scoped></style>
