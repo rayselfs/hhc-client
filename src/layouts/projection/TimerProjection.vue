@@ -83,7 +83,7 @@ const clockSize = computed(() => {
 
 <style scoped>
 .split-divider {
-  width: 8px;
+  width: 6px;
   height: 100vh;
   background: var(--timer-split-divider-color);
   position: absolute;
