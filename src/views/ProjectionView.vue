@@ -128,4 +128,8 @@ onBeforeUnmount(() => {
 })
 </script>
 
-<style scoped></style>
+<style scoped>
+:deep(.v-container) {
+  max-width: 100vw !important;
+}
+</style>
