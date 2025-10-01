@@ -6,13 +6,35 @@ import { MakerRpm } from '@electron-forge/maker-rpm'
 import { VitePlugin } from '@electron-forge/plugin-vite'
 import { FusesPlugin } from '@electron-forge/plugin-fuses'
 import { FuseV1Options, FuseVersion } from '@electron/fuses'
+import { PublisherGithub } from '@electron-forge/publisher-github'
 
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
+    appBundleId: 'com.hhc.client',
+    appCategoryType: 'public.app-category.productivity',
+    icon: './src/assets/media/hhc-icon',
   },
   rebuildConfig: {},
-  makers: [new MakerSquirrel(), new MakerZIP({}, ['darwin']), new MakerRpm({}), new MakerDeb({})],
+  makers: [
+    new MakerSquirrel({
+      name: 'HHC-Client',
+      setupIcon: './src/assets/media/hhc-icon.ico',
+    }),
+    new MakerZIP({}, ['darwin']),
+    new MakerRpm({}),
+    new MakerDeb({}),
+  ],
+  publishers: [
+    new PublisherGithub({
+      repository: {
+        owner: 'rayselfs',
+        name: 'hhc-client',
+      },
+      prerelease: false,
+      draft: true,
+    }),
+  ],
   plugins: [
     new VitePlugin({
       // `build` can specify multiple entry builds, which can be Main process, Preload scripts, Worker process, etc.
