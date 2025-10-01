@@ -4,6 +4,13 @@
     <v-toolbar-title class="text-h5">{{ toolbarTitle }}</v-toolbar-title>
     <v-spacer />
 
+    <!-- 聖經選擇器 (僅在聖經頁面顯示) -->
+    <v-slide-x-reverse-transition>
+      <div v-if="currentView === 'bible'" class="bible-selector-container">
+        <BibleSelector />
+      </div>
+    </v-slide-x-reverse-transition>
+
     <v-slide-x-reverse-transition>
       <v-text-field
         v-if="isSearching && showSearch"
@@ -117,6 +124,7 @@ import { useProjectionStore } from '@/stores/projection'
 import { useElectron } from '@/composables/useElectron'
 import { useDarkMode } from '@/composables/useDarkMode'
 import { MessageType } from '@/types/common'
+import BibleSelector from '@/components/Bible/BibleSelector.vue'
 
 // i18n
 const { t: $t, locale } = useI18n()
@@ -301,3 +309,21 @@ onMounted(() => {
   }
 })
 </script>
+
+<style scoped>
+.bible-selector-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-right: 16px;
+}
+
+@media (max-width: 768px) {
+  .bible-selector-container {
+    flex-direction: column;
+    align-items: stretch;
+    margin-right: 0;
+    margin-bottom: 8px;
+  }
+}
+</style>
