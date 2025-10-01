@@ -298,17 +298,6 @@ app.whenReady().then(() => {
   // Setup auto updater
   setupAutoUpdater()
 
-  // Automatically detect the second screen and open the projection window (but display the default content)
-  setTimeout(() => {
-    const displays = screen.getAllDisplays()
-    const hasExternalDisplay = displays.some(
-      (display) => display.bounds.x !== 0 || display.bounds.y !== 0,
-    )
-
-    if (hasExternalDisplay) {
-      createProjectionWindow()
-    }
-  }, 500) // Delay 0.5 seconds to ensure the main window has loaded
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
