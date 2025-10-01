@@ -67,6 +67,9 @@ const createMainWindow = () => {
       projectionWindow = null
     }
     mainWindow = null
+
+    // Exit application when main window is closed on all platforms
+    app.quit()
   })
 }
 
