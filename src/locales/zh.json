@@ -29,5 +29,15 @@
   "savePreset": "儲存預設",
   "resume": "繼續",
   "themeSettings": "主題設定",
-  "darkMode": "深色模式"
+  "darkMode": "深色模式",
+  "alert": {
+    "confirm": "確定",
+    "cancel": "取消",
+    "success": "成功",
+    "error": "錯誤",
+    "warning": "警告",
+    "info": "提示",
+    "screenWarning": "螢幕提示",
+    "dualScreenRequired": "此App是設計用在雙螢幕"
+  }
 }

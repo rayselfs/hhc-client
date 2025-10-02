@@ -29,5 +29,15 @@
   "savePreset": "Save Preset",
   "resume": "Resume",
   "themeSettings": "Theme Settings",
-  "darkMode": "Dark Mode"
+  "darkMode": "Dark Mode",
+  "alert": {
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "success": "Success",
+    "error": "Error",
+    "warning": "Warning",
+    "info": "Info",
+    "screenWarning": "Screen Notice",
+    "dualScreenRequired": "This app is designed for dual screens"
+  }
 }

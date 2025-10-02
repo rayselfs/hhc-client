@@ -30,17 +30,25 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ExtendedToolbar from '@/components/ExtendedToolbar.vue'
 import BibleViewer from '@/components/Bible/BibleViewer.vue'
 import TimerControl from '@/layouts/control/TimerControl.vue'
 import { useElectron } from '@/composables/useElectron'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
+import { useProjectionStore } from '@/stores/projection'
+import { useAlert } from '@/composables/useAlert'
 import { MessageType, ViewType, type AppMessage } from '@/types/common'
 
 // i18n
 const { t: $t } = useI18n()
+
+// Projection store
+const projectionStore = useProjectionStore()
+
+// Alert
+const { warning } = useAlert()
 
 // Electron composable
 const {
@@ -111,8 +119,8 @@ const handleElectronMessage = (data: AppMessage) => {
 }
 
 // 處理沒有第二螢幕的提示
-const handleNoSecondScreen = () => {
-  alert('此App是設計用在雙螢幕')
+const handleNoSecondScreen = async () => {
+  await warning($t('alert.dualScreenRequired'), $t('alert.screenWarning'))
 }
 
 // 檢查並確保投影窗口存在
@@ -130,6 +138,34 @@ const checkAndEnsureProjectionWindow = async () => {
     }
   }
 }
+
+// 監聽視圖切換，當切換到計時頁面時自動開啟投影內容
+watch(currentView, async (newView) => {
+  if (newView === 'timer' && isElectron()) {
+    // 確保投影視窗存在
+    await checkAndEnsureProjectionWindow()
+
+    // 如果投影內容是關閉的（顯示預設畫面），自動開啟
+    if (projectionStore.isShowingDefault) {
+      console.log('Projection content is closed, opening automatically...')
+
+      // 更新 store 狀態
+      projectionStore.setShowingDefault(false)
+      projectionStore.setCurrentView('timer')
+
+      // 發送消息到投影視窗
+      sendToProjection({
+        type: MessageType.TOGGLE_PROJECTION_CONTENT,
+        data: { showDefault: false },
+      })
+
+      sendToProjection({
+        type: MessageType.CHANGE_VIEW,
+        data: { view: ViewType.TIMER },
+      })
+    }
+  }
+})
 
 // 生命週期
 onMounted(async () => {
