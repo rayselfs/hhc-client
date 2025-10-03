@@ -63,7 +63,7 @@ const center = computed(() => props.size / 2)
 
 // Calculate the stroke width based on the size
 const strokeWidth = computed(() => {
-  return Math.round(props.size * 0.018)
+  return Math.round(props.size * 0.02)
 })
 
 // Calculate radius (center minus stroke width and some padding)
