@@ -20,10 +20,10 @@
     "lint": "eslint . --fix",
     "format": "prettier --write src/",
     "electron:clean": "rm -rf dist",
-    "electron:build:mac-intel": "npm run build && electron-builder --mac --x64",
-    "electron:build:mac-arm": "npm run build && electron-builder --mac --arm64",
-    "electron:build:mac-universal": "npm run build && electron-builder --mac --universal",
-    "electron:build:win": "npm run build && electron-builder --win --x64"
+    "electron:build:mac-intel": "npm run build && electron-builder --mac --x64 --config electron-builder.config.ts",
+    "electron:build:mac-arm": "npm run build && electron-builder --mac --arm64 --config electron-builder.config.ts",
+    "electron:build:mac-universal": "npm run build && electron-builder --mac --universal --config electron-builder.config.ts",
+    "electron:build:win": "npm run build && electron-builder --win --x64 --config electron-builder.config.ts"
   },
   "dependencies": {
     "@fontsource-variable/noto-sans-tc": "^5.2.9",
