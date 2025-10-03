@@ -190,7 +190,6 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-/* 頁面切換動畫 */
 .page-slide-enter-active,
 .page-slide-leave-active {
   transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);

@@ -84,7 +84,7 @@ const strokeDashoffset = computed(() => {
 // Calculate the font size based on the size
 const fontSize = computed(() => {
   const ratio = props.size / 1000
-  const baseFontSize = 340 // px
+  const baseFontSize = 310 // px
   const calculatedFontSize = baseFontSize * ratio
 
   return `${calculatedFontSize}px`

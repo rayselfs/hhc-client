@@ -10,7 +10,6 @@
               <v-col cols="12" class="d-flex justify-center">
                 <v-btn-toggle
                   v-model="timerStore.settings.mode"
-                  color="primary"
                   variant="outlined"
                   mandatory
                   class="mode-toggle"
@@ -38,38 +37,57 @@
                 timerStore.settings.mode === TimerMode.TIMER ||
                 timerStore.settings.mode === TimerMode.BOTH
               "
+              class="d-flex justify-center"
             >
-              <v-col cols="12">
-                <div class="time-input-container">
-                  <v-text-field
-                    v-model.number="minutes"
-                    :label="$t('minutes')"
-                    type="number"
-                    min="0"
-                    max="59"
-                    variant="outlined"
-                    density="compact"
-                    class="time-input"
-                    @keyup.enter="handleTimeInput"
-                    @blur="handleTimeInput"
-                    @input="validateMinutesInput"
-                    @keydown="preventNonNumeric"
-                  ></v-text-field>
-                  <v-text-field
-                    v-model.number="seconds"
-                    :label="$t('seconds')"
-                    type="number"
-                    min="0"
-                    max="59"
-                    variant="outlined"
-                    density="compact"
-                    class="time-input"
-                    @keyup.enter="handleTimeInput"
-                    @blur="handleTimeInput"
-                    @input="validateSecondsInput"
-                    @keydown="preventNonNumeric"
-                  ></v-text-field>
-                </div>
+              <v-col
+                v-if="!timerStore.settings.isRunning && (timerStore.settings.pausedTime ?? 0) === 0"
+                cols="8"
+                class="d-flex justify-center ga-5 pe-2"
+              >
+                <v-text-field
+                  v-model.number="minutes"
+                  :label="$t('minutes')"
+                  type="number"
+                  min="0"
+                  max="59"
+                  variant="outlined"
+                  density="compact"
+                  class="time-input"
+                  @keyup.enter="handleTimeInput"
+                  @blur="handleTimeInput"
+                  @input="validateMinutesInput"
+                  @keydown="preventNonNumeric"
+                ></v-text-field>
+                <v-text-field
+                  v-model.number="seconds"
+                  :label="$t('seconds')"
+                  type="number"
+                  min="0"
+                  max="59"
+                  variant="outlined"
+                  density="compact"
+                  class="time-input"
+                  @keyup.enter="handleTimeInput"
+                  @blur="handleTimeInput"
+                  @input="validateSecondsInput"
+                  @keydown="preventNonNumeric"
+                ></v-text-field>
+              </v-col>
+
+              <!-- 倒數計時器（開始後顯示） -->
+              <v-col v-else cols="12">
+                <CountdownTimer
+                  :progress="timerStore.progress"
+                  :timer-formatted-time="timerStore.formattedTime"
+                  :size="timerSize"
+                />
+              </v-col>
+            </v-row>
+
+            <!-- 時鐘模式顯示 -->
+            <v-row v-if="timerStore.settings.mode === TimerMode.CLOCK">
+              <v-col cols="12" class="d-flex justify-center">
+                <ClockDisplay :timezone="timerStore.settings.timezone" :size="clockSize" />
               </v-col>
             </v-row>
 
@@ -231,12 +249,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useTimerStore } from '@/stores/timer'
 import { useProjectionStore } from '@/stores/projection'
 import { useElectron } from '@/composables/useElectron'
 import { MessageType, ViewType, TimerMode } from '@/types/common'
+import CountdownTimer from '@/components/Timer/CountdownTimer.vue'
+import ClockDisplay from '@/components/Timer/ClockDisplay.vue'
 
 const timerStore = useTimerStore()
 const projectionStore = useProjectionStore()
@@ -248,6 +268,19 @@ const { isElectron, sendToProjection: electronSendToProjection } = useElectron()
 // 時間輸入
 const minutes = ref(5)
 const seconds = ref(0)
+// 響應式視窗尺寸
+const windowSize = ref({
+  width: window.innerWidth,
+  height: window.innerHeight,
+})
+
+// 監聽視窗大小變化
+const handleResize = () => {
+  windowSize.value = {
+    width: window.innerWidth,
+    height: window.innerHeight,
+  }
+}
 
 // 計時器
 let timerInterval: number | undefined
@@ -506,6 +539,21 @@ const sendToProjection = (forceUpdate = false) => {
   }
 }
 
+const timerSize = computed(() => {
+  const screenWidth = windowSize.value.width
+  return 300 * (screenWidth / 1920)
+})
+
+const clockSize = computed(() => {
+  const screenWidth = windowSize.value.width
+  let baseSize = 180
+  if (screenWidth < 1920) {
+    baseSize = 130
+  }
+
+  return baseSize * (screenWidth / 1920)
+})
+
 // 生命週期
 onMounted(() => {
   // 初始化時間輸入
@@ -515,6 +563,8 @@ onMounted(() => {
 
   // 初始化時發送一次投影更新
   sendToProjection(true)
+
+  window.addEventListener('resize', handleResize)
 
   // 啟動計時器
   timerInterval = window.setInterval(() => {
@@ -543,10 +593,13 @@ onBeforeUnmount(() => {
     clearInterval(timerInterval)
   }
 })
+
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
+})
 </script>
 
 <style scoped>
-/* 卡片樣式 */
 .control-card,
 .history-card {
   height: 100%;
@@ -609,15 +662,6 @@ onBeforeUnmount(() => {
 .quick-button {
   min-width: 60px;
   height: 36px; /* 與保存按鈕相同高度 */
-}
-
-/* 時間輸入容器 */
-.time-input-container {
-  display: flex;
-  justify-content: center;
-  gap: 20px;
-  padding: 0 5px;
-  width: calc(100% - 10px);
 }
 
 .time-input {
