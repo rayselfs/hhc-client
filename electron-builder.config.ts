@@ -11,6 +11,12 @@ const config: Configuration = {
     buildResources: 'build',
   },
 
+  publish: {
+    provider: 'github',
+    owner: 'rayselfs',
+    repo: 'hhc-client',
+  },
+
   mac: { target: 'dmg' },
   win: { target: 'nsis' },
   linux: { target: 'AppImage' },

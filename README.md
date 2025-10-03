@@ -1,54 +1,255 @@
-# hhc-client-test
+# HHC Client
 
-This template should help get you started developing with Vue 3 in Vite.
+> A desktop application based on Electron + Vue 3, providing timer, Bible reader, and projection features
 
-## Recommended IDE Setup
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Node.js Version](https://img.shields.io/badge/node-%5E20.19.0%20%7C%7C%20%3E%3D22.12.0-brightgreen.svg)](package.json)
+[![Vue.js](https://img.shields.io/badge/Vue.js-3.5.22-4FC08D.svg)](https://vuejs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9.0-3178C6.svg)](https://www.typescriptlang.org/)
 
-[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+## 📖 Project Overview
 
-## Recommended Browser Setup
+HHC Client is a feature-rich desktop application designed for churches and religious activities. It provides a modern user interface with multi-language support (Traditional Chinese, English) and includes the following core features:
 
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
-  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd) 
-  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
-- Firefox:
-  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
+- ⏰ **Timer Features** - Countdown and count-up timers
+- 📖 **Bible Reader** - Support for Bible content browsing and projection
+- 🖥️ **Projection Mode** - Dedicated projection window suitable for gatherings
+- 🌙 **Dark Mode** - Support for light/dark theme switching
+- 🌍 **Internationalization** - Multi-language support
+- 🔄 **Auto Update** - Built-in automatic update mechanism
 
-## Type Support for `.vue` Imports in TS
+## ✨ Features
 
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
+### Timer Functionality
 
-## Customize configuration
+- Countdown and count-up timers
+- Circular progress bar display
+- Customizable time settings
+- Projection mode optimized display
 
-See [Vite Configuration Reference](https://vite.dev/config/).
+### Bible Reader
 
-## Project Setup
+- Bible content browsing
+- Projection mode support
+- Clear text display
 
-```sh
+### Projection Features
+
+- Independent projection window
+- Full-screen display
+- Automatic screen resolution adaptation
+- Support for multiple projection content types
+
+### User Interface
+
+- Modern design based on Vuetify 3
+- Responsive layout
+- Dark/light themes
+- Traditional Chinese and English support
+
+## 🛠️ Tech Stack
+
+### Frontend Framework
+
+- **Vue 3** - Progressive JavaScript framework
+- **TypeScript** - Type-safe JavaScript
+- **Vite** - Fast frontend build tool
+- **Vuetify 3** - Material Design component library
+
+### Desktop Application
+
+- **Electron** - Cross-platform desktop application framework
+- **Electron Builder** - Application packaging tool
+- **Electron Updater** - Automatic update functionality
+
+### Development Tools
+
+- **ESLint** - Code quality checking
+- **Prettier** - Code formatting
+- **Vitest** - Unit testing framework
+- **Vue Test Utils** - Vue component testing utilities
+
+### Additional Features
+
+- **Vue I18n** - Internationalization support
+- **Pinia** - State management
+- **Vue Router** - Route management
+- **Axios** - HTTP client
+
+## 📋 System Requirements
+
+- **Node.js**: ^20.19.0 || >=22.12.0
+- **Operating Systems**:
+  - macOS (Intel/Apple Silicon)
+  - Windows (x64)
+  - Linux (x64)
+
+## 🚀 Quick Start
+
+### Install Dependencies
+
+```bash
 npm install
 ```
 
-### Compile and Hot-Reload for Development
+### Development Mode
 
-```sh
+```bash
 npm run dev
 ```
 
-### Type-Check, Compile and Minify for Production
+This will start the development server and launch the Electron application.
 
-```sh
+### Build Application
+
+```bash
+# Build for all platforms
 npm run build
+
+# Build for specific platforms
+npm run electron:build:mac-arm      # macOS Apple Silicon
+npm run electron:build:mac-intel    # macOS Intel
+npm run electron:build:mac-universal # macOS Universal
+npm run electron:build:win          # Windows x64
 ```
 
-### Run Unit Tests with [Vitest](https://vitest.dev/)
+## 📱 Usage Guide
 
-```sh
+### Main Features
+
+1. **Timer Control**
+   - Set timer duration in the main console
+   - Support for countdown and count-up timers
+   - Switch to projection mode
+
+2. **Bible Reading**
+   - Browse Bible content
+   - Projection mode display
+   - Support for various display options
+
+3. **Projection Mode**
+   - Independent projection window
+   - Full-screen display
+   - Automatic screen adaptation
+
+### Keyboard Shortcuts
+
+- `Cmd/Ctrl + R` - Reload application
+- `F11` - Toggle full-screen mode
+- `Esc` - Exit projection mode
+
+## 🛠️ Development Guide
+
+### Project Structure
+
+```
+src/
+├── components/          # Vue components
+│   ├── Bible/          # Bible-related components
+│   ├── Timer/          # Timer components
+│   └── ...
+├── composables/        # Vue composables
+├── layouts/           # Layout components
+├── locales/           # Internationalization files
+├── plugins/           # Vue plugins
+├── router/            # Route configuration
+├── stores/            # Pinia state management
+├── types/             # TypeScript type definitions
+└── views/             # Page components
+```
+
+### Development Scripts
+
+```bash
+# Development mode
+npm run dev
+
+# Build project
+npm run build
+
+# Type checking
+npm run type-check
+
+# Run tests
 npm run test:unit
-```
 
-### Lint with [ESLint](https://eslint.org/)
-
-```sh
+# Code linting
 npm run lint
+
+# Code formatting
+npm run format
+
+# Preview build results
+npm run preview
 ```
+
+### Code Standards
+
+- Use ESLint for code quality checking
+- Use Prettier for code formatting
+- Follow Vue 3 Composition API best practices
+- TypeScript strict mode
+
+## 🧪 Testing
+
+```bash
+# Run unit tests
+npm run test:unit
+
+# Run tests in watch mode
+npm run test:unit -- --watch
+```
+
+## 📦 Build & Release
+
+### Build Configuration
+
+Build configuration is located in `electron-builder.config.ts`, supporting:
+
+- macOS (Intel/Apple Silicon/Universal)
+- Windows (x64)
+- Auto-update configuration
+- Application icons and metadata
+
+### Release Process
+
+1. Update version: `npm version patch/minor/major`
+2. Build application: `npm run build`
+3. Build desktop version: `npm run electron:build:mac-arm`
+4. Publish to GitHub Releases
+
+## 🤝 Contributing
+
+We welcome contributions of any kind! Please follow these steps:
+
+1. Fork the project
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Commit your changes: `git commit -m 'Add some amazing feature'`
+4. Push to the branch: `git push origin feature/amazing-feature`
+5. Open a Pull Request
+
+### Development Environment Setup
+
+Recommended VS Code extensions:
+
+- [Vue Language Features (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.volar)
+- [TypeScript Vue Plugin (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.vscode-typescript-vue-plugin)
+- [ESLint](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint)
+- [Prettier](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode)
+
+## 📄 License
+
+This project is licensed under the [MIT License](LICENSE).
+
+## 🙏 Acknowledgments
+
+Thanks to all open-source project contributors, especially:
+
+- [Vue.js](https://vuejs.org/) - Progressive JavaScript framework
+- [Electron](https://electronjs.org/) - Cross-platform desktop application framework
+- [Vuetify](https://vuetifyjs.com/) - Material Design component library
+- [Vite](https://vitejs.dev/) - Fast frontend build tool
+
+---
+
+If you have any questions or suggestions, please submit them in [Issues](https://github.com/rayselfs/hhc-client/issues).

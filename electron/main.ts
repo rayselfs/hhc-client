@@ -2,6 +2,7 @@ import { app, BrowserWindow, screen, ipcMain } from 'electron'
 import { join } from 'path'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
+import { autoUpdater } from 'electron-updater'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -191,6 +192,18 @@ app.whenReady().then(() => {
       createMainWindow()
     }
   })
+
+  setTimeout(() => {
+    autoUpdater.checkForUpdatesAndNotify()
+  }, 3000)
+})
+
+autoUpdater.on('update-available', () => {
+  console.log('發現新版本')
+})
+
+autoUpdater.on('update-downloaded', () => {
+  console.log('新版本下載完成，將提示使用者更新')
 })
 
 app.on('window-all-closed', () => {
