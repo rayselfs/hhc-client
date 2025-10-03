@@ -1,23 +1,21 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
-import Home from '../views/HomeView.vue'
-import Projection from '../views/ProjectionView.vue'
-
-const routes = [
-  {
-    path: '/',
-    name: 'Home',
-    component: Home,
-  },
-  {
-    path: '/projection',
-    name: 'Projection',
-    component: Projection,
-  },
-]
+import Home from '@/views/HomeView.vue'
+import Projection from '@/views/ProjectionView.vue'
 
 const router = createRouter({
   history: createWebHashHistory(),
-  routes,
+  routes: [
+    {
+      path: '/',
+      name: 'Home',
+      component: Home,
+    },
+    {
+      path: '/projection',
+      name: 'Projection',
+      component: Projection,
+    },
+  ],
 })
 
 export default router
