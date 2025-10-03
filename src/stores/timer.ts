@@ -116,9 +116,6 @@ export const useTimerStore = defineStore('timer', () => {
 
     // 如果加的時間沒有超過開始倒數的時間，按比例調整進度
     if (newTime <= settings.value.originalDuration) {
-      // 計算當前進度比例
-      const currentProgress =
-        (settings.value.originalDuration - currentTime) / settings.value.originalDuration
       // 按比例計算新的剩餘時間
       settings.value.remainingTime = newTime
       settings.value.timerDuration = settings.value.originalDuration
@@ -165,7 +162,9 @@ export const useTimerStore = defineStore('timer', () => {
   const resumeTimer = () => {
     if (settings.value.pausedTime && settings.value.pausedTime > 0) {
       settings.value.isRunning = true
-      settings.value.remainingTime = settings.value.pausedTime
+      if (settings.value.remainingTime < settings.value.pausedTime) {
+        settings.value.remainingTime = settings.value.pausedTime
+      }
       settings.value.pausedTime = 0
     }
   }
