@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import AlertDialog from '@/components/AlertDialog.vue'
+import UpdateDialog from '@/components/UpdateDialog.vue'
+import DownloadDialog from '@/components/DownloadDialog.vue'
 import { useAlert } from '@/composables/useAlert'
 
 const { alertState, confirm, cancel } = useAlert()
@@ -24,6 +26,10 @@ const { alertState, confirm, cancel } = useAlert()
     @confirm="confirm"
     @cancel="cancel"
   />
+
+  <!-- Update Dialogs -->
+  <UpdateDialog />
+  <DownloadDialog />
 </template>
 
 <style scoped></style>

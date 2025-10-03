@@ -1,5 +1,24 @@
 import type { AppMessage, DisplayInfo } from './common'
 
+// AutoUpdater 相關類型定義
+export interface UpdateInfo {
+  version: string
+  releaseDate: string
+}
+
+export interface DownloadProgress {
+  percent: number
+  transferred: number
+  total: number
+  bytesPerSecond: number
+  eta: number
+}
+
+export interface UpdateResult {
+  success: boolean
+  error?: string
+}
+
 /**
  * Electron API interface definition
  */
@@ -39,6 +58,28 @@ export interface ElectronAPI {
 
   /** Remove all listeners for specified channel */
   removeAllListeners: (channel: string) => void
+
+  // AutoUpdater 相關方法
+  /** Start downloading update */
+  startDownload: () => Promise<UpdateResult>
+
+  /** Install the downloaded update */
+  installUpdate: () => Promise<UpdateResult>
+
+  /** Decline update and record the time */
+  declineUpdate: () => Promise<UpdateResult>
+
+  /** Listen for update available events */
+  onUpdateAvailable: (callback: (info: UpdateInfo) => void) => void
+
+  /** Listen for download progress events */
+  onDownloadProgress: (callback: (progress: DownloadProgress) => void) => void
+
+  /** Listen for update downloaded events */
+  onUpdateDownloaded: (callback: () => void) => void
+
+  /** Listen for update error events */
+  onUpdateError: (callback: (error: string) => void) => void
 }
 
 declare global {

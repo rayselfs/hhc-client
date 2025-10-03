@@ -3,6 +3,7 @@ import { join } from 'path'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { autoUpdater } from 'electron-updater'
+import { readFileSync, writeFileSync, existsSync } from 'fs'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -180,6 +181,42 @@ ipcMain.on('send-to-main', (event, data) => {
   }
 })
 
+// AutoUpdater IPC handlers
+ipcMain.handle('start-download', async () => {
+  try {
+    autoUpdater.downloadUpdate()
+    return { success: true }
+  } catch (error) {
+    console.error('開始下載更新失敗:', error)
+    return { success: false, error: error.message }
+  }
+})
+
+ipcMain.handle('install-update', async () => {
+  try {
+    autoUpdater.quitAndInstall()
+    return { success: true }
+  } catch (error) {
+    console.error('安裝更新失敗:', error)
+    return { success: false, error: error.message }
+  }
+})
+
+ipcMain.handle('decline-update', async () => {
+  try {
+    // 記錄拒絕時間到文件
+    const updateSettingsPath = path.join(app.getPath('userData'), 'update-settings.json')
+    const settings = {
+      lastDeclinedTime: Date.now().toString(),
+    }
+    writeFileSync(updateSettingsPath, JSON.stringify(settings, null, 2))
+    return { success: true }
+  } catch (error) {
+    console.error('記錄拒絕更新失敗:', error)
+    return { success: false, error: error.message }
+  }
+})
+
 // Application events
 app.whenReady().then(() => {
   // Set security policy
@@ -193,17 +230,62 @@ app.whenReady().then(() => {
     }
   })
 
+  // 檢查是否應該提示更新（考慮兩週延遲）
   setTimeout(() => {
-    autoUpdater.checkForUpdatesAndNotify()
+    checkForUpdates()
   }, 3000)
 })
 
-autoUpdater.on('update-available', () => {
-  console.log('發現新版本')
+// 檢查是否應該提示更新
+const checkForUpdates = () => {
+  const updateSettingsPath = path.join(app.getPath('userData'), 'update-settings.json')
+  let lastDeclinedTime = null
+
+  try {
+    if (existsSync(updateSettingsPath)) {
+      const settings = JSON.parse(readFileSync(updateSettingsPath, 'utf8'))
+      lastDeclinedTime = settings.lastDeclinedTime
+    }
+  } catch (error) {
+    console.error('讀取更新設定失敗:', error)
+  }
+
+  const twoWeeksAgo = Date.now() - 14 * 24 * 60 * 60 * 1000 // 兩週前
+
+  if (!lastDeclinedTime || parseInt(lastDeclinedTime) < twoWeeksAgo) {
+    autoUpdater.checkForUpdates()
+  }
+}
+
+// 更新可用時，發送消息到主窗口顯示確認對話框
+autoUpdater.on('update-available', (info) => {
+  console.log('發現新版本:', info.version)
+  if (mainWindow) {
+    mainWindow.webContents.send('update-available', info)
+  }
 })
 
-autoUpdater.on('update-downloaded', () => {
+// 下載進度更新
+autoUpdater.on('download-progress', (progressObj) => {
+  if (mainWindow) {
+    mainWindow.webContents.send('download-progress', progressObj)
+  }
+})
+
+// 下載完成
+autoUpdater.on('update-downloaded', (info) => {
   console.log('新版本下載完成，將提示使用者更新')
+  if (mainWindow) {
+    mainWindow.webContents.send('update-downloaded', info)
+  }
+})
+
+// 更新錯誤
+autoUpdater.on('error', (error) => {
+  console.error('更新錯誤:', error)
+  if (mainWindow) {
+    mainWindow.webContents.send('update-error', error.message)
+  }
 })
 
 app.on('window-all-closed', () => {

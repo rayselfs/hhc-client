@@ -39,5 +39,20 @@
     "info": "Info",
     "screenWarning": "Screen Notice",
     "dualScreenRequired": "This app is designed for dual screens"
+  },
+  "update": {
+    "title": "New Version Available",
+    "message": "New version {version} is available. Would you like to download and install it?",
+    "description": "The update will bring you new features and improvements.",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "downloading": "Downloading...",
+    "downloadTitle": "Downloading Update",
+    "downloadMessage": "Downloading version {version}",
+    "downloadSpeed": "Download speed: {speed}/s",
+    "remainingTime": "Remaining time: {time}",
+    "error": "An error occurred during update",
+    "downloadError": "Failed to download update",
+    "installError": "Failed to install update"
   }
 }

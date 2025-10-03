@@ -39,5 +39,20 @@
     "info": "提示",
     "screenWarning": "螢幕提示",
     "dualScreenRequired": "此App是設計用在雙螢幕"
+  },
+  "update": {
+    "title": "發現新版本",
+    "message": "發現新版本 {version}，是否要下載並安裝？",
+    "description": "更新將為您帶來新功能和改進。",
+    "confirm": "確定",
+    "cancel": "取消",
+    "downloading": "下載中...",
+    "downloadTitle": "下載更新中",
+    "downloadMessage": "正在下載版本 {version}",
+    "downloadSpeed": "下載速度: {speed}/s",
+    "remainingTime": "剩餘時間: {time}",
+    "error": "更新時發生錯誤",
+    "downloadError": "下載更新失敗",
+    "installError": "安裝更新失敗"
   }
 }
