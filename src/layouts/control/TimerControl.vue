@@ -100,29 +100,9 @@
               class="mb-4"
             >
               <v-col cols="12">
-                <!-- 保存按鈕（只在未開始時顯示） -->
-                <div
-                  v-if="
-                    !timerStore.settings.isRunning && (timerStore.settings.pausedTime ?? 0) === 0
-                  "
-                  class="save-button-container"
-                >
-                  <v-btn
-                    class="save-button"
-                    color="primary"
-                    variant="outlined"
-                    @click="saveTimerPreset"
-                  >
-                    <v-icon icon="mdi-bookmark-plus" class="mr-2"></v-icon>
-                    {{ $t('savePreset') }}
-                  </v-btn>
-                </div>
-
                 <!-- 快捷按鈕（開始計時後顯示） -->
                 <div
-                  v-else-if="
-                    timerStore.settings.isRunning || (timerStore.settings.pausedTime ?? 0) > 0
-                  "
+                  v-if="timerStore.settings.isRunning || (timerStore.settings.pausedTime ?? 0) > 0"
                   class="quick-buttons"
                 >
                   <v-btn
@@ -162,9 +142,9 @@
                 timerStore.settings.mode === TimerMode.TIMER ||
                 timerStore.settings.mode === TimerMode.BOTH
               "
-              class="mt-auto"
+              class="mt-auto d-flex justify-center"
             >
-              <v-col cols="12">
+              <v-col cols="10">
                 <!-- 開始按鈕（未開始時） -->
                 <div
                   v-if="
@@ -211,7 +191,16 @@
       <v-col cols="6">
         <v-card class="history-card">
           <v-card-text>
-            <v-label class="text-subtitle-1 mb-2">{{ $t('timerPresets') }}</v-label>
+            <div class="d-flex justify-space-between align-center mb-2">
+              <v-label class="text-subtitle-1">{{ $t('timerPresets') }}</v-label>
+              <v-btn
+                v-if="!timerStore.settings.isRunning && (timerStore.settings.pausedTime ?? 0) === 0"
+                icon="mdi-plus"
+                size="small"
+                variant="tonal"
+                @click="saveTimerPreset"
+              ></v-btn>
+            </div>
             <div v-if="timerStore.presets.length === 0" class="text-center text-grey">
               {{ $t('noPresets') }}
             </div>
@@ -667,20 +656,5 @@ onUnmounted(() => {
 .time-input {
   width: calc(50% - 10px);
   flex: 1;
-}
-
-/* 保存按鈕容器 */
-.save-button-container {
-  display: flex;
-  justify-content: center;
-  margin: 15px 0; /* 與快捷按鈕相同的間距 */
-  padding: 0 5px;
-  min-height: 40px; /* 確保與快捷按鈕相同高度 */
-  align-items: center;
-}
-
-.save-button {
-  min-width: 120px;
-  height: 36px; /* 與快捷按鈕相同高度 */
 }
 </style>
