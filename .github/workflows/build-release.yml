@@ -26,12 +26,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build and Release
+      - name: Build and Release (macOS)
+        if: matrix.os == 'macos-13'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if [ "$RUNNER_OS" == "macOS" ]; then
-            npm run electron:build:mac-universal -- --publish always
-          elif [ "$RUNNER_OS" == "Windows" ]; then
-            npm run electron:build:win -- --publish always
-          fi
+          npm run electron:build:mac-universal -- --publish always
+
+      - name: Build and Release (Windows)
+        if: matrix.os == 'windows-2022'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          npm run electron:build:win -- --publish always
