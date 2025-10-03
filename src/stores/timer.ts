@@ -113,8 +113,20 @@ export const useTimerStore = defineStore('timer', () => {
   const addTime = (secondsToAdd: number) => {
     const currentTime = settings.value.remainingTime
     const newTime = currentTime + secondsToAdd
-    settings.value.timerDuration = newTime
-    settings.value.remainingTime = newTime
+
+    // 如果加的時間沒有超過開始倒數的時間，按比例調整進度
+    if (newTime <= settings.value.originalDuration) {
+      // 計算當前進度比例
+      const currentProgress =
+        (settings.value.originalDuration - currentTime) / settings.value.originalDuration
+      // 按比例計算新的剩餘時間
+      settings.value.remainingTime = newTime
+      settings.value.timerDuration = settings.value.originalDuration
+    } else {
+      // 如果超過原時間，將新時間設為100%並繼續倒數
+      settings.value.timerDuration = newTime
+      settings.value.remainingTime = newTime
+    }
   }
 
   const setTimezone = (timezone: string) => {
