@@ -1,13 +1,13 @@
 <template>
   <v-container>
     <v-row>
-      <!-- 左側：控制計時區 -->
+      <!-- Left Side - Control Timer -->
       <v-col cols="6">
-        <v-card class="control-card">
+        <v-card class="control-card rounded-lg">
           <v-card-text>
-            <!-- 模式選擇 -->
+            <!-- Mode Selection -->
             <v-row class="mb-4">
-              <v-col cols="12" class="d-flex justify-center">
+              <v-col cols="12" align="center">
                 <v-btn-toggle
                   v-model="timerStore.settings.mode"
                   variant="outlined"
@@ -31,14 +31,8 @@
               </v-col>
             </v-row>
 
-            <!-- 計時器設定 -->
-            <v-row
-              v-if="
-                timerStore.settings.mode === TimerMode.TIMER ||
-                timerStore.settings.mode === TimerMode.BOTH
-              "
-              class="d-flex justify-center"
-            >
+            <!-- Timer Settings -->
+            <v-row class="d-flex justify-center">
               <v-col
                 v-if="!timerStore.settings.isRunning && (timerStore.settings.pausedTime ?? 0) === 0"
                 cols="8"
@@ -84,21 +78,8 @@
               </v-col>
             </v-row>
 
-            <!-- 時鐘模式顯示 -->
-            <v-row v-if="timerStore.settings.mode === TimerMode.CLOCK">
-              <v-col cols="12" class="d-flex justify-center">
-                <ClockDisplay :timezone="timerStore.settings.timezone" :size="clockSize" />
-              </v-col>
-            </v-row>
-
             <!-- 按鈕區域（保存預設或快捷按鈕） -->
-            <v-row
-              v-if="
-                timerStore.settings.mode === TimerMode.TIMER ||
-                timerStore.settings.mode === TimerMode.BOTH
-              "
-              class="mb-4"
-            >
+            <v-row class="mb-4">
               <v-col cols="12">
                 <!-- 快捷按鈕（開始計時後顯示） -->
                 <div
@@ -137,13 +118,7 @@
             </v-row>
 
             <!-- 主要控制按鈕（移到卡片底部） -->
-            <v-row
-              v-if="
-                timerStore.settings.mode === TimerMode.TIMER ||
-                timerStore.settings.mode === TimerMode.BOTH
-              "
-              class="mt-auto d-flex justify-center"
-            >
+            <v-row class="mt-auto d-flex justify-center">
               <v-col cols="10">
                 <!-- 開始按鈕（未開始時） -->
                 <div
@@ -187,12 +162,13 @@
         </v-card>
       </v-col>
 
-      <!-- 右側：Timer History -->
+      <!-- Right Side - Preset and Clock Cards -->
       <v-col cols="6">
-        <v-card class="history-card">
+        <!-- Timer Presets -->
+        <v-card class="preset-card mb-5 rounded-lg">
           <v-card-text>
-            <div class="d-flex justify-space-between align-center mb-2">
-              <v-label class="text-subtitle-1">{{ $t('timerPresets') }}</v-label>
+            <div class="d-flex justify-space-between mb-2">
+              <v-label class="text-h6 align-start">{{ $t('timerPresets') }}</v-label>
               <v-btn
                 v-if="!timerStore.settings.isRunning && (timerStore.settings.pausedTime ?? 0) === 0"
                 icon="mdi-plus"
@@ -201,16 +177,13 @@
                 @click="saveTimerPreset"
               ></v-btn>
             </div>
-            <div v-if="timerStore.presets.length === 0" class="text-center text-grey">
-              {{ $t('noPresets') }}
-            </div>
-            <v-list v-else density="compact">
+            <v-list density="compact">
               <v-list-item v-for="item in timerStore.presets" :key="item.id" class="px-0">
                 <template #prepend>
                   <v-icon icon="mdi-history"></v-icon>
                 </template>
 
-                <v-list-item-title>
+                <v-list-item-title class="text-h6">
                   {{ formatDuration(item.duration) }}
                 </v-list-item-title>
 
@@ -230,6 +203,63 @@
                 </template>
               </v-list-item>
             </v-list>
+          </v-card-text>
+        </v-card>
+
+        <!-- External Display -->
+        <v-card class="external-card rounded-lg">
+          <v-card-text>
+            <!-- External Display Toggle -->
+            <v-row>
+              <v-col cols="12" align="center">
+                <v-btn
+                  :color="externalDisplayMode === 'stopwatch' ? 'primary' : 'grey'"
+                  :variant="externalDisplayMode === 'stopwatch' ? 'flat' : 'outlined'"
+                  @click="toggleStopwatch"
+                >
+                  <v-icon icon="mdi-timer-outline" class="mr-2"></v-icon>
+                  {{ $t('stopwatch') }}
+                </v-btn>
+              </v-col>
+            </v-row>
+
+            <!-- Clock Display -->
+            <v-row v-if="externalDisplayMode === 'clock'">
+              <v-col cols="12" align="center">
+                <ClockDisplay :timezone="timerStore.settings.timezone" :size="clockSize" />
+              </v-col>
+            </v-row>
+
+            <!-- Stopwatch Display -->
+            <v-row v-else>
+              <v-col cols="12" align="center" class="pb-0">
+                <div class="stopwatch-time">{{ stopwatchTime }}</div>
+              </v-col>
+              <v-col cols="6" class="d-flex justify-end">
+                <v-btn
+                  v-if="!isStopwatchRunning"
+                  icon="mdi-play"
+                  color="primary"
+                  variant="flat"
+                  @click="startStopwatch"
+                ></v-btn>
+                <v-btn
+                  v-else
+                  icon="mdi-pause"
+                  color="warning"
+                  variant="flat"
+                  @click="pauseStopwatch"
+                ></v-btn>
+              </v-col>
+              <v-col cols="6" class="d-flex justify-start">
+                <v-btn
+                  icon="mdi-refresh"
+                  color="grey"
+                  variant="outlined"
+                  @click="resetStopwatch"
+                ></v-btn>
+              </v-col>
+            </v-row>
           </v-card-text>
         </v-card>
       </v-col>
@@ -257,6 +287,10 @@ const { isElectron, sendToProjection: electronSendToProjection } = useElectron()
 // 時間輸入
 const minutes = ref(5)
 const seconds = ref(0)
+
+// External Display 模式 - 使用 store 中的狀態
+const externalDisplayMode = computed(() => timerStore.stopwatchSettings.displayMode)
+
 // 響應式視窗尺寸
 const windowSize = ref({
   width: window.innerWidth,
@@ -543,6 +577,27 @@ const clockSize = computed(() => {
   return baseSize * (screenWidth / 1920)
 })
 
+// 碼錶相關 - 使用 store 中的方法
+const toggleStopwatch = () => {
+  timerStore.toggleStopwatchMode()
+}
+
+const startStopwatch = () => {
+  timerStore.startStopwatch()
+}
+
+const pauseStopwatch = () => {
+  timerStore.pauseStopwatch()
+}
+
+const resetStopwatch = () => {
+  timerStore.resetStopwatch()
+}
+
+// 碼錶時間顯示
+const stopwatchTime = computed(() => timerStore.getStopwatchTime())
+const isStopwatchRunning = computed(() => timerStore.stopwatchSettings.isRunning)
+
 // 生命週期
 onMounted(() => {
   // 初始化時間輸入
@@ -589,22 +644,24 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.control-card,
-.history-card {
-  height: 100%;
-  border-radius: 16px;
-  display: flex;
-  flex-direction: column;
+.control-card {
+  height: 600px;
 }
 
-.control-card :deep(.v-card-text) {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  padding: 24px;
+.preset-card {
+  height: 330px;
 }
 
-/* 開始按鈕容器 */
+.external-card {
+  height: 250px;
+}
+
+.stopwatch-time {
+  font-size: 3rem;
+  font-weight: 500;
+  color: rgb(var(--v-theme-on-surface));
+}
+
 .start-button-container {
   display: flex;
   justify-content: center;

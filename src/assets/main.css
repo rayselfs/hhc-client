@@ -8,15 +8,6 @@ html {
   font-family:
     'Open Sans Variable', 'Noto Sans TC Variable', 'Roboto Variable', 'Microsoft JhengHei',
     sans-serif;
-  overflow: hidden;
-}
-
-body {
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-  width: 100vw;
-  height: 100vh;
 }
 
 .no-scrollbar {

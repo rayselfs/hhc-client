@@ -18,6 +18,13 @@ export interface TimerSettings {
   pausedTime?: number // 暫停時剩餘時間
 }
 
+export interface StopwatchSettings {
+  isRunning: boolean
+  elapsedTime: number // 毫秒
+  startTime?: number // 開始時間戳
+  displayMode: 'clock' | 'stopwatch'
+}
+
 export const useTimerStore = defineStore('timer', () => {
   // 載入保存的設定
   const loadSettings = () => {
@@ -52,8 +59,17 @@ export const useTimerStore = defineStore('timer', () => {
 
   // 狀態
   const settings = ref<TimerSettings>(loadSettings())
-
   const presets = ref<TimerPreset[]>([])
+
+  // 碼錶狀態
+  const stopwatchSettings = ref<StopwatchSettings>({
+    isRunning: false,
+    elapsedTime: 0,
+    displayMode: 'clock',
+  })
+
+  // 碼錶計時器
+  let stopwatchInterval: number | undefined
 
   // 保存設定到 localStorage
   const saveSettings = () => {
@@ -235,6 +251,52 @@ export const useTimerStore = defineStore('timer', () => {
     localStorage.setItem('timer-presets', JSON.stringify(presets.value))
   }
 
+  // 碼錶方法
+  const startStopwatch = () => {
+    stopwatchSettings.value.isRunning = true
+    stopwatchSettings.value.startTime = Date.now() - stopwatchSettings.value.elapsedTime
+
+    stopwatchInterval = window.setInterval(() => {
+      if (stopwatchSettings.value.startTime) {
+        stopwatchSettings.value.elapsedTime = Date.now() - stopwatchSettings.value.startTime
+      }
+    }, 100)
+  }
+
+  const pauseStopwatch = () => {
+    stopwatchSettings.value.isRunning = false
+    if (stopwatchInterval) {
+      clearInterval(stopwatchInterval)
+      stopwatchInterval = undefined
+    }
+  }
+
+  const resetStopwatch = () => {
+    stopwatchSettings.value.isRunning = false
+    stopwatchSettings.value.elapsedTime = 0
+    if (stopwatchInterval) {
+      clearInterval(stopwatchInterval)
+      stopwatchInterval = undefined
+    }
+  }
+
+  const toggleStopwatchMode = () => {
+    if (stopwatchSettings.value.displayMode === 'clock') {
+      stopwatchSettings.value.displayMode = 'stopwatch'
+      resetStopwatch()
+    } else {
+      stopwatchSettings.value.displayMode = 'clock'
+      pauseStopwatch()
+    }
+  }
+
+  const getStopwatchTime = () => {
+    const totalSeconds = Math.floor(stopwatchSettings.value.elapsedTime / 1000)
+    const minutes = Math.floor(totalSeconds / 60)
+    const seconds = totalSeconds % 60
+    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+  }
+
   // 初始化
   loadPresets()
 
@@ -242,6 +304,7 @@ export const useTimerStore = defineStore('timer', () => {
     // 狀態
     settings,
     presets,
+    stopwatchSettings,
 
     // 計算屬性
     formattedTime,
@@ -261,5 +324,12 @@ export const useTimerStore = defineStore('timer', () => {
     addToPresets,
     applyPreset,
     deletePreset,
+
+    // 碼錶方法
+    startStopwatch,
+    pauseStopwatch,
+    resetStopwatch,
+    toggleStopwatchMode,
+    getStopwatchTime,
   }
 })
