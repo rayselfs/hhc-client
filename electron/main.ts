@@ -230,13 +230,15 @@ app.whenReady().then(() => {
     }
   })
 
-  // 檢查是否應該提示更新（考慮兩週延遲）
   setTimeout(() => {
     checkForUpdates()
-  }, 3000)
+  }, 1000)
 })
 
-// 檢查是否應該提示更新
+// not auto download
+autoUpdater.autoDownload = false
+
+// check for updates
 const checkForUpdates = () => {
   const updateSettingsPath = path.join(app.getPath('userData'), 'update-settings.json')
   let lastDeclinedTime = null
@@ -259,7 +261,6 @@ const checkForUpdates = () => {
 
 // 更新可用時，發送消息到主窗口顯示確認對話框
 autoUpdater.on('update-available', (info) => {
-  console.log('發現新版本:', info.version)
   if (mainWindow) {
     mainWindow.webContents.send('update-available', info)
   }
@@ -274,7 +275,6 @@ autoUpdater.on('download-progress', (progressObj) => {
 
 // 下載完成
 autoUpdater.on('update-downloaded', (info) => {
-  console.log('新版本下載完成，將提示使用者更新')
   if (mainWindow) {
     mainWindow.webContents.send('update-downloaded', info)
   }
@@ -282,7 +282,6 @@ autoUpdater.on('update-downloaded', (info) => {
 
 // 更新錯誤
 autoUpdater.on('error', (error) => {
-  console.error('更新錯誤:', error)
   if (mainWindow) {
     mainWindow.webContents.send('update-error', error.message)
   }
