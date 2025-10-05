@@ -111,8 +111,8 @@
                 ></v-btn>
                 <v-btn
                   v-else
-                  icon="mdi-pause"
-                  color="warning"
+                  :icon="timerStore.settings.isRunning ? 'mdi-pause' : 'mdi-play'"
+                  :color="timerStore.settings.isRunning ? 'warning' : 'primary'"
                   variant="flat"
                   :disabled="timerStore.settings.mode === 'clock'"
                   @click="timerStore.settings.isRunning ? pauseTimer() : resumeTimer()"
@@ -123,10 +123,7 @@
                   icon="mdi-refresh"
                   color="grey"
                   variant="outlined"
-                  :disabled="
-                    timerStore.settings.mode === 'clock' ||
-                    (!timerStore.settings.isRunning && (timerStore.settings.pausedTime ?? 0) === 0)
-                  "
+                  :disabled="timerStore.settings.mode === 'clock'"
                   @click="resetTimer"
                 ></v-btn>
               </v-col>
@@ -251,18 +248,27 @@
 import { ref, computed, onMounted, onBeforeUnmount, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useTimerStore } from '@/stores/timer'
-import { useProjectionStore } from '@/stores/projection'
+// import { useProjectionStore } from '@/stores/projection' // 不再需要，已移至 useProjectionMessaging
 import { useElectron } from '@/composables/useElectron'
-import { MessageType, ViewType, TimerMode } from '@/types/common'
+import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
+import { TimerMode } from '@/types/common'
 import CountdownTimer from '@/components/Timer/CountdownTimer.vue'
 import ClockDisplay from '@/components/Timer/ClockDisplay.vue'
+import { useMemoryManager } from '@/utils/memoryManager'
+import { throttle } from '@/utils/performanceUtils'
 
 const timerStore = useTimerStore()
-const projectionStore = useProjectionStore()
 const { t: $t } = useI18n()
 
 // Electron composable
-const { isElectron, sendToProjection: electronSendToProjection } = useElectron()
+const { isElectron } = useElectron()
+
+// 投影消息管理
+const { sendTimerUpdate, sendTimerStartProjection, forceRefreshAll, cleanupResources } =
+  useProjectionMessaging()
+
+// 記憶體管理
+const { track, untrack, cleanup } = useMemoryManager('TimerControl')
 
 // 時間輸入
 const minutes = ref('5')
@@ -283,27 +289,16 @@ const windowSize = ref({
   height: window.innerHeight,
 })
 
-// 監聽視窗大小變化
-const handleResize = () => {
+// 監聽視窗大小變化（使用節流優化）
+const handleResize = throttle(() => {
   windowSize.value = {
     width: window.innerWidth,
     height: window.innerHeight,
   }
-}
+}, 100)
 
 // 計時器
 let timerInterval: number | undefined
-
-// 狀態追蹤 - 用於優化投影更新
-let lastProjectionState: {
-  mode: string
-  timerDuration: number
-  timezone: string
-  isRunning: boolean
-  remainingTime: number
-  formattedTime: string
-  progress: number
-} | null = null
 
 // 計算屬性
 const currentDuration = computed(() => {
@@ -505,7 +500,7 @@ const updateTimerDuration = () => {
   updateDuration()
   // 立即重置投影上的計時器
   timerStore.resetTimer()
-  sendToProjection(true) // 強制更新，因為時間設定改變了
+  sendTimerUpdate(true) // 強制更新，因為時間設定改變了
 }
 
 // 處理時間輸入（按 Enter 鍵）
@@ -538,12 +533,12 @@ const addTime = (secondsToAdd: number) => {
     updateDuration()
   }
 
-  sendToProjection(true) // 強制更新，因為時間被修改了
+  sendTimerUpdate(true) // 強制更新，因為時間被修改了
 }
 
 const handleModeChange = (mode: TimerMode) => {
   timerStore.setMode(mode)
-  sendToProjection(true) // 強制更新，因為模式改變了
+  sendTimerUpdate(true) // 強制更新，因為模式改變了
 }
 
 const startTimer = () => {
@@ -551,39 +546,25 @@ const startTimer = () => {
 
   // 自動顯示投影並切換到計時器視圖
   if (isElectron()) {
-    // 更新投影 store 狀態
-    projectionStore.setCurrentView('timer')
-    projectionStore.setShowingDefault(false)
-
-    // 切換到計時器視圖
-    electronSendToProjection({
-      type: MessageType.CHANGE_VIEW,
-      data: { view: ViewType.TIMER },
-    })
-
-    // 確保顯示內容而不是預設畫面
-    electronSendToProjection({
-      type: MessageType.TOGGLE_PROJECTION_CONTENT,
-      data: { showDefault: false },
-    })
+    sendTimerStartProjection()
   }
 
-  sendToProjection(true) // 強制更新，因為計時器開始了
+  sendTimerUpdate(true) // 強制更新，因為計時器開始了
 }
 
 const pauseTimer = () => {
   timerStore.pauseTimer()
-  sendToProjection(true) // 強制更新，因為計時器暫停了
+  sendTimerUpdate(true) // 強制更新，因為計時器暫停了
 }
 
 const resetTimer = () => {
   timerStore.resetTimer()
-  sendToProjection(true) // 強制更新，因為計時器重置了
+  sendTimerUpdate(true) // 強制更新，因為計時器重置了
 }
 
 const resumeTimer = () => {
   timerStore.resumeTimer()
-  sendToProjection(true) // 強制更新，因為計時器恢復了
+  sendTimerUpdate(true) // 強制更新，因為計時器恢復了
 }
 
 const applyPreset = (item: { id: string; duration: number }) => {
@@ -594,7 +575,7 @@ const applyPreset = (item: { id: string; duration: number }) => {
     .toString()
     .padStart(2, '0')
   seconds.value = (duration % 60).toString().padStart(2, '0')
-  sendToProjection(true) // 強制更新，因為應用了預設
+  sendTimerUpdate(true) // 強制更新，因為應用了預設
 }
 
 const deletePreset = (id: string) => {
@@ -618,42 +599,7 @@ const formatDuration = (seconds: number) => {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
-// 智能投影更新 - 只在狀態真正改變時發送
-const sendToProjection = (forceUpdate = false) => {
-  if (!isElectron()) return
-
-  const currentState = {
-    mode: timerStore.settings.mode,
-    timerDuration: timerStore.settings.timerDuration,
-    timezone: timerStore.settings.timezone,
-    isRunning: timerStore.settings.isRunning,
-    remainingTime: timerStore.settings.remainingTime,
-    formattedTime: timerStore.formattedTime,
-    progress: timerStore.progress,
-  }
-
-  // 檢查狀態是否真的改變了
-  const hasStateChanged =
-    !lastProjectionState ||
-    lastProjectionState.mode !== currentState.mode ||
-    lastProjectionState.timerDuration !== currentState.timerDuration ||
-    lastProjectionState.timezone !== currentState.timezone ||
-    lastProjectionState.isRunning !== currentState.isRunning ||
-    lastProjectionState.remainingTime !== currentState.remainingTime ||
-    lastProjectionState.formattedTime !== currentState.formattedTime ||
-    Math.abs(lastProjectionState.progress - currentState.progress) > 0.1 // 進度變化超過 0.1%
-
-  // 只在狀態改變或強制更新時發送
-  if (hasStateChanged || forceUpdate) {
-    electronSendToProjection({
-      type: MessageType.UPDATE_TIMER,
-      data: currentState,
-    })
-
-    // 更新最後狀態
-    lastProjectionState = { ...currentState }
-  }
-}
+// 智能投影更新已移至 useProjectionMessaging 中處理
 
 const clockSize = computed(() => {
   const screenWidth = windowSize.value.width
@@ -691,8 +637,14 @@ onMounted(() => {
   seconds.value = (duration % 60).toString().padStart(2, '0')
 
   // 初始化時發送一次投影更新
-  sendToProjection(true)
+  forceRefreshAll()
 
+  // 追蹤事件監聽器
+  track('resize-listener', 'listener', {
+    element: window,
+    event: 'resize',
+    handler: handleResize,
+  })
   window.addEventListener('resize', handleResize)
 
   // 啟動計時器
@@ -712,19 +664,31 @@ onMounted(() => {
       (timerStore.settings.remainingTime === 0 && wasRemainingTime > 0)
 
     if (shouldUpdate) {
-      sendToProjection() // 使用智能更新，不強制
+      sendTimerUpdate() // 使用智能更新，不強制
     }
   }, 1000)
+
+  // 追蹤計時器
+  track('timer-interval', 'interval', timerInterval)
 })
 
 onBeforeUnmount(() => {
+  // 清理計時器
   if (timerInterval) {
+    untrack('timer-interval')
     clearInterval(timerInterval)
   }
+
+  // 清理事件監聽器
+  untrack('resize-listener')
+  window.removeEventListener('resize', handleResize)
+
+  // 清理投影資源
+  cleanupResources()
 })
 
 onUnmounted(() => {
-  window.removeEventListener('resize', handleResize)
+  cleanup()
 })
 </script>
 

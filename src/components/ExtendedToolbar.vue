@@ -115,19 +115,18 @@ import { useI18n } from 'vue-i18n'
 import { useTimerStore } from '@/stores/timer'
 import { useProjectionStore } from '@/stores/projection'
 import { useElectron } from '@/composables/useElectron'
+import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
 import { useDarkMode } from '@/composables/useDarkMode'
-import { MessageType } from '@/types/common'
+// import { MessageType } from '@/types/common' // 不再需要，使用優化版本
 
 // i18n
 const { t: $t, locale } = useI18n()
 
 // Electron composable
-const {
-  isElectron,
-  sendToProjection: electronSendToProjection,
-  onProjectionOpened,
-  onProjectionClosed,
-} = useElectron()
+const { isElectron, onProjectionOpened, onProjectionClosed } = useElectron()
+
+// 投影消息管理
+const { sendTimerUpdate, sendThemeUpdate, sendProjectionToggle } = useProjectionMessaging()
 
 // Props
 const props = defineProps<{
@@ -198,7 +197,7 @@ const isDarkMode = computed({
   set: (value: boolean) => {
     if (value !== isDark.value) {
       toggleDark()
-      sendThemeUpdate()
+      sendThemeUpdateMessage()
     }
   },
 })
@@ -219,53 +218,23 @@ const timezones = [
 // 處理時區變更
 const handleTimezoneChange = (timezone: string) => {
   timerStore.setTimezone(timezone)
-  sendToProjection()
+  sendTimerUpdate()
 }
 
 // 發送主題更新到投影窗口
-const sendThemeUpdate = () => {
-  if (isElectron()) {
-    electronSendToProjection({
-      type: MessageType.UPDATE_THEME,
-      data: {
-        isDark: isDark.value,
-      },
-    })
-  }
+const sendThemeUpdateMessage = () => {
+  sendThemeUpdate()
 }
 
-// 發送消息到投影窗口
-const sendToProjection = () => {
-  if (isElectron()) {
-    electronSendToProjection({
-      type: MessageType.UPDATE_TIMER,
-      data: {
-        mode: timerStore.settings.mode,
-        timerDuration: timerStore.settings.timerDuration,
-        timezone: timerStore.settings.timezone,
-        isRunning: timerStore.settings.isRunning,
-        remainingTime: timerStore.settings.remainingTime,
-        formattedTime: timerStore.formattedTime,
-        progress: timerStore.progress,
-      },
-    })
-  }
-}
+// 發送消息到投影窗口（使用優化版本）
+// const sendToProjection = () => {
+//   sendTimerUpdate()
+// }
 
 // 切換投影內容
 const toggleProjectionContent = () => {
   projectionStore.toggleProjectionContent()
   sendProjectionToggle()
-}
-
-// 發送投影切換消息
-const sendProjectionToggle = () => {
-  if (isElectron()) {
-    electronSendToProjection({
-      type: MessageType.TOGGLE_PROJECTION_CONTENT,
-      data: { showDefault: projectionStore.isShowingDefault },
-    })
-  }
 }
 
 // 處理語系切換

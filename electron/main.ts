@@ -17,7 +17,6 @@ const createMainWindow = () => {
     width: 1200,
     height: 800,
     webPreferences: {
-      webSecurity: false,
       nodeIntegration: false,
       contextIsolation: true,
       allowRunningInsecureContent: false,
@@ -84,7 +83,6 @@ const createProjectionWindow = () => {
     frame: false,
     alwaysOnTop: true,
     webPreferences: {
-      webSecurity: false,
       nodeIntegration: false,
       contextIsolation: true,
       allowRunningInsecureContent: false,

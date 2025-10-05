@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { TimerMode } from '@/types/common'
+import { useMemoryManager } from '@/utils/memoryManager'
 
 export interface TimerPreset {
   id: string
@@ -26,6 +27,9 @@ export interface StopwatchSettings {
 }
 
 export const useTimerStore = defineStore('timer', () => {
+  // 記憶體管理
+  const { track, untrack, cleanup } = useMemoryManager('useTimerStore')
+
   // 載入保存的設定
   const loadSettings = () => {
     const saved = localStorage.getItem('timer-settings')
@@ -261,11 +265,15 @@ export const useTimerStore = defineStore('timer', () => {
         stopwatchSettings.value.elapsedTime = Date.now() - stopwatchSettings.value.startTime
       }
     }, 100)
+
+    // 追蹤計時器
+    track('stopwatch-interval', 'interval', stopwatchInterval)
   }
 
   const pauseStopwatch = () => {
     stopwatchSettings.value.isRunning = false
     if (stopwatchInterval) {
+      untrack('stopwatch-interval')
       clearInterval(stopwatchInterval)
       stopwatchInterval = undefined
     }
@@ -275,6 +283,7 @@ export const useTimerStore = defineStore('timer', () => {
     stopwatchSettings.value.isRunning = false
     stopwatchSettings.value.elapsedTime = 0
     if (stopwatchInterval) {
+      untrack('stopwatch-interval')
       clearInterval(stopwatchInterval)
       stopwatchInterval = undefined
     }
@@ -331,5 +340,8 @@ export const useTimerStore = defineStore('timer', () => {
     resetStopwatch,
     toggleStopwatchMode,
     getStopwatchTime,
+
+    // 記憶體管理
+    cleanup,
   }
 })

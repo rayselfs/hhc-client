@@ -129,9 +129,7 @@ const checkAndEnsureProjectionWindow = async () => {
     try {
       const projectionExists = await checkProjectionWindow()
       if (!projectionExists) {
-        console.log('Projection window not found, recreating...')
         await ensureProjectionWindow()
-        console.log('Projection window recreated successfully')
       }
     } catch (error) {
       console.error('Error checking projection window:', error)
@@ -147,8 +145,6 @@ watch(currentView, async (newView) => {
 
     // 如果投影內容是關閉的（顯示預設畫面），自動開啟
     if (projectionStore.isShowingDefault) {
-      console.log('Projection content is closed, opening automatically...')
-
       // 更新 store 狀態
       projectionStore.setShowingDefault(false)
       projectionStore.setCurrentView('timer')

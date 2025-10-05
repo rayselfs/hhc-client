@@ -1,13 +1,17 @@
 import { onMounted, onBeforeUnmount, type Ref } from 'vue'
 import { useProjectionStore } from '@/stores/projection'
 import { useTimerStore } from '@/stores/timer'
-import { useElectron } from '@/composables/useElectron'
-import { MessageType } from '@/types/common'
+// import { useElectron } from '@/composables/useElectron' // 不再需要，使用優化版本
+import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
+// import { MessageType } from '@/types/common' // 不再需要，使用優化版本
+import { useMemoryManager } from '@/utils/memoryManager'
 
 export function useKeyboardShortcuts(currentView?: Ref<string> | string) {
   const projectionStore = useProjectionStore()
   const timerStore = useTimerStore()
-  const { sendToProjection } = useElectron()
+  // const { sendToProjection } = useElectron() // 不再需要，使用優化版本
+  const { sendTimerUpdate, sendProjectionToggle } = useProjectionMessaging()
+  const { track, untrack, cleanup } = useMemoryManager('useKeyboardShortcuts')
 
   // 處理鍵盤事件
   const handleKeydown = (event: KeyboardEvent) => {
@@ -52,21 +56,21 @@ export function useKeyboardShortcuts(currentView?: Ref<string> | string) {
           if (timerStore.settings.isRunning) {
             // 正在運行 → 暫停
             timerStore.pauseTimer()
-            sendTimerUpdate()
+            sendTimerUpdateMessage()
           } else if (timerStore.settings.pausedTime && timerStore.settings.pausedTime > 0) {
             // 已暫停 → 繼續
             timerStore.resumeTimer()
-            sendTimerUpdate()
+            sendTimerUpdateMessage()
           } else {
             // 未開始 → 開始
             timerStore.startTimer()
-            sendTimerUpdate()
+            sendTimerUpdateMessage()
           }
           break
         case 'KeyR':
           event.preventDefault()
           timerStore.resetTimer()
-          sendTimerUpdate()
+          sendTimerUpdateMessage()
           break
       }
     }
@@ -86,37 +90,29 @@ export function useKeyboardShortcuts(currentView?: Ref<string> | string) {
     }
   }
 
-  // 發送投影切換消息
-  const sendProjectionToggle = () => {
-    sendToProjection({
-      type: MessageType.TOGGLE_PROJECTION_CONTENT,
-      data: { showDefault: projectionStore.isShowingDefault },
-    })
-  }
-
-  // 發送計時器更新消息
-  const sendTimerUpdate = () => {
-    sendToProjection({
-      type: MessageType.UPDATE_TIMER,
-      data: {
-        mode: timerStore.settings.mode,
-        timerDuration: timerStore.settings.timerDuration,
-        timezone: timerStore.settings.timezone,
-        isRunning: timerStore.settings.isRunning,
-        remainingTime: timerStore.settings.remainingTime,
-        formattedTime: timerStore.formattedTime,
-        progress: timerStore.progress,
-      },
-    })
+  // 發送計時器更新消息（使用優化版本）
+  const sendTimerUpdateMessage = () => {
+    sendTimerUpdate()
   }
 
   // 生命週期管理
   onMounted(() => {
+    // 追蹤事件監聽器
+    track('keydown-listener', 'listener', {
+      element: document,
+      event: 'keydown',
+      handler: handleKeydown,
+    })
     document.addEventListener('keydown', handleKeydown)
   })
 
   onBeforeUnmount(() => {
+    // 清理事件監聽器
+    untrack('keydown-listener')
     document.removeEventListener('keydown', handleKeydown)
+
+    // 清理記憶體
+    cleanup()
   })
 
   return {
