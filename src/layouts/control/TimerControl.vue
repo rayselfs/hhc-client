@@ -203,7 +203,7 @@
             </v-row>
 
             <!-- Clock Display -->
-            <v-row v-if="externalDisplayMode === 'clock'" class="mt-4">
+            <v-row v-if="externalDisplayMode === 'clock'">
               <v-col cols="12" align="center">
                 <ClockDisplay :timezone="timerStore.settings.timezone" :size="clockSize" />
               </v-col>
@@ -657,12 +657,7 @@ const sendToProjection = (forceUpdate = false) => {
 
 const clockSize = computed(() => {
   const screenWidth = windowSize.value.width
-  let baseSize = 180
-  if (screenWidth < 1920) {
-    baseSize = 130
-  }
-
-  return baseSize * (screenWidth / 1920)
+  return 90 * (screenWidth / 1920)
 })
 
 // 碼錶相關 - 使用 store 中的方法
