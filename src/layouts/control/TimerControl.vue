@@ -5,7 +5,7 @@
       <v-col cols="6">
         <v-card class="control-card rounded-lg">
           <v-card-text>
-            <!-- Mode Selection -->
+            <!-- Timer Mode Selection -->
             <v-row class="mb-4">
               <v-col cols="12" align="center">
                 <v-btn-toggle
@@ -32,130 +32,103 @@
             </v-row>
 
             <!-- Timer Settings -->
-            <v-row class="d-flex justify-center">
-              <v-col
-                v-if="!timerStore.settings.isRunning && (timerStore.settings.pausedTime ?? 0) === 0"
-                cols="8"
-                class="d-flex justify-center ga-5 pe-2"
-              >
-                <v-text-field
-                  v-model.number="minutes"
-                  :label="$t('minutes')"
-                  type="number"
-                  min="0"
-                  max="59"
-                  variant="outlined"
-                  density="compact"
-                  class="time-input"
-                  @keyup.enter="handleTimeInput"
-                  @blur="handleTimeInput"
-                  @input="validateMinutesInput"
-                  @keydown="preventNonNumeric"
-                ></v-text-field>
-                <v-text-field
-                  v-model.number="seconds"
-                  :label="$t('seconds')"
-                  type="number"
-                  min="0"
-                  max="59"
-                  variant="outlined"
-                  density="compact"
-                  class="time-input"
-                  @keyup.enter="handleTimeInput"
-                  @blur="handleTimeInput"
-                  @input="validateSecondsInput"
-                  @keydown="preventNonNumeric"
-                ></v-text-field>
-              </v-col>
-
-              <!-- 倒數計時器（開始後顯示） -->
-              <v-col v-else cols="12">
+            <v-row>
+              <v-col cols="12">
                 <CountdownTimer
                   :progress="timerStore.progress"
                   :timer-formatted-time="timerStore.formattedTime"
-                  :size="timerSize"
-                />
-              </v-col>
-            </v-row>
-
-            <!-- 按鈕區域（保存預設或快捷按鈕） -->
-            <v-row class="mb-4">
-              <v-col cols="12">
-                <!-- 快捷按鈕（開始計時後顯示） -->
-                <div
-                  v-if="timerStore.settings.isRunning || (timerStore.settings.pausedTime ?? 0) > 0"
-                  class="quick-buttons"
+                  :size="250"
+                  :display-text="timerStore.settings.isRunning"
                 >
-                  <v-btn
-                    class="quick-button"
-                    color="primary"
-                    variant="outlined"
-                    size="small"
-                    @click="addTime(10)"
-                  >
-                    +0:10
-                  </v-btn>
-                  <v-btn
-                    class="quick-button"
-                    color="primary"
-                    variant="outlined"
-                    size="small"
-                    @click="addTime(30)"
-                  >
-                    +0:30
-                  </v-btn>
-                  <v-btn
-                    class="quick-button"
-                    color="primary"
-                    variant="outlined"
-                    size="small"
-                    @click="addTime(60)"
-                  >
-                    +1:00
-                  </v-btn>
-                </div>
+                  <template #content>
+                    <div
+                      v-if="
+                        !timerStore.settings.isRunning &&
+                        (timerStore.settings.pausedTime ?? 0) === 0
+                      "
+                      class="d-flex justify-center align-center"
+                    >
+                      <v-text-field
+                        v-model="minutes"
+                        variant="plain"
+                        density="compact"
+                        hide-details
+                        class="time-input-field"
+                        :placeholder="minutesPlaceholder"
+                        @focus="handleMinutesFocus"
+                        @blur="handleMinutesBlur"
+                        @keyup.enter="handleTimeInput"
+                        @input="validateMinutesInput"
+                        @keydown="preventNonNumeric"
+                      ></v-text-field>
+                      <span class="time-separator">:</span>
+                      <v-text-field
+                        v-model="seconds"
+                        variant="plain"
+                        density="compact"
+                        hide-details
+                        class="time-input-field"
+                        :placeholder="secondsPlaceholder"
+                        @focus="handleSecondsFocus"
+                        @blur="handleSecondsBlur"
+                        @keyup.enter="handleTimeInput"
+                        @input="validateSecondsInput"
+                        @keydown="preventNonNumeric"
+                      ></v-text-field>
+                    </div>
+                    <span v-else>{{ timerStore.formattedTime }}</span>
+                  </template>
+                </CountdownTimer>
               </v-col>
             </v-row>
 
-            <!-- 主要控制按鈕（移到卡片底部） -->
-            <v-row class="mt-auto d-flex justify-center">
-              <v-col cols="10">
-                <!-- 開始按鈕（未開始時） -->
-                <div
+            <!-- Quick Add Time Buttons -->
+            <v-row class="mb-4">
+              <v-col cols="12" align="center">
+                <v-btn class="ma-2" color="primary" variant="outlined" @click="addTime(10)">
+                  +0:10
+                </v-btn>
+                <v-btn class="ma-2" color="primary" variant="outlined" @click="addTime(30)">
+                  +0:30
+                </v-btn>
+                <v-btn class="ma-2" color="primary" variant="outlined" @click="addTime(60)">
+                  +1:00
+                </v-btn>
+              </v-col>
+            </v-row>
+
+            <v-row>
+              <v-col cols="6" class="d-flex justify-end">
+                <v-btn
                   v-if="
                     !timerStore.settings.isRunning && (timerStore.settings.pausedTime ?? 0) === 0
                   "
-                  class="start-button-container"
-                >
-                  <v-btn class="start-button" color="primary" size="x-large" @click="startTimer">
-                    <v-icon icon="mdi-play" size="large"></v-icon>
-                  </v-btn>
-                </div>
-
-                <!-- 暫停/繼續和重置按鈕（開始後） -->
-                <!-- :class="{ 'paused-button': !timerStore.settings.isRunning }" -->
-                <div v-else class="control-buttons-container">
-                  <div class="control-buttons">
-                    <v-btn
-                      class="control-button left-button"
-                      :color="timerStore.settings.isRunning ? 'primary' : 'warning'"
-                      size="x-large"
-                      @click="timerStore.settings.isRunning ? pauseTimer() : resumeTimer()"
-                    >
-                      <v-icon
-                        :icon="timerStore.settings.isRunning ? 'mdi-pause' : 'mdi-play'"
-                      ></v-icon>
-                    </v-btn>
-                    <v-btn
-                      class="control-button right-button"
-                      :color="timerStore.settings.isRunning ? 'primary' : 'warning'"
-                      size="x-large"
-                      @click="resetTimer"
-                    >
-                      <v-icon icon="mdi-refresh"></v-icon>
-                    </v-btn>
-                  </div>
-                </div>
+                  icon="mdi-play"
+                  color="primary"
+                  variant="flat"
+                  :disabled="timerStore.settings.mode === 'clock'"
+                  @click="startTimer"
+                ></v-btn>
+                <v-btn
+                  v-else
+                  icon="mdi-pause"
+                  color="warning"
+                  variant="flat"
+                  :disabled="timerStore.settings.mode === 'clock'"
+                  @click="timerStore.settings.isRunning ? pauseTimer() : resumeTimer()"
+                ></v-btn>
+              </v-col>
+              <v-col cols="6" class="d-flex justify-start">
+                <v-btn
+                  icon="mdi-refresh"
+                  color="grey"
+                  variant="outlined"
+                  :disabled="
+                    timerStore.settings.mode === 'clock' ||
+                    (!timerStore.settings.isRunning && (timerStore.settings.pausedTime ?? 0) === 0)
+                  "
+                  @click="resetTimer"
+                ></v-btn>
               </v-col>
             </v-row>
           </v-card-text>
@@ -170,10 +143,16 @@
             <div class="d-flex justify-space-between mb-2">
               <v-label class="text-h6 align-start">{{ $t('timerPresets') }}</v-label>
               <v-btn
-                v-if="!timerStore.settings.isRunning && (timerStore.settings.pausedTime ?? 0) === 0"
                 icon="mdi-plus"
                 size="small"
                 variant="tonal"
+                :disabled="
+                  timerStore.settings.isRunning || (timerStore.settings.pausedTime ?? 0) > 0
+                "
+                :class="{
+                  'cursor-not-allowed':
+                    timerStore.settings.isRunning || (timerStore.settings.pausedTime ?? 0) > 0,
+                }"
                 @click="saveTimerPreset"
               ></v-btn>
             </div>
@@ -224,7 +203,7 @@
             </v-row>
 
             <!-- Clock Display -->
-            <v-row v-if="externalDisplayMode === 'clock'">
+            <v-row v-if="externalDisplayMode === 'clock'" class="mt-4">
               <v-col cols="12" align="center">
                 <ClockDisplay :timezone="timerStore.settings.timezone" :size="clockSize" />
               </v-col>
@@ -256,6 +235,7 @@
                   icon="mdi-refresh"
                   color="grey"
                   variant="outlined"
+                  :disabled="!isStopwatchRunning && stopwatchTime === '00:00'"
                   @click="resetStopwatch"
                 ></v-btn>
               </v-col>
@@ -285,8 +265,14 @@ const { t: $t } = useI18n()
 const { isElectron, sendToProjection: electronSendToProjection } = useElectron()
 
 // 時間輸入
-const minutes = ref(5)
-const seconds = ref(0)
+const minutes = ref('5')
+const seconds = ref('0')
+
+// 輸入框焦點狀態和佔位符
+const minutesFocused = ref(false)
+const secondsFocused = ref(false)
+const minutesPlaceholder = computed(() => (minutesFocused.value ? '00' : ''))
+const secondsPlaceholder = computed(() => (secondsFocused.value ? '00' : ''))
 
 // External Display 模式 - 使用 store 中的狀態
 const externalDisplayMode = computed(() => timerStore.stopwatchSettings.displayMode)
@@ -321,7 +307,7 @@ let lastProjectionState: {
 
 // 計算屬性
 const currentDuration = computed(() => {
-  return minutes.value * 60 + seconds.value
+  return parseInt(minutes.value) * 60 + parseInt(seconds.value)
 })
 
 // 方法
@@ -332,36 +318,47 @@ const updateDuration = () => {
 
 // 處理時間輸入驗證和限制
 const validateAndNormalizeTime = () => {
-  // 確保輸入的是數字
-  if (isNaN(minutes.value) || minutes.value < 0) {
-    minutes.value = 0
+  // 轉換為數字並確保是有效值
+  const minutesNum = parseInt(minutes.value) || 0
+  const secondsNum = parseInt(seconds.value) || 0
+
+  if (minutesNum < 0) {
+    minutes.value = '00'
+  } else {
+    minutes.value = minutesNum.toString().padStart(2, '0')
   }
-  if (isNaN(seconds.value) || seconds.value < 0) {
-    seconds.value = 0
+
+  if (secondsNum < 0) {
+    seconds.value = '00'
+  } else {
+    seconds.value = secondsNum.toString().padStart(2, '0')
   }
 
   // 規則1: 秒數大於60時進位到分鐘
-  if (seconds.value >= 60) {
-    const extraMinutes = Math.floor(seconds.value / 60)
-    minutes.value += extraMinutes
-    seconds.value = seconds.value % 60
+  if (parseInt(seconds.value) >= 60) {
+    const extraMinutes = Math.floor(parseInt(seconds.value) / 60)
+    minutes.value = (parseInt(minutes.value) + extraMinutes).toString().padStart(2, '0')
+    seconds.value = (parseInt(seconds.value) % 60).toString().padStart(2, '0')
   }
 
   // 規則2: 限制最大時間為59分59秒
-  if (minutes.value >= 60) {
-    minutes.value = 59
-    seconds.value = 59
+  if (parseInt(minutes.value) >= 60) {
+    minutes.value = '59'
+    seconds.value = '59'
   }
 
-  // 規則3: 時間為0:0時限制為0分30秒
-  if (minutes.value === 0 && seconds.value === 0) {
-    minutes.value = 0
-    seconds.value = 30
+  // 規則3: 時間為0:0時限制為0分30秒（但允許用戶輸入00）
+  if (parseInt(minutes.value) === 0 && parseInt(seconds.value) === 0) {
+    // 只有在用戶沒有主動輸入00時才自動設為30
+    if (seconds.value !== '00') {
+      minutes.value = '00'
+      seconds.value = '30'
+    }
   }
 
-  // 確保分鐘和秒數都是整數
-  minutes.value = Math.floor(minutes.value)
-  seconds.value = Math.floor(seconds.value)
+  // 確保分鐘和秒數都是整數並保持兩位數格式
+  minutes.value = Math.floor(parseInt(minutes.value)).toString().padStart(2, '0')
+  seconds.value = Math.floor(parseInt(seconds.value)).toString().padStart(2, '0')
 }
 
 // 防止非數字輸入
@@ -390,53 +387,120 @@ const preventNonNumeric = (event: KeyboardEvent) => {
 
 // 實時驗證分鐘輸入
 const validateMinutesInput = () => {
-  if (isNaN(minutes.value) || minutes.value < 0) {
-    minutes.value = 0
-  }
+  // 轉換為數字並驗證
+  const numValue = parseInt(minutes.value) || 0
 
-  // 限制最大分鐘數為59
-  if (minutes.value >= 60) {
-    minutes.value = 59
+  if (numValue < 0) {
+    minutes.value = '00'
+  } else if (numValue >= 60) {
+    minutes.value = '59'
     // 如果分鐘達到上限，將秒數設為59
-    if (seconds.value < 59) {
-      seconds.value = 59
+    if (parseInt(seconds.value) < 59) {
+      seconds.value = '59'
     }
+  } else {
+    // 顯示為兩位數格式
+    minutes.value = numValue.toString().padStart(2, '0')
   }
 
-  minutes.value = Math.floor(minutes.value)
+  // 如果總時間為0:0，設為0:30（但允許用戶輸入00）
+  if (parseInt(minutes.value) === 0 && parseInt(seconds.value) === 0) {
+    seconds.value = '30'
+  }
+
   updateDuration()
 }
 
 // 實時驗證秒數輸入
 const validateSecondsInput = () => {
-  if (isNaN(seconds.value) || seconds.value < 0) {
-    seconds.value = 0
+  // 允許輸入 "00" 但保持其他驗證
+  const inputValue = seconds.value.trim()
+
+  // 如果輸入為空或只有空格，設為 "0"
+  if (inputValue === '') {
+    seconds.value = '0'
+    updateDuration()
+    return
   }
 
-  // 秒數大於60時自動進位
-  if (seconds.value >= 60) {
-    const extraMinutes = Math.floor(seconds.value / 60)
-    minutes.value += extraMinutes
-    seconds.value = seconds.value % 60
+  // 轉換為數字並驗證
+  const numValue = parseInt(inputValue) || 0
+
+  if (numValue < 0) {
+    seconds.value = '00'
+  } else if (numValue >= 60) {
+    // 秒數大於60時自動進位
+    const extraMinutes = Math.floor(numValue / 60)
+    const newMinutes = parseInt(minutes.value) + extraMinutes
+    const newSeconds = numValue % 60
 
     // 檢查分鐘是否超過限制
-    if (minutes.value >= 60) {
-      minutes.value = 59
-      seconds.value = 59
+    if (newMinutes >= 60) {
+      minutes.value = '59'
+      seconds.value = '59'
+    } else {
+      minutes.value = newMinutes.toString().padStart(2, '0')
+      seconds.value = newSeconds.toString().padStart(2, '0')
+    }
+  } else {
+    // 顯示為兩位數格式，允許 "00"
+    if (inputValue === '00' || inputValue === '0') {
+      seconds.value = '00'
+    } else {
+      seconds.value = numValue.toString().padStart(2, '0')
     }
   }
 
-  // 如果總時間為0:0，設為0:30
-  if (minutes.value === 0 && seconds.value === 0) {
-    seconds.value = 30
+  // 如果總時間為0:0，設為0:30（但允許用戶輸入00）
+  if (parseInt(minutes.value) === 0 && parseInt(seconds.value) === 0) {
+    seconds.value = '30'
   }
 
-  seconds.value = Math.floor(seconds.value)
   updateDuration()
 }
 
-// 處理時間輸入（按 Enter 鍵）
-const handleTimeInput = () => {
+// 處理分鐘輸入框焦點
+const handleMinutesFocus = () => {
+  minutesFocused.value = true
+  // 清除內容讓用戶重新輸入
+  minutes.value = ''
+}
+
+const handleMinutesBlur = () => {
+  minutesFocused.value = false
+  // 如果為空，設為 00
+  if (minutes.value === '') {
+    minutes.value = '00'
+  }
+
+  if (parseInt(minutes.value) === 0 && parseInt(seconds.value) === 0) {
+    seconds.value = '30'
+  }
+  handleTimeInput()
+}
+
+// 處理秒數輸入框焦點
+const handleSecondsFocus = () => {
+  secondsFocused.value = true
+  // 清除內容讓用戶重新輸入
+  seconds.value = ''
+}
+
+const handleSecondsBlur = () => {
+  secondsFocused.value = false
+  // 如果為空，設為 00
+  if (seconds.value === '') {
+    seconds.value = '00'
+  }
+
+  if (parseInt(minutes.value) === 0 && parseInt(seconds.value) === 0) {
+    seconds.value = '30'
+  }
+  handleTimeInput()
+}
+
+// 更新計時器持續時間
+const updateTimerDuration = () => {
   validateAndNormalizeTime()
   updateDuration()
   // 立即重置投影上的計時器
@@ -444,9 +508,36 @@ const handleTimeInput = () => {
   sendToProjection(true) // 強制更新，因為時間設定改變了
 }
 
+// 處理時間輸入（按 Enter 鍵）
+const handleTimeInput = () => {
+  updateTimerDuration()
+}
+
 // 添加時間（快捷按鈕）
 const addTime = (secondsToAdd: number) => {
-  timerStore.addTime(secondsToAdd)
+  // 如果計時器正在運行，使用 store 的 addTime 方法
+  if (timerStore.settings.isRunning) {
+    timerStore.addTime(secondsToAdd)
+  } else {
+    // 如果計時器未運行，直接調整輸入框的時間
+    const currentTotalSeconds = parseInt(minutes.value) * 60 + parseInt(seconds.value)
+    const newTotalSeconds = currentTotalSeconds + secondsToAdd
+
+    // 限制最大時間為 59:59
+    const maxSeconds = 59 * 60 + 59
+    const finalSeconds = Math.min(newTotalSeconds, maxSeconds)
+
+    // 更新輸入框
+    const newMinutes = Math.floor(finalSeconds / 60)
+    const newSeconds = finalSeconds % 60
+
+    minutes.value = newMinutes.toString().padStart(2, '0')
+    seconds.value = newSeconds.toString().padStart(2, '0')
+
+    // 更新計時器持續時間
+    updateDuration()
+  }
+
   sendToProjection(true) // 強制更新，因為時間被修改了
 }
 
@@ -500,7 +591,9 @@ const applyPreset = (item: { id: string; duration: number }) => {
   // 更新輸入欄位
   const duration = item.duration
   minutes.value = Math.floor((duration % 3600) / 60)
-  seconds.value = duration % 60
+    .toString()
+    .padStart(2, '0')
+  seconds.value = (duration % 60).toString().padStart(2, '0')
   sendToProjection(true) // 強制更新，因為應用了預設
 }
 
@@ -562,11 +655,6 @@ const sendToProjection = (forceUpdate = false) => {
   }
 }
 
-const timerSize = computed(() => {
-  const screenWidth = windowSize.value.width
-  return 300 * (screenWidth / 1920)
-})
-
 const clockSize = computed(() => {
   const screenWidth = windowSize.value.width
   let baseSize = 180
@@ -603,7 +691,9 @@ onMounted(() => {
   // 初始化時間輸入
   const duration = timerStore.settings.timerDuration
   minutes.value = Math.floor(duration / 60)
-  seconds.value = duration % 60
+    .toString()
+    .padStart(2, '0')
+  seconds.value = (duration % 60).toString().padStart(2, '0')
 
   // 初始化時發送一次投影更新
   sendToProjection(true)
@@ -657,61 +747,36 @@ onUnmounted(() => {
 }
 
 .stopwatch-time {
-  font-size: 3rem;
+  font-size: 60px;
   font-weight: 500;
-  color: rgb(var(--v-theme-on-surface));
 }
 
-.start-button-container {
-  display: flex;
-  justify-content: center;
-  margin: 20px 0 0 0;
-  padding: 0 5px;
+.time-input-field {
+  width: 90px;
 }
 
-.start-button {
-  width: calc(100% - 10px);
-  height: 50px;
-  border-radius: 25px;
+.time-separator {
+  font-size: 77px;
+  font-weight: 500;
 }
 
-/* 控制按鈕容器 */
-.control-buttons-container {
-  margin: 20px 0 0 0;
-  padding: 0 5px;
+.time-input-field :deep(.v-field__input) {
+  text-align: center;
+  font-size: 77px;
+  font-weight: 500;
+  padding: 0;
+  min-height: auto;
+  transition: all 0.2s ease;
 }
 
-.control-buttons {
-  display: flex;
-  justify-content: center;
-  gap: 20px;
-  width: calc(100% - 10px);
+.time-input-field :deep(.v-field__input::placeholder) {
+  color: rgba(var(--v-theme-on-surface), 0.4);
+  font-size: 77px;
+  font-weight: 500;
 }
 
-.control-button {
-  width: calc(50% - 10px);
-  height: 50px;
-  border-radius: 25px;
-  flex: 1;
-}
-
-/* 快捷按鈕 */
-.quick-buttons {
-  display: flex;
-  justify-content: center;
-  gap: 10px;
-  margin: 15px 0;
-  min-height: 40px; /* 確保與保存按鈕相同高度 */
-  align-items: center;
-}
-
-.quick-button {
-  min-width: 60px;
-  height: 36px; /* 與保存按鈕相同高度 */
-}
-
-.time-input {
-  width: calc(50% - 10px);
-  flex: 1;
+.time-input-field:focus-within :deep(.v-field__input) {
+  background-color: rgba(var(--v-theme-on-surface), 0.1);
+  border-radius: 8px;
 }
 </style>

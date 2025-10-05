@@ -1,12 +1,12 @@
 <template>
-  <v-dialog v-model="dialog" :max-width="maxWidth" persistent>
-    <v-card>
-      <v-card-title v-if="title" class="text-h5 pa-4">
+  <v-dialog v-model="dialog" width="450" scrollable>
+    <v-card class="rounded-lg">
+      <v-card-title v-if="title" class="text-h5 pa-4 text-break">
         <v-icon v-if="icon" :icon="icon" :color="iconColor" class="mr-2"></v-icon>
         {{ title }}
       </v-card-title>
 
-      <v-card-text class="pa-4">
+      <v-card-text class="pa-4" style="height: 80px">
         {{ message }}
       </v-card-text>
 

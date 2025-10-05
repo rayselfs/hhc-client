@@ -23,8 +23,13 @@
         }"
       />
     </svg>
-    <div class="time-left" :style="{ fontSize }">
+    <div v-if="displayText" class="time-left" :style="{ fontSize }">
       {{ timerFormattedTime }}
+    </div>
+    <div v-else class="time-left" :style="{ fontSize }">
+      <slot name="content">
+        {{ timerFormattedTime }}
+      </slot>
     </div>
   </div>
 </template>
@@ -36,9 +41,12 @@ interface Props {
   progress: number
   timerFormattedTime: string
   size: number
+  displayText?: boolean // 是否顯示文字，預設為 true
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  displayText: true,
+})
 
 // Track whether to apply transition (disable on reset)
 const shouldTransition = ref(true)
