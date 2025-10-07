@@ -258,9 +258,6 @@ const handleResize = throttle(() => {
   }
 }, 100)
 
-// 計時器
-let timerInterval: number | undefined
-
 // 計算屬性
 const currentDuration = computed(() => {
   return parseInt(minutes.value) * 60 + parseInt(seconds.value)
@@ -459,39 +456,9 @@ onMounted(() => {
     handler: handleResize,
   })
   window.addEventListener('resize', handleResize)
-
-  // 啟動計時器
-  timerInterval = window.setInterval(() => {
-    const wasRunning = timerStore.settings.isRunning
-    const wasRemainingTime = timerStore.settings.remainingTime
-
-    timerStore.tick()
-
-    // 只在以下情況發送投影更新：
-    // 1. 計時器正在運行且時間有變化
-    // 2. 計時器剛結束（從運行變為停止）
-    // 3. 剩餘時間為 0（確保結束狀態被發送）
-    const shouldUpdate =
-      (wasRunning && timerStore.settings.remainingTime !== wasRemainingTime) ||
-      (wasRunning && !timerStore.settings.isRunning) ||
-      (timerStore.settings.remainingTime === 0 && wasRemainingTime > 0)
-
-    if (shouldUpdate) {
-      sendTimerUpdate() // 使用智能更新，不強制
-    }
-  }, 1000)
-
-  // 追蹤計時器
-  track('timer-interval', 'interval', timerInterval)
 })
 
 onBeforeUnmount(() => {
-  // 清理計時器
-  if (timerInterval) {
-    untrack('timer-interval')
-    clearInterval(timerInterval)
-  }
-
   // 清理事件監聽器
   untrack('resize-listener')
   window.removeEventListener('resize', handleResize)

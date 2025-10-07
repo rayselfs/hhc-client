@@ -38,6 +38,15 @@
         </transition>
       </v-container>
     </v-main>
+
+    <!-- 懸浮計時器視窗 -->
+    <FloatingTimer
+      v-if="showFloatingTimer"
+      :remaining-time="timerStore.settings.remainingTime"
+      :is-running="timerStore.settings.isRunning"
+      :original-duration="timerStore.settings.originalDuration"
+      @click="goToTimer"
+    />
   </v-layout>
 </template>
 
@@ -47,10 +56,13 @@ import { useI18n } from 'vue-i18n'
 import ExtendedToolbar from '@/components/ExtendedToolbar.vue'
 import BibleViewer from '@/components/Bible/BibleViewer.vue'
 import TimerControl from '@/layouts/control/TimerControl.vue'
+import FloatingTimer from '@/components/Timer/FloatingTimer.vue'
 import { useElectron } from '@/composables/useElectron'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { useProjectionStore } from '@/stores/projection'
 import { useAlert } from '@/composables/useAlert'
+import { useTimerStore } from '@/stores/timer'
+import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
 import { MessageType, ViewType, type AppMessage } from '@/types/common'
 
 // i18n
@@ -61,6 +73,50 @@ const projectionStore = useProjectionStore()
 
 // Alert
 const { warning } = useAlert()
+
+// Timer store
+const timerStore = useTimerStore()
+
+// Projection messaging
+const { sendTimerUpdate } = useProjectionMessaging()
+
+// 全局計時器間隔
+let globalTimerInterval: number | undefined
+
+// 啟動全局計時器間隔
+const startGlobalTimerInterval = () => {
+  if (globalTimerInterval) {
+    clearInterval(globalTimerInterval)
+  }
+
+  globalTimerInterval = window.setInterval(() => {
+    const wasRunning = timerStore.settings.isRunning
+    const wasRemainingTime = timerStore.settings.remainingTime
+
+    timerStore.tick()
+
+    // 只在以下情況發送投影更新：
+    // 1. 計時器正在運行且時間有變化
+    // 2. 計時器剛結束（從運行變為停止）
+    // 3. 剩餘時間為 0（確保結束狀態被發送）
+    const shouldUpdate =
+      (wasRunning && timerStore.settings.remainingTime !== wasRemainingTime) ||
+      (wasRunning && !timerStore.settings.isRunning) ||
+      (timerStore.settings.remainingTime === 0 && wasRemainingTime > 0)
+
+    if (shouldUpdate) {
+      sendTimerUpdate() // 使用智能更新，不強制
+    }
+  }, 1000)
+}
+
+// 停止全局計時器間隔
+const stopGlobalTimerInterval = () => {
+  if (globalTimerInterval) {
+    clearInterval(globalTimerInterval)
+    globalTimerInterval = undefined
+  }
+}
 
 // Electron composable
 const {
@@ -81,6 +137,12 @@ const drawerCollapsed = ref(false)
 
 // 當前選中的視圖
 const currentView = ref('bible') // 預設使用聖經
+
+// 懸浮計時器顯示狀態
+const showFloatingTimer = computed(() => {
+  // 只有在計時器運行中且不在計時器頁面時才顯示
+  return timerStore.settings.isRunning && currentView.value !== 'timer'
+})
 
 // 鍵盤快捷鍵
 useKeyboardShortcuts(currentView)
@@ -115,12 +177,18 @@ const toggleDrawer = () => {
   drawerCollapsed.value = !drawerCollapsed.value
 }
 
+// 點擊懸浮計時器跳轉到計時器頁面
+const goToTimer = () => {
+  currentView.value = 'timer'
+  sendToProjection({
+    type: MessageType.CHANGE_VIEW,
+    data: { view: 'timer' as ViewType },
+  })
+}
+
 // 處理選單項目點擊事件
 const handleMenuItemClick = (item: { title: string; icon: string; component: string }) => {
   currentView.value = item.component
-  // 不再自動關閉側邊欄，因為現在是常駐模式
-
-  // 發送消息到投影窗口
   sendToProjection({
     type: MessageType.CHANGE_VIEW,
     data: { view: item.component as ViewType },
@@ -185,6 +253,9 @@ watch(currentView, async (newView) => {
 
 // 生命週期
 onMounted(async () => {
+  // 啟動全局計時器間隔
+  startGlobalTimerInterval()
+
   if (isElectron()) {
     // 監聽來自Electron的消息
     onMainMessage(handleElectronMessage)
@@ -198,6 +269,9 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  // 停止全局計時器間隔
+  stopGlobalTimerInterval()
+
   if (isElectron()) {
     removeAllListeners('main-message')
     removeAllListeners('no-second-screen-detected')
