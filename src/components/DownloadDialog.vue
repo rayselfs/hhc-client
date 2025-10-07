@@ -99,13 +99,18 @@ const handleCancel = () => {
 onMounted(() => {
   if (!isElectron()) return
 
-  // 監聽顯示下載對話框事件
-  window.addEventListener('show-download-dialog', (event: Event) => {
-    const customEvent = event as CustomEvent<{ progress: DownloadProgress; updateInfo: UpdateInfo }>
-    updateInfo.value = customEvent.detail.updateInfo
+  // 監聽更新可用事件，直接顯示下載對話框
+  window.electronAPI.onUpdateAvailable((info: UpdateInfo) => {
+    updateInfo.value = info
     showDialog.value = true
     downloadComplete.value = false
     error.value = ''
+    // 重置進度
+    progress.value = 0
+    transferred.value = 0
+    total.value = 0
+    speed.value = 0
+    eta.value = 0
   })
 
   // 監聽下載進度
@@ -117,12 +122,18 @@ onMounted(() => {
     eta.value = progressObj.eta
   })
 
-  // 監聽下載完成 - 直接安裝，不需要再次確認
+  // 監聽下載完成，顯示安裝確認對話框
   window.electronAPI.onUpdateDownloaded(() => {
     downloadComplete.value = true
     progress.value = 100
-    // 下載完成後直接安裝
-    window.electronAPI.installUpdate()
+    // 關閉下載對話框，觸發安裝確認對話框
+    showDialog.value = false
+    // 觸發安裝確認對話框
+    window.dispatchEvent(
+      new CustomEvent('show-install-dialog', {
+        detail: { updateInfo: updateInfo.value },
+      }),
+    )
   })
 
   // 監聽更新錯誤
@@ -135,7 +146,7 @@ onBeforeUnmount(() => {
   if (!isElectron()) return
 
   // 清理監聽器
-  window.removeEventListener('show-download-dialog', () => {})
+  window.electronAPI.removeAllListeners('update-available')
   window.electronAPI.removeAllListeners('download-progress')
   window.electronAPI.removeAllListeners('update-downloaded')
   window.electronAPI.removeAllListeners('update-error')

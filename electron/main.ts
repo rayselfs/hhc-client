@@ -233,9 +233,6 @@ app.whenReady().then(() => {
   }, 1000)
 })
 
-// not auto download
-autoUpdater.autoDownload = false
-
 // check for updates
 const checkForUpdates = () => {
   const updateSettingsPath = path.join(app.getPath('userData'), 'update-settings.json')
@@ -257,7 +254,7 @@ const checkForUpdates = () => {
   }
 }
 
-// 更新可用時，發送消息到主窗口顯示確認對話框
+// 更新可用時，顯示下載對話框並開始下載
 autoUpdater.on('update-available', (info) => {
   if (mainWindow) {
     mainWindow.webContents.send('update-available', info)
@@ -271,7 +268,7 @@ autoUpdater.on('download-progress', (progressObj) => {
   }
 })
 
-// 下載完成
+// 下載完成，顯示確認安裝對話框
 autoUpdater.on('update-downloaded', (info) => {
   if (mainWindow) {
     mainWindow.webContents.send('update-downloaded', info)

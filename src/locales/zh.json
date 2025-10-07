@@ -52,6 +52,12 @@
     "remainingTime": "剩餘時間: {time}",
     "error": "更新時發生錯誤",
     "downloadError": "下載更新失敗",
-    "installError": "安裝更新失敗"
+    "installError": "安裝更新失敗",
+    "readyToInstall": "更新已準備就緒",
+    "installMessage": "版本 {version} 已下載完成，是否立即安裝？",
+    "installDescription": "安裝後應用程式將重新啟動以完成更新。",
+    "installNow": "立即安裝",
+    "delay": "稍後安裝",
+    "installing": "安裝中..."
   }
 }

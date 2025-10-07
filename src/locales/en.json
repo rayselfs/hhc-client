@@ -52,6 +52,12 @@
     "remainingTime": "Remaining time: {time}",
     "error": "An error occurred during update",
     "downloadError": "Failed to download update",
-    "installError": "Failed to install update"
+    "installError": "Failed to install update",
+    "readyToInstall": "Update Ready to Install",
+    "installMessage": "Version {version} has been downloaded. Would you like to install it now?",
+    "installDescription": "The application will restart after installation to complete the update.",
+    "installNow": "Install Now",
+    "delay": "Install Later",
+    "installing": "Installing..."
   }
 }

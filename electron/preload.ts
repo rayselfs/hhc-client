@@ -44,13 +44,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   declineUpdate: () => ipcRenderer.invoke('decline-update'),
 
   // 監聽更新相關事件
-  onUpdateAvailable: (callback: (info: any) => void) => {
+  onUpdateAvailable: (callback: (info: unknown) => void) => {
     ipcRenderer.on('update-available', (event, info) => callback(info))
   },
-  onDownloadProgress: (callback: (progress: any) => void) => {
+  onDownloadProgress: (callback: (progress: unknown) => void) => {
     ipcRenderer.on('download-progress', (event, progress) => callback(progress))
   },
-  onUpdateDownloaded: (callback: (info: any) => void) => {
+  onUpdateDownloaded: (callback: (info: unknown) => void) => {
     ipcRenderer.on('update-downloaded', (event, info) => callback(info))
   },
   onUpdateError: (callback: (error: string) => void) => {
