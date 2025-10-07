@@ -32,7 +32,7 @@ jobs:
         run: npm ci
 
       - name: Build and Release (macOS)
-        if: matrix.os == 'macos-13'
+        if: matrix.os == 'macos-14'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # 如果有 Apple Developer ID，可以添加以下環境變數
@@ -46,7 +46,7 @@ jobs:
           npm run electron:build:mac-arm -- --publish always
 
       - name: Build and Release (Windows)
-        if: matrix.os == 'windows-2022'
+        if: matrix.os == 'windows-2025'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
