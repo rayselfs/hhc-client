@@ -2,7 +2,9 @@
   "bible": "Bible",
   "timer": "Timer",
   "settings": "Settings",
+  "open": "Open",
   "close": "Close",
+  "projection": "Projection",
   "about": {
     "title": "About",
     "version": "Version",

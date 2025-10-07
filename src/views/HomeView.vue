@@ -1,8 +1,13 @@
 <template>
-  <v-app>
-    <extended-toolbar :current-view="currentView" @toggle-drawer="drawer = !drawer" />
-
-    <v-navigation-drawer v-model="drawer" temporary>
+  <v-layout class="rounded rounded-md">
+    <v-navigation-drawer
+      v-model="drawer"
+      permanent
+      :rail="drawerCollapsed"
+      rail-width="72"
+      width="240"
+      class="custom-drawer"
+    >
       <v-list>
         <v-list-item
           v-for="(item, index) in menuItems"
@@ -10,14 +15,21 @@
           :value="index"
           @click="handleMenuItemClick(item)"
           :active="currentView === item.component"
+          class="menu-item"
         >
           <template #prepend>
-            <v-icon :icon="item.icon"></v-icon>
+            <v-icon :icon="item.icon" size="24"></v-icon>
           </template>
-          <v-list-item-title>{{ $t(item.title) }}</v-list-item-title>
+          <v-list-item-title v-if="!drawerCollapsed">{{ $t(item.title) }}</v-list-item-title>
         </v-list-item>
       </v-list>
     </v-navigation-drawer>
+
+    <extended-toolbar
+      :current-view="currentView"
+      :drawer-collapsed="drawerCollapsed"
+      @toggle-drawer="toggleDrawer"
+    />
 
     <v-main>
       <v-container>
@@ -26,7 +38,7 @@
         </transition>
       </v-container>
     </v-main>
-  </v-app>
+  </v-layout>
 </template>
 
 <script setup lang="ts">
@@ -61,8 +73,11 @@ const {
   removeAllListeners,
 } = useElectron()
 
-// 控制 navigation-drawer 的開關狀態，預設為關閉 (false)
-const drawer = ref(false)
+// 控制 navigation-drawer 的開關狀態，預設為開啟 (true)
+const drawer = ref(true)
+
+// 控制 drawer 的縮放狀態，預設為展開 (false)
+const drawerCollapsed = ref(false)
 
 // 當前選中的視圖
 const currentView = ref('bible') // 預設使用聖經
@@ -95,10 +110,15 @@ const currentComponent = computed(() => {
   return componentMap[currentView.value as keyof typeof componentMap]
 })
 
+// 切換 drawer 縮放狀態
+const toggleDrawer = () => {
+  drawerCollapsed.value = !drawerCollapsed.value
+}
+
 // 處理選單項目點擊事件
 const handleMenuItemClick = (item: { title: string; icon: string; component: string }) => {
   currentView.value = item.component
-  drawer.value = false // 點擊任何項目後自動關閉側邊欄
+  // 不再自動關閉側邊欄，因為現在是常駐模式
 
   // 發送消息到投影窗口
   sendToProjection({
@@ -205,5 +225,29 @@ onBeforeUnmount(() => {
 .page-slide-leave-from {
   opacity: 1;
   transform: translateX(0);
+}
+
+/* 自定義 drawer 樣式 */
+.custom-drawer {
+  transition: width 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.menu-item {
+  transition: all 0.2s ease;
+  border-radius: 8px;
+  margin: 4px 8px;
+}
+
+.menu-item:hover {
+  background-color: rgba(var(--v-theme-primary), 0.1);
+}
+
+.menu-item.v-list-item--active {
+  background-color: rgba(var(--v-theme-primary), 0.2);
+  color: rgb(var(--v-theme-primary));
+}
+
+.menu-item.v-list-item--active .v-icon {
+  color: rgb(var(--v-theme-primary));
 }
 </style>

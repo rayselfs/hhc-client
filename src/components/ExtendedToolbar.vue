@@ -1,7 +1,9 @@
 <template>
-  <v-toolbar dark prominent>
-    <v-app-bar-nav-icon @click="emitToggleDrawer" />
-    <v-toolbar-title class="text-h5">{{ toolbarTitle }}</v-toolbar-title>
+  <v-app-bar dark prominent>
+    <v-app-bar-nav-icon @click="emitToggleDrawer">
+      <v-icon>{{ drawerCollapsed ? 'mdi-menu' : 'mdi-menu-open' }}</v-icon>
+    </v-app-bar-nav-icon>
+    <v-app-bar-title class="text-h5">{{ toolbarTitle }}</v-app-bar-title>
     <v-spacer />
 
     <v-slide-x-reverse-transition>
@@ -28,15 +30,17 @@
     </v-btn>
 
     <v-btn
-      icon
+      class="mr-4"
       @click="toggleProjectionContent"
       :color="!projectionStore.isShowingDefault ? 'error' : 'default'"
-      :title="projectionStore.isShowingDefault ? $t('showContent') : $t('showDefault')"
+      :title="projectionStore.isShowingDefault ? $t('open') : $t('close')"
+      variant="outlined"
     >
-      <v-icon v-if="projectionStore.isShowingDefault">mdi-monitor</v-icon>
-      <v-icon v-else>mdi-monitor-off</v-icon>
+      <v-icon v-if="projectionStore.isShowingDefault" class="mr-2">mdi-monitor</v-icon>
+      <v-icon v-else class="mr-2">mdi-monitor-off</v-icon>
+      {{ $t('projection') }}
     </v-btn>
-  </v-toolbar>
+  </v-app-bar>
 </template>
 
 <script setup lang="ts">
@@ -58,6 +62,7 @@ const { sendProjectionToggle } = useProjectionMessaging()
 // Props
 const props = defineProps<{
   currentView: string
+  drawerCollapsed: boolean
 }>()
 
 // Drawer 的事件發送

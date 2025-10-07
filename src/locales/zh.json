@@ -2,7 +2,9 @@
   "bible": "聖經",
   "timer": "計時器",
   "settings": "設定",
+  "open": "開啟",
   "close": "關閉",
+  "projection": "投影",
   "about": {
     "title": "關於",
     "version": "版本",
