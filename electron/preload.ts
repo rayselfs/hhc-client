@@ -43,6 +43,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   installUpdate: () => ipcRenderer.invoke('install-update'),
   declineUpdate: () => ipcRenderer.invoke('decline-update'),
 
+  // 語系相關
+  updateLanguage: (language: string) => ipcRenderer.invoke('update-language', language),
+
   // 監聽更新相關事件
   onUpdateAvailable: (callback: (info: unknown) => void) => {
     ipcRenderer.on('update-available', (event, info) => callback(info))

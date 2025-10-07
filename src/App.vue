@@ -3,6 +3,9 @@ import AlertDialog from '@/components/AlertDialog.vue'
 import UpdateDialog from '@/components/UpdateDialog.vue'
 import DownloadDialog from '@/components/DownloadDialog.vue'
 import SnackBar from '@/components/SnackBar.vue'
+import SettingsDialog from '@/components/SettingsDialog.vue'
+import { ShortcutsDialog } from '@/components/Shortcuts'
+import AboutDialog from '@/components/AboutDialog.vue'
 import { useAlert } from '@/composables/useAlert'
 import { useSnackBar } from '@/composables/useSnackBar'
 
@@ -44,6 +47,15 @@ const { snackbarVisible, snackbarText, snackbarColor, snackbarTimeout, defaultCo
     :location="defaultConfig.location"
     :variant="defaultConfig.variant"
   />
+
+  <!-- Global Settings Dialog -->
+  <SettingsDialog />
+
+  <!-- Global Shortcuts Dialog -->
+  <ShortcutsDialog />
+
+  <!-- Global About Dialog -->
+  <AboutDialog />
 </template>
 
 <style scoped></style>

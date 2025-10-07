@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { autoUpdater } from 'electron-updater'
 import { readFileSync, writeFileSync, existsSync } from 'fs'
+import { createApplicationMenu } from './menu'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -22,6 +23,8 @@ const createMainWindow = () => {
       allowRunningInsecureContent: false,
       experimentalFeatures: false,
       preload: join(__dirname, 'preload.mjs'),
+      // 禁用自動填充功能
+      spellcheck: false,
     },
     title: '主控台',
   })
@@ -60,6 +63,9 @@ const createMainWindow = () => {
     // Exit application when main window is closed on all platforms
     app.quit()
   })
+
+  // 設定應用程式選單
+  createApplicationMenu(mainWindow)
 }
 
 const createProjectionWindow = () => {
@@ -211,6 +217,24 @@ ipcMain.handle('decline-update', async () => {
     return { success: true }
   } catch (error) {
     console.error('記錄拒絕更新失敗:', error)
+    return { success: false, error: error.message }
+  }
+})
+
+// 處理語系變更
+ipcMain.handle('update-language', async (event, language: string) => {
+  try {
+    const userDataPath = app.getPath('userData')
+    const settingsPath = path.join(userDataPath, 'language-settings.json')
+    const settings = { language }
+    writeFileSync(settingsPath, JSON.stringify(settings, null, 2))
+
+    // 重新創建選單
+    createApplicationMenu(mainWindow)
+
+    return { success: true }
+  } catch (error) {
+    console.error('更新語系失敗:', error)
     return { success: false, error: error.message }
   }
 })

@@ -80,6 +80,9 @@ export interface ElectronAPI {
 
   /** Listen for update error events */
   onUpdateError: (callback: (error: string) => void) => void
+
+  /** Update language setting */
+  updateLanguage: (language: string) => Promise<UpdateResult>
 }
 
 declare global {
