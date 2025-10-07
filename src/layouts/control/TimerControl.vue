@@ -55,11 +55,9 @@
                         hide-details
                         class="time-input-field"
                         :placeholder="minutesPlaceholder"
-                        @focus="handleMinutesFocus"
-                        @blur="handleMinutesBlur"
-                        @keyup.enter="handleTimeInput"
-                        @input="validateMinutesInput"
-                        @keydown="preventNonNumeric"
+                        @focus="(event: FocusEvent) => handleFocus(event, 'minutes')"
+                        @blur="() => handleBlur('minutes')"
+                        @input="(event: Event) => handleTimeInput(event, 'minutes')"
                       ></v-text-field>
                       <span class="time-separator">:</span>
                       <v-text-field
@@ -69,11 +67,9 @@
                         hide-details
                         class="time-input-field"
                         :placeholder="secondsPlaceholder"
-                        @focus="handleSecondsFocus"
-                        @blur="handleSecondsBlur"
-                        @keyup.enter="handleTimeInput"
-                        @input="validateSecondsInput"
-                        @keydown="preventNonNumeric"
+                        @focus="(event: FocusEvent) => handleFocus(event, 'seconds')"
+                        @blur="() => handleBlur('seconds')"
+                        @input="(event: Event) => handleTimeInput(event, 'seconds')"
                       ></v-text-field>
                     </div>
                     <span v-else>{{ timerStore.formattedTime }}</span>
@@ -248,7 +244,6 @@
 import { ref, computed, onMounted, onBeforeUnmount, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useTimerStore } from '@/stores/timer'
-// import { useProjectionStore } from '@/stores/projection' // 不再需要，已移至 useProjectionMessaging
 import { useElectron } from '@/composables/useElectron'
 import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
 import { TimerMode } from '@/types/common'
@@ -256,6 +251,7 @@ import CountdownTimer from '@/components/Timer/CountdownTimer.vue'
 import ClockDisplay from '@/components/Timer/ClockDisplay.vue'
 import { useMemoryManager } from '@/utils/memoryManager'
 import { throttle } from '@/utils/performanceUtils'
+import { useAlert } from '@/composables/useAlert'
 
 const timerStore = useTimerStore()
 const { t: $t } = useI18n()
@@ -313,27 +309,20 @@ const updateDuration = () => {
 
 // 處理時間輸入驗證和限制
 const validateAndNormalizeTime = () => {
-  // 轉換為數字並確保是有效值
   const minutesNum = parseInt(minutes.value) || 0
   const secondsNum = parseInt(seconds.value) || 0
 
-  if (minutesNum < 0) {
-    minutes.value = '00'
-  } else {
-    minutes.value = minutesNum.toString().padStart(2, '0')
-  }
-
-  if (secondsNum < 0) {
-    seconds.value = '00'
-  } else {
-    seconds.value = secondsNum.toString().padStart(2, '0')
-  }
-
   // 規則1: 秒數大於60時進位到分鐘
-  if (parseInt(seconds.value) >= 60) {
-    const extraMinutes = Math.floor(parseInt(seconds.value) / 60)
-    minutes.value = (parseInt(minutes.value) + extraMinutes).toString().padStart(2, '0')
-    seconds.value = (parseInt(seconds.value) % 60).toString().padStart(2, '0')
+  if (secondsNum >= 60) {
+    const extraMinutes = Math.floor(secondsNum / 60)
+    const newMinutes = minutesNum + extraMinutes
+    const newSeconds = secondsNum % 60
+
+    minutes.value = Math.min(newMinutes, 59).toString().padStart(2, '0')
+    seconds.value = newSeconds.toString().padStart(2, '0')
+  } else {
+    minutes.value = Math.min(minutesNum, 59).toString().padStart(2, '0')
+    seconds.value = Math.min(secondsNum, 59).toString().padStart(2, '0')
   }
 
   // 規則2: 限制最大時間為59分59秒
@@ -342,170 +331,71 @@ const validateAndNormalizeTime = () => {
     seconds.value = '59'
   }
 
-  // 規則3: 時間為0:0時限制為0分30秒（但允許用戶輸入00）
+  // 規則3: 時間為0:0時設為0:30
   if (parseInt(minutes.value) === 0 && parseInt(seconds.value) === 0) {
-    // 只有在用戶沒有主動輸入00時才自動設為30
-    if (seconds.value !== '00') {
-      minutes.value = '00'
-      seconds.value = '30'
-    }
+    minutes.value = '00'
+    seconds.value = '30'
   }
-
-  // 確保分鐘和秒數都是整數並保持兩位數格式
-  minutes.value = Math.floor(parseInt(minutes.value)).toString().padStart(2, '0')
-  seconds.value = Math.floor(parseInt(seconds.value)).toString().padStart(2, '0')
 }
 
-// 防止非數字輸入
-const preventNonNumeric = (event: KeyboardEvent) => {
-  // 允許的按鍵：數字、退格、刪除、Tab、Enter、箭頭鍵
-  const allowedKeys = [
-    'Backspace',
-    'Delete',
-    'Tab',
-    'Enter',
-    'ArrowLeft',
-    'ArrowRight',
-    'ArrowUp',
-    'ArrowDown',
-  ]
+// 統一的輸入處理函數
+const handleTimeInput = (event: Event, field: 'minutes' | 'seconds') => {
+  const target = event.target as HTMLInputElement
+  let value = target.value
 
-  if (allowedKeys.includes(event.key)) {
+  // 檢查非數字輸入
+  if (!/^\d*$/.test(value)) {
+    const { warning } = useAlert()
+    warning('只能輸入數字', '請輸入有效的數字')
+    // 恢復到之前的值
+    target.value = field === 'minutes' ? minutes.value : seconds.value
     return
   }
 
-  // 只允許數字輸入
-  if (!/^\d$/.test(event.key)) {
-    event.preventDefault()
+  // 防止重複輸入（解決 Windows 上輸入1變成11的問題）
+  if (value.length > 2) {
+    value = value.slice(-2)
+    target.value = value
   }
-}
 
-// 實時驗證分鐘輸入
-const validateMinutesInput = () => {
-  // 轉換為數字並驗證
-  const numValue = parseInt(minutes.value) || 0
-
-  if (numValue < 0) {
-    minutes.value = '00'
-  } else if (numValue >= 60) {
-    minutes.value = '59'
-    // 如果分鐘達到上限，將秒數設為59
-    if (parseInt(seconds.value) < 59) {
-      seconds.value = '59'
-    }
+  // 更新對應的 ref
+  if (field === 'minutes') {
+    minutes.value = value
   } else {
-    // 顯示為兩位數格式
-    minutes.value = numValue.toString().padStart(2, '0')
+    seconds.value = value
   }
 
-  // 如果總時間為0:0，設為0:30（但允許用戶輸入00）
-  if (parseInt(minutes.value) === 0 && parseInt(seconds.value) === 0) {
-    seconds.value = '30'
-  }
-
-  updateDuration()
-}
-
-// 實時驗證秒數輸入
-const validateSecondsInput = () => {
-  // 允許輸入 "00" 但保持其他驗證
-  const inputValue = seconds.value.trim()
-
-  // 如果輸入為空或只有空格，設為 "0"
-  if (inputValue === '') {
-    seconds.value = '0'
-    updateDuration()
-    return
-  }
-
-  // 轉換為數字並驗證
-  const numValue = parseInt(inputValue) || 0
-
-  if (numValue < 0) {
-    seconds.value = '00'
-  } else if (numValue >= 60) {
-    // 秒數大於60時自動進位
-    const extraMinutes = Math.floor(numValue / 60)
-    const newMinutes = parseInt(minutes.value) + extraMinutes
-    const newSeconds = numValue % 60
-
-    // 檢查分鐘是否超過限制
-    if (newMinutes >= 60) {
-      minutes.value = '59'
-      seconds.value = '59'
-    } else {
-      minutes.value = newMinutes.toString().padStart(2, '0')
-      seconds.value = newSeconds.toString().padStart(2, '0')
-    }
-  } else {
-    // 顯示為兩位數格式，允許 "00"
-    if (inputValue === '00' || inputValue === '0') {
-      seconds.value = '00'
-    } else {
-      seconds.value = numValue.toString().padStart(2, '0')
-    }
-  }
-
-  // 如果總時間為0:0，設為0:30（但允許用戶輸入00）
-  if (parseInt(minutes.value) === 0 && parseInt(seconds.value) === 0) {
-    seconds.value = '30'
-  }
-
-  updateDuration()
-}
-
-// 處理分鐘輸入框焦點
-const handleMinutesFocus = () => {
-  minutesFocused.value = true
-  // 清除內容讓用戶重新輸入
-  minutes.value = ''
-}
-
-const handleMinutesBlur = () => {
-  minutesFocused.value = false
-  // 如果為空，設為 00
-  if (minutes.value === '') {
-    minutes.value = '00'
-  }
-
-  if (parseInt(minutes.value) === 0 && parseInt(seconds.value) === 0) {
-    seconds.value = '30'
-  }
-  handleTimeInput()
-}
-
-// 處理秒數輸入框焦點
-const handleSecondsFocus = () => {
-  secondsFocused.value = true
-  // 清除內容讓用戶重新輸入
-  seconds.value = ''
-}
-
-const handleSecondsBlur = () => {
-  secondsFocused.value = false
-  // 如果為空，設為 00
-  if (seconds.value === '') {
-    seconds.value = '00'
-  }
-
-  if (parseInt(minutes.value) === 0 && parseInt(seconds.value) === 0) {
-    seconds.value = '30'
-  }
-  handleTimeInput()
-}
-
-// 更新計時器持續時間
-const updateTimerDuration = () => {
+  // 執行驗證和更新
   validateAndNormalizeTime()
   updateDuration()
-  // 立即重置投影上的計時器
-  timerStore.resetTimer()
-  sendTimerUpdate(true) // 強制更新，因為時間設定改變了
 }
 
-// 處理時間輸入（按 Enter 鍵）
-const handleTimeInput = () => {
-  updateTimerDuration()
+// 統一的焦點處理
+const handleFocus = (event: FocusEvent, field: 'minutes' | 'seconds') => {
+  if (field === 'minutes') {
+    minutesFocused.value = true
+    minutes.value = ''
+  } else {
+    secondsFocused.value = true
+    seconds.value = ''
+  }
+}
+
+const handleBlur = (field: 'minutes' | 'seconds') => {
+  if (field === 'minutes') {
+    minutesFocused.value = false
+    if (minutes.value === '') {
+      minutes.value = '00'
+    }
+  } else {
+    secondsFocused.value = false
+    if (seconds.value === '') {
+      seconds.value = '00'
+    }
+  }
+
+  timerStore.resetTimer()
+  sendTimerUpdate(true)
 }
 
 // 添加時間（快捷按鈕）

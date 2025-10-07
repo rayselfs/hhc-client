@@ -9,14 +9,3 @@ html {
     'Open Sans Variable', 'Noto Sans TC Variable', 'Roboto Variable', 'Microsoft JhengHei',
     sans-serif;
 }
-
-.no-scrollbar {
-  -ms-overflow-style: none; /* IE & Edge */
-  scrollbar-width: none; /* Firefox */
-  overflow: hidden; /* Prevent content overflow from showing scrollbars */
-}
-
-/* Hide scrollbar for WebKit browsers (Chrome, Safari) */
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
