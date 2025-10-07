@@ -57,7 +57,6 @@
                         placeholder="00"
                         @focus="handleFocus('minutes')"
                         @blur="handleBlur('minutes')"
-                        @input="(event: Event) => handleTimeInput(event, 'minutes')"
                       ></v-text-field>
                       <span class="time-separator">:</span>
                       <v-text-field
@@ -69,7 +68,6 @@
                         placeholder="00"
                         @focus="handleFocus('seconds')"
                         @blur="handleBlur('seconds')"
-                        @input="(event: Event) => handleTimeInput(event, 'seconds')"
                       ></v-text-field>
                     </div>
                     <span v-else>{{ timerStore.formattedTime }}</span>
@@ -296,18 +294,12 @@ const currentDuration = computed(() => {
   return parseInt(minutes.value) * 60 + parseInt(seconds.value)
 })
 
-// 方法
-const updateDuration = () => {
-  const duration = currentDuration.value
-  timerStore.setTimerDuration(duration)
-}
-
-// 處理時間輸入驗證和限制
+// validate and normalize time
 const validateAndNormalizeTime = () => {
   const minutesNum = parseInt(minutes.value) || 0
   const secondsNum = parseInt(seconds.value) || 0
 
-  // 規則1: 秒數大於60時進位到分鐘
+  // rule: seconds >= 60, add to minutes
   if (secondsNum >= 60) {
     const extraMinutes = Math.floor(secondsNum / 60)
     const newMinutes = minutesNum + extraMinutes
@@ -320,38 +312,22 @@ const validateAndNormalizeTime = () => {
     seconds.value = Math.min(secondsNum, 59).toString().padStart(2, '0')
   }
 
-  // 規則2: 限制最大時間為59分59秒
+  // rule: minutes >= 60, set to 59:59
   if (parseInt(minutes.value) >= 60) {
     minutes.value = '59'
     seconds.value = '59'
   }
 
-  // 規則3: 時間為0:0時設為0:30
+  // rule: minutes = 0 and seconds = 0, set to 0:30
   if (parseInt(minutes.value) === 0 && parseInt(seconds.value) === 0) {
     minutes.value = '00'
     seconds.value = '30'
   }
 }
 
-// 統一的輸入處理函數
-const handleTimeInput = (event: Event, field: 'minutes' | 'seconds') => {
-  const target = event.target as HTMLInputElement
-  const value = target.value
-
-  // 檢查非數字輸入
-  if (!/^\d*$/.test(value)) {
-    return
-  }
-
-  if (field === 'minutes') {
-    minutes.value = value
-  } else {
-    seconds.value = value
-  }
-
-  // 執行驗證和更新
-  validateAndNormalizeTime()
-  updateDuration()
+const updateDuration = () => {
+  const duration = currentDuration.value
+  timerStore.setTimerDuration(duration)
 }
 
 // 統一的焦點處理
@@ -384,7 +360,11 @@ const handleBlur = (field: 'minutes' | 'seconds') => {
   }
 
   validateAndNormalizeTime()
+
+  updateDuration()
+
   timerStore.resetTimer()
+
   sendTimerUpdate(true)
 }
 
@@ -409,7 +389,6 @@ const addTime = (secondsToAdd: number) => {
     minutes.value = newMinutes.toString().padStart(2, '0')
     seconds.value = newSeconds.toString().padStart(2, '0')
 
-    // 更新計時器持續時間
     updateDuration()
   }
 
