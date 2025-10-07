@@ -4,7 +4,11 @@
   "settings": "設定",
   "open": "開啟",
   "close": "關閉",
+  "confirmCloseProjection": "確定要關閉投影窗口嗎？",
+  "cancel": "取消",
+  "confirm": "確定",
   "projection": "投影",
+  "window": "窗口",
   "about": {
     "title": "關於",
     "version": "版本",

@@ -4,7 +4,11 @@
   "settings": "Settings",
   "open": "Open",
   "close": "Close",
+  "confirmCloseProjection": "Are you sure you want to close the projection window?",
+  "cancel": "Cancel",
+  "confirm": "Confirm",
   "projection": "Projection",
+  "window": "Window",
   "about": {
     "title": "About",
     "version": "Version",

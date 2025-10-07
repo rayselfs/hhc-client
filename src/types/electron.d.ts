@@ -32,6 +32,9 @@ export interface ElectronAPI {
   /** Ensure projection window exists, create if it doesn't exist */
   ensureProjectionWindow: () => Promise<boolean>
 
+  /** Close projection window */
+  closeProjectionWindow: () => Promise<boolean>
+
   /** Send message to projection window */
   sendToProjection: (data: AppMessage) => void
 

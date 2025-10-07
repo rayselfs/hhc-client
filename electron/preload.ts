@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 投影窗口管理
   checkProjectionWindow: () => ipcRenderer.invoke('check-projection-window'),
   ensureProjectionWindow: () => ipcRenderer.invoke('ensure-projection-window'),
+  closeProjectionWindow: () => ipcRenderer.invoke('close-projection-window'),
 
   // 消息傳遞
   sendToProjection: (data: unknown) => ipcRenderer.send('send-to-projection', data),

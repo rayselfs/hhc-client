@@ -2,9 +2,7 @@
   <v-app>
     <v-main class="fill-height h-100 w-100">
       <v-container fluid class="fill-height pa-0 bg-black text-white">
-        <transition name="fade-transition" mode="out-in">
-          <component :is="currentComponent" :key="componentKey" v-bind="componentProps" />
-        </transition>
+        <component :is="currentComponent" :key="componentKey" v-bind="componentProps" />
       </v-container>
     </v-main>
   </v-app>

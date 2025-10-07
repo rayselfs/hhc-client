@@ -154,6 +154,16 @@ ipcMain.handle('ensure-projection-window', async () => {
   return false
 })
 
+// Close the projection window
+ipcMain.handle('close-projection-window', async () => {
+  if (projectionWindow && !projectionWindow.isDestroyed()) {
+    projectionWindow.close()
+    projectionWindow = null
+    return true
+  }
+  return false
+})
+
 ipcMain.handle('get-displays', async () => {
   try {
     const displays = screen.getAllDisplays()
