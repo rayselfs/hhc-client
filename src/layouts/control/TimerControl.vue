@@ -201,36 +201,7 @@
             </v-row>
 
             <!-- Stopwatch Display -->
-            <v-row v-else>
-              <v-col cols="12" align="center" class="pb-0">
-                <div class="stopwatch-time">{{ stopwatchTime }}</div>
-              </v-col>
-              <v-col cols="6" class="d-flex justify-end">
-                <v-btn
-                  v-if="!isStopwatchRunning"
-                  icon="mdi-play"
-                  color="primary"
-                  variant="flat"
-                  @click="startStopwatch"
-                ></v-btn>
-                <v-btn
-                  v-else
-                  icon="mdi-pause"
-                  color="warning"
-                  variant="flat"
-                  @click="pauseStopwatch"
-                ></v-btn>
-              </v-col>
-              <v-col cols="6" class="d-flex justify-start">
-                <v-btn
-                  icon="mdi-refresh"
-                  color="grey"
-                  variant="outlined"
-                  :disabled="!isStopwatchRunning && stopwatchTime === '00:00'"
-                  @click="resetStopwatch"
-                ></v-btn>
-              </v-col>
-            </v-row>
+            <Stopwatch v-else />
           </v-card-text>
         </v-card>
       </v-col>
@@ -247,6 +218,7 @@ import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
 import { TimerMode } from '@/types/common'
 import CountdownTimer from '@/components/Timer/CountdownTimer.vue'
 import ClockDisplay from '@/components/Timer/ClockDisplay.vue'
+import Stopwatch from '@/components/Timer/Stopwatch.vue'
 import { useMemoryManager } from '@/utils/memoryManager'
 import { throttle } from '@/utils/performanceUtils'
 import { useSnackBar } from '@/composables/useSnackBar'
@@ -470,22 +442,6 @@ const toggleStopwatch = () => {
   timerStore.toggleStopwatchMode()
 }
 
-const startStopwatch = () => {
-  timerStore.startStopwatch()
-}
-
-const pauseStopwatch = () => {
-  timerStore.pauseStopwatch()
-}
-
-const resetStopwatch = () => {
-  timerStore.resetStopwatch()
-}
-
-// 碼錶時間顯示
-const stopwatchTime = computed(() => timerStore.getStopwatchTime())
-const isStopwatchRunning = computed(() => timerStore.stopwatchSettings.isRunning)
-
 // 生命週期
 onMounted(() => {
   // 初始化時間輸入
@@ -562,11 +518,6 @@ onUnmounted(() => {
 
 .external-card {
   height: 250px;
-}
-
-.stopwatch-time {
-  font-size: 60px;
-  font-weight: 500;
 }
 
 .time-input-field {

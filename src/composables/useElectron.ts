@@ -27,7 +27,6 @@ export const useElectron = () => {
         window.electronAPI.sendToProjection(data)
       } catch (error) {
         handleProjectionError(error as Error, 'sendToProjection', () => {
-          // 回退：嘗試重新發送
           setTimeout(() => {
             try {
               window.electronAPI.sendToProjection(data)

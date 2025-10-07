@@ -27,38 +27,35 @@ export interface StopwatchSettings {
 }
 
 export const useTimerStore = defineStore('timer', () => {
-  // 記憶體管理
   const { track, untrack, cleanup } = useMemoryManager('useTimerStore')
-
-  // 載入保存的設定
   const loadSettings = () => {
-    const saved = localStorage.getItem('timer-settings')
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved)
-        return {
-          mode: parsed.mode || TimerMode.TIMER,
-          timerDuration: parsed.timerDuration || 300, // 5分鐘
-          originalDuration: parsed.originalDuration || 300,
-          timezone: parsed.timezone || 'Asia/Taipei',
-          isRunning: false, // 重啟時總是設為未運行
-          remainingTime: parsed.originalDuration || 300,
-          pausedTime: 0, // 重啟時清除暫停狀態
-        }
-      } catch (error) {
-        console.error('Failed to load timer settings:', error)
-      }
-    }
-    // 默認設定
-    return {
+    const defaultSettings = {
       mode: TimerMode.TIMER,
-      timerDuration: 300, // 5分鐘
+      timerDuration: 300,
       originalDuration: 300,
       timezone: 'Asia/Taipei',
       isRunning: false,
       remainingTime: 300,
       pausedTime: 0,
     }
+
+    const saved = localStorage.getItem('timer-settings')
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved)
+        return {
+          ...defaultSettings,
+          ...parsed,
+          isRunning: false,
+          remainingTime: parsed.originalDuration || defaultSettings.remainingTime,
+          pausedTime: 0,
+        }
+      } catch (error) {
+        console.error('Failed to load timer settings:', error)
+        return defaultSettings
+      }
+    }
+    return defaultSettings
   }
 
   // 狀態
@@ -134,16 +131,8 @@ export const useTimerStore = defineStore('timer', () => {
     const currentTime = settings.value.remainingTime
     const newTime = currentTime + secondsToAdd
 
-    // 如果加的時間沒有超過開始倒數的時間，按比例調整進度
-    if (newTime <= settings.value.originalDuration) {
-      // 按比例計算新的剩餘時間
-      settings.value.remainingTime = newTime
-      settings.value.timerDuration = settings.value.originalDuration
-    } else {
-      // 如果超過原時間，將新時間設為100%並繼續倒數
-      settings.value.timerDuration = newTime
-      settings.value.remainingTime = newTime
-    }
+    settings.value.remainingTime = newTime
+    settings.value.timerDuration = Math.max(settings.value.timerDuration, newTime)
   }
 
   const setTimezone = (timezone: string) => {
@@ -193,15 +182,9 @@ export const useTimerStore = defineStore('timer', () => {
     if (settings.value.isRunning && settings.value.remainingTime > 0) {
       settings.value.remainingTime--
       if (settings.value.remainingTime <= 0) {
-        settings.value.remainingTime = 0 // 確保顯示為 00:00
+        settings.value.remainingTime = 0
         settings.value.isRunning = false
-        // 計時結束，可以觸發通知或其他動作
-        console.log('Timer finished!')
       }
-    } else if (settings.value.isRunning && settings.value.remainingTime <= 0) {
-      // 如果已經結束但還在運行狀態，強制停止
-      settings.value.isRunning = false
-      settings.value.remainingTime = 0
     }
   }
 
