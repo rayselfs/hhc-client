@@ -39,16 +39,7 @@
   "hours": "Hours",
   "minutes": "Minutes",
   "seconds": "Seconds",
-  "startCountdown": "Start Countdown",
-  "stopCountdown": "Stop Countdown",
-  "resetCountdown": "Reset",
-  "timerHistory": "Timer History",
   "timerPresets": "Timer Presets",
-  "clearHistory": "Clear History",
-  "savePreset": "Save Preset",
-  "resume": "Resume",
-  "themeSettings": "Theme Settings",
-  "darkMode": "Dark Mode",
   "stopwatch": "Stopwatch",
   "alert": {
     "confirm": "Confirm",
@@ -61,31 +52,18 @@
     "dualScreenRequired": "This app is designed for dual screens"
   },
   "update": {
-    "title": "New Version Available",
-    "message": "New version {version} is available. Would you like to download and install it?",
-    "description": "The update will bring you new features and improvements.",
-    "confirm": "Confirm",
-    "cancel": "Cancel",
-    "downloading": "Downloading...",
-    "downloadTitle": "Downloading Update",
-    "downloadMessage": "Downloading version {version}",
-    "downloadSpeed": "Download speed: {speed}/s",
-    "remainingTime": "Remaining time: {time}",
-    "error": "An error occurred during update",
-    "downloadError": "Failed to download update",
-    "installError": "Failed to install update",
+    "downloading": "New version found, downloading...",
     "readyToInstall": "Update Ready to Install",
     "installMessage": "Version {version} has been downloaded. Would you like to install it now?",
     "installDescription": "The application will restart after installation to complete the update.",
     "installNow": "Install Now",
     "delay": "Install Later",
-    "installing": "Installing..."
+    "installing": "Installing...",
+    "installError": "Failed to install update"
   },
   "menu": {
     "file": "File",
     "edit": "Edit",
-    "view": "View",
-    "window": "Window",
     "preferences": "Preferences",
     "quit": "Quit",
     "about": "About",
@@ -98,14 +76,7 @@
     "cut": "Cut",
     "copy": "Copy",
     "paste": "Paste",
-    "reload": "Reload",
-    "forceReload": "Force Reload",
-    "toggleDevTools": "Toggle Developer Tools",
-    "resetZoom": "Reset Zoom",
-    "zoomIn": "Zoom In",
-    "zoomOut": "Zoom Out",
-    "togglefullscreen": "Toggle Full Screen",
-    "minimize": "Minimize",
-    "close": "Close"
+    "help": "Help",
+    "shortcuts": "Keyboard Shortcuts"
   }
 }

@@ -39,16 +39,7 @@
   "hours": "小時",
   "minutes": "分鐘",
   "seconds": "秒",
-  "startCountdown": "開始倒數",
-  "stopCountdown": "停止倒數",
-  "resetCountdown": "重置",
-  "timerHistory": "計時歷史",
   "timerPresets": "計時預設",
-  "clearHistory": "清除歷史",
-  "savePreset": "儲存預設",
-  "resume": "繼續",
-  "themeSettings": "主題設定",
-  "darkMode": "深色模式",
   "stopwatch": "碼錶",
   "alert": {
     "confirm": "確定",
@@ -61,31 +52,18 @@
     "dualScreenRequired": "此App是設計用在雙螢幕"
   },
   "update": {
-    "title": "發現新版本",
-    "message": "發現新版本 {version}，是否要下載並安裝？",
-    "description": "更新將為您帶來新功能和改進。",
-    "confirm": "確定",
-    "cancel": "取消",
-    "downloading": "下載中...",
-    "downloadTitle": "下載更新中",
-    "downloadMessage": "正在下載版本 {version}",
-    "downloadSpeed": "下載速度: {speed}/s",
-    "remainingTime": "剩餘時間: {time}",
-    "error": "更新時發生錯誤",
-    "downloadError": "下載更新失敗",
-    "installError": "安裝更新失敗",
+    "downloading": "發現新版本，下載中...",
     "readyToInstall": "更新已準備就緒",
     "installMessage": "版本 {version} 已下載完成，是否立即安裝？",
     "installDescription": "安裝後應用程式將重新啟動以完成更新。",
     "installNow": "立即安裝",
     "delay": "稍後安裝",
-    "installing": "安裝中..."
+    "installing": "安裝中...",
+    "installError": "安裝更新失敗"
   },
   "menu": {
     "file": "檔案",
     "edit": "編輯",
-    "view": "檢視",
-    "window": "視窗",
     "preferences": "偏好設定",
     "quit": "結束",
     "about": "關於",
@@ -98,14 +76,7 @@
     "cut": "剪下",
     "copy": "複製",
     "paste": "貼上",
-    "reload": "重新載入",
-    "forceReload": "強制重新載入",
-    "toggleDevTools": "切換開發者工具",
-    "resetZoom": "重設縮放",
-    "zoomIn": "放大",
-    "zoomOut": "縮小",
-    "togglefullscreen": "切換全螢幕",
-    "minimize": "最小化",
-    "close": "關閉"
+    "help": "說明",
+    "shortcuts": "快捷鍵"
   }
 }

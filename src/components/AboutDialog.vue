@@ -8,7 +8,7 @@
       <v-card-text class="pa-6">
         <div class="d-flex align-center mb-6">
           <v-avatar size="80" class="mr-4">
-            <v-img src="/src/assets/media/hhc-icon.png" alt="HHC Client"></v-img>
+            <v-img :src="hhcIcon" alt="HHC Client"></v-img>
           </v-avatar>
           <div>
             <h2 class="text-h4 mb-2">HHC Client</h2>
@@ -66,6 +66,7 @@ import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useElectron } from '@/composables/useElectron'
 import packageJson from '../../package.json'
+import hhcIcon from '@/assets/media/hhc-icon.png'
 
 const { t: $t } = useI18n()
 const { isElectron } = useElectron()

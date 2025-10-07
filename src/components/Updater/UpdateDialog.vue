@@ -85,10 +85,9 @@ const handleDelay = async () => {
 onMounted(() => {
   if (!isElectron()) return
 
-  // 監聽安裝確認對話框事件
-  window.addEventListener('show-install-dialog', (event: Event) => {
-    const customEvent = event as CustomEvent<{ updateInfo: UpdateInfo }>
-    updateInfo.value = customEvent.detail.updateInfo
+  // 監聽下載完成事件
+  window.electronAPI.onUpdateDownloaded(() => {
+    updateInfo.value = { version: '1.0.6', releaseDate: new Date().toISOString() }
     showDialog.value = true
     isInstalling.value = false
     error.value = ''
@@ -105,7 +104,7 @@ onBeforeUnmount(() => {
   if (!isElectron()) return
 
   // 清理監聽器
-  window.removeEventListener('show-install-dialog', () => {})
+  window.electronAPI.removeAllListeners('update-downloaded')
   window.electronAPI.removeAllListeners('update-error')
 })
 </script>
