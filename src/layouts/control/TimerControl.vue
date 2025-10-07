@@ -218,7 +218,7 @@ import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
 import { TimerMode } from '@/types/common'
 import CountdownTimer from '@/components/Timer/CountdownTimer.vue'
 import ClockDisplay from '@/components/Timer/ClockDisplay.vue'
-import Stopwatch from '@/components/Timer/Stopwatch.vue'
+import Stopwatch from '@/components/Timer/StopWatcher.vue'
 import { useMemoryManager } from '@/utils/memoryManager'
 import { throttle } from '@/utils/performanceUtils'
 import { useSnackBar } from '@/composables/useSnackBar'
@@ -364,38 +364,36 @@ const addTime = (secondsToAdd: number) => {
     updateDuration()
   }
 
-  sendTimerUpdate(true) // 強制更新，因為時間被修改了
+  sendTimerUpdate(true)
 }
 
 const handleModeChange = (mode: TimerMode) => {
   timerStore.setMode(mode)
-  sendTimerUpdate(true) // 強制更新，因為模式改變了
+  sendTimerUpdate(true)
 }
 
 const startTimer = () => {
   timerStore.startTimer()
-
-  // 自動顯示投影並切換到計時器視圖
   if (isElectron()) {
     sendTimerStartProjection()
   }
 
-  sendTimerUpdate(true) // 強制更新，因為計時器開始了
+  sendTimerUpdate(true)
 }
 
 const pauseTimer = () => {
   timerStore.pauseTimer()
-  sendTimerUpdate(true) // 強制更新，因為計時器暫停了
+  sendTimerUpdate(true)
 }
 
 const resetTimer = () => {
   timerStore.resetTimer()
-  sendTimerUpdate(true) // 強制更新，因為計時器重置了
+  sendTimerUpdate(true)
 }
 
 const resumeTimer = () => {
   timerStore.resumeTimer()
-  sendTimerUpdate(true) // 強制更新，因為計時器恢復了
+  sendTimerUpdate(true)
 }
 
 const applyPreset = (item: { id: string; duration: number }) => {
@@ -406,7 +404,7 @@ const applyPreset = (item: { id: string; duration: number }) => {
     .toString()
     .padStart(2, '0')
   seconds.value = (duration % 60).toString().padStart(2, '0')
-  sendTimerUpdate(true) // 強制更新，因為應用了預設
+  sendTimerUpdate(true)
 }
 
 const deletePreset = (id: string) => {
