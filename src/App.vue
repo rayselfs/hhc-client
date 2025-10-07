@@ -2,9 +2,13 @@
 import AlertDialog from '@/components/AlertDialog.vue'
 import UpdateDialog from '@/components/UpdateDialog.vue'
 import DownloadDialog from '@/components/DownloadDialog.vue'
+import SnackBar from '@/components/SnackBar.vue'
 import { useAlert } from '@/composables/useAlert'
+import { useSnackBar } from '@/composables/useSnackBar'
 
 const { alertState, confirm, cancel } = useAlert()
+const { snackbarVisible, snackbarText, snackbarColor, snackbarTimeout, defaultConfig } =
+  useSnackBar()
 </script>
 
 <template>
@@ -30,6 +34,16 @@ const { alertState, confirm, cancel } = useAlert()
   <!-- Update Dialogs -->
   <UpdateDialog />
   <DownloadDialog />
+
+  <!-- Global SnackBar -->
+  <SnackBar
+    v-model="snackbarVisible"
+    :text="snackbarText"
+    :timeout="snackbarTimeout"
+    :color="snackbarColor"
+    :location="defaultConfig.location"
+    :variant="defaultConfig.variant"
+  />
 </template>
 
 <style scoped></style>

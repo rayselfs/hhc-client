@@ -54,9 +54,9 @@
                         density="compact"
                         hide-details
                         class="time-input-field"
-                        :placeholder="minutesPlaceholder"
-                        @focus="(event: FocusEvent) => handleFocus(event, 'minutes')"
-                        @blur="() => handleBlur('minutes')"
+                        placeholder="00"
+                        @focus="handleFocus('minutes')"
+                        @blur="handleBlur('minutes')"
                         @input="(event: Event) => handleTimeInput(event, 'minutes')"
                       ></v-text-field>
                       <span class="time-separator">:</span>
@@ -66,9 +66,9 @@
                         density="compact"
                         hide-details
                         class="time-input-field"
-                        :placeholder="secondsPlaceholder"
-                        @focus="(event: FocusEvent) => handleFocus(event, 'seconds')"
-                        @blur="() => handleBlur('seconds')"
+                        placeholder="00"
+                        @focus="handleFocus('seconds')"
+                        @blur="handleBlur('seconds')"
                         @input="(event: Event) => handleTimeInput(event, 'seconds')"
                       ></v-text-field>
                     </div>
@@ -251,30 +251,25 @@ import CountdownTimer from '@/components/Timer/CountdownTimer.vue'
 import ClockDisplay from '@/components/Timer/ClockDisplay.vue'
 import { useMemoryManager } from '@/utils/memoryManager'
 import { throttle } from '@/utils/performanceUtils'
-import { useAlert } from '@/composables/useAlert'
+import { useSnackBar } from '@/composables/useSnackBar'
 
 const timerStore = useTimerStore()
 const { t: $t } = useI18n()
 
-// Electron composable
+const { showSnackBar } = useSnackBar()
+
 const { isElectron } = useElectron()
 
-// 投影消息管理
 const { sendTimerUpdate, sendTimerStartProjection, forceRefreshAll, cleanupResources } =
   useProjectionMessaging()
 
-// 記憶體管理
 const { track, untrack, cleanup } = useMemoryManager('TimerControl')
 
 // 時間輸入
-const minutes = ref('5')
+const minutes = ref('3')
 const seconds = ref('0')
-
-// 輸入框焦點狀態和佔位符
-const minutesFocused = ref(false)
-const secondsFocused = ref(false)
-const minutesPlaceholder = computed(() => (minutesFocused.value ? '00' : ''))
-const secondsPlaceholder = computed(() => (secondsFocused.value ? '00' : ''))
+const focusMinutes = ref('00')
+const focusSeconds = ref('00')
 
 // External Display 模式 - 使用 store 中的狀態
 const externalDisplayMode = computed(() => timerStore.stopwatchSettings.displayMode)
@@ -341,24 +336,13 @@ const validateAndNormalizeTime = () => {
 // 統一的輸入處理函數
 const handleTimeInput = (event: Event, field: 'minutes' | 'seconds') => {
   const target = event.target as HTMLInputElement
-  let value = target.value
+  const value = target.value
 
   // 檢查非數字輸入
   if (!/^\d*$/.test(value)) {
-    const { warning } = useAlert()
-    warning('只能輸入數字', '請輸入有效的數字')
-    // 恢復到之前的值
-    target.value = field === 'minutes' ? minutes.value : seconds.value
     return
   }
 
-  // 防止重複輸入（解決 Windows 上輸入1變成11的問題）
-  if (value.length > 2) {
-    value = value.slice(-2)
-    target.value = value
-  }
-
-  // 更新對應的 ref
   if (field === 'minutes') {
     minutes.value = value
   } else {
@@ -371,29 +355,35 @@ const handleTimeInput = (event: Event, field: 'minutes' | 'seconds') => {
 }
 
 // 統一的焦點處理
-const handleFocus = (event: FocusEvent, field: 'minutes' | 'seconds') => {
+const handleFocus = (field: 'minutes' | 'seconds') => {
+  focusMinutes.value = minutes.value
+  focusSeconds.value = seconds.value
   if (field === 'minutes') {
-    minutesFocused.value = true
     minutes.value = ''
   } else {
-    secondsFocused.value = true
     seconds.value = ''
   }
 }
 
 const handleBlur = (field: 'minutes' | 'seconds') => {
   if (field === 'minutes') {
-    minutesFocused.value = false
     if (minutes.value === '') {
       minutes.value = '00'
     }
   } else {
-    secondsFocused.value = false
     if (seconds.value === '') {
       seconds.value = '00'
     }
   }
 
+  if (!/^\d*$/.test(minutes.value) || !/^\d*$/.test(seconds.value)) {
+    showSnackBar('只能輸入數字', 'error', 3000)
+    minutes.value = focusMinutes.value
+    seconds.value = focusSeconds.value
+    return
+  }
+
+  validateAndNormalizeTime()
   timerStore.resetTimer()
   sendTimerUpdate(true)
 }
