@@ -108,7 +108,7 @@
                 <v-btn
                   v-else
                   :icon="timerStore.settings.isRunning ? 'mdi-pause' : 'mdi-play'"
-                  :color="timerStore.settings.isRunning ? 'warning' : 'primary'"
+                  :color="timerStore.settings.isRunning ? 'warning' : 'warning'"
                   variant="flat"
                   :disabled="timerStore.settings.mode === 'clock'"
                   @click="timerStore.settings.isRunning ? pauseTimer() : resumeTimer()"
