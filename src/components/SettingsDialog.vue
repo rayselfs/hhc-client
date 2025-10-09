@@ -70,7 +70,7 @@ const { t: $t, t, locale } = useI18n()
 const { isElectron } = useElectron()
 
 // 投影消息管理
-const { sendTimerUpdate, sendThemeUpdate } = useProjectionMessaging()
+const { sendTimerUpdate } = useProjectionMessaging()
 
 // 設定彈窗狀態
 const isOpen = ref(false)
@@ -93,7 +93,7 @@ const isDarkMode = computed({
   set: (value: boolean) => {
     if (value !== isDark.value) {
       toggleDark()
-      sendThemeUpdate()
+      // 注意：投影視圖不支援主題切換（固定為黑底白字），因此不需要同步主題到投影窗口
     }
   },
 })

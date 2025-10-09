@@ -216,7 +216,7 @@ import { useTimerStore } from '@/stores/timer'
 import { useProjectionStore } from '@/stores/projection'
 import { useElectron } from '@/composables/useElectron'
 import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
-import { TimerMode } from '@/types/common'
+import { TimerMode, ViewType } from '@/types/common'
 import CountdownTimer from '@/components/Timer/CountdownTimer.vue'
 import ClockDisplay from '@/components/Timer/ClockDisplay.vue'
 import Stopwatch from '@/components/Timer/StopWatcher.vue'
@@ -232,7 +232,7 @@ const { showSnackBar } = useSnackBar()
 
 const { isElectron } = useElectron()
 
-const { sendTimerUpdate, sendTimerStartProjection, forceRefreshAll, cleanupResources } =
+const { sendTimerUpdate, setProjectionState, syncAllStates, cleanupResources } =
   useProjectionMessaging()
 
 const { track, untrack, cleanup } = useMemoryManager('TimerControl')
@@ -371,14 +371,15 @@ const handleModeChange = (mode: TimerMode) => {
   sendTimerUpdate(true)
 }
 
-const startTimer = () => {
+const startTimer = async () => {
   timerStore.startTimer()
 
   // 只在投影視窗沒有顯示計時器時才切換
   if (isElectron()) {
     // 如果投影視窗沒有顯示計時器（顯示預設內容或顯示其他內容），則切換到計時器
+    // setProjectionState 會自動檢查並創建投影窗口
     if (projectionStore.isShowingDefault || projectionStore.currentView !== 'timer') {
-      sendTimerStartProjection()
+      await setProjectionState(false, ViewType.TIMER)
     }
   }
 
@@ -453,8 +454,8 @@ onMounted(() => {
     .padStart(2, '0')
   seconds.value = (duration % 60).toString().padStart(2, '0')
 
-  // 初始化時發送一次投影更新
-  forceRefreshAll()
+  // 初始化時同步所有狀態到投影窗口
+  syncAllStates()
 
   // 追蹤事件監聽器
   track('resize-listener', 'listener', {

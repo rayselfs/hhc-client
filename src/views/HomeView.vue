@@ -74,7 +74,7 @@ const { warning } = useAlert()
 const timerStore = useTimerStore()
 
 // Projection messaging
-const { sendTimerUpdate } = useProjectionMessaging()
+const { sendTimerUpdate, sendViewChange } = useProjectionMessaging()
 
 // 全局計時器間隔
 let globalTimerInterval: number | undefined
@@ -117,7 +117,6 @@ const stopGlobalTimerInterval = () => {
 // Electron composable
 const {
   isElectron,
-  sendToProjection,
   onMainMessage,
   onNoSecondScreenDetected,
   checkProjectionWindow,
@@ -176,29 +175,20 @@ const toggleDrawer = () => {
 // 點擊懸浮計時器跳轉到計時器頁面
 const goToTimer = () => {
   currentView.value = 'timer'
-  sendToProjection({
-    type: MessageType.CHANGE_VIEW,
-    data: { view: 'timer' as ViewType },
-  })
+  sendViewChange(ViewType.TIMER, true)
 }
 
 // 處理選單項目點擊事件
 const handleMenuItemClick = (item: { title: string; icon: string; component: string }) => {
   currentView.value = item.component
-  sendToProjection({
-    type: MessageType.CHANGE_VIEW,
-    data: { view: item.component as ViewType },
-  })
+  sendViewChange(item.component as ViewType, true)
 }
 
 // 監聽來自Electron的消息
 const handleElectronMessage = (data: AppMessage) => {
   if (data.type === MessageType.GET_CURRENT_STATE) {
     // 發送當前狀態到投影窗口
-    sendToProjection({
-      type: MessageType.CHANGE_VIEW,
-      data: { view: currentView.value as ViewType },
-    })
+    sendViewChange(currentView.value as ViewType, true)
   }
 }
 

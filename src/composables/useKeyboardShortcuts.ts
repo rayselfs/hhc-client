@@ -1,16 +1,13 @@
 import { onMounted, onBeforeUnmount, type Ref } from 'vue'
 import { useProjectionStore } from '@/stores/projection'
 import { useTimerStore } from '@/stores/timer'
-// import { useElectron } from '@/composables/useElectron' // 不再需要，使用優化版本
 import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
-// import { MessageType } from '@/types/common' // 不再需要，使用優化版本
 import { useMemoryManager } from '@/utils/memoryManager'
 
 export function useKeyboardShortcuts(currentView?: Ref<string> | string) {
   const projectionStore = useProjectionStore()
   const timerStore = useTimerStore()
-  // const { sendToProjection } = useElectron() // 不再需要，使用優化版本
-  const { sendTimerUpdate, sendProjectionToggle } = useProjectionMessaging()
+  const { sendTimerUpdate, setProjectionState } = useProjectionMessaging()
   const { track, untrack, cleanup } = useMemoryManager('useKeyboardShortcuts')
 
   // 處理鍵盤事件
@@ -77,16 +74,16 @@ export function useKeyboardShortcuts(currentView?: Ref<string> | string) {
   }
 
   // 切換投影狀態
-  const toggleProjection = () => {
-    projectionStore.toggleProjectionContent()
-    sendProjectionToggle()
+  const toggleProjection = async () => {
+    const newShowDefault = !projectionStore.isShowingDefault
+    // setProjectionState 會自動檢查並創建投影窗口
+    await setProjectionState(newShowDefault)
   }
 
   // 關閉投影
-  const closeProjection = () => {
+  const closeProjection = async () => {
     if (!projectionStore.isShowingDefault) {
-      projectionStore.setShowingDefault(true)
-      sendProjectionToggle()
+      await setProjectionState(true)
     }
   }
 

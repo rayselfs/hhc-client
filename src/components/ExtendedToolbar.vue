@@ -82,22 +82,17 @@ import { useProjectionStore } from '@/stores/projection'
 import { useElectron } from '@/composables/useElectron'
 import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
 import { useAlert } from '@/composables/useAlert'
+import { ViewType } from '@/types/common'
 import AlertDialog from '@/components/Alert/AlertDialog.vue'
 
 // i18n
 const { t: $t } = useI18n()
 
 // Electron composable
-const {
-  isElectron,
-  onProjectionOpened,
-  onProjectionClosed,
-  checkProjectionWindow,
-  ensureProjectionWindow,
-} = useElectron()
+const { isElectron, onProjectionOpened, onProjectionClosed, checkProjectionWindow } = useElectron()
 
 // 投影消息管理
-const { sendProjectionToggle, sendTimerUpdate } = useProjectionMessaging()
+const { setProjectionState, syncAllStates, sendTimerUpdate } = useProjectionMessaging()
 
 // Alert 管理
 const { alertState, warning, confirm, cancel } = useAlert()
@@ -144,33 +139,27 @@ const closeSearch = () => {
 }
 
 // 投影功能
-
-// 投影功能
 const projectionStore = useProjectionStore()
 
 // 切換投影內容
 const toggleProjectionContent = async () => {
-  let windowWasCreated = false
+  // 計算新的投影狀態
+  const newShowDefault = !projectionStore.isShowingDefault
 
-  if (isElectron()) {
-    try {
-      const projectionExists = await checkProjectionWindow()
-      if (!projectionExists) {
-        await ensureProjectionWindow()
-        windowWasCreated = true
-        await new Promise((resolve) => setTimeout(resolve, 500))
-      }
-    } catch (error) {
-      console.error('Error checking/creating projection window:', error)
+  // 如果是要開啟投影，根據主視窗當前頁面設置投影內容
+  if (!newShowDefault) {
+    // 開啟投影：根據主視窗當前頁面切換到對應的投影頁面
+    // setProjectionState 會自動檢查並創建投影窗口
+    await setProjectionState(false, props.currentView as ViewType)
+
+    // 根據不同頁面發送對應的內容更新
+    if (props.currentView === 'timer') {
+      sendTimerUpdate(true)
     }
-  }
-
-  projectionStore.toggleProjectionContent()
-  if (windowWasCreated) {
-    sendProjectionToggle()
-    sendTimerUpdate(true)
+    // 聖經頁面會在 ProjectionView 請求當前狀態時自動更新
   } else {
-    sendProjectionToggle()
+    // 關閉投影：只切換狀態，不改變視圖
+    await setProjectionState(true)
   }
 }
 
@@ -205,8 +194,8 @@ const closeProjectionWindow = async () => {
 }
 
 onMounted(() => {
-  // 初始化時發送當前狀態
-  sendProjectionToggle()
+  // 初始化時同步所有狀態到投影窗口（包含投影狀態、計時器狀態、主題等）
+  syncAllStates()
 
   // 監聽投影窗口狀態變化
   if (isElectron()) {
