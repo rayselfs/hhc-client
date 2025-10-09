@@ -59,7 +59,6 @@ import TimerControl from '@/layouts/control/TimerControl.vue'
 import FloatingTimer from '@/components/Timer/FloatingTimer.vue'
 import { useElectron } from '@/composables/useElectron'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
-import { useProjectionStore } from '@/stores/projection'
 import { useAlert } from '@/composables/useAlert'
 import { useTimerStore } from '@/stores/timer'
 import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
@@ -67,9 +66,6 @@ import { MessageType, ViewType, type AppMessage } from '@/types/common'
 
 // i18n
 const { t: $t } = useI18n()
-
-// Projection store
-const projectionStore = useProjectionStore()
 
 // Alert
 const { warning } = useAlert()
