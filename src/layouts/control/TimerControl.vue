@@ -213,6 +213,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useTimerStore } from '@/stores/timer'
+import { useProjectionStore } from '@/stores/projection'
 import { useElectron } from '@/composables/useElectron'
 import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
 import { TimerMode } from '@/types/common'
@@ -224,6 +225,7 @@ import { throttle } from '@/utils/performanceUtils'
 import { useSnackBar } from '@/composables/useSnackBar'
 
 const timerStore = useTimerStore()
+const projectionStore = useProjectionStore()
 const { t: $t } = useI18n()
 
 const { showSnackBar } = useSnackBar()
@@ -371,8 +373,13 @@ const handleModeChange = (mode: TimerMode) => {
 
 const startTimer = () => {
   timerStore.startTimer()
+
+  // 只在投影視窗沒有顯示計時器時才切換
   if (isElectron()) {
-    sendTimerStartProjection()
+    // 如果投影視窗沒有顯示計時器（顯示預設內容或顯示其他內容），則切換到計時器
+    if (projectionStore.isShowingDefault || projectionStore.currentView !== 'timer') {
+      sendTimerStartProjection()
+    }
   }
 
   sendTimerUpdate(true)

@@ -225,29 +225,11 @@ const checkAndEnsureProjectionWindow = async () => {
   }
 }
 
-// 監聽視圖切換，當切換到計時頁面時自動開啟投影內容
-watch(currentView, async (newView) => {
-  if (newView === 'timer' && isElectron()) {
-    // 確保投影視窗存在
+// 監聽視圖切換
+watch(currentView, async () => {
+  // 確保投影視窗存在
+  if (isElectron()) {
     await checkAndEnsureProjectionWindow()
-
-    // 如果投影內容是關閉的（顯示預設畫面），自動開啟
-    if (projectionStore.isShowingDefault) {
-      // 更新 store 狀態
-      projectionStore.setShowingDefault(false)
-      projectionStore.setCurrentView('timer')
-
-      // 發送消息到投影視窗
-      sendToProjection({
-        type: MessageType.TOGGLE_PROJECTION_CONTENT,
-        data: { showDefault: false },
-      })
-
-      sendToProjection({
-        type: MessageType.CHANGE_VIEW,
-        data: { view: ViewType.TIMER },
-      })
-    }
   }
 })
 

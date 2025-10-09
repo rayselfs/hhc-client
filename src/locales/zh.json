@@ -1,7 +1,6 @@
 {
   "bible": "聖經",
   "timer": "計時器",
-  "settings": "設定",
   "open": "開啟",
   "close": "關閉",
   "confirmCloseProjection": "確定要關閉投影窗口嗎？",
@@ -9,6 +8,26 @@
   "confirm": "確定",
   "projection": "投影",
   "window": "窗口",
+  "settings": {
+    "title": "設定",
+    "timezone": "時區",
+    "theme": "主題",
+    "language": "語系",
+    "darkMode": "暗色模式",
+    "chinese": "繁體中文",
+    "english": "English"
+  },
+  "timezones": {
+    "taipei": "台北時間 (UTC+8)",
+    "hongKong": "香港時間 (UTC+8)",
+    "singapore": "新加坡時間 (UTC+8)",
+    "tokyo": "東京時間 (UTC+9)",
+    "seoul": "首爾時間 (UTC+9)",
+    "newYork": "紐約時間 (UTC-5)",
+    "london": "倫敦時間 (UTC+0)",
+    "paris": "巴黎時間 (UTC+1)",
+    "utc": "UTC時間"
+  },
   "about": {
     "title": "關於",
     "version": "版本",
@@ -30,14 +49,10 @@
     "toggleProjectionMac": "切換投影 (Mac)",
     "closeProjection": "關閉投影"
   },
-  "timezoneSettings": "時區設定",
-  "languageSettings": "語系設定",
   "search": "搜尋",
   "showContent": "顯示內容",
   "showDefault": "顯示預設",
   "timerControl": "計時器",
-  "chinese": "繁體中文",
-  "english": "English",
   "timerMode": "計時",
   "clockMode": "時鐘",
   "bothMode": "同時",

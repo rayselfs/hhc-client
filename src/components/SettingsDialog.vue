@@ -2,13 +2,13 @@
   <v-dialog v-model="isOpen" max-width="500">
     <v-card>
       <v-card-title class="text-subtitle-1 d-flex align-center">
-        {{ $t('settings') }}
+        {{ $t('settings.title') }}
       </v-card-title>
 
       <v-card-text>
         <v-row>
           <v-col cols="12">
-            <v-label class="text-subtitle-1 mb-2">{{ $t('languageSettings') }}</v-label>
+            <v-label class="text-subtitle-1 mb-2">{{ $t('settings.language') }}</v-label>
             <v-select
               v-model="selectedLanguage"
               :items="languageOptions"
@@ -27,7 +27,7 @@
             </v-select>
           </v-col>
           <v-col cols="12">
-            <v-label class="text-subtitle-1 mb-2">{{ $t('timezoneSettings') }}</v-label>
+            <v-label class="text-subtitle-1 mb-2">{{ $t('settings.timezone') }}</v-label>
             <v-select
               v-model="selectedTimezone"
               :items="timezones"
@@ -37,8 +37,12 @@
             ></v-select>
           </v-col>
           <v-col cols="12">
-            <v-label class="text-subtitle-1 mb-2">{{ $t('themeSettings') }}</v-label>
-            <v-switch v-model="isDarkMode" :label="$t('darkMode')" color="primary"></v-switch>
+            <v-label class="text-subtitle-1 mb-2">{{ $t('settings.theme') }}</v-label>
+            <v-switch
+              v-model="isDarkMode"
+              :label="$t('settings.darkMode')"
+              color="primary"
+            ></v-switch>
           </v-col>
         </v-row>
       </v-card-text>
@@ -60,7 +64,7 @@ import { useDarkMode } from '@/composables/useDarkMode'
 import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
 
 // i18n
-const { t: $t, locale } = useI18n()
+const { t: $t, t, locale } = useI18n()
 
 // Electron composable
 const { isElectron } = useElectron()
@@ -74,8 +78,8 @@ const isOpen = ref(false)
 // 語系選擇
 const selectedLanguage = ref(locale.value)
 const languageOptions = [
-  { value: 'zh', text: 'chinese' },
-  { value: 'en', text: 'english' },
+  { value: 'zh', text: 'settings.chinese' },
+  // { value: 'en', text: 'settings.english' },
 ]
 
 // 時區設定
@@ -94,18 +98,18 @@ const isDarkMode = computed({
   },
 })
 
-// 時區選項
-const timezones = [
-  { title: '台北時間 (UTC+8)', value: 'Asia/Taipei' },
-  { title: '香港時間 (UTC+8)', value: 'Asia/Hong_Kong' },
-  { title: '新加坡時間 (UTC+8)', value: 'Asia/Singapore' },
-  { title: '東京時間 (UTC+9)', value: 'Asia/Tokyo' },
-  { title: '首爾時間 (UTC+9)', value: 'Asia/Seoul' },
-  { title: '紐約時間 (UTC-5)', value: 'America/New_York' },
-  { title: '倫敦時間 (UTC+0)', value: 'Europe/London' },
-  { title: '巴黎時間 (UTC+1)', value: 'Europe/Paris' },
-  { title: 'UTC時間', value: 'UTC' },
-]
+// Timezone options
+const timezones = computed(() => [
+  { title: t('timezones.taipei'), value: 'Asia/Taipei' },
+  { title: t('timezones.hongKong'), value: 'Asia/Hong_Kong' },
+  { title: t('timezones.singapore'), value: 'Asia/Singapore' },
+  { title: t('timezones.tokyo'), value: 'Asia/Tokyo' },
+  { title: t('timezones.seoul'), value: 'Asia/Seoul' },
+  { title: t('timezones.newYork'), value: 'America/New_York' },
+  { title: t('timezones.london'), value: 'Europe/London' },
+  { title: t('timezones.paris'), value: 'Europe/Paris' },
+  { title: t('timezones.utc'), value: 'UTC' },
+])
 
 // 處理時區變更
 const handleTimezoneChange = (timezone: string) => {
@@ -153,7 +157,7 @@ onMounted(() => {
 
   // 從 localStorage 讀取保存的語系設定
   const savedLanguage = localStorage.getItem('preferred-language')
-  if (savedLanguage && (savedLanguage === 'zh' || savedLanguage === 'en')) {
+  if (savedLanguage) {
     locale.value = savedLanguage
     selectedLanguage.value = savedLanguage
   }
