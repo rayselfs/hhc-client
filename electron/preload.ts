@@ -42,7 +42,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // AutoUpdater 相關
   startDownload: () => ipcRenderer.invoke('start-download'),
   installUpdate: () => ipcRenderer.invoke('install-update'),
-  declineUpdate: () => ipcRenderer.invoke('decline-update'),
+  forceQuit: () => ipcRenderer.invoke('force-quit'),
 
   // 語系相關
   updateLanguage: (language: string) => ipcRenderer.invoke('update-language', language),
@@ -56,6 +56,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   onUpdateDownloaded: (callback: (info: unknown) => void) => {
     ipcRenderer.on('update-downloaded', (event, info) => callback(info))
+  },
+  onUpdateReadyToInstall: (callback: (info: unknown) => void) => {
+    ipcRenderer.on('update-ready-to-install', (event, info) => callback(info))
   },
   onUpdateError: (callback: (error: string) => void) => {
     ipcRenderer.on('update-error', (event, error) => callback(error))

@@ -69,15 +69,16 @@ const handleInstall = async () => {
   }
 }
 
-// 處理延遲安裝
+// 處理延遲安裝（關閉視窗時選擇稍後）
 const handleDelay = async () => {
   if (!isElectron()) return
 
   try {
-    await window.electronAPI.declineUpdate()
     showDialog.value = false
+    // 通知主進程繼續退出流程
+    await window.electronAPI.forceQuit()
   } catch (err) {
-    console.error('記錄延遲更新失敗:', err)
+    console.error('退出應用失敗:', err)
   }
 }
 
@@ -85,9 +86,9 @@ const handleDelay = async () => {
 onMounted(() => {
   if (!isElectron()) return
 
-  // 監聽下載完成事件
-  window.electronAPI.onUpdateDownloaded(() => {
-    updateInfo.value = { version: '1.0.6', releaseDate: new Date().toISOString() }
+  // 監聽準備安裝事件（用戶關閉主視窗時觸發）
+  window.electronAPI.onUpdateReadyToInstall((info) => {
+    updateInfo.value = info
     showDialog.value = true
     isInstalling.value = false
     error.value = ''
@@ -104,7 +105,7 @@ onBeforeUnmount(() => {
   if (!isElectron()) return
 
   // 清理監聽器
-  window.electronAPI.removeAllListeners('update-downloaded')
+  window.electronAPI.removeAllListeners('update-ready-to-install')
   window.electronAPI.removeAllListeners('update-error')
 })
 </script>

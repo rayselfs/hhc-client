@@ -2,9 +2,15 @@ import { app, BrowserWindow, screen, ipcMain } from 'electron'
 import { join } from 'path'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
-import { autoUpdater } from 'electron-updater'
-import { readFileSync, writeFileSync, existsSync } from 'fs'
+import { writeFileSync } from 'fs'
 import { createApplicationMenu } from './menu'
+import {
+  initAutoUpdater,
+  hasUpdateDownloaded,
+  getUpdateInfo,
+  installUpdate,
+  downloadUpdate,
+} from './autoUpdater'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -39,29 +45,39 @@ const createMainWindow = () => {
     mainWindow.loadFile(join(__dirname, 'renderer/index.html'))
   }
 
-  // Handle window close event - check for updates before quitting
+  /**
+   * 關閉視窗事件處理
+   *
+   * 'close' 事件：視窗即將關閉（可以阻止）
+   * - 檢查是否有已下載的更新
+   * - 如果有，發送事件給前端顯示 UpdateDialog（Vue 組件）
+   * - 如果沒有，直接優雅退出
+   */
   mainWindow.on('close', async (event) => {
+    // 阻止視窗立即關閉，先處理更新檢查
     event.preventDefault()
 
-    // Close projection window
-    if (projectionWindow && !projectionWindow.isDestroyed()) {
-      projectionWindow.close()
-      projectionWindow = null
+    // 檢查是否有已下載的更新
+    if (hasUpdateDownloaded()) {
+      const updateInfo = getUpdateInfo()
+      // 發送事件給前端，讓 UpdateDialog 組件處理
+      mainWindow.webContents.send('update-ready-to-install', updateInfo)
+      // 不執行 app.quit()，等待用戶在對話框中做選擇
+      // UpdateDialog 會調用 install-update 或 force-quit IPC
+    } else {
+      // 沒有更新：優雅退出應用程式
+      app.quit()
     }
-    // Force quit
-    app.exit(0)
   })
 
+  /**
+   * 視窗已關閉事件
+   *
+   * 'closed' 事件：視窗已經關閉（無法阻止）
+   * - 清理視窗引用
+   */
   mainWindow.on('closed', () => {
-    // Close projection window when main window is closed
-    if (projectionWindow && !projectionWindow.isDestroyed()) {
-      projectionWindow.close()
-      projectionWindow = null
-    }
     mainWindow = null
-
-    // Exit application when main window is closed on all platforms
-    app.quit()
   })
 
   // 設定應用程式選單
@@ -114,9 +130,12 @@ const createProjectionWindow = () => {
     })
   }
 
-  // Clean up when the window is closed
+  /**
+   * 投影視窗已關閉事件
+   * - 通知主視窗投影已關閉
+   * - 清理視窗引用
+   */
   projectionWindow.on('closed', () => {
-    // Notify the main window that the projection has been closed
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('projection-closed')
     }
@@ -198,36 +217,35 @@ ipcMain.on('send-to-main', (event, data) => {
 // AutoUpdater IPC handlers
 ipcMain.handle('start-download', async () => {
   try {
-    autoUpdater.downloadUpdate()
+    downloadUpdate()
     return { success: true }
-  } catch (error) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : '未知錯誤'
     console.error('開始下載更新失敗:', error)
-    return { success: false, error: error.message }
+    return { success: false, error: errorMessage }
   }
 })
 
 ipcMain.handle('install-update', async () => {
   try {
-    autoUpdater.quitAndInstall()
+    installUpdate()
     return { success: true }
-  } catch (error) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : '未知錯誤'
     console.error('安裝更新失敗:', error)
-    return { success: false, error: error.message }
+    return { success: false, error: errorMessage }
   }
 })
 
-ipcMain.handle('decline-update', async () => {
+// 強制退出應用程式（用戶在關閉時選擇稍後安裝）
+ipcMain.handle('force-quit', async () => {
   try {
-    // 記錄拒絕時間到文件
-    const updateSettingsPath = path.join(app.getPath('userData'), 'update-settings.json')
-    const settings = {
-      lastDeclinedTime: Date.now().toString(),
-    }
-    writeFileSync(updateSettingsPath, JSON.stringify(settings, null, 2))
+    app.quit()
     return { success: true }
-  } catch (error) {
-    console.error('記錄拒絕更新失敗:', error)
-    return { success: false, error: error.message }
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : '未知錯誤'
+    console.error('強制退出失敗:', error)
+    return { success: false, error: errorMessage }
   }
 })
 
@@ -243,9 +261,10 @@ ipcMain.handle('update-language', async (event, language: string) => {
     createApplicationMenu(mainWindow)
 
     return { success: true }
-  } catch (error) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : '未知錯誤'
     console.error('更新語系失敗:', error)
-    return { success: false, error: error.message }
+    return { success: false, error: errorMessage }
   }
 })
 
@@ -262,78 +281,30 @@ app.whenReady().then(() => {
     }
   })
 
-  setTimeout(() => {
-    checkForUpdates()
-  }, 1000)
+  // 初始化自動更新
+  initAutoUpdater(mainWindow)
 })
 
-// check for updates
-const checkForUpdates = () => {
-  const updateSettingsPath = path.join(app.getPath('userData'), 'update-settings.json')
-  let lastDeclinedTime = null
-
-  try {
-    if (existsSync(updateSettingsPath)) {
-      const settings = JSON.parse(readFileSync(updateSettingsPath, 'utf8'))
-      lastDeclinedTime = settings.lastDeclinedTime
-    }
-  } catch (error) {
-    console.error('讀取更新設定失敗:', error)
-  }
-
-  const twoWeeksAgo = Date.now() - 14 * 24 * 60 * 60 * 1000 // 兩週前
-
-  if (!lastDeclinedTime || parseInt(lastDeclinedTime) < twoWeeksAgo) {
-    autoUpdater.checkForUpdates()
-  }
-}
-
-// 更新可用時，顯示下載對話框並開始下載
-autoUpdater.on('update-available', (info) => {
-  if (mainWindow) {
-    mainWindow.webContents.send('update-available', info)
-  }
-})
-
-// 下載進度更新
-autoUpdater.on('download-progress', (progressObj) => {
-  if (mainWindow) {
-    mainWindow.webContents.send('download-progress', progressObj)
-  }
-})
-
-// 下載完成，顯示確認安裝對話框
-autoUpdater.on('update-downloaded', (info) => {
-  if (mainWindow) {
-    mainWindow.webContents.send('update-downloaded', info)
-  }
-})
-
-// 更新錯誤
-autoUpdater.on('error', (error) => {
-  if (mainWindow) {
-    mainWindow.webContents.send('update-error', error.message)
-  }
-})
-
+/**
+ * 所有視窗都已關閉事件
+ * 在 macOS 上，通常應用程式不會在所有視窗關閉時退出，但這個應用需要
+ */
 app.on('window-all-closed', () => {
-  // Ensure all windows are closed, including the projection window
-  if (projectionWindow && !projectionWindow.isDestroyed()) {
-    projectionWindow.close()
-    projectionWindow = null
-  }
-
-  // Exit the application on all platforms
   app.quit()
 })
 
-// Clean up before the application quits
+/**
+ * 應用程式即將退出事件
+ * 清理所有資源
+ */
 app.on('before-quit', () => {
-  // Force close all windows
+  // 關閉投影視窗
   if (projectionWindow && !projectionWindow.isDestroyed()) {
     projectionWindow.destroy()
     projectionWindow = null
   }
+
+  // 關閉主視窗（通常已經關閉，這裡是保險措施）
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.destroy()
     mainWindow = null
