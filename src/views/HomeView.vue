@@ -150,7 +150,7 @@ const menuItems = ref([
     component: 'bible',
   },
   {
-    title: 'timerControl',
+    title: 'timer.control',
     icon: 'mdi-clock-outline',
     component: 'timer',
   },

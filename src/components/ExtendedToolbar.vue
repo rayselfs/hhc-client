@@ -39,19 +39,23 @@
       class="mr-1"
       @click="toggleProjectionContent"
       :color="!projectionStore.isShowingDefault ? 'error' : 'default'"
-      :title="projectionStore.isShowingDefault ? $t('open') : $t('close')"
+      :title="
+        projectionStore.isShowingDefault
+          ? $t('open') + $t('projection.title')
+          : $t('close') + $t('projection.title')
+      "
       variant="outlined"
     >
       <v-icon v-if="projectionStore.isShowingDefault" class="mr-2">mdi-monitor</v-icon>
       <v-icon v-else class="mr-2">mdi-monitor-off</v-icon>
-      {{ $t('projection') }}
+      {{ $t('projection.title') }}
     </v-btn>
 
     <v-btn
       class="mr-4"
       @click="closeProjectionWindow"
       color="error"
-      :title="$t('close') + $t('projection') + $t('window')"
+      :title="$t('close') + $t('projection.title') + $t('window')"
       icon
     >
       <v-icon>mdi-close</v-icon>
@@ -114,7 +118,7 @@ const toolbarTitle = computed(() => {
     case 'bible':
       return $t('bible')
     case 'timer':
-      return $t('timer')
+      return $t('timer.control')
     default:
       return 'HHC Project Client'
   }
@@ -176,8 +180,8 @@ const closeProjectionWindow = async () => {
 
       // 使用 useAlert 的 warning 函數顯示確認對話框
       const confirmed = await warning(
-        $t('confirmCloseProjection'),
-        $t('close') + $t('projection') + $t('window'),
+        $t('projection.confirmClose'),
+        $t('close') + $t('projection.title') + $t('window'),
       )
 
       if (confirmed) {

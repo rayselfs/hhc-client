@@ -1,13 +1,36 @@
 {
-  "bible": "聖經",
-  "timer": "計時器",
   "open": "開啟",
   "close": "關閉",
-  "confirmCloseProjection": "確定要關閉投影窗口嗎？",
   "cancel": "取消",
   "confirm": "確定",
-  "projection": "投影",
-  "window": "窗口",
+  "search": "搜尋",
+  "window": "視窗",
+  "bible": "聖經",
+  "preferences": "偏好設定",
+  "help": "說明",
+  "file": "檔案",
+  "edit": "編輯",
+  "quit": "結束",
+  "timer": {
+    "control": "計時器",
+    "mode": {
+      "timer": "計時",
+      "clock": "時鐘",
+      "both": "同時"
+    },
+    "duration": "計時時間",
+    "presets": "計時預設",
+    "stopwatch": "碼錶",
+    "units": {
+      "hours": "小時",
+      "minutes": "分鐘",
+      "seconds": "秒"
+    }
+  },
+  "projection": {
+    "title": "投影",
+    "confirmClose": "確定要關閉投影窗口嗎?"
+  },
   "settings": {
     "title": "設定",
     "timezone": "時區",
@@ -40,7 +63,7 @@
     "license": "本軟體採用開源授權條款。"
   },
   "shortcuts": {
-    "title": "快捷鍵說明",
+    "title": "快捷鍵",
     "timer": "計時器快捷鍵",
     "projection": "投影快捷鍵",
     "startPauseTimer": "開始/暫停計時器",
@@ -49,19 +72,6 @@
     "toggleProjectionMac": "切換投影 (Mac)",
     "closeProjection": "關閉投影"
   },
-  "search": "搜尋",
-  "showContent": "顯示內容",
-  "showDefault": "顯示預設",
-  "timerControl": "計時器",
-  "timerMode": "計時",
-  "clockMode": "時鐘",
-  "bothMode": "同時",
-  "timerDuration": "計時時間",
-  "hours": "小時",
-  "minutes": "分鐘",
-  "seconds": "秒",
-  "timerPresets": "計時預設",
-  "stopwatch": "碼錶",
   "alert": {
     "confirm": "確定",
     "cancel": "取消",
@@ -81,23 +91,5 @@
     "delay": "稍後安裝",
     "installing": "安裝中...",
     "installError": "安裝更新失敗"
-  },
-  "menu": {
-    "file": "檔案",
-    "edit": "編輯",
-    "preferences": "偏好設定",
-    "quit": "結束",
-    "about": "關於",
-    "services": "服務",
-    "hide": "隱藏",
-    "hideOthers": "隱藏其他",
-    "unhide": "顯示全部",
-    "undo": "復原",
-    "redo": "重做",
-    "cut": "剪下",
-    "copy": "複製",
-    "paste": "貼上",
-    "help": "說明",
-    "shortcuts": "快捷鍵"
   }
 }

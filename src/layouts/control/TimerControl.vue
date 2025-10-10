@@ -17,15 +17,15 @@
                 >
                   <v-btn value="timer">
                     <v-icon icon="mdi-timer" class="mr-2"></v-icon>
-                    {{ $t('timerMode') }}
+                    {{ $t('timer.mode.timer') }}
                   </v-btn>
                   <v-btn value="both">
                     <v-icon icon="mdi-view-split-horizontal" class="mr-2"></v-icon>
-                    {{ $t('bothMode') }}
+                    {{ $t('timer.mode.both') }}
                   </v-btn>
                   <v-btn value="clock">
                     <v-icon icon="mdi-clock" class="mr-2"></v-icon>
-                    {{ $t('clockMode') }}
+                    {{ $t('timer.mode.clock') }}
                   </v-btn>
                 </v-btn-toggle>
               </v-col>
@@ -132,7 +132,7 @@
         <v-card class="preset-card mb-5 rounded-lg">
           <v-card-text>
             <div class="d-flex justify-space-between mb-2">
-              <v-label class="text-h6 align-start">{{ $t('timerPresets') }}</v-label>
+              <v-label class="text-h6 align-start">{{ $t('timer.presets') }}</v-label>
               <v-btn
                 icon="mdi-plus"
                 size="small"
@@ -188,7 +188,7 @@
                   @click="toggleStopwatch"
                 >
                   <v-icon icon="mdi-timer-outline" class="mr-2"></v-icon>
-                  {{ $t('stopwatch') }}
+                  {{ $t('timer.stopwatch') }}
                 </v-btn>
               </v-col>
             </v-row>
