@@ -116,6 +116,9 @@ onMounted(() => {
 
   // 請求當前狀態
   requestCurrentState()
+
+  // 設置 html overflow 為 hidden（只在投影視圖）
+  document.documentElement.style.overflow = 'hidden'
 })
 
 onBeforeUnmount(() => {
@@ -123,11 +126,10 @@ onBeforeUnmount(() => {
   if (isElectron()) {
     removeAllListeners('projection-message')
   }
+
+  // 恢復 html overflow（清理樣式）
+  document.documentElement.style.overflow = ''
 })
 </script>
 
-<style>
-html {
-  overflow: hidden;
-}
-</style>
+<style scoped></style>
