@@ -1,10 +1,14 @@
 <template>
   <div class="floating-timer" @click="$emit('click')">
-    <v-card class="timer-card" elevation="8" :class="{ 'pulse-animation': isRunning }">
+    <v-card
+      class="timer-card"
+      elevation="8"
+      :class="{ 'pulse-animation': timerStore.settings.isRunning }"
+    >
       <v-card-text class="pa-3">
         <CountdownTimer
-          :progress="progress"
-          :timer-formatted-time="formatTime(remainingTime)"
+          :progress="timerStore.progress"
+          :timer-formatted-time="timerStore.formattedTime"
           :size="80"
         >
         </CountdownTimer>
@@ -14,40 +18,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
 import CountdownTimer from './CountdownTimer.vue'
+import { useTimerStore } from '@/stores/timer'
 
-interface Props {
-  remainingTime: number
-  isRunning: boolean
-  originalDuration?: number
-}
-
-const props = withDefaults(defineProps<Props>(), {
-  originalDuration: 300,
-})
+const timerStore = useTimerStore()
 
 defineEmits<{
   (e: 'click'): void
 }>()
-
-// 計算進度百分比
-const progress = computed(() => {
-  if (!props.originalDuration || props.originalDuration === 0) return 0
-  return Math.max(0, (props.remainingTime / props.originalDuration) * 100)
-})
-
-// 格式化時間顯示
-const formatTime = (seconds: number) => {
-  const h = Math.floor(seconds / 3600)
-  const m = Math.floor((seconds % 3600) / 60)
-  const s = seconds % 60
-
-  if (h > 0) {
-    return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
-  }
-  return `${m}:${s.toString().padStart(2, '0')}`
-}
 </script>
 
 <style scoped>

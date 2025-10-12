@@ -62,8 +62,8 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 // 使用 i18n 作為預設值
-const confirmText = computed(() => props.confirmButtonText || t('alert.confirm'))
-const cancelText = computed(() => props.cancelButtonText || t('alert.cancel'))
+const confirmText = computed(() => props.confirmButtonText || t('confirm'))
+const cancelText = computed(() => props.cancelButtonText || t('cancel'))
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void

@@ -13,25 +13,25 @@
         autofocus
         variant="solo-inverted"
         hide-details
-        :placeholder="$t('search')"
+        :placeholder="getSearchPlaceholder(props.currentView)"
         density="compact"
         class="mr-2"
         style="width: 250px"
-        @keydown.esc="closeSearch"
+        @keydown.esc="handleCloseSearch"
       />
     </v-slide-x-reverse-transition>
 
     <v-btn
       v-if="!isSearching && showSearch"
       icon
-      @click="isSearching = true"
+      @click="handleStartSearch"
       :title="$t('search')"
       class="mr-1"
     >
       <v-icon>mdi-magnify</v-icon>
     </v-btn>
 
-    <v-btn v-else-if="isSearching && showSearch" icon @click="closeSearch">
+    <v-btn v-else-if="isSearching && showSearch" icon @click="handleCloseSearch">
       <v-icon>mdi-close</v-icon>
     </v-btn>
 
@@ -80,12 +80,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useProjectionStore } from '@/stores/projection'
 import { useElectron } from '@/composables/useElectron'
 import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
 import { useAlert } from '@/composables/useAlert'
+import { useSearch } from '@/composables/useSearch'
 import { ViewType } from '@/types/common'
 import AlertDialog from '@/components/Alert/AlertDialog.vue'
 
@@ -101,6 +102,10 @@ const { setProjectionState, syncAllStates, sendTimerUpdate } = useProjectionMess
 // Alert 管理
 const { alertState, warning, confirm, cancel } = useAlert()
 
+// 搜尋管理
+const { searchQuery, isSearching, getSearchPlaceholder, executeSearch, startSearch, closeSearch } =
+  useSearch()
+
 // Props
 const props = defineProps<{
   currentView: string
@@ -110,6 +115,7 @@ const props = defineProps<{
 // Drawer 的事件發送
 const emit = defineEmits<{
   (e: 'toggle-drawer'): void
+  (e: 'search', query: string): void
 }>()
 
 // 計算標題
@@ -118,7 +124,9 @@ const toolbarTitle = computed(() => {
     case 'bible':
       return $t('bible')
     case 'timer':
-      return $t('timer.control')
+      return $t('timer.title')
+    case 'media':
+      return $t('media.title')
     default:
       return 'HHC Project Client'
   }
@@ -133,14 +141,24 @@ const emitToggleDrawer = () => {
   emit('toggle-drawer')
 }
 
-// 搜尋功能的狀態
-const isSearching = ref(false)
-const searchQuery = ref('')
-
-const closeSearch = () => {
-  isSearching.value = false
-  searchQuery.value = ''
+// 處理搜尋開始
+const handleStartSearch = () => {
+  startSearch()
 }
+
+// 處理搜尋關閉
+const handleCloseSearch = () => {
+  closeSearch()
+  emit('search', '')
+}
+
+// 監聽搜尋查詢變化
+watch(searchQuery, (newQuery) => {
+  executeSearch(props.currentView, newQuery)
+  emit('search', newQuery)
+})
+
+// 投影功能
 
 // 投影功能
 const projectionStore = useProjectionStore()

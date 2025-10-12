@@ -29,24 +29,22 @@
       :current-view="currentView"
       :drawer-collapsed="drawerCollapsed"
       @toggle-drawer="toggleDrawer"
+      @search="handleSearch"
     />
 
     <v-main>
-      <v-container>
-        <transition name="page-slide" mode="out-in">
-          <component :is="currentComponent" :key="currentView" />
-        </transition>
-      </v-container>
+      <transition name="page-slide" mode="out-in">
+        <component
+          :is="currentComponent"
+          :key="currentView"
+          :search-query="searchQuery"
+          @search="handleSearch"
+        />
+      </transition>
     </v-main>
 
     <!-- 懸浮計時器視窗 -->
-    <FloatingTimer
-      v-if="showFloatingTimer"
-      :remaining-time="timerStore.settings.remainingTime"
-      :is-running="timerStore.settings.isRunning"
-      :original-duration="timerStore.settings.originalDuration"
-      @click="goToTimer"
-    />
+    <FloatingTimer v-if="showFloatingTimer" @click="goToTimer" />
   </v-layout>
 </template>
 
@@ -57,6 +55,7 @@ import ExtendedToolbar from '@/components/ExtendedToolbar.vue'
 import BibleViewer from '@/components/Bible/BibleViewer.vue'
 import TimerControl from '@/layouts/control/TimerControl.vue'
 import FloatingTimer from '@/components/Timer/FloatingTimer.vue'
+import MediaControl from '@/layouts/control/MediaControl.vue'
 import { useElectron } from '@/composables/useElectron'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { useAlert } from '@/composables/useAlert'
@@ -133,13 +132,15 @@ const drawerCollapsed = ref(false)
 // 當前選中的視圖
 const currentView = ref('bible') // 預設使用聖經
 
+// 搜尋查詢
+const searchQuery = ref('')
+
 // 懸浮計時器顯示狀態
 const showFloatingTimer = computed(() => {
   // 只有在計時器運行中且不在計時器頁面時才顯示
   return timerStore.settings.isRunning && currentView.value !== 'timer'
 })
 
-// 鍵盤快捷鍵
 useKeyboardShortcuts(currentView)
 
 // 選單項目配置
@@ -150,9 +151,14 @@ const menuItems = ref([
     component: 'bible',
   },
   {
-    title: 'timer.control',
+    title: 'timer.title',
     icon: 'mdi-clock-outline',
     component: 'timer',
+  },
+  {
+    title: 'media.title',
+    icon: 'mdi-folder-multiple',
+    component: 'media',
   },
 ])
 
@@ -160,6 +166,7 @@ const menuItems = ref([
 const componentMap = {
   bible: BibleViewer,
   timer: TimerControl,
+  media: MediaControl,
 }
 
 // 當前組件
@@ -176,6 +183,12 @@ const toggleDrawer = () => {
 const goToTimer = () => {
   currentView.value = 'timer'
   sendViewChange(ViewType.TIMER, true)
+}
+
+// 處理搜尋
+const handleSearch = (query: string) => {
+  searchQuery.value = query
+  // 搜尋邏輯現在由 ExtendedToolbar 中的 useSearch composable 處理
 }
 
 // 處理選單項目點擊事件

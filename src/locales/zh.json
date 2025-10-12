@@ -11,8 +11,27 @@
   "file": "檔案",
   "edit": "編輯",
   "quit": "結束",
+  "size": "大小",
+  "new": "新",
+  "add": "新增",
+  "create": "建立",
+  "homepage": "首頁",
+  "notFound": "找不到",
+  "moveTo": "移動到",
+  "move": "移動",
+  "last": "最後",
+  "modify": "修改",
+  "folder": "資料夾",
+  "preview": "預覽",
+  "delete": "刪除",
+  "upload": "上傳",
+  "select": "選擇",
+  "success": "成功",
+  "failed": "失敗",
+  "back": "返回",
+  "remove": "移除",
   "timer": {
-    "control": "計時器",
+    "title": "計時器",
     "mode": {
       "timer": "計時",
       "clock": "時鐘",
@@ -73,9 +92,6 @@
     "closeProjection": "關閉投影"
   },
   "alert": {
-    "confirm": "確定",
-    "cancel": "取消",
-    "success": "成功",
     "error": "錯誤",
     "warning": "警告",
     "info": "提示",
@@ -91,5 +107,19 @@
     "delay": "稍後安裝",
     "installing": "安裝中...",
     "installError": "安裝更新失敗"
+  },
+  "media": {
+    "title": "多媒體 (Beta)",
+    "untitledFolder": "未命名資料夾",
+    "selectedItems": "已選取 {count} 個項目",
+    "dragFilesHere": "拖拽文件到這裡",
+    "orClickUploadButton": "或點擊上傳按鈕",
+    "uploadingFiles": "正在上傳文件",
+    "noFiles": "暫無文件",
+    "deleteConfirm": "確定要刪除這個文件嗎？",
+    "gridView": "網格檢視",
+    "listView": "清單檢視",
+    "filesNotFoundMessage": "以下檔案無法找到，可能已被移動或刪除：",
+    "reuploadFiles": "重新上傳"
   }
 }

@@ -9,3 +9,15 @@ html {
     'Open Sans Variable', 'Noto Sans TC Variable', 'Roboto Variable', 'Microsoft JhengHei',
     sans-serif;
 }
+
+html.dark {
+  --v-divider-color: #ffffff;
+}
+
+html.light {
+  --v-divider-color: #000000;
+}
+
+v-divider {
+  color: var(--v-divider-color);
+}
