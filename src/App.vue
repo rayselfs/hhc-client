@@ -7,7 +7,7 @@ import AboutDialog from '@/components/AboutDialog.vue'
 import { useAlert } from '@/composables/useAlert'
 import { useSnackBar } from '@/composables/useSnackBar'
 
-const { alertState, confirm, cancel } = useAlert()
+const { alertState, confirm, cancel, handleDontShowAgain } = useAlert()
 const { snackbarVisible, snackbarText, snackbarColor, snackbarTimeout, defaultConfig } =
   useSnackBar()
 </script>
@@ -28,8 +28,11 @@ const { snackbarVisible, snackbarText, snackbarColor, snackbarTimeout, defaultCo
     :cancel-button-color="alertState.cancelButtonColor"
     :show-cancel-button="alertState.showCancelButton"
     :max-width="alertState.maxWidth"
+    :show-dont-show-again="alertState.showDontShowAgain"
+    :alert-id="alertState.alertId"
     @confirm="confirm"
     @cancel="cancel"
+    @dont-show-again="handleDontShowAgain"
   />
 
   <!-- Update Dialogs -->

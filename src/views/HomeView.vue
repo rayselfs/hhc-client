@@ -1,5 +1,12 @@
 <template>
   <v-layout class="rounded rounded-md">
+    <extended-toolbar
+      :current-view="currentView"
+      :drawer-collapsed="drawerCollapsed"
+      @toggle-drawer="toggleDrawer"
+      @search="handleSearch"
+    />
+
     <v-navigation-drawer
       v-model="drawer"
       permanent
@@ -25,13 +32,7 @@
       </v-list>
     </v-navigation-drawer>
 
-    <extended-toolbar
-      :current-view="currentView"
-      :drawer-collapsed="drawerCollapsed"
-      @toggle-drawer="toggleDrawer"
-      @search="handleSearch"
-    />
-
+    <!-- Main content -->
     <v-main>
       <transition name="page-slide" mode="out-in">
         <component
@@ -43,7 +44,7 @@
       </transition>
     </v-main>
 
-    <!-- 懸浮計時器視窗 -->
+    <!-- Extended Components -->
     <FloatingTimer v-if="showFloatingTimer" @click="goToTimer" />
   </v-layout>
 </template>
@@ -52,7 +53,7 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ExtendedToolbar from '@/components/ExtendedToolbar.vue'
-import BibleViewer from '@/components/Bible/BibleViewer.vue'
+import BibleViewer from '@/layouts/control/BibleControl.vue'
 import TimerControl from '@/layouts/control/TimerControl.vue'
 import FloatingTimer from '@/components/Timer/FloatingTimer.vue'
 import MediaControl from '@/layouts/control/MediaControl.vue'
@@ -126,8 +127,8 @@ const {
 // 控制 navigation-drawer 的開關狀態，預設為開啟 (true)
 const drawer = ref(true)
 
-// 控制 drawer 的縮放狀態，預設為展開 (false)
-const drawerCollapsed = ref(false)
+// 控制 drawer 的縮放狀態，預設為收起 (true)
+const drawerCollapsed = ref(true)
 
 // 當前選中的視圖
 const currentView = ref('bible') // 預設使用聖經
@@ -146,7 +147,7 @@ useKeyboardShortcuts(currentView)
 // 選單項目配置
 const menuItems = ref([
   {
-    title: 'bible',
+    title: 'bible.title',
     icon: 'mdi-book-open-variant',
     component: 'bible',
   },
@@ -207,7 +208,10 @@ const handleElectronMessage = (data: AppMessage) => {
 
 // 處理沒有第二螢幕的提示
 const handleNoSecondScreen = async () => {
-  await warning($t('alert.dualScreenRequired'), $t('alert.screenWarning'))
+  await warning($t('alert.dualScreenRequired'), $t('alert.screenWarning'), {
+    showDontShowAgain: true,
+    alertId: 'no-second-screen-warning',
+  })
 }
 
 // 檢查並確保投影窗口存在

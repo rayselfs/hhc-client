@@ -11,7 +11,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import DefaultProjection from '@/layouts/projection/DefaultProjection.vue'
-import BibleProjection from '@/components/Bible/BibleProjection.vue'
+import BibleProjection from '@/layouts/projection/BibleProjection.vue'
 import TimerProjection from '@/layouts/projection/TimerProjection.vue'
 import { useProjectionStore } from '@/stores/projection'
 import { useProjectionElectron } from '@/composables/useElectron'
@@ -26,10 +26,17 @@ const {
   removeAllListeners,
 } = useProjectionElectron()
 
-// 響應式變數
+// 聖經相關
 const selectedBook = ref('創世記')
+const selectedBookNumber = ref(1) // 書卷編號
 const selectedChapter = ref(1)
-const bibleContent = ref('')
+const chapterVerses = ref<Array<{ number: number; text: string }>>([])
+const currentVerse = ref(1)
+const getInitialFontSize = () => {
+  const savedFontSize = localStorage.getItem('bible-font-size')
+  return savedFontSize ? parseInt(savedFontSize, 10) : 90
+}
+const verseFontSize = ref(getInitialFontSize())
 
 // 計時器相關
 const timerMode = ref(TimerMode.BOTH)
@@ -69,8 +76,11 @@ const componentProps = computed(() => {
     case 'bible':
       return {
         selectedBook: selectedBook.value,
+        selectedBookNumber: selectedBookNumber.value,
         selectedChapter: selectedChapter.value,
-        bibleContent: bibleContent.value,
+        chapterVerses: chapterVerses.value,
+        currentVerse: currentVerse.value,
+        fontSize: verseFontSize.value,
       }
     case 'timer':
       return {
@@ -94,8 +104,13 @@ const handleMessage = (data: AppMessage) => {
       break
     case 'UPDATE_BIBLE':
       selectedBook.value = messageData.book as string
+      selectedBookNumber.value = messageData.bookNumber as number
       selectedChapter.value = messageData.chapter as number
-      bibleContent.value = messageData.content as string
+      chapterVerses.value = messageData.chapterVerses as Array<{ number: number; text: string }>
+      currentVerse.value = messageData.currentVerse as number
+      break
+    case 'UPDATE_BIBLE_FONT_SIZE':
+      verseFontSize.value = messageData.fontSize as number
       break
     case 'UPDATE_TIMER':
       timerMode.value = messageData.mode as TimerMode

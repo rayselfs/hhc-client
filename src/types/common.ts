@@ -11,6 +11,7 @@ export enum MessageType {
   BIBLE_UPDATE = 'BIBLE_UPDATE',
   UPDATE_TIMER = 'UPDATE_TIMER',
   UPDATE_BIBLE = 'UPDATE_BIBLE',
+  UPDATE_BIBLE_FONT_SIZE = 'UPDATE_BIBLE_FONT_SIZE',
   UPDATE_THEME = 'UPDATE_THEME',
   TOGGLE_PROJECTION_CONTENT = 'TOGGLE_PROJECTION_CONTENT',
   GET_CURRENT_STATE = 'get-current-state',
@@ -103,7 +104,18 @@ export interface UpdateBibleMessage extends BaseMessage {
   data: {
     book: string
     chapter: number
-    content: string
+    chapterVerses: Array<{ number: number; text: string }>
+    currentVerse: number
+  }
+}
+
+/**
+ * 更新聖經字型大小消息
+ */
+export interface UpdateBibleFontSizeMessage extends BaseMessage {
+  type: MessageType.UPDATE_BIBLE_FONT_SIZE
+  data: {
+    fontSize: number
   }
 }
 
@@ -154,6 +166,7 @@ export type AppMessage =
   | BibleUpdateMessage
   | UpdateTimerMessage
   | UpdateBibleMessage
+  | UpdateBibleFontSizeMessage
   | UpdateThemeMessage
   | ToggleProjectionContentMessage
   | TimezoneUpdateMessage

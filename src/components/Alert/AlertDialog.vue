@@ -10,6 +10,16 @@
         {{ message }}
       </v-card-text>
 
+      <!-- 不要再顯示選項 -->
+      <v-card-text v-if="showDontShowAgain" class="pa-4 pt-0">
+        <v-checkbox
+          v-model="dontShowAgain"
+          :label="$t('dontShowAgain')"
+          density="compact"
+          hide-details
+        />
+      </v-card-text>
+
       <v-card-actions class="pa-4">
         <v-spacer></v-spacer>
         <v-btn
@@ -46,6 +56,8 @@ interface Props {
   cancelButtonColor?: string
   showCancelButton?: boolean
   maxWidth?: string | number
+  showDontShowAgain?: boolean
+  alertId?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -59,6 +71,8 @@ const props = withDefaults(defineProps<Props>(), {
   cancelButtonColor: 'grey',
   showCancelButton: false,
   maxWidth: 500,
+  showDontShowAgain: false,
+  alertId: '',
 })
 
 // 使用 i18n 作為預設值
@@ -69,9 +83,11 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void
   (e: 'confirm'): void
   (e: 'cancel'): void
+  (e: 'dont-show-again', alertId: string): void
 }>()
 
 const dialog = ref(props.modelValue)
+const dontShowAgain = ref(false)
 
 watch(
   () => props.modelValue,
@@ -86,11 +102,23 @@ watch(dialog, (newVal) => {
 
 const handleConfirm = () => {
   emit('confirm')
+
+  // 如果用戶勾選了"不要再顯示"且有alertId
+  if (dontShowAgain.value && props.alertId) {
+    emit('dont-show-again', props.alertId)
+  }
+
   dialog.value = false
 }
 
 const handleCancel = () => {
   emit('cancel')
+
+  // 如果用戶勾選了"不要再顯示"且有alertId
+  if (dontShowAgain.value && props.alertId) {
+    emit('dont-show-again', props.alertId)
+  }
+
   dialog.value = false
 }
 </script>

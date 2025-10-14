@@ -238,7 +238,13 @@ export const useProjectionMessaging = () => {
    * 發送聖經更新消息
    */
   const sendBibleUpdate = (
-    bibleData: { book: string; chapter: number; content: string },
+    bibleData: {
+      book: string
+      bookNumber: number
+      chapter: number
+      chapterVerses: Array<{ number: number; text: string }>
+      currentVerse: number
+    },
     force = false,
   ) => {
     const message: AppMessage = {

@@ -4,8 +4,8 @@
   "cancel": "取消",
   "confirm": "確定",
   "search": "搜尋",
+  "refresh": "重新整理",
   "window": "視窗",
-  "bible": "聖經",
   "preferences": "偏好設定",
   "help": "說明",
   "file": "檔案",
@@ -30,6 +30,8 @@
   "failed": "失敗",
   "back": "返回",
   "remove": "移除",
+  "control": "控制",
+  "fontSize": "字型大小",
   "timer": {
     "title": "計時器",
     "mode": {
@@ -45,6 +47,14 @@
       "minutes": "分鐘",
       "seconds": "秒"
     }
+  },
+  "bible": {
+    "title": "聖經 (Beta)",
+    "verseTitle": "經文",
+    "no": "第",
+    "psalm": "篇",
+    "chapter": "章",
+    "verse": "節"
   },
   "projection": {
     "title": "投影",
@@ -98,6 +108,7 @@
     "screenWarning": "螢幕提示",
     "dualScreenRequired": "此App是設計用在雙螢幕"
   },
+  "dontShowAgain": "不要再顯示",
   "update": {
     "downloading": "發現新版本，下載中...",
     "readyToInstall": "更新已準備就緒",
@@ -109,7 +120,7 @@
     "installError": "安裝更新失敗"
   },
   "media": {
-    "title": "多媒體 (Beta)",
+    "title": "多媒體 (Alpha)",
     "untitledFolder": "未命名資料夾",
     "selectedItems": "已選取 {count} 個項目",
     "dragFilesHere": "拖拽文件到這裡",

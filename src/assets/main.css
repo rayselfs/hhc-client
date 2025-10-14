@@ -21,3 +21,7 @@ html.light {
 v-divider {
   color: var(--v-divider-color);
 }
+
+.dialog-top {
+  top: 0px;
+}

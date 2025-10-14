@@ -124,6 +124,7 @@ const createProjectionWindow = () => {
   if (isDev) {
     const devUrl = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173'
     projectionWindow.loadURL(devUrl + '#/projection')
+    projectionWindow.webContents.openDevTools()
   } else {
     projectionWindow.loadFile(join(__dirname, 'renderer/index.html'), {
       hash: '#/projection',

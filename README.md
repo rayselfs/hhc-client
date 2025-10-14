@@ -92,6 +92,17 @@ HHC Client is a feature-rich desktop application designed for churches and relig
 npm install
 ```
 
+### Environment Configuration
+
+Create a `.env` file in the project root directory to configure the Bible API host:
+
+```bash
+# Bible API 配置
+VITE_BIBLE_API_HOST=http://localhost:8080
+```
+
+**Note**: Make sure your Bible API server is running on the configured host before starting the application.
+
 ### Development Mode
 
 ```bash
