@@ -137,7 +137,7 @@ export const createApplicationMenu = (mainWindow: BrowserWindow | null) => {
 
   // macOS 特殊處理
   template.unshift({
-    label: 'HHC Client',
+    label: 'HHC',
     submenu: [
       {
         label: t.about,
