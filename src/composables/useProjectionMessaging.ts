@@ -256,6 +256,8 @@ export const useProjectionMessaging = () => {
     },
     force = false,
   ) => {
+    sendViewChange(ViewType.BIBLE, true)
+
     const message: AppMessage = {
       type: MessageType.UPDATE_BIBLE,
       data: bibleData,
