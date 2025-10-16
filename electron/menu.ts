@@ -2,6 +2,7 @@ import { Menu, BrowserWindow } from 'electron'
 import { readFileSync, existsSync } from 'fs'
 import path from 'path'
 import { app } from 'electron'
+import { autoUpdater } from 'electron-updater'
 
 // 語系設定讀取
 const getLanguage = () => {
@@ -22,7 +23,6 @@ const getLanguage = () => {
 const getTranslations = (lang: string) => {
   const translations: Record<string, Record<string, string>> = {
     zh: {
-      file: '檔案',
       preferences: '偏好設定',
       quit: '結束',
       about: '關於',
@@ -36,11 +36,11 @@ const getTranslations = (lang: string) => {
       cut: '剪下',
       copy: '複製',
       paste: '貼上',
-      help: '說明',
+      help: '幫助',
       shortcuts: '快捷鍵',
+      checkUpdates: '檢查更新',
     },
     en: {
-      file: 'File',
       preferences: 'Preferences',
       quit: 'Quit',
       about: 'About',
@@ -56,6 +56,7 @@ const getTranslations = (lang: string) => {
       paste: 'Paste',
       help: 'Help',
       shortcuts: 'Keyboard Shortcuts',
+      checkUpdates: 'Check for Updates',
     },
   }
   return translations[lang] || translations.zh
@@ -67,28 +68,6 @@ export const createApplicationMenu = (mainWindow: BrowserWindow | null) => {
   const t = getTranslations(lang)
 
   const template: Electron.MenuItemConstructorOptions[] = [
-    {
-      label: t.file,
-      submenu: [
-        {
-          label: t.preferences,
-          accelerator: 'CmdOrCtrl+,',
-          click: () => {
-            if (mainWindow) {
-              mainWindow.webContents.send('main-message', 'open-settings')
-            }
-          },
-        },
-        { type: 'separator' },
-        {
-          label: t.quit,
-          accelerator: process.platform === 'darwin' ? 'Cmd+Q' : 'Ctrl+Q',
-          click: () => {
-            app.quit()
-          },
-        },
-      ],
-    },
     {
       label: t.edit,
       submenu: [
@@ -145,19 +124,10 @@ export const createApplicationMenu = (mainWindow: BrowserWindow | null) => {
       submenu: [
         {
           label: t.shortcuts,
-          accelerator: 'CmdOrCtrl+?',
+          accelerator: 'CmdOrCtrl+S',
           click: () => {
             if (mainWindow) {
               mainWindow.webContents.send('main-message', 'open-shortcuts')
-            }
-          },
-        },
-        {
-          label: t.about,
-          accelerator: process.platform === 'darwin' ? '' : 'F1',
-          click: () => {
-            if (mainWindow) {
-              mainWindow.webContents.send('main-message', 'open-about')
             }
           },
         },
@@ -166,45 +136,43 @@ export const createApplicationMenu = (mainWindow: BrowserWindow | null) => {
   ]
 
   // macOS 特殊處理
-  if (process.platform === 'darwin') {
-    template.unshift({
-      label: app.getName(),
-      submenu: [
-        {
-          label: t.about,
-          role: 'about',
+  template.unshift({
+    label: 'HHC Client',
+    submenu: [
+      {
+        label: t.about,
+        click: () => {
+          if (mainWindow) {
+            mainWindow.webContents.send('main-message', 'open-about')
+          }
         },
-        { type: 'separator' },
-        {
-          label: t.services,
-          role: 'services',
+      },
+      {
+        label: t.checkUpdates,
+        click: () => {
+          autoUpdater.checkForUpdates()
         },
-        { type: 'separator' },
-        {
-          label: t.hide,
-          accelerator: 'Command+H',
-          role: 'hide',
+      },
+      { type: 'separator' },
+      {
+        label: t.preferences,
+        accelerator: 'CmdOrCtrl+,',
+        click: () => {
+          if (mainWindow) {
+            mainWindow.webContents.send('main-message', 'open-settings')
+          }
         },
-        {
-          label: t.hideOthers,
-          accelerator: 'Command+Shift+H',
-          role: 'hideOthers',
+      },
+      { type: 'separator' },
+      {
+        label: t.quit,
+        accelerator: 'Command+Q',
+        click: () => {
+          app.quit()
         },
-        {
-          label: t.unhide,
-          role: 'unhide',
-        },
-        { type: 'separator' },
-        {
-          label: t.quit,
-          accelerator: 'Command+Q',
-          click: () => {
-            app.quit()
-          },
-        },
-      ],
-    })
-  }
+      },
+    ],
+  })
 
   const menu = Menu.buildFromTemplate(template)
   Menu.setApplicationMenu(menu)
