@@ -44,6 +44,7 @@ jobs:
           # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           npm run electron:build:mac-arm -- --publish always
+          npm run electron:build:mac-intel -- --publish always
 
       - name: Build and Release (Windows)
         if: matrix.os == 'windows-2025'
