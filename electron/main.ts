@@ -34,9 +34,16 @@ let projectionWindow: BrowserWindow | null = null
 
 // Create main window
 const createMainWindow = () => {
+  const displays = screen.getAllDisplays()
+  const externalDisplay = displays.find(
+    (display) => display.bounds.x !== 0 || display.bounds.y !== 0,
+  )
+  const hasSecondScreen = externalDisplay !== undefined
+
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
+    show: false,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -57,6 +64,18 @@ const createMainWindow = () => {
   } else {
     mainWindow.loadFile(join(__dirname, 'renderer/index.html'))
   }
+
+  mainWindow.once('ready-to-show', () => {
+    if (process.platform === 'win32' && hasSecondScreen) {
+      mainWindow.maximize()
+    }
+
+    if (process.platform === 'darwin' && hasSecondScreen) {
+      mainWindow.setFullScreen(true)
+    }
+
+    mainWindow.show()
+  })
 
   mainWindow.on('close', async (event) => {
     // Prevent the window from closing immediately, first check for updates
