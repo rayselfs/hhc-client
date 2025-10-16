@@ -216,6 +216,7 @@ import { useTimerStore } from '@/stores/timer'
 import { useProjectionStore } from '@/stores/projection'
 import { useElectron } from '@/composables/useElectron'
 import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
+import { TIMER_CONFIG } from '@/config/app'
 import { TimerMode, ViewType } from '@/types/common'
 import CountdownTimer from '@/components/Timer/CountdownTimer.vue'
 import ClockDisplay from '@/components/Timer/ClockDisplay.vue'
@@ -437,7 +438,7 @@ const formatDuration = (seconds: number) => {
 
 const clockSize = computed(() => {
   const screenWidth = windowSize.value.width
-  return 90 * (screenWidth / 1920)
+  return TIMER_CONFIG.UI.CLOCK_BASE_SIZE * (screenWidth / TIMER_CONFIG.UI.SCREEN_BASE_WIDTH)
 })
 
 // 碼錶相關 - 使用 store 中的方法

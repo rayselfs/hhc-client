@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { TimerMode } from '@/types/common'
 import { useMemoryManager } from '@/utils/memoryManager'
+import { getTimerLocalKey, STORAGE_KEYS, getTimerDefaultSettings, TIMER_CONFIG } from '@/config/app'
 
 export interface TimerPreset {
   id: string
@@ -29,17 +30,9 @@ export interface StopwatchSettings {
 export const useTimerStore = defineStore('timer', () => {
   const { track, untrack, cleanup } = useMemoryManager('useTimerStore')
   const loadSettings = () => {
-    const defaultSettings = {
-      mode: TimerMode.TIMER,
-      timerDuration: 300,
-      originalDuration: 300,
-      timezone: 'Asia/Taipei',
-      isRunning: false,
-      remainingTime: 300,
-      pausedTime: 0,
-    }
+    const defaultSettings = getTimerDefaultSettings()
 
-    const saved = localStorage.getItem('timer-settings')
+    const saved = localStorage.getItem(getTimerLocalKey(STORAGE_KEYS.TIMER_LOCAL.SETTINGS))
     if (saved) {
       try {
         const parsed = JSON.parse(saved)
@@ -81,7 +74,10 @@ export const useTimerStore = defineStore('timer', () => {
         originalDuration: settings.value.originalDuration,
         timezone: settings.value.timezone,
       }
-      localStorage.setItem('timer-settings', JSON.stringify(settingsToSave))
+      localStorage.setItem(
+        getTimerLocalKey(STORAGE_KEYS.TIMER_LOCAL.SETTINGS),
+        JSON.stringify(settingsToSave),
+      )
     } catch (error) {
       console.error('Failed to save timer settings:', error)
     }
@@ -205,12 +201,15 @@ export const useTimerStore = defineStore('timer', () => {
     presets.value.unshift(newPreset)
 
     // 只保留最近5個預設
-    if (presets.value.length > 5) {
-      presets.value = presets.value.slice(0, 5)
+    if (presets.value.length > TIMER_CONFIG.PRESETS.MAX_COUNT) {
+      presets.value = presets.value.slice(0, TIMER_CONFIG.PRESETS.MAX_COUNT)
     }
 
     // 保存到 localStorage
-    localStorage.setItem('timer-presets', JSON.stringify(presets.value))
+    localStorage.setItem(
+      getTimerLocalKey(STORAGE_KEYS.TIMER_LOCAL.PRESETS),
+      JSON.stringify(presets.value),
+    )
   }
 
   const applyPreset = (presetItem: TimerPreset) => {
@@ -222,7 +221,7 @@ export const useTimerStore = defineStore('timer', () => {
   }
 
   const loadPresets = () => {
-    const saved = localStorage.getItem('timer-presets')
+    const saved = localStorage.getItem(getTimerLocalKey(STORAGE_KEYS.TIMER_LOCAL.PRESETS))
     if (saved) {
       try {
         const parsed = JSON.parse(saved)
@@ -235,7 +234,10 @@ export const useTimerStore = defineStore('timer', () => {
 
   const deletePreset = (id: string) => {
     presets.value = presets.value.filter((item) => item.id !== id)
-    localStorage.setItem('timer-presets', JSON.stringify(presets.value))
+    localStorage.setItem(
+      getTimerLocalKey(STORAGE_KEYS.TIMER_LOCAL.PRESETS),
+      JSON.stringify(presets.value),
+    )
   }
 
   // 碼錶方法

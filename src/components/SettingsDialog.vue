@@ -62,6 +62,7 @@ import { useTimerStore } from '@/stores/timer'
 import { useElectron } from '@/composables/useElectron'
 import { useDarkMode } from '@/composables/useDarkMode'
 import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
+import { getAppLocalKey, STORAGE_KEYS } from '@/config/app'
 
 // i18n
 const { t: $t, t, locale } = useI18n()
@@ -122,7 +123,7 @@ const handleLanguageChange = async (newLocale: string) => {
   locale.value = newLocale
   selectedLanguage.value = newLocale
   // 保存到 localStorage
-  localStorage.setItem('preferred-language', newLocale)
+  localStorage.setItem(getAppLocalKey(STORAGE_KEYS.APP_LOCAL.PREFERRED_LANGUAGE), newLocale)
 
   // 通知主進程更新語系
   if (isElectron()) {
@@ -156,7 +157,9 @@ onMounted(() => {
   }
 
   // 從 localStorage 讀取保存的語系設定
-  const savedLanguage = localStorage.getItem('preferred-language')
+  const savedLanguage = localStorage.getItem(
+    getAppLocalKey(STORAGE_KEYS.APP_LOCAL.PREFERRED_LANGUAGE),
+  )
   if (savedLanguage) {
     locale.value = savedLanguage
     selectedLanguage.value = savedLanguage

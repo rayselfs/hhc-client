@@ -4,7 +4,7 @@
       <!-- Preview -->
       <v-col cols="6" class="pl-4 pt-4 pb-4 pr-2" ref="leftColumnContainer">
         <v-card class="display-flex flex-column" :style="{ height: `${previewHeight}px` }">
-          <v-card-title class="text-h5 d-flex align-center justify-space-between">
+          <v-card-title class="d-flex align-center justify-space-between">
             <div class="d-flex align-center gap-2">
               <span class="mr-1">{{ currentPassage?.bookName || $t('bible.verseTitle') }}</span>
               <v-chip v-if="currentPassage" color="primary">
@@ -13,6 +13,7 @@
             </div>
             <div v-if="currentPassage" class="d-flex align-center gap-2">
               <v-btn
+                size="small"
                 class="mr-1"
                 :disabled="currentPassage.chapter <= 1"
                 @click="goToPreviousChapter"
@@ -20,6 +21,7 @@
                 <v-icon>mdi-chevron-left</v-icon>
               </v-btn>
               <v-btn
+                size="small"
                 :disabled="currentPassage.chapter >= getMaxChapters()"
                 @click="goToNextChapter"
               >
@@ -139,9 +141,9 @@
                     <v-label class="text-body-2 mb-2">{{ $t('control') + $t('fontSize') }}</v-label>
                     <v-slider
                       v-model="fontSize"
-                      :min="30"
-                      :max="120"
-                      :step="5"
+                      :min="BIBLE_CONFIG.FONT.MIN_SIZE"
+                      :max="BIBLE_CONFIG.FONT.MAX_SIZE"
+                      :step="BIBLE_CONFIG.FONT.SIZE_STEP"
                       thumb-label
                       @update:model-value="updateProjectionFontSize"
                     >
@@ -228,14 +230,23 @@ const currentBookData = ref<{
 
 // 字型大小控制
 const getInitialFontSize = () => {
-  // 從 localStorage 讀取上次設定的字型大小，如果沒有則使用預設值 90px
-  const savedFontSize = localStorage.getItem('bible-font-size')
-  return savedFontSize ? parseInt(savedFontSize, 10) : 90
+  // 從 localStorage 讀取上次設定的字型大小，如果沒有則使用預設值
+  const savedFontSize = localStorage.getItem(getBibleLocalKey(STORAGE_KEYS.BIBLE_LOCAL.FONT_SIZE))
+  const fontSize = savedFontSize ? parseInt(savedFontSize, 10) : getDefaultFontSize()
+  return isValidFontSize(fontSize) ? fontSize : getDefaultFontSize()
 }
 const fontSize = ref(getInitialFontSize())
 
 // 歷史記錄
 import type { Verse } from '@/types/verse'
+import {
+  getDefaultFontSize,
+  getBibleLocalKey,
+  getBibleSessionKey,
+  isValidFontSize,
+  BIBLE_CONFIG,
+  STORAGE_KEYS,
+} from '@/config/app'
 
 const historyVerses = ref<Verse[]>([])
 
@@ -570,7 +581,10 @@ const goToNextVerseProjection = () => {
 // 更新投影字型大小
 const updateProjectionFontSize = () => {
   // 保存字型大小到 localStorage
-  localStorage.setItem('bible-font-size', fontSize.value.toString())
+  localStorage.setItem(
+    getBibleLocalKey(STORAGE_KEYS.BIBLE_LOCAL.FONT_SIZE),
+    fontSize.value.toString(),
+  )
 
   // 發送字型大小更新到投影
   if (isElectron()) {
@@ -585,7 +599,9 @@ const updateProjectionFontSize = () => {
 const loadHistoryVerse = async (item: Verse) => {
   try {
     // 獲取當前選中的版本
-    const savedVersion = localStorage.getItem('selected-bible-version')
+    const savedVersion = localStorage.getItem(
+      getBibleLocalKey(STORAGE_KEYS.BIBLE_LOCAL.SELECTED_VERSION),
+    )
     const versionId = savedVersion ? parseInt(savedVersion) : 1
 
     const content = await getBibleContent(versionId)
@@ -602,11 +618,16 @@ const loadHistoryVerse = async (item: Verse) => {
 }
 
 const saveHistoryToStorage = () => {
-  sessionStorage.setItem('bible-history', JSON.stringify(historyVerses.value))
+  sessionStorage.setItem(
+    getBibleSessionKey(STORAGE_KEYS.BIBLE_SESSION.CURRENT_PASSAGE),
+    JSON.stringify(historyVerses.value),
+  )
 }
 
 const loadHistoryFromStorage = () => {
-  const saved = sessionStorage.getItem('bible-history')
+  const saved = sessionStorage.getItem(
+    getBibleSessionKey(STORAGE_KEYS.BIBLE_SESSION.CURRENT_PASSAGE),
+  )
   if (saved) {
     historyVerses.value = JSON.parse(saved)
   }
@@ -670,7 +691,9 @@ const addVerseToCustom = (verseNumber: number) => {
 const loadCustomVerse = async (item: Verse) => {
   try {
     // 獲取當前選中的版本
-    const savedVersion = localStorage.getItem('selected-bible-version')
+    const savedVersion = localStorage.getItem(
+      getBibleLocalKey(STORAGE_KEYS.BIBLE_LOCAL.SELECTED_VERSION),
+    )
     const versionId = savedVersion ? parseInt(savedVersion) : 1
 
     const content = await getBibleContent(versionId)
@@ -687,11 +710,14 @@ const loadCustomVerse = async (item: Verse) => {
 }
 
 const saveCustomToStorage = () => {
-  localStorage.setItem('bible-custom-folders', JSON.stringify(customFolders.value))
+  localStorage.setItem(
+    getBibleLocalKey(STORAGE_KEYS.BIBLE_LOCAL.CUSTOM_FOLDERS),
+    JSON.stringify(customFolders.value),
+  )
 }
 
 const loadCustomFromStorage = () => {
-  const saved = localStorage.getItem('bible-custom-folders')
+  const saved = localStorage.getItem(getBibleLocalKey(STORAGE_KEYS.BIBLE_LOCAL.CUSTOM_FOLDERS))
   if (saved) {
     customFolders.value = JSON.parse(saved)
   }

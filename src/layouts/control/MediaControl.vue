@@ -227,6 +227,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import FileExplorer from '@/components/Media/FileExplorer.vue'
 import MoveDialog from '@/components/Media/MoveDialog.vue'
+import { getMediaLocalKey, STORAGE_KEYS } from '@/config/app'
 
 const { t: $t } = useI18n()
 
@@ -784,17 +785,23 @@ const saveFilesToStorage = () => {
     url: undefined, // 不保存 URL，因為會失效
     thumbnail: file.thumbnail,
   }))
-  localStorage.setItem('media-files', JSON.stringify(filesToSave))
+  localStorage.setItem(
+    getMediaLocalKey(STORAGE_KEYS.MEDIA_LOCAL.FILES),
+    JSON.stringify(filesToSave),
+  )
 }
 
 // Save folders to localStorage
 const saveFoldersToStorage = () => {
-  localStorage.setItem('media-folders', JSON.stringify(folders.value))
+  localStorage.setItem(
+    getMediaLocalKey(STORAGE_KEYS.MEDIA_LOCAL.FOLDERS),
+    JSON.stringify(folders.value),
+  )
 }
 
 // Load files from localStorage
 const loadFilesFromStorage = async () => {
-  const saved = localStorage.getItem('media-files')
+  const saved = localStorage.getItem(getMediaLocalKey(STORAGE_KEYS.MEDIA_LOCAL.FILES))
   if (saved) {
     try {
       const parsedFiles = JSON.parse(saved)
@@ -816,7 +823,7 @@ const loadFilesFromStorage = async () => {
 
 // Load folders from localStorage
 const loadFoldersFromStorage = () => {
-  const saved = localStorage.getItem('media-folders')
+  const saved = localStorage.getItem(getMediaLocalKey(STORAGE_KEYS.MEDIA_LOCAL.FOLDERS))
   if (saved) {
     try {
       folders.value = JSON.parse(saved)

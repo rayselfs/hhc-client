@@ -110,6 +110,7 @@ import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
 import { useSearch } from '@/composables/useSearch'
 import { useAPI } from '@/composables/useAPI'
 import { useAlert } from '@/composables/useAlert'
+import { getBibleLocalKey, STORAGE_KEYS } from '@/config/app'
 import type { BibleVersion, BibleBook } from '@/types/bible'
 import { useBibleCache } from '@/composables/useBibleCache'
 import { ViewType } from '@/types/common'
@@ -308,7 +309,10 @@ const loadBibleContentForVersion = async (versionId: number, forceRefresh = fals
 // 監聽版本變化
 watch(selectedVersion, async (newVersion) => {
   if (newVersion) {
-    localStorage.setItem('selected-bible-version', newVersion.toString())
+    localStorage.setItem(
+      getBibleLocalKey(STORAGE_KEYS.BIBLE_LOCAL.SELECTED_VERSION),
+      newVersion.toString(),
+    )
     await loadBibleContentForVersion(newVersion, false)
   }
 })

@@ -1,13 +1,13 @@
 <template>
   <v-card :style="{ height: props.containerHeight ? `${props.containerHeight}px` : '100%' }">
-    <v-card-title class="d-flex align-center justify-space-between pa-1">
+    <v-card-title class="d-flex align-center justify-space-between pa-0">
       <div class="d-flex align-center">
-        <v-btn-toggle v-model="multiFunctionTab" mandatory>
+        <v-btn-toggle v-model="multiFunctionTab" mandatory class="rounded-0">
           <v-btn value="history" size="small" :title="$t('history')">
-            <v-icon>mdi-history</v-icon>
+            <v-icon size="x-large">mdi-history</v-icon>
           </v-btn>
           <v-btn value="custom" size="small" :title="$t('custom')">
-            <v-icon>mdi-folder</v-icon>
+            <v-icon size="x-large">mdi-folder</v-icon>
           </v-btn>
         </v-btn-toggle>
         <!-- 資料夾路徑導航 -->
@@ -19,10 +19,12 @@
             :disabled="!currentFolder"
             @click="navigateToRoot"
           >
-            <v-icon>mdi-home</v-icon>
+            <v-icon class="mr-1">mdi-home</v-icon>
             {{ $t('homepage') }}
           </v-btn>
-          <v-icon v-if="currentFolderPath.length > 0" size="small">mdi-chevron-right</v-icon>
+          <v-icon v-if="currentFolderPath.length > 0" size="x-small" class="ml-1 mr-1"
+            >mdi-chevron-right</v-icon
+          >
           <span v-for="(folderId, index) in currentFolderPath" :key="folderId">
             <v-btn
               size="small"
@@ -31,9 +33,10 @@
               :disabled="index === currentFolderPath.length - 1"
               @click="navigateToFolder(folderId)"
             >
+              <v-icon class="mr-1">mdi-folder</v-icon>
               {{ getFolderById(folderId)?.name }}
             </v-btn>
-            <v-icon v-if="index < currentFolderPath.length - 1" size="small"
+            <v-icon v-if="index < currentFolderPath.length - 1" size="x=small" class="ml-1 mr-1"
               >mdi-chevron-right</v-icon
             >
           </span>
@@ -191,8 +194,8 @@
     <!-- Move Verse Dialog -->
     <v-dialog v-model="showMoveVerseDialog" max-width="500">
       <v-card>
-        <v-card-title class="d-flex align-center justify-space-between">
-          <span>{{ $t('moveTo') }}</span>
+        <v-card-title class="d-flex align-center">
+          <span class="mr-3">{{ $t('moveTo') }}</span>
           <!-- 資料夾路徑導航 -->
           <div class="folder-breadcrumb">
             <v-btn
@@ -202,10 +205,13 @@
               :disabled="moveBreadcrumb.length === 0 && !selectedMoveFolder"
               @click="navigateMoveToRoot"
             >
-              <v-icon>mdi-home</v-icon>
+              <v-icon class="mr-1">mdi-home</v-icon>
               {{ $t('homepage') }}
             </v-btn>
-            <v-icon v-if="moveBreadcrumb.length > 0 || selectedMoveFolder" size="small"
+            <v-icon
+              v-if="moveBreadcrumb.length > 0 || selectedMoveFolder"
+              size="x-small"
+              class="ml-1 mr-1"
               >mdi-chevron-right</v-icon
             >
             <span v-for="(folderId, index) in moveBreadcrumb" :key="folderId">
@@ -216,9 +222,10 @@
                 :disabled="index === moveBreadcrumb.length - 1"
                 @click="navigateMoveToFolder(folderId)"
               >
+                <v-icon class="mr-1">mdi-folder</v-icon>
                 {{ getFolderById(folderId)?.name }}
               </v-btn>
-              <v-icon v-if="index < moveBreadcrumb.length - 1" size="small"
+              <v-icon v-if="index < moveBreadcrumb.length - 1" size="x-small" class="ml-1 mr-1"
                 >mdi-chevron-right</v-icon
               >
             </span>
@@ -364,6 +371,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { v4 as uuidv4 } from 'uuid'
 import type { Verse } from '@/types/verse'
+import { BIBLE_CONFIG } from '@/config/app'
 
 const { t: $t } = useI18n()
 
@@ -537,7 +545,7 @@ const getCurrentFolders = (): CustomFolder[] => {
     return props.currentFolder.folders
   } else {
     // 如果在 Homepage，返回所有資料夾（除了 Homepage 資料夾本身）
-    return props.customFolders.filter((folder) => folder.id !== 'homepage')
+    return props.customFolders.filter((folder) => folder.id !== BIBLE_CONFIG.FOLDER.HOMEPAGE_ID)
   }
 }
 
@@ -547,7 +555,9 @@ const getCurrentVerses = (): Verse[] => {
     return props.currentFolder.items
   } else {
     // 如果在 Homepage，返回 Homepage 資料夾的經文
-    const homepageFolder = props.customFolders.find((folder) => folder.id === 'homepage')
+    const homepageFolder = props.customFolders.find(
+      (folder) => folder.id === BIBLE_CONFIG.FOLDER.HOMEPAGE_ID,
+    )
     return homepageFolder ? homepageFolder.items : []
   }
 }
@@ -594,7 +604,9 @@ const removeFromCurrentFolder = (itemId: string) => {
     })
   } else {
     // 從 Homepage 資料夾中移除
-    const homepageFolder = newFolders.find((folder) => folder.id === 'homepage')
+    const homepageFolder = newFolders.find(
+      (folder) => folder.id === BIBLE_CONFIG.FOLDER.HOMEPAGE_ID,
+    )
     if (homepageFolder) {
       homepageFolder.items = homepageFolder.items.filter((item) => item.id !== itemId)
     }
@@ -737,7 +749,9 @@ const moveVerseToFolder = (verse: Verse, targetFolder: CustomFolder) => {
       folder.items = folder.items.filter((item) => item.id !== verse.id)
     })
   } else {
-    const homepageFolder = newFolders.find((folder) => folder.id === 'homepage')
+    const homepageFolder = newFolders.find(
+      (folder) => folder.id === BIBLE_CONFIG.FOLDER.HOMEPAGE_ID,
+    )
     if (homepageFolder) {
       homepageFolder.items = homepageFolder.items.filter((item) => item.id !== verse.id)
     }
@@ -858,7 +872,7 @@ const getMoveFolders = (): CustomFolder[] => {
     return selectedMoveFolder.value.folders
   } else {
     // 如果在根目錄（首頁），返回所有資料夾（除了 Homepage）
-    return props.customFolders.filter((folder) => folder.id !== 'homepage')
+    return props.customFolders.filter((folder) => folder.id !== BIBLE_CONFIG.FOLDER.HOMEPAGE_ID)
   }
 }
 
@@ -902,7 +916,9 @@ const confirmMoveVerse = () => {
     })
   } else {
     // 從 Homepage 資料夾中移除
-    const homepageFolder = newFolders.find((folder) => folder.id === 'homepage')
+    const homepageFolder = newFolders.find(
+      (folder) => folder.id === BIBLE_CONFIG.FOLDER.HOMEPAGE_ID,
+    )
     if (homepageFolder) {
       homepageFolder.items = homepageFolder.items.filter(
         (item) => item.id !== verseToMove.value!.id,
@@ -918,12 +934,12 @@ const confirmMoveVerse = () => {
     })
   } else {
     // 移動到首頁
-    let homepageFolder = newFolders.find((folder) => folder.id === 'homepage')
+    let homepageFolder = newFolders.find((folder) => folder.id === BIBLE_CONFIG.FOLDER.HOMEPAGE_ID)
     if (!homepageFolder) {
       // 創建 Homepage 資料夾
       homepageFolder = {
-        id: 'homepage',
-        name: $t('homepage') || 'Homepage',
+        id: BIBLE_CONFIG.FOLDER.HOMEPAGE_ID,
+        name: $t('homepage') || BIBLE_CONFIG.FOLDER.DEFAULT_HOMEPAGE_NAME,
         expanded: false,
         items: [],
         folders: [],
@@ -1000,10 +1016,12 @@ const pasteItem = () => {
         })
       } else {
         // 貼到首頁
-        let homepageFolder = newFolders.find((folder) => folder.id === 'homepage')
+        let homepageFolder = newFolders.find(
+          (folder) => folder.id === BIBLE_CONFIG.FOLDER.HOMEPAGE_ID,
+        )
         if (!homepageFolder) {
           homepageFolder = {
-            id: 'homepage',
+            id: BIBLE_CONFIG.FOLDER.HOMEPAGE_ID,
             name: 'Homepage',
             expanded: false,
             items: [],
@@ -1048,10 +1066,12 @@ const pasteItem = () => {
         })
       } else {
         // 貼到首頁
-        let homepageFolder = newFolders.find((folder) => folder.id === 'homepage')
+        let homepageFolder = newFolders.find(
+          (folder) => folder.id === BIBLE_CONFIG.FOLDER.HOMEPAGE_ID,
+        )
         if (!homepageFolder) {
           homepageFolder = {
-            id: 'homepage',
+            id: BIBLE_CONFIG.FOLDER.HOMEPAGE_ID,
             name: 'Homepage',
             expanded: false,
             items: [],
