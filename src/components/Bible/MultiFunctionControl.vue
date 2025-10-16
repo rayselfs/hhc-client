@@ -74,7 +74,7 @@
             v-for="(item, index) in historyVerses"
             :key="index"
             class="verse-item pa-3 d-flex align-center justify-space-between"
-            @click="loadHistoryVerse(item)"
+            @click="loadVerse(item, 'history')"
             @contextmenu="handleRightClick($event, 'history', item)"
           >
             <div>
@@ -144,7 +144,7 @@
               class="verse-item pa-2 mb-1 d-flex align-center justify-space-between"
               draggable="true"
               @dragstart="handleDragStart($event, 'verse', item)"
-              @click="loadCustomVerse(item)"
+              @click="loadVerse(item, 'custom')"
               @contextmenu="handleRightClick($event, 'verse', item)"
             >
               <div>
@@ -404,8 +404,7 @@ interface Emits {
   (e: 'update:customFolders', value: CustomFolder[]): void
   (e: 'update:currentFolderPath', value: string[]): void
   (e: 'update:currentFolder', value: CustomFolder | null): void
-  (e: 'load-history-verse', item: Verse): void
-  (e: 'load-custom-verse', item: Verse): void
+  (e: 'load-verse', item: Verse, type: 'history' | 'custom'): void
 }
 
 const props = defineProps<Props>()
@@ -456,8 +455,8 @@ const removeHistoryItem = (index: number) => {
   emit('update:historyVerses', newHistory)
 }
 
-const loadHistoryVerse = (item: Verse) => {
-  emit('load-history-verse', item)
+const loadVerse = (item: Verse, type: 'history' | 'custom') => {
+  emit('load-verse', item, type)
 }
 
 // 自訂資料夾相關函數
@@ -617,10 +616,6 @@ const removeFromCurrentFolder = (itemId: string) => {
   }
 
   emit('update:customFolders', newFolders)
-}
-
-const loadCustomVerse = (item: Verse) => {
-  emit('load-custom-verse', item)
 }
 
 const handleDragStart = (

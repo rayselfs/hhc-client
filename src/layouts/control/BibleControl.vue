@@ -79,8 +79,7 @@
               v-model:current-folder-path="currentFolderPath"
               v-model:current-folder="currentFolder"
               :container-height="multiFunctionHeight"
-              @load-history-verse="loadHistoryVerse"
-              @load-custom-verse="loadCustomVerse"
+              @load-verse="loadVerse"
             />
           </v-col>
 
@@ -346,7 +345,6 @@ const scrollToVerse = (verseNumber: number) => {
 // 更新投影畫面
 const updateProjection = async (verseNumber: number) => {
   if (currentPassage.value) {
-    // 只在投影視窗沒有顯示聖經時才切換
     if (isElectron()) {
       // 如果投影視窗沒有顯示聖經（顯示預設內容或顯示其他內容），則切換到聖經
       if (projectionStore.isShowingDefault || projectionStore.currentView !== 'bible') {
@@ -426,8 +424,6 @@ const addToHistory = (verseNumber: number) => {
 const selectVerse = (verseNumber: number) => {
   if (currentPassage.value) {
     currentPassage.value.verse = verseNumber
-
-    // 不滾動，只發送到投影
     updateProjection(verseNumber)
   }
 }
@@ -600,7 +596,7 @@ const updateProjectionFontSize = () => {
 }
 
 // 歷史記錄相關函數
-const loadHistoryVerse = async (item: Verse) => {
+const loadVerse = async (item: Verse, type: 'history' | 'custom') => {
   try {
     // 獲取當前選中的版本
     const savedVersion = localStorage.getItem(
@@ -615,6 +611,10 @@ const loadHistoryVerse = async (item: Verse) => {
       if (book) {
         handleVerseSelection(book, item.chapter, item.verse)
       }
+    }
+
+    if (type === 'custom') {
+      updateProjection(item.verse)
     }
   } catch (error) {
     reportError(error, {
@@ -693,31 +693,6 @@ const addVerseToCustom = (verseNumber: number) => {
     if (!exists) {
       homepageFolder.items.push(newVerse)
     }
-  }
-}
-
-const loadCustomVerse = async (item: Verse) => {
-  try {
-    // 獲取當前選中的版本
-    const savedVersion = localStorage.getItem(
-      getBibleLocalKey(STORAGE_KEYS.BIBLE_LOCAL.SELECTED_VERSION),
-    )
-    const versionId = savedVersion ? parseInt(savedVersion) : 1
-
-    const content = await getBibleContent(versionId)
-    if (content) {
-      // 找到對應的書卷
-      const book = content.books.find((b) => b.number === item.bookNumber)
-      if (book) {
-        handleVerseSelection(book, item.chapter, item.verse)
-      }
-    }
-  } catch (error) {
-    reportError(error, {
-      operation: 'load-custom-verse',
-      component: 'BibleControl',
-      extra: { verseId: item.id },
-    })
   }
 }
 
