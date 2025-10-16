@@ -228,8 +228,11 @@ import { useI18n } from 'vue-i18n'
 import FileExplorer from '@/components/Media/FileExplorer.vue'
 import MoveDialog from '@/components/Media/MoveDialog.vue'
 import { getMediaLocalKey, STORAGE_KEYS } from '@/config/app'
+import { useSentry } from '@/composables/useSentry'
 
 const { t: $t } = useI18n()
+
+const { reportError } = useSentry()
 
 // Breadcrumb item type
 interface BreadcrumbItem {
@@ -370,7 +373,11 @@ const fileToBase64 = (file: File): Promise<string> => {
       }
     }
     reader.onerror = (error) => {
-      console.error('FileReader error:', error)
+      reportError(error, {
+        operation: 'file-reader-error',
+        component: 'MediaControl',
+        extra: { fileName: file.name, fileSize: file.size },
+      })
       reject(error)
     }
     reader.readAsDataURL(file)
@@ -468,7 +475,10 @@ const handleFileUpload = async (uploadedFiles: File[]) => {
     // 保存到 localStorage
     saveFilesToStorage()
   } catch (error) {
-    console.error('文件上傳失敗:', error)
+    reportError(error, {
+      operation: 'file-upload',
+      component: 'MediaControl',
+    })
   } finally {
     loading.value = false
   }
@@ -724,16 +734,29 @@ const handleFilePreview = (file: FileItem) => {
         }
       }
       testImg.onerror = () => {
-        console.error('Data URL is invalid')
+        reportError(new Error('Data URL is invalid'), {
+          operation: 'preview-file',
+          component: 'MediaControl',
+          extra: { fileName: file.name, fileType: file.type },
+        })
         alert('數據 URL 無效，無法預覽')
       }
       testImg.src = dataUrl
     } catch (error) {
-      console.error('Error creating data URL:', error)
+      reportError(error, {
+        operation: 'create-data-url',
+        component: 'MediaControl',
+        extra: { fileName: file.name, fileType: file.type },
+      })
       alert('無法預覽檔案：' + (error instanceof Error ? error.message : String(error)))
     }
   } else {
-    console.error('No data found for file:', file.name)
+    reportError(new Error('No data found for file'), {
+      operation: 'preview-file-no-data',
+      component: 'MediaControl',
+      extra: { fileName: file.name },
+    })
+
     alert('檔案數據不存在，無法預覽')
   }
 }
@@ -816,7 +839,10 @@ const loadFilesFromStorage = async () => {
       // Check file status after loading
       await checkAllFilesStatus()
     } catch (error) {
-      console.error('Failed to load files:', error)
+      reportError(error, {
+        operation: 'load-files',
+        component: 'MediaControl',
+      })
     }
   }
 }
@@ -828,7 +854,10 @@ const loadFoldersFromStorage = () => {
     try {
       folders.value = JSON.parse(saved)
     } catch (error) {
-      console.error('Failed to load folders:', error)
+      reportError(error, {
+        operation: 'load-folders',
+        component: 'MediaControl',
+      })
     }
   }
 }

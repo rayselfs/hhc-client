@@ -372,8 +372,12 @@ import { useI18n } from 'vue-i18n'
 import { v4 as uuidv4 } from 'uuid'
 import type { Verse } from '@/types/verse'
 import { BIBLE_CONFIG } from '@/config/app'
+import { useSentry } from '@/composables/useSentry'
 
 const { t: $t } = useI18n()
+
+// Sentry
+const { reportError } = useSentry()
 
 // 自訂資料夾介面
 interface CustomFolder {
@@ -735,7 +739,10 @@ const handleDrop = (event: DragEvent, targetFolder: CustomFolder) => {
       moveFolderToFolder(item as CustomFolder, targetFolder)
     }
   } catch (error) {
-    console.error('拖移處理失敗:', error)
+    reportError(error, {
+      operation: 'drag-handling',
+      component: 'MultiFunctionControl',
+    })
   }
 }
 

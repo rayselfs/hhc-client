@@ -63,9 +63,13 @@ import { useAlert } from '@/composables/useAlert'
 import { useTimerStore } from '@/stores/timer'
 import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
 import { MessageType, ViewType, type AppMessage } from '@/types/common'
+import { useSentry } from '@/composables/useSentry'
 
 // i18n
 const { t: $t } = useI18n()
+
+// Sentry
+const { reportError } = useSentry()
 
 // Alert
 const { warning } = useAlert()
@@ -223,7 +227,10 @@ const checkAndEnsureProjectionWindow = async () => {
         await ensureProjectionWindow()
       }
     } catch (error) {
-      console.error('Error checking projection window:', error)
+      reportError(error, {
+        operation: 'check-projection-window',
+        component: 'HomeView',
+      })
     }
   }
 }

@@ -149,6 +149,7 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useBibleCache } from '@/composables/useBibleCache'
 import type { BibleContent, BibleBook } from '@/types/bible'
+import { useSentry } from '@/composables/useSentry'
 
 interface Props {
   modelValue: boolean
@@ -164,7 +165,7 @@ interface Emits {
 
 const { t: $t } = useI18n()
 const { getBibleContent } = useBibleCache()
-
+const { reportError } = useSentry()
 const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
@@ -257,7 +258,11 @@ const loadBibleContent = async () => {
     const content = await getBibleContent(props.versionId)
     bibleContent.value = content
   } catch (error) {
-    console.error('Error loading Bible content:', error)
+    reportError(error, {
+      operation: 'load-bible-content-dialog',
+      component: 'BibleBooksDialog',
+      extra: { versionId: props.versionId },
+    })
   } finally {
     loading.value = false
   }

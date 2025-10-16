@@ -196,6 +196,7 @@ import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
 import { useBibleCache } from '@/composables/useBibleCache'
 import { useProjectionStore } from '@/stores/projection'
 import { MessageType, ViewType } from '@/types/common'
+import { useSentry } from '@/composables/useSentry'
 import MultiFunctionControl from '@/components/Bible/MultiFunctionControl.vue'
 
 interface BiblePassage {
@@ -218,6 +219,7 @@ const { setProjectionState, sendBibleUpdate } = useProjectionMessaging()
 const projectionStore = useProjectionStore()
 const { sendToProjection } = useElectron()
 const { getBibleContent } = useBibleCache()
+const { reportError } = useSentry()
 
 // 當前選中的經文
 const currentPassage = ref<BiblePassage | null>(null)
@@ -615,7 +617,11 @@ const loadHistoryVerse = async (item: Verse) => {
       }
     }
   } catch (error) {
-    console.error('Error loading history verse:', error)
+    reportError(error, {
+      operation: 'load-history-verse',
+      component: 'BibleControl',
+      extra: { verseId: item.id },
+    })
   }
 }
 
@@ -707,7 +713,11 @@ const loadCustomVerse = async (item: Verse) => {
       }
     }
   } catch (error) {
-    console.error('Error loading custom verse:', error)
+    reportError(error, {
+      operation: 'load-custom-verse',
+      component: 'BibleControl',
+      extra: { verseId: item.id },
+    })
   }
 }
 
@@ -803,7 +813,11 @@ const copyVerseText = async () => {
       await navigator.clipboard.writeText(verseText)
       // 可以添加一個提示訊息
     } catch (err) {
-      console.error('複製失敗:', err)
+      reportError(err, {
+        operation: 'copy-verse-text',
+        component: 'BibleControl',
+        extra: { text: verseText },
+      })
       // 降級方案：使用舊的複製方法
       const textArea = document.createElement('textarea')
       textArea.value = verseText

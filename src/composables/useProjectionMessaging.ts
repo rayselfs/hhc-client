@@ -5,6 +5,7 @@ import { useProjectionStore } from '@/stores/projection'
 import { MessageType, ViewType } from '@/types/common'
 import type { AppMessage } from '@/types/common'
 import { useMemoryManager } from '@/utils/memoryManager'
+import { useSentry } from './useSentry'
 
 // 全局共享的最後發送消息記錄（解決多實例消息去重問題）
 let globalLastSentMessage: AppMessage | null = null
@@ -34,6 +35,7 @@ let globalLastSentMessage: AppMessage | null = null
  * syncAllStates()
  */
 export const useProjectionMessaging = () => {
+  const { reportError } = useSentry()
   const {
     sendToProjection: originalSendToProjection,
     isElectron,
@@ -96,7 +98,11 @@ export const useProjectionMessaging = () => {
       originalSendToProjection(message)
       globalLastSentMessage = message
     } catch (error) {
-      console.error('發送投影消息失敗:', error)
+      reportError(error, {
+        operation: 'send-projection-message',
+        component: 'useProjectionMessaging',
+        extra: { messageType: message.type },
+      })
     }
   }
 
@@ -202,7 +208,10 @@ export const useProjectionMessaging = () => {
           await new Promise((resolve) => setTimeout(resolve, 500))
         }
       } catch (error) {
-        console.error('[setProjectionState] Error checking/creating projection window:', error)
+        reportError(error, {
+          operation: 'set-projection-state',
+          component: 'useProjectionMessaging',
+        })
       }
     }
 

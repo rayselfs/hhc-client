@@ -42,10 +42,12 @@
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useElectron } from '@/composables/useElectron'
+import { useSentry } from '@/composables/useSentry'
 import type { UpdateInfo } from '@/types/electron'
 
 const { isElectron } = useElectron()
 const { t: $t } = useI18n()
+const { reportError } = useSentry()
 
 const showDialog = ref(false)
 const updateInfo = ref<UpdateInfo | null>(null)
@@ -65,7 +67,10 @@ const handleInstall = async () => {
   } catch (err) {
     error.value = $t('update.installError')
     isInstalling.value = false
-    console.error('安裝更新失敗:', err)
+    reportError(err, {
+      operation: 'install-update',
+      component: 'UpdateDialog',
+    })
   }
 }
 
@@ -78,7 +83,10 @@ const handleDelay = async () => {
     // 通知主進程繼續退出流程
     await window.electronAPI.forceQuit()
   } catch (err) {
-    console.error('退出應用失敗:', err)
+    reportError(err, {
+      operation: 'force-quit',
+      component: 'UpdateDialog',
+    })
   }
 }
 

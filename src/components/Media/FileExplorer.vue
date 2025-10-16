@@ -300,8 +300,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useSentry } from '@/composables/useSentry'
 
 const { t: $t } = useI18n()
+const { reportError } = useSentry()
 
 interface FileItem {
   id: string
@@ -544,7 +546,10 @@ const handleFolderDrop = (folderId: string, event: DragEvent) => {
         emit('folderMoveToFolder', data.id, folderId)
       }
     } catch (error) {
-      console.error('Error parsing drag data:', error)
+      reportError(error, {
+        operation: 'parse-drag-data',
+        component: 'FileExplorer',
+      })
     }
   }
 }

@@ -115,31 +115,17 @@ import type { BibleVersion, BibleBook } from '@/types/bible'
 import { useBibleCache } from '@/composables/useBibleCache'
 import { ViewType } from '@/types/common'
 import BibleBooksDialog from '@/components/Bible/BibleBooksDialog.vue'
+import { useSentry } from '@/composables/useSentry'
 
-// i18n
+const { reportError } = useSentry()
 const { t: $t } = useI18n()
-
-// Electron composable
 const { isElectron, onProjectionOpened, onProjectionClosed, checkProjectionWindow } = useElectron()
-
-// 投影消息管理
 const { setProjectionState, syncAllStates, sendTimerUpdate } = useProjectionMessaging()
-
-// Alert 管理
 const { warning } = useAlert()
-
-// 搜尋管理
 const { searchQuery, isSearching, getSearchPlaceholder, executeSearch, startSearch, closeSearch } =
   useSearch()
-
-// API 管理
 const { loading: apiLoading, getBibleVersions, getBibleContent } = useAPI()
-const {
-  saveBibleContent,
-  getBibleContent: getCachedContent,
-  hasCachedContent,
-  // deleteCachedContent,
-} = useBibleCache()
+const { saveBibleContent, getBibleContent: getCachedContent, hasCachedContent } = useBibleCache()
 const bibleVersions = ref<BibleVersion[]>([])
 const selectedVersion = ref<number | null>(null)
 const contentLoading = ref(false)
@@ -247,7 +233,10 @@ const closeProjectionWindow = async () => {
         projectionStore.setShowingDefault(true)
       }
     } catch (error) {
-      console.error('Error closing projection window:', error)
+      reportError(error, {
+        operation: 'close-projection-window',
+        component: 'ExtendedToolbar',
+      })
     }
   }
 }
@@ -263,7 +252,10 @@ const loadBibleVersions = async () => {
       selectedVersion.value = versions[0].id
     }
   } catch (error) {
-    console.error('Error loading Bible versions:', error)
+    reportError(error, {
+      operation: 'load-bible-versions',
+      component: 'ExtendedToolbar',
+    })
   }
 }
 
@@ -279,7 +271,11 @@ const loadBibleContentForVersion = async (versionId: number, forceRefresh = fals
     // 查找版本信息
     const version = bibleVersions.value.find((v) => v.id === versionId)
     if (!version) {
-      console.error('Version not found:', versionId)
+      reportError(new Error('Version not found'), {
+        operation: 'version-not-found',
+        component: 'ExtendedToolbar',
+        extra: { versionId },
+      })
       return
     }
 
@@ -300,7 +296,11 @@ const loadBibleContentForVersion = async (versionId: number, forceRefresh = fals
     // 儲存到快取
     await saveBibleContent(versionId, version.code, version.name, content)
   } catch (error) {
-    console.error('Error loading Bible content:', error)
+    reportError(error, {
+      operation: 'load-bible-content',
+      component: 'ExtendedToolbar',
+      extra: { versionId },
+    })
   } finally {
     contentLoading.value = false
   }

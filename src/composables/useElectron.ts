@@ -1,13 +1,12 @@
-import { useErrorHandler } from './useErrorHandler'
 import type { AppMessage } from '@/types/common'
+import { useSentry } from './useSentry'
 
 /**
  * Electron environment related composable
  * Provides unified Electron API calls and state management
  */
 export const useElectron = () => {
-  const { handleElectronError, handleProjectionError } = useErrorHandler()
-
+  const { reportError } = useSentry()
   /**
    * Check if running in Electron environment
    * @returns {boolean} Returns true if in Electron environment, false otherwise
@@ -26,14 +25,9 @@ export const useElectron = () => {
       try {
         window.electronAPI.sendToProjection(data)
       } catch (error) {
-        handleProjectionError(error as Error, 'sendToProjection', () => {
-          setTimeout(() => {
-            try {
-              window.electronAPI.sendToProjection(data)
-            } catch (retryError) {
-              console.error('Retry failed:', retryError)
-            }
-          }, 1000)
+        reportError(error, {
+          operation: 'send-to-projection',
+          component: 'useElectron',
         })
       }
     }
@@ -59,7 +53,10 @@ export const useElectron = () => {
       try {
         return await window.electronAPI.checkProjectionWindow()
       } catch (error) {
-        handleElectronError(error as Error, 'checkProjectionWindow')
+        reportError(error, {
+          operation: 'check-projection-window',
+          component: 'useElectron',
+        })
         return false
       }
     }
@@ -76,7 +73,10 @@ export const useElectron = () => {
       try {
         return await window.electronAPI.ensureProjectionWindow()
       } catch (error) {
-        handleProjectionError(error as Error, 'ensureProjectionWindow')
+        reportError(error, {
+          operation: 'ensure-projection-window',
+          component: 'useElectron',
+        })
         return false
       }
     }
@@ -89,7 +89,10 @@ export const useElectron = () => {
       try {
         return await window.electronAPI.getDisplays()
       } catch (error) {
-        handleElectronError(error as Error, 'getDisplays')
+        reportError(error, {
+          operation: 'get-displays',
+          component: 'useElectron',
+        })
         return []
       }
     }

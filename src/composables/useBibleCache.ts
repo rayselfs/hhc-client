@@ -1,4 +1,5 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
+import { useSentry } from './useSentry'
 import type { BibleContent, BibleBook } from '@/types/bible'
 
 /**
@@ -40,6 +41,7 @@ async function initDB(): Promise<IDBPDatabase<BibleCacheDB>> {
  * 使用 IndexedDB 來儲存和管理聖經內容快取
  */
 export function useBibleCache() {
+  const { reportError } = useSentry()
   /**
    * 儲存聖經內容到 IndexedDB
    * @param versionId - 版本 ID
@@ -63,7 +65,11 @@ export function useBibleCache() {
         timestamp: Date.now(),
       })
     } catch (error) {
-      console.error('Error saving Bible content to cache:', error)
+      reportError(error, {
+        operation: 'save-bible-content-cache',
+        component: 'useBibleCache',
+        extra: { versionId },
+      })
       throw error
     }
   }
@@ -110,7 +116,11 @@ export function useBibleCache() {
       // 更新快取
       await db.put(STORE_NAME, cached)
     } catch (error) {
-      console.error('Error saving Bible book to cache:', error)
+      reportError(error, {
+        operation: 'save-bible-book-cache',
+        component: 'useBibleCache',
+        extra: { versionId, book },
+      })
       throw error
     }
   }
@@ -131,7 +141,11 @@ export function useBibleCache() {
 
       return null
     } catch (error) {
-      console.error('Error reading Bible content from cache:', error)
+      reportError(error, {
+        operation: 'read-bible-content-cache',
+        component: 'useBibleCache',
+        extra: { versionId },
+      })
       return null
     }
   }
@@ -147,7 +161,11 @@ export function useBibleCache() {
       const cached = await db.get(STORE_NAME, versionId)
       return cached !== undefined
     } catch (error) {
-      console.error('Error checking cache:', error)
+      reportError(error, {
+        operation: 'check-cache',
+        component: 'useBibleCache',
+        extra: { versionId },
+      })
       return false
     }
   }
@@ -161,7 +179,11 @@ export function useBibleCache() {
       const db = await initDB()
       await db.delete(STORE_NAME, versionId)
     } catch (error) {
-      console.error('Error deleting cache:', error)
+      reportError(error, {
+        operation: 'delete-cache',
+        component: 'useBibleCache',
+        extra: { versionId },
+      })
       throw error
     }
   }
@@ -174,7 +196,10 @@ export function useBibleCache() {
       const db = await initDB()
       await db.clear(STORE_NAME)
     } catch (error) {
-      console.error('Error clearing all cache:', error)
+      reportError(error, {
+        operation: 'clear-all-cache',
+        component: 'useBibleCache',
+      })
       throw error
     }
   }
@@ -188,7 +213,10 @@ export function useBibleCache() {
       const keys = await db.getAllKeys(STORE_NAME)
       return keys
     } catch (error) {
-      console.error('Error getting cached version IDs:', error)
+      reportError(error, {
+        operation: 'get-cached-version-ids',
+        component: 'useBibleCache',
+      })
       return []
     }
   }

@@ -1,6 +1,7 @@
 import { ref, type Ref } from 'vue'
 import { getMainApiHost } from '@/config/api'
 import type { BibleVersion, BibleContent, BibleBook, StreamingProgress } from '@/types/bible'
+import { useSentry } from './useSentry'
 
 /**
  * API 錯誤介面
@@ -15,6 +16,7 @@ export interface ApiError {
  * 處理與 Bible API 的通訊
  */
 export function useAPI() {
+  const { reportError } = useSentry()
   const loading = ref(false)
   const error: Ref<ApiError | null> = ref(null)
 
@@ -63,7 +65,10 @@ export function useAPI() {
     } catch (err) {
       // API 失敗時，記錄錯誤並返回預設值
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred'
-      console.error('Failed to fetch Bible versions:', errorMessage)
+      reportError(err, {
+        operation: 'fetch-bible-versions',
+        component: 'useAPI',
+      })
 
       error.value = {
         message: errorMessage,
@@ -189,7 +194,10 @@ export function useAPI() {
       return bibleContent
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred'
-      console.error('Failed to fetch Bible content:', errorMessage)
+      reportError(err, {
+        operation: 'fetch-bible-content',
+        component: 'useAPI',
+      })
 
       error.value = {
         message: errorMessage,

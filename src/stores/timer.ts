@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { TimerMode } from '@/types/common'
 import { useMemoryManager } from '@/utils/memoryManager'
 import { getTimerLocalKey, STORAGE_KEYS, getTimerDefaultSettings, TIMER_CONFIG } from '@/config/app'
+import { useSentry } from '@/composables/useSentry'
 
 export interface TimerPreset {
   id: string
@@ -28,6 +29,7 @@ export interface StopwatchSettings {
 }
 
 export const useTimerStore = defineStore('timer', () => {
+  const { reportError } = useSentry()
   const { track, untrack, cleanup } = useMemoryManager('useTimerStore')
   const loadSettings = () => {
     const defaultSettings = getTimerDefaultSettings()
@@ -44,7 +46,10 @@ export const useTimerStore = defineStore('timer', () => {
           pausedTime: 0,
         }
       } catch (error) {
-        console.error('Failed to load timer settings:', error)
+        reportError(error, {
+          operation: 'load-timer-settings',
+          component: 'TimerStore',
+        })
         return defaultSettings
       }
     }
@@ -79,7 +84,11 @@ export const useTimerStore = defineStore('timer', () => {
         JSON.stringify(settingsToSave),
       )
     } catch (error) {
-      console.error('Failed to save timer settings:', error)
+      reportError(error, {
+        operation: 'save-timer-settings',
+        component: 'TimerStore',
+        extra: { settings: JSON.stringify(settings) },
+      })
     }
   }
 
@@ -227,7 +236,10 @@ export const useTimerStore = defineStore('timer', () => {
         const parsed = JSON.parse(saved)
         presets.value = parsed
       } catch (error) {
-        console.error('Failed to load timer presets:', error)
+        reportError(error, {
+          operation: 'load-timer-presets',
+          component: 'TimerStore',
+        })
       }
     }
   }

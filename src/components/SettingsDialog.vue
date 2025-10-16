@@ -63,12 +63,14 @@ import { useElectron } from '@/composables/useElectron'
 import { useDarkMode } from '@/composables/useDarkMode'
 import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
 import { getAppLocalKey, STORAGE_KEYS } from '@/config/app'
+import { useSentry } from '@/composables/useSentry'
 
 // i18n
 const { t: $t, t, locale } = useI18n()
 
 // Electron composable
 const { isElectron } = useElectron()
+const { reportError } = useSentry()
 
 // 投影消息管理
 const { sendTimerUpdate } = useProjectionMessaging()
@@ -130,7 +132,11 @@ const handleLanguageChange = async (newLocale: string) => {
     try {
       await window.electronAPI.updateLanguage(newLocale)
     } catch (error) {
-      console.error('更新語系失敗:', error)
+      reportError(error, {
+        operation: 'update-language',
+        component: 'SettingsDialog',
+        extra: { newLocale },
+      })
     }
   }
 }
