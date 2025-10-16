@@ -6,10 +6,12 @@
         <v-card class="display-flex flex-column" :style="{ height: `${previewHeight}px` }">
           <v-card-title class="d-flex align-center justify-space-between">
             <div class="d-flex align-center gap-2">
-              <span class="mr-2">{{ currentPassage?.bookName || $t('bible.verseTitle') }}</span>
-              <span v-if="currentPassage">
-                {{ currentPassage.chapter }}:{{ currentPassage.verse }}
-              </span>
+              <span class="mr-2">{{ currentPassage?.bookName || $t('preview') }}</span>
+              <div v-if="currentPassage">
+                <span class="mr-1">{{ currentPassage.chapter }}</span>
+                <span class="mr-1">:</span>
+                <span>{{ currentPassage.verse }}</span>
+              </div>
             </div>
             <div v-if="currentPassage" class="d-flex align-center gap-2">
               <v-btn

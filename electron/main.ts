@@ -20,9 +20,16 @@ let projectionWindow: BrowserWindow | null = null
 
 // Create main window
 const createMainWindow = () => {
+  const displays = screen.getAllDisplays()
+  const externalDisplay = displays.find(
+    (display) => display.bounds.x !== 0 || display.bounds.y !== 0,
+  )
+  const hasSecondScreen = externalDisplay !== undefined
+
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
+    fullscreen: hasSecondScreen, // Only fullscreen if there's a second screen
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -60,12 +67,8 @@ const createMainWindow = () => {
     // 檢查是否有已下載的更新
     if (hasUpdateDownloaded()) {
       const updateInfo = getUpdateInfo()
-      // 發送事件給前端，讓 UpdateDialog 組件處理
       mainWindow.webContents.send('update-ready-to-install', updateInfo)
-      // 不執行 app.quit()，等待用戶在對話框中做選擇
-      // UpdateDialog 會調用 install-update 或 force-quit IPC
     } else {
-      // 沒有更新：優雅退出應用程式
       app.quit()
     }
   })
@@ -85,25 +88,21 @@ const createMainWindow = () => {
 }
 
 const createProjectionWindow = () => {
-  // Get all displays
   const displays = screen.getAllDisplays()
   const externalDisplay = displays.find(
     (display) => display.bounds.x !== 0 || display.bounds.y !== 0,
   )
-
-  // Check if there is a second screen
   const hasSecondScreen = externalDisplay !== undefined
   const targetDisplay = externalDisplay || displays[0]
 
   // Create projection window
   projectionWindow = new BrowserWindow({
-    width: targetDisplay.bounds.width,
-    height: targetDisplay.bounds.height,
+    width: 1200,
+    height: 800,
     x: targetDisplay.bounds.x,
     y: targetDisplay.bounds.y,
-    fullscreen: true,
-    frame: false,
-    alwaysOnTop: true,
+    fullscreen: hasSecondScreen, // Only fullscreen if there's a second screen
+    frame: !hasSecondScreen,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
