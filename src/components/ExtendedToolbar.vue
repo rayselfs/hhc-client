@@ -6,8 +6,8 @@
     <v-app-bar-title class="text-h5">{{ toolbarTitle }}</v-app-bar-title>
     <v-spacer />
 
-    <!-- 聖經版本選擇器組 -->
-    <div class="bible-version-selector-wrapper">
+    <!-- 聖經版本選擇器組 - 只在聖經頁面顯示 -->
+    <div v-if="props.currentView === 'bible'" class="bible-version-selector-wrapper">
       <v-select
         v-model="selectedVersion"
         :items="bibleVersions"

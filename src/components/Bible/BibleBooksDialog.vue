@@ -1,7 +1,9 @@
 <template>
   <v-dialog v-model="dialogVisible" max-width="840px" content-class="dialog-top">
     <v-card>
-      <v-card-title class="text-h5 d-flex align-center justify-space-between pb-4 sticky-header">
+      <v-card-title
+        class="text-h5 d-flex align-center justify-space-between pb-3 pt-3 sticky-header"
+      >
         <!-- 麵包屑顯示 -->
         <div class="d-flex align-center">
           <span class="text-subtitle-1">
