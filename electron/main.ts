@@ -34,16 +34,9 @@ let projectionWindow: BrowserWindow | null = null
 
 // Create main window
 const createMainWindow = () => {
-  const displays = screen.getAllDisplays()
-  const externalDisplay = displays.find(
-    (display) => display.bounds.x !== 0 || display.bounds.y !== 0,
-  )
-  const hasSecondScreen = externalDisplay !== undefined
-
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
-    fullscreen: hasSecondScreen, // Only fullscreen if there's a second screen
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
