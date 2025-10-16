@@ -800,7 +800,6 @@ const copyVerseText = async () => {
     try {
       await navigator.clipboard.writeText(verseText)
       // 可以添加一個提示訊息
-      console.log('經文已複製到剪貼簿')
     } catch (err) {
       console.error('複製失敗:', err)
       // 降級方案：使用舊的複製方法

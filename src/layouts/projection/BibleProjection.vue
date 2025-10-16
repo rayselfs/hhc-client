@@ -127,13 +127,13 @@ onMounted(() => {
   right: 0;
   z-index: 1000;
   background-color: white;
-  padding: 20px;
+  padding: 12px;
   text-align: center;
-  height: 75px;
+  height: 60px;
 }
 
 .bible-header-text {
-  font-size: 2.2rem;
+  font-size: 2rem;
   font-weight: bold;
 }
 
@@ -141,7 +141,7 @@ onMounted(() => {
   flex: 1;
   overflow-y: hidden;
   /* padding: 2rem; */
-  margin-top: 75px; /* 為 fixed header 留出空間 */
+  margin-top: 60px; /* 為 fixed header 留出空間 */
   scrollbar-width: none;
   -ms-overflow-style: none;
   /* 完全禁用用戶滾動 */
