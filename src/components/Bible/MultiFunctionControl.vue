@@ -109,6 +109,12 @@
             <div v-for="folder in getCurrentFolders()" :key="folder.id" class="mb-2">
               <div
                 class="verse-item pa-2 d-flex align-center justify-space-between"
+                draggable="true"
+                @dragstart="handleDragStart($event, 'folder', folder)"
+                @dragover="handleDragOver"
+                @dragenter="handleDragEnter"
+                @dragleave="handleDragLeave"
+                @drop="handleDrop($event, folder)"
                 @dblclick="enterFolder(folder.id)"
                 @contextmenu="handleRightClick($event, 'folder', folder)"
               >
@@ -134,7 +140,7 @@
               :key="item.id"
               class="verse-item pa-2 mb-1 d-flex align-center justify-space-between"
               draggable="true"
-              @dragstart="handleDragStart($event, item)"
+              @dragstart="handleDragStart($event, 'verse', item)"
               @click="loadCustomVerse(item)"
               @contextmenu="handleRightClick($event, 'verse', item)"
             >
@@ -229,7 +235,7 @@
               <div
                 v-for="target in getMoveTargets()"
                 :key="target.id"
-                class="move-folder-item pa-3 mb-2 d-flex align-center justify-space-between"
+                class="verse-item pa-3 mb-2 d-flex align-center justify-space-between"
                 :class="{ 'selected-target': selectedMoveFolder?.id === target.id }"
                 @click="selectMoveTarget(target)"
               >
@@ -601,10 +607,192 @@ const loadCustomVerse = (item: Verse) => {
   emit('load-custom-verse', item)
 }
 
-const handleDragStart = (event: DragEvent, item: Verse) => {
+const handleDragStart = (
+  event: DragEvent,
+  type: 'verse' | 'folder',
+  item: Verse | CustomFolder,
+) => {
   if (event.dataTransfer) {
-    event.dataTransfer.setData('text/plain', JSON.stringify(item))
+    // 設置拖移數據
+    event.dataTransfer.setData('application/json', JSON.stringify({ type, item }))
+    event.dataTransfer.effectAllowed = 'move'
+
+    // 創建自定義拖移圖像
+    const dragImage = createDragImage(type, item)
+    if (dragImage) {
+      document.body.appendChild(dragImage)
+      event.dataTransfer.setDragImage(dragImage, 10, 10)
+
+      // 延遲移除拖移圖像
+      setTimeout(() => {
+        if (document.body.contains(dragImage)) {
+          document.body.removeChild(dragImage)
+        }
+      }, 0)
+    }
   }
+}
+
+// 創建拖移時的視覺效果
+const createDragImage = (
+  type: 'verse' | 'folder',
+  item: Verse | CustomFolder,
+): HTMLElement | null => {
+  const dragImage = document.createElement('div')
+  dragImage.style.position = 'absolute'
+  dragImage.style.top = '-1000px'
+  dragImage.style.left = '-1000px'
+  dragImage.style.pointerEvents = 'none'
+  dragImage.style.zIndex = '9999'
+  dragImage.style.backgroundColor = 'rgba(var(--v-theme-surface), 0.9)'
+  dragImage.style.borderRadius = '4px'
+  dragImage.style.padding = '8px 12px'
+  dragImage.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)'
+  dragImage.style.fontSize = '14px'
+  dragImage.style.fontWeight = '500'
+
+  if (type === 'verse') {
+    const verse = item as Verse
+    dragImage.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="background-color: rgb(var(--v-theme-primary)); color: white; padding: 2px 6px; border-radius: 12px; font-size: 12px; font-weight: 500;">
+          ${verse.bookAbbreviation}${verse.chapter}:${verse.verse}
+        </span>
+      </div>
+    `
+  } else {
+    const folder = item as CustomFolder
+    dragImage.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <i class="mdi mdi-folder" style="color: rgb(var(--v-theme-primary)); font-size: 16px;"></i>
+        <span>${folder.name}</span>
+      </div>
+    `
+  }
+
+  return dragImage
+}
+
+// 拖移目標處理
+const handleDragOver = (event: DragEvent) => {
+  event.preventDefault()
+  event.dataTransfer!.dropEffect = 'move'
+}
+
+const handleDragEnter = (event: DragEvent) => {
+  event.preventDefault()
+  // 找到最近的 verse-item 容器
+  const container = (event.target as HTMLElement).closest('.verse-item')
+  if (container) {
+    container.classList.add('drag-over')
+  }
+}
+
+const handleDragLeave = (event: DragEvent) => {
+  event.preventDefault()
+  // 找到最近的 verse-item 容器
+  const container = (event.target as HTMLElement).closest('.verse-item')
+  if (container) {
+    // 檢查是否真的離開了整個容器區域
+    const rect = container.getBoundingClientRect()
+    const x = event.clientX
+    const y = event.clientY
+
+    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+      container.classList.remove('drag-over')
+    }
+  }
+}
+
+const handleDrop = (event: DragEvent, targetFolder: CustomFolder) => {
+  event.preventDefault()
+
+  // 移除拖移高亮效果
+  const container = (event.target as HTMLElement).closest('.verse-item')
+  if (container) {
+    container.classList.remove('drag-over')
+  }
+
+  try {
+    const data = JSON.parse(event.dataTransfer!.getData('application/json'))
+    const { type, item } = data
+
+    if (type === 'verse') {
+      moveVerseToFolder(item as Verse, targetFolder)
+    } else if (type === 'folder') {
+      moveFolderToFolder(item as CustomFolder, targetFolder)
+    }
+  } catch (error) {
+    console.error('拖移處理失敗:', error)
+  }
+}
+
+// 移動經文到資料夾
+const moveVerseToFolder = (verse: Verse, targetFolder: CustomFolder) => {
+  const newFolders = [...props.customFolders]
+
+  // 從原位置移除經文
+  if (props.currentFolder) {
+    updateFolderInTree(newFolders, props.currentFolder.id, (folder) => {
+      folder.items = folder.items.filter((item) => item.id !== verse.id)
+    })
+  } else {
+    const homepageFolder = newFolders.find((folder) => folder.id === 'homepage')
+    if (homepageFolder) {
+      homepageFolder.items = homepageFolder.items.filter((item) => item.id !== verse.id)
+    }
+  }
+
+  // 添加到目標資料夾
+  updateFolderInTree(newFolders, targetFolder.id, (folder) => {
+    folder.items.push(verse)
+  })
+
+  emit('update:customFolders', newFolders)
+}
+
+// 移動資料夾到另一個資料夾
+const moveFolderToFolder = (folderToMove: CustomFolder, targetFolder: CustomFolder) => {
+  // 防止將資料夾移動到自己內部
+  if (isFolderInside(folderToMove, targetFolder)) {
+    return
+  }
+
+  const newFolders = [...props.customFolders]
+
+  // 從原位置移除資料夾
+  if (props.currentFolder) {
+    updateFolderInTree(newFolders, props.currentFolder.id, (folder) => {
+      folder.folders = folder.folders.filter((f) => f.id !== folderToMove.id)
+    })
+  } else {
+    // 從根目錄移除
+    const index = newFolders.findIndex((f) => f.id === folderToMove.id)
+    if (index !== -1) {
+      newFolders.splice(index, 1)
+    }
+  }
+
+  // 添加到目標資料夾
+  updateFolderInTree(newFolders, targetFolder.id, (folder) => {
+    folderToMove.parentId = targetFolder.id
+    folder.folders.push(folderToMove)
+  })
+
+  emit('update:customFolders', newFolders)
+}
+
+// 檢查資料夾是否在另一個資料夾內部
+const isFolderInside = (folderToMove: CustomFolder, targetFolder: CustomFolder): boolean => {
+  if (folderToMove.id === targetFolder.id) return true
+
+  for (const subFolder of targetFolder.folders) {
+    if (isFolderInside(folderToMove, subFolder)) {
+      return true
+    }
+  }
+
+  return false
 }
 
 const updateFolderInTree = (
@@ -961,7 +1149,12 @@ onUnmounted(() => {
   background-color: rgba(var(--v-theme-primary), 0.1);
 }
 
-.move-folder-item {
+.verse-item.drag-over {
+  background-color: rgba(var(--v-theme-primary), 0.2) !important;
+  border: 2px dashed rgba(var(--v-theme-primary), 0.5);
+}
+
+/* .move-folder-item {
   cursor: pointer;
   transition: background-color 0.2s ease;
   border-radius: 4px;
@@ -969,7 +1162,7 @@ onUnmounted(() => {
 
 .move-folder-item:hover {
   background-color: rgba(var(--v-theme-primary), 0.1);
-}
+} */
 
 .selected-target {
   background-color: rgba(var(--v-theme-primary), 0.15) !important;
