@@ -11,9 +11,23 @@ import {
   installUpdate,
   downloadUpdate,
 } from './autoUpdater'
+import * as Sentry from '@sentry/electron'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
+
+// Initialize Sentry
+const sentryDsn = process.env.SENTRY_DSN || process.env.VITE_SENTRY_DSN
+Sentry.init({
+  dsn: sentryDsn,
+  beforeSend(event) {
+    // Only send errors in production or when explicitly enabled
+    if (process.env.NODE_ENV === 'development' && !process.env.VITE_SENTRY_ENABLED) {
+      return null
+    }
+    return event
+  },
+})
 
 let mainWindow: BrowserWindow | null = null
 let projectionWindow: BrowserWindow | null = null

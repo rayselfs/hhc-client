@@ -35,6 +35,8 @@ jobs:
         if: matrix.os == 'macos-14'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          VITE_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           # 如果有 Apple Developer ID，可以添加以下環境變數
           # CSC_NAME: ${{ secrets.CSC_NAME }}
           # CSC_LINK: ${{ secrets.CSC_LINK }}
@@ -50,5 +52,7 @@ jobs:
         if: matrix.os == 'windows-2025'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          VITE_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
         run: |
           npm run electron:build:win -- --publish always
