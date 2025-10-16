@@ -14,11 +14,11 @@ export interface TimerSettings {
   mode: TimerMode
   timerDuration: number // 秒
   originalDuration: number // 原始設定的時間（秒）
-  timezone: string
-  isRunning: boolean
-  remainingTime: number // 秒
-  startTime?: Date
-  pausedTime?: number // 暫停時剩餘時間
+  remainingTime: number // 剩餘時間（秒）
+  timezone: string // 時區
+  isRunning: boolean // 是否正在運行
+  startTime?: Date // 開始時間
+  pausedTime?: number // 暫停時剩餘時間（秒）
 }
 
 export interface StopwatchSettings {

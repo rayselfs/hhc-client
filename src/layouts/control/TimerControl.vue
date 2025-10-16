@@ -342,28 +342,7 @@ const handleBlur = (field: 'minutes' | 'seconds') => {
 
 // 添加時間（快捷按鈕）
 const addTime = (secondsToAdd: number) => {
-  // 如果計時器正在運行，使用 store 的 addTime 方法
-  if (timerStore.settings.isRunning) {
-    timerStore.addTime(secondsToAdd)
-  } else {
-    // 如果計時器未運行，直接調整輸入框的時間
-    const currentTotalSeconds = parseInt(minutes.value) * 60 + parseInt(seconds.value)
-    const newTotalSeconds = currentTotalSeconds + secondsToAdd
-
-    // 限制最大時間為 59:59
-    const maxSeconds = 59 * 60 + 59
-    const finalSeconds = Math.min(newTotalSeconds, maxSeconds)
-
-    // 更新輸入框
-    const newMinutes = Math.floor(finalSeconds / 60)
-    const newSeconds = finalSeconds % 60
-
-    minutes.value = newMinutes.toString().padStart(2, '0')
-    seconds.value = newSeconds.toString().padStart(2, '0')
-
-    updateDuration()
-  }
-
+  timerStore.addTime(secondsToAdd)
   sendTimerUpdate(true)
 }
 
