@@ -86,10 +86,13 @@
               <v-card-text>
                 <!-- Chapter/Verse Navigation -->
                 <v-row class="mb-3">
-                  <v-col cols="12">
-                    <v-label class="text-body-2">{{ $t('control') }}</v-label>
+                  <v-col cols="6">
+                    <v-label class="text-body-2">{{ $t('control') + $t('bible.chapter') }}</v-label>
                   </v-col>
-                  <v-col cols="3" class="d-flex justify-center pa-0">
+                  <v-col cols="6">
+                    <v-label class="text-body-2">{{ $t('control') + $t('bible.verse') }}</v-label>
+                  </v-col>
+                  <v-col cols="3" class="d-flex justify-end pa-0 pr-2">
                     <v-btn
                       icon
                       variant="outlined"
@@ -99,7 +102,7 @@
                       <v-icon>mdi-chevron-left</v-icon>
                     </v-btn>
                   </v-col>
-                  <v-col cols="3" class="d-flex justify-center pa-0">
+                  <v-col cols="3" class="d-flex justify-start pa-0 pl-2">
                     <v-btn
                       icon
                       variant="outlined"
@@ -109,7 +112,7 @@
                       <v-icon>mdi-chevron-right</v-icon>
                     </v-btn>
                   </v-col>
-                  <v-col cols="3" class="d-flex justify-center pa-0">
+                  <v-col cols="3" class="d-flex justify-end pa-0 pr-2">
                     <v-btn
                       icon
                       variant="outlined"
@@ -119,7 +122,7 @@
                       <v-icon>mdi-chevron-up</v-icon>
                     </v-btn>
                   </v-col>
-                  <v-col cols="3" class="d-flex justify-center pa-0">
+                  <v-col cols="3" class="d-flex justify-start pa-0 pl-2">
                     <v-btn
                       icon
                       variant="outlined"
@@ -133,7 +136,7 @@
                 <!-- Font Size Slider -->
                 <v-row>
                   <v-col cols="12">
-                    <v-label class="text-body-2 mb-2">{{ $t('fontSize') }}</v-label>
+                    <v-label class="text-body-2 mb-2">{{ $t('control') + $t('fontSize') }}</v-label>
                     <v-slider
                       v-model="fontSize"
                       :min="30"
