@@ -17,6 +17,7 @@
   "create": "建立",
   "homepage": "首頁",
   "notFound": "找不到",
+  "no": "沒有",
   "moveTo": "移動到",
   "move": "移動",
   "last": "最後",
@@ -32,6 +33,12 @@
   "remove": "移除",
   "control": "控制",
   "fontSize": "字型大小",
+  "data": "資料",
+  "custom": "自訂",
+  "confirmDeleteItem": "確定刪除此項目嗎",
+  "copy": "複製",
+  "paste": "貼上",
+  "history": "歷史",
   "timer": {
     "title": "計時器",
     "mode": {
@@ -54,8 +61,16 @@
     "no": "第",
     "psalm": "篇",
     "chapter": "章",
-    "verse": "節"
+    "verse": "節",
+    "noHistory": "尚無歷史記錄",
+    "noFolder": "尚無資料夾"
   },
+  "multiFunction": "多功能",
+  "noCustomItems": "尚無自訂項目",
+  "newCollection": "新增收藏",
+  "enterFolderName": "請輸入資料夾名稱",
+  "enterCollectionName": "請輸入收藏名稱",
+  "noNote": "無備註",
   "projection": {
     "title": "投影",
     "confirmClose": "確定要關閉投影窗口嗎?"
@@ -127,7 +142,6 @@
     "orClickUploadButton": "或點擊上傳按鈕",
     "uploadingFiles": "正在上傳文件",
     "noFiles": "暫無文件",
-    "deleteConfirm": "確定要刪除這個文件嗎？",
     "gridView": "網格檢視",
     "listView": "清單檢視",
     "filesNotFoundMessage": "以下檔案無法找到，可能已被移動或刪除：",

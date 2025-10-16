@@ -308,6 +308,7 @@ const loadBibleContentForVersion = async (versionId: number, forceRefresh = fals
 // 監聽版本變化
 watch(selectedVersion, async (newVersion) => {
   if (newVersion) {
+    localStorage.setItem('selected-bible-version', newVersion.toString())
     await loadBibleContentForVersion(newVersion, false)
   }
 })
@@ -373,9 +374,9 @@ onMounted(() => {
 }
 
 .bible-version-selector {
-  width: 190px;
-  min-width: 190px;
-  max-width: 190px;
+  width: 180px;
+  min-width: 180px;
+  max-width: 180px;
 }
 
 .bible-version-selector > .v-input__control > .v-field {
