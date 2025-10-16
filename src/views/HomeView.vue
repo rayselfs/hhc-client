@@ -135,7 +135,7 @@ const drawer = ref(true)
 const drawerCollapsed = ref(true)
 
 // 當前選中的視圖
-const currentView = ref('bible') // 預設使用聖經
+const currentView = ref(ViewType.BIBLE) // 預設使用聖經
 
 // 搜尋查詢
 const searchQuery = ref('')
@@ -143,7 +143,7 @@ const searchQuery = ref('')
 // 懸浮計時器顯示狀態
 const showFloatingTimer = computed(() => {
   // 只有在計時器運行中且不在計時器頁面時才顯示
-  return timerStore.settings.isRunning && currentView.value !== 'timer'
+  return timerStore.settings.isRunning && currentView.value !== ViewType.TIMER
 })
 
 useKeyboardShortcuts(currentView)
@@ -186,26 +186,26 @@ const toggleDrawer = () => {
 
 // 點擊懸浮計時器跳轉到計時器頁面
 const goToTimer = () => {
-  currentView.value = 'timer'
+  currentView.value = ViewType.TIMER
   sendViewChange(ViewType.TIMER, true)
 }
 
 // 處理搜尋
 const handleSearch = (query: string) => {
   searchQuery.value = query
-  // 搜尋邏輯現在由 ExtendedToolbar 中的 useSearch composable 處理
 }
 
 // 處理選單項目點擊事件
 const handleMenuItemClick = (item: { title: string; icon: string; component: string }) => {
-  currentView.value = item.component
-  sendViewChange(item.component as ViewType, true)
+  currentView.value = item.component as ViewType
+  if (item.component === ViewType.TIMER) {
+    sendViewChange(ViewType.TIMER, true)
+  }
 }
 
 // 監聽來自Electron的消息
 const handleElectronMessage = (data: AppMessage) => {
   if (data.type === MessageType.GET_CURRENT_STATE) {
-    // 發送當前狀態到投影窗口
     sendViewChange(currentView.value as ViewType, true)
   }
 }
@@ -236,12 +236,7 @@ const checkAndEnsureProjectionWindow = async () => {
 }
 
 // 監聽視圖切換
-watch(currentView, async () => {
-  // 確保投影視窗存在
-  if (isElectron()) {
-    await checkAndEnsureProjectionWindow()
-  }
-})
+watch(currentView, async () => {})
 
 // 生命週期
 onMounted(async () => {
