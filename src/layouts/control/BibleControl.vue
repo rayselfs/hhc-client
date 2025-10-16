@@ -89,7 +89,7 @@
                   <v-col cols="12">
                     <v-label class="text-body-2">{{ $t('control') }}</v-label>
                   </v-col>
-                  <v-col cols="3" class="d-flex justify-center">
+                  <v-col cols="3" class="d-flex justify-center pa-0">
                     <v-btn
                       icon
                       variant="outlined"
@@ -99,7 +99,7 @@
                       <v-icon>mdi-chevron-left</v-icon>
                     </v-btn>
                   </v-col>
-                  <v-col cols="3" class="d-flex justify-center">
+                  <v-col cols="3" class="d-flex justify-center pa-0">
                     <v-btn
                       icon
                       variant="outlined"
@@ -109,7 +109,7 @@
                       <v-icon>mdi-chevron-right</v-icon>
                     </v-btn>
                   </v-col>
-                  <v-col cols="3" class="d-flex justify-center">
+                  <v-col cols="3" class="d-flex justify-center pa-0">
                     <v-btn
                       icon
                       variant="outlined"
@@ -119,7 +119,7 @@
                       <v-icon>mdi-chevron-up</v-icon>
                     </v-btn>
                   </v-col>
-                  <v-col cols="3" class="d-flex justify-center">
+                  <v-col cols="3" class="d-flex justify-center pa-0">
                     <v-btn
                       icon
                       variant="outlined"
@@ -270,9 +270,9 @@ const calculateHeights = () => {
   // 右邊兩個卡片根據 Preview card 高度分配
   const gap = 16 // mb-4 的間距 (16px)
 
-  // Multi Function Control 佔 66.67%，Projection Control 佔 33.33%
-  multiFunctionHeight.value = Math.floor((previewHeight.value - gap) * 0.6667)
-  projectionHeight.value = Math.floor((previewHeight.value - gap) * 0.3333)
+  // Multi Function Control 佔 70%，Projection Control 佔 30%
+  multiFunctionHeight.value = Math.floor((previewHeight.value - gap) * 0.7)
+  projectionHeight.value = Math.floor((previewHeight.value - gap) * 0.3)
 }
 
 // 監聽來自父組件的經文選擇事件

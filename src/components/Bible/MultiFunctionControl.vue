@@ -187,7 +187,7 @@
       <v-card>
         <v-card-title class="d-flex align-center justify-space-between">
           <span>{{ $t('moveTo') }}</span>
-          <!-- 麵包屑導航 -->
+          <!-- 資料夾路徑導航 -->
           <div class="folder-breadcrumb">
             <v-btn
               size="small"
