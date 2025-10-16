@@ -50,10 +50,9 @@ const createMainWindow = () => {
       allowRunningInsecureContent: false,
       experimentalFeatures: false,
       preload: join(__dirname, 'preload.mjs'),
-      // 禁用自動填充功能
       spellcheck: false,
     },
-    title: '主控台',
+    title: 'Console',
   })
 
   const isDev = process.env.VITE_DEV_SERVER_URL || process.env.NODE_ENV === 'development'
@@ -66,38 +65,24 @@ const createMainWindow = () => {
     mainWindow.loadFile(join(__dirname, 'renderer/index.html'))
   }
 
-  /**
-   * 關閉視窗事件處理
-   *
-   * 'close' 事件：視窗即將關閉（可以阻止）
-   * - 檢查是否有已下載的更新
-   * - 如果有，發送事件給前端顯示 UpdateDialog（Vue 組件）
-   * - 如果沒有，直接優雅退出
-   */
   mainWindow.on('close', async (event) => {
-    // 阻止視窗立即關閉，先處理更新檢查
+    // Prevent the window from closing immediately, first check for updates
     event.preventDefault()
 
-    // 檢查是否有已下載的更新
+    // Check if there is an update downloaded
     if (hasUpdateDownloaded()) {
       const updateInfo = getUpdateInfo()
-      mainWindow.webContents.send('update-ready-to-install', updateInfo)
+      mainWindow?.webContents.send('update-ready-to-install', updateInfo)
     } else {
       app.quit()
     }
   })
 
-  /**
-   * 視窗已關閉事件
-   *
-   * 'closed' 事件：視窗已經關閉（無法阻止）
-   * - 清理視窗引用
-   */
   mainWindow.on('closed', () => {
     mainWindow = null
   })
 
-  // 設定應用程式選單
+  // Set the application menu
   createApplicationMenu(mainWindow)
 }
 
@@ -124,7 +109,7 @@ const createProjectionWindow = () => {
       experimentalFeatures: false,
       preload: join(__dirname, 'preload.mjs'),
     },
-    title: '投影',
+    title: 'Projection',
   })
 
   // If there is no second screen, notify the main window to display a prompt
@@ -144,11 +129,7 @@ const createProjectionWindow = () => {
     })
   }
 
-  /**
-   * 投影視窗已關閉事件
-   * - 通知主視窗投影已關閉
-   * - 清理視窗引用
-   */
+  // Projection window closed event
   projectionWindow.on('closed', () => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('projection-closed')
@@ -210,6 +191,14 @@ ipcMain.handle('get-displays', async () => {
     }))
   } catch (error) {
     console.error('Error getting display information:', error)
+    Sentry.captureException(error, {
+      tags: {
+        operation: 'get-displays',
+      },
+      extra: {
+        context: 'Error getting display information',
+      },
+    })
     return []
   }
 })
@@ -234,8 +223,16 @@ ipcMain.handle('start-download', async () => {
     downloadUpdate()
     return { success: true }
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : '未知錯誤'
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     console.error('開始下載更新失敗:', error)
+    Sentry.captureException(error, {
+      tags: {
+        operation: 'download-update',
+      },
+      extra: {
+        context: 'Failed to start download update',
+      },
+    })
     return { success: false, error: errorMessage }
   }
 })
@@ -245,25 +242,41 @@ ipcMain.handle('install-update', async () => {
     installUpdate()
     return { success: true }
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : '未知錯誤'
-    console.error('安裝更新失敗:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    console.error('Failed to install update:', error)
+    Sentry.captureException(error, {
+      tags: {
+        operation: 'install-update',
+      },
+      extra: {
+        context: 'Failed to install update',
+      },
+    })
     return { success: false, error: errorMessage }
   }
 })
 
-// 強制退出應用程式（用戶在關閉時選擇稍後安裝）
+// Force quit the application (user chooses to install later when closing)
 ipcMain.handle('force-quit', async () => {
   try {
     app.quit()
     return { success: true }
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : '未知錯誤'
-    console.error('強制退出失敗:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    console.error('Failed to force quit:', error)
+    Sentry.captureException(error, {
+      tags: {
+        operation: 'force-quit',
+      },
+      extra: {
+        context: 'Failed to force quit',
+      },
+    })
     return { success: false, error: errorMessage }
   }
 })
 
-// 處理語系變更
+// Handle language change
 ipcMain.handle('update-language', async (event, language: string) => {
   try {
     const userDataPath = app.getPath('userData')
@@ -271,13 +284,22 @@ ipcMain.handle('update-language', async (event, language: string) => {
     const settings = { language }
     writeFileSync(settingsPath, JSON.stringify(settings, null, 2))
 
-    // 重新創建選單
+    // Re-create the menu
     createApplicationMenu(mainWindow)
 
     return { success: true }
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : '未知錯誤'
-    console.error('更新語系失敗:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    console.error('Failed to update language:', error)
+    Sentry.captureException(error, {
+      tags: {
+        operation: 'update-language',
+      },
+      extra: {
+        context: 'Failed to update language',
+        language: language,
+      },
+    })
     return { success: false, error: errorMessage }
   }
 })
@@ -295,30 +317,22 @@ app.whenReady().then(() => {
     }
   })
 
-  // 初始化自動更新
+  // Initialize autoUpdater
   initAutoUpdater(mainWindow)
 })
 
-/**
- * 所有視窗都已關閉事件
- * 在 macOS 上，通常應用程式不會在所有視窗關閉時退出，但這個應用需要
- */
+// All windows closed event
 app.on('window-all-closed', () => {
   app.quit()
 })
 
-/**
- * 應用程式即將退出事件
- * 清理所有資源
- */
+// Application will quit event
 app.on('before-quit', () => {
-  // 關閉投影視窗
   if (projectionWindow && !projectionWindow.isDestroyed()) {
     projectionWindow.destroy()
     projectionWindow = null
   }
 
-  // 關閉主視窗（通常已經關閉，這裡是保險措施）
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.destroy()
     mainWindow = null

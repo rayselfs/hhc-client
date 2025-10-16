@@ -1,20 +1,20 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
-// 暴露安全的API給渲染進程
+// Expose safe APIs to renderer process
 contextBridge.exposeInMainWorld('electronAPI', {
-  // 顯示器信息
+  // Display information
   getDisplays: () => ipcRenderer.invoke('get-displays'),
 
-  // 投影窗口管理
+  // Projection window management
   checkProjectionWindow: () => ipcRenderer.invoke('check-projection-window'),
   ensureProjectionWindow: () => ipcRenderer.invoke('ensure-projection-window'),
   closeProjectionWindow: () => ipcRenderer.invoke('close-projection-window'),
 
-  // 消息傳遞
+  // Message passing
   sendToProjection: (data: unknown) => ipcRenderer.send('send-to-projection', data),
   sendToMain: (data: unknown) => ipcRenderer.send('send-to-main', data),
 
-  // 監聽消息
+  // Listen for messages
   onProjectionMessage: (callback: (data: unknown) => void) => {
     ipcRenderer.on('projection-message', (event, data) => callback(data))
   },
@@ -34,20 +34,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('no-second-screen-detected', callback)
   },
 
-  // 移除監聽器
+  // Remove listeners
   removeAllListeners: (channel: string) => {
     ipcRenderer.removeAllListeners(channel)
   },
 
-  // AutoUpdater 相關
+  // AutoUpdater related
   startDownload: () => ipcRenderer.invoke('start-download'),
   installUpdate: () => ipcRenderer.invoke('install-update'),
   forceQuit: () => ipcRenderer.invoke('force-quit'),
 
-  // 語系相關
+  // Language related
   updateLanguage: (language: string) => ipcRenderer.invoke('update-language', language),
 
-  // 監聽更新相關事件
+  // Listen for update related events
   onUpdateAvailable: (callback: (info: unknown) => void) => {
     ipcRenderer.on('update-available', (event, info) => callback(info))
   },

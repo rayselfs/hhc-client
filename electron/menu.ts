@@ -3,8 +3,9 @@ import { readFileSync, existsSync } from 'fs'
 import path from 'path'
 import { app } from 'electron'
 import { autoUpdater } from 'electron-updater'
+import * as Sentry from '@sentry/electron'
 
-// 語系設定讀取
+// Language settings reading
 const getLanguage = () => {
   try {
     const userDataPath = app.getPath('userData')
@@ -14,12 +15,20 @@ const getLanguage = () => {
       return settings.language || 'zh'
     }
   } catch (error) {
-    console.error('讀取語系設定失敗:', error)
+    console.error('Failed to read language settings:', error)
+    Sentry.captureException(error, {
+      tags: {
+        operation: 'get-language',
+      },
+      extra: {
+        context: 'Failed to read language settings',
+      },
+    })
   }
   return 'zh'
 }
 
-// 翻譯函數
+// Translation function
 const getTranslations = (lang: string) => {
   const translations: Record<string, Record<string, string>> = {
     zh: {
@@ -62,7 +71,7 @@ const getTranslations = (lang: string) => {
   return translations[lang] || translations.zh
 }
 
-// 創建應用程式選單
+// Create application menu
 export const createApplicationMenu = (mainWindow: BrowserWindow | null) => {
   const lang = getLanguage()
   const t = getTranslations(lang)
@@ -135,7 +144,7 @@ export const createApplicationMenu = (mainWindow: BrowserWindow | null) => {
     },
   ]
 
-  // macOS 特殊處理
+  // macOS special handling
   template.unshift({
     label: 'HHC',
     submenu: [
