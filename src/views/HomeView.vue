@@ -56,7 +56,6 @@ import ExtendedToolbar from '@/components/ExtendedToolbar.vue'
 import BibleViewer from '@/layouts/control/BibleControl.vue'
 import TimerControl from '@/layouts/control/TimerControl.vue'
 import FloatingTimer from '@/components/Timer/FloatingTimer.vue'
-import MediaControl from '@/layouts/control/MediaControl.vue'
 import { useElectron } from '@/composables/useElectron'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { useAlert } from '@/composables/useAlert'
@@ -156,18 +155,12 @@ const menuItems = ref([
     icon: 'mdi-clock-outline',
     component: 'timer',
   },
-  {
-    title: 'media.title',
-    icon: 'mdi-folder-multiple',
-    component: 'media',
-  },
 ])
 
 // 組件映射
 const componentMap = {
   bible: BibleViewer,
   timer: TimerControl,
-  media: MediaControl,
 }
 
 // 當前組件
