@@ -7,9 +7,9 @@ import { createApplicationMenu } from './menu'
 import {
   initAutoUpdater,
   hasUpdateDownloaded,
-  getUpdateInfo,
   installUpdate,
   downloadUpdate,
+  stopPeriodicUpdateCheck,
 } from './autoUpdater'
 import * as Sentry from '@sentry/electron'
 
@@ -77,15 +77,13 @@ const createMainWindow = () => {
     mainWindow.show()
   })
 
-  mainWindow.on('close', async (event) => {
-    // Prevent the window from closing immediately, first check for updates
-    event.preventDefault()
-
+  mainWindow.on('close', async () => {
     // Check if there is an update downloaded
     if (hasUpdateDownloaded()) {
-      const updateInfo = getUpdateInfo()
-      mainWindow?.webContents.send('update-ready-to-install', updateInfo)
+      // Auto install update without user confirmation
+      installUpdate()
     } else {
+      // No update, quit normally
       app.quit()
     }
   })
@@ -268,26 +266,6 @@ ipcMain.handle('install-update', async () => {
   }
 })
 
-// Force quit the application (user chooses to install later when closing)
-ipcMain.handle('force-quit', async () => {
-  try {
-    app.quit()
-    return { success: true }
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    console.error('Failed to force quit:', error)
-    Sentry.captureException(error, {
-      tags: {
-        operation: 'force-quit',
-      },
-      extra: {
-        context: 'Failed to force quit',
-      },
-    })
-    return { success: false, error: errorMessage }
-  }
-})
-
 // Handle language change
 ipcMain.handle('update-language', async (event, language: string) => {
   try {
@@ -340,6 +318,9 @@ app.on('window-all-closed', () => {
 
 // Application will quit event
 app.on('before-quit', () => {
+  // Stop periodic update checks
+  stopPeriodicUpdateCheck()
+
   if (projectionWindow && !projectionWindow.isDestroyed()) {
     projectionWindow.destroy()
     projectionWindow = null

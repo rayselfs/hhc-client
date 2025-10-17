@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { AlertDialog, SnackBar } from '@/components/Alert'
-import { UpdateDialog, UpdateNotification } from '@/components/Updater'
+import { UpdateNotification } from '@/components/Updater'
 import SettingsDialog from '@/components/SettingsDialog.vue'
 import { ShortcutsDialog } from '@/components/Shortcuts'
 import AboutDialog from '@/components/AboutDialog.vue'
@@ -35,8 +35,7 @@ const { snackbarVisible, snackbarText, snackbarColor, snackbarTimeout, defaultCo
     @dont-show-again="handleDontShowAgain"
   />
 
-  <!-- Update Dialogs -->
-  <UpdateDialog />
+  <!-- Update Notification -->
   <UpdateNotification />
 
   <!-- Global SnackBar -->

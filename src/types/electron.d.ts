@@ -69,9 +69,6 @@ export interface ElectronAPI {
   /** Install the downloaded update */
   installUpdate: () => Promise<UpdateResult>
 
-  /** Force quit the application */
-  forceQuit: () => Promise<UpdateResult>
-
   /** Listen for update available events */
   onUpdateAvailable: (callback: (info: UpdateInfo) => void) => void
 
@@ -80,9 +77,6 @@ export interface ElectronAPI {
 
   /** Listen for update downloaded events (for notification purposes) */
   onUpdateDownloaded: (callback: (info: UpdateInfo) => void) => void
-
-  /** Listen for update ready to install event (triggered when user closes main window) */
-  onUpdateReadyToInstall: (callback: (info: UpdateInfo) => void) => void
 
   /** Listen for update error events */
   onUpdateError: (callback: (error: string) => void) => void

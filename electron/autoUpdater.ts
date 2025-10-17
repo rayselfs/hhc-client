@@ -5,15 +5,17 @@ import * as Sentry from '@sentry/electron'
 // Track update download status
 let updateDownloaded = false
 let updateInfo: Record<string, unknown> | null = null
+let updateCheckInterval: NodeJS.Timeout | null = null
 
 /**
  * Initialize autoUpdater functionality
  *
  * Behavior:
  * 1. Automatically check for updates after 1 second of application startup
- * 2. Automatically start downloading updates when updates are available
- * 3. Silent wait after download completion, do not disturb user
- * 4. User closes the main window to display the install confirmation dialog
+ * 2. Check for updates every 5 minutes automatically
+ * 3. Automatically start downloading updates when updates are available
+ * 4. Silent wait after download completion, do not disturb user
+ * 5. User closes the main window to display the install confirmation dialog
  *
  * @param mainWindow Main window instance
  */
@@ -24,6 +26,9 @@ export const initAutoUpdater = (mainWindow: BrowserWindow | null) => {
   setTimeout(() => {
     autoUpdater.checkForUpdates()
   }, 1000)
+
+  // Set up periodic update checks every 5 minutes
+  startPeriodicUpdateCheck()
 
   // Setup event listeners
   setupAutoUpdaterListeners(mainWindow)
@@ -109,4 +114,32 @@ export const installUpdate = () => {
  */
 export const downloadUpdate = () => {
   return autoUpdater.downloadUpdate()
+}
+
+/**
+ * Start periodic update checks every 5 minutes
+ */
+const startPeriodicUpdateCheck = () => {
+  // Clear any existing interval
+  if (updateCheckInterval) {
+    clearInterval(updateCheckInterval)
+  }
+
+  // Set up new interval for 5 minutes (300,000 milliseconds)
+  updateCheckInterval = setInterval(
+    () => {
+      autoUpdater.checkForUpdates()
+    },
+    5 * 60 * 1000,
+  ) // 5 minutes
+}
+
+/**
+ * Stop periodic update checks
+ */
+export const stopPeriodicUpdateCheck = () => {
+  if (updateCheckInterval) {
+    clearInterval(updateCheckInterval)
+    updateCheckInterval = null
+  }
 }

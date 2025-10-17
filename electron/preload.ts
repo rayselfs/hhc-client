@@ -42,7 +42,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // AutoUpdater related
   startDownload: () => ipcRenderer.invoke('start-download'),
   installUpdate: () => ipcRenderer.invoke('install-update'),
-  forceQuit: () => ipcRenderer.invoke('force-quit'),
 
   // Language related
   updateLanguage: (language: string) => ipcRenderer.invoke('update-language', language),
@@ -56,9 +55,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   onUpdateDownloaded: (callback: (info: unknown) => void) => {
     ipcRenderer.on('update-downloaded', (event, info) => callback(info))
-  },
-  onUpdateReadyToInstall: (callback: (info: unknown) => void) => {
-    ipcRenderer.on('update-ready-to-install', (event, info) => callback(info))
   },
   onUpdateError: (callback: (error: string) => void) => {
     ipcRenderer.on('update-error', (event, error) => callback(error))
