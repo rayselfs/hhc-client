@@ -54,6 +54,62 @@ export const useProjectionMessaging = () => {
   const DEBOUNCE_DELAY = 100
 
   /**
+   * 發送聖經更新消息
+   */
+  const sendBibleUpdate = (
+    bibleData: {
+      book: string
+      bookNumber: number
+      chapter: number
+      chapterVerses: Array<{ number: number; text: string }>
+      currentVerse: number
+    },
+    force = false,
+  ) => {
+    const message: AppMessage = {
+      type: MessageType.UPDATE_BIBLE,
+      data: bibleData,
+    }
+    debouncedSendToProjection(message, force)
+  }
+
+  /**
+   * 發送計時器更新消息（智能更新）
+   */
+  const sendTimerUpdate = (force = false) => {
+    const currentState = {
+      mode: timerStore.settings.mode,
+      timerDuration: timerStore.settings.timerDuration,
+      timezone: timerStore.settings.timezone,
+      isRunning: timerStore.settings.isRunning,
+      remainingTime: timerStore.settings.remainingTime,
+      formattedTime: timerStore.formattedTime,
+      progress: timerStore.progress,
+    }
+
+    const message: AppMessage = {
+      type: MessageType.UPDATE_TIMER,
+      data: currentState,
+    }
+
+    // 如果強制發送，直接發送
+    if (force) {
+      sendMessageImmediately(message)
+      return
+    }
+
+    // 檢查狀態是否真的改變了（智能更新，使用全局共享狀態）
+    const hasStateChanged =
+      !globalLastSentMessage ||
+      globalLastSentMessage.type !== message.type ||
+      JSON.stringify(globalLastSentMessage.data) !== JSON.stringify(message.data)
+
+    if (hasStateChanged) {
+      debouncedSendToProjection(message, false)
+    }
+  }
+
+  /**
    * 防抖動的發送消息函數
    */
   const debouncedSendToProjection = (() => {
@@ -114,42 +170,6 @@ export const useProjectionMessaging = () => {
 
     // 深度比較數據
     return JSON.stringify(msg1.data) === JSON.stringify(msg2.data)
-  }
-
-  /**
-   * 發送計時器更新消息（智能更新）
-   */
-  const sendTimerUpdate = (force = false) => {
-    const currentState = {
-      mode: timerStore.settings.mode,
-      timerDuration: timerStore.settings.timerDuration,
-      timezone: timerStore.settings.timezone,
-      isRunning: timerStore.settings.isRunning,
-      remainingTime: timerStore.settings.remainingTime,
-      formattedTime: timerStore.formattedTime,
-      progress: timerStore.progress,
-    }
-
-    const message: AppMessage = {
-      type: MessageType.UPDATE_TIMER,
-      data: currentState,
-    }
-
-    // 如果強制發送，直接發送
-    if (force) {
-      sendMessageImmediately(message)
-      return
-    }
-
-    // 檢查狀態是否真的改變了（智能更新，使用全局共享狀態）
-    const hasStateChanged =
-      !globalLastSentMessage ||
-      globalLastSentMessage.type !== message.type ||
-      JSON.stringify(globalLastSentMessage.data) !== JSON.stringify(message.data)
-
-    if (hasStateChanged) {
-      debouncedSendToProjection(message, false)
-    }
   }
 
   /**
@@ -241,28 +261,6 @@ export const useProjectionMessaging = () => {
 
     // 5. 強制發送所有消息以確保同步
     sendBatchMessages(messages, true)
-  }
-
-  /**
-   * 發送聖經更新消息
-   */
-  const sendBibleUpdate = (
-    bibleData: {
-      book: string
-      bookNumber: number
-      chapter: number
-      chapterVerses: Array<{ number: number; text: string }>
-      currentVerse: number
-    },
-    force = false,
-  ) => {
-    sendViewChange(ViewType.BIBLE, true)
-
-    const message: AppMessage = {
-      type: MessageType.UPDATE_BIBLE,
-      data: bibleData,
-    }
-    debouncedSendToProjection(message, force)
   }
 
   /**
