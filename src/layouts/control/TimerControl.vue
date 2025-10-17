@@ -353,16 +353,7 @@ const handleModeChange = (mode: TimerMode) => {
 
 const startTimer = async () => {
   timerStore.startTimer()
-
-  // 只在投影視窗沒有顯示計時器時才切換
-  if (isElectron()) {
-    // 如果投影視窗沒有顯示計時器（顯示預設內容或顯示其他內容），則切換到計時器
-    // setProjectionState 會自動檢查並創建投影窗口
-    if (projectionStore.isShowingDefault || projectionStore.currentView !== 'timer') {
-      await setProjectionState(false, ViewType.TIMER)
-    }
-  }
-
+  await updateProjectionState()
   sendTimerUpdate(true)
 }
 
@@ -376,9 +367,18 @@ const resetTimer = () => {
   sendTimerUpdate(true)
 }
 
-const resumeTimer = () => {
+const resumeTimer = async () => {
   timerStore.resumeTimer()
+  await updateProjectionState()
   sendTimerUpdate(true)
+}
+
+const updateProjectionState = async () => {
+  if (isElectron()) {
+    if (projectionStore.isShowingDefault || projectionStore.currentView !== 'timer') {
+      await setProjectionState(false, ViewType.TIMER)
+    }
+  }
 }
 
 const applyPreset = (item: { id: string; duration: number }) => {
