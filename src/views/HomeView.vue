@@ -64,21 +64,17 @@ import { useTimerStore } from '@/stores/timer'
 import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
 import { MessageType, ViewType, type AppMessage } from '@/types/common'
 import { useSentry } from '@/composables/useSentry'
+import { useProjectionStore } from '@/stores/projection'
 
-// i18n
+// Composable
 const { t: $t } = useI18n()
-
-// Sentry
 const { reportError } = useSentry()
-
-// Alert
 const { warning } = useAlert()
-
-// Timer store
-const timerStore = useTimerStore()
-
-// Projection messaging
 const { sendTimerUpdate, sendViewChange } = useProjectionMessaging()
+
+// Store
+const timerStore = useTimerStore()
+const projectionStore = useProjectionStore()
 
 // 全局計時器間隔
 let globalTimerInterval: number | undefined
@@ -187,6 +183,7 @@ const toggleDrawer = () => {
 // 點擊懸浮計時器跳轉到計時器頁面
 const goToTimer = () => {
   currentView.value = ViewType.TIMER
+  projectionStore.setCurrentView(currentView.value)
   sendViewChange(ViewType.TIMER, true)
 }
 
@@ -199,6 +196,7 @@ const handleSearch = (query: string) => {
 const handleMenuItemClick = (item: { title: string; icon: string; component: string }) => {
   currentView.value = item.component as ViewType
   if (item.component === ViewType.TIMER) {
+    projectionStore.setCurrentView(ViewType.TIMER)
     sendViewChange(ViewType.TIMER, true)
   }
 }

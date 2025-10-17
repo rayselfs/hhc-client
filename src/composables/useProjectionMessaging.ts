@@ -224,6 +224,7 @@ export const useProjectionMessaging = () => {
       try {
         const projectionExists = await checkProjectionWindow()
         if (!projectionExists) {
+          console.log('ensureProjectionWindow')
           await ensureProjectionWindow()
           await new Promise((resolve) => setTimeout(resolve, 500))
         }
@@ -244,12 +245,7 @@ export const useProjectionMessaging = () => {
     }
 
     // 3. 準備要發送的消息
-    const messages: AppMessage[] = [
-      {
-        type: MessageType.TOGGLE_PROJECTION_CONTENT,
-        data: { showDefault },
-      },
-    ]
+    const messages: AppMessage[] = []
 
     // 4. 如果指定了視圖，添加視圖切換消息
     if (view) {
@@ -259,7 +255,13 @@ export const useProjectionMessaging = () => {
       })
     }
 
-    // 5. 強制發送所有消息以確保同步
+    // 5. 然後發送投影內容切換消息
+    messages.push({
+      type: MessageType.TOGGLE_PROJECTION_CONTENT,
+      data: { showDefault },
+    })
+
+    // 6. 強制發送所有消息以確保同步
     sendBatchMessages(messages, true)
   }
 
