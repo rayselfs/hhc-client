@@ -7,7 +7,7 @@ import { useMemoryManager } from '@/utils/memoryManager'
 export function useKeyboardShortcuts(currentView?: Ref<string> | string) {
   const projectionStore = useProjectionStore()
   const timerStore = useTimerStore()
-  const { sendTimerUpdate, setProjectionState } = useProjectionMessaging()
+  const { setProjectionState } = useProjectionMessaging()
   const { track, untrack, cleanup } = useMemoryManager('useKeyboardShortcuts')
 
   // 處理鍵盤事件
@@ -50,24 +50,25 @@ export function useKeyboardShortcuts(currentView?: Ref<string> | string) {
       switch (event.code) {
         case 'Space':
           event.preventDefault()
-          if (timerStore.settings.isRunning) {
-            // 正在運行 → 暫停
-            timerStore.pauseTimer()
-            sendTimerUpdateMessage()
-          } else if (timerStore.settings.pausedTime && timerStore.settings.pausedTime > 0) {
-            // 已暫停 → 繼續
-            timerStore.resumeTimer()
-            sendTimerUpdateMessage()
-          } else {
-            // 未開始 → 開始
-            timerStore.startTimer()
-            sendTimerUpdateMessage()
+          switch (timerStore.state) {
+            case 'running':
+              // 正在運行 → 暫停
+              timerStore.pauseTimer()
+              break
+            case 'paused':
+              // 已暫停 → 繼續
+              timerStore.resumeTimer()
+              break
+            case 'stopped':
+              // 未開始 → 開始
+              timerStore.startTimer()
+              break
           }
           break
+
         case 'KeyR':
           event.preventDefault()
           timerStore.resetTimer()
-          sendTimerUpdateMessage()
           break
       }
     }
@@ -85,11 +86,6 @@ export function useKeyboardShortcuts(currentView?: Ref<string> | string) {
     if (!projectionStore.isShowingDefault) {
       await setProjectionState(true)
     }
-  }
-
-  // 發送計時器更新消息（使用優化版本）
-  const sendTimerUpdateMessage = () => {
-    sendTimerUpdate()
   }
 
   // 生命週期管理

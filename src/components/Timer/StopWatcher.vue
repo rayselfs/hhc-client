@@ -36,26 +36,24 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useTimerStore } from '@/stores/timer'
+import { useStopwatchStore } from '@/stores/stopwatch'
 
-const timerStore = useTimerStore()
+const stopwatchStore = useStopwatchStore()
 
-// 碼錶相關方法
 const startStopwatch = () => {
-  timerStore.startStopwatch()
+  stopwatchStore.startStopwatch()
 }
 
 const pauseStopwatch = () => {
-  timerStore.pauseStopwatch()
+  stopwatchStore.pauseStopwatch()
 }
 
 const resetStopwatch = () => {
-  timerStore.resetStopwatch()
+  stopwatchStore.resetStopwatch()
 }
 
-// 碼錶時間顯示
-const stopwatchTime = computed(() => timerStore.getStopwatchTime())
-const isStopwatchRunning = computed(() => timerStore.stopwatchSettings.isRunning)
+const stopwatchTime = computed(() => stopwatchStore.formattedTime)
+const isStopwatchRunning = computed(() => stopwatchStore.stopwatchSettings.isRunning)
 </script>
 
 <style scoped>

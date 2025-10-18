@@ -64,7 +64,8 @@ export const TIMER_CONFIG = {
 
   // UI configuration
   UI: {
-    CLOCK_BASE_SIZE: 90,
+    MIN_TIMER_HEIGHT: 600,
+    CLOCK_BASE_SIZE: 140,
     SCREEN_BASE_WIDTH: 1920,
   },
 }

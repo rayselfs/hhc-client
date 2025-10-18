@@ -1,49 +1,46 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { TimerMode } from '@/types/common'
 import { useMemoryManager } from '@/utils/memoryManager'
 import { getTimerLocalKey, STORAGE_KEYS, getTimerDefaultSettings, TIMER_CONFIG } from '@/config/app'
 import { useSentry } from '@/composables/useSentry'
+import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
 
 export interface TimerPreset {
   id: string
-  duration: number // 秒
+  duration: number // seconds
 }
 
+// Simplified settings interface, runtime state is managed separately
 export interface TimerSettings {
   mode: TimerMode
-  timerDuration: number // 秒
-  originalDuration: number // 原始設定的時間（秒）
-  remainingTime: number // 剩餘時間（秒）
-  timezone: string // 時區
-  isRunning: boolean // 是否正在運行
-  startTime?: Date // 開始時間
-  pausedTime?: number // 暫停時剩餘時間（秒）
+  timerDuration: number // seconds (dynamic total time, for progress bar)
+  originalDuration: number // seconds (the user's set time)
+  remainingTime: number // seconds
+  timezone: string // Timezone
+  startTime?: Date // Start time for 'clock' mode
 }
 
-export interface StopwatchSettings {
-  isRunning: boolean
-  elapsedTime: number // 毫秒
-  startTime?: number // 開始時間戳
-  displayMode: 'clock' | 'stopwatch'
-}
+// State machine for timer status
+type TimerState = 'stopped' | 'running' | 'paused'
 
 export const useTimerStore = defineStore('timer', () => {
   const { reportError } = useSentry()
-  const { track, untrack, cleanup } = useMemoryManager('useTimerStore')
+  const { cleanup } = useMemoryManager('useTimerStore')
+  const { sendTimerUpdate } = useProjectionMessaging()
+
   const loadSettings = () => {
     const defaultSettings = getTimerDefaultSettings()
-
     const saved = localStorage.getItem(getTimerLocalKey(STORAGE_KEYS.TIMER_LOCAL.SETTINGS))
     if (saved) {
       try {
         const parsed = JSON.parse(saved)
+        // Only load persistent settings, reset runtime state
         return {
           ...defaultSettings,
           ...parsed,
-          isRunning: false,
           remainingTime: parsed.originalDuration || defaultSettings.remainingTime,
-          pausedTime: 0,
+          timerDuration: parsed.originalDuration || defaultSettings.timerDuration,
         }
       } catch (error) {
         reportError(error, {
@@ -56,26 +53,16 @@ export const useTimerStore = defineStore('timer', () => {
     return defaultSettings
   }
 
-  // 狀態
+  // State
   const settings = ref<TimerSettings>(loadSettings())
   const presets = ref<TimerPreset[]>([])
+  const state = ref<TimerState>('stopped') // State machine
 
-  // 碼錶狀態
-  const stopwatchSettings = ref<StopwatchSettings>({
-    isRunning: false,
-    elapsedTime: 0,
-    displayMode: 'clock',
-  })
-
-  // 碼錶計時器
-  let stopwatchInterval: number | undefined
-
-  // 保存設定到 localStorage
+  // Save persistent settings to localStorage
   const saveSettings = () => {
     try {
       const settingsToSave = {
         mode: settings.value.mode,
-        timerDuration: settings.value.timerDuration,
         originalDuration: settings.value.originalDuration,
         timezone: settings.value.timezone,
       }
@@ -92,7 +79,9 @@ export const useTimerStore = defineStore('timer', () => {
     }
   }
 
-  // 計算屬性
+  // Computed Properties
+  const isRunning = computed(() => state.value === 'running')
+
   const formattedTime = computed(() => {
     const hours = Math.floor(settings.value.remainingTime / 3600)
     const minutes = Math.floor((settings.value.remainingTime % 3600) / 60)
@@ -114,30 +103,99 @@ export const useTimerStore = defineStore('timer', () => {
   })
 
   const isFinished = computed(() => {
-    return settings.value.remainingTime <= 0 && settings.value.isRunning
+    return settings.value.remainingTime <= 0 && state.value === 'stopped'
   })
 
-  // 方法
+  // Internal validation logic moved from component
+  const validateAndNormalize = (
+    minutesNum: number,
+    secondsNum: number,
+  ): { m: number; s: number } => {
+    let m = minutesNum || 0
+    let s = secondsNum || 0
+    if (s >= 60) {
+      m += Math.floor(s / 60)
+      s = s % 60
+    }
+    m = Math.min(m, 59) // Assuming 59:59 max for this UI
+    s = Math.min(s, 59)
+    if (m === 0 && s === 0) {
+      s = 30 // Default to 30s if 00:00
+    }
+    return { m, s }
+  }
+
+  // Computed setters for v-model binding on time inputs
+  const inputMinutes = computed({
+    get: () => {
+      const m = Math.floor(settings.value.originalDuration / 60)
+      return m.toString().padStart(2, '0')
+    },
+    set: (value: string) => {
+      if (!/^\d*$/.test(value) || value === '') value = '0'
+      const sNum = settings.value.originalDuration % 60
+      const { m, s } = validateAndNormalize(parseInt(value), sNum)
+      setTimerDuration(m * 60 + s)
+    },
+  })
+
+  const inputSeconds = computed({
+    get: () => {
+      const s = settings.value.originalDuration % 60
+      return s.toString().padStart(2, '0')
+    },
+    set: (value: string) => {
+      if (!/^\d*$/.test(value) || value === '') value = '0'
+      const mNum = Math.floor(settings.value.originalDuration / 60)
+      const { m, s } = validateAndNormalize(mNum, parseInt(value))
+      setTimerDuration(m * 60 + s)
+    },
+  })
+
+  // Methods
   const setMode = (mode: TimerMode) => {
     settings.value.mode = mode
     saveSettings()
   }
 
   const setTimerDuration = (duration: number) => {
-    settings.value.timerDuration = duration
-    settings.value.originalDuration = duration // 更新原始時間
-    if (!settings.value.isRunning) {
+    settings.value.originalDuration = duration
+    if (state.value === 'stopped') {
+      settings.value.timerDuration = duration
       settings.value.remainingTime = duration
     }
     saveSettings()
   }
 
+  // Refactored addTime logic
   const addTime = (secondsToAdd: number) => {
-    const currentTime = settings.value.remainingTime
-    const newTime = currentTime + secondsToAdd
+    if (state.value === 'stopped') {
+      // If stopped, add to the base duration
+      const newDuration = settings.value.originalDuration + secondsToAdd
+      const { m, s } = validateAndNormalize(0, newDuration) // Pass total seconds
+      setTimerDuration(m * 60 + s)
+    } else {
+      // If running or paused, add to the remaining time
+      const newTime = settings.value.remainingTime + secondsToAdd
+      settings.value.remainingTime = newTime
+      settings.value.timerDuration = Math.max(settings.value.timerDuration, newTime)
+    }
+  }
 
-    settings.value.remainingTime = newTime
-    settings.value.timerDuration = Math.max(settings.value.timerDuration, newTime)
+  // Remove time logic
+  const removeTime = (secondsToRemove: number) => {
+    if (state.value === 'stopped') {
+      // If stopped, remove from the base duration
+      const newDuration = Math.max(0, settings.value.originalDuration - secondsToRemove)
+      const { m, s } = validateAndNormalize(0, newDuration) // Pass total seconds
+      setTimerDuration(m * 60 + s)
+    } else {
+      // If running or paused, remove from the remaining time
+      const newTime = Math.max(0, settings.value.remainingTime - secondsToRemove)
+      settings.value.remainingTime = newTime
+      // Update timerDuration to match the new remaining time
+      settings.value.timerDuration = Math.max(settings.value.timerDuration, newTime)
+    }
   }
 
   const setTimezone = (timezone: string) => {
@@ -145,13 +203,12 @@ export const useTimerStore = defineStore('timer', () => {
     saveSettings()
   }
 
+  // State machine methods
   const startTimer = () => {
     if (settings.value.mode === 'timer' || settings.value.mode === 'both') {
-      // 如果是計時器模式，重置到原始時間並開始倒數
       settings.value.remainingTime = settings.value.originalDuration
       settings.value.timerDuration = settings.value.originalDuration
-      settings.value.isRunning = true
-      settings.value.pausedTime = 0
+      state.value = 'running'
     }
     if (settings.value.mode === 'clock' || settings.value.mode === 'both') {
       settings.value.startTime = new Date()
@@ -159,62 +216,41 @@ export const useTimerStore = defineStore('timer', () => {
   }
 
   const pauseTimer = () => {
-    if (settings.value.isRunning) {
-      settings.value.isRunning = false
-      settings.value.pausedTime = settings.value.remainingTime
-    }
+    if (state.value === 'running') state.value = 'paused'
   }
 
   const resetTimer = () => {
-    settings.value.isRunning = false
-    settings.value.remainingTime = settings.value.originalDuration // 重置到原始時間
-    settings.value.timerDuration = settings.value.originalDuration // 也重置總時間
-    settings.value.pausedTime = 0
+    state.value = 'stopped'
+    settings.value.remainingTime = settings.value.originalDuration
+    settings.value.timerDuration = settings.value.originalDuration
     settings.value.startTime = undefined
   }
 
   const resumeTimer = () => {
-    if (settings.value.pausedTime && settings.value.pausedTime > 0) {
-      settings.value.isRunning = true
-      if (settings.value.remainingTime < settings.value.pausedTime) {
-        settings.value.remainingTime = settings.value.pausedTime
-      }
-      settings.value.pausedTime = 0
-    }
+    if (state.value === 'paused') state.value = 'running'
   }
 
   const tick = () => {
-    if (settings.value.isRunning && settings.value.remainingTime > 0) {
+    if (state.value === 'running' && settings.value.remainingTime > 0) {
       settings.value.remainingTime--
       if (settings.value.remainingTime <= 0) {
         settings.value.remainingTime = 0
-        settings.value.isRunning = false
+        state.value = 'stopped'
       }
     }
   }
 
+  // Preset Methods (logic mostly unchanged)
   const addToPresets = (duration: number) => {
-    // 檢查是否已經有相同的時間設定
     const existingIndex = presets.value.findIndex((item) => item.duration === duration)
-
     if (existingIndex !== -1) {
-      // 如果已存在相同時間，移除舊的記錄
       presets.value.splice(existingIndex, 1)
     }
-
-    const newPreset: TimerPreset = {
-      id: Date.now().toString(),
-      duration,
-    }
-
+    const newPreset: TimerPreset = { id: Date.now().toString(), duration }
     presets.value.unshift(newPreset)
-
-    // 只保留最近5個預設
     if (presets.value.length > TIMER_CONFIG.PRESETS.MAX_COUNT) {
       presets.value = presets.value.slice(0, TIMER_CONFIG.PRESETS.MAX_COUNT)
     }
-
-    // 保存到 localStorage
     localStorage.setItem(
       getTimerLocalKey(STORAGE_KEYS.TIMER_LOCAL.PRESETS),
       JSON.stringify(presets.value),
@@ -222,10 +258,7 @@ export const useTimerStore = defineStore('timer', () => {
   }
 
   const applyPreset = (presetItem: TimerPreset) => {
-    settings.value.timerDuration = presetItem.duration
-    settings.value.originalDuration = presetItem.duration
-    settings.value.remainingTime = presetItem.duration
-    saveSettings()
+    setTimerDuration(presetItem.duration)
     resetTimer()
   }
 
@@ -233,8 +266,7 @@ export const useTimerStore = defineStore('timer', () => {
     const saved = localStorage.getItem(getTimerLocalKey(STORAGE_KEYS.TIMER_LOCAL.PRESETS))
     if (saved) {
       try {
-        const parsed = JSON.parse(saved)
-        presets.value = parsed
+        presets.value = JSON.parse(saved)
       } catch (error) {
         reportError(error, {
           operation: 'load-timer-presets',
@@ -252,75 +284,37 @@ export const useTimerStore = defineStore('timer', () => {
     )
   }
 
-  // 碼錶方法
-  const startStopwatch = () => {
-    stopwatchSettings.value.isRunning = true
-    stopwatchSettings.value.startTime = Date.now() - stopwatchSettings.value.elapsedTime
+  // Side Effect: Automatically update projection when state changes
+  watch(
+    [settings, state],
+    () => {
+      sendTimerUpdate(true)
+    },
+    { deep: true },
+  )
 
-    stopwatchInterval = window.setInterval(() => {
-      if (stopwatchSettings.value.startTime) {
-        stopwatchSettings.value.elapsedTime = Date.now() - stopwatchSettings.value.startTime
-      }
-    }, 100)
-
-    // 追蹤計時器
-    track('stopwatch-interval', 'interval', stopwatchInterval)
-  }
-
-  const pauseStopwatch = () => {
-    stopwatchSettings.value.isRunning = false
-    if (stopwatchInterval) {
-      untrack('stopwatch-interval')
-      clearInterval(stopwatchInterval)
-      stopwatchInterval = undefined
-    }
-  }
-
-  const resetStopwatch = () => {
-    stopwatchSettings.value.isRunning = false
-    stopwatchSettings.value.elapsedTime = 0
-    if (stopwatchInterval) {
-      untrack('stopwatch-interval')
-      clearInterval(stopwatchInterval)
-      stopwatchInterval = undefined
-    }
-  }
-
-  const toggleStopwatchMode = () => {
-    if (stopwatchSettings.value.displayMode === 'clock') {
-      stopwatchSettings.value.displayMode = 'stopwatch'
-      resetStopwatch()
-    } else {
-      stopwatchSettings.value.displayMode = 'clock'
-      pauseStopwatch()
-    }
-  }
-
-  const getStopwatchTime = () => {
-    const totalSeconds = Math.floor(stopwatchSettings.value.elapsedTime / 1000)
-    const minutes = Math.floor(totalSeconds / 60)
-    const seconds = totalSeconds % 60
-    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
-  }
-
-  // 初始化
+  // Initialization
   loadPresets()
 
   return {
-    // 狀態
+    // State
     settings,
     presets,
-    stopwatchSettings,
+    state, // Export state
 
-    // 計算屬性
+    // Computed
+    isRunning, // Export computed boolean
     formattedTime,
     progress,
     isFinished,
+    inputMinutes, // Export computed for v-model
+    inputSeconds, // Export computed for v-model
 
-    // 方法
+    // Methods
     setMode,
     setTimerDuration,
     addTime,
+    removeTime,
     setTimezone,
     startTimer,
     pauseTimer,
@@ -331,14 +325,7 @@ export const useTimerStore = defineStore('timer', () => {
     applyPreset,
     deletePreset,
 
-    // 碼錶方法
-    startStopwatch,
-    pauseStopwatch,
-    resetStopwatch,
-    toggleStopwatchMode,
-    getStopwatchTime,
-
-    // 記憶體管理
+    // Memory Management
     cleanup,
   }
 })

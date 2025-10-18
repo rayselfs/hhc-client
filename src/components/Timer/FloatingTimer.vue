@@ -1,10 +1,6 @@
 <template>
   <div class="floating-timer" @click="$emit('click')">
-    <v-card
-      class="timer-card"
-      elevation="8"
-      :class="{ 'pulse-animation': timerStore.settings.isRunning }"
-    >
+    <v-card class="timer-card" elevation="8" :class="{ 'pulse-animation': timerStore.isRunning }">
       <v-card-text class="pa-3">
         <CountdownTimer
           :progress="timerStore.progress"

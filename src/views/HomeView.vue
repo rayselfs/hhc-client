@@ -85,7 +85,7 @@ const startGlobalTimerInterval = () => {
   }
 
   globalTimerInterval = window.setInterval(() => {
-    const wasRunning = timerStore.settings.isRunning
+    const wasRunning = timerStore.isRunning
     const wasRemainingTime = timerStore.settings.remainingTime
 
     timerStore.tick()
@@ -96,7 +96,7 @@ const startGlobalTimerInterval = () => {
     // 3. 剩餘時間為 0（確保結束狀態被發送）
     const shouldUpdate =
       (wasRunning && timerStore.settings.remainingTime !== wasRemainingTime) ||
-      (wasRunning && !timerStore.settings.isRunning) ||
+      (wasRunning && !timerStore.isRunning) ||
       (timerStore.settings.remainingTime === 0 && wasRemainingTime > 0)
 
     if (shouldUpdate) {
@@ -138,7 +138,7 @@ const searchQuery = ref('')
 // 懸浮計時器顯示狀態
 const showFloatingTimer = computed(() => {
   // 只有在計時器運行中且不在計時器頁面時才顯示
-  return timerStore.settings.isRunning && currentView.value !== ViewType.TIMER
+  return timerStore.isRunning && currentView.value !== ViewType.TIMER
 })
 
 useKeyboardShortcuts(currentView)
