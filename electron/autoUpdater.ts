@@ -58,6 +58,8 @@ const setupAutoUpdaterListeners = (mainWindow: BrowserWindow | null) => {
     updateDownloaded = true
     updateInfo = info as unknown as Record<string, unknown>
 
+    stopPeriodicUpdateCheck()
+
     // send update-downloaded event to frontend
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('update-downloaded', info)
