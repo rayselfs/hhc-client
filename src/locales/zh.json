@@ -23,6 +23,8 @@
   "last": "最後",
   "modify": "修改",
   "folder": "資料夾",
+  "newFolder": "新資料夾",
+  "noFolder": "尚無資料夾",
   "preview": "預覽",
   "delete": "刪除",
   "upload": "上傳",
@@ -62,7 +64,10 @@
     "chapter": "章",
     "verse": "節",
     "noHistory": "尚無歷史記錄",
-    "noFolder": "尚無資料夾"
+    "searchBooks": "搜尋書卷...",
+    "controlFontSize": "控制字型大小",
+    "controlChapter": "控制章節",
+    "controlVerse": "控制節"
   },
   "multiFunction": "多功能",
   "noCustomItems": "尚無自訂項目",

@@ -64,7 +64,6 @@ export const TIMER_CONFIG = {
 
   // UI configuration
   UI: {
-    MIN_TIMER_HEIGHT: 600,
     CLOCK_BASE_SIZE: 140,
     SCREEN_BASE_WIDTH: 1920,
   },
@@ -100,6 +99,7 @@ export const APP_CONFIG = {
       HEADER_HEIGHT: 80,
       GAP_HEIGHT: 16,
     },
+    MIN_CARD_HEIGHT: 600,
     DRAG: {
       IMAGE_OFFSET_X: 10,
       IMAGE_OFFSET_Y: 10,

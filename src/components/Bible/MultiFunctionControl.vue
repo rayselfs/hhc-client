@@ -2,7 +2,7 @@
   <v-card :style="{ height: props.containerHeight ? `${props.containerHeight}px` : '100%' }">
     <v-card-title class="d-flex align-center justify-space-between pa-0">
       <div class="d-flex align-center">
-        <v-btn-toggle v-model="multiFunctionTab" mandatory class="rounded-0">
+        <v-btn-toggle v-model="multiFunctionTab" mandatory class="rounded-0 border-e-sm">
           <v-btn value="history" size="small" :title="$t('history')">
             <v-icon size="x-large">mdi-history</v-icon>
           </v-btn>
@@ -11,10 +11,10 @@
           </v-btn>
         </v-btn-toggle>
         <!-- 資料夾路徑導航 -->
-        <div v-if="multiFunctionTab === 'custom'" class="folder-breadcrumb ml-3">
+        <div v-if="multiFunctionTab === 'custom'" class="ml-3">
           <v-btn
             size="small"
-            class="pa-0"
+            class="pa-0 text-subtitle-1"
             variant="text"
             :disabled="!currentFolder"
             @click="navigateToRoot"
@@ -28,7 +28,7 @@
           <span v-for="(folderId, index) in currentFolderPath" :key="folderId">
             <v-btn
               size="small"
-              class="pa-0"
+              class="pa-0 text-subtitle-1"
               variant="text"
               :disabled="index === currentFolderPath.length - 1"
               @click="navigateToFolder(folderId)"
@@ -48,7 +48,7 @@
         icon
         @click="createNewFolder"
         :disabled="isMaxDepthReached"
-        :title="$t('new') + $t('folder')"
+        :title="$t('newFolder')"
       >
         <v-icon>mdi-folder-plus</v-icon>
       </v-btn>
@@ -78,7 +78,7 @@
             @contextmenu="handleRightClick($event, 'history', item)"
           >
             <div>
-              <div class="text-subtitle-1 font-weight-medium d-flex">
+              <div class="text-h6 font-weight-medium d-flex">
                 <span class="mr-1 text-no-wrap"
                   >{{ item.bookAbbreviation }}{{ item.chapter }}:{{ item.verse }} -
                 </span>
@@ -121,7 +121,7 @@
                 @dblclick="enterFolder(folder.id)"
                 @contextmenu="handleRightClick($event, 'folder', folder)"
               >
-                <div class="d-flex align-center">
+                <div class="d-flex align-center text-subtitle-1">
                   <v-icon class="mr-2">mdi-folder</v-icon>
                   <span>{{ folder.name }}</span>
                 </div>
@@ -148,7 +148,7 @@
               @contextmenu="handleRightClick($event, 'verse', item)"
             >
               <div>
-                <div class="text-subtitle-1 font-weight-medium d-flex">
+                <div class="text-h6 font-weight-medium d-flex">
                   <span class="mr-1 text-no-wrap"
                     >{{ item.bookAbbreviation }}{{ item.chapter }}:{{ item.verse }} -
                   </span>
@@ -236,7 +236,7 @@
           <!-- 移動目標列表 -->
           <div class="move-folder-list">
             <div v-if="getMoveTargets().length === 0" class="text-center pa-4 text-grey">
-              {{ $t('bible.noFolder') }}
+              {{ $t('noFolder') }}
             </div>
             <div v-else>
               <div

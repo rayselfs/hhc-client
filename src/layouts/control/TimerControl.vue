@@ -266,7 +266,7 @@ import { useStopwatchStore } from '@/stores/stopwatch'
 import { useProjectionStore } from '@/stores/projection'
 import { useElectron } from '@/composables/useElectron'
 import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
-import { TIMER_CONFIG } from '@/config/app'
+import { APP_CONFIG, TIMER_CONFIG } from '@/config/app'
 import { TimerMode, ViewType } from '@/types/common'
 import CountdownTimer from '@/components/Timer/CountdownTimer.vue'
 import ClockDisplay from '@/components/Timer/ClockDisplay.vue'
@@ -290,7 +290,7 @@ const { setProjectionState, syncAllStates, cleanupResources } = useProjectionMes
 const { track, untrack, cleanup } = useMemoryManager('TimerControl')
 
 const { leftCardHeight, rightTopCardHeight, rightBottomCardHeight } = useCardLayout({
-  minHeight: TIMER_CONFIG.UI.MIN_TIMER_HEIGHT,
+  minHeight: APP_CONFIG.UI.MIN_CARD_HEIGHT,
   topCardRatio: 0.6, // 60% 上，40% 下
 })
 

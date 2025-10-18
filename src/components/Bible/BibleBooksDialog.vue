@@ -21,10 +21,27 @@
           <span v-if="selectedChapter" class="text-subtitle-1"> {{ selectedChapter }}章 </span>
         </div>
 
-        <!-- 步驟導航按鈕 -->
+        <!-- 搜尋框和步驟導航按鈕 -->
         <div class="d-flex align-center gap-2">
+          <!-- 搜尋框 - 只在書卷頁面顯示 -->
+          <v-text-field
+            v-if="currentStep === 'books'"
+            v-model="searchQuery"
+            :placeholder="$t('bible.searchBooks')"
+            variant="plain"
+            density="compact"
+            hide-details
+            clearable
+            prepend-inner-icon="mdi-magnify"
+            class="search-field"
+            max-width="200"
+            min-width="150"
+          />
+
+          <!-- 步驟導航按鈕 -->
           <v-btn
             size="small"
+            class="text-subtitle-1"
             :color="currentStep === 'books' ? 'primary' : 'default'"
             :variant="currentStep === 'books' ? 'flat' : 'outlined'"
             :disabled="false"
@@ -34,6 +51,7 @@
           </v-btn>
           <v-btn
             size="small"
+            class="text-subtitle-1"
             :color="currentStep === 'chapters' ? 'primary' : 'default'"
             :variant="currentStep === 'chapters' ? 'flat' : 'outlined'"
             :disabled="!canNavigateToChapter"
@@ -43,6 +61,7 @@
           </v-btn>
           <v-btn
             size="small"
+            class="text-subtitle-1"
             :color="currentStep === 'verses' ? 'primary' : 'default'"
             :variant="currentStep === 'verses' ? 'flat' : 'outlined'"
             :disabled="!canNavigateToVerse"
@@ -179,6 +198,9 @@ const currentStep = ref<'books' | 'chapters' | 'verses'>('books')
 const selectedBook = ref<BibleBook | null>(null)
 const selectedChapter = ref<number | null>(null)
 
+// 搜尋功能
+const searchQuery = ref('')
+
 // 聖經內容數據
 const bibleContent = ref<BibleContent | null>(null)
 const loading = ref(false)
@@ -192,15 +214,24 @@ const canNavigateToVerse = computed(() => {
   return selectedBook.value !== null && selectedChapter.value !== null
 })
 
-// 從API數據計算書卷列表
+// 過濾書卷的函數
+const filterBooks = (books: BibleBook[]) => {
+  if (!searchQuery.value || !searchQuery.value.trim()) return books
+  const query = searchQuery.value.toLowerCase().trim()
+  return books.filter((book) => book.name.toLowerCase().includes(query))
+}
+
+// 從API數據計算書卷列表（支援搜尋過濾）
 const oldTestamentBooks = computed(() => {
   if (!bibleContent.value) return []
-  return bibleContent.value.books.filter((book) => book.number <= 39)
+  const books = bibleContent.value.books.filter((book) => book.number <= 39)
+  return filterBooks(books)
 })
 
 const newTestamentBooks = computed(() => {
   if (!bibleContent.value) return []
-  return bibleContent.value.books.filter((book) => book.number > 39)
+  const books = bibleContent.value.books.filter((book) => book.number > 39)
+  return filterBooks(books)
 })
 
 // 獲取選中書卷的章節數（從API數據獲取）
@@ -292,6 +323,7 @@ const resetToBooks = () => {
   currentStep.value = 'books'
   selectedBook.value = null
   selectedChapter.value = null
+  searchQuery.value = '' // 清除搜尋框
 }
 
 const closeDialog = () => {
@@ -357,6 +389,14 @@ const closeDialog = () => {
   background-color: rgb(var(--v-theme-surface));
   z-index: 10;
   border-bottom: 1px solid rgba(var(--v-theme-outline), 0.12);
+}
+
+.search-field {
+  transition: all 0.3s ease;
+}
+
+.search-field :deep(.v-field__input) {
+  font-size: 0.875rem;
 }
 </style>
 

@@ -3,7 +3,7 @@
     <v-row no-gutters>
       <!-- Preview -->
       <v-col cols="6" class="pl-4 pt-4 pb-4 pr-2" ref="leftColumnContainer">
-        <v-card class="display-flex flex-column" :style="{ height: `${previewHeight}px` }">
+        <v-card class="display-flex flex-column" :style="{ height: `${leftCardHeight}px` }">
           <v-card-title class="d-flex align-center justify-space-between">
             <div class="d-flex align-center gap-2">
               <span class="mr-2">{{ currentPassage?.bookName || $t('preview') }}</span>
@@ -36,7 +36,7 @@
 
           <v-card-text
             class="bible-content-wrapper pl-3 pr-3"
-            :style="{ height: `${previewHeight - 80}px` }"
+            :style="{ height: `${leftCardHeight - 80}px` }"
           >
             <div class="bible-content">
               <div
@@ -72,28 +72,28 @@
       <v-col cols="6" class="pl-2 pt-4 pb-4 pr-4" ref="rightColumnContainer">
         <v-row no-gutters class="fill-height">
           <!-- Multi Function Control -->
-          <v-col cols="12" class="mb-4" :style="{ height: `${multiFunctionHeight}px` }">
+          <v-col cols="12" class="mb-4" :style="{ height: `${rightTopCardHeight}px` }">
             <MultiFunctionControl
               v-model:history-verses="historyVerses"
               v-model:custom-folders="customFolders"
               v-model:current-folder-path="currentFolderPath"
               v-model:current-folder="currentFolder"
-              :container-height="multiFunctionHeight"
+              :container-height="rightTopCardHeight"
               @load-verse="loadVerse"
             />
           </v-col>
 
           <!-- Projection Control -->
-          <v-col cols="12" :style="{ height: `${projectionHeight}px` }">
-            <v-card :style="{ height: `${projectionHeight}px` }">
+          <v-col cols="12" :style="{ height: `${rightBottomCardHeight}px` }">
+            <v-card :style="{ height: `${rightBottomCardHeight}px` }">
               <v-card-text>
                 <!-- Chapter/Verse Navigation -->
                 <v-row class="mb-3">
                   <v-col cols="6">
-                    <v-label class="text-body-2">{{ $t('control') + $t('bible.chapter') }}</v-label>
+                    <v-label class="text-subtitle-1">{{ $t('bible.controlChapter') }}</v-label>
                   </v-col>
                   <v-col cols="6">
-                    <v-label class="text-body-2">{{ $t('control') + $t('bible.verse') }}</v-label>
+                    <v-label class="text-subtitle-1">{{ $t('bible.controlVerse') }}</v-label>
                   </v-col>
                   <v-col cols="3" class="d-flex justify-end pa-0 pr-2">
                     <v-btn
@@ -139,7 +139,9 @@
                 <!-- Font Size Slider -->
                 <v-row>
                   <v-col cols="12">
-                    <v-label class="text-body-2 mb-2">{{ $t('control') + $t('fontSize') }}</v-label>
+                    <v-label class="text-subtitle-1 mb-2">{{
+                      $t('bible.controlFontSize')
+                    }}</v-label>
                     <v-slider
                       v-model="fontSize"
                       :min="BIBLE_CONFIG.FONT.MIN_SIZE"
@@ -194,8 +196,10 @@ import { useElectron } from '@/composables/useElectron'
 import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
 import { useBibleCache } from '@/composables/useBibleCache'
 import { useProjectionStore } from '@/stores/projection'
+import { APP_CONFIG } from '@/config/app'
 import { MessageType, ViewType } from '@/types/common'
 import { useSentry } from '@/composables/useSentry'
+import { useCardLayout } from '@/composables/useLayout'
 import MultiFunctionControl from '@/components/Bible/MultiFunctionControl.vue'
 
 interface BiblePassage {
@@ -219,6 +223,10 @@ const projectionStore = useProjectionStore()
 const { sendToProjection } = useElectron()
 const { getBibleContent } = useBibleCache()
 const { reportError } = useSentry()
+const { leftCardHeight, rightTopCardHeight, rightBottomCardHeight } = useCardLayout({
+  minHeight: APP_CONFIG.UI.MIN_CARD_HEIGHT,
+  topCardRatio: 0.7,
+})
 
 // 當前選中的經文
 const currentPassage = ref<BiblePassage | null>(null)
@@ -267,30 +275,11 @@ const customFolders = ref<CustomFolder[]>([])
 const currentFolderPath = ref<string[]>([]) // 當前資料夾路徑
 const currentFolder = ref<CustomFolder | null>(null) // 當前所在的資料夾
 
-// 容器引用和高度計算
-const previewHeight = ref<number>(600)
-const multiFunctionHeight = ref<number>(400)
-const projectionHeight = ref<number>(200)
-
 // 右鍵選單相關
 const showContextMenu = ref(false)
 const contextMenuX = ref(0)
 const contextMenuY = ref(0)
 const selectedVerse = ref<{ number: number; text: string } | null>(null)
-
-// 計算三個卡片的高度
-const calculateHeights = () => {
-  // 計算 Preview card 高度：100vh - 96px
-  const viewportHeight = window.innerHeight
-  previewHeight.value = viewportHeight - 96
-
-  // 右邊兩個卡片根據 Preview card 高度分配
-  const gap = 16 // mb-4 的間距 (16px)
-
-  // Multi Function Control 佔 70%，Projection Control 佔 30%
-  multiFunctionHeight.value = Math.floor((previewHeight.value - gap) * 0.7)
-  projectionHeight.value = Math.floor((previewHeight.value - gap) * 0.3)
-}
 
 // 監聽來自父組件的經文選擇事件
 const handleVerseSelection = (
@@ -830,21 +819,12 @@ onMounted(() => {
   window.addEventListener('bible-verse-selected', eventHandler)
   document.addEventListener('keydown', handleKeydown)
 
-  // 計算初始高度
-  nextTick(() => {
-    calculateHeights()
-  })
-
-  // 監聽窗口大小變化
-  window.addEventListener('resize', calculateHeights)
-
   // 監聽點擊事件來關閉右鍵選單，使用捕獲階段
   document.addEventListener('click', handleDocumentClick, true)
 
   onUnmounted(() => {
     window.removeEventListener('bible-verse-selected', eventHandler)
     document.removeEventListener('keydown', handleKeydown)
-    window.removeEventListener('resize', calculateHeights)
     document.removeEventListener('click', handleDocumentClick, true)
   })
 })
