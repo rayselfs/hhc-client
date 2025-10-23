@@ -264,6 +264,7 @@ const navigateToStep = (step: 'books' | 'chapters' | 'verses') => {
 const selectBook = (book: BibleBook) => {
   selectedBook.value = book
   currentStep.value = 'chapters'
+  searchQuery.value = ''
 }
 
 const selectChapter = (chapter: number) => {
