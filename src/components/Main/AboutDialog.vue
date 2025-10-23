@@ -65,7 +65,7 @@
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useElectron } from '@/composables/useElectron'
-import packageJson from '../../package.json'
+import packageJson from '../../../package.json'
 import hhcIcon from '@/assets/media/hhc-icon.png'
 
 const { t: $t } = useI18n()

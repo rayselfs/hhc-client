@@ -86,7 +86,9 @@
     "language": "語系",
     "darkMode": "暗色模式",
     "chinese": "繁體中文",
-    "english": "English"
+    "english": "English",
+    "resetConfirmTitle": "恢復原廠設定",
+    "resetConfirmMessage": "此操作將清除所有儲存的資料，包含設定、認證資訊等，確定要繼續嗎？"
   },
   "timezones": {
     "taipei": "台北時間 (UTC+8)",
@@ -126,6 +128,13 @@
     "info": "提示",
     "screenWarning": "螢幕提示",
     "dualScreenRequired": "此App是設計用在雙螢幕"
+  },
+  "auth": {
+    "title": "API 認證",
+    "username": "使用者名稱",
+    "password": "密碼",
+    "required": "此欄位為必填",
+    "cancelled": "已取消認證，無法存取聖經資料"
   },
   "dontShowAgain": "不要再顯示",
   "update": {

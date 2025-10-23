@@ -116,6 +116,7 @@ import { useBibleCache } from '@/composables/useBibleCache'
 import { ViewType } from '@/types/common'
 import BibleBooksDialog from '@/components/Bible/BibleBooksDialog.vue'
 import { useSentry } from '@/composables/useSentry'
+import { useBasicAuth } from '@/composables/useBasicAuth'
 
 const { reportError } = useSentry()
 const { t: $t } = useI18n()
@@ -126,6 +127,7 @@ const { searchQuery, isSearching, getSearchPlaceholder, executeSearch, startSear
   useSearch()
 const { loading: apiLoading, getBibleVersions, getBibleContent } = useAPI()
 const { saveBibleContent, getBibleContent: getCachedContent, hasCachedContent } = useBibleCache()
+const { hasCredentials } = useBasicAuth()
 const bibleVersions = ref<BibleVersion[]>([])
 const selectedVersion = ref<number | null>(null)
 const contentLoading = ref(false)
@@ -344,12 +346,21 @@ const handleSelectVerse = (book: BibleBook, chapter: number, verse: number) => {
   )
 }
 
+// 監聽認證狀態變化，當有認證資訊時才載入聖經版本
+watch(
+  hasCredentials,
+  (newVal) => {
+    if (newVal && bibleVersions.value.length === 0) {
+      // 當認證完成且還沒有載入版本時，載入聖經版本列表
+      loadBibleVersions()
+    }
+  },
+  { immediate: true }, // 立即執行一次檢查
+)
+
 onMounted(() => {
   // 初始化時同步所有狀態到投影窗口（包含投影狀態、計時器狀態、主題等）
   syncAllStates()
-
-  // 載入聖經版本列表
-  loadBibleVersions()
 
   // 監聽投影窗口狀態變化
   if (isElectron()) {

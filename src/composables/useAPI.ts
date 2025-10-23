@@ -2,6 +2,7 @@ import { ref, type Ref } from 'vue'
 import { getMainApiHost } from '@/config/api'
 import type { BibleVersion, BibleContent, BibleBook, StreamingProgress } from '@/types/bible'
 import { useSentry } from './useSentry'
+import { useBasicAuth } from './useBasicAuth'
 
 /**
  * API 錯誤介面
@@ -17,6 +18,7 @@ export interface ApiError {
  */
 export function useAPI() {
   const { reportError } = useSentry()
+  const { getAuthHeader, hasCredentials } = useBasicAuth()
   const loading = ref(false)
   const error: Ref<ApiError | null> = ref(null)
 
@@ -39,14 +41,28 @@ export function useAPI() {
     loading.value = true
     error.value = null
 
+    // 檢查是否有認證資訊
+    if (!hasCredentials.value) {
+      loading.value = false
+      return DEFAULT_VERSIONS
+    }
+
     try {
       const apiHost = getMainApiHost()
       const url = `${apiHost}/api/bible/v1/versions`
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      }
+
+      // 添加 Basic Auth header
+      const authHeader = getAuthHeader()
+      if (authHeader) {
+        headers['Authorization'] = authHeader
+      }
+
       const response = await fetch(url, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
       })
 
       if (!response.ok) {
@@ -95,16 +111,30 @@ export function useAPI() {
     loading.value = true
     error.value = null
 
+    // 檢查是否有認證資訊
+    if (!hasCredentials.value) {
+      loading.value = false
+      throw new Error('Authentication required')
+    }
+
     try {
       const apiHost = getMainApiHost()
       const url = `${apiHost}/api/bible/v1/version/${versionId}`
 
+      const headers: HeadersInit = {
+        Accept: 'text/event-stream',
+        'Cache-Control': 'no-cache',
+      }
+
+      // 添加 Basic Auth header
+      const authHeader = getAuthHeader()
+      if (authHeader) {
+        headers['Authorization'] = authHeader
+      }
+
       const response = await fetch(url, {
         method: 'GET',
-        headers: {
-          Accept: 'text/event-stream',
-          'Cache-Control': 'no-cache',
-        },
+        headers,
       })
 
       if (!response.ok) {

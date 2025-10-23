@@ -48,6 +48,7 @@ const getTranslations = (lang: string) => {
       help: '幫助',
       shortcuts: '快捷鍵',
       checkUpdates: '檢查更新',
+      resetSettings: '恢復原廠設定',
     },
     en: {
       preferences: 'Preferences',
@@ -66,6 +67,7 @@ const getTranslations = (lang: string) => {
       help: 'Help',
       shortcuts: 'Keyboard Shortcuts',
       checkUpdates: 'Check for Updates',
+      resetSettings: 'Reset to Factory Settings',
     },
   }
   return translations[lang] || translations.zh
@@ -137,6 +139,15 @@ export const createApplicationMenu = (mainWindow: BrowserWindow | null) => {
           click: () => {
             if (mainWindow) {
               mainWindow.webContents.send('main-message', 'open-shortcuts')
+            }
+          },
+        },
+        { type: 'separator' },
+        {
+          label: t.resetSettings,
+          click: () => {
+            if (mainWindow) {
+              mainWindow.webContents.send('main-message', 'reset-factory-settings')
             }
           },
         },
