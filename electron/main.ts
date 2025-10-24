@@ -294,22 +294,41 @@ ipcMain.handle('update-language', async (event, language: string) => {
   }
 })
 
-// Application events
-app.whenReady().then(() => {
-  // Set security policy
-  app.commandLine.appendSwitch('--disable-features', 'VizDisplayCompositor')
+// Single instance lock
+const gotTheLock = app.requestSingleInstanceLock()
 
-  createMainWindow()
-
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createMainWindow()
+if (!gotTheLock) {
+  // Another instance is already running, focus it and quit
+  app.quit()
+} else {
+  // This is the first instance, handle second instance
+  app.on('second-instance', () => {
+    // Someone tried to run a second instance, focus our window instead
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) {
+        mainWindow.restore()
+      }
+      mainWindow.focus()
     }
   })
 
-  // Initialize autoUpdater
-  initAutoUpdater(mainWindow)
-})
+  // Application events
+  app.whenReady().then(() => {
+    // Set security policy
+    app.commandLine.appendSwitch('--disable-features', 'VizDisplayCompositor')
+
+    createMainWindow()
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        createMainWindow()
+      }
+    })
+
+    // Initialize autoUpdater
+    initAutoUpdater(mainWindow)
+  })
+}
 
 // All windows closed event
 app.on('window-all-closed', () => {
