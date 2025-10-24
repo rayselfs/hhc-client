@@ -100,7 +100,7 @@
 
       <!-- Custom Page -->
       <div v-else class="custom-content">
-        <div class="custom-list pa-3">
+        <div class="custom-list">
           <div
             v-if="getCurrentFolders().length === 0 && getCurrentVerses().length === 0"
             class="text-center pa-4 text-grey"

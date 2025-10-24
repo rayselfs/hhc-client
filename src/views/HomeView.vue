@@ -4,7 +4,6 @@
       :current-view="currentView"
       :drawer-collapsed="drawerCollapsed"
       @toggle-drawer="toggleDrawer"
-      @search="handleSearch"
     />
 
     <v-navigation-drawer
@@ -35,12 +34,7 @@
     <!-- Main content -->
     <v-main>
       <transition name="page-slide" mode="out-in">
-        <component
-          :is="currentComponent"
-          :key="currentView"
-          :search-query="searchQuery"
-          @search="handleSearch"
-        />
+        <component :is="currentComponent" :key="currentView" />
       </transition>
     </v-main>
 
@@ -144,9 +138,6 @@ const drawerCollapsed = ref(true)
 // 當前選中的視圖
 const currentView = ref(ViewType.BIBLE) // 預設使用聖經
 
-// 搜尋查詢
-const searchQuery = ref('')
-
 // 懸浮計時器顯示狀態
 const showFloatingTimer = computed(() => {
   // 只有在計時器運行中且不在計時器頁面時才顯示
@@ -190,11 +181,6 @@ const goToTimer = () => {
   currentView.value = ViewType.TIMER
   projectionStore.setCurrentView(currentView.value)
   sendViewChange(ViewType.TIMER, true)
-}
-
-// 處理搜尋
-const handleSearch = (query: string) => {
-  searchQuery.value = query
 }
 
 // 處理選單項目點擊事件

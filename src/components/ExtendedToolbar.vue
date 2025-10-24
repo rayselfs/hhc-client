@@ -38,12 +38,12 @@
 
     <v-slide-x-reverse-transition>
       <v-text-field
-        v-if="isSearching && showSearch"
-        v-model="searchQuery"
+        v-if="isSearching && props.currentView === 'bible'"
+        v-model="searchText"
         autofocus
         variant="solo-inverted"
         hide-details
-        :placeholder="getSearchPlaceholder(props.currentView)"
+        :placeholder="$t('search')"
         density="compact"
         class="mr-2"
         style="width: 250px"
@@ -52,7 +52,7 @@
     </v-slide-x-reverse-transition>
 
     <v-btn
-      v-if="!isSearching && showSearch"
+      v-if="!isSearching && props.currentView === 'bible'"
       icon
       @click="handleStartSearch"
       :title="$t('search')"
@@ -61,7 +61,7 @@
       <v-icon>mdi-magnify</v-icon>
     </v-btn>
 
-    <v-btn v-else-if="isSearching && showSearch" icon @click="handleCloseSearch">
+    <v-btn v-else-if="isSearching && props.currentView === 'bible'" icon @click="handleCloseSearch">
       <v-icon>mdi-close</v-icon>
     </v-btn>
 
@@ -96,7 +96,6 @@
   <BibleBooksDialog
     v-model="showBooksDialog"
     :version-id="selectedVersion"
-    @select-book="handleSelectBook"
     @select-verse="handleSelectVerse"
   />
 </template>
@@ -107,7 +106,6 @@ import { useI18n } from 'vue-i18n'
 import { useProjectionStore } from '@/stores/projection'
 import { useElectron } from '@/composables/useElectron'
 import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
-import { useSearch } from '@/composables/useSearch'
 import { useAPI } from '@/composables/useAPI'
 import { useAlert } from '@/composables/useAlert'
 import { getBibleLocalKey, STORAGE_KEYS } from '@/config/app'
@@ -123,8 +121,6 @@ const { t: $t } = useI18n()
 const { isElectron, onProjectionOpened, onProjectionClosed, checkProjectionWindow } = useElectron()
 const { setProjectionState, syncAllStates, sendTimerUpdate } = useProjectionMessaging()
 const { warning } = useAlert()
-const { searchQuery, isSearching, getSearchPlaceholder, executeSearch, startSearch, closeSearch } =
-  useSearch()
 const { loading: apiLoading, getBibleVersions, getBibleContent } = useAPI()
 const { saveBibleContent, getBibleContent: getCachedContent, hasCachedContent } = useBibleCache()
 const { hasCredentials } = useBasicAuth()
@@ -132,6 +128,8 @@ const bibleVersions = ref<BibleVersion[]>([])
 const selectedVersion = ref<number | null>(null)
 const contentLoading = ref(false)
 const showBooksDialog = ref(false)
+const isSearching = ref(false)
+const searchText = ref('')
 
 // Props
 const props = defineProps<{
@@ -142,7 +140,6 @@ const props = defineProps<{
 // Drawer 的事件發送
 const emit = defineEmits<{
   (e: 'toggle-drawer'): void
-  (e: 'search', query: string): void
 }>()
 
 // 計算標題
@@ -159,31 +156,9 @@ const toolbarTitle = computed(() => {
   }
 })
 
-// 是否顯示搜尋功能（計時器頁面時隱藏）
-const showSearch = computed(() => {
-  return props.currentView !== 'timer'
-})
-
 const emitToggleDrawer = () => {
   emit('toggle-drawer')
 }
-
-// 處理搜尋開始
-const handleStartSearch = () => {
-  startSearch()
-}
-
-// 處理搜尋關閉
-const handleCloseSearch = () => {
-  closeSearch()
-  emit('search', '')
-}
-
-// 監聽搜尋查詢變化
-watch(searchQuery, (newQuery) => {
-  executeSearch(props.currentView, newQuery)
-  emit('search', newQuery)
-})
 
 // 投影功能
 const projectionStore = useProjectionStore()
@@ -319,23 +294,6 @@ watch(selectedVersion, async (newVersion) => {
   }
 })
 
-// // 處理重新整理按鈕
-// const handleRefreshContent = async () => {
-//   if (!selectedVersion.value) return
-
-//   // 先刪除快取
-//   await deleteCachedContent(selectedVersion.value)
-
-//   // 強制重新 fetch
-//   await loadBibleContentForVersion(selectedVersion.value, true)
-// }
-
-// 處理書卷選擇
-const handleSelectBook = (book: BibleBook) => {
-  console.log('Selected book:', book)
-  // TODO: 實現書卷選擇後的邏輯
-}
-
 // 處理經文選擇
 const handleSelectVerse = (book: BibleBook, chapter: number, verse: number) => {
   // 發送全局事件給BibleViewer組件
@@ -344,6 +302,14 @@ const handleSelectVerse = (book: BibleBook, chapter: number, verse: number) => {
       detail: { book, chapter, verse },
     }),
   )
+}
+
+const handleStartSearch = () => {
+  isSearching.value = true
+}
+
+const handleCloseSearch = () => {
+  isSearching.value = false
 }
 
 // 監聽認證狀態變化，當有認證資訊時才載入聖經版本
