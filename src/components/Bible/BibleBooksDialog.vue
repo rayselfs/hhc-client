@@ -224,17 +224,19 @@ const filterBooks = (books: BibleBook[]) => {
   return books.filter((book) => book.name.toLowerCase().includes(query))
 }
 
-// 從API數據計算書卷列表（支援搜尋過濾）
-const oldTestamentBooks = computed(() => {
+// 先計算所有過濾後的書卷列表
+const filteredBooks = computed(() => {
   if (!bibleContent.value) return []
-  const books = bibleContent.value.books.filter((book) => book.number <= 39)
-  return filterBooks(books)
+  return filterBooks(bibleContent.value.books)
+})
+
+// 從已過濾的結果中分離新舊約
+const oldTestamentBooks = computed(() => {
+  return filteredBooks.value.filter((book) => book.number <= 39)
 })
 
 const newTestamentBooks = computed(() => {
-  if (!bibleContent.value) return []
-  const books = bibleContent.value.books.filter((book) => book.number > 39)
-  return filterBooks(books)
+  return filteredBooks.value.filter((book) => book.number > 39)
 })
 
 // 獲取選中書卷的章節數（從API數據獲取）
