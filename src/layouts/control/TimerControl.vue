@@ -259,7 +259,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, onUnmounted, nextTick } from 'vue'
+import { computed, onMounted, onBeforeUnmount, onUnmounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useTimerStore } from '@/stores/timer'
 import { useStopwatchStore } from '@/stores/stopwatch'
@@ -272,9 +272,8 @@ import CountdownTimer from '@/components/Timer/CountdownTimer.vue'
 import ClockDisplay from '@/components/Timer/ClockDisplay.vue'
 import Stopwatch from '@/components/Timer/StopWatcher.vue'
 import { useMemoryManager } from '@/utils/memoryManager'
-import { throttle } from '@/utils/performanceUtils'
 import { useSnackBar } from '@/composables/useSnackBar'
-import { useCardLayout } from '@/composables/useLayout'
+import { useCardLayout, useWindowSize } from '@/composables/useLayout'
 
 const timerStore = useTimerStore()
 const stopwatchStore = useStopwatchStore()
@@ -287,7 +286,7 @@ const { isElectron } = useElectron()
 
 const { setProjectionState, syncAllStates, cleanupResources } = useProjectionMessaging()
 
-const { track, untrack, cleanup } = useMemoryManager('TimerControl')
+const { cleanup } = useMemoryManager('TimerControl')
 
 const { leftCardHeight, rightTopCardHeight, rightBottomCardHeight } = useCardLayout({
   minHeight: APP_CONFIG.UI.MIN_CARD_HEIGHT,
@@ -297,18 +296,8 @@ const { leftCardHeight, rightTopCardHeight, rightBottomCardHeight } = useCardLay
 // Read display mode from stopwatch store
 const externalDisplayMode = computed(() => stopwatchStore.stopwatchSettings.displayMode)
 
-// Window size logic remains the same
-const windowSize = ref({
-  width: window.innerWidth,
-  height: window.innerHeight,
-})
-
-const handleResize = throttle(() => {
-  windowSize.value = {
-    width: window.innerWidth,
-    height: window.innerHeight,
-  }
-}, 100)
+// 使用統一的視窗尺寸 composable
+const { width } = useWindowSize(100)
 
 const handleFocus = (event: FocusEvent) => {
   const target = event.target as HTMLInputElement
@@ -399,7 +388,7 @@ const formatDuration = (seconds: number) => {
 
 // clockSize logic remains the same
 const clockSize = computed(() => {
-  const screenWidth = windowSize.value.width
+  const screenWidth = width.value
   return TIMER_CONFIG.UI.CLOCK_BASE_SIZE * (screenWidth / TIMER_CONFIG.UI.SCREEN_BASE_WIDTH)
 })
 
@@ -413,19 +402,11 @@ onMounted(() => {
   // Removed time initialization, v-model handles it
   syncAllStates()
 
-  // Track event listener
-  track('resize-listener', 'listener', {
-    element: window,
-    event: 'resize',
-    handler: handleResize,
-  })
-  window.addEventListener('resize', handleResize)
+  // useWindowSize 已經處理了 resize 監聽器，不需要手動添加
 })
 
 onBeforeUnmount(() => {
-  // Cleanup event listener
-  untrack('resize-listener')
-  window.removeEventListener('resize', handleResize)
+  // useWindowSize 已經處理了 resize 監聽器的清理，不需要手動清理
 
   // Cleanup projection resources
   cleanupResources()

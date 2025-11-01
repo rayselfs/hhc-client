@@ -26,10 +26,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { computed } from 'vue'
 import CountdownTimer from '@/components/Timer/CountdownTimer.vue'
 import ClockDisplay from '@/components/Timer/ClockDisplay.vue'
 import { TimerMode } from '@/types/common'
+import { useWindowSize } from '@/composables/useLayout'
 
 interface Props {
   timerMode: TimerMode
@@ -40,31 +41,12 @@ interface Props {
 
 const props = defineProps<Props>()
 
-// 響應式視窗尺寸
-const windowSize = ref({
-  width: window.innerWidth,
-  height: window.innerHeight,
-})
-
-// 監聽視窗大小變化
-const handleResize = () => {
-  windowSize.value = {
-    width: window.innerWidth,
-    height: window.innerHeight,
-  }
-}
-
-onMounted(() => {
-  window.addEventListener('resize', handleResize)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('resize', handleResize)
-})
+// 使用統一的視窗尺寸 composable
+const { width } = useWindowSize(100)
 
 // Calculate the circle size based on the timerMode
 const circleSize = computed(() => {
-  const screenWidth = windowSize.value.width
+  const screenWidth = width.value
   if (props.timerMode === TimerMode.BOTH) {
     return 700 * (screenWidth / 1920)
   }
@@ -72,7 +54,7 @@ const circleSize = computed(() => {
 })
 
 const clockSize = computed(() => {
-  const screenWidth = windowSize.value.width
+  const screenWidth = width.value
   if (props.timerMode === TimerMode.BOTH) {
     return 260 * (screenWidth / 1920)
   }
