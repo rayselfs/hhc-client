@@ -194,7 +194,6 @@ import { MessageType, ViewType, StorageKey, StorageCategory, getStorageKey } fro
 import { useSentry } from '@/composables/useSentry'
 import { useCardLayout } from '@/composables/useLayout'
 import { useLocalStorage } from '@/composables/useLocalStorage'
-import { useContextMenu } from '@/composables/useContextMenu'
 import MultiFunctionControl from '@/components/Bible/MultiFunctionControl.vue'
 import type { MultiFunctionVerse, BibleBook } from '@/types/bible'
 import { storeToRefs } from 'pinia'
@@ -253,14 +252,9 @@ const getInitialFontSize = () => {
 const fontSize = ref(getInitialFontSize())
 
 // 右鍵選單相關
-// 使用 useContextMenu composable 管理右鍵選單狀態
-const {
-  show: showContextMenu,
-  x: contextMenuX,
-  y: contextMenuY,
-  open: openContextMenu,
-  close: closeContextMenu,
-} = useContextMenu()
+const showContextMenu = ref(false)
+const contextMenuX = ref(0)
+const contextMenuY = ref(0)
 const selectedVerse = ref<{ number: number; text: string } | null>(null)
 
 // 監聽來自 store 的經文選擇事件
@@ -613,13 +607,50 @@ const handleKeydown = (event: KeyboardEvent) => {
 
 // 右鍵選單處理函數
 const handleVerseRightClick = (event: MouseEvent, verse: { number: number; text: string }) => {
-  selectedVerse.value = verse
-  openContextMenu(event)
+  event.preventDefault()
+  event.stopPropagation()
+
+  // 如果選單已經顯示，先關閉它
+  if (showContextMenu.value) {
+    showContextMenu.value = false
+    // 使用 nextTick 確保選單完全關閉後再顯示新的選單
+    nextTick(() => {
+      selectedVerse.value = verse
+      contextMenuX.value = event.clientX
+      contextMenuY.value = event.clientY
+      showContextMenu.value = true
+    })
+  } else {
+    // 如果選單沒有顯示，直接顯示新選單
+    selectedVerse.value = verse
+    contextMenuX.value = event.clientX
+    contextMenuY.value = event.clientY
+    showContextMenu.value = true
+  }
 }
 
-const closeVerseContextMenu = () => {
-  closeContextMenu()
+const closeContextMenu = () => {
+  showContextMenu.value = false
   selectedVerse.value = null
+}
+
+// 處理點擊事件，在有選單顯示時阻止事件傳播
+const handleDocumentClick = (event: Event) => {
+  if (showContextMenu.value) {
+    const target = event.target as Element
+
+    // 檢查點擊的目標是否在右鍵選單內
+    const isClickOnMenu =
+      target.closest('.v-menu') || target.closest('.v-list') || target.closest('.v-list-item')
+
+    if (!isClickOnMenu) {
+      event.stopPropagation()
+      event.stopImmediatePropagation()
+      event.preventDefault()
+      closeContextMenu()
+      return false
+    }
+  }
 }
 
 const copyVerseText = async () => {
@@ -644,7 +675,7 @@ const copyVerseText = async () => {
       document.body.removeChild(textArea)
     }
   }
-  closeVerseContextMenu()
+  closeContextMenu()
 }
 
 // 監聽來自 store 的 currentPassage 變化（替代 window.addEventListener）
@@ -671,10 +702,15 @@ watch(
 // 監聽來自ExtendedToolbar的事件（通過全局事件或props）
 onMounted(() => {
   // store 已經在初始化時載入了數據，不需要手動載入
+
   document.addEventListener('keydown', handleKeydown)
+
+  // 監聽點擊事件來關閉右鍵選單，使用捕獲階段
+  document.addEventListener('click', handleDocumentClick, true)
 
   onUnmounted(() => {
     document.removeEventListener('keydown', handleKeydown)
+    document.removeEventListener('click', handleDocumentClick, true)
   })
 })
 </script>
