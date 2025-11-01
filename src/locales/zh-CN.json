@@ -1,0 +1,115 @@
+{
+  "close": "关闭",
+  "cancel": "取消",
+  "confirm": "确定",
+  "search": "搜索",
+  "create": "创建",
+  "homepage": "首页",
+  "moveTo": "移动到",
+  "move": "移动",
+  "newFolder": "新文件夹",
+  "noFolder": "尚无文件夹",
+  "preview": "预览",
+  "delete": "删除",
+  "custom": "自定义",
+  "confirmDeleteItem": "确定删除此项目吗",
+  "copy": "复制",
+  "paste": "粘贴",
+  "history": "历史",
+  "projection": "投影",
+  "extendedToolbar": {
+    "openProjection": "开启投影",
+    "closeProjection": "关闭投影",
+    "closeProjectionWindow": "关闭投影窗口",
+    "confirmClose": "确定要关闭投影窗口吗?"
+  },
+  "timer": {
+    "title": "计时器",
+    "mode": {
+      "timer": "计时",
+      "clock": "时钟",
+      "both": "同时"
+    },
+    "presets": "计时预设",
+    "stopwatch": "码表"
+  },
+  "bible": {
+    "title": "圣经",
+    "no": "第",
+    "psalm": "篇",
+    "chapter": "章",
+    "verse": "节",
+    "noHistory": "尚无历史记录",
+    "searchBooks": "搜索书卷...",
+    "controlFontSize": "控制字体大小",
+    "controlChapter": "控制章节",
+    "controlVerse": "控制节"
+  },
+  "noCustomItems": "尚无自定义项目",
+  "enterFolderName": "请输入文件夹名称",
+  "settings": {
+    "title": "设置",
+    "timezone": "时区",
+    "theme": "主题",
+    "language": "语系",
+    "darkMode": "暗色模式",
+    "traditionalChinese": "繁體中文",
+    "simplifiedChinese": "简体中文",
+    "english": "English",
+    "resetConfirmTitle": "恢复出厂设置",
+    "resetConfirmMessage": "此操作将清除所有存储的数据，包含设置、认证信息等，确定要继续吗？"
+  },
+  "timezones": {
+    "taipei": "台北时间 (UTC+8)",
+    "hongKong": "香港时间 (UTC+8)",
+    "singapore": "新加坡时间 (UTC+8)",
+    "tokyo": "东京时间 (UTC+9)",
+    "seoul": "首尔时间 (UTC+9)",
+    "newYork": "纽约时间 (UTC-5)",
+    "london": "伦敦时间 (UTC+0)",
+    "paris": "巴黎时间 (UTC+1)",
+    "utc": "UTC时间"
+  },
+  "about": {
+    "title": "关于",
+    "version": "版本",
+    "description": "应用程序说明",
+    "descriptionText": "HHC Client 是一个专为教会聚会设计的多功能应用程序，提供计时器、圣经等功能，让聚会更加顺畅。",
+    "features": "主要功能",
+    "bibleFeature": "圣经功能 - 圣经经文显示",
+    "timerFeature": "计时器功能 - 倒数计时、码表、时钟显示",
+    "copyright": "© 2025 HHC. 版权所有。",
+    "license": "本软件采用开源授权条款。"
+  },
+  "shortcuts": {
+    "title": "快捷键",
+    "timer": "计时器快捷键",
+    "projection": "投影快捷键",
+    "startPauseTimer": "开始/暂停计时器",
+    "resetTimer": "重置计时器",
+    "toggleProjection": "切换投影 (Windows)",
+    "toggleProjectionMac": "切换投影 (Mac)",
+    "closeProjection": "关闭投影"
+  },
+  "alert": {
+    "error": "错误",
+    "warning": "警告",
+    "info": "提示",
+    "screenWarning": "屏幕提示",
+    "dualScreenRequired": "此App是设计用在双屏幕"
+  },
+  "auth": {
+    "title": "API 认证",
+    "username": "用户名",
+    "password": "密码",
+    "required": "此字段为必填",
+    "cancelled": "已取消认证，无法存取圣经数据"
+  },
+  "dontShowAgain": "不要再显示",
+  "update": {
+    "downloading": "发现新版本，下载中..."
+  },
+  "media": {
+    "title": "多媒体 (Alpha)"
+  }
+}

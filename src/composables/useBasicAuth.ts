@@ -1,6 +1,5 @@
 import { ref, computed } from 'vue'
-
-const STORAGE_KEY = 'basic_auth_credentials'
+import { StorageKey } from '@/types/common'
 
 interface AuthCredentials {
   username: string
@@ -20,7 +19,7 @@ export function useBasicAuth() {
    */
   const loadCredentials = (): AuthCredentials | null => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY)
+      const stored = localStorage.getItem(StorageKey.BASIC_AUTH_CREDENTIALS)
       if (stored) {
         return JSON.parse(stored) as AuthCredentials
       }
@@ -35,7 +34,7 @@ export function useBasicAuth() {
    */
   const saveCredentials = (auth: AuthCredentials) => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(auth))
+      localStorage.setItem(StorageKey.BASIC_AUTH_CREDENTIALS, JSON.stringify(auth))
       credentials.value = auth
     } catch (error) {
       console.error('Failed to save credentials to localStorage:', error)
@@ -47,7 +46,7 @@ export function useBasicAuth() {
    */
   const clearCredentials = () => {
     try {
-      localStorage.removeItem(STORAGE_KEY)
+      localStorage.removeItem(StorageKey.BASIC_AUTH_CREDENTIALS)
       credentials.value = null
     } catch (error) {
       console.error('Failed to clear credentials from localStorage:', error)

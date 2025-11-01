@@ -266,6 +266,17 @@ ipcMain.handle('install-update', async () => {
   }
 })
 
+// Handle get system locale
+ipcMain.handle('get-system-locale', async () => {
+  try {
+    console.log('app locale:', app.getLocale())
+    return app.getLocale()
+  } catch (error) {
+    console.error('Failed to get system locale:', error)
+    return 'zh-TW' // fallback
+  }
+})
+
 // Handle language change
 ipcMain.handle('update-language', async (event, language: string) => {
   try {

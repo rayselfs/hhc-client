@@ -2,9 +2,11 @@ import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { TimerMode } from '@/types/common'
 import { useMemoryManager } from '@/utils/memoryManager'
-import { getTimerLocalKey, STORAGE_KEYS, getTimerDefaultSettings, TIMER_CONFIG } from '@/config/app'
+import { TIMER_CONFIG, getTimerDefaultSettings } from '@/config/app'
 import { useSentry } from '@/composables/useSentry'
 import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
+import { useLocalStorage } from '@/composables/useLocalStorage'
+import { StorageKey, StorageCategory, getStorageKey } from '@/types/common'
 
 export interface TimerPreset {
   id: string
@@ -28,14 +30,15 @@ export const useTimerStore = defineStore('timer', () => {
   const { reportError } = useSentry()
   const { cleanup } = useMemoryManager('useTimerStore')
   const { sendTimerUpdate } = useProjectionMessaging()
-
+  const { getLocalItem, setLocalItem } = useLocalStorage()
   const loadSettings = () => {
     const defaultSettings = getTimerDefaultSettings()
-    const saved = localStorage.getItem(getTimerLocalKey(STORAGE_KEYS.TIMER_LOCAL.SETTINGS))
-    if (saved) {
+    const parsed = getLocalItem<TimerSettings>(
+      getStorageKey(StorageCategory.TIMER, StorageKey.TIMER_SETTINGS),
+      'object',
+    )
+    if (parsed) {
       try {
-        const parsed = JSON.parse(saved)
-        // Only load persistent settings, reset runtime state
         return {
           ...defaultSettings,
           ...parsed,
@@ -54,7 +57,7 @@ export const useTimerStore = defineStore('timer', () => {
   }
 
   // State
-  const settings = ref<TimerSettings>(loadSettings())
+  const settings = ref<TimerSettings>(loadSettings() as TimerSettings)
   const presets = ref<TimerPreset[]>([])
   const state = ref<TimerState>('stopped') // State machine
 
@@ -66,9 +69,10 @@ export const useTimerStore = defineStore('timer', () => {
         originalDuration: settings.value.originalDuration,
         timezone: settings.value.timezone,
       }
-      localStorage.setItem(
-        getTimerLocalKey(STORAGE_KEYS.TIMER_LOCAL.SETTINGS),
-        JSON.stringify(settingsToSave),
+      setLocalItem(
+        getStorageKey(StorageCategory.TIMER, StorageKey.TIMER_SETTINGS),
+        settingsToSave,
+        'object',
       )
     } catch (error) {
       reportError(error, {
@@ -251,9 +255,10 @@ export const useTimerStore = defineStore('timer', () => {
     if (presets.value.length > TIMER_CONFIG.PRESETS.MAX_COUNT) {
       presets.value = presets.value.slice(0, TIMER_CONFIG.PRESETS.MAX_COUNT)
     }
-    localStorage.setItem(
-      getTimerLocalKey(STORAGE_KEYS.TIMER_LOCAL.PRESETS),
-      JSON.stringify(presets.value),
+    setLocalItem(
+      getStorageKey(StorageCategory.TIMER, StorageKey.TIMER_PRESETS),
+      presets.value,
+      'array',
     )
   }
 
@@ -263,24 +268,19 @@ export const useTimerStore = defineStore('timer', () => {
   }
 
   const loadPresets = () => {
-    const saved = localStorage.getItem(getTimerLocalKey(STORAGE_KEYS.TIMER_LOCAL.PRESETS))
-    if (saved) {
-      try {
-        presets.value = JSON.parse(saved)
-      } catch (error) {
-        reportError(error, {
-          operation: 'load-timer-presets',
-          component: 'TimerStore',
-        })
-      }
-    }
+    const saved = getLocalItem<TimerPreset[]>(
+      getStorageKey(StorageCategory.TIMER, StorageKey.TIMER_PRESETS),
+      'array',
+    )
+    presets.value = saved ? saved : []
   }
 
   const deletePreset = (id: string) => {
     presets.value = presets.value.filter((item) => item.id !== id)
-    localStorage.setItem(
-      getTimerLocalKey(STORAGE_KEYS.TIMER_LOCAL.PRESETS),
-      JSON.stringify(presets.value),
+    setLocalItem(
+      getStorageKey(StorageCategory.TIMER, StorageKey.TIMER_PRESETS),
+      presets.value,
+      'array',
     )
   }
 

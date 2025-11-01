@@ -200,6 +200,7 @@ import { APP_CONFIG } from '@/config/app'
 import { MessageType, ViewType } from '@/types/common'
 import { useSentry } from '@/composables/useSentry'
 import { useCardLayout } from '@/composables/useLayout'
+import { useLocalStorage } from '@/composables/useLocalStorage'
 import MultiFunctionControl from '@/components/Bible/MultiFunctionControl.vue'
 
 interface BiblePassage {
@@ -223,6 +224,7 @@ const projectionStore = useProjectionStore()
 const { sendToProjection } = useElectron()
 const { getBibleContent } = useBibleCache()
 const { reportError } = useSentry()
+const { getLocalItem, setLocalItem } = useLocalStorage()
 const { leftCardHeight, rightTopCardHeight, rightBottomCardHeight } = useCardLayout({
   minHeight: APP_CONFIG.UI.MIN_CARD_HEIGHT,
   topCardRatio: 0.7,
@@ -242,22 +244,17 @@ const currentBookData = ref<{
 // 字型大小控制
 const getInitialFontSize = () => {
   // 從 localStorage 讀取上次設定的字型大小，如果沒有則使用預設值
-  const savedFontSize = localStorage.getItem(getBibleLocalKey(STORAGE_KEYS.BIBLE_LOCAL.FONT_SIZE))
-  const fontSize = savedFontSize ? parseInt(savedFontSize, 10) : getDefaultFontSize()
-  return isValidFontSize(fontSize) ? fontSize : getDefaultFontSize()
+  const savedFontSize = getLocalItem<number>(
+    getStorageKey(StorageCategory.BIBLE, StorageKey.FONT_SIZE),
+  )
+  return savedFontSize ? savedFontSize : BIBLE_CONFIG.FONT.DEFAULT_SIZE
 }
 const fontSize = ref(getInitialFontSize())
 
 // 歷史記錄
 import type { Verse } from '@/types/verse'
-import {
-  getDefaultFontSize,
-  getBibleLocalKey,
-  getBibleSessionKey,
-  isValidFontSize,
-  BIBLE_CONFIG,
-  STORAGE_KEYS,
-} from '@/config/app'
+import { BIBLE_CONFIG } from '@/config/app'
+import { StorageKey, StorageCategory, getStorageKey } from '@/types/common'
 
 const historyVerses = ref<Verse[]>([])
 
@@ -569,13 +566,7 @@ const goToNextVerseProjection = () => {
 
 // 更新投影字型大小
 const updateProjectionFontSize = () => {
-  // 保存字型大小到 localStorage
-  localStorage.setItem(
-    getBibleLocalKey(STORAGE_KEYS.BIBLE_LOCAL.FONT_SIZE),
-    fontSize.value.toString(),
-  )
-
-  // 發送字型大小更新到投影
+  setLocalItem(getStorageKey(StorageCategory.BIBLE, StorageKey.FONT_SIZE), fontSize.value)
   if (isElectron()) {
     sendToProjection({
       type: MessageType.UPDATE_BIBLE_FONT_SIZE,
@@ -588,10 +579,10 @@ const updateProjectionFontSize = () => {
 const loadVerse = async (item: Verse, type: 'history' | 'custom') => {
   try {
     // 獲取當前選中的版本
-    const savedVersion = localStorage.getItem(
-      getBibleLocalKey(STORAGE_KEYS.BIBLE_LOCAL.SELECTED_VERSION),
+    const savedVersion = getLocalItem<number>(
+      getStorageKey(StorageCategory.BIBLE, StorageKey.SELECTED_VERSION),
     )
-    const versionId = savedVersion ? parseInt(savedVersion) : 1
+    const versionId = savedVersion ? savedVersion : 1
 
     const content = await getBibleContent(versionId)
     if (content) {
@@ -615,18 +606,20 @@ const loadVerse = async (item: Verse, type: 'history' | 'custom') => {
 }
 
 const saveHistoryToStorage = () => {
-  sessionStorage.setItem(
-    getBibleSessionKey(STORAGE_KEYS.BIBLE_SESSION.CURRENT_PASSAGE),
-    JSON.stringify(historyVerses.value),
+  setLocalItem(
+    getStorageKey(StorageCategory.BIBLE, StorageKey.CURRENT_PASSAGE),
+    historyVerses.value,
+    'array',
   )
 }
 
 const loadHistoryFromStorage = () => {
-  const saved = sessionStorage.getItem(
-    getBibleSessionKey(STORAGE_KEYS.BIBLE_SESSION.CURRENT_PASSAGE),
+  const saved = getLocalItem<Verse[]>(
+    getStorageKey(StorageCategory.BIBLE, StorageKey.CURRENT_PASSAGE),
+    'array',
   )
   if (saved) {
-    historyVerses.value = JSON.parse(saved)
+    historyVerses.value = saved
   }
 }
 
@@ -686,16 +679,20 @@ const addVerseToCustom = (verseNumber: number) => {
 }
 
 const saveCustomToStorage = () => {
-  localStorage.setItem(
-    getBibleLocalKey(STORAGE_KEYS.BIBLE_LOCAL.CUSTOM_FOLDERS),
-    JSON.stringify(customFolders.value),
+  setLocalItem(
+    getStorageKey(StorageCategory.BIBLE, StorageKey.CUSTOM_FOLDERS),
+    customFolders.value,
+    'array',
   )
 }
 
 const loadCustomFromStorage = () => {
-  const saved = localStorage.getItem(getBibleLocalKey(STORAGE_KEYS.BIBLE_LOCAL.CUSTOM_FOLDERS))
+  const saved = getLocalItem<CustomFolder[]>(
+    getStorageKey(StorageCategory.BIBLE, StorageKey.CUSTOM_FOLDERS),
+    'array',
+  )
   if (saved) {
-    customFolders.value = JSON.parse(saved)
+    customFolders.value = saved
   }
 }
 

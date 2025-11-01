@@ -56,21 +56,19 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useTimerStore } from '@/stores/timer'
 import { useElectron } from '@/composables/useElectron'
 import { useDarkMode } from '@/composables/useDarkMode'
 import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
-import { getAppLocalKey, STORAGE_KEYS } from '@/config/app'
-import { useSentry } from '@/composables/useSentry'
+import { useLocaleDetection } from '@/composables/useLocaleDetection'
 
 // i18n
-const { t: $t, t, locale } = useI18n()
+const { t: $t, t } = useI18n()
 
 // Electron composable
 const { isElectron } = useElectron()
-const { reportError } = useSentry()
 
 // 投影消息管理
 const { sendTimerUpdate } = useProjectionMessaging()
@@ -78,12 +76,8 @@ const { sendTimerUpdate } = useProjectionMessaging()
 // 設定彈窗狀態
 const isOpen = ref(false)
 
-// 語系選擇
-const selectedLanguage = ref(locale.value)
-const languageOptions = [
-  { value: 'zh', text: 'settings.chinese' },
-  // { value: 'en', text: 'settings.english' },
-]
+// 語系管理
+const { selectedLanguage, languageOptions, handleLanguageChange } = useLocaleDetection()
 
 // 時區設定
 const timerStore = useTimerStore()
@@ -96,7 +90,6 @@ const isDarkMode = computed({
   set: (value: boolean) => {
     if (value !== isDark.value) {
       toggleDark()
-      // 注意：投影視圖不支援主題切換（固定為黑底白字），因此不需要同步主題到投影窗口
     }
   },
 })
@@ -120,27 +113,6 @@ const handleTimezoneChange = (timezone: string) => {
   sendTimerUpdate()
 }
 
-// 處理語系切換
-const handleLanguageChange = async (newLocale: string) => {
-  locale.value = newLocale
-  selectedLanguage.value = newLocale
-  // 保存到 localStorage
-  localStorage.setItem(getAppLocalKey(STORAGE_KEYS.APP_LOCAL.PREFERRED_LANGUAGE), newLocale)
-
-  // 通知主進程更新語系
-  if (isElectron()) {
-    try {
-      await window.electronAPI.updateLanguage(newLocale)
-    } catch (error) {
-      reportError(error, {
-        operation: 'update-language',
-        component: 'SettingsDialog',
-        extra: { newLocale },
-      })
-    }
-  }
-}
-
 // 開啟設定彈窗
 const openSettings = () => {
   isOpen.value = true
@@ -151,6 +123,16 @@ defineExpose({
   openSettings,
 })
 
+// 同步當前語系狀態（語系初始化已經在 App.vue 中完成，這裡只需要同步狀態）
+const { locale } = useI18n()
+watch(
+  () => locale.value,
+  (newLocale) => {
+    selectedLanguage.value = newLocale as typeof selectedLanguage.value
+  },
+  { immediate: true },
+)
+
 // 監聽 menu 事件
 onMounted(() => {
   if (isElectron()) {
@@ -160,15 +142,6 @@ onMounted(() => {
         openSettings()
       }
     })
-  }
-
-  // 從 localStorage 讀取保存的語系設定
-  const savedLanguage = localStorage.getItem(
-    getAppLocalKey(STORAGE_KEYS.APP_LOCAL.PREFERRED_LANGUAGE),
-  )
-  if (savedLanguage) {
-    locale.value = savedLanguage
-    selectedLanguage.value = savedLanguage
   }
 })
 </script>

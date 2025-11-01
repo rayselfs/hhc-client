@@ -1,46 +1,28 @@
 {
-  "open": "開啟",
   "close": "關閉",
   "cancel": "取消",
   "confirm": "確定",
   "search": "搜尋",
-  "refresh": "重新整理",
-  "window": "視窗",
-  "preferences": "偏好設定",
-  "help": "說明",
-  "file": "檔案",
-  "edit": "編輯",
-  "quit": "結束",
-  "size": "大小",
-  "new": "新",
-  "add": "新增",
   "create": "建立",
   "homepage": "首頁",
-  "notFound": "找不到",
-  "no": "沒有",
   "moveTo": "移動到",
   "move": "移動",
-  "last": "最後",
-  "modify": "修改",
-  "folder": "資料夾",
   "newFolder": "新資料夾",
   "noFolder": "尚無資料夾",
   "preview": "預覽",
   "delete": "刪除",
-  "upload": "上傳",
-  "select": "選擇",
-  "success": "成功",
-  "failed": "失敗",
-  "back": "返回",
-  "remove": "移除",
-  "control": "控制",
-  "fontSize": "字型大小",
-  "data": "資料",
   "custom": "自訂",
   "confirmDeleteItem": "確定刪除此項目嗎",
   "copy": "複製",
   "paste": "貼上",
   "history": "歷史",
+  "projection": "投影",
+  "extendedToolbar": {
+    "openProjection": "開啟投影",
+    "closeProjection": "關閉投影",
+    "closeProjectionWindow": "關閉投影窗口",
+    "confirmClose": "確定要關閉投影窗口嗎?"
+  },
   "timer": {
     "title": "計時器",
     "mode": {
@@ -48,14 +30,8 @@
       "clock": "時鐘",
       "both": "同時"
     },
-    "duration": "計時時間",
     "presets": "計時預設",
-    "stopwatch": "碼錶",
-    "units": {
-      "hours": "小時",
-      "minutes": "分鐘",
-      "seconds": "秒"
-    }
+    "stopwatch": "碼錶"
   },
   "bible": {
     "title": "聖經",
@@ -69,23 +45,16 @@
     "controlChapter": "控制章節",
     "controlVerse": "控制節"
   },
-  "multiFunction": "多功能",
   "noCustomItems": "尚無自訂項目",
-  "newCollection": "新增收藏",
   "enterFolderName": "請輸入資料夾名稱",
-  "enterCollectionName": "請輸入收藏名稱",
-  "noNote": "無備註",
-  "projection": {
-    "title": "投影",
-    "confirmClose": "確定要關閉投影窗口嗎?"
-  },
   "settings": {
     "title": "設定",
     "timezone": "時區",
     "theme": "主題",
     "language": "語系",
     "darkMode": "暗色模式",
-    "chinese": "繁體中文",
+    "traditionalChinese": "繁體中文",
+    "simplifiedChinese": "简体中文",
     "english": "English",
     "resetConfirmTitle": "恢復原廠設定",
     "resetConfirmMessage": "此操作將清除所有儲存的資料，包含設定、認證資訊等，確定要繼續嗎？"
@@ -138,26 +107,9 @@
   },
   "dontShowAgain": "不要再顯示",
   "update": {
-    "downloading": "發現新版本，下載中...",
-    "readyToInstall": "更新已準備就緒",
-    "installMessage": "版本 {version} 已下載完成，是否立即安裝？",
-    "installDescription": "安裝後應用程式將重新啟動以完成更新。",
-    "installNow": "立即安裝",
-    "delay": "稍後安裝",
-    "installing": "安裝中...",
-    "installError": "安裝更新失敗"
+    "downloading": "發現新版本，下載中..."
   },
   "media": {
-    "title": "多媒體 (Alpha)",
-    "untitledFolder": "未命名資料夾",
-    "selectedItems": "已選取 {count} 個項目",
-    "dragFilesHere": "拖拽文件到這裡",
-    "orClickUploadButton": "或點擊上傳按鈕",
-    "uploadingFiles": "正在上傳文件",
-    "noFiles": "暫無文件",
-    "gridView": "網格檢視",
-    "listView": "清單檢視",
-    "filesNotFoundMessage": "以下檔案無法找到，可能已被移動或刪除：",
-    "reuploadFiles": "重新上傳"
+    "title": "多媒體 (Alpha)"
   }
 }

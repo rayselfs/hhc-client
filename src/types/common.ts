@@ -260,3 +260,51 @@ export enum Environment {
   PRODUCTION = 'production',
   TEST = 'test',
 }
+
+/**
+ * LocalStorage 鍵名枚舉
+ */
+export enum StorageKey {
+  // App related
+  PREFERRED_LANGUAGE = 'preferred-language',
+  USER_PREFERENCES = 'user-preferences',
+  THEME = 'theme',
+  // Bible related
+  SELECTED_VERSION = 'selected-version',
+  CUSTOM_FOLDERS = 'custom-folders',
+  CURRENT_FOLDER_PATH = 'current-folder-path',
+  CURRENT_FOLDER = 'current-folder',
+  FONT_SIZE = 'font-size',
+  DARK_MODE = 'dark-mode',
+  CURRENT_PASSAGE = 'current-passage',
+  SEARCH_HISTORY = 'search-history',
+  TEMP_STATE = 'temp-state',
+  // Timer related
+  TIMER_SETTINGS = 'settings',
+  TIMER_PRESETS = 'presets',
+  // Basic Auth
+  BASIC_AUTH_CREDENTIALS = 'basic_auth_credentials',
+}
+
+/**
+ * Storage 分類枚舉
+ */
+export enum StorageCategory {
+  APP = 'app',
+  BIBLE = 'bible',
+  TIMER = 'timer',
+}
+
+/**
+ * 生成完整的 LocalStorage 鍵名
+ * @param category - 分類（app, bible, timer）
+ * @param key - 鍵名
+ * @returns 完整的 LocalStorage 鍵名
+ */
+export function getStorageKey(category: StorageCategory, key: StorageKey | string): string {
+  // 處理 BASIC_AUTH_CREDENTIALS（不使用分類前綴）
+  if (key === StorageKey.BASIC_AUTH_CREDENTIALS) {
+    return key
+  }
+  return `hhc-${category}-${key}`
+}

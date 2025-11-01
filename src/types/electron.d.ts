@@ -81,6 +81,9 @@ export interface ElectronAPI {
   /** Listen for update error events */
   onUpdateError: (callback: (error: string) => void) => void
 
+  /** Get system locale */
+  getSystemLocale: () => Promise<string>
+
   /** Update language setting */
   updateLanguage: (language: string) => Promise<UpdateResult>
 }

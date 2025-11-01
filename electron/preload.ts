@@ -44,6 +44,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   installUpdate: () => ipcRenderer.invoke('install-update'),
 
   // Language related
+  getSystemLocale: () => ipcRenderer.invoke('get-system-locale'),
   updateLanguage: (language: string) => ipcRenderer.invoke('update-language', language),
 
   // Listen for update related events

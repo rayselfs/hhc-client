@@ -173,7 +173,7 @@
     <!-- 創建資料夾對話框 -->
     <v-dialog v-model="showFolderDialog" max-width="400">
       <v-card>
-        <v-card-title>{{ $t('new') + $t('folder') }}</v-card-title>
+        <v-card-title>{{ $t('newFolder') }}</v-card-title>
         <v-card-text>
           <v-text-field
             v-model="folderName"
@@ -358,7 +358,7 @@
             <template #prepend>
               <v-icon>mdi-folder-plus</v-icon>
             </template>
-            <v-list-item-title>{{ $t('new') + $t('folder') }}</v-list-item-title>
+            <v-list-item-title>{{ $t('newFolder') }}</v-list-item-title>
           </v-list-item>
         </template>
       </v-list>
