@@ -12,7 +12,7 @@ const getLanguage = () => {
     const settingsPath = path.join(userDataPath, 'language-settings.json')
     if (existsSync(settingsPath)) {
       const settings = JSON.parse(readFileSync(settingsPath, 'utf8'))
-      return settings.language || 'zh'
+      return settings.language || 'zh-TW'
     }
   } catch (error) {
     console.error('Failed to read language settings:', error)
@@ -25,13 +25,13 @@ const getLanguage = () => {
       },
     })
   }
-  return 'zh'
+  return 'zh-TW'
 }
 
 // Translation function
 const getTranslations = (lang: string) => {
   const translations: Record<string, Record<string, string>> = {
-    zh: {
+    'zh-TW': {
       preferences: '偏好設定',
       quit: '結束',
       about: '關於',
@@ -49,6 +49,25 @@ const getTranslations = (lang: string) => {
       shortcuts: '快捷鍵',
       checkUpdates: '檢查更新',
       resetSettings: '恢復原廠設定',
+    },
+    'zh-CN': {
+      preferences: '偏好设置',
+      quit: '结束',
+      about: '关于',
+      services: '服务',
+      hide: '隐藏',
+      hideOthers: '隐藏其他',
+      unhide: '显示全部',
+      edit: '编辑',
+      undo: '复原',
+      redo: '重做',
+      cut: '剪切',
+      copy: '复制',
+      paste: '粘贴',
+      help: '帮助',
+      shortcuts: '快捷键',
+      checkUpdates: '检查更新',
+      resetSettings: '恢复出厂设置',
     },
     en: {
       preferences: 'Preferences',
@@ -70,7 +89,7 @@ const getTranslations = (lang: string) => {
       resetSettings: 'Reset to Factory Settings',
     },
   }
-  return translations[lang] || translations.zh
+  return translations[lang] || translations['zh-TW']
 }
 
 // Create application menu
