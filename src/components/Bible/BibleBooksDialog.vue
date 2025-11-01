@@ -166,9 +166,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useBibleCache } from '@/composables/useBibleCache'
 import type { BibleContent, BibleBook } from '@/types/bible'
 import { useSentry } from '@/composables/useSentry'
+import { useBibleStore } from '@/stores/bible'
 
 interface Props {
   modelValue: boolean
@@ -182,8 +182,11 @@ interface Emits {
   (e: 'select-verse', book: BibleBook, chapter: number, verse: number): void
 }
 
+// 使用 Bible Store 的 Cache 功能
+const bibleStore = useBibleStore()
+const { getBibleContent } = bibleStore
+
 const { t: $t } = useI18n()
-const { getBibleContent } = useBibleCache()
 const { reportError } = useSentry()
 const props = defineProps<Props>()
 const emit = defineEmits<Emits>()

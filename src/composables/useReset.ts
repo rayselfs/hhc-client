@@ -1,4 +1,5 @@
 import { useSentry } from './useSentry'
+import { useLocalStorage } from './useLocalStorage'
 
 /**
  * useFactoryReset composable
@@ -6,7 +7,7 @@ import { useSentry } from './useSentry'
  */
 export function useFactoryReset() {
   const { reportError } = useSentry()
-
+  const { clear } = useLocalStorage()
   /**
    * 清除所有 IndexedDB 資料庫
    */
@@ -46,7 +47,7 @@ export function useFactoryReset() {
   const clearAllStorage = async (): Promise<boolean> => {
     try {
       // 清除 localStorage
-      localStorage.clear()
+      clear()
 
       // 清除 sessionStorage
       sessionStorage.clear()

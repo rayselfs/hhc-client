@@ -79,11 +79,30 @@ export interface StreamingProgress {
  */
 export interface MultiFunctionVerse {
   id: string
-  bookName: string
   bookAbbreviation: string
   bookNumber: number
   chapter: number
   verse: number
   verseText: string
+  timestamp: number
+}
+
+/**
+ * Bible Cache 配置
+ */
+export enum BibleCacheConfig {
+  DB_NAME = 'BibleCache',
+  STORE_NAME = 'bibleContent',
+  DB_VERSION = 1,
+}
+
+/**
+ * Bible Cache 項目接口
+ */
+export interface BibleCacheItem {
+  versionId: number
+  versionCode: string
+  versionName: string
+  content: BibleContent
   timestamp: number
 }

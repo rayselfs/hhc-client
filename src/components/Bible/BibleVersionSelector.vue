@@ -39,19 +39,22 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAPI } from '@/composables/useAPI'
 import type { BibleVersion, BibleBook } from '@/types/bible'
-import { useBibleCache } from '@/composables/useBibleCache'
 import BibleBooksDialog from '@/components/Bible/BibleBooksDialog.vue'
 import { useSentry } from '@/composables/useSentry'
 import { useBasicAuth } from '@/composables/useBasicAuth'
 import { useLocalStorage } from '@/composables/useLocalStorage'
 import { StorageKey, StorageCategory, getStorageKey } from '@/types/common'
+import { useBibleStore } from '@/stores/bible'
 
 const { reportError } = useSentry()
 const { t: $t } = useI18n()
 const { loading: apiLoading, getBibleVersions, getBibleContent } = useAPI()
-const { saveBibleContent, getBibleContent: getCachedContent, hasCachedContent } = useBibleCache()
 const { hasCredentials } = useBasicAuth()
 const { setLocalItem, getLocalItem } = useLocalStorage()
+
+// 使用 Bible Store 的 Cache 功能
+const bibleStore = useBibleStore()
+const { saveBibleContent, getBibleContent: getCachedContent, hasCachedContent } = bibleStore
 
 const bibleVersions = ref<BibleVersion[]>([])
 const selectedVersion = ref<number | null>(null)

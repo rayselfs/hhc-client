@@ -193,7 +193,6 @@ import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useElectron } from '@/composables/useElectron'
 import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
-import { useBibleCache } from '@/composables/useBibleCache'
 import { useProjectionStore } from '@/stores/projection'
 import { useBibleStore } from '@/stores/bible'
 import { APP_CONFIG } from '@/config/app'
@@ -222,9 +221,13 @@ const { isElectron } = useElectron()
 const { setProjectionState, sendBibleUpdate } = useProjectionMessaging()
 const projectionStore = useProjectionStore()
 const { sendToProjection } = useElectron()
-const { getBibleContent } = useBibleCache()
 const { reportError } = useSentry()
 const { getLocalItem, setLocalItem } = useLocalStorage()
+
+// 使用 Bible Store（包含 Cache 和 History 功能）
+const bibleStore = useBibleStore()
+const { getBibleContent, addToHistory: addVerseToHistory } = bibleStore
+
 const { leftCardHeight, rightTopCardHeight, rightBottomCardHeight } = useCardLayout({
   minHeight: APP_CONFIG.UI.MIN_CARD_HEIGHT,
   topCardRatio: 0.7,
@@ -255,10 +258,6 @@ const fontSize = ref(getInitialFontSize())
 import type { MultiFunctionVerse } from '@/types/bible'
 import { BIBLE_CONFIG } from '@/config/app'
 import { StorageKey, StorageCategory, getStorageKey } from '@/types/common'
-
-// 使用 store 管理歷史記錄
-const bibleStore = useBibleStore()
-const { addToHistory: addVerseToHistory } = bibleStore
 
 // 自訂資料夾
 interface CustomFolder {
@@ -358,11 +357,30 @@ const updateProjection = async (verseNumber: number) => {
   }
 }
 
+/**
+ * 創建 MultiFunctionVerse 物件
+ * @param verseNumber - 節號
+ * @returns MultiFunctionVerse 物件，如果 currentPassage 不存在則返回 null
+ */
+const createMultiFunctionVerse = (verseNumber: number): MultiFunctionVerse | null => {
+  if (!currentPassage.value) return null
+
+  const verseText = chapterVerses.value.find((v) => v.number === verseNumber)?.text || ''
+
+  return {
+    id: crypto.randomUUID(),
+    bookAbbreviation: currentPassage.value.bookAbbreviation,
+    bookNumber: currentPassage.value.bookNumber,
+    chapter: currentPassage.value.chapter,
+    verse: verseNumber,
+    verseText,
+    timestamp: Date.now(),
+  }
+}
+
 // 添加到歷史記錄
 const addToHistory = (verseNumber: number) => {
   if (!currentPassage.value) return
-
-  const verseText = chapterVerses.value.find((v) => v.number === verseNumber)?.text || ''
 
   // ignore the same chapter
   const lastHistory = bibleStore.historyVerses[0]
@@ -374,16 +392,8 @@ const addToHistory = (verseNumber: number) => {
     return
   }
 
-  const newHistoryItem: MultiFunctionVerse = {
-    id: crypto.randomUUID(),
-    bookName: currentPassage.value.bookName,
-    bookAbbreviation: currentPassage.value.bookAbbreviation,
-    bookNumber: currentPassage.value.bookNumber,
-    chapter: currentPassage.value.chapter,
-    verse: verseNumber,
-    verseText,
-    timestamp: Date.now(),
-  }
+  const newHistoryItem = createMultiFunctionVerse(verseNumber)
+  if (!newHistoryItem) return
 
   // 使用 store 的 addToHistory，它會自動處理重複和數量限制
   addVerseToHistory(newHistoryItem)
@@ -591,19 +601,8 @@ const loadVerse = async (item: MultiFunctionVerse, type: 'history' | 'custom') =
 const addVerseToCustom = (verseNumber: number) => {
   if (!currentPassage.value) return
 
-  // 獲取經文內容
-  const verseText = chapterVerses.value.find((v) => v.number === verseNumber)?.text || ''
-
-  const newVerse: MultiFunctionVerse = {
-    id: crypto.randomUUID(),
-    bookName: currentPassage.value.bookName,
-    bookAbbreviation: currentPassage.value.bookAbbreviation,
-    bookNumber: currentPassage.value.bookNumber,
-    chapter: currentPassage.value.chapter,
-    verse: verseNumber,
-    verseText,
-    timestamp: Date.now(),
-  }
+  const newVerse = createMultiFunctionVerse(verseNumber)
+  if (!newVerse) return
 
   // 基於當前顯示的位置添加經文
   if (currentFolder.value) {

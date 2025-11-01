@@ -2,6 +2,7 @@ interface UseStorageReturn {
   getLocalItem: <T>(key: string, format?: 'int' | 'float' | 'boolean' | 'array' | 'object') => T
   setLocalItem: <T>(key: string, value: T, format?: 'array' | 'object') => void
   removeLocalItem: (key: string) => void
+  clear: () => void
 }
 
 export function useLocalStorage(): UseStorageReturn {
@@ -9,6 +10,7 @@ export function useLocalStorage(): UseStorageReturn {
     getLocalItem,
     setLocalItem,
     removeLocalItem,
+    clear,
   }
 }
 
@@ -55,4 +57,8 @@ function setLocalItem<T>(key: string, value: T, format?: 'array' | 'object'): vo
 
 function removeLocalItem(key: string): void {
   localStorage.removeItem(key)
+}
+
+function clear(): void {
+  localStorage.clear()
 }
