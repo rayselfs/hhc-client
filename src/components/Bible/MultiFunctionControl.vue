@@ -142,7 +142,7 @@
                   icon
                   size="small"
                   variant="text"
-                  @click.stop="deleteFolder(folder.id)"
+                  @click.stop="showDeleteFolderDialog(folder.id)"
                 >
                   <v-icon>mdi-delete</v-icon>
                 </v-btn>
@@ -382,7 +382,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
-import { v4 as uuidv4 } from 'uuid'
+// uuidv4 不再需要，因為 store 的 pasteItem 會自動生成 ID
 import type { MultiFunctionVerse } from '@/types/bible'
 import { BIBLE_CONFIG } from '@/config/app'
 import { useSentry } from '@/composables/useSentry'
@@ -405,26 +405,35 @@ interface CustomFolder {
 
 // Props
 interface Props {
-  customFolders: CustomFolder[]
-  currentFolderPath: string[]
-  currentFolder: CustomFolder | null
   containerHeight?: number
 }
 
 // Emits
 interface Emits {
-  (e: 'update:customFolders', value: CustomFolder[]): void
-  (e: 'update:currentFolderPath', value: string[]): void
-  (e: 'update:currentFolder', value: CustomFolder | null): void
   (e: 'load-verse', item: MultiFunctionVerse, type: 'history' | 'custom'): void
 }
 
 const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
-// Bible store - 直接在組件內使用 store 管理歷史記錄
+// Bible store - 直接使用 store 管理所有狀態
 const bibleStore = useBibleStore()
-const { historyVerses } = storeToRefs(bibleStore)
+const {
+  createFolder,
+  deleteFolder,
+  navigateToRoot: storeNavigateToRoot,
+  navigateToFolder: storeNavigateToFolder,
+  enterFolder: storeEnterFolder,
+  getCurrentFolders,
+  getCurrentVerses,
+  removeVerseFromFolder,
+  moveVerseToFolder: storeMoveVerseToFolder,
+  pasteItem: storePasteItem,
+  moveFolderToFolder: storeMoveFolderToFolder,
+  isFolderInside,
+  getFolderById: storeGetFolderById,
+} = bibleStore
+const { historyVerses, customFolders, currentFolderPath, currentFolder } = storeToRefs(bibleStore)
 
 // 狀態
 const multiFunctionTab = ref('history')
@@ -486,104 +495,31 @@ const createNewFolder = () => {
 
 const confirmCreateFolder = () => {
   if (folderName.value.trim()) {
-    const newFolder: CustomFolder = {
-      id: uuidv4(),
-      name: folderName.value.trim(),
-      expanded: false,
-      items: [],
-      folders: [],
-      parentId: props.currentFolder?.id,
-    }
-
-    const newFolders = [...props.customFolders]
-
-    if (props.currentFolder) {
-      updateFolderInTree(newFolders, props.currentFolder.id, (folder) => {
-        folder.folders.push(newFolder)
-      })
-    } else {
-      newFolders.push(newFolder)
-    }
-
-    emit('update:customFolders', newFolders)
+    // 使用 store 的 createFolder
+    createFolder(folderName.value.trim(), currentFolder.value?.id)
     showFolderDialog.value = false
     folderName.value = ''
   }
 }
 
-// 導航相關函數
+// 導航相關函數（直接使用 store 的方法）
 const navigateToRoot = () => {
-  emit('update:currentFolderPath', [])
-  emit('update:currentFolder', null)
+  storeNavigateToRoot()
 }
 
 const navigateToFolder = (folderId: string) => {
-  const folder = getFolderById(folderId)
-  if (folder) {
-    const index = props.currentFolderPath.indexOf(folderId)
-    const newPath =
-      index !== -1 ? props.currentFolderPath.slice(0, index + 1) : props.currentFolderPath
-    emit('update:currentFolderPath', newPath)
-    emit('update:currentFolder', folder)
-  }
+  storeNavigateToFolder(folderId)
 }
 
 const enterFolder = (folderId: string) => {
-  const folder = getFolderById(folderId)
-  if (folder) {
-    const newPath = [...props.currentFolderPath, folderId]
-    emit('update:currentFolderPath', newPath)
-    emit('update:currentFolder', folder)
-
-    // 清除文字選擇，防止資料夾名稱被反白
-    if (window.getSelection) {
-      window.getSelection()?.removeAllRanges()
-    }
-  }
+  storeEnterFolder(folderId)
 }
 
 const getFolderById = (folderId: string): CustomFolder | null => {
-  for (const folder of props.customFolders) {
-    if (folder.id === folderId) return folder
-    const found = findFolderInTree(folder, folderId)
-    if (found) return found
-  }
-  return null
+  return storeGetFolderById(folderId)
 }
 
-const findFolderInTree = (folder: CustomFolder, folderId: string): CustomFolder | null => {
-  for (const subFolder of folder.folders) {
-    if (subFolder.id === folderId) return subFolder
-    const found = findFolderInTree(subFolder, folderId)
-    if (found) return found
-  }
-  return null
-}
-
-const getCurrentFolders = (): CustomFolder[] => {
-  if (props.currentFolder) {
-    // 如果在資料夾中，返回該資料夾的子資料夾
-    return props.currentFolder.folders
-  } else {
-    // 如果在 Homepage，返回所有資料夾（除了 Homepage 資料夾本身）
-    return props.customFolders.filter((folder) => folder.id !== BIBLE_CONFIG.FOLDER.HOMEPAGE_ID)
-  }
-}
-
-const getCurrentVerses = (): MultiFunctionVerse[] => {
-  if (props.currentFolder) {
-    // 如果在資料夾中，返回該資料夾的經文
-    return props.currentFolder.items
-  } else {
-    // 如果在 Homepage，返回 Homepage 資料夾的經文
-    const homepageFolder = props.customFolders.find(
-      (folder) => folder.id === BIBLE_CONFIG.FOLDER.HOMEPAGE_ID,
-    )
-    return homepageFolder ? homepageFolder.items : []
-  }
-}
-
-const deleteFolder = (folderId: string) => {
+const showDeleteFolderDialog = (folderId: string) => {
   const folder = getFolderById(folderId)
   if (folder) {
     folderToDelete.value = folder
@@ -593,47 +529,18 @@ const deleteFolder = (folderId: string) => {
 
 const confirmDeleteFolder = () => {
   if (folderToDelete.value) {
-    const newFolders = [...props.customFolders]
-    deleteFolderRecursive(newFolders, folderToDelete.value.id)
-    emit('update:customFolders', newFolders)
+    // 使用 store 的 deleteFolder
+    deleteFolder(folderToDelete.value.id)
     showDeleteConfirmDialog.value = false
     folderToDelete.value = null
   }
 }
 
-const deleteFolderRecursive = (folders: CustomFolder[], id: string): boolean => {
-  for (let i = 0; i < folders.length; i++) {
-    const folder = folders[i]
-    if (folder && folder.id === id) {
-      folders.splice(i, 1)
-      return true
-    }
-    if (folder && folder.folders && deleteFolderRecursive(folder.folders, id)) {
-      return true
-    }
-  }
-  return false
-}
+// deleteFolderRecursive 現在由 store 管理，不再需要本地實現
 
 const removeFromCurrentFolder = (itemId: string) => {
-  const newFolders = [...props.customFolders]
-
-  if (props.currentFolder) {
-    // 從當前資料夾中移除
-    updateFolderInTree(newFolders, props.currentFolder.id, (folder) => {
-      folder.items = folder.items.filter((item) => item.id !== itemId)
-    })
-  } else {
-    // 從 Homepage 資料夾中移除
-    const homepageFolder = newFolders.find(
-      (folder) => folder.id === BIBLE_CONFIG.FOLDER.HOMEPAGE_ID,
-    )
-    if (homepageFolder) {
-      homepageFolder.items = homepageFolder.items.filter((item) => item.id !== itemId)
-    }
-  }
-
-  emit('update:customFolders', newFolders)
+  // 使用 store 的 removeVerseFromFolder
+  removeVerseFromFolder(itemId)
 }
 
 const handleDragStart = (
@@ -759,91 +666,19 @@ const handleDrop = (event: DragEvent, targetFolder: CustomFolder) => {
   }
 }
 
-// 移動經文到資料夾
+// 移動經文到資料夾（使用 store 的方法）
 const moveVerseToFolder = (verse: MultiFunctionVerse, targetFolder: CustomFolder) => {
-  const newFolders = [...props.customFolders]
-
-  // 從原位置移除經文
-  if (props.currentFolder) {
-    updateFolderInTree(newFolders, props.currentFolder.id, (folder) => {
-      folder.items = folder.items.filter((item) => item.id !== verse.id)
-    })
-  } else {
-    const homepageFolder = newFolders.find(
-      (folder) => folder.id === BIBLE_CONFIG.FOLDER.HOMEPAGE_ID,
-    )
-    if (homepageFolder) {
-      homepageFolder.items = homepageFolder.items.filter((item) => item.id !== verse.id)
-    }
-  }
-
-  // 添加到目標資料夾
-  updateFolderInTree(newFolders, targetFolder.id, (folder) => {
-    folder.items.push(verse)
-  })
-
-  emit('update:customFolders', newFolders)
+  storeMoveVerseToFolder(verse, targetFolder.id)
 }
 
-// 移動資料夾到另一個資料夾
+// 移動資料夾到另一個資料夾（使用 store 的方法）
 const moveFolderToFolder = (folderToMove: CustomFolder, targetFolder: CustomFolder) => {
   // 防止將資料夾移動到自己內部
   if (isFolderInside(folderToMove, targetFolder)) {
     return
   }
 
-  const newFolders = [...props.customFolders]
-
-  // 從原位置移除資料夾
-  if (props.currentFolder) {
-    updateFolderInTree(newFolders, props.currentFolder.id, (folder) => {
-      folder.folders = folder.folders.filter((f) => f.id !== folderToMove.id)
-    })
-  } else {
-    // 從根目錄移除
-    const index = newFolders.findIndex((f) => f.id === folderToMove.id)
-    if (index !== -1) {
-      newFolders.splice(index, 1)
-    }
-  }
-
-  // 添加到目標資料夾
-  updateFolderInTree(newFolders, targetFolder.id, (folder) => {
-    folderToMove.parentId = targetFolder.id
-    folder.folders.push(folderToMove)
-  })
-
-  emit('update:customFolders', newFolders)
-}
-
-// 檢查資料夾是否在另一個資料夾內部
-const isFolderInside = (folderToMove: CustomFolder, targetFolder: CustomFolder): boolean => {
-  if (folderToMove.id === targetFolder.id) return true
-
-  for (const subFolder of targetFolder.folders) {
-    if (isFolderInside(folderToMove, subFolder)) {
-      return true
-    }
-  }
-
-  return false
-}
-
-const updateFolderInTree = (
-  folders: CustomFolder[],
-  folderId: string,
-  updater: (folder: CustomFolder) => void,
-): boolean => {
-  for (const folder of folders) {
-    if (folder.id === folderId) {
-      updater(folder)
-      return true
-    }
-    if (updateFolderInTree(folder.folders, folderId, updater)) {
-      return true
-    }
-  }
-  return false
+  storeMoveFolderToFolder(folderToMove, targetFolder.id)
 }
 
 // 移動經文相關函數
@@ -892,7 +727,7 @@ const getMoveFolders = (): CustomFolder[] => {
     return selectedMoveFolder.value.folders
   } else {
     // 如果在根目錄（首頁），返回所有資料夾（除了 Homepage）
-    return props.customFolders.filter((folder) => folder.id !== BIBLE_CONFIG.FOLDER.HOMEPAGE_ID)
+    return customFolders.value.filter((folder) => folder.id !== BIBLE_CONFIG.FOLDER.HOMEPAGE_ID)
   }
 }
 
@@ -905,7 +740,7 @@ const canMoveToHomepage = computed(() => {
   if (!verseToMove.value) return false
 
   // 情況1：經文在首頁，想移動到資料夾 - 需要選擇資料夾
-  if (!props.currentFolder) {
+  if (!currentFolder.value) {
     return selectedMoveFolder.value !== null
   }
 
@@ -915,7 +750,7 @@ const canMoveToHomepage = computed(() => {
 
 // 計算當前資料夾深度
 const currentFolderDepth = computed(() => {
-  return props.currentFolderPath.length
+  return currentFolderPath.value.length
 })
 
 // 判斷是否達到最大深度（3層）
@@ -926,50 +761,10 @@ const isMaxDepthReached = computed(() => {
 const confirmMoveVerse = () => {
   if (!verseToMove.value || !canMoveToHomepage.value) return
 
-  const newFolders = [...props.customFolders]
+  // 使用 store 的 moveVerseToFolder
+  const targetFolderId = selectedMoveFolder.value?.id || null
+  storeMoveVerseToFolder(verseToMove.value, targetFolderId)
 
-  // 從原位置移除經文
-  if (props.currentFolder) {
-    // 從當前資料夾中移除
-    updateFolderInTree(newFolders, props.currentFolder.id, (folder) => {
-      folder.items = folder.items.filter((item) => item.id !== verseToMove.value!.id)
-    })
-  } else {
-    // 從 Homepage 資料夾中移除
-    const homepageFolder = newFolders.find(
-      (folder) => folder.id === BIBLE_CONFIG.FOLDER.HOMEPAGE_ID,
-    )
-    if (homepageFolder) {
-      homepageFolder.items = homepageFolder.items.filter(
-        (item) => item.id !== verseToMove.value!.id,
-      )
-    }
-  }
-
-  // 添加到目標位置
-  if (selectedMoveFolder.value) {
-    // 移動到資料夾
-    updateFolderInTree(newFolders, selectedMoveFolder.value.id, (folder) => {
-      folder.items.push(verseToMove.value!)
-    })
-  } else {
-    // 移動到首頁
-    let homepageFolder = newFolders.find((folder) => folder.id === BIBLE_CONFIG.FOLDER.HOMEPAGE_ID)
-    if (!homepageFolder) {
-      // 創建 Homepage 資料夾
-      homepageFolder = {
-        id: BIBLE_CONFIG.FOLDER.HOMEPAGE_ID,
-        name: $t('homepage') || BIBLE_CONFIG.FOLDER.DEFAULT_HOMEPAGE_NAME,
-        expanded: false,
-        items: [],
-        folders: [],
-      }
-      newFolders.push(homepageFolder)
-    }
-    homepageFolder.items.push(verseToMove.value!)
-  }
-
-  emit('update:customFolders', newFolders)
   showMoveVerseDialog.value = false
   verseToMove.value = null
   selectedMoveFolder.value = null
@@ -1022,88 +817,19 @@ const copyItem = () => {
 
 const pasteItem = () => {
   if (copiedItem.value) {
-    const newFolders = [...props.customFolders]
-
     if (copiedItem.value.type === 'verse') {
       // 複製經文
       const verse = copiedItem.value.item as MultiFunctionVerse
-      const newVerse = { ...verse, id: uuidv4() } as MultiFunctionVerse
-
-      if (props.currentFolder) {
-        // 貼到當前資料夾
-        updateFolderInTree(newFolders, props.currentFolder.id, (folder) => {
-          folder.items.push(newVerse)
-        })
-      } else {
-        // 貼到首頁
-        let homepageFolder = newFolders.find(
-          (folder) => folder.id === BIBLE_CONFIG.FOLDER.HOMEPAGE_ID,
-        )
-        if (!homepageFolder) {
-          homepageFolder = {
-            id: BIBLE_CONFIG.FOLDER.HOMEPAGE_ID,
-            name: 'Homepage',
-            expanded: false,
-            items: [],
-            folders: [],
-          }
-          newFolders.push(homepageFolder)
-        }
-        homepageFolder.items.push(newVerse)
-      }
+      storePasteItem(verse)
     } else if (copiedItem.value.type === 'folder') {
       // 複製資料夾
       const folder = copiedItem.value.item as CustomFolder
-      const newFolder = {
-        ...folder,
-        id: uuidv4(),
-        items: [...folder.items],
-        folders: [...folder.folders],
-      }
-
-      if (props.currentFolder) {
-        // 貼到當前資料夾
-        updateFolderInTree(newFolders, props.currentFolder.id, (targetFolder) => {
-          targetFolder.folders.push(newFolder)
-        })
-      } else {
-        // 貼到首頁（根目錄）
-        newFolders.push(newFolder)
-      }
+      storePasteItem(undefined, folder)
     } else if (copiedItem.value.type === 'history') {
       // 複製歷史項目到自訂
       const historyItem = copiedItem.value.item as MultiFunctionVerse
-      const newVerse: MultiFunctionVerse = {
-        ...historyItem,
-        id: uuidv4(),
-        timestamp: Date.now(),
-      }
-
-      if (props.currentFolder) {
-        // 貼到當前資料夾
-        updateFolderInTree(newFolders, props.currentFolder.id, (folder) => {
-          folder.items.push(newVerse)
-        })
-      } else {
-        // 貼到首頁
-        let homepageFolder = newFolders.find(
-          (folder) => folder.id === BIBLE_CONFIG.FOLDER.HOMEPAGE_ID,
-        )
-        if (!homepageFolder) {
-          homepageFolder = {
-            id: BIBLE_CONFIG.FOLDER.HOMEPAGE_ID,
-            name: 'Homepage',
-            expanded: false,
-            items: [],
-            folders: [],
-          }
-          newFolders.push(homepageFolder)
-        }
-        homepageFolder.items.push(newVerse)
-      }
+      storePasteItem(historyItem)
     }
-
-    emit('update:customFolders', newFolders)
   }
   closeContextMenu()
 }
@@ -1191,16 +917,6 @@ onUnmounted(() => {
   background-color: rgba(var(--v-theme-primary), 0.2) !important;
   border: 2px dashed rgba(var(--v-theme-primary), 0.5);
 }
-
-/* .move-folder-item {
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-  border-radius: 4px;
-}
-
-.move-folder-item:hover {
-  background-color: rgba(var(--v-theme-primary), 0.1);
-} */
 
 .selected-target {
   background-color: rgba(var(--v-theme-primary), 0.15) !important;

@@ -1,7 +1,7 @@
 <template>
   <div class="bible-version-selector-wrapper">
     <v-select
-      v-model="selectedVersion"
+      v-model="selectedVersionId"
       :items="bibleVersions"
       item-title="name"
       item-value="id"
@@ -11,13 +11,14 @@
       hide-details
       class="bible-version-selector mr-2"
       :disabled="apiLoading || contentLoading"
+      @update:model-value="(value) => setSelectedVersion(value)"
     >
     </v-select>
 
     <!-- 書卷選擇按鈕 -->
     <v-btn
       variant="outlined"
-      :disabled="!selectedVersion"
+      :disabled="!selectedVersionId"
       @click="showBooksDialog = true"
       :title="$t('bible.title')"
       class="books-btn"
@@ -28,7 +29,7 @@
     <!-- 聖經書卷選擇 Dialog -->
     <BibleBooksDialog
       v-model="showBooksDialog"
-      :version-id="selectedVersion"
+      :version-id="selectedVersionId"
       @select-verse="handleSelectVerse"
     />
   </div>
@@ -42,22 +43,26 @@ import type { BibleVersion, BibleBook } from '@/types/bible'
 import BibleBooksDialog from '@/components/Bible/BibleBooksDialog.vue'
 import { useSentry } from '@/composables/useSentry'
 import { useBasicAuth } from '@/composables/useBasicAuth'
-import { useLocalStorage } from '@/composables/useLocalStorage'
-import { StorageKey, StorageCategory, getStorageKey } from '@/types/common'
 import { useBibleStore } from '@/stores/bible'
+import { storeToRefs } from 'pinia'
 
 const { reportError } = useSentry()
 const { t: $t } = useI18n()
 const { loading: apiLoading, getBibleVersions, getBibleContent } = useAPI()
 const { hasCredentials } = useBasicAuth()
-const { setLocalItem, getLocalItem } = useLocalStorage()
 
-// 使用 Bible Store 的 Cache 功能
+// 使用 Bible Store
 const bibleStore = useBibleStore()
-const { saveBibleContent, getBibleContent: getCachedContent, hasCachedContent } = bibleStore
+const {
+  saveBibleContent,
+  getBibleContent: getCachedContent,
+  hasCachedContent,
+  setSelectedVersion,
+  loadPassage,
+} = bibleStore
+const { selectedVersionId } = storeToRefs(bibleStore)
 
 const bibleVersions = ref<BibleVersion[]>([])
-const selectedVersion = ref<number | null>(null)
 const contentLoading = ref(false)
 const showBooksDialog = ref(false)
 
@@ -67,18 +72,12 @@ const loadBibleVersions = async () => {
     const versions = await getBibleVersions()
     bibleVersions.value = versions
 
-    // 嘗試從 localStorage 讀取已選擇的版本
-    const savedVersion = getLocalItem<number | null>(
-      getStorageKey(StorageCategory.BIBLE, StorageKey.SELECTED_VERSION),
-      'int',
-    )
-
-    // 設定預設選擇第一個版本或已保存的版本
+    // 設定預設選擇第一個版本或已保存的版本（從 store 讀取）
     if (versions.length > 0) {
-      if (savedVersion && versions.find((v) => v.id === savedVersion)) {
-        selectedVersion.value = savedVersion
-      } else if (!selectedVersion.value && versions[0]) {
-        selectedVersion.value = versions[0].id
+      if (selectedVersionId.value && versions.find((v) => v.id === selectedVersionId.value)) {
+        // 已經在 store 中有保存的版本，不需要更新
+      } else if (!selectedVersionId.value && versions[0]) {
+        setSelectedVersion(versions[0].id)
       }
     }
   } catch (error) {
@@ -136,22 +135,16 @@ const loadBibleContentForVersion = async (versionId: number, forceRefresh = fals
   }
 }
 
-// 監聽版本變化
-watch(selectedVersion, async (newVersion) => {
+// 監聽版本變化（使用 store 的 selectedVersionId）
+watch(selectedVersionId, async (newVersion) => {
   if (newVersion) {
-    setLocalItem(getStorageKey(StorageCategory.BIBLE, StorageKey.SELECTED_VERSION), newVersion)
     await loadBibleContentForVersion(newVersion, false)
   }
 })
 
-// 處理經文選擇
+// 處理經文選擇（使用 store 的 loadPassage）
 const handleSelectVerse = (book: BibleBook, chapter: number, verse: number) => {
-  // 發送全局事件給BibleViewer組件
-  window.dispatchEvent(
-    new CustomEvent('bible-verse-selected', {
-      detail: { book, chapter, verse },
-    }),
-  )
+  loadPassage(book, chapter, verse)
 }
 
 // 監聽認證狀態變化，當有認證資訊時才載入聖經版本
@@ -166,9 +159,9 @@ watch(
   { immediate: true }, // 立即執行一次檢查
 )
 
-// 暴露 selectedVersion 供外部使用
+// 暴露 selectedVersion 供外部使用（從 store 讀取）
 defineExpose({
-  selectedVersion: computed(() => selectedVersion.value),
+  selectedVersion: computed(() => selectedVersionId.value),
 })
 </script>
 

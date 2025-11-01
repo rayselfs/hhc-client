@@ -106,3 +106,27 @@ export interface BibleCacheItem {
   content: BibleContent
   timestamp: number
 }
+
+/**
+ * 自訂資料夾接口
+ * 用於管理用戶自訂的經文資料夾結構
+ */
+export interface CustomFolder {
+  id: string
+  name: string
+  expanded: boolean
+  items: MultiFunctionVerse[]
+  folders: CustomFolder[]
+  parentId?: string
+}
+
+/**
+ * 當前選中的經文段落
+ */
+export interface CurrentPassage {
+  bookAbbreviation: string
+  bookName: string
+  bookNumber: number
+  chapter: number
+  verse: number
+}
