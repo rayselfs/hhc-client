@@ -35,8 +35,8 @@
           <v-divider />
 
           <v-card-text
-            class="bible-content-wrapper pl-3 pr-3"
-            :style="{ height: `${leftCardHeight - 80}px` }"
+            class="bible-content-wrapper pl-2 pr-2 pa-0"
+            :style="{ height: `${leftCardHeight - 48}px` }"
           >
             <div class="bible-content">
               <div
@@ -74,7 +74,6 @@
           <!-- Multi Function Control -->
           <v-col cols="12" class="mb-4" :style="{ height: `${rightTopCardHeight}px` }">
             <MultiFunctionControl
-              v-model:history-verses="historyVerses"
               v-model:custom-folders="customFolders"
               v-model:current-folder-path="currentFolderPath"
               v-model:current-folder="currentFolder"
@@ -196,6 +195,7 @@ import { useElectron } from '@/composables/useElectron'
 import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
 import { useBibleCache } from '@/composables/useBibleCache'
 import { useProjectionStore } from '@/stores/projection'
+import { useBibleStore } from '@/stores/bible'
 import { APP_CONFIG } from '@/config/app'
 import { MessageType, ViewType } from '@/types/common'
 import { useSentry } from '@/composables/useSentry'
@@ -252,18 +252,20 @@ const getInitialFontSize = () => {
 const fontSize = ref(getInitialFontSize())
 
 // 歷史記錄
-import type { Verse } from '@/types/verse'
+import type { MultiFunctionVerse } from '@/types/bible'
 import { BIBLE_CONFIG } from '@/config/app'
 import { StorageKey, StorageCategory, getStorageKey } from '@/types/common'
 
-const historyVerses = ref<Verse[]>([])
+// 使用 store 管理歷史記錄
+const bibleStore = useBibleStore()
+const { addToHistory: addVerseToHistory } = bibleStore
 
 // 自訂資料夾
 interface CustomFolder {
   id: string
   name: string
   expanded: boolean
-  items: Verse[]
+  items: MultiFunctionVerse[]
   folders: CustomFolder[]
   parentId?: string
 }
@@ -362,7 +364,17 @@ const addToHistory = (verseNumber: number) => {
 
   const verseText = chapterVerses.value.find((v) => v.number === verseNumber)?.text || ''
 
-  const newHistoryItem: Verse = {
+  // ignore the same chapter
+  const lastHistory = bibleStore.historyVerses[0]
+  if (
+    lastHistory &&
+    lastHistory.bookNumber === currentPassage.value.bookNumber &&
+    lastHistory.chapter === currentPassage.value.chapter
+  ) {
+    return
+  }
+
+  const newHistoryItem: MultiFunctionVerse = {
     id: crypto.randomUUID(),
     bookName: currentPassage.value.bookName,
     bookAbbreviation: currentPassage.value.bookAbbreviation,
@@ -373,37 +385,8 @@ const addToHistory = (verseNumber: number) => {
     timestamp: Date.now(),
   }
 
-  // ignore the same chapter
-  const lastHistory = historyVerses.value[0]
-  if (
-    lastHistory &&
-    lastHistory.bookNumber === newHistoryItem.bookNumber &&
-    lastHistory.chapter === newHistoryItem.chapter
-  ) {
-    return
-  }
-
-  // update the same chapter
-  const existingIndex = historyVerses.value.findIndex(
-    (item) =>
-      item.bookNumber === newHistoryItem.bookNumber &&
-      item.chapter === newHistoryItem.chapter &&
-      item.verse === newHistoryItem.verse,
-  )
-  if (existingIndex !== -1) {
-    historyVerses.value.splice(existingIndex, 1)
-  }
-
-  // add new history item to the top
-  historyVerses.value.unshift(newHistoryItem)
-
-  // limit the history items
-  if (historyVerses.value.length > 50) {
-    historyVerses.value.shift()
-  }
-
-  // 保存到 localStorage
-  saveHistoryToStorage()
+  // 使用 store 的 addToHistory，它會自動處理重複和數量限制
+  addVerseToHistory(newHistoryItem)
 }
 
 // 點擊選擇經文
@@ -576,7 +559,7 @@ const updateProjectionFontSize = () => {
 }
 
 // 歷史記錄相關函數
-const loadVerse = async (item: Verse, type: 'history' | 'custom') => {
+const loadVerse = async (item: MultiFunctionVerse, type: 'history' | 'custom') => {
   try {
     // 獲取當前選中的版本
     const savedVersion = getLocalItem<number>(
@@ -605,31 +588,13 @@ const loadVerse = async (item: Verse, type: 'history' | 'custom') => {
   }
 }
 
-const saveHistoryToStorage = () => {
-  setLocalItem(
-    getStorageKey(StorageCategory.BIBLE, StorageKey.CURRENT_PASSAGE),
-    historyVerses.value,
-    'array',
-  )
-}
-
-const loadHistoryFromStorage = () => {
-  const saved = getLocalItem<Verse[]>(
-    getStorageKey(StorageCategory.BIBLE, StorageKey.CURRENT_PASSAGE),
-    'array',
-  )
-  if (saved) {
-    historyVerses.value = saved
-  }
-}
-
 const addVerseToCustom = (verseNumber: number) => {
   if (!currentPassage.value) return
 
   // 獲取經文內容
   const verseText = chapterVerses.value.find((v) => v.number === verseNumber)?.text || ''
 
-  const newVerse: Verse = {
+  const newVerse: MultiFunctionVerse = {
     id: crypto.randomUUID(),
     bookName: currentPassage.value.bookName,
     bookAbbreviation: currentPassage.value.bookAbbreviation,
@@ -802,8 +767,7 @@ watch(
 
 // 監聽來自ExtendedToolbar的事件（通過全局事件或props）
 onMounted(() => {
-  // 載入儲存的數據
-  loadHistoryFromStorage()
+  // 載入儲存的數據（只有 customFolders 需要持久化，history 使用 store 管理）
   loadCustomFromStorage()
 
   // 監聽經文選擇事件

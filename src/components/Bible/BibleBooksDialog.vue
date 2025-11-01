@@ -1,6 +1,6 @@
 <template>
   <v-dialog v-model="dialogVisible" max-width="840px" content-class="dialog-top">
-    <v-card>
+    <v-card :min-height="`calc(100vh - 48px)`">
       <v-card-title
         class="text-h5 d-flex align-center justify-space-between pb-3 pt-3 sticky-header"
       >
@@ -394,6 +394,7 @@ const closeDialog = () => {
 
 .search-field {
   transition: all 0.3s ease;
+  height: 28px;
 }
 
 .search-field :deep(.v-field__input) {

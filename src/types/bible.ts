@@ -72,3 +72,18 @@ export interface StreamingProgress {
   onError?: (error: string) => void
   onTimeout?: () => void
 }
+
+/**
+ * 多功能組件使用的經文介面
+ * 用於歷史記錄和自訂資料夾中的經文項目
+ */
+export interface MultiFunctionVerse {
+  id: string
+  bookName: string
+  bookAbbreviation: string
+  bookNumber: number
+  chapter: number
+  verse: number
+  verseText: string
+  timestamp: number
+}

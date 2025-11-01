@@ -42,16 +42,28 @@
           </span>
         </div>
       </div>
-      <v-btn
-        v-if="multiFunctionTab === 'custom'"
-        variant="text"
-        icon
-        @click="createNewFolder"
-        :disabled="isMaxDepthReached"
-        :title="$t('newFolder')"
-      >
-        <v-icon>mdi-folder-plus</v-icon>
-      </v-btn>
+      <div class="d-flex align-center">
+        <v-btn
+          v-if="multiFunctionTab === 'history'"
+          variant="text"
+          icon
+          @click="clearHistory"
+          :disabled="historyVerses.length === 0"
+          :title="$t('delete')"
+        >
+          <v-icon>mdi-delete-sweep</v-icon>
+        </v-btn>
+        <v-btn
+          v-if="multiFunctionTab === 'custom'"
+          variant="text"
+          icon
+          @click="createNewFolder"
+          :disabled="isMaxDepthReached"
+          :title="$t('newFolder')"
+        >
+          <v-icon>mdi-folder-plus</v-icon>
+        </v-btn>
+      </div>
     </v-card-title>
 
     <v-divider />
@@ -59,7 +71,7 @@
     <v-card-text
       class="pa-0"
       :style="{
-        height: props.containerHeight ? `${props.containerHeight - 60}px` : 'calc(100% - 60px)',
+        height: props.containerHeight ? `${props.containerHeight - 48}px` : 'calc(100% - 48px)',
         overflowY: 'auto',
       }"
       @contextmenu="handleCardTextRightClick"
@@ -368,11 +380,13 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { v4 as uuidv4 } from 'uuid'
-import type { Verse } from '@/types/verse'
+import type { MultiFunctionVerse } from '@/types/bible'
 import { BIBLE_CONFIG } from '@/config/app'
 import { useSentry } from '@/composables/useSentry'
+import { useBibleStore } from '@/stores/bible'
 
 const { t: $t } = useI18n()
 
@@ -384,14 +398,13 @@ interface CustomFolder {
   id: string
   name: string
   expanded: boolean
-  items: Verse[]
+  items: MultiFunctionVerse[]
   folders: CustomFolder[]
   parentId?: string
 }
 
 // Props
 interface Props {
-  historyVerses: Verse[]
   customFolders: CustomFolder[]
   currentFolderPath: string[]
   currentFolder: CustomFolder | null
@@ -400,15 +413,18 @@ interface Props {
 
 // Emits
 interface Emits {
-  (e: 'update:historyVerses', value: Verse[]): void
   (e: 'update:customFolders', value: CustomFolder[]): void
   (e: 'update:currentFolderPath', value: string[]): void
   (e: 'update:currentFolder', value: CustomFolder | null): void
-  (e: 'load-verse', item: Verse, type: 'history' | 'custom'): void
+  (e: 'load-verse', item: MultiFunctionVerse, type: 'history' | 'custom'): void
 }
 
 const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
+
+// Bible store - 直接在組件內使用 store 管理歷史記錄
+const bibleStore = useBibleStore()
+const { historyVerses } = storeToRefs(bibleStore)
 
 // 狀態
 const multiFunctionTab = ref('history')
@@ -428,20 +444,20 @@ const contextMenuX = ref(0)
 const contextMenuY = ref(0)
 const selectedItem = ref<{
   type: 'verse' | 'folder' | 'history'
-  item: Verse | CustomFolder
+  item: MultiFunctionVerse | CustomFolder
 } | null>(null)
 
 // 複製/貼上相關
 const copiedItem = ref<{
   type: 'verse' | 'folder' | 'history'
-  item: Verse | CustomFolder
+  item: MultiFunctionVerse | CustomFolder
 } | null>(null)
 
 // 移動經文相關狀態
 const showMoveVerseDialog = ref(false)
 const moveBreadcrumb = ref<string[]>([])
 const selectedMoveFolder = ref<CustomFolder | null>(null)
-const verseToMove = ref<Verse | null>(null)
+const verseToMove = ref<MultiFunctionVerse | null>(null)
 const isHomepageSelected = ref(false)
 
 // 刪除確認對話框狀態
@@ -450,12 +466,14 @@ const folderToDelete = ref<CustomFolder | null>(null)
 
 // 歷史記錄相關函數
 const removeHistoryItem = (index: number) => {
-  const newHistory = [...props.historyVerses]
-  newHistory.splice(index, 1)
-  emit('update:historyVerses', newHistory)
+  historyVerses.value.splice(index, 1)
 }
 
-const loadVerse = (item: Verse, type: 'history' | 'custom') => {
+const clearHistory = () => {
+  bibleStore.clearHistory()
+}
+
+const loadVerse = (item: MultiFunctionVerse, type: 'history' | 'custom') => {
   emit('load-verse', item, type)
 }
 
@@ -552,7 +570,7 @@ const getCurrentFolders = (): CustomFolder[] => {
   }
 }
 
-const getCurrentVerses = (): Verse[] => {
+const getCurrentVerses = (): MultiFunctionVerse[] => {
   if (props.currentFolder) {
     // 如果在資料夾中，返回該資料夾的經文
     return props.currentFolder.items
@@ -621,7 +639,7 @@ const removeFromCurrentFolder = (itemId: string) => {
 const handleDragStart = (
   event: DragEvent,
   type: 'verse' | 'folder',
-  item: Verse | CustomFolder,
+  item: MultiFunctionVerse | CustomFolder,
 ) => {
   if (event.dataTransfer) {
     // 設置拖移數據
@@ -647,7 +665,7 @@ const handleDragStart = (
 // 創建拖移時的視覺效果
 const createDragImage = (
   type: 'verse' | 'folder',
-  item: Verse | CustomFolder,
+  item: MultiFunctionVerse | CustomFolder,
 ): HTMLElement | null => {
   const dragImage = document.createElement('div')
   dragImage.style.position = 'absolute'
@@ -663,7 +681,7 @@ const createDragImage = (
   dragImage.style.fontWeight = '500'
 
   if (type === 'verse') {
-    const verse = item as Verse
+    const verse = item as MultiFunctionVerse
     dragImage.innerHTML = `
       <div style="display: flex; align-items: center; gap: 8px;">
         <span style="background-color: rgb(var(--v-theme-primary)); color: white; padding: 2px 6px; border-radius: 12px; font-size: 12px; font-weight: 500;">
@@ -729,7 +747,7 @@ const handleDrop = (event: DragEvent, targetFolder: CustomFolder) => {
     const { type, item } = data
 
     if (type === 'verse') {
-      moveVerseToFolder(item as Verse, targetFolder)
+      moveVerseToFolder(item as MultiFunctionVerse, targetFolder)
     } else if (type === 'folder') {
       moveFolderToFolder(item as CustomFolder, targetFolder)
     }
@@ -742,7 +760,7 @@ const handleDrop = (event: DragEvent, targetFolder: CustomFolder) => {
 }
 
 // 移動經文到資料夾
-const moveVerseToFolder = (verse: Verse, targetFolder: CustomFolder) => {
+const moveVerseToFolder = (verse: MultiFunctionVerse, targetFolder: CustomFolder) => {
   const newFolders = [...props.customFolders]
 
   // 從原位置移除經文
@@ -829,7 +847,7 @@ const updateFolderInTree = (
 }
 
 // 移動經文相關函數
-const showMoveDialog = (item: Verse) => {
+const showMoveDialog = (item: MultiFunctionVerse) => {
   verseToMove.value = item
   moveBreadcrumb.value = []
   selectedMoveFolder.value = null
@@ -963,7 +981,7 @@ const confirmMoveVerse = () => {
 const handleRightClick = (
   event: MouseEvent,
   type: 'verse' | 'folder' | 'history',
-  item: Verse | CustomFolder,
+  item: MultiFunctionVerse | CustomFolder,
 ) => {
   event.preventDefault()
   event.stopPropagation()
@@ -1008,8 +1026,8 @@ const pasteItem = () => {
 
     if (copiedItem.value.type === 'verse') {
       // 複製經文
-      const verse = copiedItem.value.item as Verse
-      const newVerse = { ...verse, id: uuidv4() }
+      const verse = copiedItem.value.item as MultiFunctionVerse
+      const newVerse = { ...verse, id: uuidv4() } as MultiFunctionVerse
 
       if (props.currentFolder) {
         // 貼到當前資料夾
@@ -1054,8 +1072,8 @@ const pasteItem = () => {
       }
     } else if (copiedItem.value.type === 'history') {
       // 複製歷史項目到自訂
-      const historyItem = copiedItem.value.item as Verse
-      const newVerse: Verse = {
+      const historyItem = copiedItem.value.item as MultiFunctionVerse
+      const newVerse: MultiFunctionVerse = {
         ...historyItem,
         id: uuidv4(),
         timestamp: Date.now(),
@@ -1094,7 +1112,7 @@ const moveItem = () => {
   if (selectedItem.value) {
     if (selectedItem.value.type === 'verse') {
       // 使用現有的移動功能
-      showMoveDialog(selectedItem.value.item as Verse)
+      showMoveDialog(selectedItem.value.item as MultiFunctionVerse)
     } else if (selectedItem.value.type === 'folder') {
       // 資料夾移動功能（暫時使用刪除確認對話框）
       showDeleteConfirmDialog.value = true
@@ -1111,19 +1129,17 @@ const moveItem = () => {
 const deleteItem = () => {
   if (selectedItem.value) {
     if (selectedItem.value.type === 'verse') {
-      const verse = selectedItem.value.item as Verse
+      const verse = selectedItem.value.item as MultiFunctionVerse
       removeFromCurrentFolder(verse.id)
     } else if (selectedItem.value.type === 'folder') {
       const folder = selectedItem.value.item as CustomFolder
       deleteFolder(folder.id)
     } else if (selectedItem.value.type === 'history') {
       // 刪除歷史項目
-      const historyItem = selectedItem.value.item as Verse
-      const index = props.historyVerses.findIndex((item) => item.id === historyItem.id)
+      const historyItem = selectedItem.value.item as MultiFunctionVerse
+      const index = historyVerses.value.findIndex((item) => item.id === historyItem.id)
       if (index !== -1) {
-        const newHistoryVerses = [...props.historyVerses]
-        newHistoryVerses.splice(index, 1)
-        emit('update:historyVerses', newHistoryVerses)
+        historyVerses.value.splice(index, 1)
       }
     }
   }
