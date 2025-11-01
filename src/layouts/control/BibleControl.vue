@@ -197,7 +197,7 @@ interface BiblePassage {
   versionId?: number
 }
 
-interface BibleVerse {
+interface PreviewVerse {
   number: number
   text: string
 }
@@ -224,7 +224,7 @@ const { leftCardHeight, rightTopCardHeight, rightBottomCardHeight } = useCardLay
 
 // 當前選中的經文
 const currentPassage = ref<BiblePassage | null>(null)
-const chapterVerses = ref<BibleVerse[]>([])
+const chapterVerses = ref<PreviewVerse[]>([])
 const shouldScrollToVerse = ref(false)
 const currentBookData = ref<{
   code?: string
