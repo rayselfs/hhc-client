@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { TimerMode } from '@/types/common'
 import { useMemoryManager } from '@/utils/memoryManager'
 import { TIMER_CONFIG, getTimerDefaultSettings } from '@/config/app'
@@ -160,6 +160,8 @@ export const useTimerStore = defineStore('timer', () => {
   const setMode = (mode: TimerMode) => {
     settings.value.mode = mode
     saveSettings()
+    // 模式改變時立即更新投影
+    sendTimerUpdate()
   }
 
   const setTimerDuration = (duration: number) => {
@@ -205,6 +207,8 @@ export const useTimerStore = defineStore('timer', () => {
   const setTimezone = (timezone: string) => {
     settings.value.timezone = timezone
     saveSettings()
+    // 時區改變時立即更新投影
+    sendTimerUpdate()
   }
 
   // State machine methods
@@ -217,10 +221,14 @@ export const useTimerStore = defineStore('timer', () => {
     if (settings.value.mode === 'clock' || settings.value.mode === 'both') {
       settings.value.startTime = new Date()
     }
+    // 用戶操作時立即更新投影
+    sendTimerUpdate()
   }
 
   const pauseTimer = () => {
     if (state.value === 'running') state.value = 'paused'
+    // 用戶操作時立即更新投影
+    sendTimerUpdate()
   }
 
   const resetTimer = () => {
@@ -228,10 +236,14 @@ export const useTimerStore = defineStore('timer', () => {
     settings.value.remainingTime = settings.value.originalDuration
     settings.value.timerDuration = settings.value.originalDuration
     settings.value.startTime = undefined
+    // 用戶操作時立即更新投影
+    sendTimerUpdate()
   }
 
   const resumeTimer = () => {
     if (state.value === 'paused') state.value = 'running'
+    // 用戶操作時立即更新投影
+    sendTimerUpdate()
   }
 
   const tick = () => {
@@ -241,6 +253,51 @@ export const useTimerStore = defineStore('timer', () => {
         settings.value.remainingTime = 0
         state.value = 'stopped'
       }
+    }
+  }
+
+  // 全局計時器循環
+  let timerInterval: number | undefined
+
+  /**
+   * 啟動全局計時器循環
+   * 每秒執行一次 tick，並智能判斷是否需要發送投影更新
+   */
+  const startTimerLoop = () => {
+    // 防止重複啟動
+    if (timerInterval) {
+      return
+    }
+
+    timerInterval = window.setInterval(() => {
+      const wasRunning = state.value === 'running'
+      const wasRemainingTime = settings.value.remainingTime
+
+      // 執行 tick 更新計時器狀態
+      tick()
+
+      // 智能判斷是否需要發送投影更新：
+      // 1. 計時器正在運行且時間有變化
+      // 2. 計時器剛結束（從運行變為停止）
+      // 3. 剩餘時間為 0（確保結束狀態被發送）
+      const shouldUpdate =
+        (wasRunning && settings.value.remainingTime !== wasRemainingTime) ||
+        (wasRunning && state.value !== 'running') ||
+        (settings.value.remainingTime === 0 && wasRemainingTime > 0)
+
+      if (shouldUpdate) {
+        sendTimerUpdate() // 使用智能更新，不強制
+      }
+    }, 1000)
+  }
+
+  /**
+   * 停止全局計時器循環
+   */
+  const stopTimerLoop = () => {
+    if (timerInterval) {
+      clearInterval(timerInterval)
+      timerInterval = undefined
     }
   }
 
@@ -284,14 +341,20 @@ export const useTimerStore = defineStore('timer', () => {
     )
   }
 
-  // Side Effect: Automatically update projection when state changes
-  watch(
-    [settings, state],
-    () => {
-      sendTimerUpdate(true)
-    },
-    { deep: true },
-  )
+  // 包裝 cleanup 函數，確保清理計時器循環
+  const cleanupTimerStore = () => {
+    // 停止計時器循環
+    stopTimerLoop()
+    // 調用原有的 cleanup 清理其他資源
+    cleanup()
+  }
+
+  // 監聽頁面卸載事件，確保計時器被清理
+  if (typeof window !== 'undefined') {
+    window.addEventListener('beforeunload', () => {
+      stopTimerLoop()
+    })
+  }
 
   // Initialization
   loadPresets()
@@ -325,7 +388,11 @@ export const useTimerStore = defineStore('timer', () => {
     applyPreset,
     deletePreset,
 
+    // Timer Loop Management
+    startTimerLoop,
+    stopTimerLoop,
+
     // Memory Management
-    cleanup,
+    cleanup: cleanupTimerStore,
   }
 })

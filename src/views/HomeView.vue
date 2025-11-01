@@ -47,6 +47,51 @@
       @confirm="handleAuthConfirm"
       @cancel="handleAuthCancel"
     />
+
+    <!-- Global Alert Dialog -->
+    <AlertDialog
+      v-model="alertState.show"
+      :title="alertState.title"
+      :message="alertState.message"
+      :icon="alertState.icon"
+      :icon-color="alertState.iconColor"
+      :confirm-button-text="alertState.confirmButtonText"
+      :confirm-button-color="alertState.confirmButtonColor"
+      :cancel-button-text="alertState.cancelButtonText"
+      :cancel-button-color="alertState.cancelButtonColor"
+      :show-cancel-button="alertState.showCancelButton"
+      :max-width="alertState.maxWidth"
+      :show-dont-show-again="alertState.showDontShowAgain"
+      :alert-id="alertState.alertId"
+      @confirm="confirm"
+      @cancel="cancel"
+      @dont-show-again="handleDontShowAgain"
+    />
+
+    <!-- Update Notification -->
+    <UpdateNotification />
+
+    <!-- Global SnackBar -->
+    <SnackBar
+      v-model="snackbarVisible"
+      :text="snackbarText"
+      :timeout="snackbarTimeout"
+      :color="snackbarColor"
+      :location="defaultConfig.location"
+      :variant="defaultConfig.variant"
+    />
+
+    <!-- Global Settings Dialog -->
+    <SettingsDialog />
+
+    <!-- Global Shortcuts Dialog -->
+    <ShortcutsDialog />
+
+    <!-- Global About Dialog -->
+    <AboutDialog />
+
+    <!-- Global Reset Dialog -->
+    <ResetDialog />
   </v-layout>
 </template>
 
@@ -60,6 +105,10 @@ import FloatingTimer from '@/components/Timer/FloatingTimer.vue'
 import { BasicAuthDialog } from '@/components/Main'
 import { useElectron } from '@/composables/useElectron'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
+import { AlertDialog, SnackBar } from '@/components/Alert'
+import { UpdateNotification } from '@/components/Updater'
+import { SettingsDialog, AboutDialog, ResetDialog } from '@/components/Main'
+import { ShortcutsDialog } from '@/components/Shortcuts'
 import { useAlert } from '@/composables/useAlert'
 import { useSnackBar } from '@/composables/useSnackBar'
 import { useBasicAuth } from '@/composables/useBasicAuth'
@@ -68,56 +117,26 @@ import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
 import { MessageType, ViewType, type AppMessage } from '@/types/common'
 import { useSentry } from '@/composables/useSentry'
 import { useProjectionStore } from '@/stores/projection'
+import { getInitialLocale } from '@/composables/useLocaleDetection'
 
 // Composable
-const { t: $t } = useI18n()
+const { t: $t, locale } = useI18n()
 const { reportError } = useSentry()
-const { warning } = useAlert()
-const { showSnackBar } = useSnackBar()
-const { sendTimerUpdate, sendViewChange } = useProjectionMessaging()
+const { alertState, confirm, cancel, handleDontShowAgain, warning } = useAlert()
+const {
+  snackbarVisible,
+  snackbarText,
+  snackbarColor,
+  snackbarTimeout,
+  defaultConfig,
+  showSnackBar,
+} = useSnackBar()
+const { sendViewChange } = useProjectionMessaging()
 const { showAuthDialog, saveCredentials, hasCredentials } = useBasicAuth()
 
 // Store
 const timerStore = useTimerStore()
 const projectionStore = useProjectionStore()
-
-// 全局計時器間隔
-let globalTimerInterval: number | undefined
-
-// 啟動全局計時器間隔
-const startGlobalTimerInterval = () => {
-  if (globalTimerInterval) {
-    clearInterval(globalTimerInterval)
-  }
-
-  globalTimerInterval = window.setInterval(() => {
-    const wasRunning = timerStore.isRunning
-    const wasRemainingTime = timerStore.settings.remainingTime
-
-    timerStore.tick()
-
-    // 只在以下情況發送投影更新：
-    // 1. 計時器正在運行且時間有變化
-    // 2. 計時器剛結束（從運行變為停止）
-    // 3. 剩餘時間為 0（確保結束狀態被發送）
-    const shouldUpdate =
-      (wasRunning && timerStore.settings.remainingTime !== wasRemainingTime) ||
-      (wasRunning && !timerStore.isRunning) ||
-      (timerStore.settings.remainingTime === 0 && wasRemainingTime > 0)
-
-    if (shouldUpdate) {
-      sendTimerUpdate() // 使用智能更新，不強制
-    }
-  }, 1000)
-}
-
-// 停止全局計時器間隔
-const stopGlobalTimerInterval = () => {
-  if (globalTimerInterval) {
-    clearInterval(globalTimerInterval)
-    globalTimerInterval = undefined
-  }
-}
 
 // Electron composable
 const {
@@ -241,8 +260,12 @@ watch(currentView, async () => {})
 
 // 生命週期
 onMounted(async () => {
-  // 啟動全局計時器間隔
-  startGlobalTimerInterval()
+  // 初始化語系偵測
+  const initialLocale = await getInitialLocale()
+  locale.value = initialLocale
+
+  // 啟動全局計時器循環（只在主視圖中啟動，投影視圖不需要）
+  timerStore.startTimerLoop()
 
   // 檢查認證狀態，沒有認證則顯示對話框
   if (!hasCredentials.value) {
@@ -262,9 +285,6 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
-  // 停止全局計時器間隔
-  stopGlobalTimerInterval()
-
   if (isElectron()) {
     removeAllListeners('main-message')
     removeAllListeners('no-second-screen-detected')

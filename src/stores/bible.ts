@@ -5,10 +5,7 @@ import { BibleCacheConfig } from '@/types/bible'
 import { useIndexedDB } from '@/composables/useIndexedDB'
 
 export const useBibleStore = defineStore('bible', () => {
-  // History verses - 不持久化，重開 app 就消失
   const historyVerses = ref<MultiFunctionVerse[]>([])
-
-  // 使用通用的 IndexedDB
   const bibleCacheDB = useIndexedDB({
     dbName: BibleCacheConfig.DB_NAME as string,
     version: BibleCacheConfig.DB_VERSION as number,
@@ -21,10 +18,10 @@ export const useBibleStore = defineStore('bible', () => {
   })
 
   /**
-   * 添加經文到歷史記錄
+   * Add verse to history
    */
   const addToHistory = (verse: MultiFunctionVerse) => {
-    // 檢查是否已存在相同的記錄（同一章節）
+    // Check if the verse already exists in the history
     const existingIndex = historyVerses.value.findIndex(
       (item) =>
         item.bookNumber === verse.bookNumber &&
@@ -33,32 +30,32 @@ export const useBibleStore = defineStore('bible', () => {
     )
 
     if (existingIndex !== -1) {
-      // 如果已存在，移除舊的記錄
+      // If it already exists, remove the old record
       historyVerses.value.splice(existingIndex, 1)
     }
 
-    // 添加新記錄到開頭
+    // Add new record to the beginning
     historyVerses.value.unshift(verse)
 
-    // 限制歷史記錄數量（最多 50 條）
+    // Limit the history record count (maximum 50 records)
     if (historyVerses.value.length > 50) {
       historyVerses.value.shift()
     }
   }
 
   /**
-   * 清空歷史記錄
+   * Clear history
    */
   const clearHistory = () => {
     historyVerses.value = []
   }
 
   /**
-   * 儲存聖經內容到 IndexedDB
-   * @param versionId - 版本 ID
-   * @param versionCode - 版本代碼
-   * @param versionName - 版本名稱
-   * @param content - 聖經內容
+   * Save Bible content to IndexedDB
+   * @param versionId - version ID
+   * @param versionCode - version code
+   * @param versionName - version name
+   * @param content - Bible content
    */
   const saveBibleContent = async (
     versionId: number,
@@ -76,9 +73,9 @@ export const useBibleStore = defineStore('bible', () => {
   }
 
   /**
-   * 從 IndexedDB 讀取聖經內容
-   * @param versionId - 版本 ID
-   * @returns 聖經內容，如果不存在則返回 null
+   * Get Bible content from IndexedDB
+   * @param versionId - version ID
+   * @returns Bible content, if not exists, return null
    */
   const getBibleContent = async (versionId: number): Promise<BibleContent | null> => {
     const cached = await bibleCacheDB.get<BibleCacheItem>(BibleCacheConfig.STORE_NAME, versionId)
@@ -86,9 +83,9 @@ export const useBibleStore = defineStore('bible', () => {
   }
 
   /**
-   * 檢查特定版本的聖經內容是否已快取
-   * @param versionId - 版本 ID
-   * @returns 是否已快取
+   * Check if the Bible content for a specific version is cached
+   * @param versionId - version ID
+   * @returns true if cached, false otherwise
    */
   const hasCachedContent = async (versionId: number): Promise<boolean> => {
     return await bibleCacheDB.has(BibleCacheConfig.STORE_NAME, versionId)
