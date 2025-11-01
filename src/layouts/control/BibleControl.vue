@@ -73,7 +73,13 @@
         <v-row no-gutters class="fill-height">
           <!-- Multi Function Control -->
           <v-col cols="12" class="mb-4" :style="{ height: `${rightTopCardHeight}px` }">
-            <MultiFunctionControl :container-height="rightTopCardHeight" @load-verse="loadVerse" />
+            <MultiFunctionControl
+              v-model:custom-folders="customFolders"
+              v-model:current-folder-path="currentFolderPath"
+              v-model:current-folder="currentFolder"
+              :container-height="rightTopCardHeight"
+              @load-verse="loadVerse"
+            />
           </v-col>
 
           <!-- Projection Control -->
@@ -189,14 +195,12 @@ import { useElectron } from '@/composables/useElectron'
 import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
 import { useProjectionStore } from '@/stores/projection'
 import { useBibleStore } from '@/stores/bible'
-import { APP_CONFIG, BIBLE_CONFIG } from '@/config/app'
-import { MessageType, ViewType, StorageKey, StorageCategory, getStorageKey } from '@/types/common'
+import { APP_CONFIG } from '@/config/app'
+import { MessageType, ViewType } from '@/types/common'
 import { useSentry } from '@/composables/useSentry'
 import { useCardLayout } from '@/composables/useLayout'
 import { useLocalStorage } from '@/composables/useLocalStorage'
 import MultiFunctionControl from '@/components/Bible/MultiFunctionControl.vue'
-import type { MultiFunctionVerse, BibleBook } from '@/types/bible'
-import { storeToRefs } from 'pinia'
 
 interface BiblePassage {
   bookAbbreviation: string
@@ -220,17 +224,16 @@ const { sendToProjection } = useElectron()
 const { reportError } = useSentry()
 const { getLocalItem, setLocalItem } = useLocalStorage()
 
-// 使用 Bible Store
+// 使用 Bible Store（包含 Cache 和 History 功能）
 const bibleStore = useBibleStore()
-const { getBibleContent, addToHistory: addVerseToHistory, addVerseToFolder } = bibleStore
-const { selectedVersionId, currentPassage: storeCurrentPassage } = storeToRefs(bibleStore)
+const { getBibleContent, addToHistory: addVerseToHistory } = bibleStore
 
 const { leftCardHeight, rightTopCardHeight, rightBottomCardHeight } = useCardLayout({
   minHeight: APP_CONFIG.UI.MIN_CARD_HEIGHT,
   topCardRatio: 0.7,
 })
 
-// 當前選中的經文（本地狀態，用於顯示）
+// 當前選中的經文
 const currentPassage = ref<BiblePassage | null>(null)
 const chapterVerses = ref<BibleVerse[]>([])
 const shouldScrollToVerse = ref(false)
@@ -251,15 +254,42 @@ const getInitialFontSize = () => {
 }
 const fontSize = ref(getInitialFontSize())
 
+// 歷史記錄
+import type { MultiFunctionVerse } from '@/types/bible'
+import { BIBLE_CONFIG } from '@/config/app'
+import { StorageKey, StorageCategory, getStorageKey } from '@/types/common'
+
+// 自訂資料夾
+interface CustomFolder {
+  id: string
+  name: string
+  expanded: boolean
+  items: MultiFunctionVerse[]
+  folders: CustomFolder[]
+  parentId?: string
+}
+
+const customFolders = ref<CustomFolder[]>([])
+const currentFolderPath = ref<string[]>([]) // 當前資料夾路徑
+const currentFolder = ref<CustomFolder | null>(null) // 當前所在的資料夾
+
 // 右鍵選單相關
 const showContextMenu = ref(false)
 const contextMenuX = ref(0)
 const contextMenuY = ref(0)
 const selectedVerse = ref<{ number: number; text: string } | null>(null)
 
-// 監聽來自 store 的經文選擇事件
-const handleVerseSelection = (book: BibleBook, chapter: number, verse: number) => {
-  // 更新本地狀態（用於顯示）
+// 監聽來自父組件的經文選擇事件
+const handleVerseSelection = (
+  book: {
+    abbreviation?: string
+    number: number
+    name: string
+    chapters: Array<{ number: number; verses: Array<{ number: number; text: string }> }>
+  },
+  chapter: number,
+  verse: number,
+) => {
   currentPassage.value = {
     bookAbbreviation: book.abbreviation || '',
     bookName: book.name,
@@ -269,20 +299,12 @@ const handleVerseSelection = (book: BibleBook, chapter: number, verse: number) =
   }
 
   // 存儲當前書卷數據
-  currentBookData.value = {
-    code: book.abbreviation,
-    number: book.number,
-    name: book.name,
-    chapters: book.chapters.map((ch) => ({
-      number: ch.number,
-      verses: ch.verses.map((v) => ({ number: v.number, text: v.text })),
-    })),
-  }
+  currentBookData.value = book
 
   // 從選中的書卷中獲取真實的經文內容
   const selectedChapter = book.chapters.find((ch) => ch.number === chapter)
   if (selectedChapter) {
-    chapterVerses.value = selectedChapter.verses.map((v) => ({
+    chapterVerses.value = selectedChapter.verses.map((v: { number: number; text: string }) => ({
       number: v.number,
       text: v.text,
     }))
@@ -549,8 +571,11 @@ const updateProjectionFontSize = () => {
 // 歷史記錄相關函數
 const loadVerse = async (item: MultiFunctionVerse, type: 'history' | 'custom') => {
   try {
-    // 從 store 獲取當前選中的版本
-    const versionId = selectedVersionId.value || 1
+    // 獲取當前選中的版本
+    const savedVersion = getLocalItem<number>(
+      getStorageKey(StorageCategory.BIBLE, StorageKey.SELECTED_VERSION),
+    )
+    const versionId = savedVersion ? savedVersion : 1
 
     const content = await getBibleContent(versionId)
     if (content) {
@@ -579,8 +604,60 @@ const addVerseToCustom = (verseNumber: number) => {
   const newVerse = createMultiFunctionVerse(verseNumber)
   if (!newVerse) return
 
-  // 使用 store 的 addVerseToFolder（會自動處理重複檢查和保存）
-  addVerseToFolder(newVerse)
+  // 基於當前顯示的位置添加經文
+  if (currentFolder.value) {
+    // 檢查是否已存在相同的經文
+    const exists = currentFolder.value.items.some(
+      (item) =>
+        item.bookNumber === newVerse.bookNumber &&
+        item.chapter === newVerse.chapter &&
+        item.verse === newVerse.verse,
+    )
+    if (!exists) {
+      currentFolder.value.items.push(newVerse)
+    }
+  } else {
+    let homepageFolder = customFolders.value.find((folder) => folder.id === 'homepage')
+
+    if (!homepageFolder) {
+      homepageFolder = {
+        id: 'homepage',
+        name: 'Homepage',
+        expanded: false,
+        items: [],
+        folders: [],
+      }
+      customFolders.value.push(homepageFolder)
+    }
+
+    const exists = homepageFolder.items.some(
+      (item) =>
+        item.bookNumber === newVerse.bookNumber &&
+        item.chapter === newVerse.chapter &&
+        item.verse === newVerse.verse,
+    )
+    if (!exists) {
+      homepageFolder.items.push(newVerse)
+    }
+  }
+}
+
+const saveCustomToStorage = () => {
+  setLocalItem(
+    getStorageKey(StorageCategory.BIBLE, StorageKey.CUSTOM_FOLDERS),
+    customFolders.value,
+    'array',
+  )
+}
+
+const loadCustomFromStorage = () => {
+  const saved = getLocalItem<CustomFolder[]>(
+    getStorageKey(StorageCategory.BIBLE, StorageKey.CUSTOM_FOLDERS),
+    'array',
+  )
+  if (saved) {
+    customFolders.value = saved
+  }
 }
 
 // 快捷鍵處理
@@ -678,37 +755,35 @@ const copyVerseText = async () => {
   closeContextMenu()
 }
 
-// 監聽來自 store 的 currentPassage 變化（替代 window.addEventListener）
+// 監聽 customFolders 變化並自動保存
 watch(
-  storeCurrentPassage,
-  (newPassage) => {
-    if (newPassage) {
-      // 從 store 獲取當前選中的版本
-      const versionId = selectedVersionId.value || 1
-      // 需要從快取或 API 獲取完整的 book 數據來處理
-      getBibleContent(versionId).then((content) => {
-        if (content) {
-          const book = content.books.find((b) => b.number === newPassage.bookNumber)
-          if (book) {
-            handleVerseSelection(book, newPassage.chapter, newPassage.verse)
-          }
-        }
-      })
-    }
+  customFolders,
+  () => {
+    saveCustomToStorage()
   },
-  { immediate: true },
+  { deep: true },
 )
 
 // 監聽來自ExtendedToolbar的事件（通過全局事件或props）
 onMounted(() => {
-  // store 已經在初始化時載入了數據，不需要手動載入
+  // 載入儲存的數據（只有 customFolders 需要持久化，history 使用 store 管理）
+  loadCustomFromStorage()
 
+  // 監聽經文選擇事件
+  const eventHandler = (event: Event) => {
+    const customEvent = event as CustomEvent
+    const { book, chapter, verse } = customEvent.detail
+    handleVerseSelection(book, chapter, verse)
+  }
+
+  window.addEventListener('bible-verse-selected', eventHandler)
   document.addEventListener('keydown', handleKeydown)
 
   // 監聽點擊事件來關閉右鍵選單，使用捕獲階段
   document.addEventListener('click', handleDocumentClick, true)
 
   onUnmounted(() => {
+    window.removeEventListener('bible-verse-selected', eventHandler)
     document.removeEventListener('keydown', handleKeydown)
     document.removeEventListener('click', handleDocumentClick, true)
   })
