@@ -43,7 +43,8 @@
     "searchBooks": "Search books...",
     "controlFontSize": "Control Font Size",
     "controlChapter": "Control Chapter",
-    "controlVerse": "Control Verse"
+    "controlVerse": "Control Verse",
+    "copyVerseContent": "Copy Verse Content"
   },
   "noCustomItems": "No custom items yet",
   "enterFolderName": "Please enter folder name",

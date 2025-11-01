@@ -43,7 +43,8 @@
     "searchBooks": "搜索书卷...",
     "controlFontSize": "控制字体大小",
     "controlChapter": "控制章节",
-    "controlVerse": "控制节"
+    "controlVerse": "控制节",
+    "copyVerseContent": "复制经文内容"
   },
   "noCustomItems": "尚无自定义项目",
   "enterFolderName": "请输入文件夹名称",

@@ -161,30 +161,14 @@
     </v-row>
 
     <!-- 右鍵選單 -->
-    <v-menu v-model="showContextMenu" location="bottom start" :close-on-content-click="false">
-      <template #activator="{ props }">
-        <div
-          v-bind="props"
-          :style="{
-            position: 'fixed',
-            left: contextMenuX + 'px',
-            top: contextMenuY + 'px',
-            width: '1px',
-            height: '1px',
-            pointerEvents: 'none',
-            zIndex: 9999,
-          }"
-        />
-      </template>
-      <v-list density="compact">
-        <v-list-item @click="copyVerseText">
-          <template #prepend>
-            <v-icon>mdi-content-copy</v-icon>
-          </template>
-          <v-list-item-title>{{ $t('copy') }}</v-list-item-title>
-        </v-list-item>
-      </v-list>
-    </v-menu>
+    <ContextMenu ref="contextMenuRef" :close-on-content-click="false">
+      <v-list-item @click="copyVerseText">
+        <template #prepend>
+          <v-icon>mdi-content-copy</v-icon>
+        </template>
+        <v-list-item-title>{{ $t('bible.copyVerseContent') }}</v-list-item-title>
+      </v-list-item>
+    </ContextMenu>
   </v-container>
 </template>
 
@@ -200,6 +184,7 @@ import { MessageType, ViewType } from '@/types/common'
 import { useSentry } from '@/composables/useSentry'
 import { useCardLayout } from '@/composables/useLayout'
 import { useLocalStorage } from '@/composables/useLocalStorage'
+import ContextMenu from '@/components/ContextMenu.vue'
 import MultiFunctionControl from '@/components/Bible/MultiFunctionControl.vue'
 
 interface BiblePassage {
@@ -274,9 +259,7 @@ const currentFolderPath = ref<string[]>([]) // 當前資料夾路徑
 const currentFolder = ref<CustomFolder | null>(null) // 當前所在的資料夾
 
 // 右鍵選單相關
-const showContextMenu = ref(false)
-const contextMenuX = ref(0)
-const contextMenuY = ref(0)
+const contextMenuRef = ref<InstanceType<typeof ContextMenu> | null>(null)
 const selectedVerse = ref<{ number: number; text: string } | null>(null)
 
 // 監聽來自父組件的經文選擇事件
@@ -684,51 +667,16 @@ const handleKeydown = (event: KeyboardEvent) => {
 
 // 右鍵選單處理函數
 const handleVerseRightClick = (event: MouseEvent, verse: { number: number; text: string }) => {
-  event.preventDefault()
-  event.stopPropagation()
-
-  // 如果選單已經顯示，先關閉它
-  if (showContextMenu.value) {
-    showContextMenu.value = false
-    // 使用 nextTick 確保選單完全關閉後再顯示新的選單
-    nextTick(() => {
-      selectedVerse.value = verse
-      contextMenuX.value = event.clientX
-      contextMenuY.value = event.clientY
-      showContextMenu.value = true
-    })
-  } else {
-    // 如果選單沒有顯示，直接顯示新選單
-    selectedVerse.value = verse
-    contextMenuX.value = event.clientX
-    contextMenuY.value = event.clientY
-    showContextMenu.value = true
-  }
+  selectedVerse.value = verse
+  contextMenuRef.value?.open(event)
 }
 
-const closeContextMenu = () => {
-  showContextMenu.value = false
+const closeVerseContextMenu = () => {
+  contextMenuRef.value?.close()
   selectedVerse.value = null
 }
 
-// 處理點擊事件，在有選單顯示時阻止事件傳播
-const handleDocumentClick = (event: Event) => {
-  if (showContextMenu.value) {
-    const target = event.target as Element
-
-    // 檢查點擊的目標是否在右鍵選單內
-    const isClickOnMenu =
-      target.closest('.v-menu') || target.closest('.v-list') || target.closest('.v-list-item')
-
-    if (!isClickOnMenu) {
-      event.stopPropagation()
-      event.stopImmediatePropagation()
-      event.preventDefault()
-      closeContextMenu()
-      return false
-    }
-  }
-}
+// useContextMenu composable 已經處理了點擊外部關閉選單的邏輯，不需要手動監聽
 
 const copyVerseText = async () => {
   if (selectedVerse.value && currentPassage.value) {
@@ -737,6 +685,7 @@ const copyVerseText = async () => {
     try {
       await navigator.clipboard.writeText(verseText)
       // 可以添加一個提示訊息
+      closeVerseContextMenu()
     } catch (err) {
       reportError(err, {
         operation: 'copy-verse-text',
@@ -752,7 +701,7 @@ const copyVerseText = async () => {
       document.body.removeChild(textArea)
     }
   }
-  closeContextMenu()
+  closeVerseContextMenu()
 }
 
 // 監聽 customFolders 變化並自動保存
@@ -779,13 +728,9 @@ onMounted(() => {
   window.addEventListener('bible-verse-selected', eventHandler)
   document.addEventListener('keydown', handleKeydown)
 
-  // 監聽點擊事件來關閉右鍵選單，使用捕獲階段
-  document.addEventListener('click', handleDocumentClick, true)
-
   onUnmounted(() => {
     window.removeEventListener('bible-verse-selected', eventHandler)
     document.removeEventListener('keydown', handleKeydown)
-    document.removeEventListener('click', handleDocumentClick, true)
   })
 })
 </script>

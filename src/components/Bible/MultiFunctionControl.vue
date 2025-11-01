@@ -297,89 +297,73 @@
     </v-dialog>
 
     <!-- 右鍵選單 -->
-    <v-menu v-model="showContextMenu" location="bottom start" :close-on-content-click="false">
-      <template #activator="{ props }">
-        <div
-          v-bind="props"
-          :style="{
-            position: 'fixed',
-            left: contextMenuX + 'px',
-            top: contextMenuY + 'px',
-            width: '1px',
-            height: '1px',
-            pointerEvents: 'none',
-            zIndex: 9999,
-          }"
-        />
+    <ContextMenu ref="contextMenuRef" :close-on-content-click="false">
+      <!-- 當選中項目時顯示：複製、移動、刪除 -->
+      <template v-if="selectedItem">
+        <!-- 歷史項目：只顯示複製和刪除 -->
+        <template v-if="selectedItem && selectedItem.type === 'history'">
+          <v-list-item @click="copyItem">
+            <template #prepend>
+              <v-icon>mdi-content-copy</v-icon>
+            </template>
+            <v-list-item-title>{{ $t('copy') }}</v-list-item-title>
+          </v-list-item>
+          <v-list-item @click="deleteItem">
+            <template #prepend>
+              <v-icon>mdi-delete</v-icon>
+            </template>
+            <v-list-item-title>{{ $t('delete') }}</v-list-item-title>
+          </v-list-item>
+        </template>
+
+        <!-- 自訂項目（經文/資料夾）：顯示複製、移動、刪除 -->
+        <template v-else>
+          <v-list-item @click="copyItem">
+            <template #prepend>
+              <v-icon>mdi-content-copy</v-icon>
+            </template>
+            <v-list-item-title>{{ $t('copy') }}</v-list-item-title>
+          </v-list-item>
+          <v-list-item @click="moveItem">
+            <template #prepend>
+              <v-icon>mdi-folder-move</v-icon>
+            </template>
+            <v-list-item-title>{{ $t('move') }}</v-list-item-title>
+          </v-list-item>
+          <v-list-item @click="deleteItem">
+            <template #prepend>
+              <v-icon>mdi-delete</v-icon>
+            </template>
+            <v-list-item-title>{{ $t('delete') }}</v-list-item-title>
+          </v-list-item>
+        </template>
       </template>
-      <v-list density="compact">
-        <!-- 當選中項目時顯示：複製、移動、刪除 -->
-        <template v-if="selectedItem">
-          <!-- 歷史項目：只顯示複製和刪除 -->
-          <template v-if="selectedItem && selectedItem.type === 'history'">
-            <v-list-item @click="copyItem">
-              <template #prepend>
-                <v-icon>mdi-content-copy</v-icon>
-              </template>
-              <v-list-item-title>{{ $t('copy') }}</v-list-item-title>
-            </v-list-item>
-            <v-list-item @click="deleteItem">
-              <template #prepend>
-                <v-icon>mdi-delete</v-icon>
-              </template>
-              <v-list-item-title>{{ $t('delete') }}</v-list-item-title>
-            </v-list-item>
+
+      <!-- 當沒有選中項目但有複製內容時，在 custom 頁面顯示：貼上 -->
+      <template v-else-if="copiedItem && multiFunctionTab === 'custom'">
+        <v-list-item @click="pasteItem">
+          <template #prepend>
+            <v-icon>mdi-content-paste</v-icon>
           </template>
+          <v-list-item-title>{{ $t('paste') }}</v-list-item-title>
+        </v-list-item>
+      </template>
 
-          <!-- 自訂項目（經文/資料夾）：顯示複製、移動、刪除 -->
-          <template v-else>
-            <v-list-item @click="copyItem">
-              <template #prepend>
-                <v-icon>mdi-content-copy</v-icon>
-              </template>
-              <v-list-item-title>{{ $t('copy') }}</v-list-item-title>
-            </v-list-item>
-            <v-list-item @click="moveItem">
-              <template #prepend>
-                <v-icon>mdi-folder-move</v-icon>
-              </template>
-              <v-list-item-title>{{ $t('move') }}</v-list-item-title>
-            </v-list-item>
-            <v-list-item @click="deleteItem">
-              <template #prepend>
-                <v-icon>mdi-delete</v-icon>
-              </template>
-              <v-list-item-title>{{ $t('delete') }}</v-list-item-title>
-            </v-list-item>
+      <!-- 當沒有選中項目且沒有複製內容時，在 custom 頁面顯示：新資料夾 -->
+      <template v-else-if="multiFunctionTab === 'custom'">
+        <v-list-item @click="createNewFolder">
+          <template #prepend>
+            <v-icon>mdi-folder-plus</v-icon>
           </template>
-        </template>
-
-        <!-- 當沒有選中項目但有複製內容時，在 custom 頁面顯示：貼上 -->
-        <template v-else-if="copiedItem && multiFunctionTab === 'custom'">
-          <v-list-item @click="pasteItem">
-            <template #prepend>
-              <v-icon>mdi-content-paste</v-icon>
-            </template>
-            <v-list-item-title>{{ $t('paste') }}</v-list-item-title>
-          </v-list-item>
-        </template>
-
-        <!-- 當沒有選中項目且沒有複製內容時，在 custom 頁面顯示：新資料夾 -->
-        <template v-else-if="multiFunctionTab === 'custom'">
-          <v-list-item @click="createNewFolder">
-            <template #prepend>
-              <v-icon>mdi-folder-plus</v-icon>
-            </template>
-            <v-list-item-title>{{ $t('newFolder') }}</v-list-item-title>
-          </v-list-item>
-        </template>
-      </v-list>
-    </v-menu>
+          <v-list-item-title>{{ $t('newFolder') }}</v-list-item-title>
+        </v-list-item>
+      </template>
+    </ContextMenu>
   </v-card>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { v4 as uuidv4 } from 'uuid'
@@ -387,6 +371,7 @@ import type { MultiFunctionVerse } from '@/types/bible'
 import { BIBLE_CONFIG } from '@/config/app'
 import { useSentry } from '@/composables/useSentry'
 import { useBibleStore } from '@/stores/bible'
+import ContextMenu from '@/components/ContextMenu.vue'
 
 const { t: $t } = useI18n()
 
@@ -439,9 +424,8 @@ watch(multiFunctionTab, (newTab) => {
 })
 
 // 右鍵選單相關
-const showContextMenu = ref(false)
-const contextMenuX = ref(0)
-const contextMenuY = ref(0)
+const contextMenuRef = ref<InstanceType<typeof ContextMenu> | null>(null)
+
 const selectedItem = ref<{
   type: 'verse' | 'folder' | 'history'
   item: MultiFunctionVerse | CustomFolder
@@ -481,7 +465,7 @@ const loadVerse = (item: MultiFunctionVerse, type: 'history' | 'custom') => {
 const createNewFolder = () => {
   folderName.value = ''
   showFolderDialog.value = true
-  closeContextMenu()
+  closeItemContextMenu()
 }
 
 const confirmCreateFolder = () => {
@@ -983,13 +967,8 @@ const handleRightClick = (
   type: 'verse' | 'folder' | 'history',
   item: MultiFunctionVerse | CustomFolder,
 ) => {
-  event.preventDefault()
-  event.stopPropagation()
-
   selectedItem.value = { type, item }
-  contextMenuX.value = event.clientX
-  contextMenuY.value = event.clientY
-  showContextMenu.value = true
+  contextMenuRef.value?.open(event)
 }
 
 // 處理 v-card-text 的右鍵點擊
@@ -999,17 +978,12 @@ const handleCardTextRightClick = (event: MouseEvent) => {
     return
   }
 
-  event.preventDefault()
-  event.stopPropagation()
-
   selectedItem.value = null // 清空選中的項目
-  contextMenuX.value = event.clientX
-  contextMenuY.value = event.clientY
-  showContextMenu.value = true
+  contextMenuRef.value?.open(event)
 }
 
-const closeContextMenu = () => {
-  showContextMenu.value = false
+const closeItemContextMenu = () => {
+  contextMenuRef.value?.close()
   selectedItem.value = null
 }
 
@@ -1017,7 +991,7 @@ const copyItem = () => {
   if (selectedItem.value) {
     copiedItem.value = selectedItem.value
   }
-  closeContextMenu()
+  closeItemContextMenu()
 }
 
 const pasteItem = () => {
@@ -1105,7 +1079,7 @@ const pasteItem = () => {
 
     emit('update:customFolders', newFolders)
   }
-  closeContextMenu()
+  closeItemContextMenu()
 }
 
 const moveItem = () => {
@@ -1122,7 +1096,7 @@ const moveItem = () => {
       console.warn('History items cannot be moved')
     }
     // 移動 closeContextMenu 到這裡
-    closeContextMenu()
+    closeItemContextMenu()
   }
 }
 
@@ -1143,36 +1117,10 @@ const deleteItem = () => {
       }
     }
   }
-  closeContextMenu()
+  closeItemContextMenu()
 }
 
-// 處理點擊事件，在有選單顯示時阻止事件傳播
-const handleDocumentClick = (event: Event) => {
-  if (showContextMenu.value) {
-    const target = event.target as Element
-
-    // 檢查點擊的目標是否在右鍵選單內
-    const isClickOnMenu =
-      target.closest('.v-menu') || target.closest('.v-list') || target.closest('.v-list-item')
-
-    if (!isClickOnMenu) {
-      event.stopPropagation()
-      event.stopImmediatePropagation()
-      event.preventDefault()
-      closeContextMenu()
-      return false
-    }
-  }
-}
-
-// 監聽點擊事件來關閉右鍵選單
-onMounted(() => {
-  document.addEventListener('click', handleDocumentClick, true)
-})
-
-onUnmounted(() => {
-  document.removeEventListener('click', handleDocumentClick, true)
-})
+// useContextMenu composable 已經處理了點擊外部關閉選單的邏輯，不需要手動監聽
 </script>
 
 <style scoped>

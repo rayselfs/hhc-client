@@ -43,7 +43,8 @@
     "searchBooks": "搜尋書卷...",
     "controlFontSize": "控制字型大小",
     "controlChapter": "控制章節",
-    "controlVerse": "控制節"
+    "controlVerse": "控制節",
+    "copyVerseContent": "複製經文內容"
   },
   "noCustomItems": "尚無自訂項目",
   "enterFolderName": "請輸入資料夾名稱",
