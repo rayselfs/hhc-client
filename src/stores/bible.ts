@@ -1,11 +1,16 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { MultiFunctionVerse, BibleCacheItem, BibleContent } from '@/types/bible'
+import type { BibleCacheItem, BibleContent } from '@/types/bible'
 import { BibleCacheConfig } from '@/types/bible'
 import { useIndexedDB } from '@/composables/useIndexedDB'
 
 export const useBibleStore = defineStore('bible', () => {
-  const historyVerses = ref<MultiFunctionVerse[]>([])
+  // 當前載入的 Bible Content（避免重複讀取 IndexedDB）
+  const currentBibleContent = ref<{
+    versionId: number
+    content: BibleContent
+  } | null>(null)
+
   const bibleCacheDB = useIndexedDB({
     dbName: BibleCacheConfig.DB_NAME as string,
     version: BibleCacheConfig.DB_VERSION as number,
@@ -18,40 +23,7 @@ export const useBibleStore = defineStore('bible', () => {
   })
 
   /**
-   * Add verse to history
-   */
-  const addToHistory = (verse: MultiFunctionVerse) => {
-    // Check if the verse already exists in the history
-    const existingIndex = historyVerses.value.findIndex(
-      (item) =>
-        item.bookNumber === verse.bookNumber &&
-        item.chapter === verse.chapter &&
-        item.verse === verse.verse,
-    )
-
-    if (existingIndex !== -1) {
-      // If it already exists, remove the old record
-      historyVerses.value.splice(existingIndex, 1)
-    }
-
-    // Add new record to the beginning
-    historyVerses.value.unshift(verse)
-
-    // Limit the history record count (maximum 50 records)
-    if (historyVerses.value.length > 50) {
-      historyVerses.value.shift()
-    }
-  }
-
-  /**
-   * Clear history
-   */
-  const clearHistory = () => {
-    historyVerses.value = []
-  }
-
-  /**
-   * Save Bible content to IndexedDB
+   * Save Bible content to IndexedDB and update cache
    * @param versionId - version ID
    * @param versionCode - version code
    * @param versionName - version name
@@ -70,16 +42,47 @@ export const useBibleStore = defineStore('bible', () => {
       content,
       timestamp: Date.now(),
     })
+
+    // 更新 currentBibleContent 狀態
+    currentBibleContent.value = {
+      versionId,
+      content,
+    }
   }
 
   /**
-   * Get Bible content from IndexedDB
+   * Get Bible content from IndexedDB or cache
+   * 如果 currentBibleContent 已有相同版本，直接返回，避免重複讀取 IndexedDB
    * @param versionId - version ID
    * @returns Bible content, if not exists, return null
    */
   const getBibleContent = async (versionId: number): Promise<BibleContent | null> => {
+    if (currentBibleContent.value && currentBibleContent.value.versionId === versionId) {
+      return currentBibleContent.value.content
+    }
+
+    // 否則從 IndexedDB 讀取
     const cached = await bibleCacheDB.get<BibleCacheItem>(BibleCacheConfig.STORE_NAME, versionId)
-    return cached?.content ?? null
+    const content = cached?.content ?? null
+
+    // 更新 currentBibleContent 狀態
+    if (content) {
+      currentBibleContent.value = {
+        versionId,
+        content,
+      }
+    } else {
+      currentBibleContent.value = null
+    }
+
+    return content
+  }
+
+  /**
+   * 清除當前載入的 Bible Content 狀態（例如切換版本時）
+   */
+  const clearCurrentBibleContent = () => {
+    currentBibleContent.value = null
   }
 
   /**
@@ -92,13 +95,11 @@ export const useBibleStore = defineStore('bible', () => {
   }
 
   return {
-    // History
-    historyVerses,
-    addToHistory,
-    clearHistory,
     // Bible Content
+    currentBibleContent,
     saveBibleContent,
     getBibleContent,
     hasCachedContent,
+    clearCurrentBibleContent,
   }
 })

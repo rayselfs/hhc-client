@@ -370,7 +370,6 @@ import { v4 as uuidv4 } from 'uuid'
 import type { MultiFunctionVerse } from '@/types/bible'
 import { BIBLE_CONFIG } from '@/config/app'
 import { useSentry } from '@/composables/useSentry'
-import { useBibleStore } from '@/stores/bible'
 import ContextMenu from '@/components/ContextMenu.vue'
 
 const { t: $t } = useI18n()
@@ -407,9 +406,34 @@ interface Emits {
 const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
-// Bible store - 直接在組件內使用 store 管理歷史記錄
-const bibleStore = useBibleStore()
-const { historyVerses } = storeToRefs(bibleStore)
+// History 管理（從 store 移回組件）
+const historyVerses = ref<MultiFunctionVerse[]>([])
+
+/**
+ * Add verse to history
+ */
+const addToHistory = (verse: MultiFunctionVerse) => {
+  // Check if the verse already exists in the history
+  const existingIndex = historyVerses.value.findIndex(
+    (item) =>
+      item.bookNumber === verse.bookNumber &&
+      item.chapter === verse.chapter &&
+      item.verse === verse.verse,
+  )
+
+  if (existingIndex !== -1) {
+    // If it already exists, remove the old record
+    historyVerses.value.splice(existingIndex, 1)
+  }
+
+  // Add new record to the beginning
+  historyVerses.value.unshift(verse)
+
+  // Limit the history record count (maximum 50 records)
+  if (historyVerses.value.length > 50) {
+    historyVerses.value.pop()
+  }
+}
 
 // 狀態
 const multiFunctionTab = ref('history')
@@ -453,9 +477,17 @@ const removeHistoryItem = (index: number) => {
   historyVerses.value.splice(index, 1)
 }
 
+/**
+ * Clear history
+ */
 const clearHistory = () => {
-  bibleStore.clearHistory()
+  historyVerses.value = []
 }
+
+// 暴露方法供父組件使用
+defineExpose({
+  addToHistory,
+})
 
 const loadVerse = (item: MultiFunctionVerse, type: 'history' | 'custom') => {
   emit('load-verse', item, type)
