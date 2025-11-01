@@ -382,13 +382,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 // uuidv4 不再需要，因為 store 的 pasteItem 會自動生成 ID
 import type { MultiFunctionVerse } from '@/types/bible'
-import { BIBLE_CONFIG } from '@/config/app'
 import { useSentry } from '@/composables/useSentry'
+import { useContextMenu } from '@/composables/useContextMenu'
 import { useBibleStore } from '@/stores/bible'
 
 const { t: $t } = useI18n()
@@ -433,7 +433,6 @@ const {
   moveVerseToFolder,
   pasteItem: storePasteItem,
   moveFolderToFolder: storeMoveFolderToFolder,
-  isFolderInside,
   getFolderById: storeGetFolderById,
   openMoveDialog,
   closeMoveDialog,
@@ -444,7 +443,6 @@ const {
 } = bibleStore
 const {
   historyVerses,
-  customFolders,
   currentFolderPath,
   currentFolder,
   isMoveDialogOpen,
@@ -467,9 +465,14 @@ watch(multiFunctionTab, (newTab) => {
 })
 
 // 右鍵選單相關
-const showContextMenu = ref(false)
-const contextMenuX = ref(0)
-const contextMenuY = ref(0)
+// 使用 useContextMenu composable 管理右鍵選單狀態
+const {
+  show: showContextMenu,
+  x: contextMenuX,
+  y: contextMenuY,
+  open: openContextMenu,
+  close: closeContextMenu,
+} = useContextMenu()
 const selectedItem = ref<{
   type: 'verse' | 'folder' | 'history'
   item: MultiFunctionVerse | CustomFolder
@@ -504,7 +507,7 @@ const loadVerse = (item: MultiFunctionVerse, type: 'history' | 'custom') => {
 const createNewFolder = () => {
   folderName.value = ''
   showFolderDialog.value = true
-  closeContextMenu()
+  closeItemContextMenu()
 }
 
 const confirmCreateFolder = () => {
@@ -680,18 +683,6 @@ const handleDrop = (event: DragEvent, targetFolder: CustomFolder) => {
   }
 }
 
-// 移動經文到資料夾的邏輯已移至 bible.ts store 的 confirmMove 中
-
-// 移動資料夾到另一個資料夾（使用 store 的方法）
-const moveFolderToFolder = (folderToMove: CustomFolder, targetFolder: CustomFolder) => {
-  // 防止將資料夾移動到自己內部
-  if (isFolderInside(folderToMove, targetFolder)) {
-    return
-  }
-
-  storeMoveFolderToFolder(folderToMove, targetFolder.id)
-}
-
 // 移動經文相關函數（使用 store 的方法）
 const showMoveDialog = (item: MultiFunctionVerse) => {
   openMoveDialog(item, 'verse')
@@ -713,13 +704,8 @@ const handleRightClick = (
   type: 'verse' | 'folder' | 'history',
   item: MultiFunctionVerse | CustomFolder,
 ) => {
-  event.preventDefault()
-  event.stopPropagation()
-
   selectedItem.value = { type, item }
-  contextMenuX.value = event.clientX
-  contextMenuY.value = event.clientY
-  showContextMenu.value = true
+  openContextMenu(event)
 }
 
 // 處理 v-card-text 的右鍵點擊
@@ -729,17 +715,12 @@ const handleCardTextRightClick = (event: MouseEvent) => {
     return
   }
 
-  event.preventDefault()
-  event.stopPropagation()
-
   selectedItem.value = null // 清空選中的項目
-  contextMenuX.value = event.clientX
-  contextMenuY.value = event.clientY
-  showContextMenu.value = true
+  openContextMenu(event)
 }
 
-const closeContextMenu = () => {
-  showContextMenu.value = false
+const closeItemContextMenu = () => {
+  closeContextMenu()
   selectedItem.value = null
 }
 
@@ -747,7 +728,7 @@ const copyItem = () => {
   if (selectedItem.value) {
     copiedItem.value = selectedItem.value
   }
-  closeContextMenu()
+  closeItemContextMenu()
 }
 
 const pasteItem = () => {
@@ -766,7 +747,7 @@ const pasteItem = () => {
       storePasteItem(historyItem)
     }
   }
-  closeContextMenu()
+  closeItemContextMenu()
 }
 
 const moveItem = () => {
@@ -781,8 +762,8 @@ const moveItem = () => {
       // 歷史項目不能移動，這個函數不應該被調用
       console.warn('History items cannot be moved')
     }
-    // 移動 closeContextMenu 到這裡
-    closeContextMenu()
+    // 關閉選單
+    closeItemContextMenu()
   }
 }
 
@@ -803,36 +784,8 @@ const deleteItem = () => {
       }
     }
   }
-  closeContextMenu()
+  closeItemContextMenu()
 }
-
-// 處理點擊事件，在有選單顯示時阻止事件傳播
-const handleDocumentClick = (event: Event) => {
-  if (showContextMenu.value) {
-    const target = event.target as Element
-
-    // 檢查點擊的目標是否在右鍵選單內
-    const isClickOnMenu =
-      target.closest('.v-menu') || target.closest('.v-list') || target.closest('.v-list-item')
-
-    if (!isClickOnMenu) {
-      event.stopPropagation()
-      event.stopImmediatePropagation()
-      event.preventDefault()
-      closeContextMenu()
-      return false
-    }
-  }
-}
-
-// 監聽點擊事件來關閉右鍵選單
-onMounted(() => {
-  document.addEventListener('click', handleDocumentClick, true)
-})
-
-onUnmounted(() => {
-  document.removeEventListener('click', handleDocumentClick, true)
-})
 </script>
 
 <style scoped>
