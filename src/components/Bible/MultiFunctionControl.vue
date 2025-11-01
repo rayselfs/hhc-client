@@ -204,7 +204,7 @@
     </v-dialog>
 
     <!-- Move Verse Dialog -->
-    <v-dialog v-model="showMoveVerseDialog" max-width="500">
+    <v-dialog v-model="isMoveDialogOpen" max-width="500">
       <v-card>
         <v-card-title class="d-flex align-center">
           <span class="mr-3">{{ $t('moveTo') }}</span>
@@ -214,30 +214,33 @@
               size="small"
               class="pa-0"
               variant="text"
-              :disabled="moveBreadcrumb.length === 0 && !selectedMoveFolder"
-              @click="navigateMoveToRoot"
+              :disabled="moveDialogBreadcrumb.length === 0 && !moveDialogTargetFolderId"
+              @click="navigateMoveDialogToRoot"
             >
               <v-icon class="mr-1">mdi-home</v-icon>
               {{ $t('homepage') }}
             </v-btn>
             <v-icon
-              v-if="moveBreadcrumb.length > 0 || selectedMoveFolder"
+              v-if="moveDialogBreadcrumb.length > 0 || moveDialogTargetFolderId"
               size="x-small"
               class="ml-1 mr-1"
               >mdi-chevron-right</v-icon
             >
-            <span v-for="(folderId, index) in moveBreadcrumb" :key="folderId">
+            <span v-for="(folderId, index) in moveDialogBreadcrumb" :key="folderId">
               <v-btn
                 size="small"
                 class="pa-0"
                 variant="text"
-                :disabled="index === moveBreadcrumb.length - 1"
-                @click="navigateMoveToFolder(folderId)"
+                :disabled="index === moveDialogBreadcrumb.length - 1"
+                @click="navigateMoveDialogToFolder(folderId)"
               >
                 <v-icon class="mr-1">mdi-folder</v-icon>
-                {{ getFolderById(folderId)?.name }}
+                {{ storeGetFolderById(folderId)?.name }}
               </v-btn>
-              <v-icon v-if="index < moveBreadcrumb.length - 1" size="x-small" class="ml-1 mr-1"
+              <v-icon
+                v-if="index < moveDialogBreadcrumb.length - 1"
+                size="x-small"
+                class="ml-1 mr-1"
                 >mdi-chevron-right</v-icon
               >
             </span>
@@ -247,16 +250,16 @@
         <v-card-text>
           <!-- 移動目標列表 -->
           <div class="move-folder-list">
-            <div v-if="getMoveTargets().length === 0" class="text-center pa-4 text-grey">
+            <div v-if="moveDialogFolders.length === 0" class="text-center pa-4 text-grey">
               {{ $t('noFolder') }}
             </div>
             <div v-else>
               <div
-                v-for="target in getMoveTargets()"
+                v-for="target in moveDialogFolders"
                 :key="target.id"
                 class="verse-item pa-3 mb-2 d-flex align-center justify-space-between"
-                :class="{ 'selected-target': selectedMoveFolder?.id === target.id }"
-                @click="selectMoveTarget(target)"
+                :class="{ 'selected-target': moveDialogTargetFolderId === target.id }"
+                @click="selectMoveDialogTarget(target.id)"
               >
                 <div class="d-flex align-center">
                   <v-icon class="mr-2">mdi-folder</v-icon>
@@ -270,8 +273,8 @@
 
         <v-card-actions>
           <v-spacer />
-          <v-btn @click="showMoveVerseDialog = false">{{ $t('cancel') || 'Cancel' }}</v-btn>
-          <v-btn color="primary" @click="confirmMoveVerse" :disabled="!canMoveToHomepage">
+          <v-btn @click="closeMoveDialog">{{ $t('cancel') || 'Cancel' }}</v-btn>
+          <v-btn color="primary" @click="confirmMove" :disabled="!canMoveToTarget">
             {{ $t('move') }}
           </v-btn>
         </v-card-actions>
@@ -427,13 +430,29 @@ const {
   getCurrentFolders,
   getCurrentVerses,
   removeVerseFromFolder,
-  moveVerseToFolder: storeMoveVerseToFolder,
+  moveVerseToFolder,
   pasteItem: storePasteItem,
   moveFolderToFolder: storeMoveFolderToFolder,
   isFolderInside,
   getFolderById: storeGetFolderById,
+  openMoveDialog,
+  closeMoveDialog,
+  navigateMoveDialogToRoot,
+  navigateMoveDialogToFolder,
+  selectMoveDialogTarget,
+  confirmMove,
 } = bibleStore
-const { historyVerses, customFolders, currentFolderPath, currentFolder } = storeToRefs(bibleStore)
+const {
+  historyVerses,
+  customFolders,
+  currentFolderPath,
+  currentFolder,
+  isMoveDialogOpen,
+  moveDialogFolders,
+  moveDialogBreadcrumb,
+  moveDialogTargetFolderId,
+  canMoveToTarget,
+} = storeToRefs(bibleStore)
 
 // 狀態
 const multiFunctionTab = ref('history')
@@ -462,12 +481,7 @@ const copiedItem = ref<{
   item: MultiFunctionVerse | CustomFolder
 } | null>(null)
 
-// 移動經文相關狀態
-const showMoveVerseDialog = ref(false)
-const moveBreadcrumb = ref<string[]>([])
-const selectedMoveFolder = ref<CustomFolder | null>(null)
-const verseToMove = ref<MultiFunctionVerse | null>(null)
-const isHomepageSelected = ref(false)
+// 移動經文相關狀態已移至 bible.ts store
 
 // 刪除確認對話框狀態
 const showDeleteConfirmDialog = ref(false)
@@ -654,9 +668,9 @@ const handleDrop = (event: DragEvent, targetFolder: CustomFolder) => {
     const { type, item } = data
 
     if (type === 'verse') {
-      moveVerseToFolder(item as MultiFunctionVerse, targetFolder)
+      moveVerseToFolder(item as MultiFunctionVerse, targetFolder.id)
     } else if (type === 'folder') {
-      moveFolderToFolder(item as CustomFolder, targetFolder)
+      storeMoveFolderToFolder(item as CustomFolder, targetFolder.id)
     }
   } catch (error) {
     reportError(error, {
@@ -666,10 +680,7 @@ const handleDrop = (event: DragEvent, targetFolder: CustomFolder) => {
   }
 }
 
-// 移動經文到資料夾（使用 store 的方法）
-const moveVerseToFolder = (verse: MultiFunctionVerse, targetFolder: CustomFolder) => {
-  storeMoveVerseToFolder(verse, targetFolder.id)
-}
+// 移動經文到資料夾的邏輯已移至 bible.ts store 的 confirmMove 中
 
 // 移動資料夾到另一個資料夾（使用 store 的方法）
 const moveFolderToFolder = (folderToMove: CustomFolder, targetFolder: CustomFolder) => {
@@ -681,72 +692,10 @@ const moveFolderToFolder = (folderToMove: CustomFolder, targetFolder: CustomFold
   storeMoveFolderToFolder(folderToMove, targetFolder.id)
 }
 
-// 移動經文相關函數
+// 移動經文相關函數（使用 store 的方法）
 const showMoveDialog = (item: MultiFunctionVerse) => {
-  verseToMove.value = item
-  moveBreadcrumb.value = []
-  selectedMoveFolder.value = null
-  isHomepageSelected.value = false
-  showMoveVerseDialog.value = true
+  openMoveDialog(item, 'verse')
 }
-
-const navigateMoveToRoot = () => {
-  moveBreadcrumb.value = []
-  selectedMoveFolder.value = null
-  isHomepageSelected.value = false
-}
-
-const navigateMoveToFolder = (folderId: string) => {
-  const folder = getFolderById(folderId)
-  if (folder) {
-    const index = moveBreadcrumb.value.indexOf(folderId)
-    const newPath = index !== -1 ? moveBreadcrumb.value.slice(0, index + 1) : moveBreadcrumb.value
-    moveBreadcrumb.value = newPath
-    selectedMoveFolder.value = folder
-  }
-}
-
-const selectMoveTarget = (target: CustomFolder) => {
-  // 選擇資料夾
-  isHomepageSelected.value = false
-  const folder = getFolderById(target.id)
-  if (folder && folder.folders.length > 0) {
-    // 如果有子資料夾，進入該資料夾
-    moveBreadcrumb.value = [...moveBreadcrumb.value, target.id]
-    selectedMoveFolder.value = folder
-  } else {
-    // 如果沒有子資料夾，也要將資料夾添加到麵包屑中
-    moveBreadcrumb.value = [...moveBreadcrumb.value, target.id]
-    selectedMoveFolder.value = folder
-  }
-}
-
-const getMoveFolders = (): CustomFolder[] => {
-  if (selectedMoveFolder.value) {
-    // 如果在某個資料夾中，返回該資料夾的子資料夾
-    return selectedMoveFolder.value.folders
-  } else {
-    // 如果在根目錄（首頁），返回所有資料夾（除了 Homepage）
-    return customFolders.value.filter((folder) => folder.id !== BIBLE_CONFIG.FOLDER.HOMEPAGE_ID)
-  }
-}
-
-const getMoveTargets = (): CustomFolder[] => {
-  return getMoveFolders()
-}
-
-// 計算是否可以移動
-const canMoveToHomepage = computed(() => {
-  if (!verseToMove.value) return false
-
-  // 情況1：經文在首頁，想移動到資料夾 - 需要選擇資料夾
-  if (!currentFolder.value) {
-    return selectedMoveFolder.value !== null
-  }
-
-  // 情況2：經文在資料夾，想移動到其他位置 - 總是允許移動
-  return true
-})
 
 // 計算當前資料夾深度
 const currentFolderDepth = computed(() => {
@@ -757,20 +706,6 @@ const currentFolderDepth = computed(() => {
 const isMaxDepthReached = computed(() => {
   return currentFolderDepth.value >= 2 // 因為是從0開始計算，所以2就是第三層
 })
-
-const confirmMoveVerse = () => {
-  if (!verseToMove.value || !canMoveToHomepage.value) return
-
-  // 使用 store 的 moveVerseToFolder
-  const targetFolderId = selectedMoveFolder.value?.id || null
-  storeMoveVerseToFolder(verseToMove.value, targetFolderId)
-
-  showMoveVerseDialog.value = false
-  verseToMove.value = null
-  selectedMoveFolder.value = null
-  isHomepageSelected.value = false
-  moveBreadcrumb.value = []
-}
 
 // 右鍵選單處理函數
 const handleRightClick = (
@@ -840,9 +775,8 @@ const moveItem = () => {
       // 使用現有的移動功能
       showMoveDialog(selectedItem.value.item as MultiFunctionVerse)
     } else if (selectedItem.value.type === 'folder') {
-      // 資料夾移動功能（暫時使用刪除確認對話框）
-      showDeleteConfirmDialog.value = true
-      folderToDelete.value = selectedItem.value.item as CustomFolder
+      // 使用移動對話框功能
+      openMoveDialog(selectedItem.value.item as CustomFolder, 'folder')
     } else if (selectedItem.value.type === 'history') {
       // 歷史項目不能移動，這個函數不應該被調用
       console.warn('History items cannot be moved')

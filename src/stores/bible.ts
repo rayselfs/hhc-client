@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import type {
   MultiFunctionVerse,
   BibleCacheItem,
@@ -547,6 +547,131 @@ export const useBibleStore = defineStore('bible', () => {
     return false
   }
 
+  // ==================== Move Dialog State ====================
+
+  /**
+   * 移動對話框狀態
+   */
+  const isMoveDialogOpen = ref(false)
+  const itemToMove = ref<MultiFunctionVerse | CustomFolder | null>(null)
+  const itemToMoveType = ref<'verse' | 'folder' | null>(null)
+  const moveDialogTargetFolderId = ref<string | null>(null) // 對話框中當前瀏覽的資料夾 ID (null 為 root)
+  const moveDialogBreadcrumb = ref<string[]>([]) // 對話框中的麵包屑
+
+  /**
+   * 開啟移動對話框
+   * @param item - 要移動的項目（經文或資料夾）
+   * @param type - 項目類型
+   */
+  const openMoveDialog = (item: MultiFunctionVerse | CustomFolder, type: 'verse' | 'folder') => {
+    itemToMove.value = item
+    itemToMoveType.value = type
+    moveDialogTargetFolderId.value = null // 每次打開都從 root 開始
+    moveDialogBreadcrumb.value = []
+    isMoveDialogOpen.value = true
+  }
+
+  /**
+   * 關閉移動對話框
+   */
+  const closeMoveDialog = () => {
+    isMoveDialogOpen.value = false
+    itemToMove.value = null
+    itemToMoveType.value = null
+    moveDialogTargetFolderId.value = null
+    moveDialogBreadcrumb.value = []
+  }
+
+  /**
+   * 在移動對話框中導航到根目錄
+   */
+  const navigateMoveDialogToRoot = () => {
+    moveDialogTargetFolderId.value = null
+    moveDialogBreadcrumb.value = []
+  }
+
+  /**
+   * 在移動對話框中導航到指定資料夾
+   * @param folderId - 資料夾 ID
+   */
+  const navigateMoveDialogToFolder = (folderId: string) => {
+    const folder = getFolderById(folderId)
+    if (folder) {
+      const index = moveDialogBreadcrumb.value.indexOf(folderId)
+      const newPath =
+        index !== -1 ? moveDialogBreadcrumb.value.slice(0, index + 1) : moveDialogBreadcrumb.value
+      moveDialogBreadcrumb.value = newPath
+      moveDialogTargetFolderId.value = folderId
+    }
+  }
+
+  /**
+   * 在移動對話框中選擇目標資料夾（進入該資料夾）
+   * @param targetFolderId - 目標資料夾 ID
+   */
+  const selectMoveDialogTarget = (targetFolderId: string) => {
+    const folder = getFolderById(targetFolderId)
+    if (folder) {
+      // 將資料夾添加到麵包屑中
+      moveDialogBreadcrumb.value = [...moveDialogBreadcrumb.value, targetFolderId]
+      moveDialogTargetFolderId.value = targetFolderId
+    }
+  }
+
+  /**
+   * 獲取移動對話框中應顯示的資料夾列表
+   */
+  const moveDialogFolders = computed(() => {
+    if (moveDialogTargetFolderId.value) {
+      // 如果在某個資料夾中，返回該資料夾的子資料夾
+      const targetFolder = getFolderById(moveDialogTargetFolderId.value)
+      return targetFolder ? targetFolder.folders : []
+    } else {
+      // 如果在根目錄（首頁），返回所有資料夾（除了 Homepage）
+      return customFolders.value.filter((folder) => folder.id !== BIBLE_CONFIG.FOLDER.HOMEPAGE_ID)
+    }
+  })
+
+  /**
+   * 計算是否可以移動（是否選擇了目標）
+   */
+  const canMoveToTarget = computed(() => {
+    if (!itemToMove.value || !itemToMoveType.value) return false
+
+    // 情況1：經文在首頁，想移動到資料夾 - 需要選擇資料夾
+    if (!currentFolder.value && itemToMoveType.value === 'verse') {
+      return moveDialogTargetFolderId.value !== null
+    }
+
+    // 情況2：經文在資料夾，想移動到其他位置 - 總是允許移動
+    // 情況3：移動資料夾 - 總是允許移動
+    return true
+  })
+
+  /**
+   * 確認移動
+   */
+  const confirmMove = () => {
+    if (!itemToMove.value || !itemToMoveType.value || !canMoveToTarget.value) return
+
+    const targetFolderId = moveDialogTargetFolderId.value
+
+    if (itemToMoveType.value === 'verse') {
+      moveVerseToFolder(itemToMove.value as MultiFunctionVerse, targetFolderId)
+    } else if (itemToMoveType.value === 'folder') {
+      if (targetFolderId) {
+        // 防止將資料夾移動到自己內部
+        const folderToMove = itemToMove.value as CustomFolder
+        const targetFolder = getFolderById(targetFolderId)
+        if (targetFolder && !isFolderInside(folderToMove, targetFolder)) {
+          moveFolderToFolder(folderToMove, targetFolderId)
+        }
+      }
+    }
+
+    closeMoveDialog()
+  }
+
   // ==================== Current Passage Actions ====================
 
   /**
@@ -625,6 +750,19 @@ export const useBibleStore = defineStore('bible', () => {
     // Current Passage
     currentPassage,
     loadPassage,
+    // Move Dialog
+    isMoveDialogOpen,
+    itemToMove,
+    moveDialogFolders,
+    moveDialogBreadcrumb,
+    moveDialogTargetFolderId,
+    canMoveToTarget,
+    openMoveDialog,
+    closeMoveDialog,
+    navigateMoveDialogToRoot,
+    navigateMoveDialogToFolder,
+    selectMoveDialogTarget,
+    confirmMove,
     // Initialization
     initialize,
   }
