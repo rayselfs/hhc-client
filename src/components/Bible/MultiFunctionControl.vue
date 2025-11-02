@@ -36,7 +36,7 @@
               <v-icon class="mr-1">mdi-folder</v-icon>
               {{ getFolderById(folderId)?.name }}
             </v-btn>
-            <v-icon v-if="index < currentFolderPath.length - 1" size="x=small" class="ml-1 mr-1"
+            <v-icon v-if="index < currentFolderPath.length - 1" size="x-small" class="ml-1 mr-1"
               >mdi-chevron-right</v-icon
             >
           </span>
@@ -72,42 +72,47 @@
       class="pa-0"
       :style="{
         height: props.containerHeight ? `${props.containerHeight - 48}px` : 'calc(100% - 48px)',
-        overflowY: 'auto',
+        overflowY: multiFunctionTab === 'history' ? 'hidden' : 'auto',
       }"
       @contextmenu="handleCardTextRightClick"
     >
       <!-- History Page -->
-      <div v-if="multiFunctionTab === 'history'" class="history-content">
+      <div v-if="multiFunctionTab === 'history'" class="history-content" style="height: 100%">
         <div v-if="historyVerses.length === 0" class="text-center pa-4 text-grey">
           {{ $t('bible.noHistory') }}
         </div>
-        <div v-else class="history-list">
-          <div
-            v-for="(item, index) in historyVerses"
-            :key="index"
-            class="verse-item pa-3 d-flex align-center justify-space-between"
-            @click="loadVerse(item, 'history')"
-            @contextmenu="handleRightClick($event, 'history', item)"
-          >
-            <div>
-              <div class="text-h6 font-weight-medium d-flex">
-                <span class="mr-1 text-no-wrap"
-                  >{{ item.bookAbbreviation }}{{ item.chapter }}:{{ item.verse }} -
-                </span>
-                <span class="text-justify">{{ item.verseText }}</span>
-              </div>
-            </div>
-            <v-btn
-              class="verse-btn"
-              icon
-              size="small"
-              variant="text"
-              @click.stop="removeHistoryItem(index)"
+        <v-virtual-scroll
+          v-else
+          :items="historyVerses"
+          :height="props.containerHeight ? `${props.containerHeight - 48}px` : 'calc(100% - 48px)'"
+          :item-height="80"
+        >
+          <template #default="{ item }">
+            <div
+              class="verse-item pa-3 d-flex align-center justify-space-between"
+              @click="loadVerse(item, 'history')"
+              @contextmenu="handleRightClick($event, 'history', item)"
             >
-              <v-icon>mdi-close</v-icon>
-            </v-btn>
-          </div>
-        </div>
+              <div>
+                <div class="text-h6 font-weight-medium d-flex">
+                  <span class="mr-1 text-no-wrap"
+                    >{{ item.bookAbbreviation }}{{ item.chapter }}:{{ item.verse }} -
+                  </span>
+                  <span class="text-justify">{{ item.verseText }}</span>
+                </div>
+              </div>
+              <v-btn
+                class="verse-btn"
+                icon
+                size="small"
+                variant="text"
+                @click.stop="removeHistoryItem(item.id)"
+              >
+                <v-icon>mdi-close</v-icon>
+              </v-btn>
+            </div>
+          </template>
+        </v-virtual-scroll>
       </div>
 
       <!-- Custom Page -->
@@ -370,6 +375,7 @@ import { v4 as uuidv4 } from 'uuid'
 import type { MultiFunctionVerse } from '@/types/bible'
 import { BIBLE_CONFIG } from '@/config/app'
 import { useSentry } from '@/composables/useSentry'
+import { useBibleStore } from '@/stores/bible'
 import ContextMenu from '@/components/ContextMenu.vue'
 
 const { t: $t } = useI18n()
@@ -406,34 +412,10 @@ interface Emits {
 const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
-// History 管理（從 store 移回組件）
-const historyVerses = ref<MultiFunctionVerse[]>([])
-
-/**
- * Add verse to history
- */
-const addToHistory = (verse: MultiFunctionVerse) => {
-  // Check if the verse already exists in the history
-  const existingIndex = historyVerses.value.findIndex(
-    (item) =>
-      item.bookNumber === verse.bookNumber &&
-      item.chapter === verse.chapter &&
-      item.verse === verse.verse,
-  )
-
-  if (existingIndex !== -1) {
-    // If it already exists, remove the old record
-    historyVerses.value.splice(existingIndex, 1)
-  }
-
-  // Add new record to the beginning
-  historyVerses.value.unshift(verse)
-
-  // Limit the history record count (maximum 50 records)
-  if (historyVerses.value.length > 50) {
-    historyVerses.value.pop()
-  }
-}
+// Bible store - 使用 store 管理歷史記錄
+const bibleStore = useBibleStore()
+const { historyVerses } = storeToRefs(bibleStore)
+const { removeHistoryItem, clearHistory } = bibleStore
 
 // 狀態
 const multiFunctionTab = ref('history')
@@ -461,33 +443,20 @@ const copiedItem = ref<{
   item: MultiFunctionVerse | CustomFolder
 } | null>(null)
 
-// 移動經文相關狀態
+// 移動相關狀態
 const showMoveVerseDialog = ref(false)
 const moveBreadcrumb = ref<string[]>([])
 const selectedMoveFolder = ref<CustomFolder | null>(null)
 const verseToMove = ref<MultiFunctionVerse | null>(null)
+const folderToMove = ref<CustomFolder | null>(null)
+const moveItemType = ref<'verse' | 'folder'>('verse') // 區分移動類型
 const isHomepageSelected = ref(false)
 
 // 刪除確認對話框狀態
 const showDeleteConfirmDialog = ref(false)
 const folderToDelete = ref<CustomFolder | null>(null)
 
-// 歷史記錄相關函數
-const removeHistoryItem = (index: number) => {
-  historyVerses.value.splice(index, 1)
-}
-
-/**
- * Clear history
- */
-const clearHistory = () => {
-  historyVerses.value = []
-}
-
-// 暴露方法供父組件使用
-defineExpose({
-  addToHistory,
-})
+// 歷史記錄相關函數（使用 store 的方法，無需額外包裝）
 
 const loadVerse = (item: MultiFunctionVerse, type: 'history' | 'custom') => {
   emit('load-verse', item, type)
@@ -865,6 +834,19 @@ const updateFolderInTree = (
 // 移動經文相關函數
 const showMoveDialog = (item: MultiFunctionVerse) => {
   verseToMove.value = item
+  folderToMove.value = null
+  moveItemType.value = 'verse'
+  moveBreadcrumb.value = []
+  selectedMoveFolder.value = null
+  isHomepageSelected.value = false
+  showMoveVerseDialog.value = true
+}
+
+// 移動資料夾相關函數
+const showMoveFolderDialog = (item: CustomFolder) => {
+  folderToMove.value = item
+  verseToMove.value = null
+  moveItemType.value = 'folder'
   moveBreadcrumb.value = []
   selectedMoveFolder.value = null
   isHomepageSelected.value = false
@@ -903,13 +885,27 @@ const selectMoveTarget = (target: CustomFolder) => {
 }
 
 const getMoveFolders = (): CustomFolder[] => {
+  let folders: CustomFolder[] = []
+
   if (selectedMoveFolder.value) {
     // 如果在某個資料夾中，返回該資料夾的子資料夾
-    return selectedMoveFolder.value.folders
+    folders = selectedMoveFolder.value.folders
   } else {
     // 如果在根目錄（首頁），返回所有資料夾（除了 Homepage）
-    return props.customFolders.filter((folder) => folder.id !== BIBLE_CONFIG.FOLDER.HOMEPAGE_ID)
+    folders = props.customFolders.filter((folder) => folder.id !== BIBLE_CONFIG.FOLDER.HOMEPAGE_ID)
   }
+
+  // 如果是移動資料夾，需要排除正在移動的資料夾及其子資料夾
+  if (moveItemType.value === 'folder' && folderToMove.value) {
+    return folders.filter((folder) => {
+      // 排除正在移動的資料夾本身
+      if (folder.id === folderToMove.value!.id) return false
+      // 排除正在移動的資料夾的子資料夾
+      return !isFolderInside(folder, folderToMove.value!)
+    })
+  }
+
+  return folders
 }
 
 const getMoveTargets = (): CustomFolder[] => {
@@ -918,15 +914,34 @@ const getMoveTargets = (): CustomFolder[] => {
 
 // 計算是否可以移動
 const canMoveToHomepage = computed(() => {
-  if (!verseToMove.value) return false
+  if (moveItemType.value === 'verse') {
+    if (!verseToMove.value) return false
 
-  // 情況1：經文在首頁，想移動到資料夾 - 需要選擇資料夾
-  if (!props.currentFolder) {
-    return selectedMoveFolder.value !== null
+    // 情況1：經文在首頁，想移動到資料夾 - 需要選擇資料夾
+    if (!props.currentFolder) {
+      return selectedMoveFolder.value !== null
+    }
+
+    // 情況2：經文在資料夾，想移動到其他位置 - 總是允許移動
+    return true
+  } else {
+    // 移動資料夾
+    if (!folderToMove.value) return false
+
+    // 情況1：資料夾在根目錄，想移動到其他資料夾 - 需要選擇資料夾
+    if (!props.currentFolder) {
+      return selectedMoveFolder.value !== null
+    }
+
+    // 情況2：資料夾在其他資料夾內，想移動到其他位置 - 需要選擇目標（可以是首頁或其他資料夾）
+    // 但不能移動到自己內部
+    if (selectedMoveFolder.value) {
+      return !isFolderInside(folderToMove.value, selectedMoveFolder.value)
+    }
+
+    // 移動到首頁（根目錄）總是允許的
+    return true
   }
-
-  // 情況2：經文在資料夾，想移動到其他位置 - 總是允許移動
-  return true
 })
 
 // 計算當前資料夾深度
@@ -940,57 +955,98 @@ const isMaxDepthReached = computed(() => {
 })
 
 const confirmMoveVerse = () => {
-  if (!verseToMove.value || !canMoveToHomepage.value) return
+  if (!canMoveToHomepage.value) return
 
-  const newFolders = [...props.customFolders]
+  if (moveItemType.value === 'verse') {
+    if (!verseToMove.value) return
 
-  // 從原位置移除經文
-  if (props.currentFolder) {
-    // 從當前資料夾中移除
-    updateFolderInTree(newFolders, props.currentFolder.id, (folder) => {
-      folder.items = folder.items.filter((item) => item.id !== verseToMove.value!.id)
-    })
-  } else {
-    // 從 Homepage 資料夾中移除
-    const homepageFolder = newFolders.find(
-      (folder) => folder.id === BIBLE_CONFIG.FOLDER.HOMEPAGE_ID,
-    )
-    if (homepageFolder) {
-      homepageFolder.items = homepageFolder.items.filter(
-        (item) => item.id !== verseToMove.value!.id,
+    const newFolders = [...props.customFolders]
+
+    // 從原位置移除經文
+    if (props.currentFolder) {
+      // 從當前資料夾中移除
+      updateFolderInTree(newFolders, props.currentFolder.id, (folder) => {
+        folder.items = folder.items.filter((item) => item.id !== verseToMove.value!.id)
+      })
+    } else {
+      // 從 Homepage 資料夾中移除
+      const homepageFolder = newFolders.find(
+        (folder) => folder.id === BIBLE_CONFIG.FOLDER.HOMEPAGE_ID,
       )
-    }
-  }
-
-  // 添加到目標位置
-  if (selectedMoveFolder.value) {
-    // 移動到資料夾
-    updateFolderInTree(newFolders, selectedMoveFolder.value.id, (folder) => {
-      folder.items.push(verseToMove.value!)
-    })
-  } else {
-    // 移動到首頁
-    let homepageFolder = newFolders.find((folder) => folder.id === BIBLE_CONFIG.FOLDER.HOMEPAGE_ID)
-    if (!homepageFolder) {
-      // 創建 Homepage 資料夾
-      homepageFolder = {
-        id: BIBLE_CONFIG.FOLDER.HOMEPAGE_ID,
-        name: $t('homepage') || BIBLE_CONFIG.FOLDER.DEFAULT_HOMEPAGE_NAME,
-        expanded: false,
-        items: [],
-        folders: [],
+      if (homepageFolder) {
+        homepageFolder.items = homepageFolder.items.filter(
+          (item) => item.id !== verseToMove.value!.id,
+        )
       }
-      newFolders.push(homepageFolder)
     }
-    homepageFolder.items.push(verseToMove.value!)
+
+    // 添加到目標位置
+    if (selectedMoveFolder.value) {
+      // 移動到資料夾
+      updateFolderInTree(newFolders, selectedMoveFolder.value.id, (folder) => {
+        folder.items.push(verseToMove.value!)
+      })
+    } else {
+      // 移動到首頁
+      let homepageFolder = newFolders.find(
+        (folder) => folder.id === BIBLE_CONFIG.FOLDER.HOMEPAGE_ID,
+      )
+      if (!homepageFolder) {
+        // 創建 Homepage 資料夾
+        homepageFolder = {
+          id: BIBLE_CONFIG.FOLDER.HOMEPAGE_ID,
+          name: $t('homepage') || BIBLE_CONFIG.FOLDER.DEFAULT_HOMEPAGE_NAME,
+          expanded: false,
+          items: [],
+          folders: [],
+        }
+        newFolders.push(homepageFolder)
+      }
+      homepageFolder.items.push(verseToMove.value!)
+    }
+
+    emit('update:customFolders', newFolders)
+  } else {
+    // 移動資料夾
+    if (!folderToMove.value) return
+
+    if (selectedMoveFolder.value) {
+      // 移動到目標資料夾
+      moveFolderToFolder(folderToMove.value, selectedMoveFolder.value)
+    } else {
+      // 移動到首頁（根目錄）
+      const newFolders = [...props.customFolders]
+
+      // 從原位置移除資料夾
+      if (props.currentFolder) {
+        updateFolderInTree(newFolders, props.currentFolder.id, (folder) => {
+          folder.folders = folder.folders.filter((f) => f.id !== folderToMove.value!.id)
+        })
+        // 添加到根目錄
+        const folder = { ...folderToMove.value, parentId: undefined }
+        newFolders.push(folder)
+        emit('update:customFolders', newFolders)
+      } else {
+        // 如果已經在根目錄，不需要移動
+        const existingIndex = newFolders.findIndex((f) => f.id === folderToMove.value!.id)
+        if (existingIndex === -1) {
+          // 如果不在根目錄，添加到根目錄
+          const folder = { ...folderToMove.value, parentId: undefined }
+          newFolders.push(folder)
+          emit('update:customFolders', newFolders)
+        }
+      }
+    }
   }
 
-  emit('update:customFolders', newFolders)
+  // 清理狀態
   showMoveVerseDialog.value = false
   verseToMove.value = null
+  folderToMove.value = null
   selectedMoveFolder.value = null
   isHomepageSelected.value = false
   moveBreadcrumb.value = []
+  moveItemType.value = 'verse'
 }
 
 // 右鍵選單處理函數
@@ -1120,14 +1176,12 @@ const moveItem = () => {
       // 使用現有的移動功能
       showMoveDialog(selectedItem.value.item as MultiFunctionVerse)
     } else if (selectedItem.value.type === 'folder') {
-      // 資料夾移動功能（暫時使用刪除確認對話框）
-      showDeleteConfirmDialog.value = true
-      folderToDelete.value = selectedItem.value.item as CustomFolder
+      // 資料夾移動功能
+      showMoveFolderDialog(selectedItem.value.item as CustomFolder)
     } else if (selectedItem.value.type === 'history') {
       // 歷史項目不能移動，這個函數不應該被調用
       console.warn('History items cannot be moved')
     }
-    // 移動 closeContextMenu 到這裡
     closeItemContextMenu()
   }
 }
@@ -1143,10 +1197,7 @@ const deleteItem = () => {
     } else if (selectedItem.value.type === 'history') {
       // 刪除歷史項目
       const historyItem = selectedItem.value.item as MultiFunctionVerse
-      const index = historyVerses.value.findIndex((item) => item.id === historyItem.id)
-      if (index !== -1) {
-        historyVerses.value.splice(index, 1)
-      }
+      bibleStore.removeHistoryItem(historyItem.id)
     }
   }
   closeItemContextMenu()

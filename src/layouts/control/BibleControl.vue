@@ -74,7 +74,6 @@
           <!-- Multi Function Control -->
           <v-col cols="12" class="mb-4" :style="{ height: `${rightTopCardHeight}px` }">
             <MultiFunctionControl
-              ref="multiFunctionControlRef"
               v-model:custom-folders="customFolders"
               v-model:current-folder-path="currentFolderPath"
               v-model:current-folder="currentFolder"
@@ -209,13 +208,8 @@ const projectionStore = useProjectionStore()
 const { sendToProjection } = useElectron()
 const { reportError } = useSentry()
 const { getLocalItem, setLocalItem } = useLocalStorage()
-
-// 使用 Bible Store（包含 Cache 功能）
 const bibleStore = useBibleStore()
-const { getBibleContent } = bibleStore
-
-// MultiFunctionControl ref（用於添加 history）
-const multiFunctionControlRef = ref<InstanceType<typeof MultiFunctionControl> | null>(null)
+const { getBibleContent, addToHistory } = bibleStore
 
 const { leftCardHeight, rightTopCardHeight, rightBottomCardHeight } = useCardLayout({
   minHeight: APP_CONFIG.UI.MIN_CARD_HEIGHT,
@@ -340,7 +334,7 @@ const updateProjection = async (verseNumber: number) => {
 
     sendBibleUpdate(bibleData, true)
 
-    addToHistory(verseNumber)
+    addToHistoryFromVerse(verseNumber)
   }
 }
 
@@ -365,17 +359,14 @@ const createMultiFunctionVerse = (verseNumber: number): MultiFunctionVerse | nul
   }
 }
 
-// 添加到歷史記錄（通過 MultiFunctionControl 的方法）
-const addToHistory = (verseNumber: number) => {
+// 添加到歷史記錄
+const addToHistoryFromVerse = (verseNumber: number) => {
   if (!currentPassage.value) return
 
   const newHistoryItem = createMultiFunctionVerse(verseNumber)
   if (!newHistoryItem) return
 
-  // 通過 MultiFunctionControl 的 ref 添加歷史記錄
-  if (multiFunctionControlRef.value) {
-    multiFunctionControlRef.value.addToHistory(newHistoryItem)
-  }
+  addToHistory(newHistoryItem)
 }
 
 // 點擊選擇經文
