@@ -65,6 +65,7 @@
                 </v-btn>
               </div>
             </div>
+            <BottomSpacer />
           </v-card-text>
         </v-card>
       </v-col>
@@ -73,13 +74,7 @@
         <v-row no-gutters class="fill-height">
           <!-- Multi Function Control -->
           <v-col cols="12" class="mb-4" :style="{ height: `${rightTopCardHeight}px` }">
-            <MultiFunctionControl
-              v-model:custom-folders="customFolders"
-              v-model:current-folder-path="currentFolderPath"
-              v-model:current-folder="currentFolder"
-              :container-height="rightTopCardHeight"
-              @load-verse="loadVerse"
-            />
+            <MultiFunctionControl :container-height="rightTopCardHeight" @load-verse="loadVerse" />
           </v-col>
 
           <!-- Projection Control -->
@@ -173,19 +168,21 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useElectron } from '@/composables/useElectron'
 import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
 import { useProjectionStore } from '@/stores/projection'
 import { useBibleStore } from '@/stores/bible'
-import { APP_CONFIG } from '@/config/app'
-import { MessageType, ViewType } from '@/types/common'
+import { APP_CONFIG, BIBLE_CONFIG } from '@/config/app'
+import { MessageType, ViewType, StorageKey, StorageCategory, getStorageKey } from '@/types/common'
+import type { VerseItem } from '@/types/common'
 import { useSentry } from '@/composables/useSentry'
 import { useCardLayout } from '@/composables/useLayout'
 import { useLocalStorage } from '@/composables/useLocalStorage'
 import ContextMenu from '@/components/ContextMenu.vue'
 import MultiFunctionControl from '@/components/Bible/MultiFunctionControl.vue'
+import BottomSpacer from '@/components/Bible/BottomSpacer.vue'
 
 interface BiblePassage {
   bookAbbreviation: string
@@ -237,24 +234,10 @@ const getInitialFontSize = () => {
 }
 const fontSize = ref(getInitialFontSize())
 
-// 歷史記錄
-import type { MultiFunctionVerse } from '@/types/bible'
-import { BIBLE_CONFIG } from '@/config/app'
-import { StorageKey, StorageCategory, getStorageKey } from '@/types/common'
-
-// 自訂資料夾
-interface CustomFolder {
-  id: string
-  name: string
-  expanded: boolean
-  items: MultiFunctionVerse[]
-  folders: CustomFolder[]
-  parentId?: string
-}
-
-const customFolders = ref<CustomFolder[]>([])
-const currentFolderPath = ref<string[]>([]) // 當前資料夾路徑
-const currentFolder = ref<CustomFolder | null>(null) // 當前所在的資料夾
+// Use store for folder management and navigation
+const { folderStore } = bibleStore
+const { loadRootFolder } = folderStore
+const { addVerseToCurrent } = bibleStore
 
 // 右鍵選單相關
 const contextMenuRef = ref<InstanceType<typeof ContextMenu> | null>(null)
@@ -339,17 +322,18 @@ const updateProjection = async (verseNumber: number) => {
 }
 
 /**
- * 創建 MultiFunctionVerse 物件
+ * 創建 VerseItem 物件
  * @param verseNumber - 節號
- * @returns MultiFunctionVerse 物件，如果 currentPassage 不存在則返回 null
+ * @returns VerseItem 物件，如果 currentPassage 不存在則返回 null
  */
-const createMultiFunctionVerse = (verseNumber: number): MultiFunctionVerse | null => {
+const createMultiFunctionVerse = (verseNumber: number): VerseItem | null => {
   if (!currentPassage.value) return null
 
   const verseText = chapterVerses.value.find((v) => v.number === verseNumber)?.text || ''
 
   return {
     id: crypto.randomUUID(),
+    type: 'verse',
     bookAbbreviation: currentPassage.value.bookAbbreviation,
     bookNumber: currentPassage.value.bookNumber,
     chapter: currentPassage.value.chapter,
@@ -539,29 +523,44 @@ const updateProjectionFontSize = () => {
 }
 
 // 歷史記錄相關函數
-const loadVerse = async (item: MultiFunctionVerse, type: 'history' | 'custom') => {
+const loadVerse = async (item: VerseItem, type: 'history' | 'custom') => {
   try {
     // 獲取當前選中的版本
     const savedVersion = getLocalItem<number>(
       getStorageKey(StorageCategory.BIBLE, StorageKey.SELECTED_VERSION),
+      'int',
     )
-    const versionId = savedVersion ? savedVersion : 1
+    const versionId = savedVersion || 1
 
     const content = await getBibleContent(versionId)
-    if (content) {
-      // 找到對應的書卷
-      const book = content.books.find((b) => b.number === item.bookNumber)
-      if (book) {
-        handleVerseSelection(book, item.chapter, item.verse)
-      }
+    if (!content) {
+      reportError(new Error('Bible content not found'), {
+        operation: 'load-verse',
+        component: 'BibleControl',
+        extra: { versionId, item },
+      })
+      return
     }
+
+    // 找到對應的書卷
+    const book = content.books.find((b) => b.number === item.bookNumber)
+    if (!book) {
+      reportError(new Error('Book not found'), {
+        operation: 'load-verse',
+        component: 'BibleControl',
+        extra: { versionId, bookNumber: item.bookNumber, item },
+      })
+      return
+    }
+
+    handleVerseSelection(book, item.chapter, item.verse)
 
     if (type === 'custom') {
       updateProjection(item.verse)
     }
   } catch (error) {
     reportError(error, {
-      operation: 'load-history-verse',
+      operation: 'load-verse',
       component: 'BibleControl',
       extra: { verseId: item.id },
     })
@@ -574,60 +573,8 @@ const addVerseToCustom = (verseNumber: number) => {
   const newVerse = createMultiFunctionVerse(verseNumber)
   if (!newVerse) return
 
-  // 基於當前顯示的位置添加經文
-  if (currentFolder.value) {
-    // 檢查是否已存在相同的經文
-    const exists = currentFolder.value.items.some(
-      (item) =>
-        item.bookNumber === newVerse.bookNumber &&
-        item.chapter === newVerse.chapter &&
-        item.verse === newVerse.verse,
-    )
-    if (!exists) {
-      currentFolder.value.items.push(newVerse)
-    }
-  } else {
-    let homepageFolder = customFolders.value.find((folder) => folder.id === 'homepage')
-
-    if (!homepageFolder) {
-      homepageFolder = {
-        id: 'homepage',
-        name: 'Homepage',
-        expanded: false,
-        items: [],
-        folders: [],
-      }
-      customFolders.value.push(homepageFolder)
-    }
-
-    const exists = homepageFolder.items.some(
-      (item) =>
-        item.bookNumber === newVerse.bookNumber &&
-        item.chapter === newVerse.chapter &&
-        item.verse === newVerse.verse,
-    )
-    if (!exists) {
-      homepageFolder.items.push(newVerse)
-    }
-  }
-}
-
-const saveCustomToStorage = () => {
-  setLocalItem(
-    getStorageKey(StorageCategory.BIBLE, StorageKey.CUSTOM_FOLDERS),
-    customFolders.value,
-    'array',
-  )
-}
-
-const loadCustomFromStorage = () => {
-  const saved = getLocalItem<CustomFolder[]>(
-    getStorageKey(StorageCategory.BIBLE, StorageKey.CUSTOM_FOLDERS),
-    'array',
-  )
-  if (saved) {
-    customFolders.value = saved
-  }
+  // Call store action - it handles duplicate checking
+  addVerseToCurrent(newVerse)
 }
 
 // 快捷鍵處理
@@ -691,19 +638,10 @@ const copyVerseText = async () => {
   closeVerseContextMenu()
 }
 
-// 監聽 customFolders 變化並自動保存
-watch(
-  customFolders,
-  () => {
-    saveCustomToStorage()
-  },
-  { deep: true },
-)
-
 // 監聽來自ExtendedToolbar的事件（通過全局事件或props）
 onMounted(() => {
-  // 載入儲存的數據（只有 customFolders 需要持久化，history 使用 store 管理）
-  loadCustomFromStorage()
+  // 載入儲存的數據（rootFolder 已包含在 store 中，會自動遷移舊格式）
+  loadRootFolder()
 
   // 監聽經文選擇事件
   const eventHandler = (event: Event) => {

@@ -271,7 +271,7 @@ export enum StorageKey {
   THEME = 'theme',
   // Bible related
   SELECTED_VERSION = 'selected-version',
-  CUSTOM_FOLDERS = 'custom-folders',
+  FOLDERS = 'folders',
   CURRENT_FOLDER_PATH = 'current-folder-path',
   CURRENT_FOLDER = 'current-folder',
   FONT_SIZE = 'font-size',
@@ -307,4 +307,68 @@ export function getStorageKey(category: StorageCategory, key: StorageKey | strin
     return key
   }
   return `hhc-${category}-${key}`
+}
+
+/**
+ * Base interface for all folder items
+ * All items in folders must implement this interface
+ */
+export interface FolderItem {
+  id: string
+  type: 'verse' | 'file' // Type discriminator for Discriminated Union
+  timestamp: number // Timestamp when the item was created or last modified
+}
+
+/**
+ * File metadata for distinguishing file types (image, video, pdf, etc.)
+ * Used in FileItem to identify the specific file type
+ */
+export interface FileMetadata {
+  fileType: 'image' | 'video' | 'pdf' | 'audio' | 'document'
+  width?: number // Image/Video dimensions
+  height?: number // Image/Video dimensions
+  duration?: number // Video/Audio duration in seconds
+  thumbnail?: string // Video thumbnail URL
+  pageCount?: number // PDF page count
+  mimeType?: string // File MIME type
+  [key: string]: unknown // Allow extensibility
+}
+
+/**
+ * File item interface for organizing media files
+ * Images, videos, PDFs, etc. are all FileItems with different metadata.fileType
+ */
+export interface FileItem extends FolderItem {
+  type: 'file'
+  name: string
+  url: string
+  size: number // File size in bytes
+  metadata: FileMetadata
+}
+
+/**
+ * Verse item interface for organizing Bible verses
+ * Used in history and custom folders
+ * Extends FolderItem with type: 'verse'
+ */
+export interface VerseItem extends FolderItem {
+  type: 'verse'
+  bookAbbreviation: string
+  bookNumber: number
+  chapter: number
+  verse: number
+  verseText: string
+}
+
+/**
+ * Generic folder interface for organizing items
+ * @template TItem - The type of items in the folder (must extend FolderItem)
+ */
+export interface Folder<TItem extends FolderItem = FolderItem> {
+  id: string
+  name: string
+  expanded?: boolean
+  items: TItem[]
+  folders: Folder<TItem>[]
+  parentId?: string
 }

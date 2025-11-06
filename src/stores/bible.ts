@@ -1,15 +1,20 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { BibleCacheItem, BibleContent, MultiFunctionVerse } from '@/types/bible'
+import { storeToRefs } from 'pinia'
+import type { BibleCacheItem, BibleContent } from '@/types/bible'
+import type { VerseItem } from '@/types/common'
 import { BibleCacheConfig } from '@/types/bible'
+import { APP_CONFIG } from '@/config/app'
+import { StorageKey, StorageCategory } from '@/types/common'
 import { useIndexedDB } from '@/composables/useIndexedDB'
+import { useFolderStore } from './folder'
 
 export const useBibleStore = defineStore('bible', () => {
   /**
    * History of verses viewed by the user
    * Array of verses that have been accessed, limited to 50 items
    */
-  const historyVerses = ref<MultiFunctionVerse[]>([])
+  const historyVerses = ref<VerseItem[]>([])
 
   /**
    * Currently loaded Bible content in memory
@@ -111,24 +116,25 @@ export const useBibleStore = defineStore('bible', () => {
 
   /**
    * Add verse to history
-   * If the verse already exists (same book, chapter, verse), removes the old record first
-   * Maintains history limit of 50 items by removing the oldest when exceeded
    * @param verse - The verse to add to history
    */
-  const addToHistory = (verse: MultiFunctionVerse) => {
+  const addToHistory = (verse: VerseItem) => {
+    const latestHistory = historyVerses.value[0]
     const existingIndex = historyVerses.value.findIndex(
       (item) =>
         item.bookNumber === verse.bookNumber &&
         item.chapter === verse.chapter &&
         item.verse === verse.verse,
     )
-
-    if (existingIndex !== -1) {
-      // If it already exists, remove the old record
-      historyVerses.value.splice(existingIndex, 1)
+    if (
+      (latestHistory &&
+        latestHistory.bookNumber === verse.bookNumber &&
+        latestHistory.chapter === verse.chapter) ||
+      existingIndex !== -1
+    ) {
+      return
     }
 
-    // Add new record to the beginning
     historyVerses.value.unshift(verse)
 
     // Limit the history record count (maximum 50 records)
@@ -152,6 +158,42 @@ export const useBibleStore = defineStore('bible', () => {
     historyVerses.value = []
   }
 
+  /**
+   * Bible folder store instance
+   * Manages folder structure for Bible verses
+   */
+  const folderStore = useFolderStore<VerseItem>({
+    rootId: APP_CONFIG.FOLDER.ROOT_ID,
+    defaultRootName: APP_CONFIG.FOLDER.DEFAULT_ROOT_NAME,
+    storageCategory: StorageCategory.BIBLE,
+    storageKey: StorageKey.FOLDERS,
+  })
+
+  /**
+   * Add a verse to the current folder with duplicate checking
+   * Bible-specific business logic: checks for duplicate verses based on book, chapter, and verse number
+   * @param verse - The verse item to add
+   * @returns true if added, false if duplicate
+   */
+  const addVerseToCurrent = (verse: VerseItem): boolean => {
+    // Bible-specific duplicate check: same book, chapter, and verse
+    // Use storeToRefs to get reactive currentFolder
+    const { currentFolder } = storeToRefs(folderStore)
+    const exists = currentFolder.value.items.some(
+      (item: VerseItem) =>
+        item.bookNumber === verse.bookNumber &&
+        item.chapter === verse.chapter &&
+        item.verse === verse.verse,
+    )
+
+    if (!exists) {
+      // Use folder store's generic addItemToCurrent (pure push)
+      folderStore.addItemToCurrent(verse)
+      return true
+    }
+    return false
+  }
+
   return {
     // Bible Content Cache
     currentBibleContent,
@@ -164,5 +206,9 @@ export const useBibleStore = defineStore('bible', () => {
     addToHistory,
     removeHistoryItem,
     clearHistory,
+    // Folder Store (re-export for convenience)
+    folderStore,
+    // Bible-specific folder operations
+    addVerseToCurrent,
   }
 })

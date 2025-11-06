@@ -37,6 +37,13 @@ export const APP_CONFIG = {
       DELAY: 1000,
     },
   },
+
+  // Folder configuration
+  FOLDER: {
+    ROOT_ID: 'root',
+    MAX_DEPTH: 3,
+    DEFAULT_ROOT_NAME: 'Root',
+  },
 }
 
 // ==================== Bible Related Configuration ====================
@@ -57,13 +64,6 @@ export const BIBLE_CONFIG = {
       showVerseNumber: true,
       showBookAbbreviation: true,
     },
-  },
-
-  // Folder configuration
-  FOLDER: {
-    HOMEPAGE_ID: 'homepage',
-    MAX_DEPTH: 3,
-    DEFAULT_HOMEPAGE_NAME: 'Homepage',
   },
 }
 

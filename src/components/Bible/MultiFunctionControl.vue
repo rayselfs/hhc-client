@@ -17,21 +17,21 @@
             class="pa-0 text-subtitle-1"
             variant="text"
             :disabled="!currentFolder"
-            @click="navigateToRoot"
+            @click="navigateToRoot()"
           >
             <v-icon class="mr-1">mdi-home</v-icon>
             {{ $t('homepage') }}
           </v-btn>
-          <v-icon v-if="currentFolderPath.length > 0" size="x-small" class="ml-1 mr-1"
+          <v-icon v-if="currentFolderPath.length > 1" size="x-small" class="ml-1 mr-1"
             >mdi-chevron-right</v-icon
           >
-          <span v-for="(folderId, index) in currentFolderPath" :key="folderId">
+          <span v-for="(folderId, index) in currentFolderPath.slice(1)" :key="folderId">
             <v-btn
               size="small"
               class="pa-0 text-subtitle-1"
               variant="text"
               :disabled="index === currentFolderPath.length - 1"
-              @click="navigateToFolder(folderId)"
+              @click="handleNavigateToFolder(folderId)"
             >
               <v-icon class="mr-1">mdi-folder</v-icon>
               {{ getFolderById(folderId)?.name }}
@@ -119,14 +119,14 @@
       <div v-else class="custom-content">
         <div class="custom-list">
           <div
-            v-if="getCurrentFolders().length === 0 && getCurrentVerses().length === 0"
+            v-if="getCurrentFolders.length === 0 && getCurrentVerses.length === 0"
             class="text-center pa-4 text-grey"
           >
             {{ $t('noCustomItems') }}
           </div>
           <div v-else>
             <!-- 資料夾列表 -->
-            <div v-for="folder in getCurrentFolders()" :key="folder.id" class="mb-2">
+            <div v-for="folder in getCurrentFolders" :key="folder.id" class="mb-2">
               <div
                 class="verse-item pa-2 d-flex align-center justify-space-between"
                 draggable="true"
@@ -135,7 +135,7 @@
                 @dragenter="handleDragEnter"
                 @dragleave="handleDragLeave"
                 @drop="handleDrop($event, folder)"
-                @dblclick="enterFolder(folder.id)"
+                @dblclick="handleEnterFolder(folder.id)"
                 @contextmenu="handleRightClick($event, 'folder', folder)"
               >
                 <div class="d-flex align-center text-subtitle-1">
@@ -147,7 +147,7 @@
                   icon
                   size="small"
                   variant="text"
-                  @click.stop="deleteFolder(folder.id)"
+                  @click.stop="showDeleteFolderDialog(folder.id)"
                 >
                   <v-icon>mdi-delete</v-icon>
                 </v-btn>
@@ -156,7 +156,7 @@
 
             <!-- 經文列表 -->
             <div
-              v-for="item in getCurrentVerses()"
+              v-for="item in getCurrentVerses"
               :key="item.id"
               class="verse-item pa-2 mb-1 d-flex align-center justify-space-between"
               draggable="true"
@@ -252,7 +252,7 @@
         <v-card-text>
           <!-- 移動目標列表 -->
           <div class="move-folder-list">
-            <div v-if="getMoveTargets().length === 0" class="text-center pa-4 text-grey">
+            <div v-if="getMoveFolders().length === 0" class="text-center pa-4 text-grey">
               {{ $t('noFolder') }}
             </div>
             <div v-else>
@@ -276,7 +276,7 @@
         <v-card-actions>
           <v-spacer />
           <v-btn @click="showMoveVerseDialog = false">{{ $t('cancel') || 'Cancel' }}</v-btn>
-          <v-btn color="primary" @click="confirmMoveVerse" :disabled="!canMoveToHomepage">
+          <v-btn color="primary" @click="confirmMoveVerse" :disabled="!canMoveToRoot">
             {{ $t('move') }}
           </v-btn>
         </v-card-actions>
@@ -329,7 +329,7 @@
             </template>
             <v-list-item-title>{{ $t('copy') }}</v-list-item-title>
           </v-list-item>
-          <v-list-item @click="moveItem">
+          <v-list-item @click="showMoveItemDialog">
             <template #prepend>
               <v-icon>mdi-folder-move</v-icon>
             </template>
@@ -346,7 +346,7 @@
 
       <!-- 當沒有選中項目但有複製內容時，在 custom 頁面顯示：貼上 -->
       <template v-else-if="copiedItem && multiFunctionTab === 'custom'">
-        <v-list-item @click="pasteItem">
+        <v-list-item @click="pasteItemHandler">
           <template #prepend>
             <v-icon>mdi-content-paste</v-icon>
           </template>
@@ -371,58 +371,63 @@
 import { ref, computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
-import { v4 as uuidv4 } from 'uuid'
-import type { MultiFunctionVerse } from '@/types/bible'
-import { BIBLE_CONFIG } from '@/config/app'
+import type { VerseItem, Folder } from '@/types/common'
 import { useSentry } from '@/composables/useSentry'
 import { useBibleStore } from '@/stores/bible'
 import ContextMenu from '@/components/ContextMenu.vue'
+import { APP_CONFIG } from '@/config/app'
 
 const { t: $t } = useI18n()
 
 // Sentry
 const { reportError } = useSentry()
 
-// 自訂資料夾介面
-interface CustomFolder {
-  id: string
-  name: string
-  expanded: boolean
-  items: MultiFunctionVerse[]
-  folders: CustomFolder[]
-  parentId?: string
-}
-
 // Props
 interface Props {
-  customFolders: CustomFolder[]
-  currentFolderPath: string[]
-  currentFolder: CustomFolder | null
   containerHeight?: number
 }
 
 // Emits
 interface Emits {
-  (e: 'update:customFolders', value: CustomFolder[]): void
-  (e: 'update:currentFolderPath', value: string[]): void
-  (e: 'update:currentFolder', value: CustomFolder | null): void
-  (e: 'load-verse', item: MultiFunctionVerse, type: 'history' | 'custom'): void
+  (e: 'load-verse', item: VerseItem, type: 'history' | 'custom'): void
 }
 
 const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
-// Bible store - 使用 store 管理歷史記錄
+// Bible store - for history management
 const bibleStore = useBibleStore()
 const { historyVerses } = storeToRefs(bibleStore)
-const { removeHistoryItem, clearHistory } = bibleStore
+const { removeHistoryItem, clearHistory, folderStore } = bibleStore
+
+// Folder store - for all folder operations
+const {
+  currentFolderPath,
+  currentFolder,
+  getCurrentFolders,
+  getCurrentItems: getCurrentVerses,
+} = storeToRefs(folderStore)
+const {
+  navigateToRoot,
+  navigateToFolder,
+  enterFolder,
+  addFolderToCurrent,
+  removeItemFromCurrent,
+  deleteFolder: deleteFolderAction,
+  moveItem: moveItemAction,
+  moveFolder: moveFolderAction,
+  pasteItem,
+  getFolderById,
+  getMoveTargets,
+  isFolderInside,
+} = folderStore
 
 // 狀態
 const multiFunctionTab = ref('history')
 const showFolderDialog = ref(false)
 const folderName = ref('')
 
-// 監聽頁面切換，切換到 custom 時重置到 homepage
+// 監聽頁面切換，切換到 custom 時重置到 root
 watch(multiFunctionTab, (newTab) => {
   if (newTab === 'custom') {
     navigateToRoot()
@@ -434,31 +439,28 @@ const contextMenuRef = ref<InstanceType<typeof ContextMenu> | null>(null)
 
 const selectedItem = ref<{
   type: 'verse' | 'folder' | 'history'
-  item: MultiFunctionVerse | CustomFolder
+  item: VerseItem | Folder<VerseItem>
 } | null>(null)
 
 // 複製/貼上相關
 const copiedItem = ref<{
   type: 'verse' | 'folder' | 'history'
-  item: MultiFunctionVerse | CustomFolder
+  item: VerseItem | Folder<VerseItem>
 } | null>(null)
 
 // 移動相關狀態
 const showMoveVerseDialog = ref(false)
 const moveBreadcrumb = ref<string[]>([])
-const selectedMoveFolder = ref<CustomFolder | null>(null)
-const verseToMove = ref<MultiFunctionVerse | null>(null)
-const folderToMove = ref<CustomFolder | null>(null)
+const selectedMoveFolder = ref<Folder<VerseItem> | null>(null)
+const verseToMove = ref<VerseItem | null>(null)
+const folderToMove = ref<Folder<VerseItem> | null>(null)
 const moveItemType = ref<'verse' | 'folder'>('verse') // 區分移動類型
-const isHomepageSelected = ref(false)
 
 // 刪除確認對話框狀態
 const showDeleteConfirmDialog = ref(false)
-const folderToDelete = ref<CustomFolder | null>(null)
+const folderToDelete = ref<Folder<VerseItem> | null>(null)
 
-// 歷史記錄相關函數（使用 store 的方法，無需額外包裝）
-
-const loadVerse = (item: MultiFunctionVerse, type: 'history' | 'custom') => {
+const loadVerse = (item: VerseItem, type: 'history' | 'custom') => {
   emit('load-verse', item, type)
 }
 
@@ -471,104 +473,28 @@ const createNewFolder = () => {
 
 const confirmCreateFolder = () => {
   if (folderName.value.trim()) {
-    const newFolder: CustomFolder = {
-      id: uuidv4(),
-      name: folderName.value.trim(),
-      expanded: false,
-      items: [],
-      folders: [],
-      parentId: props.currentFolder?.id,
-    }
-
-    const newFolders = [...props.customFolders]
-
-    if (props.currentFolder) {
-      updateFolderInTree(newFolders, props.currentFolder.id, (folder) => {
-        folder.folders.push(newFolder)
-      })
-    } else {
-      newFolders.push(newFolder)
-    }
-
-    emit('update:customFolders', newFolders)
+    // Call store action - direct mutation
+    addFolderToCurrent(folderName.value)
     showFolderDialog.value = false
     folderName.value = ''
   }
 }
 
-// 導航相關函數
-const navigateToRoot = () => {
-  emit('update:currentFolderPath', [])
-  emit('update:currentFolder', null)
+// Navigation functions (now use store actions)
+const handleNavigateToFolder = (folderId: string) => {
+  navigateToFolder(folderId)
 }
 
-const navigateToFolder = (folderId: string) => {
-  const folder = getFolderById(folderId)
-  if (folder) {
-    const index = props.currentFolderPath.indexOf(folderId)
-    const newPath =
-      index !== -1 ? props.currentFolderPath.slice(0, index + 1) : props.currentFolderPath
-    emit('update:currentFolderPath', newPath)
-    emit('update:currentFolder', folder)
+const handleEnterFolder = (folderId: string) => {
+  enterFolder(folderId)
+
+  // Clear text selection to prevent folder name highlighting
+  if (window.getSelection) {
+    window.getSelection()?.removeAllRanges()
   }
 }
 
-const enterFolder = (folderId: string) => {
-  const folder = getFolderById(folderId)
-  if (folder) {
-    const newPath = [...props.currentFolderPath, folderId]
-    emit('update:currentFolderPath', newPath)
-    emit('update:currentFolder', folder)
-
-    // 清除文字選擇，防止資料夾名稱被反白
-    if (window.getSelection) {
-      window.getSelection()?.removeAllRanges()
-    }
-  }
-}
-
-const getFolderById = (folderId: string): CustomFolder | null => {
-  for (const folder of props.customFolders) {
-    if (folder.id === folderId) return folder
-    const found = findFolderInTree(folder, folderId)
-    if (found) return found
-  }
-  return null
-}
-
-const findFolderInTree = (folder: CustomFolder, folderId: string): CustomFolder | null => {
-  for (const subFolder of folder.folders) {
-    if (subFolder.id === folderId) return subFolder
-    const found = findFolderInTree(subFolder, folderId)
-    if (found) return found
-  }
-  return null
-}
-
-const getCurrentFolders = (): CustomFolder[] => {
-  if (props.currentFolder) {
-    // 如果在資料夾中，返回該資料夾的子資料夾
-    return props.currentFolder.folders
-  } else {
-    // 如果在 Homepage，返回所有資料夾（除了 Homepage 資料夾本身）
-    return props.customFolders.filter((folder) => folder.id !== BIBLE_CONFIG.FOLDER.HOMEPAGE_ID)
-  }
-}
-
-const getCurrentVerses = (): MultiFunctionVerse[] => {
-  if (props.currentFolder) {
-    // 如果在資料夾中，返回該資料夾的經文
-    return props.currentFolder.items
-  } else {
-    // 如果在 Homepage，返回 Homepage 資料夾的經文
-    const homepageFolder = props.customFolders.find(
-      (folder) => folder.id === BIBLE_CONFIG.FOLDER.HOMEPAGE_ID,
-    )
-    return homepageFolder ? homepageFolder.items : []
-  }
-}
-
-const deleteFolder = (folderId: string) => {
+const showDeleteFolderDialog = (folderId: string) => {
   const folder = getFolderById(folderId)
   if (folder) {
     folderToDelete.value = folder
@@ -578,53 +504,22 @@ const deleteFolder = (folderId: string) => {
 
 const confirmDeleteFolder = () => {
   if (folderToDelete.value) {
-    const newFolders = [...props.customFolders]
-    deleteFolderRecursive(newFolders, folderToDelete.value.id)
-    emit('update:customFolders', newFolders)
+    // Call store action - direct mutation
+    deleteFolderAction(folderToDelete.value.id)
     showDeleteConfirmDialog.value = false
     folderToDelete.value = null
   }
 }
 
-const deleteFolderRecursive = (folders: CustomFolder[], id: string): boolean => {
-  for (let i = 0; i < folders.length; i++) {
-    const folder = folders[i]
-    if (folder && folder.id === id) {
-      folders.splice(i, 1)
-      return true
-    }
-    if (folder && folder.folders && deleteFolderRecursive(folder.folders, id)) {
-      return true
-    }
-  }
-  return false
-}
-
 const removeFromCurrentFolder = (itemId: string) => {
-  const newFolders = [...props.customFolders]
-
-  if (props.currentFolder) {
-    // 從當前資料夾中移除
-    updateFolderInTree(newFolders, props.currentFolder.id, (folder) => {
-      folder.items = folder.items.filter((item) => item.id !== itemId)
-    })
-  } else {
-    // 從 Homepage 資料夾中移除
-    const homepageFolder = newFolders.find(
-      (folder) => folder.id === BIBLE_CONFIG.FOLDER.HOMEPAGE_ID,
-    )
-    if (homepageFolder) {
-      homepageFolder.items = homepageFolder.items.filter((item) => item.id !== itemId)
-    }
-  }
-
-  emit('update:customFolders', newFolders)
+  // Call store action - direct mutation
+  removeItemFromCurrent(itemId)
 }
 
 const handleDragStart = (
   event: DragEvent,
   type: 'verse' | 'folder',
-  item: MultiFunctionVerse | CustomFolder,
+  item: VerseItem | Folder<VerseItem>,
 ) => {
   if (event.dataTransfer) {
     // 設置拖移數據
@@ -650,7 +545,7 @@ const handleDragStart = (
 // 創建拖移時的視覺效果
 const createDragImage = (
   type: 'verse' | 'folder',
-  item: MultiFunctionVerse | CustomFolder,
+  item: VerseItem | Folder<VerseItem>,
 ): HTMLElement | null => {
   const dragImage = document.createElement('div')
   dragImage.style.position = 'absolute'
@@ -666,7 +561,7 @@ const createDragImage = (
   dragImage.style.fontWeight = '500'
 
   if (type === 'verse') {
-    const verse = item as MultiFunctionVerse
+    const verse = item as VerseItem
     dragImage.innerHTML = `
       <div style="display: flex; align-items: center; gap: 8px;">
         <span style="background-color: rgb(var(--v-theme-primary)); color: white; padding: 2px 6px; border-radius: 12px; font-size: 12px; font-weight: 500;">
@@ -675,7 +570,7 @@ const createDragImage = (
       </div>
     `
   } else {
-    const folder = item as CustomFolder
+    const folder = item as Folder<VerseItem>
     dragImage.innerHTML = `
       <div style="display: flex; align-items: center; gap: 8px;">
         <i class="mdi mdi-folder" style="color: rgb(var(--v-theme-primary)); font-size: 16px;"></i>
@@ -718,7 +613,7 @@ const handleDragLeave = (event: DragEvent) => {
   }
 }
 
-const handleDrop = (event: DragEvent, targetFolder: CustomFolder) => {
+const handleDrop = (event: DragEvent, targetFolder: Folder<VerseItem>) => {
   event.preventDefault()
 
   // 移除拖移高亮效果
@@ -732,9 +627,9 @@ const handleDrop = (event: DragEvent, targetFolder: CustomFolder) => {
     const { type, item } = data
 
     if (type === 'verse') {
-      moveVerseToFolder(item as MultiFunctionVerse, targetFolder)
+      moveVerseToFolder(item as VerseItem, targetFolder)
     } else if (type === 'folder') {
-      moveFolderToFolder(item as CustomFolder, targetFolder)
+      moveFolderToFolder(item as Folder<VerseItem>, targetFolder)
     }
   } catch (error) {
     reportError(error, {
@@ -744,119 +639,49 @@ const handleDrop = (event: DragEvent, targetFolder: CustomFolder) => {
   }
 }
 
-// 移動經文到資料夾
-const moveVerseToFolder = (verse: MultiFunctionVerse, targetFolder: CustomFolder) => {
-  const newFolders = [...props.customFolders]
-
-  // 從原位置移除經文
-  if (props.currentFolder) {
-    updateFolderInTree(newFolders, props.currentFolder.id, (folder) => {
-      folder.items = folder.items.filter((item) => item.id !== verse.id)
-    })
-  } else {
-    const homepageFolder = newFolders.find(
-      (folder) => folder.id === BIBLE_CONFIG.FOLDER.HOMEPAGE_ID,
-    )
-    if (homepageFolder) {
-      homepageFolder.items = homepageFolder.items.filter((item) => item.id !== verse.id)
-    }
-  }
-
-  // 添加到目標資料夾
-  updateFolderInTree(newFolders, targetFolder.id, (folder) => {
-    folder.items.push(verse)
-  })
-
-  emit('update:customFolders', newFolders)
+// Move verse to folder (drag & drop)
+const moveVerseToFolder = (verse: VerseItem, targetFolder: Folder<VerseItem>) => {
+  const sourceFolderId =
+    currentFolder.value.id === APP_CONFIG.FOLDER.ROOT_ID
+      ? APP_CONFIG.FOLDER.ROOT_ID
+      : currentFolder.value.id
+  // Call store action - direct mutation
+  moveItemAction(verse, targetFolder.id, sourceFolderId)
 }
 
-// 移動資料夾到另一個資料夾
-const moveFolderToFolder = (folderToMove: CustomFolder, targetFolder: CustomFolder) => {
-  // 防止將資料夾移動到自己內部
-  if (isFolderInside(folderToMove, targetFolder)) {
-    return
-  }
-
-  const newFolders = [...props.customFolders]
-
-  // 從原位置移除資料夾
-  if (props.currentFolder) {
-    updateFolderInTree(newFolders, props.currentFolder.id, (folder) => {
-      folder.folders = folder.folders.filter((f) => f.id !== folderToMove.id)
-    })
-  } else {
-    // 從根目錄移除
-    const index = newFolders.findIndex((f) => f.id === folderToMove.id)
-    if (index !== -1) {
-      newFolders.splice(index, 1)
-    }
-  }
-
-  // 添加到目標資料夾
-  updateFolderInTree(newFolders, targetFolder.id, (folder) => {
-    folderToMove.parentId = targetFolder.id
-    folder.folders.push(folderToMove)
-  })
-
-  emit('update:customFolders', newFolders)
+// Move folder to another folder (drag & drop)
+const moveFolderToFolder = (folderToMove: Folder<VerseItem>, targetFolder: Folder<VerseItem>) => {
+  const sourceFolderId =
+    currentFolder.value.id === APP_CONFIG.FOLDER.ROOT_ID
+      ? APP_CONFIG.FOLDER.ROOT_ID
+      : currentFolder.value.id
+  // Call store action - direct mutation
+  moveFolderAction(folderToMove, targetFolder.id, sourceFolderId)
 }
 
-// 檢查資料夾是否在另一個資料夾內部
-const isFolderInside = (folderToMove: CustomFolder, targetFolder: CustomFolder): boolean => {
-  if (folderToMove.id === targetFolder.id) return true
-
-  for (const subFolder of targetFolder.folders) {
-    if (isFolderInside(folderToMove, subFolder)) {
-      return true
-    }
-  }
-
-  return false
-}
-
-const updateFolderInTree = (
-  folders: CustomFolder[],
-  folderId: string,
-  updater: (folder: CustomFolder) => void,
-): boolean => {
-  for (const folder of folders) {
-    if (folder.id === folderId) {
-      updater(folder)
-      return true
-    }
-    if (updateFolderInTree(folder.folders, folderId, updater)) {
-      return true
-    }
-  }
-  return false
-}
-
-// 移動經文相關函數
-const showMoveDialog = (item: MultiFunctionVerse) => {
+// Move verse related functions
+const showMoveDialog = (item: VerseItem) => {
   verseToMove.value = item
   folderToMove.value = null
   moveItemType.value = 'verse'
   moveBreadcrumb.value = []
   selectedMoveFolder.value = null
-  isHomepageSelected.value = false
   showMoveVerseDialog.value = true
 }
 
 // 移動資料夾相關函數
-const showMoveFolderDialog = (item: CustomFolder) => {
+const showMoveFolderDialog = (item: Folder<VerseItem>) => {
   folderToMove.value = item
   verseToMove.value = null
   moveItemType.value = 'folder'
   moveBreadcrumb.value = []
   selectedMoveFolder.value = null
-  isHomepageSelected.value = false
   showMoveVerseDialog.value = true
 }
 
 const navigateMoveToRoot = () => {
   moveBreadcrumb.value = []
   selectedMoveFolder.value = null
-  isHomepageSelected.value = false
 }
 
 const navigateMoveToFolder = (folderId: string) => {
@@ -869,182 +694,99 @@ const navigateMoveToFolder = (folderId: string) => {
   }
 }
 
-const selectMoveTarget = (target: CustomFolder) => {
+const selectMoveTarget = (target: Folder<VerseItem>) => {
   // 選擇資料夾
-  isHomepageSelected.value = false
   const folder = getFolderById(target.id)
-  if (folder && folder.folders.length > 0) {
-    // 如果有子資料夾，進入該資料夾
-    moveBreadcrumb.value = [...moveBreadcrumb.value, target.id]
-    selectedMoveFolder.value = folder
-  } else {
-    // 如果沒有子資料夾，也要將資料夾添加到麵包屑中
+  if (folder) {
+    // 將資料夾添加到麵包屑中
     moveBreadcrumb.value = [...moveBreadcrumb.value, target.id]
     selectedMoveFolder.value = folder
   }
 }
 
-const getMoveFolders = (): CustomFolder[] => {
-  let folders: CustomFolder[] = []
-
-  if (selectedMoveFolder.value) {
-    // 如果在某個資料夾中，返回該資料夾的子資料夾
-    folders = selectedMoveFolder.value.folders
-  } else {
-    // 如果在根目錄（首頁），返回所有資料夾（除了 Homepage）
-    folders = props.customFolders.filter((folder) => folder.id !== BIBLE_CONFIG.FOLDER.HOMEPAGE_ID)
-  }
-
-  // 如果是移動資料夾，需要排除正在移動的資料夾及其子資料夾
-  if (moveItemType.value === 'folder' && folderToMove.value) {
-    return folders.filter((folder) => {
-      // 排除正在移動的資料夾本身
-      if (folder.id === folderToMove.value!.id) return false
-      // 排除正在移動的資料夾的子資料夾
-      return !isFolderInside(folder, folderToMove.value!)
-    })
-  }
-
-  return folders
+const getMoveFolders = (): Folder<VerseItem>[] => {
+  const excludeFolderId =
+    moveItemType.value === 'folder' && folderToMove.value ? folderToMove.value.id : undefined
+  return getMoveTargets(selectedMoveFolder.value, excludeFolderId)
 }
 
-const getMoveTargets = (): CustomFolder[] => {
-  return getMoveFolders()
-}
-
-// 計算是否可以移動
-const canMoveToHomepage = computed(() => {
+// Check if can move to root
+const canMoveToRoot = computed(() => {
   if (moveItemType.value === 'verse') {
     if (!verseToMove.value) return false
 
-    // 情況1：經文在首頁，想移動到資料夾 - 需要選擇資料夾
-    if (!props.currentFolder) {
+    const isInRoot = currentFolder.value.id === APP_CONFIG.FOLDER.ROOT_ID
+    if (isInRoot) {
       return selectedMoveFolder.value !== null
     }
-
-    // 情況2：經文在資料夾，想移動到其他位置 - 總是允許移動
     return true
   } else {
-    // 移動資料夾
+    // Moving folder
     if (!folderToMove.value) return false
 
-    // 情況1：資料夾在根目錄，想移動到其他資料夾 - 需要選擇資料夾
-    if (!props.currentFolder) {
-      return selectedMoveFolder.value !== null
-    }
-
-    // 情況2：資料夾在其他資料夾內，想移動到其他位置 - 需要選擇目標（可以是首頁或其他資料夾）
-    // 但不能移動到自己內部
     if (selectedMoveFolder.value) {
       return !isFolderInside(folderToMove.value, selectedMoveFolder.value)
     }
 
-    // 移動到首頁（根目錄）總是允許的
+    const isInRoot = currentFolder.value.id === APP_CONFIG.FOLDER.ROOT_ID
+    if (isInRoot) {
+      return false
+    }
     return true
   }
 })
 
-// 計算當前資料夾深度
+// Calculate current folder depth
 const currentFolderDepth = computed(() => {
-  return props.currentFolderPath.length
+  return currentFolderPath.value.length - 1 // Subtract 1 for root
 })
 
 // 判斷是否達到最大深度（3層）
 const isMaxDepthReached = computed(() => {
-  return currentFolderDepth.value >= 2 // 因為是從0開始計算，所以2就是第三層
+  return currentFolderDepth.value >= APP_CONFIG.FOLDER.MAX_DEPTH
 })
 
 const confirmMoveVerse = () => {
-  if (!canMoveToHomepage.value) return
+  if (!canMoveToRoot.value) return
 
   if (moveItemType.value === 'verse') {
     if (!verseToMove.value) return
 
-    const newFolders = [...props.customFolders]
+    const sourceFolderId =
+      currentFolder.value.id === APP_CONFIG.FOLDER.ROOT_ID
+        ? APP_CONFIG.FOLDER.ROOT_ID
+        : currentFolder.value.id
+    const targetFolderId = selectedMoveFolder.value
+      ? selectedMoveFolder.value.id
+      : APP_CONFIG.FOLDER.ROOT_ID
 
-    // 從原位置移除經文
-    if (props.currentFolder) {
-      // 從當前資料夾中移除
-      updateFolderInTree(newFolders, props.currentFolder.id, (folder) => {
-        folder.items = folder.items.filter((item) => item.id !== verseToMove.value!.id)
-      })
-    } else {
-      // 從 Homepage 資料夾中移除
-      const homepageFolder = newFolders.find(
-        (folder) => folder.id === BIBLE_CONFIG.FOLDER.HOMEPAGE_ID,
-      )
-      if (homepageFolder) {
-        homepageFolder.items = homepageFolder.items.filter(
-          (item) => item.id !== verseToMove.value!.id,
-        )
-      }
-    }
-
-    // 添加到目標位置
-    if (selectedMoveFolder.value) {
-      // 移動到資料夾
-      updateFolderInTree(newFolders, selectedMoveFolder.value.id, (folder) => {
-        folder.items.push(verseToMove.value!)
-      })
-    } else {
-      // 移動到首頁
-      let homepageFolder = newFolders.find(
-        (folder) => folder.id === BIBLE_CONFIG.FOLDER.HOMEPAGE_ID,
-      )
-      if (!homepageFolder) {
-        // 創建 Homepage 資料夾
-        homepageFolder = {
-          id: BIBLE_CONFIG.FOLDER.HOMEPAGE_ID,
-          name: $t('homepage') || BIBLE_CONFIG.FOLDER.DEFAULT_HOMEPAGE_NAME,
-          expanded: false,
-          items: [],
-          folders: [],
-        }
-        newFolders.push(homepageFolder)
-      }
-      homepageFolder.items.push(verseToMove.value!)
-    }
-
-    emit('update:customFolders', newFolders)
+    // Call store action - direct mutation
+    moveItemAction(verseToMove.value, targetFolderId || APP_CONFIG.FOLDER.ROOT_ID, sourceFolderId)
   } else {
-    // 移動資料夾
+    // Move folder
     if (!folderToMove.value) return
 
-    if (selectedMoveFolder.value) {
-      // 移動到目標資料夾
-      moveFolderToFolder(folderToMove.value, selectedMoveFolder.value)
-    } else {
-      // 移動到首頁（根目錄）
-      const newFolders = [...props.customFolders]
+    const sourceFolderId =
+      currentFolder.value.id === APP_CONFIG.FOLDER.ROOT_ID
+        ? APP_CONFIG.FOLDER.ROOT_ID
+        : currentFolder.value.id
+    const targetFolderId = selectedMoveFolder.value
+      ? selectedMoveFolder.value.id
+      : APP_CONFIG.FOLDER.ROOT_ID
 
-      // 從原位置移除資料夾
-      if (props.currentFolder) {
-        updateFolderInTree(newFolders, props.currentFolder.id, (folder) => {
-          folder.folders = folder.folders.filter((f) => f.id !== folderToMove.value!.id)
-        })
-        // 添加到根目錄
-        const folder = { ...folderToMove.value, parentId: undefined }
-        newFolders.push(folder)
-        emit('update:customFolders', newFolders)
-      } else {
-        // 如果已經在根目錄，不需要移動
-        const existingIndex = newFolders.findIndex((f) => f.id === folderToMove.value!.id)
-        if (existingIndex === -1) {
-          // 如果不在根目錄，添加到根目錄
-          const folder = { ...folderToMove.value, parentId: undefined }
-          newFolders.push(folder)
-          emit('update:customFolders', newFolders)
-        }
-      }
-    }
+    // Call store action - direct mutation
+    moveFolderAction(
+      folderToMove.value,
+      targetFolderId || APP_CONFIG.FOLDER.ROOT_ID,
+      sourceFolderId,
+    )
   }
 
-  // 清理狀態
+  // Cleanup state
   showMoveVerseDialog.value = false
   verseToMove.value = null
   folderToMove.value = null
   selectedMoveFolder.value = null
-  isHomepageSelected.value = false
   moveBreadcrumb.value = []
   moveItemType.value = 'verse'
 }
@@ -1053,7 +795,7 @@ const confirmMoveVerse = () => {
 const handleRightClick = (
   event: MouseEvent,
   type: 'verse' | 'folder' | 'history',
-  item: MultiFunctionVerse | CustomFolder,
+  item: VerseItem | Folder<VerseItem>,
 ) => {
   selectedItem.value = { type, item }
   contextMenuRef.value?.open(event)
@@ -1082,102 +824,35 @@ const copyItem = () => {
   closeItemContextMenu()
 }
 
-const pasteItem = () => {
+const pasteItemHandler = () => {
   if (copiedItem.value) {
-    const newFolders = [...props.customFolders]
+    const targetFolderId =
+      currentFolder.value.id === APP_CONFIG.FOLDER.ROOT_ID
+        ? APP_CONFIG.FOLDER.ROOT_ID
+        : currentFolder.value.id
 
     if (copiedItem.value.type === 'verse') {
-      // 複製經文
-      const verse = copiedItem.value.item as MultiFunctionVerse
-      const newVerse = { ...verse, id: uuidv4() } as MultiFunctionVerse
-
-      if (props.currentFolder) {
-        // 貼到當前資料夾
-        updateFolderInTree(newFolders, props.currentFolder.id, (folder) => {
-          folder.items.push(newVerse)
-        })
-      } else {
-        // 貼到首頁
-        let homepageFolder = newFolders.find(
-          (folder) => folder.id === BIBLE_CONFIG.FOLDER.HOMEPAGE_ID,
-        )
-        if (!homepageFolder) {
-          homepageFolder = {
-            id: BIBLE_CONFIG.FOLDER.HOMEPAGE_ID,
-            name: 'Homepage',
-            expanded: false,
-            items: [],
-            folders: [],
-          }
-          newFolders.push(homepageFolder)
-        }
-        homepageFolder.items.push(newVerse)
-      }
+      // Paste verse
+      pasteItem(copiedItem.value.item as VerseItem, targetFolderId, 'verse')
     } else if (copiedItem.value.type === 'folder') {
-      // 複製資料夾
-      const folder = copiedItem.value.item as CustomFolder
-      const newFolder = {
-        ...folder,
-        id: uuidv4(),
-        items: [...folder.items],
-        folders: [...folder.folders],
-      }
-
-      if (props.currentFolder) {
-        // 貼到當前資料夾
-        updateFolderInTree(newFolders, props.currentFolder.id, (targetFolder) => {
-          targetFolder.folders.push(newFolder)
-        })
-      } else {
-        // 貼到首頁（根目錄）
-        newFolders.push(newFolder)
-      }
+      // Paste folder
+      pasteItem(copiedItem.value.item as Folder<VerseItem>, targetFolderId, 'folder')
     } else if (copiedItem.value.type === 'history') {
-      // 複製歷史項目到自訂
-      const historyItem = copiedItem.value.item as MultiFunctionVerse
-      const newVerse: MultiFunctionVerse = {
-        ...historyItem,
-        id: uuidv4(),
-        timestamp: Date.now(),
-      }
-
-      if (props.currentFolder) {
-        // 貼到當前資料夾
-        updateFolderInTree(newFolders, props.currentFolder.id, (folder) => {
-          folder.items.push(newVerse)
-        })
-      } else {
-        // 貼到首頁
-        let homepageFolder = newFolders.find(
-          (folder) => folder.id === BIBLE_CONFIG.FOLDER.HOMEPAGE_ID,
-        )
-        if (!homepageFolder) {
-          homepageFolder = {
-            id: BIBLE_CONFIG.FOLDER.HOMEPAGE_ID,
-            name: 'Homepage',
-            expanded: false,
-            items: [],
-            folders: [],
-          }
-          newFolders.push(homepageFolder)
-        }
-        homepageFolder.items.push(newVerse)
-      }
+      // Paste history item as verse
+      pasteItem(copiedItem.value.item as VerseItem, targetFolderId, 'verse')
     }
-
-    emit('update:customFolders', newFolders)
   }
   closeItemContextMenu()
 }
 
-const moveItem = () => {
+const showMoveItemDialog = () => {
   if (selectedItem.value) {
     if (selectedItem.value.type === 'verse') {
       // 使用現有的移動功能
-      showMoveDialog(selectedItem.value.item as MultiFunctionVerse)
+      showMoveDialog(selectedItem.value.item as VerseItem)
     } else if (selectedItem.value.type === 'folder') {
       // 資料夾移動功能
-      showMoveFolderDialog(selectedItem.value.item as CustomFolder)
+      showMoveFolderDialog(selectedItem.value.item as Folder<VerseItem>)
     } else if (selectedItem.value.type === 'history') {
       // 歷史項目不能移動，這個函數不應該被調用
       console.warn('History items cannot be moved')
@@ -1189,21 +864,19 @@ const moveItem = () => {
 const deleteItem = () => {
   if (selectedItem.value) {
     if (selectedItem.value.type === 'verse') {
-      const verse = selectedItem.value.item as MultiFunctionVerse
+      const verse = selectedItem.value.item as VerseItem
       removeFromCurrentFolder(verse.id)
     } else if (selectedItem.value.type === 'folder') {
-      const folder = selectedItem.value.item as CustomFolder
-      deleteFolder(folder.id)
+      const folder = selectedItem.value.item as Folder<VerseItem>
+      showDeleteFolderDialog(folder.id)
     } else if (selectedItem.value.type === 'history') {
       // 刪除歷史項目
-      const historyItem = selectedItem.value.item as MultiFunctionVerse
+      const historyItem = selectedItem.value.item as VerseItem
       bibleStore.removeHistoryItem(historyItem.id)
     }
   }
   closeItemContextMenu()
 }
-
-// useContextMenu composable 已經處理了點擊外部關閉選單的邏輯，不需要手動監聽
 </script>
 
 <style scoped>

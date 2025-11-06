@@ -18,7 +18,7 @@
         <span class="verse-text">{{ verse.text }}</span>
       </div>
 
-      <div class="bottom-spacer"></div>
+      <BottomSpacer />
     </div>
   </div>
 </template>
@@ -26,6 +26,7 @@
 <script setup lang="ts">
 import { ref, watch, nextTick, onMounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import BottomSpacer from '@/components/Bible/BottomSpacer.vue'
 
 interface BibleVerse {
   number: number
@@ -173,10 +174,5 @@ onMounted(() => {
 .verse-text {
   flex: 1;
   text-align: justify;
-}
-
-.bottom-spacer {
-  height: calc(100vh - 80px); /* 減去 header 高度 */
-  width: 100%;
 }
 </style>
