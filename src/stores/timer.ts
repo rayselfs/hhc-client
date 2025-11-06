@@ -7,6 +7,7 @@ import { useSentry } from '@/composables/useSentry'
 import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
 import { useLocalStorage } from '@/composables/useLocalStorage'
 import { StorageKey, StorageCategory, getStorageKey } from '@/types/common'
+import type { TimerState as ElectronTimerState } from '@/types/electron'
 
 export interface TimerPreset {
   id: string
@@ -158,18 +159,12 @@ export const useTimerStore = defineStore('timer', () => {
 
   // Methods
   const setMode = (mode: TimerMode) => {
-    settings.value.mode = mode
+    sendTimerCommand({ action: 'setMode', mode })
     saveSettings()
-    // 模式改變時立即更新投影
-    sendTimerUpdate()
   }
 
   const setTimerDuration = (duration: number) => {
-    settings.value.originalDuration = duration
-    if (state.value === 'stopped') {
-      settings.value.timerDuration = duration
-      settings.value.remainingTime = duration
-    }
+    sendTimerCommand({ action: 'setDuration', duration })
     saveSettings()
   }
 
@@ -182,9 +177,7 @@ export const useTimerStore = defineStore('timer', () => {
       setTimerDuration(m * 60 + s)
     } else {
       // If running or paused, add to the remaining time
-      const newTime = settings.value.remainingTime + secondsToAdd
-      settings.value.remainingTime = newTime
-      settings.value.timerDuration = Math.max(settings.value.timerDuration, newTime)
+      sendTimerCommand({ action: 'addTime', seconds: secondsToAdd })
     }
   }
 
@@ -197,108 +190,66 @@ export const useTimerStore = defineStore('timer', () => {
       setTimerDuration(m * 60 + s)
     } else {
       // If running or paused, remove from the remaining time
-      const newTime = Math.max(0, settings.value.remainingTime - secondsToRemove)
-      settings.value.remainingTime = newTime
-      // Update timerDuration to match the new remaining time
-      settings.value.timerDuration = Math.max(settings.value.timerDuration, newTime)
+      sendTimerCommand({ action: 'removeTime', seconds: secondsToRemove })
     }
   }
 
   const setTimezone = (timezone: string) => {
-    settings.value.timezone = timezone
+    sendTimerCommand({ action: 'setTimezone', timezone })
     saveSettings()
-    // 時區改變時立即更新投影
+  }
+
+  // Helper function to check if Electron is available
+  const isElectron = () => {
+    return typeof window !== 'undefined' && !!window.electronAPI
+  }
+
+  // Helper function to send timer command to main process
+  const sendTimerCommand = (command: Parameters<typeof window.electronAPI.timerCommand>[0]) => {
+    if (isElectron()) {
+      try {
+        window.electronAPI.timerCommand(command)
+      } catch (error) {
+        reportError(error, {
+          operation: 'timer-command',
+          component: 'TimerStore',
+        })
+      }
+    }
+  }
+
+  // Update local state from timer state received from main process
+  const updateFromTimerState = (timerState: ElectronTimerState) => {
+    settings.value.mode = timerState.mode
+    state.value = timerState.state
+    settings.value.remainingTime = timerState.remainingTime
+    settings.value.timerDuration = timerState.timerDuration
+    settings.value.originalDuration = timerState.originalDuration
+    settings.value.timezone = timerState.timezone
+    if (timerState.startTime) {
+      settings.value.startTime = new Date(timerState.startTime)
+    } else {
+      settings.value.startTime = undefined
+    }
+    // Send projection update when state changes
     sendTimerUpdate()
   }
 
-  // State machine methods
+  // State machine methods - now send commands to main process
   const startTimer = () => {
-    if (settings.value.mode === 'timer' || settings.value.mode === 'both') {
-      settings.value.remainingTime = settings.value.originalDuration
-      settings.value.timerDuration = settings.value.originalDuration
-      state.value = 'running'
-    }
-    if (settings.value.mode === 'clock' || settings.value.mode === 'both') {
-      settings.value.startTime = new Date()
-    }
-    // 用戶操作時立即更新投影
-    sendTimerUpdate()
+    sendTimerCommand({ action: 'start' })
   }
 
   const pauseTimer = () => {
-    if (state.value === 'running') state.value = 'paused'
-    // 用戶操作時立即更新投影
-    sendTimerUpdate()
+    sendTimerCommand({ action: 'pause' })
   }
 
   const resetTimer = () => {
-    state.value = 'stopped'
-    settings.value.remainingTime = settings.value.originalDuration
-    settings.value.timerDuration = settings.value.originalDuration
-    settings.value.startTime = undefined
-    // 用戶操作時立即更新投影
-    sendTimerUpdate()
+    sendTimerCommand({ action: 'reset' })
   }
 
   const resumeTimer = () => {
-    if (state.value === 'paused') state.value = 'running'
-    // 用戶操作時立即更新投影
-    sendTimerUpdate()
-  }
-
-  const tick = () => {
-    if (state.value === 'running' && settings.value.remainingTime > 0) {
-      settings.value.remainingTime--
-      if (settings.value.remainingTime <= 0) {
-        settings.value.remainingTime = 0
-        state.value = 'stopped'
-      }
-    }
-  }
-
-  // 全局計時器循環
-  let timerInterval: number | undefined
-
-  /**
-   * 啟動全局計時器循環
-   * 每秒執行一次 tick，並智能判斷是否需要發送投影更新
-   */
-  const startTimerLoop = () => {
-    // 防止重複啟動
-    if (timerInterval) {
-      return
-    }
-
-    timerInterval = window.setInterval(() => {
-      const wasRunning = state.value === 'running'
-      const wasRemainingTime = settings.value.remainingTime
-
-      // 執行 tick 更新計時器狀態
-      tick()
-
-      // 智能判斷是否需要發送投影更新：
-      // 1. 計時器正在運行且時間有變化
-      // 2. 計時器剛結束（從運行變為停止）
-      // 3. 剩餘時間為 0（確保結束狀態被發送）
-      const shouldUpdate =
-        (wasRunning && settings.value.remainingTime !== wasRemainingTime) ||
-        (wasRunning && state.value !== 'running') ||
-        (settings.value.remainingTime === 0 && wasRemainingTime > 0)
-
-      if (shouldUpdate) {
-        sendTimerUpdate() // 使用智能更新，不強制
-      }
-    }, 1000)
-  }
-
-  /**
-   * 停止全局計時器循環
-   */
-  const stopTimerLoop = () => {
-    if (timerInterval) {
-      clearInterval(timerInterval)
-      timerInterval = undefined
-    }
+    sendTimerCommand({ action: 'resume' })
   }
 
   // Preset Methods (logic mostly unchanged)
@@ -341,23 +292,63 @@ export const useTimerStore = defineStore('timer', () => {
     )
   }
 
-  // 包裝 cleanup 函數，確保清理計時器循環
+  // 包裝 cleanup 函數
   const cleanupTimerStore = () => {
-    // 停止計時器循環
-    stopTimerLoop()
+    // 移除 IPC 監聽器
+    if (isElectron() && typeof window !== 'undefined') {
+      try {
+        window.electronAPI.removeAllListeners('timer-tick')
+      } catch (error) {
+        reportError(error, {
+          operation: 'cleanup-timer-store',
+          component: 'TimerStore',
+        })
+      }
+    }
     // 調用原有的 cleanup 清理其他資源
     cleanup()
   }
 
-  // 監聽頁面卸載事件，確保計時器被清理
-  if (typeof window !== 'undefined') {
-    window.addEventListener('beforeunload', () => {
-      stopTimerLoop()
-    })
+  // Initialize timer IPC listener
+  const initializeTimerIPC = async () => {
+    if (!isElectron()) {
+      return
+    }
+
+    try {
+      // Set up listener for timer updates from main process
+      window.electronAPI.onTimerTick((timerState: ElectronTimerState) => {
+        updateFromTimerState(timerState)
+      })
+
+      // Initialize main process timer with saved settings
+      const savedSettings = loadSettings()
+      await window.electronAPI.timerInitialize({
+        mode: savedSettings.mode as TimerMode,
+        originalDuration: savedSettings.originalDuration,
+        timezone: savedSettings.timezone,
+      })
+
+      // Get initial state from main process
+      const initialState = await window.electronAPI.timerGetState()
+      if (initialState) {
+        updateFromTimerState(initialState)
+      }
+    } catch (error) {
+      reportError(error, {
+        operation: 'initialize-timer-ipc',
+        component: 'TimerStore',
+      })
+    }
   }
 
   // Initialization
   loadPresets()
+
+  // Initialize IPC communication in Electron environment
+  if (typeof window !== 'undefined') {
+    initializeTimerIPC()
+  }
 
   return {
     // State
@@ -383,14 +374,9 @@ export const useTimerStore = defineStore('timer', () => {
     pauseTimer,
     resetTimer,
     resumeTimer,
-    tick,
     addToPresets,
     applyPreset,
     deletePreset,
-
-    // Timer Loop Management
-    startTimerLoop,
-    stopTimerLoop,
 
     // Memory Management
     cleanup: cleanupTimerStore,

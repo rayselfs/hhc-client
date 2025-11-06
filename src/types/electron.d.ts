@@ -1,4 +1,4 @@
-import type { AppMessage, DisplayInfo } from './common'
+import type { AppMessage, DisplayInfo, TimerMode } from './common'
 
 // AutoUpdater 相關類型定義
 export interface UpdateInfo {
@@ -86,6 +86,52 @@ export interface ElectronAPI {
 
   /** Update language setting */
   updateLanguage: (language: string) => Promise<UpdateResult>
+
+  // Timer related
+  /** Send timer command to main process */
+  timerCommand: (command: TimerCommand) => void
+
+  /** Get current timer state */
+  timerGetState: () => Promise<TimerState | null>
+
+  /** Initialize timer state from saved settings */
+  timerInitialize: (initialState: Partial<TimerState>) => Promise<{ success: boolean }>
+
+  /** Listen for timer state updates */
+  onTimerTick: (callback: (state: TimerState) => void) => void
+}
+
+/**
+ * Timer command interface
+ */
+export interface TimerCommand {
+  action:
+    | 'start'
+    | 'pause'
+    | 'reset'
+    | 'resume'
+    | 'setDuration'
+    | 'addTime'
+    | 'removeTime'
+    | 'setMode'
+    | 'setTimezone'
+  duration?: number
+  seconds?: number
+  mode?: TimerMode
+  timezone?: string
+}
+
+/**
+ * Timer state interface
+ */
+export interface TimerState {
+  mode: TimerMode
+  state: 'stopped' | 'running' | 'paused'
+  remainingTime: number
+  timerDuration: number
+  originalDuration: number
+  startTime?: string // ISO string format
+  timezone: string
 }
 
 declare global {

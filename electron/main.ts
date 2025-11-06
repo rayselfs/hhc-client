@@ -12,6 +12,7 @@ import {
   stopPeriodicUpdateCheck,
 } from './autoUpdater'
 import * as Sentry from '@sentry/electron'
+import { TimerService, type TimerCommand } from './timerService'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -31,6 +32,9 @@ Sentry.init({
 
 let mainWindow: BrowserWindow | null = null
 let projectionWindow: BrowserWindow | null = null
+
+// Initialize timer service
+const timerService = new TimerService()
 
 // Create main window
 const createMainWindow = () => {
@@ -89,8 +93,12 @@ const createMainWindow = () => {
   })
 
   mainWindow.on('closed', () => {
+    timerService.unregisterWindow(mainWindow!)
     mainWindow = null
   })
+
+  // Register window with timer service
+  timerService.registerWindow(mainWindow)
 
   // Set the application menu
   createApplicationMenu(mainWindow)
@@ -141,11 +149,15 @@ const createProjectionWindow = () => {
 
   // Projection window closed event
   projectionWindow.on('closed', () => {
+    timerService.unregisterWindow(projectionWindow!)
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('projection-closed')
     }
     projectionWindow = null
   })
+
+  // Register projection window with timer service
+  timerService.registerWindow(projectionWindow)
 
   // Listen for messages from the projection window
   projectionWindow.webContents.on('did-finish-load', () => {
@@ -305,6 +317,57 @@ ipcMain.handle('update-language', async (event, language: string) => {
   }
 })
 
+// Timer IPC handlers
+ipcMain.on('timer-command', (event, command: TimerCommand) => {
+  try {
+    timerService.handleCommand(command)
+  } catch (error) {
+    console.error('Timer command error:', error)
+    Sentry.captureException(error, {
+      tags: {
+        operation: 'timer-command',
+      },
+      extra: {
+        command: JSON.stringify(command),
+      },
+    })
+  }
+})
+
+// Get current timer state
+ipcMain.handle('timer-get-state', async () => {
+  try {
+    return timerService.getState()
+  } catch (error) {
+    console.error('Get timer state error:', error)
+    Sentry.captureException(error, {
+      tags: {
+        operation: 'timer-get-state',
+      },
+    })
+    return null
+  }
+})
+
+// Initialize timer state from saved settings
+ipcMain.handle(
+  'timer-initialize',
+  async (event, initialState: Partial<ReturnType<TimerService['getState']>>) => {
+    try {
+      timerService.initializeState(initialState)
+      return { success: true }
+    } catch (error) {
+      console.error('Timer initialize error:', error)
+      Sentry.captureException(error, {
+        tags: {
+          operation: 'timer-initialize',
+        },
+      })
+      return { success: false }
+    }
+  },
+)
+
 // Single instance lock
 const gotTheLock = app.requestSingleInstanceLock()
 
@@ -350,6 +413,9 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   // Stop periodic update checks
   stopPeriodicUpdateCheck()
+
+  // Cleanup timer service
+  timerService.cleanup()
 
   if (projectionWindow && !projectionWindow.isDestroyed()) {
     projectionWindow.destroy()

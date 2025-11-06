@@ -27,7 +27,7 @@
                     <v-icon icon="mdi-view-split-horizontal" class="mr-2"></v-icon>
                     {{ $t('timer.mode.both') }}
                   </v-btn>
-                  <v-btn value="clock">
+                  <v-btn value="clock" :disabled="timerStore.state !== 'stopped'">
                     <v-icon icon="mdi-clock" class="mr-2"></v-icon>
                     {{ $t('timer.mode.clock') }}
                   </v-btn>
@@ -318,12 +318,10 @@ const addTime = (secondsToAdd: number) => {
   timerStore.addTime(secondsToAdd)
 }
 
-// 檢查是否可以移除指定時間
 const canRemoveTime = (secondsToRemove: number) => {
-  return timerStore.settings.remainingTime >= secondsToRemove
+  return timerStore.settings.remainingTime > secondsToRemove
 }
 
-// 移除時間（快捷按鈕）
 const removeTime = (secondsToRemove: number) => {
   timerStore.removeTime(secondsToRemove)
 }

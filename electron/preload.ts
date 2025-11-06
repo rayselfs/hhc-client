@@ -60,4 +60,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onUpdateError: (callback: (error: string) => void) => {
     ipcRenderer.on('update-error', (event, error) => callback(error))
   },
+
+  // Timer related
+  timerCommand: (command: unknown) => ipcRenderer.send('timer-command', command),
+  timerGetState: () => ipcRenderer.invoke('timer-get-state'),
+  timerInitialize: (initialState: unknown) => ipcRenderer.invoke('timer-initialize', initialState),
+  onTimerTick: (callback: (state: unknown) => void) => {
+    ipcRenderer.on('timer-tick', (event, state) => callback(state))
+  },
 })

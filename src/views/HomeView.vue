@@ -264,9 +264,6 @@ onMounted(async () => {
   const initialLocale = await getInitialLocale()
   locale.value = initialLocale
 
-  // 啟動全局計時器循環（只在主視圖中啟動，投影視圖不需要）
-  timerStore.startTimerLoop()
-
   // 檢查認證狀態，沒有認證則顯示對話框
   if (!hasCredentials.value) {
     showAuthDialog.value = true
