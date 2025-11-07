@@ -6,32 +6,129 @@ import * as Sentry from '@sentry/electron'
 let updateDownloaded = false
 let updateInfo: Record<string, unknown> | null = null
 let updateCheckInterval: NodeJS.Timeout | null = null
+let isChinaRegion = false
+
+// GitHub and Gitee repository configuration
+const GITHUB_OWNER = 'rayselfs'
+const GITHUB_REPO = 'hhc-client'
+const GITEE_OWNER = 'rayselfs' // Replace with your Gitee username
+const GITEE_REPO = 'hhc-client' // Replace with your Gitee repo name
+
+/**
+ * Detect if user is in China region
+ * Uses timezone and IP geolocation methods
+ */
+const detectChinaRegion = async (): Promise<boolean> => {
+  try {
+    // Method 1: Check timezone
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+    if (
+      timezone.includes('Shanghai') ||
+      timezone.includes('Beijing') ||
+      timezone.includes('Chongqing')
+    ) {
+      return true
+    }
+
+    // Method 2: Try to detect via IP geolocation
+    try {
+      const response = await fetch('https://ipapi.co/json/', {
+        signal: AbortSignal.timeout(3000), // 3 second timeout
+      })
+      if (response.ok) {
+        const data = await response.json()
+        if (data.country_code === 'CN') {
+          return true
+        }
+      }
+    } catch {
+      // Ignore geolocation errors, fallback to timezone only
+      console.log('IP geolocation check failed, using timezone only')
+    }
+
+    return false
+  } catch (error) {
+    console.error('Error detecting region:', error)
+    // Default to non-China region if detection fails
+    return false
+  }
+}
+
+/**
+ * Configure autoUpdater based on region
+ */
+const configureAutoUpdater = async () => {
+  isChinaRegion = await detectChinaRegion()
+
+  if (isChinaRegion) {
+    // Use Gitee for China region
+    // Gitee doesn't have native electron-updater support, so we use generic provider
+    // The latest-*.yml files need to be accessible via direct URL
+    // We'll use Gitee's raw file URL pointing to the latest release files
+
+    // For Gitee, we use generic provider with a custom update URL
+    // Gitee Releases download URL format: https://gitee.com/{owner}/{repo}/releases/download/{tag}/{filename}
+    // Since electron-updater needs latest-*.yml files, we need to ensure they're accessible
+    // The workflow will upload these files to Gitee Releases
+
+    // Note: Gitee doesn't have a "latest" redirect like GitHub
+    // We'll use the latest release tag URL pattern
+    // The actual URL will be resolved by checking the latest release tag
+    const baseUrl = `https://gitee.com/${GITEE_OWNER}/${GITEE_REPO}/releases/download/`
+
+    autoUpdater.setFeedURL({
+      provider: 'generic',
+      url: baseUrl,
+      channel: 'latest',
+    })
+    console.log(`AutoUpdater configured for Gitee (China region) - Base URL: ${baseUrl}`)
+  } else {
+    // Use GitHub for non-China region
+    autoUpdater.setFeedURL({
+      provider: 'github',
+      owner: GITHUB_OWNER,
+      repo: GITHUB_REPO,
+    })
+    console.log('AutoUpdater configured for GitHub (non-China region)')
+  }
+}
 
 /**
  * Initialize autoUpdater functionality
  *
  * Behavior:
- * 1. Automatically check for updates after 1 second of application startup
- * 2. Check for updates every 5 minutes automatically
- * 3. Automatically start downloading updates when updates are available
- * 4. Silent wait after download completion, do not disturb user
- * 5. User closes the main window to display the install confirmation dialog
+ * 1. Detect region and configure update source (Gitee for China, GitHub for others)
+ * 2. Automatically check for updates after 2 seconds of application startup
+ * 3. Check for updates every 5 minutes automatically
+ * 4. Automatically start downloading updates when updates are available
+ * 5. Silent wait after download completion, do not disturb user
+ * 6. User closes the main window to display the install confirmation dialog
  *
  * @param mainWindow Main window instance
  */
-export const initAutoUpdater = (mainWindow: BrowserWindow | null) => {
+export const initAutoUpdater = async (mainWindow: BrowserWindow | null) => {
   if (!mainWindow) return
 
-  // Automatically check for updates after 1 second of application startup
+  // Configure autoUpdater based on region
+  await configureAutoUpdater()
+
+  // Automatically check for updates after 2 seconds of application startup
   setTimeout(() => {
     autoUpdater.checkForUpdates()
-  }, 1000)
+  }, 2000)
 
   // Set up periodic update checks every 5 minutes
   startPeriodicUpdateCheck()
 
   // Setup event listeners
   setupAutoUpdaterListeners(mainWindow)
+}
+
+/**
+ * Get current update source (for debugging/logging)
+ */
+export const getUpdateSource = (): 'gitee' | 'github' => {
+  return isChinaRegion ? 'gitee' : 'github'
 }
 
 /**

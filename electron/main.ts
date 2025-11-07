@@ -399,8 +399,15 @@ if (!gotTheLock) {
       }
     })
 
-    // Initialize autoUpdater
-    initAutoUpdater(mainWindow)
+    // Initialize autoUpdater (async)
+    initAutoUpdater(mainWindow).catch((error) => {
+      console.error('Failed to initialize autoUpdater:', error)
+      Sentry.captureException(error, {
+        tags: {
+          operation: 'init-auto-updater',
+        },
+      })
+    })
   })
 }
 
