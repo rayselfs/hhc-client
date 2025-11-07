@@ -11,20 +11,22 @@
 
     <v-spacer />
 
-    <v-slide-x-reverse-transition>
-      <v-text-field
-        v-if="isSearching && props.currentView === 'bible'"
-        v-model="searchText"
-        autofocus
-        variant="solo-inverted"
-        hide-details
-        :placeholder="$t('search')"
-        density="compact"
-        class="mr-2"
-        style="width: 250px"
-        @keydown.esc="handleCloseSearch"
-      />
-    </v-slide-x-reverse-transition>
+    <v-text-field
+      v-if="isSearching && props.currentView === 'bible'"
+      v-model="searchText"
+      ref="searchInputRef"
+      autofocus
+      variant="solo-inverted"
+      hide-details
+      :placeholder="$t('search')"
+      density="compact"
+      class="search-bar mr-2"
+      @keydown.esc="handleCloseSearch"
+    >
+      <template #append-inner>
+        <v-icon v-if="isSearching">mdi-magnify</v-icon>
+      </template>
+    </v-text-field>
 
     <v-btn
       v-if="!isSearching && props.currentView === 'bible'"
@@ -36,7 +38,12 @@
       <v-icon>mdi-magnify</v-icon>
     </v-btn>
 
-    <v-btn v-else-if="isSearching && props.currentView === 'bible'" icon @click="handleCloseSearch">
+    <v-btn
+      v-if="isSearching && props.currentView === 'bible'"
+      icon
+      @click="handleCloseSearch"
+      class="mr-1"
+    >
       <v-icon>mdi-close</v-icon>
     </v-btn>
 
@@ -201,4 +208,9 @@ onMounted(() => {
 })
 </script>
 
-<style scoped></style>
+<style scoped>
+.search-bar {
+  z-index: 1000;
+  width: 100%;
+}
+</style>
