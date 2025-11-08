@@ -123,11 +123,10 @@ jobs:
           # 目的地 repo (Gitee) - 使用 GITEE_TOKEN
           destination-repo: "https://${{ env.GITEE_USERNAME }}:${{ env.GITEE_TOKEN }}@gitee.com/${{ env.GITEE_USERNAME }}/hhc-client.git"
 
-      - name: Download artifacts from GitHub Release
+      - name: Download Windows artifact from GitHub Release
         uses: actions/download-artifact@v4
         with:
-          pattern: release-*
-          merge-multiple: true
+          name: release-windows-2025
           path: release-files
 
       - name: Upload to Gitee Releases (using Shell)
@@ -169,7 +168,7 @@ jobs:
               --arg name "Release $TAG_NAME" \
               --arg body "Release $TAG_NAME\n\nAuto-synced from GitHub" \
               --arg target "main" \
-              '{tag_name: $tag, name: $name, body: $body, prerelease: false, target_commitish: $target}')
+              '{tag_name: $tag, name: $name, body: $body, prerelease: true, target_commitish: $target}')
               
             CREATE_BODY=$(curl -s -X POST \
               -H "$AUTH_HEADER" \
@@ -198,6 +197,11 @@ jobs:
           UPLOAD_COUNT=0
           RELEASE_DIR="release-files"
 
+          TOTAL_FILES=$(find "$RELEASE_DIR" -type f | wc -l | tr -d ' ')
+          if [ "$TOTAL_FILES" -eq 0 ]; then
+            echo "No files found to upload."
+          fi
+
           find "$RELEASE_DIR" -type f -print0 | while IFS= read -r -d '' FILE; do
             FILENAME=$(basename "$FILE")
             echo "Uploading $FILENAME..."
@@ -210,6 +214,12 @@ jobs:
             if echo "$UPLOAD_RESPONSE" | jq -e '.name != null' > /dev/null; then
               echo "Successfully uploaded $FILENAME"
               UPLOAD_COUNT=$((UPLOAD_COUNT + 1))
+              if [ "$TOTAL_FILES" -gt 0 ]; then
+                PERCENT=$((UPLOAD_COUNT * 100 / TOTAL_FILES))
+                echo "Upload progress: $UPLOAD_COUNT/$TOTAL_FILES (${PERCENT}%)"
+              else
+                echo "Upload progress: $UPLOAD_COUNT files uploaded."
+              fi
             else
               echo "Failed to upload $FILENAME. Response: $UPLOAD_RESPONSE"
               # 允許繼續上傳其他檔案，不在此處 exit 1
