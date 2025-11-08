@@ -90,8 +90,8 @@ jobs:
           name: release-${{ matrix.os }}
           path: |
             release/latest.yml
-            release/HHC-Client-Setup-${{ env.BUILD_VERSION }}.exe
-            release/HHC-Client-Setup-${{ env.BUILD_VERSION }}.exe.blockmap
+            release/*.exe
+            release/*.exe.blockmap
           retention-days: 30
 
   upload-to-gitee:
