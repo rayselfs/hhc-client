@@ -109,6 +109,20 @@ jobs:
           # 確保獲取所有 tags，以便鏡像同步
           fetch-depth: 0
 
+      - name: Sync code to Gitee (optional)
+        if: success()
+        uses: wearerequired/git-mirror-action@master
+        env:
+          # GITHUB_TOKEN 是 GitHub Actions 自動提供的
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # GITEE_TOKEN 和 GITEE_USERNAME 已在 Job 的 env 中定義
+        with:
+          # 來源 repo (GitHub) - 使用 GITHUB_TOKEN
+          source-repo: "https://github-actions:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+
+          # 目的地 repo (Gitee) - 使用 GITEE_TOKEN
+          destination-repo: "https://${{ env.GITEE_USERNAME }}:${{ env.GITEE_TOKEN }}@gitee.com/${{ env.GITEE_USERNAME }}/hhc-client.git"
+
       - name: Download artifacts from GitHub Release
         uses: actions/download-artifact@v4
         with:
@@ -140,7 +154,7 @@ jobs:
           HTTP_STATUS=$(curl -s -H "$AUTH_HEADER" \
             -o gitee_response.json \
             -w "%{http_code}" \
-            "$API_BASE_URL/releases/tags/$TAG_NAME")
+            "$API_BASE_URL/releases/$TAG_NAME")
             
           BODY=$(cat gitee_response.json)
 
@@ -202,17 +216,3 @@ jobs:
           done
 
           echo "Gitee release upload completed. Uploaded $UPLOAD_COUNT files."
-
-      - name: Sync code to Gitee (optional)
-        if: success()
-        uses: wearerequired/git-mirror-action@master
-        env:
-          # GITHUB_TOKEN 是 GitHub Actions 自動提供的
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # GITEE_TOKEN 和 GITEE_USERNAME 已在 Job 的 env 中定義
-        with:
-          # 來源 repo (GitHub) - 使用 GITHUB_TOKEN
-          source-repo: "https://github-actions:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
-
-          # 目的地 repo (Gitee) - 使用 GITEE_TOKEN
-          destination-repo: "https://${{ env.GITEE_USERNAME }}:${{ env.GITEE_TOKEN }}@gitee.com/${{ env.GITEE_USERNAME }}/hhc-client.git"
