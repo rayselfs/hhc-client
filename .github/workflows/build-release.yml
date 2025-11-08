@@ -168,7 +168,8 @@ jobs:
               --arg tag "$TAG_NAME" \
               --arg name "Release $TAG_NAME" \
               --arg body "Release $TAG_NAME\n\nAuto-synced from GitHub" \
-              '{tag_name: $tag, name: $name, body: $body, prerelease: false, target_commitish: main}')
+              --arg target "main" \
+              '{tag_name: $tag, name: $name, body: $body, prerelease: false, target_commitish: $target}')
               
             CREATE_BODY=$(curl -s -X POST \
               -H "$AUTH_HEADER" \
