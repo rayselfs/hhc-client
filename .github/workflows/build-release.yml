@@ -96,9 +96,18 @@ jobs:
     runs-on: ubuntu-latest
     if: success()
 
+    env:
+      # 將 Secrets 設置為 Job 環境變數
+      GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+      GITEE_USERNAME: ${{ secrets.GITEE_USERNAME }}
+      VERSION: ${{ needs.prepare.outputs.version }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          # 確保獲取所有 tags，以便鏡像同步
+          fetch-depth: 0
 
       - name: Download artifacts from GitHub Release
         uses: actions/download-artifact@v4
@@ -107,96 +116,103 @@ jobs:
           merge-multiple: true
           path: release-files
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.x"
-
-      - name: Install dependencies
-        run: pip install requests
-
-      - name: Upload to Gitee Releases
-        env:
-          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
-          GITEE_USERNAME: ${{ secrets.GITEE_USERNAME }}
-          VERSION: ${{ needs.prepare.outputs.version }}
+      - name: Upload to Gitee Releases (using Shell)
         run: |
-          python3 << 'EOF'
-          import os
-          import requests
-          import json
-          from pathlib import Path
+          set -e # 如果有命令失敗，立即退出
 
-          GITEE_TOKEN = os.environ.get('GITEE_TOKEN')
-          GITEE_USERNAME = os.environ.get('GITEE_USERNAME')
-          VERSION = os.environ.get('VERSION', '1.0.0')
-          REPO = 'hhc-client'
-          TAG_NAME = f'v{VERSION}'
+          # 1. 設置變量
+          # 環境變數已由 env: 區塊設定
+          REPO="hhc-client" # 您的 Gitee repo 名稱
+          TAG_NAME="v$VERSION"
 
-          if not GITEE_TOKEN or not GITEE_USERNAME:
-              print("GITEE_TOKEN or GITEE_USERNAME not set, skipping Gitee upload")
-              exit(0)
+          # 檢查 Secrets 是否設置
+          if [ -z "$GITEE_TOKEN" ] || [ -z "$GITEE_USERNAME" ]; then
+            echo "GITEE_TOKEN or GITEE_USERNAME not set, skipping Gitee upload."
+            exit 0
+          fi
 
-          headers = {
-              'Authorization': f'token {GITEE_TOKEN}',
-              'Content-Type': 'application/json'
-          }
+          API_BASE_URL="https://gitee.com/api/v5/repos/$GITEE_USERNAME/$REPO"
+          AUTH_HEADER="Authorization: token $GITEE_TOKEN"
 
-          # Create or get release
-          release_url = f'https://gitee.com/api/v5/repos/{GITEE_USERNAME}/{REPO}/releases'
+          # 2. 檢查或創建 Release
+          echo "Checking for existing Gitee release for tag $TAG_NAME..."
 
-          # Check if release exists
-          try:
-              releases_response = requests.get(f'{release_url}/tags/{TAG_NAME}', headers=headers, timeout=10)
-              if releases_response.status_code == 404:
-                  # Create release
-                  release_data = {
-                      'tag_name': TAG_NAME,
-                      'name': f'Release {TAG_NAME}',
-                      'body': f'Release {TAG_NAME}\n\nAuto-synced from GitHub',
-                      'prerelease': False
-                  }
-                  create_response = requests.post(release_url, headers=headers, json=release_data, timeout=30)
-                  if create_response.status_code not in [200, 201]:
-                      print(f"Failed to create release: {create_response.text}")
-                      exit(1)
-                  release_id = create_response.json()['id']
-              else:
-                  release_id = releases_response.json()['id']
-          except Exception as e:
-              print(f"Error checking/creating release: {e}")
-              exit(1)
+          HTTP_STATUS=$(curl -s -H "$AUTH_HEADER" \
+            -o gitee_response.json \
+            -w "%{http_code}" \
+            "$API_BASE_URL/releases/tags/$TAG_NAME")
+            
+          BODY=$(cat gitee_response.json)
 
-          # Upload files from release directory
-          release_dir = Path('release-files')
-          uploaded_count = 0
-          if release_dir.exists():
-              for file_path in release_dir.rglob('*'):
-                  if file_path.is_file():
-                      print(f"Uploading {file_path.name}...")
-                      upload_url = f'https://gitee.com/api/v5/repos/{GITEE_USERNAME}/{REPO}/releases/{release_id}/attach_files'
-                      
-                      try:
-                          with open(file_path, 'rb') as f:
-                              files = {'file': (file_path.name, f, 'application/octet-stream')}
-                              upload_headers = {'Authorization': f'token {GITEE_TOKEN}'}
-                              upload_response = requests.post(upload_url, headers=upload_headers, files=files, timeout=300)
-                              if upload_response.status_code in [200, 201]:
-                                  print(f"Successfully uploaded {file_path.name}")
-                                  uploaded_count += 1
-                              else:
-                                  print(f"Failed to upload {file_path.name}: {upload_response.status_code} - {upload_response.text}")
-                      except Exception as e:
-                          print(f"Error uploading {file_path.name}: {e}")
+          if [ "$HTTP_STATUS" -eq 200 ]; then
+            echo "Release found."
+            RELEASE_ID=$(echo "$BODY" | jq -r '.id')
+          elif [ "$HTTP_STATUS" -eq 404 ]; then
+            echo "Release not found. Creating new release..."
+            
+            JSON_PAYLOAD=$(jq -n \
+              --arg tag "$TAG_NAME" \
+              --arg name "Release $TAG_NAME" \
+              --arg body "Release $TAG_NAME\n\nAuto-synced from GitHub" \
+              '{tag_name: $tag, name: $name, body: $body, prerelease: false}')
+              
+            CREATE_BODY=$(curl -s -X POST \
+              -H "$AUTH_HEADER" \
+              -H "Content-Type: application/json" \
+              -d "$JSON_PAYLOAD" \
+              "$API_BASE_URL/releases")
+              
+            RELEASE_ID=$(echo "$CREATE_BODY" | jq -r '.id')
+            if [ "$RELEASE_ID" == "null" ] || [ -z "$RELEASE_ID" ]; then
+              echo "Failed to create release. Response: $CREATE_BODY"
+              exit 1
+            fi
+            echo "Release created with ID: $RELEASE_ID"
+          else
+            echo "Failed to check Gitee release. Status: $HTTP_STATUS, Body: $BODY"
+            exit 1
+          fi
 
-          print(f"Gitee release upload completed. Uploaded {uploaded_count} files.")
-          EOF
+          if [ "$RELEASE_ID" == "null" ] || [ -z "$RELEASE_ID" ]; then
+            echo "Could not determine RELEASE_ID."
+            exit 1
+          fi
+
+          # 3. 上傳檔案
+          echo "Uploading files to Gitee release $RELEASE_ID..."
+          UPLOAD_COUNT=0
+          RELEASE_DIR="release-files"
+
+          find "$RELEASE_DIR" -type f -print0 | while IFS= read -r -d '' FILE; do
+            FILENAME=$(basename "$FILE")
+            echo "Uploading $FILENAME..."
+            
+            UPLOAD_RESPONSE=$(curl -s -X POST \
+              -H "$AUTH_HEADER" \
+              -F "file=@$FILE" \
+              "$API_BASE_URL/releases/$RELEASE_ID/attach_files")
+              
+            if echo "$UPLOAD_RESPONSE" | jq -e '.name != null' > /dev/null; then
+              echo "Successfully uploaded $FILENAME"
+              UPLOAD_COUNT=$((UPLOAD_COUNT + 1))
+            else
+              echo "Failed to upload $FILENAME. Response: $UPLOAD_RESPONSE"
+              # 允許繼續上傳其他檔案，不在此處 exit 1
+            fi
+          done
+
+          echo "Gitee release upload completed. Uploaded $UPLOAD_COUNT files."
 
       - name: Sync code to Gitee (optional)
-        if: env.GITEE_SSH_PRIVATE_KEY != ''
+        if: success()
         uses: wearerequired/git-mirror-action@master
         env:
-          SSH_PRIVATE_KEY: ${{ secrets.GITEE_SSH_PRIVATE_KEY }}
+          # GITHUB_TOKEN 是 GitHub Actions 自動提供的
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # GITEE_TOKEN 和 GITEE_USERNAME 已在 Job 的 env 中定義
         with:
-          source-repo: ${{ github.repository }}
-          destination-repo: ${{ secrets.GITEE_USERNAME }}/hhc-client
+          # 來源 repo (GitHub) - 使用 GITHUB_TOKEN
+          source-repo: "https://github-actions:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+
+          # 目的地 repo (Gitee) - 使用 GITEE_TOKEN
+          destination-repo: "https://${{ env.GITEE_USERNAME }}:${{ env.GITEE_TOKEN }}@gitee.com/${{ env.GITEE_USERNAME }}/hhc-client.git"
