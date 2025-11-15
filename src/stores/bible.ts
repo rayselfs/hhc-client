@@ -1,15 +1,32 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { storeToRefs } from 'pinia'
-import type { BibleCacheItem, BibleContent } from '@/types/bible'
+import type { BibleContent, BibleVersion } from '@/types/bible'
 import type { VerseItem } from '@/types/common'
 import { BibleCacheConfig } from '@/types/bible'
 import { APP_CONFIG } from '@/config/app'
-import { StorageKey, StorageCategory } from '@/types/common'
+import { StorageKey, StorageCategory, getStorageKey } from '@/types/common'
 import { useIndexedDB } from '@/composables/useIndexedDB'
+import { useAPI } from '@/composables/useAPI'
+import { useLocalStorage } from '@/composables/useLocalStorage'
 import { useFolderStore } from './folder'
 
 export const useBibleStore = defineStore('bible', () => {
+  const { getLocalItem } = useLocalStorage()
+  const { getBibleVersions: fetchBibleVersions, getBibleContent: fetchBibleContent } = useAPI()
+
+  /**
+   * Bible versions fetched from API. Cached in memory to avoid duplicate requests.
+   */
+  const versions = ref<BibleVersion[]>([])
+  const versionsLoading = ref(false)
+  const versionsLoaded = ref(false)
+  let versionsRequest: Promise<BibleVersion[]> | null = null
+
+  /**
+   * Current selected Bible version. Persisted to localStorage for reuse.
+   */
+  const currentVersion = ref<BibleVersion | null>(null)
+
   /**
    * History of verses viewed by the user
    * Array of verses that have been accessed, limited to 50 items
@@ -20,10 +37,12 @@ export const useBibleStore = defineStore('bible', () => {
    * Currently loaded Bible content in memory
    * Used to avoid redundant IndexedDB reads when the same version is accessed multiple times
    */
-  const currentBibleContent = ref<{
-    versionId: number
-    content: BibleContent
-  } | null>(null)
+  const currentBibleContent = ref<BibleContent | null>(null)
+
+  /**
+   * Stores error messages from async operations
+   */
+  const error = ref<string | null>(null) // <-- ADDED (Issue 2)
 
   /**
    * IndexedDB instance for Bible content cache
@@ -35,66 +54,240 @@ export const useBibleStore = defineStore('bible', () => {
     stores: [
       {
         name: BibleCacheConfig.STORE_NAME as string,
-        keyPath: 'versionId',
+        keyPath: 'version_id',
       },
     ],
   })
 
-  /**
-   * Save Bible content to IndexedDB and update cache
-   * @param versionId - version ID
-   * @param versionCode - version code
-   * @param versionName - version name
-   * @param content - Bible content
-   */
-  const saveBibleContent = async (
-    versionId: number,
-    versionCode: string,
-    versionName: string,
-    content: BibleContent,
-  ): Promise<void> => {
-    await bibleCacheDB.put<BibleCacheItem>(BibleCacheConfig.STORE_NAME, {
-      versionId,
-      versionCode,
-      versionName,
-      content,
-      timestamp: Date.now(),
-    })
+  const versionStorageKey = getStorageKey(StorageCategory.BIBLE, StorageKey.SELECTED_VERSION)
 
-    // Update in-memory cache
-    currentBibleContent.value = {
-      versionId,
-      content,
+  /**
+   * Persist the currently selected version to localStorage or clear it when null.
+   */
+  const persistCurrentVersion = (version: BibleVersion | null) => {
+    if (typeof window === 'undefined') return
+    if (version) {
+      window.localStorage.setItem(versionStorageKey, JSON.stringify(version))
+    } else {
+      window.localStorage.removeItem(versionStorageKey)
     }
   }
 
   /**
-   * Get Bible content from IndexedDB or in-memory cache
-   * If the same version is already in memory, returns it directly to avoid redundant IndexedDB reads
-   * @param versionId - The Bible version ID
-   * @returns Bible content if exists, null otherwise
+   * Retrieve a version from the in-memory list by version ID.
    */
-  const getBibleContent = async (versionId: number): Promise<BibleContent | null> => {
-    // Check in-memory cache first
-    if (currentBibleContent.value && currentBibleContent.value.versionId === versionId) {
-      return currentBibleContent.value.content
+  const getVersionById = (versionId: number | null): BibleVersion | null => {
+    if (versionId == null) {
+      return null
+    }
+    return versions.value.find((version) => version.id === versionId) ?? null
+  }
+
+  /**
+   * Set the current version, optionally persisting to localStorage and resetting caches.
+   */
+  const setCurrentVersionInternal = (version: BibleVersion | null, persist = true) => {
+    const previousId = currentVersion.value?.id
+    currentVersion.value = version ?? null
+    if (persist) {
+      persistCurrentVersion(version ?? null)
     }
 
-    // Read from IndexedDB if not in cache
-    const cached = await bibleCacheDB.get<BibleCacheItem>(BibleCacheConfig.STORE_NAME, versionId)
-    const content = cached?.content ?? null
+    if (previousId !== currentVersion.value?.id) {
+      clearCurrentBibleContent()
+    }
+  }
 
-    // Update in-memory cache
-    if (content) {
-      currentBibleContent.value = {
-        versionId,
-        content,
+  /**
+   * Update the current version by ID; clears the selection if no match is found.
+   */
+  const setCurrentVersionById = (versionId: number | null) => {
+    if (versionId == null) {
+      setCurrentVersionInternal(null, true)
+      return
+    }
+    const target = getVersionById(versionId)
+    setCurrentVersionInternal(target ?? null, true)
+  }
+
+  /**
+   * Apply the best available version from the loaded list, preferring stored preferences.
+   */
+  const applyVersionSelection = (availableVersions: BibleVersion[]) => {
+    if (availableVersions.length === 0) {
+      setCurrentVersionInternal(null, true)
+      return
+    }
+
+    const fallbackVersion = availableVersions[0]
+    if (!fallbackVersion) {
+      setCurrentVersionInternal(null, true)
+      return
+    }
+
+    const storedVersionId =
+      currentVersion.value?.id ??
+      getLocalItem<BibleVersion>(versionStorageKey, 'object')?.id ??
+      fallbackVersion.id
+
+    const matchedVersion =
+      availableVersions.find((version) => version.id === storedVersionId) ?? fallbackVersion
+
+    setCurrentVersionInternal(matchedVersion, true)
+  }
+
+  /**
+   * Ensure Bible versions are loaded; fetch from API when needed and update state.
+   */
+  const loadBibleVersions = async (forceRefresh = false): Promise<BibleVersion[]> => {
+    error.value = null // <-- ADDED (Issue 2)
+    if (versionsLoaded.value && !forceRefresh) {
+      return versions.value
+    }
+
+    if (versionsLoading.value && versionsRequest) {
+      return versionsRequest
+    }
+
+    versionsLoading.value = true
+    const request = fetchBibleVersions()
+      .then((data) => {
+        versions.value = data
+        versionsLoaded.value = true
+        applyVersionSelection(data)
+        return data
+      })
+      .catch((err) => {
+        // <-- ADDED (Issue 2)
+        console.error('Failed to load Bible versions:', err)
+        error.value = 'Failed to load versions. Please check your connection.'
+        versionsLoaded.value = false
+        return [] // Return empty on failure
+      })
+      .finally(() => {
+        versionsLoading.value = false
+        versionsRequest = null
+      })
+
+    versionsRequest = request
+    return request
+  }
+
+  // Initialize current version from storage if available
+  currentVersion.value = getLocalItem<BibleVersion>(versionStorageKey, 'object') ?? null
+
+  // --- START: Issue 1 Fix ---
+  const enrichContentWithVersion = (
+    content: BibleContent,
+    version: BibleVersion, // <-- CHANGED
+  ): BibleContent => {
+    // const version = currentVersion.value // <-- REMOVED
+    if (!version) {
+      return content
+    }
+
+    if (
+      content.version_id === version.id &&
+      content.version_code === version.code &&
+      content.version_name === version.name
+    ) {
+      return content
+    }
+
+    return {
+      ...content,
+      version_id: version.id,
+      version_code: version.code,
+      version_name: version.name,
+    }
+  }
+
+  /**
+   * Save Bible content to IndexedDB and update cache
+   */
+  const cacheBibleContent = async (
+    content: BibleContent,
+    version: BibleVersion, // <-- CHANGED
+  ): Promise<void> => {
+    const contentToPersist = enrichContentWithVersion(content, version) // <-- Pass correct version
+    try {
+      // <-- ADDED (Issue 2)
+      await bibleCacheDB.put<BibleContent>(BibleCacheConfig.STORE_NAME, contentToPersist)
+      currentBibleContent.value = contentToPersist
+    } catch (err) {
+      console.error('Failed to cache Bible content:', err)
+      error.value = 'Failed to save content to offline cache.'
+    }
+  }
+  // --- END: Issue 1 Fix ---
+
+  /**
+   * Get Bible content from in-memory cache or IndexedDB without fetching from API.
+   */
+  const getCachedBibleContent = async (versionId: number): Promise<BibleContent | null> => {
+    if (currentBibleContent.value?.version_id === versionId) {
+      return currentBibleContent.value
+    }
+
+    try {
+      // <-- ADDED (Issue 2)
+      const cached = await bibleCacheDB.get<BibleContent>(BibleCacheConfig.STORE_NAME, versionId)
+      if (cached) {
+        currentBibleContent.value = cached
+        return cached
       }
-    } else {
-      currentBibleContent.value = null
+    } catch (err) {
+      console.error('Failed to get cached content:', err)
+      error.value = 'Failed to read from offline cache.'
     }
 
-    return content
+    currentBibleContent.value = null
+    return null
+  }
+
+  /**
+   * Get Bible content, auto fetching from API when cache is missing or forceRefresh is true.
+   */
+  const getBibleContent = async (
+    versionId: number,
+    options: { forceRefresh?: boolean; useCacheOnly?: boolean } = {},
+  ): Promise<BibleContent | null> => {
+    error.value = null // <-- ADDED (Issue 2)
+    const { forceRefresh = false, useCacheOnly = false } = options
+
+    if (!forceRefresh) {
+      const cached = await getCachedBibleContent(versionId) // This now has try/catch
+      if (cached) {
+        return cached
+      }
+      if (useCacheOnly) {
+        return null
+      }
+    }
+
+    // --- START: Issue 1 & 2 Fix ---
+    try {
+      // Ensure versions are loaded to get metadata
+      if (!versionsLoaded.value || versions.value.length === 0) {
+        await loadBibleVersions()
+      }
+
+      const version = getVersionById(versionId)
+      if (!version) {
+        // This can happen if API call failed or versionId is invalid
+        throw new Error(`Bible version metadata for ID ${versionId} not found.`)
+      }
+
+      const content = await fetchBibleContent(versionId)
+      await cacheBibleContent(content, version) // Pass the correct version
+      return currentBibleContent.value
+    } catch (err) {
+      console.error(`Failed to get or cache content for ${versionId}:`, err)
+      error.value =
+        err instanceof Error ? err.message : 'An unknown error occurred while fetching content.'
+      return null
+    }
+    // --- END: Issue 1 & 2 Fix ---
   }
 
   /**
@@ -111,7 +304,17 @@ export const useBibleStore = defineStore('bible', () => {
    * @returns true if cached, false otherwise
    */
   const hasCachedContent = async (versionId: number): Promise<boolean> => {
-    return await bibleCacheDB.has(BibleCacheConfig.STORE_NAME, versionId)
+    if (currentBibleContent.value?.version_id === versionId) {
+      return true
+    }
+    try {
+      // <-- ADDED (Issue 2)
+      return await bibleCacheDB.has(BibleCacheConfig.STORE_NAME, versionId)
+    } catch (err) {
+      console.error('Failed to check cache:', err)
+      error.value = 'Failed to check cache status.'
+      return false
+    }
   }
 
   /**
@@ -177,9 +380,7 @@ export const useBibleStore = defineStore('bible', () => {
    */
   const addVerseToCurrent = (verse: VerseItem): boolean => {
     // Bible-specific duplicate check: same book, chapter, and verse
-    // Use storeToRefs to get reactive currentFolder
-    const { currentFolder } = storeToRefs(folderStore)
-    const exists = currentFolder.value.items.some(
+    const exists = folderStore.currentFolder.items.some(
       (item: VerseItem) =>
         item.bookNumber === verse.bookNumber &&
         item.chapter === verse.chapter &&
@@ -187,7 +388,6 @@ export const useBibleStore = defineStore('bible', () => {
     )
 
     if (!exists) {
-      // Use folder store's generic addItemToCurrent (pure push)
       folderStore.addItemToCurrent(verse)
       return true
     }
@@ -195,10 +395,17 @@ export const useBibleStore = defineStore('bible', () => {
   }
 
   return {
+    // Version management
+    versions,
+    versionsLoading,
+    currentVersion,
+    loadBibleVersions,
+    setCurrentVersionById,
+    getVersionById,
     // Bible Content Cache
     currentBibleContent,
-    saveBibleContent,
     getBibleContent,
+    getCachedBibleContent,
     hasCachedContent,
     clearCurrentBibleContent,
     // History Management
@@ -210,5 +417,7 @@ export const useBibleStore = defineStore('bible', () => {
     folderStore,
     // Bible-specific folder operations
     addVerseToCurrent,
+    // Error state
+    error,
   }
 })

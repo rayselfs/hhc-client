@@ -77,18 +77,7 @@ export interface StreamingProgress {
  * Bible Cache 配置
  */
 export enum BibleCacheConfig {
-  DB_NAME = 'BibleCache',
+  DB_NAME = 'BibleDB',
   STORE_NAME = 'bibleContent',
   DB_VERSION = 1,
-}
-
-/**
- * Bible Cache 項目接口
- */
-export interface BibleCacheItem {
-  versionId: number
-  versionCode: string
-  versionName: string
-  content: BibleContent
-  timestamp: number
 }

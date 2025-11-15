@@ -282,8 +282,6 @@ export enum StorageKey {
   // Timer related
   TIMER_SETTINGS = 'settings',
   TIMER_PRESETS = 'presets',
-  // Basic Auth
-  BASIC_AUTH_CREDENTIALS = 'basic_auth_credentials',
 }
 
 /**
@@ -302,10 +300,6 @@ export enum StorageCategory {
  * @returns 完整的 LocalStorage 鍵名
  */
 export function getStorageKey(category: StorageCategory, key: StorageKey | string): string {
-  // 處理 BASIC_AUTH_CREDENTIALS（不使用分類前綴）
-  if (key === StorageKey.BASIC_AUTH_CREDENTIALS) {
-    return key
-  }
   return `hhc-${category}-${key}`
 }
 

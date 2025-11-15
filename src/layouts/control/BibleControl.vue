@@ -169,6 +169,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useElectron } from '@/composables/useElectron'
 import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
@@ -206,6 +207,7 @@ const { sendToProjection } = useElectron()
 const { reportError } = useSentry()
 const { getLocalItem, setLocalItem } = useLocalStorage()
 const bibleStore = useBibleStore()
+const { currentVersion } = storeToRefs(bibleStore)
 const { getBibleContent, addToHistory } = bibleStore
 
 const { leftCardHeight, rightTopCardHeight, rightBottomCardHeight } = useCardLayout({
@@ -525,12 +527,15 @@ const updateProjectionFontSize = () => {
 // 歷史記錄相關函數
 const loadVerse = async (item: VerseItem, type: 'history' | 'custom') => {
   try {
-    // 獲取當前選中的版本
-    const savedVersion = getLocalItem<number>(
-      getStorageKey(StorageCategory.BIBLE, StorageKey.SELECTED_VERSION),
-      'int',
-    )
-    const versionId = savedVersion || 1
+    const versionId = currentVersion.value?.id
+    if (!versionId) {
+      reportError(new Error('No Bible version selected'), {
+        operation: 'load-verse',
+        component: 'BibleControl',
+        extra: { item },
+      })
+      return
+    }
 
     const content = await getBibleContent(versionId)
     if (!content) {

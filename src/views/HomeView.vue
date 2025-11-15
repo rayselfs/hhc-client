@@ -41,13 +41,6 @@
     <!-- Extended Components -->
     <FloatingTimer v-if="showFloatingTimer" @click="goToTimer" />
 
-    <!-- Basic Auth Dialog -->
-    <BasicAuthDialog
-      v-model="showAuthDialog"
-      @confirm="handleAuthConfirm"
-      @cancel="handleAuthCancel"
-    />
-
     <!-- Global Alert Dialog -->
     <AlertDialog
       v-model="alertState.show"
@@ -102,7 +95,6 @@ import ExtendedToolbar from '@/components/ExtendedToolbar.vue'
 import BibleViewer from '@/layouts/control/BibleControl.vue'
 import TimerControl from '@/layouts/control/TimerControl.vue'
 import FloatingTimer from '@/components/Timer/FloatingTimer.vue'
-import { BasicAuthDialog } from '@/components/Main'
 import { useElectron } from '@/composables/useElectron'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { AlertDialog, SnackBar } from '@/components/Alert'
@@ -111,7 +103,6 @@ import { SettingsDialog, AboutDialog, ResetDialog } from '@/components/Main'
 import { ShortcutsDialog } from '@/components/Shortcuts'
 import { useAlert } from '@/composables/useAlert'
 import { useSnackBar } from '@/composables/useSnackBar'
-import { useBasicAuth } from '@/composables/useBasicAuth'
 import { useTimerStore } from '@/stores/timer'
 import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
 import { MessageType, ViewType, type AppMessage } from '@/types/common'
@@ -123,16 +114,9 @@ import { getInitialLocale } from '@/composables/useLocaleDetection'
 const { t: $t, locale } = useI18n()
 const { reportError } = useSentry()
 const { alertState, confirm, cancel, handleDontShowAgain, warning } = useAlert()
-const {
-  snackbarVisible,
-  snackbarText,
-  snackbarColor,
-  snackbarTimeout,
-  defaultConfig,
-  showSnackBar,
-} = useSnackBar()
+const { snackbarVisible, snackbarText, snackbarColor, snackbarTimeout, defaultConfig } =
+  useSnackBar()
 const { sendViewChange } = useProjectionMessaging()
-const { showAuthDialog, saveCredentials, hasCredentials } = useBasicAuth()
 
 // Store
 const timerStore = useTimerStore()
@@ -243,18 +227,6 @@ const checkAndEnsureProjectionWindow = async () => {
   }
 }
 
-// 處理認證確認
-const handleAuthConfirm = (credentials: { username: string; password: string }) => {
-  saveCredentials(credentials)
-  showAuthDialog.value = false
-}
-
-// 處理認證取消
-const handleAuthCancel = () => {
-  showAuthDialog.value = false
-  showSnackBar($t('auth.cancelled'), 'error')
-}
-
 // 監聽視圖切換
 watch(currentView, async () => {})
 
@@ -263,11 +235,6 @@ onMounted(async () => {
   // 初始化語系偵測
   const initialLocale = await getInitialLocale()
   locale.value = initialLocale
-
-  // 檢查認證狀態，沒有認證則顯示對話框
-  if (!hasCredentials.value) {
-    showAuthDialog.value = true
-  }
 
   if (isElectron()) {
     // 監聽來自Electron的消息

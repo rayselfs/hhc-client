@@ -1,23 +1,23 @@
 <template>
   <div class="bible-version-selector-wrapper">
     <v-select
-      v-model="selectedVersion"
+      v-model="selectedVersionId"
       :items="bibleVersions"
       item-title="name"
       item-value="id"
-      :loading="apiLoading || contentLoading"
+      :loading="versionsLoading || contentLoading"
       density="compact"
       variant="outlined"
       hide-details
       class="bible-version-selector mr-2"
-      :disabled="apiLoading || contentLoading"
+      :disabled="versionsLoading || contentLoading"
     >
     </v-select>
 
     <!-- 書卷選擇按鈕 -->
     <v-btn
       variant="outlined"
-      :disabled="!selectedVersion"
+      :disabled="!selectedVersionId"
       @click="showBooksDialog = true"
       :title="$t('bible.title')"
       class="books-btn"
@@ -28,66 +28,40 @@
     <!-- 聖經書卷選擇 Dialog -->
     <BibleBooksDialog
       v-model="showBooksDialog"
-      :version-id="selectedVersion"
+      :version-id="selectedVersionId"
       @select-verse="handleSelectVerse"
     />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onMounted } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
-import { useAPI } from '@/composables/useAPI'
-import type { BibleVersion, BibleBook } from '@/types/bible'
+import type { BibleBook } from '@/types/bible'
 import BibleBooksDialog from '@/components/Bible/BibleBooksDialog.vue'
 import { useSentry } from '@/composables/useSentry'
-import { useBasicAuth } from '@/composables/useBasicAuth'
-import { useLocalStorage } from '@/composables/useLocalStorage'
-import { StorageKey, StorageCategory, getStorageKey } from '@/types/common'
 import { useBibleStore } from '@/stores/bible'
 
 const { reportError } = useSentry()
 const { t: $t } = useI18n()
-const { loading: apiLoading, getBibleVersions, getBibleContent } = useAPI()
-const { hasCredentials } = useBasicAuth()
-const { setLocalItem, getLocalItem } = useLocalStorage()
 
-// 使用 Bible Store 的 Cache 功能
+// Bible store handling versions, current selection, and cached content
 const bibleStore = useBibleStore()
-const { saveBibleContent, getBibleContent: getCachedContent, hasCachedContent } = bibleStore
+const { versions, versionsLoading, currentVersion } = storeToRefs(bibleStore)
+const { loadBibleVersions, setCurrentVersionById, getBibleContent } = bibleStore
 
-const bibleVersions = ref<BibleVersion[]>([])
-const selectedVersion = ref<number | null>(null)
 const contentLoading = ref(false)
 const showBooksDialog = ref(false)
 
-// 載入聖經版本列表
-const loadBibleVersions = async () => {
-  try {
-    const versions = await getBibleVersions()
-    bibleVersions.value = versions
+const bibleVersions = computed(() => versions.value)
 
-    // 嘗試從 localStorage 讀取已選擇的版本
-    const savedVersion = getLocalItem<number | null>(
-      getStorageKey(StorageCategory.BIBLE, StorageKey.SELECTED_VERSION),
-      'int',
-    )
-
-    // 設定預設選擇第一個版本或已保存的版本
-    if (versions.length > 0) {
-      if (savedVersion && versions.find((v) => v.id === savedVersion)) {
-        selectedVersion.value = savedVersion
-      } else if (!selectedVersion.value && versions[0]) {
-        selectedVersion.value = versions[0].id
-      }
-    }
-  } catch (error) {
-    reportError(error, {
-      operation: 'load-bible-versions',
-      component: 'BibleVersionSelector',
-    })
-  }
-}
+const selectedVersionId = computed<number | null>({
+  get: () => currentVersion.value?.id ?? null,
+  set: (value) => {
+    setCurrentVersionById(value)
+  },
+})
 
 /**
  * 載入聖經內容 (優先從快取讀取)
@@ -98,33 +72,7 @@ const loadBibleContentForVersion = async (versionId: number, forceRefresh = fals
   contentLoading.value = true
 
   try {
-    // 查找版本信息
-    const version = bibleVersions.value.find((v) => v.id === versionId)
-    if (!version) {
-      reportError(new Error('Version not found'), {
-        operation: 'version-not-found',
-        component: 'BibleVersionSelector',
-        extra: { versionId },
-      })
-      return
-    }
-
-    // 如果不是強制刷新，先檢查快取
-    if (!forceRefresh) {
-      const hasCached = await hasCachedContent(versionId)
-      if (hasCached) {
-        const cachedContent = await getCachedContent(versionId)
-        if (cachedContent) {
-          return
-        }
-      }
-    }
-
-    // 從 API 獲取內容
-    const content = await getBibleContent(versionId)
-
-    // 儲存到快取
-    await saveBibleContent(versionId, version.code, version.name, content)
+    await getBibleContent(versionId, { forceRefresh })
   } catch (error) {
     reportError(error, {
       operation: 'load-bible-content',
@@ -137,12 +85,15 @@ const loadBibleContentForVersion = async (versionId: number, forceRefresh = fals
 }
 
 // 監聽版本變化
-watch(selectedVersion, async (newVersion) => {
-  if (newVersion) {
-    setLocalItem(getStorageKey(StorageCategory.BIBLE, StorageKey.SELECTED_VERSION), newVersion)
-    await loadBibleContentForVersion(newVersion, false)
-  }
-})
+watch(
+  () => currentVersion.value?.id,
+  async (newVersion) => {
+    if (newVersion) {
+      await loadBibleContentForVersion(newVersion, false)
+    }
+  },
+  { immediate: true },
+)
 
 // 處理經文選擇
 const handleSelectVerse = (book: BibleBook, chapter: number, verse: number) => {
@@ -154,21 +105,22 @@ const handleSelectVerse = (book: BibleBook, chapter: number, verse: number) => {
   )
 }
 
-// 監聽認證狀態變化，當有認證資訊時才載入聖經版本
-watch(
-  hasCredentials,
-  (newVal) => {
-    if (newVal && bibleVersions.value.length === 0) {
-      // 當認證完成且還沒有載入版本時，載入聖經版本列表
-      loadBibleVersions()
+onMounted(async () => {
+  if (bibleVersions.value.length === 0) {
+    try {
+      await loadBibleVersions()
+    } catch (error) {
+      reportError(error, {
+        operation: 'load-bible-versions',
+        component: 'BibleVersionSelector',
+      })
     }
-  },
-  { immediate: true }, // 立即執行一次檢查
-)
+  }
+})
 
 // 暴露 selectedVersion 供外部使用
 defineExpose({
-  selectedVersion: computed(() => selectedVersion.value),
+  selectedVersion: computed(() => selectedVersionId.value),
 })
 </script>
 
