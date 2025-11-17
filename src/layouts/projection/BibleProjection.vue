@@ -26,7 +26,7 @@
 <script setup lang="ts">
 import { ref, watch, nextTick, onMounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import BottomSpacer from '@/components/Bible/BottomSpacer.vue'
+import BottomSpacer from '@/components/Main/BottomSpacer.vue'
 
 interface BibleVerse {
   number: number

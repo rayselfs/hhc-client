@@ -181,7 +181,7 @@ import { useLocalStorage } from '@/composables/useLocalStorage'
 import { useBible } from '@/composables/useBible'
 import ContextMenu from '@/components/ContextMenu.vue'
 import MultiFunctionControl from '@/components/Bible/MultiFunction/Control.vue'
-import BottomSpacer from '@/components/Bible/BottomSpacer.vue'
+import BottomSpacer from '@/components/Main/BottomSpacer.vue'
 
 interface BiblePassage {
   bookAbbreviation: string
