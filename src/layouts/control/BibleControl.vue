@@ -18,14 +18,14 @@
                 size="small"
                 class="mr-1"
                 :disabled="currentPassage.chapter <= 1"
-                @click="goToPreviousChapter"
+                @click="goToPreviousChapterPreview"
               >
                 <v-icon>mdi-chevron-left</v-icon>
               </v-btn>
               <v-btn
                 size="small"
                 :disabled="currentPassage.chapter >= getMaxChapters()"
-                @click="goToNextChapter"
+                @click="goToNextChapterPreview"
               >
                 <v-icon>mdi-chevron-right</v-icon>
               </v-btn>
@@ -142,7 +142,7 @@
                       :max="BIBLE_CONFIG.FONT.MAX_SIZE"
                       :step="BIBLE_CONFIG.FONT.SIZE_STEP"
                       thumb-label
-                      @update:model-value="updateProjectionFontSize"
+                      @update:model-value="handleFontSizeUpdate"
                     >
                       <template #thumb-label="{ modelValue }"> {{ modelValue }}px </template>
                     </v-slider>
@@ -171,18 +171,16 @@
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
-import { useElectron } from '@/composables/useElectron'
-import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
-import { useProjectionStore } from '@/stores/projection'
 import { useBibleStore } from '@/stores/bible'
 import { APP_CONFIG, BIBLE_CONFIG } from '@/config/app'
-import { MessageType, ViewType, StorageKey, StorageCategory, getStorageKey } from '@/types/common'
+import { StorageKey, StorageCategory, getStorageKey } from '@/types/common'
 import type { VerseItem } from '@/types/common'
 import { useSentry } from '@/composables/useSentry'
 import { useCardLayout } from '@/composables/useLayout'
 import { useLocalStorage } from '@/composables/useLocalStorage'
+import { useBible } from '@/composables/useBible'
 import ContextMenu from '@/components/ContextMenu.vue'
-import MultiFunctionControl from '@/components/Bible/MultiFunctionControl.vue'
+import MultiFunctionControl from '@/components/Bible/MultiFunction/Control.vue'
 import BottomSpacer from '@/components/Bible/BottomSpacer.vue'
 
 interface BiblePassage {
@@ -200,10 +198,6 @@ interface PreviewVerse {
 }
 
 const { t: $t } = useI18n()
-const { isElectron } = useElectron()
-const { setProjectionState, sendBibleUpdate } = useProjectionMessaging()
-const projectionStore = useProjectionStore()
-const { sendToProjection } = useElectron()
 const { reportError } = useSentry()
 const { getLocalItem, setLocalItem } = useLocalStorage()
 const bibleStore = useBibleStore()
@@ -236,10 +230,21 @@ const getInitialFontSize = () => {
 }
 const fontSize = ref(getInitialFontSize())
 
-// Use store for folder management and navigation
-const { folderStore } = bibleStore
+// Use Bible composable for folder management, navigation and projection
+const {
+  folderStore,
+  addVerseToCurrent,
+  scrollToVerse,
+  getMaxChapters,
+  goToPreviousChapter,
+  goToNextChapter,
+  goToPreviousVerse,
+  goToNextVerse,
+  updateProjection,
+  updateProjectionFontSize: updateFontSize,
+} = useBible(currentPassage, currentBookData, chapterVerses)
+
 const { loadRootFolder } = folderStore
-const { addVerseToCurrent } = bibleStore
 
 // 右鍵選單相關
 const contextMenuRef = ref<InstanceType<typeof ContextMenu> | null>(null)
@@ -284,43 +289,10 @@ const handleVerseSelection = (
   }
 }
 
-// 滾動到指定節
-const scrollToVerse = (verseNumber: number) => {
-  const element = document.querySelector(`[data-verse="${verseNumber}"]`)
-  if (element) {
-    element.scrollIntoView({
-      behavior: 'smooth', // 'instant'
-      block: 'start',
-    })
-  }
-}
-
-// 更新投影畫面
-const updateProjection = async (verseNumber: number) => {
-  if (currentPassage.value) {
-    if (isElectron()) {
-      // 如果投影視窗沒有顯示聖經（顯示預設內容或顯示其他內容），則切換到聖經
-      if (projectionStore.isShowingDefault || projectionStore.currentView !== 'bible') {
-        await setProjectionState(false, ViewType.BIBLE)
-      }
-    }
-
-    // 發送聖經數據
-    const bibleData = {
-      book: currentPassage.value.bookName,
-      bookNumber: currentPassage.value.bookNumber,
-      chapter: currentPassage.value.chapter,
-      chapterVerses: chapterVerses.value.map((verse) => ({
-        number: verse.number,
-        text: verse.text,
-      })),
-      currentVerse: verseNumber,
-    }
-
-    sendBibleUpdate(bibleData, true)
-
-    addToHistoryFromVerse(verseNumber)
-  }
+// 更新投影畫面（包含歷史記錄）
+const updateProjectionWithHistory = async (verseNumber: number) => {
+  await updateProjection(verseNumber)
+  addToHistoryFromVerse(verseNumber)
 }
 
 /**
@@ -359,169 +331,45 @@ const addToHistoryFromVerse = (verseNumber: number) => {
 const selectVerse = (verseNumber: number) => {
   if (currentPassage.value) {
     currentPassage.value.verse = verseNumber
-    updateProjection(verseNumber)
+    updateProjectionWithHistory(verseNumber)
   }
-}
-
-// 獲取最大章數
-const getMaxChapters = () => {
-  return currentBookData.value ? currentBookData.value.chapters.length : 0
 }
 
 // 上一章 (只影響預覽)
-const goToPreviousChapter = () => {
-  if (currentPassage.value && currentPassage.value.chapter > 1 && currentBookData.value) {
-    const newChapter = currentPassage.value.chapter - 1
-    const selectedChapter = currentBookData.value.chapters.find((ch) => ch.number === newChapter)
-
-    if (selectedChapter) {
-      // 更新章節和節數（從第1節開始）
-      currentPassage.value.chapter = newChapter
-      currentPassage.value.verse = 1
-
-      // 更新經文內容
-      chapterVerses.value = selectedChapter.verses.map((v: { number: number; text: string }) => ({
-        number: v.number,
-        text: v.text,
-      }))
-
-      // 滾動到第1節
-      nextTick(() => {
-        scrollToVerse(1)
-      })
-    }
-  }
+const goToPreviousChapterPreview = () => {
+  goToPreviousChapter(false)
 }
 
 // 下一章 (只影響預覽)
-const goToNextChapter = () => {
-  if (currentPassage.value && currentBookData.value) {
-    const maxChapters = getMaxChapters()
-    if (currentPassage.value.chapter < maxChapters) {
-      const newChapter = currentPassage.value.chapter + 1
-      const selectedChapter = currentBookData.value.chapters.find((ch) => ch.number === newChapter)
-
-      if (selectedChapter) {
-        // 更新章節和節數（從第1節開始）
-        currentPassage.value.chapter = newChapter
-        currentPassage.value.verse = 1
-
-        // 更新經文內容
-        chapterVerses.value = selectedChapter.verses.map((v: { number: number; text: string }) => ({
-          number: v.number,
-          text: v.text,
-        }))
-
-        // 滾動到第1節
-        nextTick(() => {
-          scrollToVerse(1)
-        })
-      }
-    }
-  }
+const goToNextChapterPreview = () => {
+  goToNextChapter(false)
 }
 
 // 投影控制函數
 // 上一章 (影響投影)
 const goToPreviousChapterProjection = () => {
-  if (currentPassage.value && currentPassage.value.chapter > 1 && currentBookData.value) {
-    const newChapter = currentPassage.value.chapter - 1
-    const selectedChapter = currentBookData.value.chapters.find((ch) => ch.number === newChapter)
-
-    if (selectedChapter) {
-      // 更新章節和節數（從第1節開始）
-      currentPassage.value.chapter = newChapter
-      currentPassage.value.verse = 1
-
-      // 更新經文內容
-      chapterVerses.value = selectedChapter.verses.map((v: { number: number; text: string }) => ({
-        number: v.number,
-        text: v.text,
-      }))
-
-      // 滾動到第1節
-      nextTick(() => {
-        scrollToVerse(1)
-      })
-
-      // 發送到投影
-      updateProjection(1)
-    }
-  }
+  goToPreviousChapter(true, updateProjectionWithHistory)
 }
 
 // 下一章 (影響投影)
 const goToNextChapterProjection = () => {
-  if (currentPassage.value && currentBookData.value) {
-    const maxChapters = getMaxChapters()
-    if (currentPassage.value.chapter < maxChapters) {
-      const newChapter = currentPassage.value.chapter + 1
-      const selectedChapter = currentBookData.value.chapters.find((ch) => ch.number === newChapter)
-
-      if (selectedChapter) {
-        // 更新章節和節數（從第1節開始）
-        currentPassage.value.chapter = newChapter
-        currentPassage.value.verse = 1
-
-        // 更新經文內容
-        chapterVerses.value = selectedChapter.verses.map((v: { number: number; text: string }) => ({
-          number: v.number,
-          text: v.text,
-        }))
-
-        // 滾動到第1節
-        nextTick(() => {
-          scrollToVerse(1)
-        })
-
-        // 發送到投影
-        updateProjection(1)
-      }
-    }
-  }
+  goToNextChapter(true, updateProjectionWithHistory)
 }
 
 // 上一節 (影響投影)
 const goToPreviousVerseProjection = () => {
-  if (currentPassage.value && currentPassage.value.verse > 1) {
-    const newVerse = currentPassage.value.verse - 1
-    currentPassage.value.verse = newVerse
-
-    // 滾動到新節
-    nextTick(() => {
-      scrollToVerse(newVerse)
-    })
-
-    // 發送到投影
-    updateProjection(newVerse)
-  }
+  goToPreviousVerse(true, updateProjectionWithHistory)
 }
 
 // 下一節 (影響投影)
 const goToNextVerseProjection = () => {
-  if (currentPassage.value && currentPassage.value.verse < chapterVerses.value.length) {
-    const newVerse = currentPassage.value.verse + 1
-    currentPassage.value.verse = newVerse
-
-    // 滾動到新節
-    nextTick(() => {
-      scrollToVerse(newVerse)
-    })
-
-    // 發送到投影
-    updateProjection(newVerse)
-  }
+  goToNextVerse(true, updateProjectionWithHistory)
 }
 
 // 更新投影字型大小
-const updateProjectionFontSize = () => {
+const handleFontSizeUpdate = () => {
   setLocalItem(getStorageKey(StorageCategory.BIBLE, StorageKey.FONT_SIZE), fontSize.value)
-  if (isElectron()) {
-    sendToProjection({
-      type: MessageType.UPDATE_BIBLE_FONT_SIZE,
-      data: { fontSize: fontSize.value },
-    })
-  }
+  updateFontSize(fontSize.value)
 }
 
 // 歷史記錄相關函數
@@ -561,7 +409,7 @@ const loadVerse = async (item: VerseItem, type: 'history' | 'custom') => {
     handleVerseSelection(book, item.chapter, item.verse)
 
     if (type === 'custom') {
-      updateProjection(item.verse)
+      updateProjectionWithHistory(item.verse)
     }
   } catch (error) {
     reportError(error, {

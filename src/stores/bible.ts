@@ -3,12 +3,10 @@ import { ref } from 'vue'
 import type { BibleContent, BibleVersion } from '@/types/bible'
 import type { VerseItem } from '@/types/common'
 import { BibleCacheConfig } from '@/types/bible'
-import { APP_CONFIG } from '@/config/app'
 import { StorageKey, StorageCategory, getStorageKey } from '@/types/common'
 import { useIndexedDB } from '@/composables/useIndexedDB'
 import { useAPI } from '@/composables/useAPI'
 import { useLocalStorage } from '@/composables/useLocalStorage'
-import { useFolderStore } from './folder'
 
 export const useBibleStore = defineStore('bible', () => {
   const { getLocalItem } = useLocalStorage()
@@ -42,7 +40,21 @@ export const useBibleStore = defineStore('bible', () => {
   /**
    * Stores error messages from async operations
    */
-  const error = ref<string | null>(null) // <-- ADDED (Issue 2)
+  const error = ref<string | null>(null)
+
+  /**
+   * Clear error state
+   */
+  const clearError = () => {
+    error.value = null
+  }
+
+  /**
+   * Set error with optional context
+   */
+  const setError = (message: string) => {
+    error.value = message
+  }
 
   /**
    * IndexedDB instance for Bible content cache
@@ -140,7 +152,7 @@ export const useBibleStore = defineStore('bible', () => {
    * Ensure Bible versions are loaded; fetch from API when needed and update state.
    */
   const loadBibleVersions = async (forceRefresh = false): Promise<BibleVersion[]> => {
-    error.value = null // <-- ADDED (Issue 2)
+    clearError()
     if (versionsLoaded.value && !forceRefresh) {
       return versions.value
     }
@@ -158,9 +170,8 @@ export const useBibleStore = defineStore('bible', () => {
         return data
       })
       .catch((err) => {
-        // <-- ADDED (Issue 2)
         console.error('Failed to load Bible versions:', err)
-        error.value = 'Failed to load versions. Please check your connection.'
+        setError('Failed to load versions. Please check your connection.')
         versionsLoaded.value = false
         return [] // Return empty on failure
       })
@@ -205,18 +216,14 @@ export const useBibleStore = defineStore('bible', () => {
   /**
    * Save Bible content to IndexedDB and update cache
    */
-  const cacheBibleContent = async (
-    content: BibleContent,
-    version: BibleVersion, // <-- CHANGED
-  ): Promise<void> => {
-    const contentToPersist = enrichContentWithVersion(content, version) // <-- Pass correct version
+  const cacheBibleContent = async (content: BibleContent, version: BibleVersion): Promise<void> => {
+    const contentToPersist = enrichContentWithVersion(content, version)
     try {
-      // <-- ADDED (Issue 2)
       await bibleCacheDB.put<BibleContent>(BibleCacheConfig.STORE_NAME, contentToPersist)
       currentBibleContent.value = contentToPersist
     } catch (err) {
       console.error('Failed to cache Bible content:', err)
-      error.value = 'Failed to save content to offline cache.'
+      setError('Failed to save content to offline cache.')
     }
   }
   // --- END: Issue 1 Fix ---
@@ -230,7 +237,6 @@ export const useBibleStore = defineStore('bible', () => {
     }
 
     try {
-      // <-- ADDED (Issue 2)
       const cached = await bibleCacheDB.get<BibleContent>(BibleCacheConfig.STORE_NAME, versionId)
       if (cached) {
         currentBibleContent.value = cached
@@ -238,7 +244,7 @@ export const useBibleStore = defineStore('bible', () => {
       }
     } catch (err) {
       console.error('Failed to get cached content:', err)
-      error.value = 'Failed to read from offline cache.'
+      setError('Failed to read from offline cache.')
     }
 
     currentBibleContent.value = null
@@ -252,11 +258,11 @@ export const useBibleStore = defineStore('bible', () => {
     versionId: number,
     options: { forceRefresh?: boolean; useCacheOnly?: boolean } = {},
   ): Promise<BibleContent | null> => {
-    error.value = null // <-- ADDED (Issue 2)
+    clearError()
     const { forceRefresh = false, useCacheOnly = false } = options
 
     if (!forceRefresh) {
-      const cached = await getCachedBibleContent(versionId) // This now has try/catch
+      const cached = await getCachedBibleContent(versionId)
       if (cached) {
         return cached
       }
@@ -265,7 +271,6 @@ export const useBibleStore = defineStore('bible', () => {
       }
     }
 
-    // --- START: Issue 1 & 2 Fix ---
     try {
       // Ensure versions are loaded to get metadata
       if (!versionsLoaded.value || versions.value.length === 0) {
@@ -279,15 +284,15 @@ export const useBibleStore = defineStore('bible', () => {
       }
 
       const content = await fetchBibleContent(versionId)
-      await cacheBibleContent(content, version) // Pass the correct version
+      await cacheBibleContent(content, version)
       return currentBibleContent.value
     } catch (err) {
       console.error(`Failed to get or cache content for ${versionId}:`, err)
-      error.value =
+      const errorMessage =
         err instanceof Error ? err.message : 'An unknown error occurred while fetching content.'
+      setError(errorMessage)
       return null
     }
-    // --- END: Issue 1 & 2 Fix ---
   }
 
   /**
@@ -308,11 +313,10 @@ export const useBibleStore = defineStore('bible', () => {
       return true
     }
     try {
-      // <-- ADDED (Issue 2)
       return await bibleCacheDB.has(BibleCacheConfig.STORE_NAME, versionId)
     } catch (err) {
       console.error('Failed to check cache:', err)
-      error.value = 'Failed to check cache status.'
+      setError('Failed to check cache status.')
       return false
     }
   }
@@ -361,39 +365,6 @@ export const useBibleStore = defineStore('bible', () => {
     historyVerses.value = []
   }
 
-  /**
-   * Bible folder store instance
-   * Manages folder structure for Bible verses
-   */
-  const folderStore = useFolderStore<VerseItem>({
-    rootId: APP_CONFIG.FOLDER.ROOT_ID,
-    defaultRootName: APP_CONFIG.FOLDER.DEFAULT_ROOT_NAME,
-    storageCategory: StorageCategory.BIBLE,
-    storageKey: StorageKey.FOLDERS,
-  })
-
-  /**
-   * Add a verse to the current folder with duplicate checking
-   * Bible-specific business logic: checks for duplicate verses based on book, chapter, and verse number
-   * @param verse - The verse item to add
-   * @returns true if added, false if duplicate
-   */
-  const addVerseToCurrent = (verse: VerseItem): boolean => {
-    // Bible-specific duplicate check: same book, chapter, and verse
-    const exists = folderStore.currentFolder.items.some(
-      (item: VerseItem) =>
-        item.bookNumber === verse.bookNumber &&
-        item.chapter === verse.chapter &&
-        item.verse === verse.verse,
-    )
-
-    if (!exists) {
-      folderStore.addItemToCurrent(verse)
-      return true
-    }
-    return false
-  }
-
   return {
     // Version management
     versions,
@@ -413,11 +384,9 @@ export const useBibleStore = defineStore('bible', () => {
     addToHistory,
     removeHistoryItem,
     clearHistory,
-    // Folder Store (re-export for convenience)
-    folderStore,
-    // Bible-specific folder operations
-    addVerseToCurrent,
     // Error state
     error,
+    clearError,
+    setError,
   }
 })

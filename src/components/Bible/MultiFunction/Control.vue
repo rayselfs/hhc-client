@@ -77,114 +77,29 @@
       @contextmenu="handleCardTextRightClick"
     >
       <!-- History Page -->
-      <div v-if="multiFunctionTab === 'history'" class="history-content" style="height: 100%">
-        <div v-if="historyVerses.length === 0" class="text-center pa-4 text-grey">
-          {{ $t('bible.noHistory') }}
-        </div>
-        <v-virtual-scroll
-          v-else
-          :items="historyVerses"
-          :height="props.containerHeight ? `${props.containerHeight - 48}px` : 'calc(100% - 48px)'"
-          :item-height="80"
-        >
-          <template #default="{ item }">
-            <div
-              class="verse-item pa-3 d-flex align-center justify-space-between"
-              @click="loadVerse(item, 'history')"
-              @contextmenu="handleRightClick($event, 'history', item)"
-            >
-              <div>
-                <div class="text-h6 font-weight-medium d-flex">
-                  <span class="mr-1 text-no-wrap"
-                    >{{ item.bookAbbreviation }}{{ item.chapter }}:{{ item.verse }} -
-                  </span>
-                  <span class="text-justify">{{ item.verseText }}</span>
-                </div>
-              </div>
-              <v-btn
-                class="verse-btn"
-                icon
-                size="small"
-                variant="text"
-                @click.stop="removeHistoryItem(item.id)"
-              >
-                <v-icon>mdi-close</v-icon>
-              </v-btn>
-            </div>
-          </template>
-        </v-virtual-scroll>
-      </div>
+      <HistoryTab
+        v-if="multiFunctionTab === 'history'"
+        :history-verses="historyVerses"
+        :container-height="props.containerHeight"
+        @load-verse="(item: VerseItem) => loadVerse(item, 'history')"
+        @remove-item="removeHistoryItem"
+        @right-click="
+          (event: MouseEvent, item: VerseItem) => handleRightClick(event, 'history', item)
+        "
+      />
 
       <!-- Custom Page -->
-      <div v-else class="custom-content">
-        <div class="custom-list">
-          <div
-            v-if="getCurrentFolders.length === 0 && getCurrentVerses.length === 0"
-            class="text-center pa-4 text-grey"
-          >
-            {{ $t('noCustomItems') }}
-          </div>
-          <div v-else>
-            <!-- 資料夾列表 -->
-            <div v-for="folder in getCurrentFolders" :key="folder.id" class="mb-2">
-              <div
-                class="verse-item pa-2 d-flex align-center justify-space-between"
-                draggable="true"
-                @dragstart="handleDragStart($event, 'folder', folder)"
-                @dragover="handleDragOver"
-                @dragenter="handleDragEnter"
-                @dragleave="handleDragLeave"
-                @drop="handleDrop($event, folder)"
-                @dblclick="handleEnterFolder(folder.id)"
-                @contextmenu="handleRightClick($event, 'folder', folder)"
-              >
-                <div class="d-flex align-center text-subtitle-1">
-                  <v-icon class="mr-2">mdi-folder</v-icon>
-                  <span>{{ folder.name }}</span>
-                </div>
-                <v-btn
-                  class="verse-btn"
-                  icon
-                  size="small"
-                  variant="text"
-                  @click.stop="showDeleteFolderDialog(folder.id)"
-                >
-                  <v-icon>mdi-delete</v-icon>
-                </v-btn>
-              </div>
-            </div>
-
-            <!-- 經文列表 -->
-            <div
-              v-for="item in getCurrentVerses"
-              :key="item.id"
-              class="verse-item pa-2 mb-1 d-flex align-center justify-space-between"
-              draggable="true"
-              @dragstart="handleDragStart($event, 'verse', item)"
-              @click="loadVerse(item, 'custom')"
-              @contextmenu="handleRightClick($event, 'verse', item)"
-            >
-              <div>
-                <div class="text-h6 font-weight-medium d-flex">
-                  <span class="mr-1 text-no-wrap"
-                    >{{ item.bookAbbreviation }}{{ item.chapter }}:{{ item.verse }} -
-                  </span>
-                  <span class="text-justify">{{ item.verseText }}</span>
-                </div>
-              </div>
-              <v-btn
-                class="verse-btn"
-                icon
-                size="small"
-                variant="text"
-                @click.stop="removeFromCurrentFolder(item.id)"
-              >
-                <v-icon>mdi-delete</v-icon>
-              </v-btn>
-            </div>
-          </div>
-        </div>
-      </div>
+      <CustomFolderTab
+        v-else
+        :folders="getCurrentFolders"
+        :verses="getCurrentVerses"
+        @load-verse="(item: VerseItem) => loadVerse(item, 'custom')"
+        @remove-item="removeFromCurrentFolder"
+        @enter-folder="handleEnterFolder"
+        @delete-folder="showDeleteFolderDialog"
+        @drop="handleDropToFolder"
+        @right-click="handleRightClick"
+      />
     </v-card-text>
 
     <!-- 創建資料夾對話框 -->
@@ -368,19 +283,22 @@
 </template>
 
 <script setup lang="ts">
+defineOptions({
+  name: 'BibleMultiFunctionControl',
+})
+
 import { ref, computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import type { VerseItem, Folder } from '@/types/common'
-import { useSentry } from '@/composables/useSentry'
 import { useBibleStore } from '@/stores/bible'
+import { useBible } from '@/composables/useBible'
 import ContextMenu from '@/components/ContextMenu.vue'
+import HistoryTab from './HistoryTab.vue'
+import CustomFolderTab from './CustomFolderTab.vue'
 import { APP_CONFIG } from '@/config/app'
 
 const { t: $t } = useI18n()
-
-// Sentry
-const { reportError } = useSentry()
 
 // Props
 interface Props {
@@ -398,7 +316,10 @@ const emit = defineEmits<Emits>()
 // Bible store - for history management
 const bibleStore = useBibleStore()
 const { historyVerses } = storeToRefs(bibleStore)
-const { removeHistoryItem, clearHistory, folderStore } = bibleStore
+const { removeHistoryItem, clearHistory } = bibleStore
+
+// Bible composable - for folder management
+const { folderStore } = useBible()
 
 // Folder store - for all folder operations
 const {
@@ -487,11 +408,6 @@ const handleNavigateToFolder = (folderId: string) => {
 
 const handleEnterFolder = (folderId: string) => {
   enterFolder(folderId)
-
-  // Clear text selection to prevent folder name highlighting
-  if (window.getSelection) {
-    window.getSelection()?.removeAllRanges()
-  }
 }
 
 const showDeleteFolderDialog = (folderId: string) => {
@@ -516,126 +432,15 @@ const removeFromCurrentFolder = (itemId: string) => {
   removeItemFromCurrent(itemId)
 }
 
-const handleDragStart = (
-  event: DragEvent,
-  type: 'verse' | 'folder',
-  item: VerseItem | Folder<VerseItem>,
+// 處理拖放到資料夾
+const handleDropToFolder = (
+  data: { type: 'verse' | 'folder'; item: VerseItem | Folder<VerseItem> },
+  targetFolder: Folder<VerseItem>,
 ) => {
-  if (event.dataTransfer) {
-    // 設置拖移數據
-    event.dataTransfer.setData('application/json', JSON.stringify({ type, item }))
-    event.dataTransfer.effectAllowed = 'move'
-
-    // 創建自定義拖移圖像
-    const dragImage = createDragImage(type, item)
-    if (dragImage) {
-      document.body.appendChild(dragImage)
-      event.dataTransfer.setDragImage(dragImage, 10, 10)
-
-      // 延遲移除拖移圖像
-      setTimeout(() => {
-        if (document.body.contains(dragImage)) {
-          document.body.removeChild(dragImage)
-        }
-      }, 0)
-    }
-  }
-}
-
-// 創建拖移時的視覺效果
-const createDragImage = (
-  type: 'verse' | 'folder',
-  item: VerseItem | Folder<VerseItem>,
-): HTMLElement | null => {
-  const dragImage = document.createElement('div')
-  dragImage.style.position = 'absolute'
-  dragImage.style.top = '-1000px'
-  dragImage.style.left = '-1000px'
-  dragImage.style.pointerEvents = 'none'
-  dragImage.style.zIndex = '9999'
-  dragImage.style.backgroundColor = 'rgba(var(--v-theme-surface), 0.9)'
-  dragImage.style.borderRadius = '4px'
-  dragImage.style.padding = '8px 12px'
-  dragImage.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)'
-  dragImage.style.fontSize = '14px'
-  dragImage.style.fontWeight = '500'
-
-  if (type === 'verse') {
-    const verse = item as VerseItem
-    dragImage.innerHTML = `
-      <div style="display: flex; align-items: center; gap: 8px;">
-        <span style="background-color: rgb(var(--v-theme-primary)); color: white; padding: 2px 6px; border-radius: 12px; font-size: 12px; font-weight: 500;">
-          ${verse.bookAbbreviation}${verse.chapter}:${verse.verse}
-        </span>
-      </div>
-    `
-  } else {
-    const folder = item as Folder<VerseItem>
-    dragImage.innerHTML = `
-      <div style="display: flex; align-items: center; gap: 8px;">
-        <i class="mdi mdi-folder" style="color: rgb(var(--v-theme-primary)); font-size: 16px;"></i>
-        <span>${folder.name}</span>
-      </div>
-    `
-  }
-
-  return dragImage
-}
-
-// 拖移目標處理
-const handleDragOver = (event: DragEvent) => {
-  event.preventDefault()
-  event.dataTransfer!.dropEffect = 'move'
-}
-
-const handleDragEnter = (event: DragEvent) => {
-  event.preventDefault()
-  // 找到最近的 verse-item 容器
-  const container = (event.target as HTMLElement).closest('.verse-item')
-  if (container) {
-    container.classList.add('drag-over')
-  }
-}
-
-const handleDragLeave = (event: DragEvent) => {
-  event.preventDefault()
-  // 找到最近的 verse-item 容器
-  const container = (event.target as HTMLElement).closest('.verse-item')
-  if (container) {
-    // 檢查是否真的離開了整個容器區域
-    const rect = container.getBoundingClientRect()
-    const x = event.clientX
-    const y = event.clientY
-
-    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
-      container.classList.remove('drag-over')
-    }
-  }
-}
-
-const handleDrop = (event: DragEvent, targetFolder: Folder<VerseItem>) => {
-  event.preventDefault()
-
-  // 移除拖移高亮效果
-  const container = (event.target as HTMLElement).closest('.verse-item')
-  if (container) {
-    container.classList.remove('drag-over')
-  }
-
-  try {
-    const data = JSON.parse(event.dataTransfer!.getData('application/json'))
-    const { type, item } = data
-
-    if (type === 'verse') {
-      moveVerseToFolder(item as VerseItem, targetFolder)
-    } else if (type === 'folder') {
-      moveFolderToFolder(item as Folder<VerseItem>, targetFolder)
-    }
-  } catch (error) {
-    reportError(error, {
-      operation: 'drag-handling',
-      component: 'MultiFunctionControl',
-    })
+  if (data.type === 'verse') {
+    moveVerseToFolder(data.item as VerseItem, targetFolder)
+  } else if (data.type === 'folder') {
+    moveFolderToFolder(data.item as Folder<VerseItem>, targetFolder)
   }
 }
 
@@ -895,16 +700,6 @@ const deleteItem = () => {
   background-color: rgba(var(--v-theme-primary), 0.2) !important;
   border: 2px dashed rgba(var(--v-theme-primary), 0.5);
 }
-
-/* .move-folder-item {
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-  border-radius: 4px;
-}
-
-.move-folder-item:hover {
-  background-color: rgba(var(--v-theme-primary), 0.1);
-} */
 
 .selected-target {
   background-color: rgba(var(--v-theme-primary), 0.15) !important;
