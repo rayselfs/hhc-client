@@ -83,7 +83,7 @@ import { useElectron } from '@/composables/useElectron'
 import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
 import { useAlert } from '@/composables/useAlert'
 import { ViewType } from '@/types/common'
-import BibleVersionSelector from '@/components/Bible/BibleVersionSelector.vue'
+import { VersionSelector as BibleVersionSelector } from '@/components/Bible/Selector'
 import { useSentry } from '@/composables/useSentry'
 
 const { reportError } = useSentry()

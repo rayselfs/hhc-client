@@ -26,7 +26,7 @@
     </v-btn>
 
     <!-- 聖經書卷選擇 Dialog -->
-    <BibleBooksDialog
+    <BooksDialog
       v-model="showBooksDialog"
       :version-id="selectedVersionId"
       @select-verse="handleSelectVerse"
@@ -35,11 +35,15 @@
 </template>
 
 <script setup lang="ts">
+defineOptions({
+  name: 'BibleVersionSelector',
+})
+
 import { computed, ref, watch, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import type { BibleBook } from '@/types/bible'
-import BibleBooksDialog from '@/components/Bible/BibleBooksDialog.vue'
+import BooksDialog from './BooksDialog.vue'
 import { useSentry } from '@/composables/useSentry'
 import { useBibleStore } from '@/stores/bible'
 
@@ -151,3 +155,4 @@ defineExpose({
   margin-top: 0px;
 }
 </style>
+
