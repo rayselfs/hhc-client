@@ -67,6 +67,86 @@ export const BIBLE_CONFIG = {
   },
 }
 
+export interface BibleBookConfig {
+  number: number
+  code: string
+}
+
+/**
+ * Complete list of Bible books (Old Testament + New Testament)
+ * 66 books total: 39 OT + 27 NT
+ */
+export const BIBLE_BOOKS: BibleBookConfig[] = [
+  // Old Testament (1-39)
+  { number: 1, code: 'GEN' }, // Genesis
+  { number: 2, code: 'EXO' }, // Exodus
+  { number: 3, code: 'LEV' }, // Leviticus
+  { number: 4, code: 'NUM' }, // Numbers
+  { number: 5, code: 'DEU' }, // Deuteronomy
+  { number: 6, code: 'JOS' }, // Joshua
+  { number: 7, code: 'JDG' }, // Judges
+  { number: 8, code: 'RUT' }, // Ruth
+  { number: 9, code: '1SA' }, // 1 Samuel
+  { number: 10, code: '2SA' }, // 2 Samuel
+  { number: 11, code: '1KI' }, // 1 Kings
+  { number: 12, code: '2KI' }, // 2 Kings
+  { number: 13, code: '1CH' }, // 1 Chronicles
+  { number: 14, code: '2CH' }, // 2 Chronicles
+  { number: 15, code: 'EZR' }, // Ezra
+  { number: 16, code: 'NEH' }, // Nehemiah
+  { number: 17, code: 'EST' }, // Esther
+  { number: 18, code: 'JOB' }, // Job
+  { number: 19, code: 'PSA' }, // Psalms
+  { number: 20, code: 'PRO' }, // Proverbs
+  { number: 21, code: 'ECC' }, // Ecclesiastes
+  { number: 22, code: 'SNG' }, // Song of Songs
+  { number: 23, code: 'ISA' }, // Isaiah
+  { number: 24, code: 'JER' }, // Jeremiah
+  { number: 25, code: 'LAM' }, // Lamentations
+  { number: 26, code: 'EZK' }, // Ezekiel
+  { number: 27, code: 'DAN' }, // Daniel
+  { number: 28, code: 'HOS' }, // Hosea
+  { number: 29, code: 'JOL' }, // Joel
+  { number: 30, code: 'AMO' }, // Amos
+  { number: 31, code: 'OBA' }, // Obadiah
+  { number: 32, code: 'JON' }, // Jonah
+  { number: 33, code: 'MIC' }, // Micah
+  { number: 34, code: 'NAH' }, // Nahum
+  { number: 35, code: 'HAB' }, // Habakkuk
+  { number: 36, code: 'ZEP' }, // Zephaniah
+  { number: 37, code: 'HAG' }, // Haggai
+  { number: 38, code: 'ZEC' }, // Zechariah
+  { number: 39, code: 'MAL' }, // Malachi
+  // New Testament (40-66)
+  { number: 40, code: 'MAT' }, // Matthew
+  { number: 41, code: 'MRK' }, // Mark
+  { number: 42, code: 'LUK' }, // Luke
+  { number: 43, code: 'JHN' }, // John
+  { number: 44, code: 'ACT' }, // Acts
+  { number: 45, code: 'ROM' }, // Romans
+  { number: 46, code: '1CO' }, // 1 Corinthians
+  { number: 47, code: '2CO' }, // 2 Corinthians
+  { number: 48, code: 'GAL' }, // Galatians
+  { number: 49, code: 'EPH' }, // Ephesians
+  { number: 50, code: 'PHP' }, // Philippians
+  { number: 51, code: 'COL' }, // Colossians
+  { number: 52, code: '1TH' }, // 1 Thessalonians
+  { number: 53, code: '2TH' }, // 2 Thessalonians
+  { number: 54, code: '1TI' }, // 1 Timothy
+  { number: 55, code: '2TI' }, // 2 Timothy
+  { number: 56, code: 'TIT' }, // Titus
+  { number: 57, code: 'PHM' }, // Philemon
+  { number: 58, code: 'HEB' }, // Hebrews
+  { number: 59, code: 'JAS' }, // James
+  { number: 60, code: '1PE' }, // 1 Peter
+  { number: 61, code: '2PE' }, // 2 Peter
+  { number: 62, code: '1JN' }, // 1 John
+  { number: 63, code: '2JN' }, // 2 John
+  { number: 64, code: '3JN' }, // 3 John
+  { number: 65, code: 'JUD' }, // Jude
+  { number: 66, code: 'REV' }, // Revelation
+]
+
 // ==================== Timer Related Configuration ====================
 const DEFAULT_TIMER_DURATION = 300 // 5 mins
 export const TIMER_CONFIG = {

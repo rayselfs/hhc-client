@@ -4,7 +4,7 @@
       <v-card-title
         class="text-h5 d-flex align-center justify-space-between pb-3 pt-3 sticky-header"
       >
-        <!-- 麵包屑顯示 -->
+        <!-- breadcrumb -->
         <div class="d-flex align-center">
           <span class="text-subtitle-1">
             {{ $t('bible.title') }}
@@ -13,12 +13,12 @@
             >mdi-chevron-right</v-icon
           >
           <span v-if="selectedBook" class="text-subtitle-1">
-            {{ selectedBook.name }}
+            {{ getBookNameByNumber(selectedBook.number) }}
           </span>
           <v-icon v-if="selectedChapter" size="small" class="mx-1 breadcrumb-icon"
             >mdi-chevron-right</v-icon
           >
-          <span v-if="selectedChapter" class="text-subtitle-1"> {{ selectedChapter }}章 </span>
+          <span v-if="selectedChapter" class="text-subtitle-1"> {{ selectedChapter }}</span>
         </div>
 
         <!-- 搜尋框和步驟導航按鈕 -->
@@ -47,7 +47,7 @@
             :disabled="false"
             @click="navigateToStep('books')"
           >
-            書
+            {{ $t('bible.navigateBook') }}
           </v-btn>
           <v-btn
             size="small"
@@ -57,7 +57,7 @@
             :disabled="!canNavigateToChapter"
             @click="navigateToStep('chapters')"
           >
-            章
+            {{ $t('bible.navigateChapter') }}
           </v-btn>
           <v-btn
             size="small"
@@ -67,7 +67,7 @@
             :disabled="!canNavigateToVerse"
             @click="navigateToStep('verses')"
           >
-            節
+            {{ $t('bible.navigateVerse') }}
           </v-btn>
         </div>
       </v-card-title>
@@ -80,25 +80,25 @@
           <div v-if="currentStep === 'books'" key="books">
             <div v-if="loading" class="text-center py-8">
               <v-progress-circular indeterminate color="primary" />
-              <p class="mt-2">載入聖經內容中...</p>
+              <p class="mt-2">{{ $t('bible.loadingContent') }}</p>
             </div>
 
             <div v-else-if="!bibleContent" class="text-center py-8">
               <v-icon size="64" class="mb-4">mdi-alert-circle</v-icon>
-              <p>無法載入聖經內容</p>
+              <p>{{ $t('bible.loadContentFailed') }}</p>
             </div>
 
             <div v-else>
               <div class="mb-5">
                 <v-row>
-                  <v-col v-for="book in oldTestamentBooks" :key="book.id" cols="3" class="pa-2">
+                  <v-col v-for="book in oldTestamentBooks" :key="book.number" cols="3" class="pa-2">
                     <v-btn
                       block
                       variant="outlined"
-                      @click="selectBook(book)"
+                      @click="selectBookByNumber(book.number)"
                       class="text-none text-h6 book-btn"
                     >
-                      {{ book.name }}
+                      {{ getBookName(book.code) }}
                     </v-btn>
                   </v-col>
                 </v-row>
@@ -106,14 +106,14 @@
               <div>
                 <v-divider class="mb-5" />
                 <v-row>
-                  <v-col v-for="book in newTestamentBooks" :key="book.id" cols="3" class="pa-2">
+                  <v-col v-for="book in newTestamentBooks" :key="book.number" cols="3" class="pa-2">
                     <v-btn
                       block
                       variant="outlined"
-                      @click="selectBook(book)"
+                      @click="selectBookByNumber(book.number)"
                       class="text-none text-h6 book-btn"
                     >
-                      {{ book.name }}
+                      {{ getBookName(book.code) }}
                     </v-btn>
                   </v-col>
                 </v-row>
@@ -169,6 +169,7 @@ import { useI18n } from 'vue-i18n'
 import type { BibleContent, BibleBook } from '@/types/bible'
 import { useSentry } from '@/composables/useSentry'
 import { useBibleStore } from '@/stores/bible'
+import { BIBLE_BOOKS, type BibleBookConfig } from '@/config/app'
 
 interface Props {
   modelValue: boolean
@@ -217,20 +218,27 @@ const canNavigateToVerse = computed(() => {
   return selectedBook.value !== null && selectedChapter.value !== null
 })
 
-// 過濾書卷的函數
-const filterBooks = (books: BibleBook[]) => {
-  if (!searchQuery.value || !searchQuery.value.trim()) return books
-  const query = searchQuery.value.toLowerCase().trim()
-  return books.filter((book) => book.name.toLowerCase().includes(query))
+// Get book name from i18n using book code
+const getBookName = (bookCode: string): string => {
+  return $t(`bible.books.${bookCode}`) as string
 }
 
-// 先計算所有過濾後的書卷列表
+// Filter books by search query
+const filterBooks = (books: BibleBookConfig[]) => {
+  if (!searchQuery.value || !searchQuery.value.trim()) return books
+  const query = searchQuery.value.toLowerCase().trim()
+  return books.filter((book) => {
+    const bookName = getBookName(book.code).toLowerCase()
+    return bookName.includes(query)
+  })
+}
+
+// Get all filtered books
 const filteredBooks = computed(() => {
-  if (!bibleContent.value) return []
-  return filterBooks(bibleContent.value.books)
+  return filterBooks(BIBLE_BOOKS)
 })
 
-// 從已過濾的結果中分離新舊約
+// Separate Old and New Testament books
 const oldTestamentBooks = computed(() => {
   return filteredBooks.value.filter((book) => book.number <= 39)
 })
@@ -266,10 +274,28 @@ const navigateToStep = (step: 'books' | 'chapters' | 'verses') => {
   }
 }
 
-const selectBook = (book: BibleBook) => {
-  selectedBook.value = book
-  currentStep.value = 'chapters'
-  searchQuery.value = ''
+// Get book code by number
+const getBookCodeByNumber = (bookNumber: number): string | null => {
+  const book = BIBLE_BOOKS.find((b) => b.number === bookNumber)
+  return book?.code ?? null
+}
+
+// Get book name by number
+const getBookNameByNumber = (bookNumber: number): string => {
+  const code = getBookCodeByNumber(bookNumber)
+  if (!code) return ''
+  return getBookName(code)
+}
+
+// Select book by number (find from bibleContent)
+const selectBookByNumber = (bookNumber: number) => {
+  if (!bibleContent.value) return
+  const book = bibleContent.value.books.find((b) => b.number === bookNumber)
+  if (book) {
+    selectedBook.value = book
+    currentStep.value = 'chapters'
+    searchQuery.value = ''
+  }
 }
 
 const selectChapter = (chapter: number) => {
@@ -319,7 +345,6 @@ watch(
 watch(dialogVisible, (visible) => {
   if (visible && props.versionId) {
     loadBibleContent()
-    // 每次開啟dialog都重置到書卷選擇
     resetToBooks()
   }
 })
@@ -334,7 +359,6 @@ const resetToBooks = () => {
 
 const closeDialog = () => {
   dialogVisible.value = false
-  // 重置狀態
   resetToBooks()
 }
 </script>
