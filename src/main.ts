@@ -11,6 +11,7 @@ import './assets/main.css'
 // font
 import '@fontsource-variable/open-sans'
 import '@fontsource-variable/noto-sans-tc'
+import '@fontsource-variable/noto-sans-sc'
 import '@fontsource-variable/roboto'
 
 import App from './App.vue'

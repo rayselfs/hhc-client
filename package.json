@@ -26,6 +26,7 @@
     "electron:build:win": "npm run build && electron-builder --win --x64 --config electron-builder.config.ts"
   },
   "dependencies": {
+    "@fontsource-variable/noto-sans-sc": "^5.2.9",
     "@fontsource-variable/noto-sans-tc": "^5.2.9",
     "@fontsource-variable/open-sans": "^5.2.7",
     "@fontsource-variable/roboto": "^5.2.8",
