@@ -81,3 +81,43 @@ export enum BibleCacheConfig {
   STORE_NAME = 'bibleContent',
   DB_VERSION = 1,
 }
+
+/**
+ * 聖經經文段落信息
+ */
+export interface BiblePassage {
+  bookAbbreviation: string
+  bookName: string
+  bookNumber: number
+  chapter: number
+  verse: number
+  versionId?: number
+}
+
+/**
+ * 預覽經文項目
+ */
+export interface PreviewVerse {
+  number: number
+  text: string
+}
+
+/**
+ * 搜索結果項目（API 返回格式）
+ */
+export interface SearchResult {
+  score: number
+  verse_id: string
+  version_code: string
+  book_number: number
+  chapter_number: number
+  verse_number: number
+  text: string
+}
+
+/**
+ * 搜索結果顯示項目（包含書卷縮寫）
+ */
+export interface SearchResultDisplay extends SearchResult {
+  book_abbreviation: string
+}

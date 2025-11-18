@@ -44,6 +44,9 @@
     "verse": "節",
     "noHistory": "尚無歷史記錄",
     "searchBooks": "搜尋書卷...",
+    "search": {
+      "noResults": "沒有找到相關經文"
+    },
     "controlFontSize": "控制字型大小",
     "controlChapter": "控制章節",
     "controlVerse": "控制節",

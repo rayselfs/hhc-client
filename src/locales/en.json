@@ -44,6 +44,9 @@
     "verse": "Verse",
     "noHistory": "No history yet",
     "searchBooks": "Search books...",
+    "search": {
+      "noResults": "No matching verses found"
+    },
     "controlFontSize": "Control Font Size",
     "controlChapter": "Control Chapter",
     "controlVerse": "Control Verse",

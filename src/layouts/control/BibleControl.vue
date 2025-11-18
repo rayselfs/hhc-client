@@ -6,7 +6,10 @@
         <v-card class="display-flex flex-column" :style="{ height: `${leftCardHeight}px` }">
           <v-card-title class="d-flex align-center justify-space-between">
             <div class="d-flex align-center gap-2">
-              <span class="mr-2">{{ currentBookName || $t('preview') }}</span>
+              <div>
+                <span class="mr-1">{{ currentBookName || $t('preview') }}</span>
+                <span v-if="isSearchMode"> ({{ $t('search') }})</span>
+              </div>
               <div v-if="currentPassage">
                 <span class="mr-1">{{ currentPassage.chapter }}</span>
                 <span class="mr-1">:</span>
@@ -47,8 +50,44 @@
               <v-progress-circular indeterminate color="primary" size="64"></v-progress-circular>
             </div>
 
+            <!-- 搜索結果 -->
+            <div class="bible-content" v-show="!isLoadingVerses && isSearchMode">
+              <!-- 沒有搜索結果 -->
+              <div
+                v-if="searchResultsDisplay.length === 0 && !isLoadingVerses"
+                class="d-flex align-center justify-center"
+                :style="{ height: `${leftCardHeight - 48}px` }"
+              >
+                <div class="text-center">
+                  <v-icon size="64" color="grey-lighten-1" class="mb-4">mdi-magnify</v-icon>
+                  <div class="text-h6 text-grey">
+                    {{ $t('bible.search.noResults') || '沒有找到相關經文' }}
+                  </div>
+                </div>
+              </div>
+
+              <!-- 搜索結果列表 -->
+              <template v-else>
+                <div
+                  v-for="result in searchResultsDisplay"
+                  :key="result.verse_id"
+                  class="verse-item mb-2 d-flex align-center"
+                  @click="handleSearchResultClick(result)"
+                >
+                  <div class="verse-content d-flex align-start flex-1 text-h6">
+                    <span class="mr-1 text-subtitle-1 font-weight-medium search-verse-reference">
+                      {{ result.book_abbreviation }}{{ result.chapter_number }}:{{
+                        result.verse_number
+                      }}
+                    </span>
+                    <span class="text-justify">{{ result.text }}</span>
+                  </div>
+                </div>
+              </template>
+            </div>
+
             <!-- 經文內容 -->
-            <div class="bible-content" v-show="!isLoadingVerses">
+            <div class="bible-content" v-show="!isLoadingVerses && !isSearchMode">
               <div
                 v-for="verse in chapterVerses"
                 :key="verse.number"
@@ -61,7 +100,7 @@
                 @contextmenu="handleVerseRightClick($event, verse)"
               >
                 <div class="verse-content d-flex align-start flex-1 text-h6">
-                  <span class="verse-number mr-1">{{ verse.number }}</span>
+                  <span class="verse-number mr-1 text-subtitle-1">{{ verse.number }}</span>
                   <span class="text-justify">{{ verse.text }}</span>
                 </div>
                 <v-btn
@@ -185,34 +224,27 @@ import { useBibleStore } from '@/stores/bible'
 import { APP_CONFIG, BIBLE_CONFIG } from '@/config/app'
 import { StorageKey, StorageCategory, getStorageKey } from '@/types/common'
 import type { VerseItem } from '@/types/common'
+import type { BiblePassage, PreviewVerse, SearchResult, SearchResultDisplay } from '@/types/bible'
 import { useSentry } from '@/composables/useSentry'
 import { useCardLayout } from '@/composables/useLayout'
 import { useLocalStorage } from '@/composables/useLocalStorage'
 import { useBible } from '@/composables/useBible'
+import { useAPI } from '@/composables/useAPI'
 import ContextMenu from '@/components/ContextMenu.vue'
 import MultiFunctionControl from '@/components/Bible/MultiFunction/Control.vue'
 import BottomSpacer from '@/components/Main/BottomSpacer.vue'
-
-interface BiblePassage {
-  bookAbbreviation: string
-  bookName: string
-  bookNumber: number
-  chapter: number
-  verse: number
-  versionId?: number
-}
-
-interface PreviewVerse {
-  number: number
-  text: string
-}
 
 const { t: $t } = useI18n()
 const { reportError } = useSentry()
 const { getLocalItem, setLocalItem } = useLocalStorage()
 const bibleStore = useBibleStore()
-const { currentVersion, selectedVerse: storeSelectedVerse } = storeToRefs(bibleStore)
+const {
+  currentVersion,
+  selectedVerse: storeSelectedVerse,
+  currentBibleContent,
+} = storeToRefs(bibleStore)
 const { getBibleContent, addToHistory } = bibleStore
+const { searchBibleVerses } = useAPI()
 
 const { leftCardHeight, rightTopCardHeight, rightBottomCardHeight } = useCardLayout({
   minHeight: APP_CONFIG.UI.MIN_CARD_HEIGHT,
@@ -263,6 +295,25 @@ const currentBookName = computed(() => currentPassage.value?.bookName || '')
 // Loading 狀態
 const isLoadingVerses = ref(false)
 
+// 搜索結果狀態
+const searchResults = ref<SearchResult[]>([])
+const isSearchMode = ref(false)
+
+// 搜索結果顯示（包含書卷縮寫）
+const searchResultsDisplay = computed<SearchResultDisplay[]>(() => {
+  if (!currentBibleContent.value || searchResults.value.length === 0) {
+    return []
+  }
+
+  return searchResults.value.map((result) => {
+    const book = currentBibleContent.value?.books.find((b) => b.number === result.book_number)
+    return {
+      ...result,
+      book_abbreviation: book?.abbreviation || '',
+    }
+  })
+})
+
 // 右鍵選單相關
 const contextMenuRef = ref<InstanceType<typeof ContextMenu> | null>(null)
 const selectedVerse = ref<{ number: number; text: string } | null>(null)
@@ -270,7 +321,6 @@ const selectedVerse = ref<{ number: number; text: string } | null>(null)
 // 監聽來自父組件的經文選擇事件
 // 從 store 中獲取 book 數據，而不是接收整個 book 對象
 const handleVerseSelection = async (bookNumber: number, chapter: number, verse: number) => {
-  isLoadingVerses.value = true
   const versionId = currentVersion.value?.id
   if (!versionId) {
     reportError(new Error('No Bible version selected'), {
@@ -336,8 +386,6 @@ const handleVerseSelection = async (bookNumber: number, chapter: number, verse: 
     // 等待一個 tick 讓 Vue 開始處理響應式更新
     await nextTick()
 
-    // 直接關閉 loading，讓 Vue 在背景處理 DOM 更新
-    // 不需要等待渲染完成，因為內容已經在背景渲染了（被 v-show 隱藏）
     isLoadingVerses.value = false
 
     // 滾動到指定節（使用 setTimeout 避免阻塞）
@@ -428,7 +476,7 @@ const handleFontSizeUpdate = () => {
 // 歷史記錄相關函數
 const loadVerse = async (item: VerseItem, type: 'history' | 'custom') => {
   try {
-    // 直接使用編號調用 handleVerseSelection，它會從 store 中查找 book
+    isLoadingVerses.value = true
     await handleVerseSelection(item.bookNumber, item.chapter, item.verse)
 
     if (type === 'custom') {
@@ -519,20 +567,78 @@ watch(
   storeSelectedVerse,
   async (newVerse) => {
     if (newVerse) {
+      isLoadingVerses.value = true
       await handleVerseSelection(newVerse.bookNumber, newVerse.chapter, newVerse.verse)
     }
   },
   { immediate: false },
 )
 
-// 監聽來自ExtendedToolbar的事件
+// 處理搜索結果點擊
+const handleSearchResultClick = async (result: SearchResult) => {
+  isSearchMode.value = false
+  isLoadingVerses.value = true
+  await handleVerseSelection(result.book_number, result.chapter_number, result.verse_number)
+}
+
+// 處理搜索
+const handleSearch = async (text: string) => {
+  if (!text.trim()) {
+    return
+  }
+
+  currentPassage.value = null
+  const versionId = currentVersion.value?.id
+  const versionCode = currentVersion.value?.code
+  if (!versionId || !versionCode) {
+    reportError(new Error('No Bible version selected'), {
+      operation: 'handle-search',
+      component: 'BibleControl',
+      extra: { searchText: text },
+    })
+    return
+  }
+
+  // 設置 loading 狀態
+  isLoadingVerses.value = true
+  isSearchMode.value = true
+
+  try {
+    // 確保 bible content 已載入（用於查找書卷縮寫）
+    if (!currentBibleContent.value) {
+      await getBibleContent(versionId)
+    }
+
+    // 執行搜索
+    const results = await searchBibleVerses(text, versionCode, 20)
+    searchResults.value = results
+  } catch (error) {
+    reportError(error, {
+      operation: 'handle-search',
+      component: 'BibleControl',
+      extra: { searchText: text, versionCode },
+    })
+    searchResults.value = []
+  } finally {
+    isLoadingVerses.value = false
+  }
+}
+
 onMounted(() => {
-  // 載入儲存的數據（rootFolder 已包含在 store 中，會自動遷移舊格式）
   loadRootFolder()
 
   document.addEventListener('keydown', handleKeydown)
 
+  // 監聽搜索事件
+  const handleSearchEvent = (event: Event) => {
+    const customEvent = event as CustomEvent<{ text: string }>
+    handleSearch(customEvent.detail.text)
+  }
+  window.addEventListener('bible-search', handleSearchEvent)
+
+  // 清理事件監聽器
   onUnmounted(() => {
+    window.removeEventListener('bible-search', handleSearchEvent)
     document.removeEventListener('keydown', handleKeydown)
   })
 })
@@ -565,7 +671,7 @@ onMounted(() => {
 }
 
 .verse-number {
-  min-width: 24px;
+  min-width: 20px;
   text-align: right;
 }
 
@@ -603,5 +709,10 @@ onMounted(() => {
 
 .verse-content {
   flex: 1;
+}
+
+.search-verse-reference {
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 </style>

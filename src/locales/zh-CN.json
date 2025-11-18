@@ -44,6 +44,9 @@
     "verse": "节",
     "noHistory": "尚无历史记录",
     "searchBooks": "搜索书卷...",
+    "search": {
+      "noResults": "没有找到相关经文"
+    },
     "controlFontSize": "控制字体大小",
     "controlChapter": "控制章节",
     "controlVerse": "控制节",

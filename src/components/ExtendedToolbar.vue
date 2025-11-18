@@ -11,41 +11,8 @@
 
     <v-spacer />
 
-    <v-text-field
-      v-if="isSearching && props.currentView === 'bible'"
-      v-model="searchText"
-      ref="searchInputRef"
-      autofocus
-      variant="solo-inverted"
-      hide-details
-      :placeholder="$t('search')"
-      density="compact"
-      class="search-bar mr-2"
-      @keydown.esc="handleCloseSearch"
-    >
-      <template #append-inner>
-        <v-icon v-if="isSearching">mdi-magnify</v-icon>
-      </template>
-    </v-text-field>
-
-    <v-btn
-      v-if="!isSearching && props.currentView === 'bible'"
-      icon
-      @click="handleStartSearch"
-      :title="$t('search')"
-      class="mr-1"
-    >
-      <v-icon>mdi-magnify</v-icon>
-    </v-btn>
-
-    <v-btn
-      v-if="isSearching && props.currentView === 'bible'"
-      icon
-      @click="handleCloseSearch"
-      class="mr-1"
-    >
-      <v-icon>mdi-close</v-icon>
-    </v-btn>
+    <!-- 搜索欄 - 只在聖經頁面顯示 -->
+    <SearchBar v-if="props.currentView === 'bible'" />
 
     <v-btn
       class="mr-1"
@@ -76,14 +43,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useProjectionStore } from '@/stores/projection'
 import { useElectron } from '@/composables/useElectron'
 import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
 import { useAlert } from '@/composables/useAlert'
 import { ViewType } from '@/types/common'
-import { VersionSelector as BibleVersionSelector } from '@/components/Bible/Selector'
+import { VersionSelector as BibleVersionSelector } from '@/components/Bible'
+import { SearchBar } from '@/components/Main'
 import { useSentry } from '@/composables/useSentry'
 
 const { reportError } = useSentry()
@@ -91,8 +59,6 @@ const { t: $t } = useI18n()
 const { isElectron, onProjectionOpened, onProjectionClosed, checkProjectionWindow } = useElectron()
 const { setProjectionState, syncAllStates, sendTimerUpdate } = useProjectionMessaging()
 const { warning } = useAlert()
-const isSearching = ref(false)
-const searchText = ref('')
 
 // Props
 const props = defineProps<{
@@ -181,14 +147,6 @@ const closeProjectionWindow = async () => {
   }
 }
 
-const handleStartSearch = () => {
-  isSearching.value = true
-}
-
-const handleCloseSearch = () => {
-  isSearching.value = false
-}
-
 onMounted(() => {
   // 初始化時同步所有狀態到投影窗口（包含投影狀態、計時器狀態、主題等）
   syncAllStates()
@@ -207,10 +165,3 @@ onMounted(() => {
   }
 })
 </script>
-
-<style scoped>
-.search-bar {
-  z-index: 1000;
-  width: 100%;
-}
-</style>

@@ -1,6 +1,12 @@
 import { ref, type Ref } from 'vue'
 import { getMainApiHost } from '@/config/api'
-import type { BibleVersion, BibleContent, BibleBook, StreamingProgress } from '@/types/bible'
+import type {
+  BibleVersion,
+  BibleContent,
+  BibleBook,
+  StreamingProgress,
+  SearchResult,
+} from '@/types/bible'
 import { useSentry } from './useSentry'
 
 /**
@@ -215,10 +221,70 @@ export function useAPI() {
     }
   }
 
+  /**
+   * 搜索聖經經文
+   * @param q - 搜索關鍵字
+   * @param versionCode - 版本代碼（如 'CUV-TW'）
+   * @param top - 返回結果數量，預設為 20
+   * @returns 搜索結果列表
+   */
+  const searchBibleVerses = async (
+    q: string,
+    versionCode: string,
+    top: number = 20,
+  ): Promise<SearchResult[]> => {
+    loading.value = true
+    error.value = null
+
+    try {
+      const apiHost = getMainApiHost()
+      const encodedQuery = encodeURIComponent(q)
+      const url = `${apiHost}/api/bible/v1/search?q=${encodedQuery}&version=${versionCode}&top=${top}`
+
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      }
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers,
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+
+      // 確保返回的是陣列
+      if (!Array.isArray(data)) {
+        return []
+      }
+
+      return data
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred'
+      reportError(err, {
+        operation: 'search-bible-verses',
+        component: 'useAPI',
+      })
+
+      error.value = {
+        message: errorMessage,
+        status: err instanceof Response ? err.status : undefined,
+      }
+
+      return []
+    } finally {
+      loading.value = false
+    }
+  }
+
   return {
     loading,
     error,
     getBibleVersions,
     getBibleContent,
+    searchBibleVerses,
   }
 }
