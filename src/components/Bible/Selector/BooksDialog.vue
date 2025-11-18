@@ -311,9 +311,9 @@ const selectChapter = (chapter: number) => {
 
 const selectVerse = (verse: number) => {
   if (!selectedBook.value || !selectedChapter.value) return
-
-  emit('select-verse', selectedBook.value.number, selectedChapter.value, verse)
   closeDialog()
+  emit('select-verse', selectedBook.value.number, selectedChapter.value, verse)
+  resetToBooks()
 }
 
 // 載入聖經內容
@@ -363,7 +363,6 @@ const resetToBooks = () => {
 
 const closeDialog = () => {
   dialogVisible.value = false
-  resetToBooks()
 }
 </script>
 

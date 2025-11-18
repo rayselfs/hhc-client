@@ -36,9 +36,19 @@
 
           <v-card-text
             class="bible-content-wrapper pl-2 pr-2 pa-0"
-            :style="{ height: `${leftCardHeight - 48}px` }"
+            :style="{ height: `${leftCardHeight - 48}px`, position: 'relative' }"
           >
-            <div class="bible-content">
+            <!-- Loading 狀態 -->
+            <div
+              class="align-center justify-center"
+              :class="{ 'd-none': !isLoadingVerses, 'd-flex': isLoadingVerses }"
+              :style="{ height: `${leftCardHeight - 48}px` }"
+            >
+              <v-progress-circular indeterminate color="primary" size="64"></v-progress-circular>
+            </div>
+
+            <!-- 經文內容 -->
+            <div class="bible-content" v-show="!isLoadingVerses">
               <div
                 v-for="verse in chapterVerses"
                 :key="verse.number"
@@ -64,8 +74,8 @@
                   <v-icon size="small">mdi-plus</v-icon>
                 </v-btn>
               </div>
+              <BottomSpacer />
             </div>
-            <BottomSpacer />
           </v-card-text>
         </v-card>
       </v-col>
@@ -250,6 +260,9 @@ const maxVerse = computed(() => chapterVerses.value.length)
 const hasCurrentPassage = computed(() => !!currentPassage.value)
 const currentBookName = computed(() => currentPassage.value?.bookName || '')
 
+// Loading 狀態
+const isLoadingVerses = ref(false)
+
 // 右鍵選單相關
 const contextMenuRef = ref<InstanceType<typeof ContextMenu> | null>(null)
 const selectedVerse = ref<{ number: number; text: string } | null>(null)
@@ -257,6 +270,7 @@ const selectedVerse = ref<{ number: number; text: string } | null>(null)
 // 監聽來自父組件的經文選擇事件
 // 從 store 中獲取 book 數據，而不是接收整個 book 對象
 const handleVerseSelection = async (bookNumber: number, chapter: number, verse: number) => {
+  isLoadingVerses.value = true
   const versionId = currentVersion.value?.id
   if (!versionId) {
     reportError(new Error('No Bible version selected'), {
@@ -264,6 +278,7 @@ const handleVerseSelection = async (bookNumber: number, chapter: number, verse: 
       component: 'BibleControl',
       extra: { bookNumber, chapter, verse },
     })
+    isLoadingVerses.value = false
     return
   }
 
@@ -275,6 +290,7 @@ const handleVerseSelection = async (bookNumber: number, chapter: number, verse: 
       component: 'BibleControl',
       extra: { versionId, bookNumber, chapter, verse },
     })
+    isLoadingVerses.value = false
     return
   }
 
@@ -286,6 +302,7 @@ const handleVerseSelection = async (bookNumber: number, chapter: number, verse: 
       component: 'BibleControl',
       extra: { versionId, bookNumber, chapter, verse },
     })
+    isLoadingVerses.value = false
     return
   }
 
@@ -304,14 +321,29 @@ const handleVerseSelection = async (bookNumber: number, chapter: number, verse: 
   // 從選中的書卷中獲取真實的經文內容
   const selectedChapter = book.chapters.find((ch) => ch.number === chapter)
   if (selectedChapter) {
+    // 清空舊的經文內容
+    chapterVerses.value = []
+
+    // 等待 DOM 更新
+    await nextTick()
+
+    // 設置新的經文內容（此時內容在背景渲染，但被 v-show 隱藏）
     chapterVerses.value = selectedChapter.verses.map((v: { number: number; text: string }) => ({
       number: v.number,
       text: v.text,
     }))
 
-    nextTick(() => {
+    // 等待一個 tick 讓 Vue 開始處理響應式更新
+    await nextTick()
+
+    // 直接關閉 loading，讓 Vue 在背景處理 DOM 更新
+    // 不需要等待渲染完成，因為內容已經在背景渲染了（被 v-show 隱藏）
+    isLoadingVerses.value = false
+
+    // 滾動到指定節（使用 setTimeout 避免阻塞）
+    setTimeout(() => {
       scrollToVerse(verse, 'instant')
-    })
+    }, 0)
   }
 }
 
@@ -510,6 +542,16 @@ onMounted(() => {
 .bible-content-wrapper {
   flex: 1;
   overflow-y: auto;
+  position: relative;
+}
+
+.bible-loading {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
 }
 
 .bible-content {
