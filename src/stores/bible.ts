@@ -32,6 +32,13 @@ export const useBibleStore = defineStore('bible', () => {
   const historyVerses = ref<VerseItem[]>([])
 
   /**
+   * History lookup map for fast duplicate checking
+   * Key: `${bookNumber}-${chapter}-${verse}`
+   * Value: index in historyVerses array
+   */
+  const historyLookupMap = new Map<string, number>()
+
+  /**
    * Currently loaded Bible content in memory
    * Used to avoid redundant IndexedDB reads when the same version is accessed multiple times
    */
@@ -41,6 +48,16 @@ export const useBibleStore = defineStore('bible', () => {
    * Stores error messages from async operations
    */
   const error = ref<string | null>(null)
+
+  /**
+   * Currently selected verse for component communication
+   * Used to notify components when a verse is selected
+   */
+  const selectedVerse = ref<{
+    bookNumber: number
+    chapter: number
+    verse: number
+  } | null>(null)
 
   /**
    * Clear error state
@@ -226,7 +243,6 @@ export const useBibleStore = defineStore('bible', () => {
       setError('Failed to save content to offline cache.')
     }
   }
-  // --- END: Issue 1 Fix ---
 
   /**
    * Get Bible content from in-memory cache or IndexedDB without fetching from API.
@@ -322,31 +338,64 @@ export const useBibleStore = defineStore('bible', () => {
   }
 
   /**
-   * Add verse to history
+   * Generate lookup key for verse
+   */
+  const getVerseKey = (verse: VerseItem): string => {
+    return `${verse.bookNumber}-${verse.chapter}-${verse.verse}`
+  }
+
+  /**
+   * Rebuild lookup map from current history
+   * Useful when history is loaded from storage or modified externally
+   */
+  const rebuildHistoryLookupMap = () => {
+    historyLookupMap.clear()
+    historyVerses.value.forEach((item, index) => {
+      const key = getVerseKey(item)
+      historyLookupMap.set(key, index)
+    })
+  }
+
+  /**
+   * Add verse to history with optimized duplicate checking
    * @param verse - The verse to add to history
    */
   const addToHistory = (verse: VerseItem) => {
+    const verseKey = getVerseKey(verse)
     const latestHistory = historyVerses.value[0]
-    const existingIndex = historyVerses.value.findIndex(
-      (item) =>
-        item.bookNumber === verse.bookNumber &&
-        item.chapter === verse.chapter &&
-        item.verse === verse.verse,
-    )
+
+    // Fast duplicate check using Map
+    if (historyLookupMap.has(verseKey)) {
+      return
+    }
+
+    // Check if same chapter as latest (avoid adding same chapter consecutively)
     if (
-      (latestHistory &&
-        latestHistory.bookNumber === verse.bookNumber &&
-        latestHistory.chapter === verse.chapter) ||
-      existingIndex !== -1
+      latestHistory &&
+      latestHistory.bookNumber === verse.bookNumber &&
+      latestHistory.chapter === verse.chapter
     ) {
       return
     }
 
+    // Add to history
     historyVerses.value.unshift(verse)
+
+    // Update lookup map: shift all existing indices by 1
+    const entries = Array.from(historyLookupMap.entries())
+    historyLookupMap.clear()
+    historyLookupMap.set(verseKey, 0)
+    entries.forEach(([key, index]) => {
+      historyLookupMap.set(key, index + 1)
+    })
 
     // Limit the history record count (maximum 50 records)
     if (historyVerses.value.length > 50) {
-      historyVerses.value.pop()
+      const removed = historyVerses.value.pop()
+      if (removed) {
+        const removedKey = getVerseKey(removed)
+        historyLookupMap.delete(removedKey)
+      }
     }
   }
 
@@ -355,7 +404,15 @@ export const useBibleStore = defineStore('bible', () => {
    * @param id - The verse ID to remove
    */
   const removeHistoryItem = (id: string) => {
-    historyVerses.value = historyVerses.value.filter((item) => item.id !== id)
+    const index = historyVerses.value.findIndex((item) => item.id === id)
+    if (index === -1) return
+
+    const removed = historyVerses.value[index]
+    if (!removed) return
+
+    historyVerses.value.splice(index, 1)
+
+    rebuildHistoryLookupMap()
   }
 
   /**
@@ -363,6 +420,24 @@ export const useBibleStore = defineStore('bible', () => {
    */
   const clearHistory = () => {
     historyVerses.value = []
+    historyLookupMap.clear()
+  }
+
+  /**
+   * Set the selected verse (for component communication)
+   * @param bookNumber - Book number
+   * @param chapter - Chapter number
+   * @param verse - Verse number
+   */
+  const setSelectedVerse = (bookNumber: number, chapter: number, verse: number) => {
+    selectedVerse.value = { bookNumber, chapter, verse }
+  }
+
+  /**
+   * Clear the selected verse
+   */
+  const clearSelectedVerse = () => {
+    selectedVerse.value = null
   }
 
   return {
@@ -388,5 +463,9 @@ export const useBibleStore = defineStore('bible', () => {
     error,
     clearError,
     setError,
+    // Verse selection (for component communication)
+    selectedVerse,
+    setSelectedVerse,
+    clearSelectedVerse,
   }
 })

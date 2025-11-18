@@ -293,6 +293,7 @@ import { useI18n } from 'vue-i18n'
 import type { VerseItem, Folder } from '@/types/common'
 import { useBibleStore } from '@/stores/bible'
 import { useBible } from '@/composables/useBible'
+import { isVerseItem, isFolder, type DragData } from '@/utils/typeGuards'
 import ContextMenu from '@/components/ContextMenu.vue'
 import HistoryTab from './HistoryTab.vue'
 import CustomFolderTab from './CustomFolderTab.vue'
@@ -433,14 +434,11 @@ const removeFromCurrentFolder = (itemId: string) => {
 }
 
 // 處理拖放到資料夾
-const handleDropToFolder = (
-  data: { type: 'verse' | 'folder'; item: VerseItem | Folder<VerseItem> },
-  targetFolder: Folder<VerseItem>,
-) => {
-  if (data.type === 'verse') {
-    moveVerseToFolder(data.item as VerseItem, targetFolder)
-  } else if (data.type === 'folder') {
-    moveFolderToFolder(data.item as Folder<VerseItem>, targetFolder)
+const handleDropToFolder = (data: DragData<VerseItem>, targetFolder: Folder<VerseItem>) => {
+  if (data.type === 'verse' && isVerseItem(data.item)) {
+    moveVerseToFolder(data.item, targetFolder)
+  } else if (data.type === 'folder' && isFolder(data.item)) {
+    moveFolderToFolder(data.item, targetFolder)
   }
 }
 
@@ -630,55 +628,52 @@ const copyItem = () => {
 }
 
 const pasteItemHandler = () => {
-  if (copiedItem.value) {
-    const targetFolderId =
-      currentFolder.value.id === APP_CONFIG.FOLDER.ROOT_ID
-        ? APP_CONFIG.FOLDER.ROOT_ID
-        : currentFolder.value.id
+  if (!copiedItem.value) return
 
-    if (copiedItem.value.type === 'verse') {
-      // Paste verse
-      pasteItem(copiedItem.value.item as VerseItem, targetFolderId, 'verse')
-    } else if (copiedItem.value.type === 'folder') {
-      // Paste folder
-      pasteItem(copiedItem.value.item as Folder<VerseItem>, targetFolderId, 'folder')
-    } else if (copiedItem.value.type === 'history') {
-      // Paste history item as verse
-      pasteItem(copiedItem.value.item as VerseItem, targetFolderId, 'verse')
-    }
+  const targetFolderId =
+    currentFolder.value.id === APP_CONFIG.FOLDER.ROOT_ID
+      ? APP_CONFIG.FOLDER.ROOT_ID
+      : currentFolder.value.id
+
+  if (copiedItem.value.type === 'verse' && isVerseItem(copiedItem.value.item)) {
+    // Paste verse
+    pasteItem(copiedItem.value.item, targetFolderId, 'verse')
+  } else if (copiedItem.value.type === 'folder' && isFolder(copiedItem.value.item)) {
+    // Paste folder
+    pasteItem(copiedItem.value.item, targetFolderId, 'folder')
+  } else if (copiedItem.value.type === 'history' && isVerseItem(copiedItem.value.item)) {
+    // Paste history item as verse
+    pasteItem(copiedItem.value.item, targetFolderId, 'verse')
   }
   closeItemContextMenu()
 }
 
 const showMoveItemDialog = () => {
-  if (selectedItem.value) {
-    if (selectedItem.value.type === 'verse') {
-      // 使用現有的移動功能
-      showMoveDialog(selectedItem.value.item as VerseItem)
-    } else if (selectedItem.value.type === 'folder') {
-      // 資料夾移動功能
-      showMoveFolderDialog(selectedItem.value.item as Folder<VerseItem>)
-    } else if (selectedItem.value.type === 'history') {
-      // 歷史項目不能移動，這個函數不應該被調用
-      console.warn('History items cannot be moved')
-    }
-    closeItemContextMenu()
+  if (!selectedItem.value) return
+
+  if (selectedItem.value.type === 'verse' && isVerseItem(selectedItem.value.item)) {
+    // 使用現有的移動功能
+    showMoveDialog(selectedItem.value.item)
+  } else if (selectedItem.value.type === 'folder' && isFolder(selectedItem.value.item)) {
+    // 資料夾移動功能
+    showMoveFolderDialog(selectedItem.value.item)
+  } else if (selectedItem.value.type === 'history') {
+    // 歷史項目不能移動，這個函數不應該被調用
+    console.warn('History items cannot be moved')
   }
+  closeItemContextMenu()
 }
 
 const deleteItem = () => {
-  if (selectedItem.value) {
-    if (selectedItem.value.type === 'verse') {
-      const verse = selectedItem.value.item as VerseItem
-      removeFromCurrentFolder(verse.id)
-    } else if (selectedItem.value.type === 'folder') {
-      const folder = selectedItem.value.item as Folder<VerseItem>
-      showDeleteFolderDialog(folder.id)
-    } else if (selectedItem.value.type === 'history') {
-      // 刪除歷史項目
-      const historyItem = selectedItem.value.item as VerseItem
-      bibleStore.removeHistoryItem(historyItem.id)
-    }
+  if (!selectedItem.value) return
+
+  if (selectedItem.value.type === 'verse' && isVerseItem(selectedItem.value.item)) {
+    removeFromCurrentFolder(selectedItem.value.item.id)
+  } else if (selectedItem.value.type === 'folder' && isFolder(selectedItem.value.item)) {
+    showDeleteFolderDialog(selectedItem.value.item.id)
+  } else if (selectedItem.value.type === 'history' && isVerseItem(selectedItem.value.item)) {
+    // 刪除歷史項目
+    bibleStore.removeHistoryItem(selectedItem.value.item.id)
   }
   closeItemContextMenu()
 }

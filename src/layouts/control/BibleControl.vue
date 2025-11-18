@@ -168,7 +168,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useBibleStore } from '@/stores/bible'
@@ -201,7 +201,7 @@ const { t: $t } = useI18n()
 const { reportError } = useSentry()
 const { getLocalItem, setLocalItem } = useLocalStorage()
 const bibleStore = useBibleStore()
-const { currentVersion } = storeToRefs(bibleStore)
+const { currentVersion, selectedVerse: storeSelectedVerse } = storeToRefs(bibleStore)
 const { getBibleContent, addToHistory } = bibleStore
 
 const { leftCardHeight, rightTopCardHeight, rightBottomCardHeight } = useCardLayout({
@@ -251,16 +251,41 @@ const contextMenuRef = ref<InstanceType<typeof ContextMenu> | null>(null)
 const selectedVerse = ref<{ number: number; text: string } | null>(null)
 
 // 監聽來自父組件的經文選擇事件
-const handleVerseSelection = (
-  book: {
-    abbreviation?: string
-    number: number
-    name: string
-    chapters: Array<{ number: number; verses: Array<{ number: number; text: string }> }>
-  },
-  chapter: number,
-  verse: number,
-) => {
+// 從 store 中獲取 book 數據，而不是接收整個 book 對象
+const handleVerseSelection = async (bookNumber: number, chapter: number, verse: number) => {
+  const versionId = currentVersion.value?.id
+  if (!versionId) {
+    reportError(new Error('No Bible version selected'), {
+      operation: 'handle-verse-selection',
+      component: 'BibleControl',
+      extra: { bookNumber, chapter, verse },
+    })
+    return
+  }
+
+  // 從 store 中獲取聖經內容
+  const content = await getBibleContent(versionId)
+  if (!content) {
+    reportError(new Error('Bible content not found'), {
+      operation: 'handle-verse-selection',
+      component: 'BibleControl',
+      extra: { versionId, bookNumber, chapter, verse },
+    })
+    return
+  }
+
+  // 從內容中查找對應的書卷
+  const book = content.books.find((b) => b.number === bookNumber)
+  if (!book) {
+    reportError(new Error('Book not found'), {
+      operation: 'handle-verse-selection',
+      component: 'BibleControl',
+      extra: { versionId, bookNumber, chapter, verse },
+    })
+    return
+  }
+
+  // 更新當前經文信息
   currentPassage.value = {
     bookAbbreviation: book.abbreviation || '',
     bookName: book.name,
@@ -375,38 +400,8 @@ const handleFontSizeUpdate = () => {
 // 歷史記錄相關函數
 const loadVerse = async (item: VerseItem, type: 'history' | 'custom') => {
   try {
-    const versionId = currentVersion.value?.id
-    if (!versionId) {
-      reportError(new Error('No Bible version selected'), {
-        operation: 'load-verse',
-        component: 'BibleControl',
-        extra: { item },
-      })
-      return
-    }
-
-    const content = await getBibleContent(versionId)
-    if (!content) {
-      reportError(new Error('Bible content not found'), {
-        operation: 'load-verse',
-        component: 'BibleControl',
-        extra: { versionId, item },
-      })
-      return
-    }
-
-    // 找到對應的書卷
-    const book = content.books.find((b) => b.number === item.bookNumber)
-    if (!book) {
-      reportError(new Error('Book not found'), {
-        operation: 'load-verse',
-        component: 'BibleControl',
-        extra: { versionId, bookNumber: item.bookNumber, item },
-      })
-      return
-    }
-
-    handleVerseSelection(book, item.chapter, item.verse)
+    // 直接使用編號調用 handleVerseSelection，它會從 store 中查找 book
+    await handleVerseSelection(item.bookNumber, item.chapter, item.verse)
 
     if (type === 'custom') {
       updateProjectionWithHistory(item.verse)
@@ -491,23 +486,25 @@ const copyVerseText = async () => {
   closeVerseContextMenu()
 }
 
-// 監聽來自ExtendedToolbar的事件（通過全局事件或props）
+// 監聽 store 中的經文選擇狀態
+watch(
+  storeSelectedVerse,
+  async (newVerse) => {
+    if (newVerse) {
+      await handleVerseSelection(newVerse.bookNumber, newVerse.chapter, newVerse.verse)
+    }
+  },
+  { immediate: false },
+)
+
+// 監聽來自ExtendedToolbar的事件
 onMounted(() => {
   // 載入儲存的數據（rootFolder 已包含在 store 中，會自動遷移舊格式）
   loadRootFolder()
 
-  // 監聽經文選擇事件
-  const eventHandler = (event: Event) => {
-    const customEvent = event as CustomEvent
-    const { book, chapter, verse } = customEvent.detail
-    handleVerseSelection(book, chapter, verse)
-  }
-
-  window.addEventListener('bible-verse-selected', eventHandler)
   document.addEventListener('keydown', handleKeydown)
 
   onUnmounted(() => {
-    window.removeEventListener('bible-verse-selected', eventHandler)
     document.removeEventListener('keydown', handleKeydown)
   })
 })

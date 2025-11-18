@@ -1,10 +1,7 @@
 import type { VerseItem, Folder } from '@/types/common'
 import { useSentry } from './useSentry'
-
-interface DragData {
-  type: 'verse' | 'folder'
-  item: VerseItem | Folder<VerseItem>
-}
+import type { DragData } from '@/utils/typeGuards'
+import { isValidDragData, isVerseItem, isFolder } from '@/utils/typeGuards'
 
 /**
  * 拖放功能 Composable
@@ -128,7 +125,7 @@ export const useDragAndDrop = <T extends VerseItem>() => {
    */
   const handleDrop = (
     event: DragEvent,
-    onDrop: (data: DragData, target: HTMLElement) => void,
+    onDrop: (data: DragData<T>, target: HTMLElement) => void,
   ) => {
     event.preventDefault()
 
@@ -142,7 +139,13 @@ export const useDragAndDrop = <T extends VerseItem>() => {
       const dataString = event.dataTransfer?.getData('application/json')
       if (!dataString) return
 
-      const data = JSON.parse(dataString) as DragData
+      const parsed = JSON.parse(dataString)
+      if (!isValidDragData<T>(parsed)) {
+        console.warn('Invalid drag data:', parsed)
+        return
+      }
+
+      const data = parsed as DragData<T>
       if (container) {
         onDrop(data, container)
       }
@@ -162,4 +165,3 @@ export const useDragAndDrop = <T extends VerseItem>() => {
     handleDrop,
   }
 }
-

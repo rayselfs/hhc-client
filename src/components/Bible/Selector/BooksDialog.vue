@@ -184,7 +184,7 @@ interface Emits {
   (e: 'update:modelValue', value: boolean): void
   (e: 'select-book', book: BibleBook): void
   (e: 'select-chapter', book: BibleBook, chapter: number): void
-  (e: 'select-verse', book: BibleBook, chapter: number, verse: number): void
+  (e: 'select-verse', bookNumber: number, chapter: number, verse: number): void
 }
 
 // 使用 Bible Store 的 Cache 功能
@@ -312,7 +312,7 @@ const selectChapter = (chapter: number) => {
 const selectVerse = (verse: number) => {
   if (!selectedBook.value || !selectedChapter.value) return
 
-  emit('select-verse', selectedBook.value, selectedChapter.value, verse)
+  emit('select-verse', selectedBook.value.number, selectedChapter.value, verse)
   closeDialog()
 }
 
@@ -442,4 +442,3 @@ const closeDialog = () => {
   position: fixed !important;
 }
 </style>
-

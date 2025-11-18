@@ -1,10 +1,7 @@
 <template>
   <div class="custom-content">
     <div class="custom-list">
-      <div
-        v-if="folders.length === 0 && verses.length === 0"
-        class="text-center pa-4 text-grey"
-      >
+      <div v-if="folders.length === 0 && verses.length === 0" class="text-center pa-4 text-grey">
         {{ $t('noCustomItems') }}
       </div>
       <div v-else>
@@ -74,6 +71,7 @@
 import { useI18n } from 'vue-i18n'
 import type { VerseItem, Folder } from '@/types/common'
 import { useDragAndDrop } from '@/composables/useDragAndDrop'
+import type { DragData } from '@/utils/typeGuards'
 
 interface Props {
   folders: Folder<VerseItem>[]
@@ -85,16 +83,26 @@ interface Emits {
   (e: 'remove-item', id: string): void
   (e: 'enter-folder', folderId: string): void
   (e: 'delete-folder', folderId: string): void
-  (e: 'drop', data: { type: 'verse' | 'folder'; item: VerseItem | Folder<VerseItem> }, target: Folder<VerseItem>): void
-  (e: 'right-click', event: MouseEvent, type: 'verse' | 'folder', item: VerseItem | Folder<VerseItem>): void
+  (e: 'drop', data: DragData<VerseItem>, target: Folder<VerseItem>): void
+  (
+    e: 'right-click',
+    event: MouseEvent,
+    type: 'verse' | 'folder',
+    item: VerseItem | Folder<VerseItem>,
+  ): void
 }
 
 defineProps<Props>()
 const emit = defineEmits<Emits>()
 const { t: $t } = useI18n()
 
-const { handleDragStart, handleDragOver, handleDragEnter, handleDragLeave, handleDrop: handleDropBase } =
-  useDragAndDrop<VerseItem>()
+const {
+  handleDragStart,
+  handleDragOver,
+  handleDragEnter,
+  handleDragLeave,
+  handleDrop: handleDropBase,
+} = useDragAndDrop<VerseItem>()
 
 const handleLoadVerse = (item: VerseItem) => {
   emit('load-verse', item)
@@ -157,4 +165,3 @@ const handleDrop = (event: DragEvent, targetFolder: Folder<VerseItem>) => {
   opacity: 1;
 }
 </style>
-

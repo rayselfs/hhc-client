@@ -42,7 +42,6 @@ defineOptions({
 import { computed, ref, watch, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
-import type { BibleBook } from '@/types/bible'
 import BooksDialog from './BooksDialog.vue'
 import { useSentry } from '@/composables/useSentry'
 import { useBibleStore } from '@/stores/bible'
@@ -53,7 +52,7 @@ const { t: $t } = useI18n()
 // Bible store handling versions, current selection, and cached content
 const bibleStore = useBibleStore()
 const { versions, versionsLoading, currentVersion } = storeToRefs(bibleStore)
-const { loadBibleVersions, setCurrentVersionById, getBibleContent } = bibleStore
+const { loadBibleVersions, setCurrentVersionById, getBibleContent, setSelectedVerse } = bibleStore
 
 const contentLoading = ref(false)
 const showBooksDialog = ref(false)
@@ -100,13 +99,8 @@ watch(
 )
 
 // 處理經文選擇
-const handleSelectVerse = (book: BibleBook, chapter: number, verse: number) => {
-  // 發送全局事件給BibleViewer組件
-  window.dispatchEvent(
-    new CustomEvent('bible-verse-selected', {
-      detail: { book, chapter, verse },
-    }),
-  )
+const handleSelectVerse = (bookNumber: number, chapter: number, verse: number) => {
+  setSelectedVerse(bookNumber, chapter, verse)
 }
 
 onMounted(async () => {
@@ -155,4 +149,3 @@ defineExpose({
   margin-top: 0px;
 }
 </style>
-
