@@ -1,4 +1,4 @@
-import { nextTick, type Ref } from 'vue'
+import { nextTick, computed, type Ref } from 'vue'
 import { useFolderStore } from '@/stores/folder'
 import { useElectron } from './useElectron'
 import { useProjectionMessaging } from './useProjectionMessaging'
@@ -83,10 +83,18 @@ export const useBible = (
   }
 
   /**
-   * 獲取最大章數
+   * 獲取最大章數（使用 computed 緩存）
+   */
+  const maxChapters = computed(() => {
+    return currentBookData?.value ? currentBookData.value.chapters.length : 0
+  })
+
+  /**
+   * 獲取最大章數（向後兼容的函數形式）
+   * @deprecated 使用 maxChapters.value 替代
    */
   const getMaxChapters = (): number => {
-    return currentBookData?.value ? currentBookData.value.chapters.length : 0
+    return maxChapters.value
   }
 
   /**
@@ -280,6 +288,7 @@ export const useBible = (
     addVerseToCurrent,
     // Navigation
     scrollToVerse,
+    maxChapters,
     getMaxChapters,
     navigateToChapter,
     goToPreviousChapter,

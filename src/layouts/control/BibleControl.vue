@@ -6,7 +6,7 @@
         <v-card class="display-flex flex-column" :style="{ height: `${leftCardHeight}px` }">
           <v-card-title class="d-flex align-center justify-space-between">
             <div class="d-flex align-center gap-2">
-              <span class="mr-2">{{ currentPassage?.bookName || $t('preview') }}</span>
+              <span class="mr-2">{{ currentBookName || $t('preview') }}</span>
               <div v-if="currentPassage">
                 <span class="mr-1">{{ currentPassage.chapter }}</span>
                 <span class="mr-1">:</span>
@@ -24,7 +24,7 @@
               </v-btn>
               <v-btn
                 size="small"
-                :disabled="currentPassage.chapter >= getMaxChapters()"
+                :disabled="currentPassage.chapter >= maxChapters"
                 @click="goToNextChapterPreview"
               >
                 <v-icon>mdi-chevron-right</v-icon>
@@ -103,7 +103,7 @@
                     <v-btn
                       icon
                       variant="outlined"
-                      :disabled="!currentPassage || currentPassage.chapter >= getMaxChapters()"
+                      :disabled="!currentPassage || currentPassage.chapter >= maxChapters"
                       @click="goToNextChapterProjection"
                     >
                       <v-icon>mdi-chevron-right</v-icon>
@@ -123,7 +123,7 @@
                     <v-btn
                       icon
                       variant="outlined"
-                      :disabled="!currentPassage || currentPassage.verse >= chapterVerses.length"
+                      :disabled="!hasCurrentPassage || (currentPassage?.verse ?? 0) >= maxVerse"
                       @click="goToNextVerseProjection"
                     >
                       <v-icon>mdi-chevron-down</v-icon>
@@ -168,7 +168,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useBibleStore } from '@/stores/bible'
@@ -234,7 +234,7 @@ const {
   folderStore,
   addVerseToCurrent,
   scrollToVerse,
-  getMaxChapters,
+  maxChapters,
   goToPreviousChapter,
   goToNextChapter,
   goToPreviousVerse,
@@ -244,6 +244,11 @@ const {
 } = useBible(currentPassage, currentBookData, chapterVerses)
 
 const { loadRootFolder } = folderStore
+
+// 優化的計算屬性（緩存常用計算）
+const maxVerse = computed(() => chapterVerses.value.length)
+const hasCurrentPassage = computed(() => !!currentPassage.value)
+const currentBookName = computed(() => currentPassage.value?.bookName || '')
 
 // 右鍵選單相關
 const contextMenuRef = ref<InstanceType<typeof ContextMenu> | null>(null)
