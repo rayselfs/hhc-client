@@ -72,11 +72,11 @@ export const useBible = (
   /**
    * 滾動到指定節
    */
-  const scrollToVerse = (verseNumber: number) => {
+  const scrollToVerse = (verseNumber: number, behavior: 'smooth' | 'instant' = 'smooth') => {
     const element = document.querySelector(`[data-verse="${verseNumber}"]`)
     if (element) {
       element.scrollIntoView({
-        behavior: 'smooth',
+        behavior: behavior,
         block: 'start',
       })
     }

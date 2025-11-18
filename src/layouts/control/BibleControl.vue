@@ -212,7 +212,6 @@ const { leftCardHeight, rightTopCardHeight, rightBottomCardHeight } = useCardLay
 // 當前選中的經文
 const currentPassage = ref<BiblePassage | null>(null)
 const chapterVerses = ref<PreviewVerse[]>([])
-const shouldScrollToVerse = ref(false)
 const currentBookData = ref<{
   code?: string
   number: number
@@ -305,19 +304,10 @@ const handleVerseSelection = async (bookNumber: number, chapter: number, verse: 
       text: v.text,
     }))
 
-    // 只有從 dialog 選擇時才滾動
-    shouldScrollToVerse.value = true
     nextTick(() => {
-      scrollToVerse(verse)
-      shouldScrollToVerse.value = false
+      scrollToVerse(verse, 'instant')
     })
   }
-}
-
-// 更新投影畫面（包含歷史記錄）
-const updateProjectionWithHistory = async (verseNumber: number) => {
-  await updateProjection(verseNumber)
-  addToHistoryFromVerse(verseNumber)
 }
 
 /**
@@ -356,7 +346,8 @@ const addToHistoryFromVerse = (verseNumber: number) => {
 const selectVerse = (verseNumber: number) => {
   if (currentPassage.value) {
     currentPassage.value.verse = verseNumber
-    updateProjectionWithHistory(verseNumber)
+    addToHistoryFromVerse(verseNumber)
+    updateProjection(verseNumber)
   }
 }
 
@@ -373,22 +364,22 @@ const goToNextChapterPreview = () => {
 // 投影控制函數
 // 上一章 (影響投影)
 const goToPreviousChapterProjection = () => {
-  goToPreviousChapter(true, updateProjectionWithHistory)
+  goToPreviousChapter(true, updateProjection)
 }
 
 // 下一章 (影響投影)
 const goToNextChapterProjection = () => {
-  goToNextChapter(true, updateProjectionWithHistory)
+  goToNextChapter(true, updateProjection)
 }
 
 // 上一節 (影響投影)
 const goToPreviousVerseProjection = () => {
-  goToPreviousVerse(true, updateProjectionWithHistory)
+  goToPreviousVerse(true, updateProjection)
 }
 
 // 下一節 (影響投影)
 const goToNextVerseProjection = () => {
-  goToNextVerse(true, updateProjectionWithHistory)
+  goToNextVerse(true, updateProjection)
 }
 
 // 更新投影字型大小
@@ -404,7 +395,7 @@ const loadVerse = async (item: VerseItem, type: 'history' | 'custom') => {
     await handleVerseSelection(item.bookNumber, item.chapter, item.verse)
 
     if (type === 'custom') {
-      updateProjectionWithHistory(item.verse)
+      updateProjection(item.verse)
     }
   } catch (error) {
     reportError(error, {

@@ -362,19 +362,9 @@ export const useBibleStore = defineStore('bible', () => {
    */
   const addToHistory = (verse: VerseItem) => {
     const verseKey = getVerseKey(verse)
-    const latestHistory = historyVerses.value[0]
 
     // Fast duplicate check using Map
     if (historyLookupMap.has(verseKey)) {
-      return
-    }
-
-    // Check if same chapter as latest (avoid adding same chapter consecutively)
-    if (
-      latestHistory &&
-      latestHistory.bookNumber === verse.bookNumber &&
-      latestHistory.chapter === verse.chapter
-    ) {
       return
     }
 
