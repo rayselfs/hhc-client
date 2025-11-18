@@ -80,7 +80,11 @@
                         result.verse_number
                       }}
                     </span>
-                    <span class="text-justify">{{ result.text }}</span>
+                    <span class="mr-1 text-subtitle-1">-</span>
+                    <p
+                      class="text-justify"
+                      v-html="highlightSearchText(result.text, searchText)"
+                    ></p>
                   </div>
                 </div>
               </template>
@@ -298,6 +302,7 @@ const isLoadingVerses = ref(false)
 // 搜索結果狀態
 const searchResults = ref<SearchResult[]>([])
 const isSearchMode = ref(false)
+const searchText = ref('')
 
 // 搜索結果顯示（包含書卷縮寫）
 const searchResultsDisplay = computed<SearchResultDisplay[]>(() => {
@@ -314,12 +319,27 @@ const searchResultsDisplay = computed<SearchResultDisplay[]>(() => {
   })
 })
 
+// 高亮搜索關鍵字
+const highlightSearchText = (text: string, searchTerm: string): string => {
+  if (!searchTerm || !text) {
+    return text
+  }
+
+  const escapedSearchTerm = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const regex = new RegExp(`(${escapedSearchTerm})`, 'gi')
+
+  const highlighted = text.replace(
+    regex,
+    '<span style="color: rgb(var(--v-theme-error));">$1</span>',
+  )
+  return highlighted
+}
+
 // 右鍵選單相關
 const contextMenuRef = ref<InstanceType<typeof ContextMenu> | null>(null)
 const selectedVerse = ref<{ number: number; text: string } | null>(null)
 
-// 監聽來自父組件的經文選擇事件
-// 從 store 中獲取 book 數據，而不是接收整個 book 對象
+// set preview verse
 const handleVerseSelection = async (bookNumber: number, chapter: number, verse: number) => {
   const versionId = currentVersion.value?.id
   if (!versionId) {
@@ -604,6 +624,9 @@ const handleSearch = async (text: string) => {
   isSearchMode.value = true
 
   try {
+    // 保存搜索文本（用於高亮顯示）
+    searchText.value = text.trim()
+
     // 確保 bible content 已載入（用於查找書卷縮寫）
     if (!currentBibleContent.value) {
       await getBibleContent(versionId)
@@ -714,5 +737,12 @@ onMounted(() => {
 .search-verse-reference {
   white-space: nowrap;
   flex-shrink: 0;
+}
+
+.search-highlight {
+  color: rgb(var(--v-theme-error));
+  background-color: rgba(var(--v-theme-error), 0.1);
+  padding: 2px 4px;
+  border-radius: 2px;
 }
 </style>
