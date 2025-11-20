@@ -5,20 +5,7 @@ import { useProjectionMessaging } from './useProjectionMessaging'
 import { useProjectionStore } from '@/stores/projection'
 import { APP_CONFIG } from '@/config/app'
 import { MessageType, ViewType, StorageKey, StorageCategory, type VerseItem } from '@/types/common'
-
-interface PreviewVerse {
-  number: number
-  text: string
-}
-
-interface BiblePassage {
-  bookAbbreviation: string
-  bookName: string
-  bookNumber: number
-  chapter: number
-  verse: number
-  versionId?: number
-}
+import type { BiblePassage, PreviewVerse, BibleBook } from '@/types/bible'
 
 /**
  * 聖經功能整合 Composable
@@ -26,12 +13,7 @@ interface BiblePassage {
  */
 export const useBible = (
   currentPassage?: Ref<BiblePassage | null>,
-  currentBookData?: Ref<{
-    code?: string
-    number: number
-    name: string
-    chapters: Array<{ number: number; verses: Array<{ number: number; text: string }> }>
-  } | null>,
+  currentBookData?: Ref<BibleBook | null>,
   chapterVerses?: Ref<PreviewVerse[]>,
 ) => {
   // ==================== Folder Store ====================

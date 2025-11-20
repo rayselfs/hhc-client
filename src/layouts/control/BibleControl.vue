@@ -228,7 +228,13 @@ import { useBibleStore } from '@/stores/bible'
 import { APP_CONFIG, BIBLE_CONFIG } from '@/config/app'
 import { StorageKey, StorageCategory, getStorageKey } from '@/types/common'
 import type { VerseItem } from '@/types/common'
-import type { BiblePassage, PreviewVerse, SearchResult, SearchResultDisplay } from '@/types/bible'
+import type {
+  BiblePassage,
+  PreviewVerse,
+  SearchResult,
+  SearchResultDisplay,
+  BibleBook,
+} from '@/types/bible'
 import { useSentry } from '@/composables/useSentry'
 import { useCardLayout } from '@/composables/useLayout'
 import { useLocalStorage } from '@/composables/useLocalStorage'
@@ -258,12 +264,7 @@ const { leftCardHeight, rightTopCardHeight, rightBottomCardHeight } = useCardLay
 // 當前選中的經文
 const currentPassage = ref<BiblePassage | null>(null)
 const chapterVerses = ref<PreviewVerse[]>([])
-const currentBookData = ref<{
-  code?: string
-  number: number
-  name: string
-  chapters: Array<{ number: number; verses: Array<{ number: number; text: string }> }>
-} | null>(null) // 存儲當前書卷的完整數據
+const currentBookData = ref<BibleBook | null>(null) // 存儲當前書卷的完整數據
 
 // 字型大小控制
 const getInitialFontSize = () => {
