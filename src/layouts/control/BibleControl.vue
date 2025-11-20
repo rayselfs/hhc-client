@@ -41,7 +41,7 @@
             class="bible-content-wrapper pl-2 pr-2 pa-0"
             :style="{ height: `${leftCardHeight - 48}px`, position: 'relative' }"
           >
-            <!-- Loading 狀態 -->
+            <!-- Loading State -->
             <div
               class="align-center justify-center"
               :class="{ 'd-none': !isLoadingVerses, 'd-flex': isLoadingVerses }"
@@ -50,9 +50,9 @@
               <v-progress-circular indeterminate color="primary" size="64"></v-progress-circular>
             </div>
 
-            <!-- 搜索結果 -->
+            <!-- Search Results -->
             <div class="bible-content" v-show="!isLoadingVerses && isSearchMode">
-              <!-- 沒有搜索結果 -->
+              <!-- No Results -->
               <div
                 v-if="searchResultsDisplay.length === 0 && !isLoadingVerses"
                 class="d-flex align-center justify-center"
@@ -61,12 +61,12 @@
                 <div class="text-center">
                   <v-icon size="64" color="grey-lighten-1" class="mb-4">mdi-magnify</v-icon>
                   <div class="text-h6 text-grey">
-                    {{ $t('bible.search.noResults') || '沒有找到相關經文' }}
+                    {{ $t('bible.search.noResults') }}
                   </div>
                 </div>
               </div>
 
-              <!-- 搜索結果列表 -->
+              <!-- Result List -->
               <template v-else>
                 <div
                   v-for="result in searchResultsDisplay"
@@ -90,7 +90,7 @@
               </template>
             </div>
 
-            <!-- 經文內容 -->
+            <!-- Verse Content -->
             <div class="bible-content" v-show="!isLoadingVerses && !isSearchMode">
               <div
                 v-for="verse in chapterVerses"
@@ -208,7 +208,7 @@
       </v-col>
     </v-row>
 
-    <!-- 右鍵選單 -->
+    <!-- Context Menu -->
     <ContextMenu ref="contextMenuRef" :close-on-content-click="false">
       <v-list-item @click="copyVerseText">
         <template #prepend>
@@ -261,12 +261,12 @@ const { leftCardHeight, rightTopCardHeight, rightBottomCardHeight } = useCardLay
   topCardRatio: 0.7,
 })
 
-// 當前選中的經文
+// Current selected passage
 const currentPassage = ref<BiblePassage | null>(null)
 const chapterVerses = ref<PreviewVerse[]>([])
-const currentBookData = ref<BibleBook | null>(null) // 存儲當前書卷的完整數據
+const currentBookData = ref<BibleBook | null>(null) // Store full book data
 
-// 字型大小控制
+// Font size control
 const getInitialFontSize = () => {
   const savedFontSize = getLocalItem<number>(
     getStorageKey(StorageCategory.BIBLE, StorageKey.FONT_SIZE),
@@ -291,20 +291,20 @@ const {
 
 const { loadRootFolder } = folderStore
 
-// 優化的計算屬性（緩存常用計算）
+// Optimized computed properties (cached)
 const maxVerse = computed(() => chapterVerses.value.length)
 const hasCurrentPassage = computed(() => !!currentPassage.value)
 const currentBookName = computed(() => currentPassage.value?.bookName || '')
 
-// Loading 狀態
+// Loading state
 const isLoadingVerses = ref(false)
 
-// 搜索結果狀態
+// Search state
 const searchResults = ref<SearchResult[]>([])
 const isSearchMode = ref(false)
 const searchText = ref('')
 
-// 搜索結果顯示（包含書卷縮寫）
+// Display search results (with book abbreviation)
 const searchResultsDisplay = computed<SearchResultDisplay[]>(() => {
   if (!currentBibleContent.value || searchResults.value.length === 0) {
     return []
@@ -319,7 +319,7 @@ const searchResultsDisplay = computed<SearchResultDisplay[]>(() => {
   })
 })
 
-// 高亮搜索關鍵字
+// Highlight search keywords
 const highlightSearchText = (text: string, searchTerm: string): string => {
   if (!searchTerm || !text) {
     return text
@@ -335,11 +335,11 @@ const highlightSearchText = (text: string, searchTerm: string): string => {
   return highlighted
 }
 
-// 右鍵選單相關
+// Context menu refs
 const contextMenuRef = ref<InstanceType<typeof ContextMenu> | null>(null)
 const selectedVerse = ref<{ number: number; text: string } | null>(null)
 
-// set preview verse
+// Handle verse selection for preview
 const handleVerseSelection = async (bookNumber: number, chapter: number, verse: number) => {
   const versionId = currentVersion.value?.id
   if (!versionId) {
@@ -352,7 +352,7 @@ const handleVerseSelection = async (bookNumber: number, chapter: number, verse: 
     return
   }
 
-  // 從 store 中獲取聖經內容
+  // Fetch Bible content from store
   const content = await getBibleContent(versionId)
   if (!content) {
     reportError(new Error('Bible content not found'), {
@@ -364,7 +364,7 @@ const handleVerseSelection = async (bookNumber: number, chapter: number, verse: 
     return
   }
 
-  // 從內容中查找對應的書卷
+  // Find book in content
   const book = content.books.find((b) => b.number === bookNumber)
   if (!book) {
     reportError(new Error('Book not found'), {
@@ -376,7 +376,7 @@ const handleVerseSelection = async (bookNumber: number, chapter: number, verse: 
     return
   }
 
-  // 更新當前經文信息
+  // Update current passage info
   currentPassage.value = {
     bookAbbreviation: book.abbreviation || '',
     bookName: book.name,
@@ -385,30 +385,24 @@ const handleVerseSelection = async (bookNumber: number, chapter: number, verse: 
     verse,
   }
 
-  // 存儲當前書卷數據
+  // Store current book data
   currentBookData.value = book
 
-  // 從選中的書卷中獲取真實的經文內容
+  // Get actual verses from selected chapter
   const selectedChapter = book.chapters.find((ch) => ch.number === chapter)
   if (selectedChapter) {
-    // 清空舊的經文內容
-    chapterVerses.value = []
-
-    // 等待 DOM 更新
-    await nextTick()
-
-    // 設置新的經文內容（此時內容在背景渲染，但被 v-show 隱藏）
+    // Set new verse content
     chapterVerses.value = selectedChapter.verses.map((v: { number: number; text: string }) => ({
       number: v.number,
       text: v.text,
     }))
 
-    // 等待一個 tick 讓 Vue 開始處理響應式更新
+    // Wait for DOM update
     await nextTick()
 
     isLoadingVerses.value = false
 
-    // 滾動到指定節（使用 setTimeout 避免阻塞）
+    // Scroll to specific verse (use setTimeout to avoid blocking)
     setTimeout(() => {
       scrollToVerse(verse, 'instant')
     }, 0)
@@ -416,9 +410,9 @@ const handleVerseSelection = async (bookNumber: number, chapter: number, verse: 
 }
 
 /**
- * 創建 VerseItem 物件
- * @param verseNumber - 節號
- * @returns VerseItem 物件，如果 currentPassage 不存在則返回 null
+ * Create VerseItem object
+ * @param verseNumber - Verse number
+ * @returns VerseItem object, or null if no current passage
  */
 const createMultiFunctionVerse = (verseNumber: number): VerseItem | null => {
   if (!currentPassage.value) return null
@@ -437,7 +431,7 @@ const createMultiFunctionVerse = (verseNumber: number): VerseItem | null => {
   }
 }
 
-// 添加到歷史記錄
+// Add to history
 const addToHistoryFromVerse = (verseNumber: number) => {
   if (!currentPassage.value) return
 
@@ -447,7 +441,7 @@ const addToHistoryFromVerse = (verseNumber: number) => {
   addToHistory(newHistoryItem)
 }
 
-// 點擊選擇經文
+// Select verse on click
 const selectVerse = (verseNumber: number) => {
   if (currentPassage.value) {
     currentPassage.value.verse = verseNumber
@@ -456,44 +450,44 @@ const selectVerse = (verseNumber: number) => {
   }
 }
 
-// 上一章 (只影響預覽)
+// Previous Chapter (Preview only)
 const goToPreviousChapterPreview = () => {
   goToPreviousChapter(false)
 }
 
-// 下一章 (只影響預覽)
+// Next Chapter (Preview only)
 const goToNextChapterPreview = () => {
   goToNextChapter(false)
 }
 
-// 投影控制函數
-// 上一章 (影響投影)
+// Projection Control Functions
+// Previous Chapter (Affects Projection)
 const goToPreviousChapterProjection = () => {
   goToPreviousChapter(true, updateProjection)
 }
 
-// 下一章 (影響投影)
+// Next Chapter (Affects Projection)
 const goToNextChapterProjection = () => {
   goToNextChapter(true, updateProjection)
 }
 
-// 上一節 (影響投影)
+// Previous Verse (Affects Projection)
 const goToPreviousVerseProjection = () => {
   goToPreviousVerse(true, updateProjection)
 }
 
-// 下一節 (影響投影)
+// Next Verse (Affects Projection)
 const goToNextVerseProjection = () => {
   goToNextVerse(true, updateProjection)
 }
 
-// 更新投影字型大小
+// Update projection font size
 const handleFontSizeUpdate = () => {
   setLocalItem(getStorageKey(StorageCategory.BIBLE, StorageKey.FONT_SIZE), fontSize.value)
   updateFontSize(fontSize.value)
 }
 
-// 歷史記錄相關函數
+// History related functions
 const loadVerse = async (item: VerseItem, type: 'history' | 'custom') => {
   try {
     isLoadingVerses.value = true
@@ -521,14 +515,14 @@ const addVerseToCustom = (verseNumber: number) => {
   addVerseToCurrent(newVerse)
 }
 
-// 快捷鍵處理
+// Keyboard shortcuts
 const handleKeydown = (event: KeyboardEvent) => {
-  // 避免在輸入框中觸發快捷鍵
+  // Avoid triggering shortcuts in input fields
   if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
     return
   }
 
-  // 只有在有當前經文時才響應快捷鍵
+  // Only respond if passage is selected
   if (!currentPassage.value) return
 
   switch (event.code) {
@@ -543,7 +537,7 @@ const handleKeydown = (event: KeyboardEvent) => {
   }
 }
 
-// 右鍵選單處理函數
+// Context menu handler
 const handleVerseRightClick = (event: MouseEvent, verse: { number: number; text: string }) => {
   selectedVerse.value = verse
   contextMenuRef.value?.open(event)
@@ -560,7 +554,7 @@ const copyVerseText = async () => {
 
     try {
       await navigator.clipboard.writeText(verseText)
-      // 可以添加一個提示訊息
+      // Optional: Add success message
       closeVerseContextMenu()
     } catch (err) {
       reportError(err, {
@@ -568,7 +562,7 @@ const copyVerseText = async () => {
         component: 'BibleControl',
         extra: { text: verseText },
       })
-      // 降級方案：使用舊的複製方法
+      // Fallback: Use deprecated copy method
       const textArea = document.createElement('textarea')
       textArea.value = verseText
       document.body.appendChild(textArea)
@@ -580,7 +574,7 @@ const copyVerseText = async () => {
   closeVerseContextMenu()
 }
 
-// 監聽 store 中的經文選擇狀態
+// Watch store selection state
 watch(
   storeSelectedVerse,
   async (newVerse) => {
@@ -592,57 +586,64 @@ watch(
   { immediate: false },
 )
 
-// 處理搜索結果點擊
+// Handle search result click
 const handleSearchResultClick = async (result: SearchResult) => {
   isSearchMode.value = false
   isLoadingVerses.value = true
   await handleVerseSelection(result.book_number, result.chapter_number, result.verse_number)
 }
 
-// 處理搜索
-const handleSearch = async (text: string) => {
-  if (!text.trim()) {
-    return
+// Handle search
+let searchTimeout: number | null = null
+const handleSearch = (text: string) => {
+  if (searchTimeout) {
+    window.clearTimeout(searchTimeout)
   }
 
-  currentPassage.value = null
-  const versionId = currentVersion.value?.id
-  const versionCode = currentVersion.value?.code
-  if (!versionId || !versionCode) {
-    reportError(new Error('No Bible version selected'), {
-      operation: 'handle-search',
-      component: 'BibleControl',
-      extra: { searchText: text },
-    })
-    return
-  }
-
-  // 設置 loading 狀態
-  isLoadingVerses.value = true
-  isSearchMode.value = true
-
-  try {
-    // 保存搜索文本（用於高亮顯示）
-    searchText.value = text.trim()
-
-    // 確保 bible content 已載入（用於查找書卷縮寫）
-    if (!currentBibleContent.value) {
-      await getBibleContent(versionId)
+  searchTimeout = window.setTimeout(async () => {
+    if (!text.trim()) {
+      return
     }
 
-    // 執行搜索
-    const results = await searchBibleVerses(text, versionCode, 20)
-    searchResults.value = results
-  } catch (error) {
-    reportError(error, {
-      operation: 'handle-search',
-      component: 'BibleControl',
-      extra: { searchText: text, versionCode },
-    })
-    searchResults.value = []
-  } finally {
-    isLoadingVerses.value = false
-  }
+    currentPassage.value = null
+    const versionId = currentVersion.value?.id
+    const versionCode = currentVersion.value?.code
+    if (!versionId || !versionCode) {
+      reportError(new Error('No Bible version selected'), {
+        operation: 'handle-search',
+        component: 'BibleControl',
+        extra: { searchText: text },
+      })
+      return
+    }
+
+    // Set loading state
+    isLoadingVerses.value = true
+    isSearchMode.value = true
+
+    try {
+      // Save search text for highlighting
+      searchText.value = text.trim()
+
+      // Ensure content is loaded for abbreviations
+      if (!currentBibleContent.value) {
+        await getBibleContent(versionId)
+      }
+
+      // Execute search
+      const results = await searchBibleVerses(text, versionCode, 20)
+      searchResults.value = results
+    } catch (error) {
+      reportError(error, {
+        operation: 'handle-search',
+        component: 'BibleControl',
+        extra: { searchText: text, versionCode },
+      })
+      searchResults.value = []
+    } finally {
+      isLoadingVerses.value = false
+    }
+  }, 300) // 300ms debounce
 }
 
 onMounted(() => {
@@ -657,7 +658,7 @@ onMounted(() => {
   document.addEventListener('keydown', handleKeydown)
   window.addEventListener('bible-search', handleSearchEvent)
 
-  // 清理事件監聽器
+  // Cleanup listeners
   onUnmounted(() => {
     window.removeEventListener('bible-search', handleSearchEvent)
     document.removeEventListener('keydown', handleKeydown)
