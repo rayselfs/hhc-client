@@ -234,7 +234,6 @@ import { useCardLayout } from '@/composables/useLayout'
 import { useLocalStorage } from '@/composables/useLocalStorage'
 import { useBible } from '@/composables/useBible'
 import { useAPI } from '@/composables/useAPI'
-import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import ContextMenu from '@/components/ContextMenu.vue'
 import MultiFunctionControl from '@/components/Bible/MultiFunction/Control.vue'
 import BottomSpacer from '@/components/Main/BottomSpacer.vue'
@@ -522,11 +521,26 @@ const addVerseToCustom = (verseNumber: number) => {
 }
 
 // 快捷鍵處理
-useKeyboardShortcuts('bible', {
-  hasCurrentPassage: () => !!currentPassage.value,
-  goToPreviousVerse: goToPreviousVerseProjection,
-  goToNextVerse: goToNextVerseProjection,
-})
+const handleKeydown = (event: KeyboardEvent) => {
+  // 避免在輸入框中觸發快捷鍵
+  if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
+    return
+  }
+
+  // 只有在有當前經文時才響應快捷鍵
+  if (!currentPassage.value) return
+
+  switch (event.code) {
+    case 'ArrowUp':
+      event.preventDefault()
+      goToPreviousVerseProjection()
+      break
+    case 'ArrowDown':
+      event.preventDefault()
+      goToNextVerseProjection()
+      break
+  }
+}
 
 // 右鍵選單處理函數
 const handleVerseRightClick = (event: MouseEvent, verse: { number: number; text: string }) => {
@@ -644,6 +658,7 @@ onMounted(() => {
   // 清理事件監聽器
   onUnmounted(() => {
     window.removeEventListener('bible-search', handleSearchEvent)
+    document.removeEventListener('keydown', handleKeydown)
   })
 })
 </script>

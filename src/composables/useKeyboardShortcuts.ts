@@ -4,16 +4,7 @@ import { useTimerStore } from '@/stores/timer'
 import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
 import { useMemoryManager } from '@/utils/memoryManager'
 
-interface BibleShortcuts {
-  hasCurrentPassage: () => boolean
-  goToPreviousVerse: () => void
-  goToNextVerse: () => void
-}
-
-export function useKeyboardShortcuts(
-  currentView?: Ref<string> | string,
-  bibleShortcuts?: BibleShortcuts,
-) {
+export function useKeyboardShortcuts(currentView?: Ref<string> | string) {
   const projectionStore = useProjectionStore()
   const timerStore = useTimerStore()
   const { setProjectionState } = useProjectionMessaging()
@@ -78,23 +69,6 @@ export function useKeyboardShortcuts(
         case 'KeyR':
           event.preventDefault()
           timerStore.resetTimer()
-          break
-      }
-    }
-
-    // 聖經快捷鍵 (只在聖經頁面響應)
-    if (view === 'bible' && bibleShortcuts) {
-      // 只有在有當前經文時才響應快捷鍵
-      if (!bibleShortcuts.hasCurrentPassage()) return
-
-      switch (event.code) {
-        case 'ArrowUp':
-          event.preventDefault()
-          bibleShortcuts.goToPreviousVerse()
-          break
-        case 'ArrowDown':
-          event.preventDefault()
-          bibleShortcuts.goToNextVerse()
           break
       }
     }
