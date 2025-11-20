@@ -653,6 +653,7 @@ onMounted(() => {
     const customEvent = event as CustomEvent<{ text: string }>
     handleSearch(customEvent.detail.text)
   }
+  document.addEventListener('keydown', handleKeydown)
   window.addEventListener('bible-search', handleSearchEvent)
 
   // 清理事件監聽器
