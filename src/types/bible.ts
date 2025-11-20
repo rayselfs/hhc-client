@@ -83,6 +83,14 @@ export enum BibleCacheConfig {
 }
 
 /**
+ * Bible Book Configuration
+ */
+export enum BibleBookConfig {
+  PSALMS = 19,
+  JUDE = 65,
+}
+
+/**
  * 聖經經文段落信息
  */
 export interface BiblePassage {

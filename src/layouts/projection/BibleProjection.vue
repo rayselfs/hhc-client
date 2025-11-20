@@ -49,14 +49,16 @@ const { t: $t, locale } = useI18n()
 // 追蹤是否為初始載入
 const isInitialLoad = ref(true)
 
+import { BibleBookConfig } from '@/types/bible'
+
 // 判斷是否為詩篇 (書卷編號 19)
 const isPsalms = computed(() => {
-  return props.selectedBookNumber === 19
+  return props.selectedBookNumber === BibleBookConfig.PSALMS
 })
 
 // 判斷是否為猶大書 (書卷編號 65)
 const isJude = computed(() => {
-  return props.selectedBookNumber === 65
+  return props.selectedBookNumber === BibleBookConfig.JUDE
 })
 
 // 格式化標題
