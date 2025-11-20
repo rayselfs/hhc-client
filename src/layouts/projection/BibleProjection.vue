@@ -141,11 +141,9 @@ onMounted(() => {
 .bible-content {
   flex: 1;
   overflow-y: hidden;
-  /* padding: 2rem; */
-  margin-top: 60px; /* 為 fixed header 留出空間 */
+  margin-top: 60px;
   scrollbar-width: none;
   -ms-overflow-style: none;
-  /* 完全禁用用戶滾動 */
   pointer-events: none;
 }
 
@@ -160,7 +158,7 @@ onMounted(() => {
   border-radius: 8px;
   transition: all 0.3s ease;
   pointer-events: auto;
-  line-height: 1.5;
+  line-height: 150%;
 }
 
 .verse-number {
