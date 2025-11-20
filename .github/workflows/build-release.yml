@@ -3,7 +3,7 @@ name: Build and Release
 on:
   push:
     tags:
-      - "v*.*.*"
+      - 'v*.*.*'
   workflow_dispatch:
 
 permissions:
@@ -52,7 +52,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: "npm"
+          cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
@@ -121,112 +121,13 @@ jobs:
           # GITEE_TOKEN 和 GITEE_USERNAME 已在 Job 的 env 中定義
         with:
           # 來源 repo (GitHub) - 使用 GITHUB_TOKEN
-          source-repo: "https://github-actions:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+          source-repo: 'https://github-actions:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git'
 
           # 目的地 repo (Gitee) - 使用 GITEE_TOKEN
-          destination-repo: "https://${{ env.GITEE_USERNAME }}:${{ env.GITEE_TOKEN }}@gitee.com/${{ env.GITEE_USERNAME }}/hhc-client.git"
+          destination-repo: 'https://${{ env.GITEE_USERNAME }}:${{ env.GITEE_TOKEN }}@gitee.com/${{ env.GITEE_USERNAME }}/hhc-client.git'
 
       - name: Download Windows artifact from GitHub Release
         uses: actions/download-artifact@v4
         with:
           name: release-windows-2025
           path: release-files
-
-      - name: Upload to Gitee Releases (using Shell)
-        run: |
-          set -e # 如果有命令失敗，立即退出
-
-          # 1. 設置變量
-          # 環境變數已由 env: 區塊設定
-          REPO="hhc-client" # 您的 Gitee repo 名稱
-          TAG_NAME="v$VERSION"
-
-          # 檢查 Secrets 是否設置
-          if [ -z "$GITEE_TOKEN" ] || [ -z "$GITEE_USERNAME" ]; then
-            echo "GITEE_TOKEN or GITEE_USERNAME not set, skipping Gitee upload."
-            exit 0
-          fi
-
-          API_BASE_URL="https://gitee.com/api/v5/repos/$GITEE_USERNAME/$REPO"
-          AUTH_HEADER="Authorization: token $GITEE_TOKEN"
-
-          # 2. 檢查或創建 Release
-          echo "Checking for existing Gitee release for tag $TAG_NAME..."
-
-          HTTP_STATUS=$(curl -s -H "$AUTH_HEADER" \
-            -o gitee_response.json \
-            -w "%{http_code}" \
-            "$API_BASE_URL/releases/$TAG_NAME")
-            
-          BODY=$(cat gitee_response.json)
-
-          if [ "$HTTP_STATUS" -eq 200 ]; then
-            echo "Release found."
-            RELEASE_ID=$(echo "$BODY" | jq -r '.id')
-          elif [ "$HTTP_STATUS" -eq 404 ]; then
-            echo "Release not found. Creating new release..."
-            
-            JSON_PAYLOAD=$(jq -n \
-              --arg tag "$TAG_NAME" \
-              --arg name "Release $TAG_NAME" \
-              --arg body "Release $TAG_NAME\n\nAuto-synced from GitHub" \
-              --arg target "main" \
-              '{tag_name: $tag, name: $name, body: $body, prerelease: true, target_commitish: $target}')
-              
-            CREATE_BODY=$(curl -s -X POST \
-              -H "$AUTH_HEADER" \
-              -H "Content-Type: application/json" \
-              -d "$JSON_PAYLOAD" \
-              "$API_BASE_URL/releases")
-              
-            RELEASE_ID=$(echo "$CREATE_BODY" | jq -r '.id')
-            if [ "$RELEASE_ID" == "null" ] || [ -z "$RELEASE_ID" ]; then
-              echo "Failed to create release. Response: $CREATE_BODY"
-              exit 1
-            fi
-            echo "Release created with ID: $RELEASE_ID"
-          else
-            echo "Failed to check Gitee release. Status: $HTTP_STATUS, Body: $BODY"
-            exit 1
-          fi
-
-          if [ "$RELEASE_ID" == "null" ] || [ -z "$RELEASE_ID" ]; then
-            echo "Could not determine RELEASE_ID."
-            exit 1
-          fi
-
-          # 3. 上傳檔案
-          echo "Uploading files to Gitee release $RELEASE_ID..."
-          UPLOAD_COUNT=0
-          RELEASE_DIR="release-files"
-
-          TOTAL_FILES=$(find "$RELEASE_DIR" -type f | wc -l | tr -d ' ')
-          if [ "$TOTAL_FILES" -eq 0 ]; then
-            echo "No files found to upload."
-          fi
-
-          find "$RELEASE_DIR" -type f -print0 | while IFS= read -r -d '' FILE; do
-            FILENAME=$(basename "$FILE")
-            echo "Uploading $FILENAME..."
-            
-            UPLOAD_RESPONSE=$(curl -s -X POST \
-              -H "$AUTH_HEADER" \
-              -F "file=@$FILE" \
-              "$API_BASE_URL/releases/$RELEASE_ID/attach_files")
-              
-            if echo "$UPLOAD_RESPONSE" | jq -e '.name != null' > /dev/null; then
-              echo "Successfully uploaded $FILENAME"
-              UPLOAD_COUNT=$((UPLOAD_COUNT + 1))
-              if [ "$TOTAL_FILES" -gt 0 ]; then
-                PERCENT=$((UPLOAD_COUNT * 100 / TOTAL_FILES))
-                echo "Upload progress: $UPLOAD_COUNT/$TOTAL_FILES (${PERCENT}%)"
-              else
-                echo "Upload progress: $UPLOAD_COUNT files uploaded."
-              fi
-            else
-              echo "Failed to upload $FILENAME. Response: $UPLOAD_RESPONSE"
-              # 允許繼續上傳其他檔案，不在此處 exit 1
-            fi
-          done
-
-          echo "Gitee release upload completed. Uploaded $UPLOAD_COUNT files."
