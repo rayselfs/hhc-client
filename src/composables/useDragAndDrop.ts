@@ -1,7 +1,7 @@
 import type { VerseItem, Folder } from '@/types/common'
 import { useSentry } from './useSentry'
 import type { DragData } from '@/utils/typeGuards'
-import { isValidDragData, isVerseItem, isFolder } from '@/utils/typeGuards'
+import { isValidDragData } from '@/utils/typeGuards'
 
 /**
  * 拖放功能 Composable
@@ -147,7 +147,7 @@ export const useDragAndDrop = <T extends VerseItem>() => {
 
       const data = parsed as DragData<T>
       if (container) {
-        onDrop(data, container)
+        onDrop(data, container as HTMLElement)
       }
     } catch (error) {
       reportError(error, {

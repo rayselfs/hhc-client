@@ -14,12 +14,14 @@ import DefaultProjection from '@/layouts/projection/DefaultProjection.vue'
 import BibleProjection from '@/layouts/projection/BibleProjection.vue'
 import TimerProjection from '@/layouts/projection/TimerProjection.vue'
 import { useProjectionStore } from '@/stores/projection'
+import { useTimerStore } from '@/stores/timer'
 import { useProjectionElectron } from '@/composables/useElectron'
-import { TimerMode, type AppMessage, StorageKey, StorageCategory, getStorageKey } from '@/types/common'
+import { type AppMessage, StorageKey, StorageCategory, getStorageKey } from '@/types/common'
 import { useLocalStorage } from '@/composables/useLocalStorage'
 import { BIBLE_CONFIG } from '@/config/app'
 
 const projectionStore = useProjectionStore()
+const timerStore = useTimerStore()
 const { getLocalItem } = useLocalStorage()
 
 const {
@@ -29,14 +31,13 @@ const {
   removeAllListeners,
 } = useProjectionElectron()
 
-// 聖經相關
+// bible
 const selectedBook = ref('創世記')
-const selectedBookNumber = ref(1) // 書卷編號
+const selectedBookNumber = ref(1)
 const selectedChapter = ref(1)
 const chapterVerses = ref<Array<{ number: number; text: string }>>([])
 const currentVerse = ref(1)
 const getInitialFontSize = () => {
-  // 使用與 BibleControl 相同的存儲鍵
   const savedFontSize = getLocalItem<number>(
     getStorageKey(StorageCategory.BIBLE, StorageKey.FONT_SIZE),
     'int',
@@ -45,13 +46,12 @@ const getInitialFontSize = () => {
 }
 const verseFontSize = ref(getInitialFontSize())
 
-// 計時器相關
-const timerMode = ref(TimerMode.BOTH)
-const timerFormattedTime = ref('05:00')
-const selectedTimezone = ref('Asia/Taipei')
-const timerProgress = ref(0)
+// timer
+const timerMode = computed(() => timerStore.settings.mode)
+const timerFormattedTime = computed(() => timerStore.formattedTime)
+const selectedTimezone = computed(() => timerStore.settings.timezone)
+const timerProgress = computed(() => timerStore.progress)
 
-// 動態組件配置
 const currentComponent = computed(() => {
   if (projectionStore.isShowingDefault) {
     return DefaultProjection
@@ -101,7 +101,6 @@ const componentProps = computed(() => {
   }
 })
 
-// 監聽來自主窗口的消息
 const handleMessage = (data: AppMessage) => {
   const { type, data: messageData } = data as { type: string; data: Record<string, unknown> }
 
@@ -117,13 +116,10 @@ const handleMessage = (data: AppMessage) => {
       currentVerse.value = messageData.currentVerse as number
       break
     case 'UPDATE_BIBLE_FONT_SIZE':
-      verseFontSize.value = messageData.fontSize as number
+      verseFontSize.value = Number(messageData.fontSize)
       break
     case 'UPDATE_TIMER':
-      timerMode.value = messageData.mode as TimerMode
-      timerFormattedTime.value = messageData.formattedTime as string
-      selectedTimezone.value = messageData.timezone as string
-      timerProgress.value = (messageData.progress as number) || 0
+      // keep old UPDATE_TIMER trigger
       break
     case 'TOGGLE_PROJECTION_CONTENT':
       projectionStore.setShowingDefault(messageData.showDefault as boolean)
@@ -131,25 +127,16 @@ const handleMessage = (data: AppMessage) => {
   }
 }
 
-// 生命週期
 onMounted(() => {
-  // 監聽消息
   setupMessageHandler(handleMessage)
-
-  // 請求當前狀態
   requestCurrentState()
-
-  // 設置 html overflow 為 hidden（只在投影視圖）
   document.documentElement.style.overflow = 'hidden'
 })
 
 onBeforeUnmount(() => {
-  // 清理監聽器
   if (isElectron()) {
     removeAllListeners('projection-message')
   }
-
-  // 恢復 html overflow（清理樣式）
   document.documentElement.style.overflow = ''
 })
 </script>

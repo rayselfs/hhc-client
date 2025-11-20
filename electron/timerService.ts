@@ -12,6 +12,7 @@ export interface TimerState {
   timerDuration: number // seconds (for progress calculation)
   originalDuration: number // seconds (user-set duration)
   startTime?: Date // for clock mode
+  currentTime: Date // current server time
   timezone: string
 }
 
@@ -42,10 +43,12 @@ export class TimerService {
       mode: 'timer',
       state: 'stopped',
       remainingTime: 300, // 5 minutes default
-      timerDuration: 300,
       originalDuration: 300,
+      currentTime: new Date(),
       timezone: 'Asia/Taipei',
     }
+    // Start continuous interval immediately
+    this.startInterval()
   }
 
   /**
@@ -70,7 +73,9 @@ export class TimerService {
   private broadcast() {
     const stateToSend = {
       ...this.state,
+      ...this.state,
       startTime: this.state.startTime?.toISOString(), // Convert Date to string for IPC
+      currentTime: this.state.currentTime.toISOString(), // Convert Date to string for IPC
     }
 
     this.windows.forEach((window) => {
@@ -89,15 +94,21 @@ export class TimerService {
     }
 
     this.intervalId = setInterval(() => {
+      // Always update current time
+      this.state.currentTime = new Date()
+
+      // Handle timer logic only if running
       if (this.state.state === 'running' && this.state.remainingTime > 0) {
         this.state.remainingTime--
         if (this.state.remainingTime <= 0) {
           this.state.remainingTime = 0
           this.state.state = 'stopped'
-          this.stopInterval()
+          // Don't stop interval, just stop timer logic
         }
-        this.broadcast()
       }
+
+      // Always broadcast
+      this.broadcast()
     }, 1000)
   }
 
@@ -121,7 +132,8 @@ export class TimerService {
           this.state.remainingTime = this.state.originalDuration
           this.state.timerDuration = this.state.originalDuration
           this.state.state = 'running'
-          this.startInterval()
+          this.state.state = 'running'
+          // this.startInterval() // Interval is always running
         }
         if (this.state.mode === 'clock' || this.state.mode === 'both') {
           this.state.startTime = new Date()
@@ -132,7 +144,8 @@ export class TimerService {
       case 'pause':
         if (this.state.state === 'running') {
           this.state.state = 'paused'
-          this.stopInterval()
+          this.state.state = 'paused'
+          // this.stopInterval() // Don't stop interval, just pause timer state
           this.broadcast()
         }
         break
@@ -140,7 +153,8 @@ export class TimerService {
       case 'resume':
         if (this.state.state === 'paused') {
           this.state.state = 'running'
-          this.startInterval()
+          this.state.state = 'running'
+          // this.startInterval() // Interval is always running
           this.broadcast()
         }
         break
@@ -150,7 +164,8 @@ export class TimerService {
         this.state.remainingTime = this.state.originalDuration
         this.state.timerDuration = this.state.originalDuration
         this.state.startTime = undefined
-        this.stopInterval()
+        this.state.startTime = undefined
+        // this.stopInterval() // Don't stop interval
         this.broadcast()
         break
 

@@ -4,7 +4,6 @@ import { TimerMode } from '@/types/common'
 import { useMemoryManager } from '@/utils/memoryManager'
 import { TIMER_CONFIG, getTimerDefaultSettings } from '@/config/app'
 import { useSentry } from '@/composables/useSentry'
-import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
 import { useLocalStorage } from '@/composables/useLocalStorage'
 import { StorageKey, StorageCategory, getStorageKey } from '@/types/common'
 import type { TimerState as ElectronTimerState } from '@/types/electron'
@@ -22,15 +21,15 @@ export interface TimerSettings {
   remainingTime: number // seconds
   timezone: string // Timezone
   startTime?: Date // Start time for 'clock' mode
+  currentTime: Date // Current server time
 }
 
 // State machine for timer status
-type TimerState = 'stopped' | 'running' | 'paused'
+type TimerStatus = 'stopped' | 'running' | 'paused'
 
 export const useTimerStore = defineStore('timer', () => {
   const { reportError } = useSentry()
   const { cleanup } = useMemoryManager('useTimerStore')
-  const { sendTimerUpdate } = useProjectionMessaging()
   const { getLocalItem, setLocalItem } = useLocalStorage()
   const loadSettings = () => {
     const defaultSettings = getTimerDefaultSettings()
@@ -45,6 +44,7 @@ export const useTimerStore = defineStore('timer', () => {
           ...parsed,
           remainingTime: parsed.originalDuration || defaultSettings.remainingTime,
           timerDuration: parsed.originalDuration || defaultSettings.timerDuration,
+          currentTime: new Date(),
         }
       } catch (error) {
         reportError(error, {
@@ -60,7 +60,7 @@ export const useTimerStore = defineStore('timer', () => {
   // State
   const settings = ref<TimerSettings>(loadSettings() as TimerSettings)
   const presets = ref<TimerPreset[]>([])
-  const state = ref<TimerState>('stopped') // State machine
+  const state = ref<TimerStatus>('stopped') // State machine
 
   // Save persistent settings to localStorage
   const saveSettings = () => {
@@ -231,8 +231,15 @@ export const useTimerStore = defineStore('timer', () => {
     } else {
       settings.value.startTime = undefined
     }
-    // Send projection update when state changes
-    sendTimerUpdate()
+    // Temporary interface to handle type definition sync issues
+    interface ExtendedTimerState extends ElectronTimerState {
+      currentTime?: string
+    }
+    const extendedState = timerState as ExtendedTimerState
+
+    if (extendedState.currentTime) {
+      settings.value.currentTime = new Date(extendedState.currentTime)
+    }
   }
 
   // State machine methods - now send commands to main process
@@ -322,12 +329,16 @@ export const useTimerStore = defineStore('timer', () => {
       })
 
       // Initialize main process timer with saved settings
-      const savedSettings = loadSettings()
-      await window.electronAPI.timerInitialize({
-        mode: savedSettings.mode as TimerMode,
-        originalDuration: savedSettings.originalDuration,
-        timezone: savedSettings.timezone,
-      })
+      // Only initialize if NOT in projection window to avoid resetting state
+      const isProjection = window.location.hash.includes('projection')
+      if (!isProjection) {
+        const savedSettings = loadSettings()
+        await window.electronAPI.timerInitialize({
+          mode: savedSettings.mode as TimerMode,
+          originalDuration: savedSettings.originalDuration,
+          timezone: savedSettings.timezone,
+        })
+      }
 
       // Get initial state from main process
       const initialState = await window.electronAPI.timerGetState()

@@ -131,6 +131,7 @@ export interface TimerState {
   timerDuration: number
   originalDuration: number
   startTime?: string // ISO string format
+  currentTime?: string // ISO string format
   timezone: string
 }
 
