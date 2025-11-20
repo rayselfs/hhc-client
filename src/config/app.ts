@@ -51,8 +51,8 @@ export const BIBLE_CONFIG = {
   // Font configuration
   FONT: {
     DEFAULT_SIZE: 90,
-    MIN_SIZE: 50,
-    MAX_SIZE: 120,
+    MIN_SIZE: 30,
+    MAX_SIZE: 150,
     SIZE_STEP: 5,
   },
 

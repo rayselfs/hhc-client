@@ -2,10 +2,12 @@ import { ref, computed, onBeforeUnmount } from 'vue'
 import { useElectron } from './useElectron'
 import { useTimerStore } from '@/stores/timer'
 import { useProjectionStore } from '@/stores/projection'
-import { MessageType, ViewType } from '@/types/common'
+import { MessageType, ViewType, StorageKey, StorageCategory, getStorageKey } from '@/types/common'
 import type { AppMessage } from '@/types/common'
 import { useMemoryManager } from '@/utils/memoryManager'
 import { useSentry } from './useSentry'
+import { useLocalStorage } from './useLocalStorage'
+import { BIBLE_CONFIG } from '@/config/app'
 
 // 全局共享的最後發送消息記錄（解決多實例消息去重問題）
 let globalLastSentMessage: AppMessage | null = null
@@ -45,6 +47,7 @@ export const useProjectionMessaging = () => {
   const timerStore = useTimerStore()
   const projectionStore = useProjectionStore()
   const { cleanup } = useMemoryManager('useProjectionMessaging')
+  const { getLocalItem } = useLocalStorage()
 
   // 消息隊列
   const messageQueue = ref<AppMessage[]>([])
@@ -287,6 +290,13 @@ export const useProjectionMessaging = () => {
    * 注意：投影視圖不支援主題切換（固定為黑底白字），因此不包含主題狀態
    */
   const syncAllStates = () => {
+    // 從 localStorage 讀取字體大小
+    const savedFontSize = getLocalItem<number>(
+      getStorageKey(StorageCategory.BIBLE, StorageKey.FONT_SIZE),
+      'int',
+    )
+    const bibleFontSize = savedFontSize || BIBLE_CONFIG.FONT.DEFAULT_SIZE
+
     const messages: AppMessage[] = [
       {
         type: MessageType.UPDATE_TIMER,
@@ -303,6 +313,10 @@ export const useProjectionMessaging = () => {
       {
         type: MessageType.TOGGLE_PROJECTION_CONTENT,
         data: { showDefault: projectionStore.isShowingDefault },
+      },
+      {
+        type: MessageType.UPDATE_BIBLE_FONT_SIZE,
+        data: { fontSize: bibleFontSize },
       },
     ]
 

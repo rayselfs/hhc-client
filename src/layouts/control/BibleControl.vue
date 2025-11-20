@@ -267,7 +267,6 @@ const currentBookData = ref<{
 
 // 字型大小控制
 const getInitialFontSize = () => {
-  // 從 localStorage 讀取上次設定的字型大小，如果沒有則使用預設值
   const savedFontSize = getLocalItem<number>(
     getStorageKey(StorageCategory.BIBLE, StorageKey.FONT_SIZE),
   )
@@ -554,8 +553,6 @@ const closeVerseContextMenu = () => {
   selectedVerse.value = null
 }
 
-// useContextMenu composable 已經處理了點擊外部關閉選單的邏輯，不需要手動監聽
-
 const copyVerseText = async () => {
   if (selectedVerse.value && currentPassage.value) {
     const verseText = `${currentPassage.value.bookName} ${currentPassage.value.chapter}:${selectedVerse.value.number} ${selectedVerse.value.text}`
@@ -650,9 +647,8 @@ const handleSearch = async (text: string) => {
 onMounted(() => {
   loadRootFolder()
 
-  document.addEventListener('keydown', handleKeydown)
+  updateFontSize(fontSize.value)
 
-  // 監聽搜索事件
   const handleSearchEvent = (event: Event) => {
     const customEvent = event as CustomEvent<{ text: string }>
     handleSearch(customEvent.detail.text)

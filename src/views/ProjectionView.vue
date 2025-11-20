@@ -15,9 +15,12 @@ import BibleProjection from '@/layouts/projection/BibleProjection.vue'
 import TimerProjection from '@/layouts/projection/TimerProjection.vue'
 import { useProjectionStore } from '@/stores/projection'
 import { useProjectionElectron } from '@/composables/useElectron'
-import { TimerMode, type AppMessage } from '@/types/common'
+import { TimerMode, type AppMessage, StorageKey, StorageCategory, getStorageKey } from '@/types/common'
+import { useLocalStorage } from '@/composables/useLocalStorage'
+import { BIBLE_CONFIG } from '@/config/app'
 
 const projectionStore = useProjectionStore()
+const { getLocalItem } = useLocalStorage()
 
 const {
   isElectron,
@@ -33,8 +36,12 @@ const selectedChapter = ref(1)
 const chapterVerses = ref<Array<{ number: number; text: string }>>([])
 const currentVerse = ref(1)
 const getInitialFontSize = () => {
-  const savedFontSize = localStorage.getItem('bible-font-size')
-  return savedFontSize ? parseInt(savedFontSize, 10) : 90
+  // 使用與 BibleControl 相同的存儲鍵
+  const savedFontSize = getLocalItem<number>(
+    getStorageKey(StorageCategory.BIBLE, StorageKey.FONT_SIZE),
+    'int',
+  )
+  return savedFontSize ? savedFontSize : BIBLE_CONFIG.FONT.DEFAULT_SIZE
 }
 const verseFontSize = ref(getInitialFontSize())
 
