@@ -365,4 +365,6 @@ export interface Folder<TItem extends FolderItem = FolderItem> {
   items: TItem[]
   folders: Folder<TItem>[]
   parentId?: string
+  timestamp: number
+  expiresAt?: number | null // Timestamp when the folder should be deleted, null for permanent
 }

@@ -109,10 +109,22 @@
         <v-card-text>
           <v-text-field
             v-model="folderName"
-            :label="$t('enterFolderName') || 'Enter folder name'"
+            :label="$t('bible.folderName')"
             variant="outlined"
+            density="compact"
             autofocus
             @keyup.enter="confirmCreateFolder"
+          />
+
+          <v-select
+            v-model="retentionPeriod"
+            :items="retentionOptions"
+            :label="$t('bible.retentionPeriod')"
+            item-title="title"
+            item-value="value"
+            variant="outlined"
+            density="compact"
+            class="mt-2"
           />
         </v-card-text>
         <v-card-actions>
@@ -348,6 +360,14 @@ const {
 const multiFunctionTab = ref('history')
 const showFolderDialog = ref(false)
 const folderName = ref('')
+const retentionPeriod = ref('1day') // Default to 1 day
+
+const retentionOptions = computed(() => [
+  { title: $t('bible.retention.1day'), value: '1day' },
+  { title: $t('bible.retention.1week'), value: '1week' },
+  { title: $t('bible.retention.1month'), value: '1month' },
+  { title: $t('bible.retention.permanent'), value: 'permanent' },
+])
 
 // 監聽頁面切換，切換到 custom 時重置到 root
 watch(multiFunctionTab, (newTab) => {
@@ -389,14 +409,34 @@ const loadVerse = (item: VerseItem, type: 'history' | 'custom') => {
 // 自訂資料夾相關函數
 const createNewFolder = () => {
   folderName.value = ''
+  retentionPeriod.value = '1day' // Reset to default
   showFolderDialog.value = true
   closeItemContextMenu()
 }
 
 const confirmCreateFolder = () => {
   if (folderName.value.trim()) {
+    let expiresAt: number | null = null
+    const now = Date.now()
+    const oneDay = 24 * 60 * 60 * 1000
+
+    switch (retentionPeriod.value) {
+      case '1day':
+        expiresAt = now + oneDay
+        break
+      case '1week':
+        expiresAt = now + oneDay * 7
+        break
+      case '1month':
+        expiresAt = now + oneDay * 30
+        break
+      case 'permanent':
+        expiresAt = null
+        break
+    }
+
     // Call store action - direct mutation
-    addFolderToCurrent(folderName.value)
+    addFolderToCurrent(folderName.value, expiresAt)
     showFolderDialog.value = false
     folderName.value = ''
   }

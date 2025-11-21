@@ -120,6 +120,14 @@
       "3JN": "約翰參書",
       "JUD": "猶大書",
       "REV": "啟示錄"
+    },
+    "folderName": "資料夾名稱",
+    "retentionPeriod": "保留時間",
+    "retention": {
+      "1day": "1 天",
+      "1week": "1 週",
+      "1month": "1 個月",
+      "permanent": "永久"
     }
   },
   "noCustomItems": "尚無自訂項目",

@@ -35,6 +35,7 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
       expanded: false,
       items: [],
       folders: [],
+      timestamp: Date.now(),
     })
 
     /**
@@ -73,8 +74,11 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
 
       if (saved && saved.id === config.rootId) {
         rootFolder.value = saved
+        // Check for expired folders after loading
+        if (checkExpiredFolders(rootFolder.value.folders as Folder<TItem>[])) {
+          saveRootFolder() // Save immediately if items were removed
+        }
       }
-      // Otherwise, use default rootFolder created above
     }
 
     /**
@@ -97,6 +101,40 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
       },
       { deep: true },
     )
+
+    /**
+     * Check and remove expired folders recursively
+     * @param folders - List of folders to check
+     * @returns true if any folder was removed
+     */
+    const checkExpiredFolders = (folders: Folder<TItem>[]): boolean => {
+      let changed = false
+      const now = Date.now()
+
+      // Filter out expired folders
+      const initialLength = folders.length
+      const validFolders = folders.filter((folder) => {
+        if (folder.expiresAt && folder.expiresAt < now) {
+          return false // Remove expired folder
+        }
+        return true
+      })
+
+      if (validFolders.length !== initialLength) {
+        folders.length = 0
+        folders.push(...validFolders)
+        changed = true
+      }
+
+      // Recursively check subfolders
+      folders.forEach((folder) => {
+        if (checkExpiredFolders(folder.folders)) {
+          changed = true
+        }
+      })
+
+      return changed
+    }
 
     /**
      * Navigate to root
@@ -133,8 +171,9 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
     /**
      * Add a new folder to the current folder
      * @param name - The name of the new folder
+     * @param expiresAt - Optional timestamp when the folder should expire
      */
-    const addFolderToCurrent = (name: string) => {
+    const addFolderToCurrent = (name: string, expiresAt?: number | null) => {
       if (!name.trim()) return
 
       const newFolder: Folder<TItem> = {
@@ -144,6 +183,8 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
         items: [] as TItem[],
         folders: [] as Folder<TItem>[],
         parentId: currentFolder.value?.id,
+        timestamp: Date.now(),
+        expiresAt: expiresAt || null,
       }
 
       // Direct mutation - Vue reactivity will handle the update
@@ -285,6 +326,7 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
         items: newItems,
         folders: newSubFolders,
         expanded: false, // Collapse pasted folders by default
+        timestamp: Date.now(), // Update timestamp for the clone
       }
     }
 

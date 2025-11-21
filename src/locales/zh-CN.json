@@ -120,6 +120,14 @@
       "3JN": "约翰参书",
       "JUD": "犹大书",
       "REV": "启示录"
+    },
+    "folderName": "文件夹名称",
+    "retentionPeriod": "保留时间",
+    "retention": {
+      "1day": "1 天",
+      "1week": "1 周",
+      "1month": "1 个月",
+      "permanent": "永久"
     }
   },
   "noCustomItems": "尚无自定义项目",

@@ -120,6 +120,14 @@
       "3JN": "3 John",
       "JUD": "Jude",
       "REV": "Revelation"
+    },
+    "folderName": "Folder Name",
+    "retentionPeriod": "Retention Period",
+    "retention": {
+      "1day": "1 Day",
+      "1week": "1 Week",
+      "1month": "1 Month",
+      "permanent": "Permanent"
     }
   },
   "noCustomItems": "No custom items yet",
