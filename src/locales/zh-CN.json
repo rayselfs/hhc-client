@@ -122,6 +122,7 @@
       "REV": "启示录"
     },
     "folderName": "文件夹名称",
+    "duplicateFolderName": "文件夹名称已存在",
     "retentionPeriod": "保留时间",
     "retention": {
       "1day": "1 天",

@@ -110,6 +110,7 @@
           <v-text-field
             v-model="folderName"
             :label="$t('bible.folderName')"
+            :error-messages="nameErrorMessage"
             variant="outlined"
             density="compact"
             autofocus
@@ -130,7 +131,9 @@
         <v-card-actions>
           <v-spacer />
           <v-btn @click="showFolderDialog = false">{{ $t('cancel') || 'Cancel' }}</v-btn>
-          <v-btn color="primary" @click="confirmCreateFolder">{{ $t('create') || 'Create' }}</v-btn>
+          <v-btn color="primary" :disabled="isDuplicateName" @click="confirmCreateFolder">{{
+            $t('create') || 'Create'
+          }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -369,6 +372,19 @@ const retentionOptions = computed(() => [
   { title: $t('bible.retention.permanent'), value: 'permanent' },
 ])
 
+// Check for duplicate folder name
+const isDuplicateName = computed(() => {
+  if (!folderName.value.trim()) return false
+  return currentFolder.value.folders.some((f) => f.name === folderName.value.trim())
+})
+
+const nameErrorMessage = computed(() => {
+  if (isDuplicateName.value) {
+    return $t('bible.duplicateFolderName')
+  }
+  return ''
+})
+
 // 監聽頁面切換，切換到 custom 時重置到 root
 watch(multiFunctionTab, (newTab) => {
   if (newTab === 'custom') {
@@ -415,7 +431,7 @@ const createNewFolder = () => {
 }
 
 const confirmCreateFolder = () => {
-  if (folderName.value.trim()) {
+  if (folderName.value.trim() && !isDuplicateName.value) {
     let expiresAt: number | null = null
     const now = Date.now()
     const oneDay = 24 * 60 * 60 * 1000

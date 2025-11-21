@@ -122,6 +122,7 @@
       "REV": "Revelation"
     },
     "folderName": "Folder Name",
+    "duplicateFolderName": "Folder name already exists",
     "retentionPeriod": "Retention Period",
     "retention": {
       "1day": "1 Day",

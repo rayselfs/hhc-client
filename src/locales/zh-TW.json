@@ -122,6 +122,7 @@
       "REV": "啟示錄"
     },
     "folderName": "資料夾名稱",
+    "duplicateFolderName": "資料夾名稱已存在",
     "retentionPeriod": "保留時間",
     "retention": {
       "1day": "1 天",
