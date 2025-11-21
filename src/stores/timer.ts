@@ -164,6 +164,11 @@ export const useTimerStore = defineStore('timer', () => {
   }
 
   const setTimerDuration = (duration: number) => {
+    // Optimistically update local state so saveSettings captures the new value
+    settings.value.originalDuration = duration
+    settings.value.timerDuration = duration
+    settings.value.remainingTime = duration
+
     sendTimerCommand({ action: 'setDuration', duration })
     saveSettings()
   }
