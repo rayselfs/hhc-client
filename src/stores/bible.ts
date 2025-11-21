@@ -9,7 +9,7 @@ import { useAPI } from '@/composables/useAPI'
 import { useLocalStorage } from '@/composables/useLocalStorage'
 
 export const useBibleStore = defineStore('bible', () => {
-  const { getLocalItem } = useLocalStorage()
+  const { getLocalItem, setLocalItem, removeLocalItem } = useLocalStorage()
   const { getBibleVersions: fetchBibleVersions, getBibleContent: fetchBibleContent } = useAPI()
 
   /**
@@ -96,9 +96,9 @@ export const useBibleStore = defineStore('bible', () => {
   const persistCurrentVersion = (version: BibleVersion | null) => {
     if (typeof window === 'undefined') return
     if (version) {
-      window.localStorage.setItem(versionStorageKey, JSON.stringify(version))
+      setLocalItem(versionStorageKey, version, 'object')
     } else {
-      window.localStorage.removeItem(versionStorageKey)
+      removeLocalItem(versionStorageKey)
     }
   }
 
