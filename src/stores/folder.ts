@@ -268,6 +268,37 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
     }
 
     /**
+     * Deep clone a folder and all its contents, generating new IDs
+     * @param folder - The folder to clone
+     * @param parentId - The ID of the parent folder for the new clone
+     */
+    const deepCloneFolder = (folder: Folder<TItem>, parentId: string): Folder<TItem> => {
+      const newFolderId = uuidv4()
+
+      // Deep clone items with new IDs
+      const newItems = folder.items.map((item) => ({
+        ...item,
+        id: uuidv4(),
+        // Update timestamp if it exists (common for items)
+        ...('timestamp' in item ? { timestamp: Date.now() } : {}),
+      }))
+
+      // Recursively deep clone sub-folders
+      const newSubFolders = folder.folders.map((subFolder) =>
+        deepCloneFolder(subFolder, newFolderId),
+      )
+
+      return {
+        ...folder,
+        id: newFolderId,
+        parentId: parentId,
+        items: newItems,
+        folders: newSubFolders,
+        expanded: false, // Collapse pasted folders by default
+      }
+    }
+
+    /**
      * Paste an item (verse or folder) to a target folder
      * Creates a copy with new ID
      * @param item - The item to paste (can be TItem or Folder)
@@ -298,12 +329,8 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
         }
       } else {
         const folder = item as Folder<TItem>
-        const newFolder: Folder<TItem> = {
-          ...folder,
-          id: uuidv4(),
-          items: [...folder.items] as TItem[],
-          folders: [...folder.folders] as Folder<TItem>[],
-        }
+        // Use deep clone to prevent shared references
+        const newFolder = deepCloneFolder(folder, targetFolderId)
 
         if (targetFolderId === config.rootId) {
           // @ts-expect-error - Vue's ref type system, runtime safe
