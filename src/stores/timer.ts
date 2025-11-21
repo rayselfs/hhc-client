@@ -254,6 +254,14 @@ export const useTimerStore = defineStore('timer', () => {
     if (extendedState.currentTime) {
       settings.value.currentTime = new Date(extendedState.currentTime)
     }
+
+    if (
+      settings.value.remainingTime <= 0 &&
+      state.value === 'running' &&
+      settings.value.mode !== 'clock'
+    ) {
+      state.value = 'stopped'
+    }
   }
 
   // State machine methods - now send commands to main process
