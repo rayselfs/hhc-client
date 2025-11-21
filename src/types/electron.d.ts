@@ -98,7 +98,7 @@ export interface ElectronAPI {
   timerInitialize: (initialState: Partial<TimerState>) => Promise<{ success: boolean }>
 
   /** Listen for timer state updates */
-  onTimerTick: (callback: (state: TimerState) => void) => void
+  onTimerTick: (callback: (state: Partial<TimerState>) => void) => void
 }
 
 /**

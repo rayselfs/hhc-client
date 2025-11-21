@@ -74,9 +74,24 @@ export class TimerService {
   private broadcast() {
     const stateToSend = {
       ...this.state,
-      ...this.state,
       startTime: this.state.startTime?.toISOString(), // Convert Date to string for IPC
       currentTime: this.state.currentTime.toISOString(), // Convert Date to string for IPC
+    }
+
+    this.windows.forEach((window) => {
+      if (!window.isDestroyed()) {
+        window.webContents.send('timer-tick', stateToSend)
+      }
+    })
+  }
+
+  /**
+   * Broadcast only time updates (lightweight)
+   */
+  private broadcastTick() {
+    const stateToSend = {
+      remainingTime: this.state.remainingTime,
+      currentTime: this.state.currentTime.toISOString(),
     }
 
     this.windows.forEach((window) => {
@@ -113,8 +128,8 @@ export class TimerService {
         }
       }
 
-      // Always broadcast
-      this.broadcast()
+      // Broadcast lightweight tick
+      this.broadcastTick()
     }, 1000)
   }
 

@@ -219,20 +219,27 @@ export const useTimerStore = defineStore('timer', () => {
   }
 
   // Update local state from timer state received from main process
-  const updateFromTimerState = (timerState: ElectronTimerState) => {
-    settings.value.mode = timerState.mode
-    state.value = timerState.state
-    settings.value.remainingTime = timerState.remainingTime
-    settings.value.timerDuration = timerState.timerDuration
-    settings.value.originalDuration = timerState.originalDuration
-    settings.value.timezone = timerState.timezone
-    if (timerState.startTime) {
-      settings.value.startTime = new Date(timerState.startTime)
-    } else {
-      settings.value.startTime = undefined
+  const updateFromTimerState = (timerState: Partial<ElectronTimerState>) => {
+    if (timerState.mode !== undefined) settings.value.mode = timerState.mode
+    if (timerState.state !== undefined) state.value = timerState.state
+    if (timerState.remainingTime !== undefined)
+      settings.value.remainingTime = timerState.remainingTime
+    if (timerState.timerDuration !== undefined)
+      settings.value.timerDuration = timerState.timerDuration
+    if (timerState.originalDuration !== undefined)
+      settings.value.originalDuration = timerState.originalDuration
+    if (timerState.timezone !== undefined) settings.value.timezone = timerState.timezone
+
+    if (timerState.startTime !== undefined) {
+      if (timerState.startTime) {
+        settings.value.startTime = new Date(timerState.startTime)
+      } else {
+        settings.value.startTime = undefined
+      }
     }
+
     // Temporary interface to handle type definition sync issues
-    interface ExtendedTimerState extends ElectronTimerState {
+    interface ExtendedTimerState extends Partial<ElectronTimerState> {
       currentTime?: string
     }
     const extendedState = timerState as ExtendedTimerState
@@ -324,7 +331,7 @@ export const useTimerStore = defineStore('timer', () => {
 
     try {
       // Set up listener for timer updates from main process
-      window.electronAPI.onTimerTick((timerState: ElectronTimerState) => {
+      window.electronAPI.onTimerTick((timerState: Partial<ElectronTimerState>) => {
         updateFromTimerState(timerState)
       })
 
