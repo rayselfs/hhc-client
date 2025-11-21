@@ -356,8 +356,6 @@ watch(dialogVisible, (visible) => {
 // 重置到書卷選擇狀態
 const resetToBooks = () => {
   currentStep.value = 'books'
-  selectedBook.value = null
-  selectedChapter.value = null
   searchQuery.value = '' // 清除搜尋框
 }
 
