@@ -77,67 +77,20 @@
             </v-row>
 
             <!-- Remove Time Buttons -->
-            <v-row>
-              <v-col cols="12" align="center" class="pb-0">
-                <v-btn
-                  class="ma-2 time-button"
-                  color="orange"
-                  variant="outlined"
-                  :disabled="!canRemoveTime(10)"
-                  @click="removeTime(10)"
-                >
-                  -0:10
-                </v-btn>
-                <v-btn
-                  class="ma-2 time-button"
-                  color="orange"
-                  variant="outlined"
-                  :disabled="!canRemoveTime(30)"
-                  @click="removeTime(30)"
-                >
-                  -0:30
-                </v-btn>
-                <v-btn
-                  class="ma-2 time-button"
-                  color="orange"
-                  variant="outlined"
-                  :disabled="!canRemoveTime(60)"
-                  @click="removeTime(60)"
-                >
-                  -1:00
-                </v-btn>
-              </v-col>
-            </v-row>
+            <TimeAdjustmentButtons
+              type="remove"
+              :remaining-time="timerStore.settings.remainingTime"
+              class="pb-0"
+              @adjust="removeTime"
+            />
 
             <!-- Add Time Buttons -->
-            <v-row class="mb-4">
-              <v-col cols="12" align="center" class="pt-0">
-                <v-btn
-                  class="ma-2 time-button"
-                  color="primary"
-                  variant="outlined"
-                  @click="addTime(10)"
-                >
-                  +0:10
-                </v-btn>
-                <v-btn
-                  class="ma-2 time-button"
-                  color="primary"
-                  variant="outlined"
-                  @click="addTime(30)"
-                >
-                  +0:30
-                </v-btn>
-                <v-btn
-                  class="ma-2 time-button"
-                  color="primary"
-                  variant="outlined"
-                  @click="addTime(60)"
-                >
-                  +1:00
-                </v-btn>
-              </v-col>
-            </v-row>
+            <TimeAdjustmentButtons
+              type="add"
+              :remaining-time="timerStore.settings.remainingTime"
+              class="mb-4 pt-0"
+              @adjust="addTime"
+            />
 
             <v-row>
               <v-col cols="6" class="d-flex justify-end">
@@ -271,6 +224,7 @@ import { TimerMode, ViewType } from '@/types/common'
 import CountdownTimer from '@/components/Timer/CountdownTimer.vue'
 import ClockDisplay from '@/components/Timer/ClockDisplay.vue'
 import Stopwatch from '@/components/Timer/StopWatcher.vue'
+import TimeAdjustmentButtons from '@/components/Timer/TimeAdjustmentButtons.vue'
 import { useMemoryManager } from '@/utils/memoryManager'
 import { useSnackBar } from '@/composables/useSnackBar'
 import { useCardLayout, useWindowSize } from '@/composables/useLayout'
@@ -316,10 +270,6 @@ const handleBlur = () => {
 
 const addTime = (secondsToAdd: number) => {
   timerStore.addTime(secondsToAdd)
-}
-
-const canRemoveTime = (secondsToRemove: number) => {
-  return timerStore.settings.remainingTime > secondsToRemove
 }
 
 const removeTime = (secondsToRemove: number) => {
