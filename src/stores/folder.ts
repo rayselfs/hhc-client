@@ -1,8 +1,11 @@
 import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 import { v4 as uuidv4 } from 'uuid'
+import { useDebounceFn } from '@vueuse/core'
 import type { Folder, FolderItem, StorageCategory } from '@/types/common'
+import { getStorageKey } from '@/types/common'
 import { useFolderManager } from '@/composables/useFolderManager'
+import { useLocalStorage } from '@/composables/useLocalStorage'
 
 /**
  * Configuration for folder store
@@ -57,47 +60,34 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
       getMoveTargets,
     } = folderManager
 
+    const { getLocalItem, setLocalItem } = useLocalStorage()
+
     /**
      * Load root folder from LocalStorage
      */
     const loadRootFolder = () => {
-      import('@/composables/useLocalStorage').then((module) => {
-        import('@/types/common').then((types) => {
-          const { useLocalStorage } = module
-          const { getStorageKey } = types
-          const { getLocalItem } = useLocalStorage()
+      const saved = getLocalItem<Folder<TItem>>(
+        getStorageKey(config.storageCategory, config.storageKey),
+        'object',
+      )
 
-          const saved = getLocalItem<Folder<TItem>>(
-            getStorageKey(config.storageCategory, config.storageKey),
-            'object',
-          )
-
-          if (saved && saved.id === config.rootId) {
-            rootFolder.value = saved
-          }
-          // Otherwise, use default rootFolder created above
-        })
-      })
+      if (saved && saved.id === config.rootId) {
+        rootFolder.value = saved
+      }
+      // Otherwise, use default rootFolder created above
     }
 
     /**
      * Save root folder to LocalStorage
+     * Debounced to prevent frequent writes
      */
-    const saveRootFolder = () => {
-      import('@/composables/useLocalStorage').then((module) => {
-        import('@/types/common').then((types) => {
-          const { useLocalStorage } = module
-          const { getStorageKey } = types
-          const { setLocalItem } = useLocalStorage()
-
-          setLocalItem(
-            getStorageKey(config.storageCategory, config.storageKey),
-            rootFolder.value,
-            'object',
-          )
-        })
-      })
-    }
+    const saveRootFolder = useDebounceFn(() => {
+      setLocalItem(
+        getStorageKey(config.storageCategory, config.storageKey),
+        rootFolder.value,
+        'object',
+      )
+    }, 1000)
 
     // Watch rootFolder changes and auto-save to LocalStorage
     watch(

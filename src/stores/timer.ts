@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { useDebounceFn } from '@vueuse/core'
 import { TimerMode } from '@/types/common'
 import { useMemoryManager } from '@/utils/memoryManager'
 import { TIMER_CONFIG, getTimerDefaultSettings } from '@/config/app'
@@ -63,7 +64,8 @@ export const useTimerStore = defineStore('timer', () => {
   const state = ref<TimerStatus>('stopped') // State machine
 
   // Save persistent settings to localStorage
-  const saveSettings = () => {
+  // Debounced to prevent frequent writes during typing or rapid button clicks
+  const saveSettings = useDebounceFn(() => {
     try {
       const settingsToSave = {
         mode: settings.value.mode,
@@ -82,7 +84,7 @@ export const useTimerStore = defineStore('timer', () => {
         extra: { settings: JSON.stringify(settings) },
       })
     }
-  }
+  }, 1000)
 
   // Computed Properties
   const isRunning = computed(() => state.value === 'running')
