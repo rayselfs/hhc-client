@@ -24,6 +24,7 @@ interface Props {
   remainingTime?: number
   rowClass?: string
   colClass?: string
+  isFinished?: boolean // Timer finished but not reset
 }
 
 const props = defineProps<Props>()
@@ -43,6 +44,11 @@ const getLabel = (seconds: number) => {
 }
 
 const isDisabled = (seconds: number) => {
+  // Disable add buttons when timer is finished but not reset
+  if (props.type === 'add' && props.isFinished) {
+    return true
+  }
+
   if (props.type === 'add') {
     return (props.remainingTime || 0) + seconds >= 3600
   } else {

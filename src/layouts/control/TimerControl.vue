@@ -88,6 +88,7 @@
             <TimeAdjustmentButtons
               type="add"
               :remaining-time="timerStore.settings.remainingTime"
+              :is-finished="timerStore.isFinished"
               class="mb-4 pt-0"
               @adjust="addTime"
             />
