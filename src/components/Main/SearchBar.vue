@@ -1,5 +1,5 @@
 <template>
-  <div class="d-flex align-center justify-end w-100">
+  <div class="d-flex align-center justify-end" :class="{ 'w-100': isSearching }">
     <v-text-field
       v-if="isSearching"
       v-model="searchText"
