@@ -37,6 +37,7 @@ export class TimerService {
   private state: TimerState
   private intervalId: NodeJS.Timeout | null = null
   private windows: BrowserWindow[] = []
+  private targetEndTime: number | null = null
 
   constructor() {
     this.state = {
@@ -98,12 +99,17 @@ export class TimerService {
       this.state.currentTime = new Date()
 
       // Handle timer logic only if running
-      if (this.state.state === 'running' && this.state.remainingTime > 0) {
-        this.state.remainingTime--
+      if (this.state.state === 'running') {
+        if (this.targetEndTime === null) {
+          this.targetEndTime = Date.now() + this.state.remainingTime * 1000
+        }
+
+        const remaining = Math.ceil((this.targetEndTime - Date.now()) / 1000)
+        this.state.remainingTime = Math.max(0, remaining)
+
         if (this.state.remainingTime <= 0) {
-          this.state.remainingTime = 0
           this.state.state = 'stopped'
-          // Don't stop interval, just stop timer logic
+          this.targetEndTime = null
         }
       }
 
@@ -132,8 +138,7 @@ export class TimerService {
           this.state.remainingTime = this.state.originalDuration
           this.state.timerDuration = this.state.originalDuration
           this.state.state = 'running'
-          this.state.state = 'running'
-          // this.startInterval() // Interval is always running
+          this.targetEndTime = Date.now() + this.state.remainingTime * 1000
         }
         if (this.state.mode === 'clock' || this.state.mode === 'both') {
           this.state.startTime = new Date()
@@ -144,8 +149,7 @@ export class TimerService {
       case 'pause':
         if (this.state.state === 'running') {
           this.state.state = 'paused'
-          this.state.state = 'paused'
-          // this.stopInterval() // Don't stop interval, just pause timer state
+          this.targetEndTime = null
           this.broadcast()
         }
         break
@@ -153,8 +157,7 @@ export class TimerService {
       case 'resume':
         if (this.state.state === 'paused') {
           this.state.state = 'running'
-          this.state.state = 'running'
-          // this.startInterval() // Interval is always running
+          this.targetEndTime = Date.now() + this.state.remainingTime * 1000
           this.broadcast()
         }
         break
@@ -164,8 +167,7 @@ export class TimerService {
         this.state.remainingTime = this.state.originalDuration
         this.state.timerDuration = this.state.originalDuration
         this.state.startTime = undefined
-        this.state.startTime = undefined
-        // this.stopInterval() // Don't stop interval
+        this.targetEndTime = null
         this.broadcast()
         break
 
@@ -190,6 +192,9 @@ export class TimerService {
           } else {
             // Add to remaining time
             this.state.remainingTime += command.seconds
+            if (this.state.state === 'running' && this.targetEndTime) {
+              this.targetEndTime += command.seconds * 1000
+            }
             this.state.timerDuration = Math.max(this.state.timerDuration, this.state.remainingTime)
           }
           this.broadcast()
@@ -206,6 +211,9 @@ export class TimerService {
           } else {
             // Remove from remaining time
             this.state.remainingTime = Math.max(0, this.state.remainingTime - command.seconds)
+            if (this.state.state === 'running' && this.targetEndTime) {
+              this.targetEndTime -= command.seconds * 1000
+            }
             this.state.timerDuration = Math.max(this.state.timerDuration, this.state.remainingTime)
           }
           this.broadcast()
