@@ -38,6 +38,8 @@ export class TimerService {
   private intervalId: NodeJS.Timeout | null = null
   private windows: BrowserWindow[] = []
   private targetEndTime: number | null = null
+  private lastBroadcastTime: string = ''
+  private lastBroadcastRemaining: number = -1
 
   constructor() {
     this.state = {
@@ -128,9 +130,15 @@ export class TimerService {
         }
       }
 
-      // Broadcast lightweight tick
-      this.broadcastTick()
-    }, 1000)
+      // Conditional Broadcast: Only if seconds changed
+      const currentSecondStr = this.state.currentTime.toISOString().split('.')[0]
+      if (
+        this.state.remainingTime !== this.lastBroadcastRemaining ||
+        currentSecondStr !== this.lastBroadcastTime
+      ) {
+        this.broadcastTick()
+      }
+    }, 100)
   }
 
   /**

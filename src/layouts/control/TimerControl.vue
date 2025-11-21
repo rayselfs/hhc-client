@@ -345,18 +345,11 @@ const toggleStopwatch = () => {
   stopwatchStore.toggleStopwatchMode()
 }
 
-// Lifecycle
 onMounted(() => {
-  // Removed time initialization, v-model handles it
   syncAllStates()
-
-  // useWindowSize 已經處理了 resize 監聽器，不需要手動添加
 })
 
 onBeforeUnmount(() => {
-  // useWindowSize 已經處理了 resize 監聽器的清理，不需要手動清理
-
-  // Cleanup projection resources
   cleanupResources()
 })
 
