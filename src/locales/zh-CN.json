@@ -4,6 +4,7 @@
   "confirm": "确定",
   "search": "搜索",
   "create": "创建",
+  "edit": "编辑",
   "homepage": "首页",
   "moveTo": "移动到",
   "move": "移动",
@@ -122,6 +123,7 @@
       "REV": "启示录"
     },
     "folderName": "文件夹名称",
+    "folderSettings": "文件夹设置",
     "duplicateFolderName": "文件夹名称已存在",
     "retentionPeriod": "保留时间",
     "retention": {

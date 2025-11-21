@@ -133,7 +133,7 @@ const handleRightClick = (
 }
 
 const handleDrop = (event: DragEvent, targetFolder: Folder<VerseItem>) => {
-  handleDropBase(event, (data, _container) => {
+  handleDropBase(event, (data) => {
     emit('drop', data, targetFolder)
   })
 }

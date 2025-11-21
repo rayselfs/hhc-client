@@ -223,6 +223,25 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
     }
 
     /**
+     * Update a folder's properties
+     * @param folderId - The ID of the folder to update
+     * @param updates - The properties to update
+     */
+    const updateFolder = (
+      folderId: string,
+      updates: { name?: string; expiresAt?: number | null },
+    ) => {
+      updateFolderInTree(rootFolder.value.folders, folderId, (folder) => {
+        if (updates.name !== undefined) {
+          folder.name = updates.name.trim()
+        }
+        if (updates.expiresAt !== undefined) {
+          folder.expiresAt = updates.expiresAt
+        }
+      })
+    }
+
+    /**
      * Move an item from source to target folder
      * @param item - The item to move
      * @param targetFolderId - The target folder ID (use rootId for root)
@@ -398,6 +417,7 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
       addFolderToCurrent,
       addItemToCurrent,
       removeItemFromCurrent,
+      updateFolder,
       deleteFolder,
       moveItem,
       moveFolder,

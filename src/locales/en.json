@@ -4,6 +4,7 @@
   "confirm": "Confirm",
   "search": "Search",
   "create": "Create",
+  "edit": "Edit",
   "homepage": "Home",
   "moveTo": "Move to",
   "move": "Move",
@@ -122,6 +123,7 @@
       "REV": "Revelation"
     },
     "folderName": "Folder Name",
+    "folderSettings": "Folder Settings",
     "duplicateFolderName": "Folder name already exists",
     "retentionPeriod": "Retention Period",
     "retention": {

@@ -4,6 +4,7 @@
   "confirm": "確定",
   "search": "搜尋",
   "create": "建立",
+  "edit": "編輯",
   "homepage": "首頁",
   "moveTo": "移動到",
   "move": "移動",
@@ -122,6 +123,7 @@
       "REV": "啟示錄"
     },
     "folderName": "資料夾名稱",
+    "folderSettings": "資料夾設定",
     "duplicateFolderName": "資料夾名稱已存在",
     "retentionPeriod": "保留時間",
     "retention": {

@@ -16,29 +16,24 @@
             size="small"
             class="pa-0 text-subtitle-1"
             variant="text"
-            :disabled="!currentFolder"
+            :disabled="currentFolderPath.length === 1"
             @click="navigateToRoot()"
           >
             <v-icon class="mr-1">mdi-home</v-icon>
             {{ $t('homepage') }}
           </v-btn>
-          <v-icon v-if="currentFolderPath.length > 1" size="x-small" class="ml-1 mr-1"
-            >mdi-chevron-right</v-icon
-          >
           <span v-for="(folderId, index) in currentFolderPath.slice(1)" :key="folderId">
+            <v-icon size="x-small" class="ml-1 mr-1">mdi-chevron-right</v-icon>
             <v-btn
               size="small"
               class="pa-0 text-subtitle-1"
               variant="text"
-              :disabled="index === currentFolderPath.length - 1"
+              :disabled="index === currentFolderPath.length - 2"
               @click="handleNavigateToFolder(folderId)"
             >
               <v-icon class="mr-1">mdi-folder</v-icon>
               {{ getFolderById(folderId)?.name }}
             </v-btn>
-            <v-icon v-if="index < currentFolderPath.length - 1" size="x-small" class="ml-1 mr-1"
-              >mdi-chevron-right</v-icon
-            >
           </span>
         </div>
       </div>
@@ -102,10 +97,12 @@
       />
     </v-card-text>
 
-    <!-- 創建資料夾對話框 -->
+    <!-- 創建/編輯資料夾對話框 -->
     <v-dialog v-model="showFolderDialog" max-width="400">
       <v-card>
-        <v-card-title>{{ $t('newFolder') }}</v-card-title>
+        <v-card-title>{{
+          editingFolderId ? $t('bible.folderSettings') : $t('newFolder')
+        }}</v-card-title>
         <v-card-text>
           <v-text-field
             v-model="folderName"
@@ -130,9 +127,9 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer />
-          <v-btn @click="showFolderDialog = false">{{ $t('cancel') || 'Cancel' }}</v-btn>
+          <v-btn @click="showFolderDialog = false">{{ $t('cancel') }}</v-btn>
           <v-btn color="primary" :disabled="isDuplicateName" @click="confirmCreateFolder">{{
-            $t('create') || 'Create'
+            editingFolderId ? $t('confirm') : $t('create')
           }}</v-btn>
         </v-card-actions>
       </v-card>
@@ -205,7 +202,7 @@
 
         <v-card-actions>
           <v-spacer />
-          <v-btn @click="showMoveVerseDialog = false">{{ $t('cancel') || 'Cancel' }}</v-btn>
+          <v-btn @click="showMoveVerseDialog = false">{{ $t('cancel') }}</v-btn>
           <v-btn color="primary" @click="confirmMoveVerse" :disabled="!canMoveToRoot">
             {{ $t('move') }}
           </v-btn>
@@ -259,12 +256,21 @@
             </template>
             <v-list-item-title>{{ $t('copy') }}</v-list-item-title>
           </v-list-item>
+
           <v-list-item @click="showMoveItemDialog">
             <template #prepend>
               <v-icon>mdi-folder-move</v-icon>
             </template>
             <v-list-item-title>{{ $t('move') }}</v-list-item-title>
           </v-list-item>
+
+          <v-list-item @click="showFolderSettings()">
+            <template #prepend>
+              <v-icon>mdi-cog</v-icon>
+            </template>
+            <v-list-item-title>{{ $t('edit') }}</v-list-item-title>
+          </v-list-item>
+
           <v-list-item @click="deleteItem">
             <template #prepend>
               <v-icon>mdi-delete</v-icon>
@@ -357,6 +363,7 @@ const {
   getFolderById,
   getMoveTargets,
   isFolderInside,
+  updateFolder,
 } = folderStore
 
 // 狀態
@@ -364,6 +371,7 @@ const multiFunctionTab = ref('history')
 const showFolderDialog = ref(false)
 const folderName = ref('')
 const retentionPeriod = ref('1day') // Default to 1 day
+const editingFolderId = ref<string | null>(null) // Track if we are editing a folder
 
 const retentionOptions = computed(() => [
   { title: $t('bible.retention.1day'), value: '1day' },
@@ -375,7 +383,13 @@ const retentionOptions = computed(() => [
 // Check for duplicate folder name
 const isDuplicateName = computed(() => {
   if (!folderName.value.trim()) return false
-  return currentFolder.value.folders.some((f) => f.name === folderName.value.trim())
+  return currentFolder.value.folders.some((f) => {
+    // If editing, exclude self from check
+    if (editingFolderId.value && f.id === editingFolderId.value) {
+      return false
+    }
+    return f.name === folderName.value.trim()
+  })
 })
 
 const nameErrorMessage = computed(() => {
@@ -426,6 +440,33 @@ const loadVerse = (item: VerseItem, type: 'history' | 'custom') => {
 const createNewFolder = () => {
   folderName.value = ''
   retentionPeriod.value = '1day' // Reset to default
+  editingFolderId.value = null // Reset edit mode
+  showFolderDialog.value = true
+  closeItemContextMenu()
+}
+
+const openFolderSettings = (folder: Folder<VerseItem>) => {
+  folderName.value = folder.name
+  editingFolderId.value = folder.id
+
+  // Set retention period based on expiresAt
+  if (folder.expiresAt === null || folder.expiresAt === undefined) {
+    retentionPeriod.value = 'permanent'
+  } else {
+    // Calculate approximate retention period
+    const diff = folder.expiresAt - folder.timestamp // Use creation time to determine original setting
+    const oneDay = 24 * 60 * 60 * 1000
+
+    // Simple heuristic mapping
+    if (diff > oneDay * 25) {
+      retentionPeriod.value = '1month'
+    } else if (diff > oneDay * 6) {
+      retentionPeriod.value = '1week'
+    } else {
+      retentionPeriod.value = '1day'
+    }
+  }
+
   showFolderDialog.value = true
   closeItemContextMenu()
 }
@@ -451,10 +492,20 @@ const confirmCreateFolder = () => {
         break
     }
 
-    // Call store action - direct mutation
-    addFolderToCurrent(folderName.value, expiresAt)
+    if (editingFolderId.value) {
+      // Update existing folder
+      updateFolder(editingFolderId.value, {
+        name: folderName.value,
+        expiresAt: expiresAt,
+      })
+    } else {
+      // Create new folder
+      addFolderToCurrent(folderName.value, expiresAt)
+    }
+
     showFolderDialog.value = false
     folderName.value = ''
+    editingFolderId.value = null
   }
 }
 
@@ -732,6 +783,12 @@ const deleteItem = () => {
     bibleStore.removeHistoryItem(selectedItem.value.item.id)
   }
   closeItemContextMenu()
+}
+
+const showFolderSettings = () => {
+  if (selectedItem.value?.type === 'folder' && isFolder(selectedItem.value.item)) {
+    openFolderSettings(selectedItem.value.item)
+  }
 }
 </script>
 
