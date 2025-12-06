@@ -12,6 +12,20 @@
       class="bible-version-selector mr-2"
       :disabled="versionsLoading || contentLoading"
     >
+      <template v-slot:item="{ props, item }">
+        <v-list-item v-bind="props" class="version-item">
+          <template v-slot:append>
+            <v-btn
+              icon
+              size="small"
+              variant="text"
+              @click.stop="handleItemButtonClick(item.raw.code)"
+            >
+              <v-icon size="small">mdi-refresh</v-icon>
+            </v-btn>
+          </template>
+        </v-list-item>
+      </template>
     </v-select>
 
     <!-- 書卷選擇按鈕 -->
@@ -103,6 +117,10 @@ const handleSelectVerse = (bookNumber: number, chapter: number, verse: number) =
   setSelectedVerse(bookNumber, chapter, verse)
 }
 
+const handleItemButtonClick = (versionCode: string) => {
+  loadBibleContentForVersion(versionCode, true)
+}
+
 onMounted(async () => {
   if (bibleVersions.value.length === 0) {
     try {
@@ -134,9 +152,8 @@ defineExpose({
 }
 
 .bible-version-selector {
-  width: 180px;
-  min-width: 180px;
-  max-width: 180px;
+  min-width: 220px;
+  max-width: 300px;
 }
 
 .bible-version-selector > .v-input__control > .v-field {
@@ -147,5 +164,15 @@ defineExpose({
 .books-btn {
   height: 36px;
   margin-top: 0px;
+}
+
+.version-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.version-item :deep(.v-list-item__append) {
+  padding-inline-start: 8px;
 }
 </style>
