@@ -177,7 +177,7 @@ import { BIBLE_BOOKS, type BibleBookConfig } from '@/config/app'
 
 interface Props {
   modelValue: boolean
-  versionId?: number | null
+  versionCode?: string | null
 }
 
 interface Emits {
@@ -318,17 +318,17 @@ const selectVerse = (verse: number) => {
 
 // 載入聖經內容
 const loadBibleContent = async () => {
-  if (!props.versionId) return
+  if (!props.versionCode) return
 
   loading.value = true
   try {
-    const content = await getBibleContent(props.versionId)
+    const content = await getBibleContent(props.versionCode)
     bibleContent.value = content
   } catch (error) {
     reportError(error, {
       operation: 'load-bible-content-dialog',
       component: 'BibleBooksDialog',
-      extra: { versionId: props.versionId },
+      extra: { versionCode: props.versionCode },
     })
   } finally {
     loading.value = false
@@ -337,9 +337,9 @@ const loadBibleContent = async () => {
 
 // 監聽版本變化
 watch(
-  () => props.versionId,
+  () => props.versionCode,
   () => {
-    if (props.versionId && dialogVisible.value) {
+    if (props.versionCode && dialogVisible.value) {
       loadBibleContent()
     }
   },
@@ -347,7 +347,7 @@ watch(
 
 // 監聽dialog開啟
 watch(dialogVisible, (visible) => {
-  if (visible && props.versionId) {
+  if (visible && props.versionCode) {
     loadBibleContent()
     resetToBooks()
   }

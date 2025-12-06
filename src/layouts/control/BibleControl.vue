@@ -341,8 +341,8 @@ const selectedVerse = ref<{ number: number; text: string } | null>(null)
 
 // Handle verse selection for preview
 const handleVerseSelection = async (bookNumber: number, chapter: number, verse: number) => {
-  const versionId = currentVersion.value?.id
-  if (!versionId) {
+  const versionCode = currentVersion.value?.code
+  if (!versionCode) {
     reportError(new Error('No Bible version selected'), {
       operation: 'handle-verse-selection',
       component: 'BibleControl',
@@ -353,12 +353,12 @@ const handleVerseSelection = async (bookNumber: number, chapter: number, verse: 
   }
 
   // Fetch Bible content from store
-  const content = await getBibleContent(versionId)
+  const content = await getBibleContent(versionCode)
   if (!content) {
     reportError(new Error('Bible content not found'), {
       operation: 'handle-verse-selection',
       component: 'BibleControl',
-      extra: { versionId, bookNumber, chapter, verse },
+      extra: { versionCode, bookNumber, chapter, verse },
     })
     isLoadingVerses.value = false
     return
@@ -370,7 +370,7 @@ const handleVerseSelection = async (bookNumber: number, chapter: number, verse: 
     reportError(new Error('Book not found'), {
       operation: 'handle-verse-selection',
       component: 'BibleControl',
-      extra: { versionId, bookNumber, chapter, verse },
+      extra: { versionCode, bookNumber, chapter, verse },
     })
     isLoadingVerses.value = false
     return
@@ -607,9 +607,8 @@ const handleSearch = (text: string) => {
     }
 
     currentPassage.value = null
-    const versionId = currentVersion.value?.id
     const versionCode = currentVersion.value?.code
-    if (!versionId || !versionCode) {
+    if (!versionCode) {
       reportError(new Error('No Bible version selected'), {
         operation: 'handle-search',
         component: 'BibleControl',
@@ -628,7 +627,7 @@ const handleSearch = (text: string) => {
 
       // Ensure content is loaded for abbreviations
       if (!currentBibleContent.value) {
-        await getBibleContent(versionId)
+        await getBibleContent(versionCode)
       }
 
       // Execute search

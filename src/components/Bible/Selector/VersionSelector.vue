@@ -1,10 +1,10 @@
 <template>
   <div class="bible-version-selector-wrapper">
     <v-select
-      v-model="selectedVersionId"
+      v-model="selectedVersionCode"
       :items="bibleVersions"
       item-title="name"
-      item-value="id"
+      item-value="code"
       :loading="versionsLoading || contentLoading"
       density="compact"
       variant="outlined"
@@ -17,7 +17,7 @@
     <!-- 書卷選擇按鈕 -->
     <v-btn
       variant="outlined"
-      :disabled="!selectedVersionId"
+      :disabled="!selectedVersionCode"
       @click="showBooksDialog = true"
       :title="$t('bible.title')"
       class="books-btn"
@@ -28,7 +28,7 @@
     <!-- 聖經書卷選擇 Dialog -->
     <BooksDialog
       v-model="showBooksDialog"
-      :version-id="selectedVersionId"
+      :version-code="currentVersion?.code"
       @select-verse="handleSelectVerse"
     />
   </div>
@@ -52,35 +52,35 @@ const { t: $t } = useI18n()
 // Bible store handling versions, current selection, and cached content
 const bibleStore = useBibleStore()
 const { versions, versionsLoading, currentVersion } = storeToRefs(bibleStore)
-const { loadBibleVersions, setCurrentVersionById, getBibleContent, setSelectedVerse } = bibleStore
+const { loadBibleVersions, setCurrentVersionByCode, getBibleContent, setSelectedVerse } = bibleStore
 
 const contentLoading = ref(false)
 const showBooksDialog = ref(false)
 
 const bibleVersions = computed(() => versions.value)
 
-const selectedVersionId = computed<number | null>({
-  get: () => currentVersion.value?.id ?? null,
+const selectedVersionCode = computed<string | null>({
+  get: () => currentVersion.value?.code ?? null,
   set: (value) => {
-    setCurrentVersionById(value)
+    setCurrentVersionByCode(value)
   },
 })
 
 /**
  * 載入聖經內容 (優先從快取讀取)
- * @param versionId - 版本 ID
+ * @param versionCode - 版本代碼
  * @param forceRefresh - 是否強制重新 fetch
  */
-const loadBibleContentForVersion = async (versionId: number, forceRefresh = false) => {
+const loadBibleContentForVersion = async (versionCode: string, forceRefresh = false) => {
   contentLoading.value = true
 
   try {
-    await getBibleContent(versionId, { forceRefresh })
+    await getBibleContent(versionCode, { forceRefresh })
   } catch (error) {
     reportError(error, {
       operation: 'load-bible-content',
       component: 'BibleVersionSelector',
-      extra: { versionId },
+      extra: { versionCode },
     })
   } finally {
     contentLoading.value = false
@@ -89,10 +89,10 @@ const loadBibleContentForVersion = async (versionId: number, forceRefresh = fals
 
 // 監聽版本變化
 watch(
-  () => currentVersion.value?.id,
-  async (newVersion) => {
-    if (newVersion) {
-      await loadBibleContentForVersion(newVersion, false)
+  () => currentVersion.value?.code,
+  async (newVersionCode) => {
+    if (newVersionCode) {
+      await loadBibleContentForVersion(newVersionCode, false)
     }
   },
   { immediate: true },
@@ -118,7 +118,7 @@ onMounted(async () => {
 
 // 暴露 selectedVersion 供外部使用
 defineExpose({
-  selectedVersion: computed(() => selectedVersionId.value),
+  selectedVersion: computed(() => selectedVersionCode.value),
 })
 </script>
 

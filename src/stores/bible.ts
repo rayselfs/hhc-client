@@ -75,7 +75,7 @@ export const useBibleStore = defineStore('bible', () => {
 
   /**
    * IndexedDB instance for Bible content cache
-   * Stores Bible content by version ID for offline access
+   * Stores Bible content by version code for offline access
    */
   const bibleCacheDB = useIndexedDB({
     dbName: BibleCacheConfig.DB_NAME as string,
@@ -83,7 +83,7 @@ export const useBibleStore = defineStore('bible', () => {
     stores: [
       {
         name: BibleCacheConfig.STORE_NAME as string,
-        keyPath: 'version_id',
+        keyPath: 'version_code',
       },
     ],
   })
@@ -103,13 +103,13 @@ export const useBibleStore = defineStore('bible', () => {
   }
 
   /**
-   * Retrieve a version from the in-memory list by version ID.
+   * Retrieve a version from the in-memory list by version code.
    */
-  const getVersionById = (versionId: number | null): BibleVersion | null => {
-    if (versionId == null) {
+  const getVersionByCode = (versionCode: string | null): BibleVersion | null => {
+    if (versionCode == null) {
       return null
     }
-    return versions.value.find((version) => version.id === versionId) ?? null
+    return versions.value.find((version) => version.code === versionCode) ?? null
   }
 
   /**
@@ -128,14 +128,14 @@ export const useBibleStore = defineStore('bible', () => {
   }
 
   /**
-   * Update the current version by ID; clears the selection if no match is found.
+   * Update the current version by code; clears the selection if no match is found.
    */
-  const setCurrentVersionById = (versionId: number | null) => {
-    if (versionId == null) {
+  const setCurrentVersionByCode = (versionCode: string | null) => {
+    if (versionCode == null) {
       setCurrentVersionInternal(null, true)
       return
     }
-    const target = getVersionById(versionId)
+    const target = getVersionByCode(versionCode)
     setCurrentVersionInternal(target ?? null, true)
   }
 
@@ -154,13 +154,13 @@ export const useBibleStore = defineStore('bible', () => {
       return
     }
 
-    const storedVersionId =
-      currentVersion.value?.id ??
-      getLocalItem<BibleVersion>(versionStorageKey, 'object')?.id ??
-      fallbackVersion.id
+    const storedVersionCode =
+      currentVersion.value?.code ??
+      getLocalItem<BibleVersion>(versionStorageKey, 'object')?.code ??
+      fallbackVersion.code
 
     const matchedVersion =
-      availableVersions.find((version) => version.id === storedVersionId) ?? fallbackVersion
+      availableVersions.find((version) => version.code === storedVersionCode) ?? fallbackVersion
 
     setCurrentVersionInternal(matchedVersion, true)
   }
@@ -247,13 +247,13 @@ export const useBibleStore = defineStore('bible', () => {
   /**
    * Get Bible content from in-memory cache or IndexedDB without fetching from API.
    */
-  const getCachedBibleContent = async (versionId: number): Promise<BibleContent | null> => {
-    if (currentBibleContent.value?.version_id === versionId) {
+  const getCachedBibleContent = async (versionCode: string): Promise<BibleContent | null> => {
+    if (currentBibleContent.value?.version_code === versionCode) {
       return currentBibleContent.value
     }
 
     try {
-      const cached = await bibleCacheDB.get<BibleContent>(BibleCacheConfig.STORE_NAME, versionId)
+      const cached = await bibleCacheDB.get<BibleContent>(BibleCacheConfig.STORE_NAME, versionCode)
       if (cached) {
         currentBibleContent.value = cached
         return cached
@@ -271,14 +271,14 @@ export const useBibleStore = defineStore('bible', () => {
    * Get Bible content, auto fetching from API when cache is missing or forceRefresh is true.
    */
   const getBibleContent = async (
-    versionId: number,
+    versionCode: string,
     options: { forceRefresh?: boolean; useCacheOnly?: boolean } = {},
   ): Promise<BibleContent | null> => {
     clearError()
     const { forceRefresh = false, useCacheOnly = false } = options
 
     if (!forceRefresh) {
-      const cached = await getCachedBibleContent(versionId)
+      const cached = await getCachedBibleContent(versionCode)
       if (cached) {
         return cached
       }
@@ -293,17 +293,17 @@ export const useBibleStore = defineStore('bible', () => {
         await loadBibleVersions()
       }
 
-      const version = getVersionById(versionId)
+      const version = versions.value.find((v) => v.code === versionCode)
       if (!version) {
-        // This can happen if API call failed or versionId is invalid
-        throw new Error(`Bible version metadata for ID ${versionId} not found.`)
+        // This can happen if API call failed or versionCode is invalid
+        throw new Error(`Bible version metadata for code ${versionCode} not found.`)
       }
 
-      const content = await fetchBibleContent(versionId)
+      const content = await fetchBibleContent(version.id)
       await cacheBibleContent(content, version)
       return currentBibleContent.value
     } catch (err) {
-      console.error(`Failed to get or cache content for ${versionId}:`, err)
+      console.error(`Failed to get or cache content for ${versionCode}:`, err)
       const errorMessage =
         err instanceof Error ? err.message : 'An unknown error occurred while fetching content.'
       setError(errorMessage)
@@ -321,15 +321,15 @@ export const useBibleStore = defineStore('bible', () => {
 
   /**
    * Check if the Bible content for a specific version is cached
-   * @param versionId - version ID
+   * @param versionCode - version code
    * @returns true if cached, false otherwise
    */
-  const hasCachedContent = async (versionId: number): Promise<boolean> => {
-    if (currentBibleContent.value?.version_id === versionId) {
+  const hasCachedContent = async (versionCode: string): Promise<boolean> => {
+    if (currentBibleContent.value?.version_code === versionCode) {
       return true
     }
     try {
-      return await bibleCacheDB.has(BibleCacheConfig.STORE_NAME, versionId)
+      return await bibleCacheDB.has(BibleCacheConfig.STORE_NAME, versionCode)
     } catch (err) {
       console.error('Failed to check cache:', err)
       setError('Failed to check cache status.')
@@ -436,8 +436,8 @@ export const useBibleStore = defineStore('bible', () => {
     versionsLoading,
     currentVersion,
     loadBibleVersions,
-    setCurrentVersionById,
-    getVersionById,
+    setCurrentVersionByCode,
+    getVersionByCode,
     // Bible Content Cache
     currentBibleContent,
     getBibleContent,
