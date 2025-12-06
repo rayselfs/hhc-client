@@ -6,12 +6,10 @@
     <v-app-bar-title class="text-h5">{{ toolbarTitle }}</v-app-bar-title>
     <v-spacer />
 
-    <!-- 聖經版本選擇器組 - 只在聖經頁面顯示 -->
     <BibleVersionSelector v-if="props.currentView === 'bible'" />
 
     <v-spacer />
 
-    <!-- 搜索欄 - 只在聖經頁面顯示 -->
     <SearchBar v-if="props.currentView === 'bible'" />
 
     <v-btn
@@ -25,9 +23,8 @@
       "
       variant="outlined"
     >
-      <v-icon v-if="projectionStore.isShowingDefault" class="mr-2">mdi-monitor</v-icon>
-      <v-icon v-else class="mr-2">mdi-monitor-off</v-icon>
-      {{ $t('projection') }}
+      <v-icon v-if="projectionStore.isShowingDefault" class="mr-1 ml-1">mdi-monitor</v-icon>
+      <v-icon v-else class="mr-1 ml-1">mdi-monitor-off</v-icon>
     </v-btn>
 
     <v-btn
