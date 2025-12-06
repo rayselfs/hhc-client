@@ -579,6 +579,7 @@ watch(
   storeSelectedVerse,
   async (newVerse) => {
     if (newVerse) {
+      isSearchMode.value = false // avoid stuck in search mode
       isLoadingVerses.value = true
       await handleVerseSelection(newVerse.bookNumber, newVerse.chapter, newVerse.verse)
     }
