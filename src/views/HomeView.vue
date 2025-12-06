@@ -237,6 +237,12 @@ onMounted(async () => {
   locale.value = initialLocale
 
   if (isElectron()) {
+    try {
+      await window.electronAPI.updateLanguage(initialLocale)
+    } catch (error) {
+      console.error('Failed to sync language to Electron:', error)
+    }
+
     // 監聽來自Electron的消息
     onMainMessage(handleElectronMessage)
 
