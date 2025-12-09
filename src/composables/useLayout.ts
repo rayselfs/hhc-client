@@ -1,5 +1,6 @@
 import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue'
 import { throttle } from '@/utils/performanceUtils'
+import { useDisplay } from 'vuetify'
 
 /**
  * 響應式視窗尺寸 composable
@@ -49,6 +50,7 @@ export const useCardLayout = (options: CardLayoutOptions = {}) => {
   } = options
 
   const { height } = useWindowSize(100)
+  const { lgAndUp } = useDisplay()
 
   const leftCardHeight = ref(600)
   const rightTopCardHeight = ref(360)
@@ -56,7 +58,11 @@ export const useCardLayout = (options: CardLayoutOptions = {}) => {
 
   const calculateHeights = () => {
     const viewportHeight = height.value - headerOffset
-    leftCardHeight.value = viewportHeight < minHeight ? minHeight : viewportHeight
+    // 如果小於 lg (Mobile/Tablet)，高度縮小為 80% 以顯示下方內容
+    const responsiveScale = lgAndUp.value ? 1 : 0.8
+    const targetHeight = viewportHeight * responsiveScale
+
+    leftCardHeight.value = targetHeight < minHeight ? minHeight : targetHeight
 
     const rightCardTotalHeight = leftCardHeight.value - gap
     rightTopCardHeight.value = Math.floor(rightCardTotalHeight * topCardRatio)
@@ -67,13 +73,10 @@ export const useCardLayout = (options: CardLayoutOptions = {}) => {
     calculateHeights()
   })
 
-  // 監聽 height 變化來重新計算高度
-  watch(
-    () => height.value,
-    () => {
-      calculateHeights()
-    },
-  )
+  // 監聽 height 和 lgAndUp 變化來重新計算高度
+  watch([() => height.value, lgAndUp], () => {
+    calculateHeights()
+  })
 
   return {
     leftCardHeight,

@@ -2,8 +2,13 @@
   <v-container fluid class="pa-0">
     <v-row no-gutters>
       <!-- Preview -->
-      <v-col cols="6" class="pl-4 pt-4 pb-4 pr-2" ref="leftColumnContainer">
-        <v-card class="display-flex flex-column" :style="{ height: `${leftCardHeight}px` }">
+      <v-col
+        cols="12"
+        lg="6"
+        class="pl-4 pt-4 pb-4 pr-lg-2 pr-4 mb-lg-0 mb-4"
+        :style="{ height: `${leftCardHeight}px` }"
+      >
+        <v-card :style="{ height: `${leftCardHeight}px` }">
           <v-card-title class="d-flex align-center justify-space-between">
             <div class="d-flex align-center gap-2">
               <div>
@@ -123,7 +128,7 @@
         </v-card>
       </v-col>
 
-      <v-col cols="6" class="pl-2 pt-4 pb-4 pr-4" ref="rightColumnContainer">
+      <v-col cols="12" lg="6" class="pl-lg-2 pl-4 pt-4 pb-4 pr-4" ref="rightColumnContainer">
         <v-row no-gutters class="fill-height">
           <!-- Multi Function Control -->
           <v-col cols="12" class="mb-4" :style="{ height: `${rightTopCardHeight}px` }">

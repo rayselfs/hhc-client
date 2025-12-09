@@ -4,8 +4,8 @@
       <!-- Timer -->
       <v-col
         cols="12"
-        sm="6"
-        class="pl-4 pt-4 pb-4 pr-sm-2 pr-4 mb-sm-0 mb-4"
+        lg="6"
+        class="pl-4 pt-4 pb-4 pr-lg-2 pr-4 mb-lg-0 mb-4"
         :style="{ height: `${leftCardHeight}px` }"
       >
         <v-card :style="{ height: `${leftCardHeight}px` }">
@@ -134,7 +134,7 @@
         </v-card>
       </v-col>
 
-      <v-col cols="12" sm="6" class="pl-sm-2 pl-4 pt-4 pb-4 pr-4">
+      <v-col cols="12" lg="6" class="pl-lg-2 pl-4 pt-4 pb-4 pr-4">
         <v-row no-gutters class="fill-height">
           <v-col cols="12" class="mb-4" :style="{ height: `${rightTopCardHeight}px` }">
             <v-card :style="{ height: `${rightTopCardHeight}px` }">
