@@ -86,10 +86,7 @@
                       }}
                     </span>
                     <span class="mr-1 text-subtitle-1">-</span>
-                    <p
-                      class="text-justify"
-                      v-html="highlightSearchText(result.text, searchText)"
-                    ></p>
+                    <p class="text-justify" v-html="highlightSearchText(result.text)"></p>
                   </div>
                 </div>
               </template>
@@ -317,16 +314,21 @@ const searchResultsDisplay = computed<SearchResultDisplay[]>(() => {
 })
 
 // Highlight search keywords
-const highlightSearchText = (text: string, searchTerm: string): string => {
-  if (!searchTerm || !text) {
+const searchRegex = computed(() => {
+  if (!searchText.value) {
+    return null
+  }
+  const escapedSearchTerm = searchText.value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return new RegExp(`(${escapedSearchTerm})`, 'gi')
+})
+
+const highlightSearchText = (text: string): string => {
+  if (!searchRegex.value || !text) {
     return text
   }
 
-  const escapedSearchTerm = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const regex = new RegExp(`(${escapedSearchTerm})`, 'gi')
-
   const highlighted = text.replace(
-    regex,
+    searchRegex.value,
     '<span style="color: rgb(var(--v-theme-error));">$1</span>',
   )
   return highlighted

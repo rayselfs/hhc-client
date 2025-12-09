@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, shallowRef } from 'vue'
 import type { BibleContent, BibleVersion, BibleBook } from '@/types/bible'
 import type { VerseItem } from '@/types/common'
 import { BibleCacheConfig } from '@/types/bible'
@@ -41,8 +41,9 @@ export const useBibleStore = defineStore('bible', () => {
   /**
    * Currently loaded Bible content in memory
    * Used to avoid redundant IndexedDB reads when the same version is accessed multiple times
+   * optimization: use shallowRef as the content is large and handled as an immutable blob
    */
-  const currentBibleContent = ref<BibleContent | null>(null)
+  const currentBibleContent = shallowRef<BibleContent | null>(null)
 
   /**
    * Stores error messages from async operations
@@ -269,12 +270,7 @@ export const useBibleStore = defineStore('bible', () => {
   // Initialize current version from storage if available
   currentVersion.value = getLocalItem<BibleVersion>(versionStorageKey, 'object') ?? null
 
-  // --- START: Issue 1 Fix ---
-  const enrichContentWithVersion = (
-    content: BibleContent,
-    version: BibleVersion, // <-- CHANGED
-  ): BibleContent => {
-    // const version = currentVersion.value // <-- REMOVED
+  const enrichContentWithVersion = (content: BibleContent, version: BibleVersion): BibleContent => {
     if (!version) {
       return content
     }
