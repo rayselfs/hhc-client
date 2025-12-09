@@ -39,7 +39,7 @@ const color = computed(() => (props.type === 'add' ? 'primary' : 'orange'))
 
 const getLabel = (seconds: number) => {
   const prefix = props.type === 'add' ? '+' : '-'
-  const time = seconds === 60 ? '1:00' : `0:${seconds}`
+  const time = seconds
   return `${prefix}${time}`
 }
 
@@ -59,7 +59,6 @@ const isDisabled = (seconds: number) => {
 
 <style scoped>
 .time-button {
-  min-width: 80px;
-  width: 80px;
+  width: 70px;
 }
 </style>
