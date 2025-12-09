@@ -271,6 +271,7 @@ export enum StorageKey {
   THEME = 'theme',
   // Bible related
   SELECTED_VERSION = 'selected-version',
+  VERSIONS = 'versions',
   FOLDERS = 'folders',
   CURRENT_FOLDER_PATH = 'current-folder-path',
   CURRENT_FOLDER = 'current-folder',

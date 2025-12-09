@@ -179,15 +179,32 @@ export const useBibleStore = defineStore('bible', () => {
     }
 
     versionsLoading.value = true
+
+    // Key for storing versions in localStorage
+    const versionsStorageKey = getStorageKey(StorageCategory.BIBLE, StorageKey.VERSIONS)
+
     const request = fetchBibleVersions()
       .then((data) => {
         versions.value = data
         versionsLoaded.value = true
         applyVersionSelection(data)
+        // Cache versions to localStorage
+        setLocalItem(versionsStorageKey, data, 'object')
         return data
       })
       .catch((err) => {
         console.error('Failed to load Bible versions:', err)
+
+        // Try to load from cache
+        const cachedVersions = getLocalItem<BibleVersion[]>(versionsStorageKey, 'object')
+        if (cachedVersions && cachedVersions.length > 0) {
+          console.log('Loaded Bible versions from cache due to API failure')
+          versions.value = cachedVersions
+          versionsLoaded.value = true
+          applyVersionSelection(cachedVersions)
+          return cachedVersions
+        }
+
         setError('Failed to load versions. Please check your connection.')
         versionsLoaded.value = false
         return [] // Return empty on failure
