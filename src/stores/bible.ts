@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { BibleContent, BibleVersion } from '@/types/bible'
+import type { BibleContent, BibleVersion, BibleBook } from '@/types/bible'
 import type { VerseItem } from '@/types/common'
 import { BibleCacheConfig } from '@/types/bible'
 import { StorageKey, StorageCategory, getStorageKey } from '@/types/common'
@@ -58,6 +58,54 @@ export const useBibleStore = defineStore('bible', () => {
     chapter: number
     verse: number
   } | null>(null)
+
+  /**
+   * Current selected passage for Preview
+   * Persisted in store to survive view changes
+   */
+  const currentPassage = ref<import('@/types/bible').BiblePassage | null>(null)
+
+  /**
+   * Cached verses for the current preview passage
+   */
+  const previewVerses = ref<import('@/types/bible').PreviewVerse[]>([])
+
+  /**
+   * Cached book metadata for the current preview passage
+   */
+  const previewBook = ref<BibleBook | null>(null)
+
+  /**
+   * Set the preview state
+   */
+  const setPreviewState = (
+    passage: import('@/types/bible').BiblePassage,
+    verses: import('@/types/bible').PreviewVerse[],
+    book: BibleBook,
+  ) => {
+    currentPassage.value = passage
+    previewVerses.value = verses
+    previewBook.value = book
+  }
+
+  /**
+   * Clear the preview state
+   */
+  const clearPreviewState = () => {
+    currentPassage.value = null
+    previewVerses.value = []
+    previewBook.value = null
+  }
+
+  /**
+   * Update the verse number of the current passage
+   * @param verseNumber - The new verse number
+   */
+  const setCurrentPassageVerse = (verseNumber: number) => {
+    if (currentPassage.value) {
+      currentPassage.value.verse = verseNumber
+    }
+  }
 
   /**
    * Clear error state
@@ -474,5 +522,12 @@ export const useBibleStore = defineStore('bible', () => {
     selectedVerse,
     setSelectedVerse,
     clearSelectedVerse,
+    // Preview State (Persistent across views)
+    currentPassage,
+    previewVerses,
+    previewBook,
+    setPreviewState,
+    setCurrentPassageVerse,
+    clearPreviewState,
   }
 })

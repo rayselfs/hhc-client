@@ -13,8 +13,8 @@ import type { BiblePassage, PreviewVerse, BibleBook } from '@/types/bible'
  */
 export const useBible = (
   currentPassage?: Ref<BiblePassage | null>,
-  currentBookData?: Ref<BibleBook | null>,
-  chapterVerses?: Ref<PreviewVerse[]>,
+  previewBook?: Ref<BibleBook | null>,
+  previewVerses?: Ref<PreviewVerse[]>,
 ) => {
   // ==================== Folder Store ====================
   /**
@@ -68,7 +68,7 @@ export const useBible = (
    * 獲取最大章數（使用 computed 緩存）
    */
   const maxChapters = computed(() => {
-    return currentBookData?.value ? currentBookData.value.chapters.length : 0
+    return previewBook?.value ? previewBook.value.chapters.length : 0
   })
 
   /**
@@ -83,9 +83,9 @@ export const useBible = (
    * 更新章節內容
    */
   const updateChapterContent = (chapterNumber: number) => {
-    if (!currentBookData?.value || !currentPassage?.value || !chapterVerses?.value) return false
+    if (!previewBook?.value || !currentPassage?.value || !previewVerses?.value) return false
 
-    const selectedChapter = currentBookData.value.chapters.find((ch) => ch.number === chapterNumber)
+    const selectedChapter = previewBook.value.chapters.find((ch) => ch.number === chapterNumber)
 
     if (!selectedChapter) return false
 
@@ -94,7 +94,7 @@ export const useBible = (
     currentPassage.value.verse = 1
 
     // 更新經文內容
-    chapterVerses.value = selectedChapter.verses.map((v) => ({
+    previewVerses.value = selectedChapter.verses.map((v) => ({
       number: v.number,
       text: v.text,
     }))
@@ -118,7 +118,7 @@ export const useBible = (
     updateProjection = false,
     onUpdateProjection?: (verseNumber: number) => void,
   ) => {
-    if (!currentPassage?.value || !currentBookData?.value) return
+    if (!currentPassage?.value || !previewBook?.value) return
 
     let targetChapter: number
 
@@ -172,7 +172,7 @@ export const useBible = (
     updateProjection = false,
     onUpdateProjection?: (verseNumber: number) => void,
   ) => {
-    if (!currentPassage?.value || !chapterVerses?.value) return
+    if (!currentPassage?.value || !previewVerses?.value) return
 
     let targetVerse: number
 
@@ -183,7 +183,7 @@ export const useBible = (
       targetVerse = currentPassage.value.verse - 1
     } else {
       // 'next'
-      if (currentPassage.value.verse >= chapterVerses.value.length) return
+      if (currentPassage.value.verse >= previewVerses.value.length) return
       targetVerse = currentPassage.value.verse + 1
     }
 
@@ -228,7 +228,7 @@ export const useBible = (
    * 更新投影畫面
    */
   const updateProjection = async (verseNumber: number) => {
-    if (!currentPassage?.value || !chapterVerses?.value) return
+    if (!currentPassage?.value || !previewVerses?.value) return
 
     if (isElectron()) {
       // 如果投影視窗沒有顯示聖經（顯示預設內容或顯示其他內容），則切換到聖經
@@ -242,7 +242,7 @@ export const useBible = (
       book: currentPassage.value.bookName,
       bookNumber: currentPassage.value.bookNumber,
       chapter: currentPassage.value.chapter,
-      chapterVerses: chapterVerses.value.map((verse) => ({
+      chapterVerses: previewVerses.value.map((verse) => ({
         number: verse.number,
         text: verse.text,
       })),

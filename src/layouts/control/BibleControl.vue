@@ -93,7 +93,7 @@
             <!-- Verse Content -->
             <div class="bible-content" v-show="!isLoadingVerses && !isSearchMode">
               <div
-                v-for="verse in chapterVerses"
+                v-for="verse in previewVerses"
                 :key="verse.number"
                 :data-verse="verse.number"
                 class="verse-item mb-2 d-flex align-center"
@@ -228,13 +228,7 @@ import { useBibleStore } from '@/stores/bible'
 import { APP_CONFIG, BIBLE_CONFIG } from '@/config/app'
 import { StorageKey, StorageCategory, getStorageKey } from '@/types/common'
 import type { VerseItem } from '@/types/common'
-import type {
-  BiblePassage,
-  PreviewVerse,
-  SearchResult,
-  SearchResultDisplay,
-  BibleBook,
-} from '@/types/bible'
+import type { BiblePassage, SearchResult, SearchResultDisplay } from '@/types/bible'
 import { useSentry } from '@/composables/useSentry'
 import { useCardLayout } from '@/composables/useLayout'
 import { useLocalStorage } from '@/composables/useLocalStorage'
@@ -252,19 +246,17 @@ const {
   currentVersion,
   selectedVerse: storeSelectedVerse,
   currentBibleContent,
+  currentPassage,
+  previewVerses,
+  previewBook,
 } = storeToRefs(bibleStore)
-const { getBibleContent, addToHistory } = bibleStore
+const { getBibleContent, addToHistory, setPreviewState, setCurrentPassageVerse } = bibleStore
 const { searchBibleVerses } = useAPI()
 
 const { leftCardHeight, rightTopCardHeight, rightBottomCardHeight } = useCardLayout({
   minHeight: APP_CONFIG.UI.MIN_CARD_HEIGHT,
   topCardRatio: 0.7,
 })
-
-// Current selected passage
-const currentPassage = ref<BiblePassage | null>(null)
-const chapterVerses = ref<PreviewVerse[]>([])
-const currentBookData = ref<BibleBook | null>(null) // Store full book data
 
 // Font size control
 const getInitialFontSize = () => {
@@ -287,12 +279,12 @@ const {
   goToNextVerse,
   updateProjection,
   updateProjectionFontSize: updateFontSize,
-} = useBible(currentPassage, currentBookData, chapterVerses)
+} = useBible(currentPassage, previewBook, previewVerses)
 
 const { loadRootFolder } = folderStore
 
 // Optimized computed properties (cached)
-const maxVerse = computed(() => chapterVerses.value.length)
+const maxVerse = computed(() => previewVerses.value.length)
 const hasCurrentPassage = computed(() => !!currentPassage.value)
 const currentBookName = computed(() => currentPassage.value?.bookName || '')
 
@@ -376,8 +368,8 @@ const handleVerseSelection = async (bookNumber: number, chapter: number, verse: 
     return
   }
 
-  // Update current passage info
-  currentPassage.value = {
+  // Prepare new passage info
+  const newPassage: BiblePassage = {
     bookAbbreviation: book.abbreviation || '',
     bookName: book.name,
     bookNumber: book.number,
@@ -385,17 +377,17 @@ const handleVerseSelection = async (bookNumber: number, chapter: number, verse: 
     verse,
   }
 
-  // Store current book data
-  currentBookData.value = book
-
   // Get actual verses from selected chapter
   const selectedChapter = book.chapters.find((ch) => ch.number === chapter)
   if (selectedChapter) {
-    // Set new verse content
-    chapterVerses.value = selectedChapter.verses.map((v: { number: number; text: string }) => ({
+    // Prepare new verse content
+    const newVerses = selectedChapter.verses.map((v: { number: number; text: string }) => ({
       number: v.number,
       text: v.text,
     }))
+
+    // Update store state
+    setPreviewState(newPassage, newVerses, book)
 
     // Wait for DOM update
     await nextTick()
@@ -417,7 +409,7 @@ const handleVerseSelection = async (bookNumber: number, chapter: number, verse: 
 const createMultiFunctionVerse = (verseNumber: number): VerseItem | null => {
   if (!currentPassage.value) return null
 
-  const verseText = chapterVerses.value.find((v) => v.number === verseNumber)?.text || ''
+  const verseText = previewVerses.value.find((v) => v.number === verseNumber)?.text || ''
 
   return {
     id: crypto.randomUUID(),
@@ -444,7 +436,7 @@ const addToHistoryFromVerse = (verseNumber: number) => {
 // Select verse on click
 const selectVerse = (verseNumber: number) => {
   if (currentPassage.value) {
-    currentPassage.value.verse = verseNumber
+    setCurrentPassageVerse(verseNumber)
     addToHistoryFromVerse(verseNumber)
     updateProjection(verseNumber)
   }
@@ -606,7 +598,6 @@ const handleSearch = (text: string) => {
       return
     }
 
-    currentPassage.value = null
     const versionCode = currentVersion.value?.code
     if (!versionCode) {
       reportError(new Error('No Bible version selected'), {
