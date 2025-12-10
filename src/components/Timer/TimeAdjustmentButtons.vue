@@ -59,6 +59,6 @@ const isDisabled = (seconds: number) => {
 
 <style scoped>
 .time-button {
-  width: 70px;
+  width: 60px;
 }
 </style>

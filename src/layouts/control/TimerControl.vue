@@ -182,26 +182,7 @@
           <v-col cols="12" :style="{ height: `${rightBottomCardHeight}px` }">
             <v-card :style="{ height: `${rightBottomCardHeight}px` }">
               <v-card-text>
-                <v-row>
-                  <v-col cols="12" align="center">
-                    <v-btn
-                      :color="externalDisplayMode === 'stopwatch' ? 'primary' : 'grey'"
-                      :variant="externalDisplayMode === 'stopwatch' ? 'flat' : 'outlined'"
-                      @click="toggleStopwatch"
-                    >
-                      <v-icon icon="mdi-timer-outline" class="mr-2"></v-icon>
-                      {{ $t('timer.stopwatch') }}
-                    </v-btn>
-                  </v-col>
-                </v-row>
-
-                <v-row v-if="externalDisplayMode === 'clock'">
-                  <v-col cols="12" align="center">
-                    <ClockDisplay :timezone="timerStore.settings.timezone" :size="clockSize" />
-                  </v-col>
-                </v-row>
-
-                <Stopwatch v-else />
+                <Stopwatch />
               </v-card-text>
             </v-card>
           </v-col>
@@ -212,26 +193,25 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onBeforeUnmount, onUnmounted, nextTick } from 'vue'
+import { onMounted, onBeforeUnmount, onUnmounted, nextTick } from 'vue'
 import { useDisplay } from 'vuetify'
 import { useI18n } from 'vue-i18n'
 import { useTimerStore } from '@/stores/timer'
-import { useStopwatchStore } from '@/stores/stopwatch'
+// import { useStopwatchStore } from '@/stores/stopwatch'
 import { useProjectionStore } from '@/stores/projection'
 import { useElectron } from '@/composables/useElectron'
 import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
-import { APP_CONFIG, TIMER_CONFIG } from '@/config/app'
+import { APP_CONFIG } from '@/config/app'
 import { TimerMode, ViewType } from '@/types/common'
 import CountdownTimer from '@/components/Timer/CountdownTimer.vue'
-import ClockDisplay from '@/components/Timer/ClockDisplay.vue'
 import Stopwatch from '@/components/Timer/StopWatcher.vue'
 import TimeAdjustmentButtons from '@/components/Timer/TimeAdjustmentButtons.vue'
 import { useMemoryManager } from '@/utils/memoryManager'
 import { useSnackBar } from '@/composables/useSnackBar'
-import { useCardLayout, useWindowSize } from '@/composables/useLayout'
+import { useCardLayout } from '@/composables/useLayout'
 
 const timerStore = useTimerStore()
-const stopwatchStore = useStopwatchStore()
+// const stopwatchStore = useStopwatchStore()
 const projectionStore = useProjectionStore()
 const { t: $t } = useI18n()
 
@@ -248,11 +228,6 @@ const { leftCardHeight, rightTopCardHeight, rightBottomCardHeight } = useCardLay
   topCardRatio: 0.6, // 60% 上，40% 下
 })
 
-// Read display mode from stopwatch store
-const externalDisplayMode = computed(() => stopwatchStore.stopwatchSettings.displayMode)
-
-// 使用統一的視窗尺寸 composable
-const { width } = useWindowSize(100)
 const { mdAndUp } = useDisplay()
 
 const handleFocus = (event: FocusEvent) => {
@@ -334,17 +309,6 @@ const formatDuration = (seconds: number) => {
     return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
   }
   return `${m}:${s.toString().padStart(2, '0')}`
-}
-
-// clockSize logic remains the same
-const clockSize = computed(() => {
-  const screenWidth = width.value
-  return TIMER_CONFIG.UI.CLOCK_BASE_SIZE * (screenWidth / TIMER_CONFIG.UI.SCREEN_BASE_WIDTH)
-})
-
-// Calls stopwatch store action
-const toggleStopwatch = () => {
-  stopwatchStore.toggleStopwatchMode()
 }
 
 onMounted(() => {

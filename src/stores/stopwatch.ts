@@ -6,7 +6,6 @@ export interface StopwatchSettings {
   isRunning: boolean
   elapsedTime: number // milliseconds
   startTime?: number // timestamp
-  displayMode: 'clock' | 'stopwatch'
 }
 
 export const useStopwatchStore = defineStore('stopwatch', () => {
@@ -15,7 +14,6 @@ export const useStopwatchStore = defineStore('stopwatch', () => {
   const stopwatchSettings = ref<StopwatchSettings>({
     isRunning: false,
     elapsedTime: 0,
-    displayMode: 'clock',
   })
 
   let stopwatchInterval: number | undefined
@@ -60,16 +58,6 @@ export const useStopwatchStore = defineStore('stopwatch', () => {
     }
   }
 
-  const toggleStopwatchMode = () => {
-    if (stopwatchSettings.value.displayMode === 'clock') {
-      stopwatchSettings.value.displayMode = 'stopwatch'
-      resetStopwatch() // Reset when switching to stopwatch
-    } else {
-      stopwatchSettings.value.displayMode = 'clock'
-      pauseStopwatch() // Pause when switching to clock
-    }
-  }
-
   return {
     // State
     stopwatchSettings,
@@ -81,7 +69,6 @@ export const useStopwatchStore = defineStore('stopwatch', () => {
     startStopwatch,
     pauseStopwatch,
     resetStopwatch,
-    toggleStopwatchMode,
 
     // Memory Management
     cleanup,
