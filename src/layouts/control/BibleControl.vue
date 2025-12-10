@@ -3,9 +3,8 @@
     <v-row no-gutters>
       <!-- Preview -->
       <v-col
-        cols="12"
-        lg="6"
-        class="pl-4 pt-4 pb-4 pr-lg-2 pr-4 mb-lg-0 mb-4"
+        :cols="mdAndUp ? 6 : 12"
+        :class="['pl-4 pt-4 pb-4', mdAndUp ? 'pr-2 mb-0' : 'pr-4 mb-4']"
         :style="{ height: `${leftCardHeight}px` }"
       >
         <v-card :style="{ height: `${leftCardHeight}px` }">
@@ -125,7 +124,11 @@
         </v-card>
       </v-col>
 
-      <v-col cols="12" lg="6" class="pl-lg-2 pl-4 pt-4 pb-4 pr-4" ref="rightColumnContainer">
+      <v-col
+        :cols="mdAndUp ? 6 : 12"
+        :class="['pt-4 pb-4 pr-4', mdAndUp ? 'pl-2' : 'pl-4']"
+        ref="rightColumnContainer"
+      >
         <v-row no-gutters class="fill-height">
           <!-- Multi Function Control -->
           <v-col cols="12" class="mb-4" :style="{ height: `${rightTopCardHeight}px` }">
@@ -224,6 +227,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { useDisplay } from 'vuetify'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useBibleStore } from '@/stores/bible'
@@ -254,6 +258,7 @@ const {
 } = storeToRefs(bibleStore)
 const { getBibleContent, addToHistory, setPreviewState, setCurrentPassageVerse } = bibleStore
 const { searchBibleVerses } = useAPI()
+const { mdAndUp } = useDisplay()
 
 const { leftCardHeight, rightTopCardHeight, rightBottomCardHeight } = useCardLayout({
   minHeight: APP_CONFIG.UI.MIN_CARD_HEIGHT,

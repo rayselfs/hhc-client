@@ -3,9 +3,8 @@
     <v-row no-gutters>
       <!-- Timer -->
       <v-col
-        cols="12"
-        lg="6"
-        class="pl-4 pt-4 pb-4 pr-lg-2 pr-4 mb-lg-0 mb-4"
+        :cols="mdAndUp ? 6 : 12"
+        :class="['pl-4 pt-4 pb-4', mdAndUp ? 'pr-2 mb-0' : 'pr-4 mb-4']"
         :style="{ height: `${leftCardHeight}px` }"
       >
         <v-card :style="{ height: `${leftCardHeight}px` }">
@@ -134,7 +133,7 @@
         </v-card>
       </v-col>
 
-      <v-col cols="12" lg="6" class="pl-lg-2 pl-4 pt-4 pb-4 pr-4">
+      <v-col :cols="mdAndUp ? 6 : 12" :class="['pt-4 pb-4 pr-4', mdAndUp ? 'pl-2' : 'pl-4']">
         <v-row no-gutters class="fill-height">
           <v-col cols="12" class="mb-4" :style="{ height: `${rightTopCardHeight}px` }">
             <v-card :style="{ height: `${rightTopCardHeight}px` }">
@@ -214,6 +213,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, onUnmounted, nextTick } from 'vue'
+import { useDisplay } from 'vuetify'
 import { useI18n } from 'vue-i18n'
 import { useTimerStore } from '@/stores/timer'
 import { useStopwatchStore } from '@/stores/stopwatch'
@@ -253,6 +253,7 @@ const externalDisplayMode = computed(() => stopwatchStore.stopwatchSettings.disp
 
 // 使用統一的視窗尺寸 composable
 const { width } = useWindowSize(100)
+const { mdAndUp } = useDisplay()
 
 const handleFocus = (event: FocusEvent) => {
   const target = event.target as HTMLInputElement

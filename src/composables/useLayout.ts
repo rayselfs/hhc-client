@@ -50,7 +50,7 @@ export const useCardLayout = (options: CardLayoutOptions = {}) => {
   } = options
 
   const { height } = useWindowSize(100)
-  const { lgAndUp } = useDisplay()
+  const { mdAndUp } = useDisplay()
 
   const leftCardHeight = ref(600)
   const rightTopCardHeight = ref(360)
@@ -59,7 +59,7 @@ export const useCardLayout = (options: CardLayoutOptions = {}) => {
   const calculateHeights = () => {
     const viewportHeight = height.value - headerOffset
     // 如果小於 lg (Mobile/Tablet)，高度縮小為 80% 以顯示下方內容
-    const responsiveScale = lgAndUp.value ? 1 : 0.8
+    const responsiveScale = mdAndUp.value ? 1 : 0.8
     const targetHeight = viewportHeight * responsiveScale
 
     leftCardHeight.value = targetHeight < minHeight ? minHeight : targetHeight
@@ -74,7 +74,7 @@ export const useCardLayout = (options: CardLayoutOptions = {}) => {
   })
 
   // 監聽 height 和 lgAndUp 變化來重新計算高度
-  watch([() => height.value, lgAndUp], () => {
+  watch([() => height.value, mdAndUp], () => {
     calculateHeights()
   })
 
