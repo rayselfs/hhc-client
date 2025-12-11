@@ -14,6 +14,9 @@ export interface TimerState {
   startTime?: Date // for clock mode
   currentTime: Date // current server time
   timezone: string
+  stopwatchState: 'stopped' | 'running' | 'paused'
+  stopwatchElapsedTime: number // milliseconds
+  stopwatchStartTime?: number // for precise calculation
 }
 
 export interface TimerCommand {
@@ -27,6 +30,9 @@ export interface TimerCommand {
     | 'removeTime'
     | 'setMode'
     | 'setTimezone'
+    | 'startStopwatch'
+    | 'pauseStopwatch'
+    | 'resetStopwatch'
   duration?: number
   seconds?: number
   mode?: TimerMode
@@ -43,12 +49,15 @@ export class TimerService {
 
   constructor() {
     this.state = {
-      mode: 'timer',
+      mode: 'timer' as TimerMode,
       state: 'stopped',
       remainingTime: 300, // 5 minutes default
+      timerDuration: 300,
       originalDuration: 300,
       currentTime: new Date(),
       timezone: 'Asia/Taipei',
+      stopwatchState: 'stopped',
+      stopwatchElapsedTime: 0,
     }
     // Start continuous interval immediately
     this.startInterval()
@@ -94,6 +103,7 @@ export class TimerService {
     const stateToSend = {
       remainingTime: this.state.remainingTime,
       currentTime: this.state.currentTime.toISOString(),
+      stopwatchElapsedTime: this.state.stopwatchElapsedTime,
     }
 
     this.windows.forEach((window) => {
@@ -130,11 +140,17 @@ export class TimerService {
         }
       }
 
+      // Handle stopwatch logic
+      if (this.state.stopwatchState === 'running' && this.state.stopwatchStartTime) {
+        this.state.stopwatchElapsedTime = Date.now() - this.state.stopwatchStartTime
+      }
+
       // Conditional Broadcast: Only if seconds changed
       const currentSecondStr = this.state.currentTime.toISOString().split('.')[0]
       if (
         this.state.remainingTime !== this.lastBroadcastRemaining ||
-        currentSecondStr !== this.lastBroadcastTime
+        currentSecondStr !== this.lastBroadcastTime ||
+        this.state.stopwatchState === 'running' // Always broadcast if stopwatch is running
       ) {
         this.broadcastTick()
       }
@@ -255,6 +271,29 @@ export class TimerService {
           this.state.timezone = command.timezone
           this.broadcast()
         }
+        break
+
+      case 'startStopwatch':
+        if (this.state.stopwatchState !== 'running') {
+          this.state.stopwatchState = 'running'
+          this.state.stopwatchStartTime = Date.now() - this.state.stopwatchElapsedTime
+          this.broadcast()
+        }
+        break
+
+      case 'pauseStopwatch':
+        if (this.state.stopwatchState === 'running') {
+          this.state.stopwatchState = 'paused'
+          this.state.stopwatchElapsedTime = Date.now() - (this.state.stopwatchStartTime || 0)
+          this.broadcast()
+        }
+        break
+
+      case 'resetStopwatch':
+        this.state.stopwatchState = 'stopped'
+        this.state.stopwatchElapsedTime = 0
+        this.state.stopwatchStartTime = undefined
+        this.broadcast()
         break
 
       default:

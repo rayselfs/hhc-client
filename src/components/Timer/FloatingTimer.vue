@@ -1,13 +1,18 @@
 <template>
   <div class="floating-timer" @click="$emit('click')">
     <v-card class="timer-card" elevation="8" :class="{ 'pulse-animation': timerStore.isRunning }">
-      <v-card-text class="pa-3">
-        <CountdownTimer
-          :progress="timerStore.progress"
-          :timer-formatted-time="timerStore.formattedTime"
-          :size="80"
-        >
-        </CountdownTimer>
+      <v-card-text class="pa-3" v-if="!stopwatchStore.stopwatchSettings.isStopwatchMode">
+        <template>
+          <CountdownTimer
+            :progress="timerStore.progress"
+            :timer-formatted-time="timerStore.formattedTime"
+            :size="80"
+          >
+          </CountdownTimer>
+        </template>
+      </v-card-text>
+      <v-card-text class="pa-3 d-flex justify-center align-center" v-else>
+        <Stopwatch :size="80" />
       </v-card-text>
     </v-card>
   </div>
@@ -15,9 +20,12 @@
 
 <script setup lang="ts">
 import CountdownTimer from './CountdownTimer.vue'
+import Stopwatch from './StopWatcher.vue'
 import { useTimerStore } from '@/stores/timer'
+import { useStopwatchStore } from '@/stores/stopwatch'
 
 const timerStore = useTimerStore()
+const stopwatchStore = useStopwatchStore()
 
 defineEmits<{
   (e: 'click'): void

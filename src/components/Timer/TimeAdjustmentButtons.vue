@@ -1,6 +1,6 @@
 <template>
   <v-row :class="rowClass">
-    <v-col cols="12" align="center" :class="colClass">
+    <v-col cols="12" align="center" class="pt-0" :class="colClass">
       <v-btn
         v-for="seconds in adjustments"
         :key="seconds"

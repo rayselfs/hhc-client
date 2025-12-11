@@ -115,6 +115,9 @@ export interface TimerCommand {
     | 'removeTime'
     | 'setMode'
     | 'setTimezone'
+    | 'startStopwatch'
+    | 'pauseStopwatch'
+    | 'resetStopwatch'
   duration?: number
   seconds?: number
   mode?: TimerMode
@@ -133,6 +136,8 @@ export interface TimerState {
   startTime?: string // ISO string format
   currentTime?: string // ISO string format
   timezone: string
+  stopwatchState?: 'stopped' | 'running' | 'paused'
+  stopwatchElapsedTime?: number
 }
 
 declare global {

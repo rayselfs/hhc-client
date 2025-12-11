@@ -18,6 +18,7 @@
   "paste": "Paste",
   "history": "History",
   "projection": "Project",
+  "control": "Control",
   "extendedToolbar": {
     "openProjection": "Open Projection",
     "closeProjection": "Close Projection",
@@ -32,7 +33,7 @@
       "both": "Both"
     },
     "presets": "Timer Presets",
-    "stopwatch": "Stopwatch"
+    "stopwatch": "STW"
   },
   "bible": {
     "title": "BIBLE",

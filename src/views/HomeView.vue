@@ -104,6 +104,7 @@ import { ShortcutsDialog } from '@/components/Shortcuts'
 import { useAlert } from '@/composables/useAlert'
 import { useSnackBar } from '@/composables/useSnackBar'
 import { useTimerStore } from '@/stores/timer'
+import { useStopwatchStore } from '@/stores/stopwatch'
 import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
 import { MessageType, ViewType, type AppMessage } from '@/types/common'
 import { useSentry } from '@/composables/useSentry'
@@ -120,6 +121,7 @@ const { sendViewChange } = useProjectionMessaging()
 
 // Store
 const timerStore = useTimerStore()
+const stopwatchStore = useStopwatchStore()
 const projectionStore = useProjectionStore()
 
 // Electron composable
@@ -142,9 +144,11 @@ const drawerCollapsed = ref(true)
 const currentView = ref(ViewType.BIBLE) // 預設使用聖經
 
 // 懸浮計時器顯示狀態
+// 懸浮計時器顯示狀態
 const showFloatingTimer = computed(() => {
-  // 只有在計時器運行中且不在計時器頁面時才顯示
-  return timerStore.isRunning && currentView.value !== ViewType.TIMER
+  const isTimerRunning = timerStore.isRunning
+  const isStopwatchRunning = stopwatchStore.stopwatchSettings.isRunning
+  return (isTimerRunning || isStopwatchRunning) && currentView.value !== ViewType.TIMER
 })
 
 useKeyboardShortcuts(currentView)

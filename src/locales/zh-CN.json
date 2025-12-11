@@ -18,6 +18,7 @@
   "paste": "粘贴",
   "history": "历史",
   "projection": "投影",
+  "control": "控制",
   "extendedToolbar": {
     "openProjection": "开启投影",
     "closeProjection": "关闭投影",

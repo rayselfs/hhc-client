@@ -1,7 +1,7 @@
 <template>
   <v-container fluid class="pa-0">
     <v-row no-gutters>
-      <!-- Timer -->
+      <!-- Timer/Stopwatch Layout -->
       <v-col
         :cols="mdAndUp ? 6 : 12"
         :class="['pl-4 pt-4 pb-4', mdAndUp ? 'pr-2 mb-0' : 'pr-4 mb-4']"
@@ -9,7 +9,7 @@
       >
         <v-card :style="{ height: `${leftCardHeight}px` }">
           <v-card-text>
-            <v-row class="mb-4">
+            <v-row>
               <v-col cols="12" align="center">
                 <v-btn-toggle
                   v-model="timerStore.settings.mode"
@@ -18,15 +18,26 @@
                   class="mode-toggle"
                   @update:model-value="handleModeChange"
                 >
-                  <v-btn value="timer">
-                    <v-icon icon="mdi-timer" class="mr-2"></v-icon>
-                    {{ $t('timer.mode.timer') }}
+                  <v-btn value="timer" min-width="110">
+                    <v-icon
+                      :icon="
+                        stopwatchStore.stopwatchSettings.isStopwatchMode
+                          ? 'mdi-timer-outline'
+                          : 'mdi-timer'
+                      "
+                      class="mr-2"
+                    ></v-icon>
+                    {{
+                      stopwatchStore.stopwatchSettings.isStopwatchMode
+                        ? $t('timer.stopwatch')
+                        : $t('timer.mode.timer')
+                    }}
                   </v-btn>
-                  <v-btn value="both">
+                  <v-btn value="both" min-width="110">
                     <v-icon icon="mdi-view-split-horizontal" class="mr-2"></v-icon>
                     {{ $t('timer.mode.both') }}
                   </v-btn>
-                  <v-btn value="clock" :disabled="timerStore.state !== 'stopped'">
+                  <v-btn value="clock" min-width="110" :disabled="timerStore.state !== 'stopped'">
                     <v-icon icon="mdi-clock" class="mr-2"></v-icon>
                     {{ $t('timer.mode.clock') }}
                   </v-btn>
@@ -36,66 +47,74 @@
 
             <v-row>
               <v-col cols="12">
-                <CountdownTimer
-                  :progress="timerStore.progress"
-                  :timer-formatted-time="timerStore.formattedTime"
-                  :size="250"
-                  :display-text="timerStore.isRunning"
+                <template v-if="!stopwatchStore.stopwatchSettings.isStopwatchMode">
+                  <CountdownTimer
+                    :progress="timerStore.progress"
+                    :timer-formatted-time="timerStore.formattedTime"
+                    :size="250"
+                    :display-text="timerStore.isRunning"
+                    class="mb-7"
+                  >
+                    <template #content>
+                      <div
+                        v-if="timerStore.state === 'stopped'"
+                        class="d-flex justify-center align-center"
+                      >
+                        <v-text-field
+                          v-model="timerStore.inputMinutes"
+                          variant="plain"
+                          density="compact"
+                          hide-details
+                          class="time-input-field"
+                          placeholder="00"
+                          @focus="handleFocus($event)"
+                          @blur="handleBlur()"
+                        ></v-text-field>
+                        <span class="time-separator">:</span>
+                        <v-text-field
+                          v-model="timerStore.inputSeconds"
+                          variant="plain"
+                          density="compact"
+                          hide-details
+                          class="time-input-field"
+                          placeholder="00"
+                          @focus="handleFocus($event)"
+                          @blur="handleBlur()"
+                        ></v-text-field>
+                      </div>
+                      <span v-else>{{ timerStore.formattedTime }}</span>
+                    </template>
+                  </CountdownTimer>
+
+                  <!-- Remove Time Buttons -->
+                  <TimeAdjustmentButtons
+                    type="remove"
+                    :remaining-time="timerStore.settings.remainingTime"
+                    @adjust="removeTime"
+                  />
+
+                  <!-- Add Time Buttons -->
+                  <TimeAdjustmentButtons
+                    type="add"
+                    :remaining-time="timerStore.settings.remainingTime"
+                    :is-finished="timerStore.isFinished"
+                    @adjust="addTime"
+                  />
+                </template>
+                <div
+                  v-else
+                  class="d-flex justify-center align-center fill-height"
+                  style="height: 350px"
                 >
-                  <template #content>
-                    <div
-                      v-if="timerStore.state === 'stopped'"
-                      class="d-flex justify-center align-center"
-                    >
-                      <v-text-field
-                        v-model="timerStore.inputMinutes"
-                        variant="plain"
-                        density="compact"
-                        hide-details
-                        class="time-input-field"
-                        placeholder="00"
-                        @focus="handleFocus($event)"
-                        @blur="handleBlur()"
-                      ></v-text-field>
-                      <span class="time-separator">:</span>
-                      <v-text-field
-                        v-model="timerStore.inputSeconds"
-                        variant="plain"
-                        density="compact"
-                        hide-details
-                        class="time-input-field"
-                        placeholder="00"
-                        @focus="handleFocus($event)"
-                        @blur="handleBlur()"
-                      ></v-text-field>
-                    </div>
-                    <span v-else>{{ timerStore.formattedTime }}</span>
-                  </template>
-                </CountdownTimer>
+                  <Stopwatch :size="250" />
+                </div>
               </v-col>
             </v-row>
-
-            <!-- Remove Time Buttons -->
-            <TimeAdjustmentButtons
-              type="remove"
-              :remaining-time="timerStore.settings.remainingTime"
-              class="pb-0"
-              @adjust="removeTime"
-            />
-
-            <!-- Add Time Buttons -->
-            <TimeAdjustmentButtons
-              type="add"
-              :remaining-time="timerStore.settings.remainingTime"
-              :is-finished="timerStore.isFinished"
-              class="mb-4 pt-0"
-              @adjust="addTime"
-            />
 
             <v-row>
               <v-col cols="6" class="d-flex justify-end">
                 <v-btn
-                  v-if="timerStore.state === 'stopped'"
+                  v-if="controlState === 'stopped'"
                   icon="mdi-play"
                   color="primary"
                   variant="flat"
@@ -103,7 +122,7 @@
                   @click="startTimer"
                 ></v-btn>
                 <v-btn
-                  v-if="timerStore.state === 'running'"
+                  v-if="controlState === 'running'"
                   icon="mdi-pause"
                   color="warning"
                   variant="flat"
@@ -111,7 +130,7 @@
                   @click="pauseTimer"
                 ></v-btn>
                 <v-btn
-                  v-if="timerStore.state === 'paused'"
+                  v-if="controlState === 'paused'"
                   icon="mdi-play"
                   color="warning"
                   variant="flat"
@@ -135,6 +154,7 @@
 
       <v-col :cols="mdAndUp ? 6 : 12" :class="['pt-4 pb-4 pr-4', mdAndUp ? 'pl-2' : 'pl-4']">
         <v-row no-gutters class="fill-height">
+          <!-- Presets Layout -->
           <v-col cols="12" class="mb-4" :style="{ height: `${rightTopCardHeight}px` }">
             <v-card :style="{ height: `${rightTopCardHeight}px` }">
               <v-card-text>
@@ -179,10 +199,22 @@
             </v-card>
           </v-col>
 
+          <!-- Control Layout -->
           <v-col cols="12" :style="{ height: `${rightBottomCardHeight}px` }">
             <v-card :style="{ height: `${rightBottomCardHeight}px` }">
               <v-card-text>
-                <Stopwatch />
+                <v-label class="text-h6 align-start mb-2">{{ $t('control') }}</v-label>
+                <div class="d-flex align-center fill-height">
+                  <v-switch
+                    v-model="stopwatchStore.stopwatchSettings.isStopwatchMode"
+                    :label="$t('timer.stopwatch')"
+                    color="primary"
+                    hide-details
+                    :disabled="
+                      timerStore.state !== 'stopped' || stopwatchStore.stopwatchSettings.isRunning
+                    "
+                  ></v-switch>
+                </div>
               </v-card-text>
             </v-card>
           </v-col>
@@ -193,11 +225,11 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount, onUnmounted, nextTick } from 'vue'
+import { computed, onMounted, onBeforeUnmount, onUnmounted, nextTick } from 'vue'
 import { useDisplay } from 'vuetify'
 import { useI18n } from 'vue-i18n'
 import { useTimerStore } from '@/stores/timer'
-// import { useStopwatchStore } from '@/stores/stopwatch'
+import { useStopwatchStore } from '@/stores/stopwatch'
 import { useProjectionStore } from '@/stores/projection'
 import { useElectron } from '@/composables/useElectron'
 import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
@@ -211,7 +243,7 @@ import { useSnackBar } from '@/composables/useSnackBar'
 import { useCardLayout } from '@/composables/useLayout'
 
 const timerStore = useTimerStore()
-// const stopwatchStore = useStopwatchStore()
+const stopwatchStore = useStopwatchStore()
 const projectionStore = useProjectionStore()
 const { t: $t } = useI18n()
 
@@ -226,6 +258,15 @@ const { cleanup } = useMemoryManager('TimerControl')
 const { leftCardHeight, rightTopCardHeight, rightBottomCardHeight } = useCardLayout({
   minHeight: APP_CONFIG.UI.MIN_CARD_HEIGHT,
   topCardRatio: 0.6, // 60% 上，40% 下
+})
+
+const controlState = computed(() => {
+  if (stopwatchStore.stopwatchSettings.isStopwatchMode) {
+    if (stopwatchStore.stopwatchSettings.isRunning) return 'running'
+    if (stopwatchStore.stopwatchSettings.elapsedTime > 0) return 'paused'
+    return 'stopped'
+  }
+  return timerStore.state
 })
 
 const { mdAndUp } = useDisplay()
@@ -258,21 +299,37 @@ const handleModeChange = (mode: TimerMode) => {
 }
 
 const startTimer = async () => {
-  timerStore.startTimer()
-  await updateProjectionState()
+  if (stopwatchStore.stopwatchSettings.isStopwatchMode) {
+    stopwatchStore.startStopwatch()
+  } else {
+    timerStore.startTimer()
+    await updateProjectionState()
+  }
 }
 
 const pauseTimer = () => {
-  timerStore.pauseTimer()
+  if (stopwatchStore.stopwatchSettings.isStopwatchMode) {
+    stopwatchStore.pauseStopwatch()
+  } else {
+    timerStore.pauseTimer()
+  }
 }
 
 const resetTimer = () => {
-  timerStore.resetTimer()
+  if (stopwatchStore.stopwatchSettings.isStopwatchMode) {
+    stopwatchStore.resetStopwatch()
+  } else {
+    timerStore.resetTimer()
+  }
 }
 
 const resumeTimer = async () => {
-  timerStore.resumeTimer()
-  await updateProjectionState()
+  if (stopwatchStore.stopwatchSettings.isStopwatchMode) {
+    stopwatchStore.startStopwatch()
+  } else {
+    timerStore.resumeTimer()
+    await updateProjectionState()
+  }
 }
 
 // updateProjectionState logic remains the same
