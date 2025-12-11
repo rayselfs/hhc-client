@@ -160,7 +160,7 @@ export const TIMER_CONFIG = {
     REMAINING_TIME: DEFAULT_TIMER_DURATION,
     PAUSED_TIME: 0,
     REMINDER_ENABLED: false,
-    REMINDER_TIME: 0,
+    REMINDER_TIME: 30,
   },
 
   // Stopwatch settings
