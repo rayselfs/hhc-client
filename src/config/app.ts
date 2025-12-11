@@ -159,6 +159,8 @@ export const TIMER_CONFIG = {
     IS_RUNNING: false,
     REMAINING_TIME: DEFAULT_TIMER_DURATION,
     PAUSED_TIME: 0,
+    REMINDER_ENABLED: false,
+    REMINDER_TIME: 0,
   },
 
   // Stopwatch settings
@@ -194,6 +196,8 @@ export function getTimerDefaultSettings() {
     isRunning: TIMER_CONFIG.DEFAULT_SETTINGS.IS_RUNNING,
     remainingTime: TIMER_CONFIG.DEFAULT_SETTINGS.REMAINING_TIME,
     pausedTime: TIMER_CONFIG.DEFAULT_SETTINGS.PAUSED_TIME,
+    reminderEnabled: TIMER_CONFIG.DEFAULT_SETTINGS.REMINDER_ENABLED,
+    reminderTime: TIMER_CONFIG.DEFAULT_SETTINGS.REMINDER_TIME,
   }
 }
 

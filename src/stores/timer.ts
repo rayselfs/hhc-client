@@ -23,6 +23,8 @@ export interface TimerSettings {
   timezone: string // Timezone
   startTime?: Date // Start time for 'clock' mode
   currentTime: Date // Current server time
+  reminderEnabled: boolean
+  reminderTime: number // seconds (threshold for warning)
 }
 
 // State machine for timer status
@@ -46,6 +48,8 @@ export const useTimerStore = defineStore('timer', () => {
           remainingTime: parsed.originalDuration || defaultSettings.remainingTime,
           timerDuration: parsed.originalDuration || defaultSettings.timerDuration,
           currentTime: new Date(),
+          reminderEnabled: parsed.reminderEnabled ?? defaultSettings.reminderEnabled ?? false,
+          reminderTime: parsed.reminderTime ?? defaultSettings.reminderTime ?? 0,
         }
       } catch (error) {
         reportError(error, {
@@ -71,6 +75,8 @@ export const useTimerStore = defineStore('timer', () => {
         mode: settings.value.mode,
         originalDuration: settings.value.originalDuration,
         timezone: settings.value.timezone,
+        reminderEnabled: settings.value.reminderEnabled,
+        reminderTime: settings.value.reminderTime,
       }
       setLocalItem(
         getStorageKey(StorageCategory.TIMER, StorageKey.TIMER_SETTINGS),
@@ -111,6 +117,17 @@ export const useTimerStore = defineStore('timer', () => {
 
   const isFinished = computed(() => {
     return settings.value.remainingTime <= 0 && state.value === 'stopped'
+  })
+
+  // Blinking state (replaces warning color)
+  const isWarning = computed(() => {
+    return (
+      settings.value.reminderEnabled &&
+      state.value !== 'stopped' &&
+      !isFinished.value &&
+      settings.value.remainingTime <= settings.value.reminderTime &&
+      settings.value.remainingTime > 0
+    )
   })
 
   // Internal validation logic moved from component
@@ -171,6 +188,12 @@ export const useTimerStore = defineStore('timer', () => {
     settings.value.timerDuration = duration
     settings.value.remainingTime = duration
 
+    // Auto-adjust reminder time if it exceeds the new duration
+    if (settings.value.reminderTime >= duration) {
+      const newReminder = Math.max(0, duration - 10)
+      setReminder(settings.value.reminderEnabled, newReminder)
+    }
+
     sendTimerCommand({ action: 'setDuration', duration })
     saveSettings()
   }
@@ -206,6 +229,13 @@ export const useTimerStore = defineStore('timer', () => {
     saveSettings()
   }
 
+  const setReminder = (enabled: boolean, time: number) => {
+    settings.value.reminderEnabled = enabled
+    settings.value.reminderTime = time
+    sendTimerCommand({ action: 'setReminder', reminderEnabled: enabled, reminderTime: time })
+    saveSettings()
+  }
+
   // Helper function to check if Electron is available
   const isElectron = () => {
     return typeof window !== 'undefined' && !!window.electronAPI
@@ -236,6 +266,9 @@ export const useTimerStore = defineStore('timer', () => {
     if (timerState.originalDuration !== undefined)
       settings.value.originalDuration = timerState.originalDuration
     if (timerState.timezone !== undefined) settings.value.timezone = timerState.timezone
+    if (timerState.reminderEnabled !== undefined)
+      settings.value.reminderEnabled = timerState.reminderEnabled
+    if (timerState.reminderTime !== undefined) settings.value.reminderTime = timerState.reminderTime
 
     if (timerState.startTime !== undefined) {
       if (timerState.startTime) {
@@ -359,6 +392,8 @@ export const useTimerStore = defineStore('timer', () => {
           mode: savedSettings.mode as TimerMode,
           originalDuration: savedSettings.originalDuration,
           timezone: savedSettings.timezone,
+          reminderEnabled: savedSettings.reminderEnabled,
+          reminderTime: savedSettings.reminderTime,
         })
       }
 
@@ -394,6 +429,7 @@ export const useTimerStore = defineStore('timer', () => {
     formattedTime,
     progress,
     isFinished,
+    isWarning,
     inputMinutes, // Export computed for v-model
     inputSeconds, // Export computed for v-model
 
@@ -403,6 +439,7 @@ export const useTimerStore = defineStore('timer', () => {
     addTime,
     removeTime,
     setTimezone,
+    setReminder,
     startTimer,
     pauseTimer,
     resetTimer,

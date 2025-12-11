@@ -17,6 +17,8 @@ export interface TimerState {
   stopwatchState: 'stopped' | 'running' | 'paused'
   stopwatchElapsedTime: number // milliseconds
   stopwatchStartTime?: number // for precise calculation
+  reminderEnabled: boolean
+  reminderTime: number // seconds
 }
 
 export interface TimerCommand {
@@ -33,8 +35,11 @@ export interface TimerCommand {
     | 'startStopwatch'
     | 'pauseStopwatch'
     | 'resetStopwatch'
+    | 'setReminder'
   duration?: number
   seconds?: number
+  reminderEnabled?: boolean
+  reminderTime?: number
   mode?: TimerMode
   timezone?: string
 }
@@ -58,6 +63,8 @@ export class TimerService {
       timezone: 'Asia/Taipei',
       stopwatchState: 'stopped',
       stopwatchElapsedTime: 0,
+      reminderEnabled: false,
+      reminderTime: 0,
     }
     // Start continuous interval immediately
     this.startInterval()
@@ -296,6 +303,16 @@ export class TimerService {
         this.broadcast()
         break
 
+      case 'setReminder':
+        if (command.reminderEnabled !== undefined) {
+          this.state.reminderEnabled = command.reminderEnabled
+        }
+        if (command.reminderTime !== undefined) {
+          this.state.reminderTime = command.reminderTime
+        }
+        this.broadcast()
+        break
+
       default:
         console.warn('Unknown timer command:', command)
     }
@@ -322,6 +339,12 @@ export class TimerService {
     }
     if (initialState.timezone !== undefined) {
       this.state.timezone = initialState.timezone
+    }
+    if (initialState.reminderEnabled !== undefined) {
+      this.state.reminderEnabled = initialState.reminderEnabled
+    }
+    if (initialState.reminderTime !== undefined) {
+      this.state.reminderTime = initialState.reminderTime
     }
     this.broadcast()
   }

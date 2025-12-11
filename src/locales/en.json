@@ -33,7 +33,11 @@
       "both": "Both"
     },
     "presets": "Timer Presets",
-    "stopwatch": "STW"
+    "stopwatch": "Stopwatch",
+    "reminder": "Time Reminder",
+    "reminderTime": "Reminder Time",
+    "reminderError": "Reminder time cannot be greater than total duration",
+    "reminderSecond": "sec"
   },
   "bible": {
     "title": "BIBLE",

@@ -5,6 +5,7 @@
         :progress="timerProgress"
         :timer-formatted-time="timerFormattedTime"
         :size="circleSize"
+        :is-warning="isWarning"
       />
     </v-col>
     <div class="split-divider"></div>
@@ -19,6 +20,7 @@
         :progress="timerProgress"
         :timer-formatted-time="timerFormattedTime"
         :size="circleSize"
+        :is-warning="isWarning"
       />
       <ClockDisplay v-else :timezone="selectedTimezone" :size="clockSize" />
     </v-col>
@@ -37,6 +39,7 @@ interface Props {
   timerFormattedTime: string
   selectedTimezone: string
   timerProgress: number
+  isWarning?: boolean
 }
 
 const props = defineProps<Props>()

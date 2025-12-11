@@ -51,6 +51,7 @@ const timerMode = computed(() => timerStore.settings.mode)
 const timerFormattedTime = computed(() => timerStore.formattedTime)
 const selectedTimezone = computed(() => timerStore.settings.timezone)
 const timerProgress = computed(() => timerStore.progress)
+const isWarning = computed(() => timerStore.isWarning)
 
 const currentComponent = computed(() => {
   if (projectionStore.isShowingDefault) {
@@ -95,6 +96,7 @@ const componentProps = computed(() => {
         timerFormattedTime: timerFormattedTime.value,
         selectedTimezone: selectedTimezone.value,
         timerProgress: timerProgress.value,
+        isWarning: isWarning.value,
       }
     default:
       return {}

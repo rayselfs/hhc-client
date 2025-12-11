@@ -33,7 +33,11 @@
       "both": "同时"
     },
     "presets": "计时预设",
-    "stopwatch": "码表"
+    "stopwatch": "码表",
+    "reminder": "时间提醒",
+    "reminderTime": "提醒时间",
+    "reminderError": "提醒时间不能大于总时间",
+    "reminderSecond": "秒"
   },
   "bible": {
     "title": "圣经",

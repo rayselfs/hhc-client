@@ -215,6 +215,27 @@
                     "
                   ></v-switch>
                 </div>
+                <div class="d-flex align-center mt-2">
+                  <v-switch
+                    v-model="reminderEnabled"
+                    :label="$t('timer.reminder')"
+                    color="primary"
+                    hide-details
+                    class="mr-4"
+                    :disabled="timerStore.state !== 'stopped'"
+                  ></v-switch>
+                  <v-text-field
+                    v-model="reminderTimeInput"
+                    type="number"
+                    variant="outlined"
+                    density="compact"
+                    hide-details
+                    style="max-width: 100px"
+                    :suffix="$t('timer.reminderSecond')"
+                    :disabled="timerStore.state !== 'stopped'"
+                    @update:model-value="handleReminderTimeChange"
+                  ></v-text-field>
+                </div>
               </v-card-text>
             </v-card>
           </v-col>
@@ -379,6 +400,32 @@ onBeforeUnmount(() => {
 onUnmounted(() => {
   cleanup()
 })
+
+const reminderEnabled = computed({
+  get: () => timerStore.settings.reminderEnabled,
+  set: (value) => {
+    timerStore.setReminder(value, timerStore.settings.reminderTime)
+  },
+})
+
+const reminderTimeInput = computed({
+  get: () => timerStore.settings.reminderTime,
+  set: () => {},
+})
+
+const handleReminderTimeChange = (value: string) => {
+  const seconds = parseInt(value)
+  if (isNaN(seconds) || seconds < 0) {
+    return
+  }
+  // Remove seconds * 60 conversion, use directly
+  if (seconds >= timerStore.settings.originalDuration) {
+    showSnackBar($t('timer.reminderError'), 'error')
+    timerStore.setReminder(timerStore.settings.reminderEnabled, 0) // Reset to 0
+  } else {
+    timerStore.setReminder(timerStore.settings.reminderEnabled, seconds)
+  }
+}
 </script>
 
 <style scoped>

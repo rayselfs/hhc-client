@@ -118,8 +118,11 @@ export interface TimerCommand {
     | 'startStopwatch'
     | 'pauseStopwatch'
     | 'resetStopwatch'
+    | 'setReminder'
   duration?: number
   seconds?: number
+  reminderEnabled?: boolean
+  reminderTime?: number
   mode?: TimerMode
   timezone?: string
 }
@@ -137,7 +140,10 @@ export interface TimerState {
   currentTime?: string // ISO string format
   timezone: string
   stopwatchState?: 'stopped' | 'running' | 'paused'
-  stopwatchElapsedTime?: number
+  stopwatchElapsedTime: number // milliseconds
+  stopwatchStartTime?: number // for precise calculation
+  reminderEnabled: boolean
+  reminderTime: number // seconds (threshold for warning)
 }
 
 declare global {

@@ -23,10 +23,15 @@
         }"
       />
     </svg>
-    <div v-if="displayText" class="time-left" :style="{ fontSize }">
+    <div
+      v-if="displayText"
+      class="time-left"
+      :class="{ blinking: isWarning }"
+      :style="{ fontSize }"
+    >
       {{ timerFormattedTime }}
     </div>
-    <div v-else class="time-left" :style="{ fontSize }">
+    <div v-else class="time-left" :class="{ blinking: isWarning }" :style="{ fontSize }">
       <slot name="content">
         {{ timerFormattedTime }}
       </slot>
@@ -41,11 +46,13 @@ interface Props {
   progress: number
   timerFormattedTime: string
   size: number
-  displayText?: boolean // 是否顯示文字，預設為 true
+  displayText?: boolean
+  isWarning?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   displayText: true,
+  isWarning: false,
 })
 
 // Track whether to apply transition (disable on reset)
@@ -134,5 +141,21 @@ const fontSize = computed(() => {
   left: 50%;
   transform: translate(-50%, -50%);
   font-weight: 500;
+}
+
+.blinking {
+  animation: blink 1s infinite;
+}
+
+@keyframes blink {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.2;
+  }
+  100% {
+    opacity: 1;
+  }
 }
 </style>
