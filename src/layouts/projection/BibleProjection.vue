@@ -46,40 +46,38 @@ const props = defineProps<Props>()
 const bibleContentRef = ref<HTMLElement>()
 const { t: $t, locale } = useI18n()
 
-// 追蹤是否為初始載入
 const isInitialLoad = ref(true)
 
 import { BibleBookConfig } from '@/types/bible'
+import { BIBLE_BOOKS } from '@/config/app'
 
-// 判斷是否為詩篇 (書卷編號 19)
 const isPsalms = computed(() => {
   return props.selectedBookNumber === BibleBookConfig.PSALMS
 })
 
-// 判斷是否為猶大書 (書卷編號 65)
 const isJude = computed(() => {
   return props.selectedBookNumber === BibleBookConfig.JUDE
 })
 
-// 格式化標題
 const formattedTitle = computed(() => {
-  // 保留中文if else 方便之後擴展locale
-  if (locale.value === 'zh') {
+  const bookConfig = BIBLE_BOOKS.find((b) => b.number === props.selectedBookNumber)
+  const bookName = bookConfig
+    ? ($t(`bible.books.${bookConfig.code}`) as string)
+    : props.selectedBook
+
+  if (locale.value === 'en') {
+    return `${bookName} ${props.selectedChapter}:${props.currentVerse}`
   }
 
   if (isJude.value) {
-    // 猶大書：只顯示節
-    return `${props.selectedBook} ${$t('bible.no')} ${props.currentVerse} ${$t('bible.verse')}`
+    return `${bookName} ${$t('bible.no')} ${props.currentVerse} ${$t('bible.verse')}`
   } else if (isPsalms.value) {
-    // 詩篇：章改為篇
-    return `${props.selectedBook} ${$t('bible.no')} ${props.selectedChapter} ${$t('bible.psalm')} ${$t('bible.no')} ${props.currentVerse} ${$t('bible.verse')}`
+    return `${bookName} ${$t('bible.no')} ${props.selectedChapter} ${$t('bible.psalm')} ${$t('bible.no')} ${props.currentVerse} ${$t('bible.verse')}`
   } else {
-    // 一般書卷：章節
-    return `${props.selectedBook} ${$t('bible.no')} ${props.selectedChapter} ${$t('bible.chapter')} ${$t('bible.no')} ${props.currentVerse} ${$t('bible.verse')}`
+    return `${bookName} ${$t('bible.no')} ${props.selectedChapter} ${$t('bible.chapter')} ${$t('bible.no')} ${props.currentVerse} ${$t('bible.verse')}`
   }
 })
 
-// 滾動到指定節
 const scrollToVerse = async (verseNumber: number) => {
   await nextTick()
   const element = document.getElementById(`verse-${verseNumber}`)
@@ -89,14 +87,12 @@ const scrollToVerse = async (verseNumber: number) => {
       block: 'start',
     })
 
-    // 第一次滾動後，將初始載入標記設為 false
     if (isInitialLoad.value) {
       isInitialLoad.value = false
     }
   }
 }
 
-// 監聽當前節數變化
 watch(
   () => props.currentVerse,
   (newVerse) => {

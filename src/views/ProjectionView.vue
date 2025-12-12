@@ -117,7 +117,6 @@ const handleMessage = (data: AppMessage) => {
       projectionStore.setCurrentView(messageData.view as string)
       break
     case 'UPDATE_BIBLE':
-      selectedBook.value = messageData.book as string
       selectedBookNumber.value = messageData.bookNumber as number
       selectedChapter.value = messageData.chapter as number
       chapterVerses.value = messageData.chapterVerses as Array<{ number: number; text: string }>

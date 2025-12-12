@@ -11,7 +11,7 @@
           <v-card-title class="d-flex align-center justify-space-between">
             <div class="d-flex align-center gap-2">
               <div>
-                <span class="mr-1">{{ currentBookName || $t('preview') }}</span>
+                <span class="mr-1">{{ localizedBookName || $t('preview') }}</span>
                 <span v-if="isSearchMode"> ({{ $t('search') }})</span>
               </div>
               <div v-if="currentPassage">
@@ -231,7 +231,7 @@ import { useDisplay } from 'vuetify'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useBibleStore } from '@/stores/bible'
-import { APP_CONFIG, BIBLE_CONFIG } from '@/config/app'
+import { APP_CONFIG, BIBLE_CONFIG, BIBLE_BOOKS } from '@/config/app'
 import { StorageKey, StorageCategory, getStorageKey } from '@/types/common'
 import type { VerseItem } from '@/types/common'
 import type { BiblePassage, SearchResult, SearchResultDisplay } from '@/types/bible'
@@ -293,7 +293,16 @@ const { loadRootFolder } = folderStore
 // Optimized computed properties (cached)
 const maxVerse = computed(() => previewVerses.value.length)
 const hasCurrentPassage = computed(() => !!currentPassage.value)
-const currentBookName = computed(() => currentPassage.value?.bookName || '')
+const localizedBookName = computed(() => {
+  const passage = currentPassage.value
+  if (!passage) return ''
+
+  const bookConfig = BIBLE_BOOKS.find((b) => b.number === passage.bookNumber)
+  if (bookConfig) {
+    return $t(`bible.books.${bookConfig.code}`)
+  }
+  return ''
+})
 
 // Loading state
 const isLoadingVerses = ref(false)
@@ -383,7 +392,6 @@ const handleVerseSelection = async (bookNumber: number, chapter: number, verse: 
   // Prepare new passage info
   const newPassage: BiblePassage = {
     bookAbbreviation: book.abbreviation || '',
-    bookName: book.name,
     bookNumber: book.number,
     chapter,
     verse,
@@ -554,7 +562,7 @@ const closeVerseContextMenu = () => {
 
 const copyVerseText = async () => {
   if (selectedVerse.value && currentPassage.value) {
-    const verseText = `${currentPassage.value.bookName} ${currentPassage.value.chapter}:${selectedVerse.value.number} ${selectedVerse.value.text}`
+    const verseText = `${localizedBookName.value} ${currentPassage.value.chapter}:${selectedVerse.value.number} ${selectedVerse.value.text}`
 
     try {
       await navigator.clipboard.writeText(verseText)

@@ -95,7 +95,6 @@ export enum BibleBookConfig {
  */
 export interface BiblePassage {
   bookAbbreviation: string
-  bookName: string
   bookNumber: number
   chapter: number
   verse: number

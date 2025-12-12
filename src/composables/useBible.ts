@@ -239,7 +239,6 @@ export const useBible = (
 
     // 發送聖經數據
     const bibleData = {
-      book: currentPassage.value.bookName,
       bookNumber: currentPassage.value.bookNumber,
       chapter: currentPassage.value.chapter,
       chapterVerses: previewVerses.value.map((verse) => ({
