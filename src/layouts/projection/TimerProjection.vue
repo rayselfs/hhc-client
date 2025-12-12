@@ -1,5 +1,25 @@
 <template>
-  <v-row v-if="timerMode === TimerMode.BOTH" class="fill-height ma-0 pa-0">
+  <!-- Overtime Message Display -->
+  <v-row
+    v-if="overtimeMessageEnabled && isFinished && overtimeMessage"
+    class="fill-height ma-0 pa-0 align-center justify-center"
+  >
+    <v-col cols="12" class="d-flex justify-center align-center">
+      <div
+        class="text-center text-pre-wrap text-break"
+        :style="{
+          fontSize: `${overtimeFontSize}px`,
+          lineHeight: 1.2,
+          fontWeight: 'bold',
+        }"
+      >
+        {{ overtimeMessage }}
+      </div>
+    </v-col>
+  </v-row>
+
+  <!-- Normal Timer Layout -->
+  <v-row v-else-if="timerMode === TimerMode.BOTH" class="fill-height ma-0 pa-0">
     <v-col cols="5 pa-0 d-flex align-center justify-center">
       <CountdownTimer
         :progress="timerProgress"
@@ -40,6 +60,9 @@ interface Props {
   selectedTimezone: string
   timerProgress: number
   isWarning?: boolean
+  isFinished?: boolean
+  overtimeMessageEnabled?: boolean
+  overtimeMessage?: string
 }
 
 const props = defineProps<Props>()
@@ -63,6 +86,21 @@ const clockSize = computed(() => {
   }
 
   return 400 * (screenWidth / 1920)
+})
+
+const overtimeFontSize = computed(() => {
+  const screenWidth = width.value
+  const len = props.overtimeMessage?.length || 0
+
+  if (len === 0) return 0
+  let vw = 12
+  if (len <= 4) {
+    vw = 18
+  } else if (len > 12) {
+    vw = 10
+  }
+
+  return screenWidth * (vw / 100)
 })
 </script>
 

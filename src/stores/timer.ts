@@ -6,6 +6,8 @@ import { useMemoryManager } from '@/utils/memoryManager'
 import { TIMER_CONFIG, getTimerDefaultSettings } from '@/config/app'
 import { useSentry } from '@/composables/useSentry'
 import { useLocalStorage } from '@/composables/useLocalStorage'
+import i18n from '@/plugins/i18n'
+
 import { StorageKey, StorageCategory, getStorageKey } from '@/types/common'
 import type { TimerState as ElectronTimerState } from '@/types/electron'
 
@@ -25,6 +27,8 @@ export interface TimerSettings {
   currentTime: Date // Current server time
   reminderEnabled: boolean
   reminderTime: number // seconds (threshold for warning)
+  overtimeMessageEnabled: boolean
+  overtimeMessage: string
 }
 
 // State machine for timer status
@@ -48,8 +52,14 @@ export const useTimerStore = defineStore('timer', () => {
           remainingTime: parsed.originalDuration || defaultSettings.remainingTime,
           timerDuration: parsed.originalDuration || defaultSettings.timerDuration,
           currentTime: new Date(),
-          reminderEnabled: parsed.reminderEnabled ?? defaultSettings.reminderEnabled ?? false,
-          reminderTime: parsed.reminderTime ?? defaultSettings.reminderTime ?? 0,
+          reminderEnabled: parsed.reminderEnabled ?? defaultSettings.reminderEnabled,
+          reminderTime: parsed.reminderTime ?? defaultSettings.reminderTime,
+          overtimeMessageEnabled:
+            parsed.overtimeMessageEnabled ?? defaultSettings.overtimeMessageEnabled,
+          overtimeMessage:
+            parsed.overtimeMessage ||
+            (i18n.global.t('timer.defaultOvertimeMessage') as string) ||
+            defaultSettings.overtimeMessage,
         }
       } catch (error) {
         reportError(error, {
@@ -59,7 +69,12 @@ export const useTimerStore = defineStore('timer', () => {
         return defaultSettings
       }
     }
-    return defaultSettings
+    return {
+      ...defaultSettings,
+      overtimeMessage:
+        (i18n.global.t('timer.defaultOvertimeMessage') as string) ||
+        defaultSettings.overtimeMessage,
+    }
   }
 
   // State
@@ -77,6 +92,8 @@ export const useTimerStore = defineStore('timer', () => {
         timezone: settings.value.timezone,
         reminderEnabled: settings.value.reminderEnabled,
         reminderTime: settings.value.reminderTime,
+        overtimeMessageEnabled: settings.value.overtimeMessageEnabled,
+        overtimeMessage: settings.value.overtimeMessage,
       }
       setLocalItem(
         getStorageKey(StorageCategory.TIMER, StorageKey.TIMER_SETTINGS),
@@ -236,6 +253,17 @@ export const useTimerStore = defineStore('timer', () => {
     saveSettings()
   }
 
+  const setOvertimeMessage = (enabled: boolean, message: string) => {
+    settings.value.overtimeMessageEnabled = enabled
+    settings.value.overtimeMessage = message
+    sendTimerCommand({
+      action: 'setOvertimeMessage',
+      overtimeMessageEnabled: enabled,
+      overtimeMessage: message,
+    })
+    saveSettings()
+  }
+
   // Helper function to check if Electron is available
   const isElectron = () => {
     return typeof window !== 'undefined' && !!window.electronAPI
@@ -269,6 +297,10 @@ export const useTimerStore = defineStore('timer', () => {
     if (timerState.reminderEnabled !== undefined)
       settings.value.reminderEnabled = timerState.reminderEnabled
     if (timerState.reminderTime !== undefined) settings.value.reminderTime = timerState.reminderTime
+    if (timerState.overtimeMessageEnabled !== undefined)
+      settings.value.overtimeMessageEnabled = timerState.overtimeMessageEnabled
+    if (timerState.overtimeMessage !== undefined)
+      settings.value.overtimeMessage = timerState.overtimeMessage
 
     if (timerState.startTime !== undefined) {
       if (timerState.startTime) {
@@ -394,6 +426,8 @@ export const useTimerStore = defineStore('timer', () => {
           timezone: savedSettings.timezone,
           reminderEnabled: savedSettings.reminderEnabled,
           reminderTime: savedSettings.reminderTime,
+          overtimeMessageEnabled: savedSettings.overtimeMessageEnabled,
+          overtimeMessage: savedSettings.overtimeMessage,
         })
       }
 
@@ -440,6 +474,7 @@ export const useTimerStore = defineStore('timer', () => {
     removeTime,
     setTimezone,
     setReminder,
+    setOvertimeMessage,
     startTimer,
     pauseTimer,
     resetTimer,

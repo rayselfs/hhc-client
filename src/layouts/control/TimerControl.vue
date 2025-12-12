@@ -236,6 +236,27 @@
                     @update:model-value="handleReminderTimeChange"
                   ></v-text-field>
                 </div>
+                <div class="d-flex align-center mt-2">
+                  <v-switch
+                    v-model="overtimeMessageEnabled"
+                    :label="$t('timer.overtimeMessage')"
+                    color="primary"
+                    hide-details
+                    class="mr-4"
+                    :disabled="timerStore.state !== 'stopped'"
+                  ></v-switch>
+                  <v-text-field
+                    v-model="overtimeMessageInput"
+                    variant="outlined"
+                    density="compact"
+                    hide-details
+                    :label="$t('timer.overtimeMessageLabel')"
+                    :disabled="timerStore.state !== 'stopped'"
+                    :maxlength="TIMER_CONFIG.OVERTIME_MESSAGE.MAX_LENGTH"
+                    style="max-width: 250px"
+                    @blur="handleOvertimeMessageBlur"
+                  ></v-text-field>
+                </div>
               </v-card-text>
             </v-card>
           </v-col>
@@ -254,7 +275,8 @@ import { useStopwatchStore } from '@/stores/stopwatch'
 import { useProjectionStore } from '@/stores/projection'
 import { useElectron } from '@/composables/useElectron'
 import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
-import { APP_CONFIG } from '@/config/app'
+import { APP_CONFIG, TIMER_CONFIG } from '@/config/app'
+
 import { TimerMode, ViewType } from '@/types/common'
 import CountdownTimer from '@/components/Timer/CountdownTimer.vue'
 import Stopwatch from '@/components/Timer/StopWatcher.vue'
@@ -420,10 +442,35 @@ const handleReminderTimeChange = (value: string) => {
   }
   // Remove seconds * 60 conversion, use directly
   if (seconds >= timerStore.settings.originalDuration) {
-    showSnackBar($t('timer.reminderError'), 'error')
+    showSnackBar($t('timer.reminderError'), 'warning')
     timerStore.setReminder(timerStore.settings.reminderEnabled, 0) // Reset to 0
   } else {
     timerStore.setReminder(timerStore.settings.reminderEnabled, seconds)
+  }
+}
+
+const overtimeMessageEnabled = computed({
+  get: () => timerStore.settings.overtimeMessageEnabled,
+  set: (value) => {
+    timerStore.setOvertimeMessage(value, timerStore.settings.overtimeMessage)
+  },
+})
+
+const overtimeMessageInput = computed({
+  get: () => timerStore.settings.overtimeMessage,
+  set: (value) => {
+    timerStore.setOvertimeMessage(timerStore.settings.overtimeMessageEnabled, value)
+  },
+})
+
+const handleOvertimeMessageBlur = () => {
+  if (!overtimeMessageInput.value || overtimeMessageInput.value.trim() === '') {
+    showSnackBar($t('timer.overtimeMessageError'), 'warning')
+    // Reset to default
+    timerStore.setOvertimeMessage(
+      timerStore.settings.overtimeMessageEnabled,
+      $t('timer.defaultOvertimeMessage'),
+    )
   }
 }
 </script>

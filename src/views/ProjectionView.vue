@@ -52,6 +52,9 @@ const timerFormattedTime = computed(() => timerStore.formattedTime)
 const selectedTimezone = computed(() => timerStore.settings.timezone)
 const timerProgress = computed(() => timerStore.progress)
 const isWarning = computed(() => timerStore.isWarning)
+const isFinished = computed(() => timerStore.isFinished)
+const overtimeMessageEnabled = computed(() => timerStore.settings.overtimeMessageEnabled)
+const overtimeMessage = computed(() => timerStore.settings.overtimeMessage)
 
 const currentComponent = computed(() => {
   if (projectionStore.isShowingDefault) {
@@ -97,6 +100,9 @@ const componentProps = computed(() => {
         selectedTimezone: selectedTimezone.value,
         timerProgress: timerProgress.value,
         isWarning: isWarning.value,
+        isFinished: isFinished.value,
+        overtimeMessageEnabled: overtimeMessageEnabled.value,
+        overtimeMessage: overtimeMessage.value,
       }
     default:
       return {}

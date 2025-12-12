@@ -119,10 +119,13 @@ export interface TimerCommand {
     | 'pauseStopwatch'
     | 'resetStopwatch'
     | 'setReminder'
+    | 'setOvertimeMessage'
   duration?: number
   seconds?: number
   reminderEnabled?: boolean
   reminderTime?: number
+  overtimeMessageEnabled?: boolean
+  overtimeMessage?: string
   mode?: TimerMode
   timezone?: string
 }
@@ -144,6 +147,8 @@ export interface TimerState {
   stopwatchStartTime?: number // for precise calculation
   reminderEnabled: boolean
   reminderTime: number // seconds (threshold for warning)
+  overtimeMessageEnabled: boolean
+  overtimeMessage: string
 }
 
 declare global {

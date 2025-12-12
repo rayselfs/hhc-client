@@ -65,6 +65,8 @@ export class TimerService {
       stopwatchElapsedTime: 0,
       reminderEnabled: false,
       reminderTime: 0,
+      overtimeMessageEnabled: false,
+      overtimeMessage: '',
     }
     // Start continuous interval immediately
     this.startInterval()
@@ -304,15 +306,15 @@ export class TimerService {
         break
 
       case 'setReminder':
-        if (command.reminderEnabled !== undefined) {
-          this.state.reminderEnabled = command.reminderEnabled
-        }
-        if (command.reminderTime !== undefined) {
-          this.state.reminderTime = command.reminderTime
-        }
-        this.broadcast()
+        this.state.reminderEnabled = command.reminderEnabled
+        this.state.reminderTime = command.reminderTime
+        this.broadcastTick()
         break
-
+      case 'setOvertimeMessage':
+        this.state.overtimeMessageEnabled = command.overtimeMessageEnabled
+        this.state.overtimeMessage = command.overtimeMessage
+        this.broadcastTick()
+        break
       default:
         console.warn('Unknown timer command:', command)
     }
@@ -345,6 +347,12 @@ export class TimerService {
     }
     if (initialState.reminderTime !== undefined) {
       this.state.reminderTime = initialState.reminderTime
+    }
+    if (initialState.overtimeMessageEnabled !== undefined) {
+      this.state.overtimeMessageEnabled = initialState.overtimeMessageEnabled
+    }
+    if (initialState.overtimeMessage !== undefined) {
+      this.state.overtimeMessage = initialState.overtimeMessage
     }
     this.broadcast()
   }

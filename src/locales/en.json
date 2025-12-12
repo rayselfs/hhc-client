@@ -37,7 +37,11 @@
     "reminder": "Time Reminder",
     "reminderTime": "Reminder Time",
     "reminderError": "Reminder time cannot be greater than total duration",
-    "reminderSecond": "sec"
+    "reminderSecond": "sec",
+    "overtimeMessage": "Time's Up",
+    "overtimeMessageLabel": "Message",
+    "overtimeMessageError": "Message cannot be empty",
+    "defaultOvertimeMessage": "Time's Up!"
   },
   "bible": {
     "title": "BIBLE",

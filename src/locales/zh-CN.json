@@ -37,7 +37,11 @@
     "reminder": "时间提醒",
     "reminderTime": "提醒时间",
     "reminderError": "提醒时间不能大于总时间",
-    "reminderSecond": "秒"
+    "reminderSecond": "秒",
+    "overtimeMessage": "时间到",
+    "overtimeMessageLabel": "显示文字",
+    "overtimeMessageError": "讯息不能为空",
+    "defaultOvertimeMessage": "时间到！"
   },
   "bible": {
     "title": "圣经",

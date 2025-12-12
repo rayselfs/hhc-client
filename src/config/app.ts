@@ -161,6 +161,8 @@ export const TIMER_CONFIG = {
     PAUSED_TIME: 0,
     REMINDER_ENABLED: false,
     REMINDER_TIME: 30,
+    OVERTIME_MESSAGE_ENABLED: false,
+    OVERTIME_MESSAGE: '',
   },
 
   // Stopwatch settings
@@ -173,6 +175,11 @@ export const TIMER_CONFIG = {
   // Preset limits
   PRESETS: {
     MAX_COUNT: 5,
+  },
+
+  // Overtime Message settings
+  OVERTIME_MESSAGE: {
+    MAX_LENGTH: 15,
   },
 
   // UI configuration
@@ -198,6 +205,8 @@ export function getTimerDefaultSettings() {
     pausedTime: TIMER_CONFIG.DEFAULT_SETTINGS.PAUSED_TIME,
     reminderEnabled: TIMER_CONFIG.DEFAULT_SETTINGS.REMINDER_ENABLED,
     reminderTime: TIMER_CONFIG.DEFAULT_SETTINGS.REMINDER_TIME,
+    overtimeMessageEnabled: TIMER_CONFIG.DEFAULT_SETTINGS.OVERTIME_MESSAGE_ENABLED,
+    overtimeMessage: TIMER_CONFIG.DEFAULT_SETTINGS.OVERTIME_MESSAGE,
   }
 }
 
