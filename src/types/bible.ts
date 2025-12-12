@@ -36,7 +36,6 @@ export interface BibleChapter {
  */
 export interface BibleBook {
   id: number
-  code: string
   number: number
   name: string
   abbreviation: string
