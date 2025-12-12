@@ -61,7 +61,6 @@ export const useProjectionMessaging = () => {
    */
   const sendBibleUpdate = (
     bibleData: {
-      book: string
       bookNumber: number
       chapter: number
       chapterVerses: Array<{ number: number; text: string }>
