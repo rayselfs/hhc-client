@@ -6,6 +6,7 @@
 interface MemoryTracker {
   id: string
   type: 'interval' | 'timeout' | 'listener' | 'observer'
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   resource: any
   createdAt: number
   component?: string
@@ -26,8 +27,8 @@ class MemoryManager {
   /**
    * 追蹤資源
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   track(id: string, type: MemoryTracker['type'], resource: any, component?: string): void {
-    // 如果已存在，先清理舊的
     if (this.trackers.has(id)) {
       this.untrack(id)
     }
@@ -40,7 +41,6 @@ class MemoryManager {
       component,
     })
 
-    // 限制追蹤器數量
     if (this.trackers.size > this.maxTrackers) {
       this.cleanupOldTrackers()
     }
@@ -96,7 +96,7 @@ class MemoryManager {
    */
   cleanupComponent(component: string): void {
     const componentTrackers = Array.from(this.trackers.entries())
-      .filter(([_, tracker]) => tracker.component === component)
+      .filter((entry) => entry[1].component === component)
       .map(([id]) => id)
 
     componentTrackers.forEach((id) => this.untrack(id))
@@ -146,6 +146,7 @@ export const memoryManager = MemoryManager.getInstance()
  * Vue 組合式函數：記憶體管理
  */
 export function useMemoryManager(componentName?: string) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const track = (id: string, type: MemoryTracker['type'], resource: any) => {
     memoryManager.track(id, type, resource, componentName)
   }
