@@ -89,11 +89,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ExtendedToolbar from '@/components/ExtendedToolbar.vue'
-import BibleViewer from '@/layouts/control/BibleControl.vue'
-import TimerControl from '@/layouts/control/TimerControl.vue'
+const BibleViewer = defineAsyncComponent(() => import('@/layouts/control/BibleControl.vue'))
+const TimerControl = defineAsyncComponent(() => import('@/layouts/control/TimerControl.vue'))
 import FloatingTimer from '@/components/Timer/FloatingTimer.vue'
 import { useElectron } from '@/composables/useElectron'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'

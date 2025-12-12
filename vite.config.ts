@@ -35,8 +35,22 @@ export default defineConfig({
       renderer: {},
     }),
   ],
+  esbuild: {
+    drop: ['console', 'debugger'],
+  },
   build: {
     outDir: 'dist-electron/renderer',
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vue-vendor': ['vue', 'vue-router', 'pinia', 'vue-i18n'],
+          'vuetify-vendor': ['vuetify'],
+          'utils-vendor': ['@vueuse/core', 'axios', 'uuid'],
+          'sentry-vendor': ['@sentry/vue', '@sentry/electron'],
+        },
+      },
+    },
   },
   resolve: {
     alias: {
