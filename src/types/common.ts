@@ -102,7 +102,7 @@ export interface UpdateTimerMessage extends BaseMessage {
 export interface UpdateBibleMessage extends BaseMessage {
   type: MessageType.UPDATE_BIBLE
   data: {
-    book: string
+    bookNumber: number
     chapter: number
     chapterVerses: Array<{ number: number; text: string }>
     currentVerse: number
