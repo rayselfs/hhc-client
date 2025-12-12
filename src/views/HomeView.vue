@@ -109,15 +109,16 @@ import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
 import { MessageType, ViewType, type AppMessage } from '@/types/common'
 import { useSentry } from '@/composables/useSentry'
 import { useProjectionStore } from '@/stores/projection'
-import { getInitialLocale } from '@/composables/useLocaleDetection'
+import { useLocaleDetection } from '@/composables/useLocaleDetection'
 
 // Composable
-const { t: $t, locale } = useI18n()
+const { t: $t } = useI18n()
 const { reportError } = useSentry()
 const { alertState, confirm, cancel, handleDontShowAgain, warning } = useAlert()
 const { snackbarVisible, snackbarText, snackbarColor, snackbarTimeout, defaultConfig } =
   useSnackBar()
-const { sendViewChange } = useProjectionMessaging()
+const { sendViewChange, syncAllStates } = useProjectionMessaging()
+const { initializeLanguage } = useLocaleDetection()
 
 // Store
 const timerStore = useTimerStore()
@@ -202,7 +203,7 @@ const handleMenuItemClick = (item: { title: string; icon: string; component: str
 // 監聽來自Electron的消息
 const handleElectronMessage = (data: AppMessage) => {
   if (data.type === MessageType.GET_CURRENT_STATE) {
-    sendViewChange(currentView.value as ViewType, true)
+    syncAllStates()
   }
 }
 
@@ -236,25 +237,11 @@ watch(currentView, async () => {})
 
 // 生命週期
 onMounted(async () => {
-  // 初始化語系偵測
-  const initialLocale = await getInitialLocale()
-  locale.value = initialLocale
-
+  await initializeLanguage()
   if (isElectron()) {
-    try {
-      await window.electronAPI.updateLanguage(initialLocale)
-    } catch (error) {
-      console.error('Failed to sync language to Electron:', error)
-    }
-
-    // 監聽來自Electron的消息
-    onMainMessage(handleElectronMessage)
-
-    // 監聽沒有第二螢幕的事件
     onNoSecondScreenDetected(handleNoSecondScreen)
-
-    // 檢查並確保投影窗口存在
     await checkAndEnsureProjectionWindow()
+    onMainMessage(handleElectronMessage)
   }
 })
 

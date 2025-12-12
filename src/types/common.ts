@@ -17,6 +17,7 @@ export enum MessageType {
   GET_CURRENT_STATE = 'get-current-state',
   PROJECTION_CLOSED = 'projection-closed',
   NO_SECOND_SCREEN_DETECTED = 'no-second-screen-detected',
+  UPDATE_LOCALE = 'UPDATE_LOCALE',
 }
 
 /**
@@ -158,6 +159,16 @@ export interface GetCurrentStateMessage extends BaseMessage {
 }
 
 /**
+ * 更新語系消息
+ */
+export interface UpdateLocaleMessage extends BaseMessage {
+  type: MessageType.UPDATE_LOCALE
+  data: {
+    locale: string
+  }
+}
+
+/**
  * 消息聯合類型
  */
 export type AppMessage =
@@ -171,6 +182,7 @@ export type AppMessage =
   | ToggleProjectionContentMessage
   | TimezoneUpdateMessage
   | GetCurrentStateMessage
+  | UpdateLocaleMessage
 
 /**
  * 菜單項目接口

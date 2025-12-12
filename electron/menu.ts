@@ -12,7 +12,7 @@ const getLanguage = () => {
     const settingsPath = path.join(userDataPath, 'language-settings.json')
     if (existsSync(settingsPath)) {
       const settings = JSON.parse(readFileSync(settingsPath, 'utf8'))
-      return settings.language || 'zh-TW'
+      return settings.language || 'en'
     }
   } catch (error) {
     console.error('Failed to read language settings:', error)
@@ -25,7 +25,7 @@ const getLanguage = () => {
       },
     })
   }
-  return 'zh-TW'
+  return 'en'
 }
 
 // Translation function
@@ -89,7 +89,7 @@ const getTranslations = (lang: string) => {
       resetSettings: 'Reset to Factory Settings',
     },
   }
-  return translations[lang] || translations['zh-TW']
+  return translations[lang] || translations['en']
 }
 
 // Create application menu

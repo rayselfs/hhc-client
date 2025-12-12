@@ -4,6 +4,7 @@ import { useElectron } from './useElectron'
 import { useLocalStorage } from './useLocalStorage'
 import { useSentry } from './useSentry'
 import { StorageKey, StorageCategory, getStorageKey } from '@/types/common'
+import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
 
 /**
  * 語系配置接口
@@ -23,9 +24,9 @@ interface LocaleConfig {
  * - en.json - 英文
  */
 const LOCALE_CONFIGS = [
+  { value: 'en', textKey: 'settings.english' },
   { value: 'zh-TW', textKey: 'settings.traditionalChinese' },
   { value: 'zh-CN', textKey: 'settings.simplifiedChinese' },
-  { value: 'en', textKey: 'settings.english' },
 ] as const satisfies readonly LocaleConfig[]
 
 /**
@@ -37,7 +38,7 @@ export type SupportedLocale = (typeof LOCALE_CONFIGS)[number]['value']
 /**
  * 預設語系（取第一個配置的語系）
  */
-const DEFAULT_LOCALE: SupportedLocale = LOCALE_CONFIGS[0]?.value || ('zh' as SupportedLocale)
+const DEFAULT_LOCALE: SupportedLocale = LOCALE_CONFIGS[0]?.value || ('en' as SupportedLocale)
 
 /**
  * 語系選項接口
@@ -84,7 +85,7 @@ function mapSystemLocaleToSupported(systemLocale: string | undefined): Supported
       }
     }
     // 如果只是 'zh'，返回預設語系（通常是 zh-TW）
-    return DEFAULT_LOCALE
+    return 'zh-TW'
   }
 
   // 4. 檢查是否在支援列表中（例如：'en' -> 'en'）
@@ -159,13 +160,55 @@ export function useLocaleDetection() {
   const { locale } = useI18n()
   const { isElectron } = useElectron()
   const { getLocalItem, setLocalItem } = useLocalStorage()
+
   const { reportError } = useSentry()
+  const { sendLocaleUpdate } = useProjectionMessaging()
 
   // 當前選擇的語系
   const selectedLanguage = ref<SupportedLocale>(locale.value as SupportedLocale)
 
   // 語系選項（computed，可根據需要動態生成）
   const languageOptions = computed<LanguageOption[]>(() => LANGUAGE_OPTIONS)
+
+  /**
+   * 應用新的語系設定
+   * 統一處理所有語系相關的副作用：
+   * 1. 更新 i18n 實例
+   * 2. 更新本地狀態
+   * 3. 持久化到 localStorage
+   * 4. 同步到投影視窗
+   * 5. 同步到 Electron 主進程
+   */
+  const applyLocale = async (newLocale: SupportedLocale) => {
+    // 1. 更新 i18n
+    locale.value = newLocale
+
+    // 2. 更新本地狀態
+    selectedLanguage.value = newLocale
+
+    // 3. 持久化
+    const isProjection = window.location.hash.includes('projection')
+
+    if (!isProjection) {
+      setLocalItem(getStorageKey(StorageCategory.APP, StorageKey.PREFERRED_LANGUAGE), newLocale)
+
+      // 4. 同步到投影視窗
+      sendLocaleUpdate(newLocale)
+
+      // 5. 同步到 Electron 主進程
+      if (isElectron()) {
+        try {
+          await window.electronAPI.updateLanguage(newLocale)
+        } catch (error) {
+          reportError(error, {
+            operation: 'update-language',
+            component: 'useLocaleDetection',
+            extra: { newLocale },
+          })
+        }
+      }
+    }
+  }
 
   /**
    * 初始化語系
@@ -176,17 +219,15 @@ export function useLocaleDetection() {
       getStorageKey(StorageCategory.APP, StorageKey.PREFERRED_LANGUAGE),
     )
 
+    let targetLocale: SupportedLocale
+
     if (savedLanguage && SUPPORTED_LOCALES.includes(savedLanguage as SupportedLocale)) {
-      // 如果有保存的語系，使用保存的語系
-      const savedLocale = savedLanguage as SupportedLocale
-      locale.value = savedLocale
-      selectedLanguage.value = savedLocale
+      targetLocale = savedLanguage as SupportedLocale
     } else {
-      // 如果沒有保存的語系，嘗試偵測系統語系
-      const initialLocale = await getInitialLocale()
-      locale.value = initialLocale
-      selectedLanguage.value = initialLocale
+      targetLocale = await getInitialLocale()
     }
+
+    await applyLocale(targetLocale)
   }
 
   /**
@@ -199,27 +240,7 @@ export function useLocaleDetection() {
       return
     }
 
-    const supportedLocale = newLocale as SupportedLocale
-
-    // 更新 i18n locale
-    locale.value = supportedLocale
-    selectedLanguage.value = supportedLocale
-
-    // 保存到 localStorage
-    setLocalItem(getStorageKey(StorageCategory.APP, StorageKey.PREFERRED_LANGUAGE), supportedLocale)
-
-    // 如果是在 Electron 環境，同步更新到 Electron
-    if (isElectron()) {
-      try {
-        await window.electronAPI.updateLanguage(supportedLocale)
-      } catch (error) {
-        reportError(error, {
-          operation: 'update-language',
-          component: 'useLocaleDetection',
-          extra: { newLocale: supportedLocale },
-        })
-      }
-    }
+    await applyLocale(newLocale as SupportedLocale)
   }
 
   return {

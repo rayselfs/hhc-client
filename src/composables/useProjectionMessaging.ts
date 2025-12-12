@@ -8,6 +8,7 @@ import { useMemoryManager } from '@/utils/memoryManager'
 import { useSentry } from './useSentry'
 import { useLocalStorage } from './useLocalStorage'
 import { BIBLE_CONFIG } from '@/config/app'
+import { useI18n } from 'vue-i18n'
 
 // 全局共享的最後發送消息記錄（解決多實例消息去重問題）
 let globalLastSentMessage: AppMessage | null = null
@@ -44,6 +45,7 @@ export const useProjectionMessaging = () => {
     checkProjectionWindow,
     ensureProjectionWindow,
   } = useElectron()
+  const { locale } = useI18n()
   const timerStore = useTimerStore()
   const projectionStore = useProjectionStore()
   const { cleanup } = useMemoryManager('useProjectionMessaging')
@@ -281,6 +283,17 @@ export const useProjectionMessaging = () => {
   }
 
   /**
+   * 發送語系更新消息
+   */
+  const sendLocaleUpdate = (newLocale: string) => {
+    const message: AppMessage = {
+      type: MessageType.UPDATE_LOCALE,
+      data: { locale: newLocale },
+    }
+    debouncedSendToProjection(message, true)
+  }
+
+  /**
    * 同步所有狀態到投影窗口
    * 用途：初始化時或投影窗口重新載入後，將主窗口所有狀態同步到投影窗口
    *
@@ -317,6 +330,10 @@ export const useProjectionMessaging = () => {
         type: MessageType.UPDATE_BIBLE_FONT_SIZE,
         data: { fontSize: bibleFontSize },
       },
+      {
+        type: MessageType.UPDATE_LOCALE,
+        data: { locale: locale.value },
+      },
     ]
 
     sendBatchMessages(messages, true)
@@ -350,6 +367,7 @@ export const useProjectionMessaging = () => {
     sendViewChange,
     sendTimerUpdate,
     sendBibleUpdate,
+    sendLocaleUpdate,
 
     // ====== 批量操作 ======
     syncAllStates,

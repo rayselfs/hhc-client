@@ -3,7 +3,7 @@ import en from '../locales/en.json'
 import zhTW from '../locales/zh-TW.json'
 import zhCN from '../locales/zh-CN.json'
 
-const DEFAULT_LOCALE = 'zh-TW'
+const DEFAULT_LOCALE = 'en'
 
 export default createI18n({
   legacy: false,
