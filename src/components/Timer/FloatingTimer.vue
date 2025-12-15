@@ -1,15 +1,17 @@
 <template>
   <div class="floating-timer" @click="$emit('click')">
-    <v-card class="timer-card" elevation="8" :class="{ 'pulse-animation': timerStore.isRunning }">
+    <v-card
+      class="timer-card pa-1"
+      elevation="8"
+      :class="{ 'pulse-animation': timerStore.isRunning }"
+    >
       <v-card-text class="pa-3" v-if="!stopwatchStore.stopwatchSettings.isStopwatchMode">
-        <template>
-          <CountdownTimer
-            :progress="timerStore.progress"
-            :timer-formatted-time="timerStore.formattedTime"
-            :size="80"
-          >
-          </CountdownTimer>
-        </template>
+        <CountdownTimer
+          :progress="timerStore.progress"
+          :timer-formatted-time="timerStore.formattedTime"
+          :size="90"
+        >
+        </CountdownTimer>
       </v-card-text>
       <v-card-text class="pa-3 d-flex justify-center align-center" v-else>
         <Stopwatch :size="80" />
@@ -46,7 +48,7 @@ defineEmits<{
 }
 
 .timer-card {
-  min-width: 120px;
+  min-width: 90px;
   border-radius: 12px;
   transition: all 0.3s ease;
 }
