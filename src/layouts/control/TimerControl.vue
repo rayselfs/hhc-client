@@ -183,13 +183,22 @@
                     icon="mdi-plus"
                     size="small"
                     variant="tonal"
-                    :disabled="timerStore.state !== 'stopped'"
+                    :disabled="
+                      timerStore.state !== 'stopped' ||
+                      stopwatchStore.stopwatchSettings.isStopwatchMode
+                    "
                     :class="{ 'cursor-not-allowed': timerStore.state !== 'stopped' }"
                     @click="saveTimerPreset"
                   ></v-btn>
                 </div>
                 <v-list density="compact">
-                  <v-list-item v-for="item in timerStore.presets" :key="item.id" class="px-0">
+                  <v-list-item
+                    v-for="item in timerStore.presets"
+                    :key="item.id"
+                    class="px-2 rounded preset-item"
+                    @click="applyPreset(item)"
+                    link
+                  >
                     <template #prepend>
                       <v-icon icon="mdi-history"></v-icon>
                     </template>
@@ -200,16 +209,10 @@
 
                     <template #append>
                       <v-btn
-                        icon="mdi-play"
-                        size="small"
-                        variant="text"
-                        @click="applyPreset(item)"
-                      ></v-btn>
-                      <v-btn
                         icon="mdi-delete"
                         size="small"
                         variant="text"
-                        @click="deletePreset(item.id)"
+                        @click.stop="deletePreset(item.id)"
                       ></v-btn>
                     </template>
                   </v-list-item>
@@ -530,5 +533,13 @@ const handleOvertimeMessageBlur = () => {
 .time-button {
   min-width: 80px;
   width: 80px;
+}
+
+.preset-item {
+  transition: all 0.3s ease;
+}
+
+.preset-item:hover {
+  background-color: rgba(var(--v-theme-primary), 0.2);
 }
 </style>
