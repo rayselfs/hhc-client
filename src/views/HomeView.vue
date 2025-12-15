@@ -31,17 +31,13 @@
       </v-list>
     </v-navigation-drawer>
 
-    <!-- Main content -->
     <v-main>
       <transition name="page-slide" mode="out-in">
         <component :is="currentComponent" :key="currentView" />
       </transition>
     </v-main>
 
-    <!-- Extended Components -->
     <FloatingTimer v-if="showFloatingTimer" @click="goToTimer" />
-
-    <!-- Global Alert Dialog -->
     <AlertDialog
       v-model="alertState.show"
       :title="alertState.title"
@@ -60,11 +56,7 @@
       @cancel="cancel"
       @dont-show-again="handleDontShowAgain"
     />
-
-    <!-- Update Notification -->
     <UpdateNotification />
-
-    <!-- Global SnackBar -->
     <SnackBar
       v-model="snackbarVisible"
       :text="snackbarText"
@@ -73,17 +65,9 @@
       :location="defaultConfig.location"
       :variant="defaultConfig.variant"
     />
-
-    <!-- Global Settings Dialog -->
     <SettingsDialog />
-
-    <!-- Global Shortcuts Dialog -->
     <ShortcutsDialog />
-
-    <!-- Global About Dialog -->
     <AboutDialog />
-
-    <!-- Global Reset Dialog -->
     <ResetDialog />
   </v-layout>
 </template>
