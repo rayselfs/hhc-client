@@ -37,7 +37,14 @@
                     <v-icon icon="mdi-view-split-horizontal" class="mr-2"></v-icon>
                     {{ $t('timer.mode.both') }}
                   </v-btn>
-                  <v-btn value="clock" min-width="110" :disabled="timerStore.state !== 'stopped'">
+                  <v-btn
+                    value="clock"
+                    min-width="110"
+                    :disabled="
+                      !stopwatchStore.stopwatchSettings.isStopwatchMode &&
+                      timerStore.state !== 'stopped'
+                    "
+                  >
                     <v-icon icon="mdi-clock" class="mr-2"></v-icon>
                     {{ $t('timer.mode.clock') }}
                   </v-btn>
@@ -118,7 +125,10 @@
                   icon="mdi-play"
                   color="primary"
                   variant="flat"
-                  :disabled="timerStore.settings.mode === 'clock'"
+                  :disabled="
+                    !stopwatchStore.stopwatchSettings.isStopwatchMode &&
+                    timerStore.settings.mode === 'clock'
+                  "
                   @click="startTimer"
                 ></v-btn>
                 <v-btn
@@ -126,7 +136,10 @@
                   icon="mdi-pause"
                   color="warning"
                   variant="flat"
-                  :disabled="timerStore.settings.mode === 'clock'"
+                  :disabled="
+                    !stopwatchStore.stopwatchSettings.isStopwatchMode &&
+                    timerStore.settings.mode === 'clock'
+                  "
                   @click="pauseTimer"
                 ></v-btn>
                 <v-btn
@@ -134,7 +147,10 @@
                   icon="mdi-play"
                   color="warning"
                   variant="flat"
-                  :disabled="timerStore.settings.mode === 'clock'"
+                  :disabled="
+                    !stopwatchStore.stopwatchSettings.isStopwatchMode &&
+                    timerStore.settings.mode === 'clock'
+                  "
                   @click="resumeTimer"
                 ></v-btn>
               </v-col>
@@ -143,7 +159,10 @@
                   icon="mdi-refresh"
                   color="grey"
                   variant="outlined"
-                  :disabled="timerStore.settings.mode === 'clock'"
+                  :disabled="
+                    !stopwatchStore.stopwatchSettings.isStopwatchMode &&
+                    timerStore.settings.mode === 'clock'
+                  "
                   @click="resetTimer"
                 ></v-btn>
               </v-col>
@@ -210,9 +229,6 @@
                     :label="$t('timer.stopwatch')"
                     color="primary"
                     hide-details
-                    :disabled="
-                      timerStore.state !== 'stopped' || stopwatchStore.stopwatchSettings.isRunning
-                    "
                   ></v-switch>
                 </div>
                 <div class="d-flex align-center mt-2">
@@ -222,7 +238,6 @@
                     color="primary"
                     hide-details
                     class="mr-4"
-                    :disabled="timerStore.state !== 'stopped'"
                   ></v-switch>
                   <v-text-field
                     v-model="reminderTimeInput"
@@ -243,7 +258,6 @@
                     color="primary"
                     hide-details
                     class="mr-4"
-                    :disabled="timerStore.state !== 'stopped'"
                   ></v-switch>
                   <v-text-field
                     v-model="overtimeMessageInput"

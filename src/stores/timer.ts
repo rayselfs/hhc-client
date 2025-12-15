@@ -90,9 +90,7 @@ export const useTimerStore = defineStore('timer', () => {
         mode: settings.value.mode,
         originalDuration: settings.value.originalDuration,
         timezone: settings.value.timezone,
-        reminderEnabled: settings.value.reminderEnabled,
         reminderTime: settings.value.reminderTime,
-        overtimeMessageEnabled: settings.value.overtimeMessageEnabled,
         overtimeMessage: settings.value.overtimeMessage,
       }
       setLocalItem(
