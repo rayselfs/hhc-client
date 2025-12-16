@@ -272,6 +272,7 @@
                     :maxlength="TIMER_CONFIG.OVERTIME_MESSAGE.MAX_LENGTH"
                     style="max-width: 250px"
                     @blur="handleOvertimeMessageBlur"
+                    @keyup.enter="handleOvertimeMessageEnter"
                   ></v-text-field>
                 </div>
               </v-card-text>
@@ -489,6 +490,10 @@ const handleOvertimeMessageBlur = () => {
       $t('timer.defaultOvertimeMessage'),
     )
   }
+}
+const handleOvertimeMessageEnter = (event: Event) => {
+  const target = event.target as HTMLInputElement
+  target?.blur()
 }
 </script>
 
