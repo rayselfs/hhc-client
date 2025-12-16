@@ -144,10 +144,6 @@ export const useBibleStore = defineStore('bible', () => {
   })
 
   const versionStorageKey = getStorageKey(StorageCategory.BIBLE, StorageKey.SELECTED_VERSION)
-  const multiVersionStorageKey = getStorageKey(
-    StorageCategory.BIBLE,
-    StorageKey.MULTI_VERSION_ENABLED,
-  )
   const secondVersionStorageKey = getStorageKey(
     StorageCategory.BIBLE,
     StorageKey.SECOND_VERSION_CODE,
@@ -275,17 +271,8 @@ export const useBibleStore = defineStore('bible', () => {
   currentVersion.value = getLocalItem<BibleVersion>(versionStorageKey, 'object') ?? null
 
   // Initialize multi-version state
-  isMultiVersion.value = getLocalItem<boolean>(multiVersionStorageKey) ?? false
+  isMultiVersion.value = false
   secondVersionCode.value = getLocalItem<string>(secondVersionStorageKey) ?? null
-
-  // Watchers for persistence
-  watch(isMultiVersion, (val) => {
-    if (val) {
-      setLocalItem(multiVersionStorageKey, val)
-    } else {
-      removeLocalItem(multiVersionStorageKey)
-    }
-  })
 
   watch(secondVersionCode, (val) => {
     if (val) {
