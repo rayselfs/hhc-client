@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, shallowRef } from 'vue'
+import { ref, shallowRef, watch } from 'vue'
 import type { BibleContent, BibleVersion, BibleBook } from '@/types/bible'
 import type { VerseItem } from '@/types/common'
 import { BibleCacheConfig } from '@/types/bible'
@@ -24,6 +24,12 @@ export const useBibleStore = defineStore('bible', () => {
    * Current selected Bible version. Persisted to localStorage for reuse.
    */
   const currentVersion = ref<BibleVersion | null>(null)
+
+  /**
+   * Multi-version mode state
+   */
+  const isMultiVersion = ref(false)
+  const secondVersionCode = ref<string | null>(null)
 
   /**
    * History of verses viewed by the user
@@ -138,6 +144,14 @@ export const useBibleStore = defineStore('bible', () => {
   })
 
   const versionStorageKey = getStorageKey(StorageCategory.BIBLE, StorageKey.SELECTED_VERSION)
+  const multiVersionStorageKey = getStorageKey(
+    StorageCategory.BIBLE,
+    StorageKey.MULTI_VERSION_ENABLED,
+  )
+  const secondVersionStorageKey = getStorageKey(
+    StorageCategory.BIBLE,
+    StorageKey.SECOND_VERSION_CODE,
+  )
 
   /**
    * Persist the currently selected version to localStorage or clear it when null.
@@ -269,6 +283,27 @@ export const useBibleStore = defineStore('bible', () => {
 
   // Initialize current version from storage if available
   currentVersion.value = getLocalItem<BibleVersion>(versionStorageKey, 'object') ?? null
+
+  // Initialize multi-version state
+  isMultiVersion.value = getLocalItem<boolean>(multiVersionStorageKey) ?? false
+  secondVersionCode.value = getLocalItem<string>(secondVersionStorageKey) ?? null
+
+  // Watchers for persistence
+  watch(isMultiVersion, (val) => {
+    if (val) {
+      setLocalItem(multiVersionStorageKey, val)
+    } else {
+      removeLocalItem(multiVersionStorageKey)
+    }
+  })
+
+  watch(secondVersionCode, (val) => {
+    if (val) {
+      setLocalItem(secondVersionStorageKey, val)
+    } else {
+      removeLocalItem(secondVersionStorageKey)
+    }
+  })
 
   const enrichContentWithVersion = (content: BibleContent, version: BibleVersion): BibleContent => {
     if (!version) {
@@ -499,6 +534,8 @@ export const useBibleStore = defineStore('bible', () => {
     loadBibleVersions,
     setCurrentVersionByCode,
     getVersionByCode,
+    isMultiVersion,
+    secondVersionCode,
     // Bible Content Cache
     currentBibleContent,
     getBibleContent,

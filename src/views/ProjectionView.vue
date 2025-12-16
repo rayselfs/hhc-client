@@ -40,6 +40,12 @@ const handleMessage = (data: AppMessage) => {
       selectedChapter.value = messageData.chapter as number
       chapterVerses.value = messageData.chapterVerses as Array<{ number: number; text: string }>
       currentVerse.value = messageData.currentVerse as number
+      isMultiVersion.value = !!messageData.isMultiVersion
+      secondVersionChapterVerses.value =
+        (messageData.secondVersionChapterVerses as Array<{
+          number: number
+          text: string
+        }>) || []
       break
     case 'UPDATE_BIBLE_FONT_SIZE':
       verseFontSize.value = Number(messageData.fontSize)
@@ -70,6 +76,8 @@ const selectedBookNumber = ref(1)
 const selectedChapter = ref(1)
 const chapterVerses = ref<Array<{ number: number; text: string }>>([])
 const currentVerse = ref(1)
+const isMultiVersion = ref(false)
+const secondVersionChapterVerses = ref<Array<{ number: number; text: string }>>([])
 const getInitialFontSize = () => {
   const savedFontSize = getLocalItem<number>(
     getStorageKey(StorageCategory.BIBLE, StorageKey.FONT_SIZE),
@@ -125,6 +133,8 @@ const componentProps = computed(() => {
         chapterVerses: chapterVerses.value,
         currentVerse: currentVerse.value,
         fontSize: verseFontSize.value,
+        isMultiVersion: isMultiVersion.value,
+        secondVersionChapterVerses: secondVersionChapterVerses.value,
       }
     case 'timer':
       return {

@@ -255,6 +255,8 @@ const {
   currentPassage,
   previewVerses,
   previewBook,
+  isMultiVersion,
+  secondVersionCode,
 } = storeToRefs(bibleStore)
 const { getBibleContent, addToHistory, setPreviewState, setCurrentPassageVerse } = bibleStore
 const { searchBibleVerses } = useAPI()
@@ -605,6 +607,18 @@ const handleSearchResultClick = async (result: SearchResult) => {
   isLoadingVerses.value = true
   await handleVerseSelection(result.book_number, result.chapter_number, result.verse_number)
 }
+
+// Watch multi-version state changes to update projection immediately
+watch([isMultiVersion, secondVersionCode], async ([newIsMulti, newSecondCode]) => {
+  // Only update if we have a current passage and verse
+  if (currentPassage.value && currentPassage.value.verse) {
+    // If enabling multi-version, we need to make sure we have a second version code
+    if (newIsMulti && !newSecondCode) {
+      return
+    }
+    await updateProjection(currentPassage.value.verse)
+  }
+})
 
 // Handle search
 let searchTimeout: number | null = null

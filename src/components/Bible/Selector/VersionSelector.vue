@@ -1,5 +1,6 @@
 <template>
   <div class="bible-version-selector-wrapper">
+    <!-- version selector -->
     <v-select
       v-model="selectedVersionCode"
       :items="bibleVersions"
@@ -28,18 +29,63 @@
       </template>
     </v-select>
 
-    <!-- 書卷選擇按鈕 -->
+    <!-- dropdown button -->
     <v-btn
       variant="outlined"
       :disabled="!selectedVersionCode"
       @click="showBooksDialog = true"
-      :title="$t('bible.title')"
+      :title="$t('bible.selectBooks')"
       class="books-btn"
+      :class="{ 'mr-2': isMultiVersion }"
     >
       <v-icon>mdi-book-open-page-variant</v-icon>
     </v-btn>
 
-    <!-- 聖經書卷選擇 Dialog -->
+    <!-- Second version selector -->
+    <v-select
+      v-if="isMultiVersion"
+      v-model="secondVersionCode"
+      :items="bibleVersions"
+      item-title="name"
+      item-value="code"
+      :loading="versionsLoading || contentLoading"
+      density="compact"
+      variant="outlined"
+      hide-details
+      class="bible-version-selector"
+      :disabled="versionsLoading || contentLoading"
+      placeholder="Select 2nd Version"
+    >
+      <template v-slot:item="{ props, item }">
+        <v-list-item v-bind="props" class="version-item">
+          <template v-slot:append>
+            <v-btn
+              icon
+              size="small"
+              variant="text"
+              @click.stop="handleItemButtonClick(item.raw.code)"
+            >
+              <v-icon size="small">mdi-refresh</v-icon>
+            </v-btn>
+          </template>
+        </v-list-item>
+      </template>
+    </v-select>
+
+    <!-- Multi-version toggle -->
+    <v-btn
+      variant="text"
+      density="compact"
+      icon
+      :color="isMultiVersion ? 'primary' : undefined"
+      @click="toggleMultiVersion"
+      :title="$t('bible.multiVersion')"
+      :class="!isMultiVersion ? 'ml-5' : 'ml-2'"
+    >
+      <v-icon>mdi-view-split-horizontal</v-icon>
+    </v-btn>
+
+    <!-- Bible Books Dialog -->
     <BooksDialog
       v-model="showBooksDialog"
       :version-code="currentVersion?.code"
@@ -65,7 +111,8 @@ const { t: $t } = useI18n()
 
 // Bible store handling versions, current selection, and cached content
 const bibleStore = useBibleStore()
-const { versions, versionsLoading, currentVersion } = storeToRefs(bibleStore)
+const { versions, versionsLoading, currentVersion, isMultiVersion, secondVersionCode } =
+  storeToRefs(bibleStore)
 const { loadBibleVersions, setCurrentVersionByCode, getBibleContent, setSelectedVerse } = bibleStore
 
 const contentLoading = ref(false)
@@ -112,6 +159,16 @@ watch(
   { immediate: true },
 )
 
+watch(
+  () => secondVersionCode.value,
+  async (newVersionCode) => {
+    if (newVersionCode) {
+      await loadBibleContentForVersion(newVersionCode, false)
+    }
+  },
+  { immediate: true },
+)
+
 // 處理經文選擇
 const handleSelectVerse = (bookNumber: number, chapter: number, verse: number) => {
   setSelectedVerse(bookNumber, chapter, verse)
@@ -138,6 +195,10 @@ onMounted(async () => {
 defineExpose({
   selectedVersion: computed(() => selectedVersionCode.value),
 })
+
+const toggleMultiVersion = () => {
+  isMultiVersion.value = !isMultiVersion.value
+}
 </script>
 
 <style scoped>

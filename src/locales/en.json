@@ -45,6 +45,7 @@
   },
   "bible": {
     "title": "BIBLE",
+    "selectBooks": "Select books",
     "navigateBook": "B",
     "navigateChapter": "C",
     "navigateVerse": "V",
@@ -55,9 +56,10 @@
     "noHistory": "No history yet",
     "searchBooks": "Search books...",
     "search": {
-      "noResults": "No matching verses found"
+      "noResults": "No results found"
     },
-    "controlFontSize": "Control Font Size",
+    "multiVersion": "Multi Version",
+    "controlFontSize": "Font Size",
     "controlChapter": "Control Chapter",
     "controlVerse": "Control Verse",
     "copyVerseContent": "Copy Verse Content",

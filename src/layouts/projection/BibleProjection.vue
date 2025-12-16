@@ -6,19 +6,56 @@
       </div>
     </div>
 
-    <div class="bible-content bg-black" ref="bibleContentRef">
+    <!-- Single Version Mode -->
+    <div v-if="!isMultiVersion" class="bible-content bg-black" ref="bibleContentRef">
       <div
         v-for="verse in chapterVerses"
         :key="verse.number"
         :id="`verse-${verse.number}`"
         class="verse-item pt-5 pb-5 d-flex text-justify"
-        :style="{ fontSize: `${props.fontSize}px` }"
+        :style="{ fontSize: `${computedFontSize}px` }"
       >
         <span class="verse-number">{{ verse.number }}</span>
         <span class="verse-text">{{ verse.text }}</span>
       </div>
 
       <BottomSpacer />
+    </div>
+
+    <!-- Dual Version Mode -->
+    <div v-else class="dual-version-container">
+      <!-- Top Pane (Primary Version) -->
+      <div class="split-pane top-pane bg-black" ref="topPaneRef">
+        <div
+          v-for="verse in chapterVerses"
+          :key="`v1-${verse.number}`"
+          :id="`v1-verse-${verse.number}`"
+          class="verse-item pt-5 pb-5 d-flex text-justify"
+          :style="{ fontSize: `${computedFontSize}px` }"
+        >
+          <span class="verse-number">{{ verse.number }}</span>
+          <span class="verse-text">{{ verse.text }}</span>
+        </div>
+        <BottomSpacer />
+      </div>
+
+      <!-- Divider -->
+      <div class="split-divider"></div>
+
+      <!-- Bottom Pane (Secondary Version) -->
+      <div class="split-pane bottom-pane bg-black" ref="bottomPaneRef">
+        <div
+          v-for="verse in secondVersionChapterVerses"
+          :key="`v2-${verse.number}`"
+          :id="`v2-verse-${verse.number}`"
+          class="verse-item pt-5 pb-5 d-flex text-justify"
+          :style="{ fontSize: `${computedFontSize}px` }"
+        >
+          <span class="verse-number">{{ verse.number }}</span>
+          <span class="verse-text">{{ verse.text }}</span>
+        </div>
+        <BottomSpacer />
+      </div>
     </div>
   </div>
 </template>
@@ -40,16 +77,28 @@ interface Props {
   chapterVerses: BibleVerse[]
   currentVerse: number
   fontSize?: number
+  isMultiVersion?: boolean
+  secondVersionChapterVerses?: BibleVerse[]
 }
 
 const props = defineProps<Props>()
 const bibleContentRef = ref<HTMLElement>()
+const topPaneRef = ref<HTMLElement>()
+const bottomPaneRef = ref<HTMLElement>()
 const { t: $t, locale } = useI18n()
 
 const isInitialLoad = ref(true)
 
+const computedFontSize = computed(() => {
+  const baseSize = props.fontSize || 90 // Default fallback
+  if (props.isMultiVersion) {
+    return baseSize * BIBLE_CONFIG.FONT.DUAL_VERSION_SCALE
+  }
+  return baseSize
+})
+
 import { BibleBookConfig } from '@/types/bible'
-import { BIBLE_BOOKS } from '@/config/app'
+import { BIBLE_BOOKS, BIBLE_CONFIG } from '@/config/app'
 
 const isPsalms = computed(() => {
   return props.selectedBookNumber === BibleBookConfig.PSALMS
@@ -80,16 +129,31 @@ const formattedTitle = computed(() => {
 
 const scrollToVerse = async (verseNumber: number) => {
   await nextTick()
-  const element = document.getElementById(`verse-${verseNumber}`)
-  if (element && bibleContentRef.value) {
-    element.scrollIntoView({
-      behavior: isInitialLoad.value ? 'instant' : 'smooth',
-      block: 'start',
-    })
 
-    if (isInitialLoad.value) {
-      isInitialLoad.value = false
+  const behavior = isInitialLoad.value ? 'instant' : 'smooth'
+
+  if (props.isMultiVersion) {
+    // Scroll top pane
+    const el1 = document.getElementById(`v1-verse-${verseNumber}`)
+    if (el1 && topPaneRef.value) {
+      el1.scrollIntoView({ behavior, block: 'start' })
     }
+
+    // Scroll bottom pane
+    const el2 = document.getElementById(`v2-verse-${verseNumber}`)
+    if (el2 && bottomPaneRef.value) {
+      el2.scrollIntoView({ behavior, block: 'start' })
+    }
+  } else {
+    // Scroll single pane
+    const element = document.getElementById(`verse-${verseNumber}`)
+    if (element && bibleContentRef.value) {
+      element.scrollIntoView({ behavior, block: 'start' })
+    }
+  }
+
+  if (isInitialLoad.value) {
+    isInitialLoad.value = false
   }
 }
 
@@ -98,6 +162,16 @@ watch(
   (newVerse) => {
     if (newVerse) {
       scrollToVerse(newVerse)
+    }
+  },
+)
+
+// Watch mode change to re-trigger scroll
+watch(
+  () => props.isMultiVersion,
+  () => {
+    if (props.currentVerse) {
+      scrollToVerse(props.currentVerse)
     }
   },
 )
@@ -143,6 +217,34 @@ onMounted(() => {
   scrollbar-width: none;
   -ms-overflow-style: none;
   pointer-events: none;
+}
+
+/* Dual Version Styles */
+.dual-version-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  margin-top: 60px;
+  height: calc(100vh - 60px);
+  overflow: hidden;
+}
+
+.split-pane {
+  flex: 1;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  pointer-events: none;
+}
+
+.split-pane::-webkit-scrollbar {
+  display: none;
+}
+
+.split-divider {
+  height: 2px;
+  background-color: #eee;
+  z-index: 10;
 }
 
 .bible-content::-webkit-scrollbar {

@@ -54,6 +54,7 @@ export const BIBLE_CONFIG = {
     MIN_SIZE: 30,
     MAX_SIZE: 150,
     SIZE_STEP: 5,
+    DUAL_VERSION_SCALE: 0.6,
   },
 
   // Verse configuration

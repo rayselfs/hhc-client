@@ -45,6 +45,7 @@
   },
   "bible": {
     "title": "聖經",
+    "selectBooks": "選擇聖經版本",
     "navigateBook": "書",
     "navigateChapter": "章",
     "navigateVerse": "節",
@@ -57,7 +58,8 @@
     "search": {
       "noResults": "沒有找到相關經文"
     },
-    "controlFontSize": "控制字型大小",
+    "multiVersion": "雙重版本",
+    "controlFontSize": "字型大小",
     "controlChapter": "控制章節",
     "controlVerse": "控制節",
     "copyVerseContent": "複製經文內容",

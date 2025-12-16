@@ -5,6 +5,8 @@ import { useProjectionMessaging } from './useProjectionMessaging'
 import { useProjectionStore } from '@/stores/projection'
 import { APP_CONFIG } from '@/config/app'
 import { MessageType, ViewType, StorageKey, StorageCategory, type VerseItem } from '@/types/common'
+import { useBibleStore } from '@/stores/bible'
+import { storeToRefs } from 'pinia'
 import type { BiblePassage, PreviewVerse, BibleBook } from '@/types/bible'
 
 /**
@@ -237,6 +239,34 @@ export const useBible = (
       }
     }
 
+    // Get Bible store state
+    const bibleStore = useBibleStore()
+    const { isMultiVersion, secondVersionCode } = storeToRefs(bibleStore)
+    const { getBibleContent } = bibleStore
+
+    let secondVersionVerses: Array<{ number: number; text: string }> | undefined
+
+    // If multi-version is enabled and a second version is selected, fetch its content
+    if (isMultiVersion.value && secondVersionCode.value) {
+      try {
+        const content = await getBibleContent(secondVersionCode.value)
+        if (content) {
+          const book = content.books.find((b) => b.number === currentPassage.value!.bookNumber)
+          if (book) {
+            const chapter = book.chapters.find((c) => c.number === currentPassage.value!.chapter)
+            if (chapter) {
+              secondVersionVerses = chapter.verses.map((v) => ({
+                number: v.number,
+                text: v.text,
+              }))
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch second version content:', error)
+      }
+    }
+
     // 發送聖經數據
     const bibleData = {
       bookNumber: currentPassage.value.bookNumber,
@@ -246,6 +276,8 @@ export const useBible = (
         text: verse.text,
       })),
       currentVerse: verseNumber,
+      isMultiVersion: isMultiVersion.value,
+      secondVersionChapterVerses: secondVersionVerses,
     }
 
     sendBibleUpdate(bibleData, true)
