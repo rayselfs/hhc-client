@@ -17,29 +17,18 @@ export interface ApiError {
   status?: number
 }
 
-/**
- * useAPI composable
- * 處理與 Bible API 的通訊
- */
+import { StorageKey, StorageCategory, getStorageKey } from '@/types/common'
+import { useLocalStorage } from '@/composables/useLocalStorage'
+
 export function useAPI() {
   const { reportError } = useSentry()
+  const { getLocalItem } = useLocalStorage()
   const loading = ref(false)
   const error: Ref<ApiError | null> = ref(null)
 
   /**
-   * 預設的聖經版本列表（當 API 失敗時使用）
-   */
-  const DEFAULT_VERSIONS: BibleVersion[] = [
-    {
-      id: 1,
-      code: 'CUV-TW',
-      name: '和合本（繁體）',
-    },
-  ]
-
-  /**
    * 取得所有聖經版本
-   * @returns 聖經版本列表，如果 API 失敗則返回預設值
+   * @returns 聖經版本列表
    */
   const getBibleVersions = async (): Promise<BibleVersion[]> => {
     loading.value = true
@@ -63,15 +52,14 @@ export function useAPI() {
 
       const data: BibleVersion[] = await response.json()
 
-      // 如果 API 回傳空陣列或無效數據，使用預設值
+      // 如果 API 回傳空陣列或無效數據，拋出錯誤
       if (!data || !Array.isArray(data) || data.length === 0) {
-        console.warn('API returned empty or invalid data, using default versions')
-        return DEFAULT_VERSIONS
+        throw new Error('API returned empty or invalid data')
       }
 
       return data
     } catch (err) {
-      // API 失敗時，記錄錯誤並返回預設值
+      // API 失敗時，記錄錯誤並嘗試從快取讀取
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred'
       reportError(err, {
         operation: 'fetch-bible-versions',
@@ -83,8 +71,17 @@ export function useAPI() {
         status: err instanceof Response ? err.status : undefined,
       }
 
-      // 返回預設值
-      return DEFAULT_VERSIONS
+      // Try to load from cache
+      const versionsStorageKey = getStorageKey(StorageCategory.BIBLE, StorageKey.VERSIONS)
+      const cachedVersions = getLocalItem<BibleVersion[]>(versionsStorageKey, 'object')
+
+      if (cachedVersions && cachedVersions.length > 0) {
+        console.log('Loaded Bible versions from cache due to API failure')
+        return cachedVersions
+      }
+
+      // 如果快取也沒有，則拋出錯誤
+      throw err
     } finally {
       loading.value = false
     }
