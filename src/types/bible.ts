@@ -11,6 +11,7 @@ export interface BibleVersion {
   id: number
   code: string
   name: string
+  updated_at: number
 }
 
 /**
@@ -50,6 +51,7 @@ export interface BibleContent {
   version_id: number
   version_code: string
   version_name: string
+  updated_at: number
   books: BibleBook[]
 }
 

@@ -13,19 +13,8 @@
       class="bible-version-selector mr-2"
       :disabled="versionsLoading || contentLoading"
     >
-      <template v-slot:item="{ props, item }">
-        <v-list-item v-bind="props" class="version-item">
-          <template v-slot:append>
-            <v-btn
-              icon
-              size="small"
-              variant="text"
-              @click.stop="handleItemButtonClick(item.raw.code)"
-            >
-              <v-icon size="small">mdi-refresh</v-icon>
-            </v-btn>
-          </template>
-        </v-list-item>
+      <template v-slot:item="{ props }">
+        <v-list-item v-bind="props" class="version-item"> </v-list-item>
       </template>
     </v-select>
 
@@ -56,19 +45,8 @@
       :disabled="versionsLoading || contentLoading"
       placeholder="Select 2nd Version"
     >
-      <template v-slot:item="{ props, item }">
-        <v-list-item v-bind="props" class="version-item">
-          <template v-slot:append>
-            <v-btn
-              icon
-              size="small"
-              variant="text"
-              @click.stop="handleItemButtonClick(item.raw.code)"
-            >
-              <v-icon size="small">mdi-refresh</v-icon>
-            </v-btn>
-          </template>
-        </v-list-item>
+      <template v-slot:item="{ props }">
+        <v-list-item v-bind="props" class="version-item"> </v-list-item>
       </template>
     </v-select>
 
@@ -174,10 +152,6 @@ const handleSelectVerse = (bookNumber: number, chapter: number, verse: number) =
   setSelectedVerse(bookNumber, chapter, verse)
 }
 
-const handleItemButtonClick = (versionCode: string) => {
-  loadBibleContentForVersion(versionCode, true)
-}
-
 onMounted(async () => {
   if (bibleVersions.value.length === 0) {
     try {
@@ -221,7 +195,6 @@ const toggleMultiVersion = () => {
   height: 36px;
 }
 
-.refresh-btn,
 .books-btn {
   height: 36px;
   margin-top: 0px;

@@ -130,6 +130,7 @@ export function useAPI() {
         version_id: versionId,
         version_code: '',
         version_name: '',
+        updated_at: 0,
         books: [],
       }
 
@@ -186,6 +187,9 @@ export function useAPI() {
                     bibleContent.version_id = event.version_id
                     bibleContent.version_code = event.version_code
                     bibleContent.version_name = event.version_name
+                    if (event.updated_at) {
+                      bibleContent.updated_at = event.updated_at
+                    }
                   }
                 }
               } catch (parseError) {

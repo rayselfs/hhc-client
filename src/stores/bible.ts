@@ -21,6 +21,12 @@ export const useBibleStore = defineStore('bible', () => {
   let versionsRequest: Promise<BibleVersion[]> | null = null
 
   /**
+   * Map to store in-flight content fetch promises for deduplication
+   * Key: version code, Value: Promise<BibleContent>
+   */
+  const fetchPromises = new Map<string, Promise<BibleContent>>()
+
+  /**
    * Current selected Bible version. Persisted to localStorage for reuse.
    */
   const currentVersion = ref<BibleVersion | null>(null)
@@ -264,6 +270,12 @@ export const useBibleStore = defineStore('bible', () => {
       })
 
     versionsRequest = request
+
+    // Trigger background prefetch (fire and forget)
+    request.then(() => {
+      startBackgroundPrefetch()
+    })
+
     return request
   }
 
@@ -300,20 +312,7 @@ export const useBibleStore = defineStore('bible', () => {
       version_id: version.id,
       version_code: version.code,
       version_name: version.name,
-    }
-  }
-
-  /**
-   * Save Bible content to IndexedDB and update cache
-   */
-  const cacheBibleContent = async (content: BibleContent, version: BibleVersion): Promise<void> => {
-    const contentToPersist = enrichContentWithVersion(content, version)
-    try {
-      await bibleCacheDB.put<BibleContent>(BibleCacheConfig.STORE_NAME, contentToPersist)
-      currentBibleContent.value = contentToPersist
-    } catch (err) {
-      console.error('Failed to cache Bible content:', err)
-      setError('Failed to save content to offline cache.')
+      updated_at: version.updated_at,
     }
   }
 
@@ -338,6 +337,32 @@ export const useBibleStore = defineStore('bible', () => {
 
     currentBibleContent.value = null
     return null
+  }
+
+  /**
+   * Internal helper to fetch and cache version content with request deduplication
+   */
+  const fetchAndCacheVersion = async (version: BibleVersion): Promise<BibleContent> => {
+    // Check for in-flight request
+    if (fetchPromises.has(version.code)) {
+      console.log(`[BibleStore] Reusing in-flight request for ${version.code}`)
+      return fetchPromises.get(version.code)!
+    }
+
+    const promise = (async () => {
+      try {
+        const content = await fetchBibleContent(version.id)
+        // Enrich and cache
+        const contentToPersist = enrichContentWithVersion(content, version)
+        await bibleCacheDB.put<BibleContent>(BibleCacheConfig.STORE_NAME, contentToPersist)
+        return contentToPersist
+      } finally {
+        fetchPromises.delete(version.code)
+      }
+    })()
+
+    fetchPromises.set(version.code, promise)
+    return promise
   }
 
   /**
@@ -372,15 +397,53 @@ export const useBibleStore = defineStore('bible', () => {
         throw new Error(`Bible version metadata for code ${versionCode} not found.`)
       }
 
-      const content = await fetchBibleContent(version.id)
-      await cacheBibleContent(content, version)
-      return currentBibleContent.value
+      // Use the deduplicated fetch helper
+      const content = await fetchAndCacheVersion(version)
+
+      // Update current content if this is still the requested version
+      // (Though usually the component handles race conditions, checking here is safe)
+      currentBibleContent.value = content
+
+      return content
     } catch (err) {
       console.error(`Failed to get or cache content for ${versionCode}:`, err)
       const errorMessage =
         err instanceof Error ? err.message : 'An unknown error occurred while fetching content.'
       setError(errorMessage)
       return null
+    }
+  }
+
+  /**
+   * Prefetch a specific version and cache it without updating the current view
+   * @param version - The version to prefetch
+   */
+  /**
+   * Prefetch a specific version and cache it without updating the current view
+   * Auto-updates if the server version is newer than the cached version
+   * @param version - The version to prefetch
+   */
+  const prefetchVersion = async (version: BibleVersion) => {
+    try {
+      const cached = await bibleCacheDB.get<BibleContent>(BibleCacheConfig.STORE_NAME, version.code)
+      if (cached && cached.updated_at === version.updated_at) {
+        return
+      }
+      await fetchAndCacheVersion(version)
+    } catch (err) {
+      console.warn(`[Background] Failed to prefetch/update version ${version.code}:`, err)
+    }
+  }
+
+  /**
+   * Start background prefetching of all available versions
+   * Runs sequentially to avoid network congestion
+   */
+  const startBackgroundPrefetch = async () => {
+    if (!versions.value || versions.value.length === 0) return
+
+    for (const version of versions.value) {
+      await prefetchVersion(version)
     }
   }
 
