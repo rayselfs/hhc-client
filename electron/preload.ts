@@ -5,6 +5,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Display information
   getDisplays: () => ipcRenderer.invoke('get-displays'),
 
+  // Bible API
+  getBibleVersions: () => ipcRenderer.invoke('api-bible-get-versions'),
+  getBibleContent: (versionId: number) => ipcRenderer.invoke('api-bible-get-content', versionId),
+  searchBibleVerses: (params: unknown) => ipcRenderer.invoke('api-bible-search', params),
+  onBibleContentChunk: (callback: (chunk: Uint8Array) => void) => {
+    ipcRenderer.on('api-bible-content-chunk', (event, chunk) => callback(chunk))
+  },
+
   // Projection window management
   checkProjectionWindow: () => ipcRenderer.invoke('check-projection-window'),
   ensureProjectionWindow: () => ipcRenderer.invoke('ensure-projection-window'),

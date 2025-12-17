@@ -1,5 +1,4 @@
 import { ref, type Ref } from 'vue'
-import { getMainApiHost } from '@/config/api'
 import type {
   BibleVersion,
   BibleContent,
@@ -8,6 +7,8 @@ import type {
   SearchResult,
 } from '@/types/bible'
 import { useSentry } from './useSentry'
+
+const API_HOST = import.meta.env.VITE_BIBLE_API_HOST || 'https://www.alive.org.tw'
 
 /**
  * API 錯誤介面
@@ -19,12 +20,15 @@ export interface ApiError {
 
 import { StorageKey, StorageCategory, getStorageKey } from '@/types/common'
 import { useLocalStorage } from '@/composables/useLocalStorage'
+import { useElectron } from '@/composables/useElectron'
 
 export function useAPI() {
   const { reportError } = useSentry()
   const { getLocalItem } = useLocalStorage()
   const loading = ref(false)
   const error: Ref<ApiError | null> = ref(null)
+
+  const { isElectron } = useElectron()
 
   /**
    * 取得所有聖經版本
@@ -35,8 +39,12 @@ export function useAPI() {
     error.value = null
 
     try {
-      const apiHost = getMainApiHost()
-      const url = `${apiHost}/api/bible/v1/versions`
+      if (isElectron()) {
+        const data = await window.electronAPI.getBibleVersions()
+        return data
+      }
+
+      const url = `${API_HOST}/api/bible/v1/versions`
       const headers: HeadersInit = {
         'Content-Type': 'application/json',
       }
@@ -101,31 +109,63 @@ export function useAPI() {
     error.value = null
 
     try {
-      const apiHost = getMainApiHost()
-      const url = `${apiHost}/api/bible/v1/version/${versionId}`
+      let reader: ReadableStreamDefaultReader<Uint8Array> | undefined
 
-      const headers: HeadersInit = {
-        Accept: 'text/event-stream',
-        'Cache-Control': 'no-cache',
+      if (isElectron()) {
+        // Create a push-source readable stream
+        let controller: ReadableStreamDefaultController<Uint8Array>
+        const stream = new ReadableStream<Uint8Array>({
+          start(c) {
+            controller = c
+          },
+        })
+
+        // Setup listener
+        window.electronAPI.onBibleContentChunk((chunk) => {
+          controller.enqueue(chunk)
+        })
+
+        // Call API
+        // Start the request
+        window.electronAPI
+          .getBibleContent(versionId)
+          .then(() => {
+            // When the promise resolves (success: true), we assume stream is done?
+            // Actually my api.ts implementation finishes loop then returns.
+            // So yes, we can close the stream here.
+            controller.close()
+          })
+          .catch((err) => {
+            controller.error(err)
+          })
+
+        reader = stream.getReader()
+      } else {
+        const url = `${API_HOST}/api/bible/v1/version/${versionId}`
+
+        const headers: HeadersInit = {
+          Accept: 'text/event-stream',
+          'Cache-Control': 'no-cache',
+        }
+
+        const response = await fetch(url, {
+          method: 'GET',
+          headers,
+        })
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`)
+        }
+
+        if (!response.body) {
+          throw new Error('Response body is null')
+        }
+
+        reader = response.body.getReader()
       }
 
-      const response = await fetch(url, {
-        method: 'GET',
-        headers,
-      })
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-
-      if (!response.body) {
-        throw new Error('Response body is null')
-      }
-
-      // 處理 Server-Sent Events
-      const reader = response.body.getReader()
+      // Shared Processing Logic
       const decoder = new TextDecoder()
-
       const bibleContent: BibleContent = {
         version_id: versionId,
         version_code: '',
@@ -200,6 +240,9 @@ export function useAPI() {
         }
       } finally {
         reader.releaseLock()
+        if (isElectron()) {
+          window.electronAPI.removeAllListeners('api-bible-content-chunk')
+        }
       }
 
       return bibleContent
@@ -238,9 +281,12 @@ export function useAPI() {
     error.value = null
 
     try {
-      const apiHost = getMainApiHost()
+      if (isElectron()) {
+        return await window.electronAPI.searchBibleVerses({ q, versionCode, top })
+      }
+
       const encodedQuery = encodeURIComponent(q)
-      const url = `${apiHost}/api/bible/v1/search?q=${encodedQuery}&version=${versionCode}&top=${top}`
+      const url = `${API_HOST}/api/bible/v1/search?q=${encodedQuery}&version=${versionCode}&top=${top}`
 
       const headers: HeadersInit = {
         'Content-Type': 'application/json',

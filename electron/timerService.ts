@@ -2,7 +2,7 @@
  * Timer Service for Electron Main Process
  * Manages timer state and broadcasts updates to all renderer windows
  */
-import { BrowserWindow } from 'electron'
+import { BrowserWindow, ipcMain } from 'electron'
 import type { TimerMode } from '../src/types/common'
 
 export interface TimerState {
@@ -357,11 +357,44 @@ export class TimerService {
     this.broadcast()
   }
 
-  /**
+  /*
    * Cleanup: stop interval and clear windows
    */
   cleanup() {
     this.stopInterval()
     this.windows = []
+  }
+
+  /**
+   * Register IPC handlers for timer service
+   */
+  registerIpcHandlers() {
+    ipcMain.on('timer-command', (event, command: TimerCommand) => {
+      try {
+        this.handleCommand(command)
+      } catch (error) {
+        console.error('Timer command error:', error)
+        // Sentry is initialized in main process, should be available globally or imported
+      }
+    })
+
+    ipcMain.handle('timer-get-state', async () => {
+      try {
+        return this.getState()
+      } catch (error) {
+        console.error('Get timer state error:', error)
+        return null
+      }
+    })
+
+    ipcMain.handle('timer-initialize', async (event, initialState: Partial<TimerState>) => {
+      try {
+        this.initializeState(initialState)
+        return { success: true }
+      } catch (error) {
+        console.error('Timer initialize error:', error)
+        return { success: false }
+      }
+    })
   }
 }

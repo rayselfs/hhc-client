@@ -1,4 +1,4 @@
-import { BrowserWindow } from 'electron'
+import { BrowserWindow, ipcMain } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import * as Sentry from '@sentry/electron'
 
@@ -241,4 +241,47 @@ export const stopPeriodicUpdateCheck = () => {
     clearInterval(updateCheckInterval)
     updateCheckInterval = null
   }
+}
+
+/**
+ * Register IPC handlers for autoUpdater
+ */
+export const registerAutoUpdaterHandlers = () => {
+  ipcMain.handle('start-download', async () => {
+    try {
+      downloadUpdate()
+      return { success: true }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      console.error('開始下載更新失敗:', error)
+      Sentry.captureException(error, {
+        tags: {
+          operation: 'download-update',
+        },
+        extra: {
+          context: 'Failed to start download update',
+        },
+      })
+      return { success: false, error: errorMessage }
+    }
+  })
+
+  ipcMain.handle('install-update', async () => {
+    try {
+      installUpdate()
+      return { success: true }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      console.error('Failed to install update:', error)
+      Sentry.captureException(error, {
+        tags: {
+          operation: 'install-update',
+        },
+        extra: {
+          context: 'Failed to install update',
+        },
+      })
+      return { success: false, error: errorMessage }
+    }
+  })
 }
