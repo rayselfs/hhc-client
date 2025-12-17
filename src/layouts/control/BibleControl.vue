@@ -601,6 +601,23 @@ watch(
   { immediate: false },
 )
 
+// Watch for version changes to auto-update content
+watch(
+  () => currentVersion.value?.code,
+  async (newCode, oldCode) => {
+    if (newCode && newCode !== oldCode && currentPassage.value) {
+      isLoadingVerses.value = true
+      const { bookNumber, chapter, verse } = currentPassage.value
+      await handleVerseSelection(bookNumber, chapter, verse)
+
+      // Update projection with new content if a verse is selected
+      if (verse) {
+        await updateProjection(verse)
+      }
+    }
+  },
+)
+
 // Handle search result click
 const handleSearchResultClick = async (result: SearchResult) => {
   isSearchMode.value = false
