@@ -601,6 +601,13 @@ watch(
   { immediate: false },
 )
 
+// Handle search result click
+const handleSearchResultClick = async (result: SearchResult) => {
+  isSearchMode.value = false
+  isLoadingVerses.value = true
+  await handleVerseSelection(result.book_number, result.chapter_number, result.verse_number)
+}
+
 // Watch for version changes to auto-update content
 watch(
   () => currentVersion.value?.code,
@@ -609,21 +616,9 @@ watch(
       isLoadingVerses.value = true
       const { bookNumber, chapter, verse } = currentPassage.value
       await handleVerseSelection(bookNumber, chapter, verse)
-
-      // Update projection with new content if a verse is selected
-      if (verse) {
-        await updateProjection(verse)
-      }
     }
   },
 )
-
-// Handle search result click
-const handleSearchResultClick = async (result: SearchResult) => {
-  isSearchMode.value = false
-  isLoadingVerses.value = true
-  await handleVerseSelection(result.book_number, result.chapter_number, result.verse_number)
-}
 
 // Watch multi-version state changes to update projection immediately
 watch([isMultiVersion, secondVersionCode], async ([newIsMulti, newSecondCode]) => {
