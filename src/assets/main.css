@@ -6,8 +6,8 @@
 
 html {
   font-family:
-    'Open Sans Variable', 'Noto Sans TC Variable', 'Noto Sans SC Variable', 'Roboto Variable',
-    'Microsoft JhengHei', sans-serif;
+    'Noto Sans TC Variable', 'Noto Sans SC Variable', 'Open Sans Variable', 'Roboto Variable',
+    'Microsoft JhengHei', sans-serif !important;
 }
 
 html.dark {
