@@ -1,4 +1,4 @@
-import { BrowserWindow, screen } from 'electron'
+import { BrowserWindow, screen, app } from 'electron'
 import { join } from 'path'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
@@ -77,6 +77,7 @@ export class WindowManager {
         this.timerService.unregisterWindow(this.mainWindow)
       }
       this.mainWindow = null
+      app.quit()
     })
 
     // Register with timer service
