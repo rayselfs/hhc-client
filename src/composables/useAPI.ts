@@ -245,6 +245,22 @@ export function useAPI() {
         }
       }
 
+      // Sort content before returning
+      if (bibleContent.books) {
+        bibleContent.books.sort((a, b) => a.number - b.number)
+
+        bibleContent.books.forEach((book) => {
+          if (book.chapters) {
+            book.chapters.sort((a, b) => a.number - b.number)
+            book.chapters.forEach((chapter) => {
+              if (chapter.verses) {
+                chapter.verses.sort((a, b) => a.number - b.number)
+              }
+            })
+          }
+        })
+      }
+
       return bibleContent
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred'
