@@ -1,11 +1,11 @@
 <template>
-  <div class="floating-timer" @click="$emit('click')">
+  <div class="floating-timer" @click="handleClick" v-if="isVisible">
     <v-card
       class="timer-card pa-1"
       elevation="8"
       :class="{ 'pulse-animation': timerStore.isRunning }"
     >
-      <v-card-text class="pa-3" v-if="!stopwatchStore.stopwatchSettings.isStopwatchMode">
+      <v-card-text class="pa-3" v-if="!stopwatchStore.global.isStopwatchMode">
         <CountdownTimer
           :progress="timerStore.progress"
           :timer-formatted-time="timerStore.formattedTime"
@@ -21,17 +21,28 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import CountdownTimer from './CountdownTimer.vue'
 import Stopwatch from './StopWatcher.vue'
 import { useTimerStore } from '@/stores/timer'
 import { useStopwatchStore } from '@/stores/stopwatch'
 
+import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
+import { useProjectionStore } from '@/stores/projection'
+import { ViewType } from '@/types/common'
+
 const timerStore = useTimerStore()
 const stopwatchStore = useStopwatchStore()
+const projectionStore = useProjectionStore()
+const { setProjectionState } = useProjectionMessaging()
 
-defineEmits<{
-  (e: 'click'): void
-}>()
+const isVisible = computed(() => {
+  return timerStore.isActivityRunning && projectionStore.currentView !== ViewType.TIMER
+})
+
+const handleClick = () => {
+  setProjectionState(true, ViewType.TIMER)
+}
 </script>
 
 <style scoped>

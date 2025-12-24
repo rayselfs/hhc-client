@@ -19,6 +19,8 @@ export interface TimerState {
   stopwatchStartTime?: number // for precise calculation
   reminderEnabled: boolean
   reminderTime: number // seconds
+  overtimeMessageEnabled: boolean
+  overtimeMessage: string
 }
 
 export interface TimerCommand {
@@ -36,12 +38,15 @@ export interface TimerCommand {
     | 'pauseStopwatch'
     | 'resetStopwatch'
     | 'setReminder'
+    | 'setOvertimeMessage'
   duration?: number
   seconds?: number
   reminderEnabled?: boolean
   reminderTime?: number
   mode?: TimerMode
   timezone?: string
+  overtimeMessageEnabled?: boolean
+  overtimeMessage?: string
 }
 
 export class TimerService {
@@ -306,14 +311,22 @@ export class TimerService {
         break
 
       case 'setReminder':
-        this.state.reminderEnabled = command.reminderEnabled
-        this.state.reminderTime = command.reminderTime
-        this.broadcastTick()
+        if (command.reminderEnabled !== undefined) {
+          this.state.reminderEnabled = command.reminderEnabled
+        }
+        if (command.reminderTime !== undefined) {
+          this.state.reminderTime = command.reminderTime
+        }
+        this.broadcast()
         break
       case 'setOvertimeMessage':
-        this.state.overtimeMessageEnabled = command.overtimeMessageEnabled
-        this.state.overtimeMessage = command.overtimeMessage
-        this.broadcastTick()
+        if (command.overtimeMessageEnabled !== undefined) {
+          this.state.overtimeMessageEnabled = command.overtimeMessageEnabled
+        }
+        if (command.overtimeMessage !== undefined) {
+          this.state.overtimeMessage = command.overtimeMessage
+        }
+        this.broadcast()
         break
       default:
         console.warn('Unknown timer command:', command)

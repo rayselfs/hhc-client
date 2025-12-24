@@ -8,8 +8,8 @@
         :style="{ height: `${leftCardHeight}px` }"
       >
         <v-card :style="{ height: `${leftCardHeight}px` }">
-          <v-card-text>
-            <v-row>
+          <v-card-text class="d-flex flex-column h-100">
+            <v-row class="flex-grow-0">
               <v-col cols="12" align="center">
                 <v-btn-toggle
                   v-model="timerStore.settings.mode"
@@ -19,19 +19,8 @@
                   @update:model-value="handleModeChange"
                 >
                   <v-btn value="timer" min-width="110">
-                    <v-icon
-                      :icon="
-                        stopwatchStore.stopwatchSettings.isStopwatchMode
-                          ? 'mdi-timer-outline'
-                          : 'mdi-timer'
-                      "
-                      class="mr-2"
-                    ></v-icon>
-                    {{
-                      stopwatchStore.stopwatchSettings.isStopwatchMode
-                        ? $t('timer.stopwatch')
-                        : $t('timer.mode.timer')
-                    }}
+                    <v-icon icon="mdi-timer" class="mr-2"></v-icon>
+                    {{ $t('timer.mode.timer') }}
                   </v-btn>
                   <v-btn value="both" min-width="110">
                     <v-icon icon="mdi-view-split-horizontal" class="mr-2"></v-icon>
@@ -41,8 +30,7 @@
                     value="clock"
                     min-width="110"
                     :disabled="
-                      !stopwatchStore.stopwatchSettings.isStopwatchMode &&
-                      timerStore.state !== 'stopped'
+                      !stopwatchStore.global.isStopwatchMode && timerStore.state !== 'stopped'
                     "
                   >
                     <v-icon icon="mdi-clock" class="mr-2"></v-icon>
@@ -52,82 +40,79 @@
               </v-col>
             </v-row>
 
-            <v-row>
+            <v-row class="flex-grow-1 align-center">
               <v-col cols="12">
-                <template v-if="!stopwatchStore.stopwatchSettings.isStopwatchMode">
-                  <CountdownTimer
-                    :progress="timerStore.progress"
-                    :timer-formatted-time="timerStore.formattedTime"
-                    :size="250"
-                    :display-text="timerStore.isRunning"
-                    class="mb-7"
+                <v-fade-transition mode="out-in">
+                  <div
+                    v-if="!stopwatchStore.global.isStopwatchMode"
+                    key="timer"
+                    class="d-flex flex-column align-center justify-center fill-height"
                   >
-                    <template #content>
-                      <div
-                        v-if="timerStore.state === 'stopped'"
-                        class="d-flex justify-center align-center"
-                      >
-                        <v-text-field
-                          v-model="timerStore.inputMinutes"
-                          variant="plain"
-                          density="compact"
-                          hide-details
-                          class="time-input-field"
-                          placeholder="00"
-                          @focus="handleFocus($event)"
-                          @blur="handleBlur()"
-                        ></v-text-field>
-                        <span class="time-separator">:</span>
-                        <v-text-field
-                          v-model="timerStore.inputSeconds"
-                          variant="plain"
-                          density="compact"
-                          hide-details
-                          class="time-input-field"
-                          placeholder="00"
-                          @focus="handleFocus($event)"
-                          @blur="handleBlur()"
-                        ></v-text-field>
-                      </div>
-                      <span v-else>{{ timerStore.formattedTime }}</span>
-                    </template>
-                  </CountdownTimer>
+                    <CountdownTimer
+                      :progress="timerStore.progress"
+                      :timer-formatted-time="timerStore.formattedTime"
+                      :size="250"
+                      :display-text="timerStore.isRunning"
+                      class="mb-8"
+                    >
+                      <template #content>
+                        <div
+                          v-if="timerStore.state === 'stopped'"
+                          class="d-flex justify-center align-center"
+                        >
+                          <TimeInput
+                            v-model="timerStore.inputMinutes"
+                            :on-error="(msg) => showSnackBar(msg, 'error', 3000)"
+                          />
+                          <span class="time-separator">:</span>
+                          <TimeInput
+                            v-model="timerStore.inputSeconds"
+                            :on-error="(msg) => showSnackBar(msg, 'error', 3000)"
+                          />
+                        </div>
+                        <span v-else>{{ timerStore.formattedTime }}</span>
+                      </template>
+                    </CountdownTimer>
 
-                  <!-- Remove Time Buttons -->
-                  <TimeAdjustmentButtons
-                    type="remove"
-                    :remaining-time="timerStore.settings.remainingTime"
-                    @adjust="removeTime"
-                  />
+                    <!-- Remove Time Buttons -->
+                    <TimeAdjustmentButtons
+                      type="remove"
+                      :remaining-time="timerStore.settings.remainingTime"
+                      @adjust="removeTime"
+                    />
 
-                  <!-- Add Time Buttons -->
-                  <TimeAdjustmentButtons
-                    type="add"
-                    :remaining-time="timerStore.settings.remainingTime"
-                    :is-finished="timerStore.isFinished"
-                    @adjust="addTime"
-                  />
-                </template>
-                <div
-                  v-else
-                  class="d-flex justify-center align-center fill-height"
-                  style="height: 350px"
-                >
-                  <Stopwatch :size="250" />
-                </div>
+                    <!-- Add Time Buttons -->
+                    <TimeAdjustmentButtons
+                      type="add"
+                      :remaining-time="timerStore.settings.remainingTime"
+                      :is-finished="timerStore.isFinished"
+                      @adjust="addTime"
+                    />
+                  </div>
+                  <div
+                    v-else
+                    key="stopwatch"
+                    class="d-flex justify-center align-center fill-height"
+                  >
+                    <Stopwatch :size="250" />
+                  </div>
+                </v-fade-transition>
               </v-col>
             </v-row>
 
-            <v-row>
+            <!-- Control Buttons -->
+            <v-row class="mt-auto mb-2 flex-grow-0">
               <v-col cols="6" class="d-flex justify-end">
                 <v-btn
                   v-if="controlState === 'stopped'"
                   icon="mdi-play"
                   color="primary"
                   variant="flat"
-                  :disabled="
-                    !stopwatchStore.stopwatchSettings.isStopwatchMode &&
-                    timerStore.settings.mode === 'clock'
+                  :disabled="areControlsDisabled"
+                  :title="
+                    stopwatchStore.global.isStopwatchMode
+                      ? $t('timer.startStopwatch')
+                      : $t('timer.startCountdown')
                   "
                   @click="startTimer"
                 ></v-btn>
@@ -136,9 +121,11 @@
                   icon="mdi-pause"
                   color="warning"
                   variant="flat"
-                  :disabled="
-                    !stopwatchStore.stopwatchSettings.isStopwatchMode &&
-                    timerStore.settings.mode === 'clock'
+                  :disabled="areControlsDisabled"
+                  :title="
+                    stopwatchStore.global.isStopwatchMode
+                      ? $t('timer.pauseStopwatch')
+                      : $t('timer.pauseCountdown')
                   "
                   @click="pauseTimer"
                 ></v-btn>
@@ -147,9 +134,11 @@
                   icon="mdi-play"
                   color="warning"
                   variant="flat"
-                  :disabled="
-                    !stopwatchStore.stopwatchSettings.isStopwatchMode &&
-                    timerStore.settings.mode === 'clock'
+                  :disabled="areControlsDisabled"
+                  :title="
+                    stopwatchStore.global.isStopwatchMode
+                      ? $t('timer.resumeStopwatch')
+                      : $t('timer.resumeCountdown')
                   "
                   @click="resumeTimer"
                 ></v-btn>
@@ -159,9 +148,11 @@
                   icon="mdi-refresh"
                   color="grey"
                   variant="outlined"
-                  :disabled="
-                    !stopwatchStore.stopwatchSettings.isStopwatchMode &&
-                    timerStore.settings.mode === 'clock'
+                  :disabled="areControlsDisabled"
+                  :title="
+                    stopwatchStore.global.isStopwatchMode
+                      ? $t('timer.resetStopwatch')
+                      : $t('timer.resetCountdown')
                   "
                   @click="resetTimer"
                 ></v-btn>
@@ -184,8 +175,7 @@
                     size="small"
                     variant="tonal"
                     :disabled="
-                      timerStore.state !== 'stopped' ||
-                      stopwatchStore.stopwatchSettings.isStopwatchMode
+                      timerStore.state !== 'stopped' || stopwatchStore.global.isStopwatchMode
                     "
                     :class="{ 'cursor-not-allowed': timerStore.state !== 'stopped' }"
                     @click="saveTimerPreset"
@@ -225,10 +215,10 @@
           <v-col cols="12" :style="{ height: `${rightBottomCardHeight}px` }">
             <v-card :style="{ height: `${rightBottomCardHeight}px` }">
               <v-card-text>
-                <v-label class="text-h6 align-start mb-2">{{ $t('control') }}</v-label>
+                <v-label class="text-h6 align-start mb-2">{{ $t('common.control') }}</v-label>
                 <div class="d-flex align-center fill-height">
                   <v-switch
-                    v-model="stopwatchStore.stopwatchSettings.isStopwatchMode"
+                    v-model="stopwatchStore.global.isStopwatchMode"
                     :label="$t('timer.stopwatch')"
                     color="primary"
                     hide-details
@@ -285,7 +275,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onBeforeUnmount, onUnmounted, nextTick } from 'vue'
+import { computed, onMounted, onBeforeUnmount, onUnmounted } from 'vue'
 import { useDisplay } from 'vuetify'
 import { useI18n } from 'vue-i18n'
 import { useTimerStore } from '@/stores/timer'
@@ -299,9 +289,11 @@ import { TimerMode, ViewType } from '@/types/common'
 import CountdownTimer from '@/components/Timer/CountdownTimer.vue'
 import Stopwatch from '@/components/Timer/StopWatcher.vue'
 import TimeAdjustmentButtons from '@/components/Timer/TimeAdjustmentButtons.vue'
+import TimeInput from '@/components/Timer/TimeInput.vue'
 import { useMemoryManager } from '@/utils/memoryManager'
 import { useSnackBar } from '@/composables/useSnackBar'
 import { useCardLayout } from '@/composables/useLayout'
+import { formatDuration } from '@/utils/time'
 
 const timerStore = useTimerStore()
 const stopwatchStore = useStopwatchStore()
@@ -309,43 +301,29 @@ const projectionStore = useProjectionStore()
 const { t: $t } = useI18n()
 
 const { showSnackBar } = useSnackBar()
-
 const { isElectron } = useElectron()
-
-const { setProjectionState, syncAllStates, cleanupResources } = useProjectionMessaging()
-
+const { setProjectionState, cleanupResources } = useProjectionMessaging()
 const { cleanup } = useMemoryManager('TimerControl')
 
 const { leftCardHeight, rightTopCardHeight, rightBottomCardHeight } = useCardLayout({
   minHeight: APP_CONFIG.UI.MIN_CARD_HEIGHT,
-  topCardRatio: 0.6, // 60% 上，40% 下
+  topCardRatio: 0.6,
 })
 
 const controlState = computed(() => {
-  if (stopwatchStore.stopwatchSettings.isStopwatchMode) {
-    if (stopwatchStore.stopwatchSettings.isRunning) return 'running'
-    if (stopwatchStore.stopwatchSettings.elapsedTime > 0) return 'paused'
+  if (stopwatchStore.global.isStopwatchMode) {
+    if (stopwatchStore.global.isRunning) return 'running'
+    if (stopwatchStore.global.elapsedTime > 0) return 'paused'
     return 'stopped'
   }
   return timerStore.state
 })
 
+const areControlsDisabled = computed(() => {
+  return !stopwatchStore.global.isStopwatchMode && timerStore.settings.mode === 'clock'
+})
+
 const { mdAndUp } = useDisplay()
-
-const handleFocus = (event: FocusEvent) => {
-  const target = event.target as HTMLInputElement
-  if (target) {
-    nextTick(() => {
-      target.select()
-    })
-  }
-}
-
-const handleBlur = () => {
-  if (!/^\d*$/.test(timerStore.inputMinutes) || !/^\d*$/.test(timerStore.inputSeconds)) {
-    showSnackBar('Only numbers are allowed', 'error', 3000)
-  }
-}
 
 const addTime = (secondsToAdd: number) => {
   timerStore.addTime(secondsToAdd)
@@ -360,8 +338,8 @@ const handleModeChange = (mode: TimerMode) => {
 }
 
 const startTimer = async () => {
-  if (stopwatchStore.stopwatchSettings.isStopwatchMode) {
-    stopwatchStore.startStopwatch()
+  if (stopwatchStore.global.isStopwatchMode) {
+    stopwatchStore.startGlobal()
   } else {
     timerStore.startTimer()
     await updateProjectionState()
@@ -369,24 +347,24 @@ const startTimer = async () => {
 }
 
 const pauseTimer = () => {
-  if (stopwatchStore.stopwatchSettings.isStopwatchMode) {
-    stopwatchStore.pauseStopwatch()
+  if (stopwatchStore.global.isStopwatchMode) {
+    stopwatchStore.pauseGlobal()
   } else {
     timerStore.pauseTimer()
   }
 }
 
 const resetTimer = () => {
-  if (stopwatchStore.stopwatchSettings.isStopwatchMode) {
-    stopwatchStore.resetStopwatch()
+  if (stopwatchStore.global.isStopwatchMode) {
+    stopwatchStore.resetGlobal()
   } else {
     timerStore.resetTimer()
   }
 }
 
 const resumeTimer = async () => {
-  if (stopwatchStore.stopwatchSettings.isStopwatchMode) {
-    stopwatchStore.startStopwatch()
+  if (stopwatchStore.global.isStopwatchMode) {
+    stopwatchStore.startGlobal()
   } else {
     timerStore.resumeTimer()
     await updateProjectionState()
@@ -402,35 +380,22 @@ const updateProjectionState = async () => {
   }
 }
 
-// Simplified method: just calls store action
 const applyPreset = (item: { id: string; duration: number }) => {
   timerStore.applyPreset(item)
 }
 
-// Simplified method: just calls store action
 const deletePreset = (id: string) => {
   timerStore.deletePreset(id)
 }
 
-// Simplified method: store already knows the duration
 const saveTimerPreset = () => {
   timerStore.addToPresets(timerStore.settings.originalDuration)
 }
 
-// formatDuration logic remains the same
-const formatDuration = (seconds: number) => {
-  const h = Math.floor(seconds / 3600)
-  const m = Math.floor((seconds % 3600) / 60)
-  const s = seconds % 60
-
-  if (h > 0) {
-    return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
-  }
-  return `${m}:${s.toString().padStart(2, '0')}`
-}
-
 onMounted(() => {
-  syncAllStates()
+  if (isElectron()) {
+    setProjectionState(false, ViewType.TIMER)
+  }
 })
 
 onBeforeUnmount(() => {
@@ -484,11 +449,7 @@ const overtimeMessageInput = computed({
 const handleOvertimeMessageBlur = () => {
   if (!overtimeMessageInput.value || overtimeMessageInput.value.trim() === '') {
     showSnackBar($t('timer.overtimeMessageError'), 'warning')
-    // Reset to default
-    timerStore.setOvertimeMessage(
-      timerStore.settings.overtimeMessageEnabled,
-      $t('timer.defaultOvertimeMessage'),
-    )
+    timerStore.setOvertimeMessage(timerStore.settings.overtimeMessageEnabled, "Time's Up!")
   }
 }
 const handleOvertimeMessageEnter = (event: Event) => {
@@ -506,33 +467,9 @@ const handleOvertimeMessageEnter = (event: Event) => {
   height: 250px;
 }
 
-.time-input-field {
-  width: 90px;
-}
-
 .time-separator {
   font-size: 77px;
   font-weight: 500;
-}
-
-.time-input-field :deep(.v-field__input) {
-  text-align: center;
-  font-size: 77px;
-  font-weight: 500;
-  padding: 0;
-  min-height: auto;
-  transition: all 0.2s ease;
-}
-
-.time-input-field :deep(.v-field__input::placeholder) {
-  color: rgba(var(--v-theme-on-surface), 0.4);
-  font-size: 77px;
-  font-weight: 500;
-}
-
-.time-input-field:focus-within :deep(.v-field__input) {
-  background-color: rgba(var(--v-theme-on-surface), 0.1);
-  border-radius: 8px;
 }
 
 .time-button {

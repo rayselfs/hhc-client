@@ -2,13 +2,14 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useDebounceFn } from '@vueuse/core'
 import { TimerMode } from '@/types/common'
+import { useStopwatchStore } from '@/stores/stopwatch'
 import { useMemoryManager } from '@/utils/memoryManager'
 import { TIMER_CONFIG, getTimerDefaultSettings } from '@/config/app'
 import { useSentry } from '@/composables/useSentry'
 import { useLocalStorage } from '@/composables/useLocalStorage'
-import i18n from '@/plugins/i18n'
+import { useElectron } from '@/composables/useElectron'
 
-import { StorageKey, StorageCategory, getStorageKey } from '@/types/common'
+import { StorageKey, StorageCategory, getStorageKey, MessageType } from '@/types/common'
 import type { TimerState as ElectronTimerState } from '@/types/electron'
 
 export interface TimerPreset {
@@ -35,9 +36,11 @@ export interface TimerSettings {
 type TimerStatus = 'stopped' | 'running' | 'paused'
 
 export const useTimerStore = defineStore('timer', () => {
+  const stopwatchStore = useStopwatchStore()
   const { reportError } = useSentry()
   const { cleanup } = useMemoryManager('useTimerStore')
   const { getLocalItem, setLocalItem } = useLocalStorage()
+  const { isElectron, timerCommand, sendToProjection } = useElectron()
   const loadSettings = () => {
     const defaultSettings = getTimerDefaultSettings()
     const parsed = getLocalItem<TimerSettings>(
@@ -57,9 +60,7 @@ export const useTimerStore = defineStore('timer', () => {
           overtimeMessageEnabled:
             parsed.overtimeMessageEnabled ?? defaultSettings.overtimeMessageEnabled,
           overtimeMessage:
-            parsed.overtimeMessage ||
-            (i18n.global.t('timer.defaultOvertimeMessage') as string) ||
-            defaultSettings.overtimeMessage,
+            parsed.overtimeMessage || defaultSettings.overtimeMessage || "Time's Up!",
         }
       } catch (error) {
         reportError(error, {
@@ -71,9 +72,7 @@ export const useTimerStore = defineStore('timer', () => {
     }
     return {
       ...defaultSettings,
-      overtimeMessage:
-        (i18n.global.t('timer.defaultOvertimeMessage') as string) ||
-        defaultSettings.overtimeMessage,
+      overtimeMessage: defaultSettings.overtimeMessage || "Time's Up!",
     }
   }
 
@@ -145,6 +144,11 @@ export const useTimerStore = defineStore('timer', () => {
     )
   })
 
+  // Check if either timer or stopwatch is running
+  const isActivityRunning = computed(() => {
+    return isRunning.value || stopwatchStore.global.isRunning
+  })
+
   // Internal validation logic moved from component
   const validateAndNormalize = (
     minutesNum: number,
@@ -156,7 +160,7 @@ export const useTimerStore = defineStore('timer', () => {
       m += Math.floor(s / 60)
       s = s % 60
     }
-    m = Math.min(m, 59) // Assuming 59:59 max for this UI
+    m = Math.min(m, 99) // Limit to 99 minutes to fit UI
     s = Math.min(s, 59)
     if (m === 0 && s === 0) {
       s = 30 // Default to 30s if 00:00
@@ -195,6 +199,20 @@ export const useTimerStore = defineStore('timer', () => {
   const setMode = (mode: TimerMode) => {
     sendTimerCommand({ action: 'setMode', mode })
     saveSettings()
+
+    // Broadcast generic message for state consistency
+    sendToProjection({
+      type: MessageType.TIMER_SYNC_SETTINGS,
+      data: {
+        mode,
+        timerDuration: settings.value.timerDuration,
+        timezone: settings.value.timezone,
+        isRunning: isRunning.value,
+        remainingTime: settings.value.remainingTime,
+        formattedTime: formattedTime.value,
+        progress: progress.value,
+      },
+    })
   }
 
   const setTimerDuration = (duration: number) => {
@@ -249,6 +267,23 @@ export const useTimerStore = defineStore('timer', () => {
     settings.value.reminderTime = time
     sendTimerCommand({ action: 'setReminder', reminderEnabled: enabled, reminderTime: time })
     saveSettings()
+
+    sendToProjection({
+      type: MessageType.TIMER_SYNC_SETTINGS,
+      data: {
+        mode: settings.value.mode,
+        timerDuration: settings.value.timerDuration,
+        timezone: settings.value.timezone,
+        isRunning: isRunning.value,
+        remainingTime: settings.value.remainingTime,
+        formattedTime: formattedTime.value,
+        progress: progress.value,
+        reminderEnabled: enabled,
+        reminderTime: time,
+        overtimeMessageEnabled: settings.value.overtimeMessageEnabled,
+        overtimeMessage: settings.value.overtimeMessage,
+      },
+    })
   }
 
   const setOvertimeMessage = (enabled: boolean, message: string) => {
@@ -260,18 +295,30 @@ export const useTimerStore = defineStore('timer', () => {
       overtimeMessage: message,
     })
     saveSettings()
-  }
 
-  // Helper function to check if Electron is available
-  const isElectron = () => {
-    return typeof window !== 'undefined' && !!window.electronAPI
+    sendToProjection({
+      type: MessageType.TIMER_SYNC_SETTINGS,
+      data: {
+        mode: settings.value.mode,
+        timerDuration: settings.value.timerDuration,
+        timezone: settings.value.timezone,
+        isRunning: isRunning.value,
+        remainingTime: settings.value.remainingTime,
+        formattedTime: formattedTime.value,
+        progress: progress.value,
+        reminderEnabled: settings.value.reminderEnabled,
+        reminderTime: settings.value.reminderTime,
+        overtimeMessageEnabled: enabled,
+        overtimeMessage: message,
+      },
+    })
   }
 
   // Helper function to send timer command to main process
   const sendTimerCommand = (command: Parameters<typeof window.electronAPI.timerCommand>[0]) => {
     if (isElectron()) {
       try {
-        window.electronAPI.timerCommand(command)
+        timerCommand(command)
       } catch (error) {
         reportError(error, {
           operation: 'timer-command',
@@ -368,11 +415,19 @@ export const useTimerStore = defineStore('timer', () => {
   }
 
   const loadPresets = () => {
-    const saved = getLocalItem<TimerPreset[]>(
-      getStorageKey(StorageCategory.TIMER, StorageKey.TIMER_PRESETS),
-      'array',
-    )
-    presets.value = saved ? saved : []
+    const key = getStorageKey(StorageCategory.TIMER, StorageKey.TIMER_PRESETS)
+    const raw = localStorage.getItem(key)
+
+    if (raw === null) {
+      presets.value = [
+        { id: 'default-10', duration: 600 },
+        { id: 'default-5', duration: 300 },
+        { id: 'default-3', duration: 180 },
+      ]
+    } else {
+      const saved = getLocalItem<TimerPreset[]>(key, 'array')
+      presets.value = saved || []
+    }
   }
 
   const deletePreset = (id: string) => {
@@ -386,10 +441,11 @@ export const useTimerStore = defineStore('timer', () => {
 
   // 包裝 cleanup 函數
   const cleanupTimerStore = () => {
+    const { removeAllListeners, isElectron } = useElectron()
     // 移除 IPC 監聽器
-    if (isElectron() && typeof window !== 'undefined') {
+    if (isElectron()) {
       try {
-        window.electronAPI.removeAllListeners('timer-tick')
+        removeAllListeners('timer-tick')
       } catch (error) {
         reportError(error, {
           operation: 'cleanup-timer-store',
@@ -403,13 +459,15 @@ export const useTimerStore = defineStore('timer', () => {
 
   // Initialize timer IPC listener
   const initializeTimerIPC = async () => {
+    const { isElectron, onTimerTick, timerInitialize, timerGetState } = useElectron()
+
     if (!isElectron()) {
       return
     }
 
     try {
       // Set up listener for timer updates from main process
-      window.electronAPI.onTimerTick((timerState: Partial<ElectronTimerState>) => {
+      onTimerTick((timerState: Partial<ElectronTimerState>) => {
         updateFromTimerState(timerState)
       })
 
@@ -418,7 +476,7 @@ export const useTimerStore = defineStore('timer', () => {
       const isProjection = window.location.hash.includes('projection')
       if (!isProjection) {
         const savedSettings = loadSettings()
-        await window.electronAPI.timerInitialize({
+        await timerInitialize({
           mode: savedSettings.mode as TimerMode,
           originalDuration: savedSettings.originalDuration,
           timezone: savedSettings.timezone,
@@ -430,7 +488,7 @@ export const useTimerStore = defineStore('timer', () => {
       }
 
       // Get initial state from main process
-      const initialState = await window.electronAPI.timerGetState()
+      const initialState = await timerGetState()
       if (initialState) {
         updateFromTimerState(initialState)
       }
@@ -462,6 +520,7 @@ export const useTimerStore = defineStore('timer', () => {
     progress,
     isFinished,
     isWarning,
+    isActivityRunning,
     inputMinutes, // Export computed for v-model
     inputSeconds, // Export computed for v-model
 

@@ -4,7 +4,7 @@
     :style="{ width: `${size}px`, height: `${size}px` }"
   >
     <span class="stopwatch-text" :style="{ fontSize: fontSize }">{{
-      stopwatchStore.formattedTime
+      stopwatchStore.formattedGlobalTime
     }}</span>
   </div>
 </template>
