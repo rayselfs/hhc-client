@@ -37,43 +37,56 @@ export const useProjectionMessaging = () => {
   const DEBOUNCE_DELAY = 100
 
   /**
-   * Debounced send message function
+   * Debounced send message function with keys
    */
   const debouncedSendToProjection = (() => {
-    let timeoutId: number | null = null
+    const timeoutMap = new Map<string, number>()
+
+    const getMessageKey = (message: AppMessage): string => {
+      // Create a unique key based on message type and action (if available)
+      const base = message.type
+      if (message.data && typeof message.data === 'object' && 'action' in message.data) {
+        return `${base}:${(message.data as { action: string }).action}`
+      }
+      return base
+    }
 
     return (message: AppMessage, force = false) => {
-      // If forced, clear previous timeout
+      const key = getMessageKey(message)
+
+      // If forced, clear previous timeout for this key
       if (force) {
-        if (timeoutId) {
-          clearTimeout(timeoutId)
-          timeoutId = null
+        if (timeoutMap.has(key)) {
+          clearTimeout(timeoutMap.get(key))
+          timeoutMap.delete(key)
         }
-        sendMessageImmediately(message)
+        sendMessageImmediately(message, true)
         return
       }
 
-      // Clear previous timeout
-      if (timeoutId) {
-        clearTimeout(timeoutId)
+      // Clear previous timeout for this key
+      if (timeoutMap.has(key)) {
+        clearTimeout(timeoutMap.get(key))
       }
 
       // Set new timeout
-      timeoutId = window.setTimeout(() => {
-        sendMessageImmediately(message)
-        timeoutId = null
+      const timeoutId = window.setTimeout(() => {
+        sendMessageImmediately(message, false)
+        timeoutMap.delete(key)
       }, DEBOUNCE_DELAY)
+
+      timeoutMap.set(key, timeoutId)
     }
   })()
 
   /**
    * Send message immediately
    */
-  const sendMessageImmediately = (message: AppMessage) => {
+  const sendMessageImmediately = (message: AppMessage, force = false) => {
     if (!isElectron()) return
 
-    // Check if same as last sent message
-    if (isSameMessage(globalLastSentMessage, message)) {
+    // Check if same as last sent message (unless forced)
+    if (!force && isSameMessage(globalLastSentMessage, message)) {
       return
     }
 
@@ -119,7 +132,7 @@ export const useProjectionMessaging = () => {
    */
   const sendBatchMessages = (messages: AppMessage[], force = false) => {
     if (force) {
-      messages.forEach((message) => sendMessageImmediately(message))
+      messages.forEach((message) => sendMessageImmediately(message, true))
     } else {
       messages.forEach((message) => debouncedSendToProjection(message))
     }

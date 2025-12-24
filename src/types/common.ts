@@ -209,7 +209,7 @@ export type AppMessage =
 export interface MediaUpdateMessage extends BaseMessage {
   type: MessageType.MEDIA_UPDATE
   data: {
-    playlist: FileItem[]
+    playlist?: FileItem[]
     currentIndex: number
     action: 'update' | 'next' | 'prev' | 'jump' | 'ended'
     type?: 'video' | 'image' | 'pdf'

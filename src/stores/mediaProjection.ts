@@ -136,6 +136,7 @@ export const useMediaProjectionStore = defineStore('media-projection', () => {
 
       case MessageType.MEDIA_CONTROL:
         if (!('action' in message.data)) return false
+        // ... rest of code
 
         if (message.data.action === 'zoom') {
           setZoom(Number(message.data.value))

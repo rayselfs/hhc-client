@@ -1,7 +1,7 @@
 <template>
-  <div class="media-presenter fill-height d-flex flex-column">
+  <div class="media-presenter fill-height d-flex flex-column bg-black">
     <!-- Main Content Area with Vuetify Grid -->
-    <v-container fluid class="flex-grow-1 overflow-hidden pa-0">
+    <v-container v-if="!showGrid" fluid class="flex-grow-1 overflow-hidden pa-0">
       <v-row no-gutters class="fill-height">
         <!-- Left Column: Main Preview & Controls (cols=8) -->
         <v-col cols="8" class="d-flex flex-column pa-4 border-e">
@@ -130,19 +130,11 @@
                   @mousedown.stop
                 >
                   <div class="d-flex align-center gap-2">
-                    <v-btn
-                      size="x-small"
-                      icon="mdi-minus"
-                      @click="zoomLevel = Math.max(0.1, zoomLevel - 0.1)"
-                    ></v-btn>
+                    <v-btn size="x-small" icon="mdi-minus" @click.stop="zoomOut"></v-btn>
                     <span class="text-caption" style="min-width: 40px; text-align: center"
                       >{{ Math.round(zoomLevel * 100) }}%</span
                     >
-                    <v-btn
-                      size="x-small"
-                      icon="mdi-plus"
-                      @click="zoomLevel = Math.min(5, zoomLevel + 0.1)"
-                    ></v-btn>
+                    <v-btn size="x-small" icon="mdi-plus" @click.stop="zoomIn"></v-btn>
                   </div>
                 </div>
               </v-fade-transition>
@@ -166,7 +158,7 @@
                 variant="text"
                 icon
                 size="large"
-                @click="toggleZoomMode"
+                @click="toggleZoomMode()"
                 :disabled="
                   !currentItem ||
                   (currentItem.metadata.fileType !== 'image' &&
@@ -207,7 +199,7 @@
           </div>
 
           <!-- Navigation & Progress -->
-          <div class="pb-4 d-flex align-center justify-center gap-4">
+          <div class="pb-4 d-flex align-center justify-center gap-4 mt-auto">
             <!-- Prev Button -->
             <v-btn
               icon="mdi-chevron-left"
@@ -298,46 +290,42 @@
     </v-container>
 
     <!-- Grid View Overlay -->
-    <v-dialog v-model="showGrid" fullscreen transition="fade-transition">
-      <v-card class="bg-grey-darken-4">
-        <v-container fluid class="overflow-y-auto">
-          <v-row>
-            <v-col v-for="(item, index) in playlist" :key="item.id" cols="6" sm="4" md="3" lg="2">
-              <v-card
-                @click="jumpTo(index)"
-                hover
-                :color="index === currentIndex ? 'primary' : 'grey-darken-3'"
-              >
-                <v-img
-                  v-if="item.metadata.fileType === 'image'"
-                  :src="item.url"
-                  aspect-ratio="1.77"
-                  cover
-                ></v-img>
-                <v-img
-                  v-else-if="item.metadata.thumbnail"
-                  :src="item.metadata.thumbnail"
-                  aspect-ratio="1.77"
-                  cover
-                >
-                  <div class="d-flex align-center justify-center fill-height">
-                    <v-icon size="36" color="white" style="text-shadow: 0 0 5px black">{{
-                      getIcon(item.metadata.fileType)
-                    }}</v-icon>
-                  </div>
-                </v-img>
-                <div v-else class="d-flex align-center justify-center" style="aspect-ratio: 1.77">
-                  <v-icon size="48">{{ getIcon(item.metadata.fileType) }}</v-icon>
-                </div>
-                <v-card-text class="text-caption text-truncate"
-                  >{{ index + 1 }}. {{ item.name }}</v-card-text
-                >
-              </v-card>
-            </v-col>
-          </v-row>
-        </v-container>
-      </v-card>
-    </v-dialog>
+    <v-container v-else fluid class="overflow-y-auto">
+      <v-row>
+        <v-col v-for="(item, index) in playlist" :key="item.id" cols="6" sm="4" md="3" lg="2">
+          <v-card
+            @click="jumpTo(index)"
+            hover
+            :color="index === currentIndex ? 'primary' : 'grey-darken-4'"
+          >
+            <v-img
+              v-if="item.metadata.fileType === 'image'"
+              :src="item.url"
+              aspect-ratio="1.77"
+              cover
+            ></v-img>
+            <v-img
+              v-else-if="item.metadata.thumbnail"
+              :src="item.metadata.thumbnail"
+              aspect-ratio="1.77"
+              cover
+            >
+              <div class="d-flex align-center justify-center fill-height">
+                <v-icon size="36" color="white" style="text-shadow: 0 0 5px black">{{
+                  getIcon(item.metadata.fileType)
+                }}</v-icon>
+              </div>
+            </v-img>
+            <div v-else class="d-flex align-center justify-center" style="aspect-ratio: 1.77">
+              <v-icon size="48">{{ getIcon(item.metadata.fileType) }}</v-icon>
+            </div>
+            <v-card-text class="text-caption text-truncate"
+              >{{ index + 1 }}. {{ item.name }}</v-card-text
+            >
+          </v-card>
+        </v-col>
+      </v-row>
+    </v-container>
   </div>
 </template>
 
@@ -380,23 +368,30 @@ const { setProjectionState, sendProjectionMessage } = useProjectionMessaging()
 
 // Controls Logic
 const showZoomControls = ref(false)
-const toggleZoomMode = () => {
+const toggleZoomMode = (minus = false) => {
   if (showZoomControls.value) {
-    // Turning OFF
     showZoomControls.value = false
     store.setZoom(1)
     store.setPan(0, 0)
   } else {
-    // Turning ON
+    let zoomValue = 1.2
+    if (minus) zoomValue = 0.8
     showZoomControls.value = true
-    store.setZoom(1.2) // Default to 120%
-    store.setPan(0, 0) // Reset pan
+    store.setZoom(zoomValue)
+    store.setPan(0, 0)
   }
+}
+
+const zoomIn = () => {
+  store.setZoom(Math.min(5, zoomLevel.value + 0.1))
+}
+
+const zoomOut = () => {
+  store.setZoom(Math.max(0.1, zoomLevel.value - 0.1))
 }
 
 const videoRef = ref<HTMLVideoElement | null>(null)
 
-// Video Status
 const { t } = useI18n()
 const hasStarted = ref(false)
 const videoStatusText = computed(() => {
@@ -525,9 +520,8 @@ const getIcon = (type: string) => {
 
 // Navigation & Actions
 const exitPresentation = async () => {
-  store.exit()
-  // Switch back to default projection (close media, show logo)
   await setProjectionState(true)
+  store.exit()
 }
 
 const jumpTo = (index: number) => {
@@ -536,7 +530,6 @@ const jumpTo = (index: number) => {
 
 const togglePlay = () => {
   if (!isPlaying.value) {
-    // Starting or Resuming
     hasStarted.value = true
   }
   store.setPlaying(!isPlaying.value)
@@ -558,32 +551,37 @@ const prevPdfPage = () => store.setPdfPage(pdfPage.value - 1)
 
 // State Synchronization with Projection Window
 // We watch key state and send updates
+
+// 1. Watch Playlist changes (Full Sync)
 watch(
-  [playlist, currentIndex],
-  () => {
-    sendProjectionMessage(MessageType.MEDIA_UPDATE, {
-      playlist: JSON.parse(JSON.stringify(playlist.value)), // Strip reactive proxies
-      currentIndex: currentIndex.value,
-      action: 'update',
-    })
+  playlist,
+  (newVal) => {
+    sendProjectionMessage(
+      MessageType.MEDIA_UPDATE,
+      {
+        playlist: JSON.parse(JSON.stringify(newVal)), // Strip reactive proxies
+        currentIndex: currentIndex.value,
+        action: 'update',
+      },
+      { force: true },
+    )
   },
   { deep: true },
-) // Deep watch might be expensive for playlist.
+)
 
-// Optimization: Watch currentIndex separately?
+// 2. Watch Current Index changes (Jump)
 watch(currentIndex, (val) => {
-  sendProjectionMessage(MessageType.MEDIA_UPDATE, {
-    playlist: [], // optimize? If playlist didn't change, maybe don't send?
-    // But receiver logic overwrites playlist if provided.
-    // I should update receiver to optional playlist.
-    // For now, send 'jump' action
-    currentIndex: val,
-    action: 'jump',
-  })
+  sendProjectionMessage(
+    MessageType.MEDIA_UPDATE,
+    {
+      currentIndex: val,
+      action: 'jump',
+    },
+    { force: true },
+  )
 })
 
 watch(zoomLevel, (val) => {
-  // User Request: Back to 100% should reset to center
   if (val <= 1 && (pan.value.x !== 0 || pan.value.y !== 0)) {
     store.setPan(0, 0)
   }
@@ -625,9 +623,15 @@ const handleKeydown = (e: KeyboardEvent) => {
     case 'Escape':
       if (showGrid.value) {
         showGrid.value = false
-      } else {
-        exitPresentation()
+        break
       }
+
+      if (showZoomControls.value) {
+        toggleZoomMode()
+        break
+      }
+
+      exitPresentation()
       break
     case 'ArrowRight':
     case 'ArrowDown':
@@ -654,6 +658,34 @@ const handleKeydown = (e: KeyboardEvent) => {
     case 'G':
       store.toggleGrid()
       break
+    case ' ':
+      e.preventDefault()
+      togglePlay()
+      break
+    case 'r':
+    case 'R':
+      restartVideo()
+      break
+    case 'z':
+    case 'Z':
+      toggleZoomMode()
+      break
+    case '+':
+    case '=':
+      if (showZoomControls.value) {
+        zoomIn()
+      } else {
+        toggleZoomMode()
+      }
+      break
+    case '-':
+    case '_':
+      if (showZoomControls.value) {
+        zoomOut()
+      } else {
+        toggleZoomMode(true)
+      }
+      break
   }
 }
 
@@ -665,6 +697,17 @@ onMounted(async () => {
   if (isElectron()) {
     // Switch to Media View for projection
     await setProjectionState(false, ViewType.MEDIA)
+
+    // Initial Sync
+    sendProjectionMessage(
+      MessageType.MEDIA_UPDATE,
+      {
+        playlist: JSON.parse(JSON.stringify(playlist.value)),
+        currentIndex: currentIndex.value,
+        action: 'update',
+      },
+      { force: true },
+    )
   }
 
   onProjectionMessage((msg) => {
@@ -674,7 +717,6 @@ onMounted(async () => {
       msg.data?.type === 'video'
     ) {
       // Video Finished
-      console.log('Video ended msg received')
       store.setPlaying(false)
       hasStarted.value = false // Reset to Ready
     }
@@ -688,6 +730,17 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.media-presenter {
+  border-radius: inherit;
+  display: flex;
+  left: 0;
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  z-index: 9999;
+}
+
 .live-preview-container {
   height: auto; /* Overridden by inline style */
   border: 1px solid #333;
