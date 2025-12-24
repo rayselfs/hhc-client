@@ -14,7 +14,7 @@
       <v-card-text v-if="showDontShowAgain" class="pa-4 pt-0">
         <v-checkbox
           v-model="dontShowAgain"
-          :label="$t('dontShowAgain')"
+          :label="$t('common.dontShowAgain')"
           density="compact"
           hide-details
         />
@@ -76,8 +76,8 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 // 使用 i18n 作為預設值
-const confirmText = computed(() => props.confirmButtonText || t('confirm'))
-const cancelText = computed(() => props.cancelButtonText || t('cancel'))
+const confirmText = computed(() => props.confirmButtonText || t('common.confirm'))
+const cancelText = computed(() => props.cancelButtonText || t('common.cancel'))
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void
