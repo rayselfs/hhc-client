@@ -10,11 +10,10 @@
       v-model="drawer"
       permanent
       :rail="drawerCollapsed"
-      rail-width="72"
+      rail-width="60"
       width="240"
-      class="custom-drawer"
     >
-      <v-list>
+      <v-list class="pa-0">
         <v-list-item
           v-for="(item, index) in menuItems"
           :key="index"
@@ -22,6 +21,7 @@
           @click="handleMenuItemClick(item)"
           :active="currentView === item.component"
           class="menu-item"
+          color="primary"
         >
           <template #prepend>
             <v-icon :icon="item.icon" size="24"></v-icon>
@@ -32,84 +32,52 @@
     </v-navigation-drawer>
 
     <v-main>
-      <transition name="page-slide" mode="out-in">
+      <v-slide-x-transition mode="out-in">
         <component :is="currentComponent" :key="currentView" />
-      </transition>
+      </v-slide-x-transition>
     </v-main>
 
-    <FloatingTimer v-if="showFloatingTimer" @click="goToTimer" />
-    <AlertDialog
-      v-model="alertState.show"
-      :title="alertState.title"
-      :message="alertState.message"
-      :icon="alertState.icon"
-      :icon-color="alertState.iconColor"
-      :confirm-button-text="alertState.confirmButtonText"
-      :confirm-button-color="alertState.confirmButtonColor"
-      :cancel-button-text="alertState.cancelButtonText"
-      :cancel-button-color="alertState.cancelButtonColor"
-      :show-cancel-button="alertState.showCancelButton"
-      :max-width="alertState.maxWidth"
-      :show-dont-show-again="alertState.showDontShowAgain"
-      :alert-id="alertState.alertId"
-      @confirm="confirm"
-      @cancel="cancel"
-      @dont-show-again="handleDontShowAgain"
-    />
-    <UpdateNotification />
-    <SnackBar
-      v-model="snackbarVisible"
-      :text="snackbarText"
-      :timeout="snackbarTimeout"
-      :color="snackbarColor"
-      :location="defaultConfig.location"
-      :variant="defaultConfig.variant"
-    />
-    <SettingsDialog />
-    <ShortcutsDialog />
-    <AboutDialog />
-    <ResetDialog />
+    <GlobalOverlays />
   </v-layout>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { storeToRefs } from 'pinia'
+
+// Components
 import ExtendedToolbar from '@/components/ExtendedToolbar.vue'
-const BibleViewer = defineAsyncComponent(() => import('@/layouts/control/BibleControl.vue'))
+import GlobalOverlays from '@/components/GlobalOverlays.vue'
+
+const BibleControl = defineAsyncComponent(() => import('@/layouts/control/BibleControl.vue'))
 const TimerControl = defineAsyncComponent(() => import('@/layouts/control/TimerControl.vue'))
-import FloatingTimer from '@/components/Timer/FloatingTimer.vue'
+const MediaControl = defineAsyncComponent(() => import('@/layouts/control/MediaControl.vue'))
+
+// Composables
 import { useElectron } from '@/composables/useElectron'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
-import { AlertDialog, SnackBar } from '@/components/Alert'
-import { UpdateNotification } from '@/components/Updater'
-import { SettingsDialog, AboutDialog, ResetDialog } from '@/components/Main'
-import { ShortcutsDialog } from '@/components/Shortcuts'
 import { useAlert } from '@/composables/useAlert'
-import { useSnackBar } from '@/composables/useSnackBar'
-import { useTimerStore } from '@/stores/timer'
-import { useStopwatchStore } from '@/stores/stopwatch'
-import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
-import { MessageType, ViewType, type AppMessage } from '@/types/common'
 import { useSentry } from '@/composables/useSentry'
-import { useProjectionStore } from '@/stores/projection'
 import { useLocaleDetection } from '@/composables/useLocaleDetection'
+import { useProjectionSync } from '@/composables/useProjectionSync'
 
-// Composable
+// Stores
+import { useProjectionStore } from '@/stores/projection'
+
+// Types
+import { MessageType, ViewType, type AppMessage, type MenuItem } from '@/types/common'
+
 const { t: $t } = useI18n()
 const { reportError } = useSentry()
-const { alertState, confirm, cancel, handleDontShowAgain, warning } = useAlert()
-const { snackbarVisible, snackbarText, snackbarColor, snackbarTimeout, defaultConfig } =
-  useSnackBar()
-const { sendViewChange, syncAllStates } = useProjectionMessaging()
+const { warning } = useAlert()
+const { syncAllStates } = useProjectionSync()
 const { initializeLanguage } = useLocaleDetection()
 
-// Store
-const timerStore = useTimerStore()
-const stopwatchStore = useStopwatchStore()
 const projectionStore = useProjectionStore()
 
-// Electron composable
+const { currentView } = storeToRefs(projectionStore)
+
 const {
   isElectron,
   onMainMessage,
@@ -119,79 +87,52 @@ const {
   removeAllListeners,
 } = useElectron()
 
-// 控制 navigation-drawer 的開關狀態，預設為開啟 (true)
 const drawer = ref(true)
-
-// 控制 drawer 的縮放狀態，預設為收起 (true)
 const drawerCollapsed = ref(true)
-
-// 當前選中的視圖
-const currentView = ref(ViewType.BIBLE) // 預設使用聖經
-
-// 懸浮計時器顯示狀態
-// 懸浮計時器顯示狀態
-const showFloatingTimer = computed(() => {
-  const isTimerRunning = timerStore.isRunning
-  const isStopwatchRunning = stopwatchStore.stopwatchSettings.isRunning
-  return (isTimerRunning || isStopwatchRunning) && currentView.value !== ViewType.TIMER
-})
 
 useKeyboardShortcuts(currentView)
 
-// 選單項目配置
-const menuItems = ref([
-  {
-    title: 'bible.title',
-    icon: 'mdi-book-open-variant',
-    component: 'bible',
-  },
+const menuItems = ref<MenuItem[]>([
   {
     title: 'timer.title',
     icon: 'mdi-clock-outline',
-    component: 'timer',
+    component: ViewType.TIMER,
+  },
+  {
+    title: 'bible.title',
+    icon: 'mdi-book-open-variant',
+    component: ViewType.BIBLE,
+  },
+  {
+    title: 'media.title',
+    icon: 'mdi-folder-multiple-image',
+    component: ViewType.MEDIA,
   },
 ])
 
-// 組件映射
 const componentMap = {
-  bible: BibleViewer,
-  timer: TimerControl,
+  [ViewType.BIBLE]: BibleControl,
+  [ViewType.TIMER]: TimerControl,
+  [ViewType.MEDIA]: MediaControl,
 }
 
-// 當前組件
 const currentComponent = computed(() => {
   return componentMap[currentView.value as keyof typeof componentMap]
 })
 
-// 切換 drawer 縮放狀態
 const toggleDrawer = () => {
   drawerCollapsed.value = !drawerCollapsed.value
 }
 
-// 點擊懸浮計時器跳轉到計時器頁面
-const goToTimer = () => {
-  currentView.value = ViewType.TIMER
-  projectionStore.setCurrentView(currentView.value)
-  sendViewChange(ViewType.TIMER, true)
+const handleMenuItemClick = (item: MenuItem) => {
+  projectionStore.setCurrentView(item.component)
 }
-
-// 處理選單項目點擊事件
-const handleMenuItemClick = (item: { title: string; icon: string; component: string }) => {
-  currentView.value = item.component as ViewType
-  if (item.component === ViewType.TIMER) {
-    projectionStore.setCurrentView(ViewType.TIMER)
-    sendViewChange(ViewType.TIMER, true)
-  }
-}
-
-// 監聽來自Electron的消息
 const handleElectronMessage = (data: AppMessage) => {
-  if (data.type === MessageType.GET_CURRENT_STATE) {
+  if (data.type === MessageType.SYSTEM_GET_STATE) {
     syncAllStates()
   }
 }
 
-// 處理沒有第二螢幕的提示
 const handleNoSecondScreen = async () => {
   await warning($t('alert.dualScreenRequired'), $t('alert.screenWarning'), {
     showDontShowAgain: true,
@@ -199,7 +140,6 @@ const handleNoSecondScreen = async () => {
   })
 }
 
-// 檢查並確保投影窗口存在
 const checkAndEnsureProjectionWindow = async () => {
   if (isElectron()) {
     try {
@@ -216,10 +156,7 @@ const checkAndEnsureProjectionWindow = async () => {
   }
 }
 
-// 監聽視圖切換
-watch(currentView, async () => {})
-
-// 生命週期
+// Lifecycle hooks
 onMounted(async () => {
   await initializeLanguage()
   if (isElectron()) {
@@ -237,49 +174,4 @@ onBeforeUnmount(() => {
 })
 </script>
 
-<style scoped>
-.page-slide-enter-active,
-.page-slide-leave-active {
-  transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
-}
-
-.page-slide-enter-from {
-  opacity: 0;
-  transform: translateX(30px);
-}
-
-.page-slide-leave-to {
-  opacity: 0;
-  transform: translateX(-30px);
-}
-
-.page-slide-enter-to,
-.page-slide-leave-from {
-  opacity: 1;
-  transform: translateX(0);
-}
-
-/* 自定義 drawer 樣式 */
-.custom-drawer {
-  transition: width 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-}
-
-.menu-item {
-  transition: all 0.2s ease;
-  border-radius: 8px;
-  margin: 4px 8px;
-}
-
-.menu-item:hover {
-  background-color: rgba(var(--v-theme-primary), 0.1);
-}
-
-.menu-item.v-list-item--active {
-  background-color: rgba(var(--v-theme-primary), 0.2);
-  color: rgb(var(--v-theme-primary));
-}
-
-.menu-item.v-list-item--active .v-icon {
-  color: rgb(var(--v-theme-primary));
-}
-</style>
+<style scoped></style>

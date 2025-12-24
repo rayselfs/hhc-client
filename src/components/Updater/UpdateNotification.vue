@@ -28,7 +28,8 @@ import { useElectron } from '@/composables/useElectron'
 import { useSnackBar } from '@/composables/useSnackBar'
 
 const { t: $t } = useI18n()
-const { isElectron } = useElectron()
+const { isElectron, onUpdateAvailable, onUpdateDownloaded, onUpdateError, removeAllListeners } =
+  useElectron()
 const { hideSnackBar } = useSnackBar()
 
 const isVisible = ref(false)
@@ -38,20 +39,20 @@ onMounted(() => {
   if (!isElectron()) return
 
   // 監聽更新可用事件，顯示下載通知
-  window.electronAPI.onUpdateAvailable(() => {
+  onUpdateAvailable(() => {
     isDownloading.value = true
     isVisible.value = true
   })
 
   // 監聽下載完成事件，隱藏通知
-  window.electronAPI.onUpdateDownloaded(() => {
+  onUpdateDownloaded(() => {
     isDownloading.value = false
     isVisible.value = false
     hideSnackBar()
   })
 
   // 監聽更新錯誤事件，隱藏通知
-  window.electronAPI.onUpdateError(() => {
+  onUpdateError(() => {
     isDownloading.value = false
     isVisible.value = false
     hideSnackBar()
@@ -61,9 +62,9 @@ onMounted(() => {
 onBeforeUnmount(() => {
   if (!isElectron()) return
 
-  window.electronAPI.removeAllListeners('update-available')
-  window.electronAPI.removeAllListeners('update-downloaded')
-  window.electronAPI.removeAllListeners('update-error')
+  removeAllListeners('update-available')
+  removeAllListeners('update-downloaded')
+  removeAllListeners('update-error')
 })
 </script>
 

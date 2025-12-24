@@ -6,11 +6,15 @@
     <v-app-bar-title class="text-h5">{{ toolbarTitle }}</v-app-bar-title>
     <v-spacer />
 
-    <BibleVersionSelector v-if="props.currentView === 'bible'" />
+    <v-slide-x-transition mode="out-in">
+      <BibleVersionSelector v-if="props.currentView === 'bible'" />
+    </v-slide-x-transition>
 
     <v-spacer />
 
-    <SearchBar v-if="props.currentView === 'bible'" />
+    <v-slide-x-transition mode="out-in">
+      <SearchBar v-if="props.currentView !== 'timer'" />
+    </v-slide-x-transition>
 
     <v-btn
       class="mr-1"
@@ -51,10 +55,19 @@ import { VersionSelector as BibleVersionSelector } from '@/components/Bible'
 import { SearchBar } from '@/components/Main'
 import { useSentry } from '@/composables/useSentry'
 
+import { useProjectionSync } from '@/composables/useProjectionSync'
+
 const { reportError } = useSentry()
 const { t: $t } = useI18n()
-const { isElectron, onProjectionOpened, onProjectionClosed, checkProjectionWindow } = useElectron()
-const { setProjectionState, syncAllStates, sendTimerUpdate } = useProjectionMessaging()
+const {
+  isElectron,
+  onProjectionOpened,
+  onProjectionClosed,
+  checkProjectionWindow,
+  closeProjectionWindow: closeElectronProjectionWindow,
+} = useElectron()
+const { setProjectionState } = useProjectionMessaging()
+const { syncAllStates } = useProjectionSync()
 const { warning } = useAlert()
 
 // Props
@@ -102,7 +115,7 @@ const toggleProjectionContent = async () => {
 
     // 根據不同頁面發送對應的內容更新
     if (props.currentView === 'timer') {
-      sendTimerUpdate(true)
+      syncAllStates()
     }
     // 聖經頁面會在 ProjectionView 請求當前狀態時自動更新
   } else {
@@ -130,7 +143,7 @@ const closeProjectionWindow = async () => {
 
       if (confirmed) {
         // 用戶確認後才關閉
-        await window.electronAPI.closeProjectionWindow()
+        await closeElectronProjectionWindow()
 
         // 重置投影狀態為預設
         projectionStore.setShowingDefault(true)

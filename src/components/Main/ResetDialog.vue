@@ -13,10 +13,10 @@
       <v-card-actions>
         <v-spacer />
         <v-btn color="grey" variant="text" @click="handleCancel">
-          {{ $t('cancel') }}
+          {{ $t('common.cancel') }}
         </v-btn>
         <v-btn :color="confirmButtonColor" variant="text" @click="handleConfirm">
-          {{ $t('confirm') }}
+          {{ $t('common.confirm') }}
         </v-btn>
       </v-card-actions>
     </v-card>

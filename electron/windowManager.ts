@@ -114,7 +114,7 @@ export class WindowManager {
 
     // If there is no second screen, notify the main window to display a prompt
     if (!hasSecondScreen && this.mainWindow) {
-      this.mainWindow.webContents.send('no-second-screen-detected')
+      this.mainWindow.webContents.send('SYSTEM_NO_SECOND_SCREEN')
     }
 
     const isDev = process.env.VITE_DEV_SERVER_URL || process.env.NODE_ENV === 'development'
@@ -135,7 +135,7 @@ export class WindowManager {
         this.timerService.unregisterWindow(this.projectionWindow)
       }
       if (this.mainWindow && !this.mainWindow.isDestroyed()) {
-        this.mainWindow.webContents.send('projection-closed')
+        this.mainWindow.webContents.send('SYSTEM_PROJECTION_CLOSED')
       }
       this.projectionWindow = null
     })
@@ -149,7 +149,7 @@ export class WindowManager {
     this.projectionWindow.webContents.on('did-finish-load', () => {
       // Send the current state to the projection window
       if (this.mainWindow) {
-        this.mainWindow.webContents.send('get-current-state')
+        this.mainWindow.webContents.send('SYSTEM_GET_STATE')
       }
 
       // Notify the main window that the projection has been opened

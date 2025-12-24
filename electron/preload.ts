@@ -1,9 +1,14 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 
 // Expose safe APIs to renderer process
 contextBridge.exposeInMainWorld('electronAPI', {
   // Display information
   getDisplays: () => ipcRenderer.invoke('get-displays'),
+
+  // File System
+  saveFile: (filePath: string) => ipcRenderer.invoke('save-file', filePath),
+  resetUserData: () => ipcRenderer.invoke('reset-user-data'),
+  getFilePath: (file: File) => webUtils.getPathForFile(file),
 
   // Bible API
   getBibleVersions: () => ipcRenderer.invoke('api-bible-get-versions'),
@@ -30,16 +35,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('main-message', (event, data) => callback(data))
   },
   onGetCurrentState: (callback: () => void) => {
-    ipcRenderer.on('get-current-state', callback)
+    ipcRenderer.on('SYSTEM_GET_STATE', callback)
   },
   onProjectionOpened: (callback: () => void) => {
     ipcRenderer.on('projection-opened', callback)
   },
   onProjectionClosed: (callback: () => void) => {
-    ipcRenderer.on('projection-closed', callback)
+    ipcRenderer.on('SYSTEM_PROJECTION_CLOSED', callback)
   },
   onNoSecondScreenDetected: (callback: () => void) => {
-    ipcRenderer.on('no-second-screen-detected', callback)
+    ipcRenderer.on('SYSTEM_NO_SECOND_SCREEN', callback)
   },
 
   // Remove listeners

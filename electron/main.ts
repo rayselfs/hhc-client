@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, protocol } from 'electron'
 import { createApplicationMenu } from './menu'
 import {
   initAutoUpdater,
@@ -10,6 +10,7 @@ import { TimerService } from './timerService'
 import { registerApiHandlers } from './api'
 import { WindowManager } from './windowManager'
 import { registerGenericHandlers } from './handlers'
+import { registerFileHandlers, registerFileProtocols } from './file'
 
 // Initialize Sentry
 const sentryDsn = process.env.SENTRY_DSN || process.env.VITE_SENTRY_DSN
@@ -34,8 +35,23 @@ windowManager.setTimerService(timerService)
 // Register all IPC handlers
 registerApiHandlers()
 registerGenericHandlers(windowManager)
+registerFileHandlers()
 timerService.registerIpcHandlers()
 registerAutoUpdaterHandlers()
+
+// Register privileged schemes
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'local-resource',
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      bypassCSP: true,
+      stream: true,
+    },
+  },
+])
 
 // Single instance lock
 const gotTheLock = app.requestSingleInstanceLock()
@@ -57,6 +73,9 @@ if (!gotTheLock) {
 
   // Application events
   app.whenReady().then(() => {
+    // Register file protocols
+    registerFileProtocols()
+
     // Set security policy
     app.commandLine.appendSwitch('--disable-features', 'VizDisplayCompositor')
 

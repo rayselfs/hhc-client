@@ -13,7 +13,7 @@
       <v-card-actions class="pa-4">
         <v-spacer></v-spacer>
         <v-btn color="primary" @click="isOpen = false">
-          {{ $t('close') }}
+          {{ $t('common.close') }}
         </v-btn>
       </v-card-actions>
     </v-card>
@@ -28,7 +28,7 @@ import { TIMER_SHORTCUTS, PROJECTION_SHORTCUTS } from './shortcuts'
 import ShortcutSection from './ShortcutSection.vue'
 
 const { t: $t } = useI18n()
-const { isElectron } = useElectron()
+const { isElectron, onMainMessage, removeAllListeners } = useElectron()
 
 const isOpen = ref(false)
 
@@ -58,7 +58,7 @@ defineExpose({
 
 onMounted(() => {
   if (isElectron()) {
-    window.electronAPI.onMainMessage((data: unknown) => {
+    onMainMessage((data: unknown) => {
       if (data === 'open-shortcuts') {
         openShortcuts()
       }
@@ -68,7 +68,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   if (isElectron()) {
-    window.electronAPI.removeAllListeners('main-message')
+    removeAllListeners('main-message')
   }
 })
 </script>

@@ -27,6 +27,11 @@ export interface ElectronAPI {
   /** Get display information */
   getDisplays: () => Promise<DisplayInfo[]>
 
+  // File System
+  saveFile: (filePath: string) => Promise<{ filePath: string; thumbnailPath?: string }>
+  resetUserData: () => Promise<boolean>
+  getFilePath: (file: File) => string
+
   // Bible API
   getBibleVersions: () => Promise<BibleVersion[]>
   getBibleContent: (versionId: number) => Promise<{ success: boolean }>
