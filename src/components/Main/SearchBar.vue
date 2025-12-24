@@ -6,7 +6,7 @@
       autofocus
       variant="solo-inverted"
       hide-details
-      :placeholder="$t('search')"
+      :placeholder="$t('common.search')"
       density="compact"
       class="search-bar mr-2"
       @keydown.esc="handleClose"
@@ -14,7 +14,7 @@
     >
     </v-text-field>
 
-    <v-btn v-if="!isSearching" icon @click="handleStart" :title="$t('search')" class="mr-1">
+    <v-btn v-if="!isSearching" icon @click="handleStart" :title="$t('common.search')" class="mr-1">
       <v-icon>mdi-magnify</v-icon>
     </v-btn>
 

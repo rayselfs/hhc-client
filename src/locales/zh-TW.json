@@ -1,24 +1,29 @@
 {
-  "close": "關閉",
-  "cancel": "取消",
-  "confirm": "確定",
-  "search": "搜尋",
-  "create": "建立",
-  "edit": "編輯",
-  "homepage": "首頁",
-  "moveTo": "移動到",
-  "move": "移動",
-  "newFolder": "新資料夾",
-  "noFolder": "尚無資料夾",
-  "preview": "預覽",
-  "delete": "刪除",
-  "custom": "自訂",
-  "confirmDeleteItem": "確定刪除此項目嗎",
-  "copy": "複製",
-  "paste": "貼上",
-  "history": "歷史",
-  "projection": "投影",
-  "control": "控制",
+  "common": {
+    "name": "名稱",
+    "close": "關閉",
+    "cancel": "取消",
+    "confirm": "確定",
+    "search": "搜尋",
+    "create": "建立",
+    "edit": "編輯",
+    "homepage": "首頁",
+    "moveTo": "移動到",
+    "move": "移動",
+    "type": "類型",
+    "preview": "預覽",
+    "delete": "刪除",
+    "custom": "自訂",
+    "confirmDeleteItem": "確定刪除此項目",
+    "copy": "複製",
+    "cut": "剪下",
+    "paste": "貼上",
+    "history": "歷史",
+    "projection": "投影",
+    "control": "控制",
+    "noCustomItems": "尚無自訂項目",
+    "dontShowAgain": "不要再顯示"
+  },
   "extendedToolbar": {
     "openProjection": "開啟投影",
     "closeProjection": "關閉投影",
@@ -41,7 +46,14 @@
     "overtimeMessage": "時間到",
     "overtimeMessageLabel": "顯示文字",
     "overtimeMessageError": "訊息不能為空",
-    "defaultOvertimeMessage": "時間到！"
+    "startCountdown": "開始倒數計時",
+    "pauseCountdown": "暫停倒數計時",
+    "resumeCountdown": "繼續倒數計時",
+    "resetCountdown": "重設倒數計時",
+    "startStopwatch": "開始正計時",
+    "pauseStopwatch": "暫停正計時",
+    "resumeStopwatch": "繼續正計時",
+    "resetStopwatch": "重設正計時"
   },
   "bible": {
     "title": "聖經",
@@ -132,20 +144,8 @@
       "3JN": "約翰參書",
       "JUD": "猶大書",
       "REV": "啟示錄"
-    },
-    "folderName": "資料夾名稱",
-    "folderSettings": "資料夾設定",
-    "duplicateFolderName": "資料夾名稱已存在",
-    "retentionPeriod": "保留時間",
-    "retention": {
-      "1day": "1 天",
-      "1week": "1 週",
-      "1month": "1 個月",
-      "permanent": "永久"
     }
   },
-  "noCustomItems": "尚無自訂項目",
-  "enterFolderName": "請輸入資料夾名稱",
   "settings": {
     "title": "設定",
     "timezone": "時區",
@@ -195,7 +195,8 @@
     "warning": "警告",
     "info": "提示",
     "screenWarning": "螢幕提示",
-    "dualScreenRequired": "此App是設計用在雙螢幕"
+    "dualScreenRequired": "此App是設計用在雙螢幕",
+    "useEnglishInput": "請使用英文輸入法"
   },
   "auth": {
     "title": "API 認證",
@@ -204,11 +205,55 @@
     "required": "此欄位為必填",
     "cancelled": "已取消認證，無法存取聖經資料"
   },
-  "dontShowAgain": "不要再顯示",
   "update": {
     "downloading": "發現新版本，下載中..."
   },
   "media": {
-    "title": "多媒體 (Alpha)"
+    "title": "多媒體 (Alpha)",
+    "presenterMode": "簡報者模式",
+    "nextSlide": "下一個項目",
+    "endOfSlides": "簡報結束",
+    "notes": "備註",
+    "page": "頁",
+    "zoom": "縮放",
+    "play": "播放",
+    "pause": "暫停",
+    "restart": "重新開始",
+    "stop": "停止",
+    "slideNavigator": "投影片導覽",
+    "ClickToAddNotes": "點擊添加備註",
+    "slide": "第",
+    "total": "共",
+    "slides": "張",
+    "videoReady": "影片就緒",
+    "videoPlaying": "影片播放中",
+    "videoPaused": "影片暫停中"
+  },
+  "fileExplorer": {
+    "image": "圖片",
+    "video": "影片",
+    "pdf": "PDF",
+    "youtube": "Youtube",
+    "folder": "資料夾",
+    "folderName": "資料夾名稱",
+    "folderSettings": "資料夾設定",
+    "newFolder": "新資料夾",
+    "noFolder": "尚無資料夾",
+    "noFiles": "尚無檔案",
+    "duplicateFolderName": "資料夾名稱已存在",
+    "retentionPeriod": "保留時間",
+    "retention": {
+      "1day": "1 天",
+      "1week": "1 週",
+      "1month": "1 個月",
+      "permanent": "永久"
+    },
+    "enterFolderName": "請輸入資料夾名稱",
+    "fileUpload": "檔案上傳",
+    "folderUpload": "資料夾上傳",
+    "updatedDate": "修改日期",
+    "clipboardCopied": "已將項目複製到剪貼簿",
+    "clipboardCut": "已將項目剪下到剪貼簿",
+    "uploadWebWarning": "警告：在網頁模式下上傳的檔案無法永久保存"
   }
 }

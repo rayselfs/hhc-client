@@ -19,7 +19,8 @@ interface Props {
   text?: string
   timeout?: number
   color?: string
-  location?: 'top' | 'bottom' | 'start' | 'end'
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  location?: any
   variant?: 'flat' | 'text' | 'elevated' | 'outlined' | 'plain' | 'tonal'
 }
 

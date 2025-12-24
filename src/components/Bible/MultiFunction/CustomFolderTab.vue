@@ -2,7 +2,7 @@
   <div class="custom-content">
     <div class="custom-list">
       <div v-if="folders.length === 0 && verses.length === 0" class="text-center pa-4 text-grey">
-        {{ $t('noCustomItems') }}
+        {{ $t('common.noCustomItems') }}
       </div>
       <div v-else>
         <!-- 資料夾列表 -->

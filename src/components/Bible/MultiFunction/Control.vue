@@ -3,10 +3,10 @@
     <v-card-title class="d-flex align-center justify-space-between pa-0">
       <div class="d-flex align-center">
         <v-btn-toggle v-model="multiFunctionTab" mandatory class="rounded-0 border-e-sm">
-          <v-btn value="history" size="small" :title="$t('history')">
+          <v-btn value="history" size="small" :title="$t('common.history')">
             <v-icon size="x-large">mdi-history</v-icon>
           </v-btn>
-          <v-btn value="custom" size="small" :title="$t('custom')">
+          <v-btn value="custom" size="small" :title="$t('common.custom')">
             <v-icon size="x-large">mdi-folder</v-icon>
           </v-btn>
         </v-btn-toggle>
@@ -20,7 +20,7 @@
             @click="navigateToRoot()"
           >
             <v-icon class="mr-1">mdi-home</v-icon>
-            {{ $t('homepage') }}
+            {{ $t('common.homepage') }}
           </v-btn>
           <span v-for="(folderId, index) in currentFolderPath.slice(1)" :key="folderId">
             <v-icon size="x-small" class="ml-1 mr-1">mdi-chevron-right</v-icon>
@@ -44,7 +44,7 @@
           icon
           @click="clearHistory"
           :disabled="historyVerses.length === 0"
-          :title="$t('delete')"
+          :title="$t('common.delete')"
         >
           <v-icon>mdi-delete-sweep</v-icon>
         </v-btn>
@@ -54,7 +54,7 @@
           icon
           @click="createNewFolder"
           :disabled="isMaxDepthReached"
-          :title="$t('newFolder')"
+          :title="$t('fileExplorer.newFolder')"
         >
           <v-icon>mdi-folder-plus</v-icon>
         </v-btn>
@@ -101,12 +101,12 @@
     <v-dialog v-model="showFolderDialog" max-width="400">
       <v-card>
         <v-card-title>{{
-          editingFolderId ? $t('bible.folderSettings') : $t('newFolder')
+          editingFolderId ? $t('fileExplorer.folderSettings') : $t('fileExplorer.newFolder')
         }}</v-card-title>
         <v-card-text>
           <v-text-field
             v-model="folderName"
-            :label="$t('bible.folderName')"
+            :label="$t('fileExplorer.folderName')"
             :error-messages="nameErrorMessage"
             variant="outlined"
             density="compact"
@@ -117,7 +117,7 @@
           <v-select
             v-model="retentionPeriod"
             :items="retentionOptions"
-            :label="$t('bible.retentionPeriod')"
+            :label="$t('fileExplorer.retentionPeriod')"
             item-title="title"
             item-value="value"
             variant="outlined"
@@ -127,9 +127,9 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer />
-          <v-btn @click="showFolderDialog = false">{{ $t('cancel') }}</v-btn>
+          <v-btn @click="showFolderDialog = false">{{ $t('common.cancel') }}</v-btn>
           <v-btn color="primary" :disabled="isDuplicateName" @click="confirmCreateFolder">{{
-            editingFolderId ? $t('confirm') : $t('create')
+            editingFolderId ? $t('common.confirm') : $t('common.create')
           }}</v-btn>
         </v-card-actions>
       </v-card>
@@ -139,7 +139,7 @@
     <v-dialog v-model="showMoveVerseDialog" max-width="500">
       <v-card>
         <v-card-title class="d-flex align-center">
-          <span class="mr-3">{{ $t('moveTo') }}</span>
+          <span class="mr-3">{{ $t('common.moveTo') }}</span>
           <!-- 資料夾路徑導航 -->
           <div class="folder-breadcrumb">
             <v-btn
@@ -150,7 +150,7 @@
               @click="navigateMoveToRoot"
             >
               <v-icon class="mr-1">mdi-home</v-icon>
-              {{ $t('homepage') }}
+              {{ $t('common.homepage') }}
             </v-btn>
             <v-icon
               v-if="moveBreadcrumb.length > 0 || selectedMoveFolder"
@@ -180,7 +180,7 @@
           <!-- 移動目標列表 -->
           <div class="move-folder-list">
             <div v-if="getMoveFolders().length === 0" class="text-center pa-4 text-grey">
-              {{ $t('noFolder') }}
+              {{ $t('fileExplorer.noFolder') }}
             </div>
             <div v-else>
               <div
@@ -202,9 +202,9 @@
 
         <v-card-actions>
           <v-spacer />
-          <v-btn @click="showMoveVerseDialog = false">{{ $t('cancel') }}</v-btn>
+          <v-btn @click="showMoveVerseDialog = false">{{ $t('common.cancel') }}</v-btn>
           <v-btn color="primary" @click="confirmMoveVerse" :disabled="!canMoveToRoot">
-            {{ $t('move') }}
+            {{ $t('common.move') }}
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -213,7 +213,7 @@
     <!-- 刪除資料夾確認對話框 -->
     <v-dialog v-model="showDeleteConfirmDialog" max-width="400">
       <v-card>
-        <v-card-title>{{ $t('confirmDeleteItem') }}</v-card-title>
+        <v-card-title>{{ $t('common.confirmDeleteItem') }}</v-card-title>
         <v-card-text>
           <div v-if="folderToDelete" class="mt-2 text-subtitle-1">
             <v-icon class="mr-2">mdi-folder</v-icon>
@@ -222,8 +222,8 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer />
-          <v-btn @click="showDeleteConfirmDialog = false">{{ $t('cancel') || 'Cancel' }}</v-btn>
-          <v-btn color="error" @click="confirmDeleteFolder">{{ $t('delete') || 'Delete' }}</v-btn>
+          <v-btn @click="showDeleteConfirmDialog = false">{{ $t('common.cancel') || 'Cancel' }}</v-btn>
+          <v-btn color="error" @click="confirmDeleteFolder">{{ $t('common.delete') || 'Delete' }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -238,13 +238,13 @@
             <template #prepend>
               <v-icon>mdi-content-copy</v-icon>
             </template>
-            <v-list-item-title>{{ $t('copy') }}</v-list-item-title>
+            <v-list-item-title>{{ $t('common.copy') }}</v-list-item-title>
           </v-list-item>
           <v-list-item @click="deleteItem">
             <template #prepend>
               <v-icon>mdi-delete</v-icon>
             </template>
-            <v-list-item-title>{{ $t('delete') }}</v-list-item-title>
+            <v-list-item-title>{{ $t('common.delete') }}</v-list-item-title>
           </v-list-item>
         </template>
 
@@ -254,28 +254,28 @@
             <template #prepend>
               <v-icon>mdi-content-copy</v-icon>
             </template>
-            <v-list-item-title>{{ $t('copy') }}</v-list-item-title>
+            <v-list-item-title>{{ $t('common.copy') }}</v-list-item-title>
           </v-list-item>
 
           <v-list-item @click="showMoveItemDialog">
             <template #prepend>
               <v-icon>mdi-folder-move</v-icon>
             </template>
-            <v-list-item-title>{{ $t('move') }}</v-list-item-title>
+            <v-list-item-title>{{ $t('common.move') }}</v-list-item-title>
           </v-list-item>
 
           <v-list-item @click="showFolderSettings()">
             <template #prepend>
               <v-icon>mdi-cog</v-icon>
             </template>
-            <v-list-item-title>{{ $t('edit') }}</v-list-item-title>
+            <v-list-item-title>{{ $t('common.edit') }}</v-list-item-title>
           </v-list-item>
 
           <v-list-item @click="deleteItem">
             <template #prepend>
               <v-icon>mdi-delete</v-icon>
             </template>
-            <v-list-item-title>{{ $t('delete') }}</v-list-item-title>
+            <v-list-item-title>{{ $t('common.delete') }}</v-list-item-title>
           </v-list-item>
         </template>
       </template>
@@ -286,7 +286,7 @@
           <template #prepend>
             <v-icon>mdi-content-paste</v-icon>
           </template>
-          <v-list-item-title>{{ $t('paste') }}</v-list-item-title>
+          <v-list-item-title>{{ $t('common.paste') }}</v-list-item-title>
         </v-list-item>
       </template>
 
@@ -296,7 +296,7 @@
           <template #prepend>
             <v-icon>mdi-folder-plus</v-icon>
           </template>
-          <v-list-item-title>{{ $t('newFolder') }}</v-list-item-title>
+          <v-list-item-title>{{ $t('fileExplorer.newFolder') }}</v-list-item-title>
         </v-list-item>
       </template>
     </ContextMenu>
@@ -374,10 +374,10 @@ const retentionPeriod = ref('1day') // Default to 1 day
 const editingFolderId = ref<string | null>(null) // Track if we are editing a folder
 
 const retentionOptions = computed(() => [
-  { title: $t('bible.retention.1day'), value: '1day' },
-  { title: $t('bible.retention.1week'), value: '1week' },
-  { title: $t('bible.retention.1month'), value: '1month' },
-  { title: $t('bible.retention.permanent'), value: 'permanent' },
+  { title: $t('fileExplorer.retention.1day'), value: '1day' },
+  { title: $t('fileExplorer.retention.1week'), value: '1week' },
+  { title: $t('fileExplorer.retention.1month'), value: '1month' },
+  { title: $t('fileExplorer.retention.permanent'), value: 'permanent' },
 ])
 
 // Check for duplicate folder name
@@ -394,7 +394,7 @@ const isDuplicateName = computed(() => {
 
 const nameErrorMessage = computed(() => {
   if (isDuplicateName.value) {
-    return $t('bible.duplicateFolderName')
+    return $t('fileExplorer.duplicateFolderName')
   }
   return ''
 })

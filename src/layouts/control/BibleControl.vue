@@ -11,8 +11,8 @@
           <v-card-title class="d-flex align-center justify-space-between">
             <div class="d-flex align-center gap-2">
               <div>
-                <span class="mr-1">{{ localizedBookName || $t('preview') }}</span>
-                <span v-if="isSearchMode"> ({{ $t('search') }})</span>
+                <span class="mr-1">{{ localizedBookName || $t('common.preview') }}</span>
+                <span v-if="isSearchMode"> ({{ $t('common.search') }})</span>
               </div>
               <div v-if="currentPassage">
                 <span class="mr-1">{{ currentPassage.chapter }}</span>
@@ -228,6 +228,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useDisplay } from 'vuetify'
+import { useDebounceFn } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useBibleStore } from '@/stores/bible'
@@ -633,55 +634,48 @@ watch([isMultiVersion, secondVersionCode], async ([newIsMulti, newSecondCode]) =
 })
 
 // Handle search
-let searchTimeout: number | null = null
-const handleSearch = (text: string) => {
-  if (searchTimeout) {
-    window.clearTimeout(searchTimeout)
+const handleSearch = useDebounceFn(async (text: string) => {
+  if (!text.trim()) {
+    return
   }
 
-  searchTimeout = window.setTimeout(async () => {
-    if (!text.trim()) {
-      return
+  const versionCode = currentVersion.value?.code
+  if (!versionCode) {
+    reportError(new Error('No Bible version selected'), {
+      operation: 'handle-search',
+      component: 'BibleControl',
+      extra: { searchText: text },
+    })
+    return
+  }
+
+  // Set loading state
+  isLoadingVerses.value = true
+  isSearchMode.value = true
+
+  try {
+    // Save search text for highlighting
+    searchText.value = text.trim()
+
+    // Ensure content is loaded for abbreviations
+    if (!currentBibleContent.value) {
+      await getBibleContent(versionCode)
     }
 
-    const versionCode = currentVersion.value?.code
-    if (!versionCode) {
-      reportError(new Error('No Bible version selected'), {
-        operation: 'handle-search',
-        component: 'BibleControl',
-        extra: { searchText: text },
-      })
-      return
-    }
-
-    // Set loading state
-    isLoadingVerses.value = true
-    isSearchMode.value = true
-
-    try {
-      // Save search text for highlighting
-      searchText.value = text.trim()
-
-      // Ensure content is loaded for abbreviations
-      if (!currentBibleContent.value) {
-        await getBibleContent(versionCode)
-      }
-
-      // Execute search
-      const results = await searchBibleVerses(text, versionCode, 20)
-      searchResults.value = results
-    } catch (error) {
-      reportError(error, {
-        operation: 'handle-search',
-        component: 'BibleControl',
-        extra: { searchText: text, versionCode },
-      })
-      searchResults.value = []
-    } finally {
-      isLoadingVerses.value = false
-    }
-  }, 300) // 300ms debounce
-}
+    // Execute search
+    const results = await searchBibleVerses(text, versionCode, 20)
+    searchResults.value = results
+  } catch (error) {
+    reportError(error, {
+      operation: 'handle-search',
+      component: 'BibleControl',
+      extra: { searchText: text, versionCode },
+    })
+    searchResults.value = []
+  } finally {
+    isLoadingVerses.value = false
+  }
+}, 300)
 
 onMounted(() => {
   loadRootFolder()

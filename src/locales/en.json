@@ -1,24 +1,29 @@
 {
-  "close": "Close",
-  "cancel": "Cancel",
-  "confirm": "Confirm",
-  "search": "Search",
-  "create": "Create",
-  "edit": "Edit",
-  "homepage": "Home",
-  "moveTo": "Move to",
-  "move": "Move",
-  "newFolder": "New Folder",
-  "noFolder": "No folder yet",
-  "preview": "Preview",
-  "delete": "Delete",
-  "custom": "Custom",
-  "confirmDeleteItem": "Are you sure you want to delete this item?",
-  "copy": "Copy",
-  "paste": "Paste",
-  "history": "History",
-  "projection": "Project",
-  "control": "Control",
+  "common": {
+    "name": "Name",
+    "close": "Close",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "search": "Search",
+    "create": "Create",
+    "edit": "Edit",
+    "homepage": "Home",
+    "moveTo": "Move to",
+    "move": "Move",
+    "type": "Type",
+    "preview": "Preview",
+    "delete": "Delete",
+    "custom": "Custom",
+    "confirmDeleteItem": "Confirm to delete item",
+    "copy": "Copy",
+    "cut": "Cut",
+    "paste": "Paste",
+    "history": "History",
+    "projection": "Project",
+    "control": "Control",
+    "noCustomItems": "No custom items yet",
+    "dontShowAgain": "Don't show again"
+  },
   "extendedToolbar": {
     "openProjection": "Open Projection",
     "closeProjection": "Close Projection",
@@ -41,7 +46,14 @@
     "overtimeMessage": "Time's Up",
     "overtimeMessageLabel": "Message",
     "overtimeMessageError": "Message cannot be empty",
-    "defaultOvertimeMessage": "Time's Up!"
+    "startCountdown": "Start Countdown",
+    "pauseCountdown": "Pause Countdown",
+    "resumeCountdown": "Resume Countdown",
+    "resetCountdown": "Reset Countdown",
+    "startStopwatch": "Start Stopwatch",
+    "pauseStopwatch": "Pause Stopwatch",
+    "resumeStopwatch": "Resume Stopwatch",
+    "resetStopwatch": "Reset Stopwatch"
   },
   "bible": {
     "title": "BIBLE",
@@ -132,20 +144,8 @@
       "3JN": "3 John",
       "JUD": "Jude",
       "REV": "Revelation"
-    },
-    "folderName": "Folder Name",
-    "folderSettings": "Folder Settings",
-    "duplicateFolderName": "Folder name already exists",
-    "retentionPeriod": "Retention Period",
-    "retention": {
-      "1day": "1 Day",
-      "1week": "1 Week",
-      "1month": "1 Month",
-      "permanent": "Permanent"
     }
   },
-  "noCustomItems": "No custom items yet",
-  "enterFolderName": "Please enter folder name",
   "settings": {
     "title": "Settings",
     "timezone": "Timezone",
@@ -195,7 +195,8 @@
     "warning": "Warning",
     "info": "Info",
     "screenWarning": "Screen Warning",
-    "dualScreenRequired": "This app is designed for dual-screen use"
+    "dualScreenRequired": "This app is designed for dual-screen use",
+    "useEnglishInput": "Please use English input method"
   },
   "auth": {
     "title": "API Authentication",
@@ -204,11 +205,55 @@
     "required": "This field is required",
     "cancelled": "Authentication cancelled, unable to access Bible data"
   },
-  "dontShowAgain": "Don't show again",
   "update": {
     "downloading": "New version found, downloading..."
   },
   "media": {
-    "title": "Media (Alpha)"
+    "title": "Media (Alpha)",
+    "presenterMode": "Presenter Mode",
+    "nextSlide": "Next Item",
+    "endOfSlides": "End of presentation",
+    "notes": "Notes",
+    "page": "Page",
+    "zoom": "Zoom",
+    "play": "Play",
+    "pause": "Pause",
+    "restart": "Restart",
+    "stop": "Stop",
+    "slideNavigator": "Slide Navigator",
+    "ClickToAddNotes": "Click to add notes",
+    "slide": "Slide",
+    "total": "Total",
+    "slides": "slides",
+    "videoReady": "Video Ready",
+    "videoPlaying": "Video Playing",
+    "videoPaused": "Video Paused"
+  },
+  "fileExplorer": {
+    "image": "Image",
+    "video": "Video",
+    "pdf": "PDF",
+    "youtube": "Youtube",
+    "folder": "Folder",
+    "folderName": "Folder Name",
+    "folderSettings": "Folder Settings",
+    "newFolder": "New Folder",
+    "noFolder": "No folder",
+    "noFiles": "No files",
+    "duplicateFolderName": "Folder name already exists",
+    "retentionPeriod": "Retention Period",
+    "retention": {
+      "1day": "1 Day",
+      "1week": "1 Week",
+      "1month": "1 Month",
+      "permanent": "Permanent"
+    },
+    "enterFolderName": "Please enter folder name",
+    "fileUpload": "File Upload",
+    "folderUpload": "Folder Upload",
+    "updatedDate": "Modify Date",
+    "clipboardCopied": "Items copied to clipboard",
+    "clipboardCut": "Items cut to clipboard",
+    "uploadWebWarning": "Warning: Files uploaded in web mode cannot be saved permanently"
   }
 }

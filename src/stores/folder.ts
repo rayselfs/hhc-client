@@ -18,6 +18,16 @@ export interface FolderStoreConfig {
 }
 
 /**
+ * Clipboard item definition
+ */
+export interface ClipboardItem<T extends FolderItem> {
+  type: 'file' | 'folder'
+  data: T | Folder<T>
+  action: 'copy' | 'cut'
+  sourceFolderId: string
+}
+
+/**
  * Generic folder store for managing folder tree structure
  * This store is designed to be reusable for different item types (verses, media files, etc.)
  */
@@ -44,6 +54,23 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
      * [rootId] means at root level
      */
     const currentFolderPath = ref<string[]>([config.rootId])
+
+    /**
+     * Clipboard for copy/cut operations
+     */
+    const clipboard = ref<ClipboardItem<TItem>[]>([])
+
+    const copyToClipboard = (items: ClipboardItem<TItem>[]) => {
+      clipboard.value = items
+    }
+
+    const cutToClipboard = (items: ClipboardItem<TItem>[]) => {
+      clipboard.value = items
+    }
+
+    const clearClipboard = () => {
+      clipboard.value = []
+    }
 
     /**
      * Folder manager for read-only operations
@@ -73,9 +100,10 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
       )
 
       if (saved && saved.id === config.rootId) {
-        rootFolder.value = saved
-        // Check for expired folders after loading
-        if (checkExpiredFolders(rootFolder.value.folders as Folder<TItem>[])) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        rootFolder.value = saved as any
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if (checkExpiredContent(rootFolder.value as any)) {
           saveRootFolder() // Save immediately if items were removed
         }
       }
@@ -103,35 +131,43 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
     )
 
     /**
-     * Check and remove expired folders recursively
-     * @param folders - List of folders to check
-     * @returns true if any folder was removed
+     * Check and remove expired items and folders recursively
+     * @param folder - The folder to check
+     * @returns true if anything was removed
      */
-    const checkExpiredFolders = (folders: Folder<TItem>[]): boolean => {
+    const checkExpiredContent = (folder: Folder<TItem>): boolean => {
       let changed = false
       const now = Date.now()
 
-      // Filter out expired folders
-      const initialLength = folders.length
-      const validFolders = folders.filter((folder) => {
-        if (folder.expiresAt && folder.expiresAt < now) {
-          return false // Remove expired folder
+      // 1. Check Items
+      const initialItemsLength = folder.items.length
+      folder.items = folder.items.filter((item) => {
+        if (item.expiresAt && item.expiresAt < now) {
+          return false
+        }
+        return true
+      })
+      if (folder.items.length !== initialItemsLength) {
+        changed = true
+      }
+
+      // 2. Check Subfolders
+      const initialFoldersLength = folder.folders.length
+      folder.folders = folder.folders.filter((subFolder) => {
+        // If folder itself is expired
+        if (subFolder.expiresAt && subFolder.expiresAt < now) {
+          return false
+        }
+        // If not expired, check its content recursively
+        if (checkExpiredContent(subFolder)) {
+          changed = true
         }
         return true
       })
 
-      if (validFolders.length !== initialLength) {
-        folders.length = 0
-        folders.push(...validFolders)
+      if (folder.folders.length !== initialFoldersLength) {
         changed = true
       }
-
-      // Recursively check subfolders
-      folders.forEach((folder) => {
-        if (checkExpiredFolders(folder.folders)) {
-          changed = true
-        }
-      })
 
       return changed
     }
@@ -214,6 +250,23 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
     }
 
     /**
+     * Add an item to a specific folder
+     * @param folderId - The target folder ID
+     * @param item - The item to add
+     */
+    const addItemToFolder = (folderId: string, item: TItem) => {
+      if (folderId === config.rootId) {
+        // @ts-expect-error - Vue's ref type system, runtime safe
+        rootFolder.value.items.push(item)
+      } else {
+        updateFolderInTree(rootFolder.value.folders, folderId, (folder) => {
+          // @ts-expect-error - Vue's ref type system, runtime safe
+          folder.items.push(item)
+        })
+      }
+    }
+
+    /**
      * Delete a folder and all its subfolders
      * @param folderId - The ID of the folder to delete
      */
@@ -238,7 +291,50 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
         if (updates.expiresAt !== undefined) {
           folder.expiresAt = updates.expiresAt
         }
+        folder.timestamp = Date.now()
       })
+    }
+
+    /**
+     * Reorder items in the current folder
+     * @param orderedItems - The items in the new order
+     */
+    const reorderCurrentItems = (orderedItems: TItem[]) => {
+      // Direct mutation
+      // @ts-expect-error - Vue's ref type system, runtime safe
+      currentFolder.value.items = orderedItems
+    }
+
+    /**
+     * Reorder folders in the current folder
+     * @param orderedFolders - The folders in the new order
+     */
+    const reorderCurrentFolders = (orderedFolders: Folder<TItem>[]) => {
+      // Direct mutation
+      // @ts-expect-error - Vue's ref type system, runtime safe
+      currentFolder.value.folders = orderedFolders
+    }
+
+    /**
+     * Update an item's properties
+     * @param itemId - The ID of the item to update
+     * @param folderId - The ID of the folder containing the item
+     * @param updates - The properties to update
+     */
+    const updateItem = (itemId: string, folderId: string, updates: Partial<TItem>) => {
+      if (folderId === config.rootId) {
+        const item = rootFolder.value.items.find((i) => i.id === itemId)
+        if (item) {
+          Object.assign(item, updates)
+        }
+      } else {
+        updateFolderInTree(rootFolder.value.folders, folderId, (folder) => {
+          const item = folder.items.find((i) => i.id === itemId)
+          if (item) {
+            Object.assign(item, updates)
+          }
+        })
+      }
     }
 
     /**
@@ -416,12 +512,21 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
       // Folder Operations (write actions)
       addFolderToCurrent,
       addItemToCurrent,
+      addItemToFolder,
       removeItemFromCurrent,
       updateFolder,
+      updateItem,
+      reorderCurrentItems,
+      reorderCurrentFolders,
       deleteFolder,
       moveItem,
       moveFolder,
       pasteItem,
+      // Clipboard
+      clipboard,
+      copyToClipboard,
+      cutToClipboard,
+      clearClipboard,
     }
   })()
 }

@@ -1,24 +1,29 @@
 {
-  "close": "关闭",
-  "cancel": "取消",
-  "confirm": "确定",
-  "search": "搜索",
-  "create": "创建",
-  "edit": "编辑",
-  "homepage": "首页",
-  "moveTo": "移动到",
-  "move": "移动",
-  "newFolder": "新文件夹",
-  "noFolder": "尚无文件夹",
-  "preview": "预览",
-  "delete": "删除",
-  "custom": "自定义",
-  "confirmDeleteItem": "确定删除此项目吗",
-  "copy": "复制",
-  "paste": "粘贴",
-  "history": "历史",
-  "projection": "投影",
-  "control": "控制",
+  "common": {
+    "name": "名称",
+    "close": "关闭",
+    "cancel": "取消",
+    "confirm": "确定",
+    "search": "搜索",
+    "create": "创建",
+    "edit": "编辑",
+    "homepage": "首页",
+    "moveTo": "移动到",
+    "move": "移动",
+    "type": "类型",
+    "preview": "预览",
+    "delete": "删除",
+    "custom": "自定义",
+    "confirmDeleteItem": "确定删除此项目",
+    "copy": "复制",
+    "cut": "剪下",
+    "paste": "粘贴",
+    "history": "历史",
+    "projection": "投影",
+    "control": "控制",
+    "noCustomItems": "尚无自定义项目",
+    "dontShowAgain": "不要再显示"
+  },
   "extendedToolbar": {
     "openProjection": "开启投影",
     "closeProjection": "关闭投影",
@@ -41,7 +46,14 @@
     "overtimeMessage": "时间到",
     "overtimeMessageLabel": "显示文字",
     "overtimeMessageError": "讯息不能为空",
-    "defaultOvertimeMessage": "时间到！"
+    "startCountdown": "开始倒数计时",
+    "pauseCountdown": "暂停倒数计时",
+    "resumeCountdown": "继续倒数计时",
+    "resetCountdown": "重置倒数计时",
+    "startStopwatch": "开始正计时",
+    "pauseStopwatch": "暂停正计时",
+    "resumeStopwatch": "继续正计时",
+    "resetStopwatch": "重置正计时"
   },
   "bible": {
     "title": "圣经",
@@ -96,7 +108,7 @@
       "HOS": "何西阿书",
       "JOL": "约珥书",
       "AMO": "阿摩司书",
-      "OBA": "俄巴底亚书",
+      "OBA": "俄巴底亞书",
       "JON": "约拿书",
       "MIC": "弥迦书",
       "NAH": "那鸿书",
@@ -132,20 +144,8 @@
       "3JN": "约翰参书",
       "JUD": "犹大书",
       "REV": "启示录"
-    },
-    "folderName": "文件夹名称",
-    "folderSettings": "文件夹设置",
-    "duplicateFolderName": "文件夹名称已存在",
-    "retentionPeriod": "保留时间",
-    "retention": {
-      "1day": "1 天",
-      "1week": "1 周",
-      "1month": "1 个月",
-      "permanent": "永久"
     }
   },
-  "noCustomItems": "尚无自定义项目",
-  "enterFolderName": "请输入文件夹名称",
   "settings": {
     "title": "设置",
     "timezone": "时区",
@@ -195,7 +195,8 @@
     "warning": "警告",
     "info": "提示",
     "screenWarning": "屏幕提示",
-    "dualScreenRequired": "此App是设计用在双屏幕"
+    "dualScreenRequired": "此App是设计用在双屏幕",
+    "useEnglishInput": "使用英文输入法"
   },
   "auth": {
     "title": "API 认证",
@@ -204,11 +205,55 @@
     "required": "此字段为必填",
     "cancelled": "已取消认证，无法存取圣经数据"
   },
-  "dontShowAgain": "不要再显示",
   "update": {
     "downloading": "发现新版本，下载中..."
   },
   "media": {
-    "title": "多媒体 (Alpha)"
+    "title": "多媒体 (Alpha)",
+    "presenterMode": "演示模式",
+    "nextSlide": "下一个项目",
+    "endOfSlides": "演示结束",
+    "notes": "备注",
+    "page": "页",
+    "zoom": "缩放",
+    "play": "播放",
+    "pause": "暂停",
+    "restart": "重新开始",
+    "stop": "停止",
+    "slideNavigator": "幻灯片导航",
+    "ClickToAddNotes": "点击添加备注",
+    "slide": "第",
+    "total": "共",
+    "slides": "张",
+    "videoReady": "视频就绪",
+    "videoPlaying": "视频播放中",
+    "videoPaused": "视频暂停中"
+  },
+  "fileExplorer": {
+    "image": "图片",
+    "video": "视频",
+    "pdf": "PDF",
+    "youtube": "Youtube",
+    "folder": "文件夹",
+    "folderName": "文件夹名称",
+    "folderSettings": "文件夹设置",
+    "newFolder": "新文件夹",
+    "noFolder": "尚无文件夹",
+    "noFiles": "尚无文件",
+    "duplicateFolderName": "文件夹名称已存在",
+    "retentionPeriod": "保留时间",
+    "retention": {
+      "1day": "1 天",
+      "1week": "1 周",
+      "1month": "1 个月",
+      "permanent": "永久"
+    },
+    "enterFolderName": "请输入文件夹名称",
+    "fileUpload": "文件上传",
+    "folderUpload": "文件夹上传",
+    "updatedDate": "修改日期",
+    "clipboardCopied": "已将项目复制到剪贴簿",
+    "clipboardCut": "已将项目剪下到剪贴簿",
+    "uploadWebWarning": "警告：在网页模式下上传的文件无法永久保存"
   }
 }
