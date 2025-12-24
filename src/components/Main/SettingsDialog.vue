@@ -49,7 +49,7 @@
 
       <v-card-actions>
         <v-spacer></v-spacer>
-        <v-btn color="primary" @click="isOpen = false"> {{ $t('close') }} </v-btn>
+        <v-btn color="primary" @click="isOpen = false"> {{ $t('common.close') }} </v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>
@@ -61,17 +61,18 @@ import { useI18n } from 'vue-i18n'
 import { useTimerStore } from '@/stores/timer'
 import { useElectron } from '@/composables/useElectron'
 import { useDarkMode } from '@/composables/useDarkMode'
-import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
 import { useLocaleDetection } from '@/composables/useLocaleDetection'
+
+import { useProjectionSync } from '@/composables/useProjectionSync'
 
 // i18n
 const { t: $t, t } = useI18n()
 
 // Electron composable
-const { isElectron } = useElectron()
+const { isElectron, onMainMessage } = useElectron()
 
 // 投影消息管理
-const { sendTimerUpdate } = useProjectionMessaging()
+const { syncAllStates } = useProjectionSync()
 
 // 設定彈窗狀態
 const isOpen = ref(false)
@@ -110,7 +111,7 @@ const timezones = computed(() => [
 // 處理時區變更
 const handleTimezoneChange = (timezone: string) => {
   timerStore.setTimezone(timezone)
-  sendTimerUpdate()
+  syncAllStates()
 }
 
 // 開啟設定彈窗
@@ -134,10 +135,11 @@ watch(
 )
 
 // 監聽 menu 事件
+// 監聽 menu 事件
 onMounted(() => {
   if (isElectron()) {
     // 直接監聽 open-settings 事件
-    window.electronAPI.onMainMessage((data: unknown) => {
+    onMainMessage((data: unknown) => {
       if (data === 'open-settings') {
         openSettings()
       }
