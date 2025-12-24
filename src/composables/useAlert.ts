@@ -26,10 +26,10 @@ const alertState = ref<AlertState>({
   message: '',
 })
 
-// 存儲被用戶選擇"不要再顯示"的alert ID
+// Store alert IDs for which the user selected "Don't show again"
 const suppressedAlerts = new Set<string>()
 
-// 從localStorage載入已抑制的alerts
+// Load suppressed alerts from localStorage
 const loadSuppressedAlerts = () => {
   try {
     const stored = localStorage.getItem('suppressedAlerts')
@@ -42,7 +42,7 @@ const loadSuppressedAlerts = () => {
   }
 }
 
-// 儲存被抑制的alerts到localStorage
+// Save suppressed alerts to localStorage
 const saveSuppressedAlerts = () => {
   try {
     localStorage.setItem('suppressedAlerts', JSON.stringify(Array.from(suppressedAlerts)))
@@ -51,7 +51,7 @@ const saveSuppressedAlerts = () => {
   }
 }
 
-// 初始化時載入
+// Load on initialization
 loadSuppressedAlerts()
 
 export function useAlert() {
@@ -59,7 +59,7 @@ export function useAlert() {
 
   const showAlert = (options: AlertOptions): Promise<boolean> => {
     return new Promise((resolve) => {
-      // 如果有alertId且已被抑制，直接返回false
+      // If alertId exists and is suppressed, return false immediately
       if (options.alertId && suppressedAlerts.has(options.alertId)) {
         resolve(false)
         return
@@ -92,7 +92,7 @@ export function useAlert() {
     saveSuppressedAlerts()
   }
 
-  // 便捷方法
+  // Convenience methods
   const alert = (message: string, title?: string, options?: Partial<AlertOptions>) => {
     return showAlert({
       message,

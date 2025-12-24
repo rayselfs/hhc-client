@@ -66,33 +66,35 @@ export function useContextMenu(): {
    * @param event - Click event
    */
   const handleClickOutside = (event: Event) => {
-    // 只在選單顯示時處理點擊外部事件
+    // Only handle outside click when menu is shown
     if (!show.value) return
 
     const target = event.target as Element
 
-    // 檢查點擊的目標是否在右鍵選單內
+    // Check if click target is inside context menu
     const isClickOnMenu =
       target.closest('.v-menu') ||
       target.closest('.v-list') ||
       target.closest('.v-list-item') ||
       target.closest('[role="menu"]')
 
-    // 如果點擊在選單外，關閉選單
+    // If click is outside menu, close it
     if (!isClickOnMenu) {
       close()
     }
   }
 
-  // 監聽全局點擊事件
-  // 注意：每個組件實例都會註冊自己的事件監聽器，但這不會造成衝突
-  // 因為每個實例都有獨立的 show 狀態，只有當 show.value 為 true 時才會關閉
+  // Listen for global click events
+  // Note: Each component instance registers its own listener, but this won't conflict
+  // because each instance has independent show state, closing only when show.value is true
   onMounted(() => {
     document.addEventListener('click', handleClickOutside, true)
+    document.addEventListener('contextmenu', handleClickOutside, true)
   })
 
   onUnmounted(() => {
     document.removeEventListener('click', handleClickOutside, true)
+    document.removeEventListener('contextmenu', handleClickOutside, true)
   })
 
   return {

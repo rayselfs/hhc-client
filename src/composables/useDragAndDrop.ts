@@ -4,14 +4,14 @@ import type { DragData } from '@/utils/typeGuards'
 import { isValidDragData } from '@/utils/typeGuards'
 
 /**
- * 拖放功能 Composable
- * 提供統一的拖放處理邏輯
+ * Drag and Drop Composable
+ * Provides unified drag and drop handling logic
  */
 export const useDragAndDrop = <T extends VerseItem>() => {
   const { reportError } = useSentry()
 
   /**
-   * 處理拖動開始
+   * Handle drag start
    */
   const handleDragStart = (
     event: DragEvent,
@@ -20,18 +20,18 @@ export const useDragAndDrop = <T extends VerseItem>() => {
   ) => {
     if (!event.dataTransfer) return
 
-    // 設置拖移數據
+    // Set drag data
     const data: DragData = { type, item }
     event.dataTransfer.setData('application/json', JSON.stringify(data))
     event.dataTransfer.effectAllowed = 'move'
 
-    // 創建自定義拖移圖像
+    // Create custom drag image
     const dragImage = createDragImage(type, item)
     if (dragImage) {
       document.body.appendChild(dragImage)
       event.dataTransfer.setDragImage(dragImage, 10, 10)
 
-      // 延遲移除拖移圖像
+      // Delay removing drag image
       setTimeout(() => {
         if (document.body.contains(dragImage)) {
           document.body.removeChild(dragImage)
@@ -41,7 +41,7 @@ export const useDragAndDrop = <T extends VerseItem>() => {
   }
 
   /**
-   * 創建拖移時的視覺效果
+   * Create visual effect during drag
    */
   const createDragImage = (
     type: 'verse' | 'folder',
@@ -83,7 +83,7 @@ export const useDragAndDrop = <T extends VerseItem>() => {
   }
 
   /**
-   * 處理拖動懸停
+   * Handle drag over
    */
   const handleDragOver = (event: DragEvent) => {
     event.preventDefault()
@@ -93,7 +93,7 @@ export const useDragAndDrop = <T extends VerseItem>() => {
   }
 
   /**
-   * 處理拖動進入
+   * Handle drag enter
    */
   const handleDragEnter = (event: DragEvent) => {
     event.preventDefault()
@@ -104,7 +104,7 @@ export const useDragAndDrop = <T extends VerseItem>() => {
   }
 
   /**
-   * 處理拖動離開
+   * Handle drag leave
    */
   const handleDragLeave = (event: DragEvent) => {
     event.preventDefault()
@@ -121,7 +121,7 @@ export const useDragAndDrop = <T extends VerseItem>() => {
   }
 
   /**
-   * 處理拖放
+   * Handle drop
    */
   const handleDrop = (
     event: DragEvent,
@@ -129,7 +129,7 @@ export const useDragAndDrop = <T extends VerseItem>() => {
   ) => {
     event.preventDefault()
 
-    // 移除拖移高亮效果
+    // Remove drag highlight effect
     const container = (event.target as HTMLElement).closest('.verse-item')
     if (container) {
       container.classList.remove('drag-over')

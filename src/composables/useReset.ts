@@ -1,15 +1,17 @@
 import { useSentry } from './useSentry'
 import { useLocalStorage } from './useLocalStorage'
+import { useElectron } from './useElectron'
 
 /**
  * useFactoryReset composable
- * 處理恢復原廠設定功能
+ * Handles factory reset functionality
  */
 export function useFactoryReset() {
   const { reportError } = useSentry()
   const { clear } = useLocalStorage()
+  const { isElectron, resetUserData } = useElectron()
   /**
-   * 清除所有 IndexedDB 資料庫
+   * Clear all IndexedDB databases
    */
   const clearAllIndexedDB = async (): Promise<boolean> => {
     try {
@@ -22,7 +24,7 @@ export function useFactoryReset() {
               request.onsuccess = () => resolve()
               request.onerror = () => reject(request.error)
               request.onblocked = () => {
-                // 繼續執行，即使被阻擋
+                // Continue execution even if blocked
                 resolve()
               }
             })
@@ -42,17 +44,17 @@ export function useFactoryReset() {
   }
 
   /**
-   * 清除所有儲存資料（localStorage、sessionStorage、IndexedDB）
+   * Clear all storage (localStorage, sessionStorage, IndexedDB)
    */
   const clearAllStorage = async (): Promise<boolean> => {
     try {
-      // 清除 localStorage
+      // Clear localStorage
       clear()
 
-      // 清除 sessionStorage
+      // Clear sessionStorage
       sessionStorage.clear()
 
-      // 清除 IndexedDB
+      // Clear IndexedDB
       await clearAllIndexedDB()
 
       return true
@@ -66,13 +68,17 @@ export function useFactoryReset() {
   }
 
   /**
-   * 執行恢復原廠設定
-   * 清除所有儲存資料並重新載入頁面
+   * Perform factory reset
+   * Clears all storage data and reloads page
    */
   const performFactoryReset = async () => {
     const success = await clearAllStorage()
     if (success) {
-      // 重新載入頁面以確保所有狀態被重置
+      if (isElectron()) {
+        await resetUserData()
+      }
+
+      // Reload page to ensure all state is reset
       window.location.reload()
     }
     return success

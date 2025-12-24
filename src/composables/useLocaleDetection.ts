@@ -2,26 +2,26 @@ import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useElectron } from './useElectron'
 import { useLocalStorage } from './useLocalStorage'
-import { useSentry } from './useSentry'
+
 import { StorageKey, StorageCategory, getStorageKey } from '@/types/common'
 import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
 
 /**
- * 語系配置接口
+ * Locale Configuration Interface
  */
 interface LocaleConfig {
   value: string
-  textKey: string // i18n key (例如: 'settings.chinese')
+  textKey: string // i18n key (e.g. 'settings.chinese')
 }
 
 /**
- * 語系配置列表 - 在此處新增語系即可
- * 新增語系時只需在此處添加一個項目
+ * Locale Configuration List - Add new locales here
+ * Just add an item here when adding a new locale
  *
- * 檔案命名建議：
- * - zh-TW.json - 繁體中文（台灣）
- * - zh-CN.json - 簡體中文（中國大陸）
- * - en.json - 英文
+ * File naming recommendation:
+ * - zh-TW.json - Traditional Chinese (Taiwan)
+ * - zh-CN.json - Simplified Chinese (China)
+ * - en.json - English
  */
 const LOCALE_CONFIGS = [
   { value: 'en', textKey: 'settings.english' },
@@ -30,18 +30,18 @@ const LOCALE_CONFIGS = [
 ] as const satisfies readonly LocaleConfig[]
 
 /**
- * 從配置中提取支援的語系列表
+ * Extract supported locale list from configuration
  */
 const SUPPORTED_LOCALES = LOCALE_CONFIGS.map((config) => config.value)
 export type SupportedLocale = (typeof LOCALE_CONFIGS)[number]['value']
 
 /**
- * 預設語系（取第一個配置的語系）
+ * Default locale (take the first configured locale)
  */
 const DEFAULT_LOCALE: SupportedLocale = LOCALE_CONFIGS[0]?.value || ('en' as SupportedLocale)
 
 /**
- * 語系選項接口
+ * Language Option Interface
  */
 export interface LanguageOption {
   value: SupportedLocale
@@ -49,9 +49,9 @@ export interface LanguageOption {
 }
 
 /**
- * 將系統語系代碼映射到支援的語系
- * @param systemLocale - 系統語系代碼（例如：'zh-TW', 'zh-CN', 'en-US', 'zh'）
- * @returns 支援的語系代碼
+ * Map system locale code to supported locale
+ * @param systemLocale - System locale code (e.g. 'zh-TW', 'zh-CN', 'en-US', 'zh')
+ * @returns Supported locale code
  */
 function mapSystemLocaleToSupported(systemLocale: string | undefined): SupportedLocale {
   if (!systemLocale || typeof systemLocale !== 'string') {
@@ -60,57 +60,57 @@ function mapSystemLocaleToSupported(systemLocale: string | undefined): Supported
 
   const localeLower = systemLocale.toLowerCase()
 
-  // 1. 先檢查完整的地區代碼是否在支援列表中（例如：'zh-TW', 'zh-CN'）
+  // 1. Check if full locale code is in supported list (e.g. 'zh-TW', 'zh-CN')
   if (SUPPORTED_LOCALES.includes(localeLower as SupportedLocale)) {
     return localeLower as SupportedLocale
   }
 
-  // 2. 提取主要語言代碼和地區代碼
+  // 2. Extract main language code and region code
   const parts = localeLower.split('-')
   const mainLocale = parts[0]
   const region = parts[1]
 
-  // 3. 檢查主要語言代碼是否在支援列表中（例如：'zh' -> 映射到對應的預設語系）
+  // 3. Check if main language code is in supported list (e.g. 'zh' -> map to corresponding default locale)
   if (mainLocale === 'zh') {
-    // 根據地區代碼映射
+    // Map based on region code
     if (region === 'cn' || region === 'hans') {
-      // 簡體中文 -> 檢查是否支援 zh-CN
+      // Simplified Chinese -> Check if zh-CN is supported
       if (SUPPORTED_LOCALES.includes('zh-CN' as SupportedLocale)) {
         return 'zh-CN' as SupportedLocale
       }
     } else if (region === 'tw' || region === 'hk' || region === 'hant') {
-      // 繁體中文 -> 檢查是否支援 zh-TW
+      // Traditional Chinese -> Check if zh-TW is supported
       if (SUPPORTED_LOCALES.includes('zh-TW' as SupportedLocale)) {
         return 'zh-TW' as SupportedLocale
       }
     }
-    // 如果只是 'zh'，返回預設語系（通常是 zh-TW）
+    // If just 'zh', return default locale (usually zh-TW)
     return 'zh-TW'
   }
 
-  // 4. 檢查是否在支援列表中（例如：'en' -> 'en'）
+  // 4. Check if in supported list (e.g. 'en' -> 'en')
   if (SUPPORTED_LOCALES.includes(mainLocale as SupportedLocale)) {
     return mainLocale as SupportedLocale
   }
 
-  // 5. 如果不支援，返回預設語系
+  // 5. If not supported, return default locale
   return DEFAULT_LOCALE
 }
 
 /**
- * 偵測系統語系
- * @returns 系統語系代碼
+ * Detect system locale
+ * @returns System locale code
  */
 export async function detectSystemLocale(): Promise<SupportedLocale> {
-  const { isElectron } = useElectron()
+  const { isElectron, getSystemLocale } = useElectron()
 
   try {
     if (isElectron()) {
-      // Electron 環境：使用 app.getLocale()
-      const systemLocale = await window.electronAPI.getSystemLocale()
+      // Electron environment: use app.getLocale()
+      const systemLocale = await getSystemLocale()
       return mapSystemLocaleToSupported(systemLocale)
     } else {
-      // 瀏覽器環境：使用 navigator.language
+      // Browser environment: use navigator.language
       let systemLocale: string | undefined = navigator.language
       if (!systemLocale && navigator.languages && navigator.languages.length > 0) {
         systemLocale = navigator.languages[0]
@@ -124,13 +124,13 @@ export async function detectSystemLocale(): Promise<SupportedLocale> {
 }
 
 /**
- * 獲取初始語系（優先順序：保存的語系 > 系統語系 > 預設語系）
- * @returns 初始語系代碼
+ * Get initial locale (Priority: Saved locale > System locale > Default locale)
+ * @returns Initial locale code
  */
 export async function getInitialLocale(): Promise<SupportedLocale> {
   const { getLocalItem } = useLocalStorage()
 
-  // 1. 先檢查是否有保存的語系設定
+  // 1. Check if there is a saved locale setting
   const savedLocale = getLocalItem<string>(
     getStorageKey(StorageCategory.APP, StorageKey.PREFERRED_LANGUAGE),
   )
@@ -139,13 +139,13 @@ export async function getInitialLocale(): Promise<SupportedLocale> {
     return savedLocale as SupportedLocale
   }
 
-  // 2. 如果沒有保存的設定，偵測系統語系
+  // 2. If no saved setting, detect system locale
   const systemLocale = await detectSystemLocale()
   return systemLocale
 }
 
 /**
- * 語系選項列表 - 自動從配置生成
+ * Language option list - Automatically generated from configuration
  */
 export const LANGUAGE_OPTIONS: LanguageOption[] = LOCALE_CONFIGS.map((config) => ({
   value: config.value as SupportedLocale,
@@ -154,65 +154,56 @@ export const LANGUAGE_OPTIONS: LanguageOption[] = LOCALE_CONFIGS.map((config) =>
 
 /**
  * useLocaleDetection composable
- * 提供完整的語系管理功能，包括偵測、選擇和切換
+ * Provides complete locale management functions including detection, selection, and switching
  */
 export function useLocaleDetection() {
   const { locale } = useI18n()
-  const { isElectron } = useElectron()
+  const { isElectron, updateLanguage } = useElectron()
   const { getLocalItem, setLocalItem } = useLocalStorage()
 
-  const { reportError } = useSentry()
   const { sendLocaleUpdate } = useProjectionMessaging()
 
-  // 當前選擇的語系
+  // Currently selected language
   const selectedLanguage = ref<SupportedLocale>(locale.value as SupportedLocale)
 
-  // 語系選項（computed，可根據需要動態生成）
+  // Language options (computed, can be generated dynamically if needed)
   const languageOptions = computed<LanguageOption[]>(() => LANGUAGE_OPTIONS)
 
   /**
-   * 應用新的語系設定
-   * 統一處理所有語系相關的副作用：
-   * 1. 更新 i18n 實例
-   * 2. 更新本地狀態
-   * 3. 持久化到 localStorage
-   * 4. 同步到投影視窗
-   * 5. 同步到 Electron 主進程
+   * Apply new locale setting
+   * Unified handling of all locale-related side effects:
+   * 1. Update i18n instance
+   * 2. Update local state
+   * 3. Persist to localStorage
+   * 4. Sync to projection window
+   * 5. Sync to Electron main process
    */
   const applyLocale = async (newLocale: SupportedLocale) => {
-    // 1. 更新 i18n
+    // 1. Update i18n
     locale.value = newLocale
 
-    // 2. 更新本地狀態
+    // 2. Update local state
     selectedLanguage.value = newLocale
 
-    // 3. 持久化
+    // 3. Persist
     const isProjection = window.location.hash.includes('projection')
 
     if (!isProjection) {
       setLocalItem(getStorageKey(StorageCategory.APP, StorageKey.PREFERRED_LANGUAGE), newLocale)
 
-      // 4. 同步到投影視窗
+      // 4. Sync to projection window
       sendLocaleUpdate(newLocale)
 
-      // 5. 同步到 Electron 主進程
+      // 5. Sync to Electron main process
       if (isElectron()) {
-        try {
-          await window.electronAPI.updateLanguage(newLocale)
-        } catch (error) {
-          reportError(error, {
-            operation: 'update-language',
-            component: 'useLocaleDetection',
-            extra: { newLocale },
-          })
-        }
+        await updateLanguage(newLocale)
       }
     }
   }
 
   /**
-   * 初始化語系
-   * 優先順序：保存的語系 > 系統語系 > 當前 i18n 語系
+   * Initialize locale
+   * Priority: Saved locale > System locale > Current i18n locale
    */
   const initializeLanguage = async () => {
     const savedLanguage = getLocalItem<string>(
@@ -231,8 +222,8 @@ export function useLocaleDetection() {
   }
 
   /**
-   * 處理語系切換
-   * @param newLocale - 新的語系代碼
+   * Handle language change
+   * @param newLocale - New locale code
    */
   const handleLanguageChange = async (newLocale: string) => {
     if (!SUPPORTED_LOCALES.includes(newLocale as SupportedLocale)) {
@@ -248,7 +239,7 @@ export function useLocaleDetection() {
     languageOptions,
     initializeLanguage,
     handleLanguageChange,
-    // 導出常量供外部使用
+    // Export constants for external use
     SUPPORTED_LOCALES,
     DEFAULT_LOCALE,
   }

@@ -3,8 +3,8 @@ import { throttle } from '@/utils/performanceUtils'
 import { useDisplay } from 'vuetify'
 
 /**
- * 響應式視窗尺寸 composable
- * 提供統一的 resize 監聽器，避免多個組件重複監聽
+ * Responsive window size composable
+ * Provides unified resize listener to avoid duplicate listeners in multiple components
  */
 export const useWindowSize = (throttleDelay = 100) => {
   const windowSize = ref({
@@ -46,7 +46,7 @@ export const useCardLayout = (options: CardLayoutOptions = {}) => {
     minHeight = 600,
     headerOffset = 96,
     gap = 16,
-    topCardRatio = 0.6, // 預設 60% 上，40% 下
+    topCardRatio = 0.6, // Default 60% top, 40% bottom
   } = options
 
   const { height } = useWindowSize(100)
@@ -55,10 +55,11 @@ export const useCardLayout = (options: CardLayoutOptions = {}) => {
   const leftCardHeight = ref(600)
   const rightTopCardHeight = ref(360)
   const rightBottomCardHeight = ref(240)
+  const mediaSpaceHeight = ref(600)
 
   const calculateHeights = () => {
     const viewportHeight = height.value - headerOffset
-    // 如果小於 lg (Mobile/Tablet)，高度縮小為 80% 以顯示下方內容
+    // If smaller than lg (Mobile/Tablet), scale height to 80% to show content below
     const responsiveScale = mdAndUp.value ? 1 : 0.8
     const targetHeight = viewportHeight * responsiveScale
 
@@ -67,13 +68,15 @@ export const useCardLayout = (options: CardLayoutOptions = {}) => {
     const rightCardTotalHeight = leftCardHeight.value - gap
     rightTopCardHeight.value = Math.floor(rightCardTotalHeight * topCardRatio)
     rightBottomCardHeight.value = Math.floor(rightCardTotalHeight * (1 - topCardRatio))
+
+    mediaSpaceHeight.value = viewportHeight - gap - 88
   }
 
   onMounted(() => {
     calculateHeights()
   })
 
-  // 監聽 height 和 lgAndUp 變化來重新計算高度
+  // Listen for changes in height and mdAndUp to recalculate heights
   watch([() => height.value, mdAndUp], () => {
     calculateHeights()
   })
@@ -82,6 +85,7 @@ export const useCardLayout = (options: CardLayoutOptions = {}) => {
     leftCardHeight,
     rightTopCardHeight,
     rightBottomCardHeight,
+    mediaSpaceHeight,
     calculateHeights,
   }
 }

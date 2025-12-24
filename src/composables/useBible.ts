@@ -2,7 +2,7 @@ import { nextTick, computed, type Ref } from 'vue'
 import { useFolderStore } from '@/stores/folder'
 import { useElectron } from './useElectron'
 import { useProjectionMessaging } from './useProjectionMessaging'
-import { useProjectionStore } from '@/stores/projection'
+
 import { APP_CONFIG } from '@/config/app'
 import { MessageType, ViewType, StorageKey, StorageCategory, type VerseItem } from '@/types/common'
 import { useBibleStore } from '@/stores/bible'
@@ -10,8 +10,8 @@ import { storeToRefs } from 'pinia'
 import type { BiblePassage, PreviewVerse, BibleBook } from '@/types/bible'
 
 /**
- * 聖經功能整合 Composable
- * 整合 Bible folder store、導航功能和投影功能
+ * Bible Functionality Integration Composable
+ * Integrates Bible folder store, navigation, and projection features
  */
 export const useBible = (
   currentPassage?: Ref<BiblePassage | null>,
@@ -54,7 +54,7 @@ export const useBible = (
 
   // ==================== Navigation ====================
   /**
-   * 滾動到指定節
+   * Scroll to specific verse
    */
   const scrollToVerse = (verseNumber: number, behavior: 'smooth' | 'instant' = 'smooth') => {
     const element = document.querySelector(`[data-verse="${verseNumber}"]`)
@@ -67,22 +67,14 @@ export const useBible = (
   }
 
   /**
-   * 獲取最大章數（使用 computed 緩存）
+   * Get max chapters (cached using computed)
    */
   const maxChapters = computed(() => {
     return previewBook?.value ? previewBook.value.chapters.length : 0
   })
 
   /**
-   * 獲取最大章數（向後兼容的函數形式）
-   * @deprecated 使用 maxChapters.value 替代
-   */
-  const getMaxChapters = (): number => {
-    return maxChapters.value
-  }
-
-  /**
-   * 更新章節內容
+   * Update chapter content
    */
   const updateChapterContent = (chapterNumber: number) => {
     if (!previewBook?.value || !currentPassage?.value || !previewVerses?.value) return false
@@ -91,17 +83,17 @@ export const useBible = (
 
     if (!selectedChapter) return false
 
-    // 更新章節和節數（從第1節開始）
+    // Update chapter and verse (start from verse 1)
     currentPassage.value.chapter = chapterNumber
     currentPassage.value.verse = 1
 
-    // 更新經文內容
+    // Update scripture content
     previewVerses.value = selectedChapter.verses.map((v) => ({
       number: v.number,
       text: v.text,
     }))
 
-    // 滾動到第1節
+    // Scroll to verse 1
     nextTick(() => {
       scrollToVerse(1)
     })
@@ -110,10 +102,10 @@ export const useBible = (
   }
 
   /**
-   * 導航到指定章節
-   * @param direction - 'prev' | 'next' | number (章節號)
-   * @param updateProjection - 是否更新投影（預設 false）
-   * @param onUpdateProjection - 更新投影的回調函數
+   * Navigate to specific chapter
+   * @param direction - 'prev' | 'next' | number (chapter number)
+   * @param updateProjection - Whether to update projection (default false)
+   * @param onUpdateProjection - Callback for updating projection
    */
   const navigateToChapter = (
     direction: 'prev' | 'next' | number,
@@ -131,20 +123,19 @@ export const useBible = (
       targetChapter = currentPassage.value.chapter - 1
     } else {
       // 'next'
-      const maxChapters = getMaxChapters()
-      if (currentPassage.value.chapter >= maxChapters) return
+      if (currentPassage.value.chapter >= maxChapters.value) return
       targetChapter = currentPassage.value.chapter + 1
     }
 
     const success = updateChapterContent(targetChapter)
 
     if (success && updateProjection && onUpdateProjection) {
-      onUpdateProjection(1) // 新章節從第1節開始
+      onUpdateProjection(1) // New chapter starts at verse 1
     }
   }
 
   /**
-   * 導航到上一章
+   * Navigate to previous chapter
    */
   const goToPreviousChapter = (
     updateProjection = false,
@@ -154,7 +145,7 @@ export const useBible = (
   }
 
   /**
-   * 導航到下一章
+   * Navigate to next chapter
    */
   const goToNextChapter = (
     updateProjection = false,
@@ -164,10 +155,10 @@ export const useBible = (
   }
 
   /**
-   * 導航到指定節
-   * @param direction - 'prev' | 'next' | number (節號)
-   * @param updateProjection - 是否更新投影（預設 false）
-   * @param onUpdateProjection - 更新投影的回調函數
+   * Navigate to specific verse
+   * @param direction - 'prev' | 'next' | number (verse number)
+   * @param updateProjection - Whether to update projection (default false)
+   * @param onUpdateProjection - Callback for updating projection
    */
   const navigateToVerse = (
     direction: 'prev' | 'next' | number,
@@ -191,7 +182,7 @@ export const useBible = (
 
     currentPassage.value.verse = targetVerse
 
-    // 滾動到新節
+    // Scroll to new verse
     nextTick(() => {
       scrollToVerse(targetVerse)
     })
@@ -202,7 +193,7 @@ export const useBible = (
   }
 
   /**
-   * 導航到上一節
+   * Navigate to previous verse
    */
   const goToPreviousVerse = (
     updateProjection = false,
@@ -212,7 +203,7 @@ export const useBible = (
   }
 
   /**
-   * 導航到下一節
+   * Navigate to next verse
    */
   const goToNextVerse = (
     updateProjection = false,
@@ -223,20 +214,17 @@ export const useBible = (
 
   // ==================== Projection ====================
   const { isElectron, sendToProjection } = useElectron()
-  const { setProjectionState, sendBibleUpdate } = useProjectionMessaging()
-  const projectionStore = useProjectionStore()
+  const { setProjectionState, sendProjectionMessage } = useProjectionMessaging()
 
   /**
-   * 更新投影畫面
+   * Update projection screen
+   * @param verseNumber - The clicked verse number
    */
   const updateProjection = async (verseNumber: number) => {
     if (!currentPassage?.value || !previewVerses?.value) return
 
     if (isElectron()) {
-      // 如果投影視窗沒有顯示聖經（顯示預設內容或顯示其他內容），則切換到聖經
-      if (projectionStore.isShowingDefault || projectionStore.currentView !== 'bible') {
-        await setProjectionState(false, ViewType.BIBLE)
-      }
+      await setProjectionState(false, ViewType.BIBLE)
     }
 
     // Get Bible store state
@@ -267,7 +255,7 @@ export const useBible = (
       }
     }
 
-    // 發送聖經數據
+    // Send Bible data
     const bibleData = {
       bookNumber: currentPassage.value.bookNumber,
       chapter: currentPassage.value.chapter,
@@ -280,16 +268,16 @@ export const useBible = (
       secondVersionChapterVerses: secondVersionVerses,
     }
 
-    sendBibleUpdate(bibleData, true)
+    sendProjectionMessage(MessageType.BIBLE_SYNC_CONTENT, bibleData, { force: true })
   }
 
   /**
-   * 更新投影字型大小
+   * Update projection font size
    */
   const updateProjectionFontSize = (fontSize: number) => {
     if (isElectron()) {
       sendToProjection({
-        type: MessageType.UPDATE_BIBLE_FONT_SIZE,
+        type: MessageType.BIBLE_UPDATE_FONT_SIZE,
         data: { fontSize },
       })
     }
@@ -302,7 +290,6 @@ export const useBible = (
     // Navigation
     scrollToVerse,
     maxChapters,
-    getMaxChapters,
     navigateToChapter,
     goToPreviousChapter,
     goToNextChapter,

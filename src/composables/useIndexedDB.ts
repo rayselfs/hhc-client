@@ -2,7 +2,7 @@ import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
 import { useSentry } from './useSentry'
 
 /**
- * IndexedDB 配置
+ * IndexedDB Configuration
  */
 export interface IndexedDBConfig {
   dbName: string
@@ -11,7 +11,7 @@ export interface IndexedDBConfig {
 }
 
 /**
- * Object Store 配置
+ * Object Store Configuration
  */
 export interface StoreConfig {
   name: string
@@ -21,7 +21,7 @@ export interface StoreConfig {
 }
 
 /**
- * Index 配置
+ * Index Configuration
  */
 export interface IndexConfig {
   name: string
@@ -30,20 +30,20 @@ export interface IndexConfig {
 }
 
 /**
- * 通用 IndexedDB Schema - 使用 Record 類型以支持動態 store 名稱
+ * Generic IndexedDB Schema - Uses Record type to support dynamic store names
  */
 type GenericDB = DBSchema & Record<string, { key: unknown; value: unknown }>
 
 /**
  * useIndexedDB composable
- * 提供通用的 IndexedDB 操作功能
+ * Provides generic IndexedDB operation capabilities
  */
 export function useIndexedDB(config: IndexedDBConfig) {
   const { reportError } = useSentry()
   let dbInstance: IDBPDatabase<GenericDB> | null = null
 
   /**
-   * 初始化 IndexedDB
+   * Initialize IndexedDB
    */
   const initDB = async (): Promise<IDBPDatabase<GenericDB>> => {
     if (dbInstance) {
@@ -51,12 +51,12 @@ export function useIndexedDB(config: IndexedDBConfig) {
     }
 
     try {
-      // 使用類型斷言以支持動態 store 名稱
+      // Use type assertion to support dynamic store names
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       dbInstance = (await (openDB as any)(config.dbName, config.version, {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         upgrade(db: any) {
-          // 為每個 store 創建 object store
+          // Create object store for each store
           config.stores.forEach((storeConfig) => {
             if (!db.objectStoreNames.contains(storeConfig.name)) {
               const objectStore = storeConfig.autoIncrement
@@ -67,7 +67,7 @@ export function useIndexedDB(config: IndexedDBConfig) {
                     keyPath: storeConfig.keyPath,
                   })
 
-              // 創建索引
+              // Create indices
               if (storeConfig.indices) {
                 storeConfig.indices.forEach((indexConfig) => {
                   if (!objectStore.indexNames.contains(indexConfig.name)) {
@@ -93,15 +93,15 @@ export function useIndexedDB(config: IndexedDBConfig) {
   }
 
   /**
-   * 獲取指定 store 的值
-   * @param storeName - Object store 名稱
-   * @param key - 主鍵
-   * @returns 值，如果不存在則返回 undefined
+   * Get value from specified store
+   * @param storeName - Object store name
+   * @param key - Primary key
+   * @returns Value, or undefined if not exists
    */
   const get = async <T = unknown>(storeName: string, key: unknown): Promise<T | undefined> => {
     try {
       const db = await initDB()
-      // 使用類型斷言來繞過 TypeScript 的嚴格檢查，因為 store 名稱是動態的
+      // Use type assertion to bypass TypeScript strict check because store name is dynamic
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return (await (db as any).get(storeName, key)) as T | undefined
     } catch (error) {
@@ -115,10 +115,10 @@ export function useIndexedDB(config: IndexedDBConfig) {
   }
 
   /**
-   * 保存值到指定 store
-   * @param storeName - Object store 名稱
-   * @param value - 要保存的值
-   * @returns 保存的 key
+   * Save value to specified store
+   * @param storeName - Object store name
+   * @param value - Value to save
+   * @returns Saved key
    */
   const put = async <T = unknown>(storeName: string, value: T): Promise<unknown> => {
     try {
@@ -137,10 +137,10 @@ export function useIndexedDB(config: IndexedDBConfig) {
   }
 
   /**
-   * 添加值到指定 store（如果 key 已存在則失敗）
-   * @param storeName - Object store 名稱
-   * @param value - 要添加的值
-   * @returns 添加的 key
+   * Add value to specified store (fails if key exists)
+   * @param storeName - Object store name
+   * @param value - Value to add
+   * @returns Added key
    */
   const add = async <T = unknown>(storeName: string, value: T): Promise<unknown> => {
     try {
@@ -159,9 +159,9 @@ export function useIndexedDB(config: IndexedDBConfig) {
   }
 
   /**
-   * 從指定 store 刪除值
-   * @param storeName - Object store 名稱
-   * @param key - 主鍵
+   * Delete value from specified store
+   * @param storeName - Object store name
+   * @param key - Primary key
    */
   const deleteItem = async (storeName: string, key: unknown): Promise<void> => {
     try {
@@ -180,9 +180,9 @@ export function useIndexedDB(config: IndexedDBConfig) {
   }
 
   /**
-   * 獲取指定 store 的所有值
-   * @param storeName - Object store 名稱
-   * @returns 所有值
+   * Get all values from specified store
+   * @param storeName - Object store name
+   * @returns All values
    */
   const getAll = async <T = unknown>(storeName: string): Promise<T[]> => {
     try {
@@ -201,9 +201,9 @@ export function useIndexedDB(config: IndexedDBConfig) {
   }
 
   /**
-   * 獲取指定 store 的所有主鍵
-   * @param storeName - Object store 名稱
-   * @returns 所有主鍵
+   * Get all keys from specified store
+   * @param storeName - Object store name
+   * @returns All keys
    */
   const getAllKeys = async <T = unknown>(storeName: string): Promise<T[]> => {
     try {
@@ -222,8 +222,8 @@ export function useIndexedDB(config: IndexedDBConfig) {
   }
 
   /**
-   * 清空指定 store 的所有數據
-   * @param storeName - Object store 名稱
+   * Clear all data from specified store
+   * @param storeName - Object store name
    */
   const clear = async (storeName: string): Promise<void> => {
     try {
@@ -242,10 +242,10 @@ export function useIndexedDB(config: IndexedDBConfig) {
   }
 
   /**
-   * 檢查指定 store 中是否存在指定的 key
-   * @param storeName - Object store 名稱
-   * @param key - 主鍵
-   * @returns 是否存在
+   * Check if specified key exists in specified store
+   * @param storeName - Object store name
+   * @param key - Primary key
+   * @returns Whether it exists
    */
   const has = async (storeName: string, key: unknown): Promise<boolean> => {
     try {
@@ -265,11 +265,11 @@ export function useIndexedDB(config: IndexedDBConfig) {
   }
 
   /**
-   * 使用索引查詢
-   * @param storeName - Object store 名稱
-   * @param indexName - 索引名稱
-   * @param query - 查詢值或範圍
-   * @returns 匹配的值
+   * Query using index
+   * @param storeName - Object store name
+   * @param indexName - Index name
+   * @param query - Query value or range
+   * @returns Matched values
    */
   const getByIndex = async <T = unknown>(
     storeName: string,
@@ -294,7 +294,7 @@ export function useIndexedDB(config: IndexedDBConfig) {
   }
 
   /**
-   * 關閉數據庫連接
+   * Close database connection
    */
   const close = async (): Promise<void> => {
     if (dbInstance) {

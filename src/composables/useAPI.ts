@@ -10,13 +10,7 @@ import { useSentry } from './useSentry'
 
 const API_HOST = import.meta.env.VITE_BIBLE_API_HOST || 'https://www.alive.org.tw'
 
-/**
- * API 錯誤介面
- */
-export interface ApiError {
-  message: string
-  status?: number
-}
+import { type ApiError } from '@/types/api'
 
 import { StorageKey, StorageCategory, getStorageKey } from '@/types/common'
 import { useLocalStorage } from '@/composables/useLocalStorage'
@@ -28,11 +22,18 @@ export function useAPI() {
   const loading = ref(false)
   const error: Ref<ApiError | null> = ref(null)
 
-  const { isElectron } = useElectron()
+  const {
+    isElectron,
+    getBibleVersions: electronGetBibleVersions,
+    onBibleContentChunk: electronOnBibleContentChunk,
+    getBibleContent: electronGetBibleContent,
+    searchBibleVerses: electronSearchBibleVerses,
+    removeAllListeners,
+  } = useElectron()
 
   /**
-   * 取得所有聖經版本
-   * @returns 聖經版本列表
+   * Get all Bible versions
+   * @returns List of Bible versions
    */
   const getBibleVersions = async (): Promise<BibleVersion[]> => {
     loading.value = true
@@ -40,7 +41,7 @@ export function useAPI() {
 
     try {
       if (isElectron()) {
-        const data = await window.electronAPI.getBibleVersions()
+        const data = await electronGetBibleVersions()
         return data
       }
 
@@ -60,14 +61,14 @@ export function useAPI() {
 
       const data: BibleVersion[] = await response.json()
 
-      // 如果 API 回傳空陣列或無效數據，拋出錯誤
+      // If API returns empty array or invalid data, throw error
       if (!data || !Array.isArray(data) || data.length === 0) {
         throw new Error('API returned empty or invalid data')
       }
 
       return data
     } catch (err) {
-      // API 失敗時，記錄錯誤並嘗試從快取讀取
+      // When API fails, log error and try to load from cache
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred'
       reportError(err, {
         operation: 'fetch-bible-versions',
@@ -88,7 +89,7 @@ export function useAPI() {
         return cachedVersions
       }
 
-      // 如果快取也沒有，則拋出錯誤
+      // If cache is also empty, throw error
       throw err
     } finally {
       loading.value = false
@@ -96,10 +97,10 @@ export function useAPI() {
   }
 
   /**
-   * 取得特定版本的聖經內容（使用 Streaming）
-   * @param versionId - 版本 ID
-   * @param progress - 進度回調函數
-   * @returns 聖經內容
+   * Get specific version of Bible content (using Streaming)
+   * @param versionId - Version ID
+   * @param progress - Progress callback function
+   * @returns Bible content
    */
   const getBibleContent = async (
     versionId: number,
@@ -121,14 +122,13 @@ export function useAPI() {
         })
 
         // Setup listener
-        window.electronAPI.onBibleContentChunk((chunk) => {
+        electronOnBibleContentChunk((chunk) => {
           controller.enqueue(chunk)
         })
 
         // Call API
         // Start the request
-        window.electronAPI
-          .getBibleContent(versionId)
+        electronGetBibleContent(versionId)
           .then(() => {
             // When the promise resolves (success: true), we assume stream is done?
             // Actually my api.ts implementation finishes loop then returns.
@@ -186,13 +186,13 @@ export function useAPI() {
 
           buffer += decoder.decode(value, { stream: true })
 
-          // 處理完整的 SSE 事件
+          // Handle complete SSE event
           const lines = buffer.split('\n')
-          buffer = lines.pop() || '' // 保留不完整的行
+          buffer = lines.pop() || '' // Keep incomplete line
 
           for (const line of lines) {
             if (line.startsWith('data: ')) {
-              const eventData = line.slice(6) // 移除 'data: ' 前綴
+              const eventData = line.slice(6) // Remove 'data: ' prefix
 
               try {
                 const event = JSON.parse(eventData)
@@ -206,9 +206,9 @@ export function useAPI() {
                 } else if (event.type === 'error') {
                   throw new Error(event.message)
                 } else if (event.type === 'timeout') {
-                  throw new Error('請求超時')
+                  throw new Error('Request Timeout')
                 } else {
-                  // 處理書籍數據
+                  // Handle book data
                   if (event.id && event.name && isStarted) {
                     const book: BibleBook = {
                       id: event.id,
@@ -223,7 +223,7 @@ export function useAPI() {
 
                     progress?.onBookReceived?.(book, bookCount - 1, bookCount)
                   } else if (event.version_id && !isStarted) {
-                    // 處理版本信息
+                    // Handle version info
                     bibleContent.version_id = event.version_id
                     bibleContent.version_code = event.version_code
                     bibleContent.version_name = event.version_name
@@ -241,7 +241,7 @@ export function useAPI() {
       } finally {
         reader.releaseLock()
         if (isElectron()) {
-          window.electronAPI.removeAllListeners('api-bible-content-chunk')
+          removeAllListeners('api-bible-content-chunk')
         }
       }
 
@@ -282,11 +282,11 @@ export function useAPI() {
   }
 
   /**
-   * 搜索聖經經文
-   * @param q - 搜索關鍵字
-   * @param versionCode - 版本代碼（如 'CUV-TW'）
-   * @param top - 返回結果數量，預設為 20
-   * @returns 搜索結果列表
+   * Search Bible verses
+   * @param q - Search keyword
+   * @param versionCode - Version code (e.g. 'CUV-TW')
+   * @param top - Number of results to return, default 20
+   * @returns List of search results
    */
   const searchBibleVerses = async (
     q: string,
@@ -298,7 +298,7 @@ export function useAPI() {
 
     try {
       if (isElectron()) {
-        return await window.electronAPI.searchBibleVerses({ q, versionCode, top })
+        return await electronSearchBibleVerses({ q, versionCode, top })
       }
 
       const encodedQuery = encodeURIComponent(q)
@@ -319,7 +319,7 @@ export function useAPI() {
 
       const data = await response.json()
 
-      // 確保返回的是陣列
+      // Ensure return value is an array
       if (!Array.isArray(data)) {
         return []
       }

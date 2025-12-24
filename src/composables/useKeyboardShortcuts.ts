@@ -4,23 +4,40 @@ import { useTimerStore } from '@/stores/timer'
 import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
 import { useMemoryManager } from '@/utils/memoryManager'
 
-export function useKeyboardShortcuts(currentView?: Ref<string> | string) {
+export interface KeyboardShortcutOptions {
+  currentView?: Ref<string> | string
+  onCopy?: () => void
+  onPaste?: () => void
+  onCut?: () => void
+  onDelete?: () => void
+}
+
+export function useKeyboardShortcuts(
+  optionsOrView?: Ref<string> | string | KeyboardShortcutOptions,
+) {
+  // Normalize options
+  const options: KeyboardShortcutOptions =
+    typeof optionsOrView === 'object' && 'onCopy' in (optionsOrView as object)
+      ? (optionsOrView as KeyboardShortcutOptions)
+      : { currentView: optionsOrView as Ref<string> | string }
+
+  const { currentView, onCopy, onPaste, onCut, onDelete } = options
   const projectionStore = useProjectionStore()
   const timerStore = useTimerStore()
   const { setProjectionState } = useProjectionMessaging()
   const { track, untrack, cleanup } = useMemoryManager('useKeyboardShortcuts')
 
-  // 處理鍵盤事件
+  // Handle keyboard events
   const handleKeydown = (event: KeyboardEvent) => {
-    // 避免在輸入框中觸發快捷鍵
+    // Avoid triggering shortcuts in input fields
     if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
       return
     }
 
-    // 檢查是否為 Mac 系統
+    // Check if Mac system
     const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0
 
-    // 投影快捷鍵
+    // Projection shortcuts
     if (isMac) {
       // Mac: Command + Shift + Enter
       if (event.metaKey && event.shiftKey && event.key === 'Enter') {
@@ -35,16 +52,16 @@ export function useKeyboardShortcuts(currentView?: Ref<string> | string) {
       }
     }
 
-    // 取消投影快捷鍵 (Windows 和 Mac 都是 Control + Q)
+    // Cancel projection shortcut (Ctrl+Q for both Windows and Mac)
     if (event.ctrlKey && event.key === 'q') {
-      // 只有在投影開啟時才響應 Control + Q
+      // Respond to Control + Q only when projection is open (not showing default)
       if (!projectionStore.isShowingDefault) {
         event.preventDefault()
         closeProjection()
       }
     }
 
-    // 計時器快捷鍵 (只在計時器頁面響應)
+    // Timer shortcuts (only respond in Timer page)
     const view = typeof currentView === 'string' ? currentView : currentView?.value
     if (view === 'timer') {
       switch (event.code) {
@@ -52,15 +69,15 @@ export function useKeyboardShortcuts(currentView?: Ref<string> | string) {
           event.preventDefault()
           switch (timerStore.state) {
             case 'running':
-              // 正在運行 → 暫停
+              // Running -> Pause
               timerStore.pauseTimer()
               break
             case 'paused':
-              // 已暫停 → 繼續
+              // Paused -> Resume
               timerStore.resumeTimer()
               break
             case 'stopped':
-              // 未開始 → 開始
+              // Stopped -> Start
               timerStore.startTimer()
               break
           }
@@ -72,25 +89,59 @@ export function useKeyboardShortcuts(currentView?: Ref<string> | string) {
           break
       }
     }
+
+    // Generic Shortcuts (Copy, Cut, Paste, Delete)
+    // Ctrl+C / Cmd+C
+    if ((event.metaKey || event.ctrlKey) && event.key === 'c') {
+      if (onCopy) {
+        event.preventDefault()
+        onCopy()
+      }
+    }
+
+    // Ctrl+V / Cmd+V
+    if ((event.metaKey || event.ctrlKey) && event.key === 'v') {
+      if (onPaste) {
+        event.preventDefault()
+        onPaste()
+      }
+    }
+
+    // Ctrl+X / Cmd+X
+    if ((event.metaKey || event.ctrlKey) && event.key === 'x') {
+      if (onCut) {
+        event.preventDefault()
+        onCut()
+      }
+    }
+
+    // Delete / Backspace (Backspace only on Mac usually for delete file, but Delete is standard)
+    if (event.key === 'Delete' || (isMac && event.metaKey && event.key === 'Backspace')) {
+      // Only trigger delete if not in an input, which is already handled at the top
+      if (onDelete) {
+        event.preventDefault()
+        onDelete()
+      }
+    }
   }
 
-  // 切換投影狀態
+  // Toggle projection state
   const toggleProjection = async () => {
     const newShowDefault = !projectionStore.isShowingDefault
-    // setProjectionState 會自動檢查並創建投影窗口
+    // setProjectionState automatically checks and creates projection window
     await setProjectionState(newShowDefault)
   }
 
-  // 關閉投影
+  // Close projection
   const closeProjection = async () => {
     if (!projectionStore.isShowingDefault) {
       await setProjectionState(true)
     }
   }
 
-  // 生命週期管理
+  // Lifecycle management
   onMounted(() => {
-    // 追蹤事件監聽器
+    // Track event listener
     track('keydown-listener', 'listener', {
       element: document,
       event: 'keydown',
@@ -100,11 +151,11 @@ export function useKeyboardShortcuts(currentView?: Ref<string> | string) {
   })
 
   onBeforeUnmount(() => {
-    // 清理事件監聽器
+    // Cleanup event listener
     untrack('keydown-listener')
     document.removeEventListener('keydown', handleKeydown)
 
-    // 清理記憶體
+    // Cleanup memory
     cleanup()
   })
 
