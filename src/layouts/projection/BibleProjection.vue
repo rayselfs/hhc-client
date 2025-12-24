@@ -61,27 +61,25 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick, onMounted, computed } from 'vue'
+import { ref, watch, nextTick, onMounted, computed, toRefs } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BottomSpacer from '@/components/Main/BottomSpacer.vue'
+import { useBibleProjectionStore } from '@/stores/bibleProjection'
+import { BibleBookConfig } from '@/types/bible'
+import { BIBLE_BOOKS, BIBLE_CONFIG } from '@/config/app'
 
-interface BibleVerse {
-  number: number
-  text: string
-}
+const bibleProjectionStore = useBibleProjectionStore()
+const {
+  selectedBook,
+  selectedBookNumber,
+  selectedChapter,
+  chapterVerses,
+  currentVerse,
+  verseFontSize,
+  isMultiVersion,
+  secondVersionChapterVerses,
+} = toRefs(bibleProjectionStore)
 
-interface Props {
-  selectedBook: string
-  selectedBookNumber: number
-  selectedChapter: number
-  chapterVerses: BibleVerse[]
-  currentVerse: number
-  fontSize?: number
-  isMultiVersion?: boolean
-  secondVersionChapterVerses?: BibleVerse[]
-}
-
-const props = defineProps<Props>()
 const bibleContentRef = ref<HTMLElement>()
 const topPaneRef = ref<HTMLElement>()
 const bottomPaneRef = ref<HTMLElement>()
@@ -90,40 +88,37 @@ const { t: $t, locale } = useI18n()
 const isInitialLoad = ref(true)
 
 const computedFontSize = computed(() => {
-  const baseSize = props.fontSize || 90 // Default fallback
-  if (props.isMultiVersion) {
+  const baseSize = verseFontSize.value || 90 // Default fallback
+  if (isMultiVersion.value) {
     return baseSize * BIBLE_CONFIG.FONT.DUAL_VERSION_SCALE
   }
   return baseSize
 })
 
-import { BibleBookConfig } from '@/types/bible'
-import { BIBLE_BOOKS, BIBLE_CONFIG } from '@/config/app'
-
 const isPsalms = computed(() => {
-  return props.selectedBookNumber === BibleBookConfig.PSALMS
+  return selectedBookNumber.value === BibleBookConfig.PSALMS
 })
 
 const isJude = computed(() => {
-  return props.selectedBookNumber === BibleBookConfig.JUDE
+  return selectedBookNumber.value === BibleBookConfig.JUDE
 })
 
 const formattedTitle = computed(() => {
-  const bookConfig = BIBLE_BOOKS.find((b) => b.number === props.selectedBookNumber)
+  const bookConfig = BIBLE_BOOKS.find((b) => b.number === selectedBookNumber.value)
   const bookName = bookConfig
     ? ($t(`bible.books.${bookConfig.code}`) as string)
-    : props.selectedBook
+    : selectedBook.value
 
   if (locale.value === 'en') {
-    return `${bookName} ${props.selectedChapter}:${props.currentVerse}`
+    return `${bookName} ${selectedChapter.value}:${currentVerse.value}`
   }
 
   if (isJude.value) {
-    return `${bookName} ${$t('bible.no')} ${props.currentVerse} ${$t('bible.verse')}`
+    return `${bookName} ${$t('bible.no')} ${currentVerse.value} ${$t('bible.verse')}`
   } else if (isPsalms.value) {
-    return `${bookName} ${$t('bible.no')} ${props.selectedChapter} ${$t('bible.psalm')} ${$t('bible.no')} ${props.currentVerse} ${$t('bible.verse')}`
+    return `${bookName} ${$t('bible.no')} ${selectedChapter.value} ${$t('bible.psalm')} ${$t('bible.no')} ${currentVerse.value} ${$t('bible.verse')}`
   } else {
-    return `${bookName} ${$t('bible.no')} ${props.selectedChapter} ${$t('bible.chapter')} ${$t('bible.no')} ${props.currentVerse} ${$t('bible.verse')}`
+    return `${bookName} ${$t('bible.no')} ${selectedChapter.value} ${$t('bible.chapter')} ${$t('bible.no')} ${currentVerse.value} ${$t('bible.verse')}`
   }
 })
 
@@ -132,7 +127,7 @@ const scrollToVerse = async (verseNumber: number) => {
 
   const behavior = isInitialLoad.value ? 'instant' : 'smooth'
 
-  if (props.isMultiVersion) {
+  if (isMultiVersion.value) {
     // Scroll top pane
     const el1 = document.getElementById(`v1-verse-${verseNumber}`)
     if (el1 && topPaneRef.value) {
@@ -157,28 +152,22 @@ const scrollToVerse = async (verseNumber: number) => {
   }
 }
 
-watch(
-  () => props.currentVerse,
-  (newVerse) => {
-    if (newVerse) {
-      scrollToVerse(newVerse)
-    }
-  },
-)
+watch(currentVerse, (newVerse) => {
+  if (newVerse) {
+    scrollToVerse(newVerse)
+  }
+})
 
 // Watch mode change to re-trigger scroll
-watch(
-  () => props.isMultiVersion,
-  () => {
-    if (props.currentVerse) {
-      scrollToVerse(props.currentVerse)
-    }
-  },
-)
+watch(isMultiVersion, () => {
+  if (currentVerse.value) {
+    scrollToVerse(currentVerse.value)
+  }
+})
 
 onMounted(() => {
-  if (props.currentVerse) {
-    scrollToVerse(props.currentVerse)
+  if (currentVerse.value) {
+    scrollToVerse(currentVerse.value)
   }
 })
 </script>

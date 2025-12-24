@@ -1,7 +1,11 @@
 <template>
   <!-- Overtime Message Display -->
   <v-row
-    v-if="overtimeMessageEnabled && isFinished && overtimeMessage"
+    v-if="
+      timerProjectionStore.settings.overtimeMessageEnabled &&
+      timerProjectionStore.isFinished &&
+      timerProjectionStore.settings.overtimeMessage
+    "
     class="fill-height ma-0 pa-0 align-center justify-center"
   >
     <v-col cols="12" class="d-flex justify-center align-center">
@@ -13,59 +17,52 @@
           fontWeight: 'bold',
         }"
       >
-        {{ overtimeMessage }}
+        {{ timerProjectionStore.settings.overtimeMessage }}
       </div>
     </v-col>
   </v-row>
 
   <!-- Normal Timer Layout -->
-  <v-row v-else-if="timerMode === TimerMode.BOTH" class="fill-height ma-0 pa-0">
+  <v-row
+    v-else-if="timerProjectionStore.settings.mode === TimerMode.BOTH"
+    class="fill-height ma-0 pa-0"
+  >
     <v-col cols="5 pa-0 d-flex align-center justify-center">
       <CountdownTimer
-        :progress="timerProgress"
-        :timer-formatted-time="timerFormattedTime"
+        :progress="timerProjectionStore.progress"
+        :timer-formatted-time="timerProjectionStore.formattedTime"
         :size="circleSize"
-        :is-warning="isWarning"
+        :is-warning="timerProjectionStore.isWarning"
       />
     </v-col>
     <div class="split-divider"></div>
     <v-col cols="7 pa-0 d-flex align-center justify-center">
-      <ClockDisplay :timezone="selectedTimezone" :size="clockSize" />
+      <ClockDisplay :timezone="timerProjectionStore.settings.timezone" :size="clockSize" />
     </v-col>
   </v-row>
   <v-row v-else class="fill-height ma-0 pa-0 align-center justify-center">
     <v-col cols="12 pa-0 d-flex align-center justify-center">
       <CountdownTimer
-        v-if="timerMode === TimerMode.TIMER"
-        :progress="timerProgress"
-        :timer-formatted-time="timerFormattedTime"
+        v-if="timerProjectionStore.settings.mode === TimerMode.TIMER"
+        :progress="timerProjectionStore.progress"
+        :timer-formatted-time="timerProjectionStore.formattedTime"
         :size="circleSize"
-        :is-warning="isWarning"
+        :is-warning="timerProjectionStore.isWarning"
       />
-      <ClockDisplay v-else :timezone="selectedTimezone" :size="clockSize" />
+      <ClockDisplay v-else :timezone="timerProjectionStore.settings.timezone" :size="clockSize" />
     </v-col>
   </v-row>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import CountdownTimer from '@/components/Timer/CountdownTimer.vue'
 import ClockDisplay from '@/components/Timer/ClockDisplay.vue'
 import { TimerMode } from '@/types/common'
 import { useWindowSize } from '@/composables/useLayout'
+import { useTimerProjectionStore } from '@/stores/timerProjection'
 
-interface Props {
-  timerMode: TimerMode
-  timerFormattedTime: string
-  selectedTimezone: string
-  timerProgress: number
-  isWarning?: boolean
-  isFinished?: boolean
-  overtimeMessageEnabled?: boolean
-  overtimeMessage?: string
-}
-
-const props = defineProps<Props>()
+const timerProjectionStore = useTimerProjectionStore()
 
 // 使用統一的視窗尺寸 composable
 const { width } = useWindowSize(100)
@@ -73,7 +70,7 @@ const { width } = useWindowSize(100)
 // Calculate the circle size based on the timerMode
 const circleSize = computed(() => {
   const screenWidth = width.value
-  if (props.timerMode === TimerMode.BOTH) {
+  if (timerProjectionStore.settings.mode === TimerMode.BOTH) {
     return 700 * (screenWidth / 1920)
   }
   return 1100 * (screenWidth / 1920)
@@ -81,7 +78,7 @@ const circleSize = computed(() => {
 
 const clockSize = computed(() => {
   const screenWidth = width.value
-  if (props.timerMode === TimerMode.BOTH) {
+  if (timerProjectionStore.settings.mode === TimerMode.BOTH) {
     return 260 * (screenWidth / 1920)
   }
 
@@ -90,7 +87,7 @@ const clockSize = computed(() => {
 
 const overtimeFontSize = computed(() => {
   const screenWidth = width.value
-  const len = props.overtimeMessage?.length || 0
+  const len = timerProjectionStore.settings.overtimeMessage?.length || 0
 
   if (len === 0) return 0
   let vw = 12
@@ -101,6 +98,10 @@ const overtimeFontSize = computed(() => {
   }
 
   return screenWidth * (vw / 100)
+})
+
+onMounted(() => {
+  timerProjectionStore.initialize()
 })
 </script>
 
