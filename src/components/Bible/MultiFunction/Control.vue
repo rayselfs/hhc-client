@@ -12,29 +12,11 @@
         </v-btn-toggle>
         <!-- 資料夾路徑導航 -->
         <div v-if="multiFunctionTab === 'custom'" class="ml-3">
-          <v-btn
-            size="small"
-            class="pa-0 text-subtitle-1"
-            variant="text"
-            :disabled="currentFolderPath.length === 1"
-            @click="navigateToRoot()"
-          >
-            <v-icon class="mr-1">mdi-home</v-icon>
-            {{ $t('common.homepage') }}
-          </v-btn>
-          <span v-for="(folderId, index) in currentFolderPath.slice(1)" :key="folderId">
-            <v-icon size="x-small" class="ml-1 mr-1">mdi-chevron-right</v-icon>
-            <v-btn
-              size="small"
-              class="pa-0 text-subtitle-1"
-              variant="text"
-              :disabled="index === currentFolderPath.length - 2"
-              @click="handleNavigateToFolder(folderId)"
-            >
-              <v-icon class="mr-1">mdi-folder</v-icon>
-              {{ getFolderById(folderId)?.name }}
-            </v-btn>
-          </span>
+          <FolderBreadcrumbs
+            :items="breadcrumbItems"
+            :always-enable-root="false"
+            @navigate="handleNavigateToFolder"
+          />
         </div>
       </div>
       <div class="d-flex align-center">
@@ -97,136 +79,44 @@
       />
     </v-card-text>
 
-    <!-- 創建/編輯資料夾對話框 -->
-    <v-dialog v-model="showFolderDialog" max-width="400">
-      <v-card>
-        <v-card-title>{{
-          editingFolderId ? $t('fileExplorer.folderSettings') : $t('fileExplorer.newFolder')
-        }}</v-card-title>
-        <v-card-text>
-          <v-text-field
-            v-model="folderName"
-            :label="$t('fileExplorer.folderName')"
-            :error-messages="nameErrorMessage"
-            variant="outlined"
-            density="compact"
-            autofocus
-            @keyup.enter="confirmCreateFolder"
-          />
+    <!-- Create/Edit Folder Dialog -->
+    <CreateEditFolderDialog
+      v-model="folderDialogs.showFolderDialog.value"
+      :title="
+        folderDialogs.editingFolderId.value
+          ? $t('fileExplorer.folderSettings')
+          : $t('fileExplorer.newFolder')
+      "
+      :folder-name="folderDialogs.folderName.value"
+      @update:folder-name="folderDialogs.folderName.value = $event"
+      :retention-period="folderDialogs.retentionPeriod.value"
+      @update:retention-period="folderDialogs.retentionPeriod.value = $event"
+      :retention-options="folderDialogs.retentionOptions.value"
+      :error-messages="nameErrorMessage"
+      :disable-confirm="isDuplicateName"
+      :confirm-text="
+        folderDialogs.editingFolderId.value ? $t('common.confirm') : $t('common.create')
+      "
+      show-retention
+      @confirm="confirmCreateFolder"
+    />
 
-          <v-select
-            v-model="retentionPeriod"
-            :items="retentionOptions"
-            :label="$t('fileExplorer.retentionPeriod')"
-            item-title="title"
-            item-value="value"
-            variant="outlined"
-            density="compact"
-            class="mt-2"
-          />
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn @click="showFolderDialog = false">{{ $t('common.cancel') }}</v-btn>
-          <v-btn color="primary" :disabled="isDuplicateName" @click="confirmCreateFolder">{{
-            editingFolderId ? $t('common.confirm') : $t('common.create')
-          }}</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+    <!-- Move Dialog -->
+    <MoveFolderDialog
+      v-model="folderDialogs.showMoveDialog.value"
+      :breadcrumbs="moveBreadcrumbItems"
+      :targets="getMoveFolders()"
+      @navigate="handleMoveNavigate"
+      @move="confirmMoveVerse"
+    />
 
-    <!-- Move Verse Dialog -->
-    <v-dialog v-model="showMoveVerseDialog" max-width="500">
-      <v-card>
-        <v-card-title class="d-flex align-center">
-          <span class="mr-3">{{ $t('common.moveTo') }}</span>
-          <!-- 資料夾路徑導航 -->
-          <div class="folder-breadcrumb">
-            <v-btn
-              size="small"
-              class="pa-0"
-              variant="text"
-              :disabled="moveBreadcrumb.length === 0 && !selectedMoveFolder"
-              @click="navigateMoveToRoot"
-            >
-              <v-icon class="mr-1">mdi-home</v-icon>
-              {{ $t('common.homepage') }}
-            </v-btn>
-            <v-icon
-              v-if="moveBreadcrumb.length > 0 || selectedMoveFolder"
-              size="x-small"
-              class="ml-1 mr-1"
-              >mdi-chevron-right</v-icon
-            >
-            <span v-for="(folderId, index) in moveBreadcrumb" :key="folderId">
-              <v-btn
-                size="small"
-                class="pa-0"
-                variant="text"
-                :disabled="index === moveBreadcrumb.length - 1"
-                @click="navigateMoveToFolder(folderId)"
-              >
-                <v-icon class="mr-1">mdi-folder</v-icon>
-                {{ getFolderById(folderId)?.name }}
-              </v-btn>
-              <v-icon v-if="index < moveBreadcrumb.length - 1" size="x-small" class="ml-1 mr-1"
-                >mdi-chevron-right</v-icon
-              >
-            </span>
-          </div>
-        </v-card-title>
-
-        <v-card-text>
-          <!-- 移動目標列表 -->
-          <div class="move-folder-list">
-            <div v-if="getMoveFolders().length === 0" class="text-center pa-4 text-grey">
-              {{ $t('fileExplorer.noFolder') }}
-            </div>
-            <div v-else>
-              <div
-                v-for="target in getMoveTargets()"
-                :key="target.id"
-                class="verse-item pa-3 mb-2 d-flex align-center justify-space-between"
-                :class="{ 'selected-target': selectedMoveFolder?.id === target.id }"
-                @click="selectMoveTarget(target)"
-              >
-                <div class="d-flex align-center">
-                  <v-icon class="mr-2">mdi-folder</v-icon>
-                  <span>{{ target.name }}</span>
-                </div>
-                <v-icon>mdi-chevron-right</v-icon>
-              </div>
-            </div>
-          </div>
-        </v-card-text>
-
-        <v-card-actions>
-          <v-spacer />
-          <v-btn @click="showMoveVerseDialog = false">{{ $t('common.cancel') }}</v-btn>
-          <v-btn color="primary" @click="confirmMoveVerse" :disabled="!canMoveToRoot">
-            {{ $t('common.move') }}
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
-    <!-- 刪除資料夾確認對話框 -->
-    <v-dialog v-model="showDeleteConfirmDialog" max-width="400">
-      <v-card>
-        <v-card-title>{{ $t('common.confirmDeleteItem') }}</v-card-title>
-        <v-card-text>
-          <div v-if="folderToDelete" class="mt-2 text-subtitle-1">
-            <v-icon class="mr-2">mdi-folder</v-icon>
-            <span>{{ folderToDelete.name }}</span>
-          </div>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn @click="showDeleteConfirmDialog = false">{{ $t('common.cancel') || 'Cancel' }}</v-btn>
-          <v-btn color="error" @click="confirmDeleteFolder">{{ $t('common.delete') || 'Delete' }}</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+    <!-- Delete Confirm Dialog -->
+    <DeleteConfirmDialog
+      v-model="folderDialogs.showDeleteConfirmDialog.value"
+      :item-name="folderDialogs.folderToDelete.value?.name"
+      :is-folder="!!folderDialogs.folderToDelete.value"
+      @confirm="confirmDeleteFolder"
+    />
 
     <!-- 右鍵選單 -->
     <ContextMenu ref="contextMenuRef" :close-on-content-click="false">
@@ -318,6 +208,11 @@ import { isVerseItem, isFolder, type DragData } from '@/utils/typeGuards'
 import ContextMenu from '@/components/ContextMenu.vue'
 import HistoryTab from './HistoryTab.vue'
 import CustomFolderTab from './CustomFolderTab.vue'
+import FolderBreadcrumbs from '@/components/Shared/FolderBreadcrumbs.vue'
+import MoveFolderDialog from '@/components/Shared/MoveFolderDialog.vue'
+import CreateEditFolderDialog from '@/components/Shared/CreateEditFolderDialog.vue'
+import DeleteConfirmDialog from '@/components/Shared/DeleteConfirmDialog.vue'
+import { useFolderDialogs } from '@/composables/useFolderDialogs'
 import { APP_CONFIG } from '@/config/app'
 
 const { t: $t } = useI18n()
@@ -368,27 +263,17 @@ const {
 
 // 狀態
 const multiFunctionTab = ref('history')
-const showFolderDialog = ref(false)
-const folderName = ref('')
-const retentionPeriod = ref('1day') // Default to 1 day
-const editingFolderId = ref<string | null>(null) // Track if we are editing a folder
-
-const retentionOptions = computed(() => [
-  { title: $t('fileExplorer.retention.1day'), value: '1day' },
-  { title: $t('fileExplorer.retention.1week'), value: '1week' },
-  { title: $t('fileExplorer.retention.1month'), value: '1month' },
-  { title: $t('fileExplorer.retention.permanent'), value: 'permanent' },
-])
+const folderDialogs = useFolderDialogs<VerseItem>()
 
 // Check for duplicate folder name
 const isDuplicateName = computed(() => {
-  if (!folderName.value.trim()) return false
+  if (!folderDialogs.folderName.value.trim()) return false
   return currentFolder.value.folders.some((f) => {
     // If editing, exclude self from check
-    if (editingFolderId.value && f.id === editingFolderId.value) {
+    if (folderDialogs.editingFolderId.value && f.id === folderDialogs.editingFolderId.value) {
       return false
     }
-    return f.name === folderName.value.trim()
+    return f.name === folderDialogs.folderName.value.trim()
   })
 })
 
@@ -397,6 +282,25 @@ const nameErrorMessage = computed(() => {
     return $t('fileExplorer.duplicateFolderName')
   }
   return ''
+})
+
+const breadcrumbItems = computed(() => {
+  return currentFolderPath.value.map((id) => ({
+    id,
+    name: getFolderById(id)?.name || '',
+  }))
+})
+
+// Use folderDialogs.moveBreadcrumb directly. It is already {id, name}[]
+const moveBreadcrumbItems = computed(() => {
+  // If empty, start with root? useFolderDialogs might handle this differently,
+  // but in Control.vue we want explicit Root at start if it's not seemingly there,
+  // OR we trust `moveBreadcrumb` to contain what we need.
+  // `useFolderDialogs` initializes specific breadcrumbs in openMoveDialog.
+  // Let's rely on `folderDialogs.moveBreadcrumb` being correct.
+  // However, existing MoveFolderDialog expects {id, name}[].
+  // folderDialogs.moveBreadcrumb IS {id, name}[].
+  return folderDialogs.moveBreadcrumb.value
 })
 
 // 監聽頁面切換，切換到 custom 時重置到 root
@@ -420,17 +324,12 @@ const copiedItem = ref<{
   item: VerseItem | Folder<VerseItem>
 } | null>(null)
 
-// 移動相關狀態
-const showMoveVerseDialog = ref(false)
-const moveBreadcrumb = ref<string[]>([])
-const selectedMoveFolder = ref<Folder<VerseItem> | null>(null)
-const verseToMove = ref<VerseItem | null>(null)
-const folderToMove = ref<Folder<VerseItem> | null>(null)
-const moveItemType = ref<'verse' | 'folder'>('verse') // 區分移動類型
-
-// 刪除確認對話框狀態
-const showDeleteConfirmDialog = ref(false)
-const folderToDelete = ref<Folder<VerseItem> | null>(null)
+// 移動相關狀態 (Derived from folderDialogs)
+const moveItemType = computed(() => {
+  if (folderDialogs.folderToMove.value) return 'folder'
+  if (folderDialogs.itemToMove.value) return 'verse'
+  return 'verse' // Default
+})
 
 const loadVerse = (item: VerseItem, type: 'history' | 'custom') => {
   emit('load-verse', item, type)
@@ -438,20 +337,23 @@ const loadVerse = (item: VerseItem, type: 'history' | 'custom') => {
 
 // 自訂資料夾相關函數
 const createNewFolder = () => {
-  folderName.value = ''
-  retentionPeriod.value = '1day' // Reset to default
-  editingFolderId.value = null // Reset edit mode
-  showFolderDialog.value = true
+  folderDialogs.openCreateFolderDialog()
   closeItemContextMenu()
 }
 
 const openFolderSettings = (folder: Folder<VerseItem>) => {
-  folderName.value = folder.name
-  editingFolderId.value = folder.id
+  folderDialogs.openEditDialog(folder)
 
-  // Set retention period based on expiresAt
+  // Custom logic for retention period calculation based on expiresAt
+  // `useFolderDialogs` sets default '1day' or existing value.
+  // We need to map `expiresAt` back to retentionPeriod string if it's not just a string in Folder.
+  // Wait, `Folder` type has `retentionPeriod`? No, it has `expiresAt`.
+  // `useFolderDialogs` logic for `openEditDialog` sets `folderName` and `editingFolderId`.
+  // It does NOT automatically map `expiresAt` to `retentionPeriod` because `Folder` type is generic.
+  // So we strictly need to do this mapping HERE after opening the dialog.
+
   if (folder.expiresAt === null || folder.expiresAt === undefined) {
-    retentionPeriod.value = 'permanent'
+    folderDialogs.retentionPeriod.value = 'permanent'
   } else {
     // Calculate approximate retention period
     const diff = folder.expiresAt - folder.timestamp // Use creation time to determine original setting
@@ -459,25 +361,24 @@ const openFolderSettings = (folder: Folder<VerseItem>) => {
 
     // Simple heuristic mapping
     if (diff > oneDay * 25) {
-      retentionPeriod.value = '1month'
+      folderDialogs.retentionPeriod.value = '1month'
     } else if (diff > oneDay * 6) {
-      retentionPeriod.value = '1week'
+      folderDialogs.retentionPeriod.value = '1week'
     } else {
-      retentionPeriod.value = '1day'
+      folderDialogs.retentionPeriod.value = '1day'
     }
   }
 
-  showFolderDialog.value = true
   closeItemContextMenu()
 }
 
 const confirmCreateFolder = () => {
-  if (folderName.value.trim() && !isDuplicateName.value) {
+  if (folderDialogs.folderName.value.trim() && !isDuplicateName.value) {
     let expiresAt: number | null = null
     const now = Date.now()
     const oneDay = 24 * 60 * 60 * 1000
 
-    switch (retentionPeriod.value) {
+    switch (folderDialogs.retentionPeriod.value) {
       case '1day':
         expiresAt = now + oneDay
         break
@@ -492,20 +393,20 @@ const confirmCreateFolder = () => {
         break
     }
 
-    if (editingFolderId.value) {
+    if (folderDialogs.editingFolderId.value) {
       // Update existing folder
-      updateFolder(editingFolderId.value, {
-        name: folderName.value,
+      updateFolder(folderDialogs.editingFolderId.value, {
+        name: folderDialogs.folderName.value,
         expiresAt: expiresAt,
       })
     } else {
       // Create new folder
-      addFolderToCurrent(folderName.value, expiresAt)
+      addFolderToCurrent(folderDialogs.folderName.value, expiresAt)
     }
 
-    showFolderDialog.value = false
-    folderName.value = ''
-    editingFolderId.value = null
+    folderDialogs.showFolderDialog.value = false
+    folderDialogs.folderName.value = ''
+    folderDialogs.editingFolderId.value = null
   }
 }
 
@@ -521,17 +422,16 @@ const handleEnterFolder = (folderId: string) => {
 const showDeleteFolderDialog = (folderId: string) => {
   const folder = getFolderById(folderId)
   if (folder) {
-    folderToDelete.value = folder
-    showDeleteConfirmDialog.value = true
+    folderDialogs.openDeleteFolderDialog(folder)
   }
 }
 
 const confirmDeleteFolder = () => {
-  if (folderToDelete.value) {
+  if (folderDialogs.folderToDelete.value) {
     // Call store action - direct mutation
-    deleteFolderAction(folderToDelete.value.id)
-    showDeleteConfirmDialog.value = false
-    folderToDelete.value = null
+    deleteFolderAction(folderDialogs.folderToDelete.value.id)
+    folderDialogs.showDeleteConfirmDialog.value = false
+    folderDialogs.folderToDelete.value = null
   }
 }
 
@@ -571,71 +471,72 @@ const moveFolderToFolder = (folderToMove: Folder<VerseItem>, targetFolder: Folde
 
 // Move verse related functions
 const showMoveDialog = (item: VerseItem) => {
-  verseToMove.value = item
-  folderToMove.value = null
-  moveItemType.value = 'verse'
-  moveBreadcrumb.value = []
-  selectedMoveFolder.value = null
-  showMoveVerseDialog.value = true
+  folderDialogs.openMoveDialog(item)
+  // Ensure breadcrumb starts with root
+  folderDialogs.moveBreadcrumb.value = [{ id: APP_CONFIG.FOLDER.ROOT_ID, name: 'Root' }]
 }
 
 // 移動資料夾相關函數
 const showMoveFolderDialog = (item: Folder<VerseItem>) => {
-  folderToMove.value = item
-  verseToMove.value = null
-  moveItemType.value = 'folder'
-  moveBreadcrumb.value = []
-  selectedMoveFolder.value = null
-  showMoveVerseDialog.value = true
+  folderDialogs.openMoveDialog(item)
+  // Ensure breadcrumb starts with root
+  folderDialogs.moveBreadcrumb.value = [{ id: APP_CONFIG.FOLDER.ROOT_ID, name: 'Root' }]
 }
 
 const navigateMoveToRoot = () => {
-  moveBreadcrumb.value = []
-  selectedMoveFolder.value = null
+  folderDialogs.moveBreadcrumb.value = [{ id: APP_CONFIG.FOLDER.ROOT_ID, name: 'Root' }]
+  folderDialogs.selectedMoveFolder.value = null
 }
 
 const navigateMoveToFolder = (folderId: string) => {
   const folder = getFolderById(folderId)
   if (folder) {
-    const index = moveBreadcrumb.value.indexOf(folderId)
-    const newPath = index !== -1 ? moveBreadcrumb.value.slice(0, index + 1) : moveBreadcrumb.value
-    moveBreadcrumb.value = newPath
-    selectedMoveFolder.value = folder
+    const index = folderDialogs.moveBreadcrumb.value.findIndex((b) => b.id === folderId)
+    const newPath =
+      index !== -1
+        ? folderDialogs.moveBreadcrumb.value.slice(0, index + 1)
+        : [...folderDialogs.moveBreadcrumb.value, { id: folder.id, name: folder.name }]
+    folderDialogs.moveBreadcrumb.value = newPath
+    folderDialogs.selectedMoveFolder.value = folder
   }
 }
 
-const selectMoveTarget = (target: Folder<VerseItem>) => {
-  // 選擇資料夾
-  const folder = getFolderById(target.id)
-  if (folder) {
-    // 將資料夾添加到麵包屑中
-    moveBreadcrumb.value = [...moveBreadcrumb.value, target.id]
-    selectedMoveFolder.value = folder
-  }
-}
-
+// Used by MoveFolderDialog component
 const getMoveFolders = (): Folder<VerseItem>[] => {
   const excludeFolderId =
-    moveItemType.value === 'folder' && folderToMove.value ? folderToMove.value.id : undefined
-  return getMoveTargets(selectedMoveFolder.value, excludeFolderId)
+    moveItemType.value === 'folder' && folderDialogs.folderToMove.value
+      ? folderDialogs.folderToMove.value.id
+      : undefined
+  return getMoveTargets(folderDialogs.selectedMoveFolder.value, excludeFolderId)
+}
+
+const handleMoveNavigate = (id: string) => {
+  if (id === APP_CONFIG.FOLDER.ROOT_ID) {
+    navigateMoveToRoot()
+  } else {
+    navigateMoveToFolder(id)
+  }
 }
 
 // Check if can move to root
 const canMoveToRoot = computed(() => {
   if (moveItemType.value === 'verse') {
-    if (!verseToMove.value) return false
+    if (!folderDialogs.itemToMove.value) return false
 
     const isInRoot = currentFolder.value.id === APP_CONFIG.FOLDER.ROOT_ID
     if (isInRoot) {
-      return selectedMoveFolder.value !== null
+      return folderDialogs.selectedMoveFolder.value !== null
     }
     return true
   } else {
     // Moving folder
-    if (!folderToMove.value) return false
+    if (!folderDialogs.folderToMove.value) return false
 
-    if (selectedMoveFolder.value) {
-      return !isFolderInside(folderToMove.value, selectedMoveFolder.value)
+    if (folderDialogs.selectedMoveFolder.value) {
+      return !isFolderInside(
+        folderDialogs.folderToMove.value,
+        folderDialogs.selectedMoveFolder.value,
+      )
     }
 
     const isInRoot = currentFolder.value.id === APP_CONFIG.FOLDER.ROOT_ID
@@ -656,49 +557,42 @@ const isMaxDepthReached = computed(() => {
   return currentFolderDepth.value >= APP_CONFIG.FOLDER.MAX_DEPTH
 })
 
-const confirmMoveVerse = () => {
+const confirmMoveVerse = (targetId: string) => {
   if (!canMoveToRoot.value) return
 
+  const destinationId =
+    targetId || folderDialogs.selectedMoveFolder.value?.id || APP_CONFIG.FOLDER.ROOT_ID
+
   if (moveItemType.value === 'verse') {
-    if (!verseToMove.value) return
+    if (!folderDialogs.itemToMove.value) return
 
     const sourceFolderId =
       currentFolder.value.id === APP_CONFIG.FOLDER.ROOT_ID
         ? APP_CONFIG.FOLDER.ROOT_ID
         : currentFolder.value.id
-    const targetFolderId = selectedMoveFolder.value
-      ? selectedMoveFolder.value.id
-      : APP_CONFIG.FOLDER.ROOT_ID
 
     // Call store action - direct mutation
-    moveItemAction(verseToMove.value, targetFolderId || APP_CONFIG.FOLDER.ROOT_ID, sourceFolderId)
+    // We need to cast itemToMove to VerseItem because openMoveDialog is generic
+    moveItemAction(folderDialogs.itemToMove.value as VerseItem, destinationId, sourceFolderId)
   } else {
     // Move folder
-    if (!folderToMove.value) return
+    if (!folderDialogs.folderToMove.value) return
 
     const sourceFolderId =
       currentFolder.value.id === APP_CONFIG.FOLDER.ROOT_ID
         ? APP_CONFIG.FOLDER.ROOT_ID
         : currentFolder.value.id
-    const targetFolderId = selectedMoveFolder.value
-      ? selectedMoveFolder.value.id
-      : APP_CONFIG.FOLDER.ROOT_ID
 
     // Call store action - direct mutation
-    moveFolderAction(
-      folderToMove.value,
-      targetFolderId || APP_CONFIG.FOLDER.ROOT_ID,
-      sourceFolderId,
-    )
+    moveFolderAction(folderDialogs.folderToMove.value, destinationId, sourceFolderId)
   }
 
   // Cleanup state
-  showMoveVerseDialog.value = false
-  verseToMove.value = null
-  folderToMove.value = null
-  selectedMoveFolder.value = null
-  moveBreadcrumb.value = []
-  moveItemType.value = 'verse'
+  folderDialogs.showMoveDialog.value = false
+  folderDialogs.itemToMove.value = null
+  folderDialogs.folderToMove.value = null
+  folderDialogs.selectedMoveFolder.value = null
+  folderDialogs.moveBreadcrumb.value = []
 }
 
 // 右鍵選單處理函數

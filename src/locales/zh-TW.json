@@ -22,7 +22,8 @@
     "projection": "投影",
     "control": "控制",
     "noCustomItems": "尚無自訂項目",
-    "dontShowAgain": "不要再顯示"
+    "dontShowAgain": "不要再顯示",
+    "selectedItems": "已選取 {count} 個項目"
   },
   "extendedToolbar": {
     "openProjection": "開啟投影",

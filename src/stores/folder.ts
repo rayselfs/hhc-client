@@ -2,30 +2,10 @@ import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 import { v4 as uuidv4 } from 'uuid'
 import { useDebounceFn } from '@vueuse/core'
-import type { Folder, FolderItem, StorageCategory } from '@/types/common'
+import type { Folder, FolderItem, ClipboardItem, FolderStoreConfig } from '@/types/common'
 import { getStorageKey } from '@/types/common'
 import { useFolderManager } from '@/composables/useFolderManager'
 import { useLocalStorage } from '@/composables/useLocalStorage'
-
-/**
- * Configuration for folder store
- */
-export interface FolderStoreConfig {
-  rootId: string
-  defaultRootName: string
-  storageCategory: StorageCategory
-  storageKey: string
-}
-
-/**
- * Clipboard item definition
- */
-export interface ClipboardItem<T extends FolderItem> {
-  type: 'file' | 'folder'
-  data: T | Folder<T>
-  action: 'copy' | 'cut'
-  sourceFolderId: string
-}
 
 /**
  * Generic folder store for managing folder tree structure
@@ -455,9 +435,9 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
     const pasteItem = (
       item: TItem | Folder<TItem>,
       targetFolderId: string,
-      itemType: 'verse' | 'folder',
+      itemType: 'verse' | 'file' | 'folder',
     ) => {
-      if (itemType === 'verse') {
+      if (itemType === 'verse' || itemType === 'file') {
         const verseItem = item as TItem
         const newItem: TItem = {
           ...verseItem,

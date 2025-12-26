@@ -22,7 +22,8 @@
     "projection": "Project",
     "control": "Control",
     "noCustomItems": "No custom items yet",
-    "dontShowAgain": "Don't show again"
+    "dontShowAgain": "Don't show again",
+    "selectedItems": "{count} items selected"
   },
   "extendedToolbar": {
     "openProjection": "Open Projection",

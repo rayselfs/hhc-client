@@ -1,46 +1,49 @@
-import type { VerseItem, Folder } from '@/types/common'
+import type { VerseItem, Folder, FolderItem, FileItem } from '@/types/common'
 
 /**
- * 類型守衛：檢查是否為 VerseItem
+ * Type Guard: Check if item is VerseItem
  */
-export const isVerseItem = (item: VerseItem | Folder<VerseItem>): item is VerseItem => {
-  return 'verse' in item && 'bookNumber' in item && 'chapter' in item
+export const isVerseItem = (item: FolderItem | Folder<FolderItem>): item is VerseItem => {
+  return (item as VerseItem).type === 'verse' && 'bookNumber' in item
 }
 
 /**
- * 類型守衛：檢查是否為 Folder
+ * Type Guard: Check if item is FileItem
  */
-export const isFolder = <T extends VerseItem>(
-  item: VerseItem | Folder<T>,
-): item is Folder<T> => {
-  return 'folders' in item && 'items' in item && !('verse' in item)
+export const isFileItem = (item: FolderItem | Folder<FolderItem>): item is FileItem => {
+  return (item as FileItem).type === 'file' && 'metadata' in item
 }
 
 /**
- * 拖放數據類型
+ * Type Guard: Check if item is Folder
  */
-export interface DragData<T extends VerseItem = VerseItem> {
-  type: 'verse' | 'folder'
-  item: VerseItem | Folder<T>
+export const isFolder = <T extends FolderItem>(item: T | Folder<T>): item is Folder<T> => {
+  return 'items' in item && 'folders' in item
 }
 
 /**
- * 驗證拖放數據的類型守衛
+ * Drag Data Type
  */
-export const isValidDragData = <T extends VerseItem>(
-  data: unknown,
-): data is DragData<T> => {
+export interface DragData<T extends FolderItem = FolderItem> {
+  type: 'verse' | 'file' | 'folder'
+  item: T | Folder<T>
+}
+
+/**
+ * Validate Drag Data Type Guard
+ */
+export const isValidDragData = <T extends FolderItem>(data: unknown): data is DragData<T> => {
   if (!data || typeof data !== 'object') return false
 
   const d = data as Record<string, unknown>
-  if (d.type !== 'verse' && d.type !== 'folder') return false
+  if (d.type !== 'verse' && d.type !== 'file' && d.type !== 'folder') return false
   if (!d.item || typeof d.item !== 'object') return false
 
   if (d.type === 'verse') {
-    return isVerseItem(d.item as VerseItem | Folder<T>)
+    return isVerseItem(d.item as FolderItem)
+  } else if (d.type === 'file') {
+    return isFileItem(d.item as FolderItem)
   } else {
-    return isFolder(d.item as VerseItem | Folder<T>)
+    return isFolder(d.item as FolderItem) // Type assertion might need T
   }
 }
-
-

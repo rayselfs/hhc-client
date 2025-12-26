@@ -1,22 +1,27 @@
-import type { VerseItem, Folder } from '@/types/common'
+import type { VerseItem, Folder, FolderItem, FileItem } from '@/types/common'
 import { useSentry } from './useSentry'
 import type { DragData } from '@/utils/typeGuards'
 import { isValidDragData } from '@/utils/typeGuards'
+
+interface UseDragAndDropOptions {
+  itemSelector?: string
+}
 
 /**
  * Drag and Drop Composable
  * Provides unified drag and drop handling logic
  */
-export const useDragAndDrop = <T extends VerseItem>() => {
+export const useDragAndDrop = <T extends FolderItem>(options: UseDragAndDropOptions = {}) => {
   const { reportError } = useSentry()
+  const itemSelector = options.itemSelector || '.verse-item'
 
   /**
    * Handle drag start
    */
   const handleDragStart = (
     event: DragEvent,
-    type: 'verse' | 'folder',
-    item: VerseItem | Folder<T>,
+    type: 'verse' | 'folder' | 'file',
+    item: T | Folder<T>,
   ) => {
     if (!event.dataTransfer) return
 
@@ -44,8 +49,8 @@ export const useDragAndDrop = <T extends VerseItem>() => {
    * Create visual effect during drag
    */
   const createDragImage = (
-    type: 'verse' | 'folder',
-    item: VerseItem | Folder<T>,
+    type: 'verse' | 'folder' | 'file',
+    item: T | Folder<T>,
   ): HTMLElement | null => {
     const dragImage = document.createElement('div')
     dragImage.style.position = 'absolute'
@@ -61,12 +66,20 @@ export const useDragAndDrop = <T extends VerseItem>() => {
     dragImage.style.fontWeight = '500'
 
     if (type === 'verse') {
-      const verse = item as VerseItem
+      const verse = item as unknown as VerseItem
       dragImage.innerHTML = `
         <div style="display: flex; align-items: center; gap: 8px;">
           <span style="background-color: rgb(var(--v-theme-primary)); color: white; padding: 2px 6px; border-radius: 12px; font-size: 12px; font-weight: 500;">
             ${verse.bookAbbreviation}${verse.chapter}:${verse.verse}
           </span>
+        </div>
+      `
+    } else if (type === 'file') {
+      const file = item as unknown as FileItem
+      dragImage.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <i class="mdi mdi-file" style="color: rgb(var(--v-theme-primary)); font-size: 16px;"></i>
+          <span>${file.name}</span>
         </div>
       `
     } else {
@@ -97,7 +110,7 @@ export const useDragAndDrop = <T extends VerseItem>() => {
    */
   const handleDragEnter = (event: DragEvent) => {
     event.preventDefault()
-    const container = (event.target as HTMLElement).closest('.verse-item')
+    const container = (event.target as HTMLElement).closest(itemSelector)
     if (container) {
       container.classList.add('drag-over')
     }
@@ -108,7 +121,7 @@ export const useDragAndDrop = <T extends VerseItem>() => {
    */
   const handleDragLeave = (event: DragEvent) => {
     event.preventDefault()
-    const container = (event.target as HTMLElement).closest('.verse-item')
+    const container = (event.target as HTMLElement).closest(itemSelector)
     if (container) {
       const rect = container.getBoundingClientRect()
       const x = event.clientX
@@ -125,12 +138,12 @@ export const useDragAndDrop = <T extends VerseItem>() => {
    */
   const handleDrop = (
     event: DragEvent,
-    onDrop: (data: DragData<T>, target: HTMLElement) => void,
+    onDrop: (data: DragData<T>, target: HTMLElement, event: DragEvent) => void,
   ) => {
     event.preventDefault()
 
     // Remove drag highlight effect
-    const container = (event.target as HTMLElement).closest('.verse-item')
+    const container = (event.target as HTMLElement).closest(itemSelector)
     if (container) {
       container.classList.remove('drag-over')
     }
@@ -140,14 +153,27 @@ export const useDragAndDrop = <T extends VerseItem>() => {
       if (!dataString) return
 
       const parsed = JSON.parse(dataString)
+      // Note: check for generic type T might be loose here if we rely on type property
       if (!isValidDragData<T>(parsed)) {
         console.warn('Invalid drag data:', parsed)
         return
       }
 
       const data = parsed as DragData<T>
+      // Allow drop even if not directly on a container (e.g. dropping into empty space of folder)
+      // But consumer assumes 'target' is returned.
+      // If we drop on empty space, container is null.
+      // If MediaControl needs drop on background, we should pass container (or null) to callback.
+      // But signature expects target: HTMLElement.
+
+      // For MediaControl, we often drop ON an item (to move into folder or reorder).
+      // Drop on background is handled by 'onDrop' on the background container?
+      // MediaControl passes 'onDrop' to MediaFileList/FolderList items ONLY.
+      // Background drop logic (e.g. upload) works differently or on wrapping div.
+      // Assuming we only use this for Item-to-Item drag.
+
       if (container) {
-        onDrop(data, container as HTMLElement)
+        onDrop(data, container as HTMLElement, event)
       }
     } catch (error) {
       reportError(error, {

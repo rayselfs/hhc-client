@@ -419,3 +419,23 @@ export interface Folder<TItem extends FolderItem = FolderItem> {
   timestamp: number
   expiresAt?: number | null // Timestamp when the folder should be deleted, null for permanent
 }
+
+/**
+ * Clipboard item definition
+ */
+export interface ClipboardItem<T extends FolderItem> {
+  type: 'file' | 'folder'
+  data: T | Folder<T>
+  action: 'copy' | 'cut'
+  sourceFolderId: string
+}
+
+/**
+ * Configuration for folder store
+ */
+export interface FolderStoreConfig {
+  rootId: string
+  defaultRootName: string
+  storageCategory: StorageCategory
+  storageKey: string
+}
