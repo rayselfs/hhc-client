@@ -49,8 +49,7 @@
 </template>
 
 <script setup lang="ts">
-import type { Folder, FileItem } from '@/types/common'
-import type { ClipboardItem } from '@/stores/folder'
+import type { Folder, FileItem, ClipboardItem } from '@/types/common'
 
 const props = defineProps<{
   folders: Folder<FileItem>[]

@@ -133,8 +133,7 @@
 </template>
 
 <script setup lang="ts">
-import type { FileItem } from '@/types/common'
-import type { ClipboardItem } from '@/stores/folder'
+import type { FileItem, ClipboardItem } from '@/types/common'
 
 const props = defineProps<{
   items: FileItem[]
