@@ -14,10 +14,10 @@
         </div>
         <!-- Multiple Items -->
         <div v-else-if="count && count > 0" class="mt-2 text-subtitle-1">
-          {{ $t('fileExplorer.selectedItems', { count }) }}
+          {{ $t('common.selectedItems', { count }) }}
         </div>
         <div v-else class="mt-2 text-subtitle-1">
-          {{ $t('common.confirmDelete') }}
+          {{ $t('common.confirmDeleteItem') }}
         </div>
       </v-card-text>
       <v-card-actions>

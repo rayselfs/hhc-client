@@ -247,7 +247,7 @@
           contextMenuTarget && (!selectedItems.has(contextMenuTarget.id) || selectedItems.size <= 1)
         "
         prepend-icon="mdi-pencil"
-        :title="$t('common.rename')"
+        :title="$t('common.edit')"
         @click="contextMenuTarget && openEditDialog(contextMenuTarget)"
       ></v-list-item>
 
