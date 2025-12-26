@@ -10,28 +10,30 @@
         <v-card :style="{ height: `${leftCardHeight}px` }">
           <v-card-title class="d-flex align-center justify-space-between">
             <div class="d-flex align-center gap-2">
-              <div>
-                <span class="mr-1">{{ localizedBookName || $t('common.preview') }}</span>
-                <span v-if="isSearchMode"> ({{ $t('common.search') }})</span>
+              <span class="mr-1">{{ $t('common.preview') }}</span>
+              <div v-if="currentPassage && !isSearchMode">
+                <span class="mr-1"
+                  >({{ localizedBookName }} {{ currentPassage.chapter }}:{{
+                    currentPassage.verse
+                  }})</span
+                >
               </div>
-              <div v-if="currentPassage">
-                <span class="mr-1">{{ currentPassage.chapter }}</span>
-                <span class="mr-1">:</span>
-                <span>{{ currentPassage.verse }}</span>
+              <div v-if="isSearchMode">
+                <span>({{ $t('common.search') }})</span>
               </div>
             </div>
             <div v-if="currentPassage" class="d-flex align-center gap-2">
               <v-btn
                 size="small"
                 class="mr-1"
-                :disabled="currentPassage.chapter <= 1"
+                :disabled="isSearchMode || currentPassage.chapter <= 1"
                 @click="goToPreviousChapterPreview"
               >
                 <v-icon>mdi-chevron-left</v-icon>
               </v-btn>
               <v-btn
                 size="small"
-                :disabled="currentPassage.chapter >= maxChapters"
+                :disabled="isSearchMode || currentPassage.chapter >= maxChapters"
                 @click="goToNextChapterPreview"
               >
                 <v-icon>mdi-chevron-right</v-icon>
