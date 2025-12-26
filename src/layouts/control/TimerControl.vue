@@ -392,20 +392,6 @@ const saveTimerPreset = () => {
   timerStore.addToPresets(timerStore.settings.originalDuration)
 }
 
-onMounted(() => {
-  if (isElectron()) {
-    setProjectionState(false, ViewType.TIMER)
-  }
-})
-
-onBeforeUnmount(() => {
-  cleanupResources()
-})
-
-onUnmounted(() => {
-  cleanup()
-})
-
 const reminderEnabled = computed({
   get: () => timerStore.settings.reminderEnabled,
   set: (value) => {
@@ -456,6 +442,22 @@ const handleOvertimeMessageEnter = (event: Event) => {
   const target = event.target as HTMLInputElement
   target?.blur()
 }
+
+onMounted(() => {
+  if (isElectron()) {
+    if (!projectionStore.isShowingDefault) {
+      setProjectionState(false, ViewType.TIMER)
+    }
+  }
+})
+
+onBeforeUnmount(() => {
+  cleanupResources()
+})
+
+onUnmounted(() => {
+  cleanup()
+})
 </script>
 
 <style scoped>
