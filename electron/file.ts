@@ -1,4 +1,5 @@
 import { ipcMain, app, nativeImage, protocol, net } from 'electron'
+import { pathToFileURL } from 'url'
 import { v4 as uuidv4 } from 'uuid'
 import * as Sentry from '@sentry/electron'
 import path from 'path'
@@ -11,13 +12,23 @@ export const registerFileProtocols = () => {
       let filePath = parsedUrl.pathname
 
       // Handle cases where the first part of the path is treated as the host
-      // e.g. local-resource://Users/name/... -> host: Users, pathname: /name/...
       if (parsedUrl.host) {
         filePath = path.join('/', parsedUrl.host, filePath)
       }
 
-      const decodedPath = decodeURIComponent(filePath)
-      return net.fetch(`file://${decodedPath}`)
+      let decodedPath = decodeURIComponent(filePath)
+
+      // On Windows, strip leading slash if it precedes a drive letter
+      if (process.platform === 'win32') {
+        // e.g., /C:/Users/... -> C:/Users/...
+        if (decodedPath.match(/^\/[a-zA-Z]:/)) {
+          decodedPath = decodedPath.slice(1)
+        }
+        // Ensure path uses backslashes
+        decodedPath = path.normalize(decodedPath)
+      }
+
+      return net.fetch(pathToFileURL(decodedPath).toString())
     } catch (error) {
       console.error('Failed to handle protocol request:', request.url, error)
       return new Response('Not Found', { status: 404 })
