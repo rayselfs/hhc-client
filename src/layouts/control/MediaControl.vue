@@ -638,11 +638,8 @@ const { sortBy, sortOrder, setSort, sortedFolders, sortedItems } = useMediaSort(
 
 onMounted(() => {
   mediaStore.loadRootFolder()
-  if (isElectron()) {
-    // Show default projection when entering Media Control (close active projection)
-    const { setProjectionState } = useProjectionMessaging()
-    setProjectionState(true)
-  }
+  document.addEventListener('keydown', handleEsc)
+  window.addEventListener('keydown', handleGlobalKeydown)
 })
 
 const contextMenu = useContextMenu()
@@ -1110,10 +1107,6 @@ const handleEsc = (event: KeyboardEvent) => {
   }
 }
 
-onMounted(() => {
-  document.addEventListener('keydown', handleEsc)
-})
-
 onBeforeUnmount(() => {
   window.removeEventListener('mousemove', onMouseMove)
   window.removeEventListener('mouseup', onMouseUp)
@@ -1446,10 +1439,6 @@ const handleGlobalKeydown = (e: KeyboardEvent) => {
     startPresentation(undefined, e.altKey ? false : true)
   }
 }
-
-onMounted(() => {
-  window.addEventListener('keydown', handleGlobalKeydown)
-})
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleGlobalKeydown)
