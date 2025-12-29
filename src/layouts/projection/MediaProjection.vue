@@ -55,9 +55,19 @@ import { storeToRefs } from 'pinia'
 
 // Access local store (synced via IPC)
 const store = useMediaProjectionStore()
-const { currentItem, zoomLevel, pan, isPlaying, volume, pdfPage } = storeToRefs(store)
+const { currentItem, zoomLevel, pan, isPlaying, volume, pdfPage, currentTime } = storeToRefs(store)
 
 const videoRef = ref<HTMLVideoElement | null>(null)
+
+// Sync Current Time (Seek)
+watch(currentTime, (time) => {
+  if (videoRef.value) {
+    const diff = Math.abs(videoRef.value.currentTime - time)
+    if (diff > 0.5) {
+      videoRef.value.currentTime = time
+    }
+  }
+})
 
 // Styles
 const imageStyle = computed(() => ({
@@ -115,20 +125,10 @@ onUnmounted(() => {
 })
 
 // User Request 1: Video Finished -> Ready
-import { useElectron } from '@/composables/useElectron'
-import { MessageType } from '@/types/common'
-
-const { sendToMain } = useElectron()
-
+// Send 'stop' command to backend. Backend sets isPlaying=false, increments restartTrigger.
+// We watch isPlaying (pauses video) and restartTrigger (resets currentTime=0).
 const onVideoEnded = () => {
-  // Notify Main Window (Presenter) that video finished
-  sendToMain({
-    type: MessageType.MEDIA_CONTROL,
-    data: {
-      type: 'video',
-      action: 'ended',
-    },
-  })
+  store.stop()
 }
 </script>
 

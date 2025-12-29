@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // File System
   saveFile: (filePath: string) => ipcRenderer.invoke('save-file', filePath),
+  deleteFile: (filePath: string) => ipcRenderer.invoke('delete-file', filePath),
   resetUserData: () => ipcRenderer.invoke('reset-user-data'),
   getFilePath: (file: File) => webUtils.getPathForFile(file),
 
@@ -80,5 +81,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   timerInitialize: (initialState: unknown) => ipcRenderer.invoke('timer-initialize', initialState),
   onTimerTick: (callback: (state: unknown) => void) => {
     ipcRenderer.on('timer-tick', (event, state) => callback(state))
+  },
+
+  // Media related
+  mediaCommand: (command: unknown) => ipcRenderer.send('media-command', command),
+  mediaGetState: () => ipcRenderer.invoke('media-get-state'),
+  onMediaStateUpdate: (callback: (state: unknown) => void) => {
+    ipcRenderer.on('media-state-update', (event, state) => callback(state))
   },
 })

@@ -7,6 +7,7 @@ import {
 } from './autoUpdater'
 import * as Sentry from '@sentry/electron'
 import { TimerService } from './timerService'
+import { MediaService } from './mediaService'
 import { registerApiHandlers } from './api'
 import { WindowManager } from './windowManager'
 import { registerGenericHandlers } from './handlers'
@@ -28,15 +29,18 @@ Sentry.init({
 // Initialize Managers and Services
 const windowManager = WindowManager.getInstance()
 const timerService = new TimerService()
+const mediaService = new MediaService()
 
-// Link TimerService with WindowManager
+// Link Services with WindowManager
 windowManager.setTimerService(timerService)
+windowManager.setMediaService(mediaService)
 
 // Register all IPC handlers
 registerApiHandlers()
 registerGenericHandlers(windowManager)
 registerFileHandlers()
 timerService.registerIpcHandlers()
+mediaService.registerIpcHandlers()
 registerAutoUpdaterHandlers()
 
 // Register privileged schemes

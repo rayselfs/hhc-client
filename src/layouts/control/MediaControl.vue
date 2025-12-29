@@ -666,10 +666,7 @@ const onDrop = (event: DragEvent, target: FileItem | Folder<FileItem>) => {
 }
 
 const startPresentation = async (startItem?: FileItem, fromBeginning = false) => {
-  // Get all file items in current folder
-  // User Request: Projection order should follow current sort order
   const files = sortedItems.value.filter((i) => i.type === 'file') as FileItem[]
-
   if (files.length === 0) {
     showSnackBar(t('fileExplorer.noFiles'), 'warning')
     return
@@ -685,18 +682,11 @@ const startPresentation = async (startItem?: FileItem, fromBeginning = false) =>
 
   await ensureProjectionWindow()
 
-  // Initialize store
+  // Initialize store (Sends IPC to Backend)
   mediaProjectionStore.setPlaylist(files, validIndex)
 
   // Switch projection view
   sendProjectionMessage(MessageType.VIEW_CHANGE, { view: ViewType.MEDIA })
-
-  // Sync first update
-  sendProjectionMessage(MessageType.MEDIA_UPDATE, {
-    playlist: JSON.parse(JSON.stringify(files)),
-    currentIndex: validIndex,
-    action: 'update',
-  })
 }
 
 const previewFile = (item: FileItem) => {

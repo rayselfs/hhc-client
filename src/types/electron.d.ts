@@ -1,4 +1,4 @@
-import type { AppMessage, DisplayInfo, TimerMode } from './common'
+import type { AppMessage, DisplayInfo, TimerMode, FileItem } from './common'
 import type { BibleVersion, SearchResult } from './bible'
 
 // AutoUpdater 相關類型定義
@@ -29,6 +29,7 @@ export interface ElectronAPI {
 
   // File System
   saveFile: (filePath: string) => Promise<{ filePath: string; thumbnailPath?: string }>
+  deleteFile: (filePath: string) => Promise<boolean>
   resetUserData: () => Promise<boolean>
   getFilePath: (file: File) => string
 
@@ -115,6 +116,16 @@ export interface ElectronAPI {
 
   /** Listen for timer state updates */
   onTimerTick: (callback: (state: Partial<TimerState>) => void) => void
+
+  // Media related
+  /** Send media command to main process */
+  mediaCommand: (command: MediaCommand) => void
+
+  /** Get current media state */
+  mediaGetState: () => Promise<MediaState | null>
+
+  /** Listen for media state updates */
+  onMediaStateUpdate: (callback: (state: MediaState) => void) => void
 }
 
 /**
@@ -165,6 +176,45 @@ export interface TimerState {
   reminderTime: number // seconds (threshold for warning)
   overtimeMessageEnabled: boolean
   overtimeMessage: string
+}
+
+/**
+ * Media command interface
+ */
+export interface MediaCommand {
+  action:
+    | 'play'
+    | 'pause'
+    | 'stop'
+    | 'next'
+    | 'prev'
+    | 'jump'
+    | 'setPlaylist'
+    | 'setZoom'
+    | 'setPan'
+    | 'setPdfPage'
+    | 'toggleGrid'
+    | 'exit'
+    | 'seek'
+  value?: unknown
+  playlist?: FileItem[]
+  startIndex?: number
+}
+
+/**
+ * Media state interface
+ */
+export interface MediaState {
+  playlist: FileItem[]
+  currentIndex: number
+  isPlaying: boolean
+  zoomLevel: number
+  pan: { x: number; y: number }
+  volume: number
+  pdfPage: number
+  showGrid: boolean
+  restartTrigger: number
+  currentTime: number
 }
 
 declare global {
