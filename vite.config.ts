@@ -35,9 +35,6 @@ export default defineConfig({
       renderer: {},
     }),
   ],
-  esbuild: {
-    drop: ['console', 'debugger'],
-  },
   build: {
     outDir: 'dist-electron/renderer',
     chunkSizeWarningLimit: 1000,
