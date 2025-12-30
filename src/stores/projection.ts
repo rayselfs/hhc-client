@@ -7,6 +7,9 @@ export const useProjectionStore = defineStore('projection', () => {
   const isShowingDefault = ref(true)
   const currentView = ref<ViewType>(ViewType.TIMER)
 
+  // Initialize i18n at the top level of setup function
+  const { locale } = useI18n()
+
   // 方法
   const setShowingDefault = (showing: boolean) => {
     isShowingDefault.value = showing
@@ -40,13 +43,8 @@ export const useProjectionStore = defineStore('projection', () => {
         break
       case MessageType.LOCALE_UPDATE:
         if ('locale' in message.data) {
-          try {
-            const { locale } = useI18n()
-            locale.value = message.data.locale
-            return true
-          } catch (e) {
-            console.warn('Failed to set locale in store', e)
-          }
+          locale.value = message.data.locale
+          return true
         }
         break
     }
