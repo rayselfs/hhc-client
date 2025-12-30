@@ -36,6 +36,7 @@
 </template>
 
 <script setup lang="ts">
+import { onMounted } from 'vue'
 import FloatingTimer from '@/components/Timer/FloatingTimer.vue'
 import { AlertDialog, SnackBar } from '@/components/Alert'
 import { UpdateNotification } from '@/components/Updater'
@@ -43,6 +44,8 @@ import { SettingsDialog, AboutDialog, ResetDialog } from '@/components/Main'
 import { ShortcutsDialog } from '@/components/Shortcuts'
 import { useAlert } from '@/composables/useAlert'
 import { useSnackBar } from '@/composables/useSnackBar'
+import { useBibleStore } from '@/stores/bible'
+import { useSentry } from '@/composables/useSentry'
 
 const { alertState, confirm, cancel, handleDontShowAgain } = useAlert()
 const {
@@ -53,4 +56,19 @@ const {
   snackbarLocation,
   defaultConfig,
 } = useSnackBar()
+
+// Initialize Bible store and trigger background prefetch on app startup
+const bibleStore = useBibleStore()
+const { reportError } = useSentry()
+
+onMounted(async () => {
+  try {
+    await bibleStore.loadBibleVersions()
+  } catch (error) {
+    reportError(error, {
+      operation: 'load-bible-versions',
+      component: 'GlobalOverlays',
+    })
+  }
+})
 </script>

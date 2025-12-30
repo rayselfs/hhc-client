@@ -253,7 +253,6 @@ export const useBibleStore = defineStore('bible', () => {
         versions.value = data
         versionsLoaded.value = true
         applyVersionSelection(data)
-        // Cache versions to localStorage
         setLocalItem(versionsStorageKey, data, 'object')
         return data
       })

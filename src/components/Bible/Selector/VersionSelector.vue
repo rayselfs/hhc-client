@@ -77,7 +77,7 @@ defineOptions({
   name: 'BibleVersionSelector',
 })
 
-import { computed, ref, watch, onMounted } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import BooksDialog from './BooksDialog.vue'
@@ -91,7 +91,7 @@ const { t: $t } = useI18n()
 const bibleStore = useBibleStore()
 const { versions, versionsLoading, currentVersion, isMultiVersion, secondVersionCode } =
   storeToRefs(bibleStore)
-const { loadBibleVersions, setCurrentVersionByCode, getBibleContent, setSelectedVerse } = bibleStore
+const { setCurrentVersionByCode, getBibleContent, setSelectedVerse } = bibleStore
 
 const contentLoading = ref(false)
 const showBooksDialog = ref(false)
@@ -151,19 +151,6 @@ watch(
 const handleSelectVerse = (bookNumber: number, chapter: number, verse: number) => {
   setSelectedVerse(bookNumber, chapter, verse)
 }
-
-onMounted(async () => {
-  if (bibleVersions.value.length === 0) {
-    try {
-      await loadBibleVersions()
-    } catch (error) {
-      reportError(error, {
-        operation: 'load-bible-versions',
-        component: 'BibleVersionSelector',
-      })
-    }
-  }
-})
 
 // 暴露 selectedVersion 供外部使用
 defineExpose({
