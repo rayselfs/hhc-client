@@ -141,7 +141,7 @@ export function useAPI() {
 
         reader = stream.getReader()
       } else {
-        const url = `${API_HOST}/api/bible/v1/version/${versionId}`
+        const url = `${API_HOST}/api/bible/v1/content/${versionId}`
 
         const headers: HeadersInit = {
           Accept: 'text/event-stream',

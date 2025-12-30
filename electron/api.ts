@@ -20,7 +20,7 @@ export const registerApiHandlers = () => {
   // Get Bible Content (Streaming)
   ipcMain.handle('api-bible-get-content', async (event, versionId: number) => {
     try {
-      const response = await fetch(`${API_HOST}/api/bible/v1/version/${versionId}`, {
+      const response = await fetch(`${API_HOST}/api/bible/v1/content/${versionId}`, {
         headers: {
           Accept: 'text/event-stream',
           'Cache-Control': 'no-cache',
