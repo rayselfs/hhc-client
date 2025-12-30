@@ -53,7 +53,7 @@
               <v-list width="150" density="compact" class="rounded-lg elevation-2">
                 <v-list-item
                   prepend-icon="mdi-pencil-outline"
-                  :title="$t('common.edit')"
+                  :title="$t('rename')"
                   @click="emit('edit', item)"
                 ></v-list-item>
                 <v-list-item

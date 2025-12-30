@@ -3,7 +3,6 @@ import { join } from 'path'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { TimerService } from './timerService'
-import { MediaService } from './mediaService'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -13,7 +12,6 @@ export class WindowManager {
   public mainWindow: BrowserWindow | null = null
   public projectionWindow: BrowserWindow | null = null
   private timerService: TimerService | null = null
-  private mediaService: MediaService | null = null
 
   private constructor() {}
 
@@ -26,10 +24,6 @@ export class WindowManager {
 
   setTimerService(service: TimerService) {
     this.timerService = service
-  }
-
-  setMediaService(service: MediaService) {
-    this.mediaService = service
   }
 
   createMainWindow() {
@@ -82,9 +76,6 @@ export class WindowManager {
       if (this.timerService && this.mainWindow) {
         this.timerService.unregisterWindow(this.mainWindow)
       }
-      if (this.mediaService && this.mainWindow) {
-        this.mediaService.unregisterWindow(this.mainWindow)
-      }
       this.mainWindow = null
       app.quit()
     })
@@ -92,9 +83,6 @@ export class WindowManager {
     // Register with timer service
     if (this.timerService) {
       this.timerService.registerWindow(this.mainWindow)
-    }
-    if (this.mediaService) {
-      this.mediaService.registerWindow(this.mainWindow)
     }
   }
 
@@ -146,9 +134,6 @@ export class WindowManager {
       if (this.timerService && this.projectionWindow) {
         this.timerService.unregisterWindow(this.projectionWindow)
       }
-      if (this.mediaService && this.projectionWindow) {
-        this.mediaService.unregisterWindow(this.projectionWindow)
-      }
       if (this.mainWindow && !this.mainWindow.isDestroyed()) {
         this.mainWindow.webContents.send('SYSTEM_PROJECTION_CLOSED')
       }
@@ -158,9 +143,6 @@ export class WindowManager {
     // Register projection window with timer service
     if (this.timerService) {
       this.timerService.registerWindow(this.projectionWindow)
-    }
-    if (this.mediaService) {
-      this.mediaService.registerWindow(this.projectionWindow)
     }
 
     // Listen for messages from the projection window

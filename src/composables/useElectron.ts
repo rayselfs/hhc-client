@@ -1,6 +1,6 @@
 import type { AppMessage } from '@/types/common'
 import type { BibleVersion, SearchResult } from '@/types/bible'
-import type { TimerCommand, TimerState, MediaCommand, MediaState } from '@/types/electron'
+import type { TimerCommand, TimerState } from '@/types/electron'
 import { useSentry } from './useSentry'
 
 /**
@@ -197,24 +197,6 @@ export const useElectron = () => {
   }
 
   /**
-   * Delete file from persistent storage (Electron specific)
-   */
-  const deleteFile = async (filePath: string): Promise<boolean> => {
-    if (isElectron()) {
-      try {
-        return await window.electronAPI.deleteFile(filePath)
-      } catch (error) {
-        reportError(error, {
-          operation: 'delete-file',
-          component: 'useElectron',
-        })
-        return false
-      }
-    }
-    return false
-  }
-
-  /**
    * Update system language
    */
   const updateLanguage = async (locale: string): Promise<void> => {
@@ -364,7 +346,6 @@ export const useElectron = () => {
     // File operations
     getFilePath,
     saveFile,
-    deleteFile,
 
     // Bible API
     getBibleVersions,
@@ -420,39 +401,6 @@ export const useElectron = () => {
         }
       }
       return null
-    },
-
-    // Media IPC
-    mediaCommand: (command: MediaCommand) => {
-      if (isElectron()) {
-        try {
-          window.electronAPI.mediaCommand(command)
-        } catch (error) {
-          reportError(error, {
-            operation: 'media-command',
-            component: 'useElectron',
-          })
-        }
-      }
-    },
-    mediaGetState: async () => {
-      if (isElectron()) {
-        try {
-          return await window.electronAPI.mediaGetState()
-        } catch (error) {
-          reportError(error, {
-            operation: 'media-get-state',
-            component: 'useElectron',
-          })
-          return null
-        }
-      }
-      return null
-    },
-    onMediaStateUpdate: (callback: (state: MediaState) => void) => {
-      if (isElectron()) {
-        window.electronAPI.onMediaStateUpdate(callback)
-      }
     },
 
     // Event listeners

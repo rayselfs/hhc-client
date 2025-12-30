@@ -35,69 +35,15 @@
                   class="preview-content"
                   style="object-fit: contain"
                 />
-                <!-- Video Preview with Controls -->
+                <!-- Video Status Display (No Local Playback) -->
                 <div
                   v-else-if="currentItem.metadata.fileType === 'video'"
-                  class="d-flex flex-column align-center justify-center fill-height w-100 bg-black position-relative"
-                  @mouseenter="showZoomControls = true"
-                  @mouseleave="showZoomControls = false"
+                  class="d-flex flex-column align-center justify-center fill-height w-100 bg-grey-darken-4"
                 >
-                  <video
-                    ref="videoRef"
-                    :src="currentItem.url"
-                    class="preview-content w-100 h-100"
-                    muted
-                    disablePictureInPicture
-                    @loadedmetadata="onLoadedMetadata"
-                    @timeupdate="onTimeUpdate"
-                    style="object-fit: contain"
-                  ></video>
-
-                  <!-- Custom Video Controls Overlay -->
-                  <v-fade-transition>
-                    <div
-                      v-if="showZoomControls || !isPlaying"
-                      class="position-absolute bottom-0 w-100 pa-2"
-                      style="
-                        background: linear-gradient(to top, rgba(0, 0, 0, 0.7), transparent);
-                        z-index: 10;
-                      "
-                      @mousedown.stop
-                    >
-                      <!-- Progress Bar -->
-                      <v-slider
-                        v-model="localCurrentTime"
-                        :max="duration"
-                        :min="0"
-                        color="primary"
-                        track-color="rgba(255,255,255,0.3)"
-                        thumb-size="12"
-                        hide-details
-                        class="mb-1"
-                        @start="onSeekStart"
-                        @end="onSeekEnd"
-                      ></v-slider>
-
-                      <div class="d-flex align-center justify-space-between px-2">
-                        <!-- Play/Pause & Time -->
-                        <div class="d-flex align-center">
-                          <v-btn
-                            icon
-                            variant="text"
-                            color="white"
-                            density="compact"
-                            @click.stop="togglePlay"
-                          >
-                            <v-icon size="28">{{ isPlaying ? 'mdi-pause' : 'mdi-play' }}</v-icon>
-                          </v-btn>
-
-                          <span class="text-caption text-white ml-2 font-weight-medium">
-                            {{ formatTime(localCurrentTime) }} / {{ formatTime(duration) }}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </v-fade-transition>
+                  <v-icon size="64" color="grey">mdi-video</v-icon>
+                  <div class="text-h6 mt-4 font-weight-bold">
+                    {{ videoStatusText }}
+                  </div>
                 </div>
                 <!-- PDF Preview -->
                 <div
@@ -222,6 +168,32 @@
                 :title="$t('media.zoom')"
               >
                 <v-icon size="32">mdi-magnify</v-icon>
+              </v-btn>
+
+              <!-- 3. Play/Pause (Video) -->
+              <v-btn
+                variant="text"
+                icon
+                size="large"
+                @click="togglePlay"
+                :disabled="!currentItem || currentItem.metadata.fileType !== 'video'"
+                :title="isPlaying ? $t('media.pause') : $t('media.play')"
+                :color="isPlaying || hasStarted ? 'warning' : 'primary'"
+              >
+                <v-icon size="32">{{ isPlaying ? 'mdi-pause' : 'mdi-play' }}</v-icon>
+              </v-btn>
+
+              <!-- 4. Stop (Video) -->
+              <v-btn
+                variant="text"
+                icon
+                size="large"
+                @click="restartVideo"
+                :disabled="!currentItem || currentItem.metadata.fileType !== 'video'"
+                :title="$t('media.stop')"
+                color="error"
+              >
+                <v-icon size="32">mdi-stop</v-icon>
               </v-btn>
             </div>
           </div>
@@ -360,11 +332,16 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useMediaProjectionStore } from '@/stores/mediaProjection'
+import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import { useElectron } from '@/composables/useElectron'
+import { MessageType } from '@/types/common'
+
 import { useCardLayout } from '@/composables/useLayout'
 import { APP_CONFIG } from '@/config/app'
 import { useStopwatchStore } from '@/stores/stopwatch'
+import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
+import { ViewType } from '@/types/common'
 
 const stopwatchStore = useStopwatchStore()
 
@@ -384,10 +361,10 @@ const {
   pan,
   isPlaying,
   pdfPage,
-  currentTime,
 } = storeToRefs(store)
 
-const { isElectron } = useElectron()
+const { onProjectionMessage, isElectron } = useElectron()
+const { setProjectionState, sendProjectionMessage } = useProjectionMessaging()
 
 // Controls Logic
 const showZoomControls = ref(false)
@@ -414,68 +391,13 @@ const zoomOut = () => {
 }
 
 const videoRef = ref<HTMLVideoElement | null>(null)
-// Local duration state for UI
-const duration = ref(0)
-const localCurrentTime = ref(0)
-const isSeeking = ref(false)
 
-const formatTime = (seconds: number) => {
-  if (!seconds || isNaN(seconds)) return '00:00'
-  const m = Math.floor(seconds / 60)
-  const s = Math.floor(seconds % 60)
-  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
-}
-
-const onLoadedMetadata = () => {
-  if (videoRef.value) {
-    duration.value = videoRef.value.duration
-  }
-}
-
-const onTimeUpdate = () => {
-  if (videoRef.value && !isSeeking.value) {
-    localCurrentTime.value = videoRef.value.currentTime
-    // Do not sync to store constantly here to avoid flooding IPC.
-    // Sync is handled by seek/pause/play commands or major events.
-  }
-}
-
-// Video Seek Logic
-const lastSeekTime = ref(0)
-const onSeekStart = () => {
-  isSeeking.value = true
-}
-
-const onSeekEnd = () => {
-  isSeeking.value = false
-  const val = localCurrentTime.value
-  lastSeekTime.value = Date.now()
-  if (videoRef.value) {
-    videoRef.value.currentTime = val
-  }
-  store.seek(val)
-}
-
-const togglePlay = () => {
-  store.setPlaying(!isPlaying.value)
-}
-
-// Watch store state to sync local video
-watch(isPlaying, (val) => {
-  if (videoRef.value) {
-    if (val) videoRef.value.play().catch(() => {})
-    else videoRef.value.pause()
-  }
-})
-
-watch(currentTime, (val) => {
-  // Sync from remote if difference is significant and we are not seeking
-  // Also ignore updates shortly after seeking to prevent jumping back
-  if (Date.now() - lastSeekTime.value < 1000) return
-
-  if (videoRef.value && !isSeeking.value && Math.abs(videoRef.value.currentTime - val) > 1) {
-    videoRef.value.currentTime = val
-  }
+const { t } = useI18n()
+const hasStarted = ref(false)
+const videoStatusText = computed(() => {
+  if (isPlaying.value) return t('media.videoPlaying')
+  if (hasStarted.value) return t('media.videoPaused')
+  return t('media.videoReady')
 })
 
 // Minimap Logic
@@ -561,6 +483,7 @@ const pdfUrl = computed(() => {
 
 watch(currentItem, () => {
   showZoomControls.value = false
+  hasStarted.value = false
 })
 
 // Notes handling (local ref synced to currentItem)
@@ -597,6 +520,7 @@ const getIcon = (type: string) => {
 
 // Navigation & Actions
 const exitPresentation = async () => {
+  await setProjectionState(true)
   store.exit()
 }
 
@@ -604,13 +528,22 @@ const jumpTo = (index: number) => {
   store.jumpTo(index)
 }
 
+const togglePlay = () => {
+  if (!isPlaying.value) {
+    hasStarted.value = true
+  }
+  store.setPlaying(!isPlaying.value)
+}
+
 const restartVideo = () => {
   if (videoRef.value) {
     videoRef.value.currentTime = 0
     videoRef.value.pause()
   }
-  store.seek(0)
   store.setPlaying(false)
+  hasStarted.value = false // Reset status to Ready
+
+  sendProjectionMessage(MessageType.MEDIA_CONTROL, { type: 'video', action: 'stop' })
 }
 
 const nextPdfPage = () => store.setPdfPage(pdfPage.value + 1)
@@ -620,14 +553,63 @@ const prevPdfPage = () => store.setPdfPage(pdfPage.value - 1)
 // We watch key state and send updates
 
 // 1. Watch Playlist changes (Full Sync)
-// State Synchronization with Projection Window
-// Handled by Centralized MediaService and Store
-// Watchers removed as they are no longer needed to manually send IPC.
+watch(
+  playlist,
+  (newVal) => {
+    sendProjectionMessage(
+      MessageType.MEDIA_UPDATE,
+      {
+        playlist: JSON.parse(JSON.stringify(newVal)), // Strip reactive proxies
+        currentIndex: currentIndex.value,
+        action: 'update',
+      },
+      { force: true },
+    )
+  },
+  { deep: true },
+)
+
+// 2. Watch Current Index changes (Jump)
+watch(currentIndex, (val) => {
+  sendProjectionMessage(
+    MessageType.MEDIA_UPDATE,
+    {
+      currentIndex: val,
+      action: 'jump',
+    },
+    { force: true },
+  )
+})
 
 watch(zoomLevel, (val) => {
   if (val <= 1 && (pan.value.x !== 0 || pan.value.y !== 0)) {
     store.setPan(0, 0)
   }
+
+  sendProjectionMessage(MessageType.MEDIA_CONTROL, { type: 'image', action: 'zoom', value: val })
+})
+
+watch(
+  pan,
+  (val) => {
+    sendProjectionMessage(MessageType.MEDIA_CONTROL, {
+      type: 'image',
+      action: 'pan',
+      value: { x: val.x, y: val.y },
+    })
+  },
+  { deep: true },
+)
+
+watch(isPlaying, (val) => {
+  sendProjectionMessage(MessageType.MEDIA_CONTROL, {
+    type: 'video',
+    action: val ? 'play' : 'pause',
+  })
+})
+
+watch(pdfPage, (val) => {
+  sendProjectionMessage(MessageType.MEDIA_CONTROL, { type: 'pdf', action: 'pdfPage', value: val })
 })
 
 // Keyboard Shortcuts
@@ -713,11 +695,32 @@ onMounted(async () => {
   stopwatchStore.startLocal()
 
   if (isElectron()) {
-    // Media service handles state.
-    // If we need to ensure projection is on Media View, we might need a global command,
-    // but usually MediaService interactions don't force View Change unless explicit.
-    // Assuming View Change is handled by Layout/Control wrapper when entering presentation.
+    // Switch to Media View for projection
+    await setProjectionState(false, ViewType.MEDIA)
+
+    // Initial Sync
+    sendProjectionMessage(
+      MessageType.MEDIA_UPDATE,
+      {
+        playlist: JSON.parse(JSON.stringify(playlist.value)),
+        currentIndex: currentIndex.value,
+        action: 'update',
+      },
+      { force: true },
+    )
   }
+
+  onProjectionMessage((msg) => {
+    if (
+      msg.type === MessageType.MEDIA_CONTROL &&
+      msg.data?.action === 'ended' &&
+      msg.data?.type === 'video'
+    ) {
+      // Video Finished
+      store.setPlaying(false)
+      hasStarted.value = false // Reset to Ready
+    }
+  })
 })
 
 onUnmounted(() => {
@@ -742,17 +745,6 @@ onUnmounted(() => {
   height: auto; /* Overridden by inline style */
   border: 1px solid #333;
 }
-
-/* Hide native video volume controls, fullscreen, and overflow menu */
-video::-webkit-media-controls-volume-slider,
-video::-webkit-media-controls-mute-button,
-video::-webkit-media-controls-volume-control-container,
-video::-webkit-media-controls-fullscreen-button,
-video::-webkit-media-controls-overflow-button,
-video::-webkit-media-controls-toggle-closed-captions-button {
-  display: none !important;
-}
-
 .preview-content {
   max-width: 100%;
   max-height: 100%;

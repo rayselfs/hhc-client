@@ -3,7 +3,6 @@ import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import { APP_CONFIG } from '@/config/app'
 import { useMediaStore } from '@/stores/media'
-import { useElectron } from '@/composables/useElectron'
 import type { UseFolderDialogsReturn } from './useFolderDialogs'
 import type { Folder, FileItem, ClipboardItem } from '@/types/common'
 
@@ -17,7 +16,6 @@ export function useMediaOperations(
   getUniqueName: (name: string, type: 'folder' | 'file') => string,
 ) {
   const { t } = useI18n()
-  const { isElectron, deleteFile } = useElectron()
   const {
     currentFolderPath,
     getCurrentFolders: currentFolders,
@@ -119,47 +117,24 @@ export function useMediaOperations(
   }
 
   // --- Delete ---
-  const handleItemDelete = async (item: FileItem) => {
-    if (isElectron() && item.url.startsWith('local-resource://')) {
-      // Extract path from local-resource://
-      // On Windows: local-resource://C:/path/to/file.ext -> C:\path\to\file.ext
-      // On Mac: local-resource:///Users/path/file.ext -> /Users/path/file.ext
-      let path = item.url.replace('local-resource://', '')
-      if (window.electronAPI && (await window.electronAPI.getSystemLocale())) {
-        // Dummy check or just use decodeURI?
-        path = decodeURIComponent(path)
-      }
-      // Simple decode
-      path = decodeURIComponent(path)
-
-      await deleteFile(path)
-    }
-  }
-
-  const confirmDeleteAction = async () => {
+  const confirmDeleteAction = () => {
     if (dialogs.folderToDelete.value) {
-      // We don't support deleting folder contents physically yet (complexity), just DB
       mediaStore.deleteFolder(dialogs.folderToDelete.value.id)
       selectedItems.clear()
     } else if (dialogs.itemToDelete.value) {
-      await handleItemDelete(dialogs.itemToDelete.value)
       mediaStore.removeItemFromCurrent(dialogs.itemToDelete.value.id)
       selectedItems.clear()
     } else {
       // Bulk delete
-      for (const id of selectedItems.value) {
+      selectedItems.value.forEach((id) => {
         // Try delete as folder first, then item
         const folder = currentFolders.value.find((f) => f.id === id)
         if (folder) {
           mediaStore.deleteFolder(id)
         } else {
-          const item = currentItems.value.find((i) => i.id === id)
-          if (item) {
-            await handleItemDelete(item)
-            mediaStore.removeItemFromCurrent(id)
-          }
+          mediaStore.removeItemFromCurrent(id)
         }
-      }
+      })
       selectedItems.clear()
     }
     dialogs.showDeleteConfirmDialog.value = false

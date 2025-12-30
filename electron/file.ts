@@ -13,18 +13,14 @@ export const registerFileProtocols = () => {
 
       // Handle cases where the first part of the path is treated as the host
       if (parsedUrl.host) {
-        // On Windows, if host is single letter, assume it's a drive letter (e.g. c of local-resource://c/Users/...)
-        if (process.platform === 'win32' && /^[a-zA-Z]$/.test(parsedUrl.host)) {
-          filePath = `${parsedUrl.host}:${parsedUrl.pathname}`
-        } else {
-          filePath = path.join('/', parsedUrl.host, filePath)
-        }
+        filePath = path.join('/', parsedUrl.host, filePath)
       }
 
       let decodedPath = decodeURIComponent(filePath)
 
-      // On Windows, strip leading slash if it precedes a drive letter (e.g. /C:/Users -> C:/Users)
+      // On Windows, strip leading slash if it precedes a drive letter
       if (process.platform === 'win32') {
+        // e.g., /C:/Users/... -> C:/Users/...
         if (decodedPath.match(/^\/[a-zA-Z]:/)) {
           decodedPath = decodedPath.slice(1)
         }
@@ -117,44 +113,6 @@ export const registerFileHandlers = () => {
       return true
     } catch (error) {
       console.error('Failed to reset user data:', error)
-      return false
-    }
-  })
-
-  // Handle delete file
-  ipcMain.handle('delete-file', async (event, filePath: string) => {
-    try {
-      const userDataPath = app.getPath('userData')
-      const mediaDir = path.join(userDataPath, 'media')
-      const thumbnailsDir = path.join(userDataPath, 'thumbnails')
-
-      // Security check: Ensure file is within media directory
-      // Normalize paths for comparison
-      const normalizedFilePath = path.normalize(filePath)
-      const normalizedMediaDir = path.normalize(mediaDir)
-
-      if (!normalizedFilePath.startsWith(normalizedMediaDir)) {
-        console.warn('Attempted to delete file outside media directory:', filePath)
-        return false
-      }
-
-      if (existsSync(normalizedFilePath)) {
-        rmSync(normalizedFilePath, { force: true })
-      }
-
-      // Try to delete thumbnail
-      const ext = path.extname(normalizedFilePath)
-      const filename = path.basename(normalizedFilePath, ext)
-      const thumbFilename = `${filename}.png`
-      const thumbnailPath = path.join(thumbnailsDir, thumbFilename)
-
-      if (existsSync(thumbnailPath)) {
-        rmSync(thumbnailPath, { force: true })
-      }
-
-      return true
-    } catch (error) {
-      console.error('Failed to delete file:', error)
       return false
     }
   })

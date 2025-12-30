@@ -1,25 +1,22 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { type FileItem } from '@/types/common'
-import { useElectron } from '@/composables/useElectron'
+import { type AppMessage, type FileItem, MessageType } from '@/types/common'
 
 export const useMediaProjectionStore = defineStore('media-projection', () => {
-  const { mediaCommand, onMediaStateUpdate, mediaGetState } = useElectron()
-
-  // State (Synced from Backend)
+  // Playlist State
   const playlist = ref<FileItem[]>([])
   const currentIndex = ref(-1)
-  const isPlaying = ref(false)
+  const isPresenting = ref(false)
+  const showGrid = ref(false) // For 'G' key grid view
+
+  // Media State
   const zoomLevel = ref(1)
   const pan = ref({ x: 0, y: 0 })
+  const isPlaying = ref(false)
   const volume = ref(1)
   const pdfPage = ref(1)
-  const showGrid = ref(false)
-  const restartTrigger = ref(0) // increment to trigger restart
-  const currentTime = ref(0)
 
-  // Local state (that doesn't need strict sync or is strictly local)
-  const isPresenting = ref(false) // Whether projection window is active/showing content
+  const restartTrigger = ref(0) // increment to trigger restart
 
   // Getters
   const currentItem = computed(() => {
@@ -43,99 +40,127 @@ export const useMediaProjectionStore = defineStore('media-projection', () => {
     return null
   })
 
-  // Initialize: Listen for updates
-  onMediaStateUpdate((state) => {
-    playlist.value = state.playlist
-    currentIndex.value = state.currentIndex
-    isPlaying.value = state.isPlaying
-    zoomLevel.value = state.zoomLevel
-    pan.value = state.pan
-    volume.value = state.volume
-    pdfPage.value = state.pdfPage
-    showGrid.value = state.showGrid
-    restartTrigger.value = state.restartTrigger
-    // Do not overwrite currentTime if we are the ones dragging the slider (handled in component)
-    // But for now, simple sync:
-    currentTime.value = state.currentTime
-  })
-
-  // Initial fetch
-  mediaGetState().then((state) => {
-    if (state) {
-      playlist.value = state.playlist
-      currentIndex.value = state.currentIndex
-      isPlaying.value = state.isPlaying
-      zoomLevel.value = state.zoomLevel
-      pan.value = state.pan
-      volume.value = state.volume
-      pdfPage.value = state.pdfPage
-      showGrid.value = state.showGrid
-      restartTrigger.value = state.restartTrigger
-      currentTime.value = state.currentTime
-
-      if (state.playlist && state.playlist.length > 0) {
-        isPresenting.value = true
-      }
-    }
-  })
-
-  // Actions (Send Commands)
+  // Actions
   const setPlaylist = (items: FileItem[], startIndex = 0) => {
-    // Deep clone to remove Vue Proxies and ensure serializability for IPC
-    const serializedPlaylist = JSON.parse(JSON.stringify(items))
-    mediaCommand({ action: 'setPlaylist', playlist: serializedPlaylist, startIndex })
+    playlist.value = items
+    currentIndex.value = startIndex
     isPresenting.value = true
+    resetMediaState()
   }
 
   const next = () => {
-    mediaCommand({ action: 'next' })
+    if (currentIndex.value < playlist.value.length - 1) {
+      currentIndex.value++
+      resetMediaState()
+    }
   }
 
   const prev = () => {
-    mediaCommand({ action: 'prev' })
+    if (currentIndex.value > 0) {
+      currentIndex.value--
+      resetMediaState()
+    }
   }
 
   const jumpTo = (index: number) => {
-    mediaCommand({ action: 'jump', value: index })
+    if (index >= 0 && index < playlist.value.length) {
+      currentIndex.value = index
+      showGrid.value = false
+      resetMediaState()
+    }
   }
 
   const toggleGrid = () => {
-    mediaCommand({ action: 'toggleGrid' })
+    showGrid.value = !showGrid.value
   }
 
   const exit = () => {
-    mediaCommand({ action: 'exit' })
     isPresenting.value = false
+    showGrid.value = false
+    playlist.value = []
+    currentIndex.value = -1
+  }
+
+  // Media Controls
+  const resetMediaState = () => {
+    zoomLevel.value = 1
+    pan.value = { x: 0, y: 0 }
+    isPlaying.value = false // Auto-play videos by default?
+    pdfPage.value = 1
   }
 
   const setZoom = (level: number) => {
-    mediaCommand({ action: 'setZoom', value: level })
+    zoomLevel.value = Math.max(0.1, Math.min(5, level))
   }
 
   const setPan = (x: number, y: number) => {
-    mediaCommand({ action: 'setPan', value: { x, y } })
+    pan.value = { x, y }
   }
 
   const setPlaying = (playing: boolean) => {
-    mediaCommand({ action: playing ? 'play' : 'pause' })
+    isPlaying.value = playing
   }
 
   const setPdfPage = (page: number) => {
-    mediaCommand({ action: 'setPdfPage', value: page })
+    pdfPage.value = Math.max(1, page)
   }
 
   const stop = () => {
-    mediaCommand({ action: 'stop' })
+    isPlaying.value = false
+    restartTrigger.value++
   }
 
-  const seek = (time: number) => {
-    mediaCommand({ action: 'seek', value: time })
-  }
+  /**
+   * 處理媒體投影消息
+   */
+  const handleMessage = (message: AppMessage): boolean => {
+    switch (message.type) {
+      case MessageType.MEDIA_UPDATE:
+        if (!('action' in message.data)) return false
 
-  // Legacy resetMediaState (might be needed if UI calls it, but backend handles it)
-  const resetMediaState = () => {
-    // No-op or trigger backend reset if needed?
-    // Backend resets on playlist set/jump usually.
+        if (message.data.action === 'update' && message.data.playlist) {
+          // Full playlist update
+          setPlaylist(message.data.playlist as FileItem[], message.data.currentIndex)
+          return true
+        } else if (message.data.action === 'jump') {
+          jumpTo(message.data.currentIndex)
+          return true
+        } else if (message.data.action === 'next') {
+          next()
+          return true
+        } else if (message.data.action === 'prev') {
+          prev()
+          return true
+        }
+        break
+
+      case MessageType.MEDIA_CONTROL:
+        if (!('action' in message.data)) return false
+        // ... rest of code
+
+        if (message.data.action === 'zoom') {
+          setZoom(Number(message.data.value))
+          return true
+        } else if (message.data.action === 'pan') {
+          const pan = message.data.value as { x: number; y: number }
+          setPan(pan.x, pan.y)
+          return true
+        } else if (message.data.action === 'play') {
+          setPlaying(true)
+          return true
+        } else if (message.data.action === 'pause') {
+          setPlaying(false)
+          return true
+        } else if (message.data.action === 'pdfPage') {
+          setPdfPage(Number(message.data.value))
+          return true
+        } else if (message.data.action === 'stop') {
+          stop()
+          return true
+        }
+        break
+    }
+    return false
   }
 
   return {
@@ -152,7 +177,6 @@ export const useMediaProjectionStore = defineStore('media-projection', () => {
     volume,
     pdfPage,
     restartTrigger,
-    currentTime,
     setPlaylist,
     next,
     prev,
@@ -165,6 +189,6 @@ export const useMediaProjectionStore = defineStore('media-projection', () => {
     setPlaying,
     setPdfPage,
     stop,
-    seek,
+    handleMessage,
   }
 })
