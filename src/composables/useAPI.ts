@@ -1,11 +1,5 @@
 import { ref, type Ref } from 'vue'
-import type {
-  BibleVersion,
-  BibleContent,
-  BibleBook,
-  StreamingProgress,
-  SearchResult,
-} from '@/types/bible'
+import type { BibleVersion, BibleContent, BibleBook, StreamingProgress } from '@/types/bible'
 import { useSentry } from './useSentry'
 
 const API_HOST = import.meta.env.VITE_BIBLE_API_HOST || 'https://www.alive.org.tw'
@@ -27,7 +21,6 @@ export function useAPI() {
     getBibleVersions: electronGetBibleVersions,
     onBibleContentChunk: electronOnBibleContentChunk,
     getBibleContent: electronGetBibleContent,
-    searchBibleVerses: electronSearchBibleVerses,
     removeAllListeners,
   } = useElectron()
 
@@ -281,73 +274,10 @@ export function useAPI() {
     }
   }
 
-  /**
-   * Search Bible verses
-   * @param q - Search keyword
-   * @param versionCode - Version code (e.g. 'CUV-TW')
-   * @param top - Number of results to return, default 20
-   * @returns List of search results
-   */
-  const searchBibleVerses = async (
-    q: string,
-    versionCode: string,
-    top: number = 20,
-  ): Promise<SearchResult[]> => {
-    loading.value = true
-    error.value = null
-
-    try {
-      if (isElectron()) {
-        return await electronSearchBibleVerses({ q, versionCode, top })
-      }
-
-      const encodedQuery = encodeURIComponent(q)
-      const url = `${API_HOST}/api/bible/v1/search?q=${encodedQuery}&version=${versionCode}&top=${top}`
-
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-      }
-
-      const response = await fetch(url, {
-        method: 'GET',
-        headers,
-      })
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-
-      const data = await response.json()
-
-      // Ensure return value is an array
-      if (!Array.isArray(data)) {
-        return []
-      }
-
-      return data
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred'
-      reportError(err, {
-        operation: 'search-bible-verses',
-        component: 'useAPI',
-      })
-
-      error.value = {
-        message: errorMessage,
-        status: err instanceof Response ? err.status : undefined,
-      }
-
-      return []
-    } finally {
-      loading.value = false
-    }
-  }
-
   return {
     loading,
     error,
     getBibleVersions,
     getBibleContent,
-    searchBibleVerses,
   }
 }

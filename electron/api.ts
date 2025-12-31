@@ -55,23 +55,4 @@ export const registerApiHandlers = () => {
       throw error
     }
   })
-
-  // Search Bible Verses
-  ipcMain.handle('api-bible-search', async (event, { q, versionCode, top }) => {
-    try {
-      const encodedQuery = encodeURIComponent(q)
-      const url = `${API_HOST}/api/bible/v1/search?q=${encodedQuery}&version=${versionCode}&top=${top}`
-
-      const response = await fetch(url)
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-
-      return await response.json()
-    } catch (error) {
-      console.error('Failed to search bible verses:', error)
-      throw error
-    }
-  })
 }

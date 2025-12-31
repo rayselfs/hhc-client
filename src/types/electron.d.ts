@@ -1,5 +1,5 @@
 import type { AppMessage, DisplayInfo, TimerMode } from './common'
-import type { BibleVersion, SearchResult } from './bible'
+import type { BibleVersion } from './bible'
 
 // AutoUpdater 相關類型定義
 export interface UpdateInfo {
@@ -35,11 +35,6 @@ export interface ElectronAPI {
   // Bible API
   getBibleVersions: () => Promise<BibleVersion[]>
   getBibleContent: (versionId: number) => Promise<{ success: boolean }>
-  searchBibleVerses: (params: {
-    q: string
-    versionCode: string
-    top: number
-  }) => Promise<SearchResult[]>
   onBibleContentChunk: (callback: (chunk: Uint8Array) => void) => void
 
   /** Check if projection window exists */
