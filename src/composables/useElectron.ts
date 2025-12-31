@@ -1,5 +1,5 @@
 import type { AppMessage } from '@/types/common'
-import type { BibleVersion, SearchResult } from '@/types/bible'
+import type { BibleVersion } from '@/types/bible'
 import type { TimerCommand, TimerState } from '@/types/electron'
 import { useSentry } from './useSentry'
 
@@ -279,26 +279,6 @@ export const useElectron = () => {
     }
   }
 
-  const searchBibleVerses = async (params: {
-    q: string
-    versionCode: string
-    top: number
-  }): Promise<SearchResult[]> => {
-    if (isElectron()) {
-      try {
-        return await window.electronAPI.searchBibleVerses(params)
-      } catch (error) {
-        reportError(error, {
-          operation: 'search-bible-verses',
-          component: 'useElectron',
-          extra: { params },
-        })
-        throw error
-      }
-    }
-    return []
-  }
-
   const onBibleContentChunk = (callback: (chunk: Uint8Array) => void): void => {
     if (isElectron()) {
       window.electronAPI.onBibleContentChunk(callback)
@@ -350,7 +330,6 @@ export const useElectron = () => {
     // Bible API
     getBibleVersions,
     getBibleContent,
-    searchBibleVerses,
     onBibleContentChunk,
 
     // Updater Event Listeners
