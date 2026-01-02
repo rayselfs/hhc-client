@@ -21,9 +21,9 @@
           <span v-if="selectedChapter" class="text-subtitle-1"> {{ selectedChapter }}</span>
         </div>
 
-        <!-- 搜尋框和步驟導航按鈕 -->
+        <!-- Search box and step navigation buttons -->
         <div class="d-flex align-center gap-2">
-          <!-- 搜尋框 - 只在書卷頁面顯示 -->
+          <!-- Search box - only shown on books page -->
           <v-text-field
             v-if="currentStep === 'books'"
             v-model="searchQuery"
@@ -38,7 +38,7 @@
             min-width="150"
           />
 
-          <!-- 步驟導航按鈕 -->
+          <!-- Step navigation buttons -->
           <v-btn
             size="small"
             class="text-subtitle-1"
@@ -76,7 +76,7 @@
 
       <v-card-text class="mt-5 pr-5 pl-5">
         <transition name="page-slide" mode="out-in">
-          <!-- 書卷選擇頁面 -->
+          <!-- Book selection page -->
           <div v-if="currentStep === 'books'" key="books">
             <div v-if="loading" class="text-center py-8">
               <v-progress-circular indeterminate color="primary" />
@@ -121,7 +121,7 @@
             </div>
           </div>
 
-          <!-- 章選擇頁面 -->
+          <!-- Chapter selection page -->
           <div v-else-if="currentStep === 'chapters'" key="chapters">
             <div class="chapter-verse-grid">
               <v-btn
@@ -136,7 +136,7 @@
             </div>
           </div>
 
-          <!-- 節選擇頁面 -->
+          <!-- Verse selection page -->
           <div v-else-if="currentStep === 'verses'" key="verses">
             <div class="chapter-verse-grid">
               <v-btn
@@ -187,7 +187,7 @@ interface Emits {
   (e: 'select-verse', bookNumber: number, chapter: number, verse: number): void
 }
 
-// 使用 Bible Store 的 Cache 功能
+// Use Bible Store's cache functionality
 const bibleStore = useBibleStore()
 const { getBibleContent } = bibleStore
 
@@ -201,19 +201,19 @@ const dialogVisible = computed({
   set: (value) => emit('update:modelValue', value),
 })
 
-// 當前步驟：'books' | 'chapters' | 'verses'
+// Current step: 'books' | 'chapters' | 'verses'
 const currentStep = ref<'books' | 'chapters' | 'verses'>('books')
 const selectedBook = ref<BibleBook | null>(null)
 const selectedChapter = ref<number | null>(null)
 
-// 搜尋功能
+// Search functionality
 const searchQuery = ref('')
 
-// 聖經內容數據
+// Bible content data
 const bibleContent = ref<BibleContent | null>(null)
 const loading = ref(false)
 
-// 導航控制
+// Navigation control
 const canNavigateToChapter = computed(() => {
   return selectedBook.value !== null
 })
@@ -251,13 +251,13 @@ const newTestamentBooks = computed(() => {
   return filteredBooks.value.filter((book) => book.number > 39)
 })
 
-// 獲取選中書卷的章節數（從API數據獲取）
+// Get chapter numbers for the selected book (from API data)
 const selectedBookChapters = computed(() => {
   if (!selectedBook.value) return []
   return Array.from({ length: selectedBook.value.chapters.length }, (_, i) => i + 1)
 })
 
-// 獲取選中章節的節數（從API數據獲取）
+// Get verse numbers for the selected chapter (from API data)
 const selectedChapterVerses = computed(() => {
   if (!selectedBook.value || !selectedChapter.value) return []
 
@@ -267,7 +267,7 @@ const selectedChapterVerses = computed(() => {
   return chapter.verses.map((verse) => verse.number)
 })
 
-// 導航到指定步驟
+// Navigate to specified step
 const navigateToStep = (step: 'books' | 'chapters' | 'verses') => {
   if (step === 'books') {
     currentStep.value = 'books'
@@ -316,14 +316,13 @@ const selectVerse = (verse: number) => {
   resetToBooks()
 }
 
-// 載入聖經內容
+// Load Bible content
 const loadBibleContent = async () => {
   if (!props.versionCode) return
 
   loading.value = true
   try {
-    const content = await getBibleContent(props.versionCode)
-    bibleContent.value = content
+    bibleContent.value = await getBibleContent(props.versionCode)
   } catch (error) {
     reportError(error, {
       operation: 'load-bible-content-dialog',
@@ -335,7 +334,7 @@ const loadBibleContent = async () => {
   }
 }
 
-// 監聽版本變化
+// Watch for version changes
 watch(
   () => props.versionCode,
   () => {
@@ -345,7 +344,7 @@ watch(
   },
 )
 
-// 監聽dialog開啟
+// Watch for dialog open
 watch(dialogVisible, (visible) => {
   if (visible && props.versionCode) {
     loadBibleContent()
@@ -353,10 +352,10 @@ watch(dialogVisible, (visible) => {
   }
 })
 
-// 重置到書卷選擇狀態
+// Reset to book selection state
 const resetToBooks = () => {
   currentStep.value = 'books'
-  searchQuery.value = '' // 清除搜尋框
+  searchQuery.value = '' // Clear search box
 }
 
 const closeDialog = () => {

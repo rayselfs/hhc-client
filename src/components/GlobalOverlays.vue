@@ -63,10 +63,10 @@ const { reportError } = useSentry()
 
 onMounted(async () => {
   try {
-    await bibleStore.loadBibleVersions()
+    await bibleStore.initializeBibleStore()
   } catch (error) {
     reportError(error, {
-      operation: 'load-bible-versions',
+      operation: 'initialize-bible-store',
       component: 'GlobalOverlays',
     })
   }

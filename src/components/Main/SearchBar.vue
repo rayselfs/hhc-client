@@ -14,7 +14,14 @@
     >
     </v-text-field>
 
-    <v-btn v-if="!isSearching" icon @click="handleStart" :title="$t('common.search')" class="mr-1">
+    <v-btn
+      v-if="!isSearching"
+      icon
+      @click="handleStart"
+      :title="$t('common.search')"
+      :disabled="isIndexing"
+      class="mr-1"
+    >
       <v-icon>mdi-magnify</v-icon>
     </v-btn>
 
@@ -25,17 +32,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useBibleStore } from '@/stores/bible'
 
 defineOptions({
   name: 'SearchBar',
 })
 
 const { t: $t } = useI18n()
+const bibleStore = useBibleStore()
 
 const isSearching = ref(false)
 const searchText = ref('')
+
+// Disable search can be triggered by either local searching state or store indexing state
+const isIndexing = computed(() => bibleStore.isIndexing)
 
 const handleStart = () => {
   isSearching.value = true
@@ -46,8 +58,11 @@ const handleClose = () => {
   searchText.value = ''
 }
 
-const handleInput = () => {
+const handleInput = (event: KeyboardEvent) => {
+  if (event.isComposing) return
+
   if (searchText.value.trim()) {
+    console.log('[SearchBar] Dispatching search event:', searchText.value.trim())
     window.dispatchEvent(
       new CustomEvent('bible-search', {
         detail: { text: searchText.value.trim() },

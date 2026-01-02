@@ -106,15 +106,14 @@ const selectedVersionCode = computed<string | null>({
 })
 
 /**
- * 載入聖經內容 (優先從快取讀取)
- * @param versionCode - 版本代碼
- * @param forceRefresh - 是否強制重新 fetch
+ * Load Bible content (prefer cached version)
+ * @param versionCode - Version code
  */
-const loadBibleContentForVersion = async (versionCode: string, forceRefresh = false) => {
+const loadBibleContentForVersion = async (versionCode: string) => {
   contentLoading.value = true
 
   try {
-    await getBibleContent(versionCode, { forceRefresh })
+    await getBibleContent(versionCode)
   } catch (error) {
     reportError(error, {
       operation: 'load-bible-content',
@@ -126,33 +125,36 @@ const loadBibleContentForVersion = async (versionCode: string, forceRefresh = fa
   }
 }
 
-// 監聽版本變化
+// Watch for version changes and preload content for later use
+// Note: This is a proactive cache preload. The actual content loading is handled
+// by BibleControl when needed. Due to getBibleContent's deduplication mechanism,
+// duplicate calls won't cause actual duplicate requests.
 watch(
   () => currentVersion.value?.code,
-  async (newVersionCode) => {
-    if (newVersionCode) {
-      await loadBibleContentForVersion(newVersionCode, false)
+  async (newVersionCode, oldVersionCode) => {
+    // Only preload when version actually changes (not on initial mount)
+    if (newVersionCode && newVersionCode !== oldVersionCode) {
+      await loadBibleContentForVersion(newVersionCode)
     }
   },
-  { immediate: true },
 )
 
 watch(
   () => secondVersionCode.value,
-  async (newVersionCode) => {
-    if (newVersionCode) {
-      await loadBibleContentForVersion(newVersionCode, false)
+  async (newVersionCode, oldVersionCode) => {
+    // Only preload when version actually changes (not on initial mount)
+    if (newVersionCode && newVersionCode !== oldVersionCode) {
+      await loadBibleContentForVersion(newVersionCode)
     }
   },
-  { immediate: true },
 )
 
-// 處理經文選擇
+// Handle verse selection
 const handleSelectVerse = (bookNumber: number, chapter: number, verse: number) => {
   setSelectedVerse(bookNumber, chapter, verse)
 }
 
-// 暴露 selectedVersion 供外部使用
+// Expose selectedVersion for external use
 defineExpose({
   selectedVersion: computed(() => selectedVersionCode.value),
 })

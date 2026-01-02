@@ -1,5 +1,4 @@
-import { ref, type Ref } from 'vue'
-import FlexSearch from 'flexsearch'
+import { ref, type Ref, onUnmounted } from 'vue'
 
 /**
  * Generic configuration for FlexSearch index
@@ -18,6 +17,8 @@ export interface FlexSearchConfig<T> {
     bidirectional?: boolean
     cache?: boolean
     worker?: boolean
+    context?: boolean | { resolution: number; depth: number; bidirectional: boolean }
+    encode?: boolean | string | ((str: string) => string)
   }
 }
 
@@ -29,196 +30,292 @@ export interface FlexSearchResult<T> {
   score?: number
 }
 
+// Timeout configuration
+const SEARCH_TIMEOUT_MS = 30000
+
 /**
  * Generic FlexSearch composable for full-text searching
- *
- * @example
- * ```ts
- * const { index, search, clear } = useFlexSearch<BibleVerse>({
- *   searchFields: ['text', 'reference'],
- *   idField: 'id'
- * })
- *
- * index(verses)
- * const results = await search('love')
- * ```
+ * Uses a Web Worker to avoid blocking the main thread.
  */
 export function useFlexSearch<T extends Record<string, unknown>>(config: FlexSearchConfig<T>) {
   const { searchFields, idField, options = {} } = config
 
-  // Use Document index for multi-field searching
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const flexIndex = ref<any>(null)
-  const documents = ref<Map<string | number, T>>(new Map())
+  // Current options
+  let currentOptions = { ...options }
+
   const isIndexing = ref(false)
   const isSearching = ref(false)
+  const documentCount = ref(0)
+
+  // Worker instance
+  let worker: Worker | null = null
+
+  // Pending request resolvers
+  // We use a simple queue for now since most ops are sequential or we just wait for the latest
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const pendingSearches = new Map<number, (results: any[]) => void>()
+  let nextId = 1
+
+  let exportResolve: ((data: Record<string, string>) => void) | null = null
+  let importResolve: (() => void) | null = null
 
   /**
-   * Initialize the FlexSearch index
+   * Initialize the FlexSearch worker
    */
-  const initializeIndex = () => {
-    if (flexIndex.value) return
+  const initializeWorker = () => {
+    if (worker) return
 
-    // Create document index with specified fields
-    flexIndex.value = new FlexSearch.Document({
-      tokenize: options.tokenize || 'forward',
-      resolution: options.resolution || 9,
-      document: {
-        id: idField as string,
-        index: searchFields as string[],
+    worker = new Worker(new URL('../workers/flexsearch.worker.ts', import.meta.url), {
+      type: 'module',
+    })
+
+    worker.onmessage = (e: MessageEvent) => {
+      const msg = e.data
+
+      switch (msg.type) {
+        case 'init':
+          // Init complete
+          break
+
+        case 'add':
+          // Use id to resolve if present
+          if (typeof msg.id === 'number') {
+            const resolve = pendingSearches.get(msg.id)
+            if (resolve) {
+              resolve([])
+              pendingSearches.delete(msg.id)
+            }
+          }
+
+          if (pendingSearches.size === 0) {
+            isIndexing.value = false
+          }
+
+          // We could track count here if returned
+          if (typeof msg.count === 'number') {
+            documentCount.value += msg.count
+          }
+          break
+
+        case 'search':
+          if (typeof msg.id === 'number') {
+            const resolve = pendingSearches.get(msg.id)
+            if (resolve) {
+              resolve(msg.results)
+              pendingSearches.delete(msg.id)
+            }
+          }
+          isSearching.value = pendingSearches.size > 0
+          break
+
+        case 'info':
+          if (typeof msg.count === 'number') {
+            documentCount.value = msg.count
+          }
+          break
+
+        case 'clear':
+          documentCount.value = 0
+          break
+
+        case 'export':
+          if (exportResolve) {
+            exportResolve(msg.data)
+            exportResolve = null
+          }
+          break
+
+        case 'import':
+          isIndexing.value = false
+          if (importResolve) {
+            importResolve()
+            importResolve = null
+          }
+          break
+
+        case 'error':
+          console.error('FlexSearch Worker Error:', msg.message)
+          isIndexing.value = false
+          isSearching.value = false
+          // Clear all pending searches on error
+          pendingSearches.forEach((resolve) => resolve([]))
+          pendingSearches.clear()
+          break
+      }
+    }
+
+    // Send init config
+    worker.postMessage({
+      type: 'init',
+      config: {
+        searchFields,
+        idField,
+        options: currentOptions,
       },
     })
   }
 
   /**
+   * Update options and re-initialize worker
+   * This effectively resets the index
+   */
+  const updateOptions = (newOptions: FlexSearchConfig<T>['options']) => {
+    currentOptions = { ...currentOptions, ...newOptions }
+
+    // Completely restart the worker to ensure clean state
+    if (worker) {
+      worker.terminate()
+      worker = null
+
+      // Clear pending searches as they will effectively be cancelled
+      pendingSearches.forEach((resolve) => resolve([]))
+      pendingSearches.clear()
+
+      // Reset state
+      documentCount.value = 0
+      isIndexing.value = false
+      isSearching.value = false
+
+      // Re-initialize (will be lazy loaded next time or we can force it)
+      // We don't force initialize here, let the next action trigger it
+      // But if we want to ensure config is applied immediately for subsequent calls:
+      // initializeWorker()
+    }
+  }
+
+  /**
    * Add documents to the index
-   * @param items - Array of items to index
    */
   const indexDocuments = async (items: T[]) => {
     if (!items || items.length === 0) return
+    initializeWorker()
 
     isIndexing.value = true
+    const id = nextId++
 
-    try {
-      initializeIndex()
+    return new Promise<void>((resolve) => {
+      // Store resolve in the map. Since pendingSearches expects (results: any[]) => void,
+      // we cast our resolve to any to satisfy it, even though we resolve with void
+      // Alternatively, we could update the map type, but reusing it is simpler for now.
+      pendingSearches.set(id, () => resolve())
 
-      // Clear existing data
-      documents.value.clear()
-
-      // Add documents to index
-      for (const item of items) {
-        const id = item[idField] as string | number
-        if (id !== undefined && id !== null) {
-          flexIndex.value?.add(item)
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          documents.value.set(id, item as any)
-        }
-      }
-    } finally {
-      isIndexing.value = false
-    }
-  }
-
-  /**
-   * Search the indexed documents
-   * @param query - Search query string
-   * @param limit - Maximum number of results (default: 20)
-   * @returns Array of search results with scores
-   */
-  const search = async (query: string, limit: number = 20): Promise<FlexSearchResult<T>[]> => {
-    if (!query || !query.trim() || !flexIndex.value) {
-      return []
-    }
-
-    isSearching.value = true
-
-    try {
-      // Perform search across all indexed fields
-      const results = await flexIndex.value.search(query.trim(), {
-        limit,
-        enrich: true, // Include document data in results
+      worker?.postMessage({
+        type: 'add',
+        id,
+        items: JSON.parse(JSON.stringify(items)), // Strip proxies
       })
-
-      // FlexSearch returns results grouped by field
-      // We need to merge and deduplicate results
-      const mergedResults = new Map<string | number, { item: T; score: number }>()
-
-      for (const fieldResult of results) {
-        if (Array.isArray(fieldResult.result)) {
-          for (const id of fieldResult.result) {
-            const item = documents.value.get(id) as T | undefined
-            if (item) {
-              // Keep the highest score if duplicate
-              const existing = mergedResults.get(id)
-              const score = 1 // FlexSearch doesn't provide scores by default
-              if (!existing || score > existing.score) {
-                mergedResults.set(id, { item: item as T, score })
-              }
-            }
-          }
-        }
-      }
-
-      // Convert to array and sort by score
-      return Array.from(mergedResults.values())
-        .sort((a, b) => b.score - a.score)
-        .slice(0, limit)
-    } finally {
-      isSearching.value = false
-    }
-  }
-
-  /**
-   * Clear the index and all documents
-   */
-  const clear = () => {
-    if (flexIndex.value) {
-      // FlexSearch doesn't have a clear method, so we recreate the index
-      flexIndex.value = null
-      documents.value.clear()
-    }
-  }
-
-  /**
-   * Get the number of indexed documents
-   */
-  const getDocumentCount = (): number => {
-    return documents.value.size
-  }
-
-  /**
-   * Export the index for persistence
-   * @returns Record of keys and data strings
-   */
-  const exportIndex = async (): Promise<Record<string, string>> => {
-    if (!flexIndex.value) return {}
-
-    return new Promise((resolve) => {
-      const exportData: Record<string, string> = {}
-      flexIndex.value.export((key: string, data: string) => {
-        exportData[key] = data
-      })
-      // Export is synchronous in current FlexSearch version but wrapped in callback
-      // We resolve after a microtask to ensure all callbacks fired (though typically sync)
-      setTimeout(() => resolve(exportData), 100)
     })
   }
 
   /**
-   * Import the index from persisted data
-   * @param data - Record of keys and data strings
+   * Search the indexed documents
+   */
+  const search = async (query: string, limit: number = 20): Promise<FlexSearchResult<T>[]> => {
+    if (!query || !query.trim()) return []
+    initializeWorker()
+
+    const id = nextId++
+    isSearching.value = true
+
+    return new Promise((resolve) => {
+      const timeoutId = setTimeout(() => {
+        if (pendingSearches.has(id)) {
+          console.warn(`Search request ${id} timed out`)
+          pendingSearches.delete(id)
+          isSearching.value = pendingSearches.size > 0
+          resolve([])
+        }
+      }, SEARCH_TIMEOUT_MS)
+
+      pendingSearches.set(id, (results) => {
+        clearTimeout(timeoutId)
+        resolve(results)
+      })
+
+      worker?.postMessage({
+        type: 'search',
+        id,
+        query,
+        limit,
+      })
+    })
+  }
+
+  /**
+   * Clear the index
+   */
+  const clear = () => {
+    worker?.postMessage({ type: 'clear' })
+  }
+
+  /**
+   * Get document count
+   * This is now async in nature but we return the cached value.
+   * We can trigger an update.
+   */
+  const getDocumentCount = (): number => {
+    // Request update for next time
+    worker?.postMessage({ type: 'info' })
+    return documentCount.value
+  }
+
+  /**
+   * Export the index
+   */
+  const exportIndex = async (): Promise<Record<string, string>> => {
+    initializeWorker()
+    return new Promise((resolve) => {
+      exportResolve = resolve
+      worker?.postMessage({ type: 'export' })
+    })
+  }
+
+  /**
+   * Import the index
    */
   const importIndex = async (data: Record<string, string>) => {
-    initializeIndex()
-    if (!flexIndex.value) return
-
+    initializeWorker()
     isIndexing.value = true
-    try {
-      const keys = Object.keys(data)
-      for (const key of keys) {
-        await flexIndex.value.import(key, data[key])
-      }
-    } finally {
-      isIndexing.value = false
+    return new Promise<void>((resolve) => {
+      importResolve = resolve
+      worker?.postMessage({ type: 'import', data })
+    })
+  }
+
+  // Cleanup
+  onUnmounted(() => {
+    worker?.terminate()
+    worker = null
+  })
+
+  /**
+   * Reset the worker completely
+   */
+  const reset = () => {
+    if (worker) {
+      worker.terminate()
+      worker = null
     }
+    // Clear pending searches
+    pendingSearches.forEach((resolve) => resolve([]))
+    pendingSearches.clear()
+
+    // Reset state
+    documentCount.value = 0
+    isIndexing.value = false
+    isSearching.value = false
   }
 
   return {
-    /** Add documents to search index */
     indexDocuments,
-    /** Search indexed documents */
     search,
-    /** Clear all indexed data */
     clear,
-    /** Get count of indexed documents */
+    reset,
     getDocumentCount,
-    /** Export index for persistence */
     exportIndex,
-    /** Import index from persistence */
     importIndex,
-    /** Whether indexing is in progress */
+    updateOptions,
     isIndexing: isIndexing as Readonly<Ref<boolean>>,
-    /** Whether search is in progress */
     isSearching: isSearching as Readonly<Ref<boolean>>,
   }
 }

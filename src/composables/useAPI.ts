@@ -102,6 +102,8 @@ export function useAPI() {
     loading.value = true
     error.value = null
 
+    console.log('Getting Bible content from API for version ID:', versionId)
+
     try {
       let reader: ReadableStreamDefaultReader<Uint8Array> | undefined
 
@@ -170,6 +172,7 @@ export function useAPI() {
       let buffer = ''
       let bookCount = 0
       let isStarted = false
+      let currentEventData = ''
 
       try {
         while (true) {
@@ -179,30 +182,39 @@ export function useAPI() {
 
           buffer += decoder.decode(value, { stream: true })
 
-          // Handle complete SSE event
           const lines = buffer.split('\n')
-          buffer = lines.pop() || '' // Keep incomplete line
+          // Keep the last partial line in the buffer
+          buffer = lines.pop() || ''
 
           for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const eventData = line.slice(6) // Remove 'data: ' prefix
+            // Trim whitespace to handle slightly malformed streams more gracefully,
+            // though standard SSE is strict.
+            const trimmedLine = line.trim()
 
-              try {
-                const event = JSON.parse(eventData)
+            if (trimmedLine === '') {
+              // Empty line marks end of event
+              if (currentEventData) {
+                try {
+                  const event = JSON.parse(currentEventData)
 
-                if (event.type === 'start') {
-                  isStarted = true
-                  progress?.onStart?.()
-                } else if (event.type === 'complete') {
-                  progress?.onComplete?.(bookCount)
-                  break
-                } else if (event.type === 'error') {
-                  throw new Error(event.message)
-                } else if (event.type === 'timeout') {
-                  throw new Error('Request Timeout')
-                } else {
-                  // Handle book data
-                  if (event.id && event.name && isStarted) {
+                  if (event.type === 'start') {
+                    isStarted = true
+                    progress?.onStart?.()
+                  } else if (event.type === 'complete') {
+                    progress?.onComplete?.(bookCount)
+                    break
+                  } else if (event.type === 'error') {
+                    throw new Error(event.message)
+                  } else if (event.type === 'timeout') {
+                    throw new Error('Request Timeout')
+                  } else if (event.version_id) {
+                    bibleContent.version_id = event.version_id
+                    bibleContent.version_code = event.version_code
+                    bibleContent.version_name = event.version_name
+                    if (event.updated_at) {
+                      bibleContent.updated_at = event.updated_at
+                    }
+                  } else if (event.id && event.name && isStarted) {
                     const book: BibleBook = {
                       id: event.id,
                       number: event.number,
@@ -215,19 +227,24 @@ export function useAPI() {
                     bookCount++
 
                     progress?.onBookReceived?.(book, bookCount - 1, bookCount)
-                  } else if (event.version_id && !isStarted) {
-                    // Handle version info
-                    bibleContent.version_id = event.version_id
-                    bibleContent.version_code = event.version_code
-                    bibleContent.version_name = event.version_name
-                    if (event.updated_at) {
-                      bibleContent.updated_at = event.updated_at
-                    }
                   }
+                } catch (parseError) {
+                  console.warn(
+                    'Failed to parse SSE event:',
+                    parseError,
+                    'Version ID:',
+                    versionId,
+                    'Event Data:',
+                    currentEventData,
+                  )
                 }
-              } catch (parseError) {
-                console.warn('Failed to parse SSE event:', parseError)
+                currentEventData = ''
               }
+            } else if (line.startsWith('data: ')) {
+              const content = line.slice(6)
+              currentEventData += (currentEventData ? '\n' : '') + content
+            } else if (currentEventData && !line.startsWith(':')) {
+              currentEventData += '\n' + line
             }
           }
         }

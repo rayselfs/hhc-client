@@ -60,11 +60,15 @@ export const BIBLE_CONFIG = {
   // Verse configuration
   VERSE: {
     MAX_TEXT_LENGTH: 200,
-    MAX_HISTORY_ITEMS: 100,
+    MAX_HISTORY_ITEMS: 50,
     DEFAULT_FORMAT: {
       showVerseNumber: true,
       showBookAbbreviation: true,
     },
+  },
+  // Search configuration
+  SEARCH: {
+    DEFAULT_RESULT_LIMIT: 20,
   },
 }
 

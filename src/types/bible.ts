@@ -44,15 +44,14 @@ export interface BibleBook {
 }
 
 /**
- * 完整的聖經內容
- * 對應 API: GET /api/bible/v1/version/{version_id}
+ * Bible content
  */
 export interface BibleContent {
   version_id: number
   version_code: string
   version_name: string
-  updated_at: number
   books: BibleBook[]
+  updated_at: number
 }
 
 /**
@@ -81,7 +80,8 @@ export interface StreamingProgress {
 export enum BibleCacheConfig {
   DB_NAME = 'BibleDB',
   STORE_NAME = 'bibleContent',
-  DB_VERSION = 1,
+  SEARCH_INDEX_STORE_NAME = 'bibleSearchIndex',
+  DB_VERSION = 2,
 }
 
 /**
@@ -129,4 +129,25 @@ export interface SearchResult {
  */
 export interface SearchResultDisplay extends SearchResult {
   book_abbreviation: string
+}
+
+/**
+ * Bible verse index item for FlexSearch
+ */
+export interface BibleVerseIndexItem extends Record<string, unknown> {
+  verse_id: string
+  version_code: string
+  book_number: number
+  chapter_number: number
+  verse_number: number
+  text: string
+}
+
+/**
+ * Search index data stored in IndexedDB
+ */
+export interface BibleSearchIndexData {
+  version_code: string
+  documents_data?: BibleVerseIndexItem[]
+  updated_at: number
 }

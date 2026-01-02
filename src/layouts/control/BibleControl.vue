@@ -230,7 +230,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useDisplay } from 'vuetify'
-import { useDebounceFn } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useBibleStore } from '@/stores/bible'
@@ -242,7 +241,6 @@ import { useSentry } from '@/composables/useSentry'
 import { useCardLayout } from '@/composables/useLayout'
 import { useLocalStorage } from '@/composables/useLocalStorage'
 import { useBible } from '@/composables/useBible'
-import { useAPI } from '@/composables/useAPI'
 import ContextMenu from '@/components/ContextMenu.vue'
 import MultiFunctionControl from '@/components/Bible/MultiFunction/Control.vue'
 import BottomSpacer from '@/components/Main/BottomSpacer.vue'
@@ -261,8 +259,14 @@ const {
   isMultiVersion,
   secondVersionCode,
 } = storeToRefs(bibleStore)
-const { getBibleContent, addToHistory, setPreviewState, setCurrentPassageVerse } = bibleStore
-const { searchBibleVerses } = useAPI()
+const {
+  getBibleContent,
+  addToHistory,
+  setPreviewState,
+  setCurrentPassageVerse,
+  searchBibleVerses,
+} = bibleStore
+
 const { mdAndUp } = useDisplay()
 
 const { leftCardHeight, rightTopCardHeight, rightBottomCardHeight } = useCardLayout({
@@ -359,70 +363,70 @@ const selectedVerse = ref<{ number: number; text: string } | null>(null)
 
 // Handle verse selection for preview
 const handleVerseSelection = async (bookNumber: number, chapter: number, verse: number) => {
-  const versionCode = currentVersion.value?.code
-  if (!versionCode) {
-    reportError(new Error('No Bible version selected'), {
-      operation: 'handle-verse-selection',
-      component: 'BibleControl',
-      extra: { bookNumber, chapter, verse },
-    })
+  try {
+    const versionCode = currentVersion.value?.code
+    if (!versionCode) {
+      reportError(new Error('No Bible version selected'), {
+        operation: 'handle-verse-selection',
+        component: 'BibleControl',
+        extra: { bookNumber, chapter, verse },
+      })
+      return
+    }
+
+    // Fetch Bible content from store
+    const content = await getBibleContent(versionCode)
+    if (!content) {
+      reportError(new Error('Bible content not found'), {
+        operation: 'handle-verse-selection',
+        component: 'BibleControl',
+        extra: { versionCode, bookNumber, chapter, verse },
+      })
+      return
+    }
+
+    // Find book in content
+    const book = content.books.find((b) => b.number === bookNumber)
+    if (!book) {
+      reportError(new Error('Book not found'), {
+        operation: 'handle-verse-selection',
+        component: 'BibleControl',
+        extra: { versionCode, bookNumber, chapter, verse },
+      })
+      return
+    }
+
+    // Prepare new passage info
+    const newPassage: BiblePassage = {
+      bookAbbreviation: book.abbreviation || '',
+      bookNumber: book.number,
+      chapter,
+      verse,
+    }
+
+    // Get actual verses from selected chapter
+    const selectedChapter = book.chapters.find((ch) => ch.number === chapter)
+    if (selectedChapter) {
+      // Prepare new verse content
+      const newVerses = selectedChapter.verses.map((v: { number: number; text: string }) => ({
+        number: v.number,
+        text: v.text,
+      }))
+
+      // Update store state
+      setPreviewState(newPassage, newVerses, book)
+
+      // Wait for DOM update
+      await nextTick()
+
+      // Scroll to specific verse (use setTimeout to avoid blocking)
+      setTimeout(() => {
+        scrollToVerse(verse, 'instant')
+      }, 0)
+    }
+  } finally {
+    // Ensure loading state is always reset, even if an error occurs
     isLoadingVerses.value = false
-    return
-  }
-
-  // Fetch Bible content from store
-  const content = await getBibleContent(versionCode)
-  if (!content) {
-    reportError(new Error('Bible content not found'), {
-      operation: 'handle-verse-selection',
-      component: 'BibleControl',
-      extra: { versionCode, bookNumber, chapter, verse },
-    })
-    isLoadingVerses.value = false
-    return
-  }
-
-  // Find book in content
-  const book = content.books.find((b) => b.number === bookNumber)
-  if (!book) {
-    reportError(new Error('Book not found'), {
-      operation: 'handle-verse-selection',
-      component: 'BibleControl',
-      extra: { versionCode, bookNumber, chapter, verse },
-    })
-    isLoadingVerses.value = false
-    return
-  }
-
-  // Prepare new passage info
-  const newPassage: BiblePassage = {
-    bookAbbreviation: book.abbreviation || '',
-    bookNumber: book.number,
-    chapter,
-    verse,
-  }
-
-  // Get actual verses from selected chapter
-  const selectedChapter = book.chapters.find((ch) => ch.number === chapter)
-  if (selectedChapter) {
-    // Prepare new verse content
-    const newVerses = selectedChapter.verses.map((v: { number: number; text: string }) => ({
-      number: v.number,
-      text: v.text,
-    }))
-
-    // Update store state
-    setPreviewState(newPassage, newVerses, book)
-
-    // Wait for DOM update
-    await nextTick()
-
-    isLoadingVerses.value = false
-
-    // Scroll to specific verse (use setTimeout to avoid blocking)
-    setTimeout(() => {
-      scrollToVerse(verse, 'instant')
-    }, 0)
   }
 }
 
@@ -636,7 +640,7 @@ watch([isMultiVersion, secondVersionCode], async ([newIsMulti, newSecondCode]) =
 })
 
 // Handle search
-const handleSearch = useDebounceFn(async (text: string) => {
+const handleSearch = async (text: string) => {
   if (!text.trim()) {
     return
   }
@@ -659,13 +663,12 @@ const handleSearch = useDebounceFn(async (text: string) => {
     // Save search text for highlighting
     searchText.value = text.trim()
 
-    // Ensure content is loaded for abbreviations
-    if (!currentBibleContent.value) {
-      await getBibleContent(versionCode)
-    }
-
-    // Execute search
-    const results = await searchBibleVerses(text, versionCode, 20)
+    // Execute search using store's search function
+    const results = await searchBibleVerses(
+      text.trim(),
+      versionCode,
+      BIBLE_CONFIG.SEARCH.DEFAULT_RESULT_LIMIT,
+    )
     searchResults.value = results
   } catch (error) {
     reportError(error, {
@@ -677,7 +680,7 @@ const handleSearch = useDebounceFn(async (text: string) => {
   } finally {
     isLoadingVerses.value = false
   }
-}, 300)
+}
 
 onMounted(() => {
   loadRootFolder()
