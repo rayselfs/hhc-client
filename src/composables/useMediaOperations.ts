@@ -3,6 +3,7 @@ import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import { APP_CONFIG } from '@/config/app'
 import { useMediaStore } from '@/stores/media'
+import { useElectron } from '@/composables/useElectron'
 import type { UseFolderDialogsReturn } from './useFolderDialogs'
 import type { Folder, FileItem, ClipboardItem } from '@/types/common'
 
@@ -117,7 +118,73 @@ export function useMediaOperations(
   }
 
   // --- Delete ---
-  const confirmDeleteAction = () => {
+  const { isElectron } = useElectron()
+
+  const deletePhysicalFiles = async (items: (FileItem | Folder<FileItem>)[]) => {
+    if (!isElectron()) return
+
+    const filesToDelete: FileItem[] = []
+
+    const collectFiles = (item: FileItem | Folder<FileItem>) => {
+      if ('items' in item) {
+        // It's a folder
+        item.items.forEach(collectFiles)
+        item.folders.forEach(collectFiles)
+      } else {
+        // It's a file
+        filesToDelete.push(item)
+      }
+    }
+
+    items.forEach(collectFiles)
+
+    for (const file of filesToDelete) {
+      if (file.url.startsWith('local-resource://')) {
+        const filePath = file.url.replace('local-resource://', '')
+        try {
+          await window.electronAPI.deleteFile(filePath)
+        } catch (e) {
+          console.error('Failed to delete file:', filePath, e)
+        }
+      }
+
+      if (file.metadata?.thumbnail?.startsWith('local-resource://')) {
+        const thumbPath = file.metadata.thumbnail.replace('local-resource://', '')
+        try {
+          await window.electronAPI.deleteFile(thumbPath)
+        } catch (e) {
+          console.warn('Failed to delete thumbnail:', thumbPath, e)
+        }
+      }
+    }
+  }
+
+  const confirmDeleteAction = async () => {
+    const itemsToDelete: (FileItem | Folder<FileItem>)[] = []
+
+    if (dialogs.folderToDelete.value) {
+      itemsToDelete.push(dialogs.folderToDelete.value)
+    } else if (dialogs.itemToDelete.value) {
+      itemsToDelete.push(dialogs.itemToDelete.value)
+    } else {
+      // Bulk delete
+      selectedItems.value.forEach((id) => {
+        const folder = currentFolders.value.find((f) => f.id === id)
+        if (folder) {
+          itemsToDelete.push(folder)
+        } else {
+          const item = currentItems.value.find((i) => i.id === id)
+          if (item) {
+            itemsToDelete.push(item)
+          }
+        }
+      })
+    }
+
+    // Delete physical files first
+    await deletePhysicalFiles(itemsToDelete)
+
+    // Then remove from store
     if (dialogs.folderToDelete.value) {
       mediaStore.deleteFolder(dialogs.folderToDelete.value.id)
       selectedItems.clear()
@@ -125,9 +192,8 @@ export function useMediaOperations(
       mediaStore.removeItemFromCurrent(dialogs.itemToDelete.value.id)
       selectedItems.clear()
     } else {
-      // Bulk delete
+      // Bulk delete execution
       selectedItems.value.forEach((id) => {
-        // Try delete as folder first, then item
         const folder = currentFolders.value.find((f) => f.id === id)
         if (folder) {
           mediaStore.deleteFolder(id)
@@ -137,6 +203,7 @@ export function useMediaOperations(
       })
       selectedItems.clear()
     }
+
     dialogs.showDeleteConfirmDialog.value = false
     dialogs.folderToDelete.value = null
     dialogs.itemToDelete.value = null

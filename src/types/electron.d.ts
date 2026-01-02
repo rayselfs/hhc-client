@@ -29,6 +29,7 @@ export interface ElectronAPI {
 
   // File System
   saveFile: (filePath: string) => Promise<{ filePath: string; thumbnailPath?: string }>
+  deleteFile: (filePath: string) => Promise<boolean>
   resetUserData: () => Promise<boolean>
   getFilePath: (file: File) => string
 
