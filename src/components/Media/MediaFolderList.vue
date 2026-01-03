@@ -1,26 +1,23 @@
 <template>
   <div v-if="folders.length > 0" class="mb-6">
     <v-row dense>
-      <v-col
-        v-for="folder in folders"
-        :key="folder.id"
-        cols="12"
-        sm="6"
-        md="4"
-        lg="2"
-        draggable="true"
-        @dragstart="onDragStart($event, folder)"
-        @drop="onDrop($event, folder)"
-        @dragover.prevent
-      >
+      <v-col v-for="folder in folders" :key="folder.id" cols="12" sm="6" md="4" lg="2">
         <div
           class="rounded-lg mb-2 folder-item mx-1 user-select-none"
           style="max-width: 100%"
           :class="[
             selectedItems.has(folder.id) ? 'bg-primary' : 'bg-grey-darken-4 hover-bg-grey-darken-2',
             { 'item-cut': isCut(folder.id) },
+            { 'is-dragging': draggedItems.has(folder.id) },
           ]"
           :data-id="folder.id"
+          draggable="true"
+          @dragstart="onDragStart($event, folder)"
+          @dragend="handleDragEnd"
+          @drop="onDrop($event, folder)"
+          @dragover="onDragOver"
+          @dragenter="onDragEnter"
+          @dragleave="onDragLeave"
           @click.stop="handleSelection(folder.id, $event)"
           @dblclick="openFolder(folder.id)"
           @contextmenu.prevent="openContextMenu(folder, $event)"
@@ -51,6 +48,8 @@
 <script setup lang="ts">
 import type { Folder, FileItem, ClipboardItem } from '@/types/common'
 
+import { useDragAndDrop } from '@/composables/useDragAndDrop'
+
 const props = defineProps<{
   folders: Folder<FileItem>[]
   selectedItems: Set<string>
@@ -69,12 +68,39 @@ const isCut = (id: string) => {
   return props.clipboard.some((item) => item.action === 'cut' && item.data.id === id)
 }
 
+// Drag and Drop
+const {
+  handleDragStart,
+  handleDragOver,
+  handleDragEnter,
+  handleDragLeave,
+  handleDrop,
+  handleDragEnd,
+  draggedItems,
+} = useDragAndDrop<FileItem>({
+  itemSelector: '.folder-item',
+})
+
 const onDragStart = (event: DragEvent, folder: Folder<FileItem>) => {
-  emit('drag-start', event, folder)
+  handleDragStart(event, 'folder', folder)
+}
+
+const onDragOver = (event: DragEvent) => {
+  handleDragOver(event)
+}
+
+const onDragEnter = (event: DragEvent) => {
+  handleDragEnter(event)
+}
+
+const onDragLeave = (event: DragEvent) => {
+  handleDragLeave(event)
 }
 
 const onDrop = (event: DragEvent, folder: Folder<FileItem>) => {
-  emit('drop', event, folder)
+  handleDrop(event, () => {
+    emit('drop', event, folder)
+  })
 }
 
 const handleSelection = (id: string, event: MouseEvent) => {
@@ -107,5 +133,14 @@ const openContextMenu = (folder: Folder<FileItem>, event: MouseEvent) => {
 
 .folder-item:hover {
   border-color: rgba(var(--v-theme-primary), 0.5);
+}
+
+.is-dragging {
+  opacity: 0.4 !important;
+}
+
+.drag-over {
+  border: 2px solid rgb(var(--v-theme-primary)) !important;
+  background-color: rgba(var(--v-theme-primary), 0.1) !important;
 }
 </style>

@@ -442,10 +442,11 @@ const removeFromCurrentFolder = (itemId: string) => {
 
 // 處理拖放到資料夾
 const handleDropToFolder = (data: DragData<VerseItem>, targetFolder: Folder<VerseItem>) => {
-  if (data.type === 'verse' && isVerseItem(data.item)) {
-    moveVerseToFolder(data.item, targetFolder)
-  } else if (data.type === 'folder' && isFolder(data.item)) {
-    moveFolderToFolder(data.item, targetFolder)
+  const item = data.items[0]
+  if (data.type === 'verse' && isVerseItem(item)) {
+    moveVerseToFolder(item as VerseItem, targetFolder)
+  } else if (data.type === 'folder' && isFolder(item)) {
+    moveFolderToFolder(item as Folder<VerseItem>, targetFolder)
   }
 }
 

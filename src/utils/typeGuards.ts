@@ -3,22 +3,31 @@ import type { VerseItem, Folder, FolderItem, FileItem } from '@/types/common'
 /**
  * Type Guard: Check if item is VerseItem
  */
-export const isVerseItem = (item: FolderItem | Folder<FolderItem>): item is VerseItem => {
-  return (item as VerseItem).type === 'verse' && 'bookNumber' in item
+export const isVerseItem = (item: FolderItem | Folder<FolderItem> | unknown): item is VerseItem => {
+  return (
+    !!item &&
+    typeof item === 'object' &&
+    (item as VerseItem).type === 'verse' &&
+    'bookNumber' in item
+  )
 }
 
 /**
  * Type Guard: Check if item is FileItem
  */
-export const isFileItem = (item: FolderItem | Folder<FolderItem>): item is FileItem => {
-  return (item as FileItem).type === 'file' && 'metadata' in item
+export const isFileItem = (item: FolderItem | Folder<FolderItem> | unknown): item is FileItem => {
+  return (
+    !!item && typeof item === 'object' && (item as FileItem).type === 'file' && 'metadata' in item
+  )
 }
 
 /**
  * Type Guard: Check if item is Folder
  */
-export const isFolder = <T extends FolderItem>(item: T | Folder<T>): item is Folder<T> => {
-  return 'items' in item && 'folders' in item
+export const isFolder = <T extends FolderItem>(
+  item: T | Folder<T> | unknown,
+): item is Folder<T> => {
+  return !!item && typeof item === 'object' && 'items' in item && 'folders' in item
 }
 
 /**
@@ -26,7 +35,7 @@ export const isFolder = <T extends FolderItem>(item: T | Folder<T>): item is Fol
  */
 export interface DragData<T extends FolderItem = FolderItem> {
   type: 'verse' | 'file' | 'folder'
-  item: T | Folder<T>
+  items: (T | Folder<T>)[]
 }
 
 /**
@@ -37,13 +46,19 @@ export const isValidDragData = <T extends FolderItem>(data: unknown): data is Dr
 
   const d = data as Record<string, unknown>
   if (d.type !== 'verse' && d.type !== 'file' && d.type !== 'folder') return false
-  if (!d.item || typeof d.item !== 'object') return false
+
+  // Check for items array
+  if (!d.items || !Array.isArray(d.items) || d.items.length === 0) return false
+
+  // Helper check for single item (first one)
+  const firstItem = d.items[0] as FolderItem | Folder<FolderItem>
+  if (!firstItem || typeof firstItem !== 'object') return false
 
   if (d.type === 'verse') {
-    return isVerseItem(d.item as FolderItem)
+    return isVerseItem(firstItem)
   } else if (d.type === 'file') {
-    return isFileItem(d.item as FolderItem)
+    return isFileItem(firstItem)
   } else {
-    return isFolder(d.item as FolderItem) // Type assertion might need T
+    return isFolder(firstItem)
   }
 }

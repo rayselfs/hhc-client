@@ -130,6 +130,7 @@
             :selected-items="selectedItems"
             :clipboard="clipboard"
             @drag-start="onDragStart"
+            @drag-end="handleDragEnd"
             @drop="onDrop"
             @select="handleSelection"
             @preview="previewFile"
@@ -225,7 +226,7 @@
         <!-- Delete Confirm Dialog -->
         <DeleteConfirmDialog
           v-model="showDeleteConfirmDialog"
-          :item-name="folderToDelete?.name || (itemToDelete as any)?.name"
+          :item-name="folderToDelete?.name || itemToDelete?.name"
           :is-folder="!!folderToDelete"
           :count="selectedItems.size"
           @confirm="confirmDeleteAction"
@@ -562,33 +563,50 @@ onBeforeUnmount(() => {
 const { reorderCurrentItems, reorderCurrentFolders, moveItem, moveFolder, currentFolder } =
   mediaStore
 
-const { handleDragStart } = useDragAndDrop<FileItem>({
+const { handleDragStart, handleDragEnd } = useDragAndDrop<FileItem>({
   itemSelector: '[data-id]',
 })
 
+// Helper to get selected objects
+const getAllSelectedItems = () => {
+  const selectedIds = selectedItems.value
+  const allItems: (FileItem | Folder<FileItem>)[] = []
+
+  selectedIds.forEach((id) => {
+    const folder = sortedFolders.value.find((f) => f.id === id)
+    if (folder) {
+      allItems.push(folder)
+    } else {
+      const file = sortedItems.value.find((i) => i.id === id)
+      if (file) {
+        allItems.push(file)
+      }
+    }
+  })
+  return allItems
+}
+
 const onDragStart = (event: DragEvent, item: FileItem | Folder<FileItem>) => {
   const type = 'items' in item ? 'folder' : 'file'
-  handleDragStart(event, type, item)
+  handleDragStart(event, type, item, selectedItems.value, getAllSelectedItems)
 }
 
 const onDrop = (event: DragEvent, target: FileItem | Folder<FileItem>) => {
   const dataString = event.dataTransfer?.getData('application/json')
   if (!dataString) return
 
-  let draggedId: string
   let draggedType: string
+  let draggedItems: (FileItem | Folder<FileItem>)[] = []
 
   try {
     const parsed = JSON.parse(dataString)
     if (!isValidDragData<FileItem>(parsed)) return
 
-    draggedId = parsed.item.id
     draggedType = parsed.type
+    draggedItems = parsed.items
   } catch {
     return
   }
-
-  if (draggedId === target.id) return
 
   const isTargetFolder = 'items' in target
   const targetId = target.id
@@ -606,59 +624,72 @@ const onDrop = (event: DragEvent, target: FileItem | Folder<FileItem>) => {
   const isMove = isCenter && isTargetFolder
 
   if (isMove) {
-    // Perform Move
     const sourceFolderId = currentFolder?.id || APP_CONFIG.FOLDER.ROOT_ID
+    let moveCount = 0
 
-    if (draggedType === 'file') {
-      // Move File -> Folder
-      const item = currentItems.value.find((i) => i.id === draggedId)
-      if (item) {
-        moveItem(item, targetId, sourceFolderId)
-        showSnackBar(t('fileExplorer.moveSuccess'), 'success')
-      }
-    } else {
-      // Move Folder -> Folder
-      const folder = currentFolders.value.find((f) => f.id === draggedId)
-      if (folder && isTargetFolder) {
-        // Check recursively? Store handles check
-        const success = moveFolder(folder, targetId, currentFolder?.id)
-        if (success) {
-          showSnackBar(t('fileExplorer.moveSuccess'), 'success')
-        } else {
-          showSnackBar(t('fileExplorer.moveFailed'), 'error')
+    // Filter out items that are the target itself (prevent self-drop)
+    const validItems = draggedItems.filter((item) => item.id !== targetId)
+
+    for (const item of validItems) {
+      if (draggedType === 'file') {
+        const fileItem = currentItems.value.find((i) => i.id === item.id)
+        if (fileItem) {
+          moveItem(fileItem, targetId, sourceFolderId)
+          moveCount++
+        }
+      } else if (draggedType === 'folder' && isTargetFolder) {
+        const folderItem = currentFolders.value.find((f) => f.id === item.id)
+        if (folderItem) {
+          if (moveFolder(folderItem, targetId, currentFolder?.id)) {
+            moveCount++
+          }
         }
       }
     }
+
+    if (moveCount > 0) {
+      showSnackBar(t('fileExplorer.moveSuccess'), 'success')
+      clearSelection()
+    }
   } else {
-    // Perform Reorder
-    if (draggedType === 'file' && !isTargetFolder) {
-      // Reorder Files (File -> File)
-      const items = [...sortedItems.value]
-      const fromIndex = items.findIndex((i) => i.id === draggedId)
-      const toIndex = items.findIndex((i) => i.id === targetId)
+    // Perform Reorder (Only supports single item reorder for now to keep logic simple, or we impl multi-reorder)
+    // For now, let's take the first item if multiple
+    if (draggedItems.length === 1) {
+      const draggedItem = draggedItems[0]
+      if (!draggedItem) return
 
-      if (fromIndex !== -1 && toIndex !== -1) {
-        const deleted = items.splice(fromIndex, 1)
-        const movedItem = deleted[0]
-        if (movedItem) {
-          items.splice(toIndex, 0, movedItem)
-          reorderCurrentItems(items)
-          sortBy.value = 'custom'
+      const draggedId = draggedItem.id
+      if (draggedId === targetId) return
+
+      if (draggedType === 'file' && !isTargetFolder) {
+        // Reorder Files
+        const items = [...sortedItems.value]
+        const fromIndex = items.findIndex((i) => i.id === draggedId)
+        const toIndex = items.findIndex((i) => i.id === targetId)
+
+        if (fromIndex !== -1 && toIndex !== -1) {
+          const deleted = items.splice(fromIndex, 1)
+          const movedItem = deleted[0]
+          if (movedItem) {
+            items.splice(toIndex, 0, movedItem)
+            reorderCurrentItems(items)
+            sortBy.value = 'custom'
+          }
         }
-      }
-    } else if (draggedType === 'folder' && isTargetFolder) {
-      // Reorder Folders (Folder -> Folder)
-      const folders = [...sortedFolders.value]
-      const fromIndex = folders.findIndex((f) => f.id === draggedId)
-      const toIndex = folders.findIndex((f) => f.id === targetId)
+      } else if (draggedType === 'folder' && isTargetFolder) {
+        // Reorder Folders
+        const folders = [...sortedFolders.value]
+        const fromIndex = folders.findIndex((f) => f.id === draggedId)
+        const toIndex = folders.findIndex((f) => f.id === targetId)
 
-      if (fromIndex !== -1 && toIndex !== -1) {
-        const deleted = folders.splice(fromIndex, 1)
-        const movedFolder = deleted[0]
-        if (movedFolder) {
-          folders.splice(toIndex, 0, movedFolder)
-          reorderCurrentFolders(folders)
-          sortBy.value = 'custom'
+        if (fromIndex !== -1 && toIndex !== -1) {
+          const deleted = folders.splice(fromIndex, 1)
+          const movedFolder = deleted[0]
+          if (movedFolder) {
+            folders.splice(toIndex, 0, movedFolder)
+            reorderCurrentFolders(folders)
+            sortBy.value = 'custom'
+          }
         }
       }
     }
@@ -739,5 +770,10 @@ useKeyboardShortcuts({
 }
 .gap-2 {
   gap: 8px;
+}
+.drag-over {
+  border: 2px solid rgb(var(--v-theme-primary)) !important;
+  background-color: rgba(var(--v-theme-primary), 0.1) !important;
+  border-radius: 8px;
 }
 </style>

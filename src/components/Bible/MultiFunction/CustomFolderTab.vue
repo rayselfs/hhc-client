@@ -11,6 +11,7 @@
             class="verse-item pa-2 d-flex align-center justify-space-between"
             draggable="true"
             @dragstart="(e) => handleDragStart(e, 'folder', folder)"
+            @dragend="handleDragEnd"
             @dragover="handleDragOver"
             @dragenter="handleDragEnter"
             @dragleave="handleDragLeave"
@@ -41,6 +42,7 @@
           class="verse-item pa-2 mb-1 d-flex align-center justify-space-between"
           draggable="true"
           @dragstart="(e) => handleDragStart(e, 'verse', item)"
+          @dragend="handleDragEnd"
           @click="handleLoadVerse(item)"
           @contextmenu="handleRightClick($event, 'verse', item)"
         >
@@ -101,6 +103,7 @@ const {
   handleDragOver,
   handleDragEnter,
   handleDragLeave,
+  handleDragEnd,
   handleDrop: handleDropBase,
 } = useDragAndDrop<VerseItem>()
 

@@ -10,6 +10,7 @@
         lg="2"
         draggable="true"
         @dragstart="onDragStart($event, item)"
+        @dragend="emit('drag-end', $event)"
         @drop="onDrop($event, item)"
         @dragover.prevent
       >
@@ -143,6 +144,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'drag-start', event: DragEvent, item: FileItem): void
+  (e: 'drag-end', event: DragEvent): void
   (e: 'drop', event: DragEvent, item: FileItem): void
   (e: 'select', id: string, event: MouseEvent): void
   (e: 'preview', item: FileItem): void
