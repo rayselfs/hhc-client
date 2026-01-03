@@ -337,7 +337,18 @@ const loadVerse = (item: VerseItem, type: 'history' | 'custom') => {
 
 // 自訂資料夾相關函數
 const createNewFolder = () => {
-  folderDialogs.openCreateFolderDialog()
+  const baseName = $t('fileExplorer.defaultFolderName')
+  let newName = baseName
+  let counter = 2
+
+  const existingNames = new Set(getCurrentFolders.value.map((f: Folder<VerseItem>) => f.name))
+
+  while (existingNames.has(newName)) {
+    newName = `${baseName} ${counter}`
+    counter++
+  }
+
+  folderDialogs.openCreateFolderDialog(newName)
   closeItemContextMenu()
 }
 

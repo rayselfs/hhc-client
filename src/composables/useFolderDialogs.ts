@@ -14,7 +14,7 @@ export interface UseFolderDialogsReturn<T extends FolderItem> {
   editingType: Ref<string>
   editingExtension: Ref<string>
   retentionOptions: ComputedRef<{ title: string; value: string }[]>
-  openCreateFolderDialog: () => void
+  openCreateFolderDialog: (initialName?: string) => void
   openEditDialog: (target: Folder<T> | T) => void
 
   // Delete
@@ -55,8 +55,8 @@ export function useFolderDialogs<T extends FolderItem = ItemType>(): UseFolderDi
     { title: t('fileExplorer.retention.permanent'), value: 'permanent' },
   ])
 
-  const openCreateFolderDialog = () => {
-    folderName.value = ''
+  const openCreateFolderDialog = (initialName?: string) => {
+    folderName.value = initialName || ''
     retentionPeriod.value = '1day'
     editingFolderId.value = null
     editingType.value = 'folder'

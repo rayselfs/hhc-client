@@ -8,6 +8,7 @@
       <v-card-title>{{ title }}</v-card-title>
       <v-card-text>
         <v-text-field
+          ref="nameInput"
           :model-value="folderName"
           @update:model-value="$emit('update:folderName', $event)"
           :label="$t('fileExplorer.folderName')"
@@ -43,12 +44,14 @@
 </template>
 
 <script setup lang="ts">
+import { ref, watch, nextTick, toRefs } from 'vue'
+
 interface RetentionOption {
   title: string
   value: string
 }
 
-defineProps<{
+const props = defineProps<{
   modelValue: boolean
   title: string
   folderName: string
@@ -66,4 +69,14 @@ defineEmits<{
   (e: 'update:retentionPeriod', value: string): void
   (e: 'confirm'): void
 }>()
+
+const nameInput = ref<HTMLInputElement | null>(null)
+const { modelValue } = toRefs(props)
+
+watch(modelValue, async (val) => {
+  if (val) {
+    await nextTick()
+    ;(nameInput.value as any)?.select()
+  }
+})
 </script>

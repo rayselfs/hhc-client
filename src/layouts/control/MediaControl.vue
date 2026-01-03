@@ -162,7 +162,7 @@
             <v-list-item
               prepend-icon="mdi-folder-plus-outline"
               :title="$t('fileExplorer.newFolder')"
-              @click="openCreateFolderDialog"
+              @click="createNewFolder"
             ></v-list-item>
             <v-divider class="my-2"></v-divider>
             <v-list-item
@@ -294,7 +294,7 @@
       <v-list-item
         prepend-icon="mdi-folder-plus"
         :title="$t('fileExplorer.newFolder')"
-        @click="openCreateFolderDialog"
+        @click="createNewFolder"
       ></v-list-item>
 
       <v-list-item
@@ -433,6 +433,22 @@ const {
   openMoveDialog,
   openMoveSelectedDialog,
 } = mediaDialogs
+
+// Create New Folder with Unique Name
+const createNewFolder = () => {
+  const baseName = t('fileExplorer.defaultFolderName')
+  let newName = baseName
+  let counter = 2
+
+  const existingNames = new Set(currentFolders.value.map((f: Folder<FileItem>) => f.name))
+
+  while (existingNames.has(newName)) {
+    newName = `${baseName} ${counter}`
+    counter++
+  }
+
+  openCreateFolderDialog(newName)
+}
 
 const {
   isDuplicateName,

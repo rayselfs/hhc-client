@@ -239,6 +239,7 @@
     "folderName": "資料夾名稱",
     "folderSettings": "資料夾設定",
     "newFolder": "新資料夾",
+    "defaultFolderName": "未命名資料夾",
     "noFolder": "尚無資料夾",
     "noFiles": "尚無檔案",
     "duplicateFolderName": "資料夾名稱已存在",

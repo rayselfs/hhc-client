@@ -239,6 +239,7 @@
     "folderName": "Folder Name",
     "folderSettings": "Folder Settings",
     "newFolder": "New Folder",
+    "defaultFolderName": "Untitled",
     "noFolder": "No folder",
     "noFiles": "No files",
     "duplicateFolderName": "Folder name already exists",
