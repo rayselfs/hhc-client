@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // File System
   saveFile: (filePath: string) => ipcRenderer.invoke('save-file', filePath),
   deleteFile: (filePath: string) => ipcRenderer.invoke('delete-file', filePath),
+  copyFile: (filePath: string) => ipcRenderer.invoke('copy-file', filePath),
   resetUserData: () => ipcRenderer.invoke('reset-user-data'),
   getFilePath: (file: File) => webUtils.getPathForFile(file),
 

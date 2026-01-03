@@ -172,4 +172,66 @@ export const registerFileHandlers = () => {
       return false
     }
   })
+
+  // Handle copy file
+  ipcMain.handle('copy-file', async (event, sourceUrl: string) => {
+    try {
+      const userDataPath = app.getPath('userData')
+      // Extract partial path from local-resource:// URL or absolute path
+      let cleanSourcePath = sourceUrl
+      if (cleanSourcePath.startsWith('local-resource://')) {
+        cleanSourcePath = cleanSourcePath.replace('local-resource://', '')
+      }
+
+      const normalizedSourcePath = path.normalize(cleanSourcePath)
+      const normalizedUserDataPath = path.normalize(userDataPath)
+
+      // Security check
+      if (!normalizedSourcePath.startsWith(normalizedUserDataPath)) {
+        console.warn('Security alert: Attempted to copy file from outside userData:', sourceUrl)
+        return null
+      }
+
+      // Construct new destination path
+      const mediaDir = path.join(userDataPath, 'media')
+      const ext = path.extname(normalizedSourcePath)
+      const newFilename = `${uuidv4()}${ext}`
+      const destinationPath = path.join(mediaDir, newFilename)
+
+      // Copy main file
+      await fs.copyFile(normalizedSourcePath, destinationPath)
+
+      // Check for and copy thumbnail if exists
+      let thumbnailPath: string | undefined
+      const thumbFilenameBase = path.basename(normalizedSourcePath, ext)
+      const thumbSourcePath = path.join(userDataPath, 'thumbnails', `${thumbFilenameBase}.png`)
+
+      try {
+        await fs.access(thumbSourcePath)
+        // If exists, copy it
+        const thumbnailsDir = path.join(userDataPath, 'thumbnails')
+        try {
+          await fs.access(thumbnailsDir)
+        } catch {
+          await fs.mkdir(thumbnailsDir, { recursive: true })
+        }
+
+        const newThumbFilename = `${path.basename(newFilename, ext)}.png`
+        const newThumbPath = path.join(thumbnailsDir, newThumbFilename)
+
+        await fs.copyFile(thumbSourcePath, newThumbPath)
+        thumbnailPath = newThumbPath
+      } catch {
+        // No thumbnail found or copy failed, ignore
+      }
+
+      return {
+        filePath: destinationPath,
+        thumbnailPath,
+      }
+    } catch (error) {
+      console.error('Failed to copy file:', sourceUrl, error)
+      return null
+    }
+  })
 }

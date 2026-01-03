@@ -345,7 +345,59 @@ export function useMediaOperations(
     showSnackBar(t('fileExplorer.clipboardCut'), 'info', 2000, 'bottom left')
   }
 
-  const handlePaste = () => {
+  const duplicatePhysicalFiles = async (
+    item: FileItem | Folder<FileItem>,
+  ): Promise<FileItem | Folder<FileItem> | null> => {
+    if (!isElectron()) return JSON.parse(JSON.stringify(item))
+
+    if ('items' in item) {
+      // It's a folder: Duplicate recursively
+      const newItems: FileItem[] = []
+      const newFolders: Folder<FileItem>[] = []
+
+      for (const subItem of item.items) {
+        const duplicatedSubItem = await duplicatePhysicalFiles(subItem)
+        if (duplicatedSubItem) newItems.push(duplicatedSubItem as FileItem)
+      }
+
+      for (const subFolder of item.folders) {
+        const duplicatedSubFolder = await duplicatePhysicalFiles(subFolder)
+        if (duplicatedSubFolder) newFolders.push(duplicatedSubFolder as Folder<FileItem>)
+      }
+
+      return {
+        ...item,
+        items: newItems,
+        folders: newFolders,
+      }
+    } else {
+      // It's a file: Physical Copy
+      const fileItem = item as FileItem
+      if (fileItem.url.startsWith('local-resource://')) {
+        try {
+          const result = await window.electronAPI.copyFile(fileItem.url)
+          if (result) {
+            return {
+              ...fileItem,
+              url: `local-resource://${result.filePath}`,
+              metadata: {
+                ...fileItem.metadata,
+                thumbnail: result.thumbnailPath
+                  ? `local-resource://${result.thumbnailPath}`
+                  : fileItem.metadata.thumbnail,
+              },
+            }
+          }
+        } catch (e) {
+          console.error('Failed to copy physical file', e)
+        }
+      }
+      // If not local resource or copy failed, return clone (or null if we want to be strict)
+      return JSON.parse(JSON.stringify(fileItem))
+    }
+  }
+
+  const handlePaste = async () => {
     if (clipboard.value.length === 0) return
 
     const currentPath = currentFolderPath.value
@@ -354,14 +406,24 @@ export function useMediaOperations(
         ? APP_CONFIG.FOLDER.ROOT_ID
         : currentPath[currentPath.length - 1] || APP_CONFIG.FOLDER.ROOT_ID
 
-    clipboard.value.forEach((clipboardItem) => {
+    for (const clipboardItem of clipboard.value) {
       if (clipboardItem.action === 'copy') {
         const type = clipboardItem.type === 'file' ? 'file' : 'folder'
         const uniqueName = getUniqueName(clipboardItem.data.name, type)
 
-        const itemToPaste = { ...clipboardItem.data, name: uniqueName }
+        let itemToPaste: FileItem | Folder<FileItem> | null = null
 
-        pasteItem(itemToPaste, targetFolderId, clipboardItem.type === 'file' ? 'file' : 'folder')
+        // Duplicate physical files if Electron
+        if (isElectron()) {
+          itemToPaste = await duplicatePhysicalFiles(clipboardItem.data)
+        } else {
+          itemToPaste = JSON.parse(JSON.stringify(clipboardItem.data))
+        }
+
+        if (itemToPaste) {
+          itemToPaste.name = uniqueName
+          pasteItem(itemToPaste, targetFolderId, clipboardItem.type === 'file' ? 'file' : 'folder')
+        }
       } else if (clipboardItem.action === 'cut') {
         const type = clipboardItem.type === 'file' ? 'file' : 'folder'
 
@@ -393,7 +455,7 @@ export function useMediaOperations(
           )
         }
       }
-    })
+    }
 
     if (clipboard.value.length > 0 && clipboard.value[0]?.action === 'cut') {
       clearClipboard()
