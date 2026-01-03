@@ -236,8 +236,8 @@
     <!-- Selection Box -->
     <div
       v-if="selectionBox"
-      class="selection-box bg-primary bg-opacity-10 border-primary border"
-      :style="selectionBox"
+      class="selection-box border-primary border"
+      :style="{ ...selectionBox, backgroundColor: 'rgba(var(--v-theme-primary), 0.1)' }"
     ></div>
 
     <!-- Context Menu for Items -->
