@@ -700,6 +700,7 @@ const startPresentation = async (startItem?: FileItem, fromBeginning = false) =>
 }
 
 const previewFile = (item: FileItem) => {
+  clearSelection()
   startPresentation(item)
 }
 
