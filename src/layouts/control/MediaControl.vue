@@ -241,7 +241,7 @@
     ></div>
 
     <!-- Context Menu for Items -->
-    <ContextMenu ref="contextMenuRef">
+    <ContextMenu ref="contextMenuRef" :close-on-content-click="true">
       <v-list-item
         v-if="
           contextMenuTarget && (!selectedItems.has(contextMenuTarget.id) || selectedItems.size <= 1)
@@ -289,7 +289,7 @@
     </ContextMenu>
 
     <!-- Context Menu for Background -->
-    <ContextMenu ref="backgroundContextMenuRef">
+    <ContextMenu ref="backgroundContextMenuRef" :close-on-content-click="true">
       <v-list-item
         prepend-icon="mdi-folder-plus"
         :title="$t('fileExplorer.newFolder')"
