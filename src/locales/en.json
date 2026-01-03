@@ -255,6 +255,8 @@
     "updatedDate": "Modify Date",
     "clipboardCopied": "Items copied to clipboard",
     "clipboardCut": "Items cut to clipboard",
-    "uploadWebWarning": "Warning: Files uploaded in web mode cannot be saved permanently"
+    "uploadWebWarning": "Warning: Files uploaded in web mode cannot be saved permanently",
+    "moveSuccess": "Move successfully",
+    "moveFailed": "Move failed"
   }
 }

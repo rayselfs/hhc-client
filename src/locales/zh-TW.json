@@ -255,6 +255,8 @@
     "updatedDate": "修改日期",
     "clipboardCopied": "已將項目複製到剪貼簿",
     "clipboardCut": "已將項目剪下到剪貼簿",
-    "uploadWebWarning": "警告：在網頁模式下上傳的檔案無法永久保存"
+    "uploadWebWarning": "警告：在網頁模式下上傳的檔案無法永久保存",
+    "moveSuccess": "移動成功",
+    "moveFailed": "移動失敗"
   }
 }
