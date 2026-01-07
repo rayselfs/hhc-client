@@ -6,6 +6,7 @@ import type { Folder, FolderItem, ClipboardItem, FolderStoreConfig } from '@/typ
 import { getStorageKey } from '@/types/common'
 import { useFolderManager } from '@/composables/useFolderManager'
 import { useLocalStorage } from '@/composables/useLocalStorage'
+import { fileSystemProviderFactory } from '@/services/filesystem'
 
 /**
  * Generic folder store for managing folder tree structure
@@ -40,6 +41,29 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
      */
     const clipboard = ref<ClipboardItem<TItem>[]>([])
 
+    /**
+     * Flat index for O(1) lookups
+     */
+    const folderMap = new Map<string, Folder<TItem>>()
+    const itemMap = new Map<string, TItem>()
+
+    /**
+     * Rebuild the entire index from the root folder
+     */
+    const rebuildIndex = () => {
+      folderMap.clear()
+      itemMap.clear()
+
+      const traverse = (folder: Folder<TItem>) => {
+        folderMap.set(folder.id, folder)
+        folder.items.forEach((item) => itemMap.set(item.id, item))
+        folder.folders.forEach((sub) => traverse(sub))
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      traverse(rootFolder.value as any)
+    }
+
     const copyToClipboard = (items: ClipboardItem<TItem>[]) => {
       clipboard.value = items
     }
@@ -58,6 +82,10 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
      */
     const folderManager = useFolderManager(rootFolder, currentFolderPath, {
       rootId: config.rootId,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      folderMap: folderMap as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      itemMap: itemMap as any,
     })
     const {
       currentFolder,
@@ -85,6 +113,9 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if (checkExpiredContent(rootFolder.value as any)) {
           saveRootFolder() // Save immediately if items were removed
+          rebuildIndex() // Rebuild again if expired items removed
+        } else {
+          rebuildIndex() // Build index anyway
         }
       }
     }
@@ -201,11 +232,16 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
         parentId: currentFolder.value?.id,
         timestamp: Date.now(),
         expiresAt: expiresAt || null,
+        sourceType: 'app', // Default as virtual folder
+        isLoaded: true, // Virtual folders are always "loaded"
       }
 
       // Direct mutation - Vue reactivity will handle the update
       // @ts-expect-error - Vue's ref type system, runtime safe
       currentFolder.value.folders.push(newFolder)
+
+      // Update index
+      folderMap.set(newFolder.id, newFolder)
     }
 
     /**
@@ -218,6 +254,9 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
       // Direct mutation - no checking, pure push
       // @ts-expect-error - Vue's ref type system, runtime safe
       currentFolder.value.items.push(item)
+
+      // Update index
+      itemMap.set(item.id, item)
     }
 
     /**
@@ -227,6 +266,9 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
     const removeItemFromCurrent = (itemId: string) => {
       // Direct mutation
       currentFolder.value.items = currentFolder.value.items.filter((item) => item.id !== itemId)
+
+      // Update index
+      itemMap.delete(itemId)
     }
 
     /**
@@ -253,6 +295,9 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
     const deleteFolder = (folderId: string) => {
       // Direct mutation using helper from folderManager
       deleteFolderRecursive(rootFolder.value.folders, folderId)
+
+      // Rebuild index after deletion to ensure all sub-items/folders are removed from maps
+      rebuildIndex()
     }
 
     /**
@@ -448,10 +493,12 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
         if (targetFolderId === config.rootId) {
           // @ts-expect-error - Vue's ref type system, runtime safe
           rootFolder.value.items.push(newItem)
+          itemMap.set(newItem.id, newItem)
         } else {
           updateFolderInTree(rootFolder.value.folders, targetFolderId, (folder) => {
             // @ts-expect-error - Vue's ref type system, runtime safe
             folder.items.push(newItem)
+            itemMap.set(newItem.id, newItem)
           })
         }
       } else {
@@ -462,12 +509,56 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
         if (targetFolderId === config.rootId) {
           // @ts-expect-error - Vue's ref type system, runtime safe
           rootFolder.value.folders.push(newFolder)
+          rebuildIndex()
         } else {
           updateFolderInTree(rootFolder.value.folders, targetFolderId, (target) => {
             // @ts-expect-error - Vue's ref type system, runtime safe
             target.folders.push(newFolder)
+            rebuildIndex()
           })
         }
+      }
+    }
+
+    /**
+     * Load children items and folders for a specific folder (Lazy Loading)
+     */
+    const loadChildren = async (folderId: string) => {
+      const folder = folderMap.get(folderId)
+      if (!folder || folder.isLoaded) return
+
+      // Skip lazy loading for virtual/app-managed folders
+      if (folder.sourceType === 'app') {
+        folder.isLoaded = true
+        return
+      }
+
+      try {
+        const provider = fileSystemProviderFactory.getProvider(folder.sourceType || 'local')
+        if (!provider.listDirectory) {
+          folder.isLoaded = true
+          return
+        }
+
+        const result = await provider.listDirectory(folder.id)
+        if (result.success && result.data) {
+          // Clear current content before adding new ones
+          folder.items = []
+          folder.folders = []
+
+          result.data.forEach((entry) => {
+            if ('type' in entry && entry.type === 'file') {
+              folder.items.push(entry as unknown as TItem)
+            } else {
+              folder.folders.push(entry as unknown as Folder<TItem>)
+            }
+          })
+
+          folder.isLoaded = true
+          rebuildIndex() // Update the flat index with new items
+        }
+      } catch (error) {
+        console.error(`Failed to load children for folder ${folderId}:`, error)
       }
     }
 
@@ -502,6 +593,7 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
       moveItem,
       moveFolder,
       pasteItem,
+      loadChildren,
       // Clipboard
       clipboard,
       copyToClipboard,

@@ -1,143 +1,151 @@
 <template>
-  <div v-if="items.length > 0" class="mb-1">
-    <v-row dense>
-      <v-col
-        v-for="item in items"
-        :key="item.id"
-        cols="12"
-        sm="6"
-        md="4"
-        lg="2"
-        :draggable="canMove(item)"
-        @dragstart="canMove(item) && onDragStart($event, item)"
-        @dragend="emit('drag-end', $event)"
-        @drop="onDrop($event, item)"
-        @dragover.prevent
-      >
-        <div
-          class="rounded-lg file-item user-select-none d-flex flex-column h-100 position-relative"
-          style="aspect-ratio: 1; max-width: 100%"
-          :class="[
-            selectedItems.has(item.id) ? 'bg-primary' : 'bg-grey-darken-4 hover-bg-grey-darken-2',
-            { 'item-cut': isCut(item.id) },
-          ]"
-          :data-id="item.id"
-          @click.stop="handleSelection(item.id, $event)"
-          @dblclick="previewFile(item)"
-          @contextmenu.prevent="openContextMenu(item, $event)"
-        >
-          <!-- Header Info -->
-          <div class="d-flex align-center px-3 pt-2 pb-1 w-100 overflow-hidden">
-            <v-icon
-              :icon="getFileIcon(item.metadata.fileType)"
-              color="red"
-              size="small"
-              class="mr-2 flex-shrink-0"
-            ></v-icon>
-            <span
-              class="py-2 text-body-2 text-truncate flex-grow-1"
-              style="min-width: 0"
-              :title="item.name"
-              >{{ item.name }}</span
-            >
-            <v-menu location="bottom end">
-              <template #activator="{ props }">
-                <v-btn
-                  icon="mdi-dots-vertical"
-                  variant="text"
-                  density="compact"
-                  size="small"
-                  v-bind="props"
-                  @click.stop
-                ></v-btn>
-              </template>
-              <v-list width="150" density="compact" class="rounded-lg elevation-2">
-                <v-list-item
-                  v-if="canRename(item)"
-                  prepend-icon="mdi-pencil-outline"
-                  :title="$t('common.edit')"
-                  @click="emit('edit', item)"
-                ></v-list-item>
-                <v-list-item
-                  v-if="canMove(item)"
-                  prepend-icon="mdi-folder-move-outline"
-                  :title="$t('common.move')"
-                  @click="emit('move', item)"
-                ></v-list-item>
-                <v-list-item
-                  prepend-icon="mdi-content-copy"
-                  :title="$t('common.copy')"
-                  @click="emit('copy')"
-                ></v-list-item>
-                <v-list-item
-                  v-if="canMove(item)"
-                  prepend-icon="mdi-content-cut"
-                  :title="$t('common.cut')"
-                  @click="emit('cut')"
-                ></v-list-item>
-                <v-list-item
-                  v-if="canDelete(item)"
-                  prepend-icon="mdi-delete-outline"
-                  :title="$t('common.delete')"
-                  color="error"
-                  @click="emit('delete', item)"
-                ></v-list-item>
-              </v-list>
-            </v-menu>
-          </div>
-
-          <!-- Image / Thumbnail / Icon Area -->
-          <div
-            class="flex-grow-1 mx-2 mb-2 rounded overflow-hidden position-relative bg-grey-darken-3"
+  <div v-if="items.length > 0" class="mb-1 h-100">
+    <v-virtual-scroll :items="chunkedItems" class="h-100 overflow-y-auto">
+      <template #default="{ item: rowItems }">
+        <v-row dense class="ma-0">
+          <v-col
+            v-for="item in rowItems"
+            :key="item.id"
+            cols="12"
+            sm="6"
+            md="4"
+            lg="2"
+            :draggable="canMove(item)"
+            @dragstart="canMove(item) && onDragStart($event, item)"
+            @dragend="emit('drag-end', $event)"
+            @drop="onDrop($event, item)"
+            @dragover.prevent
           >
-            <!-- Image/Thumbnail -->
-            <v-img
-              v-if="item.metadata.fileType === 'image' || item.metadata.thumbnail"
-              :src="item.metadata.thumbnail || item.url"
-              cover
-              class="h-100 w-100 bg-grey-darken-3"
+            <div
+              class="rounded-lg file-item user-select-none d-flex flex-column h-100 position-relative"
+              style="aspect-ratio: 1; max-width: 100%"
+              :class="[
+                selectedItems.has(item.id)
+                  ? 'bg-primary'
+                  : 'bg-grey-darken-4 hover-bg-grey-darken-2',
+                { 'item-cut': isCut(item.id) },
+              ]"
+              :data-id="item.id"
+              @click.stop="handleSelection(item.id, $event)"
+              @dblclick="previewFile(item)"
+              @contextmenu.prevent="openContextMenu(item, $event)"
             >
-              <!-- Type Indicator for Video -->
-              <div
-                v-if="item.metadata.fileType === 'video'"
-                class="d-flex justify-end pa-2 w-100 h-100 align-end"
-              >
-                <v-btn
-                  icon="mdi-play-circle"
-                  variant="text"
-                  color="white"
+              <!-- Header Info -->
+              <div class="d-flex align-center px-3 pt-2 pb-1 w-100 overflow-hidden">
+                <v-icon
+                  :icon="getFileIcon(item.metadata.fileType)"
+                  color="red"
                   size="small"
-                  class="bg-black-alpha-50 rounded-circle"
-                ></v-btn>
+                  class="mr-2 flex-shrink-0"
+                ></v-icon>
+                <span
+                  class="py-2 text-body-2 text-truncate flex-grow-1"
+                  style="min-width: 0"
+                  :title="item.name"
+                  >{{ item.name }}</span
+                >
+                <v-menu location="bottom end">
+                  <template #activator="{ props: menuProps }">
+                    <v-btn
+                      icon="mdi-dots-vertical"
+                      variant="text"
+                      density="compact"
+                      size="small"
+                      v-bind="menuProps"
+                      @click.stop
+                    ></v-btn>
+                  </template>
+                  <v-list width="150" density="compact" class="rounded-lg elevation-2">
+                    <v-list-item
+                      v-if="canRename(item)"
+                      prepend-icon="mdi-pencil-outline"
+                      :title="$t('common.edit')"
+                      @click="emit('edit', item)"
+                    ></v-list-item>
+                    <v-list-item
+                      v-if="canMove(item)"
+                      prepend-icon="mdi-folder-move-outline"
+                      :title="$t('common.move')"
+                      @click="emit('move', item)"
+                    ></v-list-item>
+                    <v-list-item
+                      prepend-icon="mdi-content-copy"
+                      :title="$t('common.copy')"
+                      @click="emit('copy')"
+                    ></v-list-item>
+                    <v-list-item
+                      v-if="canMove(item)"
+                      prepend-icon="mdi-content-cut"
+                      :title="$t('common.cut')"
+                      @click="emit('cut')"
+                    ></v-list-item>
+                    <v-list-item
+                      v-if="canDelete(item)"
+                      prepend-icon="mdi-delete-outline"
+                      :title="$t('common.delete')"
+                      color="error"
+                      @click="emit('delete', item)"
+                    ></v-list-item>
+                  </v-list>
+                </v-menu>
               </div>
 
-              <template #error>
-                <div class="d-flex align-center justify-center h-100 w-100 bg-grey-darken-3">
+              <!-- Image / Thumbnail / Icon Area -->
+              <div
+                class="flex-grow-1 mx-2 mb-2 rounded overflow-hidden position-relative bg-grey-darken-3"
+              >
+                <!-- Image/Thumbnail -->
+                <v-img
+                  v-if="item.metadata.fileType === 'image' || item.metadata.thumbnail"
+                  :src="item.metadata.thumbnail || item.url"
+                  cover
+                  class="h-100 w-100 bg-grey-darken-3"
+                >
+                  <!-- Type Indicator for Video -->
+                  <div
+                    v-if="item.metadata.fileType === 'video'"
+                    class="d-flex justify-end pa-2 w-100 h-100 align-end"
+                  >
+                    <v-btn
+                      icon="mdi-play-circle"
+                      variant="text"
+                      color="white"
+                      size="small"
+                      class="bg-black-alpha-50 rounded-circle"
+                    ></v-btn>
+                  </div>
+
+                  <template #error>
+                    <div class="d-flex align-center justify-center h-100 w-100 bg-grey-darken-3">
+                      <v-icon
+                        :icon="getFileIcon(item.metadata.fileType)"
+                        size="64"
+                        color="grey"
+                      ></v-icon>
+                    </div>
+                  </template>
+                </v-img>
+
+                <!-- Icon for other types -->
+                <div v-else class="d-flex align-center justify-center h-100 w-100">
                   <v-icon
                     :icon="getFileIcon(item.metadata.fileType)"
                     size="64"
-                    color="grey"
+                    :color="item.metadata.fileType === 'pdf' ? 'red' : 'grey'"
                   ></v-icon>
                 </div>
-              </template>
-            </v-img>
-
-            <!-- Icon for other types (Video without thumbnail, PDF) -->
-            <div v-else class="d-flex align-center justify-center h-100 w-100">
-              <v-icon
-                :icon="getFileIcon(item.metadata.fileType)"
-                size="64"
-                :color="item.metadata.fileType === 'pdf' ? 'red' : 'grey'"
-              ></v-icon>
+              </div>
             </div>
-          </div>
-        </div>
-      </v-col>
-    </v-row>
+          </v-col>
+        </v-row>
+      </template>
+    </v-virtual-scroll>
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useDisplay } from 'vuetify'
 import type { FileItem, ClipboardItem, ItemPermissions } from '@/types/common'
 import { DEFAULT_LOCAL_PERMISSIONS } from '@/services/filesystem'
 
@@ -161,7 +169,39 @@ const emit = defineEmits<{
   (e: 'delete', item: FileItem): void
 }>()
 
-// Permission helpers - use item permissions or defaults
+const { name: breakpointName } = useDisplay()
+
+// Calculate columns per row based on current breakpoint
+const colsPerRow = computed(() => {
+  switch (breakpointName.value) {
+    case 'xs':
+      return 1
+    case 'sm':
+      return 2
+    case 'md':
+      return 3
+    case 'lg':
+    case 'xl':
+    case 'xxl':
+      return 6
+    default:
+      return 6
+  }
+})
+
+// Group items into chunks for VVirtualScroll rows
+const chunkedItems = computed(() => {
+  const chunks: FileItem[][] = []
+  const items = props.items
+  const size = colsPerRow.value
+
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size))
+  }
+  return chunks
+})
+
+// Permission helpers
 const getPermissions = (item: FileItem): ItemPermissions => {
   return item.permissions || DEFAULT_LOCAL_PERMISSIONS
 }
@@ -229,5 +269,10 @@ const getFileIcon = (fileType: string) => {
 
 .bg-black-alpha-50 {
   background-color: rgba(0, 0, 0, 0.5);
+}
+
+/* Ensure virtual scroll takes full height */
+:deep(.v-virtual-scroll__container) {
+  display: block !important;
 }
 </style>

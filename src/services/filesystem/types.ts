@@ -183,6 +183,12 @@ export interface FileSystemProvider {
    * @param item - File or folder to check
    */
   getPermissions(item: FileItem | Folder<FileItem>): ItemPermissions
+
+  /**
+   * List contents of a directory (Lazy Loading support)
+   * @param path - Directory path to list
+   */
+  listDirectory?(path: string): Promise<ProviderResult<Array<FileItem | Folder<FileItem>>>>
 }
 
 /**

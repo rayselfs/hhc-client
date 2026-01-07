@@ -479,8 +479,10 @@ const { sortBy, sortOrder, setSort, sortedFolders, sortedItems } = useMediaSort(
   currentItems,
 )
 
-onMounted(() => {
+onMounted(async () => {
   mediaStore.loadRootFolder()
+  // Trigger initial load for root folder
+  await loadChildren('media-root')
   document.addEventListener('keydown', handleEsc)
   window.addEventListener('keydown', handleGlobalKeydown)
 })
@@ -508,9 +510,11 @@ const openContextMenu = async (target: Folder<FileItem> | FileItem, event: Mouse
   contextMenuRef.value?.open(event)
 }
 
-const openFolder = (folderId: string) => {
+const openFolder = async (folderId: string) => {
   mediaStore.enterFolder(folderId)
   clearSelection()
+  // Lazy load children when entering folder
+  await loadChildren(folderId)
 }
 
 const handleSelection = (id: string, event?: MouseEvent) => {
@@ -576,8 +580,14 @@ onBeforeUnmount(() => {
   }
 })
 
-const { reorderCurrentItems, reorderCurrentFolders, moveItem, moveFolder, currentFolder } =
-  mediaStore
+const {
+  reorderCurrentItems,
+  reorderCurrentFolders,
+  moveItem,
+  moveFolder,
+  currentFolder,
+  loadChildren,
+} = mediaStore
 
 const { handleDragStart, handleDragEnd } = useDragAndDrop<FileItem>({
   itemSelector: '[data-id]',

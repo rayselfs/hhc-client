@@ -355,7 +355,7 @@ export function getStorageKey(category: StorageCategory, key: StorageKey | strin
 /**
  * File source type - distinguishes between different storage providers
  */
-export type FileSourceType = 'local' | 'cloud' | 'sync'
+export type FileSourceType = 'local' | 'cloud' | 'sync' | 'app'
 
 /**
  * Permission flags for file/folder operations
@@ -445,6 +445,7 @@ export interface Folder<TItem extends FolderItem = FolderItem> {
   permissions?: ItemPermissions // Permission flags for operations
   cloudId?: string // Cloud provider folder ID
   syncPath?: string // Local filesystem path (for sync folders)
+  isLoaded?: boolean // Whether the sub-items/folders have been loaded
 }
 
 /**

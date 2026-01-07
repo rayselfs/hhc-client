@@ -31,6 +31,16 @@ export interface ElectronAPI {
   saveFile: (filePath: string) => Promise<{ filePath: string; thumbnailPath?: string }>
   deleteFile: (filePath: string) => Promise<boolean>
   copyFile: (filePath: string) => Promise<{ filePath: string; thumbnailPath?: string } | null>
+  listDirectory: (dirPath: string) => Promise<
+    Array<{
+      name: string
+      isDirectory: boolean
+      path: string
+      size: number
+      modifiedAt: number
+      thumbnailPath?: string
+    }>
+  >
   resetUserData: () => Promise<boolean>
   getFilePath: (file: File) => string
 

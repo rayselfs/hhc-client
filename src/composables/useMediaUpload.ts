@@ -89,7 +89,7 @@ export const useMediaUpload = () => {
             mimeType: file.type,
           },
           // Provider fields
-          sourceType: 'local',
+          sourceType: 'app',
           permissions: { ...DEFAULT_LOCAL_PERMISSIONS },
         }
 
@@ -174,7 +174,7 @@ export const useMediaUpload = () => {
           timestamp: Date.now(),
           metadata: { fileType, mimeType: file.type },
           // Provider fields
-          sourceType: 'local',
+          sourceType: 'app',
           permissions: { ...DEFAULT_LOCAL_PERMISSIONS },
         }
 

@@ -8,9 +8,11 @@ import type { Folder, FolderItem } from '@/types/common'
 /**
  * Options for folder manager configuration
  */
-export interface FolderManagerOptions {
+export interface FolderManagerOptions<TItem extends FolderItem = FolderItem> {
   rootId: string // Root folder ID
   maxDepth?: number // Maximum folder depth (optional)
+  folderMap?: Map<string, Folder<TItem>> // Optional flat index map
+  itemMap?: Map<string, TItem> // Optional flat index map
 }
 
 /**
@@ -23,7 +25,7 @@ export interface FolderManagerOptions {
 export function useFolderManager<TItem extends FolderItem = FolderItem>(
   rootFolderRef: Ref<Folder<TItem>> | { value: Folder<TItem> },
   currentFolderPathRef: Ref<string[]> | { value: string[] },
-  options: FolderManagerOptions,
+  options: FolderManagerOptions<TItem>,
 ) {
   /**
    * Find a folder by ID in the folder tree
@@ -31,6 +33,11 @@ export function useFolderManager<TItem extends FolderItem = FolderItem>(
    * @returns The folder if found, null otherwise
    */
   const getFolderById = (folderId: string): Folder<TItem> | null => {
+    // Optimization: Use flat index if available
+    if (options.folderMap && options.folderMap.has(folderId)) {
+      return options.folderMap.get(folderId) || null
+    }
+
     const root = rootFolderRef.value
     if (root.id === folderId) return root
 
