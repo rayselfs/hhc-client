@@ -3,7 +3,7 @@ import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import { APP_CONFIG } from '@/config/app'
 import { useMediaStore } from '@/stores/media'
-import { useElectron } from '@/composables/useElectron'
+import { useFileSystem } from '@/composables/useFileSystem'
 import type { UseFolderDialogsReturn } from './useFolderDialogs'
 import type { Folder, FileItem, ClipboardItem } from '@/types/common'
 
@@ -17,6 +17,7 @@ export function useMediaOperations(
   getUniqueName: (name: string, type: 'folder' | 'file') => string,
 ) {
   const { t } = useI18n()
+  const fileSystem = useFileSystem()
   const {
     currentFolderPath,
     getCurrentFolders: currentFolders,
@@ -118,16 +119,17 @@ export function useMediaOperations(
   }
 
   // --- Delete ---
-  const { isElectron } = useElectron()
-
+  /**
+   * Delete physical files from storage using the file system provider
+   * Collects all files recursively from folders and deletes them
+   */
   const deletePhysicalFiles = async (items: (FileItem | Folder<FileItem>)[]) => {
-    if (!isElectron()) return
-
+    // Collect all files to delete (including nested files in folders)
     const filesToDelete: FileItem[] = []
 
     const collectFiles = (item: FileItem | Folder<FileItem>) => {
       if ('items' in item) {
-        // It's a folder
+        // It's a folder - recursively collect files
         item.items.forEach(collectFiles)
         item.folders.forEach(collectFiles)
       } else {
@@ -138,25 +140,15 @@ export function useMediaOperations(
 
     items.forEach(collectFiles)
 
-    for (const file of filesToDelete) {
-      if (file.url.startsWith('local-resource://')) {
-        const filePath = file.url.replace('local-resource://', '')
-        try {
-          await window.electronAPI.deleteFile(filePath)
-        } catch (e) {
-          console.error('Failed to delete file:', filePath, e)
-        }
-      }
+    // Delete files using the file system provider
+    const { succeeded, failed } = await fileSystem.deleteFiles(filesToDelete)
 
-      if (file.metadata?.thumbnail?.startsWith('local-resource://')) {
-        const thumbPath = file.metadata.thumbnail.replace('local-resource://', '')
-        try {
-          await window.electronAPI.deleteFile(thumbPath)
-        } catch (e) {
-          console.warn('Failed to delete thumbnail:', thumbPath, e)
-        }
-      }
+    // Log any failures for debugging
+    if (failed.length > 0) {
+      console.warn('Some files failed to delete:', failed)
     }
+
+    return { succeeded, failed }
   }
 
   const confirmDeleteAction = async () => {
@@ -345,11 +337,13 @@ export function useMediaOperations(
     showSnackBar(t('fileExplorer.clipboardCut'), 'info', 2000, 'bottom left')
   }
 
+  /**
+   * Duplicate physical files using the file system provider
+   * For folders, recursively duplicates all contained files
+   */
   const duplicatePhysicalFiles = async (
     item: FileItem | Folder<FileItem>,
   ): Promise<FileItem | Folder<FileItem> | null> => {
-    if (!isElectron()) return JSON.parse(JSON.stringify(item))
-
     if ('items' in item) {
       // It's a folder: Duplicate recursively
       const newItems: FileItem[] = []
@@ -371,29 +365,32 @@ export function useMediaOperations(
         folders: newFolders,
       }
     } else {
-      // It's a file: Physical Copy
+      // It's a file: Physical Copy using file system provider
       const fileItem = item as FileItem
-      if (fileItem.url.startsWith('local-resource://')) {
-        try {
-          const result = await window.electronAPI.copyFile(fileItem.url)
-          if (result) {
-            return {
-              ...fileItem,
-              url: `local-resource://${result.filePath}`,
-              metadata: {
-                ...fileItem.metadata,
-                thumbnail: result.thumbnailPath
-                  ? `local-resource://${result.thumbnailPath}`
-                  : fileItem.metadata.thumbnail,
-              },
-            }
-          }
-        } catch (e) {
-          console.error('Failed to copy physical file', e)
+
+      // Check if file can be copied (has permissions)
+      if (!fileSystem.canEdit(fileItem)) {
+        // Read-only file, just return a shallow clone
+        return { ...fileItem }
+      }
+
+      // Use the file system provider to copy
+      const result = await fileSystem.copyFile(fileItem)
+
+      if (result.success && result.data) {
+        return {
+          ...fileItem,
+          url: result.data.fileUrl,
+          metadata: {
+            ...fileItem.metadata,
+            thumbnail: result.data.thumbnailUrl || fileItem.metadata.thumbnail,
+          },
         }
       }
-      // If not local resource or copy failed, return clone (or null if we want to be strict)
-      return JSON.parse(JSON.stringify(fileItem))
+
+      // If copy failed, return a clone (the logical copy still works)
+      console.warn('Physical file copy failed, using logical copy:', result.error)
+      return { ...fileItem }
     }
   }
 
@@ -411,14 +408,9 @@ export function useMediaOperations(
         const type = clipboardItem.type === 'file' ? 'file' : 'folder'
         const uniqueName = getUniqueName(clipboardItem.data.name, type)
 
-        let itemToPaste: FileItem | Folder<FileItem> | null = null
-
-        // Duplicate physical files if Electron
-        if (isElectron()) {
-          itemToPaste = await duplicatePhysicalFiles(clipboardItem.data)
-        } else {
-          itemToPaste = JSON.parse(JSON.stringify(clipboardItem.data))
-        }
+        // Duplicate physical files using the file system provider
+        // This works in both Electron and web environments
+        const itemToPaste = await duplicatePhysicalFiles(clipboardItem.data)
 
         if (itemToPaste) {
           itemToPaste.name = uniqueName

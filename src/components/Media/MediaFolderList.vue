@@ -11,8 +11,8 @@
             { 'is-dragging': draggedItems.has(folder.id) },
           ]"
           :data-id="folder.id"
-          draggable="true"
-          @dragstart="onDragStart($event, folder)"
+          :draggable="canMove(folder)"
+          @dragstart="canMove(folder) && onDragStart($event, folder)"
           @dragend="handleDragEnd"
           @drop="onDrop($event, folder)"
           @dragover="onDragOver"
@@ -46,8 +46,8 @@
 </template>
 
 <script setup lang="ts">
-import type { Folder, FileItem, ClipboardItem } from '@/types/common'
-
+import type { Folder, FileItem, ClipboardItem, ItemPermissions } from '@/types/common'
+import { DEFAULT_LOCAL_PERMISSIONS } from '@/services/filesystem'
 import { useDragAndDrop } from '@/composables/useDragAndDrop'
 
 const props = defineProps<{
@@ -63,6 +63,13 @@ const emit = defineEmits<{
   (e: 'open', id: string): void
   (e: 'context-menu', folder: Folder<FileItem>, event: MouseEvent): void
 }>()
+
+// Permission helpers - use folder permissions or defaults
+const getPermissions = (folder: Folder<FileItem>): ItemPermissions => {
+  return folder.permissions || DEFAULT_LOCAL_PERMISSIONS
+}
+
+const canMove = (folder: Folder<FileItem>) => getPermissions(folder).canMove
 
 const isCut = (id: string) => {
   return props.clipboard.some((item) => item.action === 'cut' && item.data.id === id)

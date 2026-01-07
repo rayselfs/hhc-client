@@ -353,6 +353,21 @@ export function getStorageKey(category: StorageCategory, key: StorageKey | strin
 }
 
 /**
+ * File source type - distinguishes between different storage providers
+ */
+export type FileSourceType = 'local' | 'cloud' | 'sync'
+
+/**
+ * Permission flags for file/folder operations
+ */
+export interface ItemPermissions {
+  canDelete: boolean
+  canRename: boolean
+  canMove: boolean
+  canEdit: boolean
+}
+
+/**
  * Base interface for all folder items
  * All items in folders must implement this interface
  */
@@ -361,6 +376,9 @@ export interface FolderItem {
   type: 'verse' | 'file' // Type discriminator for Discriminated Union
   timestamp: number // Timestamp when the item was created or last modified
   expiresAt?: number | null // Timestamp when the item should be deleted, null or undefined for permanent
+  // Provider-related fields
+  sourceType?: FileSourceType // Source type (local, cloud, sync)
+  permissions?: ItemPermissions // Permission flags for operations
 }
 
 /**
@@ -389,6 +407,10 @@ export interface FileItem extends FolderItem {
   size: number // File size in bytes
   metadata: FileMetadata
   notes?: string // User notes for presenter mode
+  // Cloud/Sync provider fields (for future use)
+  cloudId?: string // Cloud provider file ID (e.g., Google Drive file ID)
+  syncPath?: string // Local filesystem path (for sync folders)
+  lastSyncAt?: number // Last sync timestamp
 }
 
 /**
@@ -418,6 +440,11 @@ export interface Folder<TItem extends FolderItem = FolderItem> {
   parentId?: string
   timestamp: number
   expiresAt?: number | null // Timestamp when the folder should be deleted, null for permanent
+  // Provider-related fields
+  sourceType?: FileSourceType // Source type (local, cloud, sync)
+  permissions?: ItemPermissions // Permission flags for operations
+  cloudId?: string // Cloud provider folder ID
+  syncPath?: string // Local filesystem path (for sync folders)
 }
 
 /**

@@ -8,8 +8,8 @@
         sm="6"
         md="4"
         lg="2"
-        draggable="true"
-        @dragstart="onDragStart($event, item)"
+        :draggable="canMove(item)"
+        @dragstart="canMove(item) && onDragStart($event, item)"
         @dragend="emit('drag-end', $event)"
         @drop="onDrop($event, item)"
         @dragover.prevent
@@ -53,11 +53,13 @@
               </template>
               <v-list width="150" density="compact" class="rounded-lg elevation-2">
                 <v-list-item
+                  v-if="canRename(item)"
                   prepend-icon="mdi-pencil-outline"
                   :title="$t('common.edit')"
                   @click="emit('edit', item)"
                 ></v-list-item>
                 <v-list-item
+                  v-if="canMove(item)"
                   prepend-icon="mdi-folder-move-outline"
                   :title="$t('common.move')"
                   @click="emit('move', item)"
@@ -68,11 +70,13 @@
                   @click="emit('copy')"
                 ></v-list-item>
                 <v-list-item
+                  v-if="canMove(item)"
                   prepend-icon="mdi-content-cut"
                   :title="$t('common.cut')"
                   @click="emit('cut')"
                 ></v-list-item>
                 <v-list-item
+                  v-if="canDelete(item)"
                   prepend-icon="mdi-delete-outline"
                   :title="$t('common.delete')"
                   color="error"
@@ -134,7 +138,8 @@
 </template>
 
 <script setup lang="ts">
-import type { FileItem, ClipboardItem } from '@/types/common'
+import type { FileItem, ClipboardItem, ItemPermissions } from '@/types/common'
+import { DEFAULT_LOCAL_PERMISSIONS } from '@/services/filesystem'
 
 const props = defineProps<{
   items: FileItem[]
@@ -155,6 +160,15 @@ const emit = defineEmits<{
   (e: 'cut'): void
   (e: 'delete', item: FileItem): void
 }>()
+
+// Permission helpers - use item permissions or defaults
+const getPermissions = (item: FileItem): ItemPermissions => {
+  return item.permissions || DEFAULT_LOCAL_PERMISSIONS
+}
+
+const canMove = (item: FileItem) => getPermissions(item).canMove
+const canDelete = (item: FileItem) => getPermissions(item).canDelete
+const canRename = (item: FileItem) => getPermissions(item).canRename
 
 const isCut = (id: string) => {
   return props.clipboard.some((item) => item.action === 'cut' && item.data.id === id)

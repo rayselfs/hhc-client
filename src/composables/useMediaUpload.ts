@@ -3,15 +3,16 @@ import { v4 as uuidv4 } from 'uuid'
 import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import { useMediaStore } from '@/stores/media'
-import { useElectron } from '@/composables/useElectron'
+import { useFileSystem } from '@/composables/useFileSystem'
 import { useSnackBar } from '@/composables/useSnackBar'
+import { DEFAULT_LOCAL_PERMISSIONS } from '@/services/filesystem'
 import type { FileItem, Folder } from '@/types/common'
 
 export const useMediaUpload = () => {
   const { t } = useI18n()
   const mediaStore = useMediaStore()
   const { getCurrentFolders, getCurrentItems } = storeToRefs(mediaStore)
-  const { isElectron, getFilePath, saveFile } = useElectron()
+  const fileSystem = useFileSystem()
   const { showSnackBar } = useSnackBar()
 
   const fileInput = ref<HTMLInputElement | null>(null)
@@ -87,19 +88,25 @@ export const useMediaUpload = () => {
             fileType,
             mimeType: file.type,
           },
+          // Provider fields
+          sourceType: 'local',
+          permissions: { ...DEFAULT_LOCAL_PERMISSIONS },
         }
 
-        // If in Electron, save file to persistent storage
-        if (isElectron()) {
+        // If in Electron, save file to persistent storage using file system provider
+        if (fileSystem.isElectron.value) {
           try {
-            const filePathSource = getFilePath(file)
+            const filePathSource = fileSystem.getFilePath(file)
 
             if (filePathSource) {
-              const { filePath, thumbnailPath } = await saveFile(filePathSource)
-              newItem.url = `local-resource://${filePath}`
+              const result = await fileSystem.saveFile(filePathSource)
 
-              if (thumbnailPath) {
-                newItem.metadata.thumbnail = `local-resource://${thumbnailPath}`
+              if (result.success && result.data) {
+                newItem.url = result.data.fileUrl
+
+                if (result.data.thumbnailUrl) {
+                  newItem.metadata.thumbnail = result.data.thumbnailUrl
+                }
               }
             }
           } catch (error) {
@@ -166,15 +173,23 @@ export const useMediaUpload = () => {
           size: file.size,
           timestamp: Date.now(),
           metadata: { fileType, mimeType: file.type },
+          // Provider fields
+          sourceType: 'local',
+          permissions: { ...DEFAULT_LOCAL_PERMISSIONS },
         }
 
-        if (isElectron()) {
+        // If in Electron, save file to persistent storage using file system provider
+        if (fileSystem.isElectron.value) {
           try {
-            const filePathSource = getFilePath(file)
+            const filePathSource = fileSystem.getFilePath(file)
             if (filePathSource) {
-              const { filePath, thumbnailPath } = await saveFile(filePathSource)
-              newItem.url = `local-resource://${filePath}`
-              if (thumbnailPath) newItem.metadata.thumbnail = `local-resource://${thumbnailPath}`
+              const result = await fileSystem.saveFile(filePathSource)
+              if (result.success && result.data) {
+                newItem.url = result.data.fileUrl
+                if (result.data.thumbnailUrl) {
+                  newItem.metadata.thumbnail = result.data.thumbnailUrl
+                }
+              }
             }
           } catch (e) {
             console.error(e)
