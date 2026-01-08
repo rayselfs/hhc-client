@@ -29,9 +29,6 @@ export function useMediaOperations(
   const {
     moveItem: moveItemAction,
     moveFolder: moveFolderAction,
-    getMoveTargets,
-    getFolderById,
-    isFolderInside,
     pasteItem,
     copyToClipboard,
     cutToClipboard,
@@ -199,69 +196,6 @@ export function useMediaOperations(
     dialogs.showDeleteConfirmDialog.value = false
     dialogs.folderToDelete.value = null
     dialogs.itemToDelete.value = null
-  }
-
-  // --- Move ---
-  const getFolderPath = (folderId: string): { id: string; name: string }[] => {
-    const path: { id: string; name: string }[] = []
-    let current = getFolderById(folderId)
-    while (current) {
-      path.unshift({ id: current.id, name: current.name })
-      if (current.id === APP_CONFIG.FOLDER.ROOT_ID || !current.parentId) break
-      current = getFolderById(current.parentId)
-    }
-    return path
-  }
-
-  const navigateMoveToFolder = (folderId: string) => {
-    if (folderId === APP_CONFIG.FOLDER.ROOT_ID) {
-      dialogs.moveBreadcrumb.value = []
-      dialogs.selectedMoveFolder.value = null
-      return
-    }
-
-    const path = getFolderPath(folderId)
-    if (!path) return
-
-    dialogs.moveBreadcrumb.value = path
-    dialogs.selectedMoveFolder.value = null
-  }
-
-  const getMoveFolderTargets = () => {
-    const excludeFolderId =
-      dialogs.moveType.value === 'folder' && dialogs.folderToMove.value
-        ? dialogs.folderToMove.value.id
-        : undefined
-    return getMoveTargets(dialogs.selectedMoveFolder.value, excludeFolderId)
-  }
-
-  const confirmMove = (targetId: string) => {
-    const destId = targetId || dialogs.selectedMoveFolder.value?.id || APP_CONFIG.FOLDER.ROOT_ID
-
-    dialogs.moveSelection.value.forEach((id) => {
-      // Check for self-containment loop
-      if (id === destId) return // Cannot move into self
-
-      const folder = currentFolders.value.find((f) => f.id === id)
-      if (folder) {
-        // Check if moving folder into its own child
-        if (destId !== APP_CONFIG.FOLDER.ROOT_ID) {
-          const targetFolder = getFolderById(destId)
-          if (targetFolder && isFolderInside(folder, targetFolder)) return
-        }
-
-        mediaStore.moveFolder(folder, destId, currentFolder.value?.id)
-      } else {
-        const item = currentItems.value.find((i) => i.id === id)
-        if (item) {
-          mediaStore.moveItem(item, destId, currentFolder.value?.id)
-        }
-      }
-    })
-
-    dialogs.showMoveDialog.value = false
-    selectedItems.clear()
-    showSnackBar(t('fileExplorer.moveSuccess'), 'success')
   }
 
   // --- Clipboard ---
@@ -459,9 +393,6 @@ export function useMediaOperations(
     nameErrorMessage,
     handleSave,
     confirmDeleteAction,
-    navigateMoveToFolder,
-    getMoveFolderTargets,
-    confirmMove,
     handleCopy,
     handleCut,
     handlePaste,

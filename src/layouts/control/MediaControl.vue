@@ -14,7 +14,6 @@
               key="selection-actions"
               :selected-count="selectedItems.size"
               @clear="clearSelection"
-              @move="openMoveSelectedDialog(selectedItems)"
               @delete="openDeleteSelectionDialog"
             />
             <!-- Filter Actions Btn -->
@@ -136,7 +135,6 @@
             @preview="previewFile"
             @context-menu="openContextMenu"
             @edit="openEditDialog"
-            @move="openMoveDialog"
             @copy="handleCopy"
             @cut="handleCut"
             @delete="openDeleteItemDialog"
@@ -214,15 +212,6 @@
           @confirm="handleSave"
         />
 
-        <!-- Move Dialog -->
-        <MoveFolderDialog
-          v-model="showMoveDialog"
-          :breadcrumbs="moveBreadcrumb"
-          :targets="getMoveFolderTargets()"
-          @navigate="navigateMoveToFolder"
-          @move="confirmMove"
-        />
-
         <!-- Delete Confirm Dialog -->
         <DeleteConfirmDialog
           v-model="showDeleteConfirmDialog"
@@ -250,16 +239,6 @@
         prepend-icon="mdi-pencil"
         :title="$t('common.edit')"
         @click="contextMenuTarget && openEditDialog(contextMenuTarget)"
-      ></v-list-item>
-
-      <v-list-item
-        prepend-icon="mdi-folder-move"
-        :title="$t('common.move')"
-        @click="
-          selectedItems.size > 1
-            ? openMoveSelectedDialog(selectedItems)
-            : contextMenuTarget && openMoveDialog(contextMenuTarget)
-        "
       ></v-list-item>
 
       <v-list-item
@@ -335,7 +314,7 @@ import MediaFolderList from '@/components/Media/MediaFolderList.vue'
 import MediaFileList from '@/components/Media/MediaFileList.vue'
 import MediaHeader from '@/components/Media/MediaHeader.vue'
 import MediaSelectionBar from '@/components/Media/MediaSelectionBar.vue'
-import MoveFolderDialog from '@/components/Shared/MoveFolderDialog.vue'
+
 import CreateEditFolderDialog from '@/components/Shared/CreateEditFolderDialog.vue'
 import DeleteConfirmDialog from '@/components/Shared/DeleteConfirmDialog.vue'
 import { useMediaSort } from '@/composables/useMediaSort'
@@ -423,15 +402,11 @@ const {
   showDeleteConfirmDialog,
   folderToDelete,
   itemToDelete,
-  showMoveDialog,
-  moveBreadcrumb,
   openCreateFolderDialog,
   openEditDialog,
   openDeleteFolderDialog,
   openDeleteItemDialog,
   openDeleteSelectionDialog,
-  openMoveDialog,
-  openMoveSelectedDialog,
 } = mediaDialogs
 
 // Create New Folder with Unique Name
@@ -455,9 +430,6 @@ const {
   nameErrorMessage,
   handleSave,
   confirmDeleteAction,
-  navigateMoveToFolder,
-  getMoveFolderTargets,
-  confirmMove,
   handleCopy,
   handleCut,
   handlePaste,
@@ -556,8 +528,7 @@ const handleSelection = (id: string, event?: MouseEvent) => {
 
 const handleEsc = (event: KeyboardEvent) => {
   if (event.key === 'Escape') {
-    const isDialogOpen =
-      showFolderDialog.value || showMoveDialog.value || showDeleteConfirmDialog.value
+    const isDialogOpen = showFolderDialog.value || showDeleteConfirmDialog.value
     if (!isDialogOpen) {
       if (clipboard.value.some((item) => item.action === 'cut')) {
         clearClipboard()

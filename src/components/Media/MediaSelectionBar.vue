@@ -11,15 +11,6 @@
       $t('common.selectedItems', { count: selectedCount })
     }}</span>
     <v-btn
-      icon="mdi-folder-move-outline"
-      size="small"
-      variant="text"
-      density="comfortable"
-      class="mr-2"
-      :title="$t('common.move')"
-      @click="$emit('move')"
-    ></v-btn>
-    <v-btn
       icon="mdi-trash-can-outline"
       size="small"
       variant="text"
@@ -38,7 +29,6 @@ defineProps<{
 
 defineEmits<{
   (e: 'clear'): void
-  (e: 'move'): void
   (e: 'delete'): void
 }>()
 </script>
