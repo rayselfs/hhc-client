@@ -15,7 +15,6 @@
           :error-messages="errorMessages"
           variant="outlined"
           density="compact"
-          autofocus
           @keyup.enter="$emit('confirm')"
         />
 
@@ -70,13 +69,13 @@ defineEmits<{
   (e: 'confirm'): void
 }>()
 
-const nameInput = ref<HTMLInputElement | null>(null)
+const nameInput = ref<{ select: () => void } | null>(null)
 const { modelValue } = toRefs(props)
 
 watch(modelValue, async (val) => {
   if (val) {
     await nextTick()
-    ;(nameInput.value as any)?.select()
+    nameInput.value?.select()
   }
 })
 </script>

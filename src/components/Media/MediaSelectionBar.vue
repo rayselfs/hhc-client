@@ -39,7 +39,7 @@
       @click="$emit('cut')"
     ></v-btn>
     <v-btn
-      icon="mdi-trash-can-outline"
+      icon="mdi-delete-outline"
       size="small"
       variant="text"
       density="comfortable"

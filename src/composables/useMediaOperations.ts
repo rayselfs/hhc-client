@@ -27,7 +27,6 @@ export function useMediaOperations(
     getCurrentFolders: currentFolders,
     getCurrentItems: currentItems,
     clipboard,
-    currentFolder,
   } = storeToRefs(mediaStore)
 
   const {
@@ -457,6 +456,42 @@ export function useMediaOperations(
     }
   }
 
+  const handlePasteIntoFolder = async (targetFolderId: string) => {
+    if (clipboard.value.length === 0) return
+
+    for (const clipboardItem of clipboard.value) {
+      if (clipboardItem.action === 'copy') {
+        const type = clipboardItem.type === 'file' ? 'file' : 'folder'
+        const uniqueName = getUniqueName(clipboardItem.data.name, type)
+
+        const itemToPaste = await duplicatePhysicalFiles(clipboardItem.data)
+
+        if (itemToPaste) {
+          itemToPaste.name = uniqueName
+          pasteItem(itemToPaste, targetFolderId, clipboardItem.type === 'file' ? 'file' : 'folder')
+        }
+      } else if (clipboardItem.action === 'cut') {
+        if (clipboardItem.type === 'file') {
+          moveItemAction(
+            clipboardItem.data as FileItem,
+            targetFolderId,
+            clipboardItem.sourceFolderId,
+          )
+        } else {
+          moveFolderAction(
+            clipboardItem.data as Folder<FileItem>,
+            targetFolderId,
+            clipboardItem.sourceFolderId,
+          )
+        }
+      }
+    }
+
+    if (clipboard.value.length > 0 && clipboard.value[0]?.action === 'cut') {
+      clearClipboard()
+    }
+  }
+
   return {
     isDuplicateName,
     nameErrorMessage,
@@ -465,5 +500,6 @@ export function useMediaOperations(
     handleCopy,
     handleCut,
     handlePaste,
+    handlePasteIntoFolder,
   }
 }

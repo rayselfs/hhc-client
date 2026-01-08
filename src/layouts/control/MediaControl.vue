@@ -124,6 +124,7 @@
             @select="handleSelection"
             @open="openFolder"
             @context-menu="openContextMenu"
+            @menu-click="handleMenuClick"
           />
 
           <!-- Files Section -->
@@ -137,18 +138,15 @@
             @select="handleSelection"
             @preview="previewFile"
             @context-menu="openContextMenu"
-            @edit="openEditDialog"
-            @copy="handleCopy"
-            @cut="handleCut"
-            @delete="openDeleteItemDialog"
+            @menu-click="handleMenuClick"
           />
         </div>
 
         <!-- Floating Action Button for New Content -->
-        <v-menu location="top start" offset="10">
-          <template #activator="{ props }">
+        <v-menu v-model="showFabMenu" location="top start" offset="10">
+          <template #activator="{ props: menuProps }">
             <v-btn
-              v-bind="props"
+              v-bind="menuProps"
               position="fixed"
               location="bottom right"
               icon="mdi-plus"
@@ -159,24 +157,13 @@
               style="color: black; z-index: 100"
             ></v-btn>
           </template>
-          <v-list class="rounded-lg elevation-4 py-2" width="200">
-            <v-list-item
-              prepend-icon="mdi-folder-plus-outline"
-              :title="$t('fileExplorer.newFolder')"
-              @click="createNewFolder"
-            ></v-list-item>
-            <v-divider class="my-2"></v-divider>
-            <v-list-item
-              prepend-icon="mdi-file-upload-outline"
-              :title="$t('fileExplorer.fileUpload')"
-              @click="uploadFile"
-            ></v-list-item>
-            <v-list-item
-              prepend-icon="mdi-folder-upload-outline"
-              :title="$t('fileExplorer.folderUpload')"
-              @click="uploadFolder"
-            ></v-list-item>
-          </v-list>
+          <MediaBackgroundMenu
+            :model-value="showFabMenu"
+            :is-fab="true"
+            @create-folder="createNewFolder"
+            @upload-file="uploadFile"
+            @upload-folder="uploadFolder"
+          />
         </v-menu>
 
         <!-- Hidden Inputs -->
@@ -233,72 +220,43 @@
       :style="{ ...selectionBox, backgroundColor: 'rgba(var(--v-theme-primary), 0.1)' }"
     ></div>
 
-    <!-- Context Menu for Items -->
-    <ContextMenu ref="contextMenuRef" :close-on-content-click="true">
-      <v-list-item
-        v-if="
-          contextMenuTarget && (!selectedItems.has(contextMenuTarget.id) || selectedItems.size <= 1)
-        "
-        prepend-icon="mdi-pencil"
-        :title="$t('common.edit')"
-        @click="contextMenuTarget && openEditDialog(contextMenuTarget)"
-      ></v-list-item>
-
-      <v-list-item
-        prepend-icon="mdi-content-copy"
-        :title="$t('common.copy')"
-        @click="handleCopy"
-      ></v-list-item>
-
-      <v-list-item
-        prepend-icon="mdi-content-cut"
-        :title="$t('common.cut')"
-        @click="handleCut"
-      ></v-list-item>
-
-      <v-list-item
-        prepend-icon="mdi-delete"
-        :title="$t('common.delete')"
-        color="error"
-        @click="
-          selectedItems.size > 1
-            ? openDeleteSelectionDialog()
-            : contextMenuTarget &&
-              ('folders' in contextMenuTarget
-                ? openDeleteFolderDialog(contextMenuTarget as Folder<FileItem>)
-                : openDeleteItemDialog(contextMenuTarget as FileItem))
-        "
-      ></v-list-item>
+    <!-- Item Context Menu -->
+    <ContextMenu
+      v-if="contextMenuTarget"
+      :key="contextMenuTarget.id + (menuActivator ? '_act' : '_pos')"
+      v-model="showItemContextMenu"
+      :activator="menuActivator"
+      :position="menuPosition"
+      close-on-content-click
+      raw
+    >
+      <MediaItemContextMenu
+        :target="contextMenuTarget"
+        :is-folder="'items' in contextMenuTarget"
+        :clipboard="clipboard"
+        :selected-items="selectedItems"
+        @edit="(target) => openEditDialog(target)"
+        @copy="handleCopy"
+        @cut="handleCut"
+        @delete="handleDeleteFromContextMenu"
+        @paste-into-folder="handlePasteIntoFolderFromContextMenu"
+      />
     </ContextMenu>
 
-    <!-- Context Menu for Background -->
-    <ContextMenu ref="backgroundContextMenuRef" :close-on-content-click="true">
-      <v-list-item
-        prepend-icon="mdi-folder-plus"
-        :title="$t('fileExplorer.newFolder')"
-        @click="createNewFolder"
-      ></v-list-item>
-
-      <v-list-item
-        prepend-icon="mdi-upload"
-        :title="$t('fileExplorer.fileUpload')"
-        @click="fileInput?.click()"
-      ></v-list-item>
-
-      <v-list-item
-        prepend-icon="mdi-folder-upload"
-        :title="$t('fileExplorer.folderUpload')"
-        @click="folderInput?.click()"
-      ></v-list-item>
-
-      <v-divider class="my-1"></v-divider>
-
-      <v-list-item
-        prepend-icon="mdi-content-paste"
-        :title="$t('common.paste')"
-        :disabled="clipboard.length === 0"
-        @click="handlePaste"
-      ></v-list-item>
+    <!-- Background Context Menu -->
+    <ContextMenu
+      v-model="showBackgroundContextMenu"
+      :position="menuPosition"
+      close-on-content-click
+      raw
+    >
+      <MediaBackgroundMenu
+        :clipboard="clipboard"
+        @create-folder="createNewFolder"
+        @upload-file="uploadFile"
+        @upload-folder="uploadFolder"
+        @paste="handlePaste"
+      />
     </ContextMenu>
   </v-container>
 </template>
@@ -307,19 +265,21 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useMediaStore } from '@/stores/media'
 import { useSnackBar } from '@/composables/useSnackBar'
-import ContextMenu from '@/components/ContextMenu.vue'
 import { storeToRefs } from 'pinia'
 import { useElectron } from '@/composables/useElectron'
 import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
 import { useMediaProjectionStore } from '@/stores/mediaProjection'
-import MediaPresenter from '@/components/Media/MediaPresenter.vue'
-import MediaFolderList from '@/components/Media/MediaFolderList.vue'
-import MediaFileList from '@/components/Media/MediaFileList.vue'
-import MediaHeader from '@/components/Media/MediaHeader.vue'
-import MediaSelectionBar from '@/components/Media/MediaSelectionBar.vue'
-
-import CreateEditFolderDialog from '@/components/Shared/CreateEditFolderDialog.vue'
-import DeleteConfirmDialog from '@/components/Shared/DeleteConfirmDialog.vue'
+import ContextMenu from '@/components/ContextMenu.vue'
+import {
+  MediaHeader,
+  MediaFileList,
+  MediaFolderList,
+  MediaPresenter,
+  MediaSelectionBar,
+  MediaItemContextMenu,
+  MediaBackgroundMenu,
+} from '@/components/Media'
+import { CreateEditFolderDialog, DeleteConfirmDialog } from '@/components/Shared'
 import { useMediaSort } from '@/composables/useMediaSort'
 import { useMediaUpload } from '@/composables/useMediaUpload'
 import { useDragSelection } from '@/composables/useDragSelection'
@@ -445,6 +405,25 @@ const handleEditSelected = () => {
   }
 }
 
+const handleDeleteFromContextMenu = () => {
+  if (!contextMenuTarget.value) return
+
+  if (selectedItems.value.size > 1) {
+    openDeleteSelectionDialog()
+  } else if ('items' in contextMenuTarget.value) {
+    openDeleteFolderDialog(contextMenuTarget.value as Folder<FileItem>)
+  } else {
+    openDeleteItemDialog(contextMenuTarget.value as FileItem)
+  }
+}
+
+const handlePasteIntoFolderFromContextMenu = () => {
+  if (!contextMenuTarget.value || !('id' in contextMenuTarget.value)) return
+
+  const targetFolderId = contextMenuTarget.value.id
+  handlePasteIntoFolder(targetFolderId)
+}
+
 const {
   isDuplicateName,
   nameErrorMessage,
@@ -453,6 +432,7 @@ const {
   handleCopy,
   handleCut,
   handlePaste,
+  handlePasteIntoFolder,
 } = operations
 
 // Drag Selection
@@ -479,17 +459,39 @@ onMounted(async () => {
   window.addEventListener('keydown', handleGlobalKeydown)
 })
 
-const contextMenuRef = ref<InstanceType<typeof ContextMenu> | null>(null)
-const backgroundContextMenuRef = ref<InstanceType<typeof ContextMenu> | null>(null)
 const contextMenuTarget = ref<Folder<FileItem> | FileItem | null>(null)
+const showItemContextMenu = ref(false)
+const showBackgroundContextMenu = ref(false)
+const showFabMenu = ref(false)
+const menuActivator = ref<HTMLElement | undefined>(undefined)
+const menuPosition = ref<[number, number] | undefined>(undefined)
 
 const openBackgroundContextMenu = (event: MouseEvent) => {
   if (isDragging.value) return
-  contextMenuRef.value?.close()
-  backgroundContextMenuRef.value?.open(event)
+  event.preventDefault()
+
+  menuPosition.value = [event.clientX, event.clientY]
+  menuActivator.value = undefined
+  showBackgroundContextMenu.value = true
+  showItemContextMenu.value = false
 }
 
-const openContextMenu = async (target: Folder<FileItem> | FileItem, event: MouseEvent) => {
+const handleMenuClick = (target: Folder<FileItem> | FileItem, event: MouseEvent) => {
+  event.stopPropagation()
+
+  if (!selectedItems.value.has(target.id)) {
+    handleSelection(target.id, event)
+  }
+
+  contextMenuTarget.value = target
+  menuActivator.value = event.target as HTMLElement
+  menuPosition.value = undefined
+
+  showBackgroundContextMenu.value = false
+  showItemContextMenu.value = true
+}
+
+const openContextMenu = (target: Folder<FileItem> | FileItem, event: MouseEvent) => {
   event.preventDefault()
   event.stopPropagation()
 
@@ -497,9 +499,12 @@ const openContextMenu = async (target: Folder<FileItem> | FileItem, event: Mouse
     handleSelection(target.id, event)
   }
 
-  backgroundContextMenuRef.value?.close()
   contextMenuTarget.value = target
-  contextMenuRef.value?.open(event)
+  menuActivator.value = undefined
+  menuPosition.value = [event.clientX, event.clientY]
+
+  showBackgroundContextMenu.value = false
+  showItemContextMenu.value = true
 }
 
 const openFolder = async (folderId: string) => {

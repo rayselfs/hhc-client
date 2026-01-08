@@ -36,7 +36,7 @@
               density="compact"
               size="small"
               class="folder-context-menu-btn flex-shrink-0"
-              @click.stop="openContextMenu(folder, $event)"
+              @click.stop="emit('menu-click', folder, $event)"
             ></v-btn>
           </div>
         </div>
@@ -62,9 +62,9 @@ const emit = defineEmits<{
   (e: 'select', id: string, event: MouseEvent): void
   (e: 'open', id: string): void
   (e: 'context-menu', folder: Folder<FileItem>, event: MouseEvent): void
+  (e: 'menu-click', folder: Folder<FileItem>, event: MouseEvent): void
 }>()
 
-// Permission helpers - use folder permissions or defaults
 const getPermissions = (folder: Folder<FileItem>): ItemPermissions => {
   return folder.permissions || DEFAULT_LOCAL_PERMISSIONS
 }

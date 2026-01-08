@@ -20,6 +20,7 @@
               @copy="emit('copy')"
               @cut="emit('cut')"
               @delete="emit('delete', item)"
+              @menu-click="(item, event) => emit('menu-click', item, event)"
             />
           </v-col>
         </v-row>
@@ -52,6 +53,7 @@ const emit = defineEmits<{
   (e: 'copy'): void
   (e: 'cut'): void
   (e: 'delete', item: FileItem): void
+  (e: 'menu-click', item: FileItem, event: MouseEvent): void
 }>()
 
 const { name: breakpointName } = useDisplay()

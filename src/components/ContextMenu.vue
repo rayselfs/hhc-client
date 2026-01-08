@@ -1,13 +1,15 @@
 <template>
   <v-menu
-    v-model="show"
-    :target="[x, y]"
+    v-model="showMenu"
+    :target="menuTarget"
+    :open-on-click="false"
     location="bottom start"
     :close-on-content-click="closeOnContentClick"
+    @click:outside="isControlled && $emit('update:modelValue', false)"
   >
-    <v-list density="compact">
+    <slot v-if="props.raw" />
+    <v-list v-else density="compact" class="rounded-lg">
       <slot>
-        <!-- 默認使用配置的選單項（如果提供了 items prop） -->
         <template v-if="props.items && props.items.length > 0">
           <v-list-item
             v-for="item in props.items.filter((i) => !i.condition || i.condition())"
@@ -26,6 +28,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useContextMenu } from '@/composables/useContextMenu'
 
 export interface ContextMenuItem {
@@ -37,34 +40,58 @@ export interface ContextMenuItem {
 }
 
 interface Props {
-  /**
-   * 選單項配置
-   * 如果不提供，則使用 slot 自定義內容
-   */
   items?: ContextMenuItem[]
-  /**
-   * 點擊選單項內容時是否關閉選單
-   */
   closeOnContentClick?: boolean
+  modelValue?: boolean
+  // priority higher than position
+  activator?: HTMLElement | string
+  position?: [number, number]
+  raw?: boolean
 }
+
+const emit = defineEmits<{
+  (e: 'update:modelValue', value: boolean): void
+}>()
 
 const props = withDefaults(defineProps<Props>(), {
   items: () => [],
   closeOnContentClick: false,
+  raw: false,
 })
 
-// 使用 useContextMenu composable 管理選單狀態
-const { show, x, y, open, close } = useContextMenu()
+const { show: internalShow, x: internalX, y: internalY, open, close } = useContextMenu()
 
-// 處理選單項點擊
+const isControlled = computed(() => {
+  return props.modelValue !== undefined
+})
+
+const showMenu = computed({
+  get: () => (isControlled.value ? props.modelValue : internalShow.value),
+  set: (val) => {
+    if (isControlled.value) {
+      emit('update:modelValue', val)
+    } else {
+      internalShow.value = val
+    }
+  },
+})
+
+const menuTarget = computed(() => {
+  if (props.activator) return props.activator
+  if (props.position) return props.position
+  return [internalX.value, internalY.value] as [number, number]
+})
+
 const handleItemClick = (item: ContextMenuItem) => {
   if (item.action) {
     item.action()
   }
   close()
+  if (isControlled.value) {
+    emit('update:modelValue', false)
+  }
 }
 
-// 暴露方法供外部使用
 defineExpose({
   open,
   close,

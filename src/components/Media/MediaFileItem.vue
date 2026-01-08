@@ -22,44 +22,14 @@
         :title="item.name"
         >{{ item.name }}</span
       >
-      <v-menu location="bottom end">
-        <template #activator="{ props: menuProps }">
-          <v-btn
-            icon="mdi-dots-vertical"
-            variant="text"
-            density="compact"
-            size="small"
-            v-bind="menuProps"
-            @click.stop
-          ></v-btn>
-        </template>
-        <v-list width="150" density="compact" class="rounded-lg elevation-2">
-          <v-list-item
-            v-if="canRename"
-            prepend-icon="mdi-pencil-outline"
-            :title="$t('common.edit')"
-            @click="$emit('edit', item)"
-          ></v-list-item>
-          <v-list-item
-            prepend-icon="mdi-content-copy"
-            :title="$t('common.copy')"
-            @click="$emit('copy')"
-          ></v-list-item>
-          <v-list-item
-            v-if="canMove"
-            prepend-icon="mdi-content-cut"
-            :title="$t('common.cut')"
-            @click="$emit('cut')"
-          ></v-list-item>
-          <v-list-item
-            v-if="canDelete"
-            prepend-icon="mdi-delete-outline"
-            :title="$t('common.delete')"
-            color="error"
-            @click="$emit('delete', item)"
-          ></v-list-item>
-        </v-list>
-      </v-menu>
+      <v-btn
+        icon="mdi-dots-vertical"
+        variant="text"
+        density="compact"
+        size="small"
+        class="flex-shrink-0"
+        @click.stop="$emit('menu-click', item, $event)"
+      ></v-btn>
     </div>
 
     <!-- Image / Thumbnail / Icon Area -->
@@ -109,15 +79,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import type { FileItem, ItemPermissions } from '@/types/common'
-import { DEFAULT_LOCAL_PERMISSIONS } from '@/services/filesystem'
+import type { FileItem, ClipboardItem } from '@/types/common'
 import { useThumbnail } from '@/composables/useThumbnail'
 
 const props = defineProps<{
   item: FileItem
   isSelected: boolean
   isCut: boolean
+  clipboard?: ClipboardItem<FileItem>[]
+  selectedItems?: Set<string>
 }>()
 
 defineEmits<{
@@ -125,17 +95,10 @@ defineEmits<{
   (e: 'copy'): void
   (e: 'cut'): void
   (e: 'delete', item: FileItem): void
+  (e: 'menu-click', item: FileItem, event: MouseEvent): void
 }>()
 
 const { thumbnailSrc } = useThumbnail(props.item)
-
-const getPermissions = (item: FileItem): ItemPermissions => {
-  return item.permissions || DEFAULT_LOCAL_PERMISSIONS
-}
-
-const canMove = computed(() => getPermissions(props.item).canMove)
-const canDelete = computed(() => getPermissions(props.item).canDelete)
-const canRename = computed(() => getPermissions(props.item).canRename)
 
 const getFileIcon = (fileType: string) => {
   switch (fileType) {
