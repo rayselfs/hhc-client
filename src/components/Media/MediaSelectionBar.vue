@@ -11,6 +11,34 @@
       $t('common.selectedItems', { count: selectedCount })
     }}</span>
     <v-btn
+      v-if="selectedCount === 1"
+      icon="mdi-pencil-outline"
+      size="small"
+      variant="text"
+      density="comfortable"
+      class="mr-2"
+      :title="$t('common.edit')"
+      @click="$emit('edit')"
+    ></v-btn>
+    <v-btn
+      icon="mdi-content-copy"
+      size="small"
+      variant="text"
+      density="comfortable"
+      class="mr-2"
+      :title="$t('common.copy')"
+      @click="$emit('copy')"
+    ></v-btn>
+    <v-btn
+      icon="mdi-content-cut"
+      size="small"
+      variant="text"
+      density="comfortable"
+      class="mr-2"
+      :title="$t('common.cut')"
+      @click="$emit('cut')"
+    ></v-btn>
+    <v-btn
       icon="mdi-trash-can-outline"
       size="small"
       variant="text"
@@ -29,6 +57,9 @@ defineProps<{
 
 defineEmits<{
   (e: 'clear'): void
+  (e: 'edit'): void
+  (e: 'copy'): void
+  (e: 'cut'): void
   (e: 'delete'): void
 }>()
 </script>

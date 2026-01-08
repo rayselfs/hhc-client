@@ -14,6 +14,9 @@
               key="selection-actions"
               :selected-count="selectedItems.size"
               @clear="clearSelection"
+              @edit="handleEditSelected"
+              @copy="handleCopy"
+              @cut="handleCut"
               @delete="openDeleteSelectionDialog"
             />
             <!-- Filter Actions Btn -->
@@ -423,6 +426,23 @@ const createNewFolder = () => {
   }
 
   openCreateFolderDialog(newName)
+}
+
+// Handle edit for single selected item from selection bar
+const handleEditSelected = () => {
+  if (selectedItems.value.size !== 1) return
+
+  const selectedId = [...selectedItems.value][0]
+  const folder = currentFolders.value.find((f) => f.id === selectedId)
+  if (folder) {
+    openEditDialog(folder)
+    return
+  }
+
+  const item = currentItems.value.find((i) => i.id === selectedId)
+  if (item) {
+    openEditDialog(item)
+  }
 }
 
 const {
