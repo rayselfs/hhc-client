@@ -7,6 +7,8 @@ import { useFileSystem } from '@/composables/useFileSystem'
 import { useSnackBar } from '@/composables/useSnackBar'
 import { DEFAULT_LOCAL_PERMISSIONS } from '@/services/filesystem'
 import type { FileItem, Folder } from '@/types/common'
+import { useIndexedDB } from '@/composables/useIndexedDB'
+import { MEDIA_DB_CONFIG } from '@/config/db'
 
 export const useMediaUpload = () => {
   const { t } = useI18n()
@@ -14,6 +16,7 @@ export const useMediaUpload = () => {
   const { getCurrentFolders, getCurrentItems } = storeToRefs(mediaStore)
   const fileSystem = useFileSystem()
   const { showSnackBar } = useSnackBar()
+  const db = useIndexedDB(MEDIA_DB_CONFIG)
 
   const fileInput = ref<HTMLInputElement | null>(null)
   const folderInput = ref<HTMLInputElement | null>(null)
@@ -89,7 +92,7 @@ export const useMediaUpload = () => {
             mimeType: file.type,
           },
           // Provider fields
-          sourceType: 'app',
+          sourceType: 'local',
           permissions: { ...DEFAULT_LOCAL_PERMISSIONS },
         }
 
@@ -104,8 +107,15 @@ export const useMediaUpload = () => {
               if (result.success && result.data) {
                 newItem.url = result.data.fileUrl
 
-                if (result.data.thumbnailUrl) {
-                  newItem.metadata.thumbnail = result.data.thumbnailUrl
+                if (result.data.thumbnailData) {
+                  const blob = new Blob([result.data.thumbnailData.buffer as ArrayBuffer], {
+                    type: 'image/jpeg',
+                  })
+                  const blobId = uuidv4()
+                  await db.put('thumbnails', { id: blobId, blob, itemId: newItem.id })
+
+                  newItem.metadata.thumbnailType = 'blob'
+                  newItem.metadata.thumbnailBlobId = blobId
                 }
               }
             }
@@ -174,7 +184,7 @@ export const useMediaUpload = () => {
           timestamp: Date.now(),
           metadata: { fileType, mimeType: file.type },
           // Provider fields
-          sourceType: 'app',
+          sourceType: 'local',
           permissions: { ...DEFAULT_LOCAL_PERMISSIONS },
         }
 
@@ -186,8 +196,15 @@ export const useMediaUpload = () => {
               const result = await fileSystem.saveFile(filePathSource)
               if (result.success && result.data) {
                 newItem.url = result.data.fileUrl
-                if (result.data.thumbnailUrl) {
-                  newItem.metadata.thumbnail = result.data.thumbnailUrl
+                if (result.data.thumbnailData) {
+                  const blob = new Blob([result.data.thumbnailData.buffer as ArrayBuffer], {
+                    type: 'image/jpeg',
+                  })
+                  const blobId = uuidv4()
+                  await db.put('thumbnails', { id: blobId, blob, itemId: newItem.id })
+
+                  newItem.metadata.thumbnailType = 'blob'
+                  newItem.metadata.thumbnailBlobId = blobId
                 }
               }
             }

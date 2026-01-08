@@ -22,7 +22,7 @@ import { createSuccessResult, createFailureResult } from './types'
  */
 class FileSystemProviderFactory {
   private providers: Map<FileSourceType, FileSystemProvider> = new Map()
-  private defaultProviderType: FileSourceType = 'local'
+  private defaultProviderType: FileSourceType = 'sync'
   private initialized = false
 
   /**
@@ -41,6 +41,7 @@ class FileSystemProviderFactory {
 
       if (localResult.success) {
         this.providers.set('local', localProvider)
+        this.providers.set('sync', localProvider)
       } else {
         console.warn('LocalProvider initialization failed:', localResult.error)
       }
@@ -62,10 +63,7 @@ class FileSystemProviderFactory {
       this.initialized = true
       return createSuccessResult(undefined)
     } catch (error) {
-      return createFailureResult(
-        error instanceof Error ? error.message : String(error),
-        'UNKNOWN',
-      )
+      return createFailureResult(error instanceof Error ? error.message : String(error), 'UNKNOWN')
     }
   }
 
@@ -111,6 +109,7 @@ class FileSystemProviderFactory {
       localProvider['_isAvailable'] = true
     }
     this.providers.set('local', localProvider)
+    this.providers.set('sync', localProvider)
 
     this.initialized = true
   }

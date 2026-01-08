@@ -28,9 +28,9 @@ export interface ElectronAPI {
   getDisplays: () => Promise<DisplayInfo[]>
 
   // File System
-  saveFile: (filePath: string) => Promise<{ filePath: string; thumbnailPath?: string }>
+  saveFile: (filePath: string) => Promise<{ filePath: string; thumbnailData?: Uint8Array }>
   deleteFile: (filePath: string) => Promise<boolean>
-  copyFile: (filePath: string) => Promise<{ filePath: string; thumbnailPath?: string } | null>
+  copyFile: (filePath: string) => Promise<{ filePath: string; thumbnailData?: Uint8Array } | null>
   listDirectory: (dirPath: string) => Promise<
     Array<{
       name: string
@@ -38,7 +38,7 @@ export interface ElectronAPI {
       path: string
       size: number
       modifiedAt: number
-      thumbnailPath?: string
+      thumbnailData?: Uint8Array
     }>
   >
   resetUserData: () => Promise<boolean>

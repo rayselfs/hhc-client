@@ -34,7 +34,7 @@ import { LocalProvider } from '@/services/filesystem/providers/LocalProvider'
 export function useFileSystem() {
   const initialized = ref(false)
   const initializing = ref(false)
-  const currentProviderType = ref<FileSourceType>('local')
+  const currentProviderType = ref<FileSourceType>('sync')
 
   /**
    * Initialize the file system providers
@@ -202,9 +202,7 @@ export function useFileSystem() {
     }
 
     const provider =
-      'url' in item
-        ? getProviderForItem(item as FileItem)
-        : getProvider(item.sourceType || 'local')
+      'url' in item ? getProviderForItem(item as FileItem) : getProvider(item.sourceType || 'sync')
 
     return provider.getPermissions(item)
   }
@@ -250,7 +248,7 @@ export function useFileSystem() {
    * Check if a file item is from local storage
    */
   const isLocal = (item: FileItem): boolean => {
-    return item.sourceType === 'local' || isLocalUrl(item.url)
+    return item.sourceType === 'local' || item.sourceType === 'sync' || isLocalUrl(item.url)
   }
 
   /**
@@ -262,7 +260,7 @@ export function useFileSystem() {
     }
 
     try {
-      const localProvider = getProvider('local') as LocalProvider
+      const localProvider = getProvider('sync') as LocalProvider
       return localProvider.getFilePath(file)
     } catch {
       // Fallback to direct API call if provider not ready

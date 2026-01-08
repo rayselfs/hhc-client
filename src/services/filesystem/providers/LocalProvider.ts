@@ -15,7 +15,7 @@ import { DEFAULT_LOCAL_PERMISSIONS, createSuccessResult, createFailureResult } f
  * Files are stored in the app's userData directory.
  */
 export class LocalProvider implements FileSystemProvider {
-  readonly type = 'local' as const
+  readonly type = 'sync' as const
   readonly displayName = 'Local Storage'
   readonly urlPrefix = 'local-resource://'
 
@@ -56,9 +56,8 @@ export class LocalProvider implements FileSystemProvider {
 
       return createSuccessResult({
         filePath: result.filePath,
-        thumbnailPath: result.thumbnailPath,
+        thumbnailData: result.thumbnailData,
         fileUrl: this.buildUrl(result.filePath),
-        thumbnailUrl: result.thumbnailPath ? this.buildUrl(result.thumbnailPath) : undefined,
       })
     } catch (error) {
       return createFailureResult(error instanceof Error ? error.message : String(error), 'UNKNOWN')
@@ -111,9 +110,8 @@ export class LocalProvider implements FileSystemProvider {
 
       return createSuccessResult({
         filePath: result.filePath,
-        thumbnailPath: result.thumbnailPath,
+        thumbnailData: result.thumbnailData,
         fileUrl: this.buildUrl(result.filePath),
-        thumbnailUrl: result.thumbnailPath ? this.buildUrl(result.thumbnailPath) : undefined,
       })
     } catch (error) {
       return createFailureResult(error instanceof Error ? error.message : String(error), 'UNKNOWN')
@@ -187,9 +185,8 @@ export class LocalProvider implements FileSystemProvider {
             metadata: {
               fileType: this.getFileType(entry.name),
               filePath: entry.path,
-              thumbnailPath: entry.thumbnailPath,
+              thumbnailData: entry.thumbnailData,
               fileUrl: this.buildUrl(entry.path),
-              thumbnailUrl: entry.thumbnailPath ? this.buildUrl(entry.thumbnailPath) : undefined,
             },
           }
           return item

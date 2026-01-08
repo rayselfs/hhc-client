@@ -71,7 +71,7 @@ export const registerFileHandlers = () => {
       await fs.copy(sourcePath, destinationPath)
 
       // Generate thumbnail
-      let thumbnailPath: string | undefined
+      let thumbnailData: Buffer | undefined
       try {
         const thumb = await nativeImage.createThumbnailFromPath(destinationPath, {
           width: 300,
@@ -79,14 +79,7 @@ export const registerFileHandlers = () => {
         })
 
         if (!thumb.isEmpty()) {
-          const thumbnailsDir = path.join(userDataPath, 'thumbnails')
-          await fs.ensureDir(thumbnailsDir)
-
-          const thumbFilename = `${path.basename(filename, ext)}.png`
-          thumbnailPath = path.join(thumbnailsDir, thumbFilename)
-
-          // Async write
-          await fs.writeFile(thumbnailPath, thumb.toPNG())
+          thumbnailData = thumb.toJPEG(80)
         }
       } catch (thumbError) {
         console.warn('Failed to generate thumbnail:', thumbError)
@@ -94,7 +87,7 @@ export const registerFileHandlers = () => {
 
       return {
         filePath: destinationPath,
-        thumbnailPath,
+        thumbnailData,
       }
     } catch (error) {
       console.error('Failed to save file:', error)
@@ -216,25 +209,13 @@ export const registerFileHandlers = () => {
 
       await fs.copy(normalizedSourcePath, destinationPath)
 
-      // Copy thumbnail
-      let thumbnailPath: string | undefined
-      const thumbFilenameBase = path.basename(normalizedSourcePath, ext)
-      const thumbSourcePath = path.join(userDataPath, 'thumbnails', `${thumbFilenameBase}.png`)
-
-      if (await fs.pathExists(thumbSourcePath)) {
-        const thumbnailsDir = path.join(userDataPath, 'thumbnails')
-        await fs.ensureDir(thumbnailsDir)
-
-        const newThumbFilename = `${path.basename(newFilename, ext)}.png`
-        const newThumbPath = path.join(thumbnailsDir, newThumbFilename)
-
-        await fs.copy(thumbSourcePath, newThumbPath)
-        thumbnailPath = newThumbPath
-      }
+      // We don't copy physical thumbnails anymore,
+      // they will be generated if missing or we could just skip for copy
+      // For now, let's just return the new file path.
+      // Frontend can handle thumbnail migration or re-generation if needed.
 
       return {
         filePath: destinationPath,
-        thumbnailPath,
       }
     } catch (error) {
       console.error('Failed to copy file:', sourceUrl, error)

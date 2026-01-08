@@ -55,28 +55,42 @@ export function useIndexedDB(config: IndexedDBConfig) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       dbInstance = (await (openDB as any)(config.dbName, config.version, {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        upgrade(db: any) {
+        upgrade(db: any, oldVersion: number) {
           // Create object store for each store
           config.stores.forEach((storeConfig) => {
-            if (!db.objectStoreNames.contains(storeConfig.name)) {
-              const objectStore = storeConfig.autoIncrement
-                ? db.createObjectStore(storeConfig.name, {
-                    autoIncrement: storeConfig.autoIncrement,
-                  })
-                : db.createObjectStore(storeConfig.name, {
-                    keyPath: storeConfig.keyPath,
-                  })
-
-              // Create indices
-              if (storeConfig.indices) {
-                storeConfig.indices.forEach((indexConfig) => {
-                  if (!objectStore.indexNames.contains(indexConfig.name)) {
-                    objectStore.createIndex(indexConfig.name, indexConfig.keyPath, {
-                      unique: indexConfig.unique,
-                    })
-                  }
-                })
+            // If store exists and we are upgrading, we might need to recreate it
+            // if the structure (like keyPath) changed.
+            // For now, only recreate if explicitly needed or if it doesn't exist.
+            if (db.objectStoreNames.contains(storeConfig.name)) {
+              // Special case for MediaDB migration from v1 to v2
+              if (
+                config.dbName === 'MediaDB' &&
+                oldVersion < 2 &&
+                storeConfig.name === 'thumbnails'
+              ) {
+                db.deleteObjectStore(storeConfig.name)
+              } else {
+                return // Skip existing stores
               }
+            }
+
+            const objectStore = storeConfig.autoIncrement
+              ? db.createObjectStore(storeConfig.name, {
+                  autoIncrement: storeConfig.autoIncrement,
+                })
+              : db.createObjectStore(storeConfig.name, {
+                  keyPath: storeConfig.keyPath,
+                })
+
+            // Create indices
+            if (storeConfig.indices) {
+              storeConfig.indices.forEach((indexConfig) => {
+                if (!objectStore.indexNames.contains(indexConfig.name)) {
+                  objectStore.createIndex(indexConfig.name, indexConfig.keyPath, {
+                    unique: indexConfig.unique,
+                  })
+                }
+              })
             }
           })
         },
@@ -120,12 +134,15 @@ export function useIndexedDB(config: IndexedDBConfig) {
    * @param value - Value to save
    * @returns Saved key
    */
-  const put = async <T = unknown>(storeName: string, value: T): Promise<unknown> => {
+  const put = async <T = unknown>(
+    storeName: string,
+    value: T,
+    key?: IDBValidKey,
+  ): Promise<unknown> => {
     try {
       const db = await initDB()
-      // 使用類型斷言來繞過 TypeScript 的嚴格檢查，因為 store 名稱是動態的
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return await (db as any).put(storeName, value)
+      return await (db as any).put(storeName, value, key)
     } catch (error) {
       reportError(error, {
         operation: 'put-indexeddb',
@@ -142,12 +159,15 @@ export function useIndexedDB(config: IndexedDBConfig) {
    * @param value - Value to add
    * @returns Added key
    */
-  const add = async <T = unknown>(storeName: string, value: T): Promise<unknown> => {
+  const add = async <T = unknown>(
+    storeName: string,
+    value: T,
+    key?: IDBValidKey,
+  ): Promise<unknown> => {
     try {
       const db = await initDB()
-      // 使用類型斷言來繞過 TypeScript 的嚴格檢查，因為 store 名稱是動態的
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return await (db as any).add(storeName, value)
+      return await (db as any).add(storeName, value, key)
     } catch (error) {
       reportError(error, {
         operation: 'add-indexeddb',

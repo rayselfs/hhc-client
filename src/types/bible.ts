@@ -75,16 +75,6 @@ export interface StreamingProgress {
 }
 
 /**
- * Bible Cache 配置
- */
-export enum BibleCacheConfig {
-  DB_NAME = 'BibleDB',
-  STORE_NAME = 'bibleContent',
-  SEARCH_INDEX_STORE_NAME = 'bibleSearchIndex',
-  DB_VERSION = 2,
-}
-
-/**
  * Bible Book Configuration
  */
 export enum BibleBookConfig {

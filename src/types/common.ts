@@ -355,7 +355,7 @@ export function getStorageKey(category: StorageCategory, key: StorageKey | strin
 /**
  * File source type - distinguishes between different storage providers
  */
-export type FileSourceType = 'local' | 'cloud' | 'sync' | 'app'
+export type FileSourceType = 'local' | 'cloud' | 'sync'
 
 /**
  * Permission flags for file/folder operations
@@ -390,7 +390,9 @@ export interface FileMetadata {
   width?: number // Image/Video dimensions
   height?: number // Image/Video dimensions
   duration?: number // Video/Audio duration in seconds
-  thumbnail?: string // Video thumbnail URL
+  thumbnail?: string // Video thumbnail URL or Blob URL
+  thumbnailType?: 'url' | 'blob' // Added: source of the thumbnail
+  thumbnailBlobId?: string // Added: key for thumbnails store in IndexedDB
   pageCount?: number // PDF page count
   mimeType?: string // File MIME type
   [key: string]: unknown // Allow extensibility

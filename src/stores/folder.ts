@@ -1,25 +1,21 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 import { v4 as uuidv4 } from 'uuid'
 import { useDebounceFn } from '@vueuse/core'
 import type { Folder, FolderItem, ClipboardItem, FolderStoreConfig } from '@/types/common'
-import { getStorageKey } from '@/types/common'
 import { useFolderManager } from '@/composables/useFolderManager'
-import { useLocalStorage } from '@/composables/useLocalStorage'
 import { fileSystemProviderFactory } from '@/services/filesystem'
+import { useIndexedDB } from '@/composables/useIndexedDB'
+import { MEDIA_DB_CONFIG } from '@/config/db'
 
 /**
  * Generic folder store for managing folder tree structure
- * This store is designed to be reusable for different item types (verses, media files, etc.)
  */
 export const useFolderStore = <TItem extends FolderItem = FolderItem>(
   config: FolderStoreConfig,
 ) => {
   return defineStore(`folder-${config.rootId}`, () => {
-    /**
-     * Root folder containing all top-level folders and root-level items
-     * This is the single source of truth for the folder tree structure
-     */
     const rootFolder = ref<Folder<TItem>>({
       id: config.rootId,
       name: config.defaultRootName,
@@ -29,200 +25,131 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
       timestamp: Date.now(),
     })
 
-    /**
-     * Current folder navigation path
-     * Array of folder IDs representing the current location in the folder tree
-     * [rootId] means at root level
-     */
     const currentFolderPath = ref<string[]>([config.rootId])
-
-    /**
-     * Clipboard for copy/cut operations
-     */
     const clipboard = ref<ClipboardItem<TItem>[]>([])
-
-    /**
-     * Flat index for O(1) lookups
-     */
     const folderMap = new Map<string, Folder<TItem>>()
     const itemMap = new Map<string, TItem>()
 
-    /**
-     * Rebuild the entire index from the root folder
-     */
     const rebuildIndex = () => {
       folderMap.clear()
       itemMap.clear()
-
       const traverse = (folder: Folder<TItem>) => {
         folderMap.set(folder.id, folder)
         folder.items.forEach((item) => itemMap.set(item.id, item))
         folder.folders.forEach((sub) => traverse(sub))
       }
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       traverse(rootFolder.value as any)
     }
 
-    const copyToClipboard = (items: ClipboardItem<TItem>[]) => {
-      clipboard.value = items
-    }
-
-    const cutToClipboard = (items: ClipboardItem<TItem>[]) => {
-      clipboard.value = items
-    }
-
-    const clearClipboard = () => {
-      clipboard.value = []
-    }
-
-    /**
-     * Folder manager for read-only operations
-     * Used for querying folder tree structure
-     */
     const folderManager = useFolderManager(rootFolder, currentFolderPath, {
       rootId: config.rootId,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       folderMap: folderMap as any,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       itemMap: itemMap as any,
     })
+
     const {
       currentFolder,
       getFolderById,
-      deleteFolderRecursive,
+      deleteFolderRecursive: _deleteFolderRecursive,
       updateFolderInTree,
       isFolderInside,
       getMoveTargets,
     } = folderManager
 
-    const { getLocalItem, setLocalItem } = useLocalStorage()
+    const db = useIndexedDB(MEDIA_DB_CONFIG)
 
-    /**
-     * Load root folder from LocalStorage
-     */
-    const loadRootFolder = () => {
-      const saved = getLocalItem<Folder<TItem>>(
-        getStorageKey(config.storageCategory, config.storageKey),
-        'object',
-      )
+    const deleteFolderRecursive = async (folders: Folder<TItem>[], folderId: string) => {
+      const folderToRemove = folderMap.get(folderId)
+      if (folderToRemove) {
+        const collectItemIds = (f: Folder<TItem>, ids: string[]) => {
+          f.items.forEach((item) => ids.push(item.id))
+          f.folders.forEach((sub) => collectItemIds(sub, ids))
+        }
+        const itemIds: string[] = []
+        collectItemIds(folderToRemove, itemIds)
 
-      if (saved && saved.id === config.rootId) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        rootFolder.value = saved as any
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        if (checkExpiredContent(rootFolder.value as any)) {
-          saveRootFolder() // Save immediately if items were removed
-          rebuildIndex() // Rebuild again if expired items removed
-        } else {
-          rebuildIndex() // Build index anyway
+        for (const itemId of itemIds) {
+          const item = itemMap.get(itemId)
+          if ((item as any)?.metadata?.thumbnailBlobId) {
+            await db.delete('thumbnails', (item as any).metadata.thumbnailBlobId)
+          }
         }
       }
+      _deleteFolderRecursive(folders as any, folderId)
     }
 
-    /**
-     * Save root folder to LocalStorage
-     * Debounced to prevent frequent writes
-     */
-    const saveRootFolder = useDebounceFn(() => {
-      setLocalItem(
-        getStorageKey(config.storageCategory, config.storageKey),
-        rootFolder.value,
-        'object',
-      )
-    }, 1000)
-
-    // Watch rootFolder changes and auto-save to LocalStorage
-    watch(
-      rootFolder,
-      () => {
-        saveRootFolder()
-      },
-      { deep: true },
-    )
-
-    /**
-     * Check and remove expired items and folders recursively
-     * @param folder - The folder to check
-     * @returns true if anything was removed
-     */
     const checkExpiredContent = (folder: Folder<TItem>): boolean => {
       let changed = false
       const now = Date.now()
-
-      // 1. Check Items
       const initialItemsLength = folder.items.length
-      folder.items = folder.items.filter((item) => {
-        if (item.expiresAt && item.expiresAt < now) {
-          return false
-        }
-        return true
-      })
-      if (folder.items.length !== initialItemsLength) {
-        changed = true
-      }
+      folder.items = folder.items.filter((item) => !(item.expiresAt && item.expiresAt < now))
+      if (folder.items.length !== initialItemsLength) changed = true
 
-      // 2. Check Subfolders
       const initialFoldersLength = folder.folders.length
       folder.folders = folder.folders.filter((subFolder) => {
-        // If folder itself is expired
-        if (subFolder.expiresAt && subFolder.expiresAt < now) {
-          return false
-        }
-        // If not expired, check its content recursively
-        if (checkExpiredContent(subFolder)) {
-          changed = true
-        }
+        if (subFolder.expiresAt && subFolder.expiresAt < now) return false
+        if (checkExpiredContent(subFolder)) changed = true
         return true
       })
-
-      if (folder.folders.length !== initialFoldersLength) {
-        changed = true
-      }
-
+      if (folder.folders.length !== initialFoldersLength) changed = true
       return changed
     }
 
-    /**
-     * Navigate to root
-     */
-    const navigateToRoot = () => {
-      currentFolderPath.value = [config.rootId]
-    }
+    const saveRootFolder = useDebounceFn(async () => {
+      try {
+        await db.put('folder-structure', JSON.parse(JSON.stringify(rootFolder.value)))
+      } catch (error) {
+        console.error('Failed to save root folder to IndexedDB:', error)
+      }
+    }, 1000)
 
-    /**
-     * Navigate to a specific folder by ID
-     * If the folder ID is already in the path, navigates to that position
-     * Otherwise, navigates to the end of current path
-     * @param folderId - The folder ID to navigate to
-     */
-    const navigateToFolder = (folderId: string) => {
-      const index = currentFolderPath.value.indexOf(folderId)
-      if (index !== -1) {
-        // Navigate to existing position in path
-        currentFolderPath.value = currentFolderPath.value.slice(0, index + 1)
-      } else {
-        // Add to end of path
-        currentFolderPath.value = [...currentFolderPath.value, folderId]
+    const loadRootFolder = async () => {
+      try {
+        const savedFolder = await db.get<Folder<TItem>>('folder-structure', config.rootId)
+        if (savedFolder && savedFolder.id === config.rootId) {
+          rootFolder.value = savedFolder as any
+          if (checkExpiredContent(rootFolder.value as any)) {
+            await saveRootFolder()
+          }
+          rebuildIndex()
+        } else {
+          rebuildIndex()
+        }
+      } catch (error) {
+        console.error('Failed to load root folder from IndexedDB:', error)
+        rebuildIndex()
       }
     }
 
-    /**
-     * Enter a folder (add to navigation path)
-     * @param folderId - The folder ID to enter
-     */
+    watch(rootFolder, () => saveRootFolder(), { deep: true })
+
+    const copyToClipboard = (items: ClipboardItem<TItem>[]) => {
+      clipboard.value = items
+    }
+    const cutToClipboard = (items: ClipboardItem<TItem>[]) => {
+      clipboard.value = items
+    }
+    const clearClipboard = () => {
+      clipboard.value = []
+    }
+    const navigateToRoot = () => {
+      currentFolderPath.value = [config.rootId]
+    }
     const enterFolder = (folderId: string) => {
       currentFolderPath.value = [...currentFolderPath.value, folderId]
     }
 
-    /**
-     * Add a new folder to the current folder
-     * @param name - The name of the new folder
-     * @param expiresAt - Optional timestamp when the folder should expire
-     */
+    const navigateToFolder = (folderId: string) => {
+      const index = currentFolderPath.value.indexOf(folderId)
+      if (index !== -1) {
+        currentFolderPath.value = currentFolderPath.value.slice(0, index + 1)
+      } else {
+        currentFolderPath.value = [...currentFolderPath.value, folderId]
+      }
+    }
+
     const addFolderToCurrent = (name: string, expiresAt?: number | null) => {
       if (!name.trim()) return
-
       const newFolder: Folder<TItem> = {
         id: uuidv4(),
         name: name.trim(),
@@ -232,171 +159,91 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
         parentId: currentFolder.value?.id,
         timestamp: Date.now(),
         expiresAt: expiresAt || null,
-        sourceType: 'app', // Default as virtual folder
-        isLoaded: true, // Virtual folders are always "loaded"
+        sourceType: 'local',
+        isLoaded: true,
       }
-
-      // Direct mutation - Vue reactivity will handle the update
-      // @ts-expect-error - Vue's ref type system, runtime safe
-      currentFolder.value.folders.push(newFolder)
-
-      // Update index
+      currentFolder.value.folders.push(newFolder as any)
       folderMap.set(newFolder.id, newFolder)
     }
 
-    /**
-     * Add an item to the current folder
-     * Pure push operation without any duplicate checking
-     * Business logic (duplicate checks) should be handled by the calling store
-     * @param item - The item to add
-     */
     const addItemToCurrent = (item: TItem): void => {
-      // Direct mutation - no checking, pure push
-      // @ts-expect-error - Vue's ref type system, runtime safe
-      currentFolder.value.items.push(item)
-
-      // Update index
+      currentFolder.value.items.push(item as any)
       itemMap.set(item.id, item)
     }
 
-    /**
-     * Remove an item from the current folder
-     * @param itemId - The ID of the item to remove
-     */
-    const removeItemFromCurrent = (itemId: string) => {
-      // Direct mutation
+    const removeItemFromCurrent = async (itemId: string) => {
+      const item = itemMap.get(itemId)
+      if ((item as any)?.metadata?.thumbnailBlobId) {
+        await db.delete('thumbnails', (item as any).metadata.thumbnailBlobId)
+      }
       currentFolder.value.items = currentFolder.value.items.filter((item) => item.id !== itemId)
-
-      // Update index
       itemMap.delete(itemId)
     }
 
-    /**
-     * Add an item to a specific folder
-     * @param folderId - The target folder ID
-     * @param item - The item to add
-     */
     const addItemToFolder = (folderId: string, item: TItem) => {
       if (folderId === config.rootId) {
-        // @ts-expect-error - Vue's ref type system, runtime safe
-        rootFolder.value.items.push(item)
+        rootFolder.value.items.push(item as any)
+        itemMap.set(item.id, item)
       } else {
-        updateFolderInTree(rootFolder.value.folders, folderId, (folder) => {
-          // @ts-expect-error - Vue's ref type system, runtime safe
-          folder.items.push(item)
+        updateFolderInTree(rootFolder.value.folders as any, folderId, (folder) => {
+          folder.items.push(item as any)
+          itemMap.set(item.id, item)
         })
       }
     }
 
-    /**
-     * Delete a folder and all its subfolders
-     * @param folderId - The ID of the folder to delete
-     */
-    const deleteFolder = (folderId: string) => {
-      // Direct mutation using helper from folderManager
-      deleteFolderRecursive(rootFolder.value.folders, folderId)
-
-      // Rebuild index after deletion to ensure all sub-items/folders are removed from maps
+    const deleteFolder = async (folderId: string) => {
+      await deleteFolderRecursive(rootFolder.value.folders as any, folderId)
       rebuildIndex()
     }
 
-    /**
-     * Update a folder's properties
-     * @param folderId - The ID of the folder to update
-     * @param updates - The properties to update
-     */
     const updateFolder = (
       folderId: string,
       updates: { name?: string; expiresAt?: number | null },
     ) => {
-      updateFolderInTree(rootFolder.value.folders, folderId, (folder) => {
-        if (updates.name !== undefined) {
-          folder.name = updates.name.trim()
-        }
-        if (updates.expiresAt !== undefined) {
-          folder.expiresAt = updates.expiresAt
-        }
+      updateFolderInTree(rootFolder.value.folders as any, folderId, (folder) => {
+        if (updates.name !== undefined) folder.name = updates.name.trim()
+        if (updates.expiresAt !== undefined) folder.expiresAt = updates.expiresAt
         folder.timestamp = Date.now()
       })
     }
 
-    /**
-     * Reorder items in the current folder
-     * @param orderedItems - The items in the new order
-     */
     const reorderCurrentItems = (orderedItems: TItem[]) => {
-      // Direct mutation
-      // @ts-expect-error - Vue's ref type system, runtime safe
-      currentFolder.value.items = orderedItems
+      currentFolder.value.items = orderedItems as any
     }
-
-    /**
-     * Reorder folders in the current folder
-     * @param orderedFolders - The folders in the new order
-     */
     const reorderCurrentFolders = (orderedFolders: Folder<TItem>[]) => {
-      // Direct mutation
-      // @ts-expect-error - Vue's ref type system, runtime safe
-      currentFolder.value.folders = orderedFolders
+      currentFolder.value.folders = orderedFolders as any
     }
 
-    /**
-     * Update an item's properties
-     * @param itemId - The ID of the item to update
-     * @param folderId - The ID of the folder containing the item
-     * @param updates - The properties to update
-     */
     const updateItem = (itemId: string, folderId: string, updates: Partial<TItem>) => {
       if (folderId === config.rootId) {
         const item = rootFolder.value.items.find((i) => i.id === itemId)
-        if (item) {
-          Object.assign(item, updates)
-        }
+        if (item) Object.assign(item, updates)
       } else {
-        updateFolderInTree(rootFolder.value.folders, folderId, (folder) => {
-          const item = folder.items.find((i) => i.id === itemId)
-          if (item) {
-            Object.assign(item, updates)
-          }
+        updateFolderInTree(rootFolder.value.folders as any, folderId, (folder) => {
+          const item = folder.items.find((i) => (i as any).id === itemId)
+          if (item) Object.assign(item, updates)
         })
       }
     }
 
-    /**
-     * Move an item from source to target folder
-     * @param item - The item to move
-     * @param targetFolderId - The target folder ID (use rootId for root)
-     * @param sourceFolderId - The source folder ID (use rootId for root)
-     */
     const moveItem = (item: TItem, targetFolderId: string, sourceFolderId: string) => {
-      // Remove from source - direct mutation
       if (sourceFolderId === config.rootId) {
         rootFolder.value.items = rootFolder.value.items.filter((i) => i.id !== item.id)
       } else {
-        updateFolderInTree(rootFolder.value.folders, sourceFolderId, (folder) => {
+        updateFolderInTree(rootFolder.value.folders as any, sourceFolderId, (folder) => {
           folder.items = folder.items.filter((i) => i.id !== item.id)
         })
       }
-
-      // Add to target - direct mutation
       if (targetFolderId === config.rootId) {
-        // @ts-expect-error - Vue's ref type system, runtime safe
-        rootFolder.value.items.push(item)
+        rootFolder.value.items.push(item as any)
       } else {
-        updateFolderInTree(rootFolder.value.folders, targetFolderId, (folder) => {
-          // @ts-expect-error - Vue's ref type system, runtime safe
-          folder.items.push(item)
+        updateFolderInTree(rootFolder.value.folders as any, targetFolderId, (folder) => {
+          folder.items.push(item as any)
         })
       }
     }
 
-    /**
-     * Move a folder from source to target
-     * @param folderToMove - The folder to move
-     * @param targetFolderId - The target folder ID (use rootId for root level)
-     * @param sourceFolderId - The source folder ID (use rootId for root level)
-     * @returns true if successful, false if invalid move
-     */
     const moveFolder = (
       folderToMove: Folder<TItem>,
       targetFolderId: string,
@@ -404,158 +251,101 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
     ): boolean => {
       const targetFolder =
         targetFolderId === config.rootId ? rootFolder.value : getFolderById(targetFolderId)
+      if (!targetFolder || isFolderInside(folderToMove as any, targetFolder as any)) return false
 
-      if (!targetFolder) return false
-
-      // Prevent moving folder into itself or its children
-      // @ts-expect-error - Vue's ref type system, runtime safe
-      if (isFolderInside(folderToMove, targetFolder)) {
-        return false
-      }
-
-      // Remove from source - direct mutation
       if (sourceFolderId === config.rootId) {
         rootFolder.value.folders = rootFolder.value.folders.filter((f) => f.id !== folderToMove.id)
       } else {
-        updateFolderInTree(rootFolder.value.folders, sourceFolderId, (folder) => {
+        updateFolderInTree(rootFolder.value.folders as any, sourceFolderId, (folder) => {
           folder.folders = folder.folders.filter((f) => f.id !== folderToMove.id)
         })
       }
 
-      // Add to target - direct mutation
       if (targetFolderId === config.rootId) {
         folderToMove.parentId = config.rootId
-        // @ts-expect-error - Vue's ref type system, runtime safe
-        rootFolder.value.folders.push(folderToMove)
+        rootFolder.value.folders.push(folderToMove as any)
       } else {
-        updateFolderInTree(rootFolder.value.folders, targetFolderId, (folder) => {
+        updateFolderInTree(rootFolder.value.folders as any, targetFolderId, (folder) => {
           folderToMove.parentId = targetFolder.id
-          // @ts-expect-error - Vue's ref type system, runtime safe
-          folder.folders.push(folderToMove)
+          folder.folders.push(folderToMove as any)
         })
       }
-
       return true
     }
 
-    /**
-     * Deep clone a folder and all its contents, generating new IDs
-     * @param folder - The folder to clone
-     * @param parentId - The ID of the parent folder for the new clone
-     */
     const deepCloneFolder = (folder: Folder<TItem>, parentId: string): Folder<TItem> => {
       const newFolderId = uuidv4()
-
-      // Deep clone items with new IDs
       const newItems = folder.items.map((item) => ({
         ...item,
         id: uuidv4(),
-        // Update timestamp if it exists (common for items)
-        ...('timestamp' in item ? { timestamp: Date.now() } : {}),
+        timestamp: Date.now(),
       }))
-
-      // Recursively deep clone sub-folders
       const newSubFolders = folder.folders.map((subFolder) =>
         deepCloneFolder(subFolder, newFolderId),
       )
-
       return {
         ...folder,
         id: newFolderId,
-        parentId: parentId,
+        parentId,
         items: newItems,
         folders: newSubFolders,
-        expanded: false, // Collapse pasted folders by default
-        timestamp: Date.now(), // Update timestamp for the clone
+        expanded: false,
+        timestamp: Date.now(),
       }
     }
 
-    /**
-     * Paste an item (verse or folder) to a target folder
-     * Creates a copy with new ID
-     * @param item - The item to paste (can be TItem or Folder)
-     * @param targetFolderId - The target folder ID (use rootId for root)
-     * @param itemType - The type of item ('verse' or 'folder')
-     */
     const pasteItem = (
       item: TItem | Folder<TItem>,
       targetFolderId: string,
       itemType: 'verse' | 'file' | 'folder',
     ) => {
       if (itemType === 'verse' || itemType === 'file') {
-        const verseItem = item as TItem
-        const newItem: TItem = {
-          ...verseItem,
-          id: uuidv4(),
-          timestamp: Date.now(),
-        }
-
+        const newItem: TItem = { ...(item as TItem), id: uuidv4(), timestamp: Date.now() }
         if (targetFolderId === config.rootId) {
-          // @ts-expect-error - Vue's ref type system, runtime safe
-          rootFolder.value.items.push(newItem)
+          rootFolder.value.items.push(newItem as any)
           itemMap.set(newItem.id, newItem)
         } else {
-          updateFolderInTree(rootFolder.value.folders, targetFolderId, (folder) => {
-            // @ts-expect-error - Vue's ref type system, runtime safe
-            folder.items.push(newItem)
+          updateFolderInTree(rootFolder.value.folders as any, targetFolderId, (folder) => {
+            folder.items.push(newItem as any)
             itemMap.set(newItem.id, newItem)
           })
         }
       } else {
-        const folder = item as Folder<TItem>
-        // Use deep clone to prevent shared references
-        const newFolder = deepCloneFolder(folder, targetFolderId)
-
+        const newFolder = deepCloneFolder(item as Folder<TItem>, targetFolderId)
         if (targetFolderId === config.rootId) {
-          // @ts-expect-error - Vue's ref type system, runtime safe
-          rootFolder.value.folders.push(newFolder)
-          rebuildIndex()
+          rootFolder.value.folders.push(newFolder as any)
         } else {
-          updateFolderInTree(rootFolder.value.folders, targetFolderId, (target) => {
-            // @ts-expect-error - Vue's ref type system, runtime safe
-            target.folders.push(newFolder)
-            rebuildIndex()
+          updateFolderInTree(rootFolder.value.folders as any, targetFolderId, (target) => {
+            target.folders.push(newFolder as any)
           })
         }
+        rebuildIndex()
       }
     }
 
-    /**
-     * Load children items and folders for a specific folder (Lazy Loading)
-     */
     const loadChildren = async (folderId: string) => {
       const folder = folderMap.get(folderId)
       if (!folder || folder.isLoaded) return
-
-      // Skip lazy loading for virtual/app-managed folders
-      if (folder.sourceType === 'app') {
+      if (folder.sourceType === 'local') {
         folder.isLoaded = true
         return
       }
-
       try {
-        const provider = fileSystemProviderFactory.getProvider(folder.sourceType || 'local')
+        const provider = fileSystemProviderFactory.getProvider(folder.sourceType || 'sync')
         if (!provider.listDirectory) {
           folder.isLoaded = true
           return
         }
-
         const result = await provider.listDirectory(folder.id)
         if (result.success && result.data) {
-          // Clear current content before adding new ones
           folder.items = []
           folder.folders = []
-
           result.data.forEach((entry) => {
-            if ('type' in entry && entry.type === 'file') {
-              folder.items.push(entry as unknown as TItem)
-            } else {
-              folder.folders.push(entry as unknown as Folder<TItem>)
-            }
+            if ('type' in entry && entry.type === 'file') folder.items.push(entry as any)
+            else folder.folders.push(entry as any)
           })
-
           folder.isLoaded = true
-          rebuildIndex() // Update the flat index with new items
+          rebuildIndex()
         }
       } catch (error) {
         console.error(`Failed to load children for folder ${folderId}:`, error)
@@ -563,24 +353,19 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
     }
 
     return {
-      // Folder State
       rootFolder,
       currentFolderPath,
-      // Folder Management
       loadRootFolder,
       saveRootFolder,
-      // Folder Navigation
       navigateToRoot,
       navigateToFolder,
       enterFolder,
-      // Folder Operations (read-only computed)
       currentFolder,
       getCurrentFolders: folderManager.getCurrentFolders,
       getCurrentItems: folderManager.getCurrentItems,
       getFolderById,
       getMoveTargets,
       isFolderInside,
-      // Folder Operations (write actions)
       addFolderToCurrent,
       addItemToCurrent,
       addItemToFolder,
@@ -594,11 +379,10 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
       moveFolder,
       pasteItem,
       loadChildren,
-      // Clipboard
       clipboard,
       copyToClipboard,
       cutToClipboard,
       clearClipboard,
     }
-  })()
+  })
 }

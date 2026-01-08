@@ -11,7 +11,7 @@ import type {
   PreviewVerse,
 } from '@/types/bible'
 import type { VerseItem } from '@/types/common'
-import { BibleCacheConfig } from '@/types/bible'
+import { BIBLE_DB_CONFIG } from '@/config/db'
 import { StorageKey, StorageCategory, getStorageKey } from '@/types/common'
 import { BIBLE_CONFIG } from '@/config/app'
 import { useIndexedDB } from '@/composables/useIndexedDB'
@@ -124,20 +124,7 @@ export const useBibleStore = defineStore('bible', () => {
    * IndexedDB instance for Bible content cache
    * Stores Bible content by version code for offline access
    */
-  const bibleIndexedDB = useIndexedDB({
-    dbName: BibleCacheConfig.DB_NAME as string,
-    version: BibleCacheConfig.DB_VERSION as number,
-    stores: [
-      {
-        name: BibleCacheConfig.STORE_NAME as string,
-        keyPath: 'version_code',
-      },
-      {
-        name: BibleCacheConfig.SEARCH_INDEX_STORE_NAME as string,
-        keyPath: 'version_code',
-      },
-    ],
-  })
+  const bibleIndexedDB = useIndexedDB(BIBLE_DB_CONFIG)
 
   /**
    * FlexSearch instance for Bible verse search
@@ -335,10 +322,7 @@ export const useBibleStore = defineStore('bible', () => {
     }
 
     try {
-      const cached = await bibleIndexedDB.get<BibleContent>(
-        BibleCacheConfig.STORE_NAME,
-        versionCode,
-      )
+      const cached = await bibleIndexedDB.get<BibleContent>('bibleContent', versionCode)
       if (cached) {
         currentBibleContent.value = cached
         return cached
@@ -372,7 +356,7 @@ export const useBibleStore = defineStore('bible', () => {
       try {
         const content = await getBibleContentAPI(version.id)
         const contentWithVersion = mergeVersionInfoToContent(content, version)
-        await bibleIndexedDB.put<BibleContent>(BibleCacheConfig.STORE_NAME, contentWithVersion)
+        await bibleIndexedDB.put<BibleContent>('bibleContent', contentWithVersion)
         return contentWithVersion
       } finally {
         fetchPromises.delete(version.code)
@@ -465,10 +449,7 @@ export const useBibleStore = defineStore('bible', () => {
     }
 
     try {
-      const cached = await bibleIndexedDB.get<BibleSearchIndexData>(
-        BibleCacheConfig.SEARCH_INDEX_STORE_NAME,
-        versionCode,
-      )
+      const cached = await bibleIndexedDB.get<BibleSearchIndexData>('bibleSearchIndex', versionCode)
 
       if (cached && cached.updated_at === updatedAt && cached.documents_data) {
         await indexDocuments(cached.documents_data)
@@ -494,7 +475,7 @@ export const useBibleStore = defineStore('bible', () => {
     }
 
     const cachedIndex = await bibleIndexedDB.get<BibleSearchIndexData>(
-      BibleCacheConfig.SEARCH_INDEX_STORE_NAME,
+      'bibleSearchIndex',
       version.code,
     )
     if (cachedIndex && cachedIndex.updated_at === version.updated_at) {
@@ -506,7 +487,7 @@ export const useBibleStore = defineStore('bible', () => {
       try {
         const content = await getBibleContent(version.code)
         const index = await buildSearchIndex(content)
-        await bibleIndexedDB.put(BibleCacheConfig.SEARCH_INDEX_STORE_NAME, index)
+        await bibleIndexedDB.put('bibleSearchIndex', index)
         return index
       } finally {
         fetchSearchIndexPromises.delete(version.code)

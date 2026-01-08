@@ -3,10 +3,11 @@ import type { FileItem } from '@/types/common'
 import { StorageCategory, StorageKey } from '@/types/common'
 
 export const useMediaStore = () => {
-  return useFolderStore<FileItem>({
+  const useStore = useFolderStore<FileItem>({
     rootId: 'media-root',
     defaultRootName: 'Media Library',
     storageCategory: StorageCategory.MEDIA,
     storageKey: StorageKey.FOLDERS,
   })
+  return useStore()
 }
