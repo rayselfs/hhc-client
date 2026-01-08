@@ -1,9 +1,12 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
+import { v4 as uuidv4 } from 'uuid'
 import { APP_CONFIG } from '@/config/app'
+import { MEDIA_DB_CONFIG } from '@/config/db'
 import { useMediaStore } from '@/stores/media'
 import { useFileSystem } from '@/composables/useFileSystem'
+import { useIndexedDB } from '@/composables/useIndexedDB'
 import type { UseFolderDialogsReturn } from './useFolderDialogs'
 import type { Folder, FileItem, ClipboardItem } from '@/types/common'
 
@@ -18,6 +21,7 @@ export function useMediaOperations(
 ) {
   const { t } = useI18n()
   const fileSystem = useFileSystem()
+  const db = useIndexedDB(MEDIA_DB_CONFIG)
   const {
     currentFolderPath,
     getCurrentFolders: currentFolders,
@@ -272,6 +276,41 @@ export function useMediaOperations(
   }
 
   /**
+   * Duplicate a thumbnail blob in IndexedDB
+   * Creates a new entry with a new UUID and returns the new thumbnailBlobId
+   * @param thumbnailBlobId - The original thumbnail blob ID
+   * @param newItemId - The ID of the new copied item
+   * @returns The new thumbnailBlobId, or null if duplication failed
+   */
+  const duplicateThumbnailBlob = async (
+    thumbnailBlobId: string,
+    newItemId: string,
+  ): Promise<string | null> => {
+    try {
+      const originalThumbnail = await db.get<{ id: string; blob: Blob; itemId: string }>(
+        'thumbnails',
+        thumbnailBlobId,
+      )
+
+      if (!originalThumbnail || !originalThumbnail.blob) {
+        return null
+      }
+
+      const newBlobId = uuidv4()
+      await db.put('thumbnails', {
+        id: newBlobId,
+        blob: originalThumbnail.blob,
+        itemId: newItemId,
+      })
+
+      return newBlobId
+    } catch (error) {
+      console.warn('Failed to duplicate thumbnail blob:', error)
+      return null
+    }
+  }
+
+  /**
    * Duplicate physical files using the file system provider
    * For folders, recursively duplicates all contained files
    */
@@ -312,19 +351,49 @@ export function useMediaOperations(
       const result = await fileSystem.copyFile(fileItem)
 
       if (result.success && result.data) {
+        const newItemId = uuidv4()
+        const newMetadata = {
+          ...fileItem.metadata,
+          thumbnail: result.data.thumbnailUrl || fileItem.metadata.thumbnail,
+        }
+
+        // Duplicate the thumbnail blob in IndexedDB if it exists
+        if (fileItem.metadata.thumbnailBlobId) {
+          const newBlobId = await duplicateThumbnailBlob(
+            fileItem.metadata.thumbnailBlobId,
+            newItemId,
+          )
+          if (newBlobId) {
+            newMetadata.thumbnailBlobId = newBlobId
+          }
+        }
+
         return {
           ...fileItem,
+          id: newItemId,
           url: result.data.fileUrl,
-          metadata: {
-            ...fileItem.metadata,
-            thumbnail: result.data.thumbnailUrl || fileItem.metadata.thumbnail,
-          },
+          metadata: newMetadata,
         }
       }
 
       // If copy failed, return a clone (the logical copy still works)
+      // Still need to duplicate thumbnail if present
       console.warn('Physical file copy failed, using logical copy:', result.error)
-      return { ...fileItem }
+      const newItemId = uuidv4()
+      const newMetadata = { ...fileItem.metadata }
+
+      if (fileItem.metadata.thumbnailBlobId) {
+        const newBlobId = await duplicateThumbnailBlob(fileItem.metadata.thumbnailBlobId, newItemId)
+        if (newBlobId) {
+          newMetadata.thumbnailBlobId = newBlobId
+        }
+      }
+
+      return {
+        ...fileItem,
+        id: newItemId,
+        metadata: newMetadata,
+      }
     }
   }
 
