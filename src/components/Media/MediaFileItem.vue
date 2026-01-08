@@ -41,12 +41,6 @@
             @click="$emit('edit', item)"
           ></v-list-item>
           <v-list-item
-            v-if="canMove"
-            prepend-icon="mdi-folder-move-outline"
-            :title="$t('common.move')"
-            @click="$emit('move', item)"
-          ></v-list-item>
-          <v-list-item
             prepend-icon="mdi-content-copy"
             :title="$t('common.copy')"
             @click="$emit('copy')"
@@ -128,7 +122,6 @@ const props = defineProps<{
 
 defineEmits<{
   (e: 'edit', item: FileItem): void
-  (e: 'move', item: FileItem): void
   (e: 'copy'): void
   (e: 'cut'): void
   (e: 'delete', item: FileItem): void

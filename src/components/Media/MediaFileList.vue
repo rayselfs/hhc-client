@@ -17,7 +17,6 @@
               @dblclick="previewFile(item)"
               @contextmenu.prevent="openContextMenu(item, $event)"
               @edit="emit('edit', item)"
-              @move="emit('move', item)"
               @copy="emit('copy')"
               @cut="emit('cut')"
               @delete="emit('delete', item)"
@@ -50,7 +49,6 @@ const emit = defineEmits<{
   (e: 'preview', item: FileItem): void
   (e: 'context-menu', item: FileItem, event: MouseEvent): void
   (e: 'edit', item: FileItem): void
-  (e: 'move', item: FileItem): void
   (e: 'copy'): void
   (e: 'cut'): void
   (e: 'delete', item: FileItem): void
