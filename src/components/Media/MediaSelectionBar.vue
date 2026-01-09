@@ -1,5 +1,5 @@
 <template>
-  <div class="d-flex align-center bg-grey-darken-4 rounded-lg w-100">
+  <v-sheet class="d-flex align-center rounded-lg w-100">
     <v-btn
       icon="mdi-close"
       variant="text"
@@ -47,7 +47,7 @@
       :title="$t('common.delete')"
       @click="$emit('delete')"
     ></v-btn>
-  </div>
+  </v-sheet>
 </template>
 
 <script setup lang="ts">

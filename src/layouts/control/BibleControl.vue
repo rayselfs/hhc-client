@@ -739,15 +739,11 @@ onUnmounted(() => {
 }
 
 .verse-item:hover {
-  background-color: rgba(var(--v-theme-primary), 0.2);
+  background-color: rgba(var(--v-theme-primary), 0.5);
 }
 
 .verse-highlighted {
-  background-color: rgba(var(--v-theme-primary), 0.1);
-}
-
-.verse-highlighted .verse-number {
-  color: rgb(var(--v-theme-primary));
+  background-color: rgba(var(--v-theme-primary), 0.4);
 }
 
 .verse-btn {

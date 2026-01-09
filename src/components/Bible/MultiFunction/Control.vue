@@ -653,34 +653,4 @@ const showFolderSettings = () => {
 }
 </script>
 
-<style scoped>
-.verse-item {
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-  border-radius: 4px;
-  user-select: none; /* 防止文字選擇 */
-}
-
-.verse-item:hover {
-  background-color: rgba(var(--v-theme-primary), 0.1);
-}
-
-.verse-item.drag-over {
-  background-color: rgba(var(--v-theme-primary), 0.2) !important;
-  border: 2px dashed rgba(var(--v-theme-primary), 0.5);
-}
-
-.selected-target {
-  background-color: rgba(var(--v-theme-primary), 0.15) !important;
-  border: 1px solid rgba(var(--v-theme-primary), 0.3);
-}
-
-.verse-btn {
-  opacity: 0;
-  transition: opacity 0.2s ease;
-}
-
-.verse-item:hover .verse-btn {
-  opacity: 1;
-}
-</style>
+<style scoped></style>

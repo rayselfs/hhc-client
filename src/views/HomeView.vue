@@ -20,13 +20,14 @@
           :value="index"
           @click="handleMenuItemClick(item)"
           :active="currentView === item.component"
-          class="menu-item"
           color="primary"
         >
           <template #prepend>
             <v-icon :icon="item.icon" size="24"></v-icon>
           </template>
-          <v-list-item-title v-if="!drawerCollapsed">{{ $t(item.title) }}</v-list-item-title>
+          <v-list-item-title v-if="!drawerCollapsed" class="font-weight-medium">
+            {{ $t(item.title) }}
+          </v-list-item-title>
         </v-list-item>
       </v-list>
     </v-navigation-drawer>
@@ -174,4 +175,18 @@ onBeforeUnmount(() => {
 })
 </script>
 
-<style scoped></style>
+<style scoped>
+:deep(.v-list-item--active) {
+  background-color: rgb(var(--v-theme-primary)) !important;
+  color: rgb(var(--v-theme-on-primary)) !important;
+  opacity: 1 !important;
+}
+
+:deep(.v-list-item--active .v-list-item__overlay) {
+  display: none !important;
+}
+
+:deep(.v-list-item--active .v-icon) {
+  color: inherit !important;
+}
+</style>

@@ -33,10 +33,16 @@
       </v-card-text>
       <v-card-actions>
         <v-spacer />
-        <v-btn @click="$emit('update:modelValue', false)">{{ $t('common.cancel') }}</v-btn>
-        <v-btn color="primary" @click="$emit('confirm')" :disabled="disableConfirm">{{
-          confirmText
+        <v-btn variant="elevated" @click="$emit('update:modelValue', false)">{{
+          $t('common.cancel')
         }}</v-btn>
+        <v-btn
+          variant="elevated"
+          color="primary"
+          @click="$emit('confirm')"
+          :disabled="disableConfirm"
+          >{{ confirmText }}</v-btn
+        >
       </v-card-actions>
     </v-card>
   </v-dialog>

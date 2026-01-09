@@ -8,9 +8,10 @@
               :item="item"
               :is-selected="selectedItems.has(item.id)"
               :is-cut="isCut(item.id)"
+              :is-dragging="draggedItems.has(item.id)"
               :draggable="canMove(item)"
               @dragstart="canMove(item) && onDragStart($event, item)"
-              @dragend="emit('drag-end', $event)"
+              @dragend="onDragEnd"
               @drop="onDrop($event, item)"
               @dragover.prevent
               @click.stop="handleSelection(item.id, $event)"
@@ -35,6 +36,7 @@ import { useDisplay } from 'vuetify'
 import type { FileItem, ClipboardItem, ItemPermissions } from '@/types/common'
 import { DEFAULT_LOCAL_PERMISSIONS } from '@/services/filesystem'
 import MediaFileItem from './MediaFileItem.vue'
+import { useDragAndDrop } from '@/composables/useDragAndDrop'
 
 const props = defineProps<{
   items: FileItem[]
@@ -57,6 +59,11 @@ const emit = defineEmits<{
 }>()
 
 const { name: breakpointName } = useDisplay()
+
+// Drag and Drop
+const { handleDragStart, handleDragEnd, handleDrop, draggedItems } = useDragAndDrop<FileItem>({
+  itemSelector: '.file-item',
+})
 
 // Calculate columns per row based on current breakpoint
 const colsPerRow = computed(() => {
@@ -99,11 +106,21 @@ const isCut = (id: string) => {
 }
 
 const onDragStart = (event: DragEvent, item: FileItem) => {
+  handleDragStart(event, 'file', item, props.selectedItems, () =>
+    props.items.filter((i) => props.selectedItems.has(i.id)),
+  )
   emit('drag-start', event, item)
 }
 
+const onDragEnd = (event: DragEvent) => {
+  handleDragEnd()
+  emit('drag-end', event)
+}
+
 const onDrop = (event: DragEvent, item: FileItem) => {
-  emit('drop', event, item)
+  handleDrop(event, () => {
+    emit('drop', event, item)
+  })
 }
 
 const handleSelection = (id: string, event: MouseEvent) => {

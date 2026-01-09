@@ -79,7 +79,7 @@ const handleRightClick = (event: MouseEvent, item: VerseItem) => {
 }
 
 .verse-item:hover {
-  background-color: rgba(var(--v-theme-primary), 0.1);
+  background-color: rgba(var(--v-theme-primary), 0.4);
 }
 
 .verse-btn {
@@ -91,4 +91,3 @@ const handleRightClick = (event: MouseEvent, item: VerseItem) => {
   opacity: 1;
 }
 </style>
-

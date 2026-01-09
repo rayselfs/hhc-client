@@ -2,11 +2,12 @@
   <div v-if="folders.length > 0" class="mb-6">
     <v-row dense>
       <v-col v-for="folder in folders" :key="folder.id" cols="12" sm="6" md="4" lg="2">
-        <div
-          class="rounded-lg mb-2 folder-item mx-1 user-select-none"
-          style="max-width: 100%"
+        <v-card
+          variant="flat"
+          :color="selectedItems.has(folder.id) ? 'primary' : undefined"
+          :ripple="false"
+          class="mb-2 folder-item mx-1 user-select-none transition-swing rounded-lg"
           :class="[
-            selectedItems.has(folder.id) ? 'bg-primary' : 'bg-grey-darken-4 hover-bg-grey-darken-2',
             { 'item-cut': isCut(folder.id) },
             { 'is-dragging': draggedItems.has(folder.id) },
           ]"
@@ -23,7 +24,7 @@
           @contextmenu.prevent="openContextMenu(folder, $event)"
         >
           <div class="d-flex align-center pa-3 w-100 overflow-hidden">
-            <v-icon icon="mdi-folder" color="grey-darken-1" class="mr-3 flex-shrink-0"></v-icon>
+            <v-icon icon="mdi-folder" class="mr-3 flex-shrink-0"></v-icon>
             <span
               class="text-truncate font-weight-medium flex-grow-1"
               style="min-width: 0"
@@ -39,7 +40,7 @@
               @click.stop="emit('menu-click', folder, $event)"
             ></v-btn>
           </div>
-        </div>
+        </v-card>
       </v-col>
     </v-row>
   </div>
@@ -124,22 +125,14 @@ const openContextMenu = (folder: Folder<FileItem>, event: MouseEvent) => {
 </script>
 
 <style scoped>
-.hover-bg-grey-darken-2:hover {
-  background-color: rgb(var(--v-theme-grey-darken-2)) !important;
-}
-
 .item-cut {
   opacity: 0.5;
 }
 
 .folder-item {
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.1s ease;
   border: 1px solid transparent;
-}
-
-.folder-item:hover {
-  border-color: rgba(var(--v-theme-primary), 0.5);
 }
 
 .is-dragging {

@@ -13,9 +13,10 @@
               <v-col cols="12" align="center">
                 <v-btn-toggle
                   v-model="timerStore.settings.mode"
-                  variant="outlined"
+                  variant="elevated"
                   mandatory
-                  class="mode-toggle"
+                  color="primary"
+                  border
                   @update:model-value="handleModeChange"
                 >
                   <v-btn value="timer" min-width="110">
@@ -480,10 +481,10 @@ onUnmounted(() => {
 }
 
 .preset-item {
-  transition: all 0.3s ease;
+  transition: all 0.1s ease;
 }
 
 .preset-item:hover {
-  background-color: rgba(var(--v-theme-primary), 0.2);
+  background-color: rgba(var(--v-theme-primary), 0.5);
 }
 </style>

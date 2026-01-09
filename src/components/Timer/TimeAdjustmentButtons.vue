@@ -6,7 +6,6 @@
         :key="seconds"
         class="mr-2 ml-2 time-button"
         :color="color"
-        variant="outlined"
         :disabled="isDisabled(seconds)"
         @click="$emit('adjust', seconds)"
       >
@@ -35,7 +34,7 @@ defineEmits<{
 
 const adjustments = [10, 30, 60]
 
-const color = computed(() => (props.type === 'add' ? 'primary' : 'orange'))
+const color = computed(() => (props.type === 'add' ? 'primary' : 'warning'))
 
 const getLabel = (seconds: number) => {
   const prefix = props.type === 'add' ? '+' : '-'

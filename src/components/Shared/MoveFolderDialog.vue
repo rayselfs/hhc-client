@@ -41,8 +41,14 @@
 
       <v-card-actions>
         <v-spacer />
-        <v-btn @click="closeDialog">{{ $t('common.cancel') }}</v-btn>
-        <v-btn color="primary" @click="onConfirm" :disabled="disableConfirm" :loading="loading">
+        <v-btn variant="elevated" @click="closeDialog">{{ $t('common.cancel') }}</v-btn>
+        <v-btn
+          variant="elevated"
+          color="primary"
+          @click="onConfirm"
+          :disabled="disableConfirm"
+          :loading="loading"
+        >
           {{ confirmText || $t('common.move') }}
         </v-btn>
       </v-card-actions>

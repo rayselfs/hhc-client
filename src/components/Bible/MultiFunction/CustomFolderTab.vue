@@ -145,13 +145,13 @@ const handleDrop = (event: DragEvent, targetFolder: Folder<VerseItem>) => {
 <style scoped>
 .verse-item {
   cursor: pointer;
-  transition: background-color 0.2s ease;
+  transition: background-color 0.1s ease;
   border-radius: 4px;
   user-select: none;
 }
 
 .verse-item:hover {
-  background-color: rgba(var(--v-theme-primary), 0.1);
+  background-color: rgba(var(--v-theme-primary), 0.4);
 }
 
 .verse-item.drag-over {
@@ -161,7 +161,7 @@ const handleDrop = (event: DragEvent, targetFolder: Folder<VerseItem>) => {
 
 .verse-btn {
   opacity: 0;
-  transition: opacity 0.2s ease;
+  transition: opacity 0.1s ease;
 }
 
 .verse-item:hover .verse-btn {

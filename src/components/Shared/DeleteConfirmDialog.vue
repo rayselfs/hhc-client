@@ -22,8 +22,12 @@
       </v-card-text>
       <v-card-actions>
         <v-spacer />
-        <v-btn @click="$emit('update:modelValue', false)">{{ $t('common.cancel') }}</v-btn>
-        <v-btn color="error" @click="$emit('confirm')">{{ $t('common.delete') }}</v-btn>
+        <v-btn variant="elevated" @click="$emit('update:modelValue', false)">{{
+          $t('common.cancel')
+        }}</v-btn>
+        <v-btn variant="elevated" color="error" @click="$emit('confirm')">{{
+          $t('common.delete')
+        }}</v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>

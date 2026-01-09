@@ -49,7 +49,7 @@
 
       <v-card-actions>
         <v-spacer></v-spacer>
-        <v-btn color="primary" @click="isOpen = false"> {{ $t('common.close') }} </v-btn>
+        <v-btn @click="isOpen = false"> {{ $t('common.close') }} </v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>
