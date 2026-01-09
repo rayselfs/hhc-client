@@ -145,6 +145,8 @@ export function useFolderManager<TItem extends FolderItem = FolderItem>(
 
   /**
    * Check if a folder is inside another folder (or is the same folder)
+   * Optimized: Uses parent chain traversal instead of recursive tree search
+   * Time complexity: O(depth) instead of O(n)
    * @param folderToMove - The folder to check
    * @param targetFolder - The target folder to check against
    * @returns true if folderToMove is inside targetFolder, false otherwise
@@ -152,10 +154,18 @@ export function useFolderManager<TItem extends FolderItem = FolderItem>(
   const isFolderInside = (folderToMove: Folder<TItem>, targetFolder: Folder<TItem>): boolean => {
     if (folderToMove.id === targetFolder.id) return true
 
-    for (const subFolder of targetFolder.folders) {
-      if (isFolderInside(folderToMove, subFolder)) {
+    // Optimization: Check if targetFolder is inside folderToMove's subtree
+    // by traversing targetFolder's parent chain upward
+    // This is much faster than traversing folderToMove's entire subtree
+    let current = targetFolder
+    while (current && current.parentId && current.parentId !== options.rootId) {
+      if (current.parentId === folderToMove.id) {
         return true
       }
+      // Use folderMap for O(1) lookup if available
+      const parent = options.folderMap ? options.folderMap.get(current.parentId) : null
+      if (!parent) break
+      current = parent
     }
 
     return false

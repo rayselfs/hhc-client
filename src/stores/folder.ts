@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { defineStore } from 'pinia'
-import { ref, watch } from 'vue'
+import { ref } from 'vue'
 import { v4 as uuidv4 } from 'uuid'
 import { useDebounceFn } from '@vueuse/core'
 import {
@@ -111,7 +111,25 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
 
     const saveRootFolder = useDebounceFn(async () => {
       try {
-        await db.put(storeName, JSON.parse(JSON.stringify(rootFolder.value)))
+        // Use requestIdleCallback to avoid blocking main thread during serialization
+        if (typeof requestIdleCallback !== 'undefined') {
+          requestIdleCallback(
+            async () => {
+              try {
+                // Deep clone using JSON (compatible with all data types)
+                const clonedData = JSON.parse(JSON.stringify(rootFolder.value))
+                await db.put(storeName, clonedData)
+              } catch (error) {
+                console.error('Failed to save root folder to IndexedDB:', error)
+              }
+            },
+            { timeout: 2000 },
+          )
+        } else {
+          // Fallback for environments without requestIdleCallback
+          const clonedData = JSON.parse(JSON.stringify(rootFolder.value))
+          await db.put(storeName, clonedData)
+        }
       } catch (error) {
         console.error('Failed to save root folder to IndexedDB:', error)
       }
@@ -135,7 +153,8 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
       }
     }
 
-    watch(rootFolder, () => saveRootFolder(), { deep: true })
+    // Removed deep watch for performance - now manually trigger saveRootFolder() in mutation functions
+    // watch(rootFolder, () => saveRootFolder(), { deep: true })
 
     const copyToClipboard = (items: ClipboardItem<TItem>[]) => {
       clipboard.value = items
@@ -178,11 +197,13 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
       }
       currentFolder.value.folders.push(newFolder as any)
       folderMap.set(newFolder.id, newFolder)
+      saveRootFolder()
     }
 
     const addItemToCurrent = (item: TItem): void => {
       currentFolder.value.items.push(item as any)
       itemMap.set(item.id, item)
+      saveRootFolder()
     }
 
     const removeItemFromCurrent = async (itemId: string) => {
@@ -195,6 +216,7 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
       }
       currentFolder.value.items = currentFolder.value.items.filter((item) => item.id !== itemId)
       itemMap.delete(itemId)
+      saveRootFolder()
     }
 
     const addItemToFolder = (folderId: string, item: TItem) => {
@@ -207,11 +229,13 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
           itemMap.set(item.id, item)
         })
       }
+      saveRootFolder()
     }
 
     const deleteFolder = async (folderId: string) => {
       await deleteFolderRecursive(rootFolder.value.folders as any, folderId)
       rebuildIndex()
+      saveRootFolder()
     }
 
     const updateFolder = (
@@ -223,13 +247,16 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
         if (updates.expiresAt !== undefined) folder.expiresAt = updates.expiresAt
         folder.timestamp = Date.now()
       })
+      saveRootFolder()
     }
 
     const reorderCurrentItems = (orderedItems: TItem[]) => {
-      currentFolder.value.items = orderedItems as any
+      currentFolder.value.items = [...orderedItems] as any
+      saveRootFolder()
     }
     const reorderCurrentFolders = (orderedFolders: Folder<TItem>[]) => {
-      currentFolder.value.folders = orderedFolders as any
+      currentFolder.value.folders = [...orderedFolders] as any
+      saveRootFolder()
     }
 
     const updateItem = (itemId: string, folderId: string, updates: Partial<TItem>) => {
@@ -242,50 +269,58 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
           if (item) Object.assign(item, updates)
         })
       }
+      saveRootFolder()
     }
 
     const moveItem = (item: TItem, targetFolderId: string, sourceFolderId: string) => {
-      if (sourceFolderId === config.rootId) {
-        rootFolder.value.items = rootFolder.value.items.filter((i) => i.id !== item.id)
-      } else {
-        updateFolderInTree(rootFolder.value.folders as any, sourceFolderId, (folder) => {
-          folder.items = folder.items.filter((i) => i.id !== item.id)
-        })
+      // Use folderMap for O(1) lookup instead of recursive search
+      const sourceFolder =
+        sourceFolderId === config.rootId ? rootFolder.value : folderMap.get(sourceFolderId)
+      const targetFolder =
+        targetFolderId === config.rootId ? rootFolder.value : folderMap.get(targetFolderId)
+
+      if (!sourceFolder || !targetFolder) {
+        console.error('moveItem: source or target folder not found')
+        return
       }
-      if (targetFolderId === config.rootId) {
-        rootFolder.value.items.push(item as any)
-      } else {
-        updateFolderInTree(rootFolder.value.folders as any, targetFolderId, (folder) => {
-          folder.items.push(item as any)
-        })
-      }
+
+      // Remove item from source folder
+      sourceFolder.items = sourceFolder.items.filter((i) => i.id !== item.id) as any
+
+      // Add item to target folder
+      targetFolder.items.push(item as any)
+
+      saveRootFolder()
     }
 
     const moveFolder = (
       folderToMove: Folder<TItem>,
       targetFolderId: string,
       sourceFolderId: string,
+      skipSave = false,
     ): boolean => {
+      // Use folderMap for O(1) lookup instead of recursive search
       const targetFolder =
-        targetFolderId === config.rootId ? rootFolder.value : getFolderById(targetFolderId)
-      if (!targetFolder || isFolderInside(folderToMove as any, targetFolder as any)) return false
+        targetFolderId === config.rootId ? rootFolder.value : folderMap.get(targetFolderId)
+      const sourceFolder =
+        sourceFolderId === config.rootId ? rootFolder.value : folderMap.get(sourceFolderId)
 
-      if (sourceFolderId === config.rootId) {
-        rootFolder.value.folders = rootFolder.value.folders.filter((f) => f.id !== folderToMove.id)
-      } else {
-        updateFolderInTree(rootFolder.value.folders as any, sourceFolderId, (folder) => {
-          folder.folders = folder.folders.filter((f) => f.id !== folderToMove.id)
-        })
+      if (!targetFolder || !sourceFolder) {
+        console.error('moveFolder: source or target folder not found')
+        return false
       }
 
-      if (targetFolderId === config.rootId) {
-        folderToMove.parentId = config.rootId
-        rootFolder.value.folders.push(folderToMove as any)
-      } else {
-        updateFolderInTree(rootFolder.value.folders as any, targetFolderId, (folder) => {
-          folderToMove.parentId = targetFolder.id
-          folder.folders.push(folderToMove as any)
-        })
+      if (isFolderInside(folderToMove as any, targetFolder as any)) return false
+
+      // Remove folder from source
+      sourceFolder.folders = sourceFolder.folders.filter((f) => f.id !== folderToMove.id) as any
+
+      // Update parent ID and add to target
+      folderToMove.parentId = targetFolder.id
+      targetFolder.folders.push(folderToMove as any)
+
+      if (!skipSave) {
+        saveRootFolder()
       }
       return true
     }
@@ -338,6 +373,7 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
         }
         rebuildIndex()
       }
+      saveRootFolder()
     }
 
     const loadChildren = async (folderId: string) => {

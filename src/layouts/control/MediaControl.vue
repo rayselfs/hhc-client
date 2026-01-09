@@ -658,7 +658,9 @@ const onDrop = (event: DragEvent, target: FileItem | Folder<FileItem>) => {
       } else if (draggedType === 'folder' && isTargetFolder) {
         const folderItem = currentFolders.value.find((f) => f.id === item.id)
         if (folderItem) {
-          if (moveFolder(folderItem, targetId, currentFolder?.id)) {
+          // Use skipSave=true for all but the last item to avoid multiple saves
+          const isLastItem = validItems.indexOf(item) === validItems.length - 1
+          if (moveFolder(folderItem, targetId, currentFolder?.id, !isLastItem)) {
             moveCount++
           }
         }
