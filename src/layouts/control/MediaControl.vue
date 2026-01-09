@@ -114,31 +114,22 @@
             </div>
           </div>
 
-          <!-- Folders Section -->
-          <MediaFolderList
+          <MediaItemList
             :folders="sortedFolders"
+            :files="sortedItems"
             :selected-items="selectedItems"
             :clipboard="clipboard"
-            @drag-start="onDragStart"
-            @drop="onDrop"
-            @select="handleSelection"
-            @open="openFolder"
-            @context-menu="openContextMenu"
-            @menu-click="handleMenuClick"
-          />
-
-          <!-- Files Section -->
-          <MediaFileList
-            :items="sortedItems"
-            :selected-items="selectedItems"
-            :clipboard="clipboard"
+            :sort-by="sortBy"
+            :sort-order="sortOrder"
+            @update:sort-by="(val: any) => setSort(val)"
             @drag-start="onDragStart"
             @drag-end="handleDragEnd"
             @drop="onDrop"
-            @select="handleSelection"
-            @preview="previewFile"
-            @context-menu="openContextMenu"
-            @menu-click="handleMenuClick"
+            @selection-change="handleSelection"
+            @folder-click="openFolder"
+            @file-click="previewFile"
+            @folder-menu-click="handleMenuClick"
+            @file-menu-click="handleMenuClick"
           />
         </div>
 
@@ -220,17 +211,17 @@
       :style="{ ...selectionBox, backgroundColor: 'rgba(var(--v-theme-primary), 0.1)' }"
     ></div>
 
-    <!-- Item Context Menu -->
+    <!-- Unified Context Menu -->
     <ContextMenu
-      v-if="contextMenuTarget"
-      :key="contextMenuTarget.id + (menuActivator ? '_act' : '_pos')"
-      v-model="showItemContextMenu"
+      v-model="showContextMenu"
       :activator="menuActivator"
       :position="menuPosition"
       close-on-content-click
       raw
     >
+      <!-- Item Context Menu Content -->
       <MediaItemContextMenu
+        v-if="contextMenuTarget"
         :target="contextMenuTarget"
         :is-folder="'items' in contextMenuTarget"
         :clipboard="clipboard"
@@ -241,16 +232,9 @@
         @delete="handleDeleteFromContextMenu"
         @paste-into-folder="handlePasteIntoFolderFromContextMenu"
       />
-    </ContextMenu>
-
-    <!-- Background Context Menu -->
-    <ContextMenu
-      v-model="showBackgroundContextMenu"
-      :position="menuPosition"
-      close-on-content-click
-      raw
-    >
+      <!-- Background Context Menu Content -->
       <MediaBackgroundMenu
+        v-else
         :clipboard="clipboard"
         @create-folder="createNewFolder"
         @upload-file="uploadFile"
@@ -272,8 +256,7 @@ import { useMediaProjectionStore } from '@/stores/mediaProjection'
 import ContextMenu from '@/components/ContextMenu.vue'
 import {
   MediaHeader,
-  MediaFileList,
-  MediaFolderList,
+  MediaItemList,
   MediaPresenter,
   MediaSelectionBar,
   MediaItemContextMenu,
@@ -459,8 +442,7 @@ onMounted(async () => {
 })
 
 const contextMenuTarget = ref<Folder<FileItem> | FileItem | null>(null)
-const showItemContextMenu = ref(false)
-const showBackgroundContextMenu = ref(false)
+const showContextMenu = ref(false)
 const showFabMenu = ref(false)
 const menuActivator = ref<HTMLElement | undefined>(undefined)
 const menuPosition = ref<[number, number] | undefined>(undefined)
@@ -469,41 +451,56 @@ const openBackgroundContextMenu = (event: MouseEvent) => {
   if (isDragging.value) return
   event.preventDefault()
 
+  showFabMenu.value = false
+
+  // Clear context menu target to show background menu content
+  contextMenuTarget.value = null
+
+  // Update position for background context menu
   menuPosition.value = [event.clientX, event.clientY]
   menuActivator.value = undefined
-  showBackgroundContextMenu.value = true
-  showItemContextMenu.value = false
+
+  // Simply open/keep the unified context menu open
+  showContextMenu.value = true
 }
 
 const handleMenuClick = (target: Folder<FileItem> | FileItem, event: MouseEvent) => {
-  event.stopPropagation()
-
-  if (!selectedItems.value.has(target.id)) {
-    handleSelection(target.id, event)
-  }
-
-  contextMenuTarget.value = target
-  menuActivator.value = event.target as HTMLElement
-  menuPosition.value = undefined
-
-  showBackgroundContextMenu.value = false
-  showItemContextMenu.value = true
-}
-
-const openContextMenu = (target: Folder<FileItem> | FileItem, event: MouseEvent) => {
   event.preventDefault()
   event.stopPropagation()
 
+  showFabMenu.value = false
+
   if (!selectedItems.value.has(target.id)) {
     handleSelection(target.id, event)
   }
 
-  contextMenuTarget.value = target
-  menuActivator.value = undefined
-  menuPosition.value = [event.clientX, event.clientY]
+  // Check if we're already showing the context menu
+  const wasShowingContextMenu = showContextMenu.value
 
-  showBackgroundContextMenu.value = false
-  showItemContextMenu.value = true
+  // Set the target to show item menu content
+  contextMenuTarget.value = target
+
+  // If it's a contextmenu event (Right Click), show at mouse position
+  // If it's a click event (3-dot button), show at element position
+  if (event.type === 'contextmenu') {
+    menuActivator.value = undefined
+    menuPosition.value = [event.clientX, event.clientY]
+  } else {
+    menuActivator.value = event.target as HTMLElement
+    menuPosition.value = undefined
+  }
+
+  if (wasShowingContextMenu) {
+    // Already showing context menu, just update position and target
+    // The menu content will automatically switch based on contextMenuTarget
+    // No need to toggle visibility
+  } else {
+    // Fresh open: use 50ms delay to prevent race condition where "click-outside"
+    // from previous menu interactions might fire, causing the new menu to immediately close.
+    setTimeout(() => {
+      showContextMenu.value = true
+    }, 50)
+  }
 }
 
 const openFolder = async (folderId: string) => {

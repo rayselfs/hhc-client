@@ -3,8 +3,8 @@
     variant="flat"
     :color="isSelected ? 'primary' : undefined"
     :ripple="false"
-    class="file-item user-select-none d-flex flex-column h-100 position-relative transition-swing"
-    style="aspect-ratio: 1; max-width: 100%"
+    class="file-item user-select-none d-flex flex-column h-100 position-relative transition-swing rounded-lg"
+    style="aspect-ratio: 1; width: 100%"
     :class="[{ 'item-cut': isCut }, { 'is-dragging': isDragging }]"
     :data-id="item.id"
   >
