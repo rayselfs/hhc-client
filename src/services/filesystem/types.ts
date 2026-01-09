@@ -58,14 +58,10 @@ export interface ProviderResult<T> {
 export interface SaveFileResult {
   /** Path to the saved file (relative to provider root) */
   filePath: string
-  /** Path to the generated thumbnail (if applicable) */
-  thumbnailPath?: string
   /** Binary data for the generated thumbnail */
   thumbnailData?: Uint8Array
   /** Full URL for accessing the file (e.g., local-resource://path) */
   fileUrl: string
-  /** Full URL for accessing the thumbnail */
-  thumbnailUrl?: string
 }
 
 /**

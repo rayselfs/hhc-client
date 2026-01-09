@@ -111,24 +111,11 @@ export const registerFileHandlers = () => {
       }
 
       const entries = await fs.readdir(targetPath, { withFileTypes: true })
-      const thumbnailsDir = path.join(userDataPath, 'thumbnails')
-
       return await Promise.all(
         entries.map(async (entry) => {
           const entryPath = path.join(targetPath, entry.name)
           const stats = await fs.stat(entryPath)
           const isDirectory = entry.isDirectory()
-
-          // Try to find matching thumbnail
-          let thumbnailPath: string | undefined
-          if (!isDirectory) {
-            const ext = path.extname(entry.name)
-            const thumbName = `${path.basename(entry.name, ext)}.png`
-            const potentialThumb = path.join(thumbnailsDir, thumbName)
-            if (await fs.pathExists(potentialThumb)) {
-              thumbnailPath = potentialThumb
-            }
-          }
 
           return {
             name: entry.name,
@@ -136,7 +123,6 @@ export const registerFileHandlers = () => {
             path: entryPath,
             size: stats.size,
             modifiedAt: stats.mtimeMs,
-            thumbnailPath,
           }
         }),
       )
@@ -151,12 +137,8 @@ export const registerFileHandlers = () => {
     try {
       const userDataPath = app.getPath('userData')
       const mediaDir = path.join(userDataPath, 'media')
-      const thumbnailsDir = path.join(userDataPath, 'thumbnails')
 
-      await Promise.all([
-        fs.remove(mediaDir).catch(() => {}),
-        fs.remove(thumbnailsDir).catch(() => {}),
-      ])
+      await Promise.all([fs.remove(mediaDir).catch(() => {})])
 
       return true
     } catch (error) {

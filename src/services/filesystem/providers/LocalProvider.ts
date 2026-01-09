@@ -15,7 +15,7 @@ import { DEFAULT_LOCAL_PERMISSIONS, createSuccessResult, createFailureResult } f
  * Files are stored in the app's userData directory.
  */
 export class LocalProvider implements FileSystemProvider {
-  readonly type = 'sync' as const
+  readonly type = 'local' as const
   readonly displayName = 'Local Storage'
   readonly urlPrefix = 'local-resource://'
 
@@ -185,7 +185,6 @@ export class LocalProvider implements FileSystemProvider {
             metadata: {
               fileType: this.getFileType(entry.name),
               filePath: entry.path,
-              thumbnailData: entry.thumbnailData,
               fileUrl: this.buildUrl(entry.path),
             },
           }

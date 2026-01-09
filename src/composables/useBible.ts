@@ -1,13 +1,13 @@
 import { nextTick, computed, type Ref } from 'vue'
-import { useFolderStore } from '@/stores/folder'
 import { useElectron } from './useElectron'
 import { useProjectionMessaging } from './useProjectionMessaging'
-
-import { APP_CONFIG } from '@/config/app'
-import { MessageType, ViewType, StorageKey, StorageCategory, type VerseItem } from '@/types/common'
+import { MessageType, ViewType, type VerseItem } from '@/types/common'
 import { useBibleStore } from '@/stores/bible'
 import { storeToRefs } from 'pinia'
 import type { BiblePassage, PreviewVerse, BibleBook } from '@/types/bible'
+import { useBibleFolderStore } from '@/stores/folder'
+
+const folderStore = useBibleFolderStore()
 
 /**
  * Bible Functionality Integration Composable
@@ -18,18 +18,6 @@ export const useBible = (
   previewBook?: Ref<BibleBook | null>,
   previewVerses?: Ref<PreviewVerse[]>,
 ) => {
-  // ==================== Folder Store ====================
-  /**
-   * Bible folder store instance
-   * Manages folder structure for Bible verses
-   */
-  const folderStore = useFolderStore<VerseItem>({
-    rootId: APP_CONFIG.FOLDER.ROOT_ID,
-    defaultRootName: APP_CONFIG.FOLDER.DEFAULT_ROOT_NAME,
-    storageCategory: StorageCategory.BIBLE,
-    storageKey: StorageKey.FOLDERS,
-  })
-
   /**
    * Add a verse to the current folder with duplicate checking
    * Bible-specific business logic: checks for duplicate verses based on book, chapter, and verse number
@@ -284,8 +272,6 @@ export const useBible = (
   }
 
   return {
-    // Folder Store
-    folderStore,
     addVerseToCurrent,
     // Navigation
     scrollToVerse,

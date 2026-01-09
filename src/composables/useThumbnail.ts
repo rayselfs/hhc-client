@@ -1,7 +1,8 @@
 import { ref, watch, onUnmounted } from 'vue'
 import type { FileItem } from '@/types/common'
 import { useIndexedDB } from './useIndexedDB'
-import { MEDIA_DB_CONFIG } from '@/config/db'
+import { FOLDER_DB_CONFIG } from '@/config/db'
+import { FolderDBStore } from '@/types/enum'
 
 /**
  * Composable for managing thumbnail display
@@ -9,7 +10,7 @@ import { MEDIA_DB_CONFIG } from '@/config/db'
  */
 export function useThumbnail(item: FileItem) {
   const thumbnailSrc = ref<string | undefined>(item.metadata.thumbnail)
-  const db = useIndexedDB(MEDIA_DB_CONFIG)
+  const db = useIndexedDB(FOLDER_DB_CONFIG)
   let currentObjectURL: string | null = null
 
   const releaseObjectURL = () => {
@@ -22,7 +23,10 @@ export function useThumbnail(item: FileItem) {
   const loadThumbnail = async () => {
     if (item.metadata.thumbnailType === 'blob' && item.metadata.thumbnailBlobId) {
       try {
-        const result = await db.get<{ blob: Blob }>('thumbnails', item.metadata.thumbnailBlobId)
+        const result = await db.get<{ blob: Blob }>(
+          FolderDBStore.FOLDER_DB_THUMBNAILS_STORE_NAME,
+          item.metadata.thumbnailBlobId,
+        )
         if (result && result.blob) {
           releaseObjectURL()
           currentObjectURL = URL.createObjectURL(result.blob)

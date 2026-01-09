@@ -55,23 +55,14 @@ export function useIndexedDB(config: IndexedDBConfig) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       dbInstance = (await (openDB as any)(config.dbName, config.version, {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        upgrade(db: any, oldVersion: number) {
+        upgrade(db: any) {
           // Create object store for each store
           config.stores.forEach((storeConfig) => {
             // If store exists and we are upgrading, we might need to recreate it
             // if the structure (like keyPath) changed.
             // For now, only recreate if explicitly needed or if it doesn't exist.
             if (db.objectStoreNames.contains(storeConfig.name)) {
-              // Special case for MediaDB migration from v1 to v2
-              if (
-                config.dbName === 'MediaDB' &&
-                oldVersion < 2 &&
-                storeConfig.name === 'thumbnails'
-              ) {
-                db.deleteObjectStore(storeConfig.name)
-              } else {
-                return // Skip existing stores
-              }
+              return // Skip existing stores
             }
 
             const objectStore = storeConfig.autoIncrement

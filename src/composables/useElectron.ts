@@ -181,7 +181,7 @@ export const useElectron = () => {
    */
   const saveFile = async (
     sourcePath: string,
-  ): Promise<{ filePath: string; thumbnailPath?: string }> => {
+  ): Promise<{ filePath: string; thumbnailData?: Uint8Array }> => {
     if (isElectron()) {
       try {
         return await window.electronAPI.saveFile(sourcePath)

@@ -1,39 +1,40 @@
 import type { IndexedDBConfig } from '@/composables/useIndexedDB'
+import { FolderDBStore } from '@/types/enum'
 
 /**
  * Bible Database Configuration
  * Stores Bible versions and search index data
  */
 export const BIBLE_DB_CONFIG: IndexedDBConfig = {
-  dbName: 'BibleDB',
+  dbName: FolderDBStore.BIBLE_DB_NAME,
   version: 2,
   stores: [
     {
-      name: 'bibleContent',
-      keyPath: 'version_code',
+      name: FolderDBStore.BIBLE_DB_CONTENT_STORE_NAME,
+      keyPath: FolderDBStore.BIBLE_DB_STORE_KEY_PATH,
     },
     {
-      name: 'bibleSearchIndex',
-      keyPath: 'version_code',
+      name: FolderDBStore.BIBLE_DB_SEARCH_INDEX_STORE_NAME,
+      keyPath: FolderDBStore.BIBLE_DB_STORE_KEY_PATH,
     },
   ],
 }
 
 /**
- * Media Library Database Configuration
- * Stores folder structure and thumbnail blobs
+ * Folder Database Configuration
+ * Stores folder structure and thumbnails data
  */
-export const MEDIA_DB_CONFIG: IndexedDBConfig = {
-  dbName: 'MediaDB',
+export const FOLDER_DB_CONFIG: IndexedDBConfig = {
+  dbName: FolderDBStore.FOLDER_DB_NAME,
   version: 1,
   stores: [
     {
-      name: 'folder-structure',
-      keyPath: 'id', // Rebuild index will use this to restore the tree
+      name: FolderDBStore.FOLDER_DB_STRUCTURE_STORE_NAME,
+      keyPath: FolderDBStore.FOLDER_DB_STORE_KEY_PATH,
     },
     {
-      name: 'thumbnails',
-      keyPath: 'id',
+      name: FolderDBStore.FOLDER_DB_THUMBNAILS_STORE_NAME,
+      keyPath: FolderDBStore.FOLDER_DB_STORE_KEY_PATH,
     },
   ],
 }

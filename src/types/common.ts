@@ -319,7 +319,6 @@ export enum StorageKey {
   SELECTED_VERSION = 'selected-version',
   SECOND_VERSION_CODE = 'second-version-code',
   VERSIONS = 'versions',
-  FOLDERS = 'folders',
   CURRENT_FOLDER_PATH = 'current-folder-path',
   CURRENT_FOLDER = 'current-folder',
   FONT_SIZE = 'font-size',
@@ -467,5 +466,4 @@ export interface FolderStoreConfig {
   rootId: string
   defaultRootName: string
   storageCategory: StorageCategory
-  storageKey: string
 }

@@ -2,15 +2,15 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import { v4 as uuidv4 } from 'uuid'
-import { APP_CONFIG } from '@/config/app'
-import { MEDIA_DB_CONFIG } from '@/config/db'
-import { useMediaStore } from '@/stores/media'
+import { FOLDER_DB_CONFIG } from '@/config/db'
+import { useMediaFolderStore } from '@/stores/folder'
 import { useFileSystem } from '@/composables/useFileSystem'
 import { useIndexedDB } from '@/composables/useIndexedDB'
 import type { UseFolderDialogsReturn } from './useFolderDialogs'
 import type { Folder, FileItem, ClipboardItem } from '@/types/common'
+import { FolderDBStore, MediaFolder } from '@/types/enum'
 
-type MediaStore = ReturnType<typeof useMediaStore>
+type MediaStore = ReturnType<typeof useMediaFolderStore>
 
 export function useMediaOperations(
   mediaStore: MediaStore,
@@ -21,7 +21,7 @@ export function useMediaOperations(
 ) {
   const { t } = useI18n()
   const fileSystem = useFileSystem()
-  const db = useIndexedDB(MEDIA_DB_CONFIG)
+  const db = useIndexedDB(FOLDER_DB_CONFIG)
   const {
     currentFolderPath,
     getCurrentFolders: currentFolders,
@@ -97,10 +97,9 @@ export function useMediaOperations(
           // Derive parent ID
           const currentPath = currentFolderPath.value
           const parentId =
-            currentPath.length > 0 &&
-            currentPath[currentPath.length - 1] === APP_CONFIG.FOLDER.ROOT_ID
-              ? APP_CONFIG.FOLDER.ROOT_ID
-              : currentPath[currentPath.length - 1] || APP_CONFIG.FOLDER.ROOT_ID
+            currentPath.length > 0 && currentPath[currentPath.length - 1] === MediaFolder.ROOT_ID
+              ? MediaFolder.ROOT_ID
+              : currentPath[currentPath.length - 1] || MediaFolder.ROOT_ID
 
           mediaStore.updateItem(dialogs.editingFolderId.value, parentId, {
             name: fullName,
@@ -208,9 +207,9 @@ export function useMediaOperations(
     const items: ClipboardItem<FileItem>[] = []
     const currentPath = currentFolderPath.value
     const sourceFolderId =
-      currentPath.length > 0 && currentPath[currentPath.length - 1] === APP_CONFIG.FOLDER.ROOT_ID
-        ? APP_CONFIG.FOLDER.ROOT_ID
-        : currentPath[currentPath.length - 1] || APP_CONFIG.FOLDER.ROOT_ID
+      currentPath.length > 0 && currentPath[currentPath.length - 1] === MediaFolder.ROOT_ID
+        ? MediaFolder.ROOT_ID
+        : currentPath[currentPath.length - 1] || MediaFolder.ROOT_ID
 
     selectedItems.value.forEach((id) => {
       const folder = currentFolders.value.find((f) => f.id === id)
@@ -244,9 +243,9 @@ export function useMediaOperations(
     const items: ClipboardItem<FileItem>[] = []
     const currentPath = currentFolderPath.value
     const sourceFolderId =
-      currentPath.length > 0 && currentPath[currentPath.length - 1] === APP_CONFIG.FOLDER.ROOT_ID
-        ? APP_CONFIG.FOLDER.ROOT_ID
-        : currentPath[currentPath.length - 1] || APP_CONFIG.FOLDER.ROOT_ID
+      currentPath.length > 0 && currentPath[currentPath.length - 1] === MediaFolder.ROOT_ID
+        ? MediaFolder.ROOT_ID
+        : currentPath[currentPath.length - 1] || MediaFolder.ROOT_ID
 
     selectedItems.value.forEach((id) => {
       const folder = currentFolders.value.find((f) => f.id === id)
@@ -287,7 +286,7 @@ export function useMediaOperations(
   ): Promise<string | null> => {
     try {
       const originalThumbnail = await db.get<{ id: string; blob: Blob; itemId: string }>(
-        'thumbnails',
+        FolderDBStore.FOLDER_DB_THUMBNAILS_STORE_NAME,
         thumbnailBlobId,
       )
 
@@ -296,7 +295,7 @@ export function useMediaOperations(
       }
 
       const newBlobId = uuidv4()
-      await db.put('thumbnails', {
+      await db.put(FolderDBStore.FOLDER_DB_THUMBNAILS_STORE_NAME, {
         id: newBlobId,
         blob: originalThumbnail.blob,
         itemId: newItemId,
@@ -353,7 +352,7 @@ export function useMediaOperations(
         const newItemId = uuidv4()
         const newMetadata = {
           ...fileItem.metadata,
-          thumbnail: result.data.thumbnailUrl || fileItem.metadata.thumbnail,
+          thumbnail: fileItem.metadata.thumbnail,
         }
 
         // Duplicate the thumbnail blob in IndexedDB if it exists
@@ -401,9 +400,9 @@ export function useMediaOperations(
 
     const currentPath = currentFolderPath.value
     const targetFolderId =
-      currentPath.length > 0 && currentPath[currentPath.length - 1] === APP_CONFIG.FOLDER.ROOT_ID
-        ? APP_CONFIG.FOLDER.ROOT_ID
-        : currentPath[currentPath.length - 1] || APP_CONFIG.FOLDER.ROOT_ID
+      currentPath.length > 0 && currentPath[currentPath.length - 1] === MediaFolder.ROOT_ID
+        ? MediaFolder.ROOT_ID
+        : currentPath[currentPath.length - 1] || MediaFolder.ROOT_ID
 
     for (const clipboardItem of clipboard.value) {
       if (clipboardItem.action === 'copy') {

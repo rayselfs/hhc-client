@@ -3,11 +3,20 @@ import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 import { v4 as uuidv4 } from 'uuid'
 import { useDebounceFn } from '@vueuse/core'
-import type { Folder, FolderItem, ClipboardItem, FolderStoreConfig } from '@/types/common'
+import {
+  type Folder,
+  type FolderItem,
+  type ClipboardItem,
+  type FolderStoreConfig,
+} from '@/types/common'
 import { useFolderManager } from '@/composables/useFolderManager'
 import { fileSystemProviderFactory } from '@/services/filesystem'
 import { useIndexedDB } from '@/composables/useIndexedDB'
-import { MEDIA_DB_CONFIG } from '@/config/db'
+import { FOLDER_DB_CONFIG } from '@/config/db'
+import { FolderDBStore, MediaFolder } from '@/types/enum'
+import { BibleFolder } from '@/types/enum'
+import { StorageCategory } from '@/types/common'
+import type { VerseItem, FileItem } from '@/types/common'
 
 /**
  * Generic folder store for managing folder tree structure
@@ -23,6 +32,7 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
       items: [],
       folders: [],
       timestamp: Date.now(),
+      sourceType: 'local',
     })
 
     const currentFolderPath = ref<string[]>([config.rootId])
@@ -56,7 +66,8 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
       getMoveTargets,
     } = folderManager
 
-    const db = useIndexedDB(MEDIA_DB_CONFIG)
+    const db = useIndexedDB(FOLDER_DB_CONFIG)
+    const storeName = FolderDBStore.FOLDER_DB_STRUCTURE_STORE_NAME
 
     const deleteFolderRecursive = async (folders: Folder<TItem>[], folderId: string) => {
       const folderToRemove = folderMap.get(folderId)
@@ -71,7 +82,10 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
         for (const itemId of itemIds) {
           const item = itemMap.get(itemId)
           if ((item as any)?.metadata?.thumbnailBlobId) {
-            await db.delete('thumbnails', (item as any).metadata.thumbnailBlobId)
+            await db.delete(
+              FolderDBStore.FOLDER_DB_THUMBNAILS_STORE_NAME,
+              (item as any).metadata.thumbnailBlobId,
+            )
           }
         }
       }
@@ -97,7 +111,7 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
 
     const saveRootFolder = useDebounceFn(async () => {
       try {
-        await db.put('folder-structure', JSON.parse(JSON.stringify(rootFolder.value)))
+        await db.put(storeName, JSON.parse(JSON.stringify(rootFolder.value)))
       } catch (error) {
         console.error('Failed to save root folder to IndexedDB:', error)
       }
@@ -105,7 +119,7 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
 
     const loadRootFolder = async () => {
       try {
-        const savedFolder = await db.get<Folder<TItem>>('folder-structure', config.rootId)
+        const savedFolder = await db.get<Folder<TItem>>(storeName, config.rootId)
         if (savedFolder && savedFolder.id === config.rootId) {
           rootFolder.value = savedFolder as any
           if (checkExpiredContent(rootFolder.value as any)) {
@@ -174,7 +188,10 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
     const removeItemFromCurrent = async (itemId: string) => {
       const item = itemMap.get(itemId)
       if ((item as any)?.metadata?.thumbnailBlobId) {
-        await db.delete('thumbnails', (item as any).metadata.thumbnailBlobId)
+        await db.delete(
+          FolderDBStore.FOLDER_DB_THUMBNAILS_STORE_NAME,
+          (item as any).metadata.thumbnailBlobId,
+        )
       }
       currentFolder.value.items = currentFolder.value.items.filter((item) => item.id !== itemId)
       itemMap.delete(itemId)
@@ -326,12 +343,16 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
     const loadChildren = async (folderId: string) => {
       const folder = folderMap.get(folderId)
       if (!folder || folder.isLoaded) return
-      if (folder.sourceType === 'local') {
+
+      // Local/Default folders already have their structure in the store
+      if (!folder.sourceType || folder.sourceType === 'local') {
         folder.isLoaded = true
         return
       }
+
       try {
-        const provider = fileSystemProviderFactory.getProvider(folder.sourceType || 'sync')
+        const providerName = folder.sourceType === 'sync' ? 'sync' : folder.sourceType
+        const provider = fileSystemProviderFactory.getProvider(providerName)
         if (!provider.listDirectory) {
           folder.isLoaded = true
           return
@@ -385,4 +406,22 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
       clearClipboard,
     }
   })
+}
+
+export const useBibleFolderStore = () => {
+  const useStore = useFolderStore<VerseItem>({
+    rootId: BibleFolder.ROOT_ID,
+    defaultRootName: BibleFolder.ROOT_NAME,
+    storageCategory: StorageCategory.BIBLE,
+  })
+  return useStore()
+}
+
+export const useMediaFolderStore = () => {
+  const useStore = useFolderStore<FileItem>({
+    rootId: MediaFolder.ROOT_ID,
+    defaultRootName: MediaFolder.ROOT_NAME,
+    storageCategory: StorageCategory.MEDIA,
+  })
+  return useStore()
 }

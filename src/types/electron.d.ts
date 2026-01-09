@@ -38,7 +38,6 @@ export interface ElectronAPI {
       path: string
       size: number
       modifiedAt: number
-      thumbnailData?: Uint8Array
     }>
   >
   resetUserData: () => Promise<boolean>

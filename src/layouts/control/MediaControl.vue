@@ -263,7 +263,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { useMediaStore } from '@/stores/media'
+import { useMediaFolderStore } from '@/stores/folder'
 import { useSnackBar } from '@/composables/useSnackBar'
 import { storeToRefs } from 'pinia'
 import { useElectron } from '@/composables/useElectron'
@@ -285,21 +285,21 @@ import { useMediaUpload } from '@/composables/useMediaUpload'
 import { useDragSelection } from '@/composables/useDragSelection'
 import { useFolderDialogs } from '@/composables/useFolderDialogs'
 import { useMediaOperations } from '@/composables/useMediaOperations'
-import { MessageType, ViewType } from '@/types/common'
-
-import type { Folder, FileItem } from '@/types/common'
 import { useI18n } from 'vue-i18n'
 import { useCardLayout } from '@/composables/useLayout'
 import { APP_CONFIG } from '@/config/app'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { useDragAndDrop } from '@/composables/useDragAndDrop'
 import { isValidDragData } from '@/utils/typeGuards'
+import { MessageType, ViewType } from '@/types/common'
+import type { Folder, FileItem } from '@/types/common'
+import { MediaFolder } from '@/types/enum'
 
 const { t } = useI18n()
 const { ensureProjectionWindow } = useElectron()
 const { sendProjectionMessage } = useProjectionMessaging()
 const { showSnackBar } = useSnackBar()
-const mediaStore = useMediaStore()
+const mediaStore = useMediaFolderStore()
 const mediaProjectionStore = useMediaProjectionStore()
 const { isPresenting } = storeToRefs(mediaProjectionStore)
 const {
@@ -453,8 +453,7 @@ const { sortBy, sortOrder, setSort, sortedFolders, sortedItems } = useMediaSort(
 
 onMounted(async () => {
   mediaStore.loadRootFolder()
-  // Trigger initial load for root folder
-  await loadChildren('media-root')
+  await loadChildren(MediaFolder.ROOT_ID)
   document.addEventListener('keydown', handleEsc)
   window.addEventListener('keydown', handleGlobalKeydown)
 })
@@ -646,7 +645,7 @@ const onDrop = (event: DragEvent, target: FileItem | Folder<FileItem>) => {
   const isMove = isCenter && isTargetFolder
 
   if (isMove) {
-    const sourceFolderId = currentFolder?.id || APP_CONFIG.FOLDER.ROOT_ID
+    const sourceFolderId = currentFolder?.id || MediaFolder.ROOT_ID
     let moveCount = 0
 
     // Filter out items that are the target itself (prevent self-drop)

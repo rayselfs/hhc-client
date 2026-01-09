@@ -216,13 +216,8 @@
     </v-row>
 
     <!-- Context Menu -->
-    <ContextMenu ref="contextMenuRef" :close-on-content-click="false">
-      <v-list-item @click="copyVerseText">
-        <template #prepend>
-          <v-icon>mdi-content-copy</v-icon>
-        </template>
-        <v-list-item-title>{{ $t('bible.copyVerseContent') }}</v-list-item-title>
-      </v-list-item>
+    <ContextMenu v-model="showVerseContextMenu" :position="menuPosition" close-on-content-click raw>
+      <BibleVerseContextMenu type="preview" @copy-verse-text="copyVerseText" />
     </ContextMenu>
   </v-container>
 </template>
@@ -242,13 +237,18 @@ import { useCardLayout } from '@/composables/useLayout'
 import { useLocalStorage } from '@/composables/useLocalStorage'
 import { useBible } from '@/composables/useBible'
 import ContextMenu from '@/components/ContextMenu.vue'
+import { BibleVerseContextMenu } from '@/components/Bible'
 import MultiFunctionControl from '@/components/Bible/MultiFunction/Control.vue'
 import BottomSpacer from '@/components/Main/BottomSpacer.vue'
+import { useBibleFolderStore } from '@/stores/folder'
+import { BibleFolder } from '@/types/enum'
 
 const { t: $t } = useI18n()
 const { reportError } = useSentry()
 const { getLocalItem, setLocalItem } = useLocalStorage()
 const bibleStore = useBibleStore()
+const bibleFolderStore = useBibleFolderStore()
+const { mdAndUp } = useDisplay()
 const {
   currentVersion,
   selectedVerse: storeSelectedVerse,
@@ -267,7 +267,7 @@ const {
   searchBibleVerses,
 } = bibleStore
 
-const { mdAndUp } = useDisplay()
+const { loadChildren } = bibleFolderStore
 
 const { leftCardHeight, rightTopCardHeight, rightBottomCardHeight } = useCardLayout({
   minHeight: APP_CONFIG.UI.MIN_CARD_HEIGHT,
@@ -285,7 +285,6 @@ const fontSize = ref(getInitialFontSize())
 
 // Use Bible composable for folder management, navigation and projection
 const {
-  folderStore,
   addVerseToCurrent,
   scrollToVerse,
   maxChapters,
@@ -296,8 +295,6 @@ const {
   updateProjection,
   updateProjectionFontSize: updateFontSize,
 } = useBible(currentPassage, previewBook, previewVerses)
-
-const { loadRootFolder } = folderStore
 
 // Optimized computed properties (cached)
 const maxVerse = computed(() => previewVerses.value.length)
@@ -358,7 +355,8 @@ const highlightSearchText = (text: string): string => {
 }
 
 // Context menu refs
-const contextMenuRef = ref<InstanceType<typeof ContextMenu> | null>(null)
+const showVerseContextMenu = ref(false)
+const menuPosition = ref<[number, number] | undefined>(undefined)
 const selectedVerse = ref<{ number: number; text: string } | null>(null)
 
 // Handle verse selection for preview
@@ -560,23 +558,18 @@ const handleKeydown = (event: KeyboardEvent) => {
 
 // Context menu handler
 const handleVerseRightClick = (event: MouseEvent, verse: { number: number; text: string }) => {
+  event.preventDefault()
   selectedVerse.value = verse
-  contextMenuRef.value?.open(event)
-}
-
-const closeVerseContextMenu = () => {
-  contextMenuRef.value?.close()
-  selectedVerse.value = null
+  menuPosition.value = [event.clientX, event.clientY]
+  showVerseContextMenu.value = true
 }
 
 const copyVerseText = async () => {
   if (selectedVerse.value && currentPassage.value) {
-    const verseText = `${localizedBookName.value} ${currentPassage.value.chapter}:${selectedVerse.value.number} ${selectedVerse.value.text}`
+    const verseText = `"${selectedVerse.value.text}" ${localizedBookName.value} ${currentPassage.value.chapter}:${selectedVerse.value.number}`
 
     try {
       await navigator.clipboard.writeText(verseText)
-      // Optional: Add success message
-      closeVerseContextMenu()
     } catch (err) {
       reportError(err, {
         operation: 'copy-verse-text',
@@ -592,7 +585,7 @@ const copyVerseText = async () => {
       document.body.removeChild(textArea)
     }
   }
-  closeVerseContextMenu()
+  showVerseContextMenu.value = false
 }
 
 // Watch store selection state
@@ -682,23 +675,24 @@ const handleSearch = async (text: string) => {
   }
 }
 
-onMounted(() => {
-  loadRootFolder()
+const handleSearchEvent = (event: Event) => {
+  const customEvent = event as CustomEvent<{ text: string }>
+  handleSearch(customEvent.detail.text)
+}
+
+onMounted(async () => {
+  bibleFolderStore.loadRootFolder()
+  await loadChildren(BibleFolder.ROOT_ID)
 
   updateFontSize(fontSize.value)
 
-  const handleSearchEvent = (event: Event) => {
-    const customEvent = event as CustomEvent<{ text: string }>
-    handleSearch(customEvent.detail.text)
-  }
   document.addEventListener('keydown', handleKeydown)
   window.addEventListener('bible-search', handleSearchEvent)
+})
 
-  // Cleanup listeners
-  onUnmounted(() => {
-    window.removeEventListener('bible-search', handleSearchEvent)
-    document.removeEventListener('keydown', handleKeydown)
-  })
+onUnmounted(() => {
+  window.removeEventListener('bible-search', handleSearchEvent)
+  document.removeEventListener('keydown', handleKeydown)
 })
 </script>
 

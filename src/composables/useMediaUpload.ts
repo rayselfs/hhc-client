@@ -2,21 +2,22 @@ import { ref } from 'vue'
 import { v4 as uuidv4 } from 'uuid'
 import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
-import { useMediaStore } from '@/stores/media'
+import { useMediaFolderStore } from '@/stores/folder'
 import { useFileSystem } from '@/composables/useFileSystem'
 import { useSnackBar } from '@/composables/useSnackBar'
 import { DEFAULT_LOCAL_PERMISSIONS } from '@/services/filesystem'
 import type { FileItem, Folder } from '@/types/common'
 import { useIndexedDB } from '@/composables/useIndexedDB'
-import { MEDIA_DB_CONFIG } from '@/config/db'
+import { FOLDER_DB_CONFIG } from '@/config/db'
+import { FolderDBStore } from '@/types/enum'
 
 export const useMediaUpload = () => {
   const { t } = useI18n()
-  const mediaStore = useMediaStore()
+  const mediaStore = useMediaFolderStore()
   const { getCurrentFolders, getCurrentItems } = storeToRefs(mediaStore)
   const fileSystem = useFileSystem()
   const { showSnackBar } = useSnackBar()
-  const db = useIndexedDB(MEDIA_DB_CONFIG)
+  const db = useIndexedDB(FOLDER_DB_CONFIG)
 
   const fileInput = ref<HTMLInputElement | null>(null)
   const folderInput = ref<HTMLInputElement | null>(null)
@@ -112,7 +113,11 @@ export const useMediaUpload = () => {
                     type: 'image/jpeg',
                   })
                   const blobId = uuidv4()
-                  await db.put('thumbnails', { id: blobId, blob, itemId: newItem.id })
+                  await db.put(FolderDBStore.FOLDER_DB_THUMBNAILS_STORE_NAME, {
+                    id: blobId,
+                    blob,
+                    itemId: newItem.id,
+                  })
 
                   newItem.metadata.thumbnailType = 'blob'
                   newItem.metadata.thumbnailBlobId = blobId
@@ -201,7 +206,11 @@ export const useMediaUpload = () => {
                     type: 'image/jpeg',
                   })
                   const blobId = uuidv4()
-                  await db.put('thumbnails', { id: blobId, blob, itemId: newItem.id })
+                  await db.put(FolderDBStore.FOLDER_DB_THUMBNAILS_STORE_NAME, {
+                    id: blobId,
+                    blob,
+                    itemId: newItem.id,
+                  })
 
                   newItem.metadata.thumbnailType = 'blob'
                   newItem.metadata.thumbnailBlobId = blobId

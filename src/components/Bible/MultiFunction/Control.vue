@@ -118,77 +118,31 @@
       @confirm="confirmDeleteFolder"
     />
 
-    <!-- 右鍵選單 -->
-    <ContextMenu ref="contextMenuRef" :close-on-content-click="false">
-      <!-- 當選中項目時顯示：複製、移動、刪除 -->
-      <template v-if="selectedItem">
-        <!-- 歷史項目：只顯示複製和刪除 -->
-        <template v-if="selectedItem && selectedItem.type === 'history'">
-          <v-list-item @click="copyItem">
-            <template #prepend>
-              <v-icon>mdi-content-copy</v-icon>
-            </template>
-            <v-list-item-title>{{ $t('common.copy') }}</v-list-item-title>
-          </v-list-item>
-          <v-list-item @click="deleteItem">
-            <template #prepend>
-              <v-icon>mdi-delete</v-icon>
-            </template>
-            <v-list-item-title>{{ $t('common.delete') }}</v-list-item-title>
-          </v-list-item>
-        </template>
+    <!-- Item Context Menu -->
+    <ContextMenu v-model="showItemContextMenu" :position="menuPosition" close-on-content-click raw>
+      <BibleVerseContextMenu
+        v-if="selectedItem"
+        :type="selectedItem.type === 'history' ? 'history' : 'custom'"
+        :is-folder="isFolder(selectedItem.item)"
+        @copy="copyItem"
+        @move="showMoveItemDialog"
+        @edit="showFolderSettings"
+        @delete="deleteItem"
+      />
+    </ContextMenu>
 
-        <!-- 自訂項目（經文/資料夾）：顯示複製、移動、刪除 -->
-        <template v-else>
-          <v-list-item @click="copyItem">
-            <template #prepend>
-              <v-icon>mdi-content-copy</v-icon>
-            </template>
-            <v-list-item-title>{{ $t('common.copy') }}</v-list-item-title>
-          </v-list-item>
-
-          <v-list-item @click="showMoveItemDialog">
-            <template #prepend>
-              <v-icon>mdi-folder-move</v-icon>
-            </template>
-            <v-list-item-title>{{ $t('common.move') }}</v-list-item-title>
-          </v-list-item>
-
-          <v-list-item @click="showFolderSettings()">
-            <template #prepend>
-              <v-icon>mdi-cog</v-icon>
-            </template>
-            <v-list-item-title>{{ $t('common.edit') }}</v-list-item-title>
-          </v-list-item>
-
-          <v-list-item @click="deleteItem">
-            <template #prepend>
-              <v-icon>mdi-delete</v-icon>
-            </template>
-            <v-list-item-title>{{ $t('common.delete') }}</v-list-item-title>
-          </v-list-item>
-        </template>
-      </template>
-
-      <!-- 當沒有選中項目但有複製內容時，在 custom 頁面顯示：貼上 -->
-      <template v-else-if="copiedItem && multiFunctionTab === 'custom'">
-        <v-list-item @click="pasteItemHandler">
-          <template #prepend>
-            <v-icon>mdi-content-paste</v-icon>
-          </template>
-          <v-list-item-title>{{ $t('common.paste') }}</v-list-item-title>
-        </v-list-item>
-      </template>
-
-      <!-- 當沒有選中項目且沒有複製內容時，在 custom 頁面顯示：新資料夾 -->
-      <template v-else-if="multiFunctionTab === 'custom'">
-        <v-list-item @click="createNewFolder">
-          <template #prepend>
-            <v-icon>mdi-folder-plus</v-icon>
-          </template>
-          <v-list-item-title>{{ $t('fileExplorer.newFolder') }}</v-list-item-title>
-        </v-list-item>
-      </template>
+    <!-- Background Context Menu -->
+    <ContextMenu
+      v-model="showBackgroundContextMenu"
+      :position="menuPosition"
+      close-on-content-click
+      raw
+    >
+      <BibleBackgroundContextMenu
+        :has-clipboard="!!copiedItem"
+        @paste="pasteItemHandler"
+        @create-folder="createNewFolder"
+      />
     </ContextMenu>
   </v-card>
 </template>
@@ -202,10 +156,11 @@ import { ref, computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import type { VerseItem, Folder } from '@/types/common'
+import { useBibleFolderStore } from '@/stores/folder'
 import { useBibleStore } from '@/stores/bible'
-import { useBible } from '@/composables/useBible'
 import { isVerseItem, isFolder, type DragData } from '@/utils/typeGuards'
 import ContextMenu from '@/components/ContextMenu.vue'
+import { BibleBackgroundContextMenu, BibleVerseContextMenu } from '@/components/Bible'
 import HistoryTab from './HistoryTab.vue'
 import CustomFolderTab from './CustomFolderTab.vue'
 import FolderBreadcrumbs from '@/components/Shared/FolderBreadcrumbs.vue'
@@ -213,7 +168,8 @@ import MoveFolderDialog from '@/components/Shared/MoveFolderDialog.vue'
 import CreateEditFolderDialog from '@/components/Shared/CreateEditFolderDialog.vue'
 import DeleteConfirmDialog from '@/components/Shared/DeleteConfirmDialog.vue'
 import { useFolderDialogs } from '@/composables/useFolderDialogs'
-import { APP_CONFIG } from '@/config/app'
+import { BIBLE_CONFIG } from '@/config/app'
+import { BibleFolder } from '@/types/enum'
 
 const { t: $t } = useI18n()
 
@@ -236,7 +192,7 @@ const { historyVerses } = storeToRefs(bibleStore)
 const { removeHistoryItem, clearHistory } = bibleStore
 
 // Bible composable - for folder management
-const { folderStore } = useBible()
+const folderStore = useBibleFolderStore()
 
 // Folder store - for all folder operations
 const {
@@ -311,7 +267,9 @@ watch(multiFunctionTab, (newTab) => {
 })
 
 // 右鍵選單相關
-const contextMenuRef = ref<InstanceType<typeof ContextMenu> | null>(null)
+const showItemContextMenu = ref(false)
+const showBackgroundContextMenu = ref(false)
+const menuPosition = ref<[number, number] | undefined>(undefined)
 
 const selectedItem = ref<{
   type: 'verse' | 'folder' | 'history'
@@ -464,9 +422,7 @@ const handleDropToFolder = (data: DragData<VerseItem>, targetFolder: Folder<Vers
 // Move verse to folder (drag & drop)
 const moveVerseToFolder = (verse: VerseItem, targetFolder: Folder<VerseItem>) => {
   const sourceFolderId =
-    currentFolder.value.id === APP_CONFIG.FOLDER.ROOT_ID
-      ? APP_CONFIG.FOLDER.ROOT_ID
-      : currentFolder.value.id
+    currentFolder.value.id === BibleFolder.ROOT_ID ? BibleFolder.ROOT_ID : currentFolder.value.id
   // Call store action - direct mutation
   moveItemAction(verse, targetFolder.id, sourceFolderId)
 }
@@ -474,10 +430,7 @@ const moveVerseToFolder = (verse: VerseItem, targetFolder: Folder<VerseItem>) =>
 // Move folder to another folder (drag & drop)
 const moveFolderToFolder = (folderToMove: Folder<VerseItem>, targetFolder: Folder<VerseItem>) => {
   const sourceFolderId =
-    currentFolder.value.id === APP_CONFIG.FOLDER.ROOT_ID
-      ? APP_CONFIG.FOLDER.ROOT_ID
-      : currentFolder.value.id
-  // Call store action - direct mutation
+    currentFolder.value.id === BibleFolder.ROOT_ID ? BibleFolder.ROOT_ID : currentFolder.value.id
   moveFolderAction(folderToMove, targetFolder.id, sourceFolderId)
 }
 
@@ -485,18 +438,18 @@ const moveFolderToFolder = (folderToMove: Folder<VerseItem>, targetFolder: Folde
 const showMoveDialog = (item: VerseItem) => {
   folderDialogs.openMoveDialog(item)
   // Ensure breadcrumb starts with root
-  folderDialogs.moveBreadcrumb.value = [{ id: APP_CONFIG.FOLDER.ROOT_ID, name: 'Root' }]
+  folderDialogs.moveBreadcrumb.value = [{ id: BibleFolder.ROOT_ID, name: BibleFolder.ROOT_NAME }]
 }
 
 // 移動資料夾相關函數
 const showMoveFolderDialog = (item: Folder<VerseItem>) => {
   folderDialogs.openMoveDialog(item)
   // Ensure breadcrumb starts with root
-  folderDialogs.moveBreadcrumb.value = [{ id: APP_CONFIG.FOLDER.ROOT_ID, name: 'Root' }]
+  folderDialogs.moveBreadcrumb.value = [{ id: BibleFolder.ROOT_ID, name: BibleFolder.ROOT_NAME }]
 }
 
 const navigateMoveToRoot = () => {
-  folderDialogs.moveBreadcrumb.value = [{ id: APP_CONFIG.FOLDER.ROOT_ID, name: 'Root' }]
+  folderDialogs.moveBreadcrumb.value = [{ id: BibleFolder.ROOT_ID, name: BibleFolder.ROOT_NAME }]
   folderDialogs.selectedMoveFolder.value = null
 }
 
@@ -523,7 +476,7 @@ const getMoveFolders = (): Folder<VerseItem>[] => {
 }
 
 const handleMoveNavigate = (id: string) => {
-  if (id === APP_CONFIG.FOLDER.ROOT_ID) {
+  if (id === BibleFolder.ROOT_ID) {
     navigateMoveToRoot()
   } else {
     navigateMoveToFolder(id)
@@ -535,7 +488,7 @@ const canMoveToRoot = computed(() => {
   if (moveItemType.value === 'verse') {
     if (!folderDialogs.itemToMove.value) return false
 
-    const isInRoot = currentFolder.value.id === APP_CONFIG.FOLDER.ROOT_ID
+    const isInRoot = currentFolder.value.id === BibleFolder.ROOT_ID
     if (isInRoot) {
       return folderDialogs.selectedMoveFolder.value !== null
     }
@@ -551,7 +504,7 @@ const canMoveToRoot = computed(() => {
       )
     }
 
-    const isInRoot = currentFolder.value.id === APP_CONFIG.FOLDER.ROOT_ID
+    const isInRoot = currentFolder.value.id === BibleFolder.ROOT_ID
     if (isInRoot) {
       return false
     }
@@ -566,22 +519,20 @@ const currentFolderDepth = computed(() => {
 
 // 判斷是否達到最大深度（3層）
 const isMaxDepthReached = computed(() => {
-  return currentFolderDepth.value >= APP_CONFIG.FOLDER.MAX_DEPTH
+  return currentFolderDepth.value >= BIBLE_CONFIG.FOLDER.MAX_DEPTH
 })
 
 const confirmMoveVerse = (targetId: string) => {
   if (!canMoveToRoot.value) return
 
   const destinationId =
-    targetId || folderDialogs.selectedMoveFolder.value?.id || APP_CONFIG.FOLDER.ROOT_ID
+    targetId || folderDialogs.selectedMoveFolder.value?.id || BibleFolder.ROOT_ID
 
   if (moveItemType.value === 'verse') {
     if (!folderDialogs.itemToMove.value) return
 
     const sourceFolderId =
-      currentFolder.value.id === APP_CONFIG.FOLDER.ROOT_ID
-        ? APP_CONFIG.FOLDER.ROOT_ID
-        : currentFolder.value.id
+      currentFolder.value.id === BibleFolder.ROOT_ID ? BibleFolder.ROOT_ID : currentFolder.value.id
 
     // Call store action - direct mutation
     // We need to cast itemToMove to VerseItem because openMoveDialog is generic
@@ -591,9 +542,7 @@ const confirmMoveVerse = (targetId: string) => {
     if (!folderDialogs.folderToMove.value) return
 
     const sourceFolderId =
-      currentFolder.value.id === APP_CONFIG.FOLDER.ROOT_ID
-        ? APP_CONFIG.FOLDER.ROOT_ID
-        : currentFolder.value.id
+      currentFolder.value.id === BibleFolder.ROOT_ID ? BibleFolder.ROOT_ID : currentFolder.value.id
 
     // Call store action - direct mutation
     moveFolderAction(folderDialogs.folderToMove.value, destinationId, sourceFolderId)
@@ -613,8 +562,12 @@ const handleRightClick = (
   type: 'verse' | 'folder' | 'history',
   item: VerseItem | Folder<VerseItem>,
 ) => {
+  event.preventDefault()
+  event.stopPropagation()
   selectedItem.value = { type, item }
-  contextMenuRef.value?.open(event)
+  menuPosition.value = [event.clientX, event.clientY]
+  showBackgroundContextMenu.value = false
+  showItemContextMenu.value = true
 }
 
 // 處理 v-card-text 的右鍵點擊
@@ -624,12 +577,16 @@ const handleCardTextRightClick = (event: MouseEvent) => {
     return
   }
 
+  event.preventDefault()
   selectedItem.value = null // 清空選中的項目
-  contextMenuRef.value?.open(event)
+  menuPosition.value = [event.clientX, event.clientY]
+  showItemContextMenu.value = false
+  showBackgroundContextMenu.value = true
 }
 
 const closeItemContextMenu = () => {
-  contextMenuRef.value?.close()
+  showItemContextMenu.value = false
+  showBackgroundContextMenu.value = false
   selectedItem.value = null
 }
 
@@ -644,9 +601,7 @@ const pasteItemHandler = () => {
   if (!copiedItem.value) return
 
   const targetFolderId =
-    currentFolder.value.id === APP_CONFIG.FOLDER.ROOT_ID
-      ? APP_CONFIG.FOLDER.ROOT_ID
-      : currentFolder.value.id
+    currentFolder.value.id === BibleFolder.ROOT_ID ? BibleFolder.ROOT_ID : currentFolder.value.id
 
   if (copiedItem.value.type === 'verse' && isVerseItem(copiedItem.value.item)) {
     // Paste verse
