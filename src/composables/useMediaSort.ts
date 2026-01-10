@@ -7,8 +7,8 @@ export type SortOrder = 'asc' | 'desc'
 export function useMediaSort(folders: Ref<Folder<FileItem>[]>, items: Ref<FileItem[]>) {
   // const { t } = useI18n()
 
-  const sortBy = ref<SortBy>('custom')
-  const sortOrder = ref<SortOrder>('desc')
+  const sortBy = ref<SortBy>('name')
+  const sortOrder = ref<SortOrder>('asc')
 
   const setSort = (type: 'name' | 'date') => {
     if (sortBy.value === type) {

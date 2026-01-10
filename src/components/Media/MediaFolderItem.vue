@@ -7,14 +7,11 @@
     :class="[{ 'item-cut': isCut }, { 'is-dragging': isDragging }]"
     :data-id="item.id"
   >
-    <div class="d-flex align-center pa-3 w-100 overflow-hidden">
+    <div class="d-flex align-center px-3 py-2 w-100 overflow-hidden">
       <v-icon icon="mdi-folder" class="mr-3 flex-shrink-0"></v-icon>
-      <span
-        class="text-truncate font-weight-medium flex-grow-1"
-        style="min-width: 0"
-        :title="item.name"
-        >{{ item.name }}</span
-      >
+      <span class="text-truncate flex-grow-1" style="min-width: 0" :title="item.name">{{
+        item.name
+      }}</span>
       <v-btn
         icon="mdi-dots-vertical"
         variant="text"

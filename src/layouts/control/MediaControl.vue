@@ -2,116 +2,79 @@
   <MediaPresenter v-if="isPresenting" />
   <v-container v-else fluid class="pa-0">
     <v-row no-gutters>
-      <v-col cols="12" class="pa-4">
+      <v-col cols="12" class="py-2 px-4">
         <!-- Top Bar: Breadcrumbs and Actions -->
-        <MediaHeader :breadcrumb-items="breadcrumbItems" @navigate="navigateToFolder" />
-
-        <div class="pt-3 d-flex gap-2" style="min-height: 52px">
-          <transition name="fade" mode="out-in">
-            <!-- Selection Actions Bar -->
-            <MediaSelectionBar
-              v-if="selectedItems.size > 0"
-              key="selection-actions"
-              :selected-count="selectedItems.size"
-              @clear="clearSelection"
-              @edit="handleEditSelected"
-              @copy="handleCopy"
-              @cut="handleCut"
-              @delete="openDeleteSelectionDialog"
-            />
-            <!-- Filter Actions Btn -->
-            <div v-else key="filter-actions" class="d-flex w-100 align-center">
-              <div class="d-flex items-center">
-                <v-menu>
-                  <template #activator="{ props }">
-                    <v-btn variant="outlined" class="mr-2 rounded-lg" v-bind="props">
-                      {{ $t('common.type') }} <v-icon end icon="mdi-chevron-down"></v-icon>
-                    </v-btn>
-                  </template>
-                  <v-list density="compact" class="rounded-lg">
-                    <v-list-item
-                      :title="$t('fileExplorer.image')"
-                      value="image"
-                      prepend-icon="mdi-image"
-                    ></v-list-item>
-                    <v-list-item
-                      :title="$t('fileExplorer.video')"
-                      value="video"
-                      prepend-icon="mdi-video"
-                    ></v-list-item>
-                    <v-list-item
-                      :title="$t('fileExplorer.pdf')"
-                      value="pdf"
-                      prepend-icon="mdi-file-pdf-box"
-                    ></v-list-item>
-                    <v-list-item
-                      :title="$t('fileExplorer.youtube')"
-                      value="youtube"
-                      prepend-icon="mdi-youtube"
-                    ></v-list-item>
-                    <v-list-item
-                      :title="$t('fileExplorer.folder')"
-                      value="folder"
-                      prepend-icon="mdi-folder"
-                    ></v-list-item>
-                  </v-list>
-                </v-menu>
-              </div>
-            </div>
-          </transition>
-        </div>
+        <MediaHeader
+          class="mb-2"
+          :breadcrumb-items="breadcrumbItems"
+          @navigate="navigateToFolder"
+        />
 
         <div
           ref="mediaContainer"
-          class="pt-6 align-start overflow-y-auto overflow-x-hidden d-block"
+          class="align-star d-block"
           :style="{ height: `${mediaSpaceHeight}px` }"
           @mousedown="onSelectionMouseDown"
           @contextmenu.prevent="openBackgroundContextMenu"
         >
-          <!-- Sort -->
-          <div class="align-center ml-auto mb-2">
-            <div>
-              <v-menu>
-                <template #activator="{ props }">
-                  <v-chip variant="text" link class="mr-2" v-bind="props">
-                    {{ sortBy === 'name' ? $t('common.name') : $t('fileExplorer.updatedDate') }}
-                    <v-icon
-                      v-if="sortBy !== 'custom'"
-                      end
-                      :icon="sortOrder === 'asc' ? 'mdi-arrow-up' : 'mdi-arrow-down'"
-                    ></v-icon>
-                  </v-chip>
-                </template>
-                <v-list density="compact" class="rounded-lg">
-                  <v-list-item
-                    :title="$t('common.name')"
-                    prepend-icon="mdi-sort-alphabetical-variant"
-                    @click="setSort('name')"
-                  >
-                    <template #append>
-                      <v-icon
-                        v-if="sortBy === 'name'"
-                        :icon="sortOrder === 'asc' ? 'mdi-arrow-up' : 'mdi-arrow-down'"
-                        size="small"
-                      ></v-icon>
+          <div class="align-center d-flex" style="min-height: 40px">
+            <transition name="fade" mode="out-in">
+              <MediaSelectionBar
+                v-if="selectedItems.size > 0"
+                key="selection-actions"
+                :selected-count="selectedItems.size"
+                @clear="clearSelection"
+                @edit="handleEditSelected"
+                @copy="handleCopy"
+                @cut="handleCut"
+                @delete="openDeleteSelectionDialog"
+              />
+              <!-- Sort -->
+              <div v-else>
+                <div>
+                  <v-menu>
+                    <template #activator="{ props }">
+                      <v-chip variant="text" link class="mr-2" v-bind="props">
+                        {{ sortBy === 'name' ? $t('common.name') : $t('fileExplorer.updatedDate') }}
+                        <v-icon
+                          v-if="sortBy !== 'custom'"
+                          end
+                          :icon="sortOrder === 'asc' ? 'mdi-arrow-up' : 'mdi-arrow-down'"
+                        ></v-icon>
+                      </v-chip>
                     </template>
-                  </v-list-item>
-                  <v-list-item
-                    :title="$t('fileExplorer.updatedDate')"
-                    prepend-icon="mdi-calendar-clock"
-                    @click="setSort('date')"
-                  >
-                    <template #append>
-                      <v-icon
-                        v-if="sortBy === 'date'"
-                        :icon="sortOrder === 'asc' ? 'mdi-arrow-up' : 'mdi-arrow-down'"
-                        size="small"
-                      ></v-icon>
-                    </template>
-                  </v-list-item>
-                </v-list>
-              </v-menu>
-            </div>
+                    <v-list density="compact" class="rounded-lg">
+                      <v-list-item
+                        :title="$t('common.name')"
+                        prepend-icon="mdi-sort-alphabetical-variant"
+                        @click="setSort('name')"
+                      >
+                        <template #append>
+                          <v-icon
+                            v-if="sortBy === 'name'"
+                            :icon="sortOrder === 'asc' ? 'mdi-arrow-up' : 'mdi-arrow-down'"
+                            size="small"
+                          ></v-icon>
+                        </template>
+                      </v-list-item>
+                      <v-list-item
+                        :title="$t('fileExplorer.updatedDate')"
+                        prepend-icon="mdi-calendar-clock"
+                        @click="setSort('date')"
+                      >
+                        <template #append>
+                          <v-icon
+                            v-if="sortBy === 'date'"
+                            :icon="sortOrder === 'asc' ? 'mdi-arrow-up' : 'mdi-arrow-down'"
+                            size="small"
+                          ></v-icon>
+                        </template>
+                      </v-list-item>
+                    </v-list>
+                  </v-menu>
+                </div>
+              </div>
+            </transition>
           </div>
 
           <MediaItemList
@@ -121,6 +84,7 @@
             :clipboard="clipboard"
             :sort-by="sortBy"
             :sort-order="sortOrder"
+            :media-space-height="mediaSpaceHeight"
             @update:sort-by="(val: any) => setSort(val)"
             @drag-start="onDragStart"
             @drag-end="handleDragEnd"

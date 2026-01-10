@@ -1,5 +1,5 @@
 <template>
-  <div class="py-2 d-flex align-center">
+  <div class="py-1 d-flex align-center">
     <FolderBreadcrumbs :items="breadcrumbItems" @navigate="$emit('navigate', $event)" />
     <v-spacer></v-spacer>
     <v-btn icon="mdi-view-grid-outline" variant="text" density="comfortable"></v-btn>

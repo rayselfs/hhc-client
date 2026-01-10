@@ -69,7 +69,7 @@ export const useCardLayout = (options: CardLayoutOptions = {}) => {
     rightTopCardHeight.value = Math.floor(rightCardTotalHeight * topCardRatio)
     rightBottomCardHeight.value = Math.floor(rightCardTotalHeight * (1 - topCardRatio))
 
-    mediaSpaceHeight.value = viewportHeight - gap - 88
+    mediaSpaceHeight.value = viewportHeight - gap - 20
   }
 
   onMounted(() => {

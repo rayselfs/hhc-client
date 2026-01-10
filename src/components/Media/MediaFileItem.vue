@@ -9,20 +9,16 @@
     :data-id="item.id"
   >
     <!-- Header Info -->
-    <div class="d-flex align-center px-3 pt-2 pb-1 w-100 overflow-hidden">
+    <div class="d-flex align-center px-3 py-3 w-100 overflow-hidden">
       <v-icon
         :icon="getFileIcon(item.metadata.fileType)"
         :color="isSelected ? 'white' : 'red'"
         size="small"
         class="mr-2 flex-shrink-0"
       ></v-icon>
-      <span
-        class="py-2 text-body-2 text-truncate flex-grow-1"
-        :class="isSelected ? 'text-white' : ''"
-        style="min-width: 0"
-        :title="item.name"
-        >{{ item.name }}</span
-      >
+      <span class="text-truncate flex-grow-1" style="min-width: 0" :title="item.name">{{
+        item.name
+      }}</span>
       <v-btn
         icon="mdi-dots-vertical"
         variant="text"

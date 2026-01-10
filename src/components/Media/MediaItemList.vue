@@ -1,6 +1,10 @@
 <template>
-  <div v-if="combinedItems.length > 0" class="h-100">
-    <v-virtual-scroll :items="chunkedItems" class="h-100 overflow-y-auto">
+  <div v-if="combinedItems.length > 0" :style="{ height: `${mediaSpaceHeight}px` }">
+    <v-virtual-scroll
+      :items="chunkedItems"
+      style="height: 100%"
+      class="overflow-y-auto overflow-x-hidden"
+    >
       <template #default="{ item: rowItems }">
         <v-row dense>
           <v-col
@@ -72,6 +76,7 @@ const props = defineProps<{
   files: FileItem[]
   selectedItems: Set<string>
   clipboard: ClipboardItem<FileItem>[]
+  mediaSpaceHeight: number
   sortBy?: string
   sortOrder?: 'asc' | 'desc'
 }>()
@@ -96,6 +101,10 @@ const isFolder = (item: UnifiedItem): item is Folder<FileItem> => {
 
 const combinedItems = computed(() => {
   return [...props.folders, ...props.files]
+})
+
+const mediaSpaceHeight = computed(() => {
+  return props.mediaSpaceHeight - 50
 })
 
 // Drag and Drop
