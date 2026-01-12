@@ -26,7 +26,7 @@
                 cursor: cursorStyle,
               }"
               ref="previewContainer"
-              @mousedown="startDrag"
+              @mousedown="startPanDrag"
             >
               <template v-if="currentItem">
                 <img
@@ -113,7 +113,7 @@
                 v-if="currentItem?.metadata.fileType === 'pdf' && showZoomControls"
                 class="position-absolute w-100 h-100 top-0 left-0"
                 style="z-index: 5; cursor: grab"
-                @mousedown="startDrag"
+                @mousedown="startPanDrag"
               ></div>
 
               <!-- Zoom Controls Only -->
@@ -152,11 +152,11 @@
                 class="position-absolute bottom-0 left-0 right-0 ma-2"
                 style="z-index: 20"
                 @play="playPreviewVideo"
-                @seek="handleSeek"
+                @seek="onSeek"
                 @pause="pausePreviewVideo"
-                @replay="handleReplayVideo"
-                @seeking-start="handleSeekingStart"
-                @seeking-end="handleSeekingEnd"
+                @replay="replayVideo"
+                @seeking-start="onSeekingStart"
+                @seeking-end="onSeekingEnd"
                 @volume-change="setPreviewVolume"
                 @toggle-mute="toggleMute"
               />
@@ -180,7 +180,7 @@
                 variant="text"
                 icon
                 size="large"
-                @click="toggleZoomMode()"
+                @click="toggleZoom()"
                 :disabled="
                   !currentItem ||
                   (currentItem.metadata.fileType !== 'image' &&
@@ -338,7 +338,7 @@ import { useStopwatchStore } from '@/stores/stopwatch'
 import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
 import { ViewType } from '@/types/common'
 import { useVideoPlayer } from '@/composables/useVideoPlayer'
-import MediaVideoControls from './MediaVideoControls.vue'
+import MediaVideoControls from '@/components/Media/Preview/MediaVideoControls.vue'
 
 const stopwatchStore = useStopwatchStore()
 
@@ -364,9 +364,8 @@ const {
 const { onProjectionMessage, isElectron } = useElectron()
 const { setProjectionState, sendProjectionMessage } = useProjectionMessaging()
 
-// Controls Logic
 const showZoomControls = ref(false)
-const toggleZoomMode = (minus = false) => {
+const toggleZoom = (minus = false) => {
   if (showZoomControls.value) {
     showZoomControls.value = false
     store.setZoom(1)
@@ -388,7 +387,6 @@ const zoomOut = () => {
   store.setZoom(Math.max(0.1, zoomLevel.value - 0.1))
 }
 
-// Video Player Setup
 const previewVideoRef = ref<HTMLVideoElement | null>(null)
 const isPreviewEnded = ref(false)
 const isSeeking = ref(false)
@@ -435,9 +433,11 @@ const {
   },
 })
 
-// Handle explicit seek (user click on timeline)
-const handleSeek = (time: number) => {
-  // Lock seeking state to prevent incoming time updates from projection from reverting this
+/**
+ * Handles user seeking via the timeline.
+ * Locks the seeking state to prevent incoming projection updates from overriding the local seek.
+ */
+const onSeek = (time: number) => {
   isSeeking.value = true
 
   // 1. Update local store
@@ -460,7 +460,7 @@ const handleSeek = (time: number) => {
   }, 500)
 }
 
-const handleReplayVideo = () => {
+const replayVideo = () => {
   // 1. Reset ended state
   isPreviewEnded.value = false
 
@@ -490,8 +490,7 @@ const toggleMute = () => {
   setPreviewVolume(volume.value > 0 ? 0 : 1)
 }
 
-// Seeking handlers for timeline dragging
-const handleSeekingStart = () => {
+const onSeekingStart = () => {
   isSeeking.value = true
   sendProjectionMessage(
     MessageType.MEDIA_CONTROL,
@@ -503,7 +502,7 @@ const handleSeekingStart = () => {
   )
 }
 
-const handleSeekingEnd = (finalTime: number) => {
+const onSeekingEnd = (finalTime: number) => {
   // Lock seeking state to prevent drift correction from reverting the seek
   isSeeking.value = true
 
@@ -562,7 +561,7 @@ const cursorStyle = computed(() => {
   return isDragging.value ? 'grabbing' : 'grab'
 })
 
-const startDrag = (e: MouseEvent) => {
+const startPanDrag = (e: MouseEvent) => {
   if (!previewContainer.value || !showZoomControls.value) return
   e.preventDefault()
 
@@ -604,7 +603,6 @@ const startDrag = (e: MouseEvent) => {
   window.addEventListener('mouseup', handleMouseUp)
 }
 
-// PDF handling
 const videoURL = computed(() => {
   if (currentItem.value?.metadata.fileType === 'video' && currentItem.value.url) {
     // Add timestamp to force cache busting and ensure Accept-Ranges header is respected
@@ -663,7 +661,6 @@ const updateNotes = () => {
   }
 }
 
-// Icons
 const getIcon = (type: string) => {
   switch (type) {
     case 'video':
@@ -677,7 +674,6 @@ const getIcon = (type: string) => {
   }
 }
 
-// Navigation & Actions
 const exitPresentation = async () => {
   await setProjectionState(true)
   store.exit()
@@ -690,10 +686,6 @@ const jumpTo = (index: number) => {
 const nextPdfPage = () => store.setPdfPage(pdfPage.value + 1)
 const prevPdfPage = () => store.setPdfPage(pdfPage.value - 1)
 
-// State Synchronization with Projection Window
-// We watch key state and send updates
-
-// 1. Watch Playlist changes (Full Sync)
 watch(
   playlist,
   (newVal) => {
@@ -710,7 +702,6 @@ watch(
   { deep: true },
 )
 
-// 2. Watch Current Index changes (Jump)
 watch(currentIndex, (val) => {
   sendProjectionMessage(
     MessageType.MEDIA_UPDATE,
@@ -766,7 +757,6 @@ watch(pdfPage, (val) => {
   sendProjectionMessage(MessageType.MEDIA_CONTROL, { type: 'pdf', action: 'pdfPage', value: val })
 })
 
-// Watch volume changes (presenter only)
 watch(volume, (val) => {
   sendProjectionMessage(MessageType.MEDIA_CONTROL, {
     type: 'video',
@@ -775,7 +765,6 @@ watch(volume, (val) => {
   })
 })
 
-// Keyboard Shortcuts
 const handleKeydown = (e: KeyboardEvent) => {
   if (!isPresenting.value) return
 
@@ -790,7 +779,7 @@ const handleKeydown = (e: KeyboardEvent) => {
       }
 
       if (showZoomControls.value) {
-        toggleZoomMode()
+        toggleZoom()
         break
       }
 
@@ -823,14 +812,14 @@ const handleKeydown = (e: KeyboardEvent) => {
       break
     case 'z':
     case 'Z':
-      toggleZoomMode()
+      toggleZoom()
       break
     case '+':
     case '=':
       if (showZoomControls.value) {
         zoomIn()
       } else {
-        toggleZoomMode()
+        toggleZoom()
       }
       break
     case '-':
@@ -838,7 +827,7 @@ const handleKeydown = (e: KeyboardEvent) => {
       if (showZoomControls.value) {
         zoomOut()
       } else {
-        toggleZoomMode(true)
+        toggleZoom(true)
       }
       break
   }
@@ -926,24 +915,5 @@ onUnmounted(() => {
 .preview-content {
   max-width: 100%;
   max-height: 100%;
-}
-
-/* Customize Video.js Skin to be larger */
-:deep(.video-js .vjs-control-bar) {
-  height: 4em !important;
-  background-color: rgba(43, 51, 63, 0.9) !important;
-}
-
-:deep(.video-js .vjs-button) {
-  font-size: 1.5em !important;
-}
-
-:deep(.video-js .vjs-time-control) {
-  font-size: 1.5em !important;
-  line-height: 4em !important;
-}
-
-:deep(.video-js .vjs-volume-panel) {
-  margin-right: 1em;
 }
 </style>
