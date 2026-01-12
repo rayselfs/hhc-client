@@ -16,6 +16,11 @@ export const useMediaProjectionStore = defineStore('media-projection', () => {
   const volume = ref(1)
   const pdfPage = ref(1)
 
+  // Video State
+  const currentTime = ref(0)
+  const duration = ref(0)
+  const isSeeking = ref(false)
+
   const restartTrigger = ref(0) // increment to trigger restart
 
   // Getters
@@ -39,6 +44,24 @@ export const useMediaProjectionStore = defineStore('media-projection', () => {
     }
     return null
   })
+
+  /**
+   * Format time in MM:SS or HH:MM:SS format
+   */
+  const formatTime = (seconds: number): string => {
+    if (isNaN(seconds) || seconds < 0) return '00:00'
+    const hrs = Math.floor(seconds / 3600)
+    const mins = Math.floor((seconds % 3600) / 60)
+    const secs = Math.floor(seconds % 60)
+
+    if (hrs > 0) {
+      return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+    }
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+  }
+
+  const formattedCurrentTime = computed(() => formatTime(currentTime.value))
+  const formattedDuration = computed(() => formatTime(duration.value))
 
   // Actions
   const setPlaylist = (items: FileItem[], startIndex = 0) => {
@@ -85,8 +108,10 @@ export const useMediaProjectionStore = defineStore('media-projection', () => {
   const resetMediaState = () => {
     zoomLevel.value = 1
     pan.value = { x: 0, y: 0 }
-    isPlaying.value = false // Auto-play videos by default?
+    isPlaying.value = false
     pdfPage.value = 1
+    currentTime.value = 0
+    duration.value = 0
   }
 
   const setZoom = (level: number) => {
@@ -107,7 +132,24 @@ export const useMediaProjectionStore = defineStore('media-projection', () => {
 
   const stop = () => {
     isPlaying.value = false
+    currentTime.value = 0
     restartTrigger.value++
+  }
+
+  const setCurrentTime = (time: number) => {
+    currentTime.value = Math.max(0, time)
+  }
+
+  const setDuration = (dur: number) => {
+    duration.value = Math.max(0, dur)
+  }
+
+  const setVolume = (vol: number) => {
+    volume.value = Math.max(0, Math.min(1, vol))
+  }
+
+  const setIsSeeking = (seeking: boolean) => {
+    isSeeking.value = seeking
   }
 
   /**
@@ -157,6 +199,27 @@ export const useMediaProjectionStore = defineStore('media-projection', () => {
         } else if (message.data.action === 'stop') {
           stop()
           return true
+        } else if (message.data.action === 'seek') {
+          setCurrentTime(Number(message.data.value))
+          return true
+        } else if (message.data.action === 'volume') {
+          setVolume(Number(message.data.value))
+          return true
+        } else if (message.data.action === 'timeupdate') {
+          setCurrentTime(Number(message.data.value))
+          return true
+        } else if (message.data.action === 'durationchange') {
+          setDuration(Number(message.data.value))
+          return true
+        } else if (message.data.action === 'seeking-start') {
+          setIsSeeking(true)
+          return true
+        } else if (message.data.action === 'seeking-end') {
+          setIsSeeking(false)
+          if (message.data.value !== undefined) {
+            setCurrentTime(Number(message.data.value))
+          }
+          return true
         }
         break
     }
@@ -176,6 +239,10 @@ export const useMediaProjectionStore = defineStore('media-projection', () => {
     isPlaying,
     volume,
     pdfPage,
+    currentTime,
+    duration,
+    formattedCurrentTime,
+    formattedDuration,
     restartTrigger,
     setPlaylist,
     next,
@@ -188,6 +255,11 @@ export const useMediaProjectionStore = defineStore('media-projection', () => {
     setPan,
     setPlaying,
     setPdfPage,
+    setCurrentTime,
+    setDuration,
+    setVolume,
+    isSeeking,
+    setIsSeeking,
     stop,
     handleMessage,
   }

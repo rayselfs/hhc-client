@@ -1,5 +1,4 @@
-import { ipcMain, app, nativeImage, protocol, net } from 'electron'
-import { pathToFileURL } from 'url'
+import { ipcMain, app, nativeImage, protocol } from 'electron'
 import { v4 as uuidv4 } from 'uuid'
 import * as Sentry from '@sentry/electron'
 import path from 'path'
@@ -10,7 +9,7 @@ import fs from 'fs-extra'
  * Handles quirks between Windows and macOS/Linux.
  */
 export const registerFileProtocols = () => {
-  protocol.handle('local-resource', (request) => {
+  protocol.handle('local-resource', async (request) => {
     try {
       const requestUrl = new URL(request.url)
 
@@ -45,13 +44,121 @@ export const registerFileProtocols = () => {
         return new Response('Forbidden', { status: 403 })
       }
 
-      return net.fetch(pathToFileURL(filePath).toString())
+      // Check if file exists
+      try {
+        await fs.access(filePath)
+      } catch {
+        return new Response('Not Found', { status: 404 })
+      }
+
+      const stat = await fs.stat(filePath)
+      const fileSize = stat.size
+      const rangeHeader = request.headers.get('Range')
+
+      // Handle Range Request (Video stream / Seek)
+      if (rangeHeader) {
+        const parts = rangeHeader.replace(/bytes=/, '').split('-')
+        const start = parseInt(parts[0], 10)
+        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1
+        const chunksize = end - start + 1
+
+        const stream = fs.createReadStream(filePath, { start, end })
+
+        return nodeStreamToWebResponse(stream, 206, {
+          'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+          'Accept-Ranges': 'bytes',
+          'Content-Length': chunksize.toString(),
+          'Content-Type': getMimeType(filePath),
+        })
+      }
+
+      // Handle Full Request
+      const stream = fs.createReadStream(filePath)
+      return nodeStreamToWebResponse(stream, 200, {
+        'Content-Length': fileSize.toString(),
+        'Content-Type': getMimeType(filePath),
+        'Accept-Ranges': 'bytes',
+      })
     } catch (error) {
       console.error('Failed to handle protocol request:', request.url, error)
-      return new Response('Not Found', { status: 404 })
+      return new Response('Internal Server Error', { status: 500 })
     }
   })
 }
+
+/**
+ * Helper to convert a Node.js ReadStream to a Web Response with a ReadableStream.
+ * Handles stream lifecycle and errors safely.
+ */
+function nodeStreamToWebResponse(
+  stream: fs.ReadStream,
+  status: number,
+  headers: Record<string, string>,
+): Response {
+  const readable = new ReadableStream({
+    start(controller) {
+      stream.on('data', (chunk) => {
+        try {
+          controller.enqueue(chunk)
+        } catch {
+          // Controller closed or request cancelled
+          stream.destroy()
+        }
+      })
+      stream.on('end', () => {
+        try {
+          controller.close()
+        } catch {
+          // Ignore
+        }
+      })
+      stream.on('error', (err) => {
+        try {
+          controller.error(err)
+        } catch {
+          // Ignore
+        }
+      })
+    },
+    cancel() {
+      stream.destroy()
+    },
+  })
+
+  return new Response(readable, { status, headers })
+}
+
+// Helper to determine mime type
+function getMimeType(filePath: string): string {
+  const ext = path.extname(filePath).toLowerCase()
+  switch (ext) {
+    case '.mp4':
+      return 'video/mp4'
+    case '.webm':
+      return 'video/webm'
+    case '.ogg':
+      return 'video/ogg'
+    case '.mp3':
+      return 'audio/mpeg'
+    case '.wav':
+      return 'audio/wav'
+    case '.jpg':
+    case '.jpeg':
+      return 'image/jpeg'
+    case '.png':
+      return 'image/png'
+    case '.gif':
+      return 'image/gif'
+    case '.svg':
+      return 'image/svg+xml'
+    case '.pdf':
+      return 'application/pdf'
+    default:
+      return 'application/octet-stream'
+  }
+}
+
+// getMimeType removed as net.fetch handles content-type automatically for file:// protocol
 
 export const registerFileHandlers = () => {
   // Handle save file

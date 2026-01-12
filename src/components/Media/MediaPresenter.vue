@@ -35,15 +35,17 @@
                   class="preview-content"
                   style="object-fit: contain"
                 />
-                <!-- Video Status Display (No Local Playback) -->
+                <!-- Video Preview -->
                 <div
                   v-else-if="currentItem.metadata.fileType === 'video'"
-                  class="d-flex flex-column align-center justify-center fill-height w-100 bg-grey-darken-4"
+                  class="fill-height w-100 d-flex align-center justify-center bg-black"
                 >
-                  <v-icon size="64" color="grey">mdi-video</v-icon>
-                  <div class="text-h6 mt-4 font-weight-bold">
-                    {{ videoStatusText }}
-                  </div>
+                  <video
+                    ref="previewVideoRef"
+                    :key="currentItem.id"
+                    class="w-100 h-100"
+                    style="object-fit: contain"
+                  ></video>
                 </div>
                 <!-- PDF Preview -->
                 <div
@@ -138,6 +140,26 @@
                   </div>
                 </div>
               </v-fade-transition>
+              <!-- Custom Video Controls -->
+              <MediaVideoControls
+                v-if="currentItem?.metadata.fileType === 'video'"
+                :is-playing="isPlaying"
+                :current-time="store.currentTime"
+                :duration="store.duration"
+                :volume="volume"
+                :is-muted="false"
+                :is-ended="isPreviewEnded"
+                class="position-absolute bottom-0 left-0 right-0 ma-2"
+                style="z-index: 20"
+                @play="playPreviewVideo"
+                @seek="handleSeek"
+                @pause="pausePreviewVideo"
+                @replay="handleReplayVideo"
+                @seeking-start="handleSeekingStart"
+                @seeking-end="handleSeekingEnd"
+                @volume-change="setPreviewVolume"
+                @toggle-mute="toggleMute"
+              />
             </div>
 
             <!-- Control Bar (Under Preview) -->
@@ -168,32 +190,6 @@
                 :title="$t('media.zoom')"
               >
                 <v-icon size="32">mdi-magnify</v-icon>
-              </v-btn>
-
-              <!-- 3. Play/Pause (Video) -->
-              <v-btn
-                variant="text"
-                icon
-                size="large"
-                @click="togglePlay"
-                :disabled="!currentItem || currentItem.metadata.fileType !== 'video'"
-                :title="isPlaying ? $t('media.pause') : $t('media.play')"
-                :color="isPlaying || hasStarted ? 'warning' : 'primary'"
-              >
-                <v-icon size="32">{{ isPlaying ? 'mdi-pause' : 'mdi-play' }}</v-icon>
-              </v-btn>
-
-              <!-- 4. Stop (Video) -->
-              <v-btn
-                variant="text"
-                icon
-                size="large"
-                @click="restartVideo"
-                :disabled="!currentItem || currentItem.metadata.fileType !== 'video'"
-                :title="$t('media.stop')"
-                color="error"
-              >
-                <v-icon size="32">mdi-stop</v-icon>
               </v-btn>
             </div>
           </div>
@@ -330,9 +326,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed, nextTick } from 'vue'
 import { useMediaProjectionStore } from '@/stores/mediaProjection'
-import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import { useElectron } from '@/composables/useElectron'
 import { MessageType } from '@/types/common'
@@ -342,6 +337,8 @@ import { APP_CONFIG } from '@/config/app'
 import { useStopwatchStore } from '@/stores/stopwatch'
 import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
 import { ViewType } from '@/types/common'
+import { useVideoPlayer } from '@/composables/useVideoPlayer'
+import MediaVideoControls from './MediaVideoControls.vue'
 
 const stopwatchStore = useStopwatchStore()
 
@@ -361,6 +358,7 @@ const {
   pan,
   isPlaying,
   pdfPage,
+  volume,
 } = storeToRefs(store)
 
 const { onProjectionMessage, isElectron } = useElectron()
@@ -390,15 +388,149 @@ const zoomOut = () => {
   store.setZoom(Math.max(0.1, zoomLevel.value - 0.1))
 }
 
-const videoRef = ref<HTMLVideoElement | null>(null)
+// Video Player Setup
+const previewVideoRef = ref<HTMLVideoElement | null>(null)
+const isPreviewEnded = ref(false)
+const isSeeking = ref(false)
 
-const { t } = useI18n()
-const hasStarted = ref(false)
-const videoStatusText = computed(() => {
-  if (isPlaying.value) return t('media.videoPlaying')
-  if (hasStarted.value) return t('media.videoPaused')
-  return t('media.videoReady')
+const {
+  initialize: initializePreviewPlayer,
+  dispose: disposePreviewPlayer,
+  play: playPreviewVideo,
+  pause: pausePreviewVideo,
+  seek: seekPreviewVideo,
+  setVolume: setPreviewVolume,
+} = useVideoPlayer({
+  videoRef: previewVideoRef,
+  isMuted: false, // We use 'silent' mode instead of 'muted' to keep volume UI active
+  silent: true, // Use AudioContext to mute output but keep UI showing volume
+  onTimeUpdate: (time) => {
+    // Only update local store for UI display
+    // Do NOT send to projection - projection is the leader
+    if (!isSeeking.value) {
+      store.setCurrentTime(time)
+    }
+  },
+  onDurationChange: (dur) => {
+    store.setDuration(dur)
+    // Send duration to projection window
+    sendProjectionMessage(MessageType.MEDIA_CONTROL, {
+      type: 'video',
+      action: 'durationchange',
+      value: dur,
+    })
+  },
+  onVolumeChange: (vol) => {
+    store.setVolume(vol)
+  },
+  onEnded: () => {
+    store.setPlaying(false)
+    isPreviewEnded.value = true
+  },
+  onPlayStateChange: (playing) => {
+    store.setPlaying(playing)
+    if (playing) {
+      isPreviewEnded.value = false
+    }
+  },
 })
+
+// Handle explicit seek (user click on timeline)
+const handleSeek = (time: number) => {
+  // Lock seeking state to prevent incoming time updates from projection from reverting this
+  isSeeking.value = true
+
+  // 1. Update local store
+  store.setCurrentTime(time)
+
+  // 2. Seek local video
+  seekPreviewVideo(time)
+
+  // 3. Send explicit SEEK command to projection (bypassing watcher logic)
+  sendProjectionMessage(
+    MessageType.MEDIA_CONTROL,
+    { type: 'video', action: 'seek', value: time },
+    { force: true },
+  )
+
+  // Release lock after a short delay to allow seek to settle
+  // This prevents the "old" time from projection (which might lag) from overwriting our new time immediately
+  setTimeout(() => {
+    isSeeking.value = false
+  }, 500)
+}
+
+const handleReplayVideo = () => {
+  // 1. Reset ended state
+  isPreviewEnded.value = false
+
+  // 2. Update store state
+  store.setCurrentTime(0)
+  store.setPlaying(true)
+
+  // 3. Operate local Preview
+  seekPreviewVideo(0)
+  playPreviewVideo()
+
+  // 4. Send commands to Projection
+  sendProjectionMessage(
+    MessageType.MEDIA_CONTROL,
+    { type: 'video', action: 'seek', value: 0 },
+    { force: true },
+  )
+  sendProjectionMessage(
+    MessageType.MEDIA_CONTROL,
+    { type: 'video', action: 'play' },
+    { force: true },
+  )
+}
+
+const toggleMute = () => {
+  // If volume > 0, mute (0). If 0, restore to 1 (or prev level if we stored it, but simple 1 is fine)
+  setPreviewVolume(volume.value > 0 ? 0 : 1)
+}
+
+// Seeking handlers for timeline dragging
+const handleSeekingStart = () => {
+  isSeeking.value = true
+  sendProjectionMessage(
+    MessageType.MEDIA_CONTROL,
+    {
+      type: 'video',
+      action: 'seeking-start',
+    },
+    { force: true },
+  )
+}
+
+const handleSeekingEnd = (finalTime: number) => {
+  // Lock seeking state to prevent drift correction from reverting the seek
+  isSeeking.value = true
+
+  // 1. Update local state
+  store.setCurrentTime(finalTime)
+  seekPreviewVideo(finalTime)
+
+  if (!previewVideoRef.value) {
+    console.error('[MediaPresenter] previewVideoRef is null!')
+  }
+
+  // 2. Send seeking-end with final position to Projection
+  sendProjectionMessage(
+    MessageType.MEDIA_CONTROL,
+    {
+      type: 'video',
+      action: 'seeking-end',
+      value: finalTime,
+    },
+    { force: true },
+  )
+
+  // Release lock after delay to allow projection to catch up
+  setTimeout(() => {
+    isSeeking.value = false
+  }, 1000)
+}
 
 // Minimap Logic
 // Minimap/Preview Logic
@@ -473,18 +605,45 @@ const startDrag = (e: MouseEvent) => {
 }
 
 // PDF handling
+const videoURL = computed(() => {
+  if (currentItem.value?.metadata.fileType === 'video' && currentItem.value.url) {
+    // Add timestamp to force cache busting and ensure Accept-Ranges header is respected
+    // This solves the issue where browser caches "non-seekable" state from previous requests
+    return `${currentItem.value.url}?t=${Date.now()}`
+  }
+  return ''
+})
+
 const pdfUrl = computed(() => {
   if (!currentItem.value) return ''
   // Use #page=N to control PDF page if browser supports it
   return `${currentItem.value.url}#page=${pdfPage.value}&toolbar=0&navpanes=0&scrollbar=0`
 })
 
-// Removed local video sync watcher since we don't play video locally anymore
+// Video player initialization on item change
+watch(
+  currentItem,
+  (newItem, oldItem) => {
+    showZoomControls.value = false
 
-watch(currentItem, () => {
-  showZoomControls.value = false
-  hasStarted.value = false
-})
+    // Cleanup old video player
+    if (oldItem?.metadata.fileType === 'video') {
+      disposePreviewPlayer()
+    }
+
+    // Initialize new video player if current item is a video
+    if (newItem?.metadata.fileType === 'video' && previewVideoRef.value) {
+      // Use nextTick to ensure video element is mounted
+      nextTick(() => {
+        if (previewVideoRef.value && videoURL.value) {
+          initializePreviewPlayer()
+          previewVideoRef.value.src = videoURL.value
+        }
+      })
+    }
+  },
+  { immediate: false },
+)
 
 // Notes handling (local ref synced to currentItem)
 const itemNotes = ref('')
@@ -526,24 +685,6 @@ const exitPresentation = async () => {
 
 const jumpTo = (index: number) => {
   store.jumpTo(index)
-}
-
-const togglePlay = () => {
-  if (!isPlaying.value) {
-    hasStarted.value = true
-  }
-  store.setPlaying(!isPlaying.value)
-}
-
-const restartVideo = () => {
-  if (videoRef.value) {
-    videoRef.value.currentTime = 0
-    videoRef.value.pause()
-  }
-  store.setPlaying(false)
-  hasStarted.value = false // Reset status to Ready
-
-  sendProjectionMessage(MessageType.MEDIA_CONTROL, { type: 'video', action: 'stop' })
 }
 
 const nextPdfPage = () => store.setPdfPage(pdfPage.value + 1)
@@ -602,6 +743,19 @@ watch(
 )
 
 watch(isPlaying, (val) => {
+  // Control preview video player
+  // Prevent loop: Only call play/pause if the video state doesn't match the store state
+  if (currentItem.value?.metadata.fileType === 'video' && previewVideoRef.value) {
+    const isPaused = previewVideoRef.value.paused
+
+    if (val && isPaused) {
+      playPreviewVideo()
+    } else if (!val && !isPaused) {
+      pausePreviewVideo()
+    }
+  }
+
+  // Send to projection window
   sendProjectionMessage(MessageType.MEDIA_CONTROL, {
     type: 'video',
     action: val ? 'play' : 'pause',
@@ -610,6 +764,15 @@ watch(isPlaying, (val) => {
 
 watch(pdfPage, (val) => {
   sendProjectionMessage(MessageType.MEDIA_CONTROL, { type: 'pdf', action: 'pdfPage', value: val })
+})
+
+// Watch volume changes (presenter only)
+watch(volume, (val) => {
+  sendProjectionMessage(MessageType.MEDIA_CONTROL, {
+    type: 'video',
+    action: 'volume',
+    value: val,
+  })
 })
 
 // Keyboard Shortcuts
@@ -658,14 +821,6 @@ const handleKeydown = (e: KeyboardEvent) => {
     case 'G':
       store.toggleGrid()
       break
-    case ' ':
-      e.preventDefault()
-      togglePlay()
-      break
-    case 'r':
-    case 'R':
-      restartVideo()
-      break
     case 'z':
     case 'Z':
       toggleZoomMode()
@@ -711,21 +866,44 @@ onMounted(async () => {
   }
 
   onProjectionMessage((msg) => {
-    if (
-      msg.type === MessageType.MEDIA_CONTROL &&
-      msg.data?.action === 'ended' &&
-      msg.data?.type === 'video'
-    ) {
-      // Video Finished
-      store.setPlaying(false)
-      hasStarted.value = false // Reset to Ready
+    if (msg.type === MessageType.MEDIA_CONTROL && msg.data?.type === 'video') {
+      if (msg.data?.action === 'ended') {
+        // Video Finished
+        store.setPlaying(false)
+      } else if (msg.data?.action === 'projection-time') {
+        const projectionTime = Number(msg.data.value)
+        // Optimization: Do NOT update store.currentTime here.
+        // Let local preview drive the UI for 60fps smoothness.
+        // Only use projectionTime for drift correction.
+
+        // Sync preview video if drift > 1 second
+        if (previewVideoRef.value && !isSeeking.value && isPlaying.value) {
+          const previewTime = previewVideoRef.value.currentTime
+          const drift = Math.abs(previewTime - projectionTime)
+          if (drift > 1.0) {
+            seekPreviewVideo(projectionTime)
+          }
+        }
+      }
     }
   })
+
+  // Initialize video player if current item is already a video
+  if (currentItem.value?.metadata.fileType === 'video') {
+    nextTick(() => {
+      if (previewVideoRef.value && currentItem.value?.url) {
+        initializePreviewPlayer()
+        previewVideoRef.value.src = currentItem.value.url
+      }
+    })
+  }
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
   stopwatchStore.resetLocal()
+  // Cleanup video player
+  disposePreviewPlayer()
 })
 </script>
 
@@ -748,5 +926,24 @@ onUnmounted(() => {
 .preview-content {
   max-width: 100%;
   max-height: 100%;
+}
+
+/* Customize Video.js Skin to be larger */
+:deep(.video-js .vjs-control-bar) {
+  height: 4em !important;
+  background-color: rgba(43, 51, 63, 0.9) !important;
+}
+
+:deep(.video-js .vjs-button) {
+  font-size: 1.5em !important;
+}
+
+:deep(.video-js .vjs-time-control) {
+  font-size: 1.5em !important;
+  line-height: 4em !important;
+}
+
+:deep(.video-js .vjs-volume-panel) {
+  margin-right: 1em;
 }
 </style>
