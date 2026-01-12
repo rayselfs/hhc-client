@@ -92,20 +92,104 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
       _deleteFolderRecursive(folders as any, folderId)
     }
 
-    const checkExpiredContent = (folder: Folder<TItem>): boolean => {
+    /**
+     * Recursively checks for and deletes expired content
+     * Returns true if any content was deleted (store structure changed)
+     */
+    const purgeExpiredContent = async (folder: Folder<TItem>): Promise<boolean> => {
       let changed = false
       const now = Date.now()
-      const initialItemsLength = folder.items.length
-      folder.items = folder.items.filter((item) => !(item.expiresAt && item.expiresAt < now))
-      if (folder.items.length !== initialItemsLength) changed = true
+      // Only perform physical deletion for Media category
+      const isMedia = config.storageCategory === StorageCategory.MEDIA
+      const fs = isMedia
+        ? fileSystemProviderFactory.getProvider(folder.sourceType || 'local')
+        : null
 
-      const initialFoldersLength = folder.folders.length
-      folder.folders = folder.folders.filter((subFolder) => {
-        if (subFolder.expiresAt && subFolder.expiresAt < now) return false
-        if (checkExpiredContent(subFolder)) changed = true
-        return true
-      })
-      if (folder.folders.length !== initialFoldersLength) changed = true
+      // 1. Check Files
+      const expiredItems = folder.items.filter((item) => item.expiresAt && item.expiresAt < now)
+      if (expiredItems.length > 0) {
+        if (isMedia && fs) {
+          try {
+            // Physical Delete
+            const toDelete = expiredItems as any[]
+            await Promise.all(toDelete.map((item) => fs.deleteFile(item.url)))
+          } catch (e) {
+            console.error('Failed to delete physical files for expired items', e)
+          }
+
+          // Thumbnail Cleanup
+          for (const item of expiredItems) {
+            if ((item as any)?.metadata?.thumbnailBlobId) {
+              await db.delete(
+                FolderDBStore.FOLDER_DB_THUMBNAILS_STORE_NAME,
+                (item as any).metadata.thumbnailBlobId,
+              )
+            }
+          }
+        }
+
+        // Store Update
+        folder.items = folder.items.filter((item) => !expiredItems.includes(item))
+        changed = true
+      }
+
+      // 2. Check Subfolders
+      const expiredFolders: Folder<TItem>[] = []
+      const activeFolders: Folder<TItem>[] = []
+
+      for (const subFolder of folder.folders) {
+        if (subFolder.expiresAt && subFolder.expiresAt < now) {
+          expiredFolders.push(subFolder)
+        } else {
+          // Recursively check children
+          if (await purgeExpiredContent(subFolder)) {
+            changed = true
+          }
+          activeFolders.push(subFolder)
+        }
+      }
+
+      // Delete Expired Folders
+      if (expiredFolders.length > 0) {
+        if (isMedia && fs) {
+          for (const expFolder of expiredFolders) {
+            // Collect IDs for thumbnail cleanup
+            const collectItemIds = (f: Folder<TItem>, ids: string[]) => {
+              f.items.forEach((item) => ids.push(item.id))
+              f.folders.forEach((sub) => collectItemIds(sub, ids))
+            }
+            const itemIds: string[] = []
+            collectItemIds(expFolder, itemIds)
+
+            for (const itemId of itemIds) {
+              // Try to get item from map if available, otherwise we can't clean thumbnail?
+              // Wait, if it's expiration logic, items are in 'expFolder'.
+              // But `itemMap` is flat index.
+              const item = itemMap.get(itemId)
+              if ((item as any)?.metadata?.thumbnailBlobId) {
+                await db.delete(
+                  FolderDBStore.FOLDER_DB_THUMBNAILS_STORE_NAME,
+                  (item as any).metadata.thumbnailBlobId,
+                )
+              }
+            }
+
+            try {
+              // Physical Delete Directory
+              // LocalProvider uses path as ID. Construct URL for deletion.
+              // deleteFile in LocalProvider uses fs.remove which works for directories.
+              const folderUrl = fs.buildUrl(expFolder.id)
+              await fs.deleteFile(folderUrl)
+            } catch (e) {
+              console.error(`Failed to delete expired folder ${expFolder.name}`, e)
+            }
+          }
+        }
+
+        folder.folders = activeFolders
+        changed = true
+      }
+
       return changed
     }
 
@@ -140,7 +224,7 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
         const savedFolder = await db.get<Folder<TItem>>(storeName, config.rootId)
         if (savedFolder && savedFolder.id === config.rootId) {
           rootFolder.value = savedFolder as any
-          if (checkExpiredContent(rootFolder.value as any)) {
+          if (await purgeExpiredContent(rootFolder.value as any)) {
             await saveRootFolder()
           }
           rebuildIndex()

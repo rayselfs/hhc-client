@@ -239,32 +239,22 @@
               class="next-preview bg-black rounded mb-4 d-flex align-center justify-center"
               style="aspect-ratio: 16/9; width: 100%; height: auto"
             >
-              <template v-if="nextItem">
-                <img
-                  v-if="nextItem.metadata.fileType === 'image'"
-                  :src="nextItem.url"
-                  class="preview-content"
-                />
-                <div
-                  v-else-if="nextItem.metadata.fileType === 'pdf'"
-                  class="w-100 h-100 position-relative"
-                >
-                  <iframe
-                    :src="`${nextItem.url}#page=1&toolbar=0&navpanes=0&scrollbar=0`"
-                    class="w-100 h-100"
-                    style="border: none; pointer-events: none"
-                    scrolling="no"
-                  ></iframe>
-                  <!-- Overlay to prevent interaction with preview PDF -->
-                  <div class="position-absolute top-0 left-0 w-100 h-100"></div>
-                </div>
-                <div v-else class="text-center">
-                  <v-icon size="48" color="grey">
-                    {{ getIcon(nextItem.metadata.fileType) }}
-                  </v-icon>
-                  <div class="text-caption mt-1">{{ nextItem.name }}</div>
-                </div>
-              </template>
+              <MediaThumbnail
+                v-if="nextItem"
+                :item="nextItem"
+                :fallback-icon="getIcon(nextItem.metadata.fileType)"
+                class="preview-content rounded"
+                style="width: 100%; height: 100%"
+              >
+                <template #placeholder>
+                  <div class="text-center">
+                    <v-icon size="48" color="grey">
+                      {{ getIcon(nextItem.metadata.fileType) }}
+                    </v-icon>
+                    <div class="text-caption mt-1">{{ nextItem.name }}</div>
+                  </div>
+                </template>
+              </MediaThumbnail>
               <div v-else class="text-grey text-caption">{{ $t('media.endOfSlides') }}</div>
             </div>
           </div>
@@ -294,27 +284,22 @@
             hover
             :color="index === currentIndex ? 'primary' : 'grey-darken-4'"
           >
-            <v-img
-              v-if="item.metadata.fileType === 'image'"
-              :src="item.url"
+            <MediaThumbnail
+              :item="item"
               aspect-ratio="1.77"
-              cover
-            ></v-img>
-            <v-img
-              v-else-if="item.metadata.thumbnail"
-              :src="item.metadata.thumbnail"
-              aspect-ratio="1.77"
+              :fallback-icon="getIcon(item.metadata.fileType)"
               cover
             >
-              <div class="d-flex align-center justify-center fill-height">
+              <div
+                v-if="item.metadata.fileType !== 'image'"
+                class="d-flex align-center justify-center fill-height"
+                style="position: absolute; top: 0; left: 0; width: 100%; height: 100%"
+              >
                 <v-icon size="36" color="white" style="text-shadow: 0 0 5px black">{{
                   getIcon(item.metadata.fileType)
                 }}</v-icon>
               </div>
-            </v-img>
-            <div v-else class="d-flex align-center justify-center" style="aspect-ratio: 1.77">
-              <v-icon size="48">{{ getIcon(item.metadata.fileType) }}</v-icon>
-            </div>
+            </MediaThumbnail>
             <v-card-text class="text-caption text-truncate"
               >{{ index + 1 }}. {{ item.name }}</v-card-text
             >
@@ -339,6 +324,7 @@ import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
 import { ViewType } from '@/types/common'
 import { useVideoPlayer } from '@/composables/useVideoPlayer'
 import MediaVideoControls from '@/components/Media/Preview/MediaVideoControls.vue'
+import MediaThumbnail from '@/components/Media/MediaThumbnail.vue'
 
 const stopwatchStore = useStopwatchStore()
 

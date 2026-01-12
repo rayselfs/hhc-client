@@ -352,7 +352,7 @@ export function useMediaOperations(
         const newItemId = uuidv4()
         const newMetadata = {
           ...fileItem.metadata,
-          thumbnail: fileItem.metadata.thumbnail,
+          thumbnailUrl: fileItem.metadata.thumbnailUrl,
         }
 
         // Duplicate the thumbnail blob in IndexedDB if it exists

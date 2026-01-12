@@ -35,41 +35,32 @@
       class="flex-grow-1 mx-2 mb-2 rounded overflow-hidden position-relative"
       :class="isSelected ? 'bg-primary-darken-1' : 'bg-surface'"
     >
-      <!-- Image/Thumbnail -->
-      <v-img
-        v-if="
-          item.metadata.fileType === 'image' ||
-          item.metadata.thumbnail ||
-          item.metadata.thumbnailBlobId
-        "
-        :src="thumbnailSrc"
+      <MediaThumbnail
+        :item="item"
+        aspect-ratio="1"
+        :fallback-icon="getFileIcon(item.metadata.fileType)"
+        class="h-100 w-100 bg-transparent"
         cover
-        class="h-100 w-100"
       >
-        <template #error>
+        <template #placeholder>
           <div class="d-flex align-center justify-center h-100 w-100">
-            <v-icon :icon="getFileIcon(item.metadata.fileType)" size="64" color="grey"></v-icon>
+            <v-icon
+              :icon="getFileIcon(item.metadata.fileType)"
+              size="64"
+              :color="isSelected ? 'white' : item.metadata.fileType === 'pdf' ? 'red' : 'grey'"
+            ></v-icon>
           </div>
         </template>
-      </v-img>
-
-      <!-- Icon for other types -->
-      <div v-else class="d-flex align-center justify-center h-100 w-100">
-        <v-icon
-          :icon="getFileIcon(item.metadata.fileType)"
-          size="64"
-          :color="isSelected ? 'white' : item.metadata.fileType === 'pdf' ? 'red' : 'grey'"
-        ></v-icon>
-      </div>
+      </MediaThumbnail>
     </div>
   </v-card>
 </template>
 
 <script setup lang="ts">
 import type { FileItem, ClipboardItem } from '@/types/common'
-import { useThumbnail } from '@/composables/useThumbnail'
+import MediaThumbnail from './MediaThumbnail.vue'
 
-const props = defineProps<{
+defineProps<{
   item: FileItem
   isSelected: boolean
   isCut: boolean
@@ -85,8 +76,6 @@ defineEmits<{
   (e: 'delete', item: FileItem): void
   (e: 'menu-click', item: FileItem, event: MouseEvent): void
 }>()
-
-const { thumbnailSrc } = useThumbnail(props.item)
 
 const getFileIcon = (fileType: string) => {
   switch (fileType) {

@@ -1,4 +1,5 @@
-import { ref, watch, onUnmounted } from 'vue'
+import { ref, watch, onUnmounted, unref } from 'vue'
+import type { Ref } from 'vue'
 import type { FileItem } from '@/types/common'
 import { useIndexedDB } from './useIndexedDB'
 import { FOLDER_DB_CONFIG } from '@/config/db'
@@ -8,8 +9,8 @@ import { FolderDBStore } from '@/types/enum'
  * Composable for managing thumbnail display
  * Handles fetching Blob from IndexedDB and creating Object URLs
  */
-export function useThumbnail(item: FileItem) {
-  const thumbnailSrc = ref<string | undefined>(item.metadata.thumbnail)
+export function useThumbnail(itemOrRef: FileItem | Ref<FileItem>) {
+  const thumbnailSrc = ref<string | undefined>(unref(itemOrRef).metadata?.thumbnailUrl)
   const db = useIndexedDB(FOLDER_DB_CONFIG)
   let currentObjectURL: string | null = null
 
@@ -21,7 +22,10 @@ export function useThumbnail(item: FileItem) {
   }
 
   const loadThumbnail = async () => {
-    if (item.metadata.thumbnailType === 'blob' && item.metadata.thumbnailBlobId) {
+    const item = unref(itemOrRef)
+    if (!item) return
+
+    if (item.metadata?.thumbnailType === 'blob' && item.metadata?.thumbnailBlobId) {
       try {
         const result = await db.get<{ blob: Blob }>(
           FolderDBStore.FOLDER_DB_THUMBNAILS_STORE_NAME,
@@ -36,19 +40,29 @@ export function useThumbnail(item: FileItem) {
         console.error('Failed to load thumbnail from IndexedDB:', error)
       }
     } else {
-      thumbnailSrc.value = item.metadata.thumbnail || item.url
+      thumbnailSrc.value = item.metadata?.thumbnailUrl
     }
   }
 
   // Load initially
   loadThumbnail()
 
-  // Watch for changes (e.g., if item is updated)
+  // Watch for changes: explicitly watch the itemOrRef
+  // If it's a ref, this triggers when the object works
+  // If it's a static object, we deep watch properties or rely on the caller to pass a Ref
   watch(
-    () => item.metadata.thumbnailBlobId,
+    () => {
+      const item = unref(itemOrRef)
+      return {
+        id: item.id,
+        blobId: item.metadata?.thumbnailBlobId,
+        url: item.metadata?.thumbnailUrl,
+      }
+    },
     () => {
       loadThumbnail()
     },
+    { deep: true },
   )
 
   // Cleanup to prevent memory leaks

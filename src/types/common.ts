@@ -389,8 +389,8 @@ export interface FileMetadata {
   width?: number // Image/Video dimensions
   height?: number // Image/Video dimensions
   duration?: number // Video/Audio duration in seconds
-  thumbnail?: string // Video thumbnail URL or Blob URL
   thumbnailType?: 'url' | 'blob' // Added: source of the thumbnail
+  thumbnailUrl?: string // Video thumbnail URL or Blob URL
   thumbnailBlobId?: string // Added: key for thumbnails store in IndexedDB
   pageCount?: number // PDF page count
   mimeType?: string // File MIME type
