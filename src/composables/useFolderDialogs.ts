@@ -17,14 +17,6 @@ export interface UseFolderDialogsReturn<T extends FolderItem> {
   openCreateFolderDialog: (initialName?: string) => void
   openEditDialog: (target: Folder<T> | T) => void
 
-  // Delete
-  showDeleteConfirmDialog: Ref<boolean>
-  folderToDelete: Ref<Folder<T> | null>
-  itemToDelete: Ref<T | null>
-  openDeleteFolderDialog: (folder: Folder<T>) => void
-  openDeleteItemDialog: (item: T) => void
-  openDeleteSelectionDialog: () => void
-
   // Move
   showMoveDialog: Ref<boolean>
   moveBreadcrumb: Ref<{ id: string; name: string }[]>
@@ -35,6 +27,14 @@ export interface UseFolderDialogsReturn<T extends FolderItem> {
   itemToMove: Ref<T | null>
   openMoveDialog: (target: T | Folder<T>) => void
   openMoveSelectedDialog: (selectedIds: Set<string>) => void
+
+  // Delete
+  showDeleteConfirmDialog: Ref<boolean>
+  folderToDelete: Ref<Folder<T> | null>
+  itemToDelete: Ref<T | null>
+  openDeleteFolderDialog: (folder: Folder<T>) => void
+  openDeleteItemDialog: (item: T) => void
+  openDeleteSelectionDialog: () => void
 }
 
 export function useFolderDialogs<T extends FolderItem = ItemType>(): UseFolderDialogsReturn<T> {

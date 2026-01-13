@@ -25,7 +25,7 @@
         prepend-icon="mdi-content-paste"
         :title="$t('common.paste')"
         :disabled="clipboard.length === 0"
-        @click="$emit('paste-into-folder')"
+        @click="$emit('paste-into-folder', props.target.id)"
       ></v-list-item>
     </template>
 
@@ -59,7 +59,7 @@ const emit = defineEmits<{
   (e: 'copy'): void
   (e: 'cut'): void
   (e: 'delete', target: FileItem | Folder<FileItem>): void
-  (e: 'paste-into-folder'): void
+  (e: 'paste-into-folder', folderId: string): void
 }>()
 
 const getPermissions = (item: FileItem | Folder<FileItem>): ItemPermissions => {

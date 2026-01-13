@@ -1,79 +1,148 @@
 <template>
-  <div v-if="combinedItems.length > 0" :style="{ height: `${mediaSpaceHeight}px` }">
-    <v-virtual-scroll
-      :items="chunkedItems"
-      style="height: 100%"
-      class="overflow-y-auto overflow-x-hidden"
-    >
-      <template #default="{ item: rowItems }">
-        <v-row dense>
-          <v-col
-            v-for="item in rowItems"
-            :key="item.id"
-            cols="12"
-            sm="6"
-            md="4"
-            lg="2"
-            class="pa-2"
-          >
-            <!-- Folder Item -->
-            <MediaFolderItem
-              v-if="isFolder(item)"
-              :item="item"
-              :is-selected="selectedItems.has(item.id)"
-              :is-cut="isCut(item.id)"
-              :is-dragging="draggedItems.has(item.id)"
-              :draggable="canMove(item)"
-              @dragstart="canMove(item) && onDragStart($event, item, 'folder')"
-              @dragend="onDragEnd"
-              @drop="onDrop($event, item)"
-              @dragover="onDragOver"
-              @dragenter="onDragEnter"
-              @dragleave="onDragLeave"
-              @click.stop="handleSelection(item.id, $event)"
-              @dblclick="openFolder(item.id)"
-              @contextmenu.prevent="openContextMenu(item, $event)"
-              @menu-click="(i, e) => emit('folder-menu-click', i, e)"
-            />
+  <div
+    ref="mediaItemContainerRef"
+    class="media-item-list-container"
+    :style="{ height: `${mediaSpaceHeight}px` }"
+    @mousedown="onSelectionMouseDown"
+    @contextmenu.prevent="openBackgroundContextMenu"
+  >
+    <div v-if="items.length > 0" style="height: 100%">
+      <!-- Virtual Scroll for large lists (No animation, just performance) -->
+      <v-virtual-scroll
+        v-if="useVirtualScroll"
+        :items="chunkedItems"
+        style="height: 100%"
+        class="overflow-y-auto overflow-x-hidden"
+      >
+        <template #default="{ item: rowItems }">
+          <div class="d-flex flex-wrap">
+            <div
+              v-for="item in rowItems"
+              :key="item.id"
+              class="pa-2"
+              :style="{ width: `${ITEM_WIDTH}px`, height: `${ITEM_WIDTH}px` }"
+            >
+              <MediaItem
+                :item="item"
+                :is-selected="selectedItems.has(item.id)"
+                :is-cut="isCut(item.id)"
+                :is-dragging="draggedItems.has(item.id)"
+                :draggable="canDrag(item)"
+                @dragstart="onDragStart($event, item)"
+                @dragend="onDragEnd"
+                @drop="onDrop($event, item)"
+                @dragover="onDragOver($event, item)"
+                @dragenter="onDragEnter($event)"
+                @dragleave="onDragLeave($event)"
+                @click.stop="handleSelection(item.id, $event)"
+                @dblclick="handleDoubleClick(item)"
+                @contextmenu.prevent="openContextMenu(item, $event)"
+                @menu-click="(i, e) => emitMenuClick(i, e)"
+              />
+            </div>
+          </div>
+        </template>
+      </v-virtual-scroll>
 
-            <!-- File Item -->
-            <MediaFileItem
-              v-else
+      <!-- Standard Flex Layout for manual sort and visual feedback -->
+      <div v-else class="overflow-y-auto overflow-x-hidden" style="height: 100%">
+        <transition-group
+          name="media-list"
+          tag="div"
+          class="d-flex flex-wrap pa-2"
+          :style="{ gap: '8px' }"
+        >
+          <div
+            v-for="item in localItems"
+            :key="item.id"
+            class="media-item-wrapper"
+            :style="{ width: `${ITEM_WIDTH}px`, height: `${ITEM_WIDTH}px` }"
+            :data-id="item.id"
+          >
+            <MediaItem
               :item="item"
               :is-selected="selectedItems.has(item.id)"
               :is-cut="isCut(item.id)"
               :is-dragging="draggedItems.has(item.id)"
-              :draggable="canMove(item)"
-              @dragstart="canMove(item) && onDragStart($event, item, 'file')"
+              :draggable="canDrag(item)"
+              @dragstart="onDragStart($event, item)"
               @dragend="onDragEnd"
               @drop="onDrop($event, item)"
-              @dragover.prevent
+              @dragover="onDragOver($event, item)"
+              @dragenter="onDragEnter($event)"
+              @dragleave="onDragLeave($event)"
               @click.stop="handleSelection(item.id, $event)"
-              @dblclick="previewFile(item)"
+              @dblclick="handleDoubleClick(item)"
               @contextmenu.prevent="openContextMenu(item, $event)"
-              @menu-click="(i, e) => emit('file-menu-click', i, e)"
+              @menu-click="(i, e) => emitMenuClick(i, e)"
             />
-          </v-col>
-        </v-row>
-      </template>
-    </v-virtual-scroll>
+          </div>
+        </transition-group>
+      </div>
+    </div>
+
+    <!-- Selection Box -->
+    <div
+      v-if="selectionBox"
+      class="selection-box border-primary border"
+      :style="{ ...selectionBox, backgroundColor: 'rgba(var(--v-theme-primary), 0.1)' }"
+    ></div>
+
+    <!-- Unified Context Menu -->
+    <ContextMenu
+      v-model="showContextMenu"
+      :activator="menuActivator"
+      :position="menuPosition"
+      close-on-content-click
+      raw
+    >
+      <!-- Item Context Menu Content -->
+      <MediaItemContextMenu
+        v-if="contextMenuTarget"
+        :target="contextMenuTarget"
+        :is-folder="isFolder(contextMenuTarget)"
+        :clipboard="clipboard"
+        :selected-items="selectedItems"
+        @edit="(target) => emit('edit', target)"
+        @copy="emit('copy')"
+        @cut="emit('cut')"
+        @delete="emit('delete')"
+        @paste-into-folder="handlePasteIntoFolderFromContextMenu"
+      />
+      <!-- Background Context Menu Content -->
+      <MediaBackgroundMenu
+        v-else
+        :clipboard="clipboard"
+        @create-folder="emit('create-folder')"
+        @upload-file="emit('upload-file')"
+        @upload-folder="emit('upload-folder')"
+        @paste="emit('paste')"
+      />
+    </ContextMenu>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useDisplay } from 'vuetify'
-import type { FileItem, Folder, ClipboardItem, ItemPermissions } from '@/types/common'
+import { useI18n } from 'vue-i18n'
+import type { FileItem, Folder, ClipboardItem } from '@/types/common'
+import { MediaFolder } from '@/types/enum'
 import { DEFAULT_LOCAL_PERMISSIONS } from '@/services/filesystem'
-import MediaFileItem from './MediaFileItem.vue'
-import MediaFolderItem from './MediaFolderItem.vue'
+import MediaItem from './MediaItem.vue'
 import { useDragAndDrop } from '@/composables/useDragAndDrop'
+import { useMediaFolderStore } from '@/stores/folder'
+import { isValidDragData } from '@/utils/typeGuards'
+import { useSnackBar } from '@/composables/useSnackBar'
+import { useDragSelection } from '@/composables/useDragSelection'
+import ContextMenu from '@/components/ContextMenu.vue'
+import MediaItemContextMenu from './MediaItemContextMenu.vue'
+import MediaBackgroundMenu from './MediaBackgroundMenu.vue'
 
 type UnifiedItem = FileItem | Folder<FileItem>
 
 const props = defineProps<{
-  folders: Folder<FileItem>[]
-  files: FileItem[]
+  items: UnifiedItem[]
   selectedItems: Set<string>
   clipboard: ClipboardItem<FileItem>[]
   mediaSpaceHeight: number
@@ -82,32 +151,124 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
+  (e: 'update:selected-items', selected: Set<string>): void
   (e: 'drag-start', event: DragEvent, item: UnifiedItem): void
   (e: 'drag-end', event: DragEvent): void
-  (e: 'drop', event: DragEvent, item: UnifiedItem): void
-  (e: 'selection-change', id: string, event: MouseEvent): void
-  (e: 'folder-click', id: string): void
-  (e: 'file-click', item: FileItem): void
-  (e: 'folder-menu-click', folder: Folder<FileItem>, event: MouseEvent): void
-  (e: 'file-menu-click', item: FileItem, event: MouseEvent): void
+  (e: 'sort-change', mode: 'custom'): void
+  // Actions that need parent coordination (Dialogs)
+  (e: 'edit', target: UnifiedItem): void
+  (e: 'copy'): void
+  (e: 'cut'): void
+  (e: 'delete'): void
+  (e: 'paste'): void
+  (e: 'create-folder'): void
+  (e: 'upload-file'): void
+  (e: 'upload-folder'): void
+  (e: 'paste-into-folder', folderId: string): void
+  (e: 'open-presentation', item: FileItem): void
 }>()
 
 const { name: breakpointName } = useDisplay()
+const { t } = useI18n()
+const { showSnackBar } = useSnackBar()
+const mediaStore = useMediaFolderStore()
+
+const ITEM_WIDTH = 140
+const VIRTUAL_SCROLL_THRESHOLD = 50
 
 // Helper to check type
 const isFolder = (item: UnifiedItem): item is Folder<FileItem> => {
   return 'children' in item || !('metadata' in item)
 }
 
-const combinedItems = computed(() => {
-  return [...props.folders, ...props.files]
-})
+// Local items for manual swap
+const localItems = ref<UnifiedItem[]>([])
+
+watch(
+  () => props.items,
+  (newVal) => {
+    // Only update local items if not currently dragging
+    // Otherwise we interrupt the drag
+    if (draggedItems.value.size === 0) {
+      localItems.value = [...newVal]
+    }
+  },
+  { immediate: true },
+)
 
 const mediaSpaceHeight = computed(() => {
   return props.mediaSpaceHeight - 50
 })
 
-// Drag and Drop
+const useVirtualScroll = computed(() => {
+  return props.items.length > VIRTUAL_SCROLL_THRESHOLD
+})
+
+// --- Selection Logic ---
+const lastSelectedId = ref<string | null>(null)
+
+const handleSelection = (id: string, event: MouseEvent) => {
+  const isMultiSelect = event.ctrlKey || event.metaKey
+  const isShiftSelect = event.shiftKey
+
+  const newSelection = new Set(props.selectedItems)
+
+  if (isShiftSelect && lastSelectedId.value) {
+    const allIds = props.items.map((i) => i.id)
+    const start = allIds.indexOf(lastSelectedId.value)
+    const end = allIds.indexOf(id)
+
+    if (start !== -1 && end !== -1) {
+      const [lower, upper] = [Math.min(start, end), Math.max(start, end)]
+      const rangeIds = allIds.slice(lower, upper + 1)
+
+      if (!isMultiSelect) {
+        newSelection.clear()
+      }
+
+      rangeIds.forEach((rid) => newSelection.add(rid))
+    }
+  } else if (isMultiSelect) {
+    if (newSelection.has(id)) {
+      newSelection.delete(id)
+    } else {
+      newSelection.add(id)
+      lastSelectedId.value = id
+    }
+  } else {
+    // Single click
+    if (newSelection.size === 1 && newSelection.has(id)) {
+      // already selected singly
+      return
+    }
+    newSelection.clear()
+    newSelection.add(id)
+    lastSelectedId.value = id
+  }
+
+  emit('update:selected-items', newSelection)
+}
+
+// Drag Selection
+const mediaItemContainerRef = ref<HTMLElement | null>(null)
+
+const selectedItemsWritable = computed({
+  get: () => props.selectedItems,
+  set: (val) => emit('update:selected-items', val),
+})
+
+const {
+  selectionBox,
+  onMouseDown: onSelectionMouseDown,
+  isDragging: isSelectionDragging,
+} = useDragSelection({
+  containerRef: mediaItemContainerRef,
+  selectedIds: selectedItemsWritable,
+})
+// Wait, `MediaItem` root element is the target.
+// I should use template ref for container.
+
+// --- Drag and Drop Logic ---
 const {
   handleDragStart,
   handleDragEnd,
@@ -117,12 +278,8 @@ const {
   handleDragLeave,
   draggedItems,
 } = useDragAndDrop<FileItem>({
-  itemSelector: '.folder-item, .file-item',
+  itemSelector: '.media-item',
 })
-
-const onDragOver = (event: DragEvent) => {
-  handleDragOver(event)
-}
 
 const onDragEnter = (event: DragEvent) => {
   handleDragEnter(event)
@@ -132,99 +289,281 @@ const onDragLeave = (event: DragEvent) => {
   handleDragLeave(event)
 }
 
-// Calculate columns per row based on current breakpoint
-const colsPerRow = computed(() => {
-  switch (breakpointName.value) {
-    case 'xs':
-      return 1
-    case 'sm':
-      return 2
-    case 'md':
-      return 3
-    case 'lg':
-    case 'xl':
-    case 'xxl':
-      return 6
-    default:
-      return 6
-  }
-})
-
-// Group items into chunks for VVirtualScroll rows
-const chunkedItems = computed(() => {
-  const chunks: UnifiedItem[][] = []
-  const size = colsPerRow.value
-
-  // Chunk folders first
-  const folderItems = props.folders
-  for (let i = 0; i < folderItems.length; i += size) {
-    chunks.push(folderItems.slice(i, i + size))
-  }
-
-  // Chunk files separately to ensure they start on a new row
-  const fileItems = props.files
-  for (let i = 0; i < fileItems.length; i += size) {
-    chunks.push(fileItems.slice(i, i + size))
-  }
-
-  return chunks
-})
-
-const getPermissions = (item: UnifiedItem): ItemPermissions => {
-  return item.permissions || DEFAULT_LOCAL_PERMISSIONS
+const canDrag = (item: UnifiedItem) => {
+  const permissions = item.permissions || DEFAULT_LOCAL_PERMISSIONS
+  return permissions.canMove
 }
 
-const canMove = (item: UnifiedItem) => getPermissions(item).canMove
-
-const isCut = (id: string) => {
-  return props.clipboard.some((item) => item.action === 'cut' && item.data.id === id)
-}
-
-const onDragStart = (event: DragEvent, item: UnifiedItem, type: 'folder' | 'file') => {
-  handleDragStart(event, type, item, props.selectedItems, () =>
-    combinedItems.value.filter((i) => props.selectedItems.has(i.id)),
+const onDragStart = (event: DragEvent, item: UnifiedItem) => {
+  if (!canDrag(item)) return
+  handleDragStart(
+    event,
+    isFolder(item) ? 'folder' : 'file',
+    item,
+    props.selectedItems,
+    () => props.items.filter((i) => props.selectedItems.has(i.id)), // Use props.items
   )
   emit('drag-start', event, item)
+}
+
+const onDragOver = (event: DragEvent, targetItem: UnifiedItem) => {
+  handleDragOver(event)
+
+  if (useVirtualScroll.value) return
+  if (props.sortBy !== 'custom') return
+
+  if (isFolder(targetItem)) {
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+    const x = event.clientX - rect.left
+    const width = rect.width
+    const percent = x / width
+    if (percent > 0.2 && percent < 0.8) {
+      // In Nesting Zone -> Do not swap
+      return
+    }
+  }
+
+  const draggedId = Array.from(draggedItems.value)[0]
+  if (!draggedId || draggedId === targetItem.id) return
+
+  const draggedIndex = localItems.value.findIndex((i) => i.id === draggedId)
+  const targetIndex = localItems.value.findIndex((i) => i.id === targetItem.id)
+
+  if (draggedIndex !== -1 && targetIndex !== -1) {
+    const items = [...localItems.value]
+    const [draggedItem] = items.splice(draggedIndex, 1)
+    if (draggedItem) {
+      items.splice(targetIndex, 0, draggedItem)
+      localItems.value = items
+    }
+  }
 }
 
 const onDragEnd = (event: DragEvent) => {
   handleDragEnd()
   emit('drag-end', event)
+
+  if (draggedItems.value.size === 0) {
+    localItems.value = [...props.items]
+  }
+}
+
+const handleMove = (event: DragEvent, target: Folder<FileItem>) => {
+  const dataString = event.dataTransfer?.getData('application/json')
+  if (!dataString) return
+
+  let draggedType: string
+  let draggedItemsData: (FileItem | Folder<FileItem>)[] = []
+
+  try {
+    const parsed = JSON.parse(dataString)
+    if (!isValidDragData<FileItem>(parsed)) return
+
+    draggedType = parsed.type
+    draggedItemsData = parsed.items
+  } catch {
+    return
+  }
+
+  const targetId = target.id
+  const sourceFolderId = mediaStore.currentFolder?.id || MediaFolder.ROOT_ID
+  let moveCount = 0
+
+  const validItems = draggedItemsData.filter((item) => item.id !== targetId)
+
+  // We need to differentiate File vs Folder from the dragged data
+  // But `moveItem`/`moveFolder` needs the ACTUAL object from current state usually?
+  // Or just ID? Store actions take Objects usually to update state correctly.
+
+  for (const item of validItems) {
+    if (draggedType === 'file') {
+      // Find in Unified List
+      const fileItem = props.items.find((i) => i.id === item.id) as FileItem | undefined
+      if (fileItem && !isFolder(fileItem)) {
+        mediaStore.moveItem(fileItem, targetId, sourceFolderId)
+        moveCount++
+      }
+    } else if (draggedType === 'folder') {
+      const folderItem = props.items.find((f) => f.id === item.id) as Folder<FileItem> | undefined
+      if (folderItem && isFolder(folderItem)) {
+        const isLastItem = validItems.indexOf(item) === validItems.length - 1
+        if (
+          mediaStore.moveFolder(folderItem, targetId, mediaStore.currentFolder?.id, !isLastItem)
+        ) {
+          moveCount++
+        }
+      }
+    }
+  }
+
+  if (moveCount > 0) {
+    showSnackBar(t('fileExplorer.moveSuccess'), 'success')
+  }
 }
 
 const onDrop = (event: DragEvent, item: UnifiedItem) => {
-  // Only folders accept drops
+  let isNesting = false
   if (isFolder(item)) {
-    handleDrop(event, () => {
-      emit('drop', event, item)
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+    const x = event.clientX - rect.left
+    const width = rect.width
+    const percent = x / width
+    if (percent > 0.2 && percent < 0.8) {
+      isNesting = true
+    }
+  }
+
+  if (isNesting && isFolder(item)) {
+    handleMove(event, item)
+    handleDrop(event, () => {})
+  } else {
+    // Reorder based on localItems logic
+    const newFolders: Folder<FileItem>[] = []
+    const newFiles: FileItem[] = []
+
+    localItems.value.forEach((itm) => {
+      if (isFolder(itm)) {
+        newFolders.push(itm as Folder<FileItem>)
+      } else {
+        newFiles.push(itm as FileItem)
+      }
     })
+
+    mediaStore.reorderCurrentFolders(newFolders)
+    mediaStore.reorderCurrentItems(newFiles)
+    emit('sort-change', 'custom')
+
+    handleDrop(event, () => {})
   }
 }
 
-const handleSelection = (id: string, event: MouseEvent) => {
-  emit('selection-change', id, event)
+// --- Navigation ---
+const handleDoubleClick = (item: UnifiedItem) => {
+  if (isFolder(item)) {
+    mediaStore.enterFolder(item.id)
+    // Clear selection on enter
+    emit('update:selected-items', new Set())
+    mediaStore.loadChildren(item.id)
+  } else {
+    emit('open-presentation', item as FileItem)
+  }
 }
 
-const openFolder = (id: string) => {
-  emit('folder-click', id)
-}
+// --- Context Menu ---
+const contextMenuTarget = ref<UnifiedItem | null>(null)
+const showContextMenu = ref(false)
+const menuActivator = ref<HTMLElement | undefined>(undefined)
+const menuPosition = ref<[number, number] | undefined>(undefined)
 
-const previewFile = (item: FileItem) => {
-  emit('file-click', item)
+const openBackgroundContextMenu = (event: MouseEvent) => {
+  if (isSelectionDragging.value) return
+  event.preventDefault()
+
+  // Update position for background context menu
+  menuPosition.value = [event.clientX, event.clientY]
+  menuActivator.value = undefined
+  contextMenuTarget.value = null
+  showContextMenu.value = true
 }
 
 const openContextMenu = (item: UnifiedItem, event: MouseEvent) => {
-  if (isFolder(item)) {
-    emit('folder-menu-click', item, event)
-  } else {
-    emit('file-menu-click', item as FileItem, event)
+  event.preventDefault()
+
+  if (!props.selectedItems.has(item.id)) {
+    handleSelection(item.id, event)
   }
+
+  contextMenuTarget.value = item
+
+  // Right click show at mouse
+  menuActivator.value = undefined
+  menuPosition.value = [event.clientX, event.clientY]
+  showContextMenu.value = true
 }
+
+const emitMenuClick = (item: UnifiedItem, event: MouseEvent) => {
+  event.preventDefault()
+  event.stopPropagation()
+
+  if (!props.selectedItems.has(item.id)) {
+    handleSelection(item.id, event)
+  }
+
+  contextMenuTarget.value = item
+  // 3-dot click show at target
+  menuActivator.value = event.target as HTMLElement
+  menuPosition.value = undefined
+  showContextMenu.value = true
+}
+
+const handlePasteIntoFolderFromContextMenu = (folderId: string) => {
+  emit('paste-into-folder', folderId)
+}
+
+const isCut = (id: string) => {
+  return props.clipboard.some((item) => item.action === 'cut' && item.data.id === id)
+}
+
+// Calculate columns for Virtual Scroll chunking
+const colsPerRow = computed(() => {
+  // Approximate columns based on ITEM_WIDTH + padding
+  switch (breakpointName.value) {
+    case 'xs':
+      return 2
+    case 'sm':
+      return 3
+    case 'md':
+      return 4
+    case 'lg':
+      return 6
+    case 'xl':
+      return 8
+    case 'xxl':
+      return 10
+    default:
+      return 6
+  }
+})
+
+const chunkedItems = computed(() => {
+  const chunks: UnifiedItem[][] = []
+  const size = colsPerRow.value
+  const items = props.items
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size))
+  }
+  return chunks
+})
 </script>
 
 <style scoped>
 /* Ensure virtual scroll takes full height */
 :deep(.v-virtual-scroll__container) {
   display: block !important;
+}
+
+/* Transition Group Styles */
+.media-list-move, /* apply transition to moving elements */
+.media-list-enter-active,
+.media-list-leave-active {
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.5, 1);
+}
+
+.media-list-enter-from,
+.media-list-leave-to {
+  opacity: 0;
+  transform: scale(0.5);
+}
+
+/* ensure leaving items are taken out of layout flow so that moving
+   items can be calculated correctly. */
+.media-list-leave-active {
+  position: absolute;
+}
+
+.selection-box {
+  position: absolute;
+  z-index: 1000;
+  pointer-events: none;
 }
 </style>

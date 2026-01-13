@@ -5,4 +5,3 @@
 export { default as MultiFunctionControl } from './Control.vue'
 export { default as HistoryTab } from './HistoryTab.vue'
 export { default as CustomFolderTab } from './CustomFolderTab.vue'
-
