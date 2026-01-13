@@ -18,7 +18,10 @@
 </template>
 
 <script setup lang="ts">
-import type { ShortcutItem } from './shortcuts'
+interface ShortcutItem {
+  key: string
+  description: string
+}
 
 defineProps<{
   title: string

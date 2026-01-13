@@ -33,7 +33,6 @@ const handleCompositionStart = () => {
 }
 
 const handleKeydown = (event: KeyboardEvent) => {
-  // Check for IME usage first
   if (event.isComposing || event.key === 'Process') {
     event.preventDefault()
     props.onError?.($t('alert.useEnglishInput'))

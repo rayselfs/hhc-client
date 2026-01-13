@@ -219,6 +219,13 @@
     <ContextMenu v-model="showVerseContextMenu" :position="menuPosition" close-on-content-click raw>
       <BibleVerseContextMenu type="preview" @copy-verse-text="copyVerseText" />
     </ContextMenu>
+
+    <!-- Books Dialog -->
+    <BooksDialog
+      v-model="showBooksDialog"
+      :version-code="currentVersion?.code"
+      @select-verse="handleSelectVerseFromDialog"
+    />
   </v-container>
 </template>
 
@@ -534,28 +541,6 @@ const addVerseToCustom = (verseNumber: number) => {
   addVerseToCurrent(newVerse)
 }
 
-// Keyboard shortcuts
-const handleKeydown = (event: KeyboardEvent) => {
-  // Avoid triggering shortcuts in input fields
-  if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
-    return
-  }
-
-  // Only respond if passage is selected
-  if (!currentPassage.value) return
-
-  switch (event.code) {
-    case 'ArrowUp':
-      event.preventDefault()
-      goToPreviousVerseProjection()
-      break
-    case 'ArrowDown':
-      event.preventDefault()
-      goToNextVerseProjection()
-      break
-  }
-}
-
 // Context menu handler
 const handleVerseRightClick = (event: MouseEvent, verse: { number: number; text: string }) => {
   event.preventDefault()
@@ -680,20 +665,52 @@ const handleSearchEvent = (event: Event) => {
   handleSearch(customEvent.detail.text)
 }
 
+import { BooksDialog } from '@/components/Bible'
+
+const showBooksDialog = ref(false)
+
+const handleSelectVerseFromDialog = async (bookNumber: number, chapter: number, verse: number) => {
+  isLoadingVerses.value = true
+  await handleVerseSelection(bookNumber, chapter, verse)
+}
+
+import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
+import { KEYBOARD_SHORTCUTS } from '@/config/shortcuts'
+
 onMounted(async () => {
   bibleFolderStore.loadRootFolder()
   await loadChildren(BibleFolder.ROOT_ID)
 
   updateFontSize(fontSize.value)
 
-  document.addEventListener('keydown', handleKeydown)
   window.addEventListener('bible-search', handleSearchEvent)
 })
 
 onUnmounted(() => {
   window.removeEventListener('bible-search', handleSearchEvent)
-  document.removeEventListener('keydown', handleKeydown)
 })
+
+// Keyboard shortcuts
+useKeyboardShortcuts([
+  {
+    config: KEYBOARD_SHORTCUTS.BIBLE.PREV_VERSE,
+    handler: () => {
+      if (currentPassage.value) goToPreviousVerseProjection()
+    },
+  },
+  {
+    config: KEYBOARD_SHORTCUTS.BIBLE.NEXT_VERSE,
+    handler: () => {
+      if (currentPassage.value) goToNextVerseProjection()
+    },
+  },
+  {
+    config: KEYBOARD_SHORTCUTS.BIBLE.OPEN_BOOK_DIALOG,
+    handler: () => {
+      showBooksDialog.value = !showBooksDialog.value
+    },
+  },
+])
 </script>
 
 <style scoped>

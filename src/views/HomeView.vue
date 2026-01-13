@@ -62,6 +62,7 @@ import { useAlert } from '@/composables/useAlert'
 import { useSentry } from '@/composables/useSentry'
 import { useLocaleDetection } from '@/composables/useLocaleDetection'
 import { useProjectionSync } from '@/composables/useProjectionSync'
+import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
 
 // Stores
 import { useProjectionStore } from '@/stores/projection'
@@ -88,10 +89,36 @@ const {
   removeAllListeners,
 } = useElectron()
 
+const { setProjectionState } = useProjectionMessaging()
+
+// Toggle projection state
+const toggleProjection = async () => {
+  const newShowDefault = !projectionStore.isShowingDefault
+  await setProjectionState(newShowDefault)
+}
+
+// Close projection
+const closeProjection = async () => {
+  if (!projectionStore.isShowingDefault) {
+    await setProjectionState(true)
+  }
+}
+
 const drawer = ref(true)
 const drawerCollapsed = ref(true)
 
-useKeyboardShortcuts(currentView)
+import { KEYBOARD_SHORTCUTS } from '@/config/shortcuts'
+
+useKeyboardShortcuts([
+  {
+    config: KEYBOARD_SHORTCUTS.GLOBAL.TOGGLE_PROJECTION,
+    handler: toggleProjection,
+  },
+  {
+    config: KEYBOARD_SHORTCUTS.GLOBAL.CLOSE_PROJECTION,
+    handler: closeProjection,
+  },
+])
 
 const menuItems = ref<MenuItem[]>([
   {

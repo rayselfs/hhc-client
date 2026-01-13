@@ -185,7 +185,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useMediaFolderStore } from '@/stores/folder'
 import { useSnackBar } from '@/composables/useSnackBar'
 import { storeToRefs } from 'pinia'
@@ -344,42 +344,31 @@ const { sortBy, sortOrder, setSort, sortedUnifiedItems, sortedItems } = useMedia
   currentItems,
 )
 
+import { KEYBOARD_SHORTCUTS } from '@/config/shortcuts'
+
 onMounted(async () => {
   mediaStore.loadRootFolder()
   await loadChildren(MediaFolder.ROOT_ID)
-  document.addEventListener('keydown', handleEsc)
-  window.addEventListener('keydown', handleGlobalKeydown)
 })
 
 const showFabMenu = ref(false)
 
-const handleEsc = (event: KeyboardEvent) => {
-  if (event.key === 'Escape') {
-    const isDialogOpen = showFolderDialog.value || showDeleteConfirmDialog.value
-    if (!isDialogOpen) {
-      if (clipboard.value.some((item) => item.action === 'cut')) {
-        clearClipboard()
-      }
+const handleEsc = () => {
+  const isDialogOpen = showFolderDialog.value || showDeleteConfirmDialog.value
+  if (!isDialogOpen) {
+    if (clipboard.value.some((item) => item.action === 'cut')) {
+      clearClipboard()
+    }
 
-      // User Request: ESC to cancel selection
-      if (selectedItems.value.size > 0) {
-        selectedItems.value.clear()
-      }
+    // User Request: ESC to cancel selection
+    if (selectedItems.value.size > 0) {
+      selectedItems.value.clear()
     }
   }
 }
 
 // Explicit clear for template binding
 const testClearSelection = () => selectedItems.value.clear()
-
-onBeforeUnmount(() => {
-  document.removeEventListener('keydown', handleEsc)
-
-  // Reset cut state when leaving the page
-  if (clipboard.value.some((item) => item.action === 'cut')) {
-    clearClipboard()
-  }
-})
 
 const { loadChildren } = mediaStore
 
@@ -429,25 +418,33 @@ const previewFile = (item: FileItem) => {
   startPresentation(item)
 }
 
-// Global Keyboard Shortcuts for Presentation
-const handleGlobalKeydown = (e: KeyboardEvent) => {
-  if (e.key === 'F5') {
-    e.preventDefault()
-    startPresentation(undefined, e.altKey ? false : true)
-  }
+// Start presentation from beginning (Shift+F5 or similar)
+// But we just use F5 for generic start if no item selected?
+// Or we check event modifier in the handler.
+const handleMediaF5 = (e: KeyboardEvent) => {
+  startPresentation(undefined, e.altKey ? false : true)
 }
 
-onBeforeUnmount(() => {
-  window.removeEventListener('keydown', handleGlobalKeydown)
-})
+// Select All
+const handleSelectAll = () => {
+  // Capture Phase helps us avoid inputs, but we double check just in case logic changes
+  // Actually, useKeyboardShortcuts already guards inputs.
+
+  // Select all folders and files visible
+  const allIds = sortedUnifiedItems.value.map((item) => item.id)
+  allIds.forEach((id) => selectedItems.value.add(id))
+}
 
 // Keyboard shortcuts
-useKeyboardShortcuts({
-  onCopy: handleCopy,
-  onCut: handleCut,
-  onPaste: handlePaste,
-  onDelete: openDeleteSelectionDialog,
-})
+useKeyboardShortcuts([
+  { config: KEYBOARD_SHORTCUTS.EDIT.COPY, handler: handleCopy },
+  { config: KEYBOARD_SHORTCUTS.EDIT.CUT, handler: handleCut },
+  { config: KEYBOARD_SHORTCUTS.EDIT.PASTE, handler: handlePaste },
+  { config: KEYBOARD_SHORTCUTS.EDIT.DELETE, handler: openDeleteSelectionDialog },
+  { config: KEYBOARD_SHORTCUTS.EDIT.SELECT_ALL, handler: handleSelectAll },
+  { config: KEYBOARD_SHORTCUTS.MEDIA.ESCAPE, handler: handleEsc },
+  { config: KEYBOARD_SHORTCUTS.MEDIA.START_PRESENTATION, handler: handleMediaF5 },
+])
 </script>
 
 <style scoped>

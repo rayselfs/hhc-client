@@ -66,6 +66,7 @@ class MemoryManager {
             tracker.resource.element.removeEventListener(
               tracker.resource.event,
               tracker.resource.handler,
+              tracker.resource.options,
             )
           }
           break

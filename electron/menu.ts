@@ -49,6 +49,7 @@ const getTranslations = (lang: string) => {
       shortcuts: '快捷鍵',
       checkUpdates: '檢查更新',
       resetSettings: '恢復原廠設定',
+      selectAll: '全選',
     },
     'zh-CN': {
       preferences: '偏好设置',
@@ -68,6 +69,7 @@ const getTranslations = (lang: string) => {
       shortcuts: '快捷键',
       checkUpdates: '检查更新',
       resetSettings: '恢复出厂设置',
+      selectAll: '全选',
     },
     en: {
       preferences: 'Preferences',
@@ -87,6 +89,7 @@ const getTranslations = (lang: string) => {
       shortcuts: 'Keyboard Shortcuts',
       checkUpdates: 'Check for Updates',
       resetSettings: 'Reset to Factory Settings',
+      selectAll: 'Select All',
     },
   }
   return translations[lang] || translations['en']
@@ -144,6 +147,15 @@ export const createApplicationMenu = (mainWindow: BrowserWindow | null) => {
           click: () => {
             if (mainWindow) {
               mainWindow.webContents.paste()
+            }
+          },
+        },
+        {
+          label: t.selectAll,
+          accelerator: 'CmdOrCtrl+A',
+          click: () => {
+            if (mainWindow) {
+              mainWindow.webContents.selectAll()
             }
           },
         },

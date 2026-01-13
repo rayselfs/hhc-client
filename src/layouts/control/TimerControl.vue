@@ -305,6 +305,31 @@ const { showSnackBar } = useSnackBar()
 const { isElectron } = useElectron()
 const { setProjectionState, cleanupResources } = useProjectionMessaging()
 const { cleanup } = useMemoryManager('TimerControl')
+import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
+import { KEYBOARD_SHORTCUTS } from '@/config/shortcuts'
+
+const handleToggle = () => {
+  switch (timerStore.state) {
+    case 'running':
+      pauseTimer()
+      break
+    case 'paused':
+      resumeTimer()
+      break
+    case 'stopped':
+      startTimer()
+      break
+  }
+}
+
+const handleReset = () => {
+  timerStore.resetTimer()
+}
+
+useKeyboardShortcuts([
+  { config: KEYBOARD_SHORTCUTS.TIMER.TOGGLE, handler: handleToggle },
+  { config: KEYBOARD_SHORTCUTS.TIMER.RESET, handler: handleReset },
+])
 
 const { leftCardHeight, rightTopCardHeight, rightBottomCardHeight } = useCardLayout({
   minHeight: APP_CONFIG.UI.MIN_CARD_HEIGHT,
