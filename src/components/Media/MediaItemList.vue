@@ -20,7 +20,7 @@
               v-for="item in rowItems"
               :key="item.id"
               class="pa-2"
-              :style="{ width: `${ITEM_WIDTH}px`, height: `${ITEM_WIDTH}px` }"
+              :style="{ width: `${props.itemSize}px`, height: `${props.itemSize}px` }"
             >
               <MediaItem
                 :item="item"
@@ -37,7 +37,6 @@
                 @click.stop="handleSelection(item.id, $event)"
                 @dblclick="handleDoubleClick(item)"
                 @contextmenu.prevent="openContextMenu(item, $event)"
-                @menu-click="(i, e) => emitMenuClick(i, e)"
               />
             </div>
           </div>
@@ -56,7 +55,7 @@
             v-for="item in localItems"
             :key="item.id"
             class="media-item-wrapper"
-            :style="{ width: `${ITEM_WIDTH}px`, height: `${ITEM_WIDTH}px` }"
+            :style="{ width: `${props.itemSize}px`, height: `${props.itemSize}px` }"
             :data-id="item.id"
           >
             <MediaItem
@@ -74,7 +73,6 @@
               @click.stop="handleSelection(item.id, $event)"
               @dblclick="handleDoubleClick(item)"
               @contextmenu.prevent="openContextMenu(item, $event)"
-              @menu-click="(i, e) => emitMenuClick(i, e)"
             />
           </div>
         </transition-group>
@@ -141,14 +139,20 @@ import MediaBackgroundMenu from './MediaBackgroundMenu.vue'
 
 type UnifiedItem = FileItem | Folder<FileItem>
 
-const props = defineProps<{
-  items: UnifiedItem[]
-  selectedItems: Set<string>
-  clipboard: ClipboardItem<FileItem>[]
-  mediaSpaceHeight: number
-  sortBy?: string
-  sortOrder?: 'asc' | 'desc'
-}>()
+const props = withDefaults(
+  defineProps<{
+    items: UnifiedItem[]
+    selectedItems: Set<string>
+    clipboard: ClipboardItem<FileItem>[]
+    mediaSpaceHeight: number
+    sortBy?: string
+    sortOrder?: 'asc' | 'desc'
+    itemSize?: number
+  }>(),
+  {
+    itemSize: 140,
+  },
+)
 
 const emit = defineEmits<{
   (e: 'update:selected-items', selected: Set<string>): void
@@ -173,7 +177,6 @@ const { t } = useI18n()
 const { showSnackBar } = useSnackBar()
 const mediaStore = useMediaFolderStore()
 
-const ITEM_WIDTH = 140
 const VIRTUAL_SCROLL_THRESHOLD = 50
 
 // Helper to check type
@@ -183,6 +186,18 @@ const isFolder = (item: UnifiedItem): item is Folder<FileItem> => {
 
 // Local items for manual swap
 const localItems = ref<UnifiedItem[]>([])
+
+const {
+  handleDragStart,
+  handleDragEnd,
+  handleDrop,
+  handleDragEnter,
+  handleDragOver,
+  handleDragLeave,
+  draggedItems,
+} = useDragAndDrop<FileItem>({
+  itemSelector: '.media-item',
+})
 
 watch(
   () => props.items,
@@ -269,17 +284,6 @@ const {
 // I should use template ref for container.
 
 // --- Drag and Drop Logic ---
-const {
-  handleDragStart,
-  handleDragEnd,
-  handleDrop,
-  handleDragEnter,
-  handleDragOver,
-  handleDragLeave,
-  draggedItems,
-} = useDragAndDrop<FileItem>({
-  itemSelector: '.media-item',
-})
 
 const onDragEnter = (event: DragEvent) => {
   handleDragEnter(event)
@@ -478,21 +482,6 @@ const openContextMenu = (item: UnifiedItem, event: MouseEvent) => {
   // Right click show at mouse
   menuActivator.value = undefined
   menuPosition.value = [event.clientX, event.clientY]
-  showContextMenu.value = true
-}
-
-const emitMenuClick = (item: UnifiedItem, event: MouseEvent) => {
-  event.preventDefault()
-  event.stopPropagation()
-
-  if (!props.selectedItems.has(item.id)) {
-    handleSelection(item.id, event)
-  }
-
-  contextMenuTarget.value = item
-  // 3-dot click show at target
-  menuActivator.value = event.target as HTMLElement
-  menuPosition.value = undefined
   showContextMenu.value = true
 }
 

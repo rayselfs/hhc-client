@@ -23,7 +23,9 @@
     "control": "控制",
     "noCustomItems": "尚无自定义项目",
     "dontShowAgain": "不要再显示",
-    "selectedItems": "已选中 {count} 个项目"
+    "selectedItems": "已选中 {count} 个项目",
+    "view": "视图",
+    "sort": "排序"
   },
   "extendedToolbar": {
     "openProjection": "开启投影",
@@ -246,7 +248,11 @@
     "slides": "张",
     "videoReady": "视频就绪",
     "videoPlaying": "视频播放中",
-    "videoPaused": "视频暂停中"
+    "videoPaused": "视频暂停中",
+    "largeIcons": "大图标",
+    "mediumIcons": "中图标",
+    "smallIcons": "小图标",
+    "list": "列表"
   },
   "fileExplorer": {
     "image": "图片",

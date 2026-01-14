@@ -1,4 +1,3 @@
-export { default as MediaHeader } from './MediaHeader.vue'
 export { default as MediaItemList } from './MediaItemList.vue'
 export { default as MediaSelectionBar } from './MediaSelectionBar.vue'
 export { default as MediaPresenter } from './MediaPresenter.vue'

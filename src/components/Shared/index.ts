@@ -1,2 +1,4 @@
 export { default as CreateEditFolderDialog } from './CreateEditFolderDialog.vue'
+export { default as MoveFolderDialog } from './MoveFolderDialog.vue'
 export { default as DeleteConfirmDialog } from './DeleteConfirmDialog.vue'
+export { default as FolderBreadcrumbs } from './FolderBreadcrumbs.vue'

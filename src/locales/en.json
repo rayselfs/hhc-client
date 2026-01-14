@@ -23,7 +23,9 @@
     "control": "Control",
     "noCustomItems": "No custom items yet",
     "dontShowAgain": "Don't show again",
-    "selectedItems": "{count} items selected"
+    "selectedItems": "{count} items selected",
+    "view": "View",
+    "sort": "Sort"
   },
   "extendedToolbar": {
     "openProjection": "Open Projection",
@@ -246,7 +248,11 @@
     "slides": "slides",
     "videoReady": "Video Ready",
     "videoPlaying": "Video Playing",
-    "videoPaused": "Video Paused"
+    "videoPaused": "Video Paused",
+    "largeIcons": "Large Icons",
+    "mediumIcons": "Medium Icons",
+    "smallIcons": "Small Icons",
+    "list": "List"
   },
   "fileExplorer": {
     "image": "Image",

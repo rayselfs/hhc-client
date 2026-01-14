@@ -3,12 +3,109 @@
   <v-container v-else fluid class="pa-0">
     <v-row no-gutters>
       <v-col cols="12" class="py-2 px-4">
-        <!-- Top Bar: Breadcrumbs and Actions -->
-        <MediaHeader
-          class="mb-2"
-          :breadcrumb-items="breadcrumbItems"
-          @navigate="navigateToFolder"
-        />
+        <div class="py-1 d-flex align-center mb-2">
+          <FolderBreadcrumbs :items="breadcrumbItems" @navigate="navigateToFolder" />
+          <v-spacer></v-spacer>
+          <!-- Sort Menu -->
+          <v-menu>
+            <template #activator="{ props }">
+              <v-btn
+                v-bind="props"
+                variant="text"
+                prepend-icon="mdi-sort"
+                class="text-none mr-2"
+                density="comfortable"
+              >
+                {{ $t('common.sort') }}
+              </v-btn>
+            </template>
+            <v-list density="compact" class="rounded-lg">
+              <v-list-item
+                :title="$t('common.name')"
+                prepend-icon="mdi-sort-alphabetical-variant"
+                @click="setSort('name')"
+              >
+                <template #append>
+                  <v-icon
+                    v-if="sortBy === 'name'"
+                    :icon="sortOrder === 'asc' ? 'mdi-arrow-up' : 'mdi-arrow-down'"
+                    size="small"
+                  ></v-icon>
+                </template>
+              </v-list-item>
+              <v-list-item
+                :title="$t('fileExplorer.updatedDate')"
+                prepend-icon="mdi-calendar-clock"
+                @click="setSort('date')"
+              >
+                <template #append>
+                  <v-icon
+                    v-if="sortBy === 'date'"
+                    :icon="sortOrder === 'asc' ? 'mdi-arrow-up' : 'mdi-arrow-down'"
+                    size="small"
+                  ></v-icon>
+                </template>
+              </v-list-item>
+              <v-list-item
+                :title="$t('common.type')"
+                prepend-icon="mdi-file-tree"
+                @click="setSort('type')"
+              >
+                <template #append>
+                  <v-icon
+                    v-if="sortBy === 'type'"
+                    :icon="sortOrder === 'asc' ? 'mdi-arrow-up' : 'mdi-arrow-down'"
+                    size="small"
+                  ></v-icon>
+                </template>
+              </v-list-item>
+            </v-list>
+          </v-menu>
+
+          <!-- View Menu -->
+          <v-menu>
+            <template #activator="{ props }">
+              <v-btn
+                v-bind="props"
+                variant="text"
+                prepend-icon="mdi-view-grid-outline"
+                class="text-none"
+                density="comfortable"
+              >
+                {{ $t('common.view') }}
+              </v-btn>
+            </template>
+            <v-list density="compact" class="rounded-lg">
+              <v-list-item
+                :title="$t('media.largeIcons')"
+                prepend-icon="mdi-view-grid"
+                @click="viewMode = 'large'"
+              >
+                <template #append>
+                  <v-icon v-if="viewMode === 'large'" icon="mdi-check" size="small"></v-icon>
+                </template>
+              </v-list-item>
+              <v-list-item
+                :title="$t('media.mediumIcons')"
+                prepend-icon="mdi-view-module"
+                @click="viewMode = 'medium'"
+              >
+                <template #append>
+                  <v-icon v-if="viewMode === 'medium'" icon="mdi-check" size="small"></v-icon>
+                </template>
+              </v-list-item>
+              <v-list-item
+                :title="$t('media.smallIcons')"
+                prepend-icon="mdi-view-comfy"
+                @click="viewMode = 'small'"
+              >
+                <template #append>
+                  <v-icon v-if="viewMode === 'small'" icon="mdi-check" size="small"></v-icon>
+                </template>
+              </v-list-item>
+            </v-list>
+          </v-menu>
+        </div>
 
         <div class="align-star d-block">
           <div class="align-center d-flex" style="min-height: 40px">
@@ -23,70 +120,6 @@
                 @cut="handleCut"
                 @delete="openDeleteSelectionDialog"
               />
-              <!-- Sort -->
-              <div v-else>
-                <div>
-                  <v-menu>
-                    <template #activator="{ props }">
-                      <v-chip variant="text" link class="mr-2" v-bind="props">
-                        {{
-                          sortBy === 'name'
-                            ? $t('common.name')
-                            : sortBy === 'date'
-                              ? $t('fileExplorer.updatedDate')
-                              : $t('common.type')
-                        }}
-                        <v-icon
-                          v-if="sortBy !== 'custom'"
-                          end
-                          :icon="sortOrder === 'asc' ? 'mdi-arrow-up' : 'mdi-arrow-down'"
-                        ></v-icon>
-                      </v-chip>
-                    </template>
-                    <v-list density="compact" class="rounded-lg">
-                      <v-list-item
-                        :title="$t('common.name')"
-                        prepend-icon="mdi-sort-alphabetical-variant"
-                        @click="setSort('name')"
-                      >
-                        <template #append>
-                          <v-icon
-                            v-if="sortBy === 'name'"
-                            :icon="sortOrder === 'asc' ? 'mdi-arrow-up' : 'mdi-arrow-down'"
-                            size="small"
-                          ></v-icon>
-                        </template>
-                      </v-list-item>
-                      <v-list-item
-                        :title="$t('fileExplorer.updatedDate')"
-                        prepend-icon="mdi-calendar-clock"
-                        @click="setSort('date')"
-                      >
-                        <template #append>
-                          <v-icon
-                            v-if="sortBy === 'date'"
-                            :icon="sortOrder === 'asc' ? 'mdi-arrow-up' : 'mdi-arrow-down'"
-                            size="small"
-                          ></v-icon>
-                        </template>
-                      </v-list-item>
-                      <v-list-item
-                        :title="$t('common.type')"
-                        prepend-icon="mdi-file-tree"
-                        @click="setSort('type')"
-                      >
-                        <template #append>
-                          <v-icon
-                            v-if="sortBy === 'type'"
-                            :icon="sortOrder === 'asc' ? 'mdi-arrow-up' : 'mdi-arrow-down'"
-                            size="small"
-                          ></v-icon>
-                        </template>
-                      </v-list-item>
-                    </v-list>
-                  </v-menu>
-                </div>
-              </div>
             </transition>
           </div>
 
@@ -96,6 +129,7 @@
             :clipboard="clipboard"
             :sort-by="sortBy"
             :sort-order="sortOrder"
+            :item-size="itemSize"
             :media-space-height="mediaSpaceHeight"
             @open-presentation="previewFile"
             @sort-change="handleSortChange"
@@ -193,13 +227,12 @@ import { useElectron } from '@/composables/useElectron'
 import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
 import { useMediaProjectionStore } from '@/stores/mediaProjection'
 import {
-  MediaHeader,
   MediaItemList,
   MediaPresenter,
   MediaSelectionBar,
   MediaBackgroundMenu,
 } from '@/components/Media'
-import { CreateEditFolderDialog, DeleteConfirmDialog } from '@/components/Shared'
+import { CreateEditFolderDialog, DeleteConfirmDialog, FolderBreadcrumbs } from '@/components/Shared'
 import { useMediaSort } from '@/composables/useMediaSort'
 import { useMediaUpload } from '@/composables/useMediaUpload'
 import { useFolderDialogs } from '@/composables/useFolderDialogs'
@@ -219,6 +252,22 @@ const { sendProjectionMessage } = useProjectionMessaging()
 const { showSnackBar } = useSnackBar()
 const mediaStore = useMediaFolderStore()
 const mediaProjectionStore = useMediaProjectionStore()
+
+// View Mode
+const { viewMode } = storeToRefs(mediaStore)
+const itemSize = computed(() => {
+  switch (viewMode.value) {
+    case 'large':
+      return 250
+    case 'medium':
+      return 200
+    case 'small':
+      return 150
+    default:
+      return 150
+  }
+})
+
 const { isPresenting } = storeToRefs(mediaProjectionStore)
 const {
   currentFolderPath,

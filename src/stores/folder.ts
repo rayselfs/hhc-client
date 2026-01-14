@@ -2,7 +2,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { v4 as uuidv4 } from 'uuid'
-import { useDebounceFn } from '@vueuse/core'
+import { useDebounceFn, useLocalStorage } from '@vueuse/core'
 import {
   type Folder,
   type FolderItem,
@@ -37,6 +37,11 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
 
     const currentFolderPath = ref<string[]>([config.rootId])
     const clipboard = ref<ClipboardItem<TItem>[]>([])
+    const viewMode = useLocalStorage<'large' | 'medium' | 'small'>(
+      `hhc-view-mode-${config.rootId}`,
+      'medium',
+    )
+
     const folderMap = new Map<string, Folder<TItem>>()
     const itemMap = new Map<string, TItem>()
 
@@ -524,6 +529,7 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
       copyToClipboard,
       cutToClipboard,
       clearClipboard,
+      viewMode,
     }
   })
 }

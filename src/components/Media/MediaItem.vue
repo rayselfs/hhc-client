@@ -28,23 +28,11 @@
       <span class="text-truncate flex-grow-1" style="min-width: 0" :title="item.name">
         {{ item.name }}
       </span>
-
-      <!-- Context Menu Trigger -->
-      <v-btn
-        icon="mdi-dots-vertical"
-        variant="text"
-        density="compact"
-        size="small"
-        :color="isSelected ? 'white' : ''"
-        class="flex-shrink-0"
-        @click.stop="$emit('menu-click', item, $event)"
-      ></v-btn>
     </div>
 
     <!-- Content: Thumbnail (File) or Large Icon (Folder) -->
     <div
       class="flex-grow-1 mx-2 mb-2 rounded overflow-hidden position-relative d-flex align-center justify-center"
-      :class="isSelected ? 'bg-primary-darken-1' : 'bg-surface'"
       style="aspect-ratio: 1"
     >
       <!-- Folder: Large Icon -->
@@ -90,10 +78,6 @@ const props = defineProps<{
   isSelected: boolean
   isCut: boolean
   isDragging?: boolean
-}>()
-
-defineEmits<{
-  (e: 'menu-click', item: UnifiedItem, event: MouseEvent): void
 }>()
 
 // helpers
