@@ -2,7 +2,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { v4 as uuidv4 } from 'uuid'
-import { useDebounceFn, useLocalStorage } from '@vueuse/core'
+import { useDebounceFn } from '@vueuse/core'
 import {
   type Folder,
   type FolderItem,
@@ -37,10 +37,7 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
 
     const currentFolderPath = ref<string[]>([config.rootId])
     const clipboard = ref<ClipboardItem<TItem>[]>([])
-    const viewMode = useLocalStorage<'large' | 'medium' | 'small'>(
-      `hhc-view-mode-${config.rootId}`,
-      'medium',
-    )
+    const viewMode = ref<'large' | 'medium' | 'small'>('medium')
 
     const folderMap = new Map<string, Folder<TItem>>()
     const itemMap = new Map<string, TItem>()
@@ -400,6 +397,20 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
       }
     }
 
+    const updateFolderViewSettings = (
+      folderId: string,
+      settings: Partial<import('@/types/common').FolderViewSettings>,
+    ) => {
+      const folder = folderMap.get(folderId)
+      if (folder) {
+        folder.viewSettings = {
+          ...folder.viewSettings,
+          ...settings,
+        }
+        saveRootFolder()
+      }
+    }
+
     return {
       rootFolder,
       currentFolderPath,
@@ -419,6 +430,7 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
       addItemToFolder,
       removeItemFromCurrent,
       updateFolder,
+      updateFolderViewSettings,
       updateItem,
       reorderCurrentItems,
       reorderCurrentFolders,

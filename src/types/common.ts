@@ -429,6 +429,21 @@ export interface VerseItem extends FolderItem {
 }
 
 /**
+ * Sort Types
+ */
+export type SortBy = 'name' | 'date' | 'type' | 'custom'
+export type SortOrder = 'asc' | 'desc' | 'none'
+
+/**
+ * Folder View Settings
+ */
+export interface FolderViewSettings {
+  sortBy?: SortBy
+  sortOrder?: SortOrder
+  viewMode?: 'large' | 'medium' | 'small'
+}
+
+/**
  * Generic folder interface for organizing items
  * @template TItem - The type of items in the folder (must extend FolderItem)
  */
@@ -447,6 +462,7 @@ export interface Folder<TItem extends FolderItem = FolderItem> {
   cloudId?: string // Cloud provider folder ID
   syncPath?: string // Local filesystem path (for sync folders)
   isLoaded?: boolean // Whether the sub-items/folders have been loaded
+  viewSettings?: FolderViewSettings // Per-folder view preferences
 }
 
 /**

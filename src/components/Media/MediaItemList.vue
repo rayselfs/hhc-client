@@ -419,6 +419,7 @@ const onDrop = (event: DragEvent, item: UnifiedItem) => {
     handleDrop(event, () => {})
   } else {
     // Reorder based on localItems logic
+    // NOTE: localItems reflects the order AFTER drag-and-drop simulation in the UI
     const newFolders: Folder<FileItem>[] = []
     const newFiles: FileItem[] = []
 
@@ -430,6 +431,9 @@ const onDrop = (event: DragEvent, item: UnifiedItem) => {
       }
     })
 
+    // This updates the store with the NEW physical order derived from localItems
+    // If we were in 'Date' mode, localItems is the DATE-sorted list + the drag change.
+    // Saving this freezes the sort into Custom (physical) order.
     mediaStore.reorderCurrentFolders(newFolders)
     mediaStore.reorderCurrentItems(newFiles)
     emit('sort-change', 'custom')

@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { v4 as uuidv4 } from 'uuid'
 import { storeToRefs } from 'pinia'
@@ -7,14 +7,11 @@ import { useMediaFolderStore } from '@/stores/folder'
 import { useFileSystem } from '@/composables/useFileSystem'
 import { useIndexedDB } from '@/composables/useIndexedDB'
 import type { UseFolderDialogsReturn } from './useFolderDialogs'
-import type { Folder, FileItem, ClipboardItem } from '@/types/common'
+import type { Folder, FileItem, ClipboardItem, SortBy, SortOrder } from '@/types/common'
 import { FolderDBStore, MediaFolder } from '@/types/enum'
 import { DEFAULT_LOCAL_PERMISSIONS } from '@/services/filesystem'
 
 type MediaStore = ReturnType<typeof useMediaFolderStore>
-
-export type SortBy = 'name' | 'date' | 'type' | 'custom'
-export type SortOrder = 'asc' | 'desc'
 
 export function useMediaOperations(
   mediaStore: MediaStore,
@@ -44,75 +41,148 @@ export function useMediaOperations(
   // ==========================================
   // 1. Sorting Logic
   // ==========================================
+  // ==========================================
+  // 1. Sorting Logic
+  // ==========================================
+  // Persistence is now per-folder via mediaStore.updateFolderViewSettings
   const sortBy = ref<SortBy>('name')
   const sortOrder = ref<SortOrder>('asc')
 
-  const setSort = (type: SortBy) => {
-    if (type === 'custom') {
-      sortBy.value = 'custom'
-      return
+  const { currentFolder, viewMode } = storeToRefs(mediaStore)
+
+  // Watch for folder changes to load settings or default
+  watch(
+    () => currentFolder.value,
+    (folder: Folder<FileItem> | undefined) => {
+      if (folder) {
+        // Load settings from folder if available
+        if (folder.viewSettings) {
+          sortBy.value = folder.viewSettings.sortBy || 'name'
+          sortOrder.value = folder.viewSettings.sortOrder || 'asc'
+          // Sync global viewMode ref with folder setting
+          if (folder.viewSettings.viewMode) {
+            viewMode.value = folder.viewSettings.viewMode
+          } else {
+            viewMode.value = 'medium'
+          }
+        } else {
+          // Default settings
+          sortBy.value = 'name'
+          sortOrder.value = 'asc'
+          viewMode.value = 'medium'
+        }
+      }
+    },
+    { immediate: true, deep: true },
+  )
+
+  // Watch for viewMode changes (from UI) and save to folder
+  watch(viewMode, (newMode: 'large' | 'medium' | 'small') => {
+    if (currentFolder.value) {
+      mediaStore.updateFolderViewSettings(currentFolder.value.id, {
+        viewMode: newMode,
+      })
     }
+  })
+
+  // Update setSort to save to folder
+  const setSort = (type: SortBy) => {
+    // If clicking the same type, cycle through: asc -> desc -> none (custom) -> asc
+    let newOrder: SortOrder = 'asc'
 
     if (sortBy.value === type) {
-      sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
+      if (sortOrder.value === 'asc') {
+        newOrder = 'desc'
+      } else if (sortOrder.value === 'desc') {
+        newOrder = 'none'
+      } else {
+        newOrder = 'asc'
+      }
     } else {
-      sortBy.value = type
-      sortOrder.value = 'asc'
+      // Switching to a new type starts at 'asc'
+      newOrder = 'asc'
+    }
+
+    sortBy.value = type
+    sortOrder.value = newOrder
+
+    // Save persistence
+    if (currentFolder.value) {
+      mediaStore.updateFolderViewSettings(currentFolder.value.id, {
+        sortBy: type,
+        sortOrder: newOrder,
+      })
     }
   }
 
-  const sortedFolders = computed(() => {
-    if (sortBy.value === 'custom') return currentFolders.value
-    return [...currentFolders.value].sort((a, b) => {
-      if (sortBy.value === 'date') {
-        const timeA = a.timestamp || 0
-        const timeB = b.timestamp || 0
-        return sortOrder.value === 'asc' ? timeA - timeB : timeB - timeA
-      }
-      return sortOrder.value === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name)
-    })
-  })
+  // Type Guard Helper
+  const isFolder = (item: FileItem | Folder<FileItem>): item is Folder<FileItem> => {
+    return 'items' in item
+  }
 
-  const sortedItems = computed(() => {
-    if (sortBy.value === 'custom') return currentItems.value
-    return [...currentItems.value].sort((a, b) => {
-      if (sortBy.value === 'date') {
-        const timeA = a.timestamp || 0
-        const timeB = b.timestamp || 0
-        return sortOrder.value === 'asc' ? timeA - timeB : timeB - timeA
-      }
-      if (sortBy.value === 'type') {
-        const typeA = a.metadata?.fileType || ''
-        const typeB = b.metadata?.fileType || ''
-        const typeCompare = typeA.localeCompare(typeB)
-        if (typeCompare !== 0) {
-          return sortOrder.value === 'asc' ? typeCompare : -typeCompare
-        }
-        return a.name.localeCompare(b.name)
-      }
-      return sortOrder.value === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name)
-    })
-  })
-
-  // Unified list for display
+  // Unified list for display - Single Source of Truth
   const sortedUnifiedItems = computed(() => {
-    if (sortBy.value === 'type') {
-      const allItems = [...currentFolders.value, ...currentItems.value]
-      return allItems.sort((a, b) => {
-        const typeA = 'items' in a ? 'folder' : (a as FileItem).metadata?.fileType || 'unknown'
-        const typeB = 'items' in b ? 'folder' : (b as FileItem).metadata?.fileType || 'unknown'
-
-        const typeCompare = typeA.localeCompare(typeB)
-        if (typeCompare !== 0) {
-          return sortOrder.value === 'asc' ? typeCompare : -typeCompare
-        }
-        return sortOrder.value === 'asc'
-          ? a.name.localeCompare(b.name)
-          : b.name.localeCompare(a.name)
-      })
+    // 1. If Custom mode (sortOrder is 'none'), return physical order from store
+    if (sortOrder.value === 'none' || sortBy.value === 'custom') {
+      return [...currentFolders.value, ...currentItems.value]
     }
-    return [...sortedFolders.value, ...sortedItems.value]
+
+    // 2. Otherwise, perform visual sorting
+    // Principle: Folders Always First
+    const folders = [...currentFolders.value]
+    const items = [...currentItems.value]
+
+    const direction = sortOrder.value === 'asc' ? 1 : -1
+
+    // Sort strategy function based on current 'sortBy'
+    const compareFn = (
+      a: FileItem | Folder<FileItem>,
+      b: FileItem | Folder<FileItem>,
+      type: 'folder' | 'file',
+    ) => {
+      // Name Sort
+      if (sortBy.value === 'name') {
+        return a.name.localeCompare(b.name) * direction
+      }
+
+      // Date Sort
+      if (sortBy.value === 'date') {
+        const timeA = a.timestamp || 0
+        const timeB = b.timestamp || 0
+        return (timeA - timeB) * direction
+      }
+
+      // Type Sort (File Type)
+      if (sortBy.value === 'type') {
+        // Folders always sorted by Name when in Type mode
+        if (type === 'folder') {
+          return a.name.localeCompare(b.name) * direction
+        }
+        // Files sorted by fileType, then Name
+        const typeA = (a as FileItem).metadata?.fileType || 'unknown'
+        const typeB = (b as FileItem).metadata?.fileType || 'unknown'
+        const typeCompare = typeA.localeCompare(typeB) * direction
+        if (typeCompare !== 0) return typeCompare
+        return a.name.localeCompare(b.name) * direction
+      }
+
+      return 0
+    }
+
+    // Apply sort to separated arrays
+    folders.sort((a, b) => compareFn(a, b, 'folder'))
+    items.sort((a, b) => compareFn(a, b, 'file'))
+
+    // 3. Merge: Folders First
+    return [...folders, ...items]
   })
+
+  // Derived computed properties for backward compatibility if needed,
+  // but mostly we should use sortedUnifiedItems in the template.
+  const sortedFolders = computed(() => sortedUnifiedItems.value.filter(isFolder))
+  const sortedItems = computed(
+    () => sortedUnifiedItems.value.filter((i) => !isFolder(i)) as FileItem[],
+  )
 
   // ==========================================
   // 2. Upload Logic

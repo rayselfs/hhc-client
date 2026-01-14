@@ -21,7 +21,7 @@
               >
                 <template #append>
                   <v-icon
-                    v-if="sortBy === 'name'"
+                    v-if="sortBy === 'name' && sortOrder && sortOrder !== 'none'"
                     :icon="sortOrder === 'asc' ? 'mdi-arrow-up' : 'mdi-arrow-down'"
                     size="small"
                   ></v-icon>
@@ -34,7 +34,7 @@
               >
                 <template #append>
                   <v-icon
-                    v-if="sortBy === 'date'"
+                    v-if="sortBy === 'date' && sortOrder && sortOrder !== 'none'"
                     :icon="sortOrder === 'asc' ? 'mdi-arrow-up' : 'mdi-arrow-down'"
                     size="small"
                   ></v-icon>
@@ -47,7 +47,7 @@
               >
                 <template #append>
                   <v-icon
-                    v-if="sortBy === 'type'"
+                    v-if="sortBy === 'type' && sortOrder && sortOrder !== 'none'"
                     :icon="sortOrder === 'asc' ? 'mdi-arrow-up' : 'mdi-arrow-down'"
                     size="small"
                   ></v-icon>
@@ -101,7 +101,7 @@
             v-model:selected-items="selectedItems"
             :clipboard="clipboard"
             :sort-by="sortBy"
-            :sort-order="sortOrder"
+            :sort-order="sortOrder === 'none' || sortOrder === null ? undefined : sortOrder"
             :item-size="itemSize"
             :media-space-height="mediaSpaceHeight"
             @open-presentation="previewFile"
@@ -327,7 +327,6 @@ const {
   sortOrder,
   setSort,
   sortedUnifiedItems,
-  sortedItems,
 } = operations
 
 import { KEYBOARD_SHORTCUTS } from '@/config/shortcuts'
@@ -358,11 +357,14 @@ const handleEsc = () => {
 const { loadChildren } = mediaStore
 
 const handleSortChange = (mode: 'custom') => {
-  sortBy.value = mode
+  if (mode === 'custom') {
+    sortBy.value = 'custom'
+    sortOrder.value = 'none' // 'none' implies Custom
+  }
 }
 
 const startPresentation = async (startItem?: FileItem, fromBeginning = false) => {
-  const files = sortedItems.value.filter((i) => i.type === 'file') as FileItem[]
+  const files = sortedUnifiedItems.value.filter((i) => !('items' in i)) as FileItem[]
 
   if (files.length === 0) {
     showSnackBar(t('fileExplorer.noFiles'), 'warning')
