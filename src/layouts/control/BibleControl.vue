@@ -9,7 +9,7 @@
       >
         <v-card :style="{ height: `${leftCardHeight}px` }">
           <v-card-title class="d-flex align-center justify-space-between">
-            <div class="d-flex align-center gap-2">
+            <div class="d-flex align-center ga-2">
               <span class="mr-1">{{ $t('common.preview') }}</span>
               <div v-if="currentPassage && !isSearchMode">
                 <span class="mr-1"
@@ -22,7 +22,7 @@
                 <span>({{ $t('common.search') }})</span>
               </div>
             </div>
-            <div v-if="currentPassage" class="d-flex align-center gap-2">
+            <div v-if="currentPassage" class="d-flex align-center ga-2">
               <v-btn
                 size="small"
                 class="mr-1"

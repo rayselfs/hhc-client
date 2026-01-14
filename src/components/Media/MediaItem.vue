@@ -1,56 +1,32 @@
 <template>
-  <v-card
-    variant="flat"
-    :color="isSelected ? 'primary' : undefined"
-    :ripple="false"
-    class="media-item user-select-none d-flex flex-column transition-swing rounded-lg position-relative"
+  <div
+    class="media-item user-select-none d-flex flex-column align-center transition-swing rounded-lg position-relative pa-3"
     :class="[
       { 'item-cut': isCut },
       { 'is-dragging': isDragging },
       { 'drag-zone-center': dragZone === 'center' },
+      { 'item-selected': isSelected },
     ]"
     :data-id="item.id"
-    :style="{ width: '100%', height: '100%' }"
+    :style="{ width: '100%' }"
     @dragover="onDragOver"
     @dragleave="onDragLeave"
     @drop="onDrop"
   >
-    <!-- Header: Icon & Name -->
-    <div class="d-flex align-center px-3 py-2 w-100 overflow-hidden">
-      <!-- Folder Icon or File Type Icon -->
-      <v-icon
-        :icon="headerIcon"
-        :color="headerIconColor"
-        size="small"
-        class="mr-2 flex-shrink-0"
-      ></v-icon>
-
-      <span class="text-truncate flex-grow-1" style="min-width: 0" :title="item.name">
-        {{ item.name }}
-      </span>
-    </div>
-
     <!-- Content: Thumbnail (File) or Large Icon (Folder) -->
     <div
-      class="flex-grow-1 mx-2 mb-2 rounded overflow-hidden position-relative d-flex align-center justify-center"
-      style="aspect-ratio: 1"
+      class="icon-container mb-2 rounded overflow-hidden d-flex align-center justify-center pt-2"
+      :style="{ width: '100%', 'aspect-ratio': '1' }"
     >
       <!-- Folder: Large Icon -->
-      <v-icon
-        v-if="isFolder"
-        icon="mdi-folder"
-        size="64"
-        :color="dragZone === 'center' ? 'primary' : 'grey-lighten-1'"
-      ></v-icon>
+      <v-icon v-if="isFolder" icon="mdi-folder" :size="folderIconSize" class="folder-icon"></v-icon>
 
       <!-- File: Thumbnail -->
       <MediaThumbnail
         v-else
         :item="item as FileItem"
-        aspect-ratio="1"
         :fallback-icon="fileIcon"
-        class="h-100 w-100 bg-transparent"
-        cover
+        class="rounded-lg elevation-1"
       >
         <template #placeholder>
           <div class="d-flex align-center justify-center h-100 w-100">
@@ -63,7 +39,14 @@
         </template>
       </MediaThumbnail>
     </div>
-  </v-card>
+
+    <!-- Footer: Name -->
+    <div class="name-container w-100 text-center px-1 pb-1">
+      <span class="item-name text-caption line-clamp-2" :title="item.name">
+        {{ item.name }}
+      </span>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -78,6 +61,7 @@ const props = defineProps<{
   isSelected: boolean
   isCut: boolean
   isDragging?: boolean
+  size: number
 }>()
 
 // helpers
@@ -101,24 +85,13 @@ const fileIcon = computed(() => {
   }
 })
 
-const headerIcon = computed(() => (isFolder.value ? 'mdi-folder' : fileIcon.value))
-const headerIconColor = computed(() => {
-  if (props.isSelected) return 'white'
-  if (isFolder.value) return undefined
-  return 'red' // Default file icon color in header
-})
+const folderIconSize = computed(() => props.size * 0.9)
 
 // Drag Zone Logic
 const dragZone = ref<'center' | null>(null)
 
 const onDragOver = (e: DragEvent) => {
   if (props.isDragging) return
-
-  // Only Folders support "Drop Into" (Center Zone)
-  // Files don't accept drops (nesting), they only support Reorder (handled by List swap)
-  // BUT: if we drag a File over a File, we don't need highlighting. Visual swap handles it.
-  // So style logic is mainly for Folder Nesting.
-
   if (!isFolder.value) return
 
   const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
@@ -126,7 +99,6 @@ const onDragOver = (e: DragEvent) => {
   const width = rect.width
   const percent = x / width
 
-  // Center 60% = Nest
   if (percent > 0.2 && percent < 0.8) {
     dragZone.value = 'center'
   } else {
@@ -146,8 +118,22 @@ const onDrop = () => {
 <style scoped>
 .media-item {
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.25, 0.8, 0.5, 1);
+  transition: all 0.2s ease;
+  background-color: transparent;
   border: 1px solid transparent;
+}
+
+.media-item:hover {
+  background-color: rgba(var(--v-theme-primary), 0.1);
+}
+
+.folder-icon {
+  color: rgba(var(--v-theme-primary));
+}
+
+.item-selected {
+  background-color: rgba(var(--v-theme-primary), 0.2) !important;
+  border: 1px solid rgba(var(--v-theme-primary), 0.3) !important;
 }
 
 .item-cut {
@@ -159,12 +145,30 @@ const onDrop = () => {
   transform: scale(0.95);
 }
 
+.icon-container {
+  transition: transform 0.2s ease;
+}
+
+.media-item:hover .icon-container {
+  transform: translateY(-2px);
+}
+
+.item-name {
+  color: inherit;
+  word-break: break-all;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 0.75rem !important;
+  line-height: 1rem;
+}
+
 /* Drop Zone Styles */
 :global(.media-item.drag-zone-center) {
-  border: 2px solid rgb(var(--v-theme-primary)) !important;
-  background-color: rgba(var(--v-theme-primary), 0.15) !important;
+  background-color: rgba(var(--v-theme-primary), 0.3) !important;
+  border: 1px solid rgb(var(--v-theme-primary)) !important;
   transform: scale(1.05);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  z-index: 10;
 }
 </style>

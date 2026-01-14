@@ -22,7 +22,7 @@
         </div>
 
         <!-- Search box and step navigation buttons -->
-        <div class="d-flex align-center gap-2">
+        <div class="d-flex align-center ga-2">
           <!-- Search box - only shown on books page -->
           <v-text-field
             v-if="currentStep === 'books'"
@@ -123,7 +123,7 @@
 
           <!-- Chapter selection page -->
           <div v-else-if="currentStep === 'chapters'" key="chapters">
-            <div class="chapter-verse-grid">
+            <div class="chapter-verse-grid ga-2">
               <v-btn
                 v-for="chapterNum in selectedBookChapters"
                 :key="chapterNum"
@@ -394,10 +394,6 @@ const closeDialog = () => {
   transform: translateX(0);
 }
 
-.gap-2 {
-  gap: 8px;
-}
-
 .book-btn {
   height: 48px;
 }
@@ -405,7 +401,6 @@ const closeDialog = () => {
 .chapter-verse-grid {
   display: grid;
   grid-template-columns: repeat(10, 1fr);
-  gap: 8px;
 }
 
 .chapter-verse-btn {

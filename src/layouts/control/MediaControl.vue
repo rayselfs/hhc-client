@@ -2,7 +2,7 @@
   <MediaPresenter v-if="isPresenting" />
   <v-container v-else fluid class="pa-0">
     <v-row no-gutters>
-      <v-col cols="12" class="py-2 px-4">
+      <v-col cols="12" class="pa-4">
         <div class="py-1 d-flex align-center mb-2">
           <FolderBreadcrumbs :items="breadcrumbItems" @navigate="navigateToFolder" />
           <v-spacer></v-spacer>
@@ -96,21 +96,6 @@
         </div>
 
         <div class="align-star d-block">
-          <div class="align-center d-flex" style="min-height: 40px">
-            <transition name="fade" mode="out-in">
-              <MediaSelectionBar
-                v-if="selectedItems.size > 0"
-                key="selection-actions"
-                :selected-count="selectedItems.size"
-                @clear="testClearSelection"
-                @edit="handleEditSelected"
-                @copy="handleCopy"
-                @cut="handleCut"
-                @delete="openDeleteSelectionDialog"
-              />
-            </transition>
-          </div>
-
           <MediaItemList
             :items="sortedUnifiedItems"
             v-model:selected-items="selectedItems"
@@ -214,12 +199,7 @@ import { storeToRefs } from 'pinia'
 import { useElectron } from '@/composables/useElectron'
 import { useProjectionManager } from '@/composables/useProjectionManager'
 import { useMediaProjectionStore } from '@/stores/mediaProjection'
-import {
-  MediaItemList,
-  MediaPresenter,
-  MediaSelectionBar,
-  MediaBackgroundMenu,
-} from '@/components/Media'
+import { MediaItemList, MediaPresenter, MediaBackgroundMenu } from '@/components/Media'
 import { CreateEditFolderDialog, DeleteConfirmDialog, FolderBreadcrumbs } from '@/components/Shared'
 import { useFolderDialogs } from '@/composables/useFolderDialogs'
 import { useMediaOperations } from '@/composables/useMediaOperations'
@@ -244,23 +224,18 @@ const { viewMode } = storeToRefs(mediaStore)
 const itemSize = computed(() => {
   switch (viewMode.value) {
     case 'large':
-      return 250
-    case 'medium':
       return 200
+    case 'medium':
+      return 160
     case 'small':
-      return 150
+      return 120
     default:
-      return 150
+      return 160
   }
 })
 
 const { isPresenting } = storeToRefs(mediaProjectionStore)
-const {
-  currentFolderPath,
-  getCurrentFolders: currentFolders,
-  getCurrentItems: currentItems,
-  clipboard,
-} = storeToRefs(mediaStore)
+const { currentFolderPath, clipboard } = storeToRefs(mediaStore)
 
 const breadcrumbItems = computed(() => {
   return currentFolderPath.value.map((id) => ({
@@ -323,23 +298,6 @@ const createNewFolder = () => {
   openCreateFolderDialog(newName)
 }
 
-// Handle edit for single selected item from selection bar
-const handleEditSelected = () => {
-  if (selectedItems.value.size !== 1) return
-
-  const selectedId = [...selectedItems.value][0]
-  const folder = currentFolders.value.find((f) => f.id === selectedId)
-  if (folder) {
-    openEditDialog(folder)
-    return
-  }
-
-  const item = currentItems.value.find((i) => i.id === selectedId)
-  if (item) {
-    openEditDialog(item)
-  }
-}
-
 const handleDeleteFromList = () => {
   openDeleteSelectionDialog()
 }
@@ -396,7 +354,6 @@ const handleEsc = () => {
 }
 
 // Explicit clear for template binding
-const testClearSelection = () => selectedItems.value.clear()
 
 const { loadChildren } = mediaStore
 
@@ -477,7 +434,7 @@ useKeyboardShortcuts([
 .user-select-none {
   user-select: none;
 }
-.gap-2 {
+.ga-2 {
   gap: 8px;
 }
 </style>

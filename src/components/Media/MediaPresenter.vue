@@ -131,7 +131,7 @@
                   style="z-index: 10"
                   @mousedown.stop
                 >
-                  <div class="d-flex align-center gap-2">
+                  <div class="d-flex align-center ga-2">
                     <v-btn size="x-small" icon="mdi-minus" @click.stop="zoomOut"></v-btn>
                     <span class="text-caption" style="min-width: 40px; text-align: center"
                       >{{ Math.round(zoomLevel * 100) }}%</span
@@ -288,7 +288,7 @@
               :item="item"
               aspect-ratio="1.77"
               :fallback-icon="getIcon(item.metadata.fileType)"
-              cover
+              :cover="true"
             >
               <div
                 v-if="item.metadata.fileType !== 'image'"

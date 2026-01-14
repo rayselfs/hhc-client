@@ -4,7 +4,7 @@
     :src="thumbnailSrc"
     :cover="cover"
     :aspect-ratio="aspectRatio"
-    class="bg-grey-darken-4"
+    class=""
   >
     <slot></slot>
     <template #error>
@@ -18,11 +18,7 @@
       </div>
     </template>
   </v-img>
-  <div
-    v-else
-    class="d-flex align-center justify-center bg-grey-darken-4"
-    :style="{ aspectRatio: aspectRatio }"
-  >
+  <div v-else class="d-flex align-center justify-center" :style="{ aspectRatio: aspectRatio }">
     <slot name="placeholder">
       <v-icon size="48" color="grey">{{ fallbackIcon }}</v-icon>
     </slot>
@@ -41,8 +37,8 @@ const props = withDefaults(
     fallbackIcon?: string
   }>(),
   {
-    aspectRatio: 1.77,
-    cover: true,
+    aspectRatio: 1,
+    cover: false,
     fallbackIcon: 'mdi-file',
   },
 )

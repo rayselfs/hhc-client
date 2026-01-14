@@ -38,7 +38,7 @@
     </div>
 
     <!-- Controls Row (Bottom, with Liquid Glass Background) -->
-    <div class="controls-bar d-flex align-center gap-1 px-4 py-2 rounded-pill align-self-start">
+    <div class="controls-bar d-flex align-center ga-1 px-4 py-2 rounded-pill align-self-start">
       <!-- Play/Pause/Reset -->
       <v-btn
         icon

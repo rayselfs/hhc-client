@@ -1,5 +1,4 @@
 export { default as MediaItemList } from './MediaItemList.vue'
-export { default as MediaSelectionBar } from './MediaSelectionBar.vue'
 export { default as MediaPresenter } from './MediaPresenter.vue'
 export { default as MediaItemContextMenu } from './MediaItemContextMenu.vue'
 export { default as MediaBackgroundMenu } from './MediaBackgroundMenu.vue'

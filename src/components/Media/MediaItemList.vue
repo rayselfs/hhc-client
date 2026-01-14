@@ -20,7 +20,7 @@
               v-for="item in rowItems"
               :key="item.id"
               class="pa-2"
-              :style="{ width: `${props.itemSize}px`, height: `${props.itemSize}px` }"
+              :style="{ width: `${props.itemSize}px` }"
             >
               <MediaItem
                 :item="item"
@@ -28,6 +28,7 @@
                 :is-cut="isCut(item.id)"
                 :is-dragging="draggedItems.has(item.id)"
                 :draggable="canDrag(item)"
+                :size="props.itemSize"
                 @dragstart="onDragStart($event, item)"
                 @dragend="onDragEnd"
                 @drop="onDrop($event, item)"
@@ -45,17 +46,12 @@
 
       <!-- Standard Flex Layout for manual sort and visual feedback -->
       <div v-else class="overflow-y-auto overflow-x-hidden" style="height: 100%">
-        <transition-group
-          name="media-list"
-          tag="div"
-          class="d-flex flex-wrap pa-2"
-          :style="{ gap: '8px' }"
-        >
+        <transition-group name="media-list" tag="div" class="d-flex flex-wrap ga-1">
           <div
             v-for="item in localItems"
             :key="item.id"
             class="media-item-wrapper"
-            :style="{ width: `${props.itemSize}px`, height: `${props.itemSize}px` }"
+            :style="{ width: `${props.itemSize}px` }"
             :data-id="item.id"
           >
             <MediaItem
@@ -64,6 +60,7 @@
               :is-cut="isCut(item.id)"
               :is-dragging="draggedItems.has(item.id)"
               :draggable="canDrag(item)"
+              :size="props.itemSize"
               @dragstart="onDragStart($event, item)"
               @dragend="onDragEnd"
               @drop="onDrop($event, item)"
