@@ -9,13 +9,7 @@
           <!-- Sort Menu -->
           <v-menu>
             <template #activator="{ props }">
-              <v-btn
-                v-bind="props"
-                variant="text"
-                prepend-icon="mdi-sort"
-                class="text-none mr-2"
-                density="comfortable"
-              >
+              <v-btn v-bind="props" variant="elevated" prepend-icon="mdi-sort" class="mr-2">
                 {{ $t('common.sort') }}
               </v-btn>
             </template>
@@ -65,13 +59,7 @@
           <!-- View Menu -->
           <v-menu>
             <template #activator="{ props }">
-              <v-btn
-                v-bind="props"
-                variant="text"
-                prepend-icon="mdi-view-grid-outline"
-                class="text-none"
-                density="comfortable"
-              >
+              <v-btn v-bind="props" variant="elevated" prepend-icon="mdi-view-grid-outline">
                 {{ $t('common.view') }}
               </v-btn>
             </template>
@@ -219,7 +207,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useMediaFolderStore } from '@/stores/folder'
 import { useSnackBar } from '@/composables/useSnackBar'
 import { storeToRefs } from 'pinia'
@@ -305,6 +293,15 @@ const operations = useMediaOperations(
   showSnackBar,
 )
 
+// User Request: Clear selection when changing folder path (Best Practice)
+watch(
+  () => currentFolderPath.value,
+  () => {
+    selectedItems.value.clear()
+  },
+  { deep: true },
+)
+
 const {
   showFolderDialog,
   folderName,
@@ -377,13 +374,6 @@ const {
 
 import { KEYBOARD_SHORTCUTS } from '@/config/shortcuts'
 
-// showFabMenu is defined locally below.
-
-// ... wait, I need to check where showFabMenu comes from.
-// In the original file:
-// 389: const showFabMenu = ref(false)
-// So I should validly just remove useFileCleanup import and usage.
-
 onMounted(async () => {
   await mediaStore.loadRootFolder()
   await loadChildren(MediaFolder.ROOT_ID)
@@ -415,11 +405,6 @@ const handleSortChange = (mode: 'custom') => {
 }
 
 const startPresentation = async (startItem?: FileItem, fromBeginning = false) => {
-  // Get all file items in current folder
-  // User Request: Projection order should follow current sort order
-  // Note: sortedItems only contains FILES if we use the original `useMediaSort` properly.
-  // My updated `useMediaSort` still exports `sortedItems` (files only).
-  // So using `sortedItems` here is correct for Playlist generation (files only).
   const files = sortedItems.value.filter((i) => i.type === 'file') as FileItem[]
 
   if (files.length === 0) {

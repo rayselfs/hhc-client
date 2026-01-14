@@ -36,7 +36,7 @@
                 @dragleave="onDragLeave($event)"
                 @click.stop="handleSelection(item.id, $event)"
                 @dblclick="handleDoubleClick(item)"
-                @contextmenu.prevent="openContextMenu(item, $event)"
+                @contextmenu.stop.prevent="openContextMenu(item, $event)"
               />
             </div>
           </div>
@@ -72,7 +72,7 @@
               @dragleave="onDragLeave($event)"
               @click.stop="handleSelection(item.id, $event)"
               @dblclick="handleDoubleClick(item)"
-              @contextmenu.prevent="openContextMenu(item, $event)"
+              @contextmenu.stop.prevent="openContextMenu(item, $event)"
             />
           </div>
         </transition-group>
@@ -462,6 +462,9 @@ const menuPosition = ref<[number, number] | undefined>(undefined)
 const openBackgroundContextMenu = (event: MouseEvent) => {
   if (isSelectionDragging.value) return
   event.preventDefault()
+
+  // User Request: Clear selection when clicking on background
+  emit('update:selected-items', new Set())
 
   // Update position for background context menu
   menuPosition.value = [event.clientX, event.clientY]
