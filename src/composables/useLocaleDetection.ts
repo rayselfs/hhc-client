@@ -4,7 +4,7 @@ import { useElectron } from './useElectron'
 import { useLocalStorage } from './useLocalStorage'
 
 import { StorageKey, StorageCategory, getStorageKey } from '@/types/common'
-import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
+import { useProjectionManager } from '@/composables/useProjectionManager'
 
 /**
  * Locale Configuration Interface
@@ -161,7 +161,7 @@ export function useLocaleDetection() {
   const { isElectron, updateLanguage } = useElectron()
   const { getLocalItem, setLocalItem } = useLocalStorage()
 
-  const { sendLocaleUpdate } = useProjectionMessaging()
+  const { sendLocaleUpdate } = useProjectionManager()
 
   // Currently selected language
   const selectedLanguage = ref<SupportedLocale>(locale.value as SupportedLocale)

@@ -142,8 +142,8 @@ export function useFileSystem() {
     const result = await provider.deleteFile(item.url)
 
     // Also delete thumbnail if exists
-    if (result.success && item.metadata?.thumbnail) {
-      await provider.deleteThumbnail(item.metadata.thumbnail)
+    if (result.success && item.metadata?.thumbnailUrl) {
+      await provider.deleteThumbnail(item.metadata.thumbnailUrl)
     }
 
     return result
@@ -169,6 +169,49 @@ export function useFileSystem() {
     }
 
     return { succeeded, failed }
+  }
+
+  /**
+   * Delete physical files from storage recursively
+   * Collects all files recursively from folders and deletes them
+   * SAFELY SKIPS deletion if the items do not belong to file system (e.g. Bible verses)
+   */
+  const deletePhysicalFilesRecursive = async (
+    items: (FileItem | Folder<FileItem>)[],
+  ): Promise<{ succeeded: FileItem[]; failed: Array<{ item: FileItem; error: string }> }> => {
+    // Collect all files to delete (including nested files in folders)
+    const filesToDelete: FileItem[] = []
+
+    const collectFiles = (item: FileItem | Folder<FileItem>) => {
+      // Basic check: if it's a "VerseItem", it likely won't have 'items' array of files,
+      // but let's be more robust. If it's a folder, traverse.
+      if ('items' in item && Array.isArray(item.items)) {
+        // It's a folder - recursively collect files
+        item.items.forEach((subItem) => {
+          // Double check it's a file
+          if (!('items' in subItem)) {
+            filesToDelete.push(subItem as FileItem)
+          }
+        })
+        item.folders.forEach(collectFiles)
+      } else if (!('items' in item)) {
+        // It's a file
+        filesToDelete.push(item as FileItem)
+      }
+    }
+
+    items.forEach(collectFiles)
+
+    // Filter out items that are not actual files (e.g. Bible verses)
+    // We can assume 'url' presence or specific metadata check if needed.
+    // Verses don't have `url` usually. FileItems do.
+    const filesWithUrl = filesToDelete.filter((f) => !!f.url)
+
+    if (filesWithUrl.length === 0) {
+      return { succeeded: [], failed: [] }
+    }
+
+    return deleteFiles(filesWithUrl)
   }
 
   /**
@@ -331,5 +374,6 @@ export function useFileSystem() {
     getProviderForUrl,
     hasProvider,
     setCurrentProvider,
+    deletePhysicalFilesRecursive,
   }
 }

@@ -61,10 +61,10 @@ import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { useAlert } from '@/composables/useAlert'
 import { useSentry } from '@/composables/useSentry'
 import { useLocaleDetection } from '@/composables/useLocaleDetection'
-import { useProjectionSync } from '@/composables/useProjectionSync'
-import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
+import { useProjectionManager } from '@/composables/useProjectionManager'
 
 // Stores
+import { useFileCleanup } from '@/composables/useFileCleanup'
 import { useProjectionStore } from '@/stores/projection'
 
 // Types
@@ -73,10 +73,11 @@ import { MessageType, ViewType, type AppMessage, type MenuItem } from '@/types/c
 const { t: $t } = useI18n()
 const { reportError } = useSentry()
 const { warning } = useAlert()
-const { syncAllStates } = useProjectionSync()
 const { initializeLanguage } = useLocaleDetection()
 
+const { setProjectionState, syncAllStates } = useProjectionManager()
 const projectionStore = useProjectionStore()
+const { runCleanup } = useFileCleanup()
 
 const { currentView } = storeToRefs(projectionStore)
 
@@ -88,8 +89,6 @@ const {
   ensureProjectionWindow,
   removeAllListeners,
 } = useElectron()
-
-const { setProjectionState } = useProjectionMessaging()
 
 // Toggle projection state
 const toggleProjection = async () => {
@@ -192,6 +191,8 @@ onMounted(async () => {
     await checkAndEnsureProjectionWindow()
     onMainMessage(handleElectronMessage)
   }
+
+  runCleanup()
 })
 
 onBeforeUnmount(() => {

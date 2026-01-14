@@ -320,7 +320,7 @@ import { MessageType } from '@/types/common'
 import { useCardLayout } from '@/composables/useLayout'
 import { APP_CONFIG } from '@/config/app'
 import { useStopwatchStore } from '@/stores/stopwatch'
-import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
+import { useProjectionManager } from '@/composables/useProjectionManager'
 import { ViewType } from '@/types/common'
 import { useVideoPlayer } from '@/composables/useVideoPlayer'
 import MediaVideoControls from '@/components/Media/Preview/MediaVideoControls.vue'
@@ -348,7 +348,7 @@ const {
 } = storeToRefs(store)
 
 const { onProjectionMessage, isElectron } = useElectron()
-const { setProjectionState, sendProjectionMessage } = useProjectionMessaging()
+const { setProjectionState, sendProjectionMessage } = useProjectionManager()
 
 const showZoomControls = ref(false)
 const toggleZoom = (minus = false) => {

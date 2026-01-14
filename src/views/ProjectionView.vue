@@ -19,11 +19,11 @@ import { useProjectionElectron } from '@/composables/useElectron'
 import { ViewType, type AppMessage } from '@/types/common'
 import { useLocaleDetection } from '@/composables/useLocaleDetection'
 // 引入 Dispatcher
-import { useProjectionMessageDispatcher } from '@/composables/useProjectionMessageDispatcher'
+import { useProjectionManager } from '@/composables/useProjectionManager'
 
 const projectionStore = useProjectionStore()
 
-const { dispatchMessage } = useProjectionMessageDispatcher()
+const { dispatchMessage } = useProjectionManager()
 
 const handleMessage = (data: AppMessage) => {
   dispatchMessage(data)

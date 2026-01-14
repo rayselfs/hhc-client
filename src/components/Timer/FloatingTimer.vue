@@ -27,14 +27,14 @@ import Stopwatch from './StopWatcher.vue'
 import { useTimerStore } from '@/stores/timer'
 import { useStopwatchStore } from '@/stores/stopwatch'
 
-import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
+import { useProjectionManager } from '@/composables/useProjectionManager'
 import { useProjectionStore } from '@/stores/projection'
 import { ViewType } from '@/types/common'
 
 const timerStore = useTimerStore()
 const stopwatchStore = useStopwatchStore()
 const projectionStore = useProjectionStore()
-const { setProjectionState } = useProjectionMessaging()
+const { setProjectionState } = useProjectionManager()
 
 const isVisible = computed(() => {
   return timerStore.isActivityRunning && projectionStore.currentView !== ViewType.TIMER

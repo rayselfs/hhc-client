@@ -63,7 +63,7 @@ import { useElectron } from '@/composables/useElectron'
 import { useDarkMode } from '@/composables/useDarkMode'
 import { useLocaleDetection } from '@/composables/useLocaleDetection'
 
-import { useProjectionSync } from '@/composables/useProjectionSync'
+import { useProjectionManager } from '@/composables/useProjectionManager'
 
 // i18n
 const { t: $t, t } = useI18n()
@@ -72,7 +72,7 @@ const { t: $t, t } = useI18n()
 const { isElectron, onMainMessage } = useElectron()
 
 // 投影消息管理
-const { syncAllStates } = useProjectionSync()
+const { syncAllStates } = useProjectionManager()
 
 // 設定彈窗狀態
 const isOpen = ref(false)

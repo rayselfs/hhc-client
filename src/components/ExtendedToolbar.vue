@@ -48,14 +48,12 @@ import { computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useProjectionStore } from '@/stores/projection'
 import { useElectron } from '@/composables/useElectron'
-import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
 import { useAlert } from '@/composables/useAlert'
 import { ViewType } from '@/types/common'
 import { VersionSelector as BibleVersionSelector } from '@/components/Bible'
 import { SearchBar } from '@/components/Main'
+import { useProjectionManager } from '@/composables/useProjectionManager'
 import { useSentry } from '@/composables/useSentry'
-
-import { useProjectionSync } from '@/composables/useProjectionSync'
 
 const { reportError } = useSentry()
 const { t: $t } = useI18n()
@@ -66,8 +64,7 @@ const {
   checkProjectionWindow,
   closeProjectionWindow: closeElectronProjectionWindow,
 } = useElectron()
-const { setProjectionState } = useProjectionMessaging()
-const { syncAllStates } = useProjectionSync()
+const { setProjectionState, syncAllStates } = useProjectionManager()
 const { warning } = useAlert()
 
 // Props

@@ -678,7 +678,7 @@ import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { KEYBOARD_SHORTCUTS } from '@/config/shortcuts'
 
 onMounted(async () => {
-  bibleFolderStore.loadRootFolder()
+  await bibleFolderStore.loadRootFolder()
   await loadChildren(BibleFolder.ROOT_ID)
 
   updateFontSize(fontSize.value)

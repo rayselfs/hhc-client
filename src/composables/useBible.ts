@@ -1,6 +1,6 @@
 import { nextTick, computed, type Ref } from 'vue'
 import { useElectron } from './useElectron'
-import { useProjectionMessaging } from './useProjectionMessaging'
+import { useProjectionManager } from '@/composables/useProjectionManager'
 import { MessageType, ViewType, type VerseItem } from '@/types/common'
 import { useBibleStore } from '@/stores/bible'
 import { storeToRefs } from 'pinia'
@@ -202,7 +202,7 @@ export const useBible = (
 
   // ==================== Projection ====================
   const { isElectron, sendToProjection } = useElectron()
-  const { setProjectionState, sendProjectionMessage } = useProjectionMessaging()
+  const { setProjectionState, sendProjectionMessage } = useProjectionManager()
 
   /**
    * Update projection screen

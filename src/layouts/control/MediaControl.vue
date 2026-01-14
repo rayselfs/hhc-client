@@ -224,7 +224,7 @@ import { useMediaFolderStore } from '@/stores/folder'
 import { useSnackBar } from '@/composables/useSnackBar'
 import { storeToRefs } from 'pinia'
 import { useElectron } from '@/composables/useElectron'
-import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
+import { useProjectionManager } from '@/composables/useProjectionManager'
 import { useMediaProjectionStore } from '@/stores/mediaProjection'
 import {
   MediaItemList,
@@ -233,8 +233,6 @@ import {
   MediaBackgroundMenu,
 } from '@/components/Media'
 import { CreateEditFolderDialog, DeleteConfirmDialog, FolderBreadcrumbs } from '@/components/Shared'
-import { useMediaSort } from '@/composables/useMediaSort'
-import { useMediaUpload } from '@/composables/useMediaUpload'
 import { useFolderDialogs } from '@/composables/useFolderDialogs'
 import { useMediaOperations } from '@/composables/useMediaOperations'
 import { useI18n } from 'vue-i18n'
@@ -243,12 +241,12 @@ import { APP_CONFIG } from '@/config/app'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 
 import { MessageType, ViewType } from '@/types/common'
-import type { Folder, FileItem } from '@/types/common'
+import type { FileItem } from '@/types/common'
 import { MediaFolder } from '@/types/enum'
 
 const { t } = useI18n()
 const { ensureProjectionWindow } = useElectron()
-const { sendProjectionMessage } = useProjectionMessaging()
+const { sendProjectionMessage } = useProjectionManager()
 const { showSnackBar } = useSnackBar()
 const mediaStore = useMediaFolderStore()
 const mediaProjectionStore = useMediaProjectionStore()
@@ -286,16 +284,7 @@ const breadcrumbItems = computed(() => {
 // Navigation actions
 const { navigateToFolder, getFolderById, clearClipboard } = mediaStore
 
-const {
-  fileInput,
-  folderInput,
-  uploadFile,
-  uploadFolder,
-  handleFileChange,
-  handleFolderUpload,
-  getUniqueName,
-} = useMediaUpload()
-
+// Dialogs & Operations
 const { mediaSpaceHeight } = useCardLayout({
   minHeight: APP_CONFIG.UI.MIN_CARD_HEIGHT,
 })
@@ -303,7 +292,6 @@ const { mediaSpaceHeight } = useCardLayout({
 // Selection
 const selectedItems = ref<Set<string>>(new Set())
 
-// Dialogs & Operations
 const mediaDialogs = useFolderDialogs<FileItem>()
 const operations = useMediaOperations(
   mediaStore,
@@ -315,7 +303,6 @@ const operations = useMediaOperations(
     clear: () => selectedItems.value.clear(),
   },
   showSnackBar,
-  getUniqueName,
 )
 
 const {
@@ -335,16 +322,7 @@ const {
 // Create New Folder with Unique Name
 const createNewFolder = () => {
   const baseName = t('fileExplorer.defaultFolderName')
-  let newName = baseName
-  let counter = 2
-
-  const existingNames = new Set(currentFolders.value.map((f: Folder<FileItem>) => f.name))
-
-  while (existingNames.has(newName)) {
-    newName = `${baseName} ${counter}`
-    counter++
-  }
-
+  const newName = getUniqueName(baseName, 'folder')
   openCreateFolderDialog(newName)
 }
 
@@ -365,19 +343,12 @@ const handleEditSelected = () => {
   }
 }
 
-// MediaItemList emits 'delete' which signifies context menu delete
-// We should check if it's single or multi select context logic
-// But actually MediaItemList handles context menu targeting.
-// If it emits 'Delete', it assumes we delete the selection or the target.
-// In MediaItemList implementation: `emit('delete')` is called from Context Menu.
-// Context Menu logic in MediaItemList should ensure `selectedItems` are correct before emitting?
-// Yes, `openContextMenu` calls `handleSelection` if target not in selection.
-// So `selectedItems` should be valid for the deletion.
 const handleDeleteFromList = () => {
   openDeleteSelectionDialog()
 }
 
 const {
+  // Operations
   isDuplicateName,
   nameErrorMessage,
   handleSave,
@@ -386,17 +357,35 @@ const {
   handleCut,
   handlePaste,
   handlePasteIntoFolder,
-} = operations
+  getUniqueName,
 
-const { sortBy, sortOrder, setSort, sortedUnifiedItems, sortedItems } = useMediaSort(
-  currentFolders,
-  currentItems,
-)
+  // Upload
+  fileInput,
+  folderInput,
+  uploadFile,
+  uploadFolder,
+  handleFileChange,
+  handleFolderUpload,
+
+  // Sort
+  sortBy,
+  sortOrder,
+  setSort,
+  sortedUnifiedItems,
+  sortedItems,
+} = operations
 
 import { KEYBOARD_SHORTCUTS } from '@/config/shortcuts'
 
+// showFabMenu is defined locally below.
+
+// ... wait, I need to check where showFabMenu comes from.
+// In the original file:
+// 389: const showFabMenu = ref(false)
+// So I should validly just remove useFileCleanup import and usage.
+
 onMounted(async () => {
-  mediaStore.loadRootFolder()
+  await mediaStore.loadRootFolder()
   await loadChildren(MediaFolder.ROOT_ID)
 })
 

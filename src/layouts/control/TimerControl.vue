@@ -283,7 +283,7 @@ import { useTimerStore } from '@/stores/timer'
 import { useStopwatchStore } from '@/stores/stopwatch'
 import { useProjectionStore } from '@/stores/projection'
 import { useElectron } from '@/composables/useElectron'
-import { useProjectionMessaging } from '@/composables/useProjectionMessaging'
+import { useProjectionManager } from '@/composables/useProjectionManager'
 import { APP_CONFIG, TIMER_CONFIG } from '@/config/app'
 
 import { TimerMode, ViewType } from '@/types/common'
@@ -303,7 +303,7 @@ const { t: $t } = useI18n()
 
 const { showSnackBar } = useSnackBar()
 const { isElectron } = useElectron()
-const { setProjectionState, cleanupResources } = useProjectionMessaging()
+const { setProjectionState, cleanupResources } = useProjectionManager()
 const { cleanup } = useMemoryManager('TimerControl')
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { KEYBOARD_SHORTCUTS } from '@/config/shortcuts'
