@@ -2,12 +2,12 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { v4 as uuidv4 } from 'uuid'
-import { useDebounceFn } from '@vueuse/core'
 import {
   type Folder,
   type FolderItem,
   type ClipboardItem,
   type FolderStoreConfig,
+  type FolderDocument,
 } from '@/types/common'
 import { useFolderManager } from '@/composables/useFolderManager'
 import { fileSystemProviderFactory } from '@/services/filesystem'
@@ -20,6 +20,7 @@ import type { VerseItem, FileItem } from '@/types/common'
 
 /**
  * Generic folder store for managing folder tree structure
+ * Uses separate IndexedDB stores for folders and items (flattened structure)
  */
 export const useFolderStore = <TItem extends FolderItem = FolderItem>(
   config: FolderStoreConfig,
@@ -38,6 +39,8 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
     const currentFolderPath = ref<string[]>([config.rootId])
     const clipboard = ref<ClipboardItem<TItem>[]>([])
     const viewMode = ref<'large' | 'medium' | 'small'>('medium')
+    // Version counter to trigger reactivity when folder/item content changes
+    const contentVersion = ref(0)
 
     const folderMap = new Map<string, Folder<TItem>>()
     const itemMap = new Map<string, TItem>()
@@ -53,10 +56,16 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
       traverse(rootFolder.value as any)
     }
 
+    // Helper to trigger reactivity for content changes
+    const triggerContentUpdate = () => {
+      contentVersion.value++
+    }
+
     const folderManager = useFolderManager(rootFolder, currentFolderPath, {
       rootId: config.rootId,
       folderMap: folderMap as any,
       itemMap: itemMap as any,
+      contentVersion,
     })
 
     const {
@@ -69,81 +78,237 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
     } = folderManager
 
     const db = useIndexedDB(FOLDER_DB_CONFIG)
-    const storeName = FolderDBStore.FOLDER_DB_STRUCTURE_STORE_NAME
+    const foldersStoreName = FolderDBStore.FOLDER_DB_FOLDERS_STORE_NAME
+    const itemsStoreName = FolderDBStore.FOLDER_DB_ITEMS_STORE_NAME
+    const thumbnailsStoreName = FolderDBStore.FOLDER_DB_THUMBNAILS_STORE_NAME
 
+    // ==========================================
+    // Helper: Convert Folder to FolderDocument (strips Vue reactive proxies)
+    // ==========================================
+    const toFolderDocument = (folder: Folder<TItem>): FolderDocument => {
+      const doc: FolderDocument = {
+        id: folder.id,
+        name: folder.name,
+        parentId: folder.parentId || null,
+        expanded: folder.expanded,
+        timestamp: folder.timestamp,
+        expiresAt: folder.expiresAt,
+        sortIndex: folder.sortIndex,
+        sourceType: folder.sourceType,
+        permissions: folder.permissions
+          ? JSON.parse(JSON.stringify(folder.permissions))
+          : undefined,
+        viewSettings: folder.viewSettings
+          ? JSON.parse(JSON.stringify(folder.viewSettings))
+          : undefined,
+        cloudId: folder.cloudId,
+        syncPath: folder.syncPath,
+        isLoaded: folder.isLoaded,
+      }
+      return doc
+    }
+
+    // ==========================================
+    // Single Document Operations
+    // ==========================================
+    const saveFolderDoc = async (folder: Folder<TItem>): Promise<void> => {
+      try {
+        await db.put(foldersStoreName, toFolderDocument(folder))
+      } catch (error) {
+        console.error('Failed to save folder document:', error)
+      }
+    }
+
+    const saveItemDoc = async (item: TItem): Promise<void> => {
+      try {
+        // Convert to plain object to strip Vue reactive proxies
+        const plainItem = JSON.parse(JSON.stringify(item)) as TItem
+        await db.put(itemsStoreName, plainItem)
+      } catch (error) {
+        console.error('Failed to save item document:', error)
+      }
+    }
+
+    const deleteFolderDoc = async (folderId: string): Promise<void> => {
+      try {
+        await db.delete(foldersStoreName, folderId)
+      } catch (error) {
+        console.error('Failed to delete folder document:', error)
+      }
+    }
+
+    const deleteItemDoc = async (itemId: string): Promise<void> => {
+      try {
+        await db.delete(itemsStoreName, itemId)
+      } catch (error) {
+        console.error('Failed to delete item document:', error)
+      }
+    }
+
+    // ==========================================
+    // Batch Operations
+    // ==========================================
+    const saveFolderTreeBatch = async (folder: Folder<TItem>): Promise<void> => {
+      const folders: FolderDocument[] = []
+      const items: TItem[] = []
+
+      const collect = (f: Folder<TItem>) => {
+        folders.push(toFolderDocument(f))
+        f.items.forEach((item) => items.push(item))
+        f.folders.forEach((sub) => collect(sub))
+      }
+      collect(folder)
+
+      try {
+        await db.putBatch(foldersStoreName, folders)
+        // Convert items to plain objects to strip Vue reactive proxies
+        const plainItems = JSON.parse(JSON.stringify(items)) as TItem[]
+        await db.putBatch(itemsStoreName, plainItems)
+      } catch (error) {
+        console.error('Failed to save folder tree batch:', error)
+      }
+    }
+
+    // ==========================================
+    // Delete folder with all descendants
+    // ==========================================
     const deleteFolderRecursive = async (folders: Folder<TItem>[], folderId: string) => {
       const folderToRemove = folderMap.get(folderId)
       if (folderToRemove) {
-        const collectItemIds = (f: Folder<TItem>, ids: string[]) => {
-          f.items.forEach((item) => ids.push(item.id))
-          f.folders.forEach((sub) => collectItemIds(sub, ids))
-        }
+        // Collect all item IDs and folder IDs to delete
         const itemIds: string[] = []
-        collectItemIds(folderToRemove, itemIds)
+        const folderIds: string[] = []
 
+        const collectIds = (f: Folder<TItem>) => {
+          folderIds.push(f.id)
+          f.items.forEach((item) => itemIds.push(item.id))
+          f.folders.forEach((sub) => collectIds(sub))
+        }
+        collectIds(folderToRemove)
+
+        // Delete thumbnails for all items
         for (const itemId of itemIds) {
           const item = itemMap.get(itemId)
           if ((item as any)?.metadata?.thumbnailBlobId) {
-            await db.delete(
-              FolderDBStore.FOLDER_DB_THUMBNAILS_STORE_NAME,
-              (item as any).metadata.thumbnailBlobId,
-            )
+            await db.delete(thumbnailsStoreName, (item as any).metadata.thumbnailBlobId)
           }
         }
+
+        // Batch delete from IndexedDB
+        await db.deleteBatch(itemsStoreName, itemIds)
+        await db.deleteBatch(foldersStoreName, folderIds)
       }
+
+      // Remove from in-memory tree
       _deleteFolderRecursive(folders as any, folderId)
     }
 
-    /**
-     * Recursively checks for and deletes expired content
-     * Returns true if any content was deleted (store structure changed)
-     */
-    // purgeExpiredContent removed, logic moved to useFileCleanup
-    // The previous implementation was here (around line 104-199)
-
-    const saveRootFolder = useDebounceFn(async () => {
-      try {
-        // Use requestIdleCallback to avoid blocking main thread during serialization
-        if (typeof requestIdleCallback !== 'undefined') {
-          requestIdleCallback(
-            async () => {
-              try {
-                // Deep clone using JSON (compatible with all data types)
-                const clonedData = JSON.parse(JSON.stringify(rootFolder.value))
-                await db.put(storeName, clonedData)
-              } catch (error) {
-                console.error('Failed to save root folder to IndexedDB:', error)
-              }
-            },
-            { timeout: 2000 },
-          )
-        } else {
-          // Fallback for environments without requestIdleCallback
-          const clonedData = JSON.parse(JSON.stringify(rootFolder.value))
-          await db.put(storeName, clonedData)
-        }
-      } catch (error) {
-        console.error('Failed to save root folder to IndexedDB:', error)
-      }
-    }, 1000)
-
+    // ==========================================
+    // Load from IndexedDB
+    // ==========================================
     const loadRootFolder = async () => {
       try {
-        const savedFolder = await db.get<Folder<TItem>>(storeName, config.rootId)
-        if (savedFolder && savedFolder.id === config.rootId) {
-          rootFolder.value = savedFolder as any
+        // 1. Check if this specific root folder exists
+        const existingRoot = await db.get<FolderDocument>(foldersStoreName, config.rootId)
+
+        // If root folder doesn't exist, initialize it
+        if (!existingRoot) {
+          await saveFolderDoc(rootFolder.value as Folder<TItem>)
           rebuildIndex()
-        } else {
-          rebuildIndex()
+          return
         }
+
+        // 2. Load all folders and items for this root
+        const allFolders = await db.getAll<FolderDocument>(foldersStoreName)
+        const allItems = await db.getAll<TItem>(itemsStoreName)
+
+        // 3. Build parentId -> children mapping
+        const folderChildrenMap = new Map<string | null, FolderDocument[]>()
+        const itemParentMap = new Map<string, TItem[]>()
+
+        allFolders.forEach((f) => {
+          const parentId = f.parentId
+          const siblings = folderChildrenMap.get(parentId) || []
+          siblings.push(f)
+          folderChildrenMap.set(parentId, siblings)
+        })
+
+        allItems.forEach((i) => {
+          const folderId = (i as any).folderId
+          const siblings = itemParentMap.get(folderId) || []
+          siblings.push(i)
+          itemParentMap.set(folderId, siblings)
+        })
+
+        // 4. Recursively build tree structure
+        const buildTree = (folderId: string): Folder<TItem> | null => {
+          const doc = allFolders.find((f) => f.id === folderId)
+          if (!doc) return null
+
+          const children = folderChildrenMap.get(folderId) || []
+          const items = itemParentMap.get(folderId) || []
+
+          // Sort children by sortIndex (undefined values go to end, then by timestamp)
+          const sortedChildren = [...children].sort((a, b) => {
+            if (a.sortIndex !== undefined && b.sortIndex !== undefined) {
+              return a.sortIndex - b.sortIndex
+            }
+            if (a.sortIndex !== undefined) return -1
+            if (b.sortIndex !== undefined) return 1
+            return a.timestamp - b.timestamp
+          })
+
+          // Sort items by sortIndex (undefined values go to end, then by timestamp)
+          const sortedItems = [...items].sort((a, b) => {
+            const aIndex = (a as any).sortIndex
+            const bIndex = (b as any).sortIndex
+            if (aIndex !== undefined && bIndex !== undefined) {
+              return aIndex - bIndex
+            }
+            if (aIndex !== undefined) return -1
+            if (bIndex !== undefined) return 1
+            return a.timestamp - b.timestamp
+          })
+
+          const childFolders: Folder<TItem>[] = []
+          for (const child of sortedChildren) {
+            const built = buildTree(child.id)
+            if (built) childFolders.push(built)
+          }
+
+          return {
+            id: doc.id,
+            name: doc.name,
+            expanded: doc.expanded,
+            items: sortedItems,
+            folders: childFolders,
+            parentId: doc.parentId || undefined,
+            timestamp: doc.timestamp,
+            expiresAt: doc.expiresAt,
+            sortIndex: doc.sortIndex,
+            sourceType: doc.sourceType,
+            permissions: doc.permissions,
+            viewSettings: doc.viewSettings,
+            cloudId: doc.cloudId,
+            syncPath: doc.syncPath,
+            isLoaded: doc.isLoaded,
+          } as Folder<TItem>
+        }
+
+        const built = buildTree(config.rootId)
+        if (built) {
+          rootFolder.value = built as any
+        }
+
+        rebuildIndex()
       } catch (error) {
         console.error('Failed to load root folder from IndexedDB:', error)
       }
     }
 
-    // Removed deep watch for performance - now manually trigger saveRootFolder() in mutation functions
-    // watch(rootFolder, () => saveRootFolder(), { deep: true })
-
+    // ==========================================
+    // Clipboard operations
+    // ==========================================
     const copyToClipboard = (items: ClipboardItem<TItem>[]) => {
       clipboard.value = items
     }
@@ -153,6 +318,10 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
     const clearClipboard = () => {
       clipboard.value = []
     }
+
+    // ==========================================
+    // Navigation
+    // ==========================================
     const navigateToRoot = () => {
       currentFolderPath.value = [config.rootId]
     }
@@ -169,7 +338,10 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
       }
     }
 
-    const addFolderToCurrent = (name: string, expiresAt?: number | null) => {
+    // ==========================================
+    // Add operations
+    // ==========================================
+    const addFolderToCurrent = async (name: string, expiresAt?: number | null) => {
       if (!name.trim()) return
       const newFolder: Folder<TItem> = {
         id: uuidv4(),
@@ -183,85 +355,132 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
         sourceType: 'local',
         isLoaded: true,
       }
-      currentFolder.value.folders.push(newFolder as any)
+      // Trigger reactivity by reassigning the array
+      currentFolder.value.folders = [...currentFolder.value.folders, newFolder] as any
       folderMap.set(newFolder.id, newFolder)
-      saveRootFolder()
+      triggerContentUpdate()
+
+      // Save to IndexedDB
+      await saveFolderDoc(newFolder)
     }
 
-    const addItemToCurrent = (item: TItem): void => {
-      currentFolder.value.items.push(item as any)
+    const addItemToCurrent = async (item: TItem): Promise<void> => {
+      // Ensure folderId is set
+      ;(item as any).folderId = currentFolder.value.id
+      // Trigger reactivity by reassigning the array
+      currentFolder.value.items = [...currentFolder.value.items, item] as any
       itemMap.set(item.id, item)
-      saveRootFolder()
+      triggerContentUpdate()
+
+      // Save to IndexedDB
+      await saveItemDoc(item)
     }
 
     const removeItemFromCurrent = async (itemId: string) => {
       const item = itemMap.get(itemId)
+
+      // Delete thumbnail if exists
       if ((item as any)?.metadata?.thumbnailBlobId) {
-        await db.delete(
-          FolderDBStore.FOLDER_DB_THUMBNAILS_STORE_NAME,
-          (item as any).metadata.thumbnailBlobId,
-        )
+        await db.delete(thumbnailsStoreName, (item as any).metadata.thumbnailBlobId)
       }
+
+      // Delete from IndexedDB
+      await deleteItemDoc(itemId)
+
+      // Remove from in-memory
       currentFolder.value.items = currentFolder.value.items.filter((item) => item.id !== itemId)
       itemMap.delete(itemId)
-      saveRootFolder()
+      triggerContentUpdate()
     }
 
-    const addItemToFolder = (folderId: string, item: TItem) => {
+    const addItemToFolder = async (folderId: string, item: TItem) => {
+      // Ensure folderId is set
+      ;(item as any).folderId = folderId
+
       if (folderId === config.rootId) {
-        rootFolder.value.items.push(item as any)
+        rootFolder.value.items = [...rootFolder.value.items, item] as any
         itemMap.set(item.id, item)
       } else {
         updateFolderInTree(rootFolder.value.folders as any, folderId, (folder) => {
-          folder.items.push(item as any)
+          folder.items = [...folder.items, item] as any
           itemMap.set(item.id, item)
         })
       }
-      saveRootFolder()
+      triggerContentUpdate()
+
+      // Save to IndexedDB
+      await saveItemDoc(item)
     }
 
+    // ==========================================
+    // Delete operations
+    // ==========================================
     const deleteFolder = async (folderId: string) => {
       await deleteFolderRecursive(rootFolder.value.folders as any, folderId)
       rebuildIndex()
-      saveRootFolder()
+      triggerContentUpdate()
     }
 
-    const updateFolder = (
+    // ==========================================
+    // Update operations
+    // ==========================================
+    const updateFolder = async (
       folderId: string,
       updates: { name?: string; expiresAt?: number | null },
     ) => {
-      updateFolderInTree(rootFolder.value.folders as any, folderId, (folder) => {
+      const folder = folderMap.get(folderId)
+      if (folder) {
         if (updates.name !== undefined) folder.name = updates.name.trim()
         if (updates.expiresAt !== undefined) folder.expiresAt = updates.expiresAt
         folder.timestamp = Date.now()
-      })
-      saveRootFolder()
-    }
+        triggerContentUpdate()
 
-    const reorderCurrentItems = (orderedItems: TItem[]) => {
-      currentFolder.value.items = [...orderedItems] as any
-      saveRootFolder()
-    }
-    const reorderCurrentFolders = (orderedFolders: Folder<TItem>[]) => {
-      currentFolder.value.folders = [...orderedFolders] as any
-      saveRootFolder()
-    }
-
-    const updateItem = (itemId: string, folderId: string, updates: Partial<TItem>) => {
-      if (folderId === config.rootId) {
-        const item = rootFolder.value.items.find((i) => i.id === itemId)
-        if (item) Object.assign(item, updates)
-      } else {
-        updateFolderInTree(rootFolder.value.folders as any, folderId, (folder) => {
-          const item = folder.items.find((i) => (i as any).id === itemId)
-          if (item) Object.assign(item, updates)
-        })
+        // Save to IndexedDB
+        await saveFolderDoc(folder)
       }
-      saveRootFolder()
     }
 
-    const moveItem = (item: TItem, targetFolderId: string, sourceFolderId: string) => {
-      // Use folderMap for O(1) lookup instead of recursive search
+    const reorderCurrentItems = async (orderedItems: TItem[]) => {
+      // Update sortIndex for each item based on new order
+      orderedItems.forEach((item, index) => {
+        ;(item as any).sortIndex = index
+      })
+      currentFolder.value.items = [...orderedItems] as any
+      triggerContentUpdate()
+
+      // Save all items - convert to plain objects to strip Vue reactive proxies
+      const plainItems = JSON.parse(JSON.stringify(orderedItems)) as TItem[]
+      await db.putBatch(itemsStoreName, plainItems)
+    }
+
+    const reorderCurrentFolders = async (orderedFolders: Folder<TItem>[]) => {
+      // Update sortIndex for each folder based on new order
+      orderedFolders.forEach((folder, index) => {
+        folder.sortIndex = index
+      })
+      currentFolder.value.folders = [...orderedFolders] as any
+      triggerContentUpdate()
+
+      // Save all folders
+      const docs = orderedFolders.map(toFolderDocument)
+      await db.putBatch(foldersStoreName, docs)
+    }
+
+    const updateItem = async (itemId: string, folderId: string, updates: Partial<TItem>) => {
+      const item = itemMap.get(itemId)
+      if (item) {
+        Object.assign(item, updates)
+        triggerContentUpdate()
+
+        // Save to IndexedDB
+        await saveItemDoc(item)
+      }
+    }
+
+    // ==========================================
+    // Move operations
+    // ==========================================
+    const moveItem = async (item: TItem, targetFolderId: string, sourceFolderId: string) => {
       const sourceFolder =
         sourceFolderId === config.rootId ? rootFolder.value : folderMap.get(sourceFolderId)
       const targetFolder =
@@ -272,22 +491,24 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
         return
       }
 
-      // Remove item from source folder
+      // Remove from source (reassign to trigger reactivity)
       sourceFolder.items = sourceFolder.items.filter((i) => i.id !== item.id) as any
 
-      // Add item to target folder
-      targetFolder.items.push(item as any)
+      // Update folderId and add to target (reassign to trigger reactivity)
+      ;(item as any).folderId = targetFolderId
+      targetFolder.items = [...targetFolder.items, item] as any
+      triggerContentUpdate()
 
-      saveRootFolder()
+      // Save to IndexedDB
+      await saveItemDoc(item)
     }
 
-    const moveFolder = (
+    const moveFolder = async (
       folderToMove: Folder<TItem>,
       targetFolderId: string,
       sourceFolderId: string,
       skipSave = false,
-    ): boolean => {
-      // Use folderMap for O(1) lookup instead of recursive search
+    ): Promise<boolean> => {
       const targetFolder =
         targetFolderId === config.rootId ? rootFolder.value : folderMap.get(targetFolderId)
       const sourceFolder =
@@ -300,24 +521,30 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
 
       if (isFolderInside(folderToMove as any, targetFolder as any)) return false
 
-      // Remove folder from source
+      // Remove from source (reassign to trigger reactivity)
       sourceFolder.folders = sourceFolder.folders.filter((f) => f.id !== folderToMove.id) as any
 
-      // Update parent ID and add to target
+      // Update parentId and add to target (reassign to trigger reactivity)
       folderToMove.parentId = targetFolder.id
-      targetFolder.folders.push(folderToMove as any)
+      targetFolder.folders = [...targetFolder.folders, folderToMove] as any
+      triggerContentUpdate()
 
       if (!skipSave) {
-        saveRootFolder()
+        // Save to IndexedDB
+        await saveFolderDoc(folderToMove)
       }
       return true
     }
 
+    // ==========================================
+    // Clone and paste operations
+    // ==========================================
     const deepCloneFolder = (folder: Folder<TItem>, parentId: string): Folder<TItem> => {
       const newFolderId = uuidv4()
       const newItems = folder.items.map((item) => ({
         ...item,
         id: uuidv4(),
+        folderId: newFolderId,
         timestamp: Date.now(),
       }))
       const newSubFolders = folder.folders.map((subFolder) =>
@@ -334,36 +561,56 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
       }
     }
 
-    const pasteItem = (
+    const pasteItem = async (
       item: TItem | Folder<TItem>,
       targetFolderId: string,
       itemType: 'verse' | 'file' | 'folder',
     ) => {
       if (itemType === 'verse' || itemType === 'file') {
-        const newItem: TItem = { ...(item as TItem), id: uuidv4(), timestamp: Date.now() }
+        const newItem: TItem = {
+          ...(item as TItem),
+          id: uuidv4(),
+          folderId: targetFolderId,
+          timestamp: Date.now(),
+        } as TItem
+
         if (targetFolderId === config.rootId) {
-          rootFolder.value.items.push(newItem as any)
+          // Trigger reactivity by reassigning the array
+          rootFolder.value.items = [...rootFolder.value.items, newItem] as any
           itemMap.set(newItem.id, newItem)
         } else {
           updateFolderInTree(rootFolder.value.folders as any, targetFolderId, (folder) => {
-            folder.items.push(newItem as any)
+            // Trigger reactivity by reassigning the array
+            folder.items = [...folder.items, newItem] as any
             itemMap.set(newItem.id, newItem)
           })
         }
+        triggerContentUpdate()
+
+        // Save to IndexedDB
+        await saveItemDoc(newItem)
       } else {
         const newFolder = deepCloneFolder(item as Folder<TItem>, targetFolderId)
         if (targetFolderId === config.rootId) {
-          rootFolder.value.folders.push(newFolder as any)
+          // Trigger reactivity by reassigning the array
+          rootFolder.value.folders = [...rootFolder.value.folders, newFolder] as any
         } else {
           updateFolderInTree(rootFolder.value.folders as any, targetFolderId, (target) => {
-            target.folders.push(newFolder as any)
+            // Trigger reactivity by reassigning the array
+            target.folders = [...target.folders, newFolder] as any
           })
         }
         rebuildIndex()
+        triggerContentUpdate()
+
+        // Save entire folder tree to IndexedDB
+        await saveFolderTreeBatch(newFolder)
       }
-      saveRootFolder()
     }
 
+    // ==========================================
+    // Load children (for lazy loading)
+    // ==========================================
     const loadChildren = async (folderId: string) => {
       const folder = folderMap.get(folderId)
       if (!folder || folder.isLoaded) return
@@ -391,13 +638,17 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
           })
           folder.isLoaded = true
           rebuildIndex()
+          triggerContentUpdate()
         }
       } catch (error) {
         console.error(`Failed to load children for folder ${folderId}:`, error)
       }
     }
 
-    const updateFolderViewSettings = (
+    // ==========================================
+    // View settings
+    // ==========================================
+    const updateFolderViewSettings = async (
       folderId: string,
       settings: Partial<import('@/types/common').FolderViewSettings>,
     ) => {
@@ -407,7 +658,9 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
           ...folder.viewSettings,
           ...settings,
         }
-        saveRootFolder()
+
+        // Save to IndexedDB
+        await saveFolderDoc(folder)
       }
     }
 
@@ -415,7 +668,6 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
       rootFolder,
       currentFolderPath,
       loadRootFolder,
-      saveRootFolder,
       navigateToRoot,
       navigateToFolder,
       enterFolder,
@@ -444,6 +696,16 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
       cutToClipboard,
       clearClipboard,
       viewMode,
+      // Expose for external use (e.g., cleanup)
+      saveFolderDoc,
+      saveItemDoc,
+      deleteFolderDoc,
+      deleteItemDoc,
+      saveFolderTreeBatch,
+      db,
+      foldersStoreName,
+      itemsStoreName,
+      thumbnailsStoreName,
     }
   })
 }

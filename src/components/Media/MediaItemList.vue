@@ -183,6 +183,8 @@ const isFolder = (item: UnifiedItem): item is Folder<FileItem> => {
 
 // Local items for manual swap
 const localItems = ref<UnifiedItem[]>([])
+// Flag to track if a successful drop occurred (to prevent resetting localItems)
+const dropSucceeded = ref(false)
 
 const {
   handleDragStart,
@@ -344,12 +346,15 @@ const onDragEnd = (event: DragEvent) => {
   handleDragEnd()
   emit('drag-end', event)
 
-  if (draggedItems.value.size === 0) {
+  // Only reset localItems if drop didn't succeed (e.g., drag cancelled)
+  // If drop succeeded, localItems is already correct and store is updated
+  if (!dropSucceeded.value) {
     localItems.value = [...props.items]
   }
+  dropSucceeded.value = false
 }
 
-const handleMove = (event: DragEvent, target: Folder<FileItem>) => {
+const handleMove = async (event: DragEvent, target: Folder<FileItem>) => {
   const dataString = event.dataTransfer?.getData('application/json')
   if (!dataString) return
 
@@ -388,9 +393,13 @@ const handleMove = (event: DragEvent, target: Folder<FileItem>) => {
       const folderItem = props.items.find((f) => f.id === item.id) as Folder<FileItem> | undefined
       if (folderItem && isFolder(folderItem)) {
         const isLastItem = validItems.indexOf(item) === validItems.length - 1
-        if (
-          mediaStore.moveFolder(folderItem, targetId, mediaStore.currentFolder?.id, !isLastItem)
-        ) {
+        const moved = await mediaStore.moveFolder(
+          folderItem,
+          targetId,
+          mediaStore.currentFolder?.id,
+          !isLastItem,
+        )
+        if (moved) {
           moveCount++
         }
       }
@@ -402,7 +411,7 @@ const handleMove = (event: DragEvent, target: Folder<FileItem>) => {
   }
 }
 
-const onDrop = (event: DragEvent, item: UnifiedItem) => {
+const onDrop = async (event: DragEvent, item: UnifiedItem) => {
   let isNesting = false
   if (isFolder(item)) {
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
@@ -434,10 +443,12 @@ const onDrop = (event: DragEvent, item: UnifiedItem) => {
     // This updates the store with the NEW physical order derived from localItems
     // If we were in 'Date' mode, localItems is the DATE-sorted list + the drag change.
     // Saving this freezes the sort into Custom (physical) order.
-    mediaStore.reorderCurrentFolders(newFolders)
-    mediaStore.reorderCurrentItems(newFiles)
+    await mediaStore.reorderCurrentFolders(newFolders)
+    await mediaStore.reorderCurrentItems(newFiles)
     emit('sort-change', 'custom')
 
+    // Mark drop as successful to prevent onDragEnd from resetting localItems
+    dropSucceeded.value = true
     handleDrop(event, () => {})
   }
 }

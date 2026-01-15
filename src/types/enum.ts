@@ -23,7 +23,8 @@ export enum FolderDBStore {
   BIBLE_DB_SEARCH_INDEX_STORE_NAME = 'bibleSearchIndex',
   BIBLE_DB_STORE_KEY_PATH = 'version_code',
   FOLDER_DB_NAME = 'FolderDB',
-  FOLDER_DB_STRUCTURE_STORE_NAME = 'folder-structure',
+  FOLDER_DB_FOLDERS_STORE_NAME = 'folders',
+  FOLDER_DB_ITEMS_STORE_NAME = 'items',
   FOLDER_DB_THUMBNAILS_STORE_NAME = 'thumbnails',
   FOLDER_DB_STORE_KEY_PATH = 'id',
 }

@@ -245,9 +245,15 @@ export function useMediaOperations(
       }
 
       try {
+        const currentPath = currentFolderPath.value
+        const lastPathItem = currentPath[currentPath.length - 1]
+        const parentFolderId: string =
+          currentPath.length > 0 && lastPathItem ? lastPathItem : MediaFolder.ROOT_ID
+
         const newItem: FileItem = {
           id: uuidv4(),
           type: 'file',
+          folderId: parentFolderId,
           name: getUniqueName(file.name, 'file'),
           url: URL.createObjectURL(file), // Default to blob URL for web
           size: file.size,
@@ -272,14 +278,14 @@ export function useMediaOperations(
                   const blob = new Blob([result.data.thumbnailData.buffer as ArrayBuffer], {
                     type: 'image/jpeg',
                   })
-                  const blobId = uuidv4()
+                  // Use FileItem.id as thumbnail id (1:1 relationship)
                   await db.put(FolderDBStore.FOLDER_DB_THUMBNAILS_STORE_NAME, {
-                    id: blobId,
+                    id: newItem.id,
                     blob,
-                    itemId: newItem.id,
+                    createdAt: Date.now(),
                   })
                   newItem.metadata.thumbnailType = 'blob'
-                  newItem.metadata.thumbnailBlobId = blobId
+                  newItem.metadata.thumbnailBlobId = newItem.id
                 }
               }
             }
@@ -332,6 +338,7 @@ export function useMediaOperations(
         const newItem: FileItem = {
           id: uuidv4(),
           type: 'file',
+          folderId: createdFolder.id,
           name: file.name,
           url: URL.createObjectURL(file), // Will be updated if Electron saves it
           size: file.size,
@@ -352,14 +359,14 @@ export function useMediaOperations(
                   const blob = new Blob([result.data.thumbnailData.buffer as ArrayBuffer], {
                     type: 'image/jpeg',
                   })
-                  const blobId = uuidv4()
+                  // Use FileItem.id as thumbnail id (1:1 relationship)
                   await db.put(FolderDBStore.FOLDER_DB_THUMBNAILS_STORE_NAME, {
-                    id: blobId,
+                    id: newItem.id,
                     blob,
-                    itemId: newItem.id,
+                    createdAt: Date.now(),
                   })
                   newItem.metadata.thumbnailType = 'blob'
-                  newItem.metadata.thumbnailBlobId = blobId
+                  newItem.metadata.thumbnailBlobId = newItem.id
                 }
               }
             }
@@ -576,27 +583,28 @@ export function useMediaOperations(
   }
 
   // ... Thumbnail duplication ...
+  // Copies thumbnail from original FileItem.id to new FileItem.id
   const duplicateThumbnailBlob = async (
-    thumbnailBlobId: string,
+    originalItemId: string,
     newItemId: string,
-  ): Promise<string | null> => {
+  ): Promise<boolean> => {
     try {
-      const originalThumbnail = await db.get<{ id: string; blob: Blob; itemId: string }>(
+      const originalThumbnail = await db.get<{ id: string; blob: Blob; createdAt?: number }>(
         FolderDBStore.FOLDER_DB_THUMBNAILS_STORE_NAME,
-        thumbnailBlobId,
+        originalItemId,
       )
-      if (!originalThumbnail || !originalThumbnail.blob) return null
+      if (!originalThumbnail || !originalThumbnail.blob) return false
 
-      const newBlobId = uuidv4()
+      // New thumbnail uses newItemId as its id (1:1 relationship)
       await db.put(FolderDBStore.FOLDER_DB_THUMBNAILS_STORE_NAME, {
-        id: newBlobId,
+        id: newItemId,
         blob: originalThumbnail.blob,
-        itemId: newItemId,
+        createdAt: Date.now(),
       })
-      return newBlobId
+      return true
     } catch (error) {
       console.warn('Failed to duplicate thumbnail blob:', error)
-      return null
+      return false
     }
   }
 
@@ -636,12 +644,10 @@ export function useMediaOperations(
           ...fileItem.metadata,
           thumbnailUrl: fileItem.metadata.thumbnailUrl,
         }
+        // Duplicate thumbnail: original FileItem.id -> new FileItem.id
         if (fileItem.metadata.thumbnailBlobId) {
-          const newBlobId = await duplicateThumbnailBlob(
-            fileItem.metadata.thumbnailBlobId,
-            newItemId,
-          )
-          if (newBlobId) newMetadata.thumbnailBlobId = newBlobId
+          const success = await duplicateThumbnailBlob(fileItem.id, newItemId)
+          if (success) newMetadata.thumbnailBlobId = newItemId
         }
         return {
           ...fileItem,

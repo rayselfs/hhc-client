@@ -448,6 +448,7 @@ const createMultiFunctionVerse = (verseNumber: number): VerseItem | null => {
   return {
     id: crypto.randomUUID(),
     type: 'verse',
+    folderId: BibleFolder.ROOT_ID,
     bookAbbreviation: currentPassage.value.bookAbbreviation,
     bookNumber: currentPassage.value.bookNumber,
     chapter: currentPassage.value.chapter,

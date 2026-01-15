@@ -13,6 +13,7 @@ export interface FolderManagerOptions<TItem extends FolderItem = FolderItem> {
   maxDepth?: number // Maximum folder depth (optional)
   folderMap?: Map<string, Folder<TItem>> // Optional flat index map
   itemMap?: Map<string, TItem> // Optional flat index map
+  contentVersion?: Ref<number> // Version counter to trigger reactivity on content changes
 }
 
 /**
@@ -86,6 +87,11 @@ export function useFolderManager<TItem extends FolderItem = FolderItem>(
    * Returns subfolders if inside a folder, or all folders if at root
    */
   const getCurrentFolders = computed((): Folder<TItem>[] => {
+    // Access contentVersion to establish dependency for reactivity
+    if (options.contentVersion) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+      options.contentVersion.value
+    }
     const folder = currentFolder.value
     return folder.folders
   })
@@ -95,6 +101,11 @@ export function useFolderManager<TItem extends FolderItem = FolderItem>(
    * Returns folder items (root.items when at root, or folder.items when inside a folder)
    */
   const getCurrentItems = computed((): TItem[] => {
+    // Access contentVersion to establish dependency for reactivity
+    if (options.contentVersion) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+      options.contentVersion.value
+    }
     const folder = currentFolder.value
     return folder.items
   })

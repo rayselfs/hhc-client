@@ -178,6 +178,7 @@ export class LocalProvider implements FileSystemProvider {
             name: entry.name,
             url: this.buildUrl(entry.path),
             type: 'file',
+            folderId: path, // Parent folder path as folderId
             timestamp: entry.modifiedAt,
             size: entry.size,
             sourceType: this.type,

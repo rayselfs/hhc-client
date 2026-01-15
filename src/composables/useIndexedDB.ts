@@ -314,6 +314,98 @@ export function useIndexedDB(config: IndexedDBConfig) {
     }
   }
 
+  /**
+   * Batch put multiple items into a store
+   * @param storeName - Object store name
+   * @param items - Array of items to put
+   */
+  const putBatch = async <T = unknown>(storeName: string, items: T[]): Promise<void> => {
+    if (items.length === 0) return
+
+    try {
+      const db = await initDB()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const tx = (db as any).transaction(storeName, 'readwrite')
+      const store = tx.objectStore(storeName)
+
+      for (const item of items) {
+        store.put(item)
+      }
+
+      await tx.done
+    } catch (error) {
+      reportError(error, {
+        operation: 'putbatch-indexeddb',
+        component: 'useIndexedDB',
+        extra: { storeName, count: items.length },
+      })
+      throw error
+    }
+  }
+
+  /**
+   * Batch delete multiple items from a store
+   * @param storeName - Object store name
+   * @param keys - Array of keys to delete
+   */
+  const deleteBatch = async (storeName: string, keys: unknown[]): Promise<void> => {
+    if (keys.length === 0) return
+
+    try {
+      const db = await initDB()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const tx = (db as any).transaction(storeName, 'readwrite')
+      const store = tx.objectStore(storeName)
+
+      for (const key of keys) {
+        store.delete(key)
+      }
+
+      await tx.done
+    } catch (error) {
+      reportError(error, {
+        operation: 'deletebatch-indexeddb',
+        component: 'useIndexedDB',
+        extra: { storeName, count: keys.length },
+      })
+      throw error
+    }
+  }
+
+  /**
+   * Execute a transaction across multiple stores
+   * @param storeNames - Array of store names to include in transaction
+   * @param mode - Transaction mode ('readonly' or 'readwrite')
+   * @param callback - Function to execute within transaction
+   */
+  const transaction = async <T = void>(
+    storeNames: string[],
+    mode: IDBTransactionMode,
+    callback: (stores: Record<string, IDBObjectStore>) => Promise<T>,
+  ): Promise<T> => {
+    try {
+      const db = await initDB()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const tx = (db as any).transaction(storeNames, mode)
+
+      const stores: Record<string, IDBObjectStore> = {}
+      for (const name of storeNames) {
+        stores[name] = tx.objectStore(name)
+      }
+
+      const result = await callback(stores)
+      await tx.done
+      return result
+    } catch (error) {
+      reportError(error, {
+        operation: 'transaction-indexeddb',
+        component: 'useIndexedDB',
+        extra: { storeNames, mode },
+      })
+      throw error
+    }
+  }
+
   return {
     initDB,
     get,
@@ -326,5 +418,8 @@ export function useIndexedDB(config: IndexedDBConfig) {
     has,
     getByIndex,
     close,
+    putBatch,
+    deleteBatch,
+    transaction,
   }
 }

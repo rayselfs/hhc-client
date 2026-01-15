@@ -375,6 +375,7 @@ export interface FolderItem {
   type: 'verse' | 'file' // Type discriminator for Discriminated Union
   timestamp: number // Timestamp when the item was created or last modified
   expiresAt?: number | null // Timestamp when the item should be deleted, null or undefined for permanent
+  sortIndex?: number // Custom sort order index (for user-defined ordering)
   // Provider-related fields
   sourceType?: FileSourceType // Source type (local, cloud, sync)
   permissions?: ItemPermissions // Permission flags for operations
@@ -403,6 +404,7 @@ export interface FileMetadata {
  */
 export interface FileItem extends FolderItem {
   type: 'file'
+  folderId: string // Parent folder ID for IndexedDB relationship
   name: string
   url: string
   size: number // File size in bytes
@@ -421,6 +423,7 @@ export interface FileItem extends FolderItem {
  */
 export interface VerseItem extends FolderItem {
   type: 'verse'
+  folderId: string // Parent folder ID for IndexedDB relationship
   bookAbbreviation: string
   bookNumber: number
   chapter: number
@@ -456,6 +459,7 @@ export interface Folder<TItem extends FolderItem = FolderItem> {
   parentId?: string
   timestamp: number
   expiresAt?: number | null // Timestamp when the folder should be deleted, null for permanent
+  sortIndex?: number // Custom sort order index (for user-defined ordering)
   // Provider-related fields
   sourceType?: FileSourceType // Source type (local, cloud, sync)
   permissions?: ItemPermissions // Permission flags for operations
@@ -482,4 +486,39 @@ export interface FolderStoreConfig {
   rootId: string
   defaultRootName: string
   storageCategory: StorageCategory
+}
+
+/**
+ * Folder document for IndexedDB storage (flattened, no nested items/folders)
+ */
+export interface FolderDocument {
+  id: string
+  name: string
+  parentId: string | null // null = root folder
+  expanded?: boolean
+  timestamp: number
+  expiresAt?: number | null
+  sortIndex?: number // Custom sort order index (for user-defined ordering)
+  sourceType?: FileSourceType
+  permissions?: ItemPermissions
+  viewSettings?: FolderViewSettings
+  // Cloud/Sync provider fields (for future use)
+  cloudId?: string
+  syncPath?: string
+  isLoaded?: boolean
+}
+
+/**
+ * Item document union type for IndexedDB storage
+ */
+export type ItemDocument = FileItem | VerseItem
+
+/**
+ * Thumbnail document for IndexedDB storage
+ * id = FileItem.id (1:1 relationship)
+ */
+export interface ThumbnailDocument {
+  id: string // = FileItem.id
+  blob: Blob
+  createdAt?: number
 }
