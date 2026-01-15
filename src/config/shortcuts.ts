@@ -27,7 +27,7 @@ export const KEYBOARD_SHORTCUTS = {
     ENTER: { key: 'Enter' },
   },
   TIMER: {
-    TOGGLE: { code: 'Space' }, // Use code for physical key location if needed, or key ' '
+    TOGGLE: { code: 'Space' },
     RESET: { code: 'KeyR' },
   },
   BIBLE: {
@@ -36,5 +36,10 @@ export const KEYBOARD_SHORTCUTS = {
     PREV_CHAPTER: { code: 'ArrowLeft' },
     NEXT_CHAPTER: { code: 'ArrowRight' },
     OPEN_BOOK_DIALOG: { code: 'KeyG' },
+  },
+  SELECTION: {
+    MULTI_SELECT: { metaOrCtrl: true },
+    RANGE_SELECT: { shift: true },
+    RANGE_ADD: { shift: true, metaOrCtrl: true },
   },
 } as const

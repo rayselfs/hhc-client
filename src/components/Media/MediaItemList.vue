@@ -133,6 +133,9 @@ import { useDragSelection } from '@/composables/useDragSelection'
 import ContextMenu from '@/components/ContextMenu.vue'
 import MediaItemContextMenu from './MediaItemContextMenu.vue'
 import MediaBackgroundMenu from './MediaBackgroundMenu.vue'
+import { useSelectionModifiers } from '@/composables/useSelectionModifiers'
+
+const { getSelectionMode } = useSelectionModifiers()
 
 type UnifiedItem = FileItem | Folder<FileItem>
 
@@ -222,42 +225,47 @@ const useVirtualScroll = computed(() => {
 const lastSelectedId = ref<string | null>(null)
 
 const handleSelection = (id: string, event: MouseEvent) => {
-  const isMultiSelect = event.ctrlKey || event.metaKey
-  const isShiftSelect = event.shiftKey
-
+  const mode = getSelectionMode(event)
   const newSelection = new Set(props.selectedItems)
 
-  if (isShiftSelect && lastSelectedId.value) {
-    const allIds = props.items.map((i) => i.id)
-    const start = allIds.indexOf(lastSelectedId.value)
-    const end = allIds.indexOf(id)
+  switch (mode) {
+    case 'range':
+    case 'range-add':
+      if (lastSelectedId.value) {
+        const allIds = props.items.map((i) => i.id)
+        const start = allIds.indexOf(lastSelectedId.value)
+        const end = allIds.indexOf(id)
 
-    if (start !== -1 && end !== -1) {
-      const [lower, upper] = [Math.min(start, end), Math.max(start, end)]
-      const rangeIds = allIds.slice(lower, upper + 1)
+        if (start !== -1 && end !== -1) {
+          const [lower, upper] = [Math.min(start, end), Math.max(start, end)]
+          const rangeIds = allIds.slice(lower, upper + 1)
 
-      if (!isMultiSelect) {
-        newSelection.clear()
+          if (mode === 'range') {
+            newSelection.clear()
+          }
+          rangeIds.forEach((rid) => newSelection.add(rid))
+        }
       }
+      break
 
-      rangeIds.forEach((rid) => newSelection.add(rid))
-    }
-  } else if (isMultiSelect) {
-    if (newSelection.has(id)) {
-      newSelection.delete(id)
-    } else {
+    case 'multi':
+      if (newSelection.has(id)) {
+        newSelection.delete(id)
+      } else {
+        newSelection.add(id)
+        lastSelectedId.value = id
+      }
+      break
+
+    case 'single':
+    default:
+      if (newSelection.size === 1 && newSelection.has(id)) {
+        return // 已經是單選該項目
+      }
+      newSelection.clear()
       newSelection.add(id)
       lastSelectedId.value = id
-    }
-  } else {
-    // Single click
-    if (newSelection.size === 1 && newSelection.has(id)) {
-      // already selected singly
-      return
-    }
-    newSelection.clear()
-    newSelection.add(id)
-    lastSelectedId.value = id
+      break
   }
 
   emit('update:selected-items', newSelection)
