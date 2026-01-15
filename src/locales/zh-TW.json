@@ -26,7 +26,8 @@
     "selectedItems": "已選取 {count} 個項目",
     "view": "檢視",
     "sort": "排序",
-    "export": "匯出"
+    "export": "匯出",
+    "folderIsEmpty": "資料夾為空"
   },
   "extendedToolbar": {
     "openProjection": "開啟投影",

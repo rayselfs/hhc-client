@@ -184,6 +184,9 @@ import DeleteConfirmDialog from '@/components/Shared/DeleteConfirmDialog.vue'
 import { useFolderDialogs } from '@/composables/useFolderDialogs'
 import { BIBLE_CONFIG } from '@/config/app'
 import { BibleFolder } from '@/types/enum'
+import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
+import { KEYBOARD_SHORTCUTS } from '@/config/shortcuts'
+import { showSnackBar } from '@/composables/useSnackBar'
 
 const { t: $t } = useI18n()
 
@@ -314,6 +317,8 @@ const handleExport = async () => {
               name: folder.name,
               verses: folderVerses,
             })
+          } else {
+            showSnackBar($t('common.folderIsEmpty'), 'warning')
           }
         }
       }
@@ -447,9 +452,6 @@ const selectedItem = ref<{
   type: 'verse' | 'folder' | 'history'
   item: VerseItem | Folder<VerseItem>
 } | null>(null)
-
-import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
-import { KEYBOARD_SHORTCUTS } from '@/config/shortcuts'
 
 // Move related state (Derived from folderDialogs)
 const moveItemType = computed(() => {

@@ -26,7 +26,8 @@
     "selectedItems": "已选中 {count} 个项目",
     "view": "视图",
     "sort": "排序",
-    "export": "导出"
+    "export": "导出",
+    "folderIsEmpty": "文件夹为空"
   },
   "extendedToolbar": {
     "openProjection": "开启投影",

@@ -26,7 +26,8 @@
     "selectedItems": "{count} items selected",
     "view": "View",
     "sort": "Sort",
-    "export": "Export"
+    "export": "Export",
+    "folderIsEmpty": "Folder is empty"
   },
   "extendedToolbar": {
     "openProjection": "Open Projection",
