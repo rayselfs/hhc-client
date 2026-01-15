@@ -10,7 +10,7 @@
             <v-icon size="x-large">mdi-folder</v-icon>
           </v-btn>
         </v-btn-toggle>
-        <!-- 資料夾路徑導航 -->
+        <!-- Folder Breadcrumbs -->
         <div v-if="multiFunctionTab === 'custom'" class="ml-3">
           <FolderBreadcrumbs
             :items="breadcrumbItems"
@@ -73,6 +73,7 @@
         @right-click="
           (event: MouseEvent, item: VerseItem) => handleRightClick(event, 'history', item)
         "
+        ref="historyTabRef"
       />
 
       <!-- Custom Page -->
@@ -88,6 +89,7 @@
         @right-click="handleRightClick"
         @paste="pasteItemHandler"
         @selection-change="handleSelectionChange"
+        ref="customFolderTabRef"
       />
     </v-card-text>
 
@@ -237,10 +239,16 @@ const {
 const multiFunctionTab = ref('history')
 const folderDialogs = useFolderDialogs<VerseItem>()
 const customSelectedItems = ref<Set<string>>(new Set())
+const activeTabSelection = ref<Set<string>>(new Set())
 
 const handleSelectionChange = (selection: Set<string>) => {
+  activeTabSelection.value = selection
+  // Also sync custom specific logic (ensure export still works with customSelectedItems)
   customSelectedItems.value = selection
 }
+
+const customFolderTabRef = ref<InstanceType<typeof CustomFolderTab> | null>(null)
+const historyTabRef = ref<InstanceType<typeof HistoryTab> | null>(null)
 
 // Export Disable Logic
 const isExportDisabled = computed(() => {
@@ -423,14 +431,14 @@ const moveBreadcrumbItems = computed(() => {
   return folderDialogs.moveBreadcrumb.value
 })
 
-// 監聽頁面切換，切換到 custom 時重置到 root
+// Watch tab change, reset to root when switching to custom
 watch(multiFunctionTab, (newTab) => {
   if (newTab === 'custom') {
     navigateToRoot()
   }
 })
 
-// 右鍵選單相關
+// Context Menu State
 const showItemContextMenu = ref(false)
 const showBackgroundContextMenu = ref(false)
 const menuPosition = ref<[number, number] | undefined>(undefined)
@@ -443,7 +451,7 @@ const selectedItem = ref<{
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { KEYBOARD_SHORTCUTS } from '@/config/shortcuts'
 
-// 移動相關狀態 (Derived from folderDialogs)
+// Move related state (Derived from folderDialogs)
 const moveItemType = computed(() => {
   if (folderDialogs.folderToMove.value) return 'folder'
   if (folderDialogs.itemToMove.value) return 'verse'
@@ -454,7 +462,7 @@ const loadVerse = (item: VerseItem, type: 'history' | 'custom') => {
   emit('load-verse', item, type)
 }
 
-// 自訂資料夾相關函數
+// Custom Folder Functions
 const createNewFolder = () => {
   const baseName = $t('fileExplorer.defaultFolderName')
   let newName = baseName
@@ -562,13 +570,44 @@ const removeFromCurrentFolder = (itemId: string) => {
   removeItemFromCurrent(itemId)
 }
 
-// 處理拖放到資料夾
-const handleDropToFolder = (data: DragData<VerseItem>, targetFolder: Folder<VerseItem>) => {
+// Handle drag and drop to folder
+const handleDropToFolder = async (data: DragData<VerseItem>, targetFolder: Folder<VerseItem>) => {
   const item = data.items[0]
-  if (data.type === 'verse' && isVerseItem(item)) {
-    moveVerseToFolder(item as VerseItem, targetFolder)
-  } else if (data.type === 'folder' && isFolder(item)) {
-    moveFolderToFolder(item as Folder<VerseItem>, targetFolder)
+
+  // Check if we are dragging a selected item
+  const isMultiSelect =
+    item && activeTabSelection.value.has(item.id) && activeTabSelection.value.size > 0
+
+  if (isMultiSelect) {
+    // Batch Move
+    const sourceFolderId =
+      currentFolder.value.id === BibleFolder.ROOT_ID ? BibleFolder.ROOT_ID : currentFolder.value.id
+    const promises: Promise<void | boolean>[] = []
+
+    for (const id of activeTabSelection.value) {
+      // Check if it's a folder
+      const folder = getFolderById(id)
+      if (folder) {
+        if (!isFolderInside(folder, targetFolder)) {
+          promises.push(moveFolderAction(folder, targetFolder.id, sourceFolderId))
+        }
+      } else {
+        // Assume verse
+        const verse = getCurrentVerses.value.find((v) => v.id === id)
+        if (verse) {
+          promises.push(moveItemAction(verse, targetFolder.id, sourceFolderId))
+        }
+      }
+    }
+    await Promise.all(promises)
+    activeTabSelection.value.clear()
+  } else {
+    // Single Item Move
+    if (data.type === 'verse' && isVerseItem(item)) {
+      moveVerseToFolder(item as VerseItem, targetFolder)
+    } else if (data.type === 'folder' && isFolder(item)) {
+      moveFolderToFolder(item as Folder<VerseItem>, targetFolder)
+    }
   }
 }
 
@@ -594,7 +633,7 @@ const showMoveDialog = (item: VerseItem) => {
   folderDialogs.moveBreadcrumb.value = [{ id: BibleFolder.ROOT_ID, name: BibleFolder.ROOT_NAME }]
 }
 
-// 移動資料夾相關函數
+// Move Folder Functions
 const showMoveFolderDialog = (item: Folder<VerseItem>) => {
   folderDialogs.openMoveDialog(item)
   // Ensure breadcrumb starts with root
@@ -621,6 +660,25 @@ const navigateMoveToFolder = (folderId: string) => {
 
 // Used by MoveFolderDialog component
 const getMoveFolders = (): Folder<VerseItem>[] => {
+  // If moving selection, we must filter out any selected folders AND their children
+  if (folderDialogs.moveSelection.value.size > 0) {
+    let targets = getMoveTargets(folderDialogs.selectedMoveFolder.value)
+    const selectedIds = folderDialogs.moveSelection.value
+
+    targets = targets.filter((target) => {
+      // 1. Target cannot be one of the selected folders
+      if (selectedIds.has(target.id)) return false
+
+      // 2. Target cannot be inside any of the selected folders
+      for (const id of selectedIds) {
+        const selectedFolder = getFolderById(id)
+        if (selectedFolder && isFolderInside(selectedFolder, target)) return false
+      }
+      return true
+    })
+    return targets
+  }
+
   const excludeFolderId =
     moveItemType.value === 'folder' && folderDialogs.folderToMove.value
       ? folderDialogs.folderToMove.value.id
@@ -638,10 +696,33 @@ const handleMoveNavigate = (id: string) => {
 
 // Check if can move to root
 const canMoveToRoot = computed(() => {
+  const isMovingSelection = folderDialogs.moveSelection.value.size > 0
+  const isInRoot = currentFolder.value.id === BibleFolder.ROOT_ID
+
+  if (isMovingSelection) {
+    // If in root, can only move to a subfolder
+    if (isInRoot) {
+      return folderDialogs.selectedMoveFolder.value !== null
+    }
+
+    // If not in root, can always move to root (target is null)
+    if (folderDialogs.selectedMoveFolder.value === null) return true
+
+    // Circular check: Prevent moving a folder into itself or its children
+    const targetFolder = folderDialogs.selectedMoveFolder.value
+    for (const id of folderDialogs.moveSelection.value) {
+      const folder = getFolderById(id)
+      if (folder && isFolderInside(folder, targetFolder)) {
+        return false
+      }
+    }
+    return true
+  }
+
+  // Single Item Logic
   if (moveItemType.value === 'verse') {
     if (!folderDialogs.itemToMove.value) return false
 
-    const isInRoot = currentFolder.value.id === BibleFolder.ROOT_ID
     if (isInRoot) {
       return folderDialogs.selectedMoveFolder.value !== null
     }
@@ -657,7 +738,6 @@ const canMoveToRoot = computed(() => {
       )
     }
 
-    const isInRoot = currentFolder.value.id === BibleFolder.ROOT_ID
     if (isInRoot) {
       return false
     }
@@ -670,35 +750,51 @@ const currentFolderDepth = computed(() => {
   return currentFolderPath.value.length - 1 // Subtract 1 for root
 })
 
-// 判斷是否達到最大深度（3層）
+// Check if max depth reached (3 levels)
 const isMaxDepthReached = computed(() => {
   return currentFolderDepth.value >= BIBLE_CONFIG.FOLDER.MAX_DEPTH
 })
 
-const confirmMoveVerse = (targetId: string) => {
+const confirmMoveVerse = async (targetId: string) => {
   if (!canMoveToRoot.value) return
 
   const destinationId =
     targetId || folderDialogs.selectedMoveFolder.value?.id || BibleFolder.ROOT_ID
+  const sourceFolderId =
+    currentFolder.value.id === BibleFolder.ROOT_ID ? BibleFolder.ROOT_ID : currentFolder.value.id
 
-  if (moveItemType.value === 'verse') {
+  // Multi-select Move
+  if (folderDialogs.moveSelection.value.size > 0) {
+    const promises: Promise<void | boolean>[] = []
+
+    // We need to handle folders and verses.
+    // Iterating selection
+    for (const id of folderDialogs.moveSelection.value) {
+      // Check if it's a folder
+      const folder = getFolderById(id)
+      if (folder) {
+        promises.push(moveFolderAction(folder, destinationId, sourceFolderId, false))
+      } else {
+        // Assume verse
+        const verse = getCurrentVerses.value.find((v) => v.id === id)
+        if (verse) {
+          promises.push(moveItemAction(verse, destinationId, sourceFolderId))
+        }
+      }
+    }
+    await Promise.all(promises)
+  } else if (moveItemType.value === 'verse') {
     if (!folderDialogs.itemToMove.value) return
-
-    const sourceFolderId =
-      currentFolder.value.id === BibleFolder.ROOT_ID ? BibleFolder.ROOT_ID : currentFolder.value.id
 
     // Call store action - direct mutation
     // We need to cast itemToMove to VerseItem because openMoveDialog is generic
-    moveItemAction(folderDialogs.itemToMove.value as VerseItem, destinationId, sourceFolderId)
+    await moveItemAction(folderDialogs.itemToMove.value as VerseItem, destinationId, sourceFolderId)
   } else {
     // Move folder
     if (!folderDialogs.folderToMove.value) return
 
-    const sourceFolderId =
-      currentFolder.value.id === BibleFolder.ROOT_ID ? BibleFolder.ROOT_ID : currentFolder.value.id
-
     // Call store action - direct mutation
-    moveFolderAction(folderDialogs.folderToMove.value, destinationId, sourceFolderId)
+    await moveFolderAction(folderDialogs.folderToMove.value, destinationId, sourceFolderId)
   }
 
   // Cleanup state
@@ -706,10 +802,11 @@ const confirmMoveVerse = (targetId: string) => {
   folderDialogs.itemToMove.value = null
   folderDialogs.folderToMove.value = null
   folderDialogs.selectedMoveFolder.value = null
+  folderDialogs.moveSelection.value.clear()
   folderDialogs.moveBreadcrumb.value = []
 }
 
-// 右鍵選單處理函數
+// Handle Right Click
 const handleRightClick = (
   event: MouseEvent,
   type: 'verse' | 'folder' | 'history',
@@ -723,15 +820,15 @@ const handleRightClick = (
   showItemContextMenu.value = true
 }
 
-// 處理 v-card-text 的右鍵點擊
+// Handle background right click
 const handleCardTextRightClick = (event: MouseEvent) => {
-  // 如果右鍵點擊的是經文或資料夾，不處理
+  // Ignore if clicking on verse or folder item
   if ((event.target as HTMLElement).closest('.verse-item')) {
     return
   }
 
   event.preventDefault()
-  selectedItem.value = null // 清空選中的項目
+  selectedItem.value = null // Clear selection
   menuPosition.value = [event.clientX, event.clientY]
   showItemContextMenu.value = false
   showBackgroundContextMenu.value = true
@@ -744,21 +841,39 @@ const closeItemContextMenu = () => {
 }
 
 const copyItem = () => {
-  if (selectedItem.value) {
-    const item = selectedItem.value.item
-    const type = selectedItem.value.type === 'folder' ? 'folder' : 'verse'
-    const sourceFolderId =
-      selectedItem.value.type === 'history' ? BibleFolder.ROOT_ID : currentFolder.value.id
+  if (!selectedItem.value) return
 
-    copyToClipboard([
-      {
-        type: type,
-        data: item,
-        action: 'copy',
-        sourceFolderId,
-      },
-    ])
+  const isSelected = activeTabSelection.value.has(selectedItem.value.item.id)
+  if (isSelected) {
+    if (multiFunctionTab.value === 'custom' && customFolderTabRef.value) {
+      customFolderTabRef.value.copySelectedItems()
+      closeItemContextMenu()
+      return
+    } else if (multiFunctionTab.value === 'history' && historyTabRef.value) {
+      historyTabRef.value.copySelectedItems()
+      closeItemContextMenu()
+      return
+    }
   }
+
+  // Fallback to single item copy
+  const item = selectedItem.value.item
+
+  // Custom/History Single Item
+  const type = isFolder(item) ? 'folder' : 'verse'
+  const sourceFolderId =
+    selectedItem.value.type === 'history'
+      ? BibleFolder.ROOT_ID
+      : currentFolder.value?.id || BibleFolder.ROOT_ID
+
+  copyToClipboard([
+    {
+      type: type,
+      data: item,
+      action: 'copy',
+      sourceFolderId,
+    },
+  ])
   closeItemContextMenu()
 }
 
@@ -826,11 +941,25 @@ const showMoveItemDialog = () => {
   if (!selectedItem.value || selectedItem.value.type === 'history') return
 
   if (selectedItem.value.type === 'verse' && isVerseItem(selectedItem.value.item)) {
-    // 使用現有的移動功能
-    showMoveDialog(selectedItem.value.item)
+    // Check for multi-select
+    if (
+      activeTabSelection.value.has(selectedItem.value.item.id) &&
+      activeTabSelection.value.size > 0
+    ) {
+      folderDialogs.openMoveSelectedDialog(activeTabSelection.value)
+    } else {
+      showMoveDialog(selectedItem.value.item)
+    }
   } else if (selectedItem.value.type === 'folder' && isFolder(selectedItem.value.item)) {
-    // 資料夾移動功能
-    showMoveFolderDialog(selectedItem.value.item)
+    // Check for multi-select
+    if (
+      activeTabSelection.value.has(selectedItem.value.item.id) &&
+      activeTabSelection.value.size > 0
+    ) {
+      folderDialogs.openMoveSelectedDialog(activeTabSelection.value)
+    } else {
+      showMoveFolderDialog(selectedItem.value.item)
+    }
   }
   closeItemContextMenu()
 }
@@ -838,12 +967,28 @@ const showMoveItemDialog = () => {
 const deleteItem = () => {
   if (!selectedItem.value) return
 
+  // Check selection
+  const isSelected = activeTabSelection.value.has(selectedItem.value.item.id)
+
+  if (isSelected) {
+    // Delegate to child
+    if (multiFunctionTab.value === 'custom' && customFolderTabRef.value) {
+      customFolderTabRef.value.deleteSelectedItems()
+      closeItemContextMenu()
+      return
+    } else if (multiFunctionTab.value === 'history' && historyTabRef.value) {
+      historyTabRef.value.deleteSelectedItems()
+      closeItemContextMenu()
+      return
+    }
+  }
+
   if (selectedItem.value.type === 'verse' && isVerseItem(selectedItem.value.item)) {
     removeFromCurrentFolder(selectedItem.value.item.id)
   } else if (selectedItem.value.type === 'folder' && isFolder(selectedItem.value.item)) {
     showDeleteFolderDialog(selectedItem.value.item.id)
   } else if (selectedItem.value.type === 'history' && isVerseItem(selectedItem.value.item)) {
-    // 刪除歷史項目
+    // Delete history item
     bibleStore.removeHistoryItem(selectedItem.value.item.id)
   }
   closeItemContextMenu()

@@ -248,6 +248,12 @@ const deleteSelectedItems = () => {
   })
 }
 
+defineExpose({
+  copySelectedItems,
+  cutSelectedItems,
+  deleteSelectedItems,
+})
+
 const containerRef = ref<HTMLElement | null>(null)
 
 onClickOutside(

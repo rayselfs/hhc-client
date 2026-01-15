@@ -142,6 +142,11 @@ const deleteSelectedItems = () => {
   selectedItems.value.clear()
 }
 
+defineExpose({
+  copySelectedItems,
+  deleteSelectedItems,
+})
+
 // Keyboard Shortcuts
 useKeyboardShortcuts([
   {
