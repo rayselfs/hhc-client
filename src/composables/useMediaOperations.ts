@@ -10,18 +10,19 @@ import type { UseFolderDialogsReturn } from './useFolderDialogs'
 import type { Folder, FileItem, ClipboardItem, SortBy, SortOrder } from '@/types/common'
 import { FolderDBStore, MediaFolder } from '@/types/enum'
 import { DEFAULT_LOCAL_PERMISSIONS } from '@/services/filesystem'
+import { useSnackBar } from './useSnackBar'
 
 type MediaStore = ReturnType<typeof useMediaFolderStore>
 
 export function useMediaOperations(
   mediaStore: MediaStore,
   dialogs: UseFolderDialogsReturn<FileItem>,
-  selectedItems: { value: Set<string>; clear: () => void }, // Pass ref-like object or just the ref
-  showSnackBar: (message: string, color?: string, timeout?: number, location?: string) => void,
+  selectedItems: { value: Set<string>; clear: () => void },
 ) {
   const { t } = useI18n()
   const fileSystem = useFileSystem()
   const db = useIndexedDB(FOLDER_DB_CONFIG)
+  const { showSnackBar } = useSnackBar()
   const {
     currentFolderPath,
     getCurrentFolders: currentFolders,
@@ -36,15 +37,12 @@ export function useMediaOperations(
     copyToClipboard,
     cutToClipboard,
     clearClipboard,
+    hasClipboardItems,
   } = mediaStore
 
   // ==========================================
   // 1. Sorting Logic
   // ==========================================
-  // ==========================================
-  // 1. Sorting Logic
-  // ==========================================
-  // Persistence is now per-folder via mediaStore.updateFolderViewSettings
   const sortBy = ref<SortBy>('name')
   const sortOrder = ref<SortOrder>('asc')
 
@@ -293,13 +291,17 @@ export function useMediaOperations(
             console.error('Failed to save file in Electron:', error)
           }
         } else {
-          showSnackBar(t('fileExplorer.uploadWebWarning'), 'warning', 5000)
+          showSnackBar(t('fileExplorer.uploadWebWarning'), {
+            color: 'warning',
+          })
         }
 
         mediaStore.addItemToCurrent(newItem)
       } catch (error) {
         console.error('Failed to process file:', file.name, error)
-        showSnackBar(t('fileExplorer.uploadFailed'), 'error')
+        showSnackBar(t('fileExplorer.uploadFailed'), {
+          color: 'error',
+        })
       }
     }
     input.value = ''
@@ -543,7 +545,6 @@ export function useMediaOperations(
     })
     copyToClipboard(items)
     selectedItems.clear()
-    showSnackBar(t('fileExplorer.clipboardCopied'), 'info', 3000, 'bottom left')
   }
 
   const handleCut = () => {
@@ -579,7 +580,6 @@ export function useMediaOperations(
     })
     cutToClipboard(items)
     selectedItems.clear()
-    showSnackBar(t('fileExplorer.clipboardCut'), 'info', 2000, 'bottom left')
   }
 
   // ... Thumbnail duplication ...
@@ -672,9 +672,12 @@ export function useMediaOperations(
     for (const clipboardItem of clipboard.value) {
       if (clipboardItem.action === 'copy') {
         const type = clipboardItem.type === 'file' ? 'file' : 'folder'
-        const uniqueName = getUniqueName(clipboardItem.data.name, type)
+        const itemData = clipboardItem.data as FileItem | Folder<FileItem>
+        const uniqueName = getUniqueName(itemData.name, type)
 
-        const itemToPaste = await duplicatePhysicalFiles(clipboardItem.data)
+        const itemToPaste = await duplicatePhysicalFiles(
+          clipboardItem.data as FileItem | Folder<FileItem>,
+        )
         if (itemToPaste) {
           itemToPaste.name = uniqueName
           pasteItem(itemToPaste, targetFolderId, clipboardItem.type === 'file' ? 'file' : 'folder')
@@ -682,12 +685,16 @@ export function useMediaOperations(
       } else if (clipboardItem.action === 'cut') {
         const type = clipboardItem.type === 'file' ? 'file' : 'folder'
         if (clipboardItem.sourceFolderId !== targetFolderId) {
-          const uniqueName = getUniqueName(clipboardItem.data.name, type)
-          if (uniqueName !== clipboardItem.data.name) {
+          // Cast data to specific type to access 'name' and 'id'
+          // FolderItem has 'name' and 'id', but TS might be confused by the generic or union
+          const itemData = clipboardItem.data as FileItem | Folder<FileItem>
+          const uniqueName = getUniqueName(itemData.name, type)
+
+          if (uniqueName !== itemData.name) {
             if (type === 'folder') {
-              mediaStore.updateFolder(clipboardItem.data.id, { name: uniqueName })
+              mediaStore.updateFolder(itemData.id, { name: uniqueName })
             } else {
-              mediaStore.updateItem(clipboardItem.data.id, clipboardItem.sourceFolderId, {
+              mediaStore.updateItem(itemData.id, clipboardItem.sourceFolderId, {
                 name: uniqueName,
               })
             }
@@ -714,13 +721,16 @@ export function useMediaOperations(
   }
 
   const handlePasteIntoFolder = async (targetFolderId: string) => {
-    if (clipboard.value.length === 0) return
+    if (!hasClipboardItems()) return
 
     for (const clipboardItem of clipboard.value) {
       if (clipboardItem.action === 'copy') {
         const type = clipboardItem.type === 'file' ? 'file' : 'folder'
-        const uniqueName = getUniqueName(clipboardItem.data.name, type)
-        const itemToPaste = await duplicatePhysicalFiles(clipboardItem.data)
+        const itemData = clipboardItem.data as FileItem | Folder<FileItem>
+        const uniqueName = getUniqueName(itemData.name, type)
+        const itemToPaste = await duplicatePhysicalFiles(
+          clipboardItem.data as FileItem | Folder<FileItem>,
+        )
         if (itemToPaste) {
           itemToPaste.name = uniqueName
           pasteItem(itemToPaste, targetFolderId, clipboardItem.type === 'file' ? 'file' : 'folder')
@@ -741,7 +751,7 @@ export function useMediaOperations(
         }
       }
     }
-    if (clipboard.value.length > 0 && clipboard.value[0]?.action === 'cut') {
+    if (!hasClipboardItems() && clipboard.value[0]?.action === 'cut') {
       clearClipboard()
     }
   }

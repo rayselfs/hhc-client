@@ -495,7 +495,9 @@ const handleMove = async (event: DragEvent, target: Folder<FileItem>) => {
   }
 
   if (moveCount > 0) {
-    showSnackBar(t('fileExplorer.moveSuccess'), 'success')
+    showSnackBar(t('fileExplorer.moveSuccess'), {
+      color: 'success',
+    })
   }
 }
 

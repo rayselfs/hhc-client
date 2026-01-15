@@ -63,12 +63,16 @@
                         >
                           <TimeInput
                             v-model="timerStore.inputMinutes"
-                            :on-error="(msg) => showSnackBar(msg, 'error', 3000)"
+                            :on-error="
+                              (msg) => showSnackBar(msg, { color: 'error', timeout: 3000 })
+                            "
                           />
                           <span class="time-separator">:</span>
                           <TimeInput
                             v-model="timerStore.inputSeconds"
-                            :on-error="(msg) => showSnackBar(msg, 'error', 3000)"
+                            :on-error="
+                              (msg) => showSnackBar(msg, { color: 'error', timeout: 3000 })
+                            "
                           />
                         </div>
                         <span v-else>{{ timerStore.formattedTime }}</span>
@@ -437,7 +441,9 @@ const handleReminderTimeChange = (value: string) => {
   }
   // Remove seconds * 60 conversion, use directly
   if (seconds >= timerStore.settings.originalDuration) {
-    showSnackBar($t('timer.reminderError'), 'warning')
+    showSnackBar($t('timer.reminderError'), {
+      color: 'warning',
+    })
     timerStore.setReminder(timerStore.settings.reminderEnabled, 0) // Reset to 0
   } else {
     timerStore.setReminder(timerStore.settings.reminderEnabled, seconds)
@@ -460,7 +466,9 @@ const overtimeMessageInput = computed({
 
 const handleOvertimeMessageBlur = () => {
   if (!overtimeMessageInput.value || overtimeMessageInput.value.trim() === '') {
-    showSnackBar($t('timer.overtimeMessageError'), 'warning')
+    showSnackBar($t('timer.overtimeMessageError'), {
+      color: 'warning',
+    })
     timerStore.setOvertimeMessage(timerStore.settings.overtimeMessageEnabled, "Time's Up!")
   }
 }

@@ -46,8 +46,48 @@ export const useDragAndDrop = <T extends FolderItem>(options: UseDragAndDropOpti
     event.dataTransfer.setData('application/json', JSON.stringify(data))
     event.dataTransfer.effectAllowed = 'move'
 
-    // We rely on native browser drag image (ghost of the element)
-    // to give the feel of "moving the item".
+    // Custom Ghost Image for Verse
+    if (type === 'verse' && itemsToDrag.length > 0) {
+      const primaryItem = itemsToDrag[0] as unknown as {
+        bookAbbreviation: string
+        chapter: number
+        verse: number
+      } // Minimal shape check or use generic constraint if possible, but T is FolderItem.
+      // VerseItem has these fields.
+      if ('bookAbbreviation' in primaryItem && 'chapter' in primaryItem && 'verse' in primaryItem) {
+        let ghostText = `${primaryItem.bookAbbreviation} ${primaryItem.chapter}:${primaryItem.verse}`
+        if (itemsToDrag.length > 1) {
+          ghostText += ` (+${itemsToDrag.length - 1})`
+        }
+
+        const ghost = document.createElement('div')
+        ghost.textContent = ghostText
+        // Chip Style
+        Object.assign(ghost.style, {
+          position: 'absolute',
+          top: '-1000px',
+          left: '-1000px',
+          backgroundColor: 'rgb(var(--v-theme-surface-variant))', // Vuetify surface-variant or just #333
+          color: 'white',
+          padding: '4px 12px',
+          borderRadius: '16px',
+          fontSize: '14px',
+          fontWeight: '500',
+          whiteSpace: 'nowrap',
+          zIndex: '9999',
+          boxShadow: '0 2px 5px rgba(0,0,0,0.2)',
+          pointerEvents: 'none',
+        })
+
+        document.body.appendChild(ghost)
+        event.dataTransfer.setDragImage(ghost, 0, 0)
+
+        // Cleanup after a short delay (browser takes snapshot immediately)
+        requestAnimationFrame(() => {
+          document.body.removeChild(ghost)
+        })
+      }
+    }
   }
 
   /**

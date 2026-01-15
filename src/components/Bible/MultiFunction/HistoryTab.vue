@@ -1,5 +1,10 @@
 <template>
-  <div class="history-content" style="height: 100%">
+  <div
+    ref="containerRef"
+    class="history-content"
+    style="height: 100%"
+    @click="handleBackgroundClick"
+  >
     <div v-if="historyVerses.length === 0" class="text-center pa-4 text-grey">
       {{ $t('bible.noHistory') }}
     </div>
@@ -12,7 +17,12 @@
       <template #default="{ item }">
         <div
           class="verse-item pa-3 d-flex align-center justify-space-between"
-          @click="handleLoadVerse(item)"
+          :class="{
+            selected: isSelected(item.id),
+            focused: isFocused(item.id),
+          }"
+          @click.stop="handleItemClick(item.id, $event)"
+          @dblclick="handleLoadVerse(item)"
           @contextmenu="handleRightClick($event, item)"
         >
           <div>
@@ -39,8 +49,13 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
+import { onClickOutside } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
-import type { VerseItem } from '@/types/common'
+import type { VerseItem, ClipboardItem } from '@/types/common'
+import { useSelectionManager } from '@/composables/useSelectionManager'
+import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
+import { KEYBOARD_SHORTCUTS } from '@/config/shortcuts'
 
 interface Props {
   historyVerses: VerseItem[]
@@ -53,9 +68,91 @@ interface Emits {
   (e: 'right-click', event: MouseEvent, item: VerseItem): void
 }
 
-defineProps<Props>()
+const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 const { t: $t } = useI18n()
+
+import { useBibleFolderStore } from '@/stores/folder'
+const folderStore = useBibleFolderStore()
+const { copyToClipboard } = folderStore
+
+const { selectedItems, focusedId, handleItemClick: handleSelectionClick } = useSelectionManager()
+
+const containerRef = ref<HTMLElement | null>(null)
+
+onClickOutside(
+  containerRef,
+  () => {
+    selectedItems.value.clear()
+    focusedId.value = null
+  },
+  {
+    ignore: ['.v-overlay-container', '.v-menu__content'],
+  },
+)
+
+// Handle Item Click (Selection)
+const handleItemClick = (id: string, event: MouseEvent) => {
+  handleSelectionClick(
+    id,
+    props.historyVerses.map((v) => ({ id: v.id })),
+    event,
+  )
+}
+
+const isSelected = (id: string) => selectedItems.value.has(id)
+const isFocused = (id: string) => focusedId.value === id
+
+// Background Click
+const handleBackgroundClick = () => {
+  // Always clear selection for background click
+  // Items stop propagation, so this only runs for actual background clicks
+  selectedItems.value.clear()
+  focusedId.value = null
+}
+
+// Copy Logic
+const copySelectedItems = () => {
+  if (selectedItems.value.size === 0) return
+
+  const itemsToCopy: ClipboardItem<VerseItem>[] = []
+
+  props.historyVerses.forEach((verse) => {
+    if (selectedItems.value.has(verse.id)) {
+      itemsToCopy.push({
+        type: 'verse',
+        data: verse,
+        action: 'copy',
+        sourceFolderId: 'history', // Special ID for history
+      })
+    }
+  })
+
+  if (itemsToCopy.length > 0) {
+    copyToClipboard(itemsToCopy)
+  }
+}
+
+const deleteSelectedItems = () => {
+  if (selectedItems.value.size === 0) return
+
+  selectedItems.value.forEach((id) => {
+    emit('remove-item', id)
+  })
+  selectedItems.value.clear()
+}
+
+// Keyboard Shortcuts
+useKeyboardShortcuts([
+  {
+    config: KEYBOARD_SHORTCUTS.EDIT.COPY,
+    handler: copySelectedItems,
+  },
+  {
+    config: KEYBOARD_SHORTCUTS.EDIT.DELETE,
+    handler: deleteSelectedItems,
+  },
+])
 
 const handleLoadVerse = (item: VerseItem) => {
   emit('load-verse', item)
@@ -66,6 +163,9 @@ const handleRemoveItem = (id: string) => {
 }
 
 const handleRightClick = (event: MouseEvent, item: VerseItem) => {
+  if (!selectedItems.value.has(item.id)) {
+    handleItemClick(item.id, event)
+  }
   emit('right-click', event, item)
 }
 </script>
@@ -79,7 +179,17 @@ const handleRightClick = (event: MouseEvent, item: VerseItem) => {
 }
 
 .verse-item:hover {
-  background-color: rgba(var(--v-theme-primary), 0.4);
+  background-color: rgba(var(--v-theme-primary), 0.1);
+}
+
+.verse-item.selected {
+  background-color: rgba(var(--v-theme-primary), 0.2);
+  border: 1px solid rgba(var(--v-theme-primary), 0.5);
+}
+
+.verse-item.focused {
+  outline: 2px solid rgba(var(--v-theme-primary), 0.5);
+  outline-offset: -2px;
 }
 
 .verse-btn {

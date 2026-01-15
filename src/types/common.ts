@@ -473,7 +473,7 @@ export interface Folder<TItem extends FolderItem = FolderItem> {
  * Clipboard item definition
  */
 export interface ClipboardItem<T extends FolderItem> {
-  type: 'file' | 'folder'
+  type: 'file' | 'folder' | 'verse'
   data: T | Folder<T>
   action: 'copy' | 'cut'
   sourceFolderId: string

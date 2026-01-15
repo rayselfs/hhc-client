@@ -2,6 +2,8 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { v4 as uuidv4 } from 'uuid'
+import { useI18n } from 'vue-i18n'
+import { useSnackBar } from '@/composables/useSnackBar'
 import {
   type Folder,
   type FolderItem,
@@ -41,6 +43,10 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
     const viewMode = ref<'large' | 'medium' | 'small'>('medium')
     // Version counter to trigger reactivity when folder/item content changes
     const contentVersion = ref(0)
+
+    // Composables
+    const { t } = useI18n()
+    const { showSnackBar } = useSnackBar()
 
     const folderMap = new Map<string, Folder<TItem>>()
     const itemMap = new Map<string, TItem>()
@@ -311,12 +317,23 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
     // ==========================================
     const copyToClipboard = (items: ClipboardItem<TItem>[]) => {
       clipboard.value = items
+      showSnackBar(t('fileExplorer.clipboardCopied'), {
+        timeout: 3000,
+        location: 'bottom left',
+      })
     }
     const cutToClipboard = (items: ClipboardItem<TItem>[]) => {
       clipboard.value = items
+      showSnackBar(t('fileExplorer.clipboardCut'), {
+        timeout: 3000,
+        location: 'bottom left',
+      })
     }
     const clearClipboard = () => {
       clipboard.value = []
+    }
+    const hasClipboardItems = () => {
+      return clipboard.value.length > 0
     }
 
     // ==========================================
@@ -695,6 +712,7 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
       copyToClipboard,
       cutToClipboard,
       clearClipboard,
+      hasClipboardItems,
       viewMode,
       // Expose for external use (e.g., cleanup)
       saveFolderDoc,

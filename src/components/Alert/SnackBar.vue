@@ -7,6 +7,10 @@
     :variant="variant"
   >
     {{ text }}
+
+    <template v-slot:actions>
+      <v-btn variant="text" icon @click="isVisible = false"> <v-icon>mdi-close</v-icon></v-btn>
+    </template>
   </v-snackbar>
 </template>
 
@@ -28,7 +32,7 @@ const props = withDefaults(defineProps<Props>(), {
   modelValue: false,
   text: '',
   timeout: 5000,
-  color: 'info',
+  color: '',
   location: 'top',
   variant: 'tonal',
 })

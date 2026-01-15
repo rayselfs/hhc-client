@@ -138,12 +138,100 @@ export function useSelectionManager() {
     }
   }
 
+  // State
+  const selectedItems = ref(new Set<string>())
+  const lastSelectedId = ref<string | null>(null)
+
+  /**
+   * 核心選取更新邏輯
+   */
+  const updateSelection = (
+    items: { id: string }[],
+    targetId: string,
+    mode: 'single' | 'multi' | 'range' | 'range-add',
+  ) => {
+    const newSelection = new Set(selectedItems.value)
+
+    switch (mode) {
+      case 'range':
+      case 'range-add':
+        if (lastSelectedId.value) {
+          const allIds = items.map((i) => i.id)
+          const start = allIds.indexOf(lastSelectedId.value)
+          const end = allIds.indexOf(targetId)
+
+          if (start !== -1 && end !== -1) {
+            const [lower, upper] = [Math.min(start, end), Math.max(start, end)]
+            const rangeIds = allIds.slice(lower, upper + 1)
+
+            if (mode === 'range') {
+              newSelection.clear()
+            }
+            rangeIds.forEach((rid) => newSelection.add(rid))
+          }
+        }
+        break
+
+      case 'multi':
+        if (newSelection.has(targetId)) {
+          newSelection.delete(targetId)
+        } else {
+          newSelection.add(targetId)
+          lastSelectedId.value = targetId
+        }
+        break
+
+      case 'single':
+      default:
+        if (newSelection.size === 1 && newSelection.has(targetId)) {
+          return // Already selected singly
+        }
+        newSelection.clear()
+        newSelection.add(targetId)
+        lastSelectedId.value = targetId
+        break
+    }
+
+    selectedItems.value = newSelection
+  }
+
+  /**
+   * 處理項目點擊
+   */
+  const handleItemClick = (id: string, items: { id: string }[], event: MouseEvent) => {
+    // Update focus on click
+    focusedId.value = id
+
+    const mode = getSelectionMode(event)
+    updateSelection(items, id, mode)
+  }
+
+  /**
+   * 全選
+   */
+  const selectAll = (allIds: string[]) => {
+    selectedItems.value = new Set(allIds)
+  }
+
+  /**
+   * 清除選取
+   */
+  const clearSelection = () => {
+    selectedItems.value = new Set()
+  }
+
   return {
     matchesModifier,
     getSelectionMode,
     handleKeyNavigation,
     scrollIntoView,
     focusedId,
+    selectedItems, // Exposed
+    lastSelectedId, // Exposed
+    handleItemClick, // Exposed
+    updateSelection, // Exposed
+    selectAll, // Exposed
+    clearSelection, // Exposed
     isMac,
   }
 }

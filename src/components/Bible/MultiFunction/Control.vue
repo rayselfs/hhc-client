@@ -76,6 +76,7 @@
         @delete-folder="showDeleteFolderDialog"
         @drop="handleDropToFolder"
         @right-click="handleRightClick"
+        @paste="pasteItemHandler"
       />
     </v-card-text>
 
@@ -139,7 +140,7 @@
       raw
     >
       <BibleBackgroundContextMenu
-        :has-clipboard="!!copiedItem"
+        :has-clipboard="hasClipboardItems()"
         @paste="pasteItemHandler"
         @create-folder="createNewFolder"
       />
@@ -200,6 +201,7 @@ const {
   currentFolder,
   getCurrentFolders,
   getCurrentItems: getCurrentVerses,
+  clipboard,
 } = storeToRefs(folderStore)
 const {
   navigateToRoot,
@@ -215,6 +217,9 @@ const {
   getMoveTargets,
   isFolderInside,
   updateFolder,
+  copyToClipboard,
+  hasClipboardItems,
+  clearClipboard,
 } = folderStore
 
 // 狀態
@@ -247,15 +252,7 @@ const breadcrumbItems = computed(() => {
   }))
 })
 
-// Use folderDialogs.moveBreadcrumb directly. It is already {id, name}[]
 const moveBreadcrumbItems = computed(() => {
-  // If empty, start with root? useFolderDialogs might handle this differently,
-  // but in Control.vue we want explicit Root at start if it's not seemingly there,
-  // OR we trust `moveBreadcrumb` to contain what we need.
-  // `useFolderDialogs` initializes specific breadcrumbs in openMoveDialog.
-  // Let's rely on `folderDialogs.moveBreadcrumb` being correct.
-  // However, existing MoveFolderDialog expects {id, name}[].
-  // folderDialogs.moveBreadcrumb IS {id, name}[].
   return folderDialogs.moveBreadcrumb.value
 })
 
@@ -276,11 +273,8 @@ const selectedItem = ref<{
   item: VerseItem | Folder<VerseItem>
 } | null>(null)
 
-// 複製/貼上相關
-const copiedItem = ref<{
-  type: 'verse' | 'folder' | 'history'
-  item: VerseItem | Folder<VerseItem>
-} | null>(null)
+import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
+import { KEYBOARD_SHORTCUTS } from '@/config/shortcuts'
 
 // 移動相關狀態 (Derived from folderDialogs)
 const moveItemType = computed(() => {
@@ -312,14 +306,6 @@ const createNewFolder = () => {
 
 const openFolderSettings = (folder: Folder<VerseItem>) => {
   folderDialogs.openEditDialog(folder)
-
-  // Custom logic for retention period calculation based on expiresAt
-  // `useFolderDialogs` sets default '1day' or existing value.
-  // We need to map `expiresAt` back to retentionPeriod string if it's not just a string in Folder.
-  // Wait, `Folder` type has `retentionPeriod`? No, it has `expiresAt`.
-  // `useFolderDialogs` logic for `openEditDialog` sets `folderName` and `editingFolderId`.
-  // It does NOT automatically map `expiresAt` to `retentionPeriod` because `Folder` type is generic.
-  // So we strictly need to do this mapping HERE after opening the dialog.
 
   if (folder.expiresAt === null || folder.expiresAt === undefined) {
     folderDialogs.retentionPeriod.value = 'permanent'
@@ -592,27 +578,80 @@ const closeItemContextMenu = () => {
 
 const copyItem = () => {
   if (selectedItem.value) {
-    copiedItem.value = selectedItem.value
+    const item = selectedItem.value.item
+    const type = selectedItem.value.type === 'folder' ? 'folder' : 'verse'
+    const sourceFolderId =
+      selectedItem.value.type === 'history' ? BibleFolder.ROOT_ID : currentFolder.value.id
+
+    copyToClipboard([
+      {
+        type: type,
+        data: item,
+        action: 'copy',
+        sourceFolderId,
+      },
+    ])
   }
   closeItemContextMenu()
 }
 
-const pasteItemHandler = () => {
-  if (!copiedItem.value) return
+const pasteItemHandler = async () => {
+  if (!hasClipboardItems()) return
 
   const targetFolderId =
     currentFolder.value.id === BibleFolder.ROOT_ID ? BibleFolder.ROOT_ID : currentFolder.value.id
 
-  if (copiedItem.value.type === 'verse' && isVerseItem(copiedItem.value.item)) {
-    // Paste verse
-    pasteItem(copiedItem.value.item, targetFolderId, 'verse')
-  } else if (copiedItem.value.type === 'folder' && isFolder(copiedItem.value.item)) {
-    // Paste folder
-    pasteItem(copiedItem.value.item, targetFolderId, 'folder')
-  } else if (copiedItem.value.type === 'history' && isVerseItem(copiedItem.value.item)) {
-    // Paste history item as verse
-    pasteItem(copiedItem.value.item, targetFolderId, 'verse')
+  let movedCount = 0
+
+  for (const item of clipboard.value) {
+    const data = item.data
+
+    // Check if it's a verse or file type in clipboard
+    if (item.type === 'file' || item.type === 'verse') {
+      // Must be a VerseItem to paste into Bible Custom Folder
+      if (isVerseItem(data)) {
+        if (item.action === 'cut') {
+          await moveItemAction(data as VerseItem, targetFolderId, item.sourceFolderId)
+          movedCount++
+        } else {
+          pasteItem(data as VerseItem, targetFolderId, 'verse')
+        }
+      } else {
+        // It's a media file (FileItem) - Skip or Warn
+      }
+    } else if (item.type === 'folder') {
+      // Logic for folder
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const folder = data as Folder<any>
+      // Check content of folder to ensure compatibility
+      const isValidFolder =
+        (folder.items && folder.items.length > 0 && isVerseItem(folder.items[0])) ||
+        !folder.items ||
+        folder.items.length === 0
+
+      if (isValidFolder) {
+        if (item.action === 'cut') {
+          // Move folder
+          await moveFolderAction(
+            data as Folder<VerseItem>,
+            targetFolderId,
+            item.sourceFolderId,
+            false,
+          ) // false = don't skip save
+          movedCount++
+        } else {
+          // Paste (Clone) folder
+          pasteItem(data as Folder<VerseItem>, targetFolderId, 'folder')
+        }
+      }
+    }
   }
+
+  // Clear clipboard if any item was moved (Cut operation completed)
+  if (movedCount > 0) {
+    clearClipboard()
+  }
+
   closeItemContextMenu()
 }
 
@@ -651,6 +690,22 @@ const showFolderSettings = () => {
     openFolderSettings(selectedItem.value.item)
   }
 }
+
+// Keyboard Shortcuts
+useKeyboardShortcuts([
+  {
+    config: KEYBOARD_SHORTCUTS.EDIT.PASTE,
+    handler: () => {
+      if (multiFunctionTab.value === 'custom') {
+        pasteItemHandler()
+      }
+    },
+  },
+  {
+    config: KEYBOARD_SHORTCUTS.MEDIA.ESCAPE,
+    handler: closeItemContextMenu,
+  },
+])
 </script>
 
 <style scoped></style>

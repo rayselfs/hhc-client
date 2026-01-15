@@ -256,17 +256,12 @@ const { mediaSpaceHeight } = useCardLayout({
 const selectedItems = ref<Set<string>>(new Set())
 
 const mediaDialogs = useFolderDialogs<FileItem>()
-const operations = useMediaOperations(
-  mediaStore,
-  mediaDialogs,
-  {
-    get value() {
-      return selectedItems.value
-    },
-    clear: () => selectedItems.value.clear(),
+const operations = useMediaOperations(mediaStore, mediaDialogs, {
+  get value() {
+    return selectedItems.value
   },
-  showSnackBar,
-)
+  clear: () => selectedItems.value.clear(),
+})
 
 // User Request: Clear selection when changing folder path (Best Practice)
 watch(
@@ -367,7 +362,9 @@ const startPresentation = async (startItem?: FileItem, fromBeginning = false) =>
   const files = sortedUnifiedItems.value.filter((i) => !('items' in i)) as FileItem[]
 
   if (files.length === 0) {
-    showSnackBar(t('fileExplorer.noFiles'), 'warning')
+    showSnackBar(t('fileExplorer.noFiles'), {
+      color: 'warning',
+    })
     return
   }
 
@@ -401,18 +398,11 @@ const previewFile = (item: FileItem) => {
 }
 
 // Start presentation from beginning (Shift+F5 or similar)
-// But we just use F5 for generic start if no item selected?
-// Or we check event modifier in the handler.
 const handleMediaF5 = (e: KeyboardEvent) => {
   startPresentation(undefined, e.altKey ? false : true)
 }
 
-// Select All
 const handleSelectAll = () => {
-  // Capture Phase helps us avoid inputs, but we double check just in case logic changes
-  // Actually, useKeyboardShortcuts already guards inputs.
-
-  // Select all folders and files visible
   const allIds = sortedUnifiedItems.value.map((item) => item.id)
   allIds.forEach((id) => selectedItems.value.add(id))
 }
