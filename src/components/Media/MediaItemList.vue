@@ -3,6 +3,8 @@
     ref="mediaItemContainerRef"
     class="media-item-list-container"
     :style="{ height: `${mediaSpaceHeight}px` }"
+    tabindex="0"
+    @keydown="onKeyDown"
     @mousedown="onSelectionMouseDown"
     @contextmenu.prevent="openBackgroundContextMenu"
   >
@@ -25,6 +27,7 @@
               <MediaItem
                 :item="item"
                 :is-selected="selectedItems.has(item.id)"
+                :is-focused="focusedId === item.id"
                 :is-cut="isCut(item.id)"
                 :is-dragging="draggedItems.has(item.id)"
                 :draggable="canDrag(item)"
@@ -35,7 +38,7 @@
                 @dragover="onDragOver($event, item)"
                 @dragenter="onDragEnter($event)"
                 @dragleave="onDragLeave($event)"
-                @click.stop="handleSelection(item.id, $event)"
+                @click.stop="handleItemClick(item.id, $event)"
                 @dblclick="handleDoubleClick(item)"
                 @contextmenu.stop.prevent="openContextMenu(item, $event)"
               />
@@ -57,6 +60,7 @@
             <MediaItem
               :item="item"
               :is-selected="selectedItems.has(item.id)"
+              :is-focused="focusedId === item.id"
               :is-cut="isCut(item.id)"
               :is-dragging="draggedItems.has(item.id)"
               :draggable="canDrag(item)"
@@ -67,7 +71,7 @@
               @dragover="onDragOver($event, item)"
               @dragenter="onDragEnter($event)"
               @dragleave="onDragLeave($event)"
-              @click.stop="handleSelection(item.id, $event)"
+              @click.stop="handleItemClick(item.id, $event)"
               @dblclick="handleDoubleClick(item)"
               @contextmenu.stop.prevent="openContextMenu(item, $event)"
             />
@@ -130,12 +134,17 @@ import { useMediaFolderStore } from '@/stores/folder'
 import { isValidDragData } from '@/utils/typeGuards'
 import { useSnackBar } from '@/composables/useSnackBar'
 import { useDragSelection } from '@/composables/useDragSelection'
-import ContextMenu from '@/components/ContextMenu.vue'
 import MediaItemContextMenu from './MediaItemContextMenu.vue'
+import ContextMenu from '@/components/ContextMenu.vue'
 import MediaBackgroundMenu from './MediaBackgroundMenu.vue'
-import { useSelectionModifiers } from '@/composables/useSelectionModifiers'
+import { useSelectionManager } from '@/composables/useSelectionManager'
+import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
+import { useElementSize } from '@vueuse/core'
 
-const { getSelectionMode } = useSelectionModifiers()
+const { getSelectionMode, handleKeyNavigation, focusedId, scrollIntoView } = useSelectionManager()
+
+// Keyboard Shortcuts for Selection/Navigation
+useKeyboardShortcuts([]) // Initialize global, but we use local listener for navigation
 
 type UnifiedItem = FileItem | Folder<FileItem>
 
@@ -224,8 +233,79 @@ const useVirtualScroll = computed(() => {
 // --- Selection Logic ---
 const lastSelectedId = ref<string | null>(null)
 
-const handleSelection = (id: string, event: MouseEvent) => {
+/**
+ * Handle Item Click (Mouse Selection)
+ * Delegated to handleSelection Logic
+ */
+const handleItemClick = (id: string, event: MouseEvent) => {
+  // Update focus on click
+  focusedId.value = id
+
   const mode = getSelectionMode(event)
+  updateSelection(id, mode)
+}
+
+/**
+ * Handle Keyboard Navigation
+ */
+const onKeyDown = (event: KeyboardEvent) => {
+  // Navigation (Arrow Keys, Home, End)
+  // Use localItems to ensure navigation matches visual order
+  const currentItems = localItems.value.length > 0 ? localItems.value : props.items
+  const newFocusedId = handleKeyNavigation(
+    event,
+    currentItems as { id: string }[],
+    colsPerRow.value,
+  )
+
+  if (newFocusedId) {
+    scrollIntoView(mediaItemContainerRef.value as HTMLElement)
+
+    // Standard Behavior: Arrow keys select the item unless modifiers are held
+    // If Shift/Ctrl is held, we only move focus (user can press Space to select/toggle)
+    if (!event.shiftKey && !event.ctrlKey && !event.metaKey) {
+      updateSelection(newFocusedId, 'single')
+    } else if (event.shiftKey && !event.ctrlKey && !event.metaKey) {
+      // Shift + Arrow: Range Selection (matches SELECT_UP, SELECT_DOWN, etc.)
+      updateSelection(newFocusedId, 'range')
+    }
+  }
+
+  // Selection (Space)
+  if (event.code === 'Space') {
+    event.preventDefault()
+    if (focusedId.value) {
+      const mode = getSelectionMode(event)
+      // Space usually toggles or selects single if simple Space
+      updateSelection(
+        focusedId.value,
+        mode === 'range-add' ? 'range-add' : event.ctrlKey || event.metaKey ? 'multi' : 'single',
+      )
+    }
+  }
+
+  // Open (Enter)
+  if (event.code === 'Enter') {
+    if (focusedId.value) {
+      const item = props.items.find((i) => i.id === focusedId.value)
+      if (item) {
+        if (isFolder(item)) {
+          mediaStore.enterFolder(item.id)
+          emit('update:selected-items', new Set())
+          mediaStore.loadChildren(item.id)
+          focusedId.value = null // Clear focus on navigation
+        } else {
+          emit('open-presentation', item as FileItem)
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Core Selection Update Logic
+ */
+const updateSelection = (targetId: string, mode: 'single' | 'multi' | 'range' | 'range-add') => {
   const newSelection = new Set(props.selectedItems)
 
   switch (mode) {
@@ -234,7 +314,7 @@ const handleSelection = (id: string, event: MouseEvent) => {
       if (lastSelectedId.value) {
         const allIds = props.items.map((i) => i.id)
         const start = allIds.indexOf(lastSelectedId.value)
-        const end = allIds.indexOf(id)
+        const end = allIds.indexOf(targetId)
 
         if (start !== -1 && end !== -1) {
           const [lower, upper] = [Math.min(start, end), Math.max(start, end)]
@@ -249,22 +329,22 @@ const handleSelection = (id: string, event: MouseEvent) => {
       break
 
     case 'multi':
-      if (newSelection.has(id)) {
-        newSelection.delete(id)
+      if (newSelection.has(targetId)) {
+        newSelection.delete(targetId)
       } else {
-        newSelection.add(id)
-        lastSelectedId.value = id
+        newSelection.add(targetId)
+        lastSelectedId.value = targetId
       }
       break
 
     case 'single':
     default:
-      if (newSelection.size === 1 && newSelection.has(id)) {
-        return // 已經是單選該項目
+      if (newSelection.size === 1 && newSelection.has(targetId)) {
+        return // Already selected singly
       }
       newSelection.clear()
-      newSelection.add(id)
-      lastSelectedId.value = id
+      newSelection.add(targetId)
+      lastSelectedId.value = targetId
       break
   }
 
@@ -497,7 +577,7 @@ const openContextMenu = (item: UnifiedItem, event: MouseEvent) => {
   event.preventDefault()
 
   if (!props.selectedItems.has(item.id)) {
-    handleSelection(item.id, event)
+    handleItemClick(item.id, event)
   }
 
   contextMenuTarget.value = item
@@ -516,25 +596,35 @@ const isCut = (id: string) => {
   return props.clipboard.some((item) => item.action === 'cut' && item.data.id === id)
 }
 
-// Calculate columns for Virtual Scroll chunking
+// Calculate columns for Virtual Scroll chunking & Keyboard Navigation
+const { width: containerWidth } = useElementSize(mediaItemContainerRef)
+
 const colsPerRow = computed(() => {
-  // Approximate columns based on ITEM_WIDTH + padding
-  switch (breakpointName.value) {
-    case 'xs':
-      return 2
-    case 'sm':
-      return 3
-    case 'md':
-      return 4
-    case 'lg':
-      return 6
-    case 'xl':
-      return 8
-    case 'xxl':
-      return 10
-    default:
-      return 6
+  if (containerWidth.value <= 0) {
+    // Fallback to breakpoint if width unavailable (e.g. init)
+    switch (breakpointName.value) {
+      case 'xs':
+        return 2
+      case 'sm':
+        return 3
+      case 'md':
+        return 4
+      case 'lg':
+        return 6
+      case 'xl':
+        return 8
+      case 'xxl':
+        return 10
+      default:
+        return 6
+    }
   }
+  // Layout is flex float: itemSize + gap
+  const gap = 4 // ga-1 = 4px
+  const itemWidth = (props.itemSize || 140) + gap
+  // Floor to get number of items that fit per row
+  const cols = Math.floor((containerWidth.value + gap) / itemWidth) // Account for last gap
+  return Math.max(1, cols)
 })
 
 const chunkedItems = computed(() => {
@@ -552,6 +642,10 @@ const chunkedItems = computed(() => {
 /* Ensure virtual scroll takes full height */
 :deep(.v-virtual-scroll__container) {
   display: block !important;
+}
+
+.media-item-list-container:focus {
+  outline: none;
 }
 
 /* Transition Group Styles */

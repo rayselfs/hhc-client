@@ -42,4 +42,17 @@ export const KEYBOARD_SHORTCUTS = {
     RANGE_SELECT: { shift: true },
     RANGE_ADD: { shift: true, metaOrCtrl: true },
   },
+  NAVIGATION: {
+    MOVE_UP: { code: 'ArrowUp' },
+    MOVE_DOWN: { code: 'ArrowDown' },
+    MOVE_LEFT: { code: 'ArrowLeft' },
+    MOVE_RIGHT: { code: 'ArrowRight' },
+    SELECT_UP: { code: 'ArrowUp', shift: true },
+    SELECT_DOWN: { code: 'ArrowDown', shift: true },
+    SELECT_LEFT: { code: 'ArrowLeft', shift: true },
+    SELECT_RIGHT: { code: 'ArrowRight', shift: true },
+    TOGGLE_SELECT: { code: 'Space', metaOrCtrl: true },
+    SELECT: { code: 'Space' },
+    OPEN: { code: 'Enter' },
+  },
 } as const
