@@ -248,6 +248,52 @@ export const useElectron = () => {
     }
   }
 
+  // Hardware Acceleration
+  const getHardwareAcceleration = async (): Promise<boolean> => {
+    if (isElectron()) {
+      try {
+        return await window.electronAPI.getHardwareAcceleration()
+      } catch (error) {
+        reportError(error, {
+          operation: 'get-hardware-acceleration',
+          component: 'useElectron',
+        })
+        return true // Default to true if failed
+      }
+    }
+    return true
+  }
+
+  const setHardwareAcceleration = async (enabled: boolean): Promise<boolean> => {
+    if (isElectron()) {
+      try {
+        return await window.electronAPI.setHardwareAcceleration(enabled)
+      } catch (error) {
+        reportError(error, {
+          operation: 'set-hardware-acceleration',
+          component: 'useElectron',
+          extra: { enabled },
+        })
+        return false
+      }
+    }
+    return false
+  }
+
+  // App Control
+  const restartApp = async (): Promise<void> => {
+    if (isElectron()) {
+      try {
+        await window.electronAPI.restartApp()
+      } catch (error) {
+        reportError(error, {
+          operation: 'restart-app',
+          component: 'useElectron',
+        })
+      }
+    }
+  }
+
   // Bible API Methods
   const getBibleVersions = async (): Promise<BibleVersion[]> => {
     if (isElectron()) {
@@ -322,6 +368,9 @@ export const useElectron = () => {
     updateLanguage,
     getSystemLocale,
     resetUserData,
+    getHardwareAcceleration,
+    setHardwareAcceleration,
+    restartApp,
 
     // File operations
     getFilePath,

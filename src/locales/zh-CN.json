@@ -27,7 +27,9 @@
     "view": "视图",
     "sort": "排序",
     "export": "导出",
-    "folderIsEmpty": "文件夹为空"
+    "folderIsEmpty": "文件夹为空",
+    "later": "稍后",
+    "restartNow": "立即重启"
   },
   "extendedToolbar": {
     "openProjection": "开启投影",
@@ -161,7 +163,11 @@
     "simplifiedChinese": "简体中文",
     "english": "English",
     "resetConfirmTitle": "恢复出厂设置",
-    "resetConfirmMessage": "此操作将清除所有存储的数据，包含设置、认证信息等，确定要继续吗？"
+    "resetConfirmMessage": "此操作将清除所有存储的数据，包含设置、认证信息等，确定要继续吗？",
+    "performance": "性能",
+    "hardwareAcceleration": "硬件加速",
+    "restartRequired": "需要重新启动",
+    "restartRequiredMessage": "硬件加速设置更改后需要重新启动应用程序才能生效。"
   },
   "timezones": {
     "taipei": "台北时间 (UTC+8)",

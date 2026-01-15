@@ -27,7 +27,9 @@
     "view": "View",
     "sort": "Sort",
     "export": "Export",
-    "folderIsEmpty": "Folder is empty"
+    "folderIsEmpty": "Folder is empty",
+    "later": "Later",
+    "restartNow": "Restart Now"
   },
   "extendedToolbar": {
     "openProjection": "Open Projection",
@@ -161,7 +163,11 @@
     "simplifiedChinese": "简体中文",
     "english": "English",
     "resetConfirmTitle": "Reset to Factory Settings",
-    "resetConfirmMessage": "This operation will clear all stored data, including settings, authentication information, etc. Are you sure you want to continue?"
+    "resetConfirmMessage": "This operation will clear all stored data, including settings, authentication information, etc. Are you sure you want to continue?",
+    "performance": "Performance",
+    "hardwareAcceleration": "Hardware Acceleration",
+    "restartRequired": "Restart Required",
+    "restartRequiredMessage": "Hardware acceleration setting changes require restarting the application to take effect."
   },
   "timezones": {
     "taipei": "Taipei Time (UTC+8)",

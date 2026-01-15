@@ -44,6 +44,7 @@ export class WindowManager {
         experimentalFeatures: false,
         preload: join(__dirname, 'preload.mjs'),
         spellcheck: false,
+        backgroundThrottling: false, // Prevent throttling when window loses focus
       },
       title: 'Console',
     })
@@ -108,6 +109,7 @@ export class WindowManager {
         allowRunningInsecureContent: false,
         experimentalFeatures: false,
         preload: join(__dirname, 'preload.mjs'),
+        backgroundThrottling: false, // Prevent throttling when window loses focus
       },
       title: 'Projection',
     })

@@ -44,12 +44,42 @@
               color="primary"
             ></v-switch>
           </v-col>
+          <v-col cols="12">
+            <v-label class="text-subtitle-1 mb-2">{{ $t('settings.performance') }}</v-label>
+            <v-switch
+              v-model="hardwareAcceleration"
+              :label="$t('settings.hardwareAcceleration')"
+              color="primary"
+              @update:model-value="handleHardwareAccelerationChange"
+            ></v-switch>
+          </v-col>
         </v-row>
       </v-card-text>
 
       <v-card-actions>
         <v-spacer></v-spacer>
         <v-btn @click="isOpen = false"> {{ $t('common.close') }} </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <!-- Restart Required Dialog -->
+  <v-dialog v-model="showRestartDialog" max-width="400" persistent>
+    <v-card>
+      <v-card-title class="text-subtitle-1">
+        {{ $t('settings.restartRequired') }}
+      </v-card-title>
+      <v-card-text>
+        {{ $t('settings.restartRequiredMessage') }}
+      </v-card-text>
+      <v-card-actions>
+        <v-spacer></v-spacer>
+        <v-btn variant="text" @click="showRestartDialog = false">
+          {{ $t('common.later') }}
+        </v-btn>
+        <v-btn color="primary" variant="flat" @click="restartApp">
+          {{ $t('common.restartNow') }}
+        </v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>
@@ -69,7 +99,13 @@ import { useProjectionManager } from '@/composables/useProjectionManager'
 const { t: $t, t } = useI18n()
 
 // Electron composable
-const { isElectron, onMainMessage } = useElectron()
+const {
+  isElectron,
+  onMainMessage,
+  getHardwareAcceleration,
+  setHardwareAcceleration,
+  restartApp: electronRestartApp,
+} = useElectron()
 
 // 投影消息管理
 const { syncAllStates } = useProjectionManager()
@@ -95,6 +131,10 @@ const isDarkMode = computed({
   },
 })
 
+// Hardware acceleration 設定
+const hardwareAcceleration = ref(true)
+const showRestartDialog = ref(false)
+
 // Timezone options
 const timezones = computed(() => [
   { title: t('timezones.taipei'), value: 'Asia/Taipei' },
@@ -112,6 +152,21 @@ const timezones = computed(() => [
 const handleTimezoneChange = (timezone: string) => {
   timerStore.setTimezone(timezone)
   syncAllStates()
+}
+
+// 處理硬體加速變更
+const handleHardwareAccelerationChange = async (enabled: boolean | null) => {
+  if (isElectron() && enabled !== null) {
+    await setHardwareAcceleration(enabled)
+    showRestartDialog.value = true
+  }
+}
+
+// 重啟應用程式
+const restartApp = async () => {
+  if (isElectron()) {
+    await electronRestartApp()
+  }
 }
 
 // 開啟設定彈窗
@@ -135,9 +190,11 @@ watch(
 )
 
 // 監聽 menu 事件
-// 監聽 menu 事件
-onMounted(() => {
+onMounted(async () => {
   if (isElectron()) {
+    // 載入硬體加速設定
+    hardwareAcceleration.value = await getHardwareAcceleration()
+
     // 直接監聽 open-settings 事件
     onMainMessage((data: unknown) => {
       if (data === 'open-settings') {

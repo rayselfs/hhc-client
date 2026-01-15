@@ -11,6 +11,25 @@ import { registerApiHandlers } from './api'
 import { WindowManager } from './windowManager'
 import { registerGenericHandlers } from './handlers'
 import { registerFileHandlers, registerFileProtocols } from './file'
+import { getHardwareAcceleration } from './appSettings'
+
+// Configure hardware acceleration before app is ready
+const hardwareAccelerationEnabled = getHardwareAcceleration()
+
+if (hardwareAccelerationEnabled) {
+  // Enable hardware acceleration
+  app.commandLine.appendSwitch('enable-gpu-rasterization')
+  app.commandLine.appendSwitch('enable-zero-copy')
+  app.commandLine.appendSwitch('ignore-gpu-blocklist')
+
+  if (process.platform === 'darwin') {
+    // macOS: VideoToolbox hardware decode
+    app.commandLine.appendSwitch('enable-features', 'VaapiVideoDecoder')
+  } else if (process.platform === 'win32') {
+    // Windows: D3D11 Video Acceleration
+    app.commandLine.appendSwitch('enable-features', 'D3D11VideoDecoder')
+  }
+}
 
 // Initialize Sentry
 const sentryDsn = process.env.SENTRY_DSN || process.env.VITE_SENTRY_DSN
@@ -75,9 +94,6 @@ if (!gotTheLock) {
   app.whenReady().then(() => {
     // Register file protocols
     registerFileProtocols()
-
-    // Set security policy
-    app.commandLine.appendSwitch('--disable-features', 'VizDisplayCompositor')
 
     windowManager.createMainWindow()
 

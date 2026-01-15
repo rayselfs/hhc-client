@@ -27,7 +27,9 @@
     "view": "檢視",
     "sort": "排序",
     "export": "匯出",
-    "folderIsEmpty": "資料夾為空"
+    "folderIsEmpty": "資料夾為空",
+    "later": "稍後",
+    "restartNow": "立即重啟"
   },
   "extendedToolbar": {
     "openProjection": "開啟投影",
@@ -161,7 +163,11 @@
     "simplifiedChinese": "简体中文",
     "english": "English",
     "resetConfirmTitle": "恢復原廠設定",
-    "resetConfirmMessage": "此操作將清除所有儲存的資料，包含設定、認證資訊等，確定要繼續嗎？"
+    "resetConfirmMessage": "此操作將清除所有儲存的資料，包含設定、認證資訊等，確定要繼續嗎？",
+    "performance": "效能",
+    "hardwareAcceleration": "硬體加速",
+    "restartRequired": "需要重新啟動",
+    "restartRequiredMessage": "硬體加速設定變更後需要重新啟動應用程式才能生效。"
   },
   "timezones": {
     "taipei": "台北時間 (UTC+8)",

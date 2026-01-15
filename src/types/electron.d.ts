@@ -121,6 +121,16 @@ export interface ElectronAPI {
 
   /** Listen for timer state updates */
   onTimerTick: (callback: (state: Partial<TimerState>) => void) => void
+
+  // Hardware acceleration settings
+  /** Get hardware acceleration setting */
+  getHardwareAcceleration: () => Promise<boolean>
+
+  /** Set hardware acceleration setting */
+  setHardwareAcceleration: (enabled: boolean) => Promise<boolean>
+
+  /** Restart the application */
+  restartApp: () => Promise<void>
 }
 
 /**

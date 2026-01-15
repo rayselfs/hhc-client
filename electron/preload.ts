@@ -84,4 +84,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onTimerTick: (callback: (state: unknown) => void) => {
     ipcRenderer.on('timer-tick', (event, state) => callback(state))
   },
+
+  // Hardware acceleration settings
+  getHardwareAcceleration: () => ipcRenderer.invoke('get-hardware-acceleration'),
+  setHardwareAcceleration: (enabled: boolean) => ipcRenderer.invoke('set-hardware-acceleration', enabled),
+  restartApp: () => ipcRenderer.invoke('restart-app'),
 })

@@ -4,6 +4,7 @@ import * as Sentry from '@sentry/electron'
 import path from 'path'
 import { writeFileSync } from 'fs'
 import { createApplicationMenu } from './menu'
+import { getHardwareAcceleration, setHardwareAcceleration } from './appSettings'
 
 export const registerGenericHandlers = (windowManager: WindowManager) => {
   // Check if the projection window exists
@@ -102,5 +103,21 @@ export const registerGenericHandlers = (windowManager: WindowManager) => {
       })
       return { success: false, error: errorMessage }
     }
+  })
+
+  // Hardware acceleration handlers
+  ipcMain.handle('get-hardware-acceleration', () => {
+    return getHardwareAcceleration()
+  })
+
+  ipcMain.handle('set-hardware-acceleration', (event, enabled: boolean) => {
+    setHardwareAcceleration(enabled)
+    return true // Returns true to indicate restart is required
+  })
+
+  // Restart app handler
+  ipcMain.handle('restart-app', () => {
+    app.relaunch()
+    app.exit(0)
   })
 }
