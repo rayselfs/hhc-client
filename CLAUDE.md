@@ -1,107 +1,125 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+> **Note**: This file provides high-level context and guidelines for Claude Code to work effectively in this repository.
 
-## Current Status
+## Commands
 
-- [ ] Task Path: .claudecode/current_task.md
-- [ ] Plan Path: .claudecode/current_plan.md
+- **Development**: `npm run dev` (Vite + Electron)
+- **Build**: `npm run build` (Type-check + Build)
+- **Test**: `npm run test:unit` (Vitest)
+- **Lint/Fix**: `npm run lint` (ESLint auto-fix)
+- **Format**: `npm run format` (Prettier)
+- **Type Check**: `npm run type-check` (vue-tsc)
+- **Platform Builds**:
+  - Mac (Apple Silicon): `npm run electron:build:mac-arm`
+  - Mac (Intel): `npm run electron:build:mac-intel`
+  - Windows: `npm run electron:build:win`
 
-## Project Overview
+## Tech Stack
 
-HHC Client is a desktop application for churches built with Electron + Vue 3 + TypeScript. It provides timer, Bible reader, and media projection features with a two-window architecture: a main control window and a secondary projection window.
+- **Runtime**: Electron 38 + Node.js 20+
+- **Frontend**: Vue 3 (Composition API), TypeScript 5, Vite 7
+- **UI Framework**: Vuetify 3 (Material Design 3)
+- **State Management**: Pinia (Setup Stores)
+- **Data Storage**:
+  - **IndexedDB**: Bible content, Search Indices, Folder/File structure (`idb` wrapper)
+  - **LocalStorage**: User preferences, simple settings
+  - **Filesystem**: `fs-extra` (Electron main process only)
+- **Icons**: MDI (@mdi/font), FontAwesome
+- **I18n**: vue-i18n (en, zh-TW, zh-CN)
+- **Error Tracking**: Sentry (Main & Renderer)
+- **Updates**: electron-updater
+- **Fonts**: @fontsource-variable (Local, no CDN)
 
-## Common Commands
+## Environment Variables (.env)
 
-```bash
-npm run dev              # Start development (Vite + Electron)
-npm run build            # Type-check and build for production
-npm run type-check       # Run vue-tsc type checking
-npm run test:unit        # Run Vitest unit tests
-npm run lint             # Run ESLint with auto-fix
-npm run format           # Format src/ with Prettier
+- `VITE_BIBLE_API_HOST`: URL for Bible API (Default: `https://www.alive.org.tw`)
+- `SENTRY_DSN` / `VITE_SENTRY_DSN`: Sentry DSN for error tracking
+- `VITE_SENTRY_ENABLED`: Set to `true` to enable Sentry in development
 
-# Platform-specific builds
-npm run electron:build:mac-arm       # macOS Apple Silicon
-npm run electron:build:mac-intel     # macOS Intel
-npm run electron:build:mac-universal # macOS Universal
-npm run electron:build:win           # Windows x64
+## Project Architecture
+
+### Window Management (`electron/windowManager.ts`)
+
+- **Main Window**: Control interface (`/`)
+- **Projection Window**: Secondary display (`/projection`)
+- **Communication**: Strict IPC via `MessageType` enum.
+
+### Data Flow
+
+1. **Providers**: `services/filesystem/` implements `LocalProvider` & `WebProvider`.
+2. **Stores**: Pinia stores manage business logic and sync with DB.
+3. **IPC**:
+   - **Renderer -> Main**: `window.electronAPI.invoke(channel, data)`
+   - **Main -> Renderer**: `mainWindow.webContents.send(channel, data)`
+
+### Key Directories
+
+### Key Directories
+
+- `src/layouts/control/`: Main window panels (Bible, Timer, Media)
+- `src/layouts/projection/`: Projection window views
+- `src/services/`: Business logic independent of UI (e.g., FileSystem, BibleAPI)
+- `src/types/`: Shared TypeScript definitions (Crucial: `common.ts` for IPC messages)
+
+### File Organization
+
+```
+src/
+├── components/     # Reusable Vue components
+├── composables/    # Reusable logic hooks (30+ composables)
+├── layouts/        # Control and projection layouts
+├── stores/         # Pinia stores
+├── views/          # Page views
+├── types/          # TypeScript definitions
+├── services/       # Business logic services
+├── utils/          # Utility functions
+└── config/         # App configuration
 ```
 
-## Architecture
+## Code Style Guidelines
 
-### Two-Window Design
+### TypeScript & Naming
 
-The app runs two browser windows managed by `electron/windowManager.ts`:
+- **Strict Typing**: Avoid `any`. Use `unknown` or specific interfaces.
+- **Interfaces**: PascalCase, define in `src/types/`. NO `I` prefix (e.g., `FolderItem`).
+- **Enums**: PascalCase name, SCREAMING_SNAKE_CASE values.
+- **File Naming**:
+  - Vue Components: `PascalCase.vue` (e.g., `MediaItem.vue`)
+  - TS Files/Composables: `kebab-case.ts` (e.g., `timer-store.ts`, `use-folder.ts`)
+- **Variables/Functions**: camelCase.
+- **Import Order**:
+  1. Vue/Pinia core
+  2. 3rd party libs
+  3. Alias (`@/...`)
 
-- **Main Window** (1200x800): Control interface at route `/`
-- **Projection Window**: Full-screen display on secondary monitor at route `/projection`
+### Vue Components
 
-Windows communicate via IPC messages using a standardized `MessageType` enum (defined in `src/types/common.ts`).
+- **Syntax**: `<script setup lang="ts">`.
+- **Props**: Use `interface Props` with `withDefaults`.
+- **Error Handling**: Wrap Async/IPC calls in regex `try/catch` and use `reportError`.
+  ```typescript
+  try {
+    await ipcCall()
+  } catch (e) {
+    reportError(e, { component: 'Name', operation: 'op' })
+  }
+  ```
 
-### Electron Main Process (`electron/`)
+### Styling (SCSS)
 
-| File               | Purpose                                           |
-| ------------------ | ------------------------------------------------- |
-| `main.ts`          | Entry point, initializes all services             |
-| `windowManager.ts` | Singleton managing both windows                   |
-| `timerService.ts`  | Timer logic running at 60Hz, broadcasts via IPC   |
-| `preload.ts`       | Context bridge exposing safe APIs to renderer     |
-| `file.ts`          | File operations with `local-resource://` protocol |
-| `api.ts`           | Bible API proxy with streaming support            |
-| `handlers.ts`      | Display detection, message routing, locale        |
+- **Scoped**: Always use `<style scoped>`.
+- **Variables**: Use CSS variables (e.g., `var(--folder-bg)`) over hardcoded hex colors.
+- **Vuetify**: Use utility classes for layout/spacing first (e.g., `d-flex pa-4`).
 
-### Vue Renderer (`src/`)
+### Data & State
 
-**Key Directories:**
+- **ID Generation**: Use `uuidv4()` for all IDs (Files, Folders).
+- **Store Pattern**: Use Setup Stores (`defineStore('id', () => { ... })`).
 
-- `views/` - HomeView (main) and ProjectionView
-- `layouts/control/` - BibleControl, TimerControl, MediaControl
-- `layouts/projection/` - BibleProjection, TimerProjection, MediaProjection
-- `stores/` - Pinia stores (bible, timer, media, folder, projection, etc.)
-- `composables/` - Reusable logic hooks (30+ composables)
-- `services/media/` - FileSystemProvider pattern with Local/Web implementations
-- `types/` - TypeScript definitions including `electron.d.ts` for IPC typing
+## Definition of Done
 
-**Path Alias:** `@/*` maps to `./src/*`
-
-### IPC Communication
-
-Renderer uses `window.electronAPI` (typed in `src/types/electron.d.ts`) for:
-
-- **Invoke** (request/response): file ops, Bible API, projection management
-- **Send** (one-way): `send-to-projection`, `send-to-main`
-- **On** (listeners): `timer-tick`, `projection-message`, `main-message`
-
-### State Synchronization
-
-Main window broadcasts state to projection via debounced messages. When projection opens, it requests full state via `SYSTEM_GET_STATE` message.
-
-### File System
-
-Uses provider pattern (`src/services/media/`):
-
-- `LocalProvider.ts` - Electron file access via `local-resource://` protocol
-- `WebProvider.ts` - Browser File System Access API fallback
-- Factory: `useFileSystemFactory()` composable
-
-### Data Storage
-
-- **IndexedDB** (`useIndexedDB.ts`): Bible content and search indices
-- **localStorage** (`useLocalStorage.ts`): Settings and folder structure
-- **Search**: FlexSearch for Bible full-text search (`useFlexSearch.ts`)
-
-## Environment
-
-Requires `.env` file:
-
-```bash
-VITE_BIBLE_API_HOST=http://localhost:8080
-```
-
-## Code Style
-
-- Vue 3 Composition API with `<script setup lang="ts">`
-- Vuetify 3 for UI components (auto-imported)
-- ESLint flat config with Vue + TypeScript + Prettier
-- Tests in `src/**/__tests__/` using Vitest + jsdom
+1. **Type Check**: No TypeScript errors (`npm run type-check`).
+2. **Lint**: No ESLint warnings (`npm run lint`).
+3. **Tests**: Unit tests pass if logic was touched.
+4. **Build**: `npm run build` succeeds.
