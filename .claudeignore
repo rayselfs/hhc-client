@@ -1,0 +1,53 @@
+# Defaults
+.git/
+.svn/
+.hg/
+node_modules/
+.DS_Store
+
+# Build Outputs
+dist/
+dist-electron/
+release/
+coverage/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Editors & IDEs
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Lock Files (Noise reduction)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Assets & Binaries (Noise reduction)
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.ico
+*.svg
+*.woff
+*.woff2
+*.ttf
+*.eot
+*.icns
+*.zip
+*.tar.gz
+*.dmg
+*.exe
+
+# Large Directories
+build/
