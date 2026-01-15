@@ -248,10 +248,16 @@ const deleteSelectedItems = () => {
   })
 }
 
+const clearSelection = () => {
+  selectedItems.value.clear()
+  focusedId.value = null
+}
+
 defineExpose({
   copySelectedItems,
   cutSelectedItems,
   deleteSelectedItems,
+  clearSelection,
 })
 
 const containerRef = ref<HTMLElement | null>(null)
@@ -288,10 +294,6 @@ useKeyboardShortcuts([
   {
     config: KEYBOARD_SHORTCUTS.EDIT.CUT,
     handler: cutSelectedItems,
-  },
-  {
-    config: KEYBOARD_SHORTCUTS.EDIT.DELETE,
-    handler: deleteSelectedItems,
   },
 ])
 

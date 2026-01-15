@@ -66,6 +66,7 @@ interface Emits {
   (e: 'load-verse', item: VerseItem): void
   (e: 'remove-item', id: string): void
   (e: 'right-click', event: MouseEvent, item: VerseItem): void
+  (e: 'selection-change', selection: Set<string>): void
 }
 
 const props = defineProps<Props>()
@@ -77,6 +78,16 @@ const folderStore = useBibleFolderStore()
 const { copyToClipboard } = folderStore
 
 const { selectedItems, focusedId, handleItemClick: handleSelectionClick } = useSelectionManager()
+
+import { watch } from 'vue'
+
+watch(
+  () => selectedItems.value,
+  (newSelection) => {
+    emit('selection-change', new Set(newSelection))
+  },
+  { deep: true },
+)
 
 const containerRef = ref<HTMLElement | null>(null)
 
@@ -142,9 +153,15 @@ const deleteSelectedItems = () => {
   selectedItems.value.clear()
 }
 
+const clearSelection = () => {
+  selectedItems.value.clear()
+  focusedId.value = null
+}
+
 defineExpose({
   copySelectedItems,
   deleteSelectedItems,
+  clearSelection,
 })
 
 // Keyboard Shortcuts
@@ -152,10 +169,6 @@ useKeyboardShortcuts([
   {
     config: KEYBOARD_SHORTCUTS.EDIT.COPY,
     handler: copySelectedItems,
-  },
-  {
-    config: KEYBOARD_SHORTCUTS.EDIT.DELETE,
-    handler: deleteSelectedItems,
   },
 ])
 

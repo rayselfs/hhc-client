@@ -73,6 +73,7 @@
         @right-click="
           (event: MouseEvent, item: VerseItem) => handleRightClick(event, 'history', item)
         "
+        @selection-change="handleSelectionChange"
         ref="historyTabRef"
       />
 
@@ -129,6 +130,7 @@
       v-model="folderDialogs.showDeleteConfirmDialog.value"
       :item-name="folderDialogs.folderToDelete.value?.name"
       :is-folder="!!folderDialogs.folderToDelete.value"
+      :count="batchDeleteCount"
       @confirm="confirmDeleteFolder"
     />
 
@@ -243,6 +245,7 @@ const multiFunctionTab = ref('history')
 const folderDialogs = useFolderDialogs<VerseItem>()
 const customSelectedItems = ref<Set<string>>(new Set())
 const activeTabSelection = ref<Set<string>>(new Set())
+const batchDeleteCount = ref(0)
 
 const handleSelectionChange = (selection: Set<string>) => {
   activeTabSelection.value = selection
@@ -577,12 +580,48 @@ const showDeleteFolderDialog = (folderId: string) => {
 }
 
 const confirmDeleteFolder = () => {
-  if (folderDialogs.folderToDelete.value) {
-    // Call store action - direct mutation
-    deleteFolderAction(folderDialogs.folderToDelete.value.id)
+  // Batch Delete
+  if (batchDeleteCount.value > 0) {
+    const itemsToDelete = Array.from(activeTabSelection.value)
+
+    if (multiFunctionTab.value === 'custom') {
+      itemsToDelete.forEach((id) => {
+        // Attempt to find as folder first (more destructive)
+        let folder = getFolderById(id)
+        if (!folder) {
+          const found = getCurrentFolders.value.find((f: Folder<VerseItem>) => f.id === id)
+          if (found) folder = found
+        }
+
+        if (folder) {
+          deleteFolderAction(id)
+        } else {
+          // Assume verse
+          removeItemFromCurrent(id)
+        }
+      })
+      // Clear selection after delete
+      customFolderTabRef.value?.deleteSelectedItems() // This cleans up UI state in child if needed, or we just rely on store update
+      // Actually we should just clear selection manually since items are gone.
+      activeTabSelection.value.clear()
+    } else if (multiFunctionTab.value === 'history') {
+      itemsToDelete.forEach((id) => {
+        bibleStore.removeHistoryItem(id)
+      })
+      activeTabSelection.value.clear()
+    }
+
+    batchDeleteCount.value = 0
     folderDialogs.showDeleteConfirmDialog.value = false
-    folderDialogs.folderToDelete.value = null
+    return
   }
+
+  // Single Delete
+  if (folderDialogs.folderToDelete.value) {
+    deleteFolderAction(folderDialogs.folderToDelete.value.id)
+  }
+  folderDialogs.showDeleteConfirmDialog.value = false
+  folderDialogs.folderToDelete.value = null
 }
 
 const removeFromCurrentFolder = (itemId: string) => {
@@ -1000,32 +1039,44 @@ const showMoveItemDialog = () => {
   closeItemContextMenu()
 }
 
-const deleteItem = () => {
-  if (!selectedItem.value) return
+const handleEscape = () => {
+  // 1. Close Context Menu
+  closeItemContextMenu()
 
-  // Check selection
-  const isSelected = activeTabSelection.value.has(selectedItem.value.item.id)
-
-  if (isSelected) {
-    // Delegate to child
+  // 2. Clear Selection
+  if (activeTabSelection.value.size > 0) {
     if (multiFunctionTab.value === 'custom' && customFolderTabRef.value) {
-      customFolderTabRef.value.deleteSelectedItems()
-      closeItemContextMenu()
-      return
+      customFolderTabRef.value.clearSelection()
     } else if (multiFunctionTab.value === 'history' && historyTabRef.value) {
-      historyTabRef.value.deleteSelectedItems()
-      closeItemContextMenu()
-      return
+      historyTabRef.value.clearSelection()
     }
   }
+}
 
-  if (selectedItem.value.type === 'verse' && isVerseItem(selectedItem.value.item)) {
-    removeFromCurrentFolder(selectedItem.value.item.id)
-  } else if (selectedItem.value.type === 'folder' && isFolder(selectedItem.value.item)) {
-    showDeleteFolderDialog(selectedItem.value.item.id)
-  } else if (selectedItem.value.type === 'history' && isVerseItem(selectedItem.value.item)) {
+const deleteItem = () => {
+  // Priority 1: Multi-selection (Works for Keyboard & Context Menu if selection exists)
+  if (activeTabSelection.value.size > 0) {
+    batchDeleteCount.value = activeTabSelection.value.size
+    folderDialogs.openDeleteSelectionDialog()
+    closeItemContextMenu()
+    return
+  } else {
+    batchDeleteCount.value = 0
+  }
+
+  // Priority 2: Single Item (Context Menu only)
+  if (!selectedItem.value) return
+
+  const itemType = selectedItem.value.type
+  const item = selectedItem.value.item
+
+  if (itemType === 'verse' && isVerseItem(item)) {
+    removeFromCurrentFolder(item.id)
+  } else if (itemType === 'folder' && isFolder(item)) {
+    showDeleteFolderDialog(item.id)
+  } else if (itemType === 'history' && isVerseItem(item)) {
     // Delete history item
-    bibleStore.removeHistoryItem(selectedItem.value.item.id)
+    bibleStore.removeHistoryItem(item.id)
   }
   closeItemContextMenu()
 }
@@ -1047,8 +1098,12 @@ useKeyboardShortcuts([
     },
   },
   {
+    config: KEYBOARD_SHORTCUTS.EDIT.DELETE,
+    handler: deleteItem,
+  },
+  {
     config: KEYBOARD_SHORTCUTS.MEDIA.ESCAPE,
-    handler: closeItemContextMenu,
+    handler: handleEscape,
   },
 ])
 </script>
