@@ -34,7 +34,7 @@
 </template>
 
 <script setup lang="ts">
-defineProps<{
+const props = defineProps<{
   modelValue: boolean
   title?: string
   itemName?: string
@@ -42,8 +42,22 @@ defineProps<{
   count?: number
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void
   (e: 'confirm'): void
 }>()
+
+import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
+import { KEYBOARD_SHORTCUTS } from '@/config/shortcuts'
+
+useKeyboardShortcuts([
+  {
+    config: KEYBOARD_SHORTCUTS.MEDIA.ESCAPE,
+    handler: () => {
+      if (props.modelValue) {
+        emit('update:modelValue', false)
+      }
+    },
+  },
+])
 </script>
