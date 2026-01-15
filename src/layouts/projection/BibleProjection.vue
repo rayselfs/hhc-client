@@ -12,7 +12,7 @@
         v-for="verse in chapterVerses"
         :key="verse.number"
         :id="`verse-${verse.number}`"
-        class="verse-item pt-5 pb-5 d-flex text-justify"
+        class="verse-item pt-5 pb-5 pl-4 pr-7 d-flex text-justify"
         :style="{ fontSize: `${computedFontSize}px` }"
       >
         <span class="verse-number">{{ verse.number }}</span>
@@ -243,7 +243,6 @@ onMounted(() => {
 .verse-item {
   align-items: flex-start;
   gap: 1rem;
-  padding: 1rem;
   border-radius: 8px;
   transition: all 0.3s ease;
   pointer-events: auto;
