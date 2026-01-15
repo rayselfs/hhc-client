@@ -25,7 +25,8 @@
     "dontShowAgain": "不要再显示",
     "selectedItems": "已选中 {count} 个项目",
     "view": "视图",
-    "sort": "排序"
+    "sort": "排序",
+    "export": "导出"
   },
   "extendedToolbar": {
     "openProjection": "开启投影",

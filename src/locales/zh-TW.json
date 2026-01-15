@@ -25,7 +25,8 @@
     "dontShowAgain": "不要再顯示",
     "selectedItems": "已選取 {count} 個項目",
     "view": "檢視",
-    "sort": "排序"
+    "sort": "排序",
+    "export": "匯出"
   },
   "extendedToolbar": {
     "openProjection": "開啟投影",

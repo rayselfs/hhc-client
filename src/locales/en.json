@@ -25,7 +25,8 @@
     "dontShowAgain": "Don't show again",
     "selectedItems": "{count} items selected",
     "view": "View",
-    "sort": "Sort"
+    "sort": "Sort",
+    "export": "Export"
   },
   "extendedToolbar": {
     "openProjection": "Open Projection",

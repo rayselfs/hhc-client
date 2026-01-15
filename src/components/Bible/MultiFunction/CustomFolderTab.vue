@@ -103,6 +103,7 @@ interface Emits {
     item: VerseItem | Folder<VerseItem>,
   ): void
   (e: 'paste'): void
+  (e: 'selection-change', selection: Set<string>): void
 }
 
 const props = defineProps<Props>()
@@ -146,6 +147,16 @@ const mergedItems = computed(() => [
 const handleItemClick = (id: string, event: MouseEvent) => {
   handleSelectionClick(id, mergedItems.value, event)
 }
+
+// Watch selection changes and emit to parent
+import { watch } from 'vue'
+watch(
+  () => selectedItems.value,
+  (newSelection) => {
+    emit('selection-change', new Set(newSelection))
+  },
+  { deep: true },
+)
 
 import { KEYBOARD_SHORTCUTS } from '@/config/shortcuts'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
@@ -246,7 +257,7 @@ onClickOutside(
     focusedId.value = null
   },
   {
-    ignore: ['.v-overlay-container', '.v-menu__content'],
+    ignore: ['.v-overlay-container', '.v-menu__content', '.ignore-selection-clear'],
   },
 )
 
