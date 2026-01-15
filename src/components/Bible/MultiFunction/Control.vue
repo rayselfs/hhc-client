@@ -481,6 +481,24 @@ const createNewFolder = () => {
   closeItemContextMenu()
 }
 
+// Check if name is duplicate in current folder
+const isNameExists = (name: string) => {
+  return getCurrentFolders.value.some((f: Folder<VerseItem>) => f.name === name)
+}
+
+// Generate unique name
+const getUniqueName = (originalName: string) => {
+  let finalName = originalName
+  let counter = 2
+
+  while (isNameExists(finalName)) {
+    finalName = `${originalName} ${counter}`
+    counter++
+  }
+
+  return finalName
+}
+
 const openFolderSettings = (folder: Folder<VerseItem>) => {
   folderDialogs.openEditDialog(folder)
 
@@ -916,6 +934,15 @@ const pasteItemHandler = async () => {
       if (isValidFolder) {
         if (item.action === 'cut') {
           // Move folder
+          // Check for name collision in target folder
+          const folderData = data as Folder<VerseItem>
+          const uniqueName = getUniqueName(folderData.name)
+
+          if (uniqueName !== folderData.name) {
+            // Update name before moving
+            await updateFolder(folderData.id, { name: uniqueName })
+          }
+
           await moveFolderAction(
             data as Folder<VerseItem>,
             targetFolderId,
@@ -925,7 +952,14 @@ const pasteItemHandler = async () => {
           movedCount++
         } else {
           // Paste (Clone) folder
-          pasteItem(data as Folder<VerseItem>, targetFolderId, 'folder')
+          const folderData = data as Folder<VerseItem>
+          const uniqueName = getUniqueName(folderData.name)
+
+          // We need to pass the renamed folder to pasteItem.
+          // Since pasteItem uses deepClone, we can just spread and override name.
+          const folderToPaste = { ...folderData, name: uniqueName }
+
+          pasteItem(folderToPaste, targetFolderId, 'folder')
         }
       }
     }
