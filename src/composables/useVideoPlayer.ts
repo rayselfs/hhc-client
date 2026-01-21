@@ -1,5 +1,14 @@
 import { ref, onUnmounted, type Ref } from 'vue'
 
+/**
+ * WeakMap to track HTMLMediaElements that have been connected to AudioContext.
+ * MediaElementSourceNode can only be created once per element, so we need to track this.
+ */
+const connectedElements = new WeakMap<
+  HTMLMediaElement,
+  { audioContext: AudioContext; sourceNode: MediaElementAudioSourceNode; gainNode: GainNode }
+>()
+
 export interface VideoPlayerOptions {
   /**
    * Ref to the video HTML element
@@ -54,6 +63,23 @@ export interface VideoPlayerOptions {
    * Callback when volume changes
    */
   onVolumeChange?: (volume: number) => void
+
+  /**
+   * Callback when video encounters an error
+   * Useful for handling stream interruptions (e.g., FFmpeg process terminated)
+   */
+  onError?: (error: MediaError | null) => void
+
+  /**
+   * Callback when video stalls (waiting for data)
+   * Useful for showing loading indicators during transcoding
+   */
+  onWaiting?: () => void
+
+  /**
+   * Callback when video can continue playing after stalling
+   */
+  onCanPlay?: () => void
 }
 
 /**
@@ -69,6 +95,9 @@ export function useVideoPlayer(options: VideoPlayerOptions) {
     onEnded,
     onPlayStateChange,
     onVolumeChange,
+    onError,
+    onWaiting,
+    onCanPlay,
   } = options
 
   const isInitialized = ref(false)
@@ -113,6 +142,20 @@ export function useVideoPlayer(options: VideoPlayerOptions) {
     }
   }
 
+  const handleError = () => {
+    if (videoRef.value && onError) {
+      onError(videoRef.value.error)
+    }
+  }
+
+  const handleWaiting = () => {
+    if (onWaiting) onWaiting()
+  }
+
+  const handleCanPlay = () => {
+    if (onCanPlay) onCanPlay()
+  }
+
   /**
    * Initialize Native HTML5 player
    */
@@ -134,6 +177,9 @@ export function useVideoPlayer(options: VideoPlayerOptions) {
       el.addEventListener('play', handlePlay)
       el.addEventListener('pause', handlePause)
       el.addEventListener('volumechange', handleVolumeChange)
+      el.addEventListener('error', handleError)
+      el.addEventListener('waiting', handleWaiting)
+      el.addEventListener('canplay', handleCanPlay)
 
       // Setup Silent Mode (AudioContext) if requested
       if (silent) {
@@ -148,28 +194,52 @@ export function useVideoPlayer(options: VideoPlayerOptions) {
 
   /**
    * Setup AudioContext to mute output while keeping player volume/state active
+   * Uses a WeakMap to track already-connected elements (MediaElementSourceNode can only be created once)
    */
   const setupSilentMode = () => {
     if (!videoRef.value) return
 
     try {
+      const el = videoRef.value
+
+      // Check if this element was already connected to an AudioContext
+      const existing = connectedElements.get(el)
+      if (existing) {
+        // Reuse existing audio nodes - just ensure gain is muted
+        audioContext.value = existing.audioContext
+        gainNode.value = existing.gainNode
+        gainNode.value.gain.value = 0
+
+        // Resume if suspended
+        if (audioContext.value.state === 'suspended') {
+          audioContext.value.resume()
+        }
+        return
+      }
+
+      // Create new AudioContext and connect
       const AudioContextClass =
         window.AudioContext ||
         (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
       if (!AudioContextClass) return
 
       audioContext.value = new AudioContextClass()
-      const source = audioContext.value.createMediaElementSource(videoRef.value)
+      const sourceNode = audioContext.value.createMediaElementSource(el)
       gainNode.value = audioContext.value.createGain()
 
       // Mute the gain node
       gainNode.value.gain.value = 0
 
       // Connect source -> gain (muted) -> destination
-      // Actually, if we want it silent, we can just NOT connect to destination,
-      // but connecting to a muted gain node is safer to keep the pipeline active.
-      source.connect(gainNode.value)
+      sourceNode.connect(gainNode.value)
       gainNode.value.connect(audioContext.value.destination)
+
+      // Store in WeakMap for future reuse
+      connectedElements.set(el, {
+        audioContext: audioContext.value,
+        sourceNode,
+        gainNode: gainNode.value,
+      })
     } catch (e) {
       // Often fails if element not connected or already connected.
       // Warn but don't crash
@@ -190,6 +260,9 @@ export function useVideoPlayer(options: VideoPlayerOptions) {
       el.removeEventListener('play', handlePlay)
       el.removeEventListener('pause', handlePause)
       el.removeEventListener('volumechange', handleVolumeChange)
+      el.removeEventListener('error', handleError)
+      el.removeEventListener('waiting', handleWaiting)
+      el.removeEventListener('canplay', handleCanPlay)
 
       // Stop playback and unload
       el.pause()
@@ -199,15 +272,13 @@ export function useVideoPlayer(options: VideoPlayerOptions) {
 
     isInitialized.value = false
 
-    // Cleanup AudioContext
-    if (audioContext.value) {
-      try {
-        audioContext.value.close()
-        audioContext.value = null
-      } catch {
-        // ignore
-      }
-    }
+    // Note: We do NOT close the AudioContext here because:
+    // 1. MediaElementSourceNode can only be created once per element
+    // 2. The AudioContext is stored in WeakMap and may be reused
+    // 3. AudioContext will be garbage collected when the element is removed
+    // Just clear our local refs
+    audioContext.value = null
+    gainNode.value = null
   }
 
   /**

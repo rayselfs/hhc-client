@@ -1,7 +1,8 @@
 <template>
   <div class="media-presenter fill-height d-flex flex-column bg-black">
     <!-- Main Content Area with Vuetify Grid -->
-    <v-container v-if="!showGrid" fluid class="flex-grow-1 overflow-hidden pa-0">
+    <!-- Use v-show instead of v-if to preserve video player state when toggling grid -->
+    <v-container v-show="!showGrid" fluid class="flex-grow-1 overflow-hidden pa-0">
       <v-row no-gutters class="fill-height">
         <!-- Left Column: Main Preview & Controls (cols=8) -->
         <v-col cols="8" class="d-flex flex-column pa-4 border-e">
@@ -38,7 +39,7 @@
                 <!-- Video Preview -->
                 <div
                   v-else-if="currentItem.metadata.fileType === 'video'"
-                  class="fill-height w-100 d-flex align-center justify-center bg-black"
+                  class="fill-height w-100 d-flex align-center justify-center bg-black position-relative"
                 >
                   <video
                     ref="previewVideoRef"
@@ -149,6 +150,7 @@
                 :volume="volume"
                 :is-muted="false"
                 :is-ended="isPreviewEnded"
+                :disable-seeking="needsTranscodeComputed"
                 class="position-absolute bottom-0 left-0 right-0 ma-2"
                 style="z-index: 20"
                 @play="playPreviewVideo"
@@ -276,7 +278,7 @@
     </v-container>
 
     <!-- Grid View Overlay -->
-    <v-container v-else fluid class="overflow-y-auto">
+    <v-container v-show="showGrid" fluid class="overflow-y-auto">
       <v-row>
         <v-col v-for="(item, index) in playlist" :key="item.id" cols="6" sm="4" md="3" lg="2">
           <v-card
@@ -325,6 +327,9 @@ import { ViewType } from '@/types/common'
 import { useVideoPlayer } from '@/composables/useVideoPlayer'
 import MediaVideoControls from '@/components/Media/Preview/MediaVideoControls.vue'
 import MediaThumbnail from '@/components/Media/MediaThumbnail.vue'
+import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
+import { KEYBOARD_SHORTCUTS } from '@/config/shortcuts'
+import { needsTranscode, buildVideoUrl } from '@/utils/videoUtils'
 
 const stopwatchStore = useStopwatchStore()
 
@@ -336,7 +341,6 @@ const store = useMediaProjectionStore()
 const {
   playlist,
   currentIndex,
-  isPresenting,
   showGrid,
   currentItem,
   nextItem,
@@ -396,12 +400,17 @@ const {
     }
   },
   onDurationChange: (dur) => {
-    store.setDuration(dur)
+    // If we have a reliable duration from ffprobe metadata, prefer that
+    // over the video element's reported duration (which can be inaccurate for transcoded streams)
+    const metadataDuration = currentItem.value?.metadata?.duration
+    const effectiveDuration = metadataDuration && metadataDuration > 0 ? metadataDuration : dur
+
+    store.setDuration(effectiveDuration)
     // Send duration to projection window
     sendProjectionMessage(MessageType.MEDIA_CONTROL, {
       type: 'video',
       action: 'durationchange',
-      value: dur,
+      value: effectiveDuration,
     })
   },
   onVolumeChange: (vol) => {
@@ -420,30 +429,27 @@ const {
 })
 
 /**
- * Handles user seeking via the timeline.
- * Locks the seeking state to prevent incoming projection updates from overriding the local seek.
+ * Handles user seeking via the timeline (during drag).
+ * For native videos (MP4, WebM), performs immediate seek.
+ * For transcoded videos (MKV, AVI), seeking is DISABLED.
  */
 const onSeek = (time: number) => {
+  if (needsTranscodeComputed.value) return
+
   isSeeking.value = true
 
-  // 1. Update local store
+  // 1. Update local store for UI display
   store.setCurrentTime(time)
 
-  // 2. Seek local video
+  // For native videos (MP4, WebM), perform immediate seek
   seekPreviewVideo(time)
 
-  // 3. Send explicit SEEK command to projection (bypassing watcher logic)
+  // Send explicit SEEK command to projection (bypassing watcher logic)
   sendProjectionMessage(
     MessageType.MEDIA_CONTROL,
     { type: 'video', action: 'seek', value: time },
     { force: true },
   )
-
-  // Release lock after a short delay to allow seek to settle
-  // This prevents the "old" time from projection (which might lag) from overwriting our new time immediately
-  setTimeout(() => {
-    isSeeking.value = false
-  }, 500)
 }
 
 const replayVideo = () => {
@@ -454,16 +460,30 @@ const replayVideo = () => {
   store.setCurrentTime(0)
   store.setPlaying(true)
 
-  // 3. Operate local Preview
-  seekPreviewVideo(0)
-  playPreviewVideo()
+  // 3. For transcoded videos, reload from beginning
+  if (needsTranscodeComputed.value) {
+    // Reload from beginning and auto-play
+    initializeCurrentVideo(true)
 
-  // 4. Send commands to Projection
-  sendProjectionMessage(
-    MessageType.MEDIA_CONTROL,
-    { type: 'video', action: 'seek', value: 0 },
-    { force: true },
-  )
+    // Send seek to 0 to trigger projection reload for transcoded videos
+    sendProjectionMessage(
+      MessageType.MEDIA_CONTROL,
+      { type: 'video', action: 'seek', value: 0 },
+      { force: true },
+    )
+  } else {
+    // Native seek for MP4, WebM
+    seekPreviewVideo(0)
+    playPreviewVideo()
+
+    // Send commands to Projection
+    sendProjectionMessage(
+      MessageType.MEDIA_CONTROL,
+      { type: 'video', action: 'seek', value: 0 },
+      { force: true },
+    )
+  }
+
   sendProjectionMessage(
     MessageType.MEDIA_CONTROL,
     { type: 'video', action: 'play' },
@@ -477,6 +497,8 @@ const toggleMute = () => {
 }
 
 const onSeekingStart = () => {
+  if (needsTranscodeComputed.value) return
+
   isSeeking.value = true
   sendProjectionMessage(
     MessageType.MEDIA_CONTROL,
@@ -489,18 +511,22 @@ const onSeekingStart = () => {
 }
 
 const onSeekingEnd = (finalTime: number) => {
+  if (needsTranscodeComputed.value) return
+
   // Lock seeking state to prevent drift correction from reverting the seek
   isSeeking.value = true
 
   // 1. Update local state
   store.setCurrentTime(finalTime)
+
+  // 2. Native seek
   seekPreviewVideo(finalTime)
 
   if (!previewVideoRef.value) {
     console.error('[MediaPresenter] previewVideoRef is null!')
   }
 
-  // 2. Send seeking-end with final position to Projection
+  // Send seeking-end with final position to Projection
   sendProjectionMessage(
     MessageType.MEDIA_CONTROL,
     {
@@ -589,20 +615,88 @@ const startPanDrag = (e: MouseEvent) => {
   window.addEventListener('mouseup', handleMouseUp)
 }
 
-const videoURL = computed(() => {
-  if (currentItem.value?.metadata.fileType === 'video' && currentItem.value.url) {
-    // Add timestamp to force cache busting and ensure Accept-Ranges header is respected
-    // This solves the issue where browser caches "non-seekable" state from previous requests
-    return `${currentItem.value.url}?t=${Date.now()}`
-  }
-  return ''
-})
-
 const pdfUrl = computed(() => {
   if (!currentItem.value) return ''
   // Use #page=N to control PDF page if browser supports it
   return `${currentItem.value.url}#page=${pdfPage.value}&toolbar=0&navpanes=0&scrollbar=0`
 })
+
+// Extensions that require FFmpeg transcoding (cannot use native Range seek)
+// Now using shared utility from @/utils/videoUtils
+
+/**
+ * Check if the current video needs transcoding (based on file extension)
+ * Transcoded videos require reloading with seek parameter instead of native seek
+ */
+const needsTranscodeComputed = computed(() => {
+  const url = currentItem.value?.url
+  if (!url) return false
+  return needsTranscode(url)
+})
+
+/**
+ * Build video URL with optional seek parameter for transcoded videos
+ * Now using shared utility from @/utils/videoUtils
+ */
+const buildVideoUrlForPreview = (baseUrl: string): string => {
+  return buildVideoUrl({
+    baseUrl,
+    isTranscoded: needsTranscodeComputed.value,
+    window: 'preview',
+  })
+}
+
+/**
+ * Initialize or reinitialize video player for current item
+ * This function handles all video initialization logic in one place
+ * @param autoPlay - Whether to auto-play after initialization (default: false)
+ */
+const initializeCurrentVideo = (autoPlay = false) => {
+  const item = currentItem.value
+  if (!item || item.metadata.fileType !== 'video') return
+
+  // Reset video state for new/reinitialized item
+  isPreviewEnded.value = false
+
+  // If metadata has duration from ffprobe, use it immediately
+  const metadataDuration =
+    item.metadata.duration && item.metadata.duration > 0 ? item.metadata.duration : 0
+  if (metadataDuration > 0) {
+    store.setDuration(metadataDuration)
+    // Also send to projection
+    sendProjectionMessage(MessageType.MEDIA_CONTROL, {
+      type: 'video',
+      action: 'durationchange',
+      value: metadataDuration,
+    })
+  }
+
+  // Use nextTick to ensure video element is mounted
+  nextTick(() => {
+    if (previewVideoRef.value && item.url) {
+      // Dispose old player first to ensure clean state
+      disposePreviewPlayer()
+
+      // Initialize new player
+      initializePreviewPlayer()
+
+      // Build video URL (no seek support for transcoded videos)
+      const videoSrc = buildVideoUrlForPreview(item.url)
+      previewVideoRef.value.src = videoSrc
+
+      // Auto-play after video is ready (for replay scenario)
+      if (autoPlay) {
+        previewVideoRef.value.addEventListener(
+          'canplay',
+          () => {
+            playPreviewVideo()
+          },
+          { once: true },
+        )
+      }
+    }
+  })
+}
 
 // Video player initialization on item change
 watch(
@@ -616,14 +710,19 @@ watch(
     }
 
     // Initialize new video player if current item is a video
-    if (newItem?.metadata.fileType === 'video' && previewVideoRef.value) {
-      // Use nextTick to ensure video element is mounted
-      nextTick(() => {
-        if (previewVideoRef.value && videoURL.value) {
-          initializePreviewPlayer()
-          previewVideoRef.value.src = videoURL.value
-        }
+    if (newItem?.metadata.fileType === 'video') {
+      // Reset video state for new item
+      store.setCurrentTime(0)
+      store.setPlaying(false)
+
+      // Send reset state to projection
+      sendProjectionMessage(MessageType.MEDIA_CONTROL, {
+        type: 'video',
+        action: 'seek',
+        value: 0,
       })
+
+      initializeCurrentVideo()
     }
   },
   { immediate: false },
@@ -729,6 +828,8 @@ watch(isPlaying, (val) => {
       playPreviewVideo()
     } else if (!val && !isPaused) {
       pausePreviewVideo()
+      // Reset playbackRate when paused (in case drift correction adjusted it)
+      previewVideoRef.value.playbackRate = 1.0
     }
   }
 
@@ -751,76 +852,88 @@ watch(volume, (val) => {
   })
 })
 
-const handleKeydown = (e: KeyboardEvent) => {
-  if (!isPresenting.value) return
+const handleEscape = () => {
+  if (showGrid.value) {
+    showGrid.value = false
+    return
+  }
 
-  // Ignore if typing in notes
-  if ((e.target as HTMLElement).tagName === 'TEXTAREA') return
+  if (showZoomControls.value) {
+    toggleZoom()
+    return
+  }
 
-  switch (e.key) {
-    case 'Escape':
-      if (showGrid.value) {
-        showGrid.value = false
-        break
-      }
+  exitPresentation()
+}
 
-      if (showZoomControls.value) {
-        toggleZoom()
-        break
-      }
+const handleVideoTogglePlay = () => {
+  if (currentItem.value?.metadata.fileType !== 'video') return
 
-      exitPresentation()
-      break
-    case 'ArrowRight':
-    case 'ArrowDown':
-    case 'PageDown':
-    case 'Enter':
-    case 'n':
-    case 'N':
-      store.next()
-      break
-    case 'ArrowLeft':
-    case 'ArrowUp':
-    case 'PageUp':
-    case 'p':
-    case 'P':
-      store.prev()
-      break
-    case 'Home':
-      store.jumpTo(0)
-      break
-    case 'End':
-      store.jumpTo(playlist.value.length - 1)
-      break
-    case 'g':
-    case 'G':
-      store.toggleGrid()
-      break
-    case 'z':
-    case 'Z':
-      toggleZoom()
-      break
-    case '+':
-    case '=':
+  if (isPreviewEnded.value) {
+    replayVideo()
+  } else if (isPlaying.value) {
+    pausePreviewVideo()
+  } else {
+    playPreviewVideo()
+  }
+}
+
+useKeyboardShortcuts([
+  {
+    config: KEYBOARD_SHORTCUTS.MEDIA.ESCAPE,
+    handler: handleEscape,
+  },
+  {
+    config: KEYBOARD_SHORTCUTS.MEDIA.NEXT_SLIDE,
+    handler: () => store.next(),
+  },
+  {
+    config: KEYBOARD_SHORTCUTS.MEDIA.PREV_SLIDE,
+    handler: () => store.prev(),
+  },
+  {
+    config: KEYBOARD_SHORTCUTS.MEDIA.FIRST_SLIDE,
+    handler: () => store.jumpTo(0),
+  },
+  {
+    config: KEYBOARD_SHORTCUTS.MEDIA.LAST_SLIDE,
+    handler: () => store.jumpTo(playlist.value.length - 1),
+  },
+  {
+    config: KEYBOARD_SHORTCUTS.MEDIA.TOGGLE_GRID,
+    handler: () => store.toggleGrid(),
+  },
+  {
+    config: KEYBOARD_SHORTCUTS.MEDIA.TOGGLE_ZOOM,
+    handler: () => toggleZoom(),
+  },
+  {
+    config: KEYBOARD_SHORTCUTS.MEDIA.ZOOM_IN,
+    handler: () => {
       if (showZoomControls.value) {
         zoomIn()
       } else {
         toggleZoom()
       }
-      break
-    case '-':
-    case '_':
+    },
+  },
+  {
+    config: KEYBOARD_SHORTCUTS.MEDIA.ZOOM_OUT,
+    handler: () => {
       if (showZoomControls.value) {
         zoomOut()
       } else {
         toggleZoom(true)
       }
-      break
-  }
-}
+    },
+  },
+  {
+    config: KEYBOARD_SHORTCUTS.MEDIA.VIDEO_TOGGLE_PLAY,
+    handler: handleVideoTogglePlay,
+  },
+])
 
 onMounted(async () => {
-  window.addEventListener('keydown', handleKeydown)
   // Ensure local stopwatch is running (persisting if already running)
   stopwatchStore.startLocal()
 
@@ -851,12 +964,28 @@ onMounted(async () => {
         // Let local preview drive the UI for 60fps smoothness.
         // Only use projectionTime for drift correction.
 
-        // Sync preview video if drift > 1 second
+        // Drift correction using playbackRate adjustment
         if (previewVideoRef.value && !isSeeking.value && isPlaying.value) {
-          const previewTime = previewVideoRef.value.currentTime
-          const drift = Math.abs(previewTime - projectionTime)
-          if (drift > 1.0) {
+          // For transcoded videos, projection reports raw video.currentTime
+          // We need to compare apples to apples (both raw times, without offset)
+          const previewRawTime = previewVideoRef.value.currentTime
+
+          const drift = previewRawTime - projectionTime // positive = preview ahead, negative = preview behind
+
+          // Large drift (> 1 second): hard seek
+          if (Math.abs(drift) > 1.0) {
             seekPreviewVideo(projectionTime)
+            previewVideoRef.value.playbackRate = 1.0
+          }
+          // Medium drift (0.1 - 1 second): adjust playback rate to catch up/slow down
+          else if (Math.abs(drift) > 0.1) {
+            // Adjust rate: if preview is ahead, slow down; if behind, speed up
+            // Use gentle adjustment (±5%) to avoid noticeable audio pitch change
+            previewVideoRef.value.playbackRate = drift > 0 ? 0.95 : 1.05
+          }
+          // Small drift (< 0.1 second): reset to normal rate
+          else if (previewVideoRef.value.playbackRate !== 1.0) {
+            previewVideoRef.value.playbackRate = 1.0
           }
         }
       }
@@ -865,17 +994,11 @@ onMounted(async () => {
 
   // Initialize video player if current item is already a video
   if (currentItem.value?.metadata.fileType === 'video') {
-    nextTick(() => {
-      if (previewVideoRef.value && currentItem.value?.url) {
-        initializePreviewPlayer()
-        previewVideoRef.value.src = currentItem.value.url
-      }
-    })
+    initializeCurrentVideo()
   }
 })
 
 onUnmounted(() => {
-  window.removeEventListener('keydown', handleKeydown)
   stopwatchStore.resetLocal()
   // Cleanup video player
   disposePreviewPlayer()

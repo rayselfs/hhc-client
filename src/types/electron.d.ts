@@ -28,7 +28,11 @@ export interface ElectronAPI {
   getDisplays: () => Promise<DisplayInfo[]>
 
   // File System
-  saveFile: (filePath: string) => Promise<{ filePath: string; thumbnailData?: Uint8Array }>
+  saveFile: (filePath: string) => Promise<{
+    filePath: string
+    thumbnailData?: Uint8Array
+    videoMetadata?: { duration: number; mimeType: string }
+  }>
   deleteFile: (filePath: string) => Promise<boolean>
   copyFile: (filePath: string) => Promise<{ filePath: string; thumbnailData?: Uint8Array } | null>
   listDirectory: (dirPath: string) => Promise<
@@ -131,6 +135,60 @@ export interface ElectronAPI {
 
   /** Restart the application */
   restartApp: () => Promise<void>
+
+  // Video probe
+  /** Probe video file for transcoding information */
+  probeVideo: (filePath: string) => Promise<VideoInfo | null>
+
+  // Video quality settings
+  /** Get current video quality setting */
+  getVideoQuality: () => Promise<VideoQuality>
+
+  /** Set video quality setting */
+  setVideoQuality: (quality: VideoQuality) => Promise<boolean>
+
+  // FFmpeg settings
+  /** Get whether FFmpeg support is enabled */
+  getEnableFfmpeg: () => Promise<boolean>
+
+  /** Set whether FFmpeg support is enabled */
+  setEnableFfmpeg: (enabled: boolean) => Promise<boolean>
+
+  /** Check FFmpeg availability and get status */
+  ffmpegCheckStatus: () => Promise<FFmpegStatus>
+
+  /** Set custom FFmpeg path */
+  ffmpegSetPath: (path: string) => Promise<FFmpegStatus>
+}
+
+/**
+ * Video quality setting for transcoding
+ * - 'high': Use original bitrate (100%)
+ * - 'medium': Use 70% of original bitrate
+ * - 'low': Use 40% of original bitrate
+ */
+export type VideoQuality = 'low' | 'medium' | 'high'
+
+export interface FFmpegStatus {
+  available: boolean
+  path: string
+  version: string
+  error?: string
+}
+
+/**
+ * Video info from ffprobe
+ */
+export interface VideoInfo {
+  codec: string // 'h264', 'hevc', 'vp9', etc.
+  audioCodec: string // 'aac', 'ac3', 'dts', etc.
+  width: number
+  height: number
+  duration: number
+  bitrate: number
+  needsTranscode: boolean
+  needsAudioTranscode: boolean
+  canRemux: boolean // H.264 + supported audio can be directly remuxed
 }
 
 /**

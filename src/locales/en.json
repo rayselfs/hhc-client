@@ -155,6 +155,12 @@
   },
   "settings": {
     "title": "Settings",
+    "categories": {
+      "general": "General",
+      "media": "Media",
+      "system": "System",
+      "about": "About"
+    },
     "timezone": "Timezone",
     "theme": "Theme",
     "language": "Language",
@@ -167,7 +173,45 @@
     "performance": "Performance",
     "hardwareAcceleration": "Hardware Acceleration",
     "restartRequired": "Restart Required",
-    "restartRequiredMessage": "Hardware acceleration setting changes require restarting the application to take effect."
+    "restartRequiredMessage": "Hardware acceleration setting changes require restarting the application to take effect.",
+    "videoQuality": "Video Transcode Quality",
+    "videoQualityHint": "Affects video formats that require transcoding (e.g., MKV, AVI). Native formats like MP4 are not affected.",
+    "videoQualityOptions": {
+      "high": "High (Original)",
+      "highDesc": "Uses original video bitrate, larger file size",
+      "medium": "Medium (70%)",
+      "mediumDesc": "Balance between quality and performance",
+      "low": "Low (40%)",
+      "lowDesc": "Lower quality, smoother streaming"
+    },
+    "media": {
+      "enableExtendedVideo": "Enable Extended Video Support",
+      "enableExtendedVideoHint": "Required for non-native video formats like MKV, AVI, and MOV. Requires FFmpeg to be installed on your system.",
+      "ffmpegStatus": "FFmpeg Status",
+      "ffmpegFound": "Found (v{version})",
+      "ffmpegNotFound": "Not Found",
+      "customFfmpegPath": "Custom FFmpeg Path",
+      "customFfmpegPathPlaceholder": "Leave empty to use system default",
+      "installGuide": {
+        "title": "FFmpeg Installation Guide",
+        "windows": {
+          "step1": "Download the FFmpeg release essentials build from {gyan} or {github}.",
+          "step2": "Extract the ZIP file to a permanent location.",
+          "step3": "Copy the path to the bin/ffmpeg.exe file.",
+          "step4": "Paste the path into the Custom FFmpeg Path field in Settings."
+        },
+        "macOS": {
+          "option1Title": "Option 1: Using Homebrew (Recommended)",
+          "option1Step1": "Open Terminal.",
+          "option1Step2": "Run: brew install ffmpeg",
+          "option1Step3": "The app should automatically detect it.",
+          "option2Title": "Option 2: Manual Download",
+          "option2Step1": "Download a static build from {evermeet}.",
+          "option2Step2": "Extract and move ffmpeg to a permanent location.",
+          "option2Step3": "Point the app to this location in Settings."
+        }
+      }
+    }
   },
   "timezones": {
     "taipei": "Taipei Time (UTC+8)",
@@ -257,6 +301,7 @@
     "videoReady": "Video Ready",
     "videoPlaying": "Video Playing",
     "videoPaused": "Video Paused",
+    "seekingDisabled": "Seeking disabled for this format",
     "largeIcons": "Large Icons",
     "mediumIcons": "Medium Icons",
     "smallIcons": "Small Icons",
@@ -290,6 +335,8 @@
     "clipboardCut": "Items cut to clipboard",
     "uploadWebWarning": "Warning: Files uploaded in web mode cannot be saved permanently",
     "moveSuccess": "Move successfully",
-    "moveFailed": "Move failed"
+    "moveFailed": "Move failed",
+    "ffmpegRequired": "This video format requires Extended Video Support. Please enable it in Settings.",
+    "ffmpegNotAvailable": "FFmpeg is not available. Please install FFmpeg and configure it in Settings."
   }
 }

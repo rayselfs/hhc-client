@@ -21,10 +21,19 @@ export const KEYBOARD_SHORTCUTS = {
     SELECT_ALL: { key: 'a', metaOrCtrl: true },
   },
   MEDIA: {
-    START_PRESENTATION: { key: 'F5' }, // Contextual usage
-    START_PRESENTATION_FROM_BEGINNING: { key: 'F5', shift: true }, // Example
-    ESCAPE: { key: 'Escape' },
-    ENTER: { key: 'Enter' },
+    START_PRESENTATION: { code: 'F5' }, // Contextual usage
+    START_PRESENTATION_FROM_BEGINNING: { code: 'F5', shift: true }, // Example
+    ESCAPE: { code: 'Escape' },
+    ENTER: { code: 'Enter' },
+    NEXT_SLIDE: { codes: ['ArrowRight', 'ArrowDown', 'PageDown', 'Enter', 'KeyN'] },
+    PREV_SLIDE: { codes: ['ArrowLeft', 'ArrowUp', 'PageUp', 'KeyP'] },
+    FIRST_SLIDE: { code: 'Home' },
+    LAST_SLIDE: { code: 'End' },
+    TOGGLE_GRID: { code: 'KeyG' },
+    TOGGLE_ZOOM: { code: 'KeyZ' },
+    ZOOM_IN: { codes: ['Equal', 'NumpadAdd'] },
+    ZOOM_OUT: { codes: ['Minus', 'NumpadSubtract'] },
+    VIDEO_TOGGLE_PLAY: { code: 'Space' }, // Play/Pause/Replay video
   },
   TIMER: {
     TOGGLE: { code: 'Space' },

@@ -16,6 +16,7 @@
         hide-details
         density="compact"
         class="w-100 align-center px-1 mx-0"
+        :readonly="disableSeeking"
         @update:model-value="handleSeekInput"
         @start="handleSeekStart"
         @end="handleSeekEnd"
@@ -33,7 +34,7 @@
         }"
         variant="tonal"
       >
-        {{ formatTime(hoverTime) }}
+        {{ disableSeeking ? $t('media.seekingDisabled') : formatTime(hoverTime) }}
       </v-chip>
     </div>
 
@@ -112,6 +113,7 @@ const props = defineProps<{
   volume: number
   isMuted: boolean
   isEnded?: boolean
+  disableSeeking?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -161,6 +163,8 @@ watch(
 )
 
 const handleSeekStart = () => {
+  if (props.disableSeeking) return
+
   isDragging.value = true
   wasPlayingBeforeDrag.value = props.isPlaying
 
@@ -172,12 +176,15 @@ const handleSeekStart = () => {
 }
 
 const handleSeekInput = (val: number) => {
+  if (props.disableSeeking) return
   localTime.value = val
   // Don't emit seek during dragging - only update local state for UI
   // The final seek will be sent in handleSeekEnd
 }
 
 const handleSeekEnd = (val?: number) => {
+  if (props.disableSeeking) return
+
   isDragging.value = false
 
   // Use the event value if available, otherwise fallback to localTime

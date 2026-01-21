@@ -7,6 +7,7 @@ export interface ShortcutConfig {
   key?: string
   code?: string
   keys?: string[] | readonly string[] // For multiple alternative keys like Delete/Backspace
+  codes?: string[] | readonly string[] // For multiple alternative codes like ArrowRight/KeyN
   ctrl?: boolean
   meta?: boolean
   shift?: boolean
@@ -47,6 +48,11 @@ export function useKeyboardShortcuts(shortcuts: ShortcutHandler[]) {
 
     // Check key code or key value
     if (config.code && event.code !== config.code) return false
+
+    // Check multiple codes if provided
+    if (config.codes) {
+      if (!config.codes.includes(event.code)) return false
+    }
 
     if (config.key && event.key.toLowerCase() !== config.key.toLowerCase()) return false
 

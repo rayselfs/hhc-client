@@ -190,7 +190,7 @@ const VIRTUAL_SCROLL_THRESHOLD = 50
 
 // Helper to check type
 const isFolder = (item: UnifiedItem): item is Folder<FileItem> => {
-  return 'children' in item || !('metadata' in item)
+  return 'items' in item
 }
 
 // Local items for manual swap
@@ -293,9 +293,14 @@ const onKeyDown = (event: KeyboardEvent) => {
           mediaStore.enterFolder(item.id)
           emit('update:selected-items', new Set())
           mediaStore.loadChildren(item.id)
-          focusedId.value = null // Clear focus on navigation
+          focusedId.value = null
         } else {
-          emit('open-presentation', item as FileItem)
+          const fileItem = item as FileItem
+          if (fileItem.permissions?.canPresent === false) {
+            showSnackBar(t('fileExplorer.ffmpegRequired'), { color: 'warning' })
+            return
+          }
+          emit('open-presentation', fileItem)
         }
       }
     }
@@ -547,11 +552,15 @@ const onDrop = async (event: DragEvent, item: UnifiedItem) => {
 const handleDoubleClick = (item: UnifiedItem) => {
   if (isFolder(item)) {
     mediaStore.enterFolder(item.id)
-    // Clear selection on enter
     emit('update:selected-items', new Set())
     mediaStore.loadChildren(item.id)
   } else {
-    emit('open-presentation', item as FileItem)
+    const fileItem = item as FileItem
+    if (fileItem.permissions?.canPresent === false) {
+      showSnackBar(t('fileExplorer.ffmpegRequired'), { color: 'warning' })
+      return
+    }
+    emit('open-presentation', fileItem)
   }
 }
 

@@ -6,11 +6,29 @@ import { FOLDER_DB_CONFIG } from '@/config/db'
 import { useMediaFolderStore } from '@/stores/folder'
 import { useFileSystem } from '@/composables/useFileSystem'
 import { useIndexedDB } from '@/composables/useIndexedDB'
+import { useElectron } from '@/composables/useElectron'
 import type { UseFolderDialogsReturn } from './useFolderDialogs'
 import type { Folder, FileItem, ClipboardItem, SortBy, SortOrder } from '@/types/common'
 import { FolderDBStore, MediaFolder } from '@/types/enum'
 import { DEFAULT_LOCAL_PERMISSIONS } from '@/services/filesystem'
 import { useSnackBar } from './useSnackBar'
+import { useSettingsStore } from '@/stores/settings'
+
+// Video extensions that may not be recognized by browser MIME type detection
+const VIDEO_EXTENSIONS = ['.mkv', '.avi', '.mov', '.wmv', '.flv', '.ts', '.m2ts', '.m4v']
+
+// Non-native video extensions that require FFmpeg for transcoding
+const NON_NATIVE_VIDEO_EXTENSIONS = ['.mkv', '.avi', '.mov', '.wmv', '.flv', '.ts', '.m2ts']
+
+function isVideoExtension(filename: string): boolean {
+  const ext = filename.toLowerCase().slice(filename.lastIndexOf('.'))
+  return VIDEO_EXTENSIONS.includes(ext)
+}
+
+function isNonNativeVideoExtension(filename: string): boolean {
+  const ext = filename.toLowerCase().slice(filename.lastIndexOf('.'))
+  return NON_NATIVE_VIDEO_EXTENSIONS.includes(ext)
+}
 
 type MediaStore = ReturnType<typeof useMediaFolderStore>
 
@@ -23,6 +41,23 @@ export function useMediaOperations(
   const fileSystem = useFileSystem()
   const db = useIndexedDB(FOLDER_DB_CONFIG)
   const { showSnackBar } = useSnackBar()
+  const { isElectron, ffmpegCheckStatus } = useElectron()
+
+  const settingsStore = useSettingsStore()
+  const { isFfmpegEnabled } = storeToRefs(settingsStore)
+
+  const canProjectItem = (item: FileItem): boolean => {
+    if (item.metadata.fileType === 'image' || item.metadata.fileType === 'pdf') {
+      return true
+    }
+
+    if (item.metadata.fileType === 'video' && isNonNativeVideoExtension(item.name)) {
+      return isFfmpegEnabled.value
+    }
+
+    return true
+  }
+
   const {
     currentFolderPath,
     getCurrentFolders: currentFolders,
@@ -118,11 +153,41 @@ export function useMediaOperations(
     return 'items' in item
   }
 
+  // Helper to attach canPresent to item permissions
+  const attachCanPresent = <T extends FileItem | Folder<FileItem>>(item: T): T => {
+    // Folders always can present (they contain items)
+    if ('items' in item) {
+      return {
+        ...item,
+        permissions: {
+          ...(item.permissions || DEFAULT_LOCAL_PERMISSIONS),
+          canPresent: true,
+        },
+      }
+    }
+    // Files: compute canPresent based on type and FFmpeg status
+    const fileItem = item as FileItem
+    const canPresent = canProjectItem(fileItem)
+    return {
+      ...item,
+      permissions: {
+        ...(item.permissions || DEFAULT_LOCAL_PERMISSIONS),
+        canPresent,
+      },
+    }
+  }
+
   // Unified list for display - Single Source of Truth
   const sortedUnifiedItems = computed(() => {
+    // Track isFfmpegEnabled to recompute canPresent when setting changes
+    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+    isFfmpegEnabled.value
+
     // 1. If Custom mode (sortOrder is 'none'), return physical order from store
     if (sortOrder.value === 'none' || sortBy.value === 'custom') {
-      return [...currentFolders.value, ...currentItems.value]
+      const allItems = [...currentFolders.value, ...currentItems.value]
+      // Attach canPresent to all items
+      return allItems.map(attachCanPresent)
     }
 
     // 2. Otherwise, perform visual sorting
@@ -171,8 +236,9 @@ export function useMediaOperations(
     folders.sort((a, b) => compareFn(a, b, 'folder'))
     items.sort((a, b) => compareFn(a, b, 'file'))
 
-    // 3. Merge: Folders First
-    return [...folders, ...items]
+    // 3. Merge: Folders First, then attach canPresent to all items
+    const merged = [...folders, ...items]
+    return merged.map(attachCanPresent)
   })
 
   // Derived computed properties for backward compatibility if needed,
@@ -234,8 +300,20 @@ export function useMediaOperations(
       let fileType: FileItem['metadata']['fileType']
       if (file.type.startsWith('image/')) {
         fileType = 'image'
-      } else if (file.type.startsWith('video/')) {
+      } else if (file.type.startsWith('video/') || isVideoExtension(file.name)) {
         fileType = 'video'
+
+        if (isNonNativeVideoExtension(file.name) && isElectron()) {
+          if (!isFfmpegEnabled.value) {
+            showSnackBar(t('fileExplorer.ffmpegRequired'), { color: 'warning' })
+            continue
+          }
+          const status = await ffmpegCheckStatus()
+          if (!status.available) {
+            showSnackBar(t('fileExplorer.ffmpegNotAvailable'), { color: 'error' })
+            continue
+          }
+        }
       } else if (file.type === 'application/pdf') {
         fileType = 'pdf'
       } else {
@@ -272,6 +350,13 @@ export function useMediaOperations(
               const result = await fileSystem.saveFile(filePathSource)
               if (result.success && result.data) {
                 newItem.url = result.data.fileUrl
+
+                // Apply video metadata if available (duration, mimeType)
+                if (result.data.videoMetadata) {
+                  newItem.metadata.duration = result.data.videoMetadata.duration
+                  newItem.metadata.mimeType = result.data.videoMetadata.mimeType
+                }
+
                 if (result.data.thumbnailData) {
                   const blob = new Blob([result.data.thumbnailData.buffer as ArrayBuffer], {
                     type: 'image/jpeg',
@@ -332,8 +417,21 @@ export function useMediaOperations(
 
       let fileType: FileItem['metadata']['fileType']
       if (file.type.startsWith('image/')) fileType = 'image'
-      else if (file.type.startsWith('video/')) fileType = 'video'
-      else if (file.type === 'application/pdf') fileType = 'pdf'
+      else if (file.type.startsWith('video/') || isVideoExtension(file.name)) {
+        fileType = 'video'
+
+        if (isNonNativeVideoExtension(file.name) && isElectron()) {
+          if (!isFfmpegEnabled.value) {
+            showSnackBar(t('fileExplorer.ffmpegRequired'), { color: 'warning' })
+            continue
+          }
+          const status = await ffmpegCheckStatus()
+          if (!status.available) {
+            showSnackBar(t('fileExplorer.ffmpegNotAvailable'), { color: 'error' })
+            continue
+          }
+        }
+      } else if (file.type === 'application/pdf') fileType = 'pdf'
       else continue
 
       try {
@@ -357,6 +455,13 @@ export function useMediaOperations(
               const result = await fileSystem.saveFile(filePathSource)
               if (result.success && result.data) {
                 newItem.url = result.data.fileUrl
+
+                // Apply video metadata if available (duration, mimeType)
+                if (result.data.videoMetadata) {
+                  newItem.metadata.duration = result.data.videoMetadata.duration
+                  newItem.metadata.mimeType = result.data.videoMetadata.mimeType
+                }
+
                 if (result.data.thumbnailData) {
                   const blob = new Blob([result.data.thumbnailData.buffer as ArrayBuffer], {
                     type: 'image/jpeg',
@@ -766,7 +871,12 @@ export function useMediaOperations(
     handleCut,
     handlePaste,
     handlePasteIntoFolder,
-    getUniqueName, // Exposed for external usage if needed
+    getUniqueName,
+
+    // FFmpeg / Projectability
+    canProjectItem,
+    updateFfmpegStatus: settingsStore.updateFfmpegStatus,
+    isFfmpegEnabled,
 
     // From MediaUpload
     fileInput,

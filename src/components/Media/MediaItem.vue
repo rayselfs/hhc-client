@@ -6,9 +6,11 @@
       { 'is-dragging': isDragging },
       { 'drag-zone-center': dragZone === 'center' },
       { 'item-selected': isSelected },
+      { 'item-disabled': isDisabled },
     ]"
     :data-id="item.id"
     :style="{ width: '100%' }"
+    :title="isDisabled ? $t('fileExplorer.ffmpegRequired') : undefined"
     @dragover="onDragOver"
     @dragleave="onDragLeave"
     @drop="onDrop"
@@ -38,6 +40,15 @@
           </div>
         </template>
       </MediaThumbnail>
+
+      <!-- Disabled overlay icon -->
+      <v-icon
+        v-if="isDisabled"
+        icon="mdi-cancel"
+        size="24"
+        color="error"
+        class="disabled-overlay-icon"
+      ></v-icon>
     </div>
 
     <!-- Footer: Name -->
@@ -64,11 +75,15 @@ const props = defineProps<{
   size: number
 }>()
 
-// helpers
-const isFolder = computed(() => 'children' in props.item || !('metadata' in props.item))
+const isFolder = computed(() => 'items' in props.item)
 const isPdf = computed(
   () => !isFolder.value && (props.item as FileItem).metadata?.fileType === 'pdf',
 )
+
+const isDisabled = computed(() => {
+  if (isFolder.value) return false
+  return props.item.permissions?.canPresent === false
+})
 
 const fileIcon = computed(() => {
   if (isFolder.value) return 'mdi-folder'
@@ -145,12 +160,36 @@ const onDrop = () => {
   transform: scale(0.95);
 }
 
+.item-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: grayscale(50%);
+}
+
+.item-disabled:hover {
+  background-color: transparent;
+}
+
+.item-disabled .icon-container {
+  transform: none !important;
+}
+
 .icon-container {
   transition: transform 0.2s ease;
+  position: relative;
 }
 
 .media-item:hover .icon-container {
   transform: translateY(-2px);
+}
+
+.disabled-overlay-icon {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  padding: 2px;
 }
 
 .item-name {

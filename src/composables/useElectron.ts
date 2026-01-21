@@ -1,6 +1,6 @@
 import type { AppMessage } from '@/types/common'
 import type { BibleVersion } from '@/types/bible'
-import type { TimerCommand, TimerState } from '@/types/electron'
+import type { TimerCommand, TimerState, VideoQuality, FFmpegStatus } from '@/types/electron'
 import { useSentry } from './useSentry'
 
 /**
@@ -280,6 +280,100 @@ export const useElectron = () => {
     return false
   }
 
+  // Video Quality Settings
+  const getVideoQuality = async (): Promise<VideoQuality> => {
+    if (isElectron()) {
+      try {
+        return await window.electronAPI.getVideoQuality()
+      } catch (error) {
+        reportError(error, {
+          operation: 'get-video-quality',
+          component: 'useElectron',
+        })
+        return 'high' // Default to high if failed
+      }
+    }
+    return 'high'
+  }
+
+  const setVideoQuality = async (quality: VideoQuality): Promise<boolean> => {
+    if (isElectron()) {
+      try {
+        return await window.electronAPI.setVideoQuality(quality)
+      } catch (error) {
+        reportError(error, {
+          operation: 'set-video-quality',
+          component: 'useElectron',
+          extra: { quality },
+        })
+        return false
+      }
+    }
+    return false
+  }
+
+  const getEnableFfmpeg = async (): Promise<boolean> => {
+    if (isElectron()) {
+      try {
+        return await window.electronAPI.getEnableFfmpeg()
+      } catch (error) {
+        reportError(error, {
+          operation: 'get-enable-ffmpeg',
+          component: 'useElectron',
+        })
+        return false
+      }
+    }
+    return false
+  }
+
+  const setEnableFfmpeg = async (enabled: boolean): Promise<boolean> => {
+    if (isElectron()) {
+      try {
+        return await window.electronAPI.setEnableFfmpeg(enabled)
+      } catch (error) {
+        reportError(error, {
+          operation: 'set-enable-ffmpeg',
+          component: 'useElectron',
+          extra: { enabled },
+        })
+        return false
+      }
+    }
+    return false
+  }
+
+  const ffmpegCheckStatus = async (): Promise<FFmpegStatus> => {
+    if (isElectron()) {
+      try {
+        return await window.electronAPI.ffmpegCheckStatus()
+      } catch (error) {
+        reportError(error, {
+          operation: 'ffmpeg-check-status',
+          component: 'useElectron',
+        })
+        return { available: false, path: '', version: '', error: 'Check failed' }
+      }
+    }
+    return { available: false, path: '', version: '', error: 'Not in Electron' }
+  }
+
+  const ffmpegSetPath = async (customPath: string): Promise<FFmpegStatus> => {
+    if (isElectron()) {
+      try {
+        return await window.electronAPI.ffmpegSetPath(customPath)
+      } catch (error) {
+        reportError(error, {
+          operation: 'ffmpeg-set-path',
+          component: 'useElectron',
+          extra: { customPath },
+        })
+        return { available: false, path: '', version: '', error: 'Set path failed' }
+      }
+    }
+    return { available: false, path: '', version: '', error: 'Not in Electron' }
+  }
+
   // App Control
   const restartApp = async (): Promise<void> => {
     if (isElectron()) {
@@ -370,6 +464,12 @@ export const useElectron = () => {
     resetUserData,
     getHardwareAcceleration,
     setHardwareAcceleration,
+    getVideoQuality,
+    setVideoQuality,
+    getEnableFfmpeg,
+    setEnableFfmpeg,
+    ffmpegCheckStatus,
+    ffmpegSetPath,
     restartApp,
 
     // File operations

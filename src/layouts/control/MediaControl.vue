@@ -147,7 +147,7 @@
           ref="fileInput"
           type="file"
           multiple
-          accept="image/*,video/*,.pdf"
+          accept="image/*,video/*,.pdf,.mkv,.avi,.mov,.wmv,.flv,.ts,.m2ts"
           style="display: none"
           @change="handleFileChange"
         />
@@ -359,35 +359,33 @@ const handleSortChange = (mode: 'custom') => {
 }
 
 const startPresentation = async (startItem?: FileItem, fromBeginning = false) => {
-  const files = sortedUnifiedItems.value.filter((i) => !('items' in i)) as FileItem[]
+  const allFiles = sortedUnifiedItems.value.filter((i) => !('items' in i)) as FileItem[]
+  const presentableFiles = allFiles.filter((f) => f.permissions?.canPresent !== false)
 
-  if (files.length === 0) {
+  if (presentableFiles.length === 0) {
     showSnackBar(t('fileExplorer.noFiles'), {
       color: 'warning',
     })
     return
   }
 
-  const startIndex = startItem
-    ? files.findIndex((f) => f.id === startItem.id)
-    : fromBeginning
-      ? 0
-      : 0
-
-  const validIndex = startIndex >= 0 ? startIndex : 0
+  let startIndex = 0
+  if (startItem) {
+    const idx = presentableFiles.findIndex((f) => f.id === startItem.id)
+    startIndex = idx >= 0 ? idx : 0
+  } else if (fromBeginning) {
+    startIndex = 0
+  }
 
   await ensureProjectionWindow()
 
-  // Initialize store
-  mediaProjectionStore.setPlaylist(files, validIndex)
+  mediaProjectionStore.setPlaylist(presentableFiles, startIndex)
 
-  // Switch projection view
   sendProjectionMessage(MessageType.VIEW_CHANGE, { view: ViewType.MEDIA })
 
-  // Sync first update
   sendProjectionMessage(MessageType.MEDIA_UPDATE, {
-    playlist: JSON.parse(JSON.stringify(files)),
-    currentIndex: validIndex,
+    playlist: JSON.parse(JSON.stringify(presentableFiles)),
+    currentIndex: startIndex,
     action: 'update',
   })
 }

@@ -4,7 +4,16 @@ import * as Sentry from '@sentry/electron'
 import path from 'path'
 import { writeFileSync } from 'fs'
 import { createApplicationMenu } from './menu'
-import { getHardwareAcceleration, setHardwareAcceleration } from './appSettings'
+import {
+  getHardwareAcceleration,
+  setHardwareAcceleration,
+  getVideoQuality,
+  setVideoQuality,
+  getEnableFfmpeg,
+  setEnableFfmpeg,
+  VideoQuality,
+} from './appSettings'
+import { probeVideo, checkFFmpegStatus, setCustomFFmpegPath, clearFFmpegCache } from './ffmpeg'
 
 export const registerGenericHandlers = (windowManager: WindowManager) => {
   // Check if the projection window exists
@@ -119,5 +128,47 @@ export const registerGenericHandlers = (windowManager: WindowManager) => {
   ipcMain.handle('restart-app', () => {
     app.relaunch()
     app.exit(0)
+  })
+
+  // Probe video file for transcoding info
+  ipcMain.handle('probe-video', async (event, filePath: string) => {
+    try {
+      return await probeVideo(filePath)
+    } catch (error) {
+      console.error('Probe video failed:', error)
+      Sentry.captureException(error, {
+        tags: { operation: 'probe-video' },
+        extra: { filePath },
+      })
+      return null
+    }
+  })
+
+  // Video quality settings
+  ipcMain.handle('get-video-quality', () => {
+    return getVideoQuality()
+  })
+
+  ipcMain.handle('set-video-quality', (_event, quality: VideoQuality) => {
+    setVideoQuality(quality)
+    return true
+  })
+
+  ipcMain.handle('get-enable-ffmpeg', () => {
+    return getEnableFfmpeg()
+  })
+
+  ipcMain.handle('set-enable-ffmpeg', (_event, enabled: boolean) => {
+    setEnableFfmpeg(enabled)
+    return true
+  })
+
+  ipcMain.handle('ffmpeg-check-status', () => {
+    return checkFFmpegStatus()
+  })
+
+  ipcMain.handle('ffmpeg-set-path', (_event, customPath: string) => {
+    clearFFmpegCache()
+    return setCustomFFmpegPath(customPath)
   })
 }

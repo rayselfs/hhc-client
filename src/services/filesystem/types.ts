@@ -16,6 +16,7 @@ export const DEFAULT_LOCAL_PERMISSIONS: ItemPermissions = {
   canRename: true,
   canMove: true,
   canEdit: true,
+  canPresent: true,
 }
 
 /**
@@ -26,6 +27,7 @@ export const READONLY_PERMISSIONS: ItemPermissions = {
   canRename: false,
   canMove: false,
   canEdit: false,
+  canPresent: true,
 }
 
 /**
@@ -62,6 +64,11 @@ export interface SaveFileResult {
   thumbnailData?: Uint8Array
   /** Full URL for accessing the file (e.g., local-resource://path) */
   fileUrl: string
+  /** Video metadata (duration, mimeType) - only for video files */
+  videoMetadata?: {
+    duration: number
+    mimeType: string
+  }
 }
 
 /**

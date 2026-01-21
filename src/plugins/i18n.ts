@@ -9,6 +9,10 @@ export default createI18n({
   legacy: false,
   locale: DEFAULT_LOCALE,
   fallbackLocale: DEFAULT_LOCALE,
+  globalInjection: true,
+  warnHtmlMessage: false,
+  missingWarn: false,
+  fallbackWarn: false,
   messages: {
     'zh-TW': zhTW,
     'zh-CN': zhCN,

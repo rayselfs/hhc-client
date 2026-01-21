@@ -87,6 +87,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Hardware acceleration settings
   getHardwareAcceleration: () => ipcRenderer.invoke('get-hardware-acceleration'),
-  setHardwareAcceleration: (enabled: boolean) => ipcRenderer.invoke('set-hardware-acceleration', enabled),
+  setHardwareAcceleration: (enabled: boolean) =>
+    ipcRenderer.invoke('set-hardware-acceleration', enabled),
   restartApp: () => ipcRenderer.invoke('restart-app'),
+
+  // Video probe (for transcoding info)
+  probeVideo: (filePath: string) => ipcRenderer.invoke('probe-video', filePath),
+
+  // Video quality settings
+  getVideoQuality: () => ipcRenderer.invoke('get-video-quality'),
+  setVideoQuality: (quality: string) => ipcRenderer.invoke('set-video-quality', quality),
+
+  // FFmpeg settings
+  getEnableFfmpeg: () => ipcRenderer.invoke('get-enable-ffmpeg'),
+  setEnableFfmpeg: (enabled: boolean) => ipcRenderer.invoke('set-enable-ffmpeg', enabled),
+  ffmpegCheckStatus: () => ipcRenderer.invoke('ffmpeg-check-status'),
+  ffmpegSetPath: (path: string) => ipcRenderer.invoke('ffmpeg-set-path', path),
 })

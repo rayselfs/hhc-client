@@ -53,6 +53,7 @@ import { useVideoPlayer } from '@/composables/useVideoPlayer'
 import { useElectron } from '@/composables/useElectron'
 import { MessageType } from '@/types/common'
 import { throttle } from '@/utils/performanceUtils'
+import { needsTranscode, buildVideoUrl } from '@/utils/videoUtils'
 
 // Access local store (synced via IPC)
 const store = useMediaProjectionStore()
@@ -62,7 +63,7 @@ const { currentItem, zoomLevel, pan, isPlaying, volume, pdfPage, currentTime, is
 const videoRef = ref<HTMLVideoElement | null>(null)
 const { sendToMain } = useElectron()
 
-// Throttled time reporter - sends projection's actual time to main window (every 1 second)
+// Throttled time reporter - sends projection's actual time to main window (every 500ms for smoother sync)
 const reportTimeToMain = throttle((time: number) => {
   sendToMain({
     type: MessageType.MEDIA_CONTROL,
@@ -72,7 +73,7 @@ const reportTimeToMain = throttle((time: number) => {
       value: time,
     },
   })
-}, 1000)
+}, 500)
 
 const onVideoEnded = () => {
   // Notify Main Window (Presenter) that video finished
@@ -132,13 +133,17 @@ const pdfUrl = computed(() => {
 })
 
 // Video Control with Video.js
+// This watcher responds to store state changes (from IPC message handling)
 watch(isPlaying, (playing) => {
-  if (currentItem.value?.metadata.fileType === 'video') {
-    if (playing) {
-      playPresenterVideo()
-    } else {
-      pausePresenterVideo()
-    }
+  if (currentItem.value?.metadata.fileType !== 'video') return
+  if (!videoRef.value || !videoInitialized.value) return
+
+  // Check if current state matches desired state to avoid redundant operations
+  const isPaused = videoRef.value.paused
+  if (playing && isPaused) {
+    playPresenterVideo()
+  } else if (!playing && !isPaused) {
+    pausePresenterVideo()
   }
 })
 
@@ -155,9 +160,14 @@ watch(currentTime, (targetTime) => {
   if (currentItem.value?.metadata.fileType !== 'video') return
 
   // ONLY seek in these cases:
-  // 1. During active seeking (user dragging timeline)
+  // 1. During active seeking (user dragging timeline) - Disabled for transcoded videos in Presenter
   // 2. When paused (user is scrubbing/frame-stepping)
   if (isSeeking.value || !isPlaying.value) {
+    // If it's a transcoded video, seek might not be supported/reliable,
+    // but native seek call is harmless if not supported or range request fails.
+    // However, we disabled UI seeking for transcoded, so this shouldn't fire often
+    // except maybe for drift correction or initial load.
+    // We keep it generic.
     seekPresenterVideo(targetTime)
   }
 
@@ -178,6 +188,73 @@ watch(
   },
 )
 
+// Track video initialization to prevent duplicate FFmpeg streams
+const videoInitialized = ref(false)
+const lastVideoUrl = ref('')
+
+// Now using shared utilities from @/utils/videoUtils
+
+/**
+ * Build video URL
+ * Uses shared utility but adds projection-specific window identifier
+ */
+const buildVideoUrlForProjection = (baseUrl: string): string => {
+  const isTranscode = needsTranscode(baseUrl)
+  return buildVideoUrl({
+    baseUrl,
+    isTranscoded: isTranscode,
+    window: 'projection',
+  })
+}
+
+/**
+ * Initialize video player with proper cleanup and error handling
+ * @param forceReload - Force reload even if same URL (for replay scenario)
+ */
+const initializeVideoPlayer = (url: string, shouldPlay: boolean, forceReload = false) => {
+  if (!videoRef.value || !url) return
+
+  // Build video URL
+  const videoSrc = buildVideoUrlForProjection(url)
+
+  // Avoid reinitializing if same URL (prevents FFmpeg restart issues)
+  // Unless forceReload is true (for replay scenario)
+  if (!forceReload && videoInitialized.value && lastVideoUrl.value === url) {
+    return
+  }
+
+  // Dispose old player first
+  disposePresenterPlayer()
+
+  // Initialize new player
+  initializePresenterPlayer()
+  videoRef.value.src = videoSrc
+  lastVideoUrl.value = url
+  videoInitialized.value = true
+
+  // Handle initial play state
+  if (shouldPlay) {
+    videoRef.value.addEventListener(
+      'canplay',
+      () => {
+        playPresenterVideo()
+      },
+      { once: true },
+    )
+  }
+
+  // Handle video errors (e.g., FFmpeg stream interrupted)
+  videoRef.value.addEventListener(
+    'error',
+    (e) => {
+      console.error('Projection video error:', e)
+      // Mark as not initialized so it can be reinitialized on next attempt
+      videoInitialized.value = false
+    },
+    { once: true },
+  )
+}
+
 // Watch currentItem changes to reinitialize player
 watch(
   currentItem,
@@ -185,18 +262,15 @@ watch(
     // Cleanup old video player
     if (oldItem?.metadata.fileType === 'video') {
       disposePresenterPlayer()
+      videoInitialized.value = false
+      lastVideoUrl.value = ''
     }
 
     // Initialize new video player if current item is a video
-    if (newItem?.metadata.fileType === 'video' && videoRef.value) {
+    if (newItem?.metadata.fileType === 'video') {
       nextTick(() => {
-        if (videoRef.value && newItem.url) {
-          initializePresenterPlayer()
-          videoRef.value.src = newItem.url
-          // Sync play state after source is set
-          if (isPlaying.value) {
-            videoRef.value.addEventListener('canplay', () => playPresenterVideo(), { once: true })
-          }
+        if (newItem.url) {
+          initializeVideoPlayer(newItem.url, isPlaying.value)
         }
       })
     }
@@ -208,13 +282,8 @@ onMounted(() => {
   // Initialize video player if current item is already a video
   if (currentItem.value?.metadata.fileType === 'video') {
     nextTick(() => {
-      if (videoRef.value && currentItem.value?.url) {
-        initializePresenterPlayer()
-        videoRef.value.src = currentItem.value.url
-        // If should be playing, play it
-        if (isPlaying.value) {
-          videoRef.value.addEventListener('canplay', () => playPresenterVideo(), { once: true })
-        }
+      if (currentItem.value?.url) {
+        initializeVideoPlayer(currentItem.value.url, isPlaying.value)
       }
     })
   }
@@ -223,8 +292,10 @@ onMounted(() => {
 onUnmounted(() => {
   store.setPlaylist([], -1)
   store.exit() // Clear presenting state
-  // Cleanup video player
+  // Cleanup video player and reset tracking state
   disposePresenterPlayer()
+  videoInitialized.value = false
+  lastVideoUrl.value = ''
 })
 const { onProjectionMessage: onIpcMessage } = useElectron()
 
@@ -234,24 +305,39 @@ onIpcMessage((msg) => {
   const action = msg.data.action
   const value = msg.data.value
 
+  // Skip other actions if video not initialized (prevents errors during initialization)
+  if (!videoInitialized.value || !videoRef.value) return
+
   switch (action) {
     case 'seek':
       // Explicit seek command - FORCE seek regardless of playing state
+      // For native videos (MP4, WebM) only
       if (typeof value === 'number') {
-        seekPresenterVideo(value)
+        // If seeking to 0 on a transcoded video, we need to reload the stream
+        if (value === 0 && currentItem.value?.url && needsTranscode(currentItem.value.url)) {
+          initializeVideoPlayer(currentItem.value.url, isPlaying.value, true)
+        } else {
+          seekPresenterVideo(value)
+        }
       }
       break
     case 'play':
-      playPresenterVideo()
+      // Only play if currently paused (avoid redundant operations)
+      if (videoRef.value.paused) {
+        playPresenterVideo()
+      }
       break
     case 'pause':
-      pausePresenterVideo()
+      // Only pause if currently playing
+      if (!videoRef.value.paused) {
+        pausePresenterVideo()
+      }
       break
     case 'seeking-start':
       // Optional: Prepare for seek
       break
     case 'seeking-end':
-      // Explicit seek end command
+      // Explicit seek end command (for native videos)
       if (typeof value === 'number') {
         seekPresenterVideo(value)
       }

@@ -155,6 +155,12 @@
   },
   "settings": {
     "title": "设置",
+    "categories": {
+      "general": "通用",
+      "media": "媒体",
+      "system": "系统",
+      "about": "关于"
+    },
     "timezone": "时区",
     "theme": "主题",
     "language": "语系",
@@ -167,7 +173,45 @@
     "performance": "性能",
     "hardwareAcceleration": "硬件加速",
     "restartRequired": "需要重新启动",
-    "restartRequiredMessage": "硬件加速设置更改后需要重新启动应用程序才能生效。"
+    "restartRequiredMessage": "硬件加速设置更改后需要重新启动应用程序才能生效。",
+    "videoQuality": "视频转码品质",
+    "videoQualityHint": "影响需要转码的视频格式（如 MKV、AVI）。MP4 等原生格式不受影响。",
+    "videoQualityOptions": {
+      "high": "高（原始品质）",
+      "highDesc": "使用原始视频比特率，文件较大",
+      "medium": "中（70%）",
+      "mediumDesc": "平衡品质与性能",
+      "low": "低（40%）",
+      "lowDesc": "较低品质，串流更流畅"
+    },
+    "media": {
+      "enableExtendedVideo": "启用扩展视频支持",
+      "enableExtendedVideoHint": "需要播放非原生视频格式（如 MKV、AVI、MOV）时使用。需要系统安装 FFmpeg。",
+      "ffmpegStatus": "FFmpeg 状态",
+      "ffmpegFound": "已找到 (v{version})",
+      "ffmpegNotFound": "未找到",
+      "customFfmpegPath": "自定义 FFmpeg 路径",
+      "customFfmpegPathPlaceholder": "留空使用系统默认",
+      "installGuide": {
+        "title": "FFmpeg 安装指南",
+        "windows": {
+          "step1": "从 {gyan} 或 {github} 下载 FFmpeg 发行版本。",
+          "step2": "解压缩 ZIP 文件到固定位置。",
+          "step3": "复制 bin/ffmpeg.exe 文件的路径。",
+          "step4": "在设置中粘贴到自定义 FFmpeg 路径字段。"
+        },
+        "macOS": {
+          "option1Title": "方法一：使用 Homebrew（推荐）",
+          "option1Step1": "打开终端。",
+          "option1Step2": "运行：brew install ffmpeg",
+          "option1Step3": "应用程序会自动检测。",
+          "option2Title": "方法二：手动下载",
+          "option2Step1": "从 {evermeet} 下载静态版本。",
+          "option2Step2": "解压缩并移动 ffmpeg 到固定位置。",
+          "option2Step3": "在设置中指定该位置。"
+        }
+      }
+    }
   },
   "timezones": {
     "taipei": "台北时间 (UTC+8)",
@@ -257,6 +301,7 @@
     "videoReady": "视频就绪",
     "videoPlaying": "视频播放中",
     "videoPaused": "视频暂停中",
+    "seekingDisabled": "此格式禁止拖动时间轴",
     "largeIcons": "大图标",
     "mediumIcons": "中图标",
     "smallIcons": "小图标",
@@ -290,6 +335,8 @@
     "clipboardCut": "已将项目剪下到剪贴簿",
     "uploadWebWarning": "警告：在网页模式下上传的文件无法永久保存",
     "moveSuccess": "移动成功",
-    "moveFailed": "移动失败"
+    "moveFailed": "移动失败",
+    "ffmpegRequired": "此视频格式需要扩展视频支持功能。请在设置中启用。",
+    "ffmpegNotAvailable": "FFmpeg 无法使用。请安装 FFmpeg 并在设置中配置。"
   }
 }

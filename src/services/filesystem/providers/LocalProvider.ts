@@ -58,6 +58,7 @@ export class LocalProvider implements FileSystemProvider {
         filePath: result.filePath,
         thumbnailData: result.thumbnailData,
         fileUrl: this.buildUrl(result.filePath),
+        videoMetadata: result.videoMetadata,
       })
     } catch (error) {
       return createFailureResult(error instanceof Error ? error.message : String(error), 'UNKNOWN')

@@ -223,8 +223,9 @@ export interface MediaControlMessage extends BaseMessage {
   type: MessageType.MEDIA_CONTROL
   data: {
     type: 'video' | 'image' | 'pdf'
-    action: string // 'play', 'pause', 'zoomIn', 'zoomOut', 'nextPage', etc.
-    value?: number | string | { x: number; y: number } // zoom level, page number, pan coordinates etc.
+    action: string // 'play', 'pause', 'zoomIn', 'zoomOut', 'nextPage', 'transcode-seek', etc.
+    value?: number | string | { x: number; y: number } // zoom level, page number, pan coordinates, seek time etc.
+    shouldPlay?: boolean // For transcode-seek: whether to resume playback after loading
   }
 }
 
@@ -364,6 +365,7 @@ export interface ItemPermissions {
   canRename: boolean
   canMove: boolean
   canEdit: boolean
+  canPresent: boolean
 }
 
 /**

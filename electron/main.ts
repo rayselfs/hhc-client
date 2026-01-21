@@ -10,7 +10,7 @@ import { TimerService } from './timerService'
 import { registerApiHandlers } from './api'
 import { WindowManager } from './windowManager'
 import { registerGenericHandlers } from './handlers'
-import { registerFileHandlers, registerFileProtocols } from './file'
+import { registerFileHandlers, registerFileProtocols, cleanupFFmpegProcesses } from './file'
 import { getHardwareAcceleration } from './appSettings'
 
 // Configure hardware acceleration before app is ready
@@ -130,6 +130,9 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   // Stop periodic update checks
   stopPeriodicUpdateCheck()
+
+  // Cleanup FFmpeg processes
+  cleanupFFmpegProcesses()
 
   // Cleanup timer service
   timerService.cleanup()

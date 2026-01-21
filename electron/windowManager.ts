@@ -1,4 +1,4 @@
-import { BrowserWindow, screen, app } from 'electron'
+import { BrowserWindow, screen, app, shell } from 'electron'
 import { join } from 'path'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
@@ -47,6 +47,14 @@ export class WindowManager {
         backgroundThrottling: false, // Prevent throttling when window loses focus
       },
       title: 'Console',
+    })
+
+    // Handle external links
+    this.mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+      if (url.startsWith('https:') || url.startsWith('http:')) {
+        shell.openExternal(url)
+      }
+      return { action: 'deny' }
     })
 
     const isDev = process.env.VITE_DEV_SERVER_URL || process.env.NODE_ENV === 'development'
