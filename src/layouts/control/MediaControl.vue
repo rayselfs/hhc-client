@@ -207,7 +207,6 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useMediaFolderStore } from '@/stores/folder'
 import { useSnackBar } from '@/composables/useSnackBar'
 import { storeToRefs } from 'pinia'
-import { useElectron } from '@/composables/useElectron'
 import { useProjectionManager } from '@/composables/useProjectionManager'
 import { useMediaProjectionStore } from '@/stores/mediaProjection'
 import { useProjectionStore } from '@/stores/projection'
@@ -225,8 +224,7 @@ import type { FileItem } from '@/types/common'
 import { MediaFolder } from '@/types/enum'
 
 const { t } = useI18n()
-const { ensureProjectionWindow } = useElectron()
-const { sendProjectionMessage } = useProjectionManager()
+const { sendProjectionMessage, setProjectionState } = useProjectionManager()
 const { showSnackBar } = useSnackBar()
 const mediaStore = useMediaFolderStore()
 const mediaProjectionStore = useMediaProjectionStore()
@@ -392,11 +390,10 @@ const startPresentation = async (startItem?: FileItem, fromBeginning = false) =>
     startIndex = 0
   }
 
-  await ensureProjectionWindow()
+  // Use setProjectionState to handle window creation (with wait), view switching, and content toggle
+  await setProjectionState(false, ViewType.MEDIA)
 
   mediaProjectionStore.setPlaylist(presentableFiles, startIndex)
-
-  sendProjectionMessage(MessageType.VIEW_CHANGE, { view: ViewType.MEDIA })
 
   sendProjectionMessage(MessageType.MEDIA_UPDATE, {
     playlist: JSON.parse(JSON.stringify(presentableFiles)),
