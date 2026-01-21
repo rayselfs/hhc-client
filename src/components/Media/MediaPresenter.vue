@@ -88,17 +88,13 @@
                 </div>
               </template>
 
-              <!-- Viewport Frame Overlay (Always visible when zoomed) -->
+              <!-- Viewport Frame Overlay -->
               <div
-                v-if="
-                  (currentItem?.metadata.fileType === 'image' ||
-                    currentItem?.metadata.fileType === 'pdf') &&
-                  zoomLevel > 1
-                "
+                v-if="showZoomControls"
                 class="position-absolute border"
                 :style="{
                   borderColor: '#2196F3 !important',
-                  borderWidth: '2px !important',
+                  borderWidth: '1px !important',
                   backgroundColor: 'rgba(33, 150, 243, 0.2)',
                   width: `${minimapViewport.width}%`,
                   height: `${minimapViewport.height}%`,
@@ -120,14 +116,7 @@
               <!-- Zoom Controls Only -->
               <v-fade-transition>
                 <div
-                  v-if="
-                    (showZoomControls &&
-                      (currentItem?.metadata.fileType === 'image' ||
-                        currentItem?.metadata.fileType === 'pdf')) ||
-                    ((currentItem?.metadata.fileType === 'image' ||
-                      currentItem?.metadata.fileType === 'pdf') &&
-                      zoomLevel > 1)
-                  "
+                  v-if="showZoomControls || zoomLevel > 1"
                   class="position-absolute bottom-0 right-0 ma-4 rounded pa-2 d-flex flex-column align-center elevation-4 bg-surface"
                   style="z-index: 10"
                   @mousedown.stop
@@ -183,11 +172,7 @@
                 icon
                 size="large"
                 @click="toggleZoom()"
-                :disabled="
-                  !currentItem ||
-                  (currentItem.metadata.fileType !== 'image' &&
-                    currentItem.metadata.fileType !== 'pdf')
-                "
+                :disabled="!currentItem"
                 :color="showZoomControls ? 'primary' : ''"
                 :title="$t('media.zoom')"
               >
@@ -357,12 +342,13 @@ const { setProjectionState, sendProjectionMessage } = useProjectionManager()
 const showZoomControls = ref(false)
 const toggleZoom = (minus = false) => {
   if (showZoomControls.value) {
+    // Deactivating zoom mode: reset zoom and pan
     showZoomControls.value = false
     store.setZoom(1)
     store.setPan(0, 0)
   } else {
-    let zoomValue = 1.2
-    if (minus) zoomValue = 0.8
+    // Activating zoom mode: set initial zoom level
+    const zoomValue = minus ? 0.8 : 1.2
     showZoomControls.value = true
     store.setZoom(zoomValue)
     store.setPan(0, 0)
@@ -549,21 +535,28 @@ const previewContainer = ref<HTMLElement | null>(null)
 
 const minimapViewport = computed(() => {
   // Calculates the viewport rectangle % based on zoom and pan
+  // This must be window-size-independent (works in normalized 0-1 coordinates)
   const zoom = zoomLevel.value
 
-  // Pan is now percentage-based (-0.5 to 0.5 range where 0 is center)
-  // Logic: PanX=0.5 means Image moved 50% Right. Screen is relatively 50% Left.
-  // Wait, I updated MediaProjection to use `pan * 100%`.
-  // If Pan=0.5 -> translate(50%). Image moves Right 50% of its width.
-  // Screen center (relative to image) is at 0.5 - 0.5 = 0.0 (Left Edge).
-
+  // CSS transform in MediaProjection: scale(zoom) translate(pan.x * 100%, pan.y * 100%)
+  // Transforms compose right-to-left: translate first (in scaled space), then scale
+  // This means translate % is relative to ORIGINAL element size
+  //
+  // Viewport center in normalized original coordinates:
+  // centerX = 0.5 - pan.x
+  // centerY = 0.5 - pan.y
   const centerX = 0.5 - pan.value.x
   const centerY = 0.5 - pan.value.y
 
-  const left = (centerX - 1 / zoom / 2) * 100
-  const top = (centerY - 1 / zoom / 2) * 100
+  // Viewport size as fraction of original: 1/zoom
+  const viewportWidth = 1 / zoom
+  const viewportHeight = 1 / zoom
 
-  return { left, top, width: 100 / zoom, height: 100 / zoom }
+  // Convert to percentage for CSS positioning
+  const left = (centerX - viewportWidth / 2) * 100
+  const top = (centerY - viewportHeight / 2) * 100
+
+  return { left, top, width: viewportWidth * 100, height: viewportHeight * 100 }
 })
 
 // Cursor state
@@ -585,20 +578,21 @@ const startPanDrag = (e: MouseEvent) => {
 
   const rect = previewContainer.value.getBoundingClientRect()
 
-  // Calculate relative move as percentage of container size
-  // If I move 10% of container width...
   // User requested "Inverted" previously.
   // Move Mouse Right -> Camera Right -> Image Left -> Pan Decreases.
+  //
+  // With transform: scale(zoom) translate(pan%)
+  // translate % is relative to original size, so pan change = mouse movement %
 
   const handleMouseMove = (moveEvent: MouseEvent) => {
     const deltaX = moveEvent.clientX - startX
     const deltaY = moveEvent.clientY - startY
 
-    // Convert pixel delta to percentage (0.0 - 1.0)
+    // Convert pixel delta to percentage (0.0 - 1.0) of container
     const percentX = deltaX / rect.width
     const percentY = deltaY / rect.height
 
-    // Formula: NEW = INITIAL - DELTA
+    // Direct mapping: pan change = desired viewport shift
     const newPanX = initialPan.x - percentX
     const newPanY = initialPan.y - percentY
 
@@ -799,9 +793,9 @@ watch(currentIndex, (val) => {
 })
 
 watch(zoomLevel, (val) => {
-  if (val <= 1 && (pan.value.x !== 0 || pan.value.y !== 0)) {
-    store.setPan(0, 0)
-  }
+  // Removed auto-pan-reset when zoomLevel <= 1
+  // User can now pan at any zoom level while in zoom mode
+  // Pan is only reset when explicitly exiting zoom mode via toggleZoom()
 
   sendProjectionMessage(MessageType.MEDIA_CONTROL, { type: 'image', action: 'zoom', value: val })
 })

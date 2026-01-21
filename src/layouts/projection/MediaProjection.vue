@@ -108,7 +108,7 @@ const {
 
 // Styles
 const imageStyle = computed(() => ({
-  transform: `translate(${pan.value.x * 100}%, ${pan.value.y * 100}%) scale(${zoomLevel.value})`,
+  transform: `scale(${zoomLevel.value}) translate(${pan.value.x * 100}%, ${pan.value.y * 100}%)`,
   transition: 'transform 0.2s ease-out',
   maxWidth: '100%',
   maxHeight: '100%',
@@ -118,6 +118,8 @@ const imageStyle = computed(() => ({
 }))
 
 const videoStyle = computed(() => ({
+  transform: `scale(${zoomLevel.value}) translate(${pan.value.x * 100}%, ${pan.value.y * 100}%)`,
+  transition: 'transform 0.2s ease-out',
   maxWidth: '100%',
   maxHeight: '100%',
   width: '100%',
