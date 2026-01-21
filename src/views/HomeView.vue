@@ -92,6 +92,9 @@ const {
 
 // Toggle projection state
 const toggleProjection = async () => {
+  // If in Media view, let MediaControl handle the shortcut (START_PRESENTATION)
+  if (currentView.value === ViewType.MEDIA) return
+
   const newShowDefault = !projectionStore.isShowingDefault
   await setProjectionState(newShowDefault)
 }
