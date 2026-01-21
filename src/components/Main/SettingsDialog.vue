@@ -1,9 +1,9 @@
 <template>
   <v-dialog v-model="isOpen" max-width="700">
     <v-card>
-      <div class="d-flex flex-row" style="min-height: 500px">
+      <div class="d-flex flex-row settings-container">
         <!-- Left sidebar -->
-        <div class="settings-sidebar bg-surface-light" style="width: 180px; flex-shrink: 0">
+        <div class="settings-sidebar bg-surface-light">
           <v-list nav density="compact" class="py-2 bg-transparent">
             <v-list-item
               v-for="category in categories"
@@ -22,12 +22,12 @@
         </div>
 
         <!-- Right content -->
-        <div class="flex-grow-1 d-flex flex-column" style="min-height: 500px">
-          <v-card-title class="text-subtitle-1 d-flex align-center">
+        <div class="settings-content">
+          <v-card-title class="text-subtitle-1 d-flex align-center settings-title">
             {{ $t(currentCategoryTitle) }}
           </v-card-title>
 
-          <v-card-text class="flex-grow-1 overflow-y-auto">
+          <v-card-text class="settings-text">
             <!-- General -->
             <template v-if="activeCategory === 'general'">
               <v-row>
@@ -74,11 +74,47 @@
 
             <!-- Media -->
             <template v-if="activeCategory === 'media'">
+              <!-- FFmpeg Status (always visible) -->
+              <v-label class="text-subtitle-2 mb-2">{{
+                $t('settings.media.ffmpegStatus')
+              }}</v-label>
+              <div class="mb-2">
+                <v-chip
+                  :color="ffmpegStatus.available ? 'success' : 'warning'"
+                  size="small"
+                  class="mb-2"
+                >
+                  {{
+                    ffmpegStatus.available
+                      ? $t('settings.media.ffmpegFound', { version: ffmpegStatus.version })
+                      : $t('settings.media.ffmpegNotFound')
+                  }}
+                </v-chip>
+              </div>
+              <p v-if="ffmpegStatus.path" class="text-caption text-medium-emphasis mb-4">
+                {{ ffmpegStatus.path }}
+              </p>
+
+              <!-- Custom Path Input (always visible) -->
+              <v-text-field
+                v-model="customFfmpegPath"
+                :label="$t('settings.media.customFfmpegPath')"
+                :placeholder="$t('settings.media.customFfmpegPathPlaceholder')"
+                :hint="$t('settings.media.customFfmpegPathHint')"
+                variant="outlined"
+                density="compact"
+                clearable
+                persistent-hint
+                class="mb-4"
+                @blur="handleCustomPathChange"
+              />
+
               <!-- Enable FFmpeg Switch -->
-              <div class="d-flex align-center mb-4">
+              <div class="d-flex align-center mb-2">
                 <v-switch
                   v-model="enableFfmpeg"
                   :label="$t('settings.media.enableExtendedVideo')"
+                  :disabled="!ffmpegStatus.available"
                   color="primary"
                   hide-details
                   @update:model-value="handleEnableFfmpegChange"
@@ -90,41 +126,9 @@
               <p class="text-caption text-medium-emphasis mb-4">
                 {{ $t('settings.media.enableExtendedVideoHint') }}
               </p>
-
-              <!-- FFmpeg Status (conditional) -->
-              <template v-if="enableFfmpeg">
-                <v-label class="text-subtitle-2 mb-2">{{
-                  $t('settings.media.ffmpegStatus')
-                }}</v-label>
-                <div class="mb-2">
-                  <v-chip
-                    :color="ffmpegStatus.available ? 'success' : 'error'"
-                    size="small"
-                    class="mb-2"
-                  >
-                    {{
-                      ffmpegStatus.available
-                        ? $t('settings.media.ffmpegFound', { version: ffmpegStatus.version })
-                        : $t('settings.media.ffmpegNotFound')
-                    }}
-                  </v-chip>
-                </div>
-                <p v-if="ffmpegStatus.path" class="text-caption text-medium-emphasis mb-4">
-                  {{ ffmpegStatus.path }}
-                </p>
-
-                <!-- Custom Path Input -->
-                <v-text-field
-                  v-model="customFfmpegPath"
-                  :label="$t('settings.media.customFfmpegPath')"
-                  :placeholder="$t('settings.media.customFfmpegPathPlaceholder')"
-                  variant="outlined"
-                  density="compact"
-                  clearable
-                  class="mb-4"
-                  @blur="handleCustomPathChange"
-                />
-              </template>
+              <p v-if="!ffmpegStatus.available" class="text-caption text-error mb-4">
+                {{ $t('settings.media.ffmpegRequiredToEnable') }}
+              </p>
 
               <!-- Video Quality (disabled when FFmpeg is OFF) -->
               <v-label class="text-subtitle-2 mb-2">{{ $t('settings.videoQuality') }}</v-label>
@@ -188,7 +192,7 @@
             </template>
           </v-card-text>
 
-          <v-card-actions>
+          <v-card-actions class="settings-actions">
             <v-spacer></v-spacer>
             <v-btn @click="isOpen = false"> {{ $t('common.close') }} </v-btn>
           </v-card-actions>
@@ -371,18 +375,26 @@ const handleVideoQualityChange = async (quality: 'low' | 'medium' | 'high') => {
 // Handle Enable FFmpeg toggle
 const handleEnableFfmpegChange = async (enabled: boolean | null) => {
   if (isElectron() && enabled !== null) {
-    await setEnableFfmpeg(enabled)
-    if (enabled) {
-      ffmpegStatus.value = await ffmpegCheckStatus()
+    // Only allow enabling if FFmpeg is available
+    if (enabled && !ffmpegStatus.value.available) {
+      enableFfmpeg.value = false
+      return
     }
+    await setEnableFfmpeg(enabled)
     await settingsStore.updateFfmpegStatus()
   }
 }
 
 // Handle custom path change
 const handleCustomPathChange = async () => {
-  if (isElectron() && customFfmpegPath.value) {
-    ffmpegStatus.value = await ffmpegSetPath(customFfmpegPath.value)
+  if (isElectron()) {
+    // Always re-check status when path changes (even if empty - will check system PATH)
+    ffmpegStatus.value = await ffmpegSetPath(customFfmpegPath.value || '')
+
+    // If detection succeeds and switch is on, update store
+    if (ffmpegStatus.value.available && enableFfmpeg.value) {
+      await settingsStore.updateFfmpegStatus()
+    }
   }
 }
 
@@ -422,11 +434,11 @@ onMounted(async () => {
     // 載入影片品質設定
     videoQuality.value = await getVideoQuality()
 
-    // Load FFmpeg settings
+    // Check FFmpeg status first (regardless of switch state)
+    ffmpegStatus.value = await ffmpegCheckStatus()
+
+    // Then load FFmpeg switch state
     enableFfmpeg.value = await getEnableFfmpeg()
-    if (enableFfmpeg.value) {
-      ffmpegStatus.value = await ffmpegCheckStatus()
-    }
 
     // 直接監聯 open-settings 事件
     onMainMessage((data: unknown) => {
@@ -439,12 +451,45 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.v-card-title {
+/* Settings Container */
+.settings-container {
+  height: 600px;
+  max-height: 80vh;
+}
+
+/* Left Sidebar */
+.settings-sidebar {
+  width: 180px;
+  flex-shrink: 0;
+  border-right: 1px solid rgb(var(--v-theme-outline-variant));
+}
+
+/* Right Content Area */
+.settings-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Title - Fixed at top */
+.settings-title {
+  flex-shrink: 0;
   background-color: rgb(var(--v-theme-surface));
   border-bottom: 1px solid rgb(var(--v-theme-outline-variant));
 }
 
-.settings-sidebar {
-  border-right: 1px solid rgb(var(--v-theme-outline-variant));
+/* Content - Scrollable */
+.settings-text {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+/* Actions - Fixed at bottom */
+.settings-actions {
+  flex-shrink: 0;
+  border-top: 1px solid rgb(var(--v-theme-outline-variant));
 }
 </style>

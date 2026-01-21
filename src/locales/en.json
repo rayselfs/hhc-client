@@ -192,6 +192,8 @@
       "ffmpegNotFound": "Not Found",
       "customFfmpegPath": "Custom FFmpeg Path",
       "customFfmpegPathPlaceholder": "Leave empty to use system default",
+      "customFfmpegPathHint": "If FFmpeg is not detected automatically, you can manually specify the path here",
+      "ffmpegRequiredToEnable": "Please install FFmpeg or specify a custom path to enable this feature",
       "installGuide": {
         "title": "FFmpeg Installation Guide",
         "windows": {

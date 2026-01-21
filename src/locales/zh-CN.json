@@ -192,6 +192,8 @@
       "ffmpegNotFound": "未找到",
       "customFfmpegPath": "自定义 FFmpeg 路径",
       "customFfmpegPathPlaceholder": "留空使用系统默认",
+      "customFfmpegPathHint": "如果未能自动检测到 FFmpeg，可在此手动指定路径",
+      "ffmpegRequiredToEnable": "请先安装 FFmpeg 或指定自定义路径后才能启用此功能",
       "installGuide": {
         "title": "FFmpeg 安装指南",
         "windows": {
