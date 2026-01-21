@@ -173,8 +173,8 @@
           <!-- Presets Layout -->
           <v-col cols="12" class="mb-4" :style="{ height: `${rightTopCardHeight}px` }">
             <v-card :style="{ height: `${rightTopCardHeight}px` }" rounded="lg">
-              <v-card-text>
-                <div class="d-flex justify-space-between mb-2">
+              <v-card-text class="px-0 py-4">
+                <div class="d-flex justify-space-between mb-2 px-4">
                   <v-label class="text-h6 align-start">{{ $t('timer.presets') }}</v-label>
                   <v-btn
                     icon="mdi-plus"
@@ -191,7 +191,7 @@
                   <v-list-item
                     v-for="item in timerStore.presets"
                     :key="item.id"
-                    class="px-2 rounded preset-item"
+                    class="preset-item"
                     @click="applyPreset(item)"
                     link
                   >
