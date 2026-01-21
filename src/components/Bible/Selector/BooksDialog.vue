@@ -1,9 +1,7 @@
 <template>
   <v-dialog v-model="dialogVisible" max-width="840px" content-class="dialog-top">
-    <v-card :min-height="`calc(100vh - 48px)`">
-      <v-card-title
-        class="text-h5 d-flex align-center justify-space-between pb-3 pt-3 sticky-header"
-      >
+    <v-card rounded="lg" class="dialog-card">
+      <v-card-title class="text-h5 d-flex align-center justify-space-between pb-3 pt-3">
         <!-- breadcrumb -->
         <div class="d-flex align-center">
           <span class="text-subtitle-1">
@@ -43,8 +41,9 @@
             size="small"
             class="text-subtitle-1"
             :color="currentStep === 'books' ? 'primary' : 'default'"
-            :variant="currentStep === 'books' ? 'flat' : 'outlined'"
+            :variant="currentStep === 'books' ? 'flat' : 'elevated'"
             :disabled="false"
+            rounded="xl"
             @click="navigateToStep('books')"
           >
             {{ $t('bible.navigateBook') }}
@@ -53,8 +52,9 @@
             size="small"
             class="text-subtitle-1"
             :color="currentStep === 'chapters' ? 'primary' : 'default'"
-            :variant="currentStep === 'chapters' ? 'flat' : 'outlined'"
+            :variant="currentStep === 'chapters' ? 'flat' : 'elevated'"
             :disabled="!canNavigateToChapter"
+            rounded="xl"
             @click="navigateToStep('chapters')"
           >
             {{ $t('bible.navigateChapter') }}
@@ -63,8 +63,9 @@
             size="small"
             class="text-subtitle-1"
             :color="currentStep === 'verses' ? 'primary' : 'default'"
-            :variant="currentStep === 'verses' ? 'flat' : 'outlined'"
+            :variant="currentStep === 'verses' ? 'flat' : 'elevated'"
             :disabled="!canNavigateToVerse"
+            rounded="xl"
             @click="navigateToStep('verses')"
           >
             {{ $t('bible.navigateVerse') }}
@@ -74,7 +75,7 @@
 
       <v-divider />
 
-      <v-card-text class="mt-5 pr-5 pl-5">
+      <v-card-text class="card-content pr-5 pl-5">
         <transition name="page-slide" mode="out-in">
           <!-- Book selection page -->
           <div v-if="currentStep === 'books'" key="books">
@@ -94,9 +95,10 @@
                   <v-col v-for="book in oldTestamentBooks" :key="book.number" cols="3" class="pa-2">
                     <v-btn
                       block
-                      variant="outlined"
+                      variant="tonal"
                       @click="selectBookByNumber(book.number)"
-                      class="text-none text-h6 book-btn"
+                      class="text-none text-h6"
+                      rounded="xl"
                     >
                       {{ getBookName(book.code) }}
                     </v-btn>
@@ -109,9 +111,10 @@
                   <v-col v-for="book in newTestamentBooks" :key="book.number" cols="3" class="pa-2">
                     <v-btn
                       block
-                      variant="outlined"
+                      variant="tonal"
                       @click="selectBookByNumber(book.number)"
-                      class="text-none text-h6 book-btn"
+                      class="text-none text-h6"
+                      rounded="xl"
                     >
                       {{ getBookName(book.code) }}
                     </v-btn>
@@ -127,9 +130,10 @@
               <v-btn
                 v-for="chapterNum in selectedBookChapters"
                 :key="chapterNum"
-                variant="outlined"
+                variant="tonal"
                 @click="selectChapter(chapterNum)"
-                class="text-none chapter-verse-btn text-h5 ma-1"
+                class="text-none text-h5 ma-1"
+                rounded="xl"
               >
                 {{ chapterNum }}
               </v-btn>
@@ -138,13 +142,14 @@
 
           <!-- Verse selection page -->
           <div v-else-if="currentStep === 'verses'" key="verses">
-            <div class="chapter-verse-grid">
+            <div class="chapter-verse-grid ga-2">
               <v-btn
                 v-for="verseNum in selectedChapterVerses"
                 :key="verseNum"
-                variant="outlined"
+                variant="tonal"
                 @click="selectVerse(verseNum)"
-                class="text-none chapter-verse-btn text-h5 ma-1"
+                class="text-none text-h5 ma-1"
+                rounded="xl"
               >
                 {{ verseNum }}
               </v-btn>
@@ -153,9 +158,9 @@
         </transition>
       </v-card-text>
 
-      <v-card-actions class="pa-4">
+      <v-card-actions class="pa-2">
         <v-spacer />
-        <v-btn color="primary" variant="text" @click="closeDialog">
+        <v-btn variant="elevated" rounded="xl" @click="closeDialog">
           {{ $t('common.close') }}
         </v-btn>
       </v-card-actions>
@@ -364,8 +369,17 @@ const closeDialog = () => {
 </script>
 
 <style scoped>
-.v-dialog > .v-overlay__content > .v-card > .v-card-text {
-  padding: 0px;
+.dialog-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.card-content {
+  flex: 1 1 0;
+  min-height: calc(100vh - 40px - 44px - 24px - 24px - 24px - 18px);
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .breadcrumb-icon {
@@ -401,19 +415,6 @@ const closeDialog = () => {
 .chapter-verse-grid {
   display: grid;
   grid-template-columns: repeat(10, 1fr);
-}
-
-.chapter-verse-btn {
-  min-width: 48px;
-  height: 48px;
-}
-
-.sticky-header {
-  position: sticky;
-  top: 0;
-  background-color: rgb(var(--v-theme-surface));
-  z-index: 10;
-  border-bottom: 1px solid rgba(var(--v-theme-outline), 0.12);
 }
 
 .search-field {

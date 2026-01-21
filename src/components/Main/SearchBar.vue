@@ -1,32 +1,27 @@
 <template>
-  <div class="d-flex align-center justify-end" :class="{ 'w-100': isSearching }">
-    <v-text-field
-      v-if="isSearching"
-      v-model="searchText"
-      autofocus
-      variant="solo-inverted"
-      hide-details
-      :placeholder="$t('common.search')"
-      density="compact"
-      class="search-bar mr-2"
-      @keydown.esc="handleClose"
-      @keydown.enter="handleInput"
-    >
-    </v-text-field>
+  <div class="d-flex align-center justify-end mr-3" :class="{ 'w-100': isSearching }">
+    <template v-if="isSearching">
+      <v-text-field
+        v-model="searchText"
+        autofocus
+        hide-details
+        :placeholder="$t('common.search')"
+        variant="solo-filled"
+        density="compact"
+        class="search-input"
+        prepend-inner-icon="mdi-magnify"
+        @keydown.esc="handleClose"
+        @keydown.enter="handleInput"
+      >
+      </v-text-field>
 
-    <v-btn
-      v-if="!isSearching"
-      icon
-      @click="handleStart"
-      :title="$t('common.search')"
-      :disabled="isIndexing"
-      class="mr-1"
-    >
+      <v-btn variant="tonal" @click="handleClose" class="close-btn" elevation="0">
+        <v-icon>mdi-close</v-icon>
+      </v-btn>
+    </template>
+
+    <v-btn v-else icon @click="handleStart" :title="$t('common.search')" :disabled="isIndexing">
       <v-icon>mdi-magnify</v-icon>
-    </v-btn>
-
-    <v-btn v-if="isSearching" icon @click="handleClose" class="mr-1">
-      <v-icon>mdi-close</v-icon>
     </v-btn>
   </div>
 </template>
@@ -74,8 +69,25 @@ const handleInput = (event: KeyboardEvent) => {
 </script>
 
 <style scoped>
-.search-bar {
+.search-input {
   z-index: 1000;
-  width: 100%;
+  flex-grow: 1;
+}
+
+.search-input :deep(.v-field) {
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+  border-top-left-radius: 24px !important;
+  border-bottom-left-radius: 24px !important;
+}
+
+.close-btn {
+  border-top-left-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+  border-top-right-radius: 24px !important;
+  border-bottom-right-radius: 24px !important;
+  margin-left: 0 !important;
+  min-width: 40px;
+  height: 40px;
 }
 </style>

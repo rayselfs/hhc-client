@@ -32,6 +32,9 @@ export function useKeyboardShortcuts(shortcuts: ShortcutHandler[]) {
   const isMac = checkIsMac()
 
   const matchesConfig = (event: KeyboardEvent, config: ShortcutConfig): boolean => {
+    // Guard against undefined config
+    if (!config) return false
+
     // recursively check platform specific overrides
     if (isMac && config.mac) return matchesConfig(event, config.mac)
     if (!isMac && config.windows) return matchesConfig(event, config.windows)

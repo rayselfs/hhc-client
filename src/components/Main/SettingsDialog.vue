@@ -1,16 +1,17 @@
 <template>
-  <v-dialog v-model="isOpen" max-width="700">
-    <v-card>
+  <v-dialog v-model="isOpen" max-width="700" @keydown.esc="isOpen = false">
+    <v-card rounded="lg">
       <div class="d-flex flex-row settings-container">
         <!-- Left sidebar -->
-        <div class="settings-sidebar bg-surface-light">
-          <v-list nav density="compact" class="py-2 bg-transparent">
+        <div class="settings-sidebar">
+          <v-list nav density="compact" class="py-2">
             <v-list-item
               v-for="category in categories"
               :key="category.id"
               :value="category.id"
               :active="activeCategory === category.id"
               active-class="bg-primary"
+              rounded="lg"
               @click="activeCategory = category.id"
             >
               <template #prepend>
@@ -22,11 +23,7 @@
         </div>
 
         <!-- Right content -->
-        <div class="settings-content">
-          <v-card-title class="text-subtitle-1 d-flex align-center settings-title">
-            {{ $t(currentCategoryTitle) }}
-          </v-card-title>
-
+        <div class="settings-content pa-3">
           <v-card-text class="settings-text">
             <!-- General -->
             <template v-if="activeCategory === 'general'">
@@ -40,6 +37,8 @@
                     item-value="value"
                     variant="outlined"
                     density="compact"
+                    rounded="lg"
+                    :menu-props="{ contentClass: 'rounded-lg' }"
                     @update:model-value="handleLanguageChange"
                   >
                     <template v-slot:item="{ props, item }">
@@ -57,6 +56,8 @@
                     :items="timezones"
                     variant="outlined"
                     density="compact"
+                    rounded="lg"
+                    :menu-props="{ contentClass: 'rounded-lg' }"
                     @update:model-value="handleTimezoneChange"
                   ></v-select>
                 </v-col>
@@ -106,6 +107,7 @@
                 clearable
                 persistent-hint
                 class="mb-4"
+                rounded="lg"
                 @blur="handleCustomPathChange"
               />
 
@@ -140,6 +142,8 @@
                 item-value="value"
                 variant="outlined"
                 density="compact"
+                rounded="lg"
+                :menu-props="{ contentClass: 'rounded-lg' }"
                 @update:model-value="handleVideoQualityChange"
               >
                 <template v-slot:item="{ props, item }">
@@ -194,7 +198,9 @@
 
           <v-card-actions class="settings-actions">
             <v-spacer></v-spacer>
-            <v-btn @click="isOpen = false"> {{ $t('common.close') }} </v-btn>
+            <v-btn @click="isOpen = false" rounded="xl" size="large">
+              {{ $t('common.close') }}
+            </v-btn>
           </v-card-actions>
         </div>
       </div>
@@ -203,7 +209,7 @@
 
   <!-- Restart Required Dialog -->
   <v-dialog v-model="showRestartDialog" max-width="400" persistent>
-    <v-card>
+    <v-card rounded="lg">
       <v-card-title class="text-subtitle-1">
         {{ $t('settings.restartRequired') }}
       </v-card-title>
@@ -212,10 +218,10 @@
       </v-card-text>
       <v-card-actions>
         <v-spacer></v-spacer>
-        <v-btn variant="text" @click="showRestartDialog = false">
+        <v-btn variant="text" rounded="lg" @click="showRestartDialog = false">
           {{ $t('common.later') }}
         </v-btn>
-        <v-btn color="primary" variant="flat" @click="restartApp">
+        <v-btn color="primary" variant="flat" rounded="lg" @click="restartApp">
           {{ $t('common.restartNow') }}
         </v-btn>
       </v-card-actions>
@@ -275,11 +281,6 @@ const categories = [
   { id: 'about', title: 'settings.categories.about', icon: 'mdi-information' },
 ]
 const activeCategory = ref('general')
-
-const currentCategoryTitle = computed(() => {
-  const category = categories.find((c) => c.id === activeCategory.value)
-  return category ? category.title : 'settings.title'
-})
 
 // 語系管理
 const { selectedLanguage, languageOptions, handleLanguageChange } = useLocaleDetection()

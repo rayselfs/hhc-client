@@ -9,7 +9,13 @@
           <!-- Sort Menu -->
           <v-menu>
             <template #activator="{ props }">
-              <v-btn v-bind="props" variant="elevated" prepend-icon="mdi-sort" class="mr-2">
+              <v-btn
+                v-bind="props"
+                variant="elevated"
+                rounded="xl"
+                prepend-icon="mdi-sort"
+                class="mr-2"
+              >
                 {{ $t('common.sort') }}
               </v-btn>
             </template>
@@ -59,7 +65,12 @@
           <!-- View Menu -->
           <v-menu>
             <template #activator="{ props }">
-              <v-btn v-bind="props" variant="elevated" prepend-icon="mdi-view-grid-outline">
+              <v-btn
+                v-bind="props"
+                variant="elevated"
+                rounded="xl"
+                prepend-icon="mdi-view-grid-outline"
+              >
                 {{ $t('common.view') }}
               </v-btn>
             </template>
@@ -226,11 +237,11 @@ const { viewMode } = storeToRefs(mediaStore)
 const itemSize = computed(() => {
   switch (viewMode.value) {
     case 'large':
-      return 200
+      return 230
     case 'medium':
       return 160
     case 'small':
-      return 120
+      return 110
     default:
       return 160
   }

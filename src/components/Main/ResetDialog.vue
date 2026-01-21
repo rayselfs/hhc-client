@@ -1,6 +1,6 @@
 <template>
   <v-dialog v-model="dialog" max-width="500" persistent>
-    <v-card>
+    <v-card rounded="lg">
       <v-card-title class="d-flex align-center">
         <v-icon :color="iconColor" size="28" class="mr-2">{{ icon }}</v-icon>
         <span class="text-h5">{{ $t('settings.resetConfirmTitle') }}</span>
@@ -12,10 +12,10 @@
 
       <v-card-actions>
         <v-spacer />
-        <v-btn color="grey" variant="text" @click="handleCancel">
+        <v-btn color="grey" variant="text" rounded="lg" @click="handleCancel">
           {{ $t('common.cancel') }}
         </v-btn>
-        <v-btn :color="confirmButtonColor" variant="text" @click="handleConfirm">
+        <v-btn :color="confirmButtonColor" variant="text" rounded="lg" @click="handleConfirm">
           {{ $t('common.confirm') }}
         </v-btn>
       </v-card-actions>

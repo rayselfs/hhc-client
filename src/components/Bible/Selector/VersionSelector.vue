@@ -8,9 +8,11 @@
       item-value="code"
       :loading="versionsLoading || contentLoading"
       density="compact"
-      variant="outlined"
+      variant="solo-filled"
       hide-details
       class="bible-version-selector mr-2"
+      rounded="xl"
+      :menu-props="{ contentClass: 'rounded-xl' }"
       :disabled="versionsLoading || contentLoading"
     >
       <template v-slot:item="{ props }">
@@ -20,11 +22,12 @@
 
     <!-- dropdown button -->
     <v-btn
-      variant="outlined"
+      variant="tonal"
       :disabled="!selectedVersionCode"
       @click="showBooksDialog = true"
       :title="$t('bible.selectBooks')"
-      class="books-btn"
+      icon
+      size="small"
       :class="{ 'mr-2': isMultiVersion }"
     >
       <v-icon>mdi-book-open-page-variant</v-icon>
@@ -39,11 +42,13 @@
       item-value="code"
       :loading="versionsLoading || contentLoading"
       density="compact"
-      variant="outlined"
+      variant="solo-filled"
       hide-details
       class="bible-version-selector"
+      rounded="xl"
       :disabled="versionsLoading || contentLoading"
-      placeholder="Select 2nd Version"
+      :menu-props="{ contentClass: 'rounded-xl' }"
+      :placeholder="$t('bible.selectSecondVersion')"
     >
       <template v-slot:item="{ props }">
         <v-list-item v-bind="props" class="version-item"> </v-list-item>
@@ -63,11 +68,11 @@
       <v-icon>mdi-view-split-horizontal</v-icon>
     </v-btn>
 
-    <!-- Bible Books Dialog -->
+    <!-- Books Dialog -->
     <BooksDialog
       v-model="showBooksDialog"
-      :version-code="currentVersion?.code"
-      @select-verse="handleSelectVerse"
+      :version-code="selectedVersionCode"
+      @select-verse="handleSelectVerseFromDialog"
     />
   </div>
 </template>
@@ -80,9 +85,11 @@ defineOptions({
 import { computed, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
-import BooksDialog from './BooksDialog.vue'
 import { useSentry } from '@/composables/useSentry'
 import { useBibleStore } from '@/stores/bible'
+import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
+import { KEYBOARD_SHORTCUTS } from '@/config/shortcuts'
+import { BooksDialog } from '@/components/Bible'
 
 const { reportError } = useSentry()
 const { t: $t } = useI18n()
@@ -91,10 +98,9 @@ const { t: $t } = useI18n()
 const bibleStore = useBibleStore()
 const { versions, versionsLoading, currentVersion, isMultiVersion, secondVersionCode } =
   storeToRefs(bibleStore)
-const { setCurrentVersionByCode, getBibleContent, setSelectedVerse } = bibleStore
+const { setCurrentVersionByCode, getBibleContent } = bibleStore
 
 const contentLoading = ref(false)
-const showBooksDialog = ref(false)
 
 const bibleVersions = computed(() => versions.value)
 
@@ -149,11 +155,6 @@ watch(
   },
 )
 
-// Handle verse selection
-const handleSelectVerse = (bookNumber: number, chapter: number, verse: number) => {
-  setSelectedVerse(bookNumber, chapter, verse)
-}
-
 // Expose selectedVersion for external use
 defineExpose({
   selectedVersion: computed(() => selectedVersionCode.value),
@@ -162,6 +163,38 @@ defineExpose({
 const toggleMultiVersion = () => {
   isMultiVersion.value = !isMultiVersion.value
 }
+
+// Books dialog state
+const showBooksDialog = ref(false)
+
+// Handle verse selection from dialog
+const handleSelectVerseFromDialog = (bookNumber: number, chapter: number, verse: number) => {
+  // Dispatch event to BibleControl for verse selection handling
+  window.dispatchEvent(
+    new CustomEvent('bible-select-verse', {
+      detail: { bookNumber, chapter, verse },
+    }),
+  )
+}
+
+// Keyboard shortcuts for books dialog
+useKeyboardShortcuts([
+  {
+    config: KEYBOARD_SHORTCUTS.BIBLE.TOGGLE_BOOK_DIALOG, // G key
+    handler: () => {
+      showBooksDialog.value = !showBooksDialog.value
+    },
+  },
+  {
+    config: KEYBOARD_SHORTCUTS.BIBLE.CLOSE_DIALOG, // ESC key
+    handler: () => {
+      if (showBooksDialog.value) {
+        showBooksDialog.value = false
+      }
+    },
+    preventDefault: false, // Allow other ESC handlers if dialog is closed
+  },
+])
 </script>
 
 <style scoped>
@@ -182,11 +215,6 @@ const toggleMultiVersion = () => {
 
 .bible-version-selector > .v-input__control > .v-field {
   height: 36px;
-}
-
-.books-btn {
-  height: 36px;
-  margin-top: 0px;
 }
 
 .version-item {

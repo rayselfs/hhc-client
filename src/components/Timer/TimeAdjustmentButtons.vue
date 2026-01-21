@@ -7,6 +7,7 @@
         class="mr-2 ml-2 time-button"
         :color="color"
         :disabled="isDisabled(seconds)"
+        rounded="xl"
         @click="$emit('adjust', seconds)"
       >
         {{ getLabel(seconds) }}
@@ -59,5 +60,6 @@ const isDisabled = (seconds: number) => {
 <style scoped>
 .time-button {
   width: 60px;
+  height: 40px;
 }
 </style>

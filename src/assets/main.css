@@ -25,3 +25,7 @@ v-divider {
 .dialog-top {
   top: 0px;
 }
+
+.rounded-lg {
+  border-radius: 12px !important;
+}

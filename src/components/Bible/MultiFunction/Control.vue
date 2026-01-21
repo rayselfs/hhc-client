@@ -1,5 +1,8 @@
 <template>
-  <v-card :style="{ height: props.containerHeight ? `${props.containerHeight}px` : '100%' }">
+  <v-card
+    :style="{ height: props.containerHeight ? `${props.containerHeight}px` : '100%' }"
+    rounded="lg"
+  >
     <v-card-title class="d-flex align-center justify-space-between pa-0">
       <div class="d-flex align-center">
         <v-btn-toggle v-model="multiFunctionTab" mandatory class="rounded-0 border-e-sm">
@@ -389,7 +392,7 @@ const generateExportText = (groups: { name: string; verses: VerseItem[] }[]) => 
     .map((group) => {
       const header = `[${group.name === BibleFolder.ROOT_NAME ? '首頁' : group.name}]`
       const content = group.verses
-        .map((v) => ` - ${v.verseText} - ${v.bookAbbreviation}${v.chapter}:${v.verse}`)
+        .map((v) => ` - ${v.verseText} - ${v.bookAbbreviation} ${v.chapter}:${v.verse}`)
         .join('\n')
       return `${header}\n${content}`
     })

@@ -1,10 +1,10 @@
 <template>
-  <v-dialog v-model="isOpen" max-width="500">
-    <v-card>
+  <v-dialog v-model="isOpen" max-width="500" @keydown.esc="isOpen = false">
+    <v-card rounded="lg">
       <v-card-title class="d-flex align-center">
         {{ $t('settings.media.installGuide.title') }}
         <v-spacer />
-        <v-btn icon variant="text" @click="isOpen = false">
+        <v-btn icon variant="text" class="mt-2" @click="isOpen = false">
           <v-icon>mdi-close</v-icon>
         </v-btn>
       </v-card-title>

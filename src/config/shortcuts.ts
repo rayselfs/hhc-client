@@ -29,7 +29,6 @@ export const KEYBOARD_SHORTCUTS = {
       windows: { code: 'F5', shift: true },
     },
     ESCAPE: { code: 'Escape' },
-    ENTER: { code: 'Enter' },
     NEXT_SLIDE: { codes: ['ArrowRight', 'ArrowDown', 'PageDown', 'Enter', 'KeyN'] },
     PREV_SLIDE: { codes: ['ArrowLeft', 'ArrowUp', 'PageUp', 'KeyP'] },
     FIRST_SLIDE: { code: 'Home' },
@@ -49,7 +48,8 @@ export const KEYBOARD_SHORTCUTS = {
     NEXT_VERSE: { code: 'ArrowDown' },
     PREV_CHAPTER: { code: 'ArrowLeft' },
     NEXT_CHAPTER: { code: 'ArrowRight' },
-    OPEN_BOOK_DIALOG: { code: 'KeyG' },
+    TOGGLE_BOOK_DIALOG: { code: 'KeyG' },
+    CLOSE_DIALOG: { code: 'Escape' },
   },
   SELECTION: {
     MULTI_SELECT: { metaOrCtrl: true },

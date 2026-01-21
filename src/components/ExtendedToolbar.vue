@@ -25,7 +25,9 @@
           ? $t('extendedToolbar.openProjection')
           : $t('extendedToolbar.closeProjection')
       "
-      variant="outlined"
+      variant="tonal"
+      rounded="xl"
+      min-height="40"
     >
       <v-icon v-if="projectionStore.isShowingDefault" class="mr-1 ml-1">mdi-monitor</v-icon>
       <v-icon v-else class="mr-1 ml-1">mdi-monitor-off</v-icon>
@@ -37,6 +39,7 @@
       color="error"
       :title="$t('extendedToolbar.closeProjectionWindow')"
       icon
+      :disabled="!projectionWindowExists"
     >
       <v-icon>mdi-close</v-icon>
     </v-btn>
@@ -44,7 +47,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useProjectionStore } from '@/stores/projection'
 import { useElectron } from '@/composables/useElectron'
@@ -66,6 +69,9 @@ const {
 } = useElectron()
 const { setProjectionState, syncAllStates } = useProjectionManager()
 const { warning } = useAlert()
+
+// 追蹤投影窗口是否存在
+const projectionWindowExists = ref(false)
 
 // Props
 const props = defineProps<{
@@ -154,20 +160,25 @@ const closeProjectionWindow = async () => {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   // 初始化時同步所有狀態到投影窗口（包含投影狀態、計時器狀態、主題等）
   syncAllStates()
 
   // 監聽投影窗口狀態變化
   if (isElectron()) {
+    // 初始化時檢查投影窗口是否存在
+    projectionWindowExists.value = await checkProjectionWindow()
+
     onProjectionOpened(() => {
       // 投影窗口開啟時，預設顯示預設內容（投影關閉狀態）
       projectionStore.setShowingDefault(true)
+      projectionWindowExists.value = true
     })
 
     onProjectionClosed(() => {
       // 投影窗口關閉時，重置為預設內容狀態
       projectionStore.setShowingDefault(true)
+      projectionWindowExists.value = false
     })
   }
 })

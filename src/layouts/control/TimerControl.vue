@@ -7,7 +7,7 @@
         :class="['pl-4 pt-4 pb-4', mdAndUp ? 'pr-2 mb-0' : 'pr-4 mb-4']"
         :style="{ height: `${leftCardHeight}px` }"
       >
-        <v-card :style="{ height: `${leftCardHeight}px` }">
+        <v-card :style="{ height: `${leftCardHeight}px` }" rounded="lg">
           <v-card-text class="d-flex flex-column h-100">
             <v-row class="flex-grow-0">
               <v-col cols="12" align="center">
@@ -17,6 +17,7 @@
                   mandatory
                   color="primary"
                   border
+                  rounded="xl"
                   @update:model-value="handleModeChange"
                 >
                   <v-btn value="timer" min-width="110">
@@ -171,7 +172,7 @@
         <v-row no-gutters class="fill-height">
           <!-- Presets Layout -->
           <v-col cols="12" class="mb-4" :style="{ height: `${rightTopCardHeight}px` }">
-            <v-card :style="{ height: `${rightTopCardHeight}px` }">
+            <v-card :style="{ height: `${rightTopCardHeight}px` }" rounded="lg">
               <v-card-text>
                 <div class="d-flex justify-space-between mb-2">
                   <v-label class="text-h6 align-start">{{ $t('timer.presets') }}</v-label>
@@ -218,7 +219,7 @@
 
           <!-- Control Layout -->
           <v-col cols="12" :style="{ height: `${rightBottomCardHeight}px` }">
-            <v-card :style="{ height: `${rightBottomCardHeight}px` }">
+            <v-card :style="{ height: `${rightBottomCardHeight}px` }" rounded="lg">
               <v-card-text>
                 <v-label class="text-h6 align-start mb-2">{{ $t('common.control') }}</v-label>
                 <div class="d-flex align-center fill-height">
@@ -246,6 +247,7 @@
                     style="max-width: 100px"
                     :suffix="$t('timer.reminderSecond')"
                     :disabled="timerStore.state !== 'stopped'"
+                    rounded="xl"
                     @update:model-value="handleReminderTimeChange"
                   ></v-text-field>
                 </div>
@@ -263,9 +265,9 @@
                     density="compact"
                     hide-details
                     :label="$t('timer.overtimeMessageLabel')"
-                    :disabled="timerStore.state !== 'stopped'"
                     :maxlength="TIMER_CONFIG.OVERTIME_MESSAGE.MAX_LENGTH"
                     style="max-width: 250px"
+                    rounded="xl"
                     @blur="handleOvertimeMessageBlur"
                     @keyup.enter="handleOvertimeMessageEnter"
                   ></v-text-field>
@@ -518,6 +520,10 @@ onUnmounted(() => {
 }
 
 .preset-item:hover {
-  background-color: rgba(var(--v-theme-primary), 0.5);
+  background-color: rgba(var(--v-theme-primary), 0.7);
+}
+
+.v-btn-toggle .v-btn--active :deep(.v-btn__overlay) {
+  opacity: 0 !important;
 }
 </style>

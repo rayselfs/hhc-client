@@ -1,6 +1,6 @@
 <template>
   <v-dialog v-model="isOpen" max-width="500">
-    <v-card>
+    <v-card rounded="lg">
       <v-card-title class="text-subtitle-1 d-flex align-center">
         {{ $t('about.title') }}
       </v-card-title>

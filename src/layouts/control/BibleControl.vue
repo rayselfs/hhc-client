@@ -7,7 +7,7 @@
         :class="['pl-4 pt-4 pb-4', mdAndUp ? 'pr-2 mb-0' : 'pr-4 mb-4']"
         :style="{ height: `${leftCardHeight}px` }"
       >
-        <v-card :style="{ height: `${leftCardHeight}px` }">
+        <v-card :style="{ height: `${leftCardHeight}px` }" rounded="lg">
           <v-card-title class="d-flex align-center justify-space-between">
             <div class="d-flex align-center ga-2">
               <span class="mr-1">{{ $t('common.preview') }}</span>
@@ -27,6 +27,7 @@
                 size="small"
                 class="mr-1"
                 :disabled="isSearchMode || currentPassage.chapter <= 1"
+                rounded="xl"
                 @click="goToPreviousChapterPreview"
               >
                 <v-icon>mdi-chevron-left</v-icon>
@@ -34,6 +35,7 @@
               <v-btn
                 size="small"
                 :disabled="isSearchMode || currentPassage.chapter >= maxChapters"
+                rounded="xl"
                 @click="goToNextChapterPreview"
               >
                 <v-icon>mdi-chevron-right</v-icon>
@@ -139,7 +141,7 @@
 
           <!-- Projection Control -->
           <v-col cols="12" :style="{ height: `${rightBottomCardHeight}px` }">
-            <v-card :style="{ height: `${rightBottomCardHeight}px` }">
+            <v-card :style="{ height: `${rightBottomCardHeight}px` }" rounded="lg">
               <v-card-text>
                 <!-- Chapter/Verse Navigation -->
                 <v-row class="mb-3">
@@ -219,13 +221,6 @@
     <ContextMenu v-model="showVerseContextMenu" :position="menuPosition" close-on-content-click raw>
       <BibleVerseContextMenu type="preview" @copy-verse-text="copyVerseText" />
     </ContextMenu>
-
-    <!-- Books Dialog -->
-    <BooksDialog
-      v-model="showBooksDialog"
-      :version-code="currentVersion?.code"
-      @select-verse="handleSelectVerseFromDialog"
-    />
   </v-container>
 </template>
 
@@ -666,11 +661,9 @@ const handleSearchEvent = (event: Event) => {
   handleSearch(customEvent.detail.text)
 }
 
-import { BooksDialog } from '@/components/Bible'
-
-const showBooksDialog = ref(false)
-
-const handleSelectVerseFromDialog = async (bookNumber: number, chapter: number, verse: number) => {
+const handleSelectVerseEvent = async (event: Event) => {
+  const customEvent = event as CustomEvent<{ bookNumber: number; chapter: number; verse: number }>
+  const { bookNumber, chapter, verse } = customEvent.detail
   isLoadingVerses.value = true
   await handleVerseSelection(bookNumber, chapter, verse)
 }
@@ -685,10 +678,12 @@ onMounted(async () => {
   updateFontSize(fontSize.value)
 
   window.addEventListener('bible-search', handleSearchEvent)
+  window.addEventListener('bible-select-verse', handleSelectVerseEvent)
 })
 
 onUnmounted(() => {
   window.removeEventListener('bible-search', handleSearchEvent)
+  window.removeEventListener('bible-select-verse', handleSelectVerseEvent)
 })
 
 // Keyboard shortcuts
@@ -703,12 +698,6 @@ useKeyboardShortcuts([
     config: KEYBOARD_SHORTCUTS.BIBLE.NEXT_VERSE,
     handler: () => {
       if (currentPassage.value) goToNextVerseProjection()
-    },
-  },
-  {
-    config: KEYBOARD_SHORTCUTS.BIBLE.OPEN_BOOK_DIALOG,
-    handler: () => {
-      showBooksDialog.value = !showBooksDialog.value
     },
   },
 ])

@@ -1,7 +1,7 @@
 <template>
-  <v-dialog v-model="isOpen" max-width="800">
-    <v-card>
-      <v-card-title class="text-subtitle-1 d-flex align-center">
+  <v-dialog v-model="isOpen" max-width="800" @keydown.esc="isOpen = false">
+    <v-card rounded="lg">
+      <v-card-title class="text-h6 d-flex align-center">
         {{ $t('shortcuts.title') }}
       </v-card-title>
 
@@ -19,7 +19,7 @@
 
       <v-card-actions class="pa-4">
         <v-spacer></v-spacer>
-        <v-btn color="primary" @click="isOpen = false">
+        <v-btn rounded="xl" variant="elevated" @click="isOpen = false">
           {{ $t('common.close') }}
         </v-btn>
       </v-card-actions>
@@ -42,32 +42,50 @@ const { isElectron, onMainMessage, removeAllListeners } = useElectron()
 const isOpen = ref(false)
 const isMac = checkIsMac()
 
+const formatCode = (code: string): string => {
+  return code.replace('Key', '').replace('Arrow', '').replace('Numpad', '').replace('Page', 'Pg')
+}
+
 const formatShortcut = (config: ShortcutConfig): string => {
   // Check platform specific overrides
   if (isMac && config.mac) return formatShortcut(config.mac)
   if (!isMac && config.windows) return formatShortcut(config.windows)
 
-  const parts: string[] = []
+  const modifiers: string[] = []
 
   // Modifiers
-  if (config.metaOrCtrl) parts.push(isMac ? 'Cmd' : 'Ctrl')
-  if (config.ctrl) parts.push('Ctrl')
-  if (config.meta) parts.push(isMac ? 'Cmd' : 'Win')
-  if (config.shift) parts.push('Shift')
-  if (config.alt) parts.push(isMac ? 'Opt' : 'Alt')
+  if (config.metaOrCtrl) modifiers.push(isMac ? 'Cmd' : 'Ctrl')
+  if (config.ctrl) modifiers.push('Ctrl')
+  if (config.meta) modifiers.push(isMac ? 'Cmd' : 'Win')
+  if (config.shift) modifiers.push('Shift')
+  if (config.alt) modifiers.push(isMac ? 'Opt' : 'Alt')
 
-  // Keys
-  if (config.keys && config.keys.length > 0) {
-    const k = config.keys[0]
-    if (k) parts.push(k)
-  } else if (config.key) {
-    if (config.key === ' ') parts.push('Space')
-    else parts.push(config.key.toUpperCase())
-  } else if (config.code) {
-    parts.push(config.code.replace('Key', '').replace('Arrow', ''))
+  const modifierPrefix = modifiers.length > 0 ? modifiers.join('+') + '+' : ''
+
+  // Handle multiple codes - show up to 3
+  if (config.codes && config.codes.length > 0) {
+    const displayCodes = config.codes.slice(0, 3).map(formatCode)
+    return displayCodes.map((c) => modifierPrefix + c).join(' / ')
   }
 
-  return parts.join('+')
+  // Handle multiple keys - show up to 3
+  if (config.keys && config.keys.length > 0) {
+    const displayKeys = config.keys.slice(0, 3)
+    return displayKeys.map((k) => modifierPrefix + k).join(' / ')
+  }
+
+  // Single key
+  if (config.key) {
+    const keyDisplay = config.key === ' ' ? 'Space' : config.key.toUpperCase()
+    return modifierPrefix + keyDisplay
+  }
+
+  // Single code
+  if (config.code) {
+    return modifierPrefix + formatCode(config.code)
+  }
+
+  return ''
 }
 
 interface DisplayShortcut {
