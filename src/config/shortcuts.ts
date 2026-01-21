@@ -1,12 +1,11 @@
 export const KEYBOARD_SHORTCUTS = {
   GLOBAL: {
     TOGGLE_PROJECTION: {
-      key: 'F5',
-      mac: { meta: true, shift: true, key: 'Enter' },
-      windows: { key: 'F5' },
+      mac: { code: 'Enter', meta: true },
+      windows: { code: 'F5' },
     },
     CLOSE_PROJECTION: {
-      key: 'q',
+      code: 'KeyQ',
       ctrl: true,
     },
   },
@@ -15,14 +14,20 @@ export const KEYBOARD_SHORTCUTS = {
     PASTE: { key: 'v', metaOrCtrl: true },
     CUT: { key: 'x', metaOrCtrl: true },
     DELETE: {
-      keys: ['Delete'], // Standard Delete
-      mac: { key: 'Backspace', meta: true }, // Cmd+Backspace on Mac
+      keys: ['Delete'],
+      mac: { key: 'Backspace', meta: true },
     },
     SELECT_ALL: { key: 'a', metaOrCtrl: true },
   },
   MEDIA: {
-    START_PRESENTATION: { code: 'F5' }, // Contextual usage
-    START_PRESENTATION_FROM_BEGINNING: { code: 'F5', shift: true }, // Example
+    START_PRESENTATION: {
+      mac: { code: 'Enter', meta: true },
+      windows: { code: 'F5' },
+    },
+    START_PRESENTATION_FROM_BEGINNING: {
+      mac: { code: 'Enter', meta: true, shift: true },
+      windows: { code: 'F5', shift: true },
+    },
     ESCAPE: { code: 'Escape' },
     ENTER: { code: 'Enter' },
     NEXT_SLIDE: { codes: ['ArrowRight', 'ArrowDown', 'PageDown', 'Enter', 'KeyN'] },
@@ -33,7 +38,7 @@ export const KEYBOARD_SHORTCUTS = {
     TOGGLE_ZOOM: { code: 'KeyZ' },
     ZOOM_IN: { codes: ['Equal', 'NumpadAdd'] },
     ZOOM_OUT: { codes: ['Minus', 'NumpadSubtract'] },
-    VIDEO_TOGGLE_PLAY: { code: 'Space' }, // Play/Pause/Replay video
+    VIDEO_TOGGLE_PLAY: { code: 'Space' },
   },
   TIMER: {
     TOGGLE: { code: 'Space' },
