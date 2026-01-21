@@ -42,13 +42,7 @@
       </MediaThumbnail>
 
       <!-- Disabled overlay icon -->
-      <v-icon
-        v-if="isDisabled"
-        icon="mdi-cancel"
-        size="24"
-        color="error"
-        class="disabled-overlay-icon"
-      ></v-icon>
+      <v-icon v-if="isDisabled" icon="mdi-cancel" size="24" class="disabled-overlay-icon"></v-icon>
     </div>
 
     <!-- Footer: Name -->
@@ -162,7 +156,6 @@ const onDrop = () => {
 
 .item-disabled {
   opacity: 0.5;
-  cursor: not-allowed;
   filter: grayscale(50%);
 }
 
@@ -187,7 +180,6 @@ const onDrop = () => {
   position: absolute;
   bottom: 4px;
   right: 4px;
-  background: rgba(255, 255, 255, 0.9);
   border-radius: 50%;
   padding: 2px;
 }
