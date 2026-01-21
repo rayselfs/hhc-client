@@ -28,6 +28,7 @@
       variant="tonal"
       rounded="xl"
       min-height="40"
+      :disabled="props.currentView === 'media'"
     >
       <v-icon v-if="projectionStore.isShowingDefault" class="mr-1 ml-1">mdi-monitor</v-icon>
       <v-icon v-else class="mr-1 ml-1">mdi-monitor-off</v-icon>
