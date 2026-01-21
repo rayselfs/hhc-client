@@ -227,6 +227,10 @@ export const useProjectionManager = () => {
 
     const messages: AppMessage[] = [
       {
+        type: MessageType.VIEW_CHANGE,
+        data: { view: projectionStore.currentView },
+      },
+      {
         type: MessageType.TIMER_SYNC_SETTINGS,
         data: {
           mode: timerStore.settings.mode,

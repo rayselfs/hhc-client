@@ -199,6 +199,7 @@ import { storeToRefs } from 'pinia'
 import { useElectron } from '@/composables/useElectron'
 import { useProjectionManager } from '@/composables/useProjectionManager'
 import { useMediaProjectionStore } from '@/stores/mediaProjection'
+import { useProjectionStore } from '@/stores/projection'
 import { MediaItemList, MediaPresenter, MediaBackgroundMenu } from '@/components/Media'
 import { CreateEditFolderDialog, DeleteConfirmDialog, FolderBreadcrumbs } from '@/components/Shared'
 import { useFolderDialogs } from '@/composables/useFolderDialogs'
@@ -218,6 +219,7 @@ const { sendProjectionMessage } = useProjectionManager()
 const { showSnackBar } = useSnackBar()
 const mediaStore = useMediaFolderStore()
 const mediaProjectionStore = useMediaProjectionStore()
+const projectionStore = useProjectionStore()
 
 // View Mode
 const { viewMode } = storeToRefs(mediaStore)
@@ -359,6 +361,8 @@ const handleSortChange = (mode: 'custom') => {
 }
 
 const startPresentation = async (startItem?: FileItem, fromBeginning = false) => {
+  projectionStore.setCurrentView(ViewType.MEDIA)
+
   const allFiles = sortedUnifiedItems.value.filter((i) => !('items' in i)) as FileItem[]
   const presentableFiles = allFiles.filter((f) => f.permissions?.canPresent !== false)
 
