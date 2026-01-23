@@ -1,17 +1,18 @@
 <template>
   <v-row :class="rowClass">
     <v-col cols="12" align="center" class="pt-0" :class="colClass">
-      <v-btn
+      <liquid-btn
         v-for="seconds in adjustments"
         :key="seconds"
         class="mr-2 ml-2 time-button"
         :color="color"
         :disabled="isDisabled(seconds)"
+        variant="solid"
         rounded="xl"
         @click="$emit('adjust', seconds)"
       >
         {{ getLabel(seconds) }}
-      </v-btn>
+      </liquid-btn>
     </v-col>
   </v-row>
 </template>
