@@ -32,14 +32,14 @@
                     key="timer"
                     class="d-flex flex-column align-center justify-center fill-height"
                   >
-                    <CountdownTimer
+                    <liquid-progress-ring
                       :progress="timerStore.progress"
-                      :timer-formatted-time="timerStore.formattedTime"
+                      :formatted-time="timerStore.formattedTime"
                       :size="250"
                       :display-text="timerStore.isRunning"
                       class="mb-8"
                     >
-                      <template #content>
+                      <template #default>
                         <div
                           v-if="timerStore.state === 'stopped'"
                           class="d-flex justify-center align-center"
@@ -60,7 +60,7 @@
                         </div>
                         <span v-else>{{ timerStore.formattedTime }}</span>
                       </template>
-                    </CountdownTimer>
+                    </liquid-progress-ring>
 
                     <!-- Remove Time Buttons -->
                     <TimeAdjustmentButtons
@@ -267,7 +267,6 @@ import { useProjectionManager } from '@/composables/useProjectionManager'
 import { APP_CONFIG, TIMER_CONFIG } from '@/config/app'
 
 import { TimerMode, ViewType } from '@/types/common'
-import CountdownTimer from '@/components/Timer/CountdownTimer.vue'
 import Stopwatch from '@/components/Timer/StopWatcher.vue'
 import TimeAdjustmentButtons from '@/components/Timer/TimeAdjustmentButtons.vue'
 import TimeInput from '@/components/Timer/TimeInput.vue'

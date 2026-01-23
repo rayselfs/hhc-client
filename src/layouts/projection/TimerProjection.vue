@@ -28,9 +28,9 @@
     class="fill-height ma-0 pa-0"
   >
     <v-col cols="5 pa-0 d-flex align-center justify-center">
-      <CountdownTimer
+      <liquid-progress-ring
         :progress="timerProjectionStore.progress"
-        :timer-formatted-time="timerProjectionStore.formattedTime"
+        :formatted-time="timerProjectionStore.formattedTime"
         :size="circleSize"
         :is-warning="timerProjectionStore.isWarning"
       />
@@ -42,10 +42,10 @@
   </v-row>
   <v-row v-else class="fill-height ma-0 pa-0 align-center justify-center">
     <v-col cols="12 pa-0 d-flex align-center justify-center">
-      <CountdownTimer
+      <liquid-progress-ring
         v-if="timerProjectionStore.settings.mode === TimerMode.TIMER"
         :progress="timerProjectionStore.progress"
-        :timer-formatted-time="timerProjectionStore.formattedTime"
+        :formatted-time="timerProjectionStore.formattedTime"
         :size="circleSize"
         :is-warning="timerProjectionStore.isWarning"
       />
@@ -56,7 +56,6 @@
 
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
-import CountdownTimer from '@/components/Timer/CountdownTimer.vue'
 import ClockDisplay from '@/components/Timer/ClockDisplay.vue'
 import { TimerMode } from '@/types/common'
 import { useWindowSize } from '@/composables/useLayout'

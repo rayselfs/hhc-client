@@ -6,12 +6,12 @@
       :class="{ 'pulse-animation': timerStore.isRunning }"
     >
       <v-card-text class="pa-3" v-if="!stopwatchStore.global.isStopwatchMode">
-        <CountdownTimer
+        <liquid-progress-ring
           :progress="timerStore.progress"
-          :timer-formatted-time="timerStore.formattedTime"
+          :formatted-time="timerStore.formattedTime"
           :size="90"
-        >
-        </CountdownTimer>
+          :stroke-ratio="0.02"
+        />
       </v-card-text>
       <v-card-text class="pa-3 d-flex justify-center align-center" v-else>
         <Stopwatch :size="80" />
@@ -22,7 +22,6 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import CountdownTimer from './CountdownTimer.vue'
 import Stopwatch from './StopWatcher.vue'
 import { useTimerStore } from '@/stores/timer'
 import { useStopwatchStore } from '@/stores/stopwatch'
@@ -41,7 +40,7 @@ const isVisible = computed(() => {
 })
 
 const handleClick = () => {
-  setProjectionState(true, ViewType.TIMER)
+  setProjectionState(false, ViewType.TIMER)
 }
 </script>
 
