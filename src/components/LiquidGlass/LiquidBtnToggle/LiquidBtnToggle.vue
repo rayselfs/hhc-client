@@ -168,7 +168,7 @@ const updatePillPosition = (oldValue?: any) => {
     isAnimating.value = true
     setTimeout(() => {
       isAnimating.value = false
-    }, 400) // Match animation duration
+    }, 250) // Match animation duration
   }
 
   const el = itemRefs.value[newIndex]
@@ -247,9 +247,9 @@ onMounted(() => {
   background-color: var(--glass-pill-bg);
   border-radius: 9999px; /* Pill shape */
   transition:
-    left 0.4s cubic-bezier(1, 0, 0.4, 1),
-    width 0.4s cubic-bezier(1, 0, 0.4, 1),
-    height 0.4s cubic-bezier(1, 0, 0.4, 1);
+    left 0.25s cubic-bezier(0.2, 0, 0.2, 1),
+    width 0.25s cubic-bezier(0.2, 0, 0.2, 1),
+    height 0.25s cubic-bezier(0.2, 0, 0.2, 1);
 
   @include liquid.liquid-glass-pill-shadow;
   @include liquid.liquid-glass-backdrop(4px, 100%);
