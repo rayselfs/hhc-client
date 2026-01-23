@@ -16,6 +16,8 @@ declare module 'vue' {
     LiquidContainer: typeof import('./components/LiquidGlass/LiquidContainer/LiquidContainer.vue')['default']
     LiquidProgress: typeof import('./components/LiquidGlass/LiquidProgress/LiquidProgress.vue')['default']
     LiquidSearchBar: typeof import('./components/LiquidGlass/LiquidSearchBar/LiquidSearchBar.vue')['default']
+    LiquidSwitch: typeof import('./components/LiquidGlass/LiquidSwitch/LiquidSwitch.vue')['default']
+    LiquidTextField: typeof import('./components/LiquidGlass/LiquidTextField/LiquidTextField.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
   }
