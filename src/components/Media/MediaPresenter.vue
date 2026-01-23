@@ -80,7 +80,7 @@
 
               <!-- Viewport Frame Overlay -->
               <div
-                v-if="showZoomControls"
+                v-if="showZoomControls && currentItem?.metadata.fileType !== 'pdf'"
                 class="position-absolute border"
                 :style="{
                   borderColor: '#2196F3 !important',
@@ -103,23 +103,39 @@
                 @mousedown="startPanDrag"
               ></div>
 
-              <!-- Zoom Controls Only -->
+              <!-- Zoom Controls -->
               <v-fade-transition>
                 <div
                   v-if="showZoomControls || zoomLevel > 1"
-                  class="position-absolute bottom-0 right-0 ma-4 rounded pa-2 d-flex flex-column align-center elevation-4 bg-surface"
+                  class="position-absolute bottom-0 right-0 ma-2 rounded-pill pa-2 d-flex align-center zoom-controls"
                   style="z-index: 10"
                   @mousedown.stop
                 >
-                  <div class="d-flex align-center ga-2">
-                    <v-btn size="x-small" icon="mdi-minus" @click.stop="zoomOut"></v-btn>
-                    <span class="text-caption" style="min-width: 40px; text-align: center"
-                      >{{ Math.round(zoomLevel * 100) }}%</span
+                  <div class="d-flex align-center ga-1">
+                    <v-btn
+                      size="x-small"
+                      icon="mdi-minus"
+                      variant="text"
+                      @click.stop="zoomOut"
+                    ></v-btn>
+                    <v-btn
+                      size="small"
+                      variant="text"
+                      @click.stop="resetZoom"
+                      style="min-width: 50px"
                     >
-                    <v-btn size="x-small" icon="mdi-plus" @click.stop="zoomIn"></v-btn>
+                      {{ Math.round(zoomLevel * 100) }}
+                    </v-btn>
+                    <v-btn
+                      size="x-small"
+                      icon="mdi-plus"
+                      variant="text"
+                      @click.stop="zoomIn"
+                    ></v-btn>
                   </div>
                 </div>
               </v-fade-transition>
+
               <!-- Custom Video Controls -->
               <MediaVideoControls
                 v-if="currentItem?.metadata.fileType === 'video'"
@@ -351,6 +367,10 @@ const toggleZoom = (minus = false) => {
     store.setZoom(zoomValue)
     store.setPan(0, 0)
   }
+}
+
+const resetZoom = () => {
+  store.setPan(0, 0)
 }
 
 const zoomIn = () => {
@@ -591,8 +611,13 @@ const startPanDrag = (e: MouseEvent) => {
     const percentY = deltaY / rect.height
 
     // Direct mapping: pan change = desired viewport shift
-    const newPanX = initialPan.x - percentX
-    const newPanY = initialPan.y - percentY
+    // For PDF: Hand Tool (content follows mouse) -> ADD delta
+    // For Image: Camera Move (viewport moves) -> SUBTRACT delta
+    const isPdf = currentItem.value?.metadata.fileType === 'pdf'
+    const factor = isPdf ? 1 : -1
+
+    const newPanX = initialPan.x + percentX * factor
+    const newPanY = initialPan.y + percentY * factor
 
     store.setPan(newPanX, newPanY)
   }
@@ -1043,5 +1068,13 @@ onUnmounted(() => {
 .preview-content {
   max-width: 100%;
   max-height: 100%;
+}
+
+.zoom-controls {
+  background: rgba(20, 20, 20, 0.6);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.3);
 }
 </style>
