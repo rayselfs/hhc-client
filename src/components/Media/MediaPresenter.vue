@@ -53,8 +53,8 @@
                   v-else-if="currentItem.metadata.fileType === 'pdf'"
                   class="position-relative w-100 h-100 d-flex align-center justify-center"
                 >
-                  <!-- PDF Thumbnail Sidebar (uses pdfStore internally) -->
-                  <PdfThumbnailSidebar />
+                  <!-- PDF Sidebar (uses pdfStore internally) -->
+                  <PdfSidebar />
 
                   <!-- PDF Viewer (canvas-based) -->
                   <PdfViewer
@@ -105,10 +105,12 @@
 
               <!-- Zoom Controls -->
               <v-fade-transition>
-                <div
+                <LiquidContainer
                   v-if="showZoomControls || zoomLevel > 1"
-                  class="position-absolute bottom-0 right-0 ma-2 rounded-pill pa-2 d-flex align-center zoom-controls"
+                  class="position-absolute bottom-0 right-0 ma-2 d-flex align-center zoom-controls"
                   style="z-index: 10"
+                  padding="pa-2"
+                  mode="advanced"
                   @mousedown.stop
                 >
                   <div class="d-flex align-center ga-1">
@@ -133,7 +135,7 @@
                       @click.stop="zoomIn"
                     ></v-btn>
                   </div>
-                </div>
+                </LiquidContainer>
               </v-fade-transition>
 
               <!-- Custom Video Controls -->
@@ -320,7 +322,8 @@ import MediaVideoControls from '@/components/Media/Preview/MediaVideoControls.vu
 import MediaThumbnail from '@/components/Media/MediaThumbnail.vue'
 import PdfViewer from '@/components/Media/PdfViewer.vue'
 import PdfPresenterControls from '@/components/Media/PdfPresenterControls.vue'
-import PdfThumbnailSidebar from '@/components/Media/PdfThumbnailSidebar.vue'
+import PdfSidebar from '@/components/Media/PdfSidebar.vue'
+import LiquidContainer from '@/components/LiquidGlass/LiquidContainer.vue'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import type { PdfViewMode } from '@/composables/usePdf'
 import { usePdfPresenterStore } from '@/stores/pdfPresenter'
@@ -1068,13 +1071,5 @@ onUnmounted(() => {
 .preview-content {
   max-width: 100%;
   max-height: 100%;
-}
-
-.zoom-controls {
-  background: rgba(20, 20, 20, 0.6);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  box-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.3);
 }
 </style>

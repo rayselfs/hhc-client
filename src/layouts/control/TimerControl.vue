@@ -11,34 +11,16 @@
           <v-card-text class="d-flex flex-column h-100">
             <v-row class="flex-grow-0">
               <v-col cols="12" align="center">
-                <v-btn-toggle
+                <LiquidBtnToggle
                   v-model="timerStore.settings.mode"
-                  variant="elevated"
+                  :items="toggleItems"
                   mandatory
-                  color="primary"
-                  border
-                  rounded="xl"
+                  density="default"
+                  mode="simple"
+                  rounded="rounded-xl"
+                  size="large"
                   @update:model-value="handleModeChange"
-                >
-                  <v-btn value="timer" min-width="110">
-                    <v-icon icon="mdi-timer" class="mr-2"></v-icon>
-                    {{ $t('timer.mode.timer') }}
-                  </v-btn>
-                  <v-btn value="both" min-width="110">
-                    <v-icon icon="mdi-view-split-horizontal" class="mr-2"></v-icon>
-                    {{ $t('timer.mode.both') }}
-                  </v-btn>
-                  <v-btn
-                    value="clock"
-                    min-width="110"
-                    :disabled="
-                      !stopwatchStore.global.isStopwatchMode && timerStore.state !== 'stopped'
-                    "
-                  >
-                    <v-icon icon="mdi-clock" class="mr-2"></v-icon>
-                    {{ $t('timer.mode.clock') }}
-                  </v-btn>
-                </v-btn-toggle>
+                />
               </v-col>
             </v-row>
 
@@ -301,6 +283,7 @@ import { useMemoryManager } from '@/utils/memoryManager'
 import { useSnackBar } from '@/composables/useSnackBar'
 import { useCardLayout } from '@/composables/useLayout'
 import { formatDuration } from '@/utils/time'
+import LiquidBtnToggle from '@/components/LiquidGlass/LiquidBtnToggle.vue'
 
 const timerStore = useTimerStore()
 const stopwatchStore = useStopwatchStore()
@@ -341,6 +324,17 @@ const { leftCardHeight, rightTopCardHeight, rightBottomCardHeight } = useCardLay
   minHeight: APP_CONFIG.UI.MIN_CARD_HEIGHT,
   topCardRatio: 0.6,
 })
+
+const toggleItems = computed(() => [
+  { value: 'timer', icon: 'mdi-timer', label: $t('timer.mode.timer') },
+  { value: 'both', icon: 'mdi-view-split-horizontal', label: $t('timer.mode.both') },
+  {
+    value: 'clock',
+    icon: 'mdi-clock',
+    label: $t('timer.mode.clock'),
+    disabled: !stopwatchStore.global.isStopwatchMode && timerStore.state !== 'stopped',
+  },
+])
 
 const controlState = computed(() => {
   if (stopwatchStore.global.isStopwatchMode) {

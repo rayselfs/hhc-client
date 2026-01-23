@@ -3,7 +3,11 @@
     v-if="!pdfStore.showSidebar"
     class="pdf-controls-container d-flex flex-column justify-center position-relative"
   >
-    <div class="controls-bar d-flex align-center ga-1 px-4 py-2 rounded-pill align-self-start">
+    <LiquidContainer
+      class="controls-bar d-flex align-center ga-1 align-self-start"
+      mode="advanced"
+      padding="pa-1"
+    >
       <v-btn
         icon
         variant="text"
@@ -37,30 +41,40 @@
         <v-icon>mdi-chevron-right</v-icon>
       </v-btn>
 
-      <v-divider vertical class="mx-2" style="border-color: rgba(255, 255, 255, 0.2)" />
-
-      <v-btn-toggle
+      <LiquidBtnToggle
         :model-value="pdfStore.viewMode"
+        :items="[
+          {
+            value: 'slide',
+            icon: 'mdi-presentation',
+            title: $t('media.pdf.slideMode'),
+          },
+          {
+            value: 'scroll',
+            icon: 'mdi-script-text',
+            title: $t('media.pdf.scrollMode'),
+          },
+        ]"
         mandatory
         density="compact"
-        class="view-mode-toggle"
+        rounded="rounded-xl"
+        mode="advanced"
+        size="x-large"
+        ghost
         @update:model-value="handleViewModeChange"
-      >
-        <v-btn value="slide" size="small" :title="$t('media.pdf.slideMode')" variant="text">
-          <v-icon size="18" color="white">mdi-presentation</v-icon>
-        </v-btn>
-        <v-btn value="scroll" size="small" :title="$t('media.pdf.scrollMode')" variant="text">
-          <v-icon size="18" color="white">mdi-script-text</v-icon>
-        </v-btn>
-      </v-btn-toggle>
-    </div>
+      />
+    </LiquidContainer>
   </div>
 </template>
 
 <script setup lang="ts">
 import { usePdfPresenterStore } from '@/stores/pdfPresenter'
 import type { PdfViewMode } from '@/composables/usePdf'
+import LiquidContainer from '@/components/LiquidGlass/LiquidContainer.vue'
+import LiquidBtnToggle from '@/components/LiquidGlass/LiquidBtnToggle.vue'
+import { useI18n } from 'vue-i18n'
 
+const { t: $t } = useI18n()
 const pdfStore = usePdfPresenterStore()
 
 const emit = defineEmits<{
@@ -82,14 +96,6 @@ const handleViewModeChange = (mode: PdfViewMode) => {
   font-size: 1.2rem;
 }
 
-.controls-bar {
-  background: rgba(20, 20, 20, 0.6);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  box-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.3);
-}
-
 .page-indicator {
   cursor: pointer;
   min-width: 60px;
@@ -100,22 +106,6 @@ const handleViewModeChange = (mode: PdfViewMode) => {
 
   &:hover {
     background: rgba(255, 255, 255, 0.2);
-  }
-}
-
-.view-mode-toggle {
-  background: transparent;
-  border: none;
-
-  :deep(.v-btn) {
-    background: transparent !important;
-    border: none !important;
-    opacity: 0.7;
-
-    &.v-btn--active {
-      opacity: 1;
-      background: rgba(255, 255, 255, 0.15) !important;
-    }
   }
 }
 </style>

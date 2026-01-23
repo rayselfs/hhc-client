@@ -39,72 +39,75 @@
     </div>
 
     <!-- Controls Row (Bottom, with Liquid Glass Background) -->
-    <div class="controls-bar d-flex align-center ga-1 px-4 py-2 rounded-pill align-self-start">
-      <!-- Play/Pause/Reset -->
-      <v-btn
-        icon
-        variant="text"
-        size="small"
-        class="control-btn mr-1"
-        color="white"
-        @click="handlePlayPauseClick"
-      >
-        <transition name="scale" mode="out-in">
-          <v-icon :key="playButtonIcon">{{ playButtonIcon }}</v-icon>
-        </transition>
-      </v-btn>
-
-      <!-- Volume Container (Hover to Expand) -->
-      <div
-        class="volume-container d-flex align-center rounded-pill px-1"
-        :class="{ hovered: isVolumeHovered }"
-        @mouseenter="isVolumeHovered = true"
-        @mouseleave="isVolumeHovered = false"
-      >
+    <LiquidContainer mode="refraction" class="controls-bar align-self-start">
+      <div class="d-flex align-center ga-1 py-1 pl-1 pr-2">
+        <!-- Play/Pause/Reset -->
         <v-btn
           icon
           variant="text"
           size="small"
-          color="white"
           class="control-btn mr-1"
-          @click.stop="$emit('toggle-mute')"
+          color="white"
+          @click="handlePlayPauseClick"
         >
           <transition name="scale" mode="out-in">
-            <v-icon :key="volumeIcon">{{ volumeIcon }}</v-icon>
+            <v-icon :key="playButtonIcon">{{ playButtonIcon }}</v-icon>
           </transition>
         </v-btn>
 
-        <!-- Horizontal Slider -->
-        <div class="volume-slider-wrapper">
-          <v-slider
-            :model-value="volume"
-            :max="1"
-            :min="0"
-            :step="0.01"
+        <!-- Volume Container (Hover to Expand) -->
+        <div
+          class="volume-container d-flex align-center rounded-pill px-1"
+          :class="{ hovered: isVolumeHovered }"
+          @mouseenter="isVolumeHovered = true"
+          @mouseleave="isVolumeHovered = false"
+        >
+          <v-btn
+            icon
+            variant="text"
+            size="small"
             color="white"
-            track-color="rgba(255,255,255,0.2)"
-            thumb-size="10"
-            hide-details
-            density="compact"
-            class="volume-slider align-center"
-            @update:model-value="$emit('volume-change', $event)"
-          ></v-slider>
-        </div>
-      </div>
+            class="control-btn mr-1"
+            @click.stop="$emit('toggle-mute')"
+          >
+            <transition name="scale" mode="out-in">
+              <v-icon :key="volumeIcon">{{ volumeIcon }}</v-icon>
+            </transition>
+          </v-btn>
 
-      <!-- Time Display -->
-      <span
-        class="text-body-1 font-weight-medium text-grey-lighten-1 user-select-none ml-2"
-        style="text-align: center"
-      >
-        {{ formatTime(currentTime) }} / {{ formatTime(duration) }}
-      </span>
-    </div>
+          <!-- Horizontal Slider -->
+          <div class="volume-slider-wrapper">
+            <v-slider
+              :model-value="volume"
+              :max="1"
+              :min="0"
+              :step="0.01"
+              color="white"
+              track-color="rgba(255,255,255,0.2)"
+              thumb-size="10"
+              hide-details
+              density="compact"
+              class="volume-slider align-center"
+              @update:model-value="$emit('volume-change', $event)"
+            ></v-slider>
+          </div>
+        </div>
+
+        <!-- Time Display -->
+        <span
+          class="text-body-1 font-weight-medium text-white user-select-none ml-2"
+          style="text-align: center"
+        >
+          {{ formatTime(currentTime) }} / {{ formatTime(duration) }}
+        </span>
+      </div>
+    </LiquidContainer>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import LiquidContainer from '@/components/LiquidGlass/LiquidContainer.vue'
 
 const props = defineProps<{
   isPlaying: boolean
@@ -273,12 +276,6 @@ const handlePlayPauseClick = () => {
 }
 
 .controls-bar {
-  /* iOS Liquid Glass Effect - Only for this bar */
-  background: rgba(20, 20, 20, 0.6); /* Semi-transparent dark base */
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  box-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.3);
   transition: width 0.3s ease;
 }
 

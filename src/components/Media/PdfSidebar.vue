@@ -1,48 +1,57 @@
 <template>
-  <div v-if="pdfStore.showSidebar" class="pdf-thumbnail-sidebar">
-    <div class="sidebar-header d-flex align-center justify-space-between px-3 py-2">
-      <span class="text-subtitle-2 text-white">{{ $t('media.pdf.pages') }}</span>
-      <v-btn icon variant="text" size="x-small" color="white" @click="pdfStore.closeSidebar()">
-        <v-icon size="18">mdi-close</v-icon>
-      </v-btn>
-    </div>
+  <LiquidContainer
+    v-if="pdfStore.showSidebar"
+    class="pdf-thumbnail-sidebar"
+    mode="advanced"
+    rounded="rounded-0"
+    padding="pa-0"
+  >
+    <div class="d-flex flex-column h-100">
+      <div class="sidebar-header d-flex align-center justify-space-between px-3 py-2">
+        <span class="text-subtitle-2 text-white">{{ $t('media.pdf.pages') }}</span>
+        <v-btn icon variant="text" size="x-small" color="white" @click="pdfStore.closeSidebar()">
+          <v-icon size="18">mdi-close</v-icon>
+        </v-btn>
+      </div>
 
-    <div ref="scrollContainer" class="thumbnail-list">
-      <div
-        v-for="page in pdfStore.pageCount"
-        :key="page"
-        class="thumbnail-item"
-        :class="{ active: page === pdfStore.currentPage }"
-        @click="handlePageClick(page)"
-      >
-        <div class="thumbnail-wrapper position-relative">
-          <img
-            v-if="thumbnails.get(page)"
-            :src="thumbnails.get(page)"
-            class="thumbnail-image"
-            :alt="`Page ${page}`"
-          />
-          <div v-else class="thumbnail-placeholder d-flex align-center justify-center">
-            <v-progress-circular
-              v-if="loadingPages.has(page)"
-              indeterminate
-              size="20"
-              width="2"
-              color="white"
+      <div ref="scrollContainer" class="thumbnail-list">
+        <div
+          v-for="page in pdfStore.pageCount"
+          :key="page"
+          class="thumbnail-item"
+          :class="{ active: page === pdfStore.currentPage }"
+          @click="handlePageClick(page)"
+        >
+          <div class="thumbnail-wrapper position-relative">
+            <img
+              v-if="thumbnails.get(page)"
+              :src="thumbnails.get(page)"
+              class="thumbnail-image"
+              :alt="`Page ${page}`"
             />
-            <v-icon v-else size="24" color="grey">mdi-file-document-outline</v-icon>
-          </div>
+            <div v-else class="thumbnail-placeholder d-flex align-center justify-center">
+              <v-progress-circular
+                v-if="loadingPages.has(page)"
+                indeterminate
+                size="20"
+                width="2"
+                color="white"
+              />
+              <v-icon v-else size="24" color="grey">mdi-file-document-outline</v-icon>
+            </div>
 
-          <div class="page-badge">{{ page }}</div>
+            <div class="page-badge">{{ page }}</div>
+          </div>
         </div>
       </div>
     </div>
-  </div>
+  </LiquidContainer>
 </template>
 
 <script setup lang="ts">
 import { ref, watch, onMounted, nextTick } from 'vue'
 import { usePdfPresenterStore } from '@/stores/pdfPresenter'
+import LiquidContainer from '@/components/LiquidGlass/LiquidContainer.vue'
 
 const pdfStore = usePdfPresenterStore()
 
@@ -162,18 +171,16 @@ onMounted(() => {
 
 <style scoped lang="scss">
 .pdf-thumbnail-sidebar {
-  position: absolute;
+  position: absolute !important;
   top: 0;
   left: 0;
   bottom: 0;
   width: 180px;
   z-index: 15;
-  display: flex;
-  flex-direction: column;
-  background: rgba(20, 20, 20, 0.85);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.pdf-thumbnail-sidebar :deep(.liquid-glass-content) {
+  height: 100%;
 }
 
 .sidebar-header {

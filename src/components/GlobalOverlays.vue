@@ -32,6 +32,7 @@
     <ShortcutsDialog />
     <AboutDialog />
     <ResetDialog />
+    <LiquidGlassFilters />
   </div>
 </template>
 
@@ -41,6 +42,7 @@ import FloatingTimer from '@/components/Timer/FloatingTimer.vue'
 import { AlertDialog, SnackBar } from '@/components/Alert'
 import { UpdateNotification } from '@/components/Updater'
 import { SettingsDialog, AboutDialog, ResetDialog } from '@/components/Main'
+import { LiquidGlassFilters } from '@/components/LiquidGlass'
 import { ShortcutsDialog } from '@/components/Shortcuts'
 import { useAlert } from '@/composables/useAlert'
 import { useSnackBar } from '@/composables/useSnackBar'
