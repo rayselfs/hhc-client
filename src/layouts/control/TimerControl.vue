@@ -91,11 +91,12 @@
             <!-- Control Buttons -->
             <v-row class="mt-auto mb-2 flex-grow-0">
               <v-col cols="6" class="d-flex justify-end">
-                <v-btn
+                <liquid-btn
                   v-if="controlState === 'stopped'"
                   icon="mdi-play"
                   color="primary"
-                  variant="flat"
+                  size="x-large"
+                  variant="solid"
                   :disabled="areControlsDisabled"
                   :title="
                     stopwatchStore.global.isStopwatchMode
@@ -103,12 +104,13 @@
                       : $t('timer.startCountdown')
                   "
                   @click="startTimer"
-                ></v-btn>
-                <v-btn
+                />
+                <liquid-btn
                   v-if="controlState === 'running'"
                   icon="mdi-pause"
                   color="warning"
-                  variant="flat"
+                  variant="solid"
+                  size="x-large"
                   :disabled="areControlsDisabled"
                   :title="
                     stopwatchStore.global.isStopwatchMode
@@ -116,12 +118,13 @@
                       : $t('timer.pauseCountdown')
                   "
                   @click="pauseTimer"
-                ></v-btn>
-                <v-btn
+                />
+                <liquid-btn
                   v-if="controlState === 'paused'"
                   icon="mdi-play"
                   color="warning"
-                  variant="flat"
+                  variant="solid"
+                  size="x-large"
                   :disabled="areControlsDisabled"
                   :title="
                     stopwatchStore.global.isStopwatchMode
@@ -129,13 +132,12 @@
                       : $t('timer.resumeCountdown')
                   "
                   @click="resumeTimer"
-                ></v-btn>
+                />
               </v-col>
               <v-col cols="6" class="d-flex justify-start">
-                <v-btn
+                <liquid-btn
                   icon="mdi-refresh"
-                  color="grey"
-                  variant="outlined"
+                  size="x-large"
                   :disabled="areControlsDisabled"
                   :title="
                     stopwatchStore.global.isStopwatchMode
@@ -143,7 +145,7 @@
                       : $t('timer.resetCountdown')
                   "
                   @click="resetTimer"
-                ></v-btn>
+                />
               </v-col>
             </v-row>
           </v-card-text>
@@ -155,25 +157,24 @@
           <!-- Presets Layout -->
           <v-col cols="12" class="mb-4" :style="{ height: `${rightTopCardHeight}px` }">
             <v-card :style="{ height: `${rightTopCardHeight}px` }" rounded="lg">
-              <v-card-text class="px-0 py-4">
-                <div class="d-flex justify-space-between mb-2 px-4">
+              <v-card-text>
+                <div class="d-flex justify-space-between mb-2">
                   <v-label class="text-h6 align-start">{{ $t('timer.presets') }}</v-label>
-                  <v-btn
+                  <liquid-btn
                     icon="mdi-plus"
-                    size="small"
-                    variant="tonal"
                     :disabled="
                       timerStore.state !== 'stopped' || stopwatchStore.global.isStopwatchMode
                     "
                     :class="{ 'cursor-not-allowed': timerStore.state !== 'stopped' }"
                     @click="saveTimerPreset"
-                  ></v-btn>
+                  />
                 </div>
                 <v-list density="compact">
                   <v-list-item
                     v-for="item in timerStore.presets"
                     :key="item.id"
                     class="preset-item"
+                    rounded="lg"
                     @click="applyPreset(item)"
                     link
                   >
@@ -203,56 +204,47 @@
           <v-col cols="12" :style="{ height: `${rightBottomCardHeight}px` }">
             <v-card :style="{ height: `${rightBottomCardHeight}px` }" rounded="lg">
               <v-card-text>
-                <v-label class="text-h6 align-start mb-2">{{ $t('common.control') }}</v-label>
+                <v-label class="text-h6 align-start mb-4">{{ $t('common.control') }}</v-label>
                 <div class="d-flex align-center fill-height">
-                  <v-switch
+                  <liquid-switch
                     v-model="stopwatchStore.global.isStopwatchMode"
                     :label="$t('timer.stopwatch')"
                     color="primary"
-                    hide-details
-                  ></v-switch>
+                  />
                 </div>
-                <div class="d-flex align-center mt-2">
-                  <v-switch
+                <div class="d-flex align-center mt-4">
+                  <liquid-switch
                     v-model="reminderEnabled"
                     :label="$t('timer.reminder')"
                     color="primary"
-                    hide-details
                     class="mr-4"
-                  ></v-switch>
-                  <v-text-field
+                  />
+                  <liquid-text-field
                     v-model="reminderTimeInput"
                     type="number"
-                    variant="outlined"
-                    density="compact"
-                    hide-details
                     style="max-width: 100px"
                     :suffix="$t('timer.reminderSecond')"
                     :disabled="timerStore.state !== 'stopped'"
-                    rounded="xl"
+                    rounded
                     @update:model-value="handleReminderTimeChange"
-                  ></v-text-field>
+                  />
                 </div>
-                <div class="d-flex align-center mt-2">
-                  <v-switch
+                <div class="d-flex align-center mt-4">
+                  <liquid-switch
                     v-model="overtimeMessageEnabled"
                     :label="$t('timer.overtimeMessage')"
                     color="primary"
-                    hide-details
                     class="mr-4"
-                  ></v-switch>
-                  <v-text-field
+                  />
+                  <liquid-text-field
                     v-model="overtimeMessageInput"
-                    variant="outlined"
-                    density="compact"
-                    hide-details
-                    :label="$t('timer.overtimeMessageLabel')"
+                    :placeholder="$t('timer.overtimeMessageLabel')"
                     :maxlength="TIMER_CONFIG.OVERTIME_MESSAGE.MAX_LENGTH"
                     style="max-width: 250px"
-                    rounded="xl"
+                    rounded
                     @blur="handleOvertimeMessageBlur"
-                    @keyup.enter="handleOvertimeMessageEnter"
-                  ></v-text-field>
+                    @keyup:enter="handleOvertimeMessageEnter"
+                  />
                 </div>
               </v-card-text>
             </v-card>
@@ -429,8 +421,8 @@ const reminderTimeInput = computed({
   set: () => {},
 })
 
-const handleReminderTimeChange = (value: string) => {
-  const seconds = parseInt(value)
+const handleReminderTimeChange = (value: string | number) => {
+  const seconds = parseInt(String(value))
   if (isNaN(seconds) || seconds < 0) {
     return
   }
