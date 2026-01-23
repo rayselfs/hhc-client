@@ -41,7 +41,6 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted } from 'vue'
-import LiquidContainer from '@/components/LiquidGlass/LiquidContainer.vue'
 
 interface Item {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

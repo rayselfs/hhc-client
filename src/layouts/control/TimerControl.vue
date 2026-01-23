@@ -11,7 +11,7 @@
           <v-card-text class="d-flex flex-column h-100">
             <v-row class="flex-grow-0">
               <v-col cols="12" align="center">
-                <LiquidBtnToggle
+                <liquid-btn-toggle
                   v-model="timerStore.settings.mode"
                   :items="toggleItems"
                   mandatory
@@ -283,7 +283,6 @@ import { useMemoryManager } from '@/utils/memoryManager'
 import { useSnackBar } from '@/composables/useSnackBar'
 import { useCardLayout } from '@/composables/useLayout'
 import { formatDuration } from '@/utils/time'
-import LiquidBtnToggle from '@/components/LiquidGlass/LiquidBtnToggle.vue'
 
 const timerStore = useTimerStore()
 const stopwatchStore = useStopwatchStore()

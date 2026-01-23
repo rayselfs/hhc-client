@@ -3,6 +3,7 @@ import { createPinia } from 'pinia'
 import i18n from './plugins/i18n'
 import vuetify from './plugins/vuetify'
 import * as Sentry from '@sentry/vue'
+import { LiquidGlassPlugin } from '@/components/LiquidGlass'
 
 // css
 import 'normalize.css'
@@ -39,4 +40,5 @@ app.use(createPinia())
 app.use(router)
 app.use(i18n)
 app.use(vuetify)
+app.use(LiquidGlassPlugin, { registerComponents: false })
 app.mount('#app')

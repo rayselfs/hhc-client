@@ -105,7 +105,7 @@
 
               <!-- Zoom Controls -->
               <v-fade-transition>
-                <LiquidContainer
+                <liquid-container
                   v-if="showZoomControls || zoomLevel > 1"
                   class="position-absolute bottom-0 right-0 ma-2 d-flex align-center zoom-controls"
                   style="z-index: 10"
@@ -135,7 +135,7 @@
                       @click.stop="zoomIn"
                     ></v-btn>
                   </div>
-                </LiquidContainer>
+                </liquid-container>
               </v-fade-transition>
 
               <!-- Custom Video Controls -->
@@ -192,36 +192,29 @@
           <!-- Navigation & Progress -->
           <div class="pb-4 d-flex align-center justify-center gap-4 mt-auto">
             <!-- Prev Button -->
-            <v-btn
+            <liquid-btn
               icon="mdi-chevron-left"
               variant="outlined"
-              class="rounded-circle mr-3"
+              class="rounded-circle mr-2"
               @click="store.prev()"
               :disabled="currentIndex <= 0"
-            ></v-btn>
+            ></liquid-btn>
             <!-- Center: Text & Progress -->
-            <div class="d-flex flex-column align-center flex-grow-1 mr-3" style="max-width: 200px">
-              <div class="text-subtitle-1 font-weight-bold mb-1">
-                {{ $t('media.slide') }} {{ currentIndex + 1 }} ({{ $t('media.total') }}
-                {{ playlist.length }} {{ $t('media.slides') }})
+            <div class="flex-grow-1 mr-2" style="max-width: 200px">
+              <div class="text-subtitle-1 mb-1">
+                Slide {{ currentIndex + 1 }} / {{ playlist.length }}
               </div>
-              <v-progress-linear
-                :model-value="((currentIndex + 1) / playlist.length) * 100"
-                height="6"
-                rounded
-                color="white"
-                class="w-100"
-              ></v-progress-linear>
+              <liquid-progress :model-value="((currentIndex + 1) / playlist.length) * 100" />
             </div>
 
             <!-- Next Button -->
-            <v-btn
+            <liquid-btn
               icon="mdi-chevron-right"
               variant="outlined"
               class="rounded-circle"
               @click="store.next()"
               :disabled="currentIndex >= playlist.length - 1"
-            ></v-btn>
+            ></liquid-btn>
           </div>
         </v-col>
 
@@ -323,7 +316,6 @@ import MediaThumbnail from '@/components/Media/MediaThumbnail.vue'
 import PdfViewer from '@/components/Media/PdfViewer.vue'
 import PdfPresenterControls from '@/components/Media/PdfPresenterControls.vue'
 import PdfSidebar from '@/components/Media/PdfSidebar.vue'
-import LiquidContainer from '@/components/LiquidGlass/LiquidContainer.vue'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import type { PdfViewMode } from '@/composables/usePdf'
 import { usePdfPresenterStore } from '@/stores/pdfPresenter'

@@ -39,7 +39,7 @@
     </div>
 
     <!-- Controls Row (Bottom, with Liquid Glass Background) -->
-    <LiquidContainer mode="refraction" class="controls-bar align-self-start">
+    <liquid-container mode="refraction" class="controls-bar align-self-start">
       <div class="d-flex align-center ga-1 py-1 pl-1 pr-2">
         <!-- Play/Pause/Reset -->
         <v-btn
@@ -101,13 +101,12 @@
           {{ formatTime(currentTime) }} / {{ formatTime(duration) }}
         </span>
       </div>
-    </LiquidContainer>
+    </liquid-container>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import LiquidContainer from '@/components/LiquidGlass/LiquidContainer.vue'
 
 const props = defineProps<{
   isPlaying: boolean

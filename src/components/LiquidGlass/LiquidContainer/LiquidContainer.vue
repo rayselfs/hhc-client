@@ -31,6 +31,11 @@
 </template>
 
 <script setup lang="ts">
+import { useLiquidGlassFilters } from '../composables/useLiquidGlassFilters'
+
+// Ensure SVG filters are injected (fallback if plugin not installed)
+useLiquidGlassFilters()
+
 interface Props {
   rounded?: string
   padding?: string

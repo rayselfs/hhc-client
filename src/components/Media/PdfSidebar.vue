@@ -1,5 +1,5 @@
 <template>
-  <LiquidContainer
+  <liquid-container
     v-if="pdfStore.showSidebar"
     class="pdf-thumbnail-sidebar"
     mode="advanced"
@@ -45,13 +45,12 @@
         </div>
       </div>
     </div>
-  </LiquidContainer>
+  </liquid-container>
 </template>
 
 <script setup lang="ts">
 import { ref, watch, onMounted, nextTick } from 'vue'
 import { usePdfPresenterStore } from '@/stores/pdfPresenter'
-import LiquidContainer from '@/components/LiquidGlass/LiquidContainer.vue'
 
 const pdfStore = usePdfPresenterStore()
 

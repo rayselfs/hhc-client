@@ -5,6 +5,7 @@ import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
 
 import vuetify from 'vite-plugin-vuetify'
+import Components from 'unplugin-vue-components/vite'
 
 import electron from 'vite-plugin-electron/simple'
 
@@ -15,6 +16,10 @@ export default defineConfig({
     vue(),
     vueDevTools(),
     vuetify({ autoImport: true }),
+    Components({
+      dirs: ['src/components/LiquidGlass/*'],
+      dts: 'src/components.d.ts',
+    }),
     electron({
       main: {
         entry: 'electron/main.ts',

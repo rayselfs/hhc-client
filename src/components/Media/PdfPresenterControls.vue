@@ -3,7 +3,7 @@
     v-if="!pdfStore.showSidebar"
     class="pdf-controls-container d-flex flex-column justify-center position-relative"
   >
-    <LiquidContainer
+    <liquid-container
       class="controls-bar d-flex align-center ga-1 align-self-start"
       mode="advanced"
       padding="pa-1"
@@ -63,15 +63,13 @@
         ghost
         @update:model-value="handleViewModeChange"
       />
-    </LiquidContainer>
+    </liquid-container>
   </div>
 </template>
 
 <script setup lang="ts">
 import { usePdfPresenterStore } from '@/stores/pdfPresenter'
 import type { PdfViewMode } from '@/composables/usePdf'
-import LiquidContainer from '@/components/LiquidGlass/LiquidContainer.vue'
-import LiquidBtnToggle from '@/components/LiquidGlass/LiquidBtnToggle.vue'
 import { useI18n } from 'vue-i18n'
 
 const { t: $t } = useI18n()

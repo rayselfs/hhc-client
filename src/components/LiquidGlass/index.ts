@@ -1,3 +1,15 @@
-export { default as LiquidGlassFilters } from './LiquidGlassFilters.vue'
-export { default as LiquidContainer } from './LiquidContainer.vue'
-export { default as LiquidBtnToggle } from './LiquidBtnToggle.vue'
+// Components
+export * from './LiquidBtn'
+export * from './LiquidProgress'
+export * from './LiquidContainer'
+export * from './LiquidBtnToggle'
+
+// Plugin
+export { LiquidGlassPlugin } from './plugin'
+export type { LiquidGlassPluginOptions } from './plugin'
+
+// Composables
+export {
+  useLiquidGlassFilters,
+  injectLiquidGlassFilters,
+} from './composables/useLiquidGlassFilters'
