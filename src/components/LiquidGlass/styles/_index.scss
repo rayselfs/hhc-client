@@ -1,0 +1,8 @@
+// Liquid Glass Styles
+// Re-export for easier imports
+
+// Usage in Vue SFC:
+// @use '@/components/LiquidGlass/styles' as liquid;
+// .my-element { @include liquid.liquid-glass-pill-shadow; }
+
+@forward 'mixins';

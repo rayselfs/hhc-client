@@ -21,17 +21,13 @@
     </v-select>
 
     <!-- dropdown button -->
-    <v-btn
-      variant="tonal"
+    <liquid-btn
       :disabled="!selectedVersionCode"
       @click="showBooksDialog = true"
       :title="$t('bible.selectBooks')"
-      icon
-      size="small"
+      icon="mdi-book-open-page-variant"
       :class="{ 'mr-2': isMultiVersion }"
-    >
-      <v-icon>mdi-book-open-page-variant</v-icon>
-    </v-btn>
+    />
 
     <!-- Second version selector -->
     <v-select

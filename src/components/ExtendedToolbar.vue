@@ -13,37 +13,39 @@
     <v-spacer />
 
     <v-slide-x-transition mode="out-in">
-      <SearchBar v-if="props.currentView !== 'timer'" />
+      <LiquidSearchBar
+        v-if="props.currentView !== 'timer'"
+        class="mr-2"
+        :placeholder="$t('common.search')"
+        :disabled="isIndexing"
+        expanded-width="300"
+        @search="handleSearch"
+      />
     </v-slide-x-transition>
 
-    <v-btn
-      class="mr-1"
+    <liquid-btn
+      class="mr-2"
       @click="toggleProjectionContent"
-      :color="!projectionStore.isShowingDefault ? 'error' : 'default'"
+      :variant="!projectionStore.isShowingDefault ? 'tinted' : 'glass'"
+      :color="!projectionStore.isShowingDefault ? 'error' : undefined"
       :title="
         projectionStore.isShowingDefault
           ? $t('extendedToolbar.openProjection')
           : $t('extendedToolbar.closeProjection')
       "
-      variant="tonal"
-      rounded="xl"
-      min-height="40"
       :disabled="props.currentView === 'media'"
-    >
-      <v-icon v-if="projectionStore.isShowingDefault" class="mr-1 ml-1">mdi-monitor</v-icon>
-      <v-icon v-else class="mr-1 ml-1">mdi-monitor-off</v-icon>
-    </v-btn>
+      :icon="projectionStore.isShowingDefault ? 'mdi-monitor' : 'mdi-monitor-off'"
+    />
 
-    <v-btn
+    <liquid-btn
       class="mr-4"
       @click="closeProjectionWindow"
       color="error"
+      variant="text"
       :title="$t('extendedToolbar.closeProjectionWindow')"
-      icon
+      icon="mdi-close"
       :disabled="!projectionWindowExists"
-    >
-      <v-icon>mdi-close</v-icon>
-    </v-btn>
+    />
   </v-app-bar>
 </template>
 
@@ -51,16 +53,18 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useProjectionStore } from '@/stores/projection'
+import { useBibleStore } from '@/stores/bible'
 import { useElectron } from '@/composables/useElectron'
 import { useAlert } from '@/composables/useAlert'
 import { ViewType } from '@/types/common'
 import { VersionSelector as BibleVersionSelector } from '@/components/Bible'
-import { SearchBar } from '@/components/Main'
 import { useProjectionManager } from '@/composables/useProjectionManager'
 import { useSentry } from '@/composables/useSentry'
 
 const { reportError } = useSentry()
 const { t: $t } = useI18n()
+const bibleStore = useBibleStore()
+const isIndexing = computed(() => bibleStore.isIndexing)
 const {
   isElectron,
   onProjectionOpened,
@@ -101,6 +105,14 @@ const toolbarTitle = computed(() => {
 
 const emitToggleDrawer = () => {
   emit('toggle-drawer')
+}
+
+const handleSearch = (text: string) => {
+  window.dispatchEvent(
+    new CustomEvent('bible-search', {
+      detail: { text },
+    }),
+  )
 }
 
 // 投影功能

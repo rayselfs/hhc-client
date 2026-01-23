@@ -1,0 +1,84 @@
+// ============================================
+// Liquid Glass Shared Mixins
+// Apple-style Liquid Glass Effect
+// ============================================
+
+// ------------------------------------------
+// Glass Pill Shadow
+// Soft, Apple-style inset glass shadow
+// Used by: LiquidBtn, LiquidBtnToggle, LiquidSearchBar
+// ------------------------------------------
+@mixin liquid-glass-pill-shadow {
+  box-shadow:
+    // Soft border glow
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.35),
+    // Top highlight (soft, diffused)
+    inset 0 1px 3px 0 rgba(255, 255, 255, 0.2),
+    // Bottom inner shadow
+    inset 0 -1px 3px 0 rgba(0, 0, 0, 0.08),
+    // Outer shadow (floating effect)
+    0 2px 8px 0 rgba(0, 0, 0, 0.12),
+    0 0 1px 0 rgba(0, 0, 0, 0.08);
+}
+
+// ------------------------------------------
+// Glass Pill Shadow (Hover)
+// Enhanced shadow for hover state
+// ------------------------------------------
+@mixin liquid-glass-pill-shadow-hover {
+  box-shadow:
+    // Soft border glow (brighter)
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.5),
+    // Top highlight (brighter)
+    inset 0 1px 4px 0 rgba(255, 255, 255, 0.3),
+    // Bottom inner shadow
+    inset 0 -1px 3px 0 rgba(0, 0, 0, 0.1),
+    // Outer shadow (more pronounced floating)
+    0 4px 16px 0 rgba(0, 0, 0, 0.15),
+    0 0 1px 0 rgba(0, 0, 0, 0.1);
+}
+
+// ------------------------------------------
+// Glass Backdrop Filter
+// Apple-style blur with higher saturation
+// ------------------------------------------
+@mixin liquid-glass-backdrop($blur: 20px, $saturate: 200%) {
+  backdrop-filter: blur($blur) saturate($saturate);
+  -webkit-backdrop-filter: blur($blur) saturate($saturate);
+}
+
+// ------------------------------------------
+// Glass Tint Background
+// Neutral gray tint (Apple-style)
+// ------------------------------------------
+@mixin liquid-glass-tint($color: rgba(120, 120, 120, 0.18)) {
+  background-color: $color;
+}
+
+// ------------------------------------------
+// Glass Tint Dark
+// Darker tint for contrast
+// ------------------------------------------
+@mixin liquid-glass-tint-dark($opacity: 0.25) {
+  background: rgba(60, 60, 60, $opacity);
+}
+
+// ------------------------------------------
+// Jelly Animation
+// Squish effect for selection transitions
+// ------------------------------------------
+@mixin liquid-jelly-animation($duration: 0.4s) {
+  animation: liquid-jelly $duration cubic-bezier(1, 0, 0.4, 1);
+}
+
+@keyframes liquid-jelly {
+  0% {
+    transform: scaleX(1);
+  }
+  50% {
+    transform: scaleX(1.15);
+  }
+  100% {
+    transform: scaleX(1);
+  }
+}

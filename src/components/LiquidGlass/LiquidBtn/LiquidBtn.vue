@@ -277,6 +277,8 @@ const handleClick = (event: MouseEvent) => {
 </script>
 
 <style scoped lang="scss">
+@use '../styles' as liquid;
+
 .liquid-btn {
   border: none;
   cursor: pointer;
@@ -321,15 +323,6 @@ const handleClick = (event: MouseEvent) => {
   &--glass,
   &--tinted {
     background: transparent;
-    box-shadow:
-      0 4px 8px rgba(0, 0, 0, 0.15),
-      0 0 16px rgba(0, 0, 0, 0.08);
-
-    &:hover:not(.liquid-btn--disabled) {
-      box-shadow:
-        0 6px 12px rgba(0, 0, 0, 0.2),
-        0 0 20px rgba(0, 0, 0, 0.1);
-    }
   }
 
   // Outlined: 玻璃邊框
@@ -370,25 +363,26 @@ const handleClick = (event: MouseEvent) => {
   position: absolute;
   inset: 0;
   z-index: 0;
-  backdrop-filter: blur(12px) saturate(180%);
-  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  @include liquid.liquid-glass-backdrop;
 }
 
 .liquid-btn__glass-tint {
   position: absolute;
   inset: 0;
   z-index: 1;
-  background: rgba(40, 40, 40, 0.35);
+  @include liquid.liquid-glass-tint;
 }
 
 .liquid-btn__glass-shine {
   position: absolute;
   inset: 0;
   z-index: 2;
-  box-shadow:
-    inset 0 1px 1px 0 rgba(255, 255, 255, 0.15),
-    inset 0 -1px 1px 0 rgba(0, 0, 0, 0.1);
+  @include liquid.liquid-glass-pill-shadow;
   pointer-events: none;
+
+  .liquid-btn:hover:not(.liquid-btn--disabled) & {
+    @include liquid.liquid-glass-pill-shadow-hover;
+  }
 }
 
 .liquid-btn__content {

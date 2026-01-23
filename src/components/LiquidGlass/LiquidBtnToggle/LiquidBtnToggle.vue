@@ -206,6 +206,8 @@ onMounted(() => {
 </script>
 
 <style scoped lang="scss">
+@use '../styles' as liquid;
+
 .liquid-btn-toggle {
   display: inline-flex;
   --glass-pill-bg: rgba(255, 255, 255, 0.15);
@@ -249,32 +251,11 @@ onMounted(() => {
     width 0.4s cubic-bezier(1, 0, 0.4, 1),
     height 0.4s cubic-bezier(1, 0, 0.4, 1);
 
-  /* High Fidelity Inset Glass Shadow */
-  box-shadow:
-    /* Border stroke */
-    inset 0 0 0 1px rgba(255, 255, 255, 0.1),
-    /* Top-left highlight (Bevel) */ inset 2px 1px 0px -1px rgba(255, 255, 255, 0.9),
-    /* Bottom-right shadow (Bevel) */ inset -1.5px -1px 0px -1px rgba(255, 255, 255, 0.8),
-    /* Inner glow */ inset -2px -6px 1px -5px rgba(255, 255, 255, 0.6),
-    /* Drop shadow 1 */ inset -1px 2px 3px -1px rgba(0, 0, 0, 0.2),
-    /* Drop shadow 2 */ 0px 3px 6px 0px rgba(0, 0, 0, 0.08);
-
-  backdrop-filter: blur(4px);
+  @include liquid.liquid-glass-pill-shadow;
+  @include liquid.liquid-glass-backdrop(4px, 100%);
 
   &.animating {
-    animation: jelly 0.4s cubic-bezier(1, 0, 0.4, 1);
-  }
-}
-
-@keyframes jelly {
-  0% {
-    transform: scaleX(1);
-  }
-  50% {
-    transform: scaleX(1.15);
-  }
-  100% {
-    transform: scaleX(1);
+    @include liquid.liquid-jelly-animation;
   }
 }
 </style>
