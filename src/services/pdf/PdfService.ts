@@ -8,14 +8,6 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   import.meta.url,
 ).toString()
 
-// Suppress PDF.js "TT: undefined function" and other non-critical warnings
-// These warnings occur when parsing certain PDF fonts but don't affect rendering
-// VerbosityLevel: ERRORS = 0, WARNINGS = 1, INFOS = 5
-const { VerbosityLevel } = pdfjsLib
-// Note: setVerbosityLevel is not exported in TypeScript types but exists in runtime
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-;(pdfjsLib as any).setVerbosityLevel?.(VerbosityLevel.ERRORS)
-
 export interface PdfMetadata {
   pageCount: number
   title?: string
@@ -53,6 +45,8 @@ export class PdfService {
       // Enable range requests for large files
       disableAutoFetch: false,
       disableStream: false,
+      // Suppress non-critical font warnings (e.g., "TT: undefined function")
+      verbosity: pdfjsLib.VerbosityLevel.ERRORS,
     })
 
     this.document = await loadingTask.promise
