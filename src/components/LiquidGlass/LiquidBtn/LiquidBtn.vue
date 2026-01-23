@@ -10,11 +10,11 @@
     :to="to"
     @click="handleClick"
   >
-    <!-- Glass layers (for glass/tinted variants) -->
+    <!-- Glass layers (for glass/tinted/solid variants) -->
     <template v-if="hasGlassEffect">
       <div class="liquid-btn__glass-effect" :class="computedRounded"></div>
       <div class="liquid-btn__glass-tint" :class="computedRounded" :style="tintStyle"></div>
-      <div class="liquid-btn__glass-shine" :class="computedRounded"></div>
+      <div class="liquid-btn__glass-shine" :class="computedRounded" :style="shineStyle"></div>
     </template>
 
     <!-- Content -->
@@ -76,7 +76,7 @@ import { useLiquidGlassFilters } from '../composables/useLiquidGlassFilters'
 useLiquidGlassFilters()
 
 type SizePreset = 'x-small' | 'small' | 'large' | 'x-large'
-type Variant = 'glass' | 'tinted' | 'outlined' | 'text' | 'flat'
+type Variant = 'glass' | 'tinted' | 'solid' | 'outlined' | 'text' | 'flat'
 type Density = 'default' | 'comfortable' | 'compact'
 
 interface Props {
@@ -84,6 +84,7 @@ interface Props {
    * 按鈕變體樣式
    * - glass: 中性毛玻璃（預設）
    * - tinted: 帶色調的毛玻璃（需搭配 color）
+   * - solid: 鮮明色調的毛玻璃，適合主要 CTA（需搭配 color）
    * - outlined: 玻璃邊框
    * - text: 純文字，無背景
    * - flat: 半透明純色背景
@@ -174,10 +175,15 @@ const tag = computed(() => {
 
 const hasText = computed(() => !!slots.default)
 const iconOnly = computed(() => !!props.icon && !hasText.value)
-const hasGlassEffect = computed(() => props.variant === 'glass' || props.variant === 'tinted')
+const hasGlassEffect = computed(
+  () => props.variant === 'glass' || props.variant === 'tinted' || props.variant === 'solid',
+)
 
 const computedRounded = computed(() => {
-  if (props.rounded) return props.rounded
+  if (props.rounded) {
+    // If already prefixed with 'rounded', use as-is; otherwise add prefix
+    return props.rounded.startsWith('rounded') ? props.rounded : `rounded-${props.rounded}`
+  }
   return iconOnly.value ? 'rounded-circle' : 'rounded-pill'
 })
 
@@ -237,15 +243,51 @@ const btnStyle = computed(() => {
 })
 
 const tintStyle = computed(() => {
-  if (props.variant !== 'tinted' || !props.color) return {}
+  if (!props.color) return {}
 
   const rgb = COLOR_MAP[props.color] || '255, 255, 255'
+
+  if (props.variant === 'solid') {
+    // Solid: 更高不透明度，更鮮明
+    return {
+      background: `rgba(${rgb}, 0.55)`,
+    }
+  }
+
+  if (props.variant === 'tinted') {
+    // Tinted: 淡淡的色調
+    return {
+      background: `rgba(${rgb}, 0.2)`,
+    }
+  }
+
+  return {}
+})
+
+// Solid variant 的外發光樣式
+const shineStyle = computed(() => {
+  if (props.variant !== 'solid' || !props.color) return {}
+
+  const rgb = COLOR_MAP[props.color] || '255, 255, 255'
+
   return {
-    background: `rgba(${rgb}, 0.2)`,
+    boxShadow: `
+      inset 0 0 0 0.5px rgba(255, 255, 255, 0.4),
+      inset 0 1px 3px 0 rgba(255, 255, 255, 0.25),
+      inset 0 -1px 3px 0 rgba(0, 0, 0, 0.1),
+      0 2px 8px 0 rgba(${rgb}, 0.35),
+      0 4px 16px 0 rgba(${rgb}, 0.25),
+      0 0 1px 0 rgba(0, 0, 0, 0.1)
+    `.trim(),
   }
 })
 
 const contentStyle = computed(() => {
+  // Solid variant: 強制白字以確保對比度
+  if (props.variant === 'solid') {
+    return { color: 'rgba(255, 255, 255, 0.95)' }
+  }
+
   if (!props.color) return {}
 
   // For non-tinted variants, apply color to content
@@ -321,9 +363,12 @@ const handleClick = (event: MouseEvent) => {
 
   // Glass: 中性毛玻璃
   &--glass,
-  &--tinted {
+  &--tinted,
+  &--solid {
     background: transparent;
   }
+
+  // Solid: 帶顏色外發光 (glow 由 __glass-shine 處理)
 
   // Outlined: 玻璃邊框
   &--outlined {
