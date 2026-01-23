@@ -5,6 +5,7 @@ import { LiquidBtn } from './LiquidBtn'
 import { LiquidBtnToggle } from './LiquidBtnToggle'
 import { LiquidContainer } from './LiquidContainer'
 import { LiquidProgress } from './LiquidProgress'
+import { LiquidProgressRing } from './LiquidProgressRing'
 import { LiquidSwitch } from './LiquidSwitch'
 import { LiquidTextField } from './LiquidTextField'
 
@@ -23,6 +24,7 @@ export const LiquidGlassPlugin: Plugin = {
       app.component('LiquidBtnToggle', LiquidBtnToggle)
       app.component('LiquidContainer', LiquidContainer)
       app.component('LiquidProgress', LiquidProgress)
+      app.component('LiquidProgressRing', LiquidProgressRing)
       app.component('LiquidSwitch', LiquidSwitch)
       app.component('LiquidTextField', LiquidTextField)
     }

@@ -1,6 +1,7 @@
 // Components
 export * from './LiquidBtn'
 export * from './LiquidProgress'
+export * from './LiquidProgressRing'
 export * from './LiquidContainer'
 export * from './LiquidBtnToggle'
 export * from './LiquidSearchBar'
