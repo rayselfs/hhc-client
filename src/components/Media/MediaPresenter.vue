@@ -51,40 +51,30 @@
                 <!-- PDF Preview -->
                 <div
                   v-else-if="currentItem.metadata.fileType === 'pdf'"
-                  class="text-center position-relative w-100 h-100 d-flex align-center justify-center"
+                  class="position-relative w-100 h-100 d-flex align-center justify-center"
                 >
-                  <iframe
-                    :src="pdfUrl"
-                    class="media-content fill-height w-100"
-                    frameborder="0"
-                  ></iframe>
+                  <!-- PDF Thumbnail Sidebar (uses pdfStore internally) -->
+                  <PdfThumbnailSidebar />
 
-                  <v-btn
-                    class="position-absolute left-0 ma-2"
-                    icon="mdi-chevron-left"
-                    variant="text"
-                    color="black"
-                    @click="prevPdfPage"
-                    style="z-index: 5; background: rgba(255, 255, 255, 0.5)"
-                  ></v-btn>
+                  <!-- PDF Viewer (canvas-based) -->
+                  <PdfViewer
+                    ref="pdfViewerRef"
+                    :url="currentItem.url"
+                    :page="pdfStore.currentPage"
+                    :view-mode="pdfStore.viewMode"
+                    :zoom="zoomLevel"
+                    :pan="pan"
+                    class="w-100 h-100"
+                    @loaded="onPdfLoaded"
+                    @page-change="onPdfPageChange"
+                  />
 
-                  <div
-                    class="position-absolute bottom-0 mb-4 bg-black rounded px-2 py-1"
-                    style="z-index: 5; opacity: 0.8"
-                  >
-                    <div class="text-subtitle-2 text-white">
-                      {{ $t('media.page') }} {{ pdfPage }}
-                    </div>
-                  </div>
-
-                  <v-btn
-                    class="position-absolute right-0 ma-2"
-                    icon="mdi-chevron-right"
-                    variant="text"
-                    color="black"
-                    @click="nextPdfPage"
-                    style="z-index: 5; background: rgba(255, 255, 255, 0.5)"
-                  ></v-btn>
+                  <!-- PDF Controls Overlay (bottom-left, like video controls) -->
+                  <PdfPresenterControls
+                    class="position-absolute bottom-0 left-0 ma-2"
+                    style="z-index: 20"
+                    @view-mode-change="handlePdfViewModeChange"
+                  />
                 </div>
               </template>
 
@@ -312,7 +302,12 @@ import { ViewType } from '@/types/common'
 import { useVideoPlayer } from '@/composables/useVideoPlayer'
 import MediaVideoControls from '@/components/Media/Preview/MediaVideoControls.vue'
 import MediaThumbnail from '@/components/Media/MediaThumbnail.vue'
+import PdfViewer from '@/components/Media/PdfViewer.vue'
+import PdfPresenterControls from '@/components/Media/PdfPresenterControls.vue'
+import PdfThumbnailSidebar from '@/components/Media/PdfThumbnailSidebar.vue'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
+import type { PdfViewMode } from '@/composables/usePdf'
+import { usePdfPresenterStore } from '@/stores/pdfPresenter'
 import { KEYBOARD_SHORTCUTS } from '@/config/shortcuts'
 import { needsTranscode, buildVideoUrl } from '@/utils/videoUtils'
 
@@ -323,6 +318,7 @@ const { leftCardHeight } = useCardLayout({
 })
 
 const store = useMediaProjectionStore()
+const pdfStore = usePdfPresenterStore()
 const {
   playlist,
   currentIndex,
@@ -340,6 +336,8 @@ const { onProjectionMessage, isElectron } = useElectron()
 const { setProjectionState, sendProjectionMessage } = useProjectionManager()
 
 const showZoomControls = ref(false)
+const pdfViewerRef = ref<InstanceType<typeof PdfViewer> | null>(null)
+
 const toggleZoom = (minus = false) => {
   if (showZoomControls.value) {
     // Deactivating zoom mode: reset zoom and pan
@@ -609,19 +607,31 @@ const startPanDrag = (e: MouseEvent) => {
   window.addEventListener('mouseup', handleMouseUp)
 }
 
-const pdfUrl = computed(() => {
-  if (!currentItem.value) return ''
-  // Use #page=N to control PDF page if browser supports it
-  return `${currentItem.value.url}#page=${pdfPage.value}&toolbar=0&navpanes=0&scrollbar=0`
-})
+const onPdfLoaded = (metadata: { pageCount: number; title?: string; author?: string }) => {
+  pdfStore.setPageCount(metadata.pageCount)
+  pdfStore.setPdfService(pdfViewerRef.value?.getService() ?? null)
+  store.setPdfPageCount(metadata.pageCount)
+  sendProjectionMessage(MessageType.MEDIA_CONTROL, {
+    type: 'pdf',
+    action: 'pdfPageCount',
+    value: metadata.pageCount,
+  })
+}
 
-// Extensions that require FFmpeg transcoding (cannot use native Range seek)
-// Now using shared utility from @/utils/videoUtils
+const onPdfPageChange = (page: number) => {
+  pdfStore.setPage(page)
+  store.setPdfPage(page)
+}
 
-/**
- * Check if the current video needs transcoding (based on file extension)
- * Transcoded videos require reloading with seek parameter instead of native seek
- */
+const handlePdfViewModeChange = (mode: PdfViewMode) => {
+  store.setPdfViewMode(mode)
+  sendProjectionMessage(MessageType.MEDIA_CONTROL, {
+    type: 'pdf',
+    action: 'pdfViewMode',
+    value: mode,
+  })
+}
+
 const needsTranscodeComputed = computed(() => {
   const url = currentItem.value?.url
   if (!url) return false
@@ -697,6 +707,7 @@ watch(
   currentItem,
   (newItem, oldItem) => {
     showZoomControls.value = false
+    pdfStore.reset()
 
     // Cleanup old video player
     if (oldItem?.metadata.fileType === 'video') {
@@ -705,11 +716,9 @@ watch(
 
     // Initialize new video player if current item is a video
     if (newItem?.metadata.fileType === 'video') {
-      // Reset video state for new item
       store.setCurrentTime(0)
       store.setPlaying(false)
 
-      // Send reset state to projection
       sendProjectionMessage(MessageType.MEDIA_CONTROL, {
         type: 'video',
         action: 'seek',
@@ -761,9 +770,6 @@ const exitPresentation = async () => {
 const jumpTo = (index: number) => {
   store.jumpTo(index)
 }
-
-const nextPdfPage = () => store.setPdfPage(pdfPage.value + 1)
-const prevPdfPage = () => store.setPdfPage(pdfPage.value - 1)
 
 watch(
   playlist,
@@ -838,6 +844,14 @@ watch(pdfPage, (val) => {
   sendProjectionMessage(MessageType.MEDIA_CONTROL, { type: 'pdf', action: 'pdfPage', value: val })
 })
 
+watch(
+  () => pdfStore.currentPage,
+  (val) => {
+    store.setPdfPage(val)
+    sendProjectionMessage(MessageType.MEDIA_CONTROL, { type: 'pdf', action: 'pdfPage', value: val })
+  },
+)
+
 watch(volume, (val) => {
   sendProjectionMessage(MessageType.MEDIA_CONTROL, {
     type: 'video',
@@ -870,6 +884,13 @@ const handleVideoTogglePlay = () => {
   } else {
     playPreviewVideo()
   }
+}
+
+const handlePdfToggleViewMode = () => {
+  if (currentItem.value?.metadata.fileType !== 'pdf') return
+  const newMode = pdfStore.viewMode === 'slide' ? 'scroll' : 'slide'
+  pdfStore.setViewMode(newMode)
+  handlePdfViewModeChange(newMode)
 }
 
 useKeyboardShortcuts([
@@ -924,6 +945,10 @@ useKeyboardShortcuts([
   {
     config: KEYBOARD_SHORTCUTS.MEDIA.VIDEO_TOGGLE_PLAY,
     handler: handleVideoTogglePlay,
+  },
+  {
+    config: KEYBOARD_SHORTCUTS.MEDIA.PDF_TOGGLE_VIEW_MODE,
+    handler: handlePdfToggleViewMode,
   },
 ])
 

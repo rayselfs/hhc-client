@@ -24,13 +24,15 @@
         ></video>
 
         <!-- PDF -->
-        <iframe
+        <PdfViewer
           v-else-if="currentItem.metadata.fileType === 'pdf'"
-          :src="pdfUrl"
-          class="media-content w-100 h-100"
-          :style="imageStyle"
-          frameborder="0"
-        ></iframe>
+          :url="currentItem.url"
+          :page="pdfPage"
+          :view-mode="pdfViewMode"
+          :zoom="zoomLevel"
+          :pan="pan"
+          class="w-100 h-100"
+        />
 
         <!-- Fallback or Unsupported -->
         <div v-else class="text-h4 text-white">
@@ -54,11 +56,21 @@ import { useElectron } from '@/composables/useElectron'
 import { MessageType } from '@/types/common'
 import { throttle } from '@/utils/performanceUtils'
 import { needsTranscode, buildVideoUrl } from '@/utils/videoUtils'
+import PdfViewer from '@/components/Media/PdfViewer.vue'
 
 // Access local store (synced via IPC)
 const store = useMediaProjectionStore()
-const { currentItem, zoomLevel, pan, isPlaying, volume, pdfPage, currentTime, isSeeking } =
-  storeToRefs(store)
+const {
+  currentItem,
+  zoomLevel,
+  pan,
+  isPlaying,
+  volume,
+  pdfPage,
+  pdfViewMode,
+  currentTime,
+  isSeeking,
+} = storeToRefs(store)
 
 const videoRef = ref<HTMLVideoElement | null>(null)
 const { sendToMain } = useElectron()
@@ -126,13 +138,6 @@ const videoStyle = computed(() => ({
   height: '100%',
   objectFit: 'contain' as const,
 }))
-
-// PDF handling
-const pdfUrl = computed(() => {
-  if (!currentItem.value) return ''
-  // Use #page=N to control PDF page if browser supports it
-  return `${currentItem.value.url}#page=${pdfPage.value}&toolbar=0&navpanes=0&scrollbar=0`
-})
 
 // Video Control with Video.js
 // This watcher responds to store state changes (from IPC message handling)

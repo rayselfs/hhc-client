@@ -13,6 +13,7 @@ import { FolderDBStore, MediaFolder } from '@/types/enum'
 import { DEFAULT_LOCAL_PERMISSIONS } from '@/services/filesystem'
 import { useSnackBar } from './useSnackBar'
 import { useSettingsStore } from '@/stores/settings'
+import { processPdfFile } from './usePdfProcessing'
 
 // Video extensions that may not be recognized by browser MIME type detection
 const VIDEO_EXTENSIONS = ['.mkv', '.avi', '.mov', '.wmv', '.flv', '.ts', '.m2ts', '.m4v']
@@ -370,6 +371,26 @@ export function useMediaOperations(
                   newItem.metadata.thumbnailType = 'blob'
                   newItem.metadata.thumbnailBlobId = newItem.id
                 }
+
+                // PDF processing - extract page count and generate thumbnail using PDF.js
+                if (fileType === 'pdf') {
+                  try {
+                    const pdfResult = await processPdfFile(newItem.url)
+                    newItem.metadata.pageCount = pdfResult.pageCount
+
+                    if (pdfResult.thumbnail) {
+                      await db.put(FolderDBStore.FOLDER_DB_THUMBNAILS_STORE_NAME, {
+                        id: newItem.id,
+                        blob: pdfResult.thumbnail,
+                        createdAt: Date.now(),
+                      })
+                      newItem.metadata.thumbnailType = 'blob'
+                      newItem.metadata.thumbnailBlobId = newItem.id
+                    }
+                  } catch (pdfError) {
+                    console.warn('Failed to process PDF:', pdfError)
+                  }
+                }
               }
             }
           } catch (error) {
@@ -474,6 +495,26 @@ export function useMediaOperations(
                   })
                   newItem.metadata.thumbnailType = 'blob'
                   newItem.metadata.thumbnailBlobId = newItem.id
+                }
+
+                // PDF processing - extract page count and generate thumbnail using PDF.js
+                if (fileType === 'pdf') {
+                  try {
+                    const pdfResult = await processPdfFile(newItem.url)
+                    newItem.metadata.pageCount = pdfResult.pageCount
+
+                    if (pdfResult.thumbnail) {
+                      await db.put(FolderDBStore.FOLDER_DB_THUMBNAILS_STORE_NAME, {
+                        id: newItem.id,
+                        blob: pdfResult.thumbnail,
+                        createdAt: Date.now(),
+                      })
+                      newItem.metadata.thumbnailType = 'blob'
+                      newItem.metadata.thumbnailBlobId = newItem.id
+                    }
+                  } catch (pdfError) {
+                    console.warn('Failed to process PDF:', pdfError)
+                  }
                 }
               }
             }

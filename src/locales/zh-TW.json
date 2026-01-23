@@ -315,7 +315,15 @@
     "largeIcons": "大圖示",
     "mediumIcons": "中圖示",
     "smallIcons": "小圖示",
-    "list": "清單"
+    "list": "清單",
+    "pdf": {
+      "slideMode": "投影片模式",
+      "scrollMode": "捲動模式",
+      "jumpToPage": "跳轉到頁面",
+      "pageNumber": "頁碼",
+      "jump": "跳轉",
+      "pages": "頁面"
+    }
   },
   "fileExplorer": {
     "image": "圖片",

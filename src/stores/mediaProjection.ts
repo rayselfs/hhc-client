@@ -16,6 +16,10 @@ export const useMediaProjectionStore = defineStore('media-projection', () => {
   const volume = ref(1)
   const pdfPage = ref(1)
 
+  // PDF State
+  const pdfPageCount = ref(0)
+  const pdfViewMode = ref<'slide' | 'scroll'>('slide')
+
   // Video State
   const currentTime = ref(0)
   const duration = ref(0)
@@ -110,6 +114,8 @@ export const useMediaProjectionStore = defineStore('media-projection', () => {
     pan.value = { x: 0, y: 0 }
     isPlaying.value = false
     pdfPage.value = 1
+    pdfPageCount.value = 0
+    pdfViewMode.value = 'slide'
     currentTime.value = 0
     duration.value = 0
   }
@@ -127,7 +133,16 @@ export const useMediaProjectionStore = defineStore('media-projection', () => {
   }
 
   const setPdfPage = (page: number) => {
-    pdfPage.value = Math.max(1, page)
+    const maxPage = pdfPageCount.value > 0 ? pdfPageCount.value : Infinity
+    pdfPage.value = Math.max(1, Math.min(page, maxPage))
+  }
+
+  const setPdfPageCount = (count: number) => {
+    pdfPageCount.value = Math.max(0, count)
+  }
+
+  const setPdfViewMode = (mode: 'slide' | 'scroll') => {
+    pdfViewMode.value = mode
   }
 
   const stop = () => {
@@ -196,6 +211,12 @@ export const useMediaProjectionStore = defineStore('media-projection', () => {
         } else if (message.data.action === 'pdfPage') {
           setPdfPage(Number(message.data.value))
           return true
+        } else if (message.data.action === 'pdfPageCount') {
+          setPdfPageCount(Number(message.data.value))
+          return true
+        } else if (message.data.action === 'pdfViewMode') {
+          setPdfViewMode(message.data.value as 'slide' | 'scroll')
+          return true
         } else if (message.data.action === 'stop') {
           stop()
           return true
@@ -239,6 +260,8 @@ export const useMediaProjectionStore = defineStore('media-projection', () => {
     isPlaying,
     volume,
     pdfPage,
+    pdfPageCount,
+    pdfViewMode,
     currentTime,
     duration,
     formattedCurrentTime,
@@ -255,6 +278,8 @@ export const useMediaProjectionStore = defineStore('media-projection', () => {
     setPan,
     setPlaying,
     setPdfPage,
+    setPdfPageCount,
+    setPdfViewMode,
     setCurrentTime,
     setDuration,
     setVolume,

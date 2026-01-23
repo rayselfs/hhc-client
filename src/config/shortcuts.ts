@@ -38,6 +38,8 @@ export const KEYBOARD_SHORTCUTS = {
     ZOOM_IN: { codes: ['Equal', 'NumpadAdd'] },
     ZOOM_OUT: { codes: ['Minus', 'NumpadSubtract'] },
     VIDEO_TOGGLE_PLAY: { code: 'Space' },
+    // PDF-specific shortcuts
+    PDF_TOGGLE_VIEW_MODE: { code: 'KeyV' },
   },
   TIMER: {
     TOGGLE: { code: 'Space' },

@@ -316,7 +316,15 @@
     "largeIcons": "大图标",
     "mediumIcons": "中图标",
     "smallIcons": "小图标",
-    "list": "列表"
+    "list": "列表",
+    "pdf": {
+      "slideMode": "幻灯片模式",
+      "scrollMode": "滚动模式",
+      "jumpToPage": "跳转到页面",
+      "pageNumber": "页码",
+      "jump": "跳转",
+      "pages": "页面"
+    }
   },
   "fileExplorer": {
     "image": "图片",

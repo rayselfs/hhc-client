@@ -316,7 +316,15 @@
     "largeIcons": "Large Icons",
     "mediumIcons": "Medium Icons",
     "smallIcons": "Small Icons",
-    "list": "List"
+    "list": "List",
+    "pdf": {
+      "slideMode": "Slide Mode",
+      "scrollMode": "Scroll Mode",
+      "jumpToPage": "Jump to Page",
+      "pageNumber": "Page Number",
+      "jump": "Jump",
+      "pages": "Pages"
+    }
   },
   "fileExplorer": {
     "image": "Image",
