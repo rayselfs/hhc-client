@@ -30,6 +30,7 @@
       density="default"
       hide-details
       class="liquid-select__input"
+      :menu-props="{ contentClass: 'liquid-select-menu' }"
       @update:model-value="emit('update:modelValue', $event)"
       @focus="isFocused = true"
       @blur="isFocused = false"

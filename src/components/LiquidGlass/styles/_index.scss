@@ -1,8 +1,18 @@
+// ============================================
 // Liquid Glass Styles
-// Re-export for easier imports
+// Main entry point for all styles
+// ============================================
+
+// CSS Variables (must be first)
+@forward 'variables';
+@forward 'theme';
+
+// Mixins
+@forward 'mixins';
+
+// Global component styles (portal-rendered)
+@forward 'liquid-select-menu';
 
 // Usage in Vue SFC:
 // @use '@/components/LiquidGlass/styles' as liquid;
 // .my-element { @include liquid.liquid-glass-pill-shadow; }
-
-@forward 'mixins';

@@ -1,0 +1,37 @@
+// ============================================
+// Liquid Select Dropdown Menu Styles
+// Global styles for v-select dropdown (portal-rendered)
+// ============================================
+
+@use 'mixins' as liquid;
+
+// Custom class applied via menu-props
+.liquid-select-menu {
+  background: rgba(var(--hhc-glass-tint-dark), 0.85) !important;
+  @include liquid.liquid-glass-backdrop(var(--hhc-blur-lg), 180%);
+  border: 1px solid rgba(var(--hhc-glass-border), 0.3);
+  border-radius: 16px !important;
+  box-shadow: 0 8px 32px rgba(var(--hhc-glass-shadow-color), 0.25);
+  overflow: hidden;
+
+  // List container inside dropdown
+  .v-list {
+    background: transparent !important;
+    padding: 8px;
+  }
+
+  // Default item styling (before LiquidListItem override in Task 4)
+  .v-list-item {
+    border-radius: 8px;
+    margin-bottom: 4px;
+    transition: background var(--hhc-transition-fast) var(--hhc-transition-easing);
+
+    &:hover {
+      background: rgba(var(--hhc-glass-tint), 0.12);
+    }
+
+    &--active {
+      background: rgba(var(--hhc-theme-primary), 0.2);
+    }
+  }
+}
