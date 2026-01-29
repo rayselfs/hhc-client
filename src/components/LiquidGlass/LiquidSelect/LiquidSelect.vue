@@ -34,7 +34,36 @@
       @update:model-value="emit('update:modelValue', $event)"
       @focus="isFocused = true"
       @blur="isFocused = false"
-    />
+    >
+      <!-- Override chip slot with LiquidChip -->
+      <template v-if="chips" #chip="{ item, props: chipProps }">
+        <LiquidChip
+          v-bind="chipProps"
+          :closable="closableChips"
+          size="small"
+          :color="color"
+          variant="tinted"
+          class="liquid-select__chip"
+        >
+          {{ item.title }}
+        </LiquidChip>
+      </template>
+
+      <!-- Override item slot with LiquidListItem -->
+      <template #item="{ item, props: itemProps }">
+        <LiquidListItem
+          v-bind="itemProps"
+          :selected="isItemSelected(item)"
+          :color="color || 'primary'"
+          :hover-opacity="0.12"
+          :selected-opacity="0.2"
+          rounded="rounded-lg"
+          padding="py-2 px-3"
+        >
+          {{ item.title }}
+        </LiquidListItem>
+      </template>
+    </v-select>
   </div>
 </template>
 
@@ -42,6 +71,8 @@
 import { ref, computed } from 'vue'
 import { useLiquidGlassFilters } from '../composables/useLiquidGlassFilters'
 import { getThemeColorVar, isThemeColor, type SizeKey } from '../constants'
+import { LiquidChip } from '../LiquidChip'
+import { LiquidListItem } from '../LiquidListItem'
 
 // Ensure SVG filters are injected (fallback if plugin not installed)
 useLiquidGlassFilters()
@@ -126,6 +157,19 @@ const tintStyle = computed(() => {
 
   return {}
 })
+
+// Check if an item is selected
+const isItemSelected = (item: any) => {
+  if (!props.modelValue) return false
+
+  if (props.multiple) {
+    // For multiple selection, modelValue is an array
+    return Array.isArray(props.modelValue) && props.modelValue.some((v: any) => v === item.value)
+  }
+
+  // For single selection, modelValue is a single value
+  return props.modelValue === item.value
+}
 </script>
 
 <style scoped lang="scss">
@@ -206,5 +250,23 @@ const tintStyle = computed(() => {
   :deep(.v-select__menu-icon) {
     color: rgba(var(--hhc-glass-text), 0.7);
   }
+
+  // Chip container styling
+  :deep(.v-field__input) {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 4px;
+
+    // Hide scrollbar but keep functionality
+    scrollbar-width: none;
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+}
+
+.liquid-select__chip {
+  flex-shrink: 0;
 }
 </style>
