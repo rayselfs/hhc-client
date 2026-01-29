@@ -63,6 +63,24 @@
           {{ item.title }}
         </LiquidListItem>
       </template>
+
+      <!-- Override loader slot with LiquidProgressCircular -->
+      <template v-if="loading" #loader>
+        <LiquidProgressCircular
+          :size="20"
+          :width="2"
+          indeterminate
+          :color="color || 'primary'"
+          class="liquid-select__loader"
+        />
+      </template>
+
+      <!-- Override no-data slot for empty state -->
+      <template #no-data>
+        <div class="liquid-select__no-data">
+          <span class="text-body-2">No data available</span>
+        </div>
+      </template>
     </v-select>
   </div>
 </template>
@@ -73,6 +91,7 @@ import { useLiquidGlassFilters } from '../composables/useLiquidGlassFilters'
 import { getThemeColorVar, isThemeColor, type SizeKey } from '../constants'
 import { LiquidChip } from '../LiquidChip'
 import { LiquidListItem } from '../LiquidListItem'
+import { LiquidProgressCircular } from '../LiquidProgressCircular'
 
 // Ensure SVG filters are injected (fallback if plugin not installed)
 useLiquidGlassFilters()
@@ -251,6 +270,18 @@ const isItemSelected = (item: any) => {
     color: rgba(var(--hhc-glass-text), 0.7);
   }
 
+  // Clear icon styling
+  :deep(.v-field__clearable) {
+    color: rgba(var(--hhc-glass-text), 0.5);
+    transition:
+      color var(--hhc-transition-fast) var(--hhc-transition-easing),
+      opacity var(--hhc-transition-fast) var(--hhc-transition-easing);
+
+    &:hover {
+      color: rgba(var(--hhc-glass-text), 0.8);
+    }
+  }
+
   // Chip container styling
   :deep(.v-field__input) {
     display: flex;
@@ -268,5 +299,15 @@ const isItemSelected = (item: any) => {
 
 .liquid-select__chip {
   flex-shrink: 0;
+}
+
+.liquid-select__loader {
+  margin: 0 8px;
+}
+
+.liquid-select__no-data {
+  padding: 16px;
+  text-align: center;
+  color: rgba(var(--hhc-glass-text), 0.6);
 }
 </style>
