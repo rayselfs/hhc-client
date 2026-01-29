@@ -38,6 +38,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useLiquidGlassFilters } from '../composables/useLiquidGlassFilters'
+import { getThemeColorVar, isThemeColor } from '../constants'
 
 useLiquidGlassFilters()
 
@@ -62,22 +63,18 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void
 }>()
 
-// Color mappings
-const COLOR_MAP: Record<string, string> = {
-  primary: '59, 130, 246',
-  secondary: '139, 92, 246',
-  success: '34, 197, 94',
-  error: '239, 68, 68',
-  warning: '245, 158, 11',
-  info: '14, 165, 233',
+// Helper to get color variable
+const getColorVar = (color: string): string => {
+  if (isThemeColor(color)) return getThemeColorVar(color)
+  return color
 }
 
 const trackTintStyle = computed(() => {
   if (!props.modelValue) return {}
 
-  const rgb = COLOR_MAP[props.color] || COLOR_MAP.primary
+  const colorVar = getColorVar(props.color)
   return {
-    background: `rgba(${rgb}, 0.55)`,
+    background: `rgba(${colorVar}, var(--hhc-btn-solid-opacity))`,
   }
 })
 
@@ -99,9 +96,7 @@ const handleChange = (event: Event) => {
   -webkit-tap-highlight-color: transparent;
 
   &--disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-    pointer-events: none;
+    @include liquid.liquid-disabled;
   }
 }
 
@@ -122,7 +117,7 @@ const handleChange = (event: Event) => {
   width: 52px;
   height: 31px;
   border-radius: 16px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all var(--hhc-transition-normal) var(--hhc-transition-easing);
   flex-shrink: 0;
 }
 
@@ -130,15 +125,15 @@ const handleChange = (event: Event) => {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  @include liquid.liquid-glass-backdrop(12px, 180%);
+  @include liquid.liquid-glass-backdrop(var(--hhc-blur-md), 180%);
 }
 
 .liquid-switch__track-tint {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: rgba(120, 120, 120, 0.25);
-  transition: background 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background: rgba(var(--hhc-switch-track-tint), var(--hhc-glass-tint-hover-opacity));
+  transition: background var(--hhc-transition-normal) var(--hhc-transition-easing);
 }
 
 .liquid-switch__track-shine {
@@ -146,10 +141,10 @@ const handleChange = (event: Event) => {
   inset: 0;
   border-radius: inherit;
   box-shadow:
-    inset 0 0 0 0.5px rgba(255, 255, 255, 0.2),
-    inset 0 1px 2px 0 rgba(255, 255, 255, 0.1),
-    inset 0 -1px 2px 0 rgba(0, 0, 0, 0.1),
-    0 1px 4px 0 rgba(0, 0, 0, 0.15);
+    inset 0 0 0 0.5px rgba(var(--hhc-glass-border), 0.2),
+    inset 0 1px 2px 0 rgba(var(--hhc-glass-shine-top), 0.1),
+    inset 0 -1px 2px 0 rgba(var(--hhc-glass-shine-bottom), 0.1),
+    0 1px 4px 0 rgba(var(--hhc-glass-shadow-color), 0.15);
   pointer-events: none;
 }
 
@@ -160,7 +155,7 @@ const handleChange = (event: Event) => {
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform var(--hhc-transition-normal) var(--hhc-transition-easing);
 
   .liquid-switch--checked & {
     transform: translateX(20px);
@@ -171,8 +166,8 @@ const handleChange = (event: Event) => {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: rgba(255, 255, 255, 0.95);
-  @include liquid.liquid-glass-backdrop(8px, 150%);
+  background: rgba(var(--hhc-switch-thumb), 0.95);
+  @include liquid.liquid-glass-backdrop(var(--hhc-blur-sm), 150%);
 }
 
 .liquid-switch__thumb-shine {
@@ -180,28 +175,28 @@ const handleChange = (event: Event) => {
   inset: 0;
   border-radius: inherit;
   box-shadow:
-    inset 0 0 0 0.5px rgba(255, 255, 255, 0.5),
-    inset 0 2px 4px 0 rgba(255, 255, 255, 0.4),
-    inset 0 -1px 2px 0 rgba(0, 0, 0, 0.05),
-    0 2px 8px 0 rgba(0, 0, 0, 0.2),
-    0 1px 2px 0 rgba(0, 0, 0, 0.15);
+    inset 0 0 0 0.5px rgba(var(--hhc-glass-shine-top), 0.5),
+    inset 0 2px 4px 0 rgba(var(--hhc-glass-shine-top), 0.4),
+    inset 0 -1px 2px 0 rgba(var(--hhc-glass-shine-bottom), 0.05),
+    0 2px 8px 0 rgba(var(--hhc-glass-shadow-color), 0.2),
+    0 1px 2px 0 rgba(var(--hhc-glass-shadow-color), 0.15);
   pointer-events: none;
 }
 
 .liquid-switch__label {
   margin-left: 12px;
   font-size: 0.875rem;
-  color: rgba(255, 255, 255, 0.9);
+  @include liquid.liquid-glass-text;
 }
 
 // Hover effect
 .liquid-switch:hover:not(.liquid-switch--disabled) {
   .liquid-switch__track-shine {
     box-shadow:
-      inset 0 0 0 0.5px rgba(255, 255, 255, 0.3),
-      inset 0 1px 2px 0 rgba(255, 255, 255, 0.15),
-      inset 0 -1px 2px 0 rgba(0, 0, 0, 0.1),
-      0 2px 8px 0 rgba(0, 0, 0, 0.2);
+      inset 0 0 0 0.5px rgba(var(--hhc-glass-border), 0.3),
+      inset 0 1px 2px 0 rgba(var(--hhc-glass-shine-top), 0.15),
+      inset 0 -1px 2px 0 rgba(var(--hhc-glass-shine-bottom), 0.1),
+      0 2px 8px 0 rgba(var(--hhc-glass-shadow-color), 0.2);
   }
 }
 

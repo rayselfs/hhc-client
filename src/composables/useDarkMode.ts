@@ -1,6 +1,7 @@
 import { useDark, useToggle } from '@vueuse/core'
 import { watch } from 'vue'
 import { useTheme } from 'vuetify'
+import { setTheme, initThemeBridge } from '@/components/LiquidGlass/composables/useThemeBridge'
 
 export function useDarkMode() {
   const theme = useTheme()
@@ -13,10 +14,14 @@ export function useDarkMode() {
   const toggleDark = useToggle(isDark)
 
   const updateVuetifyTheme = () => {
-    theme.change(isDark.value ? 'dark' : 'light')
+    const themeMode = isDark.value ? 'dark' : 'light'
+    theme.change(themeMode)
+    // Bridge to LiquidGlass theme system
+    setTheme(themeMode)
   }
 
-  // Initialize the theme
+  // Initialize theme bridge and the theme
+  initThemeBridge(isDark.value ? 'dark' : 'light')
   updateVuetifyTheme()
 
   // Listen for theme changes

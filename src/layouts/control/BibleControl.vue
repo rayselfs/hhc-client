@@ -144,52 +144,46 @@
             <v-card :style="{ height: `${rightBottomCardHeight}px` }" rounded="lg">
               <v-card-text>
                 <!-- Chapter/Verse Navigation -->
-                <v-row class="mb-3">
+                <v-row>
                   <v-col cols="6">
                     <v-label class="text-subtitle-1">{{ $t('bible.controlChapter') }}</v-label>
                   </v-col>
                   <v-col cols="6">
                     <v-label class="text-subtitle-1">{{ $t('bible.controlVerse') }}</v-label>
                   </v-col>
-                  <v-col cols="3" class="d-flex justify-end pa-0 pr-2">
-                    <v-btn
-                      icon
-                      variant="outlined"
-                      :disabled="!currentPassage || currentPassage.chapter <= 1"
-                      @click="goToPreviousChapterProjection"
-                    >
-                      <v-icon>mdi-chevron-left</v-icon>
-                    </v-btn>
+                  <v-col cols="6" align="center" class="pa-1">
+                    <div>
+                      <liquid-btn
+                        icon="mdi-chevron-left"
+                        size="x-large"
+                        class="mr-3"
+                        :disabled="!currentPassage || currentPassage.chapter <= 1"
+                        @click="goToPreviousChapterProjection"
+                      />
+                      <liquid-btn
+                        icon="mdi-chevron-right"
+                        size="x-large"
+                        :disabled="!currentPassage || currentPassage.chapter >= maxChapters"
+                        @click="goToNextChapterProjection"
+                      />
+                    </div>
                   </v-col>
-                  <v-col cols="3" class="d-flex justify-start pa-0 pl-2">
-                    <v-btn
-                      icon
-                      variant="outlined"
-                      :disabled="!currentPassage || currentPassage.chapter >= maxChapters"
-                      @click="goToNextChapterProjection"
-                    >
-                      <v-icon>mdi-chevron-right</v-icon>
-                    </v-btn>
-                  </v-col>
-                  <v-col cols="3" class="d-flex justify-end pa-0 pr-2">
-                    <v-btn
-                      icon
-                      variant="outlined"
-                      :disabled="!currentPassage || currentPassage.verse <= 1"
-                      @click="goToPreviousVerseProjection"
-                    >
-                      <v-icon>mdi-chevron-up</v-icon>
-                    </v-btn>
-                  </v-col>
-                  <v-col cols="3" class="d-flex justify-start pa-0 pl-2">
-                    <v-btn
-                      icon
-                      variant="outlined"
-                      :disabled="!hasCurrentPassage || (currentPassage?.verse ?? 0) >= maxVerse"
-                      @click="goToNextVerseProjection"
-                    >
-                      <v-icon>mdi-chevron-down</v-icon>
-                    </v-btn>
+                  <v-col cols="6" align="center" class="pa-1">
+                    <div>
+                      <liquid-btn
+                        icon="mdi-chevron-up"
+                        size="x-large"
+                        class="mr-3"
+                        :disabled="!currentPassage || currentPassage.verse <= 1"
+                        @click="goToPreviousVerseProjection"
+                      />
+                      <liquid-btn
+                        icon="mdi-chevron-down"
+                        size="x-large"
+                        :disabled="!hasCurrentPassage || (currentPassage?.verse ?? 0) >= maxVerse"
+                        @click="goToNextVerseProjection"
+                      />
+                    </div>
                   </v-col>
                 </v-row>
                 <!-- Font Size Slider -->

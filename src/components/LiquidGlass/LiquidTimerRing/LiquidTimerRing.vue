@@ -1,7 +1,7 @@
 <template>
-  <div class="liquid-progress-ring" :style="{ width: `${size}px`, height: `${size}px` }">
-    <!-- SVG Progress Ring -->
-    <svg :viewBox="`0 0 ${size} ${size}`" class="liquid-progress-ring__svg">
+  <div class="liquid-timer-ring" :style="{ width: `${size}px`, height: `${size}px` }">
+    <!-- SVG Timer Ring -->
+    <svg :viewBox="`0 0 ${size} ${size}`" class="liquid-timer-ring__svg">
       <!-- Glow filter definition -->
       <defs>
         <linearGradient :id="`gradient-${uid}`" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -27,7 +27,7 @@
 
       <!-- Background ring (glass effect) -->
       <circle
-        class="liquid-progress-ring__bg"
+        class="liquid-timer-ring__bg"
         :cx="center"
         :cy="center"
         :r="radius"
@@ -38,8 +38,8 @@
 
       <!-- Progress ring (gradient + glow) -->
       <circle
-        class="liquid-progress-ring__fg"
-        :class="{ 'liquid-progress-ring__fg--no-transition': !shouldTransition }"
+        class="liquid-timer-ring__fg"
+        :class="{ 'liquid-timer-ring__fg--no-transition': !shouldTransition }"
         :cx="center"
         :cy="center"
         :r="radius"
@@ -56,8 +56,8 @@
 
     <!-- Content slot (time display) -->
     <div
-      class="liquid-progress-ring__content"
-      :class="{ 'liquid-progress-ring__content--blinking': isWarning }"
+      class="liquid-timer-ring__content"
+      :class="{ 'liquid-timer-ring__content--blinking': isWarning }"
       :style="{ fontSize: computedFontSize }"
     >
       <slot>
@@ -70,11 +70,12 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useLiquidGlassFilters } from '../composables/useLiquidGlassFilters'
+import { useId } from '../composables/useId'
 
 useLiquidGlassFilters()
 
 // Generate unique ID for SVG filters
-const uid = Math.random().toString(36).substring(2, 9)
+const uid = useId('liquid-timer-ring')
 
 interface Props {
   /** 進度值 (0-100) */
@@ -102,18 +103,40 @@ const props = withDefaults(defineProps<Props>(), {
   strokeRatio: 0.025,
 })
 
-// Color mappings
-const COLOR_MAP: Record<string, { start: string; end: string }> = {
-  primary: { start: 'rgb(99, 160, 255)', end: 'rgb(59, 130, 246)' },
-  secondary: { start: 'rgb(169, 132, 255)', end: 'rgb(139, 92, 246)' },
-  success: { start: 'rgb(74, 222, 128)', end: 'rgb(34, 197, 94)' },
-  error: { start: 'rgb(255, 118, 118)', end: 'rgb(239, 68, 68)' },
-  warning: { start: 'rgb(255, 200, 60)', end: 'rgb(245, 158, 11)' },
-  info: { start: 'rgb(56, 189, 248)', end: 'rgb(14, 165, 233)' },
+// Color mappings (use CSS variables for gradient colors)
+const GRADIENT_VAR_MAP: Record<string, { start: string; end: string }> = {
+  primary: {
+    start: 'rgb(var(--hhc-gradient-primary-start))',
+    end: 'rgb(var(--hhc-gradient-primary-end))',
+  },
+  secondary: {
+    start: 'rgb(var(--hhc-gradient-secondary-start))',
+    end: 'rgb(var(--hhc-gradient-secondary-end))',
+  },
+  success: {
+    start: 'rgb(var(--hhc-gradient-success-start))',
+    end: 'rgb(var(--hhc-gradient-success-end))',
+  },
+  error: {
+    start: 'rgb(var(--hhc-gradient-error-start))',
+    end: 'rgb(var(--hhc-gradient-error-end))',
+  },
+  warning: {
+    start: 'rgb(var(--hhc-gradient-warning-start))',
+    end: 'rgb(var(--hhc-gradient-warning-end))',
+  },
+  info: {
+    start: 'rgb(var(--hhc-gradient-info-start))',
+    end: 'rgb(var(--hhc-gradient-info-end))',
+  },
 }
 
-const gradientStart = computed(() => COLOR_MAP[props.color]?.start || COLOR_MAP.primary!.start)
-const gradientEnd = computed(() => COLOR_MAP[props.color]?.end || COLOR_MAP.primary!.end)
+const gradientStart = computed(
+  () => GRADIENT_VAR_MAP[props.color]?.start || GRADIENT_VAR_MAP.primary!.start,
+)
+const gradientEnd = computed(
+  () => GRADIENT_VAR_MAP[props.color]?.end || GRADIENT_VAR_MAP.primary!.end,
+)
 
 // Track whether to apply transition (disable on reset)
 const shouldTransition = ref(true)
@@ -151,12 +174,12 @@ const computedFontSize = computed(() => {
 </script>
 
 <style scoped lang="scss">
-.liquid-progress-ring {
+.liquid-timer-ring {
   position: relative;
   margin: 0 auto;
 }
 
-.liquid-progress-ring__svg {
+.liquid-timer-ring__svg {
   position: absolute;
   top: 0;
   left: 0;
@@ -165,11 +188,11 @@ const computedFontSize = computed(() => {
   transform: rotate(-90deg);
 }
 
-.liquid-progress-ring__bg {
-  stroke: rgba(255, 255, 255, 0.12);
+.liquid-timer-ring__bg {
+  stroke: rgba(var(--hhc-glass-text), 0.12);
 }
 
-.liquid-progress-ring__fg {
+.liquid-timer-ring__fg {
   stroke-linecap: round;
   transition: stroke-dashoffset 1s linear;
 
@@ -178,13 +201,13 @@ const computedFontSize = computed(() => {
   }
 }
 
-.liquid-progress-ring__content {
+.liquid-timer-ring__content {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.95);
+  color: rgba(var(--hhc-glass-text), 0.95);
   text-align: center;
 
   &--blinking {

@@ -10,9 +10,6 @@
 // Mixins
 @forward 'mixins';
 
-// Global component styles (portal-rendered)
-@forward 'liquid-select-menu';
-
 // Usage in Vue SFC:
 // @use '@/components/LiquidGlass/styles' as liquid;
 // .my-element { @include liquid.liquid-glass-pill-shadow; }

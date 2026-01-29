@@ -6,7 +6,7 @@
       :class="{ 'pulse-animation': timerStore.isRunning }"
     >
       <v-card-text class="pa-3" v-if="!stopwatchStore.global.isStopwatchMode">
-        <liquid-progress-ring
+        <liquid-timer-ring
           :progress="timerStore.progress"
           :formatted-time="timerStore.formattedTime"
           :size="90"

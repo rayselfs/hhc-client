@@ -9,12 +9,10 @@ import { LiquidChip } from './LiquidChip'
 import { LiquidContainer } from './LiquidContainer'
 import { LiquidDivider } from './LiquidDivider'
 import { LiquidIcon } from './LiquidIcon'
-import { LiquidListItem } from './LiquidListItem'
 import { LiquidProgress } from './LiquidProgress'
 import { LiquidProgressCircular } from './LiquidProgressCircular'
 import { LiquidTimerRing, LiquidProgressRing } from './LiquidTimerRing'
 import { LiquidSearchBar } from './LiquidSearchBar'
-import { LiquidSelect } from './LiquidSelect'
 import { LiquidSwitch } from './LiquidSwitch'
 import { LiquidTextField } from './LiquidTextField'
 
@@ -42,12 +40,10 @@ export const LiquidGlassPlugin: Plugin = {
       app.component('LiquidContainer', LiquidContainer)
       app.component('LiquidDivider', LiquidDivider)
       app.component('LiquidIcon', LiquidIcon)
-      app.component('LiquidListItem', LiquidListItem)
       app.component('LiquidProgress', LiquidProgress)
       app.component('LiquidProgressCircular', LiquidProgressCircular)
       app.component('LiquidProgressRing', LiquidProgressRing)
       app.component('LiquidSearchBar', LiquidSearchBar)
-      app.component('LiquidSelect', LiquidSelect)
       app.component('LiquidSwitch', LiquidSwitch)
       app.component('LiquidTextField', LiquidTextField)
       app.component('LiquidTimerRing', LiquidTimerRing)

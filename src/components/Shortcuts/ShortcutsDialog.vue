@@ -1,11 +1,11 @@
 <template>
   <v-dialog v-model="isOpen" max-width="800" @keydown.esc="isOpen = false">
-    <v-card rounded="lg">
+    <v-card rounded="rounded-lg" :elevation="3">
       <v-card-title class="text-h6 d-flex align-center">
         {{ $t('shortcuts.title') }}
       </v-card-title>
 
-      <v-card-text class="pa-6" style="max-height: 70vh; overflow-y: auto">
+      <v-card-text>
         <ShortcutSection
           :title="$t('shortcuts.projection')"
           :shortcuts="projectionShortcuts"
@@ -18,10 +18,10 @@
       </v-card-text>
 
       <v-card-actions class="pa-4">
-        <v-spacer></v-spacer>
-        <v-btn rounded="xl" variant="elevated" @click="isOpen = false">
+        <v-spacer />
+        <liquid-btn @click="isOpen = false">
           {{ $t('common.close') }}
-        </v-btn>
+        </liquid-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>

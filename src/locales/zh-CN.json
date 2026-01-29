@@ -272,7 +272,10 @@
     "nextVerse": "下一节",
     "prevChapter": "上一章",
     "nextChapter": "下一章",
-    "openBookDialog": "开启书卷选择 (开/关)"
+    "openBookDialog": "开启书卷选择 (开/关)",
+    "toggleBookDialog": "切换书卷选择",
+    "closeDialog": "关闭对话框",
+    "pdfToggleViewMode": "切换 PDF 查看模式"
   },
   "alert": {
     "error": "错误",

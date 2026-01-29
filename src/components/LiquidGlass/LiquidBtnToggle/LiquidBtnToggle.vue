@@ -27,7 +27,7 @@
         :title="item.title"
         type="button"
       >
-        <v-icon v-if="item.icon" :size="computedSizes.icon">{{ item.icon }}</v-icon>
+        <LiquidIcon v-if="item.icon" :icon="item.icon" :size="computedSizes.icon" />
         <span
           v-if="item.label"
           class="ml-1 text-button"
@@ -41,6 +41,8 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted } from 'vue'
+import LiquidIcon from '../LiquidIcon/LiquidIcon.vue'
+import { getSizeConfig, isSizeKey, type SizeKey } from '../constants'
 
 interface Item {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -104,41 +106,30 @@ const pillStyle = ref({
 })
 const isAnimating = ref(false)
 
-const SIZE_MAP = {
-  'x-small': { icon: 16, text: '0.625rem' },
-  small: { icon: 20, text: '0.75rem' },
-  large: { icon: 28, text: '1.25rem' },
-  'x-large': { icon: 32, text: '1.5rem' },
-}
-
 const computedSizes = computed(() => {
-  // Default sizes (when no size prop)
-  let baseIcon = 24
-  let baseText = '1rem'
+  // Get base config from shared constants
+  const sizeKey: SizeKey | number = props.size && isSizeKey(props.size) ? props.size : (props.size ?? 'default')
+  const config = getSizeConfig(sizeKey)
 
-  // Density override for default
+  let baseIcon = config.icon
+  let baseText = config.fontSize
+
+  // Density override for default (when no explicit size)
   if (props.density === 'compact' && !props.size) {
     baseIcon = 18
   }
 
-  // Size prop takes precedence
-  if (props.size) {
-    if (typeof props.size === 'string' && props.size in SIZE_MAP) {
-      const map = SIZE_MAP[props.size as keyof typeof SIZE_MAP]
-      baseIcon = map.icon
-      baseText = map.text
-    } else if (typeof props.size === 'number') {
-      baseIcon = props.size
-      baseText = `${Math.round(props.size * 0.65)}px`
-    }
+  // Handle numeric size
+  if (typeof props.size === 'number') {
+    baseIcon = props.size
+    baseText = `${Math.round(props.size * 0.65)}px`
   }
 
   // Individual overrides take highest precedence
-  const result = {
+  return {
     icon: props.iconSize ?? baseIcon,
     text: props.fontSize ?? baseText,
   }
-  return result
 })
 
 const containerMode = computed(() => (props.ghost ? 'ghost' : props.mode))
@@ -210,7 +201,7 @@ onMounted(() => {
 
 .liquid-btn-toggle {
   display: inline-flex;
-  --glass-pill-bg: rgba(255, 255, 255, 0.15);
+  --glass-pill-bg: rgba(var(--hhc-glass-tint), var(--hhc-glass-tint-opacity));
 }
 
 .toggle-track {
@@ -223,11 +214,11 @@ onMounted(() => {
   background: transparent;
   border: none;
   cursor: pointer;
-  opacity: 0.6;
-  transition: opacity 0.2s ease;
+  opacity: var(--hhc-glass-text-muted-opacity);
+  transition: opacity var(--hhc-transition-fast) var(--hhc-transition-easing);
   padding: 6px 16px;
   min-width: 36px;
-  color: white; /* Default text color for glass */
+  @include liquid.liquid-glass-text;
 
   &.density-compact {
     padding: 4px 12px;
@@ -245,14 +236,14 @@ onMounted(() => {
 .selection-pill {
   z-index: 1;
   background-color: var(--glass-pill-bg);
-  border-radius: 9999px; /* Pill shape */
+  border-radius: var(--hhc-radius-pill);
   transition:
-    left 0.25s cubic-bezier(0.2, 0, 0.2, 1),
-    width 0.25s cubic-bezier(0.2, 0, 0.2, 1),
-    height 0.25s cubic-bezier(0.2, 0, 0.2, 1);
+    left var(--hhc-transition-normal) var(--hhc-transition-easing),
+    width var(--hhc-transition-normal) var(--hhc-transition-easing),
+    height var(--hhc-transition-normal) var(--hhc-transition-easing);
 
   @include liquid.liquid-glass-pill-shadow;
-  @include liquid.liquid-glass-backdrop(4px, 100%);
+  @include liquid.liquid-glass-backdrop(var(--hhc-blur-sm), 100%);
 
   &.animating {
     @include liquid.liquid-jelly-animation;

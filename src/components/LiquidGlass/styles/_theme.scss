@@ -1,0 +1,17 @@
+// ============================================
+// Liquid Glass Theme Switching
+// ============================================
+//
+// NOTE: Theme CSS variables (light/dark mode) are now
+// defined in TypeScript and injected at runtime.
+//
+// See: styles/theme/defaults.ts for theme values
+//
+// The following selectors are handled by the JS theme system:
+//   - :root (dark mode defaults)
+//   - :root[data-theme='light'] (light mode via attribute)
+//   - @media (prefers-color-scheme: light) (system preference)
+//
+// This file is kept for backwards compatibility
+// but no longer defines any variables.
+// ============================================

@@ -1,30 +1,36 @@
 <template>
   <v-dialog v-model="isOpen" max-width="700" @keydown.esc="isOpen = false">
-    <v-card rounded="lg">
+    <v-card rounded="rounded-xl">
       <div class="d-flex flex-row settings-container">
-        <!-- Left sidebar -->
+        <!-- Left sidebar with macOS Finder style -->
         <div class="settings-sidebar">
-          <v-list nav density="compact" class="py-2">
-            <v-list-item
-              v-for="category in categories"
-              :key="category.id"
-              :value="category.id"
-              :active="activeCategory === category.id"
-              active-class="bg-primary"
-              rounded="lg"
-              @click="activeCategory = category.id"
-            >
-              <template #prepend>
-                <v-icon>{{ category.icon }}</v-icon>
-              </template>
-              <v-list-item-title>{{ $t(category.title) }}</v-list-item-title>
-            </v-list-item>
-          </v-list>
+          <liquid-container mode="simple" padding="pa-0 py-2" class="sidebar-container">
+            <div class="py-1">
+              <v-list-item
+                v-for="category in categories"
+                :key="category.id"
+                padding="py-1 px-3"
+                rounded="rounded-lg"
+                :selected="activeCategory === category.id"
+                :show-selected-border="false"
+                :selected-opacity="0.15"
+                :hover-opacity="0.1"
+                color="surface"
+                class="mx-1 mb-1"
+                @click="activeCategory = category.id"
+              >
+                <template #prepend>
+                  <v-icon size="small">{{ category.icon }}</v-icon>
+                </template>
+                <span class="text-body-2">{{ $t(category.title) }}</span>
+              </v-list-item>
+            </div>
+          </liquid-container>
         </div>
 
         <!-- Right content -->
-        <div class="settings-content pa-3">
-          <v-card-text class="settings-text">
+        <div class="settings-content">
+          <div class="pa-4">
             <!-- General -->
             <template v-if="activeCategory === 'general'">
               <v-row>
@@ -176,31 +182,13 @@
                 </v-col>
               </v-row>
             </template>
-
-            <!-- About -->
-            <template v-if="activeCategory === 'about'">
-              <div class="text-center py-4">
-                <v-icon size="64" color="primary" class="mb-4">mdi-church</v-icon>
-                <h3 class="text-h6 mb-2">HHC Client</h3>
-                <p class="text-body-2 text-medium-emphasis mb-4">
-                  {{ $t('about.version') }}: {{ appVersion }}
-                </p>
-                <p class="text-body-2 text-medium-emphasis mb-4">
-                  {{ $t('about.descriptionText') }}
-                </p>
-                <v-divider class="my-4" />
-                <p class="text-caption text-medium-emphasis">
-                  {{ $t('about.copyright') }}
-                </p>
-              </div>
-            </template>
-          </v-card-text>
+          </div>
 
           <v-card-actions class="settings-actions">
             <v-spacer></v-spacer>
-            <v-btn @click="isOpen = false" rounded="xl" size="large">
+            <liquid-btn @click="isOpen = false">
               {{ $t('common.close') }}
-            </v-btn>
+            </liquid-btn>
           </v-card-actions>
         </div>
       </div>
@@ -209,7 +197,7 @@
 
   <!-- Restart Required Dialog -->
   <v-dialog v-model="showRestartDialog" max-width="400" persistent>
-    <v-card rounded="lg">
+    <v-card rounded="rounded-lg">
       <v-card-title class="text-subtitle-1">
         {{ $t('settings.restartRequired') }}
       </v-card-title>
@@ -218,12 +206,12 @@
       </v-card-text>
       <v-card-actions>
         <v-spacer></v-spacer>
-        <v-btn variant="text" rounded="lg" @click="showRestartDialog = false">
+        <liquid-btn variant="text" @click="showRestartDialog = false">
           {{ $t('common.later') }}
-        </v-btn>
-        <v-btn color="primary" variant="flat" rounded="lg" @click="restartApp">
+        </liquid-btn>
+        <liquid-btn color="primary" @click="restartApp">
           {{ $t('common.restartNow') }}
-        </v-btn>
+        </liquid-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>
@@ -242,9 +230,6 @@ import { useProjectionManager } from '@/composables/useProjectionManager'
 import { useSettingsStore } from '@/stores/settings'
 import FFmpegInstallGuideDialog from './FFmpegInstallGuideDialog.vue'
 import type { FFmpegStatus } from '@/types/electron'
-
-// Declare __APP_VERSION__ if not available globally
-declare const __APP_VERSION__: string
 
 // i18n
 const { t: $t, t } = useI18n()
@@ -278,7 +263,6 @@ const categories = [
   { id: 'general', title: 'settings.categories.general', icon: 'mdi-cog' },
   { id: 'media', title: 'settings.categories.media', icon: 'mdi-video' },
   { id: 'system', title: 'settings.categories.system', icon: 'mdi-tune' },
-  { id: 'about', title: 'settings.categories.about', icon: 'mdi-information' },
 ]
 const activeCategory = ref('general')
 
@@ -329,15 +313,6 @@ const enableFfmpeg = ref(false)
 const ffmpegStatus = ref<FFmpegStatus>({ available: false, path: '', version: '', error: '' })
 const customFfmpegPath = ref('')
 const showInstallGuide = ref(false)
-
-// App Version
-// Use try-catch or safer access if __APP_VERSION__ is not defined in certain envs (like testing)
-let appVersion = '1.0.0'
-try {
-  appVersion = __APP_VERSION__ ?? '1.0.0'
-} catch {
-  // Ignore error if variable is not defined
-}
 
 // Timezone options
 const timezones = computed(() => [
@@ -451,18 +426,28 @@ onMounted(async () => {
 })
 </script>
 
-<style scoped>
+<style scoped lang="scss">
 /* Settings Container */
 .settings-container {
-  height: 600px;
+  height: 500px;
   max-height: 80vh;
 }
 
-/* Left Sidebar */
+/* Left Sidebar - macOS Finder style */
 .settings-sidebar {
   width: 180px;
   flex-shrink: 0;
-  border-right: 1px solid rgb(var(--v-theme-outline-variant));
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Sidebar inner container */
+.sidebar-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px !important;
 }
 
 /* Right Content Area */
@@ -474,23 +459,9 @@ onMounted(async () => {
   overflow: hidden;
 }
 
-/* Title - Fixed at top */
-.settings-title {
-  flex-shrink: 0;
-  background-color: rgb(var(--v-theme-surface));
-  border-bottom: 1px solid rgb(var(--v-theme-outline-variant));
-}
-
-/* Content - Scrollable */
-.settings-text {
-  flex: 1;
-  overflow-y: auto;
-  min-height: 0;
-}
-
 /* Actions - Fixed at bottom */
 .settings-actions {
   flex-shrink: 0;
-  border-top: 1px solid rgb(var(--v-theme-outline-variant));
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 </style>

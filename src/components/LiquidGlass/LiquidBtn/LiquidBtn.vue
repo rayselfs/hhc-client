@@ -24,7 +24,7 @@
       :style="contentStyle"
     >
       <!-- Loading spinner -->
-      <v-progress-circular
+      <LiquidProgressCircular
         v-if="loading"
         indeterminate
         :size="computedSizes.icon"
@@ -34,19 +34,16 @@
 
       <template v-else>
         <!-- Prepend icon -->
-        <v-icon
+        <LiquidIcon
           v-if="prependIcon"
+          :icon="prependIcon"
           :size="computedSizes.icon"
           class="liquid-btn__prepend"
           :class="prependIconSpacing"
-        >
-          {{ prependIcon }}
-        </v-icon>
+        />
 
         <!-- Icon only mode -->
-        <v-icon v-if="iconOnly" :size="computedSizes.icon">
-          {{ icon }}
-        </v-icon>
+        <LiquidIcon v-if="iconOnly" :icon="icon!" :size="computedSizes.icon" />
 
         <!-- Default slot (text) -->
         <span v-if="hasText" class="liquid-btn__text" :style="{ fontSize: computedSizes.text }">
@@ -54,14 +51,13 @@
         </span>
 
         <!-- Append icon -->
-        <v-icon
+        <LiquidIcon
           v-if="appendIcon"
+          :icon="appendIcon"
           :size="computedSizes.icon"
           class="liquid-btn__append"
           :class="appendIconSpacing"
-        >
-          {{ appendIcon }}
-        </v-icon>
+        />
       </template>
     </span>
   </component>
@@ -71,6 +67,15 @@
 import { computed, useSlots } from 'vue'
 import type { RouteLocationRaw } from 'vue-router'
 import { useLiquidGlassFilters } from '../composables/useLiquidGlassFilters'
+import {
+  getThemeColorVar,
+  isThemeColor,
+  getButtonSizeConfig,
+  isSizeKey,
+  type SizeKey,
+} from '../constants'
+import LiquidIcon from '../LiquidIcon/LiquidIcon.vue'
+import LiquidProgressCircular from '../LiquidProgressCircular/LiquidProgressCircular.vue'
 
 // Ensure SVG filters are injected (fallback if plugin not installed)
 useLiquidGlassFilters()
@@ -141,29 +146,17 @@ const emit = defineEmits<{
 
 const slots = useSlots()
 
-// Size mappings
-const SIZE_MAP = {
-  'x-small': { icon: 16, text: '0.625rem', height: 28, padding: '0 10px', iconPadding: '0 6px' },
-  small: { icon: 18, text: '0.75rem', height: 32, padding: '0 14px', iconPadding: '0 8px' },
-  default: { icon: 20, text: '0.875rem', height: 40, padding: '0 18px', iconPadding: '0 10px' },
-  large: { icon: 24, text: '1rem', height: 48, padding: '0 22px', iconPadding: '0 12px' },
-  'x-large': { icon: 28, text: '1.125rem', height: 56, padding: '0 28px', iconPadding: '0 14px' },
-}
-
 const DENSITY_SCALE = {
   default: 1,
   comfortable: 0.9,
   compact: 0.8,
 }
 
-// Color mappings for tinted glass
-const COLOR_MAP: Record<string, string> = {
-  primary: '59, 130, 246',
-  secondary: '139, 92, 246',
-  success: '34, 197, 94',
-  error: '239, 68, 68',
-  warning: '245, 158, 11',
-  info: '14, 165, 233',
+// Helper to get color variable
+const getColorVar = (color: string | undefined): string => {
+  if (!color) return 'var(--hhc-glass-tint)'
+  if (isThemeColor(color)) return getThemeColorVar(color)
+  return color
 }
 
 // Computed properties
@@ -188,28 +181,22 @@ const computedRounded = computed(() => {
 })
 
 const computedSizes = computed(() => {
-  let base = SIZE_MAP.default
-
-  if (props.size) {
-    if (typeof props.size === 'string' && props.size in SIZE_MAP) {
-      base = SIZE_MAP[props.size as keyof typeof SIZE_MAP]
-    } else if (typeof props.size === 'number') {
-      const s = props.size
-      base = {
-        icon: s,
-        text: `${Math.round(s * 0.55)}px`,
-        height: Math.round(s * 1.8),
-        padding: `0 ${Math.round(s * 0.75)}px`,
-        iconPadding: `0 ${Math.round(s * 0.4)}px`,
-      }
-    }
-  }
+  // Get base size from shared constants
+  const sizeKey: SizeKey | number =
+    props.size && isSizeKey(props.size) ? props.size : (props.size ?? 'default')
+  const base = getButtonSizeConfig(sizeKey)
 
   const scale = DENSITY_SCALE[props.density]
 
+  // Ensure icon size is a number
+  let iconSizeNum = Math.round(base.icon * scale)
+  if (props.iconSize != null) {
+    iconSizeNum = typeof props.iconSize === 'number' ? props.iconSize : parseInt(props.iconSize, 10)
+  }
+
   return {
-    icon: props.iconSize ?? Math.round(base.icon * scale),
-    text: props.fontSize ?? base.text,
+    icon: iconSizeNum,
+    text: props.fontSize ?? base.fontSize,
     height: Math.round(base.height * scale),
     padding: base.padding,
     iconPadding: base.iconPadding,
@@ -245,19 +232,19 @@ const btnStyle = computed(() => {
 const tintStyle = computed(() => {
   if (!props.color) return {}
 
-  const rgb = COLOR_MAP[props.color] || '255, 255, 255'
+  const colorVar = getColorVar(props.color)
 
   if (props.variant === 'solid') {
     // Solid: 更高不透明度，更鮮明
     return {
-      background: `rgba(${rgb}, 0.55)`,
+      background: `rgba(${colorVar}, var(--hhc-btn-solid-opacity))`,
     }
   }
 
   if (props.variant === 'tinted') {
     // Tinted: 淡淡的色調
     return {
-      background: `rgba(${rgb}, 0.2)`,
+      background: `rgba(${colorVar}, var(--hhc-btn-tinted-opacity))`,
     }
   }
 
@@ -268,16 +255,16 @@ const tintStyle = computed(() => {
 const shineStyle = computed(() => {
   if (props.variant !== 'solid' || !props.color) return {}
 
-  const rgb = COLOR_MAP[props.color] || '255, 255, 255'
+  const colorVar = getColorVar(props.color)
 
   return {
     boxShadow: `
-      inset 0 0 0 0.5px rgba(255, 255, 255, 0.4),
-      inset 0 1px 3px 0 rgba(255, 255, 255, 0.25),
-      inset 0 -1px 3px 0 rgba(0, 0, 0, 0.1),
-      0 2px 8px 0 rgba(${rgb}, 0.35),
-      0 4px 16px 0 rgba(${rgb}, 0.25),
-      0 0 1px 0 rgba(0, 0, 0, 0.1)
+      inset 0 0 0 0.5px rgba(var(--hhc-glass-shine-top), 0.4),
+      inset 0 1px 3px 0 rgba(var(--hhc-glass-shine-top), 0.25),
+      inset 0 -1px 3px 0 rgba(var(--hhc-glass-shine-bottom), 0.1),
+      0 2px 8px 0 rgba(${colorVar}, 0.35),
+      0 4px 16px 0 rgba(${colorVar}, 0.25),
+      0 0 1px 0 rgba(var(--hhc-glass-shadow-color), 0.1)
     `.trim(),
   }
 })
@@ -285,16 +272,15 @@ const shineStyle = computed(() => {
 const contentStyle = computed(() => {
   // Solid variant: 強制白字以確保對比度
   if (props.variant === 'solid') {
-    return { color: 'rgba(255, 255, 255, 0.95)' }
+    return { color: 'rgba(var(--hhc-glass-text), var(--hhc-glass-text-opacity))' }
   }
 
   if (!props.color) return {}
 
   // For non-tinted variants, apply color to content
   if (props.variant !== 'tinted') {
-    const rgb = COLOR_MAP[props.color]
-    if (rgb) {
-      return { color: `rgb(${rgb})` }
+    if (isThemeColor(props.color)) {
+      return { color: `rgb(${getThemeColorVar(props.color)})` }
     }
     return { color: props.color }
   }
@@ -326,13 +312,13 @@ const handleClick = (event: MouseEvent) => {
   cursor: pointer;
   font-weight: 500;
   text-decoration: none;
-  color: rgba(255, 255, 255, 0.9);
+  color: rgba(var(--hhc-glass-text), var(--hhc-glass-text-opacity));
   overflow: hidden;
   transition:
-    transform 0.2s ease,
-    opacity 0.2s ease,
-    box-shadow 0.2s ease,
-    background 0.2s ease;
+    transform var(--hhc-transition-fast) var(--hhc-transition-easing),
+    opacity var(--hhc-transition-fast) var(--hhc-transition-easing),
+    box-shadow var(--hhc-transition-fast) var(--hhc-transition-easing),
+    background var(--hhc-transition-fast) var(--hhc-transition-easing);
   user-select: none;
   -webkit-tap-highlight-color: transparent;
 
@@ -345,9 +331,7 @@ const handleClick = (event: MouseEvent) => {
   }
 
   &--disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-    pointer-events: none;
+    @include liquid.liquid-disabled;
   }
 
   &--loading {
@@ -372,13 +356,13 @@ const handleClick = (event: MouseEvent) => {
 
   // Outlined: 玻璃邊框
   &--outlined {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.25);
+    background: rgba(var(--hhc-glass-tint), 0.05);
+    border: 1px solid rgba(var(--hhc-glass-border), var(--hhc-glass-border-opacity));
     box-shadow: none;
 
     &:hover:not(.liquid-btn--disabled) {
-      background: rgba(255, 255, 255, 0.1);
-      border-color: rgba(255, 255, 255, 0.4);
+      background: rgba(var(--hhc-glass-tint), 0.1);
+      border-color: rgba(var(--hhc-glass-border), var(--hhc-glass-border-hover-opacity));
     }
   }
 
@@ -388,17 +372,17 @@ const handleClick = (event: MouseEvent) => {
     box-shadow: none;
 
     &:hover:not(.liquid-btn--disabled) {
-      background: rgba(255, 255, 255, 0.08);
+      background: rgba(var(--hhc-glass-tint), 0.08);
     }
   }
 
   // Flat: 半透明純色
   &--flat {
-    background: rgba(255, 255, 255, 0.12);
+    background: rgba(var(--hhc-glass-tint), 0.12);
     box-shadow: none;
 
     &:hover:not(.liquid-btn--disabled) {
-      background: rgba(255, 255, 255, 0.18);
+      background: rgba(var(--hhc-glass-tint), var(--hhc-glass-tint-opacity));
     }
   }
 }
@@ -416,6 +400,7 @@ const handleClick = (event: MouseEvent) => {
   inset: 0;
   z-index: 1;
   @include liquid.liquid-glass-tint;
+  transition: background var(--hhc-transition-normal) var(--hhc-transition-easing);
 }
 
 .liquid-btn__glass-shine {
@@ -428,11 +413,13 @@ const handleClick = (event: MouseEvent) => {
   .liquid-btn:hover:not(.liquid-btn--disabled) & {
     @include liquid.liquid-glass-pill-shadow-hover;
   }
+  transition: box-shadow var(--hhc-transition-normal) var(--hhc-transition-easing);
 }
 
 .liquid-btn__content {
   position: relative;
   z-index: 3;
+  transition: color var(--hhc-transition-normal) var(--hhc-transition-easing);
 }
 
 .liquid-btn__loader {

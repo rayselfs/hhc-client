@@ -21,6 +21,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { getThemeColorVar, isThemeColor, getProgressHeight, isSizeKey, type SizeKey } from '../constants'
 
 type SizePreset = 'x-small' | 'small' | 'large' | 'x-large'
 
@@ -53,32 +54,21 @@ const props = withDefaults(defineProps<Props>(), {
   rounded: 'rounded-pill',
 })
 
-const SIZE_MAP = {
-  'x-small': 4,
-  small: 6,
-  default: 8,
-  large: 10,
-  'x-large': 14,
-}
-
-const COLOR_MAP: Record<string, string> = {
-  primary: '59, 130, 246',
-  secondary: '139, 92, 246',
-  success: '34, 197, 94',
-  error: '239, 68, 68',
-  warning: '245, 158, 11',
-  info: '14, 165, 233',
-  white: '255, 255, 255',
+// Helper to get color variable
+const getColorVar = (color: string): string => {
+  if (color === 'white') return 'var(--hhc-glass-text)'
+  if (isThemeColor(color)) return getThemeColorVar(color)
+  return color
 }
 
 const computedHeight = computed(() => {
   if (props.height) {
     return typeof props.height === 'number' ? `${props.height}px` : props.height
   }
-  if (props.size && props.size in SIZE_MAP) {
-    return `${SIZE_MAP[props.size as keyof typeof SIZE_MAP]}px`
+  if (props.size && isSizeKey(props.size)) {
+    return `${getProgressHeight(props.size)}px`
   }
-  return `${SIZE_MAP.default}px`
+  return `${getProgressHeight('default')}px`
 })
 
 const computedRounded = computed(() => props.rounded)
@@ -93,14 +83,13 @@ const trackStyle = computed(() => {
   }
 
   // Apply color
-  const colorKey = props.color || 'white'
-  const rgb = COLOR_MAP[colorKey] || COLOR_MAP.white
+  const colorVar = getColorVar(props.color || 'white')
 
   style.background = `linear-gradient(
     90deg,
-    rgba(${rgb}, 0.6) 0%,
-    rgba(${rgb}, 0.8) 50%,
-    rgba(${rgb}, 0.6) 100%
+    rgba(${colorVar}, 0.6) 0%,
+    rgba(${colorVar}, 0.8) 50%,
+    rgba(${colorVar}, 0.6) 100%
   )`
 
   return style
@@ -108,37 +97,38 @@ const trackStyle = computed(() => {
 </script>
 
 <style scoped lang="scss">
+@use '../styles' as liquid;
+
 .liquid-progress {
   width: 100%;
   overflow: hidden;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  @include liquid.liquid-glass-backdrop(var(--hhc-blur-sm));
 }
 
 .liquid-progress__bg {
   position: absolute;
   inset: 0;
-  background: rgba(255, 255, 255, 0.1);
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
+  background: rgba(var(--hhc-glass-tint), var(--hhc-progress-bg-opacity));
+  box-shadow: inset 0 1px 2px rgba(var(--hhc-glass-shadow-color), 0.1);
 }
 
 .liquid-progress__track {
   top: 0;
   left: 0;
   height: 100%;
-  transition: width 0.3s ease;
+  transition: width var(--hhc-transition-normal) var(--hhc-transition-easing);
   box-shadow:
-    0 0 8px rgba(255, 255, 255, 0.3),
-    inset 0 1px 1px rgba(255, 255, 255, 0.4);
+    0 0 8px rgba(var(--hhc-glass-shine-top), 0.3),
+    inset 0 1px 1px rgba(var(--hhc-glass-shine-top), 0.4);
 }
 
 .liquid-progress__shine {
   inset: 0;
   background: linear-gradient(
     180deg,
-    rgba(255, 255, 255, 0.2) 0%,
+    rgba(var(--hhc-glass-shine-top), 0.2) 0%,
     transparent 50%,
-    rgba(0, 0, 0, 0.05) 100%
+    rgba(var(--hhc-glass-shine-bottom), 0.05) 100%
   );
   pointer-events: none;
 }

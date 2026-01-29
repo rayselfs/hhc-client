@@ -16,7 +16,7 @@
       <!-- Prepend slot -->
       <div v-if="$slots.prepend || prependIcon" class="liquid-text-field__prepend">
         <slot name="prepend">
-          <v-icon v-if="prependIcon" :size="20">{{ prependIcon }}</v-icon>
+          <LiquidIcon v-if="prependIcon" :icon="prependIcon" :size="20" />
         </slot>
       </div>
 
@@ -41,7 +41,7 @@
       <!-- Append slot -->
       <div v-if="$slots.append || appendIcon" class="liquid-text-field__append">
         <slot name="append">
-          <v-icon v-if="appendIcon" :size="20">{{ appendIcon }}</v-icon>
+          <LiquidIcon v-if="appendIcon" :icon="appendIcon" :size="20" />
         </slot>
       </div>
     </div>
@@ -51,6 +51,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useLiquidGlassFilters } from '../composables/useLiquidGlassFilters'
+import LiquidIcon from '../LiquidIcon/LiquidIcon.vue'
 
 useLiquidGlassFilters()
 
@@ -123,8 +124,7 @@ defineExpose({
   min-width: 100px;
 
   &--disabled {
-    opacity: 0.4;
-    pointer-events: none;
+    @include liquid.liquid-disabled;
   }
 }
 
@@ -134,11 +134,11 @@ defineExpose({
   align-items: center;
   min-height: 40px;
   padding: 0 14px;
-  border-radius: 12px;
+  border-radius: var(--hhc-radius-lg);
   overflow: hidden;
 
   .liquid-text-field--rounded & {
-    border-radius: 9999px;
+    border-radius: var(--hhc-radius-pill);
     padding: 0 18px;
   }
 }
@@ -147,18 +147,18 @@ defineExpose({
   position: absolute;
   inset: 0;
   z-index: 0;
-  @include liquid.liquid-glass-backdrop(12px, 180%);
+  @include liquid.liquid-glass-backdrop(var(--hhc-blur-md), 180%);
 }
 
 .liquid-text-field__tint {
   position: absolute;
   inset: 0;
   z-index: 1;
-  background: rgba(120, 120, 120, 0.2);
-  transition: background 0.2s ease;
+  background: rgba(var(--hhc-glass-tint), var(--hhc-btn-tinted-opacity));
+  transition: background var(--hhc-transition-fast) var(--hhc-transition-easing);
 
   .liquid-text-field--focused & {
-    background: rgba(120, 120, 120, 0.28);
+    background: rgba(var(--hhc-glass-tint), var(--hhc-glass-tint-hover-opacity));
   }
 }
 
@@ -168,18 +168,18 @@ defineExpose({
   z-index: 2;
   border-radius: inherit;
   box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.15),
-    inset 0 1px 2px 0 rgba(255, 255, 255, 0.1),
-    inset 0 -1px 2px 0 rgba(0, 0, 0, 0.08);
+    inset 0 0 0 1px rgba(var(--hhc-glass-border), var(--hhc-glass-border-opacity)),
+    inset 0 1px 2px 0 rgba(var(--hhc-glass-shine-top), 0.1),
+    inset 0 -1px 2px 0 rgba(var(--hhc-glass-shine-bottom), 0.08);
   pointer-events: none;
-  transition: box-shadow 0.2s ease;
+  transition: box-shadow var(--hhc-transition-fast) var(--hhc-transition-easing);
 
   .liquid-text-field--focused & {
     box-shadow:
-      inset 0 0 0 1.5px rgba(59, 130, 246, 0.5),
-      inset 0 1px 2px 0 rgba(255, 255, 255, 0.15),
-      inset 0 -1px 2px 0 rgba(0, 0, 0, 0.08),
-      0 0 0 2px rgba(59, 130, 246, 0.15);
+      inset 0 0 0 1.5px rgba(var(--hhc-theme-primary), 0.5),
+      inset 0 1px 2px 0 rgba(var(--hhc-glass-shine-top), 0.15),
+      inset 0 -1px 2px 0 rgba(var(--hhc-glass-shine-bottom), 0.08),
+      0 0 0 2px rgba(var(--hhc-theme-primary), 0.15);
   }
 }
 
@@ -192,11 +192,11 @@ defineExpose({
   border: none;
   outline: none;
   font-size: 0.875rem;
-  color: rgba(255, 255, 255, 0.95);
+  color: rgba(var(--hhc-glass-text), 0.95);
   padding: 0;
 
   &::placeholder {
-    color: rgba(255, 255, 255, 0.4);
+    color: rgba(var(--hhc-glass-text), var(--hhc-glass-text-disabled-opacity));
   }
 
   &::-webkit-outer-spin-button,
@@ -216,7 +216,7 @@ defineExpose({
   z-index: 3;
   display: flex;
   align-items: center;
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(var(--hhc-glass-text), 0.7);
 }
 
 .liquid-text-field__prepend {
@@ -232,7 +232,7 @@ defineExpose({
   z-index: 3;
   margin-left: 8px;
   font-size: 0.875rem;
-  color: rgba(255, 255, 255, 0.6);
+  @include liquid.liquid-glass-text-muted;
   white-space: nowrap;
 }
 </style>

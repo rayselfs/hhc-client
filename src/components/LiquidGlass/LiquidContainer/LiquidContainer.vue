@@ -50,12 +50,13 @@ withDefaults(defineProps<Props>(), {
 </script>
 
 <style scoped lang="scss">
+@use '../styles' as liquid;
+
 .liquid-glass-wrapper {
   overflow: hidden; /* Contains the distortion */
   box-shadow:
-    0 6px 6px rgba(0, 0, 0, 0.2),
-    0 0 20px rgba(0, 0, 0, 0.1);
-  /* transition: all 0.4s ...; (Optional hover effects) */
+    0 6px 6px rgba(var(--hhc-glass-shadow-color), 0.2),
+    0 0 20px rgba(var(--hhc-glass-shadow-color), 0.1);
 }
 
 .liquid-glass-effect {
@@ -77,7 +78,7 @@ withDefaults(defineProps<Props>(), {
   position: absolute;
   inset: 0;
   z-index: 1;
-  background: rgba(40, 40, 40, 0.4); /* Darker for our dark theme */
+  @include liquid.liquid-glass-tint-dark(0.4);
 }
 
 .liquid-glass-shine {
@@ -85,18 +86,17 @@ withDefaults(defineProps<Props>(), {
   inset: 0;
   z-index: 2;
   box-shadow:
-    inset 2px 2px 1px 0 rgba(255, 255, 255, 0.2),
-    inset -1px -1px 1px 1px rgba(255, 255, 255, 0.1);
+    inset 2px 2px 1px 0 rgba(var(--hhc-glass-shine-top), 0.2),
+    inset -1px -1px 1px 1px rgba(var(--hhc-glass-shine-top), 0.1);
   pointer-events: none;
 }
 
 /* Simple Mode Styles (Fallback) */
 .liquid-glass-wrapper.simple-mode {
-  background: rgba(20, 20, 20, 0.6);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  box-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.3);
+  background: rgba(var(--hhc-glass-simple-bg), var(--hhc-glass-simple-bg-opacity));
+  @include liquid.liquid-glass-backdrop(var(--hhc-blur-xl), 180%);
+  @include liquid.liquid-glass-border;
+  box-shadow: 0 4px 24px -1px rgba(var(--hhc-glass-shadow-color), 0.3);
 }
 
 /* Ghost Mode Styles */

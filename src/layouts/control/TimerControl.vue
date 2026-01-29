@@ -32,7 +32,7 @@
                     key="timer"
                     class="d-flex flex-column align-center justify-center fill-height"
                   >
-                    <liquid-progress-ring
+                    <liquid-timer-ring
                       :progress="timerStore.progress"
                       :formatted-time="timerStore.formattedTime"
                       :size="250"
@@ -60,7 +60,7 @@
                         </div>
                         <span v-else>{{ timerStore.formattedTime }}</span>
                       </template>
-                    </liquid-progress-ring>
+                    </liquid-timer-ring>
 
                     <!-- Remove Time Buttons -->
                     <TimeAdjustmentButtons
@@ -92,46 +92,10 @@
             <v-row class="mt-auto mb-2 flex-grow-0">
               <v-col cols="6" class="d-flex justify-end">
                 <liquid-btn
-                  v-if="controlState === 'stopped'"
-                  icon="mdi-play"
-                  color="primary"
+                  v-bind="mainControlConfig"
                   size="x-large"
                   variant="solid"
                   :disabled="areControlsDisabled"
-                  :title="
-                    stopwatchStore.global.isStopwatchMode
-                      ? $t('timer.startStopwatch')
-                      : $t('timer.startCountdown')
-                  "
-                  @click="startTimer"
-                />
-                <liquid-btn
-                  v-if="controlState === 'running'"
-                  icon="mdi-pause"
-                  color="warning"
-                  variant="solid"
-                  size="x-large"
-                  :disabled="areControlsDisabled"
-                  :title="
-                    stopwatchStore.global.isStopwatchMode
-                      ? $t('timer.pauseStopwatch')
-                      : $t('timer.pauseCountdown')
-                  "
-                  @click="pauseTimer"
-                />
-                <liquid-btn
-                  v-if="controlState === 'paused'"
-                  icon="mdi-play"
-                  color="warning"
-                  variant="solid"
-                  size="x-large"
-                  :disabled="areControlsDisabled"
-                  :title="
-                    stopwatchStore.global.isStopwatchMode
-                      ? $t('timer.resumeStopwatch')
-                      : $t('timer.resumeCountdown')
-                  "
-                  @click="resumeTimer"
                 />
               </v-col>
               <v-col cols="6" class="d-flex justify-start">
@@ -173,18 +137,16 @@
                   <v-list-item
                     v-for="item in timerStore.presets"
                     :key="item.id"
-                    class="preset-item"
-                    rounded="lg"
+                    rounded="rounded-lg"
+                    padding="pa-2"
+                    :hover-opacity="0.2"
                     @click="applyPreset(item)"
-                    link
                   >
                     <template #prepend>
                       <v-icon icon="mdi-history"></v-icon>
                     </template>
 
-                    <v-list-item-title class="text-h6">
-                      {{ formatDuration(item.duration) }}
-                    </v-list-item-title>
+                    <span class="text-h6">{{ formatDuration(item.duration) }}</span>
 
                     <template #append>
                       <v-btn
@@ -387,6 +349,35 @@ const resumeTimer = async () => {
   }
 }
 
+const mainControlConfig = computed(() => {
+  const isStopwatch = stopwatchStore.global.isStopwatchMode
+
+  switch (controlState.value) {
+    case 'running':
+      return {
+        icon: 'mdi-pause',
+        color: 'warning',
+        title: isStopwatch ? $t('timer.pauseStopwatch') : $t('timer.pauseCountdown'),
+        onClick: pauseTimer,
+      }
+    case 'paused':
+      return {
+        icon: 'mdi-play',
+        color: 'warning',
+        title: isStopwatch ? $t('timer.resumeStopwatch') : $t('timer.resumeCountdown'),
+        onClick: resumeTimer,
+      }
+    case 'stopped':
+    default:
+      return {
+        icon: 'mdi-play',
+        color: 'primary',
+        title: isStopwatch ? $t('timer.startStopwatch') : $t('timer.startCountdown'),
+        onClick: startTimer,
+      }
+  }
+})
+
 // updateProjectionState logic remains the same
 const updateProjectionState = async () => {
   if (isElectron()) {
@@ -481,14 +472,6 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.preset-card {
-  height: 335px;
-}
-
-.external-card {
-  height: 250px;
-}
-
 .time-separator {
   font-size: 77px;
   font-weight: 500;
@@ -497,14 +480,6 @@ onUnmounted(() => {
 .time-button {
   min-width: 80px;
   width: 80px;
-}
-
-.preset-item {
-  transition: all 0.1s ease;
-}
-
-.preset-item:hover {
-  background-color: rgba(var(--v-theme-primary), 0.7);
 }
 
 .v-btn-toggle .v-btn--active :deep(.v-btn__overlay) {

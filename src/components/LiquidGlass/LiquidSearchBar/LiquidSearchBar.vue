@@ -20,14 +20,13 @@
       <div class="liquid-search-bar__glass-shine rounded-pill"></div>
 
       <!-- 單一 icon，用 transform 移動 -->
-      <v-icon
+      <LiquidIcon
+        :icon="icon"
         class="liquid-search-bar__icon"
         :class="{ 'liquid-search-bar__icon--expanded': isExpanded }"
         :size="iconSize"
         @click="handleIconClick"
-      >
-        {{ icon }}
-      </v-icon>
+      />
 
       <!-- Input，展開後顯示 -->
       <input
@@ -49,6 +48,8 @@
 <script setup lang="ts">
 import { ref, computed, nextTick } from 'vue'
 import { useLiquidGlassFilters } from '../composables/useLiquidGlassFilters'
+import LiquidIcon from '../LiquidIcon/LiquidIcon.vue'
+import { getSizeConfig, isSizeKey, type SizeKey } from '../constants'
 
 useLiquidGlassFilters()
 
@@ -88,26 +89,23 @@ const isExpanded = ref(false)
 const isCollapsing = ref(false)
 const searchText = ref(props.modelValue)
 
-const SIZE_MAP = {
-  'x-small': { icon: 16, height: 28 },
-  small: { icon: 18, height: 32 },
-  default: { icon: 20, height: 40 },
-  large: { icon: 24, height: 48 },
-  'x-large': { icon: 28, height: 56 },
-}
-
 const computedSizes = computed(() => {
-  if (props.size) {
-    if (typeof props.size === 'string' && props.size in SIZE_MAP) {
-      return SIZE_MAP[props.size as keyof typeof SIZE_MAP]
-    } else if (typeof props.size === 'number') {
-      return {
-        icon: props.size,
-        height: Math.round(props.size * 1.8),
-      }
+  // Get config from shared constants
+  const sizeKey: SizeKey | number = props.size && isSizeKey(props.size) ? props.size : (props.size ?? 'default')
+  const config = getSizeConfig(sizeKey)
+
+  // Handle numeric size
+  if (typeof props.size === 'number') {
+    return {
+      icon: props.size,
+      height: Math.round(props.size * 1.8),
     }
   }
-  return SIZE_MAP.default
+
+  return {
+    icon: config.icon,
+    height: config.height,
+  }
 })
 
 const iconSize = computed(() => computedSizes.value.icon)
@@ -265,22 +263,22 @@ const handleSearch = (event: KeyboardEvent) => {
   left: calc(var(--collapsed-width) / 2);
   top: 50%;
   transform: translate(-50%, -50%);
-  color: rgba(255, 255, 255);
+  color: rgba(var(--hhc-glass-text), 1);
   cursor: pointer;
   // 確保 icon 沒有額外間距
   display: flex;
   align-items: center;
   justify-content: center;
   transition:
-    left 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-    transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    left var(--hhc-transition-normal) var(--hhc-transition-easing),
+    transform var(--hhc-transition-normal) var(--hhc-transition-easing);
 
   &--expanded {
     // 展開後：icon 左邊緣在 16px 處
     left: calc(16px + var(--icon-size) / 2);
     transform: translate(-50%, -50%);
     cursor: default;
-    color: rgba(255, 255, 255, 0.7);
+    color: rgba(var(--hhc-glass-text), 0.7);
   }
 }
 
@@ -295,12 +293,12 @@ const handleSearch = (event: KeyboardEvent) => {
   background: transparent;
   border: none;
   outline: none;
-  color: rgba(255, 255, 255, 0.9);
+  color: rgba(var(--hhc-glass-text), var(--hhc-glass-text-opacity));
   font-size: 0.875rem;
   font-weight: 400;
 
   &::placeholder {
-    color: rgba(255, 255, 255, 0.5);
+    color: rgba(var(--hhc-glass-text), 0.5);
   }
 }
 </style>

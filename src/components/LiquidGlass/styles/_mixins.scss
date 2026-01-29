@@ -1,6 +1,7 @@
 // ============================================
 // Liquid Glass Shared Mixins
 // Apple-style Liquid Glass Effect
+// Now using CSS variables for theming support
 // ============================================
 
 // ------------------------------------------
@@ -11,14 +12,14 @@
 @mixin liquid-glass-pill-shadow {
   box-shadow:
     // Soft border glow
-    inset 0 0 0 0.5px rgba(255, 255, 255, 0.35),
+    inset 0 0 0 0.5px rgba(var(--hhc-glass-border), var(--hhc-glass-glow-opacity)),
     // Top highlight (soft, diffused)
-    inset 0 1px 3px 0 rgba(255, 255, 255, 0.2),
+    inset 0 1px 3px 0 rgba(var(--hhc-glass-shine-top), var(--hhc-glass-shine-top-opacity)),
     // Bottom inner shadow
-    inset 0 -1px 3px 0 rgba(0, 0, 0, 0.08),
+    inset 0 -1px 3px 0 rgba(var(--hhc-glass-shine-bottom), var(--hhc-glass-shine-bottom-opacity)),
     // Outer shadow (floating effect)
-    0 2px 8px 0 rgba(0, 0, 0, 0.12),
-    0 0 1px 0 rgba(0, 0, 0, 0.08);
+    0 2px 8px 0 rgba(var(--hhc-glass-shadow-color), var(--hhc-glass-shadow-opacity)),
+    0 0 1px 0 rgba(var(--hhc-glass-shadow-color), var(--hhc-glass-shine-bottom-opacity));
 }
 
 // ------------------------------------------
@@ -28,21 +29,21 @@
 @mixin liquid-glass-pill-shadow-hover {
   box-shadow:
     // Soft border glow (brighter)
-    inset 0 0 0 0.5px rgba(255, 255, 255, 0.5),
+    inset 0 0 0 0.5px rgba(var(--hhc-glass-border), 0.5),
     // Top highlight (brighter)
-    inset 0 1px 4px 0 rgba(255, 255, 255, 0.3),
+    inset 0 1px 4px 0 rgba(var(--hhc-glass-shine-top), 0.3),
     // Bottom inner shadow
-    inset 0 -1px 3px 0 rgba(0, 0, 0, 0.1),
+    inset 0 -1px 3px 0 rgba(var(--hhc-glass-shine-bottom), 0.1),
     // Outer shadow (more pronounced floating)
-    0 4px 16px 0 rgba(0, 0, 0, 0.15),
-    0 0 1px 0 rgba(0, 0, 0, 0.1);
+    0 4px 16px 0 rgba(var(--hhc-glass-shadow-color), 0.15),
+    0 0 1px 0 rgba(var(--hhc-glass-shadow-color), 0.1);
 }
 
 // ------------------------------------------
 // Glass Backdrop Filter
 // Apple-style blur with higher saturation
 // ------------------------------------------
-@mixin liquid-glass-backdrop($blur: 20px, $saturate: 200%) {
+@mixin liquid-glass-backdrop($blur: var(--hhc-blur-xl), $saturate: var(--hhc-glass-saturate)) {
   backdrop-filter: blur($blur) saturate($saturate);
   -webkit-backdrop-filter: blur($blur) saturate($saturate);
 }
@@ -51,16 +52,67 @@
 // Glass Tint Background
 // Neutral gray tint (Apple-style)
 // ------------------------------------------
-@mixin liquid-glass-tint($color: rgba(120, 120, 120, 0.18)) {
-  background-color: $color;
+@mixin liquid-glass-tint($opacity: var(--hhc-glass-tint-opacity)) {
+  background-color: rgba(var(--hhc-glass-tint), $opacity);
 }
 
 // ------------------------------------------
 // Glass Tint Dark
-// Darker tint for contrast
+// Darker tint for contrast (theme-aware)
 // ------------------------------------------
-@mixin liquid-glass-tint-dark($opacity: 0.25) {
-  background: rgba(60, 60, 60, $opacity);
+@mixin liquid-glass-tint-dark($opacity: var(--hhc-glass-tint-dark-opacity)) {
+  background-color: rgba(var(--hhc-glass-tint-dark), $opacity);
+}
+
+// ------------------------------------------
+// Glass Text Color
+// Themed text color with opacity
+// ------------------------------------------
+@mixin liquid-glass-text($opacity: var(--hhc-glass-text-opacity)) {
+  color: rgba(var(--hhc-glass-text), $opacity);
+}
+
+// ------------------------------------------
+// Glass Text Muted
+// Secondary/muted text color
+// ------------------------------------------
+@mixin liquid-glass-text-muted {
+  color: rgba(var(--hhc-glass-text-muted), var(--hhc-glass-text-muted-opacity));
+}
+
+// ------------------------------------------
+// Glass Border
+// Subtle border with glow effect
+// ------------------------------------------
+@mixin liquid-glass-border($opacity: var(--hhc-glass-border-opacity)) {
+  border: 1px solid rgba(var(--hhc-glass-border), $opacity);
+}
+
+// ------------------------------------------
+// Glass Layers Structure
+// Common glass effect layer styles
+// ------------------------------------------
+@mixin liquid-glass-layers($prefix) {
+  .#{$prefix}__glass-effect {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    @include liquid-glass-backdrop;
+  }
+
+  .#{$prefix}__glass-tint {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    @include liquid-glass-tint;
+  }
+
+  .#{$prefix}__glass-shine {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    @include liquid-glass-pill-shadow;
+  }
 }
 
 // ------------------------------------------
@@ -81,4 +133,29 @@
   100% {
     transform: scaleX(1);
   }
+}
+
+// ------------------------------------------
+// Transition Helpers
+// ------------------------------------------
+@mixin liquid-transition($properties: all, $duration: var(--hhc-transition-normal)) {
+  transition: $properties $duration var(--hhc-transition-easing);
+}
+
+@mixin liquid-transition-fast($properties: all) {
+  transition: $properties var(--hhc-transition-fast) var(--hhc-transition-easing);
+}
+
+@mixin liquid-transition-slow($properties: all) {
+  transition: $properties var(--hhc-transition-slow) var(--hhc-transition-easing);
+}
+
+// ------------------------------------------
+// Disabled State
+// Common disabled styling
+// ------------------------------------------
+@mixin liquid-disabled {
+  opacity: var(--hhc-glass-text-disabled-opacity);
+  cursor: not-allowed;
+  pointer-events: none;
 }

@@ -15,34 +15,31 @@
       :item-height="80"
     >
       <template #default="{ item }">
-        <div
-          class="verse-item pa-3 d-flex align-center justify-space-between"
-          :class="{
-            selected: isSelected(item.id),
-            focused: isFocused(item.id),
-          }"
-          @click.stop="handleItemClick(item.id, $event)"
+        <v-list-item
+          padding="pa-3"
+          rounded="rounded"
+          :selected="isSelected(item.id)"
+          :focused="isFocused(item.id)"
+          :selected-opacity="0.2"
+          :hover-opacity="0.1"
+          class="mb-1"
+          @click="handleItemClick(item.id, $event)"
           @dblclick="handleLoadVerse(item)"
           @contextmenu="handleRightClick($event, item)"
         >
-          <div>
-            <div class="text-h6 font-weight-medium d-flex">
-              <span class="mr-1 text-no-wrap"
-                >{{ item.bookAbbreviation }}{{ item.chapter }}:{{ item.verse }} -
-              </span>
-              <span class="text-justify">{{ item.verseText }}</span>
-            </div>
+          <div class="text-h6 font-weight-medium d-flex">
+            <span class="mr-1 text-no-wrap"
+              >{{ item.bookAbbreviation }}{{ item.chapter }}:{{ item.verse }} -
+            </span>
+            <span class="text-justify">{{ item.verseText }}</span>
           </div>
-          <v-btn
-            class="verse-btn"
-            icon
-            size="small"
-            variant="text"
-            @click.stop="handleRemoveItem(item.id)"
-          >
-            <v-icon>mdi-close</v-icon>
-          </v-btn>
-        </div>
+
+          <template #append>
+            <v-btn icon size="small" variant="text" @click.stop="handleRemoveItem(item.id)">
+              <v-icon>mdi-close</v-icon>
+            </v-btn>
+          </template>
+        </v-list-item>
       </template>
     </v-virtual-scroll>
   </div>
@@ -103,7 +100,7 @@ onClickOutside(
 )
 
 // Handle Item Click (Selection)
-const handleItemClick = (id: string, event: MouseEvent) => {
+const handleItemClick = (id: string, event: MouseEvent | KeyboardEvent) => {
   handleSelectionClick(
     id,
     props.historyVerses.map((v) => ({ id: v.id })),
@@ -189,33 +186,5 @@ const handleRightClick = (event: MouseEvent, item: VerseItem) => {
 </script>
 
 <style scoped>
-.verse-item {
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-  border-radius: 4px;
-  user-select: none;
-}
-
-.verse-item:hover {
-  background-color: rgba(var(--v-theme-primary), 0.1);
-}
-
-.verse-item.selected {
-  background-color: rgba(var(--v-theme-primary), 0.2);
-  border: 1px solid rgba(var(--v-theme-primary), 0.5);
-}
-
-.verse-item.focused {
-  outline: 2px solid rgba(var(--v-theme-primary), 0.5);
-  outline-offset: -2px;
-}
-
-.verse-btn {
-  opacity: 0;
-  transition: opacity 0.2s ease;
-}
-
-.verse-item:hover .verse-btn {
-  opacity: 1;
-}
+/* No custom styles needed - LiquidListItem handles all hover/selection states */
 </style>

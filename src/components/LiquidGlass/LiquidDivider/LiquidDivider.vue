@@ -39,8 +39,8 @@ const dividerStyle = computed(() => {
   background: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(255, 255, 255, 0.15) 20%,
-    rgba(255, 255, 255, 0.15) 80%,
+    rgba(var(--hhc-glass-border), var(--hhc-glass-border-opacity)) 20%,
+    rgba(var(--hhc-glass-border), var(--hhc-glass-border-opacity)) 80%,
     transparent 100%
   );
 
@@ -57,8 +57,8 @@ const dividerStyle = computed(() => {
     background: linear-gradient(
       180deg,
       transparent 0%,
-      rgba(255, 255, 255, 0.15) 20%,
-      rgba(255, 255, 255, 0.15) 80%,
+      rgba(var(--hhc-glass-border), var(--hhc-glass-border-opacity)) 20%,
+      rgba(var(--hhc-glass-border), var(--hhc-glass-border-opacity)) 80%,
       transparent 100%
     );
   }

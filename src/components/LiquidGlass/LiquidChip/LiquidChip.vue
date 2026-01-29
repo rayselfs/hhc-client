@@ -17,9 +17,12 @@
     <!-- Content -->
     <span class="liquid-chip__content d-flex align-center">
       <!-- Prepend icon -->
-      <v-icon v-if="prependIcon" :size="iconSize" class="liquid-chip__prepend mr-1">
-        {{ prependIcon }}
-      </v-icon>
+      <LiquidIcon
+        v-if="prependIcon"
+        :icon="prependIcon"
+        :size="iconSize"
+        class="liquid-chip__prepend mr-1"
+      />
 
       <!-- Label -->
       <span class="liquid-chip__label">
@@ -27,9 +30,12 @@
       </span>
 
       <!-- Append icon -->
-      <v-icon v-if="appendIcon" :size="iconSize" class="liquid-chip__append ml-1">
-        {{ appendIcon }}
-      </v-icon>
+      <LiquidIcon
+        v-if="appendIcon"
+        :icon="appendIcon"
+        :size="iconSize"
+        class="liquid-chip__append ml-1"
+      />
 
       <!-- Close button -->
       <button
@@ -38,7 +44,7 @@
         class="liquid-chip__close ml-1"
         @click.stop="handleClose"
       >
-        <v-icon :size="closeIconSize">mdi-close</v-icon>
+        <LiquidIcon icon="mdi-close" :size="closeIconSize" />
       </button>
     </span>
   </component>
@@ -47,6 +53,8 @@
 <script setup lang="ts">
 import { computed, useAttrs } from 'vue'
 import { useLiquidGlassFilters } from '../composables/useLiquidGlassFilters'
+import { getThemeColorVar, isThemeColor, getChipSizeConfig, isSizeKey, type SizeKey } from '../constants'
+import LiquidIcon from '../LiquidIcon/LiquidIcon.vue'
 
 useLiquidGlassFilters()
 
@@ -84,23 +92,24 @@ const hasGlassEffect = computed(
   () => props.variant === 'glass' || props.variant === 'tinted' || props.variant === 'solid',
 )
 
-const SIZE_MAP = {
-  'x-small': { height: 20, padding: '0 6px', fontSize: '0.625rem', icon: 12, closeIcon: 12 },
-  small: { height: 24, padding: '0 8px', fontSize: '0.75rem', icon: 14, closeIcon: 14 },
-  default: { height: 28, padding: '0 10px', fontSize: '0.8125rem', icon: 16, closeIcon: 16 },
-  large: { height: 32, padding: '0 12px', fontSize: '0.875rem', icon: 18, closeIcon: 18 },
+// Helper to get color variable
+const getColorVar = (color: string | undefined): string => {
+  if (!color) return 'var(--hhc-glass-tint)'
+  if (isThemeColor(color)) return getThemeColorVar(color)
+  return color
 }
 
-const COLOR_MAP: Record<string, string> = {
-  primary: '59, 130, 246',
-  secondary: '139, 92, 246',
-  success: '34, 197, 94',
-  error: '239, 68, 68',
-  warning: '245, 158, 11',
-  info: '14, 165, 233',
-}
-
-const computedSizes = computed(() => SIZE_MAP[props.size])
+const computedSizes = computed(() => {
+  const sizeKey: SizeKey = props.size && isSizeKey(props.size) ? props.size : 'default'
+  const config = getChipSizeConfig(sizeKey)
+  return {
+    height: config.height,
+    padding: `0 ${config.paddingX}px`,
+    fontSize: config.fontSize,
+    icon: config.icon,
+    closeIcon: config.icon, // Use same as icon for consistency
+  }
+})
 const iconSize = computed(() => computedSizes.value.icon)
 const closeIconSize = computed(() => computedSizes.value.closeIcon)
 
@@ -122,14 +131,14 @@ const chipStyle = computed(() => ({
 const tintStyle = computed(() => {
   if (!props.color) return {}
 
-  const rgb = COLOR_MAP[props.color] || '255, 255, 255'
+  const colorVar = getColorVar(props.color)
 
   if (props.variant === 'solid') {
-    return { background: `rgba(${rgb}, 0.55)` }
+    return { background: `rgba(${colorVar}, var(--hhc-btn-solid-opacity))` }
   }
 
   if (props.variant === 'tinted') {
-    return { background: `rgba(${rgb}, 0.2)` }
+    return { background: `rgba(${colorVar}, var(--hhc-btn-tinted-opacity))` }
   }
 
   return {}
@@ -138,15 +147,15 @@ const tintStyle = computed(() => {
 const shineStyle = computed(() => {
   if (props.variant !== 'solid' || !props.color) return {}
 
-  const rgb = COLOR_MAP[props.color] || '255, 255, 255'
+  const colorVar = getColorVar(props.color)
 
   return {
     boxShadow: `
-      inset 0 0 0 0.5px rgba(255, 255, 255, 0.4),
-      inset 0 1px 2px 0 rgba(255, 255, 255, 0.25),
-      inset 0 -1px 2px 0 rgba(0, 0, 0, 0.1),
-      0 1px 4px 0 rgba(${rgb}, 0.3),
-      0 2px 8px 0 rgba(${rgb}, 0.2)
+      inset 0 0 0 0.5px rgba(var(--hhc-glass-shine-top), 0.4),
+      inset 0 1px 2px 0 rgba(var(--hhc-glass-shine-top), 0.25),
+      inset 0 -1px 2px 0 rgba(var(--hhc-glass-shine-bottom), 0.1),
+      0 1px 4px 0 rgba(${colorVar}, 0.3),
+      0 2px 8px 0 rgba(${colorVar}, 0.2)
     `.trim(),
   }
 })
@@ -167,14 +176,14 @@ const handleClose = (event: MouseEvent) => {
 
 .liquid-chip {
   border: none;
-  border-radius: 9999px;
+  border-radius: var(--hhc-radius-pill);
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.9);
+  color: rgba(var(--hhc-glass-text), var(--hhc-glass-text-opacity));
   overflow: hidden;
   transition:
-    transform 0.15s ease,
-    opacity 0.15s ease,
-    box-shadow 0.15s ease;
+    transform var(--hhc-transition-fast) var(--hhc-transition-easing),
+    opacity var(--hhc-transition-fast) var(--hhc-transition-easing),
+    box-shadow var(--hhc-transition-fast) var(--hhc-transition-easing);
   user-select: none;
   -webkit-tap-highlight-color: transparent;
 
@@ -191,9 +200,7 @@ const handleClose = (event: MouseEvent) => {
   }
 
   &--disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-    pointer-events: none;
+    @include liquid.liquid-disabled;
   }
 
   // Variants
@@ -204,12 +211,12 @@ const handleClose = (event: MouseEvent) => {
   }
 
   &--outlined {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.25);
+    background: rgba(var(--hhc-glass-tint), 0.05);
+    border: 1px solid rgba(var(--hhc-glass-border), var(--hhc-glass-border-opacity));
 
     &:hover:not(.liquid-chip--disabled) {
-      background: rgba(255, 255, 255, 0.1);
-      border-color: rgba(255, 255, 255, 0.4);
+      background: rgba(var(--hhc-glass-tint), 0.1);
+      border-color: rgba(var(--hhc-glass-border), var(--hhc-glass-border-hover-opacity));
     }
   }
 }
@@ -219,14 +226,14 @@ const handleClose = (event: MouseEvent) => {
   position: absolute;
   inset: 0;
   z-index: 0;
-  @include liquid.liquid-glass-backdrop(16px, 180%);
+  @include liquid.liquid-glass-backdrop(var(--hhc-blur-lg), 180%);
 }
 
 .liquid-chip__glass-tint {
   position: absolute;
   inset: 0;
   z-index: 1;
-  @include liquid.liquid-glass-tint(rgba(100, 100, 100, 0.15));
+  @include liquid.liquid-glass-tint;
 }
 
 .liquid-chip__glass-shine {
@@ -234,18 +241,18 @@ const handleClose = (event: MouseEvent) => {
   inset: 0;
   z-index: 2;
   box-shadow:
-    inset 0 0 0 0.5px rgba(255, 255, 255, 0.3),
-    inset 0 1px 2px 0 rgba(255, 255, 255, 0.15),
-    inset 0 -1px 2px 0 rgba(0, 0, 0, 0.06),
-    0 1px 4px 0 rgba(0, 0, 0, 0.1);
+    inset 0 0 0 0.5px rgba(var(--hhc-glass-border), 0.3),
+    inset 0 1px 2px 0 rgba(var(--hhc-glass-shine-top), 0.15),
+    inset 0 -1px 2px 0 rgba(var(--hhc-glass-shine-bottom), 0.06),
+    0 1px 4px 0 rgba(var(--hhc-glass-shadow-color), 0.1);
   pointer-events: none;
 
   .liquid-chip--clickable:hover:not(.liquid-chip--disabled) & {
     box-shadow:
-      inset 0 0 0 0.5px rgba(255, 255, 255, 0.45),
-      inset 0 1px 3px 0 rgba(255, 255, 255, 0.25),
-      inset 0 -1px 2px 0 rgba(0, 0, 0, 0.08),
-      0 2px 8px 0 rgba(0, 0, 0, 0.15);
+      inset 0 0 0 0.5px rgba(var(--hhc-glass-border), 0.45),
+      inset 0 1px 3px 0 rgba(var(--hhc-glass-shine-top), 0.25),
+      inset 0 -1px 2px 0 rgba(var(--hhc-glass-shine-bottom), 0.08),
+      0 2px 8px 0 rgba(var(--hhc-glass-shadow-color), 0.15);
   }
 }
 
@@ -271,7 +278,7 @@ const handleClose = (event: MouseEvent) => {
   cursor: pointer;
   border-radius: 50%;
   opacity: 0.7;
-  transition: opacity 0.15s ease;
+  transition: opacity var(--hhc-transition-fast) var(--hhc-transition-easing);
 
   &:hover {
     opacity: 1;

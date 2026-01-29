@@ -101,6 +101,7 @@ const handleBlur = () => {
   padding: 0;
   min-height: auto;
   transition: all 0.2s ease;
+  color: rgba(var(--hhc-glass-text), var(--hhc-glass-text-opacity));
 }
 
 .time-input-field :deep(.v-field__input::placeholder) {

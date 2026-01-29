@@ -198,7 +198,11 @@ export function useSelectionManager() {
   /**
    * 處理項目點擊
    */
-  const handleItemClick = (id: string, items: { id: string }[], event: MouseEvent) => {
+  const handleItemClick = (
+    id: string,
+    items: { id: string }[],
+    event: MouseEvent | KeyboardEvent,
+  ) => {
     // Update focus on click
     focusedId.value = id
 

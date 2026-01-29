@@ -7,73 +7,70 @@
       <div v-else>
         <!-- 資料夾列表 -->
         <div v-for="folder in folders" :key="folder.id" class="mb-2">
-          <div
-            class="verse-item pa-2 d-flex align-center justify-space-between"
-            :class="{
-              selected: isSelected(folder.id),
-              focused: isFocused(folder.id),
-            }"
+          <v-list-item
+            padding="pa-2"
+            rounded="rounded"
+            :selected="isSelected(folder.id)"
+            :focused="isFocused(folder.id)"
+            :selected-opacity="0.2"
+            :hover-opacity="0.1"
             draggable="true"
-            @click.stop="handleItemClick(folder.id, $event)"
-            @dragstart="(e) => handleDragStart(e, 'folder', folder)"
+            :class="{ 'drag-over': isDragOver(folder.id) }"
+            @click="handleItemClick(folder.id, $event)"
+            @dragstart="(e: DragEvent) => handleDragStart(e, 'folder', folder)"
             @dragend="handleDragEnd"
             @dragover="handleDragOver"
-            @dragenter="handleDragEnter"
+            @dragenter="(e: DragEvent) => handleDragEnter(e, folder.id)"
             @dragleave="handleDragLeave"
-            @drop="(e) => handleDrop(e, folder)"
+            @drop="(e: DragEvent) => handleDrop(e, folder)"
             @dblclick="handleEnterFolder(folder.id)"
             @contextmenu="handleRightClick($event, 'folder', folder)"
           >
-            <div class="d-flex align-center text-subtitle-1">
+            <template #prepend>
               <v-icon class="mr-2">mdi-folder</v-icon>
-              <span>{{ folder.name }}</span>
-            </div>
-            <v-btn
-              class="verse-btn"
-              icon
-              size="small"
-              variant="text"
-              @click.stop="handleDeleteFolder(folder.id)"
-            >
-              <v-icon>mdi-delete</v-icon>
-            </v-btn>
-          </div>
+            </template>
+
+            <span class="text-subtitle-1">{{ folder.name }}</span>
+
+            <template #append>
+              <v-btn icon size="small" variant="text" @click.stop="handleDeleteFolder(folder.id)">
+                <v-icon>mdi-delete</v-icon>
+              </v-btn>
+            </template>
+          </v-list-item>
         </div>
 
         <!-- 經文列表 -->
-        <div
+        <v-list-item
           v-for="item in verses"
           :key="item.id"
-          class="verse-item pa-2 mb-1 d-flex align-center justify-space-between"
-          :class="{
-            selected: isSelected(item.id),
-            focused: isFocused(item.id),
-          }"
+          padding="pa-2"
+          rounded="rounded"
+          :selected="isSelected(item.id)"
+          :focused="isFocused(item.id)"
+          :selected-opacity="0.2"
+          :hover-opacity="0.1"
+          class="mb-1"
           draggable="true"
-          @click.stop="handleItemClick(item.id, $event)"
-          @dragstart="(e) => handleDragStart(e, 'verse', item)"
+          @click="handleItemClick(item.id, $event)"
+          @dragstart="(e: DragEvent) => handleDragStart(e, 'verse', item)"
           @dragend="handleDragEnd"
           @dblclick="handleLoadVerse(item)"
           @contextmenu="handleRightClick($event, 'verse', item)"
         >
-          <div>
-            <div class="text-h6 font-weight-medium d-flex">
-              <span class="mr-1 text-no-wrap"
-                >{{ item.bookAbbreviation }}{{ item.chapter }}:{{ item.verse }} -
-              </span>
-              <span class="text-justify">{{ item.verseText }}</span>
-            </div>
+          <div class="text-h6 font-weight-medium d-flex">
+            <span class="mr-1 text-no-wrap"
+              >{{ item.bookAbbreviation }}{{ item.chapter }}:{{ item.verse }} -
+            </span>
+            <span class="text-justify">{{ item.verseText }}</span>
           </div>
-          <v-btn
-            class="verse-btn"
-            icon
-            size="small"
-            variant="text"
-            @click.stop="handleRemoveItem(item.id)"
-          >
-            <v-icon>mdi-delete</v-icon>
-          </v-btn>
-        </div>
+
+          <template #append>
+            <v-btn icon size="small" variant="text" @click.stop="handleRemoveItem(item.id)">
+              <v-icon>mdi-delete</v-icon>
+            </v-btn>
+          </template>
+        </v-list-item>
       </div>
     </div>
   </div>
@@ -113,10 +110,11 @@ const { t: $t } = useI18n()
 const {
   handleDragStart,
   handleDragOver,
-  handleDragEnter,
-  handleDragLeave,
-  handleDragEnd,
+  handleDragEnter: baseDragEnter,
+  handleDragLeave: baseDragLeave,
+  handleDragEnd: baseDragEnd,
   handleDrop: handleDropBase,
+  draggedItems,
 } = useDragAndDrop<VerseItem>()
 
 import { useSelectionManager } from '@/composables/useSelectionManager'
@@ -128,6 +126,34 @@ import { onClickOutside } from '@vueuse/core'
 
 const folderStore = useBibleFolderStore()
 const { copyToClipboard, cutToClipboard } = folderStore
+
+// Drag-over state tracking
+const dragOverId = ref<string | null>(null)
+
+const isDragOver = (id: string) => dragOverId.value === id
+
+const handleDragEnter = (event: DragEvent, folderId: string) => {
+  baseDragEnter(event)
+  // Don't highlight if dragging over self
+  if (!draggedItems.value.has(folderId)) {
+    dragOverId.value = folderId
+  }
+}
+
+const handleDragLeave = (event: DragEvent) => {
+  baseDragLeave(event)
+  // Check if we're actually leaving the element
+  const target = event.target as HTMLElement
+  const relatedTarget = event.relatedTarget as HTMLElement | null
+  if (!target.contains(relatedTarget)) {
+    dragOverId.value = null
+  }
+}
+
+const handleDragEnd = () => {
+  baseDragEnd()
+  dragOverId.value = null
+}
 
 // Selection Manager
 const {
@@ -144,7 +170,7 @@ const mergedItems = computed(() => [
 ])
 
 // Handle Click (Selection)
-const handleItemClick = (id: string, event: MouseEvent) => {
+const handleItemClick = (id: string, event: MouseEvent | KeyboardEvent) => {
   handleSelectionClick(id, mergedItems.value, event)
 }
 
@@ -345,38 +371,9 @@ const handleDrop = (event: DragEvent, targetFolder: Folder<VerseItem>) => {
   min-height: 100%; /* Ensure clicking anywhere fills height */
 }
 
-.verse-item {
-  cursor: pointer;
-  transition: background-color 0.1s ease;
-  border-radius: 4px;
-  user-select: none;
-}
-
-.verse-item:hover {
-  background-color: rgba(var(--v-theme-primary), 0.1);
-}
-
-.verse-item.selected {
-  background-color: rgba(var(--v-theme-primary), 0.2);
-  border: 1px solid rgba(var(--v-theme-primary), 0.5);
-}
-
-.verse-item.focused {
-  outline: 2px solid rgba(var(--v-theme-primary), 0.5);
-  outline-offset: -2px;
-}
-
-.verse-item.drag-over {
+/* Drag-over state for folders */
+.drag-over {
   background-color: rgba(var(--v-theme-primary), 0.2) !important;
-  border: 2px dashed rgba(var(--v-theme-primary), 0.5);
-}
-
-.verse-btn {
-  opacity: 0;
-  transition: opacity 0.1s ease;
-}
-
-.verse-item:hover .verse-btn {
-  opacity: 1;
+  border: 2px dashed rgba(var(--v-theme-primary), 0.5) !important;
 }
 </style>

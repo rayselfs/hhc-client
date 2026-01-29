@@ -28,7 +28,7 @@
     class="fill-height ma-0 pa-0"
   >
     <v-col cols="5 pa-0 d-flex align-center justify-center">
-      <liquid-progress-ring
+      <liquid-timer-ring
         :progress="timerProjectionStore.progress"
         :formatted-time="timerProjectionStore.formattedTime"
         :size="circleSize"
@@ -42,7 +42,7 @@
   </v-row>
   <v-row v-else class="fill-height ma-0 pa-0 align-center justify-center">
     <v-col cols="12 pa-0 d-flex align-center justify-center">
-      <liquid-progress-ring
+      <liquid-timer-ring
         v-if="timerProjectionStore.settings.mode === TimerMode.TIMER"
         :progress="timerProjectionStore.progress"
         :formatted-time="timerProjectionStore.formattedTime"

@@ -4,191 +4,137 @@
     :class="{
       'liquid-select--focused': isFocused,
       'liquid-select--disabled': disabled,
-      'liquid-select--rounded': rounded,
+      'liquid-select--multiple': multiple,
     }"
   >
-    <!-- Glass layers -->
-    <div class="liquid-select__glass-effect" :class="computedRounded"></div>
-    <div class="liquid-select__glass-tint" :class="computedRounded" :style="tintStyle"></div>
-    <div class="liquid-select__glass-shine" :class="computedRounded"></div>
+    <!-- Glass container -->
+    <div class="liquid-select__container">
+      <div class="liquid-select__glass"></div>
+      <div class="liquid-select__tint"></div>
+      <div class="liquid-select__shine"></div>
 
-    <!-- v-select -->
-    <v-select
-      :model-value="modelValue"
-      :items="items"
-      :item-title="itemTitle"
-      :item-value="itemValue"
-      :multiple="multiple"
-      :chips="chips"
-      :closable-chips="closableChips"
-      :clearable="clearable"
-      :disabled="disabled"
-      :loading="loading"
-      :placeholder="placeholder"
-      variant="solo-filled"
-      :color="color"
-      density="default"
-      hide-details
-      class="liquid-select__input"
-      :menu-props="{ contentClass: 'liquid-select-menu' }"
-      @update:model-value="emit('update:modelValue', $event)"
-      @focus="isFocused = true"
-      @blur="isFocused = false"
-    >
-      <!-- Override chip slot with LiquidChip -->
-      <template v-if="chips" #chip="{ item, props: chipProps }">
-        <LiquidChip
-          v-bind="chipProps"
-          :closable="closableChips"
-          size="small"
-          :color="color"
-          variant="tinted"
-          class="liquid-select__chip"
-        >
-          {{ item.title }}
-        </LiquidChip>
-      </template>
+      <!-- v-select wrapper -->
+      <VSelect
+        ref="selectRef"
+        :model-value="modelValue"
+        :items="items"
+        :label="label"
+        :placeholder="placeholder"
+        :disabled="disabled"
+        :multiple="multiple"
+        :clearable="clearable"
+        :loading="loading"
+        :search-input.sync="searchInput"
+        variant="solo-filled"
+        density="compact"
+        hide-details
+        @update:model-value="handleUpdate"
+        @focus="handleFocus"
+        @blur="handleBlur"
+      >
+        <!-- Loader slot - show LiquidProgressCircular when loading -->
+        <template v-if="loading" #loader>
+          <div class="liquid-select__loader">
+            <LiquidProgressCircular
+              :size="20"
+              :width="2"
+              indeterminate
+              color="rgba(var(--hhc-glass-text), 0.7)"
+            />
+          </div>
+        </template>
 
-      <!-- Override item slot with LiquidListItem -->
-      <template #item="{ item, props: itemProps }">
-        <LiquidListItem
-          v-bind="itemProps"
-          :selected="isItemSelected(item)"
-          :color="color || 'primary'"
-          :hover-opacity="0.12"
-          :selected-opacity="0.2"
-          rounded="rounded-lg"
-          padding="py-2 px-3"
-        >
-          {{ item.title }}
-        </LiquidListItem>
-      </template>
+        <!-- No data slot - empty state message -->
+        <template #no-data>
+          <div class="liquid-select__no-data">
+            {{ noDataText }}
+          </div>
+        </template>
 
-      <!-- Override loader slot with LiquidProgressCircular -->
-      <template v-if="loading" #loader>
-        <LiquidProgressCircular
-          :size="20"
-          :width="2"
-          indeterminate
-          :color="color || 'primary'"
-          class="liquid-select__loader"
-        />
-      </template>
-
-      <!-- Override no-data slot for empty state -->
-      <template #no-data>
-        <div class="liquid-select__no-data">
-          <span class="text-body-2">No data available</span>
-        </div>
-      </template>
-    </v-select>
+        <!-- Append slot - clear icon styling -->
+        <template v-if="clearable && modelValue" #append>
+          <button type="button" class="liquid-select__clear-btn" @click.stop="handleClear">
+            <LiquidIcon icon="mdi-close-circle" :size="18" />
+          </button>
+        </template>
+      </VSelect>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { VSelect } from 'vuetify/components'
 import { useLiquidGlassFilters } from '../composables/useLiquidGlassFilters'
-import { getThemeColorVar, isThemeColor, type SizeKey } from '../constants'
-import { LiquidChip } from '../LiquidChip'
-import { LiquidListItem } from '../LiquidListItem'
-import { LiquidProgressCircular } from '../LiquidProgressCircular'
+import LiquidProgressCircular from '../LiquidProgressCircular/LiquidProgressCircular.vue'
+import LiquidIcon from '../LiquidIcon/LiquidIcon.vue'
 
-// Ensure SVG filters are injected (fallback if plugin not installed)
 useLiquidGlassFilters()
-
-type Variant = 'glass' | 'tinted'
 
 interface Props {
   /** v-model 綁定值 */
-  modelValue?: unknown
+  modelValue?: string | number | (string | number)[] | null
   /** 選項列表 */
-  items?: unknown[]
-  /** 選項標題字段名稱 */
-  itemTitle?: string
-  /** 選項值字段名稱 */
-  itemValue?: string
-  /** 是否支援多選 */
-  multiple?: boolean
-  /** 是否顯示選中項目為 chips */
-  chips?: boolean
-  /** chips 是否可關閉 */
-  closableChips?: boolean
-  /** 是否顯示清除按鈕 */
-  clearable?: boolean
+  items?: (string | number | { title?: string; value: string | number })[]
+  /** 標籤 */
+  label?: string
+  /** Placeholder */
+  placeholder?: string
   /** 是否禁用 */
   disabled?: boolean
-  /** 是否顯示 loading 狀態 */
+  /** 是否多選 */
+  multiple?: boolean
+  /** 是否可清除 */
+  clearable?: boolean
+  /** 是否加載中 */
   loading?: boolean
-  /** Placeholder 文字 */
-  placeholder?: string
-  /**
-   * 選擇框變體樣式
-   * - glass: 中性毛玻璃（預設）
-   * - tinted: 帶色調的毛玻璃（需搭配 color）
-   */
-  variant?: Variant
-  /** 顏色（Vuetify 顏色名稱或 CSS 顏色） */
-  color?: string
-  /** 大小 */
-  size?: SizeKey
-  /** 圓角樣式 */
-  rounded?: boolean
+  /** 無數據文字 */
+  noDataText?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  multiple: false,
-  chips: false,
-  closableChips: false,
-  clearable: false,
+  modelValue: null,
+  items: () => [],
   disabled: false,
+  multiple: false,
+  clearable: false,
   loading: false,
-  variant: 'glass',
-  rounded: false,
+  noDataText: 'No data available',
 })
 
 const emit = defineEmits<{
-  (e: 'update:modelValue', value: unknown): void
+  (e: 'update:modelValue', value: string | number | (string | number)[] | null): void
+  (e: 'focus', event: FocusEvent): void
+  (e: 'blur', event: FocusEvent): void
 }>()
 
+const selectRef = ref<InstanceType<typeof VSelect> | null>(null)
 const isFocused = ref(false)
+const searchInput = ref('')
 
-// Helper to get color variable
-const getColorVar = (color: string | undefined): string => {
-  if (!color) return 'var(--hhc-glass-tint)'
-  if (isThemeColor(color)) return getThemeColorVar(color)
-  return color
+const handleUpdate = (value: string | number | (string | number)[] | null) => {
+  emit('update:modelValue', value)
 }
 
-const computedRounded = computed(() => {
-  return props.rounded ? 'rounded-pill' : 'rounded-lg'
-})
-
-const tintStyle = computed(() => {
-  if (!props.color) return {}
-
-  const colorVar = getColorVar(props.color)
-
-  if (props.variant === 'tinted') {
-    return {
-      background: `rgba(${colorVar}, var(--hhc-btn-tinted-opacity))`,
-    }
-  }
-
-  return {}
-})
-
-// Check if an item is selected
-const isItemSelected = (item: any) => {
-  if (!props.modelValue) return false
-
-  if (props.multiple) {
-    // For multiple selection, modelValue is an array
-    return Array.isArray(props.modelValue) && props.modelValue.some((v: any) => v === item.value)
-  }
-
-  // For single selection, modelValue is a single value
-  return props.modelValue === item.value
+const handleFocus = (event: FocusEvent) => {
+  isFocused.value = true
+  emit('focus', event)
 }
+
+const handleBlur = (event: FocusEvent) => {
+  isFocused.value = false
+  emit('blur', event)
+}
+
+const handleClear = () => {
+  emit('update:modelValue', props.multiple ? [] : null)
+}
+
+// Expose focus method
+defineExpose({
+  focus: () => selectRef.value?.focus(),
+  blur: () => selectRef.value?.blur(),
+})
 </script>
 
 <style scoped lang="scss">
@@ -196,22 +142,30 @@ const isItemSelected = (item: any) => {
 
 .liquid-select {
   position: relative;
-  min-width: 220px;
+  min-width: 100px;
 
   &--disabled {
     @include liquid.liquid-disabled;
   }
 }
 
-// Glass layers
-.liquid-select__glass-effect {
+.liquid-select__container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  border-radius: var(--hhc-radius-lg);
+  overflow: hidden;
+}
+
+.liquid-select__glass {
   position: absolute;
   inset: 0;
   z-index: 0;
   @include liquid.liquid-glass-backdrop(var(--hhc-blur-md), 180%);
 }
 
-.liquid-select__glass-tint {
+.liquid-select__tint {
   position: absolute;
   inset: 0;
   z-index: 1;
@@ -223,7 +177,7 @@ const isItemSelected = (item: any) => {
   }
 }
 
-.liquid-select__glass-shine {
+.liquid-select__shine {
   position: absolute;
   inset: 0;
   z-index: 2;
@@ -244,70 +198,69 @@ const isItemSelected = (item: any) => {
   }
 }
 
-// Override Vuetify's default styling
-.liquid-select__input {
-  position: relative;
-  z-index: 3;
-
-  :deep(.v-field) {
-    background: transparent !important;
-    box-shadow: none !important;
-  }
-
-  :deep(.v-field__overlay) {
-    opacity: 0 !important;
-  }
-
-  :deep(.v-field__outline) {
-    display: none !important;
-  }
-
-  :deep(.v-field__input) {
-    color: rgba(var(--hhc-glass-text), 0.95);
-  }
-
-  :deep(.v-select__menu-icon) {
-    color: rgba(var(--hhc-glass-text), 0.7);
-  }
-
-  // Clear icon styling
-  :deep(.v-field__clearable) {
-    color: rgba(var(--hhc-glass-text), 0.5);
-    transition:
-      color var(--hhc-transition-fast) var(--hhc-transition-easing),
-      opacity var(--hhc-transition-fast) var(--hhc-transition-easing);
-
-    &:hover {
-      color: rgba(var(--hhc-glass-text), 0.8);
-    }
-  }
-
-  // Chip container styling
-  :deep(.v-field__input) {
-    display: flex;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    gap: 4px;
-
-    // Hide scrollbar but keep functionality
-    scrollbar-width: none;
-    &::-webkit-scrollbar {
-      display: none;
-    }
-  }
-}
-
-.liquid-select__chip {
-  flex-shrink: 0;
-}
-
 .liquid-select__loader {
-  margin: 0 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  color: rgba(var(--hhc-glass-text), 0.7);
 }
 
 .liquid-select__no-data {
-  padding: 16px;
+  padding: 12px 16px;
   text-align: center;
-  color: rgba(var(--hhc-glass-text), 0.6);
+  color: rgba(var(--hhc-glass-text), 0.5);
+  font-size: 0.875rem;
+}
+
+.liquid-select__clear-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  color: rgba(var(--hhc-glass-text), 0.5);
+  cursor: pointer;
+  border-radius: 50%;
+  transition:
+    color var(--hhc-transition-fast) var(--hhc-transition-easing),
+    transform var(--hhc-transition-fast) var(--hhc-transition-easing);
+
+  &:hover {
+    color: rgba(var(--hhc-glass-text), 0.8);
+    transform: scale(1.1);
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+}
+
+// Override Vuetify v-select styles
+:deep(.v-select) {
+  .v-field {
+    background: transparent;
+    border: none;
+
+    .v-field__input {
+      color: rgba(var(--hhc-glass-text), 0.95);
+      font-size: 0.875rem;
+      padding: 0 14px;
+    }
+
+    .v-field__control {
+      min-height: 40px;
+    }
+  }
+
+  .v-select__selection {
+    color: rgba(var(--hhc-glass-text), 0.95);
+  }
+
+  .v-field__append-inner {
+    padding-right: 8px;
+  }
 }
 </style>

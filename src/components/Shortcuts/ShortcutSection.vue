@@ -1,7 +1,7 @@
 <template>
   <div>
     <h3 class="text-h6 mb-2">{{ title }}</h3>
-    <v-divider></v-divider>
+    <liquid-divider />
     <div class="shortcuts-list pt-3">
       <div
         v-for="shortcut in shortcuts"
@@ -9,9 +9,9 @@
         class="shortcut-item pb-3 align-center justify-space-between d-flex"
       >
         <span class="shortcut-description">{{ shortcut.description }}</span>
-        <v-chip size="small" variant="outlined" class="shortcut-key">
+        <liquid-chip size="small" class="shortcut-key">
           {{ shortcut.key }}
-        </v-chip>
+        </liquid-chip>
       </div>
     </div>
   </div>

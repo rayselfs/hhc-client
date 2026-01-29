@@ -272,7 +272,10 @@
     "nextVerse": "Next Verse",
     "prevChapter": "Previous Chapter",
     "nextChapter": "Next Chapter",
-    "openBookDialog": "Toggle Book Selection"
+    "openBookDialog": "Toggle Book Selection",
+    "toggleBookDialog": "Toggle Book Selection",
+    "closeDialog": "Close Dialog",
+    "pdfToggleViewMode": "Toggle PDF View Mode"
   },
   "alert": {
     "error": "Error",

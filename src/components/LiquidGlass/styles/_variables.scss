@@ -1,0 +1,20 @@
+// ============================================
+// Liquid Glass CSS Variables
+// ============================================
+//
+// NOTE: CSS variables are now defined in TypeScript
+// and injected at runtime via the LiquidGlassPlugin.
+//
+// See: styles/theme/defaults.ts for default values
+//
+// This file is kept for backwards compatibility
+// but no longer defines any variables.
+//
+// Usage in other projects:
+//   app.use(LiquidGlassPlugin, {
+//     theme: {
+//       dark: { colors: { primary: '10, 132, 255' } },
+//       light: { colors: { primary: '0, 122, 255' } }
+//     }
+//   })
+// ============================================
