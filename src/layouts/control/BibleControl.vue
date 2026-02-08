@@ -89,7 +89,10 @@
                       }}
                     </span>
                     <span class="mr-1 text-subtitle-1">-</span>
-                    <p class="text-justify" v-html="highlightSearchText(result.text)"></p>
+                    <p
+                      class="text-justify"
+                      v-html="sanitizeHTML(highlightSearchText(result.text))"
+                    ></p>
                   </div>
                 </div>
               </template>
@@ -238,6 +241,7 @@ import MultiFunctionControl from '@/components/Bible/MultiFunction/Control.vue'
 import BottomSpacer from '@/components/Main/BottomSpacer.vue'
 import { useBibleFolderStore } from '@/stores/folder'
 import { BibleFolder } from '@/types/enum'
+import { sanitizeHTML } from '@/utils/sanitize'
 
 const { t: $t } = useI18n()
 const { reportError } = useSentry()
@@ -664,7 +668,6 @@ const handleSelectVerseEvent = async (event: Event) => {
 
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { KEYBOARD_SHORTCUTS } from '@/config/shortcuts'
-import { sanitizeHTML } from '@/utils/sanitize'
 
 onMounted(async () => {
   await bibleFolderStore.loadRootFolder()
