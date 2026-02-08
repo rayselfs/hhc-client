@@ -739,3 +739,12 @@ Added `@typescript-eslint/no-explicit-any: 'error'` with targeted exceptions for
 2. Investigate Vue 3 generic store patterns to fix folder.ts types
 3. Consider creating typed wrapper for idb library with proper dynamic store support
 4. Document why each whitelisted file needs `any` in code comments
+
+## [2026-02-08T12:44:00Z] Task 13: Router Lazy Loading
+
+- Action: Converted ProjectionView route to lazy-load via dynamic import in src/router/index.ts
+- Verification:
+  - grep 'import(' src/router/index.ts -> found dynamic import
+  - npm run build -> succeeded (vite build produced renderer chunks)
+  - dist-electron/renderer/assets contains ProjectionView-\*.js chunk (ProjectionView-DJNb2-vA.js)
+- Result: Code-splitting for ProjectionView confirmed. Build produced multiple JS assets (15 renderer JS files) and a dedicated ProjectionView chunk named ProjectionView-DJNb2-vA.js
