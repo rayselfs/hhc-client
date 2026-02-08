@@ -38,7 +38,10 @@ describe('useProjectionElectron postMessage security', () => {
 
     window.dispatchEvent(validEvent)
 
-    expect(callback).toHaveBeenCalledWith({ type: 'TIMER_UPDATE', payload: { time: 100 } })
+    expect(callback).toHaveBeenCalledExactlyOnceWith({
+      type: 'TIMER_UPDATE',
+      payload: { time: 100 },
+    })
 
     if (cleanup) cleanup()
   })
@@ -57,7 +60,7 @@ describe('useProjectionElectron postMessage security', () => {
     const { requestCurrentState } = useProjectionElectron()
     requestCurrentState()
 
-    expect(mockOpener.postMessage).toHaveBeenCalledWith(
+    expect(mockOpener.postMessage).toHaveBeenCalledExactlyOnceWith(
       { type: 'REQUEST_STATE' },
       window.location.origin,
     )

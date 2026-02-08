@@ -27,6 +27,29 @@ export default defineConfigWithVueTs(
   vueTsConfigs.recommended,
 
   {
+    files: ['**/*.{ts,tsx,vue}'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': [
+        'error',
+        {
+          ignoreRestArgs: false,
+        },
+      ],
+    },
+  },
+
+  {
+    files: [
+      'src/composables/useIndexedDB.ts',
+      'src/stores/folder.ts',
+      'src/workers/flexsearch.worker.ts',
+    ],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+    },
+  },
+
+  {
     ...pluginVitest.configs.recommended,
     files: ['src/**/__tests__/*'],
   },

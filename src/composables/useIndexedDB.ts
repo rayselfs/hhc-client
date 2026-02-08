@@ -52,9 +52,8 @@ export function useIndexedDB(config: IndexedDBConfig) {
 
     try {
       // Use type assertion to support dynamic store names
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       dbInstance = (await (openDB as any)(config.dbName, config.version, {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         upgrade(db: any) {
           // Create object store for each store
           config.stores.forEach((storeConfig) => {
@@ -107,7 +106,7 @@ export function useIndexedDB(config: IndexedDBConfig) {
     try {
       const db = await initDB()
       // Use type assertion to bypass TypeScript strict check because store name is dynamic
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       return (await (db as any).get(storeName, key)) as T | undefined
     } catch (error) {
       reportError(error, {
@@ -132,7 +131,7 @@ export function useIndexedDB(config: IndexedDBConfig) {
   ): Promise<unknown> => {
     try {
       const db = await initDB()
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       return await (db as any).put(storeName, value, key)
     } catch (error) {
       reportError(error, {
@@ -157,7 +156,7 @@ export function useIndexedDB(config: IndexedDBConfig) {
   ): Promise<unknown> => {
     try {
       const db = await initDB()
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       return await (db as any).add(storeName, value, key)
     } catch (error) {
       reportError(error, {
@@ -178,7 +177,7 @@ export function useIndexedDB(config: IndexedDBConfig) {
     try {
       const db = await initDB()
       // 使用類型斷言來繞過 TypeScript 的嚴格檢查，因為 store 名稱是動態的
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       await (db as any).delete(storeName, key)
     } catch (error) {
       reportError(error, {
@@ -199,7 +198,7 @@ export function useIndexedDB(config: IndexedDBConfig) {
     try {
       const db = await initDB()
       // 使用類型斷言來繞過 TypeScript 的嚴格檢查，因為 store 名稱是動態的
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       return (await (db as any).getAll(storeName)) as T[]
     } catch (error) {
       reportError(error, {
@@ -220,7 +219,7 @@ export function useIndexedDB(config: IndexedDBConfig) {
     try {
       const db = await initDB()
       // 使用類型斷言來繞過 TypeScript 的嚴格檢查，因為 store 名稱是動態的
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       return (await (db as any).getAllKeys(storeName)) as T[]
     } catch (error) {
       reportError(error, {
@@ -240,7 +239,7 @@ export function useIndexedDB(config: IndexedDBConfig) {
     try {
       const db = await initDB()
       // 使用類型斷言來繞過 TypeScript 的嚴格檢查，因為 store 名稱是動態的
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       await (db as any).clear(storeName)
     } catch (error) {
       reportError(error, {
@@ -262,7 +261,7 @@ export function useIndexedDB(config: IndexedDBConfig) {
     try {
       const db = await initDB()
       // 使用類型斷言來繞過 TypeScript 的嚴格檢查，因為 store 名稱是動態的
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       const result = await (db as any).get(storeName, key)
       return result !== undefined
     } catch (error) {
@@ -290,7 +289,7 @@ export function useIndexedDB(config: IndexedDBConfig) {
     try {
       const db = await initDB()
       // 使用類型斷言來繞過 TypeScript 的嚴格檢查，因為 store 名稱是動態的
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       const tx = (db as any).transaction(storeName, 'readonly')
       const index = tx.store.index(indexName)
       return (await index.getAll(query)) as T[]
@@ -324,7 +323,7 @@ export function useIndexedDB(config: IndexedDBConfig) {
 
     try {
       const db = await initDB()
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       const tx = (db as any).transaction(storeName, 'readwrite')
       const store = tx.objectStore(storeName)
 
@@ -353,7 +352,7 @@ export function useIndexedDB(config: IndexedDBConfig) {
 
     try {
       const db = await initDB()
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       const tx = (db as any).transaction(storeName, 'readwrite')
       const store = tx.objectStore(storeName)
 
@@ -385,7 +384,7 @@ export function useIndexedDB(config: IndexedDBConfig) {
   ): Promise<T> => {
     try {
       const db = await initDB()
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       const tx = (db as any).transaction(storeNames, mode)
 
       const stores: Record<string, IDBObjectStore> = {}

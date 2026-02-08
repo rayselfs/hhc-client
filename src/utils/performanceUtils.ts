@@ -6,8 +6,7 @@
 /**
  * 防抖動函數
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function debounce<T extends (...args: any[]) => any>(
+export function debounce<T extends (...args: never[]) => unknown>(
   func: T,
   wait: number,
   immediate = false,
@@ -32,15 +31,13 @@ export function debounce<T extends (...args: any[]) => any>(
 /**
  * 節流函數
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function throttle<T extends (...args: any[]) => any>(
+export function throttle<T extends (...args: never[]) => unknown>(
   func: T,
   limit: number,
 ): (...args: Parameters<T>) => void {
   let inThrottle: boolean
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return function executedFunction(this: any, ...args: Parameters<T>) {
+  return function executedFunction(this: unknown, ...args: Parameters<T>) {
     if (!inThrottle) {
       func.apply(this, args)
       inThrottle = true
@@ -53,13 +50,11 @@ export function throttle<T extends (...args: any[]) => any>(
  * 緩存管理器
  */
 class CacheManager {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private cache = new Map<string, { value: any; expiry: number }>()
+  private cache = new Map<string, { value: unknown; expiry: number }>()
   private maxSize = 100
   private defaultTTL = 5 * 60 * 1000 // 5分鐘
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  set(key: string, value: any, ttl = this.defaultTTL): void {
+  set(key: string, value: unknown, ttl = this.defaultTTL): void {
     // 如果緩存已滿，清理最舊的項目
     if (this.cache.size >= this.maxSize) {
       this.cleanup()
@@ -71,8 +66,7 @@ class CacheManager {
     })
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  get(key: string): any | null {
+  get(key: string): unknown | null {
     const item = this.cache.get(key)
     if (!item) return null
 
@@ -144,11 +138,7 @@ export const cacheManager = new CacheManager()
 /**
  * 記憶化函數
  */
-/**
- * 記憶化函數
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function memoize<T extends (...args: any[]) => any>(
+export function memoize<T extends (...args: never[]) => unknown>(
   func: T,
   keyGenerator?: (...args: Parameters<T>) => string,
 ): T {
@@ -161,7 +151,7 @@ export function memoize<T extends (...args: any[]) => any>(
       return cache.get(key)
     }
 
-    const result = func(...args)
+    const result = func(...args) as ReturnType<T>
     cache.set(key, result)
     return result
   }) as T

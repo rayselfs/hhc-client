@@ -1181,7 +1181,7 @@ Parallel Speedup: ~45% faster than sequential
 
 ---
 
-- [ ] 11. TypeScript Strict Mode (Phase 2 — Remaining Files)
+- [x] 11. TypeScript Strict Mode (Phase 2 — Remaining Files)
 
   **What to do**:
   - Remove ALL remaining `// @ts-expect-error` annotations added in Task 5

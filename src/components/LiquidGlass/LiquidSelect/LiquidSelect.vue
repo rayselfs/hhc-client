@@ -24,7 +24,7 @@
         :multiple="multiple"
         :clearable="clearable"
         :loading="loading"
-        :search-input.sync="searchInput"
+        v-model:search-input="searchInput"
         variant="solo-filled"
         density="compact"
         hide-details
@@ -63,7 +63,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { VSelect } from 'vuetify/components'
 import { useLiquidGlassFilters } from '../composables/useLiquidGlassFilters'
 import LiquidProgressCircular from '../LiquidProgressCircular/LiquidProgressCircular.vue'
