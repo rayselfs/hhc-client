@@ -8,6 +8,7 @@
     :type="tag === 'button' ? 'button' : undefined"
     :href="href"
     :to="to"
+    :aria-label="ariaLabel"
     @click="handleClick"
   >
     <!-- Glass layers (for glass/tinted/solid variants) -->
@@ -129,6 +130,8 @@ interface Props {
   iconSize?: string | number
   /** 覆蓋文字大小 */
   fontSize?: string
+  /** ARIA 標籤 */
+  ariaLabel?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -270,9 +273,9 @@ const shineStyle = computed(() => {
 })
 
 const contentStyle = computed(() => {
-  // Solid variant: 強制白字以確保對比度
+  // Solid variant: Force white text for better contrast on colored backgrounds
   if (props.variant === 'solid') {
-    return { color: 'rgba(var(--hhc-glass-text), var(--hhc-glass-text-opacity))' }
+    return { color: 'rgba(255, 255, 255, 0.95)' }
   }
 
   if (!props.color) return {}

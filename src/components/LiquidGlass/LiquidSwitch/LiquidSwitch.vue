@@ -12,6 +12,7 @@
       class="liquid-switch__input"
       :checked="modelValue"
       :disabled="disabled"
+      :aria-label="ariaLabel"
       @change="handleChange"
     />
 
@@ -51,6 +52,8 @@ interface Props {
   disabled?: boolean
   /** 啟用時的顏色 */
   color?: string
+  /** ARIA 標籤 */
+  ariaLabel?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {

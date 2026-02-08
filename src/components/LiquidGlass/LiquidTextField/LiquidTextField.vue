@@ -29,6 +29,7 @@
         :placeholder="placeholder"
         :disabled="disabled"
         :maxlength="maxlength"
+        :aria-label="ariaLabel"
         @input="handleInput"
         @focus="handleFocus"
         @blur="handleBlur"
@@ -74,6 +75,8 @@ interface Props {
   appendIcon?: string
   /** 左右兩邊圓弧 (pill 形狀) */
   rounded?: boolean
+  /** ARIA 標籤 */
+  ariaLabel?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {

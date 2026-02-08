@@ -1,11 +1,19 @@
 <template>
-  <v-dialog v-model="isOpen" max-width="700" @keydown.esc="isOpen = false">
+  <v-dialog
+    v-model="isOpen"
+    max-width="700"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="settings-title"
+    @keydown.esc="isOpen = false"
+  >
     <v-card rounded="rounded-xl">
       <div class="d-flex flex-row settings-container">
         <!-- Left sidebar with macOS Finder style -->
         <div class="settings-sidebar">
+          <h2 id="settings-title" class="v-sr-only">{{ $t('settings.title') }}</h2>
           <liquid-container mode="simple" padding="pa-0 py-2" class="sidebar-container">
-            <div class="py-1">
+            <div class="py-1" role="tablist" aria-orientation="vertical">
               <v-list-item
                 v-for="category in categories"
                 :key="category.id"
@@ -17,6 +25,9 @@
                 :hover-opacity="0.1"
                 color="surface"
                 class="mx-1 mb-1"
+                role="tab"
+                :aria-selected="activeCategory === category.id"
+                :aria-controls="'panel-' + category.id"
                 @click="activeCategory = category.id"
               >
                 <template #prepend>
@@ -30,15 +41,20 @@
 
         <!-- Right content -->
         <div class="settings-content">
-          <div class="pa-4">
+          <div
+            class="pa-4"
+            role="tabpanel"
+            :id="'panel-' + activeCategory"
+            :aria-labelledby="'tab-' + activeCategory"
+          >
             <!-- General -->
             <template v-if="activeCategory === 'general'">
               <v-row>
                 <v-col cols="12">
-                  <v-label class="text-subtitle-1 mb-2">{{ $t('settings.language') }}</v-label>
                   <v-select
                     v-model="selectedLanguage"
                     :items="languageOptions"
+                    :label="$t('settings.language')"
                     item-title="text"
                     item-value="value"
                     variant="outlined"
@@ -56,10 +72,10 @@
                   </v-select>
                 </v-col>
                 <v-col cols="12">
-                  <v-label class="text-subtitle-1 mb-2">{{ $t('settings.timezone') }}</v-label>
                   <v-select
                     v-model="selectedTimezone"
                     :items="timezones"
+                    :label="$t('settings.timezone')"
                     variant="outlined"
                     density="compact"
                     rounded="lg"
@@ -68,10 +84,9 @@
                   ></v-select>
                 </v-col>
                 <v-col cols="12">
-                  <v-label class="text-subtitle-1 mb-2">{{ $t('settings.theme') }}</v-label>
                   <v-switch
                     v-model="isDarkMode"
-                    :label="$t('settings.darkMode')"
+                    :label="$t('settings.theme') + ': ' + $t('settings.darkMode')"
                     color="primary"
                     hide-details
                   ></v-switch>
@@ -82,14 +97,17 @@
             <!-- Media -->
             <template v-if="activeCategory === 'media'">
               <!-- FFmpeg Status (always visible) -->
-              <v-label class="text-subtitle-2 mb-2">{{
-                $t('settings.media.ffmpegStatus')
-              }}</v-label>
+              <h3 class="text-subtitle-2 mb-2">{{ $t('settings.media.ffmpegStatus') }}</h3>
               <div class="mb-2">
                 <v-chip
                   :color="ffmpegStatus.available ? 'success' : 'warning'"
                   size="small"
                   class="mb-2"
+                  :aria-label="
+                    $t('settings.media.ffmpegStatus') +
+                    ': ' +
+                    (ffmpegStatus.available ? 'Available' : 'Not found')
+                  "
                 >
                   {{
                     ffmpegStatus.available
@@ -127,22 +145,28 @@
                   hide-details
                   @update:model-value="handleEnableFfmpegChange"
                 />
-                <v-btn icon variant="text" size="small" @click="showInstallGuide = true">
+                <v-btn
+                  icon
+                  variant="text"
+                  size="small"
+                  :aria-label="$t('settings.media.ffmpegInstallGuide')"
+                  @click="showInstallGuide = true"
+                >
                   <v-icon size="small">mdi-help-circle-outline</v-icon>
                 </v-btn>
               </div>
               <p class="text-caption text-medium-emphasis mb-4">
                 {{ $t('settings.media.enableExtendedVideoHint') }}
               </p>
-              <p v-if="!ffmpegStatus.available" class="text-caption text-error mb-4">
+              <p v-if="!ffmpegStatus.available" class="text-caption text-error mb-4" role="alert">
                 {{ $t('settings.media.ffmpegRequiredToEnable') }}
               </p>
 
               <!-- Video Quality (disabled when FFmpeg is OFF) -->
-              <v-label class="text-subtitle-2 mb-2">{{ $t('settings.videoQuality') }}</v-label>
               <v-select
                 v-model="videoQuality"
                 :items="videoQualityOptions"
+                :label="$t('settings.videoQuality')"
                 :disabled="!enableFfmpeg"
                 item-title="text"
                 item-value="value"
@@ -172,7 +196,6 @@
             <template v-if="activeCategory === 'system'">
               <v-row>
                 <v-col cols="12">
-                  <v-label class="text-subtitle-1 mb-2">{{ $t('settings.performance') }}</v-label>
                   <v-switch
                     v-model="hardwareAcceleration"
                     :label="$t('settings.hardwareAcceleration')"

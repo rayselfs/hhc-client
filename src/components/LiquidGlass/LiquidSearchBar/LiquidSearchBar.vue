@@ -3,6 +3,7 @@
     class="liquid-search-bar"
     :class="{ 'liquid-search-bar--disabled': disabled }"
     :style="cssVars"
+    role="search"
   >
     <!-- 單一容器，用 clip-path 控制可見範圍 -->
     <div
@@ -12,6 +13,7 @@
         'liquid-search-bar__bar--expanded': isExpanded,
         'liquid-search-bar__bar--collapsing': isCollapsing,
       }"
+      :aria-expanded="isExpanded"
       @animationend="onAnimationEnd"
     >
       <!-- Glass layers -->
@@ -25,7 +27,12 @@
         class="liquid-search-bar__icon"
         :class="{ 'liquid-search-bar__icon--expanded': isExpanded }"
         :size="iconSize"
+        :aria-label="isExpanded ? undefined : ariaLabel || 'Expand search'"
+        role="button"
+        :tabindex="isExpanded ? -1 : 0"
         @click="handleIconClick"
+        @keydown.enter="handleIconClick"
+        @keydown.space.prevent="handleIconClick"
       />
 
       <!-- Input，展開後顯示 -->
@@ -37,6 +44,7 @@
         class="liquid-search-bar__input"
         :placeholder="placeholder"
         :disabled="disabled"
+        :aria-label="ariaLabel || placeholder"
         @blur="handleBlur"
         @keydown.esc="handleCollapse"
         @keydown.enter="handleSearch"
@@ -65,6 +73,8 @@ interface Props {
   size?: SizePreset | number
   variant?: Variant
   color?: string
+  /** ARIA 標籤 */
+  ariaLabel?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -91,7 +101,8 @@ const searchText = ref(props.modelValue)
 
 const computedSizes = computed(() => {
   // Get config from shared constants
-  const sizeKey: SizeKey | number = props.size && isSizeKey(props.size) ? props.size : (props.size ?? 'default')
+  const sizeKey: SizeKey | number =
+    props.size && isSizeKey(props.size) ? props.size : (props.size ?? 'default')
   const config = getSizeConfig(sizeKey)
 
   // Handle numeric size

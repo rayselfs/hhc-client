@@ -42,6 +42,7 @@
         v-if="closable"
         type="button"
         class="liquid-chip__close ml-1"
+        aria-label="Remove chip"
         @click.stop="handleClose"
       >
         <LiquidIcon icon="mdi-close" :size="closeIconSize" />
@@ -53,7 +54,13 @@
 <script setup lang="ts">
 import { computed, useAttrs } from 'vue'
 import { useLiquidGlassFilters } from '../composables/useLiquidGlassFilters'
-import { getThemeColorVar, isThemeColor, getChipSizeConfig, isSizeKey, type SizeKey } from '../constants'
+import {
+  getThemeColorVar,
+  isThemeColor,
+  getChipSizeConfig,
+  isSizeKey,
+  type SizeKey,
+} from '../constants'
 import LiquidIcon from '../LiquidIcon/LiquidIcon.vue'
 
 useLiquidGlassFilters()

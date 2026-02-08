@@ -1431,7 +1431,7 @@ Parallel Speedup: ~45% faster than sequential
 
 ---
 
-- [ ] 14. Accessibility Improvements (WCAG 2.1 Level AA)
+- [x] 14. Accessibility Improvements (WCAG 2.1 Level AA)
 
   **What to do**:
   - Install axe-core for automated accessibility testing: `npm install -D @axe-core/playwright` (if Playwright tests are set up) or `npm install -D axe-core` for vitest

@@ -804,3 +804,31 @@ Added `@typescript-eslint/no-explicit-any: 'error'` with targeted exceptions for
   - For components that return `ComputedRef` from stores, use `FileItem | null | undefined` in props to avoid type errors during `vue-tsc` check, as index access on arrays might return `undefined`.
   - `defineExpose` is useful for exposing methods (like `togglePlay`) to the parent for keyboard shortcut handling.
   - Preserved existing IPC and projection messaging logic by keeping it in the relevant components (mostly `MediaPlayer` and `PdfSlideshow`).
+
+## [2026-02-09] Fix: ESLint errors in MultiFunction refactoring
+
+- Fixed `vue/no-mutating-props` errors in `MultiFunctionDialogs.vue` by replacing direct prop mutations with an emit pattern.
+- Updated `Control.vue` to handle the new update emits for dialog states and fields.
+- Cleaned up `useBibleMultiFunction.ts`:
+  - Removed unused `BIBLE_CONFIG` import.
+  - Replaced `any` types with proper interfaces (`TabRef`) and specific types (`MouseEvent`, `Folder<VerseItem>`).
+  - Added necessary utility imports that were previously missing.
+- Fixed minor lint issues in other files (`LiquidProgress.vue`, `timer.test.ts`, `fileProtocol.test.ts`) to achieve zero errors.
+- Verified with `npm run lint`, `npm run type-check`, and `npx vitest run`.
+
+[2026-02-09 Task 14] Accessibility Improvements (WCAG 2.1 Level AA)
+
+- Added 'ariaLabel' prop to LiquidBtn, LiquidSelect, LiquidTextField, LiquidSearchBar, LiquidSwitch.
+- Improved LiquidSearchBar ARIA with role="search", aria-expanded, and keyboard support for the icon trigger.
+- Enhanced ContextMenu.vue and useContextMenu.ts:
+  - Added role="menu" and role="menuitem".
+  - Implemented keyboard navigation: Escape to close, ArrowUp/ArrowDown to move focus.
+  - Added auto-focus to first menu item upon opening.
+- Upgraded SettingsDialog.vue:
+  - Added role="dialog", aria-modal="true", and aria-labelledby="settings-title".
+  - Refactored labels to use Vuetify's built-in 'label' prop for better input association.
+  - Added role="tablist" and role="tab" to sidebar categories.
+- Fixed color contrast:
+  - Forced white text (rgba(255, 255, 255, 0.95)) for 'solid' variant buttons to ensure WCAG AA contrast ratio on colored backgrounds in both light and dark themes.
+- Tooling:
+  - Installed axe-core for local accessibility auditing.

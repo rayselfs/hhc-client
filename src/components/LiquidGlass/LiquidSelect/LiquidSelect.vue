@@ -24,6 +24,7 @@
         :multiple="multiple"
         :clearable="clearable"
         :loading="loading"
+        :aria-label="ariaLabel"
         v-model:search-input="searchInput"
         variant="solo-filled"
         density="compact"
@@ -53,7 +54,12 @@
 
         <!-- Append slot - clear icon styling -->
         <template v-if="clearable && modelValue" #append>
-          <button type="button" class="liquid-select__clear-btn" @click.stop="handleClear">
+          <button
+            type="button"
+            class="liquid-select__clear-btn"
+            aria-label="Clear selection"
+            @click.stop="handleClear"
+          >
             <LiquidIcon icon="mdi-close-circle" :size="18" />
           </button>
         </template>
@@ -90,6 +96,8 @@ interface Props {
   loading?: boolean
   /** 無數據文字 */
   noDataText?: string
+  /** ARIA 標籤 */
+  ariaLabel?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {

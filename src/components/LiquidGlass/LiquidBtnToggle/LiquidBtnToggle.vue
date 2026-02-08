@@ -4,6 +4,7 @@
     class="liquid-btn-toggle"
     padding="pa-1"
     :rounded="rounded"
+    role="group"
   >
     <div class="toggle-track position-relative d-flex align-center" ref="trackRef">
       <!-- The Sliding Pill (Background) -->
@@ -25,6 +26,8 @@
         }"
         @click="select(item.value)"
         :title="item.title"
+        :aria-pressed="modelValue === item.value"
+        :aria-label="item.title || item.label"
         type="button"
       >
         <LiquidIcon v-if="item.icon" :icon="item.icon" :size="computedSizes.icon" />
@@ -108,7 +111,8 @@ const isAnimating = ref(false)
 
 const computedSizes = computed(() => {
   // Get base config from shared constants
-  const sizeKey: SizeKey | number = props.size && isSizeKey(props.size) ? props.size : (props.size ?? 'default')
+  const sizeKey: SizeKey | number =
+    props.size && isSizeKey(props.size) ? props.size : (props.size ?? 'default')
   const config = getSizeConfig(sizeKey)
 
   let baseIcon = config.icon

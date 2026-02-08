@@ -61,40 +61,67 @@ export function useContextMenu(): {
     show.value = false
   }
 
-  /**
-   * Handle click outside menu to close it
-   * @param event - Click event
-   */
-  const handleClickOutside = (event: Event) => {
-    // Only handle outside click when menu is shown
+  const handleGlobalEvents = (event: Event) => {
     if (!show.value) return
 
-    const target = event.target as Element
+    if (event instanceof KeyboardEvent) {
+      if (event.key === 'Escape') {
+        close()
+        return
+      }
 
-    // Check if click target is inside context menu
-    const isClickOnMenu =
-      target.closest('.v-menu') ||
-      target.closest('.v-list') ||
-      target.closest('.v-list-item') ||
-      target.closest('[role="menu"]')
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault()
+        const items = Array.from(document.querySelectorAll('[role="menuitem"]')) as HTMLElement[]
+        if (items.length === 0) return
 
-    // If click is outside menu, close it
-    if (!isClickOnMenu) {
-      close()
+        const currentIndex = items.indexOf(document.activeElement as HTMLElement)
+        let nextIndex = 0
+
+        if (event.key === 'ArrowDown') {
+          nextIndex = (currentIndex + 1) % items.length
+        } else {
+          nextIndex = (currentIndex - 1 + items.length) % items.length
+        }
+
+        items[nextIndex]?.focus()
+      }
+    }
+
+    if (
+      event instanceof MouseEvent ||
+      (typeof TouchEvent !== 'undefined' && event instanceof TouchEvent)
+    ) {
+      const target = event.target as Element
+
+      const isClickOnMenu =
+        target.closest('.v-menu') ||
+        target.closest('.v-list') ||
+        target.closest('.v-list-item') ||
+        target.closest('[role="menu"]')
+
+      if (!isClickOnMenu) {
+        close()
+      }
     }
   }
 
-  // Listen for global click events
-  // Note: Each component instance registers its own listener, but this won't conflict
-  // because each instance has independent show state, closing only when show.value is true
   onMounted(() => {
-    document.addEventListener('click', handleClickOutside, true)
-    document.addEventListener('contextmenu', handleClickOutside, true)
+    document.addEventListener('click', handleGlobalEvents, true)
+    document.addEventListener('contextmenu', handleGlobalEvents, true)
+    document.addEventListener('keydown', handleGlobalEvents, true)
   })
 
   onUnmounted(() => {
-    document.removeEventListener('click', handleClickOutside, true)
-    document.removeEventListener('contextmenu', handleClickOutside, true)
+    document.removeEventListener('click', handleGlobalEvents, true)
+    document.removeEventListener('contextmenu', handleGlobalEvents, true)
+    document.removeEventListener('keydown', handleGlobalEvents, true)
+  })
+
+  onUnmounted(() => {
+    document.removeEventListener('click', handleGlobalEvents, true)
+    document.removeEventListener('contextmenu', handleGlobalEvents, true)
+    document.removeEventListener('keydown', handleGlobalEvents, true)
   })
 
   return {

@@ -6,6 +6,7 @@
     location="bottom start"
     :close-on-content-click="closeOnContentClick"
     @click:outside="isControlled && $emit('update:modelValue', false)"
+    role="menu"
   >
     <slot v-if="props.raw" />
     <v-list v-else density="compact" class="rounded-lg">
@@ -14,6 +15,7 @@
           <v-list-item
             v-for="item in props.items.filter((i) => !i.condition || i.condition())"
             :key="item.id || item.label"
+            role="menuitem"
             @click="handleItemClick(item)"
           >
             <template #prepend>
@@ -28,7 +30,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, watch, nextTick } from 'vue'
 import { useContextMenu } from '@/composables/useContextMenu'
 
 export interface ContextMenuItem {
@@ -74,6 +76,17 @@ const showMenu = computed({
       internalShow.value = val
     }
   },
+})
+
+watch(showMenu, (val) => {
+  if (val) {
+    nextTick(() => {
+      const firstItem = document.querySelector('[role="menuitem"]') as HTMLElement
+      if (firstItem) {
+        firstItem.focus()
+      }
+    })
+  }
 })
 
 const menuTarget = computed(() => {
