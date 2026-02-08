@@ -23,7 +23,16 @@
     "electron:build:mac-intel": "npm run build && electron-builder --mac --x64 --config electron-builder.config.ts",
     "electron:build:mac-arm": "npm run build && electron-builder --mac --arm64 --config electron-builder.config.ts",
     "electron:build:mac-universal": "npm run build && electron-builder --mac --universal --config electron-builder.config.ts",
-    "electron:build:win": "npm run build && electron-builder --win --x64 --config electron-builder.config.ts"
+    "electron:build:win": "npm run build && electron-builder --win --x64 --config electron-builder.config.ts",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,vue}": [
+      "eslint --fix"
+    ],
+    "*.{ts,vue,js,json,md}": [
+      "prettier --write"
+    ]
   },
   "dependencies": {
     "@fontsource-variable/noto-sans-sc": "^5.2.9",
@@ -70,8 +79,10 @@
     "electron-builder": "^26.0.12",
     "eslint": "^9.33.0",
     "eslint-plugin-vue": "~10.4.0",
+    "husky": "^9.1.7",
     "jiti": "^2.5.1",
     "jsdom": "^27.0.0",
+    "lint-staged": "^16.2.7",
     "npm-run-all2": "^8.0.4",
     "prettier": "3.6.2",
     "sass-embedded": "^1.97.2",
