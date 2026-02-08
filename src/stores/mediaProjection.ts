@@ -247,6 +247,19 @@ export const useMediaProjectionStore = defineStore('media-projection', () => {
     return false
   }
 
+  /**
+   * Update notes for the current playlist item
+   */
+  const updateCurrentItemNotes = (notes: string) => {
+    if (currentIndex.value >= 0 && currentIndex.value < playlist.value.length) {
+      // Ensure we mutate the reactive array element
+      const item = playlist.value[currentIndex.value]
+      if (item) {
+        item.notes = notes
+      }
+    }
+  }
+
   return {
     playlist,
     currentIndex,
@@ -286,6 +299,7 @@ export const useMediaProjectionStore = defineStore('media-projection', () => {
     isSeeking,
     setIsSeeking,
     stop,
+    updateCurrentItemNotes,
     handleMessage,
   }
 })

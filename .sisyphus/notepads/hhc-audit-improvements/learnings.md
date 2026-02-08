@@ -789,3 +789,18 @@ Added `@typescript-eslint/no-explicit-any: 'error'` with targeted exceptions for
 - Leveraged `useSelectionManager` and `useDragAndDrop` composables more effectively.
 - Maintained existing props, events, and visual behavior.
 - Verified with full build and unit tests.
+
+## [2026-02-09] Task 12b: MediaPresenter Refactoring
+
+- **Result**: Reduced `src/components/Media/MediaPresenter.vue` from 1067 to 360 lines (66% reduction).
+- **Strategy**: Extracted UI sections into 5 focused child components in `src/components/Media/Preview/`:
+  - `PdfSlideshow.vue`: Handles PDF sidebar, viewer, and presenter controls.
+  - `MediaPlayer.vue`: Handles image and video previews, including video player logic via `useVideoPlayer`.
+  - `MediaPresenterNavigation.vue`: Handles bottom navigation (prev/next) and progress bar.
+  - `MediaPresenterSidebar.vue`: Handles next slide preview and user notes.
+  - `MediaPresenterGrid.vue`: Handles the grid view overlay.
+- **Key Learnings**:
+  - Store state can be used directly in child components to avoid prop drilling, especially for global UI states like `zoomLevel`, `pan`, and `isPlaying`.
+  - For components that return `ComputedRef` from stores, use `FileItem | null | undefined` in props to avoid type errors during `vue-tsc` check, as index access on arrays might return `undefined`.
+  - `defineExpose` is useful for exposing methods (like `togglePlay`) to the parent for keyboard shortcut handling.
+  - Preserved existing IPC and projection messaging logic by keeping it in the relevant components (mostly `MediaPlayer` and `PdfSlideshow`).
