@@ -557,6 +557,9 @@ export const useProjectionElectron = () => {
     } else {
       // In browser environment, listen for postMessage
       const messageHandler = (event: MessageEvent) => {
+        if (event.origin !== window.location.origin) {
+          return
+        }
         callback(event.data)
       }
       window.addEventListener('message', messageHandler)
@@ -577,7 +580,7 @@ export const useProjectionElectron = () => {
       })
     } else if (window.opener) {
       // In browser environment, request state via postMessage
-      window.opener.postMessage({ type: 'REQUEST_STATE' }, '*')
+      window.opener.postMessage({ type: 'REQUEST_STATE' }, window.location.origin)
     }
   }
 

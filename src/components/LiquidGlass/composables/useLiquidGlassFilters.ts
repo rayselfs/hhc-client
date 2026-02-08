@@ -1,3 +1,5 @@
+import { sanitizeHTML } from '@/utils/sanitize'
+
 const FILTERS_ID = 'liquid-glass-filters'
 
 const FILTERS_SVG = `<svg id="${FILTERS_ID}" style="display:none;height:0;width:0;position:absolute">
@@ -31,7 +33,7 @@ export function injectLiquidGlassFilters(): void {
   }
 
   const container = document.createElement('div')
-  container.innerHTML = FILTERS_SVG
+  container.innerHTML = sanitizeHTML(FILTERS_SVG)
   const svg = container.firstElementChild
   if (svg) {
     document.body.appendChild(svg)

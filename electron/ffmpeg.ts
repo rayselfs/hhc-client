@@ -8,7 +8,7 @@
  */
 
 import { spawn, execSync } from 'child_process'
-import { existsSync } from 'fs'
+import { existsSync, accessSync, constants } from 'fs'
 import { app } from 'electron'
 import { appSettings } from './appSettings'
 import type { VideoQuality } from './appSettings'
@@ -62,6 +62,13 @@ function getFFmpegVersion(ffmpegPath: string): string {
 
 function validateBinaryPath(binaryPath: string): boolean {
   if (!binaryPath || !existsSync(binaryPath)) return false
+
+  try {
+    accessSync(binaryPath, constants.X_OK)
+  } catch {
+    return false
+  }
+
   try {
     execSync(`"${binaryPath}" -version`, { encoding: 'utf-8', timeout: 5000 })
     return true

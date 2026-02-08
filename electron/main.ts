@@ -66,7 +66,6 @@ protocol.registerSchemesAsPrivileged([
       standard: true,
       secure: true,
       supportFetchAPI: true,
-      bypassCSP: true,
       stream: true,
     },
   },

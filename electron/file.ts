@@ -292,10 +292,26 @@ export const registerFileProtocols = () => {
         filePath = path.normalize(filePath)
       }
 
-      // Security Check
+      // Security Check: Block path traversal and symlink attacks
       if (filePath.includes('..')) {
         console.warn('Blocked potential path traversal:', filePath)
         return new Response('Forbidden', { status: 403 })
+      }
+
+      // Additional security: Verify file is within userData directory using realpath
+      const userDataPath = app.getPath('userData')
+      const normalizedUserDataPath = path.normalize(userDataPath)
+
+      try {
+        const realPath = fs.realpathSync(filePath)
+        if (!realPath.startsWith(normalizedUserDataPath)) {
+          console.warn('Blocked file access outside userData:', filePath)
+          return new Response('Forbidden', { status: 403 })
+        }
+        filePath = realPath
+      } catch (error) {
+        // If realpath fails, the file doesn't exist or is inaccessible
+        return new Response('Not Found', { status: 404 })
       }
 
       // Check if file exists

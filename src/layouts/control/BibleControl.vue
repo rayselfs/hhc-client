@@ -347,7 +347,7 @@ const highlightSearchText = (text: string): string => {
     searchRegex.value,
     '<span style="color: rgb(var(--v-theme-error));">$1</span>',
   )
-  return highlighted
+  return sanitizeHTML(highlighted)
 }
 
 // Context menu refs
@@ -664,6 +664,7 @@ const handleSelectVerseEvent = async (event: Event) => {
 
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { KEYBOARD_SHORTCUTS } from '@/config/shortcuts'
+import { sanitizeHTML } from '@/utils/sanitize'
 
 onMounted(async () => {
   await bibleFolderStore.loadRootFolder()
