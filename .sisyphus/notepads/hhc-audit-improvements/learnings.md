@@ -187,6 +187,45 @@
 - Decision: NO changes needed
 - Reason: CI and release workflows are independent (different triggers)
 - CI blocks PRs, release workflow triggers on tags
+- CI blocks PRs, release workflow triggers on tags
+
+## [2026-02-09T00:06] Task 4: Pre-commit Hooks (Husky + lint-staged)
+
+### Installation
+
+- Husky version: 9.1.7 (added to devDependencies)
+- lint-staged version: 16.2.7 (added to devDependencies)
+- Command: `npx husky init` created `.husky/` directory and added `prepare` script
+
+### Configuration
+
+- lint-staged targets: `*.{ts,vue}` for ESLint, `*.{ts,vue,js,json,md}` for Prettier
+- Pre-commit hook: runs `npx lint-staged` (replaced default `npm test`)
+- Prepare script: `"prepare": "husky"` present in package.json
+
+### Hook Behavior
+
+- Hooks activate AFTER the commit that adds them (not on the same commit)
+- Future commits will automatically run `eslint --fix` and `prettier --write` on staged files
+- Tests NOT included in pre-commit (too slow, reserved for CI)
+
+### Gotchas
+
+- `.husky/pre-commit` must be executable (chmod +x) — verified
+- Default husky init content must be replaced with `npx lint-staged` — done
+- Hooks run in repo root, so paths are relative to project root
+
+### Verification
+
+- .husky/pre-commit exists and is executable
+- package.json contains `lint-staged` configuration and `prepare` script
+
+### Actions Performed
+
+- Installed dependencies: `npm install -D husky lint-staged`
+- Ran `npx husky init` and updated `.husky/pre-commit` to `npx lint-staged`
+- Added `lint-staged` config to package.json
+- Created commit: `chore: add husky pre-commit hooks with lint-staged for eslint and prettier`
 
 ## [2026-02-08T21:44] Task 5: TypeScript Strict Mode (Phase 1)
 
@@ -207,6 +246,7 @@
 ### Key Discovery
 
 **Codebase was already strict-compatible!** All security-critical files use proper types:
+
 - Error handling: `reportError(error, {...})` pattern (useSentry composable)
 - No bare `any` type annotations in function signatures
 - Existing `any` usages are:
@@ -259,4 +299,3 @@
 - Expected: 2-4 hours (based on fixing 50+ `any` usages mentioned in plan)
 - Actual: 15 minutes (codebase already strict-compatible)
 - Efficiency gain: 87% time saved due to existing code quality
-

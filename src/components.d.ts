@@ -17,7 +17,6 @@ declare module 'vue' {
     LiquidContainer: typeof import('./components/LiquidGlass/LiquidContainer/LiquidContainer.vue')['default']
     LiquidDivider: typeof import('./components/LiquidGlass/LiquidDivider/LiquidDivider.vue')['default']
     LiquidIcon: typeof import('./components/LiquidGlass/LiquidIcon/LiquidIcon.vue')['default']
-    LiquidListItem: typeof import('./components/LiquidGlass/LiquidListItem/LiquidListItem.vue')['default']
     LiquidProgress: typeof import('./components/LiquidGlass/LiquidProgress/LiquidProgress.vue')['default']
     LiquidProgressCircular: typeof import('./components/LiquidGlass/LiquidProgressCircular/LiquidProgressCircular.vue')['default']
     LiquidSearchBar: typeof import('./components/LiquidGlass/LiquidSearchBar/LiquidSearchBar.vue')['default']
