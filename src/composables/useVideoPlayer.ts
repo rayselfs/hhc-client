@@ -1,4 +1,5 @@
 import { ref, onUnmounted, type Ref } from 'vue'
+import { useSentry } from '@/composables/useSentry'
 
 /**
  * WeakMap to track HTMLMediaElements that have been connected to AudioContext.
@@ -100,6 +101,7 @@ export function useVideoPlayer(options: VideoPlayerOptions) {
     onCanPlay,
   } = options
 
+  const { reportError } = useSentry()
   const isInitialized = ref(false)
   const audioContext = ref<AudioContext | null>(null)
   const gainNode = ref<GainNode | null>(null)
@@ -188,7 +190,10 @@ export function useVideoPlayer(options: VideoPlayerOptions) {
 
       isInitialized.value = true
     } catch (error) {
-      console.error('Failed to initialize native video player:', error)
+      reportError(error, {
+        operation: 'initialize-native-video-player',
+        component: 'useVideoPlayer',
+      })
     }
   }
 
@@ -293,7 +298,10 @@ export function useVideoPlayer(options: VideoPlayerOptions) {
         if (error instanceof Error && error.name === 'AbortError') {
           return
         }
-        console.error('Failed to play video:', error)
+        reportError(error, {
+          operation: 'play-video',
+          component: 'useVideoPlayer',
+        })
       }
     }
   }

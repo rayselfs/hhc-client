@@ -48,7 +48,14 @@ const detectChinaRegion = async (): Promise<boolean> => {
 
     return false
   } catch (error) {
-    console.error('Error detecting region:', error)
+    Sentry.captureException(error, {
+      tags: {
+        operation: 'detect-region',
+      },
+      extra: {
+        context: 'Failed to detect China region',
+      },
+    })
     // Default to non-China region if detection fails
     return false
   }
@@ -253,7 +260,6 @@ export const registerAutoUpdaterHandlers = () => {
       return { success: true }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      console.error('開始下載更新失敗:', error)
       Sentry.captureException(error, {
         tags: {
           operation: 'download-update',
@@ -272,7 +278,6 @@ export const registerAutoUpdaterHandlers = () => {
       return { success: true }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      console.error('Failed to install update:', error)
       Sentry.captureException(error, {
         tags: {
           operation: 'install-update',

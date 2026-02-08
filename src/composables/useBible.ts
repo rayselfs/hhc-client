@@ -1,4 +1,6 @@
 import { nextTick, computed, type Ref } from 'vue'
+
+import { useSentry } from '@/composables/useSentry'
 import { useElectron } from './useElectron'
 import { useProjectionManager } from '@/composables/useProjectionManager'
 import { MessageType, ViewType, type VerseItem } from '@/types/common'
@@ -239,7 +241,12 @@ export const useBible = (
           }
         }
       } catch (error) {
-        console.error('Failed to fetch second version content:', error)
+        const { reportError } = useSentry()
+        reportError(error, {
+          operation: 'fetch-second-version-content',
+          component: 'useBible',
+          extra: { secondVersionCode: secondVersionCode.value },
+        })
       }
     }
 

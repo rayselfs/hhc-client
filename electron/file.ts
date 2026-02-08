@@ -134,7 +134,10 @@ async function buildFFmpegArgs(filePath: string, videoInfo: VideoInfo): Promise<
 async function handleTranscodeStream(filePath: string): Promise<Response> {
   // Check if FFmpeg exists
   if (!(await ffmpegExists())) {
-    console.error('FFmpeg not found at:', getFFmpegPath())
+    const error = new Error(`FFmpeg not found at: ${getFFmpegPath()}`)
+    Sentry.captureException(error, {
+      tags: { operation: 'transcode-stream' },
+    })
     return new Response('FFmpeg not available', { status: 500 })
   }
 
@@ -142,7 +145,10 @@ async function handleTranscodeStream(filePath: string): Promise<Response> {
   try {
     videoInfo = await probeVideo(filePath)
   } catch (error) {
-    console.error('Failed to probe video:', error)
+    Sentry.captureException(error, {
+      tags: { operation: 'probe-video' },
+      extra: { filePath },
+    })
     return new Response('Failed to analyze video file', { status: 500 })
   }
 
@@ -217,7 +223,10 @@ async function handleTranscodeStream(filePath: string): Promise<Response> {
       })
 
       ffmpeg.on('error', (err) => {
-        console.error('FFmpeg process error:', err)
+        Sentry.captureException(err, {
+          tags: { operation: 'ffmpeg-process-error' },
+          extra: { filePath },
+        })
         activeFFmpegProcesses.delete(streamId)
       })
 
@@ -228,7 +237,10 @@ async function handleTranscodeStream(filePath: string): Promise<Response> {
         // 255: Killed by signal (normal when stream cancelled)
         // Other codes: Actual errors
         if (code !== 0 && code !== 123 && code !== 255 && code !== null) {
-          console.error('FFmpeg exited with error code:', code)
+          Sentry.captureException(new Error(`FFmpeg exited with error code: ${code}`), {
+            tags: { operation: 'ffmpeg-exit-error' },
+            extra: { code, filePath },
+          })
         }
         activeFFmpegProcesses.delete(streamId)
       })
@@ -309,7 +321,7 @@ export const registerFileProtocols = () => {
           return new Response('Forbidden', { status: 403 })
         }
         filePath = realPath
-      } catch (error) {
+      } catch {
         // If realpath fails, the file doesn't exist or is inaccessible
         return new Response('Not Found', { status: 404 })
       }
@@ -355,7 +367,10 @@ export const registerFileProtocols = () => {
         'Accept-Ranges': 'bytes',
       })
     } catch (error) {
-      console.error('Failed to handle protocol request:', request.url, error)
+      Sentry.captureException(error, {
+        tags: { operation: 'protocol-request' },
+        extra: { url: request.url },
+      })
       return new Response('Internal Server Error', { status: 500 })
     }
   })
@@ -528,7 +543,6 @@ export const registerFileHandlers = () => {
         videoMetadata,
       }
     } catch (error) {
-      console.error('Failed to save file:', error)
       Sentry.captureException(error, {
         tags: { operation: 'save-file' },
         extra: { sourcePath },
@@ -565,7 +579,10 @@ export const registerFileHandlers = () => {
         }),
       )
     } catch (error) {
-      console.error('Failed to list directory:', error)
+      Sentry.captureException(error, {
+        tags: { operation: 'list-directory' },
+        extra: { dirPath },
+      })
       return []
     }
   })
@@ -580,7 +597,9 @@ export const registerFileHandlers = () => {
 
       return true
     } catch (error) {
-      console.error('Failed to reset user data:', error)
+      Sentry.captureException(error, {
+        tags: { operation: 'reset-user-data' },
+      })
       return false
     }
   })
@@ -638,7 +657,10 @@ export const registerFileHandlers = () => {
         filePath: destinationPath,
       }
     } catch (error) {
-      console.error('Failed to copy file:', sourceUrl, error)
+      Sentry.captureException(error, {
+        tags: { operation: 'copy-file' },
+        extra: { sourceUrl },
+      })
       return null
     }
   })

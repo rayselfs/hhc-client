@@ -2,6 +2,7 @@ import { ref, watch, onUnmounted, unref } from 'vue'
 import type { Ref } from 'vue'
 import type { FileItem } from '@/types/common'
 import { useIndexedDB } from './useIndexedDB'
+import { useSentry } from '@/composables/useSentry'
 import { FOLDER_DB_CONFIG } from '@/config/db'
 import { FolderDBStore } from '@/types/enum'
 
@@ -37,7 +38,12 @@ export function useThumbnail(itemOrRef: FileItem | Ref<FileItem>) {
           thumbnailSrc.value = currentObjectURL
         }
       } catch (error) {
-        console.error('Failed to load thumbnail from IndexedDB:', error)
+        const { reportError } = useSentry()
+        reportError(error, {
+          operation: 'load-thumbnail-from-indexeddb',
+          component: 'useThumbnail',
+          extra: { itemId: item.id },
+        })
       }
     } else {
       thumbnailSrc.value = item.metadata?.thumbnailUrl

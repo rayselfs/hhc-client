@@ -19,6 +19,7 @@ import { FolderDBStore, MediaFolder } from '@/types/enum'
 import { BibleFolder } from '@/types/enum'
 import { StorageCategory } from '@/types/common'
 import type { VerseItem, FileItem } from '@/types/common'
+import { useSentry } from '@/composables/useSentry'
 
 /**
  * Generic folder store for managing folder tree structure
@@ -121,7 +122,12 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
       try {
         await db.put(foldersStoreName, toFolderDocument(folder))
       } catch (error) {
-        console.error('Failed to save folder document:', error)
+        const { reportError } = useSentry()
+        reportError(error, {
+          operation: 'save-folder-document',
+          component: 'FolderStore',
+          extra: { folderId: folder.id, folderName: folder.name },
+        })
       }
     }
 
@@ -131,7 +137,12 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
         const plainItem = JSON.parse(JSON.stringify(item)) as TItem
         await db.put(itemsStoreName, plainItem)
       } catch (error) {
-        console.error('Failed to save item document:', error)
+        const { reportError } = useSentry()
+        reportError(error, {
+          operation: 'save-item-document',
+          component: 'FolderStore',
+          extra: { itemId: item.id },
+        })
       }
     }
 
@@ -139,7 +150,12 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
       try {
         await db.delete(foldersStoreName, folderId)
       } catch (error) {
-        console.error('Failed to delete folder document:', error)
+        const { reportError } = useSentry()
+        reportError(error, {
+          operation: 'delete-folder-document',
+          component: 'FolderStore',
+          extra: { folderId },
+        })
       }
     }
 
@@ -147,7 +163,12 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
       try {
         await db.delete(itemsStoreName, itemId)
       } catch (error) {
-        console.error('Failed to delete item document:', error)
+        const { reportError } = useSentry()
+        reportError(error, {
+          operation: 'delete-item-document',
+          component: 'FolderStore',
+          extra: { itemId },
+        })
       }
     }
 
@@ -171,7 +192,12 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
         const plainItems = JSON.parse(JSON.stringify(items)) as TItem[]
         await db.putBatch(itemsStoreName, plainItems)
       } catch (error) {
-        console.error('Failed to save folder tree batch:', error)
+        const { reportError } = useSentry()
+        reportError(error, {
+          operation: 'save-folder-tree-batch',
+          component: 'FolderStore',
+          extra: { folderId: folder.id, folderCount: folders.length, itemCount: items.length },
+        })
       }
     }
 
@@ -308,7 +334,12 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
 
         rebuildIndex()
       } catch (error) {
-        console.error('Failed to load root folder from IndexedDB:', error)
+        const { reportError } = useSentry()
+        reportError(error, {
+          operation: 'load-root-folder',
+          component: 'FolderStore',
+          extra: { rootId: config.rootId },
+        })
       }
     }
 
@@ -504,7 +535,12 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
         targetFolderId === config.rootId ? rootFolder.value : folderMap.get(targetFolderId)
 
       if (!sourceFolder || !targetFolder) {
-        console.error('moveItem: source or target folder not found')
+        const { reportError } = useSentry()
+        reportError(new Error('moveItem: source or target folder not found'), {
+          operation: 'move-item',
+          component: 'FolderStore',
+          extra: { sourceFolderId, targetFolderId, itemId: item.id },
+        })
         return
       }
 
@@ -532,7 +568,12 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
         sourceFolderId === config.rootId ? rootFolder.value : folderMap.get(sourceFolderId)
 
       if (!targetFolder || !sourceFolder) {
-        console.error('moveFolder: source or target folder not found')
+        const { reportError } = useSentry()
+        reportError(new Error('moveFolder: source or target folder not found'), {
+          operation: 'move-folder',
+          component: 'FolderStore',
+          extra: { sourceFolderId, targetFolderId, folderId: folderToMove.id },
+        })
         return false
       }
 
@@ -658,7 +699,12 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
           triggerContentUpdate()
         }
       } catch (error) {
-        console.error(`Failed to load children for folder ${folderId}:`, error)
+        const { reportError } = useSentry()
+        reportError(error, {
+          operation: 'load-folder-children',
+          component: 'FolderStore',
+          extra: { folderId },
+        })
       }
     }
 

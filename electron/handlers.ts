@@ -51,7 +51,6 @@ export const registerGenericHandlers = (windowManager: WindowManager) => {
         internal: display.internal,
       }))
     } catch (error) {
-      console.error('Error getting display information:', error)
       Sentry.captureException(error, {
         tags: {
           operation: 'get-displays',
@@ -79,7 +78,11 @@ export const registerGenericHandlers = (windowManager: WindowManager) => {
     try {
       return app.getLocale()
     } catch (error) {
-      console.error('Failed to get system locale:', error)
+      Sentry.captureException(error, {
+        tags: {
+          operation: 'get-system-locale',
+        },
+      })
       return 'en' // fallback
     }
   })
@@ -100,7 +103,6 @@ export const registerGenericHandlers = (windowManager: WindowManager) => {
       return { success: true }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      console.error('Failed to update language:', error)
       Sentry.captureException(error, {
         tags: {
           operation: 'update-language',
@@ -135,7 +137,6 @@ export const registerGenericHandlers = (windowManager: WindowManager) => {
     try {
       return await probeVideo(filePath)
     } catch (error) {
-      console.error('Probe video failed:', error)
       Sentry.captureException(error, {
         tags: { operation: 'probe-video' },
         extra: { filePath },

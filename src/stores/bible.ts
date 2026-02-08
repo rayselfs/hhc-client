@@ -237,7 +237,12 @@ export const useBibleStore = defineStore('bible', () => {
 
         setTimeout(() => {
           fetchSearchIndex(version).catch((err) => {
-            console.warn(`Failed to preload search index for ${version.code}:`, err)
+            const { reportError } = useSentry()
+            reportError(err, {
+              operation: 'preload-search-index',
+              component: 'BibleStore',
+              extra: { versionCode: version.code },
+            })
           })
         }, 0)
       }
@@ -328,7 +333,12 @@ export const useBibleStore = defineStore('bible', () => {
         return cached
       }
     } catch (err) {
-      console.error('Failed to get cached content:', err)
+      const { reportError } = useSentry()
+      reportError(err, {
+        operation: 'get-cached-bible-content',
+        component: 'BibleStore',
+        extra: { versionCode },
+      })
       setError('Failed to read from offline cache.')
     }
 
@@ -459,7 +469,12 @@ export const useBibleStore = defineStore('bible', () => {
       currentSearchIndex.value = null
       return false
     } catch (err) {
-      console.warn(`Failed to get cached search index for ${versionCode}:`, err)
+      const { reportError } = useSentry()
+      reportError(err, {
+        operation: 'get-cached-search-index',
+        component: 'BibleStore',
+        extra: { versionCode, updatedAt },
+      })
       currentSearchIndex.value = null
       return false
     }
@@ -550,7 +565,12 @@ export const useBibleStore = defineStore('bible', () => {
         text: result.item.text,
       }))
     } catch (err) {
-      console.error(`Failed to search Bible verses:`, err)
+      const { reportError } = useSentry()
+      reportError(err, {
+        operation: 'search-bible-verses',
+        component: 'BibleStore',
+        extra: { query, versionCode, limit },
+      })
       const errorMessage =
         err instanceof Error ? err.message : 'An unknown error occurred while searching.'
       setError(errorMessage)
@@ -674,7 +694,11 @@ export const useBibleStore = defineStore('bible', () => {
    */
   const startBackgroundPrefetch = async () => {
     if (!versions.value || versions.value.length === 0) {
-      console.error('No versions available to prefetch.')
+      const { reportError } = useSentry()
+      reportError(new Error('No versions available to prefetch.'), {
+        operation: 'prefetch-bible-versions',
+        component: 'BibleStore',
+      })
       return
     }
 
@@ -694,7 +718,12 @@ export const useBibleStore = defineStore('bible', () => {
         await fetchSearchIndex(version)
         isIndexing.value = false
       } catch (err) {
-        console.warn(`Failed to prefetch version ${version.code}:`, err)
+        const { reportError } = useSentry()
+        reportError(err, {
+          operation: 'prefetch-bible-version',
+          component: 'BibleStore',
+          extra: { versionCode: version.code },
+        })
       }
     }
   }
@@ -718,7 +747,11 @@ export const useBibleStore = defineStore('bible', () => {
         return data
       })
       .catch((err) => {
-        console.error('Failed to load Bible versions:', err)
+        const { reportError } = useSentry()
+        reportError(err, {
+          operation: 'initialize-bible-store',
+          component: 'BibleStore',
+        })
         setError('Failed to load versions. Please check your connection.')
         initializedVersionsLoaded.value = false
       })

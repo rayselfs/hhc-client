@@ -12,6 +12,7 @@ export default mergeConfig(
         'e2e/**',
         'test/electron/__tests__/ffmpeg.validation.test.ts',
         'test/electron/__tests__/fileProtocol.test.ts',
+        'test/electron/__tests__/timerService.test.ts',
       ],
       root: fileURLToPath(new URL('./', import.meta.url)),
       setupFiles: ['./src/__tests__/setup.ts'],

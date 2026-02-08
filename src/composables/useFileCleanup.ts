@@ -2,6 +2,7 @@ import { ref } from 'vue'
 import { useMediaFolderStore, useBibleFolderStore } from '@/stores/folder'
 import { useFileSystem } from './useFileSystem'
 import { useIndexedDB } from '@/composables/useIndexedDB'
+import { useSentry } from '@/composables/useSentry'
 import { FOLDER_DB_CONFIG } from '@/config/db'
 import { FolderDBStore } from '@/types/enum'
 import type { FileItem, FolderDocument, ItemDocument } from '@/types/common'
@@ -46,13 +47,20 @@ export function useFileCleanup() {
       try {
         await fileSystem.deletePhysicalFilesRecursive(fileItems)
       } catch (e) {
-        console.error('Failed to delete physical files for expired items', e)
+        const { reportError } = useSentry()
+        reportError(e, {
+          operation: 'delete-physical-files-expired-items',
+          component: 'useFileCleanup',
+        })
       }
 
       // Delete thumbnails
       for (const item of fileItems) {
         if (item.metadata?.thumbnailBlobId) {
-          await db.delete(FolderDBStore.FOLDER_DB_THUMBNAILS_STORE_NAME, item.metadata.thumbnailBlobId)
+          await db.delete(
+            FolderDBStore.FOLDER_DB_THUMBNAILS_STORE_NAME,
+            item.metadata.thumbnailBlobId,
+          )
         }
       }
     }
@@ -89,7 +97,11 @@ export function useFileCleanup() {
             try {
               await fileSystem.deletePhysicalFilesRecursive(mediaItems)
             } catch (e) {
-              console.error('Failed to delete physical files for expired items', e)
+              const { reportError } = useSentry()
+              reportError(e, {
+                operation: 'delete-physical-files-expired-items-background',
+                component: 'useFileCleanup',
+              })
             }
 
             // Delete thumbnails
@@ -109,8 +121,12 @@ export function useFileCleanup() {
         }
 
         // 2. Query expired folders using expiresAt index
-        const allFolders = await db.getAll<FolderDocument>(FolderDBStore.FOLDER_DB_FOLDERS_STORE_NAME)
-        const expiredFolders = allFolders.filter((folder) => folder.expiresAt && folder.expiresAt < now)
+        const allFolders = await db.getAll<FolderDocument>(
+          FolderDBStore.FOLDER_DB_FOLDERS_STORE_NAME,
+        )
+        const expiredFolders = allFolders.filter(
+          (folder) => folder.expiresAt && folder.expiresAt < now,
+        )
 
         for (const folder of expiredFolders) {
           // Determine if it's a media folder (check by looking at items or by convention)
@@ -125,7 +141,11 @@ export function useFileCleanup() {
           await bibleStore.loadRootFolder()
         }
       } catch (error) {
-        console.error('Background cleanup failed:', error)
+        const { reportError } = useSentry()
+        reportError(error, {
+          operation: 'background-cleanup',
+          component: 'useFileCleanup',
+        })
       } finally {
         isCleaning.value = false
       }

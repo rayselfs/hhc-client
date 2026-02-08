@@ -8,13 +8,14 @@ import vuetify from 'vite-plugin-vuetify'
 import Components from 'unplugin-vue-components/vite'
 
 import electron from 'vite-plugin-electron/simple'
+import { sentryVitePlugin } from '@sentry/vite-plugin'
 
 // https://vite.dev/config/
 export default defineConfig({
   base: './',
   plugins: [
     vue(),
-    vueDevTools(),
+    ...(process.env.NODE_ENV === 'development' ? [vueDevTools()] : []),
     vuetify({ autoImport: true }),
     Components({
       dirs: ['src/components/LiquidGlass/*'],
@@ -39,8 +40,20 @@ export default defineConfig({
       // 額外的 Electron 相關腳本
       renderer: {},
     }),
+    // Sentry Vite plugin for sourcemap uploads (must be last)
+    sentryVitePlugin({
+      org: process.env.SENTRY_ORG,
+      project: process.env.SENTRY_PROJECT,
+      authToken: process.env.SENTRY_AUTH_TOKEN,
+      telemetry: false,
+      sourcemaps: {
+        assets: './dist-electron/renderer/**',
+        filesToDeleteAfterUpload: ['./dist-electron/renderer/**/*.map'],
+      },
+    }),
   ],
   build: {
+    sourcemap: 'hidden',
     outDir: 'dist-electron/renderer',
     chunkSizeWarningLimit: 1000,
     rollupOptions: {

@@ -35,6 +35,9 @@
 import { ref, computed, watch, onUnmounted, nextTick } from 'vue'
 import { usePdf, type PdfViewMode } from '@/composables/usePdf'
 import { useResizeObserver } from '@vueuse/core'
+import { useSentry } from '@/composables/useSentry'
+
+const { reportError } = useSentry()
 
 const props = withDefaults(
   defineProps<{
@@ -155,7 +158,11 @@ const renderCurrentPage = async () => {
     canvasRef.value.style.width = `${zoomedWidth}px`
     canvasRef.value.style.height = `${zoomedHeight}px`
   } catch (e) {
-    console.error('Failed to render page:', e)
+    reportError(e, {
+      operation: 'render-page',
+      component: 'PdfViewer',
+      extra: { page: currentPage.value, zoom: props.zoom },
+    })
   } finally {
     isRendering.value = false
 
@@ -186,7 +193,11 @@ const renderScrollPage = async (page: number) => {
     renderedPages.value.add(page)
   } catch (e) {
     if ((e as Error)?.name === 'RenderingCancelledException') return
-    console.error(`Failed to render page ${page}:`, e)
+    reportError(e, {
+      operation: 'render-scroll-page',
+      component: 'PdfViewer',
+      extra: { page },
+    })
   }
 }
 

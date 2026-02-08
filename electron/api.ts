@@ -1,4 +1,5 @@
 import { ipcMain } from 'electron'
+import * as Sentry from '@sentry/electron'
 
 const API_HOST = import.meta.env.VITE_BIBLE_API_HOST || 'https://www.alive.org.tw'
 
@@ -12,7 +13,9 @@ export const registerApiHandlers = () => {
       }
       return await response.json()
     } catch (error) {
-      console.error('Failed to fetch bible versions:', error)
+      Sentry.captureException(error, {
+        tags: { operation: 'api-bible-get-versions' },
+      })
       throw error
     }
   })
@@ -51,7 +54,10 @@ export const registerApiHandlers = () => {
 
       return { success: true }
     } catch (error) {
-      console.error(`Failed to fetch bible content for version ${versionId}:`, error)
+      Sentry.captureException(error, {
+        tags: { operation: 'api-bible-get-content' },
+        extra: { versionId },
+      })
       throw error
     }
   })

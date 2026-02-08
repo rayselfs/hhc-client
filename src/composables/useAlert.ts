@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useSentry } from '@/composables/useSentry'
 
 export interface AlertOptions {
   title?: string
@@ -38,7 +39,11 @@ const loadSuppressedAlerts = () => {
       parsed.forEach((id: string) => suppressedAlerts.add(id))
     }
   } catch (error) {
-    console.error('Error loading suppressed alerts:', error)
+    const { reportError } = useSentry()
+    reportError(error, {
+      operation: 'load-suppressed-alerts',
+      component: 'useAlert',
+    })
   }
 }
 
@@ -47,7 +52,11 @@ const saveSuppressedAlerts = () => {
   try {
     localStorage.setItem('suppressedAlerts', JSON.stringify(Array.from(suppressedAlerts)))
   } catch (error) {
-    console.error('Error saving suppressed alerts:', error)
+    const { reportError } = useSentry()
+    reportError(error, {
+      operation: 'save-suppressed-alerts',
+      component: 'useAlert',
+    })
   }
 }
 

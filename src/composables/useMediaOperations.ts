@@ -2,6 +2,8 @@ import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { v4 as uuidv4 } from 'uuid'
 import { storeToRefs } from 'pinia'
+
+import { useSentry } from '@/composables/useSentry'
 import { FOLDER_DB_CONFIG } from '@/config/db'
 import { useMediaFolderStore } from '@/stores/folder'
 import { useFileSystem } from '@/composables/useFileSystem'
@@ -394,7 +396,12 @@ export function useMediaOperations(
               }
             }
           } catch (error) {
-            console.error('Failed to save file in Electron:', error)
+            const { reportError } = useSentry()
+            reportError(error, {
+              operation: 'save-file-electron',
+              component: 'useMediaOperations',
+              extra: { fileName: file.name, fileType },
+            })
           }
         } else {
           showSnackBar(t('fileExplorer.uploadWebWarning'), {
@@ -404,7 +411,12 @@ export function useMediaOperations(
 
         mediaStore.addItemToCurrent(newItem)
       } catch (error) {
-        console.error('Failed to process file:', file.name, error)
+        const { reportError } = useSentry()
+        reportError(error, {
+          operation: 'process-file-upload',
+          component: 'useMediaOperations',
+          extra: { fileName: file.name },
+        })
         showSnackBar(t('fileExplorer.uploadFailed'), {
           color: 'error',
         })
@@ -429,7 +441,12 @@ export function useMediaOperations(
 
     const createdFolder = currentFolders.value.find((f) => f.name === finalFolderName)
     if (!createdFolder) {
-      console.error('Failed to create folder')
+      const { reportError } = useSentry()
+      reportError(new Error('Failed to create folder'), {
+        operation: 'folder-upload',
+        component: 'useMediaOperations',
+        extra: { finalFolderName },
+      })
       return
     }
 
@@ -519,13 +536,23 @@ export function useMediaOperations(
               }
             }
           } catch (e) {
-            console.error(e)
+            const { reportError } = useSentry()
+            reportError(e, {
+              operation: 'save-folder-file-electron',
+              component: 'useMediaOperations',
+              extra: { fileName: file.name, fileType },
+            })
           }
         }
 
         mediaStore.addItemToFolder(createdFolder.id, newItem)
       } catch (e) {
-        console.error(e)
+        const { reportError } = useSentry()
+        reportError(e, {
+          operation: 'process-folder-file-upload',
+          component: 'useMediaOperations',
+          extra: { fileName: file.name, folderId: createdFolder.id },
+        })
       }
     }
     input.value = ''

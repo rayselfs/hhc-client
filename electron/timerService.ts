@@ -3,6 +3,7 @@
  * Manages timer state and broadcasts updates to all renderer windows
  */
 import { BrowserWindow, ipcMain } from 'electron'
+import * as Sentry from '@sentry/electron'
 import type { TimerMode } from '../src/types/common'
 
 export interface TimerState {
@@ -386,8 +387,10 @@ export class TimerService {
       try {
         this.handleCommand(command)
       } catch (error) {
-        console.error('Timer command error:', error)
-        // Sentry is initialized in main process, should be available globally or imported
+        Sentry.captureException(error, {
+          tags: { operation: 'timer-command' },
+          extra: { command },
+        })
       }
     })
 
@@ -395,7 +398,9 @@ export class TimerService {
       try {
         return this.getState()
       } catch (error) {
-        console.error('Get timer state error:', error)
+        Sentry.captureException(error, {
+          tags: { operation: 'timer-get-state' },
+        })
         return null
       }
     })
@@ -405,7 +410,9 @@ export class TimerService {
         this.initializeState(initialState)
         return { success: true }
       } catch (error) {
-        console.error('Timer initialize error:', error)
+        Sentry.captureException(error, {
+          tags: { operation: 'timer-initialize' },
+        })
         return { success: false }
       }
     })

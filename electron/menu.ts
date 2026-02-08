@@ -15,7 +15,6 @@ const getLanguage = () => {
       return settings.language || 'en'
     }
   } catch (error) {
-    console.error('Failed to read language settings:', error)
     Sentry.captureException(error, {
       tags: {
         operation: 'get-language',

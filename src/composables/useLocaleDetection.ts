@@ -2,6 +2,7 @@ import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useElectron } from './useElectron'
 import { useLocalStorage } from './useLocalStorage'
+import { useSentry } from '@/composables/useSentry'
 
 import { StorageKey, StorageCategory, getStorageKey } from '@/types/common'
 import { useProjectionManager } from '@/composables/useProjectionManager'
@@ -118,7 +119,11 @@ export async function detectSystemLocale(): Promise<SupportedLocale> {
       return mapSystemLocaleToSupported(systemLocale || DEFAULT_LOCALE)
     }
   } catch (error) {
-    console.error('Failed to detect system locale:', error)
+    const { reportError } = useSentry()
+    reportError(error, {
+      operation: 'detect-system-locale',
+      component: 'useLocaleDetection',
+    })
     return DEFAULT_LOCALE
   }
 }

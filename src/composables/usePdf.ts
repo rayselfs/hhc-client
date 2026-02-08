@@ -1,5 +1,6 @@
 import { ref, onUnmounted, type Ref } from 'vue'
 import { PdfService, type PdfMetadata, type RenderOptions } from '@/services/pdf'
+import { useSentry } from '@/composables/useSentry'
 
 export type PdfViewMode = 'slide' | 'scroll'
 
@@ -20,7 +21,11 @@ export interface UsePdfReturn {
   // Methods
   loadPdf: (url: string) => Promise<boolean>
   renderPage: (canvas: HTMLCanvasElement, options?: RenderOptions) => Promise<void>
-  renderPageNumber: (canvas: HTMLCanvasElement, pageNumber: number, options?: RenderOptions) => Promise<void>
+  renderPageNumber: (
+    canvas: HTMLCanvasElement,
+    pageNumber: number,
+    options?: RenderOptions,
+  ) => Promise<void>
   nextPage: () => void
   prevPage: () => void
   goToPage: (page: number) => void
@@ -35,6 +40,7 @@ export interface UsePdfReturn {
  */
 export function usePdf(options: UsePdfOptions = {}): UsePdfReturn {
   const pdfService = new PdfService()
+  const { reportError } = useSentry()
 
   // Reactive state
   const pageCount = ref(0)
@@ -61,7 +67,11 @@ export function usePdf(options: UsePdfOptions = {}): UsePdfReturn {
       return true
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to load PDF'
-      console.error('Failed to load PDF:', e)
+      reportError(e, {
+        operation: 'load-pdf',
+        component: 'usePdf',
+        extra: { url },
+      })
       return false
     } finally {
       isLoading.value = false

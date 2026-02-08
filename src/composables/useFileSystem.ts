@@ -1,4 +1,6 @@
 import { ref, computed } from 'vue'
+
+import { useSentry } from '@/composables/useSentry'
 import {
   fileSystemProviderFactory,
   type FileSystemProvider,
@@ -307,9 +309,15 @@ export function useFileSystem() {
       return localProvider.getFilePath(file)
     } catch {
       // Fallback to direct API call if provider not ready
+      const { reportError } = useSentry()
       if (window.electronAPI?.getFilePath) {
         return window.electronAPI.getFilePath(file)
       }
+      reportError(new Error('getFilePath failed: provider not ready and electronAPI unavailable'), {
+        operation: 'get-file-path',
+        component: 'useFileSystem',
+        extra: { fileName: file.name },
+      })
       return ''
     }
   }

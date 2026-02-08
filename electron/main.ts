@@ -110,7 +110,6 @@ if (!gotTheLock) {
     // Initialize autoUpdater (async)
     // Needs mainWindow for sending events
     initAutoUpdater(windowManager.mainWindow).catch((error) => {
-      console.error('Failed to initialize autoUpdater:', error)
       Sentry.captureException(error, {
         tags: {
           operation: 'init-auto-updater',

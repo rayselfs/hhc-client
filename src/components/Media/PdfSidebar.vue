@@ -51,7 +51,9 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, nextTick } from 'vue'
 import { usePdfPresenterStore } from '@/stores/pdfPresenter'
+import { useSentry } from '@/composables/useSentry'
 
+const { reportError } = useSentry()
 const pdfStore = usePdfPresenterStore()
 
 const scrollContainer = ref<HTMLElement | null>(null)
@@ -78,7 +80,11 @@ const generateThumbnail = async (page: number) => {
       thumbnails.value.set(page, url)
     }
   } catch (error) {
-    console.error(`Failed to generate thumbnail for page ${page}:`, error)
+    reportError(error, {
+      operation: 'generate-thumbnail',
+      component: 'PdfSidebar',
+      extra: { page },
+    })
   } finally {
     loadingPages.value.delete(page)
   }

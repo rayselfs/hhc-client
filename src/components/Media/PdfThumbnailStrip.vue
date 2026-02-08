@@ -1,9 +1,5 @@
 <template>
-  <div
-    ref="stripRef"
-    class="pdf-thumbnail-strip"
-    @wheel.prevent="onWheel"
-  >
+  <div ref="stripRef" class="pdf-thumbnail-strip" @wheel.prevent="onWheel">
     <div
       v-for="page in pageCount"
       :key="page"
@@ -17,7 +13,10 @@
           :ref="(el) => setThumbnailRef(el as HTMLCanvasElement | null, page)"
           class="thumbnail-canvas"
         />
-        <div v-if="!renderedPages.has(page)" class="thumbnail-placeholder d-flex align-center justify-center">
+        <div
+          v-if="!renderedPages.has(page)"
+          class="thumbnail-placeholder d-flex align-center justify-center"
+        >
           <v-progress-circular size="20" width="2" indeterminate color="grey" />
         </div>
       </div>
@@ -29,6 +28,9 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, nextTick } from 'vue'
 import { PdfService } from '@/services/pdf'
+import { useSentry } from '@/composables/useSentry'
+
+const { reportError } = useSentry()
 
 const props = defineProps<{
   /** PDF file URL */
@@ -76,7 +78,11 @@ const renderThumbnail = async (page: number) => {
     })
     renderedPages.value.add(page)
   } catch (e) {
-    console.error(`Failed to render thumbnail for page ${page}:`, e)
+    reportError(e, {
+      operation: 'render-thumbnail',
+      component: 'PdfThumbnailStrip',
+      extra: { page },
+    })
   }
 }
 
@@ -149,19 +155,30 @@ const loadPdf = async (url: string) => {
     await nextTick()
     await renderVisibleThumbnails()
   } catch (e) {
-    console.error('Failed to load PDF for thumbnails:', e)
+    reportError(e, {
+      operation: 'load-pdf-for-thumbnails',
+      component: 'PdfThumbnailStrip',
+      extra: { url },
+    })
   }
 }
 
 // Watch URL changes
-watch(() => props.url, (url) => {
-  loadPdf(url)
-}, { immediate: true })
+watch(
+  () => props.url,
+  (url) => {
+    loadPdf(url)
+  },
+  { immediate: true },
+)
 
 // Watch current page changes to scroll into view
-watch(() => props.currentPage, () => {
-  scrollToCurrentPage()
-})
+watch(
+  () => props.currentPage,
+  () => {
+    scrollToCurrentPage()
+  },
+)
 
 // Add scroll listener for lazy loading
 onMounted(() => {

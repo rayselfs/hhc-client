@@ -1,5 +1,6 @@
 import * as pdfjsLib from 'pdfjs-dist'
 import type { PDFDocumentProxy, PDFPageProxy, RenderTask } from 'pdfjs-dist'
+import * as Sentry from '@sentry/vue'
 
 // Configure PDF.js worker
 // In Vite/Electron, we use the worker from node_modules
@@ -210,7 +211,10 @@ export class PdfService {
         canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.8)
       })
     } catch (error) {
-      console.error('Failed to generate PDF thumbnail:', error)
+      Sentry.captureException(error, {
+        tags: { operation: 'generate-pdf-thumbnail' },
+        extra: { pageNumber, width },
+      })
       return null
     }
   }
