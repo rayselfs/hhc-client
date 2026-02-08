@@ -771,3 +771,21 @@ Added `@typescript-eslint/no-explicit-any: 'error'` with targeted exceptions for
 - Maintained all functionality and visual appearance.
 - Used Pinia stores and existing composables (`useBible`) directly in child components to avoid prop drilling and maintain clean architecture.
 - Verified with type-check, tests (20/20 pass), and build.
+
+## [2026-02-09] Fix: VersionSelector.vue ESLint Failure
+
+- Fixed ESLint error `The template requires child element vue/valid-template-root` in `src/components/Bible/VersionSelector.vue`.
+- Approach: Removed the empty `<template>` block entirely, converting it into a script-only component. This is the correct pattern for logic-only components in Vue 3 that only contain watchers or lifecycle hooks.
+- Verified with `npm run lint`, `npm run type-check`, and `npx vitest run`.
+
+## [2026年 2月 9日 星期一 00時20分17秒 CST] Task 12d: MediaItemList Refactoring
+
+- Successfully reduced `MediaItemList.vue` from 686 to 400 lines.
+- Extracted UI sections into focused child components:
+  - `MediaGrid.vue`: Handles Virtual Scroll and Standard Flex layouts.
+  - `MediaListItem.vue`: Wraps individual media items and their event listeners.
+  - `MediaToolbar.vue`: Contains the unified Context Menu logic.
+- Improved logic separation by moving D&D move/reorder logic to `useMediaOperations.ts`.
+- Leveraged `useSelectionManager` and `useDragAndDrop` composables more effectively.
+- Maintained existing props, events, and visual behavior.
+- Verified with full build and unit tests.

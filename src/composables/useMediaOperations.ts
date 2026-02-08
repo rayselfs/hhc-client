@@ -962,5 +962,63 @@ export function useMediaOperations(
     sortedFolders,
     sortedItems,
     sortedUnifiedItems,
+
+    handleMove: async (
+      draggedItemsData: (FileItem | Folder<FileItem>)[],
+      draggedType: string,
+      target: Folder<FileItem>,
+    ) => {
+      const targetId = target.id
+      const sourceFolderId = mediaStore.currentFolder?.id || MediaFolder.ROOT_ID
+      let moveCount = 0
+
+      const validItems = draggedItemsData.filter((item) => item.id !== targetId)
+
+      for (const item of validItems) {
+        if (draggedType === 'file') {
+          const fileItem = currentItems.value.find((i) => i.id === item.id)
+          if (fileItem) {
+            mediaStore.moveItem(fileItem, targetId, sourceFolderId)
+            moveCount++
+          }
+        } else if (draggedType === 'folder') {
+          const folderItem = currentFolders.value.find((f) => f.id === item.id)
+          if (folderItem) {
+            const isLastItem = validItems.indexOf(item) === validItems.length - 1
+            const moved = await mediaStore.moveFolder(
+              folderItem,
+              targetId,
+              mediaStore.currentFolder?.id,
+              !isLastItem,
+            )
+            if (moved) {
+              moveCount++
+            }
+          }
+        }
+      }
+
+      if (moveCount > 0) {
+        showSnackBar(t('fileExplorer.moveSuccess'), {
+          color: 'success',
+        })
+      }
+    },
+
+    handleReorder: async (items: (FileItem | Folder<FileItem>)[]) => {
+      const newFolders: Folder<FileItem>[] = []
+      const newFiles: FileItem[] = []
+
+      items.forEach((itm) => {
+        if ('items' in itm) {
+          newFolders.push(itm as Folder<FileItem>)
+        } else {
+          newFiles.push(itm as FileItem)
+        }
+      })
+
+      await mediaStore.reorderCurrentFolders(newFolders)
+      await mediaStore.reorderCurrentItems(newFiles)
+    },
   }
 }
