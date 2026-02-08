@@ -1369,7 +1369,7 @@ Parallel Speedup: ~45% faster than sequential
 
 ---
 
-- [ ] 13. Router Lazy Loading
+- [x] 13. Router Lazy Loading
 
   **What to do**:
   - In `src/router/index.ts`:

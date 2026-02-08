@@ -748,3 +748,14 @@ Added `@typescript-eslint/no-explicit-any: 'error'` with targeted exceptions for
   - npm run build -> succeeded (vite build produced renderer chunks)
   - dist-electron/renderer/assets contains ProjectionView-\*.js chunk (ProjectionView-DJNb2-vA.js)
 - Result: Code-splitting for ProjectionView confirmed. Build produced multiple JS assets (15 renderer JS files) and a dedicated ProjectionView chunk named ProjectionView-DJNb2-vA.js
+
+## [2026-02-09 00:06:02] Task 12e: TimerControl Refactoring
+
+- Successfully refactored `src/layouts/control/TimerControl.vue`, reducing line count from 488 to 257.
+- Extracted UI sections into specialized child components in `src/components/Timer/`:
+  - `TimerDisplay.vue`: Encapsulates the core timer/stopwatch display and time adjustment logic.
+  - `PresetManager.vue`: Handles the timer presets list and CRUD operations.
+  - `TimerSettings.vue`: Manages control settings like reminder time and overtime message.
+- Maintained store-based reactivity by accessing Pinia stores directly in child components, reducing prop drilling.
+- Verified that external API (keyboard shortcuts, layout) remained intact.
+- All unit tests (20/20) and type-checking passed.

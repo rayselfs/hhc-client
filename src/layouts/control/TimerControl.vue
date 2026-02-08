@@ -26,65 +26,7 @@
 
             <v-row class="flex-grow-1 align-center">
               <v-col cols="12">
-                <v-fade-transition mode="out-in">
-                  <div
-                    v-if="!stopwatchStore.global.isStopwatchMode"
-                    key="timer"
-                    class="d-flex flex-column align-center justify-center fill-height"
-                  >
-                    <liquid-timer-ring
-                      :progress="timerStore.progress"
-                      :formatted-time="timerStore.formattedTime"
-                      :size="250"
-                      :display-text="timerStore.isRunning"
-                      class="mb-8"
-                    >
-                      <template #default>
-                        <div
-                          v-if="timerStore.state === 'stopped'"
-                          class="d-flex justify-center align-center"
-                        >
-                          <TimeInput
-                            v-model="timerStore.inputMinutes"
-                            :on-error="
-                              (msg) => showSnackBar(msg, { color: 'error', timeout: 3000 })
-                            "
-                          />
-                          <span class="time-separator">:</span>
-                          <TimeInput
-                            v-model="timerStore.inputSeconds"
-                            :on-error="
-                              (msg) => showSnackBar(msg, { color: 'error', timeout: 3000 })
-                            "
-                          />
-                        </div>
-                        <span v-else>{{ timerStore.formattedTime }}</span>
-                      </template>
-                    </liquid-timer-ring>
-
-                    <!-- Remove Time Buttons -->
-                    <TimeAdjustmentButtons
-                      type="remove"
-                      :remaining-time="timerStore.settings.remainingTime"
-                      @adjust="removeTime"
-                    />
-
-                    <!-- Add Time Buttons -->
-                    <TimeAdjustmentButtons
-                      type="add"
-                      :remaining-time="timerStore.settings.remainingTime"
-                      :is-finished="timerStore.isFinished"
-                      @adjust="addTime"
-                    />
-                  </div>
-                  <div
-                    v-else
-                    key="stopwatch"
-                    class="d-flex justify-center align-center fill-height"
-                  >
-                    <Stopwatch :size="250" />
-                  </div>
-                </v-fade-transition>
+                <TimerDisplay :size="250" />
               </v-col>
             </v-row>
 
@@ -120,96 +62,12 @@
         <v-row no-gutters class="fill-height">
           <!-- Presets Layout -->
           <v-col cols="12" class="mb-4" :style="{ height: `${rightTopCardHeight}px` }">
-            <v-card :style="{ height: `${rightTopCardHeight}px` }" rounded="lg">
-              <v-card-text>
-                <div class="d-flex justify-space-between mb-2">
-                  <v-label class="text-h6 align-start">{{ $t('timer.presets') }}</v-label>
-                  <liquid-btn
-                    icon="mdi-plus"
-                    :disabled="
-                      timerStore.state !== 'stopped' || stopwatchStore.global.isStopwatchMode
-                    "
-                    :class="{ 'cursor-not-allowed': timerStore.state !== 'stopped' }"
-                    @click="saveTimerPreset"
-                  />
-                </div>
-                <v-list density="compact">
-                  <v-list-item
-                    v-for="item in timerStore.presets"
-                    :key="item.id"
-                    rounded="rounded-lg"
-                    padding="pa-2"
-                    :hover-opacity="0.2"
-                    @click="applyPreset(item)"
-                  >
-                    <template #prepend>
-                      <v-icon icon="mdi-history"></v-icon>
-                    </template>
-
-                    <span class="text-h6">{{ formatDuration(item.duration) }}</span>
-
-                    <template #append>
-                      <v-btn
-                        icon="mdi-delete"
-                        size="small"
-                        variant="text"
-                        @click.stop="deletePreset(item.id)"
-                      ></v-btn>
-                    </template>
-                  </v-list-item>
-                </v-list>
-              </v-card-text>
-            </v-card>
+            <PresetManager :height="rightTopCardHeight" />
           </v-col>
 
           <!-- Control Layout -->
           <v-col cols="12" :style="{ height: `${rightBottomCardHeight}px` }">
-            <v-card :style="{ height: `${rightBottomCardHeight}px` }" rounded="lg">
-              <v-card-text>
-                <v-label class="text-h6 align-start mb-4">{{ $t('common.control') }}</v-label>
-                <div class="d-flex align-center fill-height">
-                  <liquid-switch
-                    v-model="stopwatchStore.global.isStopwatchMode"
-                    :label="$t('timer.stopwatch')"
-                    color="primary"
-                  />
-                </div>
-                <div class="d-flex align-center mt-4">
-                  <liquid-switch
-                    v-model="reminderEnabled"
-                    :label="$t('timer.reminder')"
-                    color="primary"
-                    class="mr-4"
-                  />
-                  <liquid-text-field
-                    v-model="reminderTimeInput"
-                    type="number"
-                    style="max-width: 100px"
-                    :suffix="$t('timer.reminderSecond')"
-                    :disabled="timerStore.state !== 'stopped'"
-                    rounded
-                    @update:model-value="handleReminderTimeChange"
-                  />
-                </div>
-                <div class="d-flex align-center mt-4">
-                  <liquid-switch
-                    v-model="overtimeMessageEnabled"
-                    :label="$t('timer.overtimeMessage')"
-                    color="primary"
-                    class="mr-4"
-                  />
-                  <liquid-text-field
-                    v-model="overtimeMessageInput"
-                    :placeholder="$t('timer.overtimeMessageLabel')"
-                    :maxlength="TIMER_CONFIG.OVERTIME_MESSAGE.MAX_LENGTH"
-                    style="max-width: 250px"
-                    rounded
-                    @blur="handleOvertimeMessageBlur"
-                    @keyup:enter="handleOvertimeMessageEnter"
-                  />
-                </div>
-              </v-card-text>
-            </v-card>
+            <TimerSettings :height="rightBottomCardHeight" />
           </v-col>
         </v-row>
       </v-col>
@@ -226,28 +84,25 @@ import { useStopwatchStore } from '@/stores/stopwatch'
 import { useProjectionStore } from '@/stores/projection'
 import { useElectron } from '@/composables/useElectron'
 import { useProjectionManager } from '@/composables/useProjectionManager'
-import { APP_CONFIG, TIMER_CONFIG } from '@/config/app'
+import { APP_CONFIG } from '@/config/app'
 
 import { TimerMode, ViewType } from '@/types/common'
-import Stopwatch from '@/components/Timer/StopWatcher.vue'
-import TimeAdjustmentButtons from '@/components/Timer/TimeAdjustmentButtons.vue'
-import TimeInput from '@/components/Timer/TimeInput.vue'
+import TimerDisplay from '@/components/Timer/TimerDisplay.vue'
+import PresetManager from '@/components/Timer/PresetManager.vue'
+import TimerSettings from '@/components/Timer/TimerSettings.vue'
 import { useMemoryManager } from '@/utils/memoryManager'
-import { useSnackBar } from '@/composables/useSnackBar'
 import { useCardLayout } from '@/composables/useLayout'
-import { formatDuration } from '@/utils/time'
+import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
+import { KEYBOARD_SHORTCUTS } from '@/config/shortcuts'
 
 const timerStore = useTimerStore()
 const stopwatchStore = useStopwatchStore()
 const projectionStore = useProjectionStore()
 const { t: $t } = useI18n()
 
-const { showSnackBar } = useSnackBar()
 const { isElectron } = useElectron()
 const { setProjectionState, cleanupResources } = useProjectionManager()
 const { cleanup } = useMemoryManager('TimerControl')
-import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
-import { KEYBOARD_SHORTCUTS } from '@/config/shortcuts'
 
 const handleToggle = () => {
   switch (timerStore.state) {
@@ -302,14 +157,6 @@ const areControlsDisabled = computed(() => {
 })
 
 const { mdAndUp } = useDisplay()
-
-const addTime = (secondsToAdd: number) => {
-  timerStore.addTime(secondsToAdd)
-}
-
-const removeTime = (secondsToRemove: number) => {
-  timerStore.removeTime(secondsToRemove)
-}
 
 const handleModeChange = (mode: TimerMode) => {
   timerStore.setMode(mode)
@@ -378,80 +225,12 @@ const mainControlConfig = computed(() => {
   }
 })
 
-// updateProjectionState logic remains the same
 const updateProjectionState = async () => {
   if (isElectron()) {
     if (projectionStore.isShowingDefault || projectionStore.currentView !== 'timer') {
       await setProjectionState(false, ViewType.TIMER)
     }
   }
-}
-
-const applyPreset = (item: { id: string; duration: number }) => {
-  timerStore.applyPreset(item)
-}
-
-const deletePreset = (id: string) => {
-  timerStore.deletePreset(id)
-}
-
-const saveTimerPreset = () => {
-  timerStore.addToPresets(timerStore.settings.originalDuration)
-}
-
-const reminderEnabled = computed({
-  get: () => timerStore.settings.reminderEnabled,
-  set: (value) => {
-    timerStore.setReminder(value, timerStore.settings.reminderTime)
-  },
-})
-
-const reminderTimeInput = computed({
-  get: () => timerStore.settings.reminderTime,
-  set: () => {},
-})
-
-const handleReminderTimeChange = (value: string | number) => {
-  const seconds = parseInt(String(value))
-  if (isNaN(seconds) || seconds < 0) {
-    return
-  }
-  // Remove seconds * 60 conversion, use directly
-  if (seconds >= timerStore.settings.originalDuration) {
-    showSnackBar($t('timer.reminderError'), {
-      color: 'warning',
-    })
-    timerStore.setReminder(timerStore.settings.reminderEnabled, 0) // Reset to 0
-  } else {
-    timerStore.setReminder(timerStore.settings.reminderEnabled, seconds)
-  }
-}
-
-const overtimeMessageEnabled = computed({
-  get: () => timerStore.settings.overtimeMessageEnabled,
-  set: (value) => {
-    timerStore.setOvertimeMessage(value, timerStore.settings.overtimeMessage)
-  },
-})
-
-const overtimeMessageInput = computed({
-  get: () => timerStore.settings.overtimeMessage,
-  set: (value) => {
-    timerStore.setOvertimeMessage(timerStore.settings.overtimeMessageEnabled, value)
-  },
-})
-
-const handleOvertimeMessageBlur = () => {
-  if (!overtimeMessageInput.value || overtimeMessageInput.value.trim() === '') {
-    showSnackBar($t('timer.overtimeMessageError'), {
-      color: 'warning',
-    })
-    timerStore.setOvertimeMessage(timerStore.settings.overtimeMessageEnabled, "Time's Up!")
-  }
-}
-const handleOvertimeMessageEnter = (event: Event) => {
-  const target = event.target as HTMLInputElement
-  target?.blur()
 }
 
 onMounted(() => {
@@ -472,16 +251,6 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.time-separator {
-  font-size: 77px;
-  font-weight: 500;
-}
-
-.time-button {
-  min-width: 80px;
-  width: 80px;
-}
-
 .v-btn-toggle .v-btn--active :deep(.v-btn__overlay) {
   opacity: 0 !important;
 }
