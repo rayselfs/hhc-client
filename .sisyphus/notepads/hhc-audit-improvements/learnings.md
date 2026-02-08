@@ -759,3 +759,15 @@ Added `@typescript-eslint/no-explicit-any: 'error'` with targeted exceptions for
 - Maintained store-based reactivity by accessing Pinia stores directly in child components, reducing prop drilling.
 - Verified that external API (keyboard shortcuts, layout) remained intact.
 - All unit tests (20/20) and type-checking passed.
+
+## [2026-02-09] Task 12c: BibleControl Refactoring
+
+- Successfully refactored `src/layouts/control/BibleControl.vue` from 778 lines to 193 lines.
+- Extracted UI sections into focused child components:
+  - `BiblePreview.vue`: Handles preview display, search, and verse selection logic.
+  - `ChapterNav.vue`: Handles preview card header and chapter navigation.
+  - `ProjectionControls.vue`: Handles projection navigation and font size control.
+  - `VersionSelector.vue`: Logical component for version-related watchers.
+- Maintained all functionality and visual appearance.
+- Used Pinia stores and existing composables (`useBible`) directly in child components to avoid prop drilling and maintain clean architecture.
+- Verified with type-check, tests (20/20 pass), and build.
