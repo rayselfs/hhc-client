@@ -316,7 +316,15 @@ export const registerFileProtocols = () => {
 
       try {
         const realPath = fs.realpathSync(filePath)
-        if (!realPath.startsWith(normalizedUserDataPath)) {
+        const realUserDataPath = fs.realpathSync(normalizedUserDataPath)
+
+        // Use case-insensitive comparison on macOS/Windows (case-insensitive filesystems)
+        const isCaseInsensitiveFS = process.platform === 'darwin' || process.platform === 'win32'
+        const isWithinUserData = isCaseInsensitiveFS
+          ? realPath.toLowerCase().startsWith(realUserDataPath.toLowerCase())
+          : realPath.startsWith(realUserDataPath)
+
+        if (!isWithinUserData) {
           console.warn('Blocked file access outside userData:', filePath)
           return new Response('Forbidden', { status: 403 })
         }
