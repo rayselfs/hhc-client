@@ -35,14 +35,11 @@
         </v-row>
       </v-col>
     </v-row>
-
-    <!-- Version Logic Component (Handles version-related watchers) -->
-    <VersionSelector />
   </v-container>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useDisplay } from 'vuetify'
 import { useBibleStore } from '@/stores/bible'
 import { useCardLayout } from '@/composables/useLayout'
@@ -58,12 +55,12 @@ import MultiFunctionControl from '@/components/Bible/MultiFunction/Control.vue'
 import BiblePreview from '@/components/Bible/BiblePreview.vue'
 import ChapterNav from '@/components/Bible/ChapterNav.vue'
 import ProjectionControls from '@/components/Bible/ProjectionControls.vue'
-import VersionSelector from '@/components/Bible/VersionSelector.vue'
 
 const bibleStore = useBibleStore()
 const bibleFolderStore = useBibleFolderStore()
 const { mdAndUp } = useDisplay()
-const { currentPassage, previewBook, previewVerses } = storeToRefs(bibleStore)
+const { currentPassage, previewBook, previewVerses, isMultiVersion, secondVersionCode } =
+  storeToRefs(bibleStore)
 
 const { leftCardHeight, rightTopCardHeight, rightBottomCardHeight } = useCardLayout({
   minHeight: APP_CONFIG.UI.MIN_CARD_HEIGHT,
@@ -71,6 +68,22 @@ const { leftCardHeight, rightTopCardHeight, rightBottomCardHeight } = useCardLay
 })
 
 const { updateProjection } = useBible(currentPassage, previewBook, previewVerses)
+
+/**
+ * Watch multi-version state changes to update projection immediately.
+ * This logic ensures that when the user toggles multi-version mode or
+ * changes the second version, the projection window stays in sync.
+ */
+watch([isMultiVersion, secondVersionCode], async ([newIsMulti, newSecondCode]) => {
+  // Only update if we have a current passage and verse
+  if (currentPassage.value && currentPassage.value.verse) {
+    // If enabling multi-version, we need to make sure we have a second version code
+    if (newIsMulti && !newSecondCode) {
+      return
+    }
+    await updateProjection(currentPassage.value.verse)
+  }
+})
 
 const projectionControlsRef = ref<InstanceType<typeof ProjectionControls> | null>(null)
 const isPreviewSearchMode = ref(false)
