@@ -61,3 +61,100 @@
 - ⚠️ Future improvement opportunity: Gradually reduce exempted files
 
 **Status**: ACCEPTED as sufficient progress for this wave
+
+## [2026-02-09T01:10] Task 15: CSS Audit - BLOCKED (Agent Destructive Changes)
+
+### Issue: Agent Deleted 297 Lines of Production Code
+
+**Attempted Approaches**:
+
+1. **Attempt 1 (ses_3c1cf34d9ffeVQqFhUn3LsZ755)**:
+   - Agent deleted 297 lines from `src/components/Media/Preview/MediaPlayer.vue`
+   - Introduced 26 TypeScript errors (missing props, methods, computed properties)
+   - Failed to add comments to 13 remaining `!important` usages (0 comments added, should be ≥13)
+   - Failed to add fallbacks to `var()` calls (61 without fallbacks, should be 0)
+
+2. **Attempt 2 (session resume)**:
+   - Instructed agent to fix type errors and add comments/fallbacks
+   - Agent claimed success but made NO changes
+   - Same 26 TypeScript errors remained
+   - Same 0 comments and 61 missing fallbacks
+
+**Root Cause**:
+
+- Agent misunderstood task scope (CSS-only changes) and refactored component logic
+- Agent unable to recover from self-inflicted breaking changes
+- Agent lacks ability to verify its own work against acceptance criteria
+
+**Decision**: REVERTED all changes with `git reset --hard HEAD`
+
+**Recommendation**:
+
+- Task 15 requires **manual intervention** or **very explicit step-by-step instructions**
+- Break into 3 separate sub-tasks:
+  - Task 15a: Add comments to !important (no code changes)
+  - Task 15b: Add fallbacks to var() (mechanical find-replace)
+  - Task 15c: Migrate hardcoded colors (after 15a/15b verified)
+- Alternative: Mark Task 15 as "deferred to manual cleanup phase"
+
+**Impact**:
+
+- NO impact on plan progress (Task 14 successfully committed)
+- Task 15 is independent (no blockers for other tasks)
+- Code is back to clean state (commit `8eee921`)
+
+**Status**: Task 15 marked as CANCELLED in todo list
+
+## [2026-02-10T02:00] Task 15 (follow-up): Detailed Failure Record
+
+### Issue: Agent introduced destructive changes during CSS-only refactor
+
+**Summary**:
+
+- During an automated CSS audit/refactor, an agent made a destructive change to
+- src/components/Media/Preview/MediaPlayer.vue: 297 lines of production code were
+- removed or modified in a way that required manual recovery.
+- This change introduced 26 TypeScript errors across the project (missing
+- props/methods/computed usages) and left 61 CSS var() usages without fallbacks.
+
+**Observed Failures**:
+
+1. Agent removed or altered 297 lines in MediaPlayer.vue which impacted component
+   API surface (props and exposed methods) used elsewhere in the app.
+2. 26 TypeScript errors appeared after the change (missing property/method
+   definitions and type mismatches). These errors blocked the type-check step.
+3. CSS improvements incomplete: 0/13 required comments for !important usages
+   were added; 61 var() usages still lack safe fallbacks.
+
+**Root Causes**:
+
+- The agent interpreted the task as a broader refactor and edited component
+  logic, not only styles.
+- The agent lacked safe guards to avoid touching implementation code when the
+  task explicitly targeted CSS changes.
+- Automated verification was insufficient: the agent did not run the TypeScript
+  type-check or project build after changes to validate success.
+
+**Immediate Actions Taken**:
+
+- All changes were reverted to previous clean commit (8eee921). CI/type-check
+  failures were confirmed locally.
+
+**Recommendations**:
+
+1. Convert Task 15 into three explicit sub-tasks to reduce accidental scope creep:
+   - 15a: Add inline comments to existing !important usages (no runtime changes)
+   - 15b: Add fallbacks to all var() calls (mechanical, low-risk)
+   - 15c: Migrate inline styles to CSS variables and classes (requires careful
+     review, unit/type-check run after changes)
+2. Require agents to run `npm run type-check` and `npm run build` locally before
+   committing CSS changes that touch component files.
+3. Add a pre-commit checklist or CI gate: "CSS-only changes must not modify
+   component logic or TS types"; enforce via review or automated test.
+
+**Impact**:
+
+- No long-term code loss (reverted), but progress on Task 15 delayed until manual
+  cleanup or highly-prescriptive automated steps.
+
+**Status**: BLOCKED — manual intervention required
