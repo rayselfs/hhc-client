@@ -30,8 +30,7 @@
           :is-muted="false"
           :is-ended="isPreviewEnded"
           :disable-seeking="needsTranscodeComputed"
-          class="position-absolute bottom-0 left-0 right-0 ma-2"
-          style="z-index: 20"
+          class="position-absolute bottom-0 left-0 right-0 ma-2 media-video-controls"
           @play="playPreviewVideo"
           @seek="onSeek"
           @pause="pausePreviewVideo"
@@ -47,17 +46,12 @@
     <!-- Viewport Frame Overlay for Image -->
     <div
       v-if="showZoomControls && item?.metadata.fileType === 'image'"
-      class="position-absolute border"
+      class="position-absolute border viewport-frame"
       :style="{
-        borderColor: '#2196F3 !important',
-        borderWidth: '1px !important',
-        backgroundColor: 'rgba(33, 150, 243, 0.2)',
         width: `${minimapViewport.width}%`,
         height: `${minimapViewport.height}%`,
         left: `${minimapViewport.left}%`,
         top: `${minimapViewport.top}%`,
-        pointerEvents: 'none',
-        zIndex: 10,
       }"
     ></div>
   </div>
@@ -357,5 +351,18 @@ defineExpose({
 .preview-content {
   max-width: 100%;
   max-height: 100%;
+}
+
+.media-player .viewport-frame {
+  /* Override default border styles for the minimap viewport frame */
+  border-color: var(--viewport-frame-border-color, var(--hhc-theme-primary, #2196f3));
+  border-width: var(--viewport-frame-border-width, 1px);
+  background-color: var(--viewport-frame-bg, rgba(33, 150, 243, 0.12));
+  pointer-events: var(--viewport-frame-pointer-events, none);
+  z-index: var(--viewport-frame-z, 10);
+}
+
+.media-player .media-video-controls {
+  z-index: 20;
 }
 </style>
