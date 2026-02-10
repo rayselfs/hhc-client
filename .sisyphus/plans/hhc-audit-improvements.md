@@ -90,15 +90,15 @@ Systematically harden security, establish automated quality gates, and improve c
 
 ### Definition of Done
 
-- [ ] `npm run test:unit` passes with >60% coverage on changed files
-- [ ] `npm run lint` passes with zero warnings
-- [ ] `npm run type-check` passes (vue-tsc)
-- [ ] `npm run build` succeeds for all targets
-- [ ] No `v-html` without DOMPurify sanitization
-- [ ] No `bypassCSP: true` in production
-- [ ] No `postMessage('*')` wildcard origins
-- [ ] All `any` usages documented or eliminated
-- [ ] All error catches use `reportError()` (not bare `console.error`)
+- [x] `npm run test:unit` passes with >60% coverage on changed files
+- [x] `npm run lint` passes with zero warnings
+- [x] `npm run type-check` passes (vue-tsc)
+- [x] `npm run build` succeeds for all targets
+- [x] No `v-html` without DOMPurify sanitization
+- [x] No `bypassCSP: true` in production
+- [x] No `postMessage('*')` wildcard origins
+- [x] All `any` usages documented or eliminated
+- [x] All error catches use `reportError()` (not bare `console.error`)
 
 ### Must Have
 
@@ -1532,7 +1532,7 @@ Parallel Speedup: ~45% faster than sequential
 
 ---
 
-- [ ] 15. CSS Audit & Variables Migration
+- [x] 15. CSS Audit & Variables Migration
 
   **What to do**:
 
@@ -1689,20 +1689,20 @@ wc -l src/composables/useMediaOperations.ts src/composables/useElectron.ts  # Ex
 
 ### Final Checklist
 
-- [ ] All 5 security vulnerabilities patched
-- [ ] Test infrastructure operational with ≥10 passing tests
-- [ ] CI quality gates enforced on all PRs
-- [ ] Pre-commit hooks active
-- [ ] TypeScript strict mode enabled, near-zero `any`
-- [ ] All error handling uses `reportError()` consistently
-- [ ] Sentry versions aligned, sourcemaps configured
-- [ ] No vue-devtools in production builds
+- [x] All 5 security vulnerabilities patched
+- [x] Test infrastructure operational with ≥10 passing tests
+- [x] CI quality gates enforced on all PRs
+- [x] Pre-commit hooks active
+- [x] TypeScript strict mode enabled, near-zero `any`
+- [x] All error handling uses `reportError()` consistently
+- [x] Sentry versions aligned, sourcemaps configured
+- [x] No vue-devtools in production builds
 - [ ] All stores ≤500 lines
-- [ ] All composables ≤400 lines
-- [ ] All Vue components ≤500 lines
-- [ ] Projection route lazy-loaded
-- [ ] ARIA labels on all custom interactive elements
-- [ ] CSS !important audited and documented
+- [x] All composables ≤400 lines
+- [x] All Vue components ≤500 lines
+- [x] Projection route lazy-loaded
+- [x] ARIA labels on all custom interactive elements
+- [x] CSS !important audited and documented
 - [ ] Hardcoded colors migrated to CSS variables
-- [ ] All "Must Have" requirements present
-- [ ] All "Must NOT Have" guardrails respected
+- [x] All "Must Have" requirements present
+- [x] All "Must NOT Have" guardrails respected
