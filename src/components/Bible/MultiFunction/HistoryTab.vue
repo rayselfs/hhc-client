@@ -15,31 +15,33 @@
       :item-height="80"
     >
       <template #default="{ item }">
-        <v-list-item
-          padding="pa-3"
-          rounded="rounded"
-          :selected="isSelected(item.id)"
-          :focused="isFocused(item.id)"
-          :selected-opacity="0.2"
-          :hover-opacity="0.1"
-          class="mb-1"
-          @click="handleItemClick(item.id, $event)"
-          @dblclick="handleLoadVerse(item)"
-          @contextmenu="handleRightClick($event, item)"
-        >
-          <div class="text-h6 font-weight-medium d-flex">
-            <span class="mr-1 text-no-wrap"
-              >{{ item.bookAbbreviation }}{{ item.chapter }}:{{ item.verse }} -
-            </span>
-            <span class="text-justify">{{ item.verseText }}</span>
-          </div>
+        <v-list density="compact">
+          <v-list-item
+            padding="pa-3"
+            rounded="rounded"
+            :selected="isSelected(item.id)"
+            :focused="isFocused(item.id)"
+            :selected-opacity="0.2"
+            :hover-opacity="0.1"
+            class="mb-1"
+            @click="handleItemClick(item.id, $event)"
+            @dblclick="handleLoadVerse(item)"
+            @contextmenu="handleRightClick($event, item)"
+          >
+            <div class="text-h6 font-weight-medium d-flex">
+              <span class="mr-1 text-no-wrap"
+                >{{ item.bookAbbreviation }}{{ item.chapter }}:{{ item.verse }} -
+              </span>
+              <span class="text-justify">{{ item.verseText }}</span>
+            </div>
 
-          <template #append>
-            <v-btn icon size="small" variant="text" @click.stop="handleRemoveItem(item.id)">
-              <v-icon>mdi-close</v-icon>
-            </v-btn>
-          </template>
-        </v-list-item>
+            <template #append>
+              <v-btn icon size="small" variant="text" @click.stop="handleRemoveItem(item.id)">
+                <v-icon>mdi-close</v-icon>
+              </v-btn>
+            </template>
+          </v-list-item>
+        </v-list>
       </template>
     </v-virtual-scroll>
   </div>

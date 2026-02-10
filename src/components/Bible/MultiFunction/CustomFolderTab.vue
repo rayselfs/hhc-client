@@ -5,72 +5,74 @@
         {{ $t('common.noCustomItems') }}
       </div>
       <div v-else>
-        <!-- 資料夾列表 -->
-        <div v-for="folder in folders" :key="folder.id" class="mb-2">
+        <v-list density="compact">
+          <!-- 資料夾列表 -->
+          <div v-for="folder in folders" :key="folder.id" class="mb-2">
+            <v-list-item
+              padding="pa-2"
+              rounded="rounded"
+              :selected="isSelected(folder.id)"
+              :focused="isFocused(folder.id)"
+              :selected-opacity="0.2"
+              :hover-opacity="0.1"
+              draggable="true"
+              :class="{ 'drag-over': isDragOver(folder.id) }"
+              @click="handleItemClick(folder.id, $event)"
+              @dragstart="(e: DragEvent) => handleDragStart(e, 'folder', folder)"
+              @dragend="handleDragEnd"
+              @dragover="handleDragOver"
+              @dragenter="(e: DragEvent) => handleDragEnter(e, folder.id)"
+              @dragleave="handleDragLeave"
+              @drop="(e: DragEvent) => handleDrop(e, folder)"
+              @dblclick="handleEnterFolder(folder.id)"
+              @contextmenu="handleRightClick($event, 'folder', folder)"
+            >
+              <template #prepend>
+                <v-icon class="mr-2">mdi-folder</v-icon>
+              </template>
+
+              <span class="text-subtitle-1">{{ folder.name }}</span>
+
+              <template #append>
+                <v-btn icon size="small" variant="text" @click.stop="handleDeleteFolder(folder.id)">
+                  <v-icon>mdi-delete</v-icon>
+                </v-btn>
+              </template>
+            </v-list-item>
+          </div>
+
+          <!-- 經文列表 -->
           <v-list-item
+            v-for="item in verses"
+            :key="item.id"
             padding="pa-2"
             rounded="rounded"
-            :selected="isSelected(folder.id)"
-            :focused="isFocused(folder.id)"
+            :selected="isSelected(item.id)"
+            :focused="isFocused(item.id)"
             :selected-opacity="0.2"
             :hover-opacity="0.1"
+            class="mb-1"
             draggable="true"
-            :class="{ 'drag-over': isDragOver(folder.id) }"
-            @click="handleItemClick(folder.id, $event)"
-            @dragstart="(e: DragEvent) => handleDragStart(e, 'folder', folder)"
+            @click="handleItemClick(item.id, $event)"
+            @dragstart="(e: DragEvent) => handleDragStart(e, 'verse', item)"
             @dragend="handleDragEnd"
-            @dragover="handleDragOver"
-            @dragenter="(e: DragEvent) => handleDragEnter(e, folder.id)"
-            @dragleave="handleDragLeave"
-            @drop="(e: DragEvent) => handleDrop(e, folder)"
-            @dblclick="handleEnterFolder(folder.id)"
-            @contextmenu="handleRightClick($event, 'folder', folder)"
+            @dblclick="handleLoadVerse(item)"
+            @contextmenu="handleRightClick($event, 'verse', item)"
           >
-            <template #prepend>
-              <v-icon class="mr-2">mdi-folder</v-icon>
-            </template>
-
-            <span class="text-subtitle-1">{{ folder.name }}</span>
+            <div class="text-h6 font-weight-medium d-flex">
+              <span class="mr-1 text-no-wrap"
+                >{{ item.bookAbbreviation }}{{ item.chapter }}:{{ item.verse }} -
+              </span>
+              <span class="text-justify">{{ item.verseText }}</span>
+            </div>
 
             <template #append>
-              <v-btn icon size="small" variant="text" @click.stop="handleDeleteFolder(folder.id)">
+              <v-btn icon size="small" variant="text" @click.stop="handleRemoveItem(item.id)">
                 <v-icon>mdi-delete</v-icon>
               </v-btn>
             </template>
           </v-list-item>
-        </div>
-
-        <!-- 經文列表 -->
-        <v-list-item
-          v-for="item in verses"
-          :key="item.id"
-          padding="pa-2"
-          rounded="rounded"
-          :selected="isSelected(item.id)"
-          :focused="isFocused(item.id)"
-          :selected-opacity="0.2"
-          :hover-opacity="0.1"
-          class="mb-1"
-          draggable="true"
-          @click="handleItemClick(item.id, $event)"
-          @dragstart="(e: DragEvent) => handleDragStart(e, 'verse', item)"
-          @dragend="handleDragEnd"
-          @dblclick="handleLoadVerse(item)"
-          @contextmenu="handleRightClick($event, 'verse', item)"
-        >
-          <div class="text-h6 font-weight-medium d-flex">
-            <span class="mr-1 text-no-wrap"
-              >{{ item.bookAbbreviation }}{{ item.chapter }}:{{ item.verse }} -
-            </span>
-            <span class="text-justify">{{ item.verseText }}</span>
-          </div>
-
-          <template #append>
-            <v-btn icon size="small" variant="text" @click.stop="handleRemoveItem(item.id)">
-              <v-icon>mdi-delete</v-icon>
-            </v-btn>
-          </template>
-        </v-list-item>
+        </v-list>
       </div>
     </div>
   </div>
