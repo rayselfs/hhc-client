@@ -173,7 +173,6 @@ defineOptions({
 
 import { ref, computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useI18n } from 'vue-i18n'
 import type { VerseItem, Folder } from '@/types/common'
 import { useBibleFolderStore } from '@/stores/folder'
 import { useBibleStore } from '@/stores/bible'
@@ -186,16 +185,13 @@ import FolderBreadcrumbs from '@/components/Shared/FolderBreadcrumbs.vue'
 import MoveFolderDialog from '@/components/Shared/MoveFolderDialog.vue'
 import CreateEditFolderDialog from '@/components/Shared/CreateEditFolderDialog.vue'
 import DeleteConfirmDialog from '@/components/Shared/DeleteConfirmDialog.vue'
-import { useFolderDialogs } from '@/composables/useFolderDialogs'
-import { BIBLE_CONFIG } from '@/config/app'
-import { BibleFolder } from '@/types/enum'
-import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
-import { KEYBOARD_SHORTCUTS } from '@/config/shortcuts'
 import { useBibleExport } from '@/composables/bible/useBibleExport'
 import { useBibleContextMenu } from '@/composables/bible/useBibleContextMenu'
 import { useBibleClipboard } from '@/composables/bible/useBibleClipboard'
-
-const { t: $t } = useI18n()
+import { useBibleFolderDialogs } from '@/composables/bible/useBibleFolderDialogs'
+import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
+import { KEYBOARD_SHORTCUTS } from '@/config/shortcuts'
+import { BibleFolder } from '@/types/enum'
 
 // Props
 interface Props {
@@ -230,14 +226,11 @@ const {
   navigateToRoot,
   navigateToFolder,
   enterFolder,
-  addFolderToCurrent,
   removeItemFromCurrent,
-  deleteFolder: deleteFolderAction,
   moveItem: moveItemAction,
   moveFolder: moveFolderAction,
   pasteItem,
   getFolderById,
-  getMoveTargets,
   isFolderInside,
   updateFolder,
   copyToClipboard,
@@ -247,14 +240,11 @@ const {
 
 // Status
 const multiFunctionTab = ref('history')
-const folderDialogs = useFolderDialogs<VerseItem>()
-const customSelectedItems = ref<Set<string>>(new Set())
 const activeTabSelection = ref<Set<string>>(new Set())
-const batchDeleteCount = ref(0)
+const customSelectedItems = ref<Set<string>>(new Set())
 
 const handleSelectionChange = (selection: Set<string>) => {
   activeTabSelection.value = selection
-  // Also sync custom specific logic (ensure export still works with customSelectedItems)
   customSelectedItems.value = selection
 }
 
@@ -283,6 +273,33 @@ const {
   closeItemContextMenu,
 } = useBibleContextMenu()
 
+// Folder Dialogs Logic (extracted to composable)
+const {
+  folderDialogs,
+  batchDeleteCount,
+  isDuplicateName,
+  nameErrorMessage,
+  isMaxDepthReached,
+  createNewFolder,
+  confirmCreateFolder,
+  confirmDeleteFolder,
+  confirmMoveVerse,
+  handleMoveNavigate,
+  showMoveItemDialog,
+  deleteItem,
+  showFolderSettings,
+  getMoveFolders,
+  showDeleteFolderDialog,
+} = useBibleFolderDialogs({
+  currentFolder,
+  currentFolderPath,
+  activeTabSelection,
+  multiFunctionTab,
+  selectedItem,
+  closeItemContextMenu,
+  removeFromCurrentFolder: removeItemFromCurrent,
+})
+
 // Clipboard Operations (extracted to composable)
 const { copyItem, pasteItemHandler } = useBibleClipboard({
   selectedItem,
@@ -303,25 +320,6 @@ const { copyItem, pasteItemHandler } = useBibleClipboard({
   getCurrentFolders,
 })
 
-// Check for duplicate folder name
-const isDuplicateName = computed(() => {
-  if (!folderDialogs.folderName.value.trim()) return false
-  return currentFolder.value.folders.some((f) => {
-    // If editing, exclude self from check
-    if (folderDialogs.editingFolderId.value && f.id === folderDialogs.editingFolderId.value) {
-      return false
-    }
-    return f.name === folderDialogs.folderName.value.trim()
-  })
-})
-
-const nameErrorMessage = computed(() => {
-  if (isDuplicateName.value) {
-    return $t('fileExplorer.duplicateFolderName')
-  }
-  return ''
-})
-
 const breadcrumbItems = computed(() => {
   return currentFolderPath.value.map((id) => ({
     id,
@@ -340,93 +338,8 @@ watch(multiFunctionTab, (newTab) => {
   }
 })
 
-// Move related state (Derived from folderDialogs)
-const moveItemType = computed(() => {
-  if (folderDialogs.folderToMove.value) return 'folder'
-  if (folderDialogs.itemToMove.value) return 'verse'
-  return 'verse' // Default
-})
-
 const loadVerse = (item: VerseItem, type: 'history' | 'custom') => {
   emit('load-verse', item, type)
-}
-
-// Custom Folder Functions
-const createNewFolder = () => {
-  const baseName = $t('fileExplorer.defaultFolderName')
-  let newName = baseName
-  let counter = 2
-
-  const existingNames = new Set(getCurrentFolders.value.map((f: Folder<VerseItem>) => f.name))
-
-  while (existingNames.has(newName)) {
-    newName = `${baseName} ${counter}`
-    counter++
-  }
-
-  folderDialogs.openCreateFolderDialog(newName)
-  closeItemContextMenu()
-}
-
-const openFolderSettings = (folder: Folder<VerseItem>) => {
-  folderDialogs.openEditDialog(folder)
-
-  if (folder.expiresAt === null || folder.expiresAt === undefined) {
-    folderDialogs.retentionPeriod.value = 'permanent'
-  } else {
-    // Calculate approximate retention period
-    const diff = folder.expiresAt - folder.timestamp // Use creation time to determine original setting
-    const oneDay = 24 * 60 * 60 * 1000
-
-    // Simple heuristic mapping
-    if (diff > oneDay * 25) {
-      folderDialogs.retentionPeriod.value = '1month'
-    } else if (diff > oneDay * 6) {
-      folderDialogs.retentionPeriod.value = '1week'
-    } else {
-      folderDialogs.retentionPeriod.value = '1day'
-    }
-  }
-
-  closeItemContextMenu()
-}
-
-const confirmCreateFolder = () => {
-  if (folderDialogs.folderName.value.trim() && !isDuplicateName.value) {
-    let expiresAt: number | null = null
-    const now = Date.now()
-    const oneDay = 24 * 60 * 60 * 1000
-
-    switch (folderDialogs.retentionPeriod.value) {
-      case '1day':
-        expiresAt = now + oneDay
-        break
-      case '1week':
-        expiresAt = now + oneDay * 7
-        break
-      case '1month':
-        expiresAt = now + oneDay * 30
-        break
-      case 'permanent':
-        expiresAt = null
-        break
-    }
-
-    if (folderDialogs.editingFolderId.value) {
-      // Update existing folder
-      updateFolder(folderDialogs.editingFolderId.value, {
-        name: folderDialogs.folderName.value,
-        expiresAt: expiresAt,
-      })
-    } else {
-      // Create new folder
-      addFolderToCurrent(folderDialogs.folderName.value, expiresAt)
-    }
-
-    folderDialogs.showFolderDialog.value = false
-    folderDialogs.folderName.value = ''
-    folderDialogs.editingFolderId.value = null
-  }
 }
 
 // Navigation functions (now use store actions)
@@ -438,60 +351,7 @@ const handleEnterFolder = (folderId: string) => {
   enterFolder(folderId)
 }
 
-const showDeleteFolderDialog = (folderId: string) => {
-  const folder = getFolderById(folderId)
-  if (folder) {
-    folderDialogs.openDeleteFolderDialog(folder)
-  }
-}
-
-const confirmDeleteFolder = () => {
-  // Batch Delete
-  if (batchDeleteCount.value > 0) {
-    const itemsToDelete = Array.from(activeTabSelection.value)
-
-    if (multiFunctionTab.value === 'custom') {
-      itemsToDelete.forEach((id) => {
-        // Attempt to find as folder first (more destructive)
-        let folder = getFolderById(id)
-        if (!folder) {
-          const found = getCurrentFolders.value.find((f: Folder<VerseItem>) => f.id === id)
-          if (found) folder = found
-        }
-
-        if (folder) {
-          deleteFolderAction(id)
-        } else {
-          // Assume verse
-          removeItemFromCurrent(id)
-        }
-      })
-      // Clear selection after delete
-      customFolderTabRef.value?.deleteSelectedItems() // This cleans up UI state in child if needed, or we just rely on store update
-      // Actually we should just clear selection manually since items are gone.
-      activeTabSelection.value.clear()
-    } else if (multiFunctionTab.value === 'history') {
-      itemsToDelete.forEach((id) => {
-        bibleStore.removeHistoryItem(id)
-      })
-      activeTabSelection.value.clear()
-    }
-
-    batchDeleteCount.value = 0
-    folderDialogs.showDeleteConfirmDialog.value = false
-    return
-  }
-
-  // Single Delete
-  if (folderDialogs.folderToDelete.value) {
-    deleteFolderAction(folderDialogs.folderToDelete.value.id)
-  }
-  folderDialogs.showDeleteConfirmDialog.value = false
-  folderDialogs.folderToDelete.value = null
-}
-
 const removeFromCurrentFolder = (itemId: string) => {
-  // Call store action - direct mutation
   removeItemFromCurrent(itemId)
 }
 
@@ -540,7 +400,6 @@ const handleDropToFolder = async (data: DragData<VerseItem>, targetFolder: Folde
 const moveVerseToFolder = (verse: VerseItem, targetFolder: Folder<VerseItem>) => {
   const sourceFolderId =
     currentFolder.value.id === BibleFolder.ROOT_ID ? BibleFolder.ROOT_ID : currentFolder.value.id
-  // Call store action - direct mutation
   moveItemAction(verse, targetFolder.id, sourceFolderId)
 }
 
@@ -549,213 +408,6 @@ const moveFolderToFolder = (folderToMove: Folder<VerseItem>, targetFolder: Folde
   const sourceFolderId =
     currentFolder.value.id === BibleFolder.ROOT_ID ? BibleFolder.ROOT_ID : currentFolder.value.id
   moveFolderAction(folderToMove, targetFolder.id, sourceFolderId)
-}
-
-// Move verse related functions
-const showMoveDialog = (item: VerseItem) => {
-  folderDialogs.openMoveDialog(item)
-  // Ensure breadcrumb starts with root
-  folderDialogs.moveBreadcrumb.value = [{ id: BibleFolder.ROOT_ID, name: BibleFolder.ROOT_NAME }]
-}
-
-// Move Folder Functions
-const showMoveFolderDialog = (item: Folder<VerseItem>) => {
-  folderDialogs.openMoveDialog(item)
-  // Ensure breadcrumb starts with root
-  folderDialogs.moveBreadcrumb.value = [{ id: BibleFolder.ROOT_ID, name: BibleFolder.ROOT_NAME }]
-}
-
-const navigateMoveToRoot = () => {
-  folderDialogs.moveBreadcrumb.value = [{ id: BibleFolder.ROOT_ID, name: BibleFolder.ROOT_NAME }]
-  folderDialogs.selectedMoveFolder.value = null
-}
-
-const navigateMoveToFolder = (folderId: string) => {
-  const folder = getFolderById(folderId)
-  if (folder) {
-    const index = folderDialogs.moveBreadcrumb.value.findIndex((b) => b.id === folderId)
-    const newPath =
-      index !== -1
-        ? folderDialogs.moveBreadcrumb.value.slice(0, index + 1)
-        : [...folderDialogs.moveBreadcrumb.value, { id: folder.id, name: folder.name }]
-    folderDialogs.moveBreadcrumb.value = newPath
-    folderDialogs.selectedMoveFolder.value = folder
-  }
-}
-
-// Used by MoveFolderDialog component
-const getMoveFolders = (): Folder<VerseItem>[] => {
-  // If moving selection, we must filter out any selected folders AND their children
-  if (folderDialogs.moveSelection.value.size > 0) {
-    let targets = getMoveTargets(folderDialogs.selectedMoveFolder.value)
-    const selectedIds = folderDialogs.moveSelection.value
-
-    targets = targets.filter((target) => {
-      // 1. Target cannot be one of the selected folders
-      if (selectedIds.has(target.id)) return false
-
-      // 2. Target cannot be inside any of the selected folders
-      for (const id of selectedIds) {
-        const selectedFolder = getFolderById(id)
-        if (selectedFolder && isFolderInside(selectedFolder, target)) return false
-      }
-      return true
-    })
-    return targets
-  }
-
-  const excludeFolderId =
-    moveItemType.value === 'folder' && folderDialogs.folderToMove.value
-      ? folderDialogs.folderToMove.value.id
-      : undefined
-  return getMoveTargets(folderDialogs.selectedMoveFolder.value, excludeFolderId)
-}
-
-const handleMoveNavigate = (id: string) => {
-  if (id === BibleFolder.ROOT_ID) {
-    navigateMoveToRoot()
-  } else {
-    navigateMoveToFolder(id)
-  }
-}
-
-// Check if can move to root
-const canMoveToRoot = computed(() => {
-  const isMovingSelection = folderDialogs.moveSelection.value.size > 0
-  const isInRoot = currentFolder.value.id === BibleFolder.ROOT_ID
-
-  if (isMovingSelection) {
-    // If in root, can only move to a subfolder
-    if (isInRoot) {
-      return folderDialogs.selectedMoveFolder.value !== null
-    }
-
-    // If not in root, can always move to root (target is null)
-    if (folderDialogs.selectedMoveFolder.value === null) return true
-
-    // Circular check: Prevent moving a folder into itself or its children
-    const targetFolder = folderDialogs.selectedMoveFolder.value
-    for (const id of folderDialogs.moveSelection.value) {
-      const folder = getFolderById(id)
-      if (folder && isFolderInside(folder, targetFolder)) {
-        return false
-      }
-    }
-    return true
-  }
-
-  // Single Item Logic
-  if (moveItemType.value === 'verse') {
-    if (!folderDialogs.itemToMove.value) return false
-
-    if (isInRoot) {
-      return folderDialogs.selectedMoveFolder.value !== null
-    }
-    return true
-  } else {
-    // Moving folder
-    if (!folderDialogs.folderToMove.value) return false
-
-    if (folderDialogs.selectedMoveFolder.value) {
-      return !isFolderInside(
-        folderDialogs.folderToMove.value,
-        folderDialogs.selectedMoveFolder.value,
-      )
-    }
-
-    if (isInRoot) {
-      return false
-    }
-    return true
-  }
-})
-
-// Calculate current folder depth
-const currentFolderDepth = computed(() => {
-  return currentFolderPath.value.length - 1 // Subtract 1 for root
-})
-
-// Check if max depth reached (3 levels)
-const isMaxDepthReached = computed(() => {
-  return currentFolderDepth.value >= BIBLE_CONFIG.FOLDER.MAX_DEPTH
-})
-
-const confirmMoveVerse = async (targetId: string) => {
-  if (!canMoveToRoot.value) return
-
-  const destinationId =
-    targetId || folderDialogs.selectedMoveFolder.value?.id || BibleFolder.ROOT_ID
-  const sourceFolderId =
-    currentFolder.value.id === BibleFolder.ROOT_ID ? BibleFolder.ROOT_ID : currentFolder.value.id
-
-  // Multi-select Move
-  if (folderDialogs.moveSelection.value.size > 0) {
-    const promises: Promise<void | boolean>[] = []
-
-    // We need to handle folders and verses.
-    // Iterating selection
-    for (const id of folderDialogs.moveSelection.value) {
-      // Check if it's a folder
-      const folder = getFolderById(id)
-      if (folder) {
-        promises.push(moveFolderAction(folder, destinationId, sourceFolderId, false))
-      } else {
-        // Assume verse
-        const verse = getCurrentVerses.value.find((v) => v.id === id)
-        if (verse) {
-          promises.push(moveItemAction(verse, destinationId, sourceFolderId))
-        }
-      }
-    }
-    await Promise.all(promises)
-  } else if (moveItemType.value === 'verse') {
-    if (!folderDialogs.itemToMove.value) return
-
-    // Call store action - direct mutation
-    // We need to cast itemToMove to VerseItem because openMoveDialog is generic
-    await moveItemAction(folderDialogs.itemToMove.value as VerseItem, destinationId, sourceFolderId)
-  } else {
-    // Move folder
-    if (!folderDialogs.folderToMove.value) return
-
-    // Call store action - direct mutation
-    await moveFolderAction(folderDialogs.folderToMove.value, destinationId, sourceFolderId)
-  }
-
-  // Cleanup state
-  folderDialogs.showMoveDialog.value = false
-  folderDialogs.itemToMove.value = null
-  folderDialogs.folderToMove.value = null
-  folderDialogs.selectedMoveFolder.value = null
-  folderDialogs.moveSelection.value.clear()
-  folderDialogs.moveBreadcrumb.value = []
-}
-
-const showMoveItemDialog = () => {
-  if (!selectedItem.value || selectedItem.value.type === 'history') return
-
-  if (selectedItem.value.type === 'verse' && isVerseItem(selectedItem.value.item)) {
-    // Check for multi-select
-    if (
-      activeTabSelection.value.has(selectedItem.value.item.id) &&
-      activeTabSelection.value.size > 0
-    ) {
-      folderDialogs.openMoveSelectedDialog(activeTabSelection.value)
-    } else {
-      showMoveDialog(selectedItem.value.item)
-    }
-  } else if (selectedItem.value.type === 'folder' && isFolder(selectedItem.value.item)) {
-    // Check for multi-select
-    if (
-      activeTabSelection.value.has(selectedItem.value.item.id) &&
-      activeTabSelection.value.size > 0
-    ) {
-      folderDialogs.openMoveSelectedDialog(activeTabSelection.value)
-    } else {
-      showMoveFolderDialog(selectedItem.value.item)
-    }
-  }
-  closeItemContextMenu()
 }
 
 const handleEscape = () => {
@@ -769,40 +421,6 @@ const handleEscape = () => {
     } else if (multiFunctionTab.value === 'history' && historyTabRef.value) {
       historyTabRef.value.clearSelection()
     }
-  }
-}
-
-const deleteItem = () => {
-  // Priority 1: Multi-selection (Works for Keyboard & Context Menu if selection exists)
-  if (activeTabSelection.value.size > 0) {
-    batchDeleteCount.value = activeTabSelection.value.size
-    folderDialogs.openDeleteSelectionDialog()
-    closeItemContextMenu()
-    return
-  } else {
-    batchDeleteCount.value = 0
-  }
-
-  // Priority 2: Single Item (Context Menu only)
-  if (!selectedItem.value) return
-
-  const itemType = selectedItem.value.type
-  const item = selectedItem.value.item
-
-  if (itemType === 'verse' && isVerseItem(item)) {
-    removeFromCurrentFolder(item.id)
-  } else if (itemType === 'folder' && isFolder(item)) {
-    showDeleteFolderDialog(item.id)
-  } else if (itemType === 'history' && isVerseItem(item)) {
-    // Delete history item
-    bibleStore.removeHistoryItem(item.id)
-  }
-  closeItemContextMenu()
-}
-
-const showFolderSettings = () => {
-  if (selectedItem.value?.type === 'folder' && isFolder(selectedItem.value.item)) {
-    openFolderSettings(selectedItem.value.item)
   }
 }
 
