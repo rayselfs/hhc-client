@@ -101,7 +101,7 @@ describe('useElectron', () => {
 
       sendToProjection(message)
 
-      expect(mockElectronAPI.sendToProjection).toHaveBeenCalledWithExactlyOnceWith(message)
+      expect(mockElectronAPI.sendToProjection).toHaveBeenCalledExactlyOnceWith(message)
     })
 
     it('should send message to main window', () => {
@@ -113,7 +113,7 @@ describe('useElectron', () => {
 
       sendToMain(message)
 
-      expect(mockElectronAPI.sendToMain).toHaveBeenCalledWithExactlyOnceWith(message)
+      expect(mockElectronAPI.sendToMain).toHaveBeenCalledExactlyOnceWith(message)
     })
 
     it('should not throw when sending to projection fails in non-Electron', () => {
@@ -182,7 +182,7 @@ describe('useElectron', () => {
 
       onMainMessage(callback)
 
-      expect(mockElectronAPI.onMainMessage).toHaveBeenCalledWithExactlyOnceWith(callback)
+      expect(mockElectronAPI.onMainMessage).toHaveBeenCalledExactlyOnceWith(callback)
     })
 
     it('should register projection message listener', () => {
@@ -191,7 +191,7 @@ describe('useElectron', () => {
 
       onProjectionMessage(callback)
 
-      expect(mockElectronAPI.onProjectionMessage).toHaveBeenCalledWithExactlyOnceWith(callback)
+      expect(mockElectronAPI.onProjectionMessage).toHaveBeenCalledExactlyOnceWith(callback)
     })
 
     it('should register projection opened listener', () => {
@@ -200,7 +200,7 @@ describe('useElectron', () => {
 
       onProjectionOpened(callback)
 
-      expect(mockElectronAPI.onProjectionOpened).toHaveBeenCalledWithExactlyOnceWith(callback)
+      expect(mockElectronAPI.onProjectionOpened).toHaveBeenCalledExactlyOnceWith(callback)
     })
 
     it('should remove all listeners for channel', () => {
@@ -208,7 +208,7 @@ describe('useElectron', () => {
 
       removeAllListeners('test-channel')
 
-      expect(mockElectronAPI.removeAllListeners).toHaveBeenCalledWithExactlyOnceWith('test-channel')
+      expect(mockElectronAPI.removeAllListeners).toHaveBeenCalledExactlyOnceWith('test-channel')
     })
   })
 
@@ -221,7 +221,7 @@ describe('useElectron', () => {
       const result = getFilePath(mockFile)
 
       expect(result).toBe('/path/to/test.txt')
-      expect(mockElectronAPI.getFilePath).toHaveBeenCalledWithExactlyOnceWith(mockFile)
+      expect(mockElectronAPI.getFilePath).toHaveBeenCalledExactlyOnceWith(mockFile)
     })
 
     it('should return empty string when getting file path in non-Electron', () => {
@@ -242,7 +242,7 @@ describe('useElectron', () => {
       const result = await saveFile('/source/file.txt')
 
       expect(result).toEqual(mockResult)
-      expect(mockElectronAPI.saveFile).toHaveBeenCalledWithExactlyOnceWith('/source/file.txt')
+      expect(mockElectronAPI.saveFile).toHaveBeenCalledExactlyOnceWith('/source/file.txt')
     })
 
     it('should throw when saving file in non-Electron', async () => {
@@ -259,7 +259,7 @@ describe('useElectron', () => {
 
       await updateLanguage('zh-TW')
 
-      expect(mockElectronAPI.updateLanguage).toHaveBeenCalledWithExactlyOnceWith('zh-TW')
+      expect(mockElectronAPI.updateLanguage).toHaveBeenCalledExactlyOnceWith('zh-TW')
     })
 
     it('should get system locale', async () => {
@@ -295,7 +295,7 @@ describe('useElectron', () => {
       const result = await setHardwareAcceleration(false)
 
       expect(result).toBe(true)
-      expect(mockElectronAPI.setHardwareAcceleration).toHaveBeenCalledWithExactlyOnceWith(false)
+      expect(mockElectronAPI.setHardwareAcceleration).toHaveBeenCalledExactlyOnceWith(false)
     })
 
     it('should get video quality setting', async () => {
@@ -314,7 +314,7 @@ describe('useElectron', () => {
       const result = await setVideoQuality('medium')
 
       expect(result).toBe(true)
-      expect(mockElectronAPI.setVideoQuality).toHaveBeenCalledWithExactlyOnceWith('medium')
+      expect(mockElectronAPI.setVideoQuality).toHaveBeenCalledExactlyOnceWith('medium')
     })
 
     it('should restart app', async () => {
@@ -343,7 +343,7 @@ describe('useElectron', () => {
       const result = await setEnableFfmpeg(true)
 
       expect(result).toBe(true)
-      expect(mockElectronAPI.setEnableFfmpeg).toHaveBeenCalledWithExactlyOnceWith(true)
+      expect(mockElectronAPI.setEnableFfmpeg).toHaveBeenCalledExactlyOnceWith(true)
     })
 
     it('should check ffmpeg status', async () => {
@@ -364,7 +364,7 @@ describe('useElectron', () => {
       const result = await ffmpegSetPath('/custom/ffmpeg')
 
       expect(result).toEqual(mockStatus)
-      expect(mockElectronAPI.ffmpegSetPath).toHaveBeenCalledWithExactlyOnceWith('/custom/ffmpeg')
+      expect(mockElectronAPI.ffmpegSetPath).toHaveBeenCalledExactlyOnceWith('/custom/ffmpeg')
     })
   })
 
@@ -387,7 +387,7 @@ describe('useElectron', () => {
 
       await getBibleContent(1)
 
-      expect(mockElectronAPI.getBibleContent).toHaveBeenCalledWithExactlyOnceWith(1)
+      expect(mockElectronAPI.getBibleContent).toHaveBeenCalledExactlyOnceWith(1)
     })
 
     it('should register Bible content chunk listener', () => {
@@ -396,7 +396,7 @@ describe('useElectron', () => {
 
       onBibleContentChunk(callback)
 
-      expect(mockElectronAPI.onBibleContentChunk).toHaveBeenCalledWithExactlyOnceWith(callback)
+      expect(mockElectronAPI.onBibleContentChunk).toHaveBeenCalledExactlyOnceWith(callback)
     })
   })
 
@@ -407,7 +407,7 @@ describe('useElectron', () => {
 
       onUpdateAvailable(callback)
 
-      expect(mockElectronAPI.onUpdateAvailable).toHaveBeenCalledWithExactlyOnceWith(callback)
+      expect(mockElectronAPI.onUpdateAvailable).toHaveBeenCalledExactlyOnceWith(callback)
     })
 
     it('should register update downloaded listener', () => {
@@ -416,7 +416,7 @@ describe('useElectron', () => {
 
       onUpdateDownloaded(callback)
 
-      expect(mockElectronAPI.onUpdateDownloaded).toHaveBeenCalledWithExactlyOnceWith(callback)
+      expect(mockElectronAPI.onUpdateDownloaded).toHaveBeenCalledExactlyOnceWith(callback)
     })
 
     it('should register update error listener', () => {
@@ -425,7 +425,7 @@ describe('useElectron', () => {
 
       onUpdateError(callback)
 
-      expect(mockElectronAPI.onUpdateError).toHaveBeenCalledWithExactlyOnceWith(callback)
+      expect(mockElectronAPI.onUpdateError).toHaveBeenCalledExactlyOnceWith(callback)
     })
   })
 
@@ -436,7 +436,7 @@ describe('useElectron', () => {
 
       timerCommand(command)
 
-      expect(mockElectronAPI.timerCommand).toHaveBeenCalledWithExactlyOnceWith(command)
+      expect(mockElectronAPI.timerCommand).toHaveBeenCalledExactlyOnceWith(command)
     })
 
     it('should register timer tick listener', () => {
@@ -445,7 +445,7 @@ describe('useElectron', () => {
 
       onTimerTick(callback)
 
-      expect(mockElectronAPI.onTimerTick).toHaveBeenCalledWithExactlyOnceWith(callback)
+      expect(mockElectronAPI.onTimerTick).toHaveBeenCalledExactlyOnceWith(callback)
     })
 
     it('should initialize timer', async () => {
@@ -454,7 +454,7 @@ describe('useElectron', () => {
 
       await timerInitialize(settings)
 
-      expect(mockElectronAPI.timerInitialize).toHaveBeenCalledWithExactlyOnceWith(settings)
+      expect(mockElectronAPI.timerInitialize).toHaveBeenCalledExactlyOnceWith(settings)
     })
 
     it('should get timer state', async () => {
