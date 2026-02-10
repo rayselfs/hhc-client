@@ -21,7 +21,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { getThemeColorVar, isThemeColor, getProgressHeight, isSizeKey, type SizeKey } from '../constants'
+import { getThemeColorVar, isThemeColor, getProgressHeight, isSizeKey } from '../constants'
 
 type SizePreset = 'x-small' | 'small' | 'large' | 'x-large'
 

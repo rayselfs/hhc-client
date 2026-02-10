@@ -39,11 +39,7 @@ export default defineConfigWithVueTs(
   },
 
   {
-    files: [
-      'src/composables/useIndexedDB.ts',
-      'src/stores/folder.ts',
-      'src/workers/flexsearch.worker.ts',
-    ],
+    files: ['src/stores/folder.ts'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
     },

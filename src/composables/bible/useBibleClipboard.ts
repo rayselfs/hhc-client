@@ -130,8 +130,7 @@ export function useBibleClipboard(options: UseBibleClipboardOptions) {
           }
         }
       } else if (item.type === 'folder') {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const folder = data as Folder<any>
+        const folder = data as Folder<VerseItem>
         const isValidFolder =
           (folder.items && folder.items.length > 0 && isVerseItem(folder.items[0])) ||
           !folder.items ||

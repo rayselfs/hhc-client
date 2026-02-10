@@ -68,7 +68,11 @@ export function useKeyboardShortcuts(shortcuts: ShortcutHandler[]) {
     return true
   }
 
-  const handleKeydown = (event: KeyboardEvent) => {
+  const handleKeydown: EventListener = (evt: Event) => {
+    // Type guard: ensure event is KeyboardEvent
+    if (!(evt instanceof KeyboardEvent)) return
+    const event = evt
+
     // We are now in Capture Phase.
     // We can intercept events before they reach the target (e.g. focused button).
 

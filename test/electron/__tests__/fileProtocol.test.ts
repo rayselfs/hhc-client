@@ -37,7 +37,6 @@ describe('File Protocol Security', () => {
   })
 
   it('should block symlinks outside userData', async () => {
-    const maliciousPath = path.join(mockUserDataPath, 'safe.txt')
     const symlinkTarget = '/etc/passwd'
 
     vi.mocked(fs.realpathSync).mockReturnValue(symlinkTarget)
@@ -52,8 +51,6 @@ describe('File Protocol Security', () => {
   })
 
   it('should block .. path traversal attempts', async () => {
-    const maliciousPath = path.join(mockUserDataPath, '..', '..', 'etc', 'passwd')
-
     const mockRequest = new Request(`local-resource://../../../etc/passwd`)
 
     if (protocolHandler) {

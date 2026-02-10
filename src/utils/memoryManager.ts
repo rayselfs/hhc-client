@@ -3,11 +3,21 @@
  * 用於追蹤和清理記憶體洩漏
  */
 
+type ResourceType =
+  | number // interval/timeout ID
+  | {
+      // event listener
+      element: EventTarget
+      event: string
+      handler: EventListener
+      options?: AddEventListenerOptions | boolean
+    }
+  | { disconnect: () => void } // observer
+
 interface MemoryTracker {
   id: string
   type: 'interval' | 'timeout' | 'listener' | 'observer'
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  resource: any
+  resource: ResourceType
   createdAt: number
   component?: string
 }
@@ -27,8 +37,7 @@ class MemoryManager {
   /**
    * 追蹤資源
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  track(id: string, type: MemoryTracker['type'], resource: any, component?: string): void {
+  track(id: string, type: MemoryTracker['type'], resource: ResourceType, component?: string): void {
     if (this.trackers.has(id)) {
       this.untrack(id)
     }
@@ -56,13 +65,23 @@ class MemoryManager {
     try {
       switch (tracker.type) {
         case 'interval':
-          clearInterval(tracker.resource)
+          if (typeof tracker.resource === 'number') {
+            clearInterval(tracker.resource)
+          }
           break
         case 'timeout':
-          clearTimeout(tracker.resource)
+          if (typeof tracker.resource === 'number') {
+            clearTimeout(tracker.resource)
+          }
           break
         case 'listener':
-          if (tracker.resource.element && tracker.resource.event && tracker.resource.handler) {
+          if (
+            typeof tracker.resource === 'object' &&
+            'element' in tracker.resource &&
+            tracker.resource.element &&
+            tracker.resource.event &&
+            tracker.resource.handler
+          ) {
             tracker.resource.element.removeEventListener(
               tracker.resource.event,
               tracker.resource.handler,
@@ -71,7 +90,11 @@ class MemoryManager {
           }
           break
         case 'observer':
-          if (tracker.resource.disconnect) {
+          if (
+            typeof tracker.resource === 'object' &&
+            'disconnect' in tracker.resource &&
+            tracker.resource.disconnect
+          ) {
             tracker.resource.disconnect()
           }
           break
@@ -147,8 +170,7 @@ export const memoryManager = MemoryManager.getInstance()
  * Vue 組合式函數：記憶體管理
  */
 export function useMemoryManager(componentName?: string) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const track = (id: string, type: MemoryTracker['type'], resource: any) => {
+  const track = (id: string, type: MemoryTracker['type'], resource: ResourceType) => {
     memoryManager.track(id, type, resource, componentName)
   }
 
