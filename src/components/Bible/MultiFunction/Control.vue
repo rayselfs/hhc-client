@@ -192,6 +192,7 @@ import { BibleFolder } from '@/types/enum'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { KEYBOARD_SHORTCUTS } from '@/config/shortcuts'
 import { useBibleExport } from '@/composables/bible/useBibleExport'
+import { useBibleContextMenu } from '@/composables/bible/useBibleContextMenu'
 
 const { t: $t } = useI18n()
 
@@ -270,6 +271,17 @@ const { isExportDisabled, handleExport } = useBibleExport({
   getFolderById,
 })
 
+// Context Menu Logic (extracted to composable)
+const {
+  showItemContextMenu,
+  showBackgroundContextMenu,
+  menuPosition,
+  selectedItem,
+  handleRightClick,
+  handleCardTextRightClick,
+  closeItemContextMenu,
+} = useBibleContextMenu()
+
 // Check for duplicate folder name
 const isDuplicateName = computed(() => {
   if (!folderDialogs.folderName.value.trim()) return false
@@ -306,16 +318,6 @@ watch(multiFunctionTab, (newTab) => {
     navigateToRoot()
   }
 })
-
-// Context Menu State
-const showItemContextMenu = ref(false)
-const showBackgroundContextMenu = ref(false)
-const menuPosition = ref<[number, number] | undefined>(undefined)
-
-const selectedItem = ref<{
-  type: 'verse' | 'folder' | 'history'
-  item: VerseItem | Folder<VerseItem>
-} | null>(null)
 
 // Move related state (Derived from folderDialogs)
 const moveItemType = computed(() => {
@@ -724,40 +726,6 @@ const confirmMoveVerse = async (targetId: string) => {
   folderDialogs.selectedMoveFolder.value = null
   folderDialogs.moveSelection.value.clear()
   folderDialogs.moveBreadcrumb.value = []
-}
-
-// Handle Right Click
-const handleRightClick = (
-  event: MouseEvent,
-  type: 'verse' | 'folder' | 'history',
-  item: VerseItem | Folder<VerseItem>,
-) => {
-  event.preventDefault()
-  event.stopPropagation()
-  selectedItem.value = { type, item }
-  menuPosition.value = [event.clientX, event.clientY]
-  showBackgroundContextMenu.value = false
-  showItemContextMenu.value = true
-}
-
-// Handle background right click
-const handleCardTextRightClick = (event: MouseEvent) => {
-  // Ignore if clicking on verse or folder item
-  if ((event.target as HTMLElement).closest('.verse-item')) {
-    return
-  }
-
-  event.preventDefault()
-  selectedItem.value = null // Clear selection
-  menuPosition.value = [event.clientX, event.clientY]
-  showItemContextMenu.value = false
-  showBackgroundContextMenu.value = true
-}
-
-const closeItemContextMenu = () => {
-  showItemContextMenu.value = false
-  showBackgroundContextMenu.value = false
-  selectedItem.value = null
 }
 
 const copyItem = () => {
