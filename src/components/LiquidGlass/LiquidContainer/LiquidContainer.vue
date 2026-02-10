@@ -101,8 +101,11 @@ withDefaults(defineProps<Props>(), {
 
 /* Ghost Mode Styles */
 .liquid-glass-wrapper.ghost-mode {
+  /* Override: Force transparent background for ghost mode to allow underlying content */
   background: transparent !important;
+  /* Override: Remove box-shadow when ghost mode is enabled */
   box-shadow: none !important;
+  /* Override: Allow overflow in ghost mode for special layout needs */
   overflow: visible !important;
 }
 </style>

@@ -1090,7 +1090,7 @@ Parallel Speedup: ~45% faster than sequential
 
 ---
 
-- [ ] 10. Refactor Large Composables (useMediaOperations 940L, useElectron 591L)
+- [x] 10. Refactor Large Composables (useMediaOperations 940L, useElectron 591L)
 
   **What to do**:
   - **Target**: Each composable should be ≤400 lines
@@ -1255,7 +1255,7 @@ Parallel Speedup: ~45% faster than sequential
 
 ---
 
-- [ ] 12. Refactor Large Vue Components
+- [x] 12. Refactor Large Vue Components
 
   **What to do**:
   - **Target**: Each Vue component should be ≤500 lines

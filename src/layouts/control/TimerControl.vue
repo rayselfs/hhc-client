@@ -252,6 +252,7 @@ onUnmounted(() => {
 
 <style scoped>
 .v-btn-toggle .v-btn--active :deep(.v-btn__overlay) {
+  /* Override: Remove active button overlay to match custom toggle styling */
   opacity: 0 !important;
 }
 </style>

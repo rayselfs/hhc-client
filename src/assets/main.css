@@ -27,5 +27,6 @@ v-divider {
 }
 
 .rounded-lg {
+  /* Override: Force consistent rounded corners across components */
   border-radius: 12px !important;
 }

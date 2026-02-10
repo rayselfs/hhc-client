@@ -367,6 +367,7 @@ const handleDrop = (event: DragEvent, targetFolder: Folder<VerseItem>) => {
 }
 
 .verse-item.drag-over {
+  /* Override: Higher specificity needed during drag-over state to ensure visual feedback */
   background-color: rgba(var(--v-theme-primary), 0.2) !important;
   border: 2px dashed rgba(var(--v-theme-primary), 0.5);
 }

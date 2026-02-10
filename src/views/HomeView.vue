@@ -208,16 +208,21 @@ onBeforeUnmount(() => {
 
 <style scoped>
 :deep(.v-list-item--active) {
+  /* Override: Force active nav item color to match theme primary */
   background-color: rgb(var(--v-theme-primary)) !important;
+  /* Override: Ensure text color contrasts on active nav item */
   color: rgb(var(--v-theme-on-primary)) !important;
+  /* Override: Ensure opacity remains fully visible when active */
   opacity: 1 !important;
 }
 
 :deep(.v-list-item--active .v-list-item__overlay) {
+  /* Override: Hide default overlay for active list item */
   display: none !important;
 }
 
 :deep(.v-list-item--active .v-icon) {
+  /* Override: Ensure active icon inherits the active text color */
   color: inherit !important;
 }
 </style>

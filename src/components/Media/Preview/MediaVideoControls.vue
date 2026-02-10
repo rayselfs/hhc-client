@@ -267,10 +267,12 @@ const handlePlayPauseClick = () => {
 
 /* Remove animation for smoother timeline updates */
 :deep(.v-slider-thumb) {
+  /* Override: Disable thumb transition to avoid jitter during rapid updates */
   transition: none !important;
 }
 
 :deep(.v-slider-track__fill) {
+  /* Override: Disable track fill transition for immediate UI feedback */
   transition: none !important;
 }
 
@@ -305,7 +307,8 @@ const handlePlayPauseClick = () => {
 
 .volume-slider {
   min-width: 100px; /* Ensure underlying slider fits within wrapper */
-  margin: 0 !important; /* Force remove default margins */
+  /* Override: Force remove default margins from Vuetify slider */
+  margin: 0 !important;
 }
 
 /* Icon Transitions */

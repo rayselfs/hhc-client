@@ -176,6 +176,7 @@ onMounted(() => {
 
 <style scoped lang="scss">
 .pdf-thumbnail-sidebar {
+  /* Override: Force sidebar to be absolutely positioned over media area */
   position: absolute !important;
   top: 0;
   left: 0;

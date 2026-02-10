@@ -470,6 +470,7 @@ onMounted(async () => {
   flex: 1;
   display: flex;
   flex-direction: column;
+  /* Override: Ensure sidebar container border-radius matches design across Vuetify variants */
   border-radius: 14px !important;
 }
 

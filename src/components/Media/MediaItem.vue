@@ -141,7 +141,9 @@ const onDrop = () => {
 }
 
 .item-selected {
+  /* Override: Ensure selected state takes precedence over other item styles */
   background-color: rgba(var(--v-theme-primary), 0.2) !important;
+  /* Override: Stronger border to indicate selection across themes */
   border: 1px solid rgba(var(--v-theme-primary), 0.3) !important;
 }
 
@@ -150,6 +152,7 @@ const onDrop = () => {
 }
 
 .is-dragging {
+  /* Override: Temporarily lower opacity while dragging to indicate state */
   opacity: 0.4 !important;
   transform: scale(0.95);
 }
@@ -192,13 +195,16 @@ const onDrop = () => {
   line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  /* Override: Force consistent small font for media item names */
   font-size: 0.75rem !important;
   line-height: 1rem;
 }
 
 /* Drop Zone Styles */
 :global(.media-item.drag-zone-center) {
+  /* Override: Highlight drop target with stronger background during drag center */
   background-color: rgba(var(--v-theme-primary), 0.3) !important;
+  /* Override: Ensure border color overrides other list borders */
   border: 1px solid rgb(var(--v-theme-primary)) !important;
   transform: scale(1.05);
 }

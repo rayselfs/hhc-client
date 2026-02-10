@@ -429,8 +429,11 @@ const closeDialog = () => {
 
 <style>
 .dialog-top .v-overlay__content {
+  /* Override: Vuetify overlay positioning for dialog top offset */
   margin-top: 64px !important;
+  /* Override: Vuetify overlay positioning for dialog top offset */
   top: 64px !important;
+  /* Override: Vuetify overlay positioning for dialog top offset */
   position: fixed !important;
 }
 </style>

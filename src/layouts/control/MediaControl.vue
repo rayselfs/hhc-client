@@ -431,6 +431,7 @@ useKeyboardShortcuts([
 
 <style scoped>
 .hover-bg-grey-darken-2:hover {
+  /* Override: Ensure hover background takes precedence over Vuetify default */
   background-color: rgba(var(--v-theme-primary), 0.3) !important;
 }
 .user-select-none {

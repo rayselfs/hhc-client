@@ -197,6 +197,18 @@
 - lint-staged version: 16.2.7 (added to devDependencies)
 - Command: `npx husky init` created `.husky/` directory and added `prepare` script
 
+### Task 15a: !important comments
+
+- Found 29 occurrences of `!important` across CSS/SCSS and Vue style blocks.
+- Added preceding justification comments for each `!important` following the audit format.
+- Comment categories used: Vuetify Override, Higher specificity, Layout, Z-Index/positioning, Third-party override.
+- Verification: Re-ran grep to confirm each `!important` now has a preceding comment. Build and type-check were executed; build succeeded. LSP diagnostics for .vue files unavailable due to missing vue-language-server in the environment but no TypeScript errors reported by the build.
+
+Notes:
+
+- I made only CSS changes inside <style> blocks and .css/.scss files. No script or template edits were performed.
+- Did not remove or add any `!important` declarations; only added comments.
+
 ### Configuration
 
 - lint-staged targets: `*.{ts,vue}` for ESLint, `*.{ts,vue,js,json,md}` for Prettier
@@ -832,3 +844,69 @@ Added `@typescript-eslint/no-explicit-any: 'error'` with targeted exceptions for
   - Forced white text (rgba(255, 255, 255, 0.95)) for 'solid' variant buttons to ensure WCAG AA contrast ratio on colored backgrounds in both light and dark themes.
 - Tooling:
   - Installed axe-core for local accessibility auditing.
+
+## [2026-02-10T15:43] Task 10: Refactor Large Composables - COMPLETE
+
+### Results
+
+**10a. useMediaOperations.ts**:
+
+- Reduced from 1024L → 387L (62% reduction)
+- Created: useMediaUpload.ts (278L), useMediaClipboard.ts (291L), useMediaProcessing.ts (34L)
+- Test file: useMediaOperations.test.ts (458L, 20 tests passing)
+- Commit: b1779c9
+
+**10b. useElectron.ts**:
+
+- Reduced from 593L → 268L (55% reduction)
+- Created: useTimerIPC.ts (64L), useElectronFiles.ts (38L), useProjectionElectron.ts (60L)
+- Test file: useElectron.test.ts (514L, 43 tests passing)
+- Commit: 62801ec
+- Typo fix: cd2dad8 (corrected test matcher name)
+
+### Key Learning: Test Matcher Typo
+
+- Initial test file had typo: `toHaveBeenCalledWithExactlyOnceWith` (WRONG)
+- Correct matcher: `toHaveBeenCalledExactlyOnceWith` (21 occurrences)
+- Caused 21 test failures + 21 TypeScript errors
+- Fixed with global replace (`replaceAll: true` in Edit tool)
+- Verification: type-check passed, 43/43 tests passed
+
+### Pattern Established
+
+**Composable Extraction Strategy**:
+
+1. Write characterization tests FIRST (covers existing API)
+2. Extract logical sections into focused composables
+3. Keep original file as facade that re-exports extracted functions
+4. Verify tests pass after each extraction
+5. Commit each composable refactor separately
+
+**Test File Best Practice**:
+
+- Use comprehensive mocks (40+ electronAPI methods)
+- Test both success and error paths
+- Verify return values match expected types
+- Test non-Electron fallback behavior
+
+### Verification Results
+
+✅ `wc -l src/composables/useMediaOperations.ts` → 387 (target: ≤400)
+✅ `wc -l src/composables/useElectron.ts` → 268 (target: ≤400)
+✅ All tests pass: 20/20 (useMediaOperations), 43/43 (useElectron)
+✅ Type-check: 0 errors
+✅ Build: succeeds with no regressions
+
+## Bible MultiFunction Control Refactoring (Task 12f)
+
+- Extracted Bible-specific folder dialog and action logic into `src/composables/bible/useBibleFolderDialogs.ts`.
+- Reduced `Control.vue` line count from 830 to 451 lines.
+- Consolidated validation, move, delete, and creation logic into the new composable.
+- Maintained reactivity by using `storeToRefs` within the composable where necessary.
+- Improved code readability by separating UI orchestration from complex business logic.
+
+## ESLint Fixes for Bible Control and Folder Dialogs
+
+- Cleaned up unused imports (`useI18n`, `BIBLE_CONFIG`) and unused variables (`openFolderSettings`) in `Control.vue`.
+- Replaced `any` types with proper TypeScript interfaces in `useBibleFolderDialogs.ts` to satisfy strict ESLint rules and improve type safety.
+- Used `Ref<{ deleteSelectedItems: () => void } | null>` to type a component ref in a composable without creating circular dependencies or importing component types directly if not needed.
