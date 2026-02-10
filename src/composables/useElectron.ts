@@ -1,464 +1,234 @@
 import type { AppMessage } from '@/types/common'
 import type { BibleVersion } from '@/types/bible'
-import type { TimerCommand, TimerState, VideoQuality, FFmpegStatus } from '@/types/electron'
+import type { VideoQuality, FFmpegStatus } from '@/types/electron'
 import { useSentry } from './useSentry'
+import { useTimerIPC } from './useTimerIPC'
+import { useElectronFiles } from './useElectronFiles'
 
-/**
- * Electron environment related composable
- * Provides unified Electron API calls and state management
- */
 export const useElectron = () => {
   const { reportError } = useSentry()
-  /**
-   * Check if running in Electron environment
-   * @returns {boolean} Returns true if in Electron environment, false otherwise
-   */
+
   const isElectron = (): boolean => {
     return typeof window !== 'undefined' && !!window.electronAPI
   }
 
-  /**
-   * Send message to projection window
-   * @param {AppMessage} data - Application message to send
-   * @throws {Error} Throws error when sending fails
-   */
+  const withErrorHandling = async <T>(
+    operation: string,
+    fn: () => Promise<T>,
+    fallback: T,
+    extra?: Record<string, unknown>,
+  ): Promise<T> => {
+    if (!isElectron()) return fallback
+    try {
+      return await fn()
+    } catch (error) {
+      reportError(error, { operation, component: 'useElectron', extra })
+      return fallback
+    }
+  }
+
   const sendToProjection = (data: AppMessage): void => {
     if (isElectron()) {
       try {
         window.electronAPI.sendToProjection(data)
       } catch (error) {
-        reportError(error, {
-          operation: 'send-to-projection',
-          component: 'useElectron',
-        })
+        reportError(error, { operation: 'send-to-projection', component: 'useElectron' })
       }
     }
   }
 
-  /**
-   * Send message to main window
-   * @param {AppMessage} data - Application message to send
-   */
   const sendToMain = (data: AppMessage): void => {
-    if (isElectron()) {
-      window.electronAPI.sendToMain(data)
-    }
+    if (isElectron()) window.electronAPI.sendToMain(data)
   }
 
-  /**
-   * Check if projection window exists
-   * @returns {Promise<boolean>} Returns true if projection window exists, false otherwise
-   * @throws {Error} Throws error when check fails
-   */
-  const checkProjectionWindow = async (): Promise<boolean> => {
-    if (isElectron()) {
-      try {
-        return await window.electronAPI.checkProjectionWindow()
-      } catch (error) {
-        reportError(error, {
-          operation: 'check-projection-window',
-          component: 'useElectron',
-        })
-        return false
-      }
-    }
-    return false
-  }
+  const checkProjectionWindow = (): Promise<boolean> =>
+    withErrorHandling(
+      'check-projection-window',
+      () => window.electronAPI.checkProjectionWindow(),
+      false,
+    )
 
-  /**
-   * Ensure projection window exists, create if it doesn't exist
-   * @returns {Promise<boolean>} Returns true if successfully created or already exists, false otherwise
-   * @throws {Error} Throws error when creation fails
-   */
-  const ensureProjectionWindow = async (): Promise<boolean> => {
-    if (isElectron()) {
-      try {
-        return await window.electronAPI.ensureProjectionWindow()
-      } catch (error) {
-        reportError(error, {
-          operation: 'ensure-projection-window',
-          component: 'useElectron',
-        })
-        return false
-      }
-    }
-    return false
-  }
+  const ensureProjectionWindow = (): Promise<boolean> =>
+    withErrorHandling(
+      'ensure-projection-window',
+      () => window.electronAPI.ensureProjectionWindow(),
+      false,
+    )
 
-  // Get display information
-  const getDisplays = async (): Promise<unknown[]> => {
-    if (isElectron()) {
-      try {
-        return await window.electronAPI.getDisplays()
-      } catch (error) {
-        reportError(error, {
-          operation: 'get-displays',
-          component: 'useElectron',
-        })
-        return []
-      }
-    }
-    return []
-  }
+  const getDisplays = (): Promise<unknown[]> =>
+    withErrorHandling('get-displays', () => window.electronAPI.getDisplays(), [])
 
-  // Listen for messages from main window
   const onMainMessage = (callback: (data: AppMessage) => void): void => {
-    if (isElectron()) {
-      window.electronAPI.onMainMessage(callback)
-    }
+    if (isElectron()) window.electronAPI.onMainMessage(callback)
   }
 
-  // Listen for messages from projection window
   const onProjectionMessage = (callback: (data: AppMessage) => void): void => {
-    if (isElectron()) {
-      window.electronAPI.onProjectionMessage(callback)
-    }
+    if (isElectron()) window.electronAPI.onProjectionMessage(callback)
   }
 
-  // Listen for get current state event
   const onGetCurrentState = (callback: () => void): void => {
-    if (isElectron()) {
-      window.electronAPI.onGetCurrentState(callback)
-    }
+    if (isElectron()) window.electronAPI.onGetCurrentState(callback)
   }
 
-  // Listen for projection window opened event
   const onProjectionOpened = (callback: () => void): void => {
-    if (isElectron()) {
-      window.electronAPI.onProjectionOpened(callback)
-    }
+    if (isElectron()) window.electronAPI.onProjectionOpened(callback)
   }
 
-  // Listen for projection window closed event
   const onProjectionClosed = (callback: () => void): void => {
-    if (isElectron()) {
-      window.electronAPI.onProjectionClosed(callback)
-    }
+    if (isElectron()) window.electronAPI.onProjectionClosed(callback)
   }
 
-  // Listen for no second screen detected event
   const onNoSecondScreenDetected = (callback: () => void): void => {
-    if (isElectron()) {
-      window.electronAPI.onNoSecondScreenDetected(callback)
-    }
+    if (isElectron()) window.electronAPI.onNoSecondScreenDetected(callback)
   }
 
-  // Remove all listeners
   const removeAllListeners = (channel: string): void => {
-    if (isElectron()) {
-      window.electronAPI.removeAllListeners(channel)
-    }
+    if (isElectron()) window.electronAPI.removeAllListeners(channel)
   }
 
-  /**
-   * Close projection window
-   */
   const closeProjectionWindow = async (): Promise<void> => {
-    if (isElectron()) {
-      try {
-        await window.electronAPI.closeProjectionWindow()
-      } catch (error) {
-        reportError(error, {
-          operation: 'close-projection-window',
-          component: 'useElectron',
-        })
-      }
-    }
+    await withErrorHandling(
+      'close-projection-window',
+      () => window.electronAPI.closeProjectionWindow(),
+      false,
+    )
   }
 
-  /**
-   * Get file path from file object (Electron specific)
-   */
-  const getFilePath = (file: File): string => {
-    if (isElectron()) {
-      return window.electronAPI.getFilePath(file)
-    }
-    return ''
-  }
-
-  /**
-   * Save file to persistent storage (Electron specific)
-   */
-  const saveFile = async (
-    sourcePath: string,
-  ): Promise<{ filePath: string; thumbnailData?: Uint8Array }> => {
-    if (isElectron()) {
-      try {
-        return await window.electronAPI.saveFile(sourcePath)
-      } catch (error) {
-        reportError(error, {
-          operation: 'save-file',
-          component: 'useElectron',
-        })
-        throw error
-      }
-    }
-    throw new Error('Not in Electron environment')
-  }
-
-  /**
-   * Update system language
-   */
   const updateLanguage = async (locale: string): Promise<void> => {
-    if (isElectron()) {
-      try {
-        await window.electronAPI.updateLanguage(locale)
-      } catch (error) {
-        reportError(error, {
-          operation: 'update-language',
-          component: 'useElectron',
-          extra: { locale },
-        })
-      }
-    }
+    await withErrorHandling(
+      'update-language',
+      () => window.electronAPI.updateLanguage(locale),
+      { success: false },
+      { locale },
+    )
   }
 
-  /**
-   * Get system locale
-   */
-  const getSystemLocale = async (): Promise<string | undefined> => {
-    if (isElectron()) {
-      try {
-        return await window.electronAPI.getSystemLocale()
-      } catch (error) {
-        reportError(error, {
-          operation: 'get-system-locale',
-          component: 'useElectron',
-        })
-        return undefined
-      }
-    }
-    return undefined
-  }
+  const getSystemLocale = (): Promise<string | undefined> =>
+    withErrorHandling('get-system-locale', () => window.electronAPI.getSystemLocale(), undefined)
 
-  /**
-   * Reset user data
-   */
   const resetUserData = async (): Promise<void> => {
-    if (isElectron()) {
-      try {
-        await window.electronAPI.resetUserData()
-      } catch (error) {
-        reportError(error, {
-          operation: 'reset-user-data',
-          component: 'useElectron',
-        })
-        throw error
-      }
+    if (!isElectron()) return
+    try {
+      await window.electronAPI.resetUserData()
+    } catch (error) {
+      reportError(error, { operation: 'reset-user-data', component: 'useElectron' })
+      throw error
     }
   }
 
-  // Hardware Acceleration
-  const getHardwareAcceleration = async (): Promise<boolean> => {
-    if (isElectron()) {
-      try {
-        return await window.electronAPI.getHardwareAcceleration()
-      } catch (error) {
-        reportError(error, {
-          operation: 'get-hardware-acceleration',
-          component: 'useElectron',
-        })
-        return true // Default to true if failed
-      }
-    }
-    return true
-  }
+  const getHardwareAcceleration = (): Promise<boolean> =>
+    withErrorHandling(
+      'get-hardware-acceleration',
+      () => window.electronAPI.getHardwareAcceleration(),
+      true,
+    )
 
-  const setHardwareAcceleration = async (enabled: boolean): Promise<boolean> => {
-    if (isElectron()) {
-      try {
-        return await window.electronAPI.setHardwareAcceleration(enabled)
-      } catch (error) {
-        reportError(error, {
-          operation: 'set-hardware-acceleration',
-          component: 'useElectron',
-          extra: { enabled },
-        })
-        return false
-      }
-    }
-    return false
-  }
+  const setHardwareAcceleration = (enabled: boolean): Promise<boolean> =>
+    withErrorHandling(
+      'set-hardware-acceleration',
+      () => window.electronAPI.setHardwareAcceleration(enabled),
+      false,
+      { enabled },
+    )
 
-  // Video Quality Settings
-  const getVideoQuality = async (): Promise<VideoQuality> => {
-    if (isElectron()) {
-      try {
-        return await window.electronAPI.getVideoQuality()
-      } catch (error) {
-        reportError(error, {
-          operation: 'get-video-quality',
-          component: 'useElectron',
-        })
-        return 'high' // Default to high if failed
-      }
-    }
-    return 'high'
-  }
+  const getVideoQuality = (): Promise<VideoQuality> =>
+    withErrorHandling('get-video-quality', () => window.electronAPI.getVideoQuality(), 'high')
 
-  const setVideoQuality = async (quality: VideoQuality): Promise<boolean> => {
-    if (isElectron()) {
-      try {
-        return await window.electronAPI.setVideoQuality(quality)
-      } catch (error) {
-        reportError(error, {
-          operation: 'set-video-quality',
-          component: 'useElectron',
-          extra: { quality },
-        })
-        return false
-      }
-    }
-    return false
-  }
+  const setVideoQuality = (quality: VideoQuality): Promise<boolean> =>
+    withErrorHandling(
+      'set-video-quality',
+      () => window.electronAPI.setVideoQuality(quality),
+      false,
+      { quality },
+    )
 
-  const getEnableFfmpeg = async (): Promise<boolean> => {
-    if (isElectron()) {
-      try {
-        return await window.electronAPI.getEnableFfmpeg()
-      } catch (error) {
-        reportError(error, {
-          operation: 'get-enable-ffmpeg',
-          component: 'useElectron',
-        })
-        return false
-      }
-    }
-    return false
-  }
+  const getEnableFfmpeg = (): Promise<boolean> =>
+    withErrorHandling('get-enable-ffmpeg', () => window.electronAPI.getEnableFfmpeg(), false)
 
-  const setEnableFfmpeg = async (enabled: boolean): Promise<boolean> => {
-    if (isElectron()) {
-      try {
-        return await window.electronAPI.setEnableFfmpeg(enabled)
-      } catch (error) {
-        reportError(error, {
-          operation: 'set-enable-ffmpeg',
-          component: 'useElectron',
-          extra: { enabled },
-        })
-        return false
-      }
-    }
-    return false
-  }
+  const setEnableFfmpeg = (enabled: boolean): Promise<boolean> =>
+    withErrorHandling(
+      'set-enable-ffmpeg',
+      () => window.electronAPI.setEnableFfmpeg(enabled),
+      false,
+      { enabled },
+    )
 
-  const ffmpegCheckStatus = async (): Promise<FFmpegStatus> => {
-    if (isElectron()) {
-      try {
-        return await window.electronAPI.ffmpegCheckStatus()
-      } catch (error) {
-        reportError(error, {
-          operation: 'ffmpeg-check-status',
-          component: 'useElectron',
-        })
-        return { available: false, path: '', version: '', error: 'Check failed' }
-      }
-    }
-    return { available: false, path: '', version: '', error: 'Not in Electron' }
-  }
+  const ffmpegCheckStatus = (): Promise<FFmpegStatus> =>
+    withErrorHandling('ffmpeg-check-status', () => window.electronAPI.ffmpegCheckStatus(), {
+      available: false,
+      path: '',
+      version: '',
+      error: isElectron() ? 'Check failed' : 'Not in Electron',
+    })
 
-  const ffmpegSetPath = async (customPath: string): Promise<FFmpegStatus> => {
-    if (isElectron()) {
-      try {
-        return await window.electronAPI.ffmpegSetPath(customPath)
-      } catch (error) {
-        reportError(error, {
-          operation: 'ffmpeg-set-path',
-          component: 'useElectron',
-          extra: { customPath },
-        })
-        return { available: false, path: '', version: '', error: 'Set path failed' }
-      }
-    }
-    return { available: false, path: '', version: '', error: 'Not in Electron' }
-  }
+  const ffmpegSetPath = (customPath: string): Promise<FFmpegStatus> =>
+    withErrorHandling(
+      'ffmpeg-set-path',
+      () => window.electronAPI.ffmpegSetPath(customPath),
+      {
+        available: false,
+        path: '',
+        version: '',
+        error: isElectron() ? 'Set path failed' : 'Not in Electron',
+      },
+      { customPath },
+    )
 
-  // App Control
   const restartApp = async (): Promise<void> => {
-    if (isElectron()) {
-      try {
-        await window.electronAPI.restartApp()
-      } catch (error) {
-        reportError(error, {
-          operation: 'restart-app',
-          component: 'useElectron',
-        })
-      }
-    }
+    await withErrorHandling('restart-app', () => window.electronAPI.restartApp(), undefined)
   }
 
-  // Bible API Methods
   const getBibleVersions = async (): Promise<BibleVersion[]> => {
-    if (isElectron()) {
-      try {
-        return await window.electronAPI.getBibleVersions()
-      } catch (error) {
-        reportError(error, {
-          operation: 'get-bible-versions',
-          component: 'useElectron',
-        })
-        throw error
-      }
+    if (!isElectron()) return []
+    try {
+      return await window.electronAPI.getBibleVersions()
+    } catch (error) {
+      reportError(error, { operation: 'get-bible-versions', component: 'useElectron' })
+      throw error
     }
-    return []
   }
 
   const getBibleContent = async (versionId: number): Promise<void> => {
-    if (isElectron()) {
-      try {
-        await window.electronAPI.getBibleContent(versionId)
-      } catch (error) {
-        reportError(error, {
-          operation: 'get-bible-content',
-          component: 'useElectron',
-          extra: { versionId },
-        })
-        throw error
-      }
+    if (!isElectron()) return
+    try {
+      await window.electronAPI.getBibleContent(versionId)
+    } catch (error) {
+      reportError(error, {
+        operation: 'get-bible-content',
+        component: 'useElectron',
+        extra: { versionId },
+      })
+      throw error
     }
   }
 
   const onBibleContentChunk = (callback: (chunk: Uint8Array) => void): void => {
-    if (isElectron()) {
-      window.electronAPI.onBibleContentChunk(callback)
-    }
+    if (isElectron()) window.electronAPI.onBibleContentChunk(callback)
   }
 
-  // Updater Methods
   const onUpdateAvailable = (callback: () => void): void => {
-    if (isElectron()) {
-      window.electronAPI.onUpdateAvailable(callback)
-    }
+    if (isElectron()) window.electronAPI.onUpdateAvailable(callback)
   }
 
   const onUpdateDownloaded = (callback: () => void): void => {
-    if (isElectron()) {
-      window.electronAPI.onUpdateDownloaded(callback)
-    }
+    if (isElectron()) window.electronAPI.onUpdateDownloaded(callback)
   }
 
   const onUpdateError = (callback: (error: string) => void): void => {
-    if (isElectron()) {
-      window.electronAPI.onUpdateError(callback)
-    }
+    if (isElectron()) window.electronAPI.onUpdateError(callback)
   }
 
-  return {
-    // State check
-    isElectron,
+  const timerIPC = useTimerIPC()
+  const electronFiles = useElectronFiles()
 
-    // Message passing
+  return {
+    isElectron,
     sendToProjection,
     sendToMain,
-
-    // Window management
     checkProjectionWindow,
     ensureProjectionWindow,
     closeProjectionWindow,
     getDisplays,
-
-    // System settings
     updateLanguage,
     getSystemLocale,
     resetUserData,
@@ -471,67 +241,12 @@ export const useElectron = () => {
     ffmpegCheckStatus,
     ffmpegSetPath,
     restartApp,
-
-    // File operations
-    getFilePath,
-    saveFile,
-
-    // Bible API
     getBibleVersions,
     getBibleContent,
     onBibleContentChunk,
-
-    // Updater Event Listeners
     onUpdateAvailable,
     onUpdateDownloaded,
     onUpdateError,
-
-    // Timer IPC
-    timerCommand: (command: TimerCommand) => {
-      if (isElectron()) {
-        try {
-          window.electronAPI.timerCommand(command)
-        } catch (error) {
-          reportError(error, {
-            operation: 'timer-command',
-            component: 'useElectron',
-          })
-        }
-      }
-    },
-    onTimerTick: (callback: (state: Partial<TimerState>) => void) => {
-      if (isElectron()) {
-        window.electronAPI.onTimerTick(callback)
-      }
-    },
-    timerInitialize: async (settings: Partial<TimerState>) => {
-      if (isElectron()) {
-        try {
-          await window.electronAPI.timerInitialize(settings)
-        } catch (error) {
-          reportError(error, {
-            operation: 'timer-initialize',
-            component: 'useElectron',
-          })
-        }
-      }
-    },
-    timerGetState: async () => {
-      if (isElectron()) {
-        try {
-          return await window.electronAPI.timerGetState()
-        } catch (error) {
-          reportError(error, {
-            operation: 'timer-get-state',
-            component: 'useElectron',
-          })
-          return null
-        }
-      }
-      return null
-    },
-
-    // Event listeners
     onMainMessage,
     onProjectionMessage,
     onGetCurrentState,
@@ -539,55 +254,15 @@ export const useElectron = () => {
     onProjectionClosed,
     onNoSecondScreenDetected,
     removeAllListeners,
+    getFilePath: electronFiles.getFilePath,
+    saveFile: electronFiles.saveFile,
+    timerCommand: timerIPC.timerCommand,
+    onTimerTick: timerIPC.onTimerTick,
+    timerInitialize: timerIPC.timerInitialize,
+    timerGetState: timerIPC.timerGetState,
   }
 }
 
-/**
- * Projection window specific composable
- * Provides features specific to projection window
- */
-export const useProjectionElectron = () => {
-  const { isElectron, onProjectionMessage, onGetCurrentState, removeAllListeners } = useElectron()
-
-  // Listen for messages from main window
-  const handleMessage = (callback: (data: AppMessage) => void): (() => void) | void => {
-    if (isElectron()) {
-      // In Electron environment, listen for IPC messages
-      onProjectionMessage(callback)
-    } else {
-      // In browser environment, listen for postMessage
-      const messageHandler = (event: MessageEvent) => {
-        if (event.origin !== window.location.origin) {
-          return
-        }
-        callback(event.data)
-      }
-      window.addEventListener('message', messageHandler)
-
-      // Return cleanup function
-      return () => {
-        window.removeEventListener('message', messageHandler)
-      }
-    }
-  }
-
-  // Request current state
-  const requestCurrentState = (): void => {
-    if (isElectron()) {
-      // In Electron environment, request state via IPC
-      onGetCurrentState(() => {
-        // Main window will automatically send current state
-      })
-    } else if (window.opener) {
-      // In browser environment, request state via postMessage
-      window.opener.postMessage({ type: 'REQUEST_STATE' }, window.location.origin)
-    }
-  }
-
-  return {
-    isElectron,
-    handleMessage,
-    requestCurrentState,
-    removeAllListeners,
-  }
-}
+export { useProjectionElectron } from './useProjectionElectron'
+export { useTimerIPC } from './useTimerIPC'
+export { useElectronFiles } from './useElectronFiles'
