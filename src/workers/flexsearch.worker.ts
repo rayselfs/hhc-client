@@ -151,9 +151,11 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         }
 
         const data = msg.data
-        const keys = Object.keys(data)
-        for (const key of keys) {
-          await index.import(key, data[key])
+        for (const key of Object.keys(data)) {
+          const value = data[key]
+          if (value !== undefined) {
+            await index.import(key, value)
+          }
         }
 
         // Note: Import only restores the index structure.
