@@ -193,6 +193,7 @@ import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { KEYBOARD_SHORTCUTS } from '@/config/shortcuts'
 import { useBibleExport } from '@/composables/bible/useBibleExport'
 import { useBibleContextMenu } from '@/composables/bible/useBibleContextMenu'
+import { useBibleClipboard } from '@/composables/bible/useBibleClipboard'
 
 const { t: $t } = useI18n()
 
@@ -282,6 +283,26 @@ const {
   closeItemContextMenu,
 } = useBibleContextMenu()
 
+// Clipboard Operations (extracted to composable)
+const { copyItem, pasteItemHandler } = useBibleClipboard({
+  selectedItem,
+  activeTabSelection,
+  multiFunctionTab,
+  customFolderTabRef,
+  historyTabRef,
+  currentFolder,
+  clipboard,
+  closeItemContextMenu,
+  copyToClipboard,
+  hasClipboardItems,
+  moveItemAction,
+  pasteItem,
+  moveFolderAction,
+  updateFolder,
+  clearClipboard,
+  getCurrentFolders,
+})
+
 // Check for duplicate folder name
 const isDuplicateName = computed(() => {
   if (!folderDialogs.folderName.value.trim()) return false
@@ -345,24 +366,6 @@ const createNewFolder = () => {
 
   folderDialogs.openCreateFolderDialog(newName)
   closeItemContextMenu()
-}
-
-// Check if name is duplicate in current folder
-const isNameExists = (name: string) => {
-  return getCurrentFolders.value.some((f: Folder<VerseItem>) => f.name === name)
-}
-
-// Generate unique name
-const getUniqueName = (originalName: string) => {
-  let finalName = originalName
-  let counter = 2
-
-  while (isNameExists(finalName)) {
-    finalName = `${originalName} ${counter}`
-    counter++
-  }
-
-  return finalName
 }
 
 const openFolderSettings = (folder: Folder<VerseItem>) => {
@@ -726,119 +729,6 @@ const confirmMoveVerse = async (targetId: string) => {
   folderDialogs.selectedMoveFolder.value = null
   folderDialogs.moveSelection.value.clear()
   folderDialogs.moveBreadcrumb.value = []
-}
-
-const copyItem = () => {
-  if (!selectedItem.value) return
-
-  const isSelected = activeTabSelection.value.has(selectedItem.value.item.id)
-  if (isSelected) {
-    if (multiFunctionTab.value === 'custom' && customFolderTabRef.value) {
-      customFolderTabRef.value.copySelectedItems()
-      closeItemContextMenu()
-      return
-    } else if (multiFunctionTab.value === 'history' && historyTabRef.value) {
-      historyTabRef.value.copySelectedItems()
-      closeItemContextMenu()
-      return
-    }
-  }
-
-  // Fallback to single item copy
-  const item = selectedItem.value.item
-
-  // Custom/History Single Item
-  const type = isFolder(item) ? 'folder' : 'verse'
-  const sourceFolderId =
-    selectedItem.value.type === 'history'
-      ? BibleFolder.ROOT_ID
-      : currentFolder.value?.id || BibleFolder.ROOT_ID
-
-  copyToClipboard([
-    {
-      type: type,
-      data: item,
-      action: 'copy',
-      sourceFolderId,
-    },
-  ])
-  closeItemContextMenu()
-}
-
-const pasteItemHandler = async () => {
-  if (!hasClipboardItems()) return
-
-  const targetFolderId =
-    currentFolder.value.id === BibleFolder.ROOT_ID ? BibleFolder.ROOT_ID : currentFolder.value.id
-
-  let movedCount = 0
-
-  for (const item of clipboard.value) {
-    const data = item.data
-
-    // Check if it's a verse or file type in clipboard
-    if (item.type === 'file' || item.type === 'verse') {
-      // Must be a VerseItem to paste into Bible Custom Folder
-      if (isVerseItem(data)) {
-        if (item.action === 'cut') {
-          await moveItemAction(data as VerseItem, targetFolderId, item.sourceFolderId)
-          movedCount++
-        } else {
-          pasteItem(data as VerseItem, targetFolderId, 'verse')
-        }
-      } else {
-        // It's a media file (FileItem) - Skip or Warn
-      }
-    } else if (item.type === 'folder') {
-      // Logic for folder
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const folder = data as Folder<any>
-      // Check content of folder to ensure compatibility
-      const isValidFolder =
-        (folder.items && folder.items.length > 0 && isVerseItem(folder.items[0])) ||
-        !folder.items ||
-        folder.items.length === 0
-
-      if (isValidFolder) {
-        if (item.action === 'cut') {
-          // Move folder
-          // Check for name collision in target folder
-          const folderData = data as Folder<VerseItem>
-          const uniqueName = getUniqueName(folderData.name)
-
-          if (uniqueName !== folderData.name) {
-            // Update name before moving
-            await updateFolder(folderData.id, { name: uniqueName })
-          }
-
-          await moveFolderAction(
-            data as Folder<VerseItem>,
-            targetFolderId,
-            item.sourceFolderId,
-            false,
-          ) // false = don't skip save
-          movedCount++
-        } else {
-          // Paste (Clone) folder
-          const folderData = data as Folder<VerseItem>
-          const uniqueName = getUniqueName(folderData.name)
-
-          // We need to pass the renamed folder to pasteItem.
-          // Since pasteItem uses deepClone, we can just spread and override name.
-          const folderToPaste = { ...folderData, name: uniqueName }
-
-          pasteItem(folderToPaste, targetFolderId, 'folder')
-        }
-      }
-    }
-  }
-
-  // Clear clipboard if any item was moved (Cut operation completed)
-  if (movedCount > 0) {
-    clearClipboard()
-  }
-
-  closeItemContextMenu()
 }
 
 const showMoveItemDialog = () => {
