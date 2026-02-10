@@ -51,9 +51,7 @@ export function useFlexSearch<T extends Record<string, unknown>>(config: FlexSea
   let worker: Worker | null = null
 
   // Pending request resolvers
-  // We use a simple queue for now since most ops are sequential or we just wait for the latest
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const pendingSearches = new Map<number, (results: any[]) => void>()
+  const pendingSearches = new Map<number, (results: FlexSearchResult<T>[]) => void>()
   let nextId = 1
 
   let exportResolve: ((data: Record<string, string>) => void) | null = null
