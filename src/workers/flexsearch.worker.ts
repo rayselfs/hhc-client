@@ -1,42 +1,41 @@
-import FlexSearch from 'flexsearch'
+import FlexSearch, { type DocumentData } from 'flexsearch'
 
-// Define message types
+interface WorkerConfig {
+  options?: Record<string, unknown>
+  searchFields: string | string[] | Record<string, unknown>
+  idField?: string
+}
+
 type WorkerMessage =
-  | { type: 'init'; config: any }
-  | { type: 'add'; items: any[]; id?: number }
-  | { type: 'search'; id: number; query: string; limit?: number; options?: any }
+  | { type: 'init'; config: WorkerConfig }
+  | { type: 'add'; items: DocumentData[]; id?: number }
+  | { type: 'search'; id: number; query: string; limit?: number; options?: Record<string, unknown> }
   | { type: 'info' }
   | { type: 'clear' }
   | { type: 'export' }
-  | { type: 'import'; data: any }
+  | { type: 'import'; data: Record<string, string> }
 
-// Global state in worker
-let index: any = null
-const docs: Map<string | number, any> = new Map()
+type FlexSearchIndex = InstanceType<typeof FlexSearch.Document>
+
+let index: FlexSearchIndex | null = null
+const docs: Map<string | number, DocumentData> = new Map()
 let idField = 'id'
 
-// Helper to initialize index
-const initializeIndex = (config: any) => {
+const initializeIndex = (config: WorkerConfig) => {
   const { options = {}, searchFields, idField: id } = config
   idField = id || 'id'
 
-  // FlexSearch Document config
   index = new FlexSearch.Document({
-    tokenize: options.tokenize || 'forward',
-    resolution: options.resolution || 9,
-    cache: options.cache || false,
-    worker: false, // We are already in a worker
-    threshold: options.threshold,
-    depth: options.depth,
-    bidirectional: options.bidirectional,
-    context: options.context,
-    encode: options.encode,
+    tokenize: (options.tokenize as 'forward' | 'strict' | 'full') || 'forward',
+    resolution: (options.resolution as number) || 9,
+    cache: (options.cache as boolean | number) || false,
+    worker: false,
     document: {
       id: idField,
-      index: searchFields,
-      store: true, // We store the document in FlexSearch directly if possible, or manages it ourselves
+      index: searchFields as string | string[],
+      store: true,
     },
-  } as any)
+  })
 }
 
 self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
@@ -56,12 +55,11 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         }
 
         const items = msg.items
-        // Batch add
         for (const item of items) {
-          const id = item[idField]
-          if (id !== undefined && id !== null) {
+          const idValue = item[idField]
+          if (typeof idValue === 'string' || typeof idValue === 'number') {
             index.add(item)
-            docs.set(id, item)
+            docs.set(idValue, item)
           }
         }
 
@@ -85,7 +83,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
 
         // Process results
         // FlexSearch returns grouped results by field, we need to flatten/merge them
-        const mergedResults = new Map<string | number, { item: any; score: number }>()
+        const mergedResults = new Map<string | number, { item: DocumentData; score: number }>()
 
         for (const fieldResult of searchResults) {
           if (Array.isArray(fieldResult.result)) {
@@ -133,10 +131,11 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
 
         const exportData: Record<string, string> = {}
         await new Promise<void>((resolve) => {
-          index.export((key: string, data: string) => {
-            exportData[key] = data
-          })
-          // Hack: export callback might be sync, but ensure we return
+          if (index) {
+            index.export((key: string, data: string) => {
+              exportData[key] = data
+            })
+          }
           setTimeout(() => resolve(), 10)
         })
 
@@ -170,8 +169,9 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         break
       }
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : String(err)
     console.error('Worker error:', err)
-    self.postMessage({ type: 'error', message: err.message })
+    self.postMessage({ type: 'error', message: errorMessage })
   }
 }

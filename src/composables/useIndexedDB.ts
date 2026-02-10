@@ -1,4 +1,4 @@
-import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
+import { openDB, type IDBPDatabase, type IDBPTransaction } from 'idb'
 import { useSentry } from './useSentry'
 
 /**
@@ -30,9 +30,11 @@ export interface IndexConfig {
 }
 
 /**
- * Generic IndexedDB Schema - Uses Record type to support dynamic store names
+ * Type assertion helper for dynamic store names
+ * The idb library's type system doesn't support truly dynamic store names,
+ * so we use type assertions while maintaining runtime safety
  */
-type GenericDB = DBSchema & Record<string, { key: unknown; value: unknown }>
+type DynamicDB = IDBPDatabase
 
 /**
  * useIndexedDB composable
@@ -40,28 +42,22 @@ type GenericDB = DBSchema & Record<string, { key: unknown; value: unknown }>
  */
 export function useIndexedDB(config: IndexedDBConfig) {
   const { reportError } = useSentry()
-  let dbInstance: IDBPDatabase<GenericDB> | null = null
+  let dbInstance: DynamicDB | null = null
 
   /**
    * Initialize IndexedDB
    */
-  const initDB = async (): Promise<IDBPDatabase<GenericDB>> => {
+  const initDB = async (): Promise<DynamicDB> => {
     if (dbInstance) {
       return dbInstance
     }
 
     try {
-      // Use type assertion to support dynamic store names
-
-      dbInstance = (await (openDB as any)(config.dbName, config.version, {
-        upgrade(db: any) {
-          // Create object store for each store
+      dbInstance = await openDB(config.dbName, config.version, {
+        upgrade(db) {
           config.stores.forEach((storeConfig) => {
-            // If store exists and we are upgrading, we might need to recreate it
-            // if the structure (like keyPath) changed.
-            // For now, only recreate if explicitly needed or if it doesn't exist.
             if (db.objectStoreNames.contains(storeConfig.name)) {
-              return // Skip existing stores
+              return
             }
 
             const objectStore = storeConfig.autoIncrement
@@ -72,7 +68,6 @@ export function useIndexedDB(config: IndexedDBConfig) {
                   keyPath: storeConfig.keyPath,
                 })
 
-            // Create indices
             if (storeConfig.indices) {
               storeConfig.indices.forEach((indexConfig) => {
                 if (!objectStore.indexNames.contains(indexConfig.name)) {
@@ -84,7 +79,7 @@ export function useIndexedDB(config: IndexedDBConfig) {
             }
           })
         },
-      })) as IDBPDatabase<GenericDB>
+      })
       return dbInstance
     } catch (error) {
       reportError(error, {
@@ -102,12 +97,10 @@ export function useIndexedDB(config: IndexedDBConfig) {
    * @param key - Primary key
    * @returns Value, or undefined if not exists
    */
-  const get = async <T = unknown>(storeName: string, key: unknown): Promise<T | undefined> => {
+  const get = async <T = unknown>(storeName: string, key: IDBValidKey): Promise<T | undefined> => {
     try {
       const db = await initDB()
-      // Use type assertion to bypass TypeScript strict check because store name is dynamic
-
-      return (await (db as any).get(storeName, key)) as T | undefined
+      return (await db.get(storeName, key)) as T | undefined
     } catch (error) {
       reportError(error, {
         operation: 'get-indexeddb',
@@ -128,11 +121,10 @@ export function useIndexedDB(config: IndexedDBConfig) {
     storeName: string,
     value: T,
     key?: IDBValidKey,
-  ): Promise<unknown> => {
+  ): Promise<IDBValidKey> => {
     try {
       const db = await initDB()
-
-      return await (db as any).put(storeName, value, key)
+      return await db.put(storeName, value, key)
     } catch (error) {
       reportError(error, {
         operation: 'put-indexeddb',
@@ -153,11 +145,10 @@ export function useIndexedDB(config: IndexedDBConfig) {
     storeName: string,
     value: T,
     key?: IDBValidKey,
-  ): Promise<unknown> => {
+  ): Promise<IDBValidKey> => {
     try {
       const db = await initDB()
-
-      return await (db as any).add(storeName, value, key)
+      return await db.add(storeName, value, key)
     } catch (error) {
       reportError(error, {
         operation: 'add-indexeddb',
@@ -173,12 +164,10 @@ export function useIndexedDB(config: IndexedDBConfig) {
    * @param storeName - Object store name
    * @param key - Primary key
    */
-  const deleteItem = async (storeName: string, key: unknown): Promise<void> => {
+  const deleteItem = async (storeName: string, key: IDBValidKey): Promise<void> => {
     try {
       const db = await initDB()
-      // 使用類型斷言來繞過 TypeScript 的嚴格檢查，因為 store 名稱是動態的
-
-      await (db as any).delete(storeName, key)
+      await db.delete(storeName, key)
     } catch (error) {
       reportError(error, {
         operation: 'delete-indexeddb',
@@ -197,9 +186,7 @@ export function useIndexedDB(config: IndexedDBConfig) {
   const getAll = async <T = unknown>(storeName: string): Promise<T[]> => {
     try {
       const db = await initDB()
-      // 使用類型斷言來繞過 TypeScript 的嚴格檢查，因為 store 名稱是動態的
-
-      return (await (db as any).getAll(storeName)) as T[]
+      return (await db.getAll(storeName)) as T[]
     } catch (error) {
       reportError(error, {
         operation: 'getall-indexeddb',
@@ -215,12 +202,10 @@ export function useIndexedDB(config: IndexedDBConfig) {
    * @param storeName - Object store name
    * @returns All keys
    */
-  const getAllKeys = async <T = unknown>(storeName: string): Promise<T[]> => {
+  const getAllKeys = async <T = IDBValidKey>(storeName: string): Promise<T[]> => {
     try {
       const db = await initDB()
-      // 使用類型斷言來繞過 TypeScript 的嚴格檢查，因為 store 名稱是動態的
-
-      return (await (db as any).getAllKeys(storeName)) as T[]
+      return (await db.getAllKeys(storeName)) as T[]
     } catch (error) {
       reportError(error, {
         operation: 'getallkeys-indexeddb',
@@ -238,9 +223,7 @@ export function useIndexedDB(config: IndexedDBConfig) {
   const clear = async (storeName: string): Promise<void> => {
     try {
       const db = await initDB()
-      // 使用類型斷言來繞過 TypeScript 的嚴格檢查，因為 store 名稱是動態的
-
-      await (db as any).clear(storeName)
+      await db.clear(storeName)
     } catch (error) {
       reportError(error, {
         operation: 'clear-indexeddb',
@@ -257,12 +240,10 @@ export function useIndexedDB(config: IndexedDBConfig) {
    * @param key - Primary key
    * @returns Whether it exists
    */
-  const has = async (storeName: string, key: unknown): Promise<boolean> => {
+  const has = async (storeName: string, key: IDBValidKey): Promise<boolean> => {
     try {
       const db = await initDB()
-      // 使用類型斷言來繞過 TypeScript 的嚴格檢查，因為 store 名稱是動態的
-
-      const result = await (db as any).get(storeName, key)
+      const result = await db.get(storeName, key)
       return result !== undefined
     } catch (error) {
       reportError(error, {
@@ -284,15 +265,13 @@ export function useIndexedDB(config: IndexedDBConfig) {
   const getByIndex = async <T = unknown>(
     storeName: string,
     indexName: string,
-    query: IDBKeyRange | unknown,
+    query: IDBKeyRange | IDBValidKey,
   ): Promise<T[]> => {
     try {
       const db = await initDB()
-      // 使用類型斷言來繞過 TypeScript 的嚴格檢查，因為 store 名稱是動態的
-
-      const tx = (db as any).transaction(storeName, 'readonly')
+      const tx = db.transaction(storeName, 'readonly')
       const index = tx.store.index(indexName)
-      return (await index.getAll(query)) as T[]
+      return (await index.getAll(query as IDBKeyRange)) as T[]
     } catch (error) {
       reportError(error, {
         operation: 'getbyindex-indexeddb',
@@ -323,8 +302,7 @@ export function useIndexedDB(config: IndexedDBConfig) {
 
     try {
       const db = await initDB()
-
-      const tx = (db as any).transaction(storeName, 'readwrite')
+      const tx = db.transaction(storeName, 'readwrite')
       const store = tx.objectStore(storeName)
 
       for (const item of items) {
@@ -347,13 +325,12 @@ export function useIndexedDB(config: IndexedDBConfig) {
    * @param storeName - Object store name
    * @param keys - Array of keys to delete
    */
-  const deleteBatch = async (storeName: string, keys: unknown[]): Promise<void> => {
+  const deleteBatch = async (storeName: string, keys: IDBValidKey[]): Promise<void> => {
     if (keys.length === 0) return
 
     try {
       const db = await initDB()
-
-      const tx = (db as any).transaction(storeName, 'readwrite')
+      const tx = db.transaction(storeName, 'readwrite')
       const store = tx.objectStore(storeName)
 
       for (const key of keys) {
@@ -380,19 +357,12 @@ export function useIndexedDB(config: IndexedDBConfig) {
   const transaction = async <T = void>(
     storeNames: string[],
     mode: IDBTransactionMode,
-    callback: (stores: Record<string, IDBObjectStore>) => Promise<T>,
+    callback: (tx: IDBPTransaction<unknown, string[], IDBTransactionMode>) => Promise<T>,
   ): Promise<T> => {
     try {
       const db = await initDB()
-
-      const tx = (db as any).transaction(storeNames, mode)
-
-      const stores: Record<string, IDBObjectStore> = {}
-      for (const name of storeNames) {
-        stores[name] = tx.objectStore(name)
-      }
-
-      const result = await callback(stores)
+      const tx = db.transaction(storeNames, mode)
+      const result = await callback(tx as IDBPTransaction<unknown, string[], IDBTransactionMode>)
       await tx.done
       return result
     } catch (error) {
