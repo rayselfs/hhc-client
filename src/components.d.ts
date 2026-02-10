@@ -20,7 +20,6 @@ declare module 'vue' {
     LiquidProgress: typeof import('./components/LiquidGlass/LiquidProgress/LiquidProgress.vue')['default']
     LiquidProgressCircular: typeof import('./components/LiquidGlass/LiquidProgressCircular/LiquidProgressCircular.vue')['default']
     LiquidSearchBar: typeof import('./components/LiquidGlass/LiquidSearchBar/LiquidSearchBar.vue')['default']
-    LiquidSelect: typeof import('./components/LiquidGlass/LiquidSelect/LiquidSelect.vue')['default']
     LiquidSwitch: typeof import('./components/LiquidGlass/LiquidSwitch/LiquidSwitch.vue')['default']
     LiquidTextField: typeof import('./components/LiquidGlass/LiquidTextField/LiquidTextField.vue')['default']
     LiquidTimerRing: typeof import('./components/LiquidGlass/LiquidTimerRing/LiquidTimerRing.vue')['default']
