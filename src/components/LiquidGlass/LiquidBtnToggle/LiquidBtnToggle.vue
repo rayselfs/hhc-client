@@ -26,6 +26,7 @@
         }"
         @click="select(item.value)"
         :title="item.title"
+        :disabled="item.disabled"
         :aria-pressed="modelValue === item.value"
         :aria-label="item.title || item.label"
         type="button"
@@ -53,6 +54,7 @@ interface Item {
   icon?: string
   label?: string
   title?: string
+  disabled?: boolean
 }
 
 type SizePreset = 'x-small' | 'small' | 'large' | 'x-large'
@@ -140,6 +142,9 @@ const containerMode = computed(() => (props.ghost ? 'ghost' : props.mode))
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const select = (value: any) => {
+  const item = props.items.find((i) => i.value === value)
+  if (item?.disabled) return
+
   if (props.mandatory && value === props.modelValue) return
   emit('update:modelValue', value)
 }
@@ -233,8 +238,13 @@ onMounted(() => {
     opacity: 1;
   }
 
-  &:hover:not(.active) {
+  &:hover:not(.active):not(:disabled) {
     opacity: 0.8;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.3;
   }
 }
 
