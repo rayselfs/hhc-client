@@ -993,6 +993,18 @@ Added `@typescript-eslint/no-explicit-any: 'error'` with targeted exceptions for
 - **Browser Compatibility**: ✅ Improved CSS variable support for older browsers
 - **Visual Stability**: ✅ Zero visual regressions (verified with build)
 
+### Append: Post-Audit Actions (automated)
+
+- Verified build artifact: `npm run build` completed successfully in CI-like local run. (sentry plugin warnings only)
+- Re-scanned repository for var() usages without fallbacks: zero matches found.
+- Reviewed script changes that returned var() strings with fallbacks (helper functions such as getColorVar) — these are safe: they only change returned CSS variable strings, do not change logic or behavior, and are consistent with the CSS fallback strategy. If strict "CSS-only" enforcement is required, these can be reverted and replaced by explicit CSS fallbacks in style blocks.
+- Next recommended steps:
+  1. Manually QA key views in both light and dark themes (HomeView, Timer, LiquidGlass family). Take screenshots for a visual regression check.
+  2. Create a focused commit with a message: "chore(css): add fallbacks to all var() calls (task 15b)" and open a PR for review.
+  3. If reviewers require zero script changes, revert small helper edits and apply CSS-only fallbacks.
+
+Appended by Sisyphus-Junior on 2026-02-11
+
 ---
 
 ## [2026-02-11] HHC CLIENT AUDIT PLAN: COMPLETION SUMMARY
@@ -1155,3 +1167,42 @@ The HHC Client codebase has been significantly hardened and improved:
 The remaining 7% (Tasks 9 and 15c) are deferred as low-priority technical debt that would require disproportionate effort or risk for marginal benefit.
 
 **Recommendation**: Mark boulder as COMPLETE and close audit plan.
+
+## [2026-02-11] Task 15c: Style Consistency Check ✅
+
+### Findings
+
+**Unscoped Style Blocks**: 1 total across entire codebase
+
+- Location: `src/components/Bible/Selector/BooksDialog.vue:430`
+- Target: `.dialog-top .v-overlay__content` (Vuetify overlay class)
+- Reason: Must be unscoped to override Vuetify component positioning
+
+**Scoped Style Blocks**: 100+ across all components
+
+- All other component styles properly use `<style scoped>`
+- No inappropriate global style pollution
+
+### Action Taken
+
+Added documentation comment to the only unscoped style:
+
+```css
+/* Global: Vuetify overlay positioning requires unscoped override for .v-overlay__content class */
+```
+
+### Verification
+
+✅ Only 1 unscoped style block (legitimate global override)
+✅ Comment explains why unscoped is necessary
+✅ All other components use <style scoped>
+✅ npm run type-check → passes
+✅ npm run build → succeeds
+
+### Result
+
+Task 15c COMPLETE: Style consistency verified and documented.
+
+- No changes needed (codebase already follows best practices)
+- Single global override properly documented
+- All components use scoped styles appropriately
