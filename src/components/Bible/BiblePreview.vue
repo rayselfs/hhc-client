@@ -1,6 +1,6 @@
 <template>
   <v-card :style="{ height: `${props.height}px` }" rounded="lg">
-    <v-card-title class="pa-0">
+    <v-card-title>
       <slot name="header"></slot>
     </v-card-title>
 
