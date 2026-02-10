@@ -108,7 +108,7 @@ onMounted(() => {
 .split-divider {
   width: 6px;
   height: 100vh;
-  background: var(--timer-split-divider-color);
+  background: var(--timer-split-divider-color, rgba(0, 0, 0, 0.08));
   position: absolute;
   left: 41.6%;
   top: 0;

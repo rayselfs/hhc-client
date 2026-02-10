@@ -133,18 +133,18 @@ const onDrop = () => {
 }
 
 .media-item:hover {
-  background-color: rgba(var(--v-theme-primary), 0.1);
+  background-color: rgba(var(--v-theme-primary, 25, 118, 210), 0.1);
 }
 
 .folder-icon {
-  color: rgba(var(--v-theme-primary));
+  color: rgba(var(--v-theme-primary, 25, 118, 210));
 }
 
 .item-selected {
   /* Override: Ensure selected state takes precedence over other item styles */
-  background-color: rgba(var(--v-theme-primary), 0.2) !important;
+  background-color: rgba(var(--v-theme-primary, 25, 118, 210), 0.2) !important;
   /* Override: Stronger border to indicate selection across themes */
-  border: 1px solid rgba(var(--v-theme-primary), 0.3) !important;
+  border: 1px solid rgba(var(--v-theme-primary, 25, 118, 210), 0.3) !important;
 }
 
 .item-cut {
@@ -205,7 +205,7 @@ const onDrop = () => {
   /* Override: Highlight drop target with stronger background during drag center */
   background-color: rgba(var(--v-theme-primary), 0.3) !important;
   /* Override: Ensure border color overrides other list borders */
-  border: 1px solid rgb(var(--v-theme-primary)) !important;
+  border: 1px solid rgb(var(--v-theme-primary, 25, 118, 210)) !important;
   transform: scale(1.05);
 }
 </style>

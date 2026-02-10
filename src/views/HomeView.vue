@@ -209,9 +209,9 @@ onBeforeUnmount(() => {
 <style scoped>
 :deep(.v-list-item--active) {
   /* Override: Force active nav item color to match theme primary */
-  background-color: rgb(var(--v-theme-primary)) !important;
+  background-color: rgb(var(--v-theme-primary, 25, 118, 210)) !important;
   /* Override: Ensure text color contrasts on active nav item */
-  color: rgb(var(--v-theme-on-primary)) !important;
+  color: rgb(var(--v-theme-on-primary, 255, 255, 255)) !important;
   /* Override: Ensure opacity remains fully visible when active */
   opacity: 1 !important;
 }

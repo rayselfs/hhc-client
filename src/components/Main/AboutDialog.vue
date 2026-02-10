@@ -101,6 +101,6 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .app-icon-avatar {
-  border: 2px solid rgb(var(--v-theme-primary));
+  border: 2px solid rgb(var(--v-theme-primary, 25, 118, 210));
 }
 </style>

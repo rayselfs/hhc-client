@@ -192,8 +192,8 @@ const handleSearch = (event: KeyboardEvent) => {
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  height: var(--height);
-  min-width: var(--collapsed-width);
+  height: var(--height, 40px);
+  min-width: var(--collapsed-width, 40px);
 
   &--disabled {
     opacity: 0.4;
@@ -205,13 +205,13 @@ const handleSearch = (event: KeyboardEvent) => {
   position: relative;
   display: flex;
   align-items: center;
-  width: var(--collapsed-width);
-  height: var(--height);
+  width: var(--collapsed-width, 40px);
+  height: var(--height, 40px);
   border-radius: 9999px;
   cursor: pointer;
 
   &--expanded {
-    width: var(--expanded-width);
+    width: var(--expanded-width, 300px);
     cursor: default;
     animation: clip-expand 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
   }
@@ -223,22 +223,22 @@ const handleSearch = (event: KeyboardEvent) => {
 
 @keyframes clip-expand {
   from {
-    width: var(--collapsed-width);
+    width: var(--collapsed-width, 40px);
     clip-path: inset(0 0 0 0);
   }
   to {
-    width: var(--expanded-width);
+    width: var(--expanded-width, 300px);
     clip-path: inset(0 0 0 0);
   }
 }
 
 @keyframes clip-collapse {
   from {
-    width: var(--expanded-width);
+    width: var(--expanded-width, 300px);
     clip-path: inset(0 0 0 0);
   }
   to {
-    width: var(--collapsed-width);
+    width: var(--collapsed-width, 40px);
     clip-path: inset(0 0 0 0);
   }
 }
@@ -271,10 +271,10 @@ const handleSearch = (event: KeyboardEvent) => {
   position: absolute;
   z-index: 3;
   // 置中：left 50% of collapsed width, 然後 translateX -50% 自身寬度
-  left: calc(var(--collapsed-width) / 2);
+  left: calc(var(--collapsed-width, 40px) / 2);
   top: 50%;
   transform: translate(-50%, -50%);
-  color: rgba(var(--hhc-glass-text), 1);
+  color: rgba(var(--hhc-glass-text, 0, 0, 0), 1);
   cursor: pointer;
   // 確保 icon 沒有額外間距
   display: flex;
@@ -282,14 +282,15 @@ const handleSearch = (event: KeyboardEvent) => {
   justify-content: center;
   transition:
     left var(--hhc-transition-normal) var(--hhc-transition-easing),
-    transform var(--hhc-transition-normal) var(--hhc-transition-easing);
+    transform var(--hhc-transition-normal, 300ms)
+      var(--hhc-transition-easing, cubic-bezier(0.4, 0, 0.2, 1));
 
   &--expanded {
     // 展開後：icon 左邊緣在 16px 處
-    left: calc(16px + var(--icon-size) / 2);
+    left: calc(16px + var(--icon-size, 16px) / 2);
     transform: translate(-50%, -50%);
     cursor: default;
-    color: rgba(var(--hhc-glass-text), 0.7);
+    color: rgba(var(--hhc-glass-text, 0, 0, 0), 0.7);
   }
 }
 
@@ -297,19 +298,19 @@ const handleSearch = (event: KeyboardEvent) => {
 .liquid-search-bar__input {
   position: absolute;
   z-index: 3;
-  left: calc(16px + var(--icon-size) + 8px); // padding + icon + gap
+  left: calc(16px + var(--icon-size, 16px) + 8px); // padding + icon + gap
   right: 16px;
   top: 50%;
   transform: translateY(-50%);
   background: transparent;
   border: none;
   outline: none;
-  color: rgba(var(--hhc-glass-text), var(--hhc-glass-text-opacity));
+  color: rgba(var(--hhc-glass-text, 0, 0, 0), var(--hhc-glass-text-opacity, 1));
   font-size: 0.875rem;
   font-weight: 400;
 
   &::placeholder {
-    color: rgba(var(--hhc-glass-text), 0.5);
+    color: rgba(var(--hhc-glass-text, 0, 0, 0), 0.5);
   }
 }
 </style>

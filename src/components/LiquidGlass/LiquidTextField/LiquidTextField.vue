@@ -137,11 +137,11 @@ defineExpose({
   align-items: center;
   min-height: 40px;
   padding: 0 14px;
-  border-radius: var(--hhc-radius-lg);
+  border-radius: var(--hhc-radius-lg, 8px);
   overflow: hidden;
 
   .liquid-text-field--rounded & {
-    border-radius: var(--hhc-radius-pill);
+    border-radius: var(--hhc-radius-pill, 9999px);
     padding: 0 18px;
   }
 }
@@ -150,18 +150,22 @@ defineExpose({
   position: absolute;
   inset: 0;
   z-index: 0;
-  @include liquid.liquid-glass-backdrop(var(--hhc-blur-md), 180%);
+  @include liquid.liquid-glass-backdrop(var(--hhc-blur-md, 8px), 180%);
 }
 
 .liquid-text-field__tint {
   position: absolute;
   inset: 0;
   z-index: 1;
-  background: rgba(var(--hhc-glass-tint), var(--hhc-btn-tinted-opacity));
-  transition: background var(--hhc-transition-fast) var(--hhc-transition-easing);
+  background: rgba(var(--hhc-glass-tint, 255, 255, 255), var(--hhc-btn-tinted-opacity, 0.04));
+  transition: background var(--hhc-transition-fast, 150ms)
+    var(--hhc-transition-easing, cubic-bezier(0.4, 0, 0.2, 1));
 
   .liquid-text-field--focused & {
-    background: rgba(var(--hhc-glass-tint), var(--hhc-glass-tint-hover-opacity));
+    background: rgba(
+      var(--hhc-glass-tint, 255, 255, 255),
+      var(--hhc-glass-tint-hover-opacity, 0.08)
+    );
   }
 }
 
@@ -171,18 +175,19 @@ defineExpose({
   z-index: 2;
   border-radius: inherit;
   box-shadow:
-    inset 0 0 0 1px rgba(var(--hhc-glass-border), var(--hhc-glass-border-opacity)),
-    inset 0 1px 2px 0 rgba(var(--hhc-glass-shine-top), 0.1),
-    inset 0 -1px 2px 0 rgba(var(--hhc-glass-shine-bottom), 0.08);
+    inset 0 0 0 1px rgba(var(--hhc-glass-border, 0, 0, 0), var(--hhc-glass-border-opacity, 0.12)),
+    inset 0 1px 2px 0 rgba(var(--hhc-glass-shine-top, 255, 255, 255), 0.1),
+    inset 0 -1px 2px 0 rgba(var(--hhc-glass-shine-bottom, 0, 0, 0), 0.08);
   pointer-events: none;
-  transition: box-shadow var(--hhc-transition-fast) var(--hhc-transition-easing);
+  transition: box-shadow var(--hhc-transition-fast, 150ms)
+    var(--hhc-transition-easing, cubic-bezier(0.4, 0, 0.2, 1));
 
   .liquid-text-field--focused & {
     box-shadow:
-      inset 0 0 0 1.5px rgba(var(--hhc-theme-primary), 0.5),
-      inset 0 1px 2px 0 rgba(var(--hhc-glass-shine-top), 0.15),
-      inset 0 -1px 2px 0 rgba(var(--hhc-glass-shine-bottom), 0.08),
-      0 0 0 2px rgba(var(--hhc-theme-primary), 0.15);
+      inset 0 0 0 1.5px rgba(var(--hhc-theme-primary, 25, 118, 210), 0.5),
+      inset 0 1px 2px 0 rgba(var(--hhc-glass-shine-top, 255, 255, 255), 0.15),
+      inset 0 -1px 2px 0 rgba(var(--hhc-glass-shine-bottom, 0, 0, 0), 0.08),
+      0 0 0 2px rgba(var(--hhc-theme-primary, 25, 118, 210), 0.15);
   }
 }
 
@@ -195,11 +200,11 @@ defineExpose({
   border: none;
   outline: none;
   font-size: 0.875rem;
-  color: rgba(var(--hhc-glass-text), 0.95);
+  color: rgba(var(--hhc-glass-text, 0, 0, 0), 0.95);
   padding: 0;
 
   &::placeholder {
-    color: rgba(var(--hhc-glass-text), var(--hhc-glass-text-disabled-opacity));
+    color: rgba(var(--hhc-glass-text, 0, 0, 0), var(--hhc-glass-text-disabled-opacity, 0.4));
   }
 
   &::-webkit-outer-spin-button,
@@ -219,7 +224,7 @@ defineExpose({
   z-index: 3;
   display: flex;
   align-items: center;
-  color: rgba(var(--hhc-glass-text), 0.7);
+  color: rgba(var(--hhc-glass-text, 0, 0, 0), 0.7);
 }
 
 .liquid-text-field__prepend {

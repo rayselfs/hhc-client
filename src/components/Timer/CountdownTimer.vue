@@ -122,11 +122,11 @@ const fontSize = computed(() => {
 }
 
 .timer-display .progress-ring-bg {
-  stroke: var(--timer-progress-ring-bg);
+  stroke: var(--timer-progress-ring-bg, rgba(0, 0, 0, 0.08));
 }
 
 .timer-display .progress-ring-fg {
-  stroke: var(--timer-progress-ring-color);
+  stroke: var(--timer-progress-ring-color, #1976d2);
   stroke-linecap: round;
   transition: stroke-dashoffset 1s linear;
 }

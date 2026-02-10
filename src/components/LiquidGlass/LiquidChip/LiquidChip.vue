@@ -101,7 +101,7 @@ const hasGlassEffect = computed(
 
 // Helper to get color variable
 const getColorVar = (color: string | undefined): string => {
-  if (!color) return 'var(--hhc-glass-tint)'
+  if (!color) return 'var(--hhc-glass-tint, 255, 255, 255)'
   if (isThemeColor(color)) return getThemeColorVar(color)
   return color
 }
@@ -183,14 +183,17 @@ const handleClose = (event: MouseEvent) => {
 
 .liquid-chip {
   border: none;
-  border-radius: var(--hhc-radius-pill);
+  border-radius: var(--hhc-radius-pill, 9999px);
   font-weight: 500;
-  color: rgba(var(--hhc-glass-text), var(--hhc-glass-text-opacity));
+  color: rgba(var(--hhc-glass-text, 0, 0, 0), var(--hhc-glass-text-opacity, 1));
   overflow: hidden;
   transition:
-    transform var(--hhc-transition-fast) var(--hhc-transition-easing),
-    opacity var(--hhc-transition-fast) var(--hhc-transition-easing),
-    box-shadow var(--hhc-transition-fast) var(--hhc-transition-easing);
+    transform var(--hhc-transition-fast, 150ms)
+      var(--hhc-transition-easing, cubic-bezier(0.4, 0, 0.2, 1)),
+    opacity var(--hhc-transition-fast, 150ms)
+      var(--hhc-transition-easing, cubic-bezier(0.4, 0, 0.2, 1)),
+    box-shadow var(--hhc-transition-fast, 150ms)
+      var(--hhc-transition-easing, cubic-bezier(0.4, 0, 0.2, 1));
   user-select: none;
   -webkit-tap-highlight-color: transparent;
 
@@ -218,12 +221,15 @@ const handleClose = (event: MouseEvent) => {
   }
 
   &--outlined {
-    background: rgba(var(--hhc-glass-tint), 0.05);
-    border: 1px solid rgba(var(--hhc-glass-border), var(--hhc-glass-border-opacity));
+    background: rgba(var(--hhc-glass-tint, 255, 255, 255), 0.05);
+    border: 1px solid rgba(var(--hhc-glass-border, 0, 0, 0), var(--hhc-glass-border-opacity, 0.12));
 
     &:hover:not(.liquid-chip--disabled) {
-      background: rgba(var(--hhc-glass-tint), 0.1);
-      border-color: rgba(var(--hhc-glass-border), var(--hhc-glass-border-hover-opacity));
+      background: rgba(var(--hhc-glass-tint, 255, 255, 255), 0.1);
+      border-color: rgba(
+        var(--hhc-glass-border, 0, 0, 0),
+        var(--hhc-glass-border-hover-opacity, 0.18)
+      );
     }
   }
 }
@@ -233,7 +239,7 @@ const handleClose = (event: MouseEvent) => {
   position: absolute;
   inset: 0;
   z-index: 0;
-  @include liquid.liquid-glass-backdrop(var(--hhc-blur-lg), 180%);
+  @include liquid.liquid-glass-backdrop(var(--hhc-blur-lg, 12px), 180%);
 }
 
 .liquid-chip__glass-tint {
@@ -248,18 +254,18 @@ const handleClose = (event: MouseEvent) => {
   inset: 0;
   z-index: 2;
   box-shadow:
-    inset 0 0 0 0.5px rgba(var(--hhc-glass-border), 0.3),
-    inset 0 1px 2px 0 rgba(var(--hhc-glass-shine-top), 0.15),
-    inset 0 -1px 2px 0 rgba(var(--hhc-glass-shine-bottom), 0.06),
-    0 1px 4px 0 rgba(var(--hhc-glass-shadow-color), 0.1);
+    inset 0 0 0 0.5px rgba(var(--hhc-glass-border, 0, 0, 0), 0.3),
+    inset 0 1px 2px 0 rgba(var(--hhc-glass-shine-top, 255, 255, 255), 0.15),
+    inset 0 -1px 2px 0 rgba(var(--hhc-glass-shine-bottom, 0, 0, 0), 0.06),
+    0 1px 4px 0 rgba(var(--hhc-glass-shadow-color, 0, 0, 0), 0.1);
   pointer-events: none;
 
   .liquid-chip--clickable:hover:not(.liquid-chip--disabled) & {
     box-shadow:
-      inset 0 0 0 0.5px rgba(var(--hhc-glass-border), 0.45),
-      inset 0 1px 3px 0 rgba(var(--hhc-glass-shine-top), 0.25),
-      inset 0 -1px 2px 0 rgba(var(--hhc-glass-shine-bottom), 0.08),
-      0 2px 8px 0 rgba(var(--hhc-glass-shadow-color), 0.15);
+      inset 0 0 0 0.5px rgba(var(--hhc-glass-border, 0, 0, 0), 0.45),
+      inset 0 1px 3px 0 rgba(var(--hhc-glass-shine-top, 255, 255, 255), 0.25),
+      inset 0 -1px 2px 0 rgba(var(--hhc-glass-shine-bottom, 0, 0, 0), 0.08),
+      0 2px 8px 0 rgba(var(--hhc-glass-shadow-color, 0, 0, 0), 0.15);
   }
 }
 
@@ -285,7 +291,8 @@ const handleClose = (event: MouseEvent) => {
   cursor: pointer;
   border-radius: 50%;
   opacity: 0.7;
-  transition: opacity var(--hhc-transition-fast) var(--hhc-transition-easing);
+  transition: opacity var(--hhc-transition-fast, 150ms)
+    var(--hhc-transition-easing, cubic-bezier(0.4, 0, 0.2, 1));
 
   &:hover {
     opacity: 1;

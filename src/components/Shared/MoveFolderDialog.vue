@@ -136,6 +136,6 @@ const onConfirm = () => {
 <style scoped>
 .hover-bg-grey-darken-2:hover {
   /* Override: Ensure hover background overrides Vuetify list item hover color */
-  background-color: rgb(var(--v-theme-grey-darken-2)) !important;
+  background-color: rgb(var(--v-theme-grey-darken-2, 238, 238, 238)) !important;
 }
 </style>

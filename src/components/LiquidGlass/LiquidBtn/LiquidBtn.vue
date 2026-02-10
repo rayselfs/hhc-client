@@ -157,7 +157,7 @@ const DENSITY_SCALE = {
 
 // Helper to get color variable
 const getColorVar = (color: string | undefined): string => {
-  if (!color) return 'var(--hhc-glass-tint)'
+  if (!color) return 'var(--hhc-glass-tint, 255, 255, 255)'
   if (isThemeColor(color)) return getThemeColorVar(color)
   return color
 }
@@ -315,13 +315,17 @@ const handleClick = (event: MouseEvent) => {
   cursor: pointer;
   font-weight: 500;
   text-decoration: none;
-  color: rgba(var(--hhc-glass-text), var(--hhc-glass-text-opacity));
+  color: rgba(var(--hhc-glass-text, 0, 0, 0), var(--hhc-glass-text-opacity, 1));
   overflow: hidden;
   transition:
-    transform var(--hhc-transition-fast) var(--hhc-transition-easing),
-    opacity var(--hhc-transition-fast) var(--hhc-transition-easing),
-    box-shadow var(--hhc-transition-fast) var(--hhc-transition-easing),
-    background var(--hhc-transition-fast) var(--hhc-transition-easing);
+    transform var(--hhc-transition-fast, 150ms)
+      var(--hhc-transition-easing, cubic-bezier(0.4, 0, 0.2, 1)),
+    opacity var(--hhc-transition-fast, 150ms)
+      var(--hhc-transition-easing, cubic-bezier(0.4, 0, 0.2, 1)),
+    box-shadow var(--hhc-transition-fast, 150ms)
+      var(--hhc-transition-easing, cubic-bezier(0.4, 0, 0.2, 1)),
+    background var(--hhc-transition-fast, 150ms)
+      var(--hhc-transition-easing, cubic-bezier(0.4, 0, 0.2, 1));
   user-select: none;
   -webkit-tap-highlight-color: transparent;
 
@@ -359,13 +363,16 @@ const handleClick = (event: MouseEvent) => {
 
   // Outlined: 玻璃邊框
   &--outlined {
-    background: rgba(var(--hhc-glass-tint), 0.05);
-    border: 1px solid rgba(var(--hhc-glass-border), var(--hhc-glass-border-opacity));
+    background: rgba(var(--hhc-glass-tint, 255, 255, 255), 0.05);
+    border: 1px solid rgba(var(--hhc-glass-border, 0, 0, 0), var(--hhc-glass-border-opacity, 0.12));
     box-shadow: none;
 
     &:hover:not(.liquid-btn--disabled) {
-      background: rgba(var(--hhc-glass-tint), 0.1);
-      border-color: rgba(var(--hhc-glass-border), var(--hhc-glass-border-hover-opacity));
+      background: rgba(var(--hhc-glass-tint, 255, 255, 255), 0.1);
+      border-color: rgba(
+        var(--hhc-glass-border, 0, 0, 0),
+        var(--hhc-glass-border-hover-opacity, 0.18)
+      );
     }
   }
 
@@ -375,17 +382,17 @@ const handleClick = (event: MouseEvent) => {
     box-shadow: none;
 
     &:hover:not(.liquid-btn--disabled) {
-      background: rgba(var(--hhc-glass-tint), 0.08);
+      background: rgba(var(--hhc-glass-tint, 255, 255, 255), 0.08);
     }
   }
 
   // Flat: 半透明純色
   &--flat {
-    background: rgba(var(--hhc-glass-tint), 0.12);
+    background: rgba(var(--hhc-glass-tint, 255, 255, 255), 0.12);
     box-shadow: none;
 
     &:hover:not(.liquid-btn--disabled) {
-      background: rgba(var(--hhc-glass-tint), var(--hhc-glass-tint-opacity));
+      background: rgba(var(--hhc-glass-tint, 255, 255, 255), var(--hhc-glass-tint-opacity, 0.08));
     }
   }
 }
@@ -403,7 +410,8 @@ const handleClick = (event: MouseEvent) => {
   inset: 0;
   z-index: 1;
   @include liquid.liquid-glass-tint;
-  transition: background var(--hhc-transition-normal) var(--hhc-transition-easing);
+  transition: background var(--hhc-transition-normal, 300ms)
+    var(--hhc-transition-easing, cubic-bezier(0.4, 0, 0.2, 1));
 }
 
 .liquid-btn__glass-shine {
@@ -416,13 +424,15 @@ const handleClick = (event: MouseEvent) => {
   .liquid-btn:hover:not(.liquid-btn--disabled) & {
     @include liquid.liquid-glass-pill-shadow-hover;
   }
-  transition: box-shadow var(--hhc-transition-normal) var(--hhc-transition-easing);
+  transition: box-shadow var(--hhc-transition-normal, 300ms)
+    var(--hhc-transition-easing, cubic-bezier(0.4, 0, 0.2, 1));
 }
 
 .liquid-btn__content {
   position: relative;
   z-index: 3;
-  transition: color var(--hhc-transition-normal) var(--hhc-transition-easing);
+  transition: color var(--hhc-transition-normal, 300ms)
+    var(--hhc-transition-easing, cubic-bezier(0.4, 0, 0.2, 1));
 }
 
 .liquid-btn__loader {

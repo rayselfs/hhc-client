@@ -223,7 +223,7 @@ onMounted(() => {
 
   &.active {
     background: rgba(var(--v-theme-primary), 0.3);
-    outline: 2px solid rgb(var(--v-theme-primary));
+    outline: 2px solid rgb(var(--v-theme-primary, 25, 118, 210));
   }
 }
 

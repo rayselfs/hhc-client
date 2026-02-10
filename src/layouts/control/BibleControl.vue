@@ -198,7 +198,7 @@ useKeyboardShortcuts([
 }
 
 .search-highlight {
-  color: rgb(var(--v-theme-error));
+  color: rgb(var(--v-theme-error, 255, 82, 82));
   background-color: rgba(var(--v-theme-error), 0.1);
   padding: 2px 4px;
   border-radius: 2px;

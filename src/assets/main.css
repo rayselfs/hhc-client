@@ -19,7 +19,7 @@ html.light {
 }
 
 v-divider {
-  color: var(--v-divider-color);
+  color: var(--v-divider-color, rgba(0, 0, 0, 0.12));
 }
 
 .dialog-top {

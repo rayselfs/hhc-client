@@ -205,7 +205,7 @@ onMounted(() => {
 
 .liquid-btn-toggle {
   display: inline-flex;
-  --glass-pill-bg: rgba(var(--hhc-glass-tint), var(--hhc-glass-tint-opacity));
+  --glass-pill-bg: rgba(var(--hhc-glass-tint, 255, 255, 255), var(--hhc-glass-tint-opacity, 0.06));
 }
 
 .toggle-track {
@@ -218,8 +218,9 @@ onMounted(() => {
   background: transparent;
   border: none;
   cursor: pointer;
-  opacity: var(--hhc-glass-text-muted-opacity);
-  transition: opacity var(--hhc-transition-fast) var(--hhc-transition-easing);
+  opacity: var(--hhc-glass-text-muted-opacity, 0.7);
+  transition: opacity var(--hhc-transition-fast, 150ms)
+    var(--hhc-transition-easing, cubic-bezier(0.4, 0, 0.2, 1));
   padding: 6px 16px;
   min-width: 36px;
   @include liquid.liquid-glass-text;
@@ -239,15 +240,18 @@ onMounted(() => {
 
 .selection-pill {
   z-index: 1;
-  background-color: var(--glass-pill-bg);
-  border-radius: var(--hhc-radius-pill);
+  background-color: var(--glass-pill-bg, rgba(255, 255, 255, 0.06));
+  border-radius: var(--hhc-radius-pill, 9999px);
   transition:
-    left var(--hhc-transition-normal) var(--hhc-transition-easing),
-    width var(--hhc-transition-normal) var(--hhc-transition-easing),
-    height var(--hhc-transition-normal) var(--hhc-transition-easing);
+    left var(--hhc-transition-normal, 300ms)
+      var(--hhc-transition-easing, cubic-bezier(0.4, 0, 0.2, 1)),
+    width var(--hhc-transition-normal, 300ms)
+      var(--hhc-transition-easing, cubic-bezier(0.4, 0, 0.2, 1)),
+    height var(--hhc-transition-normal, 300ms)
+      var(--hhc-transition-easing, cubic-bezier(0.4, 0, 0.2, 1));
 
   @include liquid.liquid-glass-pill-shadow;
-  @include liquid.liquid-glass-backdrop(var(--hhc-blur-sm), 100%);
+  @include liquid.liquid-glass-backdrop(var(--hhc-blur-sm, 4px), 100%);
 
   &.animating {
     @include liquid.liquid-jelly-animation;

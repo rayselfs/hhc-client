@@ -56,7 +56,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 // Helper to get color variable
 const getColorVar = (color: string): string => {
-  if (color === 'white') return 'var(--hhc-glass-text)'
+  if (color === 'white') return 'var(--hhc-glass-text, 0, 0, 0)'
   if (isThemeColor(color)) return getThemeColorVar(color)
   return color
 }
@@ -102,33 +102,34 @@ const trackStyle = computed(() => {
 .liquid-progress {
   width: 100%;
   overflow: hidden;
-  @include liquid.liquid-glass-backdrop(var(--hhc-blur-sm));
+  @include liquid.liquid-glass-backdrop(var(--hhc-blur-sm, 4px));
 }
 
 .liquid-progress__bg {
   position: absolute;
   inset: 0;
-  background: rgba(var(--hhc-glass-tint), var(--hhc-progress-bg-opacity));
-  box-shadow: inset 0 1px 2px rgba(var(--hhc-glass-shadow-color), 0.1);
+  background: rgba(var(--hhc-glass-tint, 255, 255, 255), var(--hhc-progress-bg-opacity, 0.06));
+  box-shadow: inset 0 1px 2px rgba(var(--hhc-glass-shadow-color, 0, 0, 0), 0.1);
 }
 
 .liquid-progress__track {
   top: 0;
   left: 0;
   height: 100%;
-  transition: width var(--hhc-transition-normal) var(--hhc-transition-easing);
+  transition: width var(--hhc-transition-normal, 300ms)
+    var(--hhc-transition-easing, cubic-bezier(0.4, 0, 0.2, 1));
   box-shadow:
-    0 0 8px rgba(var(--hhc-glass-shine-top), 0.3),
-    inset 0 1px 1px rgba(var(--hhc-glass-shine-top), 0.4);
+    0 0 8px rgba(var(--hhc-glass-shine-top, 255, 255, 255), 0.3),
+    inset 0 1px 1px rgba(var(--hhc-glass-shine-top, 255, 255, 255), 0.4);
 }
 
 .liquid-progress__shine {
   inset: 0;
   background: linear-gradient(
     180deg,
-    rgba(var(--hhc-glass-shine-top), 0.2) 0%,
+    rgba(var(--hhc-glass-shine-top, 255, 255, 255), 0.2) 0%,
     transparent 50%,
-    rgba(var(--hhc-glass-shine-bottom), 0.05) 100%
+    rgba(var(--hhc-glass-shine-bottom, 0, 0, 0), 0.05) 100%
   );
   pointer-events: none;
 }
