@@ -131,7 +131,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useMediaProjectionStore } from '@/stores/mediaProjection'
 import { usePdfPresenterStore } from '@/stores/pdfPresenter'
@@ -140,6 +140,7 @@ import { useElectron } from '@/composables/useElectron'
 import { useProjectionManager } from '@/composables/useProjectionManager'
 import { useCardLayout } from '@/composables/useLayout'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
+import { useMediaZoom } from '@/composables/useMediaZoom'
 import { APP_CONFIG } from '@/config/app'
 import { KEYBOARD_SHORTCUTS } from '@/config/shortcuts'
 import { MessageType, ViewType } from '@/types/projection'
@@ -154,79 +155,25 @@ const stopwatchStore = useStopwatchStore()
 const store = useMediaProjectionStore()
 const pdfStore = usePdfPresenterStore()
 const { leftCardHeight } = useCardLayout({ minHeight: APP_CONFIG.UI.MIN_CARD_HEIGHT })
-const { playlist, currentIndex, showGrid, currentItem, nextItem, zoomLevel, pan } =
-  storeToRefs(store)
+const { playlist, currentIndex, showGrid, currentItem, nextItem } = storeToRefs(store)
 
 const { isElectron } = useElectron()
 const { setProjectionState, sendProjectionMessage } = useProjectionManager()
 
-const showZoomControls = ref(false)
 const previewContainer = ref<HTMLElement | null>(null)
 const mediaPlayerRef = ref<InstanceType<typeof MediaPlayer> | null>(null)
 
-// Zoom & Pan Logic
-const toggleZoom = (minus = false) => {
-  if (showZoomControls.value) {
-    showZoomControls.value = false
-    store.setZoom(1)
-    store.setPan(0, 0)
-  } else {
-    showZoomControls.value = true
-    store.setZoom(minus ? 0.8 : 1.2)
-    store.setPan(0, 0)
-  }
-}
-
-const resetZoom = () => store.setPan(0, 0)
-const zoomIn = () => store.setZoom(Math.min(5, zoomLevel.value + 0.1))
-const zoomOut = () => store.setZoom(Math.max(0.1, zoomLevel.value - 0.1))
-
-const isDragging = ref(false)
-const cursorStyle = computed(() => {
-  if (!showZoomControls.value) return 'default'
-  return isDragging.value ? 'grabbing' : 'grab'
-})
-
-const startPanDrag = (e: MouseEvent) => {
-  if (!previewContainer.value || !showZoomControls.value) return
-  e.preventDefault()
-  isDragging.value = true
-  const startX = e.clientX,
-    startY = e.clientY
-  const initialPan = { ...pan.value }
-  const rect = previewContainer.value.getBoundingClientRect()
-
-  const handleMouseMove = (moveEvent: MouseEvent) => {
-    const deltaX = moveEvent.clientX - startX,
-      deltaY = moveEvent.clientY - startY
-    const isPdf = currentItem.value?.metadata.fileType === 'pdf'
-    const factor = isPdf ? 1 : -1
-    store.setPan(
-      initialPan.x + (deltaX / rect.width) * factor,
-      initialPan.y + (deltaY / rect.height) * factor,
-    )
-  }
-
-  const handleMouseUp = () => {
-    isDragging.value = false
-    window.removeEventListener('mousemove', handleMouseMove)
-    window.removeEventListener('mouseup', handleMouseUp)
-  }
-  window.addEventListener('mousemove', handleMouseMove)
-  window.addEventListener('mouseup', handleMouseUp)
-}
-
-// Sync Zoom/Pan with projection
-watch(zoomLevel, (val) =>
-  sendProjectionMessage(MessageType.MEDIA_CONTROL, { type: 'image', action: 'zoom', value: val }),
-)
-watch(pan, (val) =>
-  sendProjectionMessage(MessageType.MEDIA_CONTROL, {
-    type: 'image',
-    action: 'pan',
-    value: { x: val.x, y: val.y },
-  }),
-)
+// Zoom & Pan (extracted to composable)
+const {
+  showZoomControls,
+  zoomLevel,
+  cursorStyle,
+  toggleZoom,
+  resetZoom,
+  zoomIn,
+  zoomOut,
+  startPanDrag,
+} = useMediaZoom({ previewContainer, currentItem })
 
 // Lifecycle
 const exitPresentation = async () => {
@@ -340,28 +287,12 @@ const handleNotesUpdate = (notes: string) => {
   right: 0;
   z-index: 9999;
 }
+
 .live-preview-container {
   height: auto;
   border: 1px solid #333;
 }
-</style>
 
-<style scoped>
-.media-presenter {
-  border-radius: inherit;
-  display: flex;
-  left: 0;
-  position: fixed;
-  top: 0;
-  bottom: 0;
-  right: 0;
-  z-index: 9999;
-}
-
-.live-preview-container {
-  height: auto; /* Overridden by inline style */
-  border: 1px solid #333;
-}
 .preview-content {
   max-width: 100%;
   max-height: 100%;
