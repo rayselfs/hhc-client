@@ -38,7 +38,7 @@
 </template>
 
 <script setup lang="ts">
-import type { ViewMode } from '@/types/folder'
+type ViewMode = 'large' | 'medium' | 'small'
 
 interface Props {
   viewMode: ViewMode

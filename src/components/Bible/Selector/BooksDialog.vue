@@ -2,82 +2,25 @@
   <v-dialog v-model="dialogVisible" max-width="840px" content-class="dialog-top">
     <v-card rounded="lg" class="dialog-card">
       <v-card-title class="text-h5 d-flex align-center justify-space-between pb-3 pt-3">
-        <!-- breadcrumb -->
-        <div class="d-flex align-center">
-          <span class="text-subtitle-1">
-            {{ $t('bible.title') }}
-          </span>
-          <v-icon v-if="selectedBook" size="small" class="mx-1 breadcrumb-icon"
-            >mdi-chevron-right</v-icon
-          >
-          <span v-if="selectedBook" class="text-subtitle-1">
-            {{ getBookNameByNumber(selectedBook.number) }}
-          </span>
-          <v-icon v-if="selectedChapter" size="small" class="mx-1 breadcrumb-icon"
-            >mdi-chevron-right</v-icon
-          >
-          <span v-if="selectedChapter" class="text-subtitle-1"> {{ selectedChapter }}</span>
-        </div>
+        <BibleBreadcrumb
+          :selected-book="selectedBook"
+          :selected-book-name="selectedBook ? getBookNameByNumber(selectedBook.number) : ''"
+          :selected-chapter="selectedChapter"
+        />
 
-        <!-- Search box and step navigation buttons -->
-        <div class="d-flex align-center ga-2">
-          <!-- Search box - only shown on books page -->
-          <v-text-field
-            v-if="currentStep === 'books'"
-            v-model="searchQuery"
-            :placeholder="$t('bible.searchBooks')"
-            variant="plain"
-            density="compact"
-            hide-details
-            clearable
-            prepend-inner-icon="mdi-magnify"
-            class="search-field"
-            max-width="200"
-            min-width="150"
-          />
-
-          <!-- Step navigation buttons -->
-          <v-btn
-            size="small"
-            class="text-subtitle-1"
-            :color="currentStep === 'books' ? 'primary' : 'default'"
-            :variant="currentStep === 'books' ? 'flat' : 'elevated'"
-            :disabled="false"
-            rounded="xl"
-            @click="navigateToStep('books')"
-          >
-            {{ $t('bible.navigateBook') }}
-          </v-btn>
-          <v-btn
-            size="small"
-            class="text-subtitle-1"
-            :color="currentStep === 'chapters' ? 'primary' : 'default'"
-            :variant="currentStep === 'chapters' ? 'flat' : 'elevated'"
-            :disabled="!canNavigateToChapter"
-            rounded="xl"
-            @click="navigateToStep('chapters')"
-          >
-            {{ $t('bible.navigateChapter') }}
-          </v-btn>
-          <v-btn
-            size="small"
-            class="text-subtitle-1"
-            :color="currentStep === 'verses' ? 'primary' : 'default'"
-            :variant="currentStep === 'verses' ? 'flat' : 'elevated'"
-            :disabled="!canNavigateToVerse"
-            rounded="xl"
-            @click="navigateToStep('verses')"
-          >
-            {{ $t('bible.navigateVerse') }}
-          </v-btn>
-        </div>
+        <StepNavigation
+          :current-step="currentStep"
+          v-model:search-query="searchQuery"
+          :can-navigate-to-chapter="canNavigateToChapter"
+          :can-navigate-to-verse="canNavigateToVerse"
+          @navigate="navigateToStep"
+        />
       </v-card-title>
 
       <v-divider />
 
       <v-card-text class="card-content pr-5 pl-5">
         <transition name="page-slide" mode="out-in">
-          <!-- Book selection page -->
           <div v-if="currentStep === 'books'" key="books">
             <div v-if="loading" class="text-center py-8">
               <v-progress-circular indeterminate color="primary" />
@@ -89,7 +32,7 @@
               <p>{{ $t('bible.loadContentFailed') }}</p>
             </div>
 
-            <div v-else>
+            <div v-else class="books-grid">
               <div class="mb-5">
                 <v-row>
                   <v-col v-for="book in oldTestamentBooks" :key="book.number" cols="3" class="pa-2">
@@ -124,9 +67,8 @@
             </div>
           </div>
 
-          <!-- Chapter selection page -->
           <div v-else-if="currentStep === 'chapters'" key="chapters">
-            <div class="chapter-verse-grid ga-2">
+            <div class="chapters-grid">
               <v-btn
                 v-for="chapterNum in selectedBookChapters"
                 :key="chapterNum"
@@ -140,9 +82,8 @@
             </div>
           </div>
 
-          <!-- Verse selection page -->
           <div v-else-if="currentStep === 'verses'" key="verses">
-            <div class="chapter-verse-grid ga-2">
+            <div class="verses-grid">
               <v-btn
                 v-for="verseNum in selectedChapterVerses"
                 :key="verseNum"
@@ -179,6 +120,8 @@ import type { BibleContent, BibleBook } from '@/types/bible'
 import { useSentry } from '@/composables/useSentry'
 import { useBibleStore } from '@/stores/bible'
 import { BIBLE_BOOKS, type BibleBookConfig } from '@/config/app'
+import StepNavigation from './StepNavigation.vue'
+import BibleBreadcrumb from './BibleBreadcrumb.vue'
 
 interface Props {
   modelValue: boolean
@@ -192,7 +135,6 @@ interface Emits {
   (e: 'select-verse', bookNumber: number, chapter: number, verse: number): void
 }
 
-// Use Bible Store's cache functionality
 const bibleStore = useBibleStore()
 const { getBibleContent } = bibleStore
 
@@ -206,63 +148,44 @@ const dialogVisible = computed({
   set: (value) => emit('update:modelValue', value),
 })
 
-// Current step: 'books' | 'chapters' | 'verses'
 const currentStep = ref<'books' | 'chapters' | 'verses'>('books')
 const selectedBook = ref<BibleBook | null>(null)
 const selectedChapter = ref<number | null>(null)
 
-// Search functionality
 const searchQuery = ref('')
 
-// Bible content data
 const bibleContent = ref<BibleContent | null>(null)
 const loading = ref(false)
 
-// Navigation control
-const canNavigateToChapter = computed(() => {
-  return selectedBook.value !== null
-})
+const canNavigateToChapter = computed(() => selectedBook.value !== null)
 
-const canNavigateToVerse = computed(() => {
-  return selectedBook.value !== null && selectedChapter.value !== null
-})
+const canNavigateToVerse = computed(
+  () => selectedBook.value !== null && selectedChapter.value !== null,
+)
 
-// Get book name from i18n using book code
 const getBookName = (bookCode: string): string => {
   return $t(`bible.books.${bookCode}`) as string
 }
 
-// Filter books by search query
 const filterBooks = (books: BibleBookConfig[]) => {
-  if (!searchQuery.value || !searchQuery.value.trim()) return books
+  if (!searchQuery.value?.trim()) return books
   const query = searchQuery.value.toLowerCase().trim()
-  return books.filter((book) => {
-    const bookName = getBookName(book.code).toLowerCase()
-    return bookName.includes(query)
-  })
+  return books.filter((book) => getBookName(book.code).toLowerCase().includes(query))
 }
 
-// Get all filtered books
 const filteredBooks = computed(() => {
   return filterBooks(BIBLE_BOOKS)
 })
 
-// Separate Old and New Testament books
-const oldTestamentBooks = computed(() => {
-  return filteredBooks.value.filter((book) => book.number <= 39)
-})
+const oldTestamentBooks = computed(() => filteredBooks.value.filter((book) => book.number <= 39))
 
-const newTestamentBooks = computed(() => {
-  return filteredBooks.value.filter((book) => book.number > 39)
-})
+const newTestamentBooks = computed(() => filteredBooks.value.filter((book) => book.number > 39))
 
-// Get chapter numbers for the selected book (from API data)
 const selectedBookChapters = computed(() => {
   if (!selectedBook.value) return []
   return Array.from({ length: selectedBook.value.chapters.length }, (_, i) => i + 1)
 })
 
-// Get verse numbers for the selected chapter (from API data)
 const selectedChapterVerses = computed(() => {
   if (!selectedBook.value || !selectedChapter.value) return []
 
@@ -272,31 +195,23 @@ const selectedChapterVerses = computed(() => {
   return chapter.verses.map((verse) => verse.number)
 })
 
-// Navigate to specified step
 const navigateToStep = (step: 'books' | 'chapters' | 'verses') => {
-  if (step === 'books') {
-    currentStep.value = 'books'
-  } else if (step === 'chapters' && canNavigateToChapter.value) {
-    currentStep.value = 'chapters'
-  } else if (step === 'verses' && canNavigateToVerse.value) {
-    currentStep.value = 'verses'
-  }
+  if (step === 'books') currentStep.value = 'books'
+  else if (step === 'chapters' && canNavigateToChapter.value) currentStep.value = 'chapters'
+  else if (step === 'verses' && canNavigateToVerse.value) currentStep.value = 'verses'
 }
 
-// Get book code by number
 const getBookCodeByNumber = (bookNumber: number): string | null => {
   const book = BIBLE_BOOKS.find((b) => b.number === bookNumber)
   return book?.code ?? null
 }
 
-// Get book name by number
 const getBookNameByNumber = (bookNumber: number): string => {
   const code = getBookCodeByNumber(bookNumber)
   if (!code) return ''
   return getBookName(code)
 }
 
-// Select book by number (find from bibleContent)
 const selectBookByNumber = (bookNumber: number) => {
   if (!bibleContent.value) return
   const book = bibleContent.value.books.find((b) => b.number === bookNumber)
@@ -321,7 +236,6 @@ const selectVerse = (verse: number) => {
   resetToBooks()
 }
 
-// Load Bible content
 const loadBibleContent = async () => {
   if (!props.versionCode) return
 
@@ -339,7 +253,6 @@ const loadBibleContent = async () => {
   }
 }
 
-// Watch for version changes
 watch(
   () => props.versionCode,
   () => {
@@ -349,7 +262,6 @@ watch(
   },
 )
 
-// Watch for dialog open
 watch(dialogVisible, (visible) => {
   if (visible && props.versionCode) {
     loadBibleContent()
@@ -357,10 +269,9 @@ watch(dialogVisible, (visible) => {
   }
 })
 
-// Reset to book selection state
 const resetToBooks = () => {
   currentStep.value = 'books'
-  searchQuery.value = '' // Clear search box
+  searchQuery.value = ''
 }
 
 const closeDialog = () => {
@@ -383,7 +294,6 @@ const closeDialog = () => {
 }
 
 .breadcrumb-icon {
-  /* height: 28px; */
   font-size: 0.8rem;
 }
 
