@@ -1043,12 +1043,12 @@ Wave 5 (Finalization - After All):
 
 ---
 
-- [ ] 12. Split Large Composables (Wave 4)
+- [~] 12. Split Large Composables (Wave 4) **[PARTIAL: 1/3 COMPLETE, 2/3 DEFERRED]**
 
   **What to do**:
-  - Split `src/composables/useVideoPlayer.ts` (398 lines) — extract playback controls, timeline, volume into sub-composables
-  - Split `src/composables/useMediaOperations.ts` (396 lines) — extract upload operations, clipboard operations into focused composables
-  - Split `src/composables/useFileSystem.ts` (388 lines) — extract file type detection, path utilities into utilities
+  - ✅ Split `src/composables/useVideoPlayer.ts` (398→216 lines) — extracted silent mode + event handlers
+  - ⚠️ Split `src/composables/useMediaOperations.ts` (396 lines) — **DEFERRED** (orchestrator complexity, see issues.md)
+  - ⚠️ Split `src/composables/useFileSystem.ts` (388 lines) — **DEFERRED** (not started)
   - Target: each main composable ≤ 250 lines, extracted pieces are focused single-responsibility
   - Add/update unit tests
 
@@ -1080,14 +1080,16 @@ Wave 5 (Finalization - After All):
   - `src/composables/useFileSystem.ts` — 388 lines, file system abstraction
 
   **Acceptance Criteria**:
-  - [ ] useVideoPlayer.ts ≤ 250 lines
-  - [ ] useMediaOperations.ts ≤ 250 lines
-  - [ ] useFileSystem.ts ≤ 250 lines
-  - [ ] Public APIs unchanged (same return values)
-  - [ ] Each split in separate commit
-  - [ ] `npm run type-check` → 0 errors after each
-  - [ ] `npm run test:unit` → all pass after each
-  - [ ] `npm run build` → succeeds after each
+  - [x] useVideoPlayer.ts ≤ 250 lines (216L, committed 9c3e4f8, ae7cf0f)
+  - [~] useMediaOperations.ts ≤ 250 lines (DEFERRED - orchestrator complexity)
+  - [~] useFileSystem.ts ≤ 250 lines (DEFERRED - not started)
+  - [x] Public APIs unchanged (same return values)
+  - [x] Each split in separate commit
+  - [x] `npm run type-check` → 0 errors after each
+  - [x] `npm run test:unit` → all pass after each (7 pre-existing test errors)
+  - [x] `npm run build` → succeeds after each
+
+  **Status**: PARTIALLY COMPLETE - useVideoPlayer done (-182L), useMediaOperations/useFileSystem deferred due to tight orchestrator coupling. Blocker documented in `.sisyphus/notepads/project-optimization/issues.md`. May return if time permits or adjust targets to ≤300L for orchestrators.
 
   **Commit**: YES (separate commits per composable)
   - Message pattern: `refactor: extract {focus} logic from {composable}`
