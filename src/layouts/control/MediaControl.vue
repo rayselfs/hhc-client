@@ -6,104 +6,8 @@
         <div class="py-1 d-flex align-center mb-2">
           <FolderBreadcrumbs :items="breadcrumbItems" @navigate="navigateToFolder" />
           <v-spacer></v-spacer>
-          <!-- Sort Menu -->
-          <v-menu>
-            <template #activator="{ props }">
-              <v-btn
-                v-bind="props"
-                variant="elevated"
-                rounded="xl"
-                prepend-icon="mdi-sort"
-                class="mr-2"
-              >
-                {{ $t('common.sort') }}
-              </v-btn>
-            </template>
-            <v-list density="compact" class="rounded-lg">
-              <v-list-item
-                :title="$t('common.name')"
-                prepend-icon="mdi-sort-alphabetical-variant"
-                @click="setSort('name')"
-              >
-                <template #append>
-                  <v-icon
-                    v-if="sortBy === 'name' && sortOrder && sortOrder !== 'none'"
-                    :icon="sortOrder === 'asc' ? 'mdi-arrow-up' : 'mdi-arrow-down'"
-                    size="small"
-                  ></v-icon>
-                </template>
-              </v-list-item>
-              <v-list-item
-                :title="$t('fileExplorer.updatedDate')"
-                prepend-icon="mdi-calendar-clock"
-                @click="setSort('date')"
-              >
-                <template #append>
-                  <v-icon
-                    v-if="sortBy === 'date' && sortOrder && sortOrder !== 'none'"
-                    :icon="sortOrder === 'asc' ? 'mdi-arrow-up' : 'mdi-arrow-down'"
-                    size="small"
-                  ></v-icon>
-                </template>
-              </v-list-item>
-              <v-list-item
-                :title="$t('common.type')"
-                prepend-icon="mdi-file-tree"
-                @click="setSort('type')"
-              >
-                <template #append>
-                  <v-icon
-                    v-if="sortBy === 'type' && sortOrder && sortOrder !== 'none'"
-                    :icon="sortOrder === 'asc' ? 'mdi-arrow-up' : 'mdi-arrow-down'"
-                    size="small"
-                  ></v-icon>
-                </template>
-              </v-list-item>
-            </v-list>
-          </v-menu>
-
-          <!-- View Menu -->
-          <v-menu>
-            <template #activator="{ props }">
-              <v-btn
-                v-bind="props"
-                variant="elevated"
-                rounded="xl"
-                prepend-icon="mdi-view-grid-outline"
-              >
-                {{ $t('common.view') }}
-              </v-btn>
-            </template>
-            <v-list density="compact" class="rounded-lg">
-              <v-list-item
-                :title="$t('media.largeIcons')"
-                prepend-icon="mdi-view-grid"
-                @click="viewMode = 'large'"
-              >
-                <template #append>
-                  <v-icon v-if="viewMode === 'large'" icon="mdi-check" size="small"></v-icon>
-                </template>
-              </v-list-item>
-              <v-list-item
-                :title="$t('media.mediumIcons')"
-                prepend-icon="mdi-view-module"
-                @click="viewMode = 'medium'"
-              >
-                <template #append>
-                  <v-icon v-if="viewMode === 'medium'" icon="mdi-check" size="small"></v-icon>
-                </template>
-              </v-list-item>
-              <v-list-item
-                :title="$t('media.smallIcons')"
-                prepend-icon="mdi-view-comfy"
-                @click="viewMode = 'small'"
-              >
-                <template #append>
-                  <v-icon v-if="viewMode === 'small'" icon="mdi-check" size="small"></v-icon>
-                </template>
-              </v-list-item>
-            </v-list>
-          </v-menu>
+          <SortMenu :sort-by="sortBy" :sort-order="sortOrder" @sort="setSort" />
+          <ViewModeMenu v-model:view-mode="viewMode" />
         </div>
 
         <div class="align-star d-block">
@@ -210,7 +114,13 @@ import { storeToRefs } from 'pinia'
 import { useProjectionManager } from '@/composables/useProjectionManager'
 import { useMediaProjectionStore } from '@/stores/mediaProjection'
 import { useProjectionStore } from '@/stores/projection'
-import { MediaItemList, MediaPresenter, MediaBackgroundMenu } from '@/components/Media'
+import {
+  MediaItemList,
+  MediaPresenter,
+  MediaBackgroundMenu,
+  SortMenu,
+  ViewModeMenu,
+} from '@/components/Media'
 import { CreateEditFolderDialog, DeleteConfirmDialog, FolderBreadcrumbs } from '@/components/Shared'
 import { useFolderDialogs } from '@/composables/useFolderDialogs'
 import { useMediaOperations } from '@/composables/useMediaOperations'
@@ -230,8 +140,6 @@ const { showSnackBar } = useSnackBar()
 const mediaStore = useMediaFolderStore()
 const mediaProjectionStore = useMediaProjectionStore()
 const projectionStore = useProjectionStore()
-
-// View Mode
 const { viewMode } = storeToRefs(mediaStore)
 const itemSize = computed(() => {
   switch (viewMode.value) {
@@ -256,15 +164,12 @@ const breadcrumbItems = computed(() => {
   }))
 })
 
-// Navigation actions
 const { navigateToFolder, getFolderById, clearClipboard } = mediaStore
 
-// Dialogs & Operations
 const { mediaSpaceHeight } = useCardLayout({
   minHeight: APP_CONFIG.UI.MIN_CARD_HEIGHT,
 })
 
-// Selection
 const selectedItems = ref<Set<string>>(new Set())
 
 const mediaDialogs = useFolderDialogs<FileItem>()
@@ -275,7 +180,6 @@ const operations = useMediaOperations(mediaStore, mediaDialogs, {
   clear: () => selectedItems.value.clear(),
 })
 
-// User Request: Clear selection when changing folder path (Best Practice)
 watch(
   () => currentFolderPath.value,
   () => {
