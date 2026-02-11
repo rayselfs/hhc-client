@@ -48,7 +48,10 @@
                 {{ result.book_abbreviation }}{{ result.chapter_number }}:{{ result.verse_number }}
               </span>
               <span class="mr-1 text-subtitle-1">-</span>
-              <p class="text-justify" v-html="sanitizeHTML(highlightSearchText(result.text))"></p>
+              <p
+                class="text-justify"
+                v-html="sanitizeHTML(highlightSearchText(result.text, searchText))"
+              ></p>
             </div>
           </div>
         </template>
@@ -93,20 +96,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, nextTick, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useBibleStore } from '@/stores/bible'
 import { useBible } from '@/composables/useBible'
-import { BIBLE_CONFIG, BIBLE_BOOKS } from '@/config/app'
+import { useBibleSearch } from '@/composables/useBibleSearch'
+import { useBibleVerseActions } from '@/composables/useBibleVerseActions'
+import { BIBLE_BOOKS } from '@/config/app'
 import { sanitizeHTML } from '@/utils/sanitize'
 import { useSentry } from '@/composables/useSentry'
 import ContextMenu from '@/components/Shared/ContextMenu.vue'
 import { BibleVerseContextMenu } from '@/components/Bible'
 import BottomSpacer from '@/components/Main/BottomSpacer.vue'
-import { BibleFolder } from '@/types/enum'
-import type { VerseItem } from '@/types/folder'
-import type { BiblePassage, SearchResult, SearchResultDisplay } from '@/types/bible'
+import type { BiblePassage } from '@/types/bible'
 
 interface Props {
   height: number
@@ -127,13 +130,7 @@ const {
   selectedVerse: storeSelectedVerse,
 } = storeToRefs(bibleStore)
 
-const {
-  getBibleContent,
-  addToHistory,
-  setPreviewState,
-  setCurrentPassageVerse,
-  searchBibleVerses,
-} = bibleStore
+const { getBibleContent, addToHistory, setPreviewState, setCurrentPassageVerse } = bibleStore
 
 const { addVerseToCurrent, scrollToVerse, updateProjection } = useBible(
   currentPassage,
@@ -141,54 +138,7 @@ const { addVerseToCurrent, scrollToVerse, updateProjection } = useBible(
   previewVerses,
 )
 
-// Loading state
 const isLoadingVerses = ref(false)
-
-// Search state
-const searchResults = ref<SearchResult[]>([])
-const isSearchMode = ref(false)
-const searchText = ref('')
-
-// Display search results (with book abbreviation)
-const searchResultsDisplay = computed<SearchResultDisplay[]>(() => {
-  if (!currentBibleContent.value || searchResults.value.length === 0) {
-    return []
-  }
-
-  return searchResults.value.map((result) => {
-    const book = currentBibleContent.value?.books.find((b) => b.number === result.book_number)
-    return {
-      ...result,
-      book_abbreviation: book?.abbreviation || '',
-    }
-  })
-})
-
-// Highlight search keywords
-const searchRegex = computed(() => {
-  if (!searchText.value) {
-    return null
-  }
-  const escapedSearchTerm = searchText.value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  return new RegExp(`(${escapedSearchTerm})`, 'gi')
-})
-
-const highlightSearchText = (text: string): string => {
-  if (!searchRegex.value || !text) {
-    return text
-  }
-
-  const highlighted = text.replace(
-    searchRegex.value,
-    '<span style="color: rgb(var(--v-theme-error));">$1</span>',
-  )
-  return sanitizeHTML(highlighted)
-}
-
-// Context menu refs
-const showVerseContextMenu = ref(false)
-const menuPosition = ref<[number, number] | undefined>(undefined)
-const selectedVerseItem = ref<{ number: number; text: string } | null>(null)
 
 const localizedBookName = computed(() => {
   const passage = currentPassage.value
@@ -201,7 +151,6 @@ const localizedBookName = computed(() => {
   return ''
 })
 
-// Handle verse selection for preview
 const handleVerseSelection = async (bookNumber: number, chapter: number, verse: number) => {
   try {
     const versionCode = currentVersion.value?.code
@@ -214,7 +163,6 @@ const handleVerseSelection = async (bookNumber: number, chapter: number, verse: 
       return
     }
 
-    // Fetch Bible content from store
     const content = await getBibleContent(versionCode)
     if (!content) {
       reportError(new Error('Bible content not found'), {
@@ -225,7 +173,6 @@ const handleVerseSelection = async (bookNumber: number, chapter: number, verse: 
       return
     }
 
-    // Find book in content
     const book = content.books.find((b) => b.number === bookNumber)
     if (!book) {
       reportError(new Error('Book not found'), {
@@ -236,7 +183,6 @@ const handleVerseSelection = async (bookNumber: number, chapter: number, verse: 
       return
     }
 
-    // Prepare new passage info
     const newPassage: BiblePassage = {
       bookAbbreviation: book.abbreviation || '',
       bookNumber: book.number,
@@ -244,82 +190,55 @@ const handleVerseSelection = async (bookNumber: number, chapter: number, verse: 
       verse,
     }
 
-    // Get actual verses from selected chapter
     const selectedChapter = book.chapters.find((ch) => ch.number === chapter)
     if (selectedChapter) {
-      // Prepare new verse content
       const newVerses = selectedChapter.verses.map((v: { number: number; text: string }) => ({
         number: v.number,
         text: v.text,
       }))
 
-      // Update store state
       setPreviewState(newPassage, newVerses, book)
 
-      // Wait for DOM update
       await nextTick()
 
-      // Scroll to specific verse (use setTimeout to avoid blocking)
       setTimeout(() => {
         scrollToVerse(verse, 'instant')
       }, 0)
     }
   } finally {
-    // Ensure loading state is always reset, even if an error occurs
     isLoadingVerses.value = false
   }
 }
 
-const createMultiFunctionVerse = (verseNumber: number): VerseItem | null => {
-  if (!currentPassage.value) return null
+const {
+  searchResultsDisplay,
+  isSearchMode,
+  searchText,
+  highlightSearchText,
+  handleSearchResultClick,
+  exitSearchMode,
+} = useBibleSearch({
+  currentVersion,
+  currentBibleContent,
+  onSearchResultClick: handleVerseSelection,
+  isLoadingVerses,
+})
 
-  const verseText = previewVerses.value.find((v) => v.number === verseNumber)?.text || ''
-
-  return {
-    id: crypto.randomUUID(),
-    type: 'verse',
-    folderId: BibleFolder.ROOT_ID,
-    bookAbbreviation: currentPassage.value.bookAbbreviation,
-    bookNumber: currentPassage.value.bookNumber,
-    chapter: currentPassage.value.chapter,
-    verse: verseNumber,
-    verseText,
-    timestamp: Date.now(),
-  }
-}
-
-const addToHistoryFromVerse = (verseNumber: number) => {
-  if (!currentPassage.value) return
-
-  const newHistoryItem = createMultiFunctionVerse(verseNumber)
-  if (!newHistoryItem) return
-
-  addToHistory(newHistoryItem)
-}
-
-const selectVerse = (verseNumber: number) => {
-  if (currentPassage.value) {
-    setCurrentPassageVerse(verseNumber)
-    addToHistoryFromVerse(verseNumber)
-    updateProjection(verseNumber)
-  }
-}
-
-const addVerseToCustom = (verseNumber: number) => {
-  if (!currentPassage.value) return
-
-  const newVerse = createMultiFunctionVerse(verseNumber)
-  if (!newVerse) return
-
-  addVerseToCurrent(newVerse)
-}
-
-const handleVerseRightClick = (event: MouseEvent, verse: { number: number; text: string }) => {
-  event.preventDefault()
-  selectedVerseItem.value = verse
-  menuPosition.value = [event.clientX, event.clientY]
-  showVerseContextMenu.value = true
-}
+const {
+  showVerseContextMenu,
+  menuPosition,
+  selectedVerseItem,
+  selectVerse,
+  addVerseToCustom,
+  handleVerseRightClick,
+} = useBibleVerseActions({
+  currentPassage,
+  previewVerses,
+  addToHistory,
+  setCurrentPassageVerse,
+  addVerseToCurrent,
+  updateProjection,
+})
 
 const copyVerseText = async () => {
   if (selectedVerseItem.value && currentPassage.value) {
@@ -345,67 +264,11 @@ const copyVerseText = async () => {
   showVerseContextMenu.value = false
 }
 
-const handleSearch = async (text: string) => {
-  if (!text.trim()) {
-    return
-  }
-
-  const versionCode = currentVersion.value?.code
-  if (!versionCode) {
-    reportError(new Error('No Bible version selected'), {
-      operation: 'handle-search',
-      component: 'BiblePreview',
-      extra: { searchText: text },
-    })
-    return
-  }
-
-  isLoadingVerses.value = true
-  isSearchMode.value = true
-
-  try {
-    searchText.value = text.trim()
-    const results = await searchBibleVerses(
-      text.trim(),
-      versionCode,
-      BIBLE_CONFIG.SEARCH.DEFAULT_RESULT_LIMIT,
-    )
-    searchResults.value = results
-  } catch (error) {
-    reportError(error, {
-      operation: 'handle-search',
-      component: 'BiblePreview',
-      extra: { searchText: text, versionCode },
-    })
-    searchResults.value = []
-  } finally {
-    isLoadingVerses.value = false
-  }
-}
-
-const handleSearchResultClick = async (result: SearchResult) => {
-  isSearchMode.value = false
-  isLoadingVerses.value = true
-  await handleVerseSelection(result.book_number, result.chapter_number, result.verse_number)
-}
-
-const handleSearchEvent = (event: Event) => {
-  const customEvent = event as CustomEvent<{ text: string }>
-  handleSearch(customEvent.detail.text)
-}
-
-const handleSelectVerseEvent = async (event: Event) => {
-  const customEvent = event as CustomEvent<{ bookNumber: number; chapter: number; verse: number }>
-  const { bookNumber, chapter, verse } = customEvent.detail
-  isLoadingVerses.value = true
-  await handleVerseSelection(bookNumber, chapter, verse)
-}
-
 watch(
   storeSelectedVerse,
   async (newVerse) => {
     if (newVerse) {
-      isSearchMode.value = false
+      exitSearchMode()
       isLoadingVerses.value = true
       await handleVerseSelection(newVerse.bookNumber, newVerse.chapter, newVerse.verse)
     }
@@ -423,16 +286,6 @@ watch(
     }
   },
 )
-
-onMounted(() => {
-  window.addEventListener('bible-search', handleSearchEvent)
-  window.addEventListener('bible-select-verse', handleSelectVerseEvent)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('bible-search', handleSearchEvent)
-  window.removeEventListener('bible-select-verse', handleSelectVerseEvent)
-})
 
 defineExpose({
   isLoadingVerses,
