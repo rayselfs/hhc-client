@@ -253,3 +253,108 @@ head -30 node_modules/@fontsource-variable/noto-sans-tc/index.css  # Confirmed f
 - Message: `perf: document font loading strategy (already optimized by @fontsource)`
 - Files: `src/main.ts`
 - Pre-commit: `npm run type-check && npm run build`
+
+---
+
+## Session Summary (2026-02-11)
+
+### Completed Waves: 0, 1, 2, 3 (Tasks 0-7)
+
+**Wave 0 - Baselines:**
+
+- Recorded all baseline metrics (tests, build time, bundle size, large file counts)
+- Established verification reference point for all future tasks
+
+**Wave 1 - Quick Wins (4 tasks, parallel execution):**
+
+- Created barrel exports for Timer/ and Media/Preview/ components
+- Extracted VIDEO_EXTENSIONS constants to config/media.ts (deduplication)
+- Moved 3 root-level orphan components to appropriate feature folders
+- Converted HomeView to lazy-loaded route (separate chunk)
+
+**Wave 2 - Type Splitting (1 complex task, sequential):**
+
+- Split 527-line types/common.ts into 5 domain-specific files
+- Reduced common.ts by 81.6% (527→97 lines)
+- Updated 47 files with correct domain imports
+- Zero circular dependencies achieved
+
+**Wave 3 - Performance (2 tasks, parallel execution):**
+
+- Implemented pdfjs-dist dynamic loading (408KB separate chunk)
+- Documented font loading strategy (already optimized by @fontsource)
+
+### Overall Metrics:
+
+**Before (Baseline):**
+
+- Test count: 83 tests
+- Build time: 5.440s
+- Bundle size: 16M
+- Large Vue files (>300L): 15
+- Large TS files (>200L): 32
+- types/common.ts: 527 lines
+
+**After (Waves 0-3):**
+
+- Test count: 83 tests (maintained)
+- Build time: ~5.5s (maintained)
+- Bundle size: 16M (maintained)
+- Large Vue files (>300L): 15 (unchanged - Wave 4 target)
+- Large TS files (>200L): 31 (reduced by 1 - types/common.ts split)
+- types/common.ts: **97 lines** (81.6% reduction)
+- **New**: pdfjs-dist in separate chunk (408KB on-demand)
+
+### Commits Made:
+
+1. `refactor: add barrel exports for Timer and Media/Preview components`
+2. `refactor: extract shared video extension constants to config/media.ts`
+3. `refactor: move root-level components to appropriate feature folders`
+4. `perf: lazy-load HomeView route for faster initial load`
+5. `refactor: split types/common.ts into domain-specific type files` (Wave 2)
+6. `perf: lazy-load pdfjs-dist for smaller initial bundle`
+7. `perf: document font loading strategy (already optimized by @fontsource)`
+
+### Verification Status:
+
+✅ All tasks verified with:
+
+- `npm run type-check` → 0 errors
+- `npm run test:unit` → 83/83 pass
+- `npm run lint` → 0 errors
+- `npm run build` → succeeds
+
+### Remaining Work (Wave 4-5):
+
+**Wave 4 - Large File Splits** (Tasks 8-12, all "deep" category):
+
+- PdfViewer.vue (423L→≤300L)
+- SettingsDialog.vue (491L→≤300L)
+- MediaPresenter.vue (369L→≤300L)
+- BiblePreview.vue, MediaControl.vue, BooksDialog.vue (≤350L each)
+- Large composables: useVideoPlayer, useMediaOperations, useFileSystem (≤250L each)
+
+**Wave 5 - Finalization** (Tasks 13-14):
+
+- LiquidGlass boundary evaluation
+- Final verification & bundle comparison
+
+### Key Patterns Established:
+
+1. **Python > sed/awk** for multi-file import updates (Wave 2)
+2. **Sequential domain creation** prevents circular dependency debugging (Wave 2)
+3. **Lazy-init pattern** for heavy libraries (pdfjs-dist dynamic import)
+4. **"Already optimized" is valid** - document and move on (font loading)
+5. **Atomic commits per task** with full verification before commit
+
+### Blockers Resolved:
+
+- ✅ Wave 2 type splitting complete → **Wave 4 now unblocked**
+- ✅ Wave 1 structural changes complete → **Wave 3 was unblocked**
+- ✅ All foundational work done → **Wave 4 can proceed**
+
+### Next Session Start Point:
+
+Begin with Task 8 (Split PdfViewer.vue) - component is 423 lines with complex canvas rendering, scroll mode, and zoom/pan logic. Recommended extraction: `usePdfRenderer` composable for canvas operations.
+
+---
