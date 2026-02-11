@@ -224,7 +224,7 @@ Wave 5 (Finalization - After All):
 
 ## TODOs
 
-- [ ] 0. Record Baselines (Wave 0)
+- [x] 0. Record Baselines (Wave 0)
 
   **What to do**:
   - Record current test count, build time, bundle size
@@ -281,7 +281,7 @@ Wave 5 (Finalization - After All):
 
 ---
 
-- [ ] 1. Add Missing Barrel Exports (Wave 1)
+- [x] 1. Add Missing Barrel Exports (Wave 1)
 
   **What to do**:
   - Create `src/components/Timer/index.ts` — export all 9 Timer components
@@ -359,7 +359,7 @@ Wave 5 (Finalization - After All):
 
 ---
 
-- [ ] 2. Extract Shared VIDEO_EXTENSIONS Constant (Wave 1)
+- [x] 2. Extract Shared VIDEO_EXTENSIONS Constant (Wave 1)
 
   **What to do**:
   - Create `src/config/media.ts` with shared VIDEO_EXTENSIONS and NON_NATIVE_VIDEO_EXTENSIONS
@@ -427,7 +427,7 @@ Wave 5 (Finalization - After All):
 
 ---
 
-- [ ] 3. Move Root-Level Orphan Components (Wave 1)
+- [x] 3. Move Root-Level Orphan Components (Wave 1)
 
   **What to do**:
   - Move `src/components/ContextMenu.vue` → `src/components/Shared/ContextMenu.vue`
@@ -506,7 +506,7 @@ Wave 5 (Finalization - After All):
 
 ---
 
-- [ ] 4. HomeView Lazy Loading (Wave 1)
+- [x] 4. HomeView Lazy Loading (Wave 1)
 
   **What to do**:
   - Change `src/router/index.ts` to lazy-load HomeView:
@@ -564,7 +564,7 @@ Wave 5 (Finalization - After All):
 
 ---
 
-- [ ] 5. Split types/common.ts by Domain (Wave 2)
+- [x] 5. Split types/common.ts by Domain (Wave 2)
 
   **What to do**:
   - Read `src/types/common.ts` (526 lines) and categorize each type/interface/enum by domain
@@ -661,7 +661,7 @@ Wave 5 (Finalization - After All):
 
 ---
 
-- [ ] 6. pdfjs-dist Dynamic Import (Wave 3)
+- [x] 6. pdfjs-dist Dynamic Import (Wave 3)
 
   **What to do**:
   - Modify `src/services/pdf/PdfService.ts` to dynamically import pdfjs-dist
@@ -740,7 +740,7 @@ Wave 5 (Finalization - After All):
 
 ---
 
-- [ ] 7. Font Loading Optimization (Wave 3)
+- [x] 7. Font Loading Optimization (Wave 3)
 
   **What to do**:
   - Analyze current font imports in `src/main.ts` (4 @fontsource packages)
@@ -803,7 +803,7 @@ Wave 5 (Finalization - After All):
 
 ---
 
-- [ ] 8. Split PdfViewer.vue (Wave 4)
+- [x] 8. Split PdfViewer.vue (Wave 4)
 
   **What to do**:
   - Read `src/components/Media/PdfViewer.vue` (423 lines)
