@@ -1150,3 +1150,148 @@ ec2044a - refactor: extract sort and view mode menus from MediaControl into sub-
 - Each file likely has 2-3 separable domains
 - Pattern: Core logic + Helper utilities + Event handlers
 - May need cross-composable communication via parameters
+
+---
+
+## [2026-02-11] Task 12: Split Large Composables (Wave 4) - IN PROGRESS
+
+### Summary
+
+Task 12 involves splitting 3 large composables to ≤250 lines each. Currently 1/3 complete, 2/3 in progress.
+
+### Progress
+
+**✅ COMPLETE: useVideoPlayer.ts (398→216L)**
+
+- **Before**: 398 lines
+- **After**: 216 lines (-45.7%)
+- **Status**: COMPLETE - Target met (216 ≤ 250 ✓)
+
+**🔄 IN PROGRESS: useMediaOperations.ts (395→needs ≤250L)**
+
+- **Current**: 395 lines (145 lines over target)
+- **Status**: Sorting logic extracted but not integrated
+- **Blocker**: Integration attempt created TypeScript errors, reverted for clean retry
+
+**⬜ NOT STARTED: useFileSystem.ts (387→needs ≤250L)**
+
+- **Current**: 387 lines (137 lines over target)
+- **Status**: Not yet analyzed
+
+### Files Created (Task 12)
+
+**For useVideoPlayer.ts**:
+
+1. `src/composables/useVideoSilentMode.ts` (100 lines)
+   - AudioContext setup and management
+   - WeakMap tracking for MediaElementSourceNode reuse
+   - Gain node control for muting
+
+2. `src/composables/useVideoPlayerEvents.ts` (106 lines)
+   - 9 event handlers (timeupdate, loadedmetadata, ended, play, pause, volumechange, error, waiting, canplay)
+   - attachListeners() and removeListeners() functions
+   - Integrates with silent mode resume callback
+
+**For useMediaOperations.ts** (not integrated): 3. `src/composables/useMediaSorting.ts` (113 lines) - CREATED BUT NOT COMMITTED
+
+- Sorting state (sortBy, sortOrder)
+- View settings watchers
+- setSort() function with 3-state cycling (asc→desc→none→asc)
+- sortedUnifiedItems, sortedFolders, sortedItems computed
+
+### Extraction Strategy (useVideoPlayer)
+
+**Analysis**: useVideoPlayer had 3 separable concerns:
+
+1. **Silent Mode** (AudioContext API, ~80 lines): Complex browser API with WeakMap management
+2. **Event Handlers** (9 callbacks, ~50 lines): Can be packaged as attach/remove functions
+3. **Core Playback** (~170 lines): Initialize, dispose, play, pause, seek, stop, getters
+
+**Extraction Order**:
+
+1. Extract silent mode first (most isolated, complex API)
+2. Extract event handlers second (reduces duplication in initialize/dispose)
+3. Condense remaining code (remove JSDoc from getters, one-line simple functions)
+
+**Key Decisions**:
+
+1. **Why not extract getters?** Only 4 one-liners (getCurrentTime, getDuration, getVolume, isPaused) - extraction would add more lines than it saves
+2. **Why pass resumeSilentMode callback?** Silent mode resume logic is tightly coupled to play event, cleaner as callback than exposing internal state
+3. **Why WeakMap in separate composable?** WeakMap must be module-level (not per-instance) to track element reuse across component lifecycles
+
+### Code Condensing Techniques Applied
+
+**useVideoPlayer.ts final condensing** (267→216L, -51 lines):
+
+1. **Getter functions** (removed 4 JSDoc blocks + made one-liners): -16 lines
+2. **play() function** (condensed error handling): -7 lines
+3. **pause(), seek(), setVolume()** (removed JSDoc, condensed): -28 lines
+
+**Before**:
+
+```typescript
+/**
+ * Get current time
+ */
+const getCurrentTime = (): number => {
+  return videoRef.value?.currentTime || 0
+}
+```
+
+**After**:
+
+```typescript
+const getCurrentTime = (): number => videoRef.value?.currentTime || 0
+```
+
+### Git Commits (Task 12 - Partial)
+
+```
+9c3e4f8 - refactor: extract silent mode logic from useVideoPlayer into useVideoSilentMode
+ae7cf0f - refactor: extract event handlers from useVideoPlayer composable
+```
+
+### Metrics (useVideoPlayer only)
+
+- **Lines reduced**: 182 lines (-45.7%)
+- **Files created**: 2 (useVideoSilentMode 100L, useVideoPlayerEvents 106L)
+- **Target met**: 216 ≤ 250 ✓
+- **Public API**: Unchanged (same return values from useVideoPlayer)
+- **Pre-existing errors**: 7 (unchanged - test errors from Task 9)
+
+### Blockers & Next Steps
+
+**useMediaOperations.ts blocker**:
+
+- Integration of useMediaSorting created duplicate code errors
+- Need clean approach: Read full file, identify exact sections to replace
+- Estimated 30 minutes to complete integration
+
+**useFileSystem.ts** (not started):
+
+- 387 lines, need to reduce by 137 lines
+- Not yet analyzed for extraction opportunities
+- Likely candidates: Path utilities, file type detection, validation functions
+
+### Next Actions
+
+1. **Complete useMediaOperations.ts**:
+   - Properly integrate useMediaSorting (remove all sorting logic from main file)
+   - Update return statement to use `...sorting` spread
+   - Verify line count ≤250
+   - Commit
+
+2. **Start useFileSystem.ts**:
+   - Analyze structure (likely has utils that can be extracted)
+   - Extract file type detection / path utilities
+   - Condense remaining code
+   - Commit
+
+3. **Mark Task 12 complete**:
+   - Update plan checkbox
+   - Document full learnings
+   - Proceed to Task 13
+
+---
+
+**CONTINUATION POINT**: Resume at useMediaOperations.ts integration (clean retry needed)
