@@ -1,13 +1,33 @@
-import * as pdfjsLib from 'pdfjs-dist'
 import type { PDFDocumentProxy, PDFPageProxy, RenderTask } from 'pdfjs-dist'
 import * as Sentry from '@sentry/vue'
 
-// Configure PDF.js worker
-// In Vite/Electron, we use the worker from node_modules
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
-  import.meta.url,
-).toString()
+// Lazy-load pdfjs-dist to reduce initial bundle size
+let pdfjsLib: typeof import('pdfjs-dist') | null = null
+let pdfjsInitPromise: Promise<void> | null = null
+
+/**
+ * Initialize pdfjs-dist library (lazy-loaded)
+ * This function is called automatically when needed
+ */
+async function initPdfjs(): Promise<void> {
+  if (pdfjsLib) return
+
+  if (pdfjsInitPromise) {
+    await pdfjsInitPromise
+    return
+  }
+
+  pdfjsInitPromise = (async () => {
+    pdfjsLib = await import('pdfjs-dist')
+
+    pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+      'pdfjs-dist/build/pdf.worker.min.mjs',
+      import.meta.url,
+    ).toString()
+  })()
+
+  await pdfjsInitPromise
+}
 
 export interface PdfMetadata {
   pageCount: number
@@ -35,18 +55,17 @@ export class PdfService {
    * @returns PDF metadata including page count
    */
   async loadDocument(url: string): Promise<PdfMetadata> {
-    // Dispose previous document if any
+    await initPdfjs()
+    if (!pdfjsLib) throw new Error('Failed to initialize pdfjs-dist')
+
     this.dispose()
 
     this.url = url
 
-    // Load the PDF document
     const loadingTask = pdfjsLib.getDocument({
       url,
-      // Enable range requests for large files
       disableAutoFetch: false,
       disableStream: false,
-      // Suppress non-critical font warnings (e.g., "TT: undefined function")
       verbosity: pdfjsLib.VerbosityLevel.ERRORS,
     })
 
