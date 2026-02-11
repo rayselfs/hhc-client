@@ -15,7 +15,7 @@
           <liquid-container mode="simple" padding="pa-0 py-2" class="sidebar-container">
             <div class="py-1" role="tablist" aria-orientation="vertical">
               <v-list-item
-                v-for="category in categories"
+                v-for="category in CATEGORIES"
                 :key="category.id"
                 padding="py-1 px-3"
                 rounded="rounded-lg"
@@ -47,164 +47,35 @@
             :id="'panel-' + activeCategory"
             :aria-labelledby="'tab-' + activeCategory"
           >
-            <!-- General -->
-            <template v-if="activeCategory === 'general'">
-              <v-row>
-                <v-col cols="12">
-                  <v-select
-                    v-model="selectedLanguage"
-                    :items="languageOptions"
-                    :label="$t('settings.language')"
-                    item-title="text"
-                    item-value="value"
-                    variant="outlined"
-                    density="compact"
-                    rounded="lg"
-                    :menu-props="{ contentClass: 'rounded-lg' }"
-                    @update:model-value="handleLanguageChange"
-                  >
-                    <template v-slot:item="{ props, item }">
-                      <v-list-item v-bind="props" :title="$t(item.raw.text)"></v-list-item>
-                    </template>
-                    <template v-slot:selection="{ item }">
-                      {{ $t(item.raw.text) }}
-                    </template>
-                  </v-select>
-                </v-col>
-                <v-col cols="12">
-                  <v-select
-                    v-model="selectedTimezone"
-                    :items="timezones"
-                    :label="$t('settings.timezone')"
-                    variant="outlined"
-                    density="compact"
-                    rounded="lg"
-                    :menu-props="{ contentClass: 'rounded-lg' }"
-                    @update:model-value="handleTimezoneChange"
-                  ></v-select>
-                </v-col>
-                <v-col cols="12">
-                  <v-switch
-                    v-model="isDarkMode"
-                    :label="$t('settings.theme') + ': ' + $t('settings.darkMode')"
-                    color="primary"
-                    hide-details
-                  ></v-switch>
-                </v-col>
-              </v-row>
-            </template>
+            <GeneralSettings
+              v-if="activeCategory === 'general'"
+              v-model:selected-language="selectedLanguage"
+              v-model:selected-timezone="selectedTimezone"
+              v-model:is-dark-mode="isDarkMode"
+              :language-options="languageOptions"
+              :timezones="timezones"
+              @language-change="handleLanguageChange"
+              @timezone-change="handleTimezoneChange"
+            />
 
-            <!-- Media -->
-            <template v-if="activeCategory === 'media'">
-              <!-- FFmpeg Status (always visible) -->
-              <h3 class="text-subtitle-2 mb-2">{{ $t('settings.media.ffmpegStatus') }}</h3>
-              <div class="mb-2">
-                <v-chip
-                  :color="ffmpegStatus.available ? 'success' : 'warning'"
-                  size="small"
-                  class="mb-2"
-                  :aria-label="
-                    $t('settings.media.ffmpegStatus') +
-                    ': ' +
-                    (ffmpegStatus.available ? 'Available' : 'Not found')
-                  "
-                >
-                  {{
-                    ffmpegStatus.available
-                      ? $t('settings.media.ffmpegFound', { version: ffmpegStatus.version })
-                      : $t('settings.media.ffmpegNotFound')
-                  }}
-                </v-chip>
-              </div>
-              <p v-if="ffmpegStatus.path" class="text-caption text-medium-emphasis mb-4">
-                {{ ffmpegStatus.path }}
-              </p>
+            <MediaSettings
+              v-if="activeCategory === 'media'"
+              v-model:custom-ffmpeg-path="customFfmpegPath"
+              v-model:enable-ffmpeg="enableFfmpeg"
+              v-model:video-quality="videoQuality"
+              :ffmpeg-status="ffmpegStatus"
+              :video-quality-options="VIDEO_QUALITY_OPTIONS"
+              @custom-path-change="handleCustomPathChange"
+              @enable-ffmpeg-change="handleEnableFfmpegChange"
+              @video-quality-change="handleVideoQualityChange"
+              @show-install-guide="showInstallGuide = true"
+            />
 
-              <!-- Custom Path Input (always visible) -->
-              <v-text-field
-                v-model="customFfmpegPath"
-                :label="$t('settings.media.customFfmpegPath')"
-                :placeholder="$t('settings.media.customFfmpegPathPlaceholder')"
-                :hint="$t('settings.media.customFfmpegPathHint')"
-                variant="outlined"
-                density="compact"
-                clearable
-                persistent-hint
-                class="mb-4"
-                rounded="lg"
-                @blur="handleCustomPathChange"
-              />
-
-              <!-- Enable FFmpeg Switch -->
-              <div class="d-flex align-center mb-2">
-                <v-switch
-                  v-model="enableFfmpeg"
-                  :label="$t('settings.media.enableExtendedVideo')"
-                  :disabled="!ffmpegStatus.available"
-                  color="primary"
-                  hide-details
-                  @update:model-value="handleEnableFfmpegChange"
-                />
-                <v-btn
-                  icon
-                  variant="text"
-                  size="small"
-                  :aria-label="$t('settings.media.ffmpegInstallGuide')"
-                  @click="showInstallGuide = true"
-                >
-                  <v-icon size="small">mdi-help-circle-outline</v-icon>
-                </v-btn>
-              </div>
-              <p class="text-caption text-medium-emphasis mb-4">
-                {{ $t('settings.media.enableExtendedVideoHint') }}
-              </p>
-              <p v-if="!ffmpegStatus.available" class="text-caption text-error mb-4" role="alert">
-                {{ $t('settings.media.ffmpegRequiredToEnable') }}
-              </p>
-
-              <!-- Video Quality (disabled when FFmpeg is OFF) -->
-              <v-select
-                v-model="videoQuality"
-                :items="videoQualityOptions"
-                :label="$t('settings.videoQuality')"
-                :disabled="!enableFfmpeg"
-                item-title="text"
-                item-value="value"
-                variant="outlined"
-                density="compact"
-                rounded="lg"
-                :menu-props="{ contentClass: 'rounded-lg' }"
-                @update:model-value="handleVideoQualityChange"
-              >
-                <template v-slot:item="{ props, item }">
-                  <v-list-item v-bind="props" :title="$t(item.raw.text)">
-                    <template v-slot:subtitle>
-                      {{ $t(item.raw.description) }}
-                    </template>
-                  </v-list-item>
-                </template>
-                <template v-slot:selection="{ item }">
-                  {{ $t(item.raw.text) }}
-                </template>
-              </v-select>
-              <p class="text-caption text-medium-emphasis mt-1">
-                {{ $t('settings.videoQualityHint') }}
-              </p>
-            </template>
-
-            <!-- System -->
-            <template v-if="activeCategory === 'system'">
-              <v-row>
-                <v-col cols="12">
-                  <v-switch
-                    v-model="hardwareAcceleration"
-                    :label="$t('settings.hardwareAcceleration')"
-                    color="primary"
-                    @update:model-value="handleHardwareAccelerationChange"
-                  ></v-switch>
-                </v-col>
-              </v-row>
-            </template>
+            <SystemSettings
+              v-if="activeCategory === 'system'"
+              v-model:hardware-acceleration="hardwareAcceleration"
+              @hardware-acceleration-change="handleHardwareAccelerationChange"
+            />
           </div>
 
           <v-card-actions class="settings-actions">
@@ -251,13 +122,13 @@ import { useDarkMode } from '@/composables/useDarkMode'
 import { useLocaleDetection } from '@/composables/useLocaleDetection'
 import { useProjectionManager } from '@/composables/useProjectionManager'
 import { useSettingsStore } from '@/stores/settings'
+import { GeneralSettings, MediaSettings, SystemSettings } from './Settings'
 import FFmpegInstallGuideDialog from './FFmpegInstallGuideDialog.vue'
+import { CATEGORIES, VIDEO_QUALITY_OPTIONS, getTimezoneOptions } from '@/config/settings'
 import type { FFmpegStatus } from '@/types/electron'
 
-// i18n
 const { t: $t, t } = useI18n()
 
-// Electron composable
 const {
   isElectron,
   onMainMessage,
@@ -272,31 +143,16 @@ const {
   ffmpegSetPath,
 } = useElectron()
 
-// 投影消息管理
 const { syncAllStates } = useProjectionManager()
-
-// Settings store for FFmpeg status
 const settingsStore = useSettingsStore()
-
-// 設定彈窗狀態
 const isOpen = ref(false)
-
-// Categories
-const categories = [
-  { id: 'general', title: 'settings.categories.general', icon: 'mdi-cog' },
-  { id: 'media', title: 'settings.categories.media', icon: 'mdi-video' },
-  { id: 'system', title: 'settings.categories.system', icon: 'mdi-tune' },
-]
 const activeCategory = ref('general')
 
-// 語系管理
 const { selectedLanguage, languageOptions, handleLanguageChange } = useLocaleDetection()
 
-// 時區設定
 const timerStore = useTimerStore()
 const selectedTimezone = ref(timerStore.settings.timezone)
 
-// Dark mode 設定
 const { isDark, toggleDark } = useDarkMode()
 const isDarkMode = computed({
   get: () => isDark.value,
@@ -307,74 +163,36 @@ const isDarkMode = computed({
   },
 })
 
-// Hardware acceleration 設定
 const hardwareAcceleration = ref(true)
 const showRestartDialog = ref(false)
-
-// Video quality 設定
 const videoQuality = ref<'low' | 'medium' | 'high'>('high')
-const videoQualityOptions = [
-  {
-    text: 'settings.videoQualityOptions.high',
-    value: 'high',
-    description: 'settings.videoQualityOptions.highDesc',
-  },
-  {
-    text: 'settings.videoQualityOptions.medium',
-    value: 'medium',
-    description: 'settings.videoQualityOptions.mediumDesc',
-  },
-  {
-    text: 'settings.videoQualityOptions.low',
-    value: 'low',
-    description: 'settings.videoQualityOptions.lowDesc',
-  },
-]
 
-// FFmpeg Settings
 const enableFfmpeg = ref(false)
 const ffmpegStatus = ref<FFmpegStatus>({ available: false, path: '', version: '', error: '' })
 const customFfmpegPath = ref('')
 const showInstallGuide = ref(false)
+const timezones = computed(() => getTimezoneOptions(t))
 
-// Timezone options
-const timezones = computed(() => [
-  { title: t('timezones.taipei'), value: 'Asia/Taipei' },
-  { title: t('timezones.hongKong'), value: 'Asia/Hong_Kong' },
-  { title: t('timezones.singapore'), value: 'Asia/Singapore' },
-  { title: t('timezones.tokyo'), value: 'Asia/Tokyo' },
-  { title: t('timezones.seoul'), value: 'Asia/Seoul' },
-  { title: t('timezones.newYork'), value: 'America/New_York' },
-  { title: t('timezones.london'), value: 'Europe/London' },
-  { title: t('timezones.paris'), value: 'Europe/Paris' },
-  { title: t('timezones.utc'), value: 'UTC' },
-])
-
-// 處理時區變更
 const handleTimezoneChange = (timezone: string) => {
   timerStore.setTimezone(timezone)
   syncAllStates()
 }
 
-// 處理硬體加速變更
-const handleHardwareAccelerationChange = async (enabled: boolean | null) => {
-  if (isElectron() && enabled !== null) {
+const handleHardwareAccelerationChange = async (enabled: boolean) => {
+  if (isElectron()) {
     await setHardwareAcceleration(enabled)
     showRestartDialog.value = true
   }
 }
 
-// 處理影片品質變更
 const handleVideoQualityChange = async (quality: 'low' | 'medium' | 'high') => {
   if (isElectron()) {
     await setVideoQuality(quality)
   }
 }
 
-// Handle Enable FFmpeg toggle
-const handleEnableFfmpegChange = async (enabled: boolean | null) => {
-  if (isElectron() && enabled !== null) {
-    // Only allow enabling if FFmpeg is available
+const handleEnableFfmpegChange = async (enabled: boolean) => {
+  if (isElectron()) {
     if (enabled && !ffmpegStatus.value.available) {
       enableFfmpeg.value = false
       return
@@ -384,7 +202,6 @@ const handleEnableFfmpegChange = async (enabled: boolean | null) => {
   }
 }
 
-// Handle custom path change
 const handleCustomPathChange = async () => {
   if (isElectron()) {
     // Always re-check status when path changes (even if empty - will check system PATH)
@@ -397,24 +214,20 @@ const handleCustomPathChange = async () => {
   }
 }
 
-// 重啟應用程式
 const restartApp = async () => {
   if (isElectron()) {
     await electronRestartApp()
   }
 }
 
-// 開啟設定彈窗
 const openSettings = () => {
   isOpen.value = true
 }
 
-// 暴露方法給外部使用
 defineExpose({
   openSettings,
 })
 
-// 同步當前語系狀態（語系初始化已經在 App.vue 中完成，這裡只需要同步狀態）
 const { locale } = useI18n()
 watch(
   () => locale.value,
@@ -424,22 +237,13 @@ watch(
   { immediate: true },
 )
 
-// 監聽 menu 事件
 onMounted(async () => {
   if (isElectron()) {
-    // 載入硬體加速設定
     hardwareAcceleration.value = await getHardwareAcceleration()
-
-    // 載入影片品質設定
     videoQuality.value = await getVideoQuality()
-
-    // Check FFmpeg status first (regardless of switch state)
     ffmpegStatus.value = await ffmpegCheckStatus()
-
-    // Then load FFmpeg switch state
     enableFfmpeg.value = await getEnableFfmpeg()
 
-    // 直接監聯 open-settings 事件
     onMainMessage((data: unknown) => {
       if (data === 'open-settings') {
         openSettings()
@@ -450,13 +254,11 @@ onMounted(async () => {
 </script>
 
 <style scoped lang="scss">
-/* Settings Container */
 .settings-container {
   height: 500px;
   max-height: 80vh;
 }
 
-/* Left Sidebar - macOS Finder style */
 .settings-sidebar {
   width: 180px;
   flex-shrink: 0;
@@ -465,16 +267,13 @@ onMounted(async () => {
   flex-direction: column;
 }
 
-/* Sidebar inner container */
 .sidebar-container {
   flex: 1;
   display: flex;
   flex-direction: column;
-  /* Override: Ensure sidebar container border-radius matches design across Vuetify variants */
   border-radius: 14px !important;
 }
 
-/* Right Content Area */
 .settings-content {
   flex: 1;
   display: flex;
@@ -483,7 +282,6 @@ onMounted(async () => {
   overflow: hidden;
 }
 
-/* Actions - Fixed at bottom */
 .settings-actions {
   flex-shrink: 0;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
