@@ -877,7 +877,7 @@ Wave 5 (Finalization - After All):
 
 ---
 
-- [ ] 9. Split SettingsDialog.vue (Wave 4)
+- [x] 9. Split SettingsDialog.vue (Wave 4)
 
   **What to do**:
   - Read `src/components/Main/SettingsDialog.vue` (491 lines)
@@ -942,7 +942,7 @@ Wave 5 (Finalization - After All):
 
 ---
 
-- [ ] 10. Split MediaPresenter.vue (Wave 4)
+- [x] 10. Split MediaPresenter.vue (Wave 4)
 
   **What to do**:
   - Read `src/components/Media/MediaPresenter.vue` (369 lines)
@@ -993,7 +993,7 @@ Wave 5 (Finalization - After All):
 
 ---
 
-- [ ] 11. Split Other Large Vue Components (Wave 4)
+- [x] 11. Split Other Large Vue Components (Wave 4)
 
   **What to do**:
   - Split `src/components/Bible/BiblePreview.vue` (495 lines) — extract verse rendering + scroll sync logic into composable
