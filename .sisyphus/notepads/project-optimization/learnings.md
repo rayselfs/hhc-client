@@ -1323,3 +1323,137 @@ ae7cf0f - refactor: extract event handlers from useVideoPlayer composable
 **Decision**: Skip to Tasks 13-15 (simpler analysis/verification tasks), return to Task 12 remaining files if time permits or adjust acceptance criteria to ≤300L for orchestrators.
 
 **Next**: Move to Task 13 (LiquidGlass boundary evaluation)
+
+---
+
+## [2026-02-11] Task 13: LiquidGlass Boundary Evaluation
+
+### Task Overview
+
+**Goal**: Analyze LiquidGlass usage across the app and recommend architectural boundary strategy (stay as-is, enforce stricter boundary, or extract to separate package).
+
+**Type**: Analysis and documentation only - NO code changes.
+
+**Time**: ~45 minutes
+
+### Approach
+
+1. **Structure Analysis**:
+   - Listed all LiquidGlass files: 12 components, 3 composables, theme system
+   - Total: 3,741 lines (substantial internal library)
+
+2. **Import Dependency Mapping**:
+   - Used grep to find all imports from LiquidGlass
+   - Checked both barrel export imports and direct deep imports
+   - Searched for component usage in templates
+
+3. **Coupling Analysis**:
+   - **App → LiquidGlass**: 3 files only
+     - main.ts (plugin registration)
+     - useDarkMode.ts (theme bridge)
+     - ExtendedToolbar.vue, PdfPresenterControls.vue (component usage)
+   - **LiquidGlass → App**: ZERO (perfect isolation)
+
+4. **Boundary Violation Check**:
+   - Found 1 minor violation: useDarkMode.ts bypasses barrel export
+   - All other imports use proper barrel export pattern
+
+### Key Findings
+
+**✅ Excellent Isolation**:
+
+- LiquidGlass has ZERO dependencies on application code
+- No imports from @/stores/_, @/composables/_, @/types/\* (outside LiquidGlass)
+- Only depends on Vue ecosystem (vue, @vueuse/core)
+
+**✅ Minimal Adoption Surface**:
+
+- Only 3 files use LiquidGlass (very low coupling)
+- Easy to migrate away from if needed
+
+**✅ Clear Public API**:
+
+- Barrel export (index.ts) defines 51-line public surface
+- Plugin system for registration
+- Type exports for TypeScript consumers
+
+**⚠️ Minor Weaknesses**:
+
+- 1 barrel export bypass (useDarkMode.ts - style issue only)
+- No README.md documentation
+- Plugin registration strategy not documented
+
+**✅ High Extractability**:
+
+- Can be extracted to npm package in 2-4 hours
+- No blockers
+- Already architecturally ready
+
+### Recommendation
+
+**STAY AS-IS** (Option A) with optional documentation improvements.
+
+**Rationale**:
+
+- Current architecture is already well-isolated (textbook internal library)
+- Only 3 files depend on it (minimal coupling)
+- Extraction cost outweighs benefits for single-project usage
+- Can extract later if needed (low risk, high readiness)
+
+### Documentation Created
+
+**File**: `.sisyphus/notepads/project-optimization/liquidglass-evaluation.md` (312 lines)
+
+**Contents**:
+
+- Executive summary with recommendation
+- Structure overview and metrics
+- Complete import dependency map (app → LiquidGlass, LiquidGlass → LiquidGlass)
+- Boundary violation analysis
+- Architectural strengths and weaknesses
+- Extractability assessment (YES - 2-4 hours effort)
+- Short-term improvement suggestions (ESLint rule, README, JSDoc)
+- Long-term extraction triggers (multiple projects, open source)
+
+### Verification
+
+✅ **Acceptance Criteria Met**:
+
+- [x] Evaluation document created at correct path
+- [x] Contains: usage map, import direction analysis, recommendation
+- [x] No source files modified (analysis only)
+
+**Pre-existing Errors**: 7 test errors (unchanged - not related to Task 13)
+
+### Learnings
+
+**Analysis Task Best Practices**:
+
+1. Start with structure mapping (find, ls, wc -l)
+2. Use grep for dependency mapping (imports, usage patterns)
+3. Check both directions (A → B AND B → A)
+4. Count adoption surface (how many files use the library)
+5. Assess extractability (can it be moved to separate package?)
+
+**Import Boundary Patterns**:
+
+- Barrel exports reduce coupling (single entry point)
+- Deep imports bypass boundaries (should be linted)
+- Zero reverse dependencies = excellent isolation
+
+**Internal Library Health Metrics**:
+
+- ✅ Zero app dependencies
+- ✅ Clear public API
+- ✅ Low adoption surface (<5 files)
+- ✅ High extractability
+
+**Documentation Value**:
+
+- Analysis documents capture architectural state at a point in time
+- Useful for future refactoring decisions
+- Provides extractability roadmap if needs change
+
+### Next Steps
+
+Task 13 COMPLETE. Moving to Task 14 (Final Verification & Bundle Comparison).
