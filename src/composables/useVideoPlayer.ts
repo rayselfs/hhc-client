@@ -1,14 +1,6 @@
 import { ref, onUnmounted, type Ref } from 'vue'
 import { useSentry } from '@/composables/useSentry'
-
-/**
- * WeakMap to track HTMLMediaElements that have been connected to AudioContext.
- * MediaElementSourceNode can only be created once per element, so we need to track this.
- */
-const connectedElements = new WeakMap<
-  HTMLMediaElement,
-  { audioContext: AudioContext; sourceNode: MediaElementAudioSourceNode; gainNode: GainNode }
->()
+import { useVideoSilentMode } from '@/composables/useVideoSilentMode'
 
 export interface VideoPlayerOptions {
   /**
@@ -103,8 +95,7 @@ export function useVideoPlayer(options: VideoPlayerOptions) {
 
   const { reportError } = useSentry()
   const isInitialized = ref(false)
-  const audioContext = ref<AudioContext | null>(null)
-  const gainNode = ref<GainNode | null>(null)
+  const silentMode = silent ? useVideoSilentMode(videoRef) : null
 
   // -- Event Handlers --
   const handleTimeUpdate = () => {
@@ -125,10 +116,7 @@ export function useVideoPlayer(options: VideoPlayerOptions) {
 
   const handlePlay = () => {
     if (onPlayStateChange) onPlayStateChange(true)
-    // Resume AudioContext if suspended (browser policy)
-    if (audioContext.value?.state === 'suspended') {
-      audioContext.value.resume()
-    }
+    if (silentMode) silentMode.resume()
   }
 
   const handlePause = () => {
@@ -183,10 +171,7 @@ export function useVideoPlayer(options: VideoPlayerOptions) {
       el.addEventListener('waiting', handleWaiting)
       el.addEventListener('canplay', handleCanPlay)
 
-      // Setup Silent Mode (AudioContext) if requested
-      if (silent) {
-        setupSilentMode()
-      }
+      if (silentMode) silentMode.setup()
 
       isInitialized.value = true
     } catch (error) {
@@ -194,61 +179,6 @@ export function useVideoPlayer(options: VideoPlayerOptions) {
         operation: 'initialize-native-video-player',
         component: 'useVideoPlayer',
       })
-    }
-  }
-
-  /**
-   * Setup AudioContext to mute output while keeping player volume/state active
-   * Uses a WeakMap to track already-connected elements (MediaElementSourceNode can only be created once)
-   */
-  const setupSilentMode = () => {
-    if (!videoRef.value) return
-
-    try {
-      const el = videoRef.value
-
-      // Check if this element was already connected to an AudioContext
-      const existing = connectedElements.get(el)
-      if (existing) {
-        // Reuse existing audio nodes - just ensure gain is muted
-        audioContext.value = existing.audioContext
-        gainNode.value = existing.gainNode
-        gainNode.value.gain.value = 0
-
-        // Resume if suspended
-        if (audioContext.value.state === 'suspended') {
-          audioContext.value.resume()
-        }
-        return
-      }
-
-      // Create new AudioContext and connect
-      const AudioContextClass =
-        window.AudioContext ||
-        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
-      if (!AudioContextClass) return
-
-      audioContext.value = new AudioContextClass()
-      const sourceNode = audioContext.value.createMediaElementSource(el)
-      gainNode.value = audioContext.value.createGain()
-
-      // Mute the gain node
-      gainNode.value.gain.value = 0
-
-      // Connect source -> gain (muted) -> destination
-      sourceNode.connect(gainNode.value)
-      gainNode.value.connect(audioContext.value.destination)
-
-      // Store in WeakMap for future reuse
-      connectedElements.set(el, {
-        audioContext: audioContext.value,
-        sourceNode,
-        gainNode: gainNode.value,
-      })
-    } catch (e) {
-      // Often fails if element not connected or already connected.
-      // Warn but don't crash
-      console.warn('Failed to setup AudioContext for silent mode', e)
     }
   }
 
@@ -276,14 +206,7 @@ export function useVideoPlayer(options: VideoPlayerOptions) {
     }
 
     isInitialized.value = false
-
-    // Note: We do NOT close the AudioContext here because:
-    // 1. MediaElementSourceNode can only be created once per element
-    // 2. The AudioContext is stored in WeakMap and may be reused
-    // 3. AudioContext will be garbage collected when the element is removed
-    // Just clear our local refs
-    audioContext.value = null
-    gainNode.value = null
+    if (silentMode) silentMode.cleanup()
   }
 
   /**
