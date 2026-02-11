@@ -34,10 +34,8 @@
 <script setup lang="ts">
 import { ref, computed, watch, onUnmounted, nextTick } from 'vue'
 import { usePdf, type PdfViewMode } from '@/composables/usePdf'
+import { usePdfRenderer } from '@/composables/usePdfRenderer'
 import { useResizeObserver } from '@vueuse/core'
-import { useSentry } from '@/composables/useSentry'
-
-const { reportError } = useSentry()
 
 const props = withDefaults(
   defineProps<{
@@ -82,27 +80,44 @@ const containerRef = ref<HTMLElement | null>(null)
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 const scrollContainerRef = ref<HTMLElement | null>(null)
 const pageCanvasRefs = ref<Map<number, HTMLCanvasElement>>(new Map())
-const renderedPages = ref<Set<number>>(new Set())
 
 const containerWidth = ref(0)
 const containerHeight = ref(0)
 
-const isRendering = ref(false)
-const pendingRender = ref<{ page: number; zoom: number } | null>(null)
-
-const baseWidth = ref(0)
-const baseHeight = ref(0)
-
-const canvasStyle = computed(() => {
-  const zoomedWidth = baseWidth.value * props.zoom
-  const zoomedHeight = baseHeight.value * props.zoom
-  return {
-    width: zoomedWidth > 0 ? `${zoomedWidth}px` : 'auto',
-    height: zoomedHeight > 0 ? `${zoomedHeight}px` : 'auto',
-    transform: `translate(${props.pan.x * 100}%, ${props.pan.y * 100}%)`,
-    transformOrigin: 'center center',
-    transition: 'transform 0.1s ease-out',
-  }
+const {
+  canvasStyle,
+  baseWidth,
+  baseHeight,
+  renderCurrentPage,
+  renderVisiblePages,
+  onScroll,
+  clearRenderedPages,
+} = usePdfRenderer({
+  pdfComposable: {
+    pageCount,
+    currentPage,
+    isLoading,
+    error,
+    viewMode: pdfViewMode,
+    metadata,
+    loadPdf,
+    renderPage,
+    renderPageNumber,
+    nextPage: () => {},
+    prevPage: () => {},
+    goToPage: () => {},
+    generateThumbnail: async () => null,
+    dispose,
+    getService,
+  },
+  containerWidth,
+  containerHeight,
+  canvasRef,
+  scrollContainerRef,
+  pageCanvasRefs,
+  zoom: computed(() => props.zoom),
+  pan: computed(() => props.pan),
+  emit: (event, page) => emit(event, page),
 })
 
 const setPageCanvasRef = (el: HTMLCanvasElement | null, page: number) => {
@@ -113,154 +128,12 @@ const setPageCanvasRef = (el: HTMLCanvasElement | null, page: number) => {
   }
 }
 
-const calculateBaseSize = async (): Promise<{ width: number; height: number }> => {
-  const service = getService()
-  const dims = await service.getPageDimensions(currentPage.value)
-  if (!dims) return { width: 0, height: 0 }
-
-  const scaleX = containerWidth.value / dims.width
-  const scaleY = containerHeight.value / dims.height
-  const scale = Math.min(scaleX, scaleY)
-
-  return {
-    width: dims.width * scale,
-    height: dims.height * scale,
-  }
-}
-
-const renderCurrentPage = async () => {
-  if (!canvasRef.value || isLoading.value || error.value) return
-  if (containerWidth.value <= 0 || containerHeight.value <= 0) return
-
-  if (isRendering.value) {
-    pendingRender.value = { page: currentPage.value, zoom: props.zoom }
-    return
-  }
-
-  isRendering.value = true
-
-  try {
-    const base = await calculateBaseSize()
-    baseWidth.value = base.width
-    baseHeight.value = base.height
-
-    const dpr = window.devicePixelRatio || 1
-    const effectiveZoom = props.zoom * dpr
-
-    await renderPage(canvasRef.value, {
-      fitMode: 'page',
-      containerWidth: base.width * effectiveZoom,
-      containerHeight: base.height * effectiveZoom,
-    })
-
-    const zoomedWidth = base.width * props.zoom
-    const zoomedHeight = base.height * props.zoom
-    canvasRef.value.style.width = `${zoomedWidth}px`
-    canvasRef.value.style.height = `${zoomedHeight}px`
-  } catch (e) {
-    reportError(e, {
-      operation: 'render-page',
-      component: 'PdfViewer',
-      extra: { page: currentPage.value, zoom: props.zoom },
-    })
-  } finally {
-    isRendering.value = false
-
-    if (pendingRender.value !== null) {
-      const pending = pendingRender.value
-      pendingRender.value = null
-      if (pending.page !== currentPage.value || pending.zoom !== props.zoom) {
-        currentPage.value = pending.page
-        await renderCurrentPage()
-      }
-    }
-  }
-}
-
-const renderScrollPage = async (page: number) => {
-  const canvas = pageCanvasRefs.value.get(page)
-  if (!canvas || renderedPages.value.has(page)) return
-
-  try {
-    const dpr = window.devicePixelRatio || 1
-    await renderPageNumber(canvas, page, {
-      fitMode: 'width',
-      containerWidth: containerWidth.value * dpr,
-      containerHeight: containerHeight.value * dpr,
-    })
-    canvas.style.width = `${canvas.width / dpr}px`
-    canvas.style.height = `${canvas.height / dpr}px`
-    renderedPages.value.add(page)
-  } catch (e) {
-    if ((e as Error)?.name === 'RenderingCancelledException') return
-    reportError(e, {
-      operation: 'render-scroll-page',
-      component: 'PdfViewer',
-      extra: { page },
-    })
-  }
-}
-
-const renderVisiblePages = async () => {
-  if (!scrollContainerRef.value || pdfViewMode.value !== 'scroll') return
-
-  const container = scrollContainerRef.value
-  const containerRect = container.getBoundingClientRect()
-
-  const pageWrappers = container.querySelectorAll<HTMLElement>('.pdf-page-wrapper')
-  const buffer = 2
-
-  let firstVisible = -1
-  let lastVisible = -1
-
-  pageWrappers.forEach((wrapper, index) => {
-    const wrapperRect = wrapper.getBoundingClientRect()
-    const isVisible =
-      wrapperRect.bottom > containerRect.top && wrapperRect.top < containerRect.bottom
-
-    if (isVisible) {
-      if (firstVisible === -1) firstVisible = index
-      lastVisible = index
-    }
-  })
-
-  if (firstVisible === -1) return
-
-  const startPage = Math.max(1, firstVisible + 1 - buffer)
-  const endPage = Math.min(pageCount.value, lastVisible + 1 + buffer)
-
-  for (let page = startPage; page <= endPage; page++) {
-    await renderScrollPage(page)
-  }
-
-  const scrollTop = container.scrollTop
-  const centerY = scrollTop + containerRect.height / 2
-  let detectedPage = 1
-
-  pageWrappers.forEach((wrapper, index) => {
-    const wrapperTop = wrapper.offsetTop
-    const wrapperHeight = wrapper.offsetHeight
-    if (centerY >= wrapperTop && centerY < wrapperTop + wrapperHeight) {
-      detectedPage = index + 1
-    }
-  })
-
-  if (detectedPage !== currentPage.value) {
-    currentPage.value = detectedPage
-    emit('pageChange', detectedPage)
-  }
-}
-
-const onScroll = () => {
-  renderVisiblePages()
-}
-
 watch(
   () => props.url,
   async (url) => {
     if (!url) return
 
-    renderedPages.value.clear()
+    clearRenderedPages()
     baseWidth.value = 0
     baseHeight.value = 0
 
@@ -314,7 +187,7 @@ watch(
   () => props.viewMode,
   async (mode) => {
     pdfViewMode.value = mode
-    renderedPages.value.clear()
+    clearRenderedPages()
 
     await nextTick()
 
@@ -350,7 +223,7 @@ useResizeObserver(containerRef, (entries) => {
     if (pdfViewMode.value === 'slide') {
       renderCurrentPage()
     } else {
-      renderedPages.value.clear()
+      clearRenderedPages()
       renderVisiblePages()
     }
   }
