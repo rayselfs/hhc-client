@@ -1,6 +1,7 @@
 import { ref, onUnmounted, type Ref } from 'vue'
 import { useSentry } from '@/composables/useSentry'
 import { useVideoSilentMode } from '@/composables/useVideoSilentMode'
+import { useVideoPlayerEvents, type VideoPlayerCallbacks } from '@/composables/useVideoPlayerEvents'
 
 export interface VideoPlayerOptions {
   /**
@@ -97,54 +98,22 @@ export function useVideoPlayer(options: VideoPlayerOptions) {
   const isInitialized = ref(false)
   const silentMode = silent ? useVideoSilentMode(videoRef) : null
 
-  // -- Event Handlers --
-  const handleTimeUpdate = () => {
-    if (videoRef.value && onTimeUpdate) {
-      onTimeUpdate(videoRef.value.currentTime)
-    }
+  const callbacks: VideoPlayerCallbacks = {
+    onTimeUpdate,
+    onDurationChange,
+    onEnded,
+    onPlayStateChange,
+    onVolumeChange,
+    onError,
+    onWaiting,
+    onCanPlay,
   }
 
-  const handleLoadedMetadata = () => {
-    if (videoRef.value && onDurationChange) {
-      onDurationChange(videoRef.value.duration)
-    }
-  }
-
-  const handleEnded = () => {
-    if (onEnded) onEnded()
-  }
-
-  const handlePlay = () => {
-    if (onPlayStateChange) onPlayStateChange(true)
-    if (silentMode) silentMode.resume()
-  }
-
-  const handlePause = () => {
-    if (onPlayStateChange) onPlayStateChange(false)
-  }
-
-  const handleVolumeChange = () => {
-    if (videoRef.value && onVolumeChange) {
-      const vol = videoRef.value.volume
-      const muted = videoRef.value.muted
-      const effectiveVolume = muted ? 0 : vol
-      onVolumeChange(effectiveVolume)
-    }
-  }
-
-  const handleError = () => {
-    if (videoRef.value && onError) {
-      onError(videoRef.value.error)
-    }
-  }
-
-  const handleWaiting = () => {
-    if (onWaiting) onWaiting()
-  }
-
-  const handleCanPlay = () => {
-    if (onCanPlay) onCanPlay()
-  }
+  const { attachListeners, removeListeners } = useVideoPlayerEvents(
+    videoRef,
+    callbacks,
+    silentMode?.resume,
+  )
 
   /**
    * Initialize Native HTML5 player
@@ -155,22 +124,10 @@ export function useVideoPlayer(options: VideoPlayerOptions) {
     try {
       const el = videoRef.value
 
-      // Setup Attributes
       el.muted = isMuted
       el.playsInline = true
-      // el.controls = false // We implement custom controls
 
-      // Attach Event Listeners
-      el.addEventListener('timeupdate', handleTimeUpdate)
-      el.addEventListener('loadedmetadata', handleLoadedMetadata)
-      el.addEventListener('ended', handleEnded)
-      el.addEventListener('play', handlePlay)
-      el.addEventListener('pause', handlePause)
-      el.addEventListener('volumechange', handleVolumeChange)
-      el.addEventListener('error', handleError)
-      el.addEventListener('waiting', handleWaiting)
-      el.addEventListener('canplay', handleCanPlay)
-
+      attachListeners(el)
       if (silentMode) silentMode.setup()
 
       isInitialized.value = true
@@ -188,18 +145,7 @@ export function useVideoPlayer(options: VideoPlayerOptions) {
   const dispose = () => {
     if (videoRef.value) {
       const el = videoRef.value
-      // Remove Listeners
-      el.removeEventListener('timeupdate', handleTimeUpdate)
-      el.removeEventListener('loadedmetadata', handleLoadedMetadata)
-      el.removeEventListener('ended', handleEnded)
-      el.removeEventListener('play', handlePlay)
-      el.removeEventListener('pause', handlePause)
-      el.removeEventListener('volumechange', handleVolumeChange)
-      el.removeEventListener('error', handleError)
-      el.removeEventListener('waiting', handleWaiting)
-      el.removeEventListener('canplay', handleCanPlay)
-
-      // Stop playback and unload
+      removeListeners(el)
       el.pause()
       el.removeAttribute('src')
       el.load()
@@ -209,61 +155,34 @@ export function useVideoPlayer(options: VideoPlayerOptions) {
     if (silentMode) silentMode.cleanup()
   }
 
-  /**
-   * Play the video
-   */
   const play = async () => {
     if (videoRef.value) {
       try {
         await videoRef.value.play()
       } catch (error) {
-        // Ignore AbortError which happens when play is interrupted by pause (user clicked fast)
-        if (error instanceof Error && error.name === 'AbortError') {
-          return
-        }
-        reportError(error, {
-          operation: 'play-video',
-          component: 'useVideoPlayer',
-        })
+        if (error instanceof Error && error.name === 'AbortError') return
+        reportError(error, { operation: 'play-video', component: 'useVideoPlayer' })
       }
     }
   }
 
-  /**
-   * Pause the video
-   */
   const pause = () => {
-    if (videoRef.value) {
-      videoRef.value.pause()
-    }
+    if (videoRef.value) videoRef.value.pause()
   }
 
-  /**
-   * Seek to a specific time in the video
-   * @param time Time in seconds
-   */
   const seek = (time: number) => {
     if (videoRef.value && typeof time === 'number' && !isNaN(time)) {
       videoRef.value.currentTime = time
     }
   }
 
-  /**
-   * Set volume level
-   * @param volume Volume level (0-1)
-   */
   const setVolume = (volume: number) => {
     if (videoRef.value) {
       videoRef.value.volume = Math.max(0, Math.min(1, volume))
-      if (volume > 0) {
-        videoRef.value.muted = false
-      }
+      if (volume > 0) videoRef.value.muted = false
     }
   }
 
-  /**
-   * Stop the video (reset to beginning and pause)
-   */
   const stop = () => {
     if (videoRef.value) {
       videoRef.value.pause()
@@ -271,35 +190,11 @@ export function useVideoPlayer(options: VideoPlayerOptions) {
     }
   }
 
-  /**
-   * Get current time
-   */
-  const getCurrentTime = (): number => {
-    return videoRef.value?.currentTime || 0
-  }
+  const getCurrentTime = (): number => videoRef.value?.currentTime || 0
+  const getDuration = (): number => videoRef.value?.duration || 0
+  const getVolume = (): number => videoRef.value?.volume ?? 1
+  const isPaused = (): boolean => videoRef.value?.paused ?? true
 
-  /**
-   * Get duration
-   */
-  const getDuration = (): number => {
-    return videoRef.value?.duration || 0
-  }
-
-  /**
-   * Get current volume
-   */
-  const getVolume = (): number => {
-    return videoRef.value?.volume ?? 1
-  }
-
-  /**
-   * Check if video is paused
-   */
-  const isPaused = (): boolean => {
-    return videoRef.value?.paused ?? true
-  }
-
-  // Cleanup on component unmount
   onUnmounted(() => {
     dispose()
   })
