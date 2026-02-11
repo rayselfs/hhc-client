@@ -9,7 +9,20 @@ import { LiquidGlassPlugin } from '@/components/LiquidGlass'
 import 'normalize.css'
 import './assets/main.css'
 
-// font
+/**
+ * Font Loading Strategy (Optimized)
+ *
+ * @fontsource packages include font-display: swap by default, allowing text to render
+ * immediately with fallback fonts while web fonts load. This prevents FOIT (Flash of
+ * Invisible Text) and improves perceived performance.
+ *
+ * Fonts are automatically subset by unicode-range for progressive loading:
+ * - Only required character ranges are loaded (e.g., latin-ext, chinese-tc, etc.)
+ * - Variable fonts reduce total size vs. multiple static weight files
+ *
+ * Control window: FOUT (Flash of Unstyled Text) acceptable during initial load
+ * Projection window: Fonts cached after first load, negligible FOUT in live use
+ */
 import '@fontsource-variable/open-sans'
 import '@fontsource-variable/noto-sans-tc'
 import '@fontsource-variable/noto-sans-sc'
