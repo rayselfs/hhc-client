@@ -3,21 +3,24 @@ import { ref } from 'vue'
 import { v4 as uuidv4 } from 'uuid'
 import { useI18n } from 'vue-i18n'
 import { useSnackBar } from '@/composables/useSnackBar'
-import {
-  type Folder,
-  type FolderItem,
-  type ClipboardItem,
-  type FolderStoreConfig,
-  type FolderDocument,
-} from '@/types/common'
+import type {
+  Folder,
+  FolderItem,
+  ClipboardItem,
+  FolderDocument,
+  VerseItem,
+  FileItem,
+  FolderStoreConfig,
+  FolderViewSettings,
+} from '@/types/folder'
+import { StorageCategory } from '@/types/common'
 import { useFolderManager } from '@/composables/useFolderManager'
 import { fileSystemProviderFactory } from '@/services/filesystem'
 import { useIndexedDB } from '@/composables/useIndexedDB'
 import { FOLDER_DB_CONFIG } from '@/config/db'
 import { FolderDBStore, MediaFolder } from '@/types/enum'
 import { BibleFolder } from '@/types/enum'
-import { StorageCategory } from '@/types/common'
-import type { VerseItem, FileItem } from '@/types/common'
+
 import { useSentry } from '@/composables/useSentry'
 
 /**
@@ -743,7 +746,7 @@ export const useFolderStore = <TItem extends FolderItem = FolderItem>(
     // ==========================================
     const updateFolderViewSettings = async (
       folderId: string,
-      settings: Partial<import('@/types/common').FolderViewSettings>,
+      settings: Partial<FolderViewSettings>,
     ) => {
       const folder = folderMap.get(folderId)
       if (folder) {

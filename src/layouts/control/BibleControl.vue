@@ -46,7 +46,7 @@ import { useCardLayout } from '@/composables/useLayout'
 import { useBibleFolderStore } from '@/stores/folder'
 import { BibleFolder } from '@/types/enum'
 import { APP_CONFIG } from '@/config/app'
-import type { VerseItem } from '@/types/common'
+import type { VerseItem } from '@/types/folder'
 import { useBible } from '@/composables/useBible'
 import { storeToRefs } from 'pinia'
 

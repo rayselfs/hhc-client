@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ViewType, MessageType, type AppMessage } from '@/types/common'
+import { ViewType, MessageType, type AppMessage } from '@/types/projection'
 
 export const useProjectionStore = defineStore('projection', () => {
   const isShowingDefault = ref(true)

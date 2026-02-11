@@ -10,9 +10,10 @@ import type {
   BiblePassage,
   PreviewVerse,
 } from '@/types/bible'
-import type { VerseItem } from '@/types/common'
-import { BIBLE_DB_CONFIG } from '@/config/db'
+import type { VerseItem } from '@/types/folder'
 import { StorageKey, StorageCategory, getStorageKey } from '@/types/common'
+import { BIBLE_DB_CONFIG } from '@/config/db'
+
 import { BIBLE_CONFIG } from '@/config/app'
 import { useIndexedDB } from '@/composables/useIndexedDB'
 import { useAPI } from '@/composables/useAPI'

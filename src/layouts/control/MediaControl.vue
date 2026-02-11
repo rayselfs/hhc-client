@@ -219,8 +219,9 @@ import { useCardLayout } from '@/composables/useLayout'
 import { APP_CONFIG } from '@/config/app'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 
-import { MessageType, ViewType } from '@/types/common'
-import type { FileItem } from '@/types/common'
+import { MessageType, ViewType } from '@/types/projection'
+import type { FileItem } from '@/types/folder'
+
 import { MediaFolder } from '@/types/enum'
 
 const { t } = useI18n()

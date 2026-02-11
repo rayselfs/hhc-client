@@ -105,7 +105,7 @@ import ContextMenu from '@/components/Shared/ContextMenu.vue'
 import { BibleVerseContextMenu } from '@/components/Bible'
 import BottomSpacer from '@/components/Main/BottomSpacer.vue'
 import { BibleFolder } from '@/types/enum'
-import type { VerseItem } from '@/types/common'
+import type { VerseItem } from '@/types/folder'
 import type { BiblePassage, SearchResult, SearchResultDisplay } from '@/types/bible'
 
 interface Props {

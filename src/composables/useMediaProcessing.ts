@@ -1,7 +1,7 @@
 import { storeToRefs } from 'pinia'
 
 import { useSettingsStore } from '@/stores/settings'
-import type { FileItem } from '@/types/common'
+import type { FileItem } from '@/types/folder'
 import { NON_NATIVE_VIDEO_EXTENSIONS } from '@/config/media'
 
 function isNonNativeVideoExtension(filename: string): boolean {

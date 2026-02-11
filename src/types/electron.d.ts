@@ -1,4 +1,6 @@
-import type { AppMessage, DisplayInfo, TimerMode } from './common'
+import type { DisplayInfo } from './common'
+import type { AppMessage } from './projection'
+import type { TimerMode } from './timer'
 import type { BibleVersion } from './bible'
 
 // AutoUpdater 相關類型定義

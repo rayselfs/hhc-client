@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { type AppMessage, type FileItem, MessageType } from '@/types/common'
+import { type AppMessage, MessageType } from '@/types/projection'
+import type { FileItem } from '@/types/folder'
 
 export const useMediaProjectionStore = defineStore('media-projection', () => {
   // Playlist State

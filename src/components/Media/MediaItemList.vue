@@ -66,7 +66,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { FileItem, Folder, ClipboardItem } from '@/types/common'
+import type { FileItem, Folder, ClipboardItem } from '@/types/folder'
 import { MediaFolder } from '@/types/enum'
 import { DEFAULT_LOCAL_PERMISSIONS } from '@/services/filesystem'
 import { useDragAndDrop } from '@/composables/useDragAndDrop'

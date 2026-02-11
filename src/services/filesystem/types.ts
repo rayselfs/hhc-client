@@ -2,9 +2,9 @@ import type {
   FileItem,
   Folder,
   FileMetadata,
-  FileSourceType,
   ItemPermissions,
-} from '@/types/common'
+  FileSourceType,
+} from '@/types/folder'
 
 export type { FileItem, Folder, FileMetadata, FileSourceType, ItemPermissions }
 

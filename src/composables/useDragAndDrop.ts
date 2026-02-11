@@ -1,4 +1,4 @@
-import type { Folder, FolderItem } from '@/types/common'
+import type { Folder, FolderItem } from '@/types/folder'
 import { useSentry } from './useSentry'
 import { ref } from 'vue'
 import type { DragData } from '@/utils/typeGuards'

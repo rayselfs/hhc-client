@@ -173,7 +173,7 @@ defineOptions({
 
 import { ref, computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import type { VerseItem, Folder } from '@/types/common'
+import type { VerseItem, Folder } from '@/types/folder'
 import { useBibleFolderStore } from '@/stores/folder'
 import { useBibleStore } from '@/stores/bible'
 import { isVerseItem, isFolder, type DragData } from '@/utils/typeGuards'

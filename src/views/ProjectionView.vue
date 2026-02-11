@@ -16,7 +16,7 @@ import TimerProjection from '@/layouts/projection/TimerProjection.vue'
 import MediaProjection from '@/layouts/projection/MediaProjection.vue'
 import { useProjectionStore } from '@/stores/projection'
 import { useProjectionElectron } from '@/composables/useElectron'
-import { ViewType, type AppMessage } from '@/types/common'
+import { ViewType, type AppMessage } from '@/types/projection'
 import { useLocaleDetection } from '@/composables/useLocaleDetection'
 // 引入 Dispatcher
 import { useProjectionManager } from '@/composables/useProjectionManager'

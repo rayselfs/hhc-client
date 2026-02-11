@@ -81,7 +81,7 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
-import type { VerseItem, Folder } from '@/types/common'
+import type { VerseItem, Folder, ClipboardItem } from '@/types/folder'
 import { useDragAndDrop } from '@/composables/useDragAndDrop'
 import type { DragData } from '@/utils/typeGuards'
 
@@ -122,7 +122,7 @@ const {
 import { useSelectionManager } from '@/composables/useSelectionManager'
 import { useBibleFolderStore } from '@/stores/folder'
 import { BibleFolder } from '@/types/enum'
-import type { ClipboardItem } from '@/types/common'
+
 import { computed, ref } from 'vue'
 import { onClickOutside } from '@vueuse/core'
 

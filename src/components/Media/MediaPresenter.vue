@@ -142,7 +142,7 @@ import { useCardLayout } from '@/composables/useLayout'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { APP_CONFIG } from '@/config/app'
 import { KEYBOARD_SHORTCUTS } from '@/config/shortcuts'
-import { MessageType, ViewType } from '@/types/common'
+import { MessageType, ViewType } from '@/types/projection'
 
 import PdfSlideshow from '@/components/Media/Preview/PdfSlideshow.vue'
 import MediaPlayer from '@/components/Media/Preview/MediaPlayer.vue'

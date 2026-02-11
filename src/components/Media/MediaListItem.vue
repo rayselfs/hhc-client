@@ -27,7 +27,7 @@
 </template>
 
 <script setup lang="ts">
-import type { FileItem, Folder } from '@/types/common'
+import type { FileItem, Folder } from '@/types/folder'
 import MediaItem from './MediaItem.vue'
 
 type UnifiedItem = FileItem | Folder<FileItem>

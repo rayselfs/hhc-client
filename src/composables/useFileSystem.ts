@@ -10,7 +10,7 @@ import {
   type ItemPermissions,
   DEFAULT_LOCAL_PERMISSIONS,
 } from '@/services/filesystem'
-import type { FileItem, Folder } from '@/types/common'
+import type { FileItem, Folder } from '@/types/folder'
 import { LocalProvider } from '@/services/filesystem/providers/LocalProvider'
 
 /**

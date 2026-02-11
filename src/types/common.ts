@@ -1,236 +1,7 @@
-/**
- * Message Type Enum
- * Standardized naming: CATEGORY_ACTION
- */
-export enum MessageType {
-  // --- View Control ---
-  /** Switch the main view component (Bible, Timer, Media) */
-  VIEW_CHANGE = 'VIEW_CHANGE',
-  /** Toggle projection content visibility (Mute/Unmute), showing default screen */
-  PROJECTION_TOGGLE_CONTENT = 'PROJECTION_TOGGLE_CONTENT',
-
-  // --- Timer ---
-  /** [IPC] High frequency countdown update (Tick) */
-  TIMER_TICK = 'TIMER_TICK',
-  /** [Broadcast] Sync complete timer settings (mode, color, overtime message, etc.) */
-  TIMER_SYNC_SETTINGS = 'TIMER_SYNC_SETTINGS',
-
-  // --- Bible ---
-  /** Sync Bible verse content (book, chapter, text) */
-  BIBLE_SYNC_CONTENT = 'BIBLE_SYNC_CONTENT',
-  /** Update Bible font size */
-  BIBLE_UPDATE_FONT_SIZE = 'BIBLE_UPDATE_FONT_SIZE',
-
-  // --- Media ---
-  /** Sync media playlist and current item */
-  MEDIA_UPDATE = 'MEDIA_UPDATE',
-  /** Control media playback behavior (Play, Pause, Zoom) */
-  MEDIA_CONTROL = 'MEDIA_CONTROL',
-
-  // --- Global / System ---
-  /** Switch application theme (Dark/Light) */
-  THEME_UPDATE = 'THEME_UPDATE',
-  /** Update application locale */
-  LOCALE_UPDATE = 'LOCALE_UPDATE',
-  /** [System] Request current full state (usually for initialization) */
-  SYSTEM_GET_STATE = 'SYSTEM_GET_STATE',
-  /** [System] Notification that projection window is closed */
-  SYSTEM_PROJECTION_CLOSED = 'SYSTEM_PROJECTION_CLOSED',
-  /** [System] Notification that no second screen is detected */
-  SYSTEM_NO_SECOND_SCREEN = 'SYSTEM_NO_SECOND_SCREEN',
-}
+import type { ViewType } from './projection'
 
 /**
- * View Type Enum
- */
-export enum ViewType {
-  DEFAULT = 'default',
-  BIBLE = 'bible',
-  TIMER = 'timer',
-  MEDIA = 'media',
-}
-
-/**
- * Timer Mode Enum
- */
-export enum TimerMode {
-  TIMER = 'timer',
-  CLOCK = 'clock',
-  BOTH = 'both',
-}
-
-/**
- * Base Message Interface
- */
-export interface BaseMessage {
-  type: MessageType | string
-  data: Record<string, unknown>
-}
-
-/**
- * View Change Message
- */
-export interface ChangeViewMessage extends BaseMessage {
-  type: MessageType.VIEW_CHANGE
-  data: {
-    view: ViewType
-  }
-}
-
-/**
- * Timer Tick Message (High frequency tick)
- */
-export interface TimerTickMessage extends BaseMessage {
-  type: MessageType.TIMER_TICK
-  data: {
-    mode: TimerMode
-    duration: number
-    remainingTime: number
-    isRunning: boolean
-    progress: number
-  }
-}
-
-/**
- * Timer Sync Settings Message (Broacast settings)
- */
-export interface TimerSyncSettingsMessage extends BaseMessage {
-  type: MessageType.TIMER_SYNC_SETTINGS
-  data: {
-    mode: TimerMode
-    timerDuration: number
-    timezone: string
-    isRunning: boolean
-    remainingTime: number
-    formattedTime: string
-    progress: number
-    overtimeMessageEnabled?: boolean
-    overtimeMessage?: string
-    reminderEnabled?: boolean
-    reminderTime?: number
-  }
-}
-
-/**
- * Bible Sync Content Message
- */
-export interface BibleSyncContentMessage extends BaseMessage {
-  type: MessageType.BIBLE_SYNC_CONTENT
-  data: {
-    bookNumber: number
-    chapter: number
-    chapterVerses: Array<{ number: number; text: string }>
-    currentVerse: number
-    isMultiVersion?: boolean
-    secondVersionChapterVerses?: Array<{ number: number; text: string }>
-  }
-}
-
-/**
- * Bible Update Font Size Message
- */
-export interface UpdateBibleFontSizeMessage extends BaseMessage {
-  type: MessageType.BIBLE_UPDATE_FONT_SIZE
-  data: {
-    fontSize: number
-  }
-}
-
-/**
- * Toggle Projection Content Message
- */
-export interface ToggleProjectionContentMessage extends BaseMessage {
-  type: MessageType.PROJECTION_TOGGLE_CONTENT
-  data: {
-    showDefault: boolean
-  }
-}
-
-/**
- * Update Theme Message
- */
-export interface UpdateThemeMessage extends BaseMessage {
-  type: MessageType.THEME_UPDATE
-  data: {
-    isDark: boolean
-  }
-}
-
-/**
- * Timezone Update Message - Note: This uses TIMER_SYNC_SETTINGS message type but has a different data shape (just timezone).
- * It might be better to merge this concept or keep it as a specific payload type if handled differently.
- * For now, just updating the enum.
- */
-export interface TimezoneUpdateMessage extends BaseMessage {
-  type: MessageType.TIMER_SYNC_SETTINGS
-  data: {
-    timezone: string
-  }
-}
-
-/**
- * Get Current State Message
- */
-export interface GetCurrentStateMessage extends BaseMessage {
-  type: MessageType.SYSTEM_GET_STATE
-  data: Record<string, never>
-}
-
-/**
- * Update Locale Message
- */
-export interface UpdateLocaleMessage extends BaseMessage {
-  type: MessageType.LOCALE_UPDATE
-  data: {
-    locale: string
-  }
-}
-
-/**
- * 消息聯合類型
- */
-export type AppMessage =
-  | ChangeViewMessage
-  | TimerTickMessage
-  | TimerSyncSettingsMessage
-  | BibleSyncContentMessage
-  | UpdateBibleFontSizeMessage
-  | UpdateThemeMessage
-  | ToggleProjectionContentMessage
-  | TimezoneUpdateMessage
-  | GetCurrentStateMessage
-  | UpdateLocaleMessage
-  | MediaUpdateMessage
-  | MediaControlMessage
-
-/**
- * 媒體投影更新消息
- */
-export interface MediaUpdateMessage extends BaseMessage {
-  type: MessageType.MEDIA_UPDATE
-  data: {
-    playlist?: FileItem[]
-    currentIndex: number
-    action: 'update' | 'next' | 'prev' | 'jump' | 'ended'
-    type?: 'video' | 'image' | 'pdf'
-  }
-}
-
-/**
- * 媒體控制消息
- */
-export interface MediaControlMessage extends BaseMessage {
-  type: MessageType.MEDIA_CONTROL
-  data: {
-    type: 'video' | 'image' | 'pdf'
-    action: string // 'play', 'pause', 'zoomIn', 'zoomOut', 'nextPage', 'transcode-seek', etc.
-    value?: number | string | { x: number; y: number } // zoom level, page number, pan coordinates, seek time etc.
-    shouldPlay?: boolean // For transcode-seek: whether to resume playback after loading
-  }
-}
-
-/**
- * 菜單項目接口
+ * Menu Item Interface
  */
 export interface MenuItem {
   title: string
@@ -239,7 +10,7 @@ export interface MenuItem {
 }
 
 /**
- * 顯示器信息接口
+ * Display Info Interface
  */
 export interface DisplayInfo {
   id: number
@@ -261,34 +32,7 @@ export interface DisplayInfo {
 }
 
 /**
- * 計時器預設接口
- */
-export interface TimerPreset {
-  id: string
-  name: string
-  duration: number
-  mode: TimerMode
-}
-
-/**
- * 聖經書籍接口
- */
-export interface BibleBook {
-  name: string
-  chapters: number
-}
-
-/**
- * 聖經章節接口
- */
-export interface BibleChapter {
-  book: string
-  chapter: number
-  verses: string[]
-}
-
-/**
- * 錯誤類型枚舉
+ * Error Type Enum
  */
 export enum ErrorType {
   ELECTRON = 'electron',
@@ -300,7 +44,7 @@ export enum ErrorType {
 }
 
 /**
- * 環境類型枚舉
+ * Environment Type Enum
  */
 export enum Environment {
   DEVELOPMENT = 'development',
@@ -309,7 +53,7 @@ export enum Environment {
 }
 
 /**
- * LocalStorage 鍵名枚舉
+ * LocalStorage Key Name Enum
  */
 export enum StorageKey {
   // App related
@@ -333,7 +77,7 @@ export enum StorageKey {
 }
 
 /**
- * Storage 分類枚舉
+ * Storage Category Enum
  */
 export enum StorageCategory {
   APP = 'app',
@@ -343,184 +87,11 @@ export enum StorageCategory {
 }
 
 /**
- * 生成完整的 LocalStorage 鍵名
- * @param category - 分類（app, bible, timer）
- * @param key - 鍵名
- * @returns 完整的 LocalStorage 鍵名
+ * Generate complete LocalStorage key name
+ * @param category - Category (app, bible, timer, media)
+ * @param key - Key name
+ * @returns Complete LocalStorage key name
  */
 export function getStorageKey(category: StorageCategory, key: StorageKey | string): string {
   return `hhc-${category}-${key}`
-}
-
-/**
- * File source type - distinguishes between different storage providers
- */
-export type FileSourceType = 'local' | 'cloud' | 'sync'
-
-/**
- * Permission flags for file/folder operations
- */
-export interface ItemPermissions {
-  canDelete: boolean
-  canRename: boolean
-  canMove: boolean
-  canEdit: boolean
-  canPresent: boolean
-}
-
-/**
- * Base interface for all folder items
- * All items in folders must implement this interface
- */
-export interface FolderItem {
-  id: string
-  type: 'verse' | 'file' // Type discriminator for Discriminated Union
-  timestamp: number // Timestamp when the item was created or last modified
-  expiresAt?: number | null // Timestamp when the item should be deleted, null or undefined for permanent
-  sortIndex?: number // Custom sort order index (for user-defined ordering)
-  // Provider-related fields
-  sourceType?: FileSourceType // Source type (local, cloud, sync)
-  permissions?: ItemPermissions // Permission flags for operations
-}
-
-/**
- * File metadata for distinguishing file types (image, video, pdf, etc.)
- * Used in FileItem to identify the specific file type
- */
-export interface FileMetadata {
-  fileType: 'image' | 'video' | 'pdf' | 'audio' | 'document'
-  width?: number // Image/Video dimensions
-  height?: number // Image/Video dimensions
-  duration?: number // Video/Audio duration in seconds
-  thumbnailType?: 'url' | 'blob' // Added: source of the thumbnail
-  thumbnailUrl?: string // Video thumbnail URL or Blob URL
-  thumbnailBlobId?: string // Added: key for thumbnails store in IndexedDB
-  pageCount?: number // PDF page count
-  mimeType?: string // File MIME type
-  [key: string]: unknown // Allow extensibility
-}
-
-/**
- * File item interface for organizing media files
- * Images, videos, PDFs, etc. are all FileItems with different metadata.fileType
- */
-export interface FileItem extends FolderItem {
-  type: 'file'
-  folderId: string // Parent folder ID for IndexedDB relationship
-  name: string
-  url: string
-  size: number // File size in bytes
-  metadata: FileMetadata
-  notes?: string // User notes for presenter mode
-  // Cloud/Sync provider fields (for future use)
-  cloudId?: string // Cloud provider file ID (e.g., Google Drive file ID)
-  syncPath?: string // Local filesystem path (for sync folders)
-  lastSyncAt?: number // Last sync timestamp
-}
-
-/**
- * Verse item interface for organizing Bible verses
- * Used in history and custom folders
- * Extends FolderItem with type: 'verse'
- */
-export interface VerseItem extends FolderItem {
-  type: 'verse'
-  folderId: string // Parent folder ID for IndexedDB relationship
-  bookAbbreviation: string
-  bookNumber: number
-  chapter: number
-  verse: number
-  verseText: string
-}
-
-/**
- * Sort Types
- */
-export type SortBy = 'name' | 'date' | 'type' | 'custom'
-export type SortOrder = 'asc' | 'desc' | 'none'
-
-/**
- * Folder View Settings
- */
-export interface FolderViewSettings {
-  sortBy?: SortBy
-  sortOrder?: SortOrder
-  viewMode?: 'large' | 'medium' | 'small'
-}
-
-/**
- * Generic folder interface for organizing items
- * @template TItem - The type of items in the folder (must extend FolderItem)
- */
-export interface Folder<TItem extends FolderItem = FolderItem> {
-  id: string
-  name: string
-  expanded?: boolean
-  items: TItem[]
-  folders: Folder<TItem>[]
-  parentId?: string
-  timestamp: number
-  expiresAt?: number | null // Timestamp when the folder should be deleted, null for permanent
-  sortIndex?: number // Custom sort order index (for user-defined ordering)
-  // Provider-related fields
-  sourceType?: FileSourceType // Source type (local, cloud, sync)
-  permissions?: ItemPermissions // Permission flags for operations
-  cloudId?: string // Cloud provider folder ID
-  syncPath?: string // Local filesystem path (for sync folders)
-  isLoaded?: boolean // Whether the sub-items/folders have been loaded
-  viewSettings?: FolderViewSettings // Per-folder view preferences
-}
-
-/**
- * Clipboard item definition
- */
-export interface ClipboardItem<T extends FolderItem> {
-  type: 'file' | 'folder' | 'verse'
-  data: T | Folder<T>
-  action: 'copy' | 'cut'
-  sourceFolderId: string
-}
-
-/**
- * Configuration for folder store
- */
-export interface FolderStoreConfig {
-  rootId: string
-  defaultRootName: string
-  storageCategory: StorageCategory
-}
-
-/**
- * Folder document for IndexedDB storage (flattened, no nested items/folders)
- */
-export interface FolderDocument {
-  id: string
-  name: string
-  parentId: string | null // null = root folder
-  expanded?: boolean
-  timestamp: number
-  expiresAt?: number | null
-  sortIndex?: number // Custom sort order index (for user-defined ordering)
-  sourceType?: FileSourceType
-  permissions?: ItemPermissions
-  viewSettings?: FolderViewSettings
-  // Cloud/Sync provider fields (for future use)
-  cloudId?: string
-  syncPath?: string
-  isLoaded?: boolean
-}
-
-/**
- * Item document union type for IndexedDB storage
- */
-export type ItemDocument = FileItem | VerseItem
-
-/**
- * Thumbnail document for IndexedDB storage
- * id = FileItem.id (1:1 relationship)
- */
-export interface ThumbnailDocument {
-  id: string // = FileItem.id
-  blob: Blob
-  createdAt?: number
 }

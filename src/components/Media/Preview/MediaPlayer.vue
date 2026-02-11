@@ -64,8 +64,9 @@ import { useMediaProjectionStore } from '@/stores/mediaProjection'
 import { useProjectionManager } from '@/composables/useProjectionManager'
 import { useElectron } from '@/composables/useElectron'
 import { useVideoPlayer } from '@/composables/useVideoPlayer'
-import { MessageType } from '@/types/common'
-import type { FileItem } from '@/types/common'
+import { MessageType } from '@/types/projection'
+import type { FileItem } from '@/types/folder'
+
 import { needsTranscode, buildVideoUrl } from '@/utils/videoUtils'
 import MediaVideoControls from '@/components/Media/Preview/MediaVideoControls.vue'
 

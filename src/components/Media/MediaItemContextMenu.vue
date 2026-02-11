@@ -42,7 +42,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { FileItem, Folder, ClipboardItem, ItemPermissions } from '@/types/common'
+import type { FileItem, Folder, ClipboardItem, ItemPermissions } from '@/types/folder'
 import { DEFAULT_LOCAL_PERMISSIONS } from '@/services/filesystem'
 
 interface Props {

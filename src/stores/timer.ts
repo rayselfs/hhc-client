@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useDebounceFn } from '@vueuse/core'
-import { TimerMode } from '@/types/common'
+import { TimerMode } from '@/types/timer'
 import { useStopwatchStore } from '@/stores/stopwatch'
 import { useMemoryManager } from '@/utils/memoryManager'
 import { TIMER_CONFIG, getTimerDefaultSettings } from '@/config/app'
@@ -9,7 +9,8 @@ import { useSentry } from '@/composables/useSentry'
 import { useLocalStorage } from '@/composables/useLocalStorage'
 import { useElectron } from '@/composables/useElectron'
 
-import { StorageKey, StorageCategory, getStorageKey, MessageType } from '@/types/common'
+import { StorageKey, StorageCategory, getStorageKey } from '@/types/common'
+import { MessageType } from '@/types/projection'
 import type { TimerState as ElectronTimerState } from '@/types/electron'
 
 export interface TimerPreset {

@@ -1,3 +1,6 @@
+import type { BaseMessage } from './projection'
+import { MessageType } from './projection'
+
 /**
  * Bible API 類型定義
  * 對應 bible-api 的返回結構
@@ -140,4 +143,29 @@ export interface BibleSearchIndexData {
   version_code: string
   documents_data?: BibleVerseIndexItem[]
   updated_at: number
+}
+
+/**
+ * Bible Sync Content Message
+ */
+export interface BibleSyncContentMessage extends BaseMessage {
+  type: MessageType.BIBLE_SYNC_CONTENT
+  data: {
+    bookNumber: number
+    chapter: number
+    chapterVerses: Array<{ number: number; text: string }>
+    currentVerse: number
+    isMultiVersion?: boolean
+    secondVersionChapterVerses?: Array<{ number: number; text: string }>
+  }
+}
+
+/**
+ * Bible Update Font Size Message
+ */
+export interface UpdateBibleFontSizeMessage extends BaseMessage {
+  type: MessageType.BIBLE_UPDATE_FONT_SIZE
+  data: {
+    fontSize: number
+  }
 }

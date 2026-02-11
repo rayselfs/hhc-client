@@ -32,7 +32,7 @@
 </template>
 
 <script setup lang="ts">
-import type { FileItem, Folder } from '@/types/common'
+import type { FileItem, Folder } from '@/types/folder'
 
 type UnifiedItem = FileItem | Folder<FileItem>
 

@@ -56,7 +56,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import type { Folder, FileItem } from '@/types/common'
+import type { Folder, FileItem } from '@/types/folder'
 import MediaThumbnail from './MediaThumbnail.vue'
 
 type UnifiedItem = FileItem | Folder<FileItem>

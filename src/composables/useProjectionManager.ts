@@ -9,14 +9,8 @@ import { useTimerStore } from '@/stores/timer'
 import { useMemoryManager } from '@/utils/memoryManager'
 import { useSentry } from './useSentry'
 import { useLocalStorage } from './useLocalStorage'
-import {
-  MessageType,
-  ViewType,
-  StorageKey,
-  StorageCategory,
-  getStorageKey,
-  type AppMessage,
-} from '@/types/common'
+import { MessageType, ViewType, type AppMessage } from '@/types/projection'
+import { StorageKey, StorageCategory, getStorageKey } from '@/types/common'
 import { BIBLE_CONFIG } from '@/config/app'
 
 // Globally shared last sent message record (solves multi-instance message deduplication)

@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { FOLDER_DB_CONFIG } from '@/config/db'
 import { useFileSystem } from '@/composables/useFileSystem'
 import { useIndexedDB } from '@/composables/useIndexedDB'
-import type { FileItem, Folder, ClipboardItem } from '@/types/common'
+import type { FileItem, Folder, ClipboardItem } from '@/types/folder'
 import { FolderDBStore, MediaFolder } from '@/types/enum'
 
 interface UseMediaClipboardOptions {

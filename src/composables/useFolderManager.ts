@@ -3,7 +3,7 @@
  * Provides all folder-related utilities including finding, updating, deleting, and navigating folders
  */
 import { type Ref, computed } from 'vue'
-import type { Folder, FolderItem } from '@/types/common'
+import type { Folder, FolderItem } from '@/types/folder'
 
 /**
  * Options for folder manager configuration

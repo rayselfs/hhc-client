@@ -26,7 +26,7 @@
 </template>
 
 <script setup lang="ts">
-import type { FileItem } from '@/types/common'
+import type { FileItem } from '@/types/folder'
 import { useThumbnail } from '@/composables/useThumbnail'
 
 const props = withDefaults(

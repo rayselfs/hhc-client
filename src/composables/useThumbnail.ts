@@ -1,6 +1,6 @@
 import { ref, watch, onUnmounted, unref } from 'vue'
 import type { Ref } from 'vue'
-import type { FileItem } from '@/types/common'
+import type { FileItem } from '@/types/folder'
 import { useIndexedDB } from './useIndexedDB'
 import { useSentry } from '@/composables/useSentry'
 import { FOLDER_DB_CONFIG } from '@/config/db'

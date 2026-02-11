@@ -68,7 +68,8 @@ import { useFileCleanup } from '@/composables/useFileCleanup'
 import { useProjectionStore } from '@/stores/projection'
 
 // Types
-import { MessageType, ViewType, type AppMessage, type MenuItem } from '@/types/common'
+import { MessageType, ViewType, type AppMessage } from '@/types/projection'
+import { type MenuItem } from '@/types/common'
 
 const { t: $t } = useI18n()
 const { reportError } = useSentry()

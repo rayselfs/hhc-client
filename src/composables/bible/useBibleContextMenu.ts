@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import type { VerseItem, Folder } from '@/types/common'
+import type { VerseItem, Folder } from '@/types/folder'
 
 export function useBibleContextMenu() {
   const showItemContextMenu = ref(false)

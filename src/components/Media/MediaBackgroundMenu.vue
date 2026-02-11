@@ -33,7 +33,7 @@
 </template>
 
 <script setup lang="ts">
-import type { ClipboardItem, FileItem } from '@/types/common'
+import type { ClipboardItem, FileItem } from '@/types/folder'
 
 interface Props {
   isFab?: boolean

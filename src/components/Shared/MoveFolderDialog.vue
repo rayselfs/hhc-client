@@ -59,7 +59,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import FolderBreadcrumbs from '@/components/Shared/FolderBreadcrumbs.vue'
-import type { Folder, FolderItem } from '@/types/common'
+import type { Folder, FolderItem } from '@/types/folder'
 
 interface Props {
   modelValue: boolean

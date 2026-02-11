@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { useElectron } from '../useElectron'
-import type { AppMessage } from '@/types/common'
+import type { AppMessage } from '@/types/projection'
 import type { TimerCommand, TimerState } from '@/types/electron'
-import { MessageType, ViewType, TimerMode } from '@/types/common'
+import { MessageType, ViewType } from '@/types/projection'
+import { TimerMode } from '@/types/timer'
 
 // Mock window.electronAPI
 const mockElectronAPI = {

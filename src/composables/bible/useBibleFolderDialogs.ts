@@ -1,7 +1,7 @@
 import { ref, computed, type Ref, type ComputedRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
-import type { VerseItem, Folder } from '@/types/common'
+import type { VerseItem, Folder } from '@/types/folder'
 import { useBibleFolderStore } from '@/stores/folder'
 import { useBibleStore } from '@/stores/bible'
 import { useFolderDialogs } from '@/composables/useFolderDialogs'

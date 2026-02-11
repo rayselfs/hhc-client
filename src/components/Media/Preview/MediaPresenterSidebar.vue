@@ -44,7 +44,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import type { FileItem } from '@/types/common'
+import type { FileItem } from '@/types/folder'
 import MediaThumbnail from '@/components/Media/MediaThumbnail.vue'
 
 interface Props {

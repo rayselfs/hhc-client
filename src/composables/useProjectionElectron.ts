@@ -1,4 +1,4 @@
-import type { AppMessage } from '@/types/common'
+import type { AppMessage } from '@/types/projection'
 
 export const useProjectionElectron = () => {
   const isElectron = (): boolean => {

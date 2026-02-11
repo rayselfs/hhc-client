@@ -1,4 +1,4 @@
-import type { FileItem, Folder } from '@/types/common'
+import type { FileItem, Folder } from '@/types/folder'
 import type {
   FileSystemProvider,
   ProviderResult,

@@ -1,4 +1,4 @@
-import type { AppMessage } from '@/types/common'
+import type { AppMessage } from '@/types/projection'
 import type { BibleVersion } from '@/types/bible'
 import type { VideoQuality, FFmpegStatus } from '@/types/electron'
 import { useSentry } from './useSentry'

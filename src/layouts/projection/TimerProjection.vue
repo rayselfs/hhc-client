@@ -57,7 +57,7 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import ClockDisplay from '@/components/Timer/ClockDisplay.vue'
-import { TimerMode } from '@/types/common'
+import { TimerMode } from '@/types/timer'
 import { useWindowSize } from '@/composables/useLayout'
 import { useTimerProjectionStore } from '@/stores/timerProjection'
 

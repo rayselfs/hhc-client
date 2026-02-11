@@ -1,5 +1,5 @@
 import { type Ref, type ComputedRef } from 'vue'
-import type { VerseItem, Folder, ClipboardItem } from '@/types/common'
+import type { VerseItem, Folder, ClipboardItem } from '@/types/folder'
 import { isVerseItem, isFolder } from '@/utils/typeGuards'
 import { BibleFolder } from '@/types/enum'
 

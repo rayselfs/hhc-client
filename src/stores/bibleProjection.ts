@@ -1,13 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { useLocalStorage } from '@/composables/useLocalStorage'
-import {
-  StorageCategory,
-  StorageKey,
-  getStorageKey,
-  type AppMessage,
-  MessageType,
-} from '@/types/common'
+import { StorageCategory, StorageKey, getStorageKey } from '@/types/common'
+import { type AppMessage, MessageType } from '@/types/projection'
 import { BIBLE_CONFIG } from '@/config/app'
 
 export const useBibleProjectionStore = defineStore('bibleProjection', () => {

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia } from 'pinia'
 import { createTestingPinia } from '@pinia/testing'
 import { useTimerStore } from '../timer'
-import { TimerMode } from '@/types/common'
+import { TimerMode } from '@/types/timer'
 
 describe('Timer Store', () => {
   beforeEach(() => {

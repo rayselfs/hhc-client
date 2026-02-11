@@ -4,7 +4,7 @@ import { useMediaOperations } from './useMediaOperations'
 import { useMediaFolderStore } from '@/stores/folder'
 import { createPinia, setActivePinia } from 'pinia'
 import type { UseFolderDialogsReturn } from './useFolderDialogs'
-import type { FileItem, Folder } from '@/types/common'
+import type { FileItem, Folder } from '@/types/folder'
 import { MediaFolder } from '@/types/enum'
 
 vi.mock('vue-i18n', () => ({

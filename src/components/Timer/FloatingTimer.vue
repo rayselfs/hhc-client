@@ -28,7 +28,7 @@ import { useStopwatchStore } from '@/stores/stopwatch'
 
 import { useProjectionManager } from '@/composables/useProjectionManager'
 import { useProjectionStore } from '@/stores/projection'
-import { ViewType } from '@/types/common'
+import { ViewType } from '@/types/projection'
 
 const timerStore = useTimerStore()
 const stopwatchStore = useStopwatchStore()

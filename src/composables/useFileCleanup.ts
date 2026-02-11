@@ -5,7 +5,7 @@ import { useIndexedDB } from '@/composables/useIndexedDB'
 import { useSentry } from '@/composables/useSentry'
 import { FOLDER_DB_CONFIG } from '@/config/db'
 import { FolderDBStore } from '@/types/enum'
-import type { FileItem, FolderDocument, ItemDocument } from '@/types/common'
+import type { FileItem, FolderDocument, ItemDocument } from '@/types/folder'
 
 export function useFileCleanup() {
   const mediaStore = useMediaFolderStore()

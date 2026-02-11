@@ -1,4 +1,4 @@
-import type { VerseItem, Folder, FolderItem, FileItem } from '@/types/common'
+import type { VerseItem, Folder, FolderItem, FileItem } from '@/types/folder'
 
 /**
  * Type Guard: Check if item is VerseItem

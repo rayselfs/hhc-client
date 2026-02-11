@@ -1,7 +1,7 @@
 import { ref, computed } from 'vue'
 import type { Ref, ComputedRef } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { Folder, FileItem, VerseItem, FolderItem } from '@/types/common'
+import type { Folder, FileItem, VerseItem, FolderItem } from '@/types/folder'
 
 type ItemType = FileItem | VerseItem
 

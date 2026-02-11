@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { MessageType, type AppMessage, type TimerMode } from '@/types/common'
+import { MessageType, type AppMessage } from '@/types/projection'
+import type { TimerMode } from '@/types/timer'
 import { useElectron } from '@/composables/useElectron'
 import type { TimerState as ElectronTimerState } from '@/types/electron'
 

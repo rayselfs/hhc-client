@@ -52,7 +52,7 @@
 import { ref } from 'vue'
 import { onClickOutside } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
-import type { VerseItem, ClipboardItem } from '@/types/common'
+import type { VerseItem, ClipboardItem } from '@/types/folder'
 import { useSelectionManager } from '@/composables/useSelectionManager'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { KEYBOARD_SHORTCUTS } from '@/config/shortcuts'

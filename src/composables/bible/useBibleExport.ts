@@ -2,7 +2,7 @@ import { computed, type ComputedRef, type Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { showSnackBar } from '@/composables/useSnackBar'
 import { BibleFolder } from '@/types/enum'
-import type { VerseItem, Folder } from '@/types/common'
+import type { VerseItem, Folder } from '@/types/folder'
 
 interface UseBibleExportOptions {
   historyVerses: Ref<VerseItem[]>
