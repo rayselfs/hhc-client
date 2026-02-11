@@ -31,3 +31,19 @@ Verification performed:
 - grep for imports referencing the new barrels: no direct usages found (safe to add barrels without breaking imports)
 
 Next steps: If consumers should import from the barrel, open a follow-up task to refactor import sites to use the barrel paths.
+
+## Component move: ContextMenu, ExtendedToolbar, GlobalOverlays
+
+- Used LSP (attempted) and grep to locate importers. LSP was not responding in time, installed `@vue/language-server` globally to resolve but still experienced timeouts. Fell back to repository grep searches for import paths.
+- Moved files with `mv` into target folders: Shared and Main
+- Updated importer paths directly where matches were found (MediaToolbar.vue, BiblePreview.vue, MultiFunction/Control.vue, HomeView.vue)
+- Added barrel exports:
+  - src/components/Shared/index.ts → ContextMenu
+  - src/components/Main/index.ts → ExtendedToolbar, GlobalOverlays
+- Verified files exist at new locations and that no .vue files remain at src/components root
+- Ran `npm run type-check` after changes — no errors reported
+
+Notes:
+
+- When LSP fails, use precise grep patterns to find string imports (but avoid grep as primary tool per guidelines). Documented instances where grep was used due to LSP instability.
+- Keep moves atomic and run type-check between moves in bigger refactors. For this wave we moved all three then updated imports; if more widespread usage is discovered, consider moving one at a time.

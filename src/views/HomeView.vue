@@ -48,8 +48,8 @@ import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 
 // Components
-import ExtendedToolbar from '@/components/ExtendedToolbar.vue'
-import GlobalOverlays from '@/components/GlobalOverlays.vue'
+import ExtendedToolbar from '@/components/Main/ExtendedToolbar.vue'
+import GlobalOverlays from '@/components/Main/GlobalOverlays.vue'
 
 const BibleControl = defineAsyncComponent(() => import('@/layouts/control/BibleControl.vue'))
 const TimerControl = defineAsyncComponent(() => import('@/layouts/control/TimerControl.vue'))

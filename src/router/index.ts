@@ -1,5 +1,4 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
-import Home from '@/views/HomeView.vue'
 // Projection will be lazy-loaded to enable code-splitting
 
 const router = createRouter({
@@ -8,7 +7,8 @@ const router = createRouter({
     {
       path: '/',
       name: 'Home',
-      component: Home,
+      // lazy-load HomeView when route is visited to enable code-splitting
+      component: () => import('@/views/HomeView.vue'),
     },
     {
       path: '/projection',

@@ -2,8 +2,7 @@ import { storeToRefs } from 'pinia'
 
 import { useSettingsStore } from '@/stores/settings'
 import type { FileItem } from '@/types/common'
-
-const NON_NATIVE_VIDEO_EXTENSIONS = ['.mkv', '.avi', '.mov', '.wmv', '.flv', '.ts', '.m2ts']
+import { NON_NATIVE_VIDEO_EXTENSIONS } from '@/config/media'
 
 function isNonNativeVideoExtension(filename: string): boolean {
   const ext = filename.toLowerCase().slice(filename.lastIndexOf('.'))

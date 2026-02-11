@@ -34,7 +34,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { FileItem, Folder, ClipboardItem } from '@/types/common'
-import ContextMenu from '@/components/ContextMenu.vue'
+import ContextMenu from '@/components/Shared/ContextMenu.vue'
 import MediaItemContextMenu from './MediaItemContextMenu.vue'
 import MediaBackgroundMenu from './MediaBackgroundMenu.vue'
 

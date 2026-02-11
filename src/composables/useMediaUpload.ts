@@ -13,9 +13,7 @@ import { processPdfFile } from '@/composables/usePdfProcessing'
 import type { FileItem } from '@/types/common'
 import { FolderDBStore } from '@/types/enum'
 import { DEFAULT_LOCAL_PERMISSIONS } from '@/services/filesystem'
-
-const VIDEO_EXTENSIONS = ['.mkv', '.avi', '.mov', '.wmv', '.flv', '.ts', '.m2ts', '.m4v']
-const NON_NATIVE_VIDEO_EXTENSIONS = ['.mkv', '.avi', '.mov', '.wmv', '.flv', '.ts', '.m2ts']
+import { VIDEO_EXTENSIONS, NON_NATIVE_VIDEO_EXTENSIONS } from '@/config/media'
 
 function isVideoExtension(filename: string): boolean {
   const ext = filename.toLowerCase().slice(filename.lastIndexOf('.'))
