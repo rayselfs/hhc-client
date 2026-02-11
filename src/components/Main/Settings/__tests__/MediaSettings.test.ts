@@ -34,7 +34,7 @@ describe('MediaSettings', () => {
 
     mockEmit('customPathChange')
 
-    expect(mockEmit).toHaveBeenCalledWithExactlyOnceWith('customPathChange')
+    expect(mockEmit).toHaveBeenCalledExactlyOnceWith('customPathChange')
   })
 
   it('should handle enable ffmpeg change', () => {
@@ -43,7 +43,7 @@ describe('MediaSettings', () => {
 
     mockEmit('enableFfmpegChange', newValue)
 
-    expect(mockEmit).toHaveBeenCalledWithExactlyOnceWith('enableFfmpegChange', false)
+    expect(mockEmit).toHaveBeenCalledExactlyOnceWith('enableFfmpegChange', false)
   })
 
   it('should handle video quality change', () => {
@@ -52,7 +52,7 @@ describe('MediaSettings', () => {
 
     mockEmit('videoQualityChange', newQuality)
 
-    expect(mockEmit).toHaveBeenCalledWithExactlyOnceWith('videoQualityChange', 'medium')
+    expect(mockEmit).toHaveBeenCalledExactlyOnceWith('videoQualityChange', 'medium')
   })
 
   it('should handle show install guide', () => {
@@ -60,6 +60,6 @@ describe('MediaSettings', () => {
 
     mockEmit('showInstallGuide')
 
-    expect(mockEmit).toHaveBeenCalledWithExactlyOnceWith('showInstallGuide')
+    expect(mockEmit).toHaveBeenCalledExactlyOnceWith('showInstallGuide')
   })
 })

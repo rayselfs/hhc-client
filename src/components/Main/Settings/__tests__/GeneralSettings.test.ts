@@ -29,7 +29,7 @@ describe('GeneralSettings', () => {
 
     mockEmit('languageChange', newLanguage)
 
-    expect(mockEmit).toHaveBeenCalledWithExactlyOnceWith('languageChange', 'zh-TW')
+    expect(mockEmit).toHaveBeenCalledExactlyOnceWith('languageChange', 'zh-TW')
   })
 
   it('should handle timezone change correctly', () => {
@@ -38,7 +38,7 @@ describe('GeneralSettings', () => {
 
     mockEmit('timezoneChange', newTimezone)
 
-    expect(mockEmit).toHaveBeenCalledWithExactlyOnceWith('timezoneChange', 'Asia/Tokyo')
+    expect(mockEmit).toHaveBeenCalledExactlyOnceWith('timezoneChange', 'Asia/Tokyo')
   })
 
   it('should handle dark mode toggle correctly', () => {
@@ -47,6 +47,6 @@ describe('GeneralSettings', () => {
 
     mockEmit('update:isDarkMode', newDarkMode)
 
-    expect(mockEmit).toHaveBeenCalledWithExactlyOnceWith('update:isDarkMode', true)
+    expect(mockEmit).toHaveBeenCalledExactlyOnceWith('update:isDarkMode', true)
   })
 })
