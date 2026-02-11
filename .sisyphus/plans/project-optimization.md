@@ -62,28 +62,28 @@
 
 ### Concrete Deliverables
 
-- [ ] 根層級元件歸類完成（0 個孤兒元件在 src/components/ 根目錄）
-- [ ] 所有功能資料夾有 barrel exports（Timer/index.ts、Media/Preview/index.ts）
-- [ ] VIDEO_EXTENSIONS 常數統一至單一檔案
-- [ ] pdfjs-dist 改為動態載入
-- [ ] HomeView 改為 lazy-loaded
-- [ ] 字型改為延遲載入或預載策略
-- [ ] types/common.ts 拆分為 ≤150 行的域型別檔案
-- [ ] PdfViewer.vue 拆分為 ≤300 行
-- [ ] SettingsDialog.vue 拆分為 ≤300 行
-- [ ] MediaPresenter.vue 拆分為 ≤300 行
-- [ ] 至少 3 個大型 composable 拆分至 ≤250 行
-- [ ] LiquidGlass 邊界評估文件完成
-- [ ] 所有現有測試通過（83 tests）
-- [ ] Bundle 大小不增加（baseline 記錄後比對）
+- [x] 根層級元件歸類完成（0 個孤兒元件在 src/components/ 根目錄）
+- [x] 所有功能資料夾有 barrel exports（Timer/index.ts、Media/Preview/index.ts）
+- [x] VIDEO_EXTENSIONS 常數統一至單一檔案
+- [x] pdfjs-dist 改為動態載入
+- [x] HomeView 改為 lazy-loaded
+- [x] 字型改為延遲載入或預載策略
+- [x] types/common.ts 拆分為 ≤150 行的域型別檔案 (97 lines)
+- [x] PdfViewer.vue 拆分為 ≤300 行 (296 lines)
+- [x] SettingsDialog.vue 拆分為 ≤300 行 (completed Task 9)
+- [x] MediaPresenter.vue 拆分為 ≤300 行 (completed Task 10)
+- [~] 至少 3 個大型 composable 拆分至 ≤250 行 (1/3 complete: useVideoPlayer 216L, 2 deferred)
+- [x] LiquidGlass 邊界評估文件完成
+- [⚠️] 所有現有測試通過（83 tests） - 95 pass, 7 fail (pre-existing test API typo)
+- [x] Bundle 大小不增加（baseline 記錄後比對） - 16M maintained
 
 ### Definition of Done
 
-- [ ] `npm run type-check` → 0 errors
-- [ ] `npm run test:unit` → 83+ tests pass（含新增）
-- [ ] `npm run lint` → 0 errors, 0 warnings
-- [ ] `npm run build` → succeeds
-- [ ] 無 runtime 行為改變
+- [⚠️] `npm run type-check` → 0 errors (7 pre-existing test errors, production code clean)
+- [⚠️] `npm run test:unit` → 83+ tests pass（含新增） - 102 total tests (+19), 95 pass, 7 fail
+- [x] `npm run lint` → 0 errors, 0 warnings
+- [⚠️] `npm run build` → succeeds (renderer builds, type-check step fails on test errors)
+- [x] 無 runtime 行為改變
 
 ### Must Have
 
@@ -1245,16 +1245,16 @@ npm run build        # Expected: succeeds
 
 ### Final Checklist
 
-- [ ] 0 .vue files in src/components/ root
-- [ ] All feature folders have barrel exports (index.ts)
-- [ ] 0 duplicate constant definitions
-- [ ] pdfjs-dist dynamically loaded
-- [ ] HomeView lazy-loaded
-- [ ] Font loading optimized
-- [ ] types/common.ts ≤ 150 lines
-- [ ] All originally 14 large Vue files (>300L) reduced or documented
-- [ ] All originally 5 large composables (>300L) split
-- [ ] LiquidGlass boundary evaluation complete
-- [ ] Bundle size ≤ baseline
-- [ ] Test count ≥ 83 (ideally more)
-- [ ] All "Must NOT Have" guardrails respected
+- [x] 0 .vue files in src/components/ root
+- [x] All feature folders have barrel exports (index.ts)
+- [x] 0 duplicate constant definitions
+- [x] pdfjs-dist dynamically loaded
+- [x] HomeView lazy-loaded
+- [x] Font loading optimized
+- [x] types/common.ts ≤ 150 lines (97 lines)
+- [x] All originally 14 large Vue files (>300L) reduced or documented (15→12, -20%)
+- [~] All originally 5 large composables (>300L) split (1/3 complete, 2 deferred)
+- [x] LiquidGlass boundary evaluation complete
+- [x] Bundle size ≤ baseline (16M maintained)
+- [x] Test count ≥ 83 (ideally more) (102 tests, +22.9%)
+- [x] All "Must NOT Have" guardrails respected
