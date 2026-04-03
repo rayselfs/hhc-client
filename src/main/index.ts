@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, nativeTheme } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -51,6 +51,25 @@ app.whenReady().then(() => {
 
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))
+
+  ipcMain.handle('theme:get', () => ({
+    source: nativeTheme.themeSource,
+    shouldUseDarkColors: nativeTheme.shouldUseDarkColors
+  }))
+
+  ipcMain.handle('theme:set', (_event, theme: string) => {
+    if (theme === 'light' || theme === 'dark' || theme === 'system') {
+      nativeTheme.themeSource = theme
+    }
+  })
+
+  nativeTheme.on('updated', () => {
+    BrowserWindow.getAllWindows().forEach((win) => {
+      win.webContents.send('theme:changed', {
+        shouldUseDarkColors: nativeTheme.shouldUseDarkColors
+      })
+    })
+  })
 
   createWindow()
 
