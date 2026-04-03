@@ -1,0 +1,23 @@
+/** User's explicit theme preference stored in localStorage */
+export type ThemePreference = 'light' | 'dark' | 'system'
+
+/** The actual applied theme after resolving 'system' to a concrete value */
+export type ResolvedTheme = 'light' | 'dark'
+
+/** Value shape exposed by ThemeContext */
+export interface ThemeContextValue {
+  /** Current user preference (what is stored) */
+  preference: ThemePreference
+  /** Current applied theme (after system resolution) */
+  resolved: ResolvedTheme
+  /** Change the user's theme preference */
+  setPreference: (pref: ThemePreference) => void
+}
+
+/** localStorage key for persisting theme preference — all hhc- prefixed */
+export const THEME_STORAGE_KEY = 'hhc-theme' as const
+
+/** Default values used on first launch when no localStorage key exists */
+export const THEME_DEFAULTS = {
+  preference: 'system' as ThemePreference
+}
