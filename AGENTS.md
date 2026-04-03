@@ -96,6 +96,46 @@ npm run lint             # ESLint (cached)
 npm run format           # Prettier --write .
 ```
 
+## MIGRATION CONTEXT
+
+This project is a **fresh rewrite** of `hhc-client` (Vue 3 + Vuetify + Electron) → React 19 + electron-vite.
+
+### Related Repositories
+
+| Repo                  | Path                      | Role                                                                                                    |
+| --------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `hhc-client`          | `../hhc-client/`          | **Original** — Vue 3 production app. Reference for features, types, styles, i18n, Electron main process |
+| `hhc-client-refactor` | `../hhc-client-refactor/` | **Abandoned mid-migration** — Do NOT use as codebase. Migration plan is still useful as reference       |
+
+### Migration Plan
+
+`../hhc-client-refactor/.sisyphus/plans/hhc-client-refactor.md` — Detailed plan covering Timer page migration (all 4 modes), LiquidGlass theme porting, dual-mode architecture (Electron IPC + Browser fallback), Electron main process optimization, and TDD strategy. Written for `hhc-client-refactor` but the analysis of the original codebase and migration decisions apply here.
+
+### Key Migration References in `../hhc-client/`
+
+| What                     | Where                                                 | Notes                                                                 |
+| ------------------------ | ----------------------------------------------------- | --------------------------------------------------------------------- |
+| Timer types & state      | `src/types/timer.ts`                                  | TimerMode, TimerState, TimerPreset — port with ISO string dates       |
+| Projection messages      | `src/types/projection.ts`                             | MessageType enum, AppMessage union — exclude BIBLE*\*/MEDIA*\*        |
+| LiquidGlass theme values | `src/components/LiquidGlass/styles/theme/defaults.ts` | ALL color/glass/gradient tokens                                       |
+| Glass SCSS mixins        | `src/components/LiquidGlass/styles/_mixins.scss`      | glass-surface, shine, jelly-pop animations                            |
+| Timer store (Pinia)      | `src/stores/timer.ts`                                 | Business logic to port to Zustand                                     |
+| Stopwatch store          | `src/stores/stopwatch.ts`                             | Stopwatch state machine                                               |
+| Electron timerService    | `electron/timerService.ts`                            | Has broadcast bug (lastBroadcastTime never updated) — fix during port |
+| i18n locales             | `src/locales/{en,zh-TW,zh-CN}.json`                   | Extract timer + common keys only                                      |
+| Dark mode                | `src/composables/useDarkMode.ts`                      | Port to React hook                                                    |
+
+### Migration Decisions (from plan)
+
+- **Scope**: Timer page only (all 4 modes: TIMER, CLOCK, BOTH, STOPWATCH). Bible/Media are OUT for now
+- **Dual-mode**: Must work in both Electron (IPC) and web browser (BroadcastChannel fallback)
+- **Styling**: LiquidGlass visual identity preserved via Tailwind CSS — no Vuetify
+- **Icons**: lucide-react only — no @mdi/font or FontAwesome
+- **State**: Zustand (not Pinia)
+- **i18n**: react-i18next (not vue-i18n), 3 languages: en, zh-TW, zh-CN
+- **Testing**: Vitest + RTL + Playwright, TDD approach
+- **Known bugs to fix**: 3 duplicate `isElectron()` implementations, timerService broadcast bug, duplicate types between renderer and electron
+
 ## NOTES
 
 - **IPC test**: Main has `ipcMain.on('ping')` and App.tsx sends it — scaffold example, not production code.
