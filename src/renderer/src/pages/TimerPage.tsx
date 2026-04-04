@@ -1,13 +1,11 @@
-import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 
 export default function TimerPage(): React.JSX.Element {
+  const { t } = useTranslation()
   return (
     <div data-testid="timer-page">
-      <h1>Timer</h1>
-      <p>Timer page placeholder</p>
-      <nav>
-        <Link to="/bible">Bible</Link>
-      </nav>
+      <h1>{t('timer.title')}</h1>
+      <p>{t('timer.placeholder')}</p>
     </div>
   )
 }

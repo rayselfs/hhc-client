@@ -4,9 +4,11 @@
     "bible": "BIBLE"
   },
   "timer": {
-    "title": "TIMER"
+    "title": "TIMER",
+    "placeholder": "Timer content will appear here"
   },
   "bible": {
-    "title": "BIBLE"
+    "title": "BIBLE",
+    "placeholder": "Bible content will appear here"
   }
 }

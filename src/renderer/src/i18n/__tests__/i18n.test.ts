@@ -118,3 +118,17 @@ describe('translations', () => {
     expect(i18n.t('bible.title', { lng: 'zh-CN' })).toBe('圣经')
   })
 })
+
+describe('language persistence', () => {
+  it('saves language to localStorage on changeLanguage', async () => {
+    await i18n.changeLanguage('zh-TW')
+    expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe('zh-TW')
+  })
+
+  it('saves language to localStorage when switching back', async () => {
+    await i18n.changeLanguage('zh-CN')
+    expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe('zh-CN')
+    await i18n.changeLanguage('en')
+    expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe('en')
+  })
+})

@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import routes from '../router'
@@ -40,17 +40,15 @@ describe('Router', () => {
     expect(screen.getByTestId('bible-page')).toBeInTheDocument()
   })
 
-  it('navigates from timer to bible and updates content', async () => {
+  it('navigates from timer to bible via sidebar link', async () => {
     const user = userEvent.setup()
     const router = createMemoryRouter(routes, { initialEntries: ['/'] })
     render(<RouterProvider router={router} />)
 
     expect(screen.getByTestId('timer-page')).toBeInTheDocument()
 
-    const timerPageNav = within(screen.getByTestId('timer-page')).getByRole('link', {
-      name: /bible/i
-    })
-    await user.click(timerPageNav)
+    const bibleLink = screen.getByRole('link', { name: /bible/i })
+    await user.click(bibleLink)
 
     expect(screen.getByTestId('bible-page')).toBeInTheDocument()
     expect(screen.queryByTestId('timer-page')).not.toBeInTheDocument()

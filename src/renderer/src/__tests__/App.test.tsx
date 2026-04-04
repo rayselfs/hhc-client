@@ -58,8 +58,8 @@ afterEach(() => {
 describe('App integration', () => {
   it('renders sidebar layout with timer and bible items', () => {
     renderApp(['/'])
-    expect(screen.getByText('TIMER')).toBeInTheDocument()
-    expect(screen.getByText('BIBLE')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /timer/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /bible/i })).toBeInTheDocument()
   })
 
   it('shows timer page by default', () => {

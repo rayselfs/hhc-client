@@ -4,9 +4,11 @@
     "bible": "聖經"
   },
   "timer": {
-    "title": "計時器"
+    "title": "計時器",
+    "placeholder": "計時器內容將顯示於此"
   },
   "bible": {
-    "title": "聖經"
+    "title": "聖經",
+    "placeholder": "聖經內容將顯示於此"
   }
 }

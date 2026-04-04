@@ -54,8 +54,8 @@ describe('Layout', () => {
   it('renders sidebar timer and bible labels', async () => {
     await i18n.changeLanguage('en')
     renderWithRouter(['/'])
-    expect(screen.getByText('TIMER')).toBeInTheDocument()
-    expect(screen.getByText('BIBLE')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /timer/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /bible/i })).toBeInTheDocument()
   })
 
   it('does not have a divider between header and main (no border-b on header)', async () => {

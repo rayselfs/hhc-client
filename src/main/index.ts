@@ -49,9 +49,6 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  // IPC test
-  ipcMain.on('ping', () => console.log('pong'))
-
   ipcMain.handle('theme:get', () => ({
     source: nativeTheme.themeSource,
     shouldUseDarkColors: nativeTheme.shouldUseDarkColors

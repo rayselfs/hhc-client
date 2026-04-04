@@ -31,4 +31,8 @@ i18n.use(initReactI18next).init({
   useSuspense: false
 } as Parameters<typeof i18n.init>[0])
 
+i18n.on('languageChanged', (lng: string) => {
+  localStorage.setItem(LANGUAGE_STORAGE_KEY, lng)
+})
+
 export default i18n
