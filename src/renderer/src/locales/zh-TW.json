@@ -1,0 +1,12 @@
+{
+  "nav": {
+    "timer": "計時器",
+    "bible": "聖經"
+  },
+  "timer": {
+    "title": "計時器"
+  },
+  "bible": {
+    "title": "聖經"
+  }
+}

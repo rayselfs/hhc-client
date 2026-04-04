@@ -1,0 +1,12 @@
+{
+  "nav": {
+    "timer": "TIMER",
+    "bible": "BIBLE"
+  },
+  "timer": {
+    "title": "TIMER"
+  },
+  "bible": {
+    "title": "BIBLE"
+  }
+}
