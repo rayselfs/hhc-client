@@ -1,10 +1,26 @@
 import { render, screen } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import '@renderer/i18n'
 import i18n from '@renderer/i18n'
 import { SidebarProvider } from '@renderer/components/ui/sidebar'
 import AppSidebar from '../AppSidebar'
+
+beforeEach(() => {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn()
+    }))
+  })
+})
 
 function renderWithProviders(initialEntries: string[] = ['/']): ReturnType<typeof render> {
   const router = createMemoryRouter(
