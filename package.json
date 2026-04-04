@@ -26,11 +26,13 @@
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
+    "@radix-ui/react-slot": "^1.2.4",
     "@tailwindcss/vite": "^4.2.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "electron-updater": "^6.3.9",
     "i18next": "^26.0.3",
+    "lucide-react": "^1.7.0",
     "react-i18next": "^17.0.2",
     "react-router-dom": "^7.14.0",
     "tailwind-merge": "^3.5.0",
