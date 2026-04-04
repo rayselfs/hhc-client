@@ -7,7 +7,7 @@ import i18n from '@renderer/i18n'
 import routes from '@renderer/router'
 import { ThemeProvider, useTheme } from '@renderer/contexts/ThemeContext'
 
-function renderApp(initialEntries: string[] = ['/']) {
+function renderApp(initialEntries: string[] = ['/']): ReturnType<typeof render> {
   const testRouter = createMemoryRouter(routes, { initialEntries })
   return render(
     <ThemeProvider>
@@ -21,7 +21,7 @@ function DarkModeToggle(): React.JSX.Element {
   return <button onClick={() => setPreference('dark')}>Set Dark</button>
 }
 
-function renderAppWithToggle(initialEntries: string[] = ['/']) {
+function renderAppWithToggle(initialEntries: string[] = ['/']): ReturnType<typeof render> {
   const testRouter = createMemoryRouter(routes, { initialEntries })
   return render(
     <ThemeProvider>

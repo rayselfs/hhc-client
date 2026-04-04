@@ -5,7 +5,7 @@ import '@renderer/i18n'
 import i18n from '@renderer/i18n'
 import routes from '@renderer/router'
 
-function renderWithRouter(initialEntries: string[] = ['/']) {
+function renderWithRouter(initialEntries: string[] = ['/']): ReturnType<typeof render> {
   const router = createMemoryRouter(routes, { initialEntries })
   return render(<RouterProvider router={router} />)
 }

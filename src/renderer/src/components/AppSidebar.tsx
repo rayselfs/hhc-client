@@ -9,7 +9,7 @@ import {
   SidebarMenuButton
 } from '@renderer/components/ui/sidebar'
 
-export default function AppSidebar() {
+export default function AppSidebar(): React.JSX.Element {
   const { t } = useTranslation()
   const location = useLocation()
 

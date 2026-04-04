@@ -2,7 +2,7 @@ import { Outlet } from 'react-router-dom'
 import { SidebarProvider } from '@renderer/components/ui/sidebar'
 import AppSidebar from '@renderer/components/AppSidebar'
 
-export default function Layout() {
+export default function Layout(): React.JSX.Element {
   return (
     <SidebarProvider>
       <AppSidebar />

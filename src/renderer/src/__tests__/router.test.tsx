@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import routes from '../router'
 
-function renderWithRouter(initialEntries: string[] = ['/']) {
+function renderWithRouter(initialEntries: string[] = ['/']): ReturnType<typeof render> {
   const router = createMemoryRouter(routes, { initialEntries })
   return render(<RouterProvider router={router} />)
 }

@@ -6,7 +6,7 @@ import i18n from '@renderer/i18n'
 import { SidebarProvider } from '@renderer/components/ui/sidebar'
 import AppSidebar from '../AppSidebar'
 
-function renderWithProviders(initialEntries: string[] = ['/']) {
+function renderWithProviders(initialEntries: string[] = ['/']): ReturnType<typeof render> {
   const router = createMemoryRouter(
     [
       {

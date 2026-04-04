@@ -19,7 +19,7 @@ type SidebarContextProps = {
 
 const SidebarContext = React.createContext<SidebarContextProps | null>(null)
 
-function useSidebar() {
+function useSidebar(): SidebarContextProps {
   const context = React.useContext(SidebarContext)
   if (!context) {
     throw new Error('useSidebar must be used within a SidebarProvider.')
@@ -452,6 +452,7 @@ const SidebarMenuButton = React.forwardRef<
       isActive = false,
       variant = 'default',
       size = 'default',
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       tooltip: _tooltip,
       className,
       ...props
@@ -528,9 +529,8 @@ const SidebarMenuSkeleton = React.forwardRef<
   HTMLDivElement,
   React.ComponentProps<'div'> & { showIcon?: boolean }
 >(({ className, showIcon = false, ...props }, ref) => {
-  const width = React.useMemo(() => {
-    return `${Math.floor(Math.random() * 40) + 50}%`
-  }, [])
+  // eslint-disable-next-line react-hooks/purity
+  const width = React.useMemo(() => `${Math.floor(Math.random() * 40) + 50}%`, [])
 
   return (
     <div
@@ -545,7 +545,12 @@ const SidebarMenuSkeleton = React.forwardRef<
       <div
         className="h-4 flex-1 rounded bg-sidebar-accent"
         data-sidebar="menu-skeleton-text"
-        style={{ '--skeleton-width': width, maxWidth: width } as React.CSSProperties}
+        style={
+          {
+            '--skeleton-width': width,
+            maxWidth: width
+          } as React.CSSProperties
+        }
       />
     </div>
   )
@@ -627,5 +632,6 @@ export {
   SidebarRail,
   SidebarSeparator,
   SidebarTrigger,
+  // eslint-disable-next-line react-refresh/only-export-components
   useSidebar
 }
