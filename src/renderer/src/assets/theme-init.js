@@ -1,4 +1,5 @@
 ;(function () {
+  // Key must match createStorageKey('theme') from lib/storage-keys.ts
   var pref = localStorage.getItem('hhc-theme')
   var isDark =
     pref === 'dark' ||
