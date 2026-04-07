@@ -1,14 +1,21 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createProjectionAdapter, type ProjectionAdapter } from '../lib/projection-adapter'
 import { isElectron } from '../../../shared/env'
 
-export function useProjection() {
+interface UseProjectionReturn {
+  isProjectionOpen: boolean
+  openProjection: () => Promise<void>
+  closeProjection: () => Promise<void>
+  send: (channel: string, data?: unknown) => void
+  on: (channel: string, handler: (data: unknown) => void) => () => void
+}
+
+export function useProjection(): UseProjectionReturn {
   const [isProjectionOpen, setIsProjectionOpen] = useState(false)
-  const [adapter, setAdapter] = useState<ProjectionAdapter | null>(null)
+  const adapterRef = useRef<ProjectionAdapter>(createProjectionAdapter())
 
   useEffect(() => {
-    const newAdapter = createProjectionAdapter()
-    setAdapter(newAdapter)
+    const currentAdapter = adapterRef.current
 
     // Initialize projection status and listeners (Electron only)
     if (isElectron()) {
@@ -28,12 +35,12 @@ export function useProjection() {
       return () => {
         unsubOpened()
         unsubClosed()
-        newAdapter.dispose()
+        currentAdapter.dispose()
       }
     }
 
     return () => {
-      newAdapter.dispose()
+      currentAdapter.dispose()
     }
   }, [])
 
@@ -49,17 +56,16 @@ export function useProjection() {
     if (isElectron()) {
       await window.api.projection.close()
     } else {
-      adapter?.send('__system:close', null)
+      adapterRef.current.send('__system:close', null)
     }
   }
 
   const send = (channel: string, data?: unknown): void => {
-    adapter?.send(channel, data)
+    adapterRef.current.send(channel, data)
   }
 
   const on = (channel: string, handler: (data: unknown) => void): (() => void) => {
-    if (!adapter) return () => {}
-    return adapter.on(channel, handler)
+    return adapterRef.current.on(channel, handler)
   }
 
   return { isProjectionOpen, openProjection, closeProjection, send, on }

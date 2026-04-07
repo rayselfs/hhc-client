@@ -7,6 +7,7 @@ export class WindowManager {
   public mainWindow: BrowserWindow | null = null
   public projectionWindow: BrowserWindow | null = null
 
+  // eslint-disable-next-line @typescript-eslint/no-empty-function -- singleton pattern requires private constructor
   private constructor() {}
 
   static getInstance(): WindowManager {
