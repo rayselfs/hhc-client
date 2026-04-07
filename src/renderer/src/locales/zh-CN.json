@@ -10,5 +10,14 @@
   "bible": {
     "title": "圣经",
     "placeholder": "圣经内容将显示于此"
+  },
+  "projection": {
+    "closeButton": "关闭投影窗口",
+    "closeTitle": "关闭投影",
+    "closeConfirm": "确定要关闭投影窗口吗？"
+  },
+  "common": {
+    "cancel": "取消",
+    "close": "关闭"
   }
 }

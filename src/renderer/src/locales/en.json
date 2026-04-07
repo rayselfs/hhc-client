@@ -10,5 +10,14 @@
   "bible": {
     "title": "BIBLE",
     "placeholder": "Bible content will appear here"
+  },
+  "projection": {
+    "closeButton": "Close projection window",
+    "closeTitle": "Close Projection",
+    "closeConfirm": "Are you sure you want to close the projection window?"
+  },
+  "common": {
+    "cancel": "Cancel",
+    "close": "Close"
   }
 }
