@@ -4,6 +4,19 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+@theme inline {
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+}
+
 :root {
   --sidebar-width: 200px;
+  --sidebar: oklch(0.92 0.001 286.37);
+  --sidebar-foreground: var(--foreground);
+}
+
+.dark,
+[data-theme='dark'] {
+  --sidebar: oklch(0.18 0.0059 285.89);
+  --sidebar-foreground: var(--foreground);
 }
