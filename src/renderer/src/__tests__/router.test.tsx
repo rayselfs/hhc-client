@@ -3,22 +3,6 @@ import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import routes from '../router'
 
-beforeEach(() => {
-  Object.defineProperty(window, 'matchMedia', {
-    writable: true,
-    value: vi.fn().mockImplementation((query: string) => ({
-      matches: false,
-      media: query,
-      onchange: null,
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      dispatchEvent: vi.fn()
-    }))
-  })
-})
-
 function renderWithRouter(initialEntries: string[] = ['/']): ReturnType<typeof render> {
   const router = createMemoryRouter(routes, { initialEntries })
   return render(<RouterProvider router={router} />)
