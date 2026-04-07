@@ -24,11 +24,11 @@ export function registerProjectionHandlers(windowManager: WindowManager): void {
   })
 
   ipcMain.on('projection:send', (_event, channel: string, data: unknown) => {
-    windowManager.sendToProjection(channel, data)
+    windowManager.sendToProjection('projection:message', channel, data)
   })
 
   ipcMain.on('projection:send-to-main', (_event, channel: string, data: unknown) => {
-    windowManager.sendToMain(channel, data)
+    windowManager.sendToMain('projection:message', channel, data)
   })
 
   ipcMain.handle('projection:get-displays', () => {

@@ -159,15 +159,15 @@ export class WindowManager {
     return this.projectionWindow
   }
 
-  sendToProjection(channel: string, data: unknown): void {
+  sendToProjection(channel: string, ...args: unknown[]): void {
     if (this.projectionWindow && !this.projectionWindow.isDestroyed()) {
-      this.projectionWindow.webContents.send(channel, data)
+      this.projectionWindow.webContents.send(channel, ...args)
     }
   }
 
-  sendToMain(channel: string, data: unknown): void {
+  sendToMain(channel: string, ...args: unknown[]): void {
     if (this.mainWindow && !this.mainWindow.isDestroyed()) {
-      this.mainWindow.webContents.send(channel, data)
+      this.mainWindow.webContents.send(channel, ...args)
     }
   }
 
