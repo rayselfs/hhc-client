@@ -1,4 +1,4 @@
-import { isElectron } from '../../../shared/env'
+import { isElectron } from '@renderer/lib/env'
 
 interface ProjectionAdapter {
   send(channel: string, data?: unknown): void

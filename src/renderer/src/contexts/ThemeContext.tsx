@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react'
-import { isElectron } from '../../../shared/env'
+import { isElectron } from '@renderer/lib/env'
 import {
   THEME_DEFAULTS,
   THEME_STORAGE_KEY,

@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
-vi.mock('../../../../shared/env', () => ({
+vi.mock('@renderer/lib/env', () => ({
   isElectron: vi.fn()
 }))
 
-import { isElectron } from '../../../../shared/env'
+import { isElectron } from '@renderer/lib/env'
 import { createProjectionAdapter } from '../projection-adapter'
 
 const mockPostMessage = vi.fn()

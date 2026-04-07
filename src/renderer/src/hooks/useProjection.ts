@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { createProjectionAdapter, type ProjectionAdapter } from '../lib/projection-adapter'
-import { isElectron } from '../../../shared/env'
+import { isElectron } from '@renderer/lib/env'
 
 interface UseProjectionReturn {
   isProjectionOpen: boolean
