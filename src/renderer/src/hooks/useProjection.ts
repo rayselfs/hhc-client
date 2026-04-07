@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { createProjectionAdapter, type ProjectionAdapter } from '../lib/projection-adapter'
 import { isElectron } from '@renderer/lib/env'
 
@@ -13,18 +13,16 @@ interface UseProjectionReturn {
 export function useProjection(): UseProjectionReturn {
   const [isProjectionOpen, setIsProjectionOpen] = useState(false)
   const adapterRef = useRef<ProjectionAdapter>(createProjectionAdapter())
+  const projectionWindowRef = useRef<Window | null>(null)
 
   useEffect(() => {
     const currentAdapter = adapterRef.current
 
-    // Initialize projection status and listeners (Electron only)
     if (isElectron()) {
-      // Check current status
       window.api.projection.check().then(({ exists }) => {
         setIsProjectionOpen(exists)
       })
 
-      // Listen for projection window lifecycle events
       const unsubOpened = window.api.projection.onProjectionOpened(() => {
         setIsProjectionOpen(true)
       })
@@ -39,34 +37,62 @@ export function useProjection(): UseProjectionReturn {
       }
     }
 
+    const unsubPong = currentAdapter.on('__system:pong', () => {
+      setIsProjectionOpen(true)
+    })
+    const unsubClosed = currentAdapter.on('__system:closed', () => {
+      setIsProjectionOpen(false)
+      projectionWindowRef.current = null
+    })
+
+    const projectionUrl = location.origin + location.pathname + '#/projection'
+    const win = window.open(projectionUrl, 'hhc-projection')
+    projectionWindowRef.current = win
+
+    const pollTimer = setInterval(() => {
+      if (projectionWindowRef.current?.closed) {
+        setIsProjectionOpen(false)
+        projectionWindowRef.current = null
+        clearInterval(pollTimer)
+      }
+    }, 1000)
+
     return () => {
+      unsubPong()
+      unsubClosed()
+      clearInterval(pollTimer)
       currentAdapter.dispose()
     }
   }, [])
 
-  const openProjection = async (): Promise<void> => {
+  const openProjection = useCallback(async (): Promise<void> => {
     if (isElectron()) {
       await window.api.projection.ensure()
     } else {
-      window.open(location.origin + location.pathname + '#/projection', 'hhc-projection')
+      const projectionUrl = location.origin + location.pathname + '#/projection'
+      const win = window.open(projectionUrl, 'hhc-projection')
+      projectionWindowRef.current = win
+      setIsProjectionOpen(true)
     }
-  }
+  }, [])
 
-  const closeProjection = async (): Promise<void> => {
+  const closeProjection = useCallback(async (): Promise<void> => {
     if (isElectron()) {
       await window.api.projection.close()
     } else {
       adapterRef.current.send('__system:close', null)
+      projectionWindowRef.current = null
+      setIsProjectionOpen(false)
     }
-  }
+  }, [])
 
-  const send = (channel: string, data?: unknown): void => {
+  const send = useCallback((channel: string, data?: unknown): void => {
     adapterRef.current.send(channel, data)
-  }
+  }, [])
 
-  const on = (channel: string, handler: (data: unknown) => void): (() => void) => {
+  const on = useCallback((channel: string, handler: (data: unknown) => void): (() => void) => {
     return adapterRef.current.on(channel, handler)
-  }
+  }, [])
 
   return { isProjectionOpen, openProjection, closeProjection, send, on }
 }

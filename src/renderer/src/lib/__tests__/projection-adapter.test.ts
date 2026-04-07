@@ -128,11 +128,15 @@ describe('BroadcastChannelAdapter', () => {
     expect(mockRemoveEventListener.mock.calls[0][0]).toBe('message')
   })
 
-  it('dispose() calls bc.close()', () => {
+  it('dispose() removes listeners but does not close the channel', () => {
     const adapter = createProjectionAdapter()
+    const handler = vi.fn()
+    adapter.on('ch', handler)
+
     adapter.dispose()
 
-    expect(mockClose).toHaveBeenCalledOnce()
+    expect(mockRemoveEventListener).toHaveBeenCalled()
+    expect(mockClose).not.toHaveBeenCalled()
   })
 })
 

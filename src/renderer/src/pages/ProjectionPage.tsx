@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { createProjectionAdapter, type ProjectionAdapter } from '@renderer/lib/projection-adapter'
+import { isElectron } from '@renderer/lib/env'
 
 export default function ProjectionPage(): React.JSX.Element {
   const [text, setText] = useState('')
@@ -9,12 +10,31 @@ export default function ProjectionPage(): React.JSX.Element {
     const adapter = createProjectionAdapter()
     adapterRef.current = adapter
 
-    const unsubscribe = adapter.on('projection:text', (data) => {
+    const unsubText = adapter.on('projection:text', (data) => {
       setText(data as string)
     })
 
+    let unsubClose = (): void => {}
+    let unsubPing = (): void => {}
+
+    if (!isElectron()) {
+      unsubClose = adapter.on('__system:close', () => {
+        window.close()
+      })
+      unsubPing = adapter.on('__system:ping', () => {
+        adapter.send('__system:pong', null)
+      })
+      adapter.send('__system:pong', null)
+
+      window.addEventListener('beforeunload', () => {
+        adapter.send('__system:closed', null)
+      })
+    }
+
     return () => {
-      unsubscribe()
+      unsubText()
+      unsubClose()
+      unsubPing()
       adapter.dispose()
     }
   }, [])

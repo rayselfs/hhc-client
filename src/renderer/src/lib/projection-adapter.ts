@@ -35,6 +35,7 @@ class ElectronProjectionAdapter implements ProjectionAdapter {
 class BroadcastChannelAdapter implements ProjectionAdapter {
   private bc: BroadcastChannel
   private windowId: string
+  private listeners: Array<{ listener: (event: MessageEvent) => void }> = []
 
   constructor() {
     this.bc = new BroadcastChannel('hhc-projection')
@@ -51,11 +52,18 @@ class BroadcastChannelAdapter implements ProjectionAdapter {
       if (event.data.channel === channel) handler(event.data.data)
     }
     this.bc.addEventListener('message', listener)
-    return () => this.bc.removeEventListener('message', listener)
+    this.listeners.push({ listener })
+    return () => {
+      this.bc.removeEventListener('message', listener)
+      this.listeners = this.listeners.filter((l) => l.listener !== listener)
+    }
   }
 
   dispose(): void {
-    this.bc.close()
+    this.listeners.forEach(({ listener }) => this.bc.removeEventListener('message', listener))
+    this.listeners = []
+    // Do NOT close the BroadcastChannel — it must remain open for send() to work.
+    // The channel is garbage-collected when the adapter is dereferenced.
   }
 }
 
