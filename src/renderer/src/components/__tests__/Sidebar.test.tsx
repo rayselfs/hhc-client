@@ -3,7 +3,7 @@ import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { describe, it, expect } from 'vitest'
 import '@renderer/i18n'
 import i18n from '@renderer/i18n'
-import AppSidebar from '../AppSidebar'
+import Sidebar from '../Sidebar'
 
 function renderWithRouter(initialEntries: string[] = ['/']): ReturnType<typeof render> {
   const router = createMemoryRouter(
@@ -11,9 +11,9 @@ function renderWithRouter(initialEntries: string[] = ['/']): ReturnType<typeof r
       {
         path: '/',
         children: [
-          { index: true, element: <AppSidebar /> },
-          { path: 'timer', element: <AppSidebar /> },
-          { path: 'bible', element: <AppSidebar /> }
+          { index: true, element: <Sidebar /> },
+          { path: 'timer', element: <Sidebar /> },
+          { path: 'bible', element: <Sidebar /> }
         ]
       }
     ],
@@ -22,7 +22,7 @@ function renderWithRouter(initialEntries: string[] = ['/']): ReturnType<typeof r
   return render(<RouterProvider router={router} />)
 }
 
-describe('AppSidebar', () => {
+describe('Sidebar', () => {
   it('renders Timer and Bible menu items in English', async () => {
     await i18n.changeLanguage('en')
     renderWithRouter(['/'])
