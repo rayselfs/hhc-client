@@ -25,11 +25,11 @@ export default function Layout(): React.JSX.Element {
     <div className="flex h-screen bg-background text-foreground">
       <Sidebar />
       <div className="flex flex-1 flex-col">
-        <header className="flex items-center justify-end p-4">
+        <header className="flex items-center justify-end p-2">
           <Button
             isIconOnly
             size="sm"
-            variant="ghost"
+            variant="danger-soft"
             onPress={state.open}
             isDisabled={!isProjectionOpen}
             aria-label="Close projection window"
