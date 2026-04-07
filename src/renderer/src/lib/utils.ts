@@ -1,6 +1,5 @@
-import { clsx, type ClassValue } from 'clsx'
-import { twMerge } from 'tailwind-merge'
+export const STORAGE_PREFIX = 'hhc-' as const
 
-export function cn(...inputs: ClassValue[]): string {
-  return twMerge(clsx(inputs))
+export function createStorageKey(name: string): string {
+  return `${STORAGE_PREFIX}${name}`
 }

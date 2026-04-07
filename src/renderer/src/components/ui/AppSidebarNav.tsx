@@ -1,5 +1,4 @@
 import { useLocation, Link } from 'react-router-dom'
-import { cn } from '@renderer/lib/utils'
 
 interface NavItem {
   to: string
@@ -24,7 +23,7 @@ export default function AppSidebarNav({ items, className }: AppSidebarNavProps):
 
   return (
     <nav
-      className={cn('flex flex-col gap-2 rounded-tr-xl rounded-br-xl bg-content1 p-4', className)}
+      className={`flex flex-col gap-2 rounded-tr-xl rounded-br-xl bg-content1 p-4${className ? ` ${className}` : ''}`}
       style={{ width: 'var(--sidebar-width)' }}
     >
       <ul className="flex flex-col gap-2">
@@ -36,12 +35,7 @@ export default function AppSidebarNav({ items, className }: AppSidebarNavProps):
             <li key={item.to}>
               <Link
                 to={item.to}
-                className={cn(
-                  'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                  active
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-default-500 hover:bg-default-100 hover:text-default-foreground'
-                )}
+                className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${active ? 'bg-primary/10 text-primary' : 'text-default-500 hover:bg-default-100 hover:text-default-foreground'}`}
               >
                 <Icon className="size-4" />
                 <span>{item.label}</span>

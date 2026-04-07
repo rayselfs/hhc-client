@@ -1,4 +1,4 @@
-import { createStorageKey } from '../lib/storage-keys'
+import { createStorageKey } from '../lib/utils'
 
 /** User's explicit theme preference stored in localStorage */
 export type ThemePreference = 'light' | 'dark' | 'system'

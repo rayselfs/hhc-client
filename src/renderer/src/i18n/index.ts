@@ -1,6 +1,6 @@
 import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
-import { createStorageKey } from '@renderer/lib/storage-keys'
+import { createStorageKey } from '@renderer/lib/utils'
 import en from '../locales/en.json'
 import zhTW from '../locales/zh-TW.json'
 import zhCN from '../locales/zh-CN.json'

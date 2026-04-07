@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { STORAGE_PREFIX, createStorageKey } from '../storage-keys'
+import { STORAGE_PREFIX, createStorageKey } from '../utils'
 
 describe('createStorageKey', () => {
   it('returns hhc-theme for theme', () => {
