@@ -23,7 +23,7 @@ export default function AppSidebarNav({ items, className }: AppSidebarNavProps):
 
   return (
     <nav
-      className={`flex flex-col gap-2 rounded-tr-xl rounded-br-xl bg-content1 p-4${className ? ` ${className}` : ''}`}
+      className={`flex flex-col gap-2 rounded-tr-xl rounded-br-xl bg-default p-4${className ? ` ${className}` : ''}`}
       style={{ width: 'var(--sidebar-width)' }}
     >
       <ul className="flex flex-col gap-2">

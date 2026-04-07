@@ -3,7 +3,7 @@ import AppSidebar from '@renderer/components/AppSidebar'
 
 export default function Layout(): React.JSX.Element {
   return (
-    <div className="flex h-screen">
+    <div className="flex h-screen bg-background text-foreground">
       <AppSidebar />
       <div className="flex flex-1 flex-col">
         <header className="p-4" />
