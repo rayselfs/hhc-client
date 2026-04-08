@@ -1,8 +1,18 @@
-import { useState, useEffect } from 'react'
+import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Chip, Button, Input } from '@heroui/react'
-import { Plus, X, Check } from 'lucide-react'
+import { Chip, Button } from '@heroui/react'
+import { Plus, X } from 'lucide-react'
 import { useTimerStore } from '@renderer/stores/timer'
+
+function formatDurationLabel(seconds: number): string {
+  const h = Math.floor(seconds / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  const s = seconds % 60
+  if (h > 0) return `${h}h${m > 0 ? `${m}m` : ''}`
+  if (m > 0 && s > 0) return `${m}m${s}s`
+  if (m > 0) return `${m}m`
+  return `${s}s`
+}
 
 interface PresetChipsProps {
   className?: string
@@ -17,39 +27,21 @@ export default function PresetChips({ className }: PresetChipsProps): React.JSX.
   const addPreset = useTimerStore((s) => s.addPreset)
   const loadPresets = useTimerStore((s) => s.loadPresets)
 
-  const [isAdding, setIsAdding] = useState(false)
-  const [newPresetName, setNewPresetName] = useState('')
-
   useEffect(() => {
     loadPresets()
   }, [loadPresets])
 
-  const handleAddOpen = (): void => {
-    setNewPresetName('')
-    setIsAdding(true)
-  }
+  const hasDuplicate = presets.some((p) => p.durationSeconds === totalDuration)
 
-  const handleAddConfirm = (): void => {
-    const name = newPresetName.trim()
-    if (name) {
-      addPreset(name, totalDuration)
-    }
-    setIsAdding(false)
-    setNewPresetName('')
-  }
-
-  const handleAddCancel = (): void => {
-    setIsAdding(false)
-    setNewPresetName('')
-  }
-
-  const handleAddKeyDown = (e: React.KeyboardEvent): void => {
-    if (e.key === 'Enter') handleAddConfirm()
-    if (e.key === 'Escape') handleAddCancel()
+  const handleAdd = (): void => {
+    if (hasDuplicate) return
+    const name = formatDurationLabel(totalDuration)
+    addPreset(name, totalDuration)
   }
 
   return (
     <div className={className}>
+      <h3 className="text-sm font-medium mb-2">{t('timer.timerPresets')}</h3>
       <div className="flex flex-wrap items-center gap-2">
         {presets.map((preset) => (
           <Chip key={preset.id} className="cursor-pointer">
@@ -78,29 +70,14 @@ export default function PresetChips({ className }: PresetChipsProps): React.JSX.
             </button>
           </Chip>
         ))}
-        {isAdding ? (
-          <div className="flex items-center gap-1">
-            <Input
-              autoFocus
-              value={newPresetName}
-              onChange={(e) => setNewPresetName(e.target.value)}
-              onKeyDown={handleAddKeyDown}
-              placeholder={t('timer.addPreset')}
-              aria-label={t('timer.addPreset')}
-              className="w-28"
-            />
-            <Button variant="ghost" onPress={handleAddConfirm} aria-label="Confirm Add Preset">
-              <Check className="size-4" />
-            </Button>
-            <Button variant="ghost" onPress={handleAddCancel} aria-label="Cancel Add Preset">
-              <X className="size-4" />
-            </Button>
-          </div>
-        ) : (
-          <Button variant="ghost" onPress={handleAddOpen} aria-label={t('timer.addPreset')}>
-            <Plus className="size-4" />
-          </Button>
-        )}
+        <Button
+          variant="ghost"
+          onPress={handleAdd}
+          isDisabled={hasDuplicate}
+          aria-label={t('timer.addPreset')}
+        >
+          <Plus className="size-4" />
+        </Button>
       </div>
     </div>
   )

@@ -67,6 +67,17 @@ const ModalMock = Object.assign(
   }
 )
 
+const PopoverMock = Object.assign(
+  ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  {
+    Trigger: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    Content: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    Dialog: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    Arrow: () => null,
+    Heading: ({ children }: { children: React.ReactNode }) => <div>{children}</div>
+  }
+)
+
 function useOverlayStateMock(args?: { isOpen?: boolean; onOpenChange?: (open: boolean) => void }): {
   isOpen: boolean
   setOpen: (v: boolean) => void
@@ -83,4 +94,4 @@ function useOverlayStateMock(args?: { isOpen?: boolean; onOpenChange?: (open: bo
   }
 }
 
-export { TabsMock, ModalMock, useOverlayStateMock }
+export { TabsMock, ModalMock, PopoverMock, useOverlayStateMock }

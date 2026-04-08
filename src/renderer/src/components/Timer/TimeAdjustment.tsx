@@ -16,28 +16,30 @@ export default function TimeAdjustment({ className }: TimeAdjustmentProps): Reac
 
   return (
     <div className={className}>
-      <div className="flex items-center gap-2 justify-center mb-2">
+      <div className="flex items-center gap-2 justify-center mb-3">
         {ADJUSTMENTS.map((seconds) => (
           <Button
-            key={`add-${seconds}`}
+            key={`remove-${seconds}`}
             variant="outline"
-            onPress={() => addTime(seconds)}
-            aria-label={t('timer.addTime', { seconds })}
+            className="text-warning border-warning"
+            isDisabled={remainingSeconds < seconds}
+            onPress={() => removeTime(seconds)}
+            aria-label={t('timer.removeTime', { seconds })}
           >
-            {t('timer.addTime', { seconds })}
+            {t('timer.removeTime', { seconds })}
           </Button>
         ))}
       </div>
       <div className="flex items-center gap-2 justify-center">
         {ADJUSTMENTS.map((seconds) => (
           <Button
-            key={`remove-${seconds}`}
+            key={`add-${seconds}`}
             variant="outline"
-            isDisabled={remainingSeconds < seconds}
-            onPress={() => removeTime(seconds)}
-            aria-label={t('timer.removeTime', { seconds })}
+            className="text-accent border-accent"
+            onPress={() => addTime(seconds)}
+            aria-label={t('timer.addTime', { seconds })}
           >
-            {t('timer.removeTime', { seconds })}
+            {t('timer.addTime', { seconds })}
           </Button>
         ))}
       </div>

@@ -3,9 +3,9 @@ import TimerDisplay from '../TimerDisplay'
 
 describe('TimerDisplay', () => {
   it('renders idle phase correctly', () => {
-    render(<TimerDisplay phase="idle" mainDisplay="05:00" progress={1} />)
+    const { container } = render(<TimerDisplay phase="idle" mainDisplay="05:00" progress={1} />)
     expect(screen.getByText('05:00')).toBeInTheDocument()
-    expect(screen.getByRole('progressbar')).toBeInTheDocument()
+    expect(container.querySelectorAll('circle')).toHaveLength(2)
   })
 
   it('renders main phase with sub-display', () => {

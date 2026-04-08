@@ -28,30 +28,15 @@ function renderWithI18n(): RenderResult {
   )
 }
 
-async function openPanel(user: ReturnType<typeof userEvent.setup>): Promise<void> {
-  const btn = screen.getByRole('button', { name: /settings/i })
-  await user.click(btn)
-}
-
-describe('TimerSettings — panel toggle', () => {
-  it('panel is hidden by default', () => {
+describe('TimerSettings — trigger and content', () => {
+  it('renders the settings trigger button', () => {
     renderWithI18n()
-    expect(screen.queryByRole('region', { name: /settings/i })).not.toBeInTheDocument()
+    expect(screen.getByTestId('timer-settings-trigger')).toBeInTheDocument()
   })
 
-  it('clicking settings button opens panel', async () => {
-    const user = userEvent.setup()
+  it('renders settings content via popover mock', () => {
     renderWithI18n()
-    await openPanel(user)
     expect(screen.getByRole('region', { name: /settings/i })).toBeInTheDocument()
-  })
-
-  it('clicking settings button again closes panel', async () => {
-    const user = userEvent.setup()
-    renderWithI18n()
-    await openPanel(user)
-    await user.click(screen.getByRole('button', { name: /settings/i }))
-    expect(screen.queryByRole('region', { name: /settings/i })).not.toBeInTheDocument()
   })
 })
 
@@ -61,7 +46,6 @@ describe('TimerSettings — reminder toggle', () => {
     const setReminderSpy = vi.fn()
     useTimerStore.setState({ setReminder: setReminderSpy } as never)
     renderWithI18n()
-    await openPanel(user)
 
     const switches = screen.getAllByRole('switch')
     const reminderSwitch = switches[0]
@@ -79,7 +63,6 @@ describe('TimerSettings — reminder toggle', () => {
       setReminder: setReminderSpy
     } as never)
     renderWithI18n()
-    await openPanel(user)
 
     const switches = screen.getAllByRole('switch')
     const reminderSwitch = switches[0]
@@ -99,7 +82,6 @@ describe('TimerSettings — reminder duration input', () => {
       setReminder: setReminderSpy
     } as never)
     renderWithI18n()
-    await openPanel(user)
 
     const durationInput = screen.getByRole('spinbutton', { name: /reminder time/i })
     await user.tripleClick(durationInput)
@@ -108,41 +90,35 @@ describe('TimerSettings — reminder duration input', () => {
     expect(setReminderSpy).toHaveBeenLastCalledWith(true, 9)
   })
 
-  it('shows validation error when reminderDuration >= totalDuration', async () => {
-    const user = userEvent.setup()
+  it('shows validation error when reminderDuration >= totalDuration', () => {
     useTimerStore.setState({
       reminderEnabled: true,
       reminderDuration: 300,
       totalDuration: 300
     })
     renderWithI18n()
-    await openPanel(user)
 
     expect(screen.getByRole('alert')).toHaveTextContent(/less than total duration/i)
   })
 
-  it('shows no error when reminderDuration < totalDuration', async () => {
-    const user = userEvent.setup()
+  it('shows no error when reminderDuration < totalDuration', () => {
     useTimerStore.setState({
       reminderEnabled: true,
       reminderDuration: 60,
       totalDuration: 300
     })
     renderWithI18n()
-    await openPanel(user)
 
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
-  it('shows no error when reminder is disabled even if duration >= totalDuration', async () => {
-    const user = userEvent.setup()
+  it('shows no error when reminder is disabled even if duration >= totalDuration', () => {
     useTimerStore.setState({
       reminderEnabled: false,
       reminderDuration: 300,
       totalDuration: 300
     })
     renderWithI18n()
-    await openPanel(user)
 
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
@@ -154,7 +130,6 @@ describe('TimerSettings — overtime message toggle', () => {
     const setOvertimeMessageSpy = vi.fn()
     useTimerStore.setState({ setOvertimeMessage: setOvertimeMessageSpy } as never)
     renderWithI18n()
-    await openPanel(user)
 
     const switches = screen.getAllByRole('switch')
     const overtimeSwitch = switches[1]
@@ -172,7 +147,6 @@ describe('TimerSettings — overtime message toggle', () => {
       setOvertimeMessage: setOvertimeMessageSpy
     } as never)
     renderWithI18n()
-    await openPanel(user)
 
     const switches = screen.getAllByRole('switch')
     const overtimeSwitch = switches[1]
@@ -192,7 +166,6 @@ describe('TimerSettings — overtime message text input', () => {
       setOvertimeMessage: setOvertimeMessageSpy
     } as never)
     renderWithI18n()
-    await openPanel(user)
 
     const messageInputs = screen.getAllByRole('textbox')
     const overtimeInput = messageInputs[0]
@@ -210,7 +183,6 @@ describe('TimerSettings — overtime message text input', () => {
       setOvertimeMessage: setOvertimeMessageSpy
     } as never)
     renderWithI18n()
-    await openPanel(user)
 
     const messageInputs = screen.getAllByRole('textbox')
     const overtimeInput = messageInputs[0]

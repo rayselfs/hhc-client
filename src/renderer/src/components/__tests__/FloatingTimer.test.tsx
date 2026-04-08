@@ -34,7 +34,8 @@ describe('FloatingTimer', () => {
     render(<FloatingTimer />)
 
     expect(screen.getByRole('button', { name: /go to timer/i })).toBeInTheDocument()
-    expect(screen.getByRole('progressbar')).toBeInTheDocument()
+    const svg = screen.getByRole('button', { name: /go to timer/i }).querySelector('svg')
+    expect(svg).toBeInTheDocument()
     expect(screen.getByText('01:30')).toBeInTheDocument()
   })
 

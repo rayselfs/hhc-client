@@ -1,6 +1,7 @@
 import { useLocation, useNavigate } from 'react-router-dom'
-import { ProgressCircle } from '@heroui/react'
 import { useTimerStore } from '@renderer/stores/timer'
+import { isTimerRoute } from '@renderer/lib/routes'
+import TimerRing from '@renderer/components/Timer/TimerRing'
 
 function formatMMSS(seconds: number): string {
   const s = Math.max(0, Math.round(seconds))
@@ -21,7 +22,7 @@ export default function FloatingTimer(): React.JSX.Element | null {
   const remainingSeconds = useTimerStore((s) => s.remainingSeconds)
 
   if (status !== 'running') return null
-  if (location.pathname === '/timer') return null
+  if (isTimerRoute(location.pathname)) return null
 
   return (
     <div
@@ -34,16 +35,9 @@ export default function FloatingTimer(): React.JSX.Element | null {
       }}
       aria-label="Go to timer"
     >
-      <div style={{ width: 60, height: 60 }}>
-        <ProgressCircle
-          value={progress * 100}
-          color="accent"
-          aria-label="Timer progress"
-          className="w-full h-full"
-        >
-          <span className="timer-digits text-xs font-bold">{formatMMSS(remainingSeconds)}</span>
-        </ProgressCircle>
-      </div>
+      <TimerRing progress={progress * 100} size={60} color="accent">
+        <span className="timer-digits text-xs font-bold">{formatMMSS(remainingSeconds)}</span>
+      </TimerRing>
     </div>
   )
 }

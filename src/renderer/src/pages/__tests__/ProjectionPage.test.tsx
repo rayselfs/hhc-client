@@ -60,12 +60,12 @@ describe('ProjectionPage', () => {
   })
 
   it('shows TimerDisplay when receiving timer:tick with mode=timer', () => {
-    render(<ProjectionPage />)
+    const { container } = render(<ProjectionPage />)
     act(() => {
       mockAdapter._trigger('__system:blank', { showDefault: false })
       mockAdapter._trigger('timer:tick', { ...baseTimerTick, mode: 'timer' })
     })
-    expect(screen.getByRole('progressbar')).toBeInTheDocument()
+    expect(container.querySelectorAll('circle')).toHaveLength(2)
     expect(screen.getByText('02:00')).toBeInTheDocument()
   })
 
@@ -90,12 +90,12 @@ describe('ProjectionPage', () => {
   })
 
   it('shows both TimerDisplay and ClockDisplay in both mode', () => {
-    render(<ProjectionPage />)
+    const { container } = render(<ProjectionPage />)
     act(() => {
       mockAdapter._trigger('__system:blank', { showDefault: false })
       mockAdapter._trigger('timer:tick', { ...baseTimerTick, mode: 'both' })
     })
-    expect(screen.getByRole('progressbar')).toBeInTheDocument()
+    expect(container.querySelectorAll('circle')).toHaveLength(2)
     expect(screen.getByTestId('clock-display')).toBeInTheDocument()
   })
 
@@ -106,7 +106,7 @@ describe('ProjectionPage', () => {
       mockAdapter._trigger('__system:blank', { showDefault: true })
     })
     expect(screen.getByTestId('default-projection')).toBeInTheDocument()
-    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
+    expect(screen.queryByText('02:00')).not.toBeInTheDocument()
   })
 
   it('shows overtime message when phase is overtime', () => {

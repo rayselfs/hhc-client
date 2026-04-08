@@ -65,10 +65,10 @@ beforeEach(() => {
 })
 
 describe('TimerPage — TIMER mode', () => {
-  it('renders TimerDisplay (progressbar) in timer mode', () => {
+  it('renders TimerDisplay (SVG ring) in timer mode', () => {
     useTimerStore.setState({ mode: 'timer' })
-    renderTimerPage()
-    expect(screen.getByRole('progressbar')).toBeInTheDocument()
+    const { container } = renderTimerPage()
+    expect(container.querySelector('svg circle')).toBeInTheDocument()
   })
 
   it('renders TimerControls start button in timer mode', () => {
@@ -105,16 +105,16 @@ describe('TimerPage — CLOCK mode', () => {
 
   it('does not render progressbar in clock mode', () => {
     useTimerStore.setState({ mode: 'clock' })
-    renderTimerPage()
-    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
+    const { container } = renderTimerPage()
+    expect(container.querySelectorAll('circle')).toHaveLength(0)
   })
 })
 
 describe('TimerPage — BOTH mode', () => {
   it('renders both TimerDisplay and ClockDisplay in both mode', () => {
     useTimerStore.setState({ mode: 'both' })
-    renderTimerPage()
-    expect(screen.getByRole('progressbar')).toBeInTheDocument()
+    const { container } = renderTimerPage()
+    expect(container.querySelectorAll('circle')).toHaveLength(2)
     expect(screen.getByTestId('clock-display')).toBeInTheDocument()
   })
 
@@ -140,8 +140,8 @@ describe('TimerPage — STOPWATCH mode', () => {
 
   it('does not render progressbar in stopwatch mode', () => {
     useTimerStore.setState({ mode: 'stopwatch' })
-    renderTimerPage()
-    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
+    const { container } = renderTimerPage()
+    expect(container.querySelectorAll('circle')).toHaveLength(0)
   })
 
   it('displays formatted stopwatch time from store', () => {

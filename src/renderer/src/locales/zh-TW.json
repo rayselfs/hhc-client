@@ -16,6 +16,7 @@
     "resume": "繼續",
     "reset": "重設",
     "presets": "預設時間",
+    "timerPresets": "計時器預設",
     "addPreset": "新增預設",
     "deletePreset": "刪除預設",
     "settings": "設定",
@@ -38,8 +39,8 @@
       "invalid": "格式無效，請輸入：90s、1m30s 或 03:00",
       "confirm": "設定"
     },
-    "addTime": "+{{seconds}}秒",
-    "removeTime": "-{{seconds}}秒",
+    "addTime": "+{{seconds}}",
+    "removeTime": "-{{seconds}}",
     "startStopwatch": "開始碼錶",
     "pauseStopwatch": "暫停碼錶",
     "resumeStopwatch": "繼續碼錶",

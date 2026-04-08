@@ -10,7 +10,6 @@ import StopwatchDisplay from '@renderer/components/Timer/StopwatchDisplay'
 import TimerControls from '@renderer/components/Timer/TimerControls'
 import TimeAdjustment from '@renderer/components/Timer/TimeAdjustment'
 import PresetChips from '@renderer/components/Timer/PresetChips'
-import TimerSettings from '@renderer/components/Timer/TimerSettings'
 import TimeInputDialog from '@renderer/components/Timer/TimeInputDialog'
 
 export default function TimerPage(): React.JSX.Element {
@@ -153,7 +152,7 @@ export default function TimerPage(): React.JSX.Element {
   return (
     <div data-testid="timer-page" className="flex flex-col items-center gap-4 p-6 h-full">
       {mode === 'timer' && (
-        <div className="flex flex-col items-center gap-4 flex-1">
+        <div className="flex flex-col items-center gap-4 flex-1 w-full">
           <TimerDisplay
             progress={progress}
             mainDisplay={displayValues.mainDisplay}
@@ -163,10 +162,9 @@ export default function TimerPage(): React.JSX.Element {
             overtimeMessage={overtimeMessageEnabled ? overtimeMessage : undefined}
             onTimeClick={timerStatus === 'stopped' ? () => setDialogOpen(true) : undefined}
           />
-          <TimerControls mode={mode} />
           <TimeAdjustment />
-          <PresetChips />
-          <TimerSettings />
+          <TimerControls mode={mode} />
+          <PresetChips className="self-start" />
         </div>
       )}
 

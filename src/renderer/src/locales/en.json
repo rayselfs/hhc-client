@@ -16,6 +16,7 @@
     "resume": "Resume",
     "reset": "Reset",
     "presets": "Presets",
+    "timerPresets": "Timer Presets",
     "addPreset": "Add Preset",
     "deletePreset": "Delete Preset",
     "settings": "Settings",
@@ -38,8 +39,8 @@
       "invalid": "Invalid format. Try: 90s, 1m30s, or 03:00",
       "confirm": "Set"
     },
-    "addTime": "+{{seconds}}s",
-    "removeTime": "-{{seconds}}s",
+    "addTime": "+{{seconds}}",
+    "removeTime": "-{{seconds}}",
     "startStopwatch": "Start Stopwatch",
     "pauseStopwatch": "Pause Stopwatch",
     "resumeStopwatch": "Resume Stopwatch",

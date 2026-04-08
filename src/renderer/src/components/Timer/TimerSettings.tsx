@@ -1,18 +1,12 @@
-import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Switch, Input } from '@heroui/react'
+import { Switch, Input, Popover, Button } from '@heroui/react'
 import { Settings } from 'lucide-react'
 import { useTimerStore } from '@renderer/stores/timer'
 
-interface TimerSettingsProps {
-  className?: string
-}
-
 const MAX_OVERTIME_MESSAGE_LENGTH = 15
 
-export default function TimerSettings({ className }: TimerSettingsProps): React.JSX.Element {
+export default function TimerSettings(): React.JSX.Element {
   const { t } = useTranslation()
-  const [isOpen, setIsOpen] = useState(false)
 
   const reminderEnabled = useTimerStore((s) => s.reminderEnabled)
   const reminderDuration = useTimerStore((s) => s.reminderDuration)
@@ -46,69 +40,67 @@ export default function TimerSettings({ className }: TimerSettingsProps): React.
   }
 
   return (
-    <div className={className}>
-      <button
-        type="button"
-        onClick={() => setIsOpen((prev) => !prev)}
-        aria-label={t('timer.settings')}
-        aria-expanded={isOpen}
-        className="flex items-center justify-center rounded-md p-1.5 text-sm hover:bg-white/10 transition-colors"
-      >
-        <Settings className="size-4" />
-      </button>
-
-      {isOpen && (
-        <div
-          role="region"
+    <Popover>
+      <Popover.Trigger>
+        <Button
+          isIconOnly
+          variant="ghost"
           aria-label={t('timer.settings')}
-          className="mt-2 rounded-xl border border-white/10 bg-white/5 p-4 space-y-4"
+          data-testid="timer-settings-trigger"
         >
-          <div className="flex items-center gap-4">
-            <Switch
-              isSelected={reminderEnabled}
-              onChange={handleReminderToggle}
-              aria-label={t('timer.reminder.label')}
-            >
-              <span className="text-sm">{t('timer.reminder.label')}</span>
-            </Switch>
-            <div className="flex items-center gap-1">
+          <Settings className="size-4" />
+        </Button>
+      </Popover.Trigger>
+      <Popover.Content>
+        <Popover.Dialog>
+          <div role="region" aria-label={t('timer.settings')} className="p-4 space-y-4">
+            <div className="flex items-center gap-4">
+              <Switch
+                isSelected={reminderEnabled}
+                onChange={handleReminderToggle}
+                aria-label={t('timer.reminder.label')}
+              >
+                <span className="text-sm">{t('timer.reminder.label')}</span>
+              </Switch>
+              <div className="flex items-center gap-1">
+                <Input
+                  type="number"
+                  value={String(reminderDuration)}
+                  onChange={handleReminderDurationChange}
+                  aria-label={t('timer.reminder.time')}
+                  className="w-20"
+                  min={0}
+                />
+                <span className="text-xs text-muted">{t('timer.reminder.seconds')}</span>
+              </div>
+            </div>
+            {reminderError && (
+              <p role="alert" className="text-xs text-danger -mt-2">
+                {reminderError}
+              </p>
+            )}
+
+            <div className="flex items-center gap-4">
+              <Switch
+                isSelected={overtimeMessageEnabled}
+                onChange={handleOvertimeMessageToggle}
+                aria-label={t('timer.overtimeMessage.label')}
+              >
+                <span className="text-sm">{t('timer.overtimeMessage.label')}</span>
+              </Switch>
               <Input
-                type="number"
-                value={String(reminderDuration)}
-                onChange={handleReminderDurationChange}
-                aria-label={t('timer.reminder.time')}
-                className="w-20"
-                min={0}
+                type="text"
+                value={overtimeMessage}
+                onChange={handleOvertimeMessageChange}
+                placeholder={t('timer.overtimeMessage.placeholder')}
+                aria-label={t('timer.overtimeMessage.label')}
+                maxLength={MAX_OVERTIME_MESSAGE_LENGTH}
+                className="w-40"
               />
-              <span className="text-xs text-white/60">{t('timer.reminder.seconds')}</span>
             </div>
           </div>
-          {reminderError && (
-            <p role="alert" className="text-xs text-red-400 -mt-2">
-              {reminderError}
-            </p>
-          )}
-
-          <div className="flex items-center gap-4">
-            <Switch
-              isSelected={overtimeMessageEnabled}
-              onChange={handleOvertimeMessageToggle}
-              aria-label={t('timer.overtimeMessage.label')}
-            >
-              <span className="text-sm">{t('timer.overtimeMessage.label')}</span>
-            </Switch>
-            <Input
-              type="text"
-              value={overtimeMessage}
-              onChange={handleOvertimeMessageChange}
-              placeholder={t('timer.overtimeMessage.placeholder')}
-              aria-label={t('timer.overtimeMessage.label')}
-              maxLength={MAX_OVERTIME_MESSAGE_LENGTH}
-              className="w-40"
-            />
-          </div>
-        </div>
-      )}
-    </div>
+        </Popover.Dialog>
+      </Popover.Content>
+    </Popover>
   )
 }

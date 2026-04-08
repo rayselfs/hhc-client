@@ -16,6 +16,7 @@
     "resume": "继续",
     "reset": "重置",
     "presets": "预设时间",
+    "timerPresets": "计时器预设",
     "addPreset": "新增预设",
     "deletePreset": "删除预设",
     "settings": "设置",
@@ -38,8 +39,8 @@
       "invalid": "格式无效，请输入：90s、1m30s 或 03:00",
       "confirm": "设定"
     },
-    "addTime": "+{{seconds}}秒",
-    "removeTime": "-{{seconds}}秒",
+    "addTime": "+{{seconds}}",
+    "removeTime": "-{{seconds}}",
     "startStopwatch": "开始秒表",
     "pauseStopwatch": "暂停秒表",
     "resumeStopwatch": "继续秒表",

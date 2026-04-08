@@ -21,12 +21,12 @@ function renderWithI18n(mode: 'timer' | 'clock' | 'both' | 'stopwatch' = 'timer'
 }
 
 describe('TimerControls — timer mode', () => {
-  it('stopped state: shows Start button only', () => {
+  it('stopped state: shows Start and disabled Reset', () => {
     renderWithI18n('timer')
     expect(screen.getByTestId('btn-start')).toBeInTheDocument()
     expect(screen.queryByTestId('btn-pause')).not.toBeInTheDocument()
     expect(screen.queryByTestId('btn-resume')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('btn-reset')).not.toBeInTheDocument()
+    expect(screen.getByTestId('btn-reset')).toBeDisabled()
   })
 
   it('running state: shows Pause + Reset, hides Start', () => {
@@ -35,6 +35,7 @@ describe('TimerControls — timer mode', () => {
     expect(screen.queryByTestId('btn-start')).not.toBeInTheDocument()
     expect(screen.getByTestId('btn-pause')).toBeInTheDocument()
     expect(screen.getByTestId('btn-reset')).toBeInTheDocument()
+    expect(screen.getByTestId('btn-reset')).not.toBeDisabled()
     expect(screen.queryByTestId('btn-resume')).not.toBeInTheDocument()
   })
 
@@ -85,11 +86,11 @@ describe('TimerControls — timer mode', () => {
 })
 
 describe('TimerControls — stopwatch mode', () => {
-  it('stopped state: shows Start button only', () => {
+  it('stopped state: shows Start and disabled Reset', () => {
     renderWithI18n('stopwatch')
     expect(screen.getByTestId('btn-start')).toBeInTheDocument()
     expect(screen.queryByTestId('btn-pause')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('btn-reset')).not.toBeInTheDocument()
+    expect(screen.getByTestId('btn-reset')).toBeDisabled()
   })
 
   it('running state: shows Pause + Reset', () => {

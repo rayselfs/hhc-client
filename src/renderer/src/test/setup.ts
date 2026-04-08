@@ -2,11 +2,12 @@ import '@testing-library/jest-dom/vitest'
 
 vi.mock('@heroui/react', async () => {
   const actual = await vi.importActual<typeof import('@heroui/react')>('@heroui/react')
-  const { TabsMock, ModalMock, useOverlayStateMock } = await import('./heroui-mock')
+  const { TabsMock, ModalMock, PopoverMock, useOverlayStateMock } = await import('./heroui-mock')
   return {
     ...actual,
     Tabs: TabsMock,
     Modal: ModalMock,
+    Popover: PopoverMock,
     useOverlayState: useOverlayStateMock
   }
 })

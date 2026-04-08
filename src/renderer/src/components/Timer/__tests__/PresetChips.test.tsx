@@ -71,6 +71,11 @@ describe('PresetChips — rendering', () => {
     expect(screen.getByRole('button', { name: 'Delete Preset 5m' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Delete Preset 3m' })).toBeInTheDocument()
   })
+
+  it('renders Timer Presets title', () => {
+    renderWithI18n()
+    expect(screen.getByText('Timer Presets')).toBeInTheDocument()
+  })
 })
 
 describe('PresetChips — applyPreset', () => {
@@ -113,38 +118,43 @@ describe('PresetChips — removePreset', () => {
   })
 })
 
-describe('PresetChips — addPreset', () => {
-  it('clicking add button shows inline input and typing name + confirming calls addPreset', async () => {
+describe('PresetChips — addPreset (current duration)', () => {
+  it('clicking add button calls addPreset with auto-generated name and totalDuration', async () => {
     const user = userEvent.setup()
     const addPresetSpy = vi.fn()
-    useTimerStore.setState({ addPreset: addPresetSpy, totalDuration: 300 } as never)
+    useTimerStore.setState({
+      addPreset: addPresetSpy,
+      totalDuration: 90,
+      presets: SAMPLE_PRESETS
+    } as never)
     renderWithI18n()
     await user.click(screen.getByRole('button', { name: 'Add Preset' }))
-    const input = screen.getByRole('textbox', { name: 'Add Preset' })
-    await user.type(input, 'My Preset')
-    await user.click(screen.getByRole('button', { name: 'Confirm Add Preset' }))
-    expect(addPresetSpy).toHaveBeenCalledWith('My Preset', 300)
+    expect(addPresetSpy).toHaveBeenCalledWith('1m30s', 90)
   })
 
-  it('does not call addPreset when cancelled without typing', async () => {
-    const user = userEvent.setup()
-    const addPresetSpy = vi.fn()
-    useTimerStore.setState({ addPreset: addPresetSpy } as never)
+  it('add button is disabled when totalDuration already exists in presets', () => {
+    useTimerStore.setState({ totalDuration: 300, presets: SAMPLE_PRESETS })
     renderWithI18n()
-    await user.click(screen.getByRole('button', { name: 'Add Preset' }))
-    await user.click(screen.getByRole('button', { name: 'Cancel Add Preset' }))
-    expect(addPresetSpy).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Add Preset' })).toBeDisabled()
   })
 
-  it('does not call addPreset when confirming with empty/whitespace name', async () => {
+  it('add button is enabled when totalDuration does not exist in presets', () => {
+    useTimerStore.setState({ totalDuration: 90, presets: SAMPLE_PRESETS })
+    renderWithI18n()
+    expect(screen.getByRole('button', { name: 'Add Preset' })).not.toBeDisabled()
+  })
+
+  it('does not call addPreset when duration already exists', async () => {
     const user = userEvent.setup()
     const addPresetSpy = vi.fn()
-    useTimerStore.setState({ addPreset: addPresetSpy } as never)
+    useTimerStore.setState({
+      addPreset: addPresetSpy,
+      totalDuration: 300,
+      presets: SAMPLE_PRESETS
+    } as never)
     renderWithI18n()
-    await user.click(screen.getByRole('button', { name: 'Add Preset' }))
-    const input = screen.getByRole('textbox', { name: 'Add Preset' })
-    await user.type(input, '   ')
-    await user.click(screen.getByRole('button', { name: 'Confirm Add Preset' }))
+    const addBtn = screen.getByRole('button', { name: 'Add Preset' })
+    await user.click(addBtn)
     expect(addPresetSpy).not.toHaveBeenCalled()
   })
 })

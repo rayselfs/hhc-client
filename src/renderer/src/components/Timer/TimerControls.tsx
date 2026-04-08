@@ -36,37 +36,54 @@ export default function TimerControls({ mode }: TimerControlsProps): React.JSX.E
   const isPaused = status === 'paused'
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-3">
       {isStopped && (
-        <Button variant="primary" onPress={start} data-testid="btn-start">
-          <Play className="size-4" />
-          {t('timer.start')}
+        <Button
+          isIconOnly
+          size="lg"
+          variant="primary"
+          onPress={start}
+          data-testid="btn-start"
+          aria-label={t('timer.start')}
+        >
+          <Play className="size-5" />
         </Button>
       )}
       {isRunning && (
-        <>
-          <Button variant="outline" onPress={pause} data-testid="btn-pause">
-            <Pause className="size-4" />
-            {t('timer.pause')}
-          </Button>
-          <Button variant="ghost" onPress={reset} data-testid="btn-reset">
-            <RotateCcw className="size-4" />
-            {t('timer.reset')}
-          </Button>
-        </>
+        <Button
+          isIconOnly
+          size="lg"
+          variant="outline"
+          onPress={pause}
+          data-testid="btn-pause"
+          aria-label={t('timer.pause')}
+        >
+          <Pause className="size-5" />
+        </Button>
       )}
       {isPaused && (
-        <>
-          <Button variant="primary" onPress={resume} data-testid="btn-resume">
-            <Play className="size-4" />
-            {t('timer.resume')}
-          </Button>
-          <Button variant="ghost" onPress={reset} data-testid="btn-reset">
-            <RotateCcw className="size-4" />
-            {t('timer.reset')}
-          </Button>
-        </>
+        <Button
+          isIconOnly
+          size="lg"
+          variant="primary"
+          onPress={resume}
+          data-testid="btn-resume"
+          aria-label={t('timer.resume')}
+        >
+          <Play className="size-5" />
+        </Button>
       )}
+      <Button
+        isIconOnly
+        size="lg"
+        variant="ghost"
+        onPress={reset}
+        isDisabled={isStopped}
+        data-testid="btn-reset"
+        aria-label={t('timer.reset')}
+      >
+        <RotateCcw className="size-5" />
+      </Button>
     </div>
   )
 }
