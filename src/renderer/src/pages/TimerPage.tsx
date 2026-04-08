@@ -23,19 +23,17 @@ export default function TimerPage(): React.JSX.Element {
 
       <div className="flex items-end gap-2">
         <TextField className="max-w-xs" value={message} onChange={setMessage}>
-          <Label>Send to Projection</Label>
-          <Input placeholder="Type something..." />
+          <Label>{t('timer.sendLabel')}</Label>
+          <Input placeholder={t('timer.sendPlaceholder')} />
         </TextField>
         <Button variant="primary" onPress={handleSend}>
           <Send className="size-4" />
-          Send
+          {t('common.send')}
         </Button>
       </div>
 
       {!isProjectionOpen && (
-        <p className="mt-2 text-sm text-warning">
-          Projection window is closed. Sending will open it first.
-        </p>
+        <p className="mt-2 text-sm text-warning">{t('timer.projectionClosed')}</p>
       )}
     </div>
   )

@@ -5,7 +5,10 @@
   },
   "timer": {
     "title": "计时器",
-    "placeholder": "计时器内容将显示于此"
+    "placeholder": "计时器内容将显示于此",
+    "sendLabel": "发送至投影",
+    "sendPlaceholder": "输入文字...",
+    "projectionClosed": "投影窗口已关闭，发送时将自动打开。"
   },
   "bible": {
     "title": "圣经",
@@ -14,10 +17,12 @@
   "projection": {
     "closeButton": "关闭投影窗口",
     "closeTitle": "关闭投影",
-    "closeConfirm": "确定要关闭投影窗口吗？"
+    "closeConfirm": "确定要关闭投影窗口吗？",
+    "waiting": "等待内容..."
   },
   "common": {
     "cancel": "取消",
-    "close": "关闭"
+    "close": "关闭",
+    "send": "发送"
   }
 }

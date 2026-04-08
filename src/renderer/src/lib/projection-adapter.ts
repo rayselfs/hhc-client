@@ -1,8 +1,12 @@
 import { isElectron } from '@renderer/lib/env'
+import type { ProjectionChannel, ProjectionPayload } from '@shared/projection-messages'
 
 interface ProjectionAdapter {
-  send(channel: string, data?: unknown): void
-  on(channel: string, handler: (data: unknown) => void): () => void
+  send<C extends ProjectionChannel>(channel: C, data: ProjectionPayload<C>): void
+  on<C extends ProjectionChannel>(
+    channel: C,
+    handler: (data: ProjectionPayload<C>) => void
+  ): () => void
   dispose(): void
 }
 
@@ -14,13 +18,16 @@ class ElectronProjectionAdapter implements ProjectionAdapter {
     this.api = api
   }
 
-  send(channel: string, data?: unknown): void {
+  send<C extends ProjectionChannel>(channel: C, data: ProjectionPayload<C>): void {
     this.api.send(channel, data)
   }
 
-  on(channel: string, handler: (data: unknown) => void): () => void {
+  on<C extends ProjectionChannel>(
+    channel: C,
+    handler: (data: ProjectionPayload<C>) => void
+  ): () => void {
     const unsubscribe = this.api.onProjectionMessage((ch, d) => {
-      if (ch === channel) handler(d)
+      if (ch === channel) handler(d as ProjectionPayload<C>)
     })
     this.unsubscribers.push(unsubscribe)
     return unsubscribe
@@ -42,14 +49,17 @@ class BroadcastChannelAdapter implements ProjectionAdapter {
     this.windowId = crypto.randomUUID()
   }
 
-  send(channel: string, data?: unknown): void {
+  send<C extends ProjectionChannel>(channel: C, data: ProjectionPayload<C>): void {
     this.bc.postMessage({ channel, data, sender: this.windowId })
   }
 
-  on(channel: string, handler: (data: unknown) => void): () => void {
+  on<C extends ProjectionChannel>(
+    channel: C,
+    handler: (data: ProjectionPayload<C>) => void
+  ): () => void {
     const listener = (event: MessageEvent): void => {
       if (event.data.sender === this.windowId) return
-      if (event.data.channel === channel) handler(event.data.data)
+      if (event.data.channel === channel) handler(event.data.data as ProjectionPayload<C>)
     }
     this.bc.addEventListener('message', listener)
     this.listeners.push({ listener })
@@ -62,8 +72,6 @@ class BroadcastChannelAdapter implements ProjectionAdapter {
   dispose(): void {
     this.listeners.forEach(({ listener }) => this.bc.removeEventListener('message', listener))
     this.listeners = []
-    // Do NOT close the BroadcastChannel — it must remain open for send() to work.
-    // The channel is garbage-collected when the adapter is dereferenced.
   }
 }
 

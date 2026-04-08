@@ -5,7 +5,10 @@
   },
   "timer": {
     "title": "TIMER",
-    "placeholder": "Timer content will appear here"
+    "placeholder": "Timer content will appear here",
+    "sendLabel": "Send to Projection",
+    "sendPlaceholder": "Type something...",
+    "projectionClosed": "Projection window is closed. Sending will open it first."
   },
   "bible": {
     "title": "BIBLE",
@@ -14,10 +17,12 @@
   "projection": {
     "closeButton": "Close projection window",
     "closeTitle": "Close Projection",
-    "closeConfirm": "Are you sure you want to close the projection window?"
+    "closeConfirm": "Are you sure you want to close the projection window?",
+    "waiting": "Waiting for content..."
   },
   "common": {
     "cancel": "Cancel",
-    "close": "Close"
+    "close": "Close",
+    "send": "Send"
   }
 }
