@@ -1,5 +1,12 @@
 import type { ProjectionChannel, ProjectionPayload } from '../shared/projection-messages'
 import type { DisplayInfo } from '../shared/ipc-channels'
+import type {
+  TimerCommand,
+  TimerSettings,
+  TimerState,
+  StopwatchState,
+  TimerTickPayload
+} from '../shared/types/timer'
 
 interface ThemeAPI {
   get: () => Promise<{ source: string; shouldUseDarkColors: boolean }>
@@ -21,8 +28,15 @@ interface ProjectionAPI {
   onProjectionClosed: (callback: () => void) => () => void
 }
 
+interface TimerAPI {
+  timerCommand: (cmd: TimerCommand) => Promise<void>
+  timerGetState: () => Promise<TimerState & { stopwatch: StopwatchState }>
+  timerInitialize: (settings: TimerSettings) => Promise<void>
+  onTimerTick: (callback: (payload: TimerTickPayload) => void) => () => void
+}
+
 declare global {
   interface Window {
-    api: { projection: ProjectionAPI; theme: ThemeAPI }
+    api: { projection: ProjectionAPI; theme: ThemeAPI; timer: TimerAPI }
   }
 }

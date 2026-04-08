@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, nativeTheme } from 'electron'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import { WindowManager } from './windowManager'
 import { registerProjectionHandlers } from './ipc/projection'
+import { registerTimerHandlers } from './ipc/timer'
 
 const wm = WindowManager.getInstance()
 
@@ -42,6 +43,7 @@ app.whenReady().then(() => {
   })
 
   registerProjectionHandlers(wm)
+  registerTimerHandlers()
   wm.createMainWindow()
   wm.createProjectionWindow()
 

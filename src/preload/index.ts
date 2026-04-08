@@ -6,6 +6,7 @@ import type {
   IpcMainToRendererMap
 } from '../shared/ipc-channels'
 import type { ProjectionChannel, ProjectionPayload } from '../shared/projection-messages'
+import type { TimerTickPayload } from '../shared/types/timer'
 
 function typedInvoke<C extends IpcInvokeChannel>(
   channel: C,
@@ -48,7 +49,16 @@ const projectionApi = {
   onProjectionClosed: (callback: () => void) => typedOn('projection:closed', callback)
 }
 
-const api = { projection: projectionApi, theme: themeApi }
+const timerApi = {
+  timerCommand: (cmd: IpcInvokeMap['timer:command']['args'][0]) =>
+    typedInvoke('timer:command', cmd),
+  timerGetState: () => typedInvoke('timer:get-state'),
+  timerInitialize: (settings: IpcInvokeMap['timer:initialize']['args'][0]) =>
+    typedInvoke('timer:initialize', settings),
+  onTimerTick: (callback: (payload: TimerTickPayload) => void) => typedOn('timer-tick', callback)
+}
+
+const api = { projection: projectionApi, theme: themeApi, timer: timerApi }
 
 try {
   contextBridge.exposeInMainWorld('api', api)
