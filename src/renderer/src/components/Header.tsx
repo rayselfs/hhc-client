@@ -42,8 +42,8 @@ export default function Header(): React.JSX.Element {
                 </Button>
                 <Button
                   variant="danger"
-                  onPress={() => {
-                    closeProjection()
+                  onPress={async () => {
+                    await closeProjection().catch(() => undefined)
                     state.close()
                   }}
                 >
