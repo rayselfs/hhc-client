@@ -26,9 +26,18 @@ export default function ProjectionPage(): React.JSX.Element {
       })
       adapter.send('__system:pong', null)
 
-      window.addEventListener('beforeunload', () => {
+      const handleBeforeUnload = (): void => {
         adapter.send('__system:closed', null)
-      })
+      }
+      window.addEventListener('beforeunload', handleBeforeUnload)
+
+      return () => {
+        unsubText()
+        unsubClose()
+        unsubPing()
+        window.removeEventListener('beforeunload', handleBeforeUnload)
+        adapter.dispose()
+      }
     }
 
     return () => {
