@@ -1,7 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 
-// Custom APIs for renderer
 const projectionApi = {
   check: () => ipcRenderer.invoke('projection:check'),
   ensure: () => ipcRenderer.invoke('projection:ensure'),
@@ -11,16 +10,25 @@ const projectionApi = {
     ipcRenderer.send('projection:send-to-main', channel, data),
   getDisplays: () => ipcRenderer.invoke('projection:get-displays'),
   onProjectionMessage: (callback: (channel: string, data: unknown) => void) => {
-    ipcRenderer.on('projection:message', (_event, channel, data) => callback(channel, data))
-    return () => ipcRenderer.removeAllListeners('projection:message')
+    const handler = (_event: Electron.IpcRendererEvent, channel: string, data: unknown): void => {
+      callback(channel, data)
+    }
+    ipcRenderer.on('projection:message', handler)
+    return () => ipcRenderer.removeListener('projection:message', handler)
   },
   onProjectionOpened: (callback: () => void) => {
-    ipcRenderer.on('projection:opened', () => callback())
-    return () => ipcRenderer.removeAllListeners('projection:opened')
+    const handler = (): void => {
+      callback()
+    }
+    ipcRenderer.on('projection:opened', handler)
+    return () => ipcRenderer.removeListener('projection:opened', handler)
   },
   onProjectionClosed: (callback: () => void) => {
-    ipcRenderer.on('projection:closed', () => callback())
-    return () => ipcRenderer.removeAllListeners('projection:closed')
+    const handler = (): void => {
+      callback()
+    }
+    ipcRenderer.on('projection:closed', handler)
+    return () => ipcRenderer.removeListener('projection:closed', handler)
   }
 }
 
