@@ -4,6 +4,7 @@ import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { describe, it, expect, beforeEach } from 'vitest'
 import '@renderer/i18n'
 import i18n from '@renderer/i18n'
+import { useTimerStore } from '@renderer/stores/timer'
 import Header from '../Header'
 
 vi.mock('@renderer/contexts/ProjectionContext', async (importOriginal) => {
@@ -14,11 +15,89 @@ vi.mock('@renderer/contexts/ProjectionContext', async (importOriginal) => {
   }
 })
 
+vi.mock('@heroui/react', async () => {
+  const actual = await vi.importActual<typeof import('@heroui/react')>('@heroui/react')
+
+  let capturedOnSelectionChange: ((key: string) => void) | undefined
+  let capturedSelectedKey: string | undefined
+
+  const TabsMock = Object.assign(
+    ({
+      children,
+      selectedKey,
+      onSelectionChange
+    }: {
+      children: React.ReactNode
+      selectedKey?: string
+      onSelectionChange?: (key: string) => void
+    }) => {
+      capturedOnSelectionChange = onSelectionChange
+      capturedSelectedKey = selectedKey
+      return <div role="tablist">{children}</div>
+    },
+    {
+      List: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+      Tab: ({
+        children,
+        id,
+        'data-testid': dataTestId,
+        ...rest
+      }: {
+        children: React.ReactNode
+        id?: string
+        'data-testid'?: string
+        [key: string]: unknown
+      }) => (
+        <button
+          role="tab"
+          aria-selected={capturedSelectedKey === id}
+          data-testid={dataTestId}
+          onClick={() => id && capturedOnSelectionChange?.(id)}
+          {...(rest as React.ButtonHTMLAttributes<HTMLButtonElement>)}
+        >
+          {children}
+        </button>
+      ),
+      Indicator: () => null
+    }
+  )
+
+  return {
+    ...actual,
+    Tabs: TabsMock,
+    Modal: Object.assign(({ children }: { children: React.ReactNode }) => <div>{children}</div>, {
+      Root: ({ state, children }: { state?: { isOpen: boolean }; children: React.ReactNode }) =>
+        state?.isOpen ? <div>{children}</div> : null,
+      Trigger: () => null,
+      Backdrop: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+      Container: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+      Dialog: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+      Header: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+      Heading: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+      Icon: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+      Body: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+      Footer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+      CloseTrigger: () => null
+    }),
+    useOverlayState: (args?: { isOpen?: boolean; onOpenChange?: (open: boolean) => void }) => ({
+      isOpen: args?.isOpen ?? false,
+      setOpen: (v: boolean) => args?.onOpenChange?.(v),
+      open: () => args?.onOpenChange?.(true),
+      close: () => args?.onOpenChange?.(false),
+      toggle: () => args?.onOpenChange?.(!args?.isOpen)
+    })
+  }
+})
+
 function renderWithRouter(initialEntries: string[] = ['/']): ReturnType<typeof render> {
   const router = createMemoryRouter(
     [
       {
         path: '/',
+        element: <Header />
+      },
+      {
+        path: '/timer',
         element: <Header />
       }
     ],
@@ -225,6 +304,46 @@ describe('Header', () => {
       renderWithRouter(['/'])
       expect(screen.getByRole('button', { name: '關閉投影' })).toBeInTheDocument()
       await i18n.changeLanguage('en')
+    })
+  })
+
+  describe('route-aware ModeSelector', () => {
+    it('shows ModeSelector tabs on /timer route', async () => {
+      await i18n.changeLanguage('en')
+      useTimerStore.setState({ mode: 'timer' })
+      const { useProjection } = await import('@renderer/contexts/ProjectionContext')
+      vi.mocked(useProjection).mockReturnValue({
+        isProjectionOpen: false,
+        isProjectionBlanked: true,
+        openProjection: vi.fn(),
+        closeProjection: vi.fn(),
+        blankProjection: vi.fn(),
+        project: vi.fn(),
+        send: vi.fn(),
+        on: vi.fn()
+      })
+      renderWithRouter(['/timer'])
+      expect(screen.getByTestId('mode-timer')).toBeInTheDocument()
+      expect(screen.getByTestId('mode-clock')).toBeInTheDocument()
+      expect(screen.getByTestId('mode-both')).toBeInTheDocument()
+      expect(screen.getByTestId('mode-stopwatch')).toBeInTheDocument()
+    })
+
+    it('does not show ModeSelector on non-timer routes', async () => {
+      await i18n.changeLanguage('en')
+      const { useProjection } = await import('@renderer/contexts/ProjectionContext')
+      vi.mocked(useProjection).mockReturnValue({
+        isProjectionOpen: false,
+        isProjectionBlanked: true,
+        openProjection: vi.fn(),
+        closeProjection: vi.fn(),
+        blankProjection: vi.fn(),
+        project: vi.fn(),
+        send: vi.fn(),
+        on: vi.fn()
+      })
+      renderWithRouter(['/'])
+      expect(screen.queryByTestId('mode-timer')).not.toBeInTheDocument()
     })
   })
 })

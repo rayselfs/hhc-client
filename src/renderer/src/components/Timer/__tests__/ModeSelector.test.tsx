@@ -6,6 +6,59 @@ import i18n from '@renderer/i18n'
 import ModeSelector from '@renderer/components/Timer/ModeSelector'
 import { useTimerStore } from '@renderer/stores/timer'
 
+vi.mock('@heroui/react', async () => {
+  const actual = await vi.importActual<typeof import('@heroui/react')>('@heroui/react')
+
+  let capturedOnSelectionChange: ((key: string) => void) | undefined
+  let capturedSelectedKey: string | undefined
+
+  const TabsMock = Object.assign(
+    ({
+      children,
+      selectedKey,
+      onSelectionChange
+    }: {
+      children: React.ReactNode
+      selectedKey?: string
+      onSelectionChange?: (key: string) => void
+    }) => {
+      capturedOnSelectionChange = onSelectionChange
+      capturedSelectedKey = selectedKey
+      return <div role="tablist">{children}</div>
+    },
+    {
+      List: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+      Tab: ({
+        children,
+        id,
+        'data-testid': dataTestId,
+        ...rest
+      }: {
+        children: React.ReactNode
+        id?: string
+        'data-testid'?: string
+        [key: string]: unknown
+      }) => (
+        <button
+          role="tab"
+          aria-selected={capturedSelectedKey === id}
+          data-testid={dataTestId}
+          onClick={() => id && capturedOnSelectionChange?.(id)}
+          {...(rest as React.ButtonHTMLAttributes<HTMLButtonElement>)}
+        >
+          {children}
+        </button>
+      ),
+      Indicator: () => null
+    }
+  )
+
+  return {
+    ...actual,
+    Tabs: TabsMock
+  }
+})
+
 beforeEach(() => {
   useTimerStore.setState({ mode: 'timer' })
 })
@@ -19,7 +72,7 @@ function renderWithI18n(): RenderResult {
 }
 
 describe('ModeSelector', () => {
-  it('renders all 4 mode buttons', () => {
+  it('renders all 4 mode tabs', () => {
     renderWithI18n()
     expect(screen.getByTestId('mode-timer')).toBeInTheDocument()
     expect(screen.getByTestId('mode-clock')).toBeInTheDocument()
@@ -27,13 +80,13 @@ describe('ModeSelector', () => {
     expect(screen.getByTestId('mode-stopwatch')).toBeInTheDocument()
   })
 
-  it('highlights the current mode', () => {
+  it('highlights the current mode tab', () => {
     renderWithI18n()
     expect(screen.getByTestId('mode-timer')).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByTestId('mode-clock')).toHaveAttribute('aria-selected', 'false')
   })
 
-  it('calls setMode when a mode is clicked', async () => {
+  it('calls setMode when a mode tab is clicked', async () => {
     const user = userEvent.setup()
     renderWithI18n()
     await user.click(screen.getByTestId('mode-clock'))

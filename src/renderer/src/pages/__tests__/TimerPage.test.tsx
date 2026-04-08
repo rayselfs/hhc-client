@@ -99,15 +99,6 @@ beforeEach(() => {
 })
 
 describe('TimerPage — TIMER mode', () => {
-  it('renders ModeSelector with all 4 mode tabs', () => {
-    useTimerStore.setState({ mode: 'timer' })
-    renderTimerPage()
-    expect(screen.getByTestId('mode-timer')).toBeInTheDocument()
-    expect(screen.getByTestId('mode-clock')).toBeInTheDocument()
-    expect(screen.getByTestId('mode-both')).toBeInTheDocument()
-    expect(screen.getByTestId('mode-stopwatch')).toBeInTheDocument()
-  })
-
   it('renders TimerDisplay (progressbar) in timer mode', () => {
     useTimerStore.setState({ mode: 'timer' })
     renderTimerPage()
