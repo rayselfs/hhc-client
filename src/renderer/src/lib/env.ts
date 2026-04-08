@@ -1,7 +1,7 @@
 export function isElectron(): boolean {
-  return typeof window !== 'undefined' && 'electron' in window
+  return typeof window !== 'undefined' && 'api' in window && !!window.api
 }
 
 export function isWeb(): boolean {
-  return typeof window !== 'undefined' && !('electron' in window)
+  return !isElectron()
 }

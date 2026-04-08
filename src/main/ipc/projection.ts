@@ -1,38 +1,51 @@
-import { ipcMain } from 'electron'
+import { ipcMain, BrowserWindow } from 'electron'
 import { WindowManager } from '../windowManager'
 import type { ProjectionMessageTuple } from '@shared/projection-messages'
 
-export function registerProjectionHandlers(windowManager: WindowManager): void {
-  ipcMain.handle('projection:check', () => ({
-    exists: windowManager.isProjectionOpen()
-  }))
+function isKnownWindow(wm: WindowManager, event: Electron.IpcMainInvokeEvent): boolean {
+  const senderWindow = BrowserWindow.fromWebContents(event.sender)
+  if (!senderWindow) return false
+  return senderWindow === wm.getMainWindow() || senderWindow === wm.getProjectionWindow()
+}
 
-  ipcMain.handle('projection:ensure', () => {
+function isMainWindow(wm: WindowManager, event: Electron.IpcMainInvokeEvent): boolean {
+  const senderWindow = BrowserWindow.fromWebContents(event.sender)
+  return senderWindow === wm.getMainWindow()
+}
+
+export function registerProjectionHandlers(windowManager: WindowManager): void {
+  ipcMain.handle('projection:check', (event) => {
+    if (!isKnownWindow(windowManager, event)) return { exists: false }
+    return { exists: windowManager.isProjectionOpen() }
+  })
+
+  ipcMain.handle('projection:ensure', (event) => {
+    if (!isMainWindow(windowManager, event)) return { created: false }
     const wasOpen = windowManager.isProjectionOpen()
     if (!wasOpen) {
       windowManager.createProjectionWindow()
     }
-    return {
-      created: !wasOpen
-    }
+    return { created: !wasOpen }
   })
 
-  ipcMain.handle('projection:close', () => {
+  ipcMain.handle('projection:close', (event) => {
+    if (!isMainWindow(windowManager, event)) return { closed: false }
     windowManager.closeProjection()
-    return {
-      closed: true
-    }
+    return { closed: true }
   })
 
-  ipcMain.on('projection:send', (_event, ...args: [...ProjectionMessageTuple]) => {
+  ipcMain.on('projection:send', (event, ...args: [...ProjectionMessageTuple]) => {
+    if (!isMainWindow(windowManager, event)) return
     windowManager.sendToProjection('projection:message', ...args)
   })
 
-  ipcMain.on('projection:send-to-main', (_event, ...args: [...ProjectionMessageTuple]) => {
+  ipcMain.on('projection:send-to-main', (event, ...args: [...ProjectionMessageTuple]) => {
+    if (!isKnownWindow(windowManager, event)) return
     windowManager.sendToMain('projection:message', ...args)
   })
 
-  ipcMain.handle('projection:get-displays', () => {
+  ipcMain.handle('projection:get-displays', (event) => {
+    if (!isMainWindow(windowManager, event)) return []
     const displays = windowManager.getDisplays()
     return displays.map((display) => ({
       id: display.id,

@@ -18,7 +18,12 @@ export class WindowManager {
     return WindowManager.instance
   }
 
-  private getPlatformWindowOptions(): Record<string, unknown> {
+  private getExternalDisplay(): Electron.Display | undefined {
+    const primaryId = screen.getPrimaryDisplay().id
+    return screen.getAllDisplays().find((d) => d.id !== primaryId)
+  }
+
+  private getPlatformWindowOptions(): Partial<Electron.BrowserWindowConstructorOptions> {
     if (process.platform === 'darwin') {
       let trafficLightPosition = { x: 20, y: 18 }
       try {
@@ -49,10 +54,7 @@ export class WindowManager {
   }
 
   createMainWindow(): void {
-    const displays = screen.getAllDisplays()
-    const externalDisplay = displays.find(
-      (display) => display.bounds.x !== 0 || display.bounds.y !== 0
-    )
+    const externalDisplay = this.getExternalDisplay()
     const hasSecondScreen = externalDisplay !== undefined
 
     const platformOptions = this.getPlatformWindowOptions()
@@ -65,7 +67,7 @@ export class WindowManager {
       ...platformOptions,
       webPreferences: {
         preload: join(__dirname, '../preload/index.js'),
-        sandbox: false,
+        sandbox: true,
         contextIsolation: true,
         nodeIntegration: false
       },
@@ -81,11 +83,18 @@ export class WindowManager {
       return { action: 'deny' }
     })
 
-    if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-      this.mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
-    } else {
-      this.mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
-    }
+    const loadPromise =
+      is.dev && process.env['ELECTRON_RENDERER_URL']
+        ? this.mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
+        : this.mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+
+    loadPromise.catch((err) => {
+      console.error('Failed to load main window:', err)
+    })
+
+    this.mainWindow.webContents.on('render-process-gone', (_event, details) => {
+      console.error('Main window renderer crashed:', details.reason)
+    })
 
     this.mainWindow.once('ready-to-show', () => {
       if (process.platform === 'win32' && hasSecondScreen) {
@@ -106,12 +115,9 @@ export class WindowManager {
   createProjectionWindow(): void {
     if (this.isProjectionOpen()) return
 
-    const displays = screen.getAllDisplays()
-    const externalDisplay = displays.find(
-      (display) => display.bounds.x !== 0 || display.bounds.y !== 0
-    )
+    const externalDisplay = this.getExternalDisplay()
     const hasSecondScreen = externalDisplay !== undefined
-    const targetDisplay = externalDisplay || displays[0]
+    const targetDisplay = externalDisplay || screen.getPrimaryDisplay()
 
     this.projectionWindow = new BrowserWindow({
       width: hasSecondScreen ? targetDisplay.bounds.width : 800,
@@ -122,7 +128,7 @@ export class WindowManager {
       frame: !hasSecondScreen,
       webPreferences: {
         preload: join(__dirname, '../preload/index.js'),
-        sandbox: false,
+        sandbox: true,
         contextIsolation: true,
         nodeIntegration: false
       },
@@ -131,13 +137,20 @@ export class WindowManager {
 
     optimizer.watchWindowShortcuts(this.projectionWindow)
 
-    if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-      this.projectionWindow.loadURL(process.env['ELECTRON_RENDERER_URL'] + '#/projection')
-    } else {
-      this.projectionWindow.loadFile(join(__dirname, '../renderer/index.html'), {
-        hash: '/projection'
-      })
-    }
+    const loadPromise =
+      is.dev && process.env['ELECTRON_RENDERER_URL']
+        ? this.projectionWindow.loadURL(process.env['ELECTRON_RENDERER_URL'] + '#/projection')
+        : this.projectionWindow.loadFile(join(__dirname, '../renderer/index.html'), {
+            hash: '/projection'
+          })
+
+    loadPromise.catch((err) => {
+      console.error('Failed to load projection window:', err)
+    })
+
+    this.projectionWindow.webContents.on('render-process-gone', (_event, details) => {
+      console.error('Projection window renderer crashed:', details.reason)
+    })
 
     this.projectionWindow.webContents.on('did-finish-load', () => {
       this.sendToMain('projection:opened')

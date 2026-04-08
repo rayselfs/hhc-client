@@ -5,6 +5,12 @@ import { registerProjectionHandlers } from './ipc/projection'
 
 const wm = WindowManager.getInstance()
 
+function isKnownWindow(event: Electron.IpcMainInvokeEvent): boolean {
+  const senderWindow = BrowserWindow.fromWebContents(event.sender)
+  if (!senderWindow) return false
+  return senderWindow === wm.getMainWindow() || senderWindow === wm.getProjectionWindow()
+}
+
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.electron')
 
@@ -12,12 +18,16 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  ipcMain.handle('theme:get', () => ({
-    source: nativeTheme.themeSource,
-    shouldUseDarkColors: nativeTheme.shouldUseDarkColors
-  }))
+  ipcMain.handle('theme:get', (event) => {
+    if (!isKnownWindow(event)) return { source: 'system', shouldUseDarkColors: false }
+    return {
+      source: nativeTheme.themeSource,
+      shouldUseDarkColors: nativeTheme.shouldUseDarkColors
+    }
+  })
 
-  ipcMain.handle('theme:set', (_event, theme: string) => {
+  ipcMain.handle('theme:set', (event, theme: string) => {
+    if (!isKnownWindow(event)) return
     if (theme === 'light' || theme === 'dark' || theme === 'system') {
       nativeTheme.themeSource = theme
     }
