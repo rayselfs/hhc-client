@@ -136,35 +136,165 @@ describe('TimerAdapter', () => {
 
   describe('ElectronTimerAdapter', () => {
     let adapter: ElectronTimerAdapter
+    let mockTimerCommand: ReturnType<typeof vi.fn>
+    let mockOnTimerTick: ReturnType<typeof vi.fn>
+    let mockCleanup: ReturnType<typeof vi.fn>
 
     beforeEach(() => {
+      mockTimerCommand = vi.fn()
+      mockCleanup = vi.fn()
+      mockOnTimerTick = vi.fn().mockReturnValue(mockCleanup)
+
+      vi.stubGlobal('window', {
+        api: {
+          timer: {
+            timerCommand: mockTimerCommand,
+            onTimerTick: mockOnTimerTick,
+            timerGetState: vi.fn(),
+            timerInitialize: vi.fn()
+          }
+        }
+      })
+
       adapter = new ElectronTimerAdapter()
     })
 
-    it('throws when sendCommand is called', () => {
+    it('sendCommand calls window.api.timer.timerCommand', () => {
       const cmd: WorkerIncomingMessage = { type: 'start', durationMs: 5000 }
-      expect(() => adapter.sendCommand(cmd)).toThrow(
-        'ElectronTimerAdapter not yet wired — implement in T27'
-      )
+      adapter.sendCommand(cmd)
+      expect(mockTimerCommand).toHaveBeenCalledWith({ type: 'start' })
     })
 
-    it('accepts onTick callback (stub)', () => {
-      const callback = vi.fn()
-      expect(() => adapter.onTick(callback)).not.toThrow()
+    it('sendCommand maps addTime ms to seconds', () => {
+      const cmd: WorkerIncomingMessage = { type: 'addTime', ms: 30000 }
+      adapter.sendCommand(cmd)
+      expect(mockTimerCommand).toHaveBeenCalledWith({ type: 'addTime', seconds: 30 })
     })
 
-    it('accepts onFinished callback (stub)', () => {
-      const callback = vi.fn()
-      expect(() => adapter.onFinished(callback)).not.toThrow()
+    it('sendCommand maps removeTime ms to seconds', () => {
+      const cmd: WorkerIncomingMessage = { type: 'removeTime', ms: 10000 }
+      adapter.sendCommand(cmd)
+      expect(mockTimerCommand).toHaveBeenCalledWith({ type: 'removeTime', seconds: 10 })
     })
 
-    it('accepts onStopwatchTick callback (stub)', () => {
-      const callback = vi.fn()
-      expect(() => adapter.onStopwatchTick(callback)).not.toThrow()
+    it('onTick registers via window.api.timer.onTimerTick', () => {
+      const tickCb = vi.fn()
+      adapter.onTick(tickCb)
+      expect(mockOnTimerTick).toHaveBeenCalledOnce()
     })
 
-    it('accepts dispose call (stub)', () => {
-      expect(() => adapter.dispose()).not.toThrow()
+    it('onTick callback receives remainingMs and progress from payload', () => {
+      const tickCb = vi.fn()
+      adapter.onTick(tickCb)
+
+      const payloadHandler = mockOnTimerTick.mock.calls[0][0]
+      payloadHandler({
+        mode: 'timer',
+        remainingSeconds: 90,
+        phase: 'main',
+        mainDisplay: '01:30',
+        subDisplay: null,
+        progress: 0.5,
+        overtimeSeconds: 0,
+        overtimeMessage: null
+      })
+
+      expect(tickCb).toHaveBeenCalledWith(90000, 0.5)
+    })
+
+    it('onFinished fires when phase transitions to overtime', () => {
+      const finishedCb = vi.fn()
+      adapter.onFinished(finishedCb)
+
+      const payloadHandler = mockOnTimerTick.mock.calls[0][0]
+
+      payloadHandler({
+        mode: 'timer',
+        remainingSeconds: 0,
+        phase: 'overtime',
+        mainDisplay: '00:00',
+        subDisplay: null,
+        progress: 1,
+        overtimeSeconds: 1,
+        overtimeMessage: null
+      })
+
+      expect(finishedCb).toHaveBeenCalledOnce()
+    })
+
+    it('onFinished does not fire again on repeated overtime ticks', () => {
+      const finishedCb = vi.fn()
+      adapter.onFinished(finishedCb)
+
+      const payloadHandler = mockOnTimerTick.mock.calls[0][0]
+      const overtimePayload = {
+        mode: 'timer' as const,
+        remainingSeconds: 0,
+        phase: 'overtime' as const,
+        mainDisplay: '00:00',
+        subDisplay: null,
+        progress: 1,
+        overtimeSeconds: 2,
+        overtimeMessage: null
+      }
+
+      payloadHandler(overtimePayload)
+      payloadHandler({ ...overtimePayload, overtimeSeconds: 3 })
+
+      expect(finishedCb).toHaveBeenCalledOnce()
+    })
+
+    it('onStopwatchTick fires when mode is stopwatch', () => {
+      const stopwatchCb = vi.fn()
+      adapter.onStopwatchTick(stopwatchCb)
+
+      const payloadHandler = mockOnTimerTick.mock.calls[0][0]
+      payloadHandler({
+        mode: 'stopwatch',
+        remainingSeconds: 0,
+        phase: 'idle',
+        mainDisplay: '00:00',
+        subDisplay: null,
+        progress: 0,
+        overtimeSeconds: 0,
+        overtimeMessage: null
+      })
+
+      expect(stopwatchCb).toHaveBeenCalledWith(0)
+    })
+
+    it('onTimerTick listener is registered only once across multiple registrations', () => {
+      adapter.onTick(vi.fn())
+      adapter.onFinished(vi.fn())
+      adapter.onStopwatchTick(vi.fn())
+      expect(mockOnTimerTick).toHaveBeenCalledOnce()
+    })
+
+    it('dispose calls cleanup fn returned by onTimerTick', () => {
+      adapter.onTick(vi.fn())
+      adapter.dispose()
+      expect(mockCleanup).toHaveBeenCalledOnce()
+    })
+
+    it('dispose clears callbacks so no further ticks fire', () => {
+      const tickCb = vi.fn()
+      adapter.onTick(tickCb)
+
+      const payloadHandler = mockOnTimerTick.mock.calls[0][0]
+      adapter.dispose()
+
+      payloadHandler({
+        mode: 'timer',
+        remainingSeconds: 60,
+        phase: 'main',
+        mainDisplay: '01:00',
+        subDisplay: null,
+        progress: 0.3,
+        overtimeSeconds: 0,
+        overtimeMessage: null
+      })
+
+      expect(tickCb).not.toHaveBeenCalled()
     })
   })
 })
