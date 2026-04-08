@@ -940,12 +940,11 @@ describe('preset management', () => {
 
   it('savePresets persists to localStorage', () => {
     useTimerStore.getState().addPreset('12m', 720)
-    const presets = useTimerStore.getState().presets
     const stored = localStorage.getItem('hhc-timer-presets')
     expect(stored).toBeDefined()
     const parsed = JSON.parse(stored!)
     expect(Array.isArray(parsed)).toBe(true)
-    expect(parsed.some((p: (typeof presets)[0]) => p.name === '12m')).toBe(true)
+    expect(parsed.some((p: { name: string }) => p.name === '12m')).toBe(true)
   })
 
   it('loadPresets reads and restores from localStorage', () => {

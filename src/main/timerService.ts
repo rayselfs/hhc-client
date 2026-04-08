@@ -43,7 +43,7 @@ function computeProgress(remainingSeconds: number, totalDuration: number): numbe
   return Math.max(0, Math.min(1, remainingSeconds / totalDuration))
 }
 
-interface InternalTimerSettings extends TimerSettings {}
+type InternalTimerSettings = TimerSettings
 
 interface InternalTimerState {
   status: TimerState['status']

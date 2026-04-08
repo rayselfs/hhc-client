@@ -22,7 +22,7 @@ export default function TimerDisplay({
   size = 280,
   onTimeClick,
   className
-}: TimerDisplayProps) {
+}: TimerDisplayProps): React.JSX.Element {
   const isWarning = phase === 'warning'
   const isOvertime = phase === 'overtime'
   const color = isWarning ? 'danger' : 'accent'

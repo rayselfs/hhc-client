@@ -12,7 +12,10 @@ vi.mock('electron', () => ({
 import { BrowserWindow, ipcMain } from 'electron'
 import { TimerService } from '../timerService'
 
-function makeMockWindow() {
+function makeMockWindow(): {
+  isDestroyed: () => boolean
+  webContents: { send: ReturnType<typeof vi.fn> }
+} {
   return {
     isDestroyed: () => false,
     webContents: { send: vi.fn() }

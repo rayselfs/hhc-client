@@ -8,7 +8,7 @@ interface ModeSelectorProps {
 
 const MODES: TimerMode[] = ['timer', 'clock', 'both', 'stopwatch']
 
-export default function ModeSelector({ className }: ModeSelectorProps) {
+export default function ModeSelector({ className }: ModeSelectorProps): React.JSX.Element {
   const { t } = useTranslation()
   const mode = useTimerStore((s) => s.mode)
   const setMode = useTimerStore((s) => s.setMode)

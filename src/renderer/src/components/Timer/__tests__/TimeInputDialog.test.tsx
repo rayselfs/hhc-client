@@ -42,7 +42,7 @@ vi.mock('@heroui/react', async () => {
 const onClose = vi.fn()
 const onConfirm = vi.fn()
 
-function setup(isOpen = true, initialValue?: string) {
+function setup(isOpen = true, initialValue?: string): void {
   render(
     <TimeInputDialog
       isOpen={isOpen}

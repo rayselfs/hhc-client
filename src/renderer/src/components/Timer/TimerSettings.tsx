@@ -25,22 +25,22 @@ export default function TimerSettings({ className }: TimerSettingsProps): React.
   const reminderError =
     reminderEnabled && reminderDuration >= totalDuration ? t('timer.reminder.error') : null
 
-  const handleReminderToggle = (enabled: boolean) => {
+  const handleReminderToggle = (enabled: boolean): void => {
     setReminder(enabled, reminderDuration)
   }
 
-  const handleReminderDurationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleReminderDurationChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
     const val = parseInt(e.target.value, 10)
     if (!isNaN(val) && val >= 0) {
       setReminder(reminderEnabled, val)
     }
   }
 
-  const handleOvertimeMessageToggle = (enabled: boolean) => {
+  const handleOvertimeMessageToggle = (enabled: boolean): void => {
     setOvertimeMessage(enabled, overtimeMessage)
   }
 
-  const handleOvertimeMessageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleOvertimeMessageChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
     const text = e.target.value.slice(0, MAX_OVERTIME_MESSAGE_LENGTH)
     setOvertimeMessage(overtimeMessageEnabled, text)
   }

@@ -1,4 +1,5 @@
 import { render, screen, act } from '@testing-library/react'
+import type { RenderResult } from '@testing-library/react'
 import { I18nextProvider } from 'react-i18next'
 import i18n from '@renderer/i18n'
 import { useTimerStore, DEFAULT_SETTINGS, DEFAULT_STATE } from '@renderer/stores/timer'
@@ -71,7 +72,7 @@ vi.mock('@heroui/react', async () => {
 
 import TimerPage from '../TimerPage'
 
-function renderTimerPage() {
+function renderTimerPage(): RenderResult {
   return render(
     <I18nextProvider i18n={i18n}>
       <TimerPage />

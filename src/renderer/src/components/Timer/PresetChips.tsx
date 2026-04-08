@@ -1,7 +1,7 @@
-import { useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Chip, Button } from '@heroui/react'
-import { Plus, X } from 'lucide-react'
+import { Chip, Button, Input } from '@heroui/react'
+import { Plus, X, Check } from 'lucide-react'
 import { useTimerStore } from '@renderer/stores/timer'
 
 interface PresetChipsProps {
@@ -17,15 +17,35 @@ export default function PresetChips({ className }: PresetChipsProps): React.JSX.
   const addPreset = useTimerStore((s) => s.addPreset)
   const loadPresets = useTimerStore((s) => s.loadPresets)
 
+  const [isAdding, setIsAdding] = useState(false)
+  const [newPresetName, setNewPresetName] = useState('')
+
   useEffect(() => {
     loadPresets()
   }, [loadPresets])
 
-  const handleAdd = () => {
-    const name = window.prompt(t('timer.addPreset'))
-    if (name && name.trim()) {
-      addPreset(name.trim(), totalDuration)
+  const handleAddOpen = (): void => {
+    setNewPresetName('')
+    setIsAdding(true)
+  }
+
+  const handleAddConfirm = (): void => {
+    const name = newPresetName.trim()
+    if (name) {
+      addPreset(name, totalDuration)
     }
+    setIsAdding(false)
+    setNewPresetName('')
+  }
+
+  const handleAddCancel = (): void => {
+    setIsAdding(false)
+    setNewPresetName('')
+  }
+
+  const handleAddKeyDown = (e: React.KeyboardEvent): void => {
+    if (e.key === 'Enter') handleAddConfirm()
+    if (e.key === 'Escape') handleAddCancel()
   }
 
   return (
@@ -58,9 +78,29 @@ export default function PresetChips({ className }: PresetChipsProps): React.JSX.
             </button>
           </Chip>
         ))}
-        <Button variant="ghost" onPress={handleAdd} aria-label={t('timer.addPreset')}>
-          <Plus className="size-4" />
-        </Button>
+        {isAdding ? (
+          <div className="flex items-center gap-1">
+            <Input
+              autoFocus
+              value={newPresetName}
+              onChange={(e) => setNewPresetName(e.target.value)}
+              onKeyDown={handleAddKeyDown}
+              placeholder={t('timer.addPreset')}
+              aria-label={t('timer.addPreset')}
+              className="w-28"
+            />
+            <Button variant="ghost" onPress={handleAddConfirm} aria-label="Confirm Add Preset">
+              <Check className="size-4" />
+            </Button>
+            <Button variant="ghost" onPress={handleAddCancel} aria-label="Cancel Add Preset">
+              <X className="size-4" />
+            </Button>
+          </div>
+        ) : (
+          <Button variant="ghost" onPress={handleAddOpen} aria-label={t('timer.addPreset')}>
+            <Plus className="size-4" />
+          </Button>
+        )}
       </div>
     </div>
   )

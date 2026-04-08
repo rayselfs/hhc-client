@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import type { RenderResult } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { I18nextProvider } from 'react-i18next'
 import i18n from '@renderer/i18n'
@@ -19,7 +20,7 @@ beforeEach(() => {
   })
 })
 
-function renderWithI18n() {
+function renderWithI18n(): RenderResult {
   return render(
     <I18nextProvider i18n={i18n}>
       <TimerSettings />
@@ -27,7 +28,7 @@ function renderWithI18n() {
   )
 }
 
-async function openPanel(user: ReturnType<typeof userEvent.setup>) {
+async function openPanel(user: ReturnType<typeof userEvent.setup>): Promise<void> {
   const btn = screen.getByRole('button', { name: /settings/i })
   await user.click(btn)
 }

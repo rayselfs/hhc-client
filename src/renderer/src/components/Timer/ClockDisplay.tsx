@@ -13,7 +13,10 @@ function getCurrentTime(): string {
   return `${hh}:${mm}:${ss}`
 }
 
-export default function ClockDisplay({ size = 64, className }: ClockDisplayProps) {
+export default function ClockDisplay({
+  size = 64,
+  className
+}: ClockDisplayProps): React.JSX.Element {
   const [time, setTime] = useState(getCurrentTime)
 
   useEffect(() => {

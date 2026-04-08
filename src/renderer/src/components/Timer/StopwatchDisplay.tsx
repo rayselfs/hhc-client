@@ -8,7 +8,7 @@ export default function StopwatchDisplay({
   formattedTime,
   size = 64,
   className
-}: StopwatchDisplayProps) {
+}: StopwatchDisplayProps): React.JSX.Element {
   return (
     <div
       className={`font-mono font-bold tabular-nums ${className ?? ''}`}

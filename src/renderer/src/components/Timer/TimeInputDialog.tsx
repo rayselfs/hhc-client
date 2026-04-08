@@ -1,5 +1,5 @@
 import { Modal, useOverlayState, Button, Input, Label } from '@heroui/react'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { parseDuration } from '@renderer/lib/parse-duration'
 
 interface TimeInputDialogProps {
@@ -15,22 +15,20 @@ export default function TimeInputDialog({
   onConfirm,
   initialValue = ''
 }: TimeInputDialogProps): React.JSX.Element {
-  const state = useOverlayState({
-    isOpen,
-    onOpenChange: (open) => {
-      if (!open) onClose()
-    }
-  })
-
   const [value, setValue] = useState(initialValue)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (isOpen) {
-      setValue(initialValue)
-      setError(null)
+  const state = useOverlayState({
+    isOpen,
+    onOpenChange: (open) => {
+      if (open) {
+        setValue(initialValue)
+        setError(null)
+      } else {
+        onClose()
+      }
     }
-  }, [isOpen, initialValue])
+  })
 
   const handleConfirm = (): void => {
     const seconds = parseDuration(value.trim())

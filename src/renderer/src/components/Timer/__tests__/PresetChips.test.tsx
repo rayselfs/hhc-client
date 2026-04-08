@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import type { RenderResult } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { I18nextProvider } from 'react-i18next'
 import i18n from '@renderer/i18n'
@@ -12,7 +13,14 @@ const SAMPLE_PRESETS: TimerPreset[] = [
   { id: 'preset-3m', name: '3m', durationSeconds: 180, mode: 'timer' }
 ]
 
-function mockLocalStorage() {
+function mockLocalStorage(): {
+  getItem: ReturnType<typeof vi.fn>
+  setItem: ReturnType<typeof vi.fn>
+  removeItem: ReturnType<typeof vi.fn>
+  clear: ReturnType<typeof vi.fn>
+  length: number
+  key: ReturnType<typeof vi.fn>
+} {
   return {
     getItem: vi.fn().mockReturnValue(null),
     setItem: vi.fn(),
@@ -36,7 +44,7 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-function renderWithI18n() {
+function renderWithI18n(): RenderResult {
   return render(
     <I18nextProvider i18n={i18n}>
       <PresetChips />
@@ -106,33 +114,37 @@ describe('PresetChips — removePreset', () => {
 })
 
 describe('PresetChips — addPreset', () => {
-  it('clicking add button prompts for name and calls addPreset', async () => {
+  it('clicking add button shows inline input and typing name + confirming calls addPreset', async () => {
     const user = userEvent.setup()
     const addPresetSpy = vi.fn()
     useTimerStore.setState({ addPreset: addPresetSpy, totalDuration: 300 } as never)
-    vi.stubGlobal('prompt', vi.fn().mockReturnValue('My Preset'))
     renderWithI18n()
     await user.click(screen.getByRole('button', { name: 'Add Preset' }))
+    const input = screen.getByRole('textbox', { name: 'Add Preset' })
+    await user.type(input, 'My Preset')
+    await user.click(screen.getByRole('button', { name: 'Confirm Add Preset' }))
     expect(addPresetSpy).toHaveBeenCalledWith('My Preset', 300)
   })
 
-  it('does not call addPreset when prompt is cancelled', async () => {
+  it('does not call addPreset when cancelled without typing', async () => {
     const user = userEvent.setup()
     const addPresetSpy = vi.fn()
     useTimerStore.setState({ addPreset: addPresetSpy } as never)
-    vi.stubGlobal('prompt', vi.fn().mockReturnValue(null))
     renderWithI18n()
     await user.click(screen.getByRole('button', { name: 'Add Preset' }))
+    await user.click(screen.getByRole('button', { name: 'Cancel Add Preset' }))
     expect(addPresetSpy).not.toHaveBeenCalled()
   })
 
-  it('does not call addPreset when prompt returns empty string', async () => {
+  it('does not call addPreset when confirming with empty/whitespace name', async () => {
     const user = userEvent.setup()
     const addPresetSpy = vi.fn()
     useTimerStore.setState({ addPreset: addPresetSpy } as never)
-    vi.stubGlobal('prompt', vi.fn().mockReturnValue('   '))
     renderWithI18n()
     await user.click(screen.getByRole('button', { name: 'Add Preset' }))
+    const input = screen.getByRole('textbox', { name: 'Add Preset' })
+    await user.type(input, '   ')
+    await user.click(screen.getByRole('button', { name: 'Confirm Add Preset' }))
     expect(addPresetSpy).not.toHaveBeenCalled()
   })
 })
