@@ -1,17 +1,44 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
+import type { ProjectionChannel, ProjectionPayload } from '../shared/projection-messages'
+
+const themeApi = {
+  get: () =>
+    ipcRenderer.invoke('theme:get') as Promise<{
+      source: string
+      shouldUseDarkColors: boolean
+    }>,
+  set: (theme: 'light' | 'dark' | 'system') => ipcRenderer.invoke('theme:set', theme),
+  onChanged: (callback: (data: { shouldUseDarkColors: boolean }) => void) => {
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      data: { shouldUseDarkColors: boolean }
+    ): void => {
+      callback(data)
+    }
+    ipcRenderer.on('theme:changed', handler)
+    return () => ipcRenderer.removeListener('theme:changed', handler)
+  }
+}
 
 const projectionApi = {
   check: () => ipcRenderer.invoke('projection:check'),
   ensure: () => ipcRenderer.invoke('projection:ensure'),
   close: () => ipcRenderer.invoke('projection:close'),
-  send: (channel: string, data: unknown) => ipcRenderer.send('projection:send', channel, data),
-  sendToMain: (channel: string, data: unknown) =>
+  send: <C extends ProjectionChannel>(channel: C, data: ProjectionPayload<C>) =>
+    ipcRenderer.send('projection:send', channel, data),
+  sendToMain: <C extends ProjectionChannel>(channel: C, data: ProjectionPayload<C>) =>
     ipcRenderer.send('projection:send-to-main', channel, data),
   getDisplays: () => ipcRenderer.invoke('projection:get-displays'),
-  onProjectionMessage: (callback: (channel: string, data: unknown) => void) => {
-    const handler = (_event: Electron.IpcRendererEvent, channel: string, data: unknown): void => {
-      callback(channel, data)
+  onProjectionMessage: (
+    callback: (channel: ProjectionChannel, data: ProjectionPayload<ProjectionChannel>) => void
+  ) => {
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      channel: ProjectionChannel,
+      data: ProjectionPayload<typeof channel>
+    ): void => {
+      callback(channel, data as ProjectionPayload<ProjectionChannel>)
     }
     ipcRenderer.on('projection:message', handler)
     return () => ipcRenderer.removeListener('projection:message', handler)
@@ -32,7 +59,7 @@ const projectionApi = {
   }
 }
 
-const api = { projection: projectionApi }
+const api = { projection: projectionApi, theme: themeApi }
 
 // Use `contextBridge` APIs to expose Electron APIs to
 // renderer only if context isolation is enabled, otherwise

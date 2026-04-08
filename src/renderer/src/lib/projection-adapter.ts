@@ -27,7 +27,7 @@ class ElectronProjectionAdapter implements ProjectionAdapter {
     handler: (data: ProjectionPayload<C>) => void
   ): () => void {
     const unsubscribe = this.api.onProjectionMessage((ch, d) => {
-      if (ch === channel) handler(d as ProjectionPayload<C>)
+      if ((ch as string) === channel) handler(d as ProjectionPayload<C>)
     })
     this.unsubscribers.push(unsubscribe)
     return unsubscribe

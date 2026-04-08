@@ -1,5 +1,6 @@
 import { ipcMain } from 'electron'
 import { WindowManager } from '../windowManager'
+import type { ProjectionChannel, ProjectionPayload } from '@shared/projection-messages'
 
 export function registerProjectionHandlers(windowManager: WindowManager): void {
   ipcMain.handle('projection:check', () => ({
@@ -23,13 +24,19 @@ export function registerProjectionHandlers(windowManager: WindowManager): void {
     }
   })
 
-  ipcMain.on('projection:send', (_event, channel: string, data: unknown) => {
-    windowManager.sendToProjection('projection:message', channel, data)
-  })
+  ipcMain.on(
+    'projection:send',
+    (_event, channel: ProjectionChannel, data: ProjectionPayload<typeof channel>) => {
+      windowManager.sendToProjection('projection:message', channel, data)
+    }
+  )
 
-  ipcMain.on('projection:send-to-main', (_event, channel: string, data: unknown) => {
-    windowManager.sendToMain('projection:message', channel, data)
-  })
+  ipcMain.on(
+    'projection:send-to-main',
+    (_event, channel: ProjectionChannel, data: ProjectionPayload<typeof channel>) => {
+      windowManager.sendToMain('projection:message', channel, data)
+    }
+  )
 
   ipcMain.handle('projection:get-displays', () => {
     const displays = windowManager.getDisplays()

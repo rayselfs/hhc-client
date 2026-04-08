@@ -1,11 +1,12 @@
 import { BrowserWindow, screen, app, shell } from 'electron'
 import { join } from 'path'
 import { optimizer, is } from '@electron-toolkit/utils'
+import type { IpcMainToRendererChannel, IpcMainToRendererMap } from '@shared/ipc-channels'
 
 export class WindowManager {
   private static instance: WindowManager
-  public mainWindow: BrowserWindow | null = null
-  public projectionWindow: BrowserWindow | null = null
+  private mainWindow: BrowserWindow | null = null
+  private projectionWindow: BrowserWindow | null = null
 
   // eslint-disable-next-line @typescript-eslint/no-empty-function -- singleton pattern requires private constructor
   private constructor() {}
@@ -130,10 +131,6 @@ export class WindowManager {
 
     optimizer.watchWindowShortcuts(this.projectionWindow)
 
-    if (!hasSecondScreen) {
-      this.sendToMain('projection:no-second-screen', null)
-    }
-
     if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
       this.projectionWindow.loadURL(process.env['ELECTRON_RENDERER_URL'] + '#/projection')
     } else {
@@ -143,11 +140,11 @@ export class WindowManager {
     }
 
     this.projectionWindow.webContents.on('did-finish-load', () => {
-      this.sendToMain('projection:opened', null)
+      this.sendToMain('projection:opened')
     })
 
     this.projectionWindow.on('closed', () => {
-      this.sendToMain('projection:closed', null)
+      this.sendToMain('projection:closed')
       this.projectionWindow = null
     })
   }
@@ -160,13 +157,19 @@ export class WindowManager {
     return this.projectionWindow
   }
 
-  sendToProjection(channel: string, ...args: unknown[]): void {
+  sendToProjection<C extends IpcMainToRendererChannel>(
+    channel: C,
+    ...args: IpcMainToRendererMap[C]
+  ): void {
     if (this.projectionWindow && !this.projectionWindow.isDestroyed()) {
       this.projectionWindow.webContents.send(channel, ...args)
     }
   }
 
-  sendToMain(channel: string, ...args: unknown[]): void {
+  sendToMain<C extends IpcMainToRendererChannel>(
+    channel: C,
+    ...args: IpcMainToRendererMap[C]
+  ): void {
     if (this.mainWindow && !this.mainWindow.isDestroyed()) {
       this.mainWindow.webContents.send(channel, ...args)
     }
