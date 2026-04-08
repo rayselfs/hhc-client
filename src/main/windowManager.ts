@@ -23,48 +23,15 @@ export class WindowManager {
     return screen.getAllDisplays().find((d) => d.id !== primaryId)
   }
 
-  private getPlatformWindowOptions(): Partial<Electron.BrowserWindowConstructorOptions> {
-    if (process.platform === 'darwin') {
-      let trafficLightPosition = { x: 20, y: 18 }
-      try {
-        const major = parseInt(String(process.getSystemVersion()).split('.')[0], 10)
-        if (!Number.isNaN(major) && major >= 26) {
-          trafficLightPosition = { x: 20, y: 20 }
-        }
-      } catch {
-        trafficLightPosition = { x: 20, y: 18 }
-      }
-
-      return {
-        titleBarStyle: 'hidden',
-        trafficLightPosition,
-        transparent: true
-      }
-    }
-
-    if (process.platform === 'win32') {
-      return {
-        frame: false,
-        titleBarStyle: 'hidden',
-        roundedCorners: true
-      }
-    }
-
-    return {}
-  }
-
   createMainWindow(): void {
     const externalDisplay = this.getExternalDisplay()
     const hasSecondScreen = externalDisplay !== undefined
-
-    const platformOptions = this.getPlatformWindowOptions()
 
     this.mainWindow = new BrowserWindow({
       width: 1200,
       height: 800,
       show: false,
       autoHideMenuBar: true,
-      ...platformOptions,
       webPreferences: {
         preload: join(__dirname, '../preload/index.js'),
         sandbox: true,
