@@ -9,7 +9,6 @@ import type { TimerTickPayload, StopwatchTickPayload } from '@shared/types/timer
 
 export default function ProjectionPage(): React.JSX.Element {
   const [showDefault, setShowDefault] = useState(true)
-  const [text, setText] = useState('')
   const [timerData, setTimerData] = useState<TimerTickPayload | null>(null)
   const [stopwatchData, setStopwatchData] = useState<StopwatchTickPayload | null>(null)
 
@@ -18,10 +17,6 @@ export default function ProjectionPage(): React.JSX.Element {
 
     const unsubBlank = adapter.on('__system:blank', ({ showDefault: blank }) => {
       setShowDefault(blank)
-    })
-
-    const unsubText = adapter.on('projection:text', (data) => {
-      setText(data)
     })
 
     const unsubTimerTick = adapter.on('timer:tick', (data) => {
@@ -56,7 +51,6 @@ export default function ProjectionPage(): React.JSX.Element {
 
     return () => {
       unsubBlank()
-      unsubText()
       unsubTimerTick()
       unsubStopwatch()
       unsubClose()
@@ -76,11 +70,7 @@ export default function ProjectionPage(): React.JSX.Element {
     )
   }
 
-  return (
-    <div className="flex h-screen w-full items-center justify-center bg-black">
-      {text ? <p className="text-white text-6xl font-bold">{text}</p> : <DefaultProjection />}
-    </div>
-  )
+  return <DefaultProjection />
 }
 
 function renderTimerContent(

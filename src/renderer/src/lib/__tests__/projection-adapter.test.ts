@@ -59,19 +59,20 @@ describe('BroadcastChannelAdapter', () => {
 
   it('send() calls bc.postMessage with { channel, data, sender }', () => {
     const adapter = createProjectionAdapter()
-    adapter.send('projection:text', 'hello')
+    const payload = { message: 'hello' }
+    adapter.send('timer:overtime-message', payload)
 
     expect(mockPostMessage).toHaveBeenCalledOnce()
     const arg = mockPostMessage.mock.calls[0][0]
-    expect(arg.channel).toBe('projection:text')
-    expect(arg.data).toBe('hello')
+    expect(arg.channel).toBe('timer:overtime-message')
+    expect(arg.data).toEqual(payload)
     expect(typeof arg.sender).toBe('string')
     expect(arg.sender.length).toBeGreaterThan(0)
   })
 
   it('on() registers a message event listener on bc', () => {
     const adapter = createProjectionAdapter()
-    adapter.on('projection:text', vi.fn())
+    adapter.on('timer:overtime-message', vi.fn())
 
     expect(mockAddEventListener).toHaveBeenCalledOnce()
     expect(mockAddEventListener.mock.calls[0][0]).toBe('message')
@@ -80,28 +81,30 @@ describe('BroadcastChannelAdapter', () => {
   it('on() — handler is called when message arrives with matching channel and different sender', () => {
     const adapter = createProjectionAdapter()
     const handler = vi.fn()
-    adapter.on('projection:text', handler)
+    adapter.on('timer:overtime-message', handler)
 
+    const payload = { message: 'hello' }
     const [, listener] = mockAddEventListener.mock.calls[0] as [string, (e: MessageEvent) => void]
     listener({
-      data: { channel: 'projection:text', data: 'hello', sender: 'other-window-id' }
+      data: { channel: 'timer:overtime-message', data: payload, sender: 'other-window-id' }
     } as MessageEvent)
 
     expect(handler).toHaveBeenCalledOnce()
-    expect(handler).toHaveBeenCalledWith('hello')
+    expect(handler).toHaveBeenCalledWith(payload)
   })
 
   it('on() — handler is NOT called when sender === own windowId (self-filter)', () => {
     const adapter = createProjectionAdapter()
     const handler = vi.fn()
-    adapter.on('projection:text', handler)
+    adapter.on('timer:overtime-message', handler)
 
-    adapter.send('projection:text', 'test')
+    const payload = { message: 'test' }
+    adapter.send('timer:overtime-message', payload)
     const ownSender = mockPostMessage.mock.calls[0][0].sender
 
     const [, listener] = mockAddEventListener.mock.calls[0] as [string, (e: MessageEvent) => void]
     listener({
-      data: { channel: 'projection:text', data: 'hello', sender: ownSender }
+      data: { channel: 'timer:overtime-message', data: { message: 'hello' }, sender: ownSender }
     } as MessageEvent)
 
     expect(handler).not.toHaveBeenCalled()
@@ -110,7 +113,7 @@ describe('BroadcastChannelAdapter', () => {
   it('on() — handler is NOT called when channel does not match', () => {
     const adapter = createProjectionAdapter()
     const handler = vi.fn()
-    adapter.on('projection:text', handler)
+    adapter.on('timer:overtime-message', handler)
 
     const [, listener] = mockAddEventListener.mock.calls[0] as [string, (e: MessageEvent) => void]
     listener({
@@ -123,7 +126,7 @@ describe('BroadcastChannelAdapter', () => {
   it('on() returns unsubscribe fn; after calling it, subsequent messages do not trigger handler', () => {
     const adapter = createProjectionAdapter()
     const handler = vi.fn()
-    const unsubscribe = adapter.on('projection:text', handler)
+    const unsubscribe = adapter.on('timer:overtime-message', handler)
 
     unsubscribe()
 
@@ -160,10 +163,11 @@ describe('ElectronProjectionAdapter', () => {
 
   it('send() delegates to api.send(channel, data) with default main role', () => {
     const adapter = createProjectionAdapter()
-    adapter.send('projection:text', 'hello')
+    const payload = { message: 'hello' }
+    adapter.send('timer:overtime-message', payload)
 
     expect(mockProjectionApi.send).toHaveBeenCalledOnce()
-    expect(mockProjectionApi.send).toHaveBeenCalledWith('projection:text', 'hello')
+    expect(mockProjectionApi.send).toHaveBeenCalledWith('timer:overtime-message', payload)
     expect(mockProjectionApi.sendToMain).not.toHaveBeenCalled()
   })
 
@@ -178,7 +182,7 @@ describe('ElectronProjectionAdapter', () => {
 
   it('on() registers callback via api.onProjectionMessage', () => {
     const adapter = createProjectionAdapter()
-    adapter.on('projection:text', vi.fn())
+    adapter.on('timer:overtime-message', vi.fn())
 
     expect(mockProjectionApi.onProjectionMessage).toHaveBeenCalledOnce()
   })
@@ -186,11 +190,11 @@ describe('ElectronProjectionAdapter', () => {
   it('on() — handler fires when api.onProjectionMessage is called with matching channel', () => {
     const adapter = createProjectionAdapter()
     const handler = vi.fn()
-    adapter.on('projection:text', handler)
+    adapter.on('timer:overtime-message', handler)
 
     const registeredCallback = mockProjectionApi.onProjectionMessage.mock
       .calls[0][0] as unknown as (ch: string, d: unknown) => void
-    registeredCallback('projection:text', 'payload-data')
+    registeredCallback('timer:overtime-message', 'payload-data')
 
     expect(handler).toHaveBeenCalledOnce()
     expect(handler).toHaveBeenCalledWith('payload-data')
@@ -199,7 +203,7 @@ describe('ElectronProjectionAdapter', () => {
   it('on() — handler does NOT fire when api.onProjectionMessage is called with non-matching channel', () => {
     const adapter = createProjectionAdapter()
     const handler = vi.fn()
-    adapter.on('projection:text', handler)
+    adapter.on('timer:overtime-message', handler)
 
     const registeredCallback = mockProjectionApi.onProjectionMessage.mock
       .calls[0][0] as unknown as (ch: string, d: unknown) => void
@@ -210,7 +214,7 @@ describe('ElectronProjectionAdapter', () => {
 
   it('on() returns unsubscribe fn that calls the unsubscriber returned by api.onProjectionMessage', () => {
     const adapter = createProjectionAdapter()
-    const unsubscribe = adapter.on('projection:text', vi.fn())
+    const unsubscribe = adapter.on('timer:overtime-message', vi.fn())
 
     unsubscribe()
 
@@ -223,7 +227,7 @@ describe('ElectronProjectionAdapter', () => {
     mockProjectionApi.onProjectionMessage.mockReturnValueOnce(unsub1).mockReturnValueOnce(unsub2)
 
     const adapter = createProjectionAdapter()
-    adapter.on('projection:text', vi.fn())
+    adapter.on('timer:overtime-message', vi.fn())
     adapter.on('__system:pong', vi.fn())
     adapter.dispose()
 
@@ -238,8 +242,9 @@ describe('createProjectionAdapter factory', () => {
     setupWindowApi()
 
     const adapter = createProjectionAdapter()
-    adapter.send('projection:text', 'data')
-    expect(mockProjectionApi.send).toHaveBeenCalledWith('projection:text', 'data')
+    const payload = { message: 'data' }
+    adapter.send('timer:overtime-message', payload)
+    expect(mockProjectionApi.send).toHaveBeenCalledWith('timer:overtime-message', payload)
     expect(mockPostMessage).not.toHaveBeenCalled()
   })
 
@@ -247,7 +252,8 @@ describe('createProjectionAdapter factory', () => {
     vi.mocked(isElectron).mockReturnValue(false)
 
     const adapter = createProjectionAdapter()
-    adapter.send('projection:text', 'data')
+    const payload = { message: 'data' }
+    adapter.send('timer:overtime-message', payload)
     expect(mockPostMessage).toHaveBeenCalledOnce()
     expect(mockProjectionApi.send).not.toHaveBeenCalled()
   })

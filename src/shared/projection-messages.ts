@@ -21,8 +21,6 @@ export interface SystemMessages {
 }
 
 export interface AppMessages {
-  /** Plain text sent to projection (demo — will be replaced by timer messages) */
-  'projection:text': string
   /** High-frequency timer tick data for projection display */
   'timer:tick': TimerTickPayload
   /** Full timer state sync (after settings changes, on reconnect) */

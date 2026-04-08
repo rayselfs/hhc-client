@@ -147,9 +147,9 @@ describe('ProjectionContext — web mode', () => {
   it('send delegates to adapter', () => {
     const { result } = renderProjection()
     act(() => {
-      result.current.send('projection:text', 'hello')
+      result.current.send('timer:overtime-message', { message: 'test' })
     })
-    expect(mockAdapter.send).toHaveBeenCalledWith('projection:text', 'hello')
+    expect(mockAdapter.send).toHaveBeenCalledWith('timer:overtime-message', { message: 'test' })
   })
 
   it('on delegates to adapter and returns unsubscribe', () => {
@@ -158,9 +158,9 @@ describe('ProjectionContext — web mode', () => {
     let unsub: () => void = () => {}
 
     act(() => {
-      unsub = result.current.on('projection:text', handler)
+      unsub = result.current.on('timer:overtime-message', handler)
     })
-    expect(mockAdapter.on).toHaveBeenCalledWith('projection:text', handler)
+    expect(mockAdapter.on).toHaveBeenCalledWith('timer:overtime-message', handler)
     expect(typeof unsub).toBe('function')
   })
 
@@ -182,7 +182,7 @@ describe('ProjectionContext — web mode', () => {
     expect(result.current.isProjectionBlanked).toBe(true)
 
     const projectPromise = act(async () => {
-      const p = result.current.project('projection:text', 'hello')
+      const p = result.current.project('timer:overtime-message', { message: 'hello' })
       act(() => {
         mockAdapter._trigger('__system:ready', null)
       })
@@ -191,7 +191,7 @@ describe('ProjectionContext — web mode', () => {
 
     await projectPromise
 
-    expect(mockAdapter.send).toHaveBeenCalledWith('projection:text', 'hello')
+    expect(mockAdapter.send).toHaveBeenCalledWith('timer:overtime-message', { message: 'hello' })
     expect(mockAdapter.send).toHaveBeenCalledWith('__system:blank', { showDefault: false })
     expect(result.current.isProjectionBlanked).toBe(false)
   })
@@ -204,10 +204,10 @@ describe('ProjectionContext — web mode', () => {
     })
 
     await act(async () => {
-      await result.current.project('projection:text', 'hello')
+      await result.current.project('timer:overtime-message', { message: 'hello' })
     })
 
-    expect(mockAdapter.send).toHaveBeenCalledWith('projection:text', 'hello')
+    expect(mockAdapter.send).toHaveBeenCalledWith('timer:overtime-message', { message: 'hello' })
     expect(result.current.isProjectionBlanked).toBe(false)
   })
 
@@ -270,7 +270,7 @@ describe('ProjectionContext — web mode', () => {
     vi.mocked(mockAdapter.send).mockClear()
 
     const projectPromise = act(async () => {
-      const p = result.current.project('projection:text', 'new content')
+      const p = result.current.project('timer:overtime-message', { message: 'new content' })
       act(() => {
         mockAdapter._trigger('__system:ready', null)
       })
@@ -278,7 +278,9 @@ describe('ProjectionContext — web mode', () => {
     })
 
     await projectPromise
-    expect(mockAdapter.send).toHaveBeenCalledWith('projection:text', 'new content')
+    expect(mockAdapter.send).toHaveBeenCalledWith('timer:overtime-message', {
+      message: 'new content'
+    })
   })
 
   it('polling detects closed window', async () => {
