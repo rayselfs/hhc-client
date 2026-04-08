@@ -1,12 +1,5 @@
-import { ElectronAPI } from '@electron-toolkit/preload'
 import type { ProjectionChannel, ProjectionPayload } from '../shared/projection-messages'
-
-interface DisplayInfo {
-  id: number
-  bounds: { x: number; y: number; width: number; height: number }
-  workArea: { x: number; y: number; width: number; height: number }
-  scaleFactor: number
-}
+import type { DisplayInfo } from '../shared/ipc-channels'
 
 interface ThemeAPI {
   get: () => Promise<{ source: string; shouldUseDarkColors: boolean }>
@@ -30,7 +23,6 @@ interface ProjectionAPI {
 
 declare global {
   interface Window {
-    electron: ElectronAPI
     api: { projection: ProjectionAPI; theme: ThemeAPI }
   }
 }
