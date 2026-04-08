@@ -42,21 +42,18 @@ export function ThemeProvider({ children }: { children: React.ReactNode }): Reac
   // Sync Electron nativeTheme + boot restore (Electron only)
   useEffect(() => {
     if (!isElectron()) return
-    window.electron.ipcRenderer.invoke('theme:set', preference)
+    window.api.theme.set(preference)
   }, [preference])
 
   // Listen for system theme changes — ONE listener per environment
   useEffect(() => {
     if (isElectron()) {
       // Electron: listen ONLY to IPC (matchMedia double-fires with nativeTheme)
-      const cleanup = window.electron.ipcRenderer.on(
-        'theme:changed',
-        (_event: Electron.IpcRendererEvent, data: { shouldUseDarkColors: boolean }) => {
-          if (preference === 'system') {
-            setResolved(data.shouldUseDarkColors ? 'dark' : 'light')
-          }
+      const cleanup = window.api.theme.onChanged((data) => {
+        if (preference === 'system') {
+          setResolved(data.shouldUseDarkColors ? 'dark' : 'light')
         }
-      )
+      })
       return cleanup
     } else {
       // Browser: listen ONLY to matchMedia
