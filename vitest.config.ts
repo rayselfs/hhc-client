@@ -17,7 +17,12 @@ export default defineConfig({
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     coverage: {
       provider: 'v8',
-      include: ['src/renderer/src/**/*.{ts,tsx}', 'src/shared/**/*.ts'],
+      include: [
+        'src/renderer/src/**/*.{ts,tsx}',
+        'src/shared/**/*.ts',
+        'src/main/**/*.ts',
+        'src/preload/**/*.ts'
+      ],
       exclude: ['**/*.d.ts', '**/*.test.*', '**/*.spec.*', '**/test/**']
     }
   }
