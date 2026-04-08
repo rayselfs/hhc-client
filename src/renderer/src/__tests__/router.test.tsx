@@ -4,6 +4,16 @@ import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import routes from '../router'
 import { ThemeProvider } from '@renderer/contexts/ThemeContext'
 
+vi.mock('@renderer/lib/timer-adapter', () => ({
+  createTimerAdapter: vi.fn(() => ({
+    onTick: vi.fn(),
+    onFinished: vi.fn(),
+    onStopwatchTick: vi.fn(),
+    sendCommand: vi.fn(),
+    dispose: vi.fn()
+  }))
+}))
+
 vi.mock('@renderer/contexts/ProjectionContext', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@renderer/contexts/ProjectionContext')>()
   return {

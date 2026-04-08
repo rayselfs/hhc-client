@@ -6,6 +6,16 @@ import i18n from '@renderer/i18n'
 import routes from '@renderer/router'
 import { ThemeProvider } from '@renderer/contexts/ThemeContext'
 
+vi.mock('@renderer/lib/timer-adapter', () => ({
+  createTimerAdapter: vi.fn(() => ({
+    onTick: vi.fn(),
+    onFinished: vi.fn(),
+    onStopwatchTick: vi.fn(),
+    sendCommand: vi.fn(),
+    dispose: vi.fn()
+  }))
+}))
+
 vi.mock('@renderer/contexts/ProjectionContext', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@renderer/contexts/ProjectionContext')>()
   return {
