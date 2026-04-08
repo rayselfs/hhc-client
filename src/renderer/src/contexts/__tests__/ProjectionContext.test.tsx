@@ -65,10 +65,14 @@ describe('ProjectionContext — web mode', () => {
     spy.mockRestore()
   })
 
-  it('auto-opens projection window on mount', () => {
+  it('does NOT auto-open projection window on mount', () => {
     renderProjection()
-    expect(mockWindowOpen).toHaveBeenCalledOnce()
-    expect(mockWindowOpen.mock.calls[0][1]).toBe('hhc-projection')
+    expect(mockWindowOpen).not.toHaveBeenCalled()
+  })
+
+  it('isProjectionBlanked is true initially', () => {
+    const { result } = renderProjection()
+    expect(result.current.isProjectionBlanked).toBe(true)
   })
 
   it('isProjectionOpen is false initially, becomes true on __system:pong', () => {
@@ -95,9 +99,13 @@ describe('ProjectionContext — web mode', () => {
     expect(result.current.isProjectionOpen).toBe(false)
   })
 
-  it('handles window.open returning null (popup blocked)', () => {
+  it('handles window.open returning null (popup blocked)', async () => {
     mockWindowOpen.mockReturnValue(null)
     const { result } = renderProjection()
+
+    await act(async () => {
+      await result.current.openProjection()
+    })
     expect(result.current.isProjectionOpen).toBe(false)
   })
 
@@ -156,11 +164,60 @@ describe('ProjectionContext — web mode', () => {
     expect(typeof unsub).toBe('function')
   })
 
-  it('polling detects closed window', () => {
+  it('blankProjection(true) sets isProjectionBlanked true and sends __system:blank', () => {
+    const { result } = renderProjection()
+
+    act(() => {
+      result.current.blankProjection(false)
+    })
+    expect(result.current.isProjectionBlanked).toBe(false)
+    expect(mockAdapter.send).toHaveBeenCalledWith('__system:blank', { showDefault: false })
+
+    vi.mocked(mockAdapter.send).mockClear()
+    act(() => {
+      result.current.blankProjection(true)
+    })
+    expect(result.current.isProjectionBlanked).toBe(true)
+    expect(mockAdapter.send).toHaveBeenCalledWith('__system:blank', { showDefault: true })
+  })
+
+  it('closeProjection resets isProjectionBlanked to true', async () => {
+    const { result } = renderProjection()
+
+    act(() => {
+      result.current.blankProjection(false)
+    })
+    expect(result.current.isProjectionBlanked).toBe(false)
+
+    await act(async () => {
+      await result.current.closeProjection()
+    })
+    expect(result.current.isProjectionBlanked).toBe(true)
+  })
+
+  it('__system:closed resets isProjectionBlanked to true', () => {
+    const { result } = renderProjection()
+
+    act(() => {
+      result.current.blankProjection(false)
+    })
+    expect(result.current.isProjectionBlanked).toBe(false)
+
+    act(() => {
+      mockAdapter._trigger('__system:closed', null)
+    })
+    expect(result.current.isProjectionBlanked).toBe(true)
+  })
+
+  it('polling detects closed window', async () => {
     const fakeWindow = { closed: false, close: vi.fn() }
     mockWindowOpen.mockReturnValue(fakeWindow as unknown as Window)
 
     const { result } = renderProjection()
+
+    await act(async () => {
+      await result.current.openProjection()
+    })
 
     act(() => {
       mockAdapter._trigger('__system:pong', null)
@@ -174,11 +231,16 @@ describe('ProjectionContext — web mode', () => {
     expect(result.current.isProjectionOpen).toBe(false)
   })
 
-  it('cleanup disposes adapter and closes projection window', () => {
+  it('cleanup disposes adapter and closes projection window', async () => {
     const fakeWindow = { closed: false, close: vi.fn() }
     mockWindowOpen.mockReturnValue(fakeWindow as unknown as Window)
 
-    const { unmount } = renderProjection()
+    const { result, unmount } = renderProjection()
+
+    await act(async () => {
+      await result.current.openProjection()
+    })
+
     unmount()
 
     expect(fakeWindow.close).toHaveBeenCalled()

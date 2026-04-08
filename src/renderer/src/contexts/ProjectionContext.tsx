@@ -5,8 +5,10 @@ import type { ProjectionChannel, ProjectionPayload } from '@shared/projection-me
 
 interface ProjectionContextValue {
   isProjectionOpen: boolean
+  isProjectionBlanked: boolean
   openProjection: () => Promise<void>
   closeProjection: () => Promise<void>
+  blankProjection: (blank: boolean) => void
   send: <C extends ProjectionChannel>(channel: C, data: ProjectionPayload<C>) => void
   on: <C extends ProjectionChannel>(
     channel: C,
@@ -20,25 +22,19 @@ function getProjectionUrl(): string {
   return location.origin + location.pathname + '#/projection'
 }
 
+function getAdapter(ref: React.RefObject<ProjectionAdapter | null>): ProjectionAdapter {
+  if (!ref.current) {
+    ref.current = createProjectionAdapter()
+  }
+  return ref.current
+}
+
 export function ProjectionProvider({ children }: { children: React.ReactNode }): React.JSX.Element {
   const [isProjectionOpen, setIsProjectionOpen] = useState(false)
-  const adapterRef = useRef<ProjectionAdapter>(createProjectionAdapter())
+  const [isProjectionBlanked, setIsProjectionBlanked] = useState(true)
+  const adapterRef = useRef<ProjectionAdapter | null>(null)
   const projectionWindowRef = useRef<Window | null>(null)
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
-  const startPolling = useCallback((): void => {
-    if (pollTimerRef.current) return
-    pollTimerRef.current = setInterval(() => {
-      if (projectionWindowRef.current?.closed) {
-        setIsProjectionOpen(false)
-        projectionWindowRef.current = null
-        if (pollTimerRef.current) {
-          clearInterval(pollTimerRef.current)
-          pollTimerRef.current = null
-        }
-      }
-    }, 1000)
-  }, [])
 
   const stopPolling = useCallback((): void => {
     if (pollTimerRef.current) {
@@ -47,8 +43,20 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
     }
   }, [])
 
+  const startPolling = useCallback((): void => {
+    if (pollTimerRef.current) return
+    pollTimerRef.current = setInterval(() => {
+      if (projectionWindowRef.current?.closed) {
+        setIsProjectionOpen(false)
+        setIsProjectionBlanked(true)
+        projectionWindowRef.current = null
+        stopPolling()
+      }
+    }, 1000)
+  }, [stopPolling])
+
   useEffect(() => {
-    const currentAdapter = adapterRef.current
+    const adapter = getAdapter(adapterRef)
 
     if (isElectron()) {
       window.api.projection.check().then(({ exists }) => {
@@ -60,31 +68,28 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       })
       const unsubClosed = window.api.projection.onProjectionClosed(() => {
         setIsProjectionOpen(false)
+        setIsProjectionBlanked(true)
       })
 
       return () => {
         unsubOpened()
         unsubClosed()
-        currentAdapter.dispose()
+        adapter.dispose()
       }
     }
 
-    const unsubPong = currentAdapter.on('__system:pong', () => {
+    const unsubPong = adapter.on('__system:pong', () => {
       setIsProjectionOpen(true)
     })
-    const unsubClosed = currentAdapter.on('__system:closed', () => {
+    const unsubClosed = adapter.on('__system:closed', () => {
       setIsProjectionOpen(false)
+      setIsProjectionBlanked(true)
       projectionWindowRef.current = null
+      stopPolling()
     })
 
-    const win = window.open(getProjectionUrl(), 'hhc-projection')
-    if (win) {
-      projectionWindowRef.current = win
-      startPolling()
-    }
-
     const handleBeforeUnload = (): void => {
-      currentAdapter.send('__system:close', null)
+      adapter.send('__system:close', null)
       projectionWindowRef.current?.close()
     }
     window.addEventListener('beforeunload', handleBeforeUnload)
@@ -95,7 +100,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       stopPolling()
       window.removeEventListener('beforeunload', handleBeforeUnload)
       projectionWindowRef.current?.close()
-      currentAdapter.dispose()
+      adapter.dispose()
     }
   }, [startPolling, stopPolling])
 
@@ -115,16 +120,22 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
     if (isElectron()) {
       await window.api.projection.close()
     } else {
-      adapterRef.current.send('__system:close', null)
+      getAdapter(adapterRef).send('__system:close', null)
       projectionWindowRef.current = null
       setIsProjectionOpen(false)
+      setIsProjectionBlanked(true)
       stopPolling()
     }
   }, [stopPolling])
 
+  const blankProjection = useCallback((blank: boolean): void => {
+    setIsProjectionBlanked(blank)
+    getAdapter(adapterRef).send('__system:blank', { showDefault: blank })
+  }, [])
+
   const send = useCallback(
     <C extends ProjectionChannel>(channel: C, data: ProjectionPayload<C>): void => {
-      adapterRef.current.send(channel, data)
+      getAdapter(adapterRef).send(channel, data)
     },
     []
   )
@@ -134,14 +145,22 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       channel: C,
       handler: (data: ProjectionPayload<C>) => void
     ): (() => void) => {
-      return adapterRef.current.on(channel, handler)
+      return getAdapter(adapterRef).on(channel, handler)
     },
     []
   )
 
   return (
     <ProjectionContext.Provider
-      value={{ isProjectionOpen, openProjection, closeProjection, send, on }}
+      value={{
+        isProjectionOpen,
+        isProjectionBlanked,
+        openProjection,
+        closeProjection,
+        blankProjection,
+        send,
+        on
+      }}
     >
       {children}
     </ProjectionContext.Provider>

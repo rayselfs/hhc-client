@@ -1,17 +1,22 @@
 import { useState, useEffect } from 'react'
-import { useTranslation } from 'react-i18next'
 import { createProjectionAdapter } from '@renderer/lib/projection-adapter'
 import { isElectron } from '@renderer/lib/env'
+import DefaultProjection from '@renderer/components/projection/DefaultProjection'
 
 export default function ProjectionPage(): React.JSX.Element {
-  const { t } = useTranslation()
+  const [showDefault, setShowDefault] = useState(true)
   const [text, setText] = useState('')
 
   useEffect(() => {
     const adapter = createProjectionAdapter()
 
+    const unsubBlank = adapter.on('__system:blank', ({ showDefault: blank }) => {
+      setShowDefault(blank)
+    })
+
     const unsubText = adapter.on('projection:text', (data) => {
       setText(data)
+      setShowDefault(false)
     })
 
     let unsubClose = (): void => {}
@@ -32,6 +37,7 @@ export default function ProjectionPage(): React.JSX.Element {
       window.addEventListener('beforeunload', handleBeforeUnload)
 
       return () => {
+        unsubBlank()
         unsubText()
         unsubClose()
         unsubPing()
@@ -41,6 +47,7 @@ export default function ProjectionPage(): React.JSX.Element {
     }
 
     return () => {
+      unsubBlank()
       unsubText()
       unsubClose()
       unsubPing()
@@ -48,13 +55,11 @@ export default function ProjectionPage(): React.JSX.Element {
     }
   }, [])
 
+  if (showDefault) return <DefaultProjection />
+
   return (
     <div className="flex h-screen w-full items-center justify-center bg-black">
-      {text ? (
-        <p className="text-white text-6xl font-bold">{text}</p>
-      ) : (
-        <p className="text-white/30 text-2xl">{t('projection.waiting')}</p>
-      )}
+      {text ? <p className="text-white text-6xl font-bold">{text}</p> : <DefaultProjection />}
     </div>
   )
 }
