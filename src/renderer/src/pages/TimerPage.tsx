@@ -4,7 +4,6 @@ import { useStopwatchStore } from '@renderer/stores/stopwatch'
 import { createTimerAdapter } from '@renderer/lib/timer-adapter'
 import type { TimerAdapter } from '@renderer/lib/timer-adapter'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
-import ModeSelector from '@renderer/components/Timer/ModeSelector'
 import TimerDisplay from '@renderer/components/Timer/TimerDisplay'
 import ClockDisplay from '@renderer/components/Timer/ClockDisplay'
 import StopwatchDisplay from '@renderer/components/Timer/StopwatchDisplay'
@@ -154,8 +153,6 @@ export default function TimerPage(): React.JSX.Element {
 
   return (
     <div data-testid="timer-page" className="flex flex-col items-center gap-4 p-6 h-full">
-      <ModeSelector className="w-full justify-center" />
-
       {mode === 'timer' && (
         <div className="flex flex-col items-center gap-4 flex-1">
           <TimerDisplay

@@ -1,36 +1,48 @@
 import { useTranslation } from 'react-i18next'
+import { useLocation } from 'react-router-dom'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
 import { Button, Modal, useOverlayState } from '@heroui/react'
 import { X, TriangleAlert, Monitor, MonitorOff } from 'lucide-react'
+import ModeSelector from '@renderer/components/Timer/ModeSelector'
 
 export default function Header(): React.JSX.Element {
   const { t } = useTranslation()
+  const location = useLocation()
   const { isProjectionOpen, isProjectionBlanked, closeProjection, blankProjection } =
     useProjection()
   const state = useOverlayState()
 
   return (
     <>
-      <header className="flex items-center justify-end gap-2 p-2">
-        <Button
-          isIconOnly
-          variant={isProjectionBlanked ? 'outline' : 'danger-soft'}
-          onPress={() => blankProjection(!isProjectionBlanked)}
-          isDisabled={!isProjectionOpen}
-          aria-label={t(isProjectionBlanked ? 'projection.showButton' : 'projection.blankButton')}
-        >
-          {isProjectionBlanked ? <Monitor className="size-4" /> : <MonitorOff className="size-4" />}
-        </Button>
-        <Button
-          isIconOnly
-          variant="outline"
-          className="text-danger"
-          onPress={state.open}
-          isDisabled={!isProjectionOpen}
-          aria-label={t('projection.closeButton')}
-        >
-          <X className="size-4" />
-        </Button>
+      <header className="flex items-center justify-between gap-2 p-2">
+        <div className="flex items-center gap-2">
+          {location.pathname === '/timer' && <ModeSelector />}
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            isIconOnly
+            variant={isProjectionBlanked ? 'outline' : 'danger-soft'}
+            onPress={() => blankProjection(!isProjectionBlanked)}
+            isDisabled={!isProjectionOpen}
+            aria-label={t(isProjectionBlanked ? 'projection.showButton' : 'projection.blankButton')}
+          >
+            {isProjectionBlanked ? (
+              <Monitor className="size-4" />
+            ) : (
+              <MonitorOff className="size-4" />
+            )}
+          </Button>
+          <Button
+            isIconOnly
+            variant="outline"
+            className="text-danger"
+            onPress={state.open}
+            isDisabled={!isProjectionOpen}
+            aria-label={t('projection.closeButton')}
+          >
+            <X className="size-4" />
+          </Button>
+        </div>
       </header>
       <Modal.Root state={state}>
         <Modal.Trigger />
