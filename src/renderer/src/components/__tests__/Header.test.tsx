@@ -5,7 +5,13 @@ import '@renderer/i18n'
 import i18n from '@renderer/i18n'
 import Header from '../Header'
 
-vi.mock('@renderer/hooks/useProjection')
+vi.mock('@renderer/contexts/ProjectionContext', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@renderer/contexts/ProjectionContext')>()
+  return {
+    ...actual,
+    useProjection: vi.fn()
+  }
+})
 
 function renderWithRouter(initialEntries: string[] = ['/']): ReturnType<typeof render> {
   const router = createMemoryRouter(
@@ -27,7 +33,7 @@ describe('Header', () => {
 
   it('renders a header element', async () => {
     await i18n.changeLanguage('en')
-    const { useProjection } = await import('@renderer/hooks/useProjection')
+    const { useProjection } = await import('@renderer/contexts/ProjectionContext')
     vi.mocked(useProjection).mockReturnValue({
       isProjectionOpen: false,
       openProjection: vi.fn(),
@@ -41,7 +47,7 @@ describe('Header', () => {
 
   it('renders close projection button with correct aria-label in English', async () => {
     await i18n.changeLanguage('en')
-    const { useProjection } = await import('@renderer/hooks/useProjection')
+    const { useProjection } = await import('@renderer/contexts/ProjectionContext')
     vi.mocked(useProjection).mockReturnValue({
       isProjectionOpen: true,
       openProjection: vi.fn(),
@@ -55,7 +61,7 @@ describe('Header', () => {
 
   it('disables close projection button when projection is not open', async () => {
     await i18n.changeLanguage('en')
-    const { useProjection } = await import('@renderer/hooks/useProjection')
+    const { useProjection } = await import('@renderer/contexts/ProjectionContext')
     vi.mocked(useProjection).mockReturnValue({
       isProjectionOpen: false,
       openProjection: vi.fn(),
@@ -70,7 +76,7 @@ describe('Header', () => {
 
   it('enables close projection button when projection is open', async () => {
     await i18n.changeLanguage('en')
-    const { useProjection } = await import('@renderer/hooks/useProjection')
+    const { useProjection } = await import('@renderer/contexts/ProjectionContext')
     vi.mocked(useProjection).mockReturnValue({
       isProjectionOpen: true,
       openProjection: vi.fn(),
@@ -85,7 +91,7 @@ describe('Header', () => {
 
   it('renders close projection button with correct aria-label in zh-TW', async () => {
     await i18n.changeLanguage('zh-TW')
-    const { useProjection } = await import('@renderer/hooks/useProjection')
+    const { useProjection } = await import('@renderer/contexts/ProjectionContext')
     vi.mocked(useProjection).mockReturnValue({
       isProjectionOpen: true,
       openProjection: vi.fn(),

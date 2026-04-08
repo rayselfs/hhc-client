@@ -5,6 +5,20 @@ import '@renderer/i18n'
 import i18n from '@renderer/i18n'
 import routes from '@renderer/router'
 
+vi.mock('@renderer/contexts/ProjectionContext', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@renderer/contexts/ProjectionContext')>()
+  return {
+    ...actual,
+    useProjection: vi.fn().mockReturnValue({
+      isProjectionOpen: false,
+      openProjection: vi.fn(),
+      closeProjection: vi.fn(),
+      send: vi.fn(),
+      on: vi.fn()
+    })
+  }
+})
+
 function renderWithRouter(initialEntries: string[] = ['/']): ReturnType<typeof render> {
   const router = createMemoryRouter(routes, { initialEntries })
   return render(<RouterProvider router={router} />)

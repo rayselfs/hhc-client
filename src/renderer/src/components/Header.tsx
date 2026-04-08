@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { useProjection } from '@renderer/hooks/useProjection'
+import { useProjection } from '@renderer/contexts/ProjectionContext'
 import { Button, Modal, useOverlayState } from '@heroui/react'
 import { X, TriangleAlert } from 'lucide-react'
 

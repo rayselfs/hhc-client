@@ -3,6 +3,20 @@ import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import routes from '../router'
 
+vi.mock('@renderer/contexts/ProjectionContext', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@renderer/contexts/ProjectionContext')>()
+  return {
+    ...actual,
+    useProjection: vi.fn().mockReturnValue({
+      isProjectionOpen: false,
+      openProjection: vi.fn(),
+      closeProjection: vi.fn(),
+      send: vi.fn(),
+      on: vi.fn()
+    })
+  }
+})
+
 function renderWithRouter(initialEntries: string[] = ['/']): ReturnType<typeof render> {
   const router = createMemoryRouter(routes, { initialEntries })
   return render(<RouterProvider router={router} />)

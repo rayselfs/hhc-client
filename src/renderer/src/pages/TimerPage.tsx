@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { TextField, Input, Label, Button } from '@heroui/react'
-import { useProjection } from '@renderer/hooks/useProjection'
+import { useProjection } from '@renderer/contexts/ProjectionContext'
 import { Send } from 'lucide-react'
 
 export default function TimerPage(): React.JSX.Element {
