@@ -29,7 +29,6 @@ export default function TimerPage(): React.JSX.Element {
   const swStatus = useStopwatchStore((s) => s.status)
   const swElapsedMs = useStopwatchStore((s) => s.elapsedMs)
   const swFormattedTime = useStopwatchStore((s) => s.formattedTime)
-  const formattedTime = swFormattedTime
 
   const { project } = useProjection()
 
@@ -162,7 +161,7 @@ export default function TimerPage(): React.JSX.Element {
             phase={phase}
             overtimeDisplay={displayValues.overtimeDisplay}
             overtimeMessage={overtimeMessageEnabled ? overtimeMessage : undefined}
-            onTimeClick={() => setDialogOpen(true)}
+            onTimeClick={timerStatus === 'stopped' ? () => setDialogOpen(true) : undefined}
           />
           <TimerControls mode={mode} />
           <TimeAdjustment />
@@ -187,7 +186,7 @@ export default function TimerPage(): React.JSX.Element {
               phase={phase}
               overtimeDisplay={displayValues.overtimeDisplay}
               overtimeMessage={overtimeMessageEnabled ? overtimeMessage : undefined}
-              onTimeClick={() => setDialogOpen(true)}
+              onTimeClick={timerStatus === 'stopped' ? () => setDialogOpen(true) : undefined}
             />
           </div>
           <div className="flex items-center justify-center" style={{ flex: '0 0 58%' }}>
@@ -198,7 +197,7 @@ export default function TimerPage(): React.JSX.Element {
 
       {mode === 'stopwatch' && (
         <div className="flex flex-col items-center gap-4 flex-1">
-          <StopwatchDisplay formattedTime={formattedTime} size={80} />
+          <StopwatchDisplay formattedTime={swFormattedTime} size={80} />
           <TimerControls mode="stopwatch" />
         </div>
       )}

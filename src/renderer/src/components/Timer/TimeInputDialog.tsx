@@ -1,5 +1,6 @@
 import { Modal, useOverlayState, Button, Input, Label } from '@heroui/react'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { parseDuration } from '@renderer/lib/parse-duration'
 
 interface TimeInputDialogProps {
@@ -15,6 +16,7 @@ export default function TimeInputDialog({
   onConfirm,
   initialValue = ''
 }: TimeInputDialogProps): React.JSX.Element {
+  const { t } = useTranslation()
   const [value, setValue] = useState(initialValue)
   const [error, setError] = useState<string | null>(null)
 
@@ -33,7 +35,7 @@ export default function TimeInputDialog({
   const handleConfirm = (): void => {
     const seconds = parseDuration(value.trim())
     if (seconds === null) {
-      setError('Invalid format. Try: 90s, 1m30s, or 03:00')
+      setError(t('timer.inputDialog.invalid'))
       return
     }
     onConfirm(seconds)
@@ -52,17 +54,19 @@ export default function TimeInputDialog({
         <Modal.Container>
           <Modal.Dialog className="p-2 pl-5 pr-5 pt-5">
             <Modal.Header>
-              <Modal.Heading>Set Timer Duration</Modal.Heading>
+              <Modal.Heading>{t('timer.inputDialog.title')}</Modal.Heading>
             </Modal.Header>
             <Modal.Body>
               <div className="flex flex-col gap-1">
-                <Label htmlFor="time-input-dialog-field">Duration</Label>
+                <Label htmlFor="time-input-dialog-field">
+                  {t('timer.inputDialog.durationLabel')}
+                </Label>
                 <Input
                   id="time-input-dialog-field"
                   value={value}
                   onChange={(e) => setValue(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="e.g. 1m30s, 90s, 03:00"
+                  placeholder={t('timer.inputDialog.placeholder')}
                   autoFocus
                   aria-invalid={Boolean(error)}
                   aria-describedby={error ? 'time-input-dialog-error' : undefined}
@@ -76,10 +80,10 @@ export default function TimeInputDialog({
             </Modal.Body>
             <Modal.Footer>
               <Button variant="ghost" onPress={onClose}>
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button variant="primary" onPress={handleConfirm}>
-                Set
+                {t('timer.inputDialog.confirm')}
               </Button>
             </Modal.Footer>
           </Modal.Dialog>

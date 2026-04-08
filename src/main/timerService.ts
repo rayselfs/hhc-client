@@ -1,5 +1,5 @@
 import { performance } from 'perf_hooks'
-import { BrowserWindow, ipcMain } from 'electron'
+import { BrowserWindow } from 'electron'
 import type {
   TimerCommand,
   TimerMode,
@@ -372,20 +372,6 @@ export class TimerService {
       this.timer.remainingSeconds = settings.totalDuration
     }
     this.broadcast()
-  }
-
-  registerIpcHandlers(): void {
-    ipcMain.handle('timer:command', (_event, cmd: TimerCommand) => {
-      this.handleCommand(cmd)
-    })
-
-    ipcMain.handle('timer:get-state', () => {
-      return this.getState()
-    })
-
-    ipcMain.handle('timer:initialize', (_event, settings: TimerSettings) => {
-      this.initializeState(settings)
-    })
   }
 
   dispose(): void {

@@ -32,9 +32,11 @@
     },
     "inputDialog": {
       "title": "Set Duration",
-      "placeholder": "e.g. 5m, 1m30s, 03:00",
+      "durationLabel": "Duration",
+      "placeholder": "e.g. 1m30s, 90s, 03:00",
       "hint": "Formats: 90s · 1m30s · 03:00 · 180",
-      "invalid": "Invalid time format"
+      "invalid": "Invalid format. Try: 90s, 1m30s, or 03:00",
+      "confirm": "Set"
     },
     "addTime": "+{{seconds}}s",
     "removeTime": "-{{seconds}}s",

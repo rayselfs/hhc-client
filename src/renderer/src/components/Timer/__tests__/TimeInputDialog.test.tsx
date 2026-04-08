@@ -1,6 +1,10 @@
 import { render, screen, fireEvent } from '@testing-library/react'
 import TimeInputDialog from '../TimeInputDialog'
 
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: (key: string) => key })
+}))
+
 vi.mock('@heroui/react', async () => {
   const actual = await vi.importActual<typeof import('@heroui/react')>('@heroui/react')
   return {
@@ -61,19 +65,19 @@ describe('TimeInputDialog', () => {
 
   it('renders when open', () => {
     setup(true)
-    expect(screen.getByPlaceholderText(/e\.g\./i)).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('timer.inputDialog.placeholder')).toBeInTheDocument()
   })
 
   it('does not render input when closed', () => {
     setup(false)
-    expect(screen.queryByPlaceholderText(/e\.g\./i)).not.toBeInTheDocument()
+    expect(screen.queryByPlaceholderText('timer.inputDialog.placeholder')).not.toBeInTheDocument()
   })
 
   it('accepts 1m30s → calls onConfirm(90)', () => {
     setup()
     const input = screen.getByRole('textbox')
     fireEvent.change(input, { target: { value: '1m30s' } })
-    fireEvent.click(screen.getByText('Set'))
+    fireEvent.click(screen.getByText('timer.inputDialog.confirm'))
     expect(onConfirm).toHaveBeenCalledWith(90)
     expect(onClose).toHaveBeenCalled()
   })
@@ -82,7 +86,7 @@ describe('TimeInputDialog', () => {
     setup()
     const input = screen.getByRole('textbox')
     fireEvent.change(input, { target: { value: '03:00' } })
-    fireEvent.click(screen.getByText('Set'))
+    fireEvent.click(screen.getByText('timer.inputDialog.confirm'))
     expect(onConfirm).toHaveBeenCalledWith(180)
   })
 
@@ -90,7 +94,7 @@ describe('TimeInputDialog', () => {
     setup()
     const input = screen.getByRole('textbox')
     fireEvent.change(input, { target: { value: '90s' } })
-    fireEvent.click(screen.getByText('Set'))
+    fireEvent.click(screen.getByText('timer.inputDialog.confirm'))
     expect(onConfirm).toHaveBeenCalledWith(90)
   })
 
@@ -98,14 +102,14 @@ describe('TimeInputDialog', () => {
     setup()
     const input = screen.getByRole('textbox')
     fireEvent.change(input, { target: { value: 'abc' } })
-    fireEvent.click(screen.getByText('Set'))
+    fireEvent.click(screen.getByText('timer.inputDialog.confirm'))
     expect(onConfirm).not.toHaveBeenCalled()
-    expect(screen.getByText(/invalid format/i)).toBeInTheDocument()
+    expect(screen.getByText('timer.inputDialog.invalid')).toBeInTheDocument()
   })
 
   it('calls onClose on Cancel', () => {
     setup()
-    fireEvent.click(screen.getByText('Cancel'))
+    fireEvent.click(screen.getByText('common.cancel'))
     expect(onClose).toHaveBeenCalled()
   })
 

@@ -357,6 +357,36 @@ describe('TimerPage — adapter command relay (stopwatch)', () => {
   })
 })
 
+describe('TimerPage — TimeInputDialog gating', () => {
+  it('timer display button is clickable (has aria-label) when timer is stopped', () => {
+    useTimerStore.setState({ mode: 'timer', status: 'stopped' })
+    renderTimerPage()
+    expect(screen.getByRole('button', { name: /set timer duration/i })).toBeInTheDocument()
+  })
+
+  it('timer display button is NOT clickable (no aria-label) when timer is running', () => {
+    useTimerStore.setState({
+      mode: 'timer',
+      status: 'running',
+      totalDuration: 300,
+      targetEndTime: Date.now() + 300000
+    })
+    renderTimerPage()
+    expect(screen.queryByRole('button', { name: /set timer duration/i })).not.toBeInTheDocument()
+  })
+
+  it('timer display button is NOT clickable (no aria-label) when timer is paused', () => {
+    useTimerStore.setState({
+      mode: 'timer',
+      status: 'paused',
+      totalDuration: 300,
+      remainingSeconds: 200
+    })
+    renderTimerPage()
+    expect(screen.queryByRole('button', { name: /set timer duration/i })).not.toBeInTheDocument()
+  })
+})
+
 describe('TimerPage — stopwatch projection', () => {
   it('sends timer:stopwatch projection when in stopwatch mode', async () => {
     useTimerStore.setState({ mode: 'stopwatch' })

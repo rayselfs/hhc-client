@@ -3,13 +3,10 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 vi.mock('electron', () => ({
   BrowserWindow: {
     getAllWindows: vi.fn().mockReturnValue([])
-  },
-  ipcMain: {
-    handle: vi.fn()
   }
 }))
 
-import { BrowserWindow, ipcMain } from 'electron'
+import { BrowserWindow } from 'electron'
 import { TimerService } from '../timerService'
 
 function makeMockWindow(): {
@@ -301,21 +298,6 @@ describe('TimerService', () => {
         timezone: 'UTC'
       })
       expect(service.getState().remainingSeconds).toBe(before)
-    })
-  })
-
-  describe('registerIpcHandlers', () => {
-    it('registers timer:command, timer:get-state, and timer:initialize handlers', () => {
-      service.registerIpcHandlers()
-      expect(vi.mocked(ipcMain.handle)).toHaveBeenCalledWith('timer:command', expect.any(Function))
-      expect(vi.mocked(ipcMain.handle)).toHaveBeenCalledWith(
-        'timer:get-state',
-        expect.any(Function)
-      )
-      expect(vi.mocked(ipcMain.handle)).toHaveBeenCalledWith(
-        'timer:initialize',
-        expect.any(Function)
-      )
     })
   })
 
