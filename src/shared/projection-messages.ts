@@ -10,14 +10,11 @@
  */
 
 export interface SystemMessages {
-  /** Projection window announces it is alive */
   '__system:pong': null
-  /** Main window requests a liveness check */
   '__system:ping': null
-  /** Main window tells projection to close itself */
   '__system:close': null
-  /** Projection window announces it is about to close */
   '__system:closed': null
+  '__system:blank': { showDefault: boolean }
 }
 
 export interface AppMessages {
@@ -35,3 +32,11 @@ export type ProjectionMessageMap = SystemMessages & AppMessages
 export type ProjectionChannel = keyof ProjectionMessageMap
 
 export type ProjectionPayload<C extends ProjectionChannel> = ProjectionMessageMap[C]
+
+/**
+ * Discriminated union tuple that preserves channel↔payload correlation.
+ * Use this where a channel+data pair must stay matched (IPC relay, etc).
+ */
+export type ProjectionMessageTuple = {
+  [C in ProjectionChannel]: [channel: C, data: ProjectionPayload<C>]
+}[ProjectionChannel]

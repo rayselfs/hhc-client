@@ -130,14 +130,14 @@ describe('BroadcastChannelAdapter', () => {
     expect(mockRemoveEventListener.mock.calls[0][0]).toBe('message')
   })
 
-  it('dispose() removes listeners but does not close the channel', () => {
+  it('dispose() removes listeners and closes the channel', () => {
     const adapter = createProjectionAdapter()
     adapter.on('__system:pong', vi.fn())
 
     adapter.dispose()
 
     expect(mockRemoveEventListener).toHaveBeenCalled()
-    expect(mockClose).not.toHaveBeenCalled()
+    expect(mockClose).toHaveBeenCalledOnce()
   })
 
   it('send() with system channel sends null payload correctly', () => {

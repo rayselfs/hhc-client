@@ -12,7 +12,7 @@ interface ProjectionAdapter {
 
 class ElectronProjectionAdapter implements ProjectionAdapter {
   private api: Window['api']['projection']
-  private unsubscribers: Array<() => void> = []
+  private unsubscribers = new Set<() => void>()
 
   constructor(api: Window['api']['projection']) {
     this.api = api
@@ -29,13 +29,16 @@ class ElectronProjectionAdapter implements ProjectionAdapter {
     const unsubscribe = this.api.onProjectionMessage((ch, d) => {
       if ((ch as string) === channel) handler(d as ProjectionPayload<C>)
     })
-    this.unsubscribers.push(unsubscribe)
-    return unsubscribe
+    this.unsubscribers.add(unsubscribe)
+    return () => {
+      unsubscribe()
+      this.unsubscribers.delete(unsubscribe)
+    }
   }
 
   dispose(): void {
     this.unsubscribers.forEach((unsub) => unsub())
-    this.unsubscribers = []
+    this.unsubscribers.clear()
   }
 }
 
@@ -72,6 +75,7 @@ class BroadcastChannelAdapter implements ProjectionAdapter {
   dispose(): void {
     this.listeners.forEach(({ listener }) => this.bc.removeEventListener('message', listener))
     this.listeners = []
+    this.bc.close()
   }
 }
 

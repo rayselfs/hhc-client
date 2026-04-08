@@ -6,7 +6,7 @@
  * names and payload shapes at compile time.
  */
 
-import type { ProjectionChannel, ProjectionPayload } from './projection-messages'
+import type { ProjectionMessageTuple } from './projection-messages'
 
 // ---------------------------------------------------------------------------
 // Invoke channels (renderer → main, returns a result)
@@ -35,11 +35,8 @@ export type IpcInvokeChannel = keyof IpcInvokeMap
 // ---------------------------------------------------------------------------
 
 export interface IpcSendMap {
-  'projection:send': [channel: ProjectionChannel, data: ProjectionPayload<ProjectionChannel>]
-  'projection:send-to-main': [
-    channel: ProjectionChannel,
-    data: ProjectionPayload<ProjectionChannel>
-  ]
+  'projection:send': ProjectionMessageTuple
+  'projection:send-to-main': ProjectionMessageTuple
 }
 
 export type IpcSendChannel = keyof IpcSendMap
@@ -49,7 +46,7 @@ export type IpcSendChannel = keyof IpcSendMap
 // ---------------------------------------------------------------------------
 
 export interface IpcMainToRendererMap {
-  'projection:message': [channel: ProjectionChannel, data: ProjectionPayload<ProjectionChannel>]
+  'projection:message': ProjectionMessageTuple
   'projection:opened': []
   'projection:closed': []
   'theme:changed': [{ shouldUseDarkColors: boolean }]
