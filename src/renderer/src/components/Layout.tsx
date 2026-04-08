@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom'
 import Sidebar from '@renderer/components/Sidebar'
 import Header from '@renderer/components/Header'
+import FloatingTimer from '@renderer/components/FloatingTimer'
 import { ProjectionProvider } from '@renderer/contexts/ProjectionContext'
 
 export default function Layout(): React.JSX.Element {
@@ -14,6 +15,7 @@ export default function Layout(): React.JSX.Element {
             <Outlet />
           </main>
         </div>
+        <FloatingTimer />
       </div>
     </ProjectionProvider>
   )
