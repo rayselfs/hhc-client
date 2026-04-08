@@ -1,16 +1,27 @@
 import { useTranslation } from 'react-i18next'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
 import { Button, Modal, useOverlayState } from '@heroui/react'
-import { X, TriangleAlert } from 'lucide-react'
+import { X, TriangleAlert, Monitor, MonitorOff } from 'lucide-react'
 
 export default function Header(): React.JSX.Element {
   const { t } = useTranslation()
-  const { isProjectionOpen, closeProjection } = useProjection()
+  const { isProjectionOpen, isProjectionBlanked, closeProjection, blankProjection } =
+    useProjection()
   const state = useOverlayState()
 
   return (
     <>
-      <header className="flex items-center justify-end p-2">
+      <header className="flex items-center justify-end gap-1 p-2">
+        <Button
+          isIconOnly
+          size="sm"
+          variant={isProjectionBlanked ? 'ghost' : 'secondary'}
+          onPress={() => blankProjection(!isProjectionBlanked)}
+          isDisabled={!isProjectionOpen}
+          aria-label={t(isProjectionBlanked ? 'projection.showButton' : 'projection.blankButton')}
+        >
+          {isProjectionBlanked ? <MonitorOff className="size-4" /> : <Monitor className="size-4" />}
+        </Button>
         <Button
           isIconOnly
           size="sm"

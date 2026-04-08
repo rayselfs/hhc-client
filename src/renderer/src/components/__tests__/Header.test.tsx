@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { describe, it, expect, beforeEach } from 'vitest'
 import '@renderer/i18n'
@@ -112,5 +113,107 @@ describe('Header', () => {
     renderWithRouter(['/'])
     expect(screen.getByRole('button', { name: '關閉投影視窗' })).toBeInTheDocument()
     await i18n.changeLanguage('en')
+  })
+
+  describe('blank toggle button', () => {
+    it('renders with "Blank projection" label when not blanked', async () => {
+      await i18n.changeLanguage('en')
+      const { useProjection } = await import('@renderer/contexts/ProjectionContext')
+      vi.mocked(useProjection).mockReturnValue({
+        isProjectionOpen: true,
+        isProjectionBlanked: false,
+        openProjection: vi.fn(),
+        closeProjection: vi.fn(),
+        blankProjection: vi.fn(),
+        send: vi.fn(),
+        on: vi.fn()
+      })
+      renderWithRouter(['/'])
+      expect(screen.getByRole('button', { name: 'Blank projection' })).toBeInTheDocument()
+    })
+
+    it('renders with "Show projection" label when blanked', async () => {
+      await i18n.changeLanguage('en')
+      const { useProjection } = await import('@renderer/contexts/ProjectionContext')
+      vi.mocked(useProjection).mockReturnValue({
+        isProjectionOpen: true,
+        isProjectionBlanked: true,
+        openProjection: vi.fn(),
+        closeProjection: vi.fn(),
+        blankProjection: vi.fn(),
+        send: vi.fn(),
+        on: vi.fn()
+      })
+      renderWithRouter(['/'])
+      expect(screen.getByRole('button', { name: 'Show projection' })).toBeInTheDocument()
+    })
+
+    it('is disabled when projection is not open', async () => {
+      await i18n.changeLanguage('en')
+      const { useProjection } = await import('@renderer/contexts/ProjectionContext')
+      vi.mocked(useProjection).mockReturnValue({
+        isProjectionOpen: false,
+        isProjectionBlanked: true,
+        openProjection: vi.fn(),
+        closeProjection: vi.fn(),
+        blankProjection: vi.fn(),
+        send: vi.fn(),
+        on: vi.fn()
+      })
+      renderWithRouter(['/'])
+      expect(screen.getByRole('button', { name: 'Show projection' })).toBeDisabled()
+    })
+
+    it('is enabled when projection is open', async () => {
+      await i18n.changeLanguage('en')
+      const { useProjection } = await import('@renderer/contexts/ProjectionContext')
+      vi.mocked(useProjection).mockReturnValue({
+        isProjectionOpen: true,
+        isProjectionBlanked: false,
+        openProjection: vi.fn(),
+        closeProjection: vi.fn(),
+        blankProjection: vi.fn(),
+        send: vi.fn(),
+        on: vi.fn()
+      })
+      renderWithRouter(['/'])
+      expect(screen.getByRole('button', { name: 'Blank projection' })).not.toBeDisabled()
+    })
+
+    it('calls blankProjection with toggled value on press', async () => {
+      await i18n.changeLanguage('en')
+      const { useProjection } = await import('@renderer/contexts/ProjectionContext')
+      const blankProjection = vi.fn()
+      vi.mocked(useProjection).mockReturnValue({
+        isProjectionOpen: true,
+        isProjectionBlanked: false,
+        openProjection: vi.fn(),
+        closeProjection: vi.fn(),
+        blankProjection,
+        send: vi.fn(),
+        on: vi.fn()
+      })
+      renderWithRouter(['/'])
+      const user = userEvent.setup()
+      await user.click(screen.getByRole('button', { name: 'Blank projection' }))
+      expect(blankProjection).toHaveBeenCalledWith(true)
+    })
+
+    it('renders with correct aria-label in zh-TW', async () => {
+      await i18n.changeLanguage('zh-TW')
+      const { useProjection } = await import('@renderer/contexts/ProjectionContext')
+      vi.mocked(useProjection).mockReturnValue({
+        isProjectionOpen: true,
+        isProjectionBlanked: false,
+        openProjection: vi.fn(),
+        closeProjection: vi.fn(),
+        blankProjection: vi.fn(),
+        send: vi.fn(),
+        on: vi.fn()
+      })
+      renderWithRouter(['/'])
+      expect(screen.getByRole('button', { name: '關閉投影' })).toBeInTheDocument()
+      await i18n.changeLanguage('en')
+    })
   })
 })
