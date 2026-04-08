@@ -162,7 +162,7 @@ export default function TimerPage(): React.JSX.Element {
             overtimeMessage={overtimeMessageEnabled ? overtimeMessage : undefined}
             onTimeClick={timerStatus === 'stopped' ? () => setDialogOpen(true) : undefined}
           />
-          <TimeAdjustment />
+          <TimeAdjustment className="mb-3" />
           <TimerControls mode={mode} />
           <PresetChips className="self-start" />
         </div>

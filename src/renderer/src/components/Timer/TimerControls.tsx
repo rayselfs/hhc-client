@@ -35,44 +35,22 @@ export default function TimerControls({ mode }: TimerControlsProps): React.JSX.E
   const isRunning = status === 'running'
   const isPaused = status === 'paused'
 
+  const playAction = isStopped ? start : isPaused ? resume : pause
+  const playLabel = isStopped ? t('timer.start') : isRunning ? t('timer.pause') : t('timer.resume')
+
   return (
     <div className="flex items-center gap-3">
-      {isStopped && (
-        <Button
-          isIconOnly
-          size="lg"
-          variant="primary"
-          onPress={start}
-          data-testid="btn-start"
-          aria-label={t('timer.start')}
-        >
-          <Play className="size-5" />
-        </Button>
-      )}
-      {isRunning && (
-        <Button
-          isIconOnly
-          size="lg"
-          variant="outline"
-          onPress={pause}
-          data-testid="btn-pause"
-          aria-label={t('timer.pause')}
-        >
-          <Pause className="size-5" />
-        </Button>
-      )}
-      {isPaused && (
-        <Button
-          isIconOnly
-          size="lg"
-          variant="primary"
-          onPress={resume}
-          data-testid="btn-resume"
-          aria-label={t('timer.resume')}
-        >
-          <Play className="size-5" />
-        </Button>
-      )}
+      <Button
+        isIconOnly
+        size="lg"
+        variant={isStopped ? 'primary' : 'outline'}
+        className={isStopped ? '' : 'text-warning border-warning'}
+        onPress={playAction}
+        data-testid={isStopped ? 'btn-start' : isRunning ? 'btn-pause' : 'btn-resume'}
+        aria-label={playLabel}
+      >
+        {isRunning ? <Pause className="size-5" /> : <Play className="size-5" />}
+      </Button>
       <Button
         isIconOnly
         size="lg"
