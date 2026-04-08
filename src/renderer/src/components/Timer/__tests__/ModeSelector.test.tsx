@@ -6,59 +6,6 @@ import i18n from '@renderer/i18n'
 import ModeSelector from '@renderer/components/Timer/ModeSelector'
 import { useTimerStore } from '@renderer/stores/timer'
 
-vi.mock('@heroui/react', async () => {
-  const actual = await vi.importActual<typeof import('@heroui/react')>('@heroui/react')
-
-  let capturedOnSelectionChange: ((key: string) => void) | undefined
-  let capturedSelectedKey: string | undefined
-
-  const TabsMock = Object.assign(
-    ({
-      children,
-      selectedKey,
-      onSelectionChange
-    }: {
-      children: React.ReactNode
-      selectedKey?: string
-      onSelectionChange?: (key: string) => void
-    }) => {
-      capturedOnSelectionChange = onSelectionChange
-      capturedSelectedKey = selectedKey
-      return <div role="tablist">{children}</div>
-    },
-    {
-      List: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-      Tab: ({
-        children,
-        id,
-        'data-testid': dataTestId,
-        ...rest
-      }: {
-        children: React.ReactNode
-        id?: string
-        'data-testid'?: string
-        [key: string]: unknown
-      }) => (
-        <button
-          role="tab"
-          aria-selected={capturedSelectedKey === id}
-          data-testid={dataTestId}
-          onClick={() => id && capturedOnSelectionChange?.(id)}
-          {...(rest as React.ButtonHTMLAttributes<HTMLButtonElement>)}
-        >
-          {children}
-        </button>
-      ),
-      Indicator: () => null
-    }
-  )
-
-  return {
-    ...actual,
-    Tabs: TabsMock
-  }
-})
-
 beforeEach(() => {
   useTimerStore.setState({ mode: 'timer' })
 })

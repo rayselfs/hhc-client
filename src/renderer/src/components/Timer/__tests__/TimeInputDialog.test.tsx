@@ -5,44 +5,6 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key })
 }))
 
-vi.mock('@heroui/react', async () => {
-  const actual = await vi.importActual<typeof import('@heroui/react')>('@heroui/react')
-  return {
-    ...actual,
-    Modal: Object.assign(
-      ({ isOpen, children }: { isOpen?: boolean; children: React.ReactNode }) =>
-        isOpen ? <div>{children}</div> : null,
-      {
-        Root: ({ state, children }: { state?: { isOpen: boolean }; children: React.ReactNode }) =>
-          state?.isOpen ? <div>{children}</div> : null,
-        Trigger: () => null,
-        Backdrop: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-        Container: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-        Dialog: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-        Header: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-        Heading: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-        Icon: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-        Body: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-        Footer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-        CloseTrigger: () => null
-      }
-    ),
-    useOverlayState: ({
-      isOpen,
-      onOpenChange
-    }: {
-      isOpen?: boolean
-      onOpenChange?: (open: boolean) => void
-    }) => ({
-      isOpen: isOpen ?? false,
-      setOpen: (v: boolean) => onOpenChange?.(v),
-      open: () => onOpenChange?.(true),
-      close: () => onOpenChange?.(false),
-      toggle: () => onOpenChange?.(!isOpen)
-    })
-  }
-})
-
 const onClose = vi.fn()
 const onConfirm = vi.fn()
 
