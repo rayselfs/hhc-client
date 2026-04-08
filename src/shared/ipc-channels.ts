@@ -7,6 +7,13 @@
  */
 
 import type { ProjectionMessageTuple } from './projection-messages'
+import type {
+  TimerCommand,
+  TimerSettings,
+  TimerState,
+  StopwatchState,
+  TimerTickPayload
+} from './types/timer'
 
 // ---------------------------------------------------------------------------
 // Invoke channels (renderer → main, returns a result)
@@ -26,6 +33,9 @@ export interface IpcInvokeMap {
   'projection:get-displays': { args: []; result: DisplayInfo[] }
   'theme:get': { args: []; result: { source: string; shouldUseDarkColors: boolean } }
   'theme:set': { args: ['light' | 'dark' | 'system']; result: void }
+  'timer:command': { args: [TimerCommand]; result: void }
+  'timer:initialize': { args: [TimerSettings]; result: void }
+  'timer:get-state': { args: []; result: TimerState & { stopwatch: StopwatchState } }
 }
 
 export type IpcInvokeChannel = keyof IpcInvokeMap
@@ -50,6 +60,7 @@ export interface IpcMainToRendererMap {
   'projection:opened': []
   'projection:closed': []
   'theme:changed': [{ shouldUseDarkColors: boolean }]
+  'timer-tick': [TimerTickPayload]
 }
 
 export type IpcMainToRendererChannel = keyof IpcMainToRendererMap

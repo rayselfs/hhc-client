@@ -9,6 +9,8 @@
  * interface below. send/on will accept the new channel automatically.
  */
 
+import type { TimerTickPayload, TimerSyncPayload, StopwatchTickPayload } from './types/timer'
+
 export interface SystemMessages {
   '__system:ready': null
   '__system:pong': null
@@ -21,6 +23,14 @@ export interface SystemMessages {
 export interface AppMessages {
   /** Plain text sent to projection (demo — will be replaced by timer messages) */
   'projection:text': string
+  /** High-frequency timer tick data for projection display */
+  'timer:tick': TimerTickPayload
+  /** Full timer state sync (after settings changes, on reconnect) */
+  'timer:sync': TimerSyncPayload
+  /** Stopwatch tick data */
+  'timer:stopwatch': StopwatchTickPayload
+  /** Overtime message to display on projection */
+  'timer:overtime-message': { message: string }
 }
 
 /**
