@@ -25,9 +25,6 @@ export default function Sidebar(): React.JSX.Element {
   ]
 
   const isActive = (item: NavItem): boolean => {
-    if (item.to === '/timer') {
-      return location.pathname === '/' || location.pathname === '/timer'
-    }
     return location.pathname === item.to
   }
 

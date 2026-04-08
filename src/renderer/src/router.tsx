@@ -1,4 +1,4 @@
-import { createHashRouter } from 'react-router-dom'
+import { createHashRouter, Navigate } from 'react-router-dom'
 import TimerPage from '@renderer/pages/TimerPage'
 import BiblePage from '@renderer/pages/BiblePage'
 import ProjectionPage from '@renderer/pages/ProjectionPage'
@@ -9,7 +9,7 @@ const routes = [
     path: '/',
     Component: Layout,
     children: [
-      { index: true, Component: TimerPage },
+      { index: true, element: <Navigate to="/timer" replace /> },
       { path: 'timer', Component: TimerPage },
       { path: 'bible', Component: BiblePage }
     ]
