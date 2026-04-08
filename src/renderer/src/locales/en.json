@@ -5,10 +5,47 @@
   },
   "timer": {
     "title": "TIMER",
-    "placeholder": "Timer content will appear here",
-    "sendLabel": "Send to Projection",
-    "sendPlaceholder": "Type something...",
-    "projectionClosed": "Projection window is closed. Sending will open it first."
+    "mode": {
+      "timer": "Timer",
+      "clock": "Clock",
+      "both": "Both",
+      "stopwatch": "Stopwatch"
+    },
+    "start": "Start",
+    "pause": "Pause",
+    "resume": "Resume",
+    "reset": "Reset",
+    "presets": "Presets",
+    "addPreset": "Add Preset",
+    "deletePreset": "Delete Preset",
+    "settings": "Settings",
+    "reminder": {
+      "label": "Time Reminder",
+      "time": "Reminder Time",
+      "error": "Reminder time must be less than total duration",
+      "seconds": "sec"
+    },
+    "overtimeMessage": {
+      "label": "Time's Up Message",
+      "placeholder": "Time's Up",
+      "error": "Message cannot be empty"
+    },
+    "inputDialog": {
+      "title": "Set Duration",
+      "placeholder": "e.g. 5m, 1m30s, 03:00",
+      "hint": "Formats: 90s · 1m30s · 03:00 · 180",
+      "invalid": "Invalid time format"
+    },
+    "addTime": "+{{seconds}}s",
+    "removeTime": "-{{seconds}}s",
+    "startStopwatch": "Start Stopwatch",
+    "pauseStopwatch": "Pause Stopwatch",
+    "resumeStopwatch": "Resume Stopwatch",
+    "resetStopwatch": "Reset Stopwatch",
+    "timeAlmostUp": "Time Almost Up",
+    "timeIsUp": "Time's Up",
+    "overtime": "Overtime",
+    "floatingTimer": "Timer"
   },
   "bible": {
     "title": "BIBLE",

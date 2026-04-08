@@ -5,10 +5,47 @@
   },
   "timer": {
     "title": "計時器",
-    "placeholder": "計時器內容將顯示於此",
-    "sendLabel": "傳送至投影",
-    "sendPlaceholder": "輸入文字...",
-    "projectionClosed": "投影視窗已關閉，傳送時將自動開啟。"
+    "mode": {
+      "timer": "計時",
+      "clock": "時鐘",
+      "both": "兩者",
+      "stopwatch": "碼錶"
+    },
+    "start": "開始",
+    "pause": "暫停",
+    "resume": "繼續",
+    "reset": "重設",
+    "presets": "預設時間",
+    "addPreset": "新增預設",
+    "deletePreset": "刪除預設",
+    "settings": "設定",
+    "reminder": {
+      "label": "時間提醒",
+      "time": "提醒時間",
+      "error": "提醒時間必須小於總時間",
+      "seconds": "秒"
+    },
+    "overtimeMessage": {
+      "label": "時間到訊息",
+      "placeholder": "時間到",
+      "error": "訊息不能為空"
+    },
+    "inputDialog": {
+      "title": "設定時長",
+      "placeholder": "例：5m、1m30s、03:00",
+      "hint": "支援格式：90s · 1m30s · 03:00 · 180",
+      "invalid": "時間格式無效"
+    },
+    "addTime": "+{{seconds}}秒",
+    "removeTime": "-{{seconds}}秒",
+    "startStopwatch": "開始碼錶",
+    "pauseStopwatch": "暫停碼錶",
+    "resumeStopwatch": "繼續碼錶",
+    "resetStopwatch": "重設碼錶",
+    "timeAlmostUp": "時間快到",
+    "timeIsUp": "時間到",
+    "overtime": "超時",
+    "floatingTimer": "計時器"
   },
   "bible": {
     "title": "聖經",

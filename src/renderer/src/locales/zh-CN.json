@@ -5,10 +5,47 @@
   },
   "timer": {
     "title": "计时器",
-    "placeholder": "计时器内容将显示于此",
-    "sendLabel": "发送至投影",
-    "sendPlaceholder": "输入文字...",
-    "projectionClosed": "投影窗口已关闭，发送时将自动打开。"
+    "mode": {
+      "timer": "计时",
+      "clock": "时钟",
+      "both": "两者",
+      "stopwatch": "秒表"
+    },
+    "start": "开始",
+    "pause": "暂停",
+    "resume": "继续",
+    "reset": "重置",
+    "presets": "预设时间",
+    "addPreset": "新增预设",
+    "deletePreset": "删除预设",
+    "settings": "设置",
+    "reminder": {
+      "label": "时间提醒",
+      "time": "提醒时间",
+      "error": "提醒时间必须小于总时间",
+      "seconds": "秒"
+    },
+    "overtimeMessage": {
+      "label": "时间到消息",
+      "placeholder": "时间到",
+      "error": "消息不能为空"
+    },
+    "inputDialog": {
+      "title": "设定时长",
+      "placeholder": "例：5m、1m30s、03:00",
+      "hint": "支持格式：90s · 1m30s · 03:00 · 180",
+      "invalid": "时间格式无效"
+    },
+    "addTime": "+{{seconds}}秒",
+    "removeTime": "-{{seconds}}秒",
+    "startStopwatch": "开始秒表",
+    "pauseStopwatch": "暂停秒表",
+    "resumeStopwatch": "继续秒表",
+    "resetStopwatch": "重置秒表",
+    "timeAlmostUp": "时间快到",
+    "timeIsUp": "时间到",
+    "overtime": "超时",
+    "floatingTimer": "计时器"
   },
   "bible": {
     "title": "圣经",
