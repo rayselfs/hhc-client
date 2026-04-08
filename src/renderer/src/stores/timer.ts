@@ -4,10 +4,19 @@ import type {
   TimerStatus,
   TimerPhase,
   TimerSettings,
-  TimerState
+  TimerState,
+  TimerPreset
 } from '@shared/types/timer'
 
 const MAX_DURATION_SECONDS = 99 * 3600
+
+const DEFAULT_PRESETS: TimerPreset[] = [
+  { id: 'preset-10m', name: '10m', durationSeconds: 600, mode: 'timer' },
+  { id: 'preset-5m', name: '5m', durationSeconds: 300, mode: 'timer' },
+  { id: 'preset-3m', name: '3m', durationSeconds: 180, mode: 'timer' }
+]
+
+const PRESETS_STORAGE_KEY = 'hhc-timer-presets'
 
 export interface TimerStore {
   mode: TimerMode
@@ -27,6 +36,8 @@ export interface TimerStore {
 
   targetEndTime: number | null
 
+  presets: TimerPreset[]
+
   isRunning: () => boolean
   isPaused: () => boolean
   isStopped: () => boolean
@@ -44,6 +55,12 @@ export interface TimerStore {
   tick: (currentMs: number) => void
   setReminder: (enabled: boolean, durationSeconds: number) => void
   setOvertimeMessage: (enabled: boolean, message: string) => void
+
+  addPreset: (name: string, durationSeconds: number) => void
+  removePreset: (id: string) => void
+  applyPreset: (id: string) => void
+  loadPresets: () => void
+  savePresets: () => void
 }
 
 function formatTime(totalSeconds: number): string {
@@ -110,6 +127,8 @@ export const useTimerStore = create<TimerStore>()((set, get) => ({
   formattedTime: DEFAULT_STATE.formattedTime,
 
   targetEndTime: null,
+
+  presets: [],
 
   isRunning: () => get().status === 'running',
   isPaused: () => get().status === 'paused',
@@ -267,6 +286,59 @@ export const useTimerStore = create<TimerStore>()((set, get) => ({
 
   setOvertimeMessage: (enabled: boolean, message: string) => {
     set({ overtimeMessageEnabled: enabled, overtimeMessage: message })
+  },
+
+  addPreset: (name: string, durationSeconds: number) => {
+    const s = get()
+    const id = `preset-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+    const newPreset: TimerPreset = {
+      id,
+      name,
+      durationSeconds,
+      mode: 'timer'
+    }
+    set({ presets: [...s.presets, newPreset] })
+    get().savePresets()
+  },
+
+  removePreset: (id: string) => {
+    const s = get()
+    set({ presets: s.presets.filter((p) => p.id !== id) })
+    get().savePresets()
+  },
+
+  applyPreset: (id: string) => {
+    const s = get()
+    if (s.status !== 'stopped') return
+    const preset = s.presets.find((p) => p.id === id)
+    if (preset) {
+      get().setDuration(preset.durationSeconds)
+    }
+  },
+
+  loadPresets: () => {
+    try {
+      const stored = localStorage.getItem(PRESETS_STORAGE_KEY)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          set({ presets: parsed })
+          return
+        }
+      }
+    } catch {
+      // silent fail
+    }
+    set({ presets: DEFAULT_PRESETS })
+  },
+
+  savePresets: () => {
+    const s = get()
+    try {
+      localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(s.presets))
+    } catch {
+      // silent fail
+    }
   }
 }))
 

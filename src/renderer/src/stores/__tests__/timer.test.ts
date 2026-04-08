@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import {
   useTimerStore,
   DEFAULT_STATE,
@@ -842,5 +842,147 @@ describe('getDisplayValues end-to-end via store tick', () => {
     expect(dv3.overtimeDisplay).not.toBeNull()
 
     void targetEndTime
+  })
+})
+
+describe('preset management', () => {
+  let localStorageMock: Record<string, string> = {}
+
+  beforeEach(() => {
+    localStorageMock = {}
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => localStorageMock[key] || null,
+      setItem: (key: string, value: string) => {
+        localStorageMock[key] = value
+      },
+      removeItem: (key: string) => {
+        delete localStorageMock[key]
+      },
+      clear: () => {
+        localStorageMock = {}
+      },
+      length: 0,
+      key: (index: number) => {
+        const keys = Object.keys(localStorageMock)
+        return keys[index] || null
+      }
+    })
+    useTimerStore.setState(INITIAL_STATE)
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('loads default presets when localStorage is empty', () => {
+    useTimerStore.getState().loadPresets()
+    const s = useTimerStore.getState()
+    expect(s.presets).toHaveLength(3)
+    expect(s.presets[0].name).toBe('10m')
+    expect(s.presets[1].name).toBe('5m')
+    expect(s.presets[2].name).toBe('3m')
+  })
+
+  it('addPreset increases presets array', () => {
+    useTimerStore.getState().loadPresets()
+    const initialCount = useTimerStore.getState().presets.length
+    useTimerStore.getState().addPreset('15m', 900)
+    expect(useTimerStore.getState().presets).toHaveLength(initialCount + 1)
+  })
+
+  it('addPreset with name and duration creates correct preset', () => {
+    useTimerStore.getState().addPreset('15m', 900)
+    const presets = useTimerStore.getState().presets
+    const last = presets[presets.length - 1]
+    expect(last.name).toBe('15m')
+    expect(last.durationSeconds).toBe(900)
+    expect(last.mode).toBe('timer')
+    expect(last.id).toBeDefined()
+  })
+
+  it('removePreset filters out matching id', () => {
+    useTimerStore.getState().addPreset('test', 500)
+    const presets = useTimerStore.getState().presets
+    const idToRemove = presets[presets.length - 1].id
+    useTimerStore.getState().removePreset(idToRemove)
+    expect(useTimerStore.getState().presets.find((p) => p.id === idToRemove)).toBeUndefined()
+  })
+
+  it('applyPreset sets duration when timer is stopped', () => {
+    useTimerStore.getState().addPreset('20m', 1200)
+    const presets = useTimerStore.getState().presets
+    const presetId = presets[presets.length - 1].id
+    useTimerStore.getState().applyPreset(presetId)
+    expect(useTimerStore.getState().remainingSeconds).toBe(1200)
+    expect(useTimerStore.getState().totalDuration).toBe(1200)
+  })
+
+  it('applyPreset is no-op when timer is running', () => {
+    useTimerStore.getState().addPreset('20m', 1200)
+    useTimerStore.getState().start()
+    const presets = useTimerStore.getState().presets
+    const presetId = presets[presets.length - 1].id
+    const before = useTimerStore.getState().remainingSeconds
+    useTimerStore.getState().applyPreset(presetId)
+    expect(useTimerStore.getState().remainingSeconds).toBe(before)
+  })
+
+  it('applyPreset is no-op when timer is paused', () => {
+    useTimerStore.getState().addPreset('20m', 1200)
+    useTimerStore.getState().start()
+    useTimerStore.getState().pause()
+    const presets = useTimerStore.getState().presets
+    const presetId = presets[presets.length - 1].id
+    const before = useTimerStore.getState().remainingSeconds
+    useTimerStore.getState().applyPreset(presetId)
+    expect(useTimerStore.getState().remainingSeconds).toBe(before)
+  })
+
+  it('savePresets persists to localStorage', () => {
+    useTimerStore.getState().addPreset('12m', 720)
+    const presets = useTimerStore.getState().presets
+    const stored = localStorage.getItem('hhc-timer-presets')
+    expect(stored).toBeDefined()
+    const parsed = JSON.parse(stored!)
+    expect(Array.isArray(parsed)).toBe(true)
+    expect(parsed.some((p: (typeof presets)[0]) => p.name === '12m')).toBe(true)
+  })
+
+  it('loadPresets reads and restores from localStorage', () => {
+    const testPresets = [
+      { id: 'test-1', name: 'test-10m', durationSeconds: 600, mode: 'timer' as const },
+      { id: 'test-2', name: 'test-5m', durationSeconds: 300, mode: 'timer' as const }
+    ]
+    localStorage.setItem('hhc-timer-presets', JSON.stringify(testPresets))
+    useTimerStore.getState().loadPresets()
+    const s = useTimerStore.getState()
+    expect(s.presets).toHaveLength(2)
+    expect(s.presets[0].name).toBe('test-10m')
+    expect(s.presets[1].name).toBe('test-5m')
+  })
+
+  it('loadPresets handles invalid JSON gracefully', () => {
+    localStorage.setItem('hhc-timer-presets', 'invalid-json{{{')
+    useTimerStore.getState().loadPresets()
+    const s = useTimerStore.getState()
+    expect(s.presets).toHaveLength(3)
+    expect(s.presets[0].name).toBe('10m')
+  })
+
+  it('loadPresets uses defaults when key missing', () => {
+    delete localStorageMock['hhc-timer-presets']
+    useTimerStore.getState().loadPresets()
+    const s = useTimerStore.getState()
+    expect(s.presets).toHaveLength(3)
+    expect(s.presets[0].name).toBe('10m')
+  })
+
+  it('addPreset generates unique ids', () => {
+    useTimerStore.getState().addPreset('a', 100)
+    useTimerStore.getState().addPreset('b', 200)
+    const presets = useTimerStore.getState().presets
+    const ids = presets.filter((p) => p.name === 'a' || p.name === 'b').map((p) => p.id)
+    expect(ids.length).toBe(2)
+    expect(ids[0]).not.toBe(ids[1])
   })
 })
