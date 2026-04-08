@@ -28,6 +28,7 @@ vi.stubGlobal('BroadcastChannel', MockBroadcastChannel)
 const mockProjectionUnsubscribe = vi.fn()
 const mockProjectionApi = {
   send: vi.fn<(channel: string, data: unknown) => void>(),
+  sendToMain: vi.fn<(channel: string, data: unknown) => void>(),
   onProjectionMessage: vi.fn<(callback: (ch: string, d: unknown) => void) => () => void>(
     () => mockProjectionUnsubscribe
   )
@@ -157,12 +158,22 @@ describe('ElectronProjectionAdapter', () => {
     setupWindowApi()
   })
 
-  it('send() delegates to api.send(channel, data)', () => {
+  it('send() delegates to api.send(channel, data) with default main role', () => {
     const adapter = createProjectionAdapter()
     adapter.send('projection:text', 'hello')
 
     expect(mockProjectionApi.send).toHaveBeenCalledOnce()
     expect(mockProjectionApi.send).toHaveBeenCalledWith('projection:text', 'hello')
+    expect(mockProjectionApi.sendToMain).not.toHaveBeenCalled()
+  })
+
+  it('send() delegates to api.sendToMain(channel, data) with projection role', () => {
+    const adapter = createProjectionAdapter('projection')
+    adapter.send('__system:ready', null)
+
+    expect(mockProjectionApi.sendToMain).toHaveBeenCalledOnce()
+    expect(mockProjectionApi.sendToMain).toHaveBeenCalledWith('__system:ready', null)
+    expect(mockProjectionApi.send).not.toHaveBeenCalled()
   })
 
   it('on() registers callback via api.onProjectionMessage', () => {

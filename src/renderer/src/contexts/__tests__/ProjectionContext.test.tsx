@@ -164,6 +164,53 @@ describe('ProjectionContext — web mode', () => {
     expect(typeof unsub).toBe('function')
   })
 
+  it('__system:ready sets projection ready', () => {
+    const { result } = renderProjection()
+
+    act(() => {
+      mockAdapter._trigger('__system:ready', null)
+    })
+
+    act(() => {
+      mockAdapter._trigger('__system:pong', null)
+    })
+    expect(result.current.isProjectionOpen).toBe(true)
+  })
+
+  it('project() opens projection, waits for ready, sends content, and unblanks', async () => {
+    const { result } = renderProjection()
+    expect(result.current.isProjectionBlanked).toBe(true)
+
+    const projectPromise = act(async () => {
+      const p = result.current.project('projection:text', 'hello')
+      act(() => {
+        mockAdapter._trigger('__system:ready', null)
+      })
+      return p
+    })
+
+    await projectPromise
+
+    expect(mockAdapter.send).toHaveBeenCalledWith('projection:text', 'hello')
+    expect(mockAdapter.send).toHaveBeenCalledWith('__system:blank', { showDefault: false })
+    expect(result.current.isProjectionBlanked).toBe(false)
+  })
+
+  it('project() skips ready wait when already ready', async () => {
+    const { result } = renderProjection()
+
+    act(() => {
+      mockAdapter._trigger('__system:ready', null)
+    })
+
+    await act(async () => {
+      await result.current.project('projection:text', 'hello')
+    })
+
+    expect(mockAdapter.send).toHaveBeenCalledWith('projection:text', 'hello')
+    expect(result.current.isProjectionBlanked).toBe(false)
+  })
+
   it('blankProjection(true) sets isProjectionBlanked true and sends __system:blank', () => {
     const { result } = renderProjection()
 
@@ -207,6 +254,31 @@ describe('ProjectionContext — web mode', () => {
       mockAdapter._trigger('__system:closed', null)
     })
     expect(result.current.isProjectionBlanked).toBe(true)
+  })
+
+  it('__system:closed resets ready state so project() waits again', async () => {
+    const { result } = renderProjection()
+
+    act(() => {
+      mockAdapter._trigger('__system:ready', null)
+    })
+
+    act(() => {
+      mockAdapter._trigger('__system:closed', null)
+    })
+
+    vi.mocked(mockAdapter.send).mockClear()
+
+    const projectPromise = act(async () => {
+      const p = result.current.project('projection:text', 'new content')
+      act(() => {
+        mockAdapter._trigger('__system:ready', null)
+      })
+      return p
+    })
+
+    await projectPromise
+    expect(mockAdapter.send).toHaveBeenCalledWith('projection:text', 'new content')
   })
 
   it('polling detects closed window', async () => {

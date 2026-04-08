@@ -11,21 +11,20 @@ export default function Header(): React.JSX.Element {
 
   return (
     <>
-      <header className="flex items-center justify-end gap-1 p-2">
+      <header className="flex items-center justify-end gap-2 p-2">
         <Button
           isIconOnly
-          size="sm"
-          variant={isProjectionBlanked ? 'ghost' : 'secondary'}
+          variant={isProjectionBlanked ? 'outline' : 'danger-soft'}
           onPress={() => blankProjection(!isProjectionBlanked)}
           isDisabled={!isProjectionOpen}
           aria-label={t(isProjectionBlanked ? 'projection.showButton' : 'projection.blankButton')}
         >
-          {isProjectionBlanked ? <MonitorOff className="size-4" /> : <Monitor className="size-4" />}
+          {isProjectionBlanked ? <Monitor className="size-4" /> : <MonitorOff className="size-4" />}
         </Button>
         <Button
           isIconOnly
-          size="sm"
-          variant="danger-soft"
+          variant="outline"
+          className="text-danger"
           onPress={state.open}
           isDisabled={!isProjectionOpen}
           aria-label={t('projection.closeButton')}

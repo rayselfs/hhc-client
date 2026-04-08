@@ -6,14 +6,11 @@ import { Send } from 'lucide-react'
 
 export default function TimerPage(): React.JSX.Element {
   const { t } = useTranslation()
-  const { send, isProjectionOpen, openProjection } = useProjection()
+  const { project, isProjectionOpen } = useProjection()
   const [message, setMessage] = useState('')
 
   const handleSend = async (): Promise<void> => {
-    if (!isProjectionOpen) {
-      await openProjection()
-    }
-    send('projection:text', message)
+    await project('projection:text', message)
   }
 
   return (

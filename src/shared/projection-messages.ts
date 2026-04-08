@@ -10,6 +10,7 @@
  */
 
 export interface SystemMessages {
+  '__system:ready': null
   '__system:pong': null
   '__system:ping': null
   '__system:close': null

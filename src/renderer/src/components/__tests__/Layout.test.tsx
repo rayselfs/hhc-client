@@ -16,6 +16,7 @@ vi.mock('@renderer/contexts/ProjectionContext', async (importOriginal) => {
       openProjection: vi.fn(),
       closeProjection: vi.fn(),
       blankProjection: vi.fn(),
+      project: vi.fn(),
       send: vi.fn(),
       on: vi.fn()
     })

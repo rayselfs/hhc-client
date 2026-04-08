@@ -1,6 +1,8 @@
 import { isElectron } from '@renderer/lib/env'
 import type { ProjectionChannel, ProjectionPayload } from '@shared/projection-messages'
 
+type AdapterRole = 'main' | 'projection'
+
 interface ProjectionAdapter {
   send<C extends ProjectionChannel>(channel: C, data: ProjectionPayload<C>): void
   on<C extends ProjectionChannel>(
@@ -13,13 +15,19 @@ interface ProjectionAdapter {
 class ElectronProjectionAdapter implements ProjectionAdapter {
   private api: Window['api']['projection']
   private unsubscribers = new Set<() => void>()
+  private role: AdapterRole
 
-  constructor(api: Window['api']['projection']) {
+  constructor(api: Window['api']['projection'], role: AdapterRole) {
     this.api = api
+    this.role = role
   }
 
   send<C extends ProjectionChannel>(channel: C, data: ProjectionPayload<C>): void {
-    this.api.send(channel, data)
+    if (this.role === 'projection') {
+      this.api.sendToMain(channel, data)
+    } else {
+      this.api.send(channel, data)
+    }
   }
 
   on<C extends ProjectionChannel>(
@@ -79,8 +87,8 @@ class BroadcastChannelAdapter implements ProjectionAdapter {
   }
 }
 
-function createProjectionAdapter(): ProjectionAdapter {
-  if (isElectron()) return new ElectronProjectionAdapter(window.api.projection)
+function createProjectionAdapter(role: AdapterRole = 'main'): ProjectionAdapter {
+  if (isElectron()) return new ElectronProjectionAdapter(window.api.projection, role)
   return new BroadcastChannelAdapter()
 }
 

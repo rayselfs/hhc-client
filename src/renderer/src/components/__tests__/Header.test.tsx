@@ -41,6 +41,7 @@ describe('Header', () => {
       openProjection: vi.fn(),
       closeProjection: vi.fn(),
       blankProjection: vi.fn(),
+      project: vi.fn(),
       send: vi.fn(),
       on: vi.fn()
     })
@@ -57,6 +58,7 @@ describe('Header', () => {
       openProjection: vi.fn(),
       closeProjection: vi.fn(),
       blankProjection: vi.fn(),
+      project: vi.fn(),
       send: vi.fn(),
       on: vi.fn()
     })
@@ -73,6 +75,7 @@ describe('Header', () => {
       openProjection: vi.fn(),
       closeProjection: vi.fn(),
       blankProjection: vi.fn(),
+      project: vi.fn(),
       send: vi.fn(),
       on: vi.fn()
     })
@@ -90,6 +93,7 @@ describe('Header', () => {
       openProjection: vi.fn(),
       closeProjection: vi.fn(),
       blankProjection: vi.fn(),
+      project: vi.fn(),
       send: vi.fn(),
       on: vi.fn()
     })
@@ -107,6 +111,7 @@ describe('Header', () => {
       openProjection: vi.fn(),
       closeProjection: vi.fn(),
       blankProjection: vi.fn(),
+      project: vi.fn(),
       send: vi.fn(),
       on: vi.fn()
     })
@@ -125,6 +130,7 @@ describe('Header', () => {
         openProjection: vi.fn(),
         closeProjection: vi.fn(),
         blankProjection: vi.fn(),
+        project: vi.fn(),
         send: vi.fn(),
         on: vi.fn()
       })
@@ -141,6 +147,7 @@ describe('Header', () => {
         openProjection: vi.fn(),
         closeProjection: vi.fn(),
         blankProjection: vi.fn(),
+        project: vi.fn(),
         send: vi.fn(),
         on: vi.fn()
       })
@@ -157,6 +164,7 @@ describe('Header', () => {
         openProjection: vi.fn(),
         closeProjection: vi.fn(),
         blankProjection: vi.fn(),
+        project: vi.fn(),
         send: vi.fn(),
         on: vi.fn()
       })
@@ -173,6 +181,7 @@ describe('Header', () => {
         openProjection: vi.fn(),
         closeProjection: vi.fn(),
         blankProjection: vi.fn(),
+        project: vi.fn(),
         send: vi.fn(),
         on: vi.fn()
       })
@@ -190,6 +199,7 @@ describe('Header', () => {
         openProjection: vi.fn(),
         closeProjection: vi.fn(),
         blankProjection,
+        project: vi.fn(),
         send: vi.fn(),
         on: vi.fn()
       })
@@ -208,6 +218,7 @@ describe('Header', () => {
         openProjection: vi.fn(),
         closeProjection: vi.fn(),
         blankProjection: vi.fn(),
+        project: vi.fn(),
         send: vi.fn(),
         on: vi.fn()
       })

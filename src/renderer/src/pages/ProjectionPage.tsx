@@ -8,7 +8,7 @@ export default function ProjectionPage(): React.JSX.Element {
   const [text, setText] = useState('')
 
   useEffect(() => {
-    const adapter = createProjectionAdapter()
+    const adapter = createProjectionAdapter('projection')
 
     const unsubBlank = adapter.on('__system:blank', ({ showDefault: blank }) => {
       setShowDefault(blank)
@@ -16,7 +16,6 @@ export default function ProjectionPage(): React.JSX.Element {
 
     const unsubText = adapter.on('projection:text', (data) => {
       setText(data)
-      setShowDefault(false)
     })
 
     let unsubClose = (): void => {}
@@ -30,27 +29,23 @@ export default function ProjectionPage(): React.JSX.Element {
         adapter.send('__system:pong', null)
       })
       adapter.send('__system:pong', null)
+    }
 
-      const handleBeforeUnload = (): void => {
+    adapter.send('__system:ready', null)
+
+    const handleBeforeUnload = (): void => {
+      if (!isElectron()) {
         adapter.send('__system:closed', null)
       }
-      window.addEventListener('beforeunload', handleBeforeUnload)
-
-      return () => {
-        unsubBlank()
-        unsubText()
-        unsubClose()
-        unsubPing()
-        window.removeEventListener('beforeunload', handleBeforeUnload)
-        adapter.dispose()
-      }
     }
+    window.addEventListener('beforeunload', handleBeforeUnload)
 
     return () => {
       unsubBlank()
       unsubText()
       unsubClose()
       unsubPing()
+      window.removeEventListener('beforeunload', handleBeforeUnload)
       adapter.dispose()
     }
   }, [])
