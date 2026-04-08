@@ -11,7 +11,7 @@ export default function StopwatchDisplay({
 }: StopwatchDisplayProps): React.JSX.Element {
   return (
     <div
-      className={`font-mono font-bold tabular-nums ${className ?? ''}`}
+      className={`timer-digits font-bold tabular-nums ${className ?? ''}`}
       style={{ fontSize: size }}
       data-testid="stopwatch-display"
     >

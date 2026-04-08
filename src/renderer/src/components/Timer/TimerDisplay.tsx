@@ -46,7 +46,7 @@ export default function TimerDisplay({
             type="button"
             onClick={isClickable ? onTimeClick : undefined}
             className={[
-              'font-mono font-bold text-4xl bg-transparent border-0 p-0',
+              'timer-digits font-bold text-4xl bg-transparent border-0 p-0',
               isWarning ? 'text-danger' : '',
               isClickable ? 'cursor-pointer hover:opacity-80' : 'cursor-default pointer-events-none'
             ].join(' ')}

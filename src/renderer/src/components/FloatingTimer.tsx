@@ -41,7 +41,7 @@ export default function FloatingTimer(): React.JSX.Element | null {
           aria-label="Timer progress"
           className="w-full h-full"
         >
-          <span className="font-mono text-xs font-bold">{formatMMSS(remainingSeconds)}</span>
+          <span className="timer-digits text-xs font-bold">{formatMMSS(remainingSeconds)}</span>
         </ProgressCircle>
       </div>
     </div>

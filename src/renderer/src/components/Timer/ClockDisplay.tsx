@@ -26,7 +26,7 @@ export default function ClockDisplay({
 
   return (
     <div
-      className={`font-mono font-bold tabular-nums ${className ?? ''}`}
+      className={`timer-digits font-bold tabular-nums ${className ?? ''}`}
       style={{ fontSize: size }}
       data-testid="clock-display"
     >

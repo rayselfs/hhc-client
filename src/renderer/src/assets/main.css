@@ -1,3 +1,4 @@
+@import '@fontsource-variable/roboto';
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import '@heroui/styles';
@@ -19,4 +20,8 @@
 [data-theme='dark'] {
   --sidebar: oklch(0.18 0.0059 285.89);
   --sidebar-foreground: var(--foreground);
+}
+
+.timer-digits {
+  font-family: 'Roboto Variable', 'Roboto', sans-serif;
 }
