@@ -43,8 +43,8 @@ export default function TimerControls({ mode }: TimerControlsProps): React.JSX.E
       <Button
         isIconOnly
         size="lg"
-        variant={isStopped ? 'primary' : 'outline'}
-        className={isStopped ? '' : 'text-warning border-warning'}
+        variant={isStopped ? 'primary' : 'secondary'}
+        className={isStopped ? '' : 'bg-warning text-warning-foreground'}
         onPress={playAction}
         data-testid={isStopped ? 'btn-start' : isRunning ? 'btn-pause' : 'btn-resume'}
         aria-label={playLabel}
