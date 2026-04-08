@@ -36,8 +36,10 @@ describe('Header', () => {
     const { useProjection } = await import('@renderer/contexts/ProjectionContext')
     vi.mocked(useProjection).mockReturnValue({
       isProjectionOpen: false,
+      isProjectionBlanked: true,
       openProjection: vi.fn(),
       closeProjection: vi.fn(),
+      blankProjection: vi.fn(),
       send: vi.fn(),
       on: vi.fn()
     })
@@ -50,8 +52,10 @@ describe('Header', () => {
     const { useProjection } = await import('@renderer/contexts/ProjectionContext')
     vi.mocked(useProjection).mockReturnValue({
       isProjectionOpen: true,
+      isProjectionBlanked: false,
       openProjection: vi.fn(),
       closeProjection: vi.fn(),
+      blankProjection: vi.fn(),
       send: vi.fn(),
       on: vi.fn()
     })
@@ -64,8 +68,10 @@ describe('Header', () => {
     const { useProjection } = await import('@renderer/contexts/ProjectionContext')
     vi.mocked(useProjection).mockReturnValue({
       isProjectionOpen: false,
+      isProjectionBlanked: true,
       openProjection: vi.fn(),
       closeProjection: vi.fn(),
+      blankProjection: vi.fn(),
       send: vi.fn(),
       on: vi.fn()
     })
@@ -79,8 +85,10 @@ describe('Header', () => {
     const { useProjection } = await import('@renderer/contexts/ProjectionContext')
     vi.mocked(useProjection).mockReturnValue({
       isProjectionOpen: true,
+      isProjectionBlanked: false,
       openProjection: vi.fn(),
       closeProjection: vi.fn(),
+      blankProjection: vi.fn(),
       send: vi.fn(),
       on: vi.fn()
     })
@@ -94,8 +102,10 @@ describe('Header', () => {
     const { useProjection } = await import('@renderer/contexts/ProjectionContext')
     vi.mocked(useProjection).mockReturnValue({
       isProjectionOpen: true,
+      isProjectionBlanked: false,
       openProjection: vi.fn(),
       closeProjection: vi.fn(),
+      blankProjection: vi.fn(),
       send: vi.fn(),
       on: vi.fn()
     })
