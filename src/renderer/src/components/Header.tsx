@@ -26,7 +26,7 @@ export default function Header(): React.JSX.Element {
         <Modal.Trigger />
         <Modal.Backdrop>
           <Modal.Container>
-            <Modal.Dialog>
+            <Modal.Dialog className="p-2 pl-5 pt-5">
               <Modal.Header>
                 <Modal.Icon className="text-danger">
                   <TriangleAlert className="size-6" />

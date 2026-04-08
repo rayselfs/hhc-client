@@ -4,6 +4,7 @@ import { describe, it, expect } from 'vitest'
 import '@renderer/i18n'
 import i18n from '@renderer/i18n'
 import routes from '@renderer/router'
+import { ThemeProvider } from '@renderer/contexts/ThemeContext'
 
 vi.mock('@renderer/contexts/ProjectionContext', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@renderer/contexts/ProjectionContext')>()
@@ -21,7 +22,11 @@ vi.mock('@renderer/contexts/ProjectionContext', async (importOriginal) => {
 
 function renderWithRouter(initialEntries: string[] = ['/']): ReturnType<typeof render> {
   const router = createMemoryRouter(routes, { initialEntries })
-  return render(<RouterProvider router={router} />)
+  return render(
+    <ThemeProvider>
+      <RouterProvider router={router} />
+    </ThemeProvider>
+  )
 }
 
 describe('Layout', () => {

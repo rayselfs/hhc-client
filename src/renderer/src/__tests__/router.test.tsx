@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import routes from '../router'
+import { ThemeProvider } from '@renderer/contexts/ThemeContext'
 
 vi.mock('@renderer/contexts/ProjectionContext', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@renderer/contexts/ProjectionContext')>()
@@ -19,7 +20,11 @@ vi.mock('@renderer/contexts/ProjectionContext', async (importOriginal) => {
 
 function renderWithRouter(initialEntries: string[] = ['/']): ReturnType<typeof render> {
   const router = createMemoryRouter(routes, { initialEntries })
-  return render(<RouterProvider router={router} />)
+  return render(
+    <ThemeProvider>
+      <RouterProvider router={router} />
+    </ThemeProvider>
+  )
 }
 
 describe('Router', () => {
@@ -41,7 +46,11 @@ describe('Router', () => {
   it('navigates from timer to bible via sidebar link', async () => {
     const user = userEvent.setup()
     const router = createMemoryRouter(routes, { initialEntries: ['/'] })
-    render(<RouterProvider router={router} />)
+    render(
+      <ThemeProvider>
+        <RouterProvider router={router} />
+      </ThemeProvider>
+    )
 
     expect(screen.getByTestId('timer-page')).toBeInTheDocument()
 
