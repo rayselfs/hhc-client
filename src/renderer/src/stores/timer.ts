@@ -270,4 +270,75 @@ export const useTimerStore = create<TimerStore>()((set, get) => ({
   }
 }))
 
+export interface DisplayValues {
+  mainDisplay: string
+  subDisplay: string | null
+  isRed: boolean
+  overtimeDisplay: string | null
+}
+
+export function getDisplayValues(
+  state: Pick<
+    TimerStore,
+    | 'phase'
+    | 'remainingSeconds'
+    | 'reminderDuration'
+    | 'overtimeSeconds'
+    | 'totalDuration'
+    | 'reminderEnabled'
+  >
+): DisplayValues {
+  const {
+    phase,
+    remainingSeconds,
+    reminderDuration,
+    overtimeSeconds,
+    totalDuration,
+    reminderEnabled
+  } = state
+
+  if (phase === 'idle') {
+    return {
+      mainDisplay: formatTime(totalDuration),
+      subDisplay: null,
+      isRed: false,
+      overtimeDisplay: null
+    }
+  }
+
+  if (phase === 'overtime') {
+    return {
+      mainDisplay: '00:00',
+      subDisplay: null,
+      isRed: false,
+      overtimeDisplay: formatTime(overtimeSeconds)
+    }
+  }
+
+  if (phase === 'warning') {
+    return {
+      mainDisplay: formatTime(remainingSeconds),
+      subDisplay: null,
+      isRed: true,
+      overtimeDisplay: null
+    }
+  }
+
+  if (reminderEnabled) {
+    return {
+      mainDisplay: formatTime(remainingSeconds - reminderDuration),
+      subDisplay: formatTime(reminderDuration),
+      isRed: false,
+      overtimeDisplay: null
+    }
+  }
+
+  return {
+    mainDisplay: formatTime(remainingSeconds),
+    subDisplay: null,
+    isRed: false,
+    overtimeDisplay: null
+  }
+}
+
 export type { TimerMode, TimerStatus, TimerPhase }

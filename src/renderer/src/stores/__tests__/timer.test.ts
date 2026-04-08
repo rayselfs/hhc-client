@@ -1,5 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { useTimerStore, DEFAULT_STATE, DEFAULT_SETTINGS } from '@renderer/stores/timer'
+import {
+  useTimerStore,
+  DEFAULT_STATE,
+  DEFAULT_SETTINGS,
+  getDisplayValues
+} from '@renderer/stores/timer'
 
 const INITIAL_STATE = {
   ...DEFAULT_SETTINGS,
@@ -629,5 +634,213 @@ describe('reminder phase logic with 180s duration + 60s reminder', () => {
     })
     useTimerStore.getState().tick(now + 1000)
     expect(useTimerStore.getState().phase).toBe('overtime')
+  })
+})
+
+describe('getDisplayValues', () => {
+  it('IDLE: shows totalDuration, no sub, not red, no overtime', () => {
+    const result = getDisplayValues({
+      phase: 'idle',
+      remainingSeconds: 300,
+      reminderDuration: 60,
+      overtimeSeconds: 0,
+      totalDuration: 300,
+      reminderEnabled: false
+    })
+    expect(result.mainDisplay).toBe('05:00')
+    expect(result.subDisplay).toBeNull()
+    expect(result.isRed).toBe(false)
+    expect(result.overtimeDisplay).toBeNull()
+  })
+
+  it('IDLE with custom totalDuration: formats correctly', () => {
+    const result = getDisplayValues({
+      phase: 'idle',
+      remainingSeconds: 120,
+      reminderDuration: 60,
+      overtimeSeconds: 0,
+      totalDuration: 3600,
+      reminderEnabled: false
+    })
+    expect(result.mainDisplay).toBe('1:00:00')
+  })
+
+  it('MAIN phase with reminder enabled: shows countdown-to-warning, subDisplay=reminderDuration', () => {
+    const result = getDisplayValues({
+      phase: 'main',
+      remainingSeconds: 180,
+      reminderDuration: 60,
+      overtimeSeconds: 0,
+      totalDuration: 180,
+      reminderEnabled: true
+    })
+    expect(result.mainDisplay).toBe('02:00')
+    expect(result.subDisplay).toBe('01:00')
+    expect(result.isRed).toBe(false)
+    expect(result.overtimeDisplay).toBeNull()
+  })
+
+  it('MAIN phase with reminder enabled: remainingSeconds=121', () => {
+    const result = getDisplayValues({
+      phase: 'main',
+      remainingSeconds: 121,
+      reminderDuration: 60,
+      overtimeSeconds: 0,
+      totalDuration: 180,
+      reminderEnabled: true
+    })
+    expect(result.mainDisplay).toBe('01:01')
+    expect(result.subDisplay).toBe('01:00')
+  })
+
+  it('MAIN phase with reminder enabled: remainingSeconds=61 (1s before warning)', () => {
+    const result = getDisplayValues({
+      phase: 'main',
+      remainingSeconds: 61,
+      reminderDuration: 60,
+      overtimeSeconds: 0,
+      totalDuration: 180,
+      reminderEnabled: true
+    })
+    expect(result.mainDisplay).toBe('00:01')
+    expect(result.subDisplay).toBe('01:00')
+  })
+
+  it('WARNING phase: mainDisplay=remainingSeconds in red, subDisplay=null', () => {
+    const result = getDisplayValues({
+      phase: 'warning',
+      remainingSeconds: 60,
+      reminderDuration: 60,
+      overtimeSeconds: 0,
+      totalDuration: 180,
+      reminderEnabled: true
+    })
+    expect(result.mainDisplay).toBe('01:00')
+    expect(result.subDisplay).toBeNull()
+    expect(result.isRed).toBe(true)
+    expect(result.overtimeDisplay).toBeNull()
+  })
+
+  it('WARNING phase counting down: remainingSeconds=30', () => {
+    const result = getDisplayValues({
+      phase: 'warning',
+      remainingSeconds: 30,
+      reminderDuration: 60,
+      overtimeSeconds: 0,
+      totalDuration: 180,
+      reminderEnabled: true
+    })
+    expect(result.mainDisplay).toBe('00:30')
+    expect(result.isRed).toBe(true)
+  })
+
+  it('OVERTIME phase: mainDisplay=00:00, overtimeDisplay=elapsed, not red', () => {
+    const result = getDisplayValues({
+      phase: 'overtime',
+      remainingSeconds: 0,
+      reminderDuration: 60,
+      overtimeSeconds: 15,
+      totalDuration: 180,
+      reminderEnabled: true
+    })
+    expect(result.mainDisplay).toBe('00:00')
+    expect(result.subDisplay).toBeNull()
+    expect(result.isRed).toBe(false)
+    expect(result.overtimeDisplay).toBe('00:15')
+  })
+
+  it('OVERTIME phase: overtimeDisplay counts up correctly', () => {
+    const result = getDisplayValues({
+      phase: 'overtime',
+      remainingSeconds: 0,
+      reminderDuration: 60,
+      overtimeSeconds: 90,
+      totalDuration: 180,
+      reminderEnabled: true
+    })
+    expect(result.overtimeDisplay).toBe('01:30')
+  })
+
+  it('MAIN phase with reminder DISABLED: shows remainingSeconds directly, no subDisplay', () => {
+    const result = getDisplayValues({
+      phase: 'main',
+      remainingSeconds: 180,
+      reminderDuration: 60,
+      overtimeSeconds: 0,
+      totalDuration: 180,
+      reminderEnabled: false
+    })
+    expect(result.mainDisplay).toBe('03:00')
+    expect(result.subDisplay).toBeNull()
+    expect(result.isRed).toBe(false)
+  })
+
+  it('PAUSED state uses same display as running — phase drives display, not status', () => {
+    const resultMain = getDisplayValues({
+      phase: 'main',
+      remainingSeconds: 120,
+      reminderDuration: 60,
+      overtimeSeconds: 0,
+      totalDuration: 180,
+      reminderEnabled: true
+    })
+    expect(resultMain.mainDisplay).toBe('01:00')
+    expect(resultMain.subDisplay).toBe('01:00')
+
+    const resultWarning = getDisplayValues({
+      phase: 'warning',
+      remainingSeconds: 45,
+      reminderDuration: 60,
+      overtimeSeconds: 0,
+      totalDuration: 180,
+      reminderEnabled: true
+    })
+    expect(resultWarning.mainDisplay).toBe('00:45')
+    expect(resultWarning.isRed).toBe(true)
+  })
+})
+
+describe('getDisplayValues end-to-end via store tick', () => {
+  it('full phase transition: main → warning → overtime', () => {
+    useTimerStore.setState({
+      ...INITIAL_STATE,
+      totalDuration: 180,
+      remainingSeconds: 180,
+      reminderEnabled: true,
+      reminderDuration: 60,
+      formattedTime: '03:00'
+    })
+
+    useTimerStore.getState().start()
+
+    const now = Date.now()
+    const targetEndTime = useTimerStore.getState().targetEndTime!
+
+    useTimerStore.setState({ targetEndTime: now + 121000 })
+    useTimerStore.getState().tick(now)
+    let s = useTimerStore.getState()
+    expect(s.phase).toBe('main')
+    expect(s.remainingSeconds).toBe(121)
+    const dv1 = getDisplayValues(s)
+    expect(dv1.mainDisplay).toBe('01:01')
+    expect(dv1.subDisplay).toBe('01:00')
+
+    useTimerStore.setState({ targetEndTime: now + 60000 })
+    useTimerStore.getState().tick(now)
+    s = useTimerStore.getState()
+    expect(s.phase).toBe('warning')
+    const dv2 = getDisplayValues(s)
+    expect(dv2.isRed).toBe(true)
+    expect(dv2.subDisplay).toBeNull()
+
+    useTimerStore.setState({ targetEndTime: now - 1000 })
+    useTimerStore.getState().tick(now)
+    s = useTimerStore.getState()
+    expect(s.phase).toBe('overtime')
+    const dv3 = getDisplayValues(s)
+    expect(dv3.mainDisplay).toBe('00:00')
+    expect(dv3.overtimeDisplay).not.toBeNull()
+
+    void targetEndTime
   })
 })
