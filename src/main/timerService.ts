@@ -193,7 +193,11 @@ export class TimerService {
       subDisplay: subDisplay ?? overtimeDisplay,
       progress,
       overtimeSeconds,
-      overtimeMessage: overtimeMessageEnabled ? overtimeMessage : null
+      overtimeMessage: overtimeMessageEnabled ? overtimeMessage : null,
+      ...(mode === 'stopwatch' && {
+        stopwatchElapsedMs: this.stopwatch.elapsedMs,
+        stopwatchFormattedTime: formatStopwatch(this.stopwatch.elapsedMs)
+      })
     }
   }
 

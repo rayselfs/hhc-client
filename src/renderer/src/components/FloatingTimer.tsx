@@ -21,16 +21,16 @@ export default function FloatingTimer(): React.JSX.Element | null {
   const remainingSeconds = useTimerStore((s) => s.remainingSeconds)
 
   if (status !== 'running') return null
-  if (location.pathname === '/') return null
+  if (location.pathname === '/timer') return null
 
   return (
     <div
       role="button"
       tabIndex={0}
       className="fixed bottom-4 right-4 z-50 w-20 h-20 cursor-pointer flex items-center justify-center hover:scale-105 transition-transform"
-      onClick={() => navigate('/')}
+      onClick={() => navigate('/timer')}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') navigate('/')
+        if (e.key === 'Enter' || e.key === ' ') navigate('/timer')
       }}
       aria-label="Go to timer"
     >

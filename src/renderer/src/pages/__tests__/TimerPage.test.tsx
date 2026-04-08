@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, act } from '@testing-library/react'
 import { I18nextProvider } from 'react-i18next'
 import i18n from '@renderer/i18n'
 import { useTimerStore, DEFAULT_SETTINGS, DEFAULT_STATE } from '@renderer/stores/timer'
@@ -220,5 +220,204 @@ describe('TimerPage — projection data flow', () => {
         phase: 'idle'
       })
     )
+  })
+})
+
+describe('TimerPage — adapter command relay (timer)', () => {
+  it('sends start command when timer status transitions stopped→running', async () => {
+    useTimerStore.setState({ mode: 'timer', status: 'stopped', totalDuration: 300 })
+    renderTimerPage()
+    mockSendCommand.mockClear()
+
+    await act(async () => {
+      useTimerStore.getState().start()
+    })
+
+    expect(mockSendCommand).toHaveBeenCalledWith({ type: 'start', durationMs: 300000 })
+  })
+
+  it('sends pause command when timer status transitions running→paused', async () => {
+    useTimerStore.setState({
+      mode: 'timer',
+      status: 'running',
+      totalDuration: 300,
+      targetEndTime: Date.now() + 300000
+    })
+    renderTimerPage()
+    mockSendCommand.mockClear()
+
+    await act(async () => {
+      useTimerStore.getState().pause()
+    })
+
+    expect(mockSendCommand).toHaveBeenCalledWith({ type: 'pause' })
+  })
+
+  it('sends resume command when timer status transitions paused→running', async () => {
+    useTimerStore.setState({
+      mode: 'timer',
+      status: 'paused',
+      totalDuration: 300,
+      remainingSeconds: 200
+    })
+    renderTimerPage()
+    mockSendCommand.mockClear()
+
+    await act(async () => {
+      useTimerStore.getState().resume()
+    })
+
+    expect(mockSendCommand).toHaveBeenCalledWith({ type: 'resume' })
+  })
+
+  it('sends reset command when timer status transitions running→stopped', async () => {
+    useTimerStore.setState({
+      mode: 'timer',
+      status: 'running',
+      totalDuration: 300,
+      targetEndTime: Date.now() + 300000
+    })
+    renderTimerPage()
+    mockSendCommand.mockClear()
+
+    await act(async () => {
+      useTimerStore.getState().reset()
+    })
+
+    expect(mockSendCommand).toHaveBeenCalledWith({ type: 'reset' })
+  })
+
+  it('sends reset command when timer status transitions paused→stopped', async () => {
+    useTimerStore.setState({
+      mode: 'timer',
+      status: 'paused',
+      totalDuration: 300,
+      remainingSeconds: 200
+    })
+    renderTimerPage()
+    mockSendCommand.mockClear()
+
+    await act(async () => {
+      useTimerStore.getState().reset()
+    })
+
+    expect(mockSendCommand).toHaveBeenCalledWith({ type: 'reset' })
+  })
+
+  it('does not send command on initial render when status is stopped', () => {
+    useTimerStore.setState({ mode: 'timer', status: 'stopped' })
+    renderTimerPage()
+    expect(mockSendCommand).not.toHaveBeenCalled()
+  })
+})
+
+describe('TimerPage — adapter command relay (stopwatch)', () => {
+  it('sends startStopwatch command when stopwatch transitions stopped→running', async () => {
+    useTimerStore.setState({ mode: 'stopwatch' })
+    useStopwatchStore.setState({ status: 'stopped' })
+    renderTimerPage()
+    mockSendCommand.mockClear()
+
+    await act(async () => {
+      useStopwatchStore.getState().start()
+    })
+
+    expect(mockSendCommand).toHaveBeenCalledWith({ type: 'startStopwatch' })
+  })
+
+  it('sends pauseStopwatch command when stopwatch transitions running→paused', async () => {
+    useTimerStore.setState({ mode: 'stopwatch' })
+    useStopwatchStore.setState({ status: 'running', startTimestamp: Date.now() })
+    renderTimerPage()
+    mockSendCommand.mockClear()
+
+    await act(async () => {
+      useStopwatchStore.getState().pause()
+    })
+
+    expect(mockSendCommand).toHaveBeenCalledWith({ type: 'pauseStopwatch' })
+  })
+
+  it('sends resumeStopwatch command when stopwatch transitions paused→running', async () => {
+    useTimerStore.setState({ mode: 'stopwatch' })
+    useStopwatchStore.setState({ status: 'paused', accumulatedMs: 5000 })
+    renderTimerPage()
+    mockSendCommand.mockClear()
+
+    await act(async () => {
+      useStopwatchStore.getState().resume()
+    })
+
+    expect(mockSendCommand).toHaveBeenCalledWith({ type: 'resumeStopwatch' })
+  })
+
+  it('sends resetStopwatch command when stopwatch transitions running→stopped', async () => {
+    useTimerStore.setState({ mode: 'stopwatch' })
+    useStopwatchStore.setState({ status: 'running', startTimestamp: Date.now() })
+    renderTimerPage()
+    mockSendCommand.mockClear()
+
+    await act(async () => {
+      useStopwatchStore.getState().reset()
+    })
+
+    expect(mockSendCommand).toHaveBeenCalledWith({ type: 'resetStopwatch' })
+  })
+})
+
+describe('TimerPage — stopwatch projection', () => {
+  it('sends timer:stopwatch projection when in stopwatch mode', async () => {
+    useTimerStore.setState({ mode: 'stopwatch' })
+    useStopwatchStore.setState({
+      status: 'stopped',
+      elapsedMs: 0,
+      formattedTime: '00:00.00'
+    })
+    renderTimerPage()
+
+    expect(mockProject).toHaveBeenCalledWith(
+      'timer:stopwatch',
+      expect.objectContaining({
+        elapsedMs: 0,
+        formattedTime: '00:00.00',
+        status: 'stopped'
+      })
+    )
+  })
+
+  it('sends updated timer:stopwatch projection when stopwatch state changes', async () => {
+    useTimerStore.setState({ mode: 'stopwatch' })
+    useStopwatchStore.setState({
+      status: 'stopped',
+      elapsedMs: 0,
+      formattedTime: '00:00.00'
+    })
+    renderTimerPage()
+    mockProject.mockClear()
+
+    await act(async () => {
+      useStopwatchStore.setState({
+        status: 'running',
+        elapsedMs: 1500,
+        formattedTime: '00:01.50'
+      })
+    })
+
+    expect(mockProject).toHaveBeenCalledWith(
+      'timer:stopwatch',
+      expect.objectContaining({
+        elapsedMs: 1500,
+        formattedTime: '00:01.50',
+        status: 'running'
+      })
+    )
+  })
+
+  it('does not send timer:stopwatch projection when not in stopwatch mode', () => {
+    useTimerStore.setState({ mode: 'timer' })
+    renderTimerPage()
+
+    const stopwatchCalls = mockProject.mock.calls.filter((c) => c[0] === 'timer:stopwatch')
+    expect(stopwatchCalls).toHaveLength(0)
   })
 })

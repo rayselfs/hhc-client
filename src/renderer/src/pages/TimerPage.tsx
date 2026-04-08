@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useTimerStore, getDisplayValues } from '@renderer/stores/timer'
 import { useStopwatchStore } from '@renderer/stores/stopwatch'
 import { createTimerAdapter } from '@renderer/lib/timer-adapter'
+import type { TimerAdapter } from '@renderer/lib/timer-adapter'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
 import ModeSelector from '@renderer/components/Timer/ModeSelector'
 import TimerDisplay from '@renderer/components/Timer/TimerDisplay'
@@ -24,17 +25,26 @@ export default function TimerPage(): React.JSX.Element {
   const reminderDuration = useTimerStore((s) => s.reminderDuration)
   const overtimeMessageEnabled = useTimerStore((s) => s.overtimeMessageEnabled)
   const overtimeMessage = useTimerStore((s) => s.overtimeMessage)
+  const timerStatus = useTimerStore((s) => s.status)
 
-  const formattedTime = useStopwatchStore((s) => s.formattedTime)
+  const swStatus = useStopwatchStore((s) => s.status)
+  const swElapsedMs = useStopwatchStore((s) => s.elapsedMs)
+  const swFormattedTime = useStopwatchStore((s) => s.formattedTime)
+  const formattedTime = swFormattedTime
 
   const { project } = useProjection()
 
   const [dialogOpen, setDialogOpen] = useState(false)
 
+  const adapterRef = useRef<TimerAdapter | null>(null)
+  const prevTimerStatus = useRef(timerStatus)
+  const prevSwStatus = useRef(swStatus)
+
   useEffect(() => {
     useTimerStore.getState().loadPresets()
 
     const adapter = createTimerAdapter()
+    adapterRef.current = adapter
 
     adapter.onTick(() => {
       useTimerStore.getState().tick(Date.now())
@@ -50,8 +60,54 @@ export default function TimerPage(): React.JSX.Element {
 
     return () => {
       adapter.dispose()
+      adapterRef.current = null
     }
   }, [])
+
+  useEffect(() => {
+    const prev = prevTimerStatus.current
+    prevTimerStatus.current = timerStatus
+
+    const adapter = adapterRef.current
+    if (!adapter) return
+
+    if (prev === 'stopped' && timerStatus === 'running') {
+      adapter.sendCommand({ type: 'start', durationMs: totalDuration * 1000 })
+    } else if (prev === 'running' && timerStatus === 'paused') {
+      adapter.sendCommand({ type: 'pause' })
+    } else if (prev === 'paused' && timerStatus === 'running') {
+      adapter.sendCommand({ type: 'resume' })
+    } else if (prev !== 'stopped' && timerStatus === 'stopped') {
+      adapter.sendCommand({ type: 'reset' })
+    }
+  }, [timerStatus, totalDuration])
+
+  useEffect(() => {
+    const prev = prevSwStatus.current
+    prevSwStatus.current = swStatus
+
+    const adapter = adapterRef.current
+    if (!adapter) return
+
+    if (prev === 'stopped' && swStatus === 'running') {
+      adapter.sendCommand({ type: 'startStopwatch' })
+    } else if (prev === 'running' && swStatus === 'paused') {
+      adapter.sendCommand({ type: 'pauseStopwatch' })
+    } else if (prev === 'paused' && swStatus === 'running') {
+      adapter.sendCommand({ type: 'resumeStopwatch' })
+    } else if (prev !== 'stopped' && swStatus === 'stopped') {
+      adapter.sendCommand({ type: 'resetStopwatch' })
+    }
+  }, [swStatus])
+
+  useEffect(() => {
+    if (mode !== 'stopwatch') return
+    project('timer:stopwatch', {
+      elapsedMs: swElapsedMs,
+      formattedTime: swFormattedTime,
+      status: swStatus
+    })
+  }, [mode, swElapsedMs, swFormattedTime, swStatus, project])
 
   useEffect(() => {
     const displayValues = getDisplayValues({

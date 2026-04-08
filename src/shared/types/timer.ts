@@ -99,6 +99,10 @@ export interface TimerTickPayload {
   progress: number
   overtimeSeconds: number
   overtimeMessage: string | null
+  /** Stopwatch elapsed time in ms — present when mode is 'stopwatch' */
+  stopwatchElapsedMs?: number
+  /** Stopwatch formatted time string — present when mode is 'stopwatch' */
+  stopwatchFormattedTime?: string
 }
 
 /**

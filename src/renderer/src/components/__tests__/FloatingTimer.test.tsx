@@ -38,8 +38,10 @@ describe('FloatingTimer', () => {
     expect(screen.getByText('01:30')).toBeInTheDocument()
   })
 
-  it('returns null when route is / (timer page) even when running', () => {
-    vi.mocked(useLocation).mockReturnValue({ pathname: '/' } as ReturnType<typeof useLocation>)
+  it('returns null when route is /timer (timer page) even when running', () => {
+    vi.mocked(useLocation).mockReturnValue({
+      pathname: '/timer'
+    } as ReturnType<typeof useLocation>)
     useTimerStore.setState({ status: 'running', progress: 0.75, remainingSeconds: 90 })
 
     const { container } = render(<FloatingTimer />)
@@ -65,14 +67,14 @@ describe('FloatingTimer', () => {
     expect(container.firstChild).toBeNull()
   })
 
-  it('navigates to / when clicked', () => {
+  it('navigates to /timer when clicked', () => {
     vi.mocked(useLocation).mockReturnValue({ pathname: '/bible' } as ReturnType<typeof useLocation>)
     useTimerStore.setState({ status: 'running', progress: 0.75, remainingSeconds: 90 })
 
     render(<FloatingTimer />)
     fireEvent.click(screen.getByRole('button', { name: /go to timer/i }))
 
-    expect(mockNavigate).toHaveBeenCalledWith('/')
+    expect(mockNavigate).toHaveBeenCalledWith('/timer')
   })
 
   it('formats remaining seconds as MM:SS', () => {

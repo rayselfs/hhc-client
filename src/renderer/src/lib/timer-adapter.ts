@@ -169,7 +169,7 @@ export class ElectronTimerAdapter implements TimerAdapter {
 
       // Stopwatch tick: fire when mode is stopwatch
       if (this.stopwatchTickCallback && mode === 'stopwatch') {
-        this.stopwatchTickCallback(0)
+        this.stopwatchTickCallback(payload.stopwatchElapsedMs ?? 0)
       }
 
       this.prevPhase = phase
