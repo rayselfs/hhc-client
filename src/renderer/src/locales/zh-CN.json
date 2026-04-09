@@ -72,6 +72,7 @@
   },
   "common": {
     "cancel": "取消",
+    "confirm": "确认",
     "close": "关闭",
     "send": "发送"
   },

@@ -95,8 +95,11 @@ describe('resetToDefaults', () => {
     expect(s.hardwareAcceleration).toBe(true)
   })
 
-  it('removes localStorage keys on reset', () => {
+  it('clears all localStorage and IndexedDB on reset', () => {
     let localStorageMock: Record<string, string> = {}
+    const clearFn = vi.fn(() => {
+      localStorageMock = {}
+    })
     vi.stubGlobal('localStorage', {
       getItem: (key: string) => localStorageMock[key] || null,
       setItem: (key: string, value: string) => {
@@ -105,14 +108,18 @@ describe('resetToDefaults', () => {
       removeItem: (key: string) => {
         delete localStorageMock[key]
       },
-      clear: () => {
-        localStorageMock = {}
-      },
+      clear: clearFn,
       length: 0,
       key: (index: number) => {
         const keys = Object.keys(localStorageMock)
         return keys[index] || null
       }
+    })
+
+    const deleteDatabase = vi.fn()
+    vi.stubGlobal('indexedDB', {
+      databases: vi.fn().mockResolvedValue([{ name: 'db1' }, { name: 'db2' }]),
+      deleteDatabase
     })
 
     useSettingsStore.getState().setTimezone('Europe/Paris')
@@ -121,6 +128,7 @@ describe('resetToDefaults', () => {
     expect(localStorage.getItem('hhc-hardwareAcceleration')).toBe('false')
 
     useSettingsStore.getState().resetToDefaults()
+    expect(clearFn).toHaveBeenCalled()
     expect(localStorage.getItem('hhc-timezone')).toBeNull()
     expect(localStorage.getItem('hhc-hardwareAcceleration')).toBeNull()
 

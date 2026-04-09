@@ -19,6 +19,25 @@ export const TIMEZONE_OPTIONS = [
 const DEFAULT_TIMEZONE = 'Asia/Taipei'
 const DEFAULT_HW_ACCEL = true
 
+function clearIndexedDB(): void {
+  try {
+    if (typeof indexedDB === 'undefined' || !indexedDB.databases) return
+    indexedDB.databases().then((dbs) => {
+      dbs.forEach((db) => {
+        if (db.name) {
+          try {
+            indexedDB.deleteDatabase(db.name)
+          } catch {
+            //
+          }
+        }
+      })
+    })
+  } catch {
+    //
+  }
+}
+
 function loadTimezone(): string {
   try {
     const stored = localStorage.getItem(TIMEZONE_KEY)
@@ -73,10 +92,10 @@ export const useSettingsStore = create<SettingsStore>()((set) => ({
   resetToDefaults: () => {
     set({ timezone: DEFAULT_TIMEZONE, hardwareAcceleration: DEFAULT_HW_ACCEL })
     try {
-      localStorage.removeItem(TIMEZONE_KEY)
-      localStorage.removeItem(HW_ACCEL_KEY)
+      localStorage.clear()
     } catch {
       // silent fail
     }
+    clearIndexedDB()
   }
 }))

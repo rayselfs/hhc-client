@@ -139,7 +139,7 @@ describe('PreferencesDialog', () => {
     vi.mocked(isElectron).mockReturnValue(false)
   })
 
-  it('calls reset functions when reset confirmed', async () => {
+  it('calls reset functions when reset confirmed via modal', async () => {
     const user = userEvent.setup()
     const { useSettingsStore } = await import('@renderer/stores/settings')
     const { useTheme } = await import('@renderer/contexts/ThemeContext')
@@ -161,19 +161,20 @@ describe('PreferencesDialog', () => {
       setPreference
     })
 
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
-
     renderDialog(true)
 
     const resetButton = screen.getByText('Reset')
     await user.click(resetButton)
+
+    const confirmButton = screen.getByText('Confirm')
+    await user.click(confirmButton)
 
     expect(resetToDefaults).toHaveBeenCalled()
     expect(setPreference).toHaveBeenCalledWith('system')
     expect(changeLanguageSpy).toHaveBeenCalledWith('en')
   })
 
-  it('does not reset when confirm is cancelled', async () => {
+  it('does not reset when cancel clicked in modal', async () => {
     const user = userEvent.setup()
     const { useSettingsStore } = await import('@renderer/stores/settings')
     const resetToDefaults = vi.fn()
@@ -186,12 +187,13 @@ describe('PreferencesDialog', () => {
       resetToDefaults
     })
 
-    vi.spyOn(window, 'confirm').mockReturnValue(false)
-
     renderDialog(true)
 
     const resetButton = screen.getByText('Reset')
     await user.click(resetButton)
+
+    const cancelButton = screen.getByText('Cancel')
+    await user.click(cancelButton)
 
     expect(resetToDefaults).not.toHaveBeenCalled()
   })
