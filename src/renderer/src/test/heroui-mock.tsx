@@ -288,24 +288,28 @@ const DropdownMock = Object.assign(
 )
 
 const SelectContext = React.createContext<{
-  onSelectionChange?: (key: React.Key) => void
+  onChange?: (key: React.Key) => void
 }>({})
 
 const SelectMock = Object.assign(
   ({
     children,
     className,
+    value: _v1,
+    onChange,
     selectedKey: _sk1,
     onSelectionChange,
     ...props
   }: {
     children?: React.ReactNode
     className?: string
+    value?: React.Key
+    onChange?: (key: React.Key) => void
     selectedKey?: React.Key
     onSelectionChange?: (key: React.Key) => void
     [key: string]: unknown
   }) => (
-    <SelectContext value={{ onSelectionChange }}>
+    <SelectContext value={{ onChange: onChange ?? onSelectionChange }}>
       <div
         className={className}
         data-testid="select-root"
@@ -319,17 +323,21 @@ const SelectMock = Object.assign(
     Root: ({
       children,
       className,
+      value: _v2,
+      onChange,
       selectedKey: _sk2,
       onSelectionChange,
       ...props
     }: {
       children?: React.ReactNode
       className?: string
+      value?: React.Key
+      onChange?: (key: React.Key) => void
       selectedKey?: React.Key
       onSelectionChange?: (key: React.Key) => void
       [key: string]: unknown
     }) => (
-      <SelectContext value={{ onSelectionChange }}>
+      <SelectContext value={{ onChange: onChange ?? onSelectionChange }}>
         <div
           className={className}
           data-testid="select-root"
@@ -455,8 +463,8 @@ const ListboxMock = Object.assign(
             if (id && capturedListboxOnSelectionChange) {
               capturedListboxOnSelectionChange(new Set([id]))
             }
-            if (id && selectCtx.onSelectionChange) {
-              selectCtx.onSelectionChange(id)
+            if (id && selectCtx.onChange) {
+              selectCtx.onChange(id)
             }
           }}
           {...(props as React.LiHTMLAttributes<HTMLLIElement>)}

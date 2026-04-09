@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { Switch, Select, ListBox } from '@heroui/react'
+import { Label } from 'react-aria-components'
 import { useTheme } from '@renderer/contexts/ThemeContext'
 import { useSettingsStore, TIMEZONE_OPTIONS } from '@renderer/stores/settings'
 import { isElectron } from '@renderer/lib/env'
@@ -40,59 +41,57 @@ export default function GeneralSettings(): React.JSX.Element {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1">
-        <label className="text-sm font-medium">{t('preferences.language')}</label>
-        <Select.Root
-          selectedKey={i18n.language}
-          onSelectionChange={(key) => i18n.changeLanguage(String(key))}
-          aria-label={t('preferences.language')}
-        >
-          <Select.Trigger>
-            <Select.Value />
-            <Select.Indicator />
-          </Select.Trigger>
-          <Select.Popover>
-            <ListBox>
-              {languageOptions.map((opt) => (
-                <ListBox.Item key={opt.value} id={opt.value} textValue={opt.label}>
-                  {opt.label}
+      <Select
+        variant="secondary"
+        value={i18n.language}
+        onChange={(key) => i18n.changeLanguage(String(key))}
+        aria-label={t('preferences.language')}
+      >
+        <Label>{t('preferences.language')}</Label>
+        <Select.Trigger>
+          <Select.Value />
+          <Select.Indicator />
+        </Select.Trigger>
+        <Select.Popover>
+          <ListBox>
+            {languageOptions.map((opt) => (
+              <ListBox.Item key={opt.value} id={opt.value} textValue={opt.label}>
+                {opt.label}
+              </ListBox.Item>
+            ))}
+          </ListBox>
+        </Select.Popover>
+      </Select>
+
+      <Select
+        variant="secondary"
+        value={timezone}
+        onChange={(key) => setTimezone(String(key))}
+        aria-label={t('preferences.timezone')}
+      >
+        <Label>{t('preferences.timezone')}</Label>
+        <Select.Trigger>
+          <Select.Value />
+          <Select.Indicator />
+        </Select.Trigger>
+        <Select.Popover>
+          <ListBox>
+            {TIMEZONE_OPTIONS.map((tz) => {
+              const key = tz.labelKey as TimezoneKey
+              const resolvedKey = TIMEZONE_LABEL_KEYS[key] ?? 'timezones.utc'
+              const label = t(resolvedKey)
+              return (
+                <ListBox.Item key={tz.value} id={tz.value} textValue={String(label)}>
+                  {String(label)}
                 </ListBox.Item>
-              ))}
-            </ListBox>
-          </Select.Popover>
-        </Select.Root>
-      </div>
+              )
+            })}
+          </ListBox>
+        </Select.Popover>
+      </Select>
 
-      <div className="space-y-1">
-        <label className="text-sm font-medium">{t('preferences.timezone')}</label>
-        <Select.Root
-          selectedKey={timezone}
-          onSelectionChange={(key) => setTimezone(String(key))}
-          aria-label={t('preferences.timezone')}
-        >
-          <Select.Trigger>
-            <Select.Value />
-            <Select.Indicator />
-          </Select.Trigger>
-          <Select.Popover>
-            <ListBox>
-              {TIMEZONE_OPTIONS.map((tz) => {
-                const key = tz.labelKey as TimezoneKey
-                const resolvedKey = TIMEZONE_LABEL_KEYS[key] ?? 'timezones.utc'
-                const label = t(resolvedKey)
-                return (
-                  <ListBox.Item key={tz.value} id={tz.value} textValue={String(label)}>
-                    {String(label)}
-                  </ListBox.Item>
-                )
-              })}
-            </ListBox>
-          </Select.Popover>
-        </Select.Root>
-      </div>
-
-      <div className="space-y-2">
-        <label className="text-sm font-medium">{t('preferences.darkMode')}</label>
+      <div>
+        <label className="mb-2 block text-sm font-medium">{t('preferences.darkMode')}</label>
         <div>
           <Switch
             isSelected={preference === 'dark'}
@@ -107,9 +106,11 @@ export default function GeneralSettings(): React.JSX.Element {
       </div>
 
       {isElectron() && (
-        <div className="space-y-2">
-          <label className="text-sm font-medium">{t('preferences.hardwareAcceleration')}</label>
-          <div>
+        <div>
+          <label className="mb-2 block text-sm font-medium">
+            {t('preferences.hardwareAcceleration')}
+          </label>
+          <div className="mb-2">
             <Switch
               isSelected={hardwareAcceleration}
               onChange={(checked) => setHardwareAcceleration(checked)}
@@ -124,8 +125,8 @@ export default function GeneralSettings(): React.JSX.Element {
         </div>
       )}
 
-      <div className="space-y-2 pt-4 border-t">
-        <label className="text-sm font-medium">{t('preferences.resetToDefaults')}</label>
+      <div className="pt-4 border-t">
+        <label className="mb-2 block text-sm font-medium">{t('preferences.resetToDefaults')}</label>
         <div>
           <button
             className="rounded-lg bg-danger-soft px-3 py-1.5 text-sm font-medium text-danger-soft-foreground hover:bg-danger-soft-hover transition-colors"

@@ -26,6 +26,17 @@ vi.mock('@heroui/react', async () => {
   }
 })
 
+vi.mock('react-aria-components', async () => {
+  const React = await import('react')
+  const actual =
+    await vi.importActual<typeof import('react-aria-components')>('react-aria-components')
+  return {
+    ...actual,
+    Label: ({ children, ...props }: { children?: React.ReactNode; [key: string]: unknown }) =>
+      React.createElement('label', props, children)
+  }
+})
+
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
   value: (query: string) => ({
