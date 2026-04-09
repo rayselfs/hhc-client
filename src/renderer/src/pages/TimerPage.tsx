@@ -108,11 +108,16 @@ export default function TimerPage(): React.JSX.Element {
   useEffect(() => {
     if (mode !== 'stopwatch') return
     if (!showSwOnProjection) return
-    project('timer:stopwatch', {
-      elapsedMs: swElapsedMs,
-      formattedTime: swFormattedTime,
-      status: swStatus
-    })
+    const autoOpen = swStatus === 'running' || swStatus === 'paused'
+    project(
+      'timer:stopwatch',
+      {
+        elapsedMs: swElapsedMs,
+        formattedTime: swFormattedTime,
+        status: swStatus
+      },
+      { autoOpen }
+    )
   }, [mode, swElapsedMs, swFormattedTime, swStatus, showSwOnProjection, project])
 
   useEffect(() => {
@@ -126,18 +131,24 @@ export default function TimerPage(): React.JSX.Element {
     })
 
     const projectionMode = mode === 'stopwatch' && !showSwOnProjection ? 'clock' : mode
+    const autoOpen = timerStatus === 'running' || timerStatus === 'paused'
 
-    project('timer:tick', {
-      mode: projectionMode,
-      remainingSeconds,
-      phase,
-      mainDisplay: displayValues.mainDisplay,
-      subDisplay: displayValues.subDisplay,
-      progress,
-      overtimeSeconds,
-      overtimeMessage: overtimeMessageEnabled ? overtimeMessage : null
-    })
+    project(
+      'timer:tick',
+      {
+        mode: projectionMode,
+        remainingSeconds,
+        phase,
+        mainDisplay: displayValues.mainDisplay,
+        subDisplay: displayValues.subDisplay,
+        progress,
+        overtimeSeconds,
+        overtimeMessage: overtimeMessageEnabled ? overtimeMessage : null
+      },
+      { autoOpen }
+    )
   }, [
+    timerStatus,
     mode,
     phase,
     progress,

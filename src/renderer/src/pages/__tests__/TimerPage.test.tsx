@@ -188,7 +188,8 @@ describe('TimerPage — projection data flow', () => {
       expect.objectContaining({
         mode: 'timer',
         phase: 'idle'
-      })
+      }),
+      expect.objectContaining({ autoOpen: false })
     )
   })
 })
@@ -372,7 +373,7 @@ describe('TimerPage — TimeInputPopover gating', () => {
 })
 
 describe('TimerPage — stopwatch projection', () => {
-  it('sends timer:stopwatch projection when showOnProjection is true', async () => {
+  it('sends timer:stopwatch projection when showOnProjection is true', () => {
     useTimerStore.setState({ mode: 'stopwatch' })
     useStopwatchStore.setState({
       status: 'stopped',
@@ -388,7 +389,8 @@ describe('TimerPage — stopwatch projection', () => {
         elapsedMs: 0,
         formattedTime: '00:00',
         status: 'stopped'
-      })
+      }),
+      expect.objectContaining({ autoOpen: false })
     )
   })
 
@@ -417,7 +419,8 @@ describe('TimerPage — stopwatch projection', () => {
         elapsedMs: 1500,
         formattedTime: '00:01',
         status: 'running'
-      })
+      }),
+      expect.objectContaining({ autoOpen: true })
     )
   })
 
@@ -442,7 +445,8 @@ describe('TimerPage — stopwatch projection', () => {
 
     expect(mockProject).toHaveBeenCalledWith(
       'timer:tick',
-      expect.objectContaining({ mode: 'clock' })
+      expect.objectContaining({ mode: 'clock' }),
+      expect.objectContaining({ autoOpen: false })
     )
   })
 

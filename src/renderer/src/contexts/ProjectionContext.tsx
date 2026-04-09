@@ -6,14 +6,23 @@ import type { ProjectionChannel, ProjectionPayload } from '@shared/projection-me
 /** Channels that carry displayable content (not system messages). */
 type ContentChannel = Exclude<ProjectionChannel, `__system:${string}`>
 
+interface ProjectOptions {
+  /** When true, auto-reopen projection if it's closed. Default: false. */
+  autoOpen?: boolean
+}
+
 interface ProjectionContextValue {
   isProjectionOpen: boolean
   isProjectionBlanked: boolean
   openProjection: () => Promise<void>
   closeProjection: () => Promise<void>
   blankProjection: (blank: boolean) => void
-  /** High-level: ensure projection is ready, send content, and unblank. */
-  project: <C extends ContentChannel>(channel: C, data: ProjectionPayload<C>) => Promise<void>
+  /** High-level: send content to projection and unblank. Pass autoOpen to reopen if closed. */
+  project: <C extends ContentChannel>(
+    channel: C,
+    data: ProjectionPayload<C>,
+    options?: ProjectOptions
+  ) => Promise<void>
   send: <C extends ProjectionChannel>(channel: C, data: ProjectionPayload<C>) => void
   on: <C extends ProjectionChannel>(
     channel: C,
@@ -35,7 +44,7 @@ function getAdapter(ref: React.RefObject<ProjectionAdapter | null>): ProjectionA
 }
 
 export function ProjectionProvider({ children }: { children: React.ReactNode }): React.JSX.Element {
-  const [isProjectionOpen, setIsProjectionOpen] = useState(false)
+  const [isProjectionOpen, _setIsProjectionOpen] = useState(false)
   const [isProjectionBlanked, _setIsProjectionBlanked] = useState(true)
   const adapterRef = useRef<ProjectionAdapter | null>(null)
   const projectionWindowRef = useRef<Window | null>(null)
@@ -43,10 +52,16 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
   const readyResolveRef = useRef<(() => void) | null>(null)
   const isReadyRef = useRef(false)
   const isProjectionBlankedRef = useRef(true)
+  const isProjectionOpenRef = useRef(false)
 
   const setIsProjectionBlanked = useCallback((blanked: boolean): void => {
     isProjectionBlankedRef.current = blanked
     _setIsProjectionBlanked(blanked)
+  }, [])
+
+  const setIsProjectionOpen = useCallback((open: boolean): void => {
+    isProjectionOpenRef.current = open
+    _setIsProjectionOpen(open)
   }, [])
 
   const stopPolling = useCallback((): void => {
@@ -186,15 +201,24 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
   )
 
   const project = useCallback(
-    async <C extends ContentChannel>(channel: C, data: ProjectionPayload<C>): Promise<void> => {
-      if (!isReadyRef.current) return
+    async <C extends ContentChannel>(
+      channel: C,
+      data: ProjectionPayload<C>,
+      options?: ProjectOptions
+    ): Promise<void> => {
+      if (!isReadyRef.current) {
+        if (options?.autoOpen && !isProjectionOpenRef.current) {
+          openProjection().catch(() => undefined)
+        }
+        return
+      }
       getAdapter(adapterRef).send(channel, data)
       if (isProjectionBlankedRef.current) {
         setIsProjectionBlanked(false)
         getAdapter(adapterRef).send('__system:blank', { showDefault: false })
       }
     },
-    [setIsProjectionBlanked]
+    [setIsProjectionBlanked, openProjection]
   )
 
   const on = useCallback(
