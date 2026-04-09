@@ -4,7 +4,11 @@ import { useTimerStore } from '@renderer/stores/timer'
 
 const MAX_OVERTIME_MESSAGE_LENGTH = 15
 
-export default function TimerSettings(): React.JSX.Element {
+interface TimerSettingsProps {
+  className?: string
+}
+
+export default function TimerSettings({ className }: TimerSettingsProps): React.JSX.Element {
   const { t } = useTranslation()
 
   const reminderEnabled = useTimerStore((s) => s.reminderEnabled)
@@ -39,13 +43,16 @@ export default function TimerSettings(): React.JSX.Element {
   }
 
   return (
-    <div role="region" aria-label={t('timer.settings')} className="space-y-3">
+    <div role="region" aria-label={t('timer.settings')} className={`space-y-3 ${className ?? ''}`}>
       <div className="flex items-center gap-4">
         <Switch
           isSelected={reminderEnabled}
           onChange={handleReminderToggle}
           aria-label={t('timer.reminder.label')}
         >
+          <Switch.Control>
+            <Switch.Thumb />
+          </Switch.Control>
           <span className="text-sm">{t('timer.reminder.label')}</span>
         </Switch>
         {reminderEnabled && (
@@ -74,6 +81,9 @@ export default function TimerSettings(): React.JSX.Element {
           onChange={handleOvertimeMessageToggle}
           aria-label={t('timer.overtimeMessage.label')}
         >
+          <Switch.Control>
+            <Switch.Thumb />
+          </Switch.Control>
           <span className="text-sm">{t('timer.overtimeMessage.label')}</span>
         </Switch>
         {overtimeMessageEnabled && (

@@ -42,7 +42,7 @@ export default function TimeInputPopover({
       <Popover.Trigger>{children}</Popover.Trigger>
       <Popover.Content>
         <Popover.Dialog>
-          <div className="p-3 flex flex-col gap-2">
+          <div className="p-3 flex flex-col gap-2 w-72">
             <Input
               type="text"
               value={value}
@@ -61,9 +61,11 @@ export default function TimeInputPopover({
                 {error}
               </p>
             )}
-            <Button variant="primary" size="sm" onPress={handleConfirm}>
-              {t('timer.inputDialog.confirm')}
-            </Button>
+            <div className="flex justify-end">
+              <Button variant="primary" size="sm" onPress={handleConfirm}>
+                {t('timer.inputDialog.confirm')}
+              </Button>
+            </div>
           </div>
         </Popover.Dialog>
       </Popover.Content>

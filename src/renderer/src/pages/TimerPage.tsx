@@ -163,10 +163,10 @@ export default function TimerPage(): React.JSX.Element {
             canEditTime={timerStatus === 'stopped' && !isClock}
             onTimeConfirm={(seconds) => useTimerStore.getState().setDuration(seconds)}
           />
-          {!isClock && <TimeAdjustment className="mb-3" />}
+          <TimeAdjustment className="mb-3" />
           <TimerControls mode={mode} disableStart={isClock} />
-          {!isClock && <PresetChips className="self-start" />}
-          {!isClock && <TimerSettings />}
+          <PresetChips className="self-start" />
+          <TimerSettings className="self-start" />
         </div>
       )}
 

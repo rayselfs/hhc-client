@@ -71,7 +71,7 @@ export default function PresetChips({ className }: PresetChipsProps): React.JSX.
           </Chip>
         ))}
         <Button
-          size="lg"
+          size="sm"
           variant="outline"
           onPress={handleAdd}
           isDisabled={hasDuplicate}
