@@ -159,15 +159,6 @@ describe('PresetChips — addPreset (current duration)', () => {
   })
 })
 
-describe('PresetChips — loadPresets on mount', () => {
-  it('calls loadPresets on mount', () => {
-    const loadPresetsSpy = vi.fn()
-    useTimerStore.setState({ loadPresets: loadPresetsSpy } as never)
-    renderWithI18n()
-    expect(loadPresetsSpy).toHaveBeenCalledOnce()
-  })
-})
-
 describe('PresetChips — disabled while running', () => {
   it('add button is disabled when timer is running', () => {
     useTimerStore.setState({ totalDuration: 90, presets: SAMPLE_PRESETS, status: 'running' })

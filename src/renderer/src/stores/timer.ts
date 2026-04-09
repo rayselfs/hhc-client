@@ -20,6 +20,47 @@ const PRESETS_STORAGE_KEY = 'hhc-timer-presets'
 const DURATION_STORAGE_KEY = 'hhc-timer-duration'
 const REMINDER_STORAGE_KEY = 'hhc-timer-reminder'
 
+function loadInitialDuration(): number {
+  try {
+    const stored = localStorage.getItem(DURATION_STORAGE_KEY)
+    if (stored) {
+      const seconds = parseInt(stored, 10)
+      if (!isNaN(seconds) && seconds > 0 && seconds <= MAX_DURATION_SECONDS) return seconds
+    }
+  } catch {
+    // silent fail
+  }
+  return DEFAULT_SETTINGS.totalDuration
+}
+
+function loadInitialPresets(): TimerPreset[] {
+  try {
+    const stored = localStorage.getItem(PRESETS_STORAGE_KEY)
+    if (stored) {
+      const parsed = JSON.parse(stored)
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed
+    }
+  } catch {
+    // silent fail
+  }
+  return DEFAULT_PRESETS
+}
+
+function loadInitialReminder(): { duration: number; color: string } {
+  try {
+    const stored = localStorage.getItem(REMINDER_STORAGE_KEY)
+    if (stored) {
+      const parsed = JSON.parse(stored)
+      if (parsed && typeof parsed.duration === 'number' && typeof parsed.color === 'string') {
+        return { duration: parsed.duration, color: parsed.color }
+      }
+    }
+  } catch {
+    // silent fail
+  }
+  return { duration: DEFAULT_SETTINGS.reminderDuration, color: DEFAULT_SETTINGS.reminderColor }
+}
+
 export interface TimerStore {
   mode: TimerMode
   totalDuration: number
@@ -118,26 +159,30 @@ export const DEFAULT_STATE: TimerState = {
   formattedTime: '05:00'
 }
 
+const _initialDuration = loadInitialDuration()
+const _initialPresets = loadInitialPresets()
+const _initialReminder = loadInitialReminder()
+
 export const useTimerStore = create<TimerStore>()((set, get) => ({
   mode: DEFAULT_SETTINGS.mode,
-  totalDuration: DEFAULT_SETTINGS.totalDuration,
+  totalDuration: _initialDuration,
   reminderEnabled: DEFAULT_SETTINGS.reminderEnabled,
-  reminderDuration: DEFAULT_SETTINGS.reminderDuration,
-  reminderColor: DEFAULT_SETTINGS.reminderColor,
+  reminderDuration: _initialReminder.duration,
+  reminderColor: _initialReminder.color,
   overtimeMessageEnabled: DEFAULT_SETTINGS.overtimeMessageEnabled,
   overtimeMessage: DEFAULT_SETTINGS.overtimeMessage,
   timezone: DEFAULT_SETTINGS.timezone,
 
   status: DEFAULT_STATE.status,
   phase: DEFAULT_STATE.phase,
-  remainingSeconds: DEFAULT_STATE.remainingSeconds,
+  remainingSeconds: _initialDuration,
   overtimeSeconds: DEFAULT_STATE.overtimeSeconds,
   progress: DEFAULT_STATE.progress,
-  formattedTime: DEFAULT_STATE.formattedTime,
+  formattedTime: formatTime(_initialDuration),
 
   targetEndTime: null,
 
-  presets: [],
+  presets: _initialPresets,
 
   isRunning: () => get().status === 'running',
   isPaused: () => get().status === 'paused',

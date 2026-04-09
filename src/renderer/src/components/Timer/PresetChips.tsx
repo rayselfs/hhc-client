@@ -1,4 +1,3 @@
-import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Chip, Button } from '@heroui/react'
 import { Plus, X } from 'lucide-react'
@@ -26,11 +25,6 @@ export default function PresetChips({ className }: PresetChipsProps): React.JSX.
   const applyPreset = useTimerStore((s) => s.applyPreset)
   const removePreset = useTimerStore((s) => s.removePreset)
   const addPreset = useTimerStore((s) => s.addPreset)
-  const loadPresets = useTimerStore((s) => s.loadPresets)
-
-  useEffect(() => {
-    loadPresets()
-  }, [loadPresets])
 
   const isRunning = status !== 'stopped'
   const hasDuplicate = presets.some((p) => p.durationSeconds === totalDuration)

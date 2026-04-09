@@ -37,10 +37,6 @@ export default function TimerPage(): React.JSX.Element {
   const prevSwStatus = useRef(swStatus)
 
   useEffect(() => {
-    useTimerStore.getState().loadPresets()
-    useTimerStore.getState().loadDuration()
-    useTimerStore.getState().loadReminder()
-
     const adapter = createTimerAdapter()
     adapterRef.current = adapter
 
