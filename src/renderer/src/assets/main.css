@@ -26,3 +26,10 @@
 .timer-digits {
   font-family: 'Roboto Variable', 'Roboto', sans-serif;
 }
+
+html,
+body {
+  overflow: hidden;
+  height: 100%;
+  margin: 0;
+}
