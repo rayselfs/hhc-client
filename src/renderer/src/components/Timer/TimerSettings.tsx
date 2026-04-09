@@ -1,15 +1,19 @@
 import { useTranslation } from 'react-i18next'
 import { Switch, Input } from '@heroui/react'
 import { useTimerStore } from '@renderer/stores/timer'
+import { useStopwatchStore } from '@renderer/stores/stopwatch'
+import type { TimerMode } from '@renderer/stores/timer'
 
 const MAX_OVERTIME_MESSAGE_LENGTH = 15
 
 interface TimerSettingsProps {
+  mode?: TimerMode
   className?: string
 }
 
-export default function TimerSettings({ className }: TimerSettingsProps): React.JSX.Element {
+export default function TimerSettings({ mode, className }: TimerSettingsProps): React.JSX.Element {
   const { t } = useTranslation()
+  const isStopwatch = mode === 'stopwatch'
 
   const reminderEnabled = useTimerStore((s) => s.reminderEnabled)
   const reminderDuration = useTimerStore((s) => s.reminderDuration)
@@ -18,6 +22,8 @@ export default function TimerSettings({ className }: TimerSettingsProps): React.
   const totalDuration = useTimerStore((s) => s.totalDuration)
   const setReminder = useTimerStore((s) => s.setReminder)
   const setOvertimeMessage = useTimerStore((s) => s.setOvertimeMessage)
+
+  const showOnProjection = useStopwatchStore((s) => s.showOnProjection)
 
   const reminderError =
     reminderEnabled && reminderDuration >= totalDuration ? t('timer.reminder.error') : null
@@ -45,60 +51,79 @@ export default function TimerSettings({ className }: TimerSettingsProps): React.
   return (
     <div role="region" aria-label={t('timer.settings')} className={`space-y-2 ${className ?? ''}`}>
       <h3 className="text-base font-medium mb-2">{t('timer.timerSettings')}</h3>
-      <div className="flex items-center gap-4 min-h-10">
-        <Switch
-          isSelected={reminderEnabled}
-          onChange={handleReminderToggle}
-          aria-label={t('timer.reminder.label')}
-        >
-          <Switch.Control>
-            <Switch.Thumb />
-          </Switch.Control>
-          <span className="text-sm">{t('timer.reminder.label')}</span>
-        </Switch>
-        {reminderEnabled && (
-          <div className="flex items-center gap-1">
-            <Input
-              type="number"
-              value={String(reminderDuration)}
-              onChange={handleReminderDurationChange}
-              aria-label={t('timer.reminder.time')}
-              className="w-20 [&_input]:py-1"
-              min={0}
-            />
-            <span className="text-xs text-muted">{t('timer.reminder.seconds')}</span>
-          </div>
-        )}
-      </div>
-      {reminderError && (
-        <p role="alert" className="text-xs text-danger">
-          {reminderError}
-        </p>
-      )}
 
-      <div className="flex items-center gap-4 min-h-10">
-        <Switch
-          isSelected={overtimeMessageEnabled}
-          onChange={handleOvertimeMessageToggle}
-          aria-label={t('timer.overtimeMessage.label')}
-        >
-          <Switch.Control>
-            <Switch.Thumb />
-          </Switch.Control>
-          <span className="text-sm">{t('timer.overtimeMessage.label')}</span>
-        </Switch>
-        {overtimeMessageEnabled && (
-          <Input
-            type="text"
-            value={overtimeMessage}
-            onChange={handleOvertimeMessageChange}
-            placeholder={t('timer.overtimeMessage.placeholder')}
-            aria-label={t('timer.overtimeMessage.label')}
-            maxLength={MAX_OVERTIME_MESSAGE_LENGTH}
-            className="w-40 [&_input]:py-1"
-          />
-        )}
-      </div>
+      {isStopwatch ? (
+        <div className="flex items-center gap-4 min-h-10">
+          <Switch
+            isSelected={showOnProjection}
+            onChange={() => useStopwatchStore.getState().setShowOnProjection(!showOnProjection)}
+            aria-label={t('timer.stopwatch.showOnProjection')}
+            data-testid="switch-show-stopwatch-projection"
+          >
+            <Switch.Control>
+              <Switch.Thumb />
+            </Switch.Control>
+            <span className="text-sm">{t('timer.stopwatch.showOnProjection')}</span>
+          </Switch>
+        </div>
+      ) : (
+        <>
+          <div className="flex items-center gap-4 min-h-10">
+            <Switch
+              isSelected={reminderEnabled}
+              onChange={handleReminderToggle}
+              aria-label={t('timer.reminder.label')}
+            >
+              <Switch.Control>
+                <Switch.Thumb />
+              </Switch.Control>
+              <span className="text-sm">{t('timer.reminder.label')}</span>
+            </Switch>
+            {reminderEnabled && (
+              <div className="flex items-center gap-1">
+                <Input
+                  type="number"
+                  value={String(reminderDuration)}
+                  onChange={handleReminderDurationChange}
+                  aria-label={t('timer.reminder.time')}
+                  className="w-20 [&_input]:py-1"
+                  min={0}
+                />
+                <span className="text-xs text-muted">{t('timer.reminder.seconds')}</span>
+              </div>
+            )}
+          </div>
+          {reminderError && (
+            <p role="alert" className="text-xs text-danger">
+              {reminderError}
+            </p>
+          )}
+
+          <div className="flex items-center gap-4 min-h-10">
+            <Switch
+              isSelected={overtimeMessageEnabled}
+              onChange={handleOvertimeMessageToggle}
+              aria-label={t('timer.overtimeMessage.label')}
+            >
+              <Switch.Control>
+                <Switch.Thumb />
+              </Switch.Control>
+              <span className="text-sm">{t('timer.overtimeMessage.label')}</span>
+            </Switch>
+            {overtimeMessageEnabled && (
+              <Input
+                type="text"
+                value={overtimeMessage}
+                onChange={handleOvertimeMessageChange}
+                placeholder={t('timer.overtimeMessage.placeholder')}
+                aria-label={t('timer.overtimeMessage.label')}
+                maxLength={MAX_OVERTIME_MESSAGE_LENGTH}
+                className="w-40 [&_input]:py-1"
+              />
+            )}
+          </div>
+        </>
+      )}
     </div>
   )
 }

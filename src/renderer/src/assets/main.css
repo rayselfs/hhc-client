@@ -25,6 +25,25 @@
 
 .timer-digits {
   font-family: 'Roboto Variable', 'Roboto', sans-serif;
+  font-weight: 300;
+}
+
+@container (min-inline-size: 200px) {
+  .timer-digits {
+    font-weight: 350;
+  }
+}
+
+@container (min-inline-size: 400px) {
+  .timer-digits {
+    font-weight: 400;
+  }
+}
+
+@container (min-inline-size: 600px) {
+  .timer-digits {
+    font-weight: 450;
+  }
 }
 
 html,

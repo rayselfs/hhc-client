@@ -5,6 +5,7 @@ import { I18nextProvider } from 'react-i18next'
 import i18n from '@renderer/i18n'
 import TimerSettings from '@renderer/components/Timer/TimerSettings'
 import { useTimerStore } from '@renderer/stores/timer'
+import { useStopwatchStore } from '@renderer/stores/stopwatch'
 import { DEFAULT_SETTINGS, DEFAULT_STATE } from '@renderer/stores/timer'
 
 beforeEach(() => {
@@ -218,5 +219,37 @@ describe('TimerSettings — overtime message text input', () => {
     const calls = setOvertimeMessageSpy.mock.calls
     const lastCall = calls[calls.length - 1]
     expect(lastCall[1].length).toBeLessThanOrEqual(15)
+  })
+})
+
+describe('TimerSettings — stopwatch mode', () => {
+  function renderStopwatchSettings(): RenderResult {
+    return render(
+      <I18nextProvider i18n={i18n}>
+        <TimerSettings mode="stopwatch" />
+      </I18nextProvider>
+    )
+  }
+
+  it('renders show-on-projection switch in stopwatch mode', () => {
+    renderStopwatchSettings()
+    expect(screen.getByTestId('switch-show-stopwatch-projection')).toBeInTheDocument()
+  })
+
+  it('does not render reminder or overtime switches in stopwatch mode', () => {
+    renderStopwatchSettings()
+    const switches = screen.getAllByRole('switch')
+    expect(switches).toHaveLength(1)
+  })
+
+  it('toggling show-on-projection calls setShowOnProjection', async () => {
+    const user = userEvent.setup()
+    useStopwatchStore.setState({ showOnProjection: false })
+    renderStopwatchSettings()
+
+    const sw = screen.getByRole('switch')
+    await user.click(sw)
+
+    expect(useStopwatchStore.getState().showOnProjection).toBe(true)
   })
 })

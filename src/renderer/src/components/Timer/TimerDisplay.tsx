@@ -35,8 +35,8 @@ export default function TimerDisplay({
     <button
       type="button"
       className={[
-        'timer-digits font-light bg-transparent border-0 p-0',
-        'text-[30cqi]',
+        'timer-digits bg-transparent border-0 p-0',
+        'text-[34cqi]',
         isWarning ? 'text-danger' : '',
         canEditTime ? 'hover:opacity-80' : 'pointer-events-none'
       ].join(' ')}
@@ -61,7 +61,7 @@ export default function TimerDisplay({
           digitButton
         )}
         {!isOvertime && subDisplay && (
-          <span className="absolute top-full timer-digits font-light text-[15cqi] text-default-500">
+          <span className="absolute top-full timer-digits text-[17cqi] text-default-500">
             {subDisplay}
           </span>
         )}

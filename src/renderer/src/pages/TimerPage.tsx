@@ -1,5 +1,4 @@
 import React, { useEffect, useRef } from 'react'
-import { useTranslation } from 'react-i18next'
 import { useTimerStore, getDisplayValues } from '@renderer/stores/timer'
 import { useStopwatchStore } from '@renderer/stores/stopwatch'
 import { createTimerAdapter } from '@renderer/lib/timer-adapter'
@@ -11,10 +10,8 @@ import TimerControls from '@renderer/components/Timer/TimerControls'
 import TimeAdjustment from '@renderer/components/Timer/TimeAdjustment'
 import PresetChips from '@renderer/components/Timer/PresetChips'
 import TimerSettings from '@renderer/components/Timer/TimerSettings'
-import { Switch } from '@heroui/react'
 
 export default function TimerPage(): React.JSX.Element {
-  const { t } = useTranslation()
   const mode = useTimerStore((s) => s.mode)
   const phase = useTimerStore((s) => s.phase)
   const progress = useTimerStore((s) => s.progress)
@@ -98,6 +95,15 @@ export default function TimerPage(): React.JSX.Element {
     }
   }, [swStatus])
 
+  // Direct tick for stopwatch — ensures display updates even if worker messages are delayed
+  useEffect(() => {
+    if (swStatus !== 'running') return
+    const id = setInterval(() => {
+      useStopwatchStore.getState().tick(Date.now())
+    }, 100)
+    return () => clearInterval(id)
+  }, [swStatus])
+
   useEffect(() => {
     if (mode !== 'stopwatch') return
     if (!showSwOnProjection) return
@@ -174,7 +180,7 @@ export default function TimerPage(): React.JSX.Element {
           <TimeAdjustment className="mb-3" />
           <TimerControls mode={mode} disableStart={isClock} />
           <PresetChips className="self-start my-3" />
-          <TimerSettings className="self-start mb-3" />
+          <TimerSettings mode={mode} className="self-start mb-3" />
         </div>
       )}
 
@@ -182,23 +188,7 @@ export default function TimerPage(): React.JSX.Element {
         <div className="flex flex-col items-center gap-4 flex-1">
           <StopwatchDisplay formattedTime={swFormattedTime} size={80} />
           <TimerControls mode="stopwatch" />
-          <div className="self-start mt-3" data-testid="stopwatch-settings">
-            <h3 className="text-sm font-medium text-default-500 mb-2">
-              {t('timer.timerSettings')}
-            </h3>
-            <Switch
-              size="sm"
-              isSelected={showSwOnProjection}
-              onChange={() => useStopwatchStore.getState().setShowOnProjection(!showSwOnProjection)}
-              aria-label={t('timer.stopwatch.showOnProjection')}
-              data-testid="switch-show-stopwatch-projection"
-            >
-              <Switch.Control>
-                <Switch.Thumb />
-              </Switch.Control>
-              <span className="text-sm">{t('timer.stopwatch.showOnProjection')}</span>
-            </Switch>
-          </div>
+          <TimerSettings mode="stopwatch" className="self-start mt-3" />
         </div>
       )}
     </div>
