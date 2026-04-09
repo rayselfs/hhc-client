@@ -165,8 +165,8 @@ export default function TimerPage(): React.JSX.Element {
           />
           <TimeAdjustment className="mb-3" />
           <TimerControls mode={mode} disableStart={isClock} />
-          <PresetChips className="self-start" />
-          <TimerSettings className="self-start" />
+          <PresetChips className="self-start my-3" />
+          <TimerSettings className="self-start mb-3" />
         </div>
       )}
 
