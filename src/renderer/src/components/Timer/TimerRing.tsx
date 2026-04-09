@@ -38,7 +38,7 @@ export default function TimerRing({
   const strokeWidth = Math.max(Math.round(size * 0.02), 2)
   const radius = center - strokeWidth - 2
   const circumference = 2 * Math.PI * radius
-  const offset = (progress / 100) * circumference
+  const offset = circumference - (progress / 100) * circumference
 
   const strokeClass = color === 'danger' ? 'stroke-danger' : 'stroke-accent'
 

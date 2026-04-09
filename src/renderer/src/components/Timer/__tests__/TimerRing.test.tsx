@@ -40,28 +40,28 @@ describe('TimerRing', () => {
     const strokeWidth = Math.max(Math.round(size * 0.02), 2)
     const radius = size / 2 - strokeWidth - 2
     const circumference = 2 * Math.PI * radius
-    const expectedOffset = (75 / 100) * circumference
+    const expectedOffset = circumference - (75 / 100) * circumference
 
     const { container } = render(<TimerRing progress={75} size={size} />)
     const fgCircle = container.querySelectorAll('circle')[1]
     expect(fgCircle.getAttribute('stroke-dashoffset')).toBe(String(expectedOffset))
   })
 
-  it('renders with zero progress', () => {
-    const { container } = render(<TimerRing progress={0} size={200} />)
-    const fgCircle = container.querySelectorAll('circle')[1]
-    expect(fgCircle.getAttribute('stroke-dashoffset')).toBe('0')
-  })
-
-  it('renders with full progress', () => {
+  it('renders with zero progress (empty ring)', () => {
     const size = 200
     const strokeWidth = Math.max(Math.round(size * 0.02), 2)
     const radius = size / 2 - strokeWidth - 2
     const circumference = 2 * Math.PI * radius
 
-    const { container } = render(<TimerRing progress={100} size={size} />)
+    const { container } = render(<TimerRing progress={0} size={size} />)
     const fgCircle = container.querySelectorAll('circle')[1]
     expect(fgCircle.getAttribute('stroke-dashoffset')).toBe(String(circumference))
+  })
+
+  it('renders with full progress (full ring)', () => {
+    const { container } = render(<TimerRing progress={100} size={200} />)
+    const fgCircle = container.querySelectorAll('circle')[1]
+    expect(fgCircle.getAttribute('stroke-dashoffset')).toBe('0')
   })
 
   it('applies custom className', () => {
