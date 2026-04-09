@@ -38,7 +38,7 @@ export default function PreferencesDialog({
         <Modal.Container size="lg">
           <Modal.Dialog className="overflow-hidden p-0">
             <Modal.Body className="p-0">
-              <div className="flex" style={{ maxHeight: '480px' }}>
+              <div className="flex" style={{ height: '480px' }}>
                 <nav className="flex w-44 shrink-0 flex-col gap-2 rounded-tr-3xl rounded-br-3xl bg-sidebar text-sidebar-foreground py-2 px-1">
                   <ul className="flex flex-col gap-1">
                     {categories.map((cat) => {
