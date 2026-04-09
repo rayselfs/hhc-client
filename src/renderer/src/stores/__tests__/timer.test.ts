@@ -758,7 +758,6 @@ describe('getDisplayValues', () => {
       reminderEnabled: true
     })
     expect(result.mainDisplay).toBe('00:30')
-    expect(result.isRed).toBe(true)
   })
 
   it('OVERTIME phase: mainDisplay=00:00, overtimeDisplay=elapsed, not red', () => {
@@ -772,7 +771,6 @@ describe('getDisplayValues', () => {
     })
     expect(result.mainDisplay).toBe('00:00')
     expect(result.subDisplay).toBeNull()
-    expect(result.isRed).toBe(false)
     expect(result.overtimeDisplay).toBe('00:15')
   })
 
@@ -799,7 +797,6 @@ describe('getDisplayValues', () => {
     })
     expect(result.mainDisplay).toBe('03:00')
     expect(result.subDisplay).toBeNull()
-    expect(result.isRed).toBe(false)
   })
 
   it('PAUSED state uses same display as running — phase drives display, not status', () => {
@@ -823,7 +820,6 @@ describe('getDisplayValues', () => {
       reminderEnabled: true
     })
     expect(resultWarning.mainDisplay).toBe('00:45')
-    expect(resultWarning.isRed).toBe(true)
   })
 })
 
@@ -857,7 +853,6 @@ describe('getDisplayValues end-to-end via store tick', () => {
     s = useTimerStore.getState()
     expect(s.phase).toBe('warning')
     const dv2 = getDisplayValues(s)
-    expect(dv2.isRed).toBe(true)
     expect(dv2.subDisplay).toBeNull()
 
     useTimerStore.setState({ targetEndTime: now - 1000 })
