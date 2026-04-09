@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { Modal, Button, useOverlayState } from '@heroui/react'
 import { Monitor } from 'lucide-react'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
-import { isElectron } from '@renderer/lib/env'
+import { isWeb } from '@renderer/lib/env'
 import { useEffect } from 'react'
 
 export default function ProjectionInitDialog(): React.JSX.Element | null {
@@ -11,12 +11,12 @@ export default function ProjectionInitDialog(): React.JSX.Element | null {
   const state = useOverlayState()
 
   useEffect(() => {
-    if (!isElectron() && !isProjectionOpen) {
+    if (isWeb() && !isProjectionOpen) {
       state.open()
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (isElectron()) return null
+  if (!isWeb()) return null
 
   return (
     <Modal.Root state={state}>
