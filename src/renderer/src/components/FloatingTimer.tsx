@@ -28,15 +28,15 @@ export default function FloatingTimer(): React.JSX.Element | null {
     <div
       role="button"
       tabIndex={0}
-      className="fixed bottom-4 right-4 z-50 w-20 h-20 cursor-pointer flex items-center justify-center hover:scale-105 transition-transform"
+      className="fixed bottom-4 right-4 z-50 w-25 h-25 cursor-pointer rounded-xl flex items-center justify-center hover:scale-105 transition-transform bg-surface"
       onClick={() => navigate('/timer')}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') navigate('/timer')
       }}
       aria-label="Go to timer"
     >
-      <TimerRing progress={progress * 100} size={60} color="accent">
-        <span className="timer-digits text-xs font-bold">{formatMMSS(remainingSeconds)}</span>
+      <TimerRing progress={progress * 100} size={85} color="accent">
+        <span className="timer-digits text-2xl font-bold">{formatMMSS(remainingSeconds)}</span>
       </TimerRing>
     </div>
   )
