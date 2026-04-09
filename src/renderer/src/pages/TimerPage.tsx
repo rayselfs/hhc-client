@@ -19,6 +19,7 @@ export default function TimerPage(): React.JSX.Element {
   const reminderDuration = useTimerStore((s) => s.reminderDuration)
   const reminderColor = useTimerStore((s) => s.reminderColor)
   const timerStatus = useTimerStore((s) => s.status)
+  const setDuration = useTimerStore((s) => s.setDuration)
 
   const swFormattedTime = useStopwatchStore((s) => s.formattedTime)
 
@@ -46,7 +47,7 @@ export default function TimerPage(): React.JSX.Element {
             overtimeDisplay={displayValues.overtimeDisplay}
             warningColor={reminderEnabled ? reminderColor : null}
             canEditTime={timerStatus === 'stopped' && phase !== 'overtime'}
-            onTimeConfirm={(seconds) => useTimerStore.getState().setDuration(seconds)}
+            onTimeConfirm={(seconds) => setDuration(seconds)}
           />
           <TimeAdjustment className="mb-3" />
           <TimerControls mode={mode} disableStart={isClock} />
