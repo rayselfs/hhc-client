@@ -32,15 +32,21 @@ describe('StopwatchDisplay', () => {
     expect(screen.getByText('05:00')).toBeInTheDocument()
   })
 
-  it('applies custom size via inline style', () => {
+  it('applies maxWidth when size is provided', () => {
     render(<StopwatchDisplay formattedTime="01:00" size={128} />)
     const el = screen.getByTestId('stopwatch-display')
-    expect(el).toHaveStyle('font-size: 128px')
+    expect(el).toHaveStyle('max-width: 384px')
   })
 
-  it('uses default size of 64', () => {
+  it('has no maxWidth when size is not provided', () => {
     render(<StopwatchDisplay formattedTime="01:00" />)
     const el = screen.getByTestId('stopwatch-display')
-    expect(el).toHaveStyle('font-size: 64px')
+    expect(el.style.maxWidth).toBe('')
+  })
+
+  it('uses @container class for responsive sizing', () => {
+    render(<StopwatchDisplay formattedTime="01:00" />)
+    const el = screen.getByTestId('stopwatch-display')
+    expect(el.className).toContain('@container')
   })
 })

@@ -119,5 +119,5 @@ function renderTimerContent(
   }
 
   const formattedTime = stopwatchData?.formattedTime ?? '00:00'
-  return <StopwatchDisplay formattedTime={formattedTime} size={120} className="text-white" />
+  return <StopwatchDisplay formattedTime={formattedTime} className="text-white" />
 }

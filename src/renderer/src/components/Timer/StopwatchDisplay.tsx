@@ -6,16 +6,18 @@ interface StopwatchDisplayProps {
 
 export default function StopwatchDisplay({
   formattedTime,
-  size = 64,
+  size,
   className
 }: StopwatchDisplayProps): React.JSX.Element {
   return (
     <div
-      className={`timer-digits font-bold tabular-nums ${className ?? ''}`}
-      style={{ fontSize: size }}
+      className={`@container w-full ${className ?? ''}`}
+      style={size ? { maxWidth: size * 3 } : undefined}
       data-testid="stopwatch-display"
     >
-      {formattedTime}
+      <span className="timer-digits block text-center text-[34cqi] tabular-nums">
+        {formattedTime}
+      </span>
     </div>
   )
 }

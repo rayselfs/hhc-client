@@ -177,23 +177,18 @@ describe('ProjectionContext — web mode', () => {
     expect(result.current.isProjectionOpen).toBe(true)
   })
 
-  it('project() opens projection, waits for ready, sends content, and unblanks', async () => {
+  it('project() skips send when projection is not ready', async () => {
     const { result } = renderProjection()
     expect(result.current.isProjectionBlanked).toBe(true)
 
-    const projectPromise = act(async () => {
-      const p = result.current.project('timer:overtime-message', { message: 'hello' })
-      act(() => {
-        mockAdapter._trigger('__system:ready', null)
-      })
-      return p
+    await act(async () => {
+      await result.current.project('timer:overtime-message', { message: 'hello' })
     })
 
-    await projectPromise
-
-    expect(mockAdapter.send).toHaveBeenCalledWith('timer:overtime-message', { message: 'hello' })
-    expect(mockAdapter.send).toHaveBeenCalledWith('__system:blank', { showDefault: false })
-    expect(result.current.isProjectionBlanked).toBe(false)
+    expect(mockAdapter.send).not.toHaveBeenCalledWith('timer:overtime-message', {
+      message: 'hello'
+    })
+    expect(result.current.isProjectionBlanked).toBe(true)
   })
 
   it('project() skips ready wait when already ready', async () => {
@@ -256,7 +251,7 @@ describe('ProjectionContext — web mode', () => {
     expect(result.current.isProjectionBlanked).toBe(true)
   })
 
-  it('__system:closed resets ready state so project() waits again', async () => {
+  it('__system:closed resets ready state so project() skips send', async () => {
     const { result } = renderProjection()
 
     act(() => {
@@ -269,16 +264,11 @@ describe('ProjectionContext — web mode', () => {
 
     vi.mocked(mockAdapter.send).mockClear()
 
-    const projectPromise = act(async () => {
-      const p = result.current.project('timer:overtime-message', { message: 'new content' })
-      act(() => {
-        mockAdapter._trigger('__system:ready', null)
-      })
-      return p
+    await act(async () => {
+      await result.current.project('timer:overtime-message', { message: 'new content' })
     })
 
-    await projectPromise
-    expect(mockAdapter.send).toHaveBeenCalledWith('timer:overtime-message', {
+    expect(mockAdapter.send).not.toHaveBeenCalledWith('timer:overtime-message', {
       message: 'new content'
     })
   })

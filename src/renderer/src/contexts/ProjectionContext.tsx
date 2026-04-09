@@ -23,8 +23,6 @@ interface ProjectionContextValue {
 
 const ProjectionContext = createContext<ProjectionContextValue | null>(null)
 
-const READY_TIMEOUT_MS = 10_000
-
 function getProjectionUrl(): string {
   return location.origin + location.pathname + '#/projection'
 }
@@ -38,12 +36,18 @@ function getAdapter(ref: React.RefObject<ProjectionAdapter | null>): ProjectionA
 
 export function ProjectionProvider({ children }: { children: React.ReactNode }): React.JSX.Element {
   const [isProjectionOpen, setIsProjectionOpen] = useState(false)
-  const [isProjectionBlanked, setIsProjectionBlanked] = useState(true)
+  const [isProjectionBlanked, _setIsProjectionBlanked] = useState(true)
   const adapterRef = useRef<ProjectionAdapter | null>(null)
   const projectionWindowRef = useRef<Window | null>(null)
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const readyResolveRef = useRef<(() => void) | null>(null)
   const isReadyRef = useRef(false)
+  const isProjectionBlankedRef = useRef(true)
+
+  const setIsProjectionBlanked = useCallback((blanked: boolean): void => {
+    isProjectionBlankedRef.current = blanked
+    _setIsProjectionBlanked(blanked)
+  }, [])
 
   const stopPolling = useCallback((): void => {
     if (pollTimerRef.current) {
@@ -63,7 +67,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
         stopPolling()
       }
     }, 1000)
-  }, [stopPolling])
+  }, [stopPolling, setIsProjectionBlanked])
 
   useEffect(() => {
     const adapter = getAdapter(adapterRef)
@@ -130,7 +134,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       projectionWindowRef.current?.close()
       adapter.dispose()
     }
-  }, [startPolling, stopPolling])
+  }, [startPolling, stopPolling, setIsProjectionBlanked])
 
   const openProjection = useCallback(async (): Promise<void> => {
     if (isElectron()) {
@@ -156,39 +160,15 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       readyResolveRef.current = null
       stopPolling()
     }
-  }, [stopPolling])
+  }, [stopPolling, setIsProjectionBlanked])
 
-  const ensureProjectionReady = useCallback(async (): Promise<void> => {
-    if (isReadyRef.current) return
-
-    if (isElectron()) {
-      await window.api.projection.ensure()
-    } else {
-      if (!projectionWindowRef.current || projectionWindowRef.current.closed) {
-        const win = window.open(getProjectionUrl(), 'hhc-projection')
-        if (!win) return
-        projectionWindowRef.current = win
-        startPolling()
-      }
-    }
-
-    if (isReadyRef.current) return
-
-    await new Promise<void>((resolve, reject) => {
-      readyResolveRef.current = resolve
-      setTimeout(() => {
-        if (readyResolveRef.current === resolve) {
-          readyResolveRef.current = null
-          reject(new Error('Projection ready timeout'))
-        }
-      }, READY_TIMEOUT_MS)
-    })
-  }, [startPolling])
-
-  const blankProjection = useCallback((blank: boolean): void => {
-    setIsProjectionBlanked(blank)
-    getAdapter(adapterRef).send('__system:blank', { showDefault: blank })
-  }, [])
+  const blankProjection = useCallback(
+    (blank: boolean): void => {
+      setIsProjectionBlanked(blank)
+      getAdapter(adapterRef).send('__system:blank', { showDefault: blank })
+    },
+    [setIsProjectionBlanked]
+  )
 
   const send = useCallback(
     <C extends ProjectionChannel>(channel: C, data: ProjectionPayload<C>): void => {
@@ -199,12 +179,14 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
 
   const project = useCallback(
     async <C extends ContentChannel>(channel: C, data: ProjectionPayload<C>): Promise<void> => {
-      await ensureProjectionReady()
+      if (!isReadyRef.current) return
       getAdapter(adapterRef).send(channel, data)
-      setIsProjectionBlanked(false)
-      getAdapter(adapterRef).send('__system:blank', { showDefault: false })
+      if (isProjectionBlankedRef.current) {
+        setIsProjectionBlanked(false)
+        getAdapter(adapterRef).send('__system:blank', { showDefault: false })
+      }
     },
-    [ensureProjectionReady]
+    [setIsProjectionBlanked]
   )
 
   const on = useCallback(
