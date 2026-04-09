@@ -46,6 +46,9 @@
     "pauseStopwatch": "Pause Stopwatch",
     "resumeStopwatch": "Resume Stopwatch",
     "resetStopwatch": "Reset Stopwatch",
+    "stopwatch": {
+      "showOnProjection": "Show on Projection"
+    },
     "timeAlmostUp": "Time Almost Up",
     "timeIsUp": "Time's Up",
     "overtime": "Overtime",

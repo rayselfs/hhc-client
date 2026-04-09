@@ -1,18 +1,20 @@
 import React, { useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useTimerStore, getDisplayValues } from '@renderer/stores/timer'
 import { useStopwatchStore } from '@renderer/stores/stopwatch'
 import { createTimerAdapter } from '@renderer/lib/timer-adapter'
 import type { TimerAdapter } from '@renderer/lib/timer-adapter'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
 import TimerDisplay from '@renderer/components/Timer/TimerDisplay'
-import ClockDisplay from '@renderer/components/Timer/ClockDisplay'
 import StopwatchDisplay from '@renderer/components/Timer/StopwatchDisplay'
 import TimerControls from '@renderer/components/Timer/TimerControls'
 import TimeAdjustment from '@renderer/components/Timer/TimeAdjustment'
 import PresetChips from '@renderer/components/Timer/PresetChips'
 import TimerSettings from '@renderer/components/Timer/TimerSettings'
+import { Switch } from '@heroui/react'
 
 export default function TimerPage(): React.JSX.Element {
+  const { t } = useTranslation()
   const mode = useTimerStore((s) => s.mode)
   const phase = useTimerStore((s) => s.phase)
   const progress = useTimerStore((s) => s.progress)
@@ -28,6 +30,7 @@ export default function TimerPage(): React.JSX.Element {
   const swStatus = useStopwatchStore((s) => s.status)
   const swElapsedMs = useStopwatchStore((s) => s.elapsedMs)
   const swFormattedTime = useStopwatchStore((s) => s.formattedTime)
+  const showSwOnProjection = useStopwatchStore((s) => s.showOnProjection)
 
   const { project } = useProjection()
 
@@ -97,12 +100,13 @@ export default function TimerPage(): React.JSX.Element {
 
   useEffect(() => {
     if (mode !== 'stopwatch') return
+    if (!showSwOnProjection) return
     project('timer:stopwatch', {
       elapsedMs: swElapsedMs,
       formattedTime: swFormattedTime,
       status: swStatus
     })
-  }, [mode, swElapsedMs, swFormattedTime, swStatus, project])
+  }, [mode, swElapsedMs, swFormattedTime, swStatus, showSwOnProjection, project])
 
   useEffect(() => {
     const displayValues = getDisplayValues({
@@ -114,8 +118,10 @@ export default function TimerPage(): React.JSX.Element {
       reminderEnabled
     })
 
+    const projectionMode = mode === 'stopwatch' && !showSwOnProjection ? 'clock' : mode
+
     project('timer:tick', {
-      mode,
+      mode: projectionMode,
       remainingSeconds,
       phase,
       mainDisplay: displayValues.mainDisplay,
@@ -135,6 +141,7 @@ export default function TimerPage(): React.JSX.Element {
     reminderDuration,
     overtimeMessageEnabled,
     overtimeMessage,
+    showSwOnProjection,
     project
   ])
 
@@ -149,42 +156,21 @@ export default function TimerPage(): React.JSX.Element {
 
   const isTimerLike = mode === 'timer' || mode === 'clock' || mode === 'both'
   const isClock = mode === 'clock'
-  const isBoth = mode === 'both'
 
   return (
     <div data-testid="timer-page" className="flex flex-col items-center gap-4 h-full">
       {isTimerLike && (
         <div className="flex flex-col items-center gap-4 flex-1 w-full">
-          {isBoth ? (
-            <div className="flex items-center w-full gap-4">
-              <div className="w-1/3">
-                <TimerDisplay
-                  progress={progress}
-                  mainDisplay={displayValues.mainDisplay}
-                  subDisplay={displayValues.subDisplay}
-                  phase={phase}
-                  overtimeDisplay={displayValues.overtimeDisplay}
-                  overtimeMessage={overtimeMessageEnabled ? overtimeMessage : undefined}
-                  canEditTime={timerStatus === 'stopped'}
-                  onTimeConfirm={(seconds) => useTimerStore.getState().setDuration(seconds)}
-                />
-              </div>
-              <div className="w-2/3">
-                <ClockDisplay />
-              </div>
-            </div>
-          ) : (
-            <TimerDisplay
-              progress={progress}
-              mainDisplay={displayValues.mainDisplay}
-              subDisplay={displayValues.subDisplay}
-              phase={phase}
-              overtimeDisplay={displayValues.overtimeDisplay}
-              overtimeMessage={overtimeMessageEnabled ? overtimeMessage : undefined}
-              canEditTime={timerStatus === 'stopped'}
-              onTimeConfirm={(seconds) => useTimerStore.getState().setDuration(seconds)}
-            />
-          )}
+          <TimerDisplay
+            progress={progress}
+            mainDisplay={displayValues.mainDisplay}
+            subDisplay={displayValues.subDisplay}
+            phase={phase}
+            overtimeDisplay={displayValues.overtimeDisplay}
+            overtimeMessage={overtimeMessageEnabled ? overtimeMessage : undefined}
+            canEditTime={timerStatus === 'stopped'}
+            onTimeConfirm={(seconds) => useTimerStore.getState().setDuration(seconds)}
+          />
           <TimeAdjustment className="mb-3" />
           <TimerControls mode={mode} disableStart={isClock} />
           <PresetChips className="self-start my-3" />
@@ -196,6 +182,23 @@ export default function TimerPage(): React.JSX.Element {
         <div className="flex flex-col items-center gap-4 flex-1">
           <StopwatchDisplay formattedTime={swFormattedTime} size={80} />
           <TimerControls mode="stopwatch" />
+          <div className="self-start mt-3" data-testid="stopwatch-settings">
+            <h3 className="text-sm font-medium text-default-500 mb-2">
+              {t('timer.timerSettings')}
+            </h3>
+            <Switch
+              size="sm"
+              isSelected={showSwOnProjection}
+              onChange={() => useStopwatchStore.getState().setShowOnProjection(!showSwOnProjection)}
+              aria-label={t('timer.stopwatch.showOnProjection')}
+              data-testid="switch-show-stopwatch-projection"
+            >
+              <Switch.Control>
+                <Switch.Thumb />
+              </Switch.Control>
+              <span className="text-sm">{t('timer.stopwatch.showOnProjection')}</span>
+            </Switch>
+          </div>
         </div>
       )}
     </div>

@@ -46,6 +46,9 @@
     "pauseStopwatch": "暂停秒表",
     "resumeStopwatch": "继续秒表",
     "resetStopwatch": "重置秒表",
+    "stopwatch": {
+      "showOnProjection": "显示于投影"
+    },
     "timeAlmostUp": "时间快到",
     "timeIsUp": "时间到",
     "overtime": "超时",

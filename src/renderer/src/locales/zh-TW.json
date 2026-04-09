@@ -46,6 +46,9 @@
     "pauseStopwatch": "暫停碼錶",
     "resumeStopwatch": "繼續碼錶",
     "resetStopwatch": "重設碼錶",
+    "stopwatch": {
+      "showOnProjection": "顯示於投影"
+    },
     "timeAlmostUp": "時間快到",
     "timeIsUp": "時間到",
     "overtime": "超時",

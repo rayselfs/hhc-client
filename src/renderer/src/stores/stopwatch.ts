@@ -10,6 +10,8 @@ export interface StopwatchStore {
   formattedTime: string
   elapsedSeconds: number
 
+  showOnProjection: boolean
+
   isRunning: () => boolean
   isPaused: () => boolean
   isStopped: () => boolean
@@ -19,15 +21,14 @@ export interface StopwatchStore {
   resume: () => void
   reset: () => void
   tick: (currentMs: number) => void
+  setShowOnProjection: (show: boolean) => void
 }
 
 function formatStopwatchTime(ms: number): string {
-  const totalCentiseconds = Math.floor(ms / 10)
-  const centiseconds = totalCentiseconds % 100
-  const totalSeconds = Math.floor(totalCentiseconds / 100)
+  const totalSeconds = Math.floor(ms / 1000)
   const seconds = totalSeconds % 60
   const minutes = Math.floor(totalSeconds / 60)
-  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(centiseconds).padStart(2, '0')}`
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }
 
 export const useStopwatchStore = create<StopwatchStore>()((set, get) => ({
@@ -36,8 +37,10 @@ export const useStopwatchStore = create<StopwatchStore>()((set, get) => ({
   startTimestamp: null,
   accumulatedMs: 0,
 
-  formattedTime: '00:00.00',
+  formattedTime: '00:00',
   elapsedSeconds: 0,
+
+  showOnProjection: false,
 
   isRunning: () => get().status === 'running',
   isPaused: () => get().status === 'paused',
@@ -52,7 +55,7 @@ export const useStopwatchStore = create<StopwatchStore>()((set, get) => ({
       startTimestamp: now,
       accumulatedMs: 0,
       elapsedMs: 0,
-      formattedTime: '00:00.00',
+      formattedTime: '00:00',
       elapsedSeconds: 0
     })
   },
@@ -83,7 +86,7 @@ export const useStopwatchStore = create<StopwatchStore>()((set, get) => ({
       elapsedMs: 0,
       startTimestamp: null,
       accumulatedMs: 0,
-      formattedTime: '00:00.00',
+      formattedTime: '00:00',
       elapsedSeconds: 0
     })
   },
@@ -98,5 +101,9 @@ export const useStopwatchStore = create<StopwatchStore>()((set, get) => ({
       formattedTime: formatStopwatchTime(elapsed),
       elapsedSeconds: Math.floor(elapsed / 1000)
     })
+  },
+
+  setShowOnProjection: (show: boolean) => {
+    set({ showOnProjection: show })
   }
 }))

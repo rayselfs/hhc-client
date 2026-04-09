@@ -124,10 +124,10 @@ describe('TimerPage — BOTH mode', () => {
     expect(screen.getByTestId('btn-start')).not.toBeDisabled()
   })
 
-  it('renders ClockDisplay in both mode', () => {
+  it('does not render ClockDisplay in both mode (only on projection)', () => {
     useTimerStore.setState({ mode: 'both' })
     renderTimerPage()
-    expect(screen.getByTestId('clock-display')).toBeInTheDocument()
+    expect(screen.queryByTestId('clock-display')).not.toBeInTheDocument()
   })
 
   it('does not render StopwatchDisplay in both mode', () => {
@@ -158,9 +158,9 @@ describe('TimerPage — STOPWATCH mode', () => {
 
   it('displays formatted stopwatch time from store', () => {
     useTimerStore.setState({ mode: 'stopwatch' })
-    useStopwatchStore.setState({ formattedTime: '01:23.45' })
+    useStopwatchStore.setState({ formattedTime: '01:23' })
     renderTimerPage()
-    expect(screen.getByText('01:23.45')).toBeInTheDocument()
+    expect(screen.getByText('01:23')).toBeInTheDocument()
   })
 })
 
@@ -372,12 +372,13 @@ describe('TimerPage — TimeInputPopover gating', () => {
 })
 
 describe('TimerPage — stopwatch projection', () => {
-  it('sends timer:stopwatch projection when in stopwatch mode', async () => {
+  it('sends timer:stopwatch projection when showOnProjection is true', async () => {
     useTimerStore.setState({ mode: 'stopwatch' })
     useStopwatchStore.setState({
       status: 'stopped',
       elapsedMs: 0,
-      formattedTime: '00:00.00'
+      formattedTime: '00:00',
+      showOnProjection: true
     })
     renderTimerPage()
 
@@ -385,7 +386,7 @@ describe('TimerPage — stopwatch projection', () => {
       'timer:stopwatch',
       expect.objectContaining({
         elapsedMs: 0,
-        formattedTime: '00:00.00',
+        formattedTime: '00:00',
         status: 'stopped'
       })
     )
@@ -396,7 +397,8 @@ describe('TimerPage — stopwatch projection', () => {
     useStopwatchStore.setState({
       status: 'stopped',
       elapsedMs: 0,
-      formattedTime: '00:00.00'
+      formattedTime: '00:00',
+      showOnProjection: true
     })
     renderTimerPage()
     mockProject.mockClear()
@@ -405,7 +407,7 @@ describe('TimerPage — stopwatch projection', () => {
       useStopwatchStore.setState({
         status: 'running',
         elapsedMs: 1500,
-        formattedTime: '00:01.50'
+        formattedTime: '00:01'
       })
     })
 
@@ -413,9 +415,34 @@ describe('TimerPage — stopwatch projection', () => {
       'timer:stopwatch',
       expect.objectContaining({
         elapsedMs: 1500,
-        formattedTime: '00:01.50',
+        formattedTime: '00:01',
         status: 'running'
       })
+    )
+  })
+
+  it('does not send timer:stopwatch projection when showOnProjection is false', () => {
+    useTimerStore.setState({ mode: 'stopwatch' })
+    useStopwatchStore.setState({
+      status: 'stopped',
+      elapsedMs: 0,
+      formattedTime: '00:00',
+      showOnProjection: false
+    })
+    renderTimerPage()
+
+    const stopwatchCalls = mockProject.mock.calls.filter((c) => c[0] === 'timer:stopwatch')
+    expect(stopwatchCalls).toHaveLength(0)
+  })
+
+  it('sends mode clock to projection when stopwatch showOnProjection is false', () => {
+    useTimerStore.setState({ mode: 'stopwatch' })
+    useStopwatchStore.setState({ showOnProjection: false })
+    renderTimerPage()
+
+    expect(mockProject).toHaveBeenCalledWith(
+      'timer:tick',
+      expect.objectContaining({ mode: 'clock' })
     )
   })
 
