@@ -48,7 +48,10 @@ export default function TimerRing({
 
   return (
     <div className={`relative ${className ?? ''}`} style={containerStyle}>
-      <svg viewBox={`0 0 ${size} ${size}`} className="absolute inset-0 -rotate-90 w-full h-full">
+      <svg
+        viewBox={`0 0 ${size} ${size}`}
+        className="absolute inset-0 -rotate-90 -scale-x-100 w-full h-full"
+      >
         <circle
           cx={center}
           cy={center}
