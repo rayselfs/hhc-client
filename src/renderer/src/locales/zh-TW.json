@@ -8,7 +8,7 @@
     "mode": {
       "timer": "計時",
       "clock": "時鐘",
-      "both": "兩者",
+      "both": "同時",
       "stopwatch": "碼錶"
     },
     "start": "開始",
@@ -64,7 +64,10 @@
     "closeButton": "關閉投影視窗",
     "closeTitle": "關閉投影",
     "closeConfirm": "確定要關閉投影視窗嗎？",
-    "waiting": "等待內容..."
+    "waiting": "等待內容...",
+    "openTitle": "開啟投影",
+    "openMessage": "開啟投影視窗以在第二螢幕上顯示內容。",
+    "open": "開啟"
   },
   "common": {
     "cancel": "取消",

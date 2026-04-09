@@ -64,7 +64,10 @@
     "closeButton": "Close projection window",
     "closeTitle": "Close Projection",
     "closeConfirm": "Are you sure you want to close the projection window?",
-    "waiting": "Waiting for content..."
+    "waiting": "Waiting for content...",
+    "openTitle": "Open Projection",
+    "openMessage": "Open the projection window to display content on a second screen.",
+    "open": "Open"
   },
   "common": {
     "cancel": "Cancel",

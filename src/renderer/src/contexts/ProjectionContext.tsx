@@ -142,7 +142,13 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       return
     }
 
-    const win = window.open(getProjectionUrl(), 'hhc-projection')
+    const width = screen.availWidth
+    const height = screen.availHeight
+    const win = window.open(
+      getProjectionUrl(),
+      'hhc-projection',
+      `popup,width=${width},height=${height},left=0,top=0`
+    )
     if (!win) return
     projectionWindowRef.current = win
     startPolling()
