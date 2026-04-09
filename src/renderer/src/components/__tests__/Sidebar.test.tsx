@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { describe, it, expect } from 'vitest'
 import '@renderer/i18n'
@@ -48,5 +48,13 @@ describe('Sidebar', () => {
     await i18n.changeLanguage('en')
     renderWithRouter(['/'])
     expect(screen.getByText('Guest')).toBeInTheDocument()
+  })
+
+  it('Preferences menu item opens PreferencesDialog', async () => {
+    await i18n.changeLanguage('en')
+    renderWithRouter(['/'])
+    const preferencesItem = screen.getByText('Preferences').closest('[role="menuitem"]')!
+    fireEvent.click(preferencesItem)
+    expect(screen.getByTestId('category-general')).toBeInTheDocument()
   })
 })

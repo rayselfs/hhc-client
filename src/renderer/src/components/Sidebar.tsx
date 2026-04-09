@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useLocation, Link } from 'react-router-dom'
 import { Timer, BookOpen } from 'lucide-react'
 import UserMenu from './UserMenu'
+import PreferencesDialog from './PreferencesDialog'
 
 interface NavItem {
   to: string
@@ -12,6 +14,7 @@ interface NavItem {
 export default function Sidebar(): React.JSX.Element {
   const { t } = useTranslation()
   const location = useLocation()
+  const [prefsOpen, setPrefsOpen] = useState(false)
 
   const items: NavItem[] = [
     { to: '/timer', icon: Timer, label: t('nav.timer') },
@@ -46,8 +49,9 @@ export default function Sidebar(): React.JSX.Element {
         })}
       </ul>
       <div className="mt-auto">
-        <UserMenu />
+        <UserMenu onOpenPreferences={() => setPrefsOpen(true)} />
       </div>
+      <PreferencesDialog isOpen={prefsOpen} onOpenChange={setPrefsOpen} />
     </nav>
   )
 }
