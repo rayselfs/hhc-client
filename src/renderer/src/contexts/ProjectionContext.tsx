@@ -99,6 +99,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
         unsubClosed()
         unsubReady()
         adapter.dispose()
+        adapterRef.current = null
       }
     }
 
@@ -133,6 +134,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       window.removeEventListener('beforeunload', handleBeforeUnload)
       projectionWindowRef.current?.close()
       adapter.dispose()
+      adapterRef.current = null
     }
   }, [startPolling, stopPolling, setIsProjectionBlanked])
 

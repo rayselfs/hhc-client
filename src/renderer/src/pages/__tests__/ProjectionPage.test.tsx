@@ -2,7 +2,8 @@ import { render, screen, act } from '@testing-library/react'
 import type { TimerTickPayload, StopwatchTickPayload } from '@shared/types/timer'
 
 vi.mock('@renderer/lib/env', () => ({
-  isElectron: vi.fn(() => false)
+  isElectron: vi.fn(() => false),
+  isWeb: vi.fn(() => true)
 }))
 
 vi.mock('@renderer/components/projection/DefaultProjection', () => ({
