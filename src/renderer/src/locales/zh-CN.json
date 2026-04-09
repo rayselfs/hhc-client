@@ -74,5 +74,40 @@
     "cancel": "取消",
     "close": "关闭",
     "send": "发送"
+  },
+  "userMenu": {
+    "guest": "访客",
+    "login": "登录",
+    "logout": "登出",
+    "preferences": "偏好设置",
+    "checkForUpdates": "检查更新",
+    "keyboardShortcuts": "键盘快捷键",
+    "closeApp": "关闭应用程序"
+  },
+  "preferences": {
+    "title": "偏好设置",
+    "categories": {
+      "general": "常规",
+      "media": "媒体"
+    },
+    "language": "语言",
+    "timezone": "时区",
+    "darkMode": "深色模式",
+    "hardwareAcceleration": "硬件加速",
+    "hardwareAccelerationDesc": "需要重新启动应用程序",
+    "resetToDefaults": "重置为默认值",
+    "resetToDefaultsConfirm": "将所有设置重置为默认值？",
+    "mediaPlaceholder": "媒体设置即将推出"
+  },
+  "timezones": {
+    "taipei": "台北 (UTC+8)",
+    "hongKong": "香港 (UTC+8)",
+    "singapore": "新加坡 (UTC+8)",
+    "tokyo": "东京 (UTC+9)",
+    "seoul": "首尔 (UTC+9)",
+    "newYork": "纽约 (UTC-5/-4)",
+    "london": "伦敦 (UTC+0/+1)",
+    "paris": "巴黎 (UTC+1/+2)",
+    "utc": "UTC (UTC+0)"
   }
 }

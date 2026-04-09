@@ -74,5 +74,40 @@
     "cancel": "Cancel",
     "close": "Close",
     "send": "Send"
+  },
+  "userMenu": {
+    "guest": "Guest",
+    "login": "Login",
+    "logout": "Logout",
+    "preferences": "Preferences",
+    "checkForUpdates": "Check for Updates",
+    "keyboardShortcuts": "Keyboard Shortcuts",
+    "closeApp": "Close App"
+  },
+  "preferences": {
+    "title": "Preferences",
+    "categories": {
+      "general": "General",
+      "media": "Media"
+    },
+    "language": "Language",
+    "timezone": "Timezone",
+    "darkMode": "Dark Mode",
+    "hardwareAcceleration": "Hardware Acceleration",
+    "hardwareAccelerationDesc": "Requires restarting the application",
+    "resetToDefaults": "Reset to Defaults",
+    "resetToDefaultsConfirm": "Reset all settings to their default values?",
+    "mediaPlaceholder": "Media settings coming soon"
+  },
+  "timezones": {
+    "taipei": "Taipei (UTC+8)",
+    "hongKong": "Hong Kong (UTC+8)",
+    "singapore": "Singapore (UTC+8)",
+    "tokyo": "Tokyo (UTC+9)",
+    "seoul": "Seoul (UTC+9)",
+    "newYork": "New York (UTC-5/-4)",
+    "london": "London (UTC+0/+1)",
+    "paris": "Paris (UTC+1/+2)",
+    "utc": "UTC (UTC+0)"
   }
 }

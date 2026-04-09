@@ -74,5 +74,40 @@
     "cancel": "取消",
     "close": "關閉",
     "send": "傳送"
+  },
+  "userMenu": {
+    "guest": "訪客",
+    "login": "登入",
+    "logout": "登出",
+    "preferences": "偏好設定",
+    "checkForUpdates": "檢查更新",
+    "keyboardShortcuts": "鍵盤快速鍵",
+    "closeApp": "關閉應用程式"
+  },
+  "preferences": {
+    "title": "偏好設定",
+    "categories": {
+      "general": "一般",
+      "media": "媒體"
+    },
+    "language": "語言",
+    "timezone": "時區",
+    "darkMode": "深色模式",
+    "hardwareAcceleration": "硬體加速",
+    "hardwareAccelerationDesc": "需要重新啟動應用程式",
+    "resetToDefaults": "重設為預設值",
+    "resetToDefaultsConfirm": "將所有設定重設為預設值？",
+    "mediaPlaceholder": "媒體設定即將推出"
+  },
+  "timezones": {
+    "taipei": "台北 (UTC+8)",
+    "hongKong": "香港 (UTC+8)",
+    "singapore": "新加坡 (UTC+8)",
+    "tokyo": "東京 (UTC+9)",
+    "seoul": "首爾 (UTC+9)",
+    "newYork": "紐約 (UTC-5/-4)",
+    "london": "倫敦 (UTC+0/+1)",
+    "paris": "巴黎 (UTC+1/+2)",
+    "utc": "UTC (UTC+0)"
   }
 }
