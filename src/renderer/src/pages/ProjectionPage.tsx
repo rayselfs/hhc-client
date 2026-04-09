@@ -76,14 +76,20 @@ function renderTimerContent(
   timerData: TimerTickPayload,
   stopwatchData: StopwatchTickPayload | null
 ): React.JSX.Element {
-  const { mode, progress, mainDisplay, subDisplay, phase, overtimeMessage } = timerData
+  const { mode, progress, mainDisplay, subDisplay, phase, overtimeMessage, reminderColor } =
+    timerData
 
   const isFinishedWithMessage = phase === 'overtime' && overtimeMessage
 
   if (isFinishedWithMessage) {
     return (
       <div className="flex items-center justify-center w-full h-full @container">
-        <span className="timer-digits text-[14cqi] text-center text-white">{overtimeMessage}</span>
+        <span
+          className="timer-digits text-[14cqi] text-center"
+          style={{ color: reminderColor || '#ffffff' }}
+        >
+          {overtimeMessage}
+        </span>
       </div>
     )
   }
@@ -97,6 +103,7 @@ function renderTimerContent(
         phase={phase}
         size={700}
         responsive
+        warningColor={reminderColor}
       />
     )
   }
@@ -120,6 +127,7 @@ function renderTimerContent(
             phase={phase}
             size={700}
             responsive
+            warningColor={reminderColor}
           />
         </div>
         <GlassDivider vertical className="mx-4" />

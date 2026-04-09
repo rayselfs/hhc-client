@@ -25,7 +25,8 @@
       "label": "时间提醒",
       "time": "提醒时间",
       "error": "提醒时间必须小于总时间",
-      "seconds": "秒"
+      "seconds": "秒",
+      "color": "提醒颜色"
     },
     "overtimeMessage": {
       "label": "时间到消息",

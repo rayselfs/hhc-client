@@ -234,6 +234,18 @@ describe('setDuration()', () => {
     useTimerStore.getState().setDuration(-10)
     expect(useTimerStore.getState().totalDuration).toBe(0)
   })
+
+  it('auto-disables reminder when new duration <= reminderDuration', () => {
+    useTimerStore.setState({ reminderEnabled: true, reminderDuration: 60 })
+    useTimerStore.getState().setDuration(50)
+    expect(useTimerStore.getState().reminderEnabled).toBe(false)
+  })
+
+  it('keeps reminder enabled when new duration > reminderDuration', () => {
+    useTimerStore.setState({ reminderEnabled: true, reminderDuration: 60 })
+    useTimerStore.getState().setDuration(120)
+    expect(useTimerStore.getState().reminderEnabled).toBe(true)
+  })
 })
 
 describe('addTime()', () => {
@@ -294,6 +306,20 @@ describe('removeTime()', () => {
     const s = useTimerStore.getState()
     expect(s.remainingSeconds).toBe(240)
     expect(s.totalDuration).toBe(240)
+  })
+
+  it('auto-disables reminder when stopped removeTime causes invalid state', () => {
+    useTimerStore.setState({ reminderEnabled: true, reminderDuration: 60 })
+    useTimerStore.getState().removeTime(250)
+    expect(useTimerStore.getState().totalDuration).toBe(50)
+    expect(useTimerStore.getState().reminderEnabled).toBe(false)
+  })
+
+  it('keeps reminder enabled when stopped removeTime leaves valid state', () => {
+    useTimerStore.setState({ reminderEnabled: true, reminderDuration: 60 })
+    useTimerStore.getState().removeTime(10)
+    expect(useTimerStore.getState().totalDuration).toBe(290)
+    expect(useTimerStore.getState().reminderEnabled).toBe(true)
   })
 })
 

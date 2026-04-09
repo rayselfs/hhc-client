@@ -25,7 +25,8 @@
       "label": "Time Reminder",
       "time": "Reminder Time",
       "error": "Reminder time must be less than total duration",
-      "seconds": "sec"
+      "seconds": "sec",
+      "color": "Reminder Color"
     },
     "overtimeMessage": {
       "label": "Time's Up Message",

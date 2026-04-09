@@ -17,6 +17,7 @@ export default function TimerSettings({ mode, className }: TimerSettingsProps): 
 
   const reminderEnabled = useTimerStore((s) => s.reminderEnabled)
   const reminderDuration = useTimerStore((s) => s.reminderDuration)
+  const reminderColor = useTimerStore((s) => s.reminderColor)
   const overtimeMessageEnabled = useTimerStore((s) => s.overtimeMessageEnabled)
   const overtimeMessage = useTimerStore((s) => s.overtimeMessage)
   const totalDuration = useTimerStore((s) => s.totalDuration)
@@ -25,11 +26,22 @@ export default function TimerSettings({ mode, className }: TimerSettingsProps): 
 
   const showOnProjection = useStopwatchStore((s) => s.showOnProjection)
 
+  const canEnableReminder = totalDuration > 30
   const reminderError =
     reminderEnabled && reminderDuration >= totalDuration ? t('timer.reminder.error') : null
 
   const handleReminderToggle = (enabled: boolean): void => {
-    setReminder(enabled, reminderDuration)
+    if (enabled) {
+      const duration =
+        reminderDuration < totalDuration
+          ? reminderDuration
+          : totalDuration > 60
+            ? 60
+            : totalDuration - 10
+      setReminder(true, duration)
+    } else {
+      setReminder(false, reminderDuration)
+    }
   }
 
   const handleReminderDurationChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
@@ -37,6 +49,10 @@ export default function TimerSettings({ mode, className }: TimerSettingsProps): 
     if (!isNaN(val) && val >= 0) {
       setReminder(reminderEnabled, val)
     }
+  }
+
+  const handleReminderColorChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
+    setReminder(reminderEnabled, reminderDuration, e.target.value)
   }
 
   const handleOvertimeMessageToggle = (enabled: boolean): void => {
@@ -71,6 +87,7 @@ export default function TimerSettings({ mode, className }: TimerSettingsProps): 
           <div className="flex items-center gap-4 min-h-10">
             <Switch
               isSelected={reminderEnabled}
+              isDisabled={!canEnableReminder}
               onChange={handleReminderToggle}
               aria-label={t('timer.reminder.label')}
             >
@@ -90,6 +107,13 @@ export default function TimerSettings({ mode, className }: TimerSettingsProps): 
                   min={0}
                 />
                 <span className="text-xs text-muted">{t('timer.reminder.seconds')}</span>
+                <input
+                  type="color"
+                  value={reminderColor}
+                  onChange={handleReminderColorChange}
+                  aria-label={t('timer.reminder.color')}
+                  className="w-8 h-8 rounded cursor-pointer border-0 bg-transparent p-0"
+                />
               </div>
             )}
           </div>

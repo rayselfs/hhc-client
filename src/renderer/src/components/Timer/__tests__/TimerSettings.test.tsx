@@ -106,7 +106,39 @@ describe('TimerSettings — reminder duration input', () => {
     expect(setReminderSpy).toHaveBeenLastCalledWith(true, 9)
   })
 
-  it('shows validation error when reminderDuration >= totalDuration', () => {
+  it('smart default: uses totalDuration - 10 when totalDuration < 60', async () => {
+    const user = userEvent.setup()
+    const setReminderSpy = vi.fn()
+    useTimerStore.setState({
+      totalDuration: 45,
+      remainingSeconds: 45,
+      setReminder: setReminderSpy
+    } as never)
+    renderWithI18n()
+
+    const switches = screen.getAllByRole('switch')
+    await user.click(switches[0])
+
+    expect(setReminderSpy).toHaveBeenCalledWith(true, 35)
+  })
+
+  it('disables reminder switch when totalDuration <= 30', () => {
+    useTimerStore.setState({ totalDuration: 30, remainingSeconds: 30 })
+    renderWithI18n()
+
+    const switches = screen.getAllByRole('switch')
+    expect(switches[0]).toBeDisabled()
+  })
+
+  it('enables reminder switch when totalDuration > 30', () => {
+    useTimerStore.setState({ totalDuration: 31, remainingSeconds: 31 })
+    renderWithI18n()
+
+    const switches = screen.getAllByRole('switch')
+    expect(switches[0]).not.toBeDisabled()
+  })
+
+  it('shows validation error when user sets reminderDuration >= totalDuration', () => {
     useTimerStore.setState({
       reminderEnabled: true,
       reminderDuration: 300,
@@ -115,28 +147,6 @@ describe('TimerSettings — reminder duration input', () => {
     renderWithI18n()
 
     expect(screen.getByRole('alert')).toHaveTextContent(/less than total duration/i)
-  })
-
-  it('shows no error when reminderDuration < totalDuration', () => {
-    useTimerStore.setState({
-      reminderEnabled: true,
-      reminderDuration: 60,
-      totalDuration: 300
-    })
-    renderWithI18n()
-
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
-  })
-
-  it('shows no error when reminder is disabled even if duration >= totalDuration', () => {
-    useTimerStore.setState({
-      reminderEnabled: false,
-      reminderDuration: 300,
-      totalDuration: 300
-    })
-    renderWithI18n()
-
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 })
 

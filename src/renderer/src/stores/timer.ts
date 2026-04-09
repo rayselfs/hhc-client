@@ -18,12 +18,14 @@ const DEFAULT_PRESETS: TimerPreset[] = [
 
 const PRESETS_STORAGE_KEY = 'hhc-timer-presets'
 const DURATION_STORAGE_KEY = 'hhc-timer-duration'
+const REMINDER_STORAGE_KEY = 'hhc-timer-reminder'
 
 export interface TimerStore {
   mode: TimerMode
   totalDuration: number
   reminderEnabled: boolean
   reminderDuration: number
+  reminderColor: string
   overtimeMessageEnabled: boolean
   overtimeMessage: string
   timezone: string
@@ -54,7 +56,7 @@ export interface TimerStore {
   removeTime: (seconds: number) => void
   setMode: (mode: TimerMode) => void
   tick: (currentMs: number) => void
-  setReminder: (enabled: boolean, durationSeconds: number) => void
+  setReminder: (enabled: boolean, durationSeconds: number, color?: string) => void
   setOvertimeMessage: (enabled: boolean, message: string) => void
 
   addPreset: (name: string, durationSeconds: number) => void
@@ -64,6 +66,8 @@ export interface TimerStore {
   savePresets: () => void
   loadDuration: () => void
   saveDuration: () => void
+  loadReminder: () => void
+  saveReminder: () => void
 }
 
 function formatTime(totalSeconds: number): string {
@@ -99,6 +103,7 @@ export const DEFAULT_SETTINGS: TimerSettings = {
   totalDuration: 300,
   reminderEnabled: false,
   reminderDuration: 60,
+  reminderColor: '#ef4444',
   overtimeMessageEnabled: false,
   overtimeMessage: "Time's Up!",
   timezone: 'UTC'
@@ -118,6 +123,7 @@ export const useTimerStore = create<TimerStore>()((set, get) => ({
   totalDuration: DEFAULT_SETTINGS.totalDuration,
   reminderEnabled: DEFAULT_SETTINGS.reminderEnabled,
   reminderDuration: DEFAULT_SETTINGS.reminderDuration,
+  reminderColor: DEFAULT_SETTINGS.reminderColor,
   overtimeMessageEnabled: DEFAULT_SETTINGS.overtimeMessageEnabled,
   overtimeMessage: DEFAULT_SETTINGS.overtimeMessage,
   timezone: DEFAULT_SETTINGS.timezone,
@@ -193,12 +199,14 @@ export const useTimerStore = create<TimerStore>()((set, get) => ({
     const s = get()
     if (s.status !== 'stopped') return
     const clamped = Math.max(0, Math.min(MAX_DURATION_SECONDS, seconds))
+    const autoDisableReminder = s.reminderEnabled && s.reminderDuration >= clamped
     set({
       totalDuration: clamped,
       remainingSeconds: clamped,
       progress: computeProgress(clamped, clamped),
       formattedTime: formatTime(clamped),
-      phase: 'idle'
+      phase: 'idle',
+      ...(autoDisableReminder ? { reminderEnabled: false } : {})
     })
     get().saveDuration()
   },
@@ -237,11 +245,13 @@ export const useTimerStore = create<TimerStore>()((set, get) => ({
 
     if (s.status === 'stopped') {
       const newTotal = Math.max(0, s.totalDuration - seconds)
+      const autoDisableReminder = s.reminderEnabled && s.reminderDuration >= newTotal
       set({
         totalDuration: newTotal,
         remainingSeconds: newRemaining,
         progress: computeProgress(newRemaining, newTotal),
-        formattedTime: formatTime(newRemaining)
+        formattedTime: formatTime(newRemaining),
+        ...(autoDisableReminder ? { reminderEnabled: false } : {})
       })
       get().saveDuration()
       return
@@ -300,14 +310,21 @@ export const useTimerStore = create<TimerStore>()((set, get) => ({
     })
   },
 
-  setReminder: (enabled: boolean, durationSeconds: number) => {
+  setReminder: (enabled: boolean, durationSeconds: number, color?: string) => {
     const s = get()
     const phase =
       s.status !== 'stopped'
         ? computePhase(s.status, s.remainingSeconds, enabled, durationSeconds)
         : s.phase
 
-    set({ reminderEnabled: enabled, reminderDuration: durationSeconds, phase })
+    const update: Partial<TimerStore> = {
+      reminderEnabled: enabled,
+      reminderDuration: durationSeconds,
+      phase
+    }
+    if (color !== undefined) update.reminderColor = color
+    set(update)
+    get().saveReminder()
   },
 
   setOvertimeMessage: (enabled: boolean, message: string) => {
@@ -390,6 +407,32 @@ export const useTimerStore = create<TimerStore>()((set, get) => ({
     const s = get()
     try {
       localStorage.setItem(DURATION_STORAGE_KEY, String(s.totalDuration))
+    } catch {
+      // silent fail
+    }
+  },
+
+  loadReminder: () => {
+    try {
+      const stored = localStorage.getItem(REMINDER_STORAGE_KEY)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        if (parsed && typeof parsed.duration === 'number' && typeof parsed.color === 'string') {
+          set({ reminderDuration: parsed.duration, reminderColor: parsed.color })
+        }
+      }
+    } catch {
+      // silent fail
+    }
+  },
+
+  saveReminder: () => {
+    const s = get()
+    try {
+      localStorage.setItem(
+        REMINDER_STORAGE_KEY,
+        JSON.stringify({ duration: s.reminderDuration, color: s.reminderColor })
+      )
     } catch {
       // silent fail
     }

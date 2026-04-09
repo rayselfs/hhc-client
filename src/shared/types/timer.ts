@@ -33,6 +33,7 @@ export interface TimerSettings {
   totalDuration: number
   reminderEnabled: boolean
   reminderDuration: number
+  reminderColor: string
   overtimeMessageEnabled: boolean
   overtimeMessage: string
   timezone: string
@@ -99,6 +100,7 @@ export interface TimerTickPayload {
   progress: number
   overtimeSeconds: number
   overtimeMessage: string | null
+  reminderColor: string | null
   /** Stopwatch elapsed time in ms — present when mode is 'stopwatch' */
   stopwatchElapsedMs?: number
   /** Stopwatch formatted time string — present when mode is 'stopwatch' */

@@ -20,6 +20,7 @@ export default function TimerPage(): React.JSX.Element {
   const totalDuration = useTimerStore((s) => s.totalDuration)
   const reminderEnabled = useTimerStore((s) => s.reminderEnabled)
   const reminderDuration = useTimerStore((s) => s.reminderDuration)
+  const reminderColor = useTimerStore((s) => s.reminderColor)
   const overtimeMessageEnabled = useTimerStore((s) => s.overtimeMessageEnabled)
   const overtimeMessage = useTimerStore((s) => s.overtimeMessage)
   const timerStatus = useTimerStore((s) => s.status)
@@ -38,6 +39,7 @@ export default function TimerPage(): React.JSX.Element {
   useEffect(() => {
     useTimerStore.getState().loadPresets()
     useTimerStore.getState().loadDuration()
+    useTimerStore.getState().loadReminder()
 
     const adapter = createTimerAdapter()
     adapterRef.current = adapter
@@ -143,7 +145,8 @@ export default function TimerPage(): React.JSX.Element {
         subDisplay: displayValues.subDisplay,
         progress,
         overtimeSeconds,
-        overtimeMessage: overtimeMessageEnabled ? overtimeMessage : null
+        overtimeMessage: overtimeMessageEnabled ? overtimeMessage : null,
+        reminderColor: reminderEnabled ? reminderColor : null
       },
       { autoOpen }
     )
@@ -157,6 +160,7 @@ export default function TimerPage(): React.JSX.Element {
     totalDuration,
     reminderEnabled,
     reminderDuration,
+    reminderColor,
     overtimeMessageEnabled,
     overtimeMessage,
     showSwOnProjection,
@@ -185,6 +189,7 @@ export default function TimerPage(): React.JSX.Element {
             subDisplay={displayValues.subDisplay}
             phase={phase}
             overtimeDisplay={displayValues.overtimeDisplay}
+            warningColor={reminderEnabled ? reminderColor : null}
             canEditTime={timerStatus === 'stopped' && phase !== 'overtime'}
             onTimeConfirm={(seconds) => useTimerStore.getState().setDuration(seconds)}
           />

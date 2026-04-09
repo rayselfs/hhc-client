@@ -9,6 +9,7 @@ interface TimerDisplayProps {
   overtimeDisplay?: string | null
   size?: number
   responsive?: boolean
+  warningColor?: string | null
   onTimeConfirm?: (seconds: number) => void
   canEditTime?: boolean
   className?: string
@@ -22,12 +23,14 @@ export default function TimerDisplay({
   overtimeDisplay,
   size = 280,
   responsive = false,
+  warningColor,
   onTimeConfirm,
   canEditTime,
   className
 }: TimerDisplayProps): React.JSX.Element {
   const isWarning = phase === 'warning'
   const isOvertime = phase === 'overtime'
+  const useCustomColor = (isWarning || isOvertime) && warningColor
 
   const innerContent = isOvertime ? overtimeDisplay || '00:00' : mainDisplay
 
@@ -37,9 +40,10 @@ export default function TimerDisplay({
       className={[
         'timer-digits bg-transparent border-0 p-0',
         'text-[34cqi]',
-        isWarning ? 'text-danger' : '',
+        isWarning && !warningColor ? 'text-danger' : '',
         canEditTime ? 'hover:opacity-80' : 'pointer-events-none'
       ].join(' ')}
+      style={useCustomColor ? { color: warningColor } : undefined}
       aria-label={canEditTime ? 'Set timer duration' : undefined}
     >
       {innerContent}

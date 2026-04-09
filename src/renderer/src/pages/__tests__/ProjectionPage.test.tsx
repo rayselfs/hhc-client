@@ -41,7 +41,8 @@ const baseTimerTick: TimerTickPayload = {
   subDisplay: null,
   progress: 0.5,
   overtimeSeconds: 0,
-  overtimeMessage: null
+  overtimeMessage: null,
+  reminderColor: null
 }
 
 const baseStopwatchTick: StopwatchTickPayload = {
