@@ -1,12 +1,24 @@
 import { useTranslation } from 'react-i18next'
-import { Switch, Select } from '@heroui/react'
+import { Switch, Select, ListBox } from '@heroui/react'
 import { useTheme } from '@renderer/contexts/ThemeContext'
 import { useSettingsStore, TIMEZONE_OPTIONS } from '@renderer/stores/settings'
 import { isElectron } from '@renderer/lib/env'
 
-interface GeneralSettingsProps {}
+const TIMEZONE_LABEL_KEYS = {
+  'timezones.taipei': 'timezones.taipei',
+  'timezones.hongKong': 'timezones.hongKong',
+  'timezones.singapore': 'timezones.singapore',
+  'timezones.tokyo': 'timezones.tokyo',
+  'timezones.seoul': 'timezones.seoul',
+  'timezones.newYork': 'timezones.newYork',
+  'timezones.london': 'timezones.london',
+  'timezones.paris': 'timezones.paris',
+  'timezones.utc': 'timezones.utc'
+} as const
 
-export default function GeneralSettings(_props: GeneralSettingsProps): React.JSX.Element {
+type TimezoneKey = keyof typeof TIMEZONE_LABEL_KEYS
+
+export default function GeneralSettings(): React.JSX.Element {
   const { t, i18n } = useTranslation()
   const { preference, setPreference } = useTheme()
   const { timezone, hardwareAcceleration, setTimezone, setHardwareAcceleration, resetToDefaults } =
@@ -40,15 +52,13 @@ export default function GeneralSettings(_props: GeneralSettingsProps): React.JSX
             <Select.Indicator />
           </Select.Trigger>
           <Select.Popover>
-            {languageOptions.map((opt) => (
-              <button
-                key={opt.value}
-                data-value={opt.value}
-                onClick={() => i18n.changeLanguage(opt.value)}
-              >
-                {opt.label}
-              </button>
-            ))}
+            <ListBox>
+              {languageOptions.map((opt) => (
+                <ListBox.Item key={opt.value} id={opt.value} textValue={opt.label}>
+                  {opt.label}
+                </ListBox.Item>
+              ))}
+            </ListBox>
           </Select.Popover>
         </Select.Root>
       </div>
@@ -65,46 +75,41 @@ export default function GeneralSettings(_props: GeneralSettingsProps): React.JSX
             <Select.Indicator />
           </Select.Trigger>
           <Select.Popover>
-            {TIMEZONE_OPTIONS.map((tz) => {
-              const tzLabelKeys = {
-                'timezones.taipei': t('timezones.taipei'),
-                'timezones.hongKong': t('timezones.hongKong'),
-                'timezones.singapore': t('timezones.singapore'),
-                'timezones.tokyo': t('timezones.tokyo'),
-                'timezones.seoul': t('timezones.seoul'),
-                'timezones.newYork': t('timezones.newYork'),
-                'timezones.london': t('timezones.london'),
-                'timezones.paris': t('timezones.paris'),
-                'timezones.utc': t('timezones.utc')
-              } as const
-              const label = tzLabelKeys[tz.labelKey as keyof typeof tzLabelKeys] ?? tz.labelKey
-              return (
-                <button key={tz.value} data-value={tz.value} onClick={() => setTimezone(tz.value)}>
-                  {label}
-                </button>
-              )
-            })}
+            <ListBox>
+              {TIMEZONE_OPTIONS.map((tz) => {
+                const key = tz.labelKey as TimezoneKey
+                const resolvedKey = TIMEZONE_LABEL_KEYS[key] ?? 'timezones.utc'
+                const label = t(resolvedKey)
+                return (
+                  <ListBox.Item key={tz.value} id={tz.value} textValue={String(label)}>
+                    {String(label)}
+                  </ListBox.Item>
+                )
+              })}
+            </ListBox>
           </Select.Popover>
         </Select.Root>
       </div>
 
-      <div className="flex items-center justify-between">
+      <div className="space-y-2">
         <label className="text-sm font-medium">{t('preferences.darkMode')}</label>
-        <Switch
-          isSelected={preference === 'dark'}
-          onChange={(checked) => setPreference(checked ? 'dark' : 'light')}
-          aria-label={t('preferences.darkMode')}
-        >
-          <Switch.Control>
-            <Switch.Thumb />
-          </Switch.Control>
-        </Switch>
+        <div>
+          <Switch
+            isSelected={preference === 'dark'}
+            onChange={(checked) => setPreference(checked ? 'dark' : 'light')}
+            aria-label={t('preferences.darkMode')}
+          >
+            <Switch.Control>
+              <Switch.Thumb />
+            </Switch.Control>
+          </Switch>
+        </div>
       </div>
 
       {isElectron() && (
-        <div className="space-y-1">
-          <div className="flex items-center justify-between">
-            <label className="text-sm font-medium">{t('preferences.hardwareAcceleration')}</label>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">{t('preferences.hardwareAcceleration')}</label>
+          <div>
             <Switch
               isSelected={hardwareAcceleration}
               onChange={(checked) => setHardwareAcceleration(checked)}
@@ -119,13 +124,16 @@ export default function GeneralSettings(_props: GeneralSettingsProps): React.JSX
         </div>
       )}
 
-      <div className="pt-4 border-t">
-        <button
-          className="text-sm text-red-500 hover:text-red-700 font-medium"
-          onClick={handleReset}
-        >
-          {t('preferences.resetToDefaults')}
-        </button>
+      <div className="space-y-2 pt-4 border-t">
+        <label className="text-sm font-medium">{t('preferences.resetToDefaults')}</label>
+        <div>
+          <button
+            className="rounded-lg bg-danger-soft px-3 py-1.5 text-sm font-medium text-danger-soft-foreground hover:bg-danger-soft-hover transition-colors"
+            onClick={handleReset}
+          >
+            {t('preferences.resetBtn')}
+          </button>
+        </div>
       </div>
     </div>
   )

@@ -96,6 +96,7 @@
     "hardwareAcceleration": "Hardware Acceleration",
     "hardwareAccelerationDesc": "Requires restarting the application",
     "resetToDefaults": "Reset to Defaults",
+    "resetBtn": "Reset",
     "resetToDefaultsConfirm": "Reset all settings to their default values?",
     "mediaPlaceholder": "Media settings coming soon"
   },

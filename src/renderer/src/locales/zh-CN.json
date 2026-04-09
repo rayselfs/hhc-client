@@ -96,6 +96,7 @@
     "hardwareAcceleration": "硬件加速",
     "hardwareAccelerationDesc": "需要重新启动应用程序",
     "resetToDefaults": "重置为默认值",
+    "resetBtn": "重置",
     "resetToDefaultsConfirm": "将所有设置重置为默认值？",
     "mediaPlaceholder": "媒体设置即将推出"
   },

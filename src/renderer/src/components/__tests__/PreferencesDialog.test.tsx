@@ -4,7 +4,6 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import '@renderer/i18n'
 import i18n from '@renderer/i18n'
 import PreferencesDialog from '../PreferencesDialog'
-import { TIMEZONE_OPTIONS } from '@renderer/stores/settings'
 
 vi.mock('@renderer/lib/env', () => ({
   isElectron: vi.fn().mockReturnValue(false),
@@ -166,7 +165,7 @@ describe('PreferencesDialog', () => {
 
     renderDialog(true)
 
-    const resetButton = screen.getByText('Reset to Defaults')
+    const resetButton = screen.getByText('Reset')
     await user.click(resetButton)
 
     expect(resetToDefaults).toHaveBeenCalled()
@@ -191,7 +190,7 @@ describe('PreferencesDialog', () => {
 
     renderDialog(true)
 
-    const resetButton = screen.getByText('Reset to Defaults')
+    const resetButton = screen.getByText('Reset')
     await user.click(resetButton)
 
     expect(resetToDefaults).not.toHaveBeenCalled()
