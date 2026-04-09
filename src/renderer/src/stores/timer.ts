@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { v7 as uuidv7 } from 'uuid'
 import type {
   TimerMode,
   TimerStatus,
@@ -11,9 +12,19 @@ import type {
 const MAX_DURATION_SECONDS = 99 * 3600
 
 const DEFAULT_PRESETS: TimerPreset[] = [
-  { id: 'preset-10m', name: '10:00', durationSeconds: 600, mode: 'timer' },
-  { id: 'preset-5m', name: '05:00', durationSeconds: 300, mode: 'timer' },
-  { id: 'preset-3m', name: '03:00', durationSeconds: 180, mode: 'timer' }
+  {
+    id: '019d7109-f7bf-70ef-a9de-a212faff78b9',
+    name: '10:00',
+    durationSeconds: 600,
+    mode: 'timer'
+  },
+  {
+    id: '019d7109-f7c1-705d-a343-119e8d9b9bff',
+    name: '05:00',
+    durationSeconds: 300,
+    mode: 'timer'
+  },
+  { id: '019d7109-f7c1-705d-a343-16da950eba1d', name: '03:00', durationSeconds: 180, mode: 'timer' }
 ]
 
 const PRESETS_STORAGE_KEY = 'hhc-timer-presets'
@@ -378,7 +389,7 @@ export const useTimerStore = create<TimerStore>()((set, get) => ({
 
   addPreset: (name: string, durationSeconds: number) => {
     const s = get()
-    const id = `preset-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+    const id = uuidv7()
     const newPreset: TimerPreset = {
       id,
       name,
