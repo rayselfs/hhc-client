@@ -17,9 +17,14 @@ export default function Header(): React.JSX.Element {
 
   return (
     <>
-      <header className="flex items-center justify-between gap-2 p-2">
-        <div className="flex items-center gap-2" />
-        <div className="flex items-center gap-2">{showTimerControls && <ModeSelector />}</div>
+      <header className="relative flex items-center justify-end gap-2 p-2">
+        {showTimerControls && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="pointer-events-auto">
+              <ModeSelector />
+            </div>
+          </div>
+        )}
         <div className="flex items-center gap-2">
           <Button
             isIconOnly

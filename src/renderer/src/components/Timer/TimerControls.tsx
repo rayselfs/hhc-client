@@ -48,7 +48,7 @@ export default function TimerControls({
         isIconOnly
         size="lg"
         variant={isStopped ? 'primary' : 'secondary'}
-        className={`h-14 w-14 ${isStopped ? '' : 'bg-warning text-accent-foreground'}`}
+        className={`h-14 w-14 rounded-full ${isStopped ? '' : 'bg-warning text-accent-foreground'}`}
         onPress={playAction}
         isDisabled={isStopped && disableStart}
         data-testid={isStopped ? 'btn-start' : isRunning ? 'btn-pause' : 'btn-resume'}
@@ -60,7 +60,7 @@ export default function TimerControls({
         isIconOnly
         size="lg"
         variant="outline"
-        className="h-14 w-14"
+        className="h-14 w-14 rounded-full"
         onPress={reset}
         isDisabled={isStopped}
         data-testid="btn-reset"

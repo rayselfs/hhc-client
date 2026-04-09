@@ -44,7 +44,7 @@ export default function PresetChips({ className }: PresetChipsProps): React.JSX.
       <h3 className="text-base font-medium mb-2">{t('timer.timerPresets')}</h3>
       <div className="flex flex-wrap items-center gap-2">
         {presets.map((preset) => (
-          <Chip key={preset.id} size="lg" className="cursor-pointer text-base px-4 py-2">
+          <Chip key={preset.id} size="lg" className="text-base px-4 py-2">
             <span
               role="button"
               tabIndex={0}
@@ -73,7 +73,7 @@ export default function PresetChips({ className }: PresetChipsProps): React.JSX.
         <Button
           size="sm"
           variant="outline"
-          className="text-base px-4 h-auto py-2"
+          className="text-base px-4 h-auto py-2 rounded-full"
           onPress={handleAdd}
           isDisabled={hasDuplicate}
           aria-label={t('timer.addPreset')}

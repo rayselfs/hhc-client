@@ -42,7 +42,7 @@ export default function TimeInputPopover({
       <Popover.Trigger>{children}</Popover.Trigger>
       <Popover.Content>
         <Popover.Dialog>
-          <div className="p-3 flex flex-col gap-2 w-72">
+          <div className="p-3 flex flex-col gap-2 w-72 h-28">
             <Input
               type="text"
               value={value}
@@ -56,12 +56,13 @@ export default function TimeInputPopover({
               aria-invalid={Boolean(error)}
               aria-describedby={error ? 'time-input-popover-error' : undefined}
             />
-            {error && (
-              <p id="time-input-popover-error" className="text-xs text-danger">
-                {error}
-              </p>
-            )}
-            <div className="flex justify-end">
+            <p
+              id="time-input-popover-error"
+              className={`text-xs text-danger ${error ? 'visible' : 'invisible'}`}
+            >
+              {error || '\u00A0'}
+            </p>
+            <div className="flex justify-end mt-auto">
               <Button variant="primary" size="sm" onPress={handleConfirm}>
                 {t('timer.inputDialog.confirm')}
               </Button>

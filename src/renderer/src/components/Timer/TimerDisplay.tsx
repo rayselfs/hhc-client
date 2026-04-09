@@ -39,7 +39,7 @@ export default function TimerDisplay({
         'timer-digits font-bold bg-transparent border-0 p-0',
         'text-[clamp(2rem,14cqi,4.5rem)]',
         isWarning ? 'text-danger' : '',
-        canEditTime ? 'cursor-pointer hover:opacity-80' : 'cursor-default pointer-events-none'
+        canEditTime ? 'hover:opacity-80' : 'pointer-events-none'
       ].join(' ')}
       aria-label={canEditTime ? 'Set timer duration' : undefined}
     >

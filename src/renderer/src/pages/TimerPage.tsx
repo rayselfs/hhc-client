@@ -150,7 +150,7 @@ export default function TimerPage(): React.JSX.Element {
   const isClock = mode === 'clock'
 
   return (
-    <div data-testid="timer-page" className="flex flex-col items-center gap-4 p-6 h-full">
+    <div data-testid="timer-page" className="flex flex-col items-center gap-4 h-full">
       {isTimerLike && (
         <div className="flex flex-col items-center gap-4 flex-1 w-full">
           <TimerDisplay
