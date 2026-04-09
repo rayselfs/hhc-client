@@ -1,9 +1,6 @@
-import React, { useEffect, useRef } from 'react'
+import React from 'react'
 import { useTimerStore, getDisplayValues } from '@renderer/stores/timer'
 import { useStopwatchStore } from '@renderer/stores/stopwatch'
-import { createTimerAdapter } from '@renderer/lib/timer-adapter'
-import type { TimerAdapter } from '@renderer/lib/timer-adapter'
-import { useProjection } from '@renderer/contexts/ProjectionContext'
 import TimerDisplay from '@renderer/components/Timer/TimerDisplay'
 import StopwatchDisplay from '@renderer/components/Timer/StopwatchDisplay'
 import TimerControls from '@renderer/components/Timer/TimerControls'
@@ -21,147 +18,9 @@ export default function TimerPage(): React.JSX.Element {
   const reminderEnabled = useTimerStore((s) => s.reminderEnabled)
   const reminderDuration = useTimerStore((s) => s.reminderDuration)
   const reminderColor = useTimerStore((s) => s.reminderColor)
-  const overtimeMessageEnabled = useTimerStore((s) => s.overtimeMessageEnabled)
-  const overtimeMessage = useTimerStore((s) => s.overtimeMessage)
   const timerStatus = useTimerStore((s) => s.status)
 
-  const swStatus = useStopwatchStore((s) => s.status)
-  const swElapsedMs = useStopwatchStore((s) => s.elapsedMs)
   const swFormattedTime = useStopwatchStore((s) => s.formattedTime)
-  const showSwOnProjection = useStopwatchStore((s) => s.showOnProjection)
-
-  const { project } = useProjection()
-
-  const adapterRef = useRef<TimerAdapter | null>(null)
-  const prevTimerStatus = useRef(timerStatus)
-  const prevSwStatus = useRef(swStatus)
-
-  useEffect(() => {
-    const adapter = createTimerAdapter()
-    adapterRef.current = adapter
-
-    adapter.onTick(() => {
-      useTimerStore.getState().tick(Date.now())
-    })
-
-    adapter.onFinished(() => {
-      useTimerStore.getState().tick(Date.now())
-    })
-
-    adapter.onStopwatchTick(() => {
-      useStopwatchStore.getState().tick(Date.now())
-    })
-
-    return () => {
-      adapter.dispose()
-      adapterRef.current = null
-    }
-  }, [])
-
-  useEffect(() => {
-    const prev = prevTimerStatus.current
-    prevTimerStatus.current = timerStatus
-
-    const adapter = adapterRef.current
-    if (!adapter) return
-
-    if (prev === 'stopped' && timerStatus === 'running') {
-      adapter.sendCommand({ type: 'start', durationMs: totalDuration * 1000 })
-    } else if (prev === 'running' && timerStatus === 'paused') {
-      adapter.sendCommand({ type: 'pause' })
-    } else if (prev === 'paused' && timerStatus === 'running') {
-      adapter.sendCommand({ type: 'resume' })
-    } else if (prev !== 'stopped' && timerStatus === 'stopped') {
-      adapter.sendCommand({ type: 'reset' })
-    }
-  }, [timerStatus, totalDuration])
-
-  useEffect(() => {
-    const prev = prevSwStatus.current
-    prevSwStatus.current = swStatus
-
-    const adapter = adapterRef.current
-    if (!adapter) return
-
-    if (prev === 'stopped' && swStatus === 'running') {
-      adapter.sendCommand({ type: 'startStopwatch' })
-    } else if (prev === 'running' && swStatus === 'paused') {
-      adapter.sendCommand({ type: 'pauseStopwatch' })
-    } else if (prev === 'paused' && swStatus === 'running') {
-      adapter.sendCommand({ type: 'resumeStopwatch' })
-    } else if (prev !== 'stopped' && swStatus === 'stopped') {
-      adapter.sendCommand({ type: 'resetStopwatch' })
-    }
-  }, [swStatus])
-
-  // Direct tick for stopwatch — ensures display updates even if worker messages are delayed
-  useEffect(() => {
-    if (swStatus !== 'running') return
-    const id = setInterval(() => {
-      useStopwatchStore.getState().tick(Date.now())
-    }, 100)
-    return () => clearInterval(id)
-  }, [swStatus])
-
-  useEffect(() => {
-    if (mode !== 'stopwatch') return
-    if (!showSwOnProjection) return
-    const autoShow = swStatus === 'running' || swStatus === 'paused'
-    project(
-      'timer:stopwatch',
-      {
-        elapsedMs: swElapsedMs,
-        formattedTime: swFormattedTime,
-        status: swStatus
-      },
-      { autoOpen: autoShow, autoShow }
-    )
-  }, [mode, swElapsedMs, swFormattedTime, swStatus, showSwOnProjection, project])
-
-  useEffect(() => {
-    const displayValues = getDisplayValues({
-      phase,
-      remainingSeconds,
-      reminderDuration,
-      overtimeSeconds,
-      totalDuration,
-      reminderEnabled
-    })
-
-    const projectionMode = mode === 'stopwatch' && !showSwOnProjection ? 'clock' : mode
-    const autoShow = timerStatus === 'running' || timerStatus === 'paused'
-
-    project(
-      'timer:tick',
-      {
-        mode: projectionMode,
-        remainingSeconds,
-        phase,
-        mainDisplay: displayValues.mainDisplay,
-        subDisplay: displayValues.subDisplay,
-        progress,
-        overtimeSeconds,
-        overtimeMessage: overtimeMessageEnabled ? overtimeMessage : null,
-        reminderColor: reminderEnabled ? reminderColor : null
-      },
-      { autoOpen: autoShow, autoShow }
-    )
-  }, [
-    timerStatus,
-    mode,
-    phase,
-    progress,
-    remainingSeconds,
-    overtimeSeconds,
-    totalDuration,
-    reminderEnabled,
-    reminderDuration,
-    reminderColor,
-    overtimeMessageEnabled,
-    overtimeMessage,
-    showSwOnProjection,
-    project
-  ])
 
   const displayValues = getDisplayValues({
     phase,
