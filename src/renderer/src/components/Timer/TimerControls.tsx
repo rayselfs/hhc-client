@@ -18,6 +18,7 @@ export default function TimerControls({
   const isStopwatch = mode === 'stopwatch'
 
   const timerStatus = useTimerStore((s) => s.status)
+  const timerPhase = useTimerStore((s) => s.phase)
   const timerStart = useTimerStore((s) => s.start)
   const timerPause = useTimerStore((s) => s.pause)
   const timerResume = useTimerStore((s) => s.resume)
@@ -30,12 +31,14 @@ export default function TimerControls({
   const swReset = useStopwatchStore((s) => s.reset)
 
   const status = isStopwatch ? swStatus : timerStatus
+  const phase = isStopwatch ? null : timerPhase
   const start = isStopwatch ? swStart : timerStart
   const pause = isStopwatch ? swPause : timerPause
   const resume = isStopwatch ? swResume : timerResume
   const reset = isStopwatch ? swReset : timerReset
 
   const isStopped = status === 'stopped'
+  const isOvertime = isStopped && phase === 'overtime'
   const isRunning = status === 'running'
   const isPaused = status === 'paused'
 
@@ -62,7 +65,7 @@ export default function TimerControls({
         variant="outline"
         className="h-14 w-14 rounded-full"
         onPress={reset}
-        isDisabled={isStopped}
+        isDisabled={isStopped && !isOvertime}
         data-testid="btn-reset"
         aria-label={t('timer.reset')}
       >

@@ -85,7 +85,7 @@ function renderTimerContent(
   if (isFinishedWithMessage) {
     return (
       <div className="flex items-center justify-center w-full h-full @container">
-        <span className="timer-digits text-[34cqi] text-center text-white">{overtimeMessage}</span>
+        <span className="timer-digits text-[14cqi] text-center text-white">{overtimeMessage}</span>
       </div>
     )
   }

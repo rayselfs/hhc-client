@@ -29,6 +29,12 @@ describe('TimerControls — timer mode', () => {
     expect(screen.getByTestId('btn-reset')).toBeDisabled()
   })
 
+  it('overtime state: Reset is enabled', () => {
+    useTimerStore.setState({ status: 'stopped', phase: 'overtime' })
+    renderWithI18n('timer')
+    expect(screen.getByTestId('btn-reset')).not.toBeDisabled()
+  })
+
   it('running state: shows Pause + Reset, hides Start', () => {
     useTimerStore.setState({ status: 'running' })
     renderWithI18n('timer')

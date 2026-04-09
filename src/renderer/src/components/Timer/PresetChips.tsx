@@ -49,7 +49,7 @@ export default function PresetChips({ className }: PresetChipsProps): React.JSX.
           <Chip
             key={preset.id}
             size="lg"
-            className={`text-base px-4 py-2 ${isRunning ? 'opacity-50 pointer-events-none' : ''}`}
+            className={`text-base px-4 py-2 ${isRunning ? 'opacity-50 pointer-events-none' : 'cursor-pointer'}`}
           >
             <span
               role="button"
