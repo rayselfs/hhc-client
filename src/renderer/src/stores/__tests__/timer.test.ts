@@ -351,9 +351,11 @@ describe('tick()', () => {
     })
     useTimerStore.getState().tick(now + 5000)
     const s = useTimerStore.getState()
+    expect(s.status).toBe('stopped')
     expect(s.remainingSeconds).toBe(0)
     expect(s.phase).toBe('overtime')
-    expect(s.overtimeSeconds).toBe(3)
+    expect(s.overtimeSeconds).toBe(0)
+    expect(s.targetEndTime).toBeNull()
   })
 
   it('updates formattedTime correctly', () => {
@@ -633,7 +635,9 @@ describe('reminder phase logic with 180s duration + 60s reminder', () => {
       reminderDuration: 60
     })
     useTimerStore.getState().tick(now + 1000)
-    expect(useTimerStore.getState().phase).toBe('overtime')
+    const s = useTimerStore.getState()
+    expect(s.phase).toBe('overtime')
+    expect(s.status).toBe('stopped')
   })
 })
 

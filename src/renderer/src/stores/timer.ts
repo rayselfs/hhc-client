@@ -142,12 +142,16 @@ export const useTimerStore = create<TimerStore>()((set, get) => ({
   start: () => {
     const s = get()
     if (s.status === 'running') return
+    const duration = s.phase === 'overtime' ? s.totalDuration : s.remainingSeconds
     const now = Date.now()
     set({
       status: 'running',
-      phase: computePhase('running', s.remainingSeconds, s.reminderEnabled, s.reminderDuration),
-      targetEndTime: now + s.remainingSeconds * 1000,
-      overtimeSeconds: 0
+      phase: computePhase('running', duration, s.reminderEnabled, s.reminderDuration),
+      remainingSeconds: duration,
+      targetEndTime: now + duration * 1000,
+      overtimeSeconds: 0,
+      progress: computeProgress(duration, s.totalDuration),
+      formattedTime: formatTime(duration)
     })
   },
 
@@ -271,13 +275,25 @@ export const useTimerStore = create<TimerStore>()((set, get) => ({
 
     const remainingMs = s.targetEndTime - currentMs
     const rawRemainingSeconds = remainingMs / 1000
-    const isOvertimeNow = rawRemainingSeconds <= 0
-    const overtimeSeconds = isOvertimeNow ? Math.abs(Math.floor(rawRemainingSeconds)) : 0
-    const displayRemaining = isOvertimeNow ? 0 : Math.ceil(rawRemainingSeconds)
+
+    if (rawRemainingSeconds <= 0) {
+      set({
+        status: 'stopped',
+        phase: 'overtime',
+        remainingSeconds: 0,
+        overtimeSeconds: 0,
+        progress: 0,
+        formattedTime: '00:00',
+        targetEndTime: null
+      })
+      return
+    }
+
+    const displayRemaining = Math.ceil(rawRemainingSeconds)
 
     set({
       remainingSeconds: displayRemaining,
-      overtimeSeconds,
+      overtimeSeconds: 0,
       phase: computePhase('running', displayRemaining, s.reminderEnabled, s.reminderDuration),
       progress: computeProgress(displayRemaining, s.totalDuration),
       formattedTime: formatTime(displayRemaining)

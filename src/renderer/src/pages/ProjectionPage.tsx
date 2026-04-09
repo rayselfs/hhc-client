@@ -80,6 +80,16 @@ function renderTimerContent(
 ): React.JSX.Element {
   const { mode, progress, mainDisplay, subDisplay, phase, overtimeMessage } = timerData
 
+  const isFinishedWithMessage = phase === 'overtime' && overtimeMessage
+
+  if (isFinishedWithMessage) {
+    return (
+      <div className="flex items-center justify-center w-full h-full @container">
+        <span className="timer-digits text-[34cqi] text-center text-white">{overtimeMessage}</span>
+      </div>
+    )
+  }
+
   if (mode === 'timer') {
     return (
       <TimerDisplay
@@ -87,7 +97,6 @@ function renderTimerContent(
         mainDisplay={mainDisplay}
         subDisplay={subDisplay}
         phase={phase}
-        overtimeMessage={overtimeMessage ?? undefined}
         size={700}
       />
     )
@@ -106,7 +115,6 @@ function renderTimerContent(
             mainDisplay={mainDisplay}
             subDisplay={subDisplay}
             phase={phase}
-            overtimeMessage={overtimeMessage ?? undefined}
             size={700}
           />
         </div>

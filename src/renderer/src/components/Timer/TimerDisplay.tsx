@@ -7,7 +7,6 @@ interface TimerDisplayProps {
   subDisplay?: string | null
   phase: 'idle' | 'main' | 'warning' | 'overtime'
   overtimeDisplay?: string | null
-  overtimeMessage?: string
   size?: number
   onTimeConfirm?: (seconds: number) => void
   canEditTime?: boolean
@@ -20,7 +19,6 @@ export default function TimerDisplay({
   subDisplay,
   phase,
   overtimeDisplay,
-  overtimeMessage,
   size = 280,
   onTimeConfirm,
   canEditTime,
@@ -29,7 +27,7 @@ export default function TimerDisplay({
   const isWarning = phase === 'warning'
   const isOvertime = phase === 'overtime'
 
-  const innerContent = isOvertime ? overtimeMessage || overtimeDisplay || '00:00' : mainDisplay
+  const innerContent = isOvertime ? overtimeDisplay || '00:00' : mainDisplay
 
   const digitButton = (
     <button

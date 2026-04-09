@@ -174,21 +174,27 @@ export default function TimerPage(): React.JSX.Element {
 
   const isTimerLike = mode === 'timer' || mode === 'clock' || mode === 'both'
   const isClock = mode === 'clock'
+  const isFinishedWithMessage = phase === 'overtime' && overtimeMessageEnabled
 
   return (
     <div data-testid="timer-page" className="flex flex-col items-center gap-4 h-full">
       {isTimerLike && (
         <div className="flex flex-col items-center gap-4 flex-1 w-full">
-          <TimerDisplay
-            progress={progress}
-            mainDisplay={displayValues.mainDisplay}
-            subDisplay={displayValues.subDisplay}
-            phase={phase}
-            overtimeDisplay={displayValues.overtimeDisplay}
-            overtimeMessage={overtimeMessageEnabled ? overtimeMessage : undefined}
-            canEditTime={timerStatus === 'stopped'}
-            onTimeConfirm={(seconds) => useTimerStore.getState().setDuration(seconds)}
-          />
+          {isFinishedWithMessage ? (
+            <div className="flex flex-1 items-center justify-center w-full @container">
+              <span className="timer-digits text-[34cqi] text-center">{overtimeMessage}</span>
+            </div>
+          ) : (
+            <TimerDisplay
+              progress={progress}
+              mainDisplay={displayValues.mainDisplay}
+              subDisplay={displayValues.subDisplay}
+              phase={phase}
+              overtimeDisplay={displayValues.overtimeDisplay}
+              canEditTime={timerStatus === 'stopped' && phase !== 'overtime'}
+              onTimeConfirm={(seconds) => useTimerStore.getState().setDuration(seconds)}
+            />
+          )}
           <TimeAdjustment className="mb-3" />
           <TimerControls mode={mode} disableStart={isClock} />
           <PresetChips className="self-start my-3" />

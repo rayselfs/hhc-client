@@ -38,16 +38,9 @@ describe('TimerDisplay', () => {
     expect(screen.getByText('00:15')).toBeInTheDocument()
   })
 
-  it('renders overtime phase with overtime message', () => {
-    render(
-      <TimerDisplay
-        phase="overtime"
-        mainDisplay="00:00"
-        overtimeMessage="Time Is Up!"
-        progress={0}
-      />
-    )
-    expect(screen.getByText('Time Is Up!')).toBeInTheDocument()
+  it('renders overtime phase with fallback 00:00 when no overtimeDisplay', () => {
+    render(<TimerDisplay phase="overtime" mainDisplay="00:00" progress={0} />)
+    expect(screen.getByText('00:00')).toBeInTheDocument()
   })
 
   it('renders digit as clickable when canEditTime is true', () => {
