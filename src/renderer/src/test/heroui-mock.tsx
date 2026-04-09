@@ -94,4 +94,373 @@ function useOverlayStateMock(args?: { isOpen?: boolean; onOpenChange?: (open: bo
   }
 }
 
-export { TabsMock, ModalMock, PopoverMock, useOverlayStateMock }
+const AvatarMock = Object.assign(
+  ({
+    children,
+    className,
+    ...props
+  }: {
+    children?: React.ReactNode
+    className?: string
+    [key: string]: unknown
+  }) => (
+    <div
+      data-slot="avatar"
+      className={className}
+      {...(props as React.HTMLAttributes<HTMLDivElement>)}
+    >
+      {children}
+    </div>
+  ),
+  {
+    Root: ({
+      children,
+      className,
+      ...props
+    }: {
+      children?: React.ReactNode
+      className?: string
+      [key: string]: unknown
+    }) => (
+      <div
+        data-slot="avatar"
+        className={className}
+        {...(props as React.HTMLAttributes<HTMLDivElement>)}
+      >
+        {children}
+      </div>
+    ),
+    Image: ({
+      className,
+      src,
+      alt,
+      ...props
+    }: {
+      className?: string
+      src?: string
+      alt?: string
+      [key: string]: unknown
+    }) => (
+      <img
+        src={src}
+        alt={alt}
+        className={className}
+        {...(props as React.ImgHTMLAttributes<HTMLImageElement>)}
+      />
+    ),
+    Fallback: ({
+      children,
+      className,
+      ...props
+    }: {
+      children?: React.ReactNode
+      className?: string
+      [key: string]: unknown
+    }) => (
+      <span
+        data-slot="avatar-fallback"
+        className={className}
+        {...(props as React.HTMLAttributes<HTMLSpanElement>)}
+      >
+        {children}
+      </span>
+    )
+  }
+)
+
+let capturedDropdownMenuOnAction: ((key: React.Key) => void) | undefined
+
+const DropdownMock = Object.assign(
+  ({ children, ...props }: { children?: React.ReactNode; [key: string]: unknown }) => (
+    <div {...(props as React.HTMLAttributes<HTMLDivElement>)}>{children}</div>
+  ),
+  {
+    Root: ({ children, ...props }: { children?: React.ReactNode; [key: string]: unknown }) => (
+      <div {...(props as React.HTMLAttributes<HTMLDivElement>)}>{children}</div>
+    ),
+    Trigger: ({
+      children,
+      className,
+      ...props
+    }: {
+      children?: React.ReactNode
+      className?: string
+      [key: string]: unknown
+    }) => (
+      <div className={className} {...(props as React.HTMLAttributes<HTMLDivElement>)}>
+        {children}
+      </div>
+    ),
+    Popover: ({
+      children,
+      className,
+      ...props
+    }: {
+      children?: React.ReactNode
+      className?: string
+      [key: string]: unknown
+    }) => (
+      <div className={className} {...(props as React.HTMLAttributes<HTMLDivElement>)}>
+        {children}
+      </div>
+    ),
+    Menu: ({
+      children,
+      onAction,
+      ...props
+    }: {
+      children?: React.ReactNode
+      onAction?: (key: React.Key) => void
+      [key: string]: unknown
+    }) => {
+      capturedDropdownMenuOnAction = onAction
+      return (
+        <ul role="menu" {...(props as React.HTMLAttributes<HTMLUListElement>)}>
+          {children}
+        </ul>
+      )
+    },
+    Section: ({
+      children,
+      title,
+      ...props
+    }: {
+      children?: React.ReactNode
+      title?: React.ReactNode
+      [key: string]: unknown
+    }) => (
+      <div {...(props as React.HTMLAttributes<HTMLDivElement>)}>
+        {title && <div>{title}</div>}
+        {children}
+      </div>
+    ),
+    Item: ({
+      children,
+      onAction,
+      isDisabled,
+      id,
+      ...props
+    }: {
+      children?: React.ReactNode
+      onAction?: (key: React.Key) => void
+      isDisabled?: boolean
+      id?: string
+      [key: string]: unknown
+    }) => (
+      <li
+        role="menuitem"
+        aria-disabled={isDisabled}
+        onClick={() => {
+          if (!isDisabled) {
+            const handler = onAction || capturedDropdownMenuOnAction
+            if (handler && id) {
+              handler(id)
+            }
+          }
+        }}
+        {...(props as React.LiHTMLAttributes<HTMLLIElement>)}
+      >
+        {children}
+      </li>
+    ),
+    ItemIndicator: ({
+      children,
+      ...props
+    }: {
+      children?: React.ReactNode
+      [key: string]: unknown
+    }) => <div {...(props as React.HTMLAttributes<HTMLDivElement>)}>{children}</div>,
+    SubmenuIndicator: ({
+      children,
+      ...props
+    }: {
+      children?: React.ReactNode
+      [key: string]: unknown
+    }) => <div {...(props as React.HTMLAttributes<HTMLDivElement>)}>{children}</div>,
+    SubmenuTrigger: ({
+      children,
+      ...props
+    }: {
+      children?: React.ReactNode
+      [key: string]: unknown
+    }) => <div {...(props as React.HTMLAttributes<HTMLDivElement>)}>{children}</div>
+  }
+)
+
+const SelectMock = Object.assign(
+  ({
+    children,
+    className,
+    selectedKey,
+    onSelectionChange,
+    ...props
+  }: {
+    children?: React.ReactNode
+    className?: string
+    selectedKey?: React.Key
+    onSelectionChange?: (key: React.Key) => void
+    [key: string]: unknown
+  }) => (
+    <div
+      className={className}
+      data-testid="select-root"
+      {...(props as React.HTMLAttributes<HTMLDivElement>)}
+    >
+      {children}
+    </div>
+  ),
+  {
+    Root: ({
+      children,
+      className,
+      selectedKey,
+      onSelectionChange,
+      ...props
+    }: {
+      children?: React.ReactNode
+      className?: string
+      selectedKey?: React.Key
+      onSelectionChange?: (key: React.Key) => void
+      [key: string]: unknown
+    }) => (
+      <div
+        className={className}
+        data-testid="select-root"
+        {...(props as React.HTMLAttributes<HTMLDivElement>)}
+      >
+        {children}
+      </div>
+    ),
+    Trigger: ({
+      children,
+      className,
+      ...props
+    }: {
+      children?: React.ReactNode
+      className?: string
+      [key: string]: unknown
+    }) => (
+      <button className={className} {...(props as React.ButtonHTMLAttributes<HTMLButtonElement>)}>
+        {children}
+      </button>
+    ),
+    Value: ({
+      children,
+      className,
+      ...props
+    }: {
+      children?: React.ReactNode
+      className?: string
+      [key: string]: unknown
+    }) => (
+      <span className={className} {...(props as React.HTMLAttributes<HTMLSpanElement>)}>
+        {children}
+      </span>
+    ),
+    Indicator: ({
+      children,
+      className,
+      ...props
+    }: {
+      children?: React.ReactNode
+      className?: string
+      [key: string]: unknown
+    }) => (
+      <div className={className} {...(props as React.HTMLAttributes<HTMLDivElement>)}>
+        {children}
+      </div>
+    ),
+    Popover: ({
+      children,
+      className,
+      ...props
+    }: {
+      children?: React.ReactNode
+      className?: string
+      [key: string]: unknown
+    }) => (
+      <div className={className} {...(props as React.HTMLAttributes<HTMLDivElement>)}>
+        {children}
+      </div>
+    )
+  }
+)
+
+let capturedListboxOnSelectionChange: ((keys: Set<React.Key>) => void) | undefined
+let capturedListboxSelectedKeys: Set<React.Key> | undefined
+
+const ListboxMock = Object.assign(
+  ({
+    children,
+    selectedKeys,
+    onSelectionChange,
+    ...props
+  }: {
+    children?: React.ReactNode
+    selectedKeys?: Set<React.Key>
+    onSelectionChange?: (keys: Set<React.Key>) => void
+    [key: string]: unknown
+  }) => {
+    capturedListboxOnSelectionChange = onSelectionChange
+    capturedListboxSelectedKeys = selectedKeys
+    return (
+      <ul role="listbox" {...(props as React.HTMLAttributes<HTMLUListElement>)}>
+        {children}
+      </ul>
+    )
+  },
+  {
+    Root: ({
+      children,
+      selectedKeys,
+      onSelectionChange,
+      ...props
+    }: {
+      children?: React.ReactNode
+      selectedKeys?: Set<React.Key>
+      onSelectionChange?: (keys: Set<React.Key>) => void
+      [key: string]: unknown
+    }) => {
+      capturedListboxOnSelectionChange = onSelectionChange
+      capturedListboxSelectedKeys = selectedKeys
+      return (
+        <ul role="listbox" {...(props as React.HTMLAttributes<HTMLUListElement>)}>
+          {children}
+        </ul>
+      )
+    },
+    Item: ({
+      children,
+      id,
+      ...props
+    }: {
+      children?: React.ReactNode
+      id?: string
+      [key: string]: unknown
+    }) => (
+      <li
+        role="option"
+        aria-selected={id ? capturedListboxSelectedKeys?.has(id) : false}
+        onClick={() => {
+          if (id && capturedListboxOnSelectionChange) {
+            capturedListboxOnSelectionChange(new Set([id]))
+          }
+        }}
+        {...(props as React.LiHTMLAttributes<HTMLLIElement>)}
+      >
+        {children}
+      </li>
+    )
+  }
+)
+
+export {
+  TabsMock,
+  ModalMock,
+  PopoverMock,
+  useOverlayStateMock,
+  AvatarMock,
+  DropdownMock,
+  SelectMock,
+  ListboxMock
+}
