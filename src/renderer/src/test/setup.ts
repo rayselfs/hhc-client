@@ -25,3 +25,9 @@ Object.defineProperty(window, 'matchMedia', {
     dispatchEvent: () => false
   })
 })
+
+globalThis.ResizeObserver = class {
+  observe(): void {}
+  unobserve(): void {}
+  disconnect(): void {}
+}

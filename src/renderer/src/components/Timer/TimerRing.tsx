@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useState, useCallback } from 'react'
 
 interface TimerRingProps {
   progress: number
@@ -19,6 +19,26 @@ export default function TimerRing({
 }: TimerRingProps): React.JSX.Element {
   const prevProgress = useRef<number | null>(null)
   const circleRef = useRef<SVGCircleElement>(null)
+  const wrapperRef = useRef<HTMLDivElement>(null)
+  const [measured, setMeasured] = useState<number | null>(null)
+
+  const measure = useCallback(() => {
+    const el = wrapperRef.current
+    if (!el) return
+    const s = Math.floor(Math.min(el.clientWidth, el.clientHeight) * 0.95)
+    setMeasured((prev) => (prev === s ? prev : s))
+  }, [])
+
+  useEffect(() => {
+    if (!responsive) return
+    const el = wrapperRef.current
+    if (!el) return
+
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [responsive, measure])
 
   useEffect(() => {
     const el = circleRef.current
@@ -42,12 +62,49 @@ export default function TimerRing({
 
   const strokeClass = color === 'danger' ? 'stroke-danger' : 'stroke-accent'
 
-  const containerStyle = responsive
-    ? { width: '100%', maxWidth: size, aspectRatio: '1' }
-    : { width: size, height: size }
+  if (responsive) {
+    const ringSize = measured ?? 0
+
+    return (
+      <div
+        ref={wrapperRef}
+        className={`relative w-full h-full flex items-center justify-center ${className ?? ''}`}
+      >
+        <div className="relative @container" style={{ width: ringSize, height: ringSize }}>
+          <svg
+            viewBox={`0 0 ${size} ${size}`}
+            className="absolute inset-0 rotate-90 -scale-x-100 w-full h-full"
+          >
+            <circle
+              cx={center}
+              cy={center}
+              r={radius}
+              strokeWidth={strokeWidth}
+              fill="transparent"
+              className="stroke-default"
+            />
+            <circle
+              ref={circleRef}
+              cx={center}
+              cy={center}
+              r={radius}
+              strokeWidth={strokeWidth}
+              fill="transparent"
+              strokeLinecap="round"
+              strokeDasharray={`${circumference} ${circumference}`}
+              strokeDashoffset={offset}
+              className={strokeClass}
+              style={{ transition: 'stroke-dashoffset 1s linear' }}
+            />
+          </svg>
+          <div className="absolute inset-0 flex items-center justify-center">{children}</div>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className={`relative ${className ?? ''}`} style={containerStyle}>
+    <div className={`relative ${className ?? ''}`} style={{ width: size, height: size }}>
       <svg
         viewBox={`0 0 ${size} ${size}`}
         className="absolute inset-0 rotate-90 -scale-x-100 w-full h-full"

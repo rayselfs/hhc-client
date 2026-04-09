@@ -65,9 +65,7 @@ export default function ProjectionPage(): React.JSX.Element {
 
   if (timerData) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-black">
-        {renderTimerContent(timerData, stopwatchData)}
-      </div>
+      <div className="h-screen w-full bg-black">{renderTimerContent(timerData, stopwatchData)}</div>
     )
   }
 
@@ -98,28 +96,34 @@ function renderTimerContent(
         subDisplay={subDisplay}
         phase={phase}
         size={700}
+        responsive
       />
     )
   }
 
   if (mode === 'clock') {
-    return <ClockDisplay className="text-white" />
+    return (
+      <div className="flex items-center justify-center w-full h-full">
+        <ClockDisplay className="text-white" />
+      </div>
+    )
   }
 
   if (mode === 'both') {
     return (
       <div className="flex items-center w-full h-full px-8">
-        <div className="w-[40%]">
+        <div className="w-[40%] h-full">
           <TimerDisplay
             progress={progress}
             mainDisplay={mainDisplay}
             subDisplay={subDisplay}
             phase={phase}
             size={700}
+            responsive
           />
         </div>
         <GlassDivider vertical className="mx-4" />
-        <div className="w-[60%]">
+        <div className="w-[60%] flex items-center justify-center">
           <ClockDisplay className="text-white" />
         </div>
       </div>
@@ -127,5 +131,9 @@ function renderTimerContent(
   }
 
   const formattedTime = stopwatchData?.formattedTime ?? '00:00'
-  return <StopwatchDisplay formattedTime={formattedTime} className="text-white" />
+  return (
+    <div className="flex items-center justify-center w-full h-full">
+      <StopwatchDisplay formattedTime={formattedTime} className="text-white" />
+    </div>
+  )
 }

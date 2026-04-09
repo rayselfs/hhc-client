@@ -8,6 +8,7 @@ interface TimerDisplayProps {
   phase: 'idle' | 'main' | 'warning' | 'overtime'
   overtimeDisplay?: string | null
   size?: number
+  responsive?: boolean
   onTimeConfirm?: (seconds: number) => void
   canEditTime?: boolean
   className?: string
@@ -20,6 +21,7 @@ export default function TimerDisplay({
   phase,
   overtimeDisplay,
   size = 280,
+  responsive = false,
   onTimeConfirm,
   canEditTime,
   className
@@ -49,7 +51,7 @@ export default function TimerDisplay({
       progress={progress * 100}
       size={size}
       color="accent"
-      responsive
+      responsive={responsive}
       className={`flex items-center justify-center @container ${className ?? ''}`}
     >
       <div className="relative flex flex-col items-center">
