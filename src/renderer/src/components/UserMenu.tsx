@@ -1,6 +1,7 @@
 import { Avatar, Dropdown } from '@heroui/react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { LogIn, Settings, RefreshCw, Keyboard, Power, CircleUser } from 'lucide-react'
+import { LogIn, LogOut, Settings, RefreshCw, Keyboard, Power, CircleUser } from 'lucide-react'
 
 interface UserMenuProps {
   onOpenPreferences?: () => void
@@ -8,30 +9,40 @@ interface UserMenuProps {
 
 export default function UserMenu({ onOpenPreferences }: UserMenuProps): React.JSX.Element {
   const { t } = useTranslation()
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
 
   return (
     <Dropdown.Root>
       <Dropdown.Trigger>
-        <button className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg hover:bg-default-100 transition-colors">
+        <div className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg hover:bg-default-100 transition-colors cursor-pointer">
           <Avatar.Root className="size-7">
             <Avatar.Fallback>
               <CircleUser className="size-4" />
             </Avatar.Fallback>
           </Avatar.Root>
           <span className="text-sm">{t('userMenu.guest')}</span>
-        </button>
+        </div>
       </Dropdown.Trigger>
       <Dropdown.Popover>
         <Dropdown.Menu
           onAction={(key) => {
+            if (key === 'login') setIsLoggedIn(true)
+            if (key === 'logout') setIsLoggedIn(false)
             if (key === 'preferences') onOpenPreferences?.()
             if (key === 'closeApp') window.close()
           }}
         >
-          <Dropdown.Item id="login">
-            <LogIn className="size-4" />
-            {t('userMenu.login')}
-          </Dropdown.Item>
+          {isLoggedIn ? (
+            <Dropdown.Item id="logout">
+              <LogOut className="size-4" />
+              {t('userMenu.logout')}
+            </Dropdown.Item>
+          ) : (
+            <Dropdown.Item id="login">
+              <LogIn className="size-4" />
+              {t('userMenu.login')}
+            </Dropdown.Item>
+          )}
           <Dropdown.Section>
             <Dropdown.Item id="preferences">
               <Settings className="size-4" />

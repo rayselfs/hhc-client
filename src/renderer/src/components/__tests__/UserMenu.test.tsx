@@ -46,6 +46,30 @@ describe('UserMenu', () => {
     expect(login).not.toHaveAttribute('aria-disabled', 'true')
   })
 
+  it('shows Login when not logged in', () => {
+    renderUserMenu()
+    expect(screen.getByText('Login')).toBeInTheDocument()
+    expect(screen.queryByText('Logout')).not.toBeInTheDocument()
+  })
+
+  it('shows Logout after clicking Login', () => {
+    renderUserMenu()
+    const loginItem = screen.getByText('Login').closest('[role="menuitem"]')!
+    fireEvent.click(loginItem)
+    expect(screen.getByText('Logout')).toBeInTheDocument()
+    expect(screen.queryByText('Login')).not.toBeInTheDocument()
+  })
+
+  it('shows Login again after clicking Logout', () => {
+    renderUserMenu()
+    const loginItem = screen.getByText('Login').closest('[role="menuitem"]')!
+    fireEvent.click(loginItem)
+    const logoutItem = screen.getByText('Logout').closest('[role="menuitem"]')!
+    fireEvent.click(logoutItem)
+    expect(screen.getByText('Login')).toBeInTheDocument()
+    expect(screen.queryByText('Logout')).not.toBeInTheDocument()
+  })
+
   it('close app calls window.close', () => {
     const closeSpy = vi.fn()
     vi.stubGlobal('close', closeSpy)
