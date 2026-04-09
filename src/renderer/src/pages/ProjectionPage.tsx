@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { createProjectionAdapter } from '@renderer/lib/projection-adapter'
-import { isElectron } from '@renderer/lib/env'
+import { isWeb } from '@renderer/lib/env'
 import DefaultProjection from '@renderer/components/projection/DefaultProjection'
 import TimerDisplay from '@renderer/components/Timer/TimerDisplay'
 import ClockDisplay from '@renderer/components/Timer/ClockDisplay'
@@ -31,7 +31,7 @@ export default function ProjectionPage(): React.JSX.Element {
     let unsubClose = (): void => {}
     let unsubPing = (): void => {}
 
-    if (!isElectron()) {
+    if (isWeb()) {
       unsubClose = adapter.on('__system:close', () => {
         window.close()
       })
@@ -44,7 +44,7 @@ export default function ProjectionPage(): React.JSX.Element {
     adapter.send('__system:ready', null)
 
     const handleBeforeUnload = (): void => {
-      if (!isElectron()) {
+      if (isWeb()) {
         adapter.send('__system:closed', null)
       }
     }
