@@ -1,8 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { useLocation, Link } from 'react-router-dom'
-import { Timer, BookOpen, Sun, Moon } from 'lucide-react'
-import { Switch } from '@heroui/react'
-import { useTheme } from '@renderer/contexts/ThemeContext'
+import { Timer, BookOpen } from 'lucide-react'
+import UserMenu from './UserMenu'
 
 interface NavItem {
   to: string
@@ -13,9 +12,6 @@ interface NavItem {
 export default function Sidebar(): React.JSX.Element {
   const { t } = useTranslation()
   const location = useLocation()
-  const { resolved, setPreference } = useTheme()
-
-  const isDark = resolved === 'dark'
 
   const items: NavItem[] = [
     { to: '/timer', icon: Timer, label: t('nav.timer') },
@@ -50,13 +46,7 @@ export default function Sidebar(): React.JSX.Element {
         })}
       </ul>
       <div className="mt-auto">
-        <Switch
-          isSelected={isDark}
-          onChange={() => setPreference(isDark ? 'light' : 'dark')}
-          size="sm"
-        >
-          {isDark ? <Moon className="size-3" /> : <Sun className="size-3" />}
-        </Switch>
+        <UserMenu />
       </div>
     </nav>
   )

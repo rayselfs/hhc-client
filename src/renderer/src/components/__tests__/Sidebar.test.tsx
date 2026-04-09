@@ -43,4 +43,10 @@ describe('Sidebar', () => {
     expect(screen.getByText('聖經')).toBeInTheDocument()
     await i18n.changeLanguage('en')
   })
+
+  it('renders UserMenu with guest name', async () => {
+    await i18n.changeLanguage('en')
+    renderWithRouter(['/'])
+    expect(screen.getByText('Guest')).toBeInTheDocument()
+  })
 })
