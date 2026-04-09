@@ -167,3 +167,37 @@ describe('PresetChips — loadPresets on mount', () => {
     expect(loadPresetsSpy).toHaveBeenCalledOnce()
   })
 })
+
+describe('PresetChips — disabled while running', () => {
+  it('add button is disabled when timer is running', () => {
+    useTimerStore.setState({ totalDuration: 90, presets: SAMPLE_PRESETS, status: 'running' })
+    renderWithI18n()
+    expect(screen.getByRole('button', { name: 'Add Preset' })).toBeDisabled()
+  })
+
+  it('add button is disabled when timer is paused', () => {
+    useTimerStore.setState({ totalDuration: 90, presets: SAMPLE_PRESETS, status: 'paused' })
+    renderWithI18n()
+    expect(screen.getByRole('button', { name: 'Add Preset' })).toBeDisabled()
+  })
+
+  it('preset chips are not clickable when timer is running', async () => {
+    const user = userEvent.setup()
+    const applyPresetSpy = vi.fn()
+    useTimerStore.setState({
+      applyPreset: applyPresetSpy,
+      presets: SAMPLE_PRESETS,
+      status: 'running'
+    } as never)
+    renderWithI18n()
+    await user.click(screen.getByRole('button', { name: '05:00' }))
+    expect(applyPresetSpy).not.toHaveBeenCalled()
+  })
+
+  it('delete buttons are disabled when timer is running', () => {
+    useTimerStore.setState({ presets: SAMPLE_PRESETS, status: 'running' })
+    renderWithI18n()
+    expect(screen.getByRole('button', { name: 'Delete Preset 10:00' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Delete Preset 05:00' })).toBeDisabled()
+  })
+})

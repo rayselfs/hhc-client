@@ -22,6 +22,7 @@ export default function PresetChips({ className }: PresetChipsProps): React.JSX.
   const { t } = useTranslation()
   const presets = useTimerStore((s) => s.presets)
   const totalDuration = useTimerStore((s) => s.totalDuration)
+  const status = useTimerStore((s) => s.status)
   const applyPreset = useTimerStore((s) => s.applyPreset)
   const removePreset = useTimerStore((s) => s.removePreset)
   const addPreset = useTimerStore((s) => s.addPreset)
@@ -31,6 +32,7 @@ export default function PresetChips({ className }: PresetChipsProps): React.JSX.
     loadPresets()
   }, [loadPresets])
 
+  const isRunning = status !== 'stopped'
   const hasDuplicate = presets.some((p) => p.durationSeconds === totalDuration)
 
   const handleAdd = (): void => {
@@ -44,15 +46,20 @@ export default function PresetChips({ className }: PresetChipsProps): React.JSX.
       <h3 className="text-base font-medium mb-2">{t('timer.presets')}</h3>
       <div className="flex flex-wrap items-center gap-2">
         {presets.map((preset) => (
-          <Chip key={preset.id} size="lg" className="cursor-pointer text-base px-4 py-2">
+          <Chip
+            key={preset.id}
+            size="lg"
+            className={`text-base px-4 py-2 ${isRunning ? 'opacity-50 pointer-events-none' : ''}`}
+          >
             <span
               role="button"
-              tabIndex={0}
+              tabIndex={isRunning ? -1 : 0}
               aria-label={preset.name}
+              aria-disabled={isRunning}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') applyPreset(preset.id)
+                if (!isRunning && (e.key === 'Enter' || e.key === ' ')) applyPreset(preset.id)
               }}
-              onClick={() => applyPreset(preset.id)}
+              onClick={() => !isRunning && applyPreset(preset.id)}
               className="pr-1"
             >
               {preset.name}
@@ -60,6 +67,7 @@ export default function PresetChips({ className }: PresetChipsProps): React.JSX.
             <button
               type="button"
               aria-label={`${t('timer.deletePreset')} ${preset.name}`}
+              disabled={isRunning}
               onClick={(e) => {
                 e.stopPropagation()
                 removePreset(preset.id)
@@ -75,7 +83,7 @@ export default function PresetChips({ className }: PresetChipsProps): React.JSX.
           variant="outline"
           className="text-base px-4 h-auto py-2 rounded-full"
           onPress={handleAdd}
-          isDisabled={hasDuplicate}
+          isDisabled={isRunning || hasDuplicate}
           aria-label={t('timer.addPreset')}
         >
           <Plus className="size-4" />
