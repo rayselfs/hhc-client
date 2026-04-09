@@ -1,7 +1,8 @@
 import { create } from 'zustand'
 import { createStorageKey } from '@renderer/lib/utils'
 
-const SETTINGS_STORAGE_KEY = createStorageKey('settings')
+const TIMEZONE_KEY = createStorageKey('timezone')
+const HW_ACCEL_KEY = createStorageKey('hardwareAcceleration')
 
 export const TIMEZONE_OPTIONS = [
   { value: 'Asia/Taipei', labelKey: 'timezones.taipei' },
@@ -15,58 +16,46 @@ export const TIMEZONE_OPTIONS = [
   { value: 'UTC', labelKey: 'timezones.utc' }
 ]
 
-interface SettingsData {
-  timezone: string
-  hardwareAcceleration: boolean
-}
+const DEFAULT_TIMEZONE = 'Asia/Taipei'
+const DEFAULT_HW_ACCEL = true
 
-const DEFAULT_SETTINGS: SettingsData = {
-  timezone: 'Asia/Taipei',
-  hardwareAcceleration: true
-}
-
-function loadInitialSettings(): SettingsData {
+function loadTimezone(): string {
   try {
-    const stored = localStorage.getItem(SETTINGS_STORAGE_KEY)
-    if (stored) {
-      const parsed = JSON.parse(stored)
-      if (
-        parsed &&
-        typeof parsed.timezone === 'string' &&
-        typeof parsed.hardwareAcceleration === 'boolean'
-      ) {
-        return parsed
-      }
-    }
+    const stored = localStorage.getItem(TIMEZONE_KEY)
+    if (stored && typeof stored === 'string') return stored
   } catch {
     // silent fail
   }
-  return DEFAULT_SETTINGS
+  return DEFAULT_TIMEZONE
 }
 
-export interface SettingsStore extends SettingsData {
+function loadHardwareAcceleration(): boolean {
+  try {
+    const stored = localStorage.getItem(HW_ACCEL_KEY)
+    if (stored === 'true') return true
+    if (stored === 'false') return false
+  } catch {
+    // silent fail
+  }
+  return DEFAULT_HW_ACCEL
+}
+
+export interface SettingsStore {
+  timezone: string
+  hardwareAcceleration: boolean
   setTimezone: (tz: string) => void
   setHardwareAcceleration: (enabled: boolean) => void
   resetToDefaults: () => void
 }
 
-const _initialSettings = loadInitialSettings()
-
-export const useSettingsStore = create<SettingsStore>()((set, get) => ({
-  timezone: _initialSettings.timezone,
-  hardwareAcceleration: _initialSettings.hardwareAcceleration,
+export const useSettingsStore = create<SettingsStore>()((set) => ({
+  timezone: loadTimezone(),
+  hardwareAcceleration: loadHardwareAcceleration(),
 
   setTimezone: (tz: string) => {
     set({ timezone: tz })
-    const s = get()
     try {
-      localStorage.setItem(
-        SETTINGS_STORAGE_KEY,
-        JSON.stringify({
-          timezone: s.timezone,
-          hardwareAcceleration: s.hardwareAcceleration
-        })
-      )
+      localStorage.setItem(TIMEZONE_KEY, tz)
     } catch {
       // silent fail
     }
@@ -74,24 +63,18 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
 
   setHardwareAcceleration: (enabled: boolean) => {
     set({ hardwareAcceleration: enabled })
-    const s = get()
     try {
-      localStorage.setItem(
-        SETTINGS_STORAGE_KEY,
-        JSON.stringify({
-          timezone: s.timezone,
-          hardwareAcceleration: s.hardwareAcceleration
-        })
-      )
+      localStorage.setItem(HW_ACCEL_KEY, String(enabled))
     } catch {
       // silent fail
     }
   },
 
   resetToDefaults: () => {
-    set(DEFAULT_SETTINGS)
+    set({ timezone: DEFAULT_TIMEZONE, hardwareAcceleration: DEFAULT_HW_ACCEL })
     try {
-      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(DEFAULT_SETTINGS))
+      localStorage.removeItem(TIMEZONE_KEY)
+      localStorage.removeItem(HW_ACCEL_KEY)
     } catch {
       // silent fail
     }
