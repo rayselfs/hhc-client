@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Switch, Select, ListBox, Modal, useOverlayState } from '@heroui/react'
+import { Switch, Select, ListBox } from '@heroui/react'
 import { Label } from 'react-aria-components'
 import { useTheme } from '@renderer/contexts/ThemeContext'
 import { useSettingsStore, TIMEZONE_OPTIONS } from '@renderer/stores/settings'
 import { isElectron } from '@renderer/lib/env'
+import ConfirmDialog from '@renderer/components/ConfirmDialog'
 
 const TIMEZONE_LABEL_KEYS = {
   'timezones.taipei': 'timezones.taipei',
@@ -26,10 +27,6 @@ export default function GeneralSettings(): React.JSX.Element {
   const { timezone, hardwareAcceleration, setTimezone, setHardwareAcceleration, resetToDefaults } =
     useSettingsStore()
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false)
-  const resetConfirmState = useOverlayState({
-    isOpen: resetConfirmOpen,
-    onOpenChange: setResetConfirmOpen
-  })
 
   const languageOptions = [
     { value: 'en', label: 'English' },
@@ -41,7 +38,6 @@ export default function GeneralSettings(): React.JSX.Element {
     resetToDefaults()
     setPreference('system')
     i18n.changeLanguage('en')
-    setResetConfirmOpen(false)
   }
 
   return (
@@ -142,35 +138,12 @@ export default function GeneralSettings(): React.JSX.Element {
         </div>
       </div>
 
-      <Modal.Root state={resetConfirmState}>
-        <Modal.Trigger />
-        <Modal.Backdrop>
-          <Modal.Container size="sm">
-            <Modal.Dialog>
-              <Modal.Header>
-                <Modal.Heading>{t('preferences.resetToDefaults')}</Modal.Heading>
-              </Modal.Header>
-              <Modal.Body>
-                <p className="text-sm">{t('preferences.resetToDefaultsConfirm')}</p>
-              </Modal.Body>
-              <Modal.Footer className="flex justify-end gap-2">
-                <button
-                  className="rounded-lg px-3 py-1.5 text-sm font-medium transition-colors hover:bg-default-100"
-                  onClick={() => setResetConfirmOpen(false)}
-                >
-                  {t('common.cancel')}
-                </button>
-                <button
-                  className="rounded-lg bg-danger-soft px-3 py-1.5 text-sm font-medium text-danger-soft-foreground hover:bg-danger-soft-hover transition-colors"
-                  onClick={handleResetConfirm}
-                >
-                  {t('common.confirm')}
-                </button>
-              </Modal.Footer>
-            </Modal.Dialog>
-          </Modal.Container>
-        </Modal.Backdrop>
-      </Modal.Root>
+      <ConfirmDialog
+        isOpen={resetConfirmOpen}
+        onOpenChange={setResetConfirmOpen}
+        description={t('preferences.resetToDefaultsConfirm')}
+        onConfirm={handleResetConfirm}
+      />
     </div>
   )
 }

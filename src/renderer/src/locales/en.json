@@ -74,7 +74,8 @@
     "cancel": "Cancel",
     "confirm": "Confirm",
     "close": "Close",
-    "send": "Send"
+    "send": "Send",
+    "warning": "Warning"
   },
   "userMenu": {
     "guest": "Guest",

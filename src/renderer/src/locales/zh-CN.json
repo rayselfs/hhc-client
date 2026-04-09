@@ -74,7 +74,8 @@
     "cancel": "取消",
     "confirm": "确认",
     "close": "关闭",
-    "send": "发送"
+    "send": "发送",
+    "warning": "警告"
   },
   "userMenu": {
     "guest": "访客",
