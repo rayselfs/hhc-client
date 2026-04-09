@@ -9,6 +9,8 @@ type ContentChannel = Exclude<ProjectionChannel, `__system:${string}`>
 interface ProjectOptions {
   /** When true, auto-reopen projection if it's closed. Default: false. */
   autoOpen?: boolean
+  /** When true, auto-unblank projection to show content. Default: false. */
+  autoShow?: boolean
 }
 
 interface ProjectionContextValue {
@@ -213,7 +215,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
         return
       }
       getAdapter(adapterRef).send(channel, data)
-      if (isProjectionBlankedRef.current) {
+      if (options?.autoShow && isProjectionBlankedRef.current) {
         setIsProjectionBlanked(false)
         getAdapter(adapterRef).send('__system:blank', { showDefault: false })
       }

@@ -189,7 +189,7 @@ describe('TimerPage — projection data flow', () => {
         mode: 'timer',
         phase: 'idle'
       }),
-      expect.objectContaining({ autoOpen: false })
+      expect.objectContaining({ autoShow: false })
     )
   })
 })
@@ -390,7 +390,7 @@ describe('TimerPage — stopwatch projection', () => {
         formattedTime: '00:00',
         status: 'stopped'
       }),
-      expect.objectContaining({ autoOpen: false })
+      expect.objectContaining({ autoShow: false })
     )
   })
 
@@ -420,7 +420,7 @@ describe('TimerPage — stopwatch projection', () => {
         formattedTime: '00:01',
         status: 'running'
       }),
-      expect.objectContaining({ autoOpen: true })
+      expect.objectContaining({ autoShow: true })
     )
   })
 
@@ -446,7 +446,7 @@ describe('TimerPage — stopwatch projection', () => {
     expect(mockProject).toHaveBeenCalledWith(
       'timer:tick',
       expect.objectContaining({ mode: 'clock' }),
-      expect.objectContaining({ autoOpen: false })
+      expect.objectContaining({ autoShow: false })
     )
   })
 

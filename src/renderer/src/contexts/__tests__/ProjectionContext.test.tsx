@@ -203,7 +203,43 @@ describe('ProjectionContext — web mode', () => {
     })
 
     expect(mockAdapter.send).toHaveBeenCalledWith('timer:overtime-message', { message: 'hello' })
+    expect(result.current.isProjectionBlanked).toBe(true)
+  })
+
+  it('project() with autoShow unblanks projection', async () => {
+    const { result } = renderProjection()
+
+    act(() => {
+      mockAdapter._trigger('__system:ready', null)
+    })
+
+    await act(async () => {
+      await result.current.project(
+        'timer:overtime-message',
+        { message: 'hello' },
+        { autoShow: true }
+      )
+    })
+
+    expect(mockAdapter.send).toHaveBeenCalledWith('timer:overtime-message', { message: 'hello' })
+    expect(mockAdapter.send).toHaveBeenCalledWith('__system:blank', { showDefault: false })
     expect(result.current.isProjectionBlanked).toBe(false)
+  })
+
+  it('project() without autoShow does not unblank projection', async () => {
+    const { result } = renderProjection()
+
+    act(() => {
+      mockAdapter._trigger('__system:ready', null)
+    })
+
+    await act(async () => {
+      await result.current.project('timer:overtime-message', { message: 'hello' })
+    })
+
+    expect(mockAdapter.send).toHaveBeenCalledWith('timer:overtime-message', { message: 'hello' })
+    expect(mockAdapter.send).not.toHaveBeenCalledWith('__system:blank', { showDefault: false })
+    expect(result.current.isProjectionBlanked).toBe(true)
   })
 
   it('blankProjection(true) sets isProjectionBlanked true and sends __system:blank', () => {
