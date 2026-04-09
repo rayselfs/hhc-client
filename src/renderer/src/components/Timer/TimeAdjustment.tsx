@@ -22,7 +22,7 @@ export default function TimeAdjustment({ className }: TimeAdjustmentProps): Reac
             key={`remove-${seconds}`}
             variant="outline"
             className="text-warning border-warning w-16"
-            isDisabled={remainingSeconds < seconds}
+            isDisabled={remainingSeconds <= seconds}
             onPress={() => removeTime(seconds)}
             aria-label={t('timer.removeTime', { seconds })}
           >

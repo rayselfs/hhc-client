@@ -5,6 +5,7 @@ import DefaultProjection from '@renderer/components/projection/DefaultProjection
 import TimerDisplay from '@renderer/components/Timer/TimerDisplay'
 import ClockDisplay from '@renderer/components/Timer/ClockDisplay'
 import StopwatchDisplay from '@renderer/components/Timer/StopwatchDisplay'
+import GlassDivider from '@renderer/components/GlassDivider'
 import type { TimerTickPayload, StopwatchTickPayload } from '@shared/types/timer'
 
 export default function ProjectionPage(): React.JSX.Element {
@@ -99,7 +100,7 @@ function renderTimerContent(
   if (mode === 'both') {
     return (
       <div className="flex items-center w-full h-full px-8">
-        <div className="w-1/3">
+        <div className="w-[40%]">
           <TimerDisplay
             progress={progress}
             mainDisplay={mainDisplay}
@@ -109,7 +110,8 @@ function renderTimerContent(
             size={700}
           />
         </div>
-        <div className="w-2/3">
+        <GlassDivider vertical className="mx-4" />
+        <div className="w-[60%]">
           <ClockDisplay className="text-white" />
         </div>
       </div>
