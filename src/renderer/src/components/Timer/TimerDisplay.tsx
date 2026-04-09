@@ -61,7 +61,7 @@ export default function TimerDisplay({
           digitButton
         )}
         {!isOvertime && subDisplay && (
-          <span className="absolute top-full timer-digits text-[17cqi] text-default-500">
+          <span className="absolute top-[85%] timer-digits text-[14cqi] text-default-500">
             {subDisplay}
           </span>
         )}

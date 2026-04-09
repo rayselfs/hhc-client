@@ -72,9 +72,9 @@ describe('PresetChips — rendering', () => {
     expect(screen.getByRole('button', { name: 'Delete Preset 03:00' })).toBeInTheDocument()
   })
 
-  it('renders Timer Presets title', () => {
+  it('renders Presets title', () => {
     renderWithI18n()
-    expect(screen.getByText('Timer Presets')).toBeInTheDocument()
+    expect(screen.getByText('Presets')).toBeInTheDocument()
   })
 })
 

@@ -41,7 +41,7 @@ export default function PresetChips({ className }: PresetChipsProps): React.JSX.
 
   return (
     <div className={className}>
-      <h3 className="text-base font-medium mb-2">{t('timer.timerPresets')}</h3>
+      <h3 className="text-base font-medium mb-2">{t('timer.presets')}</h3>
       <div className="flex flex-wrap items-center gap-2">
         {presets.map((preset) => (
           <Chip key={preset.id} size="lg" className="cursor-pointer text-base px-4 py-2">

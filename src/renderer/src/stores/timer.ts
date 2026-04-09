@@ -17,6 +17,7 @@ const DEFAULT_PRESETS: TimerPreset[] = [
 ]
 
 const PRESETS_STORAGE_KEY = 'hhc-timer-presets'
+const DURATION_STORAGE_KEY = 'hhc-timer-duration'
 
 export interface TimerStore {
   mode: TimerMode
@@ -61,6 +62,8 @@ export interface TimerStore {
   applyPreset: (id: string) => void
   loadPresets: () => void
   savePresets: () => void
+  loadDuration: () => void
+  saveDuration: () => void
 }
 
 function formatTime(totalSeconds: number): string {
@@ -193,6 +196,7 @@ export const useTimerStore = create<TimerStore>()((set, get) => ({
       formattedTime: formatTime(clamped),
       phase: 'idle'
     })
+    get().saveDuration()
   },
 
   addTime: (seconds: number) => {
@@ -207,6 +211,7 @@ export const useTimerStore = create<TimerStore>()((set, get) => ({
         progress: computeProgress(newRemaining, newTotal),
         formattedTime: formatTime(newRemaining)
       })
+      get().saveDuration()
       return
     }
 
@@ -234,6 +239,7 @@ export const useTimerStore = create<TimerStore>()((set, get) => ({
         progress: computeProgress(newRemaining, newTotal),
         formattedTime: formatTime(newRemaining)
       })
+      get().saveDuration()
       return
     }
 
@@ -340,6 +346,34 @@ export const useTimerStore = create<TimerStore>()((set, get) => ({
     const s = get()
     try {
       localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(s.presets))
+    } catch {
+      // silent fail
+    }
+  },
+
+  loadDuration: () => {
+    try {
+      const stored = localStorage.getItem(DURATION_STORAGE_KEY)
+      if (stored) {
+        const seconds = parseInt(stored, 10)
+        if (!isNaN(seconds) && seconds > 0 && seconds <= MAX_DURATION_SECONDS) {
+          set({
+            totalDuration: seconds,
+            remainingSeconds: seconds,
+            progress: computeProgress(seconds, seconds),
+            formattedTime: formatTime(seconds)
+          })
+        }
+      }
+    } catch {
+      // silent fail
+    }
+  },
+
+  saveDuration: () => {
+    const s = get()
+    try {
+      localStorage.setItem(DURATION_STORAGE_KEY, String(s.totalDuration))
     } catch {
       // silent fail
     }

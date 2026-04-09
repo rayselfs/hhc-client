@@ -50,7 +50,7 @@ export default function TimerSettings({ mode, className }: TimerSettingsProps): 
 
   return (
     <div role="region" aria-label={t('timer.settings')} className={`space-y-2 ${className ?? ''}`}>
-      <h3 className="text-base font-medium mb-2">{t('timer.timerSettings')}</h3>
+      <h3 className="text-base font-medium mb-2">{t('timer.settings')}</h3>
 
       {isStopwatch ? (
         <div className="flex items-center gap-4 min-h-10">

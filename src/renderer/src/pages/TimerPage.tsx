@@ -37,6 +37,7 @@ export default function TimerPage(): React.JSX.Element {
 
   useEffect(() => {
     useTimerStore.getState().loadPresets()
+    useTimerStore.getState().loadDuration()
 
     const adapter = createTimerAdapter()
     adapterRef.current = adapter
@@ -185,7 +186,7 @@ export default function TimerPage(): React.JSX.Element {
       )}
 
       {mode === 'stopwatch' && (
-        <div className="flex flex-col items-center gap-4 flex-1">
+        <div className="flex flex-col items-center gap-4 flex-1 w-full">
           <StopwatchDisplay formattedTime={swFormattedTime} size={80} />
           <TimerControls mode="stopwatch" />
           <TimerSettings mode="stopwatch" className="self-start mt-3" />

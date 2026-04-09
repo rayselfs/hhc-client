@@ -42,9 +42,10 @@ export default function TimeInputPopover({
       <Popover.Trigger>{children}</Popover.Trigger>
       <Popover.Content>
         <Popover.Dialog>
-          <div className="p-3 flex flex-col gap-2 w-72 h-28">
+          <div className="px-2 py-3 flex flex-col gap-2 w-72 h-28">
             <Input
               type="text"
+              variant="secondary"
               value={value}
               onChange={(e) => {
                 setValue(e.target.value)

@@ -985,3 +985,79 @@ describe('preset management', () => {
     expect(ids[0]).not.toBe(ids[1])
   })
 })
+
+describe('duration persistence', () => {
+  let localStorageMock: Record<string, string> = {}
+
+  beforeEach(() => {
+    localStorageMock = {}
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => localStorageMock[key] || null,
+      setItem: (key: string, value: string) => {
+        localStorageMock[key] = value
+      },
+      removeItem: (key: string) => {
+        delete localStorageMock[key]
+      },
+      clear: () => {
+        localStorageMock = {}
+      },
+      length: 0,
+      key: (index: number) => {
+        const keys = Object.keys(localStorageMock)
+        return keys[index] || null
+      }
+    })
+    useTimerStore.setState(INITIAL_STATE)
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('setDuration persists to localStorage', () => {
+    useTimerStore.getState().setDuration(120)
+    expect(localStorageMock['hhc-timer-duration']).toBe('120')
+  })
+
+  it('loadDuration restores saved duration', () => {
+    localStorageMock['hhc-timer-duration'] = '180'
+    useTimerStore.getState().loadDuration()
+    const s = useTimerStore.getState()
+    expect(s.totalDuration).toBe(180)
+    expect(s.remainingSeconds).toBe(180)
+    expect(s.formattedTime).toBe('03:00')
+  })
+
+  it('loadDuration keeps default when localStorage is empty', () => {
+    useTimerStore.getState().loadDuration()
+    const s = useTimerStore.getState()
+    expect(s.totalDuration).toBe(300)
+  })
+
+  it('loadDuration ignores invalid values', () => {
+    localStorageMock['hhc-timer-duration'] = 'not-a-number'
+    useTimerStore.getState().loadDuration()
+    expect(useTimerStore.getState().totalDuration).toBe(300)
+  })
+
+  it('loadDuration ignores zero or negative values', () => {
+    localStorageMock['hhc-timer-duration'] = '0'
+    useTimerStore.getState().loadDuration()
+    expect(useTimerStore.getState().totalDuration).toBe(300)
+
+    localStorageMock['hhc-timer-duration'] = '-10'
+    useTimerStore.getState().loadDuration()
+    expect(useTimerStore.getState().totalDuration).toBe(300)
+  })
+
+  it('addTime in stopped state persists new duration', () => {
+    useTimerStore.getState().addTime(60)
+    expect(localStorageMock['hhc-timer-duration']).toBe('360')
+  })
+
+  it('removeTime in stopped state persists new duration', () => {
+    useTimerStore.getState().removeTime(60)
+    expect(localStorageMock['hhc-timer-duration']).toBe('240')
+  })
+})
