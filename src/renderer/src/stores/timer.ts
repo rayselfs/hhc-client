@@ -374,6 +374,15 @@ export function getDisplayValues(
   } = state
 
   if (phase === 'idle') {
+    if (reminderEnabled) {
+      const mainSeconds = totalDuration - reminderDuration
+      return {
+        mainDisplay: formatTime(Math.max(0, mainSeconds)),
+        subDisplay: formatTime(reminderDuration),
+        isRed: false,
+        overtimeDisplay: null
+      }
+    }
     return {
       mainDisplay: formatTime(totalDuration),
       subDisplay: null,

@@ -364,10 +364,10 @@ describe('TimerPage — TimeInputPopover gating', () => {
     expect(screen.queryByRole('button', { name: /set timer duration/i })).not.toBeInTheDocument()
   })
 
-  it('timer display is NOT editable in clock mode even when stopped', () => {
+  it('timer display IS editable in clock mode when stopped', () => {
     useTimerStore.setState({ mode: 'clock', status: 'stopped' })
     renderTimerPage()
-    expect(screen.queryByRole('button', { name: /set timer duration/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /set timer duration/i })).toBeInTheDocument()
   })
 })
 

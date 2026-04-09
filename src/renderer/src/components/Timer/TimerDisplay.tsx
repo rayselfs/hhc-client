@@ -36,7 +36,8 @@ export default function TimerDisplay({
     <button
       type="button"
       className={[
-        'timer-digits font-bold text-4xl bg-transparent border-0 p-0',
+        'timer-digits font-bold bg-transparent border-0 p-0',
+        'text-[clamp(2rem,14cqi,4.5rem)]',
         isWarning ? 'text-danger' : '',
         canEditTime ? 'cursor-pointer hover:opacity-80' : 'cursor-default pointer-events-none'
       ].join(' ')}
@@ -51,16 +52,19 @@ export default function TimerDisplay({
       progress={progress * 100}
       size={size}
       color={color}
-      className={`flex items-center justify-center ${className ?? ''}`}
+      responsive
+      className={`flex items-center justify-center @container ${className ?? ''}`}
     >
-      <div className="flex flex-col items-center gap-1">
+      <div className="relative flex flex-col items-center">
         {canEditTime && onTimeConfirm ? (
           <TimeInputPopover onConfirm={onTimeConfirm}>{digitButton}</TimeInputPopover>
         ) : (
           digitButton
         )}
         {!isOvertime && subDisplay && (
-          <span className="text-sm text-default-500">{subDisplay}</span>
+          <span className="absolute top-full timer-digits text-[clamp(0.75rem,7cqi,1.25rem)] text-default-500">
+            {subDisplay}
+          </span>
         )}
       </div>
     </TimerRing>

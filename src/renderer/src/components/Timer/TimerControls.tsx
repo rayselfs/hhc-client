@@ -48,24 +48,25 @@ export default function TimerControls({
         isIconOnly
         size="lg"
         variant={isStopped ? 'primary' : 'secondary'}
-        className={isStopped ? '' : 'bg-warning text-accent-foreground'}
+        className={`h-14 w-14 ${isStopped ? '' : 'bg-warning text-accent-foreground'}`}
         onPress={playAction}
         isDisabled={isStopped && disableStart}
         data-testid={isStopped ? 'btn-start' : isRunning ? 'btn-pause' : 'btn-resume'}
         aria-label={playLabel}
       >
-        {isRunning ? <Pause className="size-5" /> : <Play className="size-5" />}
+        {isRunning ? <Pause className="size-6" /> : <Play className="size-6" />}
       </Button>
       <Button
         isIconOnly
         size="lg"
         variant="outline"
+        className="h-14 w-14"
         onPress={reset}
         isDisabled={isStopped}
         data-testid="btn-reset"
         aria-label={t('timer.reset')}
       >
-        <RotateCcw className="size-5" />
+        <RotateCcw className="size-6" />
       </Button>
     </div>
   )

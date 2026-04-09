@@ -43,8 +43,9 @@ export default function TimerSettings({ className }: TimerSettingsProps): React.
   }
 
   return (
-    <div role="region" aria-label={t('timer.settings')} className={`space-y-3 ${className ?? ''}`}>
-      <div className="flex items-center gap-4">
+    <div role="region" aria-label={t('timer.settings')} className={`space-y-2 ${className ?? ''}`}>
+      <h3 className="text-base font-medium mb-2">{t('timer.timerSettings')}</h3>
+      <div className="flex items-center gap-4 min-h-10">
         <Switch
           isSelected={reminderEnabled}
           onChange={handleReminderToggle}
@@ -62,7 +63,7 @@ export default function TimerSettings({ className }: TimerSettingsProps): React.
               value={String(reminderDuration)}
               onChange={handleReminderDurationChange}
               aria-label={t('timer.reminder.time')}
-              className="w-20"
+              className="w-20 [&_input]:py-1"
               min={0}
             />
             <span className="text-xs text-muted">{t('timer.reminder.seconds')}</span>
@@ -70,12 +71,12 @@ export default function TimerSettings({ className }: TimerSettingsProps): React.
         )}
       </div>
       {reminderError && (
-        <p role="alert" className="text-xs text-danger -mt-2">
+        <p role="alert" className="text-xs text-danger">
           {reminderError}
         </p>
       )}
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 min-h-10">
         <Switch
           isSelected={overtimeMessageEnabled}
           onChange={handleOvertimeMessageToggle}
@@ -94,7 +95,7 @@ export default function TimerSettings({ className }: TimerSettingsProps): React.
             placeholder={t('timer.overtimeMessage.placeholder')}
             aria-label={t('timer.overtimeMessage.label')}
             maxLength={MAX_OVERTIME_MESSAGE_LENGTH}
-            className="w-40"
+            className="w-40 [&_input]:py-1"
           />
         )}
       </div>

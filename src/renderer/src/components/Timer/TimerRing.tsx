@@ -6,6 +6,7 @@ interface TimerRingProps {
   color?: 'accent' | 'danger'
   className?: string
   children?: React.ReactNode
+  responsive?: boolean
 }
 
 export default function TimerRing({
@@ -13,7 +14,8 @@ export default function TimerRing({
   size,
   color = 'accent',
   className,
-  children
+  children,
+  responsive
 }: TimerRingProps): React.JSX.Element {
   const prevProgress = useRef<number | null>(null)
   const circleRef = useRef<SVGCircleElement>(null)
@@ -40,8 +42,12 @@ export default function TimerRing({
 
   const strokeClass = color === 'danger' ? 'stroke-danger' : 'stroke-accent'
 
+  const containerStyle = responsive
+    ? { width: '100%', maxWidth: size, aspectRatio: '1' }
+    : { width: size, height: size }
+
   return (
-    <div className={`relative ${className ?? ''}`} style={{ width: size, height: size }}>
+    <div className={`relative ${className ?? ''}`} style={containerStyle}>
       <svg viewBox={`0 0 ${size} ${size}`} className="absolute inset-0 -rotate-90 w-full h-full">
         <circle
           cx={center}

@@ -72,7 +72,7 @@ describe('TimerDisplay', () => {
     const { container } = render(
       <TimerDisplay phase="idle" mainDisplay="05:00" progress={1} size={400} />
     )
-    expect(container.firstChild).toHaveStyle('width: 400px')
-    expect(container.firstChild).toHaveStyle('height: 400px')
+    expect(container.firstChild).toHaveStyle('max-width: 400px')
+    expect(container.firstChild).toHaveStyle('aspect-ratio: 1')
   })
 })

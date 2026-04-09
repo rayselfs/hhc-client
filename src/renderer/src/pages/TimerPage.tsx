@@ -160,7 +160,7 @@ export default function TimerPage(): React.JSX.Element {
             phase={phase}
             overtimeDisplay={displayValues.overtimeDisplay}
             overtimeMessage={overtimeMessageEnabled ? overtimeMessage : undefined}
-            canEditTime={timerStatus === 'stopped' && !isClock}
+            canEditTime={timerStatus === 'stopped'}
             onTimeConfirm={(seconds) => useTimerStore.getState().setDuration(seconds)}
           />
           <TimeAdjustment className="mb-3" />
