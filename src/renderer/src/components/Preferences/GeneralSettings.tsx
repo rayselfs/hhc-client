@@ -24,8 +24,11 @@ type TimezoneKey = keyof typeof TIMEZONE_LABEL_KEYS
 export default function GeneralSettings(): React.JSX.Element {
   const { t, i18n } = useTranslation()
   const { resolved, setPreference } = useTheme()
-  const { timezone, hardwareAcceleration, setTimezone, setHardwareAcceleration, resetToDefaults } =
-    useSettingsStore()
+  const timezone = useSettingsStore((s) => s.timezone)
+  const hardwareAcceleration = useSettingsStore((s) => s.hardwareAcceleration)
+  const setTimezone = useSettingsStore((s) => s.setTimezone)
+  const setHardwareAcceleration = useSettingsStore((s) => s.setHardwareAcceleration)
+  const resetToDefaults = useSettingsStore((s) => s.resetToDefaults)
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false)
 
   const languageOptions = [

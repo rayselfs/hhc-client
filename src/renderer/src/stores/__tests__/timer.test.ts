@@ -679,7 +679,6 @@ describe('getDisplayValues', () => {
     })
     expect(result.mainDisplay).toBe('05:00')
     expect(result.subDisplay).toBeNull()
-    expect(result.isRed).toBe(false)
     expect(result.overtimeDisplay).toBeNull()
   })
 
@@ -706,7 +705,6 @@ describe('getDisplayValues', () => {
     })
     expect(result.mainDisplay).toBe('02:00')
     expect(result.subDisplay).toBe('01:00')
-    expect(result.isRed).toBe(false)
     expect(result.overtimeDisplay).toBeNull()
   })
 
@@ -747,7 +745,6 @@ describe('getDisplayValues', () => {
     })
     expect(result.mainDisplay).toBe('01:00')
     expect(result.subDisplay).toBeNull()
-    expect(result.isRed).toBe(true)
     expect(result.overtimeDisplay).toBeNull()
   })
 

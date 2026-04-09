@@ -11,7 +11,16 @@ vi.mock('@renderer/lib/env', () => ({
 }))
 
 vi.mock('@renderer/stores/settings', () => ({
-  useSettingsStore: vi.fn(),
+  useSettingsStore: vi.fn((selector) => {
+    const store = {
+      timezone: 'Asia/Taipei',
+      hardwareAcceleration: true,
+      setTimezone: vi.fn(),
+      setHardwareAcceleration: vi.fn(),
+      resetToDefaults: vi.fn()
+    }
+    return selector ? selector(store) : store
+  }),
   TIMEZONE_OPTIONS: [
     { value: 'Asia/Taipei', labelKey: 'timezones.taipei' },
     { value: 'UTC', labelKey: 'timezones.utc' }
@@ -30,15 +39,6 @@ describe('PreferencesDialog', () => {
   beforeEach(async () => {
     vi.clearAllMocks()
     await i18n.changeLanguage('en')
-
-    const { useSettingsStore } = await import('@renderer/stores/settings')
-    vi.mocked(useSettingsStore).mockReturnValue({
-      timezone: 'Asia/Taipei',
-      hardwareAcceleration: true,
-      setTimezone: vi.fn(),
-      setHardwareAcceleration: vi.fn(),
-      resetToDefaults: vi.fn()
-    })
 
     const { useTheme } = await import('@renderer/contexts/ThemeContext')
     vi.mocked(useTheme).mockReturnValue({
@@ -92,12 +92,15 @@ describe('PreferencesDialog', () => {
     const user = userEvent.setup()
     const { useSettingsStore } = await import('@renderer/stores/settings')
     const setTimezone = vi.fn()
-    vi.mocked(useSettingsStore).mockReturnValue({
-      timezone: 'Asia/Taipei',
-      hardwareAcceleration: true,
-      setTimezone,
-      setHardwareAcceleration: vi.fn(),
-      resetToDefaults: vi.fn()
+    vi.mocked(useSettingsStore).mockImplementation((selector) => {
+      const store = {
+        timezone: 'Asia/Taipei',
+        hardwareAcceleration: true,
+        setTimezone,
+        setHardwareAcceleration: vi.fn(),
+        resetToDefaults: vi.fn()
+      }
+      return selector ? selector(store) : store
     })
 
     renderDialog(true)
@@ -148,12 +151,15 @@ describe('PreferencesDialog', () => {
     const setPreference = vi.fn()
     const changeLanguageSpy = vi.spyOn(i18n, 'changeLanguage')
 
-    vi.mocked(useSettingsStore).mockReturnValue({
-      timezone: 'Asia/Taipei',
-      hardwareAcceleration: true,
-      setTimezone: vi.fn(),
-      setHardwareAcceleration: vi.fn(),
-      resetToDefaults
+    vi.mocked(useSettingsStore).mockImplementation((selector) => {
+      const store = {
+        timezone: 'Asia/Taipei',
+        hardwareAcceleration: true,
+        setTimezone: vi.fn(),
+        setHardwareAcceleration: vi.fn(),
+        resetToDefaults
+      }
+      return selector ? selector(store) : store
     })
     vi.mocked(useTheme).mockReturnValue({
       preference: 'dark',
@@ -179,12 +185,15 @@ describe('PreferencesDialog', () => {
     const { useSettingsStore } = await import('@renderer/stores/settings')
     const resetToDefaults = vi.fn()
 
-    vi.mocked(useSettingsStore).mockReturnValue({
-      timezone: 'Asia/Taipei',
-      hardwareAcceleration: true,
-      setTimezone: vi.fn(),
-      setHardwareAcceleration: vi.fn(),
-      resetToDefaults
+    vi.mocked(useSettingsStore).mockImplementation((selector) => {
+      const store = {
+        timezone: 'Asia/Taipei',
+        hardwareAcceleration: true,
+        setTimezone: vi.fn(),
+        setHardwareAcceleration: vi.fn(),
+        resetToDefaults
+      }
+      return selector ? selector(store) : store
     })
 
     renderDialog(true)

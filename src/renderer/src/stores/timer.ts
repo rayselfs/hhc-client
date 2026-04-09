@@ -498,7 +498,6 @@ export const useTimerStore = create<TimerStore>()((set, get) => ({
 export interface DisplayValues {
   mainDisplay: string
   subDisplay: string | null
-  isRed: boolean
   overtimeDisplay: string | null
 }
 
@@ -528,14 +527,12 @@ export function getDisplayValues(
       return {
         mainDisplay: formatTime(Math.max(0, mainSeconds)),
         subDisplay: formatTime(reminderDuration),
-        isRed: false,
         overtimeDisplay: null
       }
     }
     return {
       mainDisplay: formatTime(totalDuration),
       subDisplay: null,
-      isRed: false,
       overtimeDisplay: null
     }
   }
@@ -544,7 +541,6 @@ export function getDisplayValues(
     return {
       mainDisplay: '00:00',
       subDisplay: null,
-      isRed: false,
       overtimeDisplay: formatTime(overtimeSeconds)
     }
   }
@@ -553,7 +549,6 @@ export function getDisplayValues(
     return {
       mainDisplay: formatTime(remainingSeconds),
       subDisplay: null,
-      isRed: true,
       overtimeDisplay: null
     }
   }
@@ -562,7 +557,6 @@ export function getDisplayValues(
     return {
       mainDisplay: formatTime(remainingSeconds - reminderDuration),
       subDisplay: formatTime(reminderDuration),
-      isRed: false,
       overtimeDisplay: null
     }
   }
@@ -570,7 +564,6 @@ export function getDisplayValues(
   return {
     mainDisplay: formatTime(remainingSeconds),
     subDisplay: null,
-    isRed: false,
     overtimeDisplay: null
   }
 }
