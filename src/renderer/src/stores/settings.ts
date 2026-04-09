@@ -38,6 +38,48 @@ function clearIndexedDB(): void {
   }
 }
 
+function clearCacheAPI(): void {
+  try {
+    if (typeof caches === 'undefined') return
+    caches.keys().then((names) => {
+      names.forEach((name) => {
+        caches.delete(name)
+      })
+    })
+  } catch {
+    //
+  }
+}
+
+function clearCookies(): void {
+  try {
+    document.cookie.split(';').forEach((c) => {
+      const name = c.split('=')[0].trim()
+      if (name) {
+        document.cookie = `${name}=;expires=${new Date(0).toUTCString()};path=/`
+      }
+    })
+  } catch {
+    //
+  }
+}
+
+function clearAllSiteData(): void {
+  try {
+    localStorage.clear()
+  } catch {
+    // silent fail
+  }
+  try {
+    sessionStorage.clear()
+  } catch {
+    // silent fail
+  }
+  clearIndexedDB()
+  clearCacheAPI()
+  clearCookies()
+}
+
 function loadTimezone(): string {
   try {
     const stored = localStorage.getItem(TIMEZONE_KEY)
@@ -91,11 +133,6 @@ export const useSettingsStore = create<SettingsStore>()((set) => ({
 
   resetToDefaults: () => {
     set({ timezone: DEFAULT_TIMEZONE, hardwareAcceleration: DEFAULT_HW_ACCEL })
-    try {
-      localStorage.clear()
-    } catch {
-      // silent fail
-    }
-    clearIndexedDB()
+    clearAllSiteData()
   }
 }))
