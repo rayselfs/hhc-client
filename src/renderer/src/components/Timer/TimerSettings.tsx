@@ -25,6 +25,7 @@ export default function TimerSettings({ mode, className }: TimerSettingsProps): 
   const setOvertimeMessage = useTimerStore((s) => s.setOvertimeMessage)
 
   const showOnProjection = useStopwatchStore((s) => s.showOnProjection)
+  const setShowOnProjection = useStopwatchStore((s) => s.setShowOnProjection)
 
   const canEnableReminder = totalDuration > 30
   const reminderError =
@@ -72,7 +73,7 @@ export default function TimerSettings({ mode, className }: TimerSettingsProps): 
         <div className="flex items-center gap-4 min-h-10">
           <Switch
             isSelected={showOnProjection}
-            onChange={() => useStopwatchStore.getState().setShowOnProjection(!showOnProjection)}
+            onChange={() => setShowOnProjection(!showOnProjection)}
             aria-label={t('timer.stopwatch.showOnProjection')}
             data-testid="switch-show-stopwatch-projection"
           >
