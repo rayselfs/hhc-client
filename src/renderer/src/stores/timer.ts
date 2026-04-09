@@ -11,9 +11,9 @@ import type {
 const MAX_DURATION_SECONDS = 99 * 3600
 
 const DEFAULT_PRESETS: TimerPreset[] = [
-  { id: 'preset-10m', name: '10m', durationSeconds: 600, mode: 'timer' },
-  { id: 'preset-5m', name: '5m', durationSeconds: 300, mode: 'timer' },
-  { id: 'preset-3m', name: '3m', durationSeconds: 180, mode: 'timer' }
+  { id: 'preset-10m', name: '10:00', durationSeconds: 600, mode: 'timer' },
+  { id: 'preset-5m', name: '05:00', durationSeconds: 300, mode: 'timer' },
+  { id: 'preset-3m', name: '03:00', durationSeconds: 180, mode: 'timer' }
 ]
 
 const PRESETS_STORAGE_KEY = 'hhc-timer-presets'
@@ -251,6 +251,10 @@ export const useTimerStore = create<TimerStore>()((set, get) => ({
   },
 
   setMode: (mode: TimerMode) => {
+    const s = get()
+    if (mode === 'clock' && s.status !== 'stopped') {
+      get().reset()
+    }
     set({ mode })
   },
 

@@ -91,31 +91,43 @@ describe('TimerPage — TIMER mode', () => {
 })
 
 describe('TimerPage — CLOCK mode', () => {
-  it('renders ClockDisplay in clock mode', () => {
-    useTimerStore.setState({ mode: 'clock' })
-    renderTimerPage()
-    expect(screen.getByTestId('clock-display')).toBeInTheDocument()
-  })
-
-  it('does not render TimerControls (start button) in clock mode', () => {
-    useTimerStore.setState({ mode: 'clock' })
-    renderTimerPage()
-    expect(screen.queryByTestId('btn-start')).not.toBeInTheDocument()
-  })
-
-  it('does not render progressbar in clock mode', () => {
+  it('renders TimerDisplay (SVG ring) in clock mode', () => {
     useTimerStore.setState({ mode: 'clock' })
     const { container } = renderTimerPage()
-    expect(container.querySelectorAll('circle')).toHaveLength(0)
+    expect(container.querySelector('svg circle')).toBeInTheDocument()
+  })
+
+  it('renders TimerControls with disabled start in clock mode', () => {
+    useTimerStore.setState({ mode: 'clock', status: 'stopped' })
+    renderTimerPage()
+    expect(screen.getByTestId('btn-start')).toBeDisabled()
+  })
+
+  it('does not render ClockDisplay in clock mode (only on projection)', () => {
+    useTimerStore.setState({ mode: 'clock' })
+    renderTimerPage()
+    expect(screen.queryByTestId('clock-display')).not.toBeInTheDocument()
   })
 })
 
 describe('TimerPage — BOTH mode', () => {
-  it('renders both TimerDisplay and ClockDisplay in both mode', () => {
+  it('renders TimerDisplay (SVG ring) in both mode', () => {
     useTimerStore.setState({ mode: 'both' })
     const { container } = renderTimerPage()
-    expect(container.querySelectorAll('circle')).toHaveLength(2)
-    expect(screen.getByTestId('clock-display')).toBeInTheDocument()
+    expect(container.querySelector('svg circle')).toBeInTheDocument()
+  })
+
+  it('renders TimerControls start button in both mode', () => {
+    useTimerStore.setState({ mode: 'both', status: 'stopped' })
+    renderTimerPage()
+    expect(screen.getByTestId('btn-start')).toBeInTheDocument()
+    expect(screen.getByTestId('btn-start')).not.toBeDisabled()
+  })
+
+  it('does not render ClockDisplay in both mode (only on projection)', () => {
+    useTimerStore.setState({ mode: 'both' })
+    renderTimerPage()
+    expect(screen.queryByTestId('clock-display')).not.toBeInTheDocument()
   })
 
   it('does not render StopwatchDisplay in both mode', () => {
@@ -323,14 +335,14 @@ describe('TimerPage — adapter command relay (stopwatch)', () => {
   })
 })
 
-describe('TimerPage — TimeInputDialog gating', () => {
-  it('timer display button is clickable (has aria-label) when timer is stopped', () => {
+describe('TimerPage — TimeInputPopover gating', () => {
+  it('timer display is editable when timer is stopped', () => {
     useTimerStore.setState({ mode: 'timer', status: 'stopped' })
     renderTimerPage()
     expect(screen.getByRole('button', { name: /set timer duration/i })).toBeInTheDocument()
   })
 
-  it('timer display button is NOT clickable (no aria-label) when timer is running', () => {
+  it('timer display is NOT editable when timer is running', () => {
     useTimerStore.setState({
       mode: 'timer',
       status: 'running',
@@ -341,13 +353,19 @@ describe('TimerPage — TimeInputDialog gating', () => {
     expect(screen.queryByRole('button', { name: /set timer duration/i })).not.toBeInTheDocument()
   })
 
-  it('timer display button is NOT clickable (no aria-label) when timer is paused', () => {
+  it('timer display is NOT editable when timer is paused', () => {
     useTimerStore.setState({
       mode: 'timer',
       status: 'paused',
       totalDuration: 300,
       remainingSeconds: 200
     })
+    renderTimerPage()
+    expect(screen.queryByRole('button', { name: /set timer duration/i })).not.toBeInTheDocument()
+  })
+
+  it('timer display is NOT editable in clock mode even when stopped', () => {
+    useTimerStore.setState({ mode: 'clock', status: 'stopped' })
     renderTimerPage()
     expect(screen.queryByRole('button', { name: /set timer duration/i })).not.toBeInTheDocument()
   })

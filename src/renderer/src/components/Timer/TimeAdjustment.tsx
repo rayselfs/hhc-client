@@ -21,7 +21,7 @@ export default function TimeAdjustment({ className }: TimeAdjustmentProps): Reac
           <Button
             key={`remove-${seconds}`}
             variant="outline"
-            className="text-warning border-warning"
+            className="text-warning border-warning w-16"
             isDisabled={remainingSeconds < seconds}
             onPress={() => removeTime(seconds)}
             aria-label={t('timer.removeTime', { seconds })}
@@ -35,7 +35,7 @@ export default function TimeAdjustment({ className }: TimeAdjustmentProps): Reac
           <Button
             key={`add-${seconds}`}
             variant="outline"
-            className="text-accent border-accent"
+            className="text-accent border-accent w-16"
             onPress={() => addTime(seconds)}
             aria-label={t('timer.addTime', { seconds })}
           >

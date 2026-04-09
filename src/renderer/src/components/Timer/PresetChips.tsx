@@ -8,10 +8,10 @@ function formatDurationLabel(seconds: number): string {
   const h = Math.floor(seconds / 3600)
   const m = Math.floor((seconds % 3600) / 60)
   const s = seconds % 60
-  if (h > 0) return `${h}h${m > 0 ? `${m}m` : ''}`
-  if (m > 0 && s > 0) return `${m}m${s}s`
-  if (m > 0) return `${m}m`
-  return `${s}s`
+  if (h > 0) {
+    return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+  }
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
 interface PresetChipsProps {
@@ -41,10 +41,10 @@ export default function PresetChips({ className }: PresetChipsProps): React.JSX.
 
   return (
     <div className={className}>
-      <h3 className="text-sm font-medium mb-2">{t('timer.timerPresets')}</h3>
+      <h3 className="text-base font-medium mb-2">{t('timer.timerPresets')}</h3>
       <div className="flex flex-wrap items-center gap-2">
         {presets.map((preset) => (
-          <Chip key={preset.id} className="cursor-pointer">
+          <Chip key={preset.id} size="lg" className="cursor-pointer">
             <span
               role="button"
               tabIndex={0}
@@ -71,7 +71,8 @@ export default function PresetChips({ className }: PresetChipsProps): React.JSX.
           </Chip>
         ))}
         <Button
-          variant="ghost"
+          size="lg"
+          variant="outline"
           onPress={handleAdd}
           isDisabled={hasDuplicate}
           aria-label={t('timer.addPreset')}

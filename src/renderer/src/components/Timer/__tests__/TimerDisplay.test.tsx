@@ -1,5 +1,9 @@
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import TimerDisplay from '../TimerDisplay'
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: (key: string) => key })
+}))
 
 describe('TimerDisplay', () => {
   it('renders idle phase correctly', () => {
@@ -46,16 +50,22 @@ describe('TimerDisplay', () => {
     expect(screen.getByText('Time Is Up!')).toBeInTheDocument()
   })
 
-  it('calls onTimeClick when clicked', () => {
-    const handleClick = vi.fn()
-    render(<TimerDisplay phase="idle" mainDisplay="05:00" progress={1} onTimeClick={handleClick} />)
-    fireEvent.click(screen.getByText('05:00'))
-    expect(handleClick).toHaveBeenCalledTimes(1)
+  it('renders digit as clickable when canEditTime is true', () => {
+    render(
+      <TimerDisplay
+        phase="idle"
+        mainDisplay="05:00"
+        progress={1}
+        canEditTime
+        onTimeConfirm={vi.fn()}
+      />
+    )
+    expect(screen.getByRole('button', { name: /set timer duration/i })).toBeInTheDocument()
   })
 
-  it('does not crash when clicked without onTimeClick', () => {
+  it('does not render digit as clickable when canEditTime is false', () => {
     render(<TimerDisplay phase="idle" mainDisplay="05:00" progress={1} />)
-    expect(() => fireEvent.click(screen.getByText('05:00'))).not.toThrow()
+    expect(screen.queryByRole('button', { name: /set timer duration/i })).not.toBeInTheDocument()
   })
 
   it('renders with custom size', () => {

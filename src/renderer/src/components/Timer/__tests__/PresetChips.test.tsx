@@ -8,9 +8,9 @@ import { useTimerStore } from '@renderer/stores/timer'
 import type { TimerPreset } from '@shared/types/timer'
 
 const SAMPLE_PRESETS: TimerPreset[] = [
-  { id: 'preset-10m', name: '10m', durationSeconds: 600, mode: 'timer' },
-  { id: 'preset-5m', name: '5m', durationSeconds: 300, mode: 'timer' },
-  { id: 'preset-3m', name: '3m', durationSeconds: 180, mode: 'timer' }
+  { id: 'preset-10m', name: '10:00', durationSeconds: 600, mode: 'timer' },
+  { id: 'preset-5m', name: '05:00', durationSeconds: 300, mode: 'timer' },
+  { id: 'preset-3m', name: '03:00', durationSeconds: 180, mode: 'timer' }
 ]
 
 function mockLocalStorage(): {
@@ -55,9 +55,9 @@ function renderWithI18n(): RenderResult {
 describe('PresetChips — rendering', () => {
   it('renders all 3 default preset chips', () => {
     renderWithI18n()
-    expect(screen.getByRole('button', { name: '10m' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '5m' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '3m' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '10:00' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '05:00' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '03:00' })).toBeInTheDocument()
   })
 
   it('renders an add preset button', () => {
@@ -67,9 +67,9 @@ describe('PresetChips — rendering', () => {
 
   it('renders delete button for each preset', () => {
     renderWithI18n()
-    expect(screen.getByRole('button', { name: 'Delete Preset 10m' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Delete Preset 5m' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Delete Preset 3m' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Delete Preset 10:00' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Delete Preset 05:00' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Delete Preset 03:00' })).toBeInTheDocument()
   })
 
   it('renders Timer Presets title', () => {
@@ -84,7 +84,7 @@ describe('PresetChips — applyPreset', () => {
     const applyPresetSpy = vi.fn()
     useTimerStore.setState({ applyPreset: applyPresetSpy } as never)
     renderWithI18n()
-    await user.click(screen.getByRole('button', { name: '5m' }))
+    await user.click(screen.getByRole('button', { name: '05:00' }))
     expect(applyPresetSpy).toHaveBeenCalledWith('preset-5m')
   })
 
@@ -93,7 +93,7 @@ describe('PresetChips — applyPreset', () => {
     const applyPresetSpy = vi.fn()
     useTimerStore.setState({ applyPreset: applyPresetSpy } as never)
     renderWithI18n()
-    await user.click(screen.getByRole('button', { name: '10m' }))
+    await user.click(screen.getByRole('button', { name: '10:00' }))
     expect(applyPresetSpy).toHaveBeenCalledWith('preset-10m')
   })
 })
@@ -104,7 +104,7 @@ describe('PresetChips — removePreset', () => {
     const removePresetSpy = vi.fn()
     useTimerStore.setState({ removePreset: removePresetSpy } as never)
     renderWithI18n()
-    await user.click(screen.getByRole('button', { name: 'Delete Preset 5m' }))
+    await user.click(screen.getByRole('button', { name: 'Delete Preset 05:00' }))
     expect(removePresetSpy).toHaveBeenCalledWith('preset-5m')
   })
 
@@ -113,7 +113,7 @@ describe('PresetChips — removePreset', () => {
     const removePresetSpy = vi.fn()
     useTimerStore.setState({ removePreset: removePresetSpy } as never)
     renderWithI18n()
-    await user.click(screen.getByRole('button', { name: 'Delete Preset 10m' }))
+    await user.click(screen.getByRole('button', { name: 'Delete Preset 10:00' }))
     expect(removePresetSpy).toHaveBeenCalledWith('preset-10m')
   })
 })
@@ -129,7 +129,7 @@ describe('PresetChips — addPreset (current duration)', () => {
     } as never)
     renderWithI18n()
     await user.click(screen.getByRole('button', { name: 'Add Preset' }))
-    expect(addPresetSpy).toHaveBeenCalledWith('1m30s', 90)
+    expect(addPresetSpy).toHaveBeenCalledWith('01:30', 90)
   })
 
   it('add button is disabled when totalDuration already exists in presets', () => {

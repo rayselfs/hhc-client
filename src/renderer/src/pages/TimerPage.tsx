@@ -1,16 +1,15 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef } from 'react'
 import { useTimerStore, getDisplayValues } from '@renderer/stores/timer'
 import { useStopwatchStore } from '@renderer/stores/stopwatch'
 import { createTimerAdapter } from '@renderer/lib/timer-adapter'
 import type { TimerAdapter } from '@renderer/lib/timer-adapter'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
 import TimerDisplay from '@renderer/components/Timer/TimerDisplay'
-import ClockDisplay from '@renderer/components/Timer/ClockDisplay'
 import StopwatchDisplay from '@renderer/components/Timer/StopwatchDisplay'
 import TimerControls from '@renderer/components/Timer/TimerControls'
 import TimeAdjustment from '@renderer/components/Timer/TimeAdjustment'
 import PresetChips from '@renderer/components/Timer/PresetChips'
-import TimeInputDialog from '@renderer/components/Timer/TimeInputDialog'
+import TimerSettings from '@renderer/components/Timer/TimerSettings'
 
 export default function TimerPage(): React.JSX.Element {
   const mode = useTimerStore((s) => s.mode)
@@ -30,8 +29,6 @@ export default function TimerPage(): React.JSX.Element {
   const swFormattedTime = useStopwatchStore((s) => s.formattedTime)
 
   const { project } = useProjection()
-
-  const [dialogOpen, setDialogOpen] = useState(false)
 
   const adapterRef = useRef<TimerAdapter | null>(null)
   const prevTimerStatus = useRef(timerStatus)
@@ -149,9 +146,12 @@ export default function TimerPage(): React.JSX.Element {
     reminderEnabled
   })
 
+  const isTimerLike = mode === 'timer' || mode === 'clock' || mode === 'both'
+  const isClock = mode === 'clock'
+
   return (
     <div data-testid="timer-page" className="flex flex-col items-center gap-4 p-6 h-full">
-      {mode === 'timer' && (
+      {isTimerLike && (
         <div className="flex flex-col items-center gap-4 flex-1 w-full">
           <TimerDisplay
             progress={progress}
@@ -160,36 +160,13 @@ export default function TimerPage(): React.JSX.Element {
             phase={phase}
             overtimeDisplay={displayValues.overtimeDisplay}
             overtimeMessage={overtimeMessageEnabled ? overtimeMessage : undefined}
-            onTimeClick={timerStatus === 'stopped' ? () => setDialogOpen(true) : undefined}
+            canEditTime={timerStatus === 'stopped' && !isClock}
+            onTimeConfirm={(seconds) => useTimerStore.getState().setDuration(seconds)}
           />
-          <TimeAdjustment className="mb-3" />
-          <TimerControls mode={mode} />
-          <PresetChips className="self-start" />
-        </div>
-      )}
-
-      {mode === 'clock' && (
-        <div className="flex flex-1 items-center justify-center">
-          <ClockDisplay size={96} />
-        </div>
-      )}
-
-      {mode === 'both' && (
-        <div className="flex flex-row flex-1 w-full items-center">
-          <div className="flex items-center justify-center" style={{ flex: '0 0 42%' }}>
-            <TimerDisplay
-              progress={progress}
-              mainDisplay={displayValues.mainDisplay}
-              subDisplay={displayValues.subDisplay}
-              phase={phase}
-              overtimeDisplay={displayValues.overtimeDisplay}
-              overtimeMessage={overtimeMessageEnabled ? overtimeMessage : undefined}
-              onTimeClick={timerStatus === 'stopped' ? () => setDialogOpen(true) : undefined}
-            />
-          </div>
-          <div className="flex items-center justify-center" style={{ flex: '0 0 58%' }}>
-            <ClockDisplay size={80} />
-          </div>
+          {!isClock && <TimeAdjustment className="mb-3" />}
+          <TimerControls mode={mode} disableStart={isClock} />
+          {!isClock && <PresetChips className="self-start" />}
+          {!isClock && <TimerSettings />}
         </div>
       )}
 
@@ -199,15 +176,6 @@ export default function TimerPage(): React.JSX.Element {
           <TimerControls mode="stopwatch" />
         </div>
       )}
-
-      <TimeInputDialog
-        isOpen={dialogOpen}
-        onClose={() => setDialogOpen(false)}
-        onConfirm={(seconds) => {
-          useTimerStore.getState().setDuration(seconds)
-          setDialogOpen(false)
-        }}
-      />
     </div>
   )
 }

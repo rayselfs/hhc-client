@@ -4,7 +4,6 @@ import { useProjection } from '@renderer/contexts/ProjectionContext'
 import { Button, Modal, useOverlayState } from '@heroui/react'
 import { X, TriangleAlert, Monitor, MonitorOff } from 'lucide-react'
 import ModeSelector from '@renderer/components/Timer/ModeSelector'
-import TimerSettings from '@renderer/components/Timer/TimerSettings'
 import { isTimerRoute } from '@renderer/lib/routes'
 
 export default function Header(): React.JSX.Element {
@@ -19,7 +18,7 @@ export default function Header(): React.JSX.Element {
   return (
     <>
       <header className="flex items-center justify-between gap-2 p-2">
-        <div className="flex items-center gap-2">{showTimerControls && <TimerSettings />}</div>
+        <div className="flex items-center gap-2" />
         <div className="flex items-center gap-2">{showTimerControls && <ModeSelector />}</div>
         <div className="flex items-center gap-2">
           <Button

@@ -1,4 +1,5 @@
 import TimerRing from './TimerRing'
+import TimeInputPopover from './TimeInputPopover'
 
 interface TimerDisplayProps {
   progress: number
@@ -8,7 +9,8 @@ interface TimerDisplayProps {
   overtimeDisplay?: string | null
   overtimeMessage?: string
   size?: number
-  onTimeClick?: () => void
+  onTimeConfirm?: (seconds: number) => void
+  canEditTime?: boolean
   className?: string
 }
 
@@ -20,15 +22,29 @@ export default function TimerDisplay({
   overtimeDisplay,
   overtimeMessage,
   size = 280,
-  onTimeClick,
+  onTimeConfirm,
+  canEditTime,
   className
 }: TimerDisplayProps): React.JSX.Element {
   const isWarning = phase === 'warning'
   const isOvertime = phase === 'overtime'
   const color = isWarning ? 'danger' : 'accent'
-  const isClickable = Boolean(onTimeClick)
 
   const innerContent = isOvertime ? overtimeMessage || overtimeDisplay || '00:00' : mainDisplay
+
+  const digitButton = (
+    <button
+      type="button"
+      className={[
+        'timer-digits font-bold text-4xl bg-transparent border-0 p-0',
+        isWarning ? 'text-danger' : '',
+        canEditTime ? 'cursor-pointer hover:opacity-80' : 'cursor-default pointer-events-none'
+      ].join(' ')}
+      aria-label={canEditTime ? 'Set timer duration' : undefined}
+    >
+      {innerContent}
+    </button>
+  )
 
   return (
     <TimerRing
@@ -38,18 +54,11 @@ export default function TimerDisplay({
       className={`flex items-center justify-center ${className ?? ''}`}
     >
       <div className="flex flex-col items-center gap-1">
-        <button
-          type="button"
-          onClick={isClickable ? onTimeClick : undefined}
-          className={[
-            'timer-digits font-bold text-4xl bg-transparent border-0 p-0',
-            isWarning ? 'text-danger' : '',
-            isClickable ? 'cursor-pointer hover:opacity-80' : 'cursor-default pointer-events-none'
-          ].join(' ')}
-          aria-label={isClickable ? 'Set timer duration' : undefined}
-        >
-          {innerContent}
-        </button>
+        {canEditTime && onTimeConfirm ? (
+          <TimeInputPopover onConfirm={onTimeConfirm}>{digitButton}</TimeInputPopover>
+        ) : (
+          digitButton
+        )}
         {!isOvertime && subDisplay && (
           <span className="text-sm text-default-500">{subDisplay}</span>
         )}

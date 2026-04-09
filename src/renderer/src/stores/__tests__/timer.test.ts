@@ -878,9 +878,9 @@ describe('preset management', () => {
     useTimerStore.getState().loadPresets()
     const s = useTimerStore.getState()
     expect(s.presets).toHaveLength(3)
-    expect(s.presets[0].name).toBe('10m')
-    expect(s.presets[1].name).toBe('5m')
-    expect(s.presets[2].name).toBe('3m')
+    expect(s.presets[0].name).toBe('10:00')
+    expect(s.presets[1].name).toBe('05:00')
+    expect(s.presets[2].name).toBe('03:00')
   })
 
   it('addPreset increases presets array', () => {
@@ -965,7 +965,7 @@ describe('preset management', () => {
     useTimerStore.getState().loadPresets()
     const s = useTimerStore.getState()
     expect(s.presets).toHaveLength(3)
-    expect(s.presets[0].name).toBe('10m')
+    expect(s.presets[0].name).toBe('10:00')
   })
 
   it('loadPresets uses defaults when key missing', () => {
@@ -973,7 +973,7 @@ describe('preset management', () => {
     useTimerStore.getState().loadPresets()
     const s = useTimerStore.getState()
     expect(s.presets).toHaveLength(3)
-    expect(s.presets[0].name).toBe('10m')
+    expect(s.presets[0].name).toBe('10:00')
   })
 
   it('addPreset generates unique ids', () => {

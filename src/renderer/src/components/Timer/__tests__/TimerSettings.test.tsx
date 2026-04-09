@@ -28,15 +28,16 @@ function renderWithI18n(): RenderResult {
   )
 }
 
-describe('TimerSettings — trigger and content', () => {
-  it('renders the settings trigger button', () => {
-    renderWithI18n()
-    expect(screen.getByTestId('timer-settings-trigger')).toBeInTheDocument()
-  })
-
-  it('renders settings content via popover mock', () => {
+describe('TimerSettings — inline rendering', () => {
+  it('renders settings region', () => {
     renderWithI18n()
     expect(screen.getByRole('region', { name: /settings/i })).toBeInTheDocument()
+  })
+
+  it('renders both switch controls', () => {
+    renderWithI18n()
+    const switches = screen.getAllByRole('switch')
+    expect(switches).toHaveLength(2)
   })
 })
 
@@ -69,6 +70,20 @@ describe('TimerSettings — reminder toggle', () => {
     await user.click(reminderSwitch)
 
     expect(setReminderSpy).toHaveBeenCalledWith(false, 30)
+  })
+})
+
+describe('TimerSettings — reminder input visibility', () => {
+  it('does not show reminder duration input when reminder is disabled', () => {
+    useTimerStore.setState({ reminderEnabled: false })
+    renderWithI18n()
+    expect(screen.queryByRole('spinbutton', { name: /reminder time/i })).not.toBeInTheDocument()
+  })
+
+  it('shows reminder duration input when reminder is enabled', () => {
+    useTimerStore.setState({ reminderEnabled: true })
+    renderWithI18n()
+    expect(screen.getByRole('spinbutton', { name: /reminder time/i })).toBeInTheDocument()
   })
 })
 
@@ -156,6 +171,20 @@ describe('TimerSettings — overtime message toggle', () => {
   })
 })
 
+describe('TimerSettings — overtime input visibility', () => {
+  it('does not show overtime message input when overtime is disabled', () => {
+    useTimerStore.setState({ overtimeMessageEnabled: false })
+    renderWithI18n()
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+  })
+
+  it('shows overtime message input when overtime is enabled', () => {
+    useTimerStore.setState({ overtimeMessageEnabled: true })
+    renderWithI18n()
+    expect(screen.getByRole('textbox')).toBeInTheDocument()
+  })
+})
+
 describe('TimerSettings — overtime message text input', () => {
   it('changing overtime message text calls setOvertimeMessage', async () => {
     const user = userEvent.setup()
@@ -167,8 +196,7 @@ describe('TimerSettings — overtime message text input', () => {
     } as never)
     renderWithI18n()
 
-    const messageInputs = screen.getAllByRole('textbox')
-    const overtimeInput = messageInputs[0]
+    const overtimeInput = screen.getByRole('textbox')
     await user.type(overtimeInput, 'Hi')
 
     expect(setOvertimeMessageSpy).toHaveBeenCalled()
@@ -178,14 +206,13 @@ describe('TimerSettings — overtime message text input', () => {
     const user = userEvent.setup()
     const setOvertimeMessageSpy = vi.fn()
     useTimerStore.setState({
-      overtimeMessageEnabled: false,
+      overtimeMessageEnabled: true,
       overtimeMessage: '',
       setOvertimeMessage: setOvertimeMessageSpy
     } as never)
     renderWithI18n()
 
-    const messageInputs = screen.getAllByRole('textbox')
-    const overtimeInput = messageInputs[0]
+    const overtimeInput = screen.getByRole('textbox')
     await user.type(overtimeInput, 'ABCDEFGHIJKLMNOPQRSTU')
 
     const calls = setOvertimeMessageSpy.mock.calls

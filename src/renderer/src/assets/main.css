@@ -20,7 +20,7 @@
 [data-theme='dark'] {
   --sidebar: oklch(0.18 0.0059 285.89);
   --sidebar-foreground: var(--foreground);
-  --warning: oklch(0.65 0.16 72.33);
+  --warning: oklch(0.6 0.16 72.33);
 }
 
 .timer-digits {

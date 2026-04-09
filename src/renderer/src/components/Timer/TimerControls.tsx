@@ -7,9 +7,13 @@ import type { TimerMode } from '@renderer/stores/timer'
 
 interface TimerControlsProps {
   mode: TimerMode
+  disableStart?: boolean
 }
 
-export default function TimerControls({ mode }: TimerControlsProps): React.JSX.Element {
+export default function TimerControls({
+  mode,
+  disableStart
+}: TimerControlsProps): React.JSX.Element {
   const { t } = useTranslation()
   const isStopwatch = mode === 'stopwatch'
 
@@ -46,6 +50,7 @@ export default function TimerControls({ mode }: TimerControlsProps): React.JSX.E
         variant={isStopped ? 'primary' : 'secondary'}
         className={isStopped ? '' : 'bg-warning text-accent-foreground'}
         onPress={playAction}
+        isDisabled={isStopped && disableStart}
         data-testid={isStopped ? 'btn-start' : isRunning ? 'btn-pause' : 'btn-resume'}
         aria-label={playLabel}
       >
@@ -54,7 +59,7 @@ export default function TimerControls({ mode }: TimerControlsProps): React.JSX.E
       <Button
         isIconOnly
         size="lg"
-        variant="ghost"
+        variant="outline"
         onPress={reset}
         isDisabled={isStopped}
         data-testid="btn-reset"
