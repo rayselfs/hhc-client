@@ -93,21 +93,25 @@ function renderTimerContent(
   }
 
   if (mode === 'clock') {
-    return <ClockDisplay size={120} className="text-white" />
+    return <ClockDisplay className="text-white" />
   }
 
   if (mode === 'both') {
     return (
-      <div className="flex flex-row items-center justify-center gap-16 w-full">
-        <TimerDisplay
-          progress={progress}
-          mainDisplay={mainDisplay}
-          subDisplay={subDisplay}
-          phase={phase}
-          overtimeMessage={overtimeMessage ?? undefined}
-          size={500}
-        />
-        <ClockDisplay size={80} className="text-white" />
+      <div className="flex items-center w-full h-full px-8">
+        <div className="w-1/3">
+          <TimerDisplay
+            progress={progress}
+            mainDisplay={mainDisplay}
+            subDisplay={subDisplay}
+            phase={phase}
+            overtimeMessage={overtimeMessage ?? undefined}
+            size={700}
+          />
+        </div>
+        <div className="w-2/3">
+          <ClockDisplay className="text-white" />
+        </div>
       </div>
     )
   }

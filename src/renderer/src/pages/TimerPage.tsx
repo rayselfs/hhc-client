@@ -5,6 +5,7 @@ import { createTimerAdapter } from '@renderer/lib/timer-adapter'
 import type { TimerAdapter } from '@renderer/lib/timer-adapter'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
 import TimerDisplay from '@renderer/components/Timer/TimerDisplay'
+import ClockDisplay from '@renderer/components/Timer/ClockDisplay'
 import StopwatchDisplay from '@renderer/components/Timer/StopwatchDisplay'
 import TimerControls from '@renderer/components/Timer/TimerControls'
 import TimeAdjustment from '@renderer/components/Timer/TimeAdjustment'
@@ -148,21 +149,42 @@ export default function TimerPage(): React.JSX.Element {
 
   const isTimerLike = mode === 'timer' || mode === 'clock' || mode === 'both'
   const isClock = mode === 'clock'
+  const isBoth = mode === 'both'
 
   return (
     <div data-testid="timer-page" className="flex flex-col items-center gap-4 h-full">
       {isTimerLike && (
         <div className="flex flex-col items-center gap-4 flex-1 w-full">
-          <TimerDisplay
-            progress={progress}
-            mainDisplay={displayValues.mainDisplay}
-            subDisplay={displayValues.subDisplay}
-            phase={phase}
-            overtimeDisplay={displayValues.overtimeDisplay}
-            overtimeMessage={overtimeMessageEnabled ? overtimeMessage : undefined}
-            canEditTime={timerStatus === 'stopped'}
-            onTimeConfirm={(seconds) => useTimerStore.getState().setDuration(seconds)}
-          />
+          {isBoth ? (
+            <div className="flex items-center w-full gap-4">
+              <div className="w-1/3">
+                <TimerDisplay
+                  progress={progress}
+                  mainDisplay={displayValues.mainDisplay}
+                  subDisplay={displayValues.subDisplay}
+                  phase={phase}
+                  overtimeDisplay={displayValues.overtimeDisplay}
+                  overtimeMessage={overtimeMessageEnabled ? overtimeMessage : undefined}
+                  canEditTime={timerStatus === 'stopped'}
+                  onTimeConfirm={(seconds) => useTimerStore.getState().setDuration(seconds)}
+                />
+              </div>
+              <div className="w-2/3">
+                <ClockDisplay />
+              </div>
+            </div>
+          ) : (
+            <TimerDisplay
+              progress={progress}
+              mainDisplay={displayValues.mainDisplay}
+              subDisplay={displayValues.subDisplay}
+              phase={phase}
+              overtimeDisplay={displayValues.overtimeDisplay}
+              overtimeMessage={overtimeMessageEnabled ? overtimeMessage : undefined}
+              canEditTime={timerStatus === 'stopped'}
+              onTimeConfirm={(seconds) => useTimerStore.getState().setDuration(seconds)}
+            />
+          )}
           <TimeAdjustment className="mb-3" />
           <TimerControls mode={mode} disableStart={isClock} />
           <PresetChips className="self-start my-3" />

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 
 interface ClockDisplayProps {
-  size?: number
   className?: string
 }
 
@@ -13,10 +12,7 @@ function getCurrentTime(): string {
   return `${hh}:${mm}:${ss}`
 }
 
-export default function ClockDisplay({
-  size = 64,
-  className
-}: ClockDisplayProps): React.JSX.Element {
+export default function ClockDisplay({ className }: ClockDisplayProps): React.JSX.Element {
   const [time, setTime] = useState(getCurrentTime)
 
   useEffect(() => {
@@ -25,12 +21,10 @@ export default function ClockDisplay({
   }, [])
 
   return (
-    <div
-      className={`timer-digits font-bold tabular-nums ${className ?? ''}`}
-      style={{ fontSize: size }}
-      data-testid="clock-display"
-    >
-      {time}
+    <div className={`@container w-full ${className ?? ''}`} data-testid="clock-display">
+      <span className="timer-digits font-bold tabular-nums text-[24cqi] block text-center">
+        {time}
+      </span>
     </div>
   )
 }

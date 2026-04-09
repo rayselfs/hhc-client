@@ -124,10 +124,10 @@ describe('TimerPage — BOTH mode', () => {
     expect(screen.getByTestId('btn-start')).not.toBeDisabled()
   })
 
-  it('does not render ClockDisplay in both mode (only on projection)', () => {
+  it('renders ClockDisplay in both mode', () => {
     useTimerStore.setState({ mode: 'both' })
     renderTimerPage()
-    expect(screen.queryByTestId('clock-display')).not.toBeInTheDocument()
+    expect(screen.getByTestId('clock-display')).toBeInTheDocument()
   })
 
   it('does not render StopwatchDisplay in both mode', () => {
