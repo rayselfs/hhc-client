@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { useTimerStore } from '@renderer/stores/timer'
 import type { TimerMode } from '@shared/types/timer'
 
-const MODES: TimerMode[] = ['timer', 'clock', 'both', 'stopwatch']
+const TIMER_MODES: TimerMode[] = ['timer', 'both', 'clock']
+const OTHER_MODES: TimerMode[] = ['stopwatch']
 
 export default function ModeSelector(): React.JSX.Element {
   const { t } = useTranslation()
@@ -14,8 +15,15 @@ export default function ModeSelector(): React.JSX.Element {
     <Tabs selectedKey={mode} onSelectionChange={(key) => setMode(key as TimerMode)}>
       <Tabs.ListContainer>
         <Tabs.List>
-          {MODES.map((m) => (
+          {TIMER_MODES.map((m) => (
             <Tabs.Tab key={m} id={m} data-testid={`mode-${m}`}>
+              {t(`timer.mode.${m}`)}
+              <Tabs.Indicator />
+            </Tabs.Tab>
+          ))}
+          {OTHER_MODES.map((m) => (
+            <Tabs.Tab key={m} id={m} data-testid={`mode-${m}`}>
+              <Tabs.Separator />
               {t(`timer.mode.${m}`)}
               <Tabs.Indicator />
             </Tabs.Tab>
