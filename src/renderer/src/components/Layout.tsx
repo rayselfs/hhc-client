@@ -7,7 +7,7 @@ import { ProjectionProvider } from '@renderer/contexts/ProjectionContext'
 export default function Layout(): React.JSX.Element {
   return (
     <ProjectionProvider>
-      <div className="flex h-screen bg-background text-foreground">
+      <div className="flex h-screen overflow-hidden bg-background text-foreground">
         <Sidebar />
         <div className="flex flex-1 flex-col min-h-0">
           <Header />
