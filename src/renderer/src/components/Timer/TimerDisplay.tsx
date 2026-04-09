@@ -38,10 +38,10 @@ export default function TimerDisplay({
     <button
       type="button"
       className={[
-        'timer-digits bg-transparent border-0 p-0',
+        'timer-digits bg-transparent border-0 p-0 focus:outline-none',
         'text-[34cqi]',
         isWarning && !warningColor ? 'text-danger' : '',
-        canEditTime ? 'hover:opacity-80' : 'pointer-events-none'
+        canEditTime ? 'cursor-pointer hover:opacity-80' : 'pointer-events-none'
       ].join(' ')}
       style={useCustomColor ? { color: warningColor } : undefined}
       aria-label={canEditTime ? 'Set timer duration' : undefined}
