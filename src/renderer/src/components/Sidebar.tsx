@@ -51,7 +51,7 @@ export default function Sidebar(): React.JSX.Element {
       <div className="mt-auto">
         <UserMenu onOpenPreferences={() => setPrefsOpen(true)} />
       </div>
-      <PreferencesDialog isOpen={prefsOpen} onOpenChange={setPrefsOpen} />
+      {prefsOpen && <PreferencesDialog isOpen={prefsOpen} onOpenChange={setPrefsOpen} />}
     </nav>
   )
 }
