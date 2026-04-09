@@ -21,7 +21,8 @@ vi.mock('@heroui/react', async () => {
     Avatar: AvatarMock,
     Dropdown: DropdownMock,
     Select: SelectMock,
-    Listbox: ListboxMock
+    Listbox: ListboxMock,
+    ListBox: ListboxMock
   }
 })
 
@@ -40,7 +41,7 @@ Object.defineProperty(window, 'matchMedia', {
 })
 
 globalThis.ResizeObserver = class {
-  observe(): void {}
-  unobserve(): void {}
-  disconnect(): void {}
+  observe = vi.fn()
+  unobserve = vi.fn()
+  disconnect = vi.fn()
 }

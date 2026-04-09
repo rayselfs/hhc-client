@@ -287,11 +287,15 @@ const DropdownMock = Object.assign(
   }
 )
 
+const SelectContext = React.createContext<{
+  onSelectionChange?: (key: React.Key) => void
+}>({})
+
 const SelectMock = Object.assign(
   ({
     children,
     className,
-    selectedKey,
+    selectedKey: _sk1,
     onSelectionChange,
     ...props
   }: {
@@ -301,19 +305,21 @@ const SelectMock = Object.assign(
     onSelectionChange?: (key: React.Key) => void
     [key: string]: unknown
   }) => (
-    <div
-      className={className}
-      data-testid="select-root"
-      {...(props as React.HTMLAttributes<HTMLDivElement>)}
-    >
-      {children}
-    </div>
+    <SelectContext value={{ onSelectionChange }}>
+      <div
+        className={className}
+        data-testid="select-root"
+        {...(props as React.HTMLAttributes<HTMLDivElement>)}
+      >
+        {children}
+      </div>
+    </SelectContext>
   ),
   {
     Root: ({
       children,
       className,
-      selectedKey,
+      selectedKey: _sk2,
       onSelectionChange,
       ...props
     }: {
@@ -323,13 +329,15 @@ const SelectMock = Object.assign(
       onSelectionChange?: (key: React.Key) => void
       [key: string]: unknown
     }) => (
-      <div
-        className={className}
-        data-testid="select-root"
-        {...(props as React.HTMLAttributes<HTMLDivElement>)}
-      >
-        {children}
-      </div>
+      <SelectContext value={{ onSelectionChange }}>
+        <div
+          className={className}
+          data-testid="select-root"
+          {...(props as React.HTMLAttributes<HTMLDivElement>)}
+        >
+          {children}
+        </div>
+      </SelectContext>
     ),
     Trigger: ({
       children,
@@ -437,20 +445,26 @@ const ListboxMock = Object.assign(
       children?: React.ReactNode
       id?: string
       [key: string]: unknown
-    }) => (
-      <li
-        role="option"
-        aria-selected={id ? capturedListboxSelectedKeys?.has(id) : false}
-        onClick={() => {
-          if (id && capturedListboxOnSelectionChange) {
-            capturedListboxOnSelectionChange(new Set([id]))
-          }
-        }}
-        {...(props as React.LiHTMLAttributes<HTMLLIElement>)}
-      >
-        {children}
-      </li>
-    )
+    }) => {
+      const selectCtx = React.useContext(SelectContext)
+      return (
+        <li
+          role="option"
+          aria-selected={id ? capturedListboxSelectedKeys?.has(id) : false}
+          onClick={() => {
+            if (id && capturedListboxOnSelectionChange) {
+              capturedListboxOnSelectionChange(new Set([id]))
+            }
+            if (id && selectCtx.onSelectionChange) {
+              selectCtx.onSelectionChange(id)
+            }
+          }}
+          {...(props as React.LiHTMLAttributes<HTMLLIElement>)}
+        >
+          {children}
+        </li>
+      )
+    }
   }
 )
 
