@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { useLocation } from 'react-router-dom'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
-import { Button, Modal, useOverlayState } from '@heroui/react'
+import { Button, Modal, useOverlayState, toast } from '@heroui/react'
 import { X, TriangleAlert, Monitor, MonitorOff } from 'lucide-react'
 import ModeSelector from '@renderer/components/Timer/ModeSelector'
 import { isTimerRoute } from '@renderer/lib/routes'
@@ -72,7 +72,9 @@ export default function Header(): React.JSX.Element {
                 <Button
                   variant="danger"
                   onPress={async () => {
-                    await closeProjection().catch(() => undefined)
+                    await closeProjection().catch(() => {
+                      toast.danger(t('toast.projectionCloseFailed'))
+                    })
                     state.close()
                   }}
                 >

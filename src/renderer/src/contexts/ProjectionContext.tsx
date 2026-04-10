@@ -210,7 +210,9 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
     ): Promise<void> => {
       if (!isReadyRef.current) {
         if (options?.autoOpen && !isProjectionOpenRef.current) {
-          openProjection().catch(() => undefined)
+          openProjection().catch(() => {
+            console.warn('[Projection] Auto-reopen failed')
+          })
         }
         return
       }

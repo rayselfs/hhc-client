@@ -124,6 +124,8 @@
     "utc": "UTC (UTC+0)"
   },
   "toast": {
-    "storageSaveFailed": "設定儲存失敗"
+    "storageSaveFailed": "設定儲存失敗",
+    "projectionOpenFailed": "投影視窗開啟失敗",
+    "projectionCloseFailed": "投影視窗關閉失敗"
   }
 }

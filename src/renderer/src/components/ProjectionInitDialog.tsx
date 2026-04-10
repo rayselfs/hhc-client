@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { Modal, Button, useOverlayState } from '@heroui/react'
+import { Modal, Button, useOverlayState, toast } from '@heroui/react'
 import { Monitor } from 'lucide-react'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
 import { isWeb } from '@renderer/lib/env'
@@ -40,7 +40,9 @@ export default function ProjectionInitDialog(): React.JSX.Element | null {
               <Button
                 variant="primary"
                 onPress={async () => {
-                  await openProjection().catch(() => undefined)
+                  await openProjection().catch(() => {
+                    toast.danger(t('toast.projectionOpenFailed'))
+                  })
                   state.close()
                 }}
               >

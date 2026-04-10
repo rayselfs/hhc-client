@@ -124,6 +124,8 @@
     "utc": "UTC (UTC+0)"
   },
   "toast": {
-    "storageSaveFailed": "Failed to save settings"
+    "storageSaveFailed": "Failed to save settings",
+    "projectionOpenFailed": "Failed to open projection window",
+    "projectionCloseFailed": "Failed to close projection window"
   }
 }
