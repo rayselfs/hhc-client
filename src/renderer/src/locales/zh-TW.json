@@ -3,6 +3,13 @@
     "timer": "計時器",
     "bible": "聖經"
   },
+  "welcome": {
+    "title": "歡迎使用 HHC",
+    "subtitle": "讓我們設定您的偏好",
+    "language": "語言",
+    "timezone": "時區",
+    "confirm": "開始使用"
+  },
   "timer": {
     "title": "計時器",
     "mode": {

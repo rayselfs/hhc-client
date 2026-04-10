@@ -16,7 +16,7 @@ export const TIMEZONE_OPTIONS = [
   { value: 'Europe/London', labelKey: 'timezones.london' },
   { value: 'Europe/Paris', labelKey: 'timezones.paris' },
   { value: 'UTC', labelKey: 'timezones.utc' }
-]
+] as const
 
 const DEFAULT_TIMEZONE = 'Asia/Taipei'
 const DEFAULT_HW_ACCEL = true

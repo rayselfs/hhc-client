@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import routes from '../router'
 import { ThemeProvider } from '@renderer/contexts/ThemeContext'
+import { ONBOARDED_KEY } from '@renderer/lib/onboarding'
 
 vi.mock('@renderer/lib/timer-adapter', () => ({
   createTimerAdapter: vi.fn(() => ({
@@ -41,6 +42,14 @@ function renderWithRouter(initialEntries: string[] = ['/']): ReturnType<typeof r
 }
 
 describe('Router', () => {
+  beforeEach(() => {
+    localStorage.setItem(ONBOARDED_KEY, 'true')
+  })
+
+  afterEach(() => {
+    localStorage.clear()
+  })
+
   it('renders timer page at default route /', () => {
     renderWithRouter(['/'])
     expect(screen.getByTestId('timer-page')).toBeInTheDocument()

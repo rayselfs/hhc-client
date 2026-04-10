@@ -3,6 +3,13 @@
     "timer": "TIMER",
     "bible": "BIBLE"
   },
+  "welcome": {
+    "title": "Welcome to HHC",
+    "subtitle": "Let's set up your preferences",
+    "language": "Language",
+    "timezone": "Timezone",
+    "confirm": "Get Started"
+  },
   "timer": {
     "title": "TIMER",
     "mode": {

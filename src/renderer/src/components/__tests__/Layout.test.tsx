@@ -1,10 +1,11 @@
 import { render, screen } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import '@renderer/i18n'
 import i18n from '@renderer/i18n'
 import routes from '@renderer/router'
 import { ThemeProvider } from '@renderer/contexts/ThemeContext'
+import { ONBOARDED_KEY } from '@renderer/lib/onboarding'
 
 vi.mock('@renderer/lib/timer-adapter', () => ({
   createTimerAdapter: vi.fn(() => ({
@@ -43,6 +44,14 @@ function renderWithRouter(initialEntries: string[] = ['/']): ReturnType<typeof r
 }
 
 describe('Layout', () => {
+  beforeEach(() => {
+    localStorage.setItem(ONBOARDED_KEY, 'true')
+  })
+
+  afterEach(() => {
+    localStorage.clear()
+  })
+
   it('renders a header element', async () => {
     await i18n.changeLanguage('en')
     renderWithRouter(['/'])
