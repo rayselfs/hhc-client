@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { createProjectionAdapter, type ProjectionAdapter } from '@renderer/lib/projection-adapter'
 import { isElectron } from '@renderer/lib/env'
 import type { ProjectionChannel, ProjectionPayload } from '@shared/projection-messages'
@@ -233,22 +233,30 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
     []
   )
 
-  return (
-    <ProjectionContext.Provider
-      value={{
-        isProjectionOpen,
-        isProjectionBlanked,
-        openProjection,
-        closeProjection,
-        blankProjection,
-        project,
-        send,
-        on
-      }}
-    >
-      {children}
-    </ProjectionContext.Provider>
+  const contextValue = useMemo(
+    () => ({
+      isProjectionOpen,
+      isProjectionBlanked,
+      openProjection,
+      closeProjection,
+      blankProjection,
+      project,
+      send,
+      on
+    }),
+    [
+      isProjectionOpen,
+      isProjectionBlanked,
+      openProjection,
+      closeProjection,
+      blankProjection,
+      project,
+      send,
+      on
+    ]
   )
+
+  return <ProjectionContext.Provider value={contextValue}>{children}</ProjectionContext.Provider>
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
