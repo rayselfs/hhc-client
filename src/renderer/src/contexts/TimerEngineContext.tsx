@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { createTimerAdapter } from '@renderer/lib/timer-adapter'
 import type { TimerAdapter } from '@renderer/lib/timer-adapter'
 import { useTimerStore } from '@renderer/stores/timer'
@@ -11,7 +11,8 @@ export function TimerEngineProvider({
 }: {
   children: React.ReactNode
 }): React.JSX.Element {
-  const adapterRef = useRef<TimerAdapter | null>(null)
+  const [adapter] = useState(() => createTimerAdapter())
+  const adapterRef = useRef(adapter)
 
   const timerStatus = useTimerStore((s) => s.status)
   const totalDuration = useTimerStore((s) => s.totalDuration)
@@ -21,9 +22,6 @@ export function TimerEngineProvider({
   const prevSwStatus = useRef(swStatus)
 
   useEffect(() => {
-    const adapter = createTimerAdapter()
-    adapterRef.current = adapter
-
     adapter.onTick(() => {
       useTimerStore.getState().tick(Date.now())
     })
@@ -38,25 +36,24 @@ export function TimerEngineProvider({
 
     return () => {
       adapter.dispose()
-      adapterRef.current = null
     }
-  }, [])
+  }, [adapter])
 
   useEffect(() => {
     const prev = prevTimerStatus.current
     prevTimerStatus.current = timerStatus
 
-    const adapter = adapterRef.current
-    if (!adapter) return
+    const a = adapterRef.current
+    if (!a) return
 
     if (prev === 'stopped' && timerStatus === 'running') {
-      adapter.sendCommand({ type: 'start', durationMs: totalDuration * 1000 })
+      a.sendCommand({ type: 'start', durationMs: totalDuration * 1000 })
     } else if (prev === 'running' && timerStatus === 'paused') {
-      adapter.sendCommand({ type: 'pause' })
+      a.sendCommand({ type: 'pause' })
     } else if (prev === 'paused' && timerStatus === 'running') {
-      adapter.sendCommand({ type: 'resume' })
+      a.sendCommand({ type: 'resume' })
     } else if (prev !== 'stopped' && timerStatus === 'stopped') {
-      adapter.sendCommand({ type: 'reset' })
+      a.sendCommand({ type: 'reset' })
     }
   }, [timerStatus, totalDuration])
 
@@ -64,17 +61,17 @@ export function TimerEngineProvider({
     const prev = prevSwStatus.current
     prevSwStatus.current = swStatus
 
-    const adapter = adapterRef.current
-    if (!adapter) return
+    const a = adapterRef.current
+    if (!a) return
 
     if (prev === 'stopped' && swStatus === 'running') {
-      adapter.sendCommand({ type: 'startStopwatch' })
+      a.sendCommand({ type: 'startStopwatch' })
     } else if (prev === 'running' && swStatus === 'paused') {
-      adapter.sendCommand({ type: 'pauseStopwatch' })
+      a.sendCommand({ type: 'pauseStopwatch' })
     } else if (prev === 'paused' && swStatus === 'running') {
-      adapter.sendCommand({ type: 'resumeStopwatch' })
+      a.sendCommand({ type: 'resumeStopwatch' })
     } else if (prev !== 'stopped' && swStatus === 'stopped') {
-      adapter.sendCommand({ type: 'resetStopwatch' })
+      a.sendCommand({ type: 'resetStopwatch' })
     }
   }, [swStatus])
 
@@ -86,9 +83,7 @@ export function TimerEngineProvider({
     return () => clearInterval(id)
   }, [swStatus])
 
-  return (
-    <TimerEngineContext.Provider value={adapterRef.current}>{children}</TimerEngineContext.Provider>
-  )
+  return <TimerEngineContext.Provider value={adapter}>{children}</TimerEngineContext.Provider>
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
