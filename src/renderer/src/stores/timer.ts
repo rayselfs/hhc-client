@@ -74,6 +74,7 @@ function loadInitialReminder(): { duration: number; color: string } {
 }
 
 export interface TimerStore {
+  // ── Config (persistent, low-frequency) ─────────────────────
   mode: TimerMode
   totalDuration: number
   reminderEnabled: boolean
@@ -82,35 +83,41 @@ export interface TimerStore {
   overtimeMessageEnabled: boolean
   overtimeMessage: string
 
+  // ── Runtime (tick-driven, ephemeral) ───────────────────────
   status: TimerStatus
   phase: TimerPhase
   remainingSeconds: number
   overtimeSeconds: number
   progress: number
   formattedTime: string
-
   targetEndTime: number | null
 
+  // ── Presets ────────────────────────────────────────────────
   presets: TimerPreset[]
 
+  // ── Predicates ─────────────────────────────────────────────
   isRunning: () => boolean
   isPaused: () => boolean
   isStopped: () => boolean
   isWarning: () => boolean
   isOvertime: () => boolean
 
+  // ── Lifecycle actions ──────────────────────────────────────
   start: () => void
   pause: () => void
   resume: () => void
   reset: () => void
+  tick: (currentMs: number) => void
+
+  // ── Config actions ─────────────────────────────────────────
   setDuration: (seconds: number) => void
   addTime: (seconds: number) => void
   removeTime: (seconds: number) => void
   setMode: (mode: TimerMode) => void
-  tick: (currentMs: number) => void
   setReminder: (enabled: boolean, durationSeconds: number, color?: string) => void
   setOvertimeMessage: (enabled: boolean, message: string) => void
 
+  // ── Persistence actions ────────────────────────────────────
   addPreset: (name: string, durationSeconds: number) => void
   removePreset: (id: string) => void
   applyPreset: (id: string) => void
@@ -121,6 +128,30 @@ export interface TimerStore {
   loadReminder: () => void
   saveReminder: () => void
 }
+
+/** Configuration fields — persistent settings, low-frequency changes */
+type TimerConfig = Pick<
+  TimerStore,
+  | 'mode'
+  | 'totalDuration'
+  | 'reminderEnabled'
+  | 'reminderDuration'
+  | 'reminderColor'
+  | 'overtimeMessageEnabled'
+  | 'overtimeMessage'
+>
+
+/** Runtime fields — tick-driven, high-frequency, ephemeral */
+type TimerRuntime = Pick<
+  TimerStore,
+  | 'status'
+  | 'phase'
+  | 'remainingSeconds'
+  | 'overtimeSeconds'
+  | 'progress'
+  | 'formattedTime'
+  | 'targetEndTime'
+>
 
 function formatTime(totalSeconds: number): string {
   const abs = Math.abs(Math.round(totalSeconds))
@@ -566,4 +597,4 @@ export function getDisplayValues(
   }
 }
 
-export type { TimerMode, TimerStatus, TimerPhase }
+export type { TimerMode, TimerStatus, TimerPhase, TimerConfig, TimerRuntime }
