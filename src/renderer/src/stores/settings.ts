@@ -136,5 +136,6 @@ export const useSettingsStore = create<SettingsStore>()((set) => ({
   resetToDefaults: () => {
     set({ timezone: DEFAULT_TIMEZONE, hardwareAcceleration: DEFAULT_HW_ACCEL })
     clearAllSiteData()
+    toast.success(i18n.t('toast.settingsReset'))
   }
 }))

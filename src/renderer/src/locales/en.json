@@ -127,6 +127,7 @@
   "toast": {
     "storageSaveFailed": "Failed to save settings",
     "projectionOpenFailed": "Failed to open projection window",
-    "projectionCloseFailed": "Failed to close projection window"
+    "projectionCloseFailed": "Failed to close projection window",
+    "settingsReset": "Settings reset to defaults"
   }
 }

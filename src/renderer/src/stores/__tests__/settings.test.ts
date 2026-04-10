@@ -18,6 +18,7 @@ beforeEach(() => {
     hardwareAcceleration: true
   })
   mockToast.warning.mockClear()
+  mockToast.success.mockClear()
 })
 
 describe('initial state', () => {
@@ -204,6 +205,13 @@ describe('TIMEZONE_OPTIONS', () => {
     expect(values).toContain('Europe/London')
     expect(values).toContain('Europe/Paris')
     expect(values).toContain('UTC')
+  })
+})
+
+describe('resetToDefaults toast', () => {
+  it('shows toast.success on settings reset', () => {
+    useSettingsStore.getState().resetToDefaults()
+    expect(mockToast.success).toHaveBeenCalledWith('toast.settingsReset')
   })
 })
 

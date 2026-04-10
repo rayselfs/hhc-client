@@ -127,6 +127,7 @@
   "toast": {
     "storageSaveFailed": "设置保存失败",
     "projectionOpenFailed": "投影窗口打开失败",
-    "projectionCloseFailed": "投影窗口关闭失败"
+    "projectionCloseFailed": "投影窗口关闭失败",
+    "settingsReset": "已重置为默认值"
   }
 }
