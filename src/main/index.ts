@@ -3,6 +3,7 @@ import { electronApp, optimizer } from '@electron-toolkit/utils'
 import { WindowManager } from './windowManager'
 import { registerProjectionHandlers } from './ipc/projection'
 import { registerTimerHandlers } from './ipc/timer'
+import { isKnownWindow, validateTheme } from './ipc/validate'
 
 process.on('uncaughtException', (error) => {
   console.error('[MAIN] Uncaught Exception:', error)
@@ -15,12 +16,6 @@ process.on('unhandledRejection', (reason) => {
 
 const wm = WindowManager.getInstance()
 
-function isKnownWindow(event: Electron.IpcMainInvokeEvent): boolean {
-  const senderWindow = BrowserWindow.fromWebContents(event.sender)
-  if (!senderWindow) return false
-  return senderWindow === wm.getMainWindow() || senderWindow === wm.getProjectionWindow()
-}
-
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.electron')
 
@@ -29,18 +24,17 @@ app.whenReady().then(() => {
   })
 
   ipcMain.handle('theme:get', (event) => {
-    if (!isKnownWindow(event)) return { source: 'system', shouldUseDarkColors: false }
+    if (!isKnownWindow(wm, event)) return { source: 'system', shouldUseDarkColors: false }
     return {
       source: nativeTheme.themeSource,
       shouldUseDarkColors: nativeTheme.shouldUseDarkColors
     }
   })
 
-  ipcMain.handle('theme:set', (event, theme: string) => {
-    if (!isKnownWindow(event)) return
-    if (theme === 'light' || theme === 'dark' || theme === 'system') {
-      nativeTheme.themeSource = theme
-    }
+  ipcMain.handle('theme:set', (event, theme: unknown) => {
+    if (!isKnownWindow(wm, event)) return
+    if (!validateTheme(theme)) return
+    nativeTheme.themeSource = theme as 'light' | 'dark' | 'system'
   })
 
   nativeTheme.on('updated', () => {
@@ -52,7 +46,7 @@ app.whenReady().then(() => {
   })
 
   registerProjectionHandlers(wm)
-  registerTimerHandlers()
+  registerTimerHandlers(wm)
   wm.createMainWindow()
   wm.createProjectionWindow()
 

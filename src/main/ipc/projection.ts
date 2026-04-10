@@ -1,17 +1,7 @@
-import { ipcMain, BrowserWindow } from 'electron'
+import { ipcMain } from 'electron'
 import { WindowManager } from '../windowManager'
+import { isKnownWindow, isMainWindow } from './validate'
 import type { ProjectionMessageTuple } from '@shared/projection-messages'
-
-function isKnownWindow(wm: WindowManager, event: Electron.IpcMainInvokeEvent): boolean {
-  const senderWindow = BrowserWindow.fromWebContents(event.sender)
-  if (!senderWindow) return false
-  return senderWindow === wm.getMainWindow() || senderWindow === wm.getProjectionWindow()
-}
-
-function isMainWindow(wm: WindowManager, event: Electron.IpcMainInvokeEvent): boolean {
-  const senderWindow = BrowserWindow.fromWebContents(event.sender)
-  return senderWindow === wm.getMainWindow()
-}
 
 export function registerProjectionHandlers(windowManager: WindowManager): void {
   ipcMain.handle('projection:check', (event) => {

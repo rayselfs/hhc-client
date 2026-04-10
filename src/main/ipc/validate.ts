@@ -1,5 +1,6 @@
 import { BrowserWindow } from 'electron'
 import { MAX_DURATION_SECONDS } from '@shared/constants/timer'
+import type { WindowManager } from '../windowManager'
 
 const VALID_TIMER_COMMAND_TYPES = new Set([
   'start',
@@ -19,9 +20,21 @@ const VALID_TIMER_COMMAND_TYPES = new Set([
 
 const VALID_TIMER_MODES = new Set(['timer', 'clock', 'both', 'stopwatch'])
 
-export function validateSender(event: Electron.IpcMainInvokeEvent): boolean {
-  const win = BrowserWindow.fromWebContents(event.sender)
-  return win !== null
+const VALID_THEMES = new Set(['light', 'dark', 'system'])
+
+export function isKnownWindow(wm: WindowManager, event: Electron.IpcMainInvokeEvent): boolean {
+  const senderWindow = BrowserWindow.fromWebContents(event.sender)
+  if (!senderWindow) return false
+  return senderWindow === wm.getMainWindow() || senderWindow === wm.getProjectionWindow()
+}
+
+export function isMainWindow(wm: WindowManager, event: Electron.IpcMainInvokeEvent): boolean {
+  const senderWindow = BrowserWindow.fromWebContents(event.sender)
+  return senderWindow === wm.getMainWindow()
+}
+
+export function validateTheme(theme: unknown): boolean {
+  return typeof theme === 'string' && VALID_THEMES.has(theme)
 }
 
 export function validateTimerCommand(cmd: unknown): boolean {
