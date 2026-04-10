@@ -4,6 +4,15 @@ import { WindowManager } from './windowManager'
 import { registerProjectionHandlers } from './ipc/projection'
 import { registerTimerHandlers } from './ipc/timer'
 
+process.on('uncaughtException', (error) => {
+  console.error('[MAIN] Uncaught Exception:', error)
+  app.quit()
+})
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[MAIN] Unhandled Rejection:', reason)
+})
+
 const wm = WindowManager.getInstance()
 
 function isKnownWindow(event: Electron.IpcMainInvokeEvent): boolean {
