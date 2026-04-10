@@ -1,26 +1,44 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import '@renderer/i18n'
 import i18n from '@renderer/i18n'
 import WelcomePage from '../WelcomePage'
 
-vi.mock('@renderer/stores/settings', () => ({
-  useSettingsStore: vi.fn((selector) => {
-    const store = {
-      timezone: 'Asia/Taipei',
-      hardwareAcceleration: true,
-      setTimezone: vi.fn(),
-      setHardwareAcceleration: vi.fn(),
-      resetToDefaults: vi.fn()
-    }
-    return selector ? selector(store) : store
-  }),
-  TIMEZONE_OPTIONS: [
-    { value: 'Asia/Taipei', labelKey: 'timezones.taipei' },
-    { value: 'UTC', labelKey: 'timezones.utc' }
-  ]
-}))
+const mockNavigate = vi.fn()
+vi.mock('react-router-dom', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-router-dom')>()
+  return {
+    ...actual,
+    useNavigate: () => mockNavigate
+  }
+})
+
+vi.mock('@renderer/stores/settings', () => {
+  const setTimezone = vi.fn()
+  return {
+    useSettingsStore: Object.assign(
+      vi.fn((selector) => {
+        const store = {
+          timezone: 'Asia/Taipei',
+          hardwareAcceleration: true,
+          setTimezone,
+          setHardwareAcceleration: vi.fn(),
+          resetToDefaults: vi.fn()
+        }
+        return selector ? selector(store) : store
+      }),
+      {
+        getState: () => ({ setTimezone })
+      }
+    ),
+    TIMEZONE_OPTIONS: [
+      { value: 'Asia/Taipei', labelKey: 'timezones.taipei' },
+      { value: 'UTC', labelKey: 'timezones.utc' }
+    ]
+  }
+})
 
 vi.mock('@renderer/lib/onboarding', () => ({
   markOnboarded: vi.fn()
@@ -60,5 +78,17 @@ describe('WelcomePage', () => {
   it('confirm button exists', () => {
     renderWelcomePage()
     expect(screen.getByRole('button', { name: i18n.t('welcome.confirm') })).toBeInTheDocument()
+  })
+
+  it('clicking confirm calls markOnboarded and navigates to /timer', async () => {
+    const user = userEvent.setup()
+    const { markOnboarded } = await import('@renderer/lib/onboarding')
+    renderWelcomePage()
+
+    const confirmButton = screen.getByRole('button', { name: i18n.t('welcome.confirm') })
+    await user.click(confirmButton)
+
+    expect(markOnboarded).toHaveBeenCalled()
+    expect(mockNavigate).toHaveBeenCalledWith('/timer')
   })
 })

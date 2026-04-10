@@ -27,6 +27,12 @@ export default function WelcomePage(): React.JSX.Element {
   const [language, setLanguage] = useState(detectLanguage)
   const [timezone, setTimezone] = useState(detectTimezone)
 
+  const handleLanguageChange = (key: string | number): void => {
+    const lang = String(key)
+    setLanguage(lang)
+    i18n.changeLanguage(lang)
+  }
+
   const handleConfirm = (): void => {
     i18n.changeLanguage(language)
     useSettingsStore.getState().setTimezone(timezone)
@@ -54,7 +60,7 @@ export default function WelcomePage(): React.JSX.Element {
         <div className="space-y-6">
           <Select
             value={language}
-            onChange={(key) => setLanguage(String(key))}
+            onChange={(key) => key !== null && handleLanguageChange(key)}
             aria-label={t('welcome.language')}
           >
             <Label className="mb-2 block text-sm font-medium">{t('welcome.language')}</Label>
