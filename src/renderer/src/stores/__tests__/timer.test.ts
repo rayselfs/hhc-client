@@ -5,6 +5,7 @@ import {
   DEFAULT_SETTINGS,
   getDisplayValues
 } from '@renderer/stores/timer'
+import { MAX_DURATION_SECONDS } from '@shared/constants/timer'
 
 const INITIAL_STATE = {
   ...DEFAULT_SETTINGS,
@@ -225,9 +226,9 @@ describe('setDuration()', () => {
     expect(useTimerStore.getState().totalDuration).toBe(300)
   })
 
-  it('clamps to MAX (99*3600)', () => {
-    useTimerStore.getState().setDuration(99 * 3600 + 1)
-    expect(useTimerStore.getState().totalDuration).toBe(99 * 3600)
+  it('clamps to MAX_DURATION_SECONDS (3599)', () => {
+    useTimerStore.getState().setDuration(MAX_DURATION_SECONDS + 1)
+    expect(useTimerStore.getState().totalDuration).toBe(MAX_DURATION_SECONDS)
   })
 
   it('clamps to minimum 0', () => {
@@ -272,9 +273,12 @@ describe('addTime()', () => {
   })
 
   it('does not exceed MAX_DURATION_SECONDS', () => {
-    useTimerStore.setState({ remainingSeconds: 99 * 3600, totalDuration: 99 * 3600 })
-    useTimerStore.getState().addTime(3600)
-    expect(useTimerStore.getState().remainingSeconds).toBe(99 * 3600)
+    useTimerStore.setState({
+      remainingSeconds: MAX_DURATION_SECONDS,
+      totalDuration: MAX_DURATION_SECONDS
+    })
+    useTimerStore.getState().addTime(1)
+    expect(useTimerStore.getState().remainingSeconds).toBe(MAX_DURATION_SECONDS)
   })
 })
 
@@ -503,14 +507,14 @@ describe('formattedTime', () => {
     expect(useTimerStore.getState().formattedTime).toBe('05:00')
   })
 
-  it('formats 3600s (1 hour) as 1:00:00', () => {
-    useTimerStore.getState().setDuration(3600)
-    expect(useTimerStore.getState().formattedTime).toBe('1:00:00')
+  it('formats 3599s (max) as 59:59', () => {
+    useTimerStore.getState().setDuration(3599)
+    expect(useTimerStore.getState().formattedTime).toBe('59:59')
   })
 
-  it('formats 3661s as 1:01:01', () => {
+  it('formats 3599s clamped from 3661s as 59:59', () => {
     useTimerStore.getState().setDuration(3661)
-    expect(useTimerStore.getState().formattedTime).toBe('1:01:01')
+    expect(useTimerStore.getState().formattedTime).toBe('59:59')
   })
 
   it('formats 59s as 00:59', () => {
@@ -1005,6 +1009,13 @@ describe('preset management', () => {
     const ids = presets.filter((p) => p.name === 'a' || p.name === 'b').map((p) => p.id)
     expect(ids.length).toBe(2)
     expect(ids[0]).not.toBe(ids[1])
+  })
+
+  it('clamps durationSeconds to MAX_DURATION_SECONDS', () => {
+    useTimerStore.getState().addPreset('Too long', MAX_DURATION_SECONDS + 100)
+    const presets = useTimerStore.getState().presets
+    const added = presets[presets.length - 1]
+    expect(added.durationSeconds).toBe(MAX_DURATION_SECONDS)
   })
 })
 

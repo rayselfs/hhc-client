@@ -8,8 +8,7 @@ import type {
   TimerState,
   TimerPreset
 } from '@shared/types/timer'
-
-const MAX_DURATION_SECONDS = 99 * 3600
+import { MAX_DURATION_SECONDS } from '@shared/constants/timer'
 
 const DEFAULT_PRESETS: TimerPreset[] = [
   {
@@ -393,7 +392,7 @@ export const useTimerStore = create<TimerStore>()((set, get) => ({
     const newPreset: TimerPreset = {
       id,
       name,
-      durationSeconds,
+      durationSeconds: Math.min(MAX_DURATION_SECONDS, durationSeconds),
       mode: 'timer'
     }
     set({ presets: [...s.presets, newPreset] })

@@ -1,4 +1,5 @@
 import { BrowserWindow } from 'electron'
+import { MAX_DURATION_SECONDS } from '@shared/constants/timer'
 
 const VALID_TIMER_COMMAND_TYPES = new Set([
   'start',
@@ -17,8 +18,6 @@ const VALID_TIMER_COMMAND_TYPES = new Set([
 ])
 
 const VALID_TIMER_MODES = new Set(['timer', 'clock', 'both', 'stopwatch'])
-
-const MAX_DURATION_SECONDS = 86400
 
 export function validateSender(event: Electron.IpcMainInvokeEvent): boolean {
   const win = BrowserWindow.fromWebContents(event.sender)

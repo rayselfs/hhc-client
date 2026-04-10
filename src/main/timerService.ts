@@ -9,6 +9,7 @@ import type {
   StopwatchState,
   TimerTickPayload
 } from '@shared/types/timer'
+import { MAX_DURATION_SECONDS } from '@shared/constants/timer'
 
 function formatTime(totalSeconds: number): string {
   const s = Math.max(0, Math.floor(totalSeconds))
@@ -276,7 +277,7 @@ export class TimerService {
   }
 
   private handleSetDuration(seconds: number): void {
-    const clamped = Math.max(1, seconds)
+    const clamped = Math.max(1, Math.min(MAX_DURATION_SECONDS, seconds))
     this.settings.totalDuration = clamped
     if (this.timer.status === 'stopped') {
       this.timer.remainingSeconds = clamped

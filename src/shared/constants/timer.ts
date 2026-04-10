@@ -1,0 +1,1 @@
+export const MAX_DURATION_SECONDS = 3599
