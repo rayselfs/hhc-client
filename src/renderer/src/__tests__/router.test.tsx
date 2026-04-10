@@ -82,4 +82,16 @@ describe('Router', () => {
     expect(screen.getByTestId('bible-page')).toBeInTheDocument()
     expect(screen.queryByTestId('timer-page')).not.toBeInTheDocument()
   })
+
+  it('redirects to /welcome when not onboarded', () => {
+    localStorage.removeItem(ONBOARDED_KEY)
+    renderWithRouter(['/'])
+    expect(screen.getByTestId('welcome-page')).toBeInTheDocument()
+  })
+
+  it('renders timer page when already onboarded', () => {
+    localStorage.setItem(ONBOARDED_KEY, 'true')
+    renderWithRouter(['/'])
+    expect(screen.getByTestId('timer-page')).toBeInTheDocument()
+  })
 })
