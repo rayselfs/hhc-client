@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useTimerStore, getDisplayValues } from '@renderer/stores/timer'
 import { useStopwatchStore } from '@renderer/stores/stopwatch'
+import { selectFormattedTime } from '@renderer/stores/selectors/stopwatch'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
 
 export default function TimerProjectionBridge(): null {
@@ -19,7 +20,7 @@ export default function TimerProjectionBridge(): null {
 
   const swStatus = useStopwatchStore((s) => s.status)
   const swElapsedMs = useStopwatchStore((s) => s.elapsedMs)
-  const swFormattedTime = useStopwatchStore((s) => s.formattedTime)
+  const swFormattedTime = useStopwatchStore(selectFormattedTime)
   const showSwOnProjection = useStopwatchStore((s) => s.showOnProjection)
 
   const { project } = useProjection()

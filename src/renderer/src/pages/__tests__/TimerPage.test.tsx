@@ -27,9 +27,7 @@ beforeEach(() => {
     status: 'stopped',
     elapsedMs: 0,
     startTimestamp: null,
-    accumulatedMs: 0,
-    formattedTime: '00:00.00',
-    elapsedSeconds: 0
+    accumulatedMs: 0
   })
 })
 
@@ -127,7 +125,7 @@ describe('TimerPage — STOPWATCH mode', () => {
 
   it('displays formatted stopwatch time from store', () => {
     useTimerStore.setState({ mode: 'stopwatch' })
-    useStopwatchStore.setState({ formattedTime: '01:23' })
+    useStopwatchStore.setState({ elapsedMs: 83000 })
     renderTimerPage()
     expect(screen.getByText('01:23')).toBeInTheDocument()
   })

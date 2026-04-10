@@ -43,8 +43,6 @@ beforeEach(() => {
     elapsedMs: 0,
     startTimestamp: null,
     accumulatedMs: 0,
-    formattedTime: '00:00',
-    elapsedSeconds: 0,
     showOnProjection: false
   })
 })
@@ -107,7 +105,6 @@ describe('TimerProjectionBridge — timer:stopwatch projection', () => {
     useStopwatchStore.setState({
       status: 'stopped',
       elapsedMs: 0,
-      formattedTime: '00:00',
       showOnProjection: true
     })
     renderBridge()
@@ -128,7 +125,6 @@ describe('TimerProjectionBridge — timer:stopwatch projection', () => {
     useStopwatchStore.setState({
       status: 'stopped',
       elapsedMs: 0,
-      formattedTime: '00:00',
       showOnProjection: true
     })
     renderBridge()
@@ -137,8 +133,7 @@ describe('TimerProjectionBridge — timer:stopwatch projection', () => {
     await act(async () => {
       useStopwatchStore.setState({
         status: 'running',
-        elapsedMs: 1500,
-        formattedTime: '00:01'
+        elapsedMs: 1500
       })
     })
 
@@ -158,7 +153,6 @@ describe('TimerProjectionBridge — timer:stopwatch projection', () => {
     useStopwatchStore.setState({
       status: 'stopped',
       elapsedMs: 0,
-      formattedTime: '00:00',
       showOnProjection: false
     })
     renderBridge()

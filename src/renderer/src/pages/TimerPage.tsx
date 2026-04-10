@@ -1,6 +1,7 @@
 import React from 'react'
 import { useTimerStore, getDisplayValues } from '@renderer/stores/timer'
 import { useStopwatchStore } from '@renderer/stores/stopwatch'
+import { selectFormattedTime } from '@renderer/stores/selectors/stopwatch'
 import TimerDisplay from '@renderer/components/Timer/TimerDisplay'
 import StopwatchDisplay from '@renderer/components/Timer/StopwatchDisplay'
 import TimerControls from '@renderer/components/Timer/TimerControls'
@@ -21,7 +22,7 @@ export default function TimerPage(): React.JSX.Element {
   const timerStatus = useTimerStore((s) => s.status)
   const setDuration = useTimerStore((s) => s.setDuration)
 
-  const swFormattedTime = useStopwatchStore((s) => s.formattedTime)
+  const swFormattedTime = useStopwatchStore(selectFormattedTime)
 
   const displayValues = getDisplayValues({
     phase,

@@ -7,9 +7,6 @@ export interface StopwatchStore {
   startTimestamp: number | null
   accumulatedMs: number
 
-  formattedTime: string
-  elapsedSeconds: number
-
   showOnProjection: boolean
 
   isRunning: () => boolean
@@ -24,21 +21,11 @@ export interface StopwatchStore {
   setShowOnProjection: (show: boolean) => void
 }
 
-function formatStopwatchTime(ms: number): string {
-  const totalSeconds = Math.floor(ms / 1000)
-  const seconds = totalSeconds % 60
-  const minutes = Math.floor(totalSeconds / 60)
-  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
-}
-
 export const useStopwatchStore = create<StopwatchStore>()((set, get) => ({
   status: 'stopped',
   elapsedMs: 0,
   startTimestamp: null,
   accumulatedMs: 0,
-
-  formattedTime: '00:00',
-  elapsedSeconds: 0,
 
   showOnProjection: false,
 
@@ -54,9 +41,7 @@ export const useStopwatchStore = create<StopwatchStore>()((set, get) => ({
       status: 'running',
       startTimestamp: now,
       accumulatedMs: 0,
-      elapsedMs: 0,
-      formattedTime: '00:00',
-      elapsedSeconds: 0
+      elapsedMs: 0
     })
   },
 
@@ -85,9 +70,7 @@ export const useStopwatchStore = create<StopwatchStore>()((set, get) => ({
       status: 'stopped',
       elapsedMs: 0,
       startTimestamp: null,
-      accumulatedMs: 0,
-      formattedTime: '00:00',
-      elapsedSeconds: 0
+      accumulatedMs: 0
     })
   },
 
@@ -96,11 +79,7 @@ export const useStopwatchStore = create<StopwatchStore>()((set, get) => ({
     if (s.status !== 'running') return
     if (s.startTimestamp === null) return
     const elapsed = s.accumulatedMs + (currentMs - s.startTimestamp)
-    set({
-      elapsedMs: elapsed,
-      formattedTime: formatStopwatchTime(elapsed),
-      elapsedSeconds: Math.floor(elapsed / 1000)
-    })
+    set({ elapsedMs: elapsed })
   },
 
   setShowOnProjection: (show: boolean) => {

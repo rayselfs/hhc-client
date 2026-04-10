@@ -32,9 +32,7 @@ beforeEach(() => {
     status: 'stopped',
     elapsedMs: 0,
     startTimestamp: null,
-    accumulatedMs: 0,
-    formattedTime: '00:00',
-    elapsedSeconds: 0
+    accumulatedMs: 0
   })
 })
 

@@ -1,14 +1,13 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { useStopwatchStore } from '@renderer/stores/stopwatch'
+import { selectFormattedTime, selectElapsedSeconds } from '@renderer/stores/selectors/stopwatch'
 import type { StopwatchStatus } from '@shared/types/timer'
 
 const INITIAL_STATE = {
   status: 'stopped' as StopwatchStatus,
   elapsedMs: 0,
   startTimestamp: null,
-  accumulatedMs: 0,
-  formattedTime: '00:00',
-  elapsedSeconds: 0
+  accumulatedMs: 0
 }
 
 beforeEach(() => {
@@ -22,8 +21,8 @@ describe('initial state', () => {
     expect(s.elapsedMs).toBe(0)
     expect(s.startTimestamp).toBeNull()
     expect(s.accumulatedMs).toBe(0)
-    expect(s.formattedTime).toBe('00:00')
-    expect(s.elapsedSeconds).toBe(0)
+    expect(selectFormattedTime(s)).toBe('00:00')
+    expect(selectElapsedSeconds(s)).toBe(0)
   })
 })
 
@@ -62,7 +61,7 @@ describe('start()', () => {
     useStopwatchStore.getState().start()
     expect(useStopwatchStore.getState().elapsedMs).toBe(0)
     expect(useStopwatchStore.getState().accumulatedMs).toBe(0)
-    expect(useStopwatchStore.getState().formattedTime).toBe('00:00')
+    expect(selectFormattedTime(useStopwatchStore.getState())).toBe('00:00')
   })
 
   it('is a no-op when already running', () => {
@@ -170,8 +169,8 @@ describe('reset()', () => {
     expect(s.elapsedMs).toBe(0)
     expect(s.accumulatedMs).toBe(0)
     expect(s.startTimestamp).toBeNull()
-    expect(s.formattedTime).toBe('00:00')
-    expect(s.elapsedSeconds).toBe(0)
+    expect(selectFormattedTime(s)).toBe('00:00')
+    expect(selectElapsedSeconds(s)).toBe(0)
   })
 
   it('stops and clears elapsed when paused', () => {
@@ -181,7 +180,7 @@ describe('reset()', () => {
     const s = useStopwatchStore.getState()
     expect(s.status).toBe('stopped')
     expect(s.elapsedMs).toBe(0)
-    expect(s.formattedTime).toBe('00:00')
+    expect(selectFormattedTime(s)).toBe('00:00')
   })
 
   it('sets isStopped() to true after reset from any state', () => {
@@ -252,13 +251,13 @@ describe('tick()', () => {
       accumulatedMs: 0
     })
     useStopwatchStore.getState().tick(startTime + 4500)
-    expect(useStopwatchStore.getState().elapsedSeconds).toBe(4)
+    expect(selectElapsedSeconds(useStopwatchStore.getState())).toBe(4)
   })
 })
 
 describe('formattedTime', () => {
   it('shows 00:00 at 0ms', () => {
-    expect(useStopwatchStore.getState().formattedTime).toBe('00:00')
+    expect(selectFormattedTime(useStopwatchStore.getState())).toBe('00:00')
   })
 
   it('shows 00:01 at 1000ms', () => {
@@ -269,7 +268,7 @@ describe('formattedTime', () => {
       accumulatedMs: 0
     })
     useStopwatchStore.getState().tick(startTime + 1000)
-    expect(useStopwatchStore.getState().formattedTime).toBe('00:01')
+    expect(selectFormattedTime(useStopwatchStore.getState())).toBe('00:01')
   })
 
   it('shows 01:30 at 90500ms', () => {
@@ -280,7 +279,7 @@ describe('formattedTime', () => {
       accumulatedMs: 0
     })
     useStopwatchStore.getState().tick(90500)
-    expect(useStopwatchStore.getState().formattedTime).toBe('01:30')
+    expect(selectFormattedTime(useStopwatchStore.getState())).toBe('01:30')
   })
 
   it('shows 61:01 at 3661234ms (no hours, just keeps counting minutes)', () => {
@@ -291,7 +290,7 @@ describe('formattedTime', () => {
       accumulatedMs: 0
     })
     useStopwatchStore.getState().tick(3661234)
-    expect(useStopwatchStore.getState().formattedTime).toBe('61:01')
+    expect(selectFormattedTime(useStopwatchStore.getState())).toBe('61:01')
   })
 
   it('updates formattedTime on tick', () => {
@@ -302,7 +301,7 @@ describe('formattedTime', () => {
       accumulatedMs: 0
     })
     useStopwatchStore.getState().tick(500)
-    expect(useStopwatchStore.getState().formattedTime).toBe('00:00')
+    expect(selectFormattedTime(useStopwatchStore.getState())).toBe('00:00')
   })
 
   it('preserves formattedTime after pause', () => {
@@ -314,6 +313,6 @@ describe('formattedTime', () => {
     })
     useStopwatchStore.getState().tick(2500)
     useStopwatchStore.getState().pause()
-    expect(useStopwatchStore.getState().formattedTime).toBe('00:02')
+    expect(selectFormattedTime(useStopwatchStore.getState())).toBe('00:02')
   })
 })
