@@ -1,4 +1,15 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+
+const mockToast = vi.hoisted(() => ({ warning: vi.fn(), danger: vi.fn(), success: vi.fn() }))
+vi.mock('@heroui/react', async () => {
+  const actual = await vi.importActual('@heroui/react')
+  return { ...actual, toast: mockToast }
+})
+
+vi.mock('@renderer/i18n', () => ({
+  default: { t: (key: string) => key }
+}))
+
 import { useSettingsStore, TIMEZONE_OPTIONS } from '@renderer/stores/settings'
 
 beforeEach(() => {
@@ -6,6 +17,7 @@ beforeEach(() => {
     timezone: 'Asia/Taipei',
     hardwareAcceleration: true
   })
+  mockToast.warning.mockClear()
 })
 
 describe('initial state', () => {
@@ -192,5 +204,25 @@ describe('TIMEZONE_OPTIONS', () => {
     expect(values).toContain('Europe/London')
     expect(values).toContain('Europe/Paris')
     expect(values).toContain('UTC')
+  })
+})
+
+describe('storage toast notifications', () => {
+  it('shows toast.warning when setTimezone storage fails', () => {
+    const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('QuotaExceeded')
+    })
+    useSettingsStore.getState().setTimezone('UTC')
+    expect(mockToast.warning).toHaveBeenCalledWith('toast.storageSaveFailed')
+    spy.mockRestore()
+  })
+
+  it('shows toast.warning when setHardwareAcceleration storage fails', () => {
+    const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('QuotaExceeded')
+    })
+    useSettingsStore.getState().setHardwareAcceleration(false)
+    expect(mockToast.warning).toHaveBeenCalledWith('toast.storageSaveFailed')
+    spy.mockRestore()
   })
 })

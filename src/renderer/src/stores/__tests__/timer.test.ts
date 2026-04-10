@@ -1,4 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+
+const mockToast = vi.hoisted(() => ({ warning: vi.fn(), danger: vi.fn(), success: vi.fn() }))
+vi.mock('@heroui/react', async () => {
+  const actual = await vi.importActual('@heroui/react')
+  return { ...actual, toast: mockToast }
+})
+
+vi.mock('@renderer/i18n', () => ({
+  default: { t: (key: string) => key }
+}))
+
 import {
   useTimerStore,
   DEFAULT_STATE,
@@ -15,6 +26,7 @@ const INITIAL_STATE = {
 
 beforeEach(() => {
   useTimerStore.setState(INITIAL_STATE)
+  mockToast.warning.mockClear()
 })
 
 describe('initial state', () => {
@@ -1092,5 +1104,46 @@ describe('duration persistence', () => {
   it('removeTime in stopped state persists new duration', () => {
     useTimerStore.getState().removeTime(60)
     expect(localStorageMock['hhc-timer-duration']).toBe('240')
+  })
+})
+
+describe('storage toast notifications', () => {
+  it('shows toast.warning when savePresets fails', () => {
+    const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('QuotaExceeded')
+    })
+    useTimerStore.getState().savePresets()
+    expect(mockToast.warning).toHaveBeenCalledWith('toast.storageSaveFailed')
+    spy.mockRestore()
+  })
+
+  it('shows toast.warning when saveDuration fails', () => {
+    const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('QuotaExceeded')
+    })
+    useTimerStore.getState().saveDuration()
+    expect(mockToast.warning).toHaveBeenCalledWith('toast.storageSaveFailed')
+    spy.mockRestore()
+  })
+
+  it('shows toast.warning when saveReminder fails', () => {
+    const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('QuotaExceeded')
+    })
+    useTimerStore.getState().saveReminder()
+    expect(mockToast.warning).toHaveBeenCalledWith('toast.storageSaveFailed')
+    spy.mockRestore()
+  })
+
+  it('logs console.warn on loadPresets failure (no toast)', () => {
+    const spy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('SecurityError')
+    })
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    useTimerStore.getState().loadPresets()
+    expect(warnSpy).toHaveBeenCalledWith('[Timer] Failed to load presets from storage')
+    expect(mockToast.warning).not.toHaveBeenCalled()
+    spy.mockRestore()
+    warnSpy.mockRestore()
   })
 })

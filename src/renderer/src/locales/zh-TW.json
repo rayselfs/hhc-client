@@ -122,5 +122,8 @@
     "london": "倫敦 (UTC+0/+1)",
     "paris": "巴黎 (UTC+1/+2)",
     "utc": "UTC (UTC+0)"
+  },
+  "toast": {
+    "storageSaveFailed": "設定儲存失敗"
   }
 }

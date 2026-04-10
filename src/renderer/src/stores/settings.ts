@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 import { createStorageKey } from '@renderer/lib/utils'
+import { toast } from '@heroui/react'
+import i18n from '@renderer/i18n'
 
 const TIMEZONE_KEY = createStorageKey('timezone')
 const HW_ACCEL_KEY = createStorageKey('hardwareAcceleration')
@@ -85,7 +87,7 @@ function loadTimezone(): string {
     const stored = localStorage.getItem(TIMEZONE_KEY)
     if (stored && typeof stored === 'string') return stored
   } catch {
-    // silent fail
+    console.warn('[Settings] Failed to load timezone from storage')
   }
   return DEFAULT_TIMEZONE
 }
@@ -96,7 +98,7 @@ function loadHardwareAcceleration(): boolean {
     if (stored === 'true') return true
     if (stored === 'false') return false
   } catch {
-    // silent fail
+    console.warn('[Settings] Failed to load hardware acceleration from storage')
   }
   return DEFAULT_HW_ACCEL
 }
@@ -118,7 +120,7 @@ export const useSettingsStore = create<SettingsStore>()((set) => ({
     try {
       localStorage.setItem(TIMEZONE_KEY, tz)
     } catch {
-      // silent fail
+      toast.warning(i18n.t('toast.storageSaveFailed'))
     }
   },
 
@@ -127,7 +129,7 @@ export const useSettingsStore = create<SettingsStore>()((set) => ({
     try {
       localStorage.setItem(HW_ACCEL_KEY, String(enabled))
     } catch {
-      // silent fail
+      toast.warning(i18n.t('toast.storageSaveFailed'))
     }
   },
 

@@ -9,6 +9,8 @@ import type {
   TimerPreset
 } from '@shared/types/timer'
 import { MAX_DURATION_SECONDS } from '@shared/constants/timer'
+import { toast } from '@heroui/react'
+import i18n from '@renderer/i18n'
 
 const DEFAULT_PRESETS: TimerPreset[] = [
   {
@@ -38,7 +40,7 @@ function loadInitialDuration(): number {
       if (!isNaN(seconds) && seconds > 0 && seconds <= MAX_DURATION_SECONDS) return seconds
     }
   } catch {
-    // silent fail
+    console.warn('[Timer] Failed to load duration from storage')
   }
   return DEFAULT_SETTINGS.totalDuration
 }
@@ -51,7 +53,7 @@ function loadInitialPresets(): TimerPreset[] {
       if (Array.isArray(parsed) && parsed.length > 0) return parsed
     }
   } catch {
-    // silent fail
+    console.warn('[Timer] Failed to load presets from storage')
   }
   return DEFAULT_PRESETS
 }
@@ -66,7 +68,7 @@ function loadInitialReminder(): { duration: number; color: string } {
       }
     }
   } catch {
-    // silent fail
+    console.warn('[Timer] Failed to load reminder from storage')
   }
   return { duration: DEFAULT_SETTINGS.reminderDuration, color: DEFAULT_SETTINGS.reminderColor }
 }
@@ -425,7 +427,7 @@ export const useTimerStore = create<TimerStore>()((set, get) => ({
         }
       }
     } catch {
-      // silent fail
+      console.warn('[Timer] Failed to load presets from storage')
     }
     set({ presets: DEFAULT_PRESETS })
   },
@@ -435,7 +437,7 @@ export const useTimerStore = create<TimerStore>()((set, get) => ({
     try {
       localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(s.presets))
     } catch {
-      // silent fail
+      toast.warning(i18n.t('toast.storageSaveFailed'))
     }
   },
 
@@ -454,7 +456,7 @@ export const useTimerStore = create<TimerStore>()((set, get) => ({
         }
       }
     } catch {
-      // silent fail
+      console.warn('[Timer] Failed to load duration from storage')
     }
   },
 
@@ -463,7 +465,7 @@ export const useTimerStore = create<TimerStore>()((set, get) => ({
     try {
       localStorage.setItem(DURATION_STORAGE_KEY, String(s.totalDuration))
     } catch {
-      // silent fail
+      toast.warning(i18n.t('toast.storageSaveFailed'))
     }
   },
 
@@ -477,7 +479,7 @@ export const useTimerStore = create<TimerStore>()((set, get) => ({
         }
       }
     } catch {
-      // silent fail
+      console.warn('[Timer] Failed to load reminder from storage')
     }
   },
 
@@ -489,7 +491,7 @@ export const useTimerStore = create<TimerStore>()((set, get) => ({
         JSON.stringify({ duration: s.reminderDuration, color: s.reminderColor })
       )
     } catch {
-      // silent fail
+      toast.warning(i18n.t('toast.storageSaveFailed'))
     }
   }
 }))
