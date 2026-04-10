@@ -264,6 +264,7 @@ describe('TimerService', () => {
         totalDuration: 600,
         reminderEnabled: true,
         reminderDuration: 120,
+        reminderColor: '#ff0000',
         overtimeMessageEnabled: false,
         overtimeMessage: '',
         timezone: 'Asia/Taipei'
@@ -278,6 +279,7 @@ describe('TimerService', () => {
         totalDuration: 600,
         reminderEnabled: false,
         reminderDuration: 0,
+        reminderColor: '#ff0000',
         overtimeMessageEnabled: false,
         overtimeMessage: '',
         timezone: 'UTC'
@@ -293,6 +295,7 @@ describe('TimerService', () => {
         totalDuration: 999,
         reminderEnabled: false,
         reminderDuration: 0,
+        reminderColor: '#ff0000',
         overtimeMessageEnabled: false,
         overtimeMessage: '',
         timezone: 'UTC'

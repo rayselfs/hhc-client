@@ -64,6 +64,7 @@ export class TimerService {
     totalDuration: 300,
     reminderEnabled: false,
     reminderDuration: 0,
+    reminderColor: '#ff0000',
     overtimeMessageEnabled: false,
     overtimeMessage: '',
     timezone: 'UTC'
@@ -195,6 +196,7 @@ export class TimerService {
       progress,
       overtimeSeconds,
       overtimeMessage: overtimeMessageEnabled ? overtimeMessage : null,
+      reminderColor: reminderEnabled ? this.settings.reminderColor : null,
       ...(mode === 'stopwatch' && {
         stopwatchElapsedMs: this.stopwatch.elapsedMs,
         stopwatchFormattedTime: formatStopwatch(this.stopwatch.elapsedMs)
