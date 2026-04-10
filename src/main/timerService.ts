@@ -66,8 +66,7 @@ export class TimerService {
     reminderDuration: 0,
     reminderColor: '#ff0000',
     overtimeMessageEnabled: false,
-    overtimeMessage: '',
-    timezone: 'UTC'
+    overtimeMessage: ''
   }
 
   private timer: InternalTimerState = {

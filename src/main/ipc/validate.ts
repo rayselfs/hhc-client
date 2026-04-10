@@ -59,7 +59,5 @@ export function validateTimerSettings(settings: unknown): boolean {
 
   if (typeof obj.overtimeMessage !== 'string') return false
 
-  if (typeof obj.timezone !== 'string') return false
-
   return true
 }

@@ -36,7 +36,6 @@ export interface TimerSettings {
   reminderColor: string
   overtimeMessageEnabled: boolean
   overtimeMessage: string
-  timezone: string
 }
 
 /**

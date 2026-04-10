@@ -81,7 +81,6 @@ export interface TimerStore {
   reminderColor: string
   overtimeMessageEnabled: boolean
   overtimeMessage: string
-  timezone: string
 
   status: TimerStatus
   phase: TimerPhase
@@ -158,8 +157,7 @@ export const DEFAULT_SETTINGS: TimerSettings = {
   reminderDuration: 60,
   reminderColor: '#ef4444',
   overtimeMessageEnabled: false,
-  overtimeMessage: "Time's Up!",
-  timezone: 'UTC'
+  overtimeMessage: "Time's Up!"
 }
 
 export const DEFAULT_STATE: TimerState = {
@@ -183,7 +181,6 @@ export const useTimerStore = create<TimerStore>()((set, get) => ({
   reminderColor: _initialReminder.color,
   overtimeMessageEnabled: DEFAULT_SETTINGS.overtimeMessageEnabled,
   overtimeMessage: DEFAULT_SETTINGS.overtimeMessage,
-  timezone: DEFAULT_SETTINGS.timezone,
 
   status: DEFAULT_STATE.status,
   phase: DEFAULT_STATE.phase,

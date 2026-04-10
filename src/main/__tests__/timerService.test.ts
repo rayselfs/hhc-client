@@ -266,8 +266,7 @@ describe('TimerService', () => {
         reminderDuration: 120,
         reminderColor: '#ff0000',
         overtimeMessageEnabled: false,
-        overtimeMessage: '',
-        timezone: 'Asia/Taipei'
+        overtimeMessage: ''
       })
       const settings = (service as unknown as { settings: { totalDuration: number } }).settings
       expect(settings.totalDuration).toBe(600)
@@ -281,8 +280,7 @@ describe('TimerService', () => {
         reminderDuration: 0,
         reminderColor: '#ff0000',
         overtimeMessageEnabled: false,
-        overtimeMessage: '',
-        timezone: 'UTC'
+        overtimeMessage: ''
       })
       expect(service.getState().remainingSeconds).toBe(600)
     })
@@ -297,8 +295,7 @@ describe('TimerService', () => {
         reminderDuration: 0,
         reminderColor: '#ff0000',
         overtimeMessageEnabled: false,
-        overtimeMessage: '',
-        timezone: 'UTC'
+        overtimeMessage: ''
       })
       expect(service.getState().remainingSeconds).toBe(before)
     })
