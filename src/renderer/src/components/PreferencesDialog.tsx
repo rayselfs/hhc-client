@@ -63,7 +63,9 @@ export default function PreferencesDialog({
                   </ul>
                 </nav>
                 <div className="flex-1 overflow-y-auto p-5">
-                  {activeCategory === 'general' && <GeneralSettings />}
+                  {activeCategory === 'general' && (
+                    <GeneralSettings onClose={() => onOpenChange(false)} />
+                  )}
                   {activeCategory === 'media' && (
                     <p className="text-sm text-gray-500">{t('preferences.mediaPlaceholder')}</p>
                   )}

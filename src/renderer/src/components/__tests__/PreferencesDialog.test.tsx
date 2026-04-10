@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { MemoryRouter } from 'react-router-dom'
 import '@renderer/i18n'
 import i18n from '@renderer/i18n'
 import PreferencesDialog from '../PreferencesDialog'
@@ -32,7 +33,11 @@ vi.mock('@renderer/contexts/ThemeContext', () => ({
 }))
 
 function renderDialog(isOpen: boolean, onOpenChange = vi.fn()): ReturnType<typeof render> {
-  return render(<PreferencesDialog isOpen={isOpen} onOpenChange={onOpenChange} />)
+  return render(
+    <MemoryRouter>
+      <PreferencesDialog isOpen={isOpen} onOpenChange={onOpenChange} />
+    </MemoryRouter>
+  )
 }
 
 describe('PreferencesDialog', () => {
@@ -150,6 +155,7 @@ describe('PreferencesDialog', () => {
     const resetToDefaults = vi.fn()
     const setPreference = vi.fn()
     const changeLanguageSpy = vi.spyOn(i18n, 'changeLanguage')
+    const onOpenChange = vi.fn()
 
     vi.mocked(useSettingsStore).mockImplementation((selector) => {
       const store = {
@@ -167,7 +173,7 @@ describe('PreferencesDialog', () => {
       setPreference
     })
 
-    renderDialog(true)
+    renderDialog(true, onOpenChange)
 
     const resetButton = screen.getByText('Reset')
     await user.click(resetButton)
@@ -178,6 +184,7 @@ describe('PreferencesDialog', () => {
     expect(resetToDefaults).toHaveBeenCalled()
     expect(setPreference).toHaveBeenCalledWith('system')
     expect(changeLanguageSpy).toHaveBeenCalledWith('en')
+    expect(onOpenChange).toHaveBeenCalledWith(false)
   })
 
   it('does not reset when cancel clicked in modal', async () => {

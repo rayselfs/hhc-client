@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Switch, Select, ListBox } from '@heroui/react'
 import { Label } from 'react-aria-components'
@@ -21,8 +22,13 @@ const TIMEZONE_LABEL_KEYS = {
 
 type TimezoneKey = keyof typeof TIMEZONE_LABEL_KEYS
 
-export default function GeneralSettings(): React.JSX.Element {
+interface GeneralSettingsProps {
+  onClose: () => void
+}
+
+export default function GeneralSettings({ onClose }: GeneralSettingsProps): React.JSX.Element {
   const { t, i18n } = useTranslation()
+  const navigate = useNavigate()
   const { resolved, setPreference } = useTheme()
   const timezone = useSettingsStore((s) => s.timezone)
   const hardwareAcceleration = useSettingsStore((s) => s.hardwareAcceleration)
@@ -41,6 +47,8 @@ export default function GeneralSettings(): React.JSX.Element {
     resetToDefaults()
     setPreference('system')
     i18n.changeLanguage('en')
+    onClose()
+    navigate('/welcome')
   }
 
   return (
