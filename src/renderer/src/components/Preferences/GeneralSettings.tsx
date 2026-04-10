@@ -32,9 +32,9 @@ export default function GeneralSettings(): React.JSX.Element {
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false)
 
   const languageOptions = [
-    { value: 'en', label: 'English' },
-    { value: 'zh-TW', label: '繁體中文' },
-    { value: 'zh-CN', label: '简体中文' }
+    { value: 'en', label: t('preferences.languageNames.en') },
+    { value: 'zh-TW', label: t('preferences.languageNames.zhTW') },
+    { value: 'zh-CN', label: t('preferences.languageNames.zhCN') }
   ]
 
   const handleResetConfirm = (): void => {

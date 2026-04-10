@@ -1,5 +1,6 @@
 import { Component } from 'react'
 import type { ErrorInfo, ReactNode } from 'react'
+import i18next from 'i18next'
 
 interface Props {
   children: ReactNode
@@ -26,7 +27,9 @@ export class ErrorBoundary extends Component<Props, State> {
       if (this.props.fallback) return this.props.fallback
       return (
         <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-background p-8 text-foreground">
-          <h1 className="text-2xl font-bold text-danger">Something went wrong</h1>
+          <h1 className="text-2xl font-bold text-danger">
+            {i18next.t('error.somethingWentWrong')}
+          </h1>
           <pre className="max-w-xl overflow-auto rounded bg-default-100 p-4 text-sm">
             {this.state.error.message}
           </pre>
@@ -34,7 +37,7 @@ export class ErrorBoundary extends Component<Props, State> {
             className="rounded bg-primary px-4 py-2 text-white"
             onClick={() => this.setState({ error: null })}
           >
-            Try again
+            {i18next.t('error.tryAgain')}
           </button>
         </div>
       )

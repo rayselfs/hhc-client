@@ -100,7 +100,17 @@
     "resetToDefaults": "Reset to Defaults",
     "resetBtn": "Reset",
     "resetToDefaultsConfirm": "Reset all settings to their default values?",
-    "mediaPlaceholder": "Media settings coming soon"
+    "mediaPlaceholder": "Media settings coming soon",
+    "languageNames": {
+      "en": "English",
+      "zhTW": "繁體中文",
+      "zhCN": "简体中文"
+    }
+  },
+  "error": {
+    "somethingWentWrong": "Something went wrong",
+    "tryAgain": "Try again",
+    "pageError": "Page Error"
   },
   "timezones": {
     "taipei": "Taipei (UTC+8)",

@@ -100,7 +100,17 @@
     "resetToDefaults": "重設為預設值",
     "resetBtn": "重設",
     "resetToDefaultsConfirm": "將所有設定重設為預設值？",
-    "mediaPlaceholder": "媒體設定即將推出"
+    "mediaPlaceholder": "媒體設定即將推出",
+    "languageNames": {
+      "en": "English",
+      "zhTW": "繁體中文",
+      "zhCN": "简体中文"
+    }
+  },
+  "error": {
+    "somethingWentWrong": "發生錯誤",
+    "tryAgain": "重試",
+    "pageError": "頁面錯誤"
   },
   "timezones": {
     "taipei": "台北 (UTC+8)",
