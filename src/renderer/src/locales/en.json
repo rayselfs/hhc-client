@@ -122,14 +122,13 @@
   },
   "timezones": {
     "taipei": "Taipei (UTC+8)",
-    "hongKong": "Hong Kong (UTC+8)",
-    "singapore": "Singapore (UTC+8)",
     "tokyo": "Tokyo (UTC+9)",
-    "seoul": "Seoul (UTC+9)",
     "newYork": "New York (UTC-5/-4)",
-    "london": "London (UTC+0/+1)",
-    "paris": "Paris (UTC+1/+2)",
-    "utc": "UTC (UTC+0)"
+    "losAngeles": "Los Angeles (UTC-8/-7)",
+    "malaysia": "Malaysia (UTC+8)",
+    "athens": "Athens (UTC+2/+3)",
+    "melbourne": "Melbourne (UTC+10/+11)",
+    "london": "London (UTC+0/+1)"
   },
   "toast": {
     "storageSaveFailed": "Failed to save settings",

@@ -1,24 +1,34 @@
 import { useState, useEffect } from 'react'
+import { useSettingsStore } from '@renderer/stores/settings'
 
 interface ClockDisplayProps {
   className?: string
 }
 
-function getCurrentTime(): string {
-  const now = new Date()
-  const hh = String(now.getHours()).padStart(2, '0')
-  const mm = String(now.getMinutes()).padStart(2, '0')
-  const ss = String(now.getSeconds()).padStart(2, '0')
-  return `${hh}:${mm}:${ss}`
+const clockFormatter = (timezone: string): Intl.DateTimeFormat =>
+  new Intl.DateTimeFormat('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    timeZone: timezone,
+    hour12: false
+  })
+
+function getCurrentTime(timezone: string): string {
+  return clockFormatter(timezone).format(new Date())
 }
 
 export default function ClockDisplay({ className }: ClockDisplayProps): React.JSX.Element {
-  const [time, setTime] = useState(getCurrentTime)
+  const timezone = useSettingsStore((s) => s.timezone)
+  const [tick, setTick] = useState(0)
 
   useEffect(() => {
-    const id = setInterval(() => setTime(getCurrentTime()), 1000)
+    const id = setInterval(() => setTick((t) => t + 1), 1000)
     return () => clearInterval(id)
-  }, [])
+  }, [timezone])
+
+  void tick
+  const time = getCurrentTime(timezone)
 
   return (
     <div className={`@container w-full ${className ?? ''}`} data-testid="clock-display">

@@ -29,6 +29,8 @@ export interface AppMessages {
   'timer:stopwatch': StopwatchTickPayload
   /** Overtime message to display on projection */
   'timer:overtime-message': { message: string }
+  /** Timezone IANA string for clock display */
+  'settings:timezone': { timezone: string }
 }
 
 /**

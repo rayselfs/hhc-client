@@ -24,7 +24,7 @@ vi.mock('@renderer/stores/settings', () => ({
   }),
   TIMEZONE_OPTIONS: [
     { value: 'Asia/Taipei', labelKey: 'timezones.taipei' },
-    { value: 'UTC', labelKey: 'timezones.utc' }
+    { value: 'Europe/London', labelKey: 'timezones.london' }
   ]
 }))
 
@@ -110,9 +110,9 @@ describe('PreferencesDialog', () => {
 
     renderDialog(true)
 
-    const utcButton = screen.getByText('UTC (UTC+0)')
-    await user.click(utcButton)
-    expect(setTimezone).toHaveBeenCalledWith('UTC')
+    const londonButton = screen.getByText('London (UTC+0/+1)')
+    await user.click(londonButton)
+    expect(setTimezone).toHaveBeenCalledWith('Europe/London')
   })
 
   it('calls setPreference when dark mode switch clicked', async () => {

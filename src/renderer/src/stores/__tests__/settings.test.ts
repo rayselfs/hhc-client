@@ -181,8 +181,8 @@ describe('persistence round-trip', () => {
 })
 
 describe('TIMEZONE_OPTIONS', () => {
-  it('exports array with 9 timezone entries', () => {
-    expect(TIMEZONE_OPTIONS).toHaveLength(9)
+  it('exports array with 8 timezone entries', () => {
+    expect(TIMEZONE_OPTIONS).toHaveLength(8)
   })
 
   it('each entry has value and labelKey properties', () => {
@@ -197,14 +197,13 @@ describe('TIMEZONE_OPTIONS', () => {
   it('includes expected timezone values', () => {
     const values = TIMEZONE_OPTIONS.map((opt) => opt.value)
     expect(values).toContain('Asia/Taipei')
-    expect(values).toContain('Asia/Hong_Kong')
-    expect(values).toContain('Asia/Singapore')
     expect(values).toContain('Asia/Tokyo')
-    expect(values).toContain('Asia/Seoul')
     expect(values).toContain('America/New_York')
+    expect(values).toContain('America/Los_Angeles')
+    expect(values).toContain('Asia/Kuala_Lumpur')
+    expect(values).toContain('Europe/Athens')
+    expect(values).toContain('Australia/Melbourne')
     expect(values).toContain('Europe/London')
-    expect(values).toContain('Europe/Paris')
-    expect(values).toContain('UTC')
   })
 })
 

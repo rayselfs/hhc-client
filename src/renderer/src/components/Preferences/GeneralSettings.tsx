@@ -10,14 +10,13 @@ import ConfirmDialog from '@renderer/components/ConfirmDialog'
 
 const TIMEZONE_LABEL_KEYS = {
   'timezones.taipei': 'timezones.taipei',
-  'timezones.hongKong': 'timezones.hongKong',
-  'timezones.singapore': 'timezones.singapore',
   'timezones.tokyo': 'timezones.tokyo',
-  'timezones.seoul': 'timezones.seoul',
   'timezones.newYork': 'timezones.newYork',
-  'timezones.london': 'timezones.london',
-  'timezones.paris': 'timezones.paris',
-  'timezones.utc': 'timezones.utc'
+  'timezones.losAngeles': 'timezones.losAngeles',
+  'timezones.malaysia': 'timezones.malaysia',
+  'timezones.athens': 'timezones.athens',
+  'timezones.melbourne': 'timezones.melbourne',
+  'timezones.london': 'timezones.london'
 } as const
 
 type TimezoneKey = keyof typeof TIMEZONE_LABEL_KEYS
@@ -90,7 +89,7 @@ export default function GeneralSettings({ onClose }: GeneralSettingsProps): Reac
           <ListBox>
             {TIMEZONE_OPTIONS.map((tz) => {
               const key = tz.labelKey as TimezoneKey
-              const resolvedKey = TIMEZONE_LABEL_KEYS[key] ?? 'timezones.utc'
+              const resolvedKey = TIMEZONE_LABEL_KEYS[key] ?? 'timezones.taipei'
               const label = t(resolvedKey)
               return (
                 <ListBox.Item key={tz.value} id={tz.value} textValue={String(label)}>

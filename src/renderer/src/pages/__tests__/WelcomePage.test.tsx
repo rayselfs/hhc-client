@@ -35,7 +35,7 @@ vi.mock('@renderer/stores/settings', () => {
     ),
     TIMEZONE_OPTIONS: [
       { value: 'Asia/Taipei', labelKey: 'timezones.taipei' },
-      { value: 'UTC', labelKey: 'timezones.utc' }
+      { value: 'Europe/London', labelKey: 'timezones.london' }
     ]
   }
 })

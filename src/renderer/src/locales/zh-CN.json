@@ -122,14 +122,13 @@
   },
   "timezones": {
     "taipei": "台北 (UTC+8)",
-    "hongKong": "香港 (UTC+8)",
-    "singapore": "新加坡 (UTC+8)",
     "tokyo": "东京 (UTC+9)",
-    "seoul": "首尔 (UTC+9)",
     "newYork": "纽约 (UTC-5/-4)",
-    "london": "伦敦 (UTC+0/+1)",
-    "paris": "巴黎 (UTC+1/+2)",
-    "utc": "UTC (UTC+0)"
+    "losAngeles": "洛杉矶 (UTC-8/-7)",
+    "malaysia": "马来西亚 (UTC+8)",
+    "athens": "雅典 (UTC+2/+3)",
+    "melbourne": "墨尔本 (UTC+10/+11)",
+    "london": "伦敦 (UTC+0/+1)"
   },
   "toast": {
     "storageSaveFailed": "设置保存失败",

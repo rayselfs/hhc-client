@@ -1,5 +1,6 @@
 import { render, screen, act } from '@testing-library/react'
 import type { TimerTickPayload, StopwatchTickPayload } from '@shared/types/timer'
+import { useSettingsStore } from '@renderer/stores/settings'
 
 vi.mock('@renderer/lib/env', () => ({
   isElectron: vi.fn(() => false),
@@ -129,5 +130,14 @@ describe('ProjectionPage', () => {
     const { unmount } = render(<ProjectionPage />)
     unmount()
     expect(mockAdapter.dispose).toHaveBeenCalled()
+  })
+
+  it('updates settings store timezone on settings:timezone message', () => {
+    useSettingsStore.setState({ timezone: 'Asia/Taipei' })
+    render(<ProjectionPage />)
+    act(() => {
+      mockAdapter._trigger('settings:timezone', { timezone: 'America/New_York' })
+    })
+    expect(useSettingsStore.getState().timezone).toBe('America/New_York')
   })
 })

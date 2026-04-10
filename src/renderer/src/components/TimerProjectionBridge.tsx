@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useTimerStore, getDisplayValues } from '@renderer/stores/timer'
 import { useStopwatchStore } from '@renderer/stores/stopwatch'
+import { useSettingsStore } from '@renderer/stores/settings'
 import { selectFormattedTime } from '@renderer/stores/selectors/stopwatch'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
 
@@ -23,7 +24,9 @@ export default function TimerProjectionBridge(): null {
   const swFormattedTime = useStopwatchStore(selectFormattedTime)
   const showSwOnProjection = useStopwatchStore((s) => s.showOnProjection)
 
-  const { project } = useProjection()
+  const timezone = useSettingsStore((s) => s.timezone)
+
+  const { project, send, isProjectionOpen } = useProjection()
 
   useEffect(() => {
     if (mode !== 'stopwatch') return
@@ -84,6 +87,11 @@ export default function TimerProjectionBridge(): null {
     showSwOnProjection,
     project
   ])
+
+  useEffect(() => {
+    if (!isProjectionOpen) return
+    send('settings:timezone', { timezone })
+  }, [timezone, isProjectionOpen, send])
 
   return null
 }

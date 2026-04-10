@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { createProjectionAdapter } from '@renderer/lib/projection-adapter'
 import { isWeb } from '@renderer/lib/env'
+import { useSettingsStore } from '@renderer/stores/settings'
 import DefaultProjection from '@renderer/components/projection/DefaultProjection'
 import TimerDisplay from '@renderer/components/Timer/TimerDisplay'
 import ClockDisplay from '@renderer/components/Timer/ClockDisplay'
@@ -26,6 +27,10 @@ export default function ProjectionPage(): React.JSX.Element {
 
     const unsubStopwatch = adapter.on('timer:stopwatch', (data) => {
       setStopwatchData(data)
+    })
+
+    const unsubTimezone = adapter.on('settings:timezone', ({ timezone }) => {
+      useSettingsStore.getState().setTimezone(timezone)
     })
 
     let unsubClose = (): void => {}
@@ -54,6 +59,7 @@ export default function ProjectionPage(): React.JSX.Element {
       unsubBlank()
       unsubTimerTick()
       unsubStopwatch()
+      unsubTimezone()
       unsubClose()
       unsubPing()
       window.removeEventListener('beforeunload', handleBeforeUnload)

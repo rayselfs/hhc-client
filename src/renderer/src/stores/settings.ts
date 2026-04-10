@@ -8,14 +8,13 @@ const HW_ACCEL_KEY = createStorageKey('hardwareAcceleration')
 
 export const TIMEZONE_OPTIONS = [
   { value: 'Asia/Taipei', labelKey: 'timezones.taipei' },
-  { value: 'Asia/Hong_Kong', labelKey: 'timezones.hongKong' },
-  { value: 'Asia/Singapore', labelKey: 'timezones.singapore' },
   { value: 'Asia/Tokyo', labelKey: 'timezones.tokyo' },
-  { value: 'Asia/Seoul', labelKey: 'timezones.seoul' },
   { value: 'America/New_York', labelKey: 'timezones.newYork' },
-  { value: 'Europe/London', labelKey: 'timezones.london' },
-  { value: 'Europe/Paris', labelKey: 'timezones.paris' },
-  { value: 'UTC', labelKey: 'timezones.utc' }
+  { value: 'America/Los_Angeles', labelKey: 'timezones.losAngeles' },
+  { value: 'Asia/Kuala_Lumpur', labelKey: 'timezones.malaysia' },
+  { value: 'Europe/Athens', labelKey: 'timezones.athens' },
+  { value: 'Australia/Melbourne', labelKey: 'timezones.melbourne' },
+  { value: 'Europe/London', labelKey: 'timezones.london' }
 ] as const
 
 const DEFAULT_TIMEZONE = 'Asia/Taipei'

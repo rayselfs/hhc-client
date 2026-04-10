@@ -1,18 +1,21 @@
 import { renderHook, act } from '@testing-library/react'
 import { useTimerStore, DEFAULT_SETTINGS, DEFAULT_STATE } from '@renderer/stores/timer'
 import { useStopwatchStore } from '@renderer/stores/stopwatch'
+import { useSettingsStore } from '@renderer/stores/settings'
 
 const mockProject = vi.fn()
+const mockSend = vi.fn()
+let mockIsProjectionOpen = false
 
 vi.mock('@renderer/contexts/ProjectionContext', () => ({
   useProjection: vi.fn(() => ({
     project: mockProject,
-    isProjectionOpen: false,
+    isProjectionOpen: mockIsProjectionOpen,
     isProjectionBlanked: true,
     openProjection: vi.fn(),
     closeProjection: vi.fn(),
     blankProjection: vi.fn(),
-    send: vi.fn(),
+    send: mockSend,
     on: vi.fn()
   }))
 }))
@@ -32,6 +35,7 @@ function renderBridge(): ReturnType<typeof renderHook<null, unknown>> {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mockIsProjectionOpen = false
   useTimerStore.setState({
     ...DEFAULT_SETTINGS,
     ...DEFAULT_STATE,
@@ -45,6 +49,7 @@ beforeEach(() => {
     accumulatedMs: 0,
     showOnProjection: false
   })
+  useSettingsStore.setState({ timezone: 'Asia/Taipei' })
 })
 
 describe('TimerProjectionBridge — timer:tick projection', () => {
@@ -171,5 +176,31 @@ describe('TimerProjectionBridge — timer:stopwatch projection', () => {
       (c: unknown[]) => c[0] === 'timer:stopwatch'
     )
     expect(stopwatchCalls).toHaveLength(0)
+  })
+})
+
+describe('TimerProjectionBridge — settings:timezone sync', () => {
+  it('sends settings:timezone when projection is open', () => {
+    mockIsProjectionOpen = true
+    renderBridge()
+    expect(mockSend).toHaveBeenCalledWith('settings:timezone', { timezone: 'Asia/Taipei' })
+  })
+
+  it('does not send settings:timezone when projection is closed', () => {
+    mockIsProjectionOpen = false
+    renderBridge()
+    expect(mockSend).not.toHaveBeenCalledWith('settings:timezone', expect.anything())
+  })
+
+  it('sends updated timezone when settings change while projection is open', async () => {
+    mockIsProjectionOpen = true
+    renderBridge()
+    mockSend.mockClear()
+
+    await act(async () => {
+      useSettingsStore.setState({ timezone: 'America/New_York' })
+    })
+
+    expect(mockSend).toHaveBeenCalledWith('settings:timezone', { timezone: 'America/New_York' })
   })
 })
