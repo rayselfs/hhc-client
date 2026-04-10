@@ -55,6 +55,9 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
   const isReadyRef = useRef(false)
   const isProjectionBlankedRef = useRef(true)
   const isProjectionOpenRef = useRef(false)
+  const pendingPayloadsRef = useRef(new Map<string, { channel: string; data: unknown }>())
+  const pendingAutoShowRef = useRef(false)
+  const autoOpenTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const setIsProjectionBlanked = useCallback((blanked: boolean): void => {
     isProjectionBlankedRef.current = blanked
@@ -72,6 +75,27 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       pollTimerRef.current = null
     }
   }, [])
+
+  const clearPending = useCallback((): void => {
+    pendingPayloadsRef.current.clear()
+    pendingAutoShowRef.current = false
+    if (autoOpenTimeoutRef.current) {
+      clearTimeout(autoOpenTimeoutRef.current)
+      autoOpenTimeoutRef.current = null
+    }
+  }, [])
+
+  const flushPendingPayloads = useCallback((): void => {
+    const adapter = getAdapter(adapterRef)
+    pendingPayloadsRef.current.forEach(({ channel, data }) => {
+      adapter.send(channel as ContentChannel, data as ProjectionPayload<ContentChannel>)
+    })
+    if (pendingAutoShowRef.current && isProjectionBlankedRef.current) {
+      setIsProjectionBlanked(false)
+      adapter.send('__system:blank', { showDefault: false })
+    }
+    clearPending()
+  }, [setIsProjectionBlanked, clearPending])
 
   const startPolling = useCallback((): void => {
     if (pollTimerRef.current) return
@@ -103,12 +127,14 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
         setIsProjectionBlanked(true)
         isReadyRef.current = false
         readyResolveRef.current = null
+        clearPending()
       })
 
       const unsubReady = adapter.on('__system:ready', () => {
         isReadyRef.current = true
         readyResolveRef.current?.()
         readyResolveRef.current = null
+        flushPendingPayloads()
       })
 
       return () => {
@@ -128,6 +154,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       setIsProjectionBlanked(true)
       isReadyRef.current = false
       readyResolveRef.current = null
+      clearPending()
       projectionWindowRef.current = null
       stopPolling()
     })
@@ -135,6 +162,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       isReadyRef.current = true
       readyResolveRef.current?.()
       readyResolveRef.current = null
+      flushPendingPayloads()
     })
 
     const handleBeforeUnload = (): void => {
@@ -153,7 +181,14 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       adapter.dispose()
       adapterRef.current = null
     }
-  }, [startPolling, stopPolling, setIsProjectionOpen, setIsProjectionBlanked])
+  }, [
+    startPolling,
+    stopPolling,
+    setIsProjectionOpen,
+    setIsProjectionBlanked,
+    clearPending,
+    flushPendingPayloads
+  ])
 
   const openProjection = useCallback(async (): Promise<void> => {
     if (isElectron()) {
@@ -183,9 +218,10 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       setIsProjectionBlanked(true)
       isReadyRef.current = false
       readyResolveRef.current = null
+      clearPending()
       stopPolling()
     }
-  }, [stopPolling, setIsProjectionOpen, setIsProjectionBlanked])
+  }, [stopPolling, setIsProjectionOpen, setIsProjectionBlanked, clearPending])
 
   const blankProjection = useCallback(
     (blank: boolean): void => {
@@ -209,20 +245,33 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       options?: ProjectOptions
     ): Promise<void> => {
       if (!isReadyRef.current) {
+        pendingPayloadsRef.current.set(channel, { channel, data })
+        if (options?.autoShow) pendingAutoShowRef.current = true
+
         if (options?.autoOpen && !isProjectionOpenRef.current) {
           openProjection().catch(() => {
             console.warn('[Projection] Auto-reopen failed')
+            pendingPayloadsRef.current.delete(channel)
           })
+          if (!autoOpenTimeoutRef.current) {
+            autoOpenTimeoutRef.current = setTimeout(() => {
+              if (!isReadyRef.current) {
+                console.warn('[Projection] Ready timeout — discarding pending payloads')
+                clearPending()
+              }
+            }, 5000)
+          }
         }
         return
       }
+
       getAdapter(adapterRef).send(channel, data)
       if (options?.autoShow && isProjectionBlankedRef.current) {
         setIsProjectionBlanked(false)
         getAdapter(adapterRef).send('__system:blank', { showDefault: false })
       }
     },
-    [setIsProjectionBlanked, openProjection]
+    [setIsProjectionBlanked, openProjection, clearPending]
   )
 
   const on = useCallback(

@@ -177,7 +177,7 @@ describe('ProjectionContext — web mode', () => {
     expect(result.current.isProjectionOpen).toBe(true)
   })
 
-  it('project() skips send when projection is not ready', async () => {
+  it('project() buffers payload when projection is not ready', async () => {
     const { result } = renderProjection()
     expect(result.current.isProjectionBlanked).toBe(true)
 
@@ -189,6 +189,131 @@ describe('ProjectionContext — web mode', () => {
       message: 'hello'
     })
     expect(result.current.isProjectionBlanked).toBe(true)
+  })
+
+  it('project() with autoOpen buffers payload and flushes on __system:ready', async () => {
+    const { result } = renderProjection()
+
+    await act(async () => {
+      await result.current.project(
+        'timer:overtime-message',
+        { message: 'buffered' },
+        { autoOpen: true }
+      )
+    })
+
+    expect(mockWindowOpen).toHaveBeenCalledOnce()
+    expect(mockAdapter.send).not.toHaveBeenCalledWith('timer:overtime-message', {
+      message: 'buffered'
+    })
+
+    act(() => {
+      mockAdapter._trigger('__system:ready', null)
+    })
+
+    expect(mockAdapter.send).toHaveBeenCalledWith('timer:overtime-message', {
+      message: 'buffered'
+    })
+  })
+
+  it('project() latest-wins: second call to same channel replaces first', async () => {
+    const { result } = renderProjection()
+
+    await act(async () => {
+      await result.current.project('timer:overtime-message', { message: 'first' })
+    })
+    await act(async () => {
+      await result.current.project('timer:overtime-message', { message: 'second' })
+    })
+
+    act(() => {
+      mockAdapter._trigger('__system:ready', null)
+    })
+
+    expect(mockAdapter.send).not.toHaveBeenCalledWith('timer:overtime-message', {
+      message: 'first'
+    })
+    expect(mockAdapter.send).toHaveBeenCalledWith('timer:overtime-message', {
+      message: 'second'
+    })
+  })
+
+  it('project() timeout: pending cleared after 5s if ready never arrives', async () => {
+    const { result } = renderProjection()
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    await act(async () => {
+      await result.current.project(
+        'timer:overtime-message',
+        { message: 'timeout-test' },
+        { autoOpen: true }
+      )
+    })
+
+    act(() => {
+      vi.advanceTimersByTime(5000)
+    })
+
+    expect(warnSpy).toHaveBeenCalledWith('[Projection] Ready timeout — discarding pending payloads')
+
+    vi.mocked(mockAdapter.send).mockClear()
+
+    act(() => {
+      mockAdapter._trigger('__system:ready', null)
+    })
+
+    expect(mockAdapter.send).not.toHaveBeenCalledWith('timer:overtime-message', {
+      message: 'timeout-test'
+    })
+
+    warnSpy.mockRestore()
+  })
+
+  it('project() autoShow: unblank happens on flush', async () => {
+    const { result } = renderProjection()
+
+    await act(async () => {
+      await result.current.project(
+        'timer:overtime-message',
+        { message: 'show-me' },
+        { autoOpen: true, autoShow: true }
+      )
+    })
+
+    expect(result.current.isProjectionBlanked).toBe(true)
+
+    act(() => {
+      mockAdapter._trigger('__system:ready', null)
+    })
+
+    expect(mockAdapter.send).toHaveBeenCalledWith('timer:overtime-message', {
+      message: 'show-me'
+    })
+    expect(mockAdapter.send).toHaveBeenCalledWith('__system:blank', { showDefault: false })
+    expect(result.current.isProjectionBlanked).toBe(false)
+  })
+
+  it('__system:closed clears pending payloads', async () => {
+    const { result } = renderProjection()
+
+    await act(async () => {
+      await result.current.project('timer:overtime-message', { message: 'will-be-cleared' })
+    })
+
+    act(() => {
+      mockAdapter._trigger('__system:closed', null)
+    })
+
+    vi.mocked(mockAdapter.send).mockClear()
+
+    act(() => {
+      mockAdapter._trigger('__system:ready', null)
+    })
+
+    expect(mockAdapter.send).not.toHaveBeenCalledWith('timer:overtime-message', {
+      message: 'will-be-cleared'
+    })
   })
 
   it('project() skips ready wait when already ready', async () => {
@@ -287,7 +412,7 @@ describe('ProjectionContext — web mode', () => {
     expect(result.current.isProjectionBlanked).toBe(true)
   })
 
-  it('__system:closed resets ready state so project() skips send', async () => {
+  it('__system:closed resets ready state so project() buffers instead of sending', async () => {
     const { result } = renderProjection()
 
     act(() => {
