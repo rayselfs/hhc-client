@@ -95,4 +95,30 @@ describe('TimeInputDialog', () => {
     fireEvent.keyDown(input, { key: 'Escape' })
     expect(onClose).toHaveBeenCalled()
   })
+
+  it('shows error when duration exceeds 59:59', () => {
+    setup()
+    const input = screen.getByRole('textbox')
+    fireEvent.change(input, { target: { value: '99:00' } })
+    fireEvent.click(screen.getByText('timer.inputDialog.confirm'))
+    expect(onConfirm).not.toHaveBeenCalled()
+    expect(screen.getByText('timer.inputDialog.exceedsMax')).toBeInTheDocument()
+  })
+
+  it('accepts exactly 59:59 (3599 seconds)', () => {
+    setup()
+    const input = screen.getByRole('textbox')
+    fireEvent.change(input, { target: { value: '59:59' } })
+    fireEvent.click(screen.getByText('timer.inputDialog.confirm'))
+    expect(onConfirm).toHaveBeenCalledWith(3599)
+  })
+
+  it('shows error for 60:00 (3600 seconds)', () => {
+    setup()
+    const input = screen.getByRole('textbox')
+    fireEvent.change(input, { target: { value: '60:00' } })
+    fireEvent.click(screen.getByText('timer.inputDialog.confirm'))
+    expect(onConfirm).not.toHaveBeenCalled()
+    expect(screen.getByText('timer.inputDialog.exceedsMax')).toBeInTheDocument()
+  })
 })

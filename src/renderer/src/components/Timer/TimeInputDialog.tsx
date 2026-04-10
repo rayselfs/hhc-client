@@ -2,6 +2,7 @@ import { Modal, useOverlayState, Button, Input, Label } from '@heroui/react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { parseDuration } from '@renderer/lib/parse-duration'
+import { MAX_DURATION_SECONDS } from '@shared/constants/timer'
 
 interface TimeInputDialogProps {
   isOpen: boolean
@@ -36,6 +37,10 @@ export default function TimeInputDialog({
     const seconds = parseDuration(value.trim())
     if (seconds === null) {
       setError(t('timer.inputDialog.invalid'))
+      return
+    }
+    if (seconds > MAX_DURATION_SECONDS) {
+      setError(t('timer.inputDialog.exceedsMax'))
       return
     }
     onConfirm(seconds)
