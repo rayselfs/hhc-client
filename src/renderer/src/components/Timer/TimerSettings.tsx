@@ -21,6 +21,7 @@ export default function TimerSettings({ mode, className }: TimerSettingsProps): 
   const overtimeMessageEnabled = useTimerStore((s) => s.overtimeMessageEnabled)
   const overtimeMessage = useTimerStore((s) => s.overtimeMessage)
   const totalDuration = useTimerStore((s) => s.totalDuration)
+  const status = useTimerStore((s) => s.status)
   const setReminder = useTimerStore((s) => s.setReminder)
   const setOvertimeMessage = useTimerStore((s) => s.setOvertimeMessage)
 
@@ -88,7 +89,7 @@ export default function TimerSettings({ mode, className }: TimerSettingsProps): 
           <div className="flex items-center gap-4 min-h-10">
             <Switch
               isSelected={reminderEnabled}
-              isDisabled={!canEnableReminder}
+              isDisabled={!canEnableReminder || status !== 'stopped'}
               onChange={handleReminderToggle}
               aria-label={t('timer.reminder.label')}
             >
@@ -106,6 +107,7 @@ export default function TimerSettings({ mode, className }: TimerSettingsProps): 
                   aria-label={t('timer.reminder.time')}
                   className="w-20 [&_input]:py-1"
                   min={0}
+                  disabled={status !== 'stopped'}
                 />
                 <span className="text-xs text-muted">{t('timer.reminder.seconds')}</span>
                 <input
@@ -114,6 +116,7 @@ export default function TimerSettings({ mode, className }: TimerSettingsProps): 
                   onChange={handleReminderColorChange}
                   aria-label={t('timer.reminder.color')}
                   className="w-8 h-8 rounded cursor-pointer border-0 bg-transparent p-0"
+                  disabled={status !== 'stopped'}
                 />
               </div>
             )}

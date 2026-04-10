@@ -138,6 +138,55 @@ describe('TimerSettings — reminder duration input', () => {
     expect(switches[0]).not.toBeDisabled()
   })
 
+  it('disables reminder switch when timer is running', () => {
+    useTimerStore.setState({ totalDuration: 300, status: 'running' })
+    renderWithI18n()
+
+    const switches = screen.getAllByRole('switch')
+    expect(switches[0]).toBeDisabled()
+  })
+
+  it('disables reminder switch when timer is paused', () => {
+    useTimerStore.setState({ totalDuration: 300, status: 'paused' })
+    renderWithI18n()
+
+    const switches = screen.getAllByRole('switch')
+    expect(switches[0]).toBeDisabled()
+  })
+
+  it('enables reminder switch when timer is stopped', () => {
+    useTimerStore.setState({ totalDuration: 300, status: 'stopped' })
+    renderWithI18n()
+
+    const switches = screen.getAllByRole('switch')
+    expect(switches[0]).not.toBeDisabled()
+  })
+
+  it('disables reminder duration input when timer is running', () => {
+    useTimerStore.setState({
+      totalDuration: 300,
+      reminderEnabled: true,
+      reminderDuration: 60,
+      status: 'running'
+    })
+    renderWithI18n()
+
+    expect(screen.getByRole('spinbutton', { name: /reminder time/i })).toBeDisabled()
+  })
+
+  it('disables reminder color picker when timer is running', () => {
+    useTimerStore.setState({
+      totalDuration: 300,
+      reminderEnabled: true,
+      reminderDuration: 60,
+      status: 'running'
+    })
+    renderWithI18n()
+
+    const colorInput = screen.getByLabelText(/reminder color/i)
+    expect(colorInput).toBeDisabled()
+  })
+
   it('shows validation error when user sets reminderDuration >= totalDuration', () => {
     useTimerStore.setState({
       reminderEnabled: true,
