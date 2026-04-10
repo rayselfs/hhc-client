@@ -84,7 +84,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
         stopPolling()
       }
     }, 1000)
-  }, [stopPolling, setIsProjectionBlanked])
+  }, [stopPolling, setIsProjectionOpen, setIsProjectionBlanked])
 
   useEffect(() => {
     const adapter = getAdapter(adapterRef)
@@ -153,7 +153,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       adapter.dispose()
       adapterRef.current = null
     }
-  }, [startPolling, stopPolling, setIsProjectionBlanked])
+  }, [startPolling, stopPolling, setIsProjectionOpen, setIsProjectionBlanked])
 
   const openProjection = useCallback(async (): Promise<void> => {
     if (isElectron()) {
@@ -185,7 +185,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       readyResolveRef.current = null
       stopPolling()
     }
-  }, [stopPolling, setIsProjectionBlanked])
+  }, [stopPolling, setIsProjectionOpen, setIsProjectionBlanked])
 
   const blankProjection = useCallback(
     (blank: boolean): void => {
