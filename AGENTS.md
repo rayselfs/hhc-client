@@ -84,6 +84,14 @@ hhc-client-v2/
 - Renderer uses `@renderer/...` alias (resolve in both Vite and tsconfig)
 - Main/preload use relative paths
 
+## STATE MANAGEMENT
+
+### Context vs Zustand Rule
+
+- **Context** (`src/renderer/src/contexts/`): Non-serializable services and imperative environment integration. Manages long-lived adapters, window handles, DOM side-effects (theme sync). Never stores plain business data.
+- **Zustand** (`src/renderer/src/stores/`): Serializable app/domain state. Timer config, timer runtime, stopwatch, app settings. Consumed by multiple components via selectors.
+- **If a context starts looking like plain state + setters, move it to a Zustand store.**
+
 ## ANTI-PATTERNS (THIS PROJECT)
 
 - **Preload has `@ts-ignore`**: `src/preload/index.ts` lines 19/21 — fallback path when `contextIsolated` is false. Inherited from scaffold; do not add more `@ts-ignore`.
