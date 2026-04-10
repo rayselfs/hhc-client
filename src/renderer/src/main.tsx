@@ -6,11 +6,13 @@ import { ThemeProvider } from '@renderer/contexts/ThemeContext'
 import { ErrorBoundary } from '@renderer/components/ErrorBoundary'
 import { RouterProvider } from 'react-router-dom'
 import { router } from '@renderer/router'
+import { Toast } from '@heroui/react'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>
       <ThemeProvider>
+        <Toast.Provider placement="bottom" />
         <RouterProvider router={router} />
       </ThemeProvider>
     </ErrorBoundary>
