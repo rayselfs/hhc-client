@@ -9,8 +9,7 @@ import type {
   TimerPreset
 } from '@shared/types/timer'
 import { MAX_DURATION_SECONDS } from '@shared/constants/timer'
-import { toast } from '@heroui/react'
-import i18n from '@renderer/i18n'
+import { safeStorageSet } from '@renderer/lib/storage-utils'
 
 const DEFAULT_PRESETS: TimerPreset[] = [
   {
@@ -462,11 +461,7 @@ export const useTimerStore = create<TimerStore>()((set, get) => ({
 
   savePresets: () => {
     const s = get()
-    try {
-      localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(s.presets))
-    } catch {
-      toast.warning(i18n.t('toast.storageSaveFailed'))
-    }
+    safeStorageSet(PRESETS_STORAGE_KEY, JSON.stringify(s.presets))
   },
 
   loadDuration: () => {
@@ -490,11 +485,7 @@ export const useTimerStore = create<TimerStore>()((set, get) => ({
 
   saveDuration: () => {
     const s = get()
-    try {
-      localStorage.setItem(DURATION_STORAGE_KEY, String(s.totalDuration))
-    } catch {
-      toast.warning(i18n.t('toast.storageSaveFailed'))
-    }
+    safeStorageSet(DURATION_STORAGE_KEY, String(s.totalDuration))
   },
 
   loadReminder: () => {
@@ -513,14 +504,10 @@ export const useTimerStore = create<TimerStore>()((set, get) => ({
 
   saveReminder: () => {
     const s = get()
-    try {
-      localStorage.setItem(
-        REMINDER_STORAGE_KEY,
-        JSON.stringify({ duration: s.reminderDuration, color: s.reminderColor })
-      )
-    } catch {
-      toast.warning(i18n.t('toast.storageSaveFailed'))
-    }
+    safeStorageSet(
+      REMINDER_STORAGE_KEY,
+      JSON.stringify({ duration: s.reminderDuration, color: s.reminderColor })
+    )
   }
 }))
 

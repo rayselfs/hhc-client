@@ -1,13 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
-const mockToast = vi.hoisted(() => ({ warning: vi.fn(), danger: vi.fn(), success: vi.fn() }))
-vi.mock('@heroui/react', async () => {
-  const actual = await vi.importActual('@heroui/react')
-  return { ...actual, toast: mockToast }
-})
-
-vi.mock('@renderer/i18n', () => ({
-  default: { t: (key: string) => key }
+const mockSafeStorageSet = vi.hoisted(() => vi.fn())
+vi.mock('@renderer/lib/storage-utils', () => ({
+  safeStorageSet: mockSafeStorageSet
 }))
 
 import {
@@ -26,7 +21,7 @@ const INITIAL_STATE = {
 
 beforeEach(() => {
   useTimerStore.setState(INITIAL_STATE)
-  mockToast.warning.mockClear()
+  mockSafeStorageSet.mockClear()
 })
 
 describe('initial state', () => {
@@ -976,13 +971,12 @@ describe('preset management', () => {
     expect(useTimerStore.getState().remainingSeconds).toBe(before)
   })
 
-  it('savePresets persists to localStorage', () => {
+  it('savePresets persists via safeStorageSet', () => {
     useTimerStore.getState().addPreset('12m', 720)
-    const stored = localStorage.getItem('hhc-timer-presets')
-    expect(stored).toBeDefined()
-    const parsed = JSON.parse(stored!)
-    expect(Array.isArray(parsed)).toBe(true)
-    expect(parsed.some((p: { name: string }) => p.name === '12m')).toBe(true)
+    expect(mockSafeStorageSet).toHaveBeenCalledWith(
+      'hhc-timer-presets',
+      expect.stringContaining('12m')
+    )
   })
 
   it('loadPresets reads and restores from localStorage', () => {
@@ -1060,9 +1054,9 @@ describe('duration persistence', () => {
     vi.unstubAllGlobals()
   })
 
-  it('setDuration persists to localStorage', () => {
+  it('setDuration persists via safeStorageSet', () => {
     useTimerStore.getState().setDuration(120)
-    expect(localStorageMock['hhc-timer-duration']).toBe('120')
+    expect(mockSafeStorageSet).toHaveBeenCalledWith('hhc-timer-duration', '120')
   })
 
   it('loadDuration restores saved duration', () => {
@@ -1098,51 +1092,49 @@ describe('duration persistence', () => {
 
   it('addTime in stopped state persists new duration', () => {
     useTimerStore.getState().addTime(60)
-    expect(localStorageMock['hhc-timer-duration']).toBe('360')
+    expect(mockSafeStorageSet).toHaveBeenCalledWith('hhc-timer-duration', '360')
   })
 
   it('removeTime in stopped state persists new duration', () => {
     useTimerStore.getState().removeTime(60)
-    expect(localStorageMock['hhc-timer-duration']).toBe('240')
+    expect(mockSafeStorageSet).toHaveBeenCalledWith('hhc-timer-duration', '240')
   })
 })
 
-describe('storage toast notifications', () => {
-  it('shows toast.warning when savePresets fails', () => {
-    const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
-      throw new Error('QuotaExceeded')
-    })
+describe('storage persistence via safeStorageSet', () => {
+  it('savePresets calls safeStorageSet with correct key and value', () => {
     useTimerStore.getState().savePresets()
-    expect(mockToast.warning).toHaveBeenCalledWith('toast.storageSaveFailed')
-    spy.mockRestore()
+    expect(mockSafeStorageSet).toHaveBeenCalledWith(
+      'hhc-timer-presets',
+      JSON.stringify(useTimerStore.getState().presets)
+    )
   })
 
-  it('shows toast.warning when saveDuration fails', () => {
-    const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
-      throw new Error('QuotaExceeded')
-    })
+  it('saveDuration calls safeStorageSet with correct key and value', () => {
     useTimerStore.getState().saveDuration()
-    expect(mockToast.warning).toHaveBeenCalledWith('toast.storageSaveFailed')
-    spy.mockRestore()
+    expect(mockSafeStorageSet).toHaveBeenCalledWith(
+      'hhc-timer-duration',
+      String(useTimerStore.getState().totalDuration)
+    )
   })
 
-  it('shows toast.warning when saveReminder fails', () => {
-    const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
-      throw new Error('QuotaExceeded')
-    })
+  it('saveReminder calls safeStorageSet with correct key and value', () => {
     useTimerStore.getState().saveReminder()
-    expect(mockToast.warning).toHaveBeenCalledWith('toast.storageSaveFailed')
-    spy.mockRestore()
+    const s = useTimerStore.getState()
+    expect(mockSafeStorageSet).toHaveBeenCalledWith(
+      'hhc-timer-reminder',
+      JSON.stringify({ duration: s.reminderDuration, color: s.reminderColor })
+    )
   })
 
-  it('logs console.warn on loadPresets failure (no toast)', () => {
+  it('logs console.warn on loadPresets failure (no safeStorageSet call)', () => {
     const spy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
       throw new Error('SecurityError')
     })
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     useTimerStore.getState().loadPresets()
     expect(warnSpy).toHaveBeenCalledWith('[Timer] Failed to load presets from storage')
-    expect(mockToast.warning).not.toHaveBeenCalled()
+    expect(mockSafeStorageSet).not.toHaveBeenCalled()
     spy.mockRestore()
     warnSpy.mockRestore()
   })
