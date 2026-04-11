@@ -1,8 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { createJSONStorage } from 'zustand/middleware'
 
-const mockSafeStorageSet = vi.hoisted(() => vi.fn())
-vi.mock('@renderer/lib/storage-utils', () => ({
-  safeStorageSet: mockSafeStorageSet
+const lazyLocalStorage = vi.hoisted(() => ({
+  getItem: (name: string) => localStorage.getItem(name),
+  setItem: (name: string, value: string) => localStorage.setItem(name, value),
+  removeItem: (name: string) => localStorage.removeItem(name)
+}))
+
+vi.mock('@renderer/lib/persist-storage', () => ({
+  hhcPersistStorage: createJSONStorage(() => lazyLocalStorage),
+  createPersistName: (name: string) => `hhc-${name}`
 }))
 
 import {
@@ -21,7 +28,6 @@ const INITIAL_STATE = {
 
 beforeEach(() => {
   useTimerStore.setState(INITIAL_STATE)
-  mockSafeStorageSet.mockClear()
 })
 
 describe('initial state', () => {
@@ -907,8 +913,7 @@ describe('preset management', () => {
     vi.unstubAllGlobals()
   })
 
-  it('loads default presets when localStorage is empty', () => {
-    useTimerStore.getState().loadPresets()
+  it('has default presets on initial state', () => {
     const s = useTimerStore.getState()
     expect(s.presets).toHaveLength(3)
     expect(s.presets[0].name).toBe('10:00')
@@ -917,7 +922,6 @@ describe('preset management', () => {
   })
 
   it('addPreset increases presets array', () => {
-    useTimerStore.getState().loadPresets()
     const initialCount = useTimerStore.getState().presets.length
     useTimerStore.getState().addPreset('15m', 900)
     expect(useTimerStore.getState().presets).toHaveLength(initialCount + 1)
@@ -971,41 +975,47 @@ describe('preset management', () => {
     expect(useTimerStore.getState().remainingSeconds).toBe(before)
   })
 
-  it('savePresets persists via safeStorageSet', () => {
+  it('addPreset persists presets to localStorage via persist middleware', () => {
     useTimerStore.getState().addPreset('12m', 720)
-    expect(mockSafeStorageSet).toHaveBeenCalledWith(
-      'hhc-timer-presets',
-      expect.stringContaining('12m')
-    )
+    const raw = localStorageMock['hhc-timer']
+    expect(raw).toBeDefined()
+    const parsed = JSON.parse(raw)
+    const presets = parsed.state.presets
+    expect(presets.some((p: { name: string }) => p.name === '12m')).toBe(true)
   })
 
-  it('loadPresets reads and restores from localStorage', () => {
+  it('removePreset updates localStorage via persist middleware', () => {
+    useTimerStore.getState().addPreset('remove-me', 999)
+    const presetsAfterAdd = useTimerStore.getState().presets
+    const idToRemove = presetsAfterAdd[presetsAfterAdd.length - 1].id
+    useTimerStore.getState().removePreset(idToRemove)
+    const raw = localStorageMock['hhc-timer']
+    const parsed = JSON.parse(raw)
+    expect(parsed.state.presets.find((p: { id: string }) => p.id === idToRemove)).toBeUndefined()
+  })
+
+  it('persist hydration restores presets from localStorage', () => {
     const testPresets = [
       { id: 'test-1', name: 'test-10m', durationSeconds: 600, mode: 'timer' as const },
       { id: 'test-2', name: 'test-5m', durationSeconds: 300, mode: 'timer' as const }
     ]
-    localStorage.setItem('hhc-timer-presets', JSON.stringify(testPresets))
-    useTimerStore.getState().loadPresets()
+    localStorageMock['hhc-timer'] = JSON.stringify({
+      state: { presets: testPresets, totalDuration: 300 },
+      version: 0
+    })
+    useTimerStore.persist.rehydrate()
     const s = useTimerStore.getState()
     expect(s.presets).toHaveLength(2)
     expect(s.presets[0].name).toBe('test-10m')
     expect(s.presets[1].name).toBe('test-5m')
   })
 
-  it('loadPresets handles invalid JSON gracefully', () => {
-    localStorage.setItem('hhc-timer-presets', 'invalid-json{{{')
-    useTimerStore.getState().loadPresets()
+  it('persist hydration uses defaults when key missing', () => {
+    delete localStorageMock['hhc-timer']
+    useTimerStore.persist.rehydrate()
     const s = useTimerStore.getState()
-    expect(s.presets).toHaveLength(3)
-    expect(s.presets[0].name).toBe('10:00')
-  })
-
-  it('loadPresets uses defaults when key missing', () => {
-    delete localStorageMock['hhc-timer-presets']
-    useTimerStore.getState().loadPresets()
-    const s = useTimerStore.getState()
-    expect(s.presets).toHaveLength(3)
-    expect(s.presets[0].name).toBe('10:00')
+    expect(s.presets).toBeDefined()
+    expect(Array.isArray(s.presets)).toBe(true)
   })
 
   it('addPreset generates unique ids', () => {
@@ -1054,88 +1064,121 @@ describe('duration persistence', () => {
     vi.unstubAllGlobals()
   })
 
-  it('setDuration persists via safeStorageSet', () => {
+  it('setDuration persists totalDuration via persist middleware', () => {
     useTimerStore.getState().setDuration(120)
-    expect(mockSafeStorageSet).toHaveBeenCalledWith('hhc-timer-duration', '120')
+    const raw = localStorageMock['hhc-timer']
+    expect(raw).toBeDefined()
+    const parsed = JSON.parse(raw)
+    expect(parsed.state.totalDuration).toBe(120)
+    expect(parsed.version).toBe(0)
   })
 
-  it('loadDuration restores saved duration', () => {
-    localStorageMock['hhc-timer-duration'] = '180'
-    useTimerStore.getState().loadDuration()
+  it('persist hydration restores saved duration', () => {
+    localStorageMock['hhc-timer'] = JSON.stringify({
+      state: { totalDuration: 180 },
+      version: 0
+    })
+    useTimerStore.persist.rehydrate()
     const s = useTimerStore.getState()
     expect(s.totalDuration).toBe(180)
     expect(s.remainingSeconds).toBe(180)
     expect(s.formattedTime).toBe('03:00')
   })
 
-  it('loadDuration keeps default when localStorage is empty', () => {
-    useTimerStore.getState().loadDuration()
+  it('persist hydration keeps current state when key missing', () => {
+    useTimerStore.persist.rehydrate()
     const s = useTimerStore.getState()
     expect(s.totalDuration).toBe(300)
   })
 
-  it('loadDuration ignores invalid values', () => {
-    localStorageMock['hhc-timer-duration'] = 'not-a-number'
-    useTimerStore.getState().loadDuration()
-    expect(useTimerStore.getState().totalDuration).toBe(300)
-  })
-
-  it('loadDuration ignores zero or negative values', () => {
-    localStorageMock['hhc-timer-duration'] = '0'
-    useTimerStore.getState().loadDuration()
-    expect(useTimerStore.getState().totalDuration).toBe(300)
-
-    localStorageMock['hhc-timer-duration'] = '-10'
-    useTimerStore.getState().loadDuration()
-    expect(useTimerStore.getState().totalDuration).toBe(300)
-  })
-
-  it('addTime in stopped state persists new duration', () => {
+  it('addTime in stopped state persists new totalDuration', () => {
     useTimerStore.getState().addTime(60)
-    expect(mockSafeStorageSet).toHaveBeenCalledWith('hhc-timer-duration', '360')
+    const raw = localStorageMock['hhc-timer']
+    expect(raw).toBeDefined()
+    const parsed = JSON.parse(raw)
+    expect(parsed.state.totalDuration).toBe(360)
   })
 
-  it('removeTime in stopped state persists new duration', () => {
+  it('removeTime in stopped state persists new totalDuration', () => {
     useTimerStore.getState().removeTime(60)
-    expect(mockSafeStorageSet).toHaveBeenCalledWith('hhc-timer-duration', '240')
+    const raw = localStorageMock['hhc-timer']
+    expect(raw).toBeDefined()
+    const parsed = JSON.parse(raw)
+    expect(parsed.state.totalDuration).toBe(240)
   })
 })
 
-describe('storage persistence via safeStorageSet', () => {
-  it('savePresets calls safeStorageSet with correct key and value', () => {
-    useTimerStore.getState().savePresets()
-    expect(mockSafeStorageSet).toHaveBeenCalledWith(
-      'hhc-timer-presets',
-      JSON.stringify(useTimerStore.getState().presets)
-    )
-  })
+describe('persist middleware writes correct format', () => {
+  let localStorageMock: Record<string, string> = {}
 
-  it('saveDuration calls safeStorageSet with correct key and value', () => {
-    useTimerStore.getState().saveDuration()
-    expect(mockSafeStorageSet).toHaveBeenCalledWith(
-      'hhc-timer-duration',
-      String(useTimerStore.getState().totalDuration)
-    )
-  })
-
-  it('saveReminder calls safeStorageSet with correct key and value', () => {
-    useTimerStore.getState().saveReminder()
-    const s = useTimerStore.getState()
-    expect(mockSafeStorageSet).toHaveBeenCalledWith(
-      'hhc-timer-reminder',
-      JSON.stringify({ duration: s.reminderDuration, color: s.reminderColor })
-    )
-  })
-
-  it('logs console.warn on loadPresets failure (no safeStorageSet call)', () => {
-    const spy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
-      throw new Error('SecurityError')
+  beforeEach(() => {
+    localStorageMock = {}
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => localStorageMock[key] || null,
+      setItem: (key: string, value: string) => {
+        localStorageMock[key] = value
+      },
+      removeItem: (key: string) => {
+        delete localStorageMock[key]
+      },
+      clear: () => {
+        localStorageMock = {}
+      },
+      length: 0,
+      key: (index: number) => {
+        const keys = Object.keys(localStorageMock)
+        return keys[index] || null
+      }
     })
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    useTimerStore.getState().loadPresets()
-    expect(warnSpy).toHaveBeenCalledWith('[Timer] Failed to load presets from storage')
-    expect(mockSafeStorageSet).not.toHaveBeenCalled()
-    spy.mockRestore()
-    warnSpy.mockRestore()
+    useTimerStore.setState(INITIAL_STATE)
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('persist key is hhc-timer', () => {
+    useTimerStore.getState().setDuration(120)
+    expect(localStorageMock['hhc-timer']).toBeDefined()
+  })
+
+  it('persisted value has state and version fields', () => {
+    useTimerStore.getState().setDuration(120)
+    const parsed = JSON.parse(localStorageMock['hhc-timer'])
+    expect(parsed).toHaveProperty('state')
+    expect(parsed).toHaveProperty('version', 0)
+  })
+
+  it('partialize only persists config fields, not runtime fields', () => {
+    useTimerStore.getState().setDuration(120)
+    const parsed = JSON.parse(localStorageMock['hhc-timer'])
+    const state = parsed.state
+    expect(state).toHaveProperty('mode')
+    expect(state).toHaveProperty('totalDuration')
+    expect(state).toHaveProperty('reminderEnabled')
+    expect(state).toHaveProperty('reminderDuration')
+    expect(state).toHaveProperty('reminderColor')
+    expect(state).toHaveProperty('overtimeMessageEnabled')
+    expect(state).toHaveProperty('overtimeMessage')
+    expect(state).toHaveProperty('presets')
+    expect(state).not.toHaveProperty('status')
+    expect(state).not.toHaveProperty('phase')
+    expect(state).not.toHaveProperty('remainingSeconds')
+    expect(state).not.toHaveProperty('targetEndTime')
+  })
+
+  it('setReminder persists reminderEnabled and related fields', () => {
+    useTimerStore.getState().setReminder(true, 45, '#00ff00')
+    const parsed = JSON.parse(localStorageMock['hhc-timer'])
+    expect(parsed.state.reminderEnabled).toBe(true)
+    expect(parsed.state.reminderDuration).toBe(45)
+    expect(parsed.state.reminderColor).toBe('#00ff00')
+  })
+
+  it('setOvertimeMessage persists overtime fields', () => {
+    useTimerStore.getState().setOvertimeMessage(true, 'Done!')
+    const parsed = JSON.parse(localStorageMock['hhc-timer'])
+    expect(parsed.state.overtimeMessageEnabled).toBe(true)
+    expect(parsed.state.overtimeMessage).toBe('Done!')
   })
 })

@@ -27,7 +27,7 @@ hhc-client-v2/
 │   └── renderer/src/        # React app (Vite entry: main.tsx → App.tsx)
 │       ├── components/      # Layout, Sidebar, Header, Timer/, projection/, Preferences/
 │       ├── contexts/        # ThemeContext, TimerEngineContext, ProjectionContext, ContextMenuContext
-│       ├── lib/             # env.ts, projection-adapter.ts, timer-adapter.ts, utils, etc.
+│       ├── lib/             # env.ts, projection-adapter.ts, timer-adapter.ts, persist-storage.ts, utils, etc.
 │       ├── stores/          # Zustand: timer.ts, stopwatch.ts, settings.ts, selectors/
 │       ├── workers/         # timer.worker.ts (Web Worker for browser-mode tick)
 │       ├── pages/           # TimerPage, BiblePage, ProjectionPage, WelcomePage
@@ -44,24 +44,25 @@ hhc-client-v2/
 
 ## WHERE TO LOOK
 
-| Task                           | Location                                           | Notes                                                      |
-| ------------------------------ | -------------------------------------------------- | ---------------------------------------------------------- |
-| Main process / window creation | `src/main/index.ts` + `windowManager.ts`           | WindowManager singleton manages both windows               |
-| IPC handlers                   | `src/main/ipc/`                                    | projection.ts, timer.ts, validate.ts                       |
-| Timer main-process service     | `src/main/timerService.ts`                         | Broadcasts timer state to projection window                |
-| Expose API to renderer         | `src/preload/index.ts`                             | contextBridge; update `index.d.ts` for types               |
-| UI / React components          | `src/renderer/src/components/`                     | Timer/, projection/, Preferences/, Layout, etc.            |
-| Timer engine (adapter bridge)  | `src/renderer/src/contexts/TimerEngineContext.tsx` | Bridges adapter ↔ Zustand stores                           |
-| Timer adapter (dual-mode)      | `src/renderer/src/lib/timer-adapter.ts`            | BrowserTimerAdapter (Worker) vs ElectronTimerAdapter (IPC) |
-| Timer Worker                   | `src/renderer/src/workers/timer.worker.ts`         | setInterval(100ms) tick loop for browser mode              |
-| Projection messaging           | `src/renderer/src/lib/projection-adapter.ts`       | Electron IPC or BroadcastChannel adapter                   |
-| Environment detection          | `src/renderer/src/lib/env.ts`                      | `isElectron()` / `isWeb()` — renderer only                 |
-| State (Zustand)                | `src/renderer/src/stores/`                         | timer.ts, stopwatch.ts, settings.ts, selectors/            |
-| Theme system                   | `src/renderer/src/contexts/ThemeContext.tsx`       | Dark/light/system, syncs with Electron nativeTheme         |
-| Routing                        | `src/renderer/src/router.tsx`                      | HashRouter; `/projection` is outside Layout                |
-| Path alias config              | `electron.vite.config.ts` + `tsconfig.web.json`    | Keep `@renderer` alias in sync between both                |
-| CSP policy                     | `src/renderer/index.html`                          | Affects web mode only; Electron is lenient                 |
-| Packaging / installers         | `electron-builder.yml`                             | Win/Mac/Linux targets                                      |
+| Task                           | Location                                           | Notes                                                                                      |
+| ------------------------------ | -------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Main process / window creation | `src/main/index.ts` + `windowManager.ts`           | WindowManager singleton manages both windows                                               |
+| IPC handlers                   | `src/main/ipc/`                                    | projection.ts, timer.ts, validate.ts                                                       |
+| Timer main-process service     | `src/main/timerService.ts`                         | Broadcasts timer state to projection window                                                |
+| Expose API to renderer         | `src/preload/index.ts`                             | contextBridge; update `index.d.ts` for types                                               |
+| UI / React components          | `src/renderer/src/components/`                     | Timer/, projection/, Preferences/, Layout, etc.                                            |
+| Timer engine (adapter bridge)  | `src/renderer/src/contexts/TimerEngineContext.tsx` | Bridges adapter ↔ Zustand stores                                                           |
+| Timer adapter (dual-mode)      | `src/renderer/src/lib/timer-adapter.ts`            | BrowserTimerAdapter (Worker) vs ElectronTimerAdapter (IPC)                                 |
+| Timer Worker                   | `src/renderer/src/workers/timer.worker.ts`         | setInterval(100ms) tick loop for browser mode                                              |
+| Projection messaging           | `src/renderer/src/lib/projection-adapter.ts`       | Electron IPC or BroadcastChannel adapter                                                   |
+| Environment detection          | `src/renderer/src/lib/env.ts`                      | `isElectron()` / `isWeb()` — renderer only                                                 |
+| State (Zustand)                | `src/renderer/src/stores/`                         | timer.ts, stopwatch.ts, settings.ts, selectors/. Timer + Settings use `persist` middleware |
+| Persist storage adapter        | `src/renderer/src/lib/persist-storage.ts`          | Shared `hhcPersistStorage` + `createPersistName()` for all persisted stores                |
+| Theme system                   | `src/renderer/src/contexts/ThemeContext.tsx`       | Dark/light/system, syncs with Electron nativeTheme                                         |
+| Routing                        | `src/renderer/src/router.tsx`                      | HashRouter; `/projection` is outside Layout                                                |
+| Path alias config              | `electron.vite.config.ts` + `tsconfig.web.json`    | Keep `@renderer` alias in sync between both                                                |
+| CSP policy                     | `src/renderer/index.html`                          | Affects web mode only; Electron is lenient                                                 |
+| Packaging / installers         | `electron-builder.yml`                             | Win/Mac/Linux targets                                                                      |
 
 ## CONVENTIONS
 
@@ -98,6 +99,41 @@ hhc-client-v2/
 - **Context** (`src/renderer/src/contexts/`): Non-serializable services and imperative environment integration. Manages long-lived adapters, window handles, DOM side-effects (theme sync). Never stores plain business data.
 - **Zustand** (`src/renderer/src/stores/`): Serializable app/domain state. Timer config, timer runtime, stopwatch, app settings. Consumed by multiple components via selectors.
 - **If a context starts looking like plain state + setters, move it to a Zustand store.**
+
+### Zustand Persistence Convention
+
+Stores that need persistence use Zustand's `persist` middleware with a shared storage adapter:
+
+```typescript
+import { persist } from 'zustand/middleware'
+import { hhcPersistStorage, createPersistName } from '@renderer/lib/persist-storage'
+
+export const useMyStore = create<MyStore>()(
+  persist(
+    (set, get) => ({
+      /* state + actions */
+    }),
+    {
+      name: createPersistName('my-store'), // → localStorage key 'hhc-my-store'
+      storage: hhcPersistStorage, // shared adapter with error toast
+      version: 0, // bump + add migrate() on schema changes
+      partialize: (state) => ({
+        // only persist what's needed
+        /* config fields only, NOT runtime/ephemeral state */
+      })
+    }
+  )
+)
+```
+
+Key rules:
+
+- **Always use `hhcPersistStorage`** — never call `localStorage` directly from stores
+- **Always use `createPersistName()`** — maintains `hhc-` prefix convention
+- **Always use `partialize`** — only persist config/user-preference fields, never runtime state (status, progress, timers)
+- **Set `version: 0`** — bump the version and add `migrate()` when changing persisted field shapes
+- **Hydration is synchronous** — `createJSONStorage(() => localStorage)` hydrates at store creation time, no flicker
+- **Auth tokens do NOT go in persisted Zustand** — use a separate secure storage service
 
 ## DUAL-MODE ARCHITECTURE
 
@@ -154,6 +190,7 @@ adapter.onTick → store.tick(Date.now())
 - **No `as any`** — zero instances in the codebase. Do not add.
 - **No `@ts-expect-error`** — do not add.
 - **Preload has `@ts-ignore`**: `src/preload/index.ts` lines 19/21 — inherited scaffold fallback. Do not add more.
+- **No manual `localStorage` in Zustand stores** — use `persist` middleware with `hhcPersistStorage`. Direct `localStorage.getItem/setItem` in store actions is forbidden.
 - **`sandbox: false`** in BrowserWindow — security risk. Evaluate enabling when adding real features.
 - **Placeholder update URL**: `electron-builder.yml` and `dev-app-update.yml` publish to `https://example.com/auto-updates`. Replace before release.
 - **appId is generic**: `com.electron.app` in electron-builder.yml. Change before distribution.

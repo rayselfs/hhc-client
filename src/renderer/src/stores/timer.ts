@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 import { v7 as uuidv7 } from 'uuid'
 import type {
   TimerMode,
@@ -9,7 +10,7 @@ import type {
   TimerPreset
 } from '@shared/types/timer'
 import { MAX_DURATION_SECONDS } from '@shared/constants/timer'
-import { safeStorageSet } from '@renderer/lib/storage-utils'
+import { hhcPersistStorage, createPersistName } from '@renderer/lib/persist-storage'
 
 const DEFAULT_PRESETS: TimerPreset[] = [
   {
@@ -26,51 +27,6 @@ const DEFAULT_PRESETS: TimerPreset[] = [
   },
   { id: '019d7109-f7c1-705d-a343-16da950eba1d', name: '03:00', durationSeconds: 180, mode: 'timer' }
 ]
-
-const PRESETS_STORAGE_KEY = 'hhc-timer-presets'
-const DURATION_STORAGE_KEY = 'hhc-timer-duration'
-const REMINDER_STORAGE_KEY = 'hhc-timer-reminder'
-
-function loadInitialDuration(): number {
-  try {
-    const stored = localStorage.getItem(DURATION_STORAGE_KEY)
-    if (stored) {
-      const seconds = parseInt(stored, 10)
-      if (!isNaN(seconds) && seconds > 0 && seconds <= MAX_DURATION_SECONDS) return seconds
-    }
-  } catch {
-    console.warn('[Timer] Failed to load duration from storage')
-  }
-  return DEFAULT_SETTINGS.totalDuration
-}
-
-function loadInitialPresets(): TimerPreset[] {
-  try {
-    const stored = localStorage.getItem(PRESETS_STORAGE_KEY)
-    if (stored) {
-      const parsed = JSON.parse(stored)
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed
-    }
-  } catch {
-    console.warn('[Timer] Failed to load presets from storage')
-  }
-  return DEFAULT_PRESETS
-}
-
-function loadInitialReminder(): { duration: number; color: string } {
-  try {
-    const stored = localStorage.getItem(REMINDER_STORAGE_KEY)
-    if (stored) {
-      const parsed = JSON.parse(stored)
-      if (parsed && typeof parsed.duration === 'number' && typeof parsed.color === 'string') {
-        return { duration: parsed.duration, color: parsed.color }
-      }
-    }
-  } catch {
-    console.warn('[Timer] Failed to load reminder from storage')
-  }
-  return { duration: DEFAULT_SETTINGS.reminderDuration, color: DEFAULT_SETTINGS.reminderColor }
-}
 
 export interface TimerStore {
   // ── Config (persistent, low-frequency) ─────────────────────
@@ -116,16 +72,10 @@ export interface TimerStore {
   setReminder: (enabled: boolean, durationSeconds: number, color?: string) => void
   setOvertimeMessage: (enabled: boolean, message: string) => void
 
-  // ── Persistence actions ────────────────────────────────────
+  // ── Preset actions ─────────────────────────────────────────
   addPreset: (name: string, durationSeconds: number) => void
   removePreset: (id: string) => void
   applyPreset: (id: string) => void
-  loadPresets: () => void
-  savePresets: () => void
-  loadDuration: () => void
-  saveDuration: () => void
-  loadReminder: () => void
-  saveReminder: () => void
 }
 
 /** Configuration fields — persistent settings, low-frequency changes */
@@ -199,317 +149,273 @@ export const DEFAULT_STATE: TimerState = {
   formattedTime: '05:00'
 }
 
-const _initialDuration = loadInitialDuration()
-const _initialPresets = loadInitialPresets()
-const _initialReminder = loadInitialReminder()
+export const useTimerStore = create<TimerStore>()(
+  persist(
+    (set, get) => ({
+      mode: DEFAULT_SETTINGS.mode,
+      totalDuration: DEFAULT_SETTINGS.totalDuration,
+      reminderEnabled: DEFAULT_SETTINGS.reminderEnabled,
+      reminderDuration: DEFAULT_SETTINGS.reminderDuration,
+      reminderColor: DEFAULT_SETTINGS.reminderColor,
+      overtimeMessageEnabled: DEFAULT_SETTINGS.overtimeMessageEnabled,
+      overtimeMessage: DEFAULT_SETTINGS.overtimeMessage,
 
-export const useTimerStore = create<TimerStore>()((set, get) => ({
-  mode: DEFAULT_SETTINGS.mode,
-  totalDuration: _initialDuration,
-  reminderEnabled: DEFAULT_SETTINGS.reminderEnabled,
-  reminderDuration: _initialReminder.duration,
-  reminderColor: _initialReminder.color,
-  overtimeMessageEnabled: DEFAULT_SETTINGS.overtimeMessageEnabled,
-  overtimeMessage: DEFAULT_SETTINGS.overtimeMessage,
+      status: DEFAULT_STATE.status,
+      phase: DEFAULT_STATE.phase,
+      remainingSeconds: DEFAULT_SETTINGS.totalDuration,
+      overtimeSeconds: DEFAULT_STATE.overtimeSeconds,
+      progress: DEFAULT_STATE.progress,
+      formattedTime: formatTime(DEFAULT_SETTINGS.totalDuration),
 
-  status: DEFAULT_STATE.status,
-  phase: DEFAULT_STATE.phase,
-  remainingSeconds: _initialDuration,
-  overtimeSeconds: DEFAULT_STATE.overtimeSeconds,
-  progress: DEFAULT_STATE.progress,
-  formattedTime: formatTime(_initialDuration),
+      targetEndTime: null,
 
-  targetEndTime: null,
+      presets: DEFAULT_PRESETS,
 
-  presets: _initialPresets,
+      isRunning: () => get().status === 'running',
+      isPaused: () => get().status === 'paused',
+      isStopped: () => get().status === 'stopped',
+      isWarning: () => get().phase === 'warning',
+      isOvertime: () => get().phase === 'overtime',
 
-  isRunning: () => get().status === 'running',
-  isPaused: () => get().status === 'paused',
-  isStopped: () => get().status === 'stopped',
-  isWarning: () => get().phase === 'warning',
-  isOvertime: () => get().phase === 'overtime',
+      start: () => {
+        const s = get()
+        if (s.status === 'running') return
+        const duration = s.phase === 'overtime' ? s.totalDuration : s.remainingSeconds
+        const now = Date.now()
+        set({
+          status: 'running',
+          phase: computePhase('running', duration, s.reminderEnabled, s.reminderDuration),
+          remainingSeconds: duration,
+          targetEndTime: now + duration * 1000,
+          overtimeSeconds: 0,
+          progress: computeProgress(duration, s.totalDuration),
+          formattedTime: formatTime(duration)
+        })
+      },
 
-  start: () => {
-    const s = get()
-    if (s.status === 'running') return
-    const duration = s.phase === 'overtime' ? s.totalDuration : s.remainingSeconds
-    const now = Date.now()
-    set({
-      status: 'running',
-      phase: computePhase('running', duration, s.reminderEnabled, s.reminderDuration),
-      remainingSeconds: duration,
-      targetEndTime: now + duration * 1000,
-      overtimeSeconds: 0,
-      progress: computeProgress(duration, s.totalDuration),
-      formattedTime: formatTime(duration)
-    })
-  },
+      pause: () => {
+        const s = get()
+        if (s.status !== 'running') return
+        set({
+          status: 'paused',
+          phase: computePhase('paused', s.remainingSeconds, s.reminderEnabled, s.reminderDuration),
+          targetEndTime: null
+        })
+      },
 
-  pause: () => {
-    const s = get()
-    if (s.status !== 'running') return
-    set({
-      status: 'paused',
-      phase: computePhase('paused', s.remainingSeconds, s.reminderEnabled, s.reminderDuration),
-      targetEndTime: null
-    })
-  },
+      resume: () => {
+        const s = get()
+        if (s.status !== 'paused') return
+        const now = Date.now()
+        set({
+          status: 'running',
+          phase: computePhase('running', s.remainingSeconds, s.reminderEnabled, s.reminderDuration),
+          targetEndTime: now + s.remainingSeconds * 1000
+        })
+      },
 
-  resume: () => {
-    const s = get()
-    if (s.status !== 'paused') return
-    const now = Date.now()
-    set({
-      status: 'running',
-      phase: computePhase('running', s.remainingSeconds, s.reminderEnabled, s.reminderDuration),
-      targetEndTime: now + s.remainingSeconds * 1000
-    })
-  },
+      reset: () => {
+        const s = get()
+        set({
+          status: 'stopped',
+          phase: 'idle',
+          remainingSeconds: s.totalDuration,
+          overtimeSeconds: 0,
+          progress: computeProgress(s.totalDuration, s.totalDuration),
+          formattedTime: formatTime(s.totalDuration),
+          targetEndTime: null
+        })
+      },
 
-  reset: () => {
-    const s = get()
-    set({
-      status: 'stopped',
-      phase: 'idle',
-      remainingSeconds: s.totalDuration,
-      overtimeSeconds: 0,
-      progress: computeProgress(s.totalDuration, s.totalDuration),
-      formattedTime: formatTime(s.totalDuration),
-      targetEndTime: null
-    })
-  },
+      setDuration: (seconds: number) => {
+        const s = get()
+        if (s.status !== 'stopped') return
+        const clamped = Math.max(0, Math.min(MAX_DURATION_SECONDS, seconds))
+        const autoDisableReminder = s.reminderEnabled && s.reminderDuration >= clamped
+        set({
+          totalDuration: clamped,
+          remainingSeconds: clamped,
+          progress: computeProgress(clamped, clamped),
+          formattedTime: formatTime(clamped),
+          phase: 'idle',
+          ...(autoDisableReminder ? { reminderEnabled: false } : {})
+        })
+      },
 
-  setDuration: (seconds: number) => {
-    const s = get()
-    if (s.status !== 'stopped') return
-    const clamped = Math.max(0, Math.min(MAX_DURATION_SECONDS, seconds))
-    const autoDisableReminder = s.reminderEnabled && s.reminderDuration >= clamped
-    set({
-      totalDuration: clamped,
-      remainingSeconds: clamped,
-      progress: computeProgress(clamped, clamped),
-      formattedTime: formatTime(clamped),
-      phase: 'idle',
-      ...(autoDisableReminder ? { reminderEnabled: false } : {})
-    })
-    get().saveDuration()
-  },
+      addTime: (seconds: number) => {
+        const s = get()
+        const newRemaining = Math.min(MAX_DURATION_SECONDS, s.remainingSeconds + seconds)
 
-  addTime: (seconds: number) => {
-    const s = get()
-    const newRemaining = Math.min(MAX_DURATION_SECONDS, s.remainingSeconds + seconds)
-
-    if (s.status === 'stopped') {
-      const newTotal = Math.min(MAX_DURATION_SECONDS, s.totalDuration + seconds)
-      set({
-        totalDuration: newTotal,
-        remainingSeconds: newRemaining,
-        progress: computeProgress(newRemaining, newTotal),
-        formattedTime: formatTime(newRemaining)
-      })
-      get().saveDuration()
-      return
-    }
-
-    const now = Date.now()
-    const newTargetEndTime = s.status === 'running' ? now + newRemaining * 1000 : s.targetEndTime
-
-    set({
-      remainingSeconds: newRemaining,
-      phase: computePhase(s.status, newRemaining, s.reminderEnabled, s.reminderDuration),
-      progress: computeProgress(newRemaining, s.totalDuration),
-      formattedTime: formatTime(newRemaining),
-      targetEndTime: newTargetEndTime
-    })
-  },
-
-  removeTime: (seconds: number) => {
-    const s = get()
-    const newRemaining = Math.max(0, s.remainingSeconds - seconds)
-
-    if (s.status === 'stopped') {
-      const newTotal = Math.max(0, s.totalDuration - seconds)
-      const autoDisableReminder = s.reminderEnabled && s.reminderDuration >= newTotal
-      set({
-        totalDuration: newTotal,
-        remainingSeconds: newRemaining,
-        progress: computeProgress(newRemaining, newTotal),
-        formattedTime: formatTime(newRemaining),
-        ...(autoDisableReminder ? { reminderEnabled: false } : {})
-      })
-      get().saveDuration()
-      return
-    }
-
-    const now = Date.now()
-    const newTargetEndTime = s.status === 'running' ? now + newRemaining * 1000 : s.targetEndTime
-
-    set({
-      remainingSeconds: newRemaining,
-      phase: computePhase(s.status, newRemaining, s.reminderEnabled, s.reminderDuration),
-      progress: computeProgress(newRemaining, s.totalDuration),
-      formattedTime: formatTime(newRemaining),
-      targetEndTime: newTargetEndTime,
-      overtimeSeconds: newRemaining <= 0 ? s.overtimeSeconds : 0
-    })
-  },
-
-  setMode: (mode: TimerMode) => {
-    const s = get()
-    if (mode === 'clock' && s.status !== 'stopped') {
-      get().reset()
-    }
-    set({ mode })
-  },
-
-  tick: (currentMs: number) => {
-    const s = get()
-    if (s.status !== 'running') return
-    if (s.targetEndTime === null) return
-
-    const remainingMs = s.targetEndTime - currentMs
-    const rawRemainingSeconds = remainingMs / 1000
-
-    if (rawRemainingSeconds <= 0) {
-      set({
-        status: 'stopped',
-        phase: 'overtime',
-        remainingSeconds: 0,
-        overtimeSeconds: 0,
-        progress: 0,
-        formattedTime: '00:00',
-        targetEndTime: null
-      })
-      return
-    }
-
-    const displayRemaining = Math.ceil(rawRemainingSeconds)
-
-    set({
-      remainingSeconds: displayRemaining,
-      overtimeSeconds: 0,
-      phase: computePhase('running', displayRemaining, s.reminderEnabled, s.reminderDuration),
-      progress: computeProgress(displayRemaining, s.totalDuration),
-      formattedTime: formatTime(displayRemaining)
-    })
-  },
-
-  setReminder: (enabled: boolean, durationSeconds: number, color?: string) => {
-    const s = get()
-    const phase =
-      s.status !== 'stopped'
-        ? computePhase(s.status, s.remainingSeconds, enabled, durationSeconds)
-        : s.phase
-
-    const update: Partial<TimerStore> = {
-      reminderEnabled: enabled,
-      reminderDuration: durationSeconds,
-      phase
-    }
-    if (color !== undefined) update.reminderColor = color
-    set(update)
-    get().saveReminder()
-  },
-
-  setOvertimeMessage: (enabled: boolean, message: string) => {
-    set({ overtimeMessageEnabled: enabled, overtimeMessage: message })
-  },
-
-  addPreset: (name: string, durationSeconds: number) => {
-    const s = get()
-    const id = uuidv7()
-    const newPreset: TimerPreset = {
-      id,
-      name,
-      durationSeconds: Math.min(MAX_DURATION_SECONDS, durationSeconds),
-      mode: 'timer'
-    }
-    set({ presets: [...s.presets, newPreset] })
-    get().savePresets()
-  },
-
-  removePreset: (id: string) => {
-    const s = get()
-    set({ presets: s.presets.filter((p) => p.id !== id) })
-    get().savePresets()
-  },
-
-  applyPreset: (id: string) => {
-    const s = get()
-    if (s.status !== 'stopped') return
-    const preset = s.presets.find((p) => p.id === id)
-    if (preset) {
-      get().setDuration(preset.durationSeconds)
-    }
-  },
-
-  loadPresets: () => {
-    try {
-      const stored = localStorage.getItem(PRESETS_STORAGE_KEY)
-      if (stored) {
-        const parsed = JSON.parse(stored)
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          set({ presets: parsed })
+        if (s.status === 'stopped') {
+          const newTotal = Math.min(MAX_DURATION_SECONDS, s.totalDuration + seconds)
+          set({
+            totalDuration: newTotal,
+            remainingSeconds: newRemaining,
+            progress: computeProgress(newRemaining, newTotal),
+            formattedTime: formatTime(newRemaining)
+          })
           return
         }
-      }
-    } catch {
-      console.warn('[Timer] Failed to load presets from storage')
-    }
-    set({ presets: DEFAULT_PRESETS })
-  },
 
-  savePresets: () => {
-    const s = get()
-    safeStorageSet(PRESETS_STORAGE_KEY, JSON.stringify(s.presets))
-  },
+        const now = Date.now()
+        const newTargetEndTime =
+          s.status === 'running' ? now + newRemaining * 1000 : s.targetEndTime
 
-  loadDuration: () => {
-    try {
-      const stored = localStorage.getItem(DURATION_STORAGE_KEY)
-      if (stored) {
-        const seconds = parseInt(stored, 10)
-        if (!isNaN(seconds) && seconds > 0 && seconds <= MAX_DURATION_SECONDS) {
+        set({
+          remainingSeconds: newRemaining,
+          phase: computePhase(s.status, newRemaining, s.reminderEnabled, s.reminderDuration),
+          progress: computeProgress(newRemaining, s.totalDuration),
+          formattedTime: formatTime(newRemaining),
+          targetEndTime: newTargetEndTime
+        })
+      },
+
+      removeTime: (seconds: number) => {
+        const s = get()
+        const newRemaining = Math.max(0, s.remainingSeconds - seconds)
+
+        if (s.status === 'stopped') {
+          const newTotal = Math.max(0, s.totalDuration - seconds)
+          const autoDisableReminder = s.reminderEnabled && s.reminderDuration >= newTotal
           set({
-            totalDuration: seconds,
-            remainingSeconds: seconds,
-            progress: computeProgress(seconds, seconds),
-            formattedTime: formatTime(seconds)
+            totalDuration: newTotal,
+            remainingSeconds: newRemaining,
+            progress: computeProgress(newRemaining, newTotal),
+            formattedTime: formatTime(newRemaining),
+            ...(autoDisableReminder ? { reminderEnabled: false } : {})
           })
+          return
+        }
+
+        const now = Date.now()
+        const newTargetEndTime =
+          s.status === 'running' ? now + newRemaining * 1000 : s.targetEndTime
+
+        set({
+          remainingSeconds: newRemaining,
+          phase: computePhase(s.status, newRemaining, s.reminderEnabled, s.reminderDuration),
+          progress: computeProgress(newRemaining, s.totalDuration),
+          formattedTime: formatTime(newRemaining),
+          targetEndTime: newTargetEndTime,
+          overtimeSeconds: newRemaining <= 0 ? s.overtimeSeconds : 0
+        })
+      },
+
+      setMode: (mode: TimerMode) => {
+        const s = get()
+        if (mode === 'clock' && s.status !== 'stopped') {
+          get().reset()
+        }
+        set({ mode })
+      },
+
+      tick: (currentMs: number) => {
+        const s = get()
+        if (s.status !== 'running') return
+        if (s.targetEndTime === null) return
+
+        const remainingMs = s.targetEndTime - currentMs
+        const rawRemainingSeconds = remainingMs / 1000
+
+        if (rawRemainingSeconds <= 0) {
+          set({
+            status: 'stopped',
+            phase: 'overtime',
+            remainingSeconds: 0,
+            overtimeSeconds: 0,
+            progress: 0,
+            formattedTime: '00:00',
+            targetEndTime: null
+          })
+          return
+        }
+
+        const displayRemaining = Math.ceil(rawRemainingSeconds)
+
+        set({
+          remainingSeconds: displayRemaining,
+          overtimeSeconds: 0,
+          phase: computePhase('running', displayRemaining, s.reminderEnabled, s.reminderDuration),
+          progress: computeProgress(displayRemaining, s.totalDuration),
+          formattedTime: formatTime(displayRemaining)
+        })
+      },
+
+      setReminder: (enabled: boolean, durationSeconds: number, color?: string) => {
+        const s = get()
+        const phase =
+          s.status !== 'stopped'
+            ? computePhase(s.status, s.remainingSeconds, enabled, durationSeconds)
+            : s.phase
+
+        const update: Partial<TimerStore> = {
+          reminderEnabled: enabled,
+          reminderDuration: durationSeconds,
+          phase
+        }
+        if (color !== undefined) update.reminderColor = color
+        set(update)
+      },
+
+      setOvertimeMessage: (enabled: boolean, message: string) => {
+        set({ overtimeMessageEnabled: enabled, overtimeMessage: message })
+      },
+
+      addPreset: (name: string, durationSeconds: number) => {
+        const s = get()
+        const id = uuidv7()
+        const newPreset: TimerPreset = {
+          id,
+          name,
+          durationSeconds: Math.min(MAX_DURATION_SECONDS, durationSeconds),
+          mode: 'timer'
+        }
+        set({ presets: [...s.presets, newPreset] })
+      },
+
+      removePreset: (id: string) => {
+        const s = get()
+        set({ presets: s.presets.filter((p) => p.id !== id) })
+      },
+
+      applyPreset: (id: string) => {
+        const s = get()
+        if (s.status !== 'stopped') return
+        const preset = s.presets.find((p) => p.id === id)
+        if (preset) {
+          get().setDuration(preset.durationSeconds)
         }
       }
-    } catch {
-      console.warn('[Timer] Failed to load duration from storage')
-    }
-  },
-
-  saveDuration: () => {
-    const s = get()
-    safeStorageSet(DURATION_STORAGE_KEY, String(s.totalDuration))
-  },
-
-  loadReminder: () => {
-    try {
-      const stored = localStorage.getItem(REMINDER_STORAGE_KEY)
-      if (stored) {
-        const parsed = JSON.parse(stored)
-        if (parsed && typeof parsed.duration === 'number' && typeof parsed.color === 'string') {
-          set({ reminderDuration: parsed.duration, reminderColor: parsed.color })
+    }),
+    {
+      name: createPersistName('timer'),
+      storage: hhcPersistStorage,
+      version: 0,
+      partialize: (state) => ({
+        mode: state.mode,
+        totalDuration: state.totalDuration,
+        reminderEnabled: state.reminderEnabled,
+        reminderDuration: state.reminderDuration,
+        reminderColor: state.reminderColor,
+        overtimeMessageEnabled: state.overtimeMessageEnabled,
+        overtimeMessage: state.overtimeMessage,
+        presets: state.presets
+      }),
+      merge: (persisted, current) => {
+        const p = persisted as Partial<TimerStore> | undefined
+        if (!p) return current
+        const totalDuration = p.totalDuration ?? current.totalDuration
+        return {
+          ...current,
+          ...p,
+          remainingSeconds: totalDuration,
+          progress: computeProgress(totalDuration, totalDuration),
+          formattedTime: formatTime(totalDuration)
         }
       }
-    } catch {
-      console.warn('[Timer] Failed to load reminder from storage')
     }
-  },
-
-  saveReminder: () => {
-    const s = get()
-    safeStorageSet(
-      REMINDER_STORAGE_KEY,
-      JSON.stringify({ duration: s.reminderDuration, color: s.reminderColor })
-    )
-  }
-}))
+  )
+)
 
 export interface DisplayValues {
   mainDisplay: string

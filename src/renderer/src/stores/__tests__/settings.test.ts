@@ -35,7 +35,7 @@ describe('setTimezone', () => {
     expect(useSettingsStore.getState().timezone).toBe('UTC')
   })
 
-  it('persists to localStorage as plain string', () => {
+  it('persists to localStorage with persist middleware format', () => {
     let localStorageMock: Record<string, string> = {}
     vi.stubGlobal('localStorage', {
       getItem: (key: string) => localStorageMock[key] || null,
@@ -56,7 +56,11 @@ describe('setTimezone', () => {
     })
 
     useSettingsStore.getState().setTimezone('America/New_York')
-    expect(localStorage.getItem('hhc-timezone')).toBe('America/New_York')
+    const persisted = localStorage.getItem('hhc-settings')
+    expect(persisted).toBeTruthy()
+    const parsed = JSON.parse(persisted!)
+    expect(parsed.state.timezone).toBe('America/New_York')
+    expect(parsed.version).toBe(0)
 
     vi.unstubAllGlobals()
   })
@@ -68,7 +72,7 @@ describe('setHardwareAcceleration', () => {
     expect(useSettingsStore.getState().hardwareAcceleration).toBe(false)
   })
 
-  it('persists to localStorage as string boolean', () => {
+  it('persists to localStorage with persist middleware format', () => {
     let localStorageMock: Record<string, string> = {}
     vi.stubGlobal('localStorage', {
       getItem: (key: string) => localStorageMock[key] || null,
@@ -89,7 +93,11 @@ describe('setHardwareAcceleration', () => {
     })
 
     useSettingsStore.getState().setHardwareAcceleration(false)
-    expect(localStorage.getItem('hhc-hardwareAcceleration')).toBe('false')
+    const persisted = localStorage.getItem('hhc-settings')
+    expect(persisted).toBeTruthy()
+    const parsed = JSON.parse(persisted!)
+    expect(parsed.state.hardwareAcceleration).toBe(false)
+    expect(parsed.version).toBe(0)
 
     vi.unstubAllGlobals()
   })
@@ -108,7 +116,7 @@ describe('resetToDefaults', () => {
     expect(s.hardwareAcceleration).toBe(true)
   })
 
-  it('clears all localStorage and IndexedDB on reset', () => {
+  it('clears localStorage on reset', () => {
     let localStorageMock: Record<string, string> = {}
     const clearFn = vi.fn(() => {
       localStorageMock = {}
@@ -137,20 +145,20 @@ describe('resetToDefaults', () => {
 
     useSettingsStore.getState().setTimezone('Europe/Paris')
     useSettingsStore.getState().setHardwareAcceleration(false)
-    expect(localStorage.getItem('hhc-timezone')).toBe('Europe/Paris')
-    expect(localStorage.getItem('hhc-hardwareAcceleration')).toBe('false')
+    let persisted = localStorage.getItem('hhc-settings')
+    expect(persisted).toBeTruthy()
 
     useSettingsStore.getState().resetToDefaults()
     expect(clearFn).toHaveBeenCalled()
-    expect(localStorage.getItem('hhc-timezone')).toBeNull()
-    expect(localStorage.getItem('hhc-hardwareAcceleration')).toBeNull()
+    persisted = localStorage.getItem('hhc-settings')
+    expect(persisted).toBeNull()
 
     vi.unstubAllGlobals()
   })
 })
 
 describe('persistence round-trip', () => {
-  it('stores and retrieves individual keys', () => {
+  it('stores and retrieves state in persist middleware format', () => {
     let localStorageMock: Record<string, string> = {}
     vi.stubGlobal('localStorage', {
       getItem: (key: string) => localStorageMock[key] || null,
@@ -173,8 +181,12 @@ describe('persistence round-trip', () => {
     useSettingsStore.getState().setTimezone('Europe/London')
     useSettingsStore.getState().setHardwareAcceleration(false)
 
-    expect(localStorage.getItem('hhc-timezone')).toBe('Europe/London')
-    expect(localStorage.getItem('hhc-hardwareAcceleration')).toBe('false')
+    const persisted = localStorage.getItem('hhc-settings')
+    expect(persisted).toBeTruthy()
+    const parsed = JSON.parse(persisted!)
+    expect(parsed.state.timezone).toBe('Europe/London')
+    expect(parsed.state.hardwareAcceleration).toBe(false)
+    expect(parsed.version).toBe(0)
 
     vi.unstubAllGlobals()
   })
