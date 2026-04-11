@@ -4,7 +4,24 @@ import { I18nextProvider } from 'react-i18next'
 import i18n from '@renderer/i18n'
 import { useTimerStore, DEFAULT_SETTINGS, DEFAULT_STATE } from '@renderer/stores/timer'
 import { useStopwatchStore } from '@renderer/stores/stopwatch'
+import { useProjection } from '@renderer/contexts/ProjectionContext'
 import TimerPage from '../TimerPage'
+
+vi.mock('@renderer/contexts/ProjectionContext', () => ({
+  useProjection: vi.fn(() => ({
+    isProjectionOpen: false,
+    isProjectionBlanked: true,
+    projectionReadyCount: 0,
+    activeOwner: 'timer',
+    claimProjection: vi.fn(),
+    openProjection: vi.fn(),
+    closeProjection: vi.fn(),
+    blankProjection: vi.fn(),
+    project: vi.fn(),
+    send: vi.fn(),
+    on: vi.fn()
+  }))
+}))
 
 function renderTimerPage(): RenderResult {
   return render(
@@ -163,5 +180,116 @@ describe('TimerPage — TimeInputPopover gating', () => {
     useTimerStore.setState({ mode: 'clock', status: 'stopped' })
     renderTimerPage()
     expect(screen.getByRole('button', { name: /set timer duration/i })).toBeInTheDocument()
+  })
+})
+
+describe('TimerPage — projection ownership', () => {
+  it('claims timer ownership with unblank when projection opens while timer is running', () => {
+    const mockClaimProjection = vi.fn()
+
+    vi.mocked(useProjection).mockReturnValue({
+      isProjectionOpen: false,
+      isProjectionBlanked: true,
+      projectionReadyCount: 0,
+      activeOwner: 'timer',
+      claimProjection: mockClaimProjection,
+      openProjection: vi.fn(),
+      closeProjection: vi.fn(),
+      blankProjection: vi.fn(),
+      project: vi.fn(),
+      send: vi.fn(),
+      on: vi.fn()
+    })
+
+    useTimerStore.setState({ status: 'running' })
+    const { rerender } = renderTimerPage()
+
+    vi.mocked(useProjection).mockReturnValue({
+      isProjectionOpen: true,
+      isProjectionBlanked: true,
+      projectionReadyCount: 0,
+      activeOwner: 'timer',
+      claimProjection: mockClaimProjection,
+      openProjection: vi.fn(),
+      closeProjection: vi.fn(),
+      blankProjection: vi.fn(),
+      project: vi.fn(),
+      send: vi.fn(),
+      on: vi.fn()
+    })
+
+    rerender(
+      <I18nextProvider i18n={i18n}>
+        <TimerPage />
+      </I18nextProvider>
+    )
+
+    expect(mockClaimProjection).toHaveBeenCalledWith('timer', { unblank: true })
+  })
+
+  it('claims timer ownership without unblank when projection opens while timer is stopped', () => {
+    const mockClaimProjection = vi.fn()
+
+    vi.mocked(useProjection).mockReturnValue({
+      isProjectionOpen: false,
+      isProjectionBlanked: true,
+      projectionReadyCount: 0,
+      activeOwner: 'timer',
+      claimProjection: mockClaimProjection,
+      openProjection: vi.fn(),
+      closeProjection: vi.fn(),
+      blankProjection: vi.fn(),
+      project: vi.fn(),
+      send: vi.fn(),
+      on: vi.fn()
+    })
+
+    useTimerStore.setState({ status: 'stopped' })
+    const { rerender } = renderTimerPage()
+
+    vi.mocked(useProjection).mockReturnValue({
+      isProjectionOpen: true,
+      isProjectionBlanked: true,
+      projectionReadyCount: 0,
+      activeOwner: 'timer',
+      claimProjection: mockClaimProjection,
+      openProjection: vi.fn(),
+      closeProjection: vi.fn(),
+      blankProjection: vi.fn(),
+      project: vi.fn(),
+      send: vi.fn(),
+      on: vi.fn()
+    })
+
+    rerender(
+      <I18nextProvider i18n={i18n}>
+        <TimerPage />
+      </I18nextProvider>
+    )
+
+    expect(mockClaimProjection).toHaveBeenCalledWith('timer', { unblank: false })
+  })
+
+  it('does not claim projection when projection is closed', () => {
+    const mockClaimProjection = vi.fn()
+
+    vi.mocked(useProjection).mockReturnValue({
+      isProjectionOpen: false,
+      isProjectionBlanked: true,
+      projectionReadyCount: 0,
+      activeOwner: 'timer',
+      claimProjection: mockClaimProjection,
+      openProjection: vi.fn(),
+      closeProjection: vi.fn(),
+      blankProjection: vi.fn(),
+      project: vi.fn(),
+      send: vi.fn(),
+      on: vi.fn()
+    })
+
+    useTimerStore.setState({ status: 'running' })
+    renderTimerPage()
+
+    expect(mockClaimProjection).not.toHaveBeenCalled()
   })
 })
