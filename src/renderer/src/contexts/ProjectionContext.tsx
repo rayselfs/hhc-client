@@ -6,20 +6,34 @@ import type { ProjectionChannel, ProjectionPayload } from '@shared/projection-me
 /** Channels that carry displayable content (not system messages). */
 type ContentChannel = Exclude<ProjectionChannel, `__system:${string}`>
 
+/**
+ * Who currently "owns" the projection display.
+ * - 'timer': TimerProjectionBridge drives the projection (default)
+ * - 'bible': Bible page has taken over
+ * - 'media': Media page has taken over (reserved for future use)
+ */
+export type ProjectionOwner = 'timer' | 'bible' | 'media'
+
 interface ProjectOptions {
   /** When true, auto-reopen projection if it's closed. Default: false. */
   autoOpen?: boolean
-  /** When true, auto-unblank projection to show content. Default: false. */
-  autoShow?: boolean
 }
 
 interface ProjectionContextValue {
   isProjectionOpen: boolean
   isProjectionBlanked: boolean
+  projectionReadyCount: number
+  /** Who currently controls what is displayed on the projection. */
+  activeOwner: ProjectionOwner
+  /**
+   * Claim ownership of the projection display.
+   * Pass `unblank: true` to also unblank (use for explicit user actions only).
+   */
+  claimProjection: (owner: ProjectionOwner, options?: { unblank?: boolean }) => void
   openProjection: () => Promise<void>
   closeProjection: () => Promise<void>
   blankProjection: (blank: boolean) => void
-  /** High-level: send content to projection and unblank. Pass autoOpen to reopen if closed. */
+  /** Transport layer: send content to projection. Use claimProjection() for unblank/open. */
   project: <C extends ContentChannel>(
     channel: C,
     data: ProjectionPayload<C>,
@@ -48,6 +62,8 @@ function getAdapter(ref: React.RefObject<ProjectionAdapter | null>): ProjectionA
 export function ProjectionProvider({ children }: { children: React.ReactNode }): React.JSX.Element {
   const [isProjectionOpen, _setIsProjectionOpen] = useState(false)
   const [isProjectionBlanked, _setIsProjectionBlanked] = useState(true)
+  const [projectionReadyCount, setProjectionReadyCount] = useState(0)
+  const [activeOwner, setActiveOwner] = useState<ProjectionOwner>('timer')
   const adapterRef = useRef<ProjectionAdapter | null>(null)
   const projectionWindowRef = useRef<Window | null>(null)
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -56,7 +72,6 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
   const isProjectionBlankedRef = useRef(true)
   const isProjectionOpenRef = useRef(false)
   const pendingPayloadsRef = useRef(new Map<string, { channel: string; data: unknown }>())
-  const pendingAutoShowRef = useRef(false)
   const autoOpenTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const setIsProjectionBlanked = useCallback((blanked: boolean): void => {
@@ -78,7 +93,6 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
 
   const clearPending = useCallback((): void => {
     pendingPayloadsRef.current.clear()
-    pendingAutoShowRef.current = false
     if (autoOpenTimeoutRef.current) {
       clearTimeout(autoOpenTimeoutRef.current)
       autoOpenTimeoutRef.current = null
@@ -90,12 +104,8 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
     pendingPayloadsRef.current.forEach(({ channel, data }) => {
       adapter.send(channel as ContentChannel, data as ProjectionPayload<ContentChannel>)
     })
-    if (pendingAutoShowRef.current && isProjectionBlankedRef.current) {
-      setIsProjectionBlanked(false)
-      adapter.send('__system:blank', { showDefault: false })
-    }
     clearPending()
-  }, [setIsProjectionBlanked, clearPending])
+  }, [clearPending])
 
   const startPolling = useCallback((): void => {
     if (pollTimerRef.current) return
@@ -134,6 +144,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
         isReadyRef.current = true
         readyResolveRef.current?.()
         readyResolveRef.current = null
+        setProjectionReadyCount((c) => c + 1)
         flushPendingPayloads()
       })
 
@@ -162,6 +173,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       isReadyRef.current = true
       readyResolveRef.current?.()
       readyResolveRef.current = null
+      setProjectionReadyCount((c) => c + 1)
       flushPendingPayloads()
     })
 
@@ -223,6 +235,18 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
     }
   }, [stopPolling, setIsProjectionOpen, setIsProjectionBlanked, clearPending])
 
+  const claimProjection = useCallback(
+    (owner: ProjectionOwner, options?: { unblank?: boolean }): void => {
+      setActiveOwner(owner)
+      getAdapter(adapterRef).send('__system:active-owner', { owner })
+      if (options?.unblank && isProjectionBlankedRef.current) {
+        setIsProjectionBlanked(false)
+        getAdapter(adapterRef).send('__system:blank', { showDefault: false })
+      }
+    },
+    [setIsProjectionBlanked]
+  )
+
   const blankProjection = useCallback(
     (blank: boolean): void => {
       setIsProjectionBlanked(blank)
@@ -246,7 +270,6 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
     ): Promise<void> => {
       if (!isReadyRef.current) {
         pendingPayloadsRef.current.set(channel, { channel, data })
-        if (options?.autoShow) pendingAutoShowRef.current = true
 
         if (options?.autoOpen && !isProjectionOpenRef.current) {
           openProjection().catch(() => {
@@ -266,12 +289,8 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       }
 
       getAdapter(adapterRef).send(channel, data)
-      if (options?.autoShow && isProjectionBlankedRef.current) {
-        setIsProjectionBlanked(false)
-        getAdapter(adapterRef).send('__system:blank', { showDefault: false })
-      }
     },
-    [setIsProjectionBlanked, openProjection, clearPending]
+    [openProjection, clearPending]
   )
 
   const on = useCallback(
@@ -288,6 +307,9 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
     () => ({
       isProjectionOpen,
       isProjectionBlanked,
+      projectionReadyCount,
+      activeOwner,
+      claimProjection,
       openProjection,
       closeProjection,
       blankProjection,
@@ -298,6 +320,9 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
     [
       isProjectionOpen,
       isProjectionBlanked,
+      projectionReadyCount,
+      activeOwner,
+      claimProjection,
       openProjection,
       closeProjection,
       blankProjection,

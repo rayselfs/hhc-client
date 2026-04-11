@@ -31,16 +31,11 @@ export default function TimerProjectionBridge(): null {
   useEffect(() => {
     if (mode !== 'stopwatch') return
     if (!showSwOnProjection) return
-    const autoShow = swStatus === 'running' || swStatus === 'paused'
-    project(
-      'timer:stopwatch',
-      {
-        elapsedMs: swElapsedMs,
-        formattedTime: swFormattedTime,
-        status: swStatus
-      },
-      { autoOpen: autoShow, autoShow }
-    )
+    project('timer:stopwatch', {
+      elapsedMs: swElapsedMs,
+      formattedTime: swFormattedTime,
+      status: swStatus
+    })
   }, [mode, swElapsedMs, swFormattedTime, swStatus, showSwOnProjection, project])
 
   useEffect(() => {
@@ -54,23 +49,18 @@ export default function TimerProjectionBridge(): null {
     })
 
     const projectionMode = mode === 'stopwatch' && !showSwOnProjection ? 'clock' : mode
-    const autoShow = timerStatus === 'running' || timerStatus === 'paused'
 
-    project(
-      'timer:tick',
-      {
-        mode: projectionMode,
-        remainingSeconds,
-        phase,
-        mainDisplay: displayValues.mainDisplay,
-        subDisplay: displayValues.subDisplay,
-        progress,
-        overtimeSeconds,
-        overtimeMessage: overtimeMessageEnabled ? overtimeMessage : null,
-        reminderColor: reminderEnabled ? reminderColor : null
-      },
-      { autoOpen: autoShow, autoShow }
-    )
+    project('timer:tick', {
+      mode: projectionMode,
+      remainingSeconds,
+      phase,
+      mainDisplay: displayValues.mainDisplay,
+      subDisplay: displayValues.subDisplay,
+      progress,
+      overtimeSeconds,
+      overtimeMessage: overtimeMessageEnabled ? overtimeMessage : null,
+      reminderColor: reminderEnabled ? reminderColor : null
+    })
   }, [
     timerStatus,
     mode,

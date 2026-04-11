@@ -12,6 +12,9 @@ vi.mock('@renderer/contexts/ProjectionContext', () => ({
     project: mockProject,
     isProjectionOpen: mockIsProjectionOpen,
     isProjectionBlanked: true,
+    projectionReadyCount: 0,
+    activeOwner: 'timer',
+    claimProjection: vi.fn(),
     openProjection: vi.fn(),
     closeProjection: vi.fn(),
     blankProjection: vi.fn(),
@@ -61,8 +64,7 @@ describe('TimerProjectionBridge — timer:tick projection', () => {
       expect.objectContaining({
         mode: 'timer',
         phase: 'idle'
-      }),
-      expect.objectContaining({ autoShow: false })
+      })
     )
   })
 
@@ -76,8 +78,7 @@ describe('TimerProjectionBridge — timer:tick projection', () => {
     renderBridge()
     expect(mockProject).toHaveBeenCalledWith(
       'timer:tick',
-      expect.objectContaining({ mode: 'timer' }),
-      expect.objectContaining({ autoShow: true, autoOpen: true })
+      expect.objectContaining({ mode: 'timer' })
     )
   })
 
@@ -86,8 +87,7 @@ describe('TimerProjectionBridge — timer:tick projection', () => {
     renderBridge()
     expect(mockProject).toHaveBeenCalledWith(
       'timer:tick',
-      expect.objectContaining({ mode: 'timer' }),
-      expect.objectContaining({ autoShow: false, autoOpen: false })
+      expect.objectContaining({ mode: 'timer' })
     )
   })
 
@@ -98,8 +98,7 @@ describe('TimerProjectionBridge — timer:tick projection', () => {
 
     expect(mockProject).toHaveBeenCalledWith(
       'timer:tick',
-      expect.objectContaining({ mode: 'clock' }),
-      expect.objectContaining({ autoShow: false })
+      expect.objectContaining({ mode: 'clock' })
     )
   })
 })
@@ -120,8 +119,7 @@ describe('TimerProjectionBridge — timer:stopwatch projection', () => {
         elapsedMs: 0,
         formattedTime: '00:00',
         status: 'stopped'
-      }),
-      expect.objectContaining({ autoShow: false })
+      })
     )
   })
 
@@ -148,8 +146,7 @@ describe('TimerProjectionBridge — timer:stopwatch projection', () => {
         elapsedMs: 1500,
         formattedTime: '00:01',
         status: 'running'
-      }),
-      expect.objectContaining({ autoShow: true })
+      })
     )
   })
 

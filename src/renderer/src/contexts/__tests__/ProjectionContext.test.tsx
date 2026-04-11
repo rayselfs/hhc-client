@@ -270,14 +270,14 @@ describe('ProjectionContext — web mode', () => {
     warnSpy.mockRestore()
   })
 
-  it('project() autoShow: unblank happens on flush', async () => {
+  it('project() autoShow: unblank no longer happens on flush (use claimProjection instead)', async () => {
     const { result } = renderProjection()
 
     await act(async () => {
       await result.current.project(
         'timer:overtime-message',
         { message: 'show-me' },
-        { autoOpen: true, autoShow: true }
+        { autoOpen: true }
       )
     })
 
@@ -290,8 +290,8 @@ describe('ProjectionContext — web mode', () => {
     expect(mockAdapter.send).toHaveBeenCalledWith('timer:overtime-message', {
       message: 'show-me'
     })
-    expect(mockAdapter.send).toHaveBeenCalledWith('__system:blank', { showDefault: false })
-    expect(result.current.isProjectionBlanked).toBe(false)
+    expect(mockAdapter.send).not.toHaveBeenCalledWith('__system:blank', { showDefault: false })
+    expect(result.current.isProjectionBlanked).toBe(true)
   })
 
   it('__system:closed clears pending payloads', async () => {
@@ -331,27 +331,7 @@ describe('ProjectionContext — web mode', () => {
     expect(result.current.isProjectionBlanked).toBe(true)
   })
 
-  it('project() with autoShow unblanks projection', async () => {
-    const { result } = renderProjection()
-
-    act(() => {
-      mockAdapter._trigger('__system:ready', null)
-    })
-
-    await act(async () => {
-      await result.current.project(
-        'timer:overtime-message',
-        { message: 'hello' },
-        { autoShow: true }
-      )
-    })
-
-    expect(mockAdapter.send).toHaveBeenCalledWith('timer:overtime-message', { message: 'hello' })
-    expect(mockAdapter.send).toHaveBeenCalledWith('__system:blank', { showDefault: false })
-    expect(result.current.isProjectionBlanked).toBe(false)
-  })
-
-  it('project() without autoShow does not unblank projection', async () => {
+  it('project() does not unblank projection (pure transport)', async () => {
     const { result } = renderProjection()
 
     act(() => {
