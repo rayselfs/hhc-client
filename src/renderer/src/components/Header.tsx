@@ -5,7 +5,9 @@ import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
 import { ButtonGroup, Button, toast } from '@heroui/react'
 import { X, Monitor, MonitorOff, ExternalLink } from 'lucide-react'
 import ModeSelector from '@renderer/components/Timer/ModeSelector'
+import SettingsPopover from '@renderer/components/SettingsPopover'
 import { isTimerRoute } from '@renderer/lib/routes'
+import { useTimerStore } from '@renderer/stores/timer'
 
 export default function Header(): React.JSX.Element {
   const { t } = useTranslation()
@@ -18,6 +20,7 @@ export default function Header(): React.JSX.Element {
     blankProjection
   } = useProjection()
   const confirm = useConfirm()
+  const mode = useTimerStore((s) => s.mode)
 
   const showTimerControls = isTimerRoute(location.pathname)
 
@@ -44,11 +47,16 @@ export default function Header(): React.JSX.Element {
   return (
     <header className="relative flex items-center justify-end gap-2 p-2">
       {showTimerControls && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="pointer-events-auto">
-            <ModeSelector />
+        <>
+          <div className="absolute left-2 top-1/2 -translate-y-1/2">
+            <SettingsPopover mode={mode} />
           </div>
-        </div>
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="pointer-events-auto">
+              <ModeSelector />
+            </div>
+          </div>
+        </>
       )}
       <div className="flex items-center gap-2">
         <ButtonGroup size="lg">

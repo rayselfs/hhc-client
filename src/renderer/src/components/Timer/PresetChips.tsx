@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { Chip, Button } from '@heroui/react'
-import { Plus, X } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { useTimerStore } from '@renderer/stores/timer'
 
 function formatDurationLabel(seconds: number): string {
@@ -35,15 +35,26 @@ export default function PresetChips({ className }: PresetChipsProps): React.JSX.
     addPreset(name, totalDuration)
   }
 
+  const handleContextMenu = (e: React.MouseEvent, presetId: string): void => {
+    e.preventDefault()
+    if (isRunning) return
+    removePreset(presetId)
+  }
+
   return (
     <div className={className}>
-      <h3 className="text-base font-medium mb-2">{t('timer.presets')}</h3>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-col items-stretch gap-2">
         {presets.map((preset) => (
           <Chip
             key={preset.id}
             size="lg"
-            className={`text-base px-4 py-2 ${isRunning ? 'opacity-50 pointer-events-none' : 'cursor-pointer'}`}
+            className={[
+              'text-base px-4 py-2 transition-colors',
+              isRunning
+                ? 'opacity-50 pointer-events-none'
+                : 'cursor-pointer hover:bg-default-200 active:bg-default-300'
+            ].join(' ')}
+            onContextMenu={(e) => handleContextMenu(e, preset.id)}
           >
             <span
               role="button"
@@ -54,28 +65,15 @@ export default function PresetChips({ className }: PresetChipsProps): React.JSX.
                 if (!isRunning && (e.key === 'Enter' || e.key === ' ')) applyPreset(preset.id)
               }}
               onClick={() => !isRunning && applyPreset(preset.id)}
-              className="pr-1"
             >
               {preset.name}
             </span>
-            <button
-              type="button"
-              aria-label={`${t('timer.deletePreset')} ${preset.name}`}
-              disabled={isRunning}
-              onClick={(e) => {
-                e.stopPropagation()
-                removePreset(preset.id)
-              }}
-              className="ml-1 inline-flex items-center justify-center rounded-full hover:opacity-70"
-            >
-              <X className="size-3" />
-            </button>
           </Chip>
         ))}
         <Button
           size="sm"
           variant="outline"
-          className="text-base px-4 h-auto py-2 rounded-full"
+          className="text-base h-auto py-1 rounded-full w-full"
           onPress={handleAdd}
           isDisabled={isRunning || hasDuplicate}
           aria-label={t('timer.addPreset')}

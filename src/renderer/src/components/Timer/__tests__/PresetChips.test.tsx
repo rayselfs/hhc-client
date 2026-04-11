@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import type { RenderResult } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { I18nextProvider } from 'react-i18next'
@@ -65,16 +65,9 @@ describe('PresetChips — rendering', () => {
     expect(screen.getByRole('button', { name: 'Add Preset' })).toBeInTheDocument()
   })
 
-  it('renders delete button for each preset', () => {
+  it('does not render inline delete buttons', () => {
     renderWithI18n()
-    expect(screen.getByRole('button', { name: 'Delete Preset 10:00' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Delete Preset 05:00' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Delete Preset 03:00' })).toBeInTheDocument()
-  })
-
-  it('renders Presets title', () => {
-    renderWithI18n()
-    expect(screen.getByText('Presets')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /delete preset/i })).not.toBeInTheDocument()
   })
 })
 
@@ -98,23 +91,42 @@ describe('PresetChips — applyPreset', () => {
   })
 })
 
-describe('PresetChips — removePreset', () => {
-  it('clicking delete button calls removePreset with correct id', async () => {
-    const user = userEvent.setup()
+describe('PresetChips — removePreset via right-click', () => {
+  it('right-clicking chip directly calls removePreset with correct id', () => {
     const removePresetSpy = vi.fn()
     useTimerStore.setState({ removePreset: removePresetSpy } as never)
     renderWithI18n()
-    await user.click(screen.getByRole('button', { name: 'Delete Preset 05:00' }))
+
+    const chip =
+      screen.getByRole('button', { name: '05:00' }).closest('li') ??
+      screen.getByRole('button', { name: '05:00' }).parentElement!
+    fireEvent.contextMenu(chip)
+
     expect(removePresetSpy).toHaveBeenCalledWith('preset-5m')
   })
 
-  it('clicking delete for 10m calls removePreset with preset-10m', async () => {
-    const user = userEvent.setup()
+  it('right-clicking 10m chip calls removePreset with preset-10m', () => {
     const removePresetSpy = vi.fn()
     useTimerStore.setState({ removePreset: removePresetSpy } as never)
     renderWithI18n()
-    await user.click(screen.getByRole('button', { name: 'Delete Preset 10:00' }))
+
+    const chip =
+      screen.getByRole('button', { name: '10:00' }).closest('li') ??
+      screen.getByRole('button', { name: '10:00' }).parentElement!
+    fireEvent.contextMenu(chip)
+
     expect(removePresetSpy).toHaveBeenCalledWith('preset-10m')
+  })
+
+  it('right-clicking while running does not call removePreset', () => {
+    const removePresetSpy = vi.fn()
+    useTimerStore.setState({ removePreset: removePresetSpy, status: 'running' } as never)
+    renderWithI18n()
+
+    const chip = screen.getByRole('button', { name: '05:00' }).parentElement!
+    fireEvent.contextMenu(chip)
+
+    expect(removePresetSpy).not.toHaveBeenCalled()
   })
 })
 
@@ -183,12 +195,5 @@ describe('PresetChips — disabled while running', () => {
     renderWithI18n()
     await user.click(screen.getByRole('button', { name: '05:00' }))
     expect(applyPresetSpy).not.toHaveBeenCalled()
-  })
-
-  it('delete buttons are disabled when timer is running', () => {
-    useTimerStore.setState({ presets: SAMPLE_PRESETS, status: 'running' })
-    renderWithI18n()
-    expect(screen.getByRole('button', { name: 'Delete Preset 10:00' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Delete Preset 05:00' })).toBeDisabled()
   })
 })

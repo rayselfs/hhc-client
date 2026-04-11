@@ -4,7 +4,6 @@ import { I18nextProvider } from 'react-i18next'
 import i18n from '@renderer/i18n'
 import { useTimerStore, DEFAULT_SETTINGS, DEFAULT_STATE } from '@renderer/stores/timer'
 import { useStopwatchStore } from '@renderer/stores/stopwatch'
-
 import TimerPage from '../TimerPage'
 
 function renderTimerPage(): RenderResult {

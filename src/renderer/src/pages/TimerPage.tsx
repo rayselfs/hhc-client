@@ -7,7 +7,6 @@ import StopwatchDisplay from '@renderer/components/Timer/StopwatchDisplay'
 import TimerControls from '@renderer/components/Timer/TimerControls'
 import TimeAdjustment from '@renderer/components/Timer/TimeAdjustment'
 import PresetChips from '@renderer/components/Timer/PresetChips'
-import TimerSettings from '@renderer/components/Timer/TimerSettings'
 
 export default function TimerPage(): React.JSX.Element {
   const mode = useTimerStore((s) => s.mode)
@@ -37,31 +36,33 @@ export default function TimerPage(): React.JSX.Element {
   const isClock = mode === 'clock'
 
   return (
-    <div data-testid="timer-page" className="flex flex-col items-center gap-4 h-full">
+    <div data-testid="timer-page" className="flex h-full gap-4">
       {isTimerLike && (
-        <div className="flex flex-col items-center gap-4 flex-1 w-full">
-          <TimerDisplay
-            progress={progress}
-            mainDisplay={displayValues.mainDisplay}
-            subDisplay={displayValues.subDisplay}
-            phase={phase}
-            overtimeDisplay={displayValues.overtimeDisplay}
-            warningColor={reminderEnabled ? reminderColor : null}
-            canEditTime={timerStatus === 'stopped' && phase !== 'overtime'}
-            onTimeConfirm={(seconds) => setDuration(seconds)}
-          />
-          <TimeAdjustment className="mb-3" />
-          <TimerControls mode={mode} disableStart={isClock} />
-          <PresetChips className="self-start my-3" />
-          <TimerSettings mode={mode} className="self-start mb-3" />
-        </div>
+        <>
+          <div className="flex flex-col items-center gap-4 flex-1">
+            <TimerDisplay
+              progress={progress}
+              mainDisplay={displayValues.mainDisplay}
+              subDisplay={displayValues.subDisplay}
+              phase={phase}
+              overtimeDisplay={displayValues.overtimeDisplay}
+              warningColor={reminderEnabled ? reminderColor : null}
+              canEditTime={timerStatus === 'stopped' && phase !== 'overtime'}
+              onTimeConfirm={(seconds) => setDuration(seconds)}
+            />
+            <TimeAdjustment className="mb-3" />
+            <TimerControls mode={mode} disableStart={isClock} />
+          </div>
+          <div className="flex flex-col gap-2 py-2">
+            <PresetChips />
+          </div>
+        </>
       )}
 
       {mode === 'stopwatch' && (
         <div className="flex flex-col items-center gap-4 flex-1 w-full">
           <StopwatchDisplay formattedTime={swFormattedTime} size={80} />
           <TimerControls mode="stopwatch" />
-          <TimerSettings mode="stopwatch" className="self-start mt-3" />
         </div>
       )}
     </div>

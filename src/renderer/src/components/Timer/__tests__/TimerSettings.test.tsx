@@ -3,7 +3,7 @@ import type { RenderResult } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { I18nextProvider } from 'react-i18next'
 import i18n from '@renderer/i18n'
-import TimerSettings from '@renderer/components/Timer/TimerSettings'
+import SettingsPopover from '@renderer/components/SettingsPopover'
 import { useTimerStore } from '@renderer/stores/timer'
 import { useStopwatchStore } from '@renderer/stores/stopwatch'
 import { DEFAULT_SETTINGS, DEFAULT_STATE } from '@renderer/stores/timer'
@@ -21,37 +21,46 @@ beforeEach(() => {
   })
 })
 
-function renderWithI18n(): RenderResult {
+function renderWithI18n(mode?: 'stopwatch'): RenderResult {
   return render(
     <I18nextProvider i18n={i18n}>
-      <TimerSettings />
+      <SettingsPopover mode={mode} />
     </I18nextProvider>
   )
 }
 
-describe('TimerSettings — inline rendering', () => {
-  it('renders settings region', () => {
+describe('SettingsPopover — trigger button', () => {
+  it('renders settings trigger button', () => {
     renderWithI18n()
-    expect(screen.getByRole('region', { name: /settings/i })).toBeInTheDocument()
-  })
-
-  it('renders both switch controls', () => {
-    renderWithI18n()
-    const switches = screen.getAllByRole('switch')
-    expect(switches).toHaveLength(2)
+    expect(screen.getByRole('button', { name: /settings/i })).toBeInTheDocument()
   })
 })
 
-describe('TimerSettings — reminder toggle', () => {
+describe('SettingsPopover — timer mode', () => {
+  it('renders settings region after opening popover', async () => {
+    const user = userEvent.setup()
+    renderWithI18n()
+    await user.click(screen.getByRole('button', { name: /settings/i }))
+    expect(screen.getByRole('region', { name: /settings/i })).toBeInTheDocument()
+  })
+
+  it('renders both timer switches in popover', async () => {
+    const user = userEvent.setup()
+    renderWithI18n()
+    await user.click(screen.getByRole('button', { name: /settings/i }))
+    const switches = screen.getAllByRole('switch')
+    expect(switches).toHaveLength(2)
+  })
+
   it('toggling reminder switch calls setReminder with new enabled state', async () => {
     const user = userEvent.setup()
     const setReminderSpy = vi.fn()
     useTimerStore.setState({ setReminder: setReminderSpy } as never)
     renderWithI18n()
+    await user.click(screen.getByRole('button', { name: /settings/i }))
 
     const switches = screen.getAllByRole('switch')
-    const reminderSwitch = switches[0]
-    await user.click(reminderSwitch)
+    await user.click(switches[0])
 
     expect(setReminderSpy).toHaveBeenCalledWith(true, 60)
   })
@@ -65,30 +74,112 @@ describe('TimerSettings — reminder toggle', () => {
       setReminder: setReminderSpy
     } as never)
     renderWithI18n()
+    await user.click(screen.getByRole('button', { name: /settings/i }))
 
     const switches = screen.getAllByRole('switch')
-    const reminderSwitch = switches[0]
-    await user.click(reminderSwitch)
+    await user.click(switches[0])
 
     expect(setReminderSpy).toHaveBeenCalledWith(false, 30)
   })
 })
 
-describe('TimerSettings — reminder input visibility', () => {
-  it('does not show reminder duration input when reminder is disabled', () => {
+describe('SettingsPopover — reminder duration/color always visible', () => {
+  it('shows reminder duration input when popover is open (reminder disabled)', async () => {
+    const user = userEvent.setup()
     useTimerStore.setState({ reminderEnabled: false })
     renderWithI18n()
-    expect(screen.queryByRole('spinbutton', { name: /reminder time/i })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /settings/i }))
+    expect(screen.getByRole('spinbutton', { name: /reminder time/i })).toBeInTheDocument()
   })
 
-  it('shows reminder duration input when reminder is enabled', () => {
+  it('shows reminder duration input when popover is open (reminder enabled)', async () => {
+    const user = userEvent.setup()
     useTimerStore.setState({ reminderEnabled: true })
     renderWithI18n()
+    await user.click(screen.getByRole('button', { name: /settings/i }))
     expect(screen.getByRole('spinbutton', { name: /reminder time/i })).toBeInTheDocument()
+  })
+
+  it('disables reminder duration input when reminder switch is off', async () => {
+    const user = userEvent.setup()
+    useTimerStore.setState({ reminderEnabled: false, totalDuration: 300 })
+    renderWithI18n()
+    await user.click(screen.getByRole('button', { name: /settings/i }))
+    expect(screen.getByRole('spinbutton', { name: /reminder time/i })).toBeDisabled()
+  })
+
+  it('enables reminder duration input when reminder switch is on and timer stopped', async () => {
+    const user = userEvent.setup()
+    useTimerStore.setState({ reminderEnabled: true, totalDuration: 300, status: 'stopped' })
+    renderWithI18n()
+    await user.click(screen.getByRole('button', { name: /settings/i }))
+    expect(screen.getByRole('spinbutton', { name: /reminder time/i })).not.toBeDisabled()
+  })
+
+  it('disables reminder duration input when timer is running (even if reminder enabled)', async () => {
+    const user = userEvent.setup()
+    useTimerStore.setState({ reminderEnabled: true, totalDuration: 300, status: 'running' })
+    renderWithI18n()
+    await user.click(screen.getByRole('button', { name: /settings/i }))
+    expect(screen.getByRole('spinbutton', { name: /reminder time/i })).toBeDisabled()
+  })
+
+  it('disables reminder color picker when reminder switch is off', async () => {
+    const user = userEvent.setup()
+    useTimerStore.setState({ reminderEnabled: false, totalDuration: 300 })
+    renderWithI18n()
+    await user.click(screen.getByRole('button', { name: /settings/i }))
+    expect(screen.getByLabelText(/reminder color/i)).toHaveClass('pointer-events-none')
+  })
+
+  it('disables reminder color picker when timer is running', async () => {
+    const user = userEvent.setup()
+    useTimerStore.setState({ reminderEnabled: true, totalDuration: 300, status: 'running' })
+    renderWithI18n()
+    await user.click(screen.getByRole('button', { name: /settings/i }))
+    expect(screen.getByLabelText(/reminder color/i)).toHaveClass('pointer-events-none')
   })
 })
 
-describe('TimerSettings — reminder duration input', () => {
+describe('SettingsPopover — reminder switch disabled states', () => {
+  it('disables reminder switch when totalDuration <= 30', async () => {
+    const user = userEvent.setup()
+    useTimerStore.setState({ totalDuration: 30, remainingSeconds: 30 })
+    renderWithI18n()
+    await user.click(screen.getByRole('button', { name: /settings/i }))
+    const switches = screen.getAllByRole('switch')
+    expect(switches[0]).toBeDisabled()
+  })
+
+  it('disables reminder switch when timer is running', async () => {
+    const user = userEvent.setup()
+    useTimerStore.setState({ totalDuration: 300, status: 'running' })
+    renderWithI18n()
+    await user.click(screen.getByRole('button', { name: /settings/i }))
+    const switches = screen.getAllByRole('switch')
+    expect(switches[0]).toBeDisabled()
+  })
+
+  it('disables reminder switch when timer is paused', async () => {
+    const user = userEvent.setup()
+    useTimerStore.setState({ totalDuration: 300, status: 'paused' })
+    renderWithI18n()
+    await user.click(screen.getByRole('button', { name: /settings/i }))
+    const switches = screen.getAllByRole('switch')
+    expect(switches[0]).toBeDisabled()
+  })
+
+  it('enables reminder switch when timer is stopped and duration > 30', async () => {
+    const user = userEvent.setup()
+    useTimerStore.setState({ totalDuration: 300, status: 'stopped' })
+    renderWithI18n()
+    await user.click(screen.getByRole('button', { name: /settings/i }))
+    const switches = screen.getAllByRole('switch')
+    expect(switches[0]).not.toBeDisabled()
+  })
+})
+
+describe('SettingsPopover — reminder duration input', () => {
   it('changing reminder duration calls setReminder with new seconds', async () => {
     const user = userEvent.setup()
     const setReminderSpy = vi.fn()
@@ -98,6 +189,7 @@ describe('TimerSettings — reminder duration input', () => {
       setReminder: setReminderSpy
     } as never)
     renderWithI18n()
+    await user.click(screen.getByRole('button', { name: /settings/i }))
 
     const durationInput = screen.getByRole('spinbutton', { name: /reminder time/i })
     await user.tripleClick(durationInput)
@@ -115,6 +207,7 @@ describe('TimerSettings — reminder duration input', () => {
       setReminder: setReminderSpy
     } as never)
     renderWithI18n()
+    await user.click(screen.getByRole('button', { name: /settings/i }))
 
     const switches = screen.getAllByRole('switch')
     await user.click(switches[0])
@@ -122,93 +215,29 @@ describe('TimerSettings — reminder duration input', () => {
     expect(setReminderSpy).toHaveBeenCalledWith(true, 35)
   })
 
-  it('disables reminder switch when totalDuration <= 30', () => {
-    useTimerStore.setState({ totalDuration: 30, remainingSeconds: 30 })
-    renderWithI18n()
-
-    const switches = screen.getAllByRole('switch')
-    expect(switches[0]).toBeDisabled()
-  })
-
-  it('enables reminder switch when totalDuration > 30', () => {
-    useTimerStore.setState({ totalDuration: 31, remainingSeconds: 31 })
-    renderWithI18n()
-
-    const switches = screen.getAllByRole('switch')
-    expect(switches[0]).not.toBeDisabled()
-  })
-
-  it('disables reminder switch when timer is running', () => {
-    useTimerStore.setState({ totalDuration: 300, status: 'running' })
-    renderWithI18n()
-
-    const switches = screen.getAllByRole('switch')
-    expect(switches[0]).toBeDisabled()
-  })
-
-  it('disables reminder switch when timer is paused', () => {
-    useTimerStore.setState({ totalDuration: 300, status: 'paused' })
-    renderWithI18n()
-
-    const switches = screen.getAllByRole('switch')
-    expect(switches[0]).toBeDisabled()
-  })
-
-  it('enables reminder switch when timer is stopped', () => {
-    useTimerStore.setState({ totalDuration: 300, status: 'stopped' })
-    renderWithI18n()
-
-    const switches = screen.getAllByRole('switch')
-    expect(switches[0]).not.toBeDisabled()
-  })
-
-  it('disables reminder duration input when timer is running', () => {
-    useTimerStore.setState({
-      totalDuration: 300,
-      reminderEnabled: true,
-      reminderDuration: 60,
-      status: 'running'
-    })
-    renderWithI18n()
-
-    expect(screen.getByRole('spinbutton', { name: /reminder time/i })).toBeDisabled()
-  })
-
-  it('disables reminder color picker when timer is running', () => {
-    useTimerStore.setState({
-      totalDuration: 300,
-      reminderEnabled: true,
-      reminderDuration: 60,
-      status: 'running'
-    })
-    renderWithI18n()
-
-    const colorInput = screen.getByLabelText(/reminder color/i)
-    expect(colorInput).toBeDisabled()
-  })
-
-  it('shows validation error when user sets reminderDuration >= totalDuration', () => {
+  it('shows validation error when reminderDuration >= totalDuration', async () => {
+    const user = userEvent.setup()
     useTimerStore.setState({
       reminderEnabled: true,
       reminderDuration: 300,
       totalDuration: 300
     })
     renderWithI18n()
-
+    await user.click(screen.getByRole('button', { name: /settings/i }))
     expect(screen.getByRole('alert')).toHaveTextContent(/less than total duration/i)
   })
 })
 
-describe('TimerSettings — overtime message toggle', () => {
+describe('SettingsPopover — overtime message toggle', () => {
   it('toggling overtime switch calls setOvertimeMessage with new enabled state', async () => {
     const user = userEvent.setup()
     const setOvertimeMessageSpy = vi.fn()
     useTimerStore.setState({ setOvertimeMessage: setOvertimeMessageSpy } as never)
     renderWithI18n()
+    await user.click(screen.getByRole('button', { name: /settings/i }))
 
     const switches = screen.getAllByRole('switch')
-    const overtimeSwitch = switches[1]
-    await user.click(overtimeSwitch)
+    await user.click(switches[1])
 
     expect(setOvertimeMessageSpy).toHaveBeenCalledWith(true, "Time's Up!")
   })
@@ -222,30 +251,34 @@ describe('TimerSettings — overtime message toggle', () => {
       setOvertimeMessage: setOvertimeMessageSpy
     } as never)
     renderWithI18n()
+    await user.click(screen.getByRole('button', { name: /settings/i }))
 
     const switches = screen.getAllByRole('switch')
-    const overtimeSwitch = switches[1]
-    await user.click(overtimeSwitch)
+    await user.click(switches[1])
 
     expect(setOvertimeMessageSpy).toHaveBeenCalledWith(false, 'Custom!')
   })
 })
 
-describe('TimerSettings — overtime input visibility', () => {
-  it('does not show overtime message input when overtime is disabled', () => {
+describe('SettingsPopover — overtime input visibility', () => {
+  it('does not show overtime message input when overtime is disabled', async () => {
+    const user = userEvent.setup()
     useTimerStore.setState({ overtimeMessageEnabled: false })
     renderWithI18n()
+    await user.click(screen.getByRole('button', { name: /settings/i }))
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
   })
 
-  it('shows overtime message input when overtime is enabled', () => {
+  it('shows overtime message input when overtime is enabled', async () => {
+    const user = userEvent.setup()
     useTimerStore.setState({ overtimeMessageEnabled: true })
     renderWithI18n()
+    await user.click(screen.getByRole('button', { name: /settings/i }))
     expect(screen.getByRole('textbox')).toBeInTheDocument()
   })
 })
 
-describe('TimerSettings — overtime message text input', () => {
+describe('SettingsPopover — overtime message text input', () => {
   it('changing overtime message text calls setOvertimeMessage', async () => {
     const user = userEvent.setup()
     const setOvertimeMessageSpy = vi.fn()
@@ -255,6 +288,7 @@ describe('TimerSettings — overtime message text input', () => {
       setOvertimeMessage: setOvertimeMessageSpy
     } as never)
     renderWithI18n()
+    await user.click(screen.getByRole('button', { name: /settings/i }))
 
     const overtimeInput = screen.getByRole('textbox')
     await user.type(overtimeInput, 'Hi')
@@ -271,6 +305,7 @@ describe('TimerSettings — overtime message text input', () => {
       setOvertimeMessage: setOvertimeMessageSpy
     } as never)
     renderWithI18n()
+    await user.click(screen.getByRole('button', { name: /settings/i }))
 
     const overtimeInput = screen.getByRole('textbox')
     await user.type(overtimeInput, 'ABCDEFGHIJKLMNOPQRSTU')
@@ -281,22 +316,23 @@ describe('TimerSettings — overtime message text input', () => {
   })
 })
 
-describe('TimerSettings — stopwatch mode', () => {
-  function renderStopwatchSettings(): RenderResult {
-    return render(
-      <I18nextProvider i18n={i18n}>
-        <TimerSettings mode="stopwatch" />
-      </I18nextProvider>
-    )
-  }
+describe('SettingsPopover — stopwatch mode', () => {
+  it('renders settings trigger button in stopwatch mode', () => {
+    renderWithI18n('stopwatch')
+    expect(screen.getByRole('button', { name: /settings/i })).toBeInTheDocument()
+  })
 
-  it('renders show-on-projection switch in stopwatch mode', () => {
-    renderStopwatchSettings()
+  it('renders show-on-projection switch in stopwatch mode after opening popover', async () => {
+    const user = userEvent.setup()
+    renderWithI18n('stopwatch')
+    await user.click(screen.getByRole('button', { name: /settings/i }))
     expect(screen.getByTestId('switch-show-stopwatch-projection')).toBeInTheDocument()
   })
 
-  it('does not render reminder or overtime switches in stopwatch mode', () => {
-    renderStopwatchSettings()
+  it('renders only one switch in stopwatch mode', async () => {
+    const user = userEvent.setup()
+    renderWithI18n('stopwatch')
+    await user.click(screen.getByRole('button', { name: /settings/i }))
     const switches = screen.getAllByRole('switch')
     expect(switches).toHaveLength(1)
   })
@@ -304,7 +340,8 @@ describe('TimerSettings — stopwatch mode', () => {
   it('toggling show-on-projection calls setShowOnProjection', async () => {
     const user = userEvent.setup()
     useStopwatchStore.setState({ showOnProjection: false })
-    renderStopwatchSettings()
+    renderWithI18n('stopwatch')
+    await user.click(screen.getByRole('button', { name: /settings/i }))
 
     const sw = screen.getByRole('switch')
     await user.click(sw)
