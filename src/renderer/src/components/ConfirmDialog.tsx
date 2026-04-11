@@ -1,64 +1,80 @@
-import { Modal, useOverlayState } from '@heroui/react'
-import { AlertTriangle } from 'lucide-react'
+import { AlertDialog, Button, useOverlayState } from '@heroui/react'
 import { useTranslation } from 'react-i18next'
+import { useEffect } from 'react'
+import {
+  useConfirmDialogState,
+  type ConfirmDialogStatus
+} from '@renderer/contexts/ConfirmDialogContext'
 
-interface ConfirmDialogProps {
-  isOpen: boolean
-  onOpenChange: (open: boolean) => void
-  description: string
-  onConfirm: () => void
-  confirmLabel?: string
-  cancelLabel?: string
+type AlertDialogIconStatus = 'default' | 'accent' | 'success' | 'warning' | 'danger'
+
+type TitleKey = 'common.warning' | 'common.danger' | 'common.info'
+
+const STATUS_TITLES: Record<ConfirmDialogStatus, TitleKey> = {
+  warning: 'common.warning',
+  danger: 'common.danger',
+  info: 'common.info'
 }
 
-export default function ConfirmDialog({
-  isOpen,
-  onOpenChange,
-  description,
-  onConfirm,
-  confirmLabel,
-  cancelLabel
-}: ConfirmDialogProps): React.JSX.Element {
-  const { t } = useTranslation()
-  const state = useOverlayState({ isOpen, onOpenChange })
+const STATUS_ALERT: Record<ConfirmDialogStatus, AlertDialogIconStatus> = {
+  warning: 'warning',
+  danger: 'danger',
+  info: 'accent'
+}
 
-  const handleConfirm = (): void => {
-    onConfirm()
-    onOpenChange(false)
-  }
+const STATUS_CONFIRM_VARIANT: Record<ConfirmDialogStatus, 'danger' | 'primary'> = {
+  warning: 'danger',
+  danger: 'danger',
+  info: 'primary'
+}
+
+export default function ConfirmDialog(): React.JSX.Element {
+  const { t } = useTranslation()
+  const { pending, settle } = useConfirmDialogState()
+  const state = useOverlayState()
+
+  useEffect(() => {
+    if (pending) {
+      state.open()
+    } else {
+      state.close()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pending])
+
+  if (!pending) return <></>
+
+  const { status = 'warning', title, description, confirmLabel, cancelLabel } = pending.options
+  const resolvedTitle = title !== undefined ? title : t(STATUS_TITLES[status])
+  const alertStatus = STATUS_ALERT[status]
+  const confirmVariant = STATUS_CONFIRM_VARIANT[status]
 
   return (
-    <Modal.Root state={state}>
-      <Modal.Trigger />
-      <Modal.Backdrop>
-        <Modal.Container size="sm">
-          <Modal.Dialog>
-            <Modal.Header>
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="size-5 text-yellow-500" />
-                <Modal.Heading>{t('common.warning')}</Modal.Heading>
-              </div>
-            </Modal.Header>
-            <Modal.Body>
-              <p className="text-sm">{description}</p>
-            </Modal.Body>
-            <Modal.Footer className="flex justify-end gap-2">
-              <button
-                className="rounded-lg px-3 py-1.5 text-sm font-medium transition-colors hover:bg-default-100"
-                onClick={() => onOpenChange(false)}
-              >
-                {cancelLabel ?? t('common.cancel')}
-              </button>
-              <button
-                className="rounded-lg bg-danger-soft px-3 py-1.5 text-sm font-medium text-danger-soft-foreground hover:bg-danger-soft-hover transition-colors"
-                onClick={handleConfirm}
-              >
-                {confirmLabel ?? t('common.confirm')}
-              </button>
-            </Modal.Footer>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
-    </Modal.Root>
+    <AlertDialog.Backdrop
+      isOpen={state.isOpen}
+      onOpenChange={(open) => {
+        if (!open) settle(false)
+      }}
+    >
+      <AlertDialog.Container size="sm">
+        <AlertDialog.Dialog>
+          <AlertDialog.Header>
+            <AlertDialog.Icon status={alertStatus} />
+            <AlertDialog.Heading>{resolvedTitle}</AlertDialog.Heading>
+          </AlertDialog.Header>
+          <AlertDialog.Body>
+            <p className="text-sm">{description}</p>
+          </AlertDialog.Body>
+          <AlertDialog.Footer>
+            <Button variant="tertiary" onPress={() => settle(false)}>
+              {cancelLabel ?? t('common.cancel')}
+            </Button>
+            <Button variant={confirmVariant} onPress={() => settle(true)}>
+              {confirmLabel ?? t('common.confirm')}
+            </Button>
+          </AlertDialog.Footer>
+        </AlertDialog.Dialog>
+      </AlertDialog.Container>
+    </AlertDialog.Backdrop>
   )
 }
