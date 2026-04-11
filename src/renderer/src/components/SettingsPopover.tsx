@@ -86,7 +86,7 @@ export default function SettingsPopover({ mode }: SettingsPopoverProps): React.J
       <Button size="lg" isIconOnly variant="outline" aria-label={t('timer.settings')}>
         <Settings className="size-4" />
       </Button>
-      <Popover.Content placement="bottom start" className="w-96">
+      <Popover.Content placement="bottom start" className="w-80">
         <Popover.Dialog>
           <section aria-label={t('timer.settings')} className="space-y-3 p-1">
             {isStopwatch ? (
@@ -124,7 +124,7 @@ export default function SettingsPopover({ mode }: SettingsPopoverProps): React.J
                         value={String(reminderDuration)}
                         onChange={handleReminderDurationChange}
                         aria-label={t('timer.reminder.time')}
-                        className="w-14 [&_input]:py-1 [&_input]:text-center"
+                        className="w-20 [&_input]:py-1 [&_input]:text-center"
                         min={0}
                         disabled={reminderInputDisabled}
                       />
@@ -186,7 +186,7 @@ export default function SettingsPopover({ mode }: SettingsPopoverProps): React.J
                       placeholder={t('timer.overtimeMessage.placeholder')}
                       aria-label={t('timer.overtimeMessage.label')}
                       maxLength={15}
-                      className="w-32 ml-auto [&_input]:py-1"
+                      className="w-33 ml-auto [&_input]:py-1"
                     />
                   )}
                 </div>

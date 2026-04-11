@@ -48,7 +48,7 @@ export default function Layout(): React.JSX.Element {
               <Sidebar />
               <div className="flex flex-1 flex-col min-h-0">
                 <Header />
-                <main className="flex-1 overflow-auto py-4 px-6 min-w-[600px]">
+                <main className="flex-1 overflow-y-auto py-4 px-6">
                   <Outlet />
                 </main>
               </div>

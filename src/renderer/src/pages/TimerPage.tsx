@@ -39,6 +39,7 @@ export default function TimerPage(): React.JSX.Element {
     <div data-testid="timer-page" className="flex h-full gap-4">
       {isTimerLike && (
         <>
+          <div className="w-24 shrink-0" />
           <div className="flex flex-col items-center gap-4 flex-1">
             <TimerDisplay
               progress={progress}
@@ -50,10 +51,10 @@ export default function TimerPage(): React.JSX.Element {
               canEditTime={timerStatus === 'stopped' && phase !== 'overtime'}
               onTimeConfirm={(seconds) => setDuration(seconds)}
             />
-            <TimeAdjustment className="mb-3" />
             <TimerControls mode={mode} disableStart={isClock} />
+            <TimeAdjustment className="mb-3" />
           </div>
-          <div className="flex flex-col gap-2 py-2">
+          <div className="w-24 shrink-0 flex flex-col gap-2 py-2">
             <PresetChips />
           </div>
         </>
