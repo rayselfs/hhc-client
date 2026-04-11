@@ -9,7 +9,7 @@ const lazyLocalStorage = vi.hoisted(() => ({
 
 vi.mock('@renderer/lib/persist-storage', () => ({
   hhcPersistStorage: createJSONStorage(() => lazyLocalStorage),
-  createPersistName: (name: string) => `hhc-${name}`
+  createKey: (name: string) => `hhc-${name}`
 }))
 
 import {

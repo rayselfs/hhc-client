@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { toast } from '@heroui/react'
 import i18n from '@renderer/i18n'
-import { hhcPersistStorage, createPersistName } from '@renderer/lib/persist-storage'
+import { hhcPersistStorage, createKey } from '@renderer/lib/persist-storage'
 
 export const TIMEZONE_OPTIONS = [
   { value: 'Asia/Taipei', labelKey: 'timezones.taipei' },
@@ -108,7 +108,7 @@ export const useSettingsStore = create<SettingsStore>()(
       }
     }),
     {
-      name: createPersistName('settings'),
+      name: createKey('settings'),
       storage: hhcPersistStorage,
       version: 0
     }

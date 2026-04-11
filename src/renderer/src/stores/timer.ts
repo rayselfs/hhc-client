@@ -10,7 +10,7 @@ import type {
   TimerPreset
 } from '@shared/types/timer'
 import { MAX_DURATION_SECONDS } from '@shared/constants/timer'
-import { hhcPersistStorage, createPersistName } from '@renderer/lib/persist-storage'
+import { hhcPersistStorage, createKey } from '@renderer/lib/persist-storage'
 
 const DEFAULT_PRESETS: TimerPreset[] = [
   {
@@ -388,7 +388,7 @@ export const useTimerStore = create<TimerStore>()(
       }
     }),
     {
-      name: createPersistName('timer'),
+      name: createKey('timer'),
       storage: hhcPersistStorage,
       version: 0,
       partialize: (state) => ({

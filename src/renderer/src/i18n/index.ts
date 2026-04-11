@@ -1,10 +1,11 @@
 import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
+import { createKey } from '@renderer/lib/storage-prefix'
 import en from '../locales/en.json'
 import zhTW from '../locales/zh-TW.json'
 import zhCN from '../locales/zh-CN.json'
 
-export const LANGUAGE_STORAGE_KEY = 'hhc-language'
+export const LANGUAGE_STORAGE_KEY = createKey('language')
 
 function detectLanguage(): string {
   const saved = localStorage.getItem(LANGUAGE_STORAGE_KEY)

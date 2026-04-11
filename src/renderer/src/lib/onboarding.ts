@@ -1,6 +1,6 @@
-import { createStorageKey } from '@renderer/lib/persist-storage'
+import { createKey } from '@renderer/lib/storage-prefix'
 
-const ONBOARDED_KEY = createStorageKey('onboarded')
+const ONBOARDED_KEY = createKey('onboarded')
 
 export function isOnboarded(): boolean {
   try {
