@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Switch, Select, ListBox } from '@heroui/react'
+import { Switch, Select, ListBox, Button } from '@heroui/react'
 import { Label } from 'react-aria-components'
 import { useTheme } from '@renderer/contexts/ThemeContext'
 import { useSettingsStore, TIMEZONE_OPTIONS } from '@renderer/stores/settings'
@@ -145,13 +145,9 @@ export default function GeneralSettings({ onClose }: GeneralSettingsProps): Reac
       <div className="pt-4 border-t">
         <label className="mb-2 block text-sm font-medium">{t('preferences.resetToDefaults')}</label>
         <div>
-          <button
-            type="button"
-            className="rounded-lg bg-danger-soft px-3 py-1.5 text-sm font-medium text-danger-soft-foreground hover:bg-danger-soft-hover transition-colors"
-            onClick={handleResetClick}
-          >
+          <Button variant="danger" onPress={handleResetClick} className="rounded-full">
             {t('preferences.resetBtn')}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

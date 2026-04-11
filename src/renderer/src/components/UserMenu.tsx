@@ -15,7 +15,7 @@ export default function UserMenu({ onOpenPreferences }: UserMenuProps): React.JS
 
   const handleCloseApp = async (): Promise<void> => {
     const confirmed = await confirm({
-      status: 'warning',
+      status: 'danger',
       title: t('userMenu.closeAppTitle'),
       description: t('userMenu.closeAppConfirm'),
       confirmLabel: t('common.close'),
@@ -28,13 +28,13 @@ export default function UserMenu({ onOpenPreferences }: UserMenuProps): React.JS
   return (
     <Dropdown.Root>
       <Dropdown.Trigger>
-        <div className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg hover:bg-default-100 transition-colors cursor-pointer">
-          <Avatar.Root className="size-7">
+        <div className="flex items-center gap-2 w-full px-2 rounded-lg hover:bg-default-100 transition-colors cursor-pointer">
+          <Avatar.Root className="shrink-0">
             <Avatar.Fallback>
-              <CircleUser className="size-4" />
+              <CircleUser />
             </Avatar.Fallback>
           </Avatar.Root>
-          <span className="text-sm">{t('userMenu.guest')}</span>
+          <span>{t('userMenu.guest')}</span>
         </div>
       </Dropdown.Trigger>
       <Dropdown.Popover>

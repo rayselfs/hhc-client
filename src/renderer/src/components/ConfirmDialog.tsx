@@ -52,12 +52,14 @@ export default function ConfirmDialog(): React.JSX.Element {
   return (
     <AlertDialog.Backdrop
       isOpen={state.isOpen}
+      isDismissable
+      isKeyboardDismissDisabled={false}
       onOpenChange={(open) => {
         if (!open) settle(false)
       }}
     >
       <AlertDialog.Container size="sm">
-        <AlertDialog.Dialog>
+        <AlertDialog.Dialog className="p-3 pl-5 pt-5">
           <AlertDialog.Header>
             <AlertDialog.Icon status={alertStatus} />
             <AlertDialog.Heading>{resolvedTitle}</AlertDialog.Heading>

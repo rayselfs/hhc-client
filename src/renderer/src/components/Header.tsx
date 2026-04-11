@@ -18,7 +18,7 @@ export default function Header(): React.JSX.Element {
 
   const handleCloseProjection = async (): Promise<void> => {
     const confirmed = await confirm({
-      status: 'danger',
+      status: 'warning',
       title: t('projection.closeTitle'),
       description: t('projection.closeConfirm'),
       confirmLabel: t('common.close'),
