@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState } from 'react'
+import { createContext, useContext, useEffect, useRef } from 'react'
 import { createTimerAdapter } from '@renderer/lib/timer-adapter'
 import type { TimerAdapter } from '@renderer/lib/timer-adapter'
 import { useTimerStore } from '@renderer/stores/timer'
@@ -11,8 +11,7 @@ export function TimerEngineProvider({
 }: {
   children: React.ReactNode
 }): React.JSX.Element {
-  const [adapter] = useState(() => createTimerAdapter())
-  const adapterRef = useRef(adapter)
+  const adapterRef = useRef<TimerAdapter | null>(null)
 
   const timerStatus = useTimerStore((s) => s.status)
   const totalDuration = useTimerStore((s) => s.totalDuration)
@@ -22,6 +21,9 @@ export function TimerEngineProvider({
   const prevSwStatus = useRef(swStatus)
 
   useEffect(() => {
+    const adapter = createTimerAdapter()
+    adapterRef.current = adapter
+
     adapter.onTick(() => {
       useTimerStore.getState().tick(Date.now())
     })
@@ -36,8 +38,9 @@ export function TimerEngineProvider({
 
     return () => {
       adapter.dispose()
+      adapterRef.current = null
     }
-  }, [adapter])
+  }, [])
 
   useEffect(() => {
     const prev = prevTimerStatus.current
@@ -83,7 +86,9 @@ export function TimerEngineProvider({
     return () => clearInterval(id)
   }, [swStatus])
 
-  return <TimerEngineContext.Provider value={adapter}>{children}</TimerEngineContext.Provider>
+  return (
+    <TimerEngineContext.Provider value={adapterRef.current}>{children}</TimerEngineContext.Provider>
+  )
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
