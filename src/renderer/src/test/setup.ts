@@ -10,12 +10,14 @@ vi.mock('@heroui/react', async () => {
     AvatarMock,
     DropdownMock,
     SelectMock,
-    ListboxMock
+    ListboxMock,
+    AlertDialogMock
   } = await import('./heroui-mock')
   return {
     ...actual,
     Tabs: TabsMock,
     Modal: ModalMock,
+    AlertDialog: AlertDialogMock,
     Popover: PopoverMock,
     useOverlayState: useOverlayStateMock,
     Avatar: AvatarMock,

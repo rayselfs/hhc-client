@@ -5,6 +5,7 @@ import '@renderer/i18n'
 import i18n from '@renderer/i18n'
 import Sidebar from '../Sidebar'
 import { ThemeProvider } from '@renderer/contexts/ThemeContext'
+import { ConfirmDialogProvider } from '@renderer/contexts/ConfirmDialogContext'
 
 function renderWithRouter(initialEntries: string[] = ['/']): ReturnType<typeof render> {
   const router = createMemoryRouter(
@@ -22,7 +23,9 @@ function renderWithRouter(initialEntries: string[] = ['/']): ReturnType<typeof r
   )
   return render(
     <ThemeProvider>
-      <RouterProvider router={router} />
+      <ConfirmDialogProvider>
+        <RouterProvider router={router} />
+      </ConfirmDialogProvider>
     </ThemeProvider>
   )
 }

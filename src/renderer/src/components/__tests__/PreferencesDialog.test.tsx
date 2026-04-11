@@ -4,6 +4,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import '@renderer/i18n'
 import i18n from '@renderer/i18n'
+import { ConfirmDialogProvider } from '@renderer/contexts/ConfirmDialogContext'
+import ConfirmDialog from '../ConfirmDialog'
 import PreferencesDialog from '../PreferencesDialog'
 
 vi.mock('@renderer/lib/env', () => ({
@@ -35,7 +37,10 @@ vi.mock('@renderer/contexts/ThemeContext', () => ({
 function renderDialog(isOpen: boolean, onOpenChange = vi.fn()): ReturnType<typeof render> {
   return render(
     <MemoryRouter>
-      <PreferencesDialog isOpen={isOpen} onOpenChange={onOpenChange} />
+      <ConfirmDialogProvider>
+        <PreferencesDialog isOpen={isOpen} onOpenChange={onOpenChange} />
+        <ConfirmDialog />
+      </ConfirmDialogProvider>
     </MemoryRouter>
   )
 }
@@ -178,8 +183,8 @@ describe('PreferencesDialog', () => {
     const resetButton = screen.getByText('Reset')
     await user.click(resetButton)
 
-    const confirmButton = screen.getByText('Confirm')
-    await user.click(confirmButton)
+    const allResetButtons = await screen.findAllByText('Reset')
+    await user.click(allResetButtons[allResetButtons.length - 1])
 
     expect(resetToDefaults).toHaveBeenCalled()
     expect(setPreference).toHaveBeenCalledWith('system')
@@ -208,7 +213,7 @@ describe('PreferencesDialog', () => {
     const resetButton = screen.getByText('Reset')
     await user.click(resetButton)
 
-    const cancelButton = screen.getByText('Cancel')
+    const cancelButton = await screen.findByText('Cancel')
     await user.click(cancelButton)
 
     expect(resetToDefaults).not.toHaveBeenCalled()

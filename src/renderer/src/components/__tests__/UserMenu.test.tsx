@@ -2,12 +2,17 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { I18nextProvider } from 'react-i18next'
 import i18n from '@renderer/i18n'
+import { ConfirmDialogProvider } from '@renderer/contexts/ConfirmDialogContext'
+import ConfirmDialog from '../ConfirmDialog'
 import UserMenu from '../UserMenu'
 
 function renderUserMenu(props: { onOpenPreferences?: () => void } = {}): ReturnType<typeof render> {
   return render(
     <I18nextProvider i18n={i18n}>
-      <UserMenu {...props} />
+      <ConfirmDialogProvider>
+        <UserMenu {...props} />
+        <ConfirmDialog />
+      </ConfirmDialogProvider>
     </I18nextProvider>
   )
 }
@@ -70,13 +75,14 @@ describe('UserMenu', () => {
     expect(screen.queryByText('Logout')).not.toBeInTheDocument()
   })
 
-  it('close app calls window.close', () => {
+  it('close app shows confirm dialog before calling window.close', async () => {
     const closeSpy = vi.fn()
     vi.stubGlobal('close', closeSpy)
     renderUserMenu()
     const closeApp = screen.getByText('Close App').closest('[role="menuitem"]')!
     fireEvent.click(closeApp)
-    expect(closeSpy).toHaveBeenCalledOnce()
+    expect(await screen.findByText('Close Application')).toBeInTheDocument()
+    expect(closeSpy).not.toHaveBeenCalled()
     vi.unstubAllGlobals()
   })
 

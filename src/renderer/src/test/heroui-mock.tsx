@@ -85,12 +85,27 @@ function useOverlayStateMock(args?: { isOpen?: boolean; onOpenChange?: (open: bo
   close: () => void
   toggle: () => void
 } {
+  const [isOpen, setIsOpen] = React.useState(args?.isOpen ?? false)
   return {
-    isOpen: args?.isOpen ?? false,
-    setOpen: (v: boolean) => args?.onOpenChange?.(v),
-    open: () => args?.onOpenChange?.(true),
-    close: () => args?.onOpenChange?.(false),
-    toggle: () => args?.onOpenChange?.(!args?.isOpen)
+    isOpen,
+    setOpen: (v: boolean) => {
+      setIsOpen(v)
+      args?.onOpenChange?.(v)
+    },
+    open: () => {
+      setIsOpen(true)
+      args?.onOpenChange?.(true)
+    },
+    close: () => {
+      setIsOpen(false)
+      args?.onOpenChange?.(false)
+    },
+    toggle: () => {
+      setIsOpen((prev) => {
+        args?.onOpenChange?.(!prev)
+        return !prev
+      })
+    }
   }
 }
 
@@ -476,6 +491,27 @@ const ListboxMock = Object.assign(
   }
 )
 
+const AlertDialogMock = Object.assign(
+  ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  {
+    Backdrop: ({
+      isOpen,
+      children
+    }: {
+      isOpen?: boolean
+      onOpenChange?: (open: boolean) => void
+      children?: React.ReactNode
+    }) => (isOpen ? <div>{children}</div> : null),
+    Container: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    Dialog: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    Header: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    Heading: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    Icon: (_props: { status?: string }) => null,
+    Body: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    Footer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>
+  }
+)
+
 export {
   TabsMock,
   ModalMock,
@@ -484,5 +520,6 @@ export {
   AvatarMock,
   DropdownMock,
   SelectMock,
-  ListboxMock
+  ListboxMock,
+  AlertDialogMock
 }

@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import '@renderer/i18n'
 import i18n from '@renderer/i18n'
 import { useTimerStore } from '@renderer/stores/timer'
+import { ConfirmDialogProvider } from '@renderer/contexts/ConfirmDialogContext'
 import Header from '../Header'
 
 vi.mock('@renderer/contexts/ProjectionContext', async (importOriginal) => {
@@ -20,11 +21,19 @@ function renderWithRouter(initialEntries: string[] = ['/']): ReturnType<typeof r
     [
       {
         path: '/',
-        element: <Header />
+        element: (
+          <ConfirmDialogProvider>
+            <Header />
+          </ConfirmDialogProvider>
+        )
       },
       {
         path: '/timer',
-        element: <Header />
+        element: (
+          <ConfirmDialogProvider>
+            <Header />
+          </ConfirmDialogProvider>
+        )
       }
     ],
     { initialEntries }
