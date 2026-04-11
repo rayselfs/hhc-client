@@ -146,8 +146,6 @@ function renderTimerContent(
 
   const formattedTime = stopwatchData?.formattedTime ?? '00:00'
   return (
-    <div className="flex items-center justify-center w-full h-full">
-      <StopwatchDisplay formattedTime={formattedTime} className="text-white" />
-    </div>
+    <StopwatchDisplay formattedTime={formattedTime} size={700} responsive className="text-white" />
   )
 }

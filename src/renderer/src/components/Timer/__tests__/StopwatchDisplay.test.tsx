@@ -32,21 +32,8 @@ describe('StopwatchDisplay', () => {
     expect(screen.getByText('05:00')).toBeInTheDocument()
   })
 
-  it('applies maxWidth when size is provided', () => {
-    render(<StopwatchDisplay formattedTime="01:00" size={128} />)
-    const el = screen.getByTestId('stopwatch-display')
-    expect(el).toHaveStyle('max-width: 384px')
-  })
-
-  it('has no maxWidth when size is not provided', () => {
-    render(<StopwatchDisplay formattedTime="01:00" />)
-    const el = screen.getByTestId('stopwatch-display')
-    expect(el.style.maxWidth).toBe('')
-  })
-
-  it('uses @container class for responsive sizing', () => {
-    render(<StopwatchDisplay formattedTime="01:00" />)
-    const el = screen.getByTestId('stopwatch-display')
-    expect(el.className).toContain('@container')
+  it('renders a full ring (progress=100) with two SVG circles', () => {
+    const { container } = render(<StopwatchDisplay formattedTime="01:00" />)
+    expect(container.querySelectorAll('circle')).toHaveLength(2)
   })
 })

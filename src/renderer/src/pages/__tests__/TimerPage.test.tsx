@@ -116,10 +116,10 @@ describe('TimerPage — STOPWATCH mode', () => {
     expect(screen.getByTestId('btn-start')).toBeInTheDocument()
   })
 
-  it('does not render progressbar in stopwatch mode', () => {
+  it('renders a static full ring (no progress arc) in stopwatch mode', () => {
     useTimerStore.setState({ mode: 'stopwatch' })
     const { container } = renderTimerPage()
-    expect(container.querySelectorAll('circle')).toHaveLength(0)
+    expect(container.querySelectorAll('circle')).toHaveLength(2)
   })
 
   it('displays formatted stopwatch time from store', () => {

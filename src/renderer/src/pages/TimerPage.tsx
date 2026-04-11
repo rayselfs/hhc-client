@@ -60,7 +60,7 @@ export default function TimerPage(): React.JSX.Element {
 
       {mode === 'stopwatch' && (
         <div className="flex flex-col items-center gap-4 flex-1 w-full">
-          <StopwatchDisplay formattedTime={swFormattedTime} size={80} />
+          <StopwatchDisplay formattedTime={swFormattedTime} />
           <TimerControls mode="stopwatch" />
         </div>
       )}
