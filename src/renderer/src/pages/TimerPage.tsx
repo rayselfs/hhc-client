@@ -51,12 +51,10 @@ export default function TimerPage(): React.JSX.Element {
               canEditTime={timerStatus === 'stopped' && phase !== 'overtime'}
               onTimeConfirm={(seconds) => setDuration(seconds)}
             />
-            <TimerControls mode={mode} disableStart={isClock} />
-            <TimeAdjustment className="mb-3" />
+            <TimerControls className="mb-3" mode={mode} disableStart={isClock} />
+            <TimeAdjustment />
           </div>
-          <div className="w-24 shrink-0 flex flex-col gap-2 py-2">
-            <PresetChips />
-          </div>
+          <PresetChips />
         </>
       )}
 

@@ -43,7 +43,7 @@ export default function PresetChips({ className }: PresetChipsProps): React.JSX.
 
   return (
     <div className={className}>
-      <div className="flex flex-col items-stretch gap-2 w-24">
+      <div className="flex flex-col items-stretch gap-3 w-18">
         {presets.map((preset) => (
           <Chip
             key={preset.id}

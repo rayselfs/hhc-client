@@ -8,11 +8,13 @@ import type { TimerMode } from '@renderer/stores/timer'
 interface TimerControlsProps {
   mode: TimerMode
   disableStart?: boolean
+  className?: string
 }
 
 export default function TimerControls({
   mode,
-  disableStart
+  disableStart,
+  className
 }: TimerControlsProps): React.JSX.Element {
   const { t } = useTranslation()
   const isStopwatch = mode === 'stopwatch'
@@ -46,7 +48,7 @@ export default function TimerControls({
   const playLabel = isStopped ? t('timer.start') : isRunning ? t('timer.pause') : t('timer.resume')
 
   return (
-    <div className="flex items-center gap-3">
+    <div className={`flex items-center gap-3 ${className || ''}`.trim()}>
       <Button
         isIconOnly
         size="lg"
