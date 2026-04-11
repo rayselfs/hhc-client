@@ -1,4 +1,4 @@
-import { createStorageKey } from '@renderer/lib/utils'
+import { createStorageKey } from '@renderer/lib/persist-storage'
 
 const ONBOARDED_KEY = createStorageKey('onboarded')
 

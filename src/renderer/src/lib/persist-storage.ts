@@ -2,7 +2,8 @@ import { createJSONStorage } from 'zustand/middleware'
 import type { PersistStorage } from 'zustand/middleware'
 import { toast } from '@heroui/react'
 import i18n from '@renderer/i18n'
-import { STORAGE_PREFIX } from '@renderer/lib/utils'
+
+export const STORAGE_PREFIX = 'hhc-' as const
 
 const hhcStateStorage = {
   getItem: (name: string): string | null => {
@@ -33,4 +34,8 @@ export const hhcPersistStorage = createJSONStorage(() => hhcStateStorage) as Per
 
 export function createPersistName(storeName: string): string {
   return `${STORAGE_PREFIX}${storeName}`
+}
+
+export function createStorageKey(name: string): string {
+  return `${STORAGE_PREFIX}${name}`
 }

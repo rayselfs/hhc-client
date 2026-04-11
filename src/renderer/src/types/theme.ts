@@ -1,4 +1,4 @@
-import { createStorageKey } from '../lib/utils'
+import { createStorageKey } from '../lib/persist-storage'
 
 /** User's explicit theme preference stored in localStorage */
 export type ThemePreference = 'light' | 'dark' | 'system'
