@@ -3,20 +3,31 @@ import { useLocation } from 'react-router-dom'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
 import { ButtonGroup, Button, toast } from '@heroui/react'
-import { X, Monitor, MonitorOff } from 'lucide-react'
+import { X, Monitor, MonitorOff, ExternalLink } from 'lucide-react'
 import ModeSelector from '@renderer/components/Timer/ModeSelector'
 import { isTimerRoute } from '@renderer/lib/routes'
 
 export default function Header(): React.JSX.Element {
   const { t } = useTranslation()
   const location = useLocation()
-  const { isProjectionOpen, isProjectionBlanked, closeProjection, blankProjection } =
-    useProjection()
+  const {
+    isProjectionOpen,
+    isProjectionBlanked,
+    openProjection,
+    closeProjection,
+    blankProjection
+  } = useProjection()
   const confirm = useConfirm()
 
   const showTimerControls = isTimerRoute(location.pathname)
 
-  const handleCloseProjection = async (): Promise<void> => {
+  const handleCloseOrOpenProjection = async (): Promise<void> => {
+    if (!isProjectionOpen) {
+      await openProjection().catch(() => {
+        toast.danger(t('toast.projectionOpenFailed'))
+      })
+      return
+    }
     const confirmed = await confirm({
       status: 'warning',
       title: t('projection.closeTitle'),
@@ -58,12 +69,11 @@ export default function Header(): React.JSX.Element {
           <Button
             isIconOnly
             variant="outline"
-            className="text-danger px-6"
-            onPress={handleCloseProjection}
-            isDisabled={!isProjectionOpen}
-            aria-label={t('projection.closeButton')}
+            className={isProjectionOpen ? 'text-danger px-6' : 'text-default-foreground px-6'}
+            onPress={handleCloseOrOpenProjection}
+            aria-label={t(isProjectionOpen ? 'projection.closeButton' : 'projection.openButton')}
           >
-            <X className="size-4" />
+            {isProjectionOpen ? <X className="size-4" /> : <ExternalLink className="size-4" />}
             <ButtonGroup.Separator className="text-default-foreground" />
           </Button>
         </ButtonGroup>

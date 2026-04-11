@@ -6,6 +6,7 @@ import '@renderer/i18n'
 import i18n from '@renderer/i18n'
 import { useTimerStore } from '@renderer/stores/timer'
 import { ConfirmDialogProvider } from '@renderer/contexts/ConfirmDialogContext'
+import ConfirmDialog from '../ConfirmDialog'
 import Header from '../Header'
 
 vi.mock('@renderer/contexts/ProjectionContext', async (importOriginal) => {
@@ -24,6 +25,7 @@ function renderWithRouter(initialEntries: string[] = ['/']): ReturnType<typeof r
         element: (
           <ConfirmDialogProvider>
             <Header />
+            <ConfirmDialog />
           </ConfirmDialogProvider>
         )
       },
@@ -32,6 +34,7 @@ function renderWithRouter(initialEntries: string[] = ['/']): ReturnType<typeof r
         element: (
           <ConfirmDialogProvider>
             <Header />
+            <ConfirmDialog />
           </ConfirmDialogProvider>
         )
       }
@@ -63,7 +66,7 @@ describe('Header', () => {
     expect(document.querySelector('header')).toBeInTheDocument()
   })
 
-  it('renders close projection button with correct aria-label in English', async () => {
+  it('renders close projection button with correct aria-label in English when open', async () => {
     await i18n.changeLanguage('en')
     const { useProjection } = await import('@renderer/contexts/ProjectionContext')
     vi.mocked(useProjection).mockReturnValue({
@@ -80,7 +83,7 @@ describe('Header', () => {
     expect(screen.getByRole('button', { name: 'Close projection window' })).toBeInTheDocument()
   })
 
-  it('disables close projection button when projection is not open', async () => {
+  it('renders open projection button when projection is not open', async () => {
     await i18n.changeLanguage('en')
     const { useProjection } = await import('@renderer/contexts/ProjectionContext')
     vi.mocked(useProjection).mockReturnValue({
@@ -94,17 +97,18 @@ describe('Header', () => {
       on: vi.fn()
     })
     renderWithRouter(['/'])
-    const button = screen.getByRole('button', { name: 'Close projection window' })
-    expect(button).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Open projection window' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Open projection window' })).not.toBeDisabled()
   })
 
-  it('enables close projection button when projection is open', async () => {
+  it('calls openProjection when projection is closed and open-btn pressed', async () => {
     await i18n.changeLanguage('en')
     const { useProjection } = await import('@renderer/contexts/ProjectionContext')
+    const openProjection = vi.fn().mockResolvedValue(undefined)
     vi.mocked(useProjection).mockReturnValue({
-      isProjectionOpen: true,
-      isProjectionBlanked: false,
-      openProjection: vi.fn(),
+      isProjectionOpen: false,
+      isProjectionBlanked: true,
+      openProjection,
       closeProjection: vi.fn(),
       blankProjection: vi.fn(),
       project: vi.fn(),
@@ -112,8 +116,9 @@ describe('Header', () => {
       on: vi.fn()
     })
     renderWithRouter(['/'])
-    const button = screen.getByRole('button', { name: 'Close projection window' })
-    expect(button).not.toBeDisabled()
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Open projection window' }))
+    expect(openProjection).toHaveBeenCalled()
   })
 
   it('renders close projection button with correct aria-label in zh-TW', async () => {
