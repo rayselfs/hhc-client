@@ -70,6 +70,7 @@
   "projection": {
     "showButton": "Show projection",
     "blankButton": "Blank projection",
+    "openButton": "Open projection window",
     "closeButton": "Close projection window",
     "closeTitle": "Close Projection",
     "closeConfirm": "Are you sure you want to close the projection window?",

@@ -70,6 +70,7 @@
   "projection": {
     "showButton": "显示投影",
     "blankButton": "关闭投影",
+    "openButton": "开启投影窗口",
     "closeButton": "关闭投影窗口",
     "closeTitle": "关闭投影",
     "closeConfirm": "确定要关闭投影窗口吗？",
