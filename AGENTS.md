@@ -1,60 +1,67 @@
 # PROJECT KNOWLEDGE BASE
 
-**Generated:** 2026-04-08
-**Commit:** bd64918
+**Updated:** 2026-04-11
+**Commit:** 3e3833c
 **Branch:** main
 
 ## OVERVIEW
 
-Electron desktop app for church projection (`hhc-client`). React 19 + TypeScript + Vite via `electron-vite`. Dual-window architecture: main window (sidebar + pages) + projection window (fullscreen display). Supports both Electron (IPC) and browser (BroadcastChannel) environments.
+Electron desktop app for church projection (`hhc-client`). React 19 + TypeScript + Vite via `electron-vite`. Dual-window architecture: main window (sidebar + pages) + projection window (fullscreen display). **Dual-mode**: runs in both Electron (IPC) and browser (BroadcastChannel/Web Worker) environments.
 
 ## STRUCTURE
 
 ```
 hhc-client-v2/
 ├── src/
-│   ├── main/              # Electron main process
-│   │   ├── index.ts       # App lifecycle, WindowManager integration
+│   ├── main/                # Electron main process
+│   │   ├── index.ts         # App lifecycle, WindowManager integration
 │   │   ├── windowManager.ts # Singleton: main + projection window management
-│   │   └── ipc/           # IPC handler registration
-│   │       └── projection.ts
-│   ├── preload/           # Context bridge — exposes electron API to renderer
+│   │   ├── timerService.ts  # Main-process timer broadcast service
+│   │   └── ipc/             # IPC handler registration
+│   │       ├── projection.ts
+│   │       ├── timer.ts
+│   │       └── validate.ts  # Centralized sender validation
+│   ├── preload/             # Context bridge — exposes electron API to renderer
 │   │   ├── index.ts
-│   │   └── index.d.ts     # Window.electron + Window.api type declarations
-│   └── renderer/src/      # React app (Vite entry: main.tsx → App.tsx)
-│       ├── components/    # Layout.tsx (sidebar + header + close btn), Sidebar.tsx
-│       ├── contexts/      # ThemeContext (dark/light/system)
-│       ├── hooks/         # useProjection (open/close/send/on)
-│       ├── i18n/          # react-i18next setup
-│       ├── lib/           # env.ts (isElectron/isWeb), projection-adapter.ts
-│       ├── locales/       # en.json, zh-TW.json, zh-CN.json
-│       ├── pages/         # TimerPage, BiblePage, ProjectionPage
-│       ├── router.tsx     # HashRouter: Layout wraps Timer/Bible; Projection is standalone
-│       ├── types/         # Theme types
-│       └── assets/        # CSS + SVG
-├── build/                 # Packaging assets (icons, mac entitlements)
-├── resources/             # App resources (icon.png, bundled in asar)
-└── out/                   # Compiled main/preload output (gitignored)
+│   │   └── index.d.ts      # Window.electron + Window.api type declarations
+│   └── renderer/src/        # React app (Vite entry: main.tsx → App.tsx)
+│       ├── components/      # Layout, Sidebar, Header, Timer/, projection/, Preferences/
+│       ├── contexts/        # ThemeContext, TimerEngineContext, ProjectionContext, ContextMenuContext
+│       ├── lib/             # env.ts, projection-adapter.ts, timer-adapter.ts, utils, etc.
+│       ├── stores/          # Zustand: timer.ts, stopwatch.ts, settings.ts, selectors/
+│       ├── workers/         # timer.worker.ts (Web Worker for browser-mode tick)
+│       ├── pages/           # TimerPage, BiblePage, ProjectionPage, WelcomePage
+│       ├── i18n/            # react-i18next setup
+│       ├── locales/         # en.json, zh-TW.json, zh-CN.json
+│       ├── types/           # Theme types
+│       └── assets/          # CSS + SVG
+├── build/                   # Packaging assets (icons, mac entitlements)
+├── resources/               # App resources (icon.png, bundled in asar)
+└── out/                     # Compiled main/preload output (gitignored)
 ```
 
-**Double-src nesting**: Renderer lives at `src/renderer/src/` — this is the electron-vite default. The `@renderer` alias resolves here.
+**Double-src nesting**: Renderer lives at `src/renderer/src/` — electron-vite default. The `@renderer` alias resolves here.
 
 ## WHERE TO LOOK
 
-| Task                           | Location                                        | Notes                                              |
-| ------------------------------ | ----------------------------------------------- | -------------------------------------------------- |
-| Main process / window creation | `src/main/index.ts` + `windowManager.ts`        | WindowManager singleton manages both windows       |
-| IPC handlers                   | `src/main/ipc/projection.ts`                    | Projection lifecycle + messaging IPC               |
-| Expose API to renderer         | `src/preload/index.ts`                          | contextBridge; update `index.d.ts` for types       |
-| UI / React components          | `src/renderer/src/`                             | Entry: `main.tsx` → `App.tsx` → `router.tsx`       |
-| Projection messaging           | `src/renderer/src/lib/projection-adapter.ts`    | Electron IPC or BroadcastChannel adapter           |
-| Projection hook                | `src/renderer/src/hooks/useProjection.ts`       | `{ isProjectionOpen, openProjection, send, on }`   |
-| Environment detection          | `src/renderer/src/lib/env.ts`                   | `isElectron()` / `isWeb()` — renderer only         |
-| Theme system                   | `src/renderer/src/contexts/ThemeContext.tsx`    | Dark/light/system, syncs with Electron nativeTheme |
-| Routing                        | `src/renderer/src/router.tsx`                   | HashRouter; `/projection` is outside Layout        |
-| Path alias config              | `electron.vite.config.ts` + `tsconfig.web.json` | Keep `@renderer` alias in sync between both        |
-| Packaging / installers         | `electron-builder.yml`                          | Win/Mac/Linux targets                              |
-| Auto-update config             | `dev-app-update.yml`                            | Provider URL is placeholder — must replace         |
+| Task                           | Location                                           | Notes                                                      |
+| ------------------------------ | -------------------------------------------------- | ---------------------------------------------------------- |
+| Main process / window creation | `src/main/index.ts` + `windowManager.ts`           | WindowManager singleton manages both windows               |
+| IPC handlers                   | `src/main/ipc/`                                    | projection.ts, timer.ts, validate.ts                       |
+| Timer main-process service     | `src/main/timerService.ts`                         | Broadcasts timer state to projection window                |
+| Expose API to renderer         | `src/preload/index.ts`                             | contextBridge; update `index.d.ts` for types               |
+| UI / React components          | `src/renderer/src/components/`                     | Timer/, projection/, Preferences/, Layout, etc.            |
+| Timer engine (adapter bridge)  | `src/renderer/src/contexts/TimerEngineContext.tsx` | Bridges adapter ↔ Zustand stores                           |
+| Timer adapter (dual-mode)      | `src/renderer/src/lib/timer-adapter.ts`            | BrowserTimerAdapter (Worker) vs ElectronTimerAdapter (IPC) |
+| Timer Worker                   | `src/renderer/src/workers/timer.worker.ts`         | setInterval(100ms) tick loop for browser mode              |
+| Projection messaging           | `src/renderer/src/lib/projection-adapter.ts`       | Electron IPC or BroadcastChannel adapter                   |
+| Environment detection          | `src/renderer/src/lib/env.ts`                      | `isElectron()` / `isWeb()` — renderer only                 |
+| State (Zustand)                | `src/renderer/src/stores/`                         | timer.ts, stopwatch.ts, settings.ts, selectors/            |
+| Theme system                   | `src/renderer/src/contexts/ThemeContext.tsx`       | Dark/light/system, syncs with Electron nativeTheme         |
+| Routing                        | `src/renderer/src/router.tsx`                      | HashRouter; `/projection` is outside Layout                |
+| Path alias config              | `electron.vite.config.ts` + `tsconfig.web.json`    | Keep `@renderer` alias in sync between both                |
+| CSP policy                     | `src/renderer/index.html`                          | Affects web mode only; Electron is lenient                 |
+| Packaging / installers         | `electron-builder.yml`                             | Win/Mac/Linux targets                                      |
 
 ## CONVENTIONS
 
@@ -92,50 +99,20 @@ hhc-client-v2/
 - **Zustand** (`src/renderer/src/stores/`): Serializable app/domain state. Timer config, timer runtime, stopwatch, app settings. Consumed by multiple components via selectors.
 - **If a context starts looking like plain state + setters, move it to a Zustand store.**
 
-## ANTI-PATTERNS (THIS PROJECT)
+## DUAL-MODE ARCHITECTURE
 
-- **Preload has `@ts-ignore`**: `src/preload/index.ts` lines 19/21 — fallback path when `contextIsolated` is false. Inherited from scaffold; do not add more `@ts-ignore`.
-- **No `as any`** — zero instances in the codebase. Do not add.
-- **No `@ts-expect-error`** — do not add.
-- **Placeholder update URL**: `electron-builder.yml` and `dev-app-update.yml` publish to `https://example.com/auto-updates` — not functional. Replace before release.
-- **`sandbox: false`** in BrowserWindow — security risk. Evaluate enabling sandbox when adding real features.
-- **Old shadcn UI files**: `src/renderer/src/components/ui/` has leftover components with broken imports (class-variance-authority, @radix-ui). Not in use — ignore or delete.
+This app runs in two environments. Every feature must work in both.
 
-## UNIQUE STYLES
+### Adapter Pattern
 
-- **electron-vite** (not raw Vite or Webpack) — use `electron-vite` CLI for dev/build, not `vite` directly
-- **Typecheck split**: `npm run typecheck` runs two separate `tsc` passes (node + web) with `--composite false` override
-- **HashRouter**: Uses `createHashRouter` for Electron file:// compatibility
-- **HeroUI v3**: Component library (react-aria-components based). API differs significantly from v2 — use MCP or check node_modules.
-- **Dual-mode messaging**: `projection-adapter.ts` abstracts Electron IPC vs BroadcastChannel. All messaging goes through this adapter.
-- **No CI**: No GitHub Actions or other CI pipelines. Builds are local.
-- **No pre-commit hooks**: Lint/format are manual (`npm run lint`, `npm run format`).
-- **Vitest**: Configured with jsdom environment, `globals: true`. Run with `npx vitest run`.
+All cross-environment logic uses adapters that abstract Electron IPC vs browser APIs:
 
-## COMMANDS
+| Adapter              | Electron Mode              | Browser Mode                       |
+| -------------------- | -------------------------- | ---------------------------------- |
+| `projection-adapter` | IPC via preload API        | BroadcastChannel(`hhc-projection`) |
+| `timer-adapter`      | IPC via `window.api.timer` | Web Worker (`timer.worker.ts`)     |
 
-```bash
-npm install              # Install deps (postinstall runs electron-builder install-app-deps)
-npm run dev              # Start electron-vite dev server with HMR
-npm run build            # Typecheck + electron-vite build
-npm run build:mac        # Build + package for macOS (no typecheck — intentional)
-npm run build:win        # Build + package for Windows
-npm run build:linux      # Build + package for Linux
-npm run typecheck        # Run both node + web typechecks
-npm run lint             # ESLint (cached)
-npm run format           # Prettier --write .
-npx vitest run           # Run all tests
-```
-
-## ARCHITECTURE: DUAL-WINDOW PROJECTION
-
-### Window Lifecycle
-
-- App opens → main window + projection window created together (WindowManager)
-- Close main window → projection window closes too
-- Projection can be independently closed/reopened via `useProjection` hook
-
-### Messaging Flow
+### Dual-Window Projection
 
 ```
 [Main Window]                    [Projection Window]
@@ -150,57 +127,60 @@ useProjection().send(channel, data)     adapter.on(channel, handler)
 └─────────────────────────────────────────────────────┘
 ```
 
-### Key Interfaces
+### Timer Engine
 
-- **ProjectionAdapter**: `send(channel, data)`, `on(channel, handler)`, `dispose()`
-- **useProjection hook**: `{ isProjectionOpen, openProjection, closeProjection, send, on }`
-- **Preload ProjectionAPI**: `check`, `ensure`, `close`, `send`, `sendToMain`, `getDisplays`, `onProjectionMessage`, `onProjectionOpened`, `onProjectionClosed`
+```
+[Button click] → store.start() → status change
+       │
+TimerEngineContext detects status change via useEffect
+       │
+adapter.sendCommand('start')
+       │
+       ├─ Electron: IPC → main process timerService
+       └─ Browser:  postMessage → timer.worker.ts (setInterval 100ms)
+       │
+adapter.onTick → store.tick(Date.now())
+```
 
-## MIGRATION CONTEXT
+### Dual-Mode Pitfalls (IMPORTANT)
 
-This project is a **fresh rewrite** of `hhc-client` (Vue 3 + Vuetify + Electron) → React 19 + electron-vite.
+- **CSP only affects web mode**: `index.html` CSP policy is enforced by browsers but Electron is lenient. When adding Web Workers, WebSockets, or external fetches — **update CSP directives and test in browser**, not just Electron.
+- **Resource lifecycle in React StrictMode**: Any adapter/service created via `useState(() => new Resource())` will be killed by StrictMode double-mount if `dispose()` is irreversible (e.g. `worker.terminate()`). **Create disposable resources inside `useEffect`**, not `useState`. Pattern: `ElectronAdapter.dispose()` removes listeners (reversible) vs `BrowserAdapter.dispose()` terminates Worker (irreversible).
+- **Silent failures**: Electron IPC failures often throw; browser-mode failures (CSP blocks, dead Workers) are **silently swallowed**. Always check browser DevTools console when debugging web mode.
+- **Feature parity testing**: Always test both `npm run dev` (Electron) AND `localhost:5173` (browser) when modifying adapters or adding new cross-environment features.
 
-### Related Repositories
+## ANTI-PATTERNS
 
-| Repo                  | Path                      | Role                                                                                                    |
-| --------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `hhc-client`          | `../hhc-client/`          | **Original** — Vue 3 production app. Reference for features, types, styles, i18n, Electron main process |
-| `hhc-client-refactor` | `../hhc-client-refactor/` | **Abandoned mid-migration** — Do NOT use as codebase. Migration plan is still useful as reference       |
+- **No `as any`** — zero instances in the codebase. Do not add.
+- **No `@ts-expect-error`** — do not add.
+- **Preload has `@ts-ignore`**: `src/preload/index.ts` lines 19/21 — inherited scaffold fallback. Do not add more.
+- **`sandbox: false`** in BrowserWindow — security risk. Evaluate enabling when adding real features.
+- **Placeholder update URL**: `electron-builder.yml` and `dev-app-update.yml` publish to `https://example.com/auto-updates`. Replace before release.
+- **appId is generic**: `com.electron.app` in electron-builder.yml. Change before distribution.
 
-### Migration Plan
+## PROJECT-SPECIFIC NOTES
 
-`../hhc-client-refactor/.sisyphus/plans/hhc-client-refactor.md` — Detailed plan covering Timer page migration (all 4 modes), LiquidGlass theme porting, dual-mode architecture (Electron IPC + Browser fallback), Electron main process optimization, and TDD strategy. Written for `hhc-client-refactor` but the analysis of the original codebase and migration decisions apply here.
+- **electron-vite** (not raw Vite or Webpack) — use `electron-vite` CLI for dev/build
+- **Typecheck split**: `npm run typecheck` runs two separate `tsc` passes (node + web)
+- **HashRouter**: `createHashRouter` for Electron file:// compatibility
+- **HeroUI v3**: Component library (react-aria-components based). API differs from v2 — check node_modules or use MCP.
+- **No CI**: Builds are local. No GitHub Actions.
+- **No pre-commit hooks**: Lint/format are manual (`npm run lint`, `npm run format`).
+- **Vitest**: jsdom environment, `globals: true`. Run with `npx vitest run`.
+- **`out/` is gitignored**: Compiled outputs regenerate on build.
+- **Mac build skips typecheck**: `build:mac` runs `electron-vite build` directly — intentional.
 
-### Key Migration References in `../hhc-client/`
+## COMMANDS
 
-| What                     | Where                                                 | Notes                                                                 |
-| ------------------------ | ----------------------------------------------------- | --------------------------------------------------------------------- |
-| Timer types & state      | `src/types/timer.ts`                                  | TimerMode, TimerState, TimerPreset — port with ISO string dates       |
-| Projection messages      | `src/types/projection.ts`                             | MessageType enum, AppMessage union — exclude BIBLE*\*/MEDIA*\*        |
-| LiquidGlass theme values | `src/components/LiquidGlass/styles/theme/defaults.ts` | ALL color/glass/gradient tokens                                       |
-| Glass SCSS mixins        | `src/components/LiquidGlass/styles/_mixins.scss`      | glass-surface, shine, jelly-pop animations                            |
-| Timer store (Pinia)      | `src/stores/timer.ts`                                 | Business logic to port to Zustand                                     |
-| Stopwatch store          | `src/stores/stopwatch.ts`                             | Stopwatch state machine                                               |
-| Electron timerService    | `electron/timerService.ts`                            | Has broadcast bug (lastBroadcastTime never updated) — fix during port |
-| i18n locales             | `src/locales/{en,zh-TW,zh-CN}.json`                   | Extract timer + common keys only                                      |
-| Dark mode                | `src/composables/useDarkMode.ts`                      | Port to React hook                                                    |
-
-### Migration Decisions (from plan)
-
-- **Scope**: Timer page only (all 4 modes: TIMER, CLOCK, BOTH, STOPWATCH). Bible/Media are OUT for now
-- **Dual-mode**: Must work in both Electron (IPC) and web browser (BroadcastChannel fallback)
-- **Styling**: LiquidGlass visual identity preserved via Tailwind CSS — no Vuetify
-- **Icons**: lucide-react only — no @mdi/font or FontAwesome
-- **State**: Zustand (not Pinia)
-- **i18n**: react-i18next (not vue-i18n), 3 languages: en, zh-TW, zh-CN
-- **Testing**: Vitest + RTL + Playwright, TDD approach
-- **Known bugs to fix**: timerService broadcast bug, duplicate types between renderer and electron
-
-## NOTES
-
-- **IPC test**: Main has `ipcMain.on('ping')` and App.tsx sends it — scaffold example, not production code.
-- **`out/` is gitignored**: Compiled outputs regenerate on build. Don't rely on committed `out/` contents.
-- **Mac build skips typecheck**: `build:mac` runs `electron-vite build` directly (no `npm run typecheck`). This is intentional per scaffold but may want to add typecheck for CI.
-- **electron v39 + electron-builder v26**: Check compatibility before major upgrades.
-- **appId is generic**: `com.electron.app` in electron-builder.yml — change to a proper reverse-domain ID before distribution.
-- **Sample demo**: TimerPage has a text input that sends messages to ProjectionPage — demonstrates the messaging infrastructure. Not production code.
+```bash
+npm install              # Install deps (postinstall runs electron-builder install-app-deps)
+npm run dev              # Start electron-vite dev server with HMR
+npm run build            # Typecheck + electron-vite build
+npm run build:mac        # Build + package for macOS
+npm run build:win        # Build + package for Windows
+npm run build:linux      # Build + package for Linux
+npm run typecheck        # Run both node + web typechecks
+npm run lint             # ESLint (cached)
+npm run format           # Prettier --write .
+npx vitest run           # Run all tests
+```
