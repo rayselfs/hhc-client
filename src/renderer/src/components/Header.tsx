@@ -1,8 +1,9 @@
 import { useTranslation } from 'react-i18next'
 import { useLocation } from 'react-router-dom'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
-import { Button, Modal, useOverlayState, toast } from '@heroui/react'
-import { X, TriangleAlert, Monitor, MonitorOff } from 'lucide-react'
+import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
+import { ButtonGroup, Button, toast } from '@heroui/react'
+import { X, Monitor, MonitorOff } from 'lucide-react'
 import ModeSelector from '@renderer/components/Timer/ModeSelector'
 import { isTimerRoute } from '@renderer/lib/routes'
 
@@ -11,24 +12,39 @@ export default function Header(): React.JSX.Element {
   const location = useLocation()
   const { isProjectionOpen, isProjectionBlanked, closeProjection, blankProjection } =
     useProjection()
-  const state = useOverlayState()
+  const confirm = useConfirm()
 
   const showTimerControls = isTimerRoute(location.pathname)
 
+  const handleCloseProjection = async (): Promise<void> => {
+    const confirmed = await confirm({
+      status: 'danger',
+      title: t('projection.closeTitle'),
+      description: t('projection.closeConfirm'),
+      confirmLabel: t('common.close'),
+      cancelLabel: t('common.cancel')
+    })
+    if (!confirmed) return
+    await closeProjection().catch(() => {
+      toast.danger(t('toast.projectionCloseFailed'))
+    })
+  }
+
   return (
-    <>
-      <header className="relative flex items-center justify-end gap-2 p-2">
-        {showTimerControls && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="pointer-events-auto">
-              <ModeSelector />
-            </div>
+    <header className="relative flex items-center justify-end gap-2 p-2">
+      {showTimerControls && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="pointer-events-auto">
+            <ModeSelector />
           </div>
-        )}
-        <div className="flex items-center gap-2">
+        </div>
+      )}
+      <div className="flex items-center gap-2">
+        <ButtonGroup size="lg">
           <Button
             isIconOnly
-            variant={isProjectionBlanked ? 'outline' : 'danger-soft'}
+            variant="outline"
+            className={isProjectionBlanked ? 'text-default-foreground px-6' : 'text-danger px-6'}
             onPress={() => blankProjection(!isProjectionBlanked)}
             isDisabled={!isProjectionOpen}
             aria-label={t(isProjectionBlanked ? 'projection.showButton' : 'projection.blankButton')}
@@ -42,49 +58,16 @@ export default function Header(): React.JSX.Element {
           <Button
             isIconOnly
             variant="outline"
-            className="text-danger"
-            onPress={state.open}
+            className="text-danger px-6"
+            onPress={handleCloseProjection}
             isDisabled={!isProjectionOpen}
             aria-label={t('projection.closeButton')}
           >
             <X className="size-4" />
+            <ButtonGroup.Separator className="text-default-foreground" />
           </Button>
-        </div>
-      </header>
-      <Modal.Root state={state}>
-        <Modal.Trigger />
-        <Modal.Backdrop>
-          <Modal.Container>
-            <Modal.Dialog className="p-2 pl-5 pt-5">
-              <Modal.Header>
-                <Modal.Icon className="text-danger">
-                  <TriangleAlert className="size-6" />
-                </Modal.Icon>
-                <Modal.Heading>{t('projection.closeTitle')}</Modal.Heading>
-              </Modal.Header>
-              <Modal.Body>
-                <p>{t('projection.closeConfirm')}</p>
-              </Modal.Body>
-              <Modal.Footer>
-                <Button slot="close" variant="ghost">
-                  {t('common.cancel')}
-                </Button>
-                <Button
-                  variant="danger"
-                  onPress={async () => {
-                    await closeProjection().catch(() => {
-                      toast.danger(t('toast.projectionCloseFailed'))
-                    })
-                    state.close()
-                  }}
-                >
-                  {t('common.close')}
-                </Button>
-              </Modal.Footer>
-            </Modal.Dialog>
-          </Modal.Container>
-        </Modal.Backdrop>
-      </Modal.Root>
-    </>
+        </ButtonGroup>
+      </div>
+    </header>
   )
 }

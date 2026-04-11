@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Switch, Select, ListBox } from '@heroui/react'
@@ -6,7 +5,7 @@ import { Label } from 'react-aria-components'
 import { useTheme } from '@renderer/contexts/ThemeContext'
 import { useSettingsStore, TIMEZONE_OPTIONS } from '@renderer/stores/settings'
 import { isElectron } from '@renderer/lib/env'
-import ConfirmDialog from '@renderer/components/ConfirmDialog'
+import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
 
 const TIMEZONE_LABEL_KEYS = {
   'timezones.taipei': 'timezones.taipei',
@@ -34,7 +33,7 @@ export default function GeneralSettings({ onClose }: GeneralSettingsProps): Reac
   const setTimezone = useSettingsStore((s) => s.setTimezone)
   const setHardwareAcceleration = useSettingsStore((s) => s.setHardwareAcceleration)
   const resetToDefaults = useSettingsStore((s) => s.resetToDefaults)
-  const [resetConfirmOpen, setResetConfirmOpen] = useState(false)
+  const confirm = useConfirm()
 
   const languageOptions = [
     { value: 'en', label: t('preferences.languageNames.en') },
@@ -42,7 +41,14 @@ export default function GeneralSettings({ onClose }: GeneralSettingsProps): Reac
     { value: 'zh-CN', label: t('preferences.languageNames.zhCN') }
   ]
 
-  const handleResetConfirm = (): void => {
+  const handleResetClick = async (): Promise<void> => {
+    const confirmed = await confirm({
+      status: 'warning',
+      description: t('preferences.resetToDefaultsConfirm'),
+      confirmLabel: t('preferences.resetBtn'),
+      cancelLabel: t('common.cancel')
+    })
+    if (!confirmed) return
     resetToDefaults()
     setPreference('system')
     i18n.changeLanguage('en')
@@ -140,20 +146,14 @@ export default function GeneralSettings({ onClose }: GeneralSettingsProps): Reac
         <label className="mb-2 block text-sm font-medium">{t('preferences.resetToDefaults')}</label>
         <div>
           <button
+            type="button"
             className="rounded-lg bg-danger-soft px-3 py-1.5 text-sm font-medium text-danger-soft-foreground hover:bg-danger-soft-hover transition-colors"
-            onClick={() => setResetConfirmOpen(true)}
+            onClick={handleResetClick}
           >
             {t('preferences.resetBtn')}
           </button>
         </div>
       </div>
-
-      <ConfirmDialog
-        isOpen={resetConfirmOpen}
-        onOpenChange={setResetConfirmOpen}
-        description={t('preferences.resetToDefaultsConfirm')}
-        onConfirm={handleResetConfirm}
-      />
     </div>
   )
 }

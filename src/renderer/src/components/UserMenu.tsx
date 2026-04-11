@@ -2,6 +2,7 @@ import { Avatar, Dropdown } from '@heroui/react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { LogIn, LogOut, Settings, RefreshCw, Keyboard, Power, CircleUser } from 'lucide-react'
+import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
 
 interface UserMenuProps {
   onOpenPreferences?: () => void
@@ -10,6 +11,19 @@ interface UserMenuProps {
 export default function UserMenu({ onOpenPreferences }: UserMenuProps): React.JSX.Element {
   const { t } = useTranslation()
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const confirm = useConfirm()
+
+  const handleCloseApp = async (): Promise<void> => {
+    const confirmed = await confirm({
+      status: 'warning',
+      title: t('userMenu.closeAppTitle'),
+      description: t('userMenu.closeAppConfirm'),
+      confirmLabel: t('common.close'),
+      cancelLabel: t('common.cancel')
+    })
+    if (!confirmed) return
+    window.close()
+  }
 
   return (
     <Dropdown.Root>
@@ -29,7 +43,7 @@ export default function UserMenu({ onOpenPreferences }: UserMenuProps): React.JS
             if (key === 'login') setIsLoggedIn(true)
             if (key === 'logout') setIsLoggedIn(false)
             if (key === 'preferences') onOpenPreferences?.()
-            if (key === 'closeApp') window.close()
+            if (key === 'closeApp') handleCloseApp()
           }}
         >
           {isLoggedIn ? (
