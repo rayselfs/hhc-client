@@ -3,6 +3,7 @@ import { Button } from '@heroui/react'
 import { Play, Pause, RotateCcw } from 'lucide-react'
 import { useTimerStore } from '@renderer/stores/timer'
 import { useStopwatchStore } from '@renderer/stores/stopwatch'
+import { useProjection } from '@renderer/contexts/ProjectionContext'
 import type { TimerMode } from '@renderer/stores/timer'
 
 interface TimerControlsProps {
@@ -17,6 +18,7 @@ export default function TimerControls({
   className
 }: TimerControlsProps): React.JSX.Element {
   const { t } = useTranslation()
+  const { claimProjection } = useProjection()
   const isStopwatch = mode === 'stopwatch'
 
   const timerStatus = useTimerStore((s) => s.status)
@@ -44,7 +46,17 @@ export default function TimerControls({
   const isRunning = status === 'running'
   const isPaused = status === 'paused'
 
-  const playAction = isStopped ? start : isPaused ? resume : pause
+  const handleStart = (): void => {
+    claimProjection('timer', { unblank: true })
+    start()
+  }
+
+  const handleResume = (): void => {
+    claimProjection('timer', { unblank: true })
+    resume()
+  }
+
+  const playAction = isStopped ? handleStart : isPaused ? handleResume : pause
   const playLabel = isStopped ? t('timer.start') : isRunning ? t('timer.pause') : t('timer.resume')
 
   return (

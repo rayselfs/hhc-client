@@ -2,14 +2,34 @@ import { render, screen } from '@testing-library/react'
 import type { RenderResult } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { I18nextProvider } from 'react-i18next'
+import { vi } from 'vitest'
 import i18n from '@renderer/i18n'
 import TimerControls from '@renderer/components/Timer/TimerControls'
 import { useTimerStore } from '@renderer/stores/timer'
 import { useStopwatchStore } from '@renderer/stores/stopwatch'
 
+const mockClaimProjection = vi.fn()
+
+vi.mock('@renderer/contexts/ProjectionContext', () => ({
+  useProjection: vi.fn(() => ({
+    claimProjection: mockClaimProjection,
+    project: vi.fn(),
+    send: vi.fn(),
+    on: vi.fn(),
+    isProjectionOpen: false,
+    isProjectionBlanked: true,
+    projectionReadyCount: 0,
+    activeOwner: 'timer',
+    openProjection: vi.fn(),
+    closeProjection: vi.fn(),
+    blankProjection: vi.fn()
+  }))
+}))
+
 beforeEach(() => {
   useTimerStore.setState({ status: 'stopped' })
   useStopwatchStore.setState({ status: 'stopped' })
+  mockClaimProjection.mockClear()
 })
 
 function renderWithI18n(mode: 'timer' | 'clock' | 'both' | 'stopwatch' = 'timer'): RenderResult {
@@ -148,5 +168,59 @@ describe('TimerControls — clock/both modes use timerStore', () => {
     renderWithI18n('both')
     expect(screen.getByTestId('btn-resume')).toBeInTheDocument()
     expect(screen.getByTestId('btn-reset')).toBeInTheDocument()
+  })
+})
+
+describe('TimerControls — projection integration', () => {
+  beforeEach(() => {
+    mockClaimProjection.mockClear()
+  })
+
+  it('clicking Start calls claimProjection("timer", { unblank: true })', async () => {
+    const user = userEvent.setup()
+    useTimerStore.setState({ status: 'stopped' })
+    renderWithI18n('timer')
+    await user.click(screen.getByTestId('btn-start'))
+    expect(mockClaimProjection).toHaveBeenCalledWith('timer', { unblank: true })
+  })
+
+  it('clicking Resume calls claimProjection("timer", { unblank: true })', async () => {
+    const user = userEvent.setup()
+    useTimerStore.setState({ status: 'paused' })
+    renderWithI18n('timer')
+    await user.click(screen.getByTestId('btn-resume'))
+    expect(mockClaimProjection).toHaveBeenCalledWith('timer', { unblank: true })
+  })
+
+  it('clicking Pause does NOT call claimProjection', async () => {
+    const user = userEvent.setup()
+    useTimerStore.setState({ status: 'running' })
+    renderWithI18n('timer')
+    await user.click(screen.getByTestId('btn-pause'))
+    expect(mockClaimProjection).not.toHaveBeenCalled()
+  })
+
+  it('clicking Reset does NOT call claimProjection', async () => {
+    const user = userEvent.setup()
+    useTimerStore.setState({ status: 'running' })
+    renderWithI18n('timer')
+    await user.click(screen.getByTestId('btn-reset'))
+    expect(mockClaimProjection).not.toHaveBeenCalled()
+  })
+
+  it('stopwatch Start also calls claimProjection("timer", { unblank: true })', async () => {
+    const user = userEvent.setup()
+    useStopwatchStore.setState({ status: 'stopped' })
+    renderWithI18n('stopwatch')
+    await user.click(screen.getByTestId('btn-start'))
+    expect(mockClaimProjection).toHaveBeenCalledWith('timer', { unblank: true })
+  })
+
+  it('stopwatch Resume also calls claimProjection("timer", { unblank: true })', async () => {
+    const user = userEvent.setup()
+    useStopwatchStore.setState({ status: 'paused' })
+    renderWithI18n('stopwatch')
+    await user.click(screen.getByTestId('btn-resume'))
+    expect(mockClaimProjection).toHaveBeenCalledWith('timer', { unblank: true })
   })
 })
