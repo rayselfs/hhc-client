@@ -28,7 +28,7 @@ export default function Sidebar(): React.JSX.Element {
   return (
     <nav
       className="flex flex-col rounded-tr-3xl rounded-br-3xl bg-sidebar text-sidebar-foreground py-2 px-1"
-      style={{ width: 'var(--sidebar-width)' }}
+      style={{ width: 'var(--sidebar-width)', minWidth: 'var(--sidebar-min-width)' }}
     >
       <ul className="flex flex-col gap-1">
         {items.map((item) => {
