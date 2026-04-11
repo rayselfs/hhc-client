@@ -83,7 +83,9 @@
     "confirm": "Confirm",
     "close": "Close",
     "send": "Send",
-    "warning": "Warning"
+    "warning": "Warning",
+    "danger": "Danger",
+    "info": "Info"
   },
   "userMenu": {
     "guest": "Guest",
@@ -92,7 +94,9 @@
     "preferences": "Preferences",
     "checkForUpdates": "Check for Updates",
     "keyboardShortcuts": "Keyboard Shortcuts",
-    "closeApp": "Close App"
+    "closeApp": "Close App",
+    "closeAppTitle": "Close Application",
+    "closeAppConfirm": "Are you sure you want to close the application?"
   },
   "preferences": {
     "title": "Preferences",

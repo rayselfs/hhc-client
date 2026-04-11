@@ -83,7 +83,9 @@
     "confirm": "确认",
     "close": "关闭",
     "send": "发送",
-    "warning": "警告"
+    "warning": "警告",
+    "danger": "危险",
+    "info": "提示"
   },
   "userMenu": {
     "guest": "访客",
@@ -92,7 +94,9 @@
     "preferences": "偏好设置",
     "checkForUpdates": "检查更新",
     "keyboardShortcuts": "键盘快捷键",
-    "closeApp": "关闭应用程序"
+    "closeApp": "关闭应用程序",
+    "closeAppTitle": "关闭应用程序",
+    "closeAppConfirm": "确定要关闭应用程序吗？"
   },
   "preferences": {
     "title": "偏好设置",
