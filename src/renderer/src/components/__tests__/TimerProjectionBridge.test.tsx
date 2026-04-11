@@ -68,7 +68,7 @@ describe('TimerProjectionBridge — timer:tick projection', () => {
     )
   })
 
-  it('sends autoShow: true when timer is running', () => {
+  it('sends timer:tick without unblank options when timer is running', () => {
     useTimerStore.setState({
       mode: 'timer',
       status: 'running',
@@ -82,7 +82,7 @@ describe('TimerProjectionBridge — timer:tick projection', () => {
     )
   })
 
-  it('sends autoShow: false when timer is stopped', () => {
+  it('sends timer:tick without unblank options when timer is stopped', () => {
     useTimerStore.setState({ mode: 'timer', status: 'stopped' })
     renderBridge()
     expect(mockProject).toHaveBeenCalledWith(

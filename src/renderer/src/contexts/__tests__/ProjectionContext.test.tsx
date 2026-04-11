@@ -270,7 +270,7 @@ describe('ProjectionContext — web mode', () => {
     warnSpy.mockRestore()
   })
 
-  it('project() autoShow: unblank no longer happens on flush (use claimProjection instead)', async () => {
+  it('project() does not unblank on flush (use claimProjection instead)', async () => {
     const { result } = renderProjection()
 
     await act(async () => {
