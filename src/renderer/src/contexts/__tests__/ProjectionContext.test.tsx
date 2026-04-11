@@ -453,6 +453,73 @@ describe('ProjectionContext — web mode', () => {
   })
 })
 
+describe('ProjectionContext — claimProjection', () => {
+  beforeEach(() => {
+    vi.mocked(isElectron).mockReturnValue(false)
+  })
+
+  it('claimProjection sets activeOwner and sends __system:active-owner', () => {
+    const { result } = renderProjection()
+
+    act(() => {
+      result.current.claimProjection('bible')
+    })
+
+    expect(result.current.activeOwner).toBe('bible')
+    expect(mockAdapter.send).toHaveBeenCalledWith('__system:active-owner', { owner: 'bible' })
+  })
+
+  it('claimProjection with unblank: true unblanks when currently blanked', () => {
+    const { result } = renderProjection()
+    expect(result.current.isProjectionBlanked).toBe(true)
+
+    act(() => {
+      result.current.claimProjection('timer', { unblank: true })
+    })
+
+    expect(result.current.isProjectionBlanked).toBe(false)
+    expect(mockAdapter.send).toHaveBeenCalledWith('__system:blank', { showDefault: false })
+  })
+
+  it('claimProjection with unblank: true does not send __system:blank if already unblanked', () => {
+    const { result } = renderProjection()
+
+    act(() => {
+      result.current.blankProjection(false)
+    })
+    vi.mocked(mockAdapter.send).mockClear()
+
+    act(() => {
+      result.current.claimProjection('timer', { unblank: true })
+    })
+
+    expect(mockAdapter.send).not.toHaveBeenCalledWith('__system:blank', { showDefault: false })
+    expect(result.current.isProjectionBlanked).toBe(false)
+  })
+
+  it('claimProjection without options does not change blank state', () => {
+    const { result } = renderProjection()
+
+    act(() => {
+      result.current.claimProjection('bible')
+    })
+
+    expect(result.current.isProjectionBlanked).toBe(true)
+    expect(mockAdapter.send).not.toHaveBeenCalledWith('__system:blank', { showDefault: false })
+  })
+
+  it('claimProjection with unblank: false does not unblank', () => {
+    const { result } = renderProjection()
+
+    act(() => {
+      result.current.claimProjection('bible', { unblank: false })
+    })
+
+    expect(result.current.isProjectionBlanked).toBe(true)
+    expect(mockAdapter.send).not.toHaveBeenCalledWith('__system:blank', { showDefault: false })
+  })
+})
+
 describe('ProjectionContext — electron mode', () => {
   let mockCheck: ReturnType<typeof vi.fn>
   let mockEnsure: ReturnType<typeof vi.fn>
