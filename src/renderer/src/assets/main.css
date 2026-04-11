@@ -1,4 +1,7 @@
 @import '@fontsource-variable/roboto';
+@import '@fontsource-variable/open-sans';
+@import '@fontsource-variable/noto-sans-tc';
+@import '@fontsource-variable/noto-sans-sc';
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import '@heroui/styles';
@@ -6,6 +9,7 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {
+  --font-sans: 'Open Sans Variable', 'Noto Sans TC Variable', sans-serif;
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
 }
@@ -45,6 +49,18 @@
   .timer-digits {
     font-weight: 450;
   }
+}
+
+:lang(zh-TW) {
+  --font-sans: 'Open Sans Variable', 'Noto Sans TC Variable', sans-serif;
+}
+
+:lang(zh-CN) {
+  --font-sans: 'Open Sans Variable', 'Noto Sans SC Variable', sans-serif;
+}
+
+:lang(en) {
+  --font-sans: 'Open Sans Variable', 'Noto Sans TC Variable', sans-serif;
 }
 
 html,

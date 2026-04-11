@@ -19,20 +19,29 @@ function detectLanguage(): string {
   return 'en'
 }
 
+function setHtmlLang(lng: string): void {
+  document.documentElement.lang = lng
+}
+
+const initialLanguage = detectLanguage()
+
 i18n.use(initReactI18next).init({
   resources: {
     en: { translation: en },
     'zh-TW': { translation: zhTW },
     'zh-CN': { translation: zhCN }
   },
-  lng: detectLanguage(),
+  lng: initialLanguage,
   fallbackLng: 'en',
   interpolation: { escapeValue: false },
   useSuspense: false
 } as Parameters<typeof i18n.init>[0])
 
+setHtmlLang(initialLanguage)
+
 i18n.on('languageChanged', (lng: string) => {
   localStorage.setItem(LANGUAGE_STORAGE_KEY, lng)
+  setHtmlLang(lng)
 })
 
 export default i18n
