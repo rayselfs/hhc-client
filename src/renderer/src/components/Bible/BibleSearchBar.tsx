@@ -110,7 +110,7 @@ export default function BibleSearchBar(): React.JSX.Element {
       setTimeout(() => {
         const input = inputWrapperRef.current?.querySelector('input')
         input?.focus()
-      }, 50)
+      }, 250)
     }
   }, [isExpanded])
 
@@ -218,34 +218,37 @@ export default function BibleSearchBar(): React.JSX.Element {
 
   return (
     <div ref={containerRef} className="relative flex items-center" data-testid="bible-search-bar">
-      {isExpanded && (
-        <div ref={inputWrapperRef} className="relative mr-1">
-          <Input
-            data-bible-search
-            placeholder="搜尋經文..."
-            value={query}
-            onChange={(e) => handleQueryChange(e.target.value)}
-            onKeyDown={handleKeyDown}
-            className="w-52"
-            aria-label="搜尋經文"
-          />
-          {query.length > 0 && (
-            <button
-              type="button"
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 hover:text-default-600"
-              onMouseDown={(e) => {
-                e.preventDefault()
-                setQuery('')
-                setResults([])
-                setHasSearched(false)
-              }}
-              aria-label="清除搜尋"
-            >
-              <X size={14} />
-            </button>
-          )}
-        </div>
-      )}
+      <div
+        ref={inputWrapperRef}
+        className={`relative transition-all duration-200 ease-in-out overflow-hidden ${
+          isExpanded ? 'w-52 opacity-100 mr-1' : 'w-0 opacity-0'
+        }`}
+      >
+        <Input
+          data-bible-search
+          placeholder="搜尋經文..."
+          value={query}
+          onChange={(e) => handleQueryChange(e.target.value)}
+          onKeyDown={handleKeyDown}
+          className="w-52"
+          aria-label="搜尋經文"
+        />
+        {query.length > 0 && (
+          <button
+            type="button"
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 hover:text-default-600"
+            onMouseDown={(e) => {
+              e.preventDefault()
+              setQuery('')
+              setResults([])
+              setHasSearched(false)
+            }}
+            aria-label="清除搜尋"
+          >
+            <X size={14} />
+          </button>
+        )}
+      </div>
 
       <Button
         size="sm"

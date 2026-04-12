@@ -43,7 +43,9 @@ describe('BibleSearchBar', () => {
     render(<BibleSearchBar />)
     const toggle = screen.getByRole('button', { name: '搜尋經文' })
     expect(toggle).toBeInTheDocument()
-    expect(screen.queryByPlaceholderText('搜尋經文...')).not.toBeInTheDocument()
+    const input = screen.getByPlaceholderText('搜尋經文...')
+    expect(input).toHaveClass('w-52')
+    expect(input.closest('div')).toHaveClass('opacity-0')
   })
 
   it('clicking toggle expands the search bar', async () => {
@@ -65,7 +67,8 @@ describe('BibleSearchBar', () => {
     await act(async () => {
       fireEvent.click(closeToggle)
     })
-    expect(screen.queryByPlaceholderText('搜尋經文...')).not.toBeInTheDocument()
+    const input = screen.getByPlaceholderText('搜尋經文...')
+    expect(input.closest('div')).toHaveClass('opacity-0')
   })
 
   it('pressing Escape collapses the search bar', async () => {
@@ -77,7 +80,7 @@ describe('BibleSearchBar', () => {
     await act(async () => {
       fireEvent.keyDown(input, { key: 'Escape' })
     })
-    expect(screen.queryByPlaceholderText('搜尋經文...')).not.toBeInTheDocument()
+    expect(input.closest('div')).toHaveClass('opacity-0')
   })
 
   it('shows search results dropdown when hasSearched is true', async () => {
