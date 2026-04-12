@@ -28,7 +28,9 @@ export default function TimerPage(): React.JSX.Element {
 
   const isTimerActive = timerStatus === 'running' || timerStatus === 'paused'
   const isTimerActiveRef = useRef(isTimerActive)
-  isTimerActiveRef.current = isTimerActive
+  useEffect(() => {
+    isTimerActiveRef.current = isTimerActive
+  })
 
   useEffect(() => {
     if (!isProjectionOpen) return
