@@ -9,11 +9,11 @@ export const SHORTCUTS = {
     NEXT_CHAPTER: { code: 'ArrowRight', metaOrCtrl: true },
     OPEN_SELECTOR: { code: 'KeyG' },
     FOCUS_SEARCH: { code: 'KeyF', metaOrCtrl: true },
-    CLOSE_DIALOG: { code: 'Escape' },
+    CLOSE_DIALOG: { code: 'Escape' }
   },
   TIMER: {
     TOGGLE: { code: 'Space' },
-    RESET: { code: 'KeyR' },
+    RESET: { code: 'KeyR' }
   },
   EDIT: {
     COPY: { code: 'KeyC', metaOrCtrl: true },
@@ -21,6 +21,6 @@ export const SHORTCUTS = {
     PASTE: { code: 'KeyV', metaOrCtrl: true },
     SELECT_ALL: { code: 'KeyA', metaOrCtrl: true },
     DELETE: { code: 'Backspace', mac: { code: 'Backspace', meta: true } },
-    DELETE_ALT: { code: 'Delete' },
-  },
+    DELETE_ALT: { code: 'Delete' }
+  }
 } as const satisfies Record<string, Record<string, ShortcutConfig>>

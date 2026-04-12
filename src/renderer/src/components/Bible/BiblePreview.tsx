@@ -4,13 +4,20 @@ import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
 import { BIBLE_BOOKS, formatVerseReference } from '@shared/types/bible'
 import type { MouseEvent } from 'react'
+import { useRef, useEffect } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 interface BiblePreviewProps {
   onContextMenu: (event: MouseEvent<HTMLButtonElement>) => void
+  selectedVerseIndex: number
+  onSelectedVerseIndexChange: (index: number) => void
 }
 
-export function BiblePreview({ onContextMenu }: BiblePreviewProps) {
+export function BiblePreview({
+  onContextMenu,
+  selectedVerseIndex,
+  onSelectedVerseIndexChange
+}: BiblePreviewProps): React.JSX.Element {
   const {
     isLoading,
     error,
@@ -26,24 +33,37 @@ export function BiblePreview({ onContextMenu }: BiblePreviewProps) {
 
   const { fontSize } = useBibleSettingsStore()
   const { claimProjection, project } = useProjection()
+  const verseRefs = useRef<Map<number, HTMLButtonElement>>(new Map())
 
   const verses = getCurrentVerses()
   const book = getCurrentBook()
   const chapter = getCurrentChapter()
 
-  const handleVerseClick = (verseNumber: number, verseText: string) => {
+  const handleVerseClick = (verseIndex: number, verseNumber: number, verseText: string): void => {
     if (!book || !chapter) return
     const reference = formatVerseReference(book.name, book.number, chapter.number, verseNumber)
     claimProjection('bible', { unblank: true })
     project('bible:verse', { reference, text: verseText, fontSize })
     navigateTo({ bookNumber: book.number, chapter: chapter.number, verse: verseNumber })
+    onSelectedVerseIndexChange(verseIndex)
   }
+
+  useEffect(() => {
+    if (!verses || verses.length === 0) return
+    const clamped = Math.max(0, Math.min(selectedVerseIndex, verses.length - 1))
+    const verse = verses[clamped]
+    if (!verse) return
+    const el = verseRefs.current.get(verse.number)
+    if (el) {
+      el.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    }
+  }, [selectedVerseIndex, verses])
 
   const revelation = BIBLE_BOOKS.find((b) => b.number === 66)
   const isPrevDisabled = book?.number === 1 && chapter?.number === 1
   const isNextDisabled = book?.number === 66 && chapter?.number === revelation?.chapterCount
 
-  const renderContent = () => {
+  const renderContent = (): React.JSX.Element => {
     if (isLoading) {
       return (
         <div className="flex h-full items-center justify-center">
@@ -72,23 +92,36 @@ export function BiblePreview({ onContextMenu }: BiblePreviewProps) {
     return (
       <ScrollShadow hideScrollBar className="h-full">
         <div className="flex flex-col gap-2 p-4">
-          {verses.map((verse) => (
-            <button
-              key={verse.number}
-              type="button"
-              onClick={() => handleVerseClick(verse.number, verse.text)}
-              onContextMenu={onContextMenu}
-              data-verse-number={verse.number}
-              className={`w-full text-left cursor-pointer rounded-md p-2 transition-colors ${
-                currentPassage.verse === verse.number
-                  ? 'bg-primary/10 border-l-2 border-primary'
-                  : 'hover:bg-default-100'
-              }`}
-            >
-              <span className="text-default-400 mr-2">{verse.number}</span>
-              <span>{verse.text}</span>
-            </button>
-          ))}
+          {verses.map((verse, index) => {
+            const isSelected = index === selectedVerseIndex
+            const isProjected = currentPassage.verse === verse.number
+            return (
+              <button
+                key={verse.number}
+                ref={(el) => {
+                  if (el) {
+                    verseRefs.current.set(verse.number, el)
+                  } else {
+                    verseRefs.current.delete(verse.number)
+                  }
+                }}
+                type="button"
+                onClick={() => handleVerseClick(index, verse.number, verse.text)}
+                onContextMenu={onContextMenu}
+                data-verse-number={verse.number}
+                className={`w-full text-left cursor-pointer rounded-md p-2 transition-colors ${
+                  isSelected
+                    ? 'bg-primary/20 border-l-2 border-primary ring-1 ring-primary/30'
+                    : isProjected
+                      ? 'bg-primary/10 border-l-2 border-primary'
+                      : 'hover:bg-default-100'
+                }`}
+              >
+                <span className="text-default-400 mr-2">{verse.number}</span>
+                <span>{verse.text}</span>
+              </button>
+            )
+          })}
         </div>
       </ScrollShadow>
     )

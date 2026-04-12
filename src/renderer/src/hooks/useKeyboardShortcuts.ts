@@ -72,10 +72,12 @@ export function useKeyboardShortcuts(
   const { enabled = true } = options
 
   const shortcutsRef = useRef<ShortcutHandler[]>(shortcuts)
-  shortcutsRef.current = shortcuts
-
   const enabledRef = useRef<boolean>(enabled)
-  enabledRef.current = enabled
+
+  useEffect(() => {
+    shortcutsRef.current = shortcuts
+    enabledRef.current = enabled
+  })
 
   useEffect(() => {
     const handleKeydown = (event: KeyboardEvent): void => {
