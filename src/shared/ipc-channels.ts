@@ -14,6 +14,7 @@ import type {
   StopwatchState,
   TimerTickPayload
 } from './types/timer'
+import type { BibleVersion, BibleBook } from './types/bible'
 
 // ---------------------------------------------------------------------------
 // Invoke channels (renderer → main, returns a result)
@@ -36,6 +37,8 @@ export interface IpcInvokeMap {
   'timer:command': { args: [TimerCommand]; result: void }
   'timer:initialize': { args: [TimerSettings]; result: void }
   'timer:get-state': { args: []; result: TimerState & { stopwatch: StopwatchState } }
+  'bible:get-versions': { args: []; result: BibleVersion[] }
+  'bible:get-content': { args: [string]; result: BibleBook[] }
 }
 
 export type IpcInvokeChannel = keyof IpcInvokeMap

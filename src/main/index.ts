@@ -3,6 +3,7 @@ import { electronApp, optimizer } from '@electron-toolkit/utils'
 import { WindowManager } from './windowManager'
 import { registerProjectionHandlers } from './ipc/projection'
 import { registerTimerHandlers } from './ipc/timer'
+import { registerBibleApiHandlers } from './ipc/bible-api'
 import { isKnownWindow, validateTheme } from './ipc/validate'
 
 process.on('uncaughtException', (error) => {
@@ -47,6 +48,7 @@ app.whenReady().then(() => {
 
   registerProjectionHandlers(wm)
   registerTimerHandlers(wm)
+  registerBibleApiHandlers(wm)
   wm.createMainWindow()
   wm.createProjectionWindow()
 

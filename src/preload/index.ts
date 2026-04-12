@@ -58,7 +58,12 @@ const timerApi = {
   onTimerTick: (callback: (payload: TimerTickPayload) => void) => typedOn('timer-tick', callback)
 }
 
-const api = { projection: projectionApi, theme: themeApi, timer: timerApi }
+const bibleApi = {
+  getVersions: () => typedInvoke('bible:get-versions'),
+  getContent: (versionId: string) => typedInvoke('bible:get-content', versionId)
+}
+
+const api = { projection: projectionApi, theme: themeApi, timer: timerApi, bible: bibleApi }
 
 try {
   contextBridge.exposeInMainWorld('api', api)

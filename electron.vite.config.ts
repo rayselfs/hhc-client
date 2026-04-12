@@ -25,6 +25,15 @@ export default defineConfig({
         '@shared': resolve('src/shared')
       }
     },
-    plugins: [react(), tailwindcss()]
+    plugins: [react(), tailwindcss()],
+    server: {
+      proxy: {
+        '/api/bible': {
+          target: 'https://www.alive.org.tw',
+          changeOrigin: true,
+          secure: true
+        }
+      }
+    }
   }
 })
