@@ -2,10 +2,6 @@ import { create } from 'zustand'
 import type { Folder, FolderItem, FolderStoreConfig, VerseItem } from '@shared/types/folder'
 import { saveFolderTree, loadFolderTree } from '@renderer/lib/bible-db'
 
-// ---------------------------------------------------------------------------
-// Tree utility pure functions
-// ---------------------------------------------------------------------------
-
 export function findFolder<T extends FolderItem>(
   root: Folder<T>,
   id: string
@@ -25,10 +21,6 @@ export function flattenFolders<T extends FolderItem>(root: Folder<T>): Folder<T>
   }
   return result
 }
-
-// ---------------------------------------------------------------------------
-// Internal helpers
-// ---------------------------------------------------------------------------
 
 function makeRoot<T extends FolderItem>(config: FolderStoreConfig): Folder<T> {
   return {
@@ -70,54 +62,28 @@ function removeItemFromTree<T extends FolderItem>(root: Folder<T>, itemId: strin
   }
 }
 
-// Serialise root to the FolderDB[] shape that bible-db expects
-// We store [root] as a single-element array keyed by rootId
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function persistTree<T extends FolderItem>(rootId: string, root: Folder<T>): void {
-  // Fire-and-forget; errors logged inside saveFolderTree
   saveFolderTree(rootId, [root] as never)
 }
-
-// ---------------------------------------------------------------------------
-// Store state / actions type
-// ---------------------------------------------------------------------------
 
 interface FolderStoreState<TItem extends FolderItem> {
   root: Folder<TItem>
   currentFolderId: string
   isLoading: boolean
-
-  // lifecycle
   initialize: () => Promise<void>
-
-  // folder operations
   addFolder: (name: string, parentId?: string) => void
   renameFolder: (id: string, name: string) => void
   deleteFolder: (id: string) => void
-
-  // item operations
   addItem: (item: TItem, folderId?: string) => void
   removeItem: (id: string) => void
   moveItem: (itemId: string, targetFolderId: string) => void
-
-  // folder movement
   moveFolder: (folderId: string, targetFolderId: string) => void
-
-  // reorder
   reorderItems: (folderId: string, orderedIds: string[]) => void
-
-  // navigation
   navigateToFolder: (folderId: string) => void
   navigateToRoot: () => void
   navigateUp: () => void
-
-  // selectors
   getCurrentFolder: () => Folder<TItem>
 }
-
-// ---------------------------------------------------------------------------
-// Factory
-// ---------------------------------------------------------------------------
 
 export function createFolderStore<TItem extends FolderItem>(config: FolderStoreConfig) {
   return create<FolderStoreState<TItem>>()((set, get) => ({
@@ -130,7 +96,6 @@ export function createFolderStore<TItem extends FolderItem>(config: FolderStoreC
       try {
         const stored = await loadFolderTree(config.rootId)
         if (stored && stored.length > 0) {
-          // We stored [root] so the first element is the root
           set({ root: stored[0] as unknown as Folder<TItem>, isLoading: false })
         } else {
           const root = makeRoot<TItem>(config)
@@ -144,7 +109,6 @@ export function createFolderStore<TItem extends FolderItem>(config: FolderStoreC
 
     addFolder: (name, parentId) => {
       const { root } = get()
-      // Only allow adding folders at root level
       const resolvedParentId = parentId ?? config.rootId
       if (resolvedParentId !== config.rootId) {
         console.warn('[FolderStore] addFolder: only root-level folders allowed')
@@ -159,10 +123,7 @@ export function createFolderStore<TItem extends FolderItem>(config: FolderStoreC
         createdAt: Date.now(),
         sortIndex: root.folders.length
       }
-      const updated = {
-        ...root,
-        folders: [...root.folders, newFolder]
-      }
+      const updated = { ...root, folders: [...root.folders, newFolder] }
       set({ root: updated })
       persistTree(config.rootId, updated)
     },
@@ -179,7 +140,6 @@ export function createFolderStore<TItem extends FolderItem>(config: FolderStoreC
       if (id === config.rootId) return
       const { root, currentFolderId } = get()
       const updated = removeFolderFromTree(root, id)
-      // If currently inside the deleted folder, navigate to root
       const nextCurrentId = currentFolderId === id ? config.rootId : currentFolderId
       set({ root: updated, currentFolderId: nextCurrentId })
       persistTree(config.rootId, updated)
@@ -205,11 +165,8 @@ export function createFolderStore<TItem extends FolderItem>(config: FolderStoreC
 
     moveItem: (itemId, targetFolderId) => {
       const { root } = get()
-      // Find the item first
-      let foundItem: TItem | undefined
-      const withoutItem = removeItemFromTree(root, itemId)
-      // We need the actual item — scan original tree
       const allFolders = flattenFolders(root)
+      let foundItem: TItem | undefined
       for (const folder of allFolders) {
         const item = folder.items.find((i) => i.id === itemId)
         if (item) {
@@ -219,6 +176,7 @@ export function createFolderStore<TItem extends FolderItem>(config: FolderStoreC
       }
       if (!foundItem) return
       const itemToMove = foundItem
+      const withoutItem = removeItemFromTree(root, itemId)
       const updated = updateFolderInTree(withoutItem, targetFolderId, (f) => ({
         ...f,
         items: [...f.items, { ...itemToMove, sortIndex: f.items.length }]
@@ -228,18 +186,15 @@ export function createFolderStore<TItem extends FolderItem>(config: FolderStoreC
     },
 
     moveFolder: (folderId, targetFolderId) => {
-      // Only allow moving to root (enforce max 1-level nesting)
       if (targetFolderId !== config.rootId) {
         console.warn('[FolderStore] moveFolder: target must be root (max 1 level nesting)')
         return
       }
       const { root } = get()
-      // Find the folder to move
+      if (folderId === config.rootId) return
       const folderToMove = findFolder(root, folderId)
-      if (!folderToMove || folderId === config.rootId) return
-      // Remove from current parent
+      if (!folderToMove) return
       const withoutFolder = removeFolderFromTree(root, folderId)
-      // Add to root
       const updated = {
         ...withoutFolder,
         folders: [
@@ -254,13 +209,12 @@ export function createFolderStore<TItem extends FolderItem>(config: FolderStoreC
     reorderItems: (folderId, orderedIds) => {
       const { root } = get()
       const updated = updateFolderInTree(root, folderId, (f) => {
-        const reordered = orderedIds
+        const reordered: TItem[] = orderedIds
           .map((id, index) => {
             const item = f.items.find((i) => i.id === id)
-            return item ? { ...item, sortIndex: index } : null
+            return item ? ({ ...item, sortIndex: index } as TItem) : undefined
           })
-          .filter((i): i is TItem => i !== null)
-        // Append any items not in orderedIds at the end
+          .filter((i): i is TItem => i !== undefined)
         const missing = f.items.filter((i) => !orderedIds.includes(i.id))
         return { ...f, items: [...reordered, ...missing] }
       })
@@ -296,10 +250,6 @@ export function createFolderStore<TItem extends FolderItem>(config: FolderStoreC
     }
   }))
 }
-
-// ---------------------------------------------------------------------------
-// Bible-specific instance
-// ---------------------------------------------------------------------------
 
 export const useBibleFolderStore = createFolderStore<VerseItem>({
   rootId: 'bible-root',
