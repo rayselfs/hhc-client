@@ -22,8 +22,7 @@ async function fetchContent(versionId: string): Promise<BibleBook[]> {
   const timeout = setTimeout(() => controller.abort(), 60_000)
   try {
     const response = await fetch(`${API_BASE}/content/${versionId}`, {
-      signal: controller.signal,
-      headers: { Accept: 'text/event-stream', 'Cache-Control': 'no-cache' }
+      signal: controller.signal
     })
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
     if (!response.body) throw new Error('Response body is null')
