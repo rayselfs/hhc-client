@@ -1,5 +1,5 @@
-import { useState, useEffect, type ReactNode } from 'react'
-import { Modal, Button, ButtonGroup, Breadcrumbs, Divider } from '@heroui/react'
+import { useState, useEffect } from 'react'
+import { Modal, Button, ButtonGroup, Breadcrumbs } from '@heroui/react'
 import { BIBLE_BOOKS } from '@shared/types/bible'
 import type { BiblePassage } from '@shared/types/bible'
 import { useBibleStore } from '@renderer/stores/bible'
@@ -14,14 +14,6 @@ type Step = 'books' | 'chapters' | 'verses'
 
 const OLD_TESTAMENT_BOOKS = BIBLE_BOOKS.slice(0, 39)
 const NEW_TESTAMENT_BOOKS = BIBLE_BOOKS.slice(39)
-
-const LabeledDivider = ({ children }: { children: ReactNode }) => (
-  <div className="flex items-center">
-    <div className="flex-grow border-t border-default-200" />
-    <span className="flex-shrink mx-4 text-default-500 text-sm">{children}</span>
-    <div className="flex-grow border-t border-default-200" />
-  </div>
-)
 
 export function BibleSelectorDialog({ isOpen, onClose, onSelect }: BibleSelectorDialogProps) {
   const [currentStep, setCurrentStep] = useState<Step>('books')
@@ -67,7 +59,11 @@ export function BibleSelectorDialog({ isOpen, onClose, onSelect }: BibleSelector
   const renderBooks = () => (
     <div className="flex flex-col gap-4">
       <div>
-        <LabeledDivider>舊約</LabeledDivider>
+        <div className="flex items-center">
+          <div className="flex-grow border-t border-default-200" />
+          <span className="flex-shrink mx-4 text-default-500 text-sm">舊約</span>
+          <div className="flex-grow border-t border-default-200" />
+        </div>
         <div className="grid grid-cols-4 gap-1 mt-2">
           {OLD_TESTAMENT_BOOKS.map((book) => (
             <Button key={book.number} size="sm" onPress={() => handleBookSelect(book.number)}>
@@ -77,7 +73,11 @@ export function BibleSelectorDialog({ isOpen, onClose, onSelect }: BibleSelector
         </div>
       </div>
       <div>
-        <LabeledDivider>新約</LabeledDivider>
+        <div className="flex items-center">
+          <div className="flex-grow border-t border-default-200" />
+          <span className="flex-shrink mx-4 text-default-500 text-sm">新約</span>
+          <div className="flex-grow border-t border-default-200" />
+        </div>
         <div className="grid grid-cols-4 gap-1 mt-2">
           {NEW_TESTAMENT_BOOKS.map((book) => (
             <Button key={book.number} size="sm" onPress={() => handleBookSelect(book.number)}>
