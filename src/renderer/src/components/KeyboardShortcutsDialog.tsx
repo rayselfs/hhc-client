@@ -1,5 +1,6 @@
 import { Modal } from '@heroui/react'
 import { useTranslation } from 'react-i18next'
+import i18n from '@renderer/i18n'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
 import { isElectron } from '@renderer/lib/env'
 
@@ -52,10 +53,9 @@ export default function KeyboardShortcutsDialog({
   isOpen,
   onOpenChange
 }: KeyboardShortcutsDialogProps): React.JSX.Element {
-  const { t: i18nT } = useTranslation()
+  useTranslation()
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const tDynamic = (key: string): string => i18nT(key as any)
+  const tDynamic = i18n.t.bind(i18n) as (key: string) => string
 
   const renderShortcutRow = (label: string, keys: string[]): React.JSX.Element => (
     <div className="flex justify-between items-center py-2 px-3 hover:bg-default-100 rounded-lg transition-colors">
