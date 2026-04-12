@@ -188,7 +188,7 @@ export function CustomFolderTab() {
           <Modal.Container>
             <Modal.Dialog>
               <Modal.Header>
-                <Modal.Heading>{t('bible.create__new_folder', 'Create New Folder')}</Modal.Heading>
+                <Modal.Heading>{t('bible.create_new_folder', 'Create New Folder')}</Modal.Heading>
               </Modal.Header>
               <Modal.Body>
                 <TextField
