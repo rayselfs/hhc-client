@@ -1,9 +1,3 @@
-/**
- * BibleSearchEngine — wrapper around the bible-search Web Worker
- * Communicates with bible-search.worker.ts via postMessage
- * No IndexedDB persistence, no search UI — pure search engine
- */
-
 import type {
   WorkerIncomingMessage,
   WorkerOutgoingMessage
@@ -24,37 +18,31 @@ export class BibleSearchEngine {
     number,
     { resolve: (ids: number[]) => void; reject: (err: Error) => void }
   > = new Map()
-  private pendingProgress: Map<
-    number,
-    { resolve: (p: { indexed: number; total: number }) => void; reject: (err: Error) => void }
-  > = new Map()
-  private searchCounter = 0
 
-  private createWorker(): Worker {
-    return new Worker(new URL('../workers/bible-search.worker.ts', import.meta.url), {
-      type: 'module'
-    })
-  }
+  private searchCounter = 0
+  private messageHandlerBound = this.handleMessage.bind(this)
 
   async init(): Promise<void> {
     if (this.worker) return
 
-    this.worker = this.createWorker()
+    this.worker = new Worker(new URL('../workers/bible-search.worker.ts', import.meta.url), {
+      type: 'module'
+    })
 
     return new Promise((resolve, reject) => {
-      const onMessage = (event: MessageEvent<WorkerOutgoingMessage>) => {
+      const onReady = (event: MessageEvent<WorkerOutgoingMessage>) => {
         const { data } = event
         if (data.type === 'READY') {
           this.ready = true
-          this.worker?.removeEventListener('message', onMessage)
-          this.worker?.addEventListener('message', this.handleMessage.bind(this))
+          this.worker?.removeEventListener('message', onReady)
+          this.worker?.addEventListener('message', this.messageHandlerBound)
           resolve()
         } else if (data.type === 'ERROR') {
-          this.worker?.removeEventListener('message', onMessage)
+          this.worker?.removeEventListener('message', onReady)
           reject(new Error(data.message))
         }
       }
-      this.worker!.addEventListener('message', onMessage)
+      this.worker!.addEventListener('message', onReady)
       this.worker!.addEventListener('error', (e) => reject(new Error(e.message)))
 
       const msg: WorkerIncomingMessage = { type: 'INIT' }
@@ -81,21 +69,10 @@ export class BibleSearchEngine {
         }
         break
       }
-      case 'PROGRESS_RESULT': {
-        const pending = this.pendingProgress.get(data.id)
-        if (pending) {
-          pending.resolve({ indexed: data.indexed, total: data.total })
-          this.pendingProgress.delete(data.id)
-        }
-        break
-      }
       case 'ERROR': {
-        // Reject all pending
         const err = new Error(data.message)
         for (const p of this.pendingSearches.values()) p.reject(err)
         this.pendingSearches.clear()
-        for (const p of this.pendingProgress.values()) p.reject(err)
-        this.pendingProgress.clear()
         break
       }
     }
@@ -110,26 +87,17 @@ export class BibleSearchEngine {
     this.indexed = 0
 
     return new Promise((resolve, reject) => {
-      const onComplete = (event: MessageEvent<WorkerOutgoingMessage>) => {
+      const onBuildComplete = (event: MessageEvent<WorkerOutgoingMessage>) => {
         const { data } = event
         if (data.type === 'INDEX_COMPLETE') {
-          this.indexed = data.total
-          this.total = data.total
-          this.worker?.removeEventListener('message', onComplete)
-          this.worker?.addEventListener('message', this.handleMessage.bind(this))
+          this.worker?.removeEventListener('message', onBuildComplete)
           resolve()
-        } else if (data.type === 'PROGRESS') {
-          this.indexed = data.indexed
-          this.total = data.total
         } else if (data.type === 'ERROR') {
-          this.worker?.removeEventListener('message', onComplete)
+          this.worker?.removeEventListener('message', onBuildComplete)
           reject(new Error(data.message))
         }
       }
-
-      // Remove the general handler temporarily
-      this.worker!.removeEventListener('message', this.handleMessage.bind(this))
-      this.worker!.addEventListener('message', onComplete)
+      this.worker!.addEventListener('message', onBuildComplete)
 
       const msg: WorkerIncomingMessage = { type: 'BUILD_INDEX', verses }
       this.worker!.postMessage(msg)
@@ -163,9 +131,8 @@ export class BibleSearchEngine {
     this.ready = false
     this.indexed = 0
     this.total = 0
-    for (const p of this.pendingSearches.values()) p.reject(new Error('disposed'))
+    const err = new Error('disposed')
+    for (const p of this.pendingSearches.values()) p.reject(err)
     this.pendingSearches.clear()
-    for (const p of this.pendingProgress.values()) p.reject(new Error('disposed'))
-    this.pendingProgress.clear()
   }
 }

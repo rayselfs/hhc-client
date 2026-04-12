@@ -1,9 +1,3 @@
-/**
- * Web Worker for Bible full-text search
- * Uses FlexSearch Index with jieba-wasm tokenizer for Chinese text segmentation
- * No window, no document, no React imports
- */
-
 import { Index } from 'flexsearch'
 import init, { cut } from 'jieba-wasm'
 
