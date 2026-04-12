@@ -93,7 +93,8 @@ export const useBibleStore = create<BibleStore>()(
             useBibleSettingsStore.getState().setSelectedVersionId(versions[0].id)
           }
 
-          const selectedVersionId = versions[0].id
+          const selectedVersionId =
+            useBibleSettingsStore.getState().selectedVersionId || versions[0].id
 
           await get().fetchVersionContent(selectedVersionId)
 
