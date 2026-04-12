@@ -33,7 +33,7 @@ function ProjectionAutoOpen(): null {
         toast.danger(t('toast.projectionOpenFailed'))
       })
     })
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [confirm, isProjectionOpen, openProjection, t])
 
   return null
 }

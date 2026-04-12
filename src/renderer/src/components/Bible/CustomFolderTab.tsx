@@ -165,7 +165,7 @@ export function CustomFolderTab() {
           <Breadcrumbs.Item onPress={navigateToRoot}>
             {t('bible.library', 'Bible Library')}
           </Breadcrumbs.Item>
-          {currentFolder && <Breadcrumbs.Item>{currentFolder.name}</Breadcrumbs.Item>}
+          {currentFolder ? <Breadcrumbs.Item>{currentFolder.name}</Breadcrumbs.Item> : null}
         </Breadcrumbs>
         {!currentFolderId && (
           <Button variant="ghost" size="sm" onPress={() => setModalOpen(true)}>
