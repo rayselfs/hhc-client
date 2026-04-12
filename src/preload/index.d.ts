@@ -7,6 +7,7 @@ import type {
   StopwatchState,
   TimerTickPayload
 } from '../shared/types/timer'
+import type { BibleVersion, BibleBook } from '../shared/types/bible'
 
 interface ThemeAPI {
   get: () => Promise<{ source: string; shouldUseDarkColors: boolean }>
@@ -35,8 +36,13 @@ interface TimerAPI {
   onTimerTick: (callback: (payload: TimerTickPayload) => void) => () => void
 }
 
+interface BibleAPI {
+  getVersions: () => Promise<BibleVersion[]>
+  getContent: (versionId: string) => Promise<BibleBook[]>
+}
+
 declare global {
   interface Window {
-    api: { projection: ProjectionAPI; theme: ThemeAPI; timer: TimerAPI }
+    api: { projection: ProjectionAPI; theme: ThemeAPI; timer: TimerAPI; bible: BibleAPI }
   }
 }
