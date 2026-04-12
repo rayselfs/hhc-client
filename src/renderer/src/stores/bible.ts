@@ -11,10 +11,8 @@ import {
 } from '@renderer/lib/bible-db'
 import { hhcPersistStorage, createKey } from '@renderer/lib/persist-storage'
 
-// Module-level fetch deduplication: versionId → in-flight Promise
 const fetchPromises = new Map<string, Promise<BibleBook[]>>()
 
-// Module-level adapter (lazy init)
 let adapter: BibleApiAdapter | null = null
 
 function getAdapter(): BibleApiAdapter {
@@ -74,7 +72,6 @@ export const useBibleStore = create<BibleStore>()(
         set({ isLoading: true, error: null })
 
         try {
-          // Fetch versions (cache-first)
           let versions: BibleVersion[] = []
           const cachedVersions = await loadBibleVersionMeta()
           if (cachedVersions && cachedVersions.length > 0) {
@@ -86,7 +83,6 @@ export const useBibleStore = create<BibleStore>()(
 
           set({ versions })
 
-          // Determine selected version: use first available
           if (versions.length === 0) {
             set({ isLoading: false, isInitialized: true })
             return
@@ -94,7 +90,6 @@ export const useBibleStore = create<BibleStore>()(
 
           const selectedVersionId = versions[0].id
 
-          // Fetch content for selected version
           await get().fetchVersionContent(selectedVersionId)
 
           set({ isInitialized: true, isLoading: false, loadingProgress: null })
@@ -107,10 +102,8 @@ export const useBibleStore = create<BibleStore>()(
       fetchVersionContent: async (versionId: string) => {
         const s = get()
 
-        // Already in content map — skip
         if (s.content.has(versionId)) return
 
-        // Deduplicate in-flight fetches
         if (fetchPromises.has(versionId)) {
           try {
             const books = await fetchPromises.get(versionId)!
@@ -127,18 +120,13 @@ export const useBibleStore = create<BibleStore>()(
         set({ isLoading: true, error: null, loadingProgress: { loaded: 0, total: 66 } })
 
         const fetchPromise = (async (): Promise<BibleBook[]> => {
-          // Cache-first: check IndexedDB
           const cached = await loadBibleContent(versionId)
           if (cached && cached.length > 0) {
             return cached as BibleBook[]
           }
 
-          // Fetch from API
           const books = await getAdapter().fetchContent(versionId)
-
-          // Save to IndexedDB
           await saveBibleContent(versionId, books)
-
           return books
         })()
 
@@ -172,15 +160,12 @@ export const useBibleStore = create<BibleStore>()(
         if (!bookConfig) return
 
         if (chapter < bookConfig.chapterCount) {
-          // Move to next chapter in same book
           set({ currentPassage: { bookNumber, chapter: chapter + 1, verse: 1 } })
         } else {
-          // Move to first chapter of next book
           const nextBook = BIBLE_BOOKS.find((b) => b.number === bookNumber + 1)
           if (nextBook) {
             set({ currentPassage: { bookNumber: nextBook.number, chapter: 1, verse: 1 } })
           }
-          // If last book (Revelation), stay
         }
       },
 
@@ -189,10 +174,8 @@ export const useBibleStore = create<BibleStore>()(
         const { bookNumber, chapter } = s.currentPassage
 
         if (chapter > 1) {
-          // Move to previous chapter in same book
           set({ currentPassage: { bookNumber, chapter: chapter - 1, verse: 1 } })
         } else {
-          // Move to last chapter of previous book
           const prevBook = BIBLE_BOOKS.find((b) => b.number === bookNumber - 1)
           if (prevBook) {
             set({
@@ -203,7 +186,6 @@ export const useBibleStore = create<BibleStore>()(
               }
             })
           }
-          // If first book (Genesis ch1), stay
         }
       },
 
@@ -213,7 +195,6 @@ export const useBibleStore = create<BibleStore>()(
         const chapter_ = s.getCurrentChapter()
 
         if (!chapter_) {
-          // No content loaded — use BIBLE_BOOKS config to navigate chapters
           get().nextChapter()
           return
         }
@@ -221,10 +202,8 @@ export const useBibleStore = create<BibleStore>()(
         const verseCount = chapter_.verses.length
 
         if (verse < verseCount) {
-          // Move to next verse in same chapter
           set({ currentPassage: { bookNumber, chapter, verse: verse + 1 } })
         } else {
-          // Move to first verse of next chapter (cross-book if needed)
           const bookConfig = BIBLE_BOOKS.find((b) => b.number === bookNumber)
           if (!bookConfig) return
 
@@ -244,19 +223,15 @@ export const useBibleStore = create<BibleStore>()(
         const { bookNumber, chapter, verse } = s.currentPassage
 
         if (verse > 1) {
-          // Move to previous verse in same chapter
           set({ currentPassage: { bookNumber, chapter, verse: verse - 1 } })
         } else {
-          // Move to last verse of previous chapter (cross-book if needed)
           if (chapter > 1) {
-            // Go to previous chapter in same book, last verse
             const prevChapterBooks = s.content.get(s.versions.length > 0 ? s.versions[0].id : '')
             const book = prevChapterBooks?.find((b) => b.number === bookNumber)
             const prevChapter = book?.chapters.find((c) => c.number === chapter - 1)
             const lastVerse = prevChapter ? prevChapter.verses.length : 1
             set({ currentPassage: { bookNumber, chapter: chapter - 1, verse: lastVerse } })
           } else {
-            // Cross-book: go to last verse of last chapter of previous book
             const prevBook = BIBLE_BOOKS.find((b) => b.number === bookNumber - 1)
             if (prevBook) {
               const prevVersionId = s.versions.length > 0 ? s.versions[0].id : ''
@@ -273,7 +248,6 @@ export const useBibleStore = create<BibleStore>()(
                 }
               })
             }
-            // If Genesis ch1 v1, stay
           }
         }
       },
