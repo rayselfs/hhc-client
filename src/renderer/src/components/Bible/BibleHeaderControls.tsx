@@ -3,8 +3,7 @@ import BibleSelector from './BibleSelector'
 
 export default function BibleHeaderControls(): React.JSX.Element {
   const handleOpenDialog = (): void => {
-    // Dialog will be added in a future task
-    console.log('Open dialog')
+    window.dispatchEvent(new Event('open-bible-selector'))
   }
 
   return (

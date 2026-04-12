@@ -1,27 +1,74 @@
-import { useTranslation } from 'react-i18next'
-import { Button } from '@heroui/react'
-import { useProjection } from '@renderer/contexts/ProjectionContext'
+import { useEffect, useState } from 'react'
+import { useBibleStore } from '@renderer/stores/bible'
+import { useBibleFolderStore } from '@renderer/stores/folder'
+import { BiblePreview } from '@renderer/components/Bible/BiblePreview'
+import BibleMultiFunction from '@renderer/components/Bible/BibleMultiFunction'
+import { BibleSelectorDialog } from '@renderer/components/Bible/BibleSelectorDialog'
+import { useContextMenu } from '@renderer/contexts/ContextMenuContext'
+import type { BiblePassage } from '@shared/types/bible'
+import { toast } from '@heroui/react'
 
 export default function BiblePage(): React.JSX.Element {
-  const { t } = useTranslation()
-  const { project, claimProjection } = useProjection()
+  const { isInitialized, initialize } = useBibleStore()
+  const { isLoading, initialize: initializeFolderStore } = useBibleFolderStore()
+  const [isSelectorOpen, setSelectorOpen] = useState(false)
+  const { showMenu } = useContextMenu()
 
-  const handleSampleVerse = (): void => {
-    claimProjection('bible', { unblank: true })
-    project('bible:verse', {
-      reference: 'John 3:16',
-      text: 'For God so loved the world that he gave his one and only Son, that whoever believes in him shall not perish but have eternal life.',
-      fontSize: 90
-    })
+  useEffect(() => {
+    if (!isInitialized) {
+      initialize()
+    }
+    if (!isLoading) {
+      initializeFolderStore()
+    }
+  }, [isInitialized, initialize, isLoading, initializeFolderStore])
+
+  useEffect(() => {
+    const handler = (): void => setSelectorOpen(true)
+    window.addEventListener('open-bible-selector', handler)
+    return () => window.removeEventListener('open-bible-selector', handler)
+  }, [])
+
+  const handleSelectPassage = (passage: BiblePassage): void => {
+    useBibleStore.getState().navigateTo(passage)
+  }
+
+  const handleContextMenu = (event: React.MouseEvent<HTMLButtonElement>): void => {
+    const verseNumber = event.currentTarget.dataset.verseNumber
+    if (!verseNumber) return
+
+    showMenu(
+      [
+        {
+          id: 'copy',
+          label: '複製經文',
+          onAction: () => {
+            // TODO: Implement copy
+            toast.success('Copied')
+          }
+        },
+        {
+          id: 'add-to-folder',
+          label: '添加到自訂資料夾',
+          onAction: () => {
+            // TODO: Implement add to folder
+            toast.success('Added to folder')
+          }
+        }
+      ],
+      event
+    )
   }
 
   return (
-    <div data-testid="bible-page">
-      <h1>{t('bible.title')}</h1>
-      <p>{t('bible.placeholder')}</p>
-      <Button variant="primary" className="mt-4" onPress={handleSampleVerse}>
-        Sample: Project John 3:16
-      </Button>
+    <div data-testid="bible-page" className="flex flex-row gap-4 h-full p-4">
+      <BiblePreview onContextMenu={handleContextMenu} />
+      <BibleMultiFunction />
+      <BibleSelectorDialog
+        isOpen={isSelectorOpen}
+        onOpenChange={setSelectorOpen}
+        onSelect={handleSelectPassage}
+      />
     </div>
   )
 }
