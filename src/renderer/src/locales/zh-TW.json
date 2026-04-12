@@ -204,5 +204,35 @@
     "projectionOpenFailed": "投影視窗開啟失敗",
     "projectionCloseFailed": "投影視窗關閉失敗",
     "settingsReset": "已重設為預設值"
+  },
+  "shortcuts": {
+    "title": "鍵盤快速鍵",
+    "sections": {
+      "bible": "聖經",
+      "timer": "計時器",
+      "edit": "編輯"
+    },
+    "bible": {
+      "prev_verse": "上一節",
+      "next_verse": "下一節",
+      "next_verse_alt": "下一節 (替代)",
+      "prev_chapter": "上一章",
+      "next_chapter": "下一章",
+      "open_selector": "打開聖經選擇器",
+      "focus_search": "搜尋",
+      "close_dialog": "關閉對話框"
+    },
+    "timer": {
+      "toggle": "開始 / 停止",
+      "reset": "重設"
+    },
+    "edit": {
+      "copy": "複製",
+      "cut": "剪下",
+      "paste": "貼上",
+      "select_all": "全選",
+      "delete": "刪除",
+      "delete_alt": "刪除 (替代)"
+    }
   }
 }

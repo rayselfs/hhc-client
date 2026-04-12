@@ -204,5 +204,35 @@
     "projectionOpenFailed": "Failed to open projection window",
     "projectionCloseFailed": "Failed to close projection window",
     "settingsReset": "Settings reset to defaults"
+  },
+  "shortcuts": {
+    "title": "Keyboard Shortcuts",
+    "sections": {
+      "bible": "Bible",
+      "timer": "Timer",
+      "edit": "Edit"
+    },
+    "bible": {
+      "prev_verse": "Previous Verse",
+      "next_verse": "Next Verse",
+      "next_verse_alt": "Next Verse (Alternative)",
+      "prev_chapter": "Previous Chapter",
+      "next_chapter": "Next Chapter",
+      "open_selector": "Open Bible Selector",
+      "focus_search": "Search",
+      "close_dialog": "Close Dialog"
+    },
+    "timer": {
+      "toggle": "Start / Stop",
+      "reset": "Reset"
+    },
+    "edit": {
+      "copy": "Copy",
+      "cut": "Cut",
+      "paste": "Paste",
+      "select_all": "Select All",
+      "delete": "Delete",
+      "delete_alt": "Delete (Alternative)"
+    }
   }
 }

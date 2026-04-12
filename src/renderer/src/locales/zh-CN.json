@@ -204,5 +204,35 @@
     "projectionOpenFailed": "投影窗口打开失败",
     "projectionCloseFailed": "投影窗口关闭失败",
     "settingsReset": "已重置为默认值"
+  },
+  "shortcuts": {
+    "title": "键盘快捷键",
+    "sections": {
+      "bible": "圣经",
+      "timer": "计时器",
+      "edit": "编辑"
+    },
+    "bible": {
+      "prev_verse": "上一节",
+      "next_verse": "下一节",
+      "next_verse_alt": "下一节 (替代)",
+      "prev_chapter": "上一章",
+      "next_chapter": "下一章",
+      "open_selector": "打开圣经选择器",
+      "focus_search": "搜索",
+      "close_dialog": "关闭对话框"
+    },
+    "timer": {
+      "toggle": "开始 / 停止",
+      "reset": "重置"
+    },
+    "edit": {
+      "copy": "复制",
+      "cut": "剪切",
+      "paste": "粘贴",
+      "select_all": "全选",
+      "delete": "删除",
+      "delete_alt": "删除 (替代)"
+    }
   }
 }
