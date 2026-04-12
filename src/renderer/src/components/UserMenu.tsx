@@ -84,7 +84,9 @@ export default function UserMenu({ onOpenPreferences }: UserMenuProps): React.JS
           </Dropdown.Menu>
         </Dropdown.Popover>
       </Dropdown.Root>
-      <KeyboardShortcutsDialog isOpen={isShortcutsOpen} onOpenChange={setShortcutsOpen} />
+      {isShortcutsOpen && (
+        <KeyboardShortcutsDialog isOpen={isShortcutsOpen} onOpenChange={setShortcutsOpen} />
+      )}
     </>
   )
 }

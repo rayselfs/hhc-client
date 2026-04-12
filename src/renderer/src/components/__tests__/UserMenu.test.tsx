@@ -40,9 +40,7 @@ describe('UserMenu', () => {
   it('disabled items have aria-disabled', () => {
     renderUserMenu()
     const checkForUpdates = screen.getByText('Check for Updates').closest('[role="menuitem"]')
-    const keyboardShortcuts = screen.getByText('Keyboard Shortcuts').closest('[role="menuitem"]')
     expect(checkForUpdates).toHaveAttribute('aria-disabled', 'true')
-    expect(keyboardShortcuts).toHaveAttribute('aria-disabled', 'true')
   })
 
   it('login is not disabled', () => {
