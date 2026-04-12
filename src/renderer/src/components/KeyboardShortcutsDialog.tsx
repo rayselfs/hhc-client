@@ -36,7 +36,11 @@ const getDisplayKey = (code: string): string => {
 }
 
 const getMetaDisplay = (): string => {
-  return isElectron() && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'
+  if (isElectron()) {
+    const ua = navigator.userAgent
+    return ua.includes('Mac') ? '⌘' : 'Ctrl'
+  }
+  return /mac/i.test(navigator.userAgent) ? '⌘' : 'Ctrl'
 }
 
 interface ShortcutEntry {
@@ -78,16 +82,18 @@ export default function KeyboardShortcutsDialog({
       keyParts.push(getDisplayKey(config.code))
       const entryKey = key.toLowerCase()
       return {
-        label: t(`shortcuts.${sectionKey}.${entryKey}` as const, key),
+        label: (t as any)(`shortcuts.${sectionKey}.${entryKey}`),
         keys: keyParts
       }
     })
 
-    const sectionTitleKey = `shortcuts.sections.${sectionKey.toLowerCase()}` as const
+    const sectionTitleKey = `shortcuts.sections.${sectionKey.toLowerCase()}`
 
     return (
       <div key={sectionKey} className="mb-6">
-        <h3 className="text-sm font-semibold text-default-900 mb-3">{t(sectionTitleKey)}</h3>
+        <h3 className="text-sm font-semibold text-default-900 mb-3">
+          {(t as any)(sectionTitleKey)}
+        </h3>
         <div className="space-y-1">
           {entries.map((entry) => (
             <div key={entry.label}>{renderShortcutRow(entry.label, entry.keys)}</div>
@@ -103,7 +109,7 @@ export default function KeyboardShortcutsDialog({
       <Modal.Container size="sm">
         <Modal.Dialog>
           <Modal.Header>
-            <h3 className="text-lg font-semibold">{t('shortcuts.title' as const)}</h3>
+            <h3 className="text-lg font-semibold">{(t as any)('shortcuts.title')}</h3>
           </Modal.Header>
           <Modal.Body className="gap-4 max-h-96 overflow-y-auto">
             {renderSection('BIBLE', SHORTCUTS.BIBLE)}
