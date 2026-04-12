@@ -9,10 +9,14 @@ import StopwatchDisplay from '@renderer/components/Timer/StopwatchDisplay'
 import GlassDivider from '@renderer/components/GlassDivider'
 import type { TimerTickPayload, StopwatchTickPayload } from '@shared/types/timer'
 
+type ActiveContent = 'timer' | 'bible' | null
+
 export default function ProjectionPage(): React.JSX.Element {
   const [showDefault, setShowDefault] = useState(true)
+  const [activeContent, setActiveContent] = useState<ActiveContent>(null)
   const [timerData, setTimerData] = useState<TimerTickPayload | null>(null)
   const [stopwatchData, setStopwatchData] = useState<StopwatchTickPayload | null>(null)
+  const [bibleVerse, setBibleVerse] = useState<{ reference: string; text: string } | null>(null)
 
   useEffect(() => {
     const adapter = createProjectionAdapter('projection')
@@ -21,12 +25,20 @@ export default function ProjectionPage(): React.JSX.Element {
       setShowDefault(blank)
     })
 
+    const unsubActiveOwner = adapter.on('__system:active-owner', ({ owner }) => {
+      setActiveContent(owner === 'bible' ? 'bible' : 'timer')
+    })
+
     const unsubTimerTick = adapter.on('timer:tick', (data) => {
       setTimerData(data)
     })
 
     const unsubStopwatch = adapter.on('timer:stopwatch', (data) => {
       setStopwatchData(data)
+    })
+
+    const unsubBibleVerse = adapter.on('bible:verse', (data) => {
+      setBibleVerse(data)
     })
 
     const unsubTimezone = adapter.on('settings:timezone', ({ timezone }) => {
@@ -57,8 +69,10 @@ export default function ProjectionPage(): React.JSX.Element {
 
     return () => {
       unsubBlank()
+      unsubActiveOwner()
       unsubTimerTick()
       unsubStopwatch()
+      unsubBibleVerse()
       unsubTimezone()
       unsubClose()
       unsubPing()
@@ -68,6 +82,15 @@ export default function ProjectionPage(): React.JSX.Element {
   }, [])
 
   if (showDefault) return <DefaultProjection />
+
+  if (activeContent === 'bible' && bibleVerse) {
+    return (
+      <div className="h-screen w-full bg-black flex flex-col items-center justify-center px-16">
+        <p className="text-white text-[4vw] leading-relaxed text-center">{bibleVerse.text}</p>
+        <p className="text-white/60 text-[2vw] mt-8">{bibleVerse.reference}</p>
+      </div>
+    )
+  }
 
   if (timerData) {
     return (

@@ -18,6 +18,7 @@ export interface SystemMessages {
   '__system:close': null
   '__system:closed': null
   '__system:blank': { showDefault: boolean }
+  '__system:active-owner': { owner: string }
 }
 
 export interface AppMessages {
@@ -31,6 +32,8 @@ export interface AppMessages {
   'timer:overtime-message': { message: string }
   /** Timezone IANA string for clock display */
   'settings:timezone': { timezone: string }
+  /** Bible verse content for projection display */
+  'bible:verse': { reference: string; text: string }
 }
 
 /**

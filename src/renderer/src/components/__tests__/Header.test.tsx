@@ -55,6 +55,9 @@ describe('Header', () => {
     vi.mocked(useProjection).mockReturnValue({
       isProjectionOpen: false,
       isProjectionBlanked: true,
+      projectionReadyCount: 0,
+      activeOwner: 'timer',
+      claimProjection: vi.fn(),
       openProjection: vi.fn(),
       closeProjection: vi.fn(),
       blankProjection: vi.fn(),
@@ -72,6 +75,9 @@ describe('Header', () => {
     vi.mocked(useProjection).mockReturnValue({
       isProjectionOpen: true,
       isProjectionBlanked: false,
+      projectionReadyCount: 0,
+      activeOwner: 'timer',
+      claimProjection: vi.fn(),
       openProjection: vi.fn(),
       closeProjection: vi.fn(),
       blankProjection: vi.fn(),
@@ -89,6 +95,9 @@ describe('Header', () => {
     vi.mocked(useProjection).mockReturnValue({
       isProjectionOpen: false,
       isProjectionBlanked: true,
+      projectionReadyCount: 0,
+      activeOwner: 'timer',
+      claimProjection: vi.fn(),
       openProjection: vi.fn(),
       closeProjection: vi.fn(),
       blankProjection: vi.fn(),
@@ -108,6 +117,9 @@ describe('Header', () => {
     vi.mocked(useProjection).mockReturnValue({
       isProjectionOpen: false,
       isProjectionBlanked: true,
+      projectionReadyCount: 0,
+      activeOwner: 'timer',
+      claimProjection: vi.fn(),
       openProjection,
       closeProjection: vi.fn(),
       blankProjection: vi.fn(),
@@ -127,6 +139,9 @@ describe('Header', () => {
     vi.mocked(useProjection).mockReturnValue({
       isProjectionOpen: true,
       isProjectionBlanked: false,
+      projectionReadyCount: 0,
+      activeOwner: 'timer',
+      claimProjection: vi.fn(),
       openProjection: vi.fn(),
       closeProjection: vi.fn(),
       blankProjection: vi.fn(),
@@ -146,6 +161,9 @@ describe('Header', () => {
       vi.mocked(useProjection).mockReturnValue({
         isProjectionOpen: true,
         isProjectionBlanked: false,
+        projectionReadyCount: 0,
+        activeOwner: 'timer',
+        claimProjection: vi.fn(),
         openProjection: vi.fn(),
         closeProjection: vi.fn(),
         blankProjection: vi.fn(),
@@ -163,6 +181,9 @@ describe('Header', () => {
       vi.mocked(useProjection).mockReturnValue({
         isProjectionOpen: true,
         isProjectionBlanked: true,
+        projectionReadyCount: 0,
+        activeOwner: 'timer',
+        claimProjection: vi.fn(),
         openProjection: vi.fn(),
         closeProjection: vi.fn(),
         blankProjection: vi.fn(),
@@ -180,6 +201,9 @@ describe('Header', () => {
       vi.mocked(useProjection).mockReturnValue({
         isProjectionOpen: false,
         isProjectionBlanked: true,
+        projectionReadyCount: 0,
+        activeOwner: 'timer',
+        claimProjection: vi.fn(),
         openProjection: vi.fn(),
         closeProjection: vi.fn(),
         blankProjection: vi.fn(),
@@ -197,6 +221,9 @@ describe('Header', () => {
       vi.mocked(useProjection).mockReturnValue({
         isProjectionOpen: true,
         isProjectionBlanked: false,
+        projectionReadyCount: 0,
+        activeOwner: 'timer',
+        claimProjection: vi.fn(),
         openProjection: vi.fn(),
         closeProjection: vi.fn(),
         blankProjection: vi.fn(),
@@ -215,6 +242,9 @@ describe('Header', () => {
       vi.mocked(useProjection).mockReturnValue({
         isProjectionOpen: true,
         isProjectionBlanked: false,
+        projectionReadyCount: 0,
+        activeOwner: 'timer',
+        claimProjection: vi.fn(),
         openProjection: vi.fn(),
         closeProjection: vi.fn(),
         blankProjection,
@@ -234,6 +264,9 @@ describe('Header', () => {
       vi.mocked(useProjection).mockReturnValue({
         isProjectionOpen: true,
         isProjectionBlanked: false,
+        projectionReadyCount: 0,
+        activeOwner: 'timer',
+        claimProjection: vi.fn(),
         openProjection: vi.fn(),
         closeProjection: vi.fn(),
         blankProjection: vi.fn(),
@@ -255,6 +288,9 @@ describe('Header', () => {
       vi.mocked(useProjection).mockReturnValue({
         isProjectionOpen: false,
         isProjectionBlanked: true,
+        projectionReadyCount: 0,
+        activeOwner: 'timer',
+        claimProjection: vi.fn(),
         openProjection: vi.fn(),
         closeProjection: vi.fn(),
         blankProjection: vi.fn(),
@@ -275,6 +311,9 @@ describe('Header', () => {
       vi.mocked(useProjection).mockReturnValue({
         isProjectionOpen: false,
         isProjectionBlanked: true,
+        projectionReadyCount: 0,
+        activeOwner: 'timer',
+        claimProjection: vi.fn(),
         openProjection: vi.fn(),
         closeProjection: vi.fn(),
         blankProjection: vi.fn(),

@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useRef } from 'react'
 import { useTimerStore, getDisplayValues } from '@renderer/stores/timer'
 import { useStopwatchStore } from '@renderer/stores/stopwatch'
 import { selectFormattedTime } from '@renderer/stores/selectors/stopwatch'
@@ -7,6 +7,7 @@ import StopwatchDisplay from '@renderer/components/Timer/StopwatchDisplay'
 import TimerControls from '@renderer/components/Timer/TimerControls'
 import TimeAdjustment from '@renderer/components/Timer/TimeAdjustment'
 import PresetChips from '@renderer/components/Timer/PresetChips'
+import { useProjection } from '@renderer/contexts/ProjectionContext'
 
 export default function TimerPage(): React.JSX.Element {
   const mode = useTimerStore((s) => s.mode)
@@ -22,6 +23,17 @@ export default function TimerPage(): React.JSX.Element {
   const setDuration = useTimerStore((s) => s.setDuration)
 
   const swFormattedTime = useStopwatchStore(selectFormattedTime)
+
+  const { claimProjection, isProjectionOpen } = useProjection()
+
+  const isTimerActive = timerStatus === 'running' || timerStatus === 'paused'
+  const isTimerActiveRef = useRef(isTimerActive)
+  isTimerActiveRef.current = isTimerActive
+
+  useEffect(() => {
+    if (!isProjectionOpen) return
+    claimProjection('timer', { unblank: isTimerActiveRef.current })
+  }, [isProjectionOpen, claimProjection])
 
   const displayValues = getDisplayValues({
     phase,
