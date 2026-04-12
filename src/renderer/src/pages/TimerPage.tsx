@@ -8,6 +8,8 @@ import TimerControls from '@renderer/components/Timer/TimerControls'
 import TimeAdjustment from '@renderer/components/Timer/TimeAdjustment'
 import PresetChips from '@renderer/components/Timer/PresetChips'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
+import { useKeyboardShortcuts } from '@renderer/hooks/useKeyboardShortcuts'
+import { SHORTCUTS } from '@renderer/config/shortcuts'
 
 export default function TimerPage(): React.JSX.Element {
   const mode = useTimerStore((s) => s.mode)
@@ -36,6 +38,25 @@ export default function TimerPage(): React.JSX.Element {
     if (!isProjectionOpen) return
     claimProjection('timer', { unblank: isTimerActiveRef.current })
   }, [isProjectionOpen, claimProjection])
+
+  useKeyboardShortcuts([
+    {
+      config: SHORTCUTS.TIMER.TOGGLE,
+      handler: () => {
+        const { status, start, pause } = useTimerStore.getState()
+        if (status === 'running') pause()
+        else if (status === 'stopped' || status === 'paused') start()
+      },
+      preventDefault: true
+    },
+    {
+      config: SHORTCUTS.TIMER.RESET,
+      handler: () => {
+        useTimerStore.getState().reset()
+      },
+      preventDefault: true
+    }
+  ])
 
   const displayValues = getDisplayValues({
     phase,
