@@ -7,13 +7,16 @@ import {
   ColorPicker,
   ColorArea,
   ColorSlider,
-  ColorSwatch
+  ColorSwatch,
+  Slider,
+  Label
 } from '@heroui/react'
 import { parseColor } from 'react-aria-components'
 import type { Color } from 'react-aria-components'
 import { Settings } from 'lucide-react'
 import { useTimerStore } from '@renderer/stores/timer'
 import { useStopwatchStore } from '@renderer/stores/stopwatch'
+import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 import type { TimerMode } from '@renderer/stores/timer'
 
 interface SettingsPopoverProps {
@@ -23,6 +26,7 @@ interface SettingsPopoverProps {
 export default function SettingsPopover({ mode }: SettingsPopoverProps): React.JSX.Element {
   const { t } = useTranslation()
   const isStopwatch = mode === 'stopwatch'
+  const isBibleMode = !mode
 
   const reminderEnabled = useTimerStore((s) => s.reminderEnabled)
   const reminderDuration = useTimerStore((s) => s.reminderDuration)
@@ -36,6 +40,9 @@ export default function SettingsPopover({ mode }: SettingsPopoverProps): React.J
 
   const showOnProjection = useStopwatchStore((s) => s.showOnProjection)
   const setShowOnProjection = useStopwatchStore((s) => s.setShowOnProjection)
+
+  const fontSize = useBibleSettingsStore((s) => s.fontSize)
+  const setFontSize = useBibleSettingsStore((s) => s.setFontSize)
 
   const canEnableReminder = totalDuration > 30
   const isTimerRunning = status !== 'stopped'
@@ -89,7 +96,30 @@ export default function SettingsPopover({ mode }: SettingsPopoverProps): React.J
       <Popover.Content placement="bottom start" className="w-80">
         <Popover.Dialog>
           <section aria-label={t('timer.settings')} className="space-y-3 p-1">
-            {isStopwatch ? (
+            {isBibleMode ? (
+              <div className="space-y-2">
+                <Slider
+                  defaultValue={fontSize}
+                  minValue={30}
+                  maxValue={150}
+                  step={5}
+                  onChange={(value) => {
+                    if (typeof value === 'number') {
+                      setFontSize(value)
+                    }
+                  }}
+                  className="w-full"
+                >
+                  <Label>投影字體大小</Label>
+                  <Slider.Output className="text-sm text-muted-fg" />
+                  <Slider.Track className="h-2 rounded-full bg-surface-secondary">
+                    <Slider.Fill className="bg-accent" />
+                    <Slider.Thumb className="size-4 rounded-full bg-accent" />
+                  </Slider.Track>
+                </Slider>
+                <div className="text-xs text-muted-fg text-center">{fontSize}px</div>
+              </div>
+            ) : isStopwatch ? (
               <div className="flex items-center gap-3 min-h-10">
                 <Switch
                   isSelected={showOnProjection}
