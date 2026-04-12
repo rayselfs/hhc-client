@@ -64,7 +64,72 @@
   },
   "bible": {
     "title": "BIBLE",
-    "placeholder": "Bible content will appear here"
+    "placeholder": "Bible content will appear here",
+    "loading": "Loading...",
+    "retry": "Retry",
+    "noContent": "No content loaded",
+    "selectBook": "Select a book to begin",
+    "preview": {
+      "loading": "Loading...",
+      "noContent": "No verses loaded",
+      "selectBook": "Select a book to view verses"
+    },
+    "selector": {
+      "book": "Book",
+      "chapter": "Chapter",
+      "verse": "Verse",
+      "selectBook": "Select Book",
+      "selectChapter": "Select Chapter",
+      "selectVerse": "Select Verse",
+      "oldTestament": "Old Testament",
+      "newTestament": "New Testament"
+    },
+    "history": {
+      "title": "History",
+      "noHistory": "No history yet",
+      "emptyMessage": "No browsing history"
+    },
+    "library": "Bible Library",
+    "custom": {
+      "title": "Custom",
+      "newFolder": "New Folder",
+      "createNewFolder": "Create New Folder",
+      "folderName": "Folder Name",
+      "rename": "Rename",
+      "delete": "Delete",
+      "moveToFolder": "Move to Folder",
+      "emptyFolder": "Folder is empty"
+    },
+    "search": {
+      "placeholder": "Search",
+      "noResults": "No results",
+      "buildingIndex": "Building index...",
+      "searching": "Searching..."
+    },
+    "settings": {
+      "fontSize": "Projection Font Size"
+    },
+    "contextMenu": {
+      "project": "Project",
+      "addToHistory": "Add to History",
+      "addToFolder": "Add to Folder",
+      "copyText": "Copy Text",
+      "removeFromHistory": "Remove from History",
+      "removeFromFolder": "Remove from Folder"
+    },
+    "errors": {
+      "loadFailed": "Failed to load",
+      "retry": "Retry",
+      "apiUnreachable": "API unreachable"
+    },
+    "deleteFolderTitle": "Delete '{{name}}'?",
+    "deleteFolderDescription": "This action cannot be undone. All verses inside will be lost.",
+    "deleteItemTitle": "Delete '{{reference}}'?",
+    "deleteItemDescription": "This action cannot be undone.",
+    "delete_folder_title": "Delete '{{name}}'?",
+    "delete_folder_description": "This action cannot be undone. All verses inside will be lost.",
+    "delete_item_title": "Delete '{{reference}}'?",
+    "delete_item_description": "This action cannot be undone."
   },
   "projection": {
     "showButton": "Show projection",

@@ -64,7 +64,72 @@
   },
   "bible": {
     "title": "圣经",
-    "placeholder": "圣经内容将显示于此"
+    "placeholder": "圣经内容将显示于此",
+    "loading": "加载中...",
+    "retry": "重试",
+    "noContent": "无内容加载",
+    "selectBook": "选择书卷开始",
+    "preview": {
+      "loading": "加载中...",
+      "noContent": "尚未加载经文内容",
+      "selectBook": "选择书卷查看经文"
+    },
+    "selector": {
+      "book": "书卷",
+      "chapter": "章",
+      "verse": "节",
+      "selectBook": "选择书卷",
+      "selectChapter": "选择章",
+      "selectVerse": "选择节",
+      "oldTestament": "旧约",
+      "newTestament": "新约"
+    },
+    "history": {
+      "title": "历史",
+      "noHistory": "尚无浏览历史",
+      "emptyMessage": "尚无浏览历史"
+    },
+    "library": "圣经库",
+    "custom": {
+      "title": "自定",
+      "newFolder": "新增文件夹",
+      "createNewFolder": "创建新文件夹",
+      "folderName": "文件夹名称",
+      "rename": "重命名",
+      "delete": "删除",
+      "moveToFolder": "移动到文件夹",
+      "emptyFolder": "空文件夹"
+    },
+    "search": {
+      "placeholder": "搜索",
+      "noResults": "无结果",
+      "buildingIndex": "索引建立中...",
+      "searching": "搜索中..."
+    },
+    "settings": {
+      "fontSize": "投影字体大小"
+    },
+    "contextMenu": {
+      "project": "投影",
+      "addToHistory": "加入历史",
+      "addToFolder": "加入文件夹",
+      "copyText": "复制经文",
+      "removeFromHistory": "从历史移除",
+      "removeFromFolder": "从文件夹移除"
+    },
+    "errors": {
+      "loadFailed": "加载失败",
+      "retry": "重试",
+      "apiUnreachable": "无法连线"
+    },
+    "deleteFolderTitle": "删除 '{{name}}'?",
+    "deleteFolderDescription": "此操作无法撤销。文件夹中的所有经文将被删除。",
+    "deleteItemTitle": "删除 '{{reference}}'?",
+    "deleteItemDescription": "此操作无法撤销。",
+    "delete_folder_title": "删除 '{{name}}'?",
+    "delete_folder_description": "此操作无法撤销。文件夹中的所有经文将被删除。",
+    "delete_item_title": "删除 '{{reference}}'?",
+    "delete_item_description": "此操作无法撤销。"
   },
   "projection": {
     "showButton": "显示投影",

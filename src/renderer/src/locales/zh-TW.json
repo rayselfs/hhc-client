@@ -64,7 +64,72 @@
   },
   "bible": {
     "title": "聖經",
-    "placeholder": "聖經內容將顯示於此"
+    "placeholder": "聖經內容將顯示於此",
+    "loading": "載入中...",
+    "retry": "重試",
+    "noContent": "無內容載入",
+    "selectBook": "選擇書卷開始",
+    "preview": {
+      "loading": "載入中...",
+      "noContent": "尚未載入經文內容",
+      "selectBook": "選擇書卷查看經文"
+    },
+    "selector": {
+      "book": "書卷",
+      "chapter": "章",
+      "verse": "節",
+      "selectBook": "選擇書卷",
+      "selectChapter": "選擇章",
+      "selectVerse": "選擇節",
+      "oldTestament": "舊約",
+      "newTestament": "新約"
+    },
+    "history": {
+      "title": "歷史",
+      "noHistory": "尚無瀏覽歷史",
+      "emptyMessage": "尚無瀏覽歷史"
+    },
+    "library": "聖經庫",
+    "custom": {
+      "title": "自訂",
+      "newFolder": "新增資料夾",
+      "createNewFolder": "建立新資料夾",
+      "folderName": "資料夾名稱",
+      "rename": "重新命名",
+      "delete": "刪除",
+      "moveToFolder": "移動到資料夾",
+      "emptyFolder": "空資料夾"
+    },
+    "search": {
+      "placeholder": "搜尋",
+      "noResults": "無結果",
+      "buildingIndex": "索引建立中...",
+      "searching": "搜尋中..."
+    },
+    "settings": {
+      "fontSize": "投影字體大小"
+    },
+    "contextMenu": {
+      "project": "投影",
+      "addToHistory": "加入歷史",
+      "addToFolder": "加入資料夾",
+      "copyText": "複製經文",
+      "removeFromHistory": "從歷史移除",
+      "removeFromFolder": "從資料夾移除"
+    },
+    "errors": {
+      "loadFailed": "載入失敗",
+      "retry": "重試",
+      "apiUnreachable": "無法連線"
+    },
+    "deleteFolderTitle": "刪除 '{{name}}'?",
+    "deleteFolderDescription": "此動作無法復原。資料夾中的所有經文將被刪除。",
+    "deleteItemTitle": "刪除 '{{reference}}'?",
+    "deleteItemDescription": "此動作無法復原。",
+    "delete_folder_title": "刪除 '{{name}}'?",
+    "delete_folder_description": "此動作無法復原。資料夾中的所有經文將被刪除。",
+    "delete_item_title": "刪除 '{{reference}}'?",
+    "delete_item_description": "此動作無法復原。"
   },
   "projection": {
     "showButton": "顯示投影",
