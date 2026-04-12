@@ -154,7 +154,9 @@ export function CustomFolderTab() {
     return null
   }
 
-  const items = currentFolder ? [...currentFolder.folders, ...currentFolder.items] : root.folders
+  const items = currentFolder
+    ? [...currentFolder.folders, ...currentFolder.items]
+    : [...root.folders, ...root.items]
 
   return (
     <div className="flex flex-col h-full">

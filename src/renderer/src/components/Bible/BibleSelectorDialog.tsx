@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react'
-import { Modal, Button, ButtonGroup, Breadcrumbs } from '@heroui/react'
+import { Modal, Button, ButtonGroup, Breadcrumbs, Separator } from '@heroui/react'
 import { BIBLE_BOOKS } from '@shared/types/bible'
 import type { BiblePassage } from '@shared/types/bible'
 import { useBibleStore } from '@renderer/stores/bible'
 
 interface BibleSelectorDialogProps {
   isOpen: boolean
-  onClose: () => void
+  onOpenChange: (isOpen: boolean) => void
   onSelect: (passage: BiblePassage) => void
 }
 
@@ -15,7 +15,7 @@ type Step = 'books' | 'chapters' | 'verses'
 const OLD_TESTAMENT_BOOKS = BIBLE_BOOKS.slice(0, 39)
 const NEW_TESTAMENT_BOOKS = BIBLE_BOOKS.slice(39)
 
-export function BibleSelectorDialog({ isOpen, onClose, onSelect }: BibleSelectorDialogProps) {
+export function BibleSelectorDialog({ isOpen, onOpenChange, onSelect }: BibleSelectorDialogProps) {
   const [currentStep, setCurrentStep] = useState<Step>('books')
   const [selectedBook, setSelectedBook] = useState<number | null>(null)
   const [selectedChapter, setSelectedChapter] = useState<number | null>(null)
@@ -52,7 +52,7 @@ export function BibleSelectorDialog({ isOpen, onClose, onSelect }: BibleSelector
   const handleVerseSelect = (verse: number) => {
     if (selectedBook && selectedChapter) {
       onSelect({ bookNumber: selectedBook, chapter: selectedChapter, verse })
-      onClose()
+      onOpenChange(false)
     }
   }
 
@@ -60,9 +60,9 @@ export function BibleSelectorDialog({ isOpen, onClose, onSelect }: BibleSelector
     <div className="flex flex-col gap-4">
       <div>
         <div className="flex items-center">
-          <div className="flex-grow border-t border-default-200" />
+          <Separator />
           <span className="flex-shrink mx-4 text-default-500 text-sm">舊約</span>
-          <div className="flex-grow border-t border-default-200" />
+          <Separator />
         </div>
         <div className="grid grid-cols-4 gap-1 mt-2">
           {OLD_TESTAMENT_BOOKS.map((book) => (
@@ -74,9 +74,9 @@ export function BibleSelectorDialog({ isOpen, onClose, onSelect }: BibleSelector
       </div>
       <div>
         <div className="flex items-center">
-          <div className="flex-grow border-t border-default-200" />
+          <Separator />
           <span className="flex-shrink mx-4 text-default-500 text-sm">新約</span>
-          <div className="flex-grow border-t border-default-200" />
+          <Separator />
         </div>
         <div className="grid grid-cols-4 gap-1 mt-2">
           {NEW_TESTAMENT_BOOKS.map((book) => (
@@ -131,7 +131,8 @@ export function BibleSelectorDialog({ isOpen, onClose, onSelect }: BibleSelector
   }
 
   return (
-    <Modal.Backdrop isOpen={isOpen} onOpenChange={onClose}>
+    <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
+      <Modal.Backdrop />
       <Modal.Container size="lg">
         <Modal.Dialog>
           <Modal.Header>
@@ -182,6 +183,6 @@ export function BibleSelectorDialog({ isOpen, onClose, onSelect }: BibleSelector
           <Modal.Body>{renderContent()}</Modal.Body>
         </Modal.Dialog>
       </Modal.Container>
-    </Modal.Backdrop>
+    </Modal>
   )
 }
