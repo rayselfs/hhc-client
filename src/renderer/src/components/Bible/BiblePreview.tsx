@@ -1,4 +1,4 @@
-import { Button, Card, CardHeader, ScrollShadow, Spinner, Separator } from '@heroui/react'
+import { Button, Card, ScrollShadow, Spinner, Separator } from '@heroui/react'
 import { useBibleStore } from '@renderer/stores/bible'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
@@ -129,9 +129,10 @@ export function BiblePreview({
 
   return (
     <Card className="flex-1 h-full">
-      <CardHeader className="flex items-center justify-between p-4">
+      <div className="flex flex-row items-center justify-between p-4">
         <h2 className="text-lg font-semibold">
-          {book?.name} 第 {chapter?.number} 章
+          {book?.name ?? ''}
+          {book && chapter ? ` 第 ${chapter.number} 章` : ''}
         </h2>
         <div className="flex items-center gap-2">
           <Button
@@ -153,7 +154,7 @@ export function BiblePreview({
             <ChevronRight size={16} />
           </Button>
         </div>
-      </CardHeader>
+      </div>
       <Separator />
       <Card.Content className="p-0">{renderContent()}</Card.Content>
     </Card>

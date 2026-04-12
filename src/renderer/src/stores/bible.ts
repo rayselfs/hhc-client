@@ -10,6 +10,7 @@ import {
   loadBibleVersionMeta
 } from '@renderer/lib/bible-db'
 import { hhcPersistStorage, createKey } from '@renderer/lib/persist-storage'
+import { useBibleSettingsStore } from './bible-settings'
 
 const fetchPromises = new Map<string, Promise<BibleBook[]>>()
 
@@ -86,6 +87,10 @@ export const useBibleStore = create<BibleStore>()(
           if (versions.length === 0) {
             set({ isLoading: false, isInitialized: true })
             return
+          }
+
+          if (!useBibleSettingsStore.getState().selectedVersionId) {
+            useBibleSettingsStore.getState().setSelectedVersionId(versions[0].id)
           }
 
           const selectedVersionId = versions[0].id

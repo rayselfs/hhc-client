@@ -1,15 +1,24 @@
 import { Card, Tabs } from '@heroui/react'
+import { useTranslation } from 'react-i18next'
 import { HistoryTab } from './HistoryTab'
 import { CustomFolderTab } from './CustomFolderTab'
 
 export default function BibleMultiFunction(): React.JSX.Element {
+  const { t } = useTranslation()
+
   return (
-    <Card className="h-full w-[400px] flex flex-col">
+    <Card className="h-full flex-1 flex flex-col">
       <Tabs className="h-full flex flex-col">
         <Tabs.ListContainer>
           <Tabs.List aria-label="Bible Functions">
-            <Tabs.Tab id="history">歷史</Tabs.Tab>
-            <Tabs.Tab id="custom">自訂</Tabs.Tab>
+            <Tabs.Tab id="history">
+              {t('bible.history.title')}
+              <Tabs.Indicator />
+            </Tabs.Tab>
+            <Tabs.Tab id="custom">
+              {t('bible.custom.title')}
+              <Tabs.Indicator />
+            </Tabs.Tab>
           </Tabs.List>
         </Tabs.ListContainer>
         <Tabs.Panel id="history" className="flex-grow h-0">

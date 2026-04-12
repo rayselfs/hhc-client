@@ -221,6 +221,7 @@ export default function BibleSearchBar(): React.JSX.Element {
       {isExpanded && (
         <div ref={inputWrapperRef} className="relative mr-1">
           <Input
+            data-bible-search
             placeholder="搜尋經文..."
             value={query}
             onChange={(e) => handleQueryChange(e.target.value)}

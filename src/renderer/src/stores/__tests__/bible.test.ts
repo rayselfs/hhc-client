@@ -37,6 +37,7 @@ vi.mock('@renderer/lib/bible-db', () => ({
 }))
 
 import { useBibleStore } from '@renderer/stores/bible'
+import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 import type { BibleBook, BibleVersion } from '@shared/types/bible'
 
 const VERSION_1: BibleVersion = { id: 'v1', code: 'KJV', name: 'King James', updatedAt: '2024' }
@@ -68,6 +69,7 @@ const INITIAL_STATE = {
 
 beforeEach(() => {
   useBibleStore.setState(INITIAL_STATE)
+  useBibleSettingsStore.setState({ fontSize: 90, selectedVersionId: '' })
   mockFetchVersions.mockReset()
   mockFetchContent.mockReset()
   mockLoadBibleContent.mockReset()
@@ -155,6 +157,30 @@ describe('initialize()', () => {
     const s = useBibleStore.getState()
     expect(s.isInitialized).toBe(true)
     expect(s.isLoading).toBe(false)
+  })
+
+  it('sets selectedVersionId in settings store when empty (bug fix #6)', async () => {
+    mockLoadBibleVersionMeta.mockResolvedValue(undefined)
+    mockFetchVersions.mockResolvedValue([VERSION_1])
+    mockLoadBibleContent.mockResolvedValue(undefined)
+    mockFetchContent.mockResolvedValue([makeBook(1)])
+    useBibleSettingsStore.setState({ fontSize: 90, selectedVersionId: '' })
+
+    await useBibleStore.getState().initialize()
+
+    expect(useBibleSettingsStore.getState().selectedVersionId).toBe('v1')
+  })
+
+  it('does not overwrite existing selectedVersionId in settings store', async () => {
+    mockLoadBibleVersionMeta.mockResolvedValue(undefined)
+    mockFetchVersions.mockResolvedValue([VERSION_1])
+    mockLoadBibleContent.mockResolvedValue(undefined)
+    mockFetchContent.mockResolvedValue([makeBook(1)])
+    useBibleSettingsStore.setState({ fontSize: 90, selectedVersionId: 'v1-existing' })
+
+    await useBibleStore.getState().initialize()
+
+    expect(useBibleSettingsStore.getState().selectedVersionId).toBe('v1-existing')
   })
 })
 

@@ -177,4 +177,15 @@ describe('BibleSearchBar', () => {
     fireEvent.mouseDown(resultBtn)
     expect(mockNavigateTo).toHaveBeenCalledWith({ bookNumber: 1, chapter: 1, verse: 1 })
   })
+
+  it('has data-bible-search attribute on input for Ctrl+F focus', async () => {
+    render(<BibleSearchBar />)
+    const toggle = screen.getByRole('button', { name: '搜尋經文' })
+    await act(async () => {
+      fireEvent.click(toggle)
+    })
+    const input = document.querySelector<HTMLInputElement>('[data-bible-search]')
+    expect(input).not.toBeNull()
+    expect(input).toBeInTheDocument()
+  })
 })

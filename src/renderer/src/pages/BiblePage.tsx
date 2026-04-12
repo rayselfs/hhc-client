@@ -5,13 +5,13 @@ import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 import { BiblePreview } from '@renderer/components/Bible/BiblePreview'
 import BibleMultiFunction from '@renderer/components/Bible/BibleMultiFunction'
 import { BibleSelectorDialog } from '@renderer/components/Bible/BibleSelectorDialog'
-import { useContextMenu } from '@renderer/contexts/ContextMenuContext'
+import { useBibleContextMenu } from '@renderer/components/Bible/useBibleContextMenu'
+import type { VerseMenuData } from '@renderer/components/Bible/useBibleContextMenu'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
 import { useKeyboardShortcuts } from '@renderer/hooks/useKeyboardShortcuts'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
 import { formatVerseReference } from '@shared/types/bible'
 import type { BiblePassage } from '@shared/types/bible'
-import { toast } from '@heroui/react'
 
 export default function BiblePage(): React.JSX.Element {
   const {
@@ -28,7 +28,7 @@ export default function BiblePage(): React.JSX.Element {
   const { fontSize } = useBibleSettingsStore()
   const [isSelectorOpen, setSelectorOpen] = useState(false)
   const [selectedVerseIndex, setSelectedVerseIndex] = useState(0)
-  const { showMenu } = useContextMenu()
+  const { showPreviewMenu } = useBibleContextMenu()
   const { claimProjection, project } = useProjection()
 
   const selectedVerseIndexRef = useRef(0)
@@ -172,30 +172,22 @@ export default function BiblePage(): React.JSX.Element {
   }
 
   const handleContextMenu = (event: React.MouseEvent<HTMLButtonElement>): void => {
-    const verseNumber = event.currentTarget.dataset.verseNumber
+    const verseNumber = Number(event.currentTarget.dataset.verseNumber)
     if (!verseNumber) return
-
-    showMenu(
-      [
-        {
-          id: 'copy',
-          label: '複製經文',
-          onAction: () => {
-            // TODO: Implement copy
-            toast.success('Copied')
-          }
-        },
-        {
-          id: 'add-to-folder',
-          label: '添加到自訂資料夾',
-          onAction: () => {
-            // TODO: Implement add to folder
-            toast.success('Added to folder')
-          }
-        }
-      ],
-      event
-    )
+    const verses = getCurrentVerses()
+    const book = getCurrentBook()
+    const chapter = getCurrentChapter()
+    if (!verses || !book || !chapter) return
+    const verse = verses.find((v) => v.number === verseNumber)
+    if (!verse) return
+    const menuData: VerseMenuData = {
+      bookNumber: book.number,
+      chapter: chapter.number,
+      verse: verse.number,
+      text: verse.text,
+      bookName: book.name
+    }
+    showPreviewMenu(menuData, event)
   }
 
   return (
