@@ -1,4 +1,4 @@
-import { createContext, useContext, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useRef, useState } from 'react'
 
 export type ConfirmDialogStatus = 'warning' | 'danger' | 'info'
 
@@ -31,18 +31,18 @@ export function ConfirmDialogProvider({
   const [pending, setPending] = useState<PendingConfirm | null>(null)
   const resolveRef = useRef<((confirmed: boolean) => void) | null>(null)
 
-  const confirm = (options: ConfirmOptions): Promise<boolean> => {
+  const confirm = useCallback((options: ConfirmOptions): Promise<boolean> => {
     return new Promise((resolve) => {
       resolveRef.current = resolve
       setPending({ options, resolve })
     })
-  }
+  }, [])
 
-  const settle = (confirmed: boolean): void => {
+  const settle = useCallback((confirmed: boolean): void => {
     resolveRef.current?.(confirmed)
     resolveRef.current = null
     setPending(null)
-  }
+  }, [])
 
   return (
     <ConfirmDialogContext.Provider value={{ confirm, pending, settle }}>

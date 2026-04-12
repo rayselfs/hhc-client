@@ -5,8 +5,17 @@ import '@renderer/i18n'
 import { ConfirmDialogProvider, useConfirm } from '@renderer/contexts/ConfirmDialogContext'
 import ConfirmDialog from '../ConfirmDialog'
 
-function TestHarness({ onResult }: { onResult: (confirmed: boolean) => void }): React.JSX.Element {
+function TestHarness({
+  onResult,
+  onConfirmRef
+}: {
+  onResult: (confirmed: boolean) => void
+  onConfirmRef?: (confirm: any) => void
+}): React.JSX.Element {
   const confirm = useConfirm()
+  if (onConfirmRef) {
+    onConfirmRef(confirm)
+  }
   return (
     <button
       type="button"
@@ -19,10 +28,13 @@ function TestHarness({ onResult }: { onResult: (confirmed: boolean) => void }): 
   )
 }
 
-function renderWithProvider(onResult: (confirmed: boolean) => void): ReturnType<typeof render> {
+function renderWithProvider(
+  onResult: (confirmed: boolean) => void,
+  onConfirmRef?: (confirm: any) => void
+): ReturnType<typeof render> {
   return render(
     <ConfirmDialogProvider>
-      <TestHarness onResult={onResult} />
+      <TestHarness onResult={onResult} onConfirmRef={onConfirmRef} />
       <ConfirmDialog />
     </ConfirmDialogProvider>
   )
@@ -76,5 +88,30 @@ describe('ConfirmDialog', () => {
     })
     expect(result).toBe(false)
     expect(screen.queryByText('Are you sure?')).not.toBeInTheDocument()
+  })
+
+  it('maintains stable confirm reference across re-renders', () => {
+    let confirmRef1: any
+    let confirmRef2: any
+    const { rerender } = renderWithProvider(
+      () => {},
+      (confirm) => {
+        confirmRef1 = confirm
+      }
+    )
+    // Force a re-render by changing a prop on the provider
+    rerender(
+      <ConfirmDialogProvider>
+        <TestHarness
+          onResult={() => {}}
+          onConfirmRef={(confirm) => {
+            confirmRef2 = confirm
+          }}
+        />
+        <ConfirmDialog />
+      </ConfirmDialogProvider>
+    )
+    // Assert that confirm function reference is stable
+    expect(confirmRef2).toBe(confirmRef1)
   })
 })
