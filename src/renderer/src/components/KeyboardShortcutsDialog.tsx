@@ -52,7 +52,10 @@ export default function KeyboardShortcutsDialog({
   isOpen,
   onOpenChange
 }: KeyboardShortcutsDialogProps): React.JSX.Element {
-  const { t } = useTranslation()
+  const { t: i18nT } = useTranslation()
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const tDynamic = (key: string): string => i18nT(key as any)
 
   const renderShortcutRow = (label: string, keys: string[]): React.JSX.Element => (
     <div className="flex justify-between items-center py-2 px-3 hover:bg-default-100 rounded-lg transition-colors">
@@ -82,7 +85,7 @@ export default function KeyboardShortcutsDialog({
       keyParts.push(getDisplayKey(config.code))
       const entryKey = key.toLowerCase()
       return {
-        label: (t as any)(`shortcuts.${sectionKey}.${entryKey}`),
+        label: tDynamic(`shortcuts.${sectionKey}.${entryKey}`),
         keys: keyParts
       }
     })
@@ -91,9 +94,7 @@ export default function KeyboardShortcutsDialog({
 
     return (
       <div key={sectionKey} className="mb-6">
-        <h3 className="text-sm font-semibold text-default-900 mb-3">
-          {(t as any)(sectionTitleKey)}
-        </h3>
+        <h3 className="text-sm font-semibold text-default-900 mb-3">{tDynamic(sectionTitleKey)}</h3>
         <div className="space-y-1">
           {entries.map((entry) => (
             <div key={entry.label}>{renderShortcutRow(entry.label, entry.keys)}</div>
@@ -109,7 +110,7 @@ export default function KeyboardShortcutsDialog({
       <Modal.Container size="sm">
         <Modal.Dialog>
           <Modal.Header>
-            <h3 className="text-lg font-semibold">{(t as any)('shortcuts.title')}</h3>
+            <h3 className="text-lg font-semibold">{tDynamic('shortcuts.title')}</h3>
           </Modal.Header>
           <Modal.Body className="gap-4 max-h-96 overflow-y-auto">
             {renderSection('BIBLE', SHORTCUTS.BIBLE)}

@@ -4,6 +4,7 @@ import { I18nextProvider } from 'react-i18next'
 import i18n from '@renderer/i18n'
 import KeyboardShortcutsDialog from '@renderer/components/KeyboardShortcutsDialog'
 import UserMenu from '@renderer/components/UserMenu'
+import { ConfirmDialogProvider } from '@renderer/contexts/ConfirmDialogContext'
 
 describe('KeyboardShortcutsDialog', () => {
   it('renders with isOpen=true and shows section titles', () => {
@@ -34,14 +35,16 @@ describe('UserMenu', () => {
   it('keyboard shortcuts item is not disabled', () => {
     render(
       <I18nextProvider i18n={i18n}>
-        <UserMenu />
+        <ConfirmDialogProvider>
+          <UserMenu />
+        </ConfirmDialogProvider>
       </I18nextProvider>
     )
 
-    const trigger = screen.getByRole('button', { name: /guest/i })
+    const trigger = screen.getByText('Guest')
     trigger.click()
 
     const shortcutsItem = screen.getByRole('menuitem', { name: /keyboard shortcuts/i })
-    expect(shortcutsItem).not.toHaveAttribute('disabled')
+    expect(shortcutsItem).not.toHaveAttribute('aria-disabled')
   })
 })
