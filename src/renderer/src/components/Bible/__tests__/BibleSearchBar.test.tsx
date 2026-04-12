@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, act } from '@testing-library/react'
+import { render, screen, fireEvent, act, waitFor } from '@testing-library/react'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import BibleSearchBar from '../BibleSearchBar'
 
@@ -103,7 +103,12 @@ describe('BibleSearchBar', () => {
     await act(async () => {
       fireEvent.change(input, { target: { value: 'beginning' } })
     })
-    expect(screen.getByRole('listbox', { name: '搜尋結果' })).toBeInTheDocument()
+    await waitFor(
+      () => {
+        expect(screen.getByRole('listbox', { name: '搜尋結果' })).toBeInTheDocument()
+      },
+      { timeout: 1000 }
+    )
   })
 
   it('shows search results when engine returns ids', async () => {

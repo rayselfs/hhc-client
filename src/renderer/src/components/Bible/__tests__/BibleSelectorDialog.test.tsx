@@ -63,7 +63,7 @@ function renderDialog(
     onOpenChange?: (v: boolean) => void
     onSelect?: (p: BiblePassage) => void
   } = {}
-) {
+): ReturnType<typeof render> & Record<string, unknown> {
   const props = {
     isOpen: true,
     onOpenChange: vi.fn(),

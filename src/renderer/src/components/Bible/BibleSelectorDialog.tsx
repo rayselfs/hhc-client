@@ -24,14 +24,13 @@ export function BibleSelectorDialog({
   const [selectedBook, setSelectedBook] = useState<number | null>(null)
   const [selectedChapter, setSelectedChapter] = useState<number | null>(null)
 
-  // Reset state when dialog is closed
   useEffect(() => {
     if (!isOpen) {
       setTimeout(() => {
         setCurrentStep('books')
         setSelectedBook(null)
         setSelectedChapter(null)
-      }, 200) // wait for modal close animation
+      }, 200)
     }
   }, [isOpen])
 
@@ -93,7 +92,7 @@ export function BibleSelectorDialog({
     </div>
   )
 
-  const renderChapters = () => {
+  const renderChapters = (): React.JSX.Element | null => {
     if (!bookDetails) return null
     const chapters = Array.from({ length: bookDetails.chapterCount }, (_, i) => i + 1)
     return (
@@ -107,7 +106,7 @@ export function BibleSelectorDialog({
     )
   }
 
-  const renderVerses = () => {
+  const renderVerses = (): React.JSX.Element => {
     const verseCount = useBibleStore.getState().getCurrentChapter()?.verses.length || 30
     const verses = Array.from({ length: verseCount }, (_, i) => i + 1)
     return (
@@ -121,7 +120,7 @@ export function BibleSelectorDialog({
     )
   }
 
-  const renderContent = () => {
+  const renderContent = (): React.JSX.Element | null => {
     switch (currentStep) {
       case 'books':
         return renderBooks()

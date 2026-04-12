@@ -50,7 +50,10 @@ function buildVerseItem(verse: VerseMenuData): VerseItem {
   }
 }
 
-function getVerseProjectionData(item: VerseItem, fontSize: number) {
+function getVerseProjectionData(
+  item: VerseItem,
+  fontSize: number
+): { reference: string; text: string; fontSize: number } {
   const reference = formatVerseReference(
     item.bookName,
     item.bookNumber,

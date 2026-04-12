@@ -4,12 +4,12 @@ import type { VerseItem } from '@shared/types/folder'
 import { ScrollShadow, Button } from '@heroui/react'
 import { X } from 'lucide-react'
 
-export function HistoryTab() {
+export function HistoryTab(): React.JSX.Element | null {
   const items = useBibleHistoryStore((state) => state.items)
   const removeFromHistory = useBibleHistoryStore((state) => state.removeFromHistory)
   const navigateTo = useBibleStore((state) => state.navigateTo)
 
-  const handleNavigate = (item: VerseItem) => {
+  const handleNavigate = (item: VerseItem): void => {
     navigateTo({
       bookNumber: item.bookNumber,
       chapter: item.chapter,
@@ -17,11 +17,11 @@ export function HistoryTab() {
     })
   }
 
-  const handleRemove = (id: string) => {
+  const handleRemove = (id: string): void => {
     removeFromHistory(id)
   }
 
-  const getVerseReference = (item: VerseItem) => {
+  const getVerseReference = (item: VerseItem): string => {
     if (item.verseStart === item.verseEnd) {
       return `${item.bookName} ${item.chapter}:${item.verseStart}`
     }

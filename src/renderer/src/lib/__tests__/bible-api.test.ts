@@ -147,7 +147,7 @@ describe('BrowserBibleApiAdapter', () => {
     })
 
     it('throws BibleApiError with type=network on SSE error event', async () => {
-      const makeStream = () =>
+      const makeStream = (): ReadableStream<Uint8Array> =>
         makeSseStream([
           encodeSSEChunk({ type: 'start' }),
           encodeSSEChunk({ type: 'error', message: 'Server blew up' })
@@ -165,7 +165,7 @@ describe('BrowserBibleApiAdapter', () => {
     })
 
     it('throws BibleApiError with type=timeout on SSE timeout event', async () => {
-      const makeStream = () =>
+      const makeStream = (): ReadableStream<Uint8Array> =>
         makeSseStream([encodeSSEChunk({ type: 'start' }), encodeSSEChunk({ type: 'timeout' })])
 
       vi.stubGlobal(

@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { UseBoundStore, StoreApi } from 'zustand'
 import type { Folder, FolderItem, FolderStoreConfig, VerseItem } from '@shared/types/folder'
 import { saveFolderTree, loadFolderTree } from '@renderer/lib/bible-db'
 
@@ -85,7 +86,9 @@ interface FolderStoreState<TItem extends FolderItem> {
   getCurrentFolder: () => Folder<TItem>
 }
 
-export function createFolderStore<TItem extends FolderItem>(config: FolderStoreConfig) {
+export function createFolderStore<TItem extends FolderItem>(
+  config: FolderStoreConfig
+): UseBoundStore<StoreApi<FolderStoreState<TItem>>> {
   return create<FolderStoreState<TItem>>()((set, get) => ({
     root: makeRoot<TItem>(config),
     currentFolderId: config.rootId,

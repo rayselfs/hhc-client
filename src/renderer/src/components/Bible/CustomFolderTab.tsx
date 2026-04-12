@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import React, { useState, useRef, useCallback, useMemo } from 'react'
 import { useBibleFolderStore } from '@renderer/stores/folder'
 import { useBibleStore } from '@renderer/stores/bible'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
@@ -33,7 +33,7 @@ interface ClipboardState {
   mode: ClipboardMode
 }
 
-export function CustomFolderTab() {
+export function CustomFolderTab(): React.JSX.Element {
   const {
     root,
     currentFolderId,
@@ -63,9 +63,13 @@ export function CustomFolderTab() {
 
   const currentFolder = getCurrentFolder()
 
-  const items = currentFolder
-    ? [...currentFolder.folders, ...currentFolder.items]
-    : [...root.folders, ...root.items]
+  const items = useMemo(
+    () =>
+      currentFolder
+        ? [...currentFolder.folders, ...currentFolder.items]
+        : [...root.folders, ...root.items],
+    [currentFolder, root]
+  )
 
   const handleItemClick = useCallback(
     (itemId: string, event: React.MouseEvent) => {
@@ -217,7 +221,7 @@ export function CustomFolderTab() {
     { enabled: true }
   )
 
-  const handleAddFolder = () => {
+  const handleAddFolder = (): void => {
     if (newFolderName.trim()) {
       addFolder(newFolderName.trim())
       setNewFolderName('')
@@ -225,7 +229,7 @@ export function CustomFolderTab() {
     }
   }
 
-  const handleDeleteFolder = async (folderId: string, folderName: string) => {
+  const handleDeleteFolder = async (folderId: string, folderName: string): Promise<void> => {
     const confirmed = await confirm({
       title: t('bible.delete_folder_title', {
         name: folderName,
@@ -241,7 +245,7 @@ export function CustomFolderTab() {
     }
   }
 
-  const handleDeleteItem = async (item: VerseItem) => {
+  const handleDeleteItem = async (item: VerseItem): Promise<void> => {
     const reference = getVerseReference(item)
     const confirmed = await confirm({
       title: t('bible.delete_item_title', {
@@ -258,23 +262,27 @@ export function CustomFolderTab() {
     }
   }
 
-  const resetDragState = () => {
+  const resetDragState = (): void => {
     setDragState(null)
     setDropTarget(null)
     folderDragCounterRef.current.clear()
   }
 
-  const handleDragStart = (e: React.DragEvent, itemId: string, itemType: DragItemType) => {
+  const handleDragStart = (e: React.DragEvent, itemId: string, itemType: DragItemType): void => {
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('text/plain', itemId)
     setDragState({ itemId, itemType })
   }
 
-  const handleDragEnd = () => {
+  const handleDragEnd = (): void => {
     resetDragState()
   }
 
-  const handleItemDragOver = (e: React.DragEvent, targetId: string, targetType: DragItemType) => {
+  const handleItemDragOver = (
+    e: React.DragEvent,
+    targetId: string,
+    targetType: DragItemType
+  ): void => {
     e.preventDefault()
     e.stopPropagation()
 
@@ -296,14 +304,14 @@ export function CustomFolderTab() {
     e.dataTransfer.dropEffect = 'move'
   }
 
-  const handleFolderDragEnter = (e: React.DragEvent, folderId: string) => {
+  const handleFolderDragEnter = (e: React.DragEvent, folderId: string): void => {
     e.preventDefault()
     e.stopPropagation()
     const prev = folderDragCounterRef.current.get(folderId) ?? 0
     folderDragCounterRef.current.set(folderId, prev + 1)
   }
 
-  const handleFolderDragLeave = (e: React.DragEvent, folderId: string) => {
+  const handleFolderDragLeave = (e: React.DragEvent, folderId: string): void => {
     e.stopPropagation()
     const prev = folderDragCounterRef.current.get(folderId) ?? 0
     const next = prev - 1
@@ -316,15 +324,16 @@ export function CustomFolderTab() {
     }
   }
 
-  const handleListDragOver = (e: React.DragEvent) => {
+  const handleListDragOver = (e: React.DragEvent): void => {
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
   }
 
-  const handleListDrop = (e: React.DragEvent) => {
+  const handleListDrop = (e: React.DragEvent): void => {
     e.preventDefault()
     if (!dragState || dragState.itemType !== 'verse') return
     const folder = currentFolder
+    if (!folder) return
     const currentItems = folder.items
     const draggedId = dragState.itemId
     if (!currentItems.find((i) => i.id === draggedId)) return
@@ -334,7 +343,7 @@ export function CustomFolderTab() {
     resetDragState()
   }
 
-  const handleItemDrop = (e: React.DragEvent, targetId: string, targetType: DragItemType) => {
+  const handleItemDrop = (e: React.DragEvent, targetId: string, targetType: DragItemType): void => {
     e.preventDefault()
     e.stopPropagation()
 
@@ -352,6 +361,10 @@ export function CustomFolderTab() {
     }
 
     const folder = currentFolder
+    if (!folder) {
+      resetDragState()
+      return
+    }
     const currentItems = folder.items
     const draggedId = dragState.itemId
 
@@ -380,7 +393,7 @@ export function CustomFolderTab() {
 
   const dropBeforeId: string | null = dropTarget?.type === 'before' ? dropTarget.id : null
 
-  const renderDropIndicator = (id: string) => (
+  const renderDropIndicator = (id: string): React.JSX.Element => (
     <div
       className={`h-0.5 mx-2 rounded-full transition-all duration-150 ${
         dropBeforeId === id ? 'bg-primary opacity-100' : 'opacity-0'
@@ -393,7 +406,7 @@ export function CustomFolderTab() {
     item: FolderItem | Folder,
     index: number,
     allItems: (FolderItem | Folder)[]
-  ) => {
+  ): React.JSX.Element | null => {
     const isBeingDragged = dragState?.itemId === item.id
     const isLastItem = index === allItems.length - 1
     const isItemSelected = selectedItemIds.has(item.id)

@@ -30,7 +30,7 @@ export class BibleSearchEngine {
     })
 
     return new Promise((resolve, reject) => {
-      const onReady = (event: MessageEvent<WorkerOutgoingMessage>) => {
+      const onReady = (event: MessageEvent<WorkerOutgoingMessage>): void => {
         const { data } = event
         if (data.type === 'READY') {
           this.ready = true
@@ -87,7 +87,7 @@ export class BibleSearchEngine {
     this.indexed = 0
 
     return new Promise((resolve, reject) => {
-      const onBuildComplete = (event: MessageEvent<WorkerOutgoingMessage>) => {
+      const onBuildComplete = (event: MessageEvent<WorkerOutgoingMessage>): void => {
         const { data } = event
         if (data.type === 'INDEX_COMPLETE') {
           this.worker?.removeEventListener('message', onBuildComplete)

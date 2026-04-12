@@ -55,7 +55,8 @@ export default function BiblePage(): React.JSX.Element {
   const bookNumber = useBibleStore((s) => s.currentPassage.bookNumber)
   const chapterNumber = useBibleStore((s) => s.currentPassage.chapter)
   useEffect(() => {
-    setSelectedVerseIndex(0)
+    const id = requestAnimationFrame(() => setSelectedVerseIndex(0))
+    return () => cancelAnimationFrame(id)
   }, [bookNumber, chapterNumber])
 
   const projectVerse = useCallback(

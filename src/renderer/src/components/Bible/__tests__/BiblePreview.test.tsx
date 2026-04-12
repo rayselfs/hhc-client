@@ -82,11 +82,11 @@ vi.mock('@shared/types/bible', async (importOriginal) => {
   }
 })
 
-function applyOverrides(overrides: Partial<BibleStore>) {
+function applyOverrides(overrides: Partial<BibleStore>): void {
   Object.assign(storeSingleton, overrides)
 }
 
-function renderBiblePreview() {
+function renderBiblePreview(): ReturnType<typeof render> {
   return render(
     <BiblePreview
       onContextMenu={vi.fn()}
@@ -99,6 +99,7 @@ function renderBiblePreview() {
 describe('BiblePreview', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    window.HTMLElement.prototype.scrollIntoView = vi.fn()
     Object.assign(storeSingleton, {
       isLoading: false,
       error: null,
