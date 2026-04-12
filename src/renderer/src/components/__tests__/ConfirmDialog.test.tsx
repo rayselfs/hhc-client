@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, it, expect } from 'vitest'
 import '@renderer/i18n'
 import { ConfirmDialogProvider, useConfirm } from '@renderer/contexts/ConfirmDialogContext'
+import type { ConfirmOptions } from '@renderer/contexts/ConfirmDialogContext'
 import ConfirmDialog from '../ConfirmDialog'
 
 function TestHarness({
@@ -10,7 +11,7 @@ function TestHarness({
   onConfirmRef
 }: {
   onResult: (confirmed: boolean) => void
-  onConfirmRef?: (confirm: any) => void
+  onConfirmRef?: (confirm: (options: ConfirmOptions) => Promise<boolean>) => void
 }): React.JSX.Element {
   const confirm = useConfirm()
   if (onConfirmRef) {
@@ -30,7 +31,7 @@ function TestHarness({
 
 function renderWithProvider(
   onResult: (confirmed: boolean) => void,
-  onConfirmRef?: (confirm: any) => void
+  onConfirmRef?: (confirm: (options: ConfirmOptions) => Promise<boolean>) => void
 ): ReturnType<typeof render> {
   return render(
     <ConfirmDialogProvider>
@@ -91,8 +92,8 @@ describe('ConfirmDialog', () => {
   })
 
   it('maintains stable confirm reference across re-renders', () => {
-    let confirmRef1: any
-    let confirmRef2: any
+    let confirmRef1: ((options: ConfirmOptions) => Promise<boolean>) | undefined
+    let confirmRef2: ((options: ConfirmOptions) => Promise<boolean>) | undefined
     const { rerender } = renderWithProvider(
       () => {},
       (confirm) => {
