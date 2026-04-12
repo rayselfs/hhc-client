@@ -16,7 +16,11 @@ export default function ProjectionPage(): React.JSX.Element {
   const [activeContent, setActiveContent] = useState<ActiveContent>(null)
   const [timerData, setTimerData] = useState<TimerTickPayload | null>(null)
   const [stopwatchData, setStopwatchData] = useState<StopwatchTickPayload | null>(null)
-  const [bibleVerse, setBibleVerse] = useState<{ reference: string; text: string } | null>(null)
+  const [bibleVerse, setBibleVerse] = useState<{
+    reference: string
+    text: string
+    fontSize: number
+  } | null>(null)
 
   useEffect(() => {
     const adapter = createProjectionAdapter('projection')
@@ -84,10 +88,16 @@ export default function ProjectionPage(): React.JSX.Element {
   if (showDefault) return <DefaultProjection />
 
   if (activeContent === 'bible' && bibleVerse) {
+    const fontSize = bibleVerse.fontSize || 90
+    const referenceSize = Math.max(16, fontSize * 0.4)
     return (
       <div className="h-screen w-full bg-black flex flex-col items-center justify-center px-16">
-        <p className="text-white text-[4vw] leading-relaxed text-center">{bibleVerse.text}</p>
-        <p className="text-white/60 text-[2vw] mt-8">{bibleVerse.reference}</p>
+        <p className="text-white leading-relaxed text-center" style={{ fontSize: `${fontSize}px` }}>
+          {bibleVerse.text}
+        </p>
+        <p className="text-white/60 mt-8" style={{ fontSize: `${referenceSize}px` }}>
+          {bibleVerse.reference}
+        </p>
       </div>
     )
   }

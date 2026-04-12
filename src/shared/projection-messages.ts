@@ -33,7 +33,7 @@ export interface AppMessages {
   /** Timezone IANA string for clock display */
   'settings:timezone': { timezone: string }
   /** Bible verse content for projection display */
-  'bible:verse': { reference: string; text: string }
+  'bible:verse': { reference: string; text: string; fontSize: number }
 }
 
 /**

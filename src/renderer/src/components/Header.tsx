@@ -6,7 +6,9 @@ import { ButtonGroup, Button, toast } from '@heroui/react'
 import { X, Monitor, MonitorOff, ExternalLink } from 'lucide-react'
 import ModeSelector from '@renderer/components/Timer/ModeSelector'
 import SettingsPopover from '@renderer/components/SettingsPopover'
-import { isTimerRoute } from '@renderer/lib/routes'
+import BibleHeaderControls from '@renderer/components/Bible/BibleHeaderControls'
+import BibleSearchBar from '@renderer/components/Bible/BibleSearchBar'
+import { isTimerRoute, isBibleRoute } from '@renderer/lib/routes'
 import { useTimerStore } from '@renderer/stores/timer'
 
 export default function Header(): React.JSX.Element {
@@ -23,6 +25,7 @@ export default function Header(): React.JSX.Element {
   const mode = useTimerStore((s) => s.mode)
 
   const showTimerControls = isTimerRoute(location.pathname)
+  const showBibleControls = isBibleRoute(location.pathname)
 
   const handleCloseOrOpenProjection = async (): Promise<void> => {
     if (!isProjectionOpen) {
@@ -58,7 +61,20 @@ export default function Header(): React.JSX.Element {
           </div>
         </>
       )}
+      {showBibleControls && (
+        <>
+          <div className="absolute left-2 top-1/2 -translate-y-1/2">
+            <SettingsPopover />
+          </div>
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="pointer-events-auto">
+              <BibleHeaderControls />
+            </div>
+          </div>
+        </>
+      )}
       <div className="flex items-center gap-2">
+        {showBibleControls && <BibleSearchBar />}
         <ButtonGroup size="lg">
           <Button
             isIconOnly
