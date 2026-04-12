@@ -15,7 +15,11 @@ type Step = 'books' | 'chapters' | 'verses'
 const OLD_TESTAMENT_BOOKS = BIBLE_BOOKS.slice(0, 39)
 const NEW_TESTAMENT_BOOKS = BIBLE_BOOKS.slice(39)
 
-export function BibleSelectorDialog({ isOpen, onOpenChange, onSelect }: BibleSelectorDialogProps) {
+export function BibleSelectorDialog({
+  isOpen,
+  onOpenChange,
+  onSelect
+}: BibleSelectorDialogProps): React.JSX.Element {
   const [currentStep, setCurrentStep] = useState<Step>('books')
   const [selectedBook, setSelectedBook] = useState<number | null>(null)
   const [selectedChapter, setSelectedChapter] = useState<number | null>(null)
@@ -33,7 +37,7 @@ export function BibleSelectorDialog({ isOpen, onOpenChange, onSelect }: BibleSel
 
   const bookDetails = selectedBook ? BIBLE_BOOKS.find((b) => b.number === selectedBook) : null
 
-  const handleBookSelect = (bookNumber: number) => {
+  const handleBookSelect = (bookNumber: number): void => {
     setSelectedBook(bookNumber)
     const book = BIBLE_BOOKS.find((b) => b.number === bookNumber)
     if (book?.chapterCount === 1) {
@@ -44,19 +48,19 @@ export function BibleSelectorDialog({ isOpen, onOpenChange, onSelect }: BibleSel
     }
   }
 
-  const handleChapterSelect = (chapter: number) => {
+  const handleChapterSelect = (chapter: number): void => {
     setSelectedChapter(chapter)
     setCurrentStep('verses')
   }
 
-  const handleVerseSelect = (verse: number) => {
+  const handleVerseSelect = (verse: number): void => {
     if (selectedBook && selectedChapter) {
       onSelect({ bookNumber: selectedBook, chapter: selectedChapter, verse })
       onOpenChange(false)
     }
   }
 
-  const renderBooks = () => (
+  const renderBooks = (): React.JSX.Element => (
     <div className="flex flex-col gap-4">
       <div>
         <div className="flex items-center">
