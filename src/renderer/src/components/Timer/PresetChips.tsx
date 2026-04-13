@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { Chip, Button } from '@heroui/react'
+import { Button } from '@heroui/react'
 import { Plus } from 'lucide-react'
 import { useTimerStore } from '@renderer/stores/timer'
 
@@ -45,35 +45,23 @@ export default function PresetChips({ className }: PresetChipsProps): React.JSX.
     <div className={className}>
       <div className="flex flex-col items-stretch gap-3 w-18">
         {presets.map((preset) => (
-          <Chip
+          <Button
             key={preset.id}
             size="lg"
-            className={[
-              'text-base px-4 py-2 transition-colors',
-              isRunning
-                ? 'opacity-50 pointer-events-none'
-                : 'cursor-pointer hover:bg-default-200 active:bg-default-300'
-            ].join(' ')}
-            onContextMenu={(e) => handleContextMenu(e, preset.id)}
+            variant="tertiary"
+            isDisabled={isRunning}
+            className="rounded-full w-19"
+            aria-label={preset.name}
+            onPress={() => !isRunning && applyPreset(preset.id)}
+            onContextMenu={(e: React.MouseEvent) => handleContextMenu(e, preset.id)}
           >
-            <span
-              role="button"
-              tabIndex={isRunning ? -1 : 0}
-              aria-label={preset.name}
-              aria-disabled={isRunning}
-              onKeyDown={(e) => {
-                if (!isRunning && (e.key === 'Enter' || e.key === ' ')) applyPreset(preset.id)
-              }}
-              onClick={() => !isRunning && applyPreset(preset.id)}
-            >
-              {preset.name}
-            </span>
-          </Chip>
+            {preset.name}
+          </Button>
         ))}
         <Button
-          size="sm"
+          size="lg"
           variant="outline"
-          className="text-base h-auto py-1 rounded-full w-full"
+          className="rounded-full w-19"
           onPress={handleAdd}
           isDisabled={isRunning || hasDuplicate}
           aria-label={t('timer.addPreset')}
