@@ -77,14 +77,14 @@
     "selector": {
       "title": "選擇經文",
       "selectVersion": "選擇聖經版本",
-      "book": "書卷",
-      "chapter": "章",
-      "verse": "節",
+      "bookAbbr": "書",
+      "chapterAbbr": "章",
+      "verseAbbr": "節",
       "selectBook": "選擇書卷",
       "selectChapter": "選擇章",
       "selectVerse": "選擇節",
-      "oldTestament": "舊約",
-      "newTestament": "新約"
+      "searchBook": "搜尋書卷...",
+      "close": "關閉"
     },
     "history": {
       "title": "歷史",

@@ -77,14 +77,14 @@
     "selector": {
       "title": "选择经文",
       "selectVersion": "选择圣经版本",
-      "book": "书卷",
-      "chapter": "章",
-      "verse": "节",
+      "bookAbbr": "书",
+      "chapterAbbr": "章",
+      "verseAbbr": "节",
       "selectBook": "选择书卷",
       "selectChapter": "选择章",
       "selectVerse": "选择节",
-      "oldTestament": "旧约",
-      "newTestament": "新约"
+      "searchBook": "搜索书卷...",
+      "close": "关闭"
     },
     "history": {
       "title": "历史",

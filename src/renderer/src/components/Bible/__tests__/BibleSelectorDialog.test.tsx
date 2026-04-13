@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import type { BiblePassage } from '@shared/types/bible'
@@ -42,11 +42,9 @@ vi.mock('react-i18next', () => ({
     t: (key: string) => {
       const map: Record<string, string> = {
         'bible.selector.title': 'Select Passage',
-        'bible.selector.book': '書卷',
-        'bible.selector.chapter': '章',
-        'bible.selector.verse': '節',
-        'bible.selector.oldTestament': '舊約',
-        'bible.selector.newTestament': '新約',
+        'bible.selector.bookAbbr': 'B',
+        'bible.selector.chapterAbbr': 'C',
+        'bible.selector.verseAbbr': 'V',
         'bible.books.gen.name': '創世記',
         'bible.books.mat.name': '馬太福音'
       }
@@ -59,6 +57,7 @@ vi.mock('@heroui/react', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@heroui/react')>()
   return {
     ...actual,
+    ScrollShadow: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
     Modal: Object.assign(vi.fn(), {
       Backdrop: ({ isOpen, children }: { isOpen: boolean; children: React.ReactNode }) =>
         isOpen ? <div role="dialog">{children}</div> : null,
@@ -66,10 +65,60 @@ vi.mock('@heroui/react', async (importOriginal) => {
       Dialog: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
       Header: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
       Body: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+      Footer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
       CloseTrigger: () => null
     }),
-    ButtonGroup: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-    Separator: () => <hr />
+    Tabs: Object.assign(
+      ({
+        children,
+        onSelectionChange
+      }: {
+        children: React.ReactNode
+        onSelectionChange?: (key: string) => void
+      }) => (
+        // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
+        <div
+          role="none"
+          onClick={(e) => {
+            const btn = (e.target as HTMLElement).closest('[data-tab-id]')
+            if (btn && onSelectionChange) {
+              onSelectionChange(btn.getAttribute('data-tab-id') ?? '')
+            }
+          }}
+        >
+          {children}
+        </div>
+      ),
+      {
+        ListContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+        List: ({ children }: { children: React.ReactNode }) => <div role="tablist">{children}</div>,
+        Tab: ({
+          id,
+          children,
+          isDisabled
+        }: {
+          id: string
+          children: React.ReactNode
+          isDisabled?: boolean
+        }) => (
+          <button type="button" role="tab" data-tab-id={id} disabled={isDisabled}>
+            {children}
+          </button>
+        ),
+        Indicator: () => null,
+        Panel: ({ children }: { children: React.ReactNode }) => (
+          <div role="tabpanel">{children}</div>
+        )
+      }
+    ),
+    Breadcrumbs: Object.assign(
+      ({ children }: { children: React.ReactNode }) => <nav>{children}</nav>,
+      {
+        Item: ({ children, isDisabled }: { children: React.ReactNode; isDisabled?: boolean }) => (
+          <span aria-disabled={isDisabled}>{children}</span>
+        )
+      }
+    )
   }
 })
 
@@ -100,10 +149,9 @@ describe('BibleSelectorDialog', () => {
     expect(screen.getByRole('button', { name: '馬太福音' })).toBeInTheDocument()
   })
 
-  it('shows Old and New Testament separators', () => {
+  it('shows a GlassDivider between OT and NT books', () => {
     renderDialog()
-    expect(screen.getByText('舊約')).toBeInTheDocument()
-    expect(screen.getByText('新約')).toBeInTheDocument()
+    expect(screen.getByRole('separator')).toBeInTheDocument()
   })
 
   it('clicking a book navigates to chapter step', async () => {
@@ -154,15 +202,12 @@ describe('BibleSelectorDialog', () => {
     expect(onOpenChange).toHaveBeenCalledWith(false)
   })
 
-  it('breadcrumb book button navigates back to book step', async () => {
+  it('breadcrumb shows selected book name after book selection', async () => {
     const user = userEvent.setup()
     renderDialog()
     await user.click(screen.getByRole('button', { name: '創世記' }))
-    await user.click(screen.getByRole('button', { name: '1' }))
-    const breadcrumbNav = document.querySelector('nav')!
-    const breadcrumbButtons = breadcrumbNav.querySelectorAll('button')
-    fireEvent.click(breadcrumbButtons[0])
-    expect(screen.getAllByRole('button', { name: '創世記' }).length).toBeGreaterThanOrEqual(1)
+    const nav = document.querySelector('nav')!
+    expect(nav.textContent).toContain('創世記')
   })
 
   it('does not render when closed', () => {
@@ -170,11 +215,11 @@ describe('BibleSelectorDialog', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
-  it('books button in header navigates back to books step', async () => {
+  it('books tab in header navigates back to books step', async () => {
     const user = userEvent.setup()
     renderDialog()
     await user.click(screen.getByRole('button', { name: '創世記' }))
-    await user.click(screen.getByRole('button', { name: '書卷' }))
+    await user.click(screen.getByRole('tab', { name: 'B' }))
     expect(screen.getAllByRole('button', { name: '創世記' }).length).toBeGreaterThanOrEqual(1)
   })
 })

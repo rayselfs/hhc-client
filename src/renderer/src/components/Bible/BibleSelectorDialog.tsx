@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react'
-import { Modal, Button, ButtonGroup, Separator } from '@heroui/react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { Modal, Button, Tabs, Breadcrumbs, Input, ScrollShadow } from '@heroui/react'
 import { BIBLE_BOOKS } from '@shared/types/bible'
 import type { BiblePassage } from '@shared/types/bible'
 import { useBibleStore } from '@renderer/stores/bible'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 import { useTranslation } from 'react-i18next'
+import GlassDivider from '@renderer/components/GlassDivider'
 
 interface BibleSelectorDialogProps {
   isOpen: boolean
@@ -26,20 +27,53 @@ export function BibleSelectorDialog({
   const [currentStep, setCurrentStep] = useState<Step>('books')
   const [selectedBook, setSelectedBook] = useState<number | null>(null)
   const [selectedChapter, setSelectedChapter] = useState<number | null>(null)
+  const [bookSearch, setBookSearch] = useState('')
 
   useEffect(() => {
     if (!isOpen) {
       setTimeout(() => {
         setCurrentStep('books')
-        setSelectedBook(null)
         setSelectedChapter(null)
+        setBookSearch('')
       }, 200)
     }
   }, [isOpen])
 
-  const bookDetails = selectedBook ? BIBLE_BOOKS.find((b) => b.number === selectedBook) : null
+  const bookDetails = useMemo(
+    () => (selectedBook ? (BIBLE_BOOKS.find((b) => b.number === selectedBook) ?? null) : null),
+    [selectedBook]
+  )
 
-  const handleBookSelect = (bookNumber: number): void => {
+  const bookNamesMap = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const book of BIBLE_BOOKS) {
+      map.set(
+        book.code,
+        (t as (k: string) => string)(`bible.books.${book.code.toLowerCase()}.name`)
+      )
+    }
+    return map
+  }, [t])
+
+  const bookName = useCallback(
+    (code: string): string => bookNamesMap.get(code) ?? code,
+    [bookNamesMap]
+  )
+
+  const bookSearchLower = useMemo(() => bookSearch.toLowerCase(), [bookSearch])
+
+  const filteredOT = useMemo(
+    () =>
+      OLD_TESTAMENT_BOOKS.filter((b) => bookName(b.code).toLowerCase().includes(bookSearchLower)),
+    [bookName, bookSearchLower]
+  )
+  const filteredNT = useMemo(
+    () =>
+      NEW_TESTAMENT_BOOKS.filter((b) => bookName(b.code).toLowerCase().includes(bookSearchLower)),
+    [bookName, bookSearchLower]
+  )
+
+  const handleBookSelect = useCallback((bookNumber: number): void => {
     setSelectedBook(bookNumber)
     const book = BIBLE_BOOKS.find((b) => b.number === bookNumber)
     if (book?.chapterCount === 1) {
@@ -48,50 +82,70 @@ export function BibleSelectorDialog({
     } else {
       setCurrentStep('chapters')
     }
-  }
+  }, [])
 
-  const handleChapterSelect = (chapter: number): void => {
+  const handleChapterSelect = useCallback((chapter: number): void => {
     setSelectedChapter(chapter)
     setCurrentStep('verses')
-  }
+  }, [])
 
-  const handleVerseSelect = (verse: number): void => {
-    if (selectedBook && selectedChapter) {
-      onSelect({ bookNumber: selectedBook, chapter: selectedChapter, verse })
-      onOpenChange(false)
-    }
-  }
+  const handleVerseSelect = useCallback(
+    (verse: number): void => {
+      if (selectedBook && selectedChapter) {
+        onSelect({ bookNumber: selectedBook, chapter: selectedChapter, verse })
+        onOpenChange(false)
+      }
+    },
+    [selectedBook, selectedChapter, onSelect, onOpenChange]
+  )
+
+  const verseCount = useMemo(() => {
+    const versionId = useBibleSettingsStore.getState().selectedVersionId
+    const books = versionId ? useBibleStore.getState().content.get(versionId) : undefined
+    return (
+      books
+        ?.find((b) => b.number === selectedBook)
+        ?.chapters.find((c) => c.number === selectedChapter)?.verses.length ?? 30
+    )
+  }, [selectedBook, selectedChapter])
+
+  const chapterButtons = useMemo(() => {
+    if (!bookDetails) return null
+    return Array.from({ length: bookDetails.chapterCount }, (_, i) => i + 1)
+  }, [bookDetails])
+
+  const verseButtons = useMemo(
+    () => Array.from({ length: verseCount }, (_, i) => i + 1),
+    [verseCount]
+  )
 
   const renderBooks = (): React.JSX.Element => (
     <div className="flex flex-col gap-4">
       <div>
-        <div className="flex items-center">
-          <Separator />
-          <span className="flex-shrink mx-4 text-default-500 text-sm">
-            {t('bible.selector.oldTestament')}
-          </span>
-          <Separator />
-        </div>
-        <div className="grid grid-cols-4 gap-1 mt-2">
-          {OLD_TESTAMENT_BOOKS.map((book) => (
-            <Button key={book.number} size="sm" onPress={() => handleBookSelect(book.number)}>
-              {(t as (k: string) => string)(`bible.books.${book.code.toLowerCase()}.name`)}
+        <div className="grid grid-cols-4 gap-x-4 gap-y-3">
+          {filteredOT.map((book) => (
+            <Button
+              key={book.number}
+              variant="tertiary"
+              onPress={() => handleBookSelect(book.number)}
+              className="w-full h-11 rounded-full text-xl"
+            >
+              {bookName(book.code)}
             </Button>
           ))}
         </div>
       </div>
+      <GlassDivider />
       <div>
-        <div className="flex items-center">
-          <Separator />
-          <span className="flex-shrink mx-4 text-default-500 text-sm">
-            {t('bible.selector.newTestament')}
-          </span>
-          <Separator />
-        </div>
-        <div className="grid grid-cols-4 gap-1 mt-2">
-          {NEW_TESTAMENT_BOOKS.map((book) => (
-            <Button key={book.number} size="sm" onPress={() => handleBookSelect(book.number)}>
-              {(t as (k: string) => string)(`bible.books.${book.code.toLowerCase()}.name`)}
+        <div className="grid grid-cols-4 gap-x-2 gap-y-3">
+          {filteredNT.map((book) => (
+            <Button
+              key={book.number}
+              variant="tertiary"
+              onPress={() => handleBookSelect(book.number)}
+              className="w-full h-11 rounded-full text-xl"
+            >
+              {bookName(book.code)}
             </Button>
           ))}
         </div>
@@ -100,12 +154,17 @@ export function BibleSelectorDialog({
   )
 
   const renderChapters = (): React.JSX.Element | null => {
-    if (!bookDetails) return null
-    const chapters = Array.from({ length: bookDetails.chapterCount }, (_, i) => i + 1)
+    if (!chapterButtons) return null
     return (
-      <div className="grid grid-cols-10 gap-1">
-        {chapters.map((chapter) => (
-          <Button key={chapter} size="sm" isIconOnly onPress={() => handleChapterSelect(chapter)}>
+      <div className="grid grid-cols-10 gap-3">
+        {chapterButtons.map((chapter) => (
+          <Button
+            key={chapter}
+            isIconOnly
+            variant="tertiary"
+            onPress={() => handleChapterSelect(chapter)}
+            className="w-18 h-18 rounded-full aspect-square text-3xl"
+          >
             {chapter}
           </Button>
         ))}
@@ -113,100 +172,89 @@ export function BibleSelectorDialog({
     )
   }
 
-  const renderVerses = (): React.JSX.Element => {
-    const versionId = useBibleSettingsStore.getState().selectedVersionId
-    const books = versionId ? useBibleStore.getState().content.get(versionId) : undefined
-    const verseCount =
-      books
-        ?.find((b) => b.number === selectedBook)
-        ?.chapters.find((c) => c.number === selectedChapter)?.verses.length ?? 30
-    const verses = Array.from({ length: verseCount }, (_, i) => i + 1)
-    return (
-      <div className="grid grid-cols-10 gap-1">
-        {verses.map((verse) => (
-          <Button key={verse} size="sm" isIconOnly onPress={() => handleVerseSelect(verse)}>
-            {verse}
-          </Button>
-        ))}
-      </div>
-    )
-  }
-
-  const renderContent = (): React.JSX.Element | null => {
-    switch (currentStep) {
-      case 'books':
-        return renderBooks()
-      case 'chapters':
-        return renderChapters()
-      case 'verses':
-        return renderVerses()
-      default:
-        return null
-    }
-  }
+  const renderVerses = (): React.JSX.Element => (
+    <div className="grid grid-cols-10 gap-3">
+      {verseButtons.map((verse) => (
+        <Button
+          key={verse}
+          isIconOnly
+          variant="tertiary"
+          onPress={() => handleVerseSelect(verse)}
+          className="w-18 h-18 rounded-full aspect-square text-3xl"
+        >
+          {verse}
+        </Button>
+      ))}
+    </div>
+  )
 
   return (
     <Modal.Backdrop isOpen={isOpen} onOpenChange={onOpenChange}>
-      <Modal.Container size="cover">
-        <Modal.Dialog aria-label={t('bible.selector.title')}>
-          <Modal.CloseTrigger />
-          <Modal.Header>
-            <div className="flex justify-between items-center w-full">
-              <nav className="flex items-center gap-1 text-sm">
-                <button
-                  type="button"
-                  onClick={() => setCurrentStep('books')}
-                  disabled={currentStep === 'books'}
-                  className="text-default-700 hover:text-foreground disabled:text-default-400 disabled:cursor-default transition-colors"
-                >
-                  {bookDetails
-                    ? (t as (k: string) => string)(
-                        `bible.books.${bookDetails.code.toLowerCase()}.name`
-                      )
-                    : t('bible.selector.book')}
-                </button>
-                {selectedChapter && (
-                  <>
-                    <span className="text-default-400">/</span>
-                    <button
-                      type="button"
-                      onClick={() => setCurrentStep('chapters')}
-                      disabled={currentStep === 'chapters'}
-                      className="text-default-700 hover:text-foreground disabled:text-default-400 disabled:cursor-default transition-colors"
-                    >
-                      {selectedChapter}
-                    </button>
-                  </>
+      <Modal.Container size="lg">
+        <Modal.Dialog
+          aria-label={t('bible.selector.title')}
+          className="max-w-4xl w-full h-full min-h-full p-1"
+        >
+          <Modal.Header className="p-1 pl-5 pb-3">
+            <div className="flex justify-between items-center w-full gap-4">
+              <Breadcrumbs>
+                <Breadcrumbs.Item isDisabled>
+                  {bookDetails ? bookName(bookDetails.code) : null}
+                </Breadcrumbs.Item>
+                {selectedChapter != null && (
+                  <Breadcrumbs.Item isDisabled>{selectedChapter}</Breadcrumbs.Item>
                 )}
-              </nav>
-              <ButtonGroup>
-                <Button
-                  size="sm"
-                  variant={currentStep === 'books' ? 'primary' : 'secondary'}
-                  onPress={() => setCurrentStep('books')}
+              </Breadcrumbs>
+
+              <div className="flex items-center gap-2">
+                {currentStep === 'books' && (
+                  <Input
+                    aria-label={t('bible.selector.searchBook')}
+                    placeholder={t('bible.selector.searchBook')}
+                    value={bookSearch}
+                    onChange={(e) => setBookSearch(e.target.value)}
+                    className="w-36 border-0 border-b rounded-none shadow-none bg-transparent focus:ring-0"
+                  />
+                )}
+                <Tabs
+                  selectedKey={currentStep}
+                  onSelectionChange={(key) => setCurrentStep(key as Step)}
                 >
-                  {t('bible.selector.book')}
-                </Button>
-                <Button
-                  size="sm"
-                  variant={currentStep === 'chapters' ? 'primary' : 'secondary'}
-                  onPress={() => setCurrentStep('chapters')}
-                  isDisabled={!selectedBook || bookDetails?.chapterCount === 1}
-                >
-                  {t('bible.selector.chapter')}
-                </Button>
-                <Button
-                  size="sm"
-                  variant={currentStep === 'verses' ? 'primary' : 'secondary'}
-                  onPress={() => setCurrentStep('verses')}
-                  isDisabled={!selectedChapter}
-                >
-                  {t('bible.selector.verse')}
-                </Button>
-              </ButtonGroup>
+                  <Tabs.ListContainer>
+                    <Tabs.List aria-label={t('bible.selector.title')}>
+                      <Tabs.Tab id="books">
+                        {t('bible.selector.bookAbbr')}
+                        <Tabs.Indicator />
+                      </Tabs.Tab>
+                      <Tabs.Tab
+                        id="chapters"
+                        isDisabled={!selectedBook || bookDetails?.chapterCount === 1}
+                      >
+                        {t('bible.selector.chapterAbbr')}
+                        <Tabs.Indicator />
+                      </Tabs.Tab>
+                      <Tabs.Tab id="verses" isDisabled={selectedChapter == null}>
+                        {t('bible.selector.verseAbbr')}
+                        <Tabs.Indicator />
+                      </Tabs.Tab>
+                    </Tabs.List>
+                  </Tabs.ListContainer>
+                </Tabs>
+              </div>
             </div>
           </Modal.Header>
-          <Modal.Body>{renderContent()}</Modal.Body>
+          <Modal.Body className="flex flex-col overflow-hidden px-5">
+            <ScrollShadow className="flex-1 min-h-0">
+              {currentStep === 'books' && renderBooks()}
+              {currentStep === 'chapters' && renderChapters()}
+              {currentStep === 'verses' && renderVerses()}
+            </ScrollShadow>
+          </Modal.Body>
+          <Modal.Footer className="p-1">
+            <Button variant="tertiary" onPress={() => onOpenChange(false)}>
+              {t('bible.selector.close')}
+            </Button>
+          </Modal.Footer>
         </Modal.Dialog>
       </Modal.Container>
     </Modal.Backdrop>

@@ -285,9 +285,7 @@ export const useBibleStore = create<BibleStore>()(
       name: createKey('bible'),
       storage: hhcPersistStorage,
       version: 0,
-      partialize: (state) => ({
-        currentPassage: state.currentPassage
-      })
+      partialize: () => ({})
     }
   )
 )

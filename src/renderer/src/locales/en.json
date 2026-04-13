@@ -77,14 +77,14 @@
     "selector": {
       "title": "Select Passage",
       "selectVersion": "Select Bible version",
-      "book": "Book",
-      "chapter": "Chapter",
-      "verse": "Verse",
+      "bookAbbr": "B",
+      "chapterAbbr": "C",
+      "verseAbbr": "V",
       "selectBook": "Select Book",
       "selectChapter": "Select Chapter",
       "selectVerse": "Select Verse",
-      "oldTestament": "Old Testament",
-      "newTestament": "New Testament"
+      "searchBook": "Search book...",
+      "close": "Close"
     },
     "history": {
       "title": "History",
