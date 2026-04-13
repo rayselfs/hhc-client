@@ -26,6 +26,9 @@ export default defineConfig({
       }
     },
     plugins: [react(), tailwindcss()],
+    optimizeDeps: {
+      exclude: ['jieba-wasm']
+    },
     server: {
       proxy: {
         '/api/bible': {
