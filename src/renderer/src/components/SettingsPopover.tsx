@@ -102,7 +102,7 @@ export default function SettingsPopover({ mode }: SettingsPopoverProps): React.J
                   defaultValue={fontSize}
                   minValue={30}
                   maxValue={150}
-                  step={5}
+                  step={1}
                   onChange={(value) => {
                     if (typeof value === 'number') {
                       setFontSize(value)
