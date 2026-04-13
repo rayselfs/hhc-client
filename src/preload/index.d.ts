@@ -38,7 +38,7 @@ interface TimerAPI {
 
 interface BibleAPI {
   getVersions: () => Promise<BibleVersion[]>
-  getContent: (versionId: string) => Promise<BibleBook[]>
+  getContent: (versionId: number) => Promise<BibleBook[]>
 }
 
 declare global {

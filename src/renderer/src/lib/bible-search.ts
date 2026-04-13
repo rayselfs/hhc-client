@@ -13,6 +13,7 @@ export class BibleSearchEngine {
   private ready = false
   private indexed = 0
   private total = 0
+  private initPromise: Promise<void> | null = null
 
   private pendingSearches: Map<
     number,
@@ -23,13 +24,13 @@ export class BibleSearchEngine {
   private messageHandlerBound = this.handleMessage.bind(this)
 
   async init(): Promise<void> {
-    if (this.worker) return
+    if (this.initPromise) return this.initPromise
 
-    this.worker = new Worker(new URL('../workers/bible-search.worker.ts', import.meta.url), {
-      type: 'module'
-    })
+    this.initPromise = new Promise<void>((resolve, reject) => {
+      this.worker = new Worker(new URL('../workers/bible-search.worker.ts', import.meta.url), {
+        type: 'module'
+      })
 
-    return new Promise((resolve, reject) => {
       const onReady = (event: MessageEvent<WorkerOutgoingMessage>): void => {
         const { data } = event
         if (data.type === 'READY') {
@@ -39,15 +40,21 @@ export class BibleSearchEngine {
           resolve()
         } else if (data.type === 'ERROR') {
           this.worker?.removeEventListener('message', onReady)
+          this.initPromise = null
           reject(new Error(data.message))
         }
       }
-      this.worker!.addEventListener('message', onReady)
-      this.worker!.addEventListener('error', (e) => reject(new Error(e.message)))
+      this.worker.addEventListener('message', onReady)
+      this.worker.addEventListener('error', (e) => {
+        this.initPromise = null
+        reject(new Error(e.message))
+      })
 
       const msg: WorkerIncomingMessage = { type: 'INIT' }
-      this.worker!.postMessage(msg)
+      this.worker.postMessage(msg)
     })
+
+    return this.initPromise
   }
 
   private handleMessage(event: MessageEvent<WorkerOutgoingMessage>): void {
@@ -104,6 +111,52 @@ export class BibleSearchEngine {
     })
   }
 
+  exportIndex(): Promise<{ key: string; data: string }[]> {
+    if (!this.worker) {
+      return Promise.reject(new Error('BibleSearchEngine not initialized'))
+    }
+
+    return new Promise((resolve, reject) => {
+      const onExported = (event: MessageEvent<WorkerOutgoingMessage>): void => {
+        const { data } = event
+        if (data.type === 'INDEX_EXPORTED') {
+          this.worker?.removeEventListener('message', onExported)
+          resolve(data.chunks)
+        } else if (data.type === 'ERROR') {
+          this.worker?.removeEventListener('message', onExported)
+          reject(new Error(data.message))
+        }
+      }
+      this.worker!.addEventListener('message', onExported)
+
+      const msg: WorkerIncomingMessage = { type: 'EXPORT_INDEX' }
+      this.worker!.postMessage(msg)
+    })
+  }
+
+  loadIndex(chunks: { key: string; data: string }[]): Promise<void> {
+    if (!this.worker) {
+      return Promise.reject(new Error('BibleSearchEngine not initialized'))
+    }
+
+    return new Promise((resolve, reject) => {
+      const onLoaded = (event: MessageEvent<WorkerOutgoingMessage>): void => {
+        const { data } = event
+        if (data.type === 'INDEX_LOADED') {
+          this.worker?.removeEventListener('message', onLoaded)
+          resolve()
+        } else if (data.type === 'ERROR') {
+          this.worker?.removeEventListener('message', onLoaded)
+          reject(new Error(data.message))
+        }
+      }
+      this.worker!.addEventListener('message', onLoaded)
+
+      const msg: WorkerIncomingMessage = { type: 'LOAD_INDEX', chunks }
+      this.worker!.postMessage(msg)
+    })
+  }
+
   search(query: string, limit = 20): Promise<number[]> {
     if (!this.worker) {
       return Promise.reject(new Error('BibleSearchEngine not initialized'))
@@ -131,6 +184,7 @@ export class BibleSearchEngine {
     this.ready = false
     this.indexed = 0
     this.total = 0
+    this.initPromise = null
     const err = new Error('disposed')
     for (const p of this.pendingSearches.values()) p.reject(err)
     this.pendingSearches.clear()

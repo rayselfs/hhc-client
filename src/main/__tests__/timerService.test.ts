@@ -11,11 +11,11 @@ import { TimerService } from '../timerService'
 
 function makeMockWindow(): {
   isDestroyed: () => boolean
-  webContents: { send: ReturnType<typeof vi.fn> }
+  webContents: { send: ReturnType<typeof vi.fn>; isDestroyed: () => boolean }
 } {
   return {
     isDestroyed: () => false,
-    webContents: { send: vi.fn() }
+    webContents: { send: vi.fn(), isDestroyed: () => false }
   }
 }
 

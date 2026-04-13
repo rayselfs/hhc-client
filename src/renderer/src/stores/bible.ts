@@ -12,7 +12,7 @@ import {
 import { hhcPersistStorage, createKey } from '@renderer/lib/persist-storage'
 import { useBibleSettingsStore } from './bible-settings'
 
-const fetchPromises = new Map<string, Promise<BibleBook[]>>()
+const fetchPromises = new Map<number, Promise<BibleBook[]>>()
 
 let adapter: BibleApiAdapter | null = null
 
@@ -26,8 +26,8 @@ function getAdapter(): BibleApiAdapter {
 export interface BibleStore {
   // ── State ──────────────────────────────────────────────────
   versions: BibleVersion[]
-  content: Map<string, BibleBook[]>
-  currentPassage: BiblePassage
+  content: Map<number, BibleBook[]>
+  currentPassage: BiblePassage | null
   isLoading: boolean
   loadingProgress: { loaded: number; total: number } | null
   error: string | null
@@ -35,7 +35,7 @@ export interface BibleStore {
 
   // ── Actions ────────────────────────────────────────────────
   initialize: () => Promise<void>
-  fetchVersionContent: (versionId: string) => Promise<void>
+  fetchVersionContent: (versionId: number) => Promise<void>
   navigateTo: (passage: BiblePassage) => void
   nextChapter: () => void
   prevChapter: () => void
@@ -49,18 +49,12 @@ export interface BibleStore {
   getCurrentVerses: () => BibleBook['chapters'][number]['verses']
 }
 
-const DEFAULT_PASSAGE: BiblePassage = {
-  bookNumber: 1,
-  chapter: 1,
-  verse: 1
-}
-
 export const useBibleStore = create<BibleStore>()(
   persist(
     (set, get) => ({
       versions: [],
       content: new Map(),
-      currentPassage: DEFAULT_PASSAGE,
+      currentPassage: null,
       isLoading: false,
       loadingProgress: null,
       error: null,
@@ -93,10 +87,7 @@ export const useBibleStore = create<BibleStore>()(
             useBibleSettingsStore.getState().setSelectedVersionId(versions[0].id)
           }
 
-          const selectedVersionId =
-            useBibleSettingsStore.getState().selectedVersionId || versions[0].id
-
-          await get().fetchVersionContent(selectedVersionId)
+          await Promise.all(versions.map((v) => get().fetchVersionContent(v.id)))
 
           set({ isInitialized: true, isLoading: false, loadingProgress: null })
         } catch (error) {
@@ -105,7 +96,7 @@ export const useBibleStore = create<BibleStore>()(
         }
       },
 
-      fetchVersionContent: async (versionId: string) => {
+      fetchVersionContent: async (versionId: number) => {
         const s = get()
 
         if (s.content.has(versionId)) return
@@ -161,6 +152,7 @@ export const useBibleStore = create<BibleStore>()(
 
       nextChapter: () => {
         const s = get()
+        if (!s.currentPassage) return
         const { bookNumber, chapter } = s.currentPassage
         const bookConfig = BIBLE_BOOKS.find((b) => b.number === bookNumber)
         if (!bookConfig) return
@@ -177,6 +169,7 @@ export const useBibleStore = create<BibleStore>()(
 
       prevChapter: () => {
         const s = get()
+        if (!s.currentPassage) return
         const { bookNumber, chapter } = s.currentPassage
 
         if (chapter > 1) {
@@ -197,6 +190,7 @@ export const useBibleStore = create<BibleStore>()(
 
       nextVerse: () => {
         const s = get()
+        if (!s.currentPassage) return
         const { bookNumber, chapter, verse } = s.currentPassage
         const chapter_ = s.getCurrentChapter()
 
@@ -226,13 +220,14 @@ export const useBibleStore = create<BibleStore>()(
 
       prevVerse: () => {
         const s = get()
+        if (!s.currentPassage) return
         const { bookNumber, chapter, verse } = s.currentPassage
 
         if (verse > 1) {
           set({ currentPassage: { bookNumber, chapter, verse: verse - 1 } })
         } else {
           if (chapter > 1) {
-            const prevChapterBooks = s.content.get(s.versions.length > 0 ? s.versions[0].id : '')
+            const prevChapterBooks = s.content.get(s.versions.length > 0 ? s.versions[0].id : 0)
             const book = prevChapterBooks?.find((b) => b.number === bookNumber)
             const prevChapter = book?.chapters.find((c) => c.number === chapter - 1)
             const lastVerse = prevChapter ? prevChapter.verses.length : 1
@@ -240,7 +235,7 @@ export const useBibleStore = create<BibleStore>()(
           } else {
             const prevBook = BIBLE_BOOKS.find((b) => b.number === bookNumber - 1)
             if (prevBook) {
-              const prevVersionId = s.versions.length > 0 ? s.versions[0].id : ''
+              const prevVersionId = s.versions.length > 0 ? s.versions[0].id : 0
               const prevBookContent = s.content
                 .get(prevVersionId)
                 ?.find((b) => b.number === prevBook.number)
@@ -265,14 +260,16 @@ export const useBibleStore = create<BibleStore>()(
 
       getCurrentBook: () => {
         const s = get()
+        if (!s.currentPassage) return undefined
         const { bookNumber } = s.currentPassage
-        const versionId = s.versions.length > 0 ? s.versions[0].id : ''
+        const versionId = s.versions.length > 0 ? s.versions[0].id : 0
         const books = s.content.get(versionId)
         return books?.find((b) => b.number === bookNumber)
       },
 
       getCurrentChapter: () => {
         const s = get()
+        if (!s.currentPassage) return undefined
         const { chapter } = s.currentPassage
         const book = s.getCurrentBook()
         return book?.chapters.find((c) => c.number === chapter)

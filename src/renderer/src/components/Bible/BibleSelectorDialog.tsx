@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
-import { Modal, Button, ButtonGroup, Breadcrumbs, Separator } from '@heroui/react'
+import { Modal, Button, ButtonGroup, Separator } from '@heroui/react'
 import { BIBLE_BOOKS } from '@shared/types/bible'
 import type { BiblePassage } from '@shared/types/bible'
 import { useBibleStore } from '@renderer/stores/bible'
+import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
+import { useTranslation } from 'react-i18next'
 
 interface BibleSelectorDialogProps {
   isOpen: boolean
@@ -20,6 +22,7 @@ export function BibleSelectorDialog({
   onOpenChange,
   onSelect
 }: BibleSelectorDialogProps): React.JSX.Element {
+  const { t } = useTranslation()
   const [currentStep, setCurrentStep] = useState<Step>('books')
   const [selectedBook, setSelectedBook] = useState<number | null>(null)
   const [selectedChapter, setSelectedChapter] = useState<number | null>(null)
@@ -64,13 +67,15 @@ export function BibleSelectorDialog({
       <div>
         <div className="flex items-center">
           <Separator />
-          <span className="flex-shrink mx-4 text-default-500 text-sm">舊約</span>
+          <span className="flex-shrink mx-4 text-default-500 text-sm">
+            {t('bible.selector.oldTestament')}
+          </span>
           <Separator />
         </div>
         <div className="grid grid-cols-4 gap-1 mt-2">
           {OLD_TESTAMENT_BOOKS.map((book) => (
             <Button key={book.number} size="sm" onPress={() => handleBookSelect(book.number)}>
-              {book.name}
+              {(t as (k: string) => string)(`bible.books.${book.code.toLowerCase()}.name`)}
             </Button>
           ))}
         </div>
@@ -78,13 +83,15 @@ export function BibleSelectorDialog({
       <div>
         <div className="flex items-center">
           <Separator />
-          <span className="flex-shrink mx-4 text-default-500 text-sm">新約</span>
+          <span className="flex-shrink mx-4 text-default-500 text-sm">
+            {t('bible.selector.newTestament')}
+          </span>
           <Separator />
         </div>
         <div className="grid grid-cols-4 gap-1 mt-2">
           {NEW_TESTAMENT_BOOKS.map((book) => (
             <Button key={book.number} size="sm" onPress={() => handleBookSelect(book.number)}>
-              {book.name}
+              {(t as (k: string) => string)(`bible.books.${book.code.toLowerCase()}.name`)}
             </Button>
           ))}
         </div>
@@ -107,7 +114,12 @@ export function BibleSelectorDialog({
   }
 
   const renderVerses = (): React.JSX.Element => {
-    const verseCount = useBibleStore.getState().getCurrentChapter()?.verses.length || 30
+    const versionId = useBibleSettingsStore.getState().selectedVersionId
+    const books = versionId ? useBibleStore.getState().content.get(versionId) : undefined
+    const verseCount =
+      books
+        ?.find((b) => b.number === selectedBook)
+        ?.chapters.find((c) => c.number === selectedChapter)?.verses.length ?? 30
     const verses = Array.from({ length: verseCount }, (_, i) => i + 1)
     return (
       <div className="grid grid-cols-10 gap-1">
@@ -134,35 +146,46 @@ export function BibleSelectorDialog({
   }
 
   return (
-    <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
-      <Modal.Backdrop />
-      <Modal.Container size="lg">
-        <Modal.Dialog>
+    <Modal.Backdrop isOpen={isOpen} onOpenChange={onOpenChange}>
+      <Modal.Container size="cover">
+        <Modal.Dialog aria-label={t('bible.selector.title')}>
+          <Modal.CloseTrigger />
           <Modal.Header>
             <div className="flex justify-between items-center w-full">
-              <Breadcrumbs>
-                <Breadcrumbs.Item
-                  onPress={() => setCurrentStep('books')}
-                  isDisabled={currentStep === 'books'}
+              <nav className="flex items-center gap-1 text-sm">
+                <button
+                  type="button"
+                  onClick={() => setCurrentStep('books')}
+                  disabled={currentStep === 'books'}
+                  className="text-default-700 hover:text-foreground disabled:text-default-400 disabled:cursor-default transition-colors"
                 >
-                  {bookDetails?.name || '書卷'}
-                </Breadcrumbs.Item>
+                  {bookDetails
+                    ? (t as (k: string) => string)(
+                        `bible.books.${bookDetails.code.toLowerCase()}.name`
+                      )
+                    : t('bible.selector.book')}
+                </button>
                 {selectedChapter && (
-                  <Breadcrumbs.Item
-                    onPress={() => setCurrentStep('chapters')}
-                    isDisabled={currentStep === 'chapters'}
-                  >
-                    {selectedChapter}
-                  </Breadcrumbs.Item>
+                  <>
+                    <span className="text-default-400">/</span>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentStep('chapters')}
+                      disabled={currentStep === 'chapters'}
+                      className="text-default-700 hover:text-foreground disabled:text-default-400 disabled:cursor-default transition-colors"
+                    >
+                      {selectedChapter}
+                    </button>
+                  </>
                 )}
-              </Breadcrumbs>
+              </nav>
               <ButtonGroup>
                 <Button
                   size="sm"
                   variant={currentStep === 'books' ? 'primary' : 'secondary'}
                   onPress={() => setCurrentStep('books')}
                 >
-                  書卷
+                  {t('bible.selector.book')}
                 </Button>
                 <Button
                   size="sm"
@@ -170,7 +193,7 @@ export function BibleSelectorDialog({
                   onPress={() => setCurrentStep('chapters')}
                   isDisabled={!selectedBook || bookDetails?.chapterCount === 1}
                 >
-                  章
+                  {t('bible.selector.chapter')}
                 </Button>
                 <Button
                   size="sm"
@@ -178,7 +201,7 @@ export function BibleSelectorDialog({
                   onPress={() => setCurrentStep('verses')}
                   isDisabled={!selectedChapter}
                 >
-                  節
+                  {t('bible.selector.verse')}
                 </Button>
               </ButtonGroup>
             </div>
@@ -186,6 +209,6 @@ export function BibleSelectorDialog({
           <Modal.Body>{renderContent()}</Modal.Body>
         </Modal.Dialog>
       </Modal.Container>
-    </Modal>
+    </Modal.Backdrop>
   )
 }

@@ -8,7 +8,7 @@ export default function BibleMultiFunction(): React.JSX.Element {
 
   return (
     <Card className="h-full flex-1 flex flex-col">
-      <Tabs className="h-full flex flex-col">
+      <Tabs className="flex-1 flex flex-col min-h-0">
         <Tabs.ListContainer>
           <Tabs.List aria-label="Bible Functions">
             <Tabs.Tab id="history">

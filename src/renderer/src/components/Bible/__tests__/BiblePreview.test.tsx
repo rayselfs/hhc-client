@@ -71,16 +71,46 @@ vi.mock('@renderer/stores/bible', () => ({
   )
 }))
 
-vi.mock('@shared/types/bible', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@shared/types/bible')>()
-  return {
-    ...actual,
-    formatVerseReference: vi.fn(
-      (_name: string, _bookNum: number, chapter: number, verse: number) =>
-        `MockBook ${chapter}:${verse}`
-    )
+vi.mock('@renderer/stores/bible-search', () => ({
+  useBibleSearchStore: (selector?: (state: unknown) => unknown) => {
+    const state = {
+      isSearchMode: false,
+      isSearching: false,
+      isIndexReady: true,
+      results: [],
+      query: '',
+      clearSearch: vi.fn()
+    }
+    return selector ? selector(state) : state
   }
-})
+}))
+
+vi.mock('@renderer/lib/bible-utils', () => ({
+  formatVerseReference: vi.fn(
+    (_t: unknown, _bookNum: number, chapter: number, verse: number) =>
+      `MockBook ${chapter}:${verse}`
+  ),
+  getBookConfig: (bookNumber: number) => ({
+    number: bookNumber,
+    code: bookNumber === 1 ? 'Gen' : 'Exo',
+    chapterCount: bookNumber === 1 ? 50 : 40
+  }),
+  shouldShowChapterNumber: () => true
+}))
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string) => {
+      const map: Record<string, string> = {
+        'bible.books.gen.name': '創世記',
+        'bible.chapterUnit.default': '章',
+        'bible.chapterUnit.psa': '篇',
+        'bible.preview.noContent': '尚未載入經文內容'
+      }
+      return map[key] ?? key
+    }
+  })
+}))
 
 function applyOverrides(overrides: Partial<BibleStore>): void {
   Object.assign(storeSingleton, overrides)
@@ -204,20 +234,6 @@ describe('BiblePreview', () => {
     expect(
       screen.queryByText('In the beginning God created the heavens and the earth.')
     ).not.toBeInTheDocument()
-  })
-
-  it('shows error message and retry button when error is set', () => {
-    applyOverrides({ error: '載入失敗', getCurrentVerses: () => [] })
-    renderBiblePreview()
-    expect(screen.getByText('載入失敗')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '重試' })).toBeInTheDocument()
-  })
-
-  it('clicking retry button calls retry', () => {
-    applyOverrides({ error: '載入失敗', getCurrentVerses: () => [] })
-    renderBiblePreview()
-    fireEvent.click(screen.getByRole('button', { name: '重試' }))
-    expect(mockRetry).toHaveBeenCalled()
   })
 
   it('shows empty state when no verses', () => {

@@ -1,11 +1,13 @@
 import { Button, Card, ScrollShadow, Spinner, Separator } from '@heroui/react'
 import { useBibleStore } from '@renderer/stores/bible'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
+import { useBibleSearchStore } from '@renderer/stores/bible-search'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
-import { BIBLE_BOOKS, formatVerseReference } from '@shared/types/bible'
+import { formatVerseReference, getBookConfig } from '@renderer/lib/bible-utils'
 import type { MouseEvent } from 'react'
-import { useRef, useEffect } from 'react'
+import React, { useRef, useEffect } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 interface BiblePreviewProps {
   onContextMenu: (event: MouseEvent<HTMLButtonElement>) => void
@@ -18,10 +20,8 @@ export function BiblePreview({
   selectedVerseIndex,
   onSelectedVerseIndexChange
 }: BiblePreviewProps): React.JSX.Element {
+  const { t } = useTranslation()
   const {
-    isLoading,
-    error,
-    retry,
     currentPassage,
     getCurrentVerses,
     getCurrentBook,
@@ -35,17 +35,29 @@ export function BiblePreview({
   const { claimProjection, project } = useProjection()
   const verseRefs = useRef<Map<number, HTMLButtonElement>>(new Map())
 
+  const isSearchMode = useBibleSearchStore((s) => s.isSearchMode)
+  const isSearching = useBibleSearchStore((s) => s.isSearching)
+  const isIndexReady = useBibleSearchStore((s) => s.isIndexReady)
+  const searchResults = useBibleSearchStore((s) => s.results)
+  const searchQuery = useBibleSearchStore((s) => s.query)
+  const clearSearch = useBibleSearchStore((s) => s.clearSearch)
+
   const verses = getCurrentVerses()
   const book = getCurrentBook()
   const chapter = getCurrentChapter()
 
   const handleVerseClick = (verseIndex: number, verseNumber: number, verseText: string): void => {
     if (!book || !chapter) return
-    const reference = formatVerseReference(book.name, book.number, chapter.number, verseNumber)
+    const reference = formatVerseReference(t, book.number, chapter.number, verseNumber)
     claimProjection('bible', { unblank: true })
     project('bible:verse', { reference, text: verseText, fontSize })
     navigateTo({ bookNumber: book.number, chapter: chapter.number, verse: verseNumber })
     onSelectedVerseIndexChange(verseIndex)
+  }
+
+  const handleSearchResultClick = (bookNumber: number, chapterNum: number, verse: number): void => {
+    navigateTo({ bookNumber, chapter: chapterNum, verse })
+    clearSearch()
   }
 
   useEffect(() => {
@@ -59,25 +71,76 @@ export function BiblePreview({
     }
   }, [selectedVerseIndex, verses])
 
-  const revelation = BIBLE_BOOKS.find((b) => b.number === 66)
+  const revelation = getBookConfig(66)
   const isPrevDisabled = book?.number === 1 && chapter?.number === 1
   const isNextDisabled = book?.number === 66 && chapter?.number === revelation?.chapterCount
 
-  const renderContent = (): React.JSX.Element => {
-    if (isLoading) {
-      return (
-        <div className="flex h-full items-center justify-center">
-          <Spinner />
-        </div>
+  const renderHighlightedText = (text: string, keyword: string): React.ReactNode => {
+    if (!keyword.trim()) return text
+    const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const parts = text.split(new RegExp(`(${escaped})`, 'gi'))
+    let offset = 0
+    return parts.map((part) => {
+      const start = offset
+      offset += part.length
+      return part.toLowerCase() === keyword.toLowerCase() ? (
+        <mark key={start} className="bg-warning/40 text-inherit rounded-sm">
+          {part}
+        </mark>
+      ) : (
+        <React.Fragment key={start}>{part}</React.Fragment>
       )
+    })
+  }
+
+  const renderContent = (): React.JSX.Element => {
+    if (!currentPassage) {
+      return <div className="flex h-full items-center justify-center" />
     }
 
-    if (error) {
+    if (isSearchMode) {
+      if (isSearching || (!isIndexReady && searchQuery)) {
+        return (
+          <div className="flex h-full items-center justify-center">
+            <Spinner />
+          </div>
+        )
+      }
+
+      if (searchResults.length === 0) {
+        return (
+          <div className="flex h-full items-center justify-center">
+            <p className="text-default-400">無結果</p>
+          </div>
+        )
+      }
+
       return (
-        <div className="flex h-full flex-col items-center justify-center gap-4">
-          <p>{error}</p>
-          <Button onPress={retry}>重試</Button>
-        </div>
+        <ScrollShadow hideScrollBar className="h-full">
+          <div className="flex flex-col gap-1 p-4">
+            {searchResults.map((r) => {
+              const bookConfig = getBookConfig(r.bookNumber)
+              const bookAbbr = bookConfig
+                ? (t as (k: string) => string)(`bible.books.${bookConfig.code.toLowerCase()}.abbr`)
+                : String(r.bookNumber)
+              return (
+                <button
+                  key={r.verseId}
+                  type="button"
+                  onClick={() => handleSearchResultClick(r.bookNumber, r.chapter, r.verse)}
+                  className="w-full text-left rounded-md p-2 hover:bg-default-100 transition-colors"
+                >
+                  <div className="text-xs font-medium text-primary mb-0.5">
+                    {bookAbbr} {r.chapter}:{r.verse}
+                  </div>
+                  <div className="text-sm text-default-700">
+                    {renderHighlightedText(r.text, searchQuery)}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </ScrollShadow>
       )
     }
 
@@ -94,7 +157,7 @@ export function BiblePreview({
         <div className="flex flex-col gap-2 p-4">
           {verses.map((verse, index) => {
             const isSelected = index === selectedVerseIndex
-            const isProjected = currentPassage.verse === verse.number
+            const isProjected = currentPassage?.verse === verse.number
             return (
               <button
                 key={verse.number}
@@ -127,12 +190,20 @@ export function BiblePreview({
     )
   }
 
+  const bookName = book
+    ? (t as (k: string) => string)(
+        `bible.books.${getBookConfig(book.number)?.code.toLowerCase()}.name`
+      )
+    : ''
+
   return (
     <Card className="flex-1 h-full">
-      <div className="flex flex-row items-center justify-between p-4">
+      <div className="flex flex-row items-center justify-between">
         <h2 className="text-lg font-semibold">
-          {book?.name ?? ''}
-          {book && chapter ? ` 第 ${chapter.number} 章` : ''}
+          {bookName}
+          {book && chapter
+            ? ` ${chapter.number}${t(`bible.chapterUnit.${book.number === 19 ? 'psa' : 'default'}`)}`
+            : ''}
         </h2>
         <div className="flex items-center gap-2">
           <Button

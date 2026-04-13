@@ -38,7 +38,7 @@ export interface IpcInvokeMap {
   'timer:initialize': { args: [TimerSettings]; result: void }
   'timer:get-state': { args: []; result: TimerState & { stopwatch: StopwatchState } }
   'bible:get-versions': { args: []; result: BibleVersion[] }
-  'bible:get-content': { args: [string]; result: BibleBook[] }
+  'bible:get-content': { args: [number]; result: BibleBook[] }
 }
 
 export type IpcInvokeChannel = keyof IpcInvokeMap

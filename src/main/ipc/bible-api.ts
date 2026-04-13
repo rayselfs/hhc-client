@@ -2,26 +2,19 @@ import { ipcMain } from 'electron'
 import type { WindowManager } from '../windowManager'
 import { isMainWindow } from './validate'
 import type { BibleVersion, BibleBook } from '@shared/types/bible'
-
-const API_BASE = 'https://www.alive.org.tw/api/bible/v1'
+import { BIBLE_API } from '@shared/api-paths'
+import { http } from '../lib/http'
 
 async function fetchVersions(): Promise<BibleVersion[]> {
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 10_000)
-  try {
-    const response = await fetch(`${API_BASE}/versions`, { signal: controller.signal })
-    if (!response.ok) throw new Error(`HTTP ${response.status}`)
-    return (await response.json()) as BibleVersion[]
-  } finally {
-    clearTimeout(timeout)
-  }
+  const { data } = await http.get<BibleVersion[]>(BIBLE_API.versions)
+  return data
 }
 
-async function fetchContent(versionId: string): Promise<BibleBook[]> {
+async function fetchContent(versionId: number): Promise<BibleBook[]> {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 60_000)
   try {
-    const response = await fetch(`${API_BASE}/content/${versionId}`, {
+    const response = await fetch(BIBLE_API.content(versionId), {
       signal: controller.signal
     })
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
@@ -87,7 +80,7 @@ export function registerBibleApiHandlers(wm: WindowManager): void {
     return fetchVersions()
   })
 
-  ipcMain.handle('bible:get-content', async (event, versionId: string) => {
+  ipcMain.handle('bible:get-content', async (event, versionId: number) => {
     if (!isMainWindow(wm, event)) return []
     return fetchContent(versionId)
   })

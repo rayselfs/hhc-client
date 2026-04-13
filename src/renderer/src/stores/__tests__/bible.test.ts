@@ -40,7 +40,7 @@ import { useBibleStore } from '@renderer/stores/bible'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 import type { BibleBook, BibleVersion } from '@shared/types/bible'
 
-const VERSION_1: BibleVersion = { id: 'v1', code: 'KJV', name: 'King James', updatedAt: '2024' }
+const VERSION_1: BibleVersion = { id: 1, code: 'KJV', name: 'King James', updatedAt: 1765861998 }
 
 const makeBook = (number: number, chapterCount = 2, verseCount = 3): BibleBook => ({
   number,
@@ -69,7 +69,7 @@ const INITIAL_STATE = {
 
 beforeEach(() => {
   useBibleStore.setState(INITIAL_STATE)
-  useBibleSettingsStore.setState({ fontSize: 90, selectedVersionId: '' })
+  useBibleSettingsStore.setState({ fontSize: 90, selectedVersionId: 0 })
   mockFetchVersions.mockReset()
   mockFetchContent.mockReset()
   mockLoadBibleContent.mockReset()
@@ -164,11 +164,11 @@ describe('initialize()', () => {
     mockFetchVersions.mockResolvedValue([VERSION_1])
     mockLoadBibleContent.mockResolvedValue(undefined)
     mockFetchContent.mockResolvedValue([makeBook(1)])
-    useBibleSettingsStore.setState({ fontSize: 90, selectedVersionId: '' })
+    useBibleSettingsStore.setState({ fontSize: 90, selectedVersionId: 0 })
 
     await useBibleStore.getState().initialize()
 
-    expect(useBibleSettingsStore.getState().selectedVersionId).toBe('v1')
+    expect(useBibleSettingsStore.getState().selectedVersionId).toBe(1)
   })
 
   it('does not overwrite existing selectedVersionId in settings store', async () => {
@@ -176,11 +176,11 @@ describe('initialize()', () => {
     mockFetchVersions.mockResolvedValue([VERSION_1])
     mockLoadBibleContent.mockResolvedValue(undefined)
     mockFetchContent.mockResolvedValue([makeBook(1)])
-    useBibleSettingsStore.setState({ fontSize: 90, selectedVersionId: 'v1-existing' })
+    useBibleSettingsStore.setState({ fontSize: 90, selectedVersionId: 99 })
 
     await useBibleStore.getState().initialize()
 
-    expect(useBibleSettingsStore.getState().selectedVersionId).toBe('v1-existing')
+    expect(useBibleSettingsStore.getState().selectedVersionId).toBe(99)
   })
 })
 
@@ -189,10 +189,10 @@ describe('fetchVersionContent() — cache strategy', () => {
     const book = makeBook(1)
     mockLoadBibleContent.mockResolvedValue([book])
 
-    await useBibleStore.getState().fetchVersionContent('v1')
+    await useBibleStore.getState().fetchVersionContent(1)
 
     expect(mockFetchContent).not.toHaveBeenCalled()
-    expect(useBibleStore.getState().content.get('v1')).toEqual([book])
+    expect(useBibleStore.getState().content.get(1)).toEqual([book])
   })
 
   it('fetches from API when DB cache is empty (cache miss)', async () => {
@@ -200,19 +200,19 @@ describe('fetchVersionContent() — cache strategy', () => {
     mockLoadBibleContent.mockResolvedValue(undefined)
     mockFetchContent.mockResolvedValue([book])
 
-    await useBibleStore.getState().fetchVersionContent('v1')
+    await useBibleStore.getState().fetchVersionContent(1)
 
-    expect(mockFetchContent).toHaveBeenCalledWith('v1')
-    expect(mockSaveBibleContent).toHaveBeenCalledWith('v1', [book])
-    expect(useBibleStore.getState().content.get('v1')).toEqual([book])
+    expect(mockFetchContent).toHaveBeenCalledWith(1)
+    expect(mockSaveBibleContent).toHaveBeenCalledWith(1, [book])
+    expect(useBibleStore.getState().content.get(1)).toEqual([book])
   })
 
   it('skips fetch when content already in memory', async () => {
     const book = makeBook(1)
-    const existingContent = new Map([['v1', [book]]])
+    const existingContent = new Map([[1, [book]]])
     useBibleStore.setState({ content: existingContent })
 
-    await useBibleStore.getState().fetchVersionContent('v1')
+    await useBibleStore.getState().fetchVersionContent(1)
 
     expect(mockLoadBibleContent).not.toHaveBeenCalled()
     expect(mockFetchContent).not.toHaveBeenCalled()
@@ -222,7 +222,7 @@ describe('fetchVersionContent() — cache strategy', () => {
     mockLoadBibleContent.mockResolvedValue(undefined)
     mockFetchContent.mockRejectedValue(new Error('API down'))
 
-    await useBibleStore.getState().fetchVersionContent('v1')
+    await useBibleStore.getState().fetchVersionContent(1)
 
     const s = useBibleStore.getState()
     expect(s.error).toBe('API down')
@@ -239,8 +239,8 @@ describe('request deduplication', () => {
     mockLoadBibleContent.mockResolvedValue(undefined)
     mockFetchContent.mockReturnValueOnce(firstFetch)
 
-    const p1 = useBibleStore.getState().fetchVersionContent('v1')
-    const p2 = useBibleStore.getState().fetchVersionContent('v1')
+    const p1 = useBibleStore.getState().fetchVersionContent(1)
+    const p2 = useBibleStore.getState().fetchVersionContent(1)
 
     resolveFirst([makeBook(1)])
     await Promise.all([p1, p2])
@@ -330,7 +330,7 @@ describe('getCurrentBook() / getCurrentChapter() / getCurrentVerses()', () => {
     const book = makeBook(1, 3, 5)
     useBibleStore.setState({
       versions: [VERSION_1],
-      content: new Map([['v1', [book]]]),
+      content: new Map([[1, [book]]]),
       currentPassage: { bookNumber: 1, chapter: 2, verse: 1 }
     })
 

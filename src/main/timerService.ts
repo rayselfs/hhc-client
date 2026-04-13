@@ -136,7 +136,7 @@ export class TimerService {
   private broadcast(): void {
     const payload = this.buildTickPayload()
     BrowserWindow.getAllWindows().forEach((win) => {
-      if (!win.isDestroyed()) {
+      if (!win.isDestroyed() && !win.webContents.isDestroyed()) {
         win.webContents.send('timer-tick', payload)
       }
     })

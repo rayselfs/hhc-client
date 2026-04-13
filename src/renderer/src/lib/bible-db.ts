@@ -14,10 +14,10 @@ interface BibleBookDB {
 }
 
 interface BibleVersionDB {
-  id: string
+  id: number
   code: string
   name: string
-  updatedAt: string
+  updatedAt: number
 }
 
 interface FolderDB {
@@ -30,38 +30,56 @@ interface FolderDB {
   sortIndex?: number
 }
 
+interface FlexSearchCacheDB {
+  chunks: { key: string; data: string }[]
+  updatedAt: number
+}
+
 interface BibleDBSchema extends DBSchema {
   content: {
-    key: string
+    key: number
     value: BibleBookDB[]
   }
   versions: {
-    key: string
-    value: BibleVersionDB[]
+    key: number
+    value: BibleVersionDB
   }
   folders: {
     key: string
     value: FolderDB[]
   }
+  flexsearch: {
+    key: number
+    value: FlexSearchCacheDB
+  }
 }
+
+const bibleDBPromise: Promise<IDBPDatabase<BibleDBSchema>> = openDB<BibleDBSchema>('hhc-bible', 4, {
+  upgrade(db, oldVersion) {
+    if (oldVersion < 1) {
+      db.createObjectStore('content')
+      db.createObjectStore('versions')
+      db.createObjectStore('folders')
+    }
+    if (oldVersion < 2) {
+      db.createObjectStore('flexsearch')
+    }
+    if (oldVersion < 3) {
+      db.deleteObjectStore('versions')
+      db.createObjectStore('versions')
+    }
+    if (oldVersion < 4) {
+      db.deleteObjectStore('flexsearch')
+      db.createObjectStore('flexsearch')
+    }
+  }
+})
 
 export async function openBibleDB(): Promise<IDBPDatabase<BibleDBSchema>> {
-  return openDB<BibleDBSchema>('hhc-bible', 1, {
-    upgrade(db) {
-      if (!db.objectStoreNames.contains('content')) {
-        db.createObjectStore('content')
-      }
-      if (!db.objectStoreNames.contains('versions')) {
-        db.createObjectStore('versions')
-      }
-      if (!db.objectStoreNames.contains('folders')) {
-        db.createObjectStore('folders')
-      }
-    }
-  })
+  return bibleDBPromise
 }
 
-export async function saveBibleContent(versionId: string, content: BibleBookDB[]): Promise<void> {
+export async function saveBibleContent(versionId: number, content: BibleBookDB[]): Promise<void> {
   try {
     const db = await openBibleDB()
     await db.put('content', content, versionId)
@@ -70,7 +88,7 @@ export async function saveBibleContent(versionId: string, content: BibleBookDB[]
   }
 }
 
-export async function loadBibleContent(versionId: string): Promise<BibleBookDB[] | undefined> {
+export async function loadBibleContent(versionId: number): Promise<BibleBookDB[] | undefined> {
   try {
     const db = await openBibleDB()
     return await db.get('content', versionId)
@@ -83,7 +101,7 @@ export async function loadBibleContent(versionId: string): Promise<BibleBookDB[]
 export async function saveBibleVersionMeta(versions: BibleVersionDB[]): Promise<void> {
   try {
     const db = await openBibleDB()
-    await db.put('versions', versions, 'versions')
+    await Promise.all(versions.map((v) => db.put('versions', v, v.id)))
   } catch (error) {
     console.error('[bible-db] Failed to save version metadata:', error)
   }
@@ -92,14 +110,15 @@ export async function saveBibleVersionMeta(versions: BibleVersionDB[]): Promise<
 export async function loadBibleVersionMeta(): Promise<BibleVersionDB[] | undefined> {
   try {
     const db = await openBibleDB()
-    return await db.get('versions', 'versions')
+    const all = await db.getAll('versions')
+    return all.length > 0 ? all : undefined
   } catch (error) {
     console.error('[bible-db] Failed to load version metadata:', error)
     return undefined
   }
 }
 
-export async function clearBibleContent(versionId?: string): Promise<void> {
+export async function clearBibleContent(versionId?: number): Promise<void> {
   try {
     const db = await openBibleDB()
     if (versionId) {
@@ -128,5 +147,46 @@ export async function loadFolderTree(rootId: string): Promise<FolderDB[] | undef
   } catch (error) {
     console.error('[bible-db] Failed to load folder tree:', error)
     return undefined
+  }
+}
+
+export async function saveFlexSearchCache(
+  versionId: number,
+  updatedAt: number,
+  chunks: { key: string; data: string }[]
+): Promise<void> {
+  try {
+    const db = await openBibleDB()
+    await db.put('flexsearch', { chunks, updatedAt }, versionId)
+  } catch (error) {
+    console.error('[bible-db] Failed to save flexsearch cache:', error)
+  }
+}
+
+export async function loadFlexSearchCache(
+  versionId: number,
+  updatedAt: number
+): Promise<{ key: string; data: string }[] | undefined> {
+  try {
+    const db = await openBibleDB()
+    const record = await db.get('flexsearch', versionId)
+    if (!record || record.updatedAt !== updatedAt) return undefined
+    return record.chunks
+  } catch (error) {
+    console.error('[bible-db] Failed to load flexsearch cache:', error)
+    return undefined
+  }
+}
+
+export async function clearFlexSearchCache(versionId?: number): Promise<void> {
+  try {
+    const db = await openBibleDB()
+    if (versionId) {
+      await db.delete('flexsearch', versionId)
+    } else {
+      await db.clear('flexsearch')
+    }
+  } catch (error) {
+    console.error('[bible-db] Failed to clear flexsearch cache:', error)
   }
 }

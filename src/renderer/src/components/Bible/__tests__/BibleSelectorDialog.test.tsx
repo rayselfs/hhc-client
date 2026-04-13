@@ -4,16 +4,54 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import type { BiblePassage } from '@shared/types/bible'
 import { BibleSelectorDialog } from '../BibleSelectorDialog'
 
-const mockGetCurrentChapter = vi.fn(() => ({
-  number: 1,
-  verses: Array.from({ length: 30 }, (_, i) => ({ id: i + 1, number: i + 1, text: '' }))
-}))
-
 vi.mock('@renderer/stores/bible', () => ({
   useBibleStore: Object.assign(vi.fn(), {
     getState: () => ({
-      getCurrentChapter: mockGetCurrentChapter
+      content: new Map([
+        [
+          1,
+          [
+            {
+              number: 1,
+              chapters: [
+                {
+                  number: 1,
+                  verses: Array.from({ length: 30 }, (_, i) => ({
+                    id: i + 1,
+                    number: i + 1,
+                    text: ''
+                  }))
+                }
+              ]
+            }
+          ]
+        ]
+      ])
     })
+  })
+}))
+
+vi.mock('@renderer/stores/bible-settings', () => ({
+  useBibleSettingsStore: Object.assign(vi.fn(), {
+    getState: () => ({ selectedVersionId: 1 })
+  })
+}))
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string) => {
+      const map: Record<string, string> = {
+        'bible.selector.title': 'Select Passage',
+        'bible.selector.book': '書卷',
+        'bible.selector.chapter': '章',
+        'bible.selector.verse': '節',
+        'bible.selector.oldTestament': '舊約',
+        'bible.selector.newTestament': '新約',
+        'bible.books.gen.name': '創世記',
+        'bible.books.mat.name': '馬太福音'
+      }
+      return map[key] ?? key
+    }
   })
 }))
 
@@ -21,37 +59,15 @@ vi.mock('@heroui/react', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@heroui/react')>()
   return {
     ...actual,
-    Modal: Object.assign(
-      ({ isOpen, children }: { isOpen: boolean; children: React.ReactNode }) =>
+    Modal: Object.assign(vi.fn(), {
+      Backdrop: ({ isOpen, children }: { isOpen: boolean; children: React.ReactNode }) =>
         isOpen ? <div role="dialog">{children}</div> : null,
-      {
-        Backdrop: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-        Container: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-        Dialog: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-        Header: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-        Body: ({ children }: { children: React.ReactNode }) => <div>{children}</div>
-      }
-    ),
-    Breadcrumbs: Object.assign(
-      ({ children }: { children: React.ReactNode }) => (
-        <nav aria-label="breadcrumbs">{children}</nav>
-      ),
-      {
-        Item: ({
-          children,
-          onPress,
-          isDisabled
-        }: {
-          children: React.ReactNode
-          onPress?: () => void
-          isDisabled?: boolean
-        }) => (
-          <button type="button" onClick={onPress} disabled={isDisabled}>
-            {children}
-          </button>
-        )
-      }
-    ),
+      Container: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+      Dialog: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+      Header: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+      Body: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+      CloseTrigger: () => null
+    }),
     ButtonGroup: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
     Separator: () => <hr />
   }
@@ -143,7 +159,7 @@ describe('BibleSelectorDialog', () => {
     renderDialog()
     await user.click(screen.getByRole('button', { name: '創世記' }))
     await user.click(screen.getByRole('button', { name: '1' }))
-    const breadcrumbNav = screen.getByRole('navigation', { name: 'breadcrumbs' })
+    const breadcrumbNav = document.querySelector('nav')!
     const breadcrumbButtons = breadcrumbNav.querySelectorAll('button')
     fireEvent.click(breadcrumbButtons[0])
     expect(screen.getAllByRole('button', { name: '創世記' }).length).toBeGreaterThanOrEqual(1)

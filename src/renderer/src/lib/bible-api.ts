@@ -1,5 +1,7 @@
 import type { BibleBook, BibleVersion } from '@shared/types/bible'
+import { BIBLE_API } from '@shared/api-paths'
 import { isElectron } from './env'
+import { http } from './http'
 
 export type BibleApiErrorType = 'timeout' | 'network' | 'parse'
 
@@ -15,7 +17,7 @@ export class BibleApiError extends Error {
 
 export interface BibleApiAdapter {
   fetchVersions(): Promise<BibleVersion[]>
-  fetchContent(versionId: string): Promise<BibleBook[]>
+  fetchContent(versionId: number): Promise<BibleBook[]>
 }
 
 interface SseStartEvent {
@@ -153,7 +155,7 @@ export class ElectronBibleApiAdapter implements BibleApiAdapter {
     return window.api.bible.getVersions()
   }
 
-  async fetchContent(versionId: string): Promise<BibleBook[]> {
+  async fetchContent(versionId: number): Promise<BibleBook[]> {
     const books = await window.api.bible.getContent(versionId)
     return sortBooks(books)
   }
@@ -166,32 +168,23 @@ export class BrowserBibleApiAdapter implements BibleApiAdapter {
     return this.withRetry(() => this.doFetchVersions())
   }
 
-  async fetchContent(versionId: string): Promise<BibleBook[]> {
+  async fetchContent(versionId: number): Promise<BibleBook[]> {
     return this.withRetry(() => this.doFetchContent(versionId))
   }
 
   private async doFetchVersions(): Promise<BibleVersion[]> {
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS)
-
     try {
-      const response = await fetch('/api/bible/v1/versions', { signal: controller.signal })
-      if (!response.ok) {
-        throw new BibleApiError('network', `HTTP ${response.status}: ${response.statusText}`)
-      }
-      return (await response.json()) as BibleVersion[]
+      const { data } = await http.get<BibleVersion[]>(BIBLE_API.versions)
+      return data
     } catch (error) {
-      if (error instanceof BibleApiError) throw error
-      if (error instanceof DOMException && error.name === 'AbortError') {
-        throw new BibleApiError('timeout', 'Request timed out after 30s')
+      if (error instanceof Error) {
+        throw new BibleApiError('network', error.message)
       }
-      throw new BibleApiError('network', error instanceof Error ? error.message : String(error))
-    } finally {
-      clearTimeout(timeoutId)
+      throw new BibleApiError('network', String(error))
     }
   }
 
-  private async doFetchContent(versionId: string): Promise<BibleBook[]> {
+  private async doFetchContent(versionId: number): Promise<BibleBook[]> {
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS)
 

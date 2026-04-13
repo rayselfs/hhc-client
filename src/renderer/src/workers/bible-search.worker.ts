@@ -1,39 +1,36 @@
 import { Index } from 'flexsearch'
 import init, { cut } from 'jieba-wasm'
 
-// ─── Message Protocol ──────────────────────────────────────────────────────
-
 export type WorkerIncomingMessage =
   | { type: 'INIT' }
   | { type: 'BUILD_INDEX'; verses: { id: number; text: string }[] }
+  | { type: 'LOAD_INDEX'; chunks: { key: string; data: string }[] }
+  | { type: 'EXPORT_INDEX' }
   | { type: 'SEARCH'; query: string; limit?: number; id: number }
   | { type: 'GET_PROGRESS'; id: number }
 
 export type WorkerOutgoingMessage =
   | { type: 'READY' }
   | { type: 'INDEX_COMPLETE'; total: number }
+  | { type: 'INDEX_LOADED' }
+  | { type: 'INDEX_EXPORTED'; chunks: { key: string; data: string }[] }
   | { type: 'PROGRESS'; indexed: number; total: number }
   | { type: 'SEARCH_RESULT'; id: number; results: number[] }
   | { type: 'PROGRESS_RESULT'; id: number; indexed: number; total: number }
   | { type: 'ERROR'; message: string }
 
-// ─── State ─────────────────────────────────────────────────────────────────
-
 const BATCH_SIZE = 1000
 
 let flexIndex: Index | null = null
-let jiebaReady = false
 let indexed = 0
 let total = 0
 
-// ─── Jieba encoder for FlexSearch ──────────────────────────────────────────
+let jiebaReady = false
 
 function jiebaEncode(text: string): string[] {
   if (!jiebaReady) return text.split('')
   return cut(text, true)
 }
-
-// ─── Handlers ──────────────────────────────────────────────────────────────
 
 async function handleInit(): Promise<void> {
   try {
@@ -74,6 +71,38 @@ async function handleBuildIndex(verses: { id: number; text: string }[]): Promise
   self.postMessage({ type: 'INDEX_COMPLETE', total } satisfies WorkerOutgoingMessage)
 }
 
+function handleLoadIndex(chunks: { key: string; data: string }[]): void {
+  if (!flexIndex) {
+    self.postMessage({
+      type: 'ERROR',
+      message: 'Index not initialized'
+    } satisfies WorkerOutgoingMessage)
+    return
+  }
+
+  flexIndex.clear()
+  for (const chunk of chunks) {
+    flexIndex.import(chunk.key, chunk.data)
+  }
+  self.postMessage({ type: 'INDEX_LOADED' } satisfies WorkerOutgoingMessage)
+}
+
+async function handleExportIndex(): Promise<void> {
+  if (!flexIndex) {
+    self.postMessage({
+      type: 'ERROR',
+      message: 'Index not initialized'
+    } satisfies WorkerOutgoingMessage)
+    return
+  }
+
+  const chunks: { key: string; data: string }[] = []
+  await flexIndex.export((key: string, data: string) => {
+    if (data) chunks.push({ key, data })
+  })
+  self.postMessage({ type: 'INDEX_EXPORTED', chunks } satisfies WorkerOutgoingMessage)
+}
+
 function handleSearch(query: string, limit: number, id: number): void {
   if (!flexIndex) {
     self.postMessage({
@@ -99,8 +128,6 @@ function handleGetProgress(id: number): void {
   } satisfies WorkerOutgoingMessage)
 }
 
-// ─── Message Handler ───────────────────────────────────────────────────────
-
 self.onmessage = (event: MessageEvent<WorkerIncomingMessage>) => {
   const { data } = event
   switch (data.type) {
@@ -112,6 +139,15 @@ self.onmessage = (event: MessageEvent<WorkerIncomingMessage>) => {
       break
     case 'BUILD_INDEX':
       handleBuildIndex(data.verses).catch((e) => {
+        const message = e instanceof Error ? e.message : String(e)
+        self.postMessage({ type: 'ERROR', message } satisfies WorkerOutgoingMessage)
+      })
+      break
+    case 'LOAD_INDEX':
+      handleLoadIndex(data.chunks)
+      break
+    case 'EXPORT_INDEX':
+      handleExportIndex().catch((e) => {
         const message = e instanceof Error ? e.message : String(e)
         self.postMessage({ type: 'ERROR', message } satisfies WorkerOutgoingMessage)
       })

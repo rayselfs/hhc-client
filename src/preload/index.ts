@@ -60,7 +60,7 @@ const timerApi = {
 
 const bibleApi = {
   getVersions: () => typedInvoke('bible:get-versions'),
-  getContent: (versionId: string) => typedInvoke('bible:get-content', versionId)
+  getContent: (versionId: number) => typedInvoke('bible:get-content', versionId)
 }
 
 const api = { projection: projectionApi, theme: themeApi, timer: timerApi, bible: bibleApi }

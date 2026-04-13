@@ -15,7 +15,7 @@ vi.mock('@renderer/lib/persist-storage', () => ({
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 
 beforeEach(() => {
-  useBibleSettingsStore.setState({ fontSize: 90, selectedVersionId: '' })
+  useBibleSettingsStore.setState({ fontSize: 90, selectedVersionId: 0 })
 })
 
 describe('initial state', () => {
@@ -23,8 +23,8 @@ describe('initial state', () => {
     expect(useBibleSettingsStore.getState().fontSize).toBe(90)
   })
 
-  it('starts with empty selectedVersionId', () => {
-    expect(useBibleSettingsStore.getState().selectedVersionId).toBe('')
+  it('starts with selectedVersionId of 0', () => {
+    expect(useBibleSettingsStore.getState().selectedVersionId).toBe(0)
   })
 })
 
@@ -47,14 +47,14 @@ describe('setFontSize()', () => {
 
 describe('setSelectedVersionId()', () => {
   it('updates selectedVersionId', () => {
-    useBibleSettingsStore.getState().setSelectedVersionId('v1')
-    expect(useBibleSettingsStore.getState().selectedVersionId).toBe('v1')
+    useBibleSettingsStore.getState().setSelectedVersionId(1)
+    expect(useBibleSettingsStore.getState().selectedVersionId).toBe(1)
   })
 
   it('can update to a different id', () => {
-    useBibleSettingsStore.getState().setSelectedVersionId('v1')
-    useBibleSettingsStore.getState().setSelectedVersionId('v2')
-    expect(useBibleSettingsStore.getState().selectedVersionId).toBe('v2')
+    useBibleSettingsStore.getState().setSelectedVersionId(1)
+    useBibleSettingsStore.getState().setSelectedVersionId(2)
+    expect(useBibleSettingsStore.getState().selectedVersionId).toBe(2)
   })
 })
 
@@ -77,7 +77,7 @@ describe('persistence round-trip', () => {
       length: 0,
       key: (index: number) => Object.keys(localStorageMock)[index] ?? null
     })
-    useBibleSettingsStore.setState({ fontSize: 90, selectedVersionId: '' })
+    useBibleSettingsStore.setState({ fontSize: 90, selectedVersionId: 0 })
   })
 
   afterEach(() => {
@@ -94,22 +94,22 @@ describe('persistence round-trip', () => {
   })
 
   it('persists selectedVersionId to localStorage', () => {
-    useBibleSettingsStore.getState().setSelectedVersionId('kjv')
+    useBibleSettingsStore.getState().setSelectedVersionId(3)
     const raw = localStorage.getItem('hhc-bible-settings')
     expect(raw).toBeTruthy()
     const parsed = JSON.parse(raw!)
-    expect(parsed.state.selectedVersionId).toBe('kjv')
+    expect(parsed.state.selectedVersionId).toBe(3)
   })
 
   it('restores fontSize and selectedVersionId on rehydrate', () => {
     localStorageMock['hhc-bible-settings'] = JSON.stringify({
-      state: { fontSize: 140, selectedVersionId: 'niv' },
+      state: { fontSize: 140, selectedVersionId: 5 },
       version: 0
     })
     useBibleSettingsStore.persist.rehydrate()
     const s = useBibleSettingsStore.getState()
     expect(s.fontSize).toBe(140)
-    expect(s.selectedVersionId).toBe('niv')
+    expect(s.selectedVersionId).toBe(5)
   })
 
   it('keeps current state when key missing from localStorage', () => {
@@ -117,6 +117,6 @@ describe('persistence round-trip', () => {
     useBibleSettingsStore.persist.rehydrate()
     const s = useBibleSettingsStore.getState()
     expect(s.fontSize).toBe(90)
-    expect(s.selectedVersionId).toBe('')
+    expect(s.selectedVersionId).toBe(0)
   })
 })

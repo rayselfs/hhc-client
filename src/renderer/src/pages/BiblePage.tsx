@@ -10,13 +10,13 @@ import type { VerseMenuData } from '@renderer/components/Bible/useBibleContextMe
 import { useProjection } from '@renderer/contexts/ProjectionContext'
 import { useKeyboardShortcuts } from '@renderer/hooks/useKeyboardShortcuts'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
-import { formatVerseReference } from '@shared/types/bible'
+import { formatVerseReference } from '@renderer/lib/bible-utils'
 import type { BiblePassage } from '@shared/types/bible'
+import { useTranslation } from 'react-i18next'
 
 export default function BiblePage(): React.JSX.Element {
+  const { t } = useTranslation()
   const {
-    isInitialized,
-    initialize,
     getCurrentVerses,
     getCurrentBook,
     getCurrentChapter,
@@ -38,13 +38,10 @@ export default function BiblePage(): React.JSX.Element {
   })
 
   useEffect(() => {
-    if (!isInitialized) {
-      initialize()
-    }
     if (!isLoading) {
       initializeFolderStore()
     }
-  }, [isInitialized, initialize, isLoading, initializeFolderStore])
+  }, [isLoading, initializeFolderStore])
 
   useEffect(() => {
     const handler = (): void => setSelectorOpen(true)
@@ -52,8 +49,8 @@ export default function BiblePage(): React.JSX.Element {
     return () => window.removeEventListener('open-bible-selector', handler)
   }, [])
 
-  const bookNumber = useBibleStore((s) => s.currentPassage.bookNumber)
-  const chapterNumber = useBibleStore((s) => s.currentPassage.chapter)
+  const bookNumber = useBibleStore((s) => s.currentPassage?.bookNumber)
+  const chapterNumber = useBibleStore((s) => s.currentPassage?.chapter)
   useEffect(() => {
     const id = requestAnimationFrame(() => setSelectedVerseIndex(0))
     return () => cancelAnimationFrame(id)
@@ -71,13 +68,14 @@ export default function BiblePage(): React.JSX.Element {
       const chapter = getCurrentChapter()
       if (!book || !chapter) return
 
-      const reference = formatVerseReference(book.name, book.number, chapter.number, verse.number)
+      const reference = formatVerseReference(t, book.number, chapter.number, verse.number)
       claimProjection('bible', { unblank: true })
       project('bible:verse', { reference, text: verse.text, fontSize })
       navigateTo({ bookNumber: book.number, chapter: chapter.number, verse: verse.number })
       setSelectedVerseIndex(clamped)
     },
     [
+      t,
       getCurrentVerses,
       getCurrentBook,
       getCurrentChapter,
@@ -191,7 +189,7 @@ export default function BiblePage(): React.JSX.Element {
   }
 
   return (
-    <div data-testid="bible-page" className="flex flex-row gap-4 h-full p-4">
+    <div data-testid="bible-page" className="flex flex-row gap-4 h-full">
       <BiblePreview
         onContextMenu={handleContextMenu}
         selectedVerseIndex={selectedVerseIndex}

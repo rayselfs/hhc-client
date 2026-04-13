@@ -58,9 +58,10 @@ describe('BrowserBibleApiAdapter', () => {
   })
 
   describe('fetchVersions', () => {
-    it('fetches from /api/bible/v1/versions and returns JSON array', async () => {
-      const versions: BibleVersion[] = [
-        { id: '1', code: 'CUV', name: '和合本', updatedAt: '2024-01-01' }
+    it('fetches from /api/bible/v1/versions, maps raw fields, and returns BibleVersion[]', async () => {
+      const raw = [{ id: 1, code: 'CUV', name: '和合本', updated_at: 1765861998 }]
+      const expected: BibleVersion[] = [
+        { id: 1, code: 'CUV', name: '和合本', updatedAt: 1765861998 }
       ]
       vi.stubGlobal(
         'fetch',
@@ -68,12 +69,12 @@ describe('BrowserBibleApiAdapter', () => {
           ok: true,
           status: 200,
           statusText: 'OK',
-          json: vi.fn().mockResolvedValue(versions)
+          json: vi.fn().mockResolvedValue(raw)
         })
       )
 
       const result = await adapter.fetchVersions()
-      expect(result).toEqual(versions)
+      expect(result).toEqual(expected)
       expect(fetch).toHaveBeenCalledWith(
         '/api/bible/v1/versions',
         expect.objectContaining({ signal: expect.any(AbortSignal) })
@@ -123,7 +124,7 @@ describe('BrowserBibleApiAdapter', () => {
 
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue(makeMockResponse(stream)))
 
-      const books = await adapter.fetchContent('CUV')
+      const books = await adapter.fetchContent(1)
       expect(books).toHaveLength(2)
       expect(books[0].number).toBe(1)
       expect(books[0].name).toBe('Genesis')
@@ -141,7 +142,7 @@ describe('BrowserBibleApiAdapter', () => {
 
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue(makeMockResponse(stream)))
 
-      const books = await adapter.fetchContent('CUV')
+      const books = await adapter.fetchContent(1)
       expect(books).toHaveLength(1)
       expect(books[0].name).toBe('Genesis')
     })
@@ -158,7 +159,7 @@ describe('BrowserBibleApiAdapter', () => {
         vi.fn().mockImplementation(() => Promise.resolve(makeMockResponse(makeStream())))
       )
 
-      await expect(adapter.fetchContent('CUV')).rejects.toMatchObject({
+      await expect(adapter.fetchContent(1)).rejects.toMatchObject({
         type: 'network',
         message: 'Server blew up'
       })
@@ -173,7 +174,7 @@ describe('BrowserBibleApiAdapter', () => {
         vi.fn().mockImplementation(() => Promise.resolve(makeMockResponse(makeStream())))
       )
 
-      await expect(adapter.fetchContent('CUV')).rejects.toMatchObject({
+      await expect(adapter.fetchContent(1)).rejects.toMatchObject({
         type: 'timeout'
       })
     })
@@ -189,7 +190,7 @@ describe('BrowserBibleApiAdapter', () => {
       const stream = makeSseStream([chunk1, chunk2])
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue(makeMockResponse(stream)))
 
-      const books = await adapter.fetchContent('CUV')
+      const books = await adapter.fetchContent(1)
       expect(books).toHaveLength(1)
       expect(books[0].name).toBe('Genesis')
     })
@@ -206,7 +207,7 @@ describe('BrowserBibleApiAdapter', () => {
         })
       )
 
-      await expect(adapter.fetchContent('CUV')).rejects.toMatchObject({
+      await expect(adapter.fetchContent(1)).rejects.toMatchObject({
         type: 'network'
       })
     })
@@ -231,7 +232,7 @@ describe('BrowserBibleApiAdapter', () => {
 
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue(makeMockResponse(stream)))
 
-      const books = await adapter.fetchContent('CUV')
+      const books = await adapter.fetchContent(1)
       expect(books[0].chapters[0].number).toBe(1)
       expect(books[0].chapters[1].number).toBe(2)
       expect(books[0].chapters[2].number).toBe(3)
@@ -271,9 +272,7 @@ describe('ElectronBibleApiAdapter', () => {
   })
 
   it('fetchVersions delegates to window.api.bible.getVersions', async () => {
-    const versions: BibleVersion[] = [
-      { id: '1', code: 'CUV', name: '和合本', updatedAt: '2024-01-01' }
-    ]
+    const versions: BibleVersion[] = [{ id: 1, code: 'CUV', name: '和合本', updatedAt: 1765861998 }]
     mockGetVersions.mockResolvedValue(versions)
 
     const result = await adapter.fetchVersions()
@@ -287,8 +286,8 @@ describe('ElectronBibleApiAdapter', () => {
     ]
     mockGetContent.mockResolvedValue(books)
 
-    const result = await adapter.fetchContent('CUV')
-    expect(mockGetContent).toHaveBeenCalledWith('CUV')
+    const result = await adapter.fetchContent(1)
+    expect(mockGetContent).toHaveBeenCalledWith(1)
     expect(result).toEqual(books)
   })
 
@@ -300,7 +299,7 @@ describe('ElectronBibleApiAdapter', () => {
     ]
     mockGetContent.mockResolvedValue(books)
 
-    const result = await adapter.fetchContent('CUV')
+    const result = await adapter.fetchContent(1)
     expect(result[0].number).toBe(1)
     expect(result[1].number).toBe(2)
     expect(result[2].number).toBe(3)
