@@ -76,6 +76,7 @@
     },
     "selector": {
       "title": "Select Passage",
+      "selectVersion": "Select Bible version",
       "book": "Book",
       "chapter": "Chapter",
       "verse": "Verse",

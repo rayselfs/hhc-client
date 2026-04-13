@@ -49,11 +49,12 @@ export default function BibleSelector({ onOpenDialog }: BibleSelectorProps): Rea
       <Select
         value={effectiveValue}
         onChange={handleChange}
-        aria-label="Select Bible version"
+        aria-label={t('bible.selector.selectVersion')}
         isDisabled={busy}
+        className="w-44"
       >
-        <Select.Trigger>
-          <Select.Value />
+        <Select.Trigger className="rounded-full h-10 items-center">
+          <Select.Value className="justify-center flex" />
           <Select.Indicator />
         </Select.Trigger>
         <Select.Popover>
@@ -67,7 +68,7 @@ export default function BibleSelector({ onOpenDialog }: BibleSelectorProps): Rea
           </ListBox>
         </Select.Popover>
       </Select>
-      <Button size="sm" isIconOnly onPress={onOpenDialog} isDisabled={busy}>
+      <Button isIconOnly onPress={onOpenDialog} isDisabled={busy} variant="tertiary">
         {busy ? <Spinner size="sm" /> : '📖'}
       </Button>
     </div>

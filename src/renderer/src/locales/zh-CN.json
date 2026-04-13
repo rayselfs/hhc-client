@@ -76,6 +76,7 @@
     },
     "selector": {
       "title": "选择经文",
+      "selectVersion": "选择圣经版本",
       "book": "书卷",
       "chapter": "章",
       "verse": "节",

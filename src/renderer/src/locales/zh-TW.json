@@ -76,6 +76,7 @@
     },
     "selector": {
       "title": "選擇經文",
+      "selectVersion": "選擇聖經版本",
       "book": "書卷",
       "chapter": "章",
       "verse": "節",
