@@ -13,19 +13,9 @@ import { MAX_DURATION_SECONDS } from '@shared/constants/timer'
 import { hhcPersistStorage, createKey } from '@renderer/lib/persist-storage'
 
 const DEFAULT_PRESETS: TimerPreset[] = [
-  {
-    id: '019d7109-f7bf-70ef-a9de-a212faff78b9',
-    name: '10:00',
-    durationSeconds: 600,
-    mode: 'timer'
-  },
-  {
-    id: '019d7109-f7c1-705d-a343-119e8d9b9bff',
-    name: '05:00',
-    durationSeconds: 300,
-    mode: 'timer'
-  },
-  { id: '019d7109-f7c1-705d-a343-16da950eba1d', name: '03:00', durationSeconds: 180, mode: 'timer' }
+  { id: uuidv7(), name: '10:00', durationSeconds: 600, mode: 'timer' },
+  { id: uuidv7(), name: '05:00', durationSeconds: 300, mode: 'timer' },
+  { id: uuidv7(), name: '03:00', durationSeconds: 180, mode: 'timer' }
 ]
 
 export interface TimerStore {
