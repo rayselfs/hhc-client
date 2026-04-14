@@ -103,28 +103,25 @@ export default function SettingsPopover({ mode }: SettingsPopoverProps): React.J
         <Popover.Dialog>
           <section aria-label={t('timer.settings')} className="space-y-3 p-1">
             {isBibleMode ? (
-              <div className="space-y-2">
-                <Slider
-                  defaultValue={fontSize}
-                  minValue={20}
-                  maxValue={150}
-                  step={1}
-                  onChange={(value) => {
-                    if (typeof value === 'number') {
-                      setFontSize(value)
-                    }
-                  }}
-                  className="w-full"
-                >
-                  <Label>{t('bible.settings.fontSize')}</Label>
-                  <Slider.Output className="text-sm text-muted-fg" />
-                  <Slider.Track className="h-2 rounded-full bg-surface-secondary">
-                    <Slider.Fill className="bg-accent" />
-                    <Slider.Thumb className="size-4 rounded-full bg-accent" />
-                  </Slider.Track>
-                </Slider>
-                <div className="text-xs text-muted-fg text-center">{fontSize}px</div>
-              </div>
+              <Slider
+                defaultValue={fontSize}
+                minValue={20}
+                maxValue={150}
+                step={1}
+                onChange={(value) => {
+                  if (typeof value === 'number') {
+                    setFontSize(value)
+                  }
+                }}
+                className="w-full"
+              >
+                <Label>{t('bible.settings.fontSize')}</Label>
+                <Slider.Output className="text-sm text-muted-fg" />
+                <Slider.Track className="mt-3 h-2 rounded-full bg-surface-secondary">
+                  <Slider.Fill className="bg-accent" />
+                  <Slider.Thumb className="size-4 rounded-full bg-accent" />
+                </Slider.Track>
+              </Slider>
             ) : isStopwatch ? (
               <div className="flex items-center gap-3 min-h-10">
                 <Switch

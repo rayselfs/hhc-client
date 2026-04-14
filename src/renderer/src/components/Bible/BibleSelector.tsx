@@ -53,14 +53,19 @@ export default function BibleSelector({ onOpenDialog }: BibleSelectorProps): Rea
         isDisabled={busy}
         className="w-44"
       >
-        <Select.Trigger className="rounded-full h-10 items-center">
+        <Select.Trigger className="rounded-full h-10 items-center bg-transparent border border-border">
           <Select.Value className="justify-center flex" />
           <Select.Indicator />
         </Select.Trigger>
         <Select.Popover>
           <ListBox>
             {versions.map((v) => (
-              <ListBox.Item key={v.id} id={v.id} textValue={v.name}>
+              <ListBox.Item
+                key={v.id}
+                id={v.id}
+                textValue={v.name}
+                className="data-[hovered]:bg-accent data-[hovered]:text-accent-fg"
+              >
                 {v.name}
                 <ListBox.ItemIndicator />
               </ListBox.Item>
@@ -68,7 +73,7 @@ export default function BibleSelector({ onOpenDialog }: BibleSelectorProps): Rea
           </ListBox>
         </Select.Popover>
       </Select>
-      <Button isIconOnly onPress={onOpenDialog} isDisabled={busy} variant="tertiary">
+      <Button isIconOnly onPress={onOpenDialog} isDisabled={busy} variant="outline">
         {busy ? <Spinner size="sm" /> : '📖'}
       </Button>
     </div>
