@@ -14,7 +14,7 @@ import {
 import { parseColor } from 'react-aria-components'
 import type { Color } from 'react-aria-components'
 import { Settings } from 'lucide-react'
-import { useTimerStore } from '@renderer/stores/timer'
+import { useTimerStore, DEFAULT_SETTINGS } from '@renderer/stores/timer'
 import { useStopwatchStore } from '@renderer/stores/stopwatch'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 import type { TimerMode } from '@renderer/stores/timer'
@@ -86,6 +86,12 @@ export default function SettingsPopover({ mode }: SettingsPopoverProps): React.J
     setOvertimeMessage(overtimeMessageEnabled, text)
   }
 
+  const handleOvertimeMessageBlur = (): void => {
+    if (overtimeMessage.trim() === '') {
+      setOvertimeMessage(overtimeMessageEnabled, DEFAULT_SETTINGS.overtimeMessage)
+    }
+  }
+
   const parsedColor = parseColor(reminderColor)
 
   return (
@@ -155,7 +161,7 @@ export default function SettingsPopover({ mode }: SettingsPopoverProps): React.J
                         value={String(reminderDuration)}
                         onChange={handleReminderDurationChange}
                         aria-label={t('timer.reminder.time')}
-                        className="w-20 [&_input]:py-1 [&_input]:text-center"
+                        className="w-21 [&_input]:py-1 [&_input]:text-center rounded-full px-4"
                         min={0}
                         disabled={reminderInputDisabled}
                       />
@@ -209,18 +215,18 @@ export default function SettingsPopover({ mode }: SettingsPopoverProps): React.J
                     </Switch.Control>
                     <span className="text-sm">{t('timer.overtimeMessage.label')}</span>
                   </Switch>
-                  {overtimeMessageEnabled && (
-                    <Input
-                      type="text"
-                      variant="secondary"
-                      value={overtimeMessage}
-                      onChange={handleOvertimeMessageChange}
-                      placeholder={t('timer.overtimeMessage.placeholder')}
-                      aria-label={t('timer.overtimeMessage.label')}
-                      maxLength={15}
-                      className="w-33 ml-auto [&_input]:py-1"
-                    />
-                  )}
+                  <Input
+                    type="text"
+                    variant="secondary"
+                    value={overtimeMessage}
+                    onChange={handleOvertimeMessageChange}
+                    onBlur={handleOvertimeMessageBlur}
+                    placeholder={t('timer.overtimeMessage.placeholder')}
+                    aria-label={t('timer.overtimeMessage.label')}
+                    maxLength={15}
+                    disabled={!overtimeMessageEnabled}
+                    className="w-33 ml-auto [&_input]:py-1 rounded-full px-4"
+                  />
                 </div>
               </>
             )}
