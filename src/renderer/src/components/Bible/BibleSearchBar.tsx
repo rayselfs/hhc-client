@@ -68,7 +68,7 @@ export default function BibleSearchBar(): React.JSX.Element {
   }, [query, doSearch])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>): void => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
       handleSubmit()
     } else if (e.key === 'Escape') {
       collapse()
