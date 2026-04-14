@@ -15,6 +15,15 @@ export function findFolder<T extends FolderItem>(
   return undefined
 }
 
+export function getFolderPath<T extends FolderItem>(root: Folder<T>, id: string): Folder<T>[] {
+  if (root.id === id) return [root]
+  for (const child of root.folders) {
+    const path = getFolderPath(child, id)
+    if (path.length > 0) return [root, ...path]
+  }
+  return []
+}
+
 export function flattenFolders<T extends FolderItem>(root: Folder<T>): Folder<T>[] {
   const result: Folder<T>[] = [root]
   for (const child of root.folders) {
@@ -80,10 +89,12 @@ interface FolderStoreState<TItem extends FolderItem> {
   moveItem: (itemId: string, targetFolderId: string) => void
   moveFolder: (folderId: string, targetFolderId: string) => void
   reorderItems: (folderId: string, orderedIds: string[]) => void
+  reorderFolders: (parentFolderId: string, orderedIds: string[]) => void
   navigateToFolder: (folderId: string) => void
   navigateToRoot: () => void
   navigateUp: () => void
   getCurrentFolder: () => Folder<TItem>
+  getFolderPath: () => Folder<TItem>[]
 }
 
 export function createFolderStore<TItem extends FolderItem>(
@@ -113,20 +124,20 @@ export function createFolderStore<TItem extends FolderItem>(
     addFolder: (name, parentId) => {
       const { root } = get()
       const resolvedParentId = parentId ?? config.rootId
-      if (resolvedParentId !== config.rootId) {
-        console.warn('[FolderStore] addFolder: only root-level folders allowed')
-        return
-      }
+      const parentFolder = findFolder(root, resolvedParentId) ?? root
       const newFolder: Folder<TItem> = {
         id: crypto.randomUUID(),
         name,
-        parentId: config.rootId,
+        parentId: resolvedParentId,
         items: [],
         folders: [],
         createdAt: Date.now(),
-        sortIndex: root.folders.length
+        sortIndex: parentFolder.folders.length
       }
-      const updated = { ...root, folders: [...root.folders, newFolder] }
+      const updated = updateFolderInTree(root, resolvedParentId, (f) => ({
+        ...f,
+        folders: [...f.folders, newFolder]
+      }))
       set({ root: updated })
       persistTree(config.rootId, updated)
     },
@@ -189,22 +200,19 @@ export function createFolderStore<TItem extends FolderItem>(
     },
 
     moveFolder: (folderId, targetFolderId) => {
-      if (targetFolderId !== config.rootId) {
-        console.warn('[FolderStore] moveFolder: target must be root (max 1 level nesting)')
-        return
-      }
       const { root } = get()
       if (folderId === config.rootId) return
+      if (folderId === targetFolderId) return
       const folderToMove = findFolder(root, folderId)
       if (!folderToMove) return
       const withoutFolder = removeFolderFromTree(root, folderId)
-      const updated = {
-        ...withoutFolder,
+      const updated = updateFolderInTree(withoutFolder, targetFolderId, (f) => ({
+        ...f,
         folders: [
-          ...withoutFolder.folders,
-          { ...folderToMove, parentId: config.rootId, sortIndex: withoutFolder.folders.length }
+          ...f.folders,
+          { ...folderToMove, parentId: targetFolderId, sortIndex: f.folders.length }
         ]
-      }
+      }))
       set({ root: updated })
       persistTree(config.rootId, updated)
     },
@@ -220,6 +228,22 @@ export function createFolderStore<TItem extends FolderItem>(
           .filter((i): i is TItem => i !== undefined)
         const missing = f.items.filter((i) => !orderedIds.includes(i.id))
         return { ...f, items: [...reordered, ...missing] }
+      })
+      set({ root: updated })
+      persistTree(config.rootId, updated)
+    },
+
+    reorderFolders: (parentFolderId, orderedIds) => {
+      const { root } = get()
+      const updated = updateFolderInTree(root, parentFolderId, (f) => {
+        const folderMap = new Map(f.folders.map((c) => [c.id, c]))
+        const reordered: Folder<TItem>[] = orderedIds.reduce<Folder<TItem>[]>((acc, id, index) => {
+          const child = folderMap.get(id)
+          if (child) acc.push({ ...child, sortIndex: index })
+          return acc
+        }, [])
+        const missing = f.folders.filter((c) => !orderedIds.includes(c.id))
+        return { ...f, folders: [...reordered, ...missing] }
       })
       set({ root: updated })
       persistTree(config.rootId, updated)
@@ -250,6 +274,11 @@ export function createFolderStore<TItem extends FolderItem>(
     getCurrentFolder: () => {
       const { root, currentFolderId } = get()
       return findFolder(root, currentFolderId) ?? root
+    },
+
+    getFolderPath: () => {
+      const { root, currentFolderId } = get()
+      return getFolderPath(root, currentFolderId)
     }
   }))
 }
