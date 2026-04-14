@@ -50,32 +50,34 @@ export default function Header(): React.JSX.Element {
   return (
     <header className="relative flex items-center justify-end gap-2 p-2">
       <div
-        className={`transition-opacity duration-200 ${showTimerControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        className={`absolute left-2 top-1/2 -translate-y-1/2 transition-all duration-200 ${showTimerControls ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-3 pointer-events-none'}`}
       >
-        <div className="absolute left-2 top-1/2 -translate-y-1/2">
-          <SettingsPopover mode={mode} />
-        </div>
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="pointer-events-auto">
-            <ModeSelector />
-          </div>
-        </div>
+        <SettingsPopover mode={mode} />
       </div>
       <div
-        className={`transition-opacity duration-200 ${showBibleControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        className={`absolute inset-0 flex items-center justify-center pointer-events-none transition-all duration-200 ${showTimerControls ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-3'}`}
       >
-        <div className="absolute left-2 top-1/2 -translate-y-1/2">
-          <SettingsPopover />
-        </div>
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="pointer-events-auto">
-            <BibleHeaderControls />
-          </div>
+        <div className="pointer-events-auto">
+          <ModeSelector />
         </div>
       </div>
+
+      <div
+        className={`absolute left-2 top-1/2 -translate-y-1/2 transition-all duration-200 ${showBibleControls ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-3 pointer-events-none'}`}
+      >
+        <SettingsPopover />
+      </div>
+      <div
+        className={`absolute inset-0 flex items-center justify-center pointer-events-none transition-all duration-200 ${showBibleControls ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-3'}`}
+      >
+        <div className="pointer-events-auto">
+          <BibleHeaderControls />
+        </div>
+      </div>
+
       <div className="flex items-center gap-2">
         <div
-          className={`transition-opacity duration-200 ${showBibleControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+          className={`transition-all duration-200 ${showBibleControls ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-3 pointer-events-none'}`}
         >
           <BibleSearchBar />
         </div>
