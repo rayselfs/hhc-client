@@ -100,7 +100,7 @@ export default function SettingsPopover({ mode }: SettingsPopoverProps): React.J
               <div className="space-y-2">
                 <Slider
                   defaultValue={fontSize}
-                  minValue={30}
+                  minValue={20}
                   maxValue={150}
                   step={1}
                   onChange={(value) => {
@@ -110,7 +110,7 @@ export default function SettingsPopover({ mode }: SettingsPopoverProps): React.J
                   }}
                   className="w-full"
                 >
-                  <Label>投影字體大小</Label>
+                  <Label>{t('bible.settings.fontSize')}</Label>
                   <Slider.Output className="text-sm text-muted-fg" />
                   <Slider.Track className="h-2 rounded-full bg-surface-secondary">
                     <Slider.Fill className="bg-accent" />
@@ -151,6 +151,7 @@ export default function SettingsPopover({ mode }: SettingsPopoverProps): React.J
                     <div className="flex items-center gap-1 ml-auto">
                       <Input
                         type="number"
+                        variant="secondary"
                         value={String(reminderDuration)}
                         onChange={handleReminderDurationChange}
                         aria-label={t('timer.reminder.time')}
@@ -211,6 +212,7 @@ export default function SettingsPopover({ mode }: SettingsPopoverProps): React.J
                   {overtimeMessageEnabled && (
                     <Input
                       type="text"
+                      variant="secondary"
                       value={overtimeMessage}
                       onChange={handleOvertimeMessageChange}
                       placeholder={t('timer.overtimeMessage.placeholder')}
