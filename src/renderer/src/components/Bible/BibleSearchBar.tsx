@@ -10,24 +10,16 @@ export default function BibleSearchBar(): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const isIndexReady = useBibleSearchStore((state) => state.isIndexReady)
+  const collapse = useCallback((): void => {
+    setIsExpanded(false)
+    setQuery('')
+    useBibleSearchStore.getState().clearSearch()
+  }, [])
 
-  const {
-    setSearchMode,
-    setIsSearching,
-    setQuery: setStoreQuery,
-    setResults,
-    clearSearch
-  } = useBibleSearchStore.getState()
-
-  const collapse = useCallback(
-    (clear = true): void => {
-      setIsExpanded(false)
-      setQuery('')
-      if (clear) clearSearch()
-    },
-    [clearSearch]
-  )
+  const collapseUI = useCallback((): void => {
+    setIsExpanded(false)
+    setQuery('')
+  }, [])
 
   const doSearch = useCallback(
     async (q: string): Promise<void> => {
@@ -37,30 +29,36 @@ export default function BibleSearchBar(): React.JSX.Element {
         return
       }
 
+      const {
+        setSearchMode,
+        setIsSearching,
+        setQuery: setStoreQuery,
+        setResults,
+        isIndexReady
+      } = useBibleSearchStore.getState()
+
       setSearchMode(true)
       setStoreQuery(trimmed)
+      collapseUI()
 
       if (!isIndexReady) {
-        setIsSearching(false)
         setResults([])
-        collapse(false)
         return
       }
 
       setIsSearching(true)
-      collapse(false)
 
       try {
         const ids = await searchEngine.search(trimmed)
         const mapped = ids.map((id) => lookupVerseById(id)).filter((r) => r !== undefined)
-        setResults(mapped)
+        useBibleSearchStore.getState().setResults(mapped)
       } catch {
-        setResults([])
+        useBibleSearchStore.getState().setResults([])
       } finally {
-        setIsSearching(false)
+        useBibleSearchStore.getState().setIsSearching(false)
       }
     },
-    [isIndexReady, collapse, setSearchMode, setStoreQuery, setIsSearching, setResults]
+    [collapse, collapseUI]
   )
 
   const handleSubmit = useCallback((): void => {
