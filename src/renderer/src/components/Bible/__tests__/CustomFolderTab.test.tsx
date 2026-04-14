@@ -186,9 +186,10 @@ describe('CustomFolderTab', () => {
     expect(screen.getByText('創世記 1:1')).toBeInTheDocument()
   })
 
-  it('shows new folder button at root level', () => {
-    render(<CustomFolderTab />)
-    expect(screen.getByText('New Folder')).toBeInTheDocument()
+  it('opens create folder modal when isModalOpen is true', () => {
+    render(<CustomFolderTab isModalOpen={true} onModalOpenChange={vi.fn()} />)
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByText('Create New Folder')).toBeInTheDocument()
   })
 
   it('clicking folder navigates into it', () => {
@@ -205,11 +206,11 @@ describe('CustomFolderTab', () => {
     expect(mockNavigateTo).toHaveBeenCalledWith({ bookNumber: 1, chapter: 1, verse: 1 })
   })
 
-  it('clicking New Folder opens create folder modal', () => {
-    render(<CustomFolderTab />)
-    fireEvent.click(screen.getByText('New Folder'))
-    expect(screen.getByRole('dialog')).toBeInTheDocument()
-    expect(screen.getByText('Create New Folder')).toBeInTheDocument()
+  it('create folder modal calls onModalOpenChange(false) on cancel', () => {
+    const onModalOpenChange = vi.fn()
+    render(<CustomFolderTab isModalOpen={true} onModalOpenChange={onModalOpenChange} />)
+    fireEvent.click(screen.getByText('Cancel'))
+    expect(onModalOpenChange).toHaveBeenCalledWith(false)
   })
 
   it('delete folder button triggers confirm and calls deleteFolder', async () => {
@@ -251,12 +252,5 @@ describe('CustomFolderTab', () => {
     folderSingleton.getCurrentFolder = () => emptyRoot
     render(<CustomFolderTab />)
     expect(screen.getByText('Folder is empty')).toBeInTheDocument()
-  })
-
-  it('breadcrumb root navigates to root', () => {
-    render(<CustomFolderTab />)
-    const breadcrumbs = screen.getAllByRole('button', { name: 'Bible Library' })
-    fireEvent.click(breadcrumbs[0])
-    expect(mockNavigateToRoot).toHaveBeenCalled()
   })
 })

@@ -64,7 +64,7 @@ export default function BibleSelector({ onOpenDialog }: BibleSelectorProps): Rea
                 key={v.id}
                 id={v.id}
                 textValue={v.name}
-                className="data-[hovered]:bg-accent data-[hovered]:text-accent-fg"
+                className="data-hovered:bg-accent data-hovered:text-accent-fg"
               >
                 {v.name}
                 <ListBox.ItemIndicator />
@@ -73,8 +73,8 @@ export default function BibleSelector({ onOpenDialog }: BibleSelectorProps): Rea
           </ListBox>
         </Select.Popover>
       </Select>
-      <Button isIconOnly onPress={onOpenDialog} isDisabled={busy} variant="outline">
-        {busy ? <Spinner size="sm" /> : '📖'}
+      <Button isIconOnly onPress={onOpenDialog} isDisabled={busy} variant="outline" size="lg">
+        {busy ? <Spinner /> : '📖'}
       </Button>
     </div>
   )

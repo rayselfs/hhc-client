@@ -48,8 +48,10 @@ const bibleSingleton = {
 }
 
 vi.mock('@renderer/stores/bible-history', () => ({
-  useBibleHistoryStore: (selector: (state: typeof historySingleton) => unknown) =>
-    selector(historySingleton)
+  useBibleHistoryStore: Object.assign(
+    (selector: (state: typeof historySingleton) => unknown) => selector(historySingleton),
+    { getState: () => historySingleton }
+  )
 }))
 
 vi.mock('@renderer/stores/bible', () => ({

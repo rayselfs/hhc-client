@@ -7,7 +7,7 @@ import { useBibleStore } from '@renderer/stores/bible'
 import { BIBLE_BOOKS } from '@shared/types/bible'
 import { formatVerseReference } from '@renderer/lib/bible-utils'
 import type { VerseItem } from '@shared/types/folder'
-import { FolderPlus, Copy, Trash2 } from 'lucide-react'
+import { Copy, Trash2 } from 'lucide-react'
 import React from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
@@ -26,7 +26,7 @@ export interface UseBibleContextMenu {
   showFolderItemMenu: (item: VerseItem, folderId: string, e: React.MouseEvent) => void
 }
 
-function buildVerseItem(verse: VerseMenuData): VerseItem {
+export function buildVerseItem(verse: VerseMenuData): VerseItem {
   const { bookNumber, chapter, verse: verseNum, text, bookName } = verse
   const bookConfig = BIBLE_BOOKS.find((b) => b.number === bookNumber)
   const bookCode = bookConfig?.code ?? ''
@@ -65,15 +65,6 @@ export function useBibleContextMenu(): UseBibleContextMenu {
     const formattedText = `${reference} ${verse.text}`
 
     const items: ContextMenuEntry[] = [
-      {
-        id: 'add-folder',
-        label: '加入資料夾',
-        icon: React.createElement(FolderPlus, { size: 14 }),
-        onAction: () => {
-          const item = buildVerseItem(verse)
-          useBibleFolderStore.getState().addItem(item)
-        }
-      },
       {
         id: 'copy',
         label: '複製經文',

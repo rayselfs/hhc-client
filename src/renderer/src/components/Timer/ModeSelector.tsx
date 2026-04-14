@@ -16,13 +16,13 @@ export default function ModeSelector(): React.JSX.Element {
       <Tabs.ListContainer>
         <Tabs.List className="bg-transparent border border-border p-1">
           {TIMER_MODES.map((m) => (
-            <Tabs.Tab key={m} id={m} data-testid={`mode-${m}`}>
+            <Tabs.Tab key={m} id={m} data-testid={`mode-${m}`} className="min-w-20">
               {t(`timer.mode.${m}`)}
               <Tabs.Indicator className="bg-accent" />
             </Tabs.Tab>
           ))}
           {OTHER_MODES.map((m) => (
-            <Tabs.Tab key={m} id={m} data-testid={`mode-${m}`}>
+            <Tabs.Tab key={m} id={m} data-testid={`mode-${m}`} className="min-w-20">
               <Tabs.Separator />
               {t(`timer.mode.${m}`)}
               <Tabs.Indicator className="bg-accent" />
