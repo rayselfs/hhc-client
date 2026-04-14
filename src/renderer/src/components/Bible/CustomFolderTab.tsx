@@ -56,6 +56,7 @@ interface SortableItemProps {
   data: DndItemData
   isSelected: boolean
   isFolderDropTarget: boolean
+  isCut: boolean
   children: (
     dragHandleProps: React.HTMLAttributes<HTMLButtonElement>,
     isDragging: boolean
@@ -67,6 +68,7 @@ function SortableItem({
   data,
   isSelected,
   isFolderDropTarget,
+  isCut,
   children
 }: SortableItemProps): React.JSX.Element {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -77,7 +79,7 @@ function SortableItem({
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.4 : 1
+    opacity: isDragging ? 0.4 : isCut ? 0.4 : 1
   }
 
   void isSelected
@@ -671,6 +673,8 @@ export function CustomFolderTab({
               <ul className="list-none p-0 m-0">
                 {items.map((item) => {
                   const isItemSelected = selectedItemIds.has(item.id)
+                  const isItemCut =
+                    clipboard?.mode === 'cut' && clipboard.items.some((i) => i.id === item.id)
 
                   if (isFolder(item)) {
                     return (
@@ -680,6 +684,7 @@ export function CustomFolderTab({
                         data={{ type: 'folder', item }}
                         isSelected={isItemSelected}
                         isFolderDropTarget={folderDropTargetId === item.id}
+                        isCut={isItemCut}
                       >
                         {(dragHandleProps, isDragging) =>
                           renderFolderContent(item, dragHandleProps, isItemSelected, isDragging)
@@ -696,6 +701,7 @@ export function CustomFolderTab({
                         data={{ type: 'verse', item }}
                         isSelected={isItemSelected}
                         isFolderDropTarget={false}
+                        isCut={isItemCut}
                       >
                         {(dragHandleProps, isDragging) =>
                           renderVerseContent(item, dragHandleProps, isItemSelected, isDragging)
