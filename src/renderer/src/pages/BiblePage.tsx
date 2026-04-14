@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { useBibleStore } from '@renderer/stores/bible'
 import { useBibleFolderStore } from '@renderer/stores/folder'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
+import { useBibleHistoryStore } from '@renderer/stores/bible-history'
 import { BiblePreview } from '@renderer/components/Bible/BiblePreview'
 import BibleMultiFunction from '@renderer/components/Bible/BibleMultiFunction'
 import { BibleSelectorDialog } from '@renderer/components/Bible/BibleSelectorDialog'
@@ -10,7 +11,7 @@ import type { VerseMenuData } from '@renderer/components/Bible/useBibleContextMe
 import { useProjection } from '@renderer/contexts/ProjectionContext'
 import { useKeyboardShortcuts } from '@renderer/hooks/useKeyboardShortcuts'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
-import { formatVerseReference } from '@renderer/lib/bible-utils'
+import { formatVerseReference, buildVerseHistoryItem } from '@renderer/lib/bible-utils'
 import type { BiblePassage } from '@shared/types/bible'
 import { useTranslation } from 'react-i18next'
 
@@ -25,7 +26,7 @@ export default function BiblePage(): React.JSX.Element {
     prevChapter
   } = useBibleStore()
   const { isLoading, initialize: initializeFolderStore } = useBibleFolderStore()
-  const { fontSize } = useBibleSettingsStore()
+  const fontSize = useBibleSettingsStore((s) => s.fontSize)
   const [isSelectorOpen, setSelectorOpen] = useState(false)
   const [selectedVerseIndex, setSelectedVerseIndex] = useState(0)
   const { showPreviewMenu } = useBibleContextMenu()
@@ -44,6 +45,10 @@ export default function BiblePage(): React.JSX.Element {
   }, [isLoading, initializeFolderStore])
 
   useEffect(() => {
+    project('bible:settings', { fontSize })
+  }, [fontSize, project])
+
+  useEffect(() => {
     const handler = (): void => setSelectorOpen(true)
     window.addEventListener('open-bible-selector', handler)
     return () => window.removeEventListener('open-bible-selector', handler)
@@ -51,10 +56,19 @@ export default function BiblePage(): React.JSX.Element {
 
   const bookNumber = useBibleStore((s) => s.currentPassage?.bookNumber)
   const chapterNumber = useBibleStore((s) => s.currentPassage?.chapter)
+  const passageVerse = useBibleStore((s) => s.currentPassage?.verse)
   useEffect(() => {
-    const id = requestAnimationFrame(() => setSelectedVerseIndex(0))
+    const id = requestAnimationFrame(() => {
+      if (passageVerse && passageVerse > 1) {
+        const verses = getCurrentVerses()
+        const idx = verses ? verses.findIndex((v) => v.number === passageVerse) : -1
+        setSelectedVerseIndex(idx >= 0 ? idx : 0)
+      } else {
+        setSelectedVerseIndex(0)
+      }
+    })
     return () => cancelAnimationFrame(id)
-  }, [bookNumber, chapterNumber])
+  }, [bookNumber, chapterNumber, passageVerse, getCurrentVerses])
 
   const projectVerse = useCallback(
     (verseIndex: number) => {
@@ -70,20 +84,25 @@ export default function BiblePage(): React.JSX.Element {
 
       const reference = formatVerseReference(t, book.number, chapter.number, verse.number)
       claimProjection('bible', { unblank: true })
-      project('bible:verse', { reference, text: verse.text, fontSize })
+      project('bible:verse', { reference, text: verse.text })
       navigateTo({ bookNumber: book.number, chapter: chapter.number, verse: verse.number })
       setSelectedVerseIndex(clamped)
+
+      const { selectedVersionId } = useBibleSettingsStore.getState()
+      const { versions } = useBibleStore.getState()
+      const versionMeta = versions.find((v) => v.id === selectedVersionId)
+      const historyItem = buildVerseHistoryItem({
+        bookNumber: book.number,
+        bookName: book.name,
+        chapter: chapter.number,
+        verseNumber: verse.number,
+        text: verse.text,
+        versionCode: versionMeta?.code ?? '',
+        versionName: versionMeta?.name ?? ''
+      })
+      useBibleHistoryStore.getState().addToHistory(historyItem)
     },
-    [
-      t,
-      getCurrentVerses,
-      getCurrentBook,
-      getCurrentChapter,
-      claimProjection,
-      project,
-      fontSize,
-      navigateTo
-    ]
+    [t, getCurrentVerses, getCurrentBook, getCurrentChapter, claimProjection, project, navigateTo]
   )
 
   const handleNextVerse = useCallback(() => {

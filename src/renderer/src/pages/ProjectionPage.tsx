@@ -19,8 +19,8 @@ export default function ProjectionPage(): React.JSX.Element {
   const [bibleVerse, setBibleVerse] = useState<{
     reference: string
     text: string
-    fontSize: number
   } | null>(null)
+  const [bibleFontSize, setBibleFontSize] = useState(90)
 
   useEffect(() => {
     const adapter = createProjectionAdapter('projection')
@@ -43,6 +43,10 @@ export default function ProjectionPage(): React.JSX.Element {
 
     const unsubBibleVerse = adapter.on('bible:verse', (data) => {
       setBibleVerse(data)
+    })
+
+    const unsubBibleSettings = adapter.on('bible:settings', ({ fontSize }) => {
+      setBibleFontSize(fontSize)
     })
 
     const unsubTimezone = adapter.on('settings:timezone', ({ timezone }) => {
@@ -77,6 +81,7 @@ export default function ProjectionPage(): React.JSX.Element {
       unsubTimerTick()
       unsubStopwatch()
       unsubBibleVerse()
+      unsubBibleSettings()
       unsubTimezone()
       unsubClose()
       unsubPing()
@@ -88,7 +93,7 @@ export default function ProjectionPage(): React.JSX.Element {
   if (showDefault) return <DefaultProjection />
 
   if (activeContent === 'bible' && bibleVerse) {
-    const fontSize = bibleVerse.fontSize || 90
+    const fontSize = bibleFontSize
     const referenceSize = Math.max(16, fontSize * 0.4)
     return (
       <div className="h-screen w-full bg-black flex flex-col items-center justify-center px-16">

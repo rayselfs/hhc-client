@@ -1,9 +1,14 @@
 import { Button, Card, ScrollShadow, Spinner, Separator } from '@heroui/react'
 import { useBibleStore } from '@renderer/stores/bible'
-import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 import { useBibleSearchStore } from '@renderer/stores/bible-search'
+import { useBibleHistoryStore } from '@renderer/stores/bible-history'
+import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
-import { formatVerseReference, getBookConfig } from '@renderer/lib/bible-utils'
+import {
+  formatVerseReference,
+  getBookConfig,
+  buildVerseHistoryItem
+} from '@renderer/lib/bible-utils'
 import type { MouseEvent } from 'react'
 import React, { useRef, useEffect } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
@@ -31,7 +36,6 @@ export function BiblePreview({
     navigateTo
   } = useBibleStore()
 
-  const { fontSize } = useBibleSettingsStore()
   const { claimProjection, project } = useProjection()
   const verseRefs = useRef<Map<number, HTMLButtonElement>>(new Map())
 
@@ -50,9 +54,23 @@ export function BiblePreview({
     if (!book || !chapter) return
     const reference = formatVerseReference(t, book.number, chapter.number, verseNumber)
     claimProjection('bible', { unblank: true })
-    project('bible:verse', { reference, text: verseText, fontSize })
+    project('bible:verse', { reference, text: verseText })
     navigateTo({ bookNumber: book.number, chapter: chapter.number, verse: verseNumber })
     onSelectedVerseIndexChange(verseIndex)
+
+    const { selectedVersionId } = useBibleSettingsStore.getState()
+    const { versions } = useBibleStore.getState()
+    const versionMeta = versions.find((v) => v.id === selectedVersionId)
+    const historyItem = buildVerseHistoryItem({
+      bookNumber: book.number,
+      bookName: book.name,
+      chapter: chapter.number,
+      verseNumber,
+      text: verseText,
+      versionCode: versionMeta?.code ?? '',
+      versionName: versionMeta?.name ?? ''
+    })
+    useBibleHistoryStore.getState().addToHistory(historyItem)
   }
 
   const handleSearchResultClick = (bookNumber: number, chapterNum: number, verse: number): void => {
@@ -67,7 +85,7 @@ export function BiblePreview({
     if (!verse) return
     const el = verseRefs.current.get(verse.number)
     if (el) {
-      el.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+      el.scrollIntoView({ block: 'start', behavior: 'smooth' })
     }
   }, [selectedVerseIndex, verses])
 
@@ -185,6 +203,7 @@ export function BiblePreview({
               </button>
             )
           })}
+          <div className="flex-shrink-0" style={{ height: '80%' }} aria-hidden />
         </div>
       </ScrollShadow>
     )

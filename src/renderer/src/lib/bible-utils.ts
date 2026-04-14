@@ -1,6 +1,7 @@
 import type { BibleBookConfig } from '@shared/types/bible'
 import { BIBLE_BOOKS } from '@shared/types/bible'
 import type { TFunction } from 'i18next'
+import type { VerseItem } from '@shared/types/folder'
 
 type BibleBookKey = `bible.books.${string}.name`
 
@@ -31,4 +32,32 @@ export function formatVerseReference(
     return `${bookName} ${chapter}${chapterUnit}${verse}${verseUnit}`
   }
   return `${bookName} ${verse}${verseUnit}`
+}
+
+export function buildVerseHistoryItem(params: {
+  bookNumber: number
+  bookName: string
+  chapter: number
+  verseNumber: number
+  text: string
+  versionCode: string
+  versionName: string
+}): VerseItem {
+  const { bookNumber, bookName, chapter, verseNumber, text, versionCode, versionName } = params
+  const bookConfig = getBookConfig(bookNumber)
+  return {
+    id: `${versionCode}-${bookNumber}-${chapter}-${verseNumber}`,
+    type: 'verse',
+    folderId: '',
+    bookCode: bookConfig?.code ?? '',
+    bookName,
+    bookNumber,
+    chapter,
+    verseStart: verseNumber,
+    verseEnd: verseNumber,
+    text,
+    versionCode,
+    versionName,
+    createdAt: Date.now()
+  }
 }

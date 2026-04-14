@@ -55,11 +55,10 @@ function buildVerseItem(verse: VerseMenuData): VerseItem {
 
 function getVerseProjectionData(
   item: VerseItem,
-  fontSize: number,
   t: TFunction
-): { reference: string; text: string; fontSize: number } {
+): { reference: string; text: string } {
   const reference = formatVerseReference(t, item.bookNumber, item.chapter, item.verseStart)
-  return { reference, text: item.text, fontSize }
+  return { reference, text: item.text }
 }
 
 export function useBibleContextMenu(): UseBibleContextMenu {
@@ -70,7 +69,6 @@ export function useBibleContextMenu(): UseBibleContextMenu {
   const showPreviewMenu = (verse: VerseMenuData, e: React.MouseEvent): void => {
     const reference = formatVerseReference(t, verse.bookNumber, verse.chapter, verse.verse)
     const formattedText = `${reference} ${verse.text}`
-    const { fontSize } = useBibleSettingsStore.getState()
 
     const items: ContextMenuEntry[] = [
       {
@@ -79,7 +77,7 @@ export function useBibleContextMenu(): UseBibleContextMenu {
         icon: React.createElement(Monitor, { size: 14 }),
         onAction: () => {
           claimProjection('bible', { unblank: true })
-          project('bible:verse', { reference, text: verse.text, fontSize })
+          project('bible:verse', { reference, text: verse.text })
         }
       },
       {
@@ -114,8 +112,7 @@ export function useBibleContextMenu(): UseBibleContextMenu {
   }
 
   const showHistoryMenu = (item: VerseItem, e: React.MouseEvent): void => {
-    const { fontSize } = useBibleSettingsStore.getState()
-    const projData = getVerseProjectionData(item, fontSize, t)
+    const projData = getVerseProjectionData(item, t)
     const formattedText = `${projData.reference} ${item.text}`
 
     const items: ContextMenuEntry[] = [
@@ -152,8 +149,7 @@ export function useBibleContextMenu(): UseBibleContextMenu {
   }
 
   const showFolderItemMenu = (item: VerseItem, _folderId: string, e: React.MouseEvent): void => {
-    const { fontSize } = useBibleSettingsStore.getState()
-    const projData = getVerseProjectionData(item, fontSize, t)
+    const projData = getVerseProjectionData(item, t)
     const formattedText = `${projData.reference} ${item.text}`
 
     const items: ContextMenuEntry[] = [

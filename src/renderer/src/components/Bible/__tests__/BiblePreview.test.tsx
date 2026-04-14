@@ -57,8 +57,11 @@ vi.mock('@renderer/contexts/ProjectionContext', () => ({
 }))
 
 vi.mock('@renderer/stores/bible-settings', () => ({
-  useBibleSettingsStore: (selector?: (state: { fontSize: number }) => unknown) =>
-    selector ? selector({ fontSize: 90 }) : { fontSize: 90 }
+  useBibleSettingsStore: Object.assign(
+    (selector?: (state: { fontSize: number }) => unknown) =>
+      selector ? selector({ fontSize: 90 }) : { fontSize: 90 },
+    { getState: () => ({ fontSize: 90, selectedVersionId: 'mock-version' }) }
+  )
 }))
 
 vi.mock('@renderer/stores/bible', () => ({
@@ -85,6 +88,28 @@ vi.mock('@renderer/stores/bible-search', () => ({
   }
 }))
 
+vi.mock('@renderer/stores/bible-history', () => ({
+  useBibleHistoryStore: Object.assign(
+    (selector?: (state: unknown) => unknown) => {
+      const state = {
+        items: [],
+        addToHistory: vi.fn(),
+        removeFromHistory: vi.fn(),
+        clearHistory: vi.fn()
+      }
+      return selector ? selector(state) : state
+    },
+    {
+      getState: () => ({
+        items: [],
+        addToHistory: vi.fn(),
+        removeFromHistory: vi.fn(),
+        clearHistory: vi.fn()
+      })
+    }
+  )
+}))
+
 vi.mock('@renderer/lib/bible-utils', () => ({
   formatVerseReference: vi.fn(
     (_t: unknown, _bookNum: number, chapter: number, verse: number) =>
@@ -95,7 +120,22 @@ vi.mock('@renderer/lib/bible-utils', () => ({
     code: bookNumber === 1 ? 'Gen' : 'Exo',
     chapterCount: bookNumber === 1 ? 50 : 40
   }),
-  shouldShowChapterNumber: () => true
+  shouldShowChapterNumber: () => true,
+  buildVerseHistoryItem: vi.fn(() => ({
+    id: 'mock-verse-item',
+    type: 'verse',
+    folderId: '',
+    bookCode: 'GEN',
+    bookName: '創世記',
+    bookNumber: 1,
+    chapter: 1,
+    verseStart: 1,
+    verseEnd: 1,
+    text: '',
+    versionCode: '',
+    versionName: '',
+    createdAt: Date.now()
+  }))
 }))
 
 vi.mock('react-i18next', () => ({
