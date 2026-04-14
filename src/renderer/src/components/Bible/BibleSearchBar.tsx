@@ -104,7 +104,7 @@ export default function BibleSearchBar(): React.JSX.Element {
     <div
       ref={containerRef}
       data-testid="bible-search-bar"
-      className={`relative flex items-center transition-[width] duration-250 ease-in-out rounded-full border border-border ${
+      className={`relative h-10 transition-[width] duration-250 ease-in-out rounded-full border border-border ${
         isExpanded ? 'w-64' : 'w-10'
       }`}
     >
@@ -117,15 +117,15 @@ export default function BibleSearchBar(): React.JSX.Element {
         onKeyDown={handleKeyDown}
         placeholder="搜尋經文..."
         aria-label="搜尋經文"
-        className={`h-10 bg-transparent text-sm text-foreground pl-4 pr-1 outline-none placeholder:text-muted-fg transition-opacity duration-200 ${
-          isExpanded ? 'flex-1 opacity-100' : 'w-0 opacity-0 pointer-events-none'
+        className={`w-full h-full bg-transparent text-sm text-foreground pl-4 pr-10 outline-none placeholder:text-muted-fg transition-opacity duration-200 ${
+          isExpanded ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
       />
       <button
         type="button"
         onClick={isExpanded ? handleSubmit : handleToggle}
         aria-label={isExpanded ? '送出搜尋' : '搜尋經文'}
-        className="shrink-0 flex items-center justify-center w-10 h-10 text-muted-fg hover:text-foreground transition-colors"
+        className="absolute right-0 top-0 flex items-center justify-center w-10 h-10 text-muted-fg hover:text-foreground transition-colors"
       >
         <Search size={16} />
       </button>
