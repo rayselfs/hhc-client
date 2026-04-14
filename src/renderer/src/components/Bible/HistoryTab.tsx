@@ -1,13 +1,39 @@
+import { useEffect, useMemo } from 'react'
 import { useBibleHistoryStore } from '@renderer/stores/bible-history'
 import { useBibleStore } from '@renderer/stores/bible'
 import type { VerseItem } from '@shared/types/folder'
 import { ScrollShadow, Button } from '@heroui/react'
 import { X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+
+function isSameDay(ts: number, date: Date): boolean {
+  const d = new Date(ts)
+  return (
+    d.getFullYear() === date.getFullYear() &&
+    d.getMonth() === date.getMonth() &&
+    d.getDate() === date.getDate()
+  )
+}
 
 export function HistoryTab(): React.JSX.Element | null {
+  const { t } = useTranslation()
   const items = useBibleHistoryStore((state) => state.items)
   const removeFromHistory = useBibleHistoryStore((state) => state.removeFromHistory)
   const navigateTo = useBibleStore((state) => state.navigateTo)
+
+  useEffect(() => {
+    const today = new Date()
+    const { items: currentItems, removeFromHistory: remove } = useBibleHistoryStore.getState()
+    const stale = currentItems.filter((item) => !isSameDay(item.createdAt, today))
+    stale.forEach((item) => {
+      remove(item.id)
+    })
+  }, [])
+
+  const todayItems = useMemo(() => {
+    const today = new Date()
+    return items.filter((item) => isSameDay(item.createdAt, today))
+  }, [items])
 
   const handleNavigate = (item: VerseItem): void => {
     navigateTo({
@@ -28,41 +54,37 @@ export function HistoryTab(): React.JSX.Element | null {
     return `${item.bookName} ${item.chapter}:${item.verseStart}-${item.verseEnd}`
   }
 
-  if (items.length === 0) {
+  if (todayItems.length === 0) {
     return (
-      <div className="flex h-full items-center justify-center text-default-400">尚無瀏覽歷史</div>
+      <div className="flex h-full items-center justify-center text-muted">
+        {t('bible.history.emptyMessage', '尚無瀏覽歷史')}
+      </div>
     )
   }
 
   return (
     <ScrollShadow className="h-full w-full" hideScrollBar>
-      <div className="space-y-1 p-2">
-        {items.map((item) => (
+      <div className="flex flex-col gap-1 p-2">
+        {todayItems.map((item) => (
           <div
             key={item.id}
-            role="button"
-            tabIndex={0}
-            className="group flex w-full cursor-pointer items-center justify-between rounded-md p-2 text-left hover:bg-default focus:outline-none focus:ring-2 focus:ring-primary"
-            onClick={() => handleNavigate(item)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault()
-                handleNavigate(item)
-              }
-            }}
+            className="flex items-center group rounded-3xl transition-colors hover:bg-accent/8"
           >
-            <div className="flex-1 overflow-hidden">
-              <p className="truncate text-sm font-medium">{getVerseReference(item)}</p>
-              <p className="truncate text-xs text-default-500">
+            <button
+              type="button"
+              onClick={() => handleNavigate(item)}
+              className="flex-1 min-w-0 text-left cursor-pointer p-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-3xl"
+            >
+              <p className="truncate text-sm font-medium text-muted">{getVerseReference(item)}</p>
+              <p className="text-base text-foreground whitespace-normal">
                 {item.text.length > 60 ? `${item.text.substring(0, 60)}...` : item.text}
               </p>
-            </div>
+            </button>
             <Button
               variant="ghost"
               size="sm"
-              className="invisible shrink-0 group-hover:visible"
+              className="invisible shrink-0 mr-2 group-hover:visible"
               onPress={() => handleRemove(item.id)}
-              onClick={(e) => e.stopPropagation()}
             >
               <X size={16} />
             </Button>
