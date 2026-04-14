@@ -20,6 +20,7 @@
   --sidebar: oklch(0.92 0.001 286.37);
   --sidebar-foreground: var(--foreground);
   --eclipse: oklch(0.35 0.005 286);
+  --cursor-interactive: default;
 }
 
 .dark,
