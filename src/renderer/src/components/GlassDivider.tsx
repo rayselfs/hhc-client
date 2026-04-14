@@ -4,15 +4,12 @@ interface GlassDividerProps {
   className?: string
 }
 
-const BORDER_COLOR = '255, 255, 255'
-const BORDER_OPACITY = 0.15
-
 export default function GlassDivider({
   vertical = false,
   thickness = 1,
   className
 }: GlassDividerProps): React.JSX.Element {
-  const color = `rgba(${BORDER_COLOR}, ${BORDER_OPACITY})`
+  const color = 'var(--separator)'
 
   const style: React.CSSProperties = vertical
     ? {

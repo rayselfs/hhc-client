@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react'
+import GlassDivider from '@renderer/components/GlassDivider'
 
 export interface ContextMenuItem {
   id: string
@@ -86,7 +87,7 @@ export function ContextMenuProvider({
         >
           {menu.items.map((entry, i) => {
             if (entry === 'separator') {
-              return <div key={`sep-${i}`} role="separator" className="my-1 h-px bg-divider" />
+              return <GlassDivider key={`sep-${i}`} className="my-1" />
             }
             const isDanger = entry.variant === 'danger'
             return (
