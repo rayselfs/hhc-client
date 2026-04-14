@@ -81,8 +81,8 @@ export function ContextMenuProvider({
         <div
           ref={menuRef}
           role="menu"
-          className="fixed z-[9999] min-w-[160px] rounded-lg border border-divider bg-content1 py-1 shadow-lg"
-          style={{ left: menu.x, top: menu.y }}
+          className="fixed z-[9999] min-w-[160px] rounded-2xl bg-overlay py-1.5"
+          style={{ left: menu.x, top: menu.y, boxShadow: 'var(--shadow-overlay)' }}
         >
           {menu.items.map((entry, i) => {
             if (entry === 'separator') {
@@ -95,9 +95,9 @@ export function ContextMenuProvider({
                 role="menuitem"
                 type="button"
                 className={[
-                  'flex w-full items-center gap-2 px-3 py-1.5 text-sm outline-none',
-                  'hover:bg-default-100 active:bg-default-200',
-                  isDanger ? 'text-danger hover:bg-danger-50' : 'text-foreground'
+                  'flex w-full items-center gap-2 rounded-2xl px-2.5 py-1.5 text-sm outline-none cursor-pointer',
+                  'hover:bg-default active:scale-[0.98] transition-colors',
+                  isDanger ? 'text-danger' : 'text-foreground'
                 ].join(' ')}
                 onClick={() => {
                   entry.onAction()

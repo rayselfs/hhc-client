@@ -172,16 +172,16 @@ export function BiblePreview({
                 onClick={() => handleVerseClick(index, verse.number, verse.text)}
                 onContextMenu={onContextMenu}
                 data-verse-number={verse.number}
-                className={`w-full text-left cursor-pointer rounded-md p-2 transition-colors ${
+                className={`w-full text-left cursor-pointer rounded-md p-2 transition-colors flex items-start ${
                   isSelected
-                    ? 'bg-primary/20 border-l-2 border-primary ring-1 ring-primary/30'
+                    ? 'bg-primary/25 border-l-2 border-primary'
                     : isProjected
                       ? 'bg-primary/10 border-l-2 border-primary'
-                      : 'hover:bg-default-100'
+                      : 'hover:bg-primary/10'
                 }`}
               >
-                <span className="text-default-400 mr-2">{verse.number}</span>
-                <span>{verse.text}</span>
+                <span className="text-default-400 mr-2 flex-shrink-0">{verse.number}</span>
+                <span className="flex-1">{verse.text}</span>
               </button>
             )
           })}
