@@ -144,6 +144,7 @@
     "delete_folder_description": "此操作无法撤销。文件夹中的所有经文将被删除。",
     "delete_item_title": "删除 '{{reference}}'?",
     "delete_item_description": "此操作无法撤销。",
+    "delete_selected_title": "删除 {{count}} 个项目?",
     "chapterUnit": {
       "default": "章",
       "psa": "篇"

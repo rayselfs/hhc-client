@@ -144,6 +144,7 @@
     "delete_folder_description": "This action cannot be undone. All verses inside will be lost.",
     "delete_item_title": "Delete '{{reference}}'?",
     "delete_item_description": "This action cannot be undone.",
+    "delete_selected_title": "Delete {{count}} item(s)?",
     "chapterUnit": {
       "default": ":",
       "psa": ":"

@@ -144,6 +144,7 @@
     "delete_folder_description": "此動作無法復原。資料夾中的所有經文將被刪除。",
     "delete_item_title": "刪除 '{{reference}}'?",
     "delete_item_description": "此動作無法復原。",
+    "delete_selected_title": "刪除 {{count}} 個項目?",
     "chapterUnit": {
       "default": "章",
       "psa": "篇"

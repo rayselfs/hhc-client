@@ -325,9 +325,7 @@ export function CustomFolderTab({
         count: selected.length,
         defaultValue: `Delete ${selected.length} item(s)?`
       }),
-      description: t('bible.delete_item_description', {
-        defaultValue: 'This action cannot be undone.'
-      }),
+      description: t('bible.delete_item_description'),
       status: 'danger'
     })
 
@@ -587,7 +585,7 @@ export function CustomFolderTab({
           isItemSelected
             ? 'bg-accent-soft-hover'
             : isFolderDropTarget
-              ? 'bg-accent/15 ring-2 ring-accent/50 ring-dashed'
+              ? 'bg-accent-soft ring-2 ring-accent/50 ring-dashed'
               : 'hover:bg-accent/8'
         ]
           .filter(Boolean)
