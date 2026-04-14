@@ -12,24 +12,20 @@ export default function ModeSelector(): React.JSX.Element {
   const setMode = useTimerStore((s) => s.setMode)
 
   return (
-    <Tabs
-      selectedKey={mode}
-      onSelectionChange={(key) => setMode(key as TimerMode)}
-      className="mode-selector"
-    >
+    <Tabs selectedKey={mode} onSelectionChange={(key) => setMode(key as TimerMode)}>
       <Tabs.ListContainer>
         <Tabs.List>
           {TIMER_MODES.map((m) => (
             <Tabs.Tab key={m} id={m} data-testid={`mode-${m}`}>
               {t(`timer.mode.${m}`)}
-              <Tabs.Indicator />
+              <Tabs.Indicator className="bg-accent" />
             </Tabs.Tab>
           ))}
           {OTHER_MODES.map((m) => (
             <Tabs.Tab key={m} id={m} data-testid={`mode-${m}`}>
               <Tabs.Separator />
               {t(`timer.mode.${m}`)}
-              <Tabs.Indicator />
+              <Tabs.Indicator className="bg-accent" />
             </Tabs.Tab>
           ))}
         </Tabs.List>

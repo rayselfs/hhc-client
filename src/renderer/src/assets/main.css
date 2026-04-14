@@ -72,7 +72,3 @@ body {
   margin: 0;
   user-select: none;
 }
-
-.mode-selector .tabs__indicator {
-  background-color: var(--accent);
-}
