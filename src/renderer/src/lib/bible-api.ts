@@ -1,5 +1,4 @@
 import type { BibleBook, BibleVersion } from '@shared/types/bible'
-import { BIBLE_API } from '@shared/api-paths'
 import { isElectron } from './env'
 import { http } from './http'
 
@@ -174,7 +173,7 @@ export class BrowserBibleApiAdapter implements BibleApiAdapter {
 
   private async doFetchVersions(): Promise<BibleVersion[]> {
     try {
-      const { data } = await http.get<BibleVersion[]>(BIBLE_API.versions)
+      const { data } = await http.get<BibleVersion[]>('/api/bible/v1/versions')
       return data
     } catch (error) {
       if (error instanceof Error) {
