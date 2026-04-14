@@ -55,13 +55,13 @@ export function ContextMenuProvider({
 
     const handleScroll = (): void => close()
 
-    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('mousedown', handleClickOutside, true)
     document.addEventListener('keydown', handleEscape)
     document.addEventListener('scroll', handleScroll, true)
     document.addEventListener('contextmenu', handleClickOutside)
 
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('mousedown', handleClickOutside, true)
       document.removeEventListener('keydown', handleEscape)
       document.removeEventListener('scroll', handleScroll, true)
       document.removeEventListener('contextmenu', handleClickOutside)
