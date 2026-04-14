@@ -49,13 +49,14 @@ export default function Header(): React.JSX.Element {
 
   return (
     <header className="relative flex items-center justify-end gap-2 p-2">
+      {(showTimerControls || showBibleControls) && (
+        <div className="absolute left-2 top-1/2 -translate-y-1/2">
+          <SettingsPopover mode={showTimerControls ? mode : undefined} />
+        </div>
+      )}
+
       <div
-        className={`absolute left-2 top-1/2 -translate-y-1/2 transition-all duration-200 ${showTimerControls ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-3 pointer-events-none'}`}
-      >
-        <SettingsPopover mode={mode} />
-      </div>
-      <div
-        className={`absolute inset-0 flex items-center justify-center pointer-events-none transition-all duration-200 ${showTimerControls ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-3'}`}
+        className={`absolute inset-0 flex items-center justify-center pl-14 pointer-events-none transition-all duration-200 ${showTimerControls ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-3'}`}
       >
         <div className="pointer-events-auto">
           <ModeSelector />
@@ -63,12 +64,7 @@ export default function Header(): React.JSX.Element {
       </div>
 
       <div
-        className={`absolute left-2 top-1/2 -translate-y-1/2 transition-all duration-200 ${showBibleControls ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-3 pointer-events-none'}`}
-      >
-        <SettingsPopover />
-      </div>
-      <div
-        className={`absolute inset-0 flex items-center justify-center pointer-events-none transition-all duration-200 ${showBibleControls ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-3'}`}
+        className={`absolute inset-0 flex items-center justify-center pl-14 pointer-events-none transition-all duration-200 ${showBibleControls ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-3'}`}
       >
         <div className="pointer-events-auto">
           <BibleHeaderControls />
