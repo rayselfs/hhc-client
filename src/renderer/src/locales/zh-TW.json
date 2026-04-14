@@ -89,18 +89,30 @@
     "history": {
       "title": "歷史",
       "noHistory": "尚無瀏覽歷史",
-      "emptyMessage": "尚無瀏覽歷史"
+      "emptyMessage": "尚無瀏覽歷史",
+      "clearHistory": "清除歷史"
     },
     "library": "聖經庫",
     "custom": {
       "title": "自訂",
+      "home": "首頁",
       "newFolder": "新增資料夾",
       "createNewFolder": "建立新資料夾",
       "folderName": "資料夾名稱",
       "rename": "重新命名",
       "delete": "刪除",
       "moveToFolder": "移動到資料夾",
-      "emptyFolder": "空資料夾"
+      "emptyFolder": "空資料夾",
+      "contextMenu": {
+        "copy": "複製",
+        "cut": "剪下",
+        "paste": "貼上",
+        "delete": "刪除",
+        "newFolder": "新建資料夾",
+        "copyCount": "複製 {{count}} 項",
+        "cutCount": "剪下 {{count}} 項",
+        "deleteCount": "刪除 {{count}} 項"
+      }
     },
     "search": {
       "placeholder": "搜尋",

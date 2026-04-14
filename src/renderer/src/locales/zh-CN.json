@@ -89,18 +89,30 @@
     "history": {
       "title": "历史",
       "noHistory": "尚无浏览历史",
-      "emptyMessage": "尚无浏览历史"
+      "emptyMessage": "尚无浏览历史",
+      "clearHistory": "清除历史"
     },
     "library": "圣经库",
     "custom": {
       "title": "自定",
+      "home": "首页",
       "newFolder": "新增文件夹",
       "createNewFolder": "创建新文件夹",
       "folderName": "文件夹名称",
       "rename": "重命名",
       "delete": "删除",
       "moveToFolder": "移动到文件夹",
-      "emptyFolder": "空文件夹"
+      "emptyFolder": "空文件夹",
+      "contextMenu": {
+        "copy": "复制",
+        "cut": "剪切",
+        "paste": "粘贴",
+        "delete": "删除",
+        "newFolder": "新建文件夹",
+        "copyCount": "复制 {{count}} 项",
+        "cutCount": "剪切 {{count}} 项",
+        "deleteCount": "删除 {{count}} 项"
+      }
     },
     "search": {
       "placeholder": "搜索",

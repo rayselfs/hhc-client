@@ -10,6 +10,7 @@ import { FolderPlus, Folder as FolderIcon, Trash2, X, GripVertical } from 'lucid
 import { useTranslation } from 'react-i18next'
 import { useKeyboardShortcuts } from '@renderer/hooks/useKeyboardShortcuts'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
+import { useFolderContextMenu } from './useFolderContextMenu'
 
 interface CustomFolderTabProps {
   isModalOpen?: boolean
@@ -68,6 +69,9 @@ export function CustomFolderTab({
   const folderDragCounterRef = useRef<Map<string, number>>(new Map())
   const lastClickedIdRef = useRef<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+
+  const { showItemMenu, showFolderMenu, showMultiSelectMenu, showEmptyAreaMenu } =
+    useFolderContextMenu()
 
   const currentFolder = getCurrentFolder()
 
@@ -247,6 +251,83 @@ export function CustomFolderTab({
       }
     ],
     { enabled: true }
+  )
+
+  const handleContextMenuForItem = useCallback(
+    (item: VerseItem, e: React.MouseEvent): void => {
+      e.preventDefault()
+      e.stopPropagation()
+      const isAlreadySelected = selectedItemIds.has(item.id)
+      if (selectedItemIds.size > 1 && isAlreadySelected) {
+        showMultiSelectMenu(selectedItemIds, e, handleCopy, handleCut, handleDeleteSelected)
+      } else {
+        if (!isAlreadySelected) {
+          setSelectedItemIds(new Set([item.id]))
+        }
+        showItemMenu(
+          item,
+          isAlreadySelected,
+          e,
+          setSelectedItemIds,
+          handleCopy,
+          handleCut,
+          handleDeleteSelected
+        )
+      }
+    },
+    [
+      selectedItemIds,
+      showMultiSelectMenu,
+      showItemMenu,
+      handleCopy,
+      handleCut,
+      handleDeleteSelected
+    ]
+  )
+
+  const handleContextMenuForFolder = useCallback(
+    (folder: Folder, e: React.MouseEvent): void => {
+      e.preventDefault()
+      e.stopPropagation()
+      const isAlreadySelected = selectedItemIds.has(folder.id)
+      if (selectedItemIds.size > 1 && isAlreadySelected) {
+        showMultiSelectMenu(selectedItemIds, e, handleCopy, handleCut, handleDeleteSelected)
+      } else {
+        if (!isAlreadySelected) {
+          setSelectedItemIds(new Set([folder.id]))
+        }
+        showFolderMenu(
+          folder,
+          isAlreadySelected,
+          e,
+          setSelectedItemIds,
+          clipboard,
+          handleCopy,
+          handleCut,
+          handlePaste,
+          handleDeleteSelected
+        )
+      }
+    },
+    [
+      selectedItemIds,
+      clipboard,
+      showMultiSelectMenu,
+      showFolderMenu,
+      handleCopy,
+      handleCut,
+      handlePaste,
+      handleDeleteSelected
+    ]
+  )
+
+  const handleContextMenuForContainer = useCallback(
+    (e: React.MouseEvent): void => {
+      if (e.target !== e.currentTarget) return
+      e.preventDefault()
+      showEmptyAreaMenu(e, clipboard, handlePaste, () => onModalOpenChange(true))
+    },
+    [clipboard, showEmptyAreaMenu, handlePaste, onModalOpenChange]
   )
 
   const handleAddFolder = (): void => {
@@ -461,6 +542,7 @@ export function CustomFolderTab({
             aria-selected={isItemSelected}
             onClick={(e) => handleItemClick(item.id, e)}
             onDoubleClick={() => navigateToFolder(item.id)}
+            onContextMenu={(e) => handleContextMenuForFolder(item, e)}
             onKeyDown={(e) =>
               (e.key === 'Enter' || e.key === ' ') &&
               handleItemClick(item.id, e as unknown as React.MouseEvent)
@@ -528,6 +610,7 @@ export function CustomFolderTab({
             aria-selected={isItemSelected}
             onClick={(e) => handleItemClick(item.id, e)}
             onDoubleClick={() => handleVerseDoubleClick(item)}
+            onContextMenu={(e) => handleContextMenuForItem(item, e)}
             onKeyDown={(e) =>
               (e.key === 'Enter' || e.key === ' ') &&
               handleItemClick(item.id, e as unknown as React.MouseEvent)
@@ -580,7 +663,11 @@ export function CustomFolderTab({
 
   return (
     <div ref={containerRef} className="flex flex-col h-full">
-      <ScrollShadow className="grow p-2" onClick={handleContainerClick}>
+      <ScrollShadow
+        className="grow p-2"
+        onClick={handleContainerClick}
+        onContextMenu={handleContextMenuForContainer}
+      >
         {items.length === 0 ? (
           <div className="flex items-center justify-center h-full text-neutral-500">
             {t('bible.folder_empty', 'Folder is empty')}

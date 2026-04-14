@@ -89,18 +89,30 @@
     "history": {
       "title": "History",
       "noHistory": "No history yet",
-      "emptyMessage": "No browsing history"
+      "emptyMessage": "No browsing history",
+      "clearHistory": "Clear history"
     },
     "library": "Bible Library",
     "custom": {
       "title": "Custom",
+      "home": "Home",
       "newFolder": "New Folder",
       "createNewFolder": "Create New Folder",
       "folderName": "Folder Name",
       "rename": "Rename",
       "delete": "Delete",
       "moveToFolder": "Move to Folder",
-      "emptyFolder": "Folder is empty"
+      "emptyFolder": "Folder is empty",
+      "contextMenu": {
+        "copy": "Copy",
+        "cut": "Cut",
+        "paste": "Paste",
+        "delete": "Delete",
+        "newFolder": "New Folder",
+        "copyCount": "Copy {{count}} item(s)",
+        "cutCount": "Cut {{count}} item(s)",
+        "deleteCount": "Delete {{count}} item(s)"
+      }
     },
     "search": {
       "placeholder": "Search",
