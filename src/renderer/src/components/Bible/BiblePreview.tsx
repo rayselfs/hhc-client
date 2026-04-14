@@ -194,12 +194,12 @@ export function BiblePreview({
                   key={r.verseId}
                   type="button"
                   onClick={() => handleSearchResultClick(r.bookNumber, r.chapter, r.verse)}
-                  className="w-full text-left rounded-md p-2 hover:bg-default transition-colors"
+                  className="w-full text-left rounded-3xl p-3 hover:bg-accent/8 transition-colors"
                 >
-                  <div className="text-xs font-medium text-accent mb-0.5">
+                  <div className="text-xs font-medium text-accent mb-1">
                     {bookAbbr} {r.chapter}:{r.verse}
                   </div>
-                  <div className="text-sm text-foreground">
+                  <div className="text-xl text-foreground">
                     {renderHighlightedText(r.text, searchQuery)}
                   </div>
                 </button>

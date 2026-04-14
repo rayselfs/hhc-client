@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { Button } from '@heroui/react'
-import { Search, X } from 'lucide-react'
+import React, { useState, useRef, useCallback, useEffect } from 'react'
+import { Search } from 'lucide-react'
 import { searchEngine, lookupVerseById } from '@renderer/lib/bible-search-singleton'
 import { useBibleSearchStore } from '@renderer/stores/bible-search'
 
@@ -8,9 +7,8 @@ export default function BibleSearchBar(): React.JSX.Element {
   const [isExpanded, setIsExpanded] = useState(false)
   const [query, setQuery] = useState('')
 
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const inputWrapperRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   const isIndexReady = useBibleSearchStore((state) => state.isIndexReady)
 
@@ -22,55 +20,38 @@ export default function BibleSearchBar(): React.JSX.Element {
     clearSearch
   } = useBibleSearchStore.getState()
 
-  const collapse = useCallback((): void => {
-    setIsExpanded(false)
-    setQuery('')
-    clearSearch()
-  }, [clearSearch])
-
-  useEffect(() => {
-    if (!isExpanded) return
-
-    const handleMouseDown = (e: MouseEvent): void => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        collapse()
-      }
-    }
-
-    document.addEventListener('mousedown', handleMouseDown)
-    return () => document.removeEventListener('mousedown', handleMouseDown)
-  }, [isExpanded, collapse])
-
-  useEffect(() => {
-    if (isExpanded) {
-      setTimeout(() => {
-        const input = inputWrapperRef.current?.querySelector('input')
-        input?.focus()
-      }, 250)
-    }
-  }, [isExpanded])
+  const collapse = useCallback(
+    (clear = true): void => {
+      setIsExpanded(false)
+      setQuery('')
+      if (clear) clearSearch()
+    },
+    [clearSearch]
+  )
 
   const doSearch = useCallback(
     async (q: string): Promise<void> => {
-      if (!q.trim()) {
-        clearSearch()
-        setStoreQuery('')
+      const trimmed = q.trim()
+      if (!trimmed) {
+        collapse()
         return
       }
 
       setSearchMode(true)
-      setStoreQuery(q)
+      setStoreQuery(trimmed)
 
       if (!isIndexReady) {
         setIsSearching(false)
         setResults([])
+        collapse(false)
         return
       }
 
       setIsSearching(true)
+      collapse(false)
 
       try {
-        const ids = await searchEngine.search(q)
+        const ids = await searchEngine.search(trimmed)
         const mapped = ids.map((id) => lookupVerseById(id)).filter((r) => r !== undefined)
         setResults(mapped)
       } catch {
@@ -79,20 +60,17 @@ export default function BibleSearchBar(): React.JSX.Element {
         setIsSearching(false)
       }
     },
-    [isIndexReady, clearSearch, setSearchMode, setStoreQuery, setIsSearching, setResults]
+    [isIndexReady, collapse, setSearchMode, setStoreQuery, setIsSearching, setResults]
   )
 
-  const handleQueryChange = (value: string): void => {
-    setQuery(value)
+  const handleSubmit = useCallback((): void => {
+    void doSearch(query)
+  }, [query, doSearch])
 
-    if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => {
-      doSearch(value)
-    }, 300)
-  }
-
-  const handleKeyDown = (e: React.KeyboardEvent): void => {
-    if (e.key === 'Escape') {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>): void => {
+    if (e.key === 'Enter') {
+      handleSubmit()
+    } else if (e.key === 'Escape') {
       collapse()
     }
   }
@@ -105,49 +83,52 @@ export default function BibleSearchBar(): React.JSX.Element {
     }
   }
 
+  useEffect(() => {
+    if (!isExpanded) return
+    const timer = setTimeout(() => inputRef.current?.focus(), 200)
+    return () => clearTimeout(timer)
+  }, [isExpanded])
+
+  useEffect(() => {
+    if (!isExpanded) return
+    const handleMouseDown = (e: MouseEvent): void => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        collapse()
+      }
+    }
+    document.addEventListener('mousedown', handleMouseDown)
+    return () => document.removeEventListener('mousedown', handleMouseDown)
+  }, [isExpanded, collapse])
+
   return (
-    <div ref={containerRef} className="relative flex items-center" data-testid="bible-search-bar">
-      <div
-        ref={inputWrapperRef}
-        className={`relative transition-all duration-200 ease-in-out overflow-hidden ${
-          isExpanded ? 'w-52 opacity-100 mr-1' : 'w-0 opacity-0'
-        }`}
-      >
+    <div
+      ref={containerRef}
+      data-testid="bible-search-bar"
+      className={`relative flex items-center transition-all duration-250 ease-in-out overflow-hidden rounded-full border ${
+        isExpanded ? 'w-64 border-border bg-transparent' : 'w-10 border-border bg-transparent'
+      }`}
+    >
+      {isExpanded && (
         <input
+          ref={inputRef}
           data-bible-search
           type="text"
-          placeholder="搜尋經文..."
           value={query}
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleQueryChange(e.target.value)}
+          onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
+          placeholder="搜尋經文..."
           aria-label="搜尋經文"
-          className="w-full h-8 rounded-md bg-default-100 text-foreground text-sm px-3 pr-7 border border-default-200 outline-none focus:border-primary focus:bg-default-50 placeholder:text-default-400 transition-colors"
+          className="flex-1 h-10 bg-transparent text-sm text-foreground pl-4 pr-1 outline-none placeholder:text-muted-fg"
         />
-        {query.length > 0 && (
-          <button
-            type="button"
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 hover:text-default-600"
-            onMouseDown={(e) => {
-              e.preventDefault()
-              setQuery('')
-              clearSearch()
-            }}
-            aria-label="清除搜尋"
-          >
-            <X size={14} />
-          </button>
-        )}
-      </div>
-
-      <Button
-        size="sm"
-        isIconOnly
-        variant={isExpanded ? 'ghost' : 'tertiary'}
-        onPress={handleToggle}
-        aria-label={isExpanded ? '關閉搜尋' : '搜尋經文'}
+      )}
+      <button
+        type="button"
+        onClick={isExpanded ? handleSubmit : handleToggle}
+        aria-label={isExpanded ? '送出搜尋' : '搜尋經文'}
+        className="shrink-0 flex items-center justify-center w-10 h-10 text-muted-fg hover:text-foreground transition-colors"
       >
         <Search size={16} />
-      </Button>
+      </button>
     </div>
   )
 }
