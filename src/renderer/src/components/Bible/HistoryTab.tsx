@@ -38,11 +38,18 @@ export function HistoryTab(): React.JSX.Element | null {
     <ScrollShadow className="h-full w-full" hideScrollBar>
       <div className="space-y-1 p-2">
         {items.map((item) => (
-          <button
+          <div
             key={item.id}
-            type="button"
-            className="group flex w-full cursor-pointer items-center justify-between rounded-md p-2 text-left hover:bg-default-100 focus:outline-none focus:ring-2 focus:ring-primary"
+            role="button"
+            tabIndex={0}
+            className="group flex w-full cursor-pointer items-center justify-between rounded-md p-2 text-left hover:bg-default focus:outline-none focus:ring-2 focus:ring-primary"
             onClick={() => handleNavigate(item)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                handleNavigate(item)
+              }
+            }}
           >
             <div className="flex-1 overflow-hidden">
               <p className="truncate text-sm font-medium">{getVerseReference(item)}</p>
@@ -59,7 +66,7 @@ export function HistoryTab(): React.JSX.Element | null {
             >
               <X size={16} />
             </Button>
-          </button>
+          </div>
         ))}
       </div>
     </ScrollShadow>

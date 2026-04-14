@@ -1,4 +1,5 @@
-import { Button, Card, ScrollShadow, Spinner, Separator } from '@heroui/react'
+import { Button, Card, Spinner } from '@heroui/react'
+import GlassDivider from '@renderer/components/GlassDivider'
 import { useBibleStore } from '@renderer/stores/bible'
 import { useBibleSearchStore } from '@renderer/stores/bible-search'
 import { useBibleHistoryStore } from '@renderer/stores/bible-history'
@@ -10,7 +11,7 @@ import {
   buildVerseHistoryItem
 } from '@renderer/lib/bible-utils'
 import type { MouseEvent } from 'react'
-import React, { useRef, useEffect } from 'react'
+import React, { useRef, useEffect, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
@@ -38,6 +39,18 @@ export function BiblePreview({
 
   const { claimProjection, project } = useProjection()
   const verseRefs = useRef<Map<number, HTMLButtonElement>>(new Map())
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const [spacerHeight, setSpacerHeight] = useState(0)
+
+  const scrollContainerCallbackRef = (node: HTMLDivElement | null): void => {
+    scrollContainerRef.current = node
+    if (!node) return
+    setSpacerHeight(node.clientHeight)
+    const observer = new ResizeObserver(() => {
+      setSpacerHeight(node.clientHeight)
+    })
+    observer.observe(node)
+  }
 
   const isSearchMode = useBibleSearchStore((s) => s.isSearchMode)
   const isSearching = useBibleSearchStore((s) => s.isSearching)
@@ -84,8 +97,11 @@ export function BiblePreview({
     const verse = verses[clamped]
     if (!verse) return
     const el = verseRefs.current.get(verse.number)
-    if (el) {
-      el.scrollIntoView({ block: 'start', behavior: 'smooth' })
+    const container = scrollContainerRef.current
+    if (el && container) {
+      const top =
+        el.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop
+      container.scrollTo({ top, behavior: 'smooth' })
     }
   }, [selectedVerseIndex, verses])
 
@@ -128,13 +144,13 @@ export function BiblePreview({
       if (searchResults.length === 0) {
         return (
           <div className="flex h-full items-center justify-center">
-            <p className="text-default-400">無結果</p>
+            <p className="text-muted">無結果</p>
           </div>
         )
       }
 
       return (
-        <ScrollShadow hideScrollBar className="h-full">
+        <div className="h-full overflow-y-auto">
           <div className="flex flex-col gap-1 p-4">
             {searchResults.map((r) => {
               const bookConfig = getBookConfig(r.bookNumber)
@@ -146,33 +162,33 @@ export function BiblePreview({
                   key={r.verseId}
                   type="button"
                   onClick={() => handleSearchResultClick(r.bookNumber, r.chapter, r.verse)}
-                  className="w-full text-left rounded-md p-2 hover:bg-default-100 transition-colors"
+                  className="w-full text-left rounded-md p-2 hover:bg-default transition-colors"
                 >
-                  <div className="text-xs font-medium text-primary mb-0.5">
+                  <div className="text-xs font-medium text-accent mb-0.5">
                     {bookAbbr} {r.chapter}:{r.verse}
                   </div>
-                  <div className="text-sm text-default-700">
+                  <div className="text-sm text-foreground">
                     {renderHighlightedText(r.text, searchQuery)}
                   </div>
                 </button>
               )
             })}
           </div>
-        </ScrollShadow>
+        </div>
       )
     }
 
     if (!verses || verses.length === 0) {
       return (
         <div className="flex h-full items-center justify-center">
-          <p className="text-default-500">尚未載入經文內容</p>
+          <p className="text-muted">尚未載入經文內容</p>
         </div>
       )
     }
 
     return (
-      <ScrollShadow hideScrollBar className="h-full">
-        <div className="flex flex-col gap-2 p-4">
+      <div ref={scrollContainerCallbackRef} className="h-full overflow-y-auto">
+        <div className="flex flex-col gap-2 px-2">
           {verses.map((verse, index) => {
             const isSelected = index === selectedVerseIndex
             const isProjected = currentPassage?.verse === verse.number
@@ -190,22 +206,22 @@ export function BiblePreview({
                 onClick={() => handleVerseClick(index, verse.number, verse.text)}
                 onContextMenu={onContextMenu}
                 data-verse-number={verse.number}
-                className={`w-full text-left cursor-pointer rounded-md p-2 transition-colors flex items-start ${
+                className={`w-full text-left cursor-pointer rounded-3xl p-3 transition-colors flex items-start ${
                   isSelected
-                    ? 'bg-primary/25 border-l-2 border-primary'
+                    ? 'bg-accent-soft-hover'
                     : isProjected
-                      ? 'bg-primary/10 border-l-2 border-primary'
-                      : 'hover:bg-primary/10'
+                      ? 'bg-accent-soft'
+                      : 'hover:bg-accent/8'
                 }`}
               >
-                <span className="text-default-400 mr-2 flex-shrink-0">{verse.number}</span>
-                <span className="flex-1">{verse.text}</span>
+                <span className="text-muted mr-2 shrink-0">{verse.number}</span>
+                <span className="flex-1 text-xl">{verse.text}</span>
               </button>
             )
           })}
-          <div className="flex-shrink-0" style={{ height: '80%' }} aria-hidden />
+          <div className="shrink-0" style={{ height: spacerHeight }} aria-hidden />
         </div>
-      </ScrollShadow>
+      </div>
     )
   }
 
@@ -216,19 +232,19 @@ export function BiblePreview({
     : ''
 
   return (
-    <Card className="flex-1 h-full">
-      <div className="flex flex-row items-center justify-between">
-        <h2 className="text-lg font-semibold">
+    <Card className="flex flex-col h-full flex-1 p-0">
+      <Card.Header className="shrink-0 flex-row! items-center justify-between p-0">
+        <h2 className="text-lg font-semibold pl-5 pt-3">
           {bookName}
           {book && chapter
             ? ` ${chapter.number}${t(`bible.chapterUnit.${book.number === 19 ? 'psa' : 'default'}`)}`
             : ''}
         </h2>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 pt-3 pr-3">
           <Button
             isIconOnly
-            size="sm"
-            variant="ghost"
+            variant="tertiary"
+            size="lg"
             onPress={prevChapter}
             isDisabled={isPrevDisabled}
           >
@@ -236,17 +252,17 @@ export function BiblePreview({
           </Button>
           <Button
             isIconOnly
-            size="sm"
-            variant="ghost"
+            variant="tertiary"
+            size="lg"
             onPress={nextChapter}
             isDisabled={isNextDisabled}
           >
             <ChevronRight size={16} />
           </Button>
         </div>
-      </div>
-      <Separator />
-      <Card.Content className="p-0">{renderContent()}</Card.Content>
+      </Card.Header>
+      <GlassDivider />
+      <Card.Content className="flex-1 min-h-0 overflow-hidden p-0">{renderContent()}</Card.Content>
     </Card>
   )
 }

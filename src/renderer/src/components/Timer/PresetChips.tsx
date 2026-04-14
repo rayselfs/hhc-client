@@ -50,7 +50,7 @@ export default function PresetChips({ className }: PresetChipsProps): React.JSX.
             size="lg"
             variant="tertiary"
             isDisabled={isRunning}
-            className="rounded-full w-19"
+            className="rounded-full w-18"
             aria-label={preset.name}
             onPress={() => !isRunning && applyPreset(preset.id)}
             onContextMenu={(e: React.MouseEvent) => handleContextMenu(e, preset.id)}
@@ -61,7 +61,7 @@ export default function PresetChips({ className }: PresetChipsProps): React.JSX.
         <Button
           size="lg"
           variant="outline"
-          className="rounded-full w-19"
+          className="rounded-full w-18"
           onPress={handleAdd}
           isDisabled={isRunning || hasDuplicate}
           aria-label={t('timer.addPreset')}

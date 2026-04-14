@@ -21,10 +21,10 @@ export default function BibleMultiFunction(): React.JSX.Element {
             </Tabs.Tab>
           </Tabs.List>
         </Tabs.ListContainer>
-        <Tabs.Panel id="history" className="flex-grow h-0">
+        <Tabs.Panel id="history" className="flex-grow h-0 overflow-hidden">
           <HistoryTab />
         </Tabs.Panel>
-        <Tabs.Panel id="custom" className="flex-grow h-0">
+        <Tabs.Panel id="custom" className="flex-grow h-0 overflow-hidden">
           <CustomFolderTab />
         </Tabs.Panel>
       </Tabs>

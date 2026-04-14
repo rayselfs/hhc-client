@@ -71,7 +71,7 @@ export default function BiblePage(): React.JSX.Element {
   }, [bookNumber, chapterNumber, passageVerse, getCurrentVerses])
 
   const projectVerse = useCallback(
-    (verseIndex: number) => {
+    (verseIndex: number, skipHistory = false) => {
       const verses = getCurrentVerses()
       if (!verses || verses.length === 0) return
       const clamped = Math.max(0, Math.min(verseIndex, verses.length - 1))
@@ -88,19 +88,21 @@ export default function BiblePage(): React.JSX.Element {
       navigateTo({ bookNumber: book.number, chapter: chapter.number, verse: verse.number })
       setSelectedVerseIndex(clamped)
 
-      const { selectedVersionId } = useBibleSettingsStore.getState()
-      const { versions } = useBibleStore.getState()
-      const versionMeta = versions.find((v) => v.id === selectedVersionId)
-      const historyItem = buildVerseHistoryItem({
-        bookNumber: book.number,
-        bookName: book.name,
-        chapter: chapter.number,
-        verseNumber: verse.number,
-        text: verse.text,
-        versionCode: versionMeta?.code ?? '',
-        versionName: versionMeta?.name ?? ''
-      })
-      useBibleHistoryStore.getState().addToHistory(historyItem)
+      if (!skipHistory) {
+        const { selectedVersionId } = useBibleSettingsStore.getState()
+        const { versions } = useBibleStore.getState()
+        const versionMeta = versions.find((v) => v.id === selectedVersionId)
+        const historyItem = buildVerseHistoryItem({
+          bookNumber: book.number,
+          bookName: book.name,
+          chapter: chapter.number,
+          verseNumber: verse.number,
+          text: verse.text,
+          versionCode: versionMeta?.code ?? '',
+          versionName: versionMeta?.name ?? ''
+        })
+        useBibleHistoryStore.getState().addToHistory(historyItem)
+      }
     },
     [t, getCurrentVerses, getCurrentBook, getCurrentChapter, claimProjection, project, navigateTo]
   )
@@ -109,12 +111,12 @@ export default function BiblePage(): React.JSX.Element {
     const verses = getCurrentVerses()
     if (!verses || verses.length === 0) return
     const next = Math.min(selectedVerseIndexRef.current + 1, verses.length - 1)
-    projectVerse(next)
+    projectVerse(next, true)
   }, [getCurrentVerses, projectVerse])
 
   const handlePrevVerse = useCallback(() => {
     const prev = Math.max(selectedVerseIndexRef.current - 1, 0)
-    projectVerse(prev)
+    projectVerse(prev, true)
   }, [projectVerse])
 
   const handleNextChapter = useCallback(() => {
