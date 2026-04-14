@@ -104,23 +104,23 @@ export default function BibleSearchBar(): React.JSX.Element {
     <div
       ref={containerRef}
       data-testid="bible-search-bar"
-      className={`relative flex items-center transition-all duration-250 ease-in-out overflow-hidden rounded-full border ${
-        isExpanded ? 'w-64 border-border bg-transparent' : 'w-10 border-border bg-transparent'
+      className={`relative flex items-center transition-[width] duration-250 ease-in-out rounded-full border border-border ${
+        isExpanded ? 'w-64' : 'w-10'
       }`}
     >
-      {isExpanded && (
-        <input
-          ref={inputRef}
-          data-bible-search
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="搜尋經文..."
-          aria-label="搜尋經文"
-          className="flex-1 h-10 bg-transparent text-sm text-foreground pl-4 pr-1 outline-none placeholder:text-muted-fg"
-        />
-      )}
+      <input
+        ref={inputRef}
+        data-bible-search
+        type="text"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        onKeyDown={handleKeyDown}
+        placeholder="搜尋經文..."
+        aria-label="搜尋經文"
+        className={`h-10 bg-transparent text-sm text-foreground pl-4 pr-1 outline-none placeholder:text-muted-fg transition-opacity duration-200 ${
+          isExpanded ? 'flex-1 opacity-100' : 'w-0 opacity-0 pointer-events-none'
+        }`}
+      />
       <button
         type="button"
         onClick={isExpanded ? handleSubmit : handleToggle}
