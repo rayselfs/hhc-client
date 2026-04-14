@@ -23,7 +23,7 @@ export default function BiblePage(): React.JSX.Element {
     nextChapter,
     prevChapter
   } = useBibleStore()
-  const { isLoading, initialize: initializeFolderStore } = useBibleFolderStore()
+  const { initialize: initializeFolderStore } = useBibleFolderStore()
   const fontSize = useBibleSettingsStore((s) => s.fontSize)
   const [isSelectorOpen, setSelectorOpen] = useState(false)
   const [selectedVerseIndex, setSelectedVerseIndex] = useState(0)
@@ -37,10 +37,8 @@ export default function BiblePage(): React.JSX.Element {
   })
 
   useEffect(() => {
-    if (!isLoading) {
-      initializeFolderStore()
-    }
-  }, [isLoading, initializeFolderStore])
+    initializeFolderStore()
+  }, [initializeFolderStore])
 
   useEffect(() => {
     project('bible:settings', { fontSize })

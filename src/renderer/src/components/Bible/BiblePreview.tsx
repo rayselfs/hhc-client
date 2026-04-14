@@ -1,14 +1,16 @@
-import { Button, Card, Spinner } from '@heroui/react'
+import { Button, Card, ScrollShadow, Spinner } from '@heroui/react'
 import GlassDivider from '@renderer/components/GlassDivider'
 import { useBibleStore } from '@renderer/stores/bible'
 import { useBibleSearchStore } from '@renderer/stores/bible-search'
 import { useBibleHistoryStore } from '@renderer/stores/bible-history'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
+import { useBibleFolderStore } from '@renderer/stores/folder'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
 import { getBookConfig, buildVerseHistoryItem } from '@renderer/lib/bible-utils'
+import { buildVerseItem } from './useBibleContextMenu'
 import type { MouseEvent } from 'react'
 import React, { useRef, useEffect, useState } from 'react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, CirclePlus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 interface BiblePreviewProps {
@@ -36,7 +38,35 @@ export function BiblePreview({
   const { claimProjection, project } = useProjection()
   const verseRefs = useRef<Map<number, HTMLButtonElement>>(new Map())
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const prevSelectedVerseIndexRef = useRef<number>(selectedVerseIndex)
   const [spacerHeight, setSpacerHeight] = useState(0)
+  const handleQuickAddToFolder = (
+    verseNumber: number,
+    verseText: string,
+    e: React.MouseEvent
+  ): void => {
+    e.stopPropagation()
+    if (!book || !chapter) return
+    const bookName = book
+      ? (t as (k: string) => string)(
+          `bible.books.${getBookConfig(book.number)?.code.toLowerCase()}.name`
+        )
+      : ''
+    const item = buildVerseItem({
+      bookNumber: book.number,
+      chapter: chapter.number,
+      verse: verseNumber,
+      text: verseText,
+      bookName
+    })
+    const folderStore = useBibleFolderStore.getState()
+    const currentFolder = folderStore.getCurrentFolder()
+    const targetItems = currentFolder ? currentFolder.items : folderStore.root.items
+    const alreadyExists = targetItems.some((i) => i.id === item.id)
+    if (!alreadyExists) {
+      folderStore.addItem(item)
+    }
+  }
 
   const scrollContainerCallbackRef = (node: HTMLDivElement | null): void => {
     scrollContainerRef.current = node
@@ -101,8 +131,10 @@ export function BiblePreview({
     if (el && container) {
       const top =
         el.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop
-      container.scrollTo({ top, behavior: 'smooth' })
+      const isAdjacent = Math.abs(selectedVerseIndex - prevSelectedVerseIndexRef.current) <= 1
+      container.scrollTo({ top, behavior: isAdjacent ? 'smooth' : 'instant' })
     }
+    prevSelectedVerseIndexRef.current = selectedVerseIndex
   }, [selectedVerseIndex, verses])
 
   const revelation = getBookConfig(66)
@@ -187,41 +219,52 @@ export function BiblePreview({
     }
 
     return (
-      <div ref={scrollContainerCallbackRef} className="h-full overflow-y-auto">
-        <div className="flex flex-col gap-2 px-2">
-          {verses.map((verse, index) => {
-            const isSelected = index === selectedVerseIndex
-            const isProjected = currentPassage?.verse === verse.number
-            return (
-              <button
-                key={verse.number}
-                ref={(el) => {
-                  if (el) {
-                    verseRefs.current.set(verse.number, el)
-                  } else {
-                    verseRefs.current.delete(verse.number)
-                  }
-                }}
-                type="button"
-                onClick={() => handleVerseClick(index, verse.number, verse.text)}
-                onContextMenu={onContextMenu}
-                data-verse-number={verse.number}
-                className={`w-full text-left cursor-pointer rounded-3xl p-3 transition-colors flex items-start ${
-                  isSelected
-                    ? 'bg-accent-soft-hover'
-                    : isProjected
-                      ? 'bg-accent-soft'
-                      : 'hover:bg-accent/8'
-                }`}
-              >
-                <span className="text-muted mr-2 shrink-0">{verse.number}</span>
-                <span className="flex-1 text-xl">{verse.text}</span>
-              </button>
-            )
-          })}
-          <div className="shrink-0" style={{ height: spacerHeight }} aria-hidden />
+      <ScrollShadow className="h-full" hideScrollBar>
+        <div ref={scrollContainerCallbackRef} className="h-full overflow-y-auto">
+          <div className="flex flex-col gap-2 px-2">
+            {verses.map((verse, index) => {
+              const isSelected = index === selectedVerseIndex
+              const isProjected = currentPassage?.verse === verse.number
+              return (
+                <div key={verse.number} className="group relative">
+                  <button
+                    ref={(el) => {
+                      if (el) {
+                        verseRefs.current.set(verse.number, el)
+                      } else {
+                        verseRefs.current.delete(verse.number)
+                      }
+                    }}
+                    type="button"
+                    onClick={() => handleVerseClick(index, verse.number, verse.text)}
+                    onContextMenu={onContextMenu}
+                    data-verse-number={verse.number}
+                    className={`w-full text-left cursor-pointer rounded-3xl p-3 transition-colors flex items-start ${
+                      isSelected
+                        ? 'bg-accent-soft-hover'
+                        : isProjected
+                          ? 'bg-accent-soft'
+                          : 'hover:bg-accent/8'
+                    }`}
+                  >
+                    <span className="text-muted mr-2 shrink-0">{verse.number}</span>
+                    <span className="flex-1 text-xl pr-6">{verse.text}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => handleQuickAddToFolder(verse.number, verse.text, e)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-full hover:bg-accent-soft"
+                    aria-label={t('bible.contextMenu.addToFolder')}
+                  >
+                    <CirclePlus size={14} className="text-muted" />
+                  </button>
+                </div>
+              )
+            })}
+            <div className="shrink-0" style={{ height: spacerHeight }} aria-hidden />
+          </div>
         </div>
-      </div>
+      </ScrollShadow>
     )
   }
 
@@ -243,7 +286,7 @@ export function BiblePreview({
         <div className="flex items-center gap-2 pt-3 pr-3">
           <Button
             isIconOnly
-            variant="tertiary"
+            variant="ghost"
             size="lg"
             onPress={prevChapter}
             isDisabled={isPrevDisabled}
@@ -252,7 +295,7 @@ export function BiblePreview({
           </Button>
           <Button
             isIconOnly
-            variant="tertiary"
+            variant="ghost"
             size="lg"
             onPress={nextChapter}
             isDisabled={isNextDisabled}

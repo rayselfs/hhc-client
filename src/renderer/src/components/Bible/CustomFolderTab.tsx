@@ -2,13 +2,19 @@ import React, { useState, useRef, useCallback, useMemo } from 'react'
 import { useBibleFolderStore } from '@renderer/stores/folder'
 import { useBibleStore } from '@renderer/stores/bible'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
+import { useProjection } from '@renderer/contexts/ProjectionContext'
 import type { VerseItem, Folder, FolderItem } from '@shared/types/folder'
 import { isVerseItem, isFolder } from '@shared/types/folder'
-import { ScrollShadow, Button, Breadcrumbs, Input, Modal, TextField, Label } from '@heroui/react'
-import { FolderPlus, Folder as FolderIcon, Trash2, X, BookText, GripVertical } from 'lucide-react'
+import { ScrollShadow, Button, Input, Modal, TextField, Label } from '@heroui/react'
+import { FolderPlus, Folder as FolderIcon, Trash2, X, GripVertical } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useKeyboardShortcuts } from '@renderer/hooks/useKeyboardShortcuts'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
+
+interface CustomFolderTabProps {
+  isModalOpen?: boolean
+  onModalOpenChange?: (open: boolean) => void
+}
 
 function getVerseReference(item: VerseItem): string {
   if (item.verseStart === item.verseEnd) {
@@ -33,7 +39,10 @@ interface ClipboardState {
   mode: ClipboardMode
 }
 
-export function CustomFolderTab(): React.JSX.Element {
+export function CustomFolderTab({
+  isModalOpen = false,
+  onModalOpenChange = () => {}
+}: CustomFolderTabProps): React.JSX.Element {
   const {
     root,
     currentFolderId,
@@ -42,16 +51,15 @@ export function CustomFolderTab(): React.JSX.Element {
     deleteFolder,
     removeItem,
     navigateToFolder,
-    navigateToRoot,
     moveItem,
     reorderItems,
     addItem
   } = useBibleFolderStore()
   const { navigateTo } = useBibleStore.getState()
+  const { claimProjection, project } = useProjection()
   const confirm = useConfirm()
   const { t } = useTranslation()
 
-  const [isModalOpen, setModalOpen] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set())
   const [clipboard, setClipboard] = useState<ClipboardState | null>(null)
@@ -113,6 +121,26 @@ export function CustomFolderTab(): React.JSX.Element {
       lastClickedIdRef.current = null
     }
   }, [])
+
+  const handleVerseDoubleClick = useCallback(
+    (item: VerseItem) => {
+      navigateTo({ bookNumber: item.bookNumber, chapter: item.chapter, verse: item.verseStart })
+      const { content, versions } = useBibleStore.getState()
+      const versionId = versions.length > 0 ? versions[0].id : 0
+      const books = content.get(versionId)
+      const book = books?.find((b) => b.number === item.bookNumber)
+      const chapter = book?.chapters.find((c) => c.number === item.chapter)
+      if (!chapter) return
+      claimProjection('bible', { unblank: true })
+      project('bible:chapter', {
+        bookNumber: item.bookNumber,
+        chapter: item.chapter,
+        chapterVerses: chapter.verses.map((v) => ({ number: v.number, text: v.text })),
+        currentVerse: item.verseStart
+      })
+    },
+    [navigateTo, claimProjection, project]
+  )
 
   const handleSelectAll = useCallback(() => {
     setSelectedItemIds(new Set(items.map((i) => i.id)))
@@ -223,9 +251,9 @@ export function CustomFolderTab(): React.JSX.Element {
 
   const handleAddFolder = (): void => {
     if (newFolderName.trim()) {
-      addFolder(newFolderName.trim())
+      addFolder(newFolderName.trim(), currentFolderId)
       setNewFolderName('')
-      setModalOpen(false)
+      onModalOpenChange(false)
     }
   }
 
@@ -432,23 +460,24 @@ export function CustomFolderTab(): React.JSX.Element {
             tabIndex={-1}
             aria-selected={isItemSelected}
             onClick={(e) => handleItemClick(item.id, e)}
+            onDoubleClick={() => navigateToFolder(item.id)}
             onKeyDown={(e) =>
               (e.key === 'Enter' || e.key === ' ') &&
               handleItemClick(item.id, e as unknown as React.MouseEvent)
             }
             className={[
-              'flex items-center justify-between p-2 rounded-md group cursor-pointer select-none transition-colors duration-150',
+              'flex items-center justify-between rounded-3xl p-3 group cursor-pointer select-none transition-colors',
               isBeingDragged ? 'opacity-40' : '',
               isItemSelected
-                ? 'bg-primary/15 ring-1 ring-primary/40'
+                ? 'bg-accent-soft-hover'
                 : isFolderDropTarget
-                  ? 'bg-primary/15 ring-2 ring-primary/50 ring-dashed'
-                  : 'hover:bg-neutral-100 dark:hover:bg-neutral-800'
+                  ? 'bg-accent/15 ring-2 ring-accent/50 ring-dashed'
+                  : 'hover:bg-accent/8'
             ]
               .filter(Boolean)
               .join(' ')}
           >
-            <div className="flex items-center gap-1 w-full min-w-0">
+            <div className="flex items-center gap-2 min-w-0 w-full">
               <button
                 type="button"
                 aria-label={t('common.drag_handle', 'Drag to reorder')}
@@ -458,16 +487,8 @@ export function CustomFolderTab(): React.JSX.Element {
               >
                 <GripVertical className="w-4 h-4" />
               </button>
-              <Button
-                variant="ghost"
-                className="w-full justify-start h-auto p-0 font-normal min-w-0"
-                onPress={() => navigateToFolder(item.id)}
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <FolderIcon className="w-5 h-5 text-neutral-500 shrink-0" />
-                  <span className="font-medium truncate">{item.name}</span>
-                </div>
-              </Button>
+              <FolderIcon className="w-4 h-4 text-muted shrink-0" />
+              <span className="font-medium truncate flex-1">{item.name}</span>
             </div>
             <Button
               variant="ghost"
@@ -506,16 +527,15 @@ export function CustomFolderTab(): React.JSX.Element {
             tabIndex={-1}
             aria-selected={isItemSelected}
             onClick={(e) => handleItemClick(item.id, e)}
+            onDoubleClick={() => handleVerseDoubleClick(item)}
             onKeyDown={(e) =>
               (e.key === 'Enter' || e.key === ' ') &&
               handleItemClick(item.id, e as unknown as React.MouseEvent)
             }
             className={[
-              'flex items-center justify-between p-2 rounded-md group select-none transition-colors duration-150',
+              'flex items-center justify-between rounded-3xl p-3 group select-none transition-colors cursor-pointer',
               isBeingDragged ? 'opacity-40' : '',
-              isItemSelected
-                ? 'bg-primary/15 ring-1 ring-primary/40'
-                : 'hover:bg-neutral-100 dark:hover:bg-neutral-800'
+              isItemSelected ? 'bg-accent-soft-hover' : 'hover:bg-accent/8'
             ]
               .filter(Boolean)
               .join(' ')}
@@ -530,25 +550,12 @@ export function CustomFolderTab(): React.JSX.Element {
               >
                 <GripVertical className="w-4 h-4" />
               </button>
-              <Button
-                variant="ghost"
-                className="w-full justify-start h-auto p-0 font-normal min-w-0"
-                onPress={() =>
-                  navigateTo({
-                    bookNumber: item.bookNumber,
-                    chapter: item.chapter,
-                    verse: item.verseStart
-                  })
-                }
-              >
-                <div className="flex items-center gap-2 text-left min-w-0">
-                  <BookText className="w-5 h-5 text-neutral-500 shrink-0" />
-                  <div className="min-w-0">
-                    <div className="font-medium">{reference}</div>
-                    <div className="text-sm text-neutral-500 whitespace-normal">{item.text}</div>
-                  </div>
+              <div className="flex items-center gap-2 text-left min-w-0 w-full">
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-muted">{reference}</div>
+                  <div className="text-lg whitespace-normal">{item.text}</div>
                 </div>
-              </Button>
+              </div>
             </div>
             <Button
               variant="ghost"
@@ -573,22 +580,7 @@ export function CustomFolderTab(): React.JSX.Element {
 
   return (
     <div ref={containerRef} className="flex flex-col h-full">
-      <header className="flex items-center justify-between p-2 border-b border-neutral-200 dark:border-neutral-800">
-        <Breadcrumbs>
-          <Breadcrumbs.Item onPress={navigateToRoot}>
-            {t('bible.library', 'Bible Library')}
-          </Breadcrumbs.Item>
-          {currentFolder ? <Breadcrumbs.Item>{currentFolder.name}</Breadcrumbs.Item> : null}
-        </Breadcrumbs>
-        {currentFolderId === root.id && (
-          <Button variant="ghost" size="sm" onPress={() => setModalOpen(true)}>
-            <FolderPlus className="w-5 h-5 mr-2" />
-            {t('bible.new_folder', 'New Folder')}
-          </Button>
-        )}
-      </header>
-
-      <ScrollShadow className="flex-grow p-2" onClick={handleContainerClick}>
+      <ScrollShadow className="grow p-2" onClick={handleContainerClick}>
         {items.length === 0 ? (
           <div className="flex items-center justify-center h-full text-neutral-500">
             {t('bible.folder_empty', 'Folder is empty')}
@@ -600,7 +592,7 @@ export function CustomFolderTab(): React.JSX.Element {
         )}
       </ScrollShadow>
 
-      <Modal isOpen={isModalOpen} onOpenChange={setModalOpen}>
+      <Modal isOpen={isModalOpen} onOpenChange={onModalOpenChange}>
         <Modal.Backdrop>
           <Modal.Container>
             <Modal.Dialog>
@@ -619,7 +611,7 @@ export function CustomFolderTab(): React.JSX.Element {
                 </TextField>
               </Modal.Body>
               <Modal.Footer>
-                <Button variant="tertiary" onPress={() => setModalOpen(false)}>
+                <Button variant="tertiary" onPress={() => onModalOpenChange(false)}>
                   <X className="w-4 h-4 mr-2" />
                   {t('common.cancel', 'Cancel')}
                 </Button>
