@@ -5,7 +5,10 @@ import {
   useSensor,
   useSensors,
   DragOverlay,
+  useDroppable,
+  pointerWithin,
   closestCenter,
+  type CollisionDetection,
   type DragStartEvent,
   type DragEndEvent,
   type DragOverEvent
@@ -49,11 +52,14 @@ interface ClipboardState {
   mode: ClipboardMode
 }
 
-type DndItemData = { type: 'folder'; item: Folder } | { type: 'verse'; item: VerseItem }
+type DndItemData =
+  | { type: 'folder'; item: Folder }
+  | { type: 'verse'; item: VerseItem }
+  | { type: 'folder-dropzone'; folderId: string }
 
-interface SortableItemProps {
+interface SortableFolderItemProps {
   id: string
-  data: DndItemData
+  folder: Folder
   isSelected: boolean
   isFolderDropTarget: boolean
   isCut: boolean
@@ -63,17 +69,66 @@ interface SortableItemProps {
   ) => React.ReactNode
 }
 
-function SortableItem({
+function SortableFolderItem({
   id,
-  data,
-  isSelected,
-  isFolderDropTarget,
+  folder,
   isCut,
   children
-}: SortableItemProps): React.JSX.Element {
+}: SortableFolderItemProps): React.JSX.Element {
+  const sortable = useSortable({ id, data: { type: 'folder', item: folder } as DndItemData })
+  const droppable = useDroppable({
+    id: `drop-${id}`,
+    data: { type: 'folder-dropzone', folderId: id } as DndItemData
+  })
+
+  const setRef = useCallback(
+    (el: HTMLElement | null) => {
+      sortable.setNodeRef(el)
+      droppable.setNodeRef(el)
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [sortable.setNodeRef, droppable.setNodeRef]
+  )
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(sortable.transform),
+    transition: sortable.transition,
+    opacity: sortable.isDragging ? 0.4 : isCut ? 0.4 : 1
+  }
+
+  return (
+    <li ref={setRef} style={style} className="list-none">
+      {children(
+        {
+          ...sortable.attributes,
+          ...sortable.listeners
+        } as React.HTMLAttributes<HTMLButtonElement>,
+        sortable.isDragging
+      )}
+    </li>
+  )
+}
+
+interface SortableVerseItemProps {
+  id: string
+  verse: VerseItem
+  isSelected: boolean
+  isCut: boolean
+  children: (
+    dragHandleProps: React.HTMLAttributes<HTMLButtonElement>,
+    isDragging: boolean
+  ) => React.ReactNode
+}
+
+function SortableVerseItem({
+  id,
+  verse,
+  isCut,
+  children
+}: SortableVerseItemProps): React.JSX.Element {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id,
-    data
+    data: { type: 'verse', item: verse } as DndItemData
   })
 
   const style: React.CSSProperties = {
@@ -81,9 +136,6 @@ function SortableItem({
     transition,
     opacity: isDragging ? 0.4 : isCut ? 0.4 : 1
   }
-
-  void isSelected
-  void isFolderDropTarget
 
   return (
     <li ref={setNodeRef} style={style} className="list-none">
@@ -140,6 +192,16 @@ export function CustomFolderTab({
       currentFolder
         ? [...currentFolder.folders, ...currentFolder.items]
         : [...root.folders, ...root.items],
+    [currentFolder, root]
+  )
+
+  const folders = useMemo(
+    () => (currentFolder ? currentFolder.folders : root.folders),
+    [currentFolder, root]
+  )
+
+  const verses = useMemo(
+    () => (currentFolder ? currentFolder.items : root.items),
     [currentFolder, root]
   )
 
@@ -448,8 +510,8 @@ export function CustomFolderTab({
       return
     }
     const overData = over.data.current as DndItemData | undefined
-    if (overData?.type === 'folder') {
-      setFolderDropTargetId(String(over.id))
+    if (overData?.type === 'folder-dropzone') {
+      setFolderDropTargetId(overData.folderId)
     } else {
       setFolderDropTargetId(null)
     }
@@ -471,8 +533,8 @@ export function CustomFolderTab({
       const parentFolder = currentFolder
       const parentFolderId = parentFolder?.id ?? root.id
 
-      if (activeData.type === 'verse' && overData?.type === 'folder') {
-        moveItem(String(active.id), String(over.id))
+      if (overData?.type === 'folder-dropzone') {
+        moveItem(String(active.id), overData.folderId)
         return
       }
 
@@ -495,33 +557,8 @@ export function CustomFolderTab({
         }
         return
       }
-
-      if (activeData.type === 'folder' && overData?.type === 'verse') {
-        const allIds = items.map((i) => i.id)
-        const folderIds = (parentFolder ?? root).folders.map((f) => f.id)
-        const oldIndex = allIds.indexOf(String(active.id))
-        const newIndex = allIds.indexOf(String(over.id))
-        if (oldIndex !== -1 && newIndex !== -1) {
-          const reordered = arrayMove(
-            folderIds,
-            folderIds.indexOf(String(active.id)),
-            Math.min(newIndex, folderIds.length - 1)
-          )
-          reorderFolders(parentFolderId, reordered)
-        }
-        return
-      }
-
-      if (activeData.type === 'verse' && overData?.type === 'verse') {
-        const verseIds = (parentFolder ?? root).items.map((i) => i.id)
-        const oldIndex = verseIds.indexOf(String(active.id))
-        const newIndex = verseIds.indexOf(String(over.id))
-        if (oldIndex !== -1 && newIndex !== -1) {
-          reorderItems(parentFolderId, arrayMove(verseIds, oldIndex, newIndex))
-        }
-      }
     },
-    [currentFolder, root, items, moveItem, reorderItems, reorderFolders]
+    [currentFolder, root, moveItem, reorderItems, reorderFolders]
   )
 
   const renderFolderContent = (
@@ -648,74 +685,83 @@ export function CustomFolderTab({
     )
   }
 
-  const sortableIds = items.map((i) => i.id)
+  const customCollisionDetection: CollisionDetection = useCallback((args) => {
+    const folderDropZones = args.droppableContainers.filter(
+      (c) => (c.data.current as DndItemData | undefined)?.type === 'folder-dropzone'
+    )
+    const folderHits = pointerWithin({ ...args, droppableContainers: folderDropZones })
+    if (folderHits.length > 0) return folderHits
+    return closestCenter(args)
+  }, [])
+
+  const folderIds = folders.map((f) => f.id)
+  const verseIds = verses.map((v) => v.id)
 
   return (
     <div className="flex flex-col h-full">
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCenter}
+        collisionDetection={customCollisionDetection}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
-        <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
-          <ScrollShadow
-            className="grow p-2"
-            onClick={handleContainerClick}
-            onContextMenu={handleContextMenuForContainer}
-          >
-            {items.length === 0 ? (
-              <div className="flex items-center justify-center h-full text-neutral-500">
-                {t('bible.folder_empty', 'Folder is empty')}
-              </div>
-            ) : (
-              <ul className="list-none p-0 m-0">
-                {items.map((item) => {
+        <ScrollShadow
+          className="grow p-2"
+          onClick={handleContainerClick}
+          onContextMenu={handleContextMenuForContainer}
+        >
+          {items.length === 0 ? (
+            <div className="flex items-center justify-center h-full text-neutral-500">
+              {t('bible.folder_empty', 'Folder is empty')}
+            </div>
+          ) : (
+            <ul className="list-none p-0 m-0">
+              <SortableContext items={folderIds} strategy={verticalListSortingStrategy}>
+                {folders.map((item) => {
                   const isItemSelected = selectedItemIds.has(item.id)
                   const isItemCut =
                     clipboard?.mode === 'cut' && clipboard.items.some((i) => i.id === item.id)
-
-                  if (isFolder(item)) {
-                    return (
-                      <SortableItem
-                        key={item.id}
-                        id={item.id}
-                        data={{ type: 'folder', item }}
-                        isSelected={isItemSelected}
-                        isFolderDropTarget={folderDropTargetId === item.id}
-                        isCut={isItemCut}
-                      >
-                        {(dragHandleProps, isDragging) =>
-                          renderFolderContent(item, dragHandleProps, isItemSelected, isDragging)
-                        }
-                      </SortableItem>
-                    )
-                  }
-
-                  if (isVerseItem(item)) {
-                    return (
-                      <SortableItem
-                        key={item.id}
-                        id={item.id}
-                        data={{ type: 'verse', item }}
-                        isSelected={isItemSelected}
-                        isFolderDropTarget={false}
-                        isCut={isItemCut}
-                      >
-                        {(dragHandleProps, isDragging) =>
-                          renderVerseContent(item, dragHandleProps, isItemSelected, isDragging)
-                        }
-                      </SortableItem>
-                    )
-                  }
-
-                  return null
+                  return (
+                    <SortableFolderItem
+                      key={item.id}
+                      id={item.id}
+                      folder={item}
+                      isSelected={isItemSelected}
+                      isFolderDropTarget={folderDropTargetId === item.id}
+                      isCut={isItemCut}
+                    >
+                      {(dragHandleProps, isDragging) =>
+                        renderFolderContent(item, dragHandleProps, isItemSelected, isDragging)
+                      }
+                    </SortableFolderItem>
+                  )
                 })}
-              </ul>
-            )}
-          </ScrollShadow>
-        </SortableContext>
+              </SortableContext>
+
+              <SortableContext items={verseIds} strategy={verticalListSortingStrategy}>
+                {verses.map((item) => {
+                  const isItemSelected = selectedItemIds.has(item.id)
+                  const isItemCut =
+                    clipboard?.mode === 'cut' && clipboard.items.some((i) => i.id === item.id)
+                  return (
+                    <SortableVerseItem
+                      key={item.id}
+                      id={item.id}
+                      verse={item}
+                      isSelected={isItemSelected}
+                      isCut={isItemCut}
+                    >
+                      {(dragHandleProps, isDragging) =>
+                        renderVerseContent(item, dragHandleProps, isItemSelected, isDragging)
+                      }
+                    </SortableVerseItem>
+                  )
+                })}
+              </SortableContext>
+            </ul>
+          )}
+        </ScrollShadow>
 
         <DragOverlay>
           {activeDragItem ? (
