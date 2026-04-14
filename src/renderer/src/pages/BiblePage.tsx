@@ -11,12 +11,10 @@ import type { VerseMenuData } from '@renderer/components/Bible/useBibleContextMe
 import { useProjection } from '@renderer/contexts/ProjectionContext'
 import { useKeyboardShortcuts } from '@renderer/hooks/useKeyboardShortcuts'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
-import { formatVerseReference, buildVerseHistoryItem } from '@renderer/lib/bible-utils'
+import { buildVerseHistoryItem } from '@renderer/lib/bible-utils'
 import type { BiblePassage } from '@shared/types/bible'
-import { useTranslation } from 'react-i18next'
 
 export default function BiblePage(): React.JSX.Element {
-  const { t } = useTranslation()
   const {
     getCurrentVerses,
     getCurrentBook,
@@ -82,9 +80,13 @@ export default function BiblePage(): React.JSX.Element {
       const chapter = getCurrentChapter()
       if (!book || !chapter) return
 
-      const reference = formatVerseReference(t, book.number, chapter.number, verse.number)
       claimProjection('bible', { unblank: true })
-      project('bible:verse', { reference, text: verse.text })
+      project('bible:chapter', {
+        bookNumber: book.number,
+        chapter: chapter.number,
+        chapterVerses: verses.map((v) => ({ number: v.number, text: v.text })),
+        currentVerse: verse.number
+      })
       navigateTo({ bookNumber: book.number, chapter: chapter.number, verse: verse.number })
       setSelectedVerseIndex(clamped)
 
@@ -104,7 +106,7 @@ export default function BiblePage(): React.JSX.Element {
         useBibleHistoryStore.getState().addToHistory(historyItem)
       }
     },
-    [t, getCurrentVerses, getCurrentBook, getCurrentChapter, claimProjection, project, navigateTo]
+    [getCurrentVerses, getCurrentBook, getCurrentChapter, claimProjection, project, navigateTo]
   )
 
   const handleNextVerse = useCallback(() => {

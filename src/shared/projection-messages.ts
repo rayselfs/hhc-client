@@ -32,8 +32,13 @@ export interface AppMessages {
   'timer:overtime-message': { message: string }
   /** Timezone IANA string for clock display */
   'settings:timezone': { timezone: string }
-  /** Bible verse content for projection display */
-  'bible:verse': { reference: string; text: string }
+  /** Bible full chapter content for projection display */
+  'bible:chapter': {
+    bookNumber: number
+    chapter: number
+    chapterVerses: Array<{ number: number; text: string }>
+    currentVerse: number
+  }
   /** Bible display settings (font size, etc.) — sent independently from verse content */
   'bible:settings': { fontSize: number }
 }

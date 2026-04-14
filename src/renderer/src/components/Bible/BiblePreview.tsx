@@ -5,11 +5,7 @@ import { useBibleSearchStore } from '@renderer/stores/bible-search'
 import { useBibleHistoryStore } from '@renderer/stores/bible-history'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
-import {
-  formatVerseReference,
-  getBookConfig,
-  buildVerseHistoryItem
-} from '@renderer/lib/bible-utils'
+import { getBookConfig, buildVerseHistoryItem } from '@renderer/lib/bible-utils'
 import type { MouseEvent } from 'react'
 import React, { useRef, useEffect, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
@@ -63,11 +59,15 @@ export function BiblePreview({
   const book = getCurrentBook()
   const chapter = getCurrentChapter()
 
-  const handleVerseClick = (verseIndex: number, verseNumber: number, verseText: string): void => {
+  const handleVerseClick = (verseIndex: number, verseNumber: number, _verseText: string): void => {
     if (!book || !chapter) return
-    const reference = formatVerseReference(t, book.number, chapter.number, verseNumber)
     claimProjection('bible', { unblank: true })
-    project('bible:verse', { reference, text: verseText })
+    project('bible:chapter', {
+      bookNumber: book.number,
+      chapter: chapter.number,
+      chapterVerses: verses.map((v) => ({ number: v.number, text: v.text })),
+      currentVerse: verseNumber
+    })
     navigateTo({ bookNumber: book.number, chapter: chapter.number, verse: verseNumber })
     onSelectedVerseIndexChange(verseIndex)
 
@@ -79,7 +79,7 @@ export function BiblePreview({
       bookName: book.name,
       chapter: chapter.number,
       verseNumber,
-      text: verseText,
+      text: _verseText,
       versionCode: versionMeta?.code ?? '',
       versionName: versionMeta?.name ?? ''
     })
