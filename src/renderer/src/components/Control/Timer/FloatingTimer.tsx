@@ -1,7 +1,7 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useTimerStore } from '@renderer/stores/timer'
 import { isTimerRoute } from '@renderer/lib/routes'
-import TimerRing from '@renderer/components/Timer/TimerRing'
+import TimerRing from '@renderer/components/Control/Timer/TimerRing'
 
 function formatMMSS(seconds: number): string {
   const s = Math.max(0, Math.round(seconds))

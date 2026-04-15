@@ -3,7 +3,7 @@ import type { RenderResult } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { I18nextProvider } from 'react-i18next'
 import i18n from '@renderer/i18n'
-import TimeAdjustment from '@renderer/components/Timer/TimeAdjustment'
+import TimeAdjustment from '@renderer/components/Control/Timer/TimeAdjustment'
 import { useTimerStore } from '@renderer/stores/timer'
 
 beforeEach(() => {

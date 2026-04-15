@@ -1,6 +1,6 @@
 import { render, screen, act } from '@testing-library/react'
 import { useSettingsStore } from '@renderer/stores/settings'
-import ClockDisplay from '@renderer/components/Timer/ClockDisplay'
+import ClockDisplay from '@renderer/components/Control/Timer/ClockDisplay'
 
 describe('ClockDisplay', () => {
   beforeEach(() => {

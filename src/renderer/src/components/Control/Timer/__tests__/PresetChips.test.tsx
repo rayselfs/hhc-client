@@ -3,7 +3,7 @@ import type { RenderResult } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { I18nextProvider } from 'react-i18next'
 import i18n from '@renderer/i18n'
-import PresetChips from '@renderer/components/Timer/PresetChips'
+import PresetChips from '@renderer/components/Control/Timer/PresetChips'
 import { useTimerStore } from '@renderer/stores/timer'
 import type { TimerPreset } from '@shared/types/timer'
 

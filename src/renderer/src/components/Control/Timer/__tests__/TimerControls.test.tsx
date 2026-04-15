@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { I18nextProvider } from 'react-i18next'
 import { vi } from 'vitest'
 import i18n from '@renderer/i18n'
-import TimerControls from '@renderer/components/Timer/TimerControls'
+import TimerControls from '@renderer/components/Control/Timer/TimerControls'
 import { useTimerStore } from '@renderer/stores/timer'
 import { useStopwatchStore } from '@renderer/stores/stopwatch'
 
