@@ -6,8 +6,8 @@ import { ButtonGroup, Button, toast } from '@heroui/react'
 import { X, Monitor, MonitorOff, ExternalLink } from 'lucide-react'
 import ModeSelector from '@renderer/components/Control/Timer/ModeSelector'
 import SettingsPopover from '@renderer/components/SettingsPopover'
-import BibleHeaderControls from '@renderer/components/Control/Bible/BibleHeaderControls'
-import BibleSearchBar from '@renderer/components/Control/Bible/BibleSearchBar'
+import BibleSelector from '@renderer/components/Control/Bible/BibleSelector'
+import BibleSearchBar from '@renderer/components/Control/Header/SearchBar/BibleSearchBar'
 import { isTimerRoute, isBibleRoute } from '@renderer/lib/routes'
 import { useTimerStore } from '@renderer/stores/timer'
 
@@ -47,6 +47,10 @@ export default function Header(): React.JSX.Element {
     })
   }
 
+  const handleOpenBibleSelector = (): void => {
+    window.dispatchEvent(new Event('open-bible-selector'))
+  }
+
   return (
     <header className="relative flex items-center justify-end gap-2 p-2">
       {(showTimerControls || showBibleControls) && (
@@ -67,7 +71,9 @@ export default function Header(): React.JSX.Element {
         className={`absolute inset-0 flex items-center justify-center pointer-events-none transition-all duration-200 ${showBibleControls ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-3'}`}
       >
         <div className="pointer-events-auto">
-          <BibleHeaderControls />
+          <div data-testid="bible-header-controls">
+            <BibleSelector onOpenDialog={handleOpenBibleSelector} />
+          </div>
         </div>
       </div>
 

@@ -2,7 +2,7 @@ import React, { useCallback } from 'react'
 import { searchEngine, lookupVerseById } from '@renderer/lib/bible-search'
 import { useBibleSearchStore } from '@renderer/stores/bible-search'
 import { useTranslation } from 'react-i18next'
-import SearchBar from '@renderer/components/SearchBar'
+import SearchBar from '@renderer/components/Control/Header/SearchBar/SearchBar'
 
 export default function BibleSearchBar(): React.JSX.Element {
   const { t } = useTranslation()

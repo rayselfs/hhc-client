@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import BibleSearchBar from '../BibleSearchBar'
+import BibleSearchBar from './BibleSearchBar'
 
 const mockSearch = vi.fn().mockResolvedValue([])
 
