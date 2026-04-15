@@ -13,7 +13,7 @@ vi.mock('@renderer/stores/bible-search', () => ({
   })
 }))
 
-import { BibleSearchEngine } from '../bible-search-singleton'
+import { BibleSearchEngine } from '../bible-search'
 
 type MessageHandler = (event: MessageEvent<WorkerOutgoingMessage>) => void
 type ErrorHandler = (event: ErrorEvent) => void

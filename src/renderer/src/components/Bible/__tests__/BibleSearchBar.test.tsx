@@ -4,7 +4,7 @@ import BibleSearchBar from '../BibleSearchBar'
 
 const mockSearch = vi.fn().mockResolvedValue([])
 
-vi.mock('@renderer/lib/bible-search-singleton', () => ({
+vi.mock('@renderer/lib/bible-search', () => ({
   searchEngine: {
     search: (...args: unknown[]) => mockSearch(...args)
   },

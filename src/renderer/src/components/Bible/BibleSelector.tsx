@@ -3,7 +3,7 @@ import React, { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useBibleStore } from '@renderer/stores/bible'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
-import { switchVersionIndex } from '@renderer/lib/bible-search-singleton'
+import { switchVersionIndex } from '@renderer/lib/bible-search'
 import { Key } from 'react-aria-components'
 
 interface BibleSelectorProps {

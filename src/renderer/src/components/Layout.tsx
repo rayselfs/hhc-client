@@ -14,7 +14,7 @@ import { isWeb } from '@renderer/lib/env'
 import { toast } from '@heroui/react'
 import { useBibleStore } from '@renderer/stores/bible'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
-import { initializeSearchIndexes } from '@renderer/lib/bible-search-singleton'
+import { initializeSearchIndexes } from '@renderer/lib/bible-search'
 function ProjectionAutoOpen(): null {
   const { t } = useTranslation()
   const { isProjectionOpen, openProjection } = useProjection()
