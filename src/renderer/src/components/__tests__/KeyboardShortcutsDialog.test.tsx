@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { I18nextProvider } from 'react-i18next'
 import i18n from '@renderer/i18n'
-import KeyboardShortcutsDialog from '@renderer/components/KeyboardShortcutsDialog'
-import UserMenu from '@renderer/components/UserMenu'
+import KeyboardShortcutsDialog from '@renderer/components/Control/UserMenu/KeyboardShortcutsDialog'
+import UserMenu from '@renderer/components/Control/UserMenu/UserMenu'
 import { ConfirmDialogProvider } from '@renderer/contexts/ConfirmDialogContext'
 
 describe('KeyboardShortcutsDialog', () => {

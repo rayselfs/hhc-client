@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useLocation, Link } from 'react-router-dom'
 import { Timer, BookOpen } from 'lucide-react'
-import UserMenu from './UserMenu'
-import PreferencesDialog from './PreferencesDialog'
+import UserMenu from '@renderer/components/Control/UserMenu/UserMenu'
+import PreferencesDialog from '@renderer/components/Control/UserMenu/PreferencesDialog'
 
 interface NavItem {
   to: string

@@ -6,7 +6,7 @@ import '@renderer/i18n'
 import i18n from '@renderer/i18n'
 import { ConfirmDialogProvider } from '@renderer/contexts/ConfirmDialogContext'
 import ConfirmDialog from '../Common/ConfirmDialog'
-import PreferencesDialog from '../PreferencesDialog'
+import PreferencesDialog from '../Control/UserMenu/PreferencesDialog'
 
 vi.mock('@renderer/lib/env', () => ({
   isElectron: vi.fn().mockReturnValue(false),

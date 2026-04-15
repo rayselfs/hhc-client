@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { LogIn, LogOut, Settings, RefreshCw, Keyboard, Power, CircleUser } from 'lucide-react'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
-import KeyboardShortcutsDialog from '@renderer/components/KeyboardShortcutsDialog'
+import KeyboardShortcutsDialog from '@renderer/components/Control/UserMenu/KeyboardShortcutsDialog'
 
 interface UserMenuProps {
   onOpenPreferences?: () => void
