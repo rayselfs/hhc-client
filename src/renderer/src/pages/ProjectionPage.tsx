@@ -6,7 +6,7 @@ import DefaultProjection from '@renderer/components/Projection/DefaultProjection
 import TimerDisplay from '@renderer/components/Timer/TimerDisplay'
 import ClockDisplay from '@renderer/components/Timer/ClockDisplay'
 import StopwatchDisplay from '@renderer/components/Timer/StopwatchDisplay'
-import GlassDivider from '@renderer/components/GlassDivider'
+import GlassDivider from '@renderer/components/Common/GlassDivider'
 import type { TimerTickPayload, StopwatchTickPayload } from '@shared/types/timer'
 import { formatVerseReference } from '@renderer/lib/bible-utils'
 import { useTranslation } from 'react-i18next'

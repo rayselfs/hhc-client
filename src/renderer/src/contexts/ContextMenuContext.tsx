@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react'
-import GlassDivider from '@renderer/components/GlassDivider'
+import GlassDivider from '@renderer/components/Common/GlassDivider'
 
 export interface ContextMenuItem {
   id: string

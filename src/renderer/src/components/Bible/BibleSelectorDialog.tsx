@@ -5,7 +5,7 @@ import type { BiblePassage } from '@shared/types/bible'
 import { useBibleStore } from '@renderer/stores/bible'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 import { useTranslation } from 'react-i18next'
-import GlassDivider from '@renderer/components/GlassDivider'
+import GlassDivider from '@renderer/components/Common/GlassDivider'
 
 interface BibleSelectorDialogProps {
   isOpen: boolean

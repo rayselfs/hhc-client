@@ -4,7 +4,7 @@ import { describe, it, expect } from 'vitest'
 import '@renderer/i18n'
 import { ConfirmDialogProvider, useConfirm } from '@renderer/contexts/ConfirmDialogContext'
 import type { ConfirmOptions } from '@renderer/contexts/ConfirmDialogContext'
-import ConfirmDialog from '../ConfirmDialog'
+import ConfirmDialog from '../Common/ConfirmDialog'
 
 function TestHarness({
   onResult,

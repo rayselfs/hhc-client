@@ -1,5 +1,5 @@
 import { render } from '@testing-library/react'
-import GlassDivider from '@renderer/components/GlassDivider'
+import GlassDivider from '@renderer/components/Common/GlassDivider'
 
 describe('GlassDivider', () => {
   it('renders a horizontal divider by default', () => {

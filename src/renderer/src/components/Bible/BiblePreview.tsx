@@ -1,5 +1,5 @@
 import { Button, Card, ScrollShadow, Spinner } from '@heroui/react'
-import GlassDivider from '@renderer/components/GlassDivider'
+import GlassDivider from '@renderer/components/Common/GlassDivider'
 import { useBibleStore } from '@renderer/stores/bible'
 import { useBibleSearchStore } from '@renderer/stores/bible-search'
 import { useBibleHistoryStore } from '@renderer/stores/bible-history'
