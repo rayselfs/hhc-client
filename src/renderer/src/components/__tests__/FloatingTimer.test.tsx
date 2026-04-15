@@ -1,7 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useLocation, useNavigate } from 'react-router-dom'
-import FloatingTimer from '../FloatingTimer'
+import FloatingTimer from '../Control/Timer/FloatingTimer'
 import { useTimerStore } from '@renderer/stores/timer'
 import { DEFAULT_STATE, DEFAULT_SETTINGS } from '@renderer/stores/timer'
 
