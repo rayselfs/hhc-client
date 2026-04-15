@@ -14,6 +14,28 @@ export function shouldShowChapterNumber(bookNumber: number): boolean {
   return book ? book.chapterCount > 1 : true
 }
 
+export function getBookNameI18n(t: TFunction, bookNumber: number): string {
+  const book = getBookConfig(bookNumber)
+  if (!book) return ''
+  const key: BibleBookKey = `bible.books.${book.code.toLowerCase()}.name`
+  return (t as (k: string) => string)(key)
+}
+
+export function formatVerseReferenceShort(
+  t: TFunction,
+  bookNumber: number,
+  chapter: number,
+  verse: number,
+  verseEnd?: number
+): string {
+  const bookName = getBookNameI18n(t, bookNumber)
+  if (!bookName) return ''
+  if (verseEnd && verseEnd !== verse) {
+    return `${bookName} ${chapter}:${verse}-${verseEnd}`
+  }
+  return `${bookName} ${chapter}:${verse}`
+}
+
 export function formatVerseReference(
   t: TFunction,
   bookNumber: number,

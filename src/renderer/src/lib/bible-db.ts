@@ -54,24 +54,12 @@ interface BibleDBSchema extends DBSchema {
   }
 }
 
-const bibleDBPromise: Promise<IDBPDatabase<BibleDBSchema>> = openDB<BibleDBSchema>('hhc-bible', 4, {
-  upgrade(db, oldVersion) {
-    if (oldVersion < 1) {
-      db.createObjectStore('content')
-      db.createObjectStore('versions')
-      db.createObjectStore('folders')
-    }
-    if (oldVersion < 2) {
-      db.createObjectStore('flexsearch')
-    }
-    if (oldVersion < 3) {
-      db.deleteObjectStore('versions')
-      db.createObjectStore('versions')
-    }
-    if (oldVersion < 4) {
-      db.deleteObjectStore('flexsearch')
-      db.createObjectStore('flexsearch')
-    }
+const bibleDBPromise: Promise<IDBPDatabase<BibleDBSchema>> = openDB<BibleDBSchema>('hhc-bible', 1, {
+  upgrade(db) {
+    db.createObjectStore('content')
+    db.createObjectStore('versions')
+    db.createObjectStore('folders')
+    db.createObjectStore('flexsearch')
   }
 })
 

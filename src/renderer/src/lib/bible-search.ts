@@ -111,6 +111,32 @@ export class BibleSearchEngine {
     })
   }
 
+  buildCacheOnly(verses: BibleVerse[]): Promise<{ key: string; data: string }[]> {
+    if (!this.worker) {
+      return Promise.reject(new Error('BibleSearchEngine not initialized'))
+    }
+
+    return new Promise((resolve, reject) => {
+      const onCacheBuilt = (event: MessageEvent<WorkerOutgoingMessage>): void => {
+        const { data } = event
+        if (data.type === 'CACHE_BUILT') {
+          this.worker?.removeEventListener('message', onCacheBuilt)
+          resolve(data.chunks)
+        } else if (data.type === 'ERROR') {
+          this.worker?.removeEventListener('message', onCacheBuilt)
+          reject(new Error(data.message))
+        }
+      }
+      this.worker!.addEventListener('message', onCacheBuilt)
+
+      const msg: WorkerIncomingMessage = {
+        type: 'BUILD_CACHE_ONLY',
+        verses
+      }
+      this.worker!.postMessage(msg)
+    })
+  }
+
   exportIndex(): Promise<{ key: string; data: string }[]> {
     if (!this.worker) {
       return Promise.reject(new Error('BibleSearchEngine not initialized'))

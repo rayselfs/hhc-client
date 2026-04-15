@@ -42,16 +42,27 @@ function ProjectionAutoOpen(): null {
 
 export default function Layout(): React.JSX.Element {
   useEffect(() => {
-    useBibleStore.getState().initialize()
+    const tryInitSearch = (state: ReturnType<typeof useBibleStore.getState>): void => {
+      if (!state.isInitialized || state.versions.length === 0) return
+      const selectedVersionId =
+        useBibleSettingsStore.getState().selectedVersionId || state.versions[0].id
+      initializeSearchIndexes(state.content, state.versions, selectedVersionId)
+    }
 
-    return useBibleStore.subscribe((state, prev) => {
+    const unsubscribe = useBibleStore.subscribe((state, prev) => {
       if (!prev.isInitialized && state.isInitialized) {
-        if (state.versions.length === 0) return
-        const selectedVersionId =
-          useBibleSettingsStore.getState().selectedVersionId || state.versions[0].id
-        initializeSearchIndexes(state.content, state.versions, selectedVersionId)
+        tryInitSearch(state)
       }
     })
+
+    const current = useBibleStore.getState()
+    if (current.isInitialized) {
+      tryInitSearch(current)
+    } else {
+      useBibleStore.getState().initialize()
+    }
+
+    return unsubscribe
   }, [])
 
   return (

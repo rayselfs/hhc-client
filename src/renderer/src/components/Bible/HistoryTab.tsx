@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import { useBibleHistoryStore } from '@renderer/stores/bible-history'
 import { useBibleStore } from '@renderer/stores/bible'
+import { formatVerseReferenceShort } from '@renderer/lib/bible-utils'
 import type { VerseItem } from '@shared/types/folder'
 import { ScrollShadow, Button } from '@heroui/react'
 import { X } from 'lucide-react'
@@ -48,10 +49,13 @@ export function HistoryTab(): React.JSX.Element | null {
   }
 
   const getVerseReference = (item: VerseItem): string => {
-    if (item.verseStart === item.verseEnd) {
-      return `${item.bookName} ${item.chapter}:${item.verseStart}`
-    }
-    return `${item.bookName} ${item.chapter}:${item.verseStart}-${item.verseEnd}`
+    return formatVerseReferenceShort(
+      t,
+      item.bookNumber,
+      item.chapter,
+      item.verseStart,
+      item.verseEnd
+    )
   }
 
   if (todayItems.length === 0) {
@@ -75,8 +79,8 @@ export function HistoryTab(): React.JSX.Element | null {
               onClick={() => handleNavigate(item)}
               className="flex-1 min-w-0 text-left cursor-pointer p-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-3xl"
             >
-              <p className="truncate text-sm font-medium text-muted">{getVerseReference(item)}</p>
-              <p className="text-base text-foreground whitespace-normal">
+              <p className="truncate text-muted">{getVerseReference(item)}</p>
+              <p className="text-lg text-foreground whitespace-normal">
                 {item.text.length > 60 ? `${item.text.substring(0, 60)}...` : item.text}
               </p>
             </button>

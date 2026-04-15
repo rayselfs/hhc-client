@@ -1,132 +1,56 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react'
-import { Search } from 'lucide-react'
+import React, { useCallback } from 'react'
 import { searchEngine, lookupVerseById } from '@renderer/lib/bible-search-singleton'
 import { useBibleSearchStore } from '@renderer/stores/bible-search'
+import { useTranslation } from 'react-i18next'
+import SearchBar from '@renderer/components/SearchBar'
 
 export default function BibleSearchBar(): React.JSX.Element {
-  const [isExpanded, setIsExpanded] = useState(false)
-  const [query, setQuery] = useState('')
+  const { t } = useTranslation()
+  const isIndexReady = useBibleSearchStore((s) => s.isIndexReady)
 
-  const containerRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const handleSearch = useCallback(async (query: string): Promise<void> => {
+    const {
+      setSearchMode,
+      setIsSearching,
+      setQuery,
+      setResults,
+      isIndexReady: ready
+    } = useBibleSearchStore.getState()
 
-  const collapse = useCallback((): void => {
-    setIsExpanded(false)
-    setQuery('')
+    setSearchMode(true)
+    setQuery(query)
+
+    if (!ready) {
+      setResults([])
+      return
+    }
+
+    setIsSearching(true)
+
+    try {
+      const ids = await searchEngine.search(query)
+      const mapped = ids.map((id) => lookupVerseById(id)).filter((r) => r !== undefined)
+      useBibleSearchStore.getState().setResults(mapped)
+    } catch {
+      useBibleSearchStore.getState().setResults([])
+    } finally {
+      useBibleSearchStore.getState().setIsSearching(false)
+    }
+  }, [])
+
+  const handleClear = useCallback((): void => {
     useBibleSearchStore.getState().clearSearch()
   }, [])
 
-  const collapseUI = useCallback((): void => {
-    setIsExpanded(false)
-    setQuery('')
-  }, [])
-
-  const doSearch = useCallback(
-    async (q: string): Promise<void> => {
-      const trimmed = q.trim()
-      if (!trimmed) {
-        collapse()
-        return
-      }
-
-      const {
-        setSearchMode,
-        setIsSearching,
-        setQuery: setStoreQuery,
-        setResults,
-        isIndexReady
-      } = useBibleSearchStore.getState()
-
-      setSearchMode(true)
-      setStoreQuery(trimmed)
-      collapseUI()
-
-      if (!isIndexReady) {
-        setResults([])
-        return
-      }
-
-      setIsSearching(true)
-
-      try {
-        const ids = await searchEngine.search(trimmed)
-        const mapped = ids.map((id) => lookupVerseById(id)).filter((r) => r !== undefined)
-        useBibleSearchStore.getState().setResults(mapped)
-      } catch {
-        useBibleSearchStore.getState().setResults([])
-      } finally {
-        useBibleSearchStore.getState().setIsSearching(false)
-      }
-    },
-    [collapse, collapseUI]
-  )
-
-  const handleSubmit = useCallback((): void => {
-    void doSearch(query)
-  }, [query, doSearch])
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>): void => {
-    if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
-      handleSubmit()
-    } else if (e.key === 'Escape') {
-      collapse()
-    }
-  }
-
-  const handleToggle = (): void => {
-    if (isExpanded) {
-      collapse()
-    } else {
-      setIsExpanded(true)
-    }
-  }
-
-  useEffect(() => {
-    if (!isExpanded) return
-    const timer = setTimeout(() => inputRef.current?.focus(), 200)
-    return () => clearTimeout(timer)
-  }, [isExpanded])
-
-  useEffect(() => {
-    if (!isExpanded) return
-    const handleMouseDown = (e: MouseEvent): void => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        collapse()
-      }
-    }
-    document.addEventListener('mousedown', handleMouseDown)
-    return () => document.removeEventListener('mousedown', handleMouseDown)
-  }, [isExpanded, collapse])
-
   return (
-    <div
-      ref={containerRef}
-      data-testid="bible-search-bar"
-      className={`relative h-10 transition-[width] duration-250 ease-in-out rounded-full border border-border ${
-        isExpanded ? 'w-64' : 'w-10'
-      }`}
-    >
-      <input
-        ref={inputRef}
-        data-bible-search
-        type="text"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        onKeyDown={handleKeyDown}
-        placeholder="搜尋經文..."
-        aria-label="搜尋經文"
-        className={`w-full h-full bg-transparent text-sm text-foreground pl-5 pr-10 outline-none placeholder:text-muted-fg transition-opacity duration-200 ${
-          isExpanded ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        }`}
-      />
-      <button
-        type="button"
-        onClick={isExpanded ? handleSubmit : handleToggle}
-        aria-label={isExpanded ? '送出搜尋' : '搜尋經文'}
-        className="absolute right-0 top-0 flex items-center justify-center w-10 h-10 text-muted-fg hover:text-foreground transition-colors"
-      >
-        <Search size={16} />
-      </button>
-    </div>
+    <SearchBar
+      onSearch={handleSearch}
+      onClear={handleClear}
+      placeholder={t('bible.search.placeholder')}
+      submitLabel={t('bible.search.submit')}
+      disabled={!isIndexReady}
+      inputDataAttr="data-bible-search"
+      testId="bible-search-bar"
+    />
   )
 }

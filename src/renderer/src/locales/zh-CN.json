@@ -115,7 +115,9 @@
       }
     },
     "search": {
-      "placeholder": "搜索",
+      "title": "搜索",
+      "placeholder": "搜索经文...",
+      "submit": "提交搜索",
       "noResults": "无结果",
       "buildingIndex": "索引建立中...",
       "searching": "搜索中..."

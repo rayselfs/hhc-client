@@ -11,6 +11,7 @@ import {
 } from '@renderer/lib/bible-db'
 import { hhcPersistStorage, createKey } from '@renderer/lib/persist-storage'
 import { useBibleSettingsStore } from './bible-settings'
+import { useBibleSearchStore } from './bible-search'
 
 const fetchPromises = new Map<number, Promise<BibleBook[]>>()
 
@@ -147,6 +148,7 @@ export const useBibleStore = create<BibleStore>()(
       },
 
       navigateTo: (passage: BiblePassage) => {
+        useBibleSearchStore.getState().clearSearch()
         set({ currentPassage: passage })
       },
 

@@ -115,7 +115,9 @@
       }
     },
     "search": {
-      "placeholder": "Search",
+      "title": "Search",
+      "placeholder": "Search verses...",
+      "submit": "Submit search",
       "noResults": "No results",
       "buildingIndex": "Building index...",
       "searching": "Searching..."

@@ -115,7 +115,9 @@
       }
     },
     "search": {
-      "placeholder": "搜尋",
+      "title": "搜尋",
+      "placeholder": "搜尋經文...",
+      "submit": "送出搜尋",
       "noResults": "無結果",
       "buildingIndex": "索引建立中...",
       "searching": "搜尋中..."

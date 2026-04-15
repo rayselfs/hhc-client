@@ -22,6 +22,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { useBibleFolderStore } from '@renderer/stores/folder'
 import { useBibleStore } from '@renderer/stores/bible'
+import { formatVerseReferenceShort } from '@renderer/lib/bible-utils'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
 import type { VerseItem, Folder, FolderItem } from '@shared/types/folder'
@@ -29,6 +30,7 @@ import { isVerseItem, isFolder } from '@shared/types/folder'
 import { ScrollShadow, Button, Input, Modal, TextField, Label } from '@heroui/react'
 import { FolderPlus, Folder as FolderIcon, Trash2, X, GripVertical } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { useKeyboardShortcuts } from '@renderer/hooks/useKeyboardShortcuts'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
 import { useFolderContextMenu } from './useFolderContextMenu'
@@ -38,11 +40,8 @@ interface CustomFolderTabProps {
   onModalOpenChange?: (open: boolean) => void
 }
 
-function getVerseReference(item: VerseItem): string {
-  if (item.verseStart === item.verseEnd) {
-    return `${item.bookName} ${item.chapter}:${item.verseStart}`
-  }
-  return `${item.bookName} ${item.chapter}:${item.verseStart}-${item.verseEnd}`
+function getVerseReference(item: VerseItem, t: TFunction): string {
+  return formatVerseReferenceShort(t, item.bookNumber, item.chapter, item.verseStart, item.verseEnd)
 }
 
 type ClipboardMode = 'copy' | 'cut'
@@ -480,7 +479,7 @@ export function CustomFolderTab({
   }
 
   const handleDeleteItem = async (item: VerseItem): Promise<void> => {
-    const reference = getVerseReference(item)
+    const reference = getVerseReference(item, t)
     const confirmed = await confirm({
       title: t('bible.delete_item_title', {
         reference,
@@ -627,7 +626,7 @@ export function CustomFolderTab({
     isItemSelected: boolean,
     isDragging: boolean
   ): React.JSX.Element => {
-    const reference = getVerseReference(item)
+    const reference = getVerseReference(item, t)
 
     return (
       <div
@@ -767,7 +766,7 @@ export function CustomFolderTab({
               {isFolder(activeDragItem)
                 ? activeDragItem.name
                 : isVerseItem(activeDragItem)
-                  ? getVerseReference(activeDragItem as VerseItem)
+                  ? getVerseReference(activeDragItem as VerseItem, t)
                   : null}
             </div>
           ) : null}

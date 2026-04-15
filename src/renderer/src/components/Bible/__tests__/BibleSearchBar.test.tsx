@@ -1,191 +1,112 @@
-import { render, screen, fireEvent, act, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import BibleSearchBar from '../BibleSearchBar'
 
-const { mockInit, mockBuildIndex, mockSearch, mockNavigateTo } = vi.hoisted(() => ({
-  mockInit: vi.fn().mockResolvedValue(undefined),
-  mockBuildIndex: vi.fn().mockResolvedValue(undefined),
-  mockSearch: vi.fn().mockResolvedValue([]),
-  mockNavigateTo: vi.fn()
+const mockSearch = vi.fn().mockResolvedValue([])
+
+vi.mock('@renderer/lib/bible-search-singleton', () => ({
+  searchEngine: {
+    search: (...args: unknown[]) => mockSearch(...args)
+  },
+  lookupVerseById: () => undefined
 }))
 
-const bibleSingleton = {
-  versions: [{ id: 'cuv', code: 'CUV', name: '和合本', updatedAt: '' }],
-  content: new Map() as Map<string, unknown[]>
-}
+let mockIsIndexReady = true
 
-vi.mock('@renderer/stores/bible', () => ({
-  useBibleStore: Object.assign(
-    (selector: (state: typeof bibleSingleton) => unknown) => selector(bibleSingleton),
+vi.mock('@renderer/stores/bible-search', () => {
+  const state = {
+    isSearchMode: false,
+    isSearching: false,
+    get isIndexReady() {
+      return mockIsIndexReady
+    },
+    query: '',
+    results: [],
+    setSearchMode: vi.fn(),
+    setIsSearching: vi.fn(),
+    setIndexReady: vi.fn(),
+    setQuery: vi.fn(),
+    setResults: vi.fn(),
+    clearSearch: vi.fn()
+  }
+
+  const store = Object.assign(
+    (selector?: (s: typeof state) => unknown) => (selector ? selector(state) : state),
     {
-      getState: () => ({ navigateTo: mockNavigateTo })
+      getState: () => state,
+      subscribe: () => () => {}
     }
   )
-}))
 
-vi.mock('@renderer/lib/bible-search', () => ({
-  BibleSearchEngine: class {
-    init = mockInit
-    buildIndex = mockBuildIndex
-    search = mockSearch
-  }
-}))
+  return { useBibleSearchStore: store }
+})
 
 describe('BibleSearchBar', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    bibleSingleton.versions = [{ id: 'cuv', code: 'CUV', name: '和合本', updatedAt: '' }]
-    bibleSingleton.content = new Map()
-    mockSearch.mockResolvedValue([])
+    mockIsIndexReady = true
   })
 
-  it('renders the search toggle button collapsed by default', () => {
+  it('renders the search toggle button', () => {
     render(<BibleSearchBar />)
-    const toggle = screen.getByRole('button', { name: '搜尋經文' })
+    const toggle = screen.getByRole('button')
     expect(toggle).toBeInTheDocument()
-    const input = screen.getByPlaceholderText('搜尋經文...')
-    expect(input).toHaveClass('w-52')
-    expect(input.closest('div')).toHaveClass('opacity-0')
   })
 
-  it('clicking toggle expands the search bar', async () => {
+  it('expands on click', async () => {
     render(<BibleSearchBar />)
-    const toggle = screen.getByRole('button', { name: '搜尋經文' })
+    const toggle = screen.getByRole('button')
     await act(async () => {
       fireEvent.click(toggle)
     })
-    expect(screen.getByPlaceholderText('搜尋經文...')).toBeInTheDocument()
+    const input = screen.getByPlaceholderText('bible.search.placeholder')
+    expect(input).toBeInTheDocument()
   })
 
-  it('clicking toggle again collapses the search bar', async () => {
-    render(<BibleSearchBar />)
-    const toggle = screen.getByRole('button', { name: '搜尋經文' })
-    await act(async () => {
-      fireEvent.click(toggle)
-    })
-    const closeToggle = screen.getByRole('button', { name: '關閉搜尋' })
-    await act(async () => {
-      fireEvent.click(closeToggle)
-    })
-    const input = screen.getByPlaceholderText('搜尋經文...')
-    expect(input.closest('div')).toHaveClass('opacity-0')
-  })
-
-  it('pressing Escape collapses the search bar', async () => {
+  it('collapses on Escape', async () => {
     render(<BibleSearchBar />)
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '搜尋經文' }))
+      fireEvent.click(screen.getByRole('button'))
     })
-    const input = screen.getByPlaceholderText('搜尋經文...')
+    const input = screen.getByPlaceholderText('bible.search.placeholder')
     await act(async () => {
       fireEvent.keyDown(input, { key: 'Escape' })
     })
-    expect(input.closest('div')).toHaveClass('opacity-0')
+    expect(input).toHaveClass('opacity-0')
   })
 
-  it('shows search results dropdown when hasSearched is true', async () => {
-    bibleSingleton.content = new Map([
-      [
-        'cuv',
-        [
-          {
-            number: 1,
-            code: 'GEN',
-            name: '創世記',
-            abbreviation: '創',
-            chapters: [{ number: 1, verses: [{ id: 1, number: 1, text: 'In the beginning' }] }]
-          }
-        ]
-      ]
-    ])
+  it('is disabled when index is not ready', () => {
+    mockIsIndexReady = false
     render(<BibleSearchBar />)
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '搜尋經文' }))
-    })
-    const input = screen.getByPlaceholderText('搜尋經文...')
-    await act(async () => {
-      fireEvent.change(input, { target: { value: 'beginning' } })
-    })
-    await waitFor(
-      () => {
-        expect(screen.getByRole('listbox', { name: '搜尋結果' })).toBeInTheDocument()
-      },
-      { timeout: 1000 }
-    )
+    const button = screen.getByRole('button')
+    expect(button).toBeDisabled()
   })
 
-  it('shows search results when engine returns ids', async () => {
-    mockSearch.mockResolvedValue([1])
-    bibleSingleton.content = new Map([
-      [
-        'cuv',
-        [
-          {
-            number: 1,
-            code: 'GEN',
-            name: '創世記',
-            abbreviation: '創',
-            chapters: [{ number: 1, verses: [{ id: 1, number: 1, text: 'In the beginning' }] }]
-          }
-        ]
-      ]
-    ])
+  it('is enabled when index is ready', () => {
     render(<BibleSearchBar />)
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '搜尋經文' }))
-    })
-    const input = screen.getByPlaceholderText('搜尋經文...')
-    await act(async () => {
-      fireEvent.change(input, { target: { value: 'beginning' } })
-    })
-    await vi.waitFor(
-      () => {
-        expect(screen.getByText('創世記 1:1')).toBeInTheDocument()
-      },
-      { timeout: 1000 }
-    )
+    const button = screen.getByRole('button')
+    expect(button).not.toBeDisabled()
   })
 
-  it('clicking a search result calls navigateTo', async () => {
-    mockSearch.mockResolvedValue([1])
-    bibleSingleton.content = new Map([
-      [
-        'cuv',
-        [
-          {
-            number: 1,
-            code: 'GEN',
-            name: '創世記',
-            abbreviation: '創',
-            chapters: [{ number: 1, verses: [{ id: 1, number: 1, text: 'In the beginning' }] }]
-          }
-        ]
-      ]
-    ])
+  it('calls searchEngine.search on Enter', async () => {
     render(<BibleSearchBar />)
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '搜尋經文' }))
+      fireEvent.click(screen.getByRole('button'))
     })
-    const input = screen.getByPlaceholderText('搜尋經文...')
+    const input = screen.getByPlaceholderText('bible.search.placeholder')
     await act(async () => {
-      fireEvent.change(input, { target: { value: 'beginning' } })
+      fireEvent.change(input, { target: { value: 'test query' } })
     })
-    await vi.waitFor(
-      () => {
-        expect(screen.getByText('創世記 1:1')).toBeInTheDocument()
-      },
-      { timeout: 1000 }
-    )
-    const resultBtn = screen.getByText('創世記 1:1').closest('button')!
-    fireEvent.mouseDown(resultBtn)
-    expect(mockNavigateTo).toHaveBeenCalledWith({ bookNumber: 1, chapter: 1, verse: 1 })
+    await act(async () => {
+      fireEvent.keyDown(input, { key: 'Enter' })
+    })
+    expect(mockSearch).toHaveBeenCalledWith('test query')
   })
 
   it('has data-bible-search attribute on input for Ctrl+F focus', async () => {
     render(<BibleSearchBar />)
-    const toggle = screen.getByRole('button', { name: '搜尋經文' })
     await act(async () => {
-      fireEvent.click(toggle)
+      fireEvent.click(screen.getByRole('button'))
     })
     const input = document.querySelector<HTMLInputElement>('[data-bible-search]')
     expect(input).not.toBeNull()

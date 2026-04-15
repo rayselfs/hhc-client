@@ -38,22 +38,20 @@ function extractVerses(books: BibleBook[]): { id: number; text: string }[] {
   return verses
 }
 
-async function buildAndCacheVersion(
-  versionId: number,
-  updatedAt: number,
-  books: BibleBook[]
-): Promise<{ key: string; data: string }[]> {
-  buildVerseLookup(versionId, books)
-  const verses = extractVerses(books)
-  await searchEngine.buildIndex(verses)
-  const chunks = await searchEngine.exportIndex()
-  saveFlexSearchCache(versionId, updatedAt, chunks).catch(() => {})
-  return chunks
-}
-
 let activeVersionId: number | null = null
+let initPromise: Promise<void> | null = null
 
 export async function initializeSearchIndexes(
+  allVersionsBooks: Map<number, BibleBook[]>,
+  versions: BibleVersion[],
+  selectedVersionId: number
+): Promise<void> {
+  if (initPromise) return initPromise
+  initPromise = doInitialize(allVersionsBooks, versions, selectedVersionId)
+  return initPromise
+}
+
+async function doInitialize(
   allVersionsBooks: Map<number, BibleBook[]>,
   versions: BibleVersion[],
   selectedVersionId: number
@@ -66,7 +64,9 @@ export async function initializeSearchIndexes(
     const selectedVersion = versions.find((v) => v.id === selectedVersionId)
     const selectedBooks = allVersionsBooks.get(selectedVersionId)
 
-    if (!selectedVersion || !selectedBooks || selectedBooks.length === 0) return
+    if (!selectedVersion || !selectedBooks || selectedBooks.length === 0) {
+      return
+    }
 
     buildVerseLookup(selectedVersionId, selectedBooks)
 
@@ -74,32 +74,40 @@ export async function initializeSearchIndexes(
     if (cached) {
       await searchEngine.loadIndex(cached)
     } else {
-      await buildAndCacheVersion(selectedVersionId, selectedVersion.updatedAt, selectedBooks)
+      const verses = extractVerses(selectedBooks)
+      await searchEngine.buildIndex(verses)
+      const chunks = await searchEngine.exportIndex()
+      saveFlexSearchCache(selectedVersionId, selectedVersion.updatedAt, chunks).catch(() => {})
     }
 
     activeVersionId = selectedVersionId
     setIndexReady(true)
 
-    // Build remaining versions in background (fire-and-forget)
     for (const version of versions) {
       if (version.id === selectedVersionId) continue
       const books = allVersionsBooks.get(version.id)
       if (!books || books.length === 0) continue
-
-      loadFlexSearchCache(version.id, version.updatedAt)
-        .then((existing) => {
-          if (existing) {
-            buildVerseLookup(version.id, books)
-            return
-          }
-          return buildAndCacheVersion(version.id, version.updatedAt, books).then(() => {})
-        })
-        .catch(() => {})
+      buildBackgroundCache(version, books).catch(() => {})
     }
-  } catch {
-    // intentionally silent
+  } catch (err) {
+    console.error('[bible-search] Failed to initialize search index:', err)
   }
 }
+
+async function buildBackgroundCache(version: BibleVersion, books: BibleBook[]): Promise<void> {
+  const existing = await loadFlexSearchCache(version.id, version.updatedAt)
+  if (existing) {
+    buildVerseLookup(version.id, books)
+    return
+  }
+
+  buildVerseLookup(version.id, books)
+  const verses = extractVerses(books)
+  const chunks = await searchEngine.buildCacheOnly(verses)
+  saveFlexSearchCache(version.id, version.updatedAt, chunks).catch(() => {})
+}
+
+let switchGeneration = 0
 
 export async function switchVersionIndex(
   versionId: number,
@@ -108,6 +116,7 @@ export async function switchVersionIndex(
 ): Promise<void> {
   if (activeVersionId === versionId) return
 
+  const gen = ++switchGeneration
   const { setIndexReady } = useBibleSearchStore.getState()
   setIndexReady(false)
 
@@ -115,16 +124,26 @@ export async function switchVersionIndex(
     buildVerseLookup(versionId, books)
 
     const cached = await loadFlexSearchCache(versionId, version.updatedAt)
+    if (gen !== switchGeneration) return
+
     if (cached) {
       await searchEngine.loadIndex(cached)
     } else {
-      await buildAndCacheVersion(versionId, version.updatedAt, books)
+      const verses = extractVerses(books)
+      await searchEngine.buildIndex(verses)
+      if (gen !== switchGeneration) return
+      const chunks = await searchEngine.exportIndex()
+      saveFlexSearchCache(versionId, version.updatedAt, chunks).catch(() => {})
     }
+
+    if (gen !== switchGeneration) return
 
     activeVersionId = versionId
     setIndexReady(true)
   } catch {
-    // intentionally silent
+    if (gen === switchGeneration) {
+      setIndexReady(false)
+    }
   }
 }
 
