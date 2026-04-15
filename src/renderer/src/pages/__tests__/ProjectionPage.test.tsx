@@ -7,7 +7,7 @@ vi.mock('@renderer/lib/env', () => ({
   isWeb: vi.fn(() => true)
 }))
 
-vi.mock('@renderer/components/projection/DefaultProjection', () => ({
+vi.mock('@renderer/components/Projection/DefaultProjection', () => ({
   default: () => <div data-testid="default-projection">Default</div>
 }))
 

@@ -23,7 +23,7 @@ vi.mock('@renderer/contexts/ProjectionContext', () => ({
   }))
 }))
 
-import TimerProjectionBridge from '../TimerProjectionBridge'
+import TimerProjectionBridge from '../Control/Bridge/TimerProjectionBridge'
 
 function renderBridge(): ReturnType<typeof renderHook<null, unknown>> {
   return renderHook(() => null, {
