@@ -1,6 +1,19 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { WorkerOutgoingMessage } from '@renderer/workers/bible-search.worker'
-import { BibleSearchEngine } from '../bible-search'
+
+vi.mock('@renderer/lib/bible-db', () => ({
+  saveFlexSearchCache: vi.fn(),
+  loadFlexSearchCache: vi.fn()
+}))
+
+vi.mock('@renderer/stores/bible-search', () => ({
+  useBibleSearchStore: Object.assign(() => ({}), {
+    getState: () => ({ setIndexReady: vi.fn() }),
+    subscribe: () => () => {}
+  })
+}))
+
+import { BibleSearchEngine } from '../bible-search-singleton'
 
 type MessageHandler = (event: MessageEvent<WorkerOutgoingMessage>) => void
 type ErrorHandler = (event: ErrorEvent) => void
