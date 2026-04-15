@@ -2,7 +2,7 @@ import { Modal } from '@heroui/react'
 import { useTranslation } from 'react-i18next'
 import i18n from '@renderer/i18n'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
-import { isElectron } from '@renderer/lib/env'
+import { getMetaKeyLabel } from '@renderer/lib/env'
 
 interface KeyboardShortcutsDialogProps {
   isOpen: boolean
@@ -34,14 +34,6 @@ const getDisplayKey = (code: string): string => {
     return code.slice(3).toUpperCase()
   }
   return code
-}
-
-const getMetaDisplay = (): string => {
-  if (isElectron()) {
-    const ua = navigator.userAgent
-    return ua.includes('Mac') ? '⌘' : 'Ctrl'
-  }
-  return /mac/i.test(navigator.userAgent) ? '⌘' : 'Ctrl'
 }
 
 interface ShortcutEntry {
@@ -80,7 +72,7 @@ export default function KeyboardShortcutsDialog({
     const entries: ShortcutEntry[] = Object.entries(shortcuts).map(([key, config]) => {
       const keyParts: string[] = []
       if (config.metaOrCtrl) {
-        keyParts.push(getMetaDisplay())
+        keyParts.push(getMetaKeyLabel())
       }
       keyParts.push(getDisplayKey(config.code))
       const entryKey = key.toLowerCase()

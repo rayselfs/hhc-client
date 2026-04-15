@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { isMac } from '@renderer/lib/env'
 
 export interface ShortcutConfig {
   code: string
@@ -22,16 +23,12 @@ export interface UseKeyboardShortcutsOptions {
   enabled?: boolean
 }
 
-export function checkIsMac(): boolean {
-  return /mac|darwin/i.test(navigator.userAgent)
-}
-
 export function getPlatformShortcut(config: ShortcutConfig): ShortcutConfig {
-  const isMac = checkIsMac()
-  if (isMac && config.mac) {
+  const mac = isMac()
+  if (mac && config.mac) {
     return { ...config, ...config.mac }
   }
-  if (!isMac && config.windows) {
+  if (!mac && config.windows) {
     return { ...config, ...config.windows }
   }
   return config
