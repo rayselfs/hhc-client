@@ -115,7 +115,7 @@ export default function BibleSearchBar(): React.JSX.Element {
         onKeyDown={handleKeyDown}
         placeholder="搜尋經文..."
         aria-label="搜尋經文"
-        className={`w-full h-full bg-transparent text-sm text-foreground pl-4 pr-10 outline-none placeholder:text-muted-fg transition-opacity duration-200 ${
+        className={`w-full h-full bg-transparent text-sm text-foreground pl-5 pr-10 outline-none placeholder:text-muted-fg transition-opacity duration-200 ${
           isExpanded ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
       />
