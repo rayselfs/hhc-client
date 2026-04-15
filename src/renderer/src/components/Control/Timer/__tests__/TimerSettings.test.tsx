@@ -3,7 +3,8 @@ import type { RenderResult } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { I18nextProvider } from 'react-i18next'
 import i18n from '@renderer/i18n'
-import SettingsPopover from '@renderer/components/SettingsPopover'
+import SettingsPopover from '@renderer/components/Control/Header/SettingsPopover/SettingsPopover'
+import type { SettingsVariant } from '@renderer/components/Control/Header/SettingsPopover/SettingsPopover'
 import { useTimerStore } from '@renderer/stores/timer'
 import { useStopwatchStore } from '@renderer/stores/stopwatch'
 import { DEFAULT_SETTINGS, DEFAULT_STATE } from '@renderer/stores/timer'
@@ -21,10 +22,10 @@ beforeEach(() => {
   })
 })
 
-function renderWithI18n(mode?: 'stopwatch'): RenderResult {
+function renderWithI18n(variant: SettingsVariant = 'timer'): RenderResult {
   return render(
     <I18nextProvider i18n={i18n}>
-      <SettingsPopover mode={mode} />
+      <SettingsPopover variant={variant} />
     </I18nextProvider>
   )
 }

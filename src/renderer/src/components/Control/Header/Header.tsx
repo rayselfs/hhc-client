@@ -5,7 +5,7 @@ import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
 import { ButtonGroup, Button, toast } from '@heroui/react'
 import { X, Monitor, MonitorOff, ExternalLink } from 'lucide-react'
 import ModeSelector from '@renderer/components/Control/Timer/ModeSelector'
-import SettingsPopover from '@renderer/components/SettingsPopover'
+import SettingsPopover from '@renderer/components/Control/Header/SettingsPopover/SettingsPopover'
 import BibleSelector from '@renderer/components/Control/Bible/BibleSelector'
 import BibleSearchBar from '@renderer/components/Control/Header/SearchBar/BibleSearchBar'
 import { isTimerRoute, isBibleRoute } from '@renderer/lib/routes'
@@ -55,7 +55,9 @@ export default function Header(): React.JSX.Element {
     <header className="relative flex items-center justify-end gap-2 p-2">
       {(showTimerControls || showBibleControls) && (
         <div className="absolute left-2 top-1/2 -translate-y-1/2">
-          <SettingsPopover mode={showTimerControls ? mode : undefined} />
+          <SettingsPopover
+            variant={showBibleControls ? 'bible' : mode === 'stopwatch' ? 'stopwatch' : 'timer'}
+          />
         </div>
       )}
 
