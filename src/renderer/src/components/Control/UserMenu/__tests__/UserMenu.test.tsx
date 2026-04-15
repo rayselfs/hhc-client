@@ -3,8 +3,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { I18nextProvider } from 'react-i18next'
 import i18n from '@renderer/i18n'
 import { ConfirmDialogProvider } from '@renderer/contexts/ConfirmDialogContext'
-import ConfirmDialog from '../Common/ConfirmDialog'
-import UserMenu from '../Control/UserMenu/UserMenu'
+import ConfirmDialog from '../../../Common/ConfirmDialog'
+import UserMenu from '../UserMenu'
 
 function renderUserMenu(props: { onOpenPreferences?: () => void } = {}): ReturnType<typeof render> {
   return render(

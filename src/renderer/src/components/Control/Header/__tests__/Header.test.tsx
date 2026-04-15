@@ -6,8 +6,8 @@ import '@renderer/i18n'
 import i18n from '@renderer/i18n'
 import { useTimerStore } from '@renderer/stores/timer'
 import { ConfirmDialogProvider } from '@renderer/contexts/ConfirmDialogContext'
-import ConfirmDialog from '../Common/ConfirmDialog'
-import Header from '../Control/Header/Header'
+import ConfirmDialog from '../../../Common/ConfirmDialog'
+import Header from '../Header'
 
 vi.mock('@renderer/contexts/ProjectionContext', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@renderer/contexts/ProjectionContext')>()
