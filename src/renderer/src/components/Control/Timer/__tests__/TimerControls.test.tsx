@@ -224,3 +224,17 @@ describe('TimerControls — projection integration', () => {
     expect(mockClaimProjection).toHaveBeenCalledWith('timer', { unblank: true })
   })
 })
+
+describe('TimerControls — aria-keyshortcuts', () => {
+  it('play button has aria-keyshortcuts="Space"', () => {
+    renderWithI18n('timer')
+    const el = document.querySelector('[aria-keyshortcuts="Space"]')
+    expect(el).not.toBeNull()
+  })
+
+  it('reset button has aria-keyshortcuts="R"', () => {
+    renderWithI18n('timer')
+    const el = document.querySelector('[aria-keyshortcuts="R"]')
+    expect(el).not.toBeNull()
+  })
+})

@@ -1,9 +1,12 @@
+import { useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@heroui/react'
 import { Play, Pause, RotateCcw } from 'lucide-react'
 import { useTimerStore } from '@renderer/stores/timer'
 import { useStopwatchStore } from '@renderer/stores/stopwatch'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
+import { formatAriaShortcut } from '@renderer/lib/aria'
+import { SHORTCUTS } from '@renderer/config/shortcuts'
 import type { TimerMode } from '@renderer/stores/timer'
 
 interface TimerControlsProps {
@@ -46,6 +49,20 @@ export default function TimerControls({
   const isRunning = status === 'running'
   const isPaused = status === 'paused'
 
+  // react-aria filterDOMProps strips aria-keyshortcuts; set imperatively via ref
+  const playBtnRef = useRef<HTMLButtonElement>(null)
+  const resetBtnRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    playBtnRef.current?.setAttribute(
+      'aria-keyshortcuts',
+      formatAriaShortcut(SHORTCUTS.TIMER.TOGGLE)
+    )
+    resetBtnRef.current?.setAttribute(
+      'aria-keyshortcuts',
+      formatAriaShortcut(SHORTCUTS.TIMER.RESET)
+    )
+  }, [])
+
   const handleStart = (): void => {
     claimProjection('timer', { unblank: true })
     start()
@@ -62,6 +79,7 @@ export default function TimerControls({
   return (
     <div className={`flex items-center gap-3 ${className || ''}`.trim()}>
       <Button
+        ref={playBtnRef}
         isIconOnly
         size="lg"
         variant={isStopped ? 'primary' : 'secondary'}
@@ -74,6 +92,7 @@ export default function TimerControls({
         {isRunning ? <Pause className="size-6" /> : <Play className="size-6" />}
       </Button>
       <Button
+        ref={resetBtnRef}
         isIconOnly
         size="lg"
         variant="outline"
