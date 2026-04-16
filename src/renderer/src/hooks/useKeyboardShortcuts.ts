@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { isMac } from '@renderer/lib/env'
 import { registerShortcut, unregisterShortcut } from '@renderer/lib/shortcut-registry'
+import { useOptionalShortcutScope } from '@renderer/contexts/ShortcutScopeContext'
 
 export interface ShortcutConfig {
   code: string
@@ -72,13 +73,17 @@ export function useKeyboardShortcuts(
 ): void {
   const { enabled = true, sectionKey } = options
 
+  const { isOverlayActive } = useOptionalShortcutScope()
+
   const shortcutsRef = useRef<ShortcutHandler[]>(shortcuts)
   const enabledRef = useRef<boolean>(enabled)
+  const isOverlayActiveRef = useRef<boolean>(false)
   const shortcutIdsRef = useRef<string[]>([])
 
   useEffect(() => {
     shortcutsRef.current = shortcuts
     enabledRef.current = enabled
+    isOverlayActiveRef.current = isOverlayActive
   })
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -106,6 +111,7 @@ export function useKeyboardShortcuts(
         preventDefault = true,
         stopPropagation = true
       } of shortcutsRef.current) {
+        if (isOverlayActiveRef.current && config.code !== 'Escape') continue
         if (matchesConfig(event, config)) {
           if (preventDefault) event.preventDefault()
           if (stopPropagation) event.stopPropagation()
