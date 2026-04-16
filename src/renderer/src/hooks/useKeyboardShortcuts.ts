@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { isMac } from '@renderer/lib/env'
+import { registerShortcut, unregisterShortcut } from '@renderer/lib/shortcut-registry'
 
 export interface ShortcutConfig {
   code: string
@@ -17,10 +18,13 @@ export interface ShortcutHandler {
   handler: (event: KeyboardEvent) => void
   preventDefault?: boolean
   stopPropagation?: boolean
+  id?: string
+  description?: string
 }
 
 export interface UseKeyboardShortcutsOptions {
   enabled?: boolean
+  sectionKey?: string
 }
 
 export function getPlatformShortcut(config: ShortcutConfig): ShortcutConfig {
@@ -66,17 +70,31 @@ export function useKeyboardShortcuts(
   shortcuts: ShortcutHandler[],
   options: UseKeyboardShortcutsOptions = {}
 ): void {
-  const { enabled = true } = options
+  const { enabled = true, sectionKey } = options
 
   const shortcutsRef = useRef<ShortcutHandler[]>(shortcuts)
   const enabledRef = useRef<boolean>(enabled)
+  const shortcutIdsRef = useRef<string[]>([])
 
   useEffect(() => {
     shortcutsRef.current = shortcuts
     enabledRef.current = enabled
   })
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
+    shortcutIdsRef.current = shortcuts.map((shortcut, index) => shortcut.id || `shortcut-${index}`)
+
+    shortcuts.forEach((shortcut, index) => {
+      const id = shortcutIdsRef.current[index]
+      registerShortcut({
+        id,
+        config: shortcut.config,
+        description: shortcut.description,
+        sectionKey
+      })
+    })
+
     const handleKeydown = (event: KeyboardEvent): void => {
       if (event.isComposing || event.keyCode === 229) return
       if (!enabledRef.current) return
@@ -100,6 +118,9 @@ export function useKeyboardShortcuts(
     document.addEventListener('keydown', handleKeydown, true)
     return () => {
       document.removeEventListener('keydown', handleKeydown, true)
+      shortcutIdsRef.current.forEach((id) => {
+        unregisterShortcut(id)
+      })
     }
   }, [])
 }
