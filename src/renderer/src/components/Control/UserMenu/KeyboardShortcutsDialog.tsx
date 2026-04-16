@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next'
 import i18n from '@renderer/i18n'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
 import { getMetaKeyLabel } from '@renderer/lib/env'
+import { ShortcutConfig, getPlatformShortcut } from '@renderer/hooks/useKeyboardShortcuts'
+import { getRegistered, RegistryEntry } from '@renderer/lib/shortcut-registry'
 
 interface KeyboardShortcutsDialogProps {
   isOpen: boolean
@@ -49,6 +51,28 @@ export default function KeyboardShortcutsDialog({
 
   const tDynamic = i18n.t.bind(i18n) as (key: string) => string
 
+  const buildKeysFromConfig = (config: ShortcutConfig): string[] => {
+    const resolved = getPlatformShortcut(config)
+    const keyParts: string[] = []
+    if (resolved.metaOrCtrl) {
+      keyParts.push(getMetaKeyLabel())
+    }
+    if (resolved.meta && !resolved.metaOrCtrl) {
+      keyParts.push('⌘')
+    }
+    if (resolved.ctrl && !resolved.metaOrCtrl) {
+      keyParts.push('Ctrl')
+    }
+    if (resolved.shift) {
+      keyParts.push('Shift')
+    }
+    if (resolved.alt) {
+      keyParts.push('Alt')
+    }
+    keyParts.push(getDisplayKey(resolved.code))
+    return keyParts
+  }
+
   const renderShortcutRow = (label: string, keys: string[]): React.JSX.Element => (
     <div className="flex justify-between items-center py-2 px-3 hover:bg-default-100 rounded-lg transition-colors">
       <span className="text-sm text-default-700">{label}</span>
@@ -67,18 +91,13 @@ export default function KeyboardShortcutsDialog({
 
   const renderSection = (
     sectionKey: string,
-    shortcuts: Record<string, { code: string; metaOrCtrl?: boolean }>
+    shortcuts: Record<string, ShortcutConfig>
   ): React.JSX.Element => {
     const entries: ShortcutEntry[] = Object.entries(shortcuts).map(([key, config]) => {
-      const keyParts: string[] = []
-      if (config.metaOrCtrl) {
-        keyParts.push(getMetaKeyLabel())
-      }
-      keyParts.push(getDisplayKey(config.code))
       const entryKey = key.toLowerCase()
       return {
         label: tDynamic(`shortcuts.${sectionKey}.${entryKey}`),
-        keys: keyParts
+        keys: buildKeysFromConfig(config)
       }
     })
 
@@ -96,6 +115,50 @@ export default function KeyboardShortcutsDialog({
     )
   }
 
+  const renderRegistrySection = (
+    sectionKey: string,
+    entries: RegistryEntry[]
+  ): React.JSX.Element => {
+    const shortcutEntries: ShortcutEntry[] = entries.map((entry) => ({
+      label: entry.description ?? entry.id,
+      keys: buildKeysFromConfig(entry.config)
+    }))
+
+    const sectionTitleKey = `shortcuts.sections.${sectionKey.toLowerCase()}`
+
+    return (
+      <div key={sectionKey} className="mb-6">
+        <h3 className="text-sm font-semibold text-default-900 mb-3">{tDynamic(sectionTitleKey)}</h3>
+        <div className="space-y-1">
+          {shortcutEntries.map((entry) => (
+            <div key={entry.label}>{renderShortcutRow(entry.label, entry.keys)}</div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  const registryEntries = getRegistered()
+  let sectionsContent: React.JSX.Element[]
+
+  if (registryEntries.length > 0) {
+    const sectionsMap = new Map<string, RegistryEntry[]>()
+    for (const entry of registryEntries) {
+      const key = entry.sectionKey ?? 'OTHER'
+      if (!sectionsMap.has(key)) sectionsMap.set(key, [])
+      sectionsMap.get(key)!.push(entry)
+    }
+    sectionsContent = Array.from(sectionsMap.entries()).map(([sectionKey, entries]) =>
+      renderRegistrySection(sectionKey, entries)
+    )
+  } else {
+    sectionsContent = [
+      renderSection('BIBLE', SHORTCUTS.BIBLE),
+      renderSection('TIMER', SHORTCUTS.TIMER),
+      renderSection('EDIT', SHORTCUTS.EDIT)
+    ]
+  }
+
   return (
     <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
       <Modal.Backdrop />
@@ -104,11 +167,7 @@ export default function KeyboardShortcutsDialog({
           <Modal.Header>
             <h3 className="text-lg font-semibold">{tDynamic('shortcuts.title')}</h3>
           </Modal.Header>
-          <Modal.Body className="gap-4 max-h-96 overflow-y-auto">
-            {renderSection('BIBLE', SHORTCUTS.BIBLE)}
-            {renderSection('TIMER', SHORTCUTS.TIMER)}
-            {renderSection('EDIT', SHORTCUTS.EDIT)}
-          </Modal.Body>
+          <Modal.Body className="gap-4 max-h-96 overflow-y-auto">{sectionsContent}</Modal.Body>
         </Modal.Dialog>
       </Modal.Container>
     </Modal>
