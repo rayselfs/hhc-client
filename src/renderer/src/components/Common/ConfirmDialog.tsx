@@ -5,6 +5,7 @@ import {
   useConfirmDialogState,
   type ConfirmDialogStatus
 } from '@renderer/contexts/ConfirmDialogContext'
+import { ShortcutScope } from '@renderer/contexts/ShortcutScopeContext'
 
 type AlertDialogIconStatus = 'default' | 'accent' | 'success' | 'warning' | 'danger'
 
@@ -65,7 +66,9 @@ export default function ConfirmDialog(): React.JSX.Element {
             <AlertDialog.Heading>{resolvedTitle}</AlertDialog.Heading>
           </AlertDialog.Header>
           <AlertDialog.Body>
-            <p className="text-sm">{description}</p>
+            <ShortcutScope name="overlay">
+              <p className="text-sm">{description}</p>
+            </ShortcutScope>
           </AlertDialog.Body>
           <AlertDialog.Footer>
             <Button variant="tertiary" onPress={() => settle(false)}>

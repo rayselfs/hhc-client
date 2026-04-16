@@ -5,6 +5,7 @@ import { SHORTCUTS } from '@renderer/config/shortcuts'
 import { getMetaKeyLabel } from '@renderer/lib/env'
 import { ShortcutConfig, getPlatformShortcut } from '@renderer/hooks/useKeyboardShortcuts'
 import { getRegistered, RegistryEntry } from '@renderer/lib/shortcut-registry'
+import { ShortcutScope } from '@renderer/contexts/ShortcutScopeContext'
 
 interface KeyboardShortcutsDialogProps {
   isOpen: boolean
@@ -167,7 +168,9 @@ export default function KeyboardShortcutsDialog({
           <Modal.Header>
             <h3 className="text-lg font-semibold">{tDynamic('shortcuts.title')}</h3>
           </Modal.Header>
-          <Modal.Body className="gap-4 max-h-96 overflow-y-auto">{sectionsContent}</Modal.Body>
+          <Modal.Body className="gap-4 max-h-96 overflow-y-auto">
+            <ShortcutScope name="overlay">{sectionsContent}</ShortcutScope>
+          </Modal.Body>
         </Modal.Dialog>
       </Modal.Container>
     </Modal>

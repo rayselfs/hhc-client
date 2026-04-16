@@ -7,6 +7,7 @@ import i18n from '@renderer/i18n'
 import { ConfirmDialogProvider } from '@renderer/contexts/ConfirmDialogContext'
 import ConfirmDialog from '../../../Common/ConfirmDialog'
 import PreferencesDialog from '../PreferencesDialog'
+import { ShortcutScopeProvider } from '@renderer/contexts/ShortcutScopeContext'
 
 vi.mock('@renderer/lib/env', () => ({
   isElectron: vi.fn().mockReturnValue(false),
@@ -36,12 +37,14 @@ vi.mock('@renderer/contexts/ThemeContext', () => ({
 
 function renderDialog(isOpen: boolean, onOpenChange = vi.fn()): ReturnType<typeof render> {
   return render(
-    <MemoryRouter>
-      <ConfirmDialogProvider>
-        <PreferencesDialog isOpen={isOpen} onOpenChange={onOpenChange} />
-        <ConfirmDialog />
-      </ConfirmDialogProvider>
-    </MemoryRouter>
+    <ShortcutScopeProvider>
+      <MemoryRouter>
+        <ConfirmDialogProvider>
+          <PreferencesDialog isOpen={isOpen} onOpenChange={onOpenChange} />
+          <ConfirmDialog />
+        </ConfirmDialogProvider>
+      </MemoryRouter>
+    </ShortcutScopeProvider>
   )
 }
 

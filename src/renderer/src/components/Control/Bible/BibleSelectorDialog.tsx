@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Modal, Button, Tabs, Breadcrumbs, Input, ScrollShadow } from '@heroui/react'
+import { ShortcutScope } from '@renderer/contexts/ShortcutScopeContext'
 import { BIBLE_BOOKS } from '@shared/types/bible'
 import type { BiblePassage } from '@shared/types/bible'
 import { useBibleStore } from '@renderer/stores/bible'
@@ -244,11 +245,13 @@ export function BibleSelectorDialog({
             </div>
           </Modal.Header>
           <Modal.Body className="flex flex-col overflow-hidden px-5">
-            <ScrollShadow className="flex-1 min-h-0">
-              {currentStep === 'books' && renderBooks()}
-              {currentStep === 'chapters' && renderChapters()}
-              {currentStep === 'verses' && renderVerses()}
-            </ScrollShadow>
+            <ShortcutScope name="overlay">
+              <ScrollShadow className="flex-1 min-h-0">
+                {currentStep === 'books' && renderBooks()}
+                {currentStep === 'chapters' && renderChapters()}
+                {currentStep === 'verses' && renderVerses()}
+              </ScrollShadow>
+            </ShortcutScope>
           </Modal.Body>
           <Modal.Footer className="p-1">
             <Button variant="tertiary" onPress={() => onOpenChange(false)}>

@@ -5,6 +5,7 @@ import '@renderer/i18n'
 import { ConfirmDialogProvider, useConfirm } from '@renderer/contexts/ConfirmDialogContext'
 import type { ConfirmOptions } from '@renderer/contexts/ConfirmDialogContext'
 import ConfirmDialog from '../ConfirmDialog'
+import { ShortcutScopeProvider } from '@renderer/contexts/ShortcutScopeContext'
 
 function TestHarness({
   onResult,
@@ -34,10 +35,12 @@ function renderWithProvider(
   onConfirmRef?: (confirm: (options: ConfirmOptions) => Promise<boolean>) => void
 ): ReturnType<typeof render> {
   return render(
-    <ConfirmDialogProvider>
-      <TestHarness onResult={onResult} onConfirmRef={onConfirmRef} />
-      <ConfirmDialog />
-    </ConfirmDialogProvider>
+    <ShortcutScopeProvider>
+      <ConfirmDialogProvider>
+        <TestHarness onResult={onResult} onConfirmRef={onConfirmRef} />
+        <ConfirmDialog />
+      </ConfirmDialogProvider>
+    </ShortcutScopeProvider>
   )
 }
 
@@ -102,15 +105,17 @@ describe('ConfirmDialog', () => {
     )
     // Force a re-render by changing a prop on the provider
     rerender(
-      <ConfirmDialogProvider>
-        <TestHarness
-          onResult={() => {}}
-          onConfirmRef={(confirm) => {
-            confirmRef2 = confirm
-          }}
-        />
-        <ConfirmDialog />
-      </ConfirmDialogProvider>
+      <ShortcutScopeProvider>
+        <ConfirmDialogProvider>
+          <TestHarness
+            onResult={() => {}}
+            onConfirmRef={(confirm) => {
+              confirmRef2 = confirm
+            }}
+          />
+          <ConfirmDialog />
+        </ConfirmDialogProvider>
+      </ShortcutScopeProvider>
     )
     // Assert that confirm function reference is stable
     expect(confirmRef2).toBe(confirmRef1)

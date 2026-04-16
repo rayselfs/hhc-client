@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { parseDuration } from '@renderer/lib/parse-duration'
 import { MAX_DURATION_SECONDS } from '@shared/constants/timer'
+import { ShortcutScope } from '@renderer/contexts/ShortcutScopeContext'
 
 interface TimeInputDialogProps {
   isOpen: boolean
@@ -62,26 +63,28 @@ export default function TimeInputDialog({
               <Modal.Heading>{t('timer.inputDialog.title')}</Modal.Heading>
             </Modal.Header>
             <Modal.Body>
-              <div className="flex flex-col gap-1">
-                <Label htmlFor="time-input-dialog-field">
-                  {t('timer.inputDialog.durationLabel')}
-                </Label>
-                <Input
-                  id="time-input-dialog-field"
-                  value={value}
-                  onChange={(e) => setValue(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder={t('timer.inputDialog.placeholder')}
-                  autoFocus
-                  aria-invalid={Boolean(error)}
-                  aria-describedby={error ? 'time-input-dialog-error' : undefined}
-                />
-                {error && (
-                  <p id="time-input-dialog-error" className="text-sm text-danger">
-                    {error}
-                  </p>
-                )}
-              </div>
+              <ShortcutScope name="overlay">
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor="time-input-dialog-field">
+                    {t('timer.inputDialog.durationLabel')}
+                  </Label>
+                  <Input
+                    id="time-input-dialog-field"
+                    value={value}
+                    onChange={(e) => setValue(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder={t('timer.inputDialog.placeholder')}
+                    autoFocus
+                    aria-invalid={Boolean(error)}
+                    aria-describedby={error ? 'time-input-dialog-error' : undefined}
+                  />
+                  {error && (
+                    <p id="time-input-dialog-error" className="text-sm text-danger">
+                      {error}
+                    </p>
+                  )}
+                </div>
+              </ShortcutScope>
             </Modal.Body>
             <Modal.Footer>
               <Button variant="ghost" onPress={onClose}>

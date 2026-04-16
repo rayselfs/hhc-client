@@ -5,15 +5,18 @@ import i18n from '@renderer/i18n'
 import { ConfirmDialogProvider } from '@renderer/contexts/ConfirmDialogContext'
 import ConfirmDialog from '../../../Common/ConfirmDialog'
 import UserMenu from '../UserMenu'
+import { ShortcutScopeProvider } from '@renderer/contexts/ShortcutScopeContext'
 
 function renderUserMenu(props: { onOpenPreferences?: () => void } = {}): ReturnType<typeof render> {
   return render(
-    <I18nextProvider i18n={i18n}>
-      <ConfirmDialogProvider>
-        <UserMenu {...props} />
-        <ConfirmDialog />
-      </ConfirmDialogProvider>
-    </I18nextProvider>
+    <ShortcutScopeProvider>
+      <I18nextProvider i18n={i18n}>
+        <ConfirmDialogProvider>
+          <UserMenu {...props} />
+          <ConfirmDialog />
+        </ConfirmDialogProvider>
+      </I18nextProvider>
+    </ShortcutScopeProvider>
   )
 }
 

@@ -7,6 +7,7 @@ import UserMenu from '@renderer/components/Control/UserMenu/UserMenu'
 import { ConfirmDialogProvider } from '@renderer/contexts/ConfirmDialogContext'
 import { isMac, getMetaKeyLabel } from '@renderer/lib/env'
 import { getRegistered } from '@renderer/lib/shortcut-registry'
+import { ShortcutScopeProvider } from '@renderer/contexts/ShortcutScopeContext'
 
 vi.mock('@renderer/lib/shortcut-registry', () => ({
   getRegistered: vi.fn(() => [])
@@ -17,13 +18,15 @@ vi.mock('@renderer/lib/env', () => ({
   getMetaKeyLabel: vi.fn(() => 'Ctrl')
 }))
 
+const Wrapper = ({ children }: { children: React.ReactNode }): React.JSX.Element => (
+  <ShortcutScopeProvider>
+    <I18nextProvider i18n={i18n}>{children}</I18nextProvider>
+  </ShortcutScopeProvider>
+)
+
 describe('KeyboardShortcutsDialog', () => {
   it('renders with isOpen=true and shows section titles', () => {
-    render(
-      <I18nextProvider i18n={i18n}>
-        <KeyboardShortcutsDialog isOpen={true} onOpenChange={() => {}} />
-      </I18nextProvider>
-    )
+    render(<KeyboardShortcutsDialog isOpen={true} onOpenChange={() => {}} />, { wrapper: Wrapper })
 
     expect(screen.getByText('Keyboard Shortcuts')).toBeInTheDocument()
     expect(screen.getByText('Bible')).toBeInTheDocument()
@@ -33,9 +36,8 @@ describe('KeyboardShortcutsDialog', () => {
 
   it('does not render when isOpen=false', () => {
     const { container } = render(
-      <I18nextProvider i18n={i18n}>
-        <KeyboardShortcutsDialog isOpen={false} onOpenChange={() => {}} />
-      </I18nextProvider>
+      <KeyboardShortcutsDialog isOpen={false} onOpenChange={() => {}} />,
+      { wrapper: Wrapper }
     )
 
     expect(container.querySelector('[role="dialog"]')).not.toBeInTheDocument()
@@ -45,11 +47,10 @@ describe('KeyboardShortcutsDialog', () => {
 describe('UserMenu', () => {
   it('keyboard shortcuts item is not disabled', () => {
     render(
-      <I18nextProvider i18n={i18n}>
-        <ConfirmDialogProvider>
-          <UserMenu />
-        </ConfirmDialogProvider>
-      </I18nextProvider>
+      <ConfirmDialogProvider>
+        <UserMenu />
+      </ConfirmDialogProvider>,
+      { wrapper: Wrapper }
     )
 
     const trigger = screen.getByText('Guest')
@@ -77,11 +78,7 @@ describe('KeyboardShortcutsDialog - dynamic registry', () => {
       }
     ])
 
-    render(
-      <I18nextProvider i18n={i18n}>
-        <KeyboardShortcutsDialog isOpen={true} onOpenChange={() => {}} />
-      </I18nextProvider>
-    )
+    render(<KeyboardShortcutsDialog isOpen={true} onOpenChange={() => {}} />, { wrapper: Wrapper })
 
     expect(screen.getByText('Custom Bible Shortcut')).toBeInTheDocument()
   })
@@ -89,11 +86,7 @@ describe('KeyboardShortcutsDialog - dynamic registry', () => {
   it('falls back to static SHORTCUTS config when registry is empty', () => {
     vi.mocked(getRegistered).mockReturnValue([])
 
-    render(
-      <I18nextProvider i18n={i18n}>
-        <KeyboardShortcutsDialog isOpen={true} onOpenChange={() => {}} />
-      </I18nextProvider>
-    )
+    render(<KeyboardShortcutsDialog isOpen={true} onOpenChange={() => {}} />, { wrapper: Wrapper })
 
     const spaceKeys = screen.getAllByText('Space')
     expect(spaceKeys.length).toBeGreaterThan(0)
@@ -103,11 +96,7 @@ describe('KeyboardShortcutsDialog - dynamic registry', () => {
     vi.mocked(isMac).mockReturnValue(true)
     vi.mocked(getMetaKeyLabel).mockReturnValue('⌘')
 
-    render(
-      <I18nextProvider i18n={i18n}>
-        <KeyboardShortcutsDialog isOpen={true} onOpenChange={() => {}} />
-      </I18nextProvider>
-    )
+    render(<KeyboardShortcutsDialog isOpen={true} onOpenChange={() => {}} />, { wrapper: Wrapper })
 
     expect(screen.getAllByText('⌫').length).toBeGreaterThan(0)
     expect(screen.queryAllByText('⌘').length).toBeGreaterThan(0)
@@ -117,11 +106,7 @@ describe('KeyboardShortcutsDialog - dynamic registry', () => {
     vi.mocked(isMac).mockReturnValue(false)
     vi.mocked(getMetaKeyLabel).mockReturnValue('Ctrl')
 
-    render(
-      <I18nextProvider i18n={i18n}>
-        <KeyboardShortcutsDialog isOpen={true} onOpenChange={() => {}} />
-      </I18nextProvider>
-    )
+    render(<KeyboardShortcutsDialog isOpen={true} onOpenChange={() => {}} />, { wrapper: Wrapper })
 
     expect(screen.queryAllByText('⌘')).toHaveLength(0)
   })

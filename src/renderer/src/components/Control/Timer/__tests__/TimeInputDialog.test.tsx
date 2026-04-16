@@ -1,5 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react'
 import TimeInputDialog from '../TimeInputDialog'
+import { ShortcutScopeProvider } from '@renderer/contexts/ShortcutScopeContext'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key })
@@ -10,12 +11,14 @@ const onConfirm = vi.fn()
 
 function setup(isOpen = true, initialValue?: string): void {
   render(
-    <TimeInputDialog
-      isOpen={isOpen}
-      onClose={onClose}
-      onConfirm={onConfirm}
-      initialValue={initialValue}
-    />
+    <ShortcutScopeProvider>
+      <TimeInputDialog
+        isOpen={isOpen}
+        onClose={onClose}
+        onConfirm={onConfirm}
+        initialValue={initialValue}
+      />
+    </ShortcutScopeProvider>
   )
 }
 

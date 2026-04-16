@@ -6,6 +6,7 @@ import i18n from '@renderer/i18n'
 import Sidebar from '../Sidebar'
 import { ThemeProvider } from '@renderer/contexts/ThemeContext'
 import { ConfirmDialogProvider } from '@renderer/contexts/ConfirmDialogContext'
+import { ShortcutScopeProvider } from '@renderer/contexts/ShortcutScopeContext'
 
 function renderWithRouter(initialEntries: string[] = ['/']): ReturnType<typeof render> {
   const router = createMemoryRouter(
@@ -22,11 +23,13 @@ function renderWithRouter(initialEntries: string[] = ['/']): ReturnType<typeof r
     { initialEntries }
   )
   return render(
-    <ThemeProvider>
-      <ConfirmDialogProvider>
-        <RouterProvider router={router} />
-      </ConfirmDialogProvider>
-    </ThemeProvider>
+    <ShortcutScopeProvider>
+      <ThemeProvider>
+        <ConfirmDialogProvider>
+          <RouterProvider router={router} />
+        </ConfirmDialogProvider>
+      </ThemeProvider>
+    </ShortcutScopeProvider>
   )
 }
 

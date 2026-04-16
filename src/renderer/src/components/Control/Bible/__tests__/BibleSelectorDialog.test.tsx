@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import type { BiblePassage } from '@shared/types/bible'
 import { BibleSelectorDialog } from '../BibleSelectorDialog'
+import { ShortcutScopeProvider } from '@renderer/contexts/ShortcutScopeContext'
 
 vi.mock('@renderer/stores/bible', () => ({
   useBibleStore: Object.assign(vi.fn(), {
@@ -135,7 +136,14 @@ function renderDialog(
     onSelect: vi.fn(),
     ...overrides
   }
-  return { ...render(<BibleSelectorDialog {...props} />), ...props }
+  return {
+    ...render(
+      <ShortcutScopeProvider>
+        <BibleSelectorDialog {...props} />
+      </ShortcutScopeProvider>
+    ),
+    ...props
+  }
 }
 
 describe('BibleSelectorDialog', () => {
