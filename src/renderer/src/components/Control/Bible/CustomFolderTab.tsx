@@ -662,7 +662,7 @@ export function CustomFolderTab({
           </button>
           <div className="flex items-center gap-2 text-left min-w-0 w-full">
             <div className="min-w-0">
-              <div className="text-sm font-medium text-muted">{reference}</div>
+              <div className="truncate text-muted">{reference}</div>
               <div className="text-lg whitespace-normal">{item.text}</div>
             </div>
           </div>
@@ -774,36 +774,42 @@ export function CustomFolderTab({
         </DragOverlay>
       </DndContext>
 
-      <Modal isOpen={isModalOpen} onOpenChange={onModalOpenChange}>
-        <Modal.Backdrop />
-        <Modal.Container size="sm">
-          <Modal.Dialog className="p-3 pl-5 pt-5">
-            <Modal.Header>
-              <Modal.Heading>{t('bible.create_new_folder', 'Create New Folder')}</Modal.Heading>
-            </Modal.Header>
-            <Modal.Body>
-              <ShortcutScope name="overlay">
-                <TextField
-                  autoFocus
-                  value={newFolderName}
-                  onChange={setNewFolderName}
-                  onKeyDown={(e) => e.key === 'Enter' && handleAddFolder()}
-                >
-                  <Label>{t('bible.folder_name', 'Folder Name')}</Label>
-                  <Input />
-                </TextField>
-              </ShortcutScope>
-            </Modal.Body>
-            <Modal.Footer>
-              <Button variant="tertiary" onPress={() => onModalOpenChange(false)}>
-                {t('common.cancel', 'Cancel')}
-              </Button>
-              <Button variant="primary" onPress={handleAddFolder}>
-                {t('common.create', 'Create')}
-              </Button>
-            </Modal.Footer>
-          </Modal.Dialog>
-        </Modal.Container>
+      <Modal>
+        <Modal.Backdrop isOpen={isModalOpen} onOpenChange={onModalOpenChange}>
+          <Modal.Container size="sm">
+            <Modal.Dialog className="p-3 pl-5 pt-5">
+              <Modal.Header>
+                <Modal.Heading>
+                  {t('bible.custom.createNewFolder', 'Create New Folder')}
+                </Modal.Heading>
+              </Modal.Header>
+              <Modal.Body>
+                <ShortcutScope name="overlay">
+                  <TextField
+                    autoFocus
+                    value={newFolderName}
+                    onChange={setNewFolderName}
+                    className="w-full p-1"
+                    onKeyDown={(e) =>
+                      e.key === 'Enter' && !e.nativeEvent.isComposing && handleAddFolder()
+                    }
+                  >
+                    <Label>{t('bible.custom.folderName', 'Folder Name')}</Label>
+                    <Input variant="secondary" />
+                  </TextField>
+                </ShortcutScope>
+              </Modal.Body>
+              <Modal.Footer>
+                <Button variant="tertiary" onPress={() => onModalOpenChange(false)}>
+                  {t('common.cancel', 'Cancel')}
+                </Button>
+                <Button variant="primary" onPress={handleAddFolder}>
+                  {t('common.confirm', 'Confirm')}
+                </Button>
+              </Modal.Footer>
+            </Modal.Dialog>
+          </Modal.Container>
+        </Modal.Backdrop>
       </Modal>
     </div>
   )
