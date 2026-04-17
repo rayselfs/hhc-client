@@ -136,7 +136,7 @@ export function BiblePreview({
     if (!verse) return
     const el = verseRefs.current.get(verse.number)
     const container = scrollContainerRef.current
-    if (el && container) {
+    if (el && container && typeof container.scrollTo === 'function') {
       const top =
         el.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop
       const isAdjacent = Math.abs(selectedVerseIndex - prevSelectedVerseIndexRef.current) <= 1

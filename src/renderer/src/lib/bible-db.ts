@@ -54,17 +54,24 @@ interface BibleDBSchema extends DBSchema {
   }
 }
 
-const bibleDBPromise: Promise<IDBPDatabase<BibleDBSchema>> = openDB<BibleDBSchema>('hhc-bible', 1, {
-  upgrade(db) {
-    db.createObjectStore('content')
-    db.createObjectStore('versions')
-    db.createObjectStore('folders')
-    db.createObjectStore('flexsearch')
+let bibleDBPromise: Promise<IDBPDatabase<BibleDBSchema>> | null = null
+
+function getBibleDB(): Promise<IDBPDatabase<BibleDBSchema>> {
+  if (!bibleDBPromise) {
+    bibleDBPromise = openDB<BibleDBSchema>('hhc-bible', 1, {
+      upgrade(db) {
+        if (!db.objectStoreNames.contains('content')) db.createObjectStore('content')
+        if (!db.objectStoreNames.contains('versions')) db.createObjectStore('versions')
+        if (!db.objectStoreNames.contains('folders')) db.createObjectStore('folders')
+        if (!db.objectStoreNames.contains('flexsearch')) db.createObjectStore('flexsearch')
+      }
+    })
   }
-})
+  return bibleDBPromise
+}
 
 export async function openBibleDB(): Promise<IDBPDatabase<BibleDBSchema>> {
-  return bibleDBPromise
+  return getBibleDB()
 }
 
 export async function saveBibleContent(versionId: number, content: BibleBookDB[]): Promise<void> {
