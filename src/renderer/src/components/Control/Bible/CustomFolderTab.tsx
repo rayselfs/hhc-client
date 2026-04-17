@@ -28,11 +28,12 @@ import { useProjection } from '@renderer/contexts/ProjectionContext'
 import type { VerseItem, Folder, FolderItem } from '@shared/types/folder'
 import { isVerseItem, isFolder } from '@shared/types/folder'
 import { ScrollShadow, Button, Input, Modal, TextField, Label } from '@heroui/react'
-import { FolderPlus, Folder as FolderIcon, Trash2, X, GripVertical } from 'lucide-react'
+import { Folder as FolderIcon, Trash2, GripVertical } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import { useKeyboardShortcuts } from '@renderer/hooks/useKeyboardShortcuts'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
+import { ShortcutScope } from '@renderer/contexts/ShortcutScopeContext'
 import { useFolderContextMenu } from './useFolderContextMenu'
 
 interface CustomFolderTabProps {
@@ -256,8 +257,8 @@ export function CustomFolderTab({
     (item: VerseItem) => {
       navigateTo({ bookNumber: item.bookNumber, chapter: item.chapter, verse: item.verseStart })
       const { content, versions } = useBibleStore.getState()
-      const versionId = versions.length > 0 ? versions[0].id : 0
-      const books = content.get(versionId)
+      const versionId = versions?.length > 0 ? versions[0].id : 0
+      const books = content?.get(versionId)
       const book = books?.find((b) => b.number === item.bookNumber)
       const chapter = book?.chapters.find((c) => c.number === item.chapter)
       if (!chapter) return
@@ -774,13 +775,14 @@ export function CustomFolderTab({
       </DndContext>
 
       <Modal isOpen={isModalOpen} onOpenChange={onModalOpenChange}>
-        <Modal.Backdrop>
-          <Modal.Container>
-            <Modal.Dialog>
-              <Modal.Header>
-                <Modal.Heading>{t('bible.create_new_folder', 'Create New Folder')}</Modal.Heading>
-              </Modal.Header>
-              <Modal.Body>
+        <Modal.Backdrop />
+        <Modal.Container size="sm">
+          <Modal.Dialog className="p-3 pl-5 pt-5">
+            <Modal.Header>
+              <Modal.Heading>{t('bible.create_new_folder', 'Create New Folder')}</Modal.Heading>
+            </Modal.Header>
+            <Modal.Body>
+              <ShortcutScope name="overlay">
                 <TextField
                   autoFocus
                   value={newFolderName}
@@ -790,20 +792,18 @@ export function CustomFolderTab({
                   <Label>{t('bible.folder_name', 'Folder Name')}</Label>
                   <Input />
                 </TextField>
-              </Modal.Body>
-              <Modal.Footer>
-                <Button variant="tertiary" onPress={() => onModalOpenChange(false)}>
-                  <X className="w-4 h-4 mr-2" />
-                  {t('common.cancel', 'Cancel')}
-                </Button>
-                <Button onPress={handleAddFolder}>
-                  <FolderPlus className="w-4 h-4 mr-2" />
-                  {t('common.create', 'Create')}
-                </Button>
-              </Modal.Footer>
-            </Modal.Dialog>
-          </Modal.Container>
-        </Modal.Backdrop>
+              </ShortcutScope>
+            </Modal.Body>
+            <Modal.Footer>
+              <Button variant="tertiary" onPress={() => onModalOpenChange(false)}>
+                {t('common.cancel', 'Cancel')}
+              </Button>
+              <Button variant="primary" onPress={handleAddFolder}>
+                {t('common.create', 'Create')}
+              </Button>
+            </Modal.Footer>
+          </Modal.Dialog>
+        </Modal.Container>
       </Modal>
     </div>
   )

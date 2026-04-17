@@ -23,14 +23,17 @@ export default function BibleMultiFunction(): React.JSX.Element {
       <Card.Header className="shrink-0 flex-row! items-center gap-1 p-0 pt-3 px-3">
         <Tabs selectedKey={activeTab} onSelectionChange={(key) => setActiveTab(String(key))}>
           <Tabs.ListContainer>
-            <Tabs.List aria-label="Bible Functions">
+            <Tabs.List
+              aria-label="Bible Functions"
+              className="bg-transparent border border-border p-1"
+            >
               <Tabs.Tab id="history">
                 {t('bible.history.title')}
-                <Tabs.Indicator />
+                <Tabs.Indicator className="bg-accent" />
               </Tabs.Tab>
               <Tabs.Tab id="custom">
                 {t('bible.custom.title')}
-                <Tabs.Indicator />
+                <Tabs.Indicator className="bg-accent" />
               </Tabs.Tab>
             </Tabs.List>
           </Tabs.ListContainer>

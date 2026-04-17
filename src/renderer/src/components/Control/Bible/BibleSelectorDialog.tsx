@@ -129,7 +129,7 @@ export function BibleSelectorDialog({
               key={book.number}
               variant="tertiary"
               onPress={() => handleBookSelect(book.number)}
-              className="w-full h-11 rounded-full text-xl"
+              className="w-full h-11 rounded-full text-xl text-foreground"
             >
               {bookName(book.code)}
             </Button>
@@ -144,7 +144,7 @@ export function BibleSelectorDialog({
               key={book.number}
               variant="tertiary"
               onPress={() => handleBookSelect(book.number)}
-              className="w-full h-11 rounded-full text-xl"
+              className="w-full h-11 rounded-full text-xl text-foreground"
             >
               {bookName(book.code)}
             </Button>
@@ -164,7 +164,7 @@ export function BibleSelectorDialog({
             isIconOnly
             variant="tertiary"
             onPress={() => handleChapterSelect(chapter)}
-            className="w-18 h-18 rounded-full aspect-square text-3xl"
+            className="w-18 h-18 rounded-full aspect-square text-3xl text-foreground"
           >
             {chapter}
           </Button>
@@ -181,7 +181,7 @@ export function BibleSelectorDialog({
           isIconOnly
           variant="tertiary"
           onPress={() => handleVerseSelect(verse)}
-          className="w-18 h-18 rounded-full aspect-square text-3xl"
+          className="w-18 h-18 rounded-full aspect-square text-3xl text-foreground"
         >
           {verse}
         </Button>
@@ -222,21 +222,24 @@ export function BibleSelectorDialog({
                   onSelectionChange={(key) => setCurrentStep(key as Step)}
                 >
                   <Tabs.ListContainer>
-                    <Tabs.List aria-label={t('bible.selector.title')}>
+                    <Tabs.List
+                      aria-label={t('bible.selector.title')}
+                      className="bg-transparent border border-border p-1"
+                    >
                       <Tabs.Tab id="books">
                         {t('bible.selector.bookAbbr')}
-                        <Tabs.Indicator />
+                        <Tabs.Indicator className="bg-accent" />
                       </Tabs.Tab>
                       <Tabs.Tab
                         id="chapters"
                         isDisabled={!selectedBook || bookDetails?.chapterCount === 1}
                       >
                         {t('bible.selector.chapterAbbr')}
-                        <Tabs.Indicator />
+                        <Tabs.Indicator className="bg-accent" />
                       </Tabs.Tab>
                       <Tabs.Tab id="verses" isDisabled={selectedChapter == null}>
                         {t('bible.selector.verseAbbr')}
-                        <Tabs.Indicator />
+                        <Tabs.Indicator className="bg-accent" />
                       </Tabs.Tab>
                     </Tabs.List>
                   </Tabs.ListContainer>
@@ -244,9 +247,9 @@ export function BibleSelectorDialog({
               </div>
             </div>
           </Modal.Header>
-          <Modal.Body className="flex flex-col overflow-hidden px-5">
+          <Modal.Body className="flex flex-col overflow-hidden">
             <ShortcutScope name="overlay">
-              <ScrollShadow className="flex-1 min-h-0">
+              <ScrollShadow className="flex-1 min-h-0 px-5">
                 {currentStep === 'books' && renderBooks()}
                 {currentStep === 'chapters' && renderChapters()}
                 {currentStep === 'verses' && renderVerses()}

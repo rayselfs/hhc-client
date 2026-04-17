@@ -33,6 +33,10 @@ export function registerShortcut(entry: RegistryEntry): void {
   }
 
   const entries = registry.get(key)!
+
+  // Idempotent: skip if same ID already registered (handles React StrictMode double-mount)
+  if (entries.some((e) => e.id === entry.id)) return
+
   entries.push(entry)
 
   if (import.meta.env.DEV && entries.length > 1) {

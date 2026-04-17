@@ -2,6 +2,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import type { Folder, VerseItem } from '@shared/types/folder'
 import { CustomFolderTab } from '../CustomFolderTab'
+import { ShortcutScopeProvider } from '@renderer/contexts/ShortcutScopeContext'
 
 const mockNavigateTo = vi.fn()
 const mockAddFolder = vi.fn()
@@ -216,7 +217,11 @@ describe('CustomFolderTab', () => {
   })
 
   it('opens create folder modal when isModalOpen is true', () => {
-    render(<CustomFolderTab isModalOpen={true} onModalOpenChange={vi.fn()} />)
+    render(
+      <ShortcutScopeProvider>
+        <CustomFolderTab isModalOpen={true} onModalOpenChange={vi.fn()} />
+      </ShortcutScopeProvider>
+    )
     expect(screen.getByRole('dialog')).toBeInTheDocument()
     expect(screen.getByText('Create New Folder')).toBeInTheDocument()
   })
@@ -237,7 +242,11 @@ describe('CustomFolderTab', () => {
 
   it('create folder modal calls onModalOpenChange(false) on cancel', () => {
     const onModalOpenChange = vi.fn()
-    render(<CustomFolderTab isModalOpen={true} onModalOpenChange={onModalOpenChange} />)
+    render(
+      <ShortcutScopeProvider>
+        <CustomFolderTab isModalOpen={true} onModalOpenChange={onModalOpenChange} />
+      </ShortcutScopeProvider>
+    )
     fireEvent.click(screen.getByText('Cancel'))
     expect(onModalOpenChange).toHaveBeenCalledWith(false)
   })
