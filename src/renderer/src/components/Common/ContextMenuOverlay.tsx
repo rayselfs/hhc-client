@@ -1,4 +1,5 @@
 import { createPortal } from 'react-dom'
+import { useState, useEffect, useRef } from 'react'
 import GlassDivider from '@renderer/components/Common/GlassDivider'
 import type { ContextMenuEntry, ContextMenuItem } from '@renderer/contexts/ContextMenuContext'
 
@@ -17,12 +18,59 @@ export default function ContextMenuOverlay({
   menuRef,
   onClose
 }: ContextMenuOverlayProps): React.JSX.Element {
+  const menuItems = items.filter((e): e is ContextMenuItem => e !== 'separator')
+  const [focusedIndex, setFocusedIndex] = useState(0)
+  const buttonRefs = useRef<(HTMLButtonElement | null)[]>([])
+
+  useEffect(() => {
+    buttonRefs.current[0]?.focus()
+  }, [])
+
+  useEffect(() => {
+    buttonRefs.current[focusedIndex]?.focus()
+  }, [focusedIndex])
+
+  const handleKeyDown = (e: React.KeyboardEvent): void => {
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault()
+        setFocusedIndex((prev) => (prev + 1) % menuItems.length)
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        setFocusedIndex((prev) => (prev - 1 + menuItems.length) % menuItems.length)
+        break
+      case 'Home':
+        e.preventDefault()
+        setFocusedIndex(0)
+        break
+      case 'End':
+        e.preventDefault()
+        setFocusedIndex(menuItems.length - 1)
+        break
+      case 'Enter':
+      case ' ':
+        e.preventDefault()
+        menuItems[focusedIndex]?.onAction()
+        onClose()
+        break
+      case 'Tab':
+        e.preventDefault()
+        onClose()
+        break
+    }
+  }
+
+  let menuItemIdx = -1
+
   return createPortal(
     <div
       ref={menuRef}
       role="menu"
+      aria-orientation="vertical"
       className="fixed z-[9999] min-w-[160px] rounded-2xl bg-overlay py-1.5"
       style={{ left: x, top: y, boxShadow: 'var(--shadow-overlay)' }}
+      onKeyDown={handleKeyDown}
     >
       {items.map((entry, i) => {
         if (entry === 'separator') {
@@ -30,12 +78,18 @@ export default function ContextMenuOverlay({
           const key = `sep-${prev ? prev.id : 'start'}`
           return <GlassDivider key={key} className="my-1" />
         }
+        menuItemIdx++
+        const currentIdx = menuItemIdx
         const isDanger = entry.variant === 'danger'
         return (
           <button
             key={entry.id}
+            ref={(el) => {
+              buttonRefs.current[currentIdx] = el
+            }}
             role="menuitem"
             type="button"
+            tabIndex={currentIdx === focusedIndex ? 0 : -1}
             className={[
               'flex w-full items-center gap-2 rounded-2xl px-2.5 py-1.5 text-sm outline-none cursor-pointer',
               'hover:bg-default active:scale-[0.98] transition-colors',
@@ -45,6 +99,7 @@ export default function ContextMenuOverlay({
               entry.onAction()
               onClose()
             }}
+            onFocus={() => setFocusedIndex(currentIdx)}
           >
             {entry.icon && <span className="flex-shrink-0 w-4 h-4">{entry.icon}</span>}
             {entry.label}

@@ -32,12 +32,20 @@ export function ContextMenuProvider({
 }): React.JSX.Element {
   const [menu, setMenu] = useState<ContextMenuState | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<Element | null>(null)
 
-  const close = useCallback(() => setMenu(null), [])
+  const close = useCallback(() => {
+    setMenu(null)
+    if (triggerRef.current instanceof HTMLElement) {
+      triggerRef.current.focus()
+    }
+    triggerRef.current = null
+  }, [])
 
   const showMenu = useCallback((items: ContextMenuEntry[], e: React.MouseEvent): void => {
     e.preventDefault()
     e.stopPropagation()
+    triggerRef.current = document.activeElement
     setMenu({ x: e.clientX, y: e.clientY, items })
   }, [])
 

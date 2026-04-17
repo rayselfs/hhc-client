@@ -199,4 +199,169 @@ describe('ContextMenuContext', () => {
     const { result } = renderContextMenuHook()
     expect(typeof result.current.showMenu).toBe('function')
   })
+
+  it('first menuitem receives focus on menu open', () => {
+    const items: ContextMenuEntry[] = [
+      { id: 'a', label: 'Alpha', onAction: vi.fn() },
+      { id: 'b', label: 'Beta', onAction: vi.fn() }
+    ]
+
+    function TestComponent(): React.JSX.Element {
+      const { showMenu } = useContextMenu()
+      return (
+        <div data-testid="target" onContextMenu={(e) => showMenu(items, e)}>
+          target
+        </div>
+      )
+    }
+
+    renderWithProvider(<TestComponent />)
+    fireEvent.contextMenu(screen.getByTestId('target'), { clientX: 50, clientY: 50 })
+
+    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Alpha' }))
+  })
+
+  it('ArrowDown moves focus to next menuitem', () => {
+    const items: ContextMenuEntry[] = [
+      { id: 'a', label: 'Alpha', onAction: vi.fn() },
+      { id: 'b', label: 'Beta', onAction: vi.fn() }
+    ]
+
+    function TestComponent(): React.JSX.Element {
+      const { showMenu } = useContextMenu()
+      return (
+        <div data-testid="target" onContextMenu={(e) => showMenu(items, e)}>
+          target
+        </div>
+      )
+    }
+
+    renderWithProvider(<TestComponent />)
+    fireEvent.contextMenu(screen.getByTestId('target'), { clientX: 50, clientY: 50 })
+
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'ArrowDown' })
+
+    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Beta' }))
+  })
+
+  it('ArrowUp moves focus to previous menuitem and wraps', () => {
+    const items: ContextMenuEntry[] = [
+      { id: 'a', label: 'Alpha', onAction: vi.fn() },
+      { id: 'b', label: 'Beta', onAction: vi.fn() }
+    ]
+
+    function TestComponent(): React.JSX.Element {
+      const { showMenu } = useContextMenu()
+      return (
+        <div data-testid="target" onContextMenu={(e) => showMenu(items, e)}>
+          target
+        </div>
+      )
+    }
+
+    renderWithProvider(<TestComponent />)
+    fireEvent.contextMenu(screen.getByTestId('target'), { clientX: 50, clientY: 50 })
+
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'ArrowUp' })
+
+    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Beta' }))
+  })
+
+  it('Home/End jumps to first/last menuitem', () => {
+    const items: ContextMenuEntry[] = [
+      { id: 'a', label: 'Alpha', onAction: vi.fn() },
+      { id: 'b', label: 'Beta', onAction: vi.fn() },
+      { id: 'c', label: 'Gamma', onAction: vi.fn() }
+    ]
+
+    function TestComponent(): React.JSX.Element {
+      const { showMenu } = useContextMenu()
+      return (
+        <div data-testid="target" onContextMenu={(e) => showMenu(items, e)}>
+          target
+        </div>
+      )
+    }
+
+    renderWithProvider(<TestComponent />)
+    fireEvent.contextMenu(screen.getByTestId('target'), { clientX: 50, clientY: 50 })
+
+    const menu = screen.getByRole('menu')
+    fireEvent.keyDown(menu, { key: 'End' })
+    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Gamma' }))
+
+    fireEvent.keyDown(menu, { key: 'Home' })
+    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Alpha' }))
+  })
+
+  it('Enter activates focused item and closes menu', () => {
+    const onAction = vi.fn()
+    const items: ContextMenuEntry[] = [{ id: 'a', label: 'Alpha', onAction }]
+
+    function TestComponent(): React.JSX.Element {
+      const { showMenu } = useContextMenu()
+      return (
+        <div data-testid="target" onContextMenu={(e) => showMenu(items, e)}>
+          target
+        </div>
+      )
+    }
+
+    renderWithProvider(<TestComponent />)
+    fireEvent.contextMenu(screen.getByTestId('target'), { clientX: 50, clientY: 50 })
+
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Enter' })
+
+    expect(onAction).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  })
+
+  it('Tab closes menu', () => {
+    const items: ContextMenuEntry[] = [{ id: 'a', label: 'Alpha', onAction: vi.fn() }]
+
+    function TestComponent(): React.JSX.Element {
+      const { showMenu } = useContextMenu()
+      return (
+        <div data-testid="target" onContextMenu={(e) => showMenu(items, e)}>
+          target
+        </div>
+      )
+    }
+
+    renderWithProvider(<TestComponent />)
+    fireEvent.contextMenu(screen.getByTestId('target'), { clientX: 50, clientY: 50 })
+
+    expect(screen.getByRole('menu')).toBeInTheDocument()
+
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Tab' })
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  })
+
+  it('focus returns to trigger element on close', () => {
+    const items: ContextMenuEntry[] = [{ id: 'a', label: 'Alpha', onAction: vi.fn() }]
+
+    function TestComponent(): React.JSX.Element {
+      const { showMenu } = useContextMenu()
+      return (
+        <button type="button" data-testid="trigger" onContextMenu={(e) => showMenu(items, e)}>
+          trigger
+        </button>
+      )
+    }
+
+    renderWithProvider(<TestComponent />)
+    const trigger = screen.getByTestId('trigger')
+    trigger.focus()
+
+    fireEvent.contextMenu(trigger, { clientX: 50, clientY: 50 })
+    expect(screen.getByRole('menu')).toBeInTheDocument()
+
+    act(() => {
+      fireEvent.keyDown(document, { key: 'Escape' })
+    })
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect(document.activeElement).toBe(trigger)
+  })
 })
