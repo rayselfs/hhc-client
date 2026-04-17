@@ -97,10 +97,7 @@ describe('PresetChips — removePreset via right-click', () => {
     useTimerStore.setState({ removePreset: removePresetSpy } as never)
     renderWithI18n()
 
-    const chip =
-      screen.getByRole('button', { name: '05:00' }).closest('li') ??
-      screen.getByRole('button', { name: '05:00' }).parentElement!
-    fireEvent.contextMenu(chip)
+    fireEvent.contextMenu(screen.getByRole('button', { name: '05:00' }))
 
     expect(removePresetSpy).toHaveBeenCalledWith('preset-5m')
   })
@@ -110,10 +107,7 @@ describe('PresetChips — removePreset via right-click', () => {
     useTimerStore.setState({ removePreset: removePresetSpy } as never)
     renderWithI18n()
 
-    const chip =
-      screen.getByRole('button', { name: '10:00' }).closest('li') ??
-      screen.getByRole('button', { name: '10:00' }).parentElement!
-    fireEvent.contextMenu(chip)
+    fireEvent.contextMenu(screen.getByRole('button', { name: '10:00' }))
 
     expect(removePresetSpy).toHaveBeenCalledWith('preset-10m')
   })

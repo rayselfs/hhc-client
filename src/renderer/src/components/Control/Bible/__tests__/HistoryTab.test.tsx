@@ -47,6 +47,22 @@ const bibleSingleton = {
   navigateTo: mockNavigateTo
 }
 
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, defaultValue?: string | object) => {
+      const bookMap: Record<string, string> = {
+        'bible.books.gen.name': '創世記',
+        'bible.books.joh.name': '約翰福音'
+      }
+      if (bookMap[key]) return bookMap[key]
+      if (typeof defaultValue === 'string') return defaultValue
+      if (typeof defaultValue === 'object' && defaultValue && 'defaultValue' in defaultValue)
+        return (defaultValue as { defaultValue: string }).defaultValue
+      return key
+    }
+  })
+}))
+
 vi.mock('@renderer/stores/bible-history', () => ({
   useBibleHistoryStore: Object.assign(
     (selector: (state: typeof historySingleton) => unknown) => selector(historySingleton),

@@ -103,6 +103,30 @@ vi.mock('@renderer/config/shortcuts', () => ({
   }
 }))
 
+vi.mock('@renderer/contexts/ProjectionContext', () => ({
+  useProjection: () => ({
+    isProjectionOpen: false,
+    isProjectionBlanked: false,
+    projectionReadyCount: 0,
+    activeOwner: 'timer',
+    claimProjection: vi.fn(),
+    releaseOwnership: vi.fn(),
+    project: vi.fn(),
+    openProjection: vi.fn(),
+    closeProjection: vi.fn(),
+    blankProjection: vi.fn(),
+    send: vi.fn(),
+    on: vi.fn()
+  })
+}))
+
+vi.mock('@renderer/contexts/ContextMenuContext', () => ({
+  useContextMenu: () => ({
+    contextMenu: null,
+    showContextMenu: vi.fn()
+  })
+}))
+
 const mockConfirm = vi.fn(() => Promise.resolve(true))
 vi.mock('@renderer/contexts/ConfirmDialogContext', () => ({
   useConfirm: () => mockConfirm
@@ -111,6 +135,11 @@ vi.mock('@renderer/contexts/ConfirmDialogContext', () => ({
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, opts: string | { defaultValue?: string } = {}) => {
+      const bookMap: Record<string, string> = {
+        'bible.books.gen.name': '創世記',
+        'bible.books.joh.name': '約翰福音'
+      }
+      if (bookMap[key]) return bookMap[key]
       if (typeof opts === 'string') return opts
       return opts.defaultValue ?? key
     }
@@ -194,15 +223,15 @@ describe('CustomFolderTab', () => {
 
   it('clicking folder navigates into it', () => {
     render(<CustomFolderTab />)
-    const folderButton = screen.getByText('Sunday Worship').closest('button')!
-    fireEvent.click(folderButton)
+    const folderButton = screen.getByText('Sunday Worship').closest('[role="option"]')!
+    fireEvent.doubleClick(folderButton)
     expect(mockNavigateToFolder).toHaveBeenCalledWith('folder-a')
   })
 
   it('clicking verse item navigates to bible passage', () => {
     render(<CustomFolderTab />)
-    const verseButton = screen.getByText('創世記 1:1').closest('button')!
-    fireEvent.click(verseButton)
+    const verseButton = screen.getByText('創世記 1:1').closest('[role="option"]')!
+    fireEvent.doubleClick(verseButton)
     expect(mockNavigateTo).toHaveBeenCalledWith({ bookNumber: 1, chapter: 1, verse: 1 })
   })
 
