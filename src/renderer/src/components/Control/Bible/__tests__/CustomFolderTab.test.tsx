@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import type { Folder, VerseItem } from '@shared/types/folder'
 import { CustomFolderTab } from '../CustomFolderTab'
@@ -152,19 +152,16 @@ vi.mock('@heroui/react', async (importOriginal) => {
   return {
     ...actual,
     ScrollShadow: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-    Modal: Object.assign(
-      ({ isOpen, children }: { isOpen: boolean; children: React.ReactNode }) =>
+    Modal: Object.assign(({ children }: { children: React.ReactNode }) => <div>{children}</div>, {
+      Backdrop: ({ isOpen, children }: { isOpen?: boolean; children: React.ReactNode }) =>
         isOpen ? <div role="dialog">{children}</div> : null,
-      {
-        Backdrop: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-        Container: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-        Dialog: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-        Header: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-        Heading: ({ children }: { children: React.ReactNode }) => <h2>{children}</h2>,
-        Body: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-        Footer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>
-      }
-    ),
+      Container: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+      Dialog: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+      Header: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+      Heading: ({ children }: { children: React.ReactNode }) => <h2>{children}</h2>,
+      Body: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+      Footer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>
+    }),
     Breadcrumbs: Object.assign(
       ({ children }: { children: React.ReactNode }) => (
         <nav aria-label="breadcrumbs">{children}</nav>
@@ -216,13 +213,15 @@ describe('CustomFolderTab', () => {
     expect(screen.getByText('創世記 1:1')).toBeInTheDocument()
   })
 
-  it('opens create folder modal when isModalOpen is true', () => {
+  it('opens create folder modal when isModalOpen is true', async () => {
     render(
       <ShortcutScopeProvider>
         <CustomFolderTab isModalOpen={true} onModalOpenChange={vi.fn()} />
       </ShortcutScopeProvider>
     )
-    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+    })
     expect(screen.getByText('Create New Folder')).toBeInTheDocument()
   })
 
@@ -240,13 +239,16 @@ describe('CustomFolderTab', () => {
     expect(mockNavigateTo).toHaveBeenCalledWith({ bookNumber: 1, chapter: 1, verse: 1 })
   })
 
-  it('create folder modal calls onModalOpenChange(false) on cancel', () => {
+  it('create folder modal calls onModalOpenChange(false) on cancel', async () => {
     const onModalOpenChange = vi.fn()
     render(
       <ShortcutScopeProvider>
         <CustomFolderTab isModalOpen={true} onModalOpenChange={onModalOpenChange} />
       </ShortcutScopeProvider>
     )
+    await waitFor(() => {
+      expect(screen.getByText('Cancel')).toBeInTheDocument()
+    })
     fireEvent.click(screen.getByText('Cancel'))
     expect(onModalOpenChange).toHaveBeenCalledWith(false)
   })

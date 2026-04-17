@@ -1,4 +1,4 @@
-import { Button, Card, ScrollShadow, Spinner } from '@heroui/react'
+import { Button, ButtonGroup, Card, Spinner } from '@heroui/react'
 import GlassDivider from '@renderer/components/Common/GlassDivider'
 import { useBibleStore } from '@renderer/stores/bible'
 import { useBibleSearchStore } from '@renderer/stores/bible-search'
@@ -218,52 +218,50 @@ export function BiblePreview({
     }
 
     return (
-      <ScrollShadow className="h-full" hideScrollBar>
-        <div ref={scrollContainerCallbackRef} className="h-full overflow-y-auto">
-          <div className="flex flex-col gap-2 px-2">
-            {verses.map((verse, index) => {
-              const isSelected = index === selectedVerseIndex
-              const isProjected = currentPassage?.verse === verse.number
-              return (
-                <div key={verse.number} className="group relative">
-                  <button
-                    ref={(el) => {
-                      if (el) {
-                        verseRefs.current.set(verse.number, el)
-                      } else {
-                        verseRefs.current.delete(verse.number)
-                      }
-                    }}
-                    type="button"
-                    onClick={() => handleVerseClick(index, verse.number, verse.text)}
-                    onContextMenu={onContextMenu}
-                    data-verse-number={verse.number}
-                    className={`w-full text-left cursor-pointer rounded-3xl p-3 transition-colors flex items-start ${
-                      isSelected
-                        ? 'bg-accent-soft-hover'
-                        : isProjected
-                          ? 'bg-accent-soft'
-                          : 'hover:bg-accent/8'
-                    }`}
-                  >
-                    <span className="text-muted mr-2 shrink-0">{verse.number}</span>
-                    <span className="flex-1 text-xl pr-6">{verse.text}</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => handleQuickAddToFolder(verse.number, verse.text, e)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-full hover:bg-accent-soft"
-                    aria-label={t('bible.contextMenu.addToFolder')}
-                  >
-                    <CirclePlus size={14} className="text-muted" />
-                  </button>
-                </div>
-              )
-            })}
-            <div className="shrink-0" style={{ height: spacerHeight }} aria-hidden />
-          </div>
+      <div ref={scrollContainerCallbackRef} className="h-full overflow-y-auto">
+        <div className="flex flex-col gap-2 p-2 pt-0">
+          {verses.map((verse, index) => {
+            const isSelected = index === selectedVerseIndex
+            const isProjected = currentPassage?.verse === verse.number
+            return (
+              <div key={verse.number} className="group relative">
+                <button
+                  ref={(el) => {
+                    if (el) {
+                      verseRefs.current.set(verse.number, el)
+                    } else {
+                      verseRefs.current.delete(verse.number)
+                    }
+                  }}
+                  type="button"
+                  onClick={() => handleVerseClick(index, verse.number, verse.text)}
+                  onContextMenu={onContextMenu}
+                  data-verse-number={verse.number}
+                  className={`w-full text-left cursor-pointer rounded-3xl p-3 transition-colors flex items-start ${
+                    isSelected
+                      ? 'bg-accent-soft-hover'
+                      : isProjected
+                        ? 'bg-accent-soft'
+                        : 'hover:bg-accent/8'
+                  }`}
+                >
+                  <span className="text-muted mr-2 shrink-0">{verse.number}</span>
+                  <span className="flex-1 text-xl pr-6">{verse.text}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => handleQuickAddToFolder(verse.number, verse.text, e)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-full hover:bg-accent-soft"
+                  aria-label={t('bible.contextMenu.addToFolder')}
+                >
+                  <CirclePlus size={14} className="text-muted" />
+                </button>
+              </div>
+            )
+          })}
+          <div className="shrink-0" style={{ height: spacerHeight }} aria-hidden />
         </div>
-      </ScrollShadow>
+      </div>
     )
   }
 
@@ -279,17 +277,17 @@ export function BiblePreview({
     book && chapter ? ` ${chapter.number}${chapterUnit === ':' ? '' : chapterUnit}` : ''
 
   return (
-    <Card className="flex flex-col h-full flex-1 p-0">
-      <Card.Header className="shrink-0 flex-row! items-center justify-between p-0">
-        <h2 className="text-lg font-semibold pl-5 pt-3">
+    <Card className="flex flex-col h-full flex-1 p-0 gap-2">
+      <Card.Header className="shrink-0 flex-row! items-center justify-between p-0 pt-2">
+        <h2 className="text-lg font-semibold pl-5">
           {isSearchMode ? t('bible.search.title') : `${bookName}${chapterSuffix}`}
         </h2>
         {!isSearchMode && (
-          <div className="flex items-center gap-2 pt-3 pr-3">
+          <ButtonGroup size="lg" className="pr-2">
             <Button
               isIconOnly
-              variant="ghost"
-              size="lg"
+              variant="outline"
+              className="bg-default/40 hover:bg-default/80"
               onPress={prevChapter}
               isDisabled={isPrevDisabled}
             >
@@ -297,14 +295,14 @@ export function BiblePreview({
             </Button>
             <Button
               isIconOnly
-              variant="ghost"
-              size="lg"
+              variant="outline"
+              className="bg-default/40 hover:bg-default/80"
               onPress={nextChapter}
               isDisabled={isNextDisabled}
             >
               <ChevronRight size={16} />
             </Button>
-          </div>
+          </ButtonGroup>
         )}
       </Card.Header>
       <GlassDivider />

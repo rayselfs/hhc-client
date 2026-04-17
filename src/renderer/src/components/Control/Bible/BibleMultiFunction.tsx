@@ -19,9 +19,13 @@ export default function BibleMultiFunction(): React.JSX.Element {
   const folderPath = getFolderPath().slice(1)
 
   return (
-    <Card className="h-full flex-1 flex flex-col p-0">
-      <Card.Header className="shrink-0 flex-row! items-center gap-1 p-0 pt-3 px-3">
-        <Tabs selectedKey={activeTab} onSelectionChange={(key) => setActiveTab(String(key))}>
+    <Card className="flex flex-col h-full flex-1 p-0 gap-2">
+      <Card.Header className="shrink-0 flex-row! items-center p-0 pt-2">
+        <Tabs
+          selectedKey={activeTab}
+          onSelectionChange={(key) => setActiveTab(String(key))}
+          className="pl-2"
+        >
           <Tabs.ListContainer>
             <Tabs.List
               aria-label="Bible Functions"
@@ -57,7 +61,7 @@ export default function BibleMultiFunction(): React.JSX.Element {
           </Breadcrumbs>
         )}
 
-        <div className="ml-auto flex items-center gap-1 shrink-0">
+        <div className="ml-auto flex items-center gap-1 shrink-0 pr-3">
           {activeTab === 'history' && (
             <Button
               isIconOnly
@@ -82,9 +86,7 @@ export default function BibleMultiFunction(): React.JSX.Element {
           )}
         </div>
       </Card.Header>
-
       <GlassDivider />
-
       <Card.Content className="flex-1 min-h-0 overflow-hidden p-0">
         {activeTab === 'history' ? (
           <HistoryTab />

@@ -775,7 +775,7 @@ export function CustomFolderTab({
       </DndContext>
 
       <Modal>
-        <Modal.Backdrop isOpen={isModalOpen} onOpenChange={onModalOpenChange}>
+        <Modal.Backdrop isOpen={isModalOpen} onOpenChange={onModalOpenChange} isDismissable>
           <Modal.Container size="sm">
             <Modal.Dialog className="p-3 pl-5 pt-5">
               <Modal.Header>

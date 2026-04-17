@@ -68,7 +68,7 @@ export function HistoryTab(): React.JSX.Element | null {
 
   return (
     <ScrollShadow className="h-full w-full" hideScrollBar>
-      <div className="flex flex-col gap-1 p-2">
+      <div className="flex flex-col gap-2 p-2 pt-0">
         {todayItems.map((item) => (
           <div
             key={item.id}
