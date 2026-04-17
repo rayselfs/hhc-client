@@ -29,15 +29,15 @@ export function BiblePreview({
   onSelectedVerseIndexChange
 }: BiblePreviewProps): React.JSX.Element {
   const { t } = useTranslation()
+  const currentPassage = useBibleStore((s) => s.currentPassage)
   const {
-    currentPassage,
     getCurrentVerses,
     getCurrentBook,
     getCurrentChapter,
     nextChapter,
     prevChapter,
     navigateTo
-  } = useBibleStore()
+  } = useBibleStore.getState()
 
   const { claimProjection, project } = useProjection()
   const verseRefs = useRef<Map<number, HTMLButtonElement>>(new Map())

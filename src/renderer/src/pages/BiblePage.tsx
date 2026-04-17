@@ -22,7 +22,7 @@ export default function BiblePage(): React.JSX.Element {
     navigateTo,
     nextChapter,
     prevChapter
-  } = useBibleStore()
+  } = useBibleStore.getState()
   const { initialize: initializeFolderStore } = useBibleFolderStore()
   const fontSize = useBibleSettingsStore((s) => s.fontSize)
   const [isSelectorOpen, setSelectorOpen] = useState(false)
