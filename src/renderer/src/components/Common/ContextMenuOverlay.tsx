@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom'
 import GlassDivider from '@renderer/components/Common/GlassDivider'
 import type { ContextMenuEntry, ContextMenuItem } from '@renderer/contexts/ContextMenuContext'
 
@@ -16,7 +17,7 @@ export default function ContextMenuOverlay({
   menuRef,
   onClose
 }: ContextMenuOverlayProps): React.JSX.Element {
-  return (
+  return createPortal(
     <div
       ref={menuRef}
       role="menu"
@@ -50,6 +51,7 @@ export default function ContextMenuOverlay({
           </button>
         )
       })}
-    </div>
+    </div>,
+    document.body
   )
 }
