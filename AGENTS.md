@@ -206,6 +206,8 @@ adapter.onTick → store.tick(Date.now())
 - **Vitest**: jsdom environment, `globals: true`. Run with `npx vitest run`.
 - **`out/` is gitignored**: Compiled outputs regenerate on build.
 - **Mac build skips typecheck**: `build:mac` runs `electron-vite build` directly — intentional.
+- **PresetChips right-click**: Intentionally bypasses ContextMenu system — right-click directly removes preset without confirmation menu. This is by design for quick interaction.
+- **Context menu**: Generic infrastructure in `ContextMenuContext` + `ContextMenuOverlay`. Domain-specific hooks use `createFolderContextMenu` factory. See `useBibleContextMenu`/`useFolderContextMenu` for patterns.
 
 ## COMMANDS
 
