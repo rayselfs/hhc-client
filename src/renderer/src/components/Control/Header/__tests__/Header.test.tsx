@@ -305,7 +305,7 @@ describe('Header', () => {
       expect(screen.getByTestId('mode-stopwatch')).toBeInTheDocument()
     })
 
-    it('does not show ModeSelector on non-timer routes', async () => {
+    it('hides ModeSelector on non-timer routes via opacity', async () => {
       await i18n.changeLanguage('en')
       const { useProjection } = await import('@renderer/contexts/ProjectionContext')
       vi.mocked(useProjection).mockReturnValue({
@@ -322,7 +322,9 @@ describe('Header', () => {
         on: vi.fn()
       })
       renderWithRouter(['/'])
-      expect(screen.queryByTestId('mode-timer')).not.toBeInTheDocument()
+      // ModeSelector is always rendered but hidden via CSS opacity on non-timer routes
+      const wrapper = screen.getByTestId('mode-timer')?.closest('.absolute')
+      expect(wrapper?.className).toContain('opacity-0')
     })
   })
 })

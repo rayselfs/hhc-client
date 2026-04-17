@@ -214,9 +214,11 @@ describe('BiblePreview', () => {
     fireEvent.click(verseBtn)
     expect(mockClaimProjection).toHaveBeenCalledWith('bible', { unblank: true })
     expect(mockProject).toHaveBeenCalledWith(
-      'bible:verse',
+      'bible:chapter',
       expect.objectContaining({
-        text: 'In the beginning God created the heavens and the earth.'
+        bookNumber: 1,
+        chapter: 1,
+        currentVerse: 1
       })
     )
   })
