@@ -176,6 +176,9 @@ export class BrowserBibleApiAdapter implements BibleApiAdapter {
       const { data } = await http.get<BibleVersion[]>('/api/bible/v1/versions')
       return data
     } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw new BibleApiError('timeout', 'Request timed out')
+      }
       if (error instanceof Error) {
         throw new BibleApiError('network', error.message)
       }

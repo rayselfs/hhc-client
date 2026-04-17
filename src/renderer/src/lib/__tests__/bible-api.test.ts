@@ -4,7 +4,14 @@ vi.mock('@renderer/lib/env', () => ({
   isElectron: vi.fn()
 }))
 
+vi.mock('@renderer/lib/http', () => ({
+  http: {
+    get: vi.fn()
+  }
+}))
+
 import { isElectron } from '@renderer/lib/env'
+import { http } from '@renderer/lib/http'
 import {
   BrowserBibleApiAdapter,
   ElectronBibleApiAdapter,
@@ -59,38 +66,18 @@ describe('BrowserBibleApiAdapter', () => {
 
   describe('fetchVersions', () => {
     it('fetches from /api/bible/v1/versions, maps raw fields, and returns BibleVersion[]', async () => {
-      const raw = [{ id: 1, code: 'CUV', name: '和合本', updated_at: 1765861998 }]
-      const expected: BibleVersion[] = [
-        { id: 1, code: 'CUV', name: '和合本', updatedAt: 1765861998 }
-      ]
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockResolvedValue({
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          json: vi.fn().mockResolvedValue(raw)
-        })
-      )
+      const raw: BibleVersion[] = [{ id: 1, code: 'CUV', name: '和合本', updatedAt: 1765861998 }]
+      vi.mocked(http.get).mockResolvedValue({
+        data: raw
+      } as never)
 
       const result = await adapter.fetchVersions()
-      expect(result).toEqual(expected)
-      expect(fetch).toHaveBeenCalledWith(
-        '/api/bible/v1/versions',
-        expect.objectContaining({ signal: expect.any(AbortSignal) })
-      )
+      expect(result).toEqual(raw)
+      expect(http.get).toHaveBeenCalledWith('/api/bible/v1/versions')
     })
 
     it('throws BibleApiError with type=network on non-ok response', async () => {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockResolvedValue({
-          ok: false,
-          status: 404,
-          statusText: 'Not Found',
-          json: vi.fn()
-        })
-      )
+      vi.mocked(http.get).mockRejectedValue(new Error('404 Not Found'))
 
       await expect(adapter.fetchVersions()).rejects.toThrow(BibleApiError)
       try {
@@ -102,9 +89,8 @@ describe('BrowserBibleApiAdapter', () => {
     })
 
     it('throws BibleApiError with type=timeout when fetch aborts', async () => {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockRejectedValue(new DOMException('The operation was aborted', 'AbortError'))
+      vi.mocked(http.get).mockRejectedValue(
+        new DOMException('The operation was aborted', 'AbortError')
       )
 
       await expect(adapter.fetchVersions()).rejects.toMatchObject({
