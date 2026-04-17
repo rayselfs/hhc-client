@@ -364,4 +364,50 @@ describe('ContextMenuContext', () => {
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
     expect(document.activeElement).toBe(trigger)
   })
+
+  it('closes menu on window resize', () => {
+    const items: ContextMenuEntry[] = [{ id: 'a', label: 'Alpha', onAction: vi.fn() }]
+
+    function TestComponent(): React.JSX.Element {
+      const { showMenu } = useContextMenu()
+      return (
+        <div data-testid="target" onContextMenu={(e) => showMenu(items, e)}>
+          target
+        </div>
+      )
+    }
+
+    renderWithProvider(<TestComponent />)
+    fireEvent.contextMenu(screen.getByTestId('target'), { clientX: 50, clientY: 50 })
+    expect(screen.getByRole('menu')).toBeInTheDocument()
+
+    act(() => {
+      window.dispatchEvent(new Event('resize'))
+    })
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  })
+
+  it('closes menu on window blur', () => {
+    const items: ContextMenuEntry[] = [{ id: 'a', label: 'Alpha', onAction: vi.fn() }]
+
+    function TestComponent(): React.JSX.Element {
+      const { showMenu } = useContextMenu()
+      return (
+        <div data-testid="target" onContextMenu={(e) => showMenu(items, e)}>
+          target
+        </div>
+      )
+    }
+
+    renderWithProvider(<TestComponent />)
+    fireEvent.contextMenu(screen.getByTestId('target'), { clientX: 50, clientY: 50 })
+    expect(screen.getByRole('menu')).toBeInTheDocument()
+
+    act(() => {
+      window.dispatchEvent(new Event('blur'))
+    })
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  })
 })

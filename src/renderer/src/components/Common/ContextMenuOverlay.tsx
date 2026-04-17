@@ -1,5 +1,5 @@
 import { createPortal } from 'react-dom'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useLayoutEffect } from 'react'
 import GlassDivider from '@renderer/components/Common/GlassDivider'
 import type { ContextMenuEntry, ContextMenuItem } from '@renderer/contexts/ContextMenuContext'
 
@@ -21,6 +21,19 @@ export default function ContextMenuOverlay({
   const menuItems = items.filter((e): e is ContextMenuItem => e !== 'separator')
   const [focusedIndex, setFocusedIndex] = useState(0)
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([])
+  const [adjustedPos, setAdjustedPos] = useState({ x, y })
+
+  useLayoutEffect(() => {
+    const el = menuRef.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    const newX = x + rect.width > window.innerWidth ? x - rect.width : x
+    const newY = y + rect.height > window.innerHeight ? y - rect.height : y
+    setAdjustedPos({
+      x: Math.max(0, newX),
+      y: Math.max(0, newY)
+    })
+  }, [x, y, menuRef])
 
   useEffect(() => {
     buttonRefs.current[0]?.focus()
@@ -69,7 +82,7 @@ export default function ContextMenuOverlay({
       role="menu"
       aria-orientation="vertical"
       className="fixed z-[9999] min-w-[160px] rounded-2xl bg-overlay py-1.5"
-      style={{ left: x, top: y, boxShadow: 'var(--shadow-overlay)' }}
+      style={{ left: adjustedPos.x, top: adjustedPos.y, boxShadow: 'var(--shadow-overlay)' }}
       onKeyDown={handleKeyDown}
     >
       {items.map((entry, i) => {
