@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react'
-import GlassDivider from '@renderer/components/Common/GlassDivider'
+import ContextMenuOverlay from '@renderer/components/Common/ContextMenuOverlay'
 
 export interface ContextMenuItem {
   id: string
@@ -79,38 +79,13 @@ export function ContextMenuProvider({
     <ContextMenuContext.Provider value={{ showMenu }}>
       {children}
       {menu && (
-        <div
-          ref={menuRef}
-          role="menu"
-          className="fixed z-[9999] min-w-[160px] rounded-2xl bg-overlay py-1.5"
-          style={{ left: menu.x, top: menu.y, boxShadow: 'var(--shadow-overlay)' }}
-        >
-          {menu.items.map((entry, i) => {
-            if (entry === 'separator') {
-              return <GlassDivider key={`sep-${i}`} className="my-1" />
-            }
-            const isDanger = entry.variant === 'danger'
-            return (
-              <button
-                key={entry.id}
-                role="menuitem"
-                type="button"
-                className={[
-                  'flex w-full items-center gap-2 rounded-2xl px-2.5 py-1.5 text-sm outline-none cursor-pointer',
-                  'hover:bg-default active:scale-[0.98] transition-colors',
-                  isDanger ? 'text-danger' : 'text-foreground'
-                ].join(' ')}
-                onClick={() => {
-                  entry.onAction()
-                  close()
-                }}
-              >
-                {entry.icon && <span className="flex-shrink-0 w-4 h-4">{entry.icon}</span>}
-                {entry.label}
-              </button>
-            )
-          })}
-        </div>
+        <ContextMenuOverlay
+          x={menu.x}
+          y={menu.y}
+          items={menu.items}
+          menuRef={menuRef}
+          onClose={close}
+        />
       )}
     </ContextMenuContext.Provider>
   )
