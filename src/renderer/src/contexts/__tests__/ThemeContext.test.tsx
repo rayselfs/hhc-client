@@ -1,6 +1,7 @@
 import { render, screen, act, renderHook } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ThemeProvider, useTheme } from '../ThemeContext'
+import { useSettingsStore } from '@renderer/stores/settings'
 
 function mockMatchMedia(prefersDark: boolean): Array<(e: MediaQueryListEvent) => void> {
   const listeners: Array<(e: MediaQueryListEvent) => void> = []
@@ -28,15 +29,22 @@ function TestConsumer(): React.JSX.Element {
     <div>
       <span data-testid="preference">{preference}</span>
       <span data-testid="resolved">{resolved}</span>
-      <button onClick={() => setPreference('dark')}>Set Dark</button>
-      <button onClick={() => setPreference('light')}>Set Light</button>
-      <button onClick={() => setPreference('system')}>Set System</button>
+      <button type="button" onClick={() => setPreference('dark')}>
+        Set Dark
+      </button>
+      <button type="button" onClick={() => setPreference('light')}>
+        Set Light
+      </button>
+      <button type="button" onClick={() => setPreference('system')}>
+        Set System
+      </button>
     </div>
   )
 }
 
 beforeEach(() => {
   localStorage.clear()
+  useSettingsStore.setState({ themePreference: 'system' })
   document.documentElement.classList.remove('dark')
   document.documentElement.style.colorScheme = ''
   mockMatchMedia(false)
@@ -48,7 +56,6 @@ afterEach(() => {
 
 describe('useTheme', () => {
   it('throws when used outside ThemeProvider', () => {
-    // Suppress console.error for this expected throw
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     expect(() => render(<TestConsumer />)).toThrow('must be used within a ThemeProvider')
     consoleSpy.mockRestore()
@@ -88,7 +95,7 @@ describe('ThemeProvider', () => {
 
   it('resolved theme from explicit dark regardless of matchMedia', () => {
     mockMatchMedia(false)
-    localStorage.setItem('hhc-theme', 'dark')
+    useSettingsStore.setState({ themePreference: 'dark' })
     render(
       <ThemeProvider>
         <TestConsumer />
@@ -99,7 +106,7 @@ describe('ThemeProvider', () => {
 
   it('resolved theme from explicit light regardless of matchMedia', () => {
     mockMatchMedia(true)
-    localStorage.setItem('hhc-theme', 'light')
+    useSettingsStore.setState({ themePreference: 'light' })
     render(
       <ThemeProvider>
         <TestConsumer />
@@ -108,8 +115,8 @@ describe('ThemeProvider', () => {
     expect(screen.getByTestId('resolved').textContent).toBe('light')
   })
 
-  it('reads preference from localStorage on mount', () => {
-    localStorage.setItem('hhc-theme', 'dark')
+  it('reads preference from settings store on mount', () => {
+    useSettingsStore.setState({ themePreference: 'dark' })
     render(
       <ThemeProvider>
         <TestConsumer />
@@ -118,8 +125,8 @@ describe('ThemeProvider', () => {
     expect(screen.getByTestId('preference').textContent).toBe('dark')
   })
 
-  it('ignores invalid localStorage value and falls back to system', () => {
-    localStorage.setItem('hhc-theme', 'garbage')
+  it('falls back to system when store has default', () => {
+    useSettingsStore.setState({ themePreference: 'system' })
     render(
       <ThemeProvider>
         <TestConsumer />
@@ -128,7 +135,7 @@ describe('ThemeProvider', () => {
     expect(screen.getByTestId('preference').textContent).toBe('system')
   })
 
-  it('persists preference to localStorage on change', async () => {
+  it('persists preference to settings store on change', async () => {
     const user = userEvent.setup()
     render(
       <ThemeProvider>
@@ -136,7 +143,7 @@ describe('ThemeProvider', () => {
       </ThemeProvider>
     )
     await user.click(screen.getByText('Set Dark'))
-    expect(localStorage.getItem('hhc-theme')).toBe('dark')
+    expect(useSettingsStore.getState().themePreference).toBe('dark')
   })
 
   it('toggles .dark class on documentElement when resolved is dark', async () => {
@@ -153,7 +160,7 @@ describe('ThemeProvider', () => {
 
   it('removes .dark class on documentElement when resolved is light', async () => {
     const user = userEvent.setup()
-    localStorage.setItem('hhc-theme', 'dark')
+    useSettingsStore.setState({ themePreference: 'dark' })
     render(
       <ThemeProvider>
         <TestConsumer />
@@ -176,7 +183,7 @@ describe('ThemeProvider', () => {
 
   it('sets colorScheme style to light when resolved is light', async () => {
     const user = userEvent.setup()
-    localStorage.setItem('hhc-theme', 'dark')
+    useSettingsStore.setState({ themePreference: 'dark' })
     render(
       <ThemeProvider>
         <TestConsumer />
@@ -194,7 +201,6 @@ describe('ThemeProvider', () => {
         <TestConsumer />
       </ThemeProvider>
     )
-    // Initial state
     expect(screen.getByTestId('preference').textContent).toBe('system')
     expect(screen.getByTestId('resolved').textContent).toBe('light')
 

@@ -15,7 +15,8 @@ import { useSettingsStore, TIMEZONE_OPTIONS } from '@renderer/stores/settings'
 beforeEach(() => {
   useSettingsStore.setState({
     timezone: 'Asia/Taipei',
-    hardwareAcceleration: true
+    hardwareAcceleration: true,
+    themePreference: 'system'
   })
   mockToast.warning.mockClear()
   mockToast.success.mockClear()
@@ -26,6 +27,7 @@ describe('initial state', () => {
     const s = useSettingsStore.getState()
     expect(s.timezone).toBe('Asia/Taipei')
     expect(s.hardwareAcceleration).toBe(true)
+    expect(s.themePreference).toBe('system')
   })
 })
 
@@ -60,7 +62,7 @@ describe('setTimezone', () => {
     expect(persisted).toBeTruthy()
     const parsed = JSON.parse(persisted!)
     expect(parsed.state.timezone).toBe('America/New_York')
-    expect(parsed.version).toBe(0)
+    expect(parsed.version).toBe(1)
 
     vi.unstubAllGlobals()
   })
@@ -97,7 +99,7 @@ describe('setHardwareAcceleration', () => {
     expect(persisted).toBeTruthy()
     const parsed = JSON.parse(persisted!)
     expect(parsed.state.hardwareAcceleration).toBe(false)
-    expect(parsed.version).toBe(0)
+    expect(parsed.version).toBe(1)
 
     vi.unstubAllGlobals()
   })
@@ -107,13 +109,16 @@ describe('resetToDefaults', () => {
   it('reverts state to defaults after changes', () => {
     useSettingsStore.getState().setTimezone('UTC')
     useSettingsStore.getState().setHardwareAcceleration(false)
+    useSettingsStore.getState().setThemePreference('dark')
     expect(useSettingsStore.getState().timezone).toBe('UTC')
     expect(useSettingsStore.getState().hardwareAcceleration).toBe(false)
+    expect(useSettingsStore.getState().themePreference).toBe('dark')
 
     useSettingsStore.getState().resetToDefaults()
     const s = useSettingsStore.getState()
     expect(s.timezone).toBe('Asia/Taipei')
     expect(s.hardwareAcceleration).toBe(true)
+    expect(s.themePreference).toBe('system')
   })
 
   it('clears localStorage on reset', () => {
@@ -186,7 +191,7 @@ describe('persistence round-trip', () => {
     const parsed = JSON.parse(persisted!)
     expect(parsed.state.timezone).toBe('Europe/London')
     expect(parsed.state.hardwareAcceleration).toBe(false)
-    expect(parsed.version).toBe(0)
+    expect(parsed.version).toBe(1)
 
     vi.unstubAllGlobals()
   })
@@ -243,5 +248,55 @@ describe('storage toast notifications', () => {
     useSettingsStore.getState().setHardwareAcceleration(false)
     expect(mockToast.warning).toHaveBeenCalledWith('toast.storageSaveFailed')
     spy.mockRestore()
+  })
+})
+
+describe('themePreference', () => {
+  it('defaults to system', () => {
+    expect(useSettingsStore.getState().themePreference).toBe('system')
+  })
+
+  it('setThemePreference updates state', () => {
+    useSettingsStore.getState().setThemePreference('dark')
+    expect(useSettingsStore.getState().themePreference).toBe('dark')
+
+    useSettingsStore.getState().setThemePreference('light')
+    expect(useSettingsStore.getState().themePreference).toBe('light')
+  })
+
+  it('resetToDefaults resets themePreference to system', () => {
+    useSettingsStore.getState().setThemePreference('dark')
+    useSettingsStore.getState().resetToDefaults()
+    expect(useSettingsStore.getState().themePreference).toBe('system')
+  })
+
+  it('themePreference is included in persisted state', () => {
+    let localStorageMock: Record<string, string> = {}
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => localStorageMock[key] || null,
+      setItem: (key: string, value: string) => {
+        localStorageMock[key] = value
+      },
+      removeItem: (key: string) => {
+        delete localStorageMock[key]
+      },
+      clear: () => {
+        localStorageMock = {}
+      },
+      length: 0,
+      key: (index: number) => {
+        const keys = Object.keys(localStorageMock)
+        return keys[index] || null
+      }
+    })
+
+    useSettingsStore.getState().setThemePreference('dark')
+    const persisted = localStorage.getItem('hhc-settings')
+    expect(persisted).toBeTruthy()
+    const parsed = JSON.parse(persisted!)
+    expect(parsed.state.themePreference).toBe('dark')
+    expect(parsed.version).toBe(1)
+
+    vi.unstubAllGlobals()
   })
 })

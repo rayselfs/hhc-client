@@ -1,12 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { isElectron } from '@renderer/lib/env'
-import {
-  THEME_DEFAULTS,
-  THEME_STORAGE_KEY,
-  ThemeContextValue,
-  ThemePreference,
-  ResolvedTheme
-} from '../types/theme'
+import { THEME_DEFAULTS, ThemeContextValue, ThemePreference, ResolvedTheme } from '../types/theme'
+import { useSettingsStore } from '@renderer/stores/settings'
 
 const ThemeContext = createContext<ThemeContextValue | null>(null)
 
@@ -18,11 +13,10 @@ function resolveTheme(pref: ThemePreference): ResolvedTheme {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }): React.JSX.Element {
-  // Initialize from localStorage or fall back to default
-  const stored = localStorage.getItem(THEME_STORAGE_KEY) as ThemePreference | null
+  const storedPref = useSettingsStore.getState().themePreference
   const initialPref: ThemePreference =
-    stored === 'light' || stored === 'dark' || stored === 'system'
-      ? stored
+    storedPref === 'light' || storedPref === 'dark' || storedPref === 'system'
+      ? storedPref
       : THEME_DEFAULTS.preference
 
   const [preference, setPreferenceState] = useState<ThemePreference>(initialPref)
@@ -33,11 +27,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }): Reac
     document.documentElement.classList.toggle('dark', resolved === 'dark')
     document.documentElement.style.colorScheme = resolved
   }, [resolved])
-
-  // Persist preference to localStorage whenever it changes
-  useEffect(() => {
-    localStorage.setItem(THEME_STORAGE_KEY, preference)
-  }, [preference])
 
   // Sync Electron nativeTheme + boot restore (Electron only)
   useEffect(() => {
@@ -75,6 +64,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }): Reac
 
   const setPreference = (pref: ThemePreference): void => {
     setPreferenceState(pref)
+    useSettingsStore.getState().setThemePreference(pref)
   }
 
   return (

@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 import { toast } from '@heroui/react'
 import i18n from '@renderer/i18n'
 import { hhcPersistStorage, createKey } from '@renderer/lib/persist-storage'
+import { ThemePreference } from '@renderer/types/theme'
 
 export const TIMEZONE_OPTIONS = [
   { value: 'Asia/Taipei', labelKey: 'timezones.taipei' },
@@ -17,6 +18,7 @@ export const TIMEZONE_OPTIONS = [
 
 const DEFAULT_TIMEZONE = 'Asia/Taipei'
 const DEFAULT_HW_ACCEL = true
+const DEFAULT_THEME_PREFERENCE: ThemePreference = 'system'
 
 function clearIndexedDB(): void {
   try {
@@ -82,8 +84,10 @@ function clearAllSiteData(): void {
 export interface SettingsStore {
   timezone: string
   hardwareAcceleration: boolean
+  themePreference: ThemePreference
   setTimezone: (tz: string) => void
   setHardwareAcceleration: (enabled: boolean) => void
+  setThemePreference: (pref: ThemePreference) => void
   resetToDefaults: () => void
 }
 
@@ -92,6 +96,7 @@ export const useSettingsStore = create<SettingsStore>()(
     (set) => ({
       timezone: DEFAULT_TIMEZONE,
       hardwareAcceleration: DEFAULT_HW_ACCEL,
+      themePreference: DEFAULT_THEME_PREFERENCE,
 
       setTimezone: (tz: string) => {
         set({ timezone: tz })
@@ -101,8 +106,16 @@ export const useSettingsStore = create<SettingsStore>()(
         set({ hardwareAcceleration: enabled })
       },
 
+      setThemePreference: (pref: ThemePreference) => {
+        set({ themePreference: pref })
+      },
+
       resetToDefaults: () => {
-        set({ timezone: DEFAULT_TIMEZONE, hardwareAcceleration: DEFAULT_HW_ACCEL })
+        set({
+          timezone: DEFAULT_TIMEZONE,
+          hardwareAcceleration: DEFAULT_HW_ACCEL,
+          themePreference: DEFAULT_THEME_PREFERENCE
+        })
         clearAllSiteData()
         toast.success(i18n.t('toast.settingsReset'))
       }
@@ -110,7 +123,29 @@ export const useSettingsStore = create<SettingsStore>()(
     {
       name: createKey('settings'),
       storage: hhcPersistStorage,
-      version: 0
+      version: 1,
+      migrate: (persistedState, version) => {
+        const state = persistedState as Record<string, unknown>
+        if (version < 1) {
+          let themePreference: ThemePreference = 'system'
+          try {
+            const oldTheme = localStorage.getItem('hhc-theme')
+            if (oldTheme === 'dark' || oldTheme === 'light' || oldTheme === 'system') {
+              themePreference = oldTheme
+              localStorage.removeItem('hhc-theme')
+            }
+          } catch {
+            //
+          }
+          return { ...state, themePreference }
+        }
+        return state
+      },
+      partialize: (state) => ({
+        timezone: state.timezone,
+        hardwareAcceleration: state.hardwareAcceleration,
+        themePreference: state.themePreference
+      })
     }
   )
 )
