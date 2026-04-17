@@ -166,18 +166,19 @@ export default function TimerSettingsPanel({
           </Switch.Control>
           <span className="text-sm">{t('timer.overtimeMessage.label')}</span>
         </Switch>
-        <Input
-          type="text"
-          variant="secondary"
-          value={overtimeMessage}
-          onChange={handleOvertimeMessageChange}
-          onBlur={handleOvertimeMessageBlur}
-          placeholder={t('timer.overtimeMessage.placeholder')}
-          aria-label={t('timer.overtimeMessage.label')}
-          maxLength={15}
-          disabled={!overtimeMessageEnabled}
-          className="w-33 ml-auto [&_input]:py-1 rounded-full px-4"
-        />
+        {overtimeMessageEnabled && (
+          <Input
+            type="text"
+            variant="secondary"
+            value={overtimeMessage}
+            onChange={handleOvertimeMessageChange}
+            onBlur={handleOvertimeMessageBlur}
+            placeholder={t('timer.overtimeMessage.placeholder')}
+            aria-label={t('timer.overtimeMessage.label')}
+            maxLength={15}
+            className="w-33 ml-auto [&_input]:py-1 rounded-full px-4"
+          />
+        )}
       </div>
     </>
   )
