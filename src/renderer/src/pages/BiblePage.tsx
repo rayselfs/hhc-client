@@ -11,6 +11,7 @@ import type { VerseMenuData } from '@renderer/components/Control/Bible/useBibleC
 import { useProjection } from '@renderer/contexts/ProjectionContext'
 import { useKeyboardShortcuts } from '@renderer/hooks/useKeyboardShortcuts'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
+import { EVENTS } from '@renderer/config/events'
 import { buildVerseHistoryItem } from '@renderer/lib/bible-utils'
 import type { BiblePassage } from '@shared/types/bible'
 
@@ -46,8 +47,8 @@ export default function BiblePage(): React.JSX.Element {
 
   useEffect(() => {
     const handler = (): void => setSelectorOpen(true)
-    window.addEventListener('open-bible-selector', handler)
-    return () => window.removeEventListener('open-bible-selector', handler)
+    window.addEventListener(EVENTS.OPEN_BIBLE_SELECTOR, handler)
+    return () => window.removeEventListener(EVENTS.OPEN_BIBLE_SELECTOR, handler)
   }, [])
 
   const bookNumber = useBibleStore((s) => s.currentPassage?.bookNumber)

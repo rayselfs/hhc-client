@@ -9,6 +9,7 @@ import SettingsPopover from '@renderer/components/Control/Header/SettingsPopover
 import BibleSelector from '@renderer/components/Control/Bible/BibleSelector'
 import BibleSearchBar from '@renderer/components/Control/Header/SearchBar/BibleSearchBar'
 import { isTimerRoute, isBibleRoute } from '@renderer/lib/routes'
+import { EVENTS } from '@renderer/config/events'
 import { useTimerStore } from '@renderer/stores/timer'
 
 export default function Header(): React.JSX.Element {
@@ -48,7 +49,7 @@ export default function Header(): React.JSX.Element {
   }
 
   const handleOpenBibleSelector = (): void => {
-    window.dispatchEvent(new Event('open-bible-selector'))
+    window.dispatchEvent(new Event(EVENTS.OPEN_BIBLE_SELECTOR))
   }
 
   return (
