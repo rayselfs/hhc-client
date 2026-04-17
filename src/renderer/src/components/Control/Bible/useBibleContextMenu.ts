@@ -67,7 +67,7 @@ export function useBibleContextMenu(): UseBibleContextMenu {
     const items: ContextMenuEntry[] = [
       {
         id: 'copy',
-        label: '複製經文',
+        label: t('bible.contextMenu.copyText'),
         icon: React.createElement(Copy, { size: 14 }),
         onAction: () => {
           navigator.clipboard.writeText(formattedText)
@@ -78,6 +78,7 @@ export function useBibleContextMenu(): UseBibleContextMenu {
     showMenu(items, e)
   }
 
+  // TODO: used by future HistoryTab context menu
   const showHistoryMenu = (item: VerseItem, e: React.MouseEvent): void => {
     const reference = getFormattedReference(item, t)
     const formattedText = `${reference} ${item.text}`
@@ -85,7 +86,7 @@ export function useBibleContextMenu(): UseBibleContextMenu {
     const items: ContextMenuEntry[] = [
       {
         id: 'copy',
-        label: '複製經文',
+        label: t('bible.contextMenu.copyText'),
         icon: React.createElement(Copy, { size: 14 }),
         onAction: () => {
           navigator.clipboard.writeText(formattedText)
@@ -94,7 +95,7 @@ export function useBibleContextMenu(): UseBibleContextMenu {
       'separator',
       {
         id: 'remove-history',
-        label: '從歷史移除',
+        label: t('bible.contextMenu.removeFromHistory'),
         icon: React.createElement(Trash2, { size: 14 }),
         variant: 'danger',
         onAction: () => {
@@ -113,7 +114,7 @@ export function useBibleContextMenu(): UseBibleContextMenu {
     const items: ContextMenuEntry[] = [
       {
         id: 'copy',
-        label: '複製經文',
+        label: t('bible.contextMenu.copyText'),
         icon: React.createElement(Copy, { size: 14 }),
         onAction: () => {
           navigator.clipboard.writeText(formattedText)
@@ -122,7 +123,7 @@ export function useBibleContextMenu(): UseBibleContextMenu {
       'separator',
       {
         id: 'remove-folder',
-        label: '從資料夾移除',
+        label: t('bible.contextMenu.removeFromFolder'),
         icon: React.createElement(Trash2, { size: 14 }),
         variant: 'danger',
         onAction: () => {
