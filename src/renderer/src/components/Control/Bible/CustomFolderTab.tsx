@@ -384,20 +384,26 @@ export function CustomFolderTab({
       e.stopPropagation()
       const isAlreadySelected = selectedItemIds.has(item.id)
       if (selectedItemIds.size > 1 && isAlreadySelected) {
-        showMultiSelectMenu(selectedItemIds, e, handleCopy, handleCut, handleDeleteSelected)
+        showMultiSelectMenu({
+          selectedIds: selectedItemIds,
+          event: e,
+          onCopy: handleCopy,
+          onCut: handleCut,
+          onDelete: handleDeleteSelected
+        })
       } else {
         if (!isAlreadySelected) {
           setSelectedItemIds(new Set([item.id]))
         }
-        showItemMenu(
+        showItemMenu({
           item,
           isAlreadySelected,
-          e,
-          setSelectedItemIds,
-          handleCopy,
-          handleCut,
-          handleDeleteSelected
-        )
+          event: e,
+          setSelected: setSelectedItemIds,
+          onCopy: handleCopy,
+          onCut: handleCut,
+          onDelete: handleDeleteSelected
+        })
       }
     },
     [
@@ -411,27 +417,33 @@ export function CustomFolderTab({
   )
 
   const handleContextMenuForFolder = useCallback(
-    (folder: Folder, e: React.MouseEvent): void => {
+    (folder: Folder<VerseItem>, e: React.MouseEvent): void => {
       e.preventDefault()
       e.stopPropagation()
       const isAlreadySelected = selectedItemIds.has(folder.id)
       if (selectedItemIds.size > 1 && isAlreadySelected) {
-        showMultiSelectMenu(selectedItemIds, e, handleCopy, handleCut, handleDeleteSelected)
+        showMultiSelectMenu({
+          selectedIds: selectedItemIds,
+          event: e,
+          onCopy: handleCopy,
+          onCut: handleCut,
+          onDelete: handleDeleteSelected
+        })
       } else {
         if (!isAlreadySelected) {
           setSelectedItemIds(new Set([folder.id]))
         }
-        showFolderMenu(
+        showFolderMenu({
           folder,
           isAlreadySelected,
-          e,
-          setSelectedItemIds,
+          event: e,
+          setSelected: setSelectedItemIds,
           clipboard,
-          handleCopy,
-          handleCut,
-          handlePaste,
-          handleDeleteSelected
-        )
+          onCopy: handleCopy,
+          onCut: handleCut,
+          onPaste: handlePaste,
+          onDelete: handleDeleteSelected
+        })
       }
     },
     [
@@ -450,7 +462,12 @@ export function CustomFolderTab({
     (e: React.MouseEvent): void => {
       if (e.target !== e.currentTarget) return
       e.preventDefault()
-      showEmptyAreaMenu(e, clipboard, handlePaste, () => onModalOpenChange(true))
+      showEmptyAreaMenu({
+        event: e,
+        clipboard,
+        onPaste: handlePaste,
+        onNewFolder: () => onModalOpenChange(true)
+      })
     },
     [clipboard, showEmptyAreaMenu, handlePaste, onModalOpenChange]
   )
@@ -560,7 +577,7 @@ export function CustomFolderTab({
   )
 
   const renderFolderContent = (
-    item: Folder,
+    item: Folder<VerseItem>,
     dragHandleProps: React.HTMLAttributes<HTMLButtonElement>,
     isItemSelected: boolean,
     isDragging: boolean
