@@ -65,7 +65,7 @@ export default function Header(): React.JSX.Element {
       <div
         className={`absolute inset-0 flex items-center justify-center pointer-events-none transition-all duration-200 ${showTimerControls ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-3'}`}
       >
-        <div className="pointer-events-auto">
+        <div className={showTimerControls ? 'pointer-events-auto' : undefined}>
           <ModeSelector />
         </div>
       </div>
@@ -73,7 +73,7 @@ export default function Header(): React.JSX.Element {
       <div
         className={`absolute inset-0 flex items-center justify-center pointer-events-none transition-all duration-200 ${showBibleControls ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-3'}`}
       >
-        <div className="pointer-events-auto">
+        <div className={showBibleControls ? 'pointer-events-auto' : undefined}>
           <div data-testid="bible-header-controls">
             <BibleSelector onOpenDialog={handleOpenBibleSelector} />
           </div>
