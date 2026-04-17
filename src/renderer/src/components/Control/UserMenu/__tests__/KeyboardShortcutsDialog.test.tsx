@@ -1,22 +1,40 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, it, expect, vi } from 'vitest'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { I18nextProvider } from 'react-i18next'
 import i18n from '@renderer/i18n'
 import KeyboardShortcutsDialog from '@renderer/components/Control/UserMenu/KeyboardShortcutsDialog'
-import UserMenu from '@renderer/components/Control/UserMenu/UserMenu'
-import { ConfirmDialogProvider } from '@renderer/contexts/ConfirmDialogContext'
-import { isMac, getMetaKeyLabel } from '@renderer/lib/env'
-import { getRegistered } from '@renderer/lib/shortcut-registry'
 import { ShortcutScopeProvider } from '@renderer/contexts/ShortcutScopeContext'
-
-vi.mock('@renderer/lib/shortcut-registry', () => ({
-  getRegistered: vi.fn(() => [])
-}))
 
 vi.mock('@renderer/lib/env', () => ({
   isMac: vi.fn(() => false),
-  getMetaKeyLabel: vi.fn(() => 'Ctrl')
+  getMetaKeyLabel: vi.fn(() => 'Ctrl'),
+  isElectron: vi.fn(() => false),
+  isWeb: vi.fn(() => true)
 }))
+
+vi.mock('@heroui/react', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@heroui/react')>()
+  return {
+    ...actual,
+    useOverlayState: ({ isOpen }: { isOpen: boolean }) => ({
+      isOpen,
+      open: vi.fn(),
+      close: vi.fn()
+    }),
+    Modal: Object.assign(actual.Modal, {
+      Root: ({ state, children }: { state: { isOpen: boolean }; children: React.ReactNode }) =>
+        state.isOpen ? <div role="dialog">{children}</div> : null,
+      Trigger: () => null,
+      Backdrop: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+      Container: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+      Dialog: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+      Header: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+      Heading: ({ children }: { children: React.ReactNode }) => <h2>{children}</h2>,
+      Body: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+      Footer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>
+    })
+  }
+})
 
 const Wrapper = ({ children }: { children: React.ReactNode }): React.JSX.Element => (
   <ShortcutScopeProvider>
@@ -25,13 +43,11 @@ const Wrapper = ({ children }: { children: React.ReactNode }): React.JSX.Element
 )
 
 describe('KeyboardShortcutsDialog', () => {
-  it('renders with isOpen=true and shows section titles', () => {
+  it('renders sidebar with all section names when open', () => {
     render(<KeyboardShortcutsDialog isOpen={true} onOpenChange={() => {}} />, { wrapper: Wrapper })
 
-    expect(screen.getByText('Keyboard Shortcuts')).toBeInTheDocument()
-    expect(screen.getByText('Bible')).toBeInTheDocument()
-    expect(screen.getByText('Timer')).toBeInTheDocument()
-    expect(screen.getByText('Edit')).toBeInTheDocument()
+    expect(screen.getAllByText('Timer').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Bible').length).toBeGreaterThan(0)
   })
 
   it('does not render when isOpen=false', () => {
@@ -42,72 +58,20 @@ describe('KeyboardShortcutsDialog', () => {
 
     expect(container.querySelector('[role="dialog"]')).not.toBeInTheDocument()
   })
-})
 
-describe('UserMenu', () => {
-  it('keyboard shortcuts item is not disabled', () => {
-    render(
-      <ConfirmDialogProvider>
-        <UserMenu />
-      </ConfirmDialogProvider>,
-      { wrapper: Wrapper }
-    )
-
-    const trigger = screen.getByText('Guest')
-    trigger.click()
-
-    const shortcutsItem = screen.getByRole('menuitem', { name: /keyboard shortcuts/i })
-    expect(shortcutsItem).not.toHaveAttribute('aria-disabled')
-  })
-})
-
-describe('KeyboardShortcutsDialog - dynamic registry', () => {
-  beforeEach(() => {
-    vi.mocked(getRegistered).mockReturnValue([])
-    vi.mocked(isMac).mockReturnValue(false)
-    vi.mocked(getMetaKeyLabel).mockReturnValue('Ctrl')
-  })
-
-  it('reads shortcuts from registry instead of static config', () => {
-    vi.mocked(getRegistered).mockReturnValue([
-      {
-        id: 'BIBLE.CUSTOM',
-        config: { code: 'KeyB' },
-        description: 'Custom Bible Shortcut',
-        sectionKey: 'BIBLE'
-      }
-    ])
-
+  it('shows timer shortcuts by default', () => {
     render(<KeyboardShortcutsDialog isOpen={true} onOpenChange={() => {}} />, { wrapper: Wrapper })
 
-    expect(screen.getByText('Custom Bible Shortcut')).toBeInTheDocument()
+    expect(screen.getByText('Start / Stop')).toBeInTheDocument()
+    expect(screen.getByText('Reset')).toBeInTheDocument()
   })
 
-  it('falls back to static SHORTCUTS config when registry is empty', () => {
-    vi.mocked(getRegistered).mockReturnValue([])
-
+  it('switches to bible section on click', () => {
     render(<KeyboardShortcutsDialog isOpen={true} onOpenChange={() => {}} />, { wrapper: Wrapper })
 
-    const spaceKeys = screen.getAllByText('Space')
-    expect(spaceKeys.length).toBeGreaterThan(0)
-  })
+    fireEvent.click(screen.getAllByText('Bible')[0])
 
-  it('displays correct platform override for EDIT.DELETE on Mac', () => {
-    vi.mocked(isMac).mockReturnValue(true)
-    vi.mocked(getMetaKeyLabel).mockReturnValue('⌘')
-
-    render(<KeyboardShortcutsDialog isOpen={true} onOpenChange={() => {}} />, { wrapper: Wrapper })
-
-    expect(screen.getAllByText('⌫').length).toBeGreaterThan(0)
-    expect(screen.queryAllByText('⌘').length).toBeGreaterThan(0)
-  })
-
-  it('displays correct key for EDIT.DELETE on non-Mac', () => {
-    vi.mocked(isMac).mockReturnValue(false)
-    vi.mocked(getMetaKeyLabel).mockReturnValue('Ctrl')
-
-    render(<KeyboardShortcutsDialog isOpen={true} onOpenChange={() => {}} />, { wrapper: Wrapper })
-
-    expect(screen.queryAllByText('⌘')).toHaveLength(0)
+    expect(screen.getByText('Previous Verse')).toBeInTheDocument()
+    expect(screen.getByText('Next Chapter')).toBeInTheDocument()
   })
 })

@@ -1,9 +1,10 @@
-import { Modal } from '@heroui/react'
+import { useState } from 'react'
+import { Modal, useOverlayState } from '@heroui/react'
 import { useTranslation } from 'react-i18next'
+import { Timer, BookOpen } from 'lucide-react'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
 import { getMetaKeyLabel } from '@renderer/lib/env'
 import { ShortcutConfig, getPlatformShortcut } from '@renderer/hooks/useKeyboardShortcuts'
-import { getRegistered, RegistryEntry } from '@renderer/lib/shortcut-registry'
 import { ShortcutScope } from '@renderer/contexts/ShortcutScopeContext'
 
 interface KeyboardShortcutsDialogProps {
@@ -38,9 +39,58 @@ const getDisplayKey = (code: string): string => {
   return code
 }
 
-interface ShortcutEntry {
-  label: string
-  keys: string[]
+type SectionId = 'timer' | 'bible'
+
+interface SectionItem {
+  id: SectionId
+  icon: React.ComponentType<{ className?: string }>
+  labelKey: string
+  shortcuts: Record<string, ShortcutConfig>
+}
+
+const SECTIONS: SectionItem[] = [
+  { id: 'timer', icon: Timer, labelKey: 'shortcuts.sections.timer', shortcuts: SHORTCUTS.TIMER },
+  { id: 'bible', icon: BookOpen, labelKey: 'shortcuts.sections.bible', shortcuts: SHORTCUTS.BIBLE }
+]
+
+function buildKeysFromConfig(config: ShortcutConfig): string[] {
+  const resolved = getPlatformShortcut(config)
+  const keyParts: string[] = []
+  if (resolved.metaOrCtrl) {
+    keyParts.push(getMetaKeyLabel())
+  }
+  if (resolved.meta && !resolved.metaOrCtrl) {
+    keyParts.push('⌘')
+  }
+  if (resolved.ctrl && !resolved.metaOrCtrl) {
+    keyParts.push('Ctrl')
+  }
+  if (resolved.shift) {
+    keyParts.push('Shift')
+  }
+  if (resolved.alt) {
+    keyParts.push('Alt')
+  }
+  keyParts.push(getDisplayKey(resolved.code))
+  return keyParts
+}
+
+function ShortcutRow({ label, keys }: { label: string; keys: string[] }): React.JSX.Element {
+  return (
+    <div className="flex justify-between items-center py-2 px-3 hover:bg-default-100 rounded-lg transition-colors">
+      <span className="text-sm">{label}</span>
+      <div className="flex gap-1">
+        {keys.map((key) => (
+          <kbd
+            key={key}
+            className="px-2 py-1 text-xs font-semibold bg-default-200 border border-default-300 rounded"
+          >
+            {key}
+          </kbd>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 export default function KeyboardShortcutsDialog({
@@ -49,128 +99,61 @@ export default function KeyboardShortcutsDialog({
 }: KeyboardShortcutsDialogProps): React.JSX.Element {
   const { t: translate } = useTranslation()
   const t = translate as (key: string) => string
+  const [activeSection, setActiveSection] = useState<SectionId>('timer')
+  const state = useOverlayState({ isOpen, onOpenChange })
 
-  const buildKeysFromConfig = (config: ShortcutConfig): string[] => {
-    const resolved = getPlatformShortcut(config)
-    const keyParts: string[] = []
-    if (resolved.metaOrCtrl) {
-      keyParts.push(getMetaKeyLabel())
-    }
-    if (resolved.meta && !resolved.metaOrCtrl) {
-      keyParts.push('⌘')
-    }
-    if (resolved.ctrl && !resolved.metaOrCtrl) {
-      keyParts.push('Ctrl')
-    }
-    if (resolved.shift) {
-      keyParts.push('Shift')
-    }
-    if (resolved.alt) {
-      keyParts.push('Alt')
-    }
-    keyParts.push(getDisplayKey(resolved.code))
-    return keyParts
-  }
-
-  const renderShortcutRow = (label: string, keys: string[]): React.JSX.Element => (
-    <div className="flex justify-between items-center py-2 px-3 hover:bg-default-100 rounded-lg transition-colors">
-      <span className="text-sm text-default-700">{label}</span>
-      <div className="flex gap-1">
-        {keys.map((key) => (
-          <kbd
-            key={key}
-            className="px-2 py-1 text-xs font-semibold text-default-700 bg-default-200 border border-default-300 rounded"
-          >
-            {key}
-          </kbd>
-        ))}
-      </div>
-    </div>
-  )
-
-  const renderSection = (
-    sectionKey: string,
-    shortcuts: Record<string, ShortcutConfig>
-  ): React.JSX.Element => {
-    const entries: ShortcutEntry[] = Object.entries(shortcuts).map(([key, config]) => {
-      const entryKey = key.toLowerCase()
-      return {
-        label: t(`shortcuts.${sectionKey}.${entryKey}`),
-        keys: buildKeysFromConfig(config)
-      }
-    })
-
-    const sectionTitleKey = `shortcuts.sections.${sectionKey.toLowerCase()}`
-
-    return (
-      <div key={sectionKey} className="mb-6">
-        <h3 className="text-sm font-semibold text-default-900 mb-3">{t(sectionTitleKey)}</h3>
-        <div className="space-y-1">
-          {entries.map((entry) => (
-            <div key={entry.label}>{renderShortcutRow(entry.label, entry.keys)}</div>
-          ))}
-        </div>
-      </div>
-    )
-  }
-
-  const renderRegistrySection = (
-    sectionKey: string,
-    entries: RegistryEntry[]
-  ): React.JSX.Element => {
-    const shortcutEntries: ShortcutEntry[] = entries.map((entry) => ({
-      label: entry.description ?? entry.id,
-      keys: buildKeysFromConfig(entry.config)
-    }))
-
-    const sectionTitleKey = `shortcuts.sections.${sectionKey.toLowerCase()}`
-
-    return (
-      <div key={sectionKey} className="mb-6">
-        <h3 className="text-sm font-semibold text-default-900 mb-3">{t(sectionTitleKey)}</h3>
-        <div className="space-y-1">
-          {shortcutEntries.map((entry) => (
-            <div key={entry.label}>{renderShortcutRow(entry.label, entry.keys)}</div>
-          ))}
-        </div>
-      </div>
-    )
-  }
-
-  const registryEntries = getRegistered()
-  let sectionsContent: React.JSX.Element[]
-
-  if (registryEntries.length > 0) {
-    const sectionsMap = new Map<string, RegistryEntry[]>()
-    for (const entry of registryEntries) {
-      const key = entry.sectionKey ?? 'OTHER'
-      if (!sectionsMap.has(key)) sectionsMap.set(key, [])
-      sectionsMap.get(key)!.push(entry)
-    }
-    sectionsContent = Array.from(sectionsMap.entries()).map(([sectionKey, entries]) =>
-      renderRegistrySection(sectionKey, entries)
-    )
-  } else {
-    sectionsContent = [
-      renderSection('BIBLE', SHORTCUTS.BIBLE),
-      renderSection('TIMER', SHORTCUTS.TIMER),
-      renderSection('EDIT', SHORTCUTS.EDIT)
-    ]
-  }
+  const current = SECTIONS.find((s) => s.id === activeSection)!
+  const entries = Object.entries(current.shortcuts).map(([key, config]) => ({
+    label: t(`shortcuts.${current.id}.${key.toLowerCase()}`),
+    keys: buildKeysFromConfig(config)
+  }))
 
   return (
-    <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
-      <Modal.Backdrop />
-      <Modal.Container size="sm">
-        <Modal.Dialog>
-          <Modal.Header>
-            <h3 className="text-lg font-semibold">{t('shortcuts.title')}</h3>
-          </Modal.Header>
-          <Modal.Body className="gap-4 max-h-96 overflow-y-auto">
-            <ShortcutScope name="overlay">{sectionsContent}</ShortcutScope>
-          </Modal.Body>
-        </Modal.Dialog>
-      </Modal.Container>
-    </Modal>
+    <Modal.Root state={state}>
+      <Modal.Trigger />
+      <Modal.Backdrop>
+        <Modal.Container size="lg">
+          <Modal.Dialog className="overflow-hidden p-0">
+            <Modal.Body className="p-0">
+              <ShortcutScope name="overlay">
+                <div className="flex" style={{ height: '380px' }}>
+                  <nav className="flex w-44 shrink-0 flex-col gap-2 rounded-tr-3xl rounded-br-3xl bg-sidebar text-sidebar-foreground py-2 px-1">
+                    <ul className="flex flex-col gap-1">
+                      {SECTIONS.map((section) => {
+                        const active = activeSection === section.id
+                        const Icon = section.icon
+                        return (
+                          <li key={section.id}>
+                            <button
+                              type="button"
+                              aria-pressed={active}
+                              className={`flex w-full items-center gap-3 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
+                                active ? 'bg-accent-soft text-accent-soft-foreground' : ''
+                              }`}
+                              onClick={() => setActiveSection(section.id)}
+                            >
+                              <Icon className="size-4" />
+                              <span>{t(section.labelKey)}</span>
+                            </button>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  </nav>
+                  <div className="flex-1 overflow-y-auto p-5">
+                    <h3 className="text-sm font-semibold mb-3">{t(current.labelKey)}</h3>
+                    <div className="space-y-1">
+                      {entries.map((entry) => (
+                        <ShortcutRow key={entry.label} label={entry.label} keys={entry.keys} />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </ShortcutScope>
+            </Modal.Body>
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
+    </Modal.Root>
   )
 }
