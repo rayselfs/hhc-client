@@ -54,13 +54,19 @@ class BroadcastChannelAdapter implements ProjectionAdapter {
   private bc: BroadcastChannel
   private windowId: string
   private listeners: Array<{ listener: (event: MessageEvent) => void }> = []
+  private disposed = false
 
   constructor() {
     this.bc = new BroadcastChannel('hhc-projection')
     this.windowId = crypto.randomUUID()
+
+    this.bc.addEventListener('messageerror', () => {
+      console.warn('[projection-adapter] Failed to deserialize BroadcastChannel message')
+    })
   }
 
   send<C extends ProjectionChannel>(channel: C, data: ProjectionPayload<C>): void {
+    if (this.disposed) return
     this.bc.postMessage({ channel, data, sender: this.windowId })
   }
 
@@ -69,8 +75,10 @@ class BroadcastChannelAdapter implements ProjectionAdapter {
     handler: (data: ProjectionPayload<C>) => void
   ): () => void {
     const listener = (event: MessageEvent): void => {
-      if (event.data.sender === this.windowId) return
-      if (event.data.channel === channel) handler(event.data.data as ProjectionPayload<C>)
+      const msg = event.data
+      if (!msg || typeof msg !== 'object' || !('channel' in msg) || !('sender' in msg)) return
+      if (msg.sender === this.windowId) return
+      if (msg.channel === channel) handler(msg.data as ProjectionPayload<C>)
     }
     this.bc.addEventListener('message', listener)
     this.listeners.push({ listener })
@@ -81,6 +89,7 @@ class BroadcastChannelAdapter implements ProjectionAdapter {
   }
 
   dispose(): void {
+    this.disposed = true
     this.listeners.forEach(({ listener }) => this.bc.removeEventListener('message', listener))
     this.listeners = []
     this.bc.close()

@@ -74,8 +74,9 @@ describe('BroadcastChannelAdapter', () => {
     const adapter = createProjectionAdapter()
     adapter.on('timer:overtime-message', vi.fn())
 
-    expect(mockAddEventListener).toHaveBeenCalledOnce()
-    expect(mockAddEventListener.mock.calls[0][0]).toBe('message')
+    expect(mockAddEventListener).toHaveBeenCalledTimes(2)
+    expect(mockAddEventListener.mock.calls[0][0]).toBe('messageerror')
+    expect(mockAddEventListener.mock.calls[1][0]).toBe('message')
   })
 
   it('on() — handler is called when message arrives with matching channel and different sender', () => {
@@ -84,7 +85,7 @@ describe('BroadcastChannelAdapter', () => {
     adapter.on('timer:overtime-message', handler)
 
     const payload = { message: 'hello' }
-    const [, listener] = mockAddEventListener.mock.calls[0] as [string, (e: MessageEvent) => void]
+    const [, listener] = mockAddEventListener.mock.calls[1] as [string, (e: MessageEvent) => void]
     listener({
       data: { channel: 'timer:overtime-message', data: payload, sender: 'other-window-id' }
     } as MessageEvent)
@@ -102,7 +103,7 @@ describe('BroadcastChannelAdapter', () => {
     adapter.send('timer:overtime-message', payload)
     const ownSender = mockPostMessage.mock.calls[0][0].sender
 
-    const [, listener] = mockAddEventListener.mock.calls[0] as [string, (e: MessageEvent) => void]
+    const [, listener] = mockAddEventListener.mock.calls[1] as [string, (e: MessageEvent) => void]
     listener({
       data: { channel: 'timer:overtime-message', data: { message: 'hello' }, sender: ownSender }
     } as MessageEvent)
@@ -115,7 +116,7 @@ describe('BroadcastChannelAdapter', () => {
     const handler = vi.fn()
     adapter.on('timer:overtime-message', handler)
 
-    const [, listener] = mockAddEventListener.mock.calls[0] as [string, (e: MessageEvent) => void]
+    const [, listener] = mockAddEventListener.mock.calls[1] as [string, (e: MessageEvent) => void]
     listener({
       data: { channel: '__system:ping', data: null, sender: 'other-window-id' }
     } as MessageEvent)
@@ -152,6 +153,35 @@ describe('BroadcastChannelAdapter', () => {
     const arg = mockPostMessage.mock.calls[0][0]
     expect(arg.channel).toBe('__system:pong')
     expect(arg.data).toBeNull()
+  })
+
+  it('on() — handler ignores malformed messages without channel/sender', () => {
+    const adapter = createProjectionAdapter()
+    const handler = vi.fn()
+    adapter.on('timer:overtime-message', handler)
+
+    const [, listener] = mockAddEventListener.mock.calls[1] as [string, (e: MessageEvent) => void]
+
+    listener({ data: null } as MessageEvent)
+    listener({ data: 'not-an-object' } as MessageEvent)
+    listener({ data: { channel: 'timer:overtime-message' } } as MessageEvent)
+    listener({ data: { sender: 'x' } } as MessageEvent)
+
+    expect(handler).not.toHaveBeenCalled()
+  })
+
+  it('send() is a no-op after dispose()', () => {
+    const adapter = createProjectionAdapter()
+    adapter.dispose()
+    mockPostMessage.mockClear()
+
+    adapter.send('timer:overtime-message', { message: 'test' })
+    expect(mockPostMessage).not.toHaveBeenCalled()
+  })
+
+  it('constructor registers a messageerror listener', () => {
+    createProjectionAdapter()
+    expect(mockAddEventListener).toHaveBeenCalledWith('messageerror', expect.any(Function))
   })
 })
 
