@@ -1,6 +1,5 @@
 import { Modal } from '@heroui/react'
 import { useTranslation } from 'react-i18next'
-import i18n from '@renderer/i18n'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
 import { getMetaKeyLabel } from '@renderer/lib/env'
 import { ShortcutConfig, getPlatformShortcut } from '@renderer/hooks/useKeyboardShortcuts'
@@ -48,9 +47,8 @@ export default function KeyboardShortcutsDialog({
   isOpen,
   onOpenChange
 }: KeyboardShortcutsDialogProps): React.JSX.Element {
-  useTranslation()
-
-  const tDynamic = i18n.t.bind(i18n) as (key: string) => string
+  const { t: translate } = useTranslation()
+  const t = translate as (key: string) => string
 
   const buildKeysFromConfig = (config: ShortcutConfig): string[] => {
     const resolved = getPlatformShortcut(config)
@@ -97,7 +95,7 @@ export default function KeyboardShortcutsDialog({
     const entries: ShortcutEntry[] = Object.entries(shortcuts).map(([key, config]) => {
       const entryKey = key.toLowerCase()
       return {
-        label: tDynamic(`shortcuts.${sectionKey}.${entryKey}`),
+        label: t(`shortcuts.${sectionKey}.${entryKey}`),
         keys: buildKeysFromConfig(config)
       }
     })
@@ -106,7 +104,7 @@ export default function KeyboardShortcutsDialog({
 
     return (
       <div key={sectionKey} className="mb-6">
-        <h3 className="text-sm font-semibold text-default-900 mb-3">{tDynamic(sectionTitleKey)}</h3>
+        <h3 className="text-sm font-semibold text-default-900 mb-3">{t(sectionTitleKey)}</h3>
         <div className="space-y-1">
           {entries.map((entry) => (
             <div key={entry.label}>{renderShortcutRow(entry.label, entry.keys)}</div>
@@ -129,7 +127,7 @@ export default function KeyboardShortcutsDialog({
 
     return (
       <div key={sectionKey} className="mb-6">
-        <h3 className="text-sm font-semibold text-default-900 mb-3">{tDynamic(sectionTitleKey)}</h3>
+        <h3 className="text-sm font-semibold text-default-900 mb-3">{t(sectionTitleKey)}</h3>
         <div className="space-y-1">
           {shortcutEntries.map((entry) => (
             <div key={entry.label}>{renderShortcutRow(entry.label, entry.keys)}</div>
@@ -166,7 +164,7 @@ export default function KeyboardShortcutsDialog({
       <Modal.Container size="sm">
         <Modal.Dialog>
           <Modal.Header>
-            <h3 className="text-lg font-semibold">{tDynamic('shortcuts.title')}</h3>
+            <h3 className="text-lg font-semibold">{t('shortcuts.title')}</h3>
           </Modal.Header>
           <Modal.Body className="gap-4 max-h-96 overflow-y-auto">
             <ShortcutScope name="overlay">{sectionsContent}</ShortcutScope>
