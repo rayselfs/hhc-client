@@ -340,8 +340,8 @@ describe('getCurrentBook() / getCurrentChapter() / getCurrentVerses()', () => {
   })
 })
 
-describe('persist: nothing is persisted (currentPassage is runtime state)', () => {
-  it('does not persist currentPassage or any other state to localStorage', () => {
+describe('persist: only currentPassage is persisted', () => {
+  it('persists currentPassage but not runtime state', () => {
     let store: Record<string, string> = {}
     vi.stubGlobal('localStorage', {
       getItem: (k: string) => store[k] ?? null,
@@ -362,8 +362,9 @@ describe('persist: nothing is persisted (currentPassage is runtime state)', () =
     const raw = localStorage.getItem('hhc-bible')
     expect(raw).toBeTruthy()
     const parsed = JSON.parse(raw!)
-    expect(parsed.state).toEqual({})
-    expect(parsed.state).not.toHaveProperty('currentPassage')
+    expect(parsed.state).toEqual({
+      currentPassage: { bookNumber: 5, chapter: 3, verse: 2 }
+    })
     expect(parsed.state).not.toHaveProperty('isLoading')
     expect(parsed.state).not.toHaveProperty('content')
     expect(parsed.state).not.toHaveProperty('versions')
