@@ -122,11 +122,13 @@ export default function BiblePage(): React.JSX.Element {
 
   const handleNextChapter = useCallback(() => {
     nextChapter()
-  }, [nextChapter])
+    projectVerse(0, true)
+  }, [nextChapter, projectVerse])
 
   const handlePrevChapter = useCallback(() => {
     prevChapter()
-  }, [prevChapter])
+    projectVerse(0, true)
+  }, [prevChapter, projectVerse])
 
   const handleOpenSelector = useCallback(() => {
     setSelectorOpen(true)
