@@ -67,7 +67,7 @@ export function ContextMenuProvider({
     const handleBlur = (): void => close()
 
     document.addEventListener('mousedown', handleClickOutside, true)
-    document.addEventListener('keydown', handleEscape)
+    document.addEventListener('keydown', handleEscape, true)
     document.addEventListener('scroll', handleScroll, true)
     document.addEventListener('contextmenu', handleClickOutside)
     window.addEventListener('resize', handleResize)
@@ -75,7 +75,7 @@ export function ContextMenuProvider({
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside, true)
-      document.removeEventListener('keydown', handleEscape)
+      document.removeEventListener('keydown', handleEscape, true)
       document.removeEventListener('scroll', handleScroll, true)
       document.removeEventListener('contextmenu', handleClickOutside)
       window.removeEventListener('resize', handleResize)

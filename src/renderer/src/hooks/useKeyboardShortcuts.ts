@@ -112,11 +112,7 @@ export function useKeyboardShortcuts(
       if (!enabledRef.current) return
       if (isEditableTarget(event.target)) return
 
-      if (
-        event.code === 'Escape' &&
-        event.target instanceof Element &&
-        event.target.closest('[role="menu"]')
-      ) {
+      if (event.code === 'Escape' && document.querySelector('[role="menu"]')) {
         return
       }
 
