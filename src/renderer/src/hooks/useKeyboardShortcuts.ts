@@ -80,23 +80,30 @@ export function useKeyboardShortcuts(
   const isOverlayActiveRef = useRef<boolean>(false)
   const shortcutIdsRef = useRef<string[]>([])
 
+  const sectionKeyRef = useRef(sectionKey)
+
   useEffect(() => {
     shortcutsRef.current = shortcuts
     enabledRef.current = enabled
     isOverlayActiveRef.current = isOverlayActive
+    sectionKeyRef.current = sectionKey
   })
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    shortcutIdsRef.current = shortcuts.map((shortcut, index) => shortcut.id || `shortcut-${index}`)
+    const currentShortcuts = shortcutsRef.current
+    const currentSectionKey = sectionKeyRef.current
+    shortcutIdsRef.current = currentShortcuts.map(
+      (shortcut, index) => shortcut.id || `shortcut-${index}`
+    )
 
-    shortcuts.forEach((shortcut, index) => {
+    currentShortcuts.forEach((shortcut, index) => {
       const id = shortcutIdsRef.current[index]
       registerShortcut({
         id,
         config: shortcut.config,
         description: shortcut.description,
-        sectionKey
+        sectionKey: currentSectionKey
       })
     })
 
