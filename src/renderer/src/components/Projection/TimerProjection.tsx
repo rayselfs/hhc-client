@@ -42,6 +42,7 @@ export default function TimerProjection({
           size={700}
           responsive
           warningColor={reminderColor}
+          digitClassName="text-accent-foreground"
         />
       </div>
     )
@@ -67,6 +68,7 @@ export default function TimerProjection({
             size={700}
             responsive
             warningColor={reminderColor}
+            digitClassName="text-accent-foreground"
           />
         </div>
         <GlassDivider vertical className="mx-4" />

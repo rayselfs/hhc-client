@@ -27,7 +27,7 @@ export default function Sidebar(): React.JSX.Element {
 
   return (
     <nav
-      className="flex flex-col rounded-tr-3xl rounded-br-3xl bg-sidebar text-sidebar-foreground py-2 px-1"
+      className="flex flex-col rounded-tr-3xl rounded-br-3xl bg-sidebar text-sidebar-foreground py-2 px-2"
       style={{ width: 'var(--sidebar-width)', minWidth: 'var(--sidebar-min-width)' }}
     >
       <ul className="flex flex-col gap-1">
@@ -39,7 +39,8 @@ export default function Sidebar(): React.JSX.Element {
             <li key={item.to}>
               <Link
                 to={item.to}
-                className={`flex cursor-default items-center gap-3 rounded-full px-3 py-2 ${active ? 'bg-accent-soft text-accent-soft-foreground' : ''}`}
+                draggable={false}
+                className={`flex cursor-default items-center gap-3 rounded-full px-3 py-2 ${active ? 'bg-accent text-accent-foreground' : 'text-muted hover:opacity-70'}`}
               >
                 <Icon className="size-4" />
                 <span>{item.label}</span>

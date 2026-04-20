@@ -91,7 +91,15 @@
       "home": "Home",
       "newFolder": "New Folder",
       "createNewFolder": "Create New Folder",
+      "editFolder": "Edit Folder",
       "folderName": "Folder Name",
+      "retention": "Retention",
+      "duration": {
+        "1day": "1 Day",
+        "1week": "1 Week",
+        "1month": "1 Month",
+        "permanent": "Permanent"
+      },
       "rename": "Rename",
       "delete": "Delete",
       "moveToFolder": "Move to Folder",
@@ -101,6 +109,7 @@
         "cut": "Cut",
         "paste": "Paste",
         "delete": "Delete",
+        "edit": "Edit",
         "newFolder": "New Folder",
         "copyCount": "Copy {{count}} item(s)",
         "cutCount": "Cut {{count}} item(s)",

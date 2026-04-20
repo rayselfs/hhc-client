@@ -91,7 +91,15 @@
       "home": "首页",
       "newFolder": "新增文件夹",
       "createNewFolder": "创建新文件夹",
+      "editFolder": "编辑文件夹",
       "folderName": "文件夹名称",
+      "retention": "保留时间",
+      "duration": {
+        "1day": "1 天",
+        "1week": "1 周",
+        "1month": "1 个月",
+        "permanent": "永久"
+      },
       "rename": "重命名",
       "delete": "删除",
       "moveToFolder": "移动到文件夹",
@@ -101,6 +109,7 @@
         "cut": "剪切",
         "paste": "粘贴",
         "delete": "删除",
+        "edit": "编辑",
         "newFolder": "新建文件夹",
         "copyCount": "复制 {{count}} 项",
         "cutCount": "剪切 {{count}} 项",

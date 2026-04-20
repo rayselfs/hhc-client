@@ -5,14 +5,30 @@ import { useSettingsStore } from '@renderer/stores/settings'
 
 const ThemeContext = createContext<ThemeContextValue | null>(null)
 
-/** Resolve a ThemePreference to a concrete ResolvedTheme */
+const isProjectionWindow = window.location.hash.startsWith('#/projection')
+
 function resolveTheme(pref: ThemePreference): ResolvedTheme {
   if (pref === 'dark') return 'dark'
   if (pref === 'light') return 'light'
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
 }
 
-export function ThemeProvider({ children }: { children: React.ReactNode }): React.JSX.Element {
+const DARK_ONLY: ThemeContextValue = {
+  preference: 'dark',
+  resolved: 'dark',
+  setPreference: () => {}
+}
+
+function ProjectionThemeProvider({ children }: { children: React.ReactNode }): React.JSX.Element {
+  useEffect(() => {
+    document.documentElement.classList.add('dark')
+    document.documentElement.style.colorScheme = 'dark'
+  }, [])
+
+  return <ThemeContext.Provider value={DARK_ONLY}>{children}</ThemeContext.Provider>
+}
+
+function ControlThemeProvider({ children }: { children: React.ReactNode }): React.JSX.Element {
   const storedPref = useSettingsStore.getState().themePreference
   const initialPref: ThemePreference =
     storedPref === 'light' || storedPref === 'dark' || storedPref === 'system'
@@ -22,22 +38,18 @@ export function ThemeProvider({ children }: { children: React.ReactNode }): Reac
   const [preference, setPreferenceState] = useState<ThemePreference>(initialPref)
   const [resolved, setResolved] = useState<ResolvedTheme>(() => resolveTheme(initialPref))
 
-  // Apply theme to DOM whenever resolved changes
   useEffect(() => {
     document.documentElement.classList.toggle('dark', resolved === 'dark')
     document.documentElement.style.colorScheme = resolved
   }, [resolved])
 
-  // Sync Electron nativeTheme + boot restore (Electron only)
   useEffect(() => {
     if (!isElectron()) return
     window.api.theme.set(preference)
   }, [preference])
 
-  // Listen for system theme changes — ONE listener per environment
   useEffect(() => {
     if (isElectron()) {
-      // Electron: listen ONLY to IPC (matchMedia double-fires with nativeTheme)
       const cleanup = window.api.theme.onChanged((data) => {
         if (preference === 'system') {
           setResolved(data.shouldUseDarkColors ? 'dark' : 'light')
@@ -45,7 +57,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }): Reac
       })
       return cleanup
     } else {
-      // Browser: listen ONLY to matchMedia
       const mq = window.matchMedia('(prefers-color-scheme: dark)')
       const handler = (e: MediaQueryListEvent): void => {
         if (preference === 'system') {
@@ -57,7 +68,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }): Reac
     }
   }, [preference])
 
-  // Update resolved theme when preference changes
   useEffect(() => {
     setResolved(resolveTheme(preference))
   }, [preference])
@@ -71,6 +81,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }): Reac
     <ThemeContext.Provider value={{ preference, resolved, setPreference }}>
       {children}
     </ThemeContext.Provider>
+  )
+}
+
+export function ThemeProvider({ children }: { children: React.ReactNode }): React.JSX.Element {
+  return isProjectionWindow ? (
+    <ProjectionThemeProvider>{children}</ProjectionThemeProvider>
+  ) : (
+    <ControlThemeProvider>{children}</ControlThemeProvider>
   )
 }
 

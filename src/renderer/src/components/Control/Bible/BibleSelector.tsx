@@ -64,7 +64,7 @@ export default function BibleSelector({ onOpenDialog }: BibleSelectorProps): Rea
                 key={v.id}
                 id={v.id}
                 textValue={v.name}
-                className="data-hovered:bg-accent data-hovered:text-accent-fg"
+                className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
               >
                 {v.name}
                 <ListBox.ItemIndicator />

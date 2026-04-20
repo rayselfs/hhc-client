@@ -13,6 +13,7 @@ interface TimerDisplayProps {
   onTimeConfirm?: (seconds: number) => void
   canEditTime?: boolean
   className?: string
+  digitClassName?: string
 }
 
 export default function TimerDisplay({
@@ -26,7 +27,8 @@ export default function TimerDisplay({
   warningColor,
   onTimeConfirm,
   canEditTime,
-  className
+  className,
+  digitClassName
 }: TimerDisplayProps): React.JSX.Element {
   const isWarning = phase === 'warning'
   const isOvertime = phase === 'overtime'
@@ -41,7 +43,8 @@ export default function TimerDisplay({
         'timer-digits bg-transparent border-0 p-0 focus:outline-none',
         'text-[34cqi]',
         isWarning && !warningColor ? 'text-danger' : '',
-        canEditTime ? 'hover:opacity-80' : 'pointer-events-none'
+        canEditTime ? 'hover:opacity-80' : 'pointer-events-none',
+        digitClassName
       ].join(' ')}
       style={useCustomColor ? { color: warningColor } : undefined}
       aria-label={canEditTime ? 'Set timer duration' : undefined}

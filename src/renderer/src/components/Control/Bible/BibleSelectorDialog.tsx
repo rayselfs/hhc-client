@@ -129,7 +129,7 @@ export function BibleSelectorDialog({
               key={book.number}
               variant="tertiary"
               onPress={() => handleBookSelect(book.number)}
-              className="w-full h-11 rounded-full text-xl text-foreground"
+              className="w-full h-11 rounded-full text-xl text-foreground hover:bg-accent hover:text-accent-foreground"
             >
               {bookName(book.code)}
             </Button>
@@ -144,7 +144,7 @@ export function BibleSelectorDialog({
               key={book.number}
               variant="tertiary"
               onPress={() => handleBookSelect(book.number)}
-              className="w-full h-11 rounded-full text-xl text-foreground"
+              className="w-full h-11 rounded-full text-xl text-foreground hover:bg-accent hover:text-accent-foreground"
             >
               {bookName(book.code)}
             </Button>
@@ -164,7 +164,7 @@ export function BibleSelectorDialog({
             isIconOnly
             variant="tertiary"
             onPress={() => handleChapterSelect(chapter)}
-            className="w-18 h-18 rounded-full aspect-square text-3xl text-foreground"
+            className="w-18 h-18 rounded-full aspect-square text-3xl text-foreground hover:bg-accent hover:text-accent-foreground"
           >
             {chapter}
           </Button>
@@ -181,7 +181,7 @@ export function BibleSelectorDialog({
           isIconOnly
           variant="tertiary"
           onPress={() => handleVerseSelect(verse)}
-          className="w-18 h-18 rounded-full aspect-square text-3xl text-foreground"
+          className="w-18 h-18 rounded-full aspect-square text-3xl text-foreground hover:bg-accent hover:text-accent-foreground"
         >
           {verse}
         </Button>
@@ -226,18 +226,23 @@ export function BibleSelectorDialog({
                       aria-label={t('bible.selector.title')}
                       className="bg-transparent border border-border p-1"
                     >
-                      <Tabs.Tab id="books">
+                      <Tabs.Tab id="books" className="data-[selected=true]:text-accent-foreground">
                         {t('bible.selector.bookAbbr')}
                         <Tabs.Indicator className="bg-accent" />
                       </Tabs.Tab>
                       <Tabs.Tab
                         id="chapters"
                         isDisabled={!selectedBook || bookDetails?.chapterCount === 1}
+                        className="data-[selected=true]:text-accent-foreground"
                       >
                         {t('bible.selector.chapterAbbr')}
                         <Tabs.Indicator className="bg-accent" />
                       </Tabs.Tab>
-                      <Tabs.Tab id="verses" isDisabled={selectedChapter == null}>
+                      <Tabs.Tab
+                        id="verses"
+                        isDisabled={selectedChapter == null}
+                        className="data-[selected=true]:text-accent-foreground"
+                      >
                         {t('bible.selector.verseAbbr')}
                         <Tabs.Indicator className="bg-accent" />
                       </Tabs.Tab>

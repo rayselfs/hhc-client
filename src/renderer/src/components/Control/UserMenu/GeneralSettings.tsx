@@ -65,14 +65,19 @@ export default function GeneralSettings({ onClose }: GeneralSettingsProps): Reac
         aria-label={t('preferences.language')}
       >
         <Label>{t('preferences.language')}</Label>
-        <Select.Trigger>
+        <Select.Trigger className="rounded-full pl-5">
           <Select.Value />
           <Select.Indicator />
         </Select.Trigger>
         <Select.Popover>
           <ListBox>
             {languageOptions.map((opt) => (
-              <ListBox.Item key={opt.value} id={opt.value} textValue={opt.label}>
+              <ListBox.Item
+                key={opt.value}
+                id={opt.value}
+                textValue={opt.label}
+                className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
+              >
                 {opt.label}
               </ListBox.Item>
             ))}
@@ -87,7 +92,7 @@ export default function GeneralSettings({ onClose }: GeneralSettingsProps): Reac
         aria-label={t('preferences.timezone')}
       >
         <Label>{t('preferences.timezone')}</Label>
-        <Select.Trigger>
+        <Select.Trigger className="rounded-full pl-5">
           <Select.Value />
           <Select.Indicator />
         </Select.Trigger>
@@ -98,7 +103,12 @@ export default function GeneralSettings({ onClose }: GeneralSettingsProps): Reac
               const resolvedKey = TIMEZONE_LABEL_KEYS[key] ?? 'timezones.taipei'
               const label = t(resolvedKey)
               return (
-                <ListBox.Item key={tz.value} id={tz.value} textValue={String(label)}>
+                <ListBox.Item
+                  key={tz.value}
+                  id={tz.value}
+                  textValue={String(label)}
+                  className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
+                >
                   {String(label)}
                 </ListBox.Item>
               )

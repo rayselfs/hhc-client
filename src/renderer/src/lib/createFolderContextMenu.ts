@@ -1,7 +1,7 @@
 import { useContextMenu } from '@renderer/contexts/ContextMenuContext'
 import type { ContextMenuEntry } from '@renderer/contexts/ContextMenuContext'
 import type { FolderItem, Folder } from '@shared/types/folder'
-import { Copy, Scissors, Clipboard, Trash2, FolderPlus } from 'lucide-react'
+import { Copy, Scissors, Clipboard, Trash2, FolderPlus, Pencil } from 'lucide-react'
 import React from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -24,9 +24,9 @@ export interface ShowItemMenuOptions<TItem extends FolderItem> {
   isAlreadySelected: boolean
   event: React.MouseEvent
   setSelected: (ids: Set<string>) => void
-  onCopy: () => void
-  onCut: () => void
-  onDelete: () => void
+  onCopy: (targetIds: Set<string>) => void
+  onCut: (targetIds: Set<string>) => void
+  onDelete: (targetIds: Set<string>) => void
 }
 
 export interface ShowFolderMenuOptions<TItem extends FolderItem> {
@@ -35,18 +35,19 @@ export interface ShowFolderMenuOptions<TItem extends FolderItem> {
   event: React.MouseEvent
   setSelected: (ids: Set<string>) => void
   clipboard: ClipboardState | null
-  onCopy: () => void
-  onCut: () => void
+  onCopy: (targetIds: Set<string>) => void
+  onCut: (targetIds: Set<string>) => void
   onPaste: () => void
-  onDelete: () => void
+  onDelete: (targetIds: Set<string>) => void
+  onEdit?: (folder: Folder<TItem>) => void
 }
 
 export interface ShowMultiSelectMenuOptions {
   selectedIds: Set<string>
   event: React.MouseEvent
-  onCopy: () => void
-  onCut: () => void
-  onDelete: () => void
+  onCopy: (targetIds: Set<string>) => void
+  onCut: (targetIds: Set<string>) => void
+  onDelete: (targetIds: Set<string>) => void
 }
 
 export interface ShowEmptyAreaMenuOptions {
@@ -83,18 +84,19 @@ export function createFolderContextMenu<TItem extends FolderItem>(
         setSelected(new Set([item.id]))
       }
 
+      const targetIds = new Set([item.id])
       const baseItems: ContextMenuEntry[] = [
         {
           id: 'copy',
           label: t('bible.custom.contextMenu.copy'),
           icon: React.createElement(Copy, { size: 14 }),
-          onAction: onCopy
+          onAction: () => onCopy(targetIds)
         },
         {
           id: 'cut',
           label: t('bible.custom.contextMenu.cut'),
           icon: React.createElement(Scissors, { size: 14 }),
-          onAction: onCut
+          onAction: () => onCut(targetIds)
         },
         'separator',
         {
@@ -102,7 +104,7 @@ export function createFolderContextMenu<TItem extends FolderItem>(
           label: t('bible.custom.contextMenu.delete'),
           icon: React.createElement(Trash2, { size: 14 }),
           variant: 'danger',
-          onAction: onDelete
+          onAction: () => onDelete(targetIds)
         }
       ]
 
@@ -119,12 +121,14 @@ export function createFolderContextMenu<TItem extends FolderItem>(
       onCopy,
       onCut,
       onPaste,
-      onDelete
+      onDelete,
+      onEdit
     }: ShowFolderMenuOptions<TItem>): void => {
       if (!isAlreadySelected) {
         setSelected(new Set([folder.id]))
       }
 
+      const targetIds = new Set([folder.id])
       const pasteItems: ContextMenuEntry[] = clipboard
         ? [
             {
@@ -136,18 +140,31 @@ export function createFolderContextMenu<TItem extends FolderItem>(
           ]
         : []
 
+      const editItems: ContextMenuEntry[] = onEdit
+        ? [
+            {
+              id: 'edit',
+              label: t('bible.custom.contextMenu.edit'),
+              icon: React.createElement(Pencil, { size: 14 }),
+              onAction: () => onEdit(folder)
+            },
+            'separator'
+          ]
+        : []
+
       const baseItems: ContextMenuEntry[] = [
+        ...editItems,
         {
           id: 'copy',
           label: t('bible.custom.contextMenu.copy'),
           icon: React.createElement(Copy, { size: 14 }),
-          onAction: onCopy
+          onAction: () => onCopy(targetIds)
         },
         {
           id: 'cut',
           label: t('bible.custom.contextMenu.cut'),
           icon: React.createElement(Scissors, { size: 14 }),
-          onAction: onCut
+          onAction: () => onCut(targetIds)
         },
         ...pasteItems,
         'separator',
@@ -156,7 +173,7 @@ export function createFolderContextMenu<TItem extends FolderItem>(
           label: t('bible.custom.contextMenu.delete'),
           icon: React.createElement(Trash2, { size: 14 }),
           variant: 'danger',
-          onAction: onDelete
+          onAction: () => onDelete(targetIds)
         }
       ]
 
@@ -178,13 +195,13 @@ export function createFolderContextMenu<TItem extends FolderItem>(
           id: 'copy',
           label: t('bible.custom.contextMenu.copyCount', { count }),
           icon: React.createElement(Copy, { size: 14 }),
-          onAction: onCopy
+          onAction: () => onCopy(selectedIds)
         },
         {
           id: 'cut',
           label: t('bible.custom.contextMenu.cutCount', { count }),
           icon: React.createElement(Scissors, { size: 14 }),
-          onAction: onCut
+          onAction: () => onCut(selectedIds)
         },
         'separator',
         {
@@ -192,7 +209,7 @@ export function createFolderContextMenu<TItem extends FolderItem>(
           label: t('bible.custom.contextMenu.deleteCount', { count }),
           icon: React.createElement(Trash2, { size: 14 }),
           variant: 'danger',
-          onAction: onDelete
+          onAction: () => onDelete(selectedIds)
         }
       ]
 

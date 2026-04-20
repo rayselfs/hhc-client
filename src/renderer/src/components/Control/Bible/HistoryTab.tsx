@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useBibleHistoryStore } from '@renderer/stores/bible-history'
 import { useBibleStore } from '@renderer/stores/bible'
 import { formatVerseReferenceShort } from '@renderer/lib/bible-utils'
@@ -21,6 +21,8 @@ export function HistoryTab(): React.JSX.Element | null {
   const items = useBibleHistoryStore((state) => state.items)
   const removeFromHistory = useBibleHistoryStore((state) => state.removeFromHistory)
   const navigateTo = useBibleStore((state) => state.navigateTo)
+
+  const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const today = new Date()
@@ -58,6 +60,15 @@ export function HistoryTab(): React.JSX.Element | null {
     )
   }
 
+  const todayItemsLength = todayItems.length
+  useEffect(() => {
+    if (todayItemsLength === 0) return
+    const id = requestAnimationFrame(() => {
+      scrollRef.current?.scrollTo({ top: 0, behavior: 'instant' })
+    })
+    return () => cancelAnimationFrame(id)
+  }, [todayItemsLength])
+
   if (todayItems.length === 0) {
     return (
       <div className="flex h-full items-center justify-center text-muted">
@@ -67,27 +78,29 @@ export function HistoryTab(): React.JSX.Element | null {
   }
 
   return (
-    <ScrollShadow className="h-full w-full" hideScrollBar>
+    <ScrollShadow ref={scrollRef} className="h-full w-full" hideScrollBar>
       <div className="flex flex-col gap-2 p-2 pt-0">
         {todayItems.map((item) => (
           <div
             key={item.id}
-            className="flex items-center group rounded-3xl transition-colors hover:bg-accent/8"
+            className="flex items-center group rounded-3xl transition-colors hover:bg-accent hover:text-accent-foreground"
           >
             <button
               type="button"
               onClick={() => handleNavigate(item)}
-              className="flex-1 min-w-0 text-left cursor-pointer p-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-3xl"
+              className="flex-1 min-w-0 text-left p-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-3xl"
             >
-              <p className="truncate text-muted">{getVerseReference(item)}</p>
-              <p className="text-lg text-foreground whitespace-normal">
+              <p className="truncate text-muted group-hover:text-accent-foreground">
+                {getVerseReference(item)}
+              </p>
+              <p className="text-lg text-foreground group-hover:text-accent-foreground whitespace-normal">
                 {item.text.length > 60 ? `${item.text.substring(0, 60)}...` : item.text}
               </p>
             </button>
             <Button
               variant="ghost"
               size="sm"
-              className="invisible shrink-0 mr-2 group-hover:visible"
+              className="invisible shrink-0 mr-2 group-hover:visible cursor-pointer hover:bg-transparent!"
               onPress={() => handleRemove(item.id)}
             >
               <X size={16} />

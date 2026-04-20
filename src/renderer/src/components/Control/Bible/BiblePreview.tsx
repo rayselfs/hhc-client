@@ -43,6 +43,7 @@ export function BiblePreview({
   const verseRefs = useRef<Map<number, HTMLButtonElement>>(new Map())
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const prevSelectedVerseIndexRef = useRef<number>(selectedVerseIndex)
+  const scrollBehaviorRef = useRef<ScrollBehavior>('instant')
   const resizeObserverRef = useRef<ResizeObserver | null>(null)
   const [spacerHeight, setSpacerHeight] = useState(0)
   const handleQuickAddToFolder = (
@@ -108,6 +109,7 @@ export function BiblePreview({
       currentVerse: verseNumber
     })
     navigateTo({ bookNumber: book.number, chapter: chapter.number, verse: verseNumber })
+    scrollBehaviorRef.current = 'smooth'
     onSelectedVerseIndexChange(verseIndex)
 
     const { selectedVersionId } = useBibleSettingsStore.getState()
@@ -139,11 +141,21 @@ export function BiblePreview({
     if (el && container && typeof container.scrollTo === 'function') {
       const top =
         el.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop
-      const isAdjacent = Math.abs(selectedVerseIndex - prevSelectedVerseIndexRef.current) <= 1
-      container.scrollTo({ top, behavior: isAdjacent ? 'smooth' : 'instant' })
+      const behavior = scrollBehaviorRef.current
+      container.scrollTo({ top, behavior })
     }
+    scrollBehaviorRef.current = 'instant'
     prevSelectedVerseIndexRef.current = selectedVerseIndex
   }, [selectedVerseIndex, verses])
+
+  const searchResultsLength = searchResults.length
+  useEffect(() => {
+    if (!isSearchMode || searchResultsLength === 0) return
+    const id = requestAnimationFrame(() => {
+      scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'instant' })
+    })
+    return () => cancelAnimationFrame(id)
+  }, [isSearchMode, searchResultsLength])
 
   const revelation = getBookConfig(66)
   const isPrevDisabled = book?.number === 1 && chapter?.number === 1
@@ -158,7 +170,7 @@ export function BiblePreview({
       const key = `${charOffset}:${part.length}`
       charOffset += part.length
       return part.toLowerCase() === keyword.toLowerCase() ? (
-        <mark key={key} className="bg-warning/40 text-inherit rounded-sm">
+        <mark key={key} className="bg-danger/40 text-inherit rounded-sm">
           {part}
         </mark>
       ) : (
@@ -186,8 +198,8 @@ export function BiblePreview({
       }
 
       return (
-        <div className="h-full overflow-y-auto">
-          <div className="flex flex-col gap-1 p-4">
+        <div ref={scrollContainerRef} className="h-full overflow-y-auto">
+          <div className="flex flex-col gap-2 p-2 pt-0">
             {searchResults.map((r) => {
               const reference = formatVerseReferenceShort(t, r.bookNumber, r.chapter, r.verse)
               return (
@@ -195,7 +207,7 @@ export function BiblePreview({
                   key={r.verseId}
                   type="button"
                   onClick={() => handleSearchResultClick(r.bookNumber, r.chapter, r.verse)}
-                  className="w-full text-left rounded-3xl p-3 hover:bg-accent/8 transition-colors"
+                  className="w-full text-left rounded-3xl p-3 hover:bg-accent hover:text-accent-foreground transition-colors"
                 >
                   <div className="text-sm font-medium text-muted mb-1">{reference}</div>
                   <div className="text-xl text-foreground">
@@ -237,25 +249,30 @@ export function BiblePreview({
                   onClick={() => handleVerseClick(index, verse.number, verse.text)}
                   onContextMenu={onContextMenu}
                   data-verse-number={verse.number}
-                  className={`w-full text-left cursor-pointer rounded-3xl p-3 transition-colors flex items-start ${
+                  className={`w-full text-left rounded-3xl p-3 transition-colors flex items-start ${
                     isSelected
-                      ? 'bg-accent-soft-hover'
+                      ? 'bg-accent text-accent-foreground'
                       : isProjected
                         ? 'bg-accent-soft'
-                        : 'hover:bg-accent/8'
+                        : 'hover:opacity-70'
                   }`}
                 >
-                  <span className="text-muted mr-2 shrink-0">{verse.number}</span>
+                  <span
+                    className={`mr-2 shrink-0 ${isSelected ? '' : 'text-muted group-hover:text-inherit'}`}
+                  >
+                    {verse.number}
+                  </span>
                   <span className="flex-1 text-xl pr-6">{verse.text}</span>
                 </button>
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={(e) => handleQuickAddToFolder(verse.number, verse.text, e)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-full hover:bg-accent-soft"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer hover:bg-transparent!"
                   aria-label={t('bible.contextMenu.addToFolder')}
                 >
                   <CirclePlus size={14} className="text-muted" />
-                </button>
+                </Button>
               </div>
             )
           })}
@@ -279,7 +296,7 @@ export function BiblePreview({
   return (
     <Card className="flex flex-col h-full flex-1 p-0 gap-2">
       <Card.Header className="shrink-0 flex-row! items-center justify-between p-0 pt-2">
-        <h2 className="text-lg font-semibold pl-5">
+        <h2 className="text-lg pl-5">
           {isSearchMode ? t('bible.search.title') : `${bookName}${chapterSuffix}`}
         </h2>
         {!isSearchMode && (

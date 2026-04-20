@@ -24,18 +24,18 @@ export default function BibleMultiFunction(): React.JSX.Element {
         <Tabs
           selectedKey={activeTab}
           onSelectionChange={(key) => setActiveTab(String(key))}
-          className="pl-2"
+          className="pl-2 pr-1"
         >
           <Tabs.ListContainer>
             <Tabs.List
               aria-label="Bible Functions"
               className="bg-transparent border border-border p-1"
             >
-              <Tabs.Tab id="history">
+              <Tabs.Tab id="history" className="data-[selected=true]:text-accent-foreground">
                 {t('bible.history.title')}
                 <Tabs.Indicator className="bg-accent" />
               </Tabs.Tab>
-              <Tabs.Tab id="custom">
+              <Tabs.Tab id="custom" className="data-[selected=true]:text-accent-foreground">
                 {t('bible.custom.title')}
                 <Tabs.Indicator className="bg-accent" />
               </Tabs.Tab>

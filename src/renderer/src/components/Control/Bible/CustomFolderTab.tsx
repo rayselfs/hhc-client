@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useMemo } from 'react'
+import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react'
 import {
   DndContext,
   PointerSensor,
@@ -11,7 +11,8 @@ import {
   type CollisionDetection,
   type DragStartEvent,
   type DragEndEvent,
-  type DragOverEvent
+  type DragOverEvent,
+  type Modifier
 } from '@dnd-kit/core'
 import {
   SortableContext,
@@ -25,10 +26,19 @@ import { useBibleStore } from '@renderer/stores/bible'
 import { formatVerseReferenceShort } from '@renderer/lib/bible-utils'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
-import type { VerseItem, Folder, FolderItem } from '@shared/types/folder'
-import { isVerseItem, isFolder } from '@shared/types/folder'
-import { ScrollShadow, Button, Input, Modal, TextField, Label } from '@heroui/react'
-import { Folder as FolderIcon, Trash2, GripVertical } from 'lucide-react'
+import type { VerseItem, Folder, FolderItem, FolderDuration } from '@shared/types/folder'
+import { isVerseItem, isFolder, computeExpiresAt, inferDuration } from '@shared/types/folder'
+import {
+  ScrollShadow,
+  Button,
+  Input,
+  Modal,
+  TextField,
+  Label,
+  Select,
+  ListBox
+} from '@heroui/react'
+import { Folder as FolderIcon, X, BookOpen } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import { useKeyboardShortcuts } from '@renderer/hooks/useKeyboardShortcuts'
@@ -52,6 +62,25 @@ interface ClipboardState {
   mode: ClipboardMode
 }
 
+const snapCenterToCursor: Modifier = ({ activatorEvent, draggingNodeRect, transform }) => {
+  if (activatorEvent && draggingNodeRect) {
+    return {
+      ...transform,
+      x:
+        transform.x +
+        (activatorEvent as PointerEvent).clientX -
+        draggingNodeRect.left -
+        draggingNodeRect.width / 2,
+      y:
+        transform.y +
+        (activatorEvent as PointerEvent).clientY -
+        draggingNodeRect.top -
+        draggingNodeRect.height / 2
+    }
+  }
+  return transform
+}
+
 type DndItemData =
   | { type: 'folder'; item: Folder }
   | { type: 'verse'; item: VerseItem }
@@ -63,22 +92,24 @@ interface SortableFolderItemProps {
   isSelected: boolean
   isFolderDropTarget: boolean
   isCut: boolean
-  children: (
-    dragHandleProps: React.HTMLAttributes<HTMLButtonElement>,
-    isDragging: boolean
-  ) => React.ReactNode
+  isDraggedAway: boolean
+  isMultiDrag: boolean
+  children: (isDragging: boolean) => React.ReactNode
 }
 
 function SortableFolderItem({
   id,
   folder,
   isCut,
+  isDraggedAway,
+  isMultiDrag,
   children
 }: SortableFolderItemProps): React.JSX.Element {
   const sortable = useSortable({ id, data: { type: 'folder', item: folder } as DndItemData })
   const droppable = useDroppable({
     id: `drop-${id}`,
-    data: { type: 'folder-dropzone', folderId: id } as DndItemData
+    data: { type: 'folder-dropzone', folderId: id } as DndItemData,
+    disabled: isDraggedAway
   })
 
   const setRef = useCallback(
@@ -91,20 +122,20 @@ function SortableFolderItem({
   )
 
   const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(sortable.transform),
-    transition: sortable.transition,
-    opacity: sortable.isDragging ? 0.4 : isCut ? 0.4 : 1
+    transform: isMultiDrag ? undefined : CSS.Transform.toString(sortable.transform),
+    transition: isMultiDrag ? undefined : sortable.transition,
+    opacity: sortable.isDragging ? 0.4 : isDraggedAway ? 0.4 : isCut ? 0.4 : 1
   }
 
   return (
-    <li ref={setRef} style={style} className="list-none">
-      {children(
-        {
-          ...sortable.attributes,
-          ...sortable.listeners
-        } as React.HTMLAttributes<HTMLButtonElement>,
-        sortable.isDragging
-      )}
+    <li
+      ref={setRef}
+      style={style}
+      className="list-none touch-none"
+      {...sortable.attributes}
+      {...sortable.listeners}
+    >
+      {children(sortable.isDragging)}
     </li>
   )
 }
@@ -114,16 +145,17 @@ interface SortableVerseItemProps {
   verse: VerseItem
   isSelected: boolean
   isCut: boolean
-  children: (
-    dragHandleProps: React.HTMLAttributes<HTMLButtonElement>,
-    isDragging: boolean
-  ) => React.ReactNode
+  isDraggedAway: boolean
+  isMultiDrag: boolean
+  children: (isDragging: boolean) => React.ReactNode
 }
 
 function SortableVerseItem({
   id,
   verse,
   isCut,
+  isDraggedAway,
+  isMultiDrag,
   children
 }: SortableVerseItemProps): React.JSX.Element {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -132,17 +164,20 @@ function SortableVerseItem({
   })
 
   const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.4 : isCut ? 0.4 : 1
+    transform: isMultiDrag ? undefined : CSS.Transform.toString(transform),
+    transition: isMultiDrag ? undefined : transition,
+    opacity: isDragging ? 0.4 : isDraggedAway ? 0.4 : isCut ? 0.4 : 1
   }
 
   return (
-    <li ref={setNodeRef} style={style} className="list-none">
-      {children(
-        { ...attributes, ...listeners } as React.HTMLAttributes<HTMLButtonElement>,
-        isDragging
-      )}
+    <li
+      ref={setNodeRef}
+      style={style}
+      className="list-none touch-none"
+      {...attributes}
+      {...listeners}
+    >
+      {children(isDragging)}
     </li>
   )
 }
@@ -160,9 +195,11 @@ export function CustomFolderTab({
     removeItem,
     navigateToFolder,
     moveItem,
+    moveFolder,
     reorderItems,
     reorderFolders,
-    addItem
+    addItem,
+    updateFolder
   } = useBibleFolderStore()
   const { navigateTo } = useBibleStore.getState()
   const { claimProjection, project } = useProjection()
@@ -170,11 +207,15 @@ export function CustomFolderTab({
   const { t } = useTranslation()
 
   const [newFolderName, setNewFolderName] = useState('')
+  const [folderDuration, setFolderDuration] = useState<FolderDuration>('1day')
+  const [editingFolder, setEditingFolder] = useState<Folder<VerseItem> | null>(null)
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set())
   const [clipboard, setClipboard] = useState<ClipboardState | null>(null)
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
+  const [draggedIds, setDraggedIds] = useState<Set<string>>(new Set())
   const [folderDropTargetId, setFolderDropTargetId] = useState<string | null>(null)
   const lastClickedIdRef = useRef<string | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   const { showItemMenu, showFolderMenu, showMultiSelectMenu, showEmptyAreaMenu } =
     useFolderContextMenu()
@@ -209,6 +250,7 @@ export function CustomFolderTab({
     () => (activeDragId ? items.find((i) => i.id === activeDragId) : null),
     [activeDragId, items]
   )
+  const isMultiDrag = draggedIds.size > 1
 
   const handleItemClick = useCallback(
     (itemId: string, event: React.MouseEvent) => {
@@ -253,6 +295,19 @@ export function CustomFolderTab({
     }
   }, [])
 
+  useEffect(() => {
+    const handleDocumentClick = (event: MouseEvent): void => {
+      const container = containerRef.current
+      if (!container) return
+      if (container.contains(event.target as Node)) return
+      setSelectedItemIds(new Set())
+      lastClickedIdRef.current = null
+    }
+
+    document.addEventListener('mousedown', handleDocumentClick)
+    return () => document.removeEventListener('mousedown', handleDocumentClick)
+  }, [])
+
   const handleVerseDoubleClick = useCallback(
     (item: VerseItem) => {
       navigateTo({ bookNumber: item.bookNumber, chapter: item.chapter, verse: item.verseStart })
@@ -277,17 +332,39 @@ export function CustomFolderTab({
     setSelectedItemIds(new Set(items.map((i) => i.id)))
   }, [items])
 
-  const handleCopy = useCallback(() => {
-    if (selectedItemIds.size === 0) return
-    const selected = items.filter((i) => selectedItemIds.has(i.id))
-    setClipboard({ items: selected, mode: 'copy' })
-  }, [selectedItemIds, items])
+  const handleCopy = useCallback(
+    (targetIds?: Set<string>) => {
+      const ids = targetIds ?? selectedItemIds
+      if (ids.size === 0) return
+      const selected = items.filter((i) => ids.has(i.id))
+      setClipboard({ items: selected, mode: 'copy' })
+    },
+    [items, selectedItemIds]
+  )
 
-  const handleCut = useCallback(() => {
-    if (selectedItemIds.size === 0) return
-    const selected = items.filter((i) => selectedItemIds.has(i.id))
-    setClipboard({ items: selected, mode: 'cut' })
-  }, [selectedItemIds, items])
+  const handleCut = useCallback(
+    (targetIds?: Set<string>) => {
+      const ids = targetIds ?? selectedItemIds
+      if (ids.size === 0) return
+      const selected = items.filter((i) => ids.has(i.id))
+      setClipboard({ items: selected, mode: 'cut' })
+    },
+    [items, selectedItemIds]
+  )
+
+  const handleCopyKeyboard = useCallback(() => handleCopy(), [handleCopy])
+  const handleCutKeyboard = useCallback(() => handleCut(), [handleCut])
+
+  const handleEscape = useCallback(() => {
+    if (clipboard?.mode === 'cut') {
+      setClipboard(null)
+      return
+    }
+    if (selectedItemIds.size > 0) {
+      setSelectedItemIds(new Set())
+      lastClickedIdRef.current = null
+    }
+  }, [clipboard, selectedItemIds])
 
   const handlePaste = useCallback(() => {
     if (!clipboard) return
@@ -316,31 +393,40 @@ export function CustomFolderTab({
     setSelectedItemIds(new Set())
   }, [clipboard, currentFolderId, addItem, addFolder, removeItem, deleteFolder])
 
-  const handleDeleteSelected = useCallback(async () => {
-    if (selectedItemIds.size === 0) return
-    const selected = items.filter((i) => selectedItemIds.has(i.id))
+  const handleDeleteSelected = useCallback(
+    async (targetIds?: Set<string>) => {
+      const ids = targetIds ?? selectedItemIds
+      if (ids.size === 0) return
+      const selected = items.filter((i) => ids.has(i.id))
 
-    const confirmed = await confirm({
-      title: t('bible.delete_selected_title', {
-        count: selected.length,
-        defaultValue: `Delete ${selected.length} item(s)?`
-      }),
-      description: t('bible.delete_item_description'),
-      status: 'danger'
-    })
+      const confirmed = await confirm({
+        title: t('bible.delete_selected_title', {
+          count: selected.length,
+          defaultValue: `Delete ${selected.length} item(s)?`
+        }),
+        description: t('bible.delete_item_description'),
+        status: 'danger'
+      })
 
-    if (!confirmed) return
+      if (!confirmed) return
 
-    for (const item of selected) {
-      if (isFolder(item)) {
-        deleteFolder(item.id)
-      } else if (isVerseItem(item as FolderItem)) {
-        removeItem(item.id)
+      for (const item of selected) {
+        if (isFolder(item)) {
+          deleteFolder(item.id)
+        } else if (isVerseItem(item as FolderItem)) {
+          removeItem(item.id)
+        }
       }
-    }
-    setSelectedItemIds(new Set())
-    lastClickedIdRef.current = null
-  }, [selectedItemIds, items, confirm, t, removeItem, deleteFolder])
+      setSelectedItemIds(new Set())
+      lastClickedIdRef.current = null
+    },
+    [selectedItemIds, items, confirm, t, removeItem, deleteFolder]
+  )
+
+  const handleDeleteSelectedKeyboard = useCallback(
+    () => handleDeleteSelected(),
+    [handleDeleteSelected]
+  )
 
   useKeyboardShortcuts(
     [
@@ -351,12 +437,12 @@ export function CustomFolderTab({
       },
       {
         config: SHORTCUTS.EDIT.COPY,
-        handler: handleCopy,
+        handler: handleCopyKeyboard,
         preventDefault: true
       },
       {
         config: SHORTCUTS.EDIT.CUT,
-        handler: handleCut,
+        handler: handleCutKeyboard,
         preventDefault: true
       },
       {
@@ -366,16 +452,21 @@ export function CustomFolderTab({
       },
       {
         config: SHORTCUTS.EDIT.DELETE,
-        handler: handleDeleteSelected,
+        handler: handleDeleteSelectedKeyboard,
         preventDefault: true
       },
       {
         config: SHORTCUTS.EDIT.DELETE_ALT,
-        handler: handleDeleteSelected,
+        handler: handleDeleteSelectedKeyboard,
+        preventDefault: true
+      },
+      {
+        config: SHORTCUTS.EDIT.ESCAPE,
+        handler: handleEscape,
         preventDefault: true
       }
     ],
-    { enabled: true }
+    { enabled: true, sectionKey: 'edit' }
   )
 
   const handleContextMenuForItem = useCallback(
@@ -416,6 +507,16 @@ export function CustomFolderTab({
     ]
   )
 
+  const handleOpenEditFolder = useCallback(
+    (folder: Folder<VerseItem>) => {
+      setEditingFolder(folder)
+      setNewFolderName(folder.name)
+      setFolderDuration(inferDuration(folder.expiresAt, folder.createdAt))
+      onModalOpenChange(true)
+    },
+    [onModalOpenChange]
+  )
+
   const handleContextMenuForFolder = useCallback(
     (folder: Folder<VerseItem>, e: React.MouseEvent): void => {
       e.preventDefault()
@@ -442,7 +543,8 @@ export function CustomFolderTab({
           onCopy: handleCopy,
           onCut: handleCut,
           onPaste: handlePaste,
-          onDelete: handleDeleteSelected
+          onDelete: handleDeleteSelected,
+          onEdit: handleOpenEditFolder
         })
       }
     },
@@ -454,7 +556,8 @@ export function CustomFolderTab({
       handleCopy,
       handleCut,
       handlePaste,
-      handleDeleteSelected
+      handleDeleteSelected,
+      handleOpenEditFolder
     ]
   )
 
@@ -474,11 +577,33 @@ export function CustomFolderTab({
 
   const handleAddFolder = (): void => {
     if (newFolderName.trim()) {
-      addFolder(newFolderName.trim(), currentFolderId)
+      addFolder(newFolderName.trim(), currentFolderId, computeExpiresAt(folderDuration))
       setNewFolderName('')
+      setFolderDuration('1day')
       onModalOpenChange(false)
     }
   }
+
+  const handleEditFolderSubmit = (): void => {
+    if (!editingFolder || !newFolderName.trim()) return
+    updateFolder(editingFolder.id, {
+      name: newFolderName.trim(),
+      expiresAt: computeExpiresAt(folderDuration)
+    })
+    setEditingFolder(null)
+    setNewFolderName('')
+    setFolderDuration('1day')
+    onModalOpenChange(false)
+  }
+
+  const handleModalClose = (): void => {
+    setEditingFolder(null)
+    setNewFolderName('')
+    setFolderDuration('1day')
+    onModalOpenChange(false)
+  }
+
+  const handleModalSubmit = editingFolder ? handleEditFolderSubmit : handleAddFolder
 
   const handleDeleteFolder = async (folderId: string, folderName: string): Promise<void> => {
     const confirmed = await confirm({
@@ -513,28 +638,45 @@ export function CustomFolderTab({
     }
   }
 
-  const handleDragStart = useCallback((event: DragStartEvent): void => {
-    setActiveDragId(String(event.active.id))
-    setFolderDropTargetId(null)
-  }, [])
+  const handleDragStart = useCallback(
+    (event: DragStartEvent): void => {
+      const activeId = String(event.active.id)
+      setActiveDragId(activeId)
+      setFolderDropTargetId(null)
 
-  const handleDragOver = useCallback((event: DragOverEvent): void => {
-    const { over } = event
-    if (!over) {
-      setFolderDropTargetId(null)
-      return
-    }
-    const overData = over.data.current as DndItemData | undefined
-    if (overData?.type === 'folder-dropzone') {
-      setFolderDropTargetId(overData.folderId)
-    } else {
-      setFolderDropTargetId(null)
-    }
-  }, [])
+      if (selectedItemIds.has(activeId)) {
+        setDraggedIds(new Set(selectedItemIds))
+      } else {
+        setSelectedItemIds(new Set([activeId]))
+        setDraggedIds(new Set([activeId]))
+        lastClickedIdRef.current = activeId
+      }
+    },
+    [selectedItemIds]
+  )
+
+  const handleDragOver = useCallback(
+    (event: DragOverEvent): void => {
+      const { over } = event
+      if (!over) {
+        setFolderDropTargetId(null)
+        return
+      }
+      const overData = over.data.current as DndItemData | undefined
+      if (overData?.type === 'folder-dropzone' && !draggedIds.has(overData.folderId)) {
+        setFolderDropTargetId(overData.folderId)
+      } else {
+        setFolderDropTargetId(null)
+      }
+    },
+    [draggedIds]
+  )
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent): void => {
+      const currentDraggedIds = draggedIds
       setActiveDragId(null)
+      setDraggedIds(new Set())
       setFolderDropTargetId(null)
 
       const { active, over } = event
@@ -545,13 +687,36 @@ export function CustomFolderTab({
 
       if (!activeData) return
 
+      const isMultiDrag = currentDraggedIds.size > 1
       const parentFolder = currentFolder
       const parentFolderId = parentFolder?.id ?? root.id
 
       if (overData?.type === 'folder-dropzone') {
-        moveItem(String(active.id), overData.folderId)
+        const targetFolderId = overData.folderId
+        if (isMultiDrag) {
+          for (const id of currentDraggedIds) {
+            if (id === targetFolderId) continue
+            const item = items.find((i) => i.id === id)
+            if (!item) continue
+            if (isFolder(item)) {
+              moveFolder(id, targetFolderId)
+            } else {
+              moveItem(id, targetFolderId)
+            }
+          }
+        } else {
+          const activeId = String(active.id)
+          if (activeId === targetFolderId) return
+          if (activeData.type === 'folder') {
+            moveFolder(activeId, targetFolderId)
+          } else {
+            moveItem(activeId, targetFolderId)
+          }
+        }
         return
       }
+
+      if (isMultiDrag) return
 
       if (activeData.type === 'folder' && overData?.type === 'folder') {
         const folderIds = (parentFolder ?? root).folders.map((f) => f.id)
@@ -573,14 +738,13 @@ export function CustomFolderTab({
         return
       }
     },
-    [currentFolder, root, moveItem, reorderItems, reorderFolders]
+    [currentFolder, root, items, draggedIds, moveItem, moveFolder, reorderItems, reorderFolders]
   )
 
   const renderFolderContent = (
     item: Folder<VerseItem>,
-    dragHandleProps: React.HTMLAttributes<HTMLButtonElement>,
     isItemSelected: boolean,
-    isDragging: boolean
+    _isDragging: boolean
   ): React.JSX.Element => {
     const isFolderDropTarget = folderDropTargetId === item.id
 
@@ -597,42 +761,33 @@ export function CustomFolderTab({
           handleItemClick(item.id, e as unknown as React.MouseEvent)
         }
         className={[
-          'flex items-center justify-between rounded-3xl p-3 group cursor-pointer select-none transition-colors',
-          isDragging ? 'opacity-40' : '',
+          'flex items-center justify-between rounded-3xl p-3 group select-none transition-colors',
           isItemSelected
-            ? 'bg-accent-soft-hover'
+            ? 'bg-accent text-accent-foreground'
             : isFolderDropTarget
               ? 'bg-accent-soft ring-2 ring-accent/50 ring-dashed'
-              : 'hover:bg-accent/8'
+              : ''
         ]
           .filter(Boolean)
           .join(' ')}
       >
         <div className="flex items-center gap-2 min-w-0 w-full">
-          <button
-            type="button"
-            aria-label={t('common.drag_handle', 'Drag to reorder')}
-            tabIndex={-1}
-            className="opacity-0 group-hover:opacity-40 cursor-grab active:cursor-grabbing shrink-0 touch-none p-0 border-0 bg-transparent"
-            onMouseDown={(e) => e.stopPropagation()}
-            {...dragHandleProps}
-          >
-            <GripVertical className="w-4 h-4" />
-          </button>
-          <FolderIcon className="w-4 h-4 text-muted shrink-0" />
+          <FolderIcon
+            className={`w-4 h-4 shrink-0 ${isItemSelected ? 'text-accent-foreground' : 'text-muted'}`}
+          />
           <span className="font-medium truncate flex-1">{item.name}</span>
         </div>
         <Button
           variant="ghost"
           size="sm"
-          className="opacity-0 group-hover:opacity-100 shrink-0"
+          className="opacity-0 group-hover:opacity-100 shrink-0 cursor-pointer hover:!bg-transparent"
           onPress={() => handleDeleteFolder(item.id, item.name)}
           aria-label={t('bible.delete_folder_title', {
             name: item.name,
             defaultValue: `Delete ${item.name}`
           })}
         >
-          <Trash2 className="w-4 h-4" />
+          <X className="w-4 h-4" />
         </Button>
       </div>
     )
@@ -640,9 +795,8 @@ export function CustomFolderTab({
 
   const renderVerseContent = (
     item: VerseItem,
-    dragHandleProps: React.HTMLAttributes<HTMLButtonElement>,
     isItemSelected: boolean,
-    isDragging: boolean
+    _isDragging: boolean
   ): React.JSX.Element => {
     const reference = getVerseReference(item, t)
 
@@ -659,27 +813,20 @@ export function CustomFolderTab({
           handleItemClick(item.id, e as unknown as React.MouseEvent)
         }
         className={[
-          'flex items-center justify-between rounded-3xl p-3 group select-none transition-colors cursor-pointer',
-          isDragging ? 'opacity-40' : '',
-          isItemSelected ? 'bg-accent-soft-hover' : 'hover:bg-accent/8'
+          'flex items-center justify-between rounded-3xl p-3 group select-none transition-colors',
+          isItemSelected ? 'bg-accent text-accent-foreground' : ''
         ]
           .filter(Boolean)
           .join(' ')}
       >
         <div className="flex items-center gap-1 w-full min-w-0">
-          <button
-            type="button"
-            aria-label={t('common.drag_handle', 'Drag to reorder')}
-            tabIndex={-1}
-            className="opacity-0 group-hover:opacity-40 cursor-grab active:cursor-grabbing shrink-0 touch-none p-0 border-0 bg-transparent"
-            onMouseDown={(e) => e.stopPropagation()}
-            {...dragHandleProps}
-          >
-            <GripVertical className="w-4 h-4" />
-          </button>
           <div className="flex items-center gap-2 text-left min-w-0 w-full">
             <div className="min-w-0">
-              <div className="truncate text-muted">{reference}</div>
+              <div
+                className={`truncate ${isItemSelected ? 'text-accent-foreground' : 'text-muted'}`}
+              >
+                {reference}
+              </div>
               <div className="text-lg whitespace-normal">{item.text}</div>
             </div>
           </div>
@@ -687,14 +834,14 @@ export function CustomFolderTab({
         <Button
           variant="ghost"
           size="sm"
-          className="opacity-0 group-hover:opacity-100 shrink-0"
+          className="opacity-0 group-hover:opacity-100 shrink-0 cursor-pointer hover:!bg-transparent"
           onPress={() => handleDeleteItem(item)}
           aria-label={t('bible.delete_item_title', {
             reference,
             defaultValue: `Delete ${reference}`
           })}
         >
-          <Trash2 className="w-4 h-4" />
+          <X className="w-4 h-4" />
         </Button>
       </div>
     )
@@ -713,7 +860,7 @@ export function CustomFolderTab({
   const verseIds = verses.map((v) => v.id)
 
   return (
-    <div className="flex flex-col h-full">
+    <div ref={containerRef} className="flex flex-col h-full">
       <DndContext
         sensors={sensors}
         collisionDetection={customCollisionDetection}
@@ -731,8 +878,11 @@ export function CustomFolderTab({
               {t('bible.folder_empty', 'Folder is empty')}
             </div>
           ) : (
-            <ul className="list-none p-0 m-0">
-              <SortableContext items={folderIds} strategy={verticalListSortingStrategy}>
+            <ul className="list-none p-0 m-0 flex flex-col gap-2">
+              <SortableContext
+                items={folderIds}
+                strategy={isMultiDrag ? undefined : verticalListSortingStrategy}
+              >
                 {folders.map((item) => {
                   const isItemSelected = selectedItemIds.has(item.id)
                   const isItemCut =
@@ -745,16 +895,19 @@ export function CustomFolderTab({
                       isSelected={isItemSelected}
                       isFolderDropTarget={folderDropTargetId === item.id}
                       isCut={isItemCut}
+                      isDraggedAway={draggedIds.has(item.id)}
+                      isMultiDrag={isMultiDrag}
                     >
-                      {(dragHandleProps, isDragging) =>
-                        renderFolderContent(item, dragHandleProps, isItemSelected, isDragging)
-                      }
+                      {(isDragging) => renderFolderContent(item, isItemSelected, isDragging)}
                     </SortableFolderItem>
                   )
                 })}
               </SortableContext>
 
-              <SortableContext items={verseIds} strategy={verticalListSortingStrategy}>
+              <SortableContext
+                items={verseIds}
+                strategy={isMultiDrag ? undefined : verticalListSortingStrategy}
+              >
                 {verses.map((item) => {
                   const isItemSelected = selectedItemIds.has(item.id)
                   const isItemCut =
@@ -766,10 +919,10 @@ export function CustomFolderTab({
                       verse={item}
                       isSelected={isItemSelected}
                       isCut={isItemCut}
+                      isDraggedAway={draggedIds.has(item.id)}
+                      isMultiDrag={isMultiDrag}
                     >
-                      {(dragHandleProps, isDragging) =>
-                        renderVerseContent(item, dragHandleProps, isItemSelected, isDragging)
-                      }
+                      {(isDragging) => renderVerseContent(item, isItemSelected, isDragging)}
                     </SortableVerseItem>
                   )
                 })}
@@ -778,49 +931,106 @@ export function CustomFolderTab({
           )}
         </ScrollShadow>
 
-        <DragOverlay>
+        <DragOverlay modifiers={[snapCenterToCursor]}>
           {activeDragItem ? (
-            <div className="rounded-3xl bg-overlay shadow-lg p-3 opacity-90 text-sm">
-              {isFolder(activeDragItem)
-                ? activeDragItem.name
-                : isVerseItem(activeDragItem)
-                  ? getVerseReference(activeDragItem as VerseItem, t)
-                  : null}
+            <div className="relative w-fit">
+              {draggedIds.size >= 2 && (
+                <>
+                  <div className="absolute inset-0 translate-x-1 translate-y-1 rounded-full bg-accent/60 shadow" />
+                  <div className="absolute inset-0 translate-x-0.5 translate-y-0.5 rounded-full bg-accent/80 shadow" />
+                </>
+              )}
+              <div className="relative inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 bg-accent text-accent-foreground shadow-lg text-sm">
+                {isFolder(activeDragItem) ? (
+                  <>
+                    <FolderIcon className="w-3.5 h-3.5" />
+                    <span>{activeDragItem.name}</span>
+                  </>
+                ) : isVerseItem(activeDragItem) ? (
+                  <>
+                    <BookOpen className="w-3.5 h-3.5" />
+                    <span>{getVerseReference(activeDragItem as VerseItem, t)}</span>
+                  </>
+                ) : null}
+              </div>
+              {draggedIds.size >= 2 && (
+                <span className="absolute -top-2 -right-2 min-w-5 h-5 flex items-center justify-center rounded-full bg-danger text-danger-foreground text-xs font-semibold px-1">
+                  {draggedIds.size}
+                </span>
+              )}
             </div>
           ) : null}
         </DragOverlay>
       </DndContext>
 
       <Modal>
-        <Modal.Backdrop isOpen={isModalOpen} onOpenChange={onModalOpenChange} isDismissable>
+        <Modal.Backdrop isOpen={isModalOpen} onOpenChange={handleModalClose} isDismissable>
           <Modal.Container size="sm">
             <Modal.Dialog className="p-3 pl-5 pt-5">
               <Modal.Header>
                 <Modal.Heading>
-                  {t('bible.custom.createNewFolder', 'Create New Folder')}
+                  {editingFolder
+                    ? t('bible.custom.editFolder', 'Edit Folder')
+                    : t('bible.custom.createNewFolder', 'Create New Folder')}
                 </Modal.Heading>
               </Modal.Header>
               <Modal.Body>
                 <ShortcutScope name="overlay">
-                  <TextField
-                    autoFocus
-                    value={newFolderName}
-                    onChange={setNewFolderName}
-                    className="w-full p-1"
-                    onKeyDown={(e) =>
-                      e.key === 'Enter' && !e.nativeEvent.isComposing && handleAddFolder()
-                    }
-                  >
-                    <Label>{t('bible.custom.folderName', 'Folder Name')}</Label>
-                    <Input variant="secondary" />
-                  </TextField>
+                  <div className="flex flex-col gap-3">
+                    <TextField
+                      autoFocus
+                      value={newFolderName}
+                      onChange={setNewFolderName}
+                      className="w-full p-1"
+                      onKeyDown={(e) =>
+                        e.key === 'Enter' && !e.nativeEvent.isComposing && handleModalSubmit()
+                      }
+                    >
+                      <Label>{t('bible.custom.folderName', 'Folder Name')}</Label>
+                      <Input variant="secondary" />
+                    </TextField>
+                    <div className="p-1">
+                      <Label className="text-sm mb-1 block">
+                        {t('bible.custom.retention', 'Retention')}
+                      </Label>
+                      <Select
+                        value={folderDuration}
+                        onChange={(v) => setFolderDuration(v as FolderDuration)}
+                        aria-label={t('bible.custom.retention', 'Retention')}
+                        className="w-full"
+                        variant="secondary"
+                      >
+                        <Select.Trigger>
+                          <Select.Value />
+                          <Select.Indicator />
+                        </Select.Trigger>
+                        <Select.Popover>
+                          <ListBox>
+                            {(['1day', '1week', '1month', 'permanent'] as FolderDuration[]).map(
+                              (d) => (
+                                <ListBox.Item
+                                  key={d}
+                                  id={d}
+                                  textValue={t(`bible.custom.duration.${d}`)}
+                                  className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
+                                >
+                                  {t(`bible.custom.duration.${d}`)}
+                                  <ListBox.ItemIndicator />
+                                </ListBox.Item>
+                              )
+                            )}
+                          </ListBox>
+                        </Select.Popover>
+                      </Select>
+                    </div>
+                  </div>
                 </ShortcutScope>
               </Modal.Body>
               <Modal.Footer>
-                <Button variant="tertiary" onPress={() => onModalOpenChange(false)}>
+                <Button variant="tertiary" onPress={handleModalClose}>
                   {t('common.cancel', 'Cancel')}
                 </Button>
-                <Button variant="primary" onPress={handleAddFolder}>
+                <Button variant="primary" onPress={handleModalSubmit}>
                   {t('common.confirm', 'Confirm')}
                 </Button>
               </Modal.Footer>

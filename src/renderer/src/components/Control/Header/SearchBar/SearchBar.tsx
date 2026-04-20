@@ -113,7 +113,7 @@ export default function SearchBar({
         onClick={isExpanded ? handleSubmit : handleToggle}
         disabled={disabled}
         aria-label={isExpanded ? submitLabel : placeholder}
-        className="absolute right-0 top-0 flex items-center justify-center w-10 h-10 text-muted-fg hover:text-foreground transition-colors"
+        className="absolute right-0 -top-0.5 flex items-center justify-center w-10 h-10 text-muted-fg hover:text-foreground transition-colors"
       >
         <Search size={16} />
       </button>

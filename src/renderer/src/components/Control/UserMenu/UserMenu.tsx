@@ -51,18 +51,24 @@ export default function UserMenu({ onOpenPreferences }: UserMenuProps): React.JS
             }}
           >
             {isLoggedIn ? (
-              <Dropdown.Item id="logout">
+              <Dropdown.Item
+                id="logout"
+                className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
+              >
                 <LogOut className="size-4" />
                 {t('userMenu.logout')}
               </Dropdown.Item>
             ) : (
-              <Dropdown.Item id="login">
+              <Dropdown.Item id="login" isDisabled>
                 <LogIn className="size-4" />
                 {t('userMenu.login')}
               </Dropdown.Item>
             )}
             <Dropdown.Section>
-              <Dropdown.Item id="preferences">
+              <Dropdown.Item
+                id="preferences"
+                className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
+              >
                 <Settings className="size-4" />
                 {t('userMenu.preferences')}
               </Dropdown.Item>
@@ -70,13 +76,16 @@ export default function UserMenu({ onOpenPreferences }: UserMenuProps): React.JS
                 <RefreshCw className="size-4" />
                 {t('userMenu.checkForUpdates')}
               </Dropdown.Item>
-              <Dropdown.Item id="keyboardShortcuts">
+              <Dropdown.Item
+                id="keyboardShortcuts"
+                className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
+              >
                 <Keyboard className="size-4" />
                 {t('userMenu.keyboardShortcuts')}
               </Dropdown.Item>
             </Dropdown.Section>
             <Dropdown.Section>
-              <Dropdown.Item id="closeApp" className="text-danger">
+              <Dropdown.Item id="closeApp" className="text-danger data-[hovered=true]:bg-accent">
                 <Power className="size-4" />
                 {t('userMenu.closeApp')}
               </Dropdown.Item>

@@ -41,7 +41,7 @@ export default function PreferencesDialog({
             <Modal.Body className="p-0">
               <ShortcutScope name="overlay">
                 <div className="flex" style={{ height: '480px' }}>
-                  <nav className="flex w-44 shrink-0 flex-col gap-2 rounded-tr-3xl rounded-br-3xl bg-sidebar text-sidebar-foreground py-2 px-1">
+                  <nav className="flex w-44 shrink-0 flex-col gap-2 rounded-tr-3xl rounded-br-3xl bg-sidebar text-sidebar-foreground py-2 px-2">
                     <ul className="flex flex-col gap-1">
                       {categories.map((cat) => {
                         const active = activeCategory === cat.id
@@ -51,7 +51,9 @@ export default function PreferencesDialog({
                             <button
                               aria-pressed={active}
                               className={`flex w-full items-center gap-3 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
-                                active ? 'bg-accent-soft text-accent-soft-foreground' : ''
+                                active
+                                  ? 'bg-accent text-accent-foreground'
+                                  : 'text-muted hover:opacity-70'
                               }`}
                               onClick={() => setActiveCategory(cat.id)}
                               data-testid={`category-${cat.id}`}

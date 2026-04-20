@@ -21,6 +21,7 @@ export const SHORTCUTS = {
     PASTE: { code: 'KeyV', metaOrCtrl: true },
     SELECT_ALL: { code: 'KeyA', metaOrCtrl: true },
     DELETE: { code: 'Backspace', mac: { code: 'Backspace', meta: true } },
-    DELETE_ALT: { code: 'Delete' }
+    DELETE_ALT: { code: 'Delete' },
+    ESCAPE: { code: 'Escape' }
   }
 } as const satisfies Record<string, Record<string, ShortcutConfig>>

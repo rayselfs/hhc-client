@@ -1,6 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useBibleStore } from '@renderer/stores/bible'
-import { useBibleFolderStore } from '@renderer/stores/folder'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 import { useBibleHistoryStore } from '@renderer/stores/bible-history'
 import { BiblePreview } from '@renderer/components/Control/Bible/BiblePreview'
@@ -24,7 +23,6 @@ export default function BiblePage(): React.JSX.Element {
     nextChapter,
     prevChapter
   } = useBibleStore.getState()
-  const { initialize: initializeFolderStore } = useBibleFolderStore()
   const fontSize = useBibleSettingsStore((s) => s.fontSize)
   const [isSelectorOpen, setSelectorOpen] = useState(false)
   const [selectedVerseIndex, setSelectedVerseIndex] = useState(0)
@@ -36,10 +34,6 @@ export default function BiblePage(): React.JSX.Element {
   useEffect(() => {
     selectedVerseIndexRef.current = selectedVerseIndex
   })
-
-  useEffect(() => {
-    initializeFolderStore()
-  }, [initializeFolderStore])
 
   useEffect(() => {
     project('bible:settings', { fontSize })
@@ -186,7 +180,7 @@ export default function BiblePage(): React.JSX.Element {
         preventDefault: false
       }
     ],
-    { enabled: true }
+    { enabled: true, sectionKey: 'bible' }
   )
 
   const handleSelectPassage = (passage: BiblePassage): void => {

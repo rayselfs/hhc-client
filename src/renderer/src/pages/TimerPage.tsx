@@ -85,6 +85,7 @@ export default function TimerPage(): React.JSX.Element {
               warningColor={reminderEnabled ? reminderColor : null}
               canEditTime={timerStatus === 'stopped' && phase !== 'overtime'}
               onTimeConfirm={(seconds) => setDuration(seconds)}
+              digitClassName="text-segment-foreground"
             />
             <TimerControls className="mb-3" mode={mode} disableStart={isClock} />
             <TimeAdjustment />

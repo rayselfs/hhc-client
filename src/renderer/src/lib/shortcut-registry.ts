@@ -40,10 +40,13 @@ export function registerShortcut(entry: RegistryEntry): void {
   entries.push(entry)
 
   if (import.meta.env.DEV && entries.length > 1) {
-    const ids = entries.map((e) => e.id).join(', ')
-    console.warn(
-      `Shortcut conflict detected for key "${key}": ${ids}. Multiple shortcuts are bound to the same key combination.`
-    )
+    const sameSectionEntries = entries.filter((e) => e.sectionKey === entry.sectionKey)
+    if (sameSectionEntries.length > 1) {
+      const ids = sameSectionEntries.map((e) => e.id).join(', ')
+      console.warn(
+        `Shortcut conflict detected for key "${key}": ${ids}. Multiple shortcuts are bound to the same key combination.`
+      )
+    }
   }
 }
 

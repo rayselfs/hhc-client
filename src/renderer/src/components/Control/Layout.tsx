@@ -13,9 +13,7 @@ import { ConfirmDialogProvider, useConfirm } from '@renderer/contexts/ConfirmDia
 import { ShortcutScopeProvider } from '@renderer/contexts/ShortcutScopeContext'
 import { isWeb } from '@renderer/lib/env'
 import { toast } from '@heroui/react'
-import { useBibleStore } from '@renderer/stores/bible'
-import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
-import { initializeSearchIndexes } from '@renderer/lib/bible-search'
+import { initializeApp } from '@renderer/lib/app-init'
 function ProjectionAutoOpen(): null {
   const { t } = useTranslation()
   const { isProjectionOpen, openProjection } = useProjection()
@@ -43,27 +41,7 @@ function ProjectionAutoOpen(): null {
 
 export default function Layout(): React.JSX.Element {
   useEffect(() => {
-    const tryInitSearch = (state: ReturnType<typeof useBibleStore.getState>): void => {
-      if (!state.isInitialized || state.versions.length === 0) return
-      const selectedVersionId =
-        useBibleSettingsStore.getState().selectedVersionId || state.versions[0].id
-      initializeSearchIndexes(state.content, state.versions, selectedVersionId)
-    }
-
-    const unsubscribe = useBibleStore.subscribe((state, prev) => {
-      if (!prev.isInitialized && state.isInitialized) {
-        tryInitSearch(state)
-      }
-    })
-
-    const current = useBibleStore.getState()
-    if (current.isInitialized) {
-      tryInitSearch(current)
-    } else {
-      useBibleStore.getState().initialize()
-    }
-
-    return unsubscribe
+    return initializeApp()
   }, [])
 
   return (

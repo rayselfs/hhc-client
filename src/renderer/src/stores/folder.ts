@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { UseBoundStore, StoreApi } from 'zustand'
 import type { Folder, FolderItem, FolderStoreConfig, VerseItem } from '@shared/types/folder'
+import { FOLDER_DURATION_MS } from '@shared/types/folder'
 import { saveFolderTree, loadFolderTree } from '@renderer/lib/bible-db'
 
 export function findFolder<T extends FolderItem>(
@@ -81,7 +82,8 @@ interface FolderStoreState<TItem extends FolderItem> {
   currentFolderId: string
   isLoading: boolean
   initialize: () => Promise<void>
-  addFolder: (name: string, parentId?: string) => void
+  addFolder: (name: string, parentId?: string, expiresAt?: number | null) => void
+  updateFolder: (id: string, updates: { name?: string; expiresAt?: number | null }) => void
   renameFolder: (id: string, name: string) => void
   deleteFolder: (id: string) => void
   addItem: (item: TItem, folderId?: string) => void
@@ -93,6 +95,7 @@ interface FolderStoreState<TItem extends FolderItem> {
   navigateToFolder: (folderId: string) => void
   navigateToRoot: () => void
   navigateUp: () => void
+  cleanupExpired: () => void
   getCurrentFolder: () => Folder<TItem>
   getFolderPath: () => Folder<TItem>[]
 }
@@ -121,7 +124,7 @@ export function createFolderStore<TItem extends FolderItem>(
       }
     },
 
-    addFolder: (name, parentId) => {
+    addFolder: (name, parentId, expiresAt) => {
       const { root } = get()
       const resolvedParentId = parentId ?? config.rootId
       const parentFolder = findFolder(root, resolvedParentId) ?? root
@@ -132,7 +135,8 @@ export function createFolderStore<TItem extends FolderItem>(
         items: [],
         folders: [],
         createdAt: Date.now(),
-        sortIndex: parentFolder.folders.length
+        sortIndex: parentFolder.folders.length,
+        expiresAt: expiresAt !== undefined ? expiresAt : null
       }
       const updated = updateFolderInTree(root, resolvedParentId, (f) => ({
         ...f,
@@ -150,6 +154,14 @@ export function createFolderStore<TItem extends FolderItem>(
       persistTree(config.rootId, updated)
     },
 
+    updateFolder: (id, updates) => {
+      if (id === config.rootId) return
+      const { root } = get()
+      const updated = updateFolderInTree(root, id, (f) => ({ ...f, ...updates }))
+      set({ root: updated })
+      persistTree(config.rootId, updated)
+    },
+
     deleteFolder: (id) => {
       if (id === config.rootId) return
       const { root, currentFolderId } = get()
@@ -162,9 +174,14 @@ export function createFolderStore<TItem extends FolderItem>(
     addItem: (item, folderId) => {
       const { root, currentFolderId } = get()
       const targetId = folderId ?? currentFolderId
+      const isRoot = targetId === config.rootId
+      const itemWithExpiry =
+        isRoot && item.expiresAt === undefined
+          ? { ...item, expiresAt: Date.now() + FOLDER_DURATION_MS['1day'], sortIndex: 0 }
+          : item
       const updated = updateFolderInTree(root, targetId, (f) => ({
         ...f,
-        items: [...f.items, { ...item, sortIndex: f.items.length }]
+        items: [...f.items, { ...itemWithExpiry, sortIndex: f.items.length }]
       }))
       set({ root: updated })
       persistTree(config.rootId, updated)
@@ -269,6 +286,29 @@ export function createFolderStore<TItem extends FolderItem>(
       } else {
         set({ currentFolderId: config.rootId })
       }
+    },
+
+    cleanupExpired: () => {
+      const { root } = get()
+      const now = Date.now()
+      const expiredFolderIds = root.folders
+        .filter((f) => f.expiresAt != null && f.expiresAt < now)
+        .map((f) => f.id)
+      const expiredItemIds = root.items
+        .filter((i) => i.expiresAt != null && i.expiresAt < now)
+        .map((i) => i.id)
+
+      if (expiredFolderIds.length === 0 && expiredItemIds.length === 0) return
+
+      let updated = root
+      for (const id of expiredFolderIds) {
+        updated = removeFolderFromTree(updated, id)
+      }
+      for (const id of expiredItemIds) {
+        updated = removeItemFromTree(updated, id)
+      }
+      set({ root: updated })
+      persistTree(config.rootId, updated)
     },
 
     getCurrentFolder: () => {
