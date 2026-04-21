@@ -37,6 +37,7 @@ describe('UserMenu', () => {
     expect(screen.getByText('Preferences')).toBeInTheDocument()
     expect(screen.getByText('Check for Updates')).toBeInTheDocument()
     expect(screen.getByText('Keyboard Shortcuts')).toBeInTheDocument()
+    expect(screen.getByText('About')).toBeInTheDocument()
     expect(screen.getByText('Close App')).toBeInTheDocument()
   })
 

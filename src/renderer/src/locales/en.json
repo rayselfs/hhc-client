@@ -279,6 +279,10 @@
     "closeAppTitle": "Close Application",
     "closeAppConfirm": "Are you sure you want to close the application?"
   },
+  "about": {
+    "title": "About",
+    "description": "Church projection software for worship services."
+  },
   "preferences": {
     "title": "Preferences",
     "categories": {

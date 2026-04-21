@@ -279,6 +279,10 @@
     "closeAppTitle": "關閉應用程式",
     "closeAppConfirm": "確定要關閉應用程式嗎？"
   },
+  "about": {
+    "title": "關於",
+    "description": "教會敬拜投影軟體。"
+  },
   "preferences": {
     "title": "偏好設定",
     "categories": {

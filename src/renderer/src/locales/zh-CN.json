@@ -279,6 +279,10 @@
     "closeAppTitle": "关闭应用程序",
     "closeAppConfirm": "确定要关闭应用程序吗？"
   },
+  "about": {
+    "title": "关于",
+    "description": "教会敬拜投影软件。"
+  },
   "preferences": {
     "title": "偏好设置",
     "categories": {
