@@ -93,6 +93,7 @@
       "createNewFolder": "创建新文件夹",
       "editFolder": "编辑文件夹",
       "folderName": "文件夹名称",
+      "untitledFolder": "未命名文件夹",
       "retention": "保留时间",
       "duration": {
         "1day": "1 天",

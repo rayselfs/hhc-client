@@ -93,6 +93,7 @@
       "createNewFolder": "建立新資料夾",
       "editFolder": "編輯資料夾",
       "folderName": "資料夾名稱",
+      "untitledFolder": "未命名資料夾",
       "retention": "保留時間",
       "duration": {
         "1day": "1 天",

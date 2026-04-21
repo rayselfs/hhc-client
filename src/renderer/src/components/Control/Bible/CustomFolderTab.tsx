@@ -61,6 +61,13 @@ function getVerseReference(item: VerseItemRecord, t: TFunction): string {
   return formatVerseReferenceShort(t, item.bookNumber, item.chapter, item.verseStart, item.verseEnd)
 }
 
+function getNextUntitledName(baseName: string, existingNames: string[]): string {
+  if (!existingNames.includes(baseName)) return baseName
+  let n = 2
+  while (existingNames.includes(`${baseName} ${n}`)) n++
+  return `${baseName} ${n}`
+}
+
 type ClipboardMode = 'copy' | 'cut'
 
 interface ClipboardState {
@@ -232,6 +239,25 @@ export function CustomFolderTab({
 
   const folders = useChildFolders(currentFolderId)
   const verses = useItems(currentFolderId)
+
+  const generateUntitledName = useCallback((): string => {
+    const baseName = t('bible.custom.untitledFolder')
+    const existingNames = folders.map((f) => f.name)
+    return getNextUntitledName(baseName, existingNames)
+  }, [folders, t])
+
+  const openNewFolderModal = useCallback((): void => {
+    setEditingFolder(null)
+    setNewFolderName(generateUntitledName())
+    setFolderDuration('1day')
+    onModalOpenChange(true)
+  }, [generateUntitledName, onModalOpenChange])
+
+  useEffect(() => {
+    if (isModalOpen && !editingFolder) {
+      setNewFolderName(generateUntitledName())
+    }
+  }, [isModalOpen, editingFolder, generateUntitledName])
 
   const allItems = useMemo(() => [...folders, ...verses], [folders, verses])
 
@@ -581,10 +607,10 @@ export function CustomFolderTab({
         event: e,
         clipboard,
         onPaste: handlePaste,
-        onNewFolder: () => onModalOpenChange(true)
+        onNewFolder: openNewFolderModal
       })
     },
-    [clipboard, showEmptyAreaMenu, handlePaste, onModalOpenChange]
+    [clipboard, showEmptyAreaMenu, handlePaste, openNewFolderModal]
   )
 
   const handleAddFolder = (): void => {

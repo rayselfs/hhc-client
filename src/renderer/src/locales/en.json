@@ -93,6 +93,7 @@
       "createNewFolder": "Create New Folder",
       "editFolder": "Edit Folder",
       "folderName": "Folder Name",
+      "untitledFolder": "Untitled Folder",
       "retention": "Retention",
       "duration": {
         "1day": "1 Day",
