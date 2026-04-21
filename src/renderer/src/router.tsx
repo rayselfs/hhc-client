@@ -8,17 +8,22 @@ import WelcomePage from '@renderer/pages/WelcomePage'
 import { isOnboarded } from '@renderer/lib/onboarding'
 
 // eslint-disable-next-line react-refresh/only-export-components
-function RootRedirect(): React.JSX.Element {
-  return <Navigate to={isOnboarded() ? '/timer' : '/welcome'} replace />
+function OnboardingGuard({ children }: { children: React.JSX.Element }): React.JSX.Element {
+  if (!isOnboarded()) return <Navigate to="/welcome" replace />
+  return children
 }
 
 const routes = [
   {
     path: '/',
-    Component: Layout,
+    element: (
+      <OnboardingGuard>
+        <Layout />
+      </OnboardingGuard>
+    ),
     ErrorBoundary: RouteError,
     children: [
-      { index: true, element: <RootRedirect /> },
+      { index: true, element: <Navigate to="/timer" replace /> },
       { path: 'timer', Component: TimerPage, ErrorBoundary: RouteError },
       { path: 'bible', Component: BiblePage, ErrorBoundary: RouteError }
     ]

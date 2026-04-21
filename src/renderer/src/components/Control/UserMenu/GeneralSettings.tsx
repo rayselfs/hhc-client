@@ -1,4 +1,3 @@
-import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Switch, Select, ListBox, Button } from '@heroui/react'
 import { Label } from 'react-aria-components'
@@ -24,9 +23,10 @@ interface GeneralSettingsProps {
   onClose: () => void
 }
 
-export default function GeneralSettings({ onClose }: GeneralSettingsProps): React.JSX.Element {
+export default function GeneralSettings({
+  onClose: _onClose
+}: GeneralSettingsProps): React.JSX.Element {
   const { t, i18n } = useTranslation()
-  const navigate = useNavigate()
   const { resolved, setPreference } = useTheme()
   const timezone = useSettingsStore((s) => s.timezone)
   const hardwareAcceleration = useSettingsStore((s) => s.hardwareAcceleration)
@@ -50,10 +50,6 @@ export default function GeneralSettings({ onClose }: GeneralSettingsProps): Reac
     })
     if (!confirmed) return
     resetToDefaults()
-    setPreference('system')
-    i18n.changeLanguage('en')
-    onClose()
-    navigate('/welcome')
   }
 
   return (

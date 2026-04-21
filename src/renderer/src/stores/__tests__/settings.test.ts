@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 
 const mockToast = vi.hoisted(() => ({ warning: vi.fn(), danger: vi.fn(), success: vi.fn() }))
 vi.mock('@heroui/react', async () => {
@@ -10,7 +10,19 @@ vi.mock('@renderer/i18n', () => ({
   default: { t: (key: string) => key }
 }))
 
+vi.mock('@renderer/lib/site-data', () => ({
+  clearAllSiteData: vi.fn()
+}))
+
+vi.mock('@renderer/lib/env', () => ({
+  isElectron: vi.fn(() => false)
+}))
+
 import { useSettingsStore, TIMEZONE_OPTIONS } from '@renderer/stores/settings'
+import { clearAllSiteData } from '@renderer/lib/site-data'
+import { isElectron } from '@renderer/lib/env'
+
+const mockReload = vi.fn()
 
 beforeEach(() => {
   useSettingsStore.setState({
@@ -20,6 +32,16 @@ beforeEach(() => {
   })
   mockToast.warning.mockClear()
   mockToast.success.mockClear()
+  vi.mocked(clearAllSiteData).mockClear()
+  mockReload.mockClear()
+  Object.defineProperty(window, 'location', {
+    value: { reload: mockReload },
+    writable: true
+  })
+})
+
+afterEach(() => {
+  vi.restoreAllMocks()
 })
 
 describe('initial state', () => {
@@ -106,59 +128,39 @@ describe('setHardwareAcceleration', () => {
 })
 
 describe('resetToDefaults', () => {
-  it('reverts state to defaults after changes', () => {
-    useSettingsStore.getState().setTimezone('UTC')
-    useSettingsStore.getState().setHardwareAcceleration(false)
-    useSettingsStore.getState().setThemePreference('dark')
-    expect(useSettingsStore.getState().timezone).toBe('UTC')
-    expect(useSettingsStore.getState().hardwareAcceleration).toBe(false)
-    expect(useSettingsStore.getState().themePreference).toBe('dark')
-
+  it('calls clearAllSiteData', () => {
     useSettingsStore.getState().resetToDefaults()
-    const s = useSettingsStore.getState()
-    expect(s.timezone).toBe('Asia/Taipei')
-    expect(s.hardwareAcceleration).toBe(true)
-    expect(s.themePreference).toBe('system')
+    expect(clearAllSiteData).toHaveBeenCalledOnce()
   })
 
-  it('clears localStorage on reset', () => {
-    let localStorageMock: Record<string, string> = {}
-    const clearFn = vi.fn(() => {
-      localStorageMock = {}
-    })
-    vi.stubGlobal('localStorage', {
-      getItem: (key: string) => localStorageMock[key] || null,
-      setItem: (key: string, value: string) => {
-        localStorageMock[key] = value
-      },
-      removeItem: (key: string) => {
-        delete localStorageMock[key]
-      },
-      clear: clearFn,
-      length: 0,
-      key: (index: number) => {
-        const keys = Object.keys(localStorageMock)
-        return keys[index] || null
-      }
-    })
-
-    const deleteDatabase = vi.fn()
-    vi.stubGlobal('indexedDB', {
-      databases: vi.fn().mockResolvedValue([{ name: 'db1' }, { name: 'db2' }]),
-      deleteDatabase
-    })
-
-    useSettingsStore.getState().setTimezone('Europe/Paris')
-    useSettingsStore.getState().setHardwareAcceleration(false)
-    let persisted = localStorage.getItem('hhc-settings')
-    expect(persisted).toBeTruthy()
-
+  it('shows success toast', () => {
     useSettingsStore.getState().resetToDefaults()
-    expect(clearFn).toHaveBeenCalled()
-    persisted = localStorage.getItem('hhc-settings')
-    expect(persisted).toBeNull()
+    expect(mockToast.success).toHaveBeenCalledWith('toast.settingsReset')
+  })
 
-    vi.unstubAllGlobals()
+  it('reloads page after delay (web mode)', () => {
+    vi.useFakeTimers()
+    vi.mocked(isElectron).mockReturnValue(false)
+    useSettingsStore.getState().resetToDefaults()
+    expect(mockReload).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(500)
+    expect(mockReload).toHaveBeenCalledOnce()
+    vi.useRealTimers()
+  })
+
+  it('calls app.relaunch after delay (electron mode)', () => {
+    vi.useFakeTimers()
+    vi.mocked(isElectron).mockReturnValue(true)
+    const mockRelaunch = vi.fn()
+    Object.defineProperty(window, 'api', {
+      value: { app: { relaunch: mockRelaunch } },
+      writable: true
+    })
+    useSettingsStore.getState().resetToDefaults()
+    expect(mockRelaunch).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(500)
+    expect(mockRelaunch).toHaveBeenCalledOnce()
+    vi.useRealTimers()
   })
 })
 
@@ -264,10 +266,15 @@ describe('themePreference', () => {
     expect(useSettingsStore.getState().themePreference).toBe('light')
   })
 
-  it('resetToDefaults resets themePreference to system', () => {
+  it('resetToDefaults calls clearAllSiteData and reloads', () => {
+    vi.useFakeTimers()
+    vi.mocked(isElectron).mockReturnValue(false)
     useSettingsStore.getState().setThemePreference('dark')
     useSettingsStore.getState().resetToDefaults()
-    expect(useSettingsStore.getState().themePreference).toBe('system')
+    expect(clearAllSiteData).toHaveBeenCalled()
+    vi.advanceTimersByTime(500)
+    expect(mockReload).toHaveBeenCalled()
+    vi.useRealTimers()
   })
 
   it('themePreference is included in persisted state', () => {

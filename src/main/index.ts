@@ -4,6 +4,7 @@ import { WindowManager } from './windowManager'
 import { registerProjectionHandlers } from './ipc/projection'
 import { registerTimerHandlers } from './ipc/timer'
 import { registerBibleApiHandlers } from './ipc/bible-api'
+import { registerAppIpc } from './ipc/app'
 import { isKnownWindow, validateTheme } from './ipc/validate'
 
 process.on('uncaughtException', (error) => {
@@ -49,6 +50,7 @@ app.whenReady().then(() => {
   registerProjectionHandlers(wm)
   registerTimerHandlers(wm)
   registerBibleApiHandlers(wm)
+  registerAppIpc(wm)
   wm.createMainWindow()
   wm.createProjectionWindow()
 

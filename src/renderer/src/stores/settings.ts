@@ -3,6 +3,8 @@ import { persist } from 'zustand/middleware'
 import { toast } from '@heroui/react'
 import i18n from '@renderer/i18n'
 import { hhcPersistStorage, createKey } from '@renderer/lib/persist-storage'
+import { clearAllSiteData } from '@renderer/lib/site-data'
+import { isElectron } from '@renderer/lib/env'
 import { ThemePreference } from '@renderer/types/theme'
 
 export const TIMEZONE_OPTIONS = [
@@ -19,67 +21,7 @@ export const TIMEZONE_OPTIONS = [
 const DEFAULT_TIMEZONE = 'Asia/Taipei'
 const DEFAULT_HW_ACCEL = true
 const DEFAULT_THEME_PREFERENCE: ThemePreference = 'system'
-
-function clearIndexedDB(): void {
-  try {
-    if (typeof indexedDB === 'undefined' || !indexedDB.databases) return
-    indexedDB.databases().then((dbs) => {
-      dbs.forEach((db) => {
-        if (db.name) {
-          try {
-            indexedDB.deleteDatabase(db.name)
-          } catch {
-            //
-          }
-        }
-      })
-    })
-  } catch {
-    //
-  }
-}
-
-function clearCacheAPI(): void {
-  try {
-    if (typeof caches === 'undefined') return
-    caches.keys().then((names) => {
-      names.forEach((name) => {
-        caches.delete(name)
-      })
-    })
-  } catch {
-    //
-  }
-}
-
-function clearCookies(): void {
-  try {
-    document.cookie.split(';').forEach((c) => {
-      const name = c.split('=')[0].trim()
-      if (name) {
-        document.cookie = `${name}=;expires=${new Date(0).toUTCString()};path=/`
-      }
-    })
-  } catch {
-    //
-  }
-}
-
-function clearAllSiteData(): void {
-  try {
-    localStorage.clear()
-  } catch {
-    //
-  }
-  try {
-    sessionStorage.clear()
-  } catch {
-    //
-  }
-  clearIndexedDB()
-  clearCacheAPI()
-  clearCookies()
-}
+const RELOAD_DELAY_MS = 500
 
 export interface SettingsStore {
   timezone: string
@@ -111,13 +53,13 @@ export const useSettingsStore = create<SettingsStore>()(
       },
 
       resetToDefaults: () => {
-        set({
-          timezone: DEFAULT_TIMEZONE,
-          hardwareAcceleration: DEFAULT_HW_ACCEL,
-          themePreference: DEFAULT_THEME_PREFERENCE
-        })
         clearAllSiteData()
         toast.success(i18n.t('toast.settingsReset'))
+        if (isElectron()) {
+          setTimeout(() => window.api.app.relaunch(), RELOAD_DELAY_MS)
+        } else {
+          setTimeout(() => window.location.reload(), RELOAD_DELAY_MS)
+        }
       }
     }),
     {

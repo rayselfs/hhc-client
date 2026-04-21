@@ -41,8 +41,18 @@ interface BibleAPI {
   getContent: (versionId: number) => Promise<BibleBook[]>
 }
 
+interface AppAPI {
+  relaunch: () => Promise<void>
+}
+
 declare global {
   interface Window {
-    api: { projection: ProjectionAPI; theme: ThemeAPI; timer: TimerAPI; bible: BibleAPI }
+    api: {
+      projection: ProjectionAPI
+      theme: ThemeAPI
+      timer: TimerAPI
+      bible: BibleAPI
+      app: AppAPI
+    }
   }
 }

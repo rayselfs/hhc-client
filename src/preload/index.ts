@@ -63,7 +63,17 @@ const bibleApi = {
   getContent: (versionId: number) => typedInvoke('bible:get-content', versionId)
 }
 
-const api = { projection: projectionApi, theme: themeApi, timer: timerApi, bible: bibleApi }
+const appApi = {
+  relaunch: () => typedInvoke('app:relaunch')
+}
+
+const api = {
+  projection: projectionApi,
+  theme: themeApi,
+  timer: timerApi,
+  bible: bibleApi,
+  app: appApi
+}
 
 try {
   contextBridge.exposeInMainWorld('api', api)
