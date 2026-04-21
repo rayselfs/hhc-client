@@ -193,13 +193,13 @@ export function createFolderContextMenu<TItem extends FolderItem>(
       const items: ContextMenuEntry[] = [
         {
           id: 'copy',
-          label: t('bible.custom.contextMenu.copyCount', { count }),
+          label: t('bible.custom.contextMenu.copy'),
           icon: React.createElement(Copy, { size: 14 }),
           onAction: () => onCopy(selectedIds)
         },
         {
           id: 'cut',
-          label: t('bible.custom.contextMenu.cutCount', { count }),
+          label: t('bible.custom.contextMenu.cut'),
           icon: React.createElement(Scissors, { size: 14 }),
           onAction: () => onCut(selectedIds)
         },
