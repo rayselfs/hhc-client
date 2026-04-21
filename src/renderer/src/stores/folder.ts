@@ -27,7 +27,12 @@ interface FolderStoreState {
   addFolder: (name: string, parentId?: string, expiresAt?: number | null) => string
   updateFolder: (id: string, updates: { name?: string; expiresAt?: number | null }) => void
   deleteFolder: (id: string) => void
-  addItem: (item: Omit<AnyItemRecord, 'id' | 'sortIndex' | 'createdAt'> & { id?: string }) => void
+  addItem: (
+    item: Omit<AnyItemRecord, 'id' | 'sortIndex' | 'createdAt' | 'expiresAt'> & {
+      id?: string
+      expiresAt?: number | null
+    }
+  ) => void
   removeItem: (id: string) => void
   moveItem: (itemId: string, targetFolderId: string) => void
   moveFolder: (folderId: string, targetFolderId: string) => void

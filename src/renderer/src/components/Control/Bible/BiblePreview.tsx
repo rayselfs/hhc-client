@@ -32,6 +32,8 @@ export function BiblePreview({
 }: BiblePreviewProps): React.JSX.Element {
   const { t } = useTranslation()
   const currentPassage = useBibleStore((s) => s.currentPassage)
+  // re-render when version changes so getters return the selected version's content
+  void useBibleSettingsStore((s) => s.selectedVersionId)
   const {
     getCurrentVerses,
     getCurrentBook,

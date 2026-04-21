@@ -23,7 +23,7 @@ export interface UseBibleContextMenu {
   showFolderItemMenu: (item: VerseItem, folderId: string, e: React.MouseEvent) => void
 }
 
-export function buildVerseItem(verse: VerseMenuData): VerseItem {
+export function buildVerseItem(verse: VerseMenuData): Omit<VerseItem, 'expiresAt' | 'sortIndex'> {
   const { bookNumber, chapter, verse: verseNum, text } = verse
   const { selectedVersionId } = useBibleSettingsStore.getState()
 
@@ -31,14 +31,12 @@ export function buildVerseItem(verse: VerseMenuData): VerseItem {
     id: crypto.randomUUID(),
     type: 'verse',
     parentId: '',
-    sortIndex: 0,
     versionId: selectedVersionId,
     bookNumber,
     chapter,
     verse: verseNum,
     text,
-    createdAt: Date.now(),
-    expiresAt: null
+    createdAt: Date.now()
   }
 }
 

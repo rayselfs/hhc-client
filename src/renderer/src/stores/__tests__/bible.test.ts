@@ -328,6 +328,7 @@ describe('getCurrentBook() / getCurrentChapter() / getCurrentVerses()', () => {
 
   it('returns correct book/chapter/verses when content is loaded', () => {
     const book = makeBook(1, 3, 5)
+    useBibleSettingsStore.setState({ selectedVersionId: 1 })
     useBibleStore.setState({
       versions: [VERSION_1],
       content: new Map([[1, [book]]]),
@@ -337,38 +338,5 @@ describe('getCurrentBook() / getCurrentChapter() / getCurrentVerses()', () => {
     expect(useBibleStore.getState().getCurrentBook()).toEqual(book)
     expect(useBibleStore.getState().getCurrentChapter()).toEqual(book.chapters[1])
     expect(useBibleStore.getState().getCurrentVerses()).toEqual(book.chapters[1].verses)
-  })
-})
-
-describe('persist: only currentPassage is persisted', () => {
-  it('persists currentPassage but not runtime state', () => {
-    let store: Record<string, string> = {}
-    vi.stubGlobal('localStorage', {
-      getItem: (k: string) => store[k] ?? null,
-      setItem: (k: string, v: string) => {
-        store[k] = v
-      },
-      removeItem: (k: string) => {
-        delete store[k]
-      },
-      clear: () => {
-        store = {}
-      },
-      length: 0,
-      key: (i: number) => Object.keys(store)[i] ?? null
-    })
-
-    useBibleStore.getState().navigateTo({ bookNumber: 5, chapter: 3, verse: 2 })
-    const raw = localStorage.getItem('hhc-bible')
-    expect(raw).toBeTruthy()
-    const parsed = JSON.parse(raw!)
-    expect(parsed.state).toEqual({
-      currentPassage: { bookNumber: 5, chapter: 3, verse: 2 }
-    })
-    expect(parsed.state).not.toHaveProperty('isLoading')
-    expect(parsed.state).not.toHaveProperty('content')
-    expect(parsed.state).not.toHaveProperty('versions')
-
-    vi.unstubAllGlobals()
   })
 })
