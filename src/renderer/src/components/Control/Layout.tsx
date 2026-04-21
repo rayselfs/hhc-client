@@ -1,5 +1,5 @@
 import { Outlet } from 'react-router-dom'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import Sidebar from '@renderer/components/Control/Sidebar'
 import Header from '@renderer/components/Control/Header/Header'
@@ -18,9 +18,11 @@ function ProjectionAutoOpen(): null {
   const { t } = useTranslation()
   const { isProjectionOpen, openProjection } = useProjection()
   const confirm = useConfirm()
+  const hasPrompted = useRef(false)
 
   useEffect(() => {
-    if (!isWeb() || isProjectionOpen) return
+    if (!isWeb() || isProjectionOpen || hasPrompted.current) return
+    hasPrompted.current = true
 
     confirm({
       status: 'info',
