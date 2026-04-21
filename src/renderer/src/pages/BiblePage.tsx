@@ -26,6 +26,7 @@ export default function BiblePage(): React.JSX.Element {
   const fontSize = useBibleSettingsStore((s) => s.fontSize)
   const [isSelectorOpen, setSelectorOpen] = useState(false)
   const [selectedVerseIndex, setSelectedVerseIndex] = useState(0)
+  const scrollBehaviorRef = useRef<ScrollBehavior>('instant')
   const { showPreviewMenu } = useBibleContextMenu()
   const { claimProjection, project } = useProjection()
 
@@ -50,6 +51,7 @@ export default function BiblePage(): React.JSX.Element {
   const passageVerse = useBibleStore((s) => s.currentPassage?.verse)
   useEffect(() => {
     const id = requestAnimationFrame(() => {
+      scrollBehaviorRef.current = 'instant'
       if (passageVerse && passageVerse > 1) {
         const verses = getCurrentVerses()
         const idx = verses ? verses.findIndex((v) => v.number === passageVerse) : -1
@@ -106,21 +108,25 @@ export default function BiblePage(): React.JSX.Element {
     const verses = getCurrentVerses()
     if (!verses || verses.length === 0) return
     const next = Math.min(selectedVerseIndexRef.current + 1, verses.length - 1)
+    scrollBehaviorRef.current = 'smooth'
     projectVerse(next, true)
   }, [getCurrentVerses, projectVerse])
 
   const handlePrevVerse = useCallback(() => {
     const prev = Math.max(selectedVerseIndexRef.current - 1, 0)
+    scrollBehaviorRef.current = 'smooth'
     projectVerse(prev, true)
   }, [projectVerse])
 
   const handleNextChapter = useCallback(() => {
     nextChapter()
+    scrollBehaviorRef.current = 'instant'
     projectVerse(0, true)
   }, [nextChapter, projectVerse])
 
   const handlePrevChapter = useCallback(() => {
     prevChapter()
+    scrollBehaviorRef.current = 'instant'
     projectVerse(0, true)
   }, [prevChapter, projectVerse])
 
@@ -212,6 +218,7 @@ export default function BiblePage(): React.JSX.Element {
         onContextMenu={handleContextMenu}
         selectedVerseIndex={selectedVerseIndex}
         onSelectedVerseIndexChange={setSelectedVerseIndex}
+        scrollBehaviorRef={scrollBehaviorRef}
       />
       <BibleMultiFunction />
       <BibleSelectorDialog

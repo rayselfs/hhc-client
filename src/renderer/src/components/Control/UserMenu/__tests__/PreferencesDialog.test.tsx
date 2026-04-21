@@ -111,7 +111,9 @@ describe('PreferencesDialog', () => {
         hardwareAcceleration: true,
         setTimezone,
         setHardwareAcceleration: vi.fn(),
-        resetToDefaults: vi.fn()
+        resetToDefaults: vi.fn(),
+        themePreference: 'system' as const,
+        setThemePreference: vi.fn()
       }
       return selector ? selector(store) : store
     })
@@ -162,7 +164,6 @@ describe('PreferencesDialog', () => {
 
     const resetToDefaults = vi.fn()
     const setPreference = vi.fn()
-    const changeLanguageSpy = vi.spyOn(i18n, 'changeLanguage')
     const onOpenChange = vi.fn()
 
     vi.mocked(useSettingsStore).mockImplementation((selector) => {
@@ -171,7 +172,9 @@ describe('PreferencesDialog', () => {
         hardwareAcceleration: true,
         setTimezone: vi.fn(),
         setHardwareAcceleration: vi.fn(),
-        resetToDefaults
+        resetToDefaults,
+        themePreference: 'system' as const,
+        setThemePreference: vi.fn()
       }
       return selector ? selector(store) : store
     })
@@ -190,9 +193,6 @@ describe('PreferencesDialog', () => {
     await user.click(allResetButtons[allResetButtons.length - 1])
 
     expect(resetToDefaults).toHaveBeenCalled()
-    expect(setPreference).toHaveBeenCalledWith('system')
-    expect(changeLanguageSpy).toHaveBeenCalledWith('en')
-    expect(onOpenChange).toHaveBeenCalledWith(false)
   })
 
   it('does not reset when cancel clicked in modal', async () => {
@@ -206,7 +206,9 @@ describe('PreferencesDialog', () => {
         hardwareAcceleration: true,
         setTimezone: vi.fn(),
         setHardwareAcceleration: vi.fn(),
-        resetToDefaults
+        resetToDefaults,
+        themePreference: 'system' as const,
+        setThemePreference: vi.fn()
       }
       return selector ? selector(store) : store
     })

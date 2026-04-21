@@ -13,7 +13,7 @@ import {
 } from '@renderer/lib/bible-utils'
 import { buildVerseItem } from './useBibleContextMenu'
 import type { MouseEvent } from 'react'
-import React, { useRef, useEffect, useState } from 'react'
+import React, { useRef, useEffect, useState, type RefObject } from 'react'
 import { ChevronLeft, ChevronRight, CirclePlus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
@@ -21,12 +21,14 @@ interface BiblePreviewProps {
   onContextMenu: (event: MouseEvent<HTMLButtonElement>) => void
   selectedVerseIndex: number
   onSelectedVerseIndexChange: (index: number) => void
+  scrollBehaviorRef: RefObject<ScrollBehavior>
 }
 
 export function BiblePreview({
   onContextMenu,
   selectedVerseIndex,
-  onSelectedVerseIndexChange
+  onSelectedVerseIndexChange,
+  scrollBehaviorRef
 }: BiblePreviewProps): React.JSX.Element {
   const { t } = useTranslation()
   const currentPassage = useBibleStore((s) => s.currentPassage)
@@ -43,7 +45,6 @@ export function BiblePreview({
   const verseRefs = useRef<Map<number, HTMLButtonElement>>(new Map())
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const prevSelectedVerseIndexRef = useRef<number>(selectedVerseIndex)
-  const scrollBehaviorRef = useRef<ScrollBehavior>('instant')
   const resizeObserverRef = useRef<ResizeObserver | null>(null)
   const [spacerHeight, setSpacerHeight] = useState(0)
   const handleQuickAddToFolder = (
@@ -143,9 +144,9 @@ export function BiblePreview({
       const behavior = scrollBehaviorRef.current
       container.scrollTo({ top, behavior })
     }
-    scrollBehaviorRef.current = 'instant'
+    scrollBehaviorRef.current = 'smooth'
     prevSelectedVerseIndexRef.current = selectedVerseIndex
-  }, [selectedVerseIndex, verses])
+  }, [selectedVerseIndex, verses, scrollBehaviorRef])
 
   const searchResultsLength = searchResults.length
   useEffect(() => {

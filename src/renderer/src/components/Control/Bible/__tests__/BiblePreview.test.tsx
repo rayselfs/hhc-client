@@ -1,5 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { useRef } from 'react'
 import type { BibleStore } from '@renderer/stores/bible'
 import { BiblePreview } from '../BiblePreview'
 
@@ -157,13 +158,18 @@ function applyOverrides(overrides: Partial<BibleStore>): void {
 }
 
 function renderBiblePreview(): ReturnType<typeof render> {
-  return render(
-    <BiblePreview
-      onContextMenu={vi.fn()}
-      selectedVerseIndex={0}
-      onSelectedVerseIndexChange={vi.fn()}
-    />
-  )
+  function Wrapper(): React.JSX.Element {
+    const scrollBehaviorRef = useRef<ScrollBehavior>('instant')
+    return (
+      <BiblePreview
+        onContextMenu={vi.fn()}
+        selectedVerseIndex={0}
+        onSelectedVerseIndexChange={vi.fn()}
+        scrollBehaviorRef={scrollBehaviorRef}
+      />
+    )
+  }
+  return render(<Wrapper />)
 }
 
 describe('BiblePreview', () => {
