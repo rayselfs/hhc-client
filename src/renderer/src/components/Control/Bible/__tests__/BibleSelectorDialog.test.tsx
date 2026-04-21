@@ -77,7 +77,6 @@ vi.mock('@heroui/react', async (importOriginal) => {
         children: React.ReactNode
         onSelectionChange?: (key: string) => void
       }) => (
-        // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
         <div
           role="none"
           onClick={(e) => {

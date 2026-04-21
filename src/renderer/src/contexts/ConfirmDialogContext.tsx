@@ -51,12 +51,14 @@ export function ConfirmDialogProvider({
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useConfirm(): (options: ConfirmOptions) => Promise<boolean> {
   const ctx = useContext(ConfirmDialogContext)
   if (!ctx) throw new Error('useConfirm must be used within ConfirmDialogProvider')
   return ctx.confirm
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useConfirmDialogState(): Pick<ConfirmDialogContextValue, 'pending' | 'settle'> {
   const ctx = useContext(ConfirmDialogContext)
   if (!ctx) throw new Error('useConfirmDialogState must be used within ConfirmDialogProvider')

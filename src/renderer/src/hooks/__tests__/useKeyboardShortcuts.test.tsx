@@ -103,7 +103,7 @@ describe('useKeyboardShortcuts', () => {
     const config: ShortcutConfig = { code: 'Space' }
     const shortcuts: ShortcutHandler[] = [{ config, handler }]
 
-    const wrapper = ({ children }: { children: React.ReactNode }) => (
+    const wrapper = ({ children }: { children: React.ReactNode }): React.ReactElement => (
       <ShortcutScopeProvider>
         <ShortcutScope name="overlay">{children}</ShortcutScope>
       </ShortcutScopeProvider>
@@ -123,7 +123,7 @@ describe('useKeyboardShortcuts', () => {
     const config: ShortcutConfig = { code: 'Space' }
     const shortcuts: ShortcutHandler[] = [{ config, handler }]
 
-    const wrapper = ({ children }: { children: React.ReactNode }) => (
+    const wrapper = ({ children }: { children: React.ReactNode }): React.ReactElement => (
       <ShortcutScopeProvider>{children}</ShortcutScopeProvider>
     )
 
@@ -141,7 +141,7 @@ describe('useKeyboardShortcuts', () => {
     const config: ShortcutConfig = { code: 'Escape' }
     const shortcuts: ShortcutHandler[] = [{ config, handler }]
 
-    const wrapper = ({ children }: { children: React.ReactNode }) => (
+    const wrapper = ({ children }: { children: React.ReactNode }): React.ReactElement => (
       <ShortcutScopeProvider>
         <ShortcutScope name="overlay">{children}</ShortcutScope>
       </ShortcutScopeProvider>
@@ -175,13 +175,17 @@ describe('useKeyboardShortcuts', () => {
     const config: ShortcutConfig = { code: 'Space' }
     const shortcuts: ShortcutHandler[] = [{ config, handler }]
 
-    const ToggleWrapper = ({ children }: { children: React.ReactNode }) => {
+    const ToggleWrapper = ({ children }: { children: React.ReactNode }): React.ReactElement => {
       const [overlayActive, setOverlayActive] = useState(true)
       return (
         <ShortcutScopeProvider>
           {overlayActive ? (
             <ShortcutScope name="overlay">
-              <button onClick={() => setOverlayActive(false)} data-testid="close-overlay" />
+              <button
+                type="button"
+                onClick={() => setOverlayActive(false)}
+                data-testid="close-overlay"
+              />
               {children}
             </ShortcutScope>
           ) : (

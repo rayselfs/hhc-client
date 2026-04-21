@@ -19,7 +19,7 @@ function makeSettingsStorage(themePreference: string): string {
 }
 
 function runThemeInitLogic(): void {
-  var pref: string | undefined,
+  let pref: string | undefined,
     settingsRaw: string | null,
     settings: unknown,
     tp: unknown,
@@ -33,7 +33,7 @@ function runThemeInitLogic(): void {
         pref = tp as string
       }
     }
-  } catch (_e) {
+  } catch {
     //
   }
   if (!pref) {
@@ -42,7 +42,7 @@ function runThemeInitLogic(): void {
       if (oldPref === 'dark' || oldPref === 'light' || oldPref === 'system') {
         pref = oldPref
       }
-    } catch (_e) {
+    } catch {
       //
     }
   }

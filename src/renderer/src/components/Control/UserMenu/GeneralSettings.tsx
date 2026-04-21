@@ -19,13 +19,7 @@ const TIMEZONE_LABEL_KEYS = {
 
 type TimezoneKey = keyof typeof TIMEZONE_LABEL_KEYS
 
-interface GeneralSettingsProps {
-  onClose: () => void
-}
-
-export default function GeneralSettings({
-  onClose: _onClose
-}: GeneralSettingsProps): React.JSX.Element {
+export default function GeneralSettings(): React.JSX.Element {
   const { t, i18n } = useTranslation()
   const { resolved, setPreference } = useTheme()
   const timezone = useSettingsStore((s) => s.timezone)

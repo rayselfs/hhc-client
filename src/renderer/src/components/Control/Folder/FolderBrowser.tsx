@@ -29,6 +29,14 @@ import { SortableFolderItem } from './SortableFolderItem'
 import { SortableItem } from './SortableItem'
 import { FolderModal } from './FolderModal'
 
+function stripItemMeta<T extends { id: string; sortIndex: number; createdAt: number }>(
+  item: T
+): Omit<T, 'id' | 'sortIndex' | 'createdAt'> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { id: _id, sortIndex: _si, createdAt: _ca, ...rest } = item
+  return rest
+}
+
 const snapCenterToCursor: Modifier = ({ activatorEvent, draggingNodeRect, transform }) => {
   if (activatorEvent && draggingNodeRect) {
     return {
@@ -153,16 +161,15 @@ export function FolderBrowser({
   )
   const isMultiDrag = draggedIds.size > 1
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const tKey = useCallback(
-    (key: string, fallback?: string): string => (t as any)(key, fallback),
+    (key: string, fallback?: string): string =>
+      (t as (k: string, opts?: string) => string)(key, fallback),
     [t]
   )
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const tp = useCallback(
     (key: string, options?: Record<string, unknown>): string =>
-      (t as any)(`${i18nPrefix}.${key}`, options),
+      (t as (k: string, opts?: Record<string, unknown>) => string)(`${i18nPrefix}.${key}`, options),
     [t, i18nPrefix]
   )
 
@@ -181,6 +188,8 @@ export function FolderBrowser({
 
   useEffect(() => {
     if (isModalOpen && !editingFolder) {
+      // Pre-fill folder name when modal opens for "new folder" — intentional setState in effect
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setNewFolderName(generateUntitledName())
     }
   }, [isModalOpen, editingFolder, generateUntitledName])
@@ -301,7 +310,7 @@ export function FolderBrowser({
 
         const srcItems = store.getState().getItems(srcFolderId)
         for (const item of srcItems) {
-          const { id: _id, sortIndex: _si, createdAt: _ca, ...rest } = item
+          const rest = stripItemMeta(item)
           addItem({ ...rest, parentId: newFolderId, expiresAt: item.expiresAt })
         }
 
@@ -317,7 +326,7 @@ export function FolderBrowser({
         } else {
           const item = state.items[id]
           if (item) {
-            const { id: _id, sortIndex: _si, createdAt: _ca, ...rest } = item
+            const rest = stripItemMeta(item)
             addItem({ ...rest, parentId: currentFolderId, expiresAt: null })
           }
         }

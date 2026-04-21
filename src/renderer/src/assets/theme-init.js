@@ -9,7 +9,7 @@
         pref = tp
       }
     }
-  } catch (e) {
+  } catch {
     //
   }
   if (!pref) {
@@ -18,7 +18,7 @@
       if (oldPref === 'dark' || oldPref === 'light' || oldPref === 'system') {
         pref = oldPref
       }
-    } catch (e) {
+    } catch {
       //
     }
   }

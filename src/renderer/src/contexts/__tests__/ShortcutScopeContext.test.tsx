@@ -6,7 +6,7 @@ import {
   useShortcutScope
 } from '@renderer/contexts/ShortcutScopeContext'
 
-function wrapper({ children }: { children: React.ReactNode }) {
+function wrapper({ children }: { children: React.ReactNode }): React.ReactElement {
   return <ShortcutScopeProvider>{children}</ShortcutScopeProvider>
 }
 
@@ -36,7 +36,7 @@ describe('ShortcutScopeContext', () => {
   })
 
   it('returns to page scope when ShortcutScope unmounts', () => {
-    function TestComponent() {
+    function TestComponent(): React.ReactElement {
       const [show, setShow] = useState(true)
       const scope = useShortcutScope()
       return (
@@ -67,7 +67,7 @@ describe('ShortcutScopeContext', () => {
   })
 
   it('stacks scopes — innermost wins', () => {
-    function TestComponent() {
+    function TestComponent(): React.ReactElement {
       const [showInner, setShowInner] = useState(true)
       const [showOuter, setShowOuter] = useState(true)
       const scope = useShortcutScope()

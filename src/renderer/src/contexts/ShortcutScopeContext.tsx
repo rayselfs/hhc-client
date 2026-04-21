@@ -56,6 +56,7 @@ export function ShortcutScope({
   return <>{children}</>
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useShortcutScope(): { activeScope: string; isOverlayActive: boolean } {
   const ctx = useContext(ShortcutScopeContext)
   if (!ctx) throw new Error('useShortcutScope must be used within a ShortcutScopeProvider')
@@ -67,6 +68,7 @@ export function useShortcutScope(): { activeScope: string; isOverlayActive: bool
   }
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useOptionalShortcutScope(): { isOverlayActive: boolean } {
   const ctx = useContext(ShortcutScopeContext)
   if (!ctx) return { isOverlayActive: false }

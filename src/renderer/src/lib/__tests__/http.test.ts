@@ -3,7 +3,7 @@ import axios from 'axios'
 import { http } from '../http'
 
 // Get the transformer function for testing
-const getTransformer = () => {
+const getTransformer = (): ((data: string) => unknown) => {
   const transformers = http.defaults.transformResponse as unknown as ((data: string) => unknown)[]
   return transformers[0]
 }

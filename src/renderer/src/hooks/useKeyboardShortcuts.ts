@@ -89,7 +89,6 @@ export function useKeyboardShortcuts(
     sectionKeyRef.current = sectionKey
   })
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const currentShortcuts = shortcutsRef.current
     const currentSectionKey = sectionKeyRef.current
