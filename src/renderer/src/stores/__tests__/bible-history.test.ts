@@ -48,36 +48,38 @@ describe('addToHistory()', () => {
   })
 
   it('prepends new entry to the front', () => {
-    const v1 = makeVerse('v1')
-    const v2 = makeVerse('v2')
+    const v1 = makeVerse('v1', 1, 1, 1)
+    const v2 = makeVerse('v2', 1, 1, 2)
     useBibleHistoryStore.getState().addToHistory(v1)
     useBibleHistoryStore.getState().addToHistory(v2)
     expect(useBibleHistoryStore.getState().items[0].id).toBe('v2')
     expect(useBibleHistoryStore.getState().items[1].id).toBe('v1')
   })
 
-  it('deduplicates: same id moves to front rather than duplicating', () => {
-    const v1 = makeVerse('v1')
-    const v2 = makeVerse('v2')
+  it('deduplicates: same verse content moves to front rather than duplicating', () => {
+    const v1 = makeVerse('v1', 1, 1, 1)
+    const v2 = makeVerse('v2', 1, 1, 2)
     useBibleHistoryStore.getState().addToHistory(v1)
     useBibleHistoryStore.getState().addToHistory(v2)
-    useBibleHistoryStore.getState().addToHistory(v1)
+    const v1Again = makeVerse('v1-new-id', 1, 1, 1)
+    useBibleHistoryStore.getState().addToHistory(v1Again)
     const items = useBibleHistoryStore.getState().items
     expect(items).toHaveLength(2)
-    expect(items[0].id).toBe('v1')
-    expect(items[1].id).toBe('v2')
+    expect(items[0].bookNumber).toBe(1)
+    expect(items[0].verse).toBe(1)
+    expect(items[1].verse).toBe(2)
   })
 
   it('enforces max limit of 50 entries', () => {
     for (let i = 0; i < 55; i++) {
-      useBibleHistoryStore.getState().addToHistory(makeVerse(`v${i}`))
+      useBibleHistoryStore.getState().addToHistory(makeVerse(`v${i}`, i + 1, 1, 1))
     }
     expect(useBibleHistoryStore.getState().items).toHaveLength(50)
   })
 
   it('keeps most recent entries when limit exceeded', () => {
     for (let i = 0; i < 52; i++) {
-      useBibleHistoryStore.getState().addToHistory(makeVerse(`v${i}`))
+      useBibleHistoryStore.getState().addToHistory(makeVerse(`v${i}`, i + 1, 1, 1))
     }
     const items = useBibleHistoryStore.getState().items
     expect(items[0].id).toBe('v51')
@@ -87,8 +89,8 @@ describe('addToHistory()', () => {
 
 describe('removeFromHistory()', () => {
   it('removes entry by id', () => {
-    useBibleHistoryStore.getState().addToHistory(makeVerse('v1'))
-    useBibleHistoryStore.getState().addToHistory(makeVerse('v2'))
+    useBibleHistoryStore.getState().addToHistory(makeVerse('v1', 1, 1, 1))
+    useBibleHistoryStore.getState().addToHistory(makeVerse('v2', 1, 1, 2))
     useBibleHistoryStore.getState().removeFromHistory('v1')
     const items = useBibleHistoryStore.getState().items
     expect(items).toHaveLength(1)
@@ -104,8 +106,8 @@ describe('removeFromHistory()', () => {
 
 describe('clearHistory()', () => {
   it('empties all items', () => {
-    useBibleHistoryStore.getState().addToHistory(makeVerse('v1'))
-    useBibleHistoryStore.getState().addToHistory(makeVerse('v2'))
+    useBibleHistoryStore.getState().addToHistory(makeVerse('v1', 1, 1, 1))
+    useBibleHistoryStore.getState().addToHistory(makeVerse('v2', 1, 1, 2))
     useBibleHistoryStore.getState().clearHistory()
     expect(useBibleHistoryStore.getState().items).toEqual([])
   })

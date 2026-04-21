@@ -18,7 +18,13 @@ export const useBibleHistoryStore = create<BibleHistoryState>()(
       items: [],
       addToHistory: (verse) =>
         set((state) => {
-          const filtered = state.items.filter((item) => item.id !== verse.id)
+          const filtered = state.items.filter(
+            (item) =>
+              item.versionId !== verse.versionId ||
+              item.bookNumber !== verse.bookNumber ||
+              item.chapter !== verse.chapter ||
+              item.verse !== verse.verse
+          )
           const updated = [verse, ...filtered]
           return { items: updated.slice(0, MAX_HISTORY) }
         }),
