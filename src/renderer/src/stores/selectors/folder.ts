@@ -6,6 +6,7 @@ import type { FolderRecord, AnyItemRecord } from '@shared/types/folder'
 
 type FolderStore = UseBoundStore<StoreApi<FolderStoreState>>
 
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export function createFolderSelectors(useStore: FolderStore) {
   function useCurrentFolderId(): string {
     return useStore((s: FolderStoreState) => s.currentFolderId)

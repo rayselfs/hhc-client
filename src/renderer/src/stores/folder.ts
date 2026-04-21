@@ -38,6 +38,7 @@ export interface FolderStoreState {
   isItemsLoaded: (parentId: string) => boolean
 }
 
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export function createFolderStore(config: FolderStoreConfig) {
   const ops = createFolderDB(config.getDB)
   return create<FolderStoreState>()((set, get) => ({

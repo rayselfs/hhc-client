@@ -48,7 +48,7 @@ const snapCenterToCursor: Modifier = ({ activatorEvent, draggingNodeRect, transf
   return transform
 }
 
-export function getNextUntitledName(baseName: string, existingNames: string[]): string {
+function getNextUntitledName(baseName: string, existingNames: string[]): string {
   if (!existingNames.includes(baseName)) return baseName
   let n = 2
   while (existingNames.includes(`${baseName} ${n}`)) n++

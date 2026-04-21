@@ -74,9 +74,7 @@ export function createFolderContextMenu(
     const { showMenu } = useContextMenu()
     const p = config?.i18nPrefix ?? DEFAULT_I18N_PREFIX
 
-    const tKey = (key: string): string =>
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (t as (k: string) => string)(`${p}.${key}`)
+    const tKey = (key: string): string => (t as (k: string) => string)(`${p}.${key}`)
 
     const showItemMenu = ({
       item,

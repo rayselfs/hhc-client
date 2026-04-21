@@ -3,7 +3,22 @@ import type { FolderRecord, AnyItemRecord } from '@shared/types/folder'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyDB = any
 
-export function createFolderDB(getDB: () => Promise<AnyDB>) {
+export type FolderDB = ReturnType<typeof createFolderDB>
+
+export function createFolderDB(getDB: () => Promise<AnyDB>): {
+  loadAllFolders: () => Promise<FolderRecord[]>
+  saveFolder: (folder: FolderRecord) => Promise<void>
+  saveFolders: (folders: FolderRecord[]) => Promise<void>
+  deleteFolders: (ids: string[]) => Promise<void>
+  loadItemsByParent: (parentId: string) => Promise<AnyItemRecord[]>
+  saveItem: (item: AnyItemRecord) => Promise<void>
+  saveItems: (items: AnyItemRecord[]) => Promise<void>
+  deleteItem: (id: string) => Promise<void>
+  deleteItems: (ids: string[]) => Promise<void>
+  deleteItemsByParent: (parentId: string) => Promise<void>
+  deleteExpiredFolders: (now: number) => Promise<string[]>
+  deleteExpiredItems: (now: number) => Promise<string[]>
+} {
   async function loadAllFolders(): Promise<FolderRecord[]> {
     try {
       const db = await getDB()
@@ -146,5 +161,3 @@ export function createFolderDB(getDB: () => Promise<AnyDB>) {
     deleteExpiredItems
   }
 }
-
-export type FolderDBOperations = ReturnType<typeof createFolderDB>
