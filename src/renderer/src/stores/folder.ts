@@ -1,22 +1,10 @@
 import { create } from 'zustand'
 import type { FolderRecord, AnyItemRecord, FolderStoreConfig } from '@shared/types/folder'
 import { FOLDER_DURATION_MS } from '@shared/types/folder'
-import {
-  loadAllFolders,
-  loadItemsByParent,
-  saveFolder,
-  saveFolders,
-  deleteFolders,
-  saveItem,
-  saveItems,
-  deleteItem as dbDeleteItem,
-  deleteItems,
-  deleteItemsByParent,
-  deleteExpiredFolders,
-  deleteExpiredItems
-} from '@renderer/lib/bible-db'
+import { createFolderDB } from '@renderer/lib/folder-db'
+import { openBibleDB } from '@renderer/lib/bible-db'
 
-interface FolderStoreState {
+export interface FolderStoreState {
   folders: Record<string, FolderRecord>
   items: Record<string, AnyItemRecord>
   loadedParents: Set<string>
@@ -51,6 +39,7 @@ interface FolderStoreState {
 }
 
 export function createFolderStore(config: FolderStoreConfig) {
+  const ops = createFolderDB(config.getDB)
   return create<FolderStoreState>()((set, get) => ({
     folders: {},
     items: {},
@@ -61,7 +50,7 @@ export function createFolderStore(config: FolderStoreConfig) {
     initialize: async () => {
       set({ isLoading: true })
       try {
-        const allFolders = await loadAllFolders()
+        const allFolders = await ops.loadAllFolders()
         const folderMap: Record<string, FolderRecord> = {}
 
         if (allFolders.length === 0) {
@@ -73,7 +62,7 @@ export function createFolderStore(config: FolderStoreConfig) {
             createdAt: Date.now(),
             expiresAt: null
           }
-          await saveFolder(rootFolder)
+          await ops.saveFolder(rootFolder)
           folderMap[config.rootId] = rootFolder
         } else {
           for (const f of allFolders) {
@@ -88,12 +77,12 @@ export function createFolderStore(config: FolderStoreConfig) {
               createdAt: Date.now(),
               expiresAt: null
             }
-            await saveFolder(rootFolder)
+            await ops.saveFolder(rootFolder)
             folderMap[config.rootId] = rootFolder
           }
         }
 
-        const rootItems = await loadItemsByParent(config.rootId)
+        const rootItems = await ops.loadItemsByParent(config.rootId)
         const itemMap: Record<string, AnyItemRecord> = {}
         for (const item of rootItems) {
           itemMap[item.id] = item
@@ -113,7 +102,7 @@ export function createFolderStore(config: FolderStoreConfig) {
     ensureItemsLoaded: async (parentId: string) => {
       const { loadedParents } = get()
       if (loadedParents.has(parentId)) return
-      const items = await loadItemsByParent(parentId)
+      const items = await ops.loadItemsByParent(parentId)
       set((state) => {
         const newItems = { ...state.items }
         for (const item of items) {
@@ -139,7 +128,7 @@ export function createFolderStore(config: FolderStoreConfig) {
       set((state) => ({
         folders: { ...state.folders, [newFolder.id]: newFolder }
       }))
-      saveFolder(newFolder)
+      ops.saveFolder(newFolder)
       return newFolder.id
     },
 
@@ -151,7 +140,7 @@ export function createFolderStore(config: FolderStoreConfig) {
       set((state) => ({
         folders: { ...state.folders, [id]: updated }
       }))
-      saveFolder(updated)
+      ops.saveFolder(updated)
     },
 
     deleteFolder: (id) => {
@@ -178,8 +167,8 @@ export function createFolderStore(config: FolderStoreConfig) {
       const nextCurrentId = allFolderIds.includes(currentFolderId) ? config.rootId : currentFolderId
 
       set({ folders: newFolders, items: newItems, currentFolderId: nextCurrentId })
-      deleteFolders(allFolderIds)
-      if (itemIdsToDelete.length > 0) deleteItems(itemIdsToDelete)
+      ops.deleteFolders(allFolderIds)
+      if (itemIdsToDelete.length > 0) ops.deleteItems(itemIdsToDelete)
     },
 
     addItem: (itemData) => {
@@ -202,7 +191,7 @@ export function createFolderStore(config: FolderStoreConfig) {
       set((state) => ({
         items: { ...state.items, [item.id]: item }
       }))
-      saveItem(item)
+      ops.saveItem(item)
     },
 
     removeItem: (id) => {
@@ -211,7 +200,7 @@ export function createFolderStore(config: FolderStoreConfig) {
         delete newItems[id]
         return { items: newItems }
       })
-      dbDeleteItem(id)
+      ops.deleteItem(id)
     },
 
     moveItem: (itemId, targetFolderId) => {
@@ -226,7 +215,7 @@ export function createFolderStore(config: FolderStoreConfig) {
       set((state) => ({
         items: { ...state.items, [itemId]: updated }
       }))
-      saveItem(updated)
+      ops.saveItem(updated)
     },
 
     moveFolder: (folderId, targetFolderId) => {
@@ -246,7 +235,7 @@ export function createFolderStore(config: FolderStoreConfig) {
       set((state) => ({
         folders: { ...state.folders, [folderId]: updated }
       }))
-      saveFolder(updated)
+      ops.saveFolder(updated)
     },
 
     reorderItems: (_parentId, orderedIds) => {
@@ -265,7 +254,7 @@ export function createFolderStore(config: FolderStoreConfig) {
         }
         return { items: newItems }
       })
-      saveItems(updated)
+      ops.saveItems(updated)
     },
 
     reorderFolders: (_parentId, orderedIds) => {
@@ -284,7 +273,7 @@ export function createFolderStore(config: FolderStoreConfig) {
         }
         return { folders: newFolders }
       })
-      saveFolders(updated)
+      ops.saveFolders(updated)
     },
 
     navigateToFolder: async (folderId) => {
@@ -307,8 +296,8 @@ export function createFolderStore(config: FolderStoreConfig) {
 
     cleanupExpired: async () => {
       const now = Date.now()
-      const expiredFolderIds = await deleteExpiredFolders(now)
-      const expiredItemIds = await deleteExpiredItems(now)
+      const expiredFolderIds = await ops.deleteExpiredFolders(now)
+      const expiredItemIds = await ops.deleteExpiredItems(now)
 
       if (expiredFolderIds.length === 0 && expiredItemIds.length === 0) return
 
@@ -320,9 +309,9 @@ export function createFolderStore(config: FolderStoreConfig) {
       }
       const allExpiredFolderIds = [...expiredFolderIds, ...cascadeFolderIds]
       if (cascadeFolderIds.length > 0) {
-        await deleteFolders(cascadeFolderIds)
+        await ops.deleteFolders(cascadeFolderIds)
         for (const fid of cascadeFolderIds) {
-          await deleteItemsByParent(fid)
+          await ops.deleteItemsByParent(fid)
         }
       }
 
@@ -390,5 +379,5 @@ function getDescendantFolderIds(folderId: string, folders: Record<string, Folder
 export const useBibleFolderStore = createFolderStore({
   rootId: 'bible-root',
   rootName: 'Bible Library',
-  dbName: 'hhc-bible'
+  getDB: () => openBibleDB()
 })

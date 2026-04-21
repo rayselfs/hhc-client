@@ -105,6 +105,11 @@
       "delete": "刪除",
       "moveToFolder": "移動到資料夾",
       "emptyFolder": "空資料夾",
+      "deleteFolderTitle": "刪除 '{{name}}'?",
+      "deleteFolderDescription": "此動作無法復原。資料夾中的所有經文將被刪除。",
+      "deleteItemTitle": "刪除 '{{reference}}'?",
+      "deleteItemDescription": "此動作無法復原。",
+      "deleteSelectedTitle": "刪除 {{count}} 個項目?",
       "contextMenu": {
         "copy": "複製",
         "cut": "剪下",
@@ -139,11 +144,6 @@
       "retry": "重試",
       "apiUnreachable": "無法連線"
     },
-    "delete_folder_title": "刪除 '{{name}}'?",
-    "delete_folder_description": "此動作無法復原。資料夾中的所有經文將被刪除。",
-    "delete_item_title": "刪除 '{{reference}}'?",
-    "delete_item_description": "此動作無法復原。",
-    "delete_selected_title": "刪除 {{count}} 個項目?",
     "chapterUnit": {
       "default": "章",
       "psa": "篇"
@@ -216,6 +216,36 @@
       "3jo": { "name": "約翰三書" },
       "jud": { "name": "猶大書" },
       "rev": { "name": "啟示錄" }
+    }
+  },
+  "folder": {
+    "createNewFolder": "建立新資料夾",
+    "editFolder": "編輯資料夾",
+    "folderName": "資料夾名稱",
+    "untitledFolder": "未命名資料夾",
+    "retention": "保留時間",
+    "duration": {
+      "1day": "1 天",
+      "1week": "1 週",
+      "1month": "1 個月",
+      "permanent": "永久"
+    },
+    "emptyFolder": "空資料夾",
+    "deleteFolderTitle": "刪除 '{{name}}'?",
+    "deleteFolderDescription": "此動作無法復原。資料夾中的所有項目將被刪除。",
+    "deleteItemTitle": "刪除 '{{reference}}'?",
+    "deleteItemDescription": "此動作無法復原。",
+    "deleteSelectedTitle": "刪除 {{count}} 個項目?",
+    "contextMenu": {
+      "copy": "複製",
+      "cut": "剪下",
+      "paste": "貼上",
+      "delete": "刪除",
+      "edit": "編輯",
+      "newFolder": "新建資料夾",
+      "copyCount": "複製 {{count}} 項",
+      "cutCount": "剪下 {{count}} 項",
+      "deleteCount": "刪除 {{count}} 項"
     }
   },
   "projection": {

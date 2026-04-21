@@ -105,6 +105,11 @@
       "delete": "删除",
       "moveToFolder": "移动到文件夹",
       "emptyFolder": "空文件夹",
+      "deleteFolderTitle": "删除 '{{name}}'?",
+      "deleteFolderDescription": "此操作无法撤销。文件夹中的所有经文将被删除。",
+      "deleteItemTitle": "删除 '{{reference}}'?",
+      "deleteItemDescription": "此操作无法撤销。",
+      "deleteSelectedTitle": "删除 {{count}} 个项目?",
       "contextMenu": {
         "copy": "复制",
         "cut": "剪切",
@@ -139,11 +144,6 @@
       "retry": "重试",
       "apiUnreachable": "无法连线"
     },
-    "delete_folder_title": "删除 '{{name}}'?",
-    "delete_folder_description": "此操作无法撤销。文件夹中的所有经文将被删除。",
-    "delete_item_title": "删除 '{{reference}}'?",
-    "delete_item_description": "此操作无法撤销。",
-    "delete_selected_title": "删除 {{count}} 个项目?",
     "chapterUnit": {
       "default": "章",
       "psa": "篇"
@@ -216,6 +216,36 @@
       "3jo": { "name": "约翰三书" },
       "jud": { "name": "犹大书" },
       "rev": { "name": "启示录" }
+    }
+  },
+  "folder": {
+    "createNewFolder": "创建新文件夹",
+    "editFolder": "编辑文件夹",
+    "folderName": "文件夹名称",
+    "untitledFolder": "未命名文件夹",
+    "retention": "保留时间",
+    "duration": {
+      "1day": "1 天",
+      "1week": "1 周",
+      "1month": "1 个月",
+      "permanent": "永久"
+    },
+    "emptyFolder": "空文件夹",
+    "deleteFolderTitle": "删除 '{{name}}'?",
+    "deleteFolderDescription": "此操作无法撤销。文件夹中的所有项目将被删除。",
+    "deleteItemTitle": "删除 '{{reference}}'?",
+    "deleteItemDescription": "此操作无法撤销。",
+    "deleteSelectedTitle": "删除 {{count}} 个项目?",
+    "contextMenu": {
+      "copy": "复制",
+      "cut": "剪切",
+      "paste": "粘贴",
+      "delete": "删除",
+      "edit": "编辑",
+      "newFolder": "新建文件夹",
+      "copyCount": "复制 {{count}} 项",
+      "cutCount": "剪切 {{count}} 项",
+      "deleteCount": "删除 {{count}} 项"
     }
   },
   "projection": {

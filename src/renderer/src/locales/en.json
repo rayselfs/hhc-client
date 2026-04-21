@@ -105,6 +105,11 @@
       "delete": "Delete",
       "moveToFolder": "Move to Folder",
       "emptyFolder": "Folder is empty",
+      "deleteFolderTitle": "Delete '{{name}}'?",
+      "deleteFolderDescription": "This action cannot be undone. All verses inside will be lost.",
+      "deleteItemTitle": "Delete '{{reference}}'?",
+      "deleteItemDescription": "This action cannot be undone.",
+      "deleteSelectedTitle": "Delete {{count}} item(s)?",
       "contextMenu": {
         "copy": "Copy",
         "cut": "Cut",
@@ -139,11 +144,6 @@
       "retry": "Retry",
       "apiUnreachable": "API unreachable"
     },
-    "delete_folder_title": "Delete '{{name}}'?",
-    "delete_folder_description": "This action cannot be undone. All verses inside will be lost.",
-    "delete_item_title": "Delete '{{reference}}'?",
-    "delete_item_description": "This action cannot be undone.",
-    "delete_selected_title": "Delete {{count}} item(s)?",
     "chapterUnit": {
       "default": ":",
       "psa": ":"
@@ -216,6 +216,36 @@
       "3jo": { "name": "3 John" },
       "jud": { "name": "Jude" },
       "rev": { "name": "Revelation" }
+    }
+  },
+  "folder": {
+    "createNewFolder": "Create New Folder",
+    "editFolder": "Edit Folder",
+    "folderName": "Folder Name",
+    "untitledFolder": "Untitled Folder",
+    "retention": "Retention",
+    "duration": {
+      "1day": "1 Day",
+      "1week": "1 Week",
+      "1month": "1 Month",
+      "permanent": "Permanent"
+    },
+    "emptyFolder": "Folder is empty",
+    "deleteFolderTitle": "Delete '{{name}}'?",
+    "deleteFolderDescription": "This action cannot be undone. All items inside will be lost.",
+    "deleteItemTitle": "Delete '{{reference}}'?",
+    "deleteItemDescription": "This action cannot be undone.",
+    "deleteSelectedTitle": "Delete {{count}} item(s)?",
+    "contextMenu": {
+      "copy": "Copy",
+      "cut": "Cut",
+      "paste": "Paste",
+      "delete": "Delete",
+      "edit": "Edit",
+      "newFolder": "New Folder",
+      "copyCount": "Copy {{count}} item(s)",
+      "cutCount": "Cut {{count}} item(s)",
+      "deleteCount": "Delete {{count}} item(s)"
     }
   },
   "projection": {

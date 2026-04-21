@@ -13,6 +13,7 @@ export interface ClipboardState {
 }
 
 export interface FolderContextMenuConfig {
+  i18nPrefix?: string
   extraItemActions?: (itemId: string) => ContextMenuEntry[]
   extraFolderActions?: (folder: FolderRecord) => ContextMenuEntry[]
   extraEmptyAreaActions?: () => ContextMenuEntry[]
@@ -63,12 +64,19 @@ export interface UseFolderContextMenu {
   showEmptyAreaMenu: (options: ShowEmptyAreaMenuOptions) => void
 }
 
+const DEFAULT_I18N_PREFIX = 'folder.contextMenu'
+
 export function createFolderContextMenu(
   config?: FolderContextMenuConfig
 ): () => UseFolderContextMenu {
   return function useFolderContextMenu(): UseFolderContextMenu {
     const { t } = useTranslation()
     const { showMenu } = useContextMenu()
+    const p = config?.i18nPrefix ?? DEFAULT_I18N_PREFIX
+
+    const tKey = (key: string): string =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (t as (k: string) => string)(`${p}.${key}`)
 
     const showItemMenu = ({
       item,
@@ -87,20 +95,20 @@ export function createFolderContextMenu(
       const baseItems: ContextMenuEntry[] = [
         {
           id: 'copy',
-          label: t('bible.custom.contextMenu.copy'),
+          label: tKey('copy'),
           icon: React.createElement(Copy, { size: 14 }),
           onAction: () => onCopy(targetIds)
         },
         {
           id: 'cut',
-          label: t('bible.custom.contextMenu.cut'),
+          label: tKey('cut'),
           icon: React.createElement(Scissors, { size: 14 }),
           onAction: () => onCut(targetIds)
         },
         'separator',
         {
           id: 'delete',
-          label: t('bible.custom.contextMenu.delete'),
+          label: tKey('delete'),
           icon: React.createElement(Trash2, { size: 14 }),
           variant: 'danger',
           onAction: () => onDelete(targetIds)
@@ -132,7 +140,7 @@ export function createFolderContextMenu(
         ? [
             {
               id: 'paste',
-              label: t('bible.custom.contextMenu.paste'),
+              label: tKey('paste'),
               icon: React.createElement(Clipboard, { size: 14 }),
               onAction: onPaste
             }
@@ -143,7 +151,7 @@ export function createFolderContextMenu(
         ? [
             {
               id: 'edit',
-              label: t('bible.custom.contextMenu.edit'),
+              label: tKey('edit'),
               icon: React.createElement(Pencil, { size: 14 }),
               onAction: () => onEdit(folder)
             },
@@ -155,13 +163,13 @@ export function createFolderContextMenu(
         ...editItems,
         {
           id: 'copy',
-          label: t('bible.custom.contextMenu.copy'),
+          label: tKey('copy'),
           icon: React.createElement(Copy, { size: 14 }),
           onAction: () => onCopy(targetIds)
         },
         {
           id: 'cut',
-          label: t('bible.custom.contextMenu.cut'),
+          label: tKey('cut'),
           icon: React.createElement(Scissors, { size: 14 }),
           onAction: () => onCut(targetIds)
         },
@@ -169,7 +177,7 @@ export function createFolderContextMenu(
         'separator',
         {
           id: 'delete',
-          label: t('bible.custom.contextMenu.delete'),
+          label: tKey('delete'),
           icon: React.createElement(Trash2, { size: 14 }),
           variant: 'danger',
           onAction: () => onDelete(targetIds)
@@ -190,20 +198,20 @@ export function createFolderContextMenu(
       const items: ContextMenuEntry[] = [
         {
           id: 'copy',
-          label: t('bible.custom.contextMenu.copy'),
+          label: tKey('copy'),
           icon: React.createElement(Copy, { size: 14 }),
           onAction: () => onCopy(selectedIds)
         },
         {
           id: 'cut',
-          label: t('bible.custom.contextMenu.cut'),
+          label: tKey('cut'),
           icon: React.createElement(Scissors, { size: 14 }),
           onAction: () => onCut(selectedIds)
         },
         'separator',
         {
           id: 'delete',
-          label: t('bible.custom.contextMenu.delete'),
+          label: tKey('delete'),
           icon: React.createElement(Trash2, { size: 14 }),
           variant: 'danger',
           onAction: () => onDelete(selectedIds)
@@ -223,7 +231,7 @@ export function createFolderContextMenu(
         ? [
             {
               id: 'paste',
-              label: t('bible.custom.contextMenu.paste'),
+              label: tKey('paste'),
               icon: React.createElement(Clipboard, { size: 14 }),
               onAction: onPaste
             },
@@ -235,7 +243,7 @@ export function createFolderContextMenu(
         ...pasteItems,
         {
           id: 'new-folder',
-          label: t('bible.custom.contextMenu.newFolder'),
+          label: tKey('newFolder'),
           icon: React.createElement(FolderPlus, { size: 14 }),
           onAction: onNewFolder
         }

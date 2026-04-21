@@ -13,23 +13,25 @@ const mockDeleteItemsByParent = vi.fn()
 const mockDeleteExpiredFolders = vi.fn()
 const mockDeleteExpiredItems = vi.fn()
 
+vi.mock('@renderer/lib/folder-db', () => ({
+  createFolderDB: () => ({
+    loadAllFolders: (...args: unknown[]) => mockLoadAllFolders(...args),
+    loadItemsByParent: (...args: unknown[]) => mockLoadItemsByParent(...args),
+    saveFolder: (...args: unknown[]) => mockSaveFolder(...args),
+    saveFolders: (...args: unknown[]) => mockSaveFolders(...args),
+    deleteFolders: (...args: unknown[]) => mockDeleteFolders(...args),
+    saveItem: (...args: unknown[]) => mockSaveItem(...args),
+    saveItems: (...args: unknown[]) => mockSaveItems(...args),
+    deleteItem: (...args: unknown[]) => mockDeleteItem(...args),
+    deleteItems: (...args: unknown[]) => mockDeleteItems(...args),
+    deleteItemsByParent: (...args: unknown[]) => mockDeleteItemsByParent(...args),
+    deleteExpiredFolders: (...args: unknown[]) => mockDeleteExpiredFolders(...args),
+    deleteExpiredItems: (...args: unknown[]) => mockDeleteExpiredItems(...args)
+  })
+}))
+
 vi.mock('@renderer/lib/bible-db', () => ({
-  loadAllFolders: (...args: unknown[]) => mockLoadAllFolders(...args),
-  loadItemsByParent: (...args: unknown[]) => mockLoadItemsByParent(...args),
-  saveFolder: (...args: unknown[]) => mockSaveFolder(...args),
-  saveFolders: (...args: unknown[]) => mockSaveFolders(...args),
-  deleteFolders: (...args: unknown[]) => mockDeleteFolders(...args),
-  saveItem: (...args: unknown[]) => mockSaveItem(...args),
-  saveItems: (...args: unknown[]) => mockSaveItems(...args),
-  deleteItem: (...args: unknown[]) => mockDeleteItem(...args),
-  deleteItems: (...args: unknown[]) => mockDeleteItems(...args),
-  deleteItemsByParent: (...args: unknown[]) => mockDeleteItemsByParent(...args),
-  deleteExpiredFolders: (...args: unknown[]) => mockDeleteExpiredFolders(...args),
-  deleteExpiredItems: (...args: unknown[]) => mockDeleteExpiredItems(...args),
-  loadBibleContent: vi.fn(),
-  saveBibleContent: vi.fn(),
-  loadBibleVersionMeta: vi.fn(),
-  saveBibleVersionMeta: vi.fn()
+  openBibleDB: vi.fn()
 }))
 
 import { useBibleFolderStore } from '@renderer/stores/folder'

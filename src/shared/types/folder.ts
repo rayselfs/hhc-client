@@ -42,7 +42,7 @@ export type FolderItem = ItemRecord
 export interface FolderStoreConfig {
   rootId: string
   rootName: string
-  dbName: string
+  getDB: () => Promise<unknown>
 }
 
 export type FolderDuration = '1day' | '1week' | '1month' | 'permanent'
