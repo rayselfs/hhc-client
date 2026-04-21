@@ -18,7 +18,8 @@ import type { VerseItem } from '@shared/types/folder'
 const makeVerse = (id: string, bookNumber = 1, chapter = 1, verseStart = 1): VerseItem => ({
   id,
   type: 'verse',
-  folderId: 'root',
+  parentId: 'root',
+  sortIndex: 0,
   bookCode: 'Gen',
   bookName: 'Genesis',
   bookNumber,
@@ -28,7 +29,8 @@ const makeVerse = (id: string, bookNumber = 1, chapter = 1, verseStart = 1): Ver
   text: `Verse ${id}`,
   versionCode: 'KJV',
   versionName: 'King James',
-  createdAt: Date.now()
+  createdAt: Date.now(),
+  expiresAt: null
 })
 
 beforeEach(() => {
@@ -145,7 +147,7 @@ describe('persistence round-trip', () => {
     const raw = localStorage.getItem('hhc-bible-history')
     expect(raw).toBeTruthy()
     const parsed = JSON.parse(raw!)
-    expect(parsed.version).toBe(0)
+    expect(parsed.version).toBe(1)
     expect(parsed.state.items).toHaveLength(1)
     expect(parsed.state.items[0].id).toBe('v1')
   })

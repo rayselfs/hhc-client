@@ -26,8 +26,14 @@ import { useBibleStore } from '@renderer/stores/bible'
 import { formatVerseReferenceShort } from '@renderer/lib/bible-utils'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
-import type { VerseItem, Folder, FolderItem, FolderDuration } from '@shared/types/folder'
-import { isVerseItem, isFolder, computeExpiresAt, inferDuration } from '@shared/types/folder'
+import type {
+  VerseItemRecord,
+  FolderRecord,
+  AnyItemRecord,
+  FolderDuration
+} from '@shared/types/folder'
+import { isVerseItem, isFolderRecord, computeExpiresAt, inferDuration } from '@shared/types/folder'
+import { useChildFolders, useItems } from '@renderer/stores/selectors/folder'
 import {
   ScrollShadow,
   Button,
@@ -51,14 +57,14 @@ interface CustomFolderTabProps {
   onModalOpenChange?: (open: boolean) => void
 }
 
-function getVerseReference(item: VerseItem, t: TFunction): string {
+function getVerseReference(item: VerseItemRecord, t: TFunction): string {
   return formatVerseReferenceShort(t, item.bookNumber, item.chapter, item.verseStart, item.verseEnd)
 }
 
 type ClipboardMode = 'copy' | 'cut'
 
 interface ClipboardState {
-  items: (FolderItem | Folder)[]
+  itemIds: Set<string>
   mode: ClipboardMode
 }
 
@@ -82,13 +88,13 @@ const snapCenterToCursor: Modifier = ({ activatorEvent, draggingNodeRect, transf
 }
 
 type DndItemData =
-  | { type: 'folder'; item: Folder }
-  | { type: 'verse'; item: VerseItem }
+  | { type: 'folder'; item: FolderRecord }
+  | { type: 'verse'; item: AnyItemRecord }
   | { type: 'folder-dropzone'; folderId: string }
 
 interface SortableFolderItemProps {
   id: string
-  folder: Folder
+  folder: FolderRecord
   isSelected: boolean
   isFolderDropTarget: boolean
   isCut: boolean
@@ -142,7 +148,7 @@ function SortableFolderItem({
 
 interface SortableVerseItemProps {
   id: string
-  verse: VerseItem
+  verse: AnyItemRecord
   isSelected: boolean
   isCut: boolean
   isDraggedAway: boolean
@@ -187,9 +193,7 @@ export function CustomFolderTab({
   onModalOpenChange = () => {}
 }: CustomFolderTabProps): React.JSX.Element {
   const {
-    root,
     currentFolderId,
-    getCurrentFolder,
     addFolder,
     deleteFolder,
     removeItem,
@@ -208,7 +212,7 @@ export function CustomFolderTab({
 
   const [newFolderName, setNewFolderName] = useState('')
   const [folderDuration, setFolderDuration] = useState<FolderDuration>('1day')
-  const [editingFolder, setEditingFolder] = useState<Folder<VerseItem> | null>(null)
+  const [editingFolder, setEditingFolder] = useState<FolderRecord | null>(null)
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set())
   const [clipboard, setClipboard] = useState<ClipboardState | null>(null)
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
@@ -226,29 +230,14 @@ export function CustomFolderTab({
     })
   )
 
-  const currentFolder = getCurrentFolder()
+  const folders = useChildFolders(currentFolderId)
+  const verses = useItems(currentFolderId)
 
-  const items = useMemo(
-    () =>
-      currentFolder
-        ? [...currentFolder.folders, ...currentFolder.items]
-        : [...root.folders, ...root.items],
-    [currentFolder, root]
-  )
-
-  const folders = useMemo(
-    () => (currentFolder ? currentFolder.folders : root.folders),
-    [currentFolder, root]
-  )
-
-  const verses = useMemo(
-    () => (currentFolder ? currentFolder.items : root.items),
-    [currentFolder, root]
-  )
+  const allItems = useMemo(() => [...folders, ...verses], [folders, verses])
 
   const activeDragItem = useMemo(
-    () => (activeDragId ? items.find((i) => i.id === activeDragId) : null),
-    [activeDragId, items]
+    () => (activeDragId ? allItems.find((i) => i.id === activeDragId) : null),
+    [activeDragId, allItems]
   )
   const isMultiDrag = draggedIds.size > 1
 
@@ -257,7 +246,7 @@ export function CustomFolderTab({
       event.stopPropagation()
 
       if (event.shiftKey && lastClickedIdRef.current) {
-        const allIds = items.map((i) => i.id)
+        const allIds = allItems.map((i) => i.id)
         const lastIndex = allIds.indexOf(lastClickedIdRef.current)
         const currentIndex = allIds.indexOf(itemId)
         if (lastIndex !== -1 && currentIndex !== -1) {
@@ -285,7 +274,7 @@ export function CustomFolderTab({
 
       lastClickedIdRef.current = itemId
     },
-    [items]
+    [allItems]
   )
 
   const handleContainerClick = useCallback((event: React.MouseEvent) => {
@@ -309,7 +298,7 @@ export function CustomFolderTab({
   }, [])
 
   const handleVerseDoubleClick = useCallback(
-    (item: VerseItem) => {
+    (item: VerseItemRecord) => {
       navigateTo({ bookNumber: item.bookNumber, chapter: item.chapter, verse: item.verseStart })
       const { content, versions } = useBibleStore.getState()
       const versionId = versions?.length > 0 ? versions[0].id : 0
@@ -329,27 +318,25 @@ export function CustomFolderTab({
   )
 
   const handleSelectAll = useCallback(() => {
-    setSelectedItemIds(new Set(items.map((i) => i.id)))
-  }, [items])
+    setSelectedItemIds(new Set(allItems.map((i) => i.id)))
+  }, [allItems])
 
   const handleCopy = useCallback(
     (targetIds?: Set<string>) => {
       const ids = targetIds ?? selectedItemIds
       if (ids.size === 0) return
-      const selected = items.filter((i) => ids.has(i.id))
-      setClipboard({ items: selected, mode: 'copy' })
+      setClipboard({ itemIds: ids, mode: 'copy' })
     },
-    [items, selectedItemIds]
+    [selectedItemIds]
   )
 
   const handleCut = useCallback(
     (targetIds?: Set<string>) => {
       const ids = targetIds ?? selectedItemIds
       if (ids.size === 0) return
-      const selected = items.filter((i) => ids.has(i.id))
-      setClipboard({ items: selected, mode: 'cut' })
+      setClipboard({ itemIds: ids, mode: 'cut' })
     },
-    [items, selectedItemIds]
+    [selectedItemIds]
   )
 
   const handleCopyKeyboard = useCallback(() => handleCopy(), [handleCopy])
@@ -368,23 +355,26 @@ export function CustomFolderTab({
 
   const handlePaste = useCallback(() => {
     if (!clipboard) return
-    const targetFolderId = currentFolderId
 
-    for (const item of clipboard.items) {
-      if (isFolder(item)) {
-        addFolder(item.name)
-      } else if (isVerseItem(item as FolderItem)) {
-        const verseItem = item as VerseItem
-        addItem({ ...verseItem, id: crypto.randomUUID(), folderId: targetFolderId }, targetFolderId)
+    for (const id of clipboard.itemIds) {
+      const folder = useBibleFolderStore.getState().folders[id]
+      if (folder) {
+        addFolder(folder.name)
+      } else {
+        const item = useBibleFolderStore.getState().items[id]
+        if (item && isVerseItem(item)) {
+          addItem({ ...item, parentId: currentFolderId, expiresAt: null })
+        }
       }
     }
 
     if (clipboard.mode === 'cut') {
-      for (const item of clipboard.items) {
-        if (isFolder(item)) {
-          deleteFolder(item.id)
-        } else if (isVerseItem(item as FolderItem)) {
-          removeItem(item.id)
+      for (const id of clipboard.itemIds) {
+        const folder = useBibleFolderStore.getState().folders[id]
+        if (folder) {
+          deleteFolder(id)
+        } else {
+          removeItem(id)
         }
       }
       setClipboard(null)
@@ -397,12 +387,11 @@ export function CustomFolderTab({
     async (targetIds?: Set<string>) => {
       const ids = targetIds ?? selectedItemIds
       if (ids.size === 0) return
-      const selected = items.filter((i) => ids.has(i.id))
 
       const confirmed = await confirm({
         title: t('bible.delete_selected_title', {
-          count: selected.length,
-          defaultValue: `Delete ${selected.length} item(s)?`
+          count: ids.size,
+          defaultValue: `Delete ${ids.size} item(s)?`
         }),
         description: t('bible.delete_item_description'),
         status: 'danger'
@@ -410,17 +399,18 @@ export function CustomFolderTab({
 
       if (!confirmed) return
 
-      for (const item of selected) {
-        if (isFolder(item)) {
-          deleteFolder(item.id)
-        } else if (isVerseItem(item as FolderItem)) {
-          removeItem(item.id)
+      for (const id of ids) {
+        const folder = useBibleFolderStore.getState().folders[id]
+        if (folder) {
+          deleteFolder(id)
+        } else {
+          removeItem(id)
         }
       }
       setSelectedItemIds(new Set())
       lastClickedIdRef.current = null
     },
-    [selectedItemIds, items, confirm, t, removeItem, deleteFolder]
+    [selectedItemIds, confirm, t, removeItem, deleteFolder]
   )
 
   const handleDeleteSelectedKeyboard = useCallback(
@@ -470,7 +460,7 @@ export function CustomFolderTab({
   )
 
   const handleContextMenuForItem = useCallback(
-    (item: VerseItem, e: React.MouseEvent): void => {
+    (item: AnyItemRecord, e: React.MouseEvent): void => {
       e.preventDefault()
       e.stopPropagation()
       const isAlreadySelected = selectedItemIds.has(item.id)
@@ -508,7 +498,7 @@ export function CustomFolderTab({
   )
 
   const handleOpenEditFolder = useCallback(
-    (folder: Folder<VerseItem>) => {
+    (folder: FolderRecord) => {
       setEditingFolder(folder)
       setNewFolderName(folder.name)
       setFolderDuration(inferDuration(folder.expiresAt, folder.createdAt))
@@ -518,7 +508,7 @@ export function CustomFolderTab({
   )
 
   const handleContextMenuForFolder = useCallback(
-    (folder: Folder<VerseItem>, e: React.MouseEvent): void => {
+    (folder: FolderRecord, e: React.MouseEvent): void => {
       e.preventDefault()
       e.stopPropagation()
       const isAlreadySelected = selectedItemIds.has(folder.id)
@@ -621,8 +611,8 @@ export function CustomFolderTab({
     }
   }
 
-  const handleDeleteItem = async (item: VerseItem): Promise<void> => {
-    const reference = getVerseReference(item, t)
+  const handleDeleteItem = async (item: AnyItemRecord): Promise<void> => {
+    const reference = isVerseItem(item) ? getVerseReference(item, t) : item.id
     const confirmed = await confirm({
       title: t('bible.delete_item_title', {
         reference,
@@ -688,17 +678,14 @@ export function CustomFolderTab({
       if (!activeData) return
 
       const isMultiDrag = currentDraggedIds.size > 1
-      const parentFolder = currentFolder
-      const parentFolderId = parentFolder?.id ?? root.id
 
       if (overData?.type === 'folder-dropzone') {
         const targetFolderId = overData.folderId
         if (isMultiDrag) {
           for (const id of currentDraggedIds) {
             if (id === targetFolderId) continue
-            const item = items.find((i) => i.id === id)
-            if (!item) continue
-            if (isFolder(item)) {
+            const isAFolder = !!useBibleFolderStore.getState().folders[id]
+            if (isAFolder) {
               moveFolder(id, targetFolderId)
             } else {
               moveItem(id, targetFolderId)
@@ -719,30 +706,39 @@ export function CustomFolderTab({
       if (isMultiDrag) return
 
       if (activeData.type === 'folder' && overData?.type === 'folder') {
-        const folderIds = (parentFolder ?? root).folders.map((f) => f.id)
+        const folderIds = folders.map((f) => f.id)
         const oldIndex = folderIds.indexOf(String(active.id))
         const newIndex = folderIds.indexOf(String(over.id))
         if (oldIndex !== -1 && newIndex !== -1) {
-          reorderFolders(parentFolderId, arrayMove(folderIds, oldIndex, newIndex))
+          reorderFolders(currentFolderId, arrayMove(folderIds, oldIndex, newIndex))
         }
         return
       }
 
       if (activeData.type === 'verse' && overData?.type === 'verse') {
-        const verseIds = (parentFolder ?? root).items.map((i) => i.id)
+        const verseIds = verses.map((i) => i.id)
         const oldIndex = verseIds.indexOf(String(active.id))
         const newIndex = verseIds.indexOf(String(over.id))
         if (oldIndex !== -1 && newIndex !== -1) {
-          reorderItems(parentFolderId, arrayMove(verseIds, oldIndex, newIndex))
+          reorderItems(currentFolderId, arrayMove(verseIds, oldIndex, newIndex))
         }
         return
       }
     },
-    [currentFolder, root, items, draggedIds, moveItem, moveFolder, reorderItems, reorderFolders]
+    [
+      currentFolderId,
+      folders,
+      verses,
+      draggedIds,
+      moveItem,
+      moveFolder,
+      reorderItems,
+      reorderFolders
+    ]
   )
 
   const renderFolderContent = (
-    item: Folder<VerseItem>,
+    item: FolderRecord,
     isItemSelected: boolean,
     _isDragging: boolean
   ): React.JSX.Element => {
@@ -794,11 +790,11 @@ export function CustomFolderTab({
   }
 
   const renderVerseContent = (
-    item: VerseItem,
+    item: AnyItemRecord,
     isItemSelected: boolean,
     _isDragging: boolean
   ): React.JSX.Element => {
-    const reference = getVerseReference(item, t)
+    const reference = isVerseItem(item) ? getVerseReference(item, t) : item.id
 
     return (
       <div
@@ -806,7 +802,7 @@ export function CustomFolderTab({
         tabIndex={-1}
         aria-selected={isItemSelected}
         onClick={(e) => handleItemClick(item.id, e)}
-        onDoubleClick={() => handleVerseDoubleClick(item)}
+        onDoubleClick={() => isVerseItem(item) && handleVerseDoubleClick(item)}
         onContextMenu={(e) => handleContextMenuForItem(item, e)}
         onKeyDown={(e) =>
           (e.key === 'Enter' || e.key === ' ') &&
@@ -827,7 +823,7 @@ export function CustomFolderTab({
               >
                 {reference}
               </div>
-              <div className="text-lg whitespace-normal">{item.text}</div>
+              <div className="text-lg whitespace-normal">{isVerseItem(item) ? item.text : ''}</div>
             </div>
           </div>
         </div>
@@ -873,7 +869,7 @@ export function CustomFolderTab({
           onClick={handleContainerClick}
           onContextMenu={handleContextMenuForContainer}
         >
-          {items.length === 0 ? (
+          {allItems.length === 0 ? (
             <div className="flex items-center justify-center h-full text-neutral-500">
               {t('bible.folder_empty', 'Folder is empty')}
             </div>
@@ -885,8 +881,7 @@ export function CustomFolderTab({
               >
                 {folders.map((item) => {
                   const isItemSelected = selectedItemIds.has(item.id)
-                  const isItemCut =
-                    clipboard?.mode === 'cut' && clipboard.items.some((i) => i.id === item.id)
+                  const isItemCut = clipboard?.mode === 'cut' && clipboard.itemIds.has(item.id)
                   return (
                     <SortableFolderItem
                       key={item.id}
@@ -910,8 +905,7 @@ export function CustomFolderTab({
               >
                 {verses.map((item) => {
                   const isItemSelected = selectedItemIds.has(item.id)
-                  const isItemCut =
-                    clipboard?.mode === 'cut' && clipboard.items.some((i) => i.id === item.id)
+                  const isItemCut = clipboard?.mode === 'cut' && clipboard.itemIds.has(item.id)
                   return (
                     <SortableVerseItem
                       key={item.id}
@@ -941,7 +935,7 @@ export function CustomFolderTab({
                 </>
               )}
               <div className="relative inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 bg-accent text-accent-foreground shadow-lg text-sm">
-                {isFolder(activeDragItem) ? (
+                {isFolderRecord(activeDragItem) ? (
                   <>
                     <FolderIcon className="w-3.5 h-3.5" />
                     <span>{activeDragItem.name}</span>
@@ -949,7 +943,7 @@ export function CustomFolderTab({
                 ) : isVerseItem(activeDragItem) ? (
                   <>
                     <BookOpen className="w-3.5 h-3.5" />
-                    <span>{getVerseReference(activeDragItem as VerseItem, t)}</span>
+                    <span>{getVerseReference(activeDragItem, t)}</span>
                   </>
                 ) : null}
               </div>

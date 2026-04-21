@@ -38,7 +38,8 @@ export function buildVerseItem(verse: VerseMenuData): VerseItem {
   return {
     id: `${selectedVersionId}-${bookNumber}-${chapter}-${verseNum}`,
     type: 'verse',
-    folderId: '',
+    parentId: '',
+    sortIndex: 0,
     bookCode,
     bookName,
     bookNumber,
@@ -48,7 +49,8 @@ export function buildVerseItem(verse: VerseMenuData): VerseItem {
     text,
     versionCode: versionMeta?.code ?? '',
     versionName: versionMeta?.name ?? '',
-    createdAt: Date.now()
+    createdAt: Date.now(),
+    expiresAt: null
   }
 }
 

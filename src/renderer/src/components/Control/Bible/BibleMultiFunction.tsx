@@ -16,7 +16,7 @@ export default function BibleMultiFunction(): React.JSX.Element {
   const clearHistory = useBibleHistoryStore((state) => state.clearHistory)
   const { currentFolderId, navigateToRoot, navigateToFolder, getFolderPath } = useBibleFolderStore()
 
-  const folderPath = getFolderPath().slice(1)
+  const folderPath = getFolderPath(currentFolderId).slice(1)
 
   return (
     <Card className="flex flex-col h-full flex-1 p-0 gap-2">

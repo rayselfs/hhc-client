@@ -66,8 +66,7 @@ export function BiblePreview({
       bookName
     })
     const folderStore = useBibleFolderStore.getState()
-    const currentFolder = folderStore.getCurrentFolder()
-    const targetItems = currentFolder ? currentFolder.items : folderStore.root.items
+    const targetItems = folderStore.getItems(folderStore.currentFolderId)
     const alreadyExists = targetItems.some((i) => i.id === item.id)
     if (!alreadyExists) {
       folderStore.addItem(item)

@@ -32,7 +32,7 @@ export function initializeApp(): () => void {
   useBibleFolderStore.getState().initialize()
   useBibleFolderStore.subscribe((state, prev) => {
     if (prev.isLoading && !state.isLoading) {
-      useBibleFolderStore.getState().cleanupExpired()
+      void useBibleFolderStore.getState().cleanupExpired()
     }
   })
 

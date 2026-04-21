@@ -1,6 +1,6 @@
 import { useContextMenu } from '@renderer/contexts/ContextMenuContext'
 import type { ContextMenuEntry } from '@renderer/contexts/ContextMenuContext'
-import type { FolderItem, Folder } from '@shared/types/folder'
+import type { FolderRecord, FolderItem } from '@shared/types/folder'
 import { Copy, Scissors, Clipboard, Trash2, FolderPlus, Pencil } from 'lucide-react'
 import React from 'react'
 import { useTranslation } from 'react-i18next'
@@ -8,19 +8,18 @@ import { useTranslation } from 'react-i18next'
 type ClipboardMode = 'copy' | 'cut'
 
 export interface ClipboardState {
-  items: (FolderItem | Folder)[]
+  itemIds: Set<string>
   mode: ClipboardMode
 }
 
-export interface FolderContextMenuConfig<TItem extends FolderItem> {
-  extraItemActions?: (item: TItem) => ContextMenuEntry[]
-  extraFolderActions?: (folder: Folder<TItem>) => ContextMenuEntry[]
+export interface FolderContextMenuConfig {
+  extraItemActions?: (itemId: string) => ContextMenuEntry[]
+  extraFolderActions?: (folder: FolderRecord) => ContextMenuEntry[]
   extraEmptyAreaActions?: () => ContextMenuEntry[]
-  canPaste?: (item: FolderItem) => boolean
 }
 
-export interface ShowItemMenuOptions<TItem extends FolderItem> {
-  item: TItem
+export interface ShowItemMenuOptions {
+  item: FolderItem
   isAlreadySelected: boolean
   event: React.MouseEvent
   setSelected: (ids: Set<string>) => void
@@ -29,8 +28,8 @@ export interface ShowItemMenuOptions<TItem extends FolderItem> {
   onDelete: (targetIds: Set<string>) => void
 }
 
-export interface ShowFolderMenuOptions<TItem extends FolderItem> {
-  folder: Folder<TItem>
+export interface ShowFolderMenuOptions {
+  folder: FolderRecord
   isAlreadySelected: boolean
   event: React.MouseEvent
   setSelected: (ids: Set<string>) => void
@@ -39,7 +38,7 @@ export interface ShowFolderMenuOptions<TItem extends FolderItem> {
   onCut: (targetIds: Set<string>) => void
   onPaste: () => void
   onDelete: (targetIds: Set<string>) => void
-  onEdit?: (folder: Folder<TItem>) => void
+  onEdit?: (folder: FolderRecord) => void
 }
 
 export interface ShowMultiSelectMenuOptions {
@@ -57,17 +56,17 @@ export interface ShowEmptyAreaMenuOptions {
   onNewFolder: () => void
 }
 
-export interface UseFolderContextMenu<TItem extends FolderItem> {
-  showItemMenu: (options: ShowItemMenuOptions<TItem>) => void
-  showFolderMenu: (options: ShowFolderMenuOptions<TItem>) => void
+export interface UseFolderContextMenu {
+  showItemMenu: (options: ShowItemMenuOptions) => void
+  showFolderMenu: (options: ShowFolderMenuOptions) => void
   showMultiSelectMenu: (options: ShowMultiSelectMenuOptions) => void
   showEmptyAreaMenu: (options: ShowEmptyAreaMenuOptions) => void
 }
 
-export function createFolderContextMenu<TItem extends FolderItem>(
-  config?: FolderContextMenuConfig<TItem>
-): () => UseFolderContextMenu<TItem> {
-  return function useFolderContextMenu(): UseFolderContextMenu<TItem> {
+export function createFolderContextMenu(
+  config?: FolderContextMenuConfig
+): () => UseFolderContextMenu {
+  return function useFolderContextMenu(): UseFolderContextMenu {
     const { t } = useTranslation()
     const { showMenu } = useContextMenu()
 
@@ -79,7 +78,7 @@ export function createFolderContextMenu<TItem extends FolderItem>(
       onCopy,
       onCut,
       onDelete
-    }: ShowItemMenuOptions<TItem>): void => {
+    }: ShowItemMenuOptions): void => {
       if (!isAlreadySelected) {
         setSelected(new Set([item.id]))
       }
@@ -108,7 +107,7 @@ export function createFolderContextMenu<TItem extends FolderItem>(
         }
       ]
 
-      const extra = config?.extraItemActions?.(item) ?? []
+      const extra = config?.extraItemActions?.(item.id) ?? []
       showMenu([...baseItems, ...extra], event)
     }
 
@@ -123,7 +122,7 @@ export function createFolderContextMenu<TItem extends FolderItem>(
       onPaste,
       onDelete,
       onEdit
-    }: ShowFolderMenuOptions<TItem>): void => {
+    }: ShowFolderMenuOptions): void => {
       if (!isAlreadySelected) {
         setSelected(new Set([folder.id]))
       }

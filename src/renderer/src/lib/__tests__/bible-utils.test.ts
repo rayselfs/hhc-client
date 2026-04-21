@@ -174,7 +174,8 @@ describe('bible-utils', () => {
       expect(result).toEqual({
         id: 'KJV-1-1-1',
         type: 'verse',
-        folderId: '',
+        parentId: '',
+        sortIndex: 0,
         bookCode: 'Gen',
         bookName: 'Genesis',
         bookNumber: 1,
@@ -184,7 +185,8 @@ describe('bible-utils', () => {
         text: 'In the beginning...',
         versionCode: 'KJV',
         versionName: 'King James Version',
-        createdAt: expect.any(Number)
+        createdAt: expect.any(Number),
+        expiresAt: null
       })
     })
 
@@ -228,7 +230,7 @@ describe('bible-utils', () => {
         versionName: 'KJV'
       })
 
-      expect(result.folderId).toBe('')
+      expect(result.parentId).toBe('')
     })
 
     it('sets type to verse', () => {

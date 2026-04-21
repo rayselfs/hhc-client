@@ -1,5 +1,4 @@
 import { createFolderContextMenu } from '@renderer/lib/createFolderContextMenu'
-import type { VerseItem } from '@shared/types/folder'
 
 export type {
   ClipboardState,
@@ -10,4 +9,4 @@ export type {
   ShowEmptyAreaMenuOptions
 } from '@renderer/lib/createFolderContextMenu'
 
-export const useFolderContextMenu = createFolderContextMenu<VerseItem>()
+export const useFolderContextMenu = createFolderContextMenu()

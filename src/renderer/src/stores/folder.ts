@@ -1,276 +1,291 @@
 import { create } from 'zustand'
-import type { UseBoundStore, StoreApi } from 'zustand'
-import type { Folder, FolderItem, FolderStoreConfig, VerseItem } from '@shared/types/folder'
+import type { FolderRecord, AnyItemRecord, FolderStoreConfig } from '@shared/types/folder'
 import { FOLDER_DURATION_MS } from '@shared/types/folder'
-import { saveFolderTree, loadFolderTree } from '@renderer/lib/bible-db'
+import {
+  loadAllFolders,
+  loadItemsByParent,
+  saveFolder,
+  saveFolders,
+  deleteFolders,
+  saveItem,
+  saveItems,
+  deleteItem as dbDeleteItem,
+  deleteItems,
+  deleteItemsByParent,
+  deleteExpiredFolders,
+  deleteExpiredItems
+} from '@renderer/lib/bible-db'
 
-export function findFolder<T extends FolderItem>(
-  root: Folder<T>,
-  id: string
-): Folder<T> | undefined {
-  if (root.id === id) return root
-  for (const child of root.folders) {
-    const found = findFolder(child, id)
-    if (found) return found
-  }
-  return undefined
-}
-
-export function getFolderPath<T extends FolderItem>(root: Folder<T>, id: string): Folder<T>[] {
-  if (root.id === id) return [root]
-  for (const child of root.folders) {
-    const path = getFolderPath(child, id)
-    if (path.length > 0) return [root, ...path]
-  }
-  return []
-}
-
-export function flattenFolders<T extends FolderItem>(root: Folder<T>): Folder<T>[] {
-  const result: Folder<T>[] = [root]
-  for (const child of root.folders) {
-    result.push(...flattenFolders(child))
-  }
-  return result
-}
-
-function makeRoot<T extends FolderItem>(config: FolderStoreConfig): Folder<T> {
-  return {
-    id: config.rootId,
-    name: config.rootName,
-    parentId: null,
-    items: [],
-    folders: [],
-    createdAt: Date.now()
-  }
-}
-
-function updateFolderInTree<T extends FolderItem>(
-  root: Folder<T>,
-  targetId: string,
-  updater: (folder: Folder<T>) => Folder<T>
-): Folder<T> {
-  if (root.id === targetId) return updater(root)
-  return {
-    ...root,
-    folders: root.folders.map((child) => updateFolderInTree(child, targetId, updater))
-  }
-}
-
-function removeFolderFromTree<T extends FolderItem>(root: Folder<T>, targetId: string): Folder<T> {
-  return {
-    ...root,
-    folders: root.folders
-      .filter((f) => f.id !== targetId)
-      .map((child) => removeFolderFromTree(child, targetId))
-  }
-}
-
-function removeItemFromTree<T extends FolderItem>(root: Folder<T>, itemId: string): Folder<T> {
-  return {
-    ...root,
-    items: root.items.filter((i) => i.id !== itemId),
-    folders: root.folders.map((child) => removeItemFromTree(child, itemId))
-  }
-}
-
-function persistTree<T extends FolderItem>(rootId: string, root: Folder<T>): void {
-  saveFolderTree(rootId, [root] as never)
-}
-
-interface FolderStoreState<TItem extends FolderItem> {
-  root: Folder<TItem>
+interface FolderStoreState {
+  folders: Record<string, FolderRecord>
+  items: Record<string, AnyItemRecord>
+  loadedParents: Set<string>
   currentFolderId: string
   isLoading: boolean
+
   initialize: () => Promise<void>
   addFolder: (name: string, parentId?: string, expiresAt?: number | null) => void
   updateFolder: (id: string, updates: { name?: string; expiresAt?: number | null }) => void
-  renameFolder: (id: string, name: string) => void
   deleteFolder: (id: string) => void
-  addItem: (item: TItem, folderId?: string) => void
+  addItem: (item: Omit<AnyItemRecord, 'id' | 'sortIndex' | 'createdAt'>) => void
   removeItem: (id: string) => void
   moveItem: (itemId: string, targetFolderId: string) => void
   moveFolder: (folderId: string, targetFolderId: string) => void
-  reorderItems: (folderId: string, orderedIds: string[]) => void
-  reorderFolders: (parentFolderId: string, orderedIds: string[]) => void
-  navigateToFolder: (folderId: string) => void
+  reorderItems: (parentId: string, orderedIds: string[]) => void
+  reorderFolders: (parentId: string, orderedIds: string[]) => void
+  navigateToFolder: (folderId: string) => Promise<void>
   navigateToRoot: () => void
   navigateUp: () => void
-  cleanupExpired: () => void
-  getCurrentFolder: () => Folder<TItem>
-  getFolderPath: () => Folder<TItem>[]
+  cleanupExpired: () => Promise<void>
+  ensureItemsLoaded: (parentId: string) => Promise<void>
+
+  getChildFolders: (parentId: string) => FolderRecord[]
+  getItems: (parentId: string) => AnyItemRecord[]
+  getFolderPath: (folderId: string) => FolderRecord[]
+  isItemsLoaded: (parentId: string) => boolean
 }
 
-export function createFolderStore<TItem extends FolderItem>(
-  config: FolderStoreConfig
-): UseBoundStore<StoreApi<FolderStoreState<TItem>>> {
-  return create<FolderStoreState<TItem>>()((set, get) => ({
-    root: makeRoot<TItem>(config),
+export function createFolderStore(config: FolderStoreConfig) {
+  return create<FolderStoreState>()((set, get) => ({
+    folders: {},
+    items: {},
+    loadedParents: new Set<string>(),
     currentFolderId: config.rootId,
-    isLoading: false,
+    isLoading: true,
 
     initialize: async () => {
       set({ isLoading: true })
       try {
-        const stored = await loadFolderTree(config.rootId)
-        if (stored && stored.length > 0) {
-          set({ root: stored[0] as unknown as Folder<TItem>, isLoading: false })
+        const allFolders = await loadAllFolders()
+        const folderMap: Record<string, FolderRecord> = {}
+
+        if (allFolders.length === 0) {
+          const rootFolder: FolderRecord = {
+            id: config.rootId,
+            name: config.rootName,
+            parentId: null,
+            sortIndex: 0,
+            createdAt: Date.now(),
+            expiresAt: null
+          }
+          await saveFolder(rootFolder)
+          folderMap[config.rootId] = rootFolder
         } else {
-          const root = makeRoot<TItem>(config)
-          set({ root, isLoading: false })
-          persistTree(config.rootId, root)
+          for (const f of allFolders) {
+            folderMap[f.id] = f
+          }
+          if (!folderMap[config.rootId]) {
+            const rootFolder: FolderRecord = {
+              id: config.rootId,
+              name: config.rootName,
+              parentId: null,
+              sortIndex: 0,
+              createdAt: Date.now(),
+              expiresAt: null
+            }
+            await saveFolder(rootFolder)
+            folderMap[config.rootId] = rootFolder
+          }
         }
+
+        const rootItems = await loadItemsByParent(config.rootId)
+        const itemMap: Record<string, AnyItemRecord> = {}
+        for (const item of rootItems) {
+          itemMap[item.id] = item
+        }
+
+        set({
+          folders: folderMap,
+          items: itemMap,
+          loadedParents: new Set([config.rootId]),
+          isLoading: false
+        })
       } catch {
         set({ isLoading: false })
       }
     },
 
+    ensureItemsLoaded: async (parentId: string) => {
+      const { loadedParents } = get()
+      if (loadedParents.has(parentId)) return
+      const items = await loadItemsByParent(parentId)
+      set((state) => {
+        const newItems = { ...state.items }
+        for (const item of items) {
+          newItems[item.id] = item
+        }
+        const newLoaded = new Set(state.loadedParents)
+        newLoaded.add(parentId)
+        return { items: newItems, loadedParents: newLoaded }
+      })
+    },
+
     addFolder: (name, parentId, expiresAt) => {
-      const { root } = get()
-      const resolvedParentId = parentId ?? config.rootId
-      const parentFolder = findFolder(root, resolvedParentId) ?? root
-      const newFolder: Folder<TItem> = {
+      const resolvedParentId = parentId ?? get().currentFolderId
+      const siblings = get().getChildFolders(resolvedParentId)
+      const newFolder: FolderRecord = {
         id: crypto.randomUUID(),
         name,
         parentId: resolvedParentId,
-        items: [],
-        folders: [],
+        sortIndex: siblings.length,
         createdAt: Date.now(),
-        sortIndex: parentFolder.folders.length,
         expiresAt: expiresAt !== undefined ? expiresAt : null
       }
-      const updated = updateFolderInTree(root, resolvedParentId, (f) => ({
-        ...f,
-        folders: [...f.folders, newFolder]
+      set((state) => ({
+        folders: { ...state.folders, [newFolder.id]: newFolder }
       }))
-      set({ root: updated })
-      persistTree(config.rootId, updated)
-    },
-
-    renameFolder: (id, name) => {
-      if (id === config.rootId) return
-      const { root } = get()
-      const updated = updateFolderInTree(root, id, (f) => ({ ...f, name }))
-      set({ root: updated })
-      persistTree(config.rootId, updated)
+      saveFolder(newFolder)
     },
 
     updateFolder: (id, updates) => {
       if (id === config.rootId) return
-      const { root } = get()
-      const updated = updateFolderInTree(root, id, (f) => ({ ...f, ...updates }))
-      set({ root: updated })
-      persistTree(config.rootId, updated)
+      const folder = get().folders[id]
+      if (!folder) return
+      const updated = { ...folder, ...updates }
+      set((state) => ({
+        folders: { ...state.folders, [id]: updated }
+      }))
+      saveFolder(updated)
     },
 
     deleteFolder: (id) => {
       if (id === config.rootId) return
-      const { root, currentFolderId } = get()
-      const updated = removeFolderFromTree(root, id)
-      const nextCurrentId = currentFolderId === id ? config.rootId : currentFolderId
-      set({ root: updated, currentFolderId: nextCurrentId })
-      persistTree(config.rootId, updated)
+      const { folders, items, currentFolderId } = get()
+
+      const descendantIds = getDescendantFolderIds(id, folders)
+      const allFolderIds = [id, ...descendantIds]
+
+      const newFolders = { ...folders }
+      const newItems = { ...items }
+      const itemIdsToDelete: string[] = []
+
+      for (const fid of allFolderIds) {
+        delete newFolders[fid]
+        for (const item of Object.values(newItems)) {
+          if (item.parentId === fid) {
+            itemIdsToDelete.push(item.id)
+            delete newItems[item.id]
+          }
+        }
+      }
+
+      const nextCurrentId = allFolderIds.includes(currentFolderId) ? config.rootId : currentFolderId
+
+      set({ folders: newFolders, items: newItems, currentFolderId: nextCurrentId })
+      deleteFolders(allFolderIds)
+      if (itemIdsToDelete.length > 0) deleteItems(itemIdsToDelete)
     },
 
-    addItem: (item, folderId) => {
-      const { root, currentFolderId } = get()
-      const targetId = folderId ?? currentFolderId
-      const isRoot = targetId === config.rootId
-      const itemWithExpiry =
-        isRoot && item.expiresAt === undefined
-          ? { ...item, expiresAt: Date.now() + FOLDER_DURATION_MS['1day'], sortIndex: 0 }
-          : item
-      const updated = updateFolderInTree(root, targetId, (f) => ({
-        ...f,
-        items: [...f.items, { ...itemWithExpiry, sortIndex: f.items.length }]
+    addItem: (itemData) => {
+      const parentId = itemData.parentId ?? get().currentFolderId
+      const isRoot = parentId === config.rootId
+      const siblings = get().getItems(parentId)
+      const item: AnyItemRecord = {
+        ...itemData,
+        id: crypto.randomUUID(),
+        parentId,
+        sortIndex: siblings.length,
+        createdAt: Date.now(),
+        expiresAt:
+          itemData.expiresAt !== undefined
+            ? itemData.expiresAt
+            : isRoot
+              ? Date.now() + FOLDER_DURATION_MS['1day']
+              : null
+      } as AnyItemRecord
+      set((state) => ({
+        items: { ...state.items, [item.id]: item }
       }))
-      set({ root: updated })
-      persistTree(config.rootId, updated)
+      saveItem(item)
     },
 
     removeItem: (id) => {
-      const { root } = get()
-      const updated = removeItemFromTree(root, id)
-      set({ root: updated })
-      persistTree(config.rootId, updated)
+      set((state) => {
+        const newItems = { ...state.items }
+        delete newItems[id]
+        return { items: newItems }
+      })
+      dbDeleteItem(id)
     },
 
     moveItem: (itemId, targetFolderId) => {
-      const { root } = get()
-      const allFolders = flattenFolders(root)
-      let foundItem: TItem | undefined
-      for (const folder of allFolders) {
-        const item = folder.items.find((i) => i.id === itemId)
-        if (item) {
-          foundItem = item
-          break
-        }
+      const item = get().items[itemId]
+      if (!item || item.parentId === targetFolderId) return
+      const targetSiblings = get().getItems(targetFolderId)
+      const updated: AnyItemRecord = {
+        ...item,
+        parentId: targetFolderId,
+        sortIndex: targetSiblings.length
       }
-      if (!foundItem) return
-      const itemToMove = foundItem
-      const withoutItem = removeItemFromTree(root, itemId)
-      const updated = updateFolderInTree(withoutItem, targetFolderId, (f) => ({
-        ...f,
-        items: [...f.items, { ...itemToMove, sortIndex: f.items.length }]
+      set((state) => ({
+        items: { ...state.items, [itemId]: updated }
       }))
-      set({ root: updated })
-      persistTree(config.rootId, updated)
+      saveItem(updated)
     },
 
     moveFolder: (folderId, targetFolderId) => {
-      const { root } = get()
-      if (folderId === config.rootId) return
-      if (folderId === targetFolderId) return
-      const folderToMove = findFolder(root, folderId)
-      if (!folderToMove) return
-      const withoutFolder = removeFolderFromTree(root, folderId)
-      const updated = updateFolderInTree(withoutFolder, targetFolderId, (f) => ({
-        ...f,
-        folders: [
-          ...f.folders,
-          { ...folderToMove, parentId: targetFolderId, sortIndex: f.folders.length }
-        ]
-      }))
-      set({ root: updated })
-      persistTree(config.rootId, updated)
-    },
+      if (folderId === config.rootId || folderId === targetFolderId) return
+      const folder = get().folders[folderId]
+      if (!folder) return
 
-    reorderItems: (folderId, orderedIds) => {
-      const { root } = get()
-      const updated = updateFolderInTree(root, folderId, (f) => {
-        const reordered: TItem[] = orderedIds
-          .map((id, index) => {
-            const item = f.items.find((i) => i.id === id)
-            return item ? ({ ...item, sortIndex: index } as TItem) : undefined
-          })
-          .filter((i): i is TItem => i !== undefined)
-        const missing = f.items.filter((i) => !orderedIds.includes(i.id))
-        return { ...f, items: [...reordered, ...missing] }
-      })
-      set({ root: updated })
-      persistTree(config.rootId, updated)
-    },
+      const descendants = getDescendantFolderIds(folderId, get().folders)
+      if (descendants.includes(targetFolderId)) return
 
-    reorderFolders: (parentFolderId, orderedIds) => {
-      const { root } = get()
-      const updated = updateFolderInTree(root, parentFolderId, (f) => {
-        const folderMap = new Map(f.folders.map((c) => [c.id, c]))
-        const reordered: Folder<TItem>[] = orderedIds.reduce<Folder<TItem>[]>((acc, id, index) => {
-          const child = folderMap.get(id)
-          if (child) acc.push({ ...child, sortIndex: index })
-          return acc
-        }, [])
-        const missing = f.folders.filter((c) => !orderedIds.includes(c.id))
-        return { ...f, folders: [...reordered, ...missing] }
-      })
-      set({ root: updated })
-      persistTree(config.rootId, updated)
-    },
-
-    navigateToFolder: (folderId) => {
-      const { root } = get()
-      if (findFolder(root, folderId)) {
-        set({ currentFolderId: folderId })
+      const targetSiblings = get().getChildFolders(targetFolderId)
+      const updated: FolderRecord = {
+        ...folder,
+        parentId: targetFolderId,
+        sortIndex: targetSiblings.length
       }
+      set((state) => ({
+        folders: { ...state.folders, [folderId]: updated }
+      }))
+      saveFolder(updated)
+    },
+
+    reorderItems: (_parentId, orderedIds) => {
+      const { items } = get()
+      const updated: AnyItemRecord[] = []
+      for (let i = 0; i < orderedIds.length; i++) {
+        const item = items[orderedIds[i]]
+        if (item) {
+          updated.push({ ...item, sortIndex: i })
+        }
+      }
+      set((state) => {
+        const newItems = { ...state.items }
+        for (const item of updated) {
+          newItems[item.id] = item
+        }
+        return { items: newItems }
+      })
+      saveItems(updated)
+    },
+
+    reorderFolders: (_parentId, orderedIds) => {
+      const { folders } = get()
+      const updated: FolderRecord[] = []
+      for (let i = 0; i < orderedIds.length; i++) {
+        const folder = folders[orderedIds[i]]
+        if (folder) {
+          updated.push({ ...folder, sortIndex: i })
+        }
+      }
+      set((state) => {
+        const newFolders = { ...state.folders }
+        for (const folder of updated) {
+          newFolders[folder.id] = folder
+        }
+        return { folders: newFolders }
+      })
+      saveFolders(updated)
+    },
+
+    navigateToFolder: async (folderId) => {
+      const { folders } = get()
+      if (!folders[folderId]) return
+      set({ currentFolderId: folderId })
+      await get().ensureItemsLoaded(folderId)
     },
 
     navigateToRoot: () => {
@@ -278,52 +293,95 @@ export function createFolderStore<TItem extends FolderItem>(
     },
 
     navigateUp: () => {
-      const { root, currentFolderId } = get()
+      const { folders, currentFolderId } = get()
       if (currentFolderId === config.rootId) return
-      const current = findFolder(root, currentFolderId)
-      if (current?.parentId) {
-        set({ currentFolderId: current.parentId })
-      } else {
-        set({ currentFolderId: config.rootId })
-      }
+      const current = folders[currentFolderId]
+      set({ currentFolderId: current?.parentId ?? config.rootId })
     },
 
-    cleanupExpired: () => {
-      const { root } = get()
+    cleanupExpired: async () => {
       const now = Date.now()
-      const expiredFolderIds = root.folders
-        .filter((f) => f.expiresAt != null && f.expiresAt < now)
-        .map((f) => f.id)
-      const expiredItemIds = root.items
-        .filter((i) => i.expiresAt != null && i.expiresAt < now)
-        .map((i) => i.id)
+      const expiredFolderIds = await deleteExpiredFolders(now)
+      const expiredItemIds = await deleteExpiredItems(now)
 
       if (expiredFolderIds.length === 0 && expiredItemIds.length === 0) return
 
-      let updated = root
-      for (const id of expiredFolderIds) {
-        updated = removeFolderFromTree(updated, id)
+      const { folders } = get()
+
+      let cascadeFolderIds: string[] = []
+      for (const fid of expiredFolderIds) {
+        cascadeFolderIds = [...cascadeFolderIds, ...getDescendantFolderIds(fid, folders)]
       }
-      for (const id of expiredItemIds) {
-        updated = removeItemFromTree(updated, id)
+      const allExpiredFolderIds = [...expiredFolderIds, ...cascadeFolderIds]
+      if (cascadeFolderIds.length > 0) {
+        await deleteFolders(cascadeFolderIds)
+        for (const fid of cascadeFolderIds) {
+          await deleteItemsByParent(fid)
+        }
       }
-      set({ root: updated })
-      persistTree(config.rootId, updated)
+
+      set((state) => {
+        const newFolders = { ...state.folders }
+        const newItems = { ...state.items }
+        for (const id of allExpiredFolderIds) delete newFolders[id]
+        for (const id of expiredItemIds) delete newItems[id]
+        for (const item of Object.values(newItems)) {
+          if (allExpiredFolderIds.includes(item.parentId)) {
+            delete newItems[item.id]
+          }
+        }
+        return { folders: newFolders, items: newItems }
+      })
     },
 
-    getCurrentFolder: () => {
-      const { root, currentFolderId } = get()
-      return findFolder(root, currentFolderId) ?? root
+    getChildFolders: (parentId) => {
+      const { folders } = get()
+      return Object.values(folders)
+        .filter((f) => f.parentId === parentId)
+        .sort((a, b) => a.sortIndex - b.sortIndex)
     },
 
-    getFolderPath: () => {
-      const { root, currentFolderId } = get()
-      return getFolderPath(root, currentFolderId)
+    getItems: (parentId) => {
+      const { items } = get()
+      return Object.values(items)
+        .filter((i) => i.parentId === parentId)
+        .sort((a, b) => a.sortIndex - b.sortIndex)
+    },
+
+    getFolderPath: (folderId) => {
+      const { folders } = get()
+      const path: FolderRecord[] = []
+      let current = folders[folderId]
+      while (current) {
+        path.unshift(current)
+        if (current.parentId === null) break
+        current = folders[current.parentId]
+      }
+      return path
+    },
+
+    isItemsLoaded: (parentId) => {
+      return get().loadedParents.has(parentId)
     }
   }))
 }
 
-export const useBibleFolderStore = createFolderStore<VerseItem>({
+function getDescendantFolderIds(folderId: string, folders: Record<string, FolderRecord>): string[] {
+  const result: string[] = []
+  const queue = [folderId]
+  while (queue.length > 0) {
+    const current = queue.shift()!
+    for (const f of Object.values(folders)) {
+      if (f.parentId === current && f.id !== folderId) {
+        result.push(f.id)
+        queue.push(f.id)
+      }
+    }
+  }
+  return result
+}
+
+export const useBibleFolderStore = createFolderStore({
   rootId: 'bible-root',
   rootName: 'Bible Library',
   dbName: 'hhc-bible'

@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import type { Folder, VerseItem } from '@shared/types/folder'
+import type { FolderRecord, VerseItemRecord } from '@shared/types/folder'
 import { CustomFolderTab } from '../CustomFolderTab'
 import { ShortcutScopeProvider } from '@renderer/contexts/ShortcutScopeContext'
 
@@ -8,25 +8,28 @@ const mockNavigateTo = vi.fn()
 const mockAddFolder = vi.fn()
 const mockDeleteFolder = vi.fn()
 const mockRemoveItem = vi.fn()
-const mockNavigateToFolder = vi.fn()
-const mockNavigateToRoot = vi.fn()
+const mockNavigateToFolder = vi.fn(() => Promise.resolve())
+const mockNavigateToRoot = vi.fn(() => Promise.resolve())
 const mockMoveItem = vi.fn()
 const mockReorderItems = vi.fn()
 const mockAddItem = vi.fn()
 
-const mockFolderA: Folder<VerseItem> = {
+const mockFolderA: FolderRecord = {
   id: 'folder-a',
   name: 'Sunday Worship',
   parentId: 'bible-root',
-  items: [],
-  folders: [],
-  createdAt: Date.now()
+  sortIndex: 0,
+  createdAt: Date.now(),
+  expiresAt: null
 }
 
-const mockVerseItem: VerseItem = {
+const mockVerseItem: VerseItemRecord = {
   id: 'verse-1',
   type: 'verse',
-  folderId: 'bible-root',
+  parentId: 'bible-root',
+  sortIndex: 0,
+  createdAt: Date.now(),
+  expiresAt: null,
   bookCode: 'GEN',
   bookName: '創世記',
   bookNumber: 1,
@@ -35,24 +38,15 @@ const mockVerseItem: VerseItem = {
   verseEnd: 1,
   text: 'In the beginning God created.',
   versionCode: 'CUV',
-  versionName: '和合本',
-  createdAt: Date.now()
-}
-
-const mockRoot: Folder<VerseItem> = {
-  id: 'bible-root',
-  name: 'Bible Library',
-  parentId: null,
-  items: [mockVerseItem],
-  folders: [mockFolderA],
-  createdAt: Date.now()
+  versionName: '和合本'
 }
 
 const folderSingleton = {
-  root: mockRoot,
+  folders: { 'folder-a': mockFolderA },
+  items: { 'verse-1': mockVerseItem },
+  loadedParents: new Set<string>(['bible-root']),
   currentFolderId: 'bible-root',
   isLoading: false,
-  getCurrentFolder: (): Folder<VerseItem> => mockRoot,
   addFolder: mockAddFolder,
   deleteFolder: mockDeleteFolder,
   removeItem: mockRemoveItem,
@@ -61,7 +55,7 @@ const folderSingleton = {
   moveItem: mockMoveItem,
   reorderItems: mockReorderItems,
   addItem: mockAddItem,
-  renameFolder: vi.fn(),
+  updateFolder: vi.fn(),
   moveFolder: vi.fn(),
   navigateUp: vi.fn(),
   initialize: vi.fn()
@@ -79,6 +73,14 @@ vi.mock('@renderer/stores/folder', () => ({
       getState: () => folderSingleton
     }
   )
+}))
+
+let childFoldersResult: FolderRecord[] = [mockFolderA]
+let itemsResult: VerseItemRecord[] = [mockVerseItem]
+
+vi.mock('@renderer/stores/selectors/folder', () => ({
+  useChildFolders: () => childFoldersResult,
+  useItems: () => itemsResult
 }))
 
 vi.mock('@renderer/stores/bible', () => ({
@@ -192,9 +194,12 @@ vi.mock('@heroui/react', async (importOriginal) => {
 describe('CustomFolderTab', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    childFoldersResult = [mockFolderA]
+    itemsResult = [mockVerseItem]
     folderSingleton.currentFolderId = 'bible-root'
-    folderSingleton.getCurrentFolder = () => mockRoot
-    folderSingleton.root = mockRoot
+    folderSingleton.folders = { 'folder-a': mockFolderA }
+    folderSingleton.items = { 'verse-1': mockVerseItem }
+    folderSingleton.isLoading = false
     bibleSingleton.navigateTo = mockNavigateTo
     folderSingleton.addFolder = mockAddFolder
     folderSingleton.deleteFolder = mockDeleteFolder
@@ -288,8 +293,8 @@ describe('CustomFolderTab', () => {
   })
 
   it('shows empty state when folder has no items', () => {
-    const emptyRoot: Folder<VerseItem> = { ...mockRoot, items: [], folders: [] }
-    folderSingleton.getCurrentFolder = () => emptyRoot
+    childFoldersResult = []
+    itemsResult = []
     render(<CustomFolderTab />)
     expect(screen.getByText('Folder is empty')).toBeInTheDocument()
   })

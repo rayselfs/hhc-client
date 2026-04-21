@@ -31,8 +31,27 @@ export const useBibleHistoryStore = create<BibleHistoryState>()(
     {
       name: createKey('bible-history'),
       storage: hhcPersistStorage,
-      version: 0,
-      partialize: (state) => ({ items: state.items })
+      version: 1,
+      partialize: (state) => ({ items: state.items }),
+      migrate: (persisted, version) => {
+        if (version === 0) {
+          const state = persisted as { items: Record<string, unknown>[] }
+          if (state.items) {
+            state.items = state.items.map((item) => {
+              const { folderId, ...rest } = item as Record<string, unknown> & {
+                folderId?: string
+              }
+              return {
+                ...rest,
+                parentId: (rest as { parentId?: string }).parentId ?? folderId ?? '',
+                sortIndex: (rest as { sortIndex?: number }).sortIndex ?? 0,
+                expiresAt: (rest as { expiresAt?: number | null }).expiresAt ?? null
+              }
+            })
+          }
+        }
+        return persisted as BibleHistoryState
+      }
     }
   )
 )

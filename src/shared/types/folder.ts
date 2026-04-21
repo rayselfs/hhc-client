@@ -1,14 +1,23 @@
-export interface FolderItem {
+export interface FolderRecord {
   id: string
-  type: 'verse' | 'file'
+  name: string
+  parentId: string | null
+  sortIndex: number
   createdAt: number
-  sortIndex?: number
-  expiresAt?: number | null
+  expiresAt: number | null
 }
 
-export interface VerseItem extends FolderItem {
+export interface ItemRecord {
+  id: string
+  parentId: string
+  type: 'verse' | 'file'
+  sortIndex: number
+  createdAt: number
+  expiresAt: number | null
+}
+
+export interface VerseItemRecord extends ItemRecord {
   type: 'verse'
-  folderId: string
   bookCode: string
   bookName: string
   bookNumber: number
@@ -20,25 +29,19 @@ export interface VerseItem extends FolderItem {
   versionName: string
 }
 
-export interface FileItem extends FolderItem {
+export interface FileItemRecord extends ItemRecord {
   type: 'file'
-  folderId: string
   name: string
   url: string
   size: number
   mimeType: string
 }
 
-export interface Folder<TItem extends FolderItem = FolderItem> {
-  id: string
-  name: string
-  parentId: string | null
-  items: TItem[]
-  folders: Folder<TItem>[]
-  createdAt: number
-  sortIndex?: number
-  expiresAt?: number | null
-}
+export type AnyItemRecord = VerseItemRecord | FileItemRecord
+
+export type VerseItem = VerseItemRecord
+export type FileItem = FileItemRecord
+export type FolderItem = ItemRecord
 
 export interface FolderStoreConfig {
   rootId: string
@@ -81,20 +84,20 @@ export function inferDuration(
   return closest
 }
 
-export function isVerseItem(item: FolderItem): item is VerseItem {
+export function isVerseItem(item: ItemRecord): item is VerseItemRecord {
   return item.type === 'verse'
 }
 
-export function isFileItem(item: FolderItem): item is FileItem {
+export function isFileItem(item: ItemRecord): item is FileItemRecord {
   return item.type === 'file'
 }
 
-export function isFolder<T extends FolderItem>(node: unknown): node is Folder<T> {
+export function isFolderRecord(node: unknown): node is FolderRecord {
   return (
     typeof node === 'object' &&
     node !== null &&
-    'folders' in node &&
-    'items' in node &&
-    'name' in node
+    'name' in node &&
+    'parentId' in node &&
+    !('type' in node)
   )
 }

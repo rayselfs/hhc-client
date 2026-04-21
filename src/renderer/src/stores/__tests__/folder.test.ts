@@ -1,11 +1,31 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-const mockSaveFolderTree = vi.fn()
-const mockLoadFolderTree = vi.fn()
+const mockLoadAllFolders = vi.fn()
+const mockLoadItemsByParent = vi.fn()
+const mockSaveFolder = vi.fn()
+const mockSaveFolders = vi.fn()
+const mockDeleteFolders = vi.fn()
+const mockSaveItem = vi.fn()
+const mockSaveItems = vi.fn()
+const mockDeleteItem = vi.fn()
+const mockDeleteItems = vi.fn()
+const mockDeleteItemsByParent = vi.fn()
+const mockDeleteExpiredFolders = vi.fn()
+const mockDeleteExpiredItems = vi.fn()
 
 vi.mock('@renderer/lib/bible-db', () => ({
-  saveFolderTree: (...args: unknown[]) => mockSaveFolderTree(...args),
-  loadFolderTree: (...args: unknown[]) => mockLoadFolderTree(...args),
+  loadAllFolders: (...args: unknown[]) => mockLoadAllFolders(...args),
+  loadItemsByParent: (...args: unknown[]) => mockLoadItemsByParent(...args),
+  saveFolder: (...args: unknown[]) => mockSaveFolder(...args),
+  saveFolders: (...args: unknown[]) => mockSaveFolders(...args),
+  deleteFolders: (...args: unknown[]) => mockDeleteFolders(...args),
+  saveItem: (...args: unknown[]) => mockSaveItem(...args),
+  saveItems: (...args: unknown[]) => mockSaveItems(...args),
+  deleteItem: (...args: unknown[]) => mockDeleteItem(...args),
+  deleteItems: (...args: unknown[]) => mockDeleteItems(...args),
+  deleteItemsByParent: (...args: unknown[]) => mockDeleteItemsByParent(...args),
+  deleteExpiredFolders: (...args: unknown[]) => mockDeleteExpiredFolders(...args),
+  deleteExpiredItems: (...args: unknown[]) => mockDeleteExpiredItems(...args),
   loadBibleContent: vi.fn(),
   saveBibleContent: vi.fn(),
   loadBibleVersionMeta: vi.fn(),
@@ -13,14 +33,22 @@ vi.mock('@renderer/lib/bible-db', () => ({
 }))
 
 import { useBibleFolderStore } from '@renderer/stores/folder'
-import type { VerseItem } from '@shared/types/folder'
+import type { FolderRecord, VerseItemRecord } from '@shared/types/folder'
 
 const ROOT_ID = 'bible-root'
 
-const makeVerse = (id: string, overrides: Partial<VerseItem> = {}): VerseItem => ({
-  id,
+const rootFolder: FolderRecord = {
+  id: ROOT_ID,
+  name: 'Bible Library',
+  parentId: null,
+  sortIndex: 0,
+  createdAt: Date.now(),
+  expiresAt: null
+}
+
+const makeVerse = (id: string): Omit<VerseItemRecord, 'id' | 'sortIndex' | 'createdAt'> => ({
   type: 'verse',
-  folderId: ROOT_ID,
+  parentId: ROOT_ID,
   bookCode: 'Gen',
   bookName: 'Genesis',
   bookNumber: 1,
@@ -30,63 +58,61 @@ const makeVerse = (id: string, overrides: Partial<VerseItem> = {}): VerseItem =>
   text: `Verse ${id}`,
   versionCode: 'KJV',
   versionName: 'King James',
-  createdAt: Date.now(),
-  ...overrides
+  expiresAt: null
 })
 
 beforeEach(() => {
   useBibleFolderStore.setState({
-    root: {
-      id: ROOT_ID,
-      name: 'Bible Library',
-      parentId: null,
-      items: [],
-      folders: [],
-      createdAt: Date.now()
-    },
+    folders: { [ROOT_ID]: rootFolder },
+    items: {},
+    loadedParents: new Set([ROOT_ID]),
     currentFolderId: ROOT_ID,
     isLoading: false
   })
-  mockSaveFolderTree.mockReset()
-  mockLoadFolderTree.mockReset()
-  mockSaveFolderTree.mockResolvedValue(undefined)
-  mockLoadFolderTree.mockResolvedValue(undefined)
+  vi.clearAllMocks()
+  mockSaveFolder.mockResolvedValue(undefined)
+  mockSaveFolders.mockResolvedValue(undefined)
+  mockDeleteFolders.mockResolvedValue(undefined)
+  mockSaveItem.mockResolvedValue(undefined)
+  mockSaveItems.mockResolvedValue(undefined)
+  mockDeleteItem.mockResolvedValue(undefined)
+  mockDeleteItems.mockResolvedValue(undefined)
+  mockLoadAllFolders.mockResolvedValue([rootFolder])
+  mockLoadItemsByParent.mockResolvedValue([])
 })
 
 describe('initialize()', () => {
-  it('loads stored tree when available', async () => {
-    const storedRoot = {
-      id: ROOT_ID,
-      name: 'Bible Library',
-      parentId: null,
-      items: [],
-      folders: [
-        {
-          id: 'f1',
-          name: 'Folder One',
-          parentId: ROOT_ID,
-          items: [],
-          folders: [],
-          createdAt: Date.now()
-        }
-      ],
-      createdAt: Date.now()
+  it('loads stored folders when available', async () => {
+    const childFolder: FolderRecord = {
+      id: 'f1',
+      name: 'Folder One',
+      parentId: ROOT_ID,
+      sortIndex: 0,
+      createdAt: Date.now(),
+      expiresAt: null
     }
-    mockLoadFolderTree.mockResolvedValue([storedRoot])
+    mockLoadAllFolders.mockResolvedValue([rootFolder, childFolder])
     await useBibleFolderStore.getState().initialize()
-    expect(useBibleFolderStore.getState().root.folders).toHaveLength(1)
-    expect(useBibleFolderStore.getState().root.folders[0].name).toBe('Folder One')
+    const { folders } = useBibleFolderStore.getState()
+    expect(folders['f1']).toBeDefined()
+    expect(folders['f1'].name).toBe('Folder One')
   })
 
-  it('creates fresh root and persists when no stored tree', async () => {
-    mockLoadFolderTree.mockResolvedValue(undefined)
+  it('creates fresh root and persists when no stored folders', async () => {
+    mockLoadAllFolders.mockResolvedValue([])
     await useBibleFolderStore.getState().initialize()
-    expect(useBibleFolderStore.getState().root.folders).toHaveLength(0)
-    expect(mockSaveFolderTree).toHaveBeenCalled()
+    expect(useBibleFolderStore.getState().folders[ROOT_ID]).toBeDefined()
+    expect(mockSaveFolder).toHaveBeenCalled()
+  })
+
+  it('loads root items on initialize', async () => {
+    mockLoadAllFolders.mockResolvedValue([rootFolder])
+    mockLoadItemsByParent.mockResolvedValue([])
+    await useBibleFolderStore.getState().initialize()
+    expect(mockLoadItemsByParent).toHaveBeenCalledWith(ROOT_ID)
   })
 
   it('sets isLoading false after completion', async () => {
-    mockLoadFolderTree.mockResolvedValue(undefined)
     await useBibleFolderStore.getState().initialize()
     expect(useBibleFolderStore.getState().isLoading).toBe(false)
   })
@@ -95,64 +121,65 @@ describe('initialize()', () => {
 describe('addFolder()', () => {
   it('creates a new folder at root level', () => {
     useBibleFolderStore.getState().addFolder('My Folder')
-    const folders = useBibleFolderStore.getState().root.folders
-    expect(folders).toHaveLength(1)
-    expect(folders[0].name).toBe('My Folder')
-    expect(folders[0].parentId).toBe(ROOT_ID)
+    const childFolders = useBibleFolderStore.getState().getChildFolders(ROOT_ID)
+    expect(childFolders).toHaveLength(1)
+    expect(childFolders[0].name).toBe('My Folder')
+    expect(childFolders[0].parentId).toBe(ROOT_ID)
   })
 
   it('assigns unique id to new folder', () => {
     useBibleFolderStore.getState().addFolder('A')
     useBibleFolderStore.getState().addFolder('B')
-    const ids = useBibleFolderStore.getState().root.folders.map((f) => f.id)
-    expect(ids[0]).not.toBe(ids[1])
+    const childFolders = useBibleFolderStore.getState().getChildFolders(ROOT_ID)
+    expect(childFolders[0].id).not.toBe(childFolders[1].id)
   })
 
   it('persists after adding folder', () => {
     useBibleFolderStore.getState().addFolder('Test')
-    expect(mockSaveFolderTree).toHaveBeenCalled()
+    expect(mockSaveFolder).toHaveBeenCalled()
   })
 })
 
-describe('renameFolder()', () => {
+describe('updateFolder()', () => {
   it('renames an existing folder', () => {
     useBibleFolderStore.getState().addFolder('Old Name')
-    const folderId = useBibleFolderStore.getState().root.folders[0].id
-    useBibleFolderStore.getState().renameFolder(folderId, 'New Name')
-    expect(useBibleFolderStore.getState().root.folders[0].name).toBe('New Name')
+    const folderId = useBibleFolderStore.getState().getChildFolders(ROOT_ID)[0].id
+    useBibleFolderStore.getState().updateFolder(folderId, { name: 'New Name' })
+    expect(useBibleFolderStore.getState().folders[folderId].name).toBe('New Name')
   })
 
   it('does not rename root folder', () => {
-    useBibleFolderStore.getState().renameFolder(ROOT_ID, 'Hacked')
-    expect(useBibleFolderStore.getState().root.name).toBe('Bible Library')
+    useBibleFolderStore.getState().updateFolder(ROOT_ID, { name: 'Hacked' })
+    expect(useBibleFolderStore.getState().folders[ROOT_ID].name).toBe('Bible Library')
   })
 
   it('persists after rename', () => {
     useBibleFolderStore.getState().addFolder('X')
-    mockSaveFolderTree.mockClear()
-    const folderId = useBibleFolderStore.getState().root.folders[0].id
-    useBibleFolderStore.getState().renameFolder(folderId, 'Y')
-    expect(mockSaveFolderTree).toHaveBeenCalled()
+    mockSaveFolder.mockClear()
+    const folderId = useBibleFolderStore.getState().getChildFolders(ROOT_ID)[0].id
+    useBibleFolderStore.getState().updateFolder(folderId, { name: 'Y' })
+    expect(mockSaveFolder).toHaveBeenCalled()
   })
 })
 
 describe('deleteFolder()', () => {
   it('removes folder by id', () => {
     useBibleFolderStore.getState().addFolder('Delete Me')
-    const folderId = useBibleFolderStore.getState().root.folders[0].id
+    const folderId = useBibleFolderStore.getState().getChildFolders(ROOT_ID)[0].id
     useBibleFolderStore.getState().deleteFolder(folderId)
-    expect(useBibleFolderStore.getState().root.folders).toHaveLength(0)
+    expect(useBibleFolderStore.getState().folders[folderId]).toBeUndefined()
   })
 
   it('does not delete root folder', () => {
     useBibleFolderStore.getState().deleteFolder(ROOT_ID)
-    expect(useBibleFolderStore.getState().root.id).toBe(ROOT_ID)
+    expect(useBibleFolderStore.getState().folders[ROOT_ID]).toBeDefined()
+    expect(useBibleFolderStore.getState().folders[ROOT_ID].id).toBe(ROOT_ID)
   })
 
-  it('resets currentFolderId to root when deleting current folder', () => {
+  it('resets currentFolderId to root when deleting current folder', async () => {
     useBibleFolderStore.getState().addFolder('Nav Folder')
-    const folderId = useBibleFolderStore.getState().root.folders[0].id
-    useBibleFolderStore.getState().navigateToFolder(folderId)
+    const folderId = useBibleFolderStore.getState().getChildFolders(ROOT_ID)[0].id
+    await useBibleFolderStore.getState().navigateToFolder(folderId)
     expect(useBibleFolderStore.getState().currentFolderId).toBe(folderId)
     useBibleFolderStore.getState().deleteFolder(folderId)
     expect(useBibleFolderStore.getState().currentFolderId).toBe(ROOT_ID)
@@ -160,33 +187,31 @@ describe('deleteFolder()', () => {
 })
 
 describe('addItem()', () => {
-  it('adds item to current folder (root by default)', () => {
-    const verse = makeVerse('v1')
-    useBibleFolderStore.getState().addItem(verse)
-    expect(useBibleFolderStore.getState().root.items).toHaveLength(1)
-    expect(useBibleFolderStore.getState().root.items[0].id).toBe('v1')
+  it('adds item to root by default (via parentId)', () => {
+    useBibleFolderStore.getState().addItem(makeVerse('v1'))
+    const rootItems = useBibleFolderStore.getState().getItems(ROOT_ID)
+    expect(rootItems).toHaveLength(1)
   })
 
-  it('adds item to specified folder', () => {
+  it('adds item to specified folder via parentId field', () => {
     useBibleFolderStore.getState().addFolder('Sub')
-    const folderId = useBibleFolderStore.getState().root.folders[0].id
-    const verse = makeVerse('v2')
-    useBibleFolderStore.getState().addItem(verse, folderId)
-    expect(useBibleFolderStore.getState().root.folders[0].items).toHaveLength(1)
-    expect(useBibleFolderStore.getState().root.folders[0].items[0].id).toBe('v2')
+    const folderId = useBibleFolderStore.getState().getChildFolders(ROOT_ID)[0].id
+    useBibleFolderStore.getState().addItem({ ...makeVerse('v2'), parentId: folderId })
+    expect(useBibleFolderStore.getState().getItems(folderId)).toHaveLength(1)
+    expect(useBibleFolderStore.getState().getItems(ROOT_ID)).toHaveLength(0)
   })
 
   it('assigns sortIndex based on position', () => {
     useBibleFolderStore.getState().addItem(makeVerse('v1'))
     useBibleFolderStore.getState().addItem(makeVerse('v2'))
-    const items = useBibleFolderStore.getState().root.items
+    const items = useBibleFolderStore.getState().getItems(ROOT_ID)
     expect(items[0].sortIndex).toBe(0)
     expect(items[1].sortIndex).toBe(1)
   })
 
   it('persists after adding item', () => {
     useBibleFolderStore.getState().addItem(makeVerse('v1'))
-    expect(mockSaveFolderTree).toHaveBeenCalled()
+    expect(mockSaveItem).toHaveBeenCalled()
   })
 })
 
@@ -194,18 +219,22 @@ describe('removeItem()', () => {
   it('removes item by id from root', () => {
     useBibleFolderStore.getState().addItem(makeVerse('v1'))
     useBibleFolderStore.getState().addItem(makeVerse('v2'))
-    useBibleFolderStore.getState().removeItem('v1')
-    const items = useBibleFolderStore.getState().root.items
-    expect(items).toHaveLength(1)
-    expect(items[0].id).toBe('v2')
+    const rootItems = useBibleFolderStore.getState().getItems(ROOT_ID)
+    const firstId = rootItems[0].id
+    const secondId = rootItems[1].id
+    useBibleFolderStore.getState().removeItem(firstId)
+    const remaining = useBibleFolderStore.getState().getItems(ROOT_ID)
+    expect(remaining).toHaveLength(1)
+    expect(remaining[0].id).toBe(secondId)
   })
 
   it('removes item from nested folder', () => {
     useBibleFolderStore.getState().addFolder('Sub')
-    const folderId = useBibleFolderStore.getState().root.folders[0].id
-    useBibleFolderStore.getState().addItem(makeVerse('nested'), folderId)
-    useBibleFolderStore.getState().removeItem('nested')
-    expect(useBibleFolderStore.getState().root.folders[0].items).toHaveLength(0)
+    const folderId = useBibleFolderStore.getState().getChildFolders(ROOT_ID)[0].id
+    useBibleFolderStore.getState().addItem({ ...makeVerse('nested'), parentId: folderId })
+    const nestedId = useBibleFolderStore.getState().getItems(folderId)[0].id
+    useBibleFolderStore.getState().removeItem(nestedId)
+    expect(useBibleFolderStore.getState().getItems(folderId)).toHaveLength(0)
   })
 })
 
@@ -213,28 +242,30 @@ describe('moveItem()', () => {
   it('moves item from root to a subfolder', () => {
     useBibleFolderStore.getState().addItem(makeVerse('v1'))
     useBibleFolderStore.getState().addFolder('Target')
-    const targetId = useBibleFolderStore.getState().root.folders[0].id
-    useBibleFolderStore.getState().moveItem('v1', targetId)
-    expect(useBibleFolderStore.getState().root.items).toHaveLength(0)
-    expect(useBibleFolderStore.getState().root.folders[0].items).toHaveLength(1)
-    expect(useBibleFolderStore.getState().root.folders[0].items[0].id).toBe('v1')
+    const targetId = useBibleFolderStore.getState().getChildFolders(ROOT_ID)[0].id
+    const itemId = useBibleFolderStore.getState().getItems(ROOT_ID)[0].id
+    useBibleFolderStore.getState().moveItem(itemId, targetId)
+    expect(useBibleFolderStore.getState().getItems(ROOT_ID)).toHaveLength(0)
+    expect(useBibleFolderStore.getState().getItems(targetId)).toHaveLength(1)
+    expect(useBibleFolderStore.getState().getItems(targetId)[0].id).toBe(itemId)
   })
 
   it('moves item from subfolder back to root', () => {
     useBibleFolderStore.getState().addFolder('Source')
-    const sourceId = useBibleFolderStore.getState().root.folders[0].id
-    useBibleFolderStore.getState().addItem(makeVerse('v1'), sourceId)
-    useBibleFolderStore.getState().moveItem('v1', ROOT_ID)
-    expect(useBibleFolderStore.getState().root.folders[0].items).toHaveLength(0)
-    expect(useBibleFolderStore.getState().root.items).toHaveLength(1)
+    const sourceId = useBibleFolderStore.getState().getChildFolders(ROOT_ID)[0].id
+    useBibleFolderStore.getState().addItem({ ...makeVerse('v1'), parentId: sourceId })
+    const itemId = useBibleFolderStore.getState().getItems(sourceId)[0].id
+    useBibleFolderStore.getState().moveItem(itemId, ROOT_ID)
+    expect(useBibleFolderStore.getState().getItems(sourceId)).toHaveLength(0)
+    expect(useBibleFolderStore.getState().getItems(ROOT_ID)).toHaveLength(1)
   })
 
   it('is a no-op when itemId does not exist', () => {
     useBibleFolderStore.getState().addFolder('Target')
-    const targetId = useBibleFolderStore.getState().root.folders[0].id
-    mockSaveFolderTree.mockClear()
+    const targetId = useBibleFolderStore.getState().getChildFolders(ROOT_ID)[0].id
+    mockSaveItem.mockClear()
     useBibleFolderStore.getState().moveItem('nonexistent', targetId)
-    expect(mockSaveFolderTree).not.toHaveBeenCalled()
+    expect(mockSaveItem).not.toHaveBeenCalled()
   })
 })
 
@@ -243,50 +274,58 @@ describe('reorderItems()', () => {
     useBibleFolderStore.getState().addItem(makeVerse('a'))
     useBibleFolderStore.getState().addItem(makeVerse('b'))
     useBibleFolderStore.getState().addItem(makeVerse('c'))
-    useBibleFolderStore.getState().reorderItems(ROOT_ID, ['c', 'a', 'b'])
-    const items = useBibleFolderStore.getState().root.items
-    expect(items[0].id).toBe('c')
+    const [idA, idB, idC] = useBibleFolderStore
+      .getState()
+      .getItems(ROOT_ID)
+      .map((i) => i.id)
+    useBibleFolderStore.getState().reorderItems(ROOT_ID, [idC, idA, idB])
+    const items = useBibleFolderStore.getState().getItems(ROOT_ID)
+    expect(items[0].id).toBe(idC)
     expect(items[0].sortIndex).toBe(0)
-    expect(items[1].id).toBe('a')
+    expect(items[1].id).toBe(idA)
     expect(items[1].sortIndex).toBe(1)
-    expect(items[2].id).toBe('b')
+    expect(items[2].id).toBe(idB)
     expect(items[2].sortIndex).toBe(2)
   })
 
   it('persists after reorder', () => {
     useBibleFolderStore.getState().addItem(makeVerse('a'))
     useBibleFolderStore.getState().addItem(makeVerse('b'))
-    mockSaveFolderTree.mockClear()
-    useBibleFolderStore.getState().reorderItems(ROOT_ID, ['b', 'a'])
-    expect(mockSaveFolderTree).toHaveBeenCalled()
+    const [idA, idB] = useBibleFolderStore
+      .getState()
+      .getItems(ROOT_ID)
+      .map((i) => i.id)
+    mockSaveItems.mockClear()
+    useBibleFolderStore.getState().reorderItems(ROOT_ID, [idB, idA])
+    expect(mockSaveItems).toHaveBeenCalled()
   })
 })
 
 describe('navigateToFolder() / navigateUp() / navigateToRoot()', () => {
-  it('navigateToFolder sets currentFolderId', () => {
+  it('navigateToFolder sets currentFolderId', async () => {
     useBibleFolderStore.getState().addFolder('Sub')
-    const folderId = useBibleFolderStore.getState().root.folders[0].id
-    useBibleFolderStore.getState().navigateToFolder(folderId)
+    const folderId = useBibleFolderStore.getState().getChildFolders(ROOT_ID)[0].id
+    await useBibleFolderStore.getState().navigateToFolder(folderId)
     expect(useBibleFolderStore.getState().currentFolderId).toBe(folderId)
   })
 
-  it('navigateToFolder is a no-op for nonexistent folder', () => {
-    useBibleFolderStore.getState().navigateToFolder('ghost-id')
+  it('navigateToFolder is a no-op for nonexistent folder', async () => {
+    await useBibleFolderStore.getState().navigateToFolder('ghost-id')
     expect(useBibleFolderStore.getState().currentFolderId).toBe(ROOT_ID)
   })
 
-  it('navigateToRoot returns to root', () => {
+  it('navigateToRoot returns to root', async () => {
     useBibleFolderStore.getState().addFolder('Sub')
-    const folderId = useBibleFolderStore.getState().root.folders[0].id
-    useBibleFolderStore.getState().navigateToFolder(folderId)
+    const folderId = useBibleFolderStore.getState().getChildFolders(ROOT_ID)[0].id
+    await useBibleFolderStore.getState().navigateToFolder(folderId)
     useBibleFolderStore.getState().navigateToRoot()
     expect(useBibleFolderStore.getState().currentFolderId).toBe(ROOT_ID)
   })
 
-  it('navigateUp from subfolder goes to root (parent)', () => {
+  it('navigateUp from subfolder goes to root (parent)', async () => {
     useBibleFolderStore.getState().addFolder('Sub')
-    const folderId = useBibleFolderStore.getState().root.folders[0].id
-    useBibleFolderStore.getState().navigateToFolder(folderId)
+    const folderId = useBibleFolderStore.getState().getChildFolders(ROOT_ID)[0].id
+    await useBibleFolderStore.getState().navigateToFolder(folderId)
     useBibleFolderStore.getState().navigateUp()
     expect(useBibleFolderStore.getState().currentFolderId).toBe(ROOT_ID)
   })
@@ -297,18 +336,18 @@ describe('navigateToFolder() / navigateUp() / navigateToRoot()', () => {
   })
 })
 
-describe('getCurrentFolder()', () => {
+describe('current folder via folders[currentFolderId]', () => {
   it('returns root when at root', () => {
-    const current = useBibleFolderStore.getState().getCurrentFolder()
-    expect(current.id).toBe(ROOT_ID)
+    const { folders, currentFolderId } = useBibleFolderStore.getState()
+    expect(folders[currentFolderId].id).toBe(ROOT_ID)
   })
 
-  it('returns correct subfolder when navigated', () => {
+  it('returns correct subfolder when navigated', async () => {
     useBibleFolderStore.getState().addFolder('Deep')
-    const folderId = useBibleFolderStore.getState().root.folders[0].id
-    useBibleFolderStore.getState().navigateToFolder(folderId)
-    const current = useBibleFolderStore.getState().getCurrentFolder()
-    expect(current.id).toBe(folderId)
-    expect(current.name).toBe('Deep')
+    const folderId = useBibleFolderStore.getState().getChildFolders(ROOT_ID)[0].id
+    await useBibleFolderStore.getState().navigateToFolder(folderId)
+    const { folders, currentFolderId } = useBibleFolderStore.getState()
+    expect(folders[currentFolderId].id).toBe(folderId)
+    expect(folders[currentFolderId].name).toBe('Deep')
   })
 })

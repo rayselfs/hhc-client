@@ -70,7 +70,8 @@ export function buildVerseHistoryItem(params: {
   return {
     id: `${versionCode}-${bookNumber}-${chapter}-${verseNumber}`,
     type: 'verse',
-    folderId: '',
+    parentId: '',
+    sortIndex: 0,
     bookCode: bookConfig?.code ?? '',
     bookName,
     bookNumber,
@@ -80,6 +81,7 @@ export function buildVerseHistoryItem(params: {
     text,
     versionCode,
     versionName,
-    createdAt: Date.now()
+    createdAt: Date.now(),
+    expiresAt: null
   }
 }
