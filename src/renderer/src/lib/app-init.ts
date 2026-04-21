@@ -39,5 +39,10 @@ export function initializeApp(): () => void {
   return () => {
     unsubscribe()
     initialized = false
+    // Reset loading state so StrictMode re-mount can re-initialize
+    const s = useBibleStore.getState()
+    if (s.isLoading && !s.isInitialized) {
+      useBibleStore.setState({ isLoading: false })
+    }
   }
 }
