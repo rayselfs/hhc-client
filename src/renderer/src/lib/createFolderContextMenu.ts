@@ -188,8 +188,6 @@ export function createFolderContextMenu<TItem extends FolderItem>(
       onCut,
       onDelete
     }: ShowMultiSelectMenuOptions): void => {
-      const count = selectedIds.size
-
       const items: ContextMenuEntry[] = [
         {
           id: 'copy',
@@ -206,7 +204,7 @@ export function createFolderContextMenu<TItem extends FolderItem>(
         'separator',
         {
           id: 'delete',
-          label: t('bible.custom.contextMenu.deleteCount', { count }),
+          label: t('bible.custom.contextMenu.delete'),
           icon: React.createElement(Trash2, { size: 14 }),
           variant: 'danger',
           onAction: () => onDelete(selectedIds)
