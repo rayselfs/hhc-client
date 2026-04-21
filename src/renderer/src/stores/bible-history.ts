@@ -31,24 +31,41 @@ export const useBibleHistoryStore = create<BibleHistoryState>()(
     {
       name: createKey('bible-history'),
       storage: hhcPersistStorage,
-      version: 1,
+      version: 2,
       partialize: (state) => ({ items: state.items }),
       migrate: (persisted, version) => {
-        if (version === 0) {
-          const state = persisted as { items: Record<string, unknown>[] }
-          if (state.items) {
-            state.items = state.items.map((item) => {
-              const { folderId, ...rest } = item as Record<string, unknown> & {
+        const state = persisted as { items: Record<string, unknown>[] }
+        if (state.items) {
+          state.items = state.items.map((item) => {
+            const migrated = { ...item } as Record<string, unknown>
+
+            if (version < 1) {
+              const { folderId, ...rest } = migrated as Record<string, unknown> & {
                 folderId?: string
               }
-              return {
-                ...rest,
-                parentId: (rest as { parentId?: string }).parentId ?? folderId ?? '',
-                sortIndex: (rest as { sortIndex?: number }).sortIndex ?? 0,
-                expiresAt: (rest as { expiresAt?: number | null }).expiresAt ?? null
+              Object.assign(migrated, rest)
+              migrated.parentId = (migrated.parentId as string) ?? folderId ?? ''
+              migrated.sortIndex = (migrated.sortIndex as number) ?? 0
+              migrated.expiresAt = (migrated.expiresAt as number | null) ?? null
+            }
+
+            if (version < 2) {
+              if ('verseStart' in migrated) {
+                migrated.verse = migrated.verseStart
+                delete migrated.verseStart
+                delete migrated.verseEnd
               }
-            })
-          }
+              if (!('versionId' in migrated)) {
+                migrated.versionId = 0
+              }
+              delete migrated.bookCode
+              delete migrated.bookName
+              delete migrated.versionCode
+              delete migrated.versionName
+            }
+
+            return migrated
+          })
         }
         return persisted as BibleHistoryState
       }

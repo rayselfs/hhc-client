@@ -23,6 +23,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { useBibleFolderStore } from '@renderer/stores/folder'
 import { useBibleStore } from '@renderer/stores/bible'
+import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 import { formatVerseReferenceShort } from '@renderer/lib/bible-utils'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
@@ -58,7 +59,7 @@ interface CustomFolderTabProps {
 }
 
 function getVerseReference(item: VerseItemRecord, t: TFunction): string {
-  return formatVerseReferenceShort(t, item.bookNumber, item.chapter, item.verseStart, item.verseEnd)
+  return formatVerseReferenceShort(t, item.bookNumber, item.chapter, item.verse)
 }
 
 function getNextUntitledName(baseName: string, existingNames: string[]): string {
@@ -325,10 +326,19 @@ export function CustomFolderTab({
 
   const handleVerseDoubleClick = useCallback(
     (item: VerseItemRecord) => {
-      navigateTo({ bookNumber: item.bookNumber, chapter: item.chapter, verse: item.verseStart })
       const { content, versions } = useBibleStore.getState()
-      const versionId = versions?.length > 0 ? versions[0].id : 0
-      const books = content?.get(versionId)
+      const { selectedVersionId, setSelectedVersionId } = useBibleSettingsStore.getState()
+
+      const targetVersionId =
+        item.versionId && versions.some((v) => v.id === item.versionId)
+          ? item.versionId
+          : selectedVersionId
+      if (targetVersionId !== selectedVersionId) {
+        setSelectedVersionId(targetVersionId)
+      }
+
+      navigateTo({ bookNumber: item.bookNumber, chapter: item.chapter, verse: item.verse })
+      const books = content?.get(targetVersionId)
       const book = books?.find((b) => b.number === item.bookNumber)
       const chapter = book?.chapters.find((c) => c.number === item.chapter)
       if (!chapter) return
@@ -337,7 +347,7 @@ export function CustomFolderTab({
         bookNumber: item.bookNumber,
         chapter: item.chapter,
         chapterVerses: chapter.verses.map((v) => ({ number: v.number, text: v.text })),
-        currentVerse: item.verseStart
+        currentVerse: item.verse
       })
     },
     [navigateTo, claimProjection, project]

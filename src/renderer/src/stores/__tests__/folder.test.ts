@@ -49,15 +49,11 @@ const rootFolder: FolderRecord = {
 const makeVerse = (id: string): Omit<VerseItemRecord, 'id' | 'sortIndex' | 'createdAt'> => ({
   type: 'verse',
   parentId: ROOT_ID,
-  bookCode: 'Gen',
-  bookName: 'Genesis',
+  versionId: 1,
   bookNumber: 1,
   chapter: 1,
-  verseStart: 1,
-  verseEnd: 1,
+  verse: 1,
   text: `Verse ${id}`,
-  versionCode: 'KJV',
-  versionName: 'King James',
   expiresAt: null
 })
 

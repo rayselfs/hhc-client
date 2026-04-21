@@ -54,17 +54,11 @@ export function BiblePreview({
   ): void => {
     e.stopPropagation()
     if (!book || !chapter) return
-    const bookName = book
-      ? (t as (k: string) => string)(
-          `bible.books.${getBookConfig(book.number)?.code.toLowerCase()}.name`
-        )
-      : ''
     const item = buildVerseItem({
       bookNumber: book.number,
       chapter: chapter.number,
       verse: verseNumber,
-      text: verseText,
-      bookName
+      text: verseText
     })
     useBibleFolderStore.getState().addItem(item)
   }
@@ -108,16 +102,12 @@ export function BiblePreview({
     onSelectedVerseIndexChange(verseIndex)
 
     const { selectedVersionId } = useBibleSettingsStore.getState()
-    const { versions } = useBibleStore.getState()
-    const versionMeta = versions.find((v) => v.id === selectedVersionId)
     const historyItem = buildVerseHistoryItem({
+      versionId: selectedVersionId,
       bookNumber: book.number,
-      bookName: book.name,
       chapter: chapter.number,
       verseNumber,
-      text: _verseText,
-      versionCode: versionMeta?.code ?? '',
-      versionName: versionMeta?.name ?? ''
+      text: _verseText
     })
     useBibleHistoryStore.getState().addToHistory(historyItem)
   }

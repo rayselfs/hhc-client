@@ -160,74 +160,61 @@ describe('bible-utils', () => {
   describe('buildVerseHistoryItem', () => {
     it('builds verse history item with all required fields', () => {
       const params = {
+        versionId: 1,
         bookNumber: 1,
-        bookName: 'Genesis',
         chapter: 1,
         verseNumber: 1,
-        text: 'In the beginning...',
-        versionCode: 'KJV',
-        versionName: 'King James Version'
+        text: 'In the beginning...'
       }
 
       const result = buildVerseHistoryItem(params)
 
       expect(result).toEqual({
-        id: 'KJV-1-1-1',
+        id: expect.any(String),
         type: 'verse',
         parentId: '',
         sortIndex: 0,
-        bookCode: 'Gen',
-        bookName: 'Genesis',
+        versionId: 1,
         bookNumber: 1,
         chapter: 1,
-        verseStart: 1,
-        verseEnd: 1,
+        verse: 1,
         text: 'In the beginning...',
-        versionCode: 'KJV',
-        versionName: 'King James Version',
         createdAt: expect.any(Number),
         expiresAt: null
       })
     })
 
-    it('generates correct id format', () => {
+    it('generates UUID id', () => {
       const result = buildVerseHistoryItem({
+        versionId: 2,
         bookNumber: 19,
-        bookName: 'Psalms',
         chapter: 23,
         verseNumber: 1,
-        text: 'The Lord is my shepherd',
-        versionCode: 'NIV',
-        versionName: 'New International Version'
+        text: 'The Lord is my shepherd'
       })
 
-      expect(result.id).toBe('NIV-19-23-1')
+      expect(result.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)
     })
 
-    it('sets verseStart and verseEnd to the same value', () => {
+    it('sets verse from verseNumber param', () => {
       const result = buildVerseHistoryItem({
+        versionId: 3,
         bookNumber: 1,
-        bookName: 'Genesis',
         chapter: 1,
         verseNumber: 5,
-        text: 'verse text',
-        versionCode: 'ESV',
-        versionName: 'English Standard Version'
+        text: 'verse text'
       })
 
-      expect(result.verseStart).toBe(5)
-      expect(result.verseEnd).toBe(5)
+      expect(result.verse).toBe(5)
     })
 
-    it('sets folderId to empty string', () => {
+    it('sets parentId to empty string', () => {
       const result = buildVerseHistoryItem({
+        versionId: 1,
         bookNumber: 1,
-        bookName: 'Genesis',
         chapter: 1,
         verseNumber: 1,
-        text: 'text',
-        versionCode: 'KJV',
-        versionName: 'KJV'
+        text: 'text'
       })
 
       expect(result.parentId).toBe('')
@@ -235,58 +222,36 @@ describe('bible-utils', () => {
 
     it('sets type to verse', () => {
       const result = buildVerseHistoryItem({
+        versionId: 1,
         bookNumber: 1,
-        bookName: 'Genesis',
         chapter: 1,
         verseNumber: 1,
-        text: 'text',
-        versionCode: 'KJV',
-        versionName: 'KJV'
+        text: 'text'
       })
 
       expect(result.type).toBe('verse')
     })
 
-    it('handles invalid book number (bookCode becomes empty string)', () => {
+    it('stores versionId', () => {
       const result = buildVerseHistoryItem({
-        bookNumber: 999,
-        bookName: 'Unknown',
-        chapter: 1,
-        verseNumber: 1,
-        text: 'text',
-        versionCode: 'KJV',
-        versionName: 'KJV'
-      })
-
-      expect(result.bookCode).toBe('')
-      expect(result.id).toBe('KJV-999-1-1')
-    })
-
-    it('uses bookNumber 31 (Obadiah) correctly', () => {
-      const result = buildVerseHistoryItem({
+        versionId: 42,
         bookNumber: 31,
-        bookName: 'Obadiah',
         chapter: 1,
         verseNumber: 1,
-        text: 'The vision of Obadiah',
-        versionCode: 'NIV',
-        versionName: 'NIV'
+        text: 'The vision of Obadiah'
       })
 
-      expect(result.bookCode).toBe('Oba')
-      expect(result.id).toBe('NIV-31-1-1')
+      expect(result.versionId).toBe(42)
     })
 
     it('stores createdAt as current timestamp', () => {
       const before = Date.now()
       const result = buildVerseHistoryItem({
+        versionId: 1,
         bookNumber: 1,
-        bookName: 'Genesis',
         chapter: 1,
         verseNumber: 1,
-        text: 'text',
-        versionCode: 'KJV',
-        versionName: 'KJV'
+        text: 'text'
       })
       const after = Date.now()
 

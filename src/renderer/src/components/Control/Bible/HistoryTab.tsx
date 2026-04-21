@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useBibleHistoryStore } from '@renderer/stores/bible-history'
 import { useBibleStore } from '@renderer/stores/bible'
+import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 import { formatVerseReferenceShort } from '@renderer/lib/bible-utils'
 import type { VerseItem } from '@shared/types/folder'
 import { ScrollShadow, Button } from '@heroui/react'
@@ -39,10 +40,19 @@ export function HistoryTab(): React.JSX.Element | null {
   }, [items])
 
   const handleNavigate = (item: VerseItem): void => {
+    const { selectedVersionId, setSelectedVersionId } = useBibleSettingsStore.getState()
+    const { versions } = useBibleStore.getState()
+    const targetVersionId =
+      item.versionId && versions.some((v) => v.id === item.versionId)
+        ? item.versionId
+        : selectedVersionId
+    if (targetVersionId !== selectedVersionId) {
+      setSelectedVersionId(targetVersionId)
+    }
     navigateTo({
       bookNumber: item.bookNumber,
       chapter: item.chapter,
-      verse: item.verseStart
+      verse: item.verse
     })
   }
 
@@ -51,13 +61,7 @@ export function HistoryTab(): React.JSX.Element | null {
   }
 
   const getVerseReference = (item: VerseItem): string => {
-    return formatVerseReferenceShort(
-      t,
-      item.bookNumber,
-      item.chapter,
-      item.verseStart,
-      item.verseEnd
-    )
+    return formatVerseReferenceShort(t, item.bookNumber, item.chapter, item.verse)
   }
 
   const todayItemsLength = todayItems.length

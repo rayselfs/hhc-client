@@ -30,15 +30,11 @@ const mockVerseItem: VerseItemRecord = {
   sortIndex: 0,
   createdAt: Date.now(),
   expiresAt: null,
-  bookCode: 'GEN',
-  bookName: '創世記',
+  versionId: 1,
   bookNumber: 1,
   chapter: 1,
-  verseStart: 1,
-  verseEnd: 1,
-  text: 'In the beginning God created.',
-  versionCode: 'CUV',
-  versionName: '和合本'
+  verse: 1,
+  text: 'In the beginning God created.'
 }
 
 const folderSingleton = {
@@ -62,7 +58,8 @@ const folderSingleton = {
 }
 
 const bibleSingleton = {
-  navigateTo: mockNavigateTo
+  navigateTo: mockNavigateTo,
+  versions: [{ id: 1, name: 'CUV' }]
 }
 
 vi.mock('@renderer/stores/folder', () => ({
@@ -86,6 +83,12 @@ vi.mock('@renderer/stores/selectors/folder', () => ({
 vi.mock('@renderer/stores/bible', () => ({
   useBibleStore: Object.assign(vi.fn(), {
     getState: () => bibleSingleton
+  })
+}))
+
+vi.mock('@renderer/stores/bible-settings', () => ({
+  useBibleSettingsStore: Object.assign(vi.fn(), {
+    getState: () => ({ selectedVersionId: 1, setSelectedVersionId: vi.fn() })
   })
 }))
 
@@ -136,6 +139,7 @@ vi.mock('@renderer/contexts/ConfirmDialogContext', () => ({
 }))
 
 vi.mock('react-i18next', () => ({
+  initReactI18next: { type: '3rdParty', init: () => {} },
   useTranslation: () => ({
     t: (key: string, opts: string | { defaultValue?: string } = {}) => {
       const bookMap: Record<string, string> = {

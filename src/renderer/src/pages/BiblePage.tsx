@@ -87,16 +87,12 @@ export default function BiblePage(): React.JSX.Element {
 
       if (!skipHistory) {
         const { selectedVersionId } = useBibleSettingsStore.getState()
-        const { versions } = useBibleStore.getState()
-        const versionMeta = versions.find((v) => v.id === selectedVersionId)
         const historyItem = buildVerseHistoryItem({
+          versionId: selectedVersionId,
           bookNumber: book.number,
-          bookName: book.name,
           chapter: chapter.number,
           verseNumber: verse.number,
-          text: verse.text,
-          versionCode: versionMeta?.code ?? '',
-          versionName: versionMeta?.name ?? ''
+          text: verse.text
         })
         useBibleHistoryStore.getState().addToHistory(historyItem)
       }
@@ -206,8 +202,7 @@ export default function BiblePage(): React.JSX.Element {
       bookNumber: book.number,
       chapter: chapter.number,
       verse: verse.number,
-      text: verse.text,
-      bookName: book.name
+      text: verse.text
     }
     showPreviewMenu(menuData, event)
   }

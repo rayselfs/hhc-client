@@ -57,30 +57,23 @@ export function formatVerseReference(
 }
 
 export function buildVerseHistoryItem(params: {
+  versionId: number
   bookNumber: number
-  bookName: string
   chapter: number
   verseNumber: number
   text: string
-  versionCode: string
-  versionName: string
 }): VerseItem {
-  const { bookNumber, bookName, chapter, verseNumber, text, versionCode, versionName } = params
-  const bookConfig = getBookConfig(bookNumber)
+  const { versionId, bookNumber, chapter, verseNumber, text } = params
   return {
-    id: `${versionCode}-${bookNumber}-${chapter}-${verseNumber}`,
+    id: crypto.randomUUID(),
     type: 'verse',
     parentId: '',
     sortIndex: 0,
-    bookCode: bookConfig?.code ?? '',
-    bookName,
+    versionId,
     bookNumber,
     chapter,
-    verseStart: verseNumber,
-    verseEnd: verseNumber,
+    verse: verseNumber,
     text,
-    versionCode,
-    versionName,
     createdAt: Date.now(),
     expiresAt: null
   }

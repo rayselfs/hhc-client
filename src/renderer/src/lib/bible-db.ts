@@ -65,7 +65,7 @@ interface BibleDBSchema extends DBSchema {
   }
 }
 
-const DB_VERSION = 2
+const DB_VERSION = 3
 
 let bibleDBPromise: Promise<IDBPDatabase<BibleDBSchema>> | null = null
 
@@ -102,6 +102,30 @@ function getBibleDB(): Promise<IDBPDatabase<BibleDBSchema>> {
               }
             })
           }
+        }
+
+        if (oldVersion < 3) {
+          const iStore = transaction.objectStore('folder-items')
+          iStore.getAll().then((items) => {
+            for (const item of items) {
+              const raw = item as unknown as Record<string, unknown>
+              if (raw.type !== 'verse') continue
+              const migrated = { ...raw }
+              if ('verseStart' in migrated) {
+                migrated.verse = migrated.verseStart
+                delete migrated.verseStart
+                delete migrated.verseEnd
+              }
+              if (!('versionId' in migrated)) {
+                migrated.versionId = 0
+              }
+              delete migrated.bookCode
+              delete migrated.bookName
+              delete migrated.versionCode
+              delete migrated.versionName
+              iStore.put(migrated as unknown as AnyItemRecord)
+            }
+          })
         }
       }
     })

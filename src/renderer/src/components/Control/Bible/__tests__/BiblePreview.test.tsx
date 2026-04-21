@@ -125,17 +125,15 @@ vi.mock('@renderer/lib/bible-utils', () => ({
   buildVerseHistoryItem: vi.fn(() => ({
     id: 'mock-verse-item',
     type: 'verse',
-    folderId: '',
-    bookCode: 'GEN',
-    bookName: '創世記',
+    parentId: '',
+    sortIndex: 0,
+    versionId: 1,
     bookNumber: 1,
     chapter: 1,
-    verseStart: 1,
-    verseEnd: 1,
+    verse: 1,
     text: '',
-    versionCode: '',
-    versionName: '',
-    createdAt: Date.now()
+    createdAt: Date.now(),
+    expiresAt: null
   }))
 }))
 

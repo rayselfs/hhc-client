@@ -18,15 +18,11 @@ export interface ItemRecord {
 
 export interface VerseItemRecord extends ItemRecord {
   type: 'verse'
-  bookCode: string
-  bookName: string
+  versionId: number
   bookNumber: number
   chapter: number
-  verseStart: number
-  verseEnd: number
+  verse: number
   text: string
-  versionCode: string
-  versionName: string
 }
 
 export interface FileItemRecord extends ItemRecord {

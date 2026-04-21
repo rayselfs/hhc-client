@@ -3,8 +3,6 @@ import type { ContextMenuEntry } from '@renderer/contexts/ContextMenuContext'
 import { useBibleHistoryStore } from '@renderer/stores/bible-history'
 import { useBibleFolderStore } from '@renderer/stores/folder'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
-import { useBibleStore } from '@renderer/stores/bible'
-import { BIBLE_BOOKS } from '@shared/types/bible'
 import { formatVerseReference } from '@renderer/lib/bible-utils'
 import type { VerseItem } from '@shared/types/folder'
 import { Copy, Trash2 } from 'lucide-react'
@@ -17,7 +15,6 @@ export interface VerseMenuData {
   chapter: number
   verse: number
   text: string
-  bookName: string
 }
 
 export interface UseBibleContextMenu {
@@ -27,35 +24,26 @@ export interface UseBibleContextMenu {
 }
 
 export function buildVerseItem(verse: VerseMenuData): VerseItem {
-  const { bookNumber, chapter, verse: verseNum, text, bookName } = verse
-  const bookConfig = BIBLE_BOOKS.find((b) => b.number === bookNumber)
-  const bookCode = bookConfig?.code ?? ''
-
+  const { bookNumber, chapter, verse: verseNum, text } = verse
   const { selectedVersionId } = useBibleSettingsStore.getState()
-  const { versions } = useBibleStore.getState()
-  const versionMeta = versions.find((v) => v.id === selectedVersionId)
 
   return {
     id: crypto.randomUUID(),
     type: 'verse',
     parentId: '',
     sortIndex: 0,
-    bookCode,
-    bookName,
+    versionId: selectedVersionId,
     bookNumber,
     chapter,
-    verseStart: verseNum,
-    verseEnd: verseNum,
+    verse: verseNum,
     text,
-    versionCode: versionMeta?.code ?? '',
-    versionName: versionMeta?.name ?? '',
     createdAt: Date.now(),
     expiresAt: null
   }
 }
 
 function getFormattedReference(item: VerseItem, t: TFunction): string {
-  return formatVerseReference(t, item.bookNumber, item.chapter, item.verseStart)
+  return formatVerseReference(t, item.bookNumber, item.chapter, item.verse)
 }
 
 export function useBibleContextMenu(): UseBibleContextMenu {

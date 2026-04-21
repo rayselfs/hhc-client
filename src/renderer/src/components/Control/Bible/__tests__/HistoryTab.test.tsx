@@ -9,33 +9,29 @@ const mockRemoveFromHistory = vi.fn()
 const mockItem1: VerseItem = {
   id: 'item-1',
   type: 'verse',
-  folderId: 'root',
-  bookCode: 'GEN',
-  bookName: '創世記',
+  parentId: 'root',
+  sortIndex: 0,
+  versionId: 1,
   bookNumber: 1,
   chapter: 1,
-  verseStart: 1,
-  verseEnd: 1,
+  verse: 1,
   text: 'In the beginning God created the heavens and the earth.',
-  versionCode: 'CUV',
-  versionName: '和合本',
-  createdAt: Date.now()
+  createdAt: Date.now(),
+  expiresAt: null
 }
 
 const mockItem2: VerseItem = {
   id: 'item-2',
   type: 'verse',
-  folderId: 'root',
-  bookCode: 'JHN',
-  bookName: '約翰福音',
+  parentId: 'root',
+  sortIndex: 1,
+  versionId: 1,
   bookNumber: 43,
   chapter: 3,
-  verseStart: 16,
-  verseEnd: 17,
+  verse: 16,
   text: 'For God so loved the world that he gave his one and only Son.',
-  versionCode: 'CUV',
-  versionName: '和合本',
-  createdAt: Date.now()
+  createdAt: Date.now(),
+  expiresAt: null
 }
 
 const historySingleton = {
@@ -44,10 +40,12 @@ const historySingleton = {
 }
 
 const bibleSingleton = {
-  navigateTo: mockNavigateTo
+  navigateTo: mockNavigateTo,
+  versions: [{ id: 1, name: 'CUV' }]
 }
 
 vi.mock('react-i18next', () => ({
+  initReactI18next: { type: '3rdParty', init: () => {} },
   useTranslation: () => ({
     t: (key: string, defaultValue?: string | object) => {
       const bookMap: Record<string, string> = {
@@ -71,7 +69,16 @@ vi.mock('@renderer/stores/bible-history', () => ({
 }))
 
 vi.mock('@renderer/stores/bible', () => ({
-  useBibleStore: (selector: (state: typeof bibleSingleton) => unknown) => selector(bibleSingleton)
+  useBibleStore: Object.assign(
+    (selector: (state: typeof bibleSingleton) => unknown) => selector(bibleSingleton),
+    { getState: () => bibleSingleton }
+  )
+}))
+
+vi.mock('@renderer/stores/bible-settings', () => ({
+  useBibleSettingsStore: Object.assign(vi.fn(), {
+    getState: () => ({ selectedVersionId: 1, setSelectedVersionId: vi.fn() })
+  })
 }))
 
 describe('HistoryTab', () => {
@@ -85,7 +92,7 @@ describe('HistoryTab', () => {
   it('renders history items with references', () => {
     render(<HistoryTab />)
     expect(screen.getByText('創世記 1:1')).toBeInTheDocument()
-    expect(screen.getByText('約翰福音 3:16-17')).toBeInTheDocument()
+    expect(screen.getByText('約翰福音 3:16')).toBeInTheDocument()
   })
 
   it('renders verse text preview', () => {
@@ -108,7 +115,7 @@ describe('HistoryTab', () => {
 
   it('clicking second item navigates to correct passage', () => {
     render(<HistoryTab />)
-    const item = screen.getByText('約翰福音 3:16-17').closest('button')!
+    const item = screen.getByText('約翰福音 3:16').closest('button')!
     fireEvent.click(item)
     expect(mockNavigateTo).toHaveBeenCalledWith({
       bookNumber: 43,
