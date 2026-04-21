@@ -71,7 +71,7 @@ export default function TimerProjection({
             digitClassName="text-accent-foreground"
           />
         </div>
-        <GlassDivider vertical className="mx-4" />
+        <GlassDivider vertical thickness={3} className="mx-4" />
         <div className="w-[60%] flex items-center justify-center">
           <ClockDisplay className="text-white" />
         </div>
