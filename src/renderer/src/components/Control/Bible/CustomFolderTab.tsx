@@ -780,7 +780,7 @@ export function CustomFolderTab({
         <Button
           variant="ghost"
           size="sm"
-          className="opacity-0 group-hover:opacity-100 shrink-0 cursor-pointer hover:!bg-transparent"
+          className="opacity-0 group-hover:opacity-100 shrink-0 cursor-pointer hover:bg-transparent!"
           onPress={() => handleDeleteFolder(item.id, item.name)}
           aria-label={t('bible.delete_folder_title', {
             name: item.name,
@@ -834,7 +834,7 @@ export function CustomFolderTab({
         <Button
           variant="ghost"
           size="sm"
-          className="opacity-0 group-hover:opacity-100 shrink-0 cursor-pointer hover:!bg-transparent"
+          className="opacity-0 group-hover:opacity-100 shrink-0 cursor-pointer hover:bg-transparent!"
           onPress={() => handleDeleteItem(item)}
           aria-label={t('bible.delete_item_title', {
             reference,
