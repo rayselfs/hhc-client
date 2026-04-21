@@ -1015,81 +1015,83 @@ export function CustomFolderTab({
         </DragOverlay>
       </DndContext>
 
-      <Modal>
-        <Modal.Backdrop isOpen={isModalOpen} onOpenChange={handleModalClose} isDismissable>
-          <Modal.Container size="sm">
-            <Modal.Dialog className="p-3 pl-5 pt-5">
-              <Modal.Header>
-                <Modal.Heading>
-                  {editingFolder
-                    ? t('bible.custom.editFolder', 'Edit Folder')
-                    : t('bible.custom.createNewFolder', 'Create New Folder')}
-                </Modal.Heading>
-              </Modal.Header>
-              <Modal.Body>
-                <ShortcutScope name="overlay">
-                  <div className="flex flex-col gap-3">
-                    <TextField
-                      autoFocus
-                      value={newFolderName}
-                      onChange={setNewFolderName}
-                      className="w-full p-1"
-                      onKeyDown={(e) =>
-                        e.key === 'Enter' && !e.nativeEvent.isComposing && handleModalSubmit()
-                      }
-                    >
-                      <Label>{t('bible.custom.folderName', 'Folder Name')}</Label>
-                      <Input variant="secondary" />
-                    </TextField>
-                    <div className="p-1">
-                      <Label className="text-sm mb-1 block">
-                        {t('bible.custom.retention', 'Retention')}
-                      </Label>
-                      <Select
-                        value={folderDuration}
-                        onChange={(v) => setFolderDuration(v as FolderDuration)}
-                        aria-label={t('bible.custom.retention', 'Retention')}
-                        className="w-full"
-                        variant="secondary"
+      {isModalOpen && (
+        <Modal>
+          <Modal.Backdrop isOpen onOpenChange={handleModalClose} isDismissable>
+            <Modal.Container size="sm">
+              <Modal.Dialog className="p-3 pl-5 pt-5">
+                <Modal.Header>
+                  <Modal.Heading>
+                    {editingFolder
+                      ? t('bible.custom.editFolder', 'Edit Folder')
+                      : t('bible.custom.createNewFolder', 'Create New Folder')}
+                  </Modal.Heading>
+                </Modal.Header>
+                <Modal.Body>
+                  <ShortcutScope name="overlay">
+                    <div className="flex flex-col gap-3">
+                      <TextField
+                        autoFocus
+                        value={newFolderName}
+                        onChange={setNewFolderName}
+                        className="w-full p-1"
+                        onKeyDown={(e) =>
+                          e.key === 'Enter' && !e.nativeEvent.isComposing && handleModalSubmit()
+                        }
                       >
-                        <Select.Trigger>
-                          <Select.Value />
-                          <Select.Indicator />
-                        </Select.Trigger>
-                        <Select.Popover>
-                          <ListBox>
-                            {(['1day', '1week', '1month', 'permanent'] as FolderDuration[]).map(
-                              (d) => (
-                                <ListBox.Item
-                                  key={d}
-                                  id={d}
-                                  textValue={t(`bible.custom.duration.${d}`)}
-                                  className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
-                                >
-                                  {t(`bible.custom.duration.${d}`)}
-                                  <ListBox.ItemIndicator />
-                                </ListBox.Item>
-                              )
-                            )}
-                          </ListBox>
-                        </Select.Popover>
-                      </Select>
+                        <Label>{t('bible.custom.folderName', 'Folder Name')}</Label>
+                        <Input variant="secondary" />
+                      </TextField>
+                      <div className="p-1">
+                        <Label className="text-sm mb-1 block">
+                          {t('bible.custom.retention', 'Retention')}
+                        </Label>
+                        <Select
+                          value={folderDuration}
+                          onChange={(v) => setFolderDuration(v as FolderDuration)}
+                          aria-label={t('bible.custom.retention', 'Retention')}
+                          className="w-full"
+                          variant="secondary"
+                        >
+                          <Select.Trigger>
+                            <Select.Value />
+                            <Select.Indicator />
+                          </Select.Trigger>
+                          <Select.Popover>
+                            <ListBox>
+                              {(['1day', '1week', '1month', 'permanent'] as FolderDuration[]).map(
+                                (d) => (
+                                  <ListBox.Item
+                                    key={d}
+                                    id={d}
+                                    textValue={t(`bible.custom.duration.${d}`)}
+                                    className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
+                                  >
+                                    {t(`bible.custom.duration.${d}`)}
+                                    <ListBox.ItemIndicator />
+                                  </ListBox.Item>
+                                )
+                              )}
+                            </ListBox>
+                          </Select.Popover>
+                        </Select>
+                      </div>
                     </div>
-                  </div>
-                </ShortcutScope>
-              </Modal.Body>
-              <Modal.Footer>
-                <Button variant="tertiary" onPress={handleModalClose}>
-                  {t('common.cancel', 'Cancel')}
-                </Button>
-                <Button variant="primary" onPress={handleModalSubmit}>
-                  {t('common.confirm', 'Confirm')}
-                </Button>
-              </Modal.Footer>
-            </Modal.Dialog>
-          </Modal.Container>
-        </Modal.Backdrop>
-      </Modal>
+                  </ShortcutScope>
+                </Modal.Body>
+                <Modal.Footer>
+                  <Button variant="tertiary" onPress={handleModalClose}>
+                    {t('common.cancel', 'Cancel')}
+                  </Button>
+                  <Button variant="primary" onPress={handleModalSubmit}>
+                    {t('common.confirm', 'Confirm')}
+                  </Button>
+                </Modal.Footer>
+              </Modal.Dialog>
+            </Modal.Container>
+          </Modal.Backdrop>
+        </Modal>
+      )}
     </div>
   )
 }
