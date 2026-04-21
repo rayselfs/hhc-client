@@ -27,7 +27,7 @@ interface FolderStoreState {
   addFolder: (name: string, parentId?: string, expiresAt?: number | null) => void
   updateFolder: (id: string, updates: { name?: string; expiresAt?: number | null }) => void
   deleteFolder: (id: string) => void
-  addItem: (item: Omit<AnyItemRecord, 'id' | 'sortIndex' | 'createdAt'>) => void
+  addItem: (item: Omit<AnyItemRecord, 'id' | 'sortIndex' | 'createdAt'> & { id?: string }) => void
   removeItem: (id: string) => void
   moveItem: (itemId: string, targetFolderId: string) => void
   moveFolder: (folderId: string, targetFolderId: string) => void
@@ -182,7 +182,7 @@ export function createFolderStore(config: FolderStoreConfig) {
       const siblings = get().getItems(parentId)
       const item: AnyItemRecord = {
         ...itemData,
-        id: crypto.randomUUID(),
+        id: itemData.id || crypto.randomUUID(),
         parentId,
         sortIndex: siblings.length,
         createdAt: Date.now(),
