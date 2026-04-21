@@ -76,12 +76,16 @@ export default function BiblePage(): React.JSX.Element {
       if (!book || !chapter) return
 
       claimProjection('bible', { unblank: true })
-      project('bible:chapter', {
-        bookNumber: book.number,
-        chapter: chapter.number,
-        chapterVerses: verses.map((v) => ({ number: v.number, text: v.text })),
-        currentVerse: verse.number
-      })
+      project(
+        'bible:chapter',
+        {
+          bookNumber: book.number,
+          chapter: chapter.number,
+          chapterVerses: verses.map((v) => ({ number: v.number, text: v.text })),
+          currentVerse: verse.number
+        },
+        { autoOpen: true }
+      )
       navigateTo({ bookNumber: book.number, chapter: chapter.number, verse: verse.number })
       setSelectedVerseIndex(clamped)
 

@@ -351,6 +351,10 @@ describe('ProjectionContext — web mode', () => {
     const { result } = renderProjection()
 
     act(() => {
+      mockAdapter._trigger('__system:ready', null)
+    })
+
+    act(() => {
       result.current.blankProjection(false)
     })
     expect(result.current.isProjectionBlanked).toBe(false)
@@ -462,6 +466,10 @@ describe('ProjectionContext — claimProjection', () => {
     const { result } = renderProjection()
 
     act(() => {
+      mockAdapter._trigger('__system:ready', null)
+    })
+
+    act(() => {
       result.current.claimProjection('bible')
     })
 
@@ -472,6 +480,10 @@ describe('ProjectionContext — claimProjection', () => {
   it('claimProjection with unblank: true unblanks when currently blanked', () => {
     const { result } = renderProjection()
     expect(result.current.isProjectionBlanked).toBe(true)
+
+    act(() => {
+      mockAdapter._trigger('__system:ready', null)
+    })
 
     act(() => {
       result.current.claimProjection('timer', { unblank: true })

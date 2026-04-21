@@ -223,7 +223,8 @@ describe('BiblePreview', () => {
         bookNumber: 1,
         chapter: 1,
         currentVerse: 1
-      })
+      }),
+      { autoOpen: true }
     )
   })
 

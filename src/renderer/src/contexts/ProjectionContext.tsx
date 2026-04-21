@@ -235,24 +235,35 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
     }
   }, [stopPolling, setIsProjectionOpen, setIsProjectionBlanked, clearPending])
 
+  const sendOrBuffer = useCallback(
+    <C extends ProjectionChannel>(channel: C, data: ProjectionPayload<C>): void => {
+      if (isReadyRef.current) {
+        getAdapter(adapterRef).send(channel, data)
+      } else {
+        pendingPayloadsRef.current.set(channel, { channel, data })
+      }
+    },
+    []
+  )
+
   const claimProjection = useCallback(
     (owner: ProjectionOwner, options?: { unblank?: boolean }): void => {
       setActiveOwner(owner)
-      getAdapter(adapterRef).send('__system:active-owner', { owner })
+      sendOrBuffer('__system:active-owner', { owner })
       if (options?.unblank && isProjectionBlankedRef.current) {
         setIsProjectionBlanked(false)
-        getAdapter(adapterRef).send('__system:blank', { showDefault: false })
+        sendOrBuffer('__system:blank', { showDefault: false })
       }
     },
-    [setIsProjectionBlanked]
+    [setIsProjectionBlanked, sendOrBuffer]
   )
 
   const blankProjection = useCallback(
     (blank: boolean): void => {
       setIsProjectionBlanked(blank)
-      getAdapter(adapterRef).send('__system:blank', { showDefault: blank })
+      sendOrBuffer('__system:blank', { showDefault: blank })
     },
-    [setIsProjectionBlanked]
+    [setIsProjectionBlanked, sendOrBuffer]
   )
 
   const send = useCallback(

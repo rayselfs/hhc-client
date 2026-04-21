@@ -93,12 +93,16 @@ export function BiblePreview({
   const handleVerseClick = (verseIndex: number, verseNumber: number, _verseText: string): void => {
     if (!book || !chapter) return
     claimProjection('bible', { unblank: true })
-    project('bible:chapter', {
-      bookNumber: book.number,
-      chapter: chapter.number,
-      chapterVerses: verses.map((v) => ({ number: v.number, text: v.text })),
-      currentVerse: verseNumber
-    })
+    project(
+      'bible:chapter',
+      {
+        bookNumber: book.number,
+        chapter: chapter.number,
+        chapterVerses: verses.map((v) => ({ number: v.number, text: v.text })),
+        currentVerse: verseNumber
+      },
+      { autoOpen: true }
+    )
     navigateTo({ bookNumber: book.number, chapter: chapter.number, verse: verseNumber })
     scrollBehaviorRef.current = 'smooth'
     onSelectedVerseIndexChange(verseIndex)

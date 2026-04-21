@@ -58,12 +58,16 @@ export function CustomFolderTab({
       const chapter = book?.chapters.find((c) => c.number === item.chapter)
       if (!chapter) return
       claimProjection('bible', { unblank: true })
-      project('bible:chapter', {
-        bookNumber: item.bookNumber,
-        chapter: item.chapter,
-        chapterVerses: chapter.verses.map((v) => ({ number: v.number, text: v.text })),
-        currentVerse: item.verse
-      })
+      project(
+        'bible:chapter',
+        {
+          bookNumber: item.bookNumber,
+          chapter: item.chapter,
+          chapterVerses: chapter.verses.map((v) => ({ number: v.number, text: v.text })),
+          currentVerse: item.verse
+        },
+        { autoOpen: true }
+      )
     },
     [navigateTo, claimProjection, project]
   )
