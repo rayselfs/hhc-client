@@ -24,7 +24,7 @@ interface FolderStoreState {
   isLoading: boolean
 
   initialize: () => Promise<void>
-  addFolder: (name: string, parentId?: string, expiresAt?: number | null) => void
+  addFolder: (name: string, parentId?: string, expiresAt?: number | null) => string
   updateFolder: (id: string, updates: { name?: string; expiresAt?: number | null }) => void
   deleteFolder: (id: string) => void
   addItem: (item: Omit<AnyItemRecord, 'id' | 'sortIndex' | 'createdAt'> & { id?: string }) => void
@@ -135,6 +135,7 @@ export function createFolderStore(config: FolderStoreConfig) {
         folders: { ...state.folders, [newFolder.id]: newFolder }
       }))
       saveFolder(newFolder)
+      return newFolder.id
     },
 
     updateFolder: (id, updates) => {
@@ -177,7 +178,7 @@ export function createFolderStore(config: FolderStoreConfig) {
     },
 
     addItem: (itemData) => {
-      const parentId = itemData.parentId ?? get().currentFolderId
+      const parentId = itemData.parentId || get().currentFolderId
       const isRoot = parentId === config.rootId
       const siblings = get().getItems(parentId)
       const item: AnyItemRecord = {

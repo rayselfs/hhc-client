@@ -66,12 +66,7 @@ export function BiblePreview({
       text: verseText,
       bookName
     })
-    const folderStore = useBibleFolderStore.getState()
-    const targetItems = folderStore.getItems(folderStore.currentFolderId)
-    const alreadyExists = targetItems.some((i) => i.id === item.id)
-    if (!alreadyExists) {
-      folderStore.addItem(item)
-    }
+    useBibleFolderStore.getState().addItem(item)
   }
 
   const scrollContainerCallbackRef = (node: HTMLDivElement | null): void => {

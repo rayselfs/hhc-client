@@ -36,7 +36,7 @@ export function buildVerseItem(verse: VerseMenuData): VerseItem {
   const versionMeta = versions.find((v) => v.id === selectedVersionId)
 
   return {
-    id: `${selectedVersionId}-${bookNumber}-${chapter}-${verseNum}`,
+    id: crypto.randomUUID(),
     type: 'verse',
     parentId: '',
     sortIndex: 0,

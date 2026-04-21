@@ -353,35 +353,57 @@ export function CustomFolderTab({
     }
   }, [clipboard, selectedItemIds])
 
-  const handlePaste = useCallback(() => {
+  const handlePaste = useCallback(async () => {
     if (!clipboard) return
-
-    for (const id of clipboard.itemIds) {
-      const folder = useBibleFolderStore.getState().folders[id]
-      if (folder) {
-        addFolder(folder.name)
-      } else {
-        const item = useBibleFolderStore.getState().items[id]
-        if (item && isVerseItem(item)) {
-          addItem({ ...item, parentId: currentFolderId, expiresAt: null })
-        }
-      }
-    }
+    const store = useBibleFolderStore.getState()
 
     if (clipboard.mode === 'cut') {
       for (const id of clipboard.itemIds) {
-        const folder = useBibleFolderStore.getState().folders[id]
-        if (folder) {
-          deleteFolder(id)
+        if (store.folders[id]) {
+          moveFolder(id, currentFolderId)
         } else {
-          removeItem(id)
+          moveItem(id, currentFolderId)
         }
       }
       setClipboard(null)
+    } else {
+      const copyFolderDeep = async (srcFolderId: string, destParentId: string): Promise<void> => {
+        const srcFolder = useBibleFolderStore.getState().folders[srcFolderId]
+        if (!srcFolder) return
+
+        await useBibleFolderStore.getState().ensureItemsLoaded(srcFolderId)
+
+        const newFolderId = addFolder(srcFolder.name, destParentId, srcFolder.expiresAt)
+
+        const items = useBibleFolderStore.getState().getItems(srcFolderId)
+        for (const item of items) {
+          if (isVerseItem(item)) {
+            const { id: _id, sortIndex: _si, createdAt: _ca, ...rest } = item
+            addItem({ ...rest, parentId: newFolderId, expiresAt: item.expiresAt })
+          }
+        }
+
+        const childFolders = useBibleFolderStore.getState().getChildFolders(srcFolderId)
+        for (const child of childFolders) {
+          await copyFolderDeep(child.id, newFolderId)
+        }
+      }
+
+      for (const id of clipboard.itemIds) {
+        if (store.folders[id]) {
+          await copyFolderDeep(id, currentFolderId)
+        } else {
+          const item = store.items[id]
+          if (item && isVerseItem(item)) {
+            const { id: _id, sortIndex: _si, createdAt: _ca, ...rest } = item
+            addItem({ ...rest, parentId: currentFolderId, expiresAt: null })
+          }
+        }
+      }
     }
 
     setSelectedItemIds(new Set())
-  }, [clipboard, currentFolderId, addItem, addFolder, removeItem, deleteFolder])
+  }, [clipboard, currentFolderId, addItem, addFolder, moveItem, moveFolder])
 
   const handleDeleteSelected = useCallback(
     async (targetIds?: Set<string>) => {
