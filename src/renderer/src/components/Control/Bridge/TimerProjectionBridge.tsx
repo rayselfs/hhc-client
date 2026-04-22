@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import { useTimerStore, getDisplayValues } from '@renderer/stores/timer'
 import { useStopwatchStore } from '@renderer/stores/stopwatch'
 import { useSettingsStore } from '@renderer/stores/settings'
@@ -6,18 +7,35 @@ import { selectFormattedTime } from '@renderer/stores/selectors/stopwatch'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
 
 export default function TimerProjectionBridge(): null {
-  const mode = useTimerStore((s) => s.mode)
-  const phase = useTimerStore((s) => s.phase)
-  const progress = useTimerStore((s) => s.progress)
-  const remainingSeconds = useTimerStore((s) => s.remainingSeconds)
-  const overtimeSeconds = useTimerStore((s) => s.overtimeSeconds)
-  const totalDuration = useTimerStore((s) => s.totalDuration)
-  const reminderEnabled = useTimerStore((s) => s.reminderEnabled)
-  const reminderDuration = useTimerStore((s) => s.reminderDuration)
-  const reminderColor = useTimerStore((s) => s.reminderColor)
-  const overtimeMessageEnabled = useTimerStore((s) => s.overtimeMessageEnabled)
-  const overtimeMessage = useTimerStore((s) => s.overtimeMessage)
-  const timerStatus = useTimerStore((s) => s.status)
+  const {
+    mode,
+    phase,
+    progress,
+    remainingSeconds,
+    overtimeSeconds,
+    totalDuration,
+    reminderEnabled,
+    reminderDuration,
+    reminderColor,
+    overtimeMessageEnabled,
+    overtimeMessage,
+    status: timerStatus
+  } = useTimerStore(
+    useShallow((s) => ({
+      mode: s.mode,
+      phase: s.phase,
+      progress: s.progress,
+      remainingSeconds: s.remainingSeconds,
+      overtimeSeconds: s.overtimeSeconds,
+      totalDuration: s.totalDuration,
+      reminderEnabled: s.reminderEnabled,
+      reminderDuration: s.reminderDuration,
+      reminderColor: s.reminderColor,
+      overtimeMessageEnabled: s.overtimeMessageEnabled,
+      overtimeMessage: s.overtimeMessage,
+      status: s.status
+    }))
+  )
 
   const swStatus = useStopwatchStore((s) => s.status)
   const swElapsedMs = useStopwatchStore((s) => s.elapsedMs)
