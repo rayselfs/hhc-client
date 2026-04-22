@@ -193,14 +193,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       adapter.dispose()
       adapterRef.current = null
     }
-  }, [
-    startPolling,
-    stopPolling,
-    setIsProjectionOpen,
-    setIsProjectionBlanked,
-    clearPending,
-    flushPendingPayloads
-  ])
+  }, [stopPolling, setIsProjectionOpen, setIsProjectionBlanked, clearPending, flushPendingPayloads])
 
   const openProjection = useCallback(async (): Promise<void> => {
     if (isElectron()) {
