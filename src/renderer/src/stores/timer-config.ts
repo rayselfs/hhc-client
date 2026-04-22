@@ -115,37 +115,7 @@ export const useTimerConfigStore = create<TimerConfigState>()(
         overtimeMessageEnabled: state.overtimeMessageEnabled,
         overtimeMessage: state.overtimeMessage,
         presets: state.presets
-      }),
-      onRehydrateStorage: () => () => {
-        const newKeyExists = localStorage.getItem(createKey('timer-config')) !== null
-        if (!newKeyExists) {
-          try {
-            const oldRaw = localStorage.getItem(createKey('timer'))
-            if (oldRaw) {
-              const oldParsed = JSON.parse(oldRaw) as { state?: Partial<TimerConfigState> }
-              const old = oldParsed?.state
-              if (old) {
-                const migrated: Partial<TimerConfigState> = {}
-                if (old.mode !== undefined) migrated.mode = old.mode
-                if (old.totalDuration !== undefined) migrated.totalDuration = old.totalDuration
-                if (old.reminderEnabled !== undefined)
-                  migrated.reminderEnabled = old.reminderEnabled
-                if (old.reminderDuration !== undefined)
-                  migrated.reminderDuration = old.reminderDuration
-                if (old.reminderColor !== undefined) migrated.reminderColor = old.reminderColor
-                if (old.overtimeMessageEnabled !== undefined)
-                  migrated.overtimeMessageEnabled = old.overtimeMessageEnabled
-                if (old.overtimeMessage !== undefined)
-                  migrated.overtimeMessage = old.overtimeMessage
-                if (old.presets !== undefined) migrated.presets = old.presets
-                useTimerConfigStore.setState(migrated)
-              }
-            }
-          } catch (_e) {
-            void _e
-          }
-        }
-      }
+      })
     }
   )
 )

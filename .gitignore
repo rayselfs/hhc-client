@@ -8,3 +8,4 @@ coverage
 .playwright-mcp
 *.log*
 *.tsbuildinfo
+bundle-report.html
