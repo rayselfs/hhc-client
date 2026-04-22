@@ -3,7 +3,6 @@
 @import '@fontsource-variable/noto-sans-tc';
 @import '@fontsource-variable/noto-sans-sc';
 @import 'tailwindcss';
-@import 'tw-animate-css';
 @import '@heroui/styles';
 
 @custom-variant dark (&:where(.dark, .dark *));
