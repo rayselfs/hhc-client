@@ -11,14 +11,7 @@ export class WindowManager {
   private projectionWindow: BrowserWindow | null = null
 
   // eslint-disable-next-line @typescript-eslint/no-empty-function -- singleton pattern requires private constructor
-  private constructor() {
-    screen.on('display-added', () => {
-      _cachedDisplay = undefined
-    })
-    screen.on('display-removed', () => {
-      _cachedDisplay = undefined
-    })
-  }
+  private constructor() {}
 
   static getInstance(): WindowManager {
     if (!WindowManager.instance) {
@@ -40,6 +33,13 @@ export class WindowManager {
   }
 
   createMainWindow(): void {
+    screen.on('display-added', () => {
+      _cachedDisplay = undefined
+    })
+    screen.on('display-removed', () => {
+      _cachedDisplay = undefined
+    })
+
     const externalDisplay = this.getExternalDisplay()
     const hasSecondScreen = externalDisplay !== undefined
 
