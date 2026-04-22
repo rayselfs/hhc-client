@@ -13,8 +13,10 @@ import { SHORTCUTS } from '@renderer/config/shortcuts'
 import { EVENTS } from '@renderer/config/events'
 import { buildVerseHistoryItem } from '@renderer/lib/bible-utils'
 import type { BiblePassage } from '@shared/types/bible'
+import { useAppInit } from '@renderer/components/Control/Layout'
 
 export default function BiblePage(): React.JSX.Element {
+  const initialized = useAppInit()
   const {
     getCurrentVerses,
     getCurrentBook,
@@ -213,18 +215,26 @@ export default function BiblePage(): React.JSX.Element {
 
   return (
     <div data-testid="bible-page" className="flex flex-row gap-4 h-full">
-      <BiblePreview
-        onContextMenu={handleContextMenu}
-        selectedVerseIndex={selectedVerseIndex}
-        onSelectedVerseIndexChange={setSelectedVerseIndex}
-        scrollBehaviorRef={scrollBehaviorRef}
-      />
-      <BibleMultiFunction />
-      <BibleSelectorDialog
-        isOpen={isSelectorOpen}
-        onOpenChange={setSelectorOpen}
-        onSelect={handleSelectPassage}
-      />
+      {!initialized ? (
+        <div className="flex items-center justify-center h-full w-full">
+          <span className="text-default-400">Loading...</span>
+        </div>
+      ) : (
+        <>
+          <BiblePreview
+            onContextMenu={handleContextMenu}
+            selectedVerseIndex={selectedVerseIndex}
+            onSelectedVerseIndexChange={setSelectedVerseIndex}
+            scrollBehaviorRef={scrollBehaviorRef}
+          />
+          <BibleMultiFunction />
+          <BibleSelectorDialog
+            isOpen={isSelectorOpen}
+            onOpenChange={setSelectorOpen}
+            onSelect={handleSelectPassage}
+          />
+        </>
+      )}
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import { Outlet } from 'react-router-dom'
-import { useEffect, useRef } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import Sidebar from '@renderer/components/Control/Sidebar'
 import Header from '@renderer/components/Control/Header/Header'
@@ -14,6 +14,10 @@ import { ShortcutScopeProvider } from '@renderer/contexts/ShortcutScopeContext'
 import { isWeb } from '@renderer/lib/env'
 import { toast } from '@heroui/react'
 import { initializeApp } from '@renderer/lib/app-init'
+import { useBibleStore } from '@renderer/stores/bible'
+
+const AppInitContext = createContext(false)
+export const useAppInit = (): boolean => useContext(AppInitContext)
 function ProjectionAutoOpen(): null {
   const { t } = useTranslation()
   const { isProjectionOpen, openProjection } = useProjection()
@@ -42,33 +46,47 @@ function ProjectionAutoOpen(): null {
 }
 
 export default function Layout(): React.JSX.Element {
+  const [initialized, setInitialized] = useState(false)
+
   useEffect(() => {
-    return initializeApp()
+    const cleanup = initializeApp()
+    if (useBibleStore.getState().isInitialized) {
+      setInitialized(true)
+    }
+    const unsub = useBibleStore.subscribe((state) => {
+      if (state.isInitialized) setInitialized(true)
+    })
+    return () => {
+      cleanup()
+      unsub()
+    }
   }, [])
 
   return (
-    <ShortcutScopeProvider>
-      <TimerEngineProvider>
-        <ProjectionProvider>
-          <ContextMenuProvider>
-            <ConfirmDialogProvider>
-              <div className="flex h-screen overflow-hidden bg-background text-foreground">
-                <Sidebar />
-                <div className="flex flex-1 flex-col min-h-0">
-                  <Header />
-                  <main className="flex-1 overflow-y-auto py-4 px-3">
-                    <Outlet />
-                  </main>
+    <AppInitContext.Provider value={initialized}>
+      <ShortcutScopeProvider>
+        <TimerEngineProvider>
+          <ProjectionProvider>
+            <ContextMenuProvider>
+              <ConfirmDialogProvider>
+                <div className="flex h-screen overflow-hidden bg-background text-foreground">
+                  <Sidebar />
+                  <div className="flex flex-1 flex-col min-h-0">
+                    <Header />
+                    <main className="flex-1 overflow-y-auto py-4 px-3">
+                      <Outlet />
+                    </main>
+                  </div>
+                  <FloatingTimer />
                 </div>
-                <FloatingTimer />
-              </div>
-              <ConfirmDialog />
-              <TimerProjectionBridge />
-              <ProjectionAutoOpen />
-            </ConfirmDialogProvider>
-          </ContextMenuProvider>
-        </ProjectionProvider>
-      </TimerEngineProvider>
-    </ShortcutScopeProvider>
+                <ConfirmDialog />
+                <TimerProjectionBridge />
+                <ProjectionAutoOpen />
+              </ConfirmDialogProvider>
+            </ContextMenuProvider>
+          </ProjectionProvider>
+        </TimerEngineProvider>
+      </ShortcutScopeProvider>
+    </AppInitContext.Provider>
   )
 }
