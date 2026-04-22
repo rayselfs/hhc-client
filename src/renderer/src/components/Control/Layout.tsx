@@ -1,5 +1,5 @@
 import { Outlet } from 'react-router-dom'
-import { createContext, useContext, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import Sidebar from '@renderer/components/Control/Sidebar'
 import Header from '@renderer/components/Control/Header/Header'
@@ -11,13 +11,12 @@ import { TimerEngineProvider } from '@renderer/contexts/TimerEngineContext'
 import { ContextMenuProvider } from '@renderer/contexts/ContextMenuContext'
 import { ConfirmDialogProvider, useConfirm } from '@renderer/contexts/ConfirmDialogContext'
 import { ShortcutScopeProvider } from '@renderer/contexts/ShortcutScopeContext'
+import { AppInitContext } from '@renderer/contexts/AppInitContext'
 import { isWeb } from '@renderer/lib/env'
 import { toast } from '@heroui/react/toast'
 import { initializeApp } from '@renderer/lib/app-init'
 import { useBibleStore } from '@renderer/stores/bible'
 
-const AppInitContext = createContext(false)
-export const useAppInit = (): boolean => useContext(AppInitContext)
 function ProjectionAutoOpen(): null {
   const { t } = useTranslation()
   const { isProjectionOpen, openProjection } = useProjection()
@@ -50,13 +49,16 @@ export default function Layout(): React.JSX.Element {
 
   useEffect(() => {
     const cleanup = initializeApp()
-    if (useBibleStore.getState().isInitialized) {
-      setInitialized(true)
-    }
+    const timerId = setTimeout(() => {
+      if (useBibleStore.getState().isInitialized) {
+        setInitialized(true)
+      }
+    }, 0)
     const unsub = useBibleStore.subscribe((state) => {
       if (state.isInitialized) setInitialized(true)
     })
     return () => {
+      clearTimeout(timerId)
       cleanup()
       unsub()
     }

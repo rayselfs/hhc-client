@@ -12,7 +12,7 @@ import type { TFunction } from 'i18next'
 
 const LazyColorPickerContent = lazy(async () => {
   const { ColorArea, ColorSlider } = await import('@heroui/react')
-  const Component = ({ t }: { t: TFunction }) => (
+  const Component = ({ t }: { t: TFunction }): React.JSX.Element => (
     <>
       <ColorArea
         aria-label={t('timer.reminder.color')}

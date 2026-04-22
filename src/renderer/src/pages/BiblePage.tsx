@@ -8,12 +8,12 @@ import { BibleSelectorDialog } from '@renderer/components/Control/Bible/BibleSel
 import { useBibleContextMenu } from '@renderer/components/Control/Bible/useBibleContextMenu'
 import type { VerseMenuData } from '@renderer/components/Control/Bible/useBibleContextMenu'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
+import { useAppInit } from '@renderer/contexts/AppInitContext'
 import { useKeyboardShortcuts } from '@renderer/hooks/useKeyboardShortcuts'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
 import { EVENTS } from '@renderer/config/events'
 import { buildVerseHistoryItem } from '@renderer/lib/bible-utils'
 import type { BiblePassage } from '@shared/types/bible'
-import { useAppInit } from '@renderer/components/Control/Layout'
 
 export default function BiblePage(): React.JSX.Element {
   const initialized = useAppInit()
