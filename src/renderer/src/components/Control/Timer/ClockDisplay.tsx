@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { memo, useState, useEffect } from 'react'
 import { useSettingsStore } from '@renderer/stores/settings'
 
 interface ClockDisplayProps {
@@ -18,7 +18,7 @@ function getCurrentTime(timezone: string): string {
   return clockFormatter(timezone).format(new Date())
 }
 
-export default function ClockDisplay({ className }: ClockDisplayProps): React.JSX.Element {
+export default memo(function ClockDisplay({ className }: ClockDisplayProps): React.JSX.Element {
   const timezone = useSettingsStore((s) => s.timezone)
   const [tick, setTick] = useState(0)
 
@@ -37,4 +37,4 @@ export default function ClockDisplay({ className }: ClockDisplayProps): React.JS
       </span>
     </div>
   )
-}
+})
