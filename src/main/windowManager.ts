@@ -28,8 +28,15 @@ export class WindowManager {
   }
 
   private getExternalDisplay(): Electron.Display | undefined {
+    if (_cachedDisplay !== undefined) {
+      return _cachedDisplay === null ? undefined : _cachedDisplay
+    }
+
     const primaryId = screen.getPrimaryDisplay().id
-    return screen.getAllDisplays().find((d) => d.id !== primaryId)
+    const externalDisplay = screen.getAllDisplays().find((d) => d.id !== primaryId)
+    _cachedDisplay = externalDisplay ?? null
+
+    return externalDisplay
   }
 
   createMainWindow(): void {

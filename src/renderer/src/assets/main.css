@@ -3,7 +3,74 @@
 @import '@fontsource-variable/noto-sans-tc';
 @import '@fontsource-variable/noto-sans-sc';
 @import 'tailwindcss';
-@import '@heroui/styles';
+@import 'tw-animate-css';
+
+@import '@heroui/styles/base';
+
+/* Shared components — must come first (used by many other components) */
+@import '@heroui/styles/components/close-button.css';
+@import '@heroui/styles/components/description.css';
+@import '@heroui/styles/components/error-message.css';
+@import '@heroui/styles/components/field-error.css';
+@import '@heroui/styles/components/label.css';
+
+/* Navigation */
+@import '@heroui/styles/components/breadcrumbs.css';
+@import '@heroui/styles/components/tabs.css';
+
+/* Buttons */
+@import '@heroui/styles/components/button.css';
+@import '@heroui/styles/components/button-group.css';
+
+/* Collections */
+@import '@heroui/styles/components/dropdown.css';
+@import '@heroui/styles/components/list-box-item.css';
+@import '@heroui/styles/components/list-box-section.css';
+@import '@heroui/styles/components/list-box.css';
+
+/* Colors */
+@import '@heroui/styles/components/color-area.css';
+@import '@heroui/styles/components/color-picker.css';
+@import '@heroui/styles/components/color-slider.css';
+@import '@heroui/styles/components/color-swatch.css';
+@import '@heroui/styles/components/color-swatch-picker.css';
+@import '@heroui/styles/components/color-input-group.css';
+
+/* Controls */
+@import '@heroui/styles/components/slider.css';
+@import '@heroui/styles/components/switch.css';
+
+/* Feedback */
+@import '@heroui/styles/components/spinner.css';
+@import '@heroui/styles/components/toast.css';
+
+/* Forms */
+@import '@heroui/styles/components/input.css';
+@import '@heroui/styles/components/textfield.css';
+
+/* Layout */
+@import '@heroui/styles/components/card.css';
+
+/* Media */
+@import '@heroui/styles/components/avatar.css';
+
+/* Overlays */
+@import '@heroui/styles/components/alert-dialog.css';
+@import '@heroui/styles/components/modal.css';
+@import '@heroui/styles/components/popover.css';
+
+/* Pickers */
+@import '@heroui/styles/components/select.css';
+
+/* Utilities */
+@import '@heroui/styles/components/scroll-shadow.css';
+
+/* Default theme (color variables + component customizations) */
+@import '@heroui/styles/themes/default';
+
+/* Utilities + variants */
+@import '@heroui/styles/utilities';
+@import '@heroui/styles/variants';
 
 @custom-variant dark (&:where(.dark, .dark *));
 

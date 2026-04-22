@@ -7,6 +7,8 @@ import { openBibleDB } from '@renderer/lib/bible-db'
 export interface FolderStoreState {
   folders: Record<string, FolderRecord>
   items: Record<string, AnyItemRecord>
+  _foldersArray: FolderRecord[]
+  _itemsArray: AnyItemRecord[]
   loadedParents: Set<string>
   currentFolderId: string
   isLoading: boolean
@@ -44,6 +46,8 @@ export function createFolderStore(config: FolderStoreConfig) {
   return create<FolderStoreState>()((set, get) => ({
     folders: {},
     items: {},
+    _foldersArray: [],
+    _itemsArray: [],
     loadedParents: new Set<string>(),
     currentFolderId: config.rootId,
     isLoading: true,
@@ -92,6 +96,8 @@ export function createFolderStore(config: FolderStoreConfig) {
         set({
           folders: folderMap,
           items: itemMap,
+          _foldersArray: Object.values(folderMap),
+          _itemsArray: Object.values(itemMap),
           loadedParents: new Set([config.rootId]),
           isLoading: false
         })
@@ -111,7 +117,7 @@ export function createFolderStore(config: FolderStoreConfig) {
         }
         const newLoaded = new Set(state.loadedParents)
         newLoaded.add(parentId)
-        return { items: newItems, loadedParents: newLoaded }
+        return { items: newItems, _itemsArray: Object.values(newItems), loadedParents: newLoaded }
       })
     },
 
@@ -127,7 +133,8 @@ export function createFolderStore(config: FolderStoreConfig) {
         expiresAt: expiresAt !== undefined ? expiresAt : null
       }
       set((state) => ({
-        folders: { ...state.folders, [newFolder.id]: newFolder }
+        folders: { ...state.folders, [newFolder.id]: newFolder },
+        _foldersArray: [...state._foldersArray, newFolder]
       }))
       ops.saveFolder(newFolder)
       return newFolder.id
@@ -138,9 +145,13 @@ export function createFolderStore(config: FolderStoreConfig) {
       const folder = get().folders[id]
       if (!folder) return
       const updated = { ...folder, ...updates }
-      set((state) => ({
-        folders: { ...state.folders, [id]: updated }
-      }))
+      set((state) => {
+        const newFoldersArray = state._foldersArray.map((f) => (f.id === id ? updated : f))
+        return {
+          folders: { ...state.folders, [id]: updated },
+          _foldersArray: newFoldersArray
+        }
+      })
       ops.saveFolder(updated)
     },
 
@@ -167,7 +178,13 @@ export function createFolderStore(config: FolderStoreConfig) {
 
       const nextCurrentId = allFolderIds.includes(currentFolderId) ? config.rootId : currentFolderId
 
-      set({ folders: newFolders, items: newItems, currentFolderId: nextCurrentId })
+      set({
+        folders: newFolders,
+        items: newItems,
+        _foldersArray: Object.values(newFolders),
+        _itemsArray: Object.values(newItems),
+        currentFolderId: nextCurrentId
+      })
       ops.deleteFolders(allFolderIds)
       if (itemIdsToDelete.length > 0) ops.deleteItems(itemIdsToDelete)
     },
@@ -190,7 +207,8 @@ export function createFolderStore(config: FolderStoreConfig) {
               : null
       } as AnyItemRecord
       set((state) => ({
-        items: { ...state.items, [item.id]: item }
+        items: { ...state.items, [item.id]: item },
+        _itemsArray: [...state._itemsArray, item]
       }))
       ops.saveItem(item)
     },
@@ -199,7 +217,7 @@ export function createFolderStore(config: FolderStoreConfig) {
       set((state) => {
         const newItems = { ...state.items }
         delete newItems[id]
-        return { items: newItems }
+        return { items: newItems, _itemsArray: Object.values(newItems) }
       })
       ops.deleteItem(id)
     },
@@ -213,9 +231,13 @@ export function createFolderStore(config: FolderStoreConfig) {
         parentId: targetFolderId,
         sortIndex: targetSiblings.length
       }
-      set((state) => ({
-        items: { ...state.items, [itemId]: updated }
-      }))
+      set((state) => {
+        const newItemsArray = state._itemsArray.map((i) => (i.id === itemId ? updated : i))
+        return {
+          items: { ...state.items, [itemId]: updated },
+          _itemsArray: newItemsArray
+        }
+      })
       ops.saveItem(updated)
     },
 
@@ -233,9 +255,13 @@ export function createFolderStore(config: FolderStoreConfig) {
         parentId: targetFolderId,
         sortIndex: targetSiblings.length
       }
-      set((state) => ({
-        folders: { ...state.folders, [folderId]: updated }
-      }))
+      set((state) => {
+        const newFoldersArray = state._foldersArray.map((f) => (f.id === folderId ? updated : f))
+        return {
+          folders: { ...state.folders, [folderId]: updated },
+          _foldersArray: newFoldersArray
+        }
+      })
       ops.saveFolder(updated)
     },
 
@@ -253,7 +279,7 @@ export function createFolderStore(config: FolderStoreConfig) {
         for (const item of updated) {
           newItems[item.id] = item
         }
-        return { items: newItems }
+        return { items: newItems, _itemsArray: Object.values(newItems) }
       })
       ops.saveItems(updated)
     },
@@ -272,7 +298,7 @@ export function createFolderStore(config: FolderStoreConfig) {
         for (const folder of updated) {
           newFolders[folder.id] = folder
         }
-        return { folders: newFolders }
+        return { folders: newFolders, _foldersArray: Object.values(newFolders) }
       })
       ops.saveFolders(updated)
     },
@@ -326,20 +352,25 @@ export function createFolderStore(config: FolderStoreConfig) {
             delete newItems[item.id]
           }
         }
-        return { folders: newFolders, items: newItems }
+        return {
+          folders: newFolders,
+          items: newItems,
+          _foldersArray: Object.values(newFolders),
+          _itemsArray: Object.values(newItems)
+        }
       })
     },
 
     getChildFolders: (parentId) => {
-      const { folders } = get()
-      return Object.values(folders)
+      const { _foldersArray } = get()
+      return _foldersArray
         .filter((f) => f.parentId === parentId)
         .sort((a, b) => a.sortIndex - b.sortIndex)
     },
 
     getItems: (parentId) => {
-      const { items } = get()
-      return Object.values(items)
+      const { _itemsArray } = get()
+      return _itemsArray
         .filter((i) => i.parentId === parentId)
         .sort((a, b) => a.sortIndex - b.sortIndex)
     },
