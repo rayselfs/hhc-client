@@ -127,8 +127,12 @@ export class TimerService {
     const secondChanged = this.timer.remainingSeconds !== this.lastBroadcastRemaining
     const secondElapsed = nowMs - this.lastBroadcastTime >= 1000
     const stopwatchRunning = this.stopwatch.status === 'running'
+    const timerRunning = this.timer.status === 'running'
 
-    if (secondChanged || secondElapsed || stopwatchRunning) {
+    if (
+      (secondChanged || secondElapsed || stopwatchRunning) &&
+      (timerRunning || stopwatchRunning)
+    ) {
       this.broadcast()
     }
   }
