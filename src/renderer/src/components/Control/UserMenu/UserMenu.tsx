@@ -1,4 +1,5 @@
-import { Avatar, Dropdown } from '@heroui/react'
+import { Avatar } from '@heroui/react/avatar'
+import { Dropdown } from '@heroui/react/dropdown'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { LogIn, LogOut, Settings, RefreshCw, Keyboard, Power, CircleUser, Info } from 'lucide-react'

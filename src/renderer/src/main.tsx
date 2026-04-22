@@ -6,7 +6,7 @@ import { ThemeProvider } from '@renderer/contexts/ThemeContext'
 import { ErrorBoundary } from '@renderer/components/ErrorBoundary'
 import { RouterProvider } from 'react-router-dom'
 import { router } from '@renderer/router'
-import { Toast } from '@heroui/react'
+import { Toast } from '@heroui/react/toast'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

@@ -1,6 +1,6 @@
 import { useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Button } from '@heroui/react'
+import { Button } from '@heroui/react/button'
 import { Play, Pause, RotateCcw } from 'lucide-react'
 import { useTimerStore } from '@renderer/stores/timer'
 import { useStopwatchStore } from '@renderer/stores/stopwatch'

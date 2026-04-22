@@ -1,4 +1,6 @@
-import { AlertDialog, Button, useOverlayState } from '@heroui/react'
+import { AlertDialog } from '@heroui/react/alert-dialog'
+import { Button } from '@heroui/react/button'
+import { useOverlayState } from '@renderer/lib/use-overlay-state'
 import { useTranslation } from 'react-i18next'
 import { useEffect } from 'react'
 import {

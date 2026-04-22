@@ -12,7 +12,7 @@ import { ContextMenuProvider } from '@renderer/contexts/ContextMenuContext'
 import { ConfirmDialogProvider, useConfirm } from '@renderer/contexts/ConfirmDialogContext'
 import { ShortcutScopeProvider } from '@renderer/contexts/ShortcutScopeContext'
 import { isWeb } from '@renderer/lib/env'
-import { toast } from '@heroui/react'
+import { toast } from '@heroui/react/toast'
 import { initializeApp } from '@renderer/lib/app-init'
 import { useBibleStore } from '@renderer/stores/bible'
 

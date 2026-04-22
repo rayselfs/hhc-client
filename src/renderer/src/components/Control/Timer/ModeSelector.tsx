@@ -1,4 +1,4 @@
-import { Tabs } from '@heroui/react'
+import { Tabs } from '@heroui/react/tabs'
 import { useTranslation } from 'react-i18next'
 import { useTimerStore } from '@renderer/stores/timer'
 import type { TimerMode } from '@shared/types/timer'

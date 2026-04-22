@@ -1,4 +1,6 @@
-import { Popover, Button, Input } from '@heroui/react'
+import { Popover } from '@heroui/react/popover'
+import { Button } from '@heroui/react/button'
+import { Input } from '@heroui/react/input'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { parseDuration } from '@renderer/lib/parse-duration'

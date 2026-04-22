@@ -1,4 +1,5 @@
-import { Modal, useOverlayState } from '@heroui/react'
+import { Modal } from '@heroui/react/modal'
+import { useOverlayState } from '@renderer/lib/use-overlay-state'
 import { useTranslation } from 'react-i18next'
 import { ShortcutScope } from '@renderer/contexts/ShortcutScopeContext'
 import appIcon from '@renderer/assets/icon.png'

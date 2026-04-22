@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Modal, useOverlayState } from '@heroui/react'
+import { Modal } from '@heroui/react/modal'
+import { useOverlayState } from '@renderer/lib/use-overlay-state'
 import { useTranslation } from 'react-i18next'
 import { Timer, BookOpen } from 'lucide-react'
 import { SHORTCUTS } from '@renderer/config/shortcuts'

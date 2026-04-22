@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { toast } from '@heroui/react'
+import { toast } from '@heroui/react/toast'
 import i18n from '@renderer/i18n'
 import { hhcPersistStorage, createKey } from '@renderer/lib/persist-storage'
 import { clearAllSiteData } from '@renderer/lib/site-data'

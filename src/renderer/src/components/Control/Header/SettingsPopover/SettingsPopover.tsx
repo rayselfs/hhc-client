@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next'
-import { Button, Popover } from '@heroui/react'
+import { Button } from '@heroui/react/button'
+import { Popover } from '@heroui/react/popover'
 import { Settings } from 'lucide-react'
 import TimerSettingsPanel from '@renderer/components/Control/Header/SettingsPopover/TimerSettingsPanel'
 import BibleSettingsPanel from '@renderer/components/Control/Header/SettingsPopover/BibleSettingsPanel'

@@ -14,7 +14,7 @@ import {
   type Modifier
 } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
-import { ScrollShadow } from '@heroui/react'
+import { ScrollShadow } from '@heroui/react/scroll-shadow'
 import { useTranslation } from 'react-i18next'
 import type { FolderRecord, AnyItemRecord, FolderDuration } from '@shared/types/folder'
 import { computeExpiresAt, inferDuration } from '@shared/types/folder'

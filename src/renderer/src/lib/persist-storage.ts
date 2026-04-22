@@ -1,6 +1,6 @@
 import { createJSONStorage } from 'zustand/middleware'
 import type { PersistStorage } from 'zustand/middleware'
-import { toast } from '@heroui/react'
+import { toast } from '@heroui/react/toast'
 import i18n from '@renderer/i18n'
 
 export { createKey } from '@renderer/lib/storage-prefix'

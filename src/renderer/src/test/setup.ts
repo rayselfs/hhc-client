@@ -6,7 +6,6 @@ vi.mock('@heroui/react', async () => {
     TabsMock,
     ModalMock,
     PopoverMock,
-    useOverlayStateMock,
     AvatarMock,
     DropdownMock,
     SelectMock,
@@ -19,13 +18,52 @@ vi.mock('@heroui/react', async () => {
     Modal: ModalMock,
     AlertDialog: AlertDialogMock,
     Popover: PopoverMock,
-    useOverlayState: useOverlayStateMock,
     Avatar: AvatarMock,
     Dropdown: DropdownMock,
     Select: SelectMock,
     Listbox: ListboxMock,
     ListBox: ListboxMock
   }
+})
+
+vi.mock('@heroui/react/tabs', async () => {
+  const { TabsMock } = await import('./heroui-mock')
+  return { Tabs: TabsMock }
+})
+
+vi.mock('@heroui/react/modal', async () => {
+  const { ModalMock } = await import('./heroui-mock')
+  return { Modal: ModalMock }
+})
+
+vi.mock('@heroui/react/alert-dialog', async () => {
+  const { AlertDialogMock } = await import('./heroui-mock')
+  return { AlertDialog: AlertDialogMock }
+})
+
+vi.mock('@heroui/react/popover', async () => {
+  const { PopoverMock } = await import('./heroui-mock')
+  return { Popover: PopoverMock }
+})
+
+vi.mock('@heroui/react/avatar', async () => {
+  const { AvatarMock } = await import('./heroui-mock')
+  return { Avatar: AvatarMock }
+})
+
+vi.mock('@heroui/react/dropdown', async () => {
+  const { DropdownMock } = await import('./heroui-mock')
+  return { Dropdown: DropdownMock }
+})
+
+vi.mock('@heroui/react/select', async () => {
+  const { SelectMock } = await import('./heroui-mock')
+  return { Select: SelectMock }
+})
+
+vi.mock('@heroui/react/list-box', async () => {
+  const { ListboxMock } = await import('./heroui-mock')
+  return { ListBox: ListboxMock }
 })
 
 vi.mock('react-aria-components', async () => {

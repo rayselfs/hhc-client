@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next'
-import { Slider, Label } from '@heroui/react'
+import { Slider } from '@heroui/react/slider'
+import { Label } from '@heroui/react/label'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 
 export default function BibleSettingsPanel(): React.JSX.Element {

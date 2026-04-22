@@ -1,4 +1,7 @@
-import { Button, ButtonGroup, Card, Spinner } from '@heroui/react'
+import { Button } from '@heroui/react/button'
+import { ButtonGroup } from '@heroui/react/button-group'
+import { Card } from '@heroui/react/card'
+import { Spinner } from '@heroui/react/spinner'
 import GlassDivider from '@renderer/components/Common/GlassDivider'
 import { useBibleStore } from '@renderer/stores/bible'
 import { useBibleSearchStore } from '@renderer/stores/bible-search'

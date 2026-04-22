@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { Button } from '@heroui/react'
+import { Button } from '@heroui/react/button'
 import { Plus } from 'lucide-react'
 import { useTimerStore } from '@renderer/stores/timer'
 
