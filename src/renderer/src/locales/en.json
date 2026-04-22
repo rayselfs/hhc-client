@@ -105,9 +105,8 @@
       "delete": "Delete",
       "moveToFolder": "Move to Folder",
       "emptyFolder": "Folder is empty",
-      "deleteFolderTitle": "Delete '{{name}}'?",
+      "deleteTitle": "Delete {{name}} ?",
       "deleteFolderDescription": "This action cannot be undone. All verses inside will be lost.",
-      "deleteItemTitle": "Delete {{reference}} ?",
       "deleteItemDescription": "This action cannot be undone.",
       "deleteSelectedTitle": "Delete {{count}} item(s)?",
       "contextMenu": {
@@ -231,9 +230,8 @@
       "permanent": "Permanent"
     },
     "emptyFolder": "Folder is empty",
-    "deleteFolderTitle": "Delete '{{name}}'?",
+    "deleteTitle": "Delete {{name}} ?",
     "deleteFolderDescription": "This action cannot be undone. All items inside will be lost.",
-    "deleteItemTitle": "Delete {{reference}} ?",
     "deleteItemDescription": "This action cannot be undone.",
     "deleteSelectedTitle": "Delete {{count}} item(s)?",
     "contextMenu": {

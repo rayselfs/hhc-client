@@ -105,9 +105,8 @@
       "delete": "删除",
       "moveToFolder": "移动到文件夹",
       "emptyFolder": "空文件夹",
-      "deleteFolderTitle": "删除 '{{name}}'?",
+      "deleteTitle": "删除 {{name}} ?",
       "deleteFolderDescription": "此操作无法撤销。文件夹中的所有经文将被删除。",
-      "deleteItemTitle": "删除 {{reference}} ?",
       "deleteItemDescription": "此操作无法撤销。",
       "deleteSelectedTitle": "删除 {{count}} 个项目?",
       "contextMenu": {
@@ -231,9 +230,8 @@
       "permanent": "永久"
     },
     "emptyFolder": "空文件夹",
-    "deleteFolderTitle": "删除 '{{name}}'?",
+    "deleteTitle": "删除 {{name}} ?",
     "deleteFolderDescription": "此操作无法撤销。文件夹中的所有项目将被删除。",
-    "deleteItemTitle": "删除 {{reference}} ?",
     "deleteItemDescription": "此操作无法撤销。",
     "deleteSelectedTitle": "删除 {{count}} 个项目?",
     "contextMenu": {

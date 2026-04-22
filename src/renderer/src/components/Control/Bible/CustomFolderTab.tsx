@@ -123,10 +123,13 @@ export function CustomFolderTab({
             size="sm"
             className="opacity-0 group-hover:opacity-100 shrink-0 cursor-pointer hover:bg-transparent!"
             onPress={() => handlers.handleDeleteFolder(folder.id, folder.name)}
-            aria-label={t('bible.custom.deleteFolderTitle', {
+            aria-label={t('bible.custom.deleteTitle', {
               name: folder.name,
               defaultValue: `Delete ${folder.name}`
             })}
+            isDisabled={
+              handlers.selectedItemIds.size > 1 && handlers.selectedItemIds.has(folder.id)
+            }
           >
             <X className="w-4 h-4" />
           </Button>
@@ -181,10 +184,11 @@ export function CustomFolderTab({
             size="sm"
             className="opacity-0 group-hover:opacity-100 shrink-0 cursor-pointer hover:bg-transparent!"
             onPress={() => handlers.handleDeleteItem(item)}
-            aria-label={t('bible.custom.deleteItemTitle', {
-              reference,
+            aria-label={t('bible.custom.deleteTitle', {
+              name: reference,
               defaultValue: `Delete ${reference}`
             })}
+            isDisabled={handlers.selectedItemIds.size > 1 && handlers.selectedItemIds.has(item.id)}
           >
             <X className="w-4 h-4" />
           </Button>

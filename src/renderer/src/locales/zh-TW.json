@@ -105,9 +105,8 @@
       "delete": "刪除",
       "moveToFolder": "移動到資料夾",
       "emptyFolder": "空資料夾",
-      "deleteFolderTitle": "刪除 '{{name}}'?",
+      "deleteTitle": "刪除 {{name}} ?",
       "deleteFolderDescription": "此動作無法復原。資料夾中的所有經文將被刪除。",
-      "deleteItemTitle": "刪除 {{reference}} ?",
       "deleteItemDescription": "此動作無法復原。",
       "deleteSelectedTitle": "刪除 {{count}} 個項目?",
       "contextMenu": {
@@ -231,9 +230,8 @@
       "permanent": "永久"
     },
     "emptyFolder": "空資料夾",
-    "deleteFolderTitle": "刪除 '{{name}}'?",
+    "deleteTitle": "刪除 {{name}} ?",
     "deleteFolderDescription": "此動作無法復原。資料夾中的所有項目將被刪除。",
-    "deleteItemTitle": "刪除 {{reference}} ?",
     "deleteItemDescription": "此動作無法復原。",
     "deleteSelectedTitle": "刪除 {{count}} 個項目?",
     "contextMenu": {

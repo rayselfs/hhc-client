@@ -341,11 +341,26 @@ export function FolderBrowser({
       const ids = targetIds ?? selectedItemIds
       if (ids.size === 0) return
 
-      const confirmed = await confirm({
-        title: tp('deleteSelectedTitle', {
+      let title: string
+      if (ids.size === 1) {
+        const [id] = ids
+        const storeState = store.getState()
+        const folder = storeState.folders[id]
+        const name = folder
+          ? folder.name
+          : getItemReference && storeState.items[id]
+            ? getItemReference(storeState.items[id])
+            : id
+        title = tp('deleteTitle', { name, defaultValue: `Delete '${name}'?` })
+      } else {
+        title = tp('deleteSelectedTitle', {
           count: ids.size,
           defaultValue: `Delete ${ids.size} item(s)?`
-        }),
+        })
+      }
+
+      const confirmed = await confirm({
+        title,
         description: tp('deleteItemDescription', {
           defaultValue: 'This action cannot be undone.'
         }),
@@ -365,7 +380,7 @@ export function FolderBrowser({
       setSelectedItemIds(new Set())
       lastClickedIdRef.current = null
     },
-    [selectedItemIds, confirm, tp, removeItem, deleteFolder, store]
+    [selectedItemIds, confirm, tp, removeItem, deleteFolder, store, getItemReference]
   )
 
   const handleDeleteSelectedKeyboard = useCallback(
@@ -503,7 +518,7 @@ export function FolderBrowser({
   const handleDeleteFolder = useCallback(
     async (folderId: string, folderName: string): Promise<void> => {
       const confirmed = await confirm({
-        title: tp('deleteFolderTitle', {
+        title: tp('deleteTitle', {
           name: folderName,
           defaultValue: `Delete '${folderName}'?`
         }),
@@ -523,8 +538,8 @@ export function FolderBrowser({
     async (item: AnyItemRecord): Promise<void> => {
       const reference = getItemReference ? getItemReference(item) : item.id
       const confirmed = await confirm({
-        title: tp('deleteItemTitle', {
-          reference,
+        title: tp('deleteTitle', {
+          name: reference,
           defaultValue: `Delete '${reference}'?`
         }),
         description: tp('deleteItemDescription', {
