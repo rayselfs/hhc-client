@@ -26,7 +26,7 @@ export default function Sidebar(): React.JSX.Element {
   }
 
   return (
-    <nav className="shrink-0 flex flex-col rounded-tr-3xl rounded-br-3xl bg-sidebar text-sidebar-foreground py-2 px-2 w-[180px] max-lg:w-[52px] transition-[width] duration-200">
+    <nav className="shrink-0 flex flex-col rounded-tr-3xl rounded-br-3xl bg-sidebar text-sidebar-foreground py-2 px-2 w-[180px] max-lg:w-[54px] transition-[width] duration-200">
       <ul className="flex flex-col gap-1">
         {items.map((item) => {
           const active = isActive(item)
@@ -39,7 +39,7 @@ export default function Sidebar(): React.JSX.Element {
                 draggable={false}
                 className={`flex cursor-default items-center gap-3 rounded-full px-3 py-2 max-lg:justify-center max-lg:px-2 ${active ? 'bg-accent text-accent-foreground' : 'text-muted hover:opacity-70'}`}
               >
-                <Icon className="size-4 shrink-0" />
+                <Icon className="size-5 shrink-0" />
                 <span className="max-lg:hidden">{item.label}</span>
               </Link>
             </li>
