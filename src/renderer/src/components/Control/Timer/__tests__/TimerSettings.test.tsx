@@ -262,12 +262,12 @@ describe('SettingsPopover — overtime message toggle', () => {
 })
 
 describe('SettingsPopover — overtime input visibility', () => {
-  it('does not show overtime message input when overtime is disabled', async () => {
+  it('shows overtime message input as disabled when overtime is disabled', async () => {
     const user = userEvent.setup()
     useTimerStore.setState({ overtimeMessageEnabled: false })
     renderWithI18n()
     await user.click(screen.getByRole('button', { name: /settings/i }))
-    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+    expect(screen.getByRole('textbox')).toBeDisabled()
   })
 
   it('shows overtime message input when overtime is enabled', async () => {
