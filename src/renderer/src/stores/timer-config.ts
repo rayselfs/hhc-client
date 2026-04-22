@@ -84,8 +84,9 @@ export const useTimerConfigStore = create<TimerConfigState>()(
         overtimeMessage: state.overtimeMessage,
         presets: state.presets
       }),
-      onRehydrateStorage: () => (state) => {
-        if (!state) {
+      onRehydrateStorage: () => (_state) => {
+        const newKeyExists = localStorage.getItem(createKey('timer-config')) !== null
+        if (!newKeyExists) {
           try {
             const oldRaw = localStorage.getItem(createKey('timer'))
             if (oldRaw) {

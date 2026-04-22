@@ -1,5 +1,5 @@
 import { useTimerConfigStore } from './timer-config'
-import { useTimerRuntimeStore, formatTime } from './timer-runtime'
+import { useTimerRuntimeStore, formatTime, computeProgress } from './timer-runtime'
 import type { TimerConfigState } from './timer-config'
 import type { TimerRuntimeState } from './timer-runtime'
 import type { TimerMode, TimerStatus, TimerPhase } from '@shared/types/timer'
@@ -21,7 +21,10 @@ const CONFIG_KEYS = new Set<string>([
   'reminderColor',
   'overtimeMessageEnabled',
   'overtimeMessage',
-  'presets'
+  'presets',
+  'setOvertimeMessage',
+  'addPreset',
+  'removePreset'
 ])
 
 export function useTimerStore(): TimerStore
@@ -41,7 +44,6 @@ useTimerStore.setState = (partial: Partial<TimerStore>) => {
   const configPart: Record<string, unknown> = {}
   const runtimePart: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(partial as Record<string, unknown>)) {
-    if (typeof v === 'function') continue
     if (CONFIG_KEYS.has(k)) {
       configPart[k] = v
     } else {
@@ -81,6 +83,17 @@ useTimerStore.subscribe = (
 }
 
 useTimerStore.persist = useTimerConfigStore.persist
+
+useTimerConfigStore.persist.onFinishHydration((state) => {
+  const runtime = useTimerRuntimeStore.getState()
+  if (runtime.status === 'stopped') {
+    useTimerRuntimeStore.setState({
+      remainingSeconds: state.totalDuration,
+      progress: computeProgress(state.totalDuration, state.totalDuration),
+      formattedTime: formatTime(state.totalDuration)
+    })
+  }
+})
 
 export interface DisplayValues {
   mainDisplay: string
