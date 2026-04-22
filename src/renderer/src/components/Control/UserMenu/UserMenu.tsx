@@ -41,13 +41,13 @@ export default function UserMenu({ onOpenPreferences }: UserMenuProps): React.JS
     <>
       <Dropdown.Root>
         <Dropdown.Trigger>
-          <div className="flex items-center gap-2 w-full px-2 rounded-lg hover:bg-default-100 transition-colors cursor-pointer">
+          <div className="flex items-center gap-2 w-full px-2 max-lg:justify-center max-lg:px-0 rounded-lg hover:bg-default-100 transition-colors cursor-pointer">
             <Avatar.Root className="shrink-0">
               <Avatar.Fallback>
                 <CircleUser />
               </Avatar.Fallback>
             </Avatar.Root>
-            <span>{t('userMenu.guest')}</span>
+            <span className="max-lg:hidden">{t('userMenu.guest')}</span>
           </div>
         </Dropdown.Trigger>
         <Dropdown.Popover>
