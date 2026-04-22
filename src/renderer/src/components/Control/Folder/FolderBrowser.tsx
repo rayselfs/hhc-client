@@ -742,7 +742,7 @@ export function FolderBrowser({
         onDragEnd={handleDragEnd}
       >
         <ScrollShadow
-          className="grow p-2"
+          className="grow p-2 pt-0"
           onClick={handleContainerClick}
           onContextMenu={handleContextMenuForContainer}
         >
