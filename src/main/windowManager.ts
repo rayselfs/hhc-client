@@ -3,13 +3,22 @@ import { join } from 'path'
 import { optimizer, is } from '@electron-toolkit/utils'
 import type { IpcMainToRendererChannel, IpcMainToRendererMap } from '@shared/ipc-channels'
 
+let _cachedDisplay: Electron.Display | null | undefined = undefined
+
 export class WindowManager {
   private static instance: WindowManager
   private mainWindow: BrowserWindow | null = null
   private projectionWindow: BrowserWindow | null = null
 
   // eslint-disable-next-line @typescript-eslint/no-empty-function -- singleton pattern requires private constructor
-  private constructor() {}
+  private constructor() {
+    screen.on('display-added', () => {
+      _cachedDisplay = undefined
+    })
+    screen.on('display-removed', () => {
+      _cachedDisplay = undefined
+    })
+  }
 
   static getInstance(): WindowManager {
     if (!WindowManager.instance) {
@@ -94,6 +103,7 @@ export class WindowManager {
       y: targetDisplay.bounds.y,
       fullscreen: hasSecondScreen,
       frame: !hasSecondScreen,
+      show: false,
       webPreferences: {
         preload: join(__dirname, '../preload/index.js'),
         sandbox: true,
@@ -119,6 +129,10 @@ export class WindowManager {
 
     this.projectionWindow.webContents.on('render-process-gone', (_event, details) => {
       console.error('Projection window renderer crashed:', details.reason)
+    })
+
+    this.projectionWindow.once('ready-to-show', () => {
+      this.projectionWindow?.show()
     })
 
     this.projectionWindow.webContents.on('did-finish-load', () => {
