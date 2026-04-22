@@ -63,6 +63,8 @@ beforeEach(() => {
   useBibleFolderStore.setState({
     folders: { [ROOT_ID]: rootFolder },
     items: {},
+    _foldersArray: [rootFolder],
+    _itemsArray: [],
     loadedParents: new Set([ROOT_ID]),
     currentFolderId: ROOT_ID,
     isLoading: false

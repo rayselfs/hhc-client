@@ -50,19 +50,19 @@ describe('Router', () => {
     localStorage.clear()
   })
 
-  it('renders timer page at default route /', () => {
+  it('renders timer page at default route /', async () => {
     renderWithRouter(['/'])
-    expect(screen.getByTestId('timer-page')).toBeInTheDocument()
+    expect(await screen.findByTestId('timer-page')).toBeInTheDocument()
   })
 
-  it('renders timer page at /timer route', () => {
+  it('renders timer page at /timer route', async () => {
     renderWithRouter(['/timer'])
-    expect(screen.getByTestId('timer-page')).toBeInTheDocument()
+    expect(await screen.findByTestId('timer-page')).toBeInTheDocument()
   })
 
-  it('renders bible page at /bible route', () => {
+  it('renders bible page at /bible route', async () => {
     renderWithRouter(['/bible'])
-    expect(screen.getByTestId('bible-page')).toBeInTheDocument()
+    expect(await screen.findByTestId('bible-page')).toBeInTheDocument()
   })
 
   it('navigates from timer to bible via sidebar link', async () => {
@@ -74,24 +74,24 @@ describe('Router', () => {
       </ThemeProvider>
     )
 
-    expect(screen.getByTestId('timer-page')).toBeInTheDocument()
+    expect(await screen.findByTestId('timer-page')).toBeInTheDocument()
 
     const bibleLink = screen.getByRole('link', { name: /bible/i })
     await user.click(bibleLink)
 
-    expect(screen.getByTestId('bible-page')).toBeInTheDocument()
+    expect(await screen.findByTestId('bible-page')).toBeInTheDocument()
     expect(screen.queryByTestId('timer-page')).not.toBeInTheDocument()
   })
 
-  it('redirects to /welcome when not onboarded', () => {
+  it('redirects to /welcome when not onboarded', async () => {
     localStorage.removeItem(ONBOARDED_KEY)
     renderWithRouter(['/'])
-    expect(screen.getByTestId('welcome-page')).toBeInTheDocument()
+    expect(await screen.findByTestId('welcome-page')).toBeInTheDocument()
   })
 
-  it('renders timer page when already onboarded', () => {
+  it('renders timer page when already onboarded', async () => {
     localStorage.setItem(ONBOARDED_KEY, 'true')
     renderWithRouter(['/'])
-    expect(screen.getByTestId('timer-page')).toBeInTheDocument()
+    expect(await screen.findByTestId('timer-page')).toBeInTheDocument()
   })
 })

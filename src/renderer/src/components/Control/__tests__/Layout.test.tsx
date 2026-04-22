@@ -67,13 +67,13 @@ describe('Layout', () => {
   it('renders timer-page content at route /', async () => {
     await i18n.changeLanguage('en')
     renderWithRouter(['/'])
-    expect(screen.getByTestId('timer-page')).toBeInTheDocument()
+    expect(await screen.findByTestId('timer-page')).toBeInTheDocument()
   })
 
   it('renders bible-page content at route /bible', async () => {
     await i18n.changeLanguage('en')
     renderWithRouter(['/bible'])
-    expect(screen.getByTestId('bible-page')).toBeInTheDocument()
+    expect(await screen.findByTestId('bible-page')).toBeInTheDocument()
   })
 
   it('renders sidebar timer and bible labels', async () => {

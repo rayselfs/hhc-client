@@ -195,6 +195,78 @@ vi.mock('@heroui/react', async (importOriginal) => {
   }
 })
 
+vi.mock('@heroui/react/modal', () => ({
+  Modal: Object.assign(({ children }: { children: React.ReactNode }) => <div>{children}</div>, {
+    Backdrop: ({ isOpen, children }: { isOpen?: boolean; children: React.ReactNode }) =>
+      isOpen ? <div role="dialog">{children}</div> : null,
+    Container: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    Dialog: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    Header: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    Heading: ({ children }: { children: React.ReactNode }) => <h2>{children}</h2>,
+    Body: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    Footer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>
+  })
+}))
+
+vi.mock('@heroui/react/button', () => ({
+  Button: ({
+    children,
+    onPress,
+    disabled,
+    'aria-label': ariaLabel,
+    ...rest
+  }: {
+    children: React.ReactNode
+    onPress?: () => void
+    disabled?: boolean
+    'aria-label'?: string
+    [key: string]: unknown
+  }) => (
+    <button type="button" onClick={onPress} disabled={disabled} aria-label={ariaLabel} {...rest}>
+      {children}
+    </button>
+  )
+}))
+
+vi.mock('@heroui/react/input', () => ({
+  Input: () => <input id="folder-name-input" aria-label="Folder Name" />
+}))
+
+vi.mock('@heroui/react/textfield', () => ({
+  TextField: ({
+    children,
+    onChange
+  }: {
+    children: React.ReactNode
+    value?: string
+    onChange: (v: string) => void
+  }) => <div onChange={(e) => onChange((e.target as HTMLInputElement).value)}>{children}</div>
+}))
+
+vi.mock('@heroui/react/label', () => ({
+  Label: ({ children }: { children: React.ReactNode }) => (
+    <label htmlFor="folder-name-input">{children}</label>
+  )
+}))
+
+vi.mock('@heroui/react/select', () => ({
+  Select: Object.assign(({ children }: { children: React.ReactNode }) => <div>{children}</div>, {
+    Trigger: ({ children }: { children: React.ReactNode }) => (
+      <button type="button">{children}</button>
+    ),
+    Value: () => null,
+    Indicator: () => null,
+    Popover: ({ children }: { children: React.ReactNode }) => <div>{children}</div>
+  })
+}))
+
+vi.mock('@heroui/react/list-box', () => ({
+  ListBox: Object.assign(({ children }: { children: React.ReactNode }) => <ul>{children}</ul>, {
+    Item: ({ children }: { children: React.ReactNode }) => <li>{children}</li>,
+    ItemIndicator: () => null
+  })
+}))
+
 describe('CustomFolderTab', () => {
   beforeEach(() => {
     vi.clearAllMocks()

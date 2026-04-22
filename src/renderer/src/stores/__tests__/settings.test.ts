@@ -5,6 +5,7 @@ vi.mock('@heroui/react', async () => {
   const actual = await vi.importActual('@heroui/react')
   return { ...actual, toast: mockToast }
 })
+vi.mock('@heroui/react/toast', () => ({ toast: mockToast }))
 
 vi.mock('@renderer/i18n', () => ({
   default: { t: (key: string) => key }

@@ -4,7 +4,8 @@ vi.mock('electron', () => ({
   BrowserWindow: vi.fn(),
   screen: {
     getPrimaryDisplay: vi.fn(() => ({ id: 1 })),
-    getAllDisplays: vi.fn(() => [{ id: 1 }, { id: 2 }])
+    getAllDisplays: vi.fn(() => [{ id: 1 }, { id: 2 }]),
+    on: vi.fn()
   },
   app: {
     quit: vi.fn()
