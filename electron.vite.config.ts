@@ -62,6 +62,21 @@ export default defineConfig({
           secure: true
         }
       }
+    },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: (id) => {
+            if (
+              id.includes('node_modules/@react-aria/color') ||
+              id.includes('node_modules/@react-stately/color')
+            ) {
+              return 'color-picker'
+            }
+            return undefined
+          }
+        }
+      }
     }
   }
 })

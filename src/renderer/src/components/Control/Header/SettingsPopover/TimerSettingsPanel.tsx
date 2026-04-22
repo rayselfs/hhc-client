@@ -1,9 +1,34 @@
 import { useTranslation } from 'react-i18next'
-import { Switch, Input, ColorPicker, ColorArea, ColorSlider, ColorSwatch } from '@heroui/react'
+import { Switch, Input, ColorPicker, ColorSwatch } from '@heroui/react'
 import { parseColor } from 'react-aria-components'
 import type { Color } from 'react-aria-components'
 import { useTimerStore, DEFAULT_SETTINGS } from '@renderer/stores/timer'
 import { useStopwatchStore } from '@renderer/stores/stopwatch'
+import { Suspense, lazy } from 'react'
+import type { TFunction } from 'i18next'
+
+const LazyColorPickerContent = lazy(async () => {
+  const { ColorArea, ColorSlider } = await import('@heroui/react')
+  const Component = ({ t }: { t: TFunction }) => (
+    <>
+      <ColorArea
+        aria-label={t('timer.reminder.color')}
+        className="max-w-full"
+        colorSpace="hsb"
+        xChannel="saturation"
+        yChannel="brightness"
+      >
+        <ColorArea.Thumb />
+      </ColorArea>
+      <ColorSlider channel="hue" className="gap-1 px-1" colorSpace="hsb">
+        <ColorSlider.Track>
+          <ColorSlider.Thumb />
+        </ColorSlider.Track>
+      </ColorSlider>
+    </>
+  )
+  return { default: Component }
+})
 
 interface TimerSettingsPanelProps {
   isStopwatch: boolean
@@ -130,20 +155,11 @@ export default function TimerSettingsPanel({
                 />
               </ColorPicker.Trigger>
               <ColorPicker.Popover placement="bottom end" className="gap-2 px-2 py-3 w-52">
-                <ColorArea
-                  aria-label={t('timer.reminder.color')}
-                  className="max-w-full"
-                  colorSpace="hsb"
-                  xChannel="saturation"
-                  yChannel="brightness"
+                <Suspense
+                  fallback={<div className="w-8 h-8 rounded-full bg-default-200 animate-pulse" />}
                 >
-                  <ColorArea.Thumb />
-                </ColorArea>
-                <ColorSlider channel="hue" className="gap-1 px-1" colorSpace="hsb">
-                  <ColorSlider.Track>
-                    <ColorSlider.Thumb />
-                  </ColorSlider.Track>
-                </ColorSlider>
+                  <LazyColorPickerContent t={t} />
+                </Suspense>
               </ColorPicker.Popover>
             </ColorPicker>
           </div>

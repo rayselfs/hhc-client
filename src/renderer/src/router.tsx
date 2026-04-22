@@ -1,11 +1,14 @@
+import { lazy, Suspense } from 'react'
 import { createHashRouter, Navigate } from 'react-router-dom'
-import TimerPage from '@renderer/pages/TimerPage'
-import BiblePage from '@renderer/pages/BiblePage'
 import ProjectionPage from '@renderer/pages/ProjectionPage'
 import Layout from '@renderer/components/Control/Layout'
 import RouteError from '@renderer/components/RouteError'
-import WelcomePage from '@renderer/pages/WelcomePage'
+import LoadingFallback from '@renderer/components/Control/LoadingFallback'
 import { isOnboarded } from '@renderer/lib/onboarding'
+
+const TimerPage = lazy(() => import('@renderer/pages/TimerPage'))
+const BiblePage = lazy(() => import('@renderer/pages/BiblePage'))
+const WelcomePage = lazy(() => import('@renderer/pages/WelcomePage'))
 
 // eslint-disable-next-line react-refresh/only-export-components
 function OnboardingGuard({ children }: { children: React.JSX.Element }): React.JSX.Element {
@@ -24,11 +27,34 @@ const routes = [
     ErrorBoundary: RouteError,
     children: [
       { index: true, element: <Navigate to="/timer" replace /> },
-      { path: 'timer', Component: TimerPage, ErrorBoundary: RouteError },
-      { path: 'bible', Component: BiblePage, ErrorBoundary: RouteError }
+      {
+        path: 'timer',
+        element: (
+          <Suspense fallback={<LoadingFallback />}>
+            <TimerPage />
+          </Suspense>
+        ),
+        ErrorBoundary: RouteError
+      },
+      {
+        path: 'bible',
+        element: (
+          <Suspense fallback={<LoadingFallback />}>
+            <BiblePage />
+          </Suspense>
+        ),
+        ErrorBoundary: RouteError
+      }
     ]
   },
-  { path: '/welcome', Component: WelcomePage },
+  {
+    path: '/welcome',
+    element: (
+      <Suspense fallback={<LoadingFallback />}>
+        <WelcomePage />
+      </Suspense>
+    )
+  },
   { path: '/projection', Component: ProjectionPage, ErrorBoundary: RouteError }
 ]
 
