@@ -201,6 +201,10 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       return
     }
 
+    if (projectionWindowRef.current && !projectionWindowRef.current.closed) {
+      return
+    }
+
     const width = screen.availWidth
     const height = screen.availHeight
     const win = window.open(
