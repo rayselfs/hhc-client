@@ -170,7 +170,9 @@ export function CustomFolderTab({
           <div className="flex items-center gap-1 w-full min-w-0">
             <div className="flex items-center gap-2 text-left min-w-0 w-full">
               <div className="min-w-0">
-                <div className={`truncate ${isSelected ? 'text-accent-foreground' : 'text-muted'}`}>
+                <div
+                  className={`truncate ${isSelected ? 'text-accent-foreground/80 dark:text-muted' : 'text-muted'}`}
+                >
                   {reference}
                 </div>
                 <div className="text-lg whitespace-normal">

@@ -256,11 +256,11 @@ export function BiblePreview({
                       ? 'bg-accent text-accent-foreground'
                       : isProjected
                         ? 'bg-accent-soft'
-                        : 'hover:opacity-70'
+                        : 'hover:bg-accent-soft'
                   }`}
                 >
                   <span
-                    className={`mr-2 shrink-0 ${isSelected ? '' : 'text-muted group-hover:text-inherit'}`}
+                    className={`mr-2 shrink-0 ${isSelected ? 'text-accent-foreground/80 dark:text-muted' : 'text-muted'}`}
                   >
                     {verse.number}
                   </span>

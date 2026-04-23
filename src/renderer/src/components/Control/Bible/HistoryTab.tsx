@@ -95,11 +95,11 @@ export function HistoryTab(): React.JSX.Element | null {
               onClick={() => handleNavigate(item)}
               className="flex-1 min-w-0 text-left p-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-3xl"
             >
-              <p className="truncate text-muted group-hover:text-accent-foreground">
+              <p className="truncate text-muted group-hover:text-accent-foreground/80 dark:group-hover:text-muted">
                 {getVerseReference(item)}
               </p>
-              <p className="text-lg text-foreground group-hover:text-accent-foreground whitespace-normal">
-                {item.text.length > 60 ? `${item.text.substring(0, 60)}...` : item.text}
+              <p className="text-lg text-foreground group-hover:text-accent-foreground line-clamp-2">
+                {item.text}
               </p>
             </button>
             <Button
