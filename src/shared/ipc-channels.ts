@@ -27,6 +27,15 @@ export interface DisplayInfo {
   scaleFactor: number
 }
 
+export type UpdateStatus =
+  | 'idle'
+  | 'checking'
+  | 'available'
+  | 'not-available'
+  | 'downloading'
+  | 'downloaded'
+  | 'error'
+
 export interface IpcInvokeMap {
   'projection:check': { args: []; result: { exists: boolean } }
   'projection:ensure': { args: []; result: { created: boolean } }
@@ -40,6 +49,8 @@ export interface IpcInvokeMap {
   'bible:get-versions': { args: []; result: BibleVersion[] }
   'bible:get-content': { args: [number]; result: BibleBook[] }
   'app:relaunch': { args: []; result: void }
+  'update:check': { args: []; result: { updateAvailable: boolean; version?: string } }
+  'update:download-and-install': { args: []; result: void }
 }
 
 export type IpcInvokeChannel = keyof IpcInvokeMap
@@ -65,6 +76,7 @@ export interface IpcMainToRendererMap {
   'projection:closed': []
   'theme:changed': [{ shouldUseDarkColors: boolean }]
   'timer-tick': [TimerTickPayload]
+  'update:status-changed': [{ status: UpdateStatus; version?: string; error?: string }]
 }
 
 export type IpcMainToRendererChannel = keyof IpcMainToRendererMap
