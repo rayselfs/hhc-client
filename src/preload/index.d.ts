@@ -1,5 +1,5 @@
 import type { ProjectionChannel, ProjectionPayload } from '../shared/projection-messages'
-import type { DisplayInfo } from '../shared/ipc-channels'
+import type { DisplayInfo, UpdateStatus } from '../shared/ipc-channels'
 import type {
   TimerCommand,
   TimerSettings,
@@ -45,6 +45,14 @@ interface AppAPI {
   relaunch: () => Promise<void>
 }
 
+interface UpdateAPI {
+  checkForUpdates: () => Promise<{ updateAvailable: boolean; version?: string }>
+  downloadAndInstall: () => Promise<void>
+  onStatusChanged: (
+    callback: (data: { status: UpdateStatus; version?: string; error?: string }) => void
+  ) => () => void
+}
+
 declare global {
   interface Window {
     api: {
@@ -53,6 +61,7 @@ declare global {
       timer: TimerAPI
       bible: BibleAPI
       app: AppAPI
+      update: UpdateAPI
     }
   }
 }

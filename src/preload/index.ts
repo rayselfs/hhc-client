@@ -3,7 +3,8 @@ import type {
   IpcInvokeChannel,
   IpcInvokeMap,
   IpcMainToRendererChannel,
-  IpcMainToRendererMap
+  IpcMainToRendererMap,
+  UpdateStatus
 } from '../shared/ipc-channels'
 import type { ProjectionChannel, ProjectionPayload } from '../shared/projection-messages'
 import type { TimerTickPayload } from '../shared/types/timer'
@@ -67,12 +68,21 @@ const appApi = {
   relaunch: () => typedInvoke('app:relaunch')
 }
 
+const updateApi = {
+  checkForUpdates: () => typedInvoke('update:check'),
+  downloadAndInstall: () => typedInvoke('update:download-and-install'),
+  onStatusChanged: (
+    callback: (data: { status: UpdateStatus; version?: string; error?: string }) => void
+  ) => typedOn('update:status-changed', callback)
+}
+
 const api = {
   projection: projectionApi,
   theme: themeApi,
   timer: timerApi,
   bible: bibleApi,
-  app: appApi
+  app: appApi,
+  update: updateApi
 }
 
 try {
