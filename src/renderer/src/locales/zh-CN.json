@@ -64,6 +64,7 @@
   },
   "bible": {
     "title": "圣经",
+    "functionsLabel": "圣经功能",
     "preview": {
       "loading": "加载中...",
       "noContent": "尚未加载经文内容",

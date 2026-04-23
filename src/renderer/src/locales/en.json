@@ -64,6 +64,7 @@
   },
   "bible": {
     "title": "BIBLE",
+    "functionsLabel": "Bible Functions",
     "preview": {
       "loading": "Loading...",
       "noContent": "No verses loaded",

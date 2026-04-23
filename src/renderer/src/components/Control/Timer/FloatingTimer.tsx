@@ -1,4 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { useTimerStore } from '@renderer/stores/timer'
 import { isTimerRoute } from '@renderer/lib/routes'
 import TimerRing from '@renderer/components/Control/Timer/TimerRing'
@@ -17,6 +18,7 @@ function formatMMSS(seconds: number): string {
 export default function FloatingTimer(): React.JSX.Element | null {
   const location = useLocation()
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const status = useTimerStore((s) => s.status)
   const progress = useTimerStore((s) => s.progress)
   const remainingSeconds = useTimerStore((s) => s.remainingSeconds)
@@ -33,7 +35,7 @@ export default function FloatingTimer(): React.JSX.Element | null {
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') navigate('/timer')
       }}
-      aria-label="Go to timer"
+      aria-label={t('timer.floatingTimer')}
     >
       <TimerRing progress={progress * 100} size={85} color="accent">
         <span className="timer-digits text-2xl font-bold">{formatMMSS(remainingSeconds)}</span>

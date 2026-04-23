@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import TimerRing from './TimerRing'
 import TimeInputPopover from './TimeInputPopover'
 
@@ -30,6 +31,7 @@ export default function TimerDisplay({
   className,
   digitClassName
 }: TimerDisplayProps): React.JSX.Element {
+  const { t } = useTranslation()
   const isWarning = phase === 'warning'
   const isOvertime = phase === 'overtime'
   const useCustomColor = (isWarning || isOvertime) && warningColor
@@ -47,7 +49,7 @@ export default function TimerDisplay({
         digitClassName
       ].join(' ')}
       style={useCustomColor ? { color: warningColor } : undefined}
-      aria-label={canEditTime ? 'Set timer duration' : undefined}
+      aria-label={canEditTime ? t('timer.inputDialog.title') : undefined}
     >
       {innerContent}
     </button>

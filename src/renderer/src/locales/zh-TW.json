@@ -64,6 +64,7 @@
   },
   "bible": {
     "title": "聖經",
+    "functionsLabel": "聖經功能",
     "preview": {
       "loading": "載入中...",
       "noContent": "尚未載入經文內容",

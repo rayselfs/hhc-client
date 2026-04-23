@@ -31,7 +31,7 @@ export default function BibleMultiFunction(): React.JSX.Element {
         >
           <Tabs.ListContainer>
             <Tabs.List
-              aria-label="Bible Functions"
+              aria-label={t('bible.functionsLabel')}
               className="bg-transparent border border-border p-1"
             >
               <Tabs.Tab id="history" className="data-[selected=true]:text-accent-foreground">

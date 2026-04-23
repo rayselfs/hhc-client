@@ -246,7 +246,7 @@ export function CustomFolderTab({
       onModalOpenChange={onModalOpenChange}
       i18nPrefix="bible.custom"
       untitledFolderKey="bible.custom.untitledFolder"
-      emptyMessage={t('bible.folder_empty', 'Folder is empty')}
+      emptyMessage={t('bible.custom.emptyFolder')}
     />
   )
 }
