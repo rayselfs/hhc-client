@@ -6,6 +6,7 @@ import { registerTimerHandlers } from './ipc/timer'
 import { registerBibleApiHandlers } from './ipc/bible-api'
 import { registerAppIpc } from './ipc/app'
 import { isKnownWindow, validateTheme } from './ipc/validate'
+import { registerUpdateService } from './updateService'
 
 process.on('uncaughtException', (error) => {
   console.error('[MAIN] Uncaught Exception:', error)
@@ -53,6 +54,7 @@ app.whenReady().then(() => {
   registerAppIpc(wm)
   wm.createMainWindow()
   wm.createProjectionWindow()
+  registerUpdateService(wm)
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) wm.createMainWindow()
