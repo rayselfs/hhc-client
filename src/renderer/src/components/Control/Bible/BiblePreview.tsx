@@ -25,13 +25,17 @@ interface BiblePreviewProps {
   selectedVerseIndex: number
   onSelectedVerseIndexChange: (index: number) => void
   scrollBehaviorRef: RefObject<ScrollBehavior>
+  projectedPassage: { bookNumber: number; chapter: number; verse: number } | null
+  onProjected: (passage: { bookNumber: number; chapter: number; verse: number }) => void
 }
 
 export function BiblePreview({
   onContextMenu,
   selectedVerseIndex,
   onSelectedVerseIndexChange,
-  scrollBehaviorRef
+  scrollBehaviorRef,
+  projectedPassage,
+  onProjected
 }: BiblePreviewProps): React.JSX.Element {
   const { t } = useTranslation()
   const currentPassage = useBibleStore((s) => s.currentPassage)
@@ -109,6 +113,7 @@ export function BiblePreview({
     navigateTo({ bookNumber: book.number, chapter: chapter.number, verse: verseNumber })
     scrollBehaviorRef.current = 'smooth'
     onSelectedVerseIndexChange(verseIndex)
+    onProjected({ bookNumber: book.number, chapter: chapter.number, verse: verseNumber })
 
     const { selectedVersionId } = useBibleSettingsStore.getState()
     const historyItem = buildVerseHistoryItem({
@@ -227,7 +232,10 @@ export function BiblePreview({
       <div ref={scrollContainerCallbackRef} className="h-full overflow-y-auto">
         <div className="flex flex-col gap-2 p-2 pt-0">
           {verses.map((verse, index) => {
-            const isSelected = index === selectedVerseIndex
+            const isSelected =
+              projectedPassage?.bookNumber === book?.number &&
+              projectedPassage?.chapter === chapter?.number &&
+              projectedPassage?.verse === verse.number
             const isProjected = currentPassage?.verse === verse.number
             return (
               <div key={verse.number} className="group relative">

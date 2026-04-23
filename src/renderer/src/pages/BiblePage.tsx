@@ -15,6 +15,8 @@ import { EVENTS } from '@renderer/config/events'
 import { buildVerseHistoryItem } from '@renderer/lib/bible-utils'
 import type { BiblePassage } from '@shared/types/bible'
 
+type ProjectedPassage = { bookNumber: number; chapter: number; verse: number }
+
 export default function BiblePage(): React.JSX.Element {
   const initialized = useAppInit()
   const {
@@ -28,6 +30,7 @@ export default function BiblePage(): React.JSX.Element {
   const fontSize = useBibleSettingsStore((s) => s.fontSize)
   const [isSelectorOpen, setSelectorOpen] = useState(false)
   const [selectedVerseIndex, setSelectedVerseIndex] = useState(0)
+  const [projectedPassage, setProjectedPassage] = useState<ProjectedPassage | null>(null)
   const scrollBehaviorRef = useRef<ScrollBehavior>('instant')
   const { showPreviewMenu } = useBibleContextMenu()
   const { claimProjection, project } = useProjection()
@@ -90,6 +93,7 @@ export default function BiblePage(): React.JSX.Element {
       )
       navigateTo({ bookNumber: book.number, chapter: chapter.number, verse: verse.number })
       setSelectedVerseIndex(clamped)
+      setProjectedPassage({ bookNumber: book.number, chapter: chapter.number, verse: verse.number })
 
       if (!skipHistory) {
         const { selectedVersionId } = useBibleSettingsStore.getState()
@@ -226,6 +230,8 @@ export default function BiblePage(): React.JSX.Element {
             selectedVerseIndex={selectedVerseIndex}
             onSelectedVerseIndexChange={setSelectedVerseIndex}
             scrollBehaviorRef={scrollBehaviorRef}
+            projectedPassage={projectedPassage}
+            onProjected={setProjectedPassage}
           />
           <BibleMultiFunction />
           <BibleSelectorDialog
