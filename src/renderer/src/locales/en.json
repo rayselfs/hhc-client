@@ -273,6 +273,10 @@
     "logout": "Logout",
     "preferences": "Preferences",
     "checkForUpdates": "Check for Updates",
+    "upToDate": "Up to Date",
+    "updateAvailable": "Update {{version}}",
+    "checking": "Checking...",
+    "downloadingUpdate": "Downloading...",
     "keyboardShortcuts": "Keyboard Shortcuts",
     "closeApp": "Close App",
     "closeAppTitle": "Close Application",
@@ -323,7 +327,9 @@
     "projectionOpenFailed": "Failed to open projection window",
     "projectionCloseFailed": "Failed to close projection window",
     "settingsReset": "Settings reset to defaults",
-    "bibleIndexFailed": "Failed to load search index for this version"
+    "bibleIndexFailed": "Failed to load search index for this version",
+    "updateAvailable": "Update {{version}} available",
+    "updateCheckFailed": "Failed to check for updates"
   },
   "shortcuts": {
     "title": "Keyboard Shortcuts",

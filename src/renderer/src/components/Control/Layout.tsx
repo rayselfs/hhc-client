@@ -16,6 +16,7 @@ import { isWeb } from '@renderer/lib/env'
 import { toast } from '@heroui/react/toast'
 import { initializeApp } from '@renderer/lib/app-init'
 import { useBibleStore } from '@renderer/stores/bible'
+import { useAutoUpdateCheck } from '@renderer/hooks/useAutoUpdateCheck'
 
 function ProjectionAutoOpen(): null {
   const { t } = useTranslation()
@@ -46,6 +47,7 @@ function ProjectionAutoOpen(): null {
 
 export default function Layout(): React.JSX.Element {
   const [initialized, setInitialized] = useState(false)
+  useAutoUpdateCheck()
 
   useEffect(() => {
     const cleanup = initializeApp()

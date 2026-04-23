@@ -6,6 +6,13 @@ import { LogIn, LogOut, Settings, RefreshCw, Keyboard, Power, CircleUser, Info }
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
 import KeyboardShortcutsDialog from '@renderer/components/Control/UserMenu/KeyboardShortcutsDialog'
 import AboutDialog from '@renderer/components/Control/UserMenu/AboutDialog'
+import { isElectron } from '@renderer/lib/env'
+import { useUpdateStore } from '@renderer/stores/update'
+import {
+  selectIsUpdateAvailable,
+  selectUpdateStatus,
+  selectAvailableVersion
+} from '@renderer/stores/selectors/update'
 
 interface UserMenuProps {
   onOpenPreferences?: () => void
@@ -24,6 +31,9 @@ export default function UserMenu({ onOpenPreferences }: UserMenuProps): React.JS
   const [isShortcutsOpen, setShortcutsOpen] = useState(false)
   const [isAboutOpen, setAboutOpen] = useState(false)
   const confirm = useConfirm()
+  const status = useUpdateStore(selectUpdateStatus)
+  const isUpdateAvailable = useUpdateStore(selectIsUpdateAvailable)
+  const availableVersion = useUpdateStore(selectAvailableVersion)
 
   const handleCloseApp = async (): Promise<void> => {
     const confirmed = await confirm({
@@ -59,6 +69,10 @@ export default function UserMenu({ onOpenPreferences }: UserMenuProps): React.JS
               if (key === 'closeApp') handleCloseApp()
               if (key === 'keyboardShortcuts') setShortcutsOpen(true)
               if (key === 'about') setAboutOpen(true)
+              if (key === 'checkForUpdates' && isUpdateAvailable) {
+                useUpdateStore.getState().setDownloading()
+                window.api.update.downloadAndInstall().catch(console.error)
+              }
             }}
           >
             {isLoggedIn ? (
@@ -96,9 +110,19 @@ export default function UserMenu({ onOpenPreferences }: UserMenuProps): React.JS
               <Info className="size-4" />
               {t('about.title')}
             </Dropdown.Item>
-            <Dropdown.Item id="checkForUpdates" isDisabled={true}>
+            <Dropdown.Item
+              id="checkForUpdates"
+              isDisabled={!isElectron() || !isUpdateAvailable}
+              className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
+            >
               <RefreshCw className="size-4" />
-              {t('userMenu.checkForUpdates')}
+              {status === 'available'
+                ? t('userMenu.updateAvailable', { version: availableVersion })
+                : status === 'checking'
+                  ? t('userMenu.checking')
+                  : status === 'downloading'
+                    ? t('userMenu.downloadingUpdate')
+                    : t('userMenu.upToDate')}
             </Dropdown.Item>
             <Dropdown.Item
               id="closeApp"

@@ -273,6 +273,10 @@
     "logout": "登出",
     "preferences": "偏好設定",
     "checkForUpdates": "檢查更新",
+    "upToDate": "已是最新版本",
+    "updateAvailable": "更新 {{version}}",
+    "checking": "檢查中...",
+    "downloadingUpdate": "下載中...",
     "keyboardShortcuts": "鍵盤快速鍵",
     "closeApp": "關閉應用程式",
     "closeAppTitle": "關閉應用程式",
@@ -323,7 +327,9 @@
     "projectionOpenFailed": "投影視窗開啟失敗",
     "projectionCloseFailed": "投影視窗關閉失敗",
     "settingsReset": "已重設為預設值",
-    "bibleIndexFailed": "無法載入此版本的搜尋索引"
+    "bibleIndexFailed": "無法載入此版本的搜尋索引",
+    "updateAvailable": "{{version}} 版本更新可用",
+    "updateCheckFailed": "檢查更新失敗"
   },
   "shortcuts": {
     "title": "鍵盤快速鍵",

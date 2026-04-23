@@ -35,16 +35,22 @@ describe('UserMenu', () => {
     renderUserMenu()
     expect(screen.getByText('Login')).toBeInTheDocument()
     expect(screen.getByText('Preferences')).toBeInTheDocument()
-    expect(screen.getByText('Check for Updates')).toBeInTheDocument()
+    expect(screen.getByText('Up to Date')).toBeInTheDocument()
     expect(screen.getByText('Keyboard Shortcuts')).toBeInTheDocument()
     expect(screen.getByText('About')).toBeInTheDocument()
     expect(screen.getByText('Close App')).toBeInTheDocument()
   })
 
+  it('update item is disabled in web mode', () => {
+    renderUserMenu()
+    const upToDate = screen.getByText('Up to Date').closest('[role="menuitem"]')
+    expect(upToDate).toHaveAttribute('aria-disabled', 'true')
+  })
+
   it('disabled items have aria-disabled', () => {
     renderUserMenu()
-    const checkForUpdates = screen.getByText('Check for Updates').closest('[role="menuitem"]')
-    expect(checkForUpdates).toHaveAttribute('aria-disabled', 'true')
+    const login = screen.getByText('Login').closest('[role="menuitem"]')
+    expect(login).toHaveAttribute('aria-disabled', 'true')
   })
 
   it('login is disabled', () => {

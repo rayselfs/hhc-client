@@ -12,7 +12,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>
       <ThemeProvider>
-        <Toast.Provider placement="bottom" />
+        <Toast.Provider placement="bottom end" />
         <RouterProvider router={router} />
       </ThemeProvider>
     </ErrorBoundary>

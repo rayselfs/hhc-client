@@ -273,6 +273,10 @@
     "logout": "登出",
     "preferences": "偏好设置",
     "checkForUpdates": "检查更新",
+    "upToDate": "已是最新版本",
+    "updateAvailable": "更新 {{version}}",
+    "checking": "检查中...",
+    "downloadingUpdate": "下载中...",
     "keyboardShortcuts": "键盘快捷键",
     "closeApp": "关闭应用程序",
     "closeAppTitle": "关闭应用程序",
@@ -323,7 +327,9 @@
     "projectionOpenFailed": "投影窗口打开失败",
     "projectionCloseFailed": "投影窗口关闭失败",
     "settingsReset": "已重置为默认值",
-    "bibleIndexFailed": "无法加载此版本的搜索索引"
+    "bibleIndexFailed": "无法加载此版本的搜索索引",
+    "updateAvailable": "{{version}} 版本更新可用",
+    "updateCheckFailed": "检查更新失败"
   },
   "shortcuts": {
     "title": "键盘快捷键",
