@@ -110,20 +110,22 @@ export default function UserMenu({ onOpenPreferences }: UserMenuProps): React.JS
               <Info className="size-4" />
               {t('about.title')}
             </Dropdown.Item>
-            <Dropdown.Item
-              id="checkForUpdates"
-              isDisabled={!isElectron() || !isUpdateAvailable}
-              className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
-            >
-              <RefreshCw className="size-4" />
-              {status === 'available'
-                ? t('userMenu.updateAvailable', { version: availableVersion })
-                : status === 'checking'
-                  ? t('userMenu.checking')
-                  : status === 'downloading'
-                    ? t('userMenu.downloadingUpdate')
-                    : t('userMenu.upToDate')}
-            </Dropdown.Item>
+            {isElectron() && (
+              <Dropdown.Item
+                id="checkForUpdates"
+                isDisabled={!isUpdateAvailable}
+                className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
+              >
+                <RefreshCw className="size-4" />
+                {status === 'available'
+                  ? t('userMenu.updateAvailable', { version: availableVersion })
+                  : status === 'checking'
+                    ? t('userMenu.checking')
+                    : status === 'downloading'
+                      ? t('userMenu.downloadingUpdate')
+                      : t('userMenu.upToDate')}
+              </Dropdown.Item>
+            )}
             <Dropdown.Item
               id="closeApp"
               className={`text-danger data-[hovered=true]:bg-accent ${glassDividerClass}`}
