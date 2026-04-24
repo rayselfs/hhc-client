@@ -164,6 +164,8 @@ function renderBiblePreview(): ReturnType<typeof render> {
         selectedVerseIndex={0}
         onSelectedVerseIndexChange={vi.fn()}
         scrollBehaviorRef={scrollBehaviorRef}
+        projectedPassage={null}
+        onProjected={vi.fn()}
       />
     )
   }
