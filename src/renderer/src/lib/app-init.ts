@@ -2,6 +2,8 @@ import { useBibleStore } from '@renderer/stores/bible'
 import { useBibleFolderStore } from '@renderer/stores/folder'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 import { initializeSearchIndexes } from '@renderer/lib/bible-search'
+import { toast } from '@heroui/react/toast'
+import i18n from '@renderer/i18n'
 
 let initialized = false
 
@@ -37,6 +39,7 @@ export function initializeApp(): () => void {
   })
 
   const handleOnline = (): void => {
+    toast.success(i18n.t('toast.networkRestored'))
     if (useBibleStore.getState().isOffline) {
       void useBibleStore.getState().retry()
     }

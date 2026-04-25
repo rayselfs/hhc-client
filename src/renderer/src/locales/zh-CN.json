@@ -329,7 +329,8 @@
     "settingsReset": "已重置为默认值",
     "bibleIndexFailed": "无法加载此版本的搜索索引",
     "updateAvailable": "{{version}} 版本更新可用",
-    "updateCheckFailed": "检查更新失败"
+    "updateCheckFailed": "检查更新失败",
+    "networkRestored": "网络连接已恢复"
   },
   "shortcuts": {
     "title": "键盘快捷键",

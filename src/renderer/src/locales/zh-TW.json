@@ -329,7 +329,8 @@
     "settingsReset": "已重設為預設值",
     "bibleIndexFailed": "無法載入此版本的搜尋索引",
     "updateAvailable": "{{version}} 版本更新可用",
-    "updateCheckFailed": "檢查更新失敗"
+    "updateCheckFailed": "檢查更新失敗",
+    "networkRestored": "網路連線已恢復"
   },
   "shortcuts": {
     "title": "鍵盤快速鍵",

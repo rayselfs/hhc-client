@@ -329,7 +329,8 @@
     "settingsReset": "Settings reset to defaults",
     "bibleIndexFailed": "Failed to load search index for this version",
     "updateAvailable": "Update {{version}} available",
-    "updateCheckFailed": "Failed to check for updates"
+    "updateCheckFailed": "Failed to check for updates",
+    "networkRestored": "Network connection restored"
   },
   "shortcuts": {
     "title": "Keyboard Shortcuts",
