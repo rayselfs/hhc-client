@@ -22,7 +22,7 @@ export default function BibleMultiFunction(): React.JSX.Element {
   const folderPath = getFolderPath(currentFolderId).slice(1)
 
   return (
-    <Card className="flex flex-col h-full flex-1 max-lg:flex-2 p-0 gap-2">
+    <Card className="flex flex-col h-full flex-1 max-lg:flex-[2] p-0 gap-2">
       <Card.Header className="shrink-0 flex-row! items-center p-0 pt-2">
         <Tabs
           selectedKey={activeTab}
@@ -34,12 +34,18 @@ export default function BibleMultiFunction(): React.JSX.Element {
               aria-label={t('bible.functionsLabel')}
               className="bg-transparent border border-border p-1"
             >
-              <Tabs.Tab id="history" className="data-[selected=true]:text-accent-foreground">
+              <Tabs.Tab
+                id="history"
+                className="data-[selected=true]:text-accent-foreground max-lg:w-8 max-lg:px-0"
+              >
                 <span className="max-lg:hidden">{t('bible.history.title')}</span>
                 <Clock size={15} className="lg:hidden" />
                 <Tabs.Indicator className="bg-accent" />
               </Tabs.Tab>
-              <Tabs.Tab id="custom" className="data-[selected=true]:text-accent-foreground">
+              <Tabs.Tab
+                id="custom"
+                className="data-[selected=true]:text-accent-foreground max-lg:w-8 max-lg:px-0"
+              >
                 <span className="max-lg:hidden">{t('bible.custom.title')}</span>
                 <FolderOpen size={15} className="lg:hidden" />
                 <Tabs.Indicator className="bg-accent" />
@@ -65,7 +71,7 @@ export default function BibleMultiFunction(): React.JSX.Element {
                 </Breadcrumbs.Item>
               ))}
             </Breadcrumbs>
-            <div className="lg:hidden flex items-center pl-1 min-w-0">
+            <div className="lg:hidden flex items-center gap-1 min-w-0">
               {folderPath.length > 0 && (
                 <Button
                   isIconOnly
