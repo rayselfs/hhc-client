@@ -121,7 +121,7 @@ export function useKeyboardShortcuts(
         preventDefault = true,
         stopPropagation = true
       } of shortcutsRef.current) {
-        if (isOverlayActiveRef.current && config.code !== 'Escape') continue
+        if (isOverlayActiveRef.current) continue
         if (matchesConfig(event, config)) {
           if (preventDefault) event.preventDefault()
           if (stopPropagation) event.stopPropagation()

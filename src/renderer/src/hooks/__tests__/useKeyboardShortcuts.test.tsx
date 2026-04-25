@@ -136,7 +136,7 @@ describe('useKeyboardShortcuts', () => {
     expect(handler).toHaveBeenCalledOnce()
   })
 
-  it('always fires Escape shortcuts regardless of scope', () => {
+  it('does not fire Escape shortcuts when overlay scope is active', () => {
     const handler = vi.fn()
     const config: ShortcutConfig = { code: 'Escape' }
     const shortcuts: ShortcutHandler[] = [{ config, handler }]
@@ -153,7 +153,7 @@ describe('useKeyboardShortcuts', () => {
       fireEvent.keyDown(document, { code: 'Escape' })
     })
 
-    expect(handler).toHaveBeenCalledOnce()
+    expect(handler).not.toHaveBeenCalled()
   })
 
   it('backward compatible — works without ShortcutScopeProvider', () => {
