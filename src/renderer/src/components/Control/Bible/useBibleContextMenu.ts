@@ -3,7 +3,7 @@ import type { ContextMenuEntry } from '@renderer/contexts/ContextMenuContext'
 import { useBibleHistoryStore } from '@renderer/stores/bible-history'
 import { useBibleFolderStore } from '@renderer/stores/folder'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
-import { formatVerseReference } from '@renderer/lib/bible-utils'
+import { formatVerseReferenceForCopy } from '@renderer/lib/bible-utils'
 import type { VerseItem } from '@shared/types/folder'
 import { Copy, Trash2 } from 'lucide-react'
 import React from 'react'
@@ -40,17 +40,30 @@ export function buildVerseItem(verse: VerseMenuData): Omit<VerseItem, 'expiresAt
   }
 }
 
-function getFormattedReference(item: VerseItem, t: TFunction): string {
-  return formatVerseReference(t, item.bookNumber, item.chapter, item.verse)
+function getFormattedReference(item: VerseItem, t: TFunction, locale: string): string {
+  return formatVerseReferenceForCopy(
+    t,
+    item.bookNumber,
+    item.chapter,
+    item.verse,
+    item.text,
+    locale
+  )
 }
 
 export function useBibleContextMenu(): UseBibleContextMenu {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { showMenu } = useContextMenu()
 
   const showPreviewMenu = (verse: VerseMenuData, e: React.MouseEvent): void => {
-    const reference = formatVerseReference(t, verse.bookNumber, verse.chapter, verse.verse)
-    const formattedText = `${reference} ${verse.text}`
+    const formattedText = formatVerseReferenceForCopy(
+      t,
+      verse.bookNumber,
+      verse.chapter,
+      verse.verse,
+      verse.text,
+      i18n.language
+    )
 
     const items: ContextMenuEntry[] = [
       {
@@ -68,8 +81,7 @@ export function useBibleContextMenu(): UseBibleContextMenu {
 
   // TODO: used by future HistoryTab context menu
   const showHistoryMenu = (item: VerseItem, e: React.MouseEvent): void => {
-    const reference = getFormattedReference(item, t)
-    const formattedText = `${reference} ${item.text}`
+    const formattedText = getFormattedReference(item, t, i18n.language)
 
     const items: ContextMenuEntry[] = [
       {
@@ -96,8 +108,7 @@ export function useBibleContextMenu(): UseBibleContextMenu {
   }
 
   const showFolderItemMenu = (item: VerseItem, _folderId: string, e: React.MouseEvent): void => {
-    const reference = getFormattedReference(item, t)
-    const formattedText = `${reference} ${item.text}`
+    const formattedText = getFormattedReference(item, t, i18n.language)
 
     const items: ContextMenuEntry[] = [
       {

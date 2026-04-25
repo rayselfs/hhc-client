@@ -37,6 +37,28 @@ export function getBookNameI18n(t: TFunction, bookNumber: number): string {
   return (t as (k: string) => string)(key)
 }
 
+export function formatVerseReferenceForCopy(
+  t: TFunction,
+  bookNumber: number,
+  chapter: number,
+  verse: number,
+  text: string,
+  locale?: string
+): string {
+  const book = getBookConfig(bookNumber)
+  if (!book) return text
+  const key: BibleBookKey = `bible.books.${book.code.toLowerCase()}.name`
+  const bookName = (t as (k: string) => string)(key)
+  const isChinese = locale === 'zh-TW' || locale === 'zh-CN'
+  if (isChinese) {
+    const chapterUnit =
+      bookNumber === 19 ? t('bible.chapterUnit.psa') : t('bible.chapterUnit.default')
+    const chapterNumStr = toChineseChapterNumber(chapter)
+    return `${text} (${bookName}${chapterNumStr}${chapterUnit}/${verse})`
+  }
+  return `${text} (${bookName} ${chapter}:${verse})`
+}
+
 export function formatVerseReferenceShort(
   t: TFunction,
   bookNumber: number,
