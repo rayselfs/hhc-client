@@ -57,7 +57,7 @@ export default function BibleSelector({ onOpenDialog }: BibleSelectorProps): Rea
         isDisabled={busy}
         className="w-44"
       >
-        <Select.Trigger className="rounded-full h-10 items-center bg-transparent border border-border">
+        <Select.Trigger className="rounded-full h-10 items-center bg-transparent border border-border hover:bg-default-100 data-[open=true]:bg-transparent transition-colors">
           <Select.Value className="justify-center flex" />
           <Select.Indicator />
         </Select.Trigger>
