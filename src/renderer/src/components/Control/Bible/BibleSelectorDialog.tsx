@@ -134,7 +134,7 @@ export function BibleSelectorDialog({
               key={book.number}
               variant="tertiary"
               onPress={() => handleBookSelect(book.number)}
-              className="w-full h-11 rounded-full text-xl text-foreground hover:bg-accent hover:text-accent-foreground"
+              className="w-full h-11 rounded-full text-base lg:text-xl text-foreground hover:bg-accent hover:text-accent-foreground"
             >
               {bookName(book.code)}
             </Button>
@@ -149,7 +149,7 @@ export function BibleSelectorDialog({
               key={book.number}
               variant="tertiary"
               onPress={() => handleBookSelect(book.number)}
-              className="w-full h-11 rounded-full text-xl text-foreground hover:bg-accent hover:text-accent-foreground"
+              className="w-full h-11 rounded-full text-base lg:text-xl text-foreground hover:bg-accent hover:text-accent-foreground"
             >
               {bookName(book.code)}
             </Button>
@@ -162,14 +162,14 @@ export function BibleSelectorDialog({
   const renderChapters = (): React.JSX.Element | null => {
     if (!chapterButtons) return null
     return (
-      <div className="grid grid-cols-10 gap-3">
+      <div className="grid grid-cols-10 gap-1.5 lg:gap-3">
         {chapterButtons.map((chapter) => (
           <Button
             key={chapter}
             isIconOnly
             variant="tertiary"
             onPress={() => handleChapterSelect(chapter)}
-            className="w-18 h-18 rounded-full aspect-square text-3xl text-foreground hover:bg-accent hover:text-accent-foreground font-[Roboto_Variable,Roboto,sans-serif]"
+            className="w-10 h-10 md:w-14 md:h-14 lg:w-18 lg:h-18 rounded-full aspect-square text-xl md:text-2xl lg:text-3xl text-foreground hover:bg-accent hover:text-accent-foreground font-[Roboto_Variable,Roboto,sans-serif]"
           >
             {chapter}
           </Button>
@@ -179,14 +179,14 @@ export function BibleSelectorDialog({
   }
 
   const renderVerses = (): React.JSX.Element => (
-    <div className="grid grid-cols-10 gap-3">
+    <div className="grid grid-cols-10 gap-1.5 lg:gap-3">
       {verseButtons.map((verse) => (
         <Button
           key={verse}
           isIconOnly
           variant="tertiary"
           onPress={() => handleVerseSelect(verse)}
-          className="w-18 h-18 rounded-full aspect-square text-3xl text-foreground hover:bg-accent hover:text-accent-foreground font-[Roboto_Variable,Roboto,sans-serif]"
+          className="w-10 h-10 md:w-14 md:h-14 lg:w-18 lg:h-18 rounded-full aspect-square text-xl md:text-2xl lg:text-3xl text-foreground hover:bg-accent hover:text-accent-foreground font-[Roboto_Variable,Roboto,sans-serif]"
         >
           {verse}
         </Button>
