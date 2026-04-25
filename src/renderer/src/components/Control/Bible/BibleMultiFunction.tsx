@@ -3,7 +3,7 @@ import { Card } from '@heroui/react/card'
 import { Tabs } from '@heroui/react/tabs'
 import { Button } from '@heroui/react/button'
 import { Breadcrumbs } from '@heroui/react/breadcrumbs'
-import { Trash2, FolderPlus } from 'lucide-react'
+import { Trash2, FolderPlus, ChevronLeft } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import GlassDivider from '@renderer/components/Common/GlassDivider'
 import { useBibleHistoryStore } from '@renderer/stores/bible-history'
@@ -22,7 +22,7 @@ export default function BibleMultiFunction(): React.JSX.Element {
   const folderPath = getFolderPath(currentFolderId).slice(1)
 
   return (
-    <Card className="flex flex-col h-full flex-1 max-lg:flex-[2] p-0 gap-2">
+    <Card className="flex flex-col h-full flex-1 max-lg:flex-2 p-0 gap-2">
       <Card.Header className="shrink-0 flex-row! items-center p-0 pt-2">
         <Tabs
           selectedKey={activeTab}
@@ -47,21 +47,47 @@ export default function BibleMultiFunction(): React.JSX.Element {
         </Tabs>
 
         {activeTab === 'custom' && (
-          <Breadcrumbs>
-            <Breadcrumbs.Item onPress={navigateToRoot}>
-              {t('bible.custom.home', 'Home')}
-            </Breadcrumbs.Item>
-            {folderPath.map((folder) => (
-              <Breadcrumbs.Item
-                key={folder.id}
-                onPress={
-                  folder.id !== currentFolderId ? () => navigateToFolder(folder.id) : undefined
-                }
-              >
-                {folder.name}
+          <>
+            <Breadcrumbs className="max-lg:hidden">
+              <Breadcrumbs.Item onPress={navigateToRoot}>
+                {t('bible.custom.home', 'Home')}
               </Breadcrumbs.Item>
-            ))}
-          </Breadcrumbs>
+              {folderPath.map((folder) => (
+                <Breadcrumbs.Item
+                  key={folder.id}
+                  onPress={
+                    folder.id !== currentFolderId ? () => navigateToFolder(folder.id) : undefined
+                  }
+                >
+                  {folder.name}
+                </Breadcrumbs.Item>
+              ))}
+            </Breadcrumbs>
+            <div className="lg:hidden flex items-center gap-1 min-w-0">
+              {folderPath.length > 0 && (
+                <Button
+                  isIconOnly
+                  variant="ghost"
+                  size="sm"
+                  onPress={() => {
+                    if (folderPath.length <= 1) {
+                      navigateToRoot()
+                    } else {
+                      navigateToFolder(folderPath[folderPath.length - 2].id)
+                    }
+                  }}
+                  aria-label={t('common.back', 'Back')}
+                >
+                  <ChevronLeft size={16} />
+                </Button>
+              )}
+              <span className="text-sm truncate">
+                {folderPath.length === 0
+                  ? t('bible.custom.home', 'Home')
+                  : folderPath[folderPath.length - 1].name}
+              </span>
+            </div>
+          </>
         )}
 
         <div className="ml-auto flex items-center gap-1 shrink-0 pr-3">
