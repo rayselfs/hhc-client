@@ -69,7 +69,7 @@ export default function BibleProjection({
         </span>
       </div>
 
-      <GlassDivider />
+      <GlassDivider thickness={3} />
 
       <div
         ref={containerRef}
