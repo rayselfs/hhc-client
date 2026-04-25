@@ -35,10 +35,11 @@ export interface BibleStore {
   loadingProgress: { loaded: number; total: number } | null
   error: string | null
   isInitialized: boolean
+  isOffline: boolean
 
   // ── Actions ────────────────────────────────────────────────
   initialize: () => Promise<void>
-  fetchVersionContent: (versionId: number) => Promise<void>
+  fetchVersionContent: (versionId: number, forceRefresh?: boolean) => Promise<void>
   navigateTo: (passage: BiblePassage) => void
   nextChapter: () => void
   prevChapter: () => void
@@ -60,27 +61,50 @@ export const useBibleStore = create<BibleStore>()((set, get) => ({
   loadingProgress: null,
   error: null,
   isInitialized: false,
+  isOffline: false,
 
   initialize: async () => {
-    const s = get()
-    if (s.isLoading) return
+    if (get().isLoading) return
 
     set({ isLoading: true, error: null })
 
+    let freshVersions: BibleVersion[] | null = null
     try {
-      let versions: BibleVersion[] = []
-      const cachedVersions = await loadBibleVersionMeta()
-      if (cachedVersions && cachedVersions.length > 0) {
-        versions = cachedVersions
+      freshVersions = await getAdapter().fetchVersions()
+    } catch {
+      // network unavailable — fall through to offline path
+    }
+
+    const isOffline = freshVersions === null
+
+    try {
+      let versions: BibleVersion[]
+      let changedVersionIds: Set<number>
+
+      if (isOffline) {
+        const cached = await loadBibleVersionMeta()
+        if (!cached || cached.length === 0) {
+          set({ error: 'offline-no-cache', isLoading: false, isOffline: true })
+          return
+        }
+        versions = cached
+        changedVersionIds = new Set()
       } else {
-        versions = await getAdapter().fetchVersions()
+        const cachedVersions = (await loadBibleVersionMeta()) ?? []
+        versions = freshVersions!
+        changedVersionIds = new Set(
+          versions
+            .filter((v) => {
+              const c = cachedVersions.find((c) => c.id === v.id)
+              return !c || c.updatedAt !== v.updatedAt
+            })
+            .map((v) => v.id)
+        )
         await saveBibleVersionMeta(versions)
       }
 
-      set({ versions })
-
       if (versions.length === 0) {
-        set({ isLoading: false, isInitialized: true })
+        set({ versions, isOffline, isLoading: false, isInitialized: true })
         return
       }
 
@@ -88,7 +112,11 @@ export const useBibleStore = create<BibleStore>()((set, get) => ({
         useBibleSettingsStore.getState().setSelectedVersionId(versions[0].id)
       }
 
-      await Promise.all(versions.map((v) => get().fetchVersionContent(v.id)))
+      set({ versions, isOffline })
+
+      await Promise.all(
+        versions.map((v) => get().fetchVersionContent(v.id, changedVersionIds.has(v.id)))
+      )
 
       set({ isInitialized: true, isLoading: false, loadingProgress: null })
     } catch (error) {
@@ -97,12 +125,12 @@ export const useBibleStore = create<BibleStore>()((set, get) => ({
     }
   },
 
-  fetchVersionContent: async (versionId: number) => {
+  fetchVersionContent: async (versionId: number, forceRefresh = false) => {
     const s = get()
 
-    if (s.content.has(versionId)) return
+    if (!forceRefresh && s.content.has(versionId)) return
 
-    if (fetchPromises.has(versionId)) {
+    if (!forceRefresh && fetchPromises.has(versionId)) {
       try {
         const books = await fetchPromises.get(versionId)!
         const newContent = new Map(get().content)
@@ -115,12 +143,16 @@ export const useBibleStore = create<BibleStore>()((set, get) => ({
       return
     }
 
+    if (forceRefresh) fetchPromises.delete(versionId)
+
     set({ isLoading: true, error: null, loadingProgress: { loaded: 0, total: 66 } })
 
     const fetchPromise = (async (): Promise<BibleBook[]> => {
-      const cached = await loadBibleContent(versionId)
-      if (cached && cached.length > 0) {
-        return cached as BibleBook[]
+      if (!forceRefresh) {
+        const cached = await loadBibleContent(versionId)
+        if (cached && cached.length > 0) {
+          return cached as BibleBook[]
+        }
       }
 
       const books = await getAdapter().fetchContent(versionId)
@@ -256,7 +288,7 @@ export const useBibleStore = create<BibleStore>()((set, get) => ({
   },
 
   retry: async () => {
-    set({ error: null, isInitialized: false })
+    set({ error: null, isInitialized: false, isOffline: false })
     await get().initialize()
   },
 

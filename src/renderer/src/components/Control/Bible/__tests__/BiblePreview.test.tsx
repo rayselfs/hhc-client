@@ -19,6 +19,7 @@ const storeSingleton: BibleStore = {
   loadingProgress: null,
   error: null,
   isInitialized: true,
+  isOffline: false,
   initialize: vi.fn(),
   fetchVersionContent: vi.fn(),
   navigateTo: mockNavigateTo,

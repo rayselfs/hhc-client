@@ -36,8 +36,17 @@ export function initializeApp(): () => void {
     }
   })
 
+  const handleOnline = (): void => {
+    if (useBibleStore.getState().isOffline) {
+      void useBibleStore.getState().retry()
+    }
+  }
+
+  window.addEventListener('online', handleOnline)
+
   return () => {
     unsubscribe()
+    window.removeEventListener('online', handleOnline)
     initialized = false
     // Reset loading state so StrictMode re-mount can re-initialize
     const s = useBibleStore.getState()

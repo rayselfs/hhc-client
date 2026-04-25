@@ -108,12 +108,13 @@ describe('initialize()', () => {
   })
 
   it('uses cached versions when available', async () => {
+    mockFetchVersions.mockResolvedValue([VERSION_1])
     mockLoadBibleVersionMeta.mockResolvedValue([VERSION_1])
     mockLoadBibleContent.mockResolvedValue([makeBook(1)])
 
     await useBibleStore.getState().initialize()
 
-    expect(mockFetchVersions).not.toHaveBeenCalled()
+    expect(mockFetchVersions).toHaveBeenCalledTimes(1)
     expect(useBibleStore.getState().versions).toEqual([VERSION_1])
   })
 
@@ -136,7 +137,8 @@ describe('initialize()', () => {
     await useBibleStore.getState().initialize()
 
     const s = useBibleStore.getState()
-    expect(s.error).toBe('Network failure')
+    expect(s.error).toBe('offline-no-cache')
+    expect(s.isOffline).toBe(true)
     expect(s.isLoading).toBe(false)
     expect(s.isInitialized).toBe(false)
   })
