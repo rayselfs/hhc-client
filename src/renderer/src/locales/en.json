@@ -330,7 +330,8 @@
     "bibleIndexFailed": "Failed to load search index for this version",
     "updateAvailable": "Update {{version}} available",
     "updateCheckFailed": "Failed to check for updates",
-    "networkRestored": "Network connection restored"
+    "networkRestored": "Network connection restored",
+    "networkLost": "Network connection lost"
   },
   "shortcuts": {
     "title": "Keyboard Shortcuts",

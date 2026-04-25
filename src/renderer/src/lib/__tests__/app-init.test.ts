@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const mockToastSuccess = vi.fn()
+const mockToastWarning = vi.fn()
 const mockRetry = vi.fn()
 const mockInitialize = vi.fn()
 const mockFolderInitialize = vi.fn()
@@ -24,7 +25,7 @@ const folderState = {
 }
 
 vi.mock('@heroui/react/toast', () => ({
-  toast: { success: mockToastSuccess }
+  toast: { success: mockToastSuccess, warning: mockToastWarning }
 }))
 
 vi.mock('@renderer/i18n', () => ({
@@ -120,5 +121,26 @@ describe('initializeApp — online handler', () => {
     window.dispatchEvent(new Event('online'))
 
     expect(mockToastSuccess).not.toHaveBeenCalled()
+  })
+
+  it('shows warning toast when network goes offline', async () => {
+    const { initializeApp } = await import('../app-init')
+    const cleanup = initializeApp()
+
+    window.dispatchEvent(new Event('offline'))
+
+    expect(mockToastWarning).toHaveBeenCalledWith('toast.networkLost')
+    cleanup()
+  })
+
+  it('removes offline listener on cleanup', async () => {
+    const { initializeApp } = await import('../app-init')
+    const cleanup = initializeApp()
+    cleanup()
+
+    vi.clearAllMocks()
+    window.dispatchEvent(new Event('offline'))
+
+    expect(mockToastWarning).not.toHaveBeenCalled()
   })
 })

@@ -45,11 +45,17 @@ export function initializeApp(): () => void {
     }
   }
 
+  const handleOffline = (): void => {
+    toast.warning(i18n.t('toast.networkLost'))
+  }
+
   window.addEventListener('online', handleOnline)
+  window.addEventListener('offline', handleOffline)
 
   return () => {
     unsubscribe()
     window.removeEventListener('online', handleOnline)
+    window.removeEventListener('offline', handleOffline)
     initialized = false
     // Reset loading state so StrictMode re-mount can re-initialize
     const s = useBibleStore.getState()
