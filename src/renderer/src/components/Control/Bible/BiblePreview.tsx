@@ -263,7 +263,7 @@ export function BiblePreview({
                   }`}
                 >
                   <span
-                    className={`mr-2 shrink-0 ${isSelected ? 'text-accent-foreground/80 dark:text-muted' : 'text-muted'}`}
+                    className={`mr-2 shrink-0 font-[Roboto_Variable,Roboto,sans-serif] ${isSelected ? 'text-accent-foreground/80 dark:text-muted' : 'text-muted'}`}
                   >
                     {verse.number}
                   </span>

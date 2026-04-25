@@ -98,7 +98,7 @@ export function HistoryTab(): React.JSX.Element | null {
                 onClick={() => handleNavigate(item)}
                 className="flex-1 min-w-0 text-left p-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-3xl"
               >
-                <p className="truncate text-muted group-hover:text-accent-foreground/80 dark:group-hover:text-muted">
+                <p className="truncate text-muted group-hover:text-accent-foreground/80 dark:group-hover:text-muted font-[Roboto_Variable,Roboto,sans-serif]">
                   {getVerseReference(item)}
                 </p>
                 <p

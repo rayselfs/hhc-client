@@ -169,7 +169,7 @@ export function BibleSelectorDialog({
             isIconOnly
             variant="tertiary"
             onPress={() => handleChapterSelect(chapter)}
-            className="w-18 h-18 rounded-full aspect-square text-3xl text-foreground hover:bg-accent hover:text-accent-foreground"
+            className="w-18 h-18 rounded-full aspect-square text-3xl text-foreground hover:bg-accent hover:text-accent-foreground font-[Roboto_Variable,Roboto,sans-serif]"
           >
             {chapter}
           </Button>
@@ -186,7 +186,7 @@ export function BibleSelectorDialog({
           isIconOnly
           variant="tertiary"
           onPress={() => handleVerseSelect(verse)}
-          className="w-18 h-18 rounded-full aspect-square text-3xl text-foreground hover:bg-accent hover:text-accent-foreground"
+          className="w-18 h-18 rounded-full aspect-square text-3xl text-foreground hover:bg-accent hover:text-accent-foreground font-[Roboto_Variable,Roboto,sans-serif]"
         >
           {verse}
         </Button>

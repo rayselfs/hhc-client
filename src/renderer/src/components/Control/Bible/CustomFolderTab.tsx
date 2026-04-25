@@ -171,7 +171,7 @@ export function CustomFolderTab({
             <div className="flex items-center gap-2 text-left min-w-0 w-full">
               <div className="min-w-0">
                 <div
-                  className={`truncate ${isSelected ? 'text-accent-foreground/80 dark:text-muted' : 'text-muted'}`}
+                  className={`truncate font-[Roboto_Variable,Roboto,sans-serif] ${isSelected ? 'text-accent-foreground/80 dark:text-muted' : 'text-muted'}`}
                 >
                   {reference}
                 </div>
