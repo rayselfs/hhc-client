@@ -22,7 +22,7 @@ export default function BibleMultiFunction(): React.JSX.Element {
   const folderPath = getFolderPath(currentFolderId).slice(1)
 
   return (
-    <Card className="flex flex-col h-full flex-1 max-lg:flex-[2] p-0 gap-2">
+    <Card className="flex flex-col h-full flex-1 max-lg:flex-2 p-0 gap-2">
       <Card.Header className="shrink-0 flex-row! items-center p-0 pt-2">
         <Tabs
           selectedKey={activeTab}
@@ -32,14 +32,14 @@ export default function BibleMultiFunction(): React.JSX.Element {
           <Tabs.ListContainer>
             <Tabs.List
               aria-label={t('bible.functionsLabel')}
-              className="bg-transparent border border-border p-1"
+              className="bg-transparent border border-border p-1 max-lg:gap-1"
             >
               <Tabs.Tab
                 id="history"
                 className="data-[selected=true]:text-accent-foreground max-lg:w-8 max-lg:px-0"
               >
                 <span className="max-lg:hidden">{t('bible.history.title')}</span>
-                <Clock size={20} className="lg:hidden" />
+                <Clock size={18} className="lg:hidden" />
                 <Tabs.Indicator className="bg-accent" />
               </Tabs.Tab>
               <Tabs.Tab
@@ -47,7 +47,7 @@ export default function BibleMultiFunction(): React.JSX.Element {
                 className="data-[selected=true]:text-accent-foreground max-lg:w-8 max-lg:px-0"
               >
                 <span className="max-lg:hidden">{t('bible.custom.title')}</span>
-                <FolderOpen size={20} className="lg:hidden" />
+                <FolderOpen size={18} className="lg:hidden" />
                 <Tabs.Indicator className="bg-accent" />
               </Tabs.Tab>
             </Tabs.List>
