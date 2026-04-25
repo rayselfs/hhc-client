@@ -116,7 +116,7 @@ export default function SearchBar({
         className={`absolute right-0 -top-0.5 flex items-center justify-center w-10 h-10 text-muted-fg transition-colors ${
           isExpanded
             ? 'hover:text-foreground'
-            : 'hover:text-foreground hover:bg-default-100 rounded-full'
+            : 'hover:text-foreground hover:bg-default/60 rounded-full'
         }`}
       >
         <Search size={16} />
