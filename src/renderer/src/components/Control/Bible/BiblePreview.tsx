@@ -12,7 +12,8 @@ import { useProjection } from '@renderer/contexts/ProjectionContext'
 import {
   getBookConfig,
   buildVerseHistoryItem,
-  formatVerseReferenceShort
+  formatVerseReferenceShort,
+  toChineseChapterNumber
 } from '@renderer/lib/bible-utils'
 import { buildVerseItem } from './useBibleContextMenu'
 import type { MouseEvent } from 'react'
@@ -37,7 +38,7 @@ export function BiblePreview({
   projectedPassage,
   onProjected
 }: BiblePreviewProps): React.JSX.Element {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const currentPassage = useBibleStore((s) => s.currentPassage)
   const versions = useBibleStore((s) => s.versions)
   // re-render when version changes so getters return the selected version's content
@@ -297,8 +298,11 @@ export function BiblePreview({
 
   const chapterUnitKey = book?.number === 19 ? 'psa' : 'default'
   const chapterUnit = book && chapter ? t(`bible.chapterUnit.${chapterUnitKey}`) : ''
+  const isChinese = i18n.language === 'zh-TW' || i18n.language === 'zh-CN'
+  const chapterNumStr =
+    chapter && isChinese ? toChineseChapterNumber(chapter.number) : String(chapter?.number ?? '')
   const chapterSuffix =
-    book && chapter ? ` ${chapter.number}${chapterUnit === ':' ? '' : chapterUnit}` : ''
+    book && chapter ? ` ${chapterNumStr}${chapterUnit === ':' ? '' : chapterUnit}` : ''
 
   return (
     <Card className="flex flex-col h-full flex-1 max-lg:flex-[3] p-0 gap-2">

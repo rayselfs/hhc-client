@@ -6,7 +6,8 @@ import {
   getBookNameI18n,
   formatVerseReferenceShort,
   formatVerseReference,
-  buildVerseHistoryItem
+  buildVerseHistoryItem,
+  toChineseChapterNumber
 } from '../bible-utils'
 
 const mockT: TFunction = ((key: string) => key) as TFunction
@@ -154,6 +155,60 @@ describe('bible-utils', () => {
     it('formats with different chapter and verse numbers', () => {
       const result = formatVerseReference(mockT, 1, 5, 10)
       expect(result).toBe('bible.books.gen.name 5bible.chapterUnit.default10bible.verseUnit')
+    })
+  })
+
+  describe('toChineseChapterNumber', () => {
+    it('converts 1–9', () => {
+      expect(toChineseChapterNumber(1)).toBe('一')
+      expect(toChineseChapterNumber(5)).toBe('五')
+      expect(toChineseChapterNumber(9)).toBe('九')
+    })
+
+    it('converts 10', () => {
+      expect(toChineseChapterNumber(10)).toBe('十')
+    })
+
+    it('converts 11–19', () => {
+      expect(toChineseChapterNumber(11)).toBe('十一')
+      expect(toChineseChapterNumber(15)).toBe('十五')
+      expect(toChineseChapterNumber(19)).toBe('十九')
+    })
+
+    it('keeps 20 as 二十', () => {
+      expect(toChineseChapterNumber(20)).toBe('二十')
+    })
+
+    it('converts 21–29 using 廿', () => {
+      expect(toChineseChapterNumber(21)).toBe('廿一')
+      expect(toChineseChapterNumber(25)).toBe('廿五')
+      expect(toChineseChapterNumber(29)).toBe('廿九')
+    })
+
+    it('keeps 30 as 三十', () => {
+      expect(toChineseChapterNumber(30)).toBe('三十')
+    })
+
+    it('converts 31–39 using 卅', () => {
+      expect(toChineseChapterNumber(31)).toBe('卅一')
+      expect(toChineseChapterNumber(35)).toBe('卅五')
+      expect(toChineseChapterNumber(39)).toBe('卅九')
+    })
+
+    it('converts 40–99 as standard Chinese', () => {
+      expect(toChineseChapterNumber(40)).toBe('四十')
+      expect(toChineseChapterNumber(50)).toBe('五十')
+      expect(toChineseChapterNumber(55)).toBe('五十五')
+      expect(toChineseChapterNumber(99)).toBe('九十九')
+    })
+
+    it('converts 100+ with 一百 prefix', () => {
+      expect(toChineseChapterNumber(100)).toBe('一百')
+      expect(toChineseChapterNumber(119)).toBe('一百十九')
+      expect(toChineseChapterNumber(121)).toBe('一百廿一')
+      expect(toChineseChapterNumber(130)).toBe('一百三十')
+      expect(toChineseChapterNumber(139)).toBe('一百卅九')
+      expect(toChineseChapterNumber(150)).toBe('一百五十')
     })
   })
 

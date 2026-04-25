@@ -5,6 +5,22 @@ import type { VerseItem } from '@shared/types/folder'
 
 type BibleBookKey = `bible.books.${string}.name`
 
+const CN_DIGITS = ['', '一', '二', '三', '四', '五', '六', '七', '八', '九']
+
+export function toChineseChapterNumber(n: number): string {
+  if (n >= 100) return '一百' + toChineseChapterNumber(n - 100)
+  const tens = Math.floor(n / 10)
+  const units = n % 10
+  if (n === 20) return '二十'
+  if (n >= 21 && n <= 29) return '廿' + CN_DIGITS[units]
+  if (n === 30) return '三十'
+  if (n >= 31 && n <= 39) return '卅' + CN_DIGITS[units]
+  if (n === 10) return '十'
+  if (n >= 11 && n <= 19) return '十' + CN_DIGITS[units]
+  if (tens >= 4) return CN_DIGITS[tens] + '十' + (units ? CN_DIGITS[units] : '')
+  return CN_DIGITS[n]
+}
+
 export function getBookConfig(bookNumber: number): BibleBookConfig | undefined {
   return BIBLE_BOOKS.find((b) => b.number === bookNumber)
 }
