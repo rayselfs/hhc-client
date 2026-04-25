@@ -742,12 +742,12 @@ export function FolderBrowser({
         onDragEnd={handleDragEnd}
       >
         <ScrollShadow
-          className="grow p-2 pt-0"
+          className="flex-1 min-h-0 p-2 pt-0"
           onClick={handleContainerClick}
           onContextMenu={handleContextMenuForContainer}
         >
           {allItems.length === 0 ? (
-            <div className="flex items-center justify-center h-full text-neutral-500">
+            <div className="flex items-center justify-center h-full text-muted">
               {resolvedEmptyMessage}
             </div>
           ) : (
