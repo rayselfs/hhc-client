@@ -20,7 +20,7 @@ export default function TimeAdjustment({ className }: TimeAdjustmentProps): Reac
         {ADJUSTMENTS.map((seconds) => (
           <Button
             key={`remove-${seconds}`}
-            className="bg-warning hover:bg-warning-hover text-accent-foreground w-16"
+            className="bg-warning hover:bg-warning-hover hover:brightness-110 hover:shadow-md text-accent-foreground w-16"
             isDisabled={remainingSeconds <= seconds}
             onPress={() => removeTime(seconds)}
             aria-label={t('timer.removeTime', { seconds })}
