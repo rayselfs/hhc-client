@@ -3,7 +3,7 @@ import { Card } from '@heroui/react/card'
 import { Tabs } from '@heroui/react/tabs'
 import { Button } from '@heroui/react/button'
 import { Breadcrumbs } from '@heroui/react/breadcrumbs'
-import { Trash2, FolderPlus, ChevronLeft } from 'lucide-react'
+import { Trash2, FolderPlus, ChevronLeft, Clock, FolderOpen } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import GlassDivider from '@renderer/components/Common/GlassDivider'
 import { useBibleHistoryStore } from '@renderer/stores/bible-history'
@@ -35,11 +35,13 @@ export default function BibleMultiFunction(): React.JSX.Element {
               className="bg-transparent border border-border p-1"
             >
               <Tabs.Tab id="history" className="data-[selected=true]:text-accent-foreground">
-                {t('bible.history.title')}
+                <span className="max-lg:hidden">{t('bible.history.title')}</span>
+                <Clock size={15} className="lg:hidden" />
                 <Tabs.Indicator className="bg-accent" />
               </Tabs.Tab>
               <Tabs.Tab id="custom" className="data-[selected=true]:text-accent-foreground">
-                {t('bible.custom.title')}
+                <span className="max-lg:hidden">{t('bible.custom.title')}</span>
+                <FolderOpen size={15} className="lg:hidden" />
                 <Tabs.Indicator className="bg-accent" />
               </Tabs.Tab>
             </Tabs.List>
@@ -63,7 +65,7 @@ export default function BibleMultiFunction(): React.JSX.Element {
                 </Breadcrumbs.Item>
               ))}
             </Breadcrumbs>
-            <div className="lg:hidden flex items-center gap-1 min-w-0">
+            <div className="lg:hidden flex items-center pl-1 min-w-0">
               {folderPath.length > 0 && (
                 <Button
                   isIconOnly
