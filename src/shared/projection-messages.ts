@@ -38,6 +38,7 @@ export interface AppMessages {
     chapter: number
     chapterVerses: Array<{ number: number; text: string }>
     currentVerse: number
+    versionLocale?: string
   }
   /** Bible display settings (font size, etc.) — sent independently from verse content */
   'bible:settings': { fontSize: number }

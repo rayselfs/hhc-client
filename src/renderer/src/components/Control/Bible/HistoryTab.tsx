@@ -23,6 +23,7 @@ export function HistoryTab(): React.JSX.Element | null {
   const items = useBibleHistoryStore((state) => state.items)
   const removeFromHistory = useBibleHistoryStore((state) => state.removeFromHistory)
   const navigateTo = useBibleStore((state) => state.navigateTo)
+  const versions = useBibleStore((state) => state.versions)
 
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -85,33 +86,39 @@ export function HistoryTab(): React.JSX.Element | null {
   return (
     <ScrollShadow ref={scrollRef} className="h-full w-full" hideScrollBar>
       <div className="flex flex-col gap-2 p-2 pt-0">
-        {todayItems.map((item) => (
-          <div
-            key={item.id}
-            className="flex items-center group rounded-3xl transition-colors hover:bg-accent hover:text-accent-foreground"
-          >
-            <button
-              type="button"
-              onClick={() => handleNavigate(item)}
-              className="flex-1 min-w-0 text-left p-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-3xl"
+        {todayItems.map((item) => {
+          const versionLocale = versions.find((v) => v.id === item.versionId)?.locale
+          return (
+            <div
+              key={item.id}
+              className="flex items-center group rounded-3xl transition-colors hover:bg-accent hover:text-accent-foreground"
             >
-              <p className="truncate text-muted group-hover:text-accent-foreground/80 dark:group-hover:text-muted">
-                {getVerseReference(item)}
-              </p>
-              <p className="text-lg text-foreground group-hover:text-accent-foreground line-clamp-2 max-lg:line-clamp-1">
-                {item.text}
-              </p>
-            </button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="invisible shrink-0 mr-2 group-hover:visible cursor-pointer hover:bg-transparent!"
-              onPress={() => handleRemove(item.id)}
-            >
-              <X size={16} />
-            </Button>
-          </div>
-        ))}
+              <button
+                type="button"
+                onClick={() => handleNavigate(item)}
+                className="flex-1 min-w-0 text-left p-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-3xl"
+              >
+                <p className="truncate text-muted group-hover:text-accent-foreground/80 dark:group-hover:text-muted">
+                  {getVerseReference(item)}
+                </p>
+                <p
+                  lang={versionLocale}
+                  className="text-lg text-foreground group-hover:text-accent-foreground line-clamp-2 max-lg:line-clamp-1"
+                >
+                  {item.text}
+                </p>
+              </button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="invisible shrink-0 mr-2 group-hover:visible cursor-pointer hover:bg-transparent!"
+                onPress={() => handleRemove(item.id)}
+              >
+                <X size={16} />
+              </Button>
+            </div>
+          )
+        })}
       </div>
     </ScrollShadow>
   )

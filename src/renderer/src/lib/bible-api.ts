@@ -162,6 +162,9 @@ export class ElectronBibleApiAdapter implements BibleApiAdapter {
 }
 
 const BIBLE_BASE = import.meta.env.DEV ? '/api/bible/v1' : BIBLE_API.base
+const BIBLE_VERSIONS_BASE = import.meta.env.DEV
+  ? '/api/bible/v2'
+  : BIBLE_API.versions.replace('/versions', '')
 const VERSIONS_TIMEOUT_MS = 3_000
 const CONTENT_TIMEOUT_MS = 30_000
 
@@ -176,7 +179,7 @@ export class BrowserBibleApiAdapter implements BibleApiAdapter {
 
   private async doFetchVersions(): Promise<BibleVersion[]> {
     try {
-      const { data } = await http.get<BibleVersion[]>(`${BIBLE_BASE}/versions`, {
+      const { data } = await http.get<BibleVersion[]>(`${BIBLE_VERSIONS_BASE}/versions`, {
         timeout: VERSIONS_TIMEOUT_MS
       })
       return data

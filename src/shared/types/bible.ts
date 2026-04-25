@@ -2,6 +2,7 @@ export interface BibleVersion {
   id: number
   code: string
   name: string
+  locale: string
   updatedAt: number
 }
 

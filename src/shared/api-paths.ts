@@ -1,8 +1,10 @@
 const BIBLE_API_HOST = 'https://www.alive.org.tw'
-const BIBLE_API_PREFIX = '/api/bible/v1'
+const BIBLE_API_PREFIX = '/api/bible/v2'
+const BIBLE_API_CONTENT_PREFIX = '/api/bible/v1'
 
 export const BIBLE_API = {
-  base: `${BIBLE_API_HOST}${BIBLE_API_PREFIX}`,
+  base: `${BIBLE_API_HOST}${BIBLE_API_CONTENT_PREFIX}`,
   versions: `${BIBLE_API_HOST}${BIBLE_API_PREFIX}/versions`,
-  content: (versionId: number) => `${BIBLE_API_HOST}${BIBLE_API_PREFIX}/content/${versionId}`
+  content: (versionId: number) =>
+    `${BIBLE_API_HOST}${BIBLE_API_CONTENT_PREFIX}/content/${versionId}`
 } as const

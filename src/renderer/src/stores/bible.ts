@@ -87,7 +87,7 @@ export const useBibleStore = create<BibleStore>()((set, get) => ({
           set({ error: 'offline-no-cache', isLoading: false, isOffline: true })
           return
         }
-        versions = cached
+        versions = cached.map((v) => ({ ...v, locale: v.locale ?? '' }))
         changedVersionIds = new Set()
       } else {
         const cachedVersions = (await loadBibleVersionMeta()) ?? []

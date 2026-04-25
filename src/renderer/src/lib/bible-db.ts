@@ -18,6 +18,7 @@ interface BibleVersionDB {
   code: string
   name: string
   updatedAt: number
+  locale?: string
 }
 
 interface LegacyFolderDB {

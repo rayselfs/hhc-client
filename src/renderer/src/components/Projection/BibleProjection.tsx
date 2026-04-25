@@ -8,6 +8,7 @@ export type BibleChapterData = {
   chapter: number
   chapterVerses: Array<{ number: number; text: string }>
   currentVerse: number
+  versionLocale?: string
 }
 
 interface BibleProjectionProps {
@@ -20,7 +21,7 @@ export default function BibleProjection({
   fontSize
 }: BibleProjectionProps): React.JSX.Element {
   const { t } = useTranslation()
-  const { bookNumber, chapter, chapterVerses, currentVerse } = data
+  const { bookNumber, chapter, chapterVerses, currentVerse, versionLocale } = data
   const containerRef = useRef<HTMLDivElement>(null)
   const prevChapterKeyRef = useRef<string>('')
   const isFirstRenderRef = useRef(true)
@@ -93,7 +94,9 @@ export default function BibleProjection({
             >
               {verse.number}
             </span>
-            <span className="flex-1 text-justify">{verse.text}</span>
+            <span className="flex-1 text-justify" lang={versionLocale}>
+              {verse.text}
+            </span>
           </div>
         ))}
         <div style={{ height: '100vh' }} />

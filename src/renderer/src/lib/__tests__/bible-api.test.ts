@@ -65,15 +65,17 @@ describe('BrowserBibleApiAdapter', () => {
   })
 
   describe('fetchVersions', () => {
-    it('fetches from /api/bible/v1/versions, maps raw fields, and returns BibleVersion[]', async () => {
-      const raw: BibleVersion[] = [{ id: 1, code: 'CUV', name: '和合本', updatedAt: 1765861998 }]
+    it('fetches from /api/bible/v2/versions, maps raw fields, and returns BibleVersion[]', async () => {
+      const raw: BibleVersion[] = [
+        { id: 1, code: 'CUV', name: '和合本', updatedAt: 1765861998, locale: 'zh' }
+      ]
       vi.mocked(http.get).mockResolvedValue({
         data: raw
       } as never)
 
       const result = await adapter.fetchVersions()
       expect(result).toEqual(raw)
-      expect(http.get).toHaveBeenCalledWith('/api/bible/v1/versions', { timeout: 3000 })
+      expect(http.get).toHaveBeenCalledWith('/api/bible/v2/versions', { timeout: 3000 })
     })
 
     it('throws BibleApiError with type=network on non-ok response', async () => {
@@ -258,7 +260,9 @@ describe('ElectronBibleApiAdapter', () => {
   })
 
   it('fetchVersions delegates to window.api.bible.getVersions', async () => {
-    const versions: BibleVersion[] = [{ id: 1, code: 'CUV', name: '和合本', updatedAt: 1765861998 }]
+    const versions: BibleVersion[] = [
+      { id: 1, code: 'CUV', name: '和合本', updatedAt: 1765861998, locale: 'zh' }
+    ]
     mockGetVersions.mockResolvedValue(versions)
 
     const result = await adapter.fetchVersions()

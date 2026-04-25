@@ -40,7 +40,13 @@ import { useBibleStore } from '@renderer/stores/bible'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 import type { BibleBook, BibleVersion } from '@shared/types/bible'
 
-const VERSION_1: BibleVersion = { id: 1, code: 'KJV', name: 'King James', updatedAt: 1765861998 }
+const VERSION_1: BibleVersion = {
+  id: 1,
+  code: 'KJV',
+  name: 'King James',
+  updatedAt: 1765861998,
+  locale: 'en'
+}
 
 const makeBook = (number: number, chapterCount = 2, verseCount = 3): BibleBook => ({
   number,

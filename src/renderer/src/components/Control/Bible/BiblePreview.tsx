@@ -39,8 +39,10 @@ export function BiblePreview({
 }: BiblePreviewProps): React.JSX.Element {
   const { t } = useTranslation()
   const currentPassage = useBibleStore((s) => s.currentPassage)
+  const versions = useBibleStore((s) => s.versions)
   // re-render when version changes so getters return the selected version's content
-  void useBibleSettingsStore((s) => s.selectedVersionId)
+  const selectedVersionId = useBibleSettingsStore((s) => s.selectedVersionId)
+  const currentVersionLocale = versions.find((v) => v.id === selectedVersionId)?.locale
   const {
     getCurrentVerses,
     getCurrentBook,
@@ -106,7 +108,8 @@ export function BiblePreview({
         bookNumber: book.number,
         chapter: chapter.number,
         chapterVerses: verses.map((v) => ({ number: v.number, text: v.text })),
-        currentVerse: verseNumber
+        currentVerse: verseNumber,
+        versionLocale: currentVersionLocale
       },
       { autoOpen: true }
     )
@@ -264,7 +267,9 @@ export function BiblePreview({
                   >
                     {verse.number}
                   </span>
-                  <span className="flex-1 text-xl pr-9">{verse.text}</span>
+                  <span className="flex-1 text-xl pr-9" lang={currentVersionLocale}>
+                    {verse.text}
+                  </span>
                 </button>
                 <Button
                   variant="ghost"
