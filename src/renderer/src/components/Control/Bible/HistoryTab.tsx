@@ -8,6 +8,7 @@ import { ScrollShadow } from '@heroui/react/scroll-shadow'
 import { Button } from '@heroui/react/button'
 import { X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { useBibleContextMenu } from '@renderer/components/Control/Bible/useBibleContextMenu'
 
 function isSameDay(ts: number, date: Date): boolean {
   const d = new Date(ts)
@@ -24,6 +25,7 @@ export function HistoryTab(): React.JSX.Element | null {
   const removeFromHistory = useBibleHistoryStore((state) => state.removeFromHistory)
   const navigateTo = useBibleStore((state) => state.navigateTo)
   const versions = useBibleStore((state) => state.versions)
+  const { showHistoryMenu } = useBibleContextMenu()
 
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -96,6 +98,7 @@ export function HistoryTab(): React.JSX.Element | null {
               <button
                 type="button"
                 onClick={() => handleNavigate(item)}
+                onContextMenu={(e) => showHistoryMenu(item, e)}
                 className="flex-1 min-w-0 text-left p-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-3xl"
               >
                 <p className="truncate text-muted group-hover:text-accent-foreground/80 dark:group-hover:text-muted font-[Roboto_Variable,Roboto,sans-serif]">

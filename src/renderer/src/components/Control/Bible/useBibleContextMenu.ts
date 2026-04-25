@@ -5,7 +5,7 @@ import { useBibleFolderStore } from '@renderer/stores/folder'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 import { formatVerseReferenceForCopy } from '@renderer/lib/bible-utils'
 import type { VerseItem } from '@shared/types/folder'
-import { Copy, Trash2 } from 'lucide-react'
+import { Copy, Trash2, FolderPlus } from 'lucide-react'
 import React from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
@@ -90,6 +90,20 @@ export function useBibleContextMenu(): UseBibleContextMenu {
         icon: React.createElement(Copy, { size: 14 }),
         onAction: () => {
           navigator.clipboard.writeText(formattedText)
+        }
+      },
+      {
+        id: 'add-to-folder',
+        label: t('bible.contextMenu.addToFolder'),
+        icon: React.createElement(FolderPlus, { size: 14 }),
+        onAction: () => {
+          const newItem = buildVerseItem({
+            bookNumber: item.bookNumber,
+            chapter: item.chapter,
+            verse: item.verse,
+            text: item.text
+          })
+          useBibleFolderStore.getState().addItem(newItem)
         }
       },
       'separator',
