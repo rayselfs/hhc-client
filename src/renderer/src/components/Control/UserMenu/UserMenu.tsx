@@ -51,7 +51,7 @@ export default function UserMenu({ onOpenPreferences }: UserMenuProps): React.JS
     <>
       <Dropdown.Root>
         <Dropdown.Trigger>
-          <div className="flex items-center gap-2 w-full max-lg:justify-center rounded-full px-3 py-2 max-lg:px-2 text-muted hover:opacity-70 transition-opacity cursor-default">
+          <div className="flex items-center gap-2 w-full max-lg:justify-center rounded-full text-muted hover:opacity-70 transition-opacity cursor-default">
             <Avatar.Root className="shrink-0">
               <Avatar.Fallback>
                 <CircleUser />
