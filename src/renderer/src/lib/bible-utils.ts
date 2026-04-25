@@ -56,7 +56,8 @@ export function formatVerseReference(
   t: TFunction,
   bookNumber: number,
   chapter: number,
-  verse: number
+  verse: number,
+  locale?: string
 ): string {
   const book = getBookConfig(bookNumber)
   if (!book) return ''
@@ -66,7 +67,12 @@ export function formatVerseReference(
   const chapterUnit =
     bookNumber === 19 ? t('bible.chapterUnit.psa') : t('bible.chapterUnit.default')
   const verseUnit = t('bible.verseUnit')
+  const isChinese = locale === 'zh-TW' || locale === 'zh-CN'
   if (showChapter) {
+    if (isChinese && chapterUnit !== ':') {
+      const chapterNumStr = toChineseChapterNumber(chapter)
+      return `${bookName} ${chapterNumStr} ${chapterUnit}${verse}${verseUnit}`
+    }
     return `${bookName} ${chapter}${chapterUnit}${verse}${verseUnit}`
   }
   return `${bookName} ${verse}${verseUnit}`

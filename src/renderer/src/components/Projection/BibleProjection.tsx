@@ -20,7 +20,7 @@ export default function BibleProjection({
   data,
   fontSize
 }: BibleProjectionProps): React.JSX.Element {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { bookNumber, chapter, chapterVerses, currentVerse, versionLocale } = data
   const containerRef = useRef<HTMLDivElement>(null)
   const prevChapterKeyRef = useRef<string>('')
@@ -55,7 +55,8 @@ export default function BibleProjection({
     t as Parameters<typeof formatVerseReference>[0],
     bookNumber,
     chapter,
-    currentVerse
+    currentVerse,
+    i18n.language
   )
   const referenceSize = Math.max(16, fontSize * 0.35)
 
