@@ -61,11 +61,11 @@ export default function Header(): React.JSX.Element {
           <SettingsPopover
             variant={showBibleControls ? 'bible' : mode === 'stopwatch' ? 'stopwatch' : 'timer'}
           />
-          {showBibleControls && (
-            <div className="lg:hidden pointer-events-auto">
-              <BibleSelector onOpenDialog={handleOpenBibleSelector} />
-            </div>
-          )}
+          <div
+            className={`lg:hidden transition-all duration-200 ${showBibleControls ? 'opacity-100 translate-x-0 pointer-events-auto' : 'opacity-0 -translate-x-3 pointer-events-none'}`}
+          >
+            <BibleSelector onOpenDialog={handleOpenBibleSelector} />
+          </div>
         </div>
       )}
 
@@ -80,7 +80,7 @@ export default function Header(): React.JSX.Element {
       <div
         className={`absolute inset-0 flex items-center justify-center pointer-events-none transition-all duration-200 ${showBibleControls ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-3'}`}
       >
-        <div className={showBibleControls ? 'pointer-events-auto max-lg:hidden' : undefined}>
+        <div className={`max-lg:hidden ${showBibleControls ? 'pointer-events-auto' : ''}`}>
           <div data-testid="bible-header-controls">
             <BibleSelector onOpenDialog={handleOpenBibleSelector} />
           </div>
