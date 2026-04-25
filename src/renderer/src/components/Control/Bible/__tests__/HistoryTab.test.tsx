@@ -81,6 +81,15 @@ vi.mock('@renderer/stores/bible-settings', () => ({
   })
 }))
 
+vi.mock('@renderer/components/Control/Bible/useBibleContextMenu', () => ({
+  useBibleContextMenu: () => ({
+    showHistoryMenu: vi.fn(),
+    showPreviewMenu: vi.fn(),
+    showFolderItemMenu: vi.fn()
+  }),
+  buildVerseItem: vi.fn((v) => ({ ...v, id: 'mock-id', type: 'verse', parentId: '', createdAt: 0 }))
+}))
+
 describe('HistoryTab', () => {
   beforeEach(() => {
     vi.clearAllMocks()

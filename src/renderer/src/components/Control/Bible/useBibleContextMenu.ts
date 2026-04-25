@@ -79,19 +79,8 @@ export function useBibleContextMenu(): UseBibleContextMenu {
     showMenu(items, e)
   }
 
-  // TODO: used by future HistoryTab context menu
   const showHistoryMenu = (item: VerseItem, e: React.MouseEvent): void => {
-    const formattedText = getFormattedReference(item, t, i18n.language)
-
     const items: ContextMenuEntry[] = [
-      {
-        id: 'copy',
-        label: t('bible.contextMenu.copyText'),
-        icon: React.createElement(Copy, { size: 14 }),
-        onAction: () => {
-          navigator.clipboard.writeText(formattedText)
-        }
-      },
       {
         id: 'add-to-folder',
         label: t('bible.contextMenu.addToFolder'),
