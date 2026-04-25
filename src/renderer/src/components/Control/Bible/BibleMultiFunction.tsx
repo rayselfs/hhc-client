@@ -39,7 +39,7 @@ export default function BibleMultiFunction(): React.JSX.Element {
                 className="data-[selected=true]:text-accent-foreground max-lg:w-8 max-lg:px-0"
               >
                 <span className="max-lg:hidden">{t('bible.history.title')}</span>
-                <Clock size={15} className="lg:hidden" />
+                <Clock size={20} className="lg:hidden" />
                 <Tabs.Indicator className="bg-accent" />
               </Tabs.Tab>
               <Tabs.Tab
@@ -47,7 +47,7 @@ export default function BibleMultiFunction(): React.JSX.Element {
                 className="data-[selected=true]:text-accent-foreground max-lg:w-8 max-lg:px-0"
               >
                 <span className="max-lg:hidden">{t('bible.custom.title')}</span>
-                <FolderOpen size={15} className="lg:hidden" />
+                <FolderOpen size={20} className="lg:hidden" />
                 <Tabs.Indicator className="bg-accent" />
               </Tabs.Tab>
             </Tabs.List>
