@@ -26,7 +26,7 @@ export default function Sidebar(): React.JSX.Element {
   }
 
   return (
-    <nav className="shrink-0 flex flex-col rounded-tr-3xl rounded-br-3xl bg-sidebar text-sidebar-foreground py-2 px-2 w-[180px] max-lg:w-[54px] transition-[width] duration-200">
+    <nav className="shrink-0 flex flex-col rounded-tr-3xl rounded-br-3xl bg-sidebar text-sidebar-foreground py-2 px-2 w-[180px] max-lg:w-[54px]">
       <ul className="flex flex-col gap-1">
         {items.map((item) => {
           const active = isActive(item)
