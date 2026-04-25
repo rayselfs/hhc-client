@@ -71,7 +71,7 @@ export function formatVerseReference(
   if (showChapter) {
     if (isChinese && chapterUnit !== ':') {
       const chapterNumStr = toChineseChapterNumber(chapter)
-      return `${bookName} ${chapterNumStr}${chapterUnit}${verse}${verseUnit}`
+      return `${bookName}${chapterNumStr}${chapterUnit}${verse}${verseUnit}`
     }
     return `${bookName} ${chapter}${chapterUnit}${verse}${verseUnit}`
   }
