@@ -162,7 +162,8 @@ export class ElectronBibleApiAdapter implements BibleApiAdapter {
 }
 
 const BIBLE_BASE = import.meta.env.DEV ? '/api/bible/v1' : BIBLE_API.base
-const TIMEOUT_MS = 30_000
+const VERSIONS_TIMEOUT_MS = 3_000
+const CONTENT_TIMEOUT_MS = 30_000
 
 export class BrowserBibleApiAdapter implements BibleApiAdapter {
   async fetchVersions(): Promise<BibleVersion[]> {
@@ -175,7 +176,9 @@ export class BrowserBibleApiAdapter implements BibleApiAdapter {
 
   private async doFetchVersions(): Promise<BibleVersion[]> {
     try {
-      const { data } = await http.get<BibleVersion[]>(`${BIBLE_BASE}/versions`)
+      const { data } = await http.get<BibleVersion[]>(`${BIBLE_BASE}/versions`, {
+        timeout: VERSIONS_TIMEOUT_MS
+      })
       return data
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') {
@@ -190,7 +193,7 @@ export class BrowserBibleApiAdapter implements BibleApiAdapter {
 
   private async doFetchContent(versionId: number): Promise<BibleBook[]> {
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS)
+    const timeoutId = setTimeout(() => controller.abort(), CONTENT_TIMEOUT_MS)
 
     try {
       const response = await fetch(`${BIBLE_BASE}/content/${versionId}`, {
