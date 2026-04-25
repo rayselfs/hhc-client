@@ -264,13 +264,13 @@ export function BiblePreview({
                   >
                     {verse.number}
                   </span>
-                  <span className="flex-1 text-xl pr-6">{verse.text}</span>
+                  <span className="flex-1 text-xl pr-9">{verse.text}</span>
                 </button>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={(e) => handleQuickAddToFolder(verse.number, verse.text, e)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer hover:bg-transparent!"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer hover:bg-transparent!"
                   aria-label={t('bible.contextMenu.addToFolder')}
                 >
                   <CirclePlus size={14} className="text-muted" />
