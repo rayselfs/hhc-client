@@ -303,7 +303,9 @@ export function BiblePreview({
     chapter && isChinese ? toChineseChapterNumber(chapter.number) : String(chapter?.number ?? '')
   const chapterSuffix =
     book && chapter
-      ? `${isChinese ? '' : ' '}${chapterNumStr}${chapterUnit === ':' ? '' : chapterUnit}`
+      ? isChinese
+        ? ` ${chapterNumStr} ${chapterUnit === ':' ? '' : chapterUnit}`
+        : ` ${chapterNumStr}${chapterUnit === ':' ? '' : chapterUnit}`
       : ''
 
   return (
