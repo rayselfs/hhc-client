@@ -302,7 +302,9 @@ export function BiblePreview({
   const chapterNumStr =
     chapter && isChinese ? toChineseChapterNumber(chapter.number) : String(chapter?.number ?? '')
   const chapterSuffix =
-    book && chapter ? ` ${chapterNumStr}${chapterUnit === ':' ? '' : chapterUnit}` : ''
+    book && chapter
+      ? `${isChinese ? '' : ' '}${chapterNumStr}${chapterUnit === ':' ? '' : chapterUnit}`
+      : ''
 
   return (
     <Card className="flex flex-col h-full flex-1 max-lg:flex-[3] p-0 gap-2">
