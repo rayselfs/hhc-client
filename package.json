@@ -1,6 +1,6 @@
 {
   "name": "hhc-client",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "description": "This software specifically serves the church projection function",
   "main": "./out/main/index.js",
   "author": "rayselfs",
