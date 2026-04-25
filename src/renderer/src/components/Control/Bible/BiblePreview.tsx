@@ -208,7 +208,7 @@ export function BiblePreview({
                   onClick={() => handleSearchResultClick(r.bookNumber, r.chapter, r.verse)}
                   className="w-full text-left rounded-3xl p-3 hover:bg-accent hover:text-accent-foreground transition-colors"
                 >
-                  <div className="text-sm font-medium text-muted mb-1">{reference}</div>
+                  <div className="text-muted mb-1">{reference}</div>
                   <div className="text-xl text-foreground">
                     {renderHighlightedText(r.text, searchQuery)}
                   </div>
