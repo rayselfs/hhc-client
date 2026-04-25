@@ -175,7 +175,7 @@ export function CustomFolderTab({
                 >
                   {reference}
                 </div>
-                <div className="text-lg whitespace-normal">
+                <div className="text-lg whitespace-normal max-lg:truncate">
                   {isVerseItem(item) ? item.text : ''}
                 </div>
               </div>

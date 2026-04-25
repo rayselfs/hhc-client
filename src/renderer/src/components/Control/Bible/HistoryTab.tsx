@@ -98,7 +98,7 @@ export function HistoryTab(): React.JSX.Element | null {
               <p className="truncate text-muted group-hover:text-accent-foreground/80 dark:group-hover:text-muted">
                 {getVerseReference(item)}
               </p>
-              <p className="text-lg text-foreground group-hover:text-accent-foreground line-clamp-2">
+              <p className="text-lg text-foreground group-hover:text-accent-foreground line-clamp-2 max-lg:line-clamp-1">
                 {item.text}
               </p>
             </button>
