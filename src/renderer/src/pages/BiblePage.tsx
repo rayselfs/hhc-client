@@ -233,7 +233,7 @@ export default function BiblePage(): React.JSX.Element {
             projectedPassage={projectedPassage}
             onProjected={setProjectedPassage}
           />
-          <BibleMultiFunction />
+          <BibleMultiFunction onProjected={setProjectedPassage} />
           <BibleSelectorDialog
             isOpen={isSelectorOpen}
             onOpenChange={setSelectorOpen}

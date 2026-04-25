@@ -11,7 +11,13 @@ import { useBibleFolderStore } from '@renderer/stores/folder'
 import { HistoryTab } from './HistoryTab'
 import { CustomFolderTab } from './CustomFolderTab'
 
-export default function BibleMultiFunction(): React.JSX.Element {
+interface BibleMultiFunctionProps {
+  onProjected?: (passage: { bookNumber: number; chapter: number; verse: number }) => void
+}
+
+export default function BibleMultiFunction({
+  onProjected
+}: BibleMultiFunctionProps): React.JSX.Element {
   const { t } = useTranslation()
   const [activeTab, setActiveTab] = useState<string>('history')
   const [isAddFolderModalOpen, setAddFolderModalOpen] = useState(false)
@@ -131,6 +137,7 @@ export default function BibleMultiFunction(): React.JSX.Element {
           <CustomFolderTab
             isModalOpen={isAddFolderModalOpen}
             onModalOpenChange={setAddFolderModalOpen}
+            onProjected={onProjected}
           />
         )}
       </Card.Content>

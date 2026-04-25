@@ -20,6 +20,7 @@ import {
 interface CustomFolderTabProps {
   isModalOpen?: boolean
   onModalOpenChange?: (open: boolean) => void
+  onProjected?: (passage: { bookNumber: number; chapter: number; verse: number }) => void
 }
 
 function getVerseReference(item: VerseItemRecord, t: TFunction): string {
@@ -28,7 +29,8 @@ function getVerseReference(item: VerseItemRecord, t: TFunction): string {
 
 export function CustomFolderTab({
   isModalOpen = false,
-  onModalOpenChange = () => {}
+  onModalOpenChange = () => {},
+  onProjected
 }: CustomFolderTabProps): React.JSX.Element {
   const { currentFolderId } = useBibleFolderStore()
   const { navigateTo } = useBibleStore.getState()
@@ -68,8 +70,9 @@ export function CustomFolderTab({
         },
         { autoOpen: true }
       )
+      onProjected?.({ bookNumber: item.bookNumber, chapter: item.chapter, verse: item.verse })
     },
-    [navigateTo, claimProjection, project]
+    [navigateTo, claimProjection, project, onProjected]
   )
 
   const getItemReference = useCallback(
