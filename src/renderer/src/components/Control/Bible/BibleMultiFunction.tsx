@@ -73,7 +73,7 @@ export default function BibleMultiFunction(): React.JSX.Element {
               onPress={clearHistory}
               aria-label={t('bible.history.clearHistory', 'Clear history')}
             >
-              <Trash2 size={15} />
+              <Trash2 size={18} />
             </Button>
           )}
           {activeTab === 'custom' && (
@@ -84,7 +84,7 @@ export default function BibleMultiFunction(): React.JSX.Element {
               onPress={() => setAddFolderModalOpen(true)}
               aria-label={t('bible.custom.newFolder', 'New Folder')}
             >
-              <FolderPlus size={15} />
+              <FolderPlus size={18} />
             </Button>
           )}
         </div>
