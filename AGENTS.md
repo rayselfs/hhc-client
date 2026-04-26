@@ -1,7 +1,7 @@
 # PROJECT KNOWLEDGE BASE
 
-**Updated:** 2026-04-11
-**Commit:** 3e3833c
+**Updated:** 2026-04-26
+**Commit:** 1b5e6d6
 **Branch:** main
 
 ## OVERVIEW
@@ -12,28 +12,90 @@ Electron desktop app for church projection (`hhc-client`). React 19 + TypeScript
 
 ```
 hhc-client-v2/
+├── .github/workflows/       # CI + CD pipelines
+│   ├── ci.yml               # PR quality gates (lint, typecheck, test, build)
+│   ├── build-release.yml    # Tag-triggered macOS + Windows packaging → GitHub Release
+│   └── azure-static-web-apps-*.yml  # Azure SWA deploy (PR preview + tag deploy)
 ├── src/
 │   ├── main/                # Electron main process
 │   │   ├── index.ts         # App lifecycle, WindowManager integration
 │   │   ├── windowManager.ts # Singleton: main + projection window management
 │   │   ├── timerService.ts  # Main-process timer broadcast service
 │   │   └── ipc/             # IPC handler registration
+│   │       ├── app.ts       # App-level IPC (version, etc.)
+│   │       ├── bible-api.ts # Bible data IPC
 │   │       ├── projection.ts
 │   │       ├── timer.ts
 │   │       └── validate.ts  # Centralized sender validation
 │   ├── preload/             # Context bridge — exposes electron API to renderer
 │   │   ├── index.ts
 │   │   └── index.d.ts      # Window.electron + Window.api type declarations
+│   ├── shared/              # Shared between main/preload/renderer
+│   │   ├── api-paths.ts
+│   │   ├── constants/
+│   │   ├── ipc-channels.ts  # IPC channel name constants
+│   │   ├── projection-messages.ts  # Projection message types (AppMessages)
+│   │   └── types/
 │   └── renderer/src/        # React app (Vite entry: main.tsx → App.tsx)
-│       ├── components/      # Layout, Sidebar, Header, Timer/, projection/, Preferences/
-│       ├── contexts/        # ThemeContext, TimerEngineContext, ProjectionContext, ContextMenuContext
-│       ├── lib/             # env.ts, projection-adapter.ts, timer-adapter.ts, persist-storage.ts, utils, etc.
-│       ├── stores/          # Zustand: timer.ts, stopwatch.ts, settings.ts, selectors/
-│       ├── workers/         # timer.worker.ts (Web Worker for browser-mode tick)
-│       ├── pages/           # TimerPage, BiblePage, ProjectionPage, WelcomePage
+│       ├── components/
+│       │   ├── Common/      # Reusable: ConfirmDialog, ContextMenuOverlay, GlassDivider
+│       │   ├── Control/     # Domain control panels
+│       │   │   ├── Bible/   # Bible browsing + search
+│       │   │   ├── Bridge/  # Bridge/connection UI
+│       │   │   ├── Folder/  # Folder management
+│       │   │   ├── Timer/   # Timer controls
+│       │   │   ├── UserMenu/
+│       │   │   ├── Header/
+│       │   │   ├── Layout.tsx
+│       │   │   ├── LoadingFallback.tsx
+│       │   │   └── Sidebar.tsx
+│       │   ├── Projection/  # Projection display components
+│       │   │   ├── BibleProjection.tsx
+│       │   │   ├── DefaultProjection.tsx
+│       │   │   └── TimerProjection.tsx
+│       │   ├── ErrorBoundary.tsx
+│       │   └── RouteError.tsx
+│       ├── config/          # App configuration
+│       │   ├── events.ts    # Custom event names
+│       │   └── shortcuts.ts # Keyboard shortcut definitions
+│       ├── contexts/        # React contexts (non-serializable services only)
+│       │   ├── AppInitContext.ts
+│       │   ├── ConfirmDialogContext.tsx
+│       │   ├── ContextMenuContext.tsx
+│       │   ├── ProjectionContext.tsx  # ProjectionOwner type + useProjection()
+│       │   ├── ShortcutScopeContext.tsx
+│       │   ├── ThemeContext.tsx
+│       │   └── TimerEngineContext.tsx
+│       ├── lib/             # Utilities + adapters
+│       │   ├── env.ts              # isElectron() / isWeb()
+│       │   ├── projection-adapter.ts  # Dual-mode projection messaging
+│       │   ├── timer-adapter.ts       # Dual-mode timer engine
+│       │   ├── persist-storage.ts     # Shared Zustand persist adapter
+│       │   ├── shortcut-registry.ts   # Keyboard shortcut management
+│       │   ├── routes.ts             # Route path helpers
+│       │   ├── bible-api.ts / bible-db.ts / bible-search.ts / bible-utils.ts
+│       │   ├── folder-db.ts / createFolderContextMenu.ts
+│       │   ├── app-init.ts / onboarding.ts / http.ts / aria.ts
+│       │   ├── parse-duration.ts / site-data.ts / storage-prefix.ts
+│       │   └── use-overlay-state.ts
+│       ├── stores/          # Zustand stores
+│       │   ├── timer.ts / timer-config.ts / timer-runtime.ts
+│       │   ├── stopwatch.ts
+│       │   ├── settings.ts
+│       │   ├── bible.ts / bible-history.ts / bible-search.ts / bible-settings.ts
+│       │   ├── folder.ts
+│       │   ├── update.ts
+│       │   └── selectors/   # folder.ts, stopwatch.ts, update.ts
+│       ├── workers/         # Web Workers
+│       │   └── timer.worker.ts  # setInterval(100ms) tick loop for browser mode
+│       ├── pages/           # Route pages
+│       │   ├── TimerPage.tsx
+│       │   ├── BiblePage.tsx
+│       │   ├── ProjectionPage.tsx
+│       │   └── WelcomePage.tsx
 │       ├── i18n/            # react-i18next setup
 │       ├── locales/         # en.json, zh-TW.json, zh-CN.json
-│       ├── types/           # Theme types
+│       ├── types/           # theme.ts
 │       └── assets/          # CSS + SVG
 ├── build/                   # Packaging assets (icons, mac entitlements)
 ├── resources/               # App resources (icon.png, bundled in asar)
@@ -44,25 +106,29 @@ hhc-client-v2/
 
 ## WHERE TO LOOK
 
-| Task                           | Location                                           | Notes                                                                                      |
-| ------------------------------ | -------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| Main process / window creation | `src/main/index.ts` + `windowManager.ts`           | WindowManager singleton manages both windows                                               |
-| IPC handlers                   | `src/main/ipc/`                                    | projection.ts, timer.ts, validate.ts                                                       |
-| Timer main-process service     | `src/main/timerService.ts`                         | Broadcasts timer state to projection window                                                |
-| Expose API to renderer         | `src/preload/index.ts`                             | contextBridge; update `index.d.ts` for types                                               |
-| UI / React components          | `src/renderer/src/components/`                     | Timer/, projection/, Preferences/, Layout, etc.                                            |
-| Timer engine (adapter bridge)  | `src/renderer/src/contexts/TimerEngineContext.tsx` | Bridges adapter ↔ Zustand stores                                                           |
-| Timer adapter (dual-mode)      | `src/renderer/src/lib/timer-adapter.ts`            | BrowserTimerAdapter (Worker) vs ElectronTimerAdapter (IPC)                                 |
-| Timer Worker                   | `src/renderer/src/workers/timer.worker.ts`         | setInterval(100ms) tick loop for browser mode                                              |
-| Projection messaging           | `src/renderer/src/lib/projection-adapter.ts`       | Electron IPC or BroadcastChannel adapter                                                   |
-| Environment detection          | `src/renderer/src/lib/env.ts`                      | `isElectron()` / `isWeb()` — renderer only                                                 |
-| State (Zustand)                | `src/renderer/src/stores/`                         | timer.ts, stopwatch.ts, settings.ts, selectors/. Timer + Settings use `persist` middleware |
-| Persist storage adapter        | `src/renderer/src/lib/persist-storage.ts`          | Shared `hhcPersistStorage` + `createPersistName()` for all persisted stores                |
-| Theme system                   | `src/renderer/src/contexts/ThemeContext.tsx`       | Dark/light/system, syncs with Electron nativeTheme                                         |
-| Routing                        | `src/renderer/src/router.tsx`                      | HashRouter; `/projection` is outside Layout                                                |
-| Path alias config              | `electron.vite.config.ts` + `tsconfig.web.json`    | Keep `@renderer` alias in sync between both                                                |
-| CSP policy                     | `src/renderer/index.html`                          | Affects web mode only; Electron is lenient                                                 |
-| Packaging / installers         | `electron-builder.yml`                             | Win/Mac/Linux targets                                                                      |
+| Task                           | Location                                                            | Notes                                                                               |
+| ------------------------------ | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Main process / window creation | `src/main/index.ts` + `windowManager.ts`                            | WindowManager singleton manages both windows                                        |
+| IPC handlers                   | `src/main/ipc/`                                                     | app.ts, bible-api.ts, projection.ts, timer.ts, validate.ts                          |
+| Timer main-process service     | `src/main/timerService.ts`                                          | Broadcasts timer state to projection window                                         |
+| Shared types & constants       | `src/shared/`                                                       | IPC channels, projection messages, API paths, shared types                          |
+| Expose API to renderer         | `src/preload/index.ts`                                              | contextBridge; update `index.d.ts` for types                                        |
+| UI / React components          | `src/renderer/src/components/`                                      | Control/ (domain panels), Common/ (reusable), Projection/ (display)                 |
+| Timer engine (adapter bridge)  | `src/renderer/src/contexts/TimerEngineContext.tsx`                  | Bridges adapter ↔ Zustand stores                                                    |
+| Timer adapter (dual-mode)      | `src/renderer/src/lib/timer-adapter.ts`                             | BrowserTimerAdapter (Worker) vs ElectronTimerAdapter (IPC)                          |
+| Timer Worker                   | `src/renderer/src/workers/timer.worker.ts`                          | setInterval(100ms) tick loop for browser mode                                       |
+| Projection messaging           | `src/renderer/src/lib/projection-adapter.ts`                        | Electron IPC or BroadcastChannel adapter                                            |
+| Environment detection          | `src/renderer/src/lib/env.ts`                                       | `isElectron()` / `isWeb()` — renderer only                                          |
+| State (Zustand)                | `src/renderer/src/stores/`                                          | timer, stopwatch, settings, bible, folder, update. Several use `persist` middleware |
+| Persist storage adapter        | `src/renderer/src/lib/persist-storage.ts`                           | Shared `hhcPersistStorage` + `createPersistName()` for all persisted stores         |
+| Theme system                   | `src/renderer/src/contexts/ThemeContext.tsx`                        | Dark/light/system, syncs with Electron nativeTheme                                  |
+| Routing                        | `src/renderer/src/router.tsx`                                       | HashRouter; `/projection` is outside Layout                                         |
+| Keyboard shortcuts             | `src/renderer/src/config/shortcuts.ts` + `lib/shortcut-registry.ts` | Centralized shortcut definitions + runtime registry                                 |
+| Context menu                   | `ContextMenuContext` + `lib/createFolderContextMenu.ts`             | Generic infra + factory for domain-specific menus                                   |
+| Path alias config              | `electron.vite.config.ts` + `tsconfig.web.json`                     | Keep `@renderer` alias in sync between both                                         |
+| CSP policy                     | `src/renderer/index.html`                                           | Affects web mode only; Electron is lenient                                          |
+| Packaging / installers         | `electron-builder.yml`                                              | Win/Mac/Linux targets                                                               |
+| CI / CD                        | `.github/workflows/`                                                | ci.yml (PR gates), build-release.yml (tag release), Azure SWA (preview deploy)      |
 
 ## CONVENTIONS
 
@@ -87,17 +153,30 @@ hhc-client-v2/
 - `@electron-toolkit` TS + Prettier configs
 - React hooks + React Refresh plugins for `.ts/.tsx`
 
+### Git Workflow
+
+- **Never commit directly to main** — always create a feature branch first
+- Branch naming: `feat/`, `fix/`, `refactor/`, `chore/` prefix
+- Commit messages: conventional commits style (`feat:`, `fix:`, `refactor:`, etc.)
+- PR to main → CI must pass → merge
+
 ### Imports
 
 - Renderer uses `@renderer/...` alias (resolve in both Vite and tsconfig)
 - Main/preload use relative paths
+
+### Component Placement
+
+- **Domain-specific control UI** → `components/Control/{Feature}/`
+- **Projection display components** → `components/Projection/{Feature}Projection.tsx`
+- **Reusable generic components** → `components/Common/`
 
 ## STATE MANAGEMENT
 
 ### Context vs Zustand Rule
 
 - **Context** (`src/renderer/src/contexts/`): Non-serializable services and imperative environment integration. Manages long-lived adapters, window handles, DOM side-effects (theme sync). Never stores plain business data.
-- **Zustand** (`src/renderer/src/stores/`): Serializable app/domain state. Timer config, timer runtime, stopwatch, app settings. Consumed by multiple components via selectors.
+- **Zustand** (`src/renderer/src/stores/`): Serializable app/domain state. Timer config, timer runtime, stopwatch, app settings, bible state, folders. Consumed by multiple components via selectors.
 - **If a context starts looking like plain state + setters, move it to a Zustand store.**
 
 ### Zustand Persistence Convention
@@ -185,6 +264,23 @@ adapter.onTick → store.tick(Date.now())
 - **Silent failures**: Electron IPC failures often throw; browser-mode failures (CSP blocks, dead Workers) are **silently swallowed**. Always check browser DevTools console when debugging web mode.
 - **Feature parity testing**: Always test both `npm run dev` (Electron) AND `localhost:5173` (browser) when modifying adapters or adding new cross-environment features.
 
+## CI / CD
+
+| Workflow                  | File                          | Trigger               | Steps                                                                   |
+| ------------------------- | ----------------------------- | --------------------- | ----------------------------------------------------------------------- |
+| **CI Quality Gates**      | `ci.yml`                      | PR → main             | `npm ci` → lint → typecheck → vitest → build                            |
+| **Azure Static Web Apps** | `azure-static-web-apps-*.yml` | PR → main + tag `v*`  | Build renderer → deploy preview (PR) / production (tag)                 |
+| **Build and Release**     | `build-release.yml`           | tag `v*.*.*` / manual | macOS (arm64) + Windows packaging → GitHub Release (`--publish always`) |
+
+### PR → Merge Flow
+
+1. Create feature branch → open PR to `main`
+2. CI runs **lint + typecheck + test + build** (all must pass)
+3. Azure SWA deploys PR preview environment automatically
+4. Code review + CI green → merge
+5. PR close → Azure cleans up preview
+6. Release: push `v*.*.*` tag → triggers macOS + Windows build → publishes to GitHub Releases
+
 ## ANTI-PATTERNS
 
 - **No `as any`** — zero instances in the codebase. Do not add.
@@ -201,7 +297,6 @@ adapter.onTick → store.tick(Date.now())
 - **Typecheck split**: `npm run typecheck` runs two separate `tsc` passes (node + web)
 - **HashRouter**: `createHashRouter` for Electron file:// compatibility
 - **HeroUI v3**: Component library (react-aria-components based). API differs from v2 — check node_modules or use MCP.
-- **No CI**: Builds are local. No GitHub Actions.
 - **No pre-commit hooks**: Lint/format are manual (`npm run lint`, `npm run format`).
 - **Vitest**: jsdom environment, `globals: true`. Run with `npx vitest run`.
 - **`out/` is gitignored**: Compiled outputs regenerate on build.
