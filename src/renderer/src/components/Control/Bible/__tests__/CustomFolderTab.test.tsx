@@ -372,6 +372,6 @@ describe('CustomFolderTab', () => {
     childFoldersResult = []
     itemsResult = []
     render(<CustomFolderTab />)
-    expect(screen.getByText('Folder is empty')).toBeInTheDocument()
+    expect(screen.getByText('bible.custom.emptyFolder')).toBeInTheDocument()
   })
 })

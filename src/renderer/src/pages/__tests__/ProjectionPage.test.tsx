@@ -140,4 +140,14 @@ describe('ProjectionPage', () => {
     })
     expect(useSettingsStore.getState().timezone).toBe('America/New_York')
   })
+
+  it('updates timer ring color on settings:timer-ring-color message', () => {
+    const { container } = render(<ProjectionPage />)
+    act(() => {
+      mockAdapter._trigger('__system:blank', { showDefault: false })
+      mockAdapter._trigger('timer:tick', { ...baseTimerTick, mode: 'timer' })
+      mockAdapter._trigger('settings:timer-ring-color', { color: '#ef4444' })
+    })
+    expect(container.querySelectorAll('circle')).toHaveLength(2)
+  })
 })

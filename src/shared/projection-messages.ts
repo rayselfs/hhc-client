@@ -32,6 +32,8 @@ export interface AppMessages {
   'timer:overtime-message': { message: string }
   /** Timezone IANA string for clock display */
   'settings:timezone': { timezone: string }
+  /** Timer ring color for projection display */
+  'settings:timer-ring-color': { color: string }
   /** Bible full chapter content for projection display */
   'bible:chapter': {
     bookNumber: number

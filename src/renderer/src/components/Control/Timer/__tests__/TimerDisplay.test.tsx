@@ -53,7 +53,7 @@ describe('TimerDisplay', () => {
         onTimeConfirm={vi.fn()}
       />
     )
-    expect(screen.getByRole('button', { name: /set timer duration/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'timer.inputDialog.title' })).toBeInTheDocument()
   })
 
   it('does not render digit as clickable when canEditTime is false', () => {

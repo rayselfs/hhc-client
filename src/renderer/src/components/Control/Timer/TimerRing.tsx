@@ -4,6 +4,7 @@ interface TimerRingProps {
   progress: number
   size: number
   color?: 'accent' | 'danger'
+  customColor?: string
   className?: string
   children?: React.ReactNode
   responsive?: boolean
@@ -13,6 +14,7 @@ export default function TimerRing({
   progress,
   size,
   color = 'accent',
+  customColor,
   className,
   children,
   responsive
@@ -61,6 +63,10 @@ export default function TimerRing({
   const offset = circumference - (progress / 100) * circumference
 
   const strokeClass = color === 'danger' ? 'stroke-danger' : 'stroke-accent'
+  const strokeStyle: React.CSSProperties = {
+    transition: 'stroke-dashoffset 1s linear',
+    ...(customColor && { stroke: customColor })
+  }
 
   if (responsive) {
     const ringSize = measured ?? 0
@@ -94,7 +100,7 @@ export default function TimerRing({
               strokeDasharray={`${circumference} ${circumference}`}
               strokeDashoffset={offset}
               className={strokeClass}
-              style={{ transition: 'stroke-dashoffset 1s linear' }}
+              style={strokeStyle}
             />
           </svg>
           <div className="absolute inset-0 flex items-center justify-center">{children}</div>
@@ -128,7 +134,7 @@ export default function TimerRing({
           strokeDasharray={`${circumference} ${circumference}`}
           strokeDashoffset={offset}
           className={strokeClass}
-          style={{ transition: 'stroke-dashoffset 1s linear' }}
+          style={strokeStyle}
         />
       </svg>
       {children && (

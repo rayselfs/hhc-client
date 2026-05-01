@@ -42,7 +42,7 @@ describe('AboutDialog', () => {
 
     expect(screen.getByText('HHC Client')).toBeInTheDocument()
     expect(screen.getByText(/^v/)).toBeInTheDocument()
-    expect(screen.getByText('Church projection software for worship services.')).toBeInTheDocument()
+    expect(screen.getByText('Projection software.')).toBeInTheDocument()
   })
 
   it('does not render when isOpen=false', () => {

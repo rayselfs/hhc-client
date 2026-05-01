@@ -33,8 +33,8 @@ describe('FloatingTimer', () => {
 
     render(<FloatingTimer />)
 
-    expect(screen.getByRole('button', { name: /go to timer/i })).toBeInTheDocument()
-    const svg = screen.getByRole('button', { name: /go to timer/i }).querySelector('svg')
+    expect(screen.getByRole('button', { name: /timer/i })).toBeInTheDocument()
+    const svg = screen.getByRole('button', { name: /timer/i }).querySelector('svg')
     expect(svg).toBeInTheDocument()
     expect(screen.getByText('01:30')).toBeInTheDocument()
   })
@@ -73,7 +73,7 @@ describe('FloatingTimer', () => {
     useTimerStore.setState({ status: 'running', progress: 0.75, remainingSeconds: 90 })
 
     render(<FloatingTimer />)
-    fireEvent.click(screen.getByRole('button', { name: /go to timer/i }))
+    fireEvent.click(screen.getByRole('button', { name: /timer/i }))
 
     expect(mockNavigate).toHaveBeenCalledWith('/timer')
   })

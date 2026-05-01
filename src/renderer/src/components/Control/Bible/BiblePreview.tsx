@@ -298,7 +298,7 @@ export function BiblePreview({
 
   const chapterUnitKey = book?.number === 19 ? 'psa' : 'default'
   const chapterUnit = book && chapter ? t(`bible.chapterUnit.${chapterUnitKey}`) : ''
-  const isChinese = i18n.language === 'zh-TW' || i18n.language === 'zh-CN'
+  const isChinese = i18n?.language === 'zh-TW' || i18n?.language === 'zh-CN'
   const chapterNumStr =
     chapter && isChinese ? toChineseChapterNumber(chapter.number) : String(chapter?.number ?? '')
   const chapterSuffix =

@@ -7,11 +7,13 @@ import type { TimerTickPayload, StopwatchTickPayload } from '@shared/types/timer
 interface TimerProjectionProps {
   timerData: TimerTickPayload
   stopwatchData: StopwatchTickPayload | null
+  ringColor: string
 }
 
 export default function TimerProjection({
   timerData,
-  stopwatchData
+  stopwatchData,
+  ringColor
 }: TimerProjectionProps): React.JSX.Element {
   const { mode, progress, mainDisplay, subDisplay, phase, overtimeMessage, reminderColor } =
     timerData
@@ -21,12 +23,7 @@ export default function TimerProjection({
   if (isFinishedWithMessage) {
     return (
       <div className="h-screen w-full bg-black flex items-center justify-center @container">
-        <span
-          className="timer-digits text-[14cqi] text-center"
-          style={{ color: reminderColor || '#ffffff' }}
-        >
-          {overtimeMessage}
-        </span>
+        <span className="timer-digits text-[14cqi] text-center text-white">{overtimeMessage}</span>
       </div>
     )
   }
@@ -42,6 +39,7 @@ export default function TimerProjection({
           size={700}
           responsive
           warningColor={reminderColor}
+          ringColor={ringColor}
           digitClassName="text-accent-foreground"
         />
       </div>
@@ -68,6 +66,7 @@ export default function TimerProjection({
             size={700}
             responsive
             warningColor={reminderColor}
+            ringColor={ringColor}
             digitClassName="text-accent-foreground"
           />
         </div>

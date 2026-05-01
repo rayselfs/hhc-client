@@ -11,6 +11,7 @@ interface TimerDisplayProps {
   size?: number
   responsive?: boolean
   warningColor?: string | null
+  ringColor?: string
   onTimeConfirm?: (seconds: number) => void
   canEditTime?: boolean
   className?: string
@@ -26,6 +27,7 @@ export default function TimerDisplay({
   size = 280,
   responsive = false,
   warningColor,
+  ringColor,
   onTimeConfirm,
   canEditTime,
   className,
@@ -60,6 +62,7 @@ export default function TimerDisplay({
       progress={progress * 100}
       size={size}
       color="accent"
+      customColor={ringColor}
       responsive={responsive}
       className={`flex items-center justify-center @container ${className ?? ''}`}
     >
