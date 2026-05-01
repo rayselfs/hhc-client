@@ -21,15 +21,18 @@ export const TIMEZONE_OPTIONS = [
 const DEFAULT_TIMEZONE = 'Asia/Taipei'
 const DEFAULT_HW_ACCEL = true
 const DEFAULT_THEME_PREFERENCE: ThemePreference = 'system'
+const DEFAULT_TIMER_RING_COLOR = '#3b82f6'
 const RELOAD_DELAY_MS = 500
 
 export interface SettingsStore {
   timezone: string
   hardwareAcceleration: boolean
   themePreference: ThemePreference
+  timerRingColor: string
   setTimezone: (tz: string) => void
   setHardwareAcceleration: (enabled: boolean) => void
   setThemePreference: (pref: ThemePreference) => void
+  setTimerRingColor: (color: string) => void
   resetToDefaults: () => void
 }
 
@@ -39,6 +42,7 @@ export const useSettingsStore = create<SettingsStore>()(
       timezone: DEFAULT_TIMEZONE,
       hardwareAcceleration: DEFAULT_HW_ACCEL,
       themePreference: DEFAULT_THEME_PREFERENCE,
+      timerRingColor: DEFAULT_TIMER_RING_COLOR,
 
       setTimezone: (tz: string) => {
         set({ timezone: tz })
@@ -50,6 +54,10 @@ export const useSettingsStore = create<SettingsStore>()(
 
       setThemePreference: (pref: ThemePreference) => {
         set({ themePreference: pref })
+      },
+
+      setTimerRingColor: (color: string) => {
+        set({ timerRingColor: color })
       },
 
       resetToDefaults: () => {
@@ -65,7 +73,7 @@ export const useSettingsStore = create<SettingsStore>()(
     {
       name: createKey('settings'),
       storage: hhcPersistStorage,
-      version: 1,
+      version: 2,
       migrate: (persistedState, version) => {
         const state = persistedState as Record<string, unknown>
         if (version < 1) {
@@ -79,14 +87,25 @@ export const useSettingsStore = create<SettingsStore>()(
           } catch {
             //
           }
-          return { ...state, themePreference }
+          state.themePreference = themePreference
+        }
+        if (version < 2) {
+          // Fix invalid CSS variable color value
+          const ringColor = state.timerRingColor
+          if (
+            typeof ringColor === 'string' &&
+            (ringColor.includes('var(') || !ringColor.startsWith('#'))
+          ) {
+            state.timerRingColor = DEFAULT_TIMER_RING_COLOR
+          }
         }
         return state
       },
       partialize: (state) => ({
         timezone: state.timezone,
         hardwareAcceleration: state.hardwareAcceleration,
-        themePreference: state.themePreference
+        themePreference: state.themePreference,
+        timerRingColor: state.timerRingColor
       })
     }
   )

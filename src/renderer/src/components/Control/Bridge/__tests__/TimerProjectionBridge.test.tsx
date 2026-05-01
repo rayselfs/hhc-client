@@ -52,7 +52,7 @@ beforeEach(() => {
     accumulatedMs: 0,
     showOnProjection: false
   })
-  useSettingsStore.setState({ timezone: 'Asia/Taipei' })
+  useSettingsStore.setState({ timezone: 'Asia/Taipei', timerRingColor: '#3b82f6' })
 })
 
 describe('TimerProjectionBridge — timer:tick projection', () => {
@@ -199,5 +199,31 @@ describe('TimerProjectionBridge — settings:timezone sync', () => {
     })
 
     expect(mockSend).toHaveBeenCalledWith('settings:timezone', { timezone: 'America/New_York' })
+  })
+})
+
+describe('TimerProjectionBridge — settings:timer-ring-color sync', () => {
+  it('sends settings:timer-ring-color when projection is open', () => {
+    mockIsProjectionOpen = true
+    renderBridge()
+    expect(mockSend).toHaveBeenCalledWith('settings:timer-ring-color', { color: '#3b82f6' })
+  })
+
+  it('does not send settings:timer-ring-color when projection is closed', () => {
+    mockIsProjectionOpen = false
+    renderBridge()
+    expect(mockSend).not.toHaveBeenCalledWith('settings:timer-ring-color', expect.anything())
+  })
+
+  it('sends updated timer ring color when settings change while projection is open', async () => {
+    mockIsProjectionOpen = true
+    renderBridge()
+    mockSend.mockClear()
+
+    await act(async () => {
+      useSettingsStore.setState({ timerRingColor: '#ef4444' })
+    })
+
+    expect(mockSend).toHaveBeenCalledWith('settings:timer-ring-color', { color: '#ef4444' })
   })
 })

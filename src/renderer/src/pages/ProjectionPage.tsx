@@ -17,6 +17,9 @@ export default function ProjectionPage(): React.JSX.Element {
   const [stopwatchData, setStopwatchData] = useState<StopwatchTickPayload | null>(null)
   const [bibleChapter, setBibleChapter] = useState<BibleChapterData | null>(null)
   const [bibleFontSize, setBibleFontSize] = useState(90)
+  const [timerRingColor, setTimerRingColor] = useState<string>(
+    useSettingsStore.getState().timerRingColor
+  )
 
   useEffect(() => {
     const adapter = createProjectionAdapter('projection')
@@ -49,6 +52,10 @@ export default function ProjectionPage(): React.JSX.Element {
       useSettingsStore.getState().setTimezone(timezone)
     })
 
+    const unsubTimerRingColor = adapter.on('settings:timer-ring-color', ({ color }) => {
+      setTimerRingColor(color)
+    })
+
     let unsubClose = (): void => {}
     let unsubPing = (): void => {}
 
@@ -79,6 +86,7 @@ export default function ProjectionPage(): React.JSX.Element {
       unsubBibleChapter()
       unsubBibleSettings()
       unsubTimezone()
+      unsubTimerRingColor()
       unsubClose()
       unsubPing()
       window.removeEventListener('beforeunload', handleBeforeUnload)
@@ -93,7 +101,13 @@ export default function ProjectionPage(): React.JSX.Element {
   }
 
   if (timerData) {
-    return <TimerProjection timerData={timerData} stopwatchData={stopwatchData} />
+    return (
+      <TimerProjection
+        timerData={timerData}
+        stopwatchData={stopwatchData}
+        ringColor={timerRingColor}
+      />
+    )
   }
 
   return <DefaultProjection />

@@ -43,6 +43,7 @@ export default function TimerProjectionBridge(): null {
   const showSwOnProjection = useStopwatchStore((s) => s.showOnProjection)
 
   const timezone = useSettingsStore((s) => s.timezone)
+  const timerRingColor = useSettingsStore((s) => s.timerRingColor)
 
   const { project, send, isProjectionOpen } = useProjection()
 
@@ -100,6 +101,11 @@ export default function TimerProjectionBridge(): null {
     if (!isProjectionOpen) return
     send('settings:timezone', { timezone })
   }, [timezone, isProjectionOpen, send])
+
+  useEffect(() => {
+    if (!isProjectionOpen) return
+    send('settings:timer-ring-color', { color: timerRingColor })
+  }, [timerRingColor, isProjectionOpen, send])
 
   return null
 }

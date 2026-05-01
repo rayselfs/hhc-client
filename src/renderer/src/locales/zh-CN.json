@@ -39,6 +39,9 @@
       "placeholder": "时间到",
       "error": "消息不能为空"
     },
+    "ringColor": {
+      "label": "计时器环颜色"
+    },
     "inputDialog": {
       "title": "设定时长",
       "durationLabel": "时长",

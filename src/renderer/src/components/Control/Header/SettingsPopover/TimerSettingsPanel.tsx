@@ -7,6 +7,7 @@ import { parseColor } from 'react-aria-components'
 import type { Color } from 'react-aria-components'
 import { useTimerStore, DEFAULT_SETTINGS } from '@renderer/stores/timer'
 import { useStopwatchStore } from '@renderer/stores/stopwatch'
+import { useSettingsStore } from '@renderer/stores/settings'
 import { Suspense, lazy } from 'react'
 import type { TFunction } from 'i18next'
 
@@ -51,6 +52,9 @@ export default function TimerSettingsPanel({
   const status = useTimerStore((s) => s.status)
   const setReminder = useTimerStore((s) => s.setReminder)
   const setOvertimeMessage = useTimerStore((s) => s.setOvertimeMessage)
+
+  const timerRingColor = useSettingsStore((s) => s.timerRingColor)
+  const setTimerRingColor = useSettingsStore((s) => s.setTimerRingColor)
 
   const showOnProjection = useStopwatchStore((s) => s.showOnProjection)
   const setShowOnProjection = useStopwatchStore((s) => s.setShowOnProjection)
@@ -103,7 +107,12 @@ export default function TimerSettingsPanel({
     }
   }
 
+  const handleTimerRingColorChange = (color: Color): void => {
+    setTimerRingColor(color.toString('hex'))
+  }
+
   const parsedColor = parseColor(reminderColor)
+  const parsedRingColor = parseColor(timerRingColor)
 
   if (isStopwatch) {
     return (
@@ -197,6 +206,25 @@ export default function TimerSettingsPanel({
           disabled={!overtimeMessageEnabled}
           className="w-33 ml-auto [&_input]:py-1 rounded-full px-4"
         />
+      </div>
+
+      <div className="flex items-center gap-2 min-h-10">
+        <span className="text-sm">{t('timer.ringColor.label')}</span>
+        <ColorPicker value={parsedRingColor} onChange={handleTimerRingColorChange}>
+          <ColorPicker.Trigger>
+            <ColorSwatch
+              aria-label={t('timer.ringColor.label')}
+              className="size-7 rounded cursor-pointer ml-auto"
+            />
+          </ColorPicker.Trigger>
+          <ColorPicker.Popover placement="bottom end" className="gap-2 px-2 py-3 w-52">
+            <Suspense
+              fallback={<div className="w-8 h-8 rounded-full bg-default-200 animate-pulse" />}
+            >
+              <LazyColorPickerContent t={t} />
+            </Suspense>
+          </ColorPicker.Popover>
+        </ColorPicker>
       </div>
     </>
   )
