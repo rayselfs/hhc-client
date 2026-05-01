@@ -151,7 +151,7 @@ describe('TimerPage — TimeInputPopover gating', () => {
   it('timer display is editable when timer is stopped', () => {
     useTimerStore.setState({ mode: 'timer', status: 'stopped' })
     renderTimerPage()
-    expect(screen.getByRole('button', { name: /set timer duration/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /set duration/i })).toBeInTheDocument()
   })
 
   it('timer display is NOT editable when timer is running', () => {
@@ -162,7 +162,7 @@ describe('TimerPage — TimeInputPopover gating', () => {
       targetEndTime: Date.now() + 300000
     })
     renderTimerPage()
-    expect(screen.queryByRole('button', { name: /set timer duration/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /set duration/i })).not.toBeInTheDocument()
   })
 
   it('timer display is NOT editable when timer is paused', () => {
@@ -173,13 +173,13 @@ describe('TimerPage — TimeInputPopover gating', () => {
       remainingSeconds: 200
     })
     renderTimerPage()
-    expect(screen.queryByRole('button', { name: /set timer duration/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /set duration/i })).not.toBeInTheDocument()
   })
 
   it('timer display IS editable in clock mode when stopped', () => {
     useTimerStore.setState({ mode: 'clock', status: 'stopped' })
     renderTimerPage()
-    expect(screen.getByRole('button', { name: /set timer duration/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /set duration/i })).toBeInTheDocument()
   })
 })
 
