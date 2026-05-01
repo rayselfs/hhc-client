@@ -158,8 +158,11 @@ describe('HistoryTab', () => {
     }
     historySingleton.items = [longItem]
     render(<HistoryTab />)
-    const truncated = screen.getByText(/^A+\.\.\./)
-    expect(truncated).toBeInTheDocument()
-    expect(truncated.textContent?.length).toBeLessThanOrEqual(63)
+    const textElement = screen.getByText(/^A+/)
+    expect(textElement).toBeInTheDocument()
+    // CSS line-clamp doesn't modify textContent, it just visually truncates
+    expect(textElement.textContent?.length).toBe(100)
+    // Verify line-clamp CSS class is applied
+    expect(textElement).toHaveClass('line-clamp-2')
   })
 })
