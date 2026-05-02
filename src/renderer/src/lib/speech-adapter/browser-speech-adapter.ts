@@ -1,0 +1,222 @@
+import * as sdk from 'microsoft-cognitiveservices-speech-sdk'
+import { parseVerseReference } from '../verse-parser'
+import { matchBookName } from '../bible-book-matcher'
+import type {
+  SpeechAdapter,
+  SpeechAdapterConfig,
+  SpeechAdapterEventType,
+  SpeechAdapterEventListener,
+  SpeechAdapterEventMap,
+  SpeechRecognizedResult
+} from './speech-adapter.interface'
+
+export class BrowserSpeechAdapter implements SpeechAdapter {
+  private recognizer: sdk.SpeechRecognizer | null = null
+  private isActive = false
+  private listeners: Map<SpeechAdapterEventType, Set<SpeechAdapterEventListener<any>>> = new Map()
+  private config: SpeechAdapterConfig
+  private onlineHandler: (() => void) | null = null
+  private offlineHandler: (() => void) | null = null
+
+  constructor(config: SpeechAdapterConfig) {
+    this.config = config
+    this.setupNetworkListeners()
+  }
+
+  private setupNetworkListeners(): void {
+    this.onlineHandler = () => {
+      if (!this.isActive && this.recognizer) {
+        this.emit('error', {
+          error: new Error('Network connection restored'),
+          message: 'Network connection restored. Please restart recognition.'
+        })
+      }
+    }
+
+    this.offlineHandler = () => {
+      if (this.isActive) {
+        this.stop().catch(() => {})
+        this.emit('error', {
+          error: new Error('Network connection lost'),
+          message: 'Network connection lost. Recognition stopped.'
+        })
+      }
+    }
+
+    window.addEventListener('online', this.onlineHandler)
+    window.addEventListener('offline', this.offlineHandler)
+  }
+
+  async start(): Promise<void> {
+    if (this.isActive) {
+      throw new Error('Recognition already active')
+    }
+
+    if (!navigator.onLine) {
+      throw new Error('No network connection')
+    }
+
+    try {
+      const speechConfig = sdk.SpeechConfig.fromSubscription(
+        this.config.subscriptionKey,
+        this.config.region
+      )
+
+      const language = this.config.language || this.detectLanguage()
+      speechConfig.speechRecognitionLanguage = language
+
+      const audioConfig = sdk.AudioConfig.fromDefaultMicrophoneInput()
+      this.recognizer = new sdk.SpeechRecognizer(speechConfig, audioConfig)
+
+      this.recognizer.recognizing = (_s, e) => {
+        if (e.result.reason === sdk.ResultReason.RecognizingSpeech) {
+          this.emit('recognizing', { text: e.result.text })
+        }
+      }
+
+      this.recognizer.recognized = (_s, e) => {
+        if (e.result.reason === sdk.ResultReason.RecognizedSpeech) {
+          const text = e.result.text
+          const parsed = this.parseAndMatch(text)
+          if (parsed) {
+            this.emit('recognized', parsed)
+          }
+        }
+      }
+
+      this.recognizer.sessionStarted = () => {
+        this.emit('sessionStarted', undefined)
+      }
+
+      this.recognizer.sessionStopped = () => {
+        this.isActive = false
+        this.emit('sessionStopped', undefined)
+      }
+
+      this.recognizer.canceled = (_s, e) => {
+        this.isActive = false
+        const reason = sdk.CancellationReason[e.reason]
+        this.emit('canceled', { reason })
+
+        if (e.reason === sdk.CancellationReason.Error) {
+          this.emit('error', {
+            error: new Error(e.errorDetails),
+            message: e.errorDetails
+          })
+        }
+      }
+
+      this.recognizer.startContinuousRecognitionAsync(
+        () => {
+          this.isActive = true
+        },
+        (err) => {
+          this.emit('error', {
+            error: new Error(err),
+            message: `Failed to start recognition: ${err}`
+          })
+        }
+      )
+    } catch (error) {
+      this.emit('error', {
+        error: error as Error,
+        message: `Failed to initialize recognizer: ${(error as Error).message}`
+      })
+      throw error
+    }
+  }
+
+  async stop(): Promise<void> {
+    if (!this.recognizer || !this.isActive) {
+      return
+    }
+
+    return new Promise((resolve, reject) => {
+      this.recognizer!.stopContinuousRecognitionAsync(
+        () => {
+          this.isActive = false
+          resolve()
+        },
+        (err) => {
+          this.isActive = false
+          reject(new Error(err))
+        }
+      )
+    })
+  }
+
+  isRecognizing(): boolean {
+    return this.isActive
+  }
+
+  on<T extends SpeechAdapterEventType>(
+    event: T,
+    listener: SpeechAdapterEventListener<T>
+  ): () => void {
+    if (!this.listeners.has(event)) {
+      this.listeners.set(event, new Set())
+    }
+    this.listeners.get(event)!.add(listener)
+
+    return () => {
+      const eventListeners = this.listeners.get(event)
+      if (eventListeners) {
+        eventListeners.delete(listener)
+      }
+    }
+  }
+
+  dispose(): void {
+    if (this.recognizer) {
+      this.recognizer.close()
+      this.recognizer = null
+    }
+
+    if (this.onlineHandler) {
+      window.removeEventListener('online', this.onlineHandler)
+      this.onlineHandler = null
+    }
+
+    if (this.offlineHandler) {
+      window.removeEventListener('offline', this.offlineHandler)
+      this.offlineHandler = null
+    }
+
+    this.listeners.clear()
+    this.isActive = false
+  }
+
+  private detectLanguage(): string {
+    const locale = navigator.language || 'en-US'
+    if (locale.startsWith('zh-TW')) return 'zh-TW'
+    if (locale.startsWith('zh-CN')) return 'zh-CN'
+    if (locale.startsWith('zh')) return 'zh-TW'
+    if (locale.startsWith('en')) return 'en-US'
+    return 'en-US'
+  }
+
+  private parseAndMatch(text: string): SpeechRecognizedResult | null {
+    const parsed = parseVerseReference(text)
+    if (!parsed) return null
+
+    const match = matchBookName(parsed.book)
+    if (!match) return null
+
+    return {
+      text,
+      bookNumber: match.bookNumber,
+      chapter: parsed.chapter,
+      verse: parsed.verse,
+      confidence: match.confidence
+    }
+  }
+
+  private emit<T extends SpeechAdapterEventType>(event: T, data: SpeechAdapterEventMap[T]): void {
+    const eventListeners = this.listeners.get(event)
+    if (eventListeners) {
+      eventListeners.forEach((listener) => {
+        listener(data)
+      })
+    }
+  }
+}

@@ -15,6 +15,7 @@ import type {
   TimerTickPayload
 } from './types/timer'
 import type { BibleVersion, BibleBook } from './types/bible'
+import type { AzureSpeechConfig, AzureSpeechEventData } from './types/azure-speech'
 
 // ---------------------------------------------------------------------------
 // Invoke channels (renderer → main, returns a result)
@@ -51,6 +52,12 @@ export interface IpcInvokeMap {
   'app:relaunch': { args: []; result: void }
   'update:check': { args: []; result: { updateAvailable: boolean; version?: string } }
   'update:download-and-install': { args: []; result: void }
+  'azureSpeech:start': { args: [AzureSpeechConfig]; result: void }
+  'azureSpeech:stop': { args: []; result: void }
+  'azureSpeech:isRecognizing': { args: []; result: boolean }
+  'azureSpeech:saveKey': { args: [string]; result: void }
+  'azureSpeech:loadKey': { args: []; result: string }
+  'azureSpeech:deleteKey': { args: []; result: void }
 }
 
 export type IpcInvokeChannel = keyof IpcInvokeMap
@@ -77,6 +84,7 @@ export interface IpcMainToRendererMap {
   'theme:changed': [{ shouldUseDarkColors: boolean }]
   'timer-tick': [TimerTickPayload]
   'update:status-changed': [{ status: UpdateStatus; version?: string; error?: string }]
+  'azureSpeech:event': [AzureSpeechEventData]
 }
 
 export type IpcMainToRendererChannel = keyof IpcMainToRendererMap

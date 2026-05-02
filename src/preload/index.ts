@@ -8,6 +8,7 @@ import type {
 } from '../shared/ipc-channels'
 import type { ProjectionChannel, ProjectionPayload } from '../shared/projection-messages'
 import type { TimerTickPayload } from '../shared/types/timer'
+import type { AzureSpeechConfig, AzureSpeechEventData } from '../shared/types/azure-speech'
 
 function typedInvoke<C extends IpcInvokeChannel>(
   channel: C,
@@ -76,13 +77,25 @@ const updateApi = {
   ) => typedOn('update:status-changed', callback)
 }
 
+const azureSpeechApi = {
+  start: (config: AzureSpeechConfig) => typedInvoke('azureSpeech:start', config),
+  stop: () => typedInvoke('azureSpeech:stop'),
+  isRecognizing: () => typedInvoke('azureSpeech:isRecognizing'),
+  saveKey: (apiKey: string) => typedInvoke('azureSpeech:saveKey', apiKey),
+  loadKey: () => typedInvoke('azureSpeech:loadKey'),
+  deleteKey: () => typedInvoke('azureSpeech:deleteKey'),
+  onEvent: (callback: (data: AzureSpeechEventData) => void) =>
+    typedOn('azureSpeech:event', callback)
+}
+
 const api = {
   projection: projectionApi,
   theme: themeApi,
   timer: timerApi,
   bible: bibleApi,
   app: appApi,
-  update: updateApi
+  update: updateApi,
+  azureSpeech: azureSpeechApi
 }
 
 try {
