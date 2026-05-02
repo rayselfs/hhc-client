@@ -79,17 +79,21 @@ export default function SpeechRecognitionCard(): React.JSX.Element {
 
   const handleRecognized = useCallback(
     (text: string) => {
+      console.log('[Speech] Recognized raw text:', text)
+
       const parsed = parseVerseReference(text)
       if (!parsed) {
         console.warn('[Speech] Failed to parse verse reference:', text)
         return
       }
+      console.log('[Speech] Parsed:', parsed)
 
       const match = matchBookName(parsed.book)
       if (!match) {
         console.warn('[Speech] Failed to match book name:', parsed.book)
         return
       }
+      console.log('[Speech] Matched book:', match)
 
       const bookConfig = getBookConfig(match.bookNumber)
       if (!bookConfig) {
