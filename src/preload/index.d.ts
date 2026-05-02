@@ -8,7 +8,6 @@ import type {
   TimerTickPayload
 } from '../shared/types/timer'
 import type { BibleVersion, BibleBook } from '../shared/types/bible'
-import type { AzureSpeechConfig, AzureSpeechEventData } from '../shared/types/azure-speech'
 
 interface ThemeAPI {
   get: () => Promise<{ source: string; shouldUseDarkColors: boolean }>
@@ -55,13 +54,9 @@ interface UpdateAPI {
 }
 
 interface AzureSpeechAPI {
-  start: (config: AzureSpeechConfig) => Promise<void>
-  stop: () => Promise<void>
-  isRecognizing: () => Promise<boolean>
   saveKey: (apiKey: string) => Promise<void>
   loadKey: () => Promise<string>
   deleteKey: () => Promise<void>
-  onEvent: (callback: (data: AzureSpeechEventData) => void) => () => void
 }
 
 declare global {
