@@ -179,15 +179,11 @@ export default function SpeechRecognitionCard(): React.JSX.Element {
   }
 
   const handleVerseClick = (verse: RecognizedVerse): void => {
-    window.dispatchEvent(
-      new CustomEvent('bible:preview', {
-        detail: {
-          bookNumber: verse.bookNumber,
-          chapter: verse.chapter,
-          verse: verse.verse
-        }
-      })
-    )
+    useBibleStore.getState().navigateTo({
+      bookNumber: verse.bookNumber,
+      chapter: verse.chapter,
+      verse: verse.verse
+    })
   }
 
   const canStart = !isRecognizing && azureSpeech?.region && isOnline
