@@ -77,9 +77,13 @@ export class BrowserSpeechAdapter implements SpeechAdapter {
       this.recognizer.recognized = (_s, e) => {
         if (e.result.reason === sdk.ResultReason.RecognizedSpeech) {
           const text = e.result.text
+          console.log('[Adapter] Azure recognized:', text)
           const parsed = this.parseAndMatch(text)
           if (parsed) {
+            console.log('[Adapter] Parse succeeded:', parsed)
             this.emit('recognized', parsed)
+          } else {
+            console.warn('[Adapter] Parse failed for:', text)
           }
         }
       }
