@@ -161,10 +161,35 @@ function fuzzyMatch(query: string, threshold: number = 0.6): BookMatch | null {
   for (let i = 0; i < BOOK_NAMES.length; i++) {
     const book = BOOK_NAMES[i]
 
+    const normalizedZhTW = normalizeText(book.zhTW)
+    const normalizedZhCN = normalizeText(book.zhCN)
+    const normalizedEn = normalizeText(book.en)
+
+    if (normalized.includes(normalizedZhTW)) {
+      const config = BIBLE_BOOKS.find((b) => b.code.toLowerCase() === book.code)
+      if (config) {
+        return { bookNumber: config.number, confidence: 'fuzzy', score: 1.0 }
+      }
+    }
+
+    if (normalized.includes(normalizedZhCN)) {
+      const config = BIBLE_BOOKS.find((b) => b.code.toLowerCase() === book.code)
+      if (config) {
+        return { bookNumber: config.number, confidence: 'fuzzy', score: 1.0 }
+      }
+    }
+
+    if (normalized.includes(normalizedEn)) {
+      const config = BIBLE_BOOKS.find((b) => b.code.toLowerCase() === book.code)
+      if (config) {
+        return { bookNumber: config.number, confidence: 'fuzzy', score: 1.0 }
+      }
+    }
+
     const similarities = [
-      calculateLevenshteinSimilarity(normalized, normalizeText(book.zhTW)),
-      calculateLevenshteinSimilarity(normalized, normalizeText(book.zhCN)),
-      calculateLevenshteinSimilarity(normalized, normalizeText(book.en))
+      calculateLevenshteinSimilarity(normalized, normalizedZhTW),
+      calculateLevenshteinSimilarity(normalized, normalizedZhCN),
+      calculateLevenshteinSimilarity(normalized, normalizedEn)
     ]
 
     const maxSimilarity = Math.max(...similarities)

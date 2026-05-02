@@ -1,6 +1,7 @@
 /**
  * Parse verse references from speech recognition text
  * Supports Chinese numerals, Arabic numerals, and English book names
+ * Can extract verse references from natural language sentences
  *
  * Examples:
  * - "使徒行傳一章一節" → { book: "使徒行傳", chapter: 1, verse: 1 }
@@ -8,7 +9,12 @@
  * - "使徒行傳第一章第一節" → { book: "使徒行傳", chapter: 1, verse: 1 }
  * - "Acts 1:1" → { book: "Acts", chapter: 1, verse: 1 }
  * - "使徒行傳一章" → { book: "使徒行傳", chapter: 1, verse: 1 } (default verse = 1)
+ * - "我今天要講使徒行傳一章一節" → { book: "我今天要講使徒行傳", chapter: 1, verse: 1 }
+ * - "請翻到約翰福音3章16節" → { book: "請翻到約翰福音", chapter: 3, verse: 16 }
  * - "使徒行傳一" → null (invalid - missing unit)
+ *
+ * Note: Prefixes are included in the book name. Use matchBookName() for fuzzy matching
+ * to find the actual book from the extracted book name with prefix.
  */
 
 export interface ParsedVerse {
@@ -83,12 +89,11 @@ function parseChineseNumeral(text: string): number | null {
 export function parseVerseReference(text: string): ParsedVerse | null {
   if (!text) return null
 
-  // Try English format first: "Acts 1:1" or "Acts 1"
-  const englishMatch = text.match(/^([A-Za-z\s]+)\s+(\d+)(?::(\d+))?$/)
+  const englishMatch = text.match(/([A-Za-z\s]+)\s+(\d+)(?::(-?\d+))?/)
   if (englishMatch) {
     const book = englishMatch[1].trim()
     const chapter = parseInt(englishMatch[2], 10)
-    const verse = englishMatch[3] ? parseInt(englishMatch[3], 10) : 1 // Default verse = 1
+    const verse = englishMatch[3] ? parseInt(englishMatch[3], 10) : 1
 
     if (chapter > 0 && verse > 0) {
       return { book, chapter, verse }
@@ -96,12 +101,11 @@ export function parseVerseReference(text: string): ParsedVerse | null {
     return null
   }
 
-  // Try Chinese format with Arabic numerals: "使徒行傳1章1節"
-  const arabicMatch = text.match(/^(.+?)(\d+)章(?:(\d+)節)?$/)
+  const arabicMatch = text.match(/(.+?)(\d+)章(?:(\d+)節)?/)
   if (arabicMatch) {
     const book = arabicMatch[1].trim()
     const chapter = parseInt(arabicMatch[2], 10)
-    const verse = arabicMatch[3] ? parseInt(arabicMatch[3], 10) : 1 // Default verse = 1
+    const verse = arabicMatch[3] ? parseInt(arabicMatch[3], 10) : 1
 
     if (book && chapter > 0 && verse > 0) {
       return { book, chapter, verse }
@@ -112,7 +116,7 @@ export function parseVerseReference(text: string): ParsedVerse | null {
   const normalizedText = text.replace(/第/g, '')
 
   const chineseMatch = normalizedText.match(
-    /^(.+?)([一二三四五六七八九十百千]+)章(?:([一二三四五六七八九十百千]+)節)?$/
+    /(.+?)([一二三四五六七八九十百千]+)章(?:([一二三四五六七八九十百千]+)節)?/
   )
   if (chineseMatch) {
     const book = chineseMatch[1].trim()
@@ -125,9 +129,9 @@ export function parseVerseReference(text: string): ParsedVerse | null {
     if (book && chapter !== null && chapter > 0 && verse !== null && verse > 0) {
       return { book, chapter, verse }
     }
+    return null
   }
 
-  // Invalid format (e.g., "使徒行傳一" without chapter unit)
   return null
 }
 

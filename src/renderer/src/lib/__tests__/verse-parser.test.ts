@@ -187,6 +187,71 @@ describe('parseVerseReference', () => {
       })
     })
   })
+
+  describe('natural language prefixes', () => {
+    it('parses with "我今天要講" prefix', () => {
+      const result = parseVerseReference('我今天要講使徒行傳一章一節')
+      expect(result).toEqual({
+        book: '我今天要講使徒行傳',
+        chapter: 1,
+        verse: 1
+      })
+    })
+
+    it('parses with "請翻到" prefix', () => {
+      const result = parseVerseReference('請翻到馬太福音五章三節')
+      expect(result).toEqual({
+        book: '請翻到馬太福音',
+        chapter: 5,
+        verse: 3
+      })
+    })
+
+    it('parses with "現在我們來看" prefix', () => {
+      const result = parseVerseReference('現在我們來看約翰福音3章16節')
+      expect(result).toEqual({
+        book: '現在我們來看約翰福音',
+        chapter: 3,
+        verse: 16
+      })
+    })
+
+    it('parses with "讓我們打開" prefix', () => {
+      const result = parseVerseReference('讓我們打開詩篇23章1節')
+      expect(result).toEqual({
+        book: '讓我們打開詩篇',
+        chapter: 23,
+        verse: 1
+      })
+    })
+
+    it('parses English format with prefix', () => {
+      const result = parseVerseReference('Today we are reading Acts 1:1')
+      expect(result).toEqual({
+        book: 'Today we are reading Acts',
+        chapter: 1,
+        verse: 1
+      })
+    })
+
+    it('parses with prefix and Chinese numerals', () => {
+      const result = parseVerseReference('接下來是創世記第一章第一節')
+      expect(result).toEqual({
+        book: '接下來是創世記',
+        chapter: 1,
+        verse: 1
+      })
+    })
+
+    it('handles prefix with default verse', () => {
+      const result = parseVerseReference('我們來看羅馬書8章')
+      expect(result).toEqual({
+        book: '我們來看羅馬書',
+        chapter: 8,
+        verse: 1
+      })
+    })
+  })
 })
 
 describe('formatVerseReference', () => {

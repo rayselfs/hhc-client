@@ -111,6 +111,38 @@ describe('matchBookName', () => {
       const result = matchBookName('xyz', 0.99, 0.99)
       expect(result).toBeNull()
     })
+
+    it('matches book name with prefix (substring match)', () => {
+      const result = matchBookName('我今天要講使徒行傳')
+      expect(result).not.toBeNull()
+      expect(result?.bookNumber).toBe(44)
+      expect(result?.confidence).toBe('fuzzy')
+      expect(result?.score).toBe(1.0)
+    })
+
+    it('matches book name with "請翻到" prefix', () => {
+      const result = matchBookName('請翻到約翰福音')
+      expect(result).not.toBeNull()
+      expect(result?.bookNumber).toBe(43)
+      expect(result?.confidence).toBe('fuzzy')
+      expect(result?.score).toBe(1.0)
+    })
+
+    it('matches book name with English prefix', () => {
+      const result = matchBookName('Today we are reading Acts')
+      expect(result).not.toBeNull()
+      expect(result?.bookNumber).toBe(44)
+      expect(result?.confidence).toBe('fuzzy')
+      expect(result?.score).toBe(1.0)
+    })
+
+    it('matches simplified Chinese with prefix', () => {
+      const result = matchBookName('现在来看使徒行传')
+      expect(result).not.toBeNull()
+      expect(result?.bookNumber).toBe(44)
+      expect(result?.confidence).toBe('fuzzy')
+      expect(result?.score).toBe(1.0)
+    })
   })
 
   describe('priority: exact > pinyin > fuzzy', () => {
