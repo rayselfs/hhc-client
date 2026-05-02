@@ -146,7 +146,7 @@ export default function BibleSettingsPanel(): React.JSX.Element {
             onChange={(e) => setApiKey(e.target.value)}
             placeholder={t('preferences.bible.azureSpeechKeyPlaceholder')}
             disabled={isLoadingKey}
-            className="w-full pr-12"
+            className="w-full rounded-full pr-12"
           />
           <Button
             variant="ghost"
