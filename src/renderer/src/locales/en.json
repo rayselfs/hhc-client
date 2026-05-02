@@ -268,7 +268,10 @@
     "close": "Close",
     "warning": "Warning",
     "danger": "Danger",
-    "info": "Info"
+    "info": "Info",
+    "save": "Save",
+    "show": "Show",
+    "hide": "Hide"
   },
   "userMenu": {
     "guest": "Guest",
@@ -293,7 +296,8 @@
     "title": "Preferences",
     "categories": {
       "general": "General",
-      "media": "Media"
+      "media": "Media",
+      "bible": "Bible"
     },
     "language": "Language",
     "timezone": "Timezone",
@@ -308,6 +312,14 @@
       "en": "English",
       "zhTW": "繁體中文",
       "zhCN": "简体中文"
+    },
+    "bible": {
+      "azureSpeechKey": "Azure Speech API Key",
+      "azureSpeechKeyPlaceholder": "Enter your API key",
+      "azureSpeechKeyHint": "Get your API key from Azure Portal",
+      "azureSpeechRegion": "Azure Speech Region",
+      "testConnection": "Test Connection",
+      "testing": "Testing..."
     }
   },
   "error": {
@@ -334,7 +346,13 @@
     "updateAvailable": "Update {{version}} available",
     "updateCheckFailed": "Failed to check for updates",
     "networkRestored": "Network connection restored",
-    "networkLost": "Network connection lost"
+    "networkLost": "Network connection lost",
+    "azureSpeechSaved": "Azure Speech settings saved",
+    "azureSpeechCleared": "Azure Speech settings cleared",
+    "azureSpeechSaveFailed": "Failed to save Azure Speech settings",
+    "azureSpeechKeyRequired": "API key is required",
+    "azureSpeechTestSuccess": "Connection test successful",
+    "azureSpeechTestFailed": "Connection test failed"
   },
   "shortcuts": {
     "title": "Keyboard Shortcuts",

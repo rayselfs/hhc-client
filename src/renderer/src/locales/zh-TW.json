@@ -268,7 +268,10 @@
     "close": "關閉",
     "warning": "警告",
     "danger": "危險",
-    "info": "提示"
+    "info": "提示",
+    "save": "儲存",
+    "show": "顯示",
+    "hide": "隱藏"
   },
   "userMenu": {
     "guest": "訪客",
@@ -293,7 +296,8 @@
     "title": "偏好設定",
     "categories": {
       "general": "一般",
-      "media": "媒體"
+      "media": "媒體",
+      "bible": "聖經"
     },
     "language": "語言",
     "timezone": "時區",
@@ -308,6 +312,14 @@
       "en": "English",
       "zhTW": "繁體中文",
       "zhCN": "简体中文"
+    },
+    "bible": {
+      "azureSpeechKey": "Azure 語音 API 金鑰",
+      "azureSpeechKeyPlaceholder": "輸入您的 API 金鑰",
+      "azureSpeechKeyHint": "從 Azure Portal 取得您的 API 金鑰",
+      "azureSpeechRegion": "Azure 語音區域",
+      "testConnection": "測試連線",
+      "testing": "測試中..."
     }
   },
   "error": {
@@ -326,15 +338,21 @@
     "london": "倫敦 (UTC+0/+1)"
   },
   "toast": {
-    "storageSaveFailed": "設定儲存失敗",
-    "projectionOpenFailed": "投影視窗開啟失敗",
-    "projectionCloseFailed": "投影視窗關閉失敗",
-    "settingsReset": "已重設為預設值",
-    "bibleIndexFailed": "無法載入此版本的搜尋索引",
-    "updateAvailable": "{{version}} 版本更新可用",
+    "storageSaveFailed": "儲存設定失敗",
+    "projectionOpenFailed": "開啟投影視窗失敗",
+    "projectionCloseFailed": "關閉投影視窗失敗",
+    "settingsReset": "設定已重設為預設值",
+    "bibleIndexFailed": "載入此版本的搜尋索引失敗",
+    "updateAvailable": "有可用的更新 {{version}}",
     "updateCheckFailed": "檢查更新失敗",
     "networkRestored": "網路連線已恢復",
-    "networkLost": "網路連線已中斷"
+    "networkLost": "網路連線已中斷",
+    "azureSpeechSaved": "Azure 語音設定已儲存",
+    "azureSpeechCleared": "Azure 語音設定已清除",
+    "azureSpeechSaveFailed": "儲存 Azure 語音設定失敗",
+    "azureSpeechKeyRequired": "需要 API 金鑰",
+    "azureSpeechTestSuccess": "連線測試成功",
+    "azureSpeechTestFailed": "連線測試失敗"
   },
   "shortcuts": {
     "title": "鍵盤快速鍵",
