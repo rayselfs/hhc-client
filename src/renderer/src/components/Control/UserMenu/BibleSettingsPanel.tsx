@@ -23,9 +23,10 @@ export default function BibleSettingsPanel(): React.JSX.Element {
   const [originalApiKey, setOriginalApiKey] = useState('') // Track loaded value for comparison
   const [showApiKey, setShowApiKey] = useState(false)
   const [region, setRegion] = useState(azureSpeech?.region ?? 'eastasia')
-  const [originalRegion] = useState(azureSpeech?.region ?? 'eastasia') // Track original region
+  const [originalRegion, setOriginalRegion] = useState(azureSpeech?.region ?? 'eastasia') // Track original region
   const [isLoadingKey, setIsLoadingKey] = useState(true)
   const [isTesting, setIsTesting] = useState(false)
+  const [testPassed, setTestPassed] = useState(false) // Track if current config passed test
 
   useEffect(() => {
     loadAzureSpeechKey()
@@ -33,6 +34,11 @@ export default function BibleSettingsPanel(): React.JSX.Element {
         const loadedKey = key ?? ''
         setApiKey(loadedKey)
         setOriginalApiKey(loadedKey)
+        setOriginalRegion(azureSpeech?.region ?? 'eastasia')
+        // If key exists and no changes, assume previously tested
+        if (loadedKey && azureSpeech?.region) {
+          setTestPassed(true)
+        }
       })
       .catch((error) => {
         console.error('[BibleSettings] Failed to load API key:', error)
@@ -40,17 +46,29 @@ export default function BibleSettingsPanel(): React.JSX.Element {
       .finally(() => {
         setIsLoadingKey(false)
       })
-  }, [])
+  }, [azureSpeech?.region])
+
+  // Reset testPassed when key or region changes
+  useEffect(() => {
+    if (apiKey !== originalApiKey || region !== originalRegion) {
+      setTestPassed(false)
+    }
+  }, [apiKey, region, originalApiKey, originalRegion])
 
   const handleSaveSettings = async (): Promise<void> => {
     try {
       if (apiKey.trim()) {
         await saveAzureSpeechKey(apiKey.trim())
         setAzureSpeech({ region })
+        setOriginalApiKey(apiKey)
+        setOriginalRegion(region)
         toast.success(t('toast.azureSpeechSaved'))
       } else {
         await deleteAzureSpeechKey()
         setAzureSpeech(null)
+        setOriginalApiKey('')
+        setOriginalRegion('eastasia')
+        setTestPassed(false)
         toast.success(t('toast.azureSpeechCleared'))
       }
     } catch (error) {
@@ -104,9 +122,11 @@ export default function BibleSettingsPanel(): React.JSX.Element {
       })
 
       toast.success(t('toast.azureSpeechTestSuccess'))
+      setTestPassed(true)
     } catch (error) {
       console.error('[BibleSettings] Test connection failed:', error)
       toast.danger(t('toast.azureSpeechTestFailed'))
+      setTestPassed(false)
     } finally {
       setIsTesting(false)
     }
@@ -116,7 +136,7 @@ export default function BibleSettingsPanel(): React.JSX.Element {
 
   return (
     <div className="space-y-6">
-      <div>
+      <div className="space-y-2">
         <Label>{t('preferences.bible.azureSpeechKey')}</Label>
         <div className="relative w-full">
           <Input
@@ -171,15 +191,15 @@ export default function BibleSettingsPanel(): React.JSX.Element {
         <Button
           variant="primary"
           onPress={handleSaveSettings}
-          isDisabled={isLoadingKey || !hasChanges}
+          isDisabled={isLoadingKey || !testPassed || !hasChanges}
           className="rounded-full"
         >
           {t('common.save')}
         </Button>
         <Button
-          variant="secondary"
+          variant="tertiary"
           onPress={handleTestConnection}
-          isDisabled={isLoadingKey || !apiKey.trim() || isTesting}
+          isDisabled={isLoadingKey || !apiKey.trim() || isTesting || (testPassed && !hasChanges)}
           className="rounded-full"
         >
           {isTesting ? t('preferences.bible.testing') : t('preferences.bible.testConnection')}
