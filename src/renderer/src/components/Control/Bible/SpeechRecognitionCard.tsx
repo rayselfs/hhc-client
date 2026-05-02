@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Card } from '@heroui/react/card'
 import { Button } from '@heroui/react/button'
-import { Mic, MicOff, Trash2 } from 'lucide-react'
+import { ScrollShadow } from '@heroui/react/scroll-shadow'
+import { Mic, MicOff, Trash2, X } from 'lucide-react'
 import { useSettingsStore } from '@renderer/stores/settings'
 import { useBibleStore } from '@renderer/stores/bible'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
@@ -12,6 +13,7 @@ import type { SpeechAdapter } from '@renderer/lib/speech-adapter/speech-adapter.
 import { parseVerseReference } from '@renderer/lib/verse-parser'
 import { matchBookName, getBookConfig } from '@renderer/lib/bible-book-matcher'
 import { getBookNameI18n } from '@renderer/lib/bible-utils'
+import GlassDivider from '@renderer/components/Common/GlassDivider'
 
 interface RecognizedVerse {
   id: string
@@ -34,6 +36,8 @@ export default function SpeechRecognitionCard(): React.JSX.Element {
   const [error, setError] = useState<string | null>(null)
   const [adapter, setAdapter] = useState<SpeechAdapter | null>(null)
   const [isOnline, setIsOnline] = useState(navigator.onLine)
+
+  const scrollRef = useRef<HTMLDivElement>(null)
 
   const handleStopRecognition = useCallback((): void => {
     if (adapter) {
@@ -189,81 +193,85 @@ export default function SpeechRecognitionCard(): React.JSX.Element {
   const canStart = !isRecognizing && azureSpeech?.region && isOnline
 
   return (
-    <Card className="flex flex-col h-full">
-      <div className="flex justify-between items-center px-4 py-3">
+    <Card className="flex flex-col h-full flex-1 max-lg:flex-2 p-0 gap-2">
+      <Card.Header className="shrink-0 flex-row! items-center justify-between p-0 pt-2 px-3">
         <h3 className="text-sm font-medium">{t('bible.speech.title')}</h3>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-1 shrink-0">
           <Button
             size="sm"
             variant={isRecognizing ? 'danger' : 'primary'}
             onPress={isRecognizing ? handleStopRecognition : handleStartRecognition}
             isDisabled={!canStart && !isRecognizing}
-            className="flex items-center gap-1.5"
+            className="flex items-center gap-1.5 max-lg:gap-1"
           >
             {isRecognizing ? <MicOff size={16} /> : <Mic size={16} />}
-            <span>{isRecognizing ? t('bible.speech.stop') : t('bible.speech.start')}</span>
+            <span className="max-lg:hidden">
+              {isRecognizing ? t('bible.speech.stop') : t('bible.speech.start')}
+            </span>
           </Button>
           <Button
+            isIconOnly
+            variant="ghost"
             size="sm"
-            variant="outline"
             onPress={handleClearAll}
             isDisabled={recognizedVerses.length === 0}
-            isIconOnly
             aria-label={t('bible.speech.clearAll')}
           >
-            <Trash2 size={16} />
+            <Trash2 size={18} />
           </Button>
         </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto px-4 pb-4">
+      </Card.Header>
+      <GlassDivider />
+      <Card.Content className="flex-1 min-h-0 overflow-hidden p-0">
         {error && (
-          <div className="text-sm text-danger mb-2">
+          <div className="px-4 pt-2 pb-1 text-sm text-danger">
             {error === 'network-offline' && t('bible.speech.networkOffline')}
             {error === 'config-required' && t('bible.speech.configRequired')}
             {error === 'start-failed' && t('bible.speech.startFailed')}
           </div>
         )}
 
-        {isRecognizing && recognizedVerses.length === 0 && (
-          <div className="text-sm text-default-500">{t('bible.speech.listening')}</div>
+        {recognizedVerses.length === 0 && (
+          <div className="flex h-full items-center justify-center text-muted px-4">
+            {isRecognizing ? t('bible.speech.listening') : error ? '' : t('bible.speech.empty')}
+          </div>
         )}
 
-        {!isRecognizing && recognizedVerses.length === 0 && !error && (
-          <div className="text-sm text-default-400">{t('bible.speech.empty')}</div>
-        )}
-
-        <div className="space-y-2">
-          {recognizedVerses.map((verse) => (
-            <button
-              key={verse.id}
-              type="button"
-              className="flex w-full justify-between items-start p-2 hover:bg-default-100 rounded cursor-pointer group text-left"
-              onClick={() => handleVerseClick(verse)}
-            >
-              <div className="flex-1 mr-2">
-                <div className="text-xs font-medium text-default-700">
-                  {verse.bookName} {verse.chapter}:{verse.verse}
+        {recognizedVerses.length > 0 && (
+          <ScrollShadow ref={scrollRef} className="h-full w-full" hideScrollBar>
+            <div className="flex flex-col gap-2 p-2 pt-0">
+              {recognizedVerses.map((verse) => (
+                <div
+                  key={verse.id}
+                  className="flex items-center group rounded-3xl transition-colors hover:bg-accent hover:text-accent-foreground"
+                >
+                  <button
+                    type="button"
+                    onClick={() => handleVerseClick(verse)}
+                    className="flex-1 min-w-0 text-left p-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-3xl"
+                  >
+                    <p className="truncate text-muted group-hover:text-accent-foreground/80 dark:group-hover:text-muted font-[Roboto_Variable,Roboto,sans-serif] text-xs">
+                      {verse.bookName} {verse.chapter}:{verse.verse}
+                    </p>
+                    <p className="text-sm text-foreground group-hover:text-accent-foreground line-clamp-2 max-lg:line-clamp-1">
+                      {verse.text}
+                    </p>
+                  </button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="invisible shrink-0 mr-2 group-hover:visible cursor-pointer hover:bg-transparent!"
+                    onPress={() => handleRemoveVerse(verse.id)}
+                    aria-label={t('common.delete')}
+                  >
+                    <X size={16} />
+                  </Button>
                 </div>
-                <div className="text-xs text-default-600 mt-1 line-clamp-2">{verse.text}</div>
-              </div>
-              <Button
-                size="sm"
-                variant="ghost"
-                isIconOnly
-                className="opacity-0 group-hover:opacity-100 transition-opacity"
-                aria-label={t('common.delete')}
-                onPress={(e) => {
-                  e.continuePropagation()
-                  handleRemoveVerse(verse.id)
-                }}
-              >
-                <Trash2 size={14} />
-              </Button>
-            </button>
-          ))}
-        </div>
-      </div>
+              ))}
+            </div>
+          </ScrollShadow>
+        )}
+      </Card.Content>
     </Card>
   )
 }
