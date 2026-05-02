@@ -19,7 +19,7 @@ vi.mock('@renderer/lib/env', () => ({
   isElectron: vi.fn(() => false)
 }))
 
-import { useSettingsStore, TIMEZONE_OPTIONS } from '@renderer/stores/settings'
+import { useSettingsStore, TIMEZONE_OPTIONS, AZURE_REGION_OPTIONS } from '@renderer/stores/settings'
 import { clearAllSiteData } from '@renderer/lib/site-data'
 import { isElectron } from '@renderer/lib/env'
 
@@ -29,7 +29,9 @@ beforeEach(() => {
   useSettingsStore.setState({
     timezone: 'Asia/Taipei',
     hardwareAcceleration: true,
-    themePreference: 'system'
+    themePreference: 'system',
+    timerRingColor: '#3b82f6',
+    azureSpeech: null
   })
   mockToast.warning.mockClear()
   mockToast.success.mockClear()
@@ -85,7 +87,7 @@ describe('setTimezone', () => {
     expect(persisted).toBeTruthy()
     const parsed = JSON.parse(persisted!)
     expect(parsed.state.timezone).toBe('America/New_York')
-    expect(parsed.version).toBe(2)
+    expect(parsed.version).toBe(3)
 
     vi.unstubAllGlobals()
   })
@@ -122,7 +124,7 @@ describe('setHardwareAcceleration', () => {
     expect(persisted).toBeTruthy()
     const parsed = JSON.parse(persisted!)
     expect(parsed.state.hardwareAcceleration).toBe(false)
-    expect(parsed.version).toBe(2)
+    expect(parsed.version).toBe(3)
 
     vi.unstubAllGlobals()
   })
@@ -194,7 +196,7 @@ describe('persistence round-trip', () => {
     const parsed = JSON.parse(persisted!)
     expect(parsed.state.timezone).toBe('Europe/London')
     expect(parsed.state.hardwareAcceleration).toBe(false)
-    expect(parsed.version).toBe(2)
+    expect(parsed.version).toBe(3)
 
     vi.unstubAllGlobals()
   })
@@ -303,8 +305,101 @@ describe('themePreference', () => {
     expect(persisted).toBeTruthy()
     const parsed = JSON.parse(persisted!)
     expect(parsed.state.themePreference).toBe('dark')
-    expect(parsed.version).toBe(2)
+    expect(parsed.version).toBe(3)
 
     vi.unstubAllGlobals()
+  })
+})
+
+describe('azureSpeech settings', () => {
+  it('initializes with null azureSpeech', () => {
+    const state = useSettingsStore.getState()
+    expect(state.azureSpeech).toBeNull()
+  })
+
+  it('updates azureSpeech settings', () => {
+    const { setAzureSpeech } = useSettingsStore.getState()
+    const settings = { region: 'eastasia' }
+
+    setAzureSpeech(settings)
+
+    const state = useSettingsStore.getState()
+    expect(state.azureSpeech).toEqual(settings)
+  })
+
+  it('clears azureSpeech settings', () => {
+    const { setAzureSpeech } = useSettingsStore.getState()
+
+    setAzureSpeech({ region: 'eastasia' })
+    expect(useSettingsStore.getState().azureSpeech).not.toBeNull()
+
+    setAzureSpeech(null)
+    expect(useSettingsStore.getState().azureSpeech).toBeNull()
+  })
+
+  it('updates only region without apiKey', () => {
+    const { setAzureSpeech } = useSettingsStore.getState()
+
+    setAzureSpeech({ region: 'westus2' })
+
+    const state = useSettingsStore.getState()
+    expect(state.azureSpeech).toEqual({ region: 'westus2' })
+    expect(Object.keys(state.azureSpeech!)).not.toContain('apiKey')
+  })
+
+  it('persists to localStorage with correct version', () => {
+    let localStorageMock: Record<string, string> = {}
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => localStorageMock[key] || null,
+      setItem: (key: string, value: string) => {
+        localStorageMock[key] = value
+      },
+      removeItem: (key: string) => {
+        delete localStorageMock[key]
+      },
+      clear: () => {
+        localStorageMock = {}
+      },
+      length: 0,
+      key: (index: number) => {
+        const keys = Object.keys(localStorageMock)
+        return keys[index] || null
+      }
+    })
+
+    useSettingsStore.getState().setAzureSpeech({ region: 'japaneast' })
+    const persisted = localStorage.getItem('hhc-settings')
+    expect(persisted).toBeTruthy()
+    const parsed = JSON.parse(persisted!)
+    expect(parsed.state.azureSpeech).toEqual({ region: 'japaneast' })
+    expect(parsed.version).toBe(3)
+
+    vi.unstubAllGlobals()
+  })
+})
+
+describe('AZURE_REGION_OPTIONS', () => {
+  it('contains 34 regions', () => {
+    expect(AZURE_REGION_OPTIONS).toHaveLength(34)
+  })
+
+  it('includes eastasia region', () => {
+    const hasEastAsia = AZURE_REGION_OPTIONS.some((r) => r.value === 'eastasia')
+    expect(hasEastAsia).toBe(true)
+  })
+
+  it('all regions have value and label', () => {
+    AZURE_REGION_OPTIONS.forEach((region) => {
+      expect(region.value).toBeTruthy()
+      expect(region.label).toBeTruthy()
+      expect(typeof region.value).toBe('string')
+      expect(typeof region.label).toBe('string')
+    })
+  })
+
+  it('has unique region values', () => {
+    const values = AZURE_REGION_OPTIONS.map((r) => r.value)
+    const uniqueValues = new Set(values)
+    expect(uniqueValues.size).toBe(values.length)
   })
 })

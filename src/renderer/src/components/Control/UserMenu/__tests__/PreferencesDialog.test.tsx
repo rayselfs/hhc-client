@@ -19,8 +19,10 @@ vi.mock('@renderer/stores/settings', () => ({
     const store = {
       timezone: 'Asia/Taipei',
       hardwareAcceleration: true,
+      azureSpeech: null,
       setTimezone: vi.fn(),
       setHardwareAcceleration: vi.fn(),
+      setAzureSpeech: vi.fn(),
       resetToDefaults: vi.fn()
     }
     return selector ? selector(store) : store
@@ -115,7 +117,9 @@ describe('PreferencesDialog', () => {
         themePreference: 'system' as const,
         setThemePreference: vi.fn(),
         timerRingColor: '#3b82f6',
-        setTimerRingColor: vi.fn()
+        setTimerRingColor: vi.fn(),
+        azureSpeech: null,
+        setAzureSpeech: vi.fn()
       }
       return selector ? selector(store) : store
     })
@@ -178,7 +182,9 @@ describe('PreferencesDialog', () => {
         themePreference: 'system' as const,
         setThemePreference: vi.fn(),
         timerRingColor: '#3b82f6',
-        setTimerRingColor: vi.fn()
+        setTimerRingColor: vi.fn(),
+        azureSpeech: null,
+        setAzureSpeech: vi.fn()
       }
       return selector ? selector(store) : store
     })
@@ -214,7 +220,9 @@ describe('PreferencesDialog', () => {
         themePreference: 'system' as const,
         setThemePreference: vi.fn(),
         timerRingColor: '#3b82f6',
-        setTimerRingColor: vi.fn()
+        setTimerRingColor: vi.fn(),
+        azureSpeech: null,
+        setAzureSpeech: vi.fn()
       }
       return selector ? selector(store) : store
     })

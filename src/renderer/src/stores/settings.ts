@@ -18,21 +18,65 @@ export const TIMEZONE_OPTIONS = [
   { value: 'Europe/London', labelKey: 'timezones.london' }
 ] as const
 
+export const AZURE_REGION_OPTIONS = [
+  { value: 'eastasia', label: 'East Asia' },
+  { value: 'southeastasia', label: 'Southeast Asia' },
+  { value: 'eastus', label: 'East US' },
+  { value: 'eastus2', label: 'East US 2' },
+  { value: 'westus', label: 'West US' },
+  { value: 'westus2', label: 'West US 2' },
+  { value: 'westus3', label: 'West US 3' },
+  { value: 'centralus', label: 'Central US' },
+  { value: 'southcentralus', label: 'South Central US' },
+  { value: 'northcentralus', label: 'North Central US' },
+  { value: 'westcentralus', label: 'West Central US' },
+  { value: 'canadacentral', label: 'Canada Central' },
+  { value: 'canadaeast', label: 'Canada East' },
+  { value: 'brazilsouth', label: 'Brazil South' },
+  { value: 'northeurope', label: 'North Europe' },
+  { value: 'westeurope', label: 'West Europe' },
+  { value: 'uksouth', label: 'UK South' },
+  { value: 'ukwest', label: 'UK West' },
+  { value: 'francecentral', label: 'France Central' },
+  { value: 'germanywestcentral', label: 'Germany West Central' },
+  { value: 'norwayeast', label: 'Norway East' },
+  { value: 'switzerlandnorth', label: 'Switzerland North' },
+  { value: 'swedencentral', label: 'Sweden Central' },
+  { value: 'polandcentral', label: 'Poland Central' },
+  { value: 'italynorth', label: 'Italy North' },
+  { value: 'spaincentral', label: 'Spain Central' },
+  { value: 'uaenorth', label: 'UAE North' },
+  { value: 'southafricanorth', label: 'South Africa North' },
+  { value: 'centralindia', label: 'Central India' },
+  { value: 'japaneast', label: 'Japan East' },
+  { value: 'japanwest', label: 'Japan West' },
+  { value: 'koreacentral', label: 'Korea Central' },
+  { value: 'australiaeast', label: 'Australia East' },
+  { value: 'australiasoutheast', label: 'Australia Southeast' }
+] as const
+
 const DEFAULT_TIMEZONE = 'Asia/Taipei'
 const DEFAULT_HW_ACCEL = true
 const DEFAULT_THEME_PREFERENCE: ThemePreference = 'system'
 const DEFAULT_TIMER_RING_COLOR = '#3b82f6'
 const RELOAD_DELAY_MS = 500
 
+export interface AzureSpeechSettings {
+  region: string
+  // apiKey is stored separately (Electron: safeStorage, Browser: localStorage with prefix)
+}
+
 export interface SettingsStore {
   timezone: string
   hardwareAcceleration: boolean
   themePreference: ThemePreference
   timerRingColor: string
+  azureSpeech: AzureSpeechSettings | null
   setTimezone: (tz: string) => void
   setHardwareAcceleration: (enabled: boolean) => void
   setThemePreference: (pref: ThemePreference) => void
   setTimerRingColor: (color: string) => void
+  setAzureSpeech: (settings: AzureSpeechSettings | null) => void
   resetToDefaults: () => void
 }
 
@@ -43,6 +87,7 @@ export const useSettingsStore = create<SettingsStore>()(
       hardwareAcceleration: DEFAULT_HW_ACCEL,
       themePreference: DEFAULT_THEME_PREFERENCE,
       timerRingColor: DEFAULT_TIMER_RING_COLOR,
+      azureSpeech: null,
 
       setTimezone: (tz: string) => {
         set({ timezone: tz })
@@ -60,6 +105,10 @@ export const useSettingsStore = create<SettingsStore>()(
         set({ timerRingColor: color })
       },
 
+      setAzureSpeech: (settings: AzureSpeechSettings | null) => {
+        set({ azureSpeech: settings })
+      },
+
       resetToDefaults: () => {
         clearAllSiteData()
         toast.success(i18n.t('toast.settingsReset'))
@@ -73,7 +122,7 @@ export const useSettingsStore = create<SettingsStore>()(
     {
       name: createKey('settings'),
       storage: hhcPersistStorage,
-      version: 2,
+      version: 3,
       migrate: (persistedState, version) => {
         const state = persistedState as Record<string, unknown>
         if (version < 1) {
@@ -90,7 +139,6 @@ export const useSettingsStore = create<SettingsStore>()(
           state.themePreference = themePreference
         }
         if (version < 2) {
-          // Fix invalid CSS variable color value
           const ringColor = state.timerRingColor
           if (
             typeof ringColor === 'string' &&
@@ -99,13 +147,17 @@ export const useSettingsStore = create<SettingsStore>()(
             state.timerRingColor = DEFAULT_TIMER_RING_COLOR
           }
         }
+        if (version < 3) {
+          state.azureSpeech = null
+        }
         return state
       },
       partialize: (state) => ({
         timezone: state.timezone,
         hardwareAcceleration: state.hardwareAcceleration,
         themePreference: state.themePreference,
-        timerRingColor: state.timerRingColor
+        timerRingColor: state.timerRingColor,
+        azureSpeech: state.azureSpeech
       })
     }
   )
