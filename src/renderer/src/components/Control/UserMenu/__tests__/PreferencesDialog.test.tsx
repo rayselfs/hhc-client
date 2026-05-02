@@ -14,6 +14,12 @@ vi.mock('@renderer/lib/env', () => ({
   isWeb: vi.fn().mockReturnValue(true)
 }))
 
+vi.mock('@renderer/lib/azure-speech-key-storage', () => ({
+  saveAzureSpeechKey: vi.fn().mockResolvedValue(undefined),
+  loadAzureSpeechKey: vi.fn().mockResolvedValue(null),
+  deleteAzureSpeechKey: vi.fn().mockResolvedValue(undefined)
+}))
+
 vi.mock('@renderer/stores/settings', () => ({
   useSettingsStore: vi.fn((selector) => {
     const store = {
@@ -30,6 +36,10 @@ vi.mock('@renderer/stores/settings', () => ({
   TIMEZONE_OPTIONS: [
     { value: 'Asia/Taipei', labelKey: 'timezones.taipei' },
     { value: 'Europe/London', labelKey: 'timezones.london' }
+  ],
+  AZURE_REGION_OPTIONS: [
+    { value: 'eastasia', label: 'East Asia' },
+    { value: 'southeastasia', label: 'Southeast Asia' }
   ]
 }))
 
@@ -66,6 +76,7 @@ describe('PreferencesDialog', () => {
   it('renders when isOpen is true', () => {
     renderDialog(true)
     expect(screen.getByTestId('category-general')).toBeInTheDocument()
+    expect(screen.getByTestId('category-bible')).toBeInTheDocument()
     expect(screen.getByTestId('category-media')).toBeInTheDocument()
   })
 
@@ -87,6 +98,18 @@ describe('PreferencesDialog', () => {
 
     await user.click(screen.getByTestId('category-media'))
     expect(screen.getByText('Media settings coming soon')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Language')).not.toBeInTheDocument()
+
+    await user.click(screen.getByTestId('category-general'))
+    expect(screen.getByLabelText('Language')).toBeInTheDocument()
+  })
+
+  it('navigates to bible category and shows Bible settings', async () => {
+    const user = userEvent.setup()
+    renderDialog(true)
+
+    await user.click(screen.getByTestId('category-bible'))
+    expect(await screen.findByText('Azure Speech API Key')).toBeInTheDocument()
     expect(screen.queryByLabelText('Language')).not.toBeInTheDocument()
 
     await user.click(screen.getByTestId('category-general'))
