@@ -326,10 +326,10 @@
       "zhCN": "简体中文"
     },
     "bible": {
-      "azureSpeechKey": "Azure 語音 API 金鑰",
+      "azureSpeechKey": "Azure Speech Service 金鑰",
       "azureSpeechKeyPlaceholder": "輸入您的 API 金鑰",
       "azureSpeechKeyHint": "從 Azure Portal 取得您的 API 金鑰",
-      "azureSpeechRegion": "Azure 語音區域",
+      "azureSpeechRegion": "Azure Speech Service 區域",
       "testConnection": "測試連線",
       "testing": "測試中..."
     }

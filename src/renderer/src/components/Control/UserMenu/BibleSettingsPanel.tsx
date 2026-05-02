@@ -136,8 +136,8 @@ export default function BibleSettingsPanel(): React.JSX.Element {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <Label>{t('preferences.bible.azureSpeechKey')}</Label>
+      <div>
+        <Label className="mb-2 block">{t('preferences.bible.azureSpeechKey')}</Label>
         <div className="relative w-full">
           <Input
             type={showApiKey ? 'text' : 'password'}

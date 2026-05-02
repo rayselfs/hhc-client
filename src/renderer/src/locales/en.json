@@ -326,10 +326,10 @@
       "zhCN": "简体中文"
     },
     "bible": {
-      "azureSpeechKey": "Azure Speech API Key",
+      "azureSpeechKey": "Azure Speech Service Key",
       "azureSpeechKeyPlaceholder": "Enter your API key",
       "azureSpeechKeyHint": "Get your API key from Azure Portal",
-      "azureSpeechRegion": "Azure Speech Region",
+      "azureSpeechRegion": "Azure Speech Service Region",
       "testConnection": "Test Connection",
       "testing": "Testing..."
     }
