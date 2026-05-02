@@ -120,25 +120,26 @@ export default function BibleSettingsPanel(): React.JSX.Element {
         <Label className="mb-2 block text-sm font-medium">
           {t('preferences.bible.azureSpeechKey')}
         </Label>
-        <div className="flex gap-2">
+        <div className="relative">
           <Input
             type={showApiKey ? 'text' : 'password'}
+            variant="secondary"
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
             placeholder={t('preferences.bible.azureSpeechKeyPlaceholder')}
             disabled={isLoadingKey}
-            className="flex-1"
+            className="pr-12"
           />
           <Button
-            variant="secondary"
+            variant="ghost"
+            size="sm"
             onPress={() => setShowApiKey(!showApiKey)}
-            className="shrink-0 rounded-full px-3"
+            className="absolute right-1 top-1/2 -translate-y-1/2"
             aria-label={showApiKey ? t('common.hide') : t('common.show')}
           >
             {showApiKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
           </Button>
         </div>
-        <p className="mt-1 text-xs text-muted">{t('preferences.bible.azureSpeechKeyHint')}</p>
       </div>
 
       <Select
