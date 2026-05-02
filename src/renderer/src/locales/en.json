@@ -131,6 +131,17 @@
       "submit": "Submit search",
       "noResults": "No results"
     },
+    "speech": {
+      "title": "Verse Recognition",
+      "start": "Start Detection",
+      "stop": "Stop Detection",
+      "listening": "Listening...",
+      "empty": "No verses recognized yet",
+      "networkOffline": "Network is offline",
+      "configRequired": "Please configure Azure Speech API first",
+      "startFailed": "Failed to start voice recognition",
+      "clearAll": "Clear All"
+    },
     "settings": {
       "fontSize": "Projection Font Size"
     },
@@ -271,7 +282,8 @@
     "info": "Info",
     "save": "Save",
     "show": "Show",
-    "hide": "Hide"
+    "hide": "Hide",
+    "delete": "Delete"
   },
   "userMenu": {
     "guest": "Guest",

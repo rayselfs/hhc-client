@@ -131,6 +131,17 @@
       "submit": "送出搜尋",
       "noResults": "無結果"
     },
+    "speech": {
+      "title": "經文辨識",
+      "start": "開始偵測",
+      "stop": "停止偵測",
+      "listening": "正在聆聽...",
+      "empty": "尚未辨識任何經文",
+      "networkOffline": "網路已斷線",
+      "configRequired": "請先設定 Azure Speech API",
+      "startFailed": "啟動語音辨識失敗",
+      "clearAll": "清空"
+    },
     "settings": {
       "fontSize": "投影字體大小"
     },
@@ -271,7 +282,8 @@
     "info": "提示",
     "save": "儲存",
     "show": "顯示",
-    "hide": "隱藏"
+    "hide": "隱藏",
+    "delete": "刪除"
   },
   "userMenu": {
     "guest": "訪客",

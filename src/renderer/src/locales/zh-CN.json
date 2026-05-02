@@ -131,6 +131,17 @@
       "submit": "提交搜索",
       "noResults": "无结果"
     },
+    "speech": {
+      "title": "经文识别",
+      "start": "开始检测",
+      "stop": "停止检测",
+      "listening": "正在聆听...",
+      "empty": "尚未识别任何经文",
+      "networkOffline": "网络已断线",
+      "configRequired": "请先设置 Azure Speech API",
+      "startFailed": "启动语音识别失败",
+      "clearAll": "清空"
+    },
     "settings": {
       "fontSize": "投影字体大小"
     },
@@ -271,7 +282,8 @@
     "info": "提示",
     "save": "保存",
     "show": "显示",
-    "hide": "隐藏"
+    "hide": "隐藏",
+    "delete": "删除"
   },
   "userMenu": {
     "guest": "访客",
