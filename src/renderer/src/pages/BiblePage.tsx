@@ -4,6 +4,7 @@ import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 import { useBibleHistoryStore } from '@renderer/stores/bible-history'
 import { BiblePreview } from '@renderer/components/Control/Bible/BiblePreview'
 import BibleMultiFunction from '@renderer/components/Control/Bible/BibleMultiFunction'
+import SpeechRecognitionCard from '@renderer/components/Control/Bible/SpeechRecognitionCard'
 import { BibleSelectorDialog } from '@renderer/components/Control/Bible/BibleSelectorDialog'
 import { useBibleContextMenu } from '@renderer/components/Control/Bible/useBibleContextMenu'
 import type { VerseMenuData } from '@renderer/components/Control/Bible/useBibleContextMenu'
@@ -233,7 +234,14 @@ export default function BiblePage(): React.JSX.Element {
             projectedPassage={projectedPassage}
             onProjected={setProjectedPassage}
           />
-          <BibleMultiFunction onProjected={setProjectedPassage} />
+          <div className="flex flex-col gap-4 flex-1">
+            <div className="flex-1 min-h-0">
+              <BibleMultiFunction onProjected={setProjectedPassage} />
+            </div>
+            <div className="flex-1 min-h-0">
+              <SpeechRecognitionCard />
+            </div>
+          </div>
           <BibleSelectorDialog
             isOpen={isSelectorOpen}
             onOpenChange={setSelectorOpen}
