@@ -70,7 +70,7 @@
     "functionsLabel": "圣经功能",
     "preview": {
       "loading": "加载中...",
-      "noContent": "尚未加载经文内容",
+      "noContent": "未加载经文内容",
       "selectBook": "选择书卷查看经文"
     },
     "selector": {
@@ -136,7 +136,7 @@
       "start": "开始检测",
       "stop": "停止检测",
       "listening": "正在聆听...",
-      "empty": "尚未识别任何经文",
+      "empty": "未识别任何经文",
       "networkOffline": "网络已断线",
       "configRequired": "请先设置 Azure Speech API",
       "startFailed": "启动语音识别失败",

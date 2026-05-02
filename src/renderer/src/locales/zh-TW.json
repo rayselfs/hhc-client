@@ -70,7 +70,7 @@
     "functionsLabel": "聖經功能",
     "preview": {
       "loading": "載入中...",
-      "noContent": "尚未載入經文內容",
+      "noContent": "未載入經文內容",
       "selectBook": "選擇書卷查看經文"
     },
     "selector": {
@@ -87,7 +87,7 @@
     },
     "history": {
       "title": "歷史",
-      "emptyMessage": "尚無瀏覽歷史",
+      "emptyMessage": "無瀏覽歷史",
       "clearHistory": "清除歷史"
     },
     "custom": {
@@ -136,7 +136,7 @@
       "start": "開始偵測",
       "stop": "停止偵測",
       "listening": "正在聆聽...",
-      "empty": "尚未辨識任何經文",
+      "empty": "未辨識任何經文",
       "networkOffline": "網路已斷線",
       "configRequired": "請先設定 Azure Speech API",
       "startFailed": "啟動語音辨識失敗",
