@@ -384,3 +384,32 @@ describe('verse range pattern (X Y 兩節)', () => {
     expect(result!.verse).toBe(5)
   })
 })
+
+describe('篇 as chapter marker', () => {
+  it('parses 詩篇51篇 (篇 as chapter)', () => {
+    const result = parseVerseReference('詩篇51篇')
+    expect(result).toEqual({ book: '詩篇', chapter: 51, verse: 1 })
+  })
+
+  it('parses 詩篇23篇1節', () => {
+    const result = parseVerseReference('詩篇23篇1節')
+    expect(result).toEqual({ book: '詩篇', chapter: 23, verse: 1 })
+  })
+
+  it('corrects 十篇→詩篇 and parses', () => {
+    const result = parseVerseReference('十篇51篇')
+    expect(result).toEqual({ book: '詩篇', chapter: 51, verse: 1 })
+  })
+})
+
+describe('no chapter marker (single-chapter books)', () => {
+  it('parses 猶大書3節 → chapter=1, verse=3', () => {
+    const result = parseVerseReference('猶大書3節')
+    expect(result).toEqual({ book: '猶大書', chapter: 1, verse: 3 })
+  })
+
+  it('parses 猶大書第五節 → chapter=1, verse=5', () => {
+    const result = parseVerseReference('猶大書第五節')
+    expect(result).toEqual({ book: '猶大書', chapter: 1, verse: 5 })
+  })
+})

@@ -135,6 +135,7 @@ function collectNumberAfter(
 }
 
 const SPEECH_CORRECTIONS: [RegExp, string][] = [
+  [/十篇/g, '詩篇'],
   [/說/g, '書'],
   [/招/g, '章'],
   [/結/g, '節'],
@@ -174,6 +175,10 @@ function extractFirstVerseFromRange(
   return null
 }
 
+function isChapterMarker(token: string): boolean {
+  return token === 'zhang' || token === 'pian'
+}
+
 function parsePinyinVerse(text: string): ParsedVerse | null {
   const corrected = correctSpeechErrors(text)
   const cleaned = corrected.replace(/[。，、！？.,!?；：…\s]/g, '').replace(/第/g, '')
@@ -181,20 +186,44 @@ function parsePinyinVerse(text: string): ParsedVerse | null {
 
   const tokens = pinyin(cleaned, { toneType: 'none', type: 'array' })
 
-  const zhangIdx = tokens.indexOf('zhang')
-  if (zhangIdx < 1) return null
+  let chapterMarkerIdx = -1
+  let hasAnyChapterMarker = false
+  for (let i = tokens.length - 1; i >= 1; i--) {
+    if (isChapterMarker(tokens[i])) {
+      hasAnyChapterMarker = true
+      const hasNumber = collectNumberBefore(tokens, i)
+      if (hasNumber) {
+        chapterMarkerIdx = i
+        break
+      }
+    }
+  }
 
-  const chapterResult = collectNumberBefore(tokens, zhangIdx)
+  if (chapterMarkerIdx >= 1) {
+    return parseWithChapterMarker(cleaned, tokens, chapterMarkerIdx)
+  }
+
+  if (hasAnyChapterMarker) return null
+
+  return parseWithoutChapterMarker(cleaned, tokens)
+}
+
+function parseWithChapterMarker(
+  cleaned: string,
+  tokens: string[],
+  chapterMarkerIdx: number
+): ParsedVerse | null {
+  const chapterResult = collectNumberBefore(tokens, chapterMarkerIdx)
   if (!chapterResult) return null
 
   const book = cleaned.slice(0, chapterResult.startIdx).trim()
   if (!book) return null
 
   let verse = 1
-  const afterZhang = zhangIdx + 1
+  const afterMarker = chapterMarkerIdx + 1
 
   let verseMarkerIdx = -1
-  for (let i = afterZhang; i < tokens.length; i++) {
+  for (let i = afterMarker; i < tokens.length; i++) {
     if (isVerseMarker(tokens[i])) {
       verseMarkerIdx = i
       break
@@ -204,19 +233,41 @@ function parsePinyinVerse(text: string): ParsedVerse | null {
     }
   }
 
-  if (verseMarkerIdx > afterZhang) {
+  if (verseMarkerIdx > afterMarker) {
     const verseResult =
-      extractFirstVerseFromRange(tokens, afterZhang, verseMarkerIdx) ??
+      extractFirstVerseFromRange(tokens, afterMarker, verseMarkerIdx) ??
       collectNumberBefore(tokens, verseMarkerIdx)
     if (verseResult) verse = verseResult.value
   } else if (verseMarkerIdx === -1) {
-    const verseResult = collectNumberAfter(tokens, afterZhang)
+    const verseResult = collectNumberAfter(tokens, afterMarker)
     if (verseResult) verse = verseResult.value
   }
 
   if (verse <= 0) return null
 
   return { book, chapter: chapterResult.value, verse }
+}
+
+function parseWithoutChapterMarker(cleaned: string, tokens: string[]): ParsedVerse | null {
+  let verseMarkerIdx = -1
+  for (let i = 0; i < tokens.length; i++) {
+    if (isVerseMarker(tokens[i])) {
+      verseMarkerIdx = i
+      break
+    }
+  }
+
+  if (verseMarkerIdx < 1) return null
+
+  const verseResult = collectNumberBefore(tokens, verseMarkerIdx)
+  if (!verseResult) return null
+
+  const book = cleaned.slice(0, verseResult.startIdx).trim()
+  if (!book) return null
+
+  if (verseResult.value <= 0) return null
+
+  return { book, chapter: 1, verse: verseResult.value }
 }
 
 export function parseVerseReference(text: string): ParsedVerse | null {
