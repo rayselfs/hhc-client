@@ -76,14 +76,14 @@ describe('BrowserSpeechAdapter - Cost Protection', () => {
   })
 
   describe('idle timeout', () => {
-    it('emits idleTimeout with default 5min timeout', async () => {
+    it('emits idleTimeout with default 3min timeout', async () => {
       const handler = vi.fn()
       const adapter = createAdapter()
       adapter.on('idleTimeout', handler)
 
       await startAdapter(adapter)
 
-      vi.advanceTimersByTime(4 * 60 * 1000 + 30_000)
+      vi.advanceTimersByTime(2 * 60 * 1000 + 30_000)
       expect(handler).not.toHaveBeenCalled()
 
       vi.advanceTimersByTime(60_000)

@@ -22,7 +22,7 @@ export class BrowserSpeechAdapter implements SpeechAdapter {
   private readonly BUFFER_TIMEOUT = 5000
 
   private static readonly WATCHDOG_INTERVAL = 30_000
-  private static readonly DEFAULT_IDLE_TIMEOUT_MS = 5 * 60 * 1000
+  private static readonly DEFAULT_IDLE_TIMEOUT_MS = 3 * 60 * 1000
   private static readonly DEFAULT_MAX_SESSION_MS = 60 * 60 * 1000
   private static readonly MAX_CONSECUTIVE_ERRORS = 3
   private watchdogTimer: ReturnType<typeof setInterval> | null = null

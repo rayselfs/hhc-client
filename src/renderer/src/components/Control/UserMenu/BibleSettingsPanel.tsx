@@ -17,7 +17,7 @@ import { toast } from '@heroui/react/toast'
 import { parseDuration, formatDurationHMS } from '@renderer/lib/parse-duration'
 
 export default function BibleSettingsPanel(): React.JSX.Element {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const azureSpeech = useSettingsStore((s) => s.azureSpeech)
   const setAzureSpeech = useSettingsStore((s) => s.setAzureSpeech)
   const speechMaxSessionSec = useBibleSettingsStore((s) => s.speechMaxSessionSec)
@@ -94,7 +94,9 @@ export default function BibleSettingsPanel(): React.JSX.Element {
         await import('microsoft-cognitiveservices-speech-sdk')
 
       const config = SpeechConfig.fromSubscription(apiKey.trim(), region)
-      config.speechRecognitionLanguage = 'en-US'
+      const testLanguage =
+        i18n.language === 'zh-TW' ? 'zh-TW' : i18n.language === 'zh-CN' ? 'zh-CN' : 'en-US'
+      config.speechRecognitionLanguage = testLanguage
 
       const recognizer = new SpeechRecognizer(config)
 
