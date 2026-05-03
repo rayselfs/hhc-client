@@ -140,6 +140,17 @@ export class BrowserSpeechAdapter implements SpeechAdapter {
       const language = this.config.language || this.detectLanguage()
       speechConfig.speechRecognitionLanguage = language
 
+      speechConfig.setServiceProperty(
+        'InitialSilenceTimeoutMs',
+        '5000',
+        sdk.ServicePropertyChannel.UriQueryParameter
+      )
+      speechConfig.setServiceProperty(
+        'EndSilenceTimeoutMs',
+        '600',
+        sdk.ServicePropertyChannel.UriQueryParameter
+      )
+
       const audioConfig = sdk.AudioConfig.fromDefaultMicrophoneInput()
       this.recognizer = new sdk.SpeechRecognizer(speechConfig, audioConfig)
 

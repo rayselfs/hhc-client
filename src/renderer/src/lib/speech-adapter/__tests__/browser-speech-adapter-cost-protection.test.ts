@@ -12,7 +12,8 @@ vi.mock('microsoft-cognitiveservices-speech-sdk', () => {
   return {
     SpeechConfig: {
       fromSubscription: vi.fn(() => ({
-        speechRecognitionLanguage: ''
+        speechRecognitionLanguage: '',
+        setServiceProperty: vi.fn()
       }))
     },
     AudioConfig: {
@@ -37,6 +38,9 @@ vi.mock('microsoft-cognitiveservices-speech-sdk', () => {
     CancellationReason: {
       Error: 1,
       EndOfStream: 0
+    },
+    ServicePropertyChannel: {
+      UriQueryParameter: 0
     }
   }
 })
