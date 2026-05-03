@@ -15,7 +15,8 @@ vi.mock('microsoft-cognitiveservices-speech-sdk', () => {
       fromSubscription: vi.fn(() => ({
         speechRecognitionLanguage: '',
         outputFormat: 0,
-        setServiceProperty: vi.fn()
+        setServiceProperty: vi.fn(),
+        setProfanity: vi.fn()
       }))
     },
     AudioConfig: {
@@ -54,6 +55,14 @@ vi.mock('microsoft-cognitiveservices-speech-sdk', () => {
     },
     PropertyId: {
       SpeechServiceResponse_JsonResult: 'SpeechServiceResponse_JsonResult'
+    },
+    ProfanityOption: {
+      Raw: 2
+    },
+    Connection: {
+      fromRecognizer: vi.fn(() => ({
+        openConnection: vi.fn()
+      }))
     }
   }
 })

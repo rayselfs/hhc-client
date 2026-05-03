@@ -141,6 +141,7 @@ export class BrowserSpeechAdapter implements SpeechAdapter {
       const language = this.config.language || this.detectLanguage()
       speechConfig.speechRecognitionLanguage = language
       speechConfig.outputFormat = sdk.OutputFormat.Detailed
+      speechConfig.setProfanity(sdk.ProfanityOption.Raw)
 
       speechConfig.setServiceProperty(
         'InitialSilenceTimeoutMs',
@@ -155,6 +156,9 @@ export class BrowserSpeechAdapter implements SpeechAdapter {
 
       const audioConfig = sdk.AudioConfig.fromDefaultMicrophoneInput()
       this.recognizer = new sdk.SpeechRecognizer(speechConfig, audioConfig)
+
+      const connection = sdk.Connection.fromRecognizer(this.recognizer)
+      connection.openConnection()
 
       const phraseList = sdk.PhraseListGrammar.fromRecognizer(this.recognizer)
       for (const phrase of getBiblePhrases(language)) {
