@@ -21,9 +21,81 @@ export class BrowserSpeechAdapter implements SpeechAdapter {
   private bufferTimer: ReturnType<typeof setTimeout> | null = null
   private readonly BUFFER_TIMEOUT = 5000
 
+  private static readonly WATCHDOG_INTERVAL = 30_000
+  private static readonly DEFAULT_IDLE_TIMEOUT_MS = 5 * 60 * 1000
+  private static readonly DEFAULT_MAX_SESSION_MS = 60 * 60 * 1000
+  private static readonly MAX_CONSECUTIVE_ERRORS = 3
+  private watchdogTimer: ReturnType<typeof setInterval> | null = null
+  private lastActivityTime = 0
+  private sessionStartTime = 0
+  private consecutiveErrors = 0
+  private idleTimeoutMs: number
+  private maxSessionMs: number
+  private beforeUnloadHandler: (() => void) | null = null
+
   constructor(config: SpeechAdapterConfig) {
     this.config = config
+    this.idleTimeoutMs = config.idleTimeoutMs ?? BrowserSpeechAdapter.DEFAULT_IDLE_TIMEOUT_MS
+    this.maxSessionMs = config.maxSessionMs ?? BrowserSpeechAdapter.DEFAULT_MAX_SESSION_MS
     this.setupNetworkListeners()
+    this.setupBeforeUnloadHandler()
+  }
+
+  private setupBeforeUnloadHandler(): void {
+    this.beforeUnloadHandler = () => {
+      if (this.isActive && this.recognizer) {
+        this.recognizer.stopContinuousRecognitionAsync(
+          () => {},
+          () => {}
+        )
+        this.recognizer.close()
+        this.isActive = false
+      }
+    }
+    window.addEventListener('beforeunload', this.beforeUnloadHandler)
+  }
+
+  private recordActivity(): void {
+    this.lastActivityTime = Date.now()
+    this.consecutiveErrors = 0
+  }
+
+  private startWatchdog(): void {
+    this.lastActivityTime = Date.now()
+    this.sessionStartTime = Date.now()
+    this.consecutiveErrors = 0
+    this.stopWatchdog()
+    this.watchdogTimer = setInterval(() => {
+      const now = Date.now()
+      if (now - this.sessionStartTime >= this.maxSessionMs) {
+        this.emit('maxDurationReached', undefined)
+        this.stop().catch(() => {})
+        return
+      }
+      if (now - this.lastActivityTime >= this.idleTimeoutMs) {
+        this.emit('idleTimeout', undefined)
+        this.stop().catch(() => {})
+      }
+    }, BrowserSpeechAdapter.WATCHDOG_INTERVAL)
+  }
+
+  private stopWatchdog(): void {
+    if (this.watchdogTimer) {
+      clearInterval(this.watchdogTimer)
+      this.watchdogTimer = null
+    }
+  }
+
+  private handleCancellationError(errorDetails: string): void {
+    this.consecutiveErrors++
+    const message =
+      this.consecutiveErrors >= BrowserSpeechAdapter.MAX_CONSECUTIVE_ERRORS
+        ? `Recognition stopped after ${this.consecutiveErrors} consecutive errors: ${errorDetails}`
+        : errorDetails
+    this.emit('error', { error: new Error(message), message })
+    if (this.consecutiveErrors >= BrowserSpeechAdapter.MAX_CONSECUTIVE_ERRORS) {
+      this.stopWatchdog()
+    }
   }
 
   private setupNetworkListeners(): void {
@@ -73,12 +145,14 @@ export class BrowserSpeechAdapter implements SpeechAdapter {
 
       this.recognizer.recognizing = (_s, e) => {
         if (e.result.reason === sdk.ResultReason.RecognizingSpeech) {
+          this.recordActivity()
           this.emit('recognizing', { text: e.result.text })
         }
       }
 
       this.recognizer.recognized = (_s, e) => {
         if (e.result.reason === sdk.ResultReason.RecognizedSpeech) {
+          this.recordActivity()
           const text = e.result.text
           console.log('[Adapter] Azure recognized:', text)
           this.handleRecognizedText(text)
@@ -100,16 +174,14 @@ export class BrowserSpeechAdapter implements SpeechAdapter {
         this.emit('canceled', { reason })
 
         if (e.reason === sdk.CancellationReason.Error) {
-          this.emit('error', {
-            error: new Error(e.errorDetails),
-            message: e.errorDetails
-          })
+          this.handleCancellationError(e.errorDetails)
         }
       }
 
       this.recognizer.startContinuousRecognitionAsync(
         () => {
           this.isActive = true
+          this.startWatchdog()
         },
         (err) => {
           this.emit('error', {
@@ -133,6 +205,7 @@ export class BrowserSpeechAdapter implements SpeechAdapter {
     }
 
     this.clearBuffer()
+    this.stopWatchdog()
 
     return new Promise((resolve, reject) => {
       this.recognizer!.stopContinuousRecognitionAsync(
@@ -171,6 +244,12 @@ export class BrowserSpeechAdapter implements SpeechAdapter {
 
   dispose(): void {
     this.clearBuffer()
+    this.stopWatchdog()
+
+    if (this.beforeUnloadHandler) {
+      window.removeEventListener('beforeunload', this.beforeUnloadHandler)
+      this.beforeUnloadHandler = null
+    }
 
     if (this.recognizer) {
       this.recognizer.close()

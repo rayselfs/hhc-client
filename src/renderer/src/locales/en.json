@@ -140,7 +140,10 @@
       "networkOffline": "Network is offline",
       "configRequired": "Please configure Azure Speech API first",
       "startFailed": "Failed to start voice recognition",
-      "clearAll": "Clear All"
+      "clearAll": "Clear All",
+      "idleTimeout": "No speech activity detected, recognition stopped",
+      "maxDuration": "Maximum session duration reached, recognition stopped",
+      "errorRetryExceeded": "Too many consecutive errors, recognition stopped"
     },
     "settings": {
       "fontSize": "Projection Font Size"
@@ -328,10 +331,12 @@
     "bible": {
       "azureSpeechKey": "Azure Speech Service Key",
       "azureSpeechKeyPlaceholder": "Enter your API key",
-      "azureSpeechKeyHint": "Get your API key from Azure Portal",
+      "azureSpeechKeyHint": "Get your API key from the Azure Portal",
       "azureSpeechRegion": "Azure Speech Service Region",
       "testConnection": "Test Connection",
-      "testing": "Testing..."
+      "testing": "Testing...",
+      "maxSessionDuration": "Voice Recognition Max Duration",
+      "maxSessionDurationUnit": "min"
     }
   },
   "error": {

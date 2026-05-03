@@ -140,7 +140,10 @@
       "networkOffline": "網路已斷線",
       "configRequired": "請先設定 Azure Speech API",
       "startFailed": "啟動語音辨識失敗",
-      "clearAll": "清空"
+      "clearAll": "清空",
+      "idleTimeout": "長時間無語音活動，已自動停止偵測",
+      "maxDuration": "已達最大偵測時長，已自動停止",
+      "errorRetryExceeded": "連續錯誤過多，已自動停止偵測"
     },
     "settings": {
       "fontSize": "投影字體大小"
@@ -331,7 +334,9 @@
       "azureSpeechKeyHint": "從 Azure Portal 取得您的 API 金鑰",
       "azureSpeechRegion": "Azure Speech Service 區域",
       "testConnection": "測試連線",
-      "testing": "測試中..."
+      "testing": "測試中...",
+      "maxSessionDuration": "語音辨識最大時長",
+      "maxSessionDurationUnit": "分鐘"
     }
   },
   "error": {

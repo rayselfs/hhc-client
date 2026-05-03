@@ -89,7 +89,7 @@ describe('persistence round-trip', () => {
     const raw = localStorage.getItem('hhc-bible-settings')
     expect(raw).toBeTruthy()
     const parsed = JSON.parse(raw!)
-    expect(parsed.version).toBe(0)
+    expect(parsed.version).toBe(1)
     expect(parsed.state.fontSize).toBe(110)
   })
 

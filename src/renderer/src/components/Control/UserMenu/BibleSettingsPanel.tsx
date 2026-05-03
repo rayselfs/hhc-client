@@ -7,6 +7,7 @@ import { Button } from '@heroui/react/button'
 import { Label } from 'react-aria-components'
 import { Eye, EyeOff } from 'lucide-react'
 import { useSettingsStore, AZURE_REGION_OPTIONS } from '@renderer/stores/settings'
+import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 import {
   saveAzureSpeechKey,
   loadAzureSpeechKey,
@@ -18,6 +19,8 @@ export default function BibleSettingsPanel(): React.JSX.Element {
   const { t } = useTranslation()
   const azureSpeech = useSettingsStore((s) => s.azureSpeech)
   const setAzureSpeech = useSettingsStore((s) => s.setAzureSpeech)
+  const speechMaxSessionMin = useBibleSettingsStore((s) => s.speechMaxSessionMin)
+  const setSpeechMaxSessionMin = useBibleSettingsStore((s) => s.setSpeechMaxSessionMin)
 
   const [apiKey, setApiKey] = useState('')
   const [originalApiKey, setOriginalApiKey] = useState('') // Track loaded value for comparison
@@ -186,6 +189,27 @@ export default function BibleSettingsPanel(): React.JSX.Element {
           </ListBox>
         </Select.Popover>
       </Select>
+
+      <div>
+        <Label className="mb-2 block">{t('preferences.bible.maxSessionDuration')}</Label>
+        <div className="flex items-center gap-2">
+          <Input
+            type="number"
+            variant="secondary"
+            value={String(speechMaxSessionMin)}
+            onChange={(e) => {
+              const val = Math.max(1, Math.min(480, Number(e.target.value) || 60))
+              setSpeechMaxSessionMin(val)
+            }}
+            className="w-24 rounded-full"
+            min={1}
+            max={480}
+          />
+          <span className="text-sm text-muted">
+            {t('preferences.bible.maxSessionDurationUnit')}
+          </span>
+        </div>
+      </div>
 
       <div className="flex gap-2">
         <Button

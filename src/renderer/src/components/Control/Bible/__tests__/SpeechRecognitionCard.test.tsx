@@ -152,11 +152,13 @@ describe('SpeechRecognitionCard', () => {
 
       await waitFor(() => {
         expect(loadAzureSpeechKey).toHaveBeenCalled()
-        expect(createSpeechAdapter).toHaveBeenCalledWith({
-          subscriptionKey: 'mock-api-key',
-          region: 'eastasia',
-          language: 'en-US'
-        })
+        expect(createSpeechAdapter).toHaveBeenCalledWith(
+          expect.objectContaining({
+            subscriptionKey: 'mock-api-key',
+            region: 'eastasia',
+            language: 'en-US'
+          })
+        )
         expect(mockAdapter.start).toHaveBeenCalled()
       })
 

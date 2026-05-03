@@ -10,6 +10,10 @@ export interface SpeechAdapterConfig {
   subscriptionKey: string
   region: string
   language?: string
+  /** Idle timeout in ms — auto-stop when no speech activity. Default 5 min. */
+  idleTimeoutMs?: number
+  /** Max session duration in ms — hard cap per start/stop cycle. Default 60 min. */
+  maxSessionMs?: number
 }
 
 export type SpeechAdapterEventType =
@@ -19,6 +23,8 @@ export type SpeechAdapterEventType =
   | 'sessionStopped'
   | 'canceled'
   | 'error'
+  | 'idleTimeout'
+  | 'maxDurationReached'
 
 export interface SpeechAdapterEventMap {
   recognizing: { text: string }
@@ -27,6 +33,8 @@ export interface SpeechAdapterEventMap {
   sessionStopped: undefined
   canceled: { reason: string }
   error: { error: Error; message: string }
+  idleTimeout: undefined
+  maxDurationReached: undefined
 }
 
 export type SpeechAdapterEventListener<T extends SpeechAdapterEventType> = (

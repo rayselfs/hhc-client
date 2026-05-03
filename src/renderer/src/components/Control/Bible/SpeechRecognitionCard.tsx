@@ -15,6 +15,12 @@ import { matchBookName, getBookConfig } from '@renderer/lib/bible-book-matcher'
 import { getBookNameI18n } from '@renderer/lib/bible-utils'
 import GlassDivider from '@renderer/components/Common/GlassDivider'
 
+function formatElapsed(totalSeconds: number): string {
+  const m = Math.floor(totalSeconds / 60)
+  const s = totalSeconds % 60
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+}
+
 interface RecognizedVerse {
   id: string
   bookNumber: number
@@ -36,10 +42,17 @@ export default function SpeechRecognitionCard(): React.JSX.Element {
   const [error, setError] = useState<string | null>(null)
   const [adapter, setAdapter] = useState<SpeechAdapter | null>(null)
   const [isOnline, setIsOnline] = useState(navigator.onLine)
+  const [elapsedSeconds, setElapsedSeconds] = useState(0)
 
   const scrollRef = useRef<HTMLDivElement>(null)
+  const elapsedTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const speechMaxSessionMin = useBibleSettingsStore((s) => s.speechMaxSessionMin)
 
   const handleStopRecognition = useCallback((): void => {
+    if (elapsedTimerRef.current) {
+      clearInterval(elapsedTimerRef.current)
+      elapsedTimerRef.current = null
+    }
     if (adapter) {
       adapter.stop().catch((err) => {
         console.error('[SpeechRecognitionCard] Stop recognition failed:', err)
@@ -71,6 +84,9 @@ export default function SpeechRecognitionCard(): React.JSX.Element {
 
   useEffect(() => {
     return () => {
+      if (elapsedTimerRef.current) {
+        clearInterval(elapsedTimerRef.current)
+      }
       if (adapter) {
         adapter.dispose()
       }
@@ -147,7 +163,8 @@ export default function SpeechRecognitionCard(): React.JSX.Element {
       const newAdapter = createSpeechAdapter({
         subscriptionKey: apiKey,
         region: azureSpeech.region,
-        language: locale
+        language: locale,
+        maxSessionMs: speechMaxSessionMin * 60 * 1000
       })
 
       newAdapter.on('recognized', (data) => {
@@ -164,9 +181,27 @@ export default function SpeechRecognitionCard(): React.JSX.Element {
 
       newAdapter.on('sessionStopped', () => {
         setIsRecognizing(false)
+        if (elapsedTimerRef.current) {
+          clearInterval(elapsedTimerRef.current)
+          elapsedTimerRef.current = null
+        }
+      })
+
+      newAdapter.on('idleTimeout', () => {
+        setError('idle-timeout')
+        setIsRecognizing(false)
+      })
+
+      newAdapter.on('maxDurationReached', () => {
+        setError('max-duration')
+        setIsRecognizing(false)
       })
 
       await newAdapter.start()
+
+      elapsedTimerRef.current = setInterval(() => {
+        setElapsedSeconds((s) => s + 1)
+      }, 1000)
 
       setAdapter(newAdapter)
       setIsRecognizing(true)
@@ -199,7 +234,12 @@ export default function SpeechRecognitionCard(): React.JSX.Element {
   return (
     <Card className="flex flex-col h-full flex-1 max-lg:flex-2 p-0 gap-2">
       <Card.Header className="shrink-0 flex-row! items-center justify-between p-0 pt-2 px-3">
-        <h3 className="text-sm font-medium">{t('bible.speech.title')}</h3>
+        <div className="flex items-center gap-1">
+          <h3 className="text-sm font-medium">{t('bible.speech.title')}</h3>
+          <span className="text-xs text-muted tabular-nums ml-1">
+            {formatElapsed(elapsedSeconds)}
+          </span>
+        </div>
         <div className="flex items-center gap-1 shrink-0">
           <Button
             size="sm"
@@ -232,6 +272,9 @@ export default function SpeechRecognitionCard(): React.JSX.Element {
             {error === 'network-offline' && t('bible.speech.networkOffline')}
             {error === 'config-required' && t('bible.speech.configRequired')}
             {error === 'start-failed' && t('bible.speech.startFailed')}
+            {error === 'idle-timeout' && t('bible.speech.idleTimeout')}
+            {error === 'max-duration' && t('bible.speech.maxDuration')}
+            {error === 'error-retry-exceeded' && t('bible.speech.errorRetryExceeded')}
           </div>
         )}
 
