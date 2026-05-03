@@ -227,7 +227,7 @@ export default function SpeechRecognitionCard(): React.JSX.Element {
   const canStart = !isRecognizing && azureSpeech?.region && isOnline
 
   return (
-    <Card className="flex flex-col h-full flex-1 max-lg:flex-2 p-0 gap-2">
+    <Card className="flex flex-col h-full p-0 gap-2">
       <Card.Header className="shrink-0 flex-row! items-center justify-between p-0 pt-2 px-3">
         <div className="flex items-center gap-1">
           <h3 className="text-sm font-medium">{t('bible.speech.title')}</h3>

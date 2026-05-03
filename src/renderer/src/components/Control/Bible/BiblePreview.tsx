@@ -309,7 +309,7 @@ export function BiblePreview({
       : ''
 
   return (
-    <Card className="flex flex-col h-full flex-1 max-lg:flex-[3] p-0 gap-2">
+    <Card className="flex flex-col h-full flex-1 max-lg:flex-[6] p-0 gap-2">
       <Card.Header className="shrink-0 flex-row! items-center justify-between p-0 pt-2">
         <h2 className="text-lg pl-5">
           {isSearchMode ? t('bible.search.title') : `${bookName}${chapterSuffix}`}
