@@ -188,6 +188,38 @@ describe('matchBookName', () => {
     })
   })
 
+  describe('Azure speech recognition fuzzy cases (sliding window)', () => {
+    it('matches 創世紀 → 創世記 (紀/記 off by one char)', () => {
+      const result = matchBookName('創世紀')
+      expect(result).not.toBeNull()
+      expect(result?.bookNumber).toBe(1)
+    })
+
+    it('matches with long prefix: 然後我在這裡讀創世紀', () => {
+      const result = matchBookName('然後我在這裡讀創世紀')
+      expect(result).not.toBeNull()
+      expect(result?.bookNumber).toBe(1)
+    })
+
+    it('matches 加拉泰書 → 加拉太書 (泰/太 off by one char)', () => {
+      const result = matchBookName('加拉泰書')
+      expect(result).not.toBeNull()
+      expect(result?.bookNumber).toBe(48)
+    })
+
+    it('matches 立位劑 → 利未記 via pinyin', () => {
+      const result = matchBookName('立位劑')
+      expect(result).not.toBeNull()
+      expect(result?.bookNumber).toBe(3)
+    })
+
+    it('matches 使圖形傳 → 使徒行傳 via pinyin', () => {
+      const result = matchBookName('使圖形傳')
+      expect(result).not.toBeNull()
+      expect(result?.bookNumber).toBe(44)
+    })
+  })
+
   describe('edge cases', () => {
     it('returns null for empty string', () => {
       expect(matchBookName('')).toBeNull()

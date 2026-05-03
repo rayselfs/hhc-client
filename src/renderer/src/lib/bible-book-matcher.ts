@@ -161,38 +161,23 @@ function fuzzyMatch(query: string, threshold: number = 0.6): BookMatch | null {
   for (let i = 0; i < BOOK_NAMES.length; i++) {
     const book = BOOK_NAMES[i]
 
-    const normalizedZhTW = normalizeText(book.zhTW)
-    const normalizedZhCN = normalizeText(book.zhCN)
-    const normalizedEn = normalizeText(book.en)
+    const candidates = [normalizeText(book.zhTW), normalizeText(book.zhCN), normalizeText(book.en)]
 
-    if (normalized.includes(normalizedZhTW)) {
-      const config = BIBLE_BOOKS.find((b) => b.code.toLowerCase() === book.code)
-      if (config) {
-        return { bookNumber: config.number, confidence: 'fuzzy', score: 1.0 }
+    for (const candidate of candidates) {
+      if (normalized.includes(candidate)) {
+        const config = BIBLE_BOOKS.find((b) => b.code.toLowerCase() === book.code)
+        if (config) {
+          return { bookNumber: config.number, confidence: 'fuzzy', score: 1.0 }
+        }
       }
     }
 
-    if (normalized.includes(normalizedZhCN)) {
-      const config = BIBLE_BOOKS.find((b) => b.code.toLowerCase() === book.code)
-      if (config) {
-        return { bookNumber: config.number, confidence: 'fuzzy', score: 1.0 }
-      }
+    let maxSimilarity = 0
+    for (const candidate of candidates) {
+      const sim = slidingWindowSimilarity(normalized, candidate)
+      if (sim > maxSimilarity) maxSimilarity = sim
     }
 
-    if (normalized.includes(normalizedEn)) {
-      const config = BIBLE_BOOKS.find((b) => b.code.toLowerCase() === book.code)
-      if (config) {
-        return { bookNumber: config.number, confidence: 'fuzzy', score: 1.0 }
-      }
-    }
-
-    const similarities = [
-      calculateLevenshteinSimilarity(normalized, normalizedZhTW),
-      calculateLevenshteinSimilarity(normalized, normalizedZhCN),
-      calculateLevenshteinSimilarity(normalized, normalizedEn)
-    ]
-
-    const maxSimilarity = Math.max(...similarities)
     if (maxSimilarity >= threshold && maxSimilarity > bestScore) {
       const config = BIBLE_BOOKS.find((b) => b.code.toLowerCase() === book.code)
       if (config) {
@@ -203,6 +188,22 @@ function fuzzyMatch(query: string, threshold: number = 0.6): BookMatch | null {
   }
 
   return bestMatch
+}
+
+// Slide a window of bookName's length across query, return best Levenshtein similarity
+function slidingWindowSimilarity(query: string, bookName: string): number {
+  if (query.length < bookName.length) {
+    return calculateLevenshteinSimilarity(query, bookName)
+  }
+
+  let best = 0
+  const windowLen = bookName.length
+  for (let i = 0; i <= query.length - windowLen; i++) {
+    const window = query.substring(i, i + windowLen)
+    const sim = calculateLevenshteinSimilarity(window, bookName)
+    if (sim > best) best = sim
+  }
+  return best
 }
 
 function calculateSimilarity(str1: string, str2: string): number {
