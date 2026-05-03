@@ -134,8 +134,49 @@ function collectNumberAfter(
   return null
 }
 
+const SPEECH_CORRECTIONS: [RegExp, string][] = [
+  [/說/g, '書'],
+  [/招/g, '章'],
+  [/結/g, '節'],
+  [/借/g, '節'],
+  [/紀/g, '記']
+]
+
+function correctSpeechErrors(text: string): string {
+  let result = text
+  for (const [pattern, replacement] of SPEECH_CORRECTIONS) {
+    result = result.replace(pattern, replacement)
+  }
+  return result
+}
+
+function extractFirstVerseFromRange(
+  tokens: string[],
+  start: number,
+  end: number
+): { value: number; startIdx: number } | null {
+  if (end - start < 2) return null
+
+  const hasLiang = tokens[end - 1] === 'liang'
+  if (!hasLiang) return null
+
+  const firstToken = tokens[start]
+  if (isDigitToken(firstToken)) {
+    return { value: parseInt(firstToken, 10), startIdx: start }
+  }
+  if (isPinyinNumeral(firstToken) && firstToken !== 'liang') {
+    const val = PINYIN_NUMERALS[firstToken]
+    if (val !== undefined && val < 10) {
+      return { value: val, startIdx: start }
+    }
+  }
+
+  return null
+}
+
 function parsePinyinVerse(text: string): ParsedVerse | null {
-  const cleaned = text.replace(/[。，、！？.,!?；：…\s]/g, '').replace(/第/g, '')
+  const corrected = correctSpeechErrors(text)
+  const cleaned = corrected.replace(/[。，、！？.,!?；：…\s]/g, '').replace(/第/g, '')
   if (!cleaned) return null
 
   const tokens = pinyin(cleaned, { toneType: 'none', type: 'array' })
@@ -164,7 +205,9 @@ function parsePinyinVerse(text: string): ParsedVerse | null {
   }
 
   if (verseMarkerIdx > afterZhang) {
-    const verseResult = collectNumberBefore(tokens, verseMarkerIdx)
+    const verseResult =
+      extractFirstVerseFromRange(tokens, afterZhang, verseMarkerIdx) ??
+      collectNumberBefore(tokens, verseMarkerIdx)
     if (verseResult) verse = verseResult.value
   } else if (verseMarkerIdx === -1) {
     const verseResult = collectNumberAfter(tokens, afterZhang)

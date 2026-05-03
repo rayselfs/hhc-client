@@ -247,7 +247,7 @@ describe('parseVerseReference', () => {
 
     it('handles real Azure output with prefix', () => {
       expect(parseVerseReference('然後我在這裡讀創世紀5章3節')).toEqual({
-        book: '然後我在這裡讀創世紀',
+        book: '然後我在這裡讀創世記',
         chapter: 5,
         verse: 3
       })
@@ -345,5 +345,42 @@ describe('formatVerseReference', () => {
 
   it('formats in English style for en-US', () => {
     expect(formatVerseReference(verse, 'en-US')).toBe('使徒行傳 1:1')
+  })
+})
+
+describe('speech error correction', () => {
+  it('corrects 說→書 (以賽亞說 → 以賽亞書)', () => {
+    const result = parseVerseReference('以賽亞說49章5節')
+    expect(result).toEqual({ book: '以賽亞書', chapter: 49, verse: 5 })
+  })
+
+  it('corrects 招→章 (49招 → 49章)', () => {
+    const result = parseVerseReference('以賽亞書49招5節')
+    expect(result).toEqual({ book: '以賽亞書', chapter: 49, verse: 5 })
+  })
+
+  it('corrects multiple errors in one input', () => {
+    const result = parseVerseReference('以賽亞說49招5結')
+    expect(result).toEqual({ book: '以賽亞書', chapter: 49, verse: 5 })
+  })
+
+  it('corrects 紀→記 (創世紀 → 創世記)', () => {
+    const result = parseVerseReference('創世紀1章1節')
+    expect(result).toEqual({ book: '創世記', chapter: 1, verse: 1 })
+  })
+})
+
+describe('verse range pattern (X Y 兩節)', () => {
+  it('extracts first verse from 五六兩節', () => {
+    const result = parseVerseReference('以賽亞書49章五六兩節')
+    expect(result).not.toBeNull()
+    expect(result!.chapter).toBe(49)
+    expect(result!.verse).toBe(5)
+  })
+
+  it('extracts first verse from digit range (56兩節)', () => {
+    const result = parseVerseReference('以賽亞書49章56兩節')
+    expect(result).not.toBeNull()
+    expect(result!.verse).toBe(5)
   })
 })
