@@ -188,6 +188,80 @@ describe('parseVerseReference', () => {
     })
   })
 
+  describe('Azure speech homophones (pinyin-based parsing)', () => {
+    it('handles 張 as 章 (zhang homophone)', () => {
+      expect(parseVerseReference('約翰福音5張3節')).toEqual({
+        book: '約翰福音',
+        chapter: 5,
+        verse: 3
+      })
+    })
+
+    it('handles 結 as 節 (jie homophone)', () => {
+      expect(parseVerseReference('創世記1章1結')).toEqual({
+        book: '創世記',
+        chapter: 1,
+        verse: 1
+      })
+    })
+
+    it('handles 簡 as 節 (near-phone jian)', () => {
+      expect(parseVerseReference('羅馬書3章一簡')).toEqual({
+        book: '羅馬書',
+        chapter: 3,
+        verse: 1
+      })
+    })
+
+    it('handles 集 as 節 (near-phone ji)', () => {
+      expect(parseVerseReference('薩摩爾季下13章一集')).toEqual({
+        book: '薩摩爾季下',
+        chapter: 13,
+        verse: 1
+      })
+    })
+
+    it('handles 張 with no verse marker', () => {
+      expect(parseVerseReference('使圖形傳6張')).toEqual({
+        book: '使圖形傳',
+        chapter: 6,
+        verse: 1
+      })
+    })
+
+    it('handles 張 + Arabic verse without marker', () => {
+      expect(parseVerseReference('約翰福音5張3')).toEqual({
+        book: '約翰福音',
+        chapter: 5,
+        verse: 3
+      })
+    })
+
+    it('handles 兩 as verse number 2', () => {
+      expect(parseVerseReference('立魏計3章兩節')).toEqual({
+        book: '立魏計',
+        chapter: 3,
+        verse: 2
+      })
+    })
+
+    it('handles real Azure output with prefix', () => {
+      expect(parseVerseReference('然後我在這裡讀創世紀5章3節')).toEqual({
+        book: '然後我在這裡讀創世紀',
+        chapter: 5,
+        verse: 3
+      })
+    })
+
+    it('handles Azure output with trailing text after verse marker', () => {
+      expect(parseVerseReference('麻辣雞書3章5節來一下')).toEqual({
+        book: '麻辣雞書',
+        chapter: 3,
+        verse: 5
+      })
+    })
+  })
+
   describe('natural language prefixes', () => {
     it('parses with "我今天要講" prefix', () => {
       const result = parseVerseReference('我今天要講使徒行傳一章一節')

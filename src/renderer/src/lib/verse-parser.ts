@@ -1,21 +1,4 @@
-/**
- * Parse verse references from speech recognition text
- * Supports Chinese numerals, Arabic numerals, and English book names
- * Can extract verse references from natural language sentences
- *
- * Examples:
- * - "使徒行傳一章一節" → { book: "使徒行傳", chapter: 1, verse: 1 }
- * - "使徒行傳1章1節" → { book: "使徒行傳", chapter: 1, verse: 1 }
- * - "使徒行傳第一章第一節" → { book: "使徒行傳", chapter: 1, verse: 1 }
- * - "Acts 1:1" → { book: "Acts", chapter: 1, verse: 1 }
- * - "使徒行傳一章" → { book: "使徒行傳", chapter: 1, verse: 1 } (default verse = 1)
- * - "我今天要講使徒行傳一章一節" → { book: "我今天要講使徒行傳", chapter: 1, verse: 1 }
- * - "請翻到約翰福音3章16節" → { book: "請翻到約翰福音", chapter: 3, verse: 16 }
- * - "使徒行傳一" → null (invalid - missing unit)
- *
- * Note: Prefixes are included in the book name. Use matchBookName() for fuzzy matching
- * to find the actual book from the extracted book name with prefix.
- */
+import { pinyin } from 'pinyin-pro'
 
 export interface ParsedVerse {
   book: string
@@ -23,44 +6,45 @@ export interface ParsedVerse {
   verse: number
 }
 
-// Chinese numeral mapping
-const CHINESE_NUMERALS: Record<string, number> = {
-  一: 1,
-  二: 2,
-  三: 3,
-  四: 4,
-  五: 5,
-  六: 6,
-  七: 7,
-  八: 8,
-  九: 9,
-  十: 10,
-  百: 100,
-  千: 1000
+// pinyin token → number value (章 "zhang" and 節 "jie" are matched separately as markers)
+const PINYIN_NUMERALS: Record<string, number> = {
+  yi: 1,
+  er: 2,
+  san: 3,
+  si: 4,
+  wu: 5,
+  liu: 6,
+  qi: 7,
+  ba: 8,
+  jiu: 9,
+  shi: 10,
+  bai: 100,
+  qian: 1000,
+  liang: 2
 }
 
-/**
- * Convert Chinese numerals to Arabic numbers
- * Examples:
- * - "一" → 1
- * - "十" → 10
- * - "十一" → 11
- * - "二十" → 20
- * - "二十一" → 21
- * - "一百" → 100
- * - "一百二十三" → 123
- */
-function parseChineseNumeral(text: string): number | null {
-  if (!text) return null
+function isPinyinNumeral(token: string): boolean {
+  return token in PINYIN_NUMERALS
+}
+
+function isDigitToken(token: string): boolean {
+  return /^\d+$/.test(token)
+}
+
+function isVerseMarker(token: string): boolean {
+  return token === 'jie' || token === 'ji' || token === 'jian'
+}
+
+// ["er","shi","yi"] → 21, ["liang"] → 2, ["yi","bai"] → 100
+function parsePinyinNumeral(tokens: string[]): number | null {
+  if (tokens.length === 0) return null
 
   let result = 0
   let current = 0
   let lastWasMultiplier = false
 
-  for (let i = 0; i < text.length; i++) {
-    const char = text[i]
-    const value = CHINESE_NUMERALS[char]
-
+  for (const token of tokens) {
+    const value = PINYIN_NUMERALS[token]
     if (value === undefined) return null
 
     if (value >= 10) {
@@ -82,10 +66,116 @@ function parseChineseNumeral(text: string): number | null {
   return result
 }
 
-/**
- * Parse verse reference from text
- * Returns null if format is invalid
- */
+function collectNumberBefore(
+  tokens: string[],
+  endIdx: number
+): { value: number; startIdx: number } | null {
+  if (endIdx <= 0) return null
+
+  let i = endIdx - 1
+  const digitTokens: string[] = []
+  while (i >= 0 && isDigitToken(tokens[i])) {
+    digitTokens.unshift(tokens[i])
+    i--
+  }
+  if (digitTokens.length > 0) {
+    const value = parseInt(digitTokens.join(''), 10)
+    if (value > 0) return { value, startIdx: i + 1 }
+  }
+
+  i = endIdx - 1
+  const numeralTokens: string[] = []
+  while (i >= 0 && isPinyinNumeral(tokens[i])) {
+    numeralTokens.unshift(tokens[i])
+    i--
+  }
+  if (i >= 0 && tokens[i] === 'di') {
+    i--
+  }
+  if (numeralTokens.length > 0) {
+    const value = parsePinyinNumeral(numeralTokens)
+    if (value !== null && value > 0) return { value, startIdx: i + 1 }
+  }
+
+  return null
+}
+
+function collectNumberAfter(
+  tokens: string[],
+  startIdx: number
+): { value: number; endIdx: number } | null {
+  if (startIdx >= tokens.length) return null
+
+  let i = startIdx
+  const digitTokens: string[] = []
+  while (i < tokens.length && isDigitToken(tokens[i])) {
+    digitTokens.push(tokens[i])
+    i++
+  }
+  if (digitTokens.length > 0) {
+    const value = parseInt(digitTokens.join(''), 10)
+    if (value > 0) return { value, endIdx: i }
+  }
+
+  i = startIdx
+  if (i < tokens.length && tokens[i] === 'di') {
+    i++
+  }
+  const numeralTokens: string[] = []
+  while (i < tokens.length && isPinyinNumeral(tokens[i])) {
+    numeralTokens.push(tokens[i])
+    i++
+  }
+  if (numeralTokens.length > 0) {
+    const value = parsePinyinNumeral(numeralTokens)
+    if (value !== null && value > 0) return { value, endIdx: i }
+  }
+
+  return null
+}
+
+function parsePinyinVerse(text: string): ParsedVerse | null {
+  const cleaned = text.replace(/[。，、！？.,!?；：…\s]/g, '').replace(/第/g, '')
+  if (!cleaned) return null
+
+  const tokens = pinyin(cleaned, { toneType: 'none', type: 'array' })
+
+  const zhangIdx = tokens.indexOf('zhang')
+  if (zhangIdx < 1) return null
+
+  const chapterResult = collectNumberBefore(tokens, zhangIdx)
+  if (!chapterResult) return null
+
+  const book = cleaned.slice(0, chapterResult.startIdx).trim()
+  if (!book) return null
+
+  let verse = 1
+  const afterZhang = zhangIdx + 1
+
+  let verseMarkerIdx = -1
+  for (let i = afterZhang; i < tokens.length; i++) {
+    if (isVerseMarker(tokens[i])) {
+      verseMarkerIdx = i
+      break
+    }
+    if (!isDigitToken(tokens[i]) && !isPinyinNumeral(tokens[i]) && tokens[i] !== 'di') {
+      break
+    }
+  }
+
+  if (verseMarkerIdx > afterZhang) {
+    const verseResult = collectNumberBefore(tokens, verseMarkerIdx)
+    if (verseResult) verse = verseResult.value
+  } else if (verseMarkerIdx === -1) {
+    const verseResult = collectNumberAfter(tokens, afterZhang)
+    if (verseResult) verse = verseResult.value
+  }
+
+  if (verse <= 0) return null
+
+  return { book, chapter: chapterResult.value, verse }
+}
+
 export function parseVerseReference(text: string): ParsedVerse | null {
   if (!text) return null
 
@@ -101,43 +191,9 @@ export function parseVerseReference(text: string): ParsedVerse | null {
     return null
   }
 
-  const arabicMatch = text.match(/(.+?)(\d+)章(?:(\d+)節)?/)
-  if (arabicMatch) {
-    const book = arabicMatch[1].trim()
-    const chapter = parseInt(arabicMatch[2], 10)
-    const verse = arabicMatch[3] ? parseInt(arabicMatch[3], 10) : 1
-
-    if (book && chapter > 0 && verse > 0) {
-      return { book, chapter, verse }
-    }
-    return null
-  }
-
-  const normalizedText = text.replace(/第/g, '')
-
-  const chineseMatch = normalizedText.match(
-    /(.+?)([一二三四五六七八九十百千]+)章(?:([一二三四五六七八九十百千]+)節)?/
-  )
-  if (chineseMatch) {
-    const book = chineseMatch[1].trim()
-    const chapterText = chineseMatch[2]
-    const verseText = chineseMatch[3]
-
-    const chapter = parseChineseNumeral(chapterText)
-    const verse = verseText ? parseChineseNumeral(verseText) : 1
-
-    if (book && chapter !== null && chapter > 0 && verse !== null && verse > 0) {
-      return { book, chapter, verse }
-    }
-    return null
-  }
-
-  return null
+  return parsePinyinVerse(text)
 }
 
-/**
- * Format parsed verse to standard display format
- */
 export function formatVerseReference(parsed: ParsedVerse, locale: string = 'zh-TW'): string {
   if (locale.startsWith('en')) {
     return `${parsed.book} ${parsed.chapter}:${parsed.verse}`
