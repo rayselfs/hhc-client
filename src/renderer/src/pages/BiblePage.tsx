@@ -234,7 +234,7 @@ export default function BiblePage(): React.JSX.Element {
             projectedPassage={projectedPassage}
             onProjected={setProjectedPassage}
           />
-          <div className="flex flex-col gap-4 flex-1 max-lg:flex-[4]">
+          <div className="flex flex-col gap-4 flex-1 max-lg:flex-4">
             <div className="flex-1 min-h-0">
               <BibleMultiFunction onProjected={setProjectedPassage} />
             </div>

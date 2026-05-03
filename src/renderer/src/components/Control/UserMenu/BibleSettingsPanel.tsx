@@ -239,7 +239,7 @@ export default function BibleSettingsPanel(): React.JSX.Element {
             }
           }}
           placeholder="e.g. 1h30m, 01:30:00"
-          className="w-40 rounded-full"
+          className="rounded-full w-full"
         />
       </div>
     </div>
