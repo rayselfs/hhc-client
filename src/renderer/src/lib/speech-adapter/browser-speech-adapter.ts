@@ -17,6 +17,9 @@ export class BrowserSpeechAdapter implements SpeechAdapter {
   private config: SpeechAdapterConfig
   private onlineHandler: (() => void) | null = null
   private offlineHandler: (() => void) | null = null
+  private incompleteBuffer = ''
+  private bufferTimer: ReturnType<typeof setTimeout> | null = null
+  private readonly BUFFER_TIMEOUT = 5000
 
   constructor(config: SpeechAdapterConfig) {
     this.config = config
@@ -78,13 +81,7 @@ export class BrowserSpeechAdapter implements SpeechAdapter {
         if (e.result.reason === sdk.ResultReason.RecognizedSpeech) {
           const text = e.result.text
           console.log('[Adapter] Azure recognized:', text)
-          const parsed = this.parseAndMatch(text)
-          if (parsed) {
-            console.log('[Adapter] Parse succeeded:', parsed)
-            this.emit('recognized', parsed)
-          } else {
-            console.warn('[Adapter] Parse failed for:', text)
-          }
+          this.handleRecognizedText(text)
         }
       }
 
@@ -135,6 +132,8 @@ export class BrowserSpeechAdapter implements SpeechAdapter {
       return
     }
 
+    this.clearBuffer()
+
     return new Promise((resolve, reject) => {
       this.recognizer!.stopContinuousRecognitionAsync(
         () => {
@@ -171,6 +170,8 @@ export class BrowserSpeechAdapter implements SpeechAdapter {
   }
 
   dispose(): void {
+    this.clearBuffer()
+
     if (this.recognizer) {
       this.recognizer.close()
       this.recognizer = null
@@ -213,6 +214,49 @@ export class BrowserSpeechAdapter implements SpeechAdapter {
       verse: parsed.verse,
       confidence: match.confidence
     }
+  }
+
+  private stripPunctuation(text: string): string {
+    return text.replace(/[。，、！？.,!?；：…]/g, '')
+  }
+
+  private clearBuffer(): void {
+    this.incompleteBuffer = ''
+    if (this.bufferTimer) {
+      clearTimeout(this.bufferTimer)
+      this.bufferTimer = null
+    }
+  }
+
+  private handleRecognizedText(text: string): void {
+    let parsed = this.parseAndMatch(text)
+    if (parsed) {
+      console.log('[Adapter] Parse succeeded:', parsed)
+      this.clearBuffer()
+      this.emit('recognized', parsed)
+      return
+    }
+
+    if (this.incompleteBuffer) {
+      const combined = this.stripPunctuation(this.incompleteBuffer) + this.stripPunctuation(text)
+      console.log('[Adapter] Trying buffer combination:', combined)
+      parsed = this.parseAndMatch(combined)
+      if (parsed) {
+        console.log('[Adapter] Buffer combination succeeded:', parsed)
+        this.clearBuffer()
+        this.emit('recognized', parsed)
+        return
+      }
+    }
+
+    console.warn('[Adapter] Parse failed, buffering:', text)
+    this.clearBuffer()
+    this.incompleteBuffer = text
+    this.bufferTimer = setTimeout(() => {
+      console.log('[Adapter] Buffer expired, clearing:', this.incompleteBuffer)
+      this.incompleteBuffer = ''
+      this.bufferTimer = null
+    }, this.BUFFER_TIMEOUT)
   }
 
   private emit<T extends SpeechAdapterEventType>(event: T, data: SpeechAdapterEventMap[T]): void {
