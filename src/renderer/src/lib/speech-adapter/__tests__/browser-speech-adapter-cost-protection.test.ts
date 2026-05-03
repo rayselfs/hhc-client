@@ -14,6 +14,7 @@ vi.mock('microsoft-cognitiveservices-speech-sdk', () => {
     SpeechConfig: {
       fromSubscription: vi.fn(() => ({
         speechRecognitionLanguage: '',
+        outputFormat: 0,
         setServiceProperty: vi.fn()
       }))
     },
@@ -47,6 +48,12 @@ vi.mock('microsoft-cognitiveservices-speech-sdk', () => {
       fromRecognizer: vi.fn(() => ({
         addPhrase: vi.fn()
       }))
+    },
+    OutputFormat: {
+      Detailed: 1
+    },
+    PropertyId: {
+      SpeechServiceResponse_JsonResult: 'SpeechServiceResponse_JsonResult'
     }
   }
 })
@@ -283,6 +290,80 @@ describe('BrowserSpeechAdapter - Cost Protection', () => {
 
       vi.advanceTimersByTime(120_000)
       expect(handler).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('confidence filtering', () => {
+    function makeResult(text: string, confidence: number) {
+      return {
+        result: {
+          reason: 3,
+          text,
+          properties: {
+            getProperty: vi.fn(() => JSON.stringify({ NBest: [{ Confidence: confidence }] }))
+          }
+        }
+      }
+    }
+
+    it('accepts high-confidence results (>= 0.7)', async () => {
+      const handler = vi.fn()
+      const adapter = createAdapter()
+      adapter.on('recognized', handler)
+
+      await startAdapter(adapter)
+      const instance = getRecognizerInstance()
+      const recognizedCb = instance.recognized as (_s: unknown, e: unknown) => void
+
+      recognizedCb(null, makeResult('創世記第一章', 0.85))
+
+      adapter.dispose()
+    })
+
+    it('ignores low-confidence results (< 0.4)', async () => {
+      const handler = vi.fn()
+      const adapter = createAdapter()
+      adapter.on('recognized', handler)
+
+      await startAdapter(adapter)
+      const instance = getRecognizerInstance()
+      const recognizedCb = instance.recognized as (_s: unknown, e: unknown) => void
+
+      recognizedCb(null, makeResult('random noise', 0.2))
+
+      expect(handler).not.toHaveBeenCalled()
+      adapter.dispose()
+    })
+
+    it('accepts medium-confidence results (0.4-0.7) with warning', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const adapter = createAdapter()
+
+      await startAdapter(adapter)
+      const instance = getRecognizerInstance()
+      const recognizedCb = instance.recognized as (_s: unknown, e: unknown) => void
+
+      recognizedCb(null, makeResult('可能的文字', 0.55))
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Medium confidence'),
+        expect.any(Number),
+        expect.any(String)
+      )
+      warnSpy.mockRestore()
+      adapter.dispose()
+    })
+
+    it('passes through when confidence is unavailable', async () => {
+      const adapter = createAdapter()
+
+      await startAdapter(adapter)
+      const instance = getRecognizerInstance()
+      const recognizedCb = instance.recognized as (_s: unknown, e: unknown) => void
+
+      recognizedCb(null, { result: { reason: 3, text: 'no properties' } })
+
+      adapter.dispose()
     })
   })
 })

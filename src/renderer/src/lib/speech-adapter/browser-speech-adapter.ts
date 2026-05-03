@@ -140,6 +140,7 @@ export class BrowserSpeechAdapter implements SpeechAdapter {
 
       const language = this.config.language || this.detectLanguage()
       speechConfig.speechRecognitionLanguage = language
+      speechConfig.outputFormat = sdk.OutputFormat.Detailed
 
       speechConfig.setServiceProperty(
         'InitialSilenceTimeoutMs',
@@ -171,7 +172,17 @@ export class BrowserSpeechAdapter implements SpeechAdapter {
         if (e.result.reason === sdk.ResultReason.RecognizedSpeech) {
           this.recordActivity()
           const text = e.result.text
-          console.log('[Adapter] Azure recognized:', text)
+          const confidence = this.extractConfidence(e.result)
+
+          if (confidence !== null && confidence < 0.4) {
+            console.log('[Adapter] Low confidence (%.2f), ignoring: %s', confidence, text)
+            return
+          }
+          if (confidence !== null && confidence < 0.7) {
+            console.warn('[Adapter] Medium confidence (%.2f): %s', confidence, text)
+          }
+
+          console.log('[Adapter] Azure recognized (confidence=%.2f): %s', confidence, text)
           this.handleRecognizedText(text)
         }
       }
@@ -294,6 +305,21 @@ export class BrowserSpeechAdapter implements SpeechAdapter {
     if (locale.startsWith('zh')) return 'zh-TW'
     if (locale.startsWith('en')) return 'en-US'
     return 'en-US'
+  }
+
+  private extractConfidence(result: sdk.SpeechRecognitionResult): number | null {
+    try {
+      const json = result.properties.getProperty(sdk.PropertyId.SpeechServiceResponse_JsonResult)
+      if (!json) return null
+      const parsed = JSON.parse(json)
+      const nBest = parsed?.NBest
+      if (Array.isArray(nBest) && nBest.length > 0) {
+        return nBest[0].Confidence ?? null
+      }
+      return null
+    } catch {
+      return null
+    }
   }
 
   private parseAndMatch(text: string): SpeechRecognizedResult | null {
