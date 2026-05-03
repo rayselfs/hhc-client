@@ -1,6 +1,7 @@
 import * as sdk from 'microsoft-cognitiveservices-speech-sdk'
 import { parseVerseReference } from '../verse-parser'
 import { matchBookName } from '../bible-book-matcher'
+import { getBiblePhrases } from './bible-phrases'
 import type {
   SpeechAdapter,
   SpeechAdapterConfig,
@@ -153,6 +154,11 @@ export class BrowserSpeechAdapter implements SpeechAdapter {
 
       const audioConfig = sdk.AudioConfig.fromDefaultMicrophoneInput()
       this.recognizer = new sdk.SpeechRecognizer(speechConfig, audioConfig)
+
+      const phraseList = sdk.PhraseListGrammar.fromRecognizer(this.recognizer)
+      for (const phrase of getBiblePhrases(language)) {
+        phraseList.addPhrase(phrase)
+      }
 
       this.recognizer.recognizing = (_s, e) => {
         if (e.result.reason === sdk.ResultReason.RecognizingSpeech) {

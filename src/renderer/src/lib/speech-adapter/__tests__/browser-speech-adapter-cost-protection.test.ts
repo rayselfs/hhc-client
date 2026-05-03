@@ -5,7 +5,8 @@ vi.mock('../../verse-parser', () => ({
 }))
 
 vi.mock('../../bible-book-matcher', () => ({
-  matchBookName: vi.fn(() => null)
+  matchBookName: vi.fn(() => null),
+  getAllBookNames: vi.fn(() => [])
 }))
 
 vi.mock('microsoft-cognitiveservices-speech-sdk', () => {
@@ -41,6 +42,11 @@ vi.mock('microsoft-cognitiveservices-speech-sdk', () => {
     },
     ServicePropertyChannel: {
       UriQueryParameter: 0
+    },
+    PhraseListGrammar: {
+      fromRecognizer: vi.fn(() => ({
+        addPhrase: vi.fn()
+      }))
     }
   }
 })
