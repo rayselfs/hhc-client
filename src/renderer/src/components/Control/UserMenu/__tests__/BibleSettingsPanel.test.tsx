@@ -24,6 +24,24 @@ vi.mock('@renderer/lib/azure-speech-key-storage', () => ({
   deleteAzureSpeechKey: vi.fn()
 }))
 
+vi.mock('microsoft-cognitiveservices-speech-sdk', () => ({
+  SpeechConfig: {
+    fromSubscription: vi.fn(() => ({ speechRecognitionLanguage: '' }))
+  },
+  SpeechRecognizer: vi.fn().mockImplementation(function () {
+    const instance = {
+      sessionStarted: null as (() => void) | null,
+      canceled: null as (() => void) | null,
+      startContinuousRecognitionAsync: vi.fn((onSuccess: () => void) => {
+        onSuccess()
+        if (instance.sessionStarted) instance.sessionStarted()
+      }),
+      close: vi.fn()
+    }
+    return instance
+  })
+}))
+
 const mockSettingsStore = {
   azureSpeech: null as { region: string } | null,
   setAzureSpeech: vi.fn()
@@ -55,7 +73,7 @@ describe('BibleSettingsPanel', () => {
       expect(screen.getByPlaceholderText('Enter your API key')).toBeInTheDocument()
     })
 
-    expect(screen.getByText('Azure Speech Region')).toBeInTheDocument()
+    expect(screen.getByLabelText('Azure Speech Service Region')).toBeInTheDocument()
     expect(screen.getByText('Save')).toBeInTheDocument()
     expect(screen.getByText('Test Connection')).toBeInTheDocument()
   })
@@ -101,7 +119,7 @@ describe('BibleSettingsPanel', () => {
     expect(input.type).toBe('password')
   })
 
-  it('saves API key and region', async () => {
+  it('saves API key and region after successful test', async () => {
     const user = userEvent.setup()
     render(<BibleSettingsPanel />)
 
@@ -111,6 +129,13 @@ describe('BibleSettingsPanel', () => {
 
     const input = screen.getByPlaceholderText('Enter your API key')
     await user.type(input, 'new-api-key')
+
+    const testButton = screen.getByText('Test Connection')
+    await user.click(testButton)
+
+    await waitFor(() => {
+      expect(vi.mocked(toast).success).toHaveBeenCalledWith('Connection test successful')
+    })
 
     const saveButton = screen.getByText('Save')
     await user.click(saveButton)
@@ -124,7 +149,7 @@ describe('BibleSettingsPanel', () => {
     })
   })
 
-  it('clears settings when API key is empty', async () => {
+  it('disables save when clearing existing key without re-testing', async () => {
     const user = userEvent.setup()
     vi.mocked(azureSpeechKeyStorage.loadAzureSpeechKey).mockResolvedValue('existing-key')
     mockSettingsStore.azureSpeech = { region: 'eastasia' }
@@ -140,13 +165,7 @@ describe('BibleSettingsPanel', () => {
     await user.clear(input)
 
     const saveButton = screen.getByText('Save')
-    await user.click(saveButton)
-
-    await waitFor(() => {
-      expect(vi.mocked(azureSpeechKeyStorage.deleteAzureSpeechKey)).toHaveBeenCalled()
-      expect(mockSettingsStore.setAzureSpeech).toHaveBeenCalledWith(null)
-      expect(vi.mocked(toast).success).toHaveBeenCalledWith('Azure Speech settings cleared')
-    })
+    expect(saveButton).toBeDisabled()
   })
 
   it('shows error toast when save fails', async () => {
@@ -161,6 +180,13 @@ describe('BibleSettingsPanel', () => {
 
     const input = screen.getByPlaceholderText('Enter your API key')
     await user.type(input, 'test-key')
+
+    const testButton = screen.getByText('Test Connection')
+    await user.click(testButton)
+
+    await waitFor(() => {
+      expect(vi.mocked(toast).success).toHaveBeenCalledWith('Connection test successful')
+    })
 
     const saveButton = screen.getByText('Save')
     await user.click(saveButton)

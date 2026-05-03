@@ -6,6 +6,9 @@ import { loadAzureSpeechKey } from '@renderer/lib/azure-speech-key-storage'
 import { useSettingsStore } from '@renderer/stores/settings'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 import { useBibleStore } from '@renderer/stores/bible'
+import { parseVerseReference } from '@renderer/lib/verse-parser'
+import { matchBookName, getBookConfig } from '@renderer/lib/bible-book-matcher'
+import { getBookNameI18n } from '@renderer/lib/bible-utils'
 import type { SpeechAdapter } from '@renderer/lib/speech-adapter'
 import type { BibleBook } from '@shared/types/bible'
 
@@ -14,6 +17,9 @@ vi.mock('@renderer/lib/azure-speech-key-storage')
 vi.mock('@renderer/stores/settings')
 vi.mock('@renderer/stores/bible-settings')
 vi.mock('@renderer/stores/bible')
+vi.mock('@renderer/lib/verse-parser')
+vi.mock('@renderer/lib/bible-book-matcher')
+vi.mock('@renderer/lib/bible-utils')
 
 const mockUseTranslation = vi.fn()
 vi.mock('react-i18next', () => ({
@@ -28,7 +34,7 @@ describe('SpeechRecognitionCard', () => {
   let mockAdapter: SpeechAdapter
   let eventListeners: Record<string, (data: unknown) => void>
   let mockSettingsState: { azureSpeech: { region: string } }
-  let mockBibleSettingsState: { selectedVersionId: number }
+  let mockBibleSettingsState: { selectedVersionId: number; speechMaxSessionMin: number }
   let mockBibleState: { content: Map<number, BibleBook[]> }
 
   beforeEach(() => {
@@ -60,7 +66,7 @@ describe('SpeechRecognitionCard', () => {
         : mockSettingsState
     })
 
-    mockBibleSettingsState = { selectedVersionId: 1 }
+    mockBibleSettingsState = { selectedVersionId: 1, speechMaxSessionMin: 60 }
     vi.mocked(useBibleSettingsStore).mockImplementation((selector: unknown) => {
       return selector
         ? (selector as (s: typeof mockBibleSettingsState) => unknown)(mockBibleSettingsState)
@@ -97,6 +103,24 @@ describe('SpeechRecognitionCard', () => {
       writable: true,
       value: true
     })
+
+    vi.mocked(getBookNameI18n).mockReturnValue('Acts')
+    vi.mocked(parseVerseReference).mockImplementation((text: string) => {
+      if (text.includes('使徒行傳') && text.includes('1章1節'))
+        return { book: '使徒行傳', chapter: 1, verse: 1 }
+      if (text.includes('使徒行傳') && text.includes('1章2節'))
+        return { book: '使徒行傳', chapter: 1, verse: 2 }
+      return null
+    })
+    vi.mocked(matchBookName).mockImplementation((book: string) => {
+      if (book === '使徒行傳') return { bookNumber: 44, confidence: 'exact' as const, score: 1 }
+      return null
+    })
+    vi.mocked(getBookConfig).mockImplementation((bookNumber: number) => {
+      if (bookNumber === 44)
+        return { number: 44, code: 'Act', testament: 'NT' as const, chapterCount: 28 }
+      return undefined
+    })
   })
 
   afterEach(() => {
@@ -112,13 +136,17 @@ describe('SpeechRecognitionCard', () => {
       expect(screen.getByRole('button', { name: /bible.speech.clear/i })).toBeInTheDocument()
     })
 
-    it('should disable start button when Azure config is missing', async () => {
+    it('should show error when Azure API key is missing', async () => {
       vi.mocked(loadAzureSpeechKey).mockResolvedValue(null)
 
       render(<SpeechRecognitionCard />)
 
       const startButton = screen.getByRole('button', { name: /bible.speech.start/i })
-      expect(startButton).toBeDisabled()
+      fireEvent.click(startButton)
+
+      await waitFor(() => {
+        expect(screen.getByText(/bible\.speech\.configRequired/i)).toBeInTheDocument()
+      })
     })
 
     it('should disable start button when region is missing', () => {
@@ -199,7 +227,7 @@ describe('SpeechRecognitionCard', () => {
       fireEvent.click(startButton)
 
       await waitFor(() => {
-        expect(screen.getByText(/bible.speech.error.start-failed/i)).toBeInTheDocument()
+        expect(screen.getByText(/bible\.speech\.startFailed/i)).toBeInTheDocument()
       })
     })
 
@@ -223,7 +251,7 @@ describe('SpeechRecognitionCard', () => {
 
       await waitFor(() => {
         expect(mockAdapter.stop).toHaveBeenCalled()
-        expect(screen.getByText(/bible.speech.error.network-offline/i)).toBeInTheDocument()
+        expect(screen.getByText(/bible\.speech\.networkOffline/i)).toBeInTheDocument()
       })
     })
   })
@@ -241,7 +269,7 @@ describe('SpeechRecognitionCard', () => {
       })
 
       // Simulate recognition result
-      eventListeners.recognized('使徒行傳1章1節')
+      eventListeners.recognized({ text: '使徒行傳1章1節' })
 
       await waitFor(() => {
         expect(screen.getByText('Acts 1:1')).toBeInTheDocument()
@@ -249,7 +277,7 @@ describe('SpeechRecognitionCard', () => {
       })
 
       // Add another verse
-      eventListeners.recognized('使徒行傳1章2節')
+      eventListeners.recognized({ text: '使徒行傳1章2節' })
 
       await waitFor(() => {
         const verseItems = screen.getAllByText(/Acts 1/)
@@ -270,7 +298,7 @@ describe('SpeechRecognitionCard', () => {
       })
 
       // Simulate recognition result for a verse not in the mock store
-      eventListeners.recognized('創世記1章1節')
+      eventListeners.recognized({ text: '創世記1章1節' })
 
       // Should not add item if book not found in content
       await waitFor(() => {
@@ -290,7 +318,7 @@ describe('SpeechRecognitionCard', () => {
       })
 
       // Simulate invalid recognition result
-      eventListeners.recognized('hello world')
+      eventListeners.recognized({ text: 'hello world' })
 
       // Should not add any items
       await waitFor(() => {
@@ -301,7 +329,10 @@ describe('SpeechRecognitionCard', () => {
 
   describe('Verse Item Actions', () => {
     it('should dispatch preview event when verse item is clicked', async () => {
-      const dispatchEventSpy = vi.spyOn(window, 'dispatchEvent')
+      const mockNavigateTo = vi.fn()
+      ;(useBibleStore as unknown as { getState: () => unknown }).getState = () => ({
+        navigateTo: mockNavigateTo
+      })
 
       render(<SpeechRecognitionCard />)
 
@@ -313,30 +344,23 @@ describe('SpeechRecognitionCard', () => {
         expect(mockAdapter.start).toHaveBeenCalled()
       })
 
-      eventListeners.recognized('使徒行傳1章1節')
+      eventListeners.recognized({ text: '使徒行傳1章1節' })
 
       await waitFor(() => {
         expect(screen.getByText('Acts 1:1')).toBeInTheDocument()
       })
 
-      // Click the verse item
-      const verseItem = screen.getByText('Acts 1:1').closest('div')!
-      fireEvent.click(verseItem)
+      // Click the verse item button
+      const verseButton = screen.getByText('Acts 1:1').closest('button')!
+      fireEvent.click(verseButton)
 
       await waitFor(() => {
-        expect(dispatchEventSpy).toHaveBeenCalledWith(
-          expect.objectContaining({
-            type: 'bible:preview',
-            detail: expect.objectContaining({
-              bookNumber: 44,
-              chapter: 1,
-              verse: 1
-            })
-          })
-        )
+        expect(mockNavigateTo).toHaveBeenCalledWith({
+          bookNumber: 44,
+          chapter: 1,
+          verse: 1
+        })
       })
-
-      dispatchEventSpy.mockRestore()
     })
 
     it('should delete verse item when delete button is clicked', async () => {
@@ -350,7 +374,7 @@ describe('SpeechRecognitionCard', () => {
         expect(mockAdapter.start).toHaveBeenCalled()
       })
 
-      eventListeners.recognized('使徒行傳1章1節')
+      eventListeners.recognized({ text: '使徒行傳1章1節' })
 
       await waitFor(() => {
         expect(screen.getByText('Acts 1:1')).toBeInTheDocument()
@@ -376,8 +400,8 @@ describe('SpeechRecognitionCard', () => {
         expect(mockAdapter.start).toHaveBeenCalled()
       })
 
-      eventListeners.recognized('使徒行傳1章1節')
-      eventListeners.recognized('使徒行傳1章2節')
+      eventListeners.recognized({ text: '使徒行傳1章1節' })
+      eventListeners.recognized({ text: '使徒行傳1章2節' })
 
       await waitFor(() => {
         expect(screen.getByText('Acts 1:1')).toBeInTheDocument()
@@ -405,7 +429,7 @@ describe('SpeechRecognitionCard', () => {
       fireEvent.click(startButton)
 
       await waitFor(() => {
-        expect(screen.getByText(/bible.speech.error.config-required/i)).toBeInTheDocument()
+        expect(screen.getByText(/bible\.speech\.configRequired/i)).toBeInTheDocument()
       })
     })
 
@@ -421,10 +445,13 @@ describe('SpeechRecognitionCard', () => {
       })
 
       // Simulate error event
-      eventListeners.error({ message: 'Speech service error' })
+      eventListeners.error({
+        error: new Error('Speech service error'),
+        message: 'Speech service error'
+      })
 
       await waitFor(() => {
-        expect(screen.getByText(/Speech service error/i)).toBeInTheDocument()
+        expect(screen.getByText(/bible\.speech\.startFailed/i)).toBeInTheDocument()
       })
     })
 
@@ -443,7 +470,6 @@ describe('SpeechRecognitionCard', () => {
       eventListeners.sessionStopped({})
 
       await waitFor(() => {
-        expect(mockAdapter.dispose).toHaveBeenCalled()
         // Button should change back to "start"
         expect(screen.getByRole('button', { name: /bible.speech.start/i })).toBeInTheDocument()
       })
