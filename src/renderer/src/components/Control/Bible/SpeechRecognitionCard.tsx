@@ -13,13 +13,8 @@ import type { SpeechAdapter } from '@renderer/lib/speech-adapter/speech-adapter.
 import { parseVerseReference } from '@renderer/lib/verse-parser'
 import { matchBookName, getBookConfig } from '@renderer/lib/bible-book-matcher'
 import { getBookNameI18n } from '@renderer/lib/bible-utils'
+import { formatDurationHMS } from '@renderer/lib/parse-duration'
 import GlassDivider from '@renderer/components/Common/GlassDivider'
-
-function formatElapsed(totalSeconds: number): string {
-  const m = Math.floor(totalSeconds / 60)
-  const s = totalSeconds % 60
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-}
 
 interface RecognizedVerse {
   id: string
@@ -46,7 +41,7 @@ export default function SpeechRecognitionCard(): React.JSX.Element {
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const elapsedTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const speechMaxSessionMin = useBibleSettingsStore((s) => s.speechMaxSessionMin)
+  const speechMaxSessionSec = useBibleSettingsStore((s) => s.speechMaxSessionSec)
 
   const handleStopRecognition = useCallback((): void => {
     if (elapsedTimerRef.current) {
@@ -164,7 +159,7 @@ export default function SpeechRecognitionCard(): React.JSX.Element {
         subscriptionKey: apiKey,
         region: azureSpeech.region,
         language: locale,
-        maxSessionMs: speechMaxSessionMin * 60 * 1000
+        maxSessionMs: speechMaxSessionSec * 1000
       })
 
       newAdapter.on('recognized', (data) => {
@@ -237,7 +232,7 @@ export default function SpeechRecognitionCard(): React.JSX.Element {
         <div className="flex items-center gap-1">
           <h3 className="text-sm font-medium">{t('bible.speech.title')}</h3>
           <span className="text-xs text-muted tabular-nums ml-1">
-            {formatElapsed(elapsedSeconds)}
+            {formatDurationHMS(elapsedSeconds)}
           </span>
         </div>
         <div className="flex items-center gap-1 shrink-0">

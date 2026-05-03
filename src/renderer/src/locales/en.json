@@ -335,8 +335,7 @@
       "azureSpeechRegion": "Azure Speech Service Region",
       "testConnection": "Test Connection",
       "testing": "Testing...",
-      "maxSessionDuration": "Voice Recognition Max Duration",
-      "maxSessionDurationUnit": "min"
+      "maxSessionDuration": "Voice Recognition Max Duration"
     }
   },
   "error": {

@@ -34,7 +34,7 @@ describe('SpeechRecognitionCard', () => {
   let mockAdapter: SpeechAdapter
   let eventListeners: Record<string, (data: unknown) => void>
   let mockSettingsState: { azureSpeech: { region: string } }
-  let mockBibleSettingsState: { selectedVersionId: number; speechMaxSessionMin: number }
+  let mockBibleSettingsState: { selectedVersionId: number; speechMaxSessionSec: number }
   let mockBibleState: { content: Map<number, BibleBook[]> }
 
   beforeEach(() => {
@@ -66,7 +66,7 @@ describe('SpeechRecognitionCard', () => {
         : mockSettingsState
     })
 
-    mockBibleSettingsState = { selectedVersionId: 1, speechMaxSessionMin: 60 }
+    mockBibleSettingsState = { selectedVersionId: 1, speechMaxSessionSec: 3600 }
     vi.mocked(useBibleSettingsStore).mockImplementation((selector: unknown) => {
       return selector
         ? (selector as (s: typeof mockBibleSettingsState) => unknown)(mockBibleSettingsState)

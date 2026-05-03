@@ -14,13 +14,14 @@ import {
   deleteAzureSpeechKey
 } from '@renderer/lib/azure-speech-key-storage'
 import { toast } from '@heroui/react/toast'
+import { parseDuration, formatDurationHMS } from '@renderer/lib/parse-duration'
 
 export default function BibleSettingsPanel(): React.JSX.Element {
   const { t } = useTranslation()
   const azureSpeech = useSettingsStore((s) => s.azureSpeech)
   const setAzureSpeech = useSettingsStore((s) => s.setAzureSpeech)
-  const speechMaxSessionMin = useBibleSettingsStore((s) => s.speechMaxSessionMin)
-  const setSpeechMaxSessionMin = useBibleSettingsStore((s) => s.setSpeechMaxSessionMin)
+  const speechMaxSessionSec = useBibleSettingsStore((s) => s.speechMaxSessionSec)
+  const setSpeechMaxSessionSec = useBibleSettingsStore((s) => s.setSpeechMaxSessionSec)
 
   const [apiKey, setApiKey] = useState('')
   const [originalApiKey, setOriginalApiKey] = useState('') // Track loaded value for comparison
@@ -30,6 +31,7 @@ export default function BibleSettingsPanel(): React.JSX.Element {
   const [isLoadingKey, setIsLoadingKey] = useState(true)
   const [isTesting, setIsTesting] = useState(false)
   const [testPassed, setTestPassed] = useState(false) // Track if current config passed test
+  const [maxSessionInput, setMaxSessionInput] = useState(formatDurationHMS(speechMaxSessionSec))
 
   useEffect(() => {
     loadAzureSpeechKey()
@@ -190,27 +192,6 @@ export default function BibleSettingsPanel(): React.JSX.Element {
         </Select.Popover>
       </Select>
 
-      <div>
-        <Label className="mb-2 block">{t('preferences.bible.maxSessionDuration')}</Label>
-        <div className="flex items-center gap-2">
-          <Input
-            type="number"
-            variant="secondary"
-            value={String(speechMaxSessionMin)}
-            onChange={(e) => {
-              const val = Math.max(1, Math.min(480, Number(e.target.value) || 60))
-              setSpeechMaxSessionMin(val)
-            }}
-            className="w-24 rounded-full"
-            min={1}
-            max={480}
-          />
-          <span className="text-sm text-muted">
-            {t('preferences.bible.maxSessionDurationUnit')}
-          </span>
-        </div>
-      </div>
-
       <div className="flex gap-2">
         <Button
           variant="primary"
@@ -228,6 +209,38 @@ export default function BibleSettingsPanel(): React.JSX.Element {
         >
           {isTesting ? t('preferences.bible.testing') : t('preferences.bible.testConnection')}
         </Button>
+      </div>
+
+      <div>
+        <Label className="mb-2 block">{t('preferences.bible.maxSessionDuration')}</Label>
+        <Input
+          type="text"
+          variant="secondary"
+          value={maxSessionInput}
+          onChange={(e) => setMaxSessionInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              const sec = parseDuration(maxSessionInput)
+              if (sec !== null && sec > 0) {
+                setSpeechMaxSessionSec(sec)
+                setMaxSessionInput(formatDurationHMS(sec))
+              } else {
+                setMaxSessionInput(formatDurationHMS(speechMaxSessionSec))
+              }
+            }
+          }}
+          onBlur={() => {
+            const sec = parseDuration(maxSessionInput)
+            if (sec !== null && sec > 0) {
+              setSpeechMaxSessionSec(sec)
+              setMaxSessionInput(formatDurationHMS(sec))
+            } else {
+              setMaxSessionInput(formatDurationHMS(speechMaxSessionSec))
+            }
+          }}
+          placeholder="e.g. 1h30m, 01:30:00"
+          className="w-40 rounded-full"
+        />
       </div>
     </div>
   )

@@ -15,7 +15,7 @@ vi.mock('@renderer/lib/persist-storage', () => ({
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 
 beforeEach(() => {
-  useBibleSettingsStore.setState({ fontSize: 90, selectedVersionId: 0 })
+  useBibleSettingsStore.setState({ fontSize: 90, selectedVersionId: 0, speechMaxSessionSec: 3600 })
 })
 
 describe('initial state', () => {
@@ -25,6 +25,10 @@ describe('initial state', () => {
 
   it('starts with selectedVersionId of 0', () => {
     expect(useBibleSettingsStore.getState().selectedVersionId).toBe(0)
+  })
+
+  it('starts with speechMaxSessionSec of 3600', () => {
+    expect(useBibleSettingsStore.getState().speechMaxSessionSec).toBe(3600)
   })
 })
 
@@ -77,7 +81,11 @@ describe('persistence round-trip', () => {
       length: 0,
       key: (index: number) => Object.keys(localStorageMock)[index] ?? null
     })
-    useBibleSettingsStore.setState({ fontSize: 90, selectedVersionId: 0 })
+    useBibleSettingsStore.setState({
+      fontSize: 90,
+      selectedVersionId: 0,
+      speechMaxSessionSec: 3600
+    })
   })
 
   afterEach(() => {
@@ -89,7 +97,7 @@ describe('persistence round-trip', () => {
     const raw = localStorage.getItem('hhc-bible-settings')
     expect(raw).toBeTruthy()
     const parsed = JSON.parse(raw!)
-    expect(parsed.version).toBe(1)
+    expect(parsed.version).toBe(2)
     expect(parsed.state.fontSize).toBe(110)
   })
 
@@ -118,5 +126,64 @@ describe('persistence round-trip', () => {
     const s = useBibleSettingsStore.getState()
     expect(s.fontSize).toBe(90)
     expect(s.selectedVersionId).toBe(0)
+  })
+})
+
+describe('setSpeechMaxSessionSec()', () => {
+  it('updates speechMaxSessionSec', () => {
+    useBibleSettingsStore.getState().setSpeechMaxSessionSec(7200)
+    expect(useBibleSettingsStore.getState().speechMaxSessionSec).toBe(7200)
+  })
+})
+
+describe('migration', () => {
+  let localStorageMock: Record<string, string> = {}
+
+  beforeEach(() => {
+    localStorageMock = {}
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => localStorageMock[key] ?? null,
+      setItem: (key: string, value: string) => {
+        localStorageMock[key] = value
+      },
+      removeItem: (key: string) => {
+        delete localStorageMock[key]
+      },
+      clear: () => {
+        localStorageMock = {}
+      },
+      length: 0,
+      key: (index: number) => Object.keys(localStorageMock)[index] ?? null
+    })
+    useBibleSettingsStore.setState({
+      fontSize: 90,
+      selectedVersionId: 0,
+      speechMaxSessionSec: 3600
+    })
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('migrates speechMaxSessionMin (v1) to speechMaxSessionSec (v2) by multiplying by 60', () => {
+    localStorageMock['hhc-bible-settings'] = JSON.stringify({
+      state: { fontSize: 100, selectedVersionId: 2, speechMaxSessionMin: 90 },
+      version: 1
+    })
+    useBibleSettingsStore.persist.rehydrate()
+    const s = useBibleSettingsStore.getState()
+    expect(s.speechMaxSessionSec).toBe(5400) // 90 * 60
+    expect(s.fontSize).toBe(100)
+  })
+
+  it('migrates from version 0 (no speechMaxSession field) to v2 with default 3600', () => {
+    localStorageMock['hhc-bible-settings'] = JSON.stringify({
+      state: { fontSize: 110, selectedVersionId: 1 },
+      version: 0
+    })
+    useBibleSettingsStore.persist.rehydrate()
+    const s = useBibleSettingsStore.getState()
+    expect(s.speechMaxSessionSec).toBe(3600)
   })
 })

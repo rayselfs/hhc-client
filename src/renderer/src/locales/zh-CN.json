@@ -335,8 +335,7 @@
       "azureSpeechRegion": "Azure Speech Service 区域",
       "testConnection": "测试连接",
       "testing": "测试中...",
-      "maxSessionDuration": "语音识别最大时长",
-      "maxSessionDurationUnit": "分钟"
+      "maxSessionDuration": "语音识别最大时长"
     }
   },
   "error": {
