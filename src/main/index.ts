@@ -5,7 +5,7 @@ import { registerProjectionHandlers } from './ipc/projection'
 import { registerTimerHandlers } from './ipc/timer'
 import { registerBibleApiHandlers } from './ipc/bible-api'
 import { registerAppIpc } from './ipc/app'
-import { registerAzureSpeechStorageHandlers } from './ipc/azure-speech-storage'
+import { registerSpeechKeyStorageHandlers } from './ipc/speech-key-storage'
 import { isKnownWindow, validateTheme } from './ipc/validate'
 import { registerUpdateService } from './updateService'
 
@@ -53,7 +53,7 @@ app.whenReady().then(() => {
   registerTimerHandlers(wm)
   registerBibleApiHandlers(wm)
   registerAppIpc(wm)
-  registerAzureSpeechStorageHandlers(wm)
+  registerSpeechKeyStorageHandlers(wm)
   wm.createMainWindow()
   wm.createProjectionWindow()
   registerUpdateService(wm)

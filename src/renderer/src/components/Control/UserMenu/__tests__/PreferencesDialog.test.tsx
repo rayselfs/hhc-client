@@ -14,10 +14,10 @@ vi.mock('@renderer/lib/env', () => ({
   isWeb: vi.fn().mockReturnValue(true)
 }))
 
-vi.mock('@renderer/lib/azure-speech-key-storage', () => ({
-  saveAzureSpeechKey: vi.fn().mockResolvedValue(undefined),
-  loadAzureSpeechKey: vi.fn().mockResolvedValue(null),
-  deleteAzureSpeechKey: vi.fn().mockResolvedValue(undefined)
+vi.mock('@renderer/lib/speech-key-storage', () => ({
+  saveSpeechKey: vi.fn().mockResolvedValue(undefined),
+  loadSpeechKey: vi.fn().mockResolvedValue(null),
+  deleteSpeechKey: vi.fn().mockResolvedValue(undefined)
 }))
 
 vi.mock('@renderer/stores/settings', () => ({
@@ -25,7 +25,12 @@ vi.mock('@renderer/stores/settings', () => ({
     const store = {
       timezone: 'Asia/Taipei',
       hardwareAcceleration: true,
-      speech: { activeProvider: 'azure' as const, azure: { region: 'eastasia', language: 'zh-TW' as const }, gcp: { language: 'cmn-Hant-TW' as const }, whisper: { modelDir: '', language: 'zh-TW' as const } },
+      speech: {
+        activeProvider: 'azure' as const,
+        azure: { region: 'eastasia', language: 'zh-TW' as const },
+        gcp: { language: 'cmn-Hant-TW' as const },
+        whisper: { modelDir: '', language: 'zh-TW' as const }
+      },
       setTimezone: vi.fn(),
       setHardwareAcceleration: vi.fn(),
       setSpeech: vi.fn(),
@@ -141,7 +146,12 @@ describe('PreferencesDialog', () => {
         setThemePreference: vi.fn(),
         timerRingColor: '#3b82f6',
         setTimerRingColor: vi.fn(),
-        speech: { activeProvider: 'azure' as const, azure: { region: 'eastasia', language: 'zh-TW' as const }, gcp: { language: 'cmn-Hant-TW' as const }, whisper: { modelDir: '', language: 'zh-TW' as const } },
+        speech: {
+          activeProvider: 'azure' as const,
+          azure: { region: 'eastasia', language: 'zh-TW' as const },
+          gcp: { language: 'cmn-Hant-TW' as const },
+          whisper: { modelDir: '', language: 'zh-TW' as const }
+        },
         setSpeech: vi.fn()
       }
       return selector ? selector(store) : store
@@ -206,7 +216,12 @@ describe('PreferencesDialog', () => {
         setThemePreference: vi.fn(),
         timerRingColor: '#3b82f6',
         setTimerRingColor: vi.fn(),
-        speech: { activeProvider: 'azure' as const, azure: { region: 'eastasia', language: 'zh-TW' as const }, gcp: { language: 'cmn-Hant-TW' as const }, whisper: { modelDir: '', language: 'zh-TW' as const } },
+        speech: {
+          activeProvider: 'azure' as const,
+          azure: { region: 'eastasia', language: 'zh-TW' as const },
+          gcp: { language: 'cmn-Hant-TW' as const },
+          whisper: { modelDir: '', language: 'zh-TW' as const }
+        },
         setSpeech: vi.fn()
       }
       return selector ? selector(store) : store
@@ -244,7 +259,12 @@ describe('PreferencesDialog', () => {
         setThemePreference: vi.fn(),
         timerRingColor: '#3b82f6',
         setTimerRingColor: vi.fn(),
-        speech: { activeProvider: 'azure' as const, azure: { region: 'eastasia', language: 'zh-TW' as const }, gcp: { language: 'cmn-Hant-TW' as const }, whisper: { modelDir: '', language: 'zh-TW' as const } },
+        speech: {
+          activeProvider: 'azure' as const,
+          azure: { region: 'eastasia', language: 'zh-TW' as const },
+          gcp: { language: 'cmn-Hant-TW' as const },
+          whisper: { modelDir: '', language: 'zh-TW' as const }
+        },
         setSpeech: vi.fn()
       }
       return selector ? selector(store) : store

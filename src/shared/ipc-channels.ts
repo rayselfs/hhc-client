@@ -51,9 +51,9 @@ export interface IpcInvokeMap {
   'app:relaunch': { args: []; result: void }
   'update:check': { args: []; result: { updateAvailable: boolean; version?: string } }
   'update:download-and-install': { args: []; result: void }
-  'azureSpeech:saveKey': { args: [string]; result: void }
-  'azureSpeech:loadKey': { args: []; result: string }
-  'azureSpeech:deleteKey': { args: []; result: void }
+  'speech:saveKey': { args: [string, string]; result: void }
+  'speech:loadKey': { args: [string]; result: string }
+  'speech:deleteKey': { args: [string]; result: void }
 }
 
 export type IpcInvokeChannel = keyof IpcInvokeMap

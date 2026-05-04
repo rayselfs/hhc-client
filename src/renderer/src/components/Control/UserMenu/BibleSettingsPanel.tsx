@@ -8,11 +8,7 @@ import { Label } from 'react-aria-components'
 import { Eye, EyeOff } from 'lucide-react'
 import { useSettingsStore, AZURE_REGION_OPTIONS } from '@renderer/stores/settings'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
-import {
-  saveAzureSpeechKey,
-  loadAzureSpeechKey,
-  deleteAzureSpeechKey
-} from '@renderer/lib/azure-speech-key-storage'
+import { saveSpeechKey, loadSpeechKey, deleteSpeechKey } from '@renderer/lib/speech-key-storage'
 import { toast } from '@heroui/react/toast'
 import { parseDuration, formatDurationHMS } from '@renderer/lib/parse-duration'
 
@@ -34,7 +30,7 @@ export default function BibleSettingsPanel(): React.JSX.Element {
   const [maxSessionInput, setMaxSessionInput] = useState(formatDurationHMS(speechMaxSessionSec))
 
   useEffect(() => {
-    loadAzureSpeechKey()
+    loadSpeechKey('azure')
       .then((key) => {
         const loadedKey = key ?? ''
         setApiKey(loadedKey)
@@ -61,13 +57,13 @@ export default function BibleSettingsPanel(): React.JSX.Element {
   const handleSaveSettings = async (): Promise<void> => {
     try {
       if (apiKey.trim()) {
-        await saveAzureSpeechKey(apiKey.trim())
+        await saveSpeechKey('azure', apiKey.trim())
         setSpeech({ ...speech, azure: { ...speech.azure, region } })
         setOriginalApiKey(apiKey)
         setOriginalRegion(region)
         toast.success(t('toast.azureSpeechSaved'))
       } else {
-        await deleteAzureSpeechKey()
+        await deleteSpeechKey('azure')
         setOriginalApiKey('')
         setOriginalRegion(speech.azure.region)
         setTestPassed(false)

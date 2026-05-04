@@ -2,7 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import SpeechRecognitionCard from '../SpeechRecognitionCard'
 import { createSpeechAdapter } from '@renderer/lib/speech-adapter'
-import { loadAzureSpeechKey } from '@renderer/lib/azure-speech-key-storage'
+import { loadSpeechKey } from '@renderer/lib/speech-key-storage'
 import { useSettingsStore } from '@renderer/stores/settings'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 import { useBibleStore } from '@renderer/stores/bible'
@@ -13,7 +13,7 @@ import type { SpeechAdapter } from '@renderer/lib/speech-adapter'
 import type { BibleBook } from '@shared/types/bible'
 
 vi.mock('@renderer/lib/speech-adapter')
-vi.mock('@renderer/lib/azure-speech-key-storage')
+vi.mock('@renderer/lib/speech-key-storage')
 vi.mock('@renderer/stores/settings')
 vi.mock('@renderer/stores/bible-settings')
 vi.mock('@renderer/stores/bible')
@@ -64,7 +64,7 @@ describe('SpeechRecognitionCard', () => {
     }
 
     vi.mocked(createSpeechAdapter).mockReturnValue(mockAdapter)
-    vi.mocked(loadAzureSpeechKey).mockResolvedValue('mock-api-key')
+    vi.mocked(loadSpeechKey).mockResolvedValue('mock-api-key')
 
     mockSettingsState = {
       speech: {
@@ -151,7 +151,7 @@ describe('SpeechRecognitionCard', () => {
     })
 
     it('should show error when Azure API key is missing', async () => {
-      vi.mocked(loadAzureSpeechKey).mockResolvedValue(null)
+      vi.mocked(loadSpeechKey).mockResolvedValue(null)
 
       render(<SpeechRecognitionCard />)
 
@@ -193,7 +193,7 @@ describe('SpeechRecognitionCard', () => {
       fireEvent.click(startButton)
 
       await waitFor(() => {
-        expect(loadAzureSpeechKey).toHaveBeenCalled()
+        expect(loadSpeechKey).toHaveBeenCalled()
         expect(createSpeechAdapter).toHaveBeenCalledWith(
           expect.objectContaining({
             subscriptionKey: 'mock-api-key',
@@ -435,7 +435,7 @@ describe('SpeechRecognitionCard', () => {
 
   describe('Error Handling', () => {
     it('should show config-required error when API key is missing', async () => {
-      vi.mocked(loadAzureSpeechKey).mockResolvedValue(null)
+      vi.mocked(loadSpeechKey).mockResolvedValue(null)
 
       render(<SpeechRecognitionCard />)
 

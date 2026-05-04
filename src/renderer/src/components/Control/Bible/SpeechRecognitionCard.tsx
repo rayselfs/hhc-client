@@ -8,7 +8,7 @@ import { useSettingsStore } from '@renderer/stores/settings'
 import { useBibleStore } from '@renderer/stores/bible'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 import { useBibleSpeechStore } from '@renderer/stores/bible-speech'
-import { loadAzureSpeechKey } from '@renderer/lib/azure-speech-key-storage'
+import { loadSpeechKey } from '@renderer/lib/speech-key-storage'
 import { createSpeechAdapter } from '@renderer/lib/speech-adapter'
 import type { SpeechAdapter } from '@renderer/lib/speech-adapter/speech-adapter.interface'
 import { parseVerseReference } from '@renderer/lib/verse-parser'
@@ -142,7 +142,7 @@ export default function SpeechRecognitionCard(): React.JSX.Element {
 
   const handleStartRecognition = async (): Promise<void> => {
     try {
-      const apiKey = await loadAzureSpeechKey()
+      const apiKey = await loadSpeechKey('azure')
       if (!apiKey || !speech.azure.region) {
         setError('config-required')
         return

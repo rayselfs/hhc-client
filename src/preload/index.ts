@@ -76,10 +76,10 @@ const updateApi = {
   ) => typedOn('update:status-changed', callback)
 }
 
-const azureSpeechApi = {
-  saveKey: (apiKey: string) => typedInvoke('azureSpeech:saveKey', apiKey),
-  loadKey: () => typedInvoke('azureSpeech:loadKey'),
-  deleteKey: () => typedInvoke('azureSpeech:deleteKey')
+const speechApi = {
+  saveKey: (provider: string, apiKey: string) => typedInvoke('speech:saveKey', provider, apiKey),
+  loadKey: (provider: string) => typedInvoke('speech:loadKey', provider),
+  deleteKey: (provider: string) => typedInvoke('speech:deleteKey', provider)
 }
 
 const api = {
@@ -89,7 +89,7 @@ const api = {
   bible: bibleApi,
   app: appApi,
   update: updateApi,
-  azureSpeech: azureSpeechApi
+  speech: speechApi
 }
 
 try {

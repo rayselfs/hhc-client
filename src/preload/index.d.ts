@@ -53,10 +53,10 @@ interface UpdateAPI {
   ) => () => void
 }
 
-interface AzureSpeechAPI {
-  saveKey: (apiKey: string) => Promise<void>
-  loadKey: () => Promise<string>
-  deleteKey: () => Promise<void>
+interface SpeechAPI {
+  saveKey: (provider: string, apiKey: string) => Promise<void>
+  loadKey: (provider: string) => Promise<string>
+  deleteKey: (provider: string) => Promise<void>
 }
 
 declare global {
@@ -68,7 +68,7 @@ declare global {
       bible: BibleAPI
       app: AppAPI
       update: UpdateAPI
-      azureSpeech: AzureSpeechAPI
+      speech: SpeechAPI
     }
   }
 }
