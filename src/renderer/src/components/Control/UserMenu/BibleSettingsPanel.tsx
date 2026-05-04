@@ -515,42 +515,45 @@ export default function BibleSettingsPanel(): React.JSX.Element {
 
           {isElectron() && (
             <div className="space-y-3">
-              <Select
-                variant="secondary"
-                value={whisperModel}
-                onChange={(key) => setWhisperModel(key as WhisperModel)}
-                aria-label={t('preferences.bible.whisperSelectModel' as never)}
-              >
-                <Label>{t('preferences.bible.whisperSelectModel' as never)}</Label>
-                <Select.Trigger className="rounded-full pl-5">
-                  <Select.Value />
-                  <Select.Indicator />
-                </Select.Trigger>
-                <Select.Popover>
-                  <ListBox>
-                    {WHISPER_MODEL_OPTIONS.map((opt) => (
-                      <ListBox.Item
-                        key={opt.value}
-                        id={opt.value}
-                        textValue={opt.label}
-                        className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
-                      >
-                        {opt.label}
-                      </ListBox.Item>
-                    ))}
-                  </ListBox>
-                </Select.Popover>
-              </Select>
-
-              <Button
-                variant="secondary"
-                onPress={handleDownloadWhisper}
-                isDisabled={downloadProgress !== null && !downloadProgress.done}
-                className="rounded-full w-full flex items-center justify-center gap-1.5"
-              >
-                <Download className="size-4" />
-                {t('preferences.bible.whisperDownloadAndBind' as never)}
-              </Button>
+              <div className="flex gap-2 items-end">
+                <div className="flex-1">
+                  <Select
+                    variant="secondary"
+                    value={whisperModel}
+                    onChange={(key) => setWhisperModel(key as WhisperModel)}
+                    aria-label={t('preferences.bible.whisperSelectModel' as never)}
+                  >
+                    <Label>{t('preferences.bible.whisperSelectModel' as never)}</Label>
+                    <Select.Trigger className="rounded-full pl-5">
+                      <Select.Value />
+                      <Select.Indicator />
+                    </Select.Trigger>
+                    <Select.Popover>
+                      <ListBox>
+                        {WHISPER_MODEL_OPTIONS.map((opt) => (
+                          <ListBox.Item
+                            key={opt.value}
+                            id={opt.value}
+                            textValue={opt.label}
+                            className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
+                          >
+                            {opt.label}
+                          </ListBox.Item>
+                        ))}
+                      </ListBox>
+                    </Select.Popover>
+                  </Select>
+                </div>
+                <Button
+                  variant="secondary"
+                  onPress={handleDownloadWhisper}
+                  isDisabled={downloadProgress !== null && !downloadProgress.done}
+                  className="rounded-full shrink-0 flex items-center gap-1.5"
+                >
+                  <Download className="size-4" />
+                  {t('preferences.bible.whisperDownloadAndBind' as never)}
+                </Button>
+              </div>
 
               {downloadProgress !== null && !downloadProgress.done && (
                 <div className="space-y-1">
