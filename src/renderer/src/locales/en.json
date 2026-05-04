@@ -141,6 +141,7 @@
       "configRequired": "Please configure Azure Speech API first",
       "startFailed": "Failed to start voice recognition",
       "clearAll": "Clear All",
+      "exportLog": "Export Raw Log",
       "idleTimeout": "No speech activity detected, recognition stopped",
       "maxDuration": "Maximum session duration reached, recognition stopped",
       "errorRetryExceeded": "Too many consecutive errors, recognition stopped"

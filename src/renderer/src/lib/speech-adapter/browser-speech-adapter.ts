@@ -178,15 +178,12 @@ export class BrowserSpeechAdapter implements SpeechAdapter {
           const text = e.result.text
           const confidence = this.extractConfidence(e.result)
 
+          this.emit('rawRecognized', { text, confidence })
+
           if (confidence !== null && confidence < 0.4) {
-            console.log('[Adapter] Low confidence (%.2f), ignoring: %s', confidence, text)
             return
           }
-          if (confidence !== null && confidence < 0.7) {
-            console.warn('[Adapter] Medium confidence (%.2f): %s', confidence, text)
-          }
 
-          console.log('[Adapter] Azure recognized (confidence=%.2f): %s', confidence, text)
           this.handleRecognizedText(text)
         }
       }
@@ -357,7 +354,6 @@ export class BrowserSpeechAdapter implements SpeechAdapter {
   private handleRecognizedText(text: string): void {
     let parsed = this.parseAndMatch(text)
     if (parsed) {
-      console.log('[Adapter] Parse succeeded:', parsed)
       this.clearBuffer()
       this.emit('recognized', parsed)
       return
@@ -365,21 +361,17 @@ export class BrowserSpeechAdapter implements SpeechAdapter {
 
     if (this.incompleteBuffer) {
       const combined = this.stripPunctuation(this.incompleteBuffer) + this.stripPunctuation(text)
-      console.log('[Adapter] Trying buffer combination:', combined)
       parsed = this.parseAndMatch(combined)
       if (parsed) {
-        console.log('[Adapter] Buffer combination succeeded:', parsed)
         this.clearBuffer()
         this.emit('recognized', parsed)
         return
       }
     }
 
-    console.warn('[Adapter] Parse failed, buffering:', text)
     this.clearBuffer()
     this.incompleteBuffer = text
     this.bufferTimer = setTimeout(() => {
-      console.log('[Adapter] Buffer expired, clearing:', this.incompleteBuffer)
       this.incompleteBuffer = ''
       this.bufferTimer = null
     }, this.BUFFER_TIMEOUT)

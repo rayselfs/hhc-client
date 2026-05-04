@@ -141,6 +141,7 @@
       "configRequired": "請先設定 Azure Speech API",
       "startFailed": "啟動語音辨識失敗",
       "clearAll": "清空",
+      "exportLog": "匯出原始紀錄",
       "idleTimeout": "長時間無語音活動，已自動停止偵測",
       "maxDuration": "已達最大偵測時長，已自動停止",
       "errorRetryExceeded": "連續錯誤過多，已自動停止偵測"

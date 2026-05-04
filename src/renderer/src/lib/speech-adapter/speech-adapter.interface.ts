@@ -19,6 +19,7 @@ export interface SpeechAdapterConfig {
 export type SpeechAdapterEventType =
   | 'recognizing'
   | 'recognized'
+  | 'rawRecognized'
   | 'sessionStarted'
   | 'sessionStopped'
   | 'canceled'
@@ -29,6 +30,7 @@ export type SpeechAdapterEventType =
 export interface SpeechAdapterEventMap {
   recognizing: { text: string }
   recognized: SpeechRecognizedResult
+  rawRecognized: { text: string; confidence: number | null }
   sessionStarted: undefined
   sessionStopped: undefined
   canceled: { reason: string }

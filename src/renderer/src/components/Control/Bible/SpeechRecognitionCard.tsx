@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Card } from '@heroui/react/card'
 import { Button } from '@heroui/react/button'
 import { ScrollShadow } from '@heroui/react/scroll-shadow'
-import { Mic, MicOff, Trash2, X } from 'lucide-react'
+import { Download, Mic, MicOff, Trash2, X } from 'lucide-react'
 import { useSettingsStore } from '@renderer/stores/settings'
 import { useBibleStore } from '@renderer/stores/bible'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
@@ -26,6 +26,12 @@ interface RecognizedVerse {
   timestamp: number
 }
 
+interface RawRecognizedEntry {
+  text: string
+  confidence: number | null
+  timestamp: number
+}
+
 export default function SpeechRecognitionCard(): React.JSX.Element {
   const { t, i18n } = useTranslation()
   const azureSpeech = useSettingsStore((s) => s.azureSpeech)
@@ -38,9 +44,11 @@ export default function SpeechRecognitionCard(): React.JSX.Element {
   const [adapter, setAdapter] = useState<SpeechAdapter | null>(null)
   const [isOnline, setIsOnline] = useState(navigator.onLine)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
+  const [hasRawLog, setHasRawLog] = useState(false)
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const elapsedTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const rawLogRef = useRef<RawRecognizedEntry[]>([])
   const speechMaxSessionSec = useBibleSettingsStore((s) => s.speechMaxSessionSec)
 
   const handleStopRecognition = useCallback((): void => {
@@ -49,9 +57,7 @@ export default function SpeechRecognitionCard(): React.JSX.Element {
       elapsedTimerRef.current = null
     }
     if (adapter) {
-      adapter.stop().catch((err) => {
-        console.error('[SpeechRecognitionCard] Stop recognition failed:', err)
-      })
+      adapter.stop().catch(() => {})
       adapter.dispose()
       setAdapter(null)
     }
@@ -90,42 +96,23 @@ export default function SpeechRecognitionCard(): React.JSX.Element {
 
   const handleRecognized = useCallback(
     (text: string) => {
-      console.log('[Speech] Recognized raw text:', text)
-
       const parsed = parseVerseReference(text)
-      if (!parsed) {
-        console.warn('[Speech] Failed to parse verse reference:', text)
-        return
-      }
-      console.log('[Speech] Parsed:', parsed)
+      if (!parsed) return
 
       const match = matchBookName(parsed.book)
-      if (!match) {
-        console.warn('[Speech] Failed to match book name:', parsed.book)
-        return
-      }
-      console.log('[Speech] Matched book:', match)
+      if (!match) return
 
       const bookConfig = getBookConfig(match.bookNumber)
-      if (!bookConfig) {
-        console.warn('[Speech] Failed to get book config:', match.bookNumber)
-        return
-      }
+      if (!bookConfig) return
 
-      if (!selectedVersionId) {
-        console.warn('[Speech] No version selected')
-        return
-      }
+      if (!selectedVersionId) return
 
       const books = bibleContent.get(selectedVersionId)
       const book = books?.find((b) => b.number === match.bookNumber)
       const chapter = book?.chapters.find((c) => c.number === parsed.chapter)
       const verseData = chapter?.verses.find((v) => v.number === parsed.verse)
 
-      if (!verseData) {
-        console.warn('[Speech] Failed to get verse text')
-        return
-      }
+      if (!verseData) return
 
       const bookName = getBookNameI18n(t, match.bookNumber)
 
@@ -168,8 +155,16 @@ export default function SpeechRecognitionCard(): React.JSX.Element {
         }
       })
 
-      newAdapter.on('error', (data) => {
-        console.error('[SpeechRecognitionCard] Speech error:', data.error)
+      newAdapter.on('rawRecognized', (data) => {
+        rawLogRef.current.push({
+          text: data.text,
+          confidence: data.confidence,
+          timestamp: Date.now()
+        })
+        setHasRawLog(true)
+      })
+
+      newAdapter.on('error', () => {
         setError('start-failed')
         setIsRecognizing(false)
       })
@@ -192,6 +187,7 @@ export default function SpeechRecognitionCard(): React.JSX.Element {
         setIsRecognizing(false)
       })
 
+      setElapsedSeconds(0)
       await newAdapter.start()
 
       elapsedTimerRef.current = setInterval(() => {
@@ -201,15 +197,34 @@ export default function SpeechRecognitionCard(): React.JSX.Element {
       setAdapter(newAdapter)
       setIsRecognizing(true)
       setError(null)
-    } catch (err) {
-      console.error('[SpeechRecognitionCard] Start recognition failed:', err)
+    } catch {
       setError('start-failed')
     }
   }
 
   const handleClearAll = (): void => {
     setRecognizedVerses([])
+    rawLogRef.current = []
+    setHasRawLog(false)
     setError(null)
+  }
+
+  const handleExportLog = (): void => {
+    if (rawLogRef.current.length === 0) return
+
+    const lines = rawLogRef.current.map((entry) => {
+      const time = new Date(entry.timestamp).toLocaleTimeString('en-US', { hour12: false })
+      const conf = entry.confidence !== null ? ` [${entry.confidence.toFixed(2)}]` : ''
+      return `${time}${conf} ${entry.text}`
+    })
+
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `speech-log-${new Date().toISOString().slice(0, 10)}.txt`
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   const handleRemoveVerse = (id: string): void => {
@@ -231,11 +246,6 @@ export default function SpeechRecognitionCard(): React.JSX.Element {
       <Card.Header className="shrink-0 flex-row! items-center justify-between p-0 pt-2 px-3">
         <div className="flex items-center gap-1">
           <h3 className="text-sm font-medium">{t('bible.speech.title')}</h3>
-          <span className="text-xs text-muted tabular-nums ml-1">
-            {formatDurationHMS(elapsedSeconds)}
-          </span>
-        </div>
-        <div className="flex items-center gap-1 shrink-0">
           <Button
             size="sm"
             variant={isRecognizing ? 'danger' : 'primary'}
@@ -247,6 +257,21 @@ export default function SpeechRecognitionCard(): React.JSX.Element {
             <span className="max-lg:hidden">
               {isRecognizing ? t('bible.speech.stop') : t('bible.speech.start')}
             </span>
+          </Button>
+          <span className="text-xs text-muted tabular-nums ml-1">
+            {formatDurationHMS(elapsedSeconds)}
+          </span>
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          <Button
+            isIconOnly
+            variant="ghost"
+            size="sm"
+            onPress={handleExportLog}
+            isDisabled={!hasRawLog}
+            aria-label={t('bible.speech.exportLog')}
+          >
+            <Download size={18} />
           </Button>
           <Button
             isIconOnly
