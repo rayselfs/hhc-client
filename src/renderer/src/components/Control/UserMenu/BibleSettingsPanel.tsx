@@ -330,7 +330,7 @@ export default function BibleSettingsPanel(): React.JSX.Element {
       {activeProvider === 'azure' && (
         <div className="space-y-4">
           <div>
-            <Label className="mb-2 block">{t('preferences.bible.azureSpeechKey')}</Label>
+            <Label className="mb-2 block">{t('common.apiKey')}</Label>
             <div className="relative w-full">
               <Input
                 type={showAzureKey ? 'text' : 'password'}
@@ -357,9 +357,9 @@ export default function BibleSettingsPanel(): React.JSX.Element {
             variant="secondary"
             value={azureRegion}
             onChange={(key) => setAzureRegion(String(key))}
-            aria-label={t('preferences.bible.azureSpeechRegion')}
+            aria-label={t('common.region')}
           >
-            <Label>{t('preferences.bible.azureSpeechRegion')}</Label>
+            <Label>{t('common.region')}</Label>
             <Select.Trigger className="rounded-full pl-5">
               <Select.Value />
               <Select.Indicator />
@@ -412,7 +412,7 @@ export default function BibleSettingsPanel(): React.JSX.Element {
       {activeProvider === 'gcp' && (
         <div className="space-y-4">
           <div>
-            <Label className="mb-2 block">{t('preferences.bible.gcpSpeechKey')}</Label>
+            <Label className="mb-2 block">{t('common.apiKey')}</Label>
             <div className="relative w-full">
               <Input
                 type={showGcpKey ? 'text' : 'password'}

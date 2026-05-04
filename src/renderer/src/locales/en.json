@@ -418,7 +418,9 @@
     "save": "Save",
     "show": "Show",
     "hide": "Hide",
-    "delete": "Delete"
+    "delete": "Delete",
+    "apiKey": "Key",
+    "region": "Region"
   },
   "userMenu": {
     "guest": "Guest",

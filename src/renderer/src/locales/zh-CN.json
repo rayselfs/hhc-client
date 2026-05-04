@@ -418,7 +418,9 @@
     "save": "保存",
     "show": "显示",
     "hide": "隐藏",
-    "delete": "删除"
+    "delete": "删除",
+    "apiKey": "密钥",
+    "region": "区域"
   },
   "userMenu": {
     "guest": "访客",
