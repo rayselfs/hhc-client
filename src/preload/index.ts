@@ -65,7 +65,9 @@ const bibleApi = {
 }
 
 const appApi = {
-  relaunch: () => typedInvoke('app:relaunch')
+  relaunch: () => typedInvoke('app:relaunch'),
+  selectDirectory: () => typedInvoke('app:select-directory'),
+  setModelDir: (dir: string) => typedInvoke('app:set-model-dir', dir)
 }
 
 const updateApi = {

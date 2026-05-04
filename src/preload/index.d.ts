@@ -43,6 +43,8 @@ interface BibleAPI {
 
 interface AppAPI {
   relaunch: () => Promise<void>
+  selectDirectory: () => Promise<string | null>
+  setModelDir: (dir: string) => Promise<void>
 }
 
 interface UpdateAPI {
