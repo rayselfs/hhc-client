@@ -4,7 +4,9 @@ import type {
   IpcInvokeMap,
   IpcMainToRendererChannel,
   IpcMainToRendererMap,
-  UpdateStatus
+  UpdateStatus,
+  WhisperModel,
+  WhisperDownloadProgress
 } from '../shared/ipc-channels'
 import type { ProjectionChannel, ProjectionPayload } from '../shared/projection-messages'
 import type { TimerTickPayload } from '../shared/types/timer'
@@ -67,7 +69,11 @@ const bibleApi = {
 const appApi = {
   relaunch: () => typedInvoke('app:relaunch'),
   selectDirectory: () => typedInvoke('app:select-directory'),
-  setModelDir: (dir: string) => typedInvoke('app:set-model-dir', dir)
+  setModelDir: (dir: string) => typedInvoke('app:set-model-dir', dir),
+  downloadWhisperModel: (model: WhisperModel, destDir: string) =>
+    typedInvoke('app:download-whisper-model', model, destDir),
+  onDownloadProgress: (callback: (data: WhisperDownloadProgress) => void) =>
+    typedOn('app:download-progress', callback)
 }
 
 const updateApi = {

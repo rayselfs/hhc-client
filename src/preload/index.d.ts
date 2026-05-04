@@ -1,5 +1,10 @@
 import type { ProjectionChannel, ProjectionPayload } from '../shared/projection-messages'
-import type { DisplayInfo, UpdateStatus } from '../shared/ipc-channels'
+import type {
+  DisplayInfo,
+  UpdateStatus,
+  WhisperModel,
+  WhisperDownloadProgress
+} from '../shared/ipc-channels'
 import type {
   TimerCommand,
   TimerSettings,
@@ -45,6 +50,8 @@ interface AppAPI {
   relaunch: () => Promise<void>
   selectDirectory: () => Promise<string | null>
   setModelDir: (dir: string) => Promise<void>
+  downloadWhisperModel: (model: WhisperModel, destDir: string) => Promise<void>
+  onDownloadProgress: (callback: (data: WhisperDownloadProgress) => void) => () => void
 }
 
 interface UpdateAPI {

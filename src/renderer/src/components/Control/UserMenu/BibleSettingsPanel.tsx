@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Input } from '@heroui/react/input'
 import { Select } from '@heroui/react/select'
 import { ListBox } from '@heroui/react/list-box'
 import { Button } from '@heroui/react/button'
 import { Label } from 'react-aria-components'
-import { Eye, EyeOff, FolderOpen, ExternalLink } from 'lucide-react'
+import { Eye, EyeOff, FolderOpen, Download } from 'lucide-react'
 import { useSettingsStore, AZURE_REGION_OPTIONS } from '@renderer/stores/settings'
 import type { SpeechProvider } from '@renderer/stores/settings'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
@@ -13,6 +13,12 @@ import { saveSpeechKey, loadSpeechKey, deleteSpeechKey } from '@renderer/lib/spe
 import { toast } from '@heroui/react/toast'
 import { parseDuration, formatDurationHMS } from '@renderer/lib/parse-duration'
 import { isElectron } from '@renderer/lib/env'
+import type { WhisperModel, WhisperDownloadProgress } from '@shared/ipc-channels'
+
+const WHISPER_MODEL_OPTIONS: { value: WhisperModel; label: string }[] = [
+  { value: 'whisper-base', label: 'Whisper Base (~75 MB)' },
+  { value: 'whisper-small', label: 'Whisper Small (~240 MB)' }
+]
 
 const PROVIDER_OPTIONS: { value: SpeechProvider; electronOnly?: boolean; webOnly?: boolean }[] = [
   { value: 'azure' },
@@ -53,6 +59,9 @@ export default function BibleSettingsPanel(): React.JSX.Element {
 
   // Whisper state
   const [whisperDir, setWhisperDir] = useState(speech.whisper.modelDir)
+  const [whisperModel, setWhisperModel] = useState<WhisperModel>('whisper-base')
+  const [downloadProgress, setDownloadProgress] = useState<WhisperDownloadProgress | null>(null)
+  const unsubscribeDownloadRef = useRef<(() => void) | null>(null)
 
   const [maxSessionInput, setMaxSessionInput] = useState(formatDurationHMS(speechMaxSessionSec))
 
@@ -203,6 +212,36 @@ export default function BibleSettingsPanel(): React.JSX.Element {
       await window.api.app.setModelDir(dir)
       setWhisperDir(dir)
       setSpeech({ ...speech, whisper: { ...speech.whisper, modelDir: dir } })
+    }
+  }
+
+  const handleDownloadWhisper = async (): Promise<void> => {
+    if (!isElectron()) return
+    const dir = await window.api.app.selectDirectory()
+    if (!dir) return
+
+    unsubscribeDownloadRef.current?.()
+    unsubscribeDownloadRef.current = window.api.app.onDownloadProgress((data) => {
+      setDownloadProgress(data)
+      if (data.done) {
+        setWhisperDir(dir)
+        setSpeech({ ...speech, whisper: { ...speech.whisper, modelDir: dir } })
+        toast.success(t('preferences.bible.whisperDownloadComplete' as never))
+      }
+      if (data.error) {
+        toast.danger(data.error)
+        setDownloadProgress(null)
+      }
+    })
+
+    try {
+      await window.api.app.downloadWhisperModel(whisperModel, dir)
+    } catch (err) {
+      toast.danger(String(err))
+      setDownloadProgress(null)
+    } finally {
+      unsubscribeDownloadRef.current?.()
+      unsubscribeDownloadRef.current = null
     }
   }
 
@@ -465,38 +504,61 @@ export default function BibleSettingsPanel(): React.JSX.Element {
             </Select.Popover>
           </Select>
 
-          <div>
-            <p className="text-sm text-muted mb-2">
-              {t('preferences.bible.whisperDownloadModels')}
-            </p>
-            <div className="space-y-1">
-              {[
-                {
-                  label: 'Whisper Base (~150MB)',
-                  url: 'https://huggingface.co/onnx-community/whisper-base/tree/main'
-                },
-                {
-                  label: 'Whisper Small (~500MB)',
-                  url: 'https://huggingface.co/onnx-community/whisper-small/tree/main'
-                },
-                {
-                  label: 'Whisper Large-v3 (~3GB)',
-                  url: 'https://huggingface.co/onnx-community/whisper-large-v3/tree/main'
-                }
-              ].map((m) => (
-                <a
-                  key={m.url}
-                  href={m.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center gap-1.5 text-sm text-accent hover:underline"
-                >
-                  <ExternalLink className="size-3" />
-                  {m.label}
-                </a>
-              ))}
+          {isElectron() && (
+            <div className="space-y-3">
+              <Select
+                variant="secondary"
+                value={whisperModel}
+                onChange={(key) => setWhisperModel(key as WhisperModel)}
+                aria-label={t('preferences.bible.whisperSelectModel' as never)}
+              >
+                <Label>{t('preferences.bible.whisperSelectModel' as never)}</Label>
+                <Select.Trigger className="rounded-full pl-5">
+                  <Select.Value />
+                  <Select.Indicator />
+                </Select.Trigger>
+                <Select.Popover>
+                  <ListBox>
+                    {WHISPER_MODEL_OPTIONS.map((opt) => (
+                      <ListBox.Item
+                        key={opt.value}
+                        id={opt.value}
+                        textValue={opt.label}
+                        className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
+                      >
+                        {opt.label}
+                      </ListBox.Item>
+                    ))}
+                  </ListBox>
+                </Select.Popover>
+              </Select>
+
+              <Button
+                variant="secondary"
+                onPress={handleDownloadWhisper}
+                isDisabled={downloadProgress !== null && !downloadProgress.done}
+                className="rounded-full w-full flex items-center justify-center gap-1.5"
+              >
+                <Download className="size-4" />
+                {t('preferences.bible.whisperDownloadAndBind' as never)}
+              </Button>
+
+              {downloadProgress !== null && !downloadProgress.done && (
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs text-muted">
+                    <span className="truncate max-w-[70%]">{downloadProgress.currentFile}</span>
+                    <span>{downloadProgress.percent}%</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
+                    <div
+                      className="h-full bg-accent rounded-full transition-all duration-200"
+                      style={{ width: `${downloadProgress.percent}%` }}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
+          )}
         </div>
       )}
 

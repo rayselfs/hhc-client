@@ -16,6 +16,16 @@ import type {
 } from './types/timer'
 import type { BibleVersion, BibleBook } from './types/bible'
 
+export type WhisperModel = 'whisper-base' | 'whisper-small'
+
+export interface WhisperDownloadProgress {
+  model: WhisperModel
+  percent: number
+  currentFile: string
+  done: boolean
+  error?: string
+}
+
 // ---------------------------------------------------------------------------
 // Invoke channels (renderer → main, returns a result)
 // ---------------------------------------------------------------------------
@@ -56,6 +66,7 @@ export interface IpcInvokeMap {
   'speech:deleteKey': { args: [string]; result: void }
   'app:select-directory': { args: []; result: string | null }
   'app:set-model-dir': { args: [string]; result: void }
+  'app:download-whisper-model': { args: [WhisperModel, string]; result: void }
 }
 
 export type IpcInvokeChannel = keyof IpcInvokeMap
@@ -82,6 +93,7 @@ export interface IpcMainToRendererMap {
   'theme:changed': [{ shouldUseDarkColors: boolean }]
   'timer-tick': [TimerTickPayload]
   'update:status-changed': [{ status: UpdateStatus; version?: string; error?: string }]
+  'app:download-progress': [WhisperDownloadProgress]
 }
 
 export type IpcMainToRendererChannel = keyof IpcMainToRendererMap
