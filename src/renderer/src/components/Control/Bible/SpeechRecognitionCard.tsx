@@ -85,14 +85,19 @@ export default function SpeechRecognitionCard(): React.JSX.Element {
 
   useEffect(() => {
     return () => {
-      if (elapsedTimerRef.current) {
-        clearInterval(elapsedTimerRef.current)
-      }
       if (adapter) {
         adapter.dispose()
       }
     }
   }, [adapter])
+
+  useEffect(() => {
+    return () => {
+      if (elapsedTimerRef.current) {
+        clearInterval(elapsedTimerRef.current)
+      }
+    }
+  }, [])
 
   const handleRecognized = useCallback(
     (text: string) => {
@@ -243,10 +248,9 @@ export default function SpeechRecognitionCard(): React.JSX.Element {
 
   return (
     <Card className="flex flex-col h-full p-0 gap-2">
-      <Card.Header className="shrink-0 flex-row! items-center justify-between p-0 pt-2 px-3">
+      <Card.Header className="shrink-0 flex-row! items-center justify-between p-0 pt-2 pl-2 pr-3">
         <div className="flex items-center gap-1">
           <Button
-            size="sm"
             variant={isRecognizing ? 'danger' : 'primary'}
             onPress={isRecognizing ? handleStopRecognition : handleStartRecognition}
             isDisabled={!canStart && !isRecognizing}
