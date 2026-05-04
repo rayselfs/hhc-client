@@ -5,6 +5,7 @@ import '@renderer/i18n'
 import BibleSettingsPanel from '../BibleSettingsPanel'
 import { toast } from '@heroui/react/toast'
 import * as azureSpeechKeyStorage from '@renderer/lib/azure-speech-key-storage'
+import { DEFAULT_SPEECH } from '@renderer/stores/settings'
 
 vi.mock('@heroui/react/toast', () => ({
   toast: {
@@ -43,8 +44,8 @@ vi.mock('microsoft-cognitiveservices-speech-sdk', () => ({
 }))
 
 const mockSettingsStore = {
-  azureSpeech: null as { region: string } | null,
-  setAzureSpeech: vi.fn()
+  speech: { ...DEFAULT_SPEECH },
+  setSpeech: vi.fn()
 }
 
 vi.mock('@renderer/stores/settings', async () => {
@@ -60,7 +61,7 @@ vi.mock('@renderer/stores/settings', async () => {
 describe('BibleSettingsPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockSettingsStore.azureSpeech = null
+    mockSettingsStore.speech = { ...DEFAULT_SPEECH }
     vi.mocked(azureSpeechKeyStorage.loadAzureSpeechKey).mockResolvedValue(null)
     vi.mocked(azureSpeechKeyStorage.saveAzureSpeechKey).mockResolvedValue(undefined)
     vi.mocked(azureSpeechKeyStorage.deleteAzureSpeechKey).mockResolvedValue(undefined)
@@ -90,7 +91,10 @@ describe('BibleSettingsPanel', () => {
   })
 
   it('loads existing region from settings', async () => {
-    mockSettingsStore.azureSpeech = { region: 'westus2' }
+    mockSettingsStore.speech = {
+      ...DEFAULT_SPEECH,
+      azure: { ...DEFAULT_SPEECH.azure, region: 'westus2' }
+    }
 
     render(<BibleSettingsPanel />)
 
@@ -144,7 +148,9 @@ describe('BibleSettingsPanel', () => {
       expect(vi.mocked(azureSpeechKeyStorage.saveAzureSpeechKey)).toHaveBeenCalledWith(
         'new-api-key'
       )
-      expect(mockSettingsStore.setAzureSpeech).toHaveBeenCalledWith({ region: 'eastasia' })
+      expect(mockSettingsStore.setSpeech).toHaveBeenCalledWith(
+        expect.objectContaining({ azure: expect.objectContaining({ region: 'eastasia' }) })
+      )
       expect(vi.mocked(toast).success).toHaveBeenCalledWith('Azure Speech settings saved')
     })
   })
@@ -152,7 +158,10 @@ describe('BibleSettingsPanel', () => {
   it('disables save when clearing existing key without re-testing', async () => {
     const user = userEvent.setup()
     vi.mocked(azureSpeechKeyStorage.loadAzureSpeechKey).mockResolvedValue('existing-key')
-    mockSettingsStore.azureSpeech = { region: 'eastasia' }
+    mockSettingsStore.speech = {
+      ...DEFAULT_SPEECH,
+      azure: { ...DEFAULT_SPEECH.azure, region: 'eastasia' }
+    }
 
     render(<BibleSettingsPanel />)
 
@@ -198,7 +207,10 @@ describe('BibleSettingsPanel', () => {
 
   it('disables save button when no changes', async () => {
     vi.mocked(azureSpeechKeyStorage.loadAzureSpeechKey).mockResolvedValue('existing-key')
-    mockSettingsStore.azureSpeech = { region: 'eastasia' }
+    mockSettingsStore.speech = {
+      ...DEFAULT_SPEECH,
+      azure: { ...DEFAULT_SPEECH.azure, region: 'eastasia' }
+    }
 
     render(<BibleSettingsPanel />)
 

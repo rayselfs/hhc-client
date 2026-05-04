@@ -61,9 +61,34 @@ const DEFAULT_THEME_PREFERENCE: ThemePreference = 'system'
 const DEFAULT_TIMER_RING_COLOR = '#3b82f6'
 const RELOAD_DELAY_MS = 500
 
-export interface AzureSpeechSettings {
+export type SpeechProvider = 'azure' | 'gcp' | 'webSpeech' | 'whisper'
+
+export interface AzureSpeechConfig {
   region: string
-  // apiKey is stored separately (Electron: safeStorage, Browser: localStorage with prefix)
+  language: 'zh-TW' | 'zh-CN'
+}
+
+export interface GcpSpeechConfig {
+  language: 'cmn-Hant-TW' | 'cmn-Hans-CN'
+}
+
+export interface WhisperSpeechConfig {
+  modelDir: string
+  language: 'zh-TW' | 'zh-CN'
+}
+
+export interface SpeechSettings {
+  activeProvider: SpeechProvider
+  azure: AzureSpeechConfig
+  gcp: GcpSpeechConfig
+  whisper: WhisperSpeechConfig
+}
+
+export const DEFAULT_SPEECH: SpeechSettings = {
+  activeProvider: 'azure',
+  azure: { region: 'eastasia', language: 'zh-TW' },
+  gcp: { language: 'cmn-Hant-TW' },
+  whisper: { modelDir: '', language: 'zh-TW' }
 }
 
 export interface SettingsStore {
@@ -71,12 +96,12 @@ export interface SettingsStore {
   hardwareAcceleration: boolean
   themePreference: ThemePreference
   timerRingColor: string
-  azureSpeech: AzureSpeechSettings | null
+  speech: SpeechSettings
   setTimezone: (tz: string) => void
   setHardwareAcceleration: (enabled: boolean) => void
   setThemePreference: (pref: ThemePreference) => void
   setTimerRingColor: (color: string) => void
-  setAzureSpeech: (settings: AzureSpeechSettings | null) => void
+  setSpeech: (settings: SpeechSettings) => void
   resetToDefaults: () => void
 }
 
@@ -87,7 +112,7 @@ export const useSettingsStore = create<SettingsStore>()(
       hardwareAcceleration: DEFAULT_HW_ACCEL,
       themePreference: DEFAULT_THEME_PREFERENCE,
       timerRingColor: DEFAULT_TIMER_RING_COLOR,
-      azureSpeech: null,
+      speech: DEFAULT_SPEECH,
 
       setTimezone: (tz: string) => {
         set({ timezone: tz })
@@ -105,8 +130,8 @@ export const useSettingsStore = create<SettingsStore>()(
         set({ timerRingColor: color })
       },
 
-      setAzureSpeech: (settings: AzureSpeechSettings | null) => {
-        set({ azureSpeech: settings })
+      setSpeech: (settings: SpeechSettings) => {
+        set({ speech: settings })
       },
 
       resetToDefaults: () => {
@@ -122,7 +147,7 @@ export const useSettingsStore = create<SettingsStore>()(
     {
       name: createKey('settings'),
       storage: hhcPersistStorage,
-      version: 3,
+      version: 4,
       migrate: (persistedState, version) => {
         const state = persistedState as Record<string, unknown>
         if (version < 1) {
@@ -150,6 +175,9 @@ export const useSettingsStore = create<SettingsStore>()(
         if (version < 3) {
           state.azureSpeech = null
         }
+        if (version < 4) {
+          state.speech = DEFAULT_SPEECH
+        }
         return state
       },
       partialize: (state) => ({
@@ -157,7 +185,7 @@ export const useSettingsStore = create<SettingsStore>()(
         hardwareAcceleration: state.hardwareAcceleration,
         themePreference: state.themePreference,
         timerRingColor: state.timerRingColor,
-        azureSpeech: state.azureSpeech
+        speech: state.speech
       })
     }
   )

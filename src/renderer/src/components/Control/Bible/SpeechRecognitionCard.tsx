@@ -35,7 +35,7 @@ interface RawRecognizedEntry {
 
 export default function SpeechRecognitionCard(): React.JSX.Element {
   const { t, i18n } = useTranslation()
-  const azureSpeech = useSettingsStore((s) => s.azureSpeech)
+  const speech = useSettingsStore((s) => s.speech)
   const selectedVersionId = useBibleSettingsStore((s) => s.selectedVersionId)
   const bibleContent = useBibleStore((s) => s.content)
 
@@ -143,7 +143,7 @@ export default function SpeechRecognitionCard(): React.JSX.Element {
   const handleStartRecognition = async (): Promise<void> => {
     try {
       const apiKey = await loadAzureSpeechKey()
-      if (!apiKey || !azureSpeech?.region) {
+      if (!apiKey || !speech.azure.region) {
         setError('config-required')
         return
       }
@@ -153,7 +153,7 @@ export default function SpeechRecognitionCard(): React.JSX.Element {
 
       const newAdapter = createSpeechAdapter({
         subscriptionKey: apiKey,
-        region: azureSpeech.region,
+        region: speech.azure.region,
         language: locale,
         maxSessionMs: speechMaxSessionSec * 1000
       })
@@ -248,7 +248,7 @@ export default function SpeechRecognitionCard(): React.JSX.Element {
     })
   }
 
-  const canStart = !isRecognizing && azureSpeech?.region && isOnline
+  const canStart = !isRecognizing && speech.azure.region && isOnline
 
   return (
     <Card className="flex flex-col h-full p-0 gap-2">

@@ -19,7 +19,12 @@ vi.mock('@renderer/lib/env', () => ({
   isElectron: vi.fn(() => false)
 }))
 
-import { useSettingsStore, TIMEZONE_OPTIONS, AZURE_REGION_OPTIONS } from '@renderer/stores/settings'
+import {
+  useSettingsStore,
+  TIMEZONE_OPTIONS,
+  AZURE_REGION_OPTIONS,
+  DEFAULT_SPEECH
+} from '@renderer/stores/settings'
 import { clearAllSiteData } from '@renderer/lib/site-data'
 import { isElectron } from '@renderer/lib/env'
 
@@ -31,7 +36,7 @@ beforeEach(() => {
     hardwareAcceleration: true,
     themePreference: 'system',
     timerRingColor: '#3b82f6',
-    azureSpeech: null
+    speech: DEFAULT_SPEECH
   })
   mockToast.warning.mockClear()
   mockToast.success.mockClear()
@@ -87,7 +92,7 @@ describe('setTimezone', () => {
     expect(persisted).toBeTruthy()
     const parsed = JSON.parse(persisted!)
     expect(parsed.state.timezone).toBe('America/New_York')
-    expect(parsed.version).toBe(3)
+    expect(parsed.version).toBe(4)
 
     vi.unstubAllGlobals()
   })
@@ -124,7 +129,7 @@ describe('setHardwareAcceleration', () => {
     expect(persisted).toBeTruthy()
     const parsed = JSON.parse(persisted!)
     expect(parsed.state.hardwareAcceleration).toBe(false)
-    expect(parsed.version).toBe(3)
+    expect(parsed.version).toBe(4)
 
     vi.unstubAllGlobals()
   })
@@ -196,7 +201,7 @@ describe('persistence round-trip', () => {
     const parsed = JSON.parse(persisted!)
     expect(parsed.state.timezone).toBe('Europe/London')
     expect(parsed.state.hardwareAcceleration).toBe(false)
-    expect(parsed.version).toBe(3)
+    expect(parsed.version).toBe(4)
 
     vi.unstubAllGlobals()
   })
@@ -305,49 +310,31 @@ describe('themePreference', () => {
     expect(persisted).toBeTruthy()
     const parsed = JSON.parse(persisted!)
     expect(parsed.state.themePreference).toBe('dark')
-    expect(parsed.version).toBe(3)
+    expect(parsed.version).toBe(4)
 
     vi.unstubAllGlobals()
   })
 })
 
-describe('azureSpeech settings', () => {
-  it('initializes with null azureSpeech', () => {
+describe('speech settings', () => {
+  it('initializes with default speech settings', () => {
     const state = useSettingsStore.getState()
-    expect(state.azureSpeech).toBeNull()
+    expect(state.speech).toEqual(DEFAULT_SPEECH)
+    expect(state.speech.activeProvider).toBe('azure')
+    expect(state.speech.azure.region).toBe('eastasia')
   })
 
-  it('updates azureSpeech settings', () => {
-    const { setAzureSpeech } = useSettingsStore.getState()
-    const settings = { region: 'eastasia' }
+  it('updates speech settings', () => {
+    const { setSpeech } = useSettingsStore.getState()
+    const updated = { ...DEFAULT_SPEECH, azure: { ...DEFAULT_SPEECH.azure, region: 'westus2' } }
 
-    setAzureSpeech(settings)
-
-    const state = useSettingsStore.getState()
-    expect(state.azureSpeech).toEqual(settings)
-  })
-
-  it('clears azureSpeech settings', () => {
-    const { setAzureSpeech } = useSettingsStore.getState()
-
-    setAzureSpeech({ region: 'eastasia' })
-    expect(useSettingsStore.getState().azureSpeech).not.toBeNull()
-
-    setAzureSpeech(null)
-    expect(useSettingsStore.getState().azureSpeech).toBeNull()
-  })
-
-  it('updates only region without apiKey', () => {
-    const { setAzureSpeech } = useSettingsStore.getState()
-
-    setAzureSpeech({ region: 'westus2' })
+    setSpeech(updated)
 
     const state = useSettingsStore.getState()
-    expect(state.azureSpeech).toEqual({ region: 'westus2' })
-    expect(Object.keys(state.azureSpeech!)).not.toContain('apiKey')
+    expect(state.speech.azure.region).toBe('westus2')
   })
 
-  it('persists to localStorage with correct version', () => {
+  it('persists speech to localStorage with correct version', () => {
     let localStorageMock: Record<string, string> = {}
     vi.stubGlobal('localStorage', {
       getItem: (key: string) => localStorageMock[key] || null,
@@ -367,12 +354,13 @@ describe('azureSpeech settings', () => {
       }
     })
 
-    useSettingsStore.getState().setAzureSpeech({ region: 'japaneast' })
+    const updated = { ...DEFAULT_SPEECH, azure: { ...DEFAULT_SPEECH.azure, region: 'japaneast' } }
+    useSettingsStore.getState().setSpeech(updated)
     const persisted = localStorage.getItem('hhc-settings')
     expect(persisted).toBeTruthy()
     const parsed = JSON.parse(persisted!)
-    expect(parsed.state.azureSpeech).toEqual({ region: 'japaneast' })
-    expect(parsed.version).toBe(3)
+    expect(parsed.state.speech.azure.region).toBe('japaneast')
+    expect(parsed.version).toBe(4)
 
     vi.unstubAllGlobals()
   })

@@ -18,19 +18,19 @@ import { parseDuration, formatDurationHMS } from '@renderer/lib/parse-duration'
 
 export default function BibleSettingsPanel(): React.JSX.Element {
   const { t, i18n } = useTranslation()
-  const azureSpeech = useSettingsStore((s) => s.azureSpeech)
-  const setAzureSpeech = useSettingsStore((s) => s.setAzureSpeech)
+  const speech = useSettingsStore((s) => s.speech)
+  const setSpeech = useSettingsStore((s) => s.setSpeech)
   const speechMaxSessionSec = useBibleSettingsStore((s) => s.speechMaxSessionSec)
   const setSpeechMaxSessionSec = useBibleSettingsStore((s) => s.setSpeechMaxSessionSec)
 
   const [apiKey, setApiKey] = useState('')
-  const [originalApiKey, setOriginalApiKey] = useState('') // Track loaded value for comparison
+  const [originalApiKey, setOriginalApiKey] = useState('')
   const [showApiKey, setShowApiKey] = useState(false)
-  const [region, setRegion] = useState(azureSpeech?.region ?? 'eastasia')
-  const [originalRegion, setOriginalRegion] = useState(azureSpeech?.region ?? 'eastasia') // Track original region
+  const [region, setRegion] = useState(speech.azure.region)
+  const [originalRegion, setOriginalRegion] = useState(speech.azure.region)
   const [isLoadingKey, setIsLoadingKey] = useState(true)
   const [isTesting, setIsTesting] = useState(false)
-  const [testPassed, setTestPassed] = useState(false) // Track if current config passed test
+  const [testPassed, setTestPassed] = useState(false)
   const [maxSessionInput, setMaxSessionInput] = useState(formatDurationHMS(speechMaxSessionSec))
 
   useEffect(() => {
@@ -39,9 +39,8 @@ export default function BibleSettingsPanel(): React.JSX.Element {
         const loadedKey = key ?? ''
         setApiKey(loadedKey)
         setOriginalApiKey(loadedKey)
-        setOriginalRegion(azureSpeech?.region ?? 'eastasia')
-        // If key exists and no changes, assume previously tested
-        if (loadedKey && azureSpeech?.region) {
+        setOriginalRegion(speech.azure.region)
+        if (loadedKey && speech.azure.region) {
           setTestPassed(true)
         }
       })
@@ -51,9 +50,8 @@ export default function BibleSettingsPanel(): React.JSX.Element {
       .finally(() => {
         setIsLoadingKey(false)
       })
-  }, [azureSpeech?.region])
+  }, [speech.azure.region])
 
-  // Reset testPassed when key or region changes
   useEffect(() => {
     if (apiKey !== originalApiKey || region !== originalRegion) {
       setTestPassed(false)
@@ -64,15 +62,14 @@ export default function BibleSettingsPanel(): React.JSX.Element {
     try {
       if (apiKey.trim()) {
         await saveAzureSpeechKey(apiKey.trim())
-        setAzureSpeech({ region })
+        setSpeech({ ...speech, azure: { ...speech.azure, region } })
         setOriginalApiKey(apiKey)
         setOriginalRegion(region)
         toast.success(t('toast.azureSpeechSaved'))
       } else {
         await deleteAzureSpeechKey()
-        setAzureSpeech(null)
         setOriginalApiKey('')
-        setOriginalRegion('eastasia')
+        setOriginalRegion(speech.azure.region)
         setTestPassed(false)
         toast.success(t('toast.azureSpeechCleared'))
       }

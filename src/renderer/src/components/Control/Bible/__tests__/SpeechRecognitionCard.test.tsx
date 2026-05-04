@@ -33,7 +33,14 @@ vi.mock('react-i18next', () => ({
 describe('SpeechRecognitionCard', () => {
   let mockAdapter: SpeechAdapter
   let eventListeners: Record<string, (data: unknown) => void>
-  let mockSettingsState: { azureSpeech: { region: string } }
+  let mockSettingsState: {
+    speech: {
+      azure: { region: string; language: string }
+      activeProvider: string
+      gcp: { language: string }
+      whisper: { modelDir: string; language: string }
+    }
+  }
   let mockBibleSettingsState: { selectedVersionId: number; speechMaxSessionSec: number }
   let mockBibleState: { content: Map<number, BibleBook[]> }
 
@@ -59,7 +66,14 @@ describe('SpeechRecognitionCard', () => {
     vi.mocked(createSpeechAdapter).mockReturnValue(mockAdapter)
     vi.mocked(loadAzureSpeechKey).mockResolvedValue('mock-api-key')
 
-    mockSettingsState = { azureSpeech: { region: 'eastasia' } }
+    mockSettingsState = {
+      speech: {
+        activeProvider: 'azure',
+        azure: { region: 'eastasia', language: 'zh-TW' },
+        gcp: { language: 'cmn-Hant-TW' },
+        whisper: { modelDir: '', language: 'zh-TW' }
+      }
+    }
     vi.mocked(useSettingsStore).mockImplementation((selector: unknown) => {
       return selector
         ? (selector as (s: typeof mockSettingsState) => unknown)(mockSettingsState)
@@ -150,7 +164,7 @@ describe('SpeechRecognitionCard', () => {
     })
 
     it('should disable start button when region is missing', () => {
-      mockSettingsState.azureSpeech.region = ''
+      mockSettingsState.speech.azure.region = ''
 
       render(<SpeechRecognitionCard />)
 

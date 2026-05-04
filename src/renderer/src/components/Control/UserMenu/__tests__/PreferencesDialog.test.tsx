@@ -25,10 +25,10 @@ vi.mock('@renderer/stores/settings', () => ({
     const store = {
       timezone: 'Asia/Taipei',
       hardwareAcceleration: true,
-      azureSpeech: null,
+      speech: { activeProvider: 'azure' as const, azure: { region: 'eastasia', language: 'zh-TW' as const }, gcp: { language: 'cmn-Hant-TW' as const }, whisper: { modelDir: '', language: 'zh-TW' as const } },
       setTimezone: vi.fn(),
       setHardwareAcceleration: vi.fn(),
-      setAzureSpeech: vi.fn(),
+      setSpeech: vi.fn(),
       resetToDefaults: vi.fn()
     }
     return selector ? selector(store) : store
@@ -141,8 +141,8 @@ describe('PreferencesDialog', () => {
         setThemePreference: vi.fn(),
         timerRingColor: '#3b82f6',
         setTimerRingColor: vi.fn(),
-        azureSpeech: null,
-        setAzureSpeech: vi.fn()
+        speech: { activeProvider: 'azure' as const, azure: { region: 'eastasia', language: 'zh-TW' as const }, gcp: { language: 'cmn-Hant-TW' as const }, whisper: { modelDir: '', language: 'zh-TW' as const } },
+        setSpeech: vi.fn()
       }
       return selector ? selector(store) : store
     })
@@ -206,8 +206,8 @@ describe('PreferencesDialog', () => {
         setThemePreference: vi.fn(),
         timerRingColor: '#3b82f6',
         setTimerRingColor: vi.fn(),
-        azureSpeech: null,
-        setAzureSpeech: vi.fn()
+        speech: { activeProvider: 'azure' as const, azure: { region: 'eastasia', language: 'zh-TW' as const }, gcp: { language: 'cmn-Hant-TW' as const }, whisper: { modelDir: '', language: 'zh-TW' as const } },
+        setSpeech: vi.fn()
       }
       return selector ? selector(store) : store
     })
@@ -244,8 +244,8 @@ describe('PreferencesDialog', () => {
         setThemePreference: vi.fn(),
         timerRingColor: '#3b82f6',
         setTimerRingColor: vi.fn(),
-        azureSpeech: null,
-        setAzureSpeech: vi.fn()
+        speech: { activeProvider: 'azure' as const, azure: { region: 'eastasia', language: 'zh-TW' as const }, gcp: { language: 'cmn-Hant-TW' as const }, whisper: { modelDir: '', language: 'zh-TW' as const } },
+        setSpeech: vi.fn()
       }
       return selector ? selector(store) : store
     })
