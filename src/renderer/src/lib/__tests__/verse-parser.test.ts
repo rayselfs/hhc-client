@@ -255,7 +255,7 @@ describe('parseVerseReference', () => {
 
     it('handles Azure output with trailing text after verse marker', () => {
       expect(parseVerseReference('麻辣雞書3章5節來一下')).toEqual({
-        book: '麻辣雞書',
+        book: '瑪拉基書',
         chapter: 3,
         verse: 5
       })

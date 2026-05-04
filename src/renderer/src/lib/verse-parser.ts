@@ -140,7 +140,11 @@ const SPEECH_CORRECTIONS: [RegExp, string][] = [
   [/招/g, '章'],
   [/結/g, '節'],
   [/借/g, '節'],
-  [/紀/g, '記']
+  [/紀/g, '記'],
+  [/麻辣雞/g, '瑪拉基'],
+  [/馬拉基/g, '瑪拉基'],
+  [/馬拉肌/g, '瑪拉基'],
+  [/媽拉基/g, '瑪拉基']
 ]
 
 function correctSpeechErrors(text: string): string {
