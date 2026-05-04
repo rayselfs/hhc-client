@@ -167,72 +167,204 @@
     },
     "verseUnit": "",
     "books": {
-      "gen": { "name": "Genesis" },
-      "exo": { "name": "Exodus" },
-      "lev": { "name": "Leviticus" },
-      "num": { "name": "Numbers" },
-      "deu": { "name": "Deuteronomy" },
-      "jos": { "name": "Joshua" },
-      "jdg": { "name": "Judges" },
-      "rut": { "name": "Ruth" },
-      "1sa": { "name": "1 Samuel" },
-      "2sa": { "name": "2 Samuel" },
-      "1ki": { "name": "1 Kings" },
-      "2ki": { "name": "2 Kings" },
-      "1ch": { "name": "1 Chronicles" },
-      "2ch": { "name": "2 Chronicles" },
-      "ezr": { "name": "Ezra" },
-      "neh": { "name": "Nehemiah" },
-      "est": { "name": "Esther" },
-      "job": { "name": "Job" },
-      "psa": { "name": "Psalms" },
-      "pro": { "name": "Proverbs" },
-      "ecc": { "name": "Ecclesiastes" },
-      "sol": { "name": "Song of Solomon" },
-      "isa": { "name": "Isaiah" },
-      "jer": { "name": "Jeremiah" },
-      "lam": { "name": "Lamentations" },
-      "eze": { "name": "Ezekiel" },
-      "dan": { "name": "Daniel" },
-      "hos": { "name": "Hosea" },
-      "joe": { "name": "Joel" },
-      "amo": { "name": "Amos" },
-      "oba": { "name": "Obadiah" },
-      "jon": { "name": "Jonah" },
-      "mic": { "name": "Micah" },
-      "nah": { "name": "Nahum" },
-      "hab": { "name": "Habakkuk" },
-      "zep": { "name": "Zephaniah" },
-      "hag": { "name": "Haggai" },
-      "zec": { "name": "Zechariah" },
-      "mal": { "name": "Malachi" },
-      "mat": { "name": "Matthew" },
-      "mar": { "name": "Mark" },
-      "luk": { "name": "Luke" },
-      "joh": { "name": "John" },
-      "act": { "name": "Acts" },
-      "rom": { "name": "Romans" },
-      "1co": { "name": "1 Corinthians" },
-      "2co": { "name": "2 Corinthians" },
-      "gal": { "name": "Galatians" },
-      "eph": { "name": "Ephesians" },
-      "phi": { "name": "Philippians" },
-      "col": { "name": "Colossians" },
-      "1th": { "name": "1 Thessalonians" },
-      "2th": { "name": "2 Thessalonians" },
-      "1ti": { "name": "1 Timothy" },
-      "2ti": { "name": "2 Timothy" },
-      "tit": { "name": "Titus" },
-      "phm": { "name": "Philemon" },
-      "heb": { "name": "Hebrews" },
-      "jas": { "name": "James" },
-      "1pe": { "name": "1 Peter" },
-      "2pe": { "name": "2 Peter" },
-      "1jo": { "name": "1 John" },
-      "2jo": { "name": "2 John" },
-      "3jo": { "name": "3 John" },
-      "jud": { "name": "Jude" },
-      "rev": { "name": "Revelation" }
+      "gen": {
+        "name": "Genesis"
+      },
+      "exo": {
+        "name": "Exodus"
+      },
+      "lev": {
+        "name": "Leviticus"
+      },
+      "num": {
+        "name": "Numbers"
+      },
+      "deu": {
+        "name": "Deuteronomy"
+      },
+      "jos": {
+        "name": "Joshua"
+      },
+      "jdg": {
+        "name": "Judges"
+      },
+      "rut": {
+        "name": "Ruth"
+      },
+      "1sa": {
+        "name": "1 Samuel"
+      },
+      "2sa": {
+        "name": "2 Samuel"
+      },
+      "1ki": {
+        "name": "1 Kings"
+      },
+      "2ki": {
+        "name": "2 Kings"
+      },
+      "1ch": {
+        "name": "1 Chronicles"
+      },
+      "2ch": {
+        "name": "2 Chronicles"
+      },
+      "ezr": {
+        "name": "Ezra"
+      },
+      "neh": {
+        "name": "Nehemiah"
+      },
+      "est": {
+        "name": "Esther"
+      },
+      "job": {
+        "name": "Job"
+      },
+      "psa": {
+        "name": "Psalms"
+      },
+      "pro": {
+        "name": "Proverbs"
+      },
+      "ecc": {
+        "name": "Ecclesiastes"
+      },
+      "sol": {
+        "name": "Song of Solomon"
+      },
+      "isa": {
+        "name": "Isaiah"
+      },
+      "jer": {
+        "name": "Jeremiah"
+      },
+      "lam": {
+        "name": "Lamentations"
+      },
+      "eze": {
+        "name": "Ezekiel"
+      },
+      "dan": {
+        "name": "Daniel"
+      },
+      "hos": {
+        "name": "Hosea"
+      },
+      "joe": {
+        "name": "Joel"
+      },
+      "amo": {
+        "name": "Amos"
+      },
+      "oba": {
+        "name": "Obadiah"
+      },
+      "jon": {
+        "name": "Jonah"
+      },
+      "mic": {
+        "name": "Micah"
+      },
+      "nah": {
+        "name": "Nahum"
+      },
+      "hab": {
+        "name": "Habakkuk"
+      },
+      "zep": {
+        "name": "Zephaniah"
+      },
+      "hag": {
+        "name": "Haggai"
+      },
+      "zec": {
+        "name": "Zechariah"
+      },
+      "mal": {
+        "name": "Malachi"
+      },
+      "mat": {
+        "name": "Matthew"
+      },
+      "mar": {
+        "name": "Mark"
+      },
+      "luk": {
+        "name": "Luke"
+      },
+      "joh": {
+        "name": "John"
+      },
+      "act": {
+        "name": "Acts"
+      },
+      "rom": {
+        "name": "Romans"
+      },
+      "1co": {
+        "name": "1 Corinthians"
+      },
+      "2co": {
+        "name": "2 Corinthians"
+      },
+      "gal": {
+        "name": "Galatians"
+      },
+      "eph": {
+        "name": "Ephesians"
+      },
+      "phi": {
+        "name": "Philippians"
+      },
+      "col": {
+        "name": "Colossians"
+      },
+      "1th": {
+        "name": "1 Thessalonians"
+      },
+      "2th": {
+        "name": "2 Thessalonians"
+      },
+      "1ti": {
+        "name": "1 Timothy"
+      },
+      "2ti": {
+        "name": "2 Timothy"
+      },
+      "tit": {
+        "name": "Titus"
+      },
+      "phm": {
+        "name": "Philemon"
+      },
+      "heb": {
+        "name": "Hebrews"
+      },
+      "jas": {
+        "name": "James"
+      },
+      "1pe": {
+        "name": "1 Peter"
+      },
+      "2pe": {
+        "name": "2 Peter"
+      },
+      "1jo": {
+        "name": "1 John"
+      },
+      "2jo": {
+        "name": "2 John"
+      },
+      "3jo": {
+        "name": "3 John"
+      },
+      "jud": {
+        "name": "Jude"
+      },
+      "rev": {
+        "name": "Revelation"
+      }
     }
   },
   "folder": {
@@ -335,7 +467,19 @@
       "azureSpeechRegion": "Azure Speech Service Region",
       "testConnection": "Test Connection",
       "testing": "Testing...",
-      "maxSessionDuration": "Voice Recognition Max Duration"
+      "maxSessionDuration": "Voice Recognition Max Duration",
+      "speechProvider": "Speech Provider",
+      "gcpSpeechKey": "Google Cloud API Key",
+      "gcpSpeechKeyPlaceholder": "Enter your API key",
+      "whisperModelDir": "Whisper Model Directory",
+      "whisperSelectDir": "Select Directory",
+      "whisperNoDirSelected": "No directory selected",
+      "whisperDownloadModels": "Download Models",
+      "speechLanguage": "Language",
+      "providerAzure": "Azure Speech",
+      "providerGcp": "Google Cloud STT",
+      "providerWebSpeech": "Web Speech API",
+      "providerWhisper": "Whisper (Local)"
     }
   },
   "error": {
@@ -368,7 +512,10 @@
     "azureSpeechSaveFailed": "Failed to save Azure Speech settings",
     "azureSpeechKeyRequired": "API key is required",
     "azureSpeechTestSuccess": "Connection test successful",
-    "azureSpeechTestFailed": "Connection test failed"
+    "azureSpeechTestFailed": "Connection test failed",
+    "gcpSpeechSaved": "Google Cloud STT settings saved",
+    "gcpSpeechCleared": "Google Cloud STT settings cleared",
+    "gcpSpeechSaveFailed": "Failed to save Google Cloud STT settings"
   },
   "shortcuts": {
     "title": "Keyboard Shortcuts",

@@ -1,7 +1,7 @@
 import * as sdk from 'microsoft-cognitiveservices-speech-sdk'
-import { parseVerseReference } from '../verse-parser'
-import { matchBookName } from '../bible-book-matcher'
-import { getBiblePhrases } from './bible-phrases'
+import { parseVerseReference } from '../../verse-parser'
+import { matchBookName } from '../../bible-book-matcher'
+import { getBiblePhrases } from '../bible-phrases'
 import type {
   SpeechAdapter,
   SpeechAdapterConfig,
@@ -9,7 +9,7 @@ import type {
   SpeechAdapterEventListener,
   SpeechAdapterEventMap,
   SpeechRecognizedResult
-} from './speech-adapter.interface'
+} from '../speech-adapter.interface'
 
 export class AzureSpeechAdapter implements SpeechAdapter {
   private recognizer: sdk.SpeechRecognizer | null = null

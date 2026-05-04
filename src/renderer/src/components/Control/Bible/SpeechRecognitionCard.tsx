@@ -9,7 +9,7 @@ import { useBibleStore } from '@renderer/stores/bible'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 import { useBibleSpeechStore } from '@renderer/stores/bible-speech'
 import { loadSpeechKey } from '@renderer/lib/speech-key-storage'
-import { createSpeechAdapter } from '@renderer/lib/speech-adapter'
+import { createSpeechAdapter, AzureSpeechAdapter } from '@renderer/lib/speech-adapter'
 import type { SpeechAdapter } from '@renderer/lib/speech-adapter/speech-adapter.interface'
 import { parseVerseReference } from '@renderer/lib/verse-parser'
 import { matchBookName, getBookConfig } from '@renderer/lib/bible-book-matcher'
@@ -142,21 +142,36 @@ export default function SpeechRecognitionCard(): React.JSX.Element {
 
   const handleStartRecognition = async (): Promise<void> => {
     try {
-      const apiKey = await loadSpeechKey('azure')
-      if (!apiKey || !speech.azure.region) {
-        setError('config-required')
-        return
+      const provider = speech.activeProvider
+      let newAdapter: SpeechAdapter
+
+      if (provider === 'azure') {
+        const apiKey = await loadSpeechKey('azure')
+        if (!apiKey || !speech.azure.region) {
+          setError('config-required')
+          return
+        }
+        const locale =
+          i18n.language === 'zh-TW' ? 'zh-TW' : i18n.language === 'zh-CN' ? 'zh-CN' : 'en-US'
+        newAdapter = new AzureSpeechAdapter({
+          subscriptionKey: apiKey,
+          region: speech.azure.region,
+          language: locale as 'zh-TW' | 'zh-CN',
+          maxSessionMs: speechMaxSessionSec * 1000
+        })
+      } else if (provider === 'whisper') {
+        if (!speech.whisper.modelDir) {
+          setError('config-required')
+          return
+        }
+        newAdapter = createSpeechAdapter(provider, speech, {
+          maxSessionMs: speechMaxSessionSec * 1000
+        })
+      } else {
+        newAdapter = createSpeechAdapter(provider, speech, {
+          maxSessionMs: speechMaxSessionSec * 1000
+        })
       }
-
-      const locale =
-        i18n.language === 'zh-TW' ? 'zh-TW' : i18n.language === 'zh-CN' ? 'zh-CN' : 'en-US'
-
-      const newAdapter = createSpeechAdapter({
-        subscriptionKey: apiKey,
-        region: speech.azure.region,
-        language: locale,
-        maxSessionMs: speechMaxSessionSec * 1000
-      })
 
       newAdapter.on('recognized', (data) => {
         if (data.text) {
@@ -248,7 +263,15 @@ export default function SpeechRecognitionCard(): React.JSX.Element {
     })
   }
 
-  const canStart = !isRecognizing && speech.azure.region && isOnline
+  const canStart =
+    !isRecognizing &&
+    isOnline &&
+    (() => {
+      const p = speech.activeProvider
+      if (p === 'azure') return !!speech.azure.region
+      if (p === 'whisper') return !!speech.whisper.modelDir
+      return true
+    })()
 
   return (
     <Card className="flex flex-col h-full p-0 gap-2">

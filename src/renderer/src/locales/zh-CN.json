@@ -167,72 +167,204 @@
     },
     "verseUnit": "节",
     "books": {
-      "gen": { "name": "创世记" },
-      "exo": { "name": "出埃及记" },
-      "lev": { "name": "利未记" },
-      "num": { "name": "民数记" },
-      "deu": { "name": "申命记" },
-      "jos": { "name": "约书亚记" },
-      "jdg": { "name": "士师记" },
-      "rut": { "name": "路得记" },
-      "1sa": { "name": "撒母耳记上" },
-      "2sa": { "name": "撒母耳记下" },
-      "1ki": { "name": "列王纪上" },
-      "2ki": { "name": "列王纪下" },
-      "1ch": { "name": "历代志上" },
-      "2ch": { "name": "历代志下" },
-      "ezr": { "name": "以斯拉记" },
-      "neh": { "name": "尼希米记" },
-      "est": { "name": "以斯帖记" },
-      "job": { "name": "约伯记" },
-      "psa": { "name": "诗篇" },
-      "pro": { "name": "箴言" },
-      "ecc": { "name": "传道书" },
-      "sol": { "name": "雅歌" },
-      "isa": { "name": "以赛亚书" },
-      "jer": { "name": "耶利米书" },
-      "lam": { "name": "耶利米哀歌" },
-      "eze": { "name": "以西结书" },
-      "dan": { "name": "但以理书" },
-      "hos": { "name": "何西阿书" },
-      "joe": { "name": "约珥书" },
-      "amo": { "name": "阿摩司书" },
-      "oba": { "name": "俄巴底亚书" },
-      "jon": { "name": "约拿书" },
-      "mic": { "name": "弥迦书" },
-      "nah": { "name": "那鸿书" },
-      "hab": { "name": "哈巴谷书" },
-      "zep": { "name": "西番雅书" },
-      "hag": { "name": "哈该书" },
-      "zec": { "name": "撒迦利亚书" },
-      "mal": { "name": "玛拉基书" },
-      "mat": { "name": "马太福音" },
-      "mar": { "name": "马可福音" },
-      "luk": { "name": "路加福音" },
-      "joh": { "name": "约翰福音" },
-      "act": { "name": "使徒行传" },
-      "rom": { "name": "罗马书" },
-      "1co": { "name": "哥林多前书" },
-      "2co": { "name": "哥林多后书" },
-      "gal": { "name": "加拉太书" },
-      "eph": { "name": "以弗所书" },
-      "phi": { "name": "腓立比书" },
-      "col": { "name": "歌罗西书" },
-      "1th": { "name": "帖撒罗尼迦前书" },
-      "2th": { "name": "帖撒罗尼迦后书" },
-      "1ti": { "name": "提摩太前书" },
-      "2ti": { "name": "提摩太后书" },
-      "tit": { "name": "提多书" },
-      "phm": { "name": "腓利门书" },
-      "heb": { "name": "希伯来书" },
-      "jas": { "name": "雅各书" },
-      "1pe": { "name": "彼得前书" },
-      "2pe": { "name": "彼得后书" },
-      "1jo": { "name": "约翰一书" },
-      "2jo": { "name": "约翰二书" },
-      "3jo": { "name": "约翰三书" },
-      "jud": { "name": "犹大书" },
-      "rev": { "name": "启示录" }
+      "gen": {
+        "name": "创世记"
+      },
+      "exo": {
+        "name": "出埃及记"
+      },
+      "lev": {
+        "name": "利未记"
+      },
+      "num": {
+        "name": "民数记"
+      },
+      "deu": {
+        "name": "申命记"
+      },
+      "jos": {
+        "name": "约书亚记"
+      },
+      "jdg": {
+        "name": "士师记"
+      },
+      "rut": {
+        "name": "路得记"
+      },
+      "1sa": {
+        "name": "撒母耳记上"
+      },
+      "2sa": {
+        "name": "撒母耳记下"
+      },
+      "1ki": {
+        "name": "列王纪上"
+      },
+      "2ki": {
+        "name": "列王纪下"
+      },
+      "1ch": {
+        "name": "历代志上"
+      },
+      "2ch": {
+        "name": "历代志下"
+      },
+      "ezr": {
+        "name": "以斯拉记"
+      },
+      "neh": {
+        "name": "尼希米记"
+      },
+      "est": {
+        "name": "以斯帖记"
+      },
+      "job": {
+        "name": "约伯记"
+      },
+      "psa": {
+        "name": "诗篇"
+      },
+      "pro": {
+        "name": "箴言"
+      },
+      "ecc": {
+        "name": "传道书"
+      },
+      "sol": {
+        "name": "雅歌"
+      },
+      "isa": {
+        "name": "以赛亚书"
+      },
+      "jer": {
+        "name": "耶利米书"
+      },
+      "lam": {
+        "name": "耶利米哀歌"
+      },
+      "eze": {
+        "name": "以西结书"
+      },
+      "dan": {
+        "name": "但以理书"
+      },
+      "hos": {
+        "name": "何西阿书"
+      },
+      "joe": {
+        "name": "约珥书"
+      },
+      "amo": {
+        "name": "阿摩司书"
+      },
+      "oba": {
+        "name": "俄巴底亚书"
+      },
+      "jon": {
+        "name": "约拿书"
+      },
+      "mic": {
+        "name": "弥迦书"
+      },
+      "nah": {
+        "name": "那鸿书"
+      },
+      "hab": {
+        "name": "哈巴谷书"
+      },
+      "zep": {
+        "name": "西番雅书"
+      },
+      "hag": {
+        "name": "哈该书"
+      },
+      "zec": {
+        "name": "撒迦利亚书"
+      },
+      "mal": {
+        "name": "玛拉基书"
+      },
+      "mat": {
+        "name": "马太福音"
+      },
+      "mar": {
+        "name": "马可福音"
+      },
+      "luk": {
+        "name": "路加福音"
+      },
+      "joh": {
+        "name": "约翰福音"
+      },
+      "act": {
+        "name": "使徒行传"
+      },
+      "rom": {
+        "name": "罗马书"
+      },
+      "1co": {
+        "name": "哥林多前书"
+      },
+      "2co": {
+        "name": "哥林多后书"
+      },
+      "gal": {
+        "name": "加拉太书"
+      },
+      "eph": {
+        "name": "以弗所书"
+      },
+      "phi": {
+        "name": "腓立比书"
+      },
+      "col": {
+        "name": "歌罗西书"
+      },
+      "1th": {
+        "name": "帖撒罗尼迦前书"
+      },
+      "2th": {
+        "name": "帖撒罗尼迦后书"
+      },
+      "1ti": {
+        "name": "提摩太前书"
+      },
+      "2ti": {
+        "name": "提摩太后书"
+      },
+      "tit": {
+        "name": "提多书"
+      },
+      "phm": {
+        "name": "腓利门书"
+      },
+      "heb": {
+        "name": "希伯来书"
+      },
+      "jas": {
+        "name": "雅各书"
+      },
+      "1pe": {
+        "name": "彼得前书"
+      },
+      "2pe": {
+        "name": "彼得后书"
+      },
+      "1jo": {
+        "name": "约翰一书"
+      },
+      "2jo": {
+        "name": "约翰二书"
+      },
+      "3jo": {
+        "name": "约翰三书"
+      },
+      "jud": {
+        "name": "犹大书"
+      },
+      "rev": {
+        "name": "启示录"
+      }
     }
   },
   "folder": {
@@ -335,7 +467,19 @@
       "azureSpeechRegion": "Azure Speech Service 区域",
       "testConnection": "测试连接",
       "testing": "测试中...",
-      "maxSessionDuration": "语音识别最大时长"
+      "maxSessionDuration": "语音识别最大时长",
+      "speechProvider": "语音识别提供商",
+      "gcpSpeechKey": "Google Cloud API 密钥",
+      "gcpSpeechKeyPlaceholder": "输入您的 API 密钥",
+      "whisperModelDir": "Whisper 模型目录",
+      "whisperSelectDir": "选择目录",
+      "whisperNoDirSelected": "尚未选择目录",
+      "whisperDownloadModels": "下载模型",
+      "speechLanguage": "语言",
+      "providerAzure": "Azure 语音",
+      "providerGcp": "Google Cloud STT",
+      "providerWebSpeech": "Web Speech API",
+      "providerWhisper": "Whisper（本地）"
     }
   },
   "error": {
@@ -368,7 +512,10 @@
     "azureSpeechSaveFailed": "保存 Azure 语音设置失败",
     "azureSpeechKeyRequired": "需要 API 密钥",
     "azureSpeechTestSuccess": "连接测试成功",
-    "azureSpeechTestFailed": "连接测试失败"
+    "azureSpeechTestFailed": "连接测试失败",
+    "gcpSpeechSaved": "Google Cloud STT 设置已保存",
+    "gcpSpeechCleared": "Google Cloud STT 设置已清除",
+    "gcpSpeechSaveFailed": "保存 Google Cloud STT 设置失败"
   },
   "shortcuts": {
     "title": "键盘快捷键",
