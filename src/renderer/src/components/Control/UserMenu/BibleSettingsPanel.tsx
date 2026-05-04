@@ -16,9 +16,9 @@ import { isElectron } from '@renderer/lib/env'
 import type { WhisperModel, WhisperDownloadProgress } from '@shared/ipc-channels'
 
 const WHISPER_MODEL_OPTIONS: { value: WhisperModel; label: string }[] = [
-  { value: 'whisper-base', label: 'Whisper Base (~75 MB)' },
-  { value: 'whisper-small', label: 'Whisper Small (~240 MB)' },
-  { value: 'whisper-medium', label: 'Whisper Medium (~460 MB)' }
+  { value: 'whisper-base', label: 'Base (~75 MB)' },
+  { value: 'whisper-small', label: 'Small (~240 MB)' },
+  { value: 'whisper-medium', label: 'Medium (~460 MB)' }
 ]
 
 const PROVIDER_OPTIONS: { value: SpeechProvider; electronOnly?: boolean; webOnly?: boolean }[] = [
