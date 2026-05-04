@@ -174,11 +174,18 @@ export class BrowserSpeechAdapter implements SpeechAdapter {
 
       this.recognizer.recognized = (_s, e) => {
         if (e.result.reason === sdk.ResultReason.RecognizedSpeech) {
-          this.recordActivity()
           const text = e.result.text
           const confidence = this.extractConfidence(e.result)
 
+          if (text && text.trim().length > 0) {
+            this.recordActivity()
+          }
+
           this.emit('rawRecognized', { text, confidence })
+
+          if (!text || text.trim().length === 0) {
+            return
+          }
 
           if (confidence !== null && confidence < 0.4) {
             return
