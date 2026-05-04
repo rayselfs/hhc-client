@@ -518,7 +518,10 @@
     "azureSpeechTestFailed": "Connection test failed",
     "gcpSpeechSaved": "Google Cloud STT settings saved",
     "gcpSpeechCleared": "Google Cloud STT settings cleared",
-    "gcpSpeechSaveFailed": "Failed to save Google Cloud STT settings"
+    "gcpSpeechSaveFailed": "Failed to save Google Cloud STT settings",
+    "gcpSpeechKeyRequired": "Please enter a Google Cloud API key",
+    "gcpSpeechTestSuccess": "Google Cloud STT connection successful",
+    "gcpSpeechTestFailed": "Google Cloud STT connection failed"
   },
   "shortcuts": {
     "title": "Keyboard Shortcuts",

@@ -74,7 +74,6 @@ export interface GcpSpeechConfig {
 
 export interface WhisperSpeechConfig {
   modelDir: string
-  language: 'zh-TW' | 'zh-CN'
 }
 
 export interface SpeechSettings {
@@ -88,7 +87,7 @@ export const DEFAULT_SPEECH: SpeechSettings = {
   activeProvider: 'azure',
   azure: { region: 'eastasia', language: 'zh-TW' },
   gcp: { language: 'cmn-Hant-TW' },
-  whisper: { modelDir: '', language: 'zh-TW' }
+  whisper: { modelDir: '' }
 }
 
 export interface SettingsStore {

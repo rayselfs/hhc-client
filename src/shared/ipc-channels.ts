@@ -16,7 +16,7 @@ import type {
 } from './types/timer'
 import type { BibleVersion, BibleBook } from './types/bible'
 
-export type WhisperModel = 'whisper-base' | 'whisper-small'
+export type WhisperModel = 'whisper-base' | 'whisper-small' | 'whisper-medium'
 
 export interface WhisperDownloadProgress {
   model: WhisperModel

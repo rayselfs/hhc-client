@@ -518,7 +518,10 @@
     "azureSpeechTestFailed": "连接测试失败",
     "gcpSpeechSaved": "Google Cloud STT 设置已保存",
     "gcpSpeechCleared": "Google Cloud STT 设置已清除",
-    "gcpSpeechSaveFailed": "保存 Google Cloud STT 设置失败"
+    "gcpSpeechSaveFailed": "保存 Google Cloud STT 设置失败",
+    "gcpSpeechKeyRequired": "请输入 Google Cloud API 密钥",
+    "gcpSpeechTestSuccess": "Google Cloud STT 连接成功",
+    "gcpSpeechTestFailed": "Google Cloud STT 连接失败"
   },
   "shortcuts": {
     "title": "键盘快捷键",

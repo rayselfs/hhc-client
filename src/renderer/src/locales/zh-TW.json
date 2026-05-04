@@ -518,7 +518,10 @@
     "azureSpeechTestFailed": "連線測試失敗",
     "gcpSpeechSaved": "Google Cloud STT 設定已儲存",
     "gcpSpeechCleared": "Google Cloud STT 設定已清除",
-    "gcpSpeechSaveFailed": "儲存 Google Cloud STT 設定失敗"
+    "gcpSpeechSaveFailed": "儲存 Google Cloud STT 設定失敗",
+    "gcpSpeechKeyRequired": "請輸入 Google Cloud API 金鑰",
+    "gcpSpeechTestSuccess": "Google Cloud STT 連線成功",
+    "gcpSpeechTestFailed": "Google Cloud STT 連線失敗"
   },
   "shortcuts": {
     "title": "鍵盤快速鍵",

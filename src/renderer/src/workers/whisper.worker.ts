@@ -4,7 +4,7 @@
  * Only active in Electron mode (custom protocol requires main process registration)
  */
 
-export type WhisperWorkerIncoming = { type: 'transcribe'; audio: Float32Array; language?: string }
+export type WhisperWorkerIncoming = { type: 'transcribe'; audio: Float32Array }
 
 export type WhisperWorkerOutgoing =
   | { type: 'result'; text: string }

@@ -37,6 +37,20 @@ const WHISPER_FILES: Record<string, string[]> = {
     'added_tokens.json',
     'onnx/encoder_model_quantized.onnx',
     'onnx/decoder_model_merged_quantized.onnx'
+  ],
+  'whisper-medium': [
+    'config.json',
+    'generation_config.json',
+    'tokenizer.json',
+    'tokenizer_config.json',
+    'special_tokens_map.json',
+    'normalizer.json',
+    'preprocessor_config.json',
+    'vocab.json',
+    'merges.txt',
+    'added_tokens.json',
+    'onnx/encoder_model_quantized.onnx',
+    'onnx/decoder_model_merged_quantized.onnx'
   ]
 }
 
@@ -129,7 +143,7 @@ export function registerAppIpc(wm: WindowManager): void {
 
   ipcMain.handle('app:select-directory', async (event) => {
     if (!isMainWindow(wm, event)) return null
-    const result = await dialog.showOpenDialog({ properties: ['openDirectory'] })
+    const result = await dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'] })
     return result.canceled ? null : result.filePaths[0]
   })
 

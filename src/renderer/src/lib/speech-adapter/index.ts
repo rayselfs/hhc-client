@@ -44,7 +44,6 @@ export function createSpeechAdapter(
       })
     case 'whisper':
       return new WhisperSpeechAdapter({
-        language: sp.whisper.language,
         maxSessionMs: opts?.maxSessionMs
       })
   }

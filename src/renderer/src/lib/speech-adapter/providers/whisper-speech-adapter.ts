@@ -7,7 +7,6 @@ import type {
 import type { WhisperWorkerIncoming, WhisperWorkerOutgoing } from '@renderer/workers/whisper.worker'
 
 export interface WhisperSpeechAdapterConfig {
-  language: 'zh-TW' | 'zh-CN'
   maxSessionMs?: number
   idleTimeoutMs?: number
 }
@@ -20,17 +19,13 @@ export class WhisperSpeechAdapter implements SpeechAdapter {
   private batchIntervalId: ReturnType<typeof setInterval> | null = null
   private chunks: Blob[] = []
   private listeners: Map<SpeechAdapterEventType, Set<SpeechAdapterEventListener<any>>> = new Map()
-  private config: WhisperSpeechAdapterConfig
 
-  constructor(config: WhisperSpeechAdapterConfig) {
-    this.config = config
-  }
+  constructor(_config: WhisperSpeechAdapterConfig = {}) {}
 
   async start(): Promise<void> {
-    this.worker = new Worker(
-      new URL('../../../workers/whisper.worker.ts', import.meta.url),
-      { type: 'module' }
-    )
+    this.worker = new Worker(new URL('../../../workers/whisper.worker.ts', import.meta.url), {
+      type: 'module'
+    })
 
     this.worker.onmessage = (event: MessageEvent<WhisperWorkerOutgoing>) => {
       const msg = event.data
@@ -75,7 +70,10 @@ export class WhisperSpeechAdapter implements SpeechAdapter {
     const float32 = audioBuffer.getChannelData(0)
     audioContext.close()
 
-    this.worker.postMessage({ type: 'transcribe', audio: float32, language: this.config.language } satisfies WhisperWorkerIncoming)
+    this.worker.postMessage({
+      type: 'transcribe',
+      audio: float32
+    } satisfies WhisperWorkerIncoming)
   }
 
   async stop(): Promise<void> {

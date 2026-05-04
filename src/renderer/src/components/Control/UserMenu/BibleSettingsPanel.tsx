@@ -5,7 +5,7 @@ import { Select } from '@heroui/react/select'
 import { ListBox } from '@heroui/react/list-box'
 import { Button } from '@heroui/react/button'
 import { Label } from 'react-aria-components'
-import { Eye, EyeOff, FolderOpen, Download } from 'lucide-react'
+import { Eye, EyeOff, Download } from 'lucide-react'
 import { useSettingsStore, AZURE_REGION_OPTIONS } from '@renderer/stores/settings'
 import type { SpeechProvider } from '@renderer/stores/settings'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
@@ -17,7 +17,8 @@ import type { WhisperModel, WhisperDownloadProgress } from '@shared/ipc-channels
 
 const WHISPER_MODEL_OPTIONS: { value: WhisperModel; label: string }[] = [
   { value: 'whisper-base', label: 'Whisper Base (~75 MB)' },
-  { value: 'whisper-small', label: 'Whisper Small (~240 MB)' }
+  { value: 'whisper-small', label: 'Whisper Small (~240 MB)' },
+  { value: 'whisper-medium', label: 'Whisper Medium (~460 MB)' }
 ]
 
 const PROVIDER_OPTIONS: { value: SpeechProvider; electronOnly?: boolean; webOnly?: boolean }[] = [
@@ -48,7 +49,7 @@ export default function BibleSettingsPanel(): React.JSX.Element {
   const [azureRegion, setAzureRegion] = useState(speech.azure.region)
   const [originalAzureRegion, setOriginalAzureRegion] = useState(speech.azure.region)
   const [isLoadingAzureKey, setIsLoadingAzureKey] = useState(true)
-  const [isTesting, setIsTesting] = useState(false)
+  const [isAzureTesting, setIsAzureTesting] = useState(false)
   const [azureTestPassed, setAzureTestPassed] = useState(false)
 
   // GCP state
@@ -56,6 +57,8 @@ export default function BibleSettingsPanel(): React.JSX.Element {
   const [originalGcpKey, setOriginalGcpKey] = useState('')
   const [showGcpKey, setShowGcpKey] = useState(false)
   const [isLoadingGcpKey, setIsLoadingGcpKey] = useState(true)
+  const [isGcpTesting, setIsGcpTesting] = useState(false)
+  const [gcpTestPassed, setGcpTestPassed] = useState(false)
 
   // Whisper state
   const [whisperDir, setWhisperDir] = useState(speech.whisper.modelDir)
@@ -88,6 +91,7 @@ export default function BibleSettingsPanel(): React.JSX.Element {
         const loaded = key ?? ''
         setGcpKey(loaded)
         setOriginalGcpKey(loaded)
+        if (loaded) setGcpTestPassed(true)
       })
       .catch((e) => console.error('[BibleSettings] Failed to load GCP key:', e))
       .finally(() => setIsLoadingGcpKey(false))
@@ -112,6 +116,13 @@ export default function BibleSettingsPanel(): React.JSX.Element {
     }
   }, [azureKey, azureRegion, originalAzureKey, originalAzureRegion])
 
+  // Reset gcp test if key changes
+  useEffect(() => {
+    if (gcpKey !== originalGcpKey) {
+      setGcpTestPassed(false)
+    }
+  }, [gcpKey, originalGcpKey])
+
   // --- Azure handlers ---
   const handleAzureSave = async (): Promise<void> => {
     try {
@@ -133,12 +144,12 @@ export default function BibleSettingsPanel(): React.JSX.Element {
     }
   }
 
-  const handleTestConnection = async (): Promise<void> => {
+  const handleAzureTestConnection = async (): Promise<void> => {
     if (!azureKey.trim()) {
       toast.warning(t('toast.azureSpeechKeyRequired'))
       return
     }
-    setIsTesting(true)
+    setIsAzureTesting(true)
     try {
       const { SpeechConfig, SpeechRecognizer } =
         await import('microsoft-cognitiveservices-speech-sdk')
@@ -174,11 +185,11 @@ export default function BibleSettingsPanel(): React.JSX.Element {
       toast.success(t('toast.azureSpeechTestSuccess'))
       setAzureTestPassed(true)
     } catch (error) {
-      console.error('[BibleSettings] Test connection failed:', error)
+      console.error('[BibleSettings] Azure test connection failed:', error)
       toast.danger(t('toast.azureSpeechTestFailed'))
       setAzureTestPassed(false)
     } finally {
-      setIsTesting(false)
+      setIsAzureTesting(false)
     }
   }
 
@@ -194,6 +205,7 @@ export default function BibleSettingsPanel(): React.JSX.Element {
       } else {
         await deleteSpeechKey('gcp')
         setOriginalGcpKey('')
+        setGcpTestPassed(false)
         toast.success(t('toast.gcpSpeechCleared'))
       }
     } catch (error) {
@@ -202,19 +214,47 @@ export default function BibleSettingsPanel(): React.JSX.Element {
     }
   }
 
-  const gcpHasChanges = gcpKey !== originalGcpKey
-
-  // --- Whisper handlers ---
-  const handleSelectWhisperDir = async (): Promise<void> => {
-    if (!isElectron()) return
-    const dir = await window.api.app.selectDirectory()
-    if (dir) {
-      await window.api.app.setModelDir(dir)
-      setWhisperDir(dir)
-      setSpeech({ ...speech, whisper: { ...speech.whisper, modelDir: dir } })
+  const handleGcpTestConnection = async (): Promise<void> => {
+    if (!gcpKey.trim()) {
+      toast.warning(t('toast.gcpSpeechKeyRequired'))
+      return
+    }
+    setIsGcpTesting(true)
+    try {
+      const silentAudio = new Uint8Array(1600)
+      const base64 = btoa(String.fromCharCode(...silentAudio))
+      const response = await fetch(
+        `https://speech.googleapis.com/v1/speech:recognize?key=${gcpKey.trim()}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            config: { encoding: 'LINEAR16', sampleRateHertz: 8000, languageCode: 'zh-TW' },
+            audio: { content: base64 }
+          })
+        }
+      )
+      if (response.ok || response.status === 200) {
+        toast.success(t('toast.gcpSpeechTestSuccess'))
+        setGcpTestPassed(true)
+      } else {
+        const body = await response.json().catch(() => ({}))
+        const message =
+          (body as { error?: { message?: string } })?.error?.message ?? response.statusText
+        throw new Error(message)
+      }
+    } catch (error) {
+      console.error('[BibleSettings] GCP test connection failed:', error)
+      toast.danger(t('toast.gcpSpeechTestFailed'))
+      setGcpTestPassed(false)
+    } finally {
+      setIsGcpTesting(false)
     }
   }
 
+  const gcpHasChanges = gcpKey !== originalGcpKey
+
+  // --- Whisper handlers ---
   const handleDownloadWhisper = async (): Promise<void> => {
     if (!isElectron()) return
     const dir = await window.api.app.selectDirectory()
@@ -351,16 +391,18 @@ export default function BibleSettingsPanel(): React.JSX.Element {
             </Button>
             <Button
               variant="tertiary"
-              onPress={handleTestConnection}
+              onPress={handleAzureTestConnection}
               isDisabled={
                 isLoadingAzureKey ||
                 !azureKey.trim() ||
-                isTesting ||
+                isAzureTesting ||
                 (azureTestPassed && !azureHasChanges)
               }
               className="rounded-full"
             >
-              {isTesting ? t('preferences.bible.testing') : t('preferences.bible.testConnection')}
+              {isAzureTesting
+                ? t('preferences.bible.testing')
+                : t('preferences.bible.testConnection')}
             </Button>
           </div>
         </div>
@@ -396,10 +438,25 @@ export default function BibleSettingsPanel(): React.JSX.Element {
             <Button
               variant="primary"
               onPress={handleGcpSave}
-              isDisabled={isLoadingGcpKey || !gcpHasChanges}
+              isDisabled={isLoadingGcpKey || !gcpTestPassed || !gcpHasChanges}
               className="rounded-full"
             >
               {t('common.save')}
+            </Button>
+            <Button
+              variant="tertiary"
+              onPress={handleGcpTestConnection}
+              isDisabled={
+                isLoadingGcpKey ||
+                !gcpKey.trim() ||
+                isGcpTesting ||
+                (gcpTestPassed && !gcpHasChanges)
+              }
+              className="rounded-full"
+            >
+              {isGcpTesting
+                ? t('preferences.bible.testing')
+                : t('preferences.bible.testConnection')}
             </Button>
           </div>
         </div>
@@ -451,58 +508,10 @@ export default function BibleSettingsPanel(): React.JSX.Element {
         <div className="space-y-4">
           <div>
             <Label className="mb-2 block">{t('preferences.bible.whisperModelDir')}</Label>
-            <div className="flex gap-2 items-center">
-              <div className="flex-1 text-sm text-muted truncate rounded-full bg-secondary px-4 py-2 min-w-0">
-                {whisperDir || t('preferences.bible.whisperNoDirSelected')}
-              </div>
-              {isElectron() && (
-                <Button
-                  variant="secondary"
-                  onPress={handleSelectWhisperDir}
-                  className="rounded-full shrink-0 flex items-center gap-1.5"
-                >
-                  <FolderOpen className="size-4" />
-                  {t('preferences.bible.whisperSelectDir')}
-                </Button>
-              )}
+            <div className="text-sm text-muted truncate rounded-full bg-secondary px-4 py-2">
+              {whisperDir || t('preferences.bible.whisperNoDirSelected')}
             </div>
           </div>
-
-          <Select
-            variant="secondary"
-            value={speech.whisper.language}
-            onChange={(key) =>
-              setSpeech({
-                ...speech,
-                whisper: { ...speech.whisper, language: key as 'zh-TW' | 'zh-CN' }
-              })
-            }
-            aria-label={t('preferences.bible.speechLanguage')}
-          >
-            <Label>{t('preferences.bible.speechLanguage')}</Label>
-            <Select.Trigger className="rounded-full pl-5">
-              <Select.Value />
-              <Select.Indicator />
-            </Select.Trigger>
-            <Select.Popover>
-              <ListBox>
-                <ListBox.Item
-                  id="zh-TW"
-                  textValue="繁體中文 (zh-TW)"
-                  className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
-                >
-                  繁體中文 (zh-TW)
-                </ListBox.Item>
-                <ListBox.Item
-                  id="zh-CN"
-                  textValue="简体中文 (zh-CN)"
-                  className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
-                >
-                  简体中文 (zh-CN)
-                </ListBox.Item>
-              </ListBox>
-            </Select.Popover>
-          </Select>
 
           {isElectron() && (
             <div className="space-y-3">
