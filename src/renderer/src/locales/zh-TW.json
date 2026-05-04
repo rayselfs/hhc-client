@@ -132,8 +132,7 @@
       "noResults": "無結果"
     },
     "speech": {
-      "title": "經文辨識",
-      "start": "開始偵測",
+      "start": "開始偵測經文",
       "stop": "停止偵測",
       "listening": "正在聆聽...",
       "empty": "未辨識任何經文",

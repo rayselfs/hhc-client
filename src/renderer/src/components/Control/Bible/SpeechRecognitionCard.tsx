@@ -245,18 +245,21 @@ export default function SpeechRecognitionCard(): React.JSX.Element {
     <Card className="flex flex-col h-full p-0 gap-2">
       <Card.Header className="shrink-0 flex-row! items-center justify-between p-0 pt-2 px-3">
         <div className="flex items-center gap-1">
-          <h3 className="text-sm font-medium">{t('bible.speech.title')}</h3>
           <Button
             size="sm"
             variant={isRecognizing ? 'danger' : 'primary'}
             onPress={isRecognizing ? handleStopRecognition : handleStartRecognition}
             isDisabled={!canStart && !isRecognizing}
-            className="flex items-center gap-1.5 max-lg:gap-1"
+            className="flex items-center gap-1.5"
           >
-            {isRecognizing ? <MicOff size={16} /> : <Mic size={16} />}
             <span className="max-lg:hidden">
               {isRecognizing ? t('bible.speech.stop') : t('bible.speech.start')}
             </span>
+            {isRecognizing ? (
+              <MicOff size={16} className="lg:hidden" />
+            ) : (
+              <Mic size={16} className="lg:hidden" />
+            )}
           </Button>
           <span className="text-xs text-muted tabular-nums ml-1">
             {formatDurationHMS(elapsedSeconds)}

@@ -132,8 +132,7 @@
       "noResults": "No results"
     },
     "speech": {
-      "title": "Verse Recognition",
-      "start": "Start Detection",
+      "start": "Detect Scripture",
       "stop": "Stop Detection",
       "listening": "Listening...",
       "empty": "No verses recognized yet",

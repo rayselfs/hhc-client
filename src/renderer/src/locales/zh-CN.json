@@ -132,8 +132,7 @@
       "noResults": "无结果"
     },
     "speech": {
-      "title": "经文识别",
-      "start": "开始检测",
+      "start": "开始检测经文",
       "stop": "停止检测",
       "listening": "正在聆听...",
       "empty": "未识别任何经文",
