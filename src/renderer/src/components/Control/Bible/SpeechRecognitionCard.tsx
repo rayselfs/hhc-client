@@ -7,6 +7,7 @@ import { Download, Mic, MicOff, Trash2, X } from 'lucide-react'
 import { useSettingsStore } from '@renderer/stores/settings'
 import { useBibleStore } from '@renderer/stores/bible'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
+import { useBibleSpeechStore } from '@renderer/stores/bible-speech'
 import { loadAzureSpeechKey } from '@renderer/lib/azure-speech-key-storage'
 import { createSpeechAdapter } from '@renderer/lib/speech-adapter'
 import type { SpeechAdapter } from '@renderer/lib/speech-adapter/speech-adapter.interface'
@@ -38,12 +39,15 @@ export default function SpeechRecognitionCard(): React.JSX.Element {
   const selectedVersionId = useBibleSettingsStore((s) => s.selectedVersionId)
   const bibleContent = useBibleStore((s) => s.content)
 
+  const elapsedSeconds = useBibleSpeechStore((s) => s.elapsedSeconds)
+  const incrementElapsedSeconds = useBibleSpeechStore((s) => s.incrementElapsedSeconds)
+  const resetElapsedSeconds = useBibleSpeechStore((s) => s.resetElapsedSeconds)
+
   const [isRecognizing, setIsRecognizing] = useState(false)
   const [recognizedVerses, setRecognizedVerses] = useState<RecognizedVerse[]>([])
   const [error, setError] = useState<string | null>(null)
   const [adapter, setAdapter] = useState<SpeechAdapter | null>(null)
   const [isOnline, setIsOnline] = useState(navigator.onLine)
-  const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [hasRawLog, setHasRawLog] = useState(false)
 
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -192,11 +196,10 @@ export default function SpeechRecognitionCard(): React.JSX.Element {
         setIsRecognizing(false)
       })
 
-      setElapsedSeconds(0)
       await newAdapter.start()
 
       elapsedTimerRef.current = setInterval(() => {
-        setElapsedSeconds((s) => s + 1)
+        incrementElapsedSeconds()
       }, 1000)
 
       setAdapter(newAdapter)
@@ -212,6 +215,7 @@ export default function SpeechRecognitionCard(): React.JSX.Element {
     rawLogRef.current = []
     setHasRawLog(false)
     setError(null)
+    resetElapsedSeconds()
   }
 
   const handleExportLog = (): void => {
