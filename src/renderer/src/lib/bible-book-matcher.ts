@@ -139,7 +139,7 @@ function pinyinMatch(query: string, threshold: number = 0.75): BookMatch | null 
     const book = BOOK_NAMES[i]
     const normalizedBookPinyin = normalizeText(book.pinyin)
 
-    const similarity = calculateSimilarity(normalizedQuery, normalizedBookPinyin)
+    const similarity = slidingWindowSimilarity(normalizedQuery, normalizedBookPinyin)
     if (similarity >= threshold && similarity > bestScore) {
       const config = BIBLE_BOOKS.find((b) => b.code.toLowerCase() === book.code)
       if (config) {
@@ -204,22 +204,6 @@ function slidingWindowSimilarity(query: string, bookName: string): number {
     if (sim > best) best = sim
   }
   return best
-}
-
-function calculateSimilarity(str1: string, str2: string): number {
-  if (str1 === str2) return 1.0
-  if (!str1 || !str2) return 0.0
-
-  let matches = 0
-  const minLength = Math.min(str1.length, str2.length)
-
-  for (let i = 0; i < minLength; i++) {
-    if (str1[i] === str2[i]) {
-      matches++
-    }
-  }
-
-  return matches / Math.max(str1.length, str2.length)
 }
 
 function calculateLevenshteinDistance(str1: string, str2: string): number {

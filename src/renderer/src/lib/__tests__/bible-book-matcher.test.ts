@@ -94,7 +94,7 @@ describe('matchBookName', () => {
       const result = matchBookName('使徒行传傳')
       expect(result).not.toBeNull()
       expect(result?.bookNumber).toBe(44)
-      expect(result?.confidence).toBe('fuzzy')
+      expect(result?.confidence).toBe('pinyin')
       expect(result?.score).toBeGreaterThan(0.6)
     })
 
@@ -116,7 +116,7 @@ describe('matchBookName', () => {
       const result = matchBookName('我今天要講使徒行傳')
       expect(result).not.toBeNull()
       expect(result?.bookNumber).toBe(44)
-      expect(result?.confidence).toBe('fuzzy')
+      expect(result?.confidence).toBe('pinyin')
       expect(result?.score).toBe(1.0)
     })
 
@@ -124,7 +124,7 @@ describe('matchBookName', () => {
       const result = matchBookName('請翻到約翰福音')
       expect(result).not.toBeNull()
       expect(result?.bookNumber).toBe(43)
-      expect(result?.confidence).toBe('fuzzy')
+      expect(result?.confidence).toBe('pinyin')
       expect(result?.score).toBe(1.0)
     })
 
@@ -140,7 +140,7 @@ describe('matchBookName', () => {
       const result = matchBookName('现在来看使徒行传')
       expect(result).not.toBeNull()
       expect(result?.bookNumber).toBe(44)
-      expect(result?.confidence).toBe('fuzzy')
+      expect(result?.confidence).toBe('pinyin')
       expect(result?.score).toBe(1.0)
     })
   })
