@@ -6,6 +6,7 @@ import { hhcPersistStorage, createKey } from '@renderer/lib/persist-storage'
 import { clearAllSiteData } from '@renderer/lib/site-data'
 import { isElectron } from '@renderer/lib/env'
 import { ThemePreference } from '@renderer/types/theme'
+import type { WhisperModel } from '@shared/ipc-channels'
 
 export const TIMEZONE_OPTIONS = [
   { value: 'Asia/Taipei', labelKey: 'timezones.taipei' },
@@ -74,6 +75,7 @@ export interface GcpSpeechConfig {
 
 export interface WhisperSpeechConfig {
   modelDir: string
+  installedModel: WhisperModel | null
 }
 
 export interface SpeechSettings {
@@ -87,7 +89,7 @@ export const DEFAULT_SPEECH: SpeechSettings = {
   activeProvider: 'azure',
   azure: { region: 'eastasia', language: 'zh-TW' },
   gcp: { language: 'cmn-Hant-TW' },
-  whisper: { modelDir: '' }
+  whisper: { modelDir: '', installedModel: null }
 }
 
 export interface SettingsStore {
@@ -146,7 +148,7 @@ export const useSettingsStore = create<SettingsStore>()(
     {
       name: createKey('settings'),
       storage: hhcPersistStorage,
-      version: 4,
+      version: 5,
       migrate: (persistedState, version) => {
         const state = persistedState as Record<string, unknown>
         if (version < 1) {
@@ -176,6 +178,15 @@ export const useSettingsStore = create<SettingsStore>()(
         }
         if (version < 4) {
           state.speech = DEFAULT_SPEECH
+        }
+        if (version < 5) {
+          const speech = state.speech as Record<string, unknown> | undefined
+          if (speech && typeof speech === 'object') {
+            const whisper = speech.whisper as Record<string, unknown> | undefined
+            if (whisper && typeof whisper === 'object') {
+              whisper.installedModel = null
+            }
+          }
         }
         return state
       },

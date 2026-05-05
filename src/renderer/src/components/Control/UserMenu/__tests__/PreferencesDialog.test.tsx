@@ -29,7 +29,7 @@ vi.mock('@renderer/stores/settings', () => ({
         activeProvider: 'azure' as const,
         azure: { region: 'eastasia', language: 'zh-TW' as const },
         gcp: { language: 'cmn-Hant-TW' as const },
-        whisper: { modelDir: '', language: 'zh-TW' as const }
+        whisper: { modelDir: '', installedModel: null }
       },
       setTimezone: vi.fn(),
       setHardwareAcceleration: vi.fn(),
@@ -150,7 +150,7 @@ describe('PreferencesDialog', () => {
           activeProvider: 'azure' as const,
           azure: { region: 'eastasia', language: 'zh-TW' as const },
           gcp: { language: 'cmn-Hant-TW' as const },
-          whisper: { modelDir: '', language: 'zh-TW' as const }
+          whisper: { modelDir: '', installedModel: null }
         },
         setSpeech: vi.fn()
       }
@@ -220,7 +220,7 @@ describe('PreferencesDialog', () => {
           activeProvider: 'azure' as const,
           azure: { region: 'eastasia', language: 'zh-TW' as const },
           gcp: { language: 'cmn-Hant-TW' as const },
-          whisper: { modelDir: '', language: 'zh-TW' as const }
+          whisper: { modelDir: '', installedModel: null }
         },
         setSpeech: vi.fn()
       }
@@ -263,7 +263,7 @@ describe('PreferencesDialog', () => {
           activeProvider: 'azure' as const,
           azure: { region: 'eastasia', language: 'zh-TW' as const },
           gcp: { language: 'cmn-Hant-TW' as const },
-          whisper: { modelDir: '', language: 'zh-TW' as const }
+          whisper: { modelDir: '', installedModel: null }
         },
         setSpeech: vi.fn()
       }

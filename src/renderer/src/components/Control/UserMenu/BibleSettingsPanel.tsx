@@ -14,6 +14,7 @@ import { toast } from '@heroui/react/toast'
 import { parseDuration, formatDurationHMS } from '@renderer/lib/parse-duration'
 import { isElectron } from '@renderer/lib/env'
 import type { WhisperModel, WhisperDownloadProgress } from '@shared/ipc-channels'
+import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
 
 const WHISPER_MODEL_OPTIONS: { value: WhisperModel; label: string }[] = [
   { value: 'whisper-base', label: 'Base (~75 MB)' },
@@ -62,9 +63,12 @@ export default function BibleSettingsPanel(): React.JSX.Element {
 
   // Whisper state
   const [whisperDir, setWhisperDir] = useState(speech.whisper.modelDir)
-  const [whisperModel, setWhisperModel] = useState<WhisperModel>('whisper-base')
+  const [whisperModel, setWhisperModel] = useState<WhisperModel>(
+    speech.whisper.installedModel ?? 'whisper-base'
+  )
   const [downloadProgress, setDownloadProgress] = useState<WhisperDownloadProgress | null>(null)
   const unsubscribeDownloadRef = useRef<(() => void) | null>(null)
+  const confirm = useConfirm()
 
   const [maxSessionInput, setMaxSessionInput] = useState(formatDurationHMS(speechMaxSessionSec))
 
@@ -100,13 +104,6 @@ export default function BibleSettingsPanel(): React.JSX.Element {
   // Keep whisper dir in sync with store
   useEffect(() => {
     setWhisperDir(speech.whisper.modelDir)
-  }, [speech.whisper.modelDir])
-
-  // On mount: if whisper dir is set in Electron, restore it to main process
-  useEffect(() => {
-    if (isElectron() && speech.whisper.modelDir) {
-      window.api.app.setModelDir(speech.whisper.modelDir).catch(() => {})
-    }
   }, [speech.whisper.modelDir])
 
   // Reset azure test if key/region changes
@@ -260,17 +257,34 @@ export default function BibleSettingsPanel(): React.JSX.Element {
     const dir = await window.api.app.selectDirectory()
     if (!dir) return
 
+    const dirInfo = await window.api.app.checkWhisperDir(dir)
+    if (dirInfo.hasFiles) {
+      const ok = await confirm({
+        status: 'warning',
+        title: t('preferences.bible.whisperOverwriteTitle' as never),
+        description: t('preferences.bible.whisperOverwriteDesc' as never)
+      })
+      if (!ok) return
+    }
+
     unsubscribeDownloadRef.current?.()
     unsubscribeDownloadRef.current = window.api.app.onDownloadProgress((data) => {
       setDownloadProgress(data)
       if (data.done) {
         setWhisperDir(dir)
-        setSpeech({ ...speech, whisper: { ...speech.whisper, modelDir: dir } })
+        setSpeech({
+          ...speech,
+          whisper: { ...speech.whisper, modelDir: dir, installedModel: whisperModel }
+        })
         toast.success(t('preferences.bible.whisperDownloadComplete' as never))
+        unsubscribeDownloadRef.current?.()
+        unsubscribeDownloadRef.current = null
       }
       if (data.error) {
         toast.danger(data.error)
         setDownloadProgress(null)
+        unsubscribeDownloadRef.current?.()
+        unsubscribeDownloadRef.current = null
       }
     })
 
@@ -279,7 +293,6 @@ export default function BibleSettingsPanel(): React.JSX.Element {
     } catch (err) {
       toast.danger(String(err))
       setDownloadProgress(null)
-    } finally {
       unsubscribeDownloadRef.current?.()
       unsubscribeDownloadRef.current = null
     }
@@ -547,7 +560,10 @@ export default function BibleSettingsPanel(): React.JSX.Element {
                 <Button
                   variant="secondary"
                   onPress={handleDownloadWhisper}
-                  isDisabled={downloadProgress !== null && !downloadProgress.done}
+                  isDisabled={
+                    (downloadProgress !== null && !downloadProgress.done) ||
+                    whisperModel === speech.whisper.installedModel
+                  }
                   className="rounded-full shrink-0 flex items-center gap-1.5"
                 >
                   <Download className="size-4" />

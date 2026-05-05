@@ -3,7 +3,8 @@ import type {
   DisplayInfo,
   UpdateStatus,
   WhisperModel,
-  WhisperDownloadProgress
+  WhisperDownloadProgress,
+  WhisperDirInfo
 } from '../shared/ipc-channels'
 import type {
   TimerCommand,
@@ -50,6 +51,7 @@ interface AppAPI {
   relaunch: () => Promise<void>
   selectDirectory: () => Promise<string | null>
   setModelDir: (dir: string) => Promise<void>
+  checkWhisperDir: (dir: string) => Promise<WhisperDirInfo>
   downloadWhisperModel: (model: WhisperModel, destDir: string) => Promise<void>
   onDownloadProgress: (callback: (data: WhisperDownloadProgress) => void) => () => void
 }

@@ -26,8 +26,11 @@ export interface WhisperDownloadProgress {
   error?: string
 }
 
+export interface WhisperDirInfo {
+  hasFiles: boolean
+}
+
 // ---------------------------------------------------------------------------
-// Invoke channels (renderer → main, returns a result)
 // ---------------------------------------------------------------------------
 
 export interface DisplayInfo {
@@ -66,6 +69,7 @@ export interface IpcInvokeMap {
   'speech:deleteKey': { args: [string]; result: void }
   'app:select-directory': { args: []; result: string | null }
   'app:set-model-dir': { args: [string]; result: void }
+  'app:check-whisper-dir': { args: [string]; result: WhisperDirInfo }
   'app:download-whisper-model': { args: [WhisperModel, string]; result: void }
 }
 

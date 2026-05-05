@@ -5,7 +5,11 @@ import fs from 'fs'
 import https from 'https'
 import type { WindowManager } from '../windowManager'
 import { isMainWindow } from './validate'
-import type { WhisperModel, WhisperDownloadProgress } from '../../shared/ipc-channels'
+import type {
+  WhisperModel,
+  WhisperDownloadProgress,
+  WhisperDirInfo
+} from '../../shared/ipc-channels'
 
 const HF_BASE = 'https://huggingface.co/onnx-community'
 
@@ -70,7 +74,7 @@ function httpsHead(url: string): Promise<{ contentLength: number }> {
             ) {
               const location = res.headers.location
               if (location) {
-                request(location)
+                request(new URL(location, targetUrl).href)
                 return
               }
             }
@@ -102,7 +106,7 @@ function downloadFile(
           ) {
             const location = res.headers.location
             if (location) {
-              request(location)
+              request(new URL(location, targetUrl).href)
               return
             }
           }
@@ -129,6 +133,13 @@ function downloadFile(
 
 let whisperModelDir: string | null = null
 
+function detectInstalledModel(destDir: string): WhisperDirInfo {
+  const whisperSubDir = path.join(destDir, 'whisper')
+  if (!fs.existsSync(whisperSubDir)) return { hasFiles: false }
+  const entries = fs.readdirSync(whisperSubDir)
+  return { hasFiles: entries.length > 0 }
+}
+
 export function registerAppIpc(wm: WindowManager): void {
   ipcMain.handle('app:relaunch', (event) => {
     if (!isMainWindow(wm, event)) return
@@ -150,6 +161,11 @@ export function registerAppIpc(wm: WindowManager): void {
   ipcMain.handle('app:set-model-dir', (event, dir: string) => {
     if (!isMainWindow(wm, event)) return
     whisperModelDir = dir
+  })
+
+  ipcMain.handle('app:check-whisper-dir', (event, dir: string): WhisperDirInfo => {
+    if (!isMainWindow(wm, event)) return { hasFiles: false }
+    return detectInstalledModel(dir)
   })
 
   ipcMain.handle(
