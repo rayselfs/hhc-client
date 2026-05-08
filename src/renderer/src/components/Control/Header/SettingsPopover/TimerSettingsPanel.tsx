@@ -99,6 +99,15 @@ export default function TimerSettingsPanel({
     setEditingValue(e.target.value)
   }
 
+  const handleReminderDurationEnter = (): void => {
+    const trimmed = (editingValue ?? '').trim()
+    if (!/^\d+$/.test(trimmed)) {
+      toast.danger(t('toast.reminderDurationInvalid'))
+      return
+    }
+    focusSinkRef.current?.focus()
+  }
+
   const handleReminderDurationBlur = (): void => {
     const trimmed = inputValue.trim()
 
@@ -191,7 +200,7 @@ export default function TimerSettingsPanel({
               onFocus={handleReminderDurationFocus}
               onChange={handleReminderDurationChange}
               onBlur={handleReminderDurationBlur}
-              onKeyDown={(e) => e.key === 'Enter' && focusSinkRef.current?.focus()}
+              onKeyDown={(e) => e.key === 'Enter' && handleReminderDurationEnter()}
               aria-label={t('timer.reminder.time')}
               className="w-21 [&_input]:py-1 [&_input]:text-center rounded-full px-4"
               disabled={reminderInputDisabled}
