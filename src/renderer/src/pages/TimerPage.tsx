@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react'
 import { useTimerStore, getDisplayValues } from '@renderer/stores/timer'
+import { useTimerConfigStore } from '@renderer/stores/timer-config'
 import { useStopwatchStore } from '@renderer/stores/stopwatch'
 import { selectFormattedTime } from '@renderer/stores/selectors/stopwatch'
 import TimerDisplay from '@renderer/components/Control/Timer/TimerDisplay'
@@ -10,8 +11,11 @@ import PresetChips from '@renderer/components/Control/Timer/PresetChips'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
 import { useKeyboardShortcuts } from '@renderer/hooks/useKeyboardShortcuts'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
+import { toast } from '@heroui/react/toast'
+import { useTranslation } from 'react-i18next'
 
 export default function TimerPage(): React.JSX.Element {
+  const { t } = useTranslation()
   const mode = useTimerStore((s) => s.mode)
   const phase = useTimerStore((s) => s.phase)
   const progress = useTimerStore((s) => s.progress)
@@ -33,6 +37,18 @@ export default function TimerPage(): React.JSX.Element {
   useEffect(() => {
     isTimerActiveRef.current = isTimerActive
   })
+
+  useEffect(() => {
+    return useTimerConfigStore.subscribe((state, prevState) => {
+      if (
+        prevState.reminderEnabled &&
+        !state.reminderEnabled &&
+        state.totalDuration !== prevState.totalDuration
+      ) {
+        toast.danger(t('toast.reminderAutoDisabled'))
+      }
+    })
+  }, [t])
 
   useEffect(() => {
     if (!isProjectionOpen) return

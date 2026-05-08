@@ -336,7 +336,8 @@
     "updateCheckFailed": "Failed to check for updates",
     "networkRestored": "Network connection restored",
     "networkLost": "Network connection lost",
-    "reminderDurationInvalid": "Invalid input. Please enter a number."
+    "reminderDurationInvalid": "Invalid input. Please enter a number.",
+    "reminderAutoDisabled": "Reminder disabled — duration is shorter than reminder time"
   },
   "shortcuts": {
     "title": "Keyboard Shortcuts",
