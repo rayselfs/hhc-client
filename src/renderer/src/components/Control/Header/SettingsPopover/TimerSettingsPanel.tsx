@@ -58,7 +58,9 @@ export default function TimerSettingsPanel({
   const setOvertimeMessage = useTimerStore((s) => s.setOvertimeMessage)
 
   const timerRingColor = useSettingsStore((s) => s.timerRingColor)
+  const timerRingColorEnabled = useSettingsStore((s) => s.timerRingColorEnabled)
   const setTimerRingColor = useSettingsStore((s) => s.setTimerRingColor)
+  const setTimerRingColorEnabled = useSettingsStore((s) => s.setTimerRingColorEnabled)
 
   const showOnProjection = useStopwatchStore((s) => s.showOnProjection)
   const setShowOnProjection = useStopwatchStore((s) => s.setShowOnProjection)
@@ -242,12 +244,21 @@ export default function TimerSettingsPanel({
       </div>
 
       <div className="flex items-center gap-2 min-h-10">
-        <span className="text-sm">{t('timer.ringColor.label')}</span>
+        <Switch
+          isSelected={timerRingColorEnabled}
+          onChange={setTimerRingColorEnabled}
+          aria-label={t('timer.ringColor.label')}
+        >
+          <Switch.Control>
+            <Switch.Thumb />
+          </Switch.Control>
+          <span className="text-sm">{t('timer.ringColor.label')}</span>
+        </Switch>
         <ColorPicker value={parsedRingColor} onChange={handleTimerRingColorChange}>
           <ColorPicker.Trigger>
             <ColorSwatch
               aria-label={t('timer.ringColor.label')}
-              className="size-7 rounded cursor-pointer ml-auto"
+              className={`size-7 rounded cursor-pointer ml-auto ${!timerRingColorEnabled ? 'opacity-40 pointer-events-none' : ''}`}
             />
           </ColorPicker.Trigger>
           <ColorPicker.Popover placement="bottom end" className="gap-2 px-2 py-3 w-52">

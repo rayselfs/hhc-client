@@ -40,7 +40,7 @@
       "error": "訊息不能為空"
     },
     "ringColor": {
-      "label": "計時器環顏色"
+      "label": "自訂計時環顏色"
     },
     "inputDialog": {
       "title": "設定時長",

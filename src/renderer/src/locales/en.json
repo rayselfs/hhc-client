@@ -40,7 +40,7 @@
       "error": "Message cannot be empty"
     },
     "ringColor": {
-      "label": "Timer Ring Color"
+      "label": "Custom Timer Ring Color"
     },
     "inputDialog": {
       "title": "Set Duration",
