@@ -334,7 +334,8 @@
     "updateAvailable": "{{version}} 版本更新可用",
     "updateCheckFailed": "检查更新失败",
     "networkRestored": "网络连接已恢复",
-    "networkLost": "网络连接已中断"
+    "networkLost": "网络连接已中断",
+    "reminderDurationInvalid": "输入无效，请输入数字"
   },
   "shortcuts": {
     "title": "键盘快捷键",

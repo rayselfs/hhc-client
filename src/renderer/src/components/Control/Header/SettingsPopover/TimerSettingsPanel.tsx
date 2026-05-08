@@ -3,13 +3,17 @@ import { Switch } from '@heroui/react/switch'
 import { Input } from '@heroui/react/input'
 import { ColorPicker } from '@heroui/react/color-picker'
 import { ColorSwatch } from '@heroui/react/color-swatch'
+import { toast } from '@heroui/react/toast'
 import { parseColor } from 'react-aria-components'
 import type { Color } from 'react-aria-components'
 import { useTimerStore, DEFAULT_SETTINGS } from '@renderer/stores/timer'
 import { useStopwatchStore } from '@renderer/stores/stopwatch'
 import { useSettingsStore } from '@renderer/stores/settings'
-import { Suspense, lazy } from 'react'
+import { Suspense, lazy, useState, useRef, useEffect } from 'react'
 import type { TFunction } from 'i18next'
+
+const REMINDER_MIN = 10
+const REMINDER_MAX = 3600
 
 const LazyColorPickerContent = lazy(async () => {
   const { ColorArea, ColorSlider } = await import('@heroui/react')
@@ -59,6 +63,16 @@ export default function TimerSettingsPanel({
   const showOnProjection = useStopwatchStore((s) => s.showOnProjection)
   const setShowOnProjection = useStopwatchStore((s) => s.setShowOnProjection)
 
+  const [inputValue, setInputValue] = useState(String(reminderDuration))
+  const previousValueRef = useRef(String(reminderDuration))
+  const isFocusedRef = useRef(false)
+
+  useEffect(() => {
+    if (!isFocusedRef.current) {
+      setInputValue(String(reminderDuration))
+    }
+  }, [reminderDuration])
+
   const canEnableReminder = totalDuration > 30
   const isTimerRunning = status !== 'stopped'
   const reminderInputDisabled = isTimerRunning || !reminderEnabled
@@ -80,9 +94,34 @@ export default function TimerSettingsPanel({
     }
   }
 
+  const handleReminderDurationFocus = (): void => {
+    isFocusedRef.current = true
+    previousValueRef.current = inputValue
+  }
+
   const handleReminderDurationChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
-    const val = parseInt(e.target.value, 10)
-    if (!isNaN(val) && val >= 0) {
+    setInputValue(e.target.value)
+  }
+
+  const handleReminderDurationBlur = (): void => {
+    isFocusedRef.current = false
+    const trimmed = inputValue.trim()
+
+    if (!/^\d+$/.test(trimmed)) {
+      setInputValue(previousValueRef.current)
+      toast.danger(t('toast.reminderDurationInvalid'))
+      return
+    }
+
+    const val = parseInt(trimmed, 10)
+    if (val < REMINDER_MIN) {
+      setInputValue(String(REMINDER_MIN))
+      setReminder(reminderEnabled, REMINDER_MIN)
+    } else if (val > REMINDER_MAX) {
+      setInputValue(String(REMINDER_MAX))
+      setReminder(reminderEnabled, REMINDER_MAX)
+    } else {
+      setInputValue(String(val))
       setReminder(reminderEnabled, val)
     }
   }
@@ -149,13 +188,15 @@ export default function TimerSettingsPanel({
           </Switch>
           <div className="flex items-center gap-1 ml-auto">
             <Input
-              type="number"
+              type="text"
+              inputMode="numeric"
               variant="secondary"
-              value={String(reminderDuration)}
+              value={inputValue}
+              onFocus={handleReminderDurationFocus}
               onChange={handleReminderDurationChange}
+              onBlur={handleReminderDurationBlur}
               aria-label={t('timer.reminder.time')}
               className="w-21 [&_input]:py-1 [&_input]:text-center rounded-full px-4"
-              min={0}
               disabled={reminderInputDisabled}
             />
             <span className="text-xs text-muted shrink-0">{t('timer.reminder.seconds')}</span>

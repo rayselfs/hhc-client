@@ -334,7 +334,8 @@
     "updateAvailable": "{{version}} 版本更新可用",
     "updateCheckFailed": "檢查更新失敗",
     "networkRestored": "網路連線已恢復",
-    "networkLost": "網路連線已中斷"
+    "networkLost": "網路連線已中斷",
+    "reminderDurationInvalid": "輸入無效，請輸入數字"
   },
   "shortcuts": {
     "title": "鍵盤快速鍵",

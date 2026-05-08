@@ -334,7 +334,8 @@
     "updateAvailable": "Update {{version}} available",
     "updateCheckFailed": "Failed to check for updates",
     "networkRestored": "Network connection restored",
-    "networkLost": "Network connection lost"
+    "networkLost": "Network connection lost",
+    "reminderDurationInvalid": "Invalid input. Please enter a number."
   },
   "shortcuts": {
     "title": "Keyboard Shortcuts",
