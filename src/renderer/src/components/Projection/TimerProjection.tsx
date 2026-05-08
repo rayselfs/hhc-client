@@ -7,7 +7,7 @@ import type { TimerTickPayload, StopwatchTickPayload } from '@shared/types/timer
 interface TimerProjectionProps {
   timerData: TimerTickPayload
   stopwatchData: StopwatchTickPayload | null
-  ringColor: string
+  ringColor?: string
 }
 
 export default function TimerProjection({

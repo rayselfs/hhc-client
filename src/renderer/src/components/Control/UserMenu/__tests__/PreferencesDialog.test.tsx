@@ -115,7 +115,9 @@ describe('PreferencesDialog', () => {
         themePreference: 'system' as const,
         setThemePreference: vi.fn(),
         timerRingColor: '#3b82f6',
-        setTimerRingColor: vi.fn()
+        setTimerRingColor: vi.fn(),
+        timerRingColorEnabled: false,
+        setTimerRingColorEnabled: vi.fn()
       }
       return selector ? selector(store) : store
     })
@@ -178,7 +180,9 @@ describe('PreferencesDialog', () => {
         themePreference: 'system' as const,
         setThemePreference: vi.fn(),
         timerRingColor: '#3b82f6',
-        setTimerRingColor: vi.fn()
+        setTimerRingColor: vi.fn(),
+        timerRingColorEnabled: false,
+        setTimerRingColorEnabled: vi.fn()
       }
       return selector ? selector(store) : store
     })
@@ -214,7 +218,9 @@ describe('PreferencesDialog', () => {
         themePreference: 'system' as const,
         setThemePreference: vi.fn(),
         timerRingColor: '#3b82f6',
-        setTimerRingColor: vi.fn()
+        setTimerRingColor: vi.fn(),
+        timerRingColorEnabled: false,
+        setTimerRingColorEnabled: vi.fn()
       }
       return selector ? selector(store) : store
     })

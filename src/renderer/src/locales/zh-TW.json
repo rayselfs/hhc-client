@@ -31,6 +31,7 @@
       "label": "時間提醒",
       "time": "提醒時間",
       "error": "提醒時間必須小於總時間",
+      "errorRange": "需介於 10 至 3600 秒之間",
       "seconds": "秒",
       "color": "提醒顏色"
     },
@@ -40,7 +41,7 @@
       "error": "訊息不能為空"
     },
     "ringColor": {
-      "label": "計時器環顏色"
+      "label": "自訂計時環顏色"
     },
     "inputDialog": {
       "title": "設定時長",
@@ -334,7 +335,10 @@
     "updateAvailable": "{{version}} 版本更新可用",
     "updateCheckFailed": "檢查更新失敗",
     "networkRestored": "網路連線已恢復",
-    "networkLost": "網路連線已中斷"
+    "networkLost": "網路連線已中斷",
+    "reminderDurationInvalid": "輸入無效，請輸入數字",
+    "reminderDurationEmpty": "提醒時間不能為空",
+    "reminderAutoDisabled": "提醒已關閉 — 計時時間不足提醒時間"
   },
   "shortcuts": {
     "title": "鍵盤快速鍵",

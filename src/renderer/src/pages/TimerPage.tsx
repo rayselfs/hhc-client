@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react'
 import { useTimerStore, getDisplayValues } from '@renderer/stores/timer'
+import { useTimerConfigStore } from '@renderer/stores/timer-config'
 import { useStopwatchStore } from '@renderer/stores/stopwatch'
 import { selectFormattedTime } from '@renderer/stores/selectors/stopwatch'
 import TimerDisplay from '@renderer/components/Control/Timer/TimerDisplay'
@@ -10,8 +11,11 @@ import PresetChips from '@renderer/components/Control/Timer/PresetChips'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
 import { useKeyboardShortcuts } from '@renderer/hooks/useKeyboardShortcuts'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
+import { toast } from '@heroui/react/toast'
+import { useTranslation } from 'react-i18next'
 
 export default function TimerPage(): React.JSX.Element {
+  const { t } = useTranslation()
   const mode = useTimerStore((s) => s.mode)
   const phase = useTimerStore((s) => s.phase)
   const progress = useTimerStore((s) => s.progress)
@@ -33,6 +37,18 @@ export default function TimerPage(): React.JSX.Element {
   useEffect(() => {
     isTimerActiveRef.current = isTimerActive
   })
+
+  useEffect(() => {
+    return useTimerConfigStore.subscribe((state, prevState) => {
+      if (
+        prevState.reminderEnabled &&
+        !state.reminderEnabled &&
+        state.totalDuration !== prevState.totalDuration
+      ) {
+        toast.danger(t('toast.reminderAutoDisabled'))
+      }
+    })
+  }, [t])
 
   useEffect(() => {
     if (!isProjectionOpen) return
@@ -68,36 +84,39 @@ export default function TimerPage(): React.JSX.Element {
   })
 
   const isTimerLike = mode === 'timer' || mode === 'clock' || mode === 'both'
-  const isClock = mode === 'clock'
 
   return (
-    <div data-testid="timer-page" className="flex h-full gap-4">
+    <div data-testid="timer-page" className="flex min-h-full gap-4">
       {isTimerLike && (
         <>
-          <div className="w-18 shrink-0" />
+          <div className="w-18 shrink-0 max-lg:hidden" />
           <div className="flex flex-col items-center gap-4 flex-1">
-            <TimerDisplay
-              progress={progress}
-              mainDisplay={displayValues.mainDisplay}
-              subDisplay={displayValues.subDisplay}
-              phase={phase}
-              overtimeDisplay={displayValues.overtimeDisplay}
-              warningColor={reminderEnabled ? reminderColor : null}
-              canEditTime={timerStatus === 'stopped' && phase !== 'overtime'}
-              onTimeConfirm={(seconds) => setDuration(seconds)}
-              digitClassName="text-segment-foreground"
-            />
-            <TimerControls className="mb-3" mode={mode} disableStart={isClock} />
-            <TimeAdjustment />
+            <div className="flex flex-col items-center gap-4 lg:scale-125 lg:origin-top">
+              <TimerDisplay
+                progress={progress}
+                mainDisplay={displayValues.mainDisplay}
+                subDisplay={displayValues.subDisplay}
+                phase={phase}
+                overtimeDisplay={displayValues.overtimeDisplay}
+                warningColor={reminderEnabled ? reminderColor : null}
+                canEditTime={timerStatus === 'stopped' && phase !== 'overtime'}
+                onTimeConfirm={(seconds) => setDuration(seconds)}
+                digitClassName="text-segment-foreground"
+              />
+              <TimerControls className="mb-3" mode={mode} />
+              <TimeAdjustment />
+            </div>
           </div>
-          <PresetChips className="shrink-0" />
+          <PresetChips className="shrink-0 max-lg:hidden" />
         </>
       )}
 
       {mode === 'stopwatch' && (
         <div className="flex flex-col items-center gap-4 flex-1 w-full">
-          <StopwatchDisplay formattedTime={swFormattedTime} />
-          <TimerControls mode="stopwatch" />
+          <div className="flex flex-col items-center gap-4 lg:scale-125 lg:origin-top">
+            <StopwatchDisplay formattedTime={swFormattedTime} />
+            <TimerControls mode="stopwatch" />
+          </div>
         </div>
       )}
     </div>
