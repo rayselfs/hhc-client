@@ -3,6 +3,7 @@ import { Switch } from '@heroui/react/switch'
 import { Input } from '@heroui/react/input'
 import { ColorPicker } from '@heroui/react/color-picker'
 import { ColorSwatch } from '@heroui/react/color-swatch'
+import { toast } from '@heroui/react/toast'
 import { parseColor } from 'react-aria-components'
 import type { Color } from 'react-aria-components'
 import { useTimerStore, DEFAULT_SETTINGS } from '@renderer/stores/timer'
@@ -73,20 +74,14 @@ export default function TimerSettingsPanel({
   const isTimerRunning = status !== 'stopped'
   const reminderInputDisabled = isTimerRunning || !reminderEnabled
 
-  const reminderError = (() => {
-    if (!reminderEnabled) return null
-    if (editingValue !== null) {
-      const trimmed = editingValue.trim()
-      if (trimmed === '') return null
-      if (!/^\d+$/.test(trimmed)) return t('toast.reminderDurationInvalid')
-      const val = parseInt(trimmed, 10)
-      if (val < REMINDER_MIN || val > REMINDER_MAX) return t('timer.reminder.errorRange')
-      if (val >= totalDuration) return t('timer.reminder.error')
-      return null
-    }
-    if (reminderDuration >= totalDuration) return t('timer.reminder.error')
+  const validateReminderInput = (value: string): string | null => {
+    const trimmed = value.trim()
+    if (!/^\d+$/.test(trimmed)) return t('toast.reminderDurationInvalid')
+    const val = parseInt(trimmed, 10)
+    if (val < REMINDER_MIN || val > REMINDER_MAX) return t('timer.reminder.errorRange')
+    if (val >= totalDuration) return t('timer.reminder.error')
     return null
-  })()
+  }
 
   const handleReminderToggle = (enabled: boolean): void => {
     if (enabled) {
@@ -111,23 +106,23 @@ export default function TimerSettingsPanel({
   }
 
   const handleReminderDurationEnter = (): void => {
-    if (reminderError !== null) return
+    const error = validateReminderInput(editingValue ?? '')
+    if (error !== null) {
+      toast.danger(error)
+      return
+    }
     focusSinkRef.current?.focus()
   }
 
   const handleReminderDurationBlur = (): void => {
-    const trimmed = inputValue.trim()
-    if (!/^\d+$/.test(trimmed)) {
-      setEditingValue(null)
-      return
-    }
-    const val = parseInt(trimmed, 10)
-    if (val < REMINDER_MIN || val > REMINDER_MAX || val >= totalDuration) {
-      setEditingValue(null)
-      return
-    }
+    const current = inputValue
     setEditingValue(null)
-    setReminder(reminderEnabled, val)
+    const error = validateReminderInput(current)
+    if (error !== null) {
+      toast.danger(error)
+      return
+    }
+    setReminder(reminderEnabled, parseInt(current.trim(), 10))
   }
 
   const handleReminderColorChange = (color: Color): void => {
@@ -178,56 +173,49 @@ export default function TimerSettingsPanel({
   return (
     <div className="contents">
       <div ref={focusSinkRef} tabIndex={-1} className="sr-only" />
-      <div className="space-y-1">
-        <div className="flex items-center gap-2 min-h-10">
-          <Switch
-            isSelected={reminderEnabled}
-            isDisabled={!canEnableReminder || (isTimerRunning && !reminderEnabled)}
-            onChange={handleReminderToggle}
-            aria-label={t('timer.reminder.label')}
-          >
-            <Switch.Control>
-              <Switch.Thumb />
-            </Switch.Control>
-            <span className="text-sm">{t('timer.reminder.label')}</span>
-          </Switch>
-          <div className="flex items-center gap-1 ml-auto">
-            <Input
-              type="text"
-              inputMode="numeric"
-              variant="secondary"
-              value={inputValue}
-              onFocus={handleReminderDurationFocus}
-              onChange={handleReminderDurationChange}
-              onBlur={handleReminderDurationBlur}
-              onKeyDown={(e) => e.key === 'Enter' && handleReminderDurationEnter()}
-              aria-label={t('timer.reminder.time')}
-              className="w-21 [&_input]:py-1 [&_input]:text-center rounded-full px-4"
-              disabled={reminderInputDisabled}
-            />
-            <span className="text-xs text-muted shrink-0">{t('timer.reminder.seconds')}</span>
-            <ColorPicker value={parsedColor} onChange={handleReminderColorChange}>
-              <ColorPicker.Trigger isDisabled={reminderInputDisabled}>
-                <ColorSwatch
-                  aria-label={t('timer.reminder.color')}
-                  className={`size-7 rounded cursor-pointer ${reminderInputDisabled ? 'opacity-40' : ''}`}
-                />
-              </ColorPicker.Trigger>
-              <ColorPicker.Popover placement="bottom end" className="gap-2 px-2 py-3 w-52">
-                <Suspense
-                  fallback={<div className="w-8 h-8 rounded-full bg-default-200 animate-pulse" />}
-                >
-                  <LazyColorPickerContent t={t} />
-                </Suspense>
-              </ColorPicker.Popover>
-            </ColorPicker>
-          </div>
+      <div className="flex items-center gap-2 min-h-10">
+        <Switch
+          isSelected={reminderEnabled}
+          isDisabled={!canEnableReminder || (isTimerRunning && !reminderEnabled)}
+          onChange={handleReminderToggle}
+          aria-label={t('timer.reminder.label')}
+        >
+          <Switch.Control>
+            <Switch.Thumb />
+          </Switch.Control>
+          <span className="text-sm">{t('timer.reminder.label')}</span>
+        </Switch>
+        <div className="flex items-center gap-1 ml-auto">
+          <Input
+            type="text"
+            inputMode="numeric"
+            variant="secondary"
+            value={inputValue}
+            onFocus={handleReminderDurationFocus}
+            onChange={handleReminderDurationChange}
+            onBlur={handleReminderDurationBlur}
+            onKeyDown={(e) => e.key === 'Enter' && handleReminderDurationEnter()}
+            aria-label={t('timer.reminder.time')}
+            className="w-21 [&_input]:py-1 [&_input]:text-center rounded-full px-4"
+            disabled={reminderInputDisabled}
+          />
+          <span className="text-xs text-muted shrink-0">{t('timer.reminder.seconds')}</span>
+          <ColorPicker value={parsedColor} onChange={handleReminderColorChange}>
+            <ColorPicker.Trigger isDisabled={reminderInputDisabled}>
+              <ColorSwatch
+                aria-label={t('timer.reminder.color')}
+                className={`size-7 rounded cursor-pointer ${reminderInputDisabled ? 'opacity-40' : ''}`}
+              />
+            </ColorPicker.Trigger>
+            <ColorPicker.Popover placement="bottom end" className="gap-2 px-2 py-3 w-52">
+              <Suspense
+                fallback={<div className="w-8 h-8 rounded-full bg-default-200 animate-pulse" />}
+              >
+                <LazyColorPickerContent t={t} />
+              </Suspense>
+            </ColorPicker.Popover>
+          </ColorPicker>
         </div>
-        {reminderError && (
-          <p role="alert" className="text-xs text-danger">
-            {reminderError}
-          </p>
-        )}
       </div>
 
       <div className="flex items-center gap-2 min-h-10">
