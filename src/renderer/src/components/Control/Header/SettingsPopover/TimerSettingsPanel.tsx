@@ -189,7 +189,7 @@ export default function TimerSettingsPanel({
               onFocus={handleReminderDurationFocus}
               onChange={handleReminderDurationChange}
               onBlur={handleReminderDurationBlur}
-              onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+              onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLElement).blur()}
               aria-label={t('timer.reminder.time')}
               className="w-21 [&_input]:py-1 [&_input]:text-center rounded-full px-4"
               disabled={reminderInputDisabled}
@@ -236,7 +236,7 @@ export default function TimerSettingsPanel({
           value={overtimeMessage}
           onChange={handleOvertimeMessageChange}
           onBlur={handleOvertimeMessageBlur}
-          onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+          onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLElement).blur()}
           placeholder={t('timer.overtimeMessage.placeholder')}
           aria-label={t('timer.overtimeMessage.label')}
           maxLength={15}
