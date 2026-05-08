@@ -9,7 +9,7 @@ import type { Color } from 'react-aria-components'
 import { useTimerStore, DEFAULT_SETTINGS } from '@renderer/stores/timer'
 import { useStopwatchStore } from '@renderer/stores/stopwatch'
 import { useSettingsStore } from '@renderer/stores/settings'
-import { Suspense, lazy, useState, useRef, useEffect } from 'react'
+import { Suspense, lazy, useState } from 'react'
 import type { TFunction } from 'i18next'
 
 const REMINDER_MIN = 10
@@ -63,15 +63,9 @@ export default function TimerSettingsPanel({
   const showOnProjection = useStopwatchStore((s) => s.showOnProjection)
   const setShowOnProjection = useStopwatchStore((s) => s.setShowOnProjection)
 
-  const [inputValue, setInputValue] = useState(String(reminderDuration))
-  const previousValueRef = useRef(String(reminderDuration))
-  const isFocusedRef = useRef(false)
+  const [editingValue, setEditingValue] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!isFocusedRef.current) {
-      setInputValue(String(reminderDuration))
-    }
-  }, [reminderDuration])
+  const inputValue = editingValue ?? String(reminderDuration)
 
   const canEnableReminder = totalDuration > 30
   const isTimerRunning = status !== 'stopped'
@@ -95,33 +89,31 @@ export default function TimerSettingsPanel({
   }
 
   const handleReminderDurationFocus = (): void => {
-    isFocusedRef.current = true
-    previousValueRef.current = inputValue
+    setEditingValue(inputValue)
   }
 
   const handleReminderDurationChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
-    setInputValue(e.target.value)
+    setEditingValue(e.target.value)
   }
 
   const handleReminderDurationBlur = (): void => {
-    isFocusedRef.current = false
     const trimmed = inputValue.trim()
 
     if (!/^\d+$/.test(trimmed)) {
-      setInputValue(previousValueRef.current)
+      setEditingValue(null)
       toast.danger(t('toast.reminderDurationInvalid'))
       return
     }
 
     const val = parseInt(trimmed, 10)
     if (val < REMINDER_MIN) {
-      setInputValue(String(REMINDER_MIN))
+      setEditingValue(null)
       setReminder(reminderEnabled, REMINDER_MIN)
     } else if (val > REMINDER_MAX) {
-      setInputValue(String(REMINDER_MAX))
+      setEditingValue(null)
       setReminder(reminderEnabled, REMINDER_MAX)
     } else {
-      setInputValue(String(val))
+      setEditingValue(null)
       setReminder(reminderEnabled, val)
     }
   }
