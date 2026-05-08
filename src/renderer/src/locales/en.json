@@ -337,6 +337,7 @@
     "networkRestored": "Network connection restored",
     "networkLost": "Network connection lost",
     "reminderDurationInvalid": "Invalid input. Please enter a number.",
+    "reminderDurationEmpty": "Reminder time cannot be empty.",
     "reminderAutoDisabled": "Reminder disabled — duration is shorter than reminder time"
   },
   "shortcuts": {

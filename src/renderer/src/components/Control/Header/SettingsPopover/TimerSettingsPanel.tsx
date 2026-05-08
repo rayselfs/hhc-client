@@ -76,6 +76,7 @@ export default function TimerSettingsPanel({
 
   const validateReminderInput = (value: string): string | null => {
     const trimmed = value.trim()
+    if (trimmed === '') return t('toast.reminderDurationEmpty')
     if (!/^\d+$/.test(trimmed)) return t('toast.reminderDurationInvalid')
     const val = parseInt(trimmed, 10)
     if (val < REMINDER_MIN || val > REMINDER_MAX) return t('timer.reminder.errorRange')

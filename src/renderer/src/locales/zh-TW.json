@@ -337,6 +337,7 @@
     "networkRestored": "網路連線已恢復",
     "networkLost": "網路連線已中斷",
     "reminderDurationInvalid": "輸入無效，請輸入數字",
+    "reminderDurationEmpty": "提醒時間不能為空",
     "reminderAutoDisabled": "提醒已關閉 — 計時時間不足提醒時間"
   },
   "shortcuts": {
