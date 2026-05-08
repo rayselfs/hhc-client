@@ -89,8 +89,8 @@ export default function TimerPage(): React.JSX.Element {
     <div data-testid="timer-page" className="flex h-full gap-4">
       {isTimerLike && (
         <>
-          <div className="w-18 shrink-0" />
-          <div className="flex flex-col items-center gap-4 flex-1">
+          <div className="w-18 shrink-0 max-lg:hidden" />
+          <div className="flex flex-col items-center justify-center gap-4 flex-1">
             <TimerDisplay
               progress={progress}
               mainDisplay={displayValues.mainDisplay}

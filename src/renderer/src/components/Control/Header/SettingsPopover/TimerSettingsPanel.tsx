@@ -172,7 +172,7 @@ export default function TimerSettingsPanel({
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-2">
       <div ref={focusSinkRef} tabIndex={-1} className="sr-only" />
       <div className="flex items-center gap-2 min-h-10">
         <Switch
@@ -202,10 +202,10 @@ export default function TimerSettingsPanel({
           />
           <span className="text-xs text-muted shrink-0">{t('timer.reminder.seconds')}</span>
           <ColorPicker value={parsedColor} onChange={handleReminderColorChange}>
-            <ColorPicker.Trigger isDisabled={reminderInputDisabled}>
+            <ColorPicker.Trigger isDisabled={reminderInputDisabled} className="self-stretch">
               <ColorSwatch
                 aria-label={t('timer.reminder.color')}
-                className={`size-7 rounded cursor-pointer ${reminderInputDisabled ? 'opacity-40' : ''}`}
+                className={`aspect-square h-full rounded cursor-pointer ${reminderInputDisabled ? 'opacity-40' : ''}`}
               />
             </ColorPicker.Trigger>
             <ColorPicker.Popover placement="bottom end" className="gap-2 px-2 py-3 w-52">
@@ -257,10 +257,10 @@ export default function TimerSettingsPanel({
           <span className="text-sm">{t('timer.ringColor.label')}</span>
         </Switch>
         <ColorPicker value={parsedRingColor} onChange={handleTimerRingColorChange}>
-          <ColorPicker.Trigger isDisabled={!timerRingColorEnabled}>
+          <ColorPicker.Trigger isDisabled={!timerRingColorEnabled} className="self-stretch">
             <ColorSwatch
               aria-label={t('timer.ringColor.label')}
-              className={`size-7 rounded cursor-pointer ml-auto ${!timerRingColorEnabled ? 'opacity-40' : ''}`}
+              className={`aspect-square h-full rounded cursor-pointer ml-auto ${!timerRingColorEnabled ? 'opacity-40' : ''}`}
             />
           </ColorPicker.Trigger>
           <ColorPicker.Popover placement="bottom end" className="gap-2 px-2 py-3 w-52">
