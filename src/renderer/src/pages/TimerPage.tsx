@@ -91,28 +91,32 @@ export default function TimerPage(): React.JSX.Element {
         <>
           <div className="w-18 shrink-0 max-lg:hidden" />
           <div className="flex flex-col items-center justify-center gap-4 flex-1">
-            <TimerDisplay
-              progress={progress}
-              mainDisplay={displayValues.mainDisplay}
-              subDisplay={displayValues.subDisplay}
-              phase={phase}
-              overtimeDisplay={displayValues.overtimeDisplay}
-              warningColor={reminderEnabled ? reminderColor : null}
-              canEditTime={timerStatus === 'stopped' && phase !== 'overtime'}
-              onTimeConfirm={(seconds) => setDuration(seconds)}
-              digitClassName="text-segment-foreground"
-            />
-            <TimerControls className="mb-3" mode={mode} />
-            <TimeAdjustment />
+            <div className="flex flex-col items-center gap-4 lg:scale-125">
+              <TimerDisplay
+                progress={progress}
+                mainDisplay={displayValues.mainDisplay}
+                subDisplay={displayValues.subDisplay}
+                phase={phase}
+                overtimeDisplay={displayValues.overtimeDisplay}
+                warningColor={reminderEnabled ? reminderColor : null}
+                canEditTime={timerStatus === 'stopped' && phase !== 'overtime'}
+                onTimeConfirm={(seconds) => setDuration(seconds)}
+                digitClassName="text-segment-foreground"
+              />
+              <TimerControls className="mb-3" mode={mode} />
+              <TimeAdjustment />
+            </div>
           </div>
           <PresetChips className="shrink-0 max-lg:hidden" />
         </>
       )}
 
       {mode === 'stopwatch' && (
-        <div className="flex flex-col items-center gap-4 flex-1 w-full">
-          <StopwatchDisplay formattedTime={swFormattedTime} />
-          <TimerControls mode="stopwatch" />
+        <div className="flex flex-col items-center justify-center gap-4 flex-1 w-full">
+          <div className="flex flex-col items-center gap-4 lg:scale-125">
+            <StopwatchDisplay formattedTime={swFormattedTime} />
+            <TimerControls mode="stopwatch" />
+          </div>
         </div>
       )}
     </div>
