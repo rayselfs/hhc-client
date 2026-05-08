@@ -86,7 +86,7 @@ export default function TimerPage(): React.JSX.Element {
   const isTimerLike = mode === 'timer' || mode === 'clock' || mode === 'both'
 
   return (
-    <div data-testid="timer-page" className="flex h-full gap-4">
+    <div data-testid="timer-page" className="flex min-h-full gap-4">
       {isTimerLike && (
         <>
           <div className="w-18 shrink-0 max-lg:hidden" />
