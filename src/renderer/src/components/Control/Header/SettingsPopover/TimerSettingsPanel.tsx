@@ -195,10 +195,10 @@ export default function TimerSettingsPanel({
             />
             <span className="text-xs text-muted shrink-0">{t('timer.reminder.seconds')}</span>
             <ColorPicker value={parsedColor} onChange={handleReminderColorChange}>
-              <ColorPicker.Trigger>
+              <ColorPicker.Trigger isDisabled={reminderInputDisabled}>
                 <ColorSwatch
                   aria-label={t('timer.reminder.color')}
-                  className={`size-7 rounded cursor-pointer ${reminderInputDisabled ? 'opacity-40 pointer-events-none' : ''}`}
+                  className={`size-7 rounded cursor-pointer ${reminderInputDisabled ? 'opacity-40' : ''}`}
                 />
               </ColorPicker.Trigger>
               <ColorPicker.Popover placement="bottom end" className="gap-2 px-2 py-3 w-52">
@@ -255,10 +255,10 @@ export default function TimerSettingsPanel({
           <span className="text-sm">{t('timer.ringColor.label')}</span>
         </Switch>
         <ColorPicker value={parsedRingColor} onChange={handleTimerRingColorChange}>
-          <ColorPicker.Trigger>
+          <ColorPicker.Trigger isDisabled={!timerRingColorEnabled}>
             <ColorSwatch
               aria-label={t('timer.ringColor.label')}
-              className={`size-7 rounded cursor-pointer ml-auto ${!timerRingColorEnabled ? 'opacity-40 pointer-events-none' : ''}`}
+              className={`size-7 rounded cursor-pointer ml-auto ${!timerRingColorEnabled ? 'opacity-40' : ''}`}
             />
           </ColorPicker.Trigger>
           <ColorPicker.Popover placement="bottom end" className="gap-2 px-2 py-3 w-52">
