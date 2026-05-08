@@ -3,7 +3,6 @@ import { Switch } from '@heroui/react/switch'
 import { Input } from '@heroui/react/input'
 import { ColorPicker } from '@heroui/react/color-picker'
 import { ColorSwatch } from '@heroui/react/color-swatch'
-import { toast } from '@heroui/react/toast'
 import { parseColor } from 'react-aria-components'
 import type { Color } from 'react-aria-components'
 import { useTimerStore, DEFAULT_SETTINGS } from '@renderer/stores/timer'
@@ -74,8 +73,20 @@ export default function TimerSettingsPanel({
   const isTimerRunning = status !== 'stopped'
   const reminderInputDisabled = isTimerRunning || !reminderEnabled
 
-  const reminderError =
-    reminderEnabled && reminderDuration >= totalDuration ? t('timer.reminder.error') : null
+  const reminderError = (() => {
+    if (!reminderEnabled) return null
+    if (editingValue !== null) {
+      const trimmed = editingValue.trim()
+      if (trimmed === '') return null
+      if (!/^\d+$/.test(trimmed)) return t('toast.reminderDurationInvalid')
+      const val = parseInt(trimmed, 10)
+      if (val < REMINDER_MIN || val > REMINDER_MAX) return t('timer.reminder.errorRange')
+      if (val >= totalDuration) return t('timer.reminder.error')
+      return null
+    }
+    if (reminderDuration >= totalDuration) return t('timer.reminder.error')
+    return null
+  })()
 
   const handleReminderToggle = (enabled: boolean): void => {
     if (enabled) {
@@ -100,34 +111,23 @@ export default function TimerSettingsPanel({
   }
 
   const handleReminderDurationEnter = (): void => {
-    const trimmed = (editingValue ?? '').trim()
-    if (!/^\d+$/.test(trimmed)) {
-      toast.danger(t('toast.reminderDurationInvalid'))
-      return
-    }
+    if (reminderError !== null) return
     focusSinkRef.current?.focus()
   }
 
   const handleReminderDurationBlur = (): void => {
     const trimmed = inputValue.trim()
-
     if (!/^\d+$/.test(trimmed)) {
       setEditingValue(null)
-      toast.danger(t('toast.reminderDurationInvalid'))
       return
     }
-
     const val = parseInt(trimmed, 10)
-    if (val < REMINDER_MIN) {
+    if (val < REMINDER_MIN || val > REMINDER_MAX || val >= totalDuration) {
       setEditingValue(null)
-      setReminder(reminderEnabled, REMINDER_MIN)
-    } else if (val > REMINDER_MAX) {
-      setEditingValue(null)
-      setReminder(reminderEnabled, REMINDER_MAX)
-    } else {
-      setEditingValue(null)
-      setReminder(reminderEnabled, val)
+      return
     }
+    setEditingValue(null)
+    setReminder(reminderEnabled, val)
   }
 
   const handleReminderColorChange = (color: Color): void => {
