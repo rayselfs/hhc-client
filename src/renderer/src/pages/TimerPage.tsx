@@ -105,7 +105,7 @@ export default function TimerPage(): React.JSX.Element {
             <TimerControls className="mb-3" mode={mode} />
             <TimeAdjustment />
           </div>
-          <PresetChips className="shrink-0" />
+          <PresetChips className="shrink-0 max-lg:hidden" />
         </>
       )}
 
