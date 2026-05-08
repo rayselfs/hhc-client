@@ -91,7 +91,7 @@ export default function TimerPage(): React.JSX.Element {
         <>
           <div className="w-18 shrink-0 max-lg:hidden" />
           <div className="flex flex-col items-center gap-4 flex-1">
-            <div className="flex flex-col items-center gap-4 lg:scale-125">
+            <div className="flex flex-col items-center gap-4 lg:scale-125 lg:origin-top">
               <TimerDisplay
                 progress={progress}
                 mainDisplay={displayValues.mainDisplay}
@@ -113,7 +113,7 @@ export default function TimerPage(): React.JSX.Element {
 
       {mode === 'stopwatch' && (
         <div className="flex flex-col items-center gap-4 flex-1 w-full">
-          <div className="flex flex-col items-center gap-4 lg:scale-125">
+          <div className="flex flex-col items-center gap-4 lg:scale-125 lg:origin-top">
             <StopwatchDisplay formattedTime={swFormattedTime} />
             <TimerControls mode="stopwatch" />
           </div>
