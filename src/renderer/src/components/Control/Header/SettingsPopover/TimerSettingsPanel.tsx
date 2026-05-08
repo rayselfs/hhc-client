@@ -177,7 +177,7 @@ export default function TimerSettingsPanel({
 
   return (
     <div className="contents">
-      <div ref={focusSinkRef} tabIndex={-1} className="sr-only" aria-hidden="true" />
+      <div ref={focusSinkRef} tabIndex={-1} className="sr-only" />
       <div className="space-y-1">
         <div className="flex items-center gap-2 min-h-10">
           <Switch
