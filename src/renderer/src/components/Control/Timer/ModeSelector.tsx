@@ -28,7 +28,7 @@ export default function ModeSelector(): React.JSX.Element {
               key={m}
               id={m}
               data-testid={`mode-${m}`}
-              className="max-lg:w-8 max-lg:px-0 data-[selected=true]:text-accent-foreground"
+              className="min-w-20 max-lg:min-w-0 max-lg:w-8 max-lg:px-0 data-[selected=true]:text-accent-foreground"
             >
               <span className="max-lg:hidden">{t(`timer.mode.${m}`)}</span>
               <span className="lg:hidden">{MODE_ICONS[m]}</span>
@@ -40,7 +40,7 @@ export default function ModeSelector(): React.JSX.Element {
               key={m}
               id={m}
               data-testid={`mode-${m}`}
-              className="max-lg:w-8 max-lg:px-0 data-[selected=true]:text-accent-foreground"
+              className="min-w-20 max-lg:min-w-0 max-lg:w-8 max-lg:px-0 data-[selected=true]:text-accent-foreground"
             >
               <Tabs.Separator />
               <span className="max-lg:hidden">{t(`timer.mode.${m}`)}</span>
