@@ -9,7 +9,7 @@ import type { Color } from 'react-aria-components'
 import { useTimerStore, DEFAULT_SETTINGS } from '@renderer/stores/timer'
 import { useStopwatchStore } from '@renderer/stores/stopwatch'
 import { useSettingsStore } from '@renderer/stores/settings'
-import { Suspense, lazy, useState } from 'react'
+import { Suspense, lazy, useRef, useState } from 'react'
 import type { TFunction } from 'i18next'
 
 const REMINDER_MIN = 10
@@ -66,6 +66,7 @@ export default function TimerSettingsPanel({
   const setShowOnProjection = useStopwatchStore((s) => s.setShowOnProjection)
 
   const [editingValue, setEditingValue] = useState<string | null>(null)
+  const focusSinkRef = useRef<HTMLDivElement>(null)
 
   const inputValue = editingValue ?? String(reminderDuration)
 
@@ -166,7 +167,8 @@ export default function TimerSettingsPanel({
   }
 
   return (
-    <>
+    <div className="contents">
+      <div ref={focusSinkRef} tabIndex={-1} className="sr-only" aria-hidden="true" />
       <div className="space-y-1">
         <div className="flex items-center gap-2 min-h-10">
           <Switch
@@ -189,7 +191,7 @@ export default function TimerSettingsPanel({
               onFocus={handleReminderDurationFocus}
               onChange={handleReminderDurationChange}
               onBlur={handleReminderDurationBlur}
-              onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLElement).blur()}
+              onKeyDown={(e) => e.key === 'Enter' && focusSinkRef.current?.focus()}
               aria-label={t('timer.reminder.time')}
               className="w-21 [&_input]:py-1 [&_input]:text-center rounded-full px-4"
               disabled={reminderInputDisabled}
@@ -236,7 +238,7 @@ export default function TimerSettingsPanel({
           value={overtimeMessage}
           onChange={handleOvertimeMessageChange}
           onBlur={handleOvertimeMessageBlur}
-          onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLElement).blur()}
+          onKeyDown={(e) => e.key === 'Enter' && focusSinkRef.current?.focus()}
           placeholder={t('timer.overtimeMessage.placeholder')}
           aria-label={t('timer.overtimeMessage.label')}
           maxLength={15}
@@ -272,6 +274,6 @@ export default function TimerSettingsPanel({
           </ColorPicker.Popover>
         </ColorPicker>
       </div>
-    </>
+    </div>
   )
 }
