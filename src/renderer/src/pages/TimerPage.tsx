@@ -68,7 +68,6 @@ export default function TimerPage(): React.JSX.Element {
   })
 
   const isTimerLike = mode === 'timer' || mode === 'clock' || mode === 'both'
-  const isClock = mode === 'clock'
 
   return (
     <div data-testid="timer-page" className="flex h-full gap-4">
@@ -87,7 +86,7 @@ export default function TimerPage(): React.JSX.Element {
               onTimeConfirm={(seconds) => setDuration(seconds)}
               digitClassName="text-segment-foreground"
             />
-            <TimerControls className="mb-3" mode={mode} disableStart={isClock} />
+            <TimerControls className="mb-3" mode={mode} />
             <TimeAdjustment />
           </div>
           <PresetChips className="shrink-0" />

@@ -30,6 +30,7 @@ export default function TimerControls({
   const timerPause = useTimerStore((s) => s.pause)
   const timerResume = useTimerStore((s) => s.resume)
   const timerReset = useTimerStore((s) => s.reset)
+  const setMode = useTimerStore((s) => s.setMode)
 
   const swStatus = useStopwatchStore((s) => s.status)
   const swStart = useStopwatchStore((s) => s.start)
@@ -64,6 +65,7 @@ export default function TimerControls({
   }, [])
 
   const handleStart = (): void => {
+    if (mode === 'clock') setMode('both')
     openProjection().catch(() => {})
     claimProjection('timer', { unblank: true })
     start()
