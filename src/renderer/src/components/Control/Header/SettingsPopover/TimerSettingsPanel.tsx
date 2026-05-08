@@ -177,7 +177,7 @@ export default function TimerSettingsPanel({
         <div className="flex items-center gap-2 min-h-10">
           <Switch
             isSelected={reminderEnabled}
-            isDisabled={!canEnableReminder || isTimerRunning}
+            isDisabled={!canEnableReminder || (isTimerRunning && !reminderEnabled)}
             onChange={handleReminderToggle}
             aria-label={t('timer.reminder.label')}
           >
