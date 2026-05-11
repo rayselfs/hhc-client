@@ -105,7 +105,7 @@ export function CustomFolderTab({
             handlers.handleItemClick(folder.id, e as unknown as React.MouseEvent)
           }
           className={[
-            'flex items-center justify-between rounded-3xl p-3 group select-none transition-colors',
+            'flex items-center justify-between rounded-lg p-3 group select-none transition-colors',
             isSelected
               ? 'bg-accent text-accent-foreground'
               : isFolderDropTarget
@@ -164,7 +164,7 @@ export function CustomFolderTab({
             handlers.handleItemClick(item.id, e as unknown as React.MouseEvent)
           }
           className={[
-            'flex items-center justify-between rounded-3xl p-3 group select-none transition-colors',
+            'flex items-center justify-between rounded-lg p-3 group select-none transition-colors',
             isSelected ? 'bg-accent text-accent-foreground' : ''
           ]
             .filter(Boolean)

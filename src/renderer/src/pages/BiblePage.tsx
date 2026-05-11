@@ -4,6 +4,7 @@ import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 import { useBibleHistoryStore } from '@renderer/stores/bible-history'
 import { BiblePreview } from '@renderer/components/Control/Bible/BiblePreview'
 import BibleMultiFunction from '@renderer/components/Control/Bible/BibleMultiFunction'
+import SpeechRecognitionCard from '@renderer/components/Control/Bible/SpeechRecognitionCard'
 import { BibleSelectorDialog } from '@renderer/components/Control/Bible/BibleSelectorDialog'
 import { useBibleContextMenu } from '@renderer/components/Control/Bible/useBibleContextMenu'
 import type { VerseMenuData } from '@renderer/components/Control/Bible/useBibleContextMenu'
@@ -28,6 +29,7 @@ export default function BiblePage(): React.JSX.Element {
     prevChapter
   } = useBibleStore.getState()
   const fontSize = useBibleSettingsStore((s) => s.fontSize)
+  const speechEnabled = useBibleSettingsStore((s) => s.speechEnabled)
   const [isSelectorOpen, setSelectorOpen] = useState(false)
   const [selectedVerseIndex, setSelectedVerseIndex] = useState(0)
   const [projectedPassage, setProjectedPassage] = useState<ProjectedPassage | null>(null)
@@ -233,7 +235,16 @@ export default function BiblePage(): React.JSX.Element {
             projectedPassage={projectedPassage}
             onProjected={setProjectedPassage}
           />
-          <BibleMultiFunction onProjected={setProjectedPassage} />
+          <div className="flex flex-col gap-4 flex-1 max-lg:flex-4">
+            <div className={speechEnabled ? 'flex-1 min-h-0' : 'h-full min-h-0'}>
+              <BibleMultiFunction onProjected={setProjectedPassage} />
+            </div>
+            {speechEnabled && (
+              <div className="flex-1 min-h-0">
+                <SpeechRecognitionCard />
+              </div>
+            )}
+          </div>
           <BibleSelectorDialog
             isOpen={isSelectorOpen}
             onOpenChange={setSelectorOpen}

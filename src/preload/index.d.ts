@@ -1,5 +1,11 @@
 import type { ProjectionChannel, ProjectionPayload } from '../shared/projection-messages'
-import type { DisplayInfo, UpdateStatus } from '../shared/ipc-channels'
+import type {
+  DisplayInfo,
+  UpdateStatus,
+  WhisperModel,
+  WhisperDownloadProgress,
+  WhisperDirInfo
+} from '../shared/ipc-channels'
 import type {
   TimerCommand,
   TimerSettings,
@@ -43,6 +49,11 @@ interface BibleAPI {
 
 interface AppAPI {
   relaunch: () => Promise<void>
+  selectDirectory: () => Promise<string | null>
+  setModelDir: (dir: string) => Promise<void>
+  checkWhisperDir: (dir: string) => Promise<WhisperDirInfo>
+  downloadWhisperModel: (model: WhisperModel, destDir: string) => Promise<void>
+  onDownloadProgress: (callback: (data: WhisperDownloadProgress) => void) => () => void
 }
 
 interface UpdateAPI {
@@ -51,6 +62,12 @@ interface UpdateAPI {
   onStatusChanged: (
     callback: (data: { status: UpdateStatus; version?: string; error?: string }) => void
   ) => () => void
+}
+
+interface SpeechAPI {
+  saveKey: (provider: string, apiKey: string) => Promise<void>
+  loadKey: (provider: string) => Promise<string>
+  deleteKey: (provider: string) => Promise<void>
 }
 
 declare global {
@@ -62,6 +79,7 @@ declare global {
       bible: BibleAPI
       app: AppAPI
       update: UpdateAPI
+      speech: SpeechAPI
     }
   }
 }

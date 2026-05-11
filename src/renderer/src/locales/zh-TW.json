@@ -71,7 +71,7 @@
     "functionsLabel": "聖經功能",
     "preview": {
       "loading": "載入中...",
-      "noContent": "尚未載入經文內容",
+      "noContent": "未載入經文內容",
       "selectBook": "選擇書卷查看經文"
     },
     "selector": {
@@ -88,7 +88,7 @@
     },
     "history": {
       "title": "歷史",
-      "emptyMessage": "尚無瀏覽歷史",
+      "emptyMessage": "無瀏覽歷史",
       "clearHistory": "清除歷史"
     },
     "custom": {
@@ -132,6 +132,20 @@
       "submit": "送出搜尋",
       "noResults": "無結果"
     },
+    "speech": {
+      "start": "開始偵測經文",
+      "stop": "停止偵測",
+      "listening": "正在聆聽...",
+      "empty": "未辨識任何經文",
+      "networkOffline": "網路已斷線",
+      "configRequired": "請先設定 Azure Speech API",
+      "startFailed": "啟動語音辨識失敗",
+      "clearAll": "清空",
+      "exportLog": "匯出原始紀錄",
+      "idleTimeout": "長時間無語音活動，已自動停止偵測",
+      "maxDuration": "已達最大偵測時長，已自動停止",
+      "errorRetryExceeded": "連續錯誤過多，已自動停止偵測"
+    },
     "settings": {
       "fontSize": "投影字體大小"
     },
@@ -154,72 +168,204 @@
     },
     "verseUnit": "節",
     "books": {
-      "gen": { "name": "創世記" },
-      "exo": { "name": "出埃及記" },
-      "lev": { "name": "利未記" },
-      "num": { "name": "民數記" },
-      "deu": { "name": "申命記" },
-      "jos": { "name": "約書亞記" },
-      "jdg": { "name": "士師記" },
-      "rut": { "name": "路得記" },
-      "1sa": { "name": "撒母耳記上" },
-      "2sa": { "name": "撒母耳記下" },
-      "1ki": { "name": "列王紀上" },
-      "2ki": { "name": "列王紀下" },
-      "1ch": { "name": "歷代志上" },
-      "2ch": { "name": "歷代志下" },
-      "ezr": { "name": "以斯拉記" },
-      "neh": { "name": "尼希米記" },
-      "est": { "name": "以斯帖記" },
-      "job": { "name": "約伯記" },
-      "psa": { "name": "詩篇" },
-      "pro": { "name": "箴言" },
-      "ecc": { "name": "傳道書" },
-      "sol": { "name": "雅歌" },
-      "isa": { "name": "以賽亞書" },
-      "jer": { "name": "耶利米書" },
-      "lam": { "name": "耶利米哀歌" },
-      "eze": { "name": "以西結書" },
-      "dan": { "name": "但以理書" },
-      "hos": { "name": "何西阿書" },
-      "joe": { "name": "約珥書" },
-      "amo": { "name": "阿摩司書" },
-      "oba": { "name": "俄巴底亞書" },
-      "jon": { "name": "約拿書" },
-      "mic": { "name": "彌迦書" },
-      "nah": { "name": "那鴻書" },
-      "hab": { "name": "哈巴谷書" },
-      "zep": { "name": "西番雅書" },
-      "hag": { "name": "哈該書" },
-      "zec": { "name": "撒迦利亞書" },
-      "mal": { "name": "瑪拉基書" },
-      "mat": { "name": "馬太福音" },
-      "mar": { "name": "馬可福音" },
-      "luk": { "name": "路加福音" },
-      "joh": { "name": "約翰福音" },
-      "act": { "name": "使徒行傳" },
-      "rom": { "name": "羅馬書" },
-      "1co": { "name": "哥林多前書" },
-      "2co": { "name": "哥林多後書" },
-      "gal": { "name": "加拉太書" },
-      "eph": { "name": "以弗所書" },
-      "phi": { "name": "腓立比書" },
-      "col": { "name": "歌羅西書" },
-      "1th": { "name": "帖撒羅尼迦前書" },
-      "2th": { "name": "帖撒羅尼迦後書" },
-      "1ti": { "name": "提摩太前書" },
-      "2ti": { "name": "提摩太後書" },
-      "tit": { "name": "提多書" },
-      "phm": { "name": "腓利門書" },
-      "heb": { "name": "希伯來書" },
-      "jas": { "name": "雅各書" },
-      "1pe": { "name": "彼得前書" },
-      "2pe": { "name": "彼得後書" },
-      "1jo": { "name": "約翰一書" },
-      "2jo": { "name": "約翰二書" },
-      "3jo": { "name": "約翰三書" },
-      "jud": { "name": "猶大書" },
-      "rev": { "name": "啟示錄" }
+      "gen": {
+        "name": "創世記"
+      },
+      "exo": {
+        "name": "出埃及記"
+      },
+      "lev": {
+        "name": "利未記"
+      },
+      "num": {
+        "name": "民數記"
+      },
+      "deu": {
+        "name": "申命記"
+      },
+      "jos": {
+        "name": "約書亞記"
+      },
+      "jdg": {
+        "name": "士師記"
+      },
+      "rut": {
+        "name": "路得記"
+      },
+      "1sa": {
+        "name": "撒母耳記上"
+      },
+      "2sa": {
+        "name": "撒母耳記下"
+      },
+      "1ki": {
+        "name": "列王紀上"
+      },
+      "2ki": {
+        "name": "列王紀下"
+      },
+      "1ch": {
+        "name": "歷代志上"
+      },
+      "2ch": {
+        "name": "歷代志下"
+      },
+      "ezr": {
+        "name": "以斯拉記"
+      },
+      "neh": {
+        "name": "尼希米記"
+      },
+      "est": {
+        "name": "以斯帖記"
+      },
+      "job": {
+        "name": "約伯記"
+      },
+      "psa": {
+        "name": "詩篇"
+      },
+      "pro": {
+        "name": "箴言"
+      },
+      "ecc": {
+        "name": "傳道書"
+      },
+      "sol": {
+        "name": "雅歌"
+      },
+      "isa": {
+        "name": "以賽亞書"
+      },
+      "jer": {
+        "name": "耶利米書"
+      },
+      "lam": {
+        "name": "耶利米哀歌"
+      },
+      "eze": {
+        "name": "以西結書"
+      },
+      "dan": {
+        "name": "但以理書"
+      },
+      "hos": {
+        "name": "何西阿書"
+      },
+      "joe": {
+        "name": "約珥書"
+      },
+      "amo": {
+        "name": "阿摩司書"
+      },
+      "oba": {
+        "name": "俄巴底亞書"
+      },
+      "jon": {
+        "name": "約拿書"
+      },
+      "mic": {
+        "name": "彌迦書"
+      },
+      "nah": {
+        "name": "那鴻書"
+      },
+      "hab": {
+        "name": "哈巴谷書"
+      },
+      "zep": {
+        "name": "西番雅書"
+      },
+      "hag": {
+        "name": "哈該書"
+      },
+      "zec": {
+        "name": "撒迦利亞書"
+      },
+      "mal": {
+        "name": "瑪拉基書"
+      },
+      "mat": {
+        "name": "馬太福音"
+      },
+      "mar": {
+        "name": "馬可福音"
+      },
+      "luk": {
+        "name": "路加福音"
+      },
+      "joh": {
+        "name": "約翰福音"
+      },
+      "act": {
+        "name": "使徒行傳"
+      },
+      "rom": {
+        "name": "羅馬書"
+      },
+      "1co": {
+        "name": "哥林多前書"
+      },
+      "2co": {
+        "name": "哥林多後書"
+      },
+      "gal": {
+        "name": "加拉太書"
+      },
+      "eph": {
+        "name": "以弗所書"
+      },
+      "phi": {
+        "name": "腓立比書"
+      },
+      "col": {
+        "name": "歌羅西書"
+      },
+      "1th": {
+        "name": "帖撒羅尼迦前書"
+      },
+      "2th": {
+        "name": "帖撒羅尼迦後書"
+      },
+      "1ti": {
+        "name": "提摩太前書"
+      },
+      "2ti": {
+        "name": "提摩太後書"
+      },
+      "tit": {
+        "name": "提多書"
+      },
+      "phm": {
+        "name": "腓利門書"
+      },
+      "heb": {
+        "name": "希伯來書"
+      },
+      "jas": {
+        "name": "雅各書"
+      },
+      "1pe": {
+        "name": "彼得前書"
+      },
+      "2pe": {
+        "name": "彼得後書"
+      },
+      "1jo": {
+        "name": "約翰一書"
+      },
+      "2jo": {
+        "name": "約翰二書"
+      },
+      "3jo": {
+        "name": "約翰三書"
+      },
+      "jud": {
+        "name": "猶大書"
+      },
+      "rev": {
+        "name": "啟示錄"
+      }
     }
   },
   "folder": {
@@ -269,7 +415,13 @@
     "close": "關閉",
     "warning": "警告",
     "danger": "危險",
-    "info": "提示"
+    "info": "提示",
+    "save": "儲存",
+    "show": "顯示",
+    "hide": "隱藏",
+    "delete": "刪除",
+    "apiKey": "金鑰",
+    "region": "區域"
   },
   "userMenu": {
     "guest": "訪客",
@@ -294,7 +446,8 @@
     "title": "偏好設定",
     "categories": {
       "general": "一般",
-      "media": "媒體"
+      "media": "媒體",
+      "bible": "聖經"
     },
     "language": "語言",
     "timezone": "時區",
@@ -309,6 +462,33 @@
       "en": "English",
       "zhTW": "繁體中文",
       "zhCN": "简体中文"
+    },
+    "bible": {
+      "azureSpeechKey": "Azure Speech Service 金鑰",
+      "azureSpeechKeyPlaceholder": "輸入您的 API 金鑰",
+      "azureSpeechKeyHint": "從 Azure Portal 取得您的 API 金鑰",
+      "azureSpeechRegion": "Azure Speech Service 區域",
+      "testConnection": "測試連線",
+      "testing": "測試中...",
+      "maxSessionDuration": "語音辨識最大時長",
+      "speechProvider": "語音辨識服務",
+      "gcpSpeechKey": "Google Cloud API 金鑰",
+      "gcpSpeechKeyPlaceholder": "輸入您的 API 金鑰",
+      "whisperModelDir": "Whisper 模型目錄",
+      "whisperSelectDir": "選擇目錄",
+      "whisperNoDirSelected": "未設定",
+      "whisperDownloadModels": "下載模型",
+      "whisperSelectModel": "選擇模型",
+      "whisperDownloadAndBind": "下載",
+      "whisperDownloadComplete": "模型下載完成",
+      "whisperOverwriteTitle": "模型已存在",
+      "whisperOverwriteDesc": "此資料夾已有 Whisper 模型，繼續下載將會覆蓋。確定要繼續嗎？",
+      "speechLanguage": "語言",
+      "providerAzure": "Azure Speech Service",
+      "providerGcp": "Google Cloud STT",
+      "providerWebSpeech": "Web Speech API",
+      "providerWhisper": "Whisper（本機）",
+      "speechEnabled": "開啟語音辨識"
     }
   },
   "error": {
@@ -327,15 +507,28 @@
     "london": "倫敦 (UTC+0/+1)"
   },
   "toast": {
-    "storageSaveFailed": "設定儲存失敗",
-    "projectionOpenFailed": "投影視窗開啟失敗",
-    "projectionCloseFailed": "投影視窗關閉失敗",
-    "settingsReset": "已重設為預設值",
-    "bibleIndexFailed": "無法載入此版本的搜尋索引",
-    "updateAvailable": "{{version}} 版本更新可用",
+    "storageSaveFailed": "儲存設定失敗",
+    "projectionOpenFailed": "開啟投影視窗失敗",
+    "projectionCloseFailed": "關閉投影視窗失敗",
+    "settingsReset": "設定已重設為預設值",
+    "bibleIndexFailed": "載入此版本的搜尋索引失敗",
+    "updateAvailable": "有可用的更新 {{version}}",
     "updateCheckFailed": "檢查更新失敗",
     "networkRestored": "網路連線已恢復",
     "networkLost": "網路連線已中斷",
+    "whisperDirReset": "找不到 Whisper 模型目錄，設定已重置",
+    "azureSpeechSaved": "Azure 語音設定已儲存",
+    "azureSpeechCleared": "Azure 語音設定已清除",
+    "azureSpeechSaveFailed": "儲存 Azure 語音設定失敗",
+    "azureSpeechKeyRequired": "需要 API 金鑰",
+    "azureSpeechTestSuccess": "連線測試成功",
+    "azureSpeechTestFailed": "連線測試失敗",
+    "gcpSpeechSaved": "Google Cloud STT 設定已儲存",
+    "gcpSpeechCleared": "Google Cloud STT 設定已清除",
+    "gcpSpeechSaveFailed": "儲存 Google Cloud STT 設定失敗",
+    "gcpSpeechKeyRequired": "請輸入 Google Cloud API 金鑰",
+    "gcpSpeechTestSuccess": "Google Cloud STT 連線成功",
+    "gcpSpeechTestFailed": "Google Cloud STT 連線失敗",
     "reminderDurationInvalid": "輸入無效，請輸入數字",
     "reminderDurationEmpty": "提醒時間不能為空",
     "reminderAutoDisabled": "提醒已關閉 — 計時時間不足提醒時間"

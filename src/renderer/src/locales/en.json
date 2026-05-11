@@ -132,6 +132,20 @@
       "submit": "Submit search",
       "noResults": "No results"
     },
+    "speech": {
+      "start": "Detect Scripture",
+      "stop": "Stop Detection",
+      "listening": "Listening...",
+      "empty": "No verses recognized yet",
+      "networkOffline": "Network is offline",
+      "configRequired": "Please configure Azure Speech API first",
+      "startFailed": "Failed to start voice recognition",
+      "clearAll": "Clear All",
+      "exportLog": "Export Raw Log",
+      "idleTimeout": "No speech activity detected, recognition stopped",
+      "maxDuration": "Maximum session duration reached, recognition stopped",
+      "errorRetryExceeded": "Too many consecutive errors, recognition stopped"
+    },
     "settings": {
       "fontSize": "Projection Font Size"
     },
@@ -154,72 +168,204 @@
     },
     "verseUnit": "",
     "books": {
-      "gen": { "name": "Genesis" },
-      "exo": { "name": "Exodus" },
-      "lev": { "name": "Leviticus" },
-      "num": { "name": "Numbers" },
-      "deu": { "name": "Deuteronomy" },
-      "jos": { "name": "Joshua" },
-      "jdg": { "name": "Judges" },
-      "rut": { "name": "Ruth" },
-      "1sa": { "name": "1 Samuel" },
-      "2sa": { "name": "2 Samuel" },
-      "1ki": { "name": "1 Kings" },
-      "2ki": { "name": "2 Kings" },
-      "1ch": { "name": "1 Chronicles" },
-      "2ch": { "name": "2 Chronicles" },
-      "ezr": { "name": "Ezra" },
-      "neh": { "name": "Nehemiah" },
-      "est": { "name": "Esther" },
-      "job": { "name": "Job" },
-      "psa": { "name": "Psalms" },
-      "pro": { "name": "Proverbs" },
-      "ecc": { "name": "Ecclesiastes" },
-      "sol": { "name": "Song of Solomon" },
-      "isa": { "name": "Isaiah" },
-      "jer": { "name": "Jeremiah" },
-      "lam": { "name": "Lamentations" },
-      "eze": { "name": "Ezekiel" },
-      "dan": { "name": "Daniel" },
-      "hos": { "name": "Hosea" },
-      "joe": { "name": "Joel" },
-      "amo": { "name": "Amos" },
-      "oba": { "name": "Obadiah" },
-      "jon": { "name": "Jonah" },
-      "mic": { "name": "Micah" },
-      "nah": { "name": "Nahum" },
-      "hab": { "name": "Habakkuk" },
-      "zep": { "name": "Zephaniah" },
-      "hag": { "name": "Haggai" },
-      "zec": { "name": "Zechariah" },
-      "mal": { "name": "Malachi" },
-      "mat": { "name": "Matthew" },
-      "mar": { "name": "Mark" },
-      "luk": { "name": "Luke" },
-      "joh": { "name": "John" },
-      "act": { "name": "Acts" },
-      "rom": { "name": "Romans" },
-      "1co": { "name": "1 Corinthians" },
-      "2co": { "name": "2 Corinthians" },
-      "gal": { "name": "Galatians" },
-      "eph": { "name": "Ephesians" },
-      "phi": { "name": "Philippians" },
-      "col": { "name": "Colossians" },
-      "1th": { "name": "1 Thessalonians" },
-      "2th": { "name": "2 Thessalonians" },
-      "1ti": { "name": "1 Timothy" },
-      "2ti": { "name": "2 Timothy" },
-      "tit": { "name": "Titus" },
-      "phm": { "name": "Philemon" },
-      "heb": { "name": "Hebrews" },
-      "jas": { "name": "James" },
-      "1pe": { "name": "1 Peter" },
-      "2pe": { "name": "2 Peter" },
-      "1jo": { "name": "1 John" },
-      "2jo": { "name": "2 John" },
-      "3jo": { "name": "3 John" },
-      "jud": { "name": "Jude" },
-      "rev": { "name": "Revelation" }
+      "gen": {
+        "name": "Genesis"
+      },
+      "exo": {
+        "name": "Exodus"
+      },
+      "lev": {
+        "name": "Leviticus"
+      },
+      "num": {
+        "name": "Numbers"
+      },
+      "deu": {
+        "name": "Deuteronomy"
+      },
+      "jos": {
+        "name": "Joshua"
+      },
+      "jdg": {
+        "name": "Judges"
+      },
+      "rut": {
+        "name": "Ruth"
+      },
+      "1sa": {
+        "name": "1 Samuel"
+      },
+      "2sa": {
+        "name": "2 Samuel"
+      },
+      "1ki": {
+        "name": "1 Kings"
+      },
+      "2ki": {
+        "name": "2 Kings"
+      },
+      "1ch": {
+        "name": "1 Chronicles"
+      },
+      "2ch": {
+        "name": "2 Chronicles"
+      },
+      "ezr": {
+        "name": "Ezra"
+      },
+      "neh": {
+        "name": "Nehemiah"
+      },
+      "est": {
+        "name": "Esther"
+      },
+      "job": {
+        "name": "Job"
+      },
+      "psa": {
+        "name": "Psalms"
+      },
+      "pro": {
+        "name": "Proverbs"
+      },
+      "ecc": {
+        "name": "Ecclesiastes"
+      },
+      "sol": {
+        "name": "Song of Solomon"
+      },
+      "isa": {
+        "name": "Isaiah"
+      },
+      "jer": {
+        "name": "Jeremiah"
+      },
+      "lam": {
+        "name": "Lamentations"
+      },
+      "eze": {
+        "name": "Ezekiel"
+      },
+      "dan": {
+        "name": "Daniel"
+      },
+      "hos": {
+        "name": "Hosea"
+      },
+      "joe": {
+        "name": "Joel"
+      },
+      "amo": {
+        "name": "Amos"
+      },
+      "oba": {
+        "name": "Obadiah"
+      },
+      "jon": {
+        "name": "Jonah"
+      },
+      "mic": {
+        "name": "Micah"
+      },
+      "nah": {
+        "name": "Nahum"
+      },
+      "hab": {
+        "name": "Habakkuk"
+      },
+      "zep": {
+        "name": "Zephaniah"
+      },
+      "hag": {
+        "name": "Haggai"
+      },
+      "zec": {
+        "name": "Zechariah"
+      },
+      "mal": {
+        "name": "Malachi"
+      },
+      "mat": {
+        "name": "Matthew"
+      },
+      "mar": {
+        "name": "Mark"
+      },
+      "luk": {
+        "name": "Luke"
+      },
+      "joh": {
+        "name": "John"
+      },
+      "act": {
+        "name": "Acts"
+      },
+      "rom": {
+        "name": "Romans"
+      },
+      "1co": {
+        "name": "1 Corinthians"
+      },
+      "2co": {
+        "name": "2 Corinthians"
+      },
+      "gal": {
+        "name": "Galatians"
+      },
+      "eph": {
+        "name": "Ephesians"
+      },
+      "phi": {
+        "name": "Philippians"
+      },
+      "col": {
+        "name": "Colossians"
+      },
+      "1th": {
+        "name": "1 Thessalonians"
+      },
+      "2th": {
+        "name": "2 Thessalonians"
+      },
+      "1ti": {
+        "name": "1 Timothy"
+      },
+      "2ti": {
+        "name": "2 Timothy"
+      },
+      "tit": {
+        "name": "Titus"
+      },
+      "phm": {
+        "name": "Philemon"
+      },
+      "heb": {
+        "name": "Hebrews"
+      },
+      "jas": {
+        "name": "James"
+      },
+      "1pe": {
+        "name": "1 Peter"
+      },
+      "2pe": {
+        "name": "2 Peter"
+      },
+      "1jo": {
+        "name": "1 John"
+      },
+      "2jo": {
+        "name": "2 John"
+      },
+      "3jo": {
+        "name": "3 John"
+      },
+      "jud": {
+        "name": "Jude"
+      },
+      "rev": {
+        "name": "Revelation"
+      }
     }
   },
   "folder": {
@@ -269,7 +415,13 @@
     "close": "Close",
     "warning": "Warning",
     "danger": "Danger",
-    "info": "Info"
+    "info": "Info",
+    "save": "Save",
+    "show": "Show",
+    "hide": "Hide",
+    "delete": "Delete",
+    "apiKey": "Key",
+    "region": "Region"
   },
   "userMenu": {
     "guest": "Guest",
@@ -294,7 +446,8 @@
     "title": "Preferences",
     "categories": {
       "general": "General",
-      "media": "Media"
+      "media": "Media",
+      "bible": "Bible"
     },
     "language": "Language",
     "timezone": "Timezone",
@@ -309,6 +462,33 @@
       "en": "English",
       "zhTW": "繁體中文",
       "zhCN": "简体中文"
+    },
+    "bible": {
+      "azureSpeechKey": "Azure Speech Service Key",
+      "azureSpeechKeyPlaceholder": "Enter your API key",
+      "azureSpeechKeyHint": "Get your API key from the Azure Portal",
+      "azureSpeechRegion": "Azure Speech Service Region",
+      "testConnection": "Test Connection",
+      "testing": "Testing...",
+      "maxSessionDuration": "Voice Recognition Max Duration",
+      "speechProvider": "Speech Service",
+      "gcpSpeechKey": "Google Cloud API Key",
+      "gcpSpeechKeyPlaceholder": "Enter your API key",
+      "whisperModelDir": "Whisper Model Directory",
+      "whisperSelectDir": "Select Directory",
+      "whisperNoDirSelected": "Not configured",
+      "whisperDownloadModels": "Download Models",
+      "whisperSelectModel": "Select Model",
+      "whisperDownloadAndBind": "Download",
+      "whisperDownloadComplete": "Model downloaded successfully",
+      "whisperOverwriteTitle": "Model Already Exists",
+      "whisperOverwriteDesc": "This folder already contains a Whisper model. Downloading will overwrite it. Continue?",
+      "speechLanguage": "Language",
+      "providerAzure": "Azure Speech Service",
+      "providerGcp": "Google Cloud STT",
+      "providerWebSpeech": "Web Speech API",
+      "providerWhisper": "Whisper (Local)",
+      "speechEnabled": "Enable Voice Recognition"
     }
   },
   "error": {
@@ -336,6 +516,19 @@
     "updateCheckFailed": "Failed to check for updates",
     "networkRestored": "Network connection restored",
     "networkLost": "Network connection lost",
+    "whisperDirReset": "Whisper model directory not found, settings have been reset",
+    "azureSpeechSaved": "Azure Speech settings saved",
+    "azureSpeechCleared": "Azure Speech settings cleared",
+    "azureSpeechSaveFailed": "Failed to save Azure Speech settings",
+    "azureSpeechKeyRequired": "API key is required",
+    "azureSpeechTestSuccess": "Connection test successful",
+    "azureSpeechTestFailed": "Connection test failed",
+    "gcpSpeechSaved": "Google Cloud STT settings saved",
+    "gcpSpeechCleared": "Google Cloud STT settings cleared",
+    "gcpSpeechSaveFailed": "Failed to save Google Cloud STT settings",
+    "gcpSpeechKeyRequired": "Please enter a Google Cloud API key",
+    "gcpSpeechTestSuccess": "Google Cloud STT connection successful",
+    "gcpSpeechTestFailed": "Google Cloud STT connection failed",
     "reminderDurationInvalid": "Invalid input. Please enter a number.",
     "reminderDurationEmpty": "Reminder time cannot be empty.",
     "reminderAutoDisabled": "Reminder disabled — duration is shorter than reminder time"

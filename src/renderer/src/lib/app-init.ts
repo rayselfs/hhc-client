@@ -1,15 +1,45 @@
 import { useBibleStore } from '@renderer/stores/bible'
 import { useBibleFolderStore } from '@renderer/stores/folder'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
+import { useSettingsStore } from '@renderer/stores/settings'
 import { initializeSearchIndexes } from '@renderer/lib/bible-search'
+import { isElectron } from '@renderer/lib/env'
 import { toast } from '@heroui/react/toast'
 import i18n from '@renderer/i18n'
 
 let initialized = false
 
+async function initWhisperModelDir(): Promise<void> {
+  if (!isElectron()) return
+  const { speech, setSpeech } = useSettingsStore.getState()
+  const modelDir = speech.whisper.modelDir
+  if (!modelDir) return
+
+  const info = await window.api.app.checkWhisperDir(modelDir)
+  if (!info.hasFiles) {
+    setSpeech({ ...speech, whisper: { ...speech.whisper, modelDir: '', installedModel: null } })
+    toast.warning(i18n.t('toast.whisperDirReset' as never))
+  } else {
+    await window.api.app.setModelDir(modelDir)
+  }
+}
+
 export function initializeApp(): () => void {
   if (initialized) return () => {}
   initialized = true
+
+  void initWhisperModelDir()
+
+  let prevModelDir = useSettingsStore.getState().speech.whisper.modelDir
+  const unsubWhisper = useSettingsStore.subscribe((state) => {
+    const modelDir = state.speech.whisper.modelDir
+    if (modelDir !== prevModelDir) {
+      prevModelDir = modelDir
+      if (isElectron() && modelDir) {
+        window.api.app.setModelDir(modelDir).catch(() => {})
+      }
+    }
+  })
 
   const tryInitSearch = (state: ReturnType<typeof useBibleStore.getState>): void => {
     if (!state.isInitialized || state.versions.length === 0) return
@@ -54,10 +84,10 @@ export function initializeApp(): () => void {
 
   return () => {
     unsubscribe()
+    unsubWhisper()
     window.removeEventListener('online', handleOnline)
     window.removeEventListener('offline', handleOffline)
     initialized = false
-    // Reset loading state so StrictMode re-mount can re-initialize
     const s = useBibleStore.getState()
     if (s.isLoading && !s.isInitialized) {
       useBibleStore.setState({ isLoading: false })

@@ -16,8 +16,21 @@ import type {
 } from './types/timer'
 import type { BibleVersion, BibleBook } from './types/bible'
 
+export type WhisperModel = 'whisper-base' | 'whisper-small' | 'whisper-medium'
+
+export interface WhisperDownloadProgress {
+  model: WhisperModel
+  percent: number
+  currentFile: string
+  done: boolean
+  error?: string
+}
+
+export interface WhisperDirInfo {
+  hasFiles: boolean
+}
+
 // ---------------------------------------------------------------------------
-// Invoke channels (renderer → main, returns a result)
 // ---------------------------------------------------------------------------
 
 export interface DisplayInfo {
@@ -51,6 +64,13 @@ export interface IpcInvokeMap {
   'app:relaunch': { args: []; result: void }
   'update:check': { args: []; result: { updateAvailable: boolean; version?: string } }
   'update:download-and-install': { args: []; result: void }
+  'speech:saveKey': { args: [string, string]; result: void }
+  'speech:loadKey': { args: [string]; result: string }
+  'speech:deleteKey': { args: [string]; result: void }
+  'app:select-directory': { args: []; result: string | null }
+  'app:set-model-dir': { args: [string]; result: void }
+  'app:check-whisper-dir': { args: [string]; result: WhisperDirInfo }
+  'app:download-whisper-model': { args: [WhisperModel, string]; result: void }
 }
 
 export type IpcInvokeChannel = keyof IpcInvokeMap
@@ -77,6 +97,7 @@ export interface IpcMainToRendererMap {
   'theme:changed': [{ shouldUseDarkColors: boolean }]
   'timer-tick': [TimerTickPayload]
   'update:status-changed': [{ status: UpdateStatus; version?: string; error?: string }]
+  'app:download-progress': [WhisperDownloadProgress]
 }
 
 export type IpcMainToRendererChannel = keyof IpcMainToRendererMap

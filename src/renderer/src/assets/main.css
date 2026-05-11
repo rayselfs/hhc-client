@@ -40,23 +40,15 @@
 
 @theme {
   --font-sans: 'Inter Variable', 'Noto Sans TC Variable', sans-serif;
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
 }
 
 :root {
-  --sidebar-width: 180px;
-  --sidebar-min-width: 52px;
-  --sidebar: oklch(0.92 0.001 286.37);
-  --sidebar-foreground: var(--foreground);
   --eclipse: oklch(0.35 0.005 286);
   --cursor-interactive: default;
 }
 
 .dark,
 [data-theme='dark'] {
-  --sidebar: oklch(0.18 0.0059 285.89);
-  --sidebar-foreground: var(--foreground);
   --warning: oklch(0.42 0.1006 79.22);
   --accent: oklch(0.35 0.1 245);
 }

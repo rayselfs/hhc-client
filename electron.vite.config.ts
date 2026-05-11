@@ -44,6 +44,9 @@ export default defineConfig({
     define: {
       __APP_VERSION__: JSON.stringify(pkg.version)
     },
+    worker: {
+      format: 'es'
+    },
     plugins: [
       react(),
       tailwindcss(),

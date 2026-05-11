@@ -53,3 +53,14 @@ export function formatDuration(seconds: number): string {
   if (h > 0) return `${h}:${mm}:${ss}`
   return `${mm}:${ss}`
 }
+
+/**
+ * Always format as HH:MM:SS (zero-padded hours).
+ */
+export function formatDurationHMS(seconds: number): string {
+  const abs = Math.abs(Math.floor(seconds))
+  const h = Math.floor(abs / 3600)
+  const m = Math.floor((abs % 3600) / 60)
+  const s = abs % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+}

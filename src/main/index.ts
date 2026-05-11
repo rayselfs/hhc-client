@@ -1,12 +1,17 @@
-import { app, BrowserWindow, ipcMain, nativeTheme } from 'electron'
+import { app, BrowserWindow, ipcMain, nativeTheme, protocol } from 'electron'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import { WindowManager } from './windowManager'
 import { registerProjectionHandlers } from './ipc/projection'
 import { registerTimerHandlers } from './ipc/timer'
 import { registerBibleApiHandlers } from './ipc/bible-api'
-import { registerAppIpc } from './ipc/app'
+import { registerAppIpc, registerLocalModelProtocol } from './ipc/app'
+import { registerSpeechKeyStorageHandlers } from './ipc/speech-key-storage'
 import { isKnownWindow, validateTheme } from './ipc/validate'
 import { registerUpdateService } from './updateService'
+
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'local-model', privileges: { secure: true, supportFetchAPI: true, stream: true } }
+])
 
 process.on('uncaughtException', (error) => {
   console.error('[MAIN] Uncaught Exception:', error)
@@ -52,6 +57,8 @@ app.whenReady().then(() => {
   registerTimerHandlers(wm)
   registerBibleApiHandlers(wm)
   registerAppIpc(wm)
+  registerLocalModelProtocol()
+  registerSpeechKeyStorageHandlers(wm)
   wm.createMainWindow()
   wm.createProjectionWindow()
   registerUpdateService(wm)

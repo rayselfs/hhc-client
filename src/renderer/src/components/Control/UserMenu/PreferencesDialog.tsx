@@ -2,8 +2,9 @@ import { useState } from 'react'
 import { Modal } from '@heroui/react/modal'
 import { useOverlayState } from '@renderer/lib/use-overlay-state'
 import { useTranslation } from 'react-i18next'
-import { Settings, Film } from 'lucide-react'
+import { Settings, Film, BookOpen } from 'lucide-react'
 import GeneralSettings from '@renderer/components/Control/UserMenu/GeneralSettings'
+import BibleSettingsPanel from '@renderer/components/Control/UserMenu/BibleSettingsPanel'
 import { ShortcutScope } from '@renderer/contexts/ShortcutScopeContext'
 
 interface PreferencesDialogProps {
@@ -11,16 +12,20 @@ interface PreferencesDialogProps {
   onOpenChange: (open: boolean) => void
 }
 
-type Category = 'general' | 'media'
+type Category = 'general' | 'media' | 'bible'
 
 interface CategoryItem {
   id: Category
   icon: React.ComponentType<{ className?: string }>
-  labelKey: 'preferences.categories.general' | 'preferences.categories.media'
+  labelKey:
+    | 'preferences.categories.general'
+    | 'preferences.categories.media'
+    | 'preferences.categories.bible'
 }
 
 const categories: CategoryItem[] = [
   { id: 'general', icon: Settings, labelKey: 'preferences.categories.general' },
+  { id: 'bible', icon: BookOpen, labelKey: 'preferences.categories.bible' },
   { id: 'media', icon: Film, labelKey: 'preferences.categories.media' }
 ]
 
@@ -42,7 +47,7 @@ export default function PreferencesDialog({
             <Modal.Body className="p-0">
               <ShortcutScope name="overlay">
                 <div className="flex" style={{ height: '480px' }}>
-                  <nav className="flex w-44 shrink-0 flex-col gap-2 rounded-tr-3xl rounded-br-3xl bg-sidebar text-sidebar-foreground py-2 px-2">
+                  <nav className="flex w-44 shrink-0 flex-col gap-2 rounded-tr-3xl rounded-br-3xl bg-surface-secondary text-foreground py-2 px-2">
                     <ul className="flex flex-col gap-1">
                       {categories.map((cat) => {
                         const active = activeCategory === cat.id
@@ -50,6 +55,7 @@ export default function PreferencesDialog({
                         return (
                           <li key={cat.id}>
                             <button
+                              type="button"
                               aria-pressed={active}
                               className={`flex w-full items-center gap-3 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
                                 active
@@ -69,6 +75,7 @@ export default function PreferencesDialog({
                   </nav>
                   <div className="flex-1 overflow-y-auto p-5">
                     {activeCategory === 'general' && <GeneralSettings />}
+                    {activeCategory === 'bible' && <BibleSettingsPanel />}
                     {activeCategory === 'media' && (
                       <p className="text-sm text-gray-500">{t('preferences.mediaPlaceholder')}</p>
                     )}
