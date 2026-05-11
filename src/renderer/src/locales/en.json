@@ -486,7 +486,8 @@
       "providerAzure": "Azure Speech Service",
       "providerGcp": "Google Cloud STT",
       "providerWebSpeech": "Web Speech API",
-      "providerWhisper": "Whisper (Local)"
+      "providerWhisper": "Whisper (Local)",
+      "speechEnabled": "Enable Voice Recognition"
     }
   },
   "error": {

@@ -6,9 +6,11 @@ export interface BibleSettingsStore {
   fontSize: number
   selectedVersionId: number
   speechMaxSessionSec: number
+  speechEnabled: boolean
   setFontSize: (size: number) => void
   setSelectedVersionId: (id: number) => void
   setSpeechMaxSessionSec: (sec: number) => void
+  setSpeechEnabled: (enabled: boolean) => void
 }
 
 export const useBibleSettingsStore = create<BibleSettingsStore>()(
@@ -17,6 +19,7 @@ export const useBibleSettingsStore = create<BibleSettingsStore>()(
       fontSize: 90,
       selectedVersionId: 0,
       speechMaxSessionSec: 3600,
+      speechEnabled: false,
 
       setFontSize: (size: number) => {
         set({ fontSize: size })
@@ -28,12 +31,16 @@ export const useBibleSettingsStore = create<BibleSettingsStore>()(
 
       setSpeechMaxSessionSec: (sec: number) => {
         set({ speechMaxSessionSec: sec })
+      },
+
+      setSpeechEnabled: (enabled: boolean) => {
+        set({ speechEnabled: enabled })
       }
     }),
     {
       name: createKey('bible-settings'),
       storage: hhcPersistStorage,
-      version: 2,
+      version: 3,
       migrate: (persisted: unknown, version: number) => {
         const state = persisted as Record<string, unknown>
         if (version < 1) {
@@ -44,12 +51,16 @@ export const useBibleSettingsStore = create<BibleSettingsStore>()(
           state.speechMaxSessionSec = oldMin * 60
           delete state.speechMaxSessionMin
         }
+        if (version < 3) {
+          state.speechEnabled = false
+        }
         return state as unknown as BibleSettingsStore
       },
       partialize: (state) => ({
         fontSize: state.fontSize,
         selectedVersionId: state.selectedVersionId,
-        speechMaxSessionSec: state.speechMaxSessionSec
+        speechMaxSessionSec: state.speechMaxSessionSec,
+        speechEnabled: state.speechEnabled
       })
     }
   )

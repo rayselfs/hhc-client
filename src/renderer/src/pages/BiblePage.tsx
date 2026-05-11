@@ -29,6 +29,7 @@ export default function BiblePage(): React.JSX.Element {
     prevChapter
   } = useBibleStore.getState()
   const fontSize = useBibleSettingsStore((s) => s.fontSize)
+  const speechEnabled = useBibleSettingsStore((s) => s.speechEnabled)
   const [isSelectorOpen, setSelectorOpen] = useState(false)
   const [selectedVerseIndex, setSelectedVerseIndex] = useState(0)
   const [projectedPassage, setProjectedPassage] = useState<ProjectedPassage | null>(null)
@@ -235,12 +236,14 @@ export default function BiblePage(): React.JSX.Element {
             onProjected={setProjectedPassage}
           />
           <div className="flex flex-col gap-4 flex-1 max-lg:flex-4">
-            <div className="flex-1 min-h-0">
+            <div className={speechEnabled ? 'flex-1 min-h-0' : 'h-full min-h-0'}>
               <BibleMultiFunction onProjected={setProjectedPassage} />
             </div>
-            <div className="flex-1 min-h-0">
-              <SpeechRecognitionCard />
-            </div>
+            {speechEnabled && (
+              <div className="flex-1 min-h-0">
+                <SpeechRecognitionCard />
+              </div>
+            )}
           </div>
           <BibleSelectorDialog
             isOpen={isSelectorOpen}

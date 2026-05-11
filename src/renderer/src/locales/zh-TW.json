@@ -486,7 +486,8 @@
       "providerAzure": "Azure Speech Service",
       "providerGcp": "Google Cloud STT",
       "providerWebSpeech": "Web Speech API",
-      "providerWhisper": "Whisper（本機）"
+      "providerWhisper": "Whisper（本機）",
+      "speechEnabled": "開啟語音辨識"
     }
   },
   "error": {

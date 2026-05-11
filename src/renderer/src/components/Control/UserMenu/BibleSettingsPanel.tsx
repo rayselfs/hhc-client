@@ -4,6 +4,7 @@ import { Input } from '@heroui/react/input'
 import { Select } from '@heroui/react/select'
 import { ListBox } from '@heroui/react/list-box'
 import { Button } from '@heroui/react/button'
+import { Switch } from '@heroui/react/switch'
 import { Label } from 'react-aria-components'
 import { Eye, EyeOff, Download } from 'lucide-react'
 import { useSettingsStore, AZURE_REGION_OPTIONS } from '@renderer/stores/settings'
@@ -42,6 +43,8 @@ export default function BibleSettingsPanel(): React.JSX.Element {
   const setSpeech = useSettingsStore((s) => s.setSpeech)
   const speechMaxSessionSec = useBibleSettingsStore((s) => s.speechMaxSessionSec)
   const setSpeechMaxSessionSec = useBibleSettingsStore((s) => s.setSpeechMaxSessionSec)
+  const speechEnabled = useBibleSettingsStore((s) => s.speechEnabled)
+  const setSpeechEnabled = useBibleSettingsStore((s) => s.setSpeechEnabled)
 
   // Azure state
   const [azureKey, setAzureKey] = useState('')
@@ -311,6 +314,11 @@ export default function BibleSettingsPanel(): React.JSX.Element {
 
   return (
     <div className="space-y-6">
+      {/* Speech recognition toggle */}
+      <Switch isSelected={speechEnabled} onChange={(e) => setSpeechEnabled(e.target.checked)}>
+        {t('preferences.bible.speechEnabled')}
+      </Switch>
+
       {/* Provider selector */}
       <Select
         variant="secondary"

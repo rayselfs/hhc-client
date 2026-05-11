@@ -413,3 +413,44 @@ describe('no chapter marker (single-chapter books)', () => {
     expect(result).toEqual({ book: '猶大書', chapter: 1, verse: 5 })
   })
 })
+
+describe('numeral homophones (pinyin-based, toneType: none)', () => {
+  // These cases arise from speech recognition misrecognising numeral characters
+  // as homophones. Because verse-parser converts all characters to toneless pinyin
+  // before number parsing, homophones of numeral characters are handled automatically:
+  //   石 (shí, stone) → 'shi' = 十 (10) ✓
+  //   實 (shí, real)  → 'shi' = 十 (10) ✓
+  //   食 (shí, eat)   → 'shi' = 十 (10) ✓
+  //   似 (sì, like)   → 'si'  = 四 (4)  ✓
+  //   武 (wǔ, martial)→ 'wu'  = 五 (5)  ✓
+
+  it('石 as 十: 約翰福音石一章二節 → chapter=11, verse=2', () => {
+    const result = parseVerseReference('約翰福音石一章二節')
+    expect(result).toEqual({ book: '約翰福音', chapter: 11, verse: 2 })
+  })
+
+  it('實 as 十: 約翰福音實一章二節 → chapter=11, verse=2', () => {
+    const result = parseVerseReference('約翰福音實一章二節')
+    expect(result).toEqual({ book: '約翰福音', chapter: 11, verse: 2 })
+  })
+
+  it('食 as 十: 馬太福音食章三節 → chapter=10, verse=3', () => {
+    const result = parseVerseReference('馬太福音食章三節')
+    expect(result).toEqual({ book: '馬太福音', chapter: 10, verse: 3 })
+  })
+
+  it('似 as 四: 羅馬書似章八節 → chapter=4, verse=8', () => {
+    const result = parseVerseReference('羅馬書似章八節')
+    expect(result).toEqual({ book: '羅馬書', chapter: 4, verse: 8 })
+  })
+
+  it('石一 + Arabic verse: 約翰福音石一章2節 → chapter=11, verse=2', () => {
+    const result = parseVerseReference('約翰福音石一章2節')
+    expect(result).toEqual({ book: '約翰福音', chapter: 11, verse: 2 })
+  })
+
+  it('homophone in verse position: 羅馬書八章石節 → chapter=8, verse=10', () => {
+    const result = parseVerseReference('羅馬書八章石節')
+    expect(result).toEqual({ book: '羅馬書', chapter: 8, verse: 10 })
+  })
+})
