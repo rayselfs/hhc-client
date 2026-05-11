@@ -315,9 +315,20 @@ export default function BibleSettingsPanel(): React.JSX.Element {
   return (
     <div className="space-y-6">
       {/* Speech recognition toggle */}
-      <Switch isSelected={speechEnabled} onChange={(e) => setSpeechEnabled(e.target.checked)}>
-        {t('preferences.bible.speechEnabled')}
-      </Switch>
+      <div>
+        <label className="mb-2 block text-sm font-medium">
+          {t('preferences.bible.speechEnabled')}
+        </label>
+        <Switch
+          isSelected={speechEnabled}
+          onChange={(checked) => setSpeechEnabled(checked)}
+          aria-label={t('preferences.bible.speechEnabled')}
+        >
+          <Switch.Control>
+            <Switch.Thumb />
+          </Switch.Control>
+        </Switch>
+      </div>
 
       {/* Provider selector */}
       <Select
