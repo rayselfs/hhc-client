@@ -50,7 +50,7 @@ describe('SettingsPopover — timer mode', () => {
     renderWithI18n()
     await user.click(screen.getByRole('button', { name: /settings/i }))
     const switches = screen.getAllByRole('switch')
-    expect(switches).toHaveLength(2)
+    expect(switches).toHaveLength(3)
   })
 
   it('toggling reminder switch calls setReminder with new enabled state', async () => {
@@ -90,7 +90,7 @@ describe('SettingsPopover — reminder duration/color always visible', () => {
     useTimerStore.setState({ reminderEnabled: false })
     renderWithI18n()
     await user.click(screen.getByRole('button', { name: /settings/i }))
-    expect(screen.getByRole('spinbutton', { name: /reminder time/i })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: /reminder time/i })).toBeInTheDocument()
   })
 
   it('shows reminder duration input when popover is open (reminder enabled)', async () => {
@@ -98,7 +98,7 @@ describe('SettingsPopover — reminder duration/color always visible', () => {
     useTimerStore.setState({ reminderEnabled: true })
     renderWithI18n()
     await user.click(screen.getByRole('button', { name: /settings/i }))
-    expect(screen.getByRole('spinbutton', { name: /reminder time/i })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: /reminder time/i })).toBeInTheDocument()
   })
 
   it('disables reminder duration input when reminder switch is off', async () => {
@@ -106,7 +106,7 @@ describe('SettingsPopover — reminder duration/color always visible', () => {
     useTimerStore.setState({ reminderEnabled: false, totalDuration: 300 })
     renderWithI18n()
     await user.click(screen.getByRole('button', { name: /settings/i }))
-    expect(screen.getByRole('spinbutton', { name: /reminder time/i })).toBeDisabled()
+    expect(screen.getByRole('textbox', { name: /reminder time/i })).toBeDisabled()
   })
 
   it('enables reminder duration input when reminder switch is on and timer stopped', async () => {
@@ -114,7 +114,7 @@ describe('SettingsPopover — reminder duration/color always visible', () => {
     useTimerStore.setState({ reminderEnabled: true, totalDuration: 300, status: 'stopped' })
     renderWithI18n()
     await user.click(screen.getByRole('button', { name: /settings/i }))
-    expect(screen.getByRole('spinbutton', { name: /reminder time/i })).not.toBeDisabled()
+    expect(screen.getByRole('textbox', { name: /reminder time/i })).not.toBeDisabled()
   })
 
   it('disables reminder duration input when timer is running (even if reminder enabled)', async () => {
@@ -122,7 +122,7 @@ describe('SettingsPopover — reminder duration/color always visible', () => {
     useTimerStore.setState({ reminderEnabled: true, totalDuration: 300, status: 'running' })
     renderWithI18n()
     await user.click(screen.getByRole('button', { name: /settings/i }))
-    expect(screen.getByRole('spinbutton', { name: /reminder time/i })).toBeDisabled()
+    expect(screen.getByRole('textbox', { name: /reminder time/i })).toBeDisabled()
   })
 
   it('disables reminder color picker when reminder switch is off', async () => {
@@ -130,7 +130,7 @@ describe('SettingsPopover — reminder duration/color always visible', () => {
     useTimerStore.setState({ reminderEnabled: false, totalDuration: 300 })
     renderWithI18n()
     await user.click(screen.getByRole('button', { name: /settings/i }))
-    expect(screen.getByLabelText(/reminder color/i)).toHaveClass('pointer-events-none')
+    expect(screen.getByRole('button', { name: /reminder color/i })).toBeDisabled()
   })
 
   it('disables reminder color picker when timer is running', async () => {
@@ -138,7 +138,7 @@ describe('SettingsPopover — reminder duration/color always visible', () => {
     useTimerStore.setState({ reminderEnabled: true, totalDuration: 300, status: 'running' })
     renderWithI18n()
     await user.click(screen.getByRole('button', { name: /settings/i }))
-    expect(screen.getByLabelText(/reminder color/i)).toHaveClass('pointer-events-none')
+    expect(screen.getByRole('button', { name: /reminder color/i })).toBeDisabled()
   })
 })
 
@@ -192,11 +192,12 @@ describe('SettingsPopover — reminder duration input', () => {
     renderWithI18n()
     await user.click(screen.getByRole('button', { name: /settings/i }))
 
-    const durationInput = screen.getByRole('spinbutton', { name: /reminder time/i })
+    const durationInput = screen.getByRole('textbox', { name: /reminder time/i })
     await user.tripleClick(durationInput)
-    await user.keyboard('9')
+    await user.keyboard('120')
+    await user.tab()
 
-    expect(setReminderSpy).toHaveBeenLastCalledWith(true, 9)
+    expect(setReminderSpy).toHaveBeenLastCalledWith(true, 120)
   })
 
   it('smart default: uses totalDuration - 10 when totalDuration < 60', async () => {
@@ -216,7 +217,7 @@ describe('SettingsPopover — reminder duration input', () => {
     expect(setReminderSpy).toHaveBeenCalledWith(true, 35)
   })
 
-  it('shows validation error when reminderDuration >= totalDuration', async () => {
+  it('does not show inline validation error when reminderDuration >= totalDuration (toast-based)', async () => {
     const user = userEvent.setup()
     useTimerStore.setState({
       reminderEnabled: true,
@@ -225,7 +226,7 @@ describe('SettingsPopover — reminder duration input', () => {
     })
     renderWithI18n()
     await user.click(screen.getByRole('button', { name: /settings/i }))
-    expect(screen.getByRole('alert')).toHaveTextContent(/less than total duration/i)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 })
 
@@ -267,7 +268,7 @@ describe('SettingsPopover — overtime input visibility', () => {
     useTimerStore.setState({ overtimeMessageEnabled: false })
     renderWithI18n()
     await user.click(screen.getByRole('button', { name: /settings/i }))
-    expect(screen.getByRole('textbox')).toBeDisabled()
+    expect(screen.getByRole('textbox', { name: "Time's Up Message" })).toBeDisabled()
   })
 
   it('shows overtime message input when overtime is enabled', async () => {
@@ -275,7 +276,7 @@ describe('SettingsPopover — overtime input visibility', () => {
     useTimerStore.setState({ overtimeMessageEnabled: true })
     renderWithI18n()
     await user.click(screen.getByRole('button', { name: /settings/i }))
-    expect(screen.getByRole('textbox')).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: "Time's Up Message" })).toBeInTheDocument()
   })
 })
 
@@ -291,7 +292,7 @@ describe('SettingsPopover — overtime message text input', () => {
     renderWithI18n()
     await user.click(screen.getByRole('button', { name: /settings/i }))
 
-    const overtimeInput = screen.getByRole('textbox')
+    const overtimeInput = screen.getByRole('textbox', { name: "Time's Up Message" })
     await user.type(overtimeInput, 'Hi')
 
     expect(setOvertimeMessageSpy).toHaveBeenCalled()
@@ -308,7 +309,7 @@ describe('SettingsPopover — overtime message text input', () => {
     renderWithI18n()
     await user.click(screen.getByRole('button', { name: /settings/i }))
 
-    const overtimeInput = screen.getByRole('textbox')
+    const overtimeInput = screen.getByRole('textbox', { name: "Time's Up Message" })
     await user.type(overtimeInput, 'ABCDEFGHIJKLMNOPQRSTU')
 
     const calls = setOvertimeMessageSpy.mock.calls

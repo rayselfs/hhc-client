@@ -31,6 +31,7 @@
       "label": "時間提醒",
       "time": "提醒時間",
       "error": "提醒時間必須小於總時間",
+      "errorRange": "需介於 10 至 3600 秒之間",
       "seconds": "秒",
       "color": "提醒顏色"
     },
@@ -40,7 +41,7 @@
       "error": "訊息不能為空"
     },
     "ringColor": {
-      "label": "計時器環顏色"
+      "label": "自訂計時環顏色"
     },
     "inputDialog": {
       "title": "設定時長",
@@ -527,7 +528,10 @@
     "gcpSpeechSaveFailed": "儲存 Google Cloud STT 設定失敗",
     "gcpSpeechKeyRequired": "請輸入 Google Cloud API 金鑰",
     "gcpSpeechTestSuccess": "Google Cloud STT 連線成功",
-    "gcpSpeechTestFailed": "Google Cloud STT 連線失敗"
+    "gcpSpeechTestFailed": "Google Cloud STT 連線失敗",
+    "reminderDurationInvalid": "輸入無效，請輸入數字",
+    "reminderDurationEmpty": "提醒時間不能為空",
+    "reminderAutoDisabled": "提醒已關閉 — 計時時間不足提醒時間"
   },
   "shortcuts": {
     "title": "鍵盤快速鍵",

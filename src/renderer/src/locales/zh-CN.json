@@ -31,6 +31,7 @@
       "label": "时间提醒",
       "time": "提醒时间",
       "error": "提醒时间必须小于总时间",
+      "errorRange": "需介于 10 至 3600 秒之间",
       "seconds": "秒",
       "color": "提醒颜色"
     },
@@ -40,7 +41,7 @@
       "error": "消息不能为空"
     },
     "ringColor": {
-      "label": "计时器环颜色"
+      "label": "自定计时环颜色"
     },
     "inputDialog": {
       "title": "设定时长",
@@ -527,7 +528,10 @@
     "gcpSpeechSaveFailed": "保存 Google Cloud STT 设置失败",
     "gcpSpeechKeyRequired": "请输入 Google Cloud API 密钥",
     "gcpSpeechTestSuccess": "Google Cloud STT 连接成功",
-    "gcpSpeechTestFailed": "Google Cloud STT 连接失败"
+    "gcpSpeechTestFailed": "Google Cloud STT 连接失败",
+    "reminderDurationInvalid": "输入无效，请输入数字",
+    "reminderDurationEmpty": "提醒时间不能为空",
+    "reminderAutoDisabled": "提醒已关闭 — 计时时间不足提醒时间"
   },
   "shortcuts": {
     "title": "键盘快捷键",

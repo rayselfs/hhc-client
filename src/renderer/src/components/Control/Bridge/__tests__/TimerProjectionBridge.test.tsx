@@ -52,7 +52,7 @@ beforeEach(() => {
     accumulatedMs: 0,
     showOnProjection: false
   })
-  useSettingsStore.setState({ timezone: 'Asia/Taipei', timerRingColor: '#3b82f6' })
+  useSettingsStore.setState({ timezone: 'Asia/Taipei', timerRingColor: '#3b82f6', timerRingColorEnabled: true })
 })
 
 describe('TimerProjectionBridge — timer:tick projection', () => {
@@ -221,7 +221,7 @@ describe('TimerProjectionBridge — settings:timer-ring-color sync', () => {
     mockSend.mockClear()
 
     await act(async () => {
-      useSettingsStore.setState({ timerRingColor: '#ef4444' })
+      useSettingsStore.setState({ timerRingColor: '#ef4444', timerRingColorEnabled: true })
     })
 
     expect(mockSend).toHaveBeenCalledWith('settings:timer-ring-color', { color: '#ef4444' })

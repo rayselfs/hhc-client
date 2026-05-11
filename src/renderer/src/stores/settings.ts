@@ -60,6 +60,7 @@ const DEFAULT_TIMEZONE = 'Asia/Taipei'
 const DEFAULT_HW_ACCEL = true
 const DEFAULT_THEME_PREFERENCE: ThemePreference = 'system'
 const DEFAULT_TIMER_RING_COLOR = '#3b82f6'
+const DEFAULT_TIMER_RING_COLOR_ENABLED = false
 const RELOAD_DELAY_MS = 500
 
 export type SpeechProvider = 'azure' | 'gcp' | 'webSpeech' | 'whisper'
@@ -97,11 +98,13 @@ export interface SettingsStore {
   hardwareAcceleration: boolean
   themePreference: ThemePreference
   timerRingColor: string
+  timerRingColorEnabled: boolean
   speech: SpeechSettings
   setTimezone: (tz: string) => void
   setHardwareAcceleration: (enabled: boolean) => void
   setThemePreference: (pref: ThemePreference) => void
   setTimerRingColor: (color: string) => void
+  setTimerRingColorEnabled: (enabled: boolean) => void
   setSpeech: (settings: SpeechSettings) => void
   resetToDefaults: () => void
 }
@@ -113,6 +116,7 @@ export const useSettingsStore = create<SettingsStore>()(
       hardwareAcceleration: DEFAULT_HW_ACCEL,
       themePreference: DEFAULT_THEME_PREFERENCE,
       timerRingColor: DEFAULT_TIMER_RING_COLOR,
+      timerRingColorEnabled: DEFAULT_TIMER_RING_COLOR_ENABLED,
       speech: DEFAULT_SPEECH,
 
       setTimezone: (tz: string) => {
@@ -135,6 +139,10 @@ export const useSettingsStore = create<SettingsStore>()(
         set({ speech: settings })
       },
 
+      setTimerRingColorEnabled: (enabled: boolean) => {
+        set({ timerRingColorEnabled: enabled })
+      },
+
       resetToDefaults: () => {
         clearAllSiteData()
         toast.success(i18n.t('toast.settingsReset'))
@@ -148,7 +156,7 @@ export const useSettingsStore = create<SettingsStore>()(
     {
       name: createKey('settings'),
       storage: hhcPersistStorage,
-      version: 5,
+      version: 6,
       migrate: (persistedState, version) => {
         const state = persistedState as Record<string, unknown>
         if (version < 1) {
@@ -188,6 +196,11 @@ export const useSettingsStore = create<SettingsStore>()(
             }
           }
         }
+        if (version < 6) {
+          if (state.timerRingColorEnabled === undefined) {
+            state.timerRingColorEnabled = DEFAULT_TIMER_RING_COLOR_ENABLED
+          }
+        }
         return state
       },
       partialize: (state) => ({
@@ -195,6 +208,7 @@ export const useSettingsStore = create<SettingsStore>()(
         hardwareAcceleration: state.hardwareAcceleration,
         themePreference: state.themePreference,
         timerRingColor: state.timerRingColor,
+        timerRingColorEnabled: state.timerRingColorEnabled,
         speech: state.speech
       })
     }

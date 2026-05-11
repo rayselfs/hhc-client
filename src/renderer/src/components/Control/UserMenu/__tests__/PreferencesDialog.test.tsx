@@ -146,6 +146,8 @@ describe('PreferencesDialog', () => {
         setThemePreference: vi.fn(),
         timerRingColor: '#3b82f6',
         setTimerRingColor: vi.fn(),
+        timerRingColorEnabled: false,
+        setTimerRingColorEnabled: vi.fn(),
         speech: {
           activeProvider: 'azure' as const,
           azure: { region: 'eastasia', language: 'zh-TW' as const },
@@ -216,6 +218,8 @@ describe('PreferencesDialog', () => {
         setThemePreference: vi.fn(),
         timerRingColor: '#3b82f6',
         setTimerRingColor: vi.fn(),
+        timerRingColorEnabled: false,
+        setTimerRingColorEnabled: vi.fn(),
         speech: {
           activeProvider: 'azure' as const,
           azure: { region: 'eastasia', language: 'zh-TW' as const },
@@ -259,6 +263,8 @@ describe('PreferencesDialog', () => {
         setThemePreference: vi.fn(),
         timerRingColor: '#3b82f6',
         setTimerRingColor: vi.fn(),
+        timerRingColorEnabled: false,
+        setTimerRingColorEnabled: vi.fn(),
         speech: {
           activeProvider: 'azure' as const,
           azure: { region: 'eastasia', language: 'zh-TW' as const },

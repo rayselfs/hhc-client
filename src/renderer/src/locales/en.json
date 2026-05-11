@@ -31,6 +31,7 @@
       "label": "Time Reminder",
       "time": "Reminder Time",
       "error": "Reminder time must be less than total duration",
+      "errorRange": "Must be between 10 and 3600 seconds",
       "seconds": "sec",
       "color": "Reminder Color"
     },
@@ -40,7 +41,7 @@
       "error": "Message cannot be empty"
     },
     "ringColor": {
-      "label": "Timer Ring Color"
+      "label": "Custom Timer Ring Color"
     },
     "inputDialog": {
       "title": "Set Duration",
@@ -527,7 +528,10 @@
     "gcpSpeechSaveFailed": "Failed to save Google Cloud STT settings",
     "gcpSpeechKeyRequired": "Please enter a Google Cloud API key",
     "gcpSpeechTestSuccess": "Google Cloud STT connection successful",
-    "gcpSpeechTestFailed": "Google Cloud STT connection failed"
+    "gcpSpeechTestFailed": "Google Cloud STT connection failed",
+    "reminderDurationInvalid": "Invalid input. Please enter a number.",
+    "reminderDurationEmpty": "Reminder time cannot be empty.",
+    "reminderAutoDisabled": "Reminder disabled — duration is shorter than reminder time"
   },
   "shortcuts": {
     "title": "Keyboard Shortcuts",

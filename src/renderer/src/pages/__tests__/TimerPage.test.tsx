@@ -80,10 +80,10 @@ describe('TimerPage — CLOCK mode', () => {
     expect(container.querySelector('svg circle')).toBeInTheDocument()
   })
 
-  it('renders TimerControls with disabled start in clock mode', () => {
+  it('renders TimerControls with enabled start in clock mode (auto-switches to both)', () => {
     useTimerStore.setState({ mode: 'clock', status: 'stopped' })
     renderTimerPage()
-    expect(screen.getByTestId('btn-start')).toBeDisabled()
+    expect(screen.getByTestId('btn-start')).not.toBeDisabled()
   })
 
   it('does not render ClockDisplay in clock mode (only on projection)', () => {
