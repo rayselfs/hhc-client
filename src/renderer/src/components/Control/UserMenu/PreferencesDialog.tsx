@@ -47,7 +47,7 @@ export default function PreferencesDialog({
             <Modal.Body className="p-0">
               <ShortcutScope name="overlay">
                 <div className="flex" style={{ height: '480px' }}>
-                  <nav className="flex w-44 shrink-0 flex-col gap-2 rounded-tr-3xl rounded-br-3xl bg-sidebar text-sidebar-foreground py-2 px-2">
+                  <nav className="flex w-44 shrink-0 flex-col gap-2 rounded-tr-3xl rounded-br-3xl bg-surface-secondary text-foreground py-2 px-2">
                     <ul className="flex flex-col gap-1">
                       {categories.map((cat) => {
                         const active = activeCategory === cat.id
