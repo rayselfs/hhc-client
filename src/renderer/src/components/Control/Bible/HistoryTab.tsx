@@ -93,7 +93,7 @@ export function HistoryTab(): React.JSX.Element | null {
           return (
             <div
               key={item.id}
-              className="flex items-center group rounded-3xl transition-colors hover:bg-accent hover:text-accent-foreground"
+              className="flex items-center group rounded-lg transition-colors hover:bg-accent hover:text-accent-foreground"
             >
               <button
                 type="button"

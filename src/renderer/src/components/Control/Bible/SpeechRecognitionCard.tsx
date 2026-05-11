@@ -351,7 +351,7 @@ export default function SpeechRecognitionCard(): React.JSX.Element {
               {recognizedVerses.map((verse) => (
                 <div
                   key={verse.id}
-                  className="flex items-center group rounded-3xl transition-colors hover:bg-accent hover:text-accent-foreground"
+                  className="flex items-center group rounded-lg transition-colors hover:bg-accent hover:text-accent-foreground"
                 >
                   <button
                     type="button"

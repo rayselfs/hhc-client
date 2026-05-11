@@ -210,7 +210,7 @@ export function BiblePreview({
                   key={r.verseId}
                   type="button"
                   onClick={() => handleSearchResultClick(r.bookNumber, r.chapter, r.verse)}
-                  className="w-full text-left rounded-3xl p-3 hover:bg-accent hover:text-accent-foreground transition-colors"
+                  className="w-full text-left rounded-lg p-3 hover:bg-accent hover:text-accent-foreground transition-colors"
                 >
                   <div className="text-muted mb-1">{reference}</div>
                   <div className="text-xl text-foreground">
@@ -255,7 +255,7 @@ export function BiblePreview({
                   onClick={() => handleVerseClick(index, verse.number, verse.text)}
                   onContextMenu={onContextMenu}
                   data-verse-number={verse.number}
-                  className={`w-full text-left rounded-3xl p-3 transition-colors flex items-start ${
+                  className={`w-full text-left rounded-lg p-3 transition-colors flex items-start ${
                     isSelected
                       ? 'bg-accent text-accent-foreground'
                       : isProjected
