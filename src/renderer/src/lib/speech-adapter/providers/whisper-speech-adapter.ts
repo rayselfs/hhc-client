@@ -18,9 +18,13 @@ export class WhisperSpeechAdapter implements SpeechAdapter {
   private active = false
   private batchIntervalId: ReturnType<typeof setInterval> | null = null
   private chunks: Blob[] = []
-  private listeners: Map<SpeechAdapterEventType, Set<SpeechAdapterEventListener<any>>> = new Map()
+  private listeners: Map<SpeechAdapterEventType, Set<SpeechAdapterEventListener<SpeechAdapterEventType>>> = new Map()
+  private config: WhisperSpeechAdapterConfig
+  private maxSessionTimer: ReturnType<typeof setTimeout> | null = null
 
-  constructor(_config: WhisperSpeechAdapterConfig = {}) {}
+  constructor(config: WhisperSpeechAdapterConfig = {}) {
+    this.config = config
+  }
 
   async start(): Promise<void> {
     this.worker = new Worker(new URL('../../../workers/whisper.worker.ts', import.meta.url), {
@@ -53,6 +57,13 @@ export class WhisperSpeechAdapter implements SpeechAdapter {
     this.active = true
     this.emit('sessionStarted', undefined)
 
+    if (this.config.maxSessionMs) {
+      this.maxSessionTimer = setTimeout(() => {
+        this.stop().catch(() => {})
+        this.emit('maxDurationReached', undefined)
+      }, this.config.maxSessionMs)
+    }
+
     this.batchIntervalId = setInterval(() => {
       this.flushBatch().catch(() => {})
     }, 2000)
@@ -77,6 +88,10 @@ export class WhisperSpeechAdapter implements SpeechAdapter {
   }
 
   async stop(): Promise<void> {
+    if (this.maxSessionTimer) {
+      clearTimeout(this.maxSessionTimer)
+      this.maxSessionTimer = null
+    }
     if (this.batchIntervalId) {
       clearInterval(this.batchIntervalId)
       this.batchIntervalId = null
@@ -105,13 +120,17 @@ export class WhisperSpeechAdapter implements SpeechAdapter {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, new Set())
     }
-    this.listeners.get(event)!.add(listener)
+    this.listeners.get(event)!.add(listener as SpeechAdapterEventListener<SpeechAdapterEventType>)
     return () => {
-      this.listeners.get(event)?.delete(listener)
+      this.listeners.get(event)?.delete(listener as SpeechAdapterEventListener<SpeechAdapterEventType>)
     }
   }
 
   dispose(): void {
+    if (this.maxSessionTimer) {
+      clearTimeout(this.maxSessionTimer)
+      this.maxSessionTimer = null
+    }
     if (this.batchIntervalId) {
       clearInterval(this.batchIntervalId)
       this.batchIntervalId = null

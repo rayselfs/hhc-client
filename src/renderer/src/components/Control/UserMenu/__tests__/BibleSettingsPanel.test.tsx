@@ -6,6 +6,8 @@ import BibleSettingsPanel from '../BibleSettingsPanel'
 import { toast } from '@heroui/react/toast'
 import * as speechKeyStorage from '@renderer/lib/speech-key-storage'
 import { DEFAULT_SPEECH } from '@renderer/stores/settings'
+import { ConfirmDialogProvider } from '@renderer/contexts/ConfirmDialogContext'
+import ConfirmDialog from '../../../Common/ConfirmDialog'
 
 vi.mock('@heroui/react/toast', () => ({
   toast: {
@@ -58,6 +60,15 @@ vi.mock('@renderer/stores/settings', async () => {
   }
 })
 
+function renderPanel(): ReturnType<typeof render> {
+  return render(
+    <ConfirmDialogProvider>
+      <BibleSettingsPanel />
+      <ConfirmDialog />
+    </ConfirmDialogProvider>
+  )
+}
+
 describe('BibleSettingsPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -68,13 +79,13 @@ describe('BibleSettingsPanel', () => {
   })
 
   it('renders API key input and region select', async () => {
-    render(<BibleSettingsPanel />)
+    renderPanel()
 
     await waitFor(() => {
       expect(screen.getByPlaceholderText('Enter your API key')).toBeInTheDocument()
     })
 
-    expect(screen.getByLabelText('Azure Speech Service Region')).toBeInTheDocument()
+    expect(screen.getByLabelText('Region')).toBeInTheDocument()
     expect(screen.getByText('Save')).toBeInTheDocument()
     expect(screen.getByText('Test Connection')).toBeInTheDocument()
   })
@@ -82,7 +93,7 @@ describe('BibleSettingsPanel', () => {
   it('loads existing API key on mount', async () => {
     vi.mocked(speechKeyStorage.loadSpeechKey).mockResolvedValue('existing-key')
 
-    render(<BibleSettingsPanel />)
+    renderPanel()
 
     await waitFor(() => {
       const input = screen.getByPlaceholderText('Enter your API key') as HTMLInputElement
@@ -96,7 +107,7 @@ describe('BibleSettingsPanel', () => {
       azure: { ...DEFAULT_SPEECH.azure, region: 'westus2' }
     }
 
-    render(<BibleSettingsPanel />)
+    renderPanel()
 
     await waitFor(() => {
       expect(screen.getByPlaceholderText('Enter your API key')).toBeInTheDocument()
@@ -105,7 +116,7 @@ describe('BibleSettingsPanel', () => {
 
   it('toggles API key visibility', async () => {
     const user = userEvent.setup()
-    render(<BibleSettingsPanel />)
+    renderPanel()
 
     await waitFor(() => {
       expect(screen.getByPlaceholderText('Enter your API key')).toBeInTheDocument()
@@ -125,7 +136,7 @@ describe('BibleSettingsPanel', () => {
 
   it('saves API key and region after successful test', async () => {
     const user = userEvent.setup()
-    render(<BibleSettingsPanel />)
+    renderPanel()
 
     await waitFor(() => {
       expect(screen.getByPlaceholderText('Enter your API key')).toBeInTheDocument()
@@ -161,7 +172,7 @@ describe('BibleSettingsPanel', () => {
       azure: { ...DEFAULT_SPEECH.azure, region: 'eastasia' }
     }
 
-    render(<BibleSettingsPanel />)
+    renderPanel()
 
     await waitFor(() => {
       const input = screen.getByPlaceholderText('Enter your API key') as HTMLInputElement
@@ -179,7 +190,7 @@ describe('BibleSettingsPanel', () => {
     const user = userEvent.setup()
     vi.mocked(speechKeyStorage.saveSpeechKey).mockRejectedValue(new Error('Save failed'))
 
-    render(<BibleSettingsPanel />)
+    renderPanel()
 
     await waitFor(() => {
       expect(screen.getByPlaceholderText('Enter your API key')).toBeInTheDocument()
@@ -210,7 +221,7 @@ describe('BibleSettingsPanel', () => {
       azure: { ...DEFAULT_SPEECH.azure, region: 'eastasia' }
     }
 
-    render(<BibleSettingsPanel />)
+    renderPanel()
 
     await waitFor(() => {
       const input = screen.getByPlaceholderText('Enter your API key') as HTMLInputElement
@@ -222,7 +233,7 @@ describe('BibleSettingsPanel', () => {
   })
 
   it('disables test button when no API key', async () => {
-    render(<BibleSettingsPanel />)
+    renderPanel()
 
     await waitFor(() => {
       expect(screen.getByPlaceholderText('Enter your API key')).toBeInTheDocument()
@@ -233,7 +244,7 @@ describe('BibleSettingsPanel', () => {
   })
 
   it('disables test button while loading', async () => {
-    render(<BibleSettingsPanel />)
+    renderPanel()
 
     const testButton = screen.getByText('Test Connection')
     expect(testButton).toBeDisabled()

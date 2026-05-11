@@ -114,7 +114,7 @@ describe('PreferencesDialog', () => {
     renderDialog(true)
 
     await user.click(screen.getByTestId('category-bible'))
-    expect(await screen.findByText('Azure Speech Service Key')).toBeInTheDocument()
+    expect(await screen.findByText('Test Connection')).toBeInTheDocument()
     expect(screen.queryByLabelText('Language')).not.toBeInTheDocument()
 
     await user.click(screen.getByTestId('category-general'))

@@ -14,7 +14,7 @@ import type {
 export class AzureSpeechAdapter implements SpeechAdapter {
   private recognizer: sdk.SpeechRecognizer | null = null
   private isActive = false
-  private listeners: Map<SpeechAdapterEventType, Set<SpeechAdapterEventListener<any>>> = new Map()
+  private listeners: Map<SpeechAdapterEventType, Set<SpeechAdapterEventListener<SpeechAdapterEventType>>> = new Map()
   private config: SpeechAdapterConfig
   private onlineHandler: (() => void) | null = null
   private offlineHandler: (() => void) | null = null
@@ -268,12 +268,12 @@ export class AzureSpeechAdapter implements SpeechAdapter {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, new Set())
     }
-    this.listeners.get(event)!.add(listener)
+    this.listeners.get(event)!.add(listener as SpeechAdapterEventListener<SpeechAdapterEventType>)
 
     return () => {
       const eventListeners = this.listeners.get(event)
       if (eventListeners) {
-        eventListeners.delete(listener)
+        eventListeners.delete(listener as SpeechAdapterEventListener<SpeechAdapterEventType>)
       }
     }
   }

@@ -1,11 +1,12 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import SpeechRecognitionCard from '../SpeechRecognitionCard'
-import { createSpeechAdapter } from '@renderer/lib/speech-adapter'
+import { createSpeechAdapter, AzureSpeechAdapter } from '@renderer/lib/speech-adapter'
 import { loadSpeechKey } from '@renderer/lib/speech-key-storage'
 import { useSettingsStore } from '@renderer/stores/settings'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 import { useBibleStore } from '@renderer/stores/bible'
+import { useBibleSpeechStore } from '@renderer/stores/bible-speech'
 import { parseVerseReference } from '@renderer/lib/verse-parser'
 import { matchBookName, getBookConfig } from '@renderer/lib/bible-book-matcher'
 import { getBookNameI18n } from '@renderer/lib/bible-utils'
@@ -17,6 +18,7 @@ vi.mock('@renderer/lib/speech-key-storage')
 vi.mock('@renderer/stores/settings')
 vi.mock('@renderer/stores/bible-settings')
 vi.mock('@renderer/stores/bible')
+vi.mock('@renderer/stores/bible-speech')
 vi.mock('@renderer/lib/verse-parser')
 vi.mock('@renderer/lib/bible-book-matcher')
 vi.mock('@renderer/lib/bible-utils')
@@ -64,6 +66,9 @@ describe('SpeechRecognitionCard', () => {
     }
 
     vi.mocked(createSpeechAdapter).mockReturnValue(mockAdapter)
+    vi.mocked(AzureSpeechAdapter).mockImplementation(function () {
+      return mockAdapter as unknown as InstanceType<typeof AzureSpeechAdapter>
+    })
     vi.mocked(loadSpeechKey).mockResolvedValue('mock-api-key')
 
     mockSettingsState = {
@@ -85,6 +90,17 @@ describe('SpeechRecognitionCard', () => {
       return selector
         ? (selector as (s: typeof mockBibleSettingsState) => unknown)(mockBibleSettingsState)
         : mockBibleSettingsState
+    })
+
+    const mockBibleSpeechState = {
+      elapsedSeconds: 0,
+      incrementElapsedSeconds: vi.fn(),
+      resetElapsedSeconds: vi.fn()
+    }
+    vi.mocked(useBibleSpeechStore).mockImplementation((selector: unknown) => {
+      return selector
+        ? (selector as (s: typeof mockBibleSpeechState) => unknown)(mockBibleSpeechState)
+        : mockBibleSpeechState
     })
 
     const mockBibleContent = new Map<number, BibleBook[]>()
@@ -145,7 +161,6 @@ describe('SpeechRecognitionCard', () => {
     it('should render with correct header and buttons', () => {
       render(<SpeechRecognitionCard />)
 
-      expect(screen.getByText('bible.speech.title')).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /bible.speech.start/i })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /bible.speech.clear/i })).toBeInTheDocument()
     })
@@ -194,7 +209,7 @@ describe('SpeechRecognitionCard', () => {
 
       await waitFor(() => {
         expect(loadSpeechKey).toHaveBeenCalled()
-        expect(createSpeechAdapter).toHaveBeenCalledWith(
+        expect(AzureSpeechAdapter).toHaveBeenCalledWith(
           expect.objectContaining({
             subscriptionKey: 'mock-api-key',
             region: 'eastasia',
@@ -503,7 +518,7 @@ describe('SpeechRecognitionCard', () => {
       fireEvent.click(startButton)
 
       await waitFor(() => {
-        expect(createSpeechAdapter).toHaveBeenCalledWith(
+        expect(AzureSpeechAdapter).toHaveBeenCalledWith(
           expect.objectContaining({
             language: 'zh-TW'
           })
@@ -523,7 +538,7 @@ describe('SpeechRecognitionCard', () => {
       fireEvent.click(startButton)
 
       await waitFor(() => {
-        expect(createSpeechAdapter).toHaveBeenCalledWith(
+        expect(AzureSpeechAdapter).toHaveBeenCalledWith(
           expect.objectContaining({
             language: 'zh-CN'
           })
@@ -543,7 +558,7 @@ describe('SpeechRecognitionCard', () => {
       fireEvent.click(startButton)
 
       await waitFor(() => {
-        expect(createSpeechAdapter).toHaveBeenCalledWith(
+        expect(AzureSpeechAdapter).toHaveBeenCalledWith(
           expect.objectContaining({
             language: 'en-US'
           })
