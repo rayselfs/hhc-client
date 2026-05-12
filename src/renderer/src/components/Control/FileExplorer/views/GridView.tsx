@@ -17,6 +17,7 @@ export interface GridViewProps {
   onItemClick: (id: string, event: React.MouseEvent) => void
   onItemDoubleClick: (id: string, event: React.MouseEvent) => void
   onItemContextMenu: (id: string, event: React.MouseEvent) => void
+  renderItemWrapper?: (item: GridViewItem, children: React.ReactNode) => React.ReactNode
 }
 
 export function GridView({
@@ -24,7 +25,8 @@ export function GridView({
   viewMode,
   onItemClick,
   onItemDoubleClick,
-  onItemContextMenu
+  onItemContextMenu,
+  renderItemWrapper
 }: GridViewProps): React.JSX.Element {
   const { t } = useTranslation()
 
@@ -65,27 +67,30 @@ export function GridView({
 
   return (
     <div className={`grid gap-4 p-4 ${gridColsClass}`}>
-      {items.map((item) => (
-        <div
-          key={item.id}
-          className={`flex flex-col items-center justify-start rounded-lg p-2 cursor-pointer transition-colors hover:bg-content2/60 ${
-            item.isSelected ? 'ring-2 ring-primary bg-primary/10' : ''
-          }`}
-          onClick={(e) => onItemClick(item.id, e)}
-          onDoubleClick={(e) => onItemDoubleClick(item.id, e)}
-          onContextMenu={(e) => onItemContextMenu(item.id, e)}
-        >
-          <div className="flex items-center justify-center text-default-500">
-            {getFileIcon(item.mimeType, item.isFolder, iconSize)}
-          </div>
-          <span
-            className={`w-full text-center text-foreground break-words ${nameClass}`}
-            title={item.name}
+      {items.map((item) => {
+        const content = (
+          <div
+            className={`flex flex-col items-center justify-start rounded-lg p-2 cursor-pointer transition-colors hover:bg-content2/60 ${
+              item.isSelected ? 'ring-2 ring-primary bg-primary/10' : ''
+            }`}
+            onClick={(e) => onItemClick(item.id, e)}
+            onDoubleClick={(e) => onItemDoubleClick(item.id, e)}
+            onContextMenu={(e) => onItemContextMenu(item.id, e)}
           >
-            {item.name}
-          </span>
-        </div>
-      ))}
+            <div className="flex items-center justify-center text-default-500">
+              {getFileIcon(item.mimeType, item.isFolder, iconSize)}
+            </div>
+            <span
+              className={`w-full text-center text-foreground break-words ${nameClass}`}
+              title={item.name}
+            >
+              {item.name}
+            </span>
+          </div>
+        )
+
+        return <React.Fragment key={item.id}>{renderItemWrapper?.(item, content) ?? content}</React.Fragment>
+      })}
     </div>
   )
 }
