@@ -363,13 +363,17 @@ export function FileBrowser({
   )
 
   const folders = useMemo(
-    () => foldersArray.filter((folder) => folder.parentId === currentFolderId),
+    () =>
+      foldersArray.filter(
+        (folder) => folder.parentId === currentFolderId && !folder.deletedAt
+      ),
     [foldersArray, currentFolderId]
   )
   const fileItems = useMemo(
     () =>
       itemsArray.filter(
-        (item): item is FileItemRecord => item.parentId === currentFolderId && isFileItemRecord(item)
+        (item): item is FileItemRecord =>
+          item.parentId === currentFolderId && isFileItemRecord(item) && !item.deletedAt
       ),
     [itemsArray, currentFolderId]
   )

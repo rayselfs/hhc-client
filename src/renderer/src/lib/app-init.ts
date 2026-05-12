@@ -73,6 +73,8 @@ export function initializeApp(): () => void {
   useFileExplorerStore.subscribe((state, prev) => {
     if (prev.isLoading && !state.isLoading) {
       void useFileExplorerStore.getState().cleanupExpired()
+      const retentionMs = useSettingsStore.getState().trashRetentionDays * 86_400_000
+      void useFileExplorerStore.getState().purgeTrash(retentionMs)
     }
   })
 

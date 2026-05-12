@@ -30,7 +30,8 @@ vi.mock('@renderer/lib/folder-db', () => ({
     deleteItems: vi.fn().mockResolvedValue(undefined),
     deleteItemsByParent: vi.fn().mockResolvedValue(undefined),
     deleteExpiredFolders: vi.fn().mockResolvedValue([]),
-    deleteExpiredItems: vi.fn().mockResolvedValue([])
+    deleteExpiredItems: vi.fn().mockResolvedValue([]),
+    purgeTrashOlderThan: vi.fn().mockResolvedValue({ folderIds: [], itemIds: [] })
   }))
 }))
 

@@ -35,6 +35,11 @@ export interface FolderStoreState {
   cleanupExpired: () => Promise<void>
   ensureItemsLoaded: (parentId: string) => Promise<void>
   toggleFavorite: (folderId: string) => void
+  softDeleteFolder: (folderId: string) => void
+  softDeleteItem: (itemId: string) => void
+  restoreFolder: (folderId: string) => void
+  restoreItem: (itemId: string) => void
+  purgeTrash: (retentionMs: number) => Promise<void>
 
   getChildFolders: (parentId: string) => FolderRecord[]
   getItems: (parentId: string) => AnyItemRecord[]
@@ -347,6 +352,98 @@ export function createFolderStore(config: FolderStoreConfig) {
         _foldersArray: state._foldersArray.map((f) => (f.id === folderId ? updated : f))
       }))
       ops.saveFolder(updated)
+    },
+
+    softDeleteFolder: (folderId) => {
+      if (folderId === config.rootId) return
+      const folder = get().folders[folderId]
+      if (!folder) return
+      const updated: FolderRecord = {
+        ...folder,
+        deletedAt: Date.now(),
+        originalParentId: folder.parentId ?? config.rootId
+      }
+      set((state) => ({
+        folders: { ...state.folders, [folderId]: updated },
+        _foldersArray: state._foldersArray.map((f) => (f.id === folderId ? updated : f))
+      }))
+      ops.saveFolder(updated)
+    },
+
+    softDeleteItem: (itemId) => {
+      const item = get().items[itemId]
+      if (!item) return
+      const updated: AnyItemRecord = {
+        ...item,
+        deletedAt: Date.now(),
+        originalParentId: item.parentId
+      }
+      set((state) => ({
+        items: { ...state.items, [itemId]: updated },
+        _itemsArray: state._itemsArray.map((i) => (i.id === itemId ? updated : i))
+      }))
+      ops.saveItem(updated)
+    },
+
+    restoreFolder: (folderId) => {
+      const { folders } = get()
+      const folder = folders[folderId]
+      if (!folder || !folder.deletedAt) return
+      const parentId = folder.originalParentId
+      const targetParentId =
+        parentId && folders[parentId] && !folders[parentId].deletedAt
+          ? parentId
+          : config.rootId
+      const updated: FolderRecord = {
+        ...folder,
+        parentId: targetParentId,
+        deletedAt: undefined,
+        originalParentId: undefined
+      }
+      set((state) => ({
+        folders: { ...state.folders, [folderId]: updated },
+        _foldersArray: state._foldersArray.map((f) => (f.id === folderId ? updated : f))
+      }))
+      ops.saveFolder(updated)
+    },
+
+    restoreItem: (itemId) => {
+      const { items, folders } = get()
+      const item = items[itemId]
+      if (!item || !item.deletedAt) return
+      const parentId = item.originalParentId
+      const targetParentId =
+        parentId && folders[parentId] && !folders[parentId].deletedAt
+          ? parentId
+          : config.rootId
+      const updated: AnyItemRecord = {
+        ...item,
+        parentId: targetParentId,
+        deletedAt: undefined,
+        originalParentId: undefined
+      }
+      set((state) => ({
+        items: { ...state.items, [itemId]: updated },
+        _itemsArray: state._itemsArray.map((i) => (i.id === itemId ? updated : i))
+      }))
+      ops.saveItem(updated)
+    },
+
+    purgeTrash: async (retentionMs) => {
+      const { folderIds, itemIds } = await ops.purgeTrashOlderThan(Date.now(), retentionMs)
+      if (folderIds.length === 0 && itemIds.length === 0) return
+      set((state) => {
+        const newFolders = { ...state.folders }
+        const newItems = { ...state.items }
+        for (const id of folderIds) delete newFolders[id]
+        for (const id of itemIds) delete newItems[id]
+        return {
+          folders: newFolders,
+          items: newItems,
+          _foldersArray: Object.values(newFolders),
+          _itemsArray: Object.values(newItems)
+        }
+      })
     },
 
     cleanupExpired: async () => {

@@ -457,7 +457,9 @@
       "uploadFiles": "檔案上傳",
       "uploadFolder": "資料夾上傳",
       "addFavorite": "加入我的最愛",
-      "removeFavorite": "移除我的最愛"
+      "removeFavorite": "移除我的最愛",
+      "restore": "還原",
+      "permanentDelete": "永久刪除"
     }
   },
   "projection": {
@@ -631,5 +633,13 @@
       "title": "還沒有最愛",
       "description": "對資料夾按右鍵以加入我的最愛"
     }
+  },
+  "trash": {
+    "empty": {
+      "title": "垃圾桶是空的",
+      "description": "已刪除的檔案與資料夾會顯示在這裡"
+    },
+    "permanentDeleteTitle": "永久刪除？",
+    "permanentDeleteDescription": "此操作無法復原。"
   }
 }

@@ -86,14 +86,21 @@ export async function addFileItemToStore(file: File, parentId: string): Promise<
   return id
 }
 
-export async function removeFileItemFromStore(id: string): Promise<void> {
-  const db = await openFileExplorerDB()
+export function removeFileItemFromStore(id: string): void {
+  useFileExplorerStore.getState().softDeleteItem(id)
+}
 
+export async function permanentDeleteFileItemFromStore(id: string): Promise<void> {
+  const db = await openFileExplorerDB()
   useFileExplorerStore.getState().removeItem(id)
   await Promise.all([deleteFileBlob(db, id), deleteThumbnail(id)])
 }
 
-export async function deleteFolderFromStore(folderId: string): Promise<void> {
+export function deleteFolderFromStore(folderId: string): void {
+  useFileExplorerStore.getState().softDeleteFolder(folderId)
+}
+
+export async function permanentDeleteFolderFromStore(folderId: string): Promise<void> {
   const state = useFileExplorerStore.getState()
   const db = await openFileExplorerDB()
 

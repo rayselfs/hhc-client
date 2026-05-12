@@ -6,6 +6,8 @@ export interface FolderRecord {
   createdAt: number
   expiresAt: number | null
   isFavorited?: boolean
+  deletedAt?: number
+  originalParentId?: string
 }
 
 export interface ItemRecord {
@@ -15,6 +17,8 @@ export interface ItemRecord {
   sortIndex: number
   createdAt: number
   expiresAt: number | null
+  deletedAt?: number
+  originalParentId?: string
 }
 
 export interface VerseItemRecord extends ItemRecord {

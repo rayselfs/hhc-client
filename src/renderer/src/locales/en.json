@@ -457,7 +457,9 @@
       "uploadFiles": "Upload Files",
       "uploadFolder": "Upload Folder",
       "addFavorite": "Add to Favorites",
-      "removeFavorite": "Remove from Favorites"
+      "removeFavorite": "Remove from Favorites",
+      "restore": "Restore",
+      "permanentDelete": "Delete Permanently"
     }
   },
   "projection": {
@@ -631,5 +633,13 @@
       "title": "No favorites yet",
       "description": "Right-click a folder to add it to Favorites"
     }
+  },
+  "trash": {
+    "empty": {
+      "title": "Trash is empty",
+      "description": "Deleted files and folders will appear here"
+    },
+    "permanentDeleteTitle": "Delete Permanently?",
+    "permanentDeleteDescription": "This action cannot be undone."
   }
 }

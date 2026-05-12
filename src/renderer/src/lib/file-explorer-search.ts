@@ -13,6 +13,7 @@ export function searchAllItems(query: string, storeState: FolderStoreState, root
 
   for (const record of storeState._itemsArray) {
     if (record.type !== 'file') continue
+    if (record.deletedAt) continue
     if (!record.name.toLowerCase().includes(lowerQuery)) continue
 
     const item = record as FileItemRecord
@@ -27,6 +28,7 @@ export function searchAllItems(query: string, storeState: FolderStoreState, root
   if (results.length < 20) {
     for (const folder of storeState._foldersArray) {
       if (folder.parentId === null) continue
+      if (folder.deletedAt) continue
       if (!folder.name.toLowerCase().includes(lowerQuery)) continue
 
       const pathFolders = storeState.getFolderPath(folder.parentId).filter((f) => f.parentId !== null)
