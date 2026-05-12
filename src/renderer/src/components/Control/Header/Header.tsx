@@ -12,6 +12,7 @@ import BibleSelector from '@renderer/components/Control/Bible/BibleSelector'
 import SearchBarToggle from '@renderer/components/Control/Header/SearchBar/SearchBarToggle'
 import Breadcrumb from '@renderer/components/Control/FileExplorer/Breadcrumb'
 import ViewModeDropdown from '@renderer/components/Control/FileExplorer/ViewModeDropdown'
+import SortDropdown from '@renderer/components/Control/FileExplorer/SortDropdown'
 import { isTimerRoute, isBibleRoute, isFilesRoute } from '@renderer/lib/routes'
 import { EVENTS } from '@renderer/config/events'
 import { useTimerStore } from '@renderer/stores/timer'
@@ -36,6 +37,9 @@ export default function Header(): React.JSX.Element {
   const navigateToRoot = useFileExplorerStore((state) => state.navigateToRoot)
   const viewMode = useFileExplorerSettings((state) => state.viewMode)
   const setViewMode = useFileExplorerSettings((state) => state.setViewMode)
+  const sortField = useFileExplorerSettings((state) => state.sortField)
+  const sortDir = useFileExplorerSettings((state) => state.sortDir)
+  const setSortFieldAndDir = useFileExplorerSettings((state) => state.setSortFieldAndDir)
 
   const showTimerControls = isTimerRoute(location.pathname)
   const showBibleControls = isBibleRoute(location.pathname)
@@ -90,7 +94,10 @@ export default function Header(): React.JSX.Element {
 
       {showFilesControls && (
         <div className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center gap-2 max-w-[50%]">
-          <ViewModeDropdown viewMode={viewMode} onViewModeChange={setViewMode} />
+          <div className="flex items-center gap-0">
+            <ViewModeDropdown viewMode={viewMode} onViewModeChange={setViewMode} />
+            <SortDropdown sortField={sortField} sortDir={sortDir} onSortChange={setSortFieldAndDir} />
+          </div>
           <Breadcrumb
             currentFolderId={currentFolderId}
             getFolderPath={getFolderPath}

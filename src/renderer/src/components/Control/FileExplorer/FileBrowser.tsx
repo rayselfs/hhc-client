@@ -34,6 +34,25 @@ import type { ClipboardState } from '@renderer/components/Control/FileExplorer'
 import { getFileIcon } from './views/getFileIcon'
 import { GridView, ListView, type GridViewItem } from './views'
 import type { SearchResult } from '@renderer/lib/file-explorer-search'
+import { formatFileKind } from '@renderer/lib/format-file-kind'
+import type { SortField, SortDir } from '@renderer/stores/file-explorer'
+
+function compareItems(a: GridViewItem, b: GridViewItem, field: SortField, dir: SortDir): number {
+  const sign = dir === 'asc' ? 1 : -1
+  switch (field) {
+    case 'name':
+      return sign * a.name.localeCompare(b.name)
+    case 'createdAt':
+      return sign * ((a.createdAt ?? 0) - (b.createdAt ?? 0))
+    case 'size':
+      return sign * ((a.size ?? 0) - (b.size ?? 0))
+    case 'kind': {
+      const ka = formatFileKind(a.mimeType, a.isFolder)
+      const kb = formatFileKind(b.mimeType, b.isFolder)
+      return sign * ka.localeCompare(kb)
+    }
+  }
+}
 
 export interface FileBrowserProps {
   onItemContextMenu?: (itemId: string, event: React.MouseEvent) => void
@@ -44,6 +63,7 @@ export interface FileBrowserProps {
   onCut?: (selectedIds: Set<string>) => void
   onPaste?: () => void
   clipboard?: ClipboardState | null
+  onEscape?: () => void
 }
 
 type FileExplorerDndData =
@@ -197,7 +217,8 @@ export function FileBrowser({
   onCopy,
   onCut,
   onPaste,
-  clipboard
+  clipboard,
+  onEscape
 }: FileBrowserProps): React.JSX.Element {
   const { t } = useTranslation()
   const confirm = useConfirm()
@@ -210,6 +231,12 @@ export function FileBrowser({
   const reorderItems = useFileExplorerStore((state) => state.reorderItems)
   const reorderFolders = useFileExplorerStore((state) => state.reorderFolders)
   const viewMode = useFileExplorerSettings((state) => state.viewMode)
+  const sortField = useFileExplorerSettings((state) => state.sortField)
+  const sortDir = useFileExplorerSettings((state) => state.sortDir)
+  const setSortDir = useFileExplorerSettings((state) => state.setSortDir)
+  const setSortFieldAndDir = useFileExplorerSettings((state) => state.setSortFieldAndDir)
+  const colWidths = useFileExplorerSettings((state) => state.colWidths)
+  const setColWidths = useFileExplorerSettings((state) => state.setColWidths)
   const searchQuery = useFileExplorerSearch((state) => state.searchQuery)
   const setSearchQuery = useFileExplorerSearch((state) => state.setSearchQuery)
 
@@ -322,10 +349,18 @@ export function FileBrowser({
     [folders, fileItems, selectedIds, thumbnails]
   )
 
-  const allIds = useMemo(() => allItems.map((item) => item.id), [allItems])
-  const folderIds = useMemo(() => folders.map((folder) => folder.id), [folders])
-  const itemIds = useMemo(() => fileItems.map((item) => item.id), [fileItems])
-  const activeItem = activeId ? allItems.find((item) => item.id === activeId) : null
+  const sortedItems = useMemo(() => {
+    const folders = allItems.filter((item) => item.isFolder)
+    const files = allItems.filter((item) => !item.isFolder)
+    folders.sort((a, b) => compareItems(a, b, sortField, sortDir))
+    files.sort((a, b) => compareItems(a, b, sortField, sortDir))
+    return [...folders, ...files]
+  }, [allItems, sortField, sortDir])
+
+  const allIds = useMemo(() => sortedItems.map((item) => item.id), [sortedItems])
+  const folderIds = useMemo(() => sortedItems.filter((item) => item.isFolder).map((item) => item.id), [sortedItems])
+  const itemIds = useMemo(() => sortedItems.filter((item) => !item.isFolder).map((item) => item.id), [sortedItems])
+  const activeItem = activeId ? sortedItems.find((item) => item.id === activeId) : null
   const isMultiDrag = draggedIds.size > 1
 
   const handleItemClick = useCallback(
@@ -367,6 +402,11 @@ export function FileBrowser({
     setLastSelectedId(null)
   }, [])
 
+  const handleEscape = useCallback((): void => {
+    clearSelection()
+    onEscape?.()
+  }, [clearSelection, onEscape])
+
   const handleContainerClick = useCallback(
     (event: React.MouseEvent): void => {
       if ((event.target as Element).closest('[data-file-item]')) return
@@ -389,23 +429,23 @@ export function FileBrowser({
       event.preventDefault()
       event.stopPropagation()
       if (!selectedIds.has(itemId)) setSelectedIds(new Set([itemId]))
-      const item = allItems.find((entry) => entry.id === itemId)
+      const item = sortedItems.find((entry) => entry.id === itemId)
       if (item?.isFolder) {
         onFolderContextMenu?.(itemId, event)
       } else {
         onItemContextMenu?.(itemId, event)
       }
     },
-    [allItems, selectedIds, onFolderContextMenu, onItemContextMenu]
+    [sortedItems, selectedIds, onFolderContextMenu, onItemContextMenu]
   )
 
   const handleItemDoubleClick = useCallback(
     (itemId: string, event: React.MouseEvent): void => {
       event.stopPropagation()
-      const item = allItems.find((entry) => entry.id === itemId)
+      const item = sortedItems.find((entry) => entry.id === itemId)
       if (item?.isFolder) void navigateToFolder(itemId)
     },
-    [allItems, navigateToFolder]
+    [sortedItems, navigateToFolder]
   )
 
   const handleSelectAll = useCallback((): void => {
@@ -456,7 +496,7 @@ export function FileBrowser({
       { config: SHORTCUTS.EDIT.COPY, handler: handleCopySelected, preventDefault: true },
       { config: SHORTCUTS.EDIT.CUT, handler: handleCutSelected, preventDefault: true },
       { config: SHORTCUTS.EDIT.PASTE, handler: handlePasteSelected, preventDefault: true },
-      { config: SHORTCUTS.EDIT.ESCAPE, handler: clearSelection, preventDefault: true },
+      { config: SHORTCUTS.EDIT.ESCAPE, handler: handleEscape, preventDefault: true },
       {
         config: SHORTCUTS.EDIT.DELETE,
         handler: () => void handleDeleteSelected(),
@@ -469,6 +509,25 @@ export function FileBrowser({
       }
     ],
     { enabled: true, sectionKey: 'edit' }
+  )
+
+  const handleSortChange = useCallback(
+    (field: SortField) => {
+      if (field === sortField) {
+        if (field === 'createdAt') {
+          setSortDir(sortDir === 'asc' ? 'desc' : 'asc')
+        } else {
+          if (sortDir === 'asc') {
+            setSortDir('desc')
+          } else {
+            setSortFieldAndDir('createdAt', 'asc')
+          }
+        }
+      } else {
+        setSortFieldAndDir(field, 'asc')
+      }
+    },
+    [sortField, sortDir, setSortDir, setSortFieldAndDir]
   )
 
   const handleDragStart = useCallback(
@@ -625,7 +684,12 @@ export function FileBrowser({
           <SortableContext items={[...folderIds, ...itemIds]}>
             {viewMode === 'list' ? (
               <ListView
-                items={allItems}
+                items={sortedItems}
+                sortField={sortField}
+                sortDir={sortDir}
+                onSortChange={handleSortChange}
+                colWidths={colWidths}
+                onColWidthChange={(col, w) => setColWidths({ [col]: w })}
                 onItemClick={handleItemClick}
                 onItemDoubleClick={handleItemDoubleClick}
                 onItemContextMenu={handleItemContextMenu}
@@ -633,7 +697,7 @@ export function FileBrowser({
               />
             ) : (
               <GridView
-                items={allItems}
+                items={sortedItems}
                 viewMode={viewMode}
                 onItemClick={handleItemClick}
                 onItemDoubleClick={handleItemDoubleClick}

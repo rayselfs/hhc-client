@@ -105,6 +105,19 @@ async function generateVideoThumbnail(file: File): Promise<string | null> {
 }
 
 async function generatePdfThumbnail(file: File): Promise<string | null> {
+  // pdfjs-dist ≥ 5.7 calls Map.prototype.getOrInsertComputed which is a TC39 Stage 2 proposal
+  // not yet available in browsers or Electron — polyfill it before importing the library.
+  if (!('getOrInsertComputed' in Map.prototype)) {
+    Object.defineProperty(Map.prototype, 'getOrInsertComputed', {
+      value<K, V>(this: Map<K, V>, key: K, factory: (key: K) => V): V {
+        if (!this.has(key)) this.set(key, factory(key))
+        return this.get(key)!
+      },
+      configurable: true,
+      writable: true
+    })
+  }
+
   const pdfjsLib = await import('pdfjs-dist')
   pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
     'pdfjs-dist/build/pdf.worker.mjs',

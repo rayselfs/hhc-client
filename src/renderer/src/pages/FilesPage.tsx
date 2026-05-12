@@ -23,6 +23,7 @@ import {
 import type { ClipboardState } from '@renderer/components/Control/FileExplorer'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
 import { getThumbnail, saveThumbnail } from '@renderer/lib/thumbnail-db'
+import { openFileExplorerDB, getFileBlob, storeFileBlob } from '@renderer/lib/file-explorer-db'
 
 export default function FilesPage(): React.JSX.Element {
   const { t } = useTranslation()
@@ -114,6 +115,12 @@ export default function FilesPage(): React.JSX.Element {
     setClipboard({ itemIds: new Set(targetIds), mode: 'cut' })
   }, [])
 
+  const handleEscape = useCallback((): void => {
+    if (clipboard?.mode === 'cut') {
+      setClipboard(null)
+    }
+  }, [clipboard])
+
   const handleDelete = useCallback(
     async (targetIds: Set<string>): Promise<void> => {
       if (targetIds.size === 0) return
@@ -153,9 +160,14 @@ export default function FilesPage(): React.JSX.Element {
       } else if (state.items[id]) {
         if (clipboard.mode === 'copy') {
           const item = state.items[id]
+          if (item.type !== 'file') continue
           const newId = crypto.randomUUID()
           const { id: _id, sortIndex: _si, createdAt: _ca, ...rest } = item
-          addItem({ ...rest, id: newId, parentId: currentFolderId })
+          const db = await openFileExplorerDB()
+          const blob = await getFileBlob(db, id)
+          if (blob) await storeFileBlob(db, newId, blob)
+          const newUrl = { url: `blob:${newId}` }
+          addItem({ ...rest, ...newUrl, id: newId, parentId: currentFolderId })
           const dataUrl = await getThumbnail(id)
           if (dataUrl) {
             await saveThumbnail(newId, dataUrl)
@@ -342,6 +354,7 @@ export default function FilesPage(): React.JSX.Element {
           onCut={handleCut}
           onPaste={() => void handlePaste()}
           clipboard={clipboard}
+          onEscape={handleEscape}
         />
       </FileExplorerShell>
       <FileExplorerFAB onUploadFiles={handleUploadFiles} onUploadFolder={handleUploadFolder} />

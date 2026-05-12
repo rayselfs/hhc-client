@@ -370,6 +370,33 @@
       "deleteCount": "刪除 {{count}} 項"
     }
   },
+  "fileKind": {
+    "folder": "資料夾",
+    "file": "檔案",
+    "pngImage": "PNG 檔案",
+    "jpegImage": "JPEG 檔案",
+    "gifImage": "GIF 檔案",
+    "webpImage": "WebP 檔案",
+    "svgImage": "SVG 檔案",
+    "bmpImage": "BMP 檔案",
+    "tiffImage": "TIFF 檔案",
+    "heicImage": "HEIC 檔案",
+    "heifImage": "HEIF 檔案",
+    "mp4Video": "MP4 檔案",
+    "quicktimeVideo": "QuickTime 檔案",
+    "webmVideo": "WebM 檔案",
+    "aviVideo": "AVI 檔案",
+    "mkvVideo": "MKV 檔案",
+    "mpegVideo": "MPEG 檔案",
+    "oggVideo": "OGG 檔案",
+    "pdfDocument": "PDF 文件",
+    "powerpointPresentation": "PowerPoint 簡報",
+    "keynotePresentation": "Keynote 簡報",
+    "presentation": "簡報",
+    "imageFile": "{{ext}} 檔案",
+    "videoFile": "{{ext}} 檔案",
+    "audioFile": "{{ext}} 音訊"
+  },
   "fileExplorer": {
     "title": "檔案",
     "search": {
@@ -405,6 +432,17 @@
     "empty": {
       "title": "目前沒有檔案",
       "description": "上傳檔案即可開始使用"
+    },
+    "sort": {
+      "title": "排序",
+      "nameAsc": "名稱 A–Z",
+      "nameDesc": "名稱 Z–A",
+      "createdAsc": "最舊優先",
+      "createdDesc": "最新優先",
+      "sizeAsc": "最小優先",
+      "sizeDesc": "最大優先",
+      "kindAsc": "類型 A–Z",
+      "kindDesc": "類型 Z–A"
     },
     "contextMenu": {
       "rename": "重新命名",

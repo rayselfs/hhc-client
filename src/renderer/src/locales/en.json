@@ -370,6 +370,33 @@
       "deleteCount": "Delete {{count}} item(s)"
     }
   },
+  "fileKind": {
+    "folder": "Folder",
+    "file": "File",
+    "pngImage": "PNG Image",
+    "jpegImage": "JPEG Image",
+    "gifImage": "GIF Image",
+    "webpImage": "WebP Image",
+    "svgImage": "SVG Image",
+    "bmpImage": "BMP Image",
+    "tiffImage": "TIFF Image",
+    "heicImage": "HEIC Image",
+    "heifImage": "HEIF Image",
+    "mp4Video": "MP4 Video",
+    "quicktimeVideo": "QuickTime Video",
+    "webmVideo": "WebM Video",
+    "aviVideo": "AVI Video",
+    "mkvVideo": "MKV Video",
+    "mpegVideo": "MPEG Video",
+    "oggVideo": "OGG Video",
+    "pdfDocument": "PDF Document",
+    "powerpointPresentation": "PowerPoint Presentation",
+    "keynotePresentation": "Keynote Presentation",
+    "presentation": "Presentation",
+    "imageFile": "{{ext}} Image",
+    "videoFile": "{{ext}} Video",
+    "audioFile": "{{ext}} Audio"
+  },
   "fileExplorer": {
     "title": "FILES",
     "search": {
@@ -405,6 +432,17 @@
     "empty": {
       "title": "No files yet",
       "description": "Upload files to get started"
+    },
+    "sort": {
+      "title": "Sort",
+      "nameAsc": "Name A–Z",
+      "nameDesc": "Name Z–A",
+      "createdAsc": "Oldest First",
+      "createdDesc": "Newest First",
+      "sizeAsc": "Smallest First",
+      "sizeDesc": "Largest First",
+      "kindAsc": "Kind A–Z",
+      "kindDesc": "Kind Z–A"
     },
     "contextMenu": {
       "rename": "Rename",

@@ -6,9 +6,19 @@ import { hhcPersistStorage, createPersistName } from '@renderer/lib/persist-stor
 import { createFolderStore } from '@renderer/stores/folder'
 import type { FileExplorerViewMode, FileItemRecord } from '@shared/types/folder'
 
+export type SortField = 'name' | 'createdAt' | 'size' | 'kind'
+export type SortDir = 'asc' | 'desc'
+
 interface FileExplorerSettingsState {
   viewMode: FileExplorerViewMode
   setViewMode: (mode: FileExplorerViewMode) => void
+  sortField: SortField
+  sortDir: SortDir
+  setSortField: (field: SortField) => void
+  setSortDir: (dir: SortDir) => void
+  setSortFieldAndDir: (field: SortField, dir: SortDir) => void
+  colWidths: { created: number; size: number; kind: number }
+  setColWidths: (widths: Partial<{ created: number; size: number; kind: number }>) => void
 }
 
 interface FileExplorerSearchState {
@@ -26,14 +36,26 @@ export const useFileExplorerSettings = create<FileExplorerSettingsState>()(
   persist(
     (set) => ({
       viewMode: 'medium-icon',
-      setViewMode: (viewMode) => set({ viewMode })
+      setViewMode: (viewMode) => set({ viewMode }),
+      sortField: 'createdAt',
+      sortDir: 'asc',
+      setSortField: (sortField) => set({ sortField }),
+      setSortDir: (sortDir) => set({ sortDir }),
+      setSortFieldAndDir: (sortField, sortDir) => set({ sortField, sortDir }),
+      colWidths: { created: 112, size: 80, kind: 96 },
+      setColWidths: (widths) =>
+        set((state) => ({ colWidths: { ...state.colWidths, ...widths } }))
     }),
     {
       name: createPersistName('file-explorer-settings'),
       storage: hhcPersistStorage,
-      version: 0,
+      version: 1,
+      migrate: (state: any) => state,
       partialize: (state) => ({
-        viewMode: state.viewMode
+        viewMode: state.viewMode,
+        sortField: state.sortField,
+        sortDir: state.sortDir,
+        colWidths: state.colWidths
       })
     }
   )
