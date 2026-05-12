@@ -70,19 +70,19 @@ describe('searchAllItems', () => {
   it('returns empty array for empty query', () => {
     const file = makeFile({ name: 'photo.jpg' })
     const state = makeStoreState([file])
-    expect(searchAllItems('', state)).toEqual([])
+    expect(searchAllItems('', state, 'Files')).toEqual([])
   })
 
   it('returns empty array for whitespace-only query', () => {
     const file = makeFile({ name: 'photo.jpg' })
     const state = makeStoreState([file])
-    expect(searchAllItems('   ', state)).toEqual([])
+    expect(searchAllItems('   ', state, 'Files')).toEqual([])
   })
 
   it('returns matching file items', () => {
     const file = makeFile({ name: 'photo.jpg' })
     const state = makeStoreState([file])
-    const results = searchAllItems('photo', state)
+    const results = searchAllItems('photo', state, 'Files')
     expect(results).toHaveLength(1)
     const r = results[0]
     expect(r.kind).toBe('file')
@@ -92,16 +92,16 @@ describe('searchAllItems', () => {
   it('is case-insensitive', () => {
     const file = makeFile({ name: 'MyDocument.pdf' })
     const state = makeStoreState([file])
-    expect(searchAllItems('mydocument', state)).toHaveLength(1)
-    expect(searchAllItems('MYDOCUMENT', state)).toHaveLength(1)
-    expect(searchAllItems('MyDocument', state)).toHaveLength(1)
+    expect(searchAllItems('mydocument', state, 'Files')).toHaveLength(1)
+    expect(searchAllItems('MYDOCUMENT', state, 'Files')).toHaveLength(1)
+    expect(searchAllItems('MyDocument', state, 'Files')).toHaveLength(1)
   })
 
   it('filters out non-matching items', () => {
     const file1 = makeFile({ name: 'photo.jpg' })
     const file2 = makeFile({ name: 'report.pdf' })
     const state = makeStoreState([file1, file2])
-    const results = searchAllItems('photo', state)
+    const results = searchAllItems('photo', state, 'Files')
     expect(results).toHaveLength(1)
     const r = results[0]
     expect(r.kind).toBe('file')
@@ -113,7 +113,7 @@ describe('searchAllItems', () => {
     const file2 = makeFile({ name: 'photo2.jpg' })
     const file3 = makeFile({ name: 'document.pdf' })
     const state = makeStoreState([file1, file2, file3])
-    const results = searchAllItems('photo', state)
+    const results = searchAllItems('photo', state, 'Files')
     expect(results).toHaveLength(2)
   })
 
@@ -132,7 +132,7 @@ describe('searchAllItems', () => {
       text: 'photo verse text'
     }
     const state = makeStoreState([verseItem])
-    const results = searchAllItems('photo', state)
+    const results = searchAllItems('photo', state, 'Files')
     expect(results).toHaveLength(0)
   })
 
@@ -141,7 +141,7 @@ describe('searchAllItems', () => {
       makeFile({ id: `file-${i}`, name: `photo-${i}.jpg` })
     )
     const state = makeStoreState(files)
-    const results = searchAllItems('photo', state)
+    const results = searchAllItems('photo', state, 'Files')
     expect(results).toHaveLength(20)
   })
 
@@ -151,7 +151,7 @@ describe('searchAllItems', () => {
     const state = makeStoreState([file], [subfolder])
     state.getFolderPath = vi.fn().mockReturnValue([subfolder])
 
-    const results = searchAllItems('beach', state)
+    const results = searchAllItems('beach', state, 'Files')
     expect(results).toHaveLength(1)
     expect(results[0].folderPath).toContain('Files')
     expect(results[0].folderPath).toContain('Vacation')
@@ -160,19 +160,19 @@ describe('searchAllItems', () => {
   it('returns empty array when no items match', () => {
     const file = makeFile({ name: 'photo.jpg' })
     const state = makeStoreState([file])
-    expect(searchAllItems('xyz-no-match', state)).toEqual([])
+    expect(searchAllItems('xyz-no-match', state, 'Files')).toEqual([])
   })
 
   it('returns empty array when store has no items', () => {
     const state = makeStoreState([])
-    expect(searchAllItems('anything', state)).toEqual([])
+    expect(searchAllItems('anything', state, 'Files')).toEqual([])
   })
 
   it('matches partial name substrings', () => {
     const file = makeFile({ name: 'annual-report-2024.pdf' })
     const state = makeStoreState([file])
-    expect(searchAllItems('report', state)).toHaveLength(1)
-    expect(searchAllItems('2024', state)).toHaveLength(1)
-    expect(searchAllItems('annual', state)).toHaveLength(1)
+    expect(searchAllItems('report', state, 'Files')).toHaveLength(1)
+    expect(searchAllItems('2024', state, 'Files')).toHaveLength(1)
+    expect(searchAllItems('annual', state, 'Files')).toHaveLength(1)
   })
 })

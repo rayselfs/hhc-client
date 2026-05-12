@@ -1,7 +1,7 @@
 import React from 'react'
 import { useTranslation } from 'react-i18next'
 import { LayoutGrid, Grid2X2, Grid3X3, AlignJustify, Check } from 'lucide-react'
-import { Dropdown } from '@heroui/react/dropdown'
+import { Dropdown, Button } from '@heroui/react'
 import type { FileExplorerViewMode } from '@shared/types/folder'
 
 type ViewLabelKey =
@@ -43,15 +43,10 @@ export default function ViewModeDropdown({
   const ActiveIcon = MODE_ICON_MAP[viewMode]
 
   return (
-    <Dropdown.Root>
-      <Dropdown.Trigger>
-        <div
-          aria-label={t('fileExplorer.view.largeIcon')}
-          className="flex items-center justify-center w-10 h-10 rounded-full border border-border text-muted-fg hover:text-foreground hover:bg-default/60 transition-colors cursor-default"
-        >
-          <ActiveIcon size={16} />
-        </div>
-      </Dropdown.Trigger>
+    <Dropdown>
+      <Button isIconOnly variant="outline" size="lg" aria-label={t('fileExplorer.view.title', 'View')}>
+        <ActiveIcon size={16} />
+      </Button>
       <Dropdown.Popover>
         <Dropdown.Menu onAction={(key) => onViewModeChange(key as FileExplorerViewMode)}>
           {VIEW_MODE_OPTIONS.map(({ mode, Icon, labelKey }) => (
@@ -63,6 +58,6 @@ export default function ViewModeDropdown({
           ))}
         </Dropdown.Menu>
       </Dropdown.Popover>
-    </Dropdown.Root>
+    </Dropdown>
   )
 }

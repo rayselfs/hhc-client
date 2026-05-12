@@ -1,5 +1,5 @@
 import React from 'react'
-import { Dropdown } from '@heroui/react'
+import { Dropdown, Button } from '@heroui/react'
 import { ArrowUpDown, ArrowUp, ArrowDown, Check } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { SortField, SortDir } from '@renderer/stores/file-explorer'
@@ -10,54 +10,67 @@ export interface SortDropdownProps {
   onSortChange: (field: SortField, dir: SortDir) => void
 }
 
-export default function SortDropdown({
-  sortField,
-  sortDir,
-  onSortChange
-}: SortDropdownProps): React.JSX.Element {
+type SortFieldKey =
+  | 'fileExplorer.sort.name'
+  | 'fileExplorer.sort.createdAt'
+  | 'fileExplorer.sort.size'
+  | 'fileExplorer.sort.kind'
+
+const SORT_FIELDS: SortField[] = ['name', 'createdAt', 'size', 'kind']
+const FIELD_KEY: Record<SortField, SortFieldKey> = {
+  name: 'fileExplorer.sort.name',
+  createdAt: 'fileExplorer.sort.createdAt',
+  size: 'fileExplorer.sort.size',
+  kind: 'fileExplorer.sort.kind'
+}
+
+export default function SortDropdown({ sortField, sortDir, onSortChange }: SortDropdownProps): React.JSX.Element {
   const { t } = useTranslation()
+  const isActive = sortDir !== 'none'
 
-  const isDefault = sortField === 'createdAt' && sortDir === 'asc'
-  const ActiveIcon = isDefault ? ArrowUpDown : sortDir === 'asc' ? ArrowUp : ArrowDown
-
-  const items: { field: SortField; dir: SortDir; labelKey: string; defaultLabel: string }[] = [
-    { field: 'name', dir: 'asc', labelKey: 'fileExplorer.sort.nameAsc', defaultLabel: 'Name A–Z' },
-    { field: 'name', dir: 'desc', labelKey: 'fileExplorer.sort.nameDesc', defaultLabel: 'Name Z–A' },
-    { field: 'createdAt', dir: 'asc', labelKey: 'fileExplorer.sort.createdAsc', defaultLabel: 'Oldest First' },
-    { field: 'createdAt', dir: 'desc', labelKey: 'fileExplorer.sort.createdDesc', defaultLabel: 'Newest First' },
-    { field: 'size', dir: 'asc', labelKey: 'fileExplorer.sort.sizeAsc', defaultLabel: 'Smallest First' },
-    { field: 'size', dir: 'desc', labelKey: 'fileExplorer.sort.sizeDesc', defaultLabel: 'Largest First' },
-    { field: 'kind', dir: 'asc', labelKey: 'fileExplorer.sort.kindAsc', defaultLabel: 'Kind A–Z' },
-    { field: 'kind', dir: 'desc', labelKey: 'fileExplorer.sort.kindDesc', defaultLabel: 'Kind Z–A' }
-  ]
+  const handleFieldPress = (field: SortField): void => {
+    if (!isActive || sortField !== field) {
+      onSortChange(field, 'asc')
+    } else if (sortDir === 'asc') {
+      onSortChange(field, 'desc')
+    } else {
+      onSortChange(field, 'asc')
+    }
+  }
 
   return (
     <Dropdown>
-      <Dropdown.Trigger>
-        <div
-          aria-label={t('fileExplorer.sort.title', 'Sort')}
-          className={`flex items-center justify-center w-10 h-10 rounded-full border border-border transition-colors cursor-default ${
-            isDefault
-              ? 'text-muted-fg hover:text-foreground hover:bg-default/60'
-              : 'text-primary border-primary/30 bg-primary/10 hover:bg-primary/20'
-          }`}
-        >
-          <ActiveIcon size={16} />
-        </div>
-      </Dropdown.Trigger>
+      <Button
+        isIconOnly
+        variant="outline"
+        size="lg"
+        aria-label={t('fileExplorer.sort.title', 'Sort')}
+        className={isActive ? 'text-primary' : ''}
+      >
+        <ArrowUpDown size={16} />
+      </Button>
       <Dropdown.Popover placement="bottom start">
         <Dropdown.Menu aria-label={t('fileExplorer.sort.title', 'Sort')}>
-          {items.map((item) => {
-            const isActive = sortField === item.field && sortDir === item.dir
+          <Dropdown.Item
+            key="none"
+            onPress={() => onSortChange(sortField, 'none')}
+          >
+            <div className="flex items-center justify-between w-full">
+              <span>{t('fileExplorer.sort.none', 'None')}</span>
+              {!isActive && <Check size={14} className="text-primary ml-4" />}
+            </div>
+          </Dropdown.Item>
+          {SORT_FIELDS.map((field) => {
+            const isFieldActive = isActive && sortField === field
             return (
-              <Dropdown.Item
-                key={`${item.field}-${item.dir}`}
-                onPress={() => onSortChange(item.field, item.dir)}
-                className="flex items-center justify-between"
-              >
+              <Dropdown.Item key={field} onPress={() => handleFieldPress(field)}>
                 <div className="flex items-center justify-between w-full">
-                  <span>{t(item.labelKey, item.defaultLabel)}</span>
-                  {isActive && <Check size={16} className="text-primary ml-4" />}
+                  <span>{t(FIELD_KEY[field])}</span>
+                  {isFieldActive && (
+                    sortDir === 'asc'
+                      ? <ArrowUp size={14} className="text-primary ml-4" />
+                      : <ArrowDown size={14} className="text-primary ml-4" />
+                  )}
                 </div>
               </Dropdown.Item>
             )

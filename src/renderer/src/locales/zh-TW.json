@@ -411,6 +411,7 @@
       "selectedCount": "已選 {{count}} 個"
     },
     "view": {
+      "title": "顯示",
       "largeIcon": "大圖示",
       "mediumIcon": "中圖示",
       "smallIcon": "小圖示",
@@ -435,14 +436,11 @@
     },
     "sort": {
       "title": "排序",
-      "nameAsc": "名稱 A–Z",
-      "nameDesc": "名稱 Z–A",
-      "createdAsc": "最舊優先",
-      "createdDesc": "最新優先",
-      "sizeAsc": "最小優先",
-      "sizeDesc": "最大優先",
-      "kindAsc": "類型 A–Z",
-      "kindDesc": "類型 Z–A"
+      "none": "不排序",
+      "name": "名稱",
+      "createdAt": "建立時間",
+      "size": "大小",
+      "kind": "類型"
     },
     "contextMenu": {
       "rename": "重新命名",

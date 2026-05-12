@@ -411,6 +411,7 @@
       "selectedCount": "{{count}} selected"
     },
     "view": {
+      "title": "View",
       "largeIcon": "Large Icons",
       "mediumIcon": "Medium Icons",
       "smallIcon": "Small Icons",
@@ -435,14 +436,11 @@
     },
     "sort": {
       "title": "Sort",
-      "nameAsc": "Name A–Z",
-      "nameDesc": "Name Z–A",
-      "createdAsc": "Oldest First",
-      "createdDesc": "Newest First",
-      "sizeAsc": "Smallest First",
-      "sizeDesc": "Largest First",
-      "kindAsc": "Kind A–Z",
-      "kindDesc": "Kind Z–A"
+      "none": "None",
+      "name": "Name",
+      "createdAt": "Created",
+      "size": "Size",
+      "kind": "Kind"
     },
     "contextMenu": {
       "rename": "Rename",

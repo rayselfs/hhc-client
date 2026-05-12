@@ -5,7 +5,7 @@ export type SearchResult =
   | { kind: 'file'; item: FileItemRecord; folderPath: string }
   | { kind: 'folder'; folder: FolderRecord; folderPath: string }
 
-export function searchAllItems(query: string, storeState: FolderStoreState): SearchResult[] {
+export function searchAllItems(query: string, storeState: FolderStoreState, rootLabel: string): SearchResult[] {
   if (query.trim() === '') return []
 
   const lowerQuery = query.toLowerCase()
@@ -17,7 +17,7 @@ export function searchAllItems(query: string, storeState: FolderStoreState): Sea
 
     const item = record as FileItemRecord
     const pathFolders = storeState.getFolderPath(item.parentId)
-    const folderPath = ['Files', ...pathFolders.map((f) => f.name)].join(' > ')
+    const folderPath = [rootLabel, ...pathFolders.map((f) => f.name)].join(' > ')
 
     results.push({ kind: 'file', item, folderPath })
 
@@ -30,7 +30,7 @@ export function searchAllItems(query: string, storeState: FolderStoreState): Sea
       if (!folder.name.toLowerCase().includes(lowerQuery)) continue
 
       const pathFolders = storeState.getFolderPath(folder.parentId)
-      const folderPath = ['Files', ...pathFolders.map((f) => f.name)].join(' > ')
+      const folderPath = [rootLabel, ...pathFolders.map((f) => f.name)].join(' > ')
 
       results.push({ kind: 'folder', folder, folderPath })
 

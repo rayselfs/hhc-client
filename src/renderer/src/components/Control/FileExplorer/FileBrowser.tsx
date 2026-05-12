@@ -35,9 +35,9 @@ import { getFileIcon } from './views/getFileIcon'
 import { GridView, ListView, type GridViewItem } from './views'
 import type { SearchResult } from '@renderer/lib/file-explorer-search'
 import { formatFileKind } from '@renderer/lib/format-file-kind'
-import type { SortField, SortDir } from '@renderer/stores/file-explorer'
+import type { SortField } from '@renderer/stores/file-explorer'
 
-function compareItems(a: GridViewItem, b: GridViewItem, field: SortField, dir: SortDir): number {
+function compareItems(a: GridViewItem, b: GridViewItem, field: SortField, dir: 'asc' | 'desc'): number {
   const sign = dir === 'asc' ? 1 : -1
   switch (field) {
     case 'name':
@@ -175,7 +175,7 @@ function SearchResultsList({
             <button
               key={result.item.id}
               type="button"
-              onClick={() => onFileClick(result)}
+              onDoubleClick={() => onFileClick(result)}
               className="flex items-center gap-3 rounded-md px-3 py-2 text-left text-sm cursor-pointer hover:bg-content2/60 focus:outline-none"
             >
               <div className="flex-shrink-0 w-6 flex items-center justify-center text-default-500">
@@ -192,7 +192,7 @@ function SearchResultsList({
           <button
             key={result.folder.id}
             type="button"
-            onClick={() => onFolderClick(result)}
+            onDoubleClick={() => onFolderClick(result)}
             className="flex items-center gap-3 rounded-md px-3 py-2 text-left text-sm cursor-pointer hover:bg-content2/60 focus:outline-none"
           >
             <div className="flex-shrink-0 w-6 flex items-center justify-center">
@@ -279,8 +279,8 @@ export function FileBrowser({
 
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return []
-    return searchAllItems(searchQuery, useFileExplorerStore.getState())
-  }, [searchQuery, itemsArray, foldersArray])
+    return searchAllItems(searchQuery, useFileExplorerStore.getState(), t('fileExplorer.breadcrumb.root'))
+  }, [searchQuery, itemsArray, foldersArray, t])
 
   useEffect(() => {
     let cancelled = false
@@ -352,8 +352,10 @@ export function FileBrowser({
   const sortedItems = useMemo(() => {
     const folders = allItems.filter((item) => item.isFolder)
     const files = allItems.filter((item) => !item.isFolder)
-    folders.sort((a, b) => compareItems(a, b, sortField, sortDir))
-    files.sort((a, b) => compareItems(a, b, sortField, sortDir))
+    if (sortDir !== 'none') {
+      folders.sort((a, b) => compareItems(a, b, sortField, sortDir))
+      files.sort((a, b) => compareItems(a, b, sortField, sortDir))
+    }
     return [...folders, ...files]
   }, [allItems, sortField, sortDir])
 
@@ -513,18 +515,12 @@ export function FileBrowser({
 
   const handleSortChange = useCallback(
     (field: SortField) => {
-      if (field === sortField) {
-        if (field === 'createdAt') {
-          setSortDir(sortDir === 'asc' ? 'desc' : 'asc')
-        } else {
-          if (sortDir === 'asc') {
-            setSortDir('desc')
-          } else {
-            setSortFieldAndDir('createdAt', 'asc')
-          }
-        }
-      } else {
+      if (sortDir === 'none' || field !== sortField) {
         setSortFieldAndDir(field, 'asc')
+      } else if (sortDir === 'asc') {
+        setSortDir('desc')
+      } else {
+        setSortDir('asc')
       }
     },
     [sortField, sortDir, setSortDir, setSortFieldAndDir]

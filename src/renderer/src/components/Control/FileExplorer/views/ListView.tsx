@@ -1,7 +1,6 @@
 import React, { useCallback } from 'react'
 import { Folder, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import GlassDivider from '@renderer/components/Common/GlassDivider'
 import { formatFileKind } from '@renderer/lib/format-file-kind'
 import type { SortField, SortDir } from '@renderer/stores/file-explorer'
 import { getFileIcon } from './getFileIcon'
@@ -77,7 +76,7 @@ export function ListView({
   )
 
   const renderSortIcon = (field: SortField): React.ReactNode => {
-    if (sortField !== field) {
+    if (sortDir === 'none' || sortField !== field) {
       return <ArrowUpDown size={12} className="opacity-30" />
     }
     return sortDir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
@@ -98,7 +97,7 @@ export function ListView({
 
   return (
     <div className="flex flex-col">
-      <div className="sticky top-0 bg-background z-10">
+      <div className="sticky top-0 bg-background z-10 border-b border-divider">
         <div className="flex items-center px-3 py-1.5">
           <div className="w-6 flex-shrink-0 mr-3" />
           <div
@@ -148,7 +147,6 @@ export function ListView({
             {renderSortIcon('kind')}
           </div>
         </div>
-        <GlassDivider />
       </div>
 
       <div className="flex flex-col p-2">

@@ -24,7 +24,7 @@ export function SearchBar({ className }: SearchBarProps): React.JSX.Element {
       setOpen(false)
       return
     }
-    const found = searchAllItems(q, useFileExplorerStore.getState())
+    const found = searchAllItems(q, useFileExplorerStore.getState(), t('fileExplorer.breadcrumb.root'))
     setResults(found)
     setOpen(true)
   }, [])

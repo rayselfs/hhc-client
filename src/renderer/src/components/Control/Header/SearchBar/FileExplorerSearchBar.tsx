@@ -18,18 +18,10 @@ export default function FileExplorerSearchBar(): React.JSX.Element {
     setSearchQuery('')
   }, [setSearchQuery])
 
-  const handleQueryChange = useCallback(
-    (query: string): void => {
-      setSearchQuery(query)
-    },
-    [setSearchQuery]
-  )
-
   return (
     <SearchBar
       onSearch={handleSearch}
       onClear={handleClear}
-      onQueryChange={handleQueryChange}
       placeholder={t('fileExplorer.search.placeholder')}
       submitLabel={t('fileExplorer.search.placeholder')}
     />

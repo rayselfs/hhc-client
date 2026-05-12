@@ -411,6 +411,7 @@
       "selectedCount": "已选 {{count}} 个"
     },
     "view": {
+      "title": "显示",
       "largeIcon": "大图标",
       "mediumIcon": "中图标",
       "smallIcon": "小图标",
@@ -435,14 +436,11 @@
     },
     "sort": {
       "title": "排序",
-      "nameAsc": "名称 A–Z",
-      "nameDesc": "名称 Z–A",
-      "createdAsc": "最旧优先",
-      "createdDesc": "最新优先",
-      "sizeAsc": "最小优先",
-      "sizeDesc": "最大优先",
-      "kindAsc": "类型 A–Z",
-      "kindDesc": "类型 Z–A"
+      "none": "不排序",
+      "name": "名称",
+      "createdAt": "创建时间",
+      "size": "大小",
+      "kind": "类型"
     },
     "contextMenu": {
       "rename": "重命名",

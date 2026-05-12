@@ -94,10 +94,10 @@ export default function Header(): React.JSX.Element {
 
       {showFilesControls && (
         <div className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center gap-2 max-w-[50%]">
-          <div className="flex items-center gap-0">
+          <ButtonGroup size="lg">
             <ViewModeDropdown viewMode={viewMode} onViewModeChange={setViewMode} />
             <SortDropdown sortField={sortField} sortDir={sortDir} onSortChange={setSortFieldAndDir} />
-          </div>
+          </ButtonGroup>
           <Breadcrumb
             currentFolderId={currentFolderId}
             getFolderPath={getFolderPath}

@@ -7,7 +7,7 @@ import { createFolderStore } from '@renderer/stores/folder'
 import type { FileExplorerViewMode, FileItemRecord } from '@shared/types/folder'
 
 export type SortField = 'name' | 'createdAt' | 'size' | 'kind'
-export type SortDir = 'asc' | 'desc'
+export type SortDir = 'asc' | 'desc' | 'none'
 
 interface FileExplorerSettingsState {
   viewMode: FileExplorerViewMode
@@ -38,7 +38,7 @@ export const useFileExplorerSettings = create<FileExplorerSettingsState>()(
       viewMode: 'medium-icon',
       setViewMode: (viewMode) => set({ viewMode }),
       sortField: 'createdAt',
-      sortDir: 'asc',
+      sortDir: 'none',
       setSortField: (sortField) => set({ sortField }),
       setSortDir: (sortDir) => set({ sortDir }),
       setSortFieldAndDir: (sortField, sortDir) => set({ sortField, sortDir }),
