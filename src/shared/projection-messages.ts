@@ -44,6 +44,8 @@ export interface AppMessages {
   }
   /** Bible display settings (font size, etc.) — sent independently from verse content */
   'bible:settings': { fontSize: number }
+  /** File item to display on projection (stub — coming soon) */
+  'file:show': { fileId: string; fileName: string }
 }
 
 /**
