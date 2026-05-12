@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   FileExplorerShell,
   FileUpload,
@@ -7,11 +7,12 @@ import {
 } from '@renderer/components/Control/FileExplorer'
 import FileBrowser from '@renderer/components/Control/FileExplorer/FileBrowser'
 import { removeFileItemFromStore, useFileExplorerStore } from '@renderer/stores/file-explorer'
+import type { AnyItemRecord } from '@shared/types/folder'
 import type { ClipboardState } from '@renderer/components/Control/FileExplorer'
 
 export default function FilesPage(): React.JSX.Element {
   const currentFolderId = useFileExplorerStore((state) => state.currentFolderId)
-  const getItems = useFileExplorerStore((state) => state.getItems)
+  const itemsArray = useFileExplorerStore((state) => state._itemsArray)
   const getChildFolders = useFileExplorerStore((state) => state.getChildFolders)
   const addFolder = useFileExplorerStore((state) => state.addFolder)
   const deleteFolder = useFileExplorerStore((state) => state.deleteFolder)
@@ -27,7 +28,10 @@ export default function FilesPage(): React.JSX.Element {
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
 
-  const itemCount = getItems(currentFolderId).length
+  const itemCount = useMemo(
+    () => itemsArray.filter((item: AnyItemRecord) => item.parentId === currentFolderId).length,
+    [itemsArray, currentFolderId]
+  )
   const selectedCount = selectedIds.size
 
   useEffect(() => {

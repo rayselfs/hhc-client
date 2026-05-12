@@ -2,7 +2,8 @@ import React, { useCallback, useMemo, useRef, useState } from 'react'
 import {
   DndContext,
   DragOverlay,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   closestCenter,
   pointerWithin,
   useDroppable,
@@ -125,8 +126,8 @@ export function FileBrowser({
   const { t } = useTranslation()
   const confirm = useConfirm()
   const currentFolderId = useFileExplorerStore((state) => state.currentFolderId)
-  const getChildFolders = useFileExplorerStore((state) => state.getChildFolders)
-  const getItems = useFileExplorerStore((state) => state.getItems)
+  const foldersArray = useFileExplorerStore((state) => state._foldersArray)
+  const itemsArray = useFileExplorerStore((state) => state._itemsArray)
   const navigateToFolder = useFileExplorerStore((state) => state.navigateToFolder)
   const moveItem = useFileExplorerStore((state) => state.moveItem)
   const moveFolder = useFileExplorerStore((state) => state.moveFolder)
@@ -147,13 +148,25 @@ export function FileBrowser({
   }, [selectedIds, onSelectionChange])
 
   const sensors = useSensors(
-    useSensor(PointerSensor, {
+    useSensor(MouseSensor, {
       activationConstraint: { distance: 8 }
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 250, tolerance: 5 }
     })
   )
 
-  const folders = getChildFolders(currentFolderId)
-  const fileItems = getItems(currentFolderId).filter(isFileItemRecord)
+  const folders = useMemo(
+    () => foldersArray.filter((folder) => folder.parentId === currentFolderId),
+    [foldersArray, currentFolderId]
+  )
+  const fileItems = useMemo(
+    () =>
+      itemsArray.filter(
+        (item): item is FileItemRecord => item.parentId === currentFolderId && isFileItemRecord(item)
+      ),
+    [itemsArray, currentFolderId]
+  )
 
   const allItems: GridViewItem[] = useMemo(
     () => [
@@ -401,10 +414,12 @@ export function FileBrowser({
   )
 
   const customCollisionDetection: CollisionDetection = useCallback((args) => {
-    const folderDropZones = args.droppableContainers.filter(
-      (container) =>
-        (container.data.current as FileExplorerDndData | undefined)?.type === 'folder-dropzone'
-    )
+    const folderDropZones = args.droppableContainers.filter((container) => {
+      const data = container.data.current as FileExplorerDndData | undefined
+      if (data?.type !== 'folder-dropzone') return false
+      if (args.active && container.id === `drop-${String(args.active.id)}`) return false
+      return true
+    })
     const folderHits = pointerWithin({ ...args, droppableContainers: folderDropZones })
     if (folderHits.length > 0) return folderHits
     return closestCenter(args)
