@@ -407,6 +407,10 @@
     "upload": {
       "button": "Upload"
     },
+    "status": {
+      "itemCount": "{{count}} item(s)",
+      "selectedCount": "{{count}} selected"
+    },
     "view": {
       "largeIcon": "Large Icons",
       "mediumIcon": "Medium Icons",

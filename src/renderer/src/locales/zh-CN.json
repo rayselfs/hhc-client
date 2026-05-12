@@ -407,6 +407,10 @@
     "upload": {
       "button": "上传"
     },
+    "status": {
+      "itemCount": "{{count}} 个项目",
+      "selectedCount": "已选 {{count}} 个"
+    },
     "view": {
       "largeIcon": "大图标",
       "mediumIcon": "中图标",
