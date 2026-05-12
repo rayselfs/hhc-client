@@ -10,7 +10,6 @@ import {
   useSensors,
   type CollisionDetection,
   type DragEndEvent,
-  type DragOverEvent,
   type DragStartEvent
 } from '@dnd-kit/core'
 import { SortableContext, arrayMove, useSortable } from '@dnd-kit/sortable'
@@ -84,7 +83,7 @@ function SortableViewItem({
       sortable.setNodeRef(el)
       if (item.isFolder) droppable.setNodeRef(el)
     },
-    [item.isFolder, sortable.setNodeRef, droppable.setNodeRef]
+    [item.isFolder, sortable, droppable]
   )
 
   const style: React.CSSProperties = {
@@ -340,7 +339,7 @@ export function FileBrowser({
     [selectedIds]
   )
 
-  const handleDragOver = useCallback((_event: DragOverEvent): void => {}, [])
+  const handleDragOver = useCallback((): void => {}, [])
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent): void => {
@@ -357,7 +356,9 @@ export function FileBrowser({
 
       if (overData?.type === 'folder-dropzone') {
         const targetFolderId = overData.folderId
-        for (const id of currentDraggedIds.size > 0 ? currentDraggedIds : new Set([String(active.id)])) {
+        for (const id of currentDraggedIds.size > 0
+          ? currentDraggedIds
+          : new Set([String(active.id)])) {
           if (id === targetFolderId) continue
           if (folderIds.includes(id)) {
             moveFolder(id, targetFolderId)
@@ -387,7 +388,16 @@ export function FileBrowser({
         }
       }
     },
-    [draggedIds, folderIds, itemIds, currentFolderId, moveFolder, moveItem, reorderFolders, reorderItems]
+    [
+      draggedIds,
+      folderIds,
+      itemIds,
+      currentFolderId,
+      moveFolder,
+      moveItem,
+      reorderFolders,
+      reorderItems
+    ]
   )
 
   const customCollisionDetection: CollisionDetection = useCallback((args) => {
@@ -428,7 +438,11 @@ export function FileBrowser({
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
-        <div className="min-h-full" onClick={handleContainerClick} onContextMenu={handleContainerContextMenu}>
+        <div
+          className="min-h-full"
+          onClick={handleContainerClick}
+          onContextMenu={handleContainerContextMenu}
+        >
           <SortableContext items={[...folderIds, ...itemIds]}>
             {viewMode === 'list' ? (
               <ListView

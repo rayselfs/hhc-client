@@ -30,10 +30,7 @@ function makeFolder(overrides: Partial<FolderRecord> = {}): FolderRecord {
   }
 }
 
-function makeStoreState(
-  items: AnyItemRecord[],
-  folders: FolderRecord[] = []
-): FolderStoreState {
+function makeStoreState(items: AnyItemRecord[], folders: FolderRecord[] = []): FolderStoreState {
   const folderMap: Record<string, FolderRecord> = {}
   for (const f of folders) {
     folderMap[f.id] = f

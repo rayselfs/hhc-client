@@ -75,7 +75,11 @@ export function ListView({
           </div>
         )
 
-        return <React.Fragment key={item.id}>{renderItemWrapper?.(item, content) ?? content}</React.Fragment>
+        return (
+          <React.Fragment key={item.id}>
+            {renderItemWrapper?.(item, content) ?? content}
+          </React.Fragment>
+        )
       })}
     </div>
   )

@@ -101,7 +101,13 @@ export default function FilesPage(): React.JSX.Element {
         }
       } else if (state.items[id]) {
         if (clipboard.mode === 'copy') {
-          const { id: _id, sortIndex: _sortIndex, createdAt: _createdAt, ...itemData } = state.items[id]
+          const item = state.items[id]
+          const itemData = {
+            ...item,
+            id: undefined,
+            sortIndex: undefined,
+            createdAt: undefined
+          }
           addItem({ ...itemData, parentId: currentFolderId })
         } else {
           moveItem(id, currentFolderId)
@@ -145,7 +151,15 @@ export default function FilesPage(): React.JSX.Element {
         }
       })
     },
-    [selectedIds, showMultiSelectMenu, showItemMenu, handleCopy, handleCut, handleDelete, startRename]
+    [
+      selectedIds,
+      showMultiSelectMenu,
+      showItemMenu,
+      handleCopy,
+      handleCut,
+      handleDelete,
+      startRename
+    ]
   )
 
   const handleFolderContextMenu = useCallback(
@@ -244,13 +258,14 @@ export default function FilesPage(): React.JSX.Element {
               submitRename()
             }}
           >
-            <label className="mb-2 block text-xs font-medium text-default-500" htmlFor="file-rename-input">
+            <label
+              className="mb-2 block text-xs font-medium text-default-500"
+              htmlFor="file-rename-input"
+            >
               Rename
             </label>
             <input
               id="file-rename-input"
-              // eslint-disable-next-line jsx-a11y/no-autofocus
-              autoFocus
               value={renameValue}
               onChange={(event) => setRenameValue(event.target.value)}
               onKeyDown={(event) => {
