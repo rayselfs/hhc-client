@@ -55,7 +55,7 @@ export default function ViewModeDropdown({
       <Dropdown.Popover>
         <Dropdown.Menu onAction={(key) => onViewModeChange(key as FileExplorerViewMode)}>
           {VIEW_MODE_OPTIONS.map(({ mode, Icon, labelKey }) => (
-            <Dropdown.Item key={mode} id={mode}>
+            <Dropdown.Item key={mode} id={mode} className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground">
               <Icon size={16} />
               {t(labelKey)}
               {mode === viewMode && <Check size={14} className="ml-auto" />}

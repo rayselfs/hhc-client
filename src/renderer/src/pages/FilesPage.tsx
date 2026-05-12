@@ -1,15 +1,18 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   FileExplorerShell,
   useFileContextMenu
 } from '@renderer/components/Control/FileExplorer'
 import FileBrowser from '@renderer/components/Control/FileExplorer/FileBrowser'
 import FileExplorerFAB from '@renderer/components/Control/FileExplorer/FileExplorerFAB'
+import { FolderModal } from '@renderer/components/Control/Folder/FolderModal'
 import { removeFileItemFromStore, useFileExplorerStore } from '@renderer/stores/file-explorer'
-import type { AnyItemRecord } from '@shared/types/folder'
+import { computeExpiresAt, type AnyItemRecord, type FolderDuration } from '@shared/types/folder'
 import type { ClipboardState } from '@renderer/components/Control/FileExplorer'
 
 export default function FilesPage(): React.JSX.Element {
+  const { t } = useTranslation()
   const currentFolderId = useFileExplorerStore((state) => state.currentFolderId)
   const itemsArray = useFileExplorerStore((state) => state._itemsArray)
   const foldersArray = useFileExplorerStore((state) => state._foldersArray)
@@ -27,6 +30,9 @@ export default function FilesPage(): React.JSX.Element {
   const [clipboard, setClipboard] = useState<ClipboardState | null>(null)
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
+  const [isCreateFolderModalOpen, setIsCreateFolderModalOpen] = useState(false)
+  const [createFolderName, setCreateFolderName] = useState('')
+  const [createFolderDuration, setCreateFolderDuration] = useState<FolderDuration>('1day')
 
   const itemCount = useMemo(
     () =>
@@ -211,26 +217,37 @@ export default function FilesPage(): React.JSX.Element {
     ]
   )
 
+  const openCreateFolderModal = useCallback((): void => {
+    const existingNames = getChildFolders(currentFolderId).map((f) => f.name)
+    const base = t('folder.untitledFolder')
+    let name = base
+    let n = 2
+    while (existingNames.includes(name)) {
+      name = `${base} ${n}`
+      n++
+    }
+    setCreateFolderName(name)
+    setCreateFolderDuration('1day')
+    setIsCreateFolderModalOpen(true)
+  }, [getChildFolders, currentFolderId, t])
+
+  const handleCreateFolderSubmit = useCallback((): void => {
+    const name = createFolderName.trim()
+    if (!name) return
+    addFolder(name, currentFolderId, computeExpiresAt(createFolderDuration))
+    setIsCreateFolderModalOpen(false)
+  }, [createFolderName, createFolderDuration, addFolder, currentFolderId])
+
   const handleEmptyAreaContextMenu = useCallback(
     (event: React.MouseEvent): void => {
       showEmptyAreaMenu({
         event,
         clipboard,
         onPaste: handlePaste,
-        onNewFolder: () => {
-          const existingNames = getChildFolders(currentFolderId).map((folder) => folder.name)
-          const baseName = 'New Folder'
-          let name = baseName
-          let suffix = 2
-          while (existingNames.includes(name)) {
-            name = `${baseName} ${suffix}`
-            suffix += 1
-          }
-          addFolder(name, currentFolderId)
-        }
+        onNewFolder: openCreateFolderModal
       })
     },
-    [clipboard, currentFolderId, getChildFolders, addFolder, showEmptyAreaMenu, handlePaste]
+    [clipboard, showEmptyAreaMenu, handlePaste, openCreateFolderModal]
   )
 
   return (
@@ -274,6 +291,16 @@ export default function FilesPage(): React.JSX.Element {
         )}
       </FileExplorerShell>
       <FileExplorerFAB />
+      <FolderModal
+        isOpen={isCreateFolderModalOpen}
+        onClose={() => setIsCreateFolderModalOpen(false)}
+        onSubmit={handleCreateFolderSubmit}
+        editingFolder={null}
+        folderName={createFolderName}
+        onFolderNameChange={setCreateFolderName}
+        folderDuration={createFolderDuration}
+        onFolderDurationChange={setCreateFolderDuration}
+      />
     </>
   )
 }

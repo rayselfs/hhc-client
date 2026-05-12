@@ -52,7 +52,7 @@ export default function FileExplorerFAB(): React.JSX.Element {
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [folderName, setFolderName] = useState('')
-  const [folderDuration, setFolderDuration] = useState<FolderDuration>('permanent')
+  const [folderDuration, setFolderDuration] = useState<FolderDuration>('1day')
 
   useEffect(() => {
     const el = folderInputRef.current
@@ -72,7 +72,7 @@ export default function FileExplorerFAB(): React.JSX.Element {
       n++
     }
     setFolderName(name)
-    setFolderDuration('permanent')
+    setFolderDuration('1day')
     setIsModalOpen(true)
   }
 
@@ -165,15 +165,15 @@ export default function FileExplorerFAB(): React.JSX.Element {
                 if (key === 'uploadFolder') folderInputRef.current?.click()
               }}
             >
-              <Dropdown.Item id="newFolder">
+              <Dropdown.Item id="newFolder" className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground">
                 <FolderPlus size={16} />
                 {t('fileExplorer.fab.newFolder')}
               </Dropdown.Item>
-              <Dropdown.Item id="uploadFiles">
+              <Dropdown.Item id="uploadFiles" className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground">
                 <Upload size={16} />
                 {t('fileExplorer.fab.uploadFiles', 'Upload Files')}
               </Dropdown.Item>
-              <Dropdown.Item id="uploadFolder">
+              <Dropdown.Item id="uploadFolder" className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground">
                 <Folder size={16} />
                 {t('fileExplorer.fab.uploadFolder', 'Upload Folder')}
               </Dropdown.Item>
