@@ -428,7 +428,11 @@
       "rename": "Rename",
       "delete": "Delete",
       "move": "Move",
-      "newFolder": "New Folder"
+      "newFolder": "New Folder",
+      "copy": "Copy",
+      "cut": "Cut",
+      "paste": "Paste",
+      "edit": "Edit"
     }
   },
   "projection": {
