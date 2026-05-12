@@ -1,7 +1,8 @@
 {
   "nav": {
     "timer": "TIMER",
-    "bible": "BIBLE"
+    "bible": "BIBLE",
+    "files": "FILES"
   },
   "welcome": {
     "title": "Welcome to HHC",
@@ -395,6 +396,35 @@
       "copyCount": "Copy {{count}} item(s)",
       "cutCount": "Cut {{count}} item(s)",
       "deleteCount": "Delete {{count}} item(s)"
+    }
+  },
+  "fileExplorer": {
+    "title": "FILES",
+    "search": {
+      "placeholder": "Search files...",
+      "noResults": "No results found"
+    },
+    "upload": {
+      "button": "Upload"
+    },
+    "view": {
+      "largeIcon": "Large Icons",
+      "mediumIcon": "Medium Icons",
+      "smallIcon": "Small Icons",
+      "list": "List"
+    },
+    "breadcrumb": {
+      "root": "Files"
+    },
+    "empty": {
+      "title": "No files yet",
+      "description": "Upload files to get started"
+    },
+    "contextMenu": {
+      "rename": "Rename",
+      "delete": "Delete",
+      "move": "Move",
+      "newFolder": "New Folder"
     }
   },
   "projection": {

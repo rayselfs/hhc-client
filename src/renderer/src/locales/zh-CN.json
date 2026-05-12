@@ -1,7 +1,8 @@
 {
   "nav": {
     "timer": "计时器",
-    "bible": "圣经"
+    "bible": "圣经",
+    "files": "文件"
   },
   "welcome": {
     "title": "欢迎使用 HHC",
@@ -395,6 +396,35 @@
       "copyCount": "复制 {{count}} 项",
       "cutCount": "剪切 {{count}} 项",
       "deleteCount": "删除 {{count}} 项"
+    }
+  },
+  "fileExplorer": {
+    "title": "文件",
+    "search": {
+      "placeholder": "搜索文件...",
+      "noResults": "未找到结果"
+    },
+    "upload": {
+      "button": "上传"
+    },
+    "view": {
+      "largeIcon": "大图标",
+      "mediumIcon": "中图标",
+      "smallIcon": "小图标",
+      "list": "列表"
+    },
+    "breadcrumb": {
+      "root": "文件"
+    },
+    "empty": {
+      "title": "还没有文件",
+      "description": "上传文件即可开始使用"
+    },
+    "contextMenu": {
+      "rename": "重命名",
+      "delete": "删除",
+      "move": "移动",
+      "newFolder": "新建文件夹"
     }
   },
   "projection": {

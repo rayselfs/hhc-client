@@ -1,7 +1,8 @@
 {
   "nav": {
     "timer": "計時器",
-    "bible": "聖經"
+    "bible": "聖經",
+    "files": "檔案"
   },
   "welcome": {
     "title": "歡迎使用 HHC",
@@ -395,6 +396,35 @@
       "copyCount": "複製 {{count}} 項",
       "cutCount": "剪下 {{count}} 項",
       "deleteCount": "刪除 {{count}} 項"
+    }
+  },
+  "fileExplorer": {
+    "title": "檔案",
+    "search": {
+      "placeholder": "搜尋檔案...",
+      "noResults": "找不到結果"
+    },
+    "upload": {
+      "button": "上傳"
+    },
+    "view": {
+      "largeIcon": "大圖示",
+      "mediumIcon": "中圖示",
+      "smallIcon": "小圖示",
+      "list": "清單"
+    },
+    "breadcrumb": {
+      "root": "檔案"
+    },
+    "empty": {
+      "title": "目前沒有檔案",
+      "description": "上傳檔案即可開始使用"
+    },
+    "contextMenu": {
+      "rename": "重新命名",
+      "delete": "刪除",
+      "move": "移動",
+      "newFolder": "新增資料夾"
     }
   },
   "projection": {
