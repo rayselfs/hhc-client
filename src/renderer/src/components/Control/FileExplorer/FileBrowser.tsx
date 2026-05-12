@@ -28,6 +28,9 @@ export interface FileBrowserProps {
   onFolderContextMenu?: (folderId: string, event: React.MouseEvent) => void
   onEmptyAreaContextMenu?: (event: React.MouseEvent) => void
   onSelectionChange?: (selectedIds: Set<string>) => void
+  onCopy?: (selectedIds: Set<string>) => void
+  onCut?: (selectedIds: Set<string>) => void
+  onPaste?: () => void
 }
 
 type FileExplorerDndData =
@@ -115,7 +118,10 @@ export function FileBrowser({
   onItemContextMenu,
   onFolderContextMenu,
   onEmptyAreaContextMenu,
-  onSelectionChange
+  onSelectionChange,
+  onCopy,
+  onCut,
+  onPaste
 }: FileBrowserProps): React.JSX.Element {
   const { t } = useTranslation()
   const confirm = useConfirm()
@@ -283,9 +289,26 @@ export function FileBrowser({
     clearSelection()
   }, [selectedIds, confirm, t, folderIds, deleteFolder, removeItem, clearSelection])
 
+  const handleCopySelected = useCallback((): void => {
+    if (selectedIds.size === 0) return
+    onCopy?.(selectedIds)
+  }, [selectedIds, onCopy])
+
+  const handleCutSelected = useCallback((): void => {
+    if (selectedIds.size === 0) return
+    onCut?.(selectedIds)
+  }, [selectedIds, onCut])
+
+  const handlePasteSelected = useCallback((): void => {
+    onPaste?.()
+  }, [onPaste])
+
   useKeyboardShortcuts(
     [
       { config: SHORTCUTS.EDIT.SELECT_ALL, handler: handleSelectAll, preventDefault: true },
+      { config: SHORTCUTS.EDIT.COPY, handler: handleCopySelected, preventDefault: true },
+      { config: SHORTCUTS.EDIT.CUT, handler: handleCutSelected, preventDefault: true },
+      { config: SHORTCUTS.EDIT.PASTE, handler: handlePasteSelected, preventDefault: true },
       { config: SHORTCUTS.EDIT.ESCAPE, handler: clearSelection, preventDefault: true },
       {
         config: SHORTCUTS.EDIT.DELETE,

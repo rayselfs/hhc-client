@@ -16,6 +16,7 @@ export interface FolderStoreState {
   initialize: () => Promise<void>
   addFolder: (name: string, parentId?: string, expiresAt?: number | null) => string
   updateFolder: (id: string, updates: { name?: string; expiresAt?: number | null }) => void
+  updateItem?: (id: string, updates: Partial<AnyItemRecord>) => void
   deleteFolder: (id: string) => void
   addItem: (
     item: Omit<AnyItemRecord, 'id' | 'sortIndex' | 'createdAt' | 'expiresAt'> & {
@@ -153,6 +154,20 @@ export function createFolderStore(config: FolderStoreConfig) {
         }
       })
       ops.saveFolder(updated)
+    },
+
+    updateItem: (id, updates) => {
+      const item = get().items[id]
+      if (!item) return
+      const updated = { ...item, ...updates } as AnyItemRecord
+      set((state) => {
+        const newItemsArray = state._itemsArray.map((entry) => (entry.id === id ? updated : entry))
+        return {
+          items: { ...state.items, [id]: updated },
+          _itemsArray: newItemsArray
+        }
+      })
+      ops.saveItem(updated)
     },
 
     deleteFolder: (id) => {

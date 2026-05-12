@@ -6,7 +6,7 @@ import {
   useFileContextMenu
 } from '@renderer/components/Control/FileExplorer'
 import FileBrowser from '@renderer/components/Control/FileExplorer/FileBrowser'
-import { useFileExplorerStore } from '@renderer/stores/file-explorer'
+import { removeFileItemFromStore, useFileExplorerStore } from '@renderer/stores/file-explorer'
 import type { ClipboardState } from '@renderer/components/Control/FileExplorer'
 
 export default function FilesPage(): React.JSX.Element {
@@ -14,15 +14,18 @@ export default function FilesPage(): React.JSX.Element {
   const getItems = useFileExplorerStore((state) => state.getItems)
   const getChildFolders = useFileExplorerStore((state) => state.getChildFolders)
   const addFolder = useFileExplorerStore((state) => state.addFolder)
-  const removeItem = useFileExplorerStore((state) => state.removeItem)
   const deleteFolder = useFileExplorerStore((state) => state.deleteFolder)
   const moveItem = useFileExplorerStore((state) => state.moveItem)
   const moveFolder = useFileExplorerStore((state) => state.moveFolder)
   const addItem = useFileExplorerStore((state) => state.addItem)
+  const updateFolder = useFileExplorerStore((state) => state.updateFolder)
+  const updateItem = useFileExplorerStore((state) => state.updateItem)
   const { showItemMenu, showFolderMenu, showMultiSelectMenu, showEmptyAreaMenu } =
     useFileContextMenu()
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [clipboard, setClipboard] = useState<ClipboardState | null>(null)
+  const [renamingId, setRenamingId] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState('')
 
   const itemCount = getItems(currentFolderId).length
   const selectedCount = selectedIds.size
@@ -45,6 +48,31 @@ export default function FilesPage(): React.JSX.Element {
     setClipboard({ itemIds: new Set(targetIds), mode: 'cut' })
   }, [])
 
+  const startRename = useCallback((id: string, name: string): void => {
+    setRenamingId(id)
+    setRenameValue(name)
+  }, [])
+
+  const cancelRename = useCallback((): void => {
+    setRenamingId(null)
+    setRenameValue('')
+  }, [])
+
+  const submitRename = useCallback((): void => {
+    if (!renamingId) return
+    const nextName = renameValue.trim()
+    if (nextName === '') return
+
+    const state = useFileExplorerStore.getState()
+    if (state.folders[renamingId]) {
+      updateFolder(renamingId, { name: nextName })
+    } else if (state.items[renamingId]?.type === 'file' && updateItem) {
+      updateItem(renamingId, { name: nextName })
+    }
+
+    cancelRename()
+  }, [renamingId, renameValue, updateFolder, updateItem, cancelRename])
+
   const handleDelete = useCallback(
     (targetIds: Set<string>): void => {
       for (const id of targetIds) {
@@ -52,12 +80,12 @@ export default function FilesPage(): React.JSX.Element {
         if (state.folders[id]) {
           deleteFolder(id)
         } else {
-          removeItem(id)
+          void removeFileItemFromStore(id)
         }
       }
       setSelectedIds(new Set())
     },
-    [deleteFolder, removeItem]
+    [deleteFolder]
   )
 
   const handlePaste = useCallback((): void => {
@@ -110,10 +138,14 @@ export default function FilesPage(): React.JSX.Element {
         setSelected: setSelectedIds,
         onCopy: handleCopy,
         onCut: handleCut,
-        onDelete: handleDelete
+        onDelete: handleDelete,
+        onEdit: (targetItem) => {
+          const fileItem = useFileExplorerStore.getState().items[targetItem.id]
+          if (fileItem?.type === 'file') startRename(fileItem.id, fileItem.name)
+        }
       })
     },
-    [selectedIds, showMultiSelectMenu, showItemMenu, handleCopy, handleCut, handleDelete]
+    [selectedIds, showMultiSelectMenu, showItemMenu, handleCopy, handleCut, handleDelete, startRename]
   )
 
   const handleFolderContextMenu = useCallback(
@@ -142,7 +174,8 @@ export default function FilesPage(): React.JSX.Element {
         onCopy: handleCopy,
         onCut: handleCut,
         onPaste: handlePaste,
-        onDelete: handleDelete
+        onDelete: handleDelete,
+        onEdit: (targetFolder) => startRename(targetFolder.id, targetFolder.name)
       })
     },
     [
@@ -153,7 +186,8 @@ export default function FilesPage(): React.JSX.Element {
       handleCopy,
       handleCut,
       handlePaste,
-      handleDelete
+      handleDelete,
+      startRename
     ]
   )
 
@@ -195,9 +229,38 @@ export default function FilesPage(): React.JSX.Element {
             onFolderContextMenu={handleFolderContextMenu}
             onEmptyAreaContextMenu={handleEmptyAreaContextMenu}
             onSelectionChange={handleSelectionChange}
+            onCopy={handleCopy}
+            onCut={handleCut}
+            onPaste={handlePaste}
           />
         </div>
       </div>
+      {renamingId && (
+        <div className="absolute inset-0 z-50 flex items-start justify-center bg-background/20 pt-24 backdrop-blur-sm">
+          <form
+            className="w-80 rounded-lg border border-border bg-content1 p-3 shadow-xl"
+            onSubmit={(event) => {
+              event.preventDefault()
+              submitRename()
+            }}
+          >
+            <label className="mb-2 block text-xs font-medium text-default-500" htmlFor="file-rename-input">
+              Rename
+            </label>
+            <input
+              id="file-rename-input"
+              // eslint-disable-next-line jsx-a11y/no-autofocus
+              autoFocus
+              value={renameValue}
+              onChange={(event) => setRenameValue(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') cancelRename()
+              }}
+              className="w-full rounded-md border border-default-200 bg-default-100 px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+            />
+          </form>
+        </div>
+      )}
     </FileExplorerShell>
   )
 }

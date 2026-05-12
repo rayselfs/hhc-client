@@ -27,6 +27,7 @@ export interface ShowItemMenuOptions {
   onCopy: (targetIds: Set<string>) => void
   onCut: (targetIds: Set<string>) => void
   onDelete: (targetIds: Set<string>) => void
+  onEdit?: (item: FolderItem) => void
 }
 
 export interface ShowFolderMenuOptions {
@@ -83,14 +84,27 @@ export function createFolderContextMenu(
       setSelected,
       onCopy,
       onCut,
-      onDelete
+      onDelete,
+      onEdit
     }: ShowItemMenuOptions): void => {
       if (!isAlreadySelected) {
         setSelected(new Set([item.id]))
       }
 
       const targetIds = new Set([item.id])
+      const editItems: ContextMenuEntry[] = onEdit
+        ? [
+            {
+              id: 'edit',
+              label: tKey('edit'),
+              icon: React.createElement(Pencil, { size: 14 }),
+              onAction: () => onEdit(item)
+            },
+            'separator'
+          ]
+        : []
       const baseItems: ContextMenuEntry[] = [
+        ...editItems,
         {
           id: 'copy',
           label: tKey('copy'),
