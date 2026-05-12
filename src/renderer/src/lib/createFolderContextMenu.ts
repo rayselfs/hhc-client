@@ -1,7 +1,7 @@
 import { useContextMenu } from '@renderer/contexts/ContextMenuContext'
 import type { ContextMenuEntry } from '@renderer/contexts/ContextMenuContext'
 import type { FolderRecord, FolderItem } from '@shared/types/folder'
-import { Copy, Scissors, Clipboard, Trash2, FolderPlus, Pencil } from 'lucide-react'
+import { Copy, Scissors, Clipboard, Trash2, FolderPlus, Pencil, Upload, Folder } from 'lucide-react'
 import React from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -56,6 +56,8 @@ export interface ShowEmptyAreaMenuOptions {
   clipboard: ClipboardState | null
   onPaste: () => void
   onNewFolder: () => void
+  onUploadFiles?: () => void
+  onUploadFolder?: () => void
 }
 
 export interface UseFolderContextMenu {
@@ -237,7 +239,9 @@ export function createFolderContextMenu(
       event,
       clipboard,
       onPaste,
-      onNewFolder
+      onNewFolder,
+      onUploadFiles,
+      onUploadFolder
     }: ShowEmptyAreaMenuOptions): void => {
       const pasteItems: ContextMenuEntry[] = clipboard
         ? [
@@ -251,6 +255,33 @@ export function createFolderContextMenu(
           ]
         : []
 
+      const uploadItems: ContextMenuEntry[] =
+        onUploadFiles || onUploadFolder
+          ? [
+              'separator',
+              ...(onUploadFiles
+                ? [
+                    {
+                      id: 'upload-files',
+                      label: tKey('uploadFiles'),
+                      icon: React.createElement(Upload, { size: 14 }),
+                      onAction: onUploadFiles
+                    } as ContextMenuEntry
+                  ]
+                : []),
+              ...(onUploadFolder
+                ? [
+                    {
+                      id: 'upload-folder',
+                      label: tKey('uploadFolder'),
+                      icon: React.createElement(Folder, { size: 14 }),
+                      onAction: onUploadFolder
+                    } as ContextMenuEntry
+                  ]
+                : [])
+            ]
+          : []
+
       const baseItems: ContextMenuEntry[] = [
         ...pasteItems,
         {
@@ -258,7 +289,8 @@ export function createFolderContextMenu(
           label: tKey('newFolder'),
           icon: React.createElement(FolderPlus, { size: 14 }),
           onAction: onNewFolder
-        }
+        },
+        ...uploadItems
       ]
 
       const extra = config?.extraEmptyAreaActions?.() ?? []

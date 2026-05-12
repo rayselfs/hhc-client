@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   FileExplorerShell,
@@ -7,7 +7,12 @@ import {
 import FileBrowser from '@renderer/components/Control/FileExplorer/FileBrowser'
 import FileExplorerFAB from '@renderer/components/Control/FileExplorer/FileExplorerFAB'
 import { FolderModal } from '@renderer/components/Control/Folder/FolderModal'
-import { removeFileItemFromStore, useFileExplorerStore } from '@renderer/stores/file-explorer'
+import {
+  deleteFolderFromStore,
+  removeFileItemFromStore,
+  useFileExplorerStore
+} from '@renderer/stores/file-explorer'
+import { uploadFiles, uploadFolderFiles } from '@renderer/lib/upload-utils'
 import { computeExpiresAt, type AnyItemRecord, type FolderDuration } from '@shared/types/folder'
 import type { ClipboardState } from '@renderer/components/Control/FileExplorer'
 
@@ -18,7 +23,6 @@ export default function FilesPage(): React.JSX.Element {
   const foldersArray = useFileExplorerStore((state) => state._foldersArray)
   const getChildFolders = useFileExplorerStore((state) => state.getChildFolders)
   const addFolder = useFileExplorerStore((state) => state.addFolder)
-  const deleteFolder = useFileExplorerStore((state) => state.deleteFolder)
   const moveItem = useFileExplorerStore((state) => state.moveItem)
   const moveFolder = useFileExplorerStore((state) => state.moveFolder)
   const addItem = useFileExplorerStore((state) => state.addItem)
@@ -34,6 +38,9 @@ export default function FilesPage(): React.JSX.Element {
   const [createFolderName, setCreateFolderName] = useState('')
   const [createFolderDuration, setCreateFolderDuration] = useState<FolderDuration>('1day')
 
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const folderInputRef = useRef<HTMLInputElement>(null)
+
   const itemCount = useMemo(
     () =>
       itemsArray.filter((item: AnyItemRecord) => item.parentId === currentFolderId).length +
@@ -45,6 +52,42 @@ export default function FilesPage(): React.JSX.Element {
   useEffect(() => {
     void useFileExplorerStore.getState().initialize()
   }, [])
+
+  useEffect(() => {
+    const el = folderInputRef.current
+    if (el) {
+      el.setAttribute('webkitdirectory', '')
+      el.setAttribute('directory', '')
+    }
+  }, [])
+
+  const handleUploadFiles = useCallback((): void => {
+    fileInputRef.current?.click()
+  }, [])
+
+  const handleUploadFolder = useCallback((): void => {
+    folderInputRef.current?.click()
+  }, [])
+
+  const handleFileChange = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
+      const files = Array.from(e.target.files ?? [])
+      if (files.length === 0) return
+      await uploadFiles(files, currentFolderId)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    },
+    [currentFolderId]
+  )
+
+  const handleFolderChange = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
+      const allFiles = Array.from(e.target.files ?? [])
+      if (allFiles.length === 0) return
+      await uploadFolderFiles(allFiles, currentFolderId, addFolder)
+      if (folderInputRef.current) folderInputRef.current.value = ''
+    },
+    [currentFolderId, addFolder]
+  )
 
   const handleSelectionChange = useCallback((nextSelectedIds: Set<string>): void => {
     setSelectedIds(nextSelectedIds)
@@ -85,20 +128,17 @@ export default function FilesPage(): React.JSX.Element {
     cancelRename()
   }, [renamingId, renameValue, updateFolder, updateItem, cancelRename])
 
-  const handleDelete = useCallback(
-    (targetIds: Set<string>): void => {
-      for (const id of targetIds) {
-        const state = useFileExplorerStore.getState()
-        if (state.folders[id]) {
-          deleteFolder(id)
-        } else {
-          void removeFileItemFromStore(id)
-        }
+  const handleDelete = useCallback((targetIds: Set<string>): void => {
+    for (const id of targetIds) {
+      const state = useFileExplorerStore.getState()
+      if (state.folders[id]) {
+        void deleteFolderFromStore(id)
+      } else {
+        void removeFileItemFromStore(id)
       }
-      setSelectedIds(new Set())
-    },
-    [deleteFolder]
-  )
+    }
+    setSelectedIds(new Set())
+  }, [])
 
   const handlePaste = useCallback((): void => {
     if (!clipboard) return
@@ -244,14 +284,31 @@ export default function FilesPage(): React.JSX.Element {
         event,
         clipboard,
         onPaste: handlePaste,
-        onNewFolder: openCreateFolderModal
+        onNewFolder: openCreateFolderModal,
+        onUploadFiles: handleUploadFiles,
+        onUploadFolder: handleUploadFolder
       })
     },
-    [clipboard, showEmptyAreaMenu, handlePaste, openCreateFolderModal]
+    [clipboard, showEmptyAreaMenu, handlePaste, openCreateFolderModal, handleUploadFiles, handleUploadFolder]
   )
 
   return (
     <>
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        accept="image/*,video/*,.pdf,.pptx,.ppt,.key,.odp"
+        className="hidden"
+        onChange={(e) => void handleFileChange(e)}
+      />
+      <input
+        ref={folderInputRef}
+        type="file"
+        multiple
+        className="hidden"
+        onChange={(e) => void handleFolderChange(e)}
+      />
       <FileExplorerShell itemCount={itemCount} selectedCount={selectedCount}>
         <FileBrowser
           onItemContextMenu={handleItemContextMenu}
@@ -290,7 +347,7 @@ export default function FilesPage(): React.JSX.Element {
           </div>
         )}
       </FileExplorerShell>
-      <FileExplorerFAB />
+      <FileExplorerFAB onUploadFiles={handleUploadFiles} onUploadFolder={handleUploadFolder} />
       <FolderModal
         isOpen={isCreateFolderModalOpen}
         onClose={() => setIsCreateFolderModalOpen(false)}

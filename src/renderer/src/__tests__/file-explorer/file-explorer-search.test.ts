@@ -84,7 +84,9 @@ describe('searchAllItems', () => {
     const state = makeStoreState([file])
     const results = searchAllItems('photo', state)
     expect(results).toHaveLength(1)
-    expect(results[0].item.name).toBe('photo.jpg')
+    const r = results[0]
+    expect(r.kind).toBe('file')
+    if (r.kind === 'file') expect(r.item.name).toBe('photo.jpg')
   })
 
   it('is case-insensitive', () => {
@@ -101,7 +103,9 @@ describe('searchAllItems', () => {
     const state = makeStoreState([file1, file2])
     const results = searchAllItems('photo', state)
     expect(results).toHaveLength(1)
-    expect(results[0].item.name).toBe('photo.jpg')
+    const r = results[0]
+    expect(r.kind).toBe('file')
+    if (r.kind === 'file') expect(r.item.name).toBe('photo.jpg')
   })
 
   it('returns all matching items when multiple match', () => {

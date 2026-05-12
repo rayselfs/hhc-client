@@ -2,6 +2,7 @@ import React from 'react'
 import { Folder } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import GlassDivider from '@renderer/components/Common/GlassDivider'
+import { formatFileKind } from '@renderer/lib/format-file-kind'
 import { getFileIcon } from './getFileIcon'
 import type { GridViewItem } from './GridView'
 
@@ -13,20 +14,13 @@ export interface ListViewProps {
   renderItemWrapper?: (item: GridViewItem, children: React.ReactNode) => React.ReactNode
 }
 
-function getTypeName(mimeType: string | undefined, isFolder: boolean): string {
-  if (isFolder) return 'Folder'
-  if (!mimeType) return 'File'
-  const firstPart = mimeType.split('/')[0]
-  return firstPart.charAt(0).toUpperCase() + firstPart.slice(1)
-}
-
 function formatDate(ts: number | undefined): string {
   if (ts === undefined) return '—'
-  return new Date(ts).toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric'
-  })
+  const d = new Date(ts)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}/${m}/${day}`
 }
 
 function formatFileSize(bytes: number | undefined): string {
@@ -111,7 +105,7 @@ export function ListView({
                 {item.isFolder ? '—' : formatFileSize(item.size)}
               </div>
               <div className="w-24 flex-shrink-0 text-xs text-default-400 truncate">
-                {getTypeName(item.mimeType, item.isFolder)}
+                {formatFileKind(item.mimeType, item.isFolder)}
               </div>
             </div>
           )

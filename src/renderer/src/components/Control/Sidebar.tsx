@@ -81,7 +81,7 @@ export default function Sidebar(): React.JSX.Element {
             <Dropdown.Root>
               <Dropdown.Trigger>
                 <div
-                  className={`flex cursor-default items-center justify-center rounded-full px-2 py-2 ${activeSubItem ? 'bg-accent text-accent-foreground' : 'text-muted hover:opacity-70'}`}
+                  className={`flex w-full cursor-default items-center justify-center rounded-full px-2 py-2 ${activeSubItem ? 'bg-accent text-accent-foreground' : 'text-muted hover:opacity-70'}`}
                 >
                   <MediaGroupIcon className="size-5 shrink-0" />
                 </div>

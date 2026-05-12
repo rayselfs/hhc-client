@@ -417,7 +417,9 @@
       "copy": "复制",
       "cut": "剪切",
       "paste": "粘贴",
-      "edit": "编辑"
+      "edit": "编辑",
+      "uploadFiles": "上传文件",
+      "uploadFolder": "上传文件夹"
     }
   },
   "projection": {

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { deleteFileBlob, openFileExplorerDB, storeFileBlob } from '@renderer/lib/file-explorer-db'
+import { deleteThumbnail } from '@renderer/lib/thumbnail-db'
 import { hhcPersistStorage, createPersistName } from '@renderer/lib/persist-storage'
 import { createFolderStore } from '@renderer/stores/folder'
 import type { FileExplorerViewMode, FileItemRecord } from '@shared/types/folder'
@@ -8,6 +9,11 @@ import type { FileExplorerViewMode, FileItemRecord } from '@shared/types/folder'
 interface FileExplorerSettingsState {
   viewMode: FileExplorerViewMode
   setViewMode: (mode: FileExplorerViewMode) => void
+}
+
+interface FileExplorerSearchState {
+  searchQuery: string
+  setSearchQuery: (query: string) => void
 }
 
 export const useFileExplorerStore = createFolderStore({
@@ -33,6 +39,11 @@ export const useFileExplorerSettings = create<FileExplorerSettingsState>()(
   )
 )
 
+export const useFileExplorerSearch = create<FileExplorerSearchState>()((set) => ({
+  searchQuery: '',
+  setSearchQuery: (searchQuery) => set({ searchQuery })
+}))
+
 export async function addFileItemToStore(file: File, parentId: string): Promise<string> {
   const db = await openFileExplorerDB()
   const id = crypto.randomUUID()
@@ -57,5 +68,31 @@ export async function removeFileItemFromStore(id: string): Promise<void> {
   const db = await openFileExplorerDB()
 
   useFileExplorerStore.getState().removeItem(id)
-  await deleteFileBlob(db, id)
+  await Promise.all([deleteFileBlob(db, id), deleteThumbnail(id)])
+}
+
+export async function deleteFolderFromStore(folderId: string): Promise<void> {
+  const state = useFileExplorerStore.getState()
+  const db = await openFileExplorerDB()
+
+  const itemIds: string[] = []
+  const queue: string[] = [folderId]
+
+  while (queue.length > 0) {
+    const currentId = queue.shift()!
+    for (const item of state._itemsArray) {
+      if (item.parentId === currentId && item.type === 'file') {
+        itemIds.push(item.id)
+      }
+    }
+    for (const folder of state._foldersArray) {
+      if (folder.parentId === currentId) {
+        queue.push(folder.id)
+      }
+    }
+  }
+
+  await Promise.all(itemIds.flatMap((id) => [deleteFileBlob(db, id), deleteThumbnail(id)]))
+
+  state.deleteFolder(folderId)
 }

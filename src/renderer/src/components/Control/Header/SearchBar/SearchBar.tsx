@@ -4,6 +4,7 @@ import { Search } from 'lucide-react'
 export interface SearchBarProps {
   onSearch: (query: string) => void
   onClear: () => void
+  onQueryChange?: (query: string) => void
   placeholder: string
   submitLabel: string
   disabled?: boolean
@@ -16,6 +17,7 @@ export interface SearchBarProps {
 export default function SearchBar({
   onSearch,
   onClear,
+  onQueryChange,
   placeholder,
   submitLabel,
   disabled = false,
@@ -101,7 +103,10 @@ export default function SearchBar({
         ref={inputRef}
         type="text"
         value={query}
-        onChange={(e) => setQuery(e.target.value)}
+        onChange={(e) => {
+          setQuery(e.target.value)
+          onQueryChange?.(e.target.value)
+        }}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         aria-label={placeholder}

@@ -15,14 +15,24 @@ import {
 } from '@dnd-kit/core'
 import { SortableContext, arrayMove, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { Folder } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
 import { useKeyboardShortcuts } from '@renderer/hooks/useKeyboardShortcuts'
 import { getThumbnail } from '@renderer/lib/thumbnail-db'
-import { useFileExplorerSettings, useFileExplorerStore } from '@renderer/stores/file-explorer'
+import { searchAllItems } from '@renderer/lib/file-explorer-search'
+import {
+  deleteFolderFromStore,
+  removeFileItemFromStore,
+  useFileExplorerSearch,
+  useFileExplorerSettings,
+  useFileExplorerStore
+} from '@renderer/stores/file-explorer'
 import type { FileItemRecord, FolderRecord } from '@shared/types/folder'
+import { getFileIcon } from './views/getFileIcon'
 import { GridView, ListView, type GridViewItem } from './views'
+import type { SearchResult } from '@renderer/lib/file-explorer-search'
 
 export interface FileBrowserProps {
   onItemContextMenu?: (itemId: string, event: React.MouseEvent) => void
@@ -106,6 +116,7 @@ function SortableViewItem({
     <div
       ref={setRef}
       style={style}
+      data-file-item
       className="touch-none"
       {...sortable.attributes}
       {...sortable.listeners}
@@ -119,6 +130,57 @@ function DragOverlayContent({ name, count }: { name: string; count: number }): R
   return (
     <div className="rounded-lg bg-content1 px-3 py-2 text-sm text-foreground shadow-lg ring-1 ring-border">
       {count > 1 ? `${count} items` : name}
+    </div>
+  )
+}
+
+function SearchResultsList({
+  results,
+  onFileClick,
+  onFolderClick
+}: {
+  results: SearchResult[]
+  onFileClick: (result: SearchResult & { kind: 'file' }) => void
+  onFolderClick: (result: SearchResult & { kind: 'folder' }) => void
+}): React.JSX.Element {
+  return (
+    <div className="flex flex-col p-2">
+      {results.map((result) => {
+        if (result.kind === 'file') {
+          return (
+            <button
+              key={result.item.id}
+              type="button"
+              onClick={() => onFileClick(result)}
+              className="flex items-center gap-3 rounded-md px-3 py-2 text-left text-sm cursor-pointer hover:bg-content2/60 focus:outline-none"
+            >
+              <div className="flex-shrink-0 w-6 flex items-center justify-center text-default-500">
+                {getFileIcon(result.item.mimeType, false, 20)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="truncate text-sm text-foreground">{result.item.name}</div>
+                <div className="truncate text-xs text-default-400">{result.folderPath}</div>
+              </div>
+            </button>
+          )
+        }
+        return (
+          <button
+            key={result.folder.id}
+            type="button"
+            onClick={() => onFolderClick(result)}
+            className="flex items-center gap-3 rounded-md px-3 py-2 text-left text-sm cursor-pointer hover:bg-content2/60 focus:outline-none"
+          >
+            <div className="flex-shrink-0 w-6 flex items-center justify-center">
+              <Folder size={20} className="text-accent" fill="currentColor" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="truncate text-sm text-foreground">{result.folder.name}</div>
+              <div className="truncate text-xs text-default-400">{result.folderPath}</div>
+            </div>
+          </button>
+        )
+      })}
     </div>
   )
 }
@@ -142,9 +204,9 @@ export function FileBrowser({
   const moveFolder = useFileExplorerStore((state) => state.moveFolder)
   const reorderItems = useFileExplorerStore((state) => state.reorderItems)
   const reorderFolders = useFileExplorerStore((state) => state.reorderFolders)
-  const removeItem = useFileExplorerStore((state) => state.removeItem)
-  const deleteFolder = useFileExplorerStore((state) => state.deleteFolder)
   const viewMode = useFileExplorerSettings((state) => state.viewMode)
+  const searchQuery = useFileExplorerSearch((state) => state.searchQuery)
+  const setSearchQuery = useFileExplorerSearch((state) => state.setSearchQuery)
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [lastSelectedId, setLastSelectedId] = useState<string | null>(null)
@@ -182,6 +244,11 @@ export function FileBrowser({
       ),
     [itemsArray, currentFolderId]
   )
+
+  const searchResults = useMemo(() => {
+    if (!searchQuery.trim()) return []
+    return searchAllItems(searchQuery, useFileExplorerStore.getState())
+  }, [searchQuery, itemsArray, foldersArray])
 
   useEffect(() => {
     let cancelled = false
@@ -295,13 +362,17 @@ export function FileBrowser({
     setLastSelectedId(null)
   }, [])
 
-  const handleContainerClick = useCallback((): void => {
-    clearSelection()
-  }, [clearSelection])
+  const handleContainerClick = useCallback(
+    (event: React.MouseEvent): void => {
+      if ((event.target as Element).closest('[data-file-item]')) return
+      clearSelection()
+    },
+    [clearSelection]
+  )
 
   const handleContainerContextMenu = useCallback(
     (event: React.MouseEvent): void => {
-      if (event.target !== event.currentTarget) return
+      if ((event.target as Element).closest('[data-file-item]')) return
       event.preventDefault()
       onEmptyAreaContextMenu?.(event)
     },
@@ -352,13 +423,13 @@ export function FileBrowser({
 
     for (const id of selectedIds) {
       if (folderIds.includes(id)) {
-        deleteFolder(id)
+        await deleteFolderFromStore(id)
       } else {
-        removeItem(id)
+        await removeFileItemFromStore(id)
       }
     }
     clearSelection()
-  }, [selectedIds, confirm, t, folderIds, deleteFolder, removeItem, clearSelection])
+  }, [selectedIds, confirm, t, folderIds, clearSelection])
 
   const handleCopySelected = useCallback((): void => {
     if (selectedIds.size === 0) return
@@ -502,6 +573,33 @@ export function FileBrowser({
     },
     [folders, fileItems, draggedIds, isMultiDrag]
   )
+
+  if (searchQuery.trim()) {
+    const handleSearchFileClick = (result: SearchResult & { kind: 'file' }): void => {
+      void navigateToFolder(result.item.parentId)
+      setSearchQuery('')
+    }
+    const handleSearchFolderClick = (result: SearchResult & { kind: 'folder' }): void => {
+      void navigateToFolder(result.folder.id)
+      setSearchQuery('')
+    }
+
+    return (
+      <div className="h-full overflow-auto">
+        {searchResults.length === 0 ? (
+          <div className="flex h-full flex-col items-center justify-center text-center p-4">
+            <p className="text-sm text-default-400">{t('fileExplorer.search.noResults')}</p>
+          </div>
+        ) : (
+          <SearchResultsList
+            results={searchResults}
+            onFileClick={handleSearchFileClick}
+            onFolderClick={handleSearchFolderClick}
+          />
+        )}
+      </div>
+    )
+  }
 
   return (
     <div ref={containerRef} className="h-full" onClick={handleContainerClick}>

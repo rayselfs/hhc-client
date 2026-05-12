@@ -86,19 +86,19 @@ export function GridView({
 
   switch (viewMode) {
     case 'large-icon':
+      gridColsClass = 'grid-cols-[repeat(auto-fill,minmax(192px,1fr))]'
+      iconSize = 96
+      nameClass = 'line-clamp-2 text-base mt-2'
+      break
+    case 'medium-icon':
       gridColsClass = 'grid-cols-[repeat(auto-fill,minmax(128px,1fr))]'
       iconSize = 64
       nameClass = 'line-clamp-2 text-sm mt-2'
       break
-    case 'medium-icon':
+    case 'small-icon':
       gridColsClass = 'grid-cols-[repeat(auto-fill,minmax(88px,1fr))]'
       iconSize = 40
       nameClass = 'line-clamp-2 text-xs mt-1'
-      break
-    case 'small-icon':
-      gridColsClass = 'grid-cols-[repeat(auto-fill,minmax(56px,1fr))]'
-      iconSize = 24
-      nameClass = 'truncate text-xs mt-1'
       break
   }
 

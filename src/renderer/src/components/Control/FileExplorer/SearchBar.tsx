@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Search } from 'lucide-react'
+import { Search, Folder } from 'lucide-react'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { searchAllItems } from '@renderer/lib/file-explorer-search'
 import { getFileIcon } from '@renderer/components/Control/FileExplorer/views/getFileIcon'
@@ -48,7 +48,8 @@ export function SearchBar({ className }: SearchBarProps): React.JSX.Element {
   }, [])
 
   const handleResultClick = useCallback((result: SearchResult) => {
-    useFileExplorerStore.getState().navigateToFolder(result.item.parentId)
+    const folderId = result.kind === 'file' ? result.item.parentId : result.folder.id
+    void useFileExplorerStore.getState().navigateToFolder(folderId)
     setQuery('')
     setResults([])
     setOpen(false)
@@ -91,22 +92,32 @@ export function SearchBar({ className }: SearchBarProps): React.JSX.Element {
               {t('fileExplorer.search.noResults')}
             </div>
           ) : (
-            results.map((result) => (
-              <button
-                key={result.item.id}
-                type="button"
-                onClick={() => handleResultClick(result)}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-default-100 focus:bg-default-100 focus:outline-none"
-              >
-                <span className="shrink-0 text-default-500">
-                  {getFileIcon(result.item.mimeType, false, 16)}
-                </span>
-                <span className="min-w-0 flex-1 truncate font-medium">{result.item.name}</span>
-                <span className="shrink-0 truncate text-xs text-default-400">
-                  {result.folderPath}
-                </span>
-              </button>
-            ))
+            results.map((result) => {
+              const key = result.kind === 'file' ? result.item.id : result.folder.id
+              const name = result.kind === 'file' ? result.item.name : result.folder.name
+              const icon =
+                result.kind === 'file' ? (
+                  <span className="shrink-0 text-default-500">
+                    {getFileIcon(result.item.mimeType, false, 16)}
+                  </span>
+                ) : (
+                  <Folder size={16} className="shrink-0 text-accent" fill="currentColor" />
+                )
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => handleResultClick(result)}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-default-100 focus:bg-default-100 focus:outline-none"
+                >
+                  {icon}
+                  <span className="min-w-0 flex-1 truncate font-medium">{name}</span>
+                  <span className="shrink-0 truncate text-xs text-default-400">
+                    {result.folderPath}
+                  </span>
+                </button>
+              )
+            })
           )}
         </div>
       )}
