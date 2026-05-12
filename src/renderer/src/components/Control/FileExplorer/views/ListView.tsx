@@ -1,5 +1,7 @@
 import React from 'react'
+import { Folder } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import GlassDivider from '@renderer/components/Common/GlassDivider'
 import { getFileIcon } from './getFileIcon'
 import type { GridViewItem } from './GridView'
 
@@ -11,19 +13,29 @@ export interface ListViewProps {
   renderItemWrapper?: (item: GridViewItem, children: React.ReactNode) => React.ReactNode
 }
 
-function formatFileSize(bytes: number | undefined): string {
-  if (bytes === undefined) return '—'
-  if (bytes < 1024 * 1024) {
-    return `${Math.round(bytes / 1024)} KB`
-  }
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
-
 function getTypeName(mimeType: string | undefined, isFolder: boolean): string {
   if (isFolder) return 'Folder'
   if (!mimeType) return 'File'
   const firstPart = mimeType.split('/')[0]
   return firstPart.charAt(0).toUpperCase() + firstPart.slice(1)
+}
+
+function formatDate(ts: number | undefined): string {
+  if (ts === undefined) return '—'
+  return new Date(ts).toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  })
+}
+
+function formatFileSize(bytes: number | undefined): string {
+  if (bytes === undefined) return '—'
+  if (bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB']
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1)
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`
 }
 
 export function ListView({
@@ -49,38 +61,68 @@ export function ListView({
   }
 
   return (
-    <div className="flex flex-col p-2">
-      {items.map((item) => {
-        const content = (
-          <div
-            className={`flex items-center gap-3 rounded-md px-3 py-2 cursor-pointer transition-colors hover:bg-content2/60 ${
-              item.isSelected ? 'bg-primary/10' : ''
-            }`}
-            onClick={(e) => onItemClick(item.id, e)}
-            onDoubleClick={(e) => onItemDoubleClick(item.id, e)}
-            onContextMenu={(e) => onItemContextMenu(item.id, e)}
-          >
-            <div className="flex-shrink-0 text-default-500">
-              {getFileIcon(item.mimeType, item.isFolder, 24)}
-            </div>
-            <div className="flex-1 truncate text-sm text-foreground" title={item.name}>
-              {item.name}
-            </div>
-            <div className="w-24 flex-shrink-0 text-xs text-default-400 truncate">
-              {getTypeName(item.mimeType, item.isFolder)}
-            </div>
-            <div className="w-20 flex-shrink-0 text-right text-xs text-default-400">
-              {formatFileSize(item.size)}
-            </div>
+    <div className="flex flex-col">
+      <div className="sticky top-0 bg-background z-10">
+        <div className="flex items-center gap-3 px-3 py-1.5">
+          <div className="w-6 flex-shrink-0" />
+          <div className="flex-1 text-xs font-medium text-default-400 uppercase tracking-wide">
+            {t('fileExplorer.list.name', 'Name')}
           </div>
-        )
+          <div className="w-28 flex-shrink-0 text-xs font-medium text-default-400 uppercase tracking-wide">
+            {t('fileExplorer.list.createdAt', 'Created')}
+          </div>
+          <div className="w-20 flex-shrink-0 text-xs font-medium text-default-400 uppercase tracking-wide">
+            {t('fileExplorer.list.size', 'Size')}
+          </div>
+          <div className="w-24 flex-shrink-0 text-xs font-medium text-default-400 uppercase tracking-wide">
+            {t('fileExplorer.list.kind', 'Kind')}
+          </div>
+        </div>
+        <GlassDivider />
+      </div>
 
-        return (
-          <React.Fragment key={item.id}>
-            {renderItemWrapper?.(item, content) ?? content}
-          </React.Fragment>
-        )
-      })}
+      <div className="flex flex-col p-2">
+        {items.map((item) => {
+          const content = (
+            <div
+              className={`flex items-center gap-3 rounded-md px-3 py-2 cursor-pointer transition-colors hover:bg-content2/60 ${
+                item.isSelected ? 'bg-surface' : ''
+              }`}
+              onClick={(e) => onItemClick(item.id, e)}
+              onDoubleClick={(e) => onItemDoubleClick(item.id, e)}
+              onContextMenu={(e) => onItemContextMenu(item.id, e)}
+            >
+              <div className="flex-shrink-0 w-6 flex items-center justify-center">
+                {item.isFolder ? (
+                  <Folder size={20} className="text-accent" fill="currentColor" />
+                ) : (
+                  <div className="text-default-500">
+                    {getFileIcon(item.mimeType, item.isFolder, 20)}
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 truncate text-sm text-foreground" title={item.name}>
+                {item.name}
+              </div>
+              <div className="w-28 flex-shrink-0 text-xs text-default-400">
+                {formatDate(item.createdAt)}
+              </div>
+              <div className="w-20 flex-shrink-0 text-xs text-default-400">
+                {item.isFolder ? '—' : formatFileSize(item.size)}
+              </div>
+              <div className="w-24 flex-shrink-0 text-xs text-default-400 truncate">
+                {getTypeName(item.mimeType, item.isFolder)}
+              </div>
+            </div>
+          )
+
+          return (
+            <React.Fragment key={item.id}>
+              {renderItemWrapper?.(item, content) ?? content}
+            </React.Fragment>
+          )
+        })}
+      </div>
     </div>
   )
 }

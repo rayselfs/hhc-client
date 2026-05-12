@@ -1,12 +1,23 @@
 import { useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Upload } from 'lucide-react'
+import { saveThumbnail } from '@renderer/lib/thumbnail-db'
+import { generateThumbnail } from '@renderer/lib/thumbnail-generator'
 import { addFileItemToStore } from '@renderer/stores/file-explorer'
 
 interface FileUploadProps {
   currentFolderId: string
   onUploadStart?: () => void
   onUploadComplete?: (count: number) => void
+}
+
+function canGenerateThumbnail(file: File): boolean {
+  return file.type.startsWith('image/') || file.type.startsWith('video/') || file.type === 'application/pdf'
+}
+
+async function generateAndSaveThumbnail(file: File, itemId: string): Promise<void> {
+  const thumbnail = await generateThumbnail(file)
+  if (thumbnail) await saveThumbnail(itemId, thumbnail)
 }
 
 export function FileUpload({
@@ -27,7 +38,14 @@ export function FileUpload({
 
     onUploadStart?.()
 
-    await Promise.all(files.map((file) => addFileItemToStore(file, currentFolderId)))
+    await Promise.all(
+      files.map(async (file) => {
+        const itemId = await addFileItemToStore(file, currentFolderId)
+        if (canGenerateThumbnail(file)) {
+          generateAndSaveThumbnail(file, itemId).catch(console.error)
+        }
+      })
+    )
 
     onUploadComplete?.(files.length)
 

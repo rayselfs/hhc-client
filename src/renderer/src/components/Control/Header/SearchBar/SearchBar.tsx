@@ -10,6 +10,7 @@ export interface SearchBarProps {
   /** e.g. 'data-bible-search' — sets a data attribute on the input for external focus via querySelector */
   inputDataAttr?: string
   testId?: string
+  renderDropdown?: React.ReactNode
 }
 
 export default function SearchBar({
@@ -19,7 +20,8 @@ export default function SearchBar({
   submitLabel,
   disabled = false,
   inputDataAttr,
-  testId
+  testId,
+  renderDropdown
 }: SearchBarProps): React.JSX.Element {
   const [isExpanded, setIsExpanded] = useState(false)
   const [query, setQuery] = useState('')
@@ -121,6 +123,9 @@ export default function SearchBar({
       >
         <Search size={16} />
       </button>
+      {isExpanded && renderDropdown && (
+        <div className="absolute top-full left-0 right-0 mt-1 z-50">{renderDropdown}</div>
+      )}
     </div>
   )
 }

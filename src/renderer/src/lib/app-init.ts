@@ -2,6 +2,7 @@ import { useBibleStore } from '@renderer/stores/bible'
 import { useBibleFolderStore } from '@renderer/stores/folder'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 import { useSettingsStore } from '@renderer/stores/settings'
+import { useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { initializeSearchIndexes } from '@renderer/lib/bible-search'
 import { isElectron } from '@renderer/lib/env'
 import { toast } from '@heroui/react/toast'
@@ -65,6 +66,13 @@ export function initializeApp(): () => void {
   useBibleFolderStore.subscribe((state, prev) => {
     if (prev.isLoading && !state.isLoading) {
       void useBibleFolderStore.getState().cleanupExpired()
+    }
+  })
+
+  useFileExplorerStore.getState().initialize()
+  useFileExplorerStore.subscribe((state, prev) => {
+    if (prev.isLoading && !state.isLoading) {
+      void useFileExplorerStore.getState().cleanupExpired()
     }
   })
 

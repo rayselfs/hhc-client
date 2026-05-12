@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   DndContext,
   DragOverlay,
@@ -19,6 +19,7 @@ import { useTranslation } from 'react-i18next'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
 import { useKeyboardShortcuts } from '@renderer/hooks/useKeyboardShortcuts'
+import { getThumbnail } from '@renderer/lib/thumbnail-db'
 import { useFileExplorerSettings, useFileExplorerStore } from '@renderer/stores/file-explorer'
 import type { FileItemRecord, FolderRecord } from '@shared/types/folder'
 import { GridView, ListView, type GridViewItem } from './views'
@@ -56,6 +57,14 @@ function isFileItemRecord(item: unknown): item is FileItemRecord {
     'name' in item &&
     'mimeType' in item &&
     'size' in item
+  )
+}
+
+function canHaveThumbnail(mimeType: string | undefined): boolean {
+  return (
+    mimeType?.startsWith('image/') === true ||
+    mimeType?.startsWith('video/') === true ||
+    mimeType === 'application/pdf'
   )
 }
 
@@ -141,11 +150,17 @@ export function FileBrowser({
   const [lastSelectedId, setLastSelectedId] = useState<string | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [draggedIds, setDraggedIds] = useState<Set<string>>(new Set())
+  const [thumbnails, setThumbnails] = useState<Record<string, string | null>>({})
   const containerRef = useRef<HTMLDivElement>(null)
 
   React.useEffect(() => {
     onSelectionChange?.(selectedIds)
   }, [selectedIds, onSelectionChange])
+
+  React.useEffect(() => {
+    setSelectedIds(new Set())
+    setLastSelectedId(null)
+  }, [currentFolderId])
 
   const sensors = useSensors(
     useSensor(MouseSensor, {
@@ -168,12 +183,57 @@ export function FileBrowser({
     [itemsArray, currentFolderId]
   )
 
+  useEffect(() => {
+    let cancelled = false
+    const thumbnailItems = fileItems.filter((item) => canHaveThumbnail(item.mimeType))
+    const now = Date.now()
+    const TWO_MINUTES = 2 * 60 * 1000
+
+    setThumbnails((current) => {
+      const next: Record<string, string | null> = {}
+      for (const item of thumbnailItems) {
+        if (Object.prototype.hasOwnProperty.call(current, item.id)) next[item.id] = current[item.id]
+      }
+      return next
+    })
+
+    async function loadThumbnails(): Promise<void> {
+      for (const item of thumbnailItems) {
+        if (cancelled) return
+        const dataUrl = await getThumbnail(item.id)
+        if (dataUrl !== null) {
+          setThumbnails((prev) => ({ ...prev, [item.id]: dataUrl }))
+        } else if (now - (item.createdAt ?? 0) > TWO_MINUTES) {
+          setThumbnails((prev) => ({ ...prev, [item.id]: null }))
+        }
+      }
+    }
+
+    void loadThumbnails()
+
+    return () => {
+      cancelled = true
+    }
+  }, [fileItems])
+
+  useEffect(() => {
+    const onThumbnailReady = (e: Event): void => {
+      const { itemId, dataUrl } = (
+        e as CustomEvent<{ itemId: string; dataUrl: string | null }>
+      ).detail
+      setThumbnails((prev) => ({ ...prev, [itemId]: dataUrl }))
+    }
+    window.addEventListener('hhc:thumbnail-ready', onThumbnailReady)
+    return () => window.removeEventListener('hhc:thumbnail-ready', onThumbnailReady)
+  }, [])
+
   const allItems: GridViewItem[] = useMemo(
     () => [
       ...folders.map((folder) => ({
         id: folder.id,
         name: folder.name,
         isFolder: true,
+        createdAt: folder.createdAt,
         isSelected: selectedIds.has(folder.id)
       })),
       ...fileItems.map((item) => ({
@@ -182,10 +242,12 @@ export function FileBrowser({
         isFolder: false,
         mimeType: item.mimeType,
         size: item.size,
+        createdAt: item.createdAt,
+        thumbnailUrl: canHaveThumbnail(item.mimeType) ? thumbnails[item.id] : null,
         isSelected: selectedIds.has(item.id)
       }))
     ],
-    [folders, fileItems, selectedIds]
+    [folders, fileItems, selectedIds, thumbnails]
   )
 
   const allIds = useMemo(() => allItems.map((item) => item.id), [allItems])
@@ -233,12 +295,9 @@ export function FileBrowser({
     setLastSelectedId(null)
   }, [])
 
-  const handleContainerClick = useCallback(
-    (event: React.MouseEvent): void => {
-      if (event.target === event.currentTarget) clearSelection()
-    },
-    [clearSelection]
-  )
+  const handleContainerClick = useCallback((): void => {
+    clearSelection()
+  }, [clearSelection])
 
   const handleContainerContextMenu = useCallback(
     (event: React.MouseEvent): void => {

@@ -1,11 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   FileExplorerShell,
-  FileUpload,
-  SearchBar,
   useFileContextMenu
 } from '@renderer/components/Control/FileExplorer'
 import FileBrowser from '@renderer/components/Control/FileExplorer/FileBrowser'
+import FileExplorerFAB from '@renderer/components/Control/FileExplorer/FileExplorerFAB'
 import { removeFileItemFromStore, useFileExplorerStore } from '@renderer/stores/file-explorer'
 import type { AnyItemRecord } from '@shared/types/folder'
 import type { ClipboardState } from '@renderer/components/Control/FileExplorer'
@@ -13,6 +12,7 @@ import type { ClipboardState } from '@renderer/components/Control/FileExplorer'
 export default function FilesPage(): React.JSX.Element {
   const currentFolderId = useFileExplorerStore((state) => state.currentFolderId)
   const itemsArray = useFileExplorerStore((state) => state._itemsArray)
+  const foldersArray = useFileExplorerStore((state) => state._foldersArray)
   const getChildFolders = useFileExplorerStore((state) => state.getChildFolders)
   const addFolder = useFileExplorerStore((state) => state.addFolder)
   const deleteFolder = useFileExplorerStore((state) => state.deleteFolder)
@@ -29,8 +29,10 @@ export default function FilesPage(): React.JSX.Element {
   const [renameValue, setRenameValue] = useState('')
 
   const itemCount = useMemo(
-    () => itemsArray.filter((item: AnyItemRecord) => item.parentId === currentFolderId).length,
-    [itemsArray, currentFolderId]
+    () =>
+      itemsArray.filter((item: AnyItemRecord) => item.parentId === currentFolderId).length +
+      foldersArray.filter((folder) => folder.parentId === currentFolderId).length,
+    [itemsArray, foldersArray, currentFolderId]
   )
   const selectedCount = selectedIds.size
 
@@ -232,54 +234,46 @@ export default function FilesPage(): React.JSX.Element {
   )
 
   return (
-    <FileExplorerShell
-      itemCount={itemCount}
-      selectedCount={selectedCount}
-      headerRight={<FileUpload currentFolderId={currentFolderId} />}
-    >
-      <div className="flex h-full flex-col">
-        <div className="shrink-0 border-b border-border px-3 py-2">
-          <SearchBar className="max-w-md" />
-        </div>
-        <div className="min-h-0 flex-1">
-          <FileBrowser
-            onItemContextMenu={handleItemContextMenu}
-            onFolderContextMenu={handleFolderContextMenu}
-            onEmptyAreaContextMenu={handleEmptyAreaContextMenu}
-            onSelectionChange={handleSelectionChange}
-            onCopy={handleCopy}
-            onCut={handleCut}
-            onPaste={handlePaste}
-          />
-        </div>
-      </div>
-      {renamingId && (
-        <div className="absolute inset-0 z-50 flex items-start justify-center bg-background/20 pt-24 backdrop-blur-sm">
-          <form
-            className="w-80 rounded-lg border border-border bg-content1 p-3 shadow-xl"
-            onSubmit={(event) => {
-              event.preventDefault()
-              submitRename()
-            }}
-          >
-            <label
-              className="mb-2 block text-xs font-medium text-default-500"
-              htmlFor="file-rename-input"
-            >
-              Rename
-            </label>
-            <input
-              id="file-rename-input"
-              value={renameValue}
-              onChange={(event) => setRenameValue(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Escape') cancelRename()
+    <>
+      <FileExplorerShell itemCount={itemCount} selectedCount={selectedCount}>
+        <FileBrowser
+          onItemContextMenu={handleItemContextMenu}
+          onFolderContextMenu={handleFolderContextMenu}
+          onEmptyAreaContextMenu={handleEmptyAreaContextMenu}
+          onSelectionChange={handleSelectionChange}
+          onCopy={handleCopy}
+          onCut={handleCut}
+          onPaste={handlePaste}
+        />
+        {renamingId && (
+          <div className="absolute inset-0 z-50 flex items-start justify-center bg-background/20 pt-24 backdrop-blur-sm">
+            <form
+              className="w-80 rounded-lg border border-border bg-content1 p-3 shadow-xl"
+              onSubmit={(event) => {
+                event.preventDefault()
+                submitRename()
               }}
-              className="w-full rounded-md border border-default-200 bg-default-100 px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
-            />
-          </form>
-        </div>
-      )}
-    </FileExplorerShell>
+            >
+              <label
+                className="mb-2 block text-xs font-medium text-default-500"
+                htmlFor="file-rename-input"
+              >
+                Rename
+              </label>
+              <input
+                id="file-rename-input"
+                value={renameValue}
+                onChange={(event) => setRenameValue(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') cancelRename()
+                }}
+                className="w-full rounded-md border border-default-200 bg-default-100 px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+              />
+            </form>
+          </div>
+        )}
+      </FileExplorerShell>
+      <FileExplorerFAB />
+    </>
   )
 }

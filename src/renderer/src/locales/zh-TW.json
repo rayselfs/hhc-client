@@ -2,7 +2,10 @@
   "nav": {
     "timer": "計時器",
     "bible": "聖經",
-    "files": "檔案"
+    "files": "文件",
+    "media": "多媒體",
+    "favorites": "我的最愛",
+    "trash": "垃圾桶"
   },
   "welcome": {
     "title": "歡迎使用 HHC",
@@ -94,38 +97,7 @@
     },
     "custom": {
       "title": "自訂",
-      "home": "首頁",
-      "newFolder": "新增資料夾",
-      "createNewFolder": "建立新資料夾",
-      "editFolder": "編輯資料夾",
-      "folderName": "資料夾名稱",
-      "untitledFolder": "未命名資料夾",
-      "retention": "保留時間",
-      "duration": {
-        "1day": "1 天",
-        "1week": "1 週",
-        "1month": "1 個月",
-        "permanent": "永久"
-      },
-      "rename": "重新命名",
-      "delete": "刪除",
-      "moveToFolder": "移動到資料夾",
-      "emptyFolder": "空資料夾",
-      "deleteTitle": "刪除 {{name}} ?",
-      "deleteFolderDescription": "此動作無法復原。資料夾中的所有經文將被刪除。",
-      "deleteItemDescription": "此動作無法復原。",
-      "deleteSelectedTitle": "刪除 {{count}} 個項目?",
-      "contextMenu": {
-        "copy": "複製",
-        "cut": "剪下",
-        "paste": "貼上",
-        "delete": "刪除",
-        "edit": "編輯",
-        "newFolder": "新建資料夾",
-        "copyCount": "複製 {{count}} 項",
-        "cutCount": "剪下 {{count}} 項",
-        "deleteCount": "刪除 {{count}} 項"
-      }
+      "home": "首頁"
     },
     "search": {
       "title": "搜尋",
@@ -418,7 +390,20 @@
       "list": "清單"
     },
     "breadcrumb": {
-      "root": "檔案"
+      "root": "首頁"
+    },
+    "fab": {
+      "label": "新增",
+      "newFolder": "新增資料夾",
+      "uploadFiles": "檔案上傳",
+      "uploadFolder": "資料夾上傳",
+      "upload": "上傳"
+    },
+    "list": {
+      "name": "檔名",
+      "kind": "種類",
+      "createdAt": "建立時間",
+      "size": "大小"
     },
     "empty": {
       "title": "目前沒有檔案",

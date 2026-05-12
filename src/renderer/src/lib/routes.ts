@@ -5,3 +5,7 @@ export function isTimerRoute(pathname: string): boolean {
 export function isBibleRoute(pathname: string): boolean {
   return pathname === '/bible'
 }
+
+export function isFilesRoute(pathname: string): boolean {
+  return pathname === '/files'
+}

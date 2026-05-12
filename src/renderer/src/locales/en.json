@@ -2,7 +2,10 @@
   "nav": {
     "timer": "TIMER",
     "bible": "BIBLE",
-    "files": "FILES"
+    "files": "FILES",
+    "media": "MEDIA",
+    "favorites": "FAVORITES",
+    "trash": "TRASH"
   },
   "welcome": {
     "title": "Welcome to HHC",
@@ -94,38 +97,7 @@
     },
     "custom": {
       "title": "Custom",
-      "home": "Home",
-      "newFolder": "New Folder",
-      "createNewFolder": "Create New Folder",
-      "editFolder": "Edit Folder",
-      "folderName": "Folder Name",
-      "untitledFolder": "Untitled Folder",
-      "retention": "Retention",
-      "duration": {
-        "1day": "1 Day",
-        "1week": "1 Week",
-        "1month": "1 Month",
-        "permanent": "Permanent"
-      },
-      "rename": "Rename",
-      "delete": "Delete",
-      "moveToFolder": "Move to Folder",
-      "emptyFolder": "Folder is empty",
-      "deleteTitle": "Delete {{name}} ?",
-      "deleteFolderDescription": "This action cannot be undone. All verses inside will be lost.",
-      "deleteItemDescription": "This action cannot be undone.",
-      "deleteSelectedTitle": "Delete {{count}} item(s)?",
-      "contextMenu": {
-        "copy": "Copy",
-        "cut": "Cut",
-        "paste": "Paste",
-        "delete": "Delete",
-        "edit": "Edit",
-        "newFolder": "New Folder",
-        "copyCount": "Copy {{count}} item(s)",
-        "cutCount": "Cut {{count}} item(s)",
-        "deleteCount": "Delete {{count}} item(s)"
-      }
+      "home": "Home"
     },
     "search": {
       "title": "Search",
@@ -418,7 +390,20 @@
       "list": "List"
     },
     "breadcrumb": {
-      "root": "Files"
+      "root": "Home"
+    },
+    "fab": {
+      "label": "New",
+      "newFolder": "New Folder",
+      "uploadFiles": "Upload Files",
+      "uploadFolder": "Upload Folder",
+      "upload": "Upload"
+    },
+    "list": {
+      "name": "Name",
+      "kind": "Kind",
+      "createdAt": "Created",
+      "size": "Size"
     },
     "empty": {
       "title": "No files yet",

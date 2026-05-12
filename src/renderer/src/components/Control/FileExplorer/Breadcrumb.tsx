@@ -15,7 +15,7 @@ export default function Breadcrumb({
   onNavigate
 }: BreadcrumbProps): React.JSX.Element {
   const { t } = useTranslation()
-  const path = getFolderPath(currentFolderId)
+  const path = getFolderPath(currentFolderId).filter((folder) => folder.parentId !== null)
 
   return (
     <nav aria-label="breadcrumb" className="flex items-center gap-0.5 min-w-0 overflow-hidden">

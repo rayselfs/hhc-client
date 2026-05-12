@@ -10,9 +10,13 @@ import ModeSelector from '@renderer/components/Control/Timer/ModeSelector'
 import SettingsPopover from '@renderer/components/Control/Header/SettingsPopover/SettingsPopover'
 import BibleSelector from '@renderer/components/Control/Bible/BibleSelector'
 import BibleSearchBar from '@renderer/components/Control/Header/SearchBar/BibleSearchBar'
-import { isTimerRoute, isBibleRoute } from '@renderer/lib/routes'
+import FileExplorerSearchBar from '@renderer/components/Control/Header/SearchBar/FileExplorerSearchBar'
+import Breadcrumb from '@renderer/components/Control/FileExplorer/Breadcrumb'
+import ViewModeDropdown from '@renderer/components/Control/FileExplorer/ViewModeDropdown'
+import { isTimerRoute, isBibleRoute, isFilesRoute } from '@renderer/lib/routes'
 import { EVENTS } from '@renderer/config/events'
 import { useTimerStore } from '@renderer/stores/timer'
+import { useFileExplorerStore, useFileExplorerSettings } from '@renderer/stores/file-explorer'
 
 export default function Header(): React.JSX.Element {
   const { t } = useTranslation()
@@ -27,8 +31,16 @@ export default function Header(): React.JSX.Element {
   const confirm = useConfirm()
   const mode = useTimerStore((s) => s.mode)
 
+  const currentFolderId = useFileExplorerStore((state) => state.currentFolderId)
+  const getFolderPath = useFileExplorerStore((state) => state.getFolderPath)
+  const navigateToFolder = useFileExplorerStore((state) => state.navigateToFolder)
+  const navigateToRoot = useFileExplorerStore((state) => state.navigateToRoot)
+  const viewMode = useFileExplorerSettings((state) => state.viewMode)
+  const setViewMode = useFileExplorerSettings((state) => state.setViewMode)
+
   const showTimerControls = isTimerRoute(location.pathname)
   const showBibleControls = isBibleRoute(location.pathname)
+  const showFilesControls = isFilesRoute(location.pathname)
 
   const handleCloseOrOpenProjection = async (): Promise<void> => {
     if (!isProjectionOpen) {
@@ -54,6 +66,14 @@ export default function Header(): React.JSX.Element {
     window.dispatchEvent(new Event(EVENTS.OPEN_BIBLE_SELECTOR))
   }
 
+  const handleBreadcrumbNavigate = (folderId: string | null): void => {
+    if (folderId === null) {
+      navigateToRoot()
+    } else {
+      void navigateToFolder(folderId)
+    }
+  }
+
   return (
     <header className="relative flex items-center justify-end gap-2 p-2">
       {(showTimerControls || showBibleControls) && (
@@ -66,6 +86,17 @@ export default function Header(): React.JSX.Element {
           >
             <BibleSelector onOpenDialog={handleOpenBibleSelector} />
           </div>
+        </div>
+      )}
+
+      {showFilesControls && (
+        <div className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center gap-2 max-w-[50%]">
+          <ViewModeDropdown viewMode={viewMode} onViewModeChange={setViewMode} />
+          <Breadcrumb
+            currentFolderId={currentFolderId}
+            getFolderPath={getFolderPath}
+            onNavigate={handleBreadcrumbNavigate}
+          />
         </div>
       )}
 
@@ -92,6 +123,11 @@ export default function Header(): React.JSX.Element {
           className={`transition-all duration-200 ${showBibleControls ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-3 pointer-events-none'}`}
         >
           <BibleSearchBar />
+        </div>
+        <div
+          className={`transition-all duration-200 ${showFilesControls ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-3 pointer-events-none'}`}
+        >
+          <FileExplorerSearchBar />
         </div>
         <ButtonGroup size="lg">
           <Button

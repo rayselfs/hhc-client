@@ -33,7 +33,7 @@ export const useFileExplorerSettings = create<FileExplorerSettingsState>()(
   )
 )
 
-export async function addFileItemToStore(file: File, parentId: string): Promise<void> {
+export async function addFileItemToStore(file: File, parentId: string): Promise<string> {
   const db = await openFileExplorerDB()
   const id = crypto.randomUUID()
 
@@ -50,6 +50,7 @@ export async function addFileItemToStore(file: File, parentId: string): Promise<
   }
 
   useFileExplorerStore.getState().addItem(item)
+  return id
 }
 
 export async function removeFileItemFromStore(id: string): Promise<void> {

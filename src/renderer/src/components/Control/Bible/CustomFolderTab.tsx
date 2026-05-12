@@ -126,7 +126,7 @@ export function CustomFolderTab({
             size="sm"
             className="opacity-0 group-hover:opacity-100 shrink-0 cursor-pointer hover:bg-transparent!"
             onPress={() => handlers.handleDeleteFolder(folder.id, folder.name)}
-            aria-label={t('bible.custom.deleteTitle', {
+            aria-label={t('folder.deleteTitle', {
               name: folder.name,
               defaultValue: `Delete ${folder.name}`
             })}
@@ -197,7 +197,7 @@ export function CustomFolderTab({
             size="sm"
             className="opacity-0 group-hover:opacity-100 shrink-0 cursor-pointer hover:bg-transparent!"
             onPress={() => handlers.handleDeleteItem(item)}
-            aria-label={t('bible.custom.deleteTitle', {
+            aria-label={t('folder.deleteTitle', {
               name: reference,
               defaultValue: `Delete ${reference}`
             })}
@@ -257,9 +257,6 @@ export function CustomFolderTab({
       getItemReference={getItemReference}
       isModalOpen={isModalOpen}
       onModalOpenChange={onModalOpenChange}
-      i18nPrefix="bible.custom"
-      untitledFolderKey="bible.custom.untitledFolder"
-      emptyMessage={t('bible.custom.emptyFolder')}
     />
   )
 }

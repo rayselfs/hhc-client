@@ -1,4 +1,6 @@
 import React from 'react'
+import { Folder } from 'lucide-react'
+import { Skeleton } from '@heroui/react/skeleton'
 import { useTranslation } from 'react-i18next'
 import { getFileIcon } from './getFileIcon'
 
@@ -8,7 +10,42 @@ export interface GridViewItem {
   isFolder: boolean
   mimeType?: string
   size?: number
+  createdAt?: number
+  thumbnailUrl?: string | null
   isSelected: boolean
+}
+
+function canHaveThumbnail(mimeType: string | undefined): boolean {
+  return (
+    mimeType?.startsWith('image/') === true ||
+    mimeType?.startsWith('video/') === true ||
+    mimeType === 'application/pdf'
+  )
+}
+
+function renderGridIcon(item: GridViewItem, iconSize: number): React.ReactNode {
+  if (item.isFolder) {
+    return <Folder size={iconSize} className="text-accent" fill="currentColor" />
+  }
+
+  if (item.thumbnailUrl) {
+    return (
+      <img
+        src={item.thumbnailUrl}
+        alt={item.name}
+        className="object-cover rounded"
+        style={{ width: iconSize, height: iconSize }}
+      />
+    )
+  }
+
+  if (item.thumbnailUrl === undefined && canHaveThumbnail(item.mimeType)) {
+    return <Skeleton className="rounded" style={{ width: iconSize, height: iconSize }} />
+  }
+
+  return (
+    <div className="text-default-500">{getFileIcon(item.mimeType, item.isFolder, iconSize)}</div>
+  )
 }
 
 export interface GridViewProps {
@@ -71,14 +108,14 @@ export function GridView({
         const content = (
           <div
             className={`flex flex-col items-center justify-start rounded-lg p-2 cursor-pointer transition-colors hover:bg-content2/60 ${
-              item.isSelected ? 'ring-2 ring-primary bg-primary/10' : ''
+              item.isSelected ? 'bg-surface' : ''
             }`}
             onClick={(e) => onItemClick(item.id, e)}
             onDoubleClick={(e) => onItemDoubleClick(item.id, e)}
             onContextMenu={(e) => onItemContextMenu(item.id, e)}
           >
-            <div className="flex items-center justify-center text-default-500">
-              {getFileIcon(item.mimeType, item.isFolder, iconSize)}
+            <div className="flex items-center justify-center">
+              {renderGridIcon(item, iconSize)}
             </div>
             <span
               className={`w-full text-center text-foreground break-words ${nameClass}`}
