@@ -17,7 +17,7 @@ interface FileExplorerSettingsState {
 export const useFileExplorerStore = createFolderStore({
   rootId: 'file-root',
   rootName: 'Files',
-  getDB: () => openFileExplorerDB() as Promise<unknown>
+  getDB: () => openFileExplorerDB()
 })
 
 export const useFileExplorerSettings = create<FileExplorerSettingsState>()(
@@ -53,8 +53,7 @@ export async function addFileItemToStore(file: File, parentId: string): Promise<
     mimeType: file.type || 'application/octet-stream'
   }
 
-  const addItem = useFileExplorerStore.getState().addItem as (fileItem: typeof item) => void
-  addItem(item)
+  useFileExplorerStore.getState().addItem(item)
 }
 
 export async function removeFileItemFromStore(id: string): Promise<void> {

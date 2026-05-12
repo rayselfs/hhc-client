@@ -1,5 +1,5 @@
 import type { DBSchema, IDBPDatabase } from 'idb'
-import { openDB } from 'idb'
+import { openDB, unwrap } from 'idb'
 import type { AnyItemRecord, FolderRecord } from '@shared/types/folder'
 
 interface FileBlobRecord {
@@ -8,16 +8,6 @@ interface FileBlobRecord {
 }
 
 interface FileExplorerDBSchema extends DBSchema {
-  folders: {
-    key: string
-    value: FolderRecord
-    indexes: { 'by-parent': string }
-  }
-  items: {
-    key: string
-    value: AnyItemRecord
-    indexes: { 'by-parent': string }
-  }
   'file-blobs': {
     key: string
     value: FileBlobRecord
@@ -35,24 +25,14 @@ interface FileExplorerDBSchema extends DBSchema {
 }
 
 const DB_NAME = 'hhc-file-explorer'
-const DB_VERSION = 1
+const DB_VERSION = 2
 
 let fileExplorerDBPromise: Promise<IDBPDatabase<FileExplorerDBSchema>> | null = null
 
 function getFileExplorerDB(): Promise<IDBPDatabase<FileExplorerDBSchema>> {
   if (!fileExplorerDBPromise) {
     fileExplorerDBPromise = openDB<FileExplorerDBSchema>(DB_NAME, DB_VERSION, {
-      upgrade(db) {
-        if (!db.objectStoreNames.contains('folders')) {
-          const folderStore = db.createObjectStore('folders', { keyPath: 'id' })
-          folderStore.createIndex('by-parent', 'parentId')
-        }
-
-        if (!db.objectStoreNames.contains('items')) {
-          const itemStore = db.createObjectStore('items', { keyPath: 'id' })
-          itemStore.createIndex('by-parent', 'parentId')
-        }
-
+      upgrade(db, oldVersion) {
         if (!db.objectStoreNames.contains('file-blobs')) {
           db.createObjectStore('file-blobs', { keyPath: 'id' })
         }
@@ -66,6 +46,12 @@ function getFileExplorerDB(): Promise<IDBPDatabase<FileExplorerDBSchema>> {
           const folderItemStore = db.createObjectStore('folder-items', { keyPath: 'id' })
           folderItemStore.createIndex('by-parent', 'parentId')
         }
+
+        if (oldVersion < 2) {
+          const nativeDb: IDBDatabase = unwrap(db)
+          if (nativeDb.objectStoreNames.contains('folders')) nativeDb.deleteObjectStore('folders')
+          if (nativeDb.objectStoreNames.contains('items')) nativeDb.deleteObjectStore('items')
+        }
       }
     })
   }
@@ -73,22 +59,29 @@ function getFileExplorerDB(): Promise<IDBPDatabase<FileExplorerDBSchema>> {
   return fileExplorerDBPromise
 }
 
-export async function openFileExplorerDB(): Promise<IDBDatabase> {
-  return (await getFileExplorerDB()) as unknown as IDBDatabase
+export async function openFileExplorerDB(): Promise<IDBPDatabase<FileExplorerDBSchema>> {
+  return getFileExplorerDB()
 }
 
-export async function storeFileBlob(db: IDBDatabase, id: string, blob: Blob): Promise<void> {
-  const idb = db as unknown as IDBPDatabase<FileExplorerDBSchema>
-  await idb.put('file-blobs', { id, blob })
+export async function storeFileBlob(
+  db: IDBPDatabase<FileExplorerDBSchema>,
+  id: string,
+  blob: Blob
+): Promise<void> {
+  await db.put('file-blobs', { id, blob })
 }
 
-export async function getFileBlob(db: IDBDatabase, id: string): Promise<Blob | null> {
-  const idb = db as unknown as IDBPDatabase<FileExplorerDBSchema>
-  const record = await idb.get('file-blobs', id)
+export async function getFileBlob(
+  db: IDBPDatabase<FileExplorerDBSchema>,
+  id: string
+): Promise<Blob | null> {
+  const record = await db.get('file-blobs', id)
   return record?.blob ?? null
 }
 
-export async function deleteFileBlob(db: IDBDatabase, id: string): Promise<void> {
-  const idb = db as unknown as IDBPDatabase<FileExplorerDBSchema>
-  await idb.delete('file-blobs', id)
+export async function deleteFileBlob(
+  db: IDBPDatabase<FileExplorerDBSchema>,
+  id: string
+): Promise<void> {
+  await db.delete('file-blobs', id)
 }

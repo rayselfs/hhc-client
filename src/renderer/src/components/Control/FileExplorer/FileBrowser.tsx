@@ -27,6 +27,7 @@ export interface FileBrowserProps {
   onItemContextMenu?: (itemId: string, event: React.MouseEvent) => void
   onFolderContextMenu?: (folderId: string, event: React.MouseEvent) => void
   onEmptyAreaContextMenu?: (event: React.MouseEvent) => void
+  onSelectionChange?: (selectedIds: Set<string>) => void
 }
 
 type FileExplorerDndData =
@@ -113,7 +114,8 @@ function DragOverlayContent({ name, count }: { name: string; count: number }): R
 export function FileBrowser({
   onItemContextMenu,
   onFolderContextMenu,
-  onEmptyAreaContextMenu
+  onEmptyAreaContextMenu,
+  onSelectionChange
 }: FileBrowserProps): React.JSX.Element {
   const { t } = useTranslation()
   const confirm = useConfirm()
@@ -134,6 +136,10 @@ export function FileBrowser({
   const [activeId, setActiveId] = useState<string | null>(null)
   const [draggedIds, setDraggedIds] = useState<Set<string>>(new Set())
   const containerRef = useRef<HTMLDivElement>(null)
+
+  React.useEffect(() => {
+    onSelectionChange?.(selectedIds)
+  }, [selectedIds, onSelectionChange])
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
