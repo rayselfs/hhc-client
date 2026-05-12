@@ -1,6 +1,8 @@
 export { default as FileExplorerShell } from './FileExplorerShell'
+export { default as FileBrowser } from './FileBrowser'
 export { default as Breadcrumb } from './Breadcrumb'
 export { default as ViewModeToggle } from './ViewModeToggle'
 export type { FileExplorerShellProps } from './FileExplorerShell'
+export type { FileBrowserProps } from './FileBrowser'
 export type { BreadcrumbProps } from './Breadcrumb'
 export type { ViewModeToggleProps } from './ViewModeToggle'
