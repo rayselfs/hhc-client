@@ -430,7 +430,8 @@
       "name": "文件名",
       "kind": "种类",
       "createdAt": "创建时间",
-      "size": "大小"
+      "size": "大小",
+      "path": "路径"
     },
     "empty": {
       "title": "还没有文件",

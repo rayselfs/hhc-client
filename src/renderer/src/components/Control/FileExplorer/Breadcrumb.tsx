@@ -22,7 +22,7 @@ export default function Breadcrumb({
       <button
         type="button"
         onClick={() => onNavigate(null)}
-        className="shrink-0 text-sm text-foreground/70 hover:text-foreground transition-colors px-1 py-0.5 rounded hover:bg-default/60"
+        className="shrink-0 text-base text-foreground/70 hover:text-foreground transition-colors px-1 py-0.5 rounded hover:bg-default/60"
       >
         {t('fileExplorer.breadcrumb.root')}
       </button>
@@ -33,14 +33,14 @@ export default function Breadcrumb({
           <React.Fragment key={folder.id}>
             <ChevronRight size={12} className="shrink-0 text-foreground/40" aria-hidden="true" />
             {isLast ? (
-              <span className="text-sm font-medium text-foreground truncate px-1 py-0.5">
+              <span className="text-base font-medium text-foreground truncate px-1 py-0.5">
                 {folder.name}
               </span>
             ) : (
               <button
                 type="button"
                 onClick={() => onNavigate(folder.id)}
-                className="text-sm text-foreground/70 hover:text-foreground transition-colors px-1 py-0.5 rounded hover:bg-default/60 truncate max-w-[120px]"
+                className="text-base text-foreground/70 hover:text-foreground transition-colors px-1 py-0.5 rounded hover:bg-default/60 truncate max-w-[120px]"
               >
                 {folder.name}
               </button>

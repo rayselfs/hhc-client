@@ -430,7 +430,8 @@
       "name": "Name",
       "kind": "Kind",
       "createdAt": "Created",
-      "size": "Size"
+      "size": "Size",
+      "path": "Path"
     },
     "empty": {
       "title": "No files yet",

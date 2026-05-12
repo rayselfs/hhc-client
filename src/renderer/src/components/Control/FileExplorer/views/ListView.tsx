@@ -97,7 +97,7 @@ export function ListView({
 
   return (
     <div className="flex flex-col">
-      <div className="sticky top-0 bg-background z-10 border-b border-divider">
+      <div className="sticky top-0 bg-background z-10 border-b border-default-200">
         <div className="flex items-center px-3 py-1.5">
           <div className="w-6 flex-shrink-0 mr-3" />
           <div

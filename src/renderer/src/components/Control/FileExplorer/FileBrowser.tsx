@@ -163,53 +163,134 @@ function DragOverlayContent({ name, count }: { name: string; count: number }): R
   )
 }
 
+function formatSearchDate(ts: number | undefined): string {
+  if (ts === undefined) return '—'
+  const d = new Date(ts)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}/${m}/${day}`
+}
+
+function formatSearchFileSize(bytes: number | undefined): string {
+  if (bytes === undefined) return '—'
+  if (bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB']
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1)
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`
+}
+
+const SEARCH_COL = { created: 90, size: 72, kind: 96, path: 200 }
+
 function SearchResultsList({
   results,
+  selectedId,
+  onSelectId,
   onFileClick,
   onFolderClick
 }: {
   results: SearchResult[]
+  selectedId: string | null
+  onSelectId: (id: string) => void
   onFileClick: (result: SearchResult & { kind: 'file' }) => void
   onFolderClick: (result: SearchResult & { kind: 'folder' }) => void
 }): React.JSX.Element {
+  const { t } = useTranslation()
+
   return (
-    <div className="flex flex-col p-2">
-      {results.map((result) => {
-        if (result.kind === 'file') {
-          return (
-            <button
-              key={result.item.id}
-              type="button"
-              onDoubleClick={() => onFileClick(result)}
-              className="flex items-center gap-3 rounded-md px-3 py-2 text-left text-sm cursor-pointer hover:bg-content2/60 focus:outline-none"
-            >
-              <div className="flex-shrink-0 w-6 flex items-center justify-center text-default-500">
-                {getFileIcon(result.item.mimeType, false, 20)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="truncate text-sm text-foreground">{result.item.name}</div>
-                <div className="truncate text-xs text-default-400">{result.folderPath}</div>
-              </div>
-            </button>
-          )
-        }
-        return (
-          <button
-            key={result.folder.id}
-            type="button"
-            onDoubleClick={() => onFolderClick(result)}
-            className="flex items-center gap-3 rounded-md px-3 py-2 text-left text-sm cursor-pointer hover:bg-content2/60 focus:outline-none"
+    <div className="flex flex-col">
+      <div className="sticky top-0 bg-background z-10 border-b border-default-200">
+        <div className="flex items-center px-3 py-1.5">
+          <div className="w-6 flex-shrink-0 mr-3" />
+          <div className="flex-1 min-w-0 text-xs font-medium text-default-400 uppercase tracking-wide">
+            {t('fileExplorer.list.name', 'Name')}
+          </div>
+          <div
+            className="flex-shrink-0 text-xs font-medium text-default-400 uppercase tracking-wide pl-2"
+            style={{ width: SEARCH_COL.created }}
           >
-            <div className="flex-shrink-0 w-6 flex items-center justify-center">
-              <Folder size={20} className="text-accent" fill="currentColor" />
+            {t('fileExplorer.list.createdAt', 'Created')}
+          </div>
+          <div
+            className="flex-shrink-0 text-xs font-medium text-default-400 uppercase tracking-wide pl-2"
+            style={{ width: SEARCH_COL.size }}
+          >
+            {t('fileExplorer.list.size', 'Size')}
+          </div>
+          <div
+            className="flex-shrink-0 text-xs font-medium text-default-400 uppercase tracking-wide pl-2"
+            style={{ width: SEARCH_COL.kind }}
+          >
+            {t('fileExplorer.list.kind', 'Kind')}
+          </div>
+          <div
+            className="flex-shrink-0 text-xs font-medium text-default-400 uppercase tracking-wide pl-2"
+            style={{ width: SEARCH_COL.path }}
+          >
+            {t('fileExplorer.list.path', 'Path')}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-col p-2">
+        {results.map((result) => {
+          const isFile = result.kind === 'file'
+          const id = isFile ? result.item.id : result.folder.id
+          const name = isFile ? result.item.name : result.folder.name
+          const mimeType = isFile ? result.item.mimeType : undefined
+          const size = isFile ? result.item.size : undefined
+          const createdAt = isFile ? result.item.createdAt : result.folder.createdAt
+          const isSelected = selectedId === id
+
+          return (
+            <div
+              key={id}
+              className={`flex items-center rounded-md px-3 py-2 cursor-pointer transition-colors hover:bg-content2/60 ${isSelected ? 'bg-surface' : ''}`}
+              onClick={() => onSelectId(id)}
+              onDoubleClick={() => {
+                if (result.kind === 'file') onFileClick(result)
+                else onFolderClick(result)
+              }}
+            >
+              <div className="flex-shrink-0 w-6 flex items-center justify-center mr-3">
+                {!isFile ? (
+                  <Folder size={20} className="text-accent" fill="currentColor" />
+                ) : (
+                  <div className="text-danger">{getFileIcon(mimeType, false, 20)}</div>
+                )}
+              </div>
+              <div className="flex-1 min-w-0 truncate text-sm text-foreground" title={name}>
+                {name}
+              </div>
+              <div
+                className="flex-shrink-0 text-sm text-default-400 pl-2"
+                style={{ width: SEARCH_COL.created }}
+              >
+                {formatSearchDate(createdAt)}
+              </div>
+              <div
+                className="flex-shrink-0 text-sm text-default-400 pl-2"
+                style={{ width: SEARCH_COL.size }}
+              >
+                {!isFile ? '—' : formatSearchFileSize(size)}
+              </div>
+              <div
+                className="flex-shrink-0 text-sm text-default-400 truncate pl-2"
+                style={{ width: SEARCH_COL.kind }}
+              >
+                {formatFileKind(mimeType, !isFile, t)}
+              </div>
+              <div
+                className="flex-shrink-0 text-sm text-default-400 truncate pl-2"
+                style={{ width: SEARCH_COL.path }}
+              >
+                {result.folderPath}
+              </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="truncate text-sm text-foreground">{result.folder.name}</div>
-              <div className="truncate text-xs text-default-400">{result.folderPath}</div>
-            </div>
-          </button>
-        )
-      })}
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -250,6 +331,7 @@ export function FileBrowser({
   const [activeId, setActiveId] = useState<string | null>(null)
   const [draggedIds, setDraggedIds] = useState<Set<string>>(new Set())
   const [thumbnails, setThumbnails] = useState<Record<string, string | null>>({})
+  const [selectedSearchId, setSelectedSearchId] = useState<string | null>(null)
   const [rubberBandRect, setRubberBandRect] = useState<{
     left: number
     top: number
@@ -294,8 +376,17 @@ export function FileBrowser({
 
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return []
-    return searchAllItems(searchQuery, useFileExplorerStore.getState(), t('fileExplorer.breadcrumb.root'))
+    const raw = searchAllItems(searchQuery, useFileExplorerStore.getState(), t('fileExplorer.breadcrumb.root'))
+    return [...raw].sort((a, b) => {
+      const nameA = a.kind === 'file' ? a.item.name : a.folder.name
+      const nameB = b.kind === 'file' ? b.item.name : b.folder.name
+      return nameA.localeCompare(nameB)
+    })
   }, [searchQuery, itemsArray, foldersArray, t])
+
+  useEffect(() => {
+    setSelectedSearchId(null)
+  }, [searchQuery])
 
   useEffect(() => {
     let cancelled = false
@@ -459,10 +550,10 @@ export function FileBrowser({
         container.querySelectorAll<HTMLElement>('[data-item-id]').forEach((el) => {
           const r = el.getBoundingClientRect()
           if (
-            r.right > left &&
-            r.left < left + width &&
-            r.bottom > top &&
-            r.top < top + height
+            r.left >= left &&
+            r.right <= left + width &&
+            r.top >= top &&
+            r.bottom <= top + height
           ) {
             const id = el.dataset.itemId
             if (id) newSelected.add(id)
@@ -767,6 +858,8 @@ export function FileBrowser({
         ) : (
           <SearchResultsList
             results={searchResults}
+            selectedId={selectedSearchId}
+            onSelectId={setSelectedSearchId}
             onFileClick={handleSearchFileClick}
             onFolderClick={handleSearchFolderClick}
           />
@@ -833,7 +926,7 @@ export function FileBrowser({
 
       {rubberBandRect && (
         <div
-          className="pointer-events-none fixed z-50 rounded-sm border border-primary/60 bg-primary/10"
+          className="pointer-events-none fixed z-50 rounded-sm border border-primary/60 bg-accent/20"
           style={{
             left: rubberBandRect.left,
             top: rubberBandRect.top,
@@ -845,7 +938,7 @@ export function FileBrowser({
 
       {isOsDragOver && (
         <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center">
-          <div className="absolute inset-2 rounded-xl border-2 border-dashed border-primary/60 bg-primary/5" />
+          <div className="absolute inset-2 rounded-xl border-2 border-dashed border-primary/60 bg-accent/10" />
           <div className="relative flex flex-col items-center gap-2 text-primary/80">
             <Upload size={32} />
             <span className="text-sm font-medium">

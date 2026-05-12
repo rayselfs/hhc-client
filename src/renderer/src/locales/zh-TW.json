@@ -430,7 +430,8 @@
       "name": "檔名",
       "kind": "種類",
       "createdAt": "建立時間",
-      "size": "大小"
+      "size": "大小",
+      "path": "路徑"
     },
     "empty": {
       "title": "目前沒有檔案",

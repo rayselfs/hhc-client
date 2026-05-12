@@ -16,8 +16,8 @@ export function searchAllItems(query: string, storeState: FolderStoreState, root
     if (!record.name.toLowerCase().includes(lowerQuery)) continue
 
     const item = record as FileItemRecord
-    const pathFolders = storeState.getFolderPath(item.parentId)
-    const folderPath = [rootLabel, ...pathFolders.map((f) => f.name)].join(' > ')
+    const pathFolders = storeState.getFolderPath(item.parentId).filter((f) => f.parentId !== null)
+    const folderPath = '/' + [rootLabel, ...pathFolders.map((f) => f.name)].join('/')
 
     results.push({ kind: 'file', item, folderPath })
 
@@ -29,8 +29,8 @@ export function searchAllItems(query: string, storeState: FolderStoreState, root
       if (folder.parentId === null) continue
       if (!folder.name.toLowerCase().includes(lowerQuery)) continue
 
-      const pathFolders = storeState.getFolderPath(folder.parentId)
-      const folderPath = [rootLabel, ...pathFolders.map((f) => f.name)].join(' > ')
+      const pathFolders = storeState.getFolderPath(folder.parentId).filter((f) => f.parentId !== null)
+      const folderPath = '/' + [rootLabel, ...pathFolders.map((f) => f.name)].join('/')
 
       results.push({ kind: 'folder', folder, folderPath })
 

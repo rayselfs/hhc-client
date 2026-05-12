@@ -17,6 +17,7 @@ import { isTimerRoute, isBibleRoute, isFilesRoute } from '@renderer/lib/routes'
 import { EVENTS } from '@renderer/config/events'
 import { useTimerStore } from '@renderer/stores/timer'
 import { useFileExplorerStore, useFileExplorerSettings } from '@renderer/stores/file-explorer'
+import GlassDivider from '@renderer/components/Common/GlassDivider'
 
 export default function Header(): React.JSX.Element {
   const { t } = useTranslation()
@@ -96,6 +97,7 @@ export default function Header(): React.JSX.Element {
         <div className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center gap-2 max-w-[50%]">
           <ButtonGroup size="lg">
             <ViewModeDropdown viewMode={viewMode} onViewModeChange={setViewMode} />
+            <GlassDivider vertical className="h-6 self-center mx-px" />
             <SortDropdown sortField={sortField} sortDir={sortDir} onSortChange={setSortFieldAndDir} />
           </ButtonGroup>
           <Breadcrumb
