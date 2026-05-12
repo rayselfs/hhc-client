@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useLocation, Link } from 'react-router-dom'
-import { Timer, BookOpen } from 'lucide-react'
+import { Timer, BookOpen, FolderOpen } from 'lucide-react'
 import UserMenu from '@renderer/components/Control/UserMenu/UserMenu'
 import PreferencesDialog from '@renderer/components/Control/UserMenu/PreferencesDialog'
 
@@ -18,7 +18,8 @@ export default function Sidebar(): React.JSX.Element {
 
   const items: NavItem[] = [
     { to: '/timer', icon: Timer, label: t('nav.timer') },
-    { to: '/bible', icon: BookOpen, label: t('nav.bible') }
+    { to: '/bible', icon: BookOpen, label: t('nav.bible') },
+    { to: '/files', icon: FolderOpen, label: t('nav.files') }
   ]
 
   const isActive = (item: NavItem): boolean => {
