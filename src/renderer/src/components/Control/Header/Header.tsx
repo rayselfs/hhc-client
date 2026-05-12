@@ -9,8 +9,7 @@ import { X, Monitor, MonitorOff, ExternalLink } from 'lucide-react'
 import ModeSelector from '@renderer/components/Control/Timer/ModeSelector'
 import SettingsPopover from '@renderer/components/Control/Header/SettingsPopover/SettingsPopover'
 import BibleSelector from '@renderer/components/Control/Bible/BibleSelector'
-import BibleSearchBar from '@renderer/components/Control/Header/SearchBar/BibleSearchBar'
-import FileExplorerSearchBar from '@renderer/components/Control/Header/SearchBar/FileExplorerSearchBar'
+import SearchBarToggle from '@renderer/components/Control/Header/SearchBar/SearchBarToggle'
 import Breadcrumb from '@renderer/components/Control/FileExplorer/Breadcrumb'
 import ViewModeDropdown from '@renderer/components/Control/FileExplorer/ViewModeDropdown'
 import { isTimerRoute, isBibleRoute, isFilesRoute } from '@renderer/lib/routes'
@@ -119,16 +118,9 @@ export default function Header(): React.JSX.Element {
       </div>
 
       <div className="flex items-center gap-2">
-        <div
-          className={`transition-all duration-200 ${showBibleControls ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-3 pointer-events-none'}`}
-        >
-          <BibleSearchBar />
-        </div>
-        <div
-          className={`transition-all duration-200 ${showFilesControls ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-3 pointer-events-none'}`}
-        >
-          <FileExplorerSearchBar />
-        </div>
+        {(showBibleControls || showFilesControls) && (
+          <SearchBarToggle variant={showBibleControls ? 'bible' : 'fileExplorer'} />
+        )}
         <ButtonGroup size="lg">
           <Button
             isIconOnly

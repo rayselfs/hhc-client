@@ -1,6 +1,7 @@
 import { addFileItemToStore, useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { generateThumbnail } from '@renderer/lib/thumbnail-generator'
 import { saveThumbnail } from '@renderer/lib/thumbnail-db'
+import { computeExpiresAt } from '@shared/types/folder'
 
 const SUPPORTED_EXTENSIONS = new Set(['pdf', 'pptx', 'ppt', 'key', 'odp'])
 
@@ -53,7 +54,7 @@ export async function uploadFolderFiles(
         const parentPath = parts.slice(0, depth - 1).join('/')
         const parentId =
           depth === 1 ? currentFolderId : (pathToFolderId.get(parentPath) ?? currentFolderId)
-        const id = addFolder(parts[depth - 1], parentId)
+        const id = addFolder(parts[depth - 1], parentId, computeExpiresAt('1day'))
         pathToFolderId.set(folderPath, id)
       }
     }

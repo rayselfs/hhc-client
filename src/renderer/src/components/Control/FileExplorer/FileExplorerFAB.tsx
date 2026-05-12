@@ -76,18 +76,31 @@ export default function FileExplorerFAB({
                 if (key === 'uploadFolder') onUploadFolder?.()
               }}
             >
-              <Dropdown.Item id="newFolder" className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground">
-                <FolderPlus size={16} />
-                {t('fileExplorer.fab.newFolder')}
-              </Dropdown.Item>
-              <Dropdown.Item id="uploadFiles" className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground">
-                <Upload size={16} />
-                {t('fileExplorer.fab.uploadFiles', 'Upload Files')}
-              </Dropdown.Item>
-              <Dropdown.Item id="uploadFolder" className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground">
-                <Folder size={16} />
-                {t('fileExplorer.fab.uploadFolder', 'Upload Folder')}
-              </Dropdown.Item>
+              <Dropdown.Section>
+                <Dropdown.Item
+                  id="newFolder"
+                  className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
+                >
+                  <FolderPlus size={16} />
+                  {t('fileExplorer.contextMenu.newFolder')}
+                </Dropdown.Item>
+              </Dropdown.Section>
+              <Dropdown.Section>
+                <Dropdown.Item
+                  id="uploadFiles"
+                  className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
+                >
+                  <Upload size={16} />
+                  {t('fileExplorer.contextMenu.uploadFiles')}
+                </Dropdown.Item>
+                <Dropdown.Item
+                  id="uploadFolder"
+                  className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
+                >
+                  <Folder size={16} />
+                  {t('fileExplorer.contextMenu.uploadFolder')}
+                </Dropdown.Item>
+              </Dropdown.Section>
             </Dropdown.Menu>
           </Dropdown.Popover>
         </Dropdown.Root>

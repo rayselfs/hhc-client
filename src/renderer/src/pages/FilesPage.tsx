@@ -13,11 +13,20 @@ import {
   useFileExplorerStore
 } from '@renderer/stores/file-explorer'
 import { uploadFiles, uploadFolderFiles } from '@renderer/lib/upload-utils'
-import { computeExpiresAt, type AnyItemRecord, type FolderDuration } from '@shared/types/folder'
+import {
+  computeExpiresAt,
+  inferDuration,
+  type AnyItemRecord,
+  type FolderDuration,
+  type FolderRecord
+} from '@shared/types/folder'
 import type { ClipboardState } from '@renderer/components/Control/FileExplorer'
+import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
+import { getThumbnail, saveThumbnail } from '@renderer/lib/thumbnail-db'
 
 export default function FilesPage(): React.JSX.Element {
   const { t } = useTranslation()
+  const confirm = useConfirm()
   const currentFolderId = useFileExplorerStore((state) => state.currentFolderId)
   const itemsArray = useFileExplorerStore((state) => state._itemsArray)
   const foldersArray = useFileExplorerStore((state) => state._foldersArray)
@@ -32,11 +41,13 @@ export default function FilesPage(): React.JSX.Element {
     useFileContextMenu()
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [clipboard, setClipboard] = useState<ClipboardState | null>(null)
-  const [renamingId, setRenamingId] = useState<string | null>(null)
-  const [renameValue, setRenameValue] = useState('')
   const [isCreateFolderModalOpen, setIsCreateFolderModalOpen] = useState(false)
   const [createFolderName, setCreateFolderName] = useState('')
   const [createFolderDuration, setCreateFolderDuration] = useState<FolderDuration>('1day')
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editModalName, setEditModalName] = useState('')
+  const [editModalDuration, setEditModalDuration] = useState<FolderDuration>('1day')
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
@@ -103,44 +114,32 @@ export default function FilesPage(): React.JSX.Element {
     setClipboard({ itemIds: new Set(targetIds), mode: 'cut' })
   }, [])
 
-  const startRename = useCallback((id: string, name: string): void => {
-    setRenamingId(id)
-    setRenameValue(name)
-  }, [])
-
-  const cancelRename = useCallback((): void => {
-    setRenamingId(null)
-    setRenameValue('')
-  }, [])
-
-  const submitRename = useCallback((): void => {
-    if (!renamingId) return
-    const nextName = renameValue.trim()
-    if (nextName === '') return
-
-    const state = useFileExplorerStore.getState()
-    if (state.folders[renamingId]) {
-      updateFolder(renamingId, { name: nextName })
-    } else if (state.items[renamingId]?.type === 'file' && updateItem) {
-      updateItem(renamingId, { name: nextName })
-    }
-
-    cancelRename()
-  }, [renamingId, renameValue, updateFolder, updateItem, cancelRename])
-
-  const handleDelete = useCallback((targetIds: Set<string>): void => {
-    for (const id of targetIds) {
-      const state = useFileExplorerStore.getState()
-      if (state.folders[id]) {
-        void deleteFolderFromStore(id)
-      } else {
-        void removeFileItemFromStore(id)
+  const handleDelete = useCallback(
+    async (targetIds: Set<string>): Promise<void> => {
+      if (targetIds.size === 0) return
+      const confirmed = await confirm({
+        title: t('folder.deleteSelectedTitle', {
+          count: targetIds.size,
+          defaultValue: `Delete ${targetIds.size} item(s)?`
+        }),
+        description: t('folder.deleteItemDescription', 'This action cannot be undone.'),
+        status: 'danger'
+      })
+      if (!confirmed) return
+      for (const id of targetIds) {
+        const state = useFileExplorerStore.getState()
+        if (state.folders[id]) {
+          await deleteFolderFromStore(id)
+        } else {
+          await removeFileItemFromStore(id)
+        }
       }
-    }
-    setSelectedIds(new Set())
-  }, [])
+      setSelectedIds(new Set())
+    },
+    [confirm, t]
+  )
 
-  const handlePaste = useCallback((): void => {
+  const handlePaste = useCallback(async (): Promise<void> => {
     if (!clipboard) return
     const state = useFileExplorerStore.getState()
 
@@ -154,13 +153,16 @@ export default function FilesPage(): React.JSX.Element {
       } else if (state.items[id]) {
         if (clipboard.mode === 'copy') {
           const item = state.items[id]
-          const itemData = {
-            ...item,
-            id: undefined,
-            sortIndex: undefined,
-            createdAt: undefined
+          const newId = crypto.randomUUID()
+          const { id: _id, sortIndex: _si, createdAt: _ca, ...rest } = item
+          addItem({ ...rest, id: newId, parentId: currentFolderId })
+          const dataUrl = await getThumbnail(id)
+          if (dataUrl) {
+            await saveThumbnail(newId, dataUrl)
+            window.dispatchEvent(
+              new CustomEvent('hhc:thumbnail-ready', { detail: { itemId: newId, dataUrl } })
+            )
           }
-          addItem({ ...itemData, parentId: currentFolderId })
         } else {
           moveItem(id, currentFolderId)
         }
@@ -170,6 +172,30 @@ export default function FilesPage(): React.JSX.Element {
     if (clipboard.mode === 'cut') setClipboard(null)
     setSelectedIds(new Set())
   }, [clipboard, currentFolderId, addFolder, addItem, moveFolder, moveItem])
+
+  const openEditModal = useCallback((id: string): void => {
+    const state = useFileExplorerStore.getState()
+    const target = state.folders[id] ?? state.items[id]
+    if (!target) return
+    setEditingId(id)
+    setEditModalName(target.name)
+    setEditModalDuration(inferDuration(target.expiresAt, target.createdAt ?? Date.now()))
+    setIsEditModalOpen(true)
+  }, [])
+
+  const handleEditSubmit = useCallback((): void => {
+    if (!editingId) return
+    const name = editModalName.trim()
+    if (!name) return
+    const state = useFileExplorerStore.getState()
+    if (state.folders[editingId]) {
+      updateFolder(editingId, { name, expiresAt: computeExpiresAt(editModalDuration) })
+    } else if (state.items[editingId]) {
+      updateItem?.(editingId, { name, expiresAt: computeExpiresAt(editModalDuration) })
+    }
+    setIsEditModalOpen(false)
+    setEditingId(null)
+  }, [editingId, editModalName, editModalDuration, updateFolder, updateItem])
 
   const handleItemContextMenu = useCallback(
     (itemId: string, event: React.MouseEvent): void => {
@@ -197,10 +223,7 @@ export default function FilesPage(): React.JSX.Element {
         onCopy: handleCopy,
         onCut: handleCut,
         onDelete: handleDelete,
-        onEdit: (targetItem) => {
-          const fileItem = useFileExplorerStore.getState().items[targetItem.id]
-          if (fileItem?.type === 'file') startRename(fileItem.id, fileItem.name)
-        }
+        onEdit: (targetItem) => openEditModal(targetItem.id)
       })
     },
     [
@@ -210,7 +233,7 @@ export default function FilesPage(): React.JSX.Element {
       handleCopy,
       handleCut,
       handleDelete,
-      startRename
+      openEditModal
     ]
   )
 
@@ -241,7 +264,7 @@ export default function FilesPage(): React.JSX.Element {
         onCut: handleCut,
         onPaste: handlePaste,
         onDelete: handleDelete,
-        onEdit: (targetFolder) => startRename(targetFolder.id, targetFolder.name)
+        onEdit: (targetFolder) => openEditModal(targetFolder.id)
       })
     },
     [
@@ -253,7 +276,7 @@ export default function FilesPage(): React.JSX.Element {
       handleCut,
       handlePaste,
       handleDelete,
-      startRename
+      openEditModal
     ]
   )
 
@@ -317,35 +340,9 @@ export default function FilesPage(): React.JSX.Element {
           onSelectionChange={handleSelectionChange}
           onCopy={handleCopy}
           onCut={handleCut}
-          onPaste={handlePaste}
+          onPaste={() => void handlePaste()}
+          clipboard={clipboard}
         />
-        {renamingId && (
-          <div className="absolute inset-0 z-50 flex items-start justify-center bg-background/20 pt-24 backdrop-blur-sm">
-            <form
-              className="w-80 rounded-lg border border-border bg-content1 p-3 shadow-xl"
-              onSubmit={(event) => {
-                event.preventDefault()
-                submitRename()
-              }}
-            >
-              <label
-                className="mb-2 block text-xs font-medium text-default-500"
-                htmlFor="file-rename-input"
-              >
-                Rename
-              </label>
-              <input
-                id="file-rename-input"
-                value={renameValue}
-                onChange={(event) => setRenameValue(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Escape') cancelRename()
-                }}
-                className="w-full rounded-md border border-default-200 bg-default-100 px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
-              />
-            </form>
-          </div>
-        )}
       </FileExplorerShell>
       <FileExplorerFAB onUploadFiles={handleUploadFiles} onUploadFolder={handleUploadFolder} />
       <FolderModal
@@ -357,6 +354,24 @@ export default function FilesPage(): React.JSX.Element {
         onFolderNameChange={setCreateFolderName}
         folderDuration={createFolderDuration}
         onFolderDurationChange={setCreateFolderDuration}
+      />
+      <FolderModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false)
+          setEditingId(null)
+        }}
+        onSubmit={handleEditSubmit}
+        editingFolder={
+          editingId
+            ? (useFileExplorerStore.getState().folders[editingId] as FolderRecord | undefined) ??
+              ({ id: editingId, name: editModalName } as FolderRecord)
+            : null
+        }
+        folderName={editModalName}
+        onFolderNameChange={setEditModalName}
+        folderDuration={editModalDuration}
+        onFolderDurationChange={setEditModalDuration}
       />
     </>
   )

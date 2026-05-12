@@ -30,6 +30,7 @@ import {
   useFileExplorerStore
 } from '@renderer/stores/file-explorer'
 import type { FileItemRecord, FolderRecord } from '@shared/types/folder'
+import type { ClipboardState } from '@renderer/components/Control/FileExplorer'
 import { getFileIcon } from './views/getFileIcon'
 import { GridView, ListView, type GridViewItem } from './views'
 import type { SearchResult } from '@renderer/lib/file-explorer-search'
@@ -42,6 +43,7 @@ export interface FileBrowserProps {
   onCopy?: (selectedIds: Set<string>) => void
   onCut?: (selectedIds: Set<string>) => void
   onPaste?: () => void
+  clipboard?: ClipboardState | null
 }
 
 type FileExplorerDndData =
@@ -55,6 +57,7 @@ interface SortableViewItemProps {
   file?: FileItemRecord
   isDraggedAway: boolean
   isMultiDrag: boolean
+  isCut?: boolean
   children: React.ReactNode
 }
 
@@ -84,6 +87,7 @@ function SortableViewItem({
   file,
   isDraggedAway,
   isMultiDrag,
+  isCut,
   children
 }: SortableViewItemProps): React.JSX.Element {
   const sortable = useSortable({
@@ -109,7 +113,7 @@ function SortableViewItem({
   const style: React.CSSProperties = {
     transform: isMultiDrag ? undefined : CSS.Transform.toString(sortable.transform),
     transition: isMultiDrag ? undefined : sortable.transition,
-    opacity: sortable.isDragging || isDraggedAway ? 0.4 : 1
+    opacity: sortable.isDragging || isDraggedAway ? 0.4 : isCut ? 0.4 : 1
   }
 
   return (
@@ -192,7 +196,8 @@ export function FileBrowser({
   onSelectionChange,
   onCopy,
   onCut,
-  onPaste
+  onPaste,
+  clipboard
 }: FileBrowserProps): React.JSX.Element {
   const { t } = useTranslation()
   const confirm = useConfirm()
@@ -559,6 +564,7 @@ export function FileBrowser({
     (item: GridViewItem, children: React.ReactNode): React.ReactNode => {
       const folder = folders.find((entry) => entry.id === item.id)
       const file = fileItems.find((entry) => entry.id === item.id)
+      const isCut = !!clipboard && clipboard.mode === 'cut' && clipboard.itemIds.has(item.id)
       return (
         <SortableViewItem
           item={item}
@@ -566,12 +572,13 @@ export function FileBrowser({
           file={file}
           isDraggedAway={draggedIds.has(item.id)}
           isMultiDrag={isMultiDrag}
+          isCut={isCut}
         >
           {children}
         </SortableViewItem>
       )
     },
-    [folders, fileItems, draggedIds, isMultiDrag]
+    [folders, fileItems, draggedIds, isMultiDrag, clipboard]
   )
 
   if (searchQuery.trim()) {

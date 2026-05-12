@@ -394,9 +394,6 @@
     },
     "fab": {
       "label": "新增",
-      "newFolder": "新增資料夾",
-      "uploadFiles": "檔案上傳",
-      "uploadFolder": "資料夾上傳",
       "upload": "上傳"
     },
     "list": {

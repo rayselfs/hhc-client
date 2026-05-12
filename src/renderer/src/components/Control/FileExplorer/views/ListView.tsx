@@ -59,16 +59,16 @@ export function ListView({
       <div className="sticky top-0 bg-background z-10">
         <div className="flex items-center gap-3 px-3 py-1.5">
           <div className="w-6 flex-shrink-0" />
-          <div className="flex-1 text-xs font-medium text-default-400 uppercase tracking-wide">
+          <div className="flex-1 text-sm font-medium text-default-400 uppercase tracking-wide">
             {t('fileExplorer.list.name', 'Name')}
           </div>
-          <div className="w-28 flex-shrink-0 text-xs font-medium text-default-400 uppercase tracking-wide">
+          <div className="w-28 flex-shrink-0 text-sm font-medium text-default-400 uppercase tracking-wide">
             {t('fileExplorer.list.createdAt', 'Created')}
           </div>
-          <div className="w-20 flex-shrink-0 text-xs font-medium text-default-400 uppercase tracking-wide">
+          <div className="w-20 flex-shrink-0 text-sm font-medium text-default-400 uppercase tracking-wide">
             {t('fileExplorer.list.size', 'Size')}
           </div>
-          <div className="w-24 flex-shrink-0 text-xs font-medium text-default-400 uppercase tracking-wide">
+          <div className="w-24 flex-shrink-0 text-sm font-medium text-default-400 uppercase tracking-wide">
             {t('fileExplorer.list.kind', 'Kind')}
           </div>
         </div>
@@ -90,21 +90,21 @@ export function ListView({
                 {item.isFolder ? (
                   <Folder size={20} className="text-accent" fill="currentColor" />
                 ) : (
-                  <div className="text-default-500">
+                  <div className="text-danger">
                     {getFileIcon(item.mimeType, item.isFolder, 20)}
                   </div>
                 )}
               </div>
-              <div className="flex-1 truncate text-sm text-foreground" title={item.name}>
+              <div className="flex-1 truncate text-base text-foreground" title={item.name}>
                 {item.name}
               </div>
-              <div className="w-28 flex-shrink-0 text-xs text-default-400">
+              <div className="w-28 flex-shrink-0 text-sm text-default-400">
                 {formatDate(item.createdAt)}
               </div>
-              <div className="w-20 flex-shrink-0 text-xs text-default-400">
+              <div className="w-20 flex-shrink-0 text-sm text-default-400">
                 {item.isFolder ? '—' : formatFileSize(item.size)}
               </div>
-              <div className="w-24 flex-shrink-0 text-xs text-default-400 truncate">
+              <div className="w-24 flex-shrink-0 text-sm text-default-400 truncate">
                 {formatFileKind(item.mimeType, item.isFolder)}
               </div>
             </div>
