@@ -35,6 +35,8 @@ export interface FileItemRecord extends ItemRecord {
 
 export type AnyItemRecord = VerseItemRecord | FileItemRecord
 
+export type FileExplorerViewMode = 'large-icon' | 'medium-icon' | 'small-icon' | 'list'
+
 export type VerseItem = VerseItemRecord
 export type FileItem = FileItemRecord
 export type FolderItem = ItemRecord
