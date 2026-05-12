@@ -1,5 +1,5 @@
 import React from 'react'
-import { Folder } from 'lucide-react'
+import { Folder, Star } from 'lucide-react'
 import { Skeleton } from '@heroui/react/skeleton'
 import { useTranslation } from 'react-i18next'
 import { getFileIcon } from './getFileIcon'
@@ -13,6 +13,7 @@ export interface GridViewItem {
   createdAt?: number
   thumbnailUrl?: string | null
   isSelected: boolean
+  isFavorited?: boolean
 }
 
 function canHaveThumbnail(mimeType: string | undefined): boolean {
@@ -114,8 +115,14 @@ export function GridView({
             onDoubleClick={(e) => onItemDoubleClick(item.id, e)}
             onContextMenu={(e) => onItemContextMenu(item.id, e)}
           >
-            <div className="flex items-center justify-center">
+            <div className="relative flex items-center justify-center">
               {renderGridIcon(item, iconSize)}
+              {item.isFavorited && item.isFolder && (
+                <Star
+                  size={13}
+                  className="absolute -top-1 -right-1 text-warning fill-warning drop-shadow-sm"
+                />
+              )}
             </div>
             <span
               className={`w-full text-center text-foreground break-words ${nameClass}`}

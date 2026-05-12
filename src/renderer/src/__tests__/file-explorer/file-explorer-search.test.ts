@@ -59,6 +59,7 @@ function makeStoreState(items: AnyItemRecord[], folders: FolderRecord[] = []): F
     navigateUp: vi.fn(),
     cleanupExpired: vi.fn(),
     ensureItemsLoaded: vi.fn(),
+    toggleFavorite: vi.fn(),
     getChildFolders: vi.fn().mockReturnValue([]),
     getItems: vi.fn().mockReturnValue([]),
     getFolderPath: vi.fn().mockReturnValue([]),

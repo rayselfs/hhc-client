@@ -455,7 +455,9 @@
       "paste": "貼上",
       "edit": "編輯",
       "uploadFiles": "檔案上傳",
-      "uploadFolder": "資料夾上傳"
+      "uploadFolder": "資料夾上傳",
+      "addFavorite": "加入我的最愛",
+      "removeFavorite": "移除我的最愛"
     }
   },
   "projection": {
@@ -622,6 +624,12 @@
       "select_all": "全選",
       "delete": "刪除",
       "delete_alt": "刪除 (替代)"
+    }
+  },
+  "favorites": {
+    "empty": {
+      "title": "還沒有最愛",
+      "description": "對資料夾按右鍵以加入我的最愛"
     }
   }
 }

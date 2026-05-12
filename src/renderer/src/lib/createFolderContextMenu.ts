@@ -14,8 +14,8 @@ export interface ClipboardState {
 
 export interface FolderContextMenuConfig {
   i18nPrefix?: string
-  extraItemActions?: (itemId: string) => ContextMenuEntry[]
-  extraFolderActions?: (folder: FolderRecord) => ContextMenuEntry[]
+  extraItemActions?: (itemId: string, t: (key: string) => string) => ContextMenuEntry[]
+  extraFolderActions?: (folder: FolderRecord, t: (key: string) => string) => ContextMenuEntry[]
   extraEmptyAreaActions?: () => ContextMenuEntry[]
 }
 
@@ -129,7 +129,7 @@ export function createFolderContextMenu(
         }
       ]
 
-      const extra = config?.extraItemActions?.(item.id) ?? []
+      const extra = config?.extraItemActions?.(item.id, t as (key: string) => string) ?? []
       showMenu([...baseItems, ...extra], event)
     }
 
@@ -198,7 +198,7 @@ export function createFolderContextMenu(
         }
       ]
 
-      const extra = config?.extraFolderActions?.(folder) ?? []
+      const extra = config?.extraFolderActions?.(folder, t as (key: string) => string) ?? []
       showMenu([...baseItems, ...extra], event)
     }
 

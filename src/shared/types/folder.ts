@@ -5,6 +5,7 @@ export interface FolderRecord {
   sortIndex: number
   createdAt: number
   expiresAt: number | null
+  isFavorited?: boolean
 }
 
 export interface ItemRecord {

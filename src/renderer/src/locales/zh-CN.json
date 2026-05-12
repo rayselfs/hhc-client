@@ -455,7 +455,9 @@
       "paste": "粘贴",
       "edit": "编辑",
       "uploadFiles": "上传文件",
-      "uploadFolder": "上传文件夹"
+      "uploadFolder": "上传文件夹",
+      "addFavorite": "加入我的收藏",
+      "removeFavorite": "移除我的收藏"
     }
   },
   "projection": {
@@ -622,6 +624,12 @@
       "select_all": "全选",
       "delete": "删除",
       "delete_alt": "删除 (替代)"
+    }
+  },
+  "favorites": {
+    "empty": {
+      "title": "还没有收藏",
+      "description": "右键单击文件夹以添加到我的收藏"
     }
   }
 }

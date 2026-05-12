@@ -439,6 +439,7 @@ export function FileBrowser({
         name: folder.name,
         isFolder: true,
         createdAt: folder.createdAt,
+        isFavorited: folder.isFavorited,
         isSelected: selectedIds.has(folder.id)
       })),
       ...fileItems.map((item) => ({

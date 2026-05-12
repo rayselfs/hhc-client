@@ -21,7 +21,7 @@ interface MediaSubItem {
 
 const MEDIA_SUB_ITEMS: MediaSubItem[] = [
   { to: '/files', icon: Files, labelKey: 'nav.files', disabled: false },
-  { to: '/favorites', icon: Star, labelKey: 'nav.favorites', disabled: true },
+  { to: '/favorites', icon: Star, labelKey: 'nav.favorites', disabled: false },
   { to: '/trash', icon: Trash2, labelKey: 'nav.trash', disabled: true }
 ]
 

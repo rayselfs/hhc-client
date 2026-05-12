@@ -34,6 +34,7 @@ export interface FolderStoreState {
   navigateUp: () => void
   cleanupExpired: () => Promise<void>
   ensureItemsLoaded: (parentId: string) => Promise<void>
+  toggleFavorite: (folderId: string) => void
 
   getChildFolders: (parentId: string) => FolderRecord[]
   getItems: (parentId: string) => AnyItemRecord[]
@@ -334,6 +335,18 @@ export function createFolderStore(config: FolderStoreConfig) {
       if (currentFolderId === config.rootId) return
       const current = folders[currentFolderId]
       set({ currentFolderId: current?.parentId ?? config.rootId })
+    },
+
+    toggleFavorite: (folderId) => {
+      if (folderId === config.rootId) return
+      const folder = get().folders[folderId]
+      if (!folder) return
+      const updated: FolderRecord = { ...folder, isFavorited: !folder.isFavorited }
+      set((state) => ({
+        folders: { ...state.folders, [folderId]: updated },
+        _foldersArray: state._foldersArray.map((f) => (f.id === folderId ? updated : f))
+      }))
+      ops.saveFolder(updated)
     },
 
     cleanupExpired: async () => {

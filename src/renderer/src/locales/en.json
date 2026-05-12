@@ -455,7 +455,9 @@
       "paste": "Paste",
       "edit": "Edit",
       "uploadFiles": "Upload Files",
-      "uploadFolder": "Upload Folder"
+      "uploadFolder": "Upload Folder",
+      "addFavorite": "Add to Favorites",
+      "removeFavorite": "Remove from Favorites"
     }
   },
   "projection": {
@@ -622,6 +624,12 @@
       "select_all": "Select All",
       "delete": "Delete",
       "delete_alt": "Delete (Alternative)"
+    }
+  },
+  "favorites": {
+    "empty": {
+      "title": "No favorites yet",
+      "description": "Right-click a folder to add it to Favorites"
     }
   }
 }
