@@ -15,7 +15,7 @@ import {
 } from '@dnd-kit/core'
 import { SortableContext, arrayMove, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Folder } from 'lucide-react'
+import { Folder, Upload } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
@@ -29,6 +29,7 @@ import {
   useFileExplorerSettings,
   useFileExplorerStore
 } from '@renderer/stores/file-explorer'
+import { uploadFromDataTransfer } from '@renderer/lib/upload-utils'
 import type { FileItemRecord, FolderRecord } from '@shared/types/folder'
 import type { ClipboardState } from '@renderer/components/Control/FileExplorer'
 import { getFileIcon } from './views/getFileIcon'
@@ -78,6 +79,7 @@ interface SortableViewItemProps {
   isDraggedAway: boolean
   isMultiDrag: boolean
   isCut?: boolean
+  isOsDragTarget?: boolean
   children: React.ReactNode
 }
 
@@ -108,6 +110,7 @@ function SortableViewItem({
   isDraggedAway,
   isMultiDrag,
   isCut,
+  isOsDragTarget,
   children
 }: SortableViewItemProps): React.JSX.Element {
   const sortable = useSortable({
@@ -141,7 +144,9 @@ function SortableViewItem({
       ref={setRef}
       style={style}
       data-file-item
-      className="touch-none"
+      data-item-id={item.id}
+      {...(item.isFolder ? { 'data-folder-id': item.id } : {})}
+      className={`touch-none rounded-lg${isOsDragTarget ? ' ring-2 ring-inset ring-primary/50' : ''}`}
       {...sortable.attributes}
       {...sortable.listeners}
     >
@@ -245,7 +250,17 @@ export function FileBrowser({
   const [activeId, setActiveId] = useState<string | null>(null)
   const [draggedIds, setDraggedIds] = useState<Set<string>>(new Set())
   const [thumbnails, setThumbnails] = useState<Record<string, string | null>>({})
+  const [rubberBandRect, setRubberBandRect] = useState<{
+    left: number
+    top: number
+    width: number
+    height: number
+  } | null>(null)
+  const [isOsDragOver, setIsOsDragOver] = useState(false)
+  const [osDragTargetFolderId, setOsDragTargetFolderId] = useState<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const justRubberBandedRef = useRef(false)
+  const osDragTargetFolderIdRef = useRef<string | null>(null)
 
   React.useEffect(() => {
     onSelectionChange?.(selectedIds)
@@ -412,9 +427,64 @@ export function FileBrowser({
   const handleContainerClick = useCallback(
     (event: React.MouseEvent): void => {
       if ((event.target as Element).closest('[data-file-item]')) return
+      if (justRubberBandedRef.current) {
+        justRubberBandedRef.current = false
+        return
+      }
       clearSelection()
     },
     [clearSelection]
+  )
+
+  const handleContainerMouseDown = useCallback(
+    (e: React.MouseEvent): void => {
+      if (e.button !== 0) return
+      if ((e.target as Element).closest('[data-file-item]')) return
+
+      const startX = e.clientX
+      const startY = e.clientY
+      let currentRect: { left: number; top: number; width: number; height: number } | null = null
+
+      const handleMouseMove = (moveEvent: MouseEvent): void => {
+        const left = Math.min(startX, moveEvent.clientX)
+        const top = Math.min(startY, moveEvent.clientY)
+        const width = Math.abs(moveEvent.clientX - startX)
+        const height = Math.abs(moveEvent.clientY - startY)
+        currentRect = { left, top, width, height }
+        setRubberBandRect(currentRect)
+
+        const container = containerRef.current
+        if (!container) return
+        const newSelected = new Set<string>()
+        container.querySelectorAll<HTMLElement>('[data-item-id]').forEach((el) => {
+          const r = el.getBoundingClientRect()
+          if (
+            r.right > left &&
+            r.left < left + width &&
+            r.bottom > top &&
+            r.top < top + height
+          ) {
+            const id = el.dataset.itemId
+            if (id) newSelected.add(id)
+          }
+        })
+        setSelectedIds(newSelected)
+        setLastSelectedId(null)
+      }
+
+      const handleMouseUp = (): void => {
+        if (currentRect && (currentRect.width > 5 || currentRect.height > 5)) {
+          justRubberBandedRef.current = true
+        }
+        setRubberBandRect(null)
+        window.removeEventListener('mousemove', handleMouseMove)
+        window.removeEventListener('mouseup', handleMouseUp)
+      }
+
+      window.addEventListener('mousemove', handleMouseMove)
+      window.addEventListener('mouseup', handleMouseUp)
+    },
+    []
   )
 
   const handleContainerContextMenu = useCallback(
@@ -424,6 +494,46 @@ export function FileBrowser({
       onEmptyAreaContextMenu?.(event)
     },
     [onEmptyAreaContextMenu]
+  )
+
+  const handleOsDragEnter = useCallback((e: React.DragEvent): void => {
+    if (!e.dataTransfer.types.includes('Files')) return
+    e.preventDefault()
+    setIsOsDragOver(true)
+  }, [])
+
+  const handleOsDragOver = useCallback((e: React.DragEvent): void => {
+    if (!e.dataTransfer.types.includes('Files')) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'copy'
+    const folderEl = (e.target as Element).closest<HTMLElement>('[data-folder-id]')
+    const folderId = folderEl?.dataset.folderId ?? null
+    if (folderId !== osDragTargetFolderIdRef.current) {
+      osDragTargetFolderIdRef.current = folderId
+      setOsDragTargetFolderId(folderId)
+    }
+  }, [])
+
+  const handleOsDragLeave = useCallback((e: React.DragEvent): void => {
+    if (!e.dataTransfer.types.includes('Files')) return
+    const container = containerRef.current
+    if (container && e.relatedTarget && container.contains(e.relatedTarget as Node)) return
+    setIsOsDragOver(false)
+    osDragTargetFolderIdRef.current = null
+    setOsDragTargetFolderId(null)
+  }, [])
+
+  const handleOsDrop = useCallback(
+    async (e: React.DragEvent): Promise<void> => {
+      if (!e.dataTransfer.types.includes('Files')) return
+      e.preventDefault()
+      setIsOsDragOver(false)
+      const targetId = osDragTargetFolderIdRef.current ?? currentFolderId
+      osDragTargetFolderIdRef.current = null
+      setOsDragTargetFolderId(null)
+      await uploadFromDataTransfer(e.dataTransfer.items, targetId)
+    },
+    [currentFolderId]
   )
 
   const handleItemContextMenu = useCallback(
@@ -620,6 +730,7 @@ export function FileBrowser({
       const folder = folders.find((entry) => entry.id === item.id)
       const file = fileItems.find((entry) => entry.id === item.id)
       const isCut = !!clipboard && clipboard.mode === 'cut' && clipboard.itemIds.has(item.id)
+      const isOsDragTarget = item.isFolder && osDragTargetFolderId === item.id
       return (
         <SortableViewItem
           item={item}
@@ -628,12 +739,13 @@ export function FileBrowser({
           isDraggedAway={draggedIds.has(item.id)}
           isMultiDrag={isMultiDrag}
           isCut={isCut}
+          isOsDragTarget={isOsDragTarget}
         >
           {children}
         </SortableViewItem>
       )
     },
-    [folders, fileItems, draggedIds, isMultiDrag, clipboard]
+    [folders, fileItems, draggedIds, isMultiDrag, clipboard, osDragTargetFolderId]
   )
 
   if (searchQuery.trim()) {
@@ -664,7 +776,16 @@ export function FileBrowser({
   }
 
   return (
-    <div ref={containerRef} className="h-full" onClick={handleContainerClick}>
+    <div
+      ref={containerRef}
+      className="relative h-full"
+      onClick={handleContainerClick}
+      onMouseDown={handleContainerMouseDown}
+      onDragEnter={handleOsDragEnter}
+      onDragOver={handleOsDragOver}
+      onDragLeave={handleOsDragLeave}
+      onDrop={(e) => void handleOsDrop(e)}
+    >
       <DndContext
         sensors={sensors}
         collisionDetection={customCollisionDetection}
@@ -709,6 +830,32 @@ export function FileBrowser({
           ) : null}
         </DragOverlay>
       </DndContext>
+
+      {rubberBandRect && (
+        <div
+          className="pointer-events-none fixed z-50 rounded-sm border border-primary/60 bg-primary/10"
+          style={{
+            left: rubberBandRect.left,
+            top: rubberBandRect.top,
+            width: rubberBandRect.width,
+            height: rubberBandRect.height
+          }}
+        />
+      )}
+
+      {isOsDragOver && (
+        <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center">
+          <div className="absolute inset-2 rounded-xl border-2 border-dashed border-primary/60 bg-primary/5" />
+          <div className="relative flex flex-col items-center gap-2 text-primary/80">
+            <Upload size={32} />
+            <span className="text-sm font-medium">
+              {osDragTargetFolderId
+                ? t('fileExplorer.upload.dropToFolder', 'Drop into folder')
+                : t('fileExplorer.upload.dropToUpload', 'Drop to upload')}
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -404,7 +404,9 @@
       "noResults": "未找到结果"
     },
     "upload": {
-      "button": "上传"
+      "button": "上传",
+      "dropToUpload": "拖曳以上传",
+      "dropToFolder": "放入文件夹"
     },
     "status": {
       "itemCount": "{{count}} 个项目",

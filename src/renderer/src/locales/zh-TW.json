@@ -404,7 +404,9 @@
       "noResults": "找不到結果"
     },
     "upload": {
-      "button": "上傳"
+      "button": "上傳",
+      "dropToUpload": "拖曳以上傳",
+      "dropToFolder": "放入資料夾"
     },
     "status": {
       "itemCount": "{{count}} 個項目",

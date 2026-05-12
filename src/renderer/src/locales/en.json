@@ -404,7 +404,9 @@
       "noResults": "No results found"
     },
     "upload": {
-      "button": "Upload"
+      "button": "Upload",
+      "dropToUpload": "Drop to upload",
+      "dropToFolder": "Drop into folder"
     },
     "status": {
       "itemCount": "{{count}} item(s)",
