@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Trash2, RotateCcw } from 'lucide-react'
 import {
@@ -11,22 +11,26 @@ import { useContextMenu } from '@renderer/contexts/ContextMenuContext'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
 import { useKeyboardShortcuts } from '@renderer/hooks/useKeyboardShortcuts'
 import { useItemSelection } from '@renderer/hooks/useItemSelection'
+import { useThumbnails, canHaveThumbnail } from '@renderer/hooks/useThumbnails'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
-import { getThumbnail } from '@renderer/lib/thumbnail-db'
+import { compareByField } from '@renderer/lib/file-explorer-sort'
 import { GridView, ListView } from '@renderer/components/Control/FileExplorer/views'
 import type { FileItemRecord, FolderRecord } from '@shared/types/folder'
 import type { SortField } from '@renderer/stores/file-explorer'
+import type { SortableItem } from '@renderer/lib/file-explorer-sort'
 
 type TrashEntry =
   | { kind: 'folder'; folder: FolderRecord }
   | { kind: 'file'; item: FileItemRecord }
 
-function canHaveThumbnail(mimeType: string | undefined): boolean {
-  return (
-    mimeType?.startsWith('image/') === true ||
-    mimeType?.startsWith('video/') === true ||
-    mimeType === 'application/pdf'
-  )
+function toSortable(e: TrashEntry): SortableItem {
+  return {
+    name: e.kind === 'folder' ? e.folder.name : e.item.name,
+    size: e.kind === 'file' ? e.item.size : undefined,
+    createdAt: e.kind === 'folder' ? e.folder.createdAt : e.item.createdAt,
+    mimeType: e.kind === 'file' ? e.item.mimeType : undefined,
+    isFolder: e.kind === 'folder'
+  }
 }
 
 function compareTrashByField(
@@ -35,26 +39,7 @@ function compareTrashByField(
   field: SortField,
   dir: 'asc' | 'desc'
 ): number {
-  const sign = dir === 'asc' ? 1 : -1
-  const nameA = a.kind === 'folder' ? a.folder.name : a.item.name
-  const nameB = b.kind === 'folder' ? b.folder.name : b.item.name
-  const sizeA = a.kind === 'file' ? a.item.size : 0
-  const sizeB = b.kind === 'file' ? b.item.size : 0
-  const createdAtA = a.kind === 'folder' ? a.folder.createdAt : a.item.createdAt
-  const createdAtB = b.kind === 'folder' ? b.folder.createdAt : b.item.createdAt
-  switch (field) {
-    case 'name':
-      return sign * nameA.localeCompare(nameB)
-    case 'createdAt':
-      return sign * (createdAtA - createdAtB)
-    case 'size':
-      return sign * (sizeA - sizeB)
-    case 'kind': {
-      const kindA = a.kind === 'folder' ? 'folder' : (a.item.mimeType ?? '')
-      const kindB = b.kind === 'folder' ? 'folder' : (b.item.mimeType ?? '')
-      return sign * kindA.localeCompare(kindB)
-    }
-  }
+  return compareByField(toSortable(a), toSortable(b), field, dir)
 }
 
 export default function TrashPage(): React.JSX.Element {
@@ -97,40 +82,15 @@ export default function TrashPage(): React.JSX.Element {
     return all
   }, [foldersArray, itemsArray, sortField, sortDir])
 
-  const [thumbnails, setThumbnails] = useState<Record<string, string | null>>({})
+  const thumbnailFileItems = useMemo(
+    () =>
+      entries
+        .filter((e): e is { kind: 'file'; item: FileItemRecord } => e.kind === 'file')
+        .map((e) => e.item),
+    [entries]
+  )
 
-  useEffect(() => {
-    let cancelled = false
-    const thumbnailItems = entries
-      .filter((e): e is { kind: 'file'; item: FileItemRecord } => e.kind === 'file')
-      .filter((e) => canHaveThumbnail(e.item.mimeType))
-
-    setThumbnails((current) => {
-      const next: Record<string, string | null> = {}
-      for (const e of thumbnailItems) {
-        if (Object.prototype.hasOwnProperty.call(current, e.item.id)) next[e.item.id] = current[e.item.id]
-      }
-      return next
-    })
-
-    async function loadThumbnails(): Promise<void> {
-      for (const e of thumbnailItems) {
-        if (cancelled) return
-        const dataUrl = await getThumbnail(e.item.id)
-        if (dataUrl !== null) {
-          setThumbnails((prev) => ({ ...prev, [e.item.id]: dataUrl }))
-        } else {
-          setThumbnails((prev) => ({ ...prev, [e.item.id]: null }))
-        }
-      }
-    }
-
-    void loadThumbnails()
-
-    return () => {
-      cancelled = true
-    }
-  }, [entries])
+  const thumbnails = useThumbnails(thumbnailFileItems)
 
   const gridItems = useMemo(
     () =>

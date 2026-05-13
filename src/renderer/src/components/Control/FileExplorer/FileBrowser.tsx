@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   DndContext,
   DragOverlay,
@@ -20,7 +20,10 @@ import { useTranslation } from 'react-i18next'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
 import { useKeyboardShortcuts } from '@renderer/hooks/useKeyboardShortcuts'
-import { getThumbnail } from '@renderer/lib/thumbnail-db'
+import { useItemSelection } from '@renderer/hooks/useItemSelection'
+import { useOsFileDrop } from '@renderer/hooks/useOsFileDrop'
+import { useThumbnails, canHaveThumbnail } from '@renderer/hooks/useThumbnails'
+import { compareByField } from '@renderer/lib/file-explorer-sort'
 import { searchAllItems } from '@renderer/lib/file-explorer-search'
 import {
   deleteFolderFromStore,
@@ -38,23 +41,6 @@ import { GridView, ListView, type GridViewItem } from './views'
 import type { SearchResult } from '@renderer/lib/file-explorer-search'
 import { formatFileKind } from '@renderer/lib/format-file-kind'
 import type { SortField } from '@renderer/stores/file-explorer'
-
-function compareItems(a: GridViewItem, b: GridViewItem, field: SortField, dir: 'asc' | 'desc'): number {
-  const sign = dir === 'asc' ? 1 : -1
-  switch (field) {
-    case 'name':
-      return sign * a.name.localeCompare(b.name)
-    case 'createdAt':
-      return sign * ((a.createdAt ?? 0) - (b.createdAt ?? 0))
-    case 'size':
-      return sign * ((a.size ?? 0) - (b.size ?? 0))
-    case 'kind': {
-      const ka = formatFileKind(a.mimeType, a.isFolder)
-      const kb = formatFileKind(b.mimeType, b.isFolder)
-      return sign * ka.localeCompare(kb)
-    }
-  }
-}
 
 export interface FileBrowserProps {
   onItemContextMenu?: (itemId: string, event: React.MouseEvent) => void
@@ -93,14 +79,6 @@ function isFileItemRecord(item: unknown): item is FileItemRecord {
     'name' in item &&
     'mimeType' in item &&
     'size' in item
-  )
-}
-
-function canHaveThumbnail(mimeType: string | undefined): boolean {
-  return (
-    mimeType?.startsWith('image/') === true ||
-    mimeType?.startsWith('video/') === true ||
-    mimeType === 'application/pdf'
   )
 }
 
@@ -345,32 +323,9 @@ export function FileBrowser({
   const searchQuery = useFileExplorerSearch((state) => state.searchQuery)
   const setSearchQuery = useFileExplorerSearch((state) => state.setSearchQuery)
 
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [lastSelectedId, setLastSelectedId] = useState<string | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [draggedIds, setDraggedIds] = useState<Set<string>>(new Set())
-  const [thumbnails, setThumbnails] = useState<Record<string, string | null>>({})
   const [selectedSearchId, setSelectedSearchId] = useState<string | null>(null)
-  const [rubberBandRect, setRubberBandRect] = useState<{
-    left: number
-    top: number
-    width: number
-    height: number
-  } | null>(null)
-  const [isOsDragOver, setIsOsDragOver] = useState(false)
-  const [osDragTargetFolderId, setOsDragTargetFolderId] = useState<string | null>(null)
-  const containerRef = useRef<HTMLDivElement>(null)
-  const justRubberBandedRef = useRef(false)
-  const osDragTargetFolderIdRef = useRef<string | null>(null)
-
-  React.useEffect(() => {
-    onSelectionChange?.(selectedIds)
-  }, [selectedIds, onSelectionChange])
-
-  React.useEffect(() => {
-    setSelectedIds(new Set())
-    setLastSelectedId(null)
-  }, [currentFolderId])
 
   const sensors = useSensors(
     useSensor(MouseSensor, {
@@ -409,53 +364,7 @@ export function FileBrowser({
     })
   }, [searchQuery, itemsArray, foldersArray, t])
 
-  useEffect(() => {
-    setSelectedSearchId(null)
-  }, [searchQuery])
-
-  useEffect(() => {
-    let cancelled = false
-    const thumbnailItems = fileItems.filter((item) => canHaveThumbnail(item.mimeType))
-    const now = Date.now()
-    const TWO_MINUTES = 2 * 60 * 1000
-
-    setThumbnails((current) => {
-      const next: Record<string, string | null> = {}
-      for (const item of thumbnailItems) {
-        if (Object.prototype.hasOwnProperty.call(current, item.id)) next[item.id] = current[item.id]
-      }
-      return next
-    })
-
-    async function loadThumbnails(): Promise<void> {
-      for (const item of thumbnailItems) {
-        if (cancelled) return
-        const dataUrl = await getThumbnail(item.id)
-        if (dataUrl !== null) {
-          setThumbnails((prev) => ({ ...prev, [item.id]: dataUrl }))
-        } else if (now - (item.createdAt ?? 0) > TWO_MINUTES) {
-          setThumbnails((prev) => ({ ...prev, [item.id]: null }))
-        }
-      }
-    }
-
-    void loadThumbnails()
-
-    return () => {
-      cancelled = true
-    }
-  }, [fileItems])
-
-  useEffect(() => {
-    const onThumbnailReady = (e: Event): void => {
-      const { itemId, dataUrl } = (
-        e as CustomEvent<{ itemId: string; dataUrl: string | null }>
-      ).detail
-      setThumbnails((prev) => ({ ...prev, [itemId]: dataUrl }))
-    }
-    window.addEventListener('hhc:thumbnail-ready', onThumbnailReady)
-    return () => window.removeEventListener('hhc:thumbnail-ready', onThumbnailReady)
-  }, [])
+  const thumbnails = useThumbnails(fileItems, { pendingAgeMs: 2 * 60 * 1000 })
 
   const allItems: GridViewItem[] = useMemo(
     () => [
@@ -465,7 +374,7 @@ export function FileBrowser({
         isFolder: true,
         createdAt: folder.createdAt,
         isFavorited: folder.isFavorited,
-        isSelected: selectedIds.has(folder.id)
+        isSelected: false
       })),
       ...fileItems.map((item) => ({
         id: item.id,
@@ -475,18 +384,18 @@ export function FileBrowser({
         size: item.size,
         createdAt: item.createdAt,
         thumbnailUrl: canHaveThumbnail(item.mimeType) ? thumbnails[item.id] : null,
-        isSelected: selectedIds.has(item.id)
+        isSelected: false
       }))
     ],
-    [folders, fileItems, selectedIds, thumbnails]
+    [folders, fileItems, thumbnails]
   )
 
   const sortedItems = useMemo(() => {
     const foldersSubset = allItems.filter((item) => item.isFolder)
     const filesSubset = allItems.filter((item) => !item.isFolder)
     if (sortDir !== 'none') {
-      foldersSubset.sort((a, b) => compareItems(a, b, sortField, sortDir))
-      filesSubset.sort((a, b) => compareItems(a, b, sortField, sortDir))
+      foldersSubset.sort((a, b) => compareByField(a, b, sortField, sortDir))
+      filesSubset.sort((a, b) => compareByField(a, b, sortField, sortDir))
       return [...foldersSubset, ...filesSubset]
     }
     const customOrder = customOrders[currentFolderId]
@@ -510,112 +419,48 @@ export function FileBrowser({
   const activeItem = activeId ? sortedItems.find((item) => item.id === activeId) : null
   const isMultiDrag = draggedIds.size > 1
 
-  const handleItemClick = useCallback(
-    (itemId: string, event: React.MouseEvent): void => {
-      event.stopPropagation()
+  const {
+    selectedIds,
+    setSelectedIds,
+    clearSelection,
+    selectAll,
+    handleItemClick,
+    handleContainerClick,
+    handleContainerMouseDown,
+    rubberBandRect,
+    containerRef
+  } = useItemSelection(allIds)
 
-      if (event.shiftKey && lastSelectedId) {
-        const lastIndex = allIds.indexOf(lastSelectedId)
-        const currentIndex = allIds.indexOf(itemId)
-        if (lastIndex !== -1 && currentIndex !== -1) {
-          const start = Math.min(lastIndex, currentIndex)
-          const end = Math.max(lastIndex, currentIndex)
-          setSelectedIds(new Set(allIds.slice(start, end + 1)))
-          return
-        }
+  const { isOsDragOver, osDragTargetFolderId, handlers: osDragHandlers } = useOsFileDrop(
+    containerRef,
+    {
+      onDrop: async (dataTransfer, targetId) => {
+        await uploadFromDataTransfer(dataTransfer.items, targetId ?? currentFolderId)
       }
-
-      if (event.ctrlKey || event.metaKey) {
-        setSelectedIds((prev) => {
-          const next = new Set(prev)
-          if (next.has(itemId)) {
-            next.delete(itemId)
-          } else {
-            next.add(itemId)
-          }
-          return next
-        })
-      } else {
-        setSelectedIds(new Set([itemId]))
-      }
-
-      setLastSelectedId(itemId)
-    },
-    [allIds, lastSelectedId]
+    }
   )
 
-  const clearSelection = useCallback((): void => {
-    setSelectedIds(new Set())
-    setLastSelectedId(null)
-  }, [])
+  const sortedItemsWithSelection = useMemo(
+    () => sortedItems.map((i) => ({ ...i, isSelected: selectedIds.has(i.id) })),
+    [sortedItems, selectedIds]
+  )
+
+  useEffect(() => {
+    onSelectionChange?.(selectedIds)
+  }, [selectedIds, onSelectionChange])
+
+  useEffect(() => {
+    clearSelection()
+  }, [currentFolderId, clearSelection])
+
+  useEffect(() => {
+    setSelectedSearchId(null)
+  }, [searchQuery])
 
   const handleEscape = useCallback((): void => {
     clearSelection()
     onEscape?.()
   }, [clearSelection, onEscape])
-
-  const handleContainerClick = useCallback(
-    (event: React.MouseEvent): void => {
-      if ((event.target as Element).closest('[data-file-item]')) return
-      if (justRubberBandedRef.current) {
-        justRubberBandedRef.current = false
-        return
-      }
-      clearSelection()
-    },
-    [clearSelection]
-  )
-
-  const handleContainerMouseDown = useCallback(
-    (e: React.MouseEvent): void => {
-      if (e.button !== 0) return
-      if ((e.target as Element).closest('[data-file-item]')) return
-
-      const startX = e.clientX
-      const startY = e.clientY
-      let currentRect: { left: number; top: number; width: number; height: number } | null = null
-
-      const handleMouseMove = (moveEvent: MouseEvent): void => {
-        const left = Math.min(startX, moveEvent.clientX)
-        const top = Math.min(startY, moveEvent.clientY)
-        const width = Math.abs(moveEvent.clientX - startX)
-        const height = Math.abs(moveEvent.clientY - startY)
-        currentRect = { left, top, width, height }
-        setRubberBandRect(currentRect)
-
-        const container = containerRef.current
-        if (!container) return
-        const newSelected = new Set<string>()
-        container.querySelectorAll<HTMLElement>('[data-item-id]').forEach((el) => {
-          const r = el.getBoundingClientRect()
-          if (
-            r.left < left + width &&
-            r.right > left &&
-            r.top < top + height &&
-            r.bottom > top
-          ) {
-            const id = el.dataset.itemId
-            if (id) newSelected.add(id)
-          }
-        })
-        setSelectedIds(newSelected)
-        setLastSelectedId(null)
-      }
-
-      const handleMouseUp = (): void => {
-        if (currentRect && (currentRect.width > 5 || currentRect.height > 5)) {
-          justRubberBandedRef.current = true
-        }
-        setRubberBandRect(null)
-        window.removeEventListener('mousemove', handleMouseMove)
-        window.removeEventListener('mouseup', handleMouseUp)
-      }
-
-      window.addEventListener('mousemove', handleMouseMove)
-      window.addEventListener('mouseup', handleMouseUp)
-    },
-    []
-  )
 
   const handleContainerContextMenu = useCallback(
     (event: React.MouseEvent): void => {
@@ -624,46 +469,6 @@ export function FileBrowser({
       onEmptyAreaContextMenu?.(event)
     },
     [onEmptyAreaContextMenu]
-  )
-
-  const handleOsDragEnter = useCallback((e: React.DragEvent): void => {
-    if (!e.dataTransfer.types.includes('Files')) return
-    e.preventDefault()
-    setIsOsDragOver(true)
-  }, [])
-
-  const handleOsDragOver = useCallback((e: React.DragEvent): void => {
-    if (!e.dataTransfer.types.includes('Files')) return
-    e.preventDefault()
-    e.dataTransfer.dropEffect = 'copy'
-    const folderEl = (e.target as Element).closest<HTMLElement>('[data-folder-id]')
-    const folderId = folderEl?.dataset.folderId ?? null
-    if (folderId !== osDragTargetFolderIdRef.current) {
-      osDragTargetFolderIdRef.current = folderId
-      setOsDragTargetFolderId(folderId)
-    }
-  }, [])
-
-  const handleOsDragLeave = useCallback((e: React.DragEvent): void => {
-    if (!e.dataTransfer.types.includes('Files')) return
-    const container = containerRef.current
-    if (container && e.relatedTarget && container.contains(e.relatedTarget as Node)) return
-    setIsOsDragOver(false)
-    osDragTargetFolderIdRef.current = null
-    setOsDragTargetFolderId(null)
-  }, [])
-
-  const handleOsDrop = useCallback(
-    async (e: React.DragEvent): Promise<void> => {
-      if (!e.dataTransfer.types.includes('Files')) return
-      e.preventDefault()
-      setIsOsDragOver(false)
-      const targetId = osDragTargetFolderIdRef.current ?? currentFolderId
-      osDragTargetFolderIdRef.current = null
-      setOsDragTargetFolderId(null)
-      await uploadFromDataTransfer(e.dataTransfer.items, targetId)
-    },
-    [currentFolderId]
   )
 
   const handleItemContextMenu = useCallback(
@@ -678,7 +483,7 @@ export function FileBrowser({
         onItemContextMenu?.(itemId, event)
       }
     },
-    [sortedItems, selectedIds, onFolderContextMenu, onItemContextMenu]
+    [sortedItems, selectedIds, setSelectedIds, onFolderContextMenu, onItemContextMenu]
   )
 
   const handleItemDoubleClick = useCallback(
@@ -689,10 +494,6 @@ export function FileBrowser({
     },
     [sortedItems, navigateToFolder]
   )
-
-  const handleSelectAll = useCallback((): void => {
-    setSelectedIds(new Set(allIds))
-  }, [allIds])
 
   const handleDeleteSelected = useCallback(async (): Promise<void> => {
     if (selectedIds.size === 0) return
@@ -734,7 +535,7 @@ export function FileBrowser({
 
   useKeyboardShortcuts(
     [
-      { config: SHORTCUTS.EDIT.SELECT_ALL, handler: handleSelectAll, preventDefault: true },
+      { config: SHORTCUTS.EDIT.SELECT_ALL, handler: selectAll, preventDefault: true },
       { config: SHORTCUTS.EDIT.COPY, handler: handleCopySelected, preventDefault: true },
       { config: SHORTCUTS.EDIT.CUT, handler: handleCutSelected, preventDefault: true },
       { config: SHORTCUTS.EDIT.PASTE, handler: handlePasteSelected, preventDefault: true },
@@ -776,10 +577,9 @@ export function FileBrowser({
       } else {
         setSelectedIds(new Set([nextActiveId]))
         setDraggedIds(new Set([nextActiveId]))
-        setLastSelectedId(nextActiveId)
       }
     },
-    [selectedIds]
+    [selectedIds, setSelectedIds]
   )
 
   const handleDragOver = useCallback((): void => {}, [])
@@ -904,10 +704,10 @@ export function FileBrowser({
       className="relative h-full"
       onClick={handleContainerClick}
       onMouseDown={handleContainerMouseDown}
-      onDragEnter={handleOsDragEnter}
-      onDragOver={handleOsDragOver}
-      onDragLeave={handleOsDragLeave}
-      onDrop={(e) => void handleOsDrop(e)}
+      onDragEnter={osDragHandlers.onDragEnter}
+      onDragOver={osDragHandlers.onDragOver}
+      onDragLeave={osDragHandlers.onDragLeave}
+      onDrop={osDragHandlers.onDrop}
     >
       <DndContext
         sensors={sensors}
@@ -920,10 +720,10 @@ export function FileBrowser({
             className="h-full"
             onContextMenu={handleContainerContextMenu}
           >
-          <SortableContext items={sortedItems.map((item) => item.id)}>
+          <SortableContext items={sortedItemsWithSelection.map((item) => item.id)}>
             {viewMode === 'list' ? (
               <ListView
-                items={sortedItems}
+                items={sortedItemsWithSelection}
                 sortField={sortField}
                 sortDir={sortDir}
                 onSortChange={handleSortChange}
@@ -936,7 +736,7 @@ export function FileBrowser({
               />
             ) : (
               <GridView
-                items={sortedItems}
+                items={sortedItemsWithSelection}
                 viewMode={viewMode}
                 onItemClick={handleItemClick}
                 onItemDoubleClick={handleItemDoubleClick}
