@@ -60,6 +60,7 @@ export function createFolderStore(config: FolderStoreConfig) {
     isLoading: true,
 
     initialize: async () => {
+      if (get()._foldersArray.length > 0) return
       set({ isLoading: true })
       try {
         const allFolders = await ops.loadAllFolders()
@@ -348,10 +349,9 @@ export function createFolderStore(config: FolderStoreConfig) {
       if (!folder) return
       let updated: FolderRecord
       if (!folder.isFavorited) {
-        updated = { ...folder, isFavorited: true, preservedExpiresAt: folder.expiresAt, expiresAt: null }
+        updated = { ...folder, isFavorited: true, expiresAt: null }
       } else {
-        const restoredExpiresAt = folder.preservedExpiresAt !== undefined ? folder.preservedExpiresAt : folder.expiresAt
-        updated = { ...folder, isFavorited: false, expiresAt: restoredExpiresAt, preservedExpiresAt: undefined }
+        updated = { ...folder, isFavorited: false }
       }
       set((state) => ({
         folders: { ...state.folders, [folderId]: updated },

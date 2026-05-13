@@ -49,6 +49,7 @@ export default function FilesPage(): React.JSX.Element {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editModalName, setEditModalName] = useState('')
   const [editModalDuration, setEditModalDuration] = useState<FolderDuration>('1day')
+  const [editingIsFavorited, setEditingIsFavorited] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
@@ -192,6 +193,7 @@ export default function FilesPage(): React.JSX.Element {
     setEditingId(id)
     setEditModalName(target.name)
     setEditModalDuration(inferDuration(target.expiresAt, target.createdAt ?? Date.now()))
+    setEditingIsFavorited(state.folders[id]?.isFavorited ?? false)
     setIsEditModalOpen(true)
   }, [])
 
@@ -385,6 +387,7 @@ export default function FilesPage(): React.JSX.Element {
         onFolderNameChange={setEditModalName}
         folderDuration={editModalDuration}
         onFolderDurationChange={setEditModalDuration}
+        isRetentionLocked={editingIsFavorited}
       />
     </>
   )
