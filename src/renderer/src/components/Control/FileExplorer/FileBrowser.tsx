@@ -146,7 +146,7 @@ function SortableViewItem({
       data-file-item
       data-item-id={item.id}
       {...(item.isFolder ? { 'data-folder-id': item.id } : {})}
-      className={`touch-none rounded-lg${isOsDragTarget ? ' ring-2 ring-inset ring-primary/50' : ''}`}
+      className={`touch-none rounded-lg${isOsDragTarget || (droppable.isOver && item.isFolder) ? ' ring-2 ring-inset ring-primary/50' : ''}`}
       {...sortable.attributes}
       {...sortable.listeners}
     >
@@ -155,9 +155,26 @@ function SortableViewItem({
   )
 }
 
-function DragOverlayContent({ name, count }: { name: string; count: number }): React.JSX.Element {
+function DragOverlayContent({
+  name,
+  count,
+  isFolder,
+  mimeType
+}: {
+  name: string
+  count: number
+  isFolder: boolean
+  mimeType?: string
+}): React.JSX.Element {
   return (
-    <div className="rounded-lg bg-content1 px-3 py-2 text-sm text-foreground shadow-lg ring-1 ring-border">
+    <div className="rounded-lg bg-content1 px-3 py-2 text-sm text-foreground shadow-lg ring-1 ring-border flex items-center gap-2">
+      <div className="flex-shrink-0">
+        {isFolder ? (
+          <Folder size={16} className="text-accent" fill="currentColor" />
+        ) : (
+          <div className="text-danger">{getFileIcon(mimeType, false, 16)}</div>
+        )}
+      </div>
       {count > 1 ? `${count} items` : name}
     </div>
   )
@@ -365,17 +382,19 @@ export function FileBrowser({
 
   const folders = useMemo(
     () =>
-      foldersArray.filter(
-        (folder) => folder.parentId === currentFolderId && !folder.deletedAt
-      ),
+      foldersArray
+        .filter((folder) => folder.parentId === currentFolderId && !folder.deletedAt)
+        .sort((a, b) => a.sortIndex - b.sortIndex),
     [foldersArray, currentFolderId]
   )
   const fileItems = useMemo(
     () =>
-      itemsArray.filter(
-        (item): item is FileItemRecord =>
-          item.parentId === currentFolderId && isFileItemRecord(item) && !item.deletedAt
-      ),
+      itemsArray
+        .filter(
+          (item): item is FileItemRecord =>
+            item.parentId === currentFolderId && isFileItemRecord(item) && !item.deletedAt
+        )
+        .sort((a, b) => a.sortIndex - b.sortIndex),
     [itemsArray, currentFolderId]
   )
 
@@ -556,10 +575,10 @@ export function FileBrowser({
         container.querySelectorAll<HTMLElement>('[data-item-id]').forEach((el) => {
           const r = el.getBoundingClientRect()
           if (
-            r.left >= left &&
-            r.right <= left + width &&
-            r.top >= top &&
-            r.bottom <= top + height
+            r.left < left + width &&
+            r.right > left &&
+            r.top < top + height &&
+            r.bottom > top
           ) {
             const id = el.dataset.itemId
             if (id) newSelected.add(id)
@@ -786,6 +805,7 @@ export function FileBrowser({
         const newIndex = folderIds.indexOf(String(over.id))
         if (oldIndex !== -1 && newIndex !== -1) {
           reorderFolders(currentFolderId, arrayMove(folderIds, oldIndex, newIndex))
+          setSortDir('none')
         }
         return
       }
@@ -795,6 +815,7 @@ export function FileBrowser({
         const newIndex = itemIds.indexOf(String(over.id))
         if (oldIndex !== -1 && newIndex !== -1) {
           reorderItems(currentFolderId, arrayMove(itemIds, oldIndex, newIndex))
+          setSortDir('none')
         }
       }
     },
@@ -806,7 +827,8 @@ export function FileBrowser({
       moveFolder,
       moveItem,
       reorderFolders,
-      reorderItems
+      reorderItems,
+      setSortDir
     ]
   )
 
@@ -892,11 +914,11 @@ export function FileBrowser({
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
-        <div
-          className="min-h-full"
-          onClick={handleContainerClick}
-          onContextMenu={handleContainerContextMenu}
-        >
+          <div
+            className="h-full"
+            onClick={handleContainerClick}
+            onContextMenu={handleContainerContextMenu}
+          >
           <SortableContext items={[...folderIds, ...itemIds]}>
             {viewMode === 'list' ? (
               <ListView
@@ -926,7 +948,12 @@ export function FileBrowser({
         </div>
         <DragOverlay>
           {activeItem ? (
-            <DragOverlayContent name={activeItem.name} count={draggedIds.size || 1} />
+            <DragOverlayContent
+              name={activeItem.name}
+              count={draggedIds.size || 1}
+              isFolder={activeItem.isFolder}
+              mimeType={activeItem.mimeType}
+            />
           ) : null}
         </DragOverlay>
       </DndContext>

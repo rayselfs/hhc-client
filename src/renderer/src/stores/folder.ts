@@ -372,6 +372,7 @@ export function createFolderStore(config: FolderStoreConfig) {
       if (!folder) return
       const updated: FolderRecord = {
         ...folder,
+        isFavorited: false,
         deletedAt: Date.now(),
         originalParentId: folder.parentId ?? config.rootId
       }
@@ -408,6 +409,7 @@ export function createFolderStore(config: FolderStoreConfig) {
           : config.rootId
       const updated: FolderRecord = {
         ...folder,
+        isFavorited: false,
         parentId: targetParentId,
         deletedAt: undefined,
         originalParentId: undefined

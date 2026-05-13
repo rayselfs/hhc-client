@@ -9,6 +9,9 @@ import {
 } from '@renderer/stores/file-explorer'
 import { useContextMenu } from '@renderer/contexts/ContextMenuContext'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
+import { useKeyboardShortcuts } from '@renderer/hooks/useKeyboardShortcuts'
+import { useItemSelection } from '@renderer/hooks/useItemSelection'
+import { SHORTCUTS } from '@renderer/config/shortcuts'
 import { GridView, ListView } from '@renderer/components/Control/FileExplorer/views'
 import type { FileItemRecord, FolderRecord } from '@shared/types/folder'
 import type { SortField } from '@renderer/stores/file-explorer'
@@ -85,9 +88,49 @@ export default function TrashPage(): React.JSX.Element {
     return all
   }, [foldersArray, itemsArray, sortField, sortDir])
 
+  const gridItems = useMemo(
+    () =>
+      entries.map((entry) => ({
+        id: entry.kind === 'folder' ? entry.folder.id : entry.item.id,
+        name: entry.kind === 'folder' ? entry.folder.name : entry.item.name,
+        isFolder: entry.kind === 'folder',
+        mimeType: entry.kind === 'file' ? entry.item.mimeType : undefined,
+        size: entry.kind === 'file' ? entry.item.size : undefined,
+        createdAt: entry.kind === 'folder' ? entry.folder.createdAt : entry.item.createdAt,
+        isSelected: false
+      })),
+    [entries]
+  )
+
+  const allIds = useMemo(() => gridItems.map((i) => i.id), [gridItems])
+
+  const {
+    selectedIds,
+    setSelectedIds,
+    clearSelection,
+    selectAll,
+    handleItemClick,
+    handleContainerClick,
+    handleContainerMouseDown,
+    rubberBandRect,
+    containerRef
+  } = useItemSelection(allIds)
+
+  const gridItemsWithSelection = useMemo(
+    () => gridItems.map((i) => ({ ...i, isSelected: selectedIds.has(i.id) })),
+    [gridItems, selectedIds]
+  )
+
   const handleContextMenu = useCallback(
-    (entry: TrashEntry, event: React.MouseEvent): void => {
+    (id: string, event: React.MouseEvent): void => {
       event.preventDefault()
+      const isAlreadySelected = selectedIds.has(id)
+      if (!isAlreadySelected) {
+        setSelectedIds(new Set([id]))
+      }
+      const effectiveIds =
+        isAlreadySelected && selectedIds.size > 1 ? selectedIds : new Set([id])
+
       showMenu(
         [
           {
@@ -95,8 +138,15 @@ export default function TrashPage(): React.JSX.Element {
             label: t('fileExplorer.contextMenu.restore'),
             icon: React.createElement(RotateCcw, { size: 14 }),
             onAction: () => {
-              if (entry.kind === 'folder') restoreFolder(entry.folder.id)
-              else restoreItem(entry.item.id)
+              for (const eid of effectiveIds) {
+                const entry = entries.find(
+                  (e) => (e.kind === 'folder' ? e.folder.id : e.item.id) === eid
+                )
+                if (!entry) continue
+                if (entry.kind === 'folder') restoreFolder(entry.folder.id)
+                else restoreItem(entry.item.id)
+              }
+              clearSelection()
             }
           },
           'separator',
@@ -112,32 +162,35 @@ export default function TrashPage(): React.JSX.Element {
                 status: 'danger'
               })
               if (!confirmed) return
-              if (entry.kind === 'folder') {
-                await permanentDeleteFolderFromStore(entry.folder.id)
-              } else {
-                await permanentDeleteFileItemFromStore(entry.item.id)
+              for (const eid of effectiveIds) {
+                const entry = entries.find(
+                  (e) => (e.kind === 'folder' ? e.folder.id : e.item.id) === eid
+                )
+                if (!entry) continue
+                if (entry.kind === 'folder') {
+                  await permanentDeleteFolderFromStore(entry.folder.id)
+                } else {
+                  await permanentDeleteFileItemFromStore(entry.item.id)
+                }
               }
+              clearSelection()
             }
           }
         ],
         event
       )
     },
-    [showMenu, t, restoreFolder, restoreItem, confirm]
-  )
-
-  const gridItems = useMemo(
-    () =>
-      entries.map((entry) => ({
-        id: entry.kind === 'folder' ? entry.folder.id : entry.item.id,
-        name: entry.kind === 'folder' ? entry.folder.name : entry.item.name,
-        isFolder: entry.kind === 'folder',
-        mimeType: entry.kind === 'file' ? entry.item.mimeType : undefined,
-        size: entry.kind === 'file' ? entry.item.size : undefined,
-        createdAt: entry.kind === 'folder' ? entry.folder.createdAt : entry.item.createdAt,
-        isSelected: false
-      })),
-    [entries]
+    [
+      showMenu,
+      t,
+      restoreFolder,
+      restoreItem,
+      confirm,
+      entries,
+      selectedIds,
+      setSelectedIds,
+      clearSelection
+    ]
   )
 
   const handleSortChange = useCallback(
@@ -153,19 +206,12 @@ export default function TrashPage(): React.JSX.Element {
     [sortField, sortDir, setSortDir, setSortFieldAndDir]
   )
 
-  const handleItemContextMenuById = useCallback(
-    (id: string, event: React.MouseEvent): void => {
-      const entry = entries.find((e) => (e.kind === 'folder' ? e.folder.id : e.item.id) === id)
-      if (!entry) return
-      handleContextMenu(entry, event)
-    },
-    [entries, handleContextMenu]
-  )
-
-  const handleItemClick = useCallback((_id: string, _event: React.MouseEvent): void => {}, [])
-  const handleItemDoubleClick = useCallback(
-    (_id: string, _event: React.MouseEvent): void => {},
-    []
+  useKeyboardShortcuts(
+    [
+      { config: SHORTCUTS.EDIT.SELECT_ALL, handler: selectAll, preventDefault: true },
+      { config: SHORTCUTS.EDIT.ESCAPE, handler: clearSelection, preventDefault: true }
+    ],
+    { enabled: true, sectionKey: 'trash' }
   )
 
   if (entries.length === 0) {
@@ -179,26 +225,43 @@ export default function TrashPage(): React.JSX.Element {
   }
 
   return (
-    <div className="h-full overflow-auto">
+    <div
+      ref={containerRef}
+      className="relative h-full overflow-auto"
+      onClick={handleContainerClick}
+      onMouseDown={handleContainerMouseDown}
+    >
       {viewMode === 'list' ? (
         <ListView
-          items={gridItems}
+          items={gridItemsWithSelection}
           sortField={sortField}
           sortDir={sortDir}
           onSortChange={handleSortChange}
           colWidths={colWidths}
           onColWidthChange={(col, w) => setColWidths({ [col]: w })}
           onItemClick={handleItemClick}
-          onItemDoubleClick={handleItemDoubleClick}
-          onItemContextMenu={handleItemContextMenuById}
+          onItemDoubleClick={(_id, _e) => {}}
+          onItemContextMenu={handleContextMenu}
         />
       ) : (
         <GridView
-          items={gridItems}
+          items={gridItemsWithSelection}
           viewMode={viewMode}
           onItemClick={handleItemClick}
-          onItemDoubleClick={handleItemDoubleClick}
-          onItemContextMenu={handleItemContextMenuById}
+          onItemDoubleClick={(_id, _e) => {}}
+          onItemContextMenu={handleContextMenu}
+        />
+      )}
+
+      {rubberBandRect && (
+        <div
+          className="pointer-events-none fixed z-50 rounded-sm border border-primary/60 bg-accent/20"
+          style={{
+            left: rubberBandRect.left,
+            top: rubberBandRect.top,
+            width: rubberBandRect.width,
+            height: rubberBandRect.height
+          }}
         />
       )}
     </div>

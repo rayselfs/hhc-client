@@ -9,6 +9,9 @@ import {
   useFavoritesExplorerSettings
 } from '@renderer/stores/file-explorer'
 import { useContextMenu } from '@renderer/contexts/ContextMenuContext'
+import { useKeyboardShortcuts } from '@renderer/hooks/useKeyboardShortcuts'
+import { useItemSelection } from '@renderer/hooks/useItemSelection'
+import { SHORTCUTS } from '@renderer/config/shortcuts'
 import type { SortField } from '@renderer/stores/file-explorer'
 
 function compareByField(a: GridViewItem, b: GridViewItem, field: SortField, dir: 'asc' | 'desc'): number {
@@ -45,15 +48,15 @@ export default function FavoritesPage(): React.JSX.Element {
     void useFileExplorerStore.getState().initialize()
   }, [])
 
-  const items: GridViewItem[] = useMemo(() => {
+  const sortedItems: GridViewItem[] = useMemo(() => {
     const favoritedFolders = foldersArray.filter((f) => f.isFavorited)
     const gridItems: GridViewItem[] = favoritedFolders.map((f) => ({
       id: f.id,
       name: f.name,
       isFolder: true,
       createdAt: f.createdAt,
-      isSelected: false,
-      isFavorited: true
+      isFavorited: true,
+      isSelected: false
     }))
     if (sortDir !== 'none') {
       gridItems.sort((a, b) => compareByField(a, b, sortField, sortDir))
@@ -62,6 +65,25 @@ export default function FavoritesPage(): React.JSX.Element {
     }
     return gridItems
   }, [foldersArray, sortField, sortDir])
+
+  const allIds = useMemo(() => sortedItems.map((i) => i.id), [sortedItems])
+
+  const {
+    selectedIds,
+    setSelectedIds,
+    clearSelection,
+    selectAll,
+    handleItemClick,
+    handleContainerClick,
+    handleContainerMouseDown,
+    rubberBandRect,
+    containerRef
+  } = useItemSelection(allIds)
+
+  const itemsWithSelection = useMemo(
+    () => sortedItems.map((i) => ({ ...i, isSelected: selectedIds.has(i.id) })),
+    [sortedItems, selectedIds]
+  )
 
   const handleDoubleClick = useCallback(
     async (folderId: string): Promise<void> => {
@@ -74,19 +96,29 @@ export default function FavoritesPage(): React.JSX.Element {
 
   const handleContextMenu = useCallback(
     (folderId: string, event: React.MouseEvent): void => {
+      const isAlreadySelected = selectedIds.has(folderId)
+      if (!isAlreadySelected) {
+        setSelectedIds(new Set([folderId]))
+      }
+      const effectiveIds =
+        isAlreadySelected && selectedIds.size > 1 ? selectedIds : new Set([folderId])
+
       showMenu(
         [
           {
             id: 'remove-favorite',
             label: t('fileExplorer.contextMenu.removeFavorite'),
             icon: React.createElement(StarOff, { size: 14 }),
-            onAction: () => toggleFavorite(folderId)
+            onAction: () => {
+              for (const id of effectiveIds) toggleFavorite(id)
+              clearSelection()
+            }
           }
         ],
         event
       )
     },
-    [showMenu, t, toggleFavorite]
+    [showMenu, t, toggleFavorite, selectedIds, setSelectedIds, clearSelection]
   )
 
   const handleSortChange = useCallback(
@@ -110,7 +142,15 @@ export default function FavoritesPage(): React.JSX.Element {
     [handleDoubleClick]
   )
 
-  if (items.length === 0) {
+  useKeyboardShortcuts(
+    [
+      { config: SHORTCUTS.EDIT.SELECT_ALL, handler: selectAll, preventDefault: true },
+      { config: SHORTCUTS.EDIT.ESCAPE, handler: clearSelection, preventDefault: true }
+    ],
+    { enabled: true, sectionKey: 'favorites' }
+  )
+
+  if (sortedItems.length === 0) {
     return (
       <div className="flex h-full flex-col items-center justify-center text-center p-8">
         <Star size={48} className="text-default-300 mb-4" />
@@ -121,27 +161,44 @@ export default function FavoritesPage(): React.JSX.Element {
   }
 
   return (
-    <div className="h-full overflow-auto">
+    <div
+      ref={containerRef}
+      className="relative h-full overflow-auto"
+      onClick={handleContainerClick}
+      onMouseDown={handleContainerMouseDown}
+    >
       {viewMode === 'list' ? (
         <ListView
-          items={items}
+          items={itemsWithSelection}
           sortField={sortField}
           sortDir={sortDir}
           onSortChange={handleSortChange}
           colWidths={colWidths}
           onColWidthChange={(col, w) => setColWidths({ [col]: w })}
-          onItemClick={() => {}}
+          onItemClick={handleItemClick}
           onItemDoubleClick={handleItemDoubleClick}
           onItemContextMenu={handleContextMenu}
         />
       ) : (
         <GridView
-          items={items}
+          items={itemsWithSelection}
           viewMode={viewMode}
-          onItemClick={() => {}}
+          onItemClick={handleItemClick}
           onItemDoubleClick={handleItemDoubleClick}
           onItemContextMenu={handleContextMenu}
           onItemFavoriteToggle={toggleFavorite}
+        />
+      )}
+
+      {rubberBandRect && (
+        <div
+          className="pointer-events-none fixed z-50 rounded-sm border border-primary/60 bg-accent/20"
+          style={{
+            left: rubberBandRect.left,
+            top: rubberBandRect.top,
+            width: rubberBandRect.width,
+            height: rubberBandRect.height
+          }}
         />
       )}
     </div>
