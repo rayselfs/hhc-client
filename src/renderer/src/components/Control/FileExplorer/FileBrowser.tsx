@@ -916,7 +916,6 @@ export function FileBrowser({
       >
           <div
             className="h-full"
-            onClick={handleContainerClick}
             onContextMenu={handleContainerContextMenu}
           >
           <SortableContext items={[...folderIds, ...itemIds]}>
