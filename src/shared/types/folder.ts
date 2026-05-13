@@ -6,6 +6,7 @@ export interface FolderRecord {
   createdAt: number
   expiresAt: number | null
   isFavorited?: boolean
+  preservedExpiresAt?: number | null
   deletedAt?: number
   originalParentId?: string
 }

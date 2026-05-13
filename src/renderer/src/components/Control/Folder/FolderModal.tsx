@@ -6,6 +6,7 @@ import { TextField } from '@heroui/react/textfield'
 import { Label } from '@heroui/react/label'
 import { Select } from '@heroui/react/select'
 import { ListBox } from '@heroui/react/list-box'
+import { Lock } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { FolderDuration, FolderRecord } from '@shared/types/folder'
 import { ShortcutScope } from '@renderer/contexts/ShortcutScopeContext'
@@ -19,6 +20,7 @@ export interface FolderModalProps {
   onFolderNameChange: (name: string) => void
   folderDuration: FolderDuration
   onFolderDurationChange: (duration: FolderDuration) => void
+  isRetentionLocked?: boolean
   i18nPrefix?: string
 }
 
@@ -33,6 +35,7 @@ export function FolderModal({
   onFolderNameChange,
   folderDuration,
   onFolderDurationChange,
+  isRetentionLocked,
   i18nPrefix
 }: FolderModalProps): React.JSX.Element | null {
   const { t } = useTranslation()
@@ -69,13 +72,19 @@ export function FolderModal({
                     <Input variant="secondary" />
                   </TextField>
                   <div className="p-1">
-                    <Label className="text-sm mb-1 block">{tKey('retention', 'Retention')}</Label>
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <Label className="text-sm">{tKey('retention', 'Retention')}</Label>
+                      {isRetentionLocked && (
+                        <Lock size={12} className="text-default-400" />
+                      )}
+                    </div>
                     <Select
                       value={folderDuration}
                       onChange={(v) => onFolderDurationChange(v as FolderDuration)}
                       aria-label={tKey('retention', 'Retention')}
                       className="w-full"
                       variant="secondary"
+                      isDisabled={isRetentionLocked}
                     >
                       <Select.Trigger>
                         <Select.Value />

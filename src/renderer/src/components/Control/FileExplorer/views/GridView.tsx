@@ -121,8 +121,8 @@ export function GridView({
               <button
                 className={`absolute top-1 right-1 rounded p-0.5 transition-opacity ${
                   item.isFavorited
-                    ? 'opacity-100 text-warning'
-                    : 'opacity-0 group-hover:opacity-100 text-default-400 hover:text-warning'
+                    ? 'opacity-100 text-yellow-400'
+                    : 'opacity-0 group-hover:opacity-100 text-default-400 hover:text-yellow-400'
                 }`}
                 onClick={(e) => {
                   e.stopPropagation()
@@ -130,7 +130,7 @@ export function GridView({
                 }}
                 aria-label={item.isFavorited ? 'Remove from favorites' : 'Add to favorites'}
               >
-                <Star size={13} className={item.isFavorited ? 'fill-warning drop-shadow-sm' : ''} />
+                <Star size={16} className={item.isFavorited ? 'fill-yellow-400 drop-shadow-sm' : ''} />
               </button>
             )}
             <div className="flex items-center justify-center">

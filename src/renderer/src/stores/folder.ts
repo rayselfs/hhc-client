@@ -346,7 +346,13 @@ export function createFolderStore(config: FolderStoreConfig) {
       if (folderId === config.rootId) return
       const folder = get().folders[folderId]
       if (!folder) return
-      const updated: FolderRecord = { ...folder, isFavorited: !folder.isFavorited }
+      let updated: FolderRecord
+      if (!folder.isFavorited) {
+        updated = { ...folder, isFavorited: true, preservedExpiresAt: folder.expiresAt, expiresAt: null }
+      } else {
+        const restoredExpiresAt = folder.preservedExpiresAt !== undefined ? folder.preservedExpiresAt : folder.expiresAt
+        updated = { ...folder, isFavorited: false, expiresAt: restoredExpiresAt, preservedExpiresAt: undefined }
+      }
       set((state) => ({
         folders: { ...state.folders, [folderId]: updated },
         _foldersArray: state._foldersArray.map((f) => (f.id === folderId ? updated : f))
