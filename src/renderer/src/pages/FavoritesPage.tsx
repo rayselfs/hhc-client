@@ -11,22 +11,9 @@ import {
 import { useContextMenu } from '@renderer/contexts/ContextMenuContext'
 import { useKeyboardShortcuts } from '@renderer/hooks/useKeyboardShortcuts'
 import { useItemSelection } from '@renderer/hooks/useItemSelection'
+import { compareByField } from '@renderer/lib/file-explorer-sort'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
 import type { SortField } from '@renderer/stores/file-explorer'
-
-function compareByField(a: GridViewItem, b: GridViewItem, field: SortField, dir: 'asc' | 'desc'): number {
-  const sign = dir === 'asc' ? 1 : -1
-  switch (field) {
-    case 'name':
-      return sign * a.name.localeCompare(b.name)
-    case 'createdAt':
-      return sign * ((a.createdAt ?? 0) - (b.createdAt ?? 0))
-    case 'size':
-      return sign * ((a.size ?? 0) - (b.size ?? 0))
-    case 'kind':
-      return sign * a.name.localeCompare(b.name)
-  }
-}
 
 export default function FavoritesPage(): React.JSX.Element {
   const { t } = useTranslation()

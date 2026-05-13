@@ -34,33 +34,45 @@ export const useFileExplorerStore = createFolderStore({
   getDB: () => openFileExplorerDB()
 })
 
-export const useFileExplorerSettings = create<FileExplorerSettingsState>()(
-  persist(
-    (set) => ({
-      viewMode: 'medium-icon',
-      setViewMode: (viewMode) => set({ viewMode }),
-      sortField: 'createdAt',
-      sortDir: 'none',
-      setSortField: (sortField) => set({ sortField }),
-      setSortDir: (sortDir) => set({ sortDir }),
-      setSortFieldAndDir: (sortField, sortDir) => set({ sortField, sortDir }),
-      colWidths: { created: 112, size: 80, kind: 96 },
-      setColWidths: (widths) =>
-        set((state) => ({ colWidths: { ...state.colWidths, ...widths } }))
-    }),
-    {
-      name: createPersistName('file-explorer-settings'),
-      storage: hhcPersistStorage,
-      version: 1,
-      migrate: (state: any) => state,
-      partialize: (state) => ({
-        viewMode: state.viewMode,
-        sortField: state.sortField,
-        sortDir: state.sortDir,
-        colWidths: state.colWidths
-      })
-    }
+function createExplorerSettingsStore(
+  persistName: string,
+  defaults: { sortField: SortField; sortDir: SortDir },
+  options: { version?: number; migrate?: (state: any) => any } = {}
+) {
+  return create<FileExplorerSettingsState>()(
+    persist(
+      (set) => ({
+        viewMode: 'medium-icon',
+        setViewMode: (viewMode) => set({ viewMode }),
+        sortField: defaults.sortField,
+        sortDir: defaults.sortDir,
+        setSortField: (sortField) => set({ sortField }),
+        setSortDir: (sortDir) => set({ sortDir }),
+        setSortFieldAndDir: (sortField, sortDir) => set({ sortField, sortDir }),
+        colWidths: { created: 112, size: 80, kind: 96 },
+        setColWidths: (widths) =>
+          set((state) => ({ colWidths: { ...state.colWidths, ...widths } }))
+      }),
+      {
+        name: createPersistName(persistName),
+        storage: hhcPersistStorage,
+        version: options.version ?? 0,
+        ...(options.migrate ? { migrate: options.migrate } : {}),
+        partialize: (state) => ({
+          viewMode: state.viewMode,
+          sortField: state.sortField,
+          sortDir: state.sortDir,
+          colWidths: state.colWidths
+        })
+      }
+    )
   )
+}
+
+export const useFileExplorerSettings = createExplorerSettingsStore(
+  'file-explorer-settings',
+  { sortField: 'createdAt', sortDir: 'none' },
+  { version: 1, migrate: (state) => state }
 )
 
 export const useFileExplorerSearch = create<FileExplorerSearchState>()((set) => ({
@@ -68,60 +80,14 @@ export const useFileExplorerSearch = create<FileExplorerSearchState>()((set) => 
   setSearchQuery: (searchQuery) => set({ searchQuery })
 }))
 
-export const useFavoritesExplorerSettings = create<FileExplorerSettingsState>()(
-  persist(
-    (set) => ({
-      viewMode: 'medium-icon',
-      setViewMode: (viewMode) => set({ viewMode }),
-      sortField: 'name',
-      sortDir: 'asc',
-      setSortField: (sortField) => set({ sortField }),
-      setSortDir: (sortDir) => set({ sortDir }),
-      setSortFieldAndDir: (sortField, sortDir) => set({ sortField, sortDir }),
-      colWidths: { created: 112, size: 80, kind: 96 },
-      setColWidths: (widths) =>
-        set((state) => ({ colWidths: { ...state.colWidths, ...widths } }))
-    }),
-    {
-      name: createPersistName('favorites-explorer-settings'),
-      storage: hhcPersistStorage,
-      version: 0,
-      partialize: (state) => ({
-        viewMode: state.viewMode,
-        sortField: state.sortField,
-        sortDir: state.sortDir,
-        colWidths: state.colWidths
-      })
-    }
-  )
+export const useFavoritesExplorerSettings = createExplorerSettingsStore(
+  'favorites-explorer-settings',
+  { sortField: 'name', sortDir: 'asc' }
 )
 
-export const useTrashExplorerSettings = create<FileExplorerSettingsState>()(
-  persist(
-    (set) => ({
-      viewMode: 'medium-icon',
-      setViewMode: (viewMode) => set({ viewMode }),
-      sortField: 'createdAt',
-      sortDir: 'desc',
-      setSortField: (sortField) => set({ sortField }),
-      setSortDir: (sortDir) => set({ sortDir }),
-      setSortFieldAndDir: (sortField, sortDir) => set({ sortField, sortDir }),
-      colWidths: { created: 112, size: 80, kind: 96 },
-      setColWidths: (widths) =>
-        set((state) => ({ colWidths: { ...state.colWidths, ...widths } }))
-    }),
-    {
-      name: createPersistName('trash-explorer-settings'),
-      storage: hhcPersistStorage,
-      version: 0,
-      partialize: (state) => ({
-        viewMode: state.viewMode,
-        sortField: state.sortField,
-        sortDir: state.sortDir,
-        colWidths: state.colWidths
-      })
-    }
-  )
+export const useTrashExplorerSettings = createExplorerSettingsStore(
+  'trash-explorer-settings',
+  { sortField: 'createdAt', sortDir: 'desc' }
 )
 
 interface FileExplorerCustomOrderState {
