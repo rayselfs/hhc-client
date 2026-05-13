@@ -312,6 +312,7 @@ export function FileBrowser({
   const foldersArray = useFileExplorerStore((state) => state._foldersArray)
   const itemsArray = useFileExplorerStore((state) => state._itemsArray)
   const navigateToFolder = useFileExplorerStore((state) => state.navigateToFolder)
+  const toggleFavorite = useFileExplorerStore((state) => state.toggleFavorite)
   const moveItem = useFileExplorerStore((state) => state.moveItem)
   const moveFolder = useFileExplorerStore((state) => state.moveFolder)
   const reorderItems = useFileExplorerStore((state) => state.reorderItems)
@@ -917,6 +918,7 @@ export function FileBrowser({
                 onItemClick={handleItemClick}
                 onItemDoubleClick={handleItemDoubleClick}
                 onItemContextMenu={handleItemContextMenu}
+                onItemFavoriteToggle={toggleFavorite}
                 renderItemWrapper={renderItemWrapper}
               />
             )}

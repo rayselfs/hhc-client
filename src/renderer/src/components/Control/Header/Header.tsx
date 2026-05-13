@@ -13,10 +13,15 @@ import SearchBarToggle from '@renderer/components/Control/Header/SearchBar/Searc
 import Breadcrumb from '@renderer/components/Control/FileExplorer/Breadcrumb'
 import ViewModeDropdown from '@renderer/components/Control/FileExplorer/ViewModeDropdown'
 import SortDropdown from '@renderer/components/Control/FileExplorer/SortDropdown'
-import { isTimerRoute, isBibleRoute, isFilesRoute } from '@renderer/lib/routes'
+import { isTimerRoute, isBibleRoute, isFilesRoute, isFavoritesRoute, isTrashRoute } from '@renderer/lib/routes'
 import { EVENTS } from '@renderer/config/events'
 import { useTimerStore } from '@renderer/stores/timer'
-import { useFileExplorerStore, useFileExplorerSettings } from '@renderer/stores/file-explorer'
+import {
+  useFileExplorerStore,
+  useFileExplorerSettings,
+  useFavoritesExplorerSettings,
+  useTrashExplorerSettings
+} from '@renderer/stores/file-explorer'
 import GlassDivider from '@renderer/components/Common/GlassDivider'
 
 export default function Header(): React.JSX.Element {
@@ -42,9 +47,30 @@ export default function Header(): React.JSX.Element {
   const sortDir = useFileExplorerSettings((state) => state.sortDir)
   const setSortFieldAndDir = useFileExplorerSettings((state) => state.setSortFieldAndDir)
 
+  const favViewMode = useFavoritesExplorerSettings((state) => state.viewMode)
+  const favSetViewMode = useFavoritesExplorerSettings((state) => state.setViewMode)
+  const favSortField = useFavoritesExplorerSettings((state) => state.sortField)
+  const favSortDir = useFavoritesExplorerSettings((state) => state.sortDir)
+  const favSetSortFieldAndDir = useFavoritesExplorerSettings((state) => state.setSortFieldAndDir)
+
+  const trashViewMode = useTrashExplorerSettings((state) => state.viewMode)
+  const trashSetViewMode = useTrashExplorerSettings((state) => state.setViewMode)
+  const trashSortField = useTrashExplorerSettings((state) => state.sortField)
+  const trashSortDir = useTrashExplorerSettings((state) => state.sortDir)
+  const trashSetSortFieldAndDir = useTrashExplorerSettings((state) => state.setSortFieldAndDir)
+
   const showTimerControls = isTimerRoute(location.pathname)
   const showBibleControls = isBibleRoute(location.pathname)
   const showFilesControls = isFilesRoute(location.pathname)
+  const showFavoritesControls = isFavoritesRoute(location.pathname)
+  const showTrashControls = isTrashRoute(location.pathname)
+  const showExplorerControls = showFilesControls || showFavoritesControls || showTrashControls
+
+  const activeViewMode = showFavoritesControls ? favViewMode : showTrashControls ? trashViewMode : viewMode
+  const activeSetViewMode = showFavoritesControls ? favSetViewMode : showTrashControls ? trashSetViewMode : setViewMode
+  const activeSortField = showFavoritesControls ? favSortField : showTrashControls ? trashSortField : sortField
+  const activeSortDir = showFavoritesControls ? favSortDir : showTrashControls ? trashSortDir : sortDir
+  const activeSetSortFieldAndDir = showFavoritesControls ? favSetSortFieldAndDir : showTrashControls ? trashSetSortFieldAndDir : setSortFieldAndDir
 
   const handleCloseOrOpenProjection = async (): Promise<void> => {
     if (!isProjectionOpen) {
@@ -93,18 +119,20 @@ export default function Header(): React.JSX.Element {
         </div>
       )}
 
-      {showFilesControls && (
+      {showExplorerControls && (
         <div className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center gap-2 max-w-[50%]">
           <ButtonGroup size="lg">
-            <ViewModeDropdown viewMode={viewMode} onViewModeChange={setViewMode} />
+            <ViewModeDropdown viewMode={activeViewMode} onViewModeChange={activeSetViewMode} />
             <GlassDivider vertical className="h-6 self-center mx-px" />
-            <SortDropdown sortField={sortField} sortDir={sortDir} onSortChange={setSortFieldAndDir} />
+            <SortDropdown sortField={activeSortField} sortDir={activeSortDir} onSortChange={activeSetSortFieldAndDir} />
           </ButtonGroup>
-          <Breadcrumb
-            currentFolderId={currentFolderId}
-            getFolderPath={getFolderPath}
-            onNavigate={handleBreadcrumbNavigate}
-          />
+          {showFilesControls && (
+            <Breadcrumb
+              currentFolderId={currentFolderId}
+              getFolderPath={getFolderPath}
+              onNavigate={handleBreadcrumbNavigate}
+            />
+          )}
         </div>
       )}
 

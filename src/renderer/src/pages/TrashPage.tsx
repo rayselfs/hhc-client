@@ -1,34 +1,48 @@
 import React, { useCallback, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Folder, Trash2, RotateCcw } from 'lucide-react'
-import { useFileExplorerStore } from '@renderer/stores/file-explorer'
+import { Trash2, RotateCcw } from 'lucide-react'
 import {
+  useFileExplorerStore,
+  useTrashExplorerSettings,
   permanentDeleteFolderFromStore,
   permanentDeleteFileItemFromStore
 } from '@renderer/stores/file-explorer'
 import { useContextMenu } from '@renderer/contexts/ContextMenuContext'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
-import { getFileIcon } from '@renderer/components/Control/FileExplorer/views/getFileIcon'
+import { GridView, ListView } from '@renderer/components/Control/FileExplorer/views'
 import type { FileItemRecord, FolderRecord } from '@shared/types/folder'
+import type { SortField } from '@renderer/stores/file-explorer'
 
 type TrashEntry =
   | { kind: 'folder'; folder: FolderRecord }
   | { kind: 'file'; item: FileItemRecord }
 
-function formatDate(ts: number): string {
-  const d = new Date(ts)
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}/${m}/${day}`
-}
-
-function formatSize(bytes: number): string {
-  if (bytes === 0) return '0 B'
-  const k = 1024
-  const sizes = ['B', 'KB', 'MB', 'GB']
-  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1)
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`
+function compareTrashByField(
+  a: TrashEntry,
+  b: TrashEntry,
+  field: SortField,
+  dir: 'asc' | 'desc'
+): number {
+  const sign = dir === 'asc' ? 1 : -1
+  const nameA = a.kind === 'folder' ? a.folder.name : a.item.name
+  const nameB = b.kind === 'folder' ? b.folder.name : b.item.name
+  const sizeA = a.kind === 'file' ? a.item.size : 0
+  const sizeB = b.kind === 'file' ? b.item.size : 0
+  const createdAtA = a.kind === 'folder' ? a.folder.createdAt : a.item.createdAt
+  const createdAtB = b.kind === 'folder' ? b.folder.createdAt : b.item.createdAt
+  switch (field) {
+    case 'name':
+      return sign * nameA.localeCompare(nameB)
+    case 'createdAt':
+      return sign * (createdAtA - createdAtB)
+    case 'size':
+      return sign * (sizeA - sizeB)
+    case 'kind': {
+      const kindA = a.kind === 'folder' ? 'folder' : (a.item.mimeType ?? '')
+      const kindB = b.kind === 'folder' ? 'folder' : (b.item.mimeType ?? '')
+      return sign * kindA.localeCompare(kindB)
+    }
+  }
 }
 
 export default function TrashPage(): React.JSX.Element {
@@ -39,6 +53,13 @@ export default function TrashPage(): React.JSX.Element {
   const itemsArray = useFileExplorerStore((state) => state._itemsArray)
   const restoreFolder = useFileExplorerStore((state) => state.restoreFolder)
   const restoreItem = useFileExplorerStore((state) => state.restoreItem)
+  const viewMode = useTrashExplorerSettings((state) => state.viewMode)
+  const sortField = useTrashExplorerSettings((state) => state.sortField)
+  const sortDir = useTrashExplorerSettings((state) => state.sortDir)
+  const setSortDir = useTrashExplorerSettings((state) => state.setSortDir)
+  const setSortFieldAndDir = useTrashExplorerSettings((state) => state.setSortFieldAndDir)
+  const colWidths = useTrashExplorerSettings((state) => state.colWidths)
+  const setColWidths = useTrashExplorerSettings((state) => state.setColWidths)
 
   useEffect(() => {
     void useFileExplorerStore.getState().initialize()
@@ -51,12 +72,18 @@ export default function TrashPage(): React.JSX.Element {
     const files: TrashEntry[] = itemsArray
       .filter((i): i is FileItemRecord => i.type === 'file' && !!i.deletedAt)
       .map((i) => ({ kind: 'file', item: i }))
-    return [...folders, ...files].sort((a, b) => {
-      const ta = a.kind === 'folder' ? (a.folder.deletedAt ?? 0) : (a.item.deletedAt ?? 0)
-      const tb = b.kind === 'folder' ? (b.folder.deletedAt ?? 0) : (b.item.deletedAt ?? 0)
-      return tb - ta
-    })
-  }, [foldersArray, itemsArray])
+    const all = [...folders, ...files]
+    if (sortDir !== 'none') {
+      all.sort((a, b) => compareTrashByField(a, b, sortField, sortDir))
+    } else {
+      all.sort((a, b) => {
+        const ta = a.kind === 'folder' ? (a.folder.deletedAt ?? 0) : (a.item.deletedAt ?? 0)
+        const tb = b.kind === 'folder' ? (b.folder.deletedAt ?? 0) : (b.item.deletedAt ?? 0)
+        return tb - ta
+      })
+    }
+    return all
+  }, [foldersArray, itemsArray, sortField, sortDir])
 
   const handleContextMenu = useCallback(
     (entry: TrashEntry, event: React.MouseEvent): void => {
@@ -99,6 +126,48 @@ export default function TrashPage(): React.JSX.Element {
     [showMenu, t, restoreFolder, restoreItem, confirm]
   )
 
+  const gridItems = useMemo(
+    () =>
+      entries.map((entry) => ({
+        id: entry.kind === 'folder' ? entry.folder.id : entry.item.id,
+        name: entry.kind === 'folder' ? entry.folder.name : entry.item.name,
+        isFolder: entry.kind === 'folder',
+        mimeType: entry.kind === 'file' ? entry.item.mimeType : undefined,
+        size: entry.kind === 'file' ? entry.item.size : undefined,
+        createdAt: entry.kind === 'folder' ? entry.folder.createdAt : entry.item.createdAt,
+        isSelected: false
+      })),
+    [entries]
+  )
+
+  const handleSortChange = useCallback(
+    (field: SortField) => {
+      if (sortDir === 'none' || field !== sortField) {
+        setSortFieldAndDir(field, 'asc')
+      } else if (sortDir === 'asc') {
+        setSortDir('desc')
+      } else {
+        setSortDir('asc')
+      }
+    },
+    [sortField, sortDir, setSortDir, setSortFieldAndDir]
+  )
+
+  const handleItemContextMenuById = useCallback(
+    (id: string, event: React.MouseEvent): void => {
+      const entry = entries.find((e) => (e.kind === 'folder' ? e.folder.id : e.item.id) === id)
+      if (!entry) return
+      handleContextMenu(entry, event)
+    },
+    [entries, handleContextMenu]
+  )
+
+  const handleItemClick = useCallback((_id: string, _event: React.MouseEvent): void => {}, [])
+  const handleItemDoubleClick = useCallback(
+    (_id: string, _event: React.MouseEvent): void => {},
+    []
+  )
+
   if (entries.length === 0) {
     return (
       <div className="flex h-full flex-col items-center justify-center text-center p-8">
@@ -110,57 +179,28 @@ export default function TrashPage(): React.JSX.Element {
   }
 
   return (
-    <div className="flex flex-col h-full overflow-auto">
-      <div className="sticky top-0 bg-background z-10 border-b border-default-200">
-        <div className="flex items-center px-3 py-1.5">
-          <div className="w-6 flex-shrink-0 mr-3" />
-          <div className="flex-1 min-w-0 text-xs font-medium text-default-400 uppercase tracking-wide">
-            {t('fileExplorer.list.name')}
-          </div>
-          <div className="w-24 flex-shrink-0 text-xs font-medium text-default-400 uppercase tracking-wide pl-2">
-            {t('fileExplorer.list.createdAt')}
-          </div>
-          <div className="w-20 flex-shrink-0 text-xs font-medium text-default-400 uppercase tracking-wide pl-2">
-            {t('fileExplorer.list.size')}
-          </div>
-        </div>
-      </div>
-
-      <div className="flex flex-col p-2">
-        {entries.map((entry) => {
-          const id = entry.kind === 'folder' ? entry.folder.id : entry.item.id
-          const name = entry.kind === 'folder' ? entry.folder.name : entry.item.name
-          const createdAt =
-            entry.kind === 'folder' ? entry.folder.createdAt : entry.item.createdAt
-          const size = entry.kind === 'file' ? entry.item.size : undefined
-          const mimeType = entry.kind === 'file' ? entry.item.mimeType : undefined
-
-          return (
-            <div
-              key={id}
-              className="flex items-center rounded-md px-3 py-2 cursor-default transition-colors hover:bg-content2/60"
-              onContextMenu={(e) => void handleContextMenu(entry, e)}
-            >
-              <div className="flex-shrink-0 w-6 flex items-center justify-center mr-3">
-                {entry.kind === 'folder' ? (
-                  <Folder size={20} className="text-accent" fill="currentColor" />
-                ) : (
-                  <div className="text-danger">{getFileIcon(mimeType, false, 20)}</div>
-                )}
-              </div>
-              <div className="flex-1 min-w-0 truncate text-sm text-foreground" title={name}>
-                {name}
-              </div>
-              <div className="w-24 flex-shrink-0 text-sm text-default-400 pl-2">
-                {formatDate(createdAt)}
-              </div>
-              <div className="w-20 flex-shrink-0 text-sm text-default-400 pl-2">
-                {size !== undefined ? formatSize(size) : '—'}
-              </div>
-            </div>
-          )
-        })}
-      </div>
+    <div className="h-full overflow-auto">
+      {viewMode === 'list' ? (
+        <ListView
+          items={gridItems}
+          sortField={sortField}
+          sortDir={sortDir}
+          onSortChange={handleSortChange}
+          colWidths={colWidths}
+          onColWidthChange={(col, w) => setColWidths({ [col]: w })}
+          onItemClick={handleItemClick}
+          onItemDoubleClick={handleItemDoubleClick}
+          onItemContextMenu={handleItemContextMenuById}
+        />
+      ) : (
+        <GridView
+          items={gridItems}
+          viewMode={viewMode}
+          onItemClick={handleItemClick}
+          onItemDoubleClick={handleItemDoubleClick}
+          onItemContextMenu={handleItemContextMenuById}
+        />
+      )}
     </div>
   )
 }

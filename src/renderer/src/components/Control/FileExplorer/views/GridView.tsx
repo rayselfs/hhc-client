@@ -55,6 +55,7 @@ export interface GridViewProps {
   onItemClick: (id: string, event: React.MouseEvent) => void
   onItemDoubleClick: (id: string, event: React.MouseEvent) => void
   onItemContextMenu: (id: string, event: React.MouseEvent) => void
+  onItemFavoriteToggle?: (id: string) => void
   renderItemWrapper?: (item: GridViewItem, children: React.ReactNode) => React.ReactNode
 }
 
@@ -64,6 +65,7 @@ export function GridView({
   onItemClick,
   onItemDoubleClick,
   onItemContextMenu,
+  onItemFavoriteToggle,
   renderItemWrapper
 }: GridViewProps): React.JSX.Element {
   const { t } = useTranslation()
@@ -108,21 +110,31 @@ export function GridView({
       {items.map((item) => {
         const content = (
           <div
-            className={`flex flex-col items-center justify-start rounded-lg p-2 cursor-pointer transition-colors hover:bg-content2/60 ${
+            className={`group relative flex flex-col items-center justify-start rounded-lg p-2 cursor-pointer transition-colors hover:bg-content2/60 ${
               item.isSelected ? 'bg-surface' : ''
             }`}
             onClick={(e) => onItemClick(item.id, e)}
             onDoubleClick={(e) => onItemDoubleClick(item.id, e)}
             onContextMenu={(e) => onItemContextMenu(item.id, e)}
           >
-            <div className="relative flex items-center justify-center">
+            {item.isFolder && onItemFavoriteToggle && (
+              <button
+                className={`absolute top-1 right-1 rounded p-0.5 transition-opacity ${
+                  item.isFavorited
+                    ? 'opacity-100 text-warning'
+                    : 'opacity-0 group-hover:opacity-100 text-default-400 hover:text-warning'
+                }`}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onItemFavoriteToggle(item.id)
+                }}
+                aria-label={item.isFavorited ? 'Remove from favorites' : 'Add to favorites'}
+              >
+                <Star size={13} className={item.isFavorited ? 'fill-warning drop-shadow-sm' : ''} />
+              </button>
+            )}
+            <div className="flex items-center justify-center">
               {renderGridIcon(item, iconSize)}
-              {item.isFavorited && item.isFolder && (
-                <Star
-                  size={13}
-                  className="absolute -top-1 -right-1 text-warning fill-warning drop-shadow-sm"
-                />
-              )}
             </div>
             <span
               className={`w-full text-center text-foreground break-words ${nameClass}`}
