@@ -26,8 +26,10 @@ interface FileExplorerSearchState {
   setSearchQuery: (query: string) => void
 }
 
+export const FILE_EXPLORER_ROOT_ID = 'file-root'
+
 export const useFileExplorerStore = createFolderStore({
-  rootId: 'file-root',
+  rootId: FILE_EXPLORER_ROOT_ID,
   rootName: 'Files',
   getDB: () => openFileExplorerDB()
 })

@@ -49,7 +49,7 @@ export interface FolderStoreState {
 
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export function createFolderStore(config: FolderStoreConfig) {
-  const ops = createFolderDB(config.getDB)
+  const ops = createFolderDB(config.getDB, config.rootId)
   return create<FolderStoreState>()((set, get) => ({
     folders: {},
     items: {},
@@ -138,7 +138,11 @@ export function createFolderStore(config: FolderStoreConfig) {
         parentId: resolvedParentId,
         sortIndex: siblings.length,
         createdAt: Date.now(),
-        expiresAt: expiresAt !== undefined ? expiresAt : null
+        expiresAt: expiresAt !== undefined
+            ? expiresAt
+            : resolvedParentId === config.rootId
+              ? Date.now() + FOLDER_DURATION_MS['1day']
+              : get().folders[resolvedParentId]?.expiresAt ?? null
       }
       set((state) => ({
         folders: { ...state.folders, [newFolder.id]: newFolder },
@@ -251,7 +255,9 @@ export function createFolderStore(config: FolderStoreConfig) {
       const updated: AnyItemRecord = {
         ...item,
         parentId: targetFolderId,
-        sortIndex: targetSiblings.length
+        sortIndex: targetSiblings.length,
+        expiresAt:
+          targetFolderId === config.rootId ? Date.now() + FOLDER_DURATION_MS['1day'] : null
       }
       set((state) => {
         const newItemsArray = state._itemsArray.map((i) => (i.id === itemId ? updated : i))

@@ -10,7 +10,8 @@ import { FolderModal } from '@renderer/components/Control/Folder/FolderModal'
 import {
   deleteFolderFromStore,
   removeFileItemFromStore,
-  useFileExplorerStore
+  useFileExplorerStore,
+  FILE_EXPLORER_ROOT_ID
 } from '@renderer/stores/file-explorer'
 import { uploadFiles, uploadFolderFiles } from '@renderer/lib/upload-utils'
 import {
@@ -50,6 +51,7 @@ export default function FilesPage(): React.JSX.Element {
   const [editModalName, setEditModalName] = useState('')
   const [editModalDuration, setEditModalDuration] = useState<FolderDuration>('1day')
   const [editingIsFavorited, setEditingIsFavorited] = useState(false)
+  const [editingHideDuration, setEditingHideDuration] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
@@ -163,7 +165,7 @@ export default function FilesPage(): React.JSX.Element {
           const item = state.items[id]
           if (item.type !== 'file') continue
           const newId = crypto.randomUUID()
-          const { id: _id, sortIndex: _si, createdAt: _ca, ...rest } = item
+          const { id: _id, sortIndex: _si, createdAt: _ca, expiresAt: _ea, ...rest } = item
           const db = await openFileExplorerDB()
           const blob = await getFileBlob(db, id)
           if (blob) await storeFileBlob(db, newId, blob)
@@ -190,10 +192,13 @@ export default function FilesPage(): React.JSX.Element {
     const state = useFileExplorerStore.getState()
     const target = state.folders[id] ?? state.items[id]
     if (!target) return
+    const isFileItemInSubfolder =
+      !state.folders[id] && !!state.items[id] && state.items[id].parentId !== FILE_EXPLORER_ROOT_ID
     setEditingId(id)
     setEditModalName(target.name)
     setEditModalDuration(inferDuration(target.expiresAt, target.createdAt ?? Date.now()))
     setEditingIsFavorited(state.folders[id]?.isFavorited ?? false)
+    setEditingHideDuration(isFileItemInSubfolder)
     setIsEditModalOpen(true)
   }, [])
 
@@ -205,7 +210,11 @@ export default function FilesPage(): React.JSX.Element {
     if (state.folders[editingId]) {
       updateFolder(editingId, { name, expiresAt: computeExpiresAt(editModalDuration) })
     } else if (state.items[editingId]) {
-      updateItem?.(editingId, { name, expiresAt: computeExpiresAt(editModalDuration) })
+      const isRoot = state.items[editingId].parentId === FILE_EXPLORER_ROOT_ID
+      updateItem?.(editingId, {
+        name,
+        expiresAt: isRoot ? computeExpiresAt(editModalDuration) : null
+      })
     }
     setIsEditModalOpen(false)
     setEditingId(null)
@@ -388,6 +397,7 @@ export default function FilesPage(): React.JSX.Element {
         folderDuration={editModalDuration}
         onFolderDurationChange={setEditModalDuration}
         isRetentionLocked={editingIsFavorited}
+        hideDuration={editingHideDuration}
       />
     </>
   )

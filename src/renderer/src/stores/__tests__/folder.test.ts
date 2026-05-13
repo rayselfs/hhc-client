@@ -82,6 +82,11 @@ beforeEach(() => {
 })
 
 describe('initialize()', () => {
+  beforeEach(() => {
+    // Reset store so the idempotent guard (checks _foldersArray.length) doesn't short-circuit
+    useBibleFolderStore.setState({ _foldersArray: [], folders: {} })
+  })
+
   it('loads stored folders when available', async () => {
     const childFolder: FolderRecord = {
       id: 'f1',

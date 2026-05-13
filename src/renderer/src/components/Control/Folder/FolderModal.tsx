@@ -21,6 +21,7 @@ export interface FolderModalProps {
   folderDuration: FolderDuration
   onFolderDurationChange: (duration: FolderDuration) => void
   isRetentionLocked?: boolean
+  hideDuration?: boolean
   i18nPrefix?: string
 }
 
@@ -36,6 +37,7 @@ export function FolderModal({
   folderDuration,
   onFolderDurationChange,
   isRetentionLocked,
+  hideDuration,
   i18nPrefix
 }: FolderModalProps): React.JSX.Element | null {
   const { t } = useTranslation()
@@ -71,6 +73,7 @@ export function FolderModal({
                     <Label>{tKey('folderName', 'Folder Name')}</Label>
                     <Input variant="secondary" />
                   </TextField>
+                  {!hideDuration && (
                   <div className="p-1">
                     <div className="flex items-center gap-1.5 mb-1">
                       <Label className="text-sm">{tKey('retention', 'Retention')}</Label>
@@ -109,6 +112,7 @@ export function FolderModal({
                       </Select.Popover>
                     </Select>
                   </div>
+                  )}
                 </div>
               </ShortcutScope>
             </Modal.Body>

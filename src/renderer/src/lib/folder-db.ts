@@ -5,7 +5,7 @@ type AnyDB = any
 
 export type FolderDB = ReturnType<typeof createFolderDB>
 
-export function createFolderDB(getDB: () => Promise<AnyDB>): {
+export function createFolderDB(getDB: () => Promise<AnyDB>, rootId: string): {
   loadAllFolders: () => Promise<FolderRecord[]>
   saveFolder: (folder: FolderRecord) => Promise<void>
   saveFolders: (folders: FolderRecord[]) => Promise<void>
@@ -136,7 +136,9 @@ export function createFolderDB(getDB: () => Promise<AnyDB>): {
     try {
       const db = await getDB()
       const all: AnyItemRecord[] = await db.getAll('folder-items')
-      const expired = all.filter((i) => i.expiresAt != null && i.expiresAt < now)
+      const expired = all.filter(
+        (i) => i.parentId === rootId && i.expiresAt != null && i.expiresAt < now
+      )
       if (expired.length === 0) return []
       const ids = expired.map((i) => i.id)
       await deleteItems(ids)
