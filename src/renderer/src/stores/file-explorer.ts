@@ -124,6 +124,27 @@ export const useTrashExplorerSettings = create<FileExplorerSettingsState>()(
   )
 )
 
+interface FileExplorerCustomOrderState {
+  orders: Record<string, string[]>
+  setOrder: (folderId: string, orderedIds: string[]) => void
+}
+
+export const useFileExplorerCustomOrder = create<FileExplorerCustomOrderState>()(
+  persist(
+    (set) => ({
+      orders: {},
+      setOrder: (folderId, orderedIds) =>
+        set((state) => ({ orders: { ...state.orders, [folderId]: orderedIds } }))
+    }),
+    {
+      name: createPersistName('file-explorer-custom-order'),
+      storage: hhcPersistStorage,
+      version: 0,
+      partialize: (state) => ({ orders: state.orders })
+    }
+  )
+)
+
 export async function addFileItemToStore(file: File, parentId: string): Promise<string> {
   const db = await openFileExplorerDB()
   const id = crypto.randomUUID()

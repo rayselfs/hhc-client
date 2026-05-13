@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Trash2, RotateCcw } from 'lucide-react'
 import {
@@ -12,6 +12,7 @@ import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
 import { useKeyboardShortcuts } from '@renderer/hooks/useKeyboardShortcuts'
 import { useItemSelection } from '@renderer/hooks/useItemSelection'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
+import { getThumbnail } from '@renderer/lib/thumbnail-db'
 import { GridView, ListView } from '@renderer/components/Control/FileExplorer/views'
 import type { FileItemRecord, FolderRecord } from '@shared/types/folder'
 import type { SortField } from '@renderer/stores/file-explorer'
@@ -19,6 +20,14 @@ import type { SortField } from '@renderer/stores/file-explorer'
 type TrashEntry =
   | { kind: 'folder'; folder: FolderRecord }
   | { kind: 'file'; item: FileItemRecord }
+
+function canHaveThumbnail(mimeType: string | undefined): boolean {
+  return (
+    mimeType?.startsWith('image/') === true ||
+    mimeType?.startsWith('video/') === true ||
+    mimeType === 'application/pdf'
+  )
+}
 
 function compareTrashByField(
   a: TrashEntry,
@@ -88,6 +97,41 @@ export default function TrashPage(): React.JSX.Element {
     return all
   }, [foldersArray, itemsArray, sortField, sortDir])
 
+  const [thumbnails, setThumbnails] = useState<Record<string, string | null>>({})
+
+  useEffect(() => {
+    let cancelled = false
+    const thumbnailItems = entries
+      .filter((e): e is { kind: 'file'; item: FileItemRecord } => e.kind === 'file')
+      .filter((e) => canHaveThumbnail(e.item.mimeType))
+
+    setThumbnails((current) => {
+      const next: Record<string, string | null> = {}
+      for (const e of thumbnailItems) {
+        if (Object.prototype.hasOwnProperty.call(current, e.item.id)) next[e.item.id] = current[e.item.id]
+      }
+      return next
+    })
+
+    async function loadThumbnails(): Promise<void> {
+      for (const e of thumbnailItems) {
+        if (cancelled) return
+        const dataUrl = await getThumbnail(e.item.id)
+        if (dataUrl !== null) {
+          setThumbnails((prev) => ({ ...prev, [e.item.id]: dataUrl }))
+        } else {
+          setThumbnails((prev) => ({ ...prev, [e.item.id]: null }))
+        }
+      }
+    }
+
+    void loadThumbnails()
+
+    return () => {
+      cancelled = true
+    }
+  }, [entries])
+
   const gridItems = useMemo(
     () =>
       entries.map((entry) => ({
@@ -97,9 +141,13 @@ export default function TrashPage(): React.JSX.Element {
         mimeType: entry.kind === 'file' ? entry.item.mimeType : undefined,
         size: entry.kind === 'file' ? entry.item.size : undefined,
         createdAt: entry.kind === 'folder' ? entry.folder.createdAt : entry.item.createdAt,
+        thumbnailUrl:
+          entry.kind === 'file' && canHaveThumbnail(entry.item.mimeType)
+            ? thumbnails[entry.item.id]
+            : null,
         isSelected: false
       })),
-    [entries]
+    [entries, thumbnails]
   )
 
   const allIds = useMemo(() => gridItems.map((i) => i.id), [gridItems])

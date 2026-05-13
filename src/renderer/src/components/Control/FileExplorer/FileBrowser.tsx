@@ -25,6 +25,7 @@ import { searchAllItems } from '@renderer/lib/file-explorer-search'
 import {
   deleteFolderFromStore,
   removeFileItemFromStore,
+  useFileExplorerCustomOrder,
   useFileExplorerSearch,
   useFileExplorerSettings,
   useFileExplorerStore
@@ -146,7 +147,7 @@ function SortableViewItem({
       data-file-item
       data-item-id={item.id}
       {...(item.isFolder ? { 'data-folder-id': item.id } : {})}
-      className={`touch-none rounded-lg${isOsDragTarget || (droppable.isOver && item.isFolder) ? ' ring-2 ring-inset ring-primary/50' : ''}`}
+      className={`touch-none rounded-lg${isOsDragTarget ? ' ring-2 ring-inset ring-primary/50' : ''}${droppable.isOver && item.isFolder ? ' bg-surface' : ''}`}
       {...sortable.attributes}
       {...sortable.listeners}
     >
@@ -167,7 +168,7 @@ function DragOverlayContent({
   mimeType?: string
 }): React.JSX.Element {
   return (
-    <div className="rounded-lg bg-content1 px-3 py-2 text-sm text-foreground shadow-lg ring-1 ring-border flex items-center gap-2">
+    <div className="rounded-lg bg-default-100 px-3 py-2 text-sm text-foreground shadow-lg ring-1 ring-border flex items-center gap-2">
       <div className="flex-shrink-0">
         {isFolder ? (
           <Folder size={16} className="text-accent" fill="currentColor" />
@@ -332,8 +333,8 @@ export function FileBrowser({
   const toggleFavorite = useFileExplorerStore((state) => state.toggleFavorite)
   const moveItem = useFileExplorerStore((state) => state.moveItem)
   const moveFolder = useFileExplorerStore((state) => state.moveFolder)
-  const reorderItems = useFileExplorerStore((state) => state.reorderItems)
-  const reorderFolders = useFileExplorerStore((state) => state.reorderFolders)
+  const customOrders = useFileExplorerCustomOrder((state) => state.orders)
+  const setCustomOrder = useFileExplorerCustomOrder((state) => state.setOrder)
   const viewMode = useFileExplorerSettings((state) => state.viewMode)
   const sortField = useFileExplorerSettings((state) => state.sortField)
   const sortDir = useFileExplorerSettings((state) => state.sortDir)
@@ -481,18 +482,31 @@ export function FileBrowser({
   )
 
   const sortedItems = useMemo(() => {
-    const folders = allItems.filter((item) => item.isFolder)
-    const files = allItems.filter((item) => !item.isFolder)
+    const foldersSubset = allItems.filter((item) => item.isFolder)
+    const filesSubset = allItems.filter((item) => !item.isFolder)
     if (sortDir !== 'none') {
-      folders.sort((a, b) => compareItems(a, b, sortField, sortDir))
-      files.sort((a, b) => compareItems(a, b, sortField, sortDir))
+      foldersSubset.sort((a, b) => compareItems(a, b, sortField, sortDir))
+      filesSubset.sort((a, b) => compareItems(a, b, sortField, sortDir))
+      return [...foldersSubset, ...filesSubset]
     }
-    return [...folders, ...files]
-  }, [allItems, sortField, sortDir])
+    const customOrder = customOrders[currentFolderId]
+    if (!customOrder) {
+      return [...foldersSubset, ...filesSubset]
+    }
+    const itemMap = new Map(allItems.map((item) => [item.id, item]))
+    const ordered: GridViewItem[] = []
+    for (const id of customOrder) {
+      const item = itemMap.get(id)
+      if (item) ordered.push(item)
+    }
+    const orderedIds = new Set(customOrder)
+    const newFolders = foldersSubset.filter((item) => !orderedIds.has(item.id))
+    const newFiles = filesSubset.filter((item) => !orderedIds.has(item.id))
+    return [...ordered, ...newFolders, ...newFiles]
+  }, [allItems, sortField, sortDir, currentFolderId, customOrders])
 
   const allIds = useMemo(() => sortedItems.map((item) => item.id), [sortedItems])
   const folderIds = useMemo(() => sortedItems.filter((item) => item.isFolder).map((item) => item.id), [sortedItems])
-  const itemIds = useMemo(() => sortedItems.filter((item) => !item.isFolder).map((item) => item.id), [sortedItems])
   const activeItem = activeId ? sortedItems.find((item) => item.id === activeId) : null
   const isMultiDrag = draggedIds.size > 1
 
@@ -800,34 +814,22 @@ export function FileBrowser({
 
       if (currentDraggedIds.size > 1) return
 
-      if (activeData.type === 'folder' && overData?.type === 'folder') {
-        const oldIndex = folderIds.indexOf(String(active.id))
-        const newIndex = folderIds.indexOf(String(over.id))
-        if (oldIndex !== -1 && newIndex !== -1) {
-          reorderFolders(currentFolderId, arrayMove(folderIds, oldIndex, newIndex))
-          setSortDir('none')
-        }
-        return
-      }
-
-      if (activeData.type === 'item' && overData?.type === 'item') {
-        const oldIndex = itemIds.indexOf(String(active.id))
-        const newIndex = itemIds.indexOf(String(over.id))
-        if (oldIndex !== -1 && newIndex !== -1) {
-          reorderItems(currentFolderId, arrayMove(itemIds, oldIndex, newIndex))
-          setSortDir('none')
-        }
+      const allSortedIds = sortedItems.map((item) => item.id)
+      const oldIndex = allSortedIds.indexOf(String(active.id))
+      const newIndex = allSortedIds.indexOf(String(over.id))
+      if (oldIndex !== -1 && newIndex !== -1) {
+        setCustomOrder(currentFolderId, arrayMove(allSortedIds, oldIndex, newIndex))
+        setSortDir('none')
       }
     },
     [
       draggedIds,
       folderIds,
-      itemIds,
+      sortedItems,
       currentFolderId,
       moveFolder,
       moveItem,
-      reorderFolders,
-      reorderItems,
+      setCustomOrder,
       setSortDir
     ]
   )
@@ -918,7 +920,7 @@ export function FileBrowser({
             className="h-full"
             onContextMenu={handleContainerContextMenu}
           >
-          <SortableContext items={[...folderIds, ...itemIds]}>
+          <SortableContext items={sortedItems.map((item) => item.id)}>
             {viewMode === 'list' ? (
               <ListView
                 items={sortedItems}
