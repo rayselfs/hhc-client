@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Star, StarOff } from 'lucide-react'
+import { StarOff } from 'lucide-react'
 import { GridView, ListView, type GridViewItem } from '@renderer/components/Control/FileExplorer/views'
 import {
   useFileExplorerStore,
@@ -13,6 +13,7 @@ import { useKeyboardShortcuts } from '@renderer/hooks/useKeyboardShortcuts'
 import { useItemSelection } from '@renderer/hooks/useItemSelection'
 import { compareByField } from '@renderer/lib/file-explorer-sort'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
+import FileExplorerShell from '@renderer/components/Control/FileExplorer/FileExplorerShell'
 import type { SortField } from '@renderer/stores/file-explorer'
 
 export default function FavoritesPage(): React.JSX.Element {
@@ -140,7 +141,6 @@ export default function FavoritesPage(): React.JSX.Element {
   if (sortedItems.length === 0) {
     return (
       <div className="flex h-full flex-col items-center justify-center text-center p-8">
-        <Star size={48} className="text-default-300 mb-4" />
         <h3 className="text-lg font-medium text-foreground">{t('favorites.empty.title')}</h3>
         <p className="text-sm text-default-400 mt-1">{t('favorites.empty.description')}</p>
       </div>
@@ -148,12 +148,13 @@ export default function FavoritesPage(): React.JSX.Element {
   }
 
   return (
-    <div
-      ref={containerRef}
-      className="relative h-full overflow-auto"
-      onClick={handleContainerClick}
-      onMouseDown={handleContainerMouseDown}
-    >
+    <FileExplorerShell itemCount={sortedItems.length} selectedCount={selectedIds.size}>
+      <div
+        ref={containerRef}
+        className="relative h-full overflow-auto"
+        onClick={handleContainerClick}
+        onMouseDown={handleContainerMouseDown}
+      >
       {viewMode === 'list' ? (
         <ListView
           items={itemsWithSelection}
@@ -178,16 +179,17 @@ export default function FavoritesPage(): React.JSX.Element {
       )}
 
       {rubberBandRect && (
-        <div
-          className="pointer-events-none fixed z-50 rounded-sm border border-primary/60 bg-accent/20"
-          style={{
-            left: rubberBandRect.left,
-            top: rubberBandRect.top,
-            width: rubberBandRect.width,
-            height: rubberBandRect.height
-          }}
-        />
-      )}
-    </div>
+          <div
+            className="pointer-events-none fixed z-50 rounded-sm border border-primary/60 bg-accent/20"
+            style={{
+              left: rubberBandRect.left,
+              top: rubberBandRect.top,
+              width: rubberBandRect.width,
+              height: rubberBandRect.height
+            }}
+          />
+        )}
+      </div>
+    </FileExplorerShell>
   )
 }

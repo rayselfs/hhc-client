@@ -15,6 +15,7 @@ import { useThumbnails, canHaveThumbnail } from '@renderer/hooks/useThumbnails'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
 import { compareByField } from '@renderer/lib/file-explorer-sort'
 import { GridView, ListView } from '@renderer/components/Control/FileExplorer/views'
+import FileExplorerShell from '@renderer/components/Control/FileExplorer/FileExplorerShell'
 import type { FileItemRecord, FolderRecord } from '@shared/types/folder'
 import type { SortField } from '@renderer/stores/file-explorer'
 import type { SortableItem } from '@renderer/lib/file-explorer-sort'
@@ -225,7 +226,6 @@ export default function TrashPage(): React.JSX.Element {
   if (entries.length === 0) {
     return (
       <div className="flex h-full flex-col items-center justify-center text-center p-8">
-        <Trash2 size={48} className="text-default-300 mb-4" />
         <h3 className="text-lg font-medium text-foreground">{t('trash.empty.title')}</h3>
         <p className="text-sm text-default-400 mt-1">{t('trash.empty.description')}</p>
       </div>
@@ -233,12 +233,13 @@ export default function TrashPage(): React.JSX.Element {
   }
 
   return (
-    <div
-      ref={containerRef}
-      className="relative h-full overflow-auto"
-      onClick={handleContainerClick}
-      onMouseDown={handleContainerMouseDown}
-    >
+    <FileExplorerShell itemCount={entries.length} selectedCount={selectedIds.size}>
+      <div
+        ref={containerRef}
+        className="relative h-full overflow-auto"
+        onClick={handleContainerClick}
+        onMouseDown={handleContainerMouseDown}
+      >
       {viewMode === 'list' ? (
         <ListView
           items={gridItemsWithSelection}
@@ -262,16 +263,17 @@ export default function TrashPage(): React.JSX.Element {
       )}
 
       {rubberBandRect && (
-        <div
-          className="pointer-events-none fixed z-50 rounded-sm border border-primary/60 bg-accent/20"
-          style={{
-            left: rubberBandRect.left,
-            top: rubberBandRect.top,
-            width: rubberBandRect.width,
-            height: rubberBandRect.height
-          }}
-        />
-      )}
-    </div>
+          <div
+            className="pointer-events-none fixed z-50 rounded-sm border border-primary/60 bg-accent/20"
+            style={{
+              left: rubberBandRect.left,
+              top: rubberBandRect.top,
+              width: rubberBandRect.width,
+              height: rubberBandRect.height
+            }}
+          />
+        )}
+      </div>
+    </FileExplorerShell>
   )
 }
