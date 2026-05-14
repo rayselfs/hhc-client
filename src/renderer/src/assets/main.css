@@ -106,8 +106,11 @@ body {
   outline: none;
 }
 
+*[data-focus-visible='true'] {
+  box-shadow: none;
+}
+
 .breadcrumbs .breadcrumbs__link[data-focus-visible='true'],
 .breadcrumbs .breadcrumbs__link[data-pressed='true'] {
-  box-shadow: none;
   background: transparent;
 }
