@@ -63,7 +63,7 @@ export default function FileExplorerFAB({
           <Dropdown.Trigger>
             <div
               aria-label={t('fileExplorer.fab.label', 'New')}
-              className="flex items-center justify-center w-14 h-14 rounded-full bg-surface text-foreground shadow-lg hover:opacity-80 transition-opacity cursor-default"
+              className="flex items-center justify-center w-14 h-14 rounded-full bg-surface text-foreground shadow-lg hover:opacity-80 transition-opacity cursor-default outline-none focus:outline-none"
             >
               <Plus size={24} />
             </div>

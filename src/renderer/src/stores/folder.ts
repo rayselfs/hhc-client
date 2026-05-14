@@ -368,19 +368,46 @@ export function createFolderStore(config: FolderStoreConfig) {
 
     softDeleteFolder: (folderId) => {
       if (folderId === config.rootId) return
-      const folder = get().folders[folderId]
+      const { folders } = get()
+      const folder = folders[folderId]
       if (!folder) return
+
+      const queue: string[] = [folderId]
+      const visited = new Set<string>()
+      while (queue.length > 0) {
+        const current = queue.shift()!
+        if (visited.has(current)) continue
+        visited.add(current)
+        for (const f of Object.values(folders)) {
+          if (f.parentId === current) queue.push(f.id)
+        }
+      }
+      visited.delete(folderId)
+
       const updated: FolderRecord = {
         ...folder,
         isFavorited: false,
         deletedAt: Date.now(),
         originalParentId: folder.parentId ?? config.rootId
       }
-      set((state) => ({
-        folders: { ...state.folders, [folderId]: updated },
-        _foldersArray: state._foldersArray.map((f) => (f.id === folderId ? updated : f))
-      }))
+
+      const descendantUpdates: FolderRecord[] = []
+      for (const id of visited) {
+        const f = folders[id]
+        if (f?.isFavorited) descendantUpdates.push({ ...f, isFavorited: false })
+      }
+
+      set((state) => {
+        const newFolders = { ...state.folders, [folderId]: updated }
+        for (const f of descendantUpdates) newFolders[f.id] = f
+        return {
+          folders: newFolders,
+          _foldersArray: state._foldersArray.map((f) => newFolders[f.id] ?? f)
+        }
+      })
+
       ops.saveFolder(updated)
+      if (descendantUpdates.length > 0) ops.saveFolders(descendantUpdates)
     },
 
     softDeleteItem: (itemId) => {

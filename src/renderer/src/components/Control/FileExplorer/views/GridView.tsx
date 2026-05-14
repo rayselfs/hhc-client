@@ -112,7 +112,7 @@ export function GridView({
           <div
             data-file-item
             data-item-id={item.id}
-            className={`group relative flex flex-col items-center justify-start rounded-lg p-2 cursor-pointer transition-colors hover:bg-content2/60 ${
+            className={`group relative flex flex-col items-center justify-start rounded-lg p-2 cursor-default transition-colors hover:bg-content2/60 ${
               item.isSelected ? 'bg-surface' : ''
             }`}
             onClick={(e) => onItemClick(item.id, e)}
