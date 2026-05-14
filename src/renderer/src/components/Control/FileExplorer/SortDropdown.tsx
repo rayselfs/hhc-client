@@ -1,9 +1,7 @@
-import React, { useState } from 'react'
-import { Button } from '@heroui/react/button'
-import { Popover } from '@heroui/react/popover'
+import React from 'react'
+import { Dropdown, Button } from '@heroui/react'
 import { ArrowUpDown, ArrowUp, ArrowDown, Check } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import GlassDivider from '@renderer/components/Common/GlassDivider'
 import type { SortField, SortDir } from '@renderer/stores/file-explorer'
 
 export interface SortDropdownProps {
@@ -26,12 +24,20 @@ const FIELD_KEY: Record<SortField, SortFieldKey> = {
   kind: 'fileExplorer.sort.kind'
 }
 
-export default function SortDropdown({ sortField, sortDir, onSortChange }: SortDropdownProps): React.JSX.Element {
+export default function SortDropdown({
+  sortField,
+  sortDir,
+  onSortChange
+}: SortDropdownProps): React.JSX.Element {
   const { t } = useTranslation()
-  const [isOpen, setIsOpen] = useState(false)
   const isActive = sortDir !== 'none'
 
-  const handleFieldPress = (field: SortField): void => {
+  const handleAction = (key: React.Key): void => {
+    if (key === 'none') {
+      onSortChange(sortField, 'none')
+      return
+    }
+    const field = key as SortField
     if (!isActive || sortField !== field) {
       onSortChange(field, 'asc')
     } else if (sortDir === 'asc') {
@@ -39,11 +45,10 @@ export default function SortDropdown({ sortField, sortDir, onSortChange }: SortD
     } else {
       onSortChange(field, 'asc')
     }
-    setIsOpen(false)
   }
 
   return (
-    <Popover isOpen={isOpen} onOpenChange={setIsOpen}>
+    <Dropdown>
       <Button
         isIconOnly
         variant="outline"
@@ -53,39 +58,39 @@ export default function SortDropdown({ sortField, sortDir, onSortChange }: SortD
       >
         <ArrowUpDown size={16} />
       </Button>
-      <Popover.Content placement="bottom start" className="w-44 p-1">
-        <Popover.Dialog>
-          <div className="flex flex-col gap-0.5">
-            <button
-              type="button"
-              className="flex items-center justify-between rounded-xl px-2.5 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground w-full"
-              onClick={() => { onSortChange(sortField, 'none'); setIsOpen(false) }}
+      <Dropdown.Popover>
+        <Dropdown.Menu onAction={handleAction}>
+          <Dropdown.Section>
+            <Dropdown.Item
+              id="none"
+              className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
             >
-              <span>{t('fileExplorer.sort.none', 'None')}</span>
-              {!isActive && <Check size={14} className="text-primary ml-4" />}
-            </button>
-            <GlassDivider className="my-0.5" />
+              {t('fileExplorer.sort.none', 'None')}
+              {!isActive && <Check size={14} className="ml-auto" />}
+            </Dropdown.Item>
+          </Dropdown.Section>
+          <Dropdown.Section>
             {SORT_FIELDS.map((field) => {
               const isFieldActive = isActive && sortField === field
               return (
-                <button
+                <Dropdown.Item
                   key={field}
-                  type="button"
-                  className="flex items-center justify-between rounded-xl px-2.5 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground w-full"
-                  onClick={() => handleFieldPress(field)}
+                  id={field}
+                  className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
                 >
-                  <span>{t(FIELD_KEY[field])}</span>
-                  {isFieldActive && (
-                    sortDir === 'asc'
-                      ? <ArrowUp size={14} className="text-primary ml-4" />
-                      : <ArrowDown size={14} className="text-primary ml-4" />
-                  )}
-                </button>
+                  {t(FIELD_KEY[field])}
+                  {isFieldActive &&
+                    (sortDir === 'asc' ? (
+                      <ArrowUp size={14} className="text-primary ml-auto" />
+                    ) : (
+                      <ArrowDown size={14} className="text-primary ml-auto" />
+                    ))}
+                </Dropdown.Item>
               )
             })}
-          </div>
-        </Popover.Dialog>
-      </Popover.Content>
-    </Popover>
+          </Dropdown.Section>
+        </Dropdown.Menu>
+      </Dropdown.Popover>
+    </Dropdown>
   )
 }

@@ -22,7 +22,6 @@ import {
   useFavoritesExplorerSettings,
   useTrashExplorerSettings
 } from '@renderer/stores/file-explorer'
-import GlassDivider from '@renderer/components/Common/GlassDivider'
 
 export default function Header(): React.JSX.Element {
   const { t } = useTranslation()
@@ -119,22 +118,25 @@ export default function Header(): React.JSX.Element {
         </div>
       )}
 
-      {showExplorerControls && (
-        <div className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center gap-2 max-w-[50%]">
-          <ButtonGroup size="lg">
-            <ViewModeDropdown viewMode={activeViewMode} onViewModeChange={activeSetViewMode} />
-            <GlassDivider vertical className="h-6 self-center mx-px" />
-            <SortDropdown sortField={activeSortField} sortDir={activeSortDir} onSortChange={activeSetSortFieldAndDir} />
-          </ButtonGroup>
-          {showFilesControls && (
-            <Breadcrumb
-              currentFolderId={currentFolderId}
-              getFolderPath={getFolderPath}
-              onNavigate={handleBreadcrumbNavigate}
-            />
-          )}
-        </div>
-      )}
+      <div
+        className={`absolute left-2 top-1/2 -translate-y-1/2 flex items-center gap-2 max-w-[50%] transition-all duration-200 ${showExplorerControls ? 'opacity-100 translate-x-0 pointer-events-auto' : 'opacity-0 -translate-x-3 pointer-events-none'}`}
+      >
+        <ButtonGroup size="lg">
+          <ViewModeDropdown viewMode={activeViewMode} onViewModeChange={activeSetViewMode} />
+          <SortDropdown
+            sortField={activeSortField}
+            sortDir={activeSortDir}
+            onSortChange={activeSetSortFieldAndDir}
+          />
+        </ButtonGroup>
+        {showFilesControls && (
+          <Breadcrumb
+            currentFolderId={currentFolderId}
+            getFolderPath={getFolderPath}
+            onNavigate={handleBreadcrumbNavigate}
+          />
+        )}
+      </div>
 
       <div
         className={`absolute inset-0 flex items-center lg:justify-center max-lg:justify-start max-lg:pl-14 pointer-events-none transition-all duration-200 ${showTimerControls ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-3'}`}

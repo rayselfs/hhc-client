@@ -104,7 +104,7 @@ describe('PreferencesDialog', () => {
     renderDialog(true)
 
     await user.click(screen.getByTestId('category-media'))
-    expect(screen.getByText('Media settings coming soon')).toBeInTheDocument()
+    expect(screen.getByLabelText('Trash Retention Period')).toBeInTheDocument()
     expect(screen.queryByLabelText('Language')).not.toBeInTheDocument()
 
     await user.click(screen.getByTestId('category-general'))
