@@ -26,9 +26,7 @@ const MEDIA_SUB_ITEMS: MediaSubItem[] = [
 ]
 
 function useIsCollapsed(): boolean {
-  const [collapsed, setCollapsed] = useState(() =>
-    window.matchMedia('(max-width: 1023px)').matches
-  )
+  const [collapsed, setCollapsed] = useState(() => window.matchMedia('(max-width: 1023px)').matches)
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 1023px)')
     const handler = (e: MediaQueryListEvent): void => setCollapsed(e.matches)

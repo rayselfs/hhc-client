@@ -48,7 +48,10 @@ export interface WebSpeechAdapterConfig {
 export class WebSpeechAdapter implements SpeechAdapter {
   private recognition: IWebSpeechRecognition | null = null
   private active = false
-  private listeners: Map<SpeechAdapterEventType, Set<SpeechAdapterEventListener<SpeechAdapterEventType>>> = new Map()
+  private listeners: Map<
+    SpeechAdapterEventType,
+    Set<SpeechAdapterEventListener<SpeechAdapterEventType>>
+  > = new Map()
   private config: WebSpeechAdapterConfig
 
   constructor(config: WebSpeechAdapterConfig) {
@@ -122,7 +125,9 @@ export class WebSpeechAdapter implements SpeechAdapter {
     }
     this.listeners.get(event)!.add(listener as SpeechAdapterEventListener<SpeechAdapterEventType>)
     return () => {
-      this.listeners.get(event)?.delete(listener as SpeechAdapterEventListener<SpeechAdapterEventType>)
+      this.listeners
+        .get(event)
+        ?.delete(listener as SpeechAdapterEventListener<SpeechAdapterEventType>)
     }
   }
 

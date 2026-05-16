@@ -132,12 +132,13 @@ export function GridView({
                 }}
                 aria-label={item.isFavorited ? 'Remove from favorites' : 'Add to favorites'}
               >
-                <Star size={16} className={item.isFavorited ? 'fill-yellow-400 drop-shadow-sm' : ''} />
+                <Star
+                  size={16}
+                  className={item.isFavorited ? 'fill-yellow-400 drop-shadow-sm' : ''}
+                />
               </button>
             )}
-            <div className="flex items-center justify-center">
-              {renderGridIcon(item, iconSize)}
-            </div>
+            <div className="flex items-center justify-center">{renderGridIcon(item, iconSize)}</div>
             <span
               className={`w-full text-center text-foreground break-words ${nameClass}`}
               title={item.name}

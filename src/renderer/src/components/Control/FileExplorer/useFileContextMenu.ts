@@ -21,7 +21,11 @@ export const useFileContextMenu = createFolderContextMenu({
       'separator',
       {
         id: isFavorited ? 'remove-favorite' : 'add-favorite',
-        label: t(isFavorited ? 'fileExplorer.contextMenu.removeFavorite' : 'fileExplorer.contextMenu.addFavorite'),
+        label: t(
+          isFavorited
+            ? 'fileExplorer.contextMenu.removeFavorite'
+            : 'fileExplorer.contextMenu.addFavorite'
+        ),
         icon: React.createElement(isFavorited ? StarOff : Star, { size: 14 }),
         onAction: () => toggleFavorite(folder.id)
       }

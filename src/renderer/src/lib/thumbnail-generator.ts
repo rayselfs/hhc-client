@@ -130,7 +130,10 @@ async function generatePdfThumbnail(file: File): Promise<string | null> {
   try {
     const page = await pdf.getPage(1)
     const viewport = page.getViewport({ scale: 1 })
-    const scale = Math.min(THUMBNAIL_MAX_SIZE / viewport.width, THUMBNAIL_MAX_SIZE / viewport.height)
+    const scale = Math.min(
+      THUMBNAIL_MAX_SIZE / viewport.width,
+      THUMBNAIL_MAX_SIZE / viewport.height
+    )
     const renderViewport = page.getViewport({ scale })
     const canvas = createCanvas(Math.ceil(renderViewport.width), Math.ceil(renderViewport.height))
     const context = canvas.getContext('2d')

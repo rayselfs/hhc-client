@@ -5,7 +5,11 @@ export type SearchResult =
   | { kind: 'file'; item: FileItemRecord; folderPath: string }
   | { kind: 'folder'; folder: FolderRecord; folderPath: string }
 
-export function searchAllItems(query: string, storeState: FolderStoreState, rootLabel: string): SearchResult[] {
+export function searchAllItems(
+  query: string,
+  storeState: FolderStoreState,
+  rootLabel: string
+): SearchResult[] {
   if (query.trim() === '') return []
 
   const lowerQuery = query.toLowerCase()
@@ -31,7 +35,9 @@ export function searchAllItems(query: string, storeState: FolderStoreState, root
       if (folder.deletedAt) continue
       if (!folder.name.toLowerCase().includes(lowerQuery)) continue
 
-      const pathFolders = storeState.getFolderPath(folder.parentId).filter((f) => f.parentId !== null)
+      const pathFolders = storeState
+        .getFolderPath(folder.parentId)
+        .filter((f) => f.parentId !== null)
       const folderPath = '/' + [rootLabel, ...pathFolders.map((f) => f.name)].join('/')
 
       results.push({ kind: 'folder', folder, folderPath })

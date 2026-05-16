@@ -107,7 +107,7 @@ export function ListView({
             {t('fileExplorer.list.name', 'Name')}
             {renderSortIcon('name')}
           </div>
-          
+
           <div
             className="w-1 cursor-col-resize flex-shrink-0 hover:bg-primary/40 h-6"
             onPointerDown={(e) => handlePointerDown(e, 'created')}
@@ -166,24 +166,31 @@ export function ListView({
                 {item.isFolder ? (
                   <Folder size={20} className="text-accent" fill="currentColor" />
                 ) : (
-                  <div className="text-danger">
-                    {getFileIcon(item.mimeType, item.isFolder, 20)}
-                  </div>
+                  <div className="text-danger">{getFileIcon(item.mimeType, item.isFolder, 20)}</div>
                 )}
               </div>
               <div className="flex-1 truncate text-base text-foreground" title={item.name}>
                 {item.name}
               </div>
               <div className="w-1 flex-shrink-0" />
-              <div className="flex-shrink-0 text-sm text-default-400 pl-2" style={{ width: colWidths.created }}>
+              <div
+                className="flex-shrink-0 text-sm text-default-400 pl-2"
+                style={{ width: colWidths.created }}
+              >
                 {formatDate(item.createdAt)}
               </div>
               <div className="w-1 flex-shrink-0" />
-              <div className="flex-shrink-0 text-sm text-default-400 pl-2" style={{ width: colWidths.size }}>
+              <div
+                className="flex-shrink-0 text-sm text-default-400 pl-2"
+                style={{ width: colWidths.size }}
+              >
                 {item.isFolder ? '—' : formatFileSize(item.size)}
               </div>
               <div className="w-1 flex-shrink-0" />
-              <div className="flex-shrink-0 text-sm text-default-400 truncate pl-2" style={{ width: colWidths.kind }}>
+              <div
+                className="flex-shrink-0 text-sm text-default-400 truncate pl-2"
+                style={{ width: colWidths.kind }}
+              >
                 {formatFileKind(item.mimeType, item.isFolder, t)}
               </div>
             </div>

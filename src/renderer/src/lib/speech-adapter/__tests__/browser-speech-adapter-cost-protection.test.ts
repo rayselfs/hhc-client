@@ -306,7 +306,13 @@ describe('BrowserSpeechAdapter - Cost Protection', () => {
     function makeResult(
       text: string,
       confidence: number
-    ): { result: { reason: number; text: string; properties: { getProperty: ReturnType<typeof vi.fn> } } } {
+    ): {
+      result: {
+        reason: number
+        text: string
+        properties: { getProperty: ReturnType<typeof vi.fn> }
+      }
+    } {
       return {
         result: {
           reason: 3,

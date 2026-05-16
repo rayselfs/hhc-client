@@ -52,7 +52,11 @@ beforeEach(() => {
     accumulatedMs: 0,
     showOnProjection: false
   })
-  useSettingsStore.setState({ timezone: 'Asia/Taipei', timerRingColor: '#3b82f6', timerRingColorEnabled: true })
+  useSettingsStore.setState({
+    timezone: 'Asia/Taipei',
+    timerRingColor: '#3b82f6',
+    timerRingColorEnabled: true
+  })
 })
 
 describe('TimerProjectionBridge — timer:tick projection', () => {

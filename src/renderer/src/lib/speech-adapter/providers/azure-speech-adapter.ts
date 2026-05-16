@@ -14,7 +14,10 @@ import type {
 export class AzureSpeechAdapter implements SpeechAdapter {
   private recognizer: sdk.SpeechRecognizer | null = null
   private isActive = false
-  private listeners: Map<SpeechAdapterEventType, Set<SpeechAdapterEventListener<SpeechAdapterEventType>>> = new Map()
+  private listeners: Map<
+    SpeechAdapterEventType,
+    Set<SpeechAdapterEventListener<SpeechAdapterEventType>>
+  > = new Map()
   private config: SpeechAdapterConfig
   private onlineHandler: (() => void) | null = null
   private offlineHandler: (() => void) | null = null

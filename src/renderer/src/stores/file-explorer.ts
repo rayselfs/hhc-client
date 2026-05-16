@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import type { UseBoundStore, StoreApi } from 'zustand'
 import { deleteFileBlob, openFileExplorerDB, storeFileBlob } from '@renderer/lib/file-explorer-db'
 import { deleteThumbnail } from '@renderer/lib/thumbnail-db'
 import { hhcPersistStorage, createPersistName } from '@renderer/lib/persist-storage'
@@ -37,8 +38,8 @@ export const useFileExplorerStore = createFolderStore({
 function createExplorerSettingsStore(
   persistName: string,
   defaults: { sortField: SortField; sortDir: SortDir },
-  options: { version?: number; migrate?: (state: any) => any } = {}
-) {
+  options: { version?: number; migrate?: (state: unknown) => unknown } = {}
+): UseBoundStore<StoreApi<FileExplorerSettingsState>> {
   return create<FileExplorerSettingsState>()(
     persist(
       (set) => ({
@@ -50,8 +51,7 @@ function createExplorerSettingsStore(
         setSortDir: (sortDir) => set({ sortDir }),
         setSortFieldAndDir: (sortField, sortDir) => set({ sortField, sortDir }),
         colWidths: { created: 112, size: 80, kind: 96 },
-        setColWidths: (widths) =>
-          set((state) => ({ colWidths: { ...state.colWidths, ...widths } }))
+        setColWidths: (widths) => set((state) => ({ colWidths: { ...state.colWidths, ...widths } }))
       }),
       {
         name: createPersistName(persistName),
@@ -85,10 +85,10 @@ export const useFavoritesExplorerSettings = createExplorerSettingsStore(
   { sortField: 'name', sortDir: 'asc' }
 )
 
-export const useTrashExplorerSettings = createExplorerSettingsStore(
-  'trash-explorer-settings',
-  { sortField: 'createdAt', sortDir: 'desc' }
-)
+export const useTrashExplorerSettings = createExplorerSettingsStore('trash-explorer-settings', {
+  sortField: 'createdAt',
+  sortDir: 'desc'
+})
 
 interface FileExplorerCustomOrderState {
   orders: Record<string, string[]>

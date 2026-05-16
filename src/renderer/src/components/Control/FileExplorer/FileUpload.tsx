@@ -12,7 +12,11 @@ interface FileUploadProps {
 }
 
 function canGenerateThumbnail(file: File): boolean {
-  return file.type.startsWith('image/') || file.type.startsWith('video/') || file.type === 'application/pdf'
+  return (
+    file.type.startsWith('image/') ||
+    file.type.startsWith('video/') ||
+    file.type === 'application/pdf'
+  )
 }
 
 async function generateAndSaveThumbnail(file: File, itemId: string): Promise<void> {

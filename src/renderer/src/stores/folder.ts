@@ -138,11 +138,12 @@ export function createFolderStore(config: FolderStoreConfig) {
         parentId: resolvedParentId,
         sortIndex: siblings.length,
         createdAt: Date.now(),
-        expiresAt: expiresAt !== undefined
+        expiresAt:
+          expiresAt !== undefined
             ? expiresAt
             : resolvedParentId === config.rootId
               ? Date.now() + FOLDER_DURATION_MS['1day']
-              : get().folders[resolvedParentId]?.expiresAt ?? null
+              : (get().folders[resolvedParentId]?.expiresAt ?? null)
       }
       set((state) => ({
         folders: { ...state.folders, [newFolder.id]: newFolder },
@@ -256,8 +257,7 @@ export function createFolderStore(config: FolderStoreConfig) {
         ...item,
         parentId: targetFolderId,
         sortIndex: targetSiblings.length,
-        expiresAt:
-          targetFolderId === config.rootId ? Date.now() + FOLDER_DURATION_MS['1day'] : null
+        expiresAt: targetFolderId === config.rootId ? Date.now() + FOLDER_DURATION_MS['1day'] : null
       }
       set((state) => {
         const newItemsArray = state._itemsArray.map((i) => (i.id === itemId ? updated : i))
@@ -431,9 +431,7 @@ export function createFolderStore(config: FolderStoreConfig) {
       if (!folder || !folder.deletedAt) return
       const parentId = folder.originalParentId
       const targetParentId =
-        parentId && folders[parentId] && !folders[parentId].deletedAt
-          ? parentId
-          : config.rootId
+        parentId && folders[parentId] && !folders[parentId].deletedAt ? parentId : config.rootId
       const updated: FolderRecord = {
         ...folder,
         isFavorited: false,
@@ -454,9 +452,7 @@ export function createFolderStore(config: FolderStoreConfig) {
       if (!item || !item.deletedAt) return
       const parentId = item.originalParentId
       const targetParentId =
-        parentId && folders[parentId] && !folders[parentId].deletedAt
-          ? parentId
-          : config.rootId
+        parentId && folders[parentId] && !folders[parentId].deletedAt ? parentId : config.rootId
       const updated: AnyItemRecord = {
         ...item,
         parentId: targetParentId,

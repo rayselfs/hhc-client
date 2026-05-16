@@ -356,7 +356,11 @@ export function FileBrowser({
 
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return []
-    const raw = searchAllItems(searchQuery, useFileExplorerStore.getState(), t('fileExplorer.breadcrumb.root'))
+    const raw = searchAllItems(
+      searchQuery,
+      useFileExplorerStore.getState(),
+      t('fileExplorer.breadcrumb.root')
+    )
     return [...raw].sort((a, b) => {
       const nameA = a.kind === 'file' ? a.item.name : a.folder.name
       const nameB = b.kind === 'file' ? b.item.name : b.folder.name
@@ -415,7 +419,10 @@ export function FileBrowser({
   }, [allItems, sortField, sortDir, currentFolderId, customOrders])
 
   const allIds = useMemo(() => sortedItems.map((item) => item.id), [sortedItems])
-  const folderIds = useMemo(() => sortedItems.filter((item) => item.isFolder).map((item) => item.id), [sortedItems])
+  const folderIds = useMemo(
+    () => sortedItems.filter((item) => item.isFolder).map((item) => item.id),
+    [sortedItems]
+  )
   const activeItem = activeId ? sortedItems.find((item) => item.id === activeId) : null
   const isMultiDrag = draggedIds.size > 1
 
@@ -431,14 +438,15 @@ export function FileBrowser({
     containerRef
   } = useItemSelection(allIds)
 
-  const { isOsDragOver, osDragTargetFolderId, handlers: osDragHandlers } = useOsFileDrop(
-    containerRef,
-    {
-      onDrop: async (dataTransfer, targetId) => {
-        await uploadFromDataTransfer(dataTransfer.items, targetId ?? currentFolderId)
-      }
+  const {
+    isOsDragOver,
+    osDragTargetFolderId,
+    handlers: osDragHandlers
+  } = useOsFileDrop(containerRef, {
+    onDrop: async (dataTransfer, targetId) => {
+      await uploadFromDataTransfer(dataTransfer.items, targetId ?? currentFolderId)
     }
-  )
+  })
 
   const sortedItemsWithSelection = useMemo(
     () => sortedItems.map((i) => ({ ...i, isSelected: selectedIds.has(i.id) })),
@@ -716,10 +724,7 @@ export function FileBrowser({
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
-          <div
-            className="h-full"
-            onContextMenu={handleContainerContextMenu}
-          >
+        <div className="h-full" onContextMenu={handleContainerContextMenu}>
           <SortableContext items={sortedItemsWithSelection.map((item) => item.id)}>
             {viewMode === 'list' ? (
               <ListView

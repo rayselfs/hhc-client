@@ -74,44 +74,42 @@ export function FolderModal({
                     <Input variant="secondary" />
                   </TextField>
                   {!hideDuration && (
-                  <div className="p-1">
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <Label className="text-sm">{tKey('retention', 'Retention')}</Label>
-                      {isRetentionLocked && (
-                        <Lock size={12} className="text-default-400" />
-                      )}
+                    <div className="p-1">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <Label className="text-sm">{tKey('retention', 'Retention')}</Label>
+                        {isRetentionLocked && <Lock size={12} className="text-default-400" />}
+                      </div>
+                      <Select
+                        value={folderDuration}
+                        onChange={(v) => onFolderDurationChange(v as FolderDuration)}
+                        aria-label={tKey('retention', 'Retention')}
+                        className="w-full"
+                        variant="secondary"
+                        isDisabled={isRetentionLocked}
+                      >
+                        <Select.Trigger>
+                          <Select.Value />
+                          <Select.Indicator />
+                        </Select.Trigger>
+                        <Select.Popover>
+                          <ListBox>
+                            {(['1day', '1week', '1month', 'permanent'] as FolderDuration[]).map(
+                              (d) => (
+                                <ListBox.Item
+                                  key={d}
+                                  id={d}
+                                  textValue={tKey(`duration.${d}`)}
+                                  className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
+                                >
+                                  {tKey(`duration.${d}`)}
+                                  <ListBox.ItemIndicator />
+                                </ListBox.Item>
+                              )
+                            )}
+                          </ListBox>
+                        </Select.Popover>
+                      </Select>
                     </div>
-                    <Select
-                      value={folderDuration}
-                      onChange={(v) => onFolderDurationChange(v as FolderDuration)}
-                      aria-label={tKey('retention', 'Retention')}
-                      className="w-full"
-                      variant="secondary"
-                      isDisabled={isRetentionLocked}
-                    >
-                      <Select.Trigger>
-                        <Select.Value />
-                        <Select.Indicator />
-                      </Select.Trigger>
-                      <Select.Popover>
-                        <ListBox>
-                          {(['1day', '1week', '1month', 'permanent'] as FolderDuration[]).map(
-                            (d) => (
-                              <ListBox.Item
-                                key={d}
-                                id={d}
-                                textValue={tKey(`duration.${d}`)}
-                                className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
-                              >
-                                {tKey(`duration.${d}`)}
-                                <ListBox.ItemIndicator />
-                              </ListBox.Item>
-                            )
-                          )}
-                        </ListBox>
-                      </Select.Popover>
-                    </Select>
-                  </div>
                   )}
                 </div>
               </ShortcutScope>

@@ -2,7 +2,11 @@ import React, { useCallback, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { StarOff } from 'lucide-react'
-import { GridView, ListView, type GridViewItem } from '@renderer/components/Control/FileExplorer/views'
+import {
+  GridView,
+  ListView,
+  type GridViewItem
+} from '@renderer/components/Control/FileExplorer/views'
 import {
   useFileExplorerStore,
   useFileExplorerSearch,
@@ -157,30 +161,30 @@ export default function FavoritesPage(): React.JSX.Element {
         onClick={handleContainerClick}
         onMouseDown={handleContainerMouseDown}
       >
-      {viewMode === 'list' ? (
-        <ListView
-          items={itemsWithSelection}
-          sortField={sortField}
-          sortDir={sortDir}
-          onSortChange={handleSortChange}
-          colWidths={colWidths}
-          onColWidthChange={(col, w) => setColWidths({ [col]: w })}
-          onItemClick={handleItemClick}
-          onItemDoubleClick={handleItemDoubleClick}
-          onItemContextMenu={handleContextMenu}
-        />
-      ) : (
-        <GridView
-          items={itemsWithSelection}
-          viewMode={viewMode}
-          onItemClick={handleItemClick}
-          onItemDoubleClick={handleItemDoubleClick}
-          onItemContextMenu={handleContextMenu}
-          onItemFavoriteToggle={toggleFavorite}
-        />
-      )}
+        {viewMode === 'list' ? (
+          <ListView
+            items={itemsWithSelection}
+            sortField={sortField}
+            sortDir={sortDir}
+            onSortChange={handleSortChange}
+            colWidths={colWidths}
+            onColWidthChange={(col, w) => setColWidths({ [col]: w })}
+            onItemClick={handleItemClick}
+            onItemDoubleClick={handleItemDoubleClick}
+            onItemContextMenu={handleContextMenu}
+          />
+        ) : (
+          <GridView
+            items={itemsWithSelection}
+            viewMode={viewMode}
+            onItemClick={handleItemClick}
+            onItemDoubleClick={handleItemDoubleClick}
+            onItemContextMenu={handleContextMenu}
+            onItemFavoriteToggle={toggleFavorite}
+          />
+        )}
 
-      {rubberBandRect && (
+        {rubberBandRect && (
           <div
             className="pointer-events-none fixed z-50 rounded-sm border border-primary/60 bg-accent/20"
             style={{

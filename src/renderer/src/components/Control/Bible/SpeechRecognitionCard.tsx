@@ -38,10 +38,10 @@ const PROVIDER_REQUIREMENTS: Record<
   SpeechProvider,
   { requiresOnline: boolean; isReady: (s: SpeechSettings) => boolean }
 > = {
-  azure:     { requiresOnline: true,  isReady: (s) => !!s.azure.region },
-  gcp:       { requiresOnline: true,  isReady: () => true },
-  webSpeech: { requiresOnline: true,  isReady: () => true },
-  whisper:   { requiresOnline: false, isReady: (s) => !!s.whisper.modelDir }
+  azure: { requiresOnline: true, isReady: (s) => !!s.azure.region },
+  gcp: { requiresOnline: true, isReady: () => true },
+  webSpeech: { requiresOnline: true, isReady: () => true },
+  whisper: { requiresOnline: false, isReady: (s) => !!s.whisper.modelDir }
 }
 
 export default function SpeechRecognitionCard(): React.JSX.Element {
@@ -276,9 +276,7 @@ export default function SpeechRecognitionCard(): React.JSX.Element {
 
   const providerReqs = PROVIDER_REQUIREMENTS[speech.activeProvider]
   const canStart =
-    !isRecognizing &&
-    providerReqs.isReady(speech) &&
-    (!providerReqs.requiresOnline || isOnline)
+    !isRecognizing && providerReqs.isReady(speech) && (!providerReqs.requiresOnline || isOnline)
 
   return (
     <Card className="flex flex-col h-full p-0 gap-2">

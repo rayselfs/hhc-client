@@ -20,9 +20,7 @@ import type { FileItemRecord, FolderRecord } from '@shared/types/folder'
 import type { SortField } from '@renderer/stores/file-explorer'
 import type { SortableItem } from '@renderer/lib/file-explorer-sort'
 
-type TrashEntry =
-  | { kind: 'folder'; folder: FolderRecord }
-  | { kind: 'file'; item: FileItemRecord }
+type TrashEntry = { kind: 'folder'; folder: FolderRecord } | { kind: 'file'; item: FileItemRecord }
 
 function toSortable(e: TrashEntry): SortableItem {
   return {
@@ -137,8 +135,7 @@ export default function TrashPage(): React.JSX.Element {
       if (!isAlreadySelected) {
         setSelectedIds(new Set([id]))
       }
-      const effectiveIds =
-        isAlreadySelected && selectedIds.size > 1 ? selectedIds : new Set([id])
+      const effectiveIds = isAlreadySelected && selectedIds.size > 1 ? selectedIds : new Set([id])
 
       showMenu(
         [
@@ -242,29 +239,29 @@ export default function TrashPage(): React.JSX.Element {
         onClick={handleContainerClick}
         onMouseDown={handleContainerMouseDown}
       >
-      {viewMode === 'list' ? (
-        <ListView
-          items={gridItemsWithSelection}
-          sortField={sortField}
-          sortDir={sortDir}
-          onSortChange={handleSortChange}
-          colWidths={colWidths}
-          onColWidthChange={(col, w) => setColWidths({ [col]: w })}
-          onItemClick={handleItemClick}
-          onItemDoubleClick={(_id, _e) => {}}
-          onItemContextMenu={handleContextMenu}
-        />
-      ) : (
-        <GridView
-          items={gridItemsWithSelection}
-          viewMode={viewMode}
-          onItemClick={handleItemClick}
-          onItemDoubleClick={(_id, _e) => {}}
-          onItemContextMenu={handleContextMenu}
-        />
-      )}
+        {viewMode === 'list' ? (
+          <ListView
+            items={gridItemsWithSelection}
+            sortField={sortField}
+            sortDir={sortDir}
+            onSortChange={handleSortChange}
+            colWidths={colWidths}
+            onColWidthChange={(col, w) => setColWidths({ [col]: w })}
+            onItemClick={handleItemClick}
+            onItemDoubleClick={() => {}}
+            onItemContextMenu={handleContextMenu}
+          />
+        ) : (
+          <GridView
+            items={gridItemsWithSelection}
+            viewMode={viewMode}
+            onItemClick={handleItemClick}
+            onItemDoubleClick={() => {}}
+            onItemContextMenu={handleContextMenu}
+          />
+        )}
 
-      {rubberBandRect && (
+        {rubberBandRect && (
           <div
             className="pointer-events-none fixed z-50 rounded-sm border border-primary/60 bg-accent/20"
             style={{

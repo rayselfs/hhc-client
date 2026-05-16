@@ -1,9 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-  FileExplorerShell,
-  useFileContextMenu
-} from '@renderer/components/Control/FileExplorer'
+import { FileExplorerShell, useFileContextMenu } from '@renderer/components/Control/FileExplorer'
 import FileBrowser from '@renderer/components/Control/FileExplorer/FileBrowser'
 import FileExplorerFAB from '@renderer/components/Control/FileExplorer/FileExplorerFAB'
 import { FolderModal } from '@renderer/components/Control/Folder/FolderModal'
@@ -165,12 +162,16 @@ export default function FilesPage(): React.JSX.Element {
           const item = state.items[id]
           if (item.type !== 'file') continue
           const newId = crypto.randomUUID()
-          const { id: _id, sortIndex: _si, createdAt: _ca, expiresAt: _ea, ...rest } = item
           const db = await openFileExplorerDB()
           const blob = await getFileBlob(db, id)
           if (blob) await storeFileBlob(db, newId, blob)
-          const newUrl = { url: `blob:${newId}` }
-          addItem({ ...rest, ...newUrl, id: newId, parentId: currentFolderId })
+          addItem({
+            ...item,
+            url: `blob:${newId}`,
+            id: newId,
+            parentId: currentFolderId,
+            expiresAt: undefined
+          })
           const dataUrl = await getThumbnail(id)
           if (dataUrl) {
             await saveThumbnail(newId, dataUrl)
@@ -335,7 +336,14 @@ export default function FilesPage(): React.JSX.Element {
         onUploadFolder: handleUploadFolder
       })
     },
-    [clipboard, showEmptyAreaMenu, handlePaste, openCreateFolderModal, handleUploadFiles, handleUploadFolder]
+    [
+      clipboard,
+      showEmptyAreaMenu,
+      handlePaste,
+      openCreateFolderModal,
+      handleUploadFiles,
+      handleUploadFolder
+    ]
   )
 
   return (
@@ -388,8 +396,8 @@ export default function FilesPage(): React.JSX.Element {
         onSubmit={handleEditSubmit}
         editingFolder={
           editingId
-            ? (useFileExplorerStore.getState().folders[editingId] as FolderRecord | undefined) ??
-              ({ id: editingId, name: editModalName } as FolderRecord)
+            ? ((useFileExplorerStore.getState().folders[editingId] as FolderRecord | undefined) ??
+              ({ id: editingId, name: editModalName } as FolderRecord))
             : null
         }
         folderName={editModalName}

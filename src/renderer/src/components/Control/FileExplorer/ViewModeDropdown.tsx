@@ -44,13 +44,22 @@ export default function ViewModeDropdown({
 
   return (
     <Dropdown>
-      <Button isIconOnly variant="outline" size="lg" aria-label={t('fileExplorer.view.title', 'View')}>
+      <Button
+        isIconOnly
+        variant="outline"
+        size="lg"
+        aria-label={t('fileExplorer.view.title', 'View')}
+      >
         <ActiveIcon size={16} />
       </Button>
       <Dropdown.Popover>
         <Dropdown.Menu onAction={(key) => onViewModeChange(key as FileExplorerViewMode)}>
           {VIEW_MODE_OPTIONS.map(({ mode, Icon, labelKey }) => (
-            <Dropdown.Item key={mode} id={mode} className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground">
+            <Dropdown.Item
+              key={mode}
+              id={mode}
+              className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
+            >
               <Icon size={16} />
               {t(labelKey)}
               {mode === viewMode && <Check size={14} className="ml-auto" />}

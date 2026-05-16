@@ -13,7 +13,13 @@ import SearchBarToggle from '@renderer/components/Control/Header/SearchBar/Searc
 import Breadcrumb from '@renderer/components/Control/FileExplorer/Breadcrumb'
 import ViewModeDropdown from '@renderer/components/Control/FileExplorer/ViewModeDropdown'
 import SortDropdown from '@renderer/components/Control/FileExplorer/SortDropdown'
-import { isTimerRoute, isBibleRoute, isFilesRoute, isFavoritesRoute, isTrashRoute } from '@renderer/lib/routes'
+import {
+  isTimerRoute,
+  isBibleRoute,
+  isFilesRoute,
+  isFavoritesRoute,
+  isTrashRoute
+} from '@renderer/lib/routes'
 import { EVENTS } from '@renderer/config/events'
 import { useTimerStore } from '@renderer/stores/timer'
 import {
@@ -65,11 +71,31 @@ export default function Header(): React.JSX.Element {
   const showTrashControls = isTrashRoute(location.pathname)
   const showExplorerControls = showFilesControls || showFavoritesControls || showTrashControls
 
-  const activeViewMode = showFavoritesControls ? favViewMode : showTrashControls ? trashViewMode : viewMode
-  const activeSetViewMode = showFavoritesControls ? favSetViewMode : showTrashControls ? trashSetViewMode : setViewMode
-  const activeSortField = showFavoritesControls ? favSortField : showTrashControls ? trashSortField : sortField
-  const activeSortDir = showFavoritesControls ? favSortDir : showTrashControls ? trashSortDir : sortDir
-  const activeSetSortFieldAndDir = showFavoritesControls ? favSetSortFieldAndDir : showTrashControls ? trashSetSortFieldAndDir : setSortFieldAndDir
+  const activeViewMode = showFavoritesControls
+    ? favViewMode
+    : showTrashControls
+      ? trashViewMode
+      : viewMode
+  const activeSetViewMode = showFavoritesControls
+    ? favSetViewMode
+    : showTrashControls
+      ? trashSetViewMode
+      : setViewMode
+  const activeSortField = showFavoritesControls
+    ? favSortField
+    : showTrashControls
+      ? trashSortField
+      : sortField
+  const activeSortDir = showFavoritesControls
+    ? favSortDir
+    : showTrashControls
+      ? trashSortDir
+      : sortDir
+  const activeSetSortFieldAndDir = showFavoritesControls
+    ? favSetSortFieldAndDir
+    : showTrashControls
+      ? trashSetSortFieldAndDir
+      : setSortFieldAndDir
 
   const handleCloseOrOpenProjection = async (): Promise<void> => {
     if (!isProjectionOpen) {

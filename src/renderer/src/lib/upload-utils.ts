@@ -51,9 +51,7 @@ export function isSupportedFile(file: File): boolean {
 
 export function canGenerateThumbnail(mimeType: string): boolean {
   return (
-    mimeType.startsWith('image/') ||
-    mimeType.startsWith('video/') ||
-    mimeType === 'application/pdf'
+    mimeType.startsWith('image/') || mimeType.startsWith('video/') || mimeType === 'application/pdf'
   )
 }
 

@@ -59,7 +59,8 @@ export function formatFileKind(
   if (!mimeType) return t?.('fileKind.file', { defaultValue: 'File' }) ?? 'File'
 
   const known = MIME_TO_KIND[mimeType]
-  if (known) return t?.(known, { defaultValue: MIME_KIND_FALLBACK[known] }) ?? MIME_KIND_FALLBACK[known]
+  if (known)
+    return t?.(known, { defaultValue: MIME_KIND_FALLBACK[known] }) ?? MIME_KIND_FALLBACK[known]
 
   const [type, subtype] = mimeType.split('/')
   if (type === 'image') {

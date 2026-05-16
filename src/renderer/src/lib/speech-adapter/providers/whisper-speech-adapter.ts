@@ -18,7 +18,10 @@ export class WhisperSpeechAdapter implements SpeechAdapter {
   private active = false
   private batchIntervalId: ReturnType<typeof setInterval> | null = null
   private chunks: Blob[] = []
-  private listeners: Map<SpeechAdapterEventType, Set<SpeechAdapterEventListener<SpeechAdapterEventType>>> = new Map()
+  private listeners: Map<
+    SpeechAdapterEventType,
+    Set<SpeechAdapterEventListener<SpeechAdapterEventType>>
+  > = new Map()
   private config: WhisperSpeechAdapterConfig
   private maxSessionTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -122,7 +125,9 @@ export class WhisperSpeechAdapter implements SpeechAdapter {
     }
     this.listeners.get(event)!.add(listener as SpeechAdapterEventListener<SpeechAdapterEventType>)
     return () => {
-      this.listeners.get(event)?.delete(listener as SpeechAdapterEventListener<SpeechAdapterEventType>)
+      this.listeners
+        .get(event)
+        ?.delete(listener as SpeechAdapterEventListener<SpeechAdapterEventType>)
     }
   }
 

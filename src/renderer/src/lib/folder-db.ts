@@ -5,7 +5,10 @@ type AnyDB = any
 
 export type FolderDB = ReturnType<typeof createFolderDB>
 
-export function createFolderDB(getDB: () => Promise<AnyDB>, rootId: string): {
+export function createFolderDB(
+  getDB: () => Promise<AnyDB>,
+  rootId: string
+): {
   loadAllFolders: () => Promise<FolderRecord[]>
   saveFolder: (folder: FolderRecord) => Promise<void>
   saveFolders: (folders: FolderRecord[]) => Promise<void>
@@ -18,7 +21,10 @@ export function createFolderDB(getDB: () => Promise<AnyDB>, rootId: string): {
   deleteItemsByParent: (parentId: string) => Promise<void>
   deleteExpiredFolders: (now: number) => Promise<string[]>
   deleteExpiredItems: (now: number) => Promise<string[]>
-  purgeTrashOlderThan: (now: number, retentionMs: number) => Promise<{ folderIds: string[]; itemIds: string[] }>
+  purgeTrashOlderThan: (
+    now: number,
+    retentionMs: number
+  ) => Promise<{ folderIds: string[]; itemIds: string[] }>
 } {
   async function loadAllFolders(): Promise<FolderRecord[]> {
     try {
@@ -156,14 +162,10 @@ export function createFolderDB(getDB: () => Promise<AnyDB>, rootId: string): {
     try {
       const cutoff = now - retentionMs
       const allFolders = await loadAllFolders()
-      const expiredFolders = allFolders.filter(
-        (f) => f.deletedAt != null && f.deletedAt < cutoff
-      )
+      const expiredFolders = allFolders.filter((f) => f.deletedAt != null && f.deletedAt < cutoff)
       const db = await getDB()
       const allItems: AnyItemRecord[] = await db.getAll('folder-items')
-      const expiredItems = allItems.filter(
-        (i) => i.deletedAt != null && i.deletedAt < cutoff
-      )
+      const expiredItems = allItems.filter((i) => i.deletedAt != null && i.deletedAt < cutoff)
       const folderIds = expiredFolders.map((f) => f.id)
       const itemIds = expiredItems.map((i) => i.id)
       if (folderIds.length > 0) await deleteFolders(folderIds)
