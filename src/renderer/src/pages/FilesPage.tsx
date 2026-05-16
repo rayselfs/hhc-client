@@ -162,16 +162,12 @@ export default function FilesPage(): React.JSX.Element {
           const item = state.items[id]
           if (item.type !== 'file') continue
           const newId = crypto.randomUUID()
+          const { id: _id, sortIndex: _si, createdAt: _ca, expiresAt: _ea, ...rest } = item
           const db = await openFileExplorerDB()
           const blob = await getFileBlob(db, id)
           if (blob) await storeFileBlob(db, newId, blob)
-          addItem({
-            ...item,
-            url: `blob:${newId}`,
-            id: newId,
-            parentId: currentFolderId,
-            expiresAt: undefined
-          })
+          const newUrl = { url: `blob:${newId}` }
+          addItem({ ...rest, ...newUrl, id: newId, parentId: currentFolderId })
           const dataUrl = await getThumbnail(id)
           if (dataUrl) {
             await saveThumbnail(newId, dataUrl)
