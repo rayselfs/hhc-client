@@ -9,10 +9,25 @@ import { X, Monitor, MonitorOff, ExternalLink } from 'lucide-react'
 import ModeSelector from '@renderer/components/Control/Timer/ModeSelector'
 import SettingsPopover from '@renderer/components/Control/Header/SettingsPopover/SettingsPopover'
 import BibleSelector from '@renderer/components/Control/Bible/BibleSelector'
-import BibleSearchBar from '@renderer/components/Control/Header/SearchBar/BibleSearchBar'
-import { isTimerRoute, isBibleRoute } from '@renderer/lib/routes'
+import SearchBarToggle from '@renderer/components/Control/Header/SearchBar/SearchBarToggle'
+import Breadcrumb from '@renderer/components/Control/FileExplorer/Breadcrumb'
+import ViewModeDropdown from '@renderer/components/Control/FileExplorer/ViewModeDropdown'
+import SortDropdown from '@renderer/components/Control/FileExplorer/SortDropdown'
+import {
+  isTimerRoute,
+  isBibleRoute,
+  isFilesRoute,
+  isFavoritesRoute,
+  isTrashRoute
+} from '@renderer/lib/routes'
 import { EVENTS } from '@renderer/config/events'
 import { useTimerStore } from '@renderer/stores/timer'
+import {
+  useFileExplorerStore,
+  useFileExplorerSettings,
+  useFavoritesExplorerSettings,
+  useTrashExplorerSettings
+} from '@renderer/stores/file-explorer'
 
 export default function Header(): React.JSX.Element {
   const { t } = useTranslation()
@@ -27,8 +42,60 @@ export default function Header(): React.JSX.Element {
   const confirm = useConfirm()
   const mode = useTimerStore((s) => s.mode)
 
+  const currentFolderId = useFileExplorerStore((state) => state.currentFolderId)
+  const getFolderPath = useFileExplorerStore((state) => state.getFolderPath)
+  const navigateToFolder = useFileExplorerStore((state) => state.navigateToFolder)
+  const navigateToRoot = useFileExplorerStore((state) => state.navigateToRoot)
+  const viewMode = useFileExplorerSettings((state) => state.viewMode)
+  const setViewMode = useFileExplorerSettings((state) => state.setViewMode)
+  const sortField = useFileExplorerSettings((state) => state.sortField)
+  const sortDir = useFileExplorerSettings((state) => state.sortDir)
+  const setSortFieldAndDir = useFileExplorerSettings((state) => state.setSortFieldAndDir)
+
+  const favViewMode = useFavoritesExplorerSettings((state) => state.viewMode)
+  const favSetViewMode = useFavoritesExplorerSettings((state) => state.setViewMode)
+  const favSortField = useFavoritesExplorerSettings((state) => state.sortField)
+  const favSortDir = useFavoritesExplorerSettings((state) => state.sortDir)
+  const favSetSortFieldAndDir = useFavoritesExplorerSettings((state) => state.setSortFieldAndDir)
+
+  const trashViewMode = useTrashExplorerSettings((state) => state.viewMode)
+  const trashSetViewMode = useTrashExplorerSettings((state) => state.setViewMode)
+  const trashSortField = useTrashExplorerSettings((state) => state.sortField)
+  const trashSortDir = useTrashExplorerSettings((state) => state.sortDir)
+  const trashSetSortFieldAndDir = useTrashExplorerSettings((state) => state.setSortFieldAndDir)
+
   const showTimerControls = isTimerRoute(location.pathname)
   const showBibleControls = isBibleRoute(location.pathname)
+  const showFilesControls = isFilesRoute(location.pathname)
+  const showFavoritesControls = isFavoritesRoute(location.pathname)
+  const showTrashControls = isTrashRoute(location.pathname)
+  const showExplorerControls = showFilesControls || showFavoritesControls || showTrashControls
+
+  const activeViewMode = showFavoritesControls
+    ? favViewMode
+    : showTrashControls
+      ? trashViewMode
+      : viewMode
+  const activeSetViewMode = showFavoritesControls
+    ? favSetViewMode
+    : showTrashControls
+      ? trashSetViewMode
+      : setViewMode
+  const activeSortField = showFavoritesControls
+    ? favSortField
+    : showTrashControls
+      ? trashSortField
+      : sortField
+  const activeSortDir = showFavoritesControls
+    ? favSortDir
+    : showTrashControls
+      ? trashSortDir
+      : sortDir
+  const activeSetSortFieldAndDir = showFavoritesControls
+    ? favSetSortFieldAndDir
+    : showTrashControls
+      ? trashSetSortFieldAndDir
+      : setSortFieldAndDir
 
   const handleCloseOrOpenProjection = async (): Promise<void> => {
     if (!isProjectionOpen) {
@@ -54,6 +121,14 @@ export default function Header(): React.JSX.Element {
     window.dispatchEvent(new Event(EVENTS.OPEN_BIBLE_SELECTOR))
   }
 
+  const handleBreadcrumbNavigate = (folderId: string | null): void => {
+    if (folderId === null) {
+      navigateToRoot()
+    } else {
+      void navigateToFolder(folderId)
+    }
+  }
+
   return (
     <header className="relative flex items-center justify-end gap-2 p-2">
       {(showTimerControls || showBibleControls) && (
@@ -68,6 +143,26 @@ export default function Header(): React.JSX.Element {
           </div>
         </div>
       )}
+
+      <div
+        className={`absolute left-2 top-1/2 -translate-y-1/2 flex items-center gap-2 max-w-[50%] transition-all duration-200 ${showExplorerControls ? 'opacity-100 translate-x-0 pointer-events-auto' : 'opacity-0 -translate-x-3 pointer-events-none'}`}
+      >
+        <ButtonGroup size="lg">
+          <ViewModeDropdown viewMode={activeViewMode} onViewModeChange={activeSetViewMode} />
+          <SortDropdown
+            sortField={activeSortField}
+            sortDir={activeSortDir}
+            onSortChange={activeSetSortFieldAndDir}
+          />
+        </ButtonGroup>
+        {showFilesControls && (
+          <Breadcrumb
+            currentFolderId={currentFolderId}
+            getFolderPath={getFolderPath}
+            onNavigate={handleBreadcrumbNavigate}
+          />
+        )}
+      </div>
 
       <div
         className={`absolute inset-0 flex items-center lg:justify-center max-lg:justify-start max-lg:pl-14 pointer-events-none transition-all duration-200 ${showTimerControls ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-3'}`}
@@ -88,11 +183,9 @@ export default function Header(): React.JSX.Element {
       </div>
 
       <div className="flex items-center gap-2">
-        <div
-          className={`transition-all duration-200 ${showBibleControls ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-3 pointer-events-none'}`}
-        >
-          <BibleSearchBar />
-        </div>
+        {(showBibleControls || showFilesControls) && (
+          <SearchBarToggle variant={showBibleControls ? 'bible' : 'fileExplorer'} />
+        )}
         <ButtonGroup size="lg">
           <Button
             isIconOnly

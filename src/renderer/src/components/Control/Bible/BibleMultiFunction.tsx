@@ -122,7 +122,7 @@ export default function BibleMultiFunction({
               variant="ghost"
               size="sm"
               onPress={() => setAddFolderModalOpen(true)}
-              aria-label={t('bible.custom.newFolder', 'New Folder')}
+              aria-label={t('folder.contextMenu.newFolder')}
             >
               <FolderPlus size={18} />
             </Button>

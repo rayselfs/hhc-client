@@ -829,6 +829,7 @@ export function FolderBrowser({
         folderDuration={folderDuration}
         onFolderDurationChange={setFolderDuration}
         i18nPrefix={i18nPrefix}
+        isRetentionLocked={editingFolder?.isFavorited ?? false}
       />
     </div>
   )

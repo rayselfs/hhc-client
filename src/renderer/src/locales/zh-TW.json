@@ -1,7 +1,11 @@
 {
   "nav": {
     "timer": "計時器",
-    "bible": "聖經"
+    "bible": "聖經",
+    "files": "文件",
+    "media": "多媒體",
+    "favorites": "我的最愛",
+    "trash": "垃圾桶"
   },
   "welcome": {
     "title": "歡迎使用 HHC",
@@ -93,38 +97,7 @@
     },
     "custom": {
       "title": "自訂",
-      "home": "首頁",
-      "newFolder": "新增資料夾",
-      "createNewFolder": "建立新資料夾",
-      "editFolder": "編輯資料夾",
-      "folderName": "資料夾名稱",
-      "untitledFolder": "未命名資料夾",
-      "retention": "保留時間",
-      "duration": {
-        "1day": "1 天",
-        "1week": "1 週",
-        "1month": "1 個月",
-        "permanent": "永久"
-      },
-      "rename": "重新命名",
-      "delete": "刪除",
-      "moveToFolder": "移動到資料夾",
-      "emptyFolder": "空資料夾",
-      "deleteTitle": "刪除 {{name}} ?",
-      "deleteFolderDescription": "此動作無法復原。資料夾中的所有經文將被刪除。",
-      "deleteItemDescription": "此動作無法復原。",
-      "deleteSelectedTitle": "刪除 {{count}} 個項目?",
-      "contextMenu": {
-        "copy": "複製",
-        "cut": "剪下",
-        "paste": "貼上",
-        "delete": "刪除",
-        "edit": "編輯",
-        "newFolder": "新建資料夾",
-        "copyCount": "複製 {{count}} 項",
-        "cutCount": "剪下 {{count}} 項",
-        "deleteCount": "刪除 {{count}} 項"
-      }
+      "home": "首頁"
     },
     "search": {
       "title": "搜尋",
@@ -397,6 +370,98 @@
       "deleteCount": "刪除 {{count}} 項"
     }
   },
+  "fileKind": {
+    "folder": "資料夾",
+    "file": "檔案",
+    "pngImage": "PNG 檔案",
+    "jpegImage": "JPEG 檔案",
+    "gifImage": "GIF 檔案",
+    "webpImage": "WebP 檔案",
+    "svgImage": "SVG 檔案",
+    "bmpImage": "BMP 檔案",
+    "tiffImage": "TIFF 檔案",
+    "heicImage": "HEIC 檔案",
+    "heifImage": "HEIF 檔案",
+    "mp4Video": "MP4 檔案",
+    "quicktimeVideo": "QuickTime 檔案",
+    "webmVideo": "WebM 檔案",
+    "aviVideo": "AVI 檔案",
+    "mkvVideo": "MKV 檔案",
+    "mpegVideo": "MPEG 檔案",
+    "oggVideo": "OGG 檔案",
+    "pdfDocument": "PDF 文件",
+    "powerpointPresentation": "PowerPoint 簡報",
+    "keynotePresentation": "Keynote 簡報",
+    "presentation": "簡報",
+    "imageFile": "{{ext}} 檔案",
+    "videoFile": "{{ext}} 檔案",
+    "audioFile": "{{ext}} 音訊"
+  },
+  "fileExplorer": {
+    "title": "檔案",
+    "search": {
+      "placeholder": "搜尋檔案...",
+      "noResults": "找不到結果"
+    },
+    "upload": {
+      "button": "上傳",
+      "dropToUpload": "拖曳以上傳",
+      "dropToFolder": "放入資料夾"
+    },
+    "status": {
+      "itemCount": "{{count}} 個項目",
+      "selectedCount": "已選 {{count}} 個"
+    },
+    "view": {
+      "title": "顯示",
+      "largeIcon": "大圖示",
+      "mediumIcon": "中圖示",
+      "smallIcon": "小圖示",
+      "list": "清單"
+    },
+    "breadcrumb": {
+      "root": "首頁"
+    },
+    "fab": {
+      "label": "新增",
+      "upload": "上傳"
+    },
+    "list": {
+      "name": "檔名",
+      "kind": "種類",
+      "createdAt": "建立時間",
+      "size": "大小",
+      "path": "路徑"
+    },
+    "empty": {
+      "title": "目前沒有檔案",
+      "description": "上傳檔案即可開始使用"
+    },
+    "sort": {
+      "title": "排序",
+      "none": "不排序",
+      "name": "名稱",
+      "createdAt": "建立時間",
+      "size": "大小",
+      "kind": "類型"
+    },
+    "contextMenu": {
+      "rename": "重新命名",
+      "delete": "刪除",
+      "move": "移動",
+      "newFolder": "新增資料夾",
+      "copy": "複製",
+      "cut": "剪下",
+      "paste": "貼上",
+      "edit": "編輯",
+      "uploadFiles": "檔案上傳",
+      "uploadFolder": "資料夾上傳",
+      "addFavorite": "加入我的最愛",
+      "removeFavorite": "移除我的最愛",
+      "restore": "還原",
+      "permanentDelete": "永久刪除"
+    }
+  },
   "projection": {
     "showButton": "顯示投影",
     "blankButton": "關閉投影",
@@ -446,7 +511,7 @@
     "title": "偏好設定",
     "categories": {
       "general": "一般",
-      "media": "媒體",
+      "media": "多媒體",
       "bible": "聖經"
     },
     "language": "語言",
@@ -458,6 +523,18 @@
     "resetBtn": "重設",
     "resetToDefaultsConfirm": "將所有設定重設為預設值？",
     "mediaPlaceholder": "媒體設定即將推出",
+    "trash": {
+      "retentionLabel": "垃圾桶保留期限",
+      "retentionDesc": "垃圾桶中的項目將在此期限後永久刪除",
+      "days": {
+        "7": "7 天",
+        "14": "14 天",
+        "30": "30 天",
+        "60": "60 天",
+        "90": "90 天",
+        "0": "永久"
+      }
+    },
     "languageNames": {
       "en": "English",
       "zhTW": "繁體中文",
@@ -562,5 +639,19 @@
       "delete": "刪除",
       "delete_alt": "刪除 (替代)"
     }
+  },
+  "favorites": {
+    "empty": {
+      "title": "還沒有最愛",
+      "description": "對資料夾按右鍵以加入我的最愛"
+    }
+  },
+  "trash": {
+    "empty": {
+      "title": "垃圾桶是空的",
+      "description": "已刪除的檔案與資料夾會顯示在這裡"
+    },
+    "permanentDeleteTitle": "永久刪除？",
+    "permanentDeleteDescription": "此操作無法復原。"
   }
 }

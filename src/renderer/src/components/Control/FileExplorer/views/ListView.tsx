@@ -1,0 +1,208 @@
+import React, { useCallback } from 'react'
+import { Folder, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import { formatFileKind } from '@renderer/lib/format-file-kind'
+import type { SortField, SortDir } from '@renderer/stores/file-explorer'
+import { getFileIcon } from './getFileIcon'
+import type { GridViewItem } from './GridView'
+
+export interface ListViewProps {
+  items: GridViewItem[]
+  sortField: SortField
+  sortDir: SortDir
+  onSortChange: (field: SortField) => void
+  colWidths: { created: number; size: number; kind: number }
+  onColWidthChange: (col: 'created' | 'size' | 'kind', width: number) => void
+  onItemClick: (id: string, event: React.MouseEvent) => void
+  onItemDoubleClick: (id: string, event: React.MouseEvent) => void
+  onItemContextMenu: (id: string, event: React.MouseEvent) => void
+  renderItemWrapper?: (item: GridViewItem, children: React.ReactNode) => React.ReactNode
+}
+
+function formatDate(ts: number | undefined): string {
+  if (ts === undefined) return '—'
+  const d = new Date(ts)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}/${m}/${day}`
+}
+
+function formatFileSize(bytes: number | undefined): string {
+  if (bytes === undefined) return '—'
+  if (bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB']
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1)
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`
+}
+
+export function ListView({
+  items,
+  sortField,
+  sortDir,
+  onSortChange,
+  colWidths,
+  onColWidthChange,
+  onItemClick,
+  onItemDoubleClick,
+  onItemContextMenu,
+  renderItemWrapper
+}: ListViewProps): React.JSX.Element {
+  const { t } = useTranslation()
+
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent, col: 'created' | 'size' | 'kind') => {
+      const target = e.currentTarget as HTMLElement
+      target.setPointerCapture(e.pointerId)
+      const startX = e.clientX
+      const startWidth = colWidths[col]
+
+      const onPointerMove = (moveEvent: PointerEvent): void => {
+        const delta = moveEvent.clientX - startX
+        onColWidthChange(col, Math.max(60, startWidth - delta))
+      }
+
+      const onPointerUp = (upEvent: PointerEvent): void => {
+        target.releasePointerCapture(upEvent.pointerId)
+        target.removeEventListener('pointermove', onPointerMove)
+        target.removeEventListener('pointerup', onPointerUp)
+      }
+
+      target.addEventListener('pointermove', onPointerMove)
+      target.addEventListener('pointerup', onPointerUp)
+    },
+    [colWidths, onColWidthChange]
+  )
+
+  const renderSortIcon = (field: SortField): React.ReactNode => {
+    if (sortDir === 'none' || sortField !== field) {
+      return <ArrowUpDown size={12} className="opacity-30" />
+    }
+    return sortDir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
+  }
+
+  if (items.length === 0) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center text-center p-4">
+        <h3 className="text-lg font-medium text-foreground">
+          {t('fileExplorer.empty.title', 'No files yet')}
+        </h3>
+        <p className="text-sm text-default-400 mt-1">
+          {t('fileExplorer.empty.description', 'Upload files to get started')}
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col">
+      <div className="sticky top-0 bg-background z-10 border-b border-default-200">
+        <div className="flex items-center px-3 py-1.5">
+          <div className="w-6 flex-shrink-0 mr-3" />
+          <div
+            className="flex-1 flex items-center gap-1 text-sm font-medium text-default-400 uppercase tracking-wide cursor-pointer hover:text-foreground"
+            onClick={() => onSortChange('name')}
+          >
+            {t('fileExplorer.list.name', 'Name')}
+            {renderSortIcon('name')}
+          </div>
+
+          <div
+            className="w-1 cursor-col-resize flex-shrink-0 hover:bg-primary/40 h-6"
+            onPointerDown={(e) => handlePointerDown(e, 'created')}
+          />
+          <div
+            className="flex-shrink-0 flex items-center gap-1 text-sm font-medium text-default-400 uppercase tracking-wide cursor-pointer hover:text-foreground pl-2"
+            style={{ width: colWidths.created }}
+            onClick={() => onSortChange('createdAt')}
+          >
+            {t('fileExplorer.list.createdAt', 'Created')}
+            {renderSortIcon('createdAt')}
+          </div>
+
+          <div
+            className="w-1 cursor-col-resize flex-shrink-0 hover:bg-primary/40 h-6"
+            onPointerDown={(e) => handlePointerDown(e, 'size')}
+          />
+          <div
+            className="flex-shrink-0 flex items-center gap-1 text-sm font-medium text-default-400 uppercase tracking-wide cursor-pointer hover:text-foreground pl-2"
+            style={{ width: colWidths.size }}
+            onClick={() => onSortChange('size')}
+          >
+            {t('fileExplorer.list.size', 'Size')}
+            {renderSortIcon('size')}
+          </div>
+
+          <div
+            className="w-1 cursor-col-resize flex-shrink-0 hover:bg-primary/40 h-6"
+            onPointerDown={(e) => handlePointerDown(e, 'kind')}
+          />
+          <div
+            className="flex-shrink-0 flex items-center gap-1 text-sm font-medium text-default-400 uppercase tracking-wide cursor-pointer hover:text-foreground pl-2"
+            style={{ width: colWidths.kind }}
+            onClick={() => onSortChange('kind')}
+          >
+            {t('fileExplorer.list.kind', 'Kind')}
+            {renderSortIcon('kind')}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-col p-2">
+        {items.map((item) => {
+          const content = (
+            <div
+              data-file-item
+              data-item-id={item.id}
+              className={`flex items-center rounded-md px-3 py-2 cursor-default transition-colors hover:bg-content2/60 ${
+                item.isSelected ? 'bg-surface' : ''
+              }`}
+              onClick={(e) => onItemClick(item.id, e)}
+              onDoubleClick={(e) => onItemDoubleClick(item.id, e)}
+              onContextMenu={(e) => onItemContextMenu(item.id, e)}
+            >
+              <div className="flex-shrink-0 w-6 flex items-center justify-center mr-3">
+                {item.isFolder ? (
+                  <Folder size={20} className="text-accent" fill="currentColor" />
+                ) : (
+                  <div className="text-danger">{getFileIcon(item.mimeType, item.isFolder, 20)}</div>
+                )}
+              </div>
+              <div className="flex-1 truncate text-base text-foreground" title={item.name}>
+                {item.name}
+              </div>
+              <div className="w-1 flex-shrink-0" />
+              <div
+                className="flex-shrink-0 text-sm text-default-400 pl-2"
+                style={{ width: colWidths.created }}
+              >
+                {formatDate(item.createdAt)}
+              </div>
+              <div className="w-1 flex-shrink-0" />
+              <div
+                className="flex-shrink-0 text-sm text-default-400 pl-2"
+                style={{ width: colWidths.size }}
+              >
+                {item.isFolder ? '—' : formatFileSize(item.size)}
+              </div>
+              <div className="w-1 flex-shrink-0" />
+              <div
+                className="flex-shrink-0 text-sm text-default-400 truncate pl-2"
+                style={{ width: colWidths.kind }}
+              >
+                {formatFileKind(item.mimeType, item.isFolder, t)}
+              </div>
+            </div>
+          )
+
+          return (
+            <React.Fragment key={item.id}>
+              {renderItemWrapper?.(item, content) ?? content}
+            </React.Fragment>
+          )
+        })}
+      </div>
+    </div>
+  )
+}

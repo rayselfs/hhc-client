@@ -34,6 +34,8 @@ vi.mock('@renderer/stores/settings', () => ({
       setTimezone: vi.fn(),
       setHardwareAcceleration: vi.fn(),
       setSpeech: vi.fn(),
+      trashRetentionDays: 30,
+      setTrashRetentionDays: vi.fn(),
       resetToDefaults: vi.fn()
     }
     return selector ? selector(store) : store
@@ -102,7 +104,7 @@ describe('PreferencesDialog', () => {
     renderDialog(true)
 
     await user.click(screen.getByTestId('category-media'))
-    expect(screen.getByText('Media settings coming soon')).toBeInTheDocument()
+    expect(screen.getByLabelText('Trash Retention Period')).toBeInTheDocument()
     expect(screen.queryByLabelText('Language')).not.toBeInTheDocument()
 
     await user.click(screen.getByTestId('category-general'))
@@ -154,7 +156,9 @@ describe('PreferencesDialog', () => {
           gcp: { language: 'cmn-Hant-TW' as const },
           whisper: { modelDir: '', installedModel: null }
         },
-        setSpeech: vi.fn()
+        setSpeech: vi.fn(),
+        trashRetentionDays: 30,
+        setTrashRetentionDays: vi.fn()
       }
       return selector ? selector(store) : store
     })
@@ -226,7 +230,9 @@ describe('PreferencesDialog', () => {
           gcp: { language: 'cmn-Hant-TW' as const },
           whisper: { modelDir: '', installedModel: null }
         },
-        setSpeech: vi.fn()
+        setSpeech: vi.fn(),
+        trashRetentionDays: 30,
+        setTrashRetentionDays: vi.fn()
       }
       return selector ? selector(store) : store
     })
@@ -271,7 +277,9 @@ describe('PreferencesDialog', () => {
           gcp: { language: 'cmn-Hant-TW' as const },
           whisper: { modelDir: '', installedModel: null }
         },
-        setSpeech: vi.fn()
+        setSpeech: vi.fn(),
+        trashRetentionDays: 30,
+        setTrashRetentionDays: vi.fn()
       }
       return selector ? selector(store) : store
     })

@@ -17,7 +17,10 @@ export class GcpSpeechAdapter implements SpeechAdapter {
   private mediaRecorder: MediaRecorder | null = null
   private active = false
   private batchIntervalId: ReturnType<typeof setInterval> | null = null
-  private listeners: Map<SpeechAdapterEventType, Set<SpeechAdapterEventListener<SpeechAdapterEventType>>> = new Map()
+  private listeners: Map<
+    SpeechAdapterEventType,
+    Set<SpeechAdapterEventListener<SpeechAdapterEventType>>
+  > = new Map()
   private config: GcpSpeechAdapterConfig
   private chunks: Blob[] = []
   private stream: MediaStream | null = null
@@ -123,7 +126,9 @@ export class GcpSpeechAdapter implements SpeechAdapter {
     }
     this.listeners.get(event)!.add(listener as SpeechAdapterEventListener<SpeechAdapterEventType>)
     return () => {
-      this.listeners.get(event)?.delete(listener as SpeechAdapterEventListener<SpeechAdapterEventType>)
+      this.listeners
+        .get(event)
+        ?.delete(listener as SpeechAdapterEventListener<SpeechAdapterEventType>)
     }
   }
 

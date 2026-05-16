@@ -6,6 +6,8 @@ const mockRetry = vi.fn()
 const mockInitialize = vi.fn()
 const mockFolderInitialize = vi.fn()
 const mockFolderCleanupExpired = vi.fn().mockResolvedValue(undefined)
+const mockFileExplorerInitialize = vi.fn()
+const mockFileExplorerCleanupExpired = vi.fn().mockResolvedValue(undefined)
 const mockInitializeSearchIndexes = vi.fn()
 
 const bibleState = {
@@ -22,6 +24,12 @@ const folderState = {
   isLoading: false,
   initialize: mockFolderInitialize,
   cleanupExpired: mockFolderCleanupExpired
+}
+
+const fileExplorerState = {
+  isLoading: false,
+  initialize: mockFileExplorerInitialize,
+  cleanupExpired: mockFileExplorerCleanupExpired
 }
 
 vi.mock('@heroui/react/toast', () => ({
@@ -48,6 +56,16 @@ vi.mock('@renderer/stores/folder', () => ({
     (selector: (s: typeof folderState) => unknown) => selector(folderState),
     {
       getState: () => folderState,
+      subscribe: vi.fn(() => vi.fn())
+    }
+  )
+}))
+
+vi.mock('@renderer/stores/file-explorer', () => ({
+  useFileExplorerStore: Object.assign(
+    (selector: (s: typeof fileExplorerState) => unknown) => selector(fileExplorerState),
+    {
+      getState: () => fileExplorerState,
       subscribe: vi.fn(() => vi.fn())
     }
   )

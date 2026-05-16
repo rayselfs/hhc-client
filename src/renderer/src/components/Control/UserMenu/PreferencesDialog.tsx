@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { Settings, Film, BookOpen } from 'lucide-react'
 import GeneralSettings from '@renderer/components/Control/UserMenu/GeneralSettings'
 import BibleSettingsPanel from '@renderer/components/Control/UserMenu/BibleSettingsPanel'
+import MediaSettings from '@renderer/components/Control/UserMenu/MediaSettings'
 import { ShortcutScope } from '@renderer/contexts/ShortcutScopeContext'
 
 interface PreferencesDialogProps {
@@ -76,9 +77,7 @@ export default function PreferencesDialog({
                   <div className="flex-1 overflow-y-auto p-5">
                     {activeCategory === 'general' && <GeneralSettings />}
                     {activeCategory === 'bible' && <BibleSettingsPanel />}
-                    {activeCategory === 'media' && (
-                      <p className="text-sm text-gray-500">{t('preferences.mediaPlaceholder')}</p>
-                    )}
+                    {activeCategory === 'media' && <MediaSettings />}
                   </div>
                 </div>
               </ShortcutScope>

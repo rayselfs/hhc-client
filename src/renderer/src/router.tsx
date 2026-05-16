@@ -8,6 +8,9 @@ import { isOnboarded } from '@renderer/lib/onboarding'
 
 const TimerPage = lazy(() => import('@renderer/pages/TimerPage'))
 const BiblePage = lazy(() => import('@renderer/pages/BiblePage'))
+const FilesPage = lazy(() => import('@renderer/pages/FilesPage'))
+const FavoritesPage = lazy(() => import('@renderer/pages/FavoritesPage'))
+const TrashPage = lazy(() => import('@renderer/pages/TrashPage'))
 const WelcomePage = lazy(() => import('@renderer/pages/WelcomePage'))
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -41,6 +44,33 @@ const routes = [
         element: (
           <Suspense fallback={<LoadingFallback />}>
             <BiblePage />
+          </Suspense>
+        ),
+        ErrorBoundary: RouteError
+      },
+      {
+        path: 'files',
+        element: (
+          <Suspense fallback={<LoadingFallback />}>
+            <FilesPage />
+          </Suspense>
+        ),
+        ErrorBoundary: RouteError
+      },
+      {
+        path: 'favorites',
+        element: (
+          <Suspense fallback={<LoadingFallback />}>
+            <FavoritesPage />
+          </Suspense>
+        ),
+        ErrorBoundary: RouteError
+      },
+      {
+        path: 'trash',
+        element: (
+          <Suspense fallback={<LoadingFallback />}>
+            <TrashPage />
           </Suspense>
         ),
         ErrorBoundary: RouteError

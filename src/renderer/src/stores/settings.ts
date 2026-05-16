@@ -61,6 +61,7 @@ const DEFAULT_HW_ACCEL = true
 const DEFAULT_THEME_PREFERENCE: ThemePreference = 'system'
 const DEFAULT_TIMER_RING_COLOR = '#3b82f6'
 const DEFAULT_TIMER_RING_COLOR_ENABLED = false
+const DEFAULT_TRASH_RETENTION_DAYS = 30
 const RELOAD_DELAY_MS = 500
 
 export type SpeechProvider = 'azure' | 'gcp' | 'webSpeech' | 'whisper'
@@ -100,12 +101,14 @@ export interface SettingsStore {
   timerRingColor: string
   timerRingColorEnabled: boolean
   speech: SpeechSettings
+  trashRetentionDays: number
   setTimezone: (tz: string) => void
   setHardwareAcceleration: (enabled: boolean) => void
   setThemePreference: (pref: ThemePreference) => void
   setTimerRingColor: (color: string) => void
   setTimerRingColorEnabled: (enabled: boolean) => void
   setSpeech: (settings: SpeechSettings) => void
+  setTrashRetentionDays: (days: number) => void
   resetToDefaults: () => void
 }
 
@@ -118,6 +121,7 @@ export const useSettingsStore = create<SettingsStore>()(
       timerRingColor: DEFAULT_TIMER_RING_COLOR,
       timerRingColorEnabled: DEFAULT_TIMER_RING_COLOR_ENABLED,
       speech: DEFAULT_SPEECH,
+      trashRetentionDays: DEFAULT_TRASH_RETENTION_DAYS,
 
       setTimezone: (tz: string) => {
         set({ timezone: tz })
@@ -143,6 +147,10 @@ export const useSettingsStore = create<SettingsStore>()(
         set({ timerRingColorEnabled: enabled })
       },
 
+      setTrashRetentionDays: (days: number) => {
+        set({ trashRetentionDays: days })
+      },
+
       resetToDefaults: () => {
         clearAllSiteData()
         toast.success(i18n.t('toast.settingsReset'))
@@ -156,7 +164,7 @@ export const useSettingsStore = create<SettingsStore>()(
     {
       name: createKey('settings'),
       storage: hhcPersistStorage,
-      version: 6,
+      version: 7,
       migrate: (persistedState, version) => {
         const state = persistedState as Record<string, unknown>
         if (version < 1) {
@@ -201,6 +209,9 @@ export const useSettingsStore = create<SettingsStore>()(
             state.timerRingColorEnabled = DEFAULT_TIMER_RING_COLOR_ENABLED
           }
         }
+        if (version < 7) {
+          state.trashRetentionDays = DEFAULT_TRASH_RETENTION_DAYS
+        }
         return state
       },
       partialize: (state) => ({
@@ -209,7 +220,8 @@ export const useSettingsStore = create<SettingsStore>()(
         themePreference: state.themePreference,
         timerRingColor: state.timerRingColor,
         timerRingColorEnabled: state.timerRingColorEnabled,
-        speech: state.speech
+        speech: state.speech,
+        trashRetentionDays: state.trashRetentionDays
       })
     }
   )

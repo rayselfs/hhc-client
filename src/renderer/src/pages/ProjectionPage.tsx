@@ -5,10 +5,11 @@ import { useSettingsStore } from '@renderer/stores/settings'
 import DefaultProjection from '@renderer/components/Projection/DefaultProjection'
 import BibleProjection from '@renderer/components/Projection/BibleProjection'
 import TimerProjection from '@renderer/components/Projection/TimerProjection'
+import FileProjection from '@renderer/components/Projection/FileProjection'
 import type { BibleChapterData } from '@renderer/components/Projection/BibleProjection'
 import type { TimerTickPayload, StopwatchTickPayload } from '@shared/types/timer'
 
-type ActiveContent = 'timer' | 'bible' | null
+type ActiveContent = 'timer' | 'bible' | 'file' | null
 
 export default function ProjectionPage(): React.JSX.Element {
   const [showDefault, setShowDefault] = useState(true)
@@ -17,6 +18,7 @@ export default function ProjectionPage(): React.JSX.Element {
   const [stopwatchData, setStopwatchData] = useState<StopwatchTickPayload | null>(null)
   const [bibleChapter, setBibleChapter] = useState<BibleChapterData | null>(null)
   const [bibleFontSize, setBibleFontSize] = useState(90)
+  const [fileData, setFileData] = useState<{ fileId: string; fileName: string } | null>(null)
   const [timerRingColor, setTimerRingColor] = useState<string | null>(() => {
     const s = useSettingsStore.getState()
     return s.timerRingColorEnabled ? s.timerRingColor : null
@@ -43,6 +45,12 @@ export default function ProjectionPage(): React.JSX.Element {
 
     const unsubBibleChapter = adapter.on('bible:chapter', (data) => {
       setBibleChapter(data)
+      setActiveContent('bible')
+    })
+
+    const unsubFileShow = adapter.on('file:show', (data) => {
+      setFileData(data)
+      setActiveContent('file')
     })
 
     const unsubBibleSettings = adapter.on('bible:settings', ({ fontSize }) => {
@@ -85,6 +93,7 @@ export default function ProjectionPage(): React.JSX.Element {
       unsubTimerTick()
       unsubStopwatch()
       unsubBibleChapter()
+      unsubFileShow()
       unsubBibleSettings()
       unsubTimezone()
       unsubTimerRingColor()
@@ -99,6 +108,10 @@ export default function ProjectionPage(): React.JSX.Element {
 
   if (activeContent === 'bible' && bibleChapter) {
     return <BibleProjection data={bibleChapter} fontSize={bibleFontSize} />
+  }
+
+  if (activeContent === 'file' && fileData) {
+    return <FileProjection fileName={fileData.fileName} />
   }
 
   if (timerData) {

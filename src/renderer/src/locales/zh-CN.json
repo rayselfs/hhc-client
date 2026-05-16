@@ -1,7 +1,11 @@
 {
   "nav": {
     "timer": "计时器",
-    "bible": "圣经"
+    "bible": "圣经",
+    "files": "文件",
+    "media": "多媒体",
+    "favorites": "我的收藏",
+    "trash": "回收站"
   },
   "welcome": {
     "title": "欢迎使用 HHC",
@@ -93,38 +97,7 @@
     },
     "custom": {
       "title": "自定",
-      "home": "首页",
-      "newFolder": "新增文件夹",
-      "createNewFolder": "创建新文件夹",
-      "editFolder": "编辑文件夹",
-      "folderName": "文件夹名称",
-      "untitledFolder": "未命名文件夹",
-      "retention": "保留时间",
-      "duration": {
-        "1day": "1 天",
-        "1week": "1 周",
-        "1month": "1 个月",
-        "permanent": "永久"
-      },
-      "rename": "重命名",
-      "delete": "删除",
-      "moveToFolder": "移动到文件夹",
-      "emptyFolder": "空文件夹",
-      "deleteTitle": "删除 {{name}} ?",
-      "deleteFolderDescription": "此操作无法撤销。文件夹中的所有经文将被删除。",
-      "deleteItemDescription": "此操作无法撤销。",
-      "deleteSelectedTitle": "删除 {{count}} 个项目?",
-      "contextMenu": {
-        "copy": "复制",
-        "cut": "剪切",
-        "paste": "粘贴",
-        "delete": "删除",
-        "edit": "编辑",
-        "newFolder": "新建文件夹",
-        "copyCount": "复制 {{count}} 项",
-        "cutCount": "剪切 {{count}} 项",
-        "deleteCount": "删除 {{count}} 项"
-      }
+      "home": "首页"
     },
     "search": {
       "title": "搜索",
@@ -397,6 +370,98 @@
       "deleteCount": "删除 {{count}} 项"
     }
   },
+  "fileKind": {
+    "folder": "資料夾",
+    "file": "檔案",
+    "pngImage": "PNG 檔案",
+    "jpegImage": "JPEG 檔案",
+    "gifImage": "GIF 檔案",
+    "webpImage": "WebP 檔案",
+    "svgImage": "SVG 檔案",
+    "bmpImage": "BMP 檔案",
+    "tiffImage": "TIFF 檔案",
+    "heicImage": "HEIC 檔案",
+    "heifImage": "HEIF 檔案",
+    "mp4Video": "MP4 檔案",
+    "quicktimeVideo": "QuickTime 檔案",
+    "webmVideo": "WebM 檔案",
+    "aviVideo": "AVI 檔案",
+    "mkvVideo": "MKV 檔案",
+    "mpegVideo": "MPEG 檔案",
+    "oggVideo": "OGG 檔案",
+    "pdfDocument": "PDF 文件",
+    "powerpointPresentation": "PowerPoint 簡報",
+    "keynotePresentation": "Keynote 簡報",
+    "presentation": "簡報",
+    "imageFile": "{{ext}} 檔案",
+    "videoFile": "{{ext}} 檔案",
+    "audioFile": "{{ext}} 音訊"
+  },
+  "fileExplorer": {
+    "title": "文件",
+    "search": {
+      "placeholder": "搜索文件...",
+      "noResults": "未找到结果"
+    },
+    "upload": {
+      "button": "上传",
+      "dropToUpload": "拖曳以上传",
+      "dropToFolder": "放入文件夹"
+    },
+    "status": {
+      "itemCount": "{{count}} 个项目",
+      "selectedCount": "已选 {{count}} 个"
+    },
+    "view": {
+      "title": "显示",
+      "largeIcon": "大图标",
+      "mediumIcon": "中图标",
+      "smallIcon": "小图标",
+      "list": "列表"
+    },
+    "breadcrumb": {
+      "root": "首页"
+    },
+    "fab": {
+      "label": "新建",
+      "upload": "上传"
+    },
+    "list": {
+      "name": "文件名",
+      "kind": "种类",
+      "createdAt": "创建时间",
+      "size": "大小",
+      "path": "路径"
+    },
+    "empty": {
+      "title": "还没有文件",
+      "description": "上传文件即可开始使用"
+    },
+    "sort": {
+      "title": "排序",
+      "none": "不排序",
+      "name": "名称",
+      "createdAt": "创建时间",
+      "size": "大小",
+      "kind": "类型"
+    },
+    "contextMenu": {
+      "rename": "重命名",
+      "delete": "删除",
+      "move": "移动",
+      "newFolder": "新建文件夹",
+      "copy": "复制",
+      "cut": "剪切",
+      "paste": "粘贴",
+      "edit": "编辑",
+      "uploadFiles": "上传文件",
+      "uploadFolder": "上传文件夹",
+      "addFavorite": "加入我的收藏",
+      "removeFavorite": "移除我的收藏",
+      "restore": "还原",
+      "permanentDelete": "永久删除"
+    }
+  },
   "projection": {
     "showButton": "显示投影",
     "blankButton": "关闭投影",
@@ -446,7 +511,7 @@
     "title": "偏好设置",
     "categories": {
       "general": "常规",
-      "media": "媒体",
+      "media": "多媒体",
       "bible": "圣经"
     },
     "language": "语言",
@@ -458,6 +523,18 @@
     "resetBtn": "重置",
     "resetToDefaultsConfirm": "将所有设置重置为默认值？",
     "mediaPlaceholder": "媒体设置即将推出",
+    "trash": {
+      "retentionLabel": "垃圾桶保留期限",
+      "retentionDesc": "垃圾桶中的项目将在此期限后永久删除",
+      "days": {
+        "7": "7 天",
+        "14": "14 天",
+        "30": "30 天",
+        "60": "60 天",
+        "90": "90 天",
+        "0": "永久"
+      }
+    },
     "languageNames": {
       "en": "English",
       "zhTW": "繁體中文",
@@ -562,5 +639,19 @@
       "delete": "删除",
       "delete_alt": "删除 (替代)"
     }
+  },
+  "favorites": {
+    "empty": {
+      "title": "还没有收藏",
+      "description": "右键单击文件夹以添加到我的收藏"
+    }
+  },
+  "trash": {
+    "empty": {
+      "title": "回收站是空的",
+      "description": "已删除的文件与文件夹将显示在这里"
+    },
+    "permanentDeleteTitle": "永久删除？",
+    "permanentDeleteDescription": "此操作无法撤销。"
   }
 }

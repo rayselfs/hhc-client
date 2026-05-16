@@ -5,7 +5,10 @@ type AnyDB = any
 
 export type FolderDB = ReturnType<typeof createFolderDB>
 
-export function createFolderDB(getDB: () => Promise<AnyDB>): {
+export function createFolderDB(
+  getDB: () => Promise<AnyDB>,
+  rootId: string
+): {
   loadAllFolders: () => Promise<FolderRecord[]>
   saveFolder: (folder: FolderRecord) => Promise<void>
   saveFolders: (folders: FolderRecord[]) => Promise<void>
@@ -18,6 +21,10 @@ export function createFolderDB(getDB: () => Promise<AnyDB>): {
   deleteItemsByParent: (parentId: string) => Promise<void>
   deleteExpiredFolders: (now: number) => Promise<string[]>
   deleteExpiredItems: (now: number) => Promise<string[]>
+  purgeTrashOlderThan: (
+    now: number,
+    retentionMs: number
+  ) => Promise<{ folderIds: string[]; itemIds: string[] }>
 } {
   async function loadAllFolders(): Promise<FolderRecord[]> {
     try {
@@ -135,7 +142,9 @@ export function createFolderDB(getDB: () => Promise<AnyDB>): {
     try {
       const db = await getDB()
       const all: AnyItemRecord[] = await db.getAll('folder-items')
-      const expired = all.filter((i) => i.expiresAt != null && i.expiresAt < now)
+      const expired = all.filter(
+        (i) => i.parentId === rootId && i.expiresAt != null && i.expiresAt < now
+      )
       if (expired.length === 0) return []
       const ids = expired.map((i) => i.id)
       await deleteItems(ids)
@@ -143,6 +152,28 @@ export function createFolderDB(getDB: () => Promise<AnyDB>): {
     } catch (error) {
       console.error('[folder-db] Failed to delete expired items:', error)
       return []
+    }
+  }
+
+  async function purgeTrashOlderThan(
+    now: number,
+    retentionMs: number
+  ): Promise<{ folderIds: string[]; itemIds: string[] }> {
+    try {
+      const cutoff = now - retentionMs
+      const allFolders = await loadAllFolders()
+      const expiredFolders = allFolders.filter((f) => f.deletedAt != null && f.deletedAt < cutoff)
+      const db = await getDB()
+      const allItems: AnyItemRecord[] = await db.getAll('folder-items')
+      const expiredItems = allItems.filter((i) => i.deletedAt != null && i.deletedAt < cutoff)
+      const folderIds = expiredFolders.map((f) => f.id)
+      const itemIds = expiredItems.map((i) => i.id)
+      if (folderIds.length > 0) await deleteFolders(folderIds)
+      if (itemIds.length > 0) await deleteItems(itemIds)
+      return { folderIds, itemIds }
+    } catch (error) {
+      console.error('[folder-db] Failed to purge trash:', error)
+      return { folderIds: [], itemIds: [] }
     }
   }
 
@@ -158,6 +189,7 @@ export function createFolderDB(getDB: () => Promise<AnyDB>): {
     deleteItems,
     deleteItemsByParent,
     deleteExpiredFolders,
-    deleteExpiredItems
+    deleteExpiredItems,
+    purgeTrashOlderThan
   }
 }

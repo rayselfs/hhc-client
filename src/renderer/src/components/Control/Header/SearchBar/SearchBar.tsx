@@ -4,22 +4,26 @@ import { Search } from 'lucide-react'
 export interface SearchBarProps {
   onSearch: (query: string) => void
   onClear: () => void
+  onQueryChange?: (query: string) => void
   placeholder: string
   submitLabel: string
   disabled?: boolean
   /** e.g. 'data-bible-search' — sets a data attribute on the input for external focus via querySelector */
   inputDataAttr?: string
   testId?: string
+  renderDropdown?: React.ReactNode
 }
 
 export default function SearchBar({
   onSearch,
   onClear,
+  onQueryChange,
   placeholder,
   submitLabel,
   disabled = false,
   inputDataAttr,
-  testId
+  testId,
+  renderDropdown
 }: SearchBarProps): React.JSX.Element {
   const [isExpanded, setIsExpanded] = useState(false)
   const [query, setQuery] = useState('')
@@ -99,7 +103,10 @@ export default function SearchBar({
         ref={inputRef}
         type="text"
         value={query}
-        onChange={(e) => setQuery(e.target.value)}
+        onChange={(e) => {
+          setQuery(e.target.value)
+          onQueryChange?.(e.target.value)
+        }}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         aria-label={placeholder}
@@ -121,6 +128,9 @@ export default function SearchBar({
       >
         <Search size={16} />
       </button>
+      {isExpanded && renderDropdown && (
+        <div className="absolute top-full left-0 right-0 mt-1 z-50">{renderDropdown}</div>
+      )}
     </div>
   )
 }

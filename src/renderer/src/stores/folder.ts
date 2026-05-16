@@ -16,6 +16,7 @@ export interface FolderStoreState {
   initialize: () => Promise<void>
   addFolder: (name: string, parentId?: string, expiresAt?: number | null) => string
   updateFolder: (id: string, updates: { name?: string; expiresAt?: number | null }) => void
+  updateItem?: (id: string, updates: Partial<AnyItemRecord>) => void
   deleteFolder: (id: string) => void
   addItem: (
     item: Omit<AnyItemRecord, 'id' | 'sortIndex' | 'createdAt' | 'expiresAt'> & {
@@ -33,6 +34,12 @@ export interface FolderStoreState {
   navigateUp: () => void
   cleanupExpired: () => Promise<void>
   ensureItemsLoaded: (parentId: string) => Promise<void>
+  toggleFavorite: (folderId: string) => void
+  softDeleteFolder: (folderId: string) => void
+  softDeleteItem: (itemId: string) => void
+  restoreFolder: (folderId: string) => void
+  restoreItem: (itemId: string) => void
+  purgeTrash: (retentionMs: number) => Promise<void>
 
   getChildFolders: (parentId: string) => FolderRecord[]
   getItems: (parentId: string) => AnyItemRecord[]
@@ -42,7 +49,7 @@ export interface FolderStoreState {
 
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export function createFolderStore(config: FolderStoreConfig) {
-  const ops = createFolderDB(config.getDB)
+  const ops = createFolderDB(config.getDB, config.rootId)
   return create<FolderStoreState>()((set, get) => ({
     folders: {},
     items: {},
@@ -53,6 +60,7 @@ export function createFolderStore(config: FolderStoreConfig) {
     isLoading: true,
 
     initialize: async () => {
+      if (get()._foldersArray.length > 0) return
       set({ isLoading: true })
       try {
         const allFolders = await ops.loadAllFolders()
@@ -130,7 +138,12 @@ export function createFolderStore(config: FolderStoreConfig) {
         parentId: resolvedParentId,
         sortIndex: siblings.length,
         createdAt: Date.now(),
-        expiresAt: expiresAt !== undefined ? expiresAt : null
+        expiresAt:
+          expiresAt !== undefined
+            ? expiresAt
+            : resolvedParentId === config.rootId
+              ? Date.now() + FOLDER_DURATION_MS['1day']
+              : (get().folders[resolvedParentId]?.expiresAt ?? null)
       }
       set((state) => ({
         folders: { ...state.folders, [newFolder.id]: newFolder },
@@ -153,6 +166,20 @@ export function createFolderStore(config: FolderStoreConfig) {
         }
       })
       ops.saveFolder(updated)
+    },
+
+    updateItem: (id, updates) => {
+      const item = get().items[id]
+      if (!item) return
+      const updated = { ...item, ...updates } as AnyItemRecord
+      set((state) => {
+        const newItemsArray = state._itemsArray.map((entry) => (entry.id === id ? updated : entry))
+        return {
+          items: { ...state.items, [id]: updated },
+          _itemsArray: newItemsArray
+        }
+      })
+      ops.saveItem(updated)
     },
 
     deleteFolder: (id) => {
@@ -229,7 +256,8 @@ export function createFolderStore(config: FolderStoreConfig) {
       const updated: AnyItemRecord = {
         ...item,
         parentId: targetFolderId,
-        sortIndex: targetSiblings.length
+        sortIndex: targetSiblings.length,
+        expiresAt: targetFolderId === config.rootId ? Date.now() + FOLDER_DURATION_MS['1day'] : null
       }
       set((state) => {
         const newItemsArray = state._itemsArray.map((i) => (i.id === itemId ? updated : i))
@@ -319,6 +347,140 @@ export function createFolderStore(config: FolderStoreConfig) {
       if (currentFolderId === config.rootId) return
       const current = folders[currentFolderId]
       set({ currentFolderId: current?.parentId ?? config.rootId })
+    },
+
+    toggleFavorite: (folderId) => {
+      if (folderId === config.rootId) return
+      const folder = get().folders[folderId]
+      if (!folder) return
+      let updated: FolderRecord
+      if (!folder.isFavorited) {
+        updated = { ...folder, isFavorited: true, expiresAt: null }
+      } else {
+        updated = { ...folder, isFavorited: false }
+      }
+      set((state) => ({
+        folders: { ...state.folders, [folderId]: updated },
+        _foldersArray: state._foldersArray.map((f) => (f.id === folderId ? updated : f))
+      }))
+      ops.saveFolder(updated)
+    },
+
+    softDeleteFolder: (folderId) => {
+      if (folderId === config.rootId) return
+      const { folders } = get()
+      const folder = folders[folderId]
+      if (!folder) return
+
+      const queue: string[] = [folderId]
+      const visited = new Set<string>()
+      while (queue.length > 0) {
+        const current = queue.shift()!
+        if (visited.has(current)) continue
+        visited.add(current)
+        for (const f of Object.values(folders)) {
+          if (f.parentId === current) queue.push(f.id)
+        }
+      }
+      visited.delete(folderId)
+
+      const updated: FolderRecord = {
+        ...folder,
+        isFavorited: false,
+        deletedAt: Date.now(),
+        originalParentId: folder.parentId ?? config.rootId
+      }
+
+      const descendantUpdates: FolderRecord[] = []
+      for (const id of visited) {
+        const f = folders[id]
+        if (f?.isFavorited) descendantUpdates.push({ ...f, isFavorited: false })
+      }
+
+      set((state) => {
+        const newFolders = { ...state.folders, [folderId]: updated }
+        for (const f of descendantUpdates) newFolders[f.id] = f
+        return {
+          folders: newFolders,
+          _foldersArray: state._foldersArray.map((f) => newFolders[f.id] ?? f)
+        }
+      })
+
+      ops.saveFolder(updated)
+      if (descendantUpdates.length > 0) ops.saveFolders(descendantUpdates)
+    },
+
+    softDeleteItem: (itemId) => {
+      const item = get().items[itemId]
+      if (!item) return
+      const updated: AnyItemRecord = {
+        ...item,
+        deletedAt: Date.now(),
+        originalParentId: item.parentId
+      }
+      set((state) => ({
+        items: { ...state.items, [itemId]: updated },
+        _itemsArray: state._itemsArray.map((i) => (i.id === itemId ? updated : i))
+      }))
+      ops.saveItem(updated)
+    },
+
+    restoreFolder: (folderId) => {
+      const { folders } = get()
+      const folder = folders[folderId]
+      if (!folder || !folder.deletedAt) return
+      const parentId = folder.originalParentId
+      const targetParentId =
+        parentId && folders[parentId] && !folders[parentId].deletedAt ? parentId : config.rootId
+      const updated: FolderRecord = {
+        ...folder,
+        isFavorited: false,
+        parentId: targetParentId,
+        deletedAt: undefined,
+        originalParentId: undefined
+      }
+      set((state) => ({
+        folders: { ...state.folders, [folderId]: updated },
+        _foldersArray: state._foldersArray.map((f) => (f.id === folderId ? updated : f))
+      }))
+      ops.saveFolder(updated)
+    },
+
+    restoreItem: (itemId) => {
+      const { items, folders } = get()
+      const item = items[itemId]
+      if (!item || !item.deletedAt) return
+      const parentId = item.originalParentId
+      const targetParentId =
+        parentId && folders[parentId] && !folders[parentId].deletedAt ? parentId : config.rootId
+      const updated: AnyItemRecord = {
+        ...item,
+        parentId: targetParentId,
+        deletedAt: undefined,
+        originalParentId: undefined
+      }
+      set((state) => ({
+        items: { ...state.items, [itemId]: updated },
+        _itemsArray: state._itemsArray.map((i) => (i.id === itemId ? updated : i))
+      }))
+      ops.saveItem(updated)
+    },
+
+    purgeTrash: async (retentionMs) => {
+      const { folderIds, itemIds } = await ops.purgeTrashOlderThan(Date.now(), retentionMs)
+      if (folderIds.length === 0 && itemIds.length === 0) return
+      set((state) => {
+        const newFolders = { ...state.folders }
+        const newItems = { ...state.items }
+        for (const id of folderIds) delete newFolders[id]
+        for (const id of itemIds) delete newItems[id]
+        return {
+          folders: newFolders,
+          items: newItems,
+          _foldersArray: Object.values(newFolders),
+          _itemsArray: Object.values(newItems)
+        }
+      })
     },
 
     cleanupExpired: async () => {

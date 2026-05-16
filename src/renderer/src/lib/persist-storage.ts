@@ -4,6 +4,7 @@ import { toast } from '@heroui/react/toast'
 import i18n from '@renderer/i18n'
 
 export { createKey } from '@renderer/lib/storage-prefix'
+export { createKey as createPersistName } from '@renderer/lib/storage-prefix'
 
 const hhcStateStorage = {
   getItem: (name: string): string | null => {

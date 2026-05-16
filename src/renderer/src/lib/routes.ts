@@ -5,3 +5,15 @@ export function isTimerRoute(pathname: string): boolean {
 export function isBibleRoute(pathname: string): boolean {
   return pathname === '/bible'
 }
+
+export function isFilesRoute(pathname: string): boolean {
+  return pathname === '/files'
+}
+
+export function isFavoritesRoute(pathname: string): boolean {
+  return pathname === '/favorites'
+}
+
+export function isTrashRoute(pathname: string): boolean {
+  return pathname === '/trash'
+}
