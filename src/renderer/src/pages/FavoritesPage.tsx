@@ -140,10 +140,12 @@ export default function FavoritesPage(): React.JSX.Element {
 
   if (sortedItems.length === 0) {
     return (
-      <div className="flex h-full flex-col items-center justify-center text-center p-8">
-        <h3 className="text-lg font-medium text-foreground">{t('favorites.empty.title')}</h3>
-        <p className="text-sm text-default-400 mt-1">{t('favorites.empty.description')}</p>
-      </div>
+      <FileExplorerShell itemCount={0} selectedCount={0}>
+        <div className="flex h-full flex-col items-center justify-center text-center p-8">
+          <h3 className="text-lg font-medium text-foreground">{t('favorites.empty.title')}</h3>
+          <p className="text-sm text-default-400 mt-1">{t('favorites.empty.description')}</p>
+        </div>
+      </FileExplorerShell>
     )
   }
 
