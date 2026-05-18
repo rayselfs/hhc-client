@@ -121,9 +121,7 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
     if (!store.updateItem) return
     store.updateItem(itemId, { notes })
     set((state) => ({
-      playlist: state.playlist.map((item) =>
-        item.id === itemId ? { ...item, notes } : item
-      )
+      playlist: state.playlist.map((item) => (item.id === itemId ? { ...item, notes } : item))
     }))
   }
 }))

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from '@heroui/react/toast'
 import { useTranslation } from 'react-i18next'
 import type { FileItemRecord } from '@shared/types/folder'
@@ -9,7 +9,7 @@ interface ImagePreviewProps {
   item: FileItemRecord
 }
 
-export default function ImagePreview({ item }: ImagePreviewProps) {
+export default function ImagePreview({ item }: ImagePreviewProps): React.JSX.Element {
   const { t } = useTranslation()
   const [imgSrc, setImgSrc] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -25,10 +25,10 @@ export default function ImagePreview({ item }: ImagePreviewProps) {
   useEffect(() => {
     let objectUrl: string | null = null
     let cancelled = false
-    setLoading(true)
-    setError(false)
 
-    async function load() {
+    async function load(): Promise<void> {
+      setLoading(true)
+      setError(false)
       const db = await openFileExplorerDB()
       const blob = await getFileBlob(db, item.id)
       if (cancelled) return
@@ -56,18 +56,25 @@ export default function ImagePreview({ item }: ImagePreviewProps) {
       if (objectUrl) URL.revokeObjectURL(objectUrl)
       setImgSrc(null)
     }
-  }, [item.id])
+  }, [item.id, t])
 
   useEffect(() => {
-    setPanX(0)
-    setPanY(0)
+    const raf = requestAnimationFrame(() => {
+      setPanX(0)
+      setPanY(0)
+    })
+    return () => cancelAnimationFrame(raf)
   }, [item.id])
 
   useEffect(() => {
     if (zoomLevel === 1) {
-      setPanX(0)
-      setPanY(0)
+      const raf = requestAnimationFrame(() => {
+        setPanX(0)
+        setPanY(0)
+      })
+      return () => cancelAnimationFrame(raf)
     }
+    return undefined
   }, [zoomLevel])
 
   const handleMouseDown = useCallback(

@@ -18,7 +18,11 @@ type PdfState = {
   viewMode: 'single' | 'continuous'
 }
 
-export default function FileProjection({ fileName, initialFileId, initialMimeType }: FileProjectionProps): React.JSX.Element {
+export default function FileProjection({
+  fileName,
+  initialFileId,
+  initialMimeType
+}: FileProjectionProps): React.JSX.Element {
   const [objectUrl, setObjectUrl] = useState<string | null>(null)
   const [mimeType, setMimeType] = useState<string | null>(null)
   const [zoom, setZoom] = useState(1)
@@ -121,7 +125,9 @@ export default function FileProjection({ fileName, initialFileId, initialMimeTyp
         break
       case 'pdfViewMode':
         if (data.value === 'single' || data.value === 'continuous') {
-          setPdfState((prev) => (prev ? { ...prev, viewMode: data.value as 'single' | 'continuous' } : prev))
+          setPdfState((prev) =>
+            prev ? { ...prev, viewMode: data.value as 'single' | 'continuous' } : prev
+          )
         }
         break
     }
@@ -158,9 +164,7 @@ export default function FileProjection({ fileName, initialFileId, initialMimeTyp
     }
   }, [objectUrl])
 
-  const transform = zoom !== 1
-    ? `scale(${zoom}) translate(${pan.x}px, ${pan.y}px)`
-    : undefined
+  const transform = zoom !== 1 ? `scale(${zoom}) translate(${pan.x}px, ${pan.y}px)` : undefined
 
   if (pdfState) {
     return (
@@ -213,16 +217,22 @@ export default function FileProjection({ fileName, initialFileId, initialMimeTyp
   )
 }
 
-function PdfCanvas({ canvas }: { canvas: HTMLCanvasElement | undefined }): React.JSX.Element | null {
+function PdfCanvas({
+  canvas
+}: {
+  canvas: HTMLCanvasElement | undefined
+}): React.JSX.Element | null {
   const containerRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     const container = containerRef.current
     if (!container || !canvas) return
     container.innerHTML = ''
-    canvas.style.maxWidth = '100%'
-    canvas.style.maxHeight = '100vh'
-    canvas.style.objectFit = 'contain'
+    Object.assign(canvas.style, {
+      maxWidth: '100%',
+      maxHeight: '100vh',
+      objectFit: 'contain'
+    })
     container.appendChild(canvas)
     return () => {
       container.innerHTML = ''

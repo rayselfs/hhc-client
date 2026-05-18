@@ -18,7 +18,11 @@ export default function ProjectionPage(): React.JSX.Element {
   const [stopwatchData, setStopwatchData] = useState<StopwatchTickPayload | null>(null)
   const [bibleChapter, setBibleChapter] = useState<BibleChapterData | null>(null)
   const [bibleFontSize, setBibleFontSize] = useState(90)
-  const [fileData, setFileData] = useState<{ fileId: string; fileName: string; mimeType: string } | null>(null)
+  const [fileData, setFileData] = useState<{
+    fileId: string
+    fileName: string
+    mimeType: string
+  } | null>(null)
   const [timerRingColor, setTimerRingColor] = useState<string | null>(() => {
     const s = useSettingsStore.getState()
     return s.timerRingColorEnabled ? s.timerRingColor : null
@@ -111,7 +115,13 @@ export default function ProjectionPage(): React.JSX.Element {
   }
 
   if (activeContent === 'file' && fileData) {
-    return <FileProjection fileName={fileData.fileName} initialFileId={fileData.fileId} initialMimeType={fileData.mimeType} />
+    return (
+      <FileProjection
+        fileName={fileData.fileName}
+        initialFileId={fileData.fileId}
+        initialMimeType={fileData.mimeType}
+      />
+    )
   }
 
   if (timerData) {

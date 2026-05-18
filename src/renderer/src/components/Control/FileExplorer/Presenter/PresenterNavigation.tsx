@@ -1,7 +1,8 @@
+import React from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 
-export default function PresenterNavigation() {
+export default function PresenterNavigation(): React.JSX.Element {
   const { t } = useTranslation()
   const canNext = useMediaProjectionStore((s) => s.canNext())
   const canPrev = useMediaProjectionStore((s) => s.canPrev())

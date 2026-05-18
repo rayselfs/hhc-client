@@ -179,7 +179,10 @@ describe('updateNotes', () => {
   it('calls useFileExplorerStore.updateItem', async () => {
     const { useFileExplorerStore } = await import('@renderer/stores/file-explorer')
     const mockUpdateItem = vi.fn()
-    useFileExplorerStore.setState({ updateItem: mockUpdateItem } as any)
+    useFileExplorerStore.setState({ updateItem: mockUpdateItem } as Pick<
+      ReturnType<typeof useFileExplorerStore.getState>,
+      'updateItem'
+    >)
 
     useMediaProjectionStore.getState().updateNotes('a', 'hello')
     expect(mockUpdateItem).toHaveBeenCalledWith('a', { notes: 'hello' })

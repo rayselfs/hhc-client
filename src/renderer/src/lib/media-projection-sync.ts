@@ -62,7 +62,7 @@ export function useMediaProjectionSync(): void {
   useEffect(() => {
     let videoPlaying = false
 
-    const onTogglePlay = () => {
+    const onTogglePlay = (): void => {
       videoPlaying = !videoPlaying
       send('file:control', { action: videoPlaying ? 'play' : 'pause' })
     }
@@ -74,11 +74,11 @@ export function useMediaProjectionSync(): void {
   useEffect(() => {
     let pdfPage = 1
 
-    const onNext = () => {
+    const onNext = (): void => {
       pdfPage++
       send('file:control', { action: 'pdfPage', value: pdfPage })
     }
-    const onPrev = () => {
+    const onPrev = (): void => {
       pdfPage = Math.max(1, pdfPage - 1)
       send('file:control', { action: 'pdfPage', value: pdfPage })
     }
@@ -92,17 +92,20 @@ export function useMediaProjectionSync(): void {
   }, [send])
 
   useEffect(() => {
-    const onSeek = (e: Event) => {
+    const onSeek = (e: Event): void => {
       const detail = (e as CustomEvent<{ time: number }>).detail
       if (!detail) return
 
       const now = Date.now()
       if (now - lastSeekRef.current < 200) {
         if (seekTimerRef.current) clearTimeout(seekTimerRef.current)
-        seekTimerRef.current = setTimeout(() => {
-          lastSeekRef.current = Date.now()
-          send('file:control', { action: 'seek', value: detail.time })
-        }, 200 - (now - lastSeekRef.current))
+        seekTimerRef.current = setTimeout(
+          () => {
+            lastSeekRef.current = Date.now()
+            send('file:control', { action: 'seek', value: detail.time })
+          },
+          200 - (now - lastSeekRef.current)
+        )
         return
       }
 

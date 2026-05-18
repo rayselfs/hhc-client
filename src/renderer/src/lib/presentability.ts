@@ -23,5 +23,7 @@ export function getMediaType(mimeType: string): MediaType | null {
 }
 
 export function getPresentableItems(items: AnyItemRecord[]): FileItemRecord[] {
-  return items.filter((item): item is FileItemRecord => isFileItem(item) && isPresentable(item.mimeType))
+  return items.filter(
+    (item): item is FileItemRecord => isFileItem(item) && isPresentable(item.mimeType)
+  )
 }

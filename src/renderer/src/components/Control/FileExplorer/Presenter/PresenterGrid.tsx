@@ -1,7 +1,8 @@
+import React from 'react'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 import { useThumbnails } from '@renderer/hooks/useThumbnails'
 
-export default function PresenterGrid() {
+export default function PresenterGrid(): React.JSX.Element {
   const playlist = useMediaProjectionStore((s) => s.playlist)
   const currentIndex = useMediaProjectionStore((s) => s.currentIndex)
   const jumpTo = useMediaProjectionStore((s) => s.jumpTo)

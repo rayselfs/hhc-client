@@ -594,12 +594,8 @@ export function FileBrowser({
             toast.warning(t('fileExplorer.noProjectableFiles'))
             return
           }
-          const firstSelected = [...selectedIds].find((id) =>
-            presentable.some((f) => f.id === id)
-          )
-          const idx = firstSelected
-            ? presentable.findIndex((f) => f.id === firstSelected)
-            : 0
+          const firstSelected = [...selectedIds].find((id) => presentable.some((f) => f.id === id))
+          const idx = firstSelected ? presentable.findIndex((f) => f.id === firstSelected) : 0
           useMediaProjectionStore.getState().startPresentation(presentable, Math.max(0, idx))
         },
         preventDefault: true

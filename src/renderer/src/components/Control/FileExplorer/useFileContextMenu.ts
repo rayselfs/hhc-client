@@ -47,7 +47,9 @@ export const useFileContextMenu = createFolderContextMenu({
     const isFavorited = folder.isFavorited ?? false
     const folderItems = getItems(folder.id)
     const presentableFiles = getPresentableItems(folderItems)
-    const actions: Array<'separator' | { id: string; label: string; icon: React.ReactElement; onAction: () => void }> = []
+    const actions: Array<
+      'separator' | { id: string; label: string; icon: React.ReactElement; onAction: () => void }
+    > = []
 
     if (presentableFiles.length > 0) {
       actions.push('separator', {
@@ -60,19 +62,16 @@ export const useFileContextMenu = createFolderContextMenu({
       })
     }
 
-    actions.push(
-      ...(actions.length === 0 ? ['separator' as const] : []),
-      {
-        id: isFavorited ? 'remove-favorite' : 'add-favorite',
-        label: t(
-          isFavorited
-            ? 'fileExplorer.contextMenu.removeFavorite'
-            : 'fileExplorer.contextMenu.addFavorite'
-        ),
-        icon: React.createElement(isFavorited ? StarOff : Star, { size: 14 }),
-        onAction: () => toggleFavorite(folder.id)
-      }
-    )
+    actions.push(...(actions.length === 0 ? ['separator' as const] : []), {
+      id: isFavorited ? 'remove-favorite' : 'add-favorite',
+      label: t(
+        isFavorited
+          ? 'fileExplorer.contextMenu.removeFavorite'
+          : 'fileExplorer.contextMenu.addFavorite'
+      ),
+      icon: React.createElement(isFavorited ? StarOff : Star, { size: 14 }),
+      onAction: () => toggleFavorite(folder.id)
+    })
 
     return actions
   }

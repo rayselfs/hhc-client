@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { toast } from '@heroui/react/toast'
 import { useTranslation } from 'react-i18next'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
@@ -10,7 +10,7 @@ interface PdfPreviewProps {
   item: FileItemRecord
 }
 
-async function ensurePdfjsPolyfill() {
+async function ensurePdfjsPolyfill(): Promise<void> {
   if (!('getOrInsertComputed' in Map.prototype)) {
     Object.defineProperty(Map.prototype, 'getOrInsertComputed', {
       value<K, V>(this: Map<K, V>, key: K, factory: (key: K) => V): V {
@@ -23,7 +23,7 @@ async function ensurePdfjsPolyfill() {
   }
 }
 
-async function loadPdfjsLib() {
+async function loadPdfjsLib(): Promise<typeof import('pdfjs-dist')> {
   await ensurePdfjsPolyfill()
   const pdfjsLib = await import('pdfjs-dist')
   pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
@@ -38,7 +38,7 @@ async function renderPage(
   pageNum: number,
   canvas: HTMLCanvasElement,
   scale = 1.5
-) {
+): Promise<void> {
   const page = await pdf.getPage(pageNum)
   const viewport = page.getViewport({ scale })
   canvas.width = viewport.width
@@ -48,7 +48,7 @@ async function renderPage(
   await page.render({ canvasContext: ctx, viewport, canvas }).promise
 }
 
-export default function PdfPreview({ item }: PdfPreviewProps) {
+export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element {
   const { t } = useTranslation()
   const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
@@ -67,7 +67,7 @@ export default function PdfPreview({ item }: PdfPreviewProps) {
     let objectUrl: string | null = null
     let doc: PDFDocumentProxy | null = null
 
-    async function load() {
+    async function load(): Promise<void> {
       setLoading(true)
       setError(false)
       try {
@@ -122,7 +122,7 @@ export default function PdfPreview({ item }: PdfPreviewProps) {
       if (doc) doc.destroy()
       setPdfDoc(null)
     }
-  }, [item.id])
+  }, [item.id, t])
 
   useEffect(() => {
     if (!pdfDoc || pdfViewMode !== 'slide') return
@@ -143,7 +143,7 @@ export default function PdfPreview({ item }: PdfPreviewProps) {
     if (!pdfDoc || pdfViewMode !== 'scroll') return
     let cancelled = false
 
-    async function renderAll() {
+    async function renderAll(): Promise<void> {
       for (let i = 0; i < pdfDoc!.numPages; i++) {
         if (cancelled) return
         const canvas = scrollCanvasRefs.current[i]
@@ -160,8 +160,8 @@ export default function PdfPreview({ item }: PdfPreviewProps) {
   }, [pdfDoc, pdfViewMode, pageCount])
 
   useEffect(() => {
-    const handleNext = () => setCurrentPage((p) => Math.min(p + 1, pageCount))
-    const handlePrev = () => setCurrentPage((p) => Math.max(p - 1, 1))
+    const handleNext = (): void => setCurrentPage((p) => Math.min(p + 1, pageCount))
+    const handlePrev = (): void => setCurrentPage((p) => Math.max(p - 1, 1))
     window.addEventListener('media:pdfNextPage', handleNext)
     window.addEventListener('media:pdfPrevPage', handlePrev)
     return () => {
@@ -171,7 +171,11 @@ export default function PdfPreview({ item }: PdfPreviewProps) {
   }, [pageCount])
 
   if (loading) {
-    return <div className="w-full h-full flex items-center justify-center text-white/50">{t('presenter.loading')}</div>
+    return (
+      <div className="w-full h-full flex items-center justify-center text-white/50">
+        {t('presenter.loading')}
+      </div>
+    )
   }
 
   if (error || !pdfDoc) {

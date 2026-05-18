@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
 import { useTimerRuntimeStore } from '@renderer/stores/timer-runtime'
@@ -14,7 +14,7 @@ import PresenterNavigation from './PresenterNavigation'
 import PresenterSidebar from './PresenterSidebar'
 import PresenterGrid from './PresenterGrid'
 
-export default function MediaPresenter() {
+export default function MediaPresenter(): React.JSX.Element {
   const { t } = useTranslation()
   const { claimProjection, blankProjection } = useProjection()
   const [clock, setClock] = useState(() => new Date().toLocaleTimeString())
@@ -27,16 +27,8 @@ export default function MediaPresenter() {
   const pdfViewMode = useMediaProjectionStore((s) => s.pdfViewMode)
   const currentItem = useMediaProjectionStore((s) => s.currentItem())
 
-  const {
-    exit,
-    next,
-    prev,
-    jumpTo,
-    toggleGrid,
-    setPdfViewMode,
-    setZoomLevel,
-    resetZoom
-  } = useMediaProjectionStore.getState()
+  const { exit, next, prev, jumpTo, toggleGrid, setPdfViewMode, setZoomLevel, resetZoom } =
+    useMediaProjectionStore.getState()
 
   useEffect(() => {
     const timerStatus = useTimerRuntimeStore.getState().status
@@ -132,15 +124,9 @@ export default function MediaPresenter() {
           {/* Preview container */}
           <div className="flex-1 flex items-center justify-center bg-black overflow-hidden">
             <div className="aspect-video w-full max-h-full overflow-hidden">
-              {mediaType === 'image' && currentItem && (
-                <ImagePreview item={currentItem} />
-              )}
-              {mediaType === 'video' && currentItem && (
-                <VideoPreview item={currentItem} />
-              )}
-              {mediaType === 'pdf' && currentItem && (
-                <PdfPreview item={currentItem} />
-              )}
+              {mediaType === 'image' && currentItem && <ImagePreview item={currentItem} />}
+              {mediaType === 'video' && currentItem && <VideoPreview item={currentItem} />}
+              {mediaType === 'pdf' && currentItem && <PdfPreview item={currentItem} />}
               {!mediaType && (
                 <div className="text-white/50 text-center w-full h-full flex items-center justify-center">
                   {t('presenter.noMediaSelected')}
@@ -163,9 +149,7 @@ export default function MediaPresenter() {
             >
               Z {t('presenter.zoom')}
             </button>
-            {zoomLevel > 1 && (
-              <span className="text-white/70 text-sm">{zoomLevel}x</span>
-            )}
+            {zoomLevel > 1 && <span className="text-white/70 text-sm">{zoomLevel}x</span>}
           </div>
 
           {/* Navigation */}

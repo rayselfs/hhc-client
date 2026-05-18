@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { toast } from '@heroui/react/toast'
 import { useTranslation } from 'react-i18next'
 import type { FileItemRecord } from '@shared/types/folder'
@@ -15,7 +15,7 @@ function formatTime(seconds: number): string {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
-export default function VideoPreview({ item }: VideoPreviewProps) {
+export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Element {
   const { t } = useTranslation()
   const videoRef = useRef<HTMLVideoElement>(null)
   const [videoSrc, setVideoSrc] = useState<string | null>(null)
@@ -28,7 +28,7 @@ export default function VideoPreview({ item }: VideoPreviewProps) {
     let objectUrl: string | null = null
     let cancelled = false
 
-    async function load() {
+    async function load(): Promise<void> {
       const db = await openFileExplorerDB()
       const blob = await getFileBlob(db, item.id)
       if (cancelled) return
@@ -52,18 +52,21 @@ export default function VideoPreview({ item }: VideoPreviewProps) {
       cancelled = true
       if (objectUrl) URL.revokeObjectURL(objectUrl)
       setVideoSrc(null)
-      if (videoRef.current) videoRef.current.pause()
+      const video = videoRef.current
+      if (video) video.pause()
     }
-  }, [item.id])
+  }, [item.id, t])
 
   useEffect(() => {
-    const handleTogglePlay = () => {
+    const handleTogglePlay = (): void => {
       if (!videoRef.current) return
       if (videoRef.current.paused) {
         videoRef.current
           .play()
           .then(() => setIsPlaying(true))
-          .catch(() => {})
+          .catch((err: unknown) => {
+            console.error('Video play error:', err)
+          })
       } else {
         videoRef.current.pause()
         setIsPlaying(false)
@@ -81,11 +84,11 @@ export default function VideoPreview({ item }: VideoPreviewProps) {
     )
   }
 
-  const handlePlayPause = () => {
+  const handlePlayPause = (): void => {
     window.dispatchEvent(new CustomEvent('media:togglePlay'))
   }
 
-  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>): void => {
     if (!videoRef.current) return
     const time = Number(e.target.value)
     videoRef.current.currentTime = time

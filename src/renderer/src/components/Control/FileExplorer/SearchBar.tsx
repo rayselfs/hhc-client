@@ -18,20 +18,23 @@ export function SearchBar({ className }: SearchBarProps): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const runSearch = useCallback((q: string) => {
-    if (q.trim() === '') {
-      setResults([])
-      setOpen(false)
-      return
-    }
-    const found = searchAllItems(
-      q,
-      useFileExplorerStore.getState(),
-      t('fileExplorer.breadcrumb.root')
-    )
-    setResults(found)
-    setOpen(true)
-  }, [t])
+  const runSearch = useCallback(
+    (q: string) => {
+      if (q.trim() === '') {
+        setResults([])
+        setOpen(false)
+        return
+      }
+      const found = searchAllItems(
+        q,
+        useFileExplorerStore.getState(),
+        t('fileExplorer.breadcrumb.root')
+      )
+      setResults(found)
+      setOpen(true)
+    },
+    [t]
+  )
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {

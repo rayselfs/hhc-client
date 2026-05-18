@@ -248,15 +248,15 @@ export default function TrashPage(): React.JSX.Element {
             colWidths={colWidths}
             onColWidthChange={(col, w) => setColWidths({ [col]: w })}
             onItemClick={handleItemClick}
-          onItemDoubleClick={(_id, _e) => {}}
-          onItemContextMenu={handleContextMenu}
-        />
-      ) : (
-        <GridView
-          items={gridItemsWithSelection}
-          viewMode={viewMode}
-          onItemClick={handleItemClick}
-          onItemDoubleClick={(_id, _e) => {}}
+            onItemDoubleClick={(_id, _e) => {}}
+            onItemContextMenu={handleContextMenu}
+          />
+        ) : (
+          <GridView
+            items={gridItemsWithSelection}
+            viewMode={viewMode}
+            onItemClick={handleItemClick}
+            onItemDoubleClick={(_id, _e) => {}}
             onItemContextMenu={handleContextMenu}
           />
         )}
