@@ -23,5 +23,24 @@ export const SHORTCUTS = {
     DELETE: { code: 'Backspace', mac: { code: 'Backspace', meta: true } },
     DELETE_ALT: { code: 'Delete' },
     ESCAPE: { code: 'Escape' }
+  },
+  MEDIA: {
+    ESCAPE: { code: 'Escape' },
+    NEXT_SLIDE: { code: 'ArrowRight' },
+    PREV_SLIDE: { code: 'ArrowLeft' },
+    NEXT_SLIDE_ALT: { code: 'ArrowDown' },
+    PREV_SLIDE_ALT: { code: 'ArrowUp' },
+    FIRST_SLIDE: { code: 'Home' },
+    LAST_SLIDE: { code: 'End' },
+    TOGGLE_GRID: { code: 'KeyG' },
+    TOGGLE_ZOOM: { code: 'KeyZ' },
+    ZOOM_IN: { code: 'Equal', metaOrCtrl: true },
+    ZOOM_OUT: { code: 'Minus', metaOrCtrl: true },
+    VIDEO_TOGGLE_PLAY: { code: 'Space' },
+    PDF_NEXT_PAGE: { code: 'ArrowRight', metaOrCtrl: true },
+    PDF_PREV_PAGE: { code: 'ArrowLeft', metaOrCtrl: true },
+    PDF_TOGGLE_VIEW_MODE: { code: 'KeyV' },
+    START_PRESENTATION: { code: 'F5' },
+    START_FROM_CURRENT: { code: 'F5', shift: true }
   }
 } as const satisfies Record<string, Record<string, ShortcutConfig>>

@@ -36,6 +36,7 @@ export interface FileItemRecord extends ItemRecord {
   url: string
   size: number
   mimeType: string
+  notes?: string
 }
 
 export type AnyItemRecord = VerseItemRecord | FileItemRecord
