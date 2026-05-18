@@ -458,6 +458,7 @@
       "uploadFolder": "Upload Folder",
       "addFavorite": "Add to Favorites",
       "removeFavorite": "Remove from Favorites",
+      "project": "Project",
       "restore": "Restore",
       "permanentDelete": "Delete Permanently"
     }
