@@ -656,5 +656,20 @@
     },
     "permanentDeleteTitle": "Delete Permanently?",
     "permanentDeleteDescription": "This action cannot be undone."
+  },
+  "presenter": {
+    "noMediaSelected": "No media selected",
+    "grid": "Grid",
+    "zoom": "Zoom",
+    "next": "Next",
+    "prev": "Prev",
+    "endOfSlides": "End of slides",
+    "noPreview": "No preview",
+    "notes": "Notes",
+    "notesPlaceholder": "Add notes...",
+    "loading": "Loading...",
+    "imageLoadFailed": "Failed to load image",
+    "videoLoadFailed": "Failed to load video",
+    "pdfLoadFailed": "Failed to load PDF"
   }
 }

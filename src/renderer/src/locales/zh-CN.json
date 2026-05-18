@@ -656,5 +656,20 @@
     },
     "permanentDeleteTitle": "永久删除？",
     "permanentDeleteDescription": "此操作无法撤销。"
+  },
+  "presenter": {
+    "noMediaSelected": "未选择媒体",
+    "grid": "网格",
+    "zoom": "缩放",
+    "next": "下一张",
+    "prev": "上一张",
+    "endOfSlides": "投影结束",
+    "noPreview": "无预览",
+    "notes": "备注",
+    "notesPlaceholder": "添加备注...",
+    "loading": "加载中...",
+    "imageLoadFailed": "无法加载图片",
+    "videoLoadFailed": "无法加载视频",
+    "pdfLoadFailed": "无法加载 PDF"
   }
 }

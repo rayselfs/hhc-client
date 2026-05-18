@@ -76,7 +76,7 @@ export default function VideoPreview({ item }: VideoPreviewProps) {
   if (error) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-black">
-        <div className="text-white/50 text-center">無法載入影片</div>
+        <div className="text-white/50 text-center">{t('presenter.videoLoadFailed')}</div>
       </div>
     )
   }

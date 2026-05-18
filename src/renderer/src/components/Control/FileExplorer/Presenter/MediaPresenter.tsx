@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
 import { useTimerRuntimeStore } from '@renderer/stores/timer-runtime'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
@@ -14,6 +15,7 @@ import PresenterSidebar from './PresenterSidebar'
 import PresenterGrid from './PresenterGrid'
 
 export default function MediaPresenter() {
+  const { t } = useTranslation()
   const { claimProjection, blankProjection } = useProjection()
   const [clock, setClock] = useState(() => new Date().toLocaleTimeString())
 
@@ -141,7 +143,7 @@ export default function MediaPresenter() {
               )}
               {!mediaType && (
                 <div className="text-white/50 text-center w-full h-full flex items-center justify-center">
-                  No media selected
+                  {t('presenter.noMediaSelected')}
                 </div>
               )}
             </div>
@@ -153,13 +155,13 @@ export default function MediaPresenter() {
               className={`text-sm px-2 py-1 rounded ${showGrid ? 'bg-white/20 text-white' : 'text-white/50 hover:text-white'}`}
               onClick={() => toggleGrid()}
             >
-              G Grid
+              G {t('presenter.grid')}
             </button>
             <button
               className={`text-sm px-2 py-1 rounded ${zoomLevel > 1 ? 'bg-white/20 text-white' : 'text-white/50 hover:text-white'}`}
               onClick={() => (zoomLevel > 1 ? resetZoom() : setZoomLevel(2))}
             >
-              Z Zoom
+              Z {t('presenter.zoom')}
             </button>
             {zoomLevel > 1 && (
               <span className="text-white/70 text-sm">{zoomLevel}x</span>

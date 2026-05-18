@@ -171,13 +171,13 @@ export default function PdfPreview({ item }: PdfPreviewProps) {
   }, [pageCount])
 
   if (loading) {
-    return <div className="w-full h-full flex items-center justify-center text-white/50">Loading...</div>
+    return <div className="w-full h-full flex items-center justify-center text-white/50">{t('presenter.loading')}</div>
   }
 
   if (error || !pdfDoc) {
     return (
       <div className="w-full h-full flex items-center justify-center text-white/50">
-        無法載入 PDF
+        {t('presenter.pdfLoadFailed')}
       </div>
     )
   }

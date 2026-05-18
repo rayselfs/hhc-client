@@ -95,7 +95,7 @@ export default function ImagePreview({ item }: ImagePreviewProps) {
   if (loading) {
     return (
       <div className="w-full h-full flex items-center justify-center text-white/50">
-        Loading...
+        {t('presenter.loading')}
       </div>
     )
   }
@@ -103,7 +103,7 @@ export default function ImagePreview({ item }: ImagePreviewProps) {
   if (error || !imgSrc) {
     return (
       <div className="w-full h-full flex items-center justify-center text-white/50">
-        無法載入圖片
+        {t('presenter.imageLoadFailed')}
       </div>
     )
   }

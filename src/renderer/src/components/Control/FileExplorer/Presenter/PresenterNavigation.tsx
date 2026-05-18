@@ -1,6 +1,8 @@
+import { useTranslation } from 'react-i18next'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 
 export default function PresenterNavigation() {
+  const { t } = useTranslation()
   const canNext = useMediaProjectionStore((s) => s.canNext())
   const canPrev = useMediaProjectionStore((s) => s.canPrev())
   const progress = useMediaProjectionStore((s) => s.progress())
@@ -14,7 +16,7 @@ export default function PresenterNavigation() {
         onClick={() => prev()}
         disabled={!canPrev}
       >
-        ← Prev
+        ← {t('presenter.prev')}
       </button>
 
       <span className="text-white/70 text-sm font-mono">{progress}</span>
@@ -24,7 +26,7 @@ export default function PresenterNavigation() {
         onClick={() => next()}
         disabled={!canNext}
       >
-        Next →
+        {t('presenter.next')} →
       </button>
     </div>
   )

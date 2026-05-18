@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 import { useThumbnails } from '@renderer/hooks/useThumbnails'
 
 export default function PresenterSidebar() {
+  const { t } = useTranslation()
   const nextItem = useMediaProjectionStore((s) => s.nextItem())
   const currentItem = useMediaProjectionStore((s) => s.currentItem())
   const updateNotes = useMediaProjectionStore((s) => s.updateNotes)
@@ -27,10 +29,10 @@ export default function PresenterSidebar() {
   return (
     <div className="flex flex-col h-full bg-black/50 border-l border-white/10">
       <div className="p-3 border-b border-white/10">
-        <div className="text-white/50 text-xs uppercase tracking-wide mb-2">Next</div>
+        <div className="text-white/50 text-xs uppercase tracking-wide mb-2">{t('presenter.next')}</div>
         <div className="aspect-video bg-black/50 rounded overflow-hidden flex items-center justify-center">
           {nextItem === null && (
-            <span className="text-white/50 text-sm">投影結束</span>
+            <span className="text-white/50 text-sm">{t('presenter.endOfSlides')}</span>
           )}
           {nextItem && nextThumbnail && (
             <img
@@ -40,7 +42,7 @@ export default function PresenterSidebar() {
             />
           )}
           {nextItem && !nextThumbnail && (
-            <span className="text-white/30 text-xs">No preview</span>
+            <span className="text-white/30 text-xs">{t('presenter.noPreview')}</span>
           )}
         </div>
         {nextItem && (
@@ -49,12 +51,12 @@ export default function PresenterSidebar() {
       </div>
 
       <div className="flex-1 flex flex-col p-3">
-        <div className="text-white/50 text-xs uppercase tracking-wide mb-2">Notes</div>
+        <div className="text-white/50 text-xs uppercase tracking-wide mb-2">{t('presenter.notes')}</div>
         <textarea
           className="flex-1 bg-black/30 text-white/90 text-sm rounded p-2 resize-none border border-white/10 focus:outline-none focus:border-white/30"
           value={notes}
           onChange={(e) => handleNotesChange(e.target.value)}
-          placeholder="Add notes..."
+          placeholder={t('presenter.notesPlaceholder')}
         />
       </div>
     </div>
