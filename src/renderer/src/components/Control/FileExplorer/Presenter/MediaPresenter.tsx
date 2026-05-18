@@ -5,6 +5,7 @@ import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 import { useKeyboardShortcuts } from '@renderer/hooks/useKeyboardShortcuts'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
 import { getMediaType } from '@renderer/lib/presentability'
+import { useMediaProjectionSync } from '@renderer/lib/media-projection-sync'
 import ImagePreview from './ImagePreview'
 import VideoPreview from './VideoPreview'
 import PdfPreview from './PdfPreview'
@@ -15,6 +16,8 @@ import PresenterGrid from './PresenterGrid'
 export default function MediaPresenter() {
   const { claimProjection, blankProjection } = useProjection()
   const [clock, setClock] = useState(() => new Date().toLocaleTimeString())
+
+  useMediaProjectionSync()
 
   const playlist = useMediaProjectionStore((s) => s.playlist)
   const showGrid = useMediaProjectionStore((s) => s.showGrid)
