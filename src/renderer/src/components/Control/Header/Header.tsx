@@ -28,6 +28,8 @@ import {
   useFavoritesExplorerSettings,
   useTrashExplorerSettings
 } from '@renderer/stores/file-explorer'
+import { getPresentableItems } from '@renderer/lib/presentability'
+import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 
 export default function Header(): React.JSX.Element {
   const { t } = useTranslation()
@@ -191,7 +193,20 @@ export default function Header(): React.JSX.Element {
             isIconOnly
             variant="outline"
             className={isProjectionBlanked ? 'text-default-foreground px-6' : 'text-danger px-6'}
-            onPress={() => blankProjection(!isProjectionBlanked)}
+            onPress={() => {
+              if (isProjectionBlanked && showFilesControls) {
+                const state = useFileExplorerStore.getState()
+                const items = state._itemsArray.filter(
+                  (item) => item.parentId === state.currentFolderId && !item.deletedAt
+                )
+                const presentable = getPresentableItems(items)
+                if (presentable.length > 0) {
+                  useMediaProjectionStore.getState().startPresentation(presentable, 0)
+                  return
+                }
+              }
+              blankProjection(!isProjectionBlanked)
+            }}
             isDisabled={!isProjectionOpen}
             aria-label={t(isProjectionBlanked ? 'projection.showButton' : 'projection.blankButton')}
           >

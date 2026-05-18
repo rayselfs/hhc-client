@@ -22,10 +22,13 @@ import type { ClipboardState } from '@renderer/components/Control/FileExplorer'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
 import { getThumbnail, saveThumbnail } from '@renderer/lib/thumbnail-db'
 import { openFileExplorerDB, getFileBlob, storeFileBlob } from '@renderer/lib/file-explorer-db'
+import MediaPresenter from '@renderer/components/Control/FileExplorer/Presenter/MediaPresenter'
+import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 
 export default function FilesPage(): React.JSX.Element {
   const { t } = useTranslation()
   const confirm = useConfirm()
+  const isPresenting = useMediaProjectionStore((s) => s.isPresenting)
   const currentFolderId = useFileExplorerStore((state) => state.currentFolderId)
   const itemsArray = useFileExplorerStore((state) => state._itemsArray)
   const foldersArray = useFileExplorerStore((state) => state._foldersArray)
@@ -403,6 +406,7 @@ export default function FilesPage(): React.JSX.Element {
         isRetentionLocked={editingIsFavorited}
         hideDuration={editingHideDuration}
       />
+      {isPresenting && <MediaPresenter />}
     </>
   )
 }

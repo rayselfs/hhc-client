@@ -40,6 +40,8 @@ import { getFileIcon } from './views/getFileIcon'
 import { GridView, ListView, type GridViewItem } from './views'
 import type { SearchResult } from '@renderer/lib/file-explorer-search'
 import { formatFileKind } from '@renderer/lib/format-file-kind'
+import { isPresentable, getPresentableItems } from '@renderer/lib/presentability'
+import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 import type { SortField } from '@renderer/stores/file-explorer'
 
 export interface FileBrowserProps {
@@ -498,9 +500,20 @@ export function FileBrowser({
     (itemId: string, event: React.MouseEvent): void => {
       event.stopPropagation()
       const item = sortedItems.find((entry) => entry.id === itemId)
-      if (item?.isFolder) void navigateToFolder(itemId)
+      if (item?.isFolder) {
+        void navigateToFolder(itemId)
+        return
+      }
+      const file = fileItems.find((entry) => entry.id === itemId)
+      if (file && isPresentable(file.mimeType)) {
+        const presentable = getPresentableItems(fileItems)
+        const idx = presentable.findIndex((f) => f.id === itemId)
+        if (idx !== -1) {
+          useMediaProjectionStore.getState().startPresentation(presentable, idx)
+        }
+      }
     },
-    [sortedItems, navigateToFolder]
+    [sortedItems, fileItems, navigateToFolder]
   )
 
   const handleDeleteSelected = useCallback(async (): Promise<void> => {
@@ -556,6 +569,31 @@ export function FileBrowser({
       {
         config: SHORTCUTS.EDIT.DELETE_ALT,
         handler: () => void handleDeleteSelected(),
+        preventDefault: true
+      },
+      {
+        config: SHORTCUTS.MEDIA.START_PRESENTATION,
+        handler: () => {
+          const presentable = getPresentableItems(fileItems)
+          if (presentable.length > 0) {
+            useMediaProjectionStore.getState().startPresentation(presentable, 0)
+          }
+        },
+        preventDefault: true
+      },
+      {
+        config: SHORTCUTS.MEDIA.START_FROM_CURRENT,
+        handler: () => {
+          const presentable = getPresentableItems(fileItems)
+          if (presentable.length === 0) return
+          const firstSelected = [...selectedIds].find((id) =>
+            presentable.some((f) => f.id === id)
+          )
+          const idx = firstSelected
+            ? presentable.findIndex((f) => f.id === firstSelected)
+            : 0
+          useMediaProjectionStore.getState().startPresentation(presentable, Math.max(0, idx))
+        },
         preventDefault: true
       }
     ],
