@@ -36,7 +36,9 @@ export default function ProjectionPage(): React.JSX.Element {
     })
 
     const unsubActiveOwner = adapter.on('__system:active-owner', ({ owner }) => {
-      setActiveContent(owner === 'bible' ? 'bible' : 'timer')
+      if (owner === 'bible') setActiveContent('bible')
+      else if (owner === 'media') setActiveContent('file')
+      else setActiveContent('timer')
     })
 
     const unsubTimerTick = adapter.on('timer:tick', (data) => {
