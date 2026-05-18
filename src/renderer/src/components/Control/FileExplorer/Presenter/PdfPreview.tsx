@@ -160,8 +160,24 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
   }, [pdfDoc, pdfViewMode, pageCount])
 
   useEffect(() => {
-    const handleNext = (): void => setCurrentPage((p) => Math.min(p + 1, pageCount))
-    const handlePrev = (): void => setCurrentPage((p) => Math.max(p - 1, 1))
+    const handleNext = (): void => {
+      setCurrentPage((p) => {
+        const next = Math.min(p + 1, pageCount)
+        window.dispatchEvent(
+          new CustomEvent('media:pdfPageChanged', { detail: { page: next } })
+        )
+        return next
+      })
+    }
+    const handlePrev = (): void => {
+      setCurrentPage((p) => {
+        const prev = Math.max(p - 1, 1)
+        window.dispatchEvent(
+          new CustomEvent('media:pdfPageChanged', { detail: { page: prev } })
+        )
+        return prev
+      })
+    }
     window.addEventListener('media:pdfNextPage', handleNext)
     window.addEventListener('media:pdfPrevPage', handlePrev)
     return () => {

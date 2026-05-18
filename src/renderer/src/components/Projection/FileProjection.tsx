@@ -102,7 +102,10 @@ export default function FileProjection({
   const handleControl = useCallback((data: FileControlPayload) => {
     switch (data.action) {
       case 'play':
-        videoRef.current?.play()
+        if (videoRef.current) {
+          videoRef.current.muted = false
+          videoRef.current.play().catch(() => {})
+        }
         break
       case 'pause':
         videoRef.current?.pause()
@@ -204,7 +207,7 @@ export default function FileProjection({
           ref={videoRef}
           src={objectUrl}
           className="max-h-full max-w-full object-contain"
-          autoPlay
+          muted
         />
       </div>
     )

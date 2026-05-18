@@ -72,22 +72,15 @@ export function useMediaProjectionSync(): void {
   }, [send])
 
   useEffect(() => {
-    let pdfPage = 1
-
-    const onNext = (): void => {
-      pdfPage++
-      send('file:control', { action: 'pdfPage', value: pdfPage })
-    }
-    const onPrev = (): void => {
-      pdfPage = Math.max(1, pdfPage - 1)
-      send('file:control', { action: 'pdfPage', value: pdfPage })
+    const onPageChanged = (e: Event): void => {
+      const detail = (e as CustomEvent<{ page: number }>).detail
+      if (!detail || typeof detail.page !== 'number') return
+      send('file:control', { action: 'pdfPage', value: detail.page })
     }
 
-    window.addEventListener('media:pdfNextPage', onNext)
-    window.addEventListener('media:pdfPrevPage', onPrev)
+    window.addEventListener('media:pdfPageChanged', onPageChanged)
     return () => {
-      window.removeEventListener('media:pdfNextPage', onNext)
-      window.removeEventListener('media:pdfPrevPage', onPrev)
+      window.removeEventListener('media:pdfPageChanged', onPageChanged)
     }
   }, [send])
 
