@@ -8,6 +8,8 @@ type FileControlPayload = AppMessages['file:control']
 
 type FileProjectionProps = {
   fileName?: string
+  initialFileId?: string
+  initialMimeType?: string
 }
 
 type PdfState = {
@@ -16,7 +18,7 @@ type PdfState = {
   viewMode: 'single' | 'continuous'
 }
 
-export default function FileProjection({ fileName }: FileProjectionProps): React.JSX.Element {
+export default function FileProjection({ fileName, initialFileId, initialMimeType }: FileProjectionProps): React.JSX.Element {
   const [objectUrl, setObjectUrl] = useState<string | null>(null)
   const [mimeType, setMimeType] = useState<string | null>(null)
   const [zoom, setZoom] = useState(1)
@@ -143,6 +145,12 @@ export default function FileProjection({ fileName }: FileProjectionProps): React
       adapter.dispose()
     }
   }, [loadFile, handleControl])
+
+  useEffect(() => {
+    if (initialFileId && initialMimeType) {
+      loadFile(initialFileId, initialMimeType)
+    }
+  }, [])
 
   useEffect(() => {
     return () => {

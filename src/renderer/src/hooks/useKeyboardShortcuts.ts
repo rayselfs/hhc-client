@@ -51,6 +51,17 @@ export function matchesConfig(event: KeyboardEvent, config: ShortcutConfig): boo
     if (!event.metaKey && !event.ctrlKey) return false
   }
 
+  // Reject modified keypresses when shortcut doesn't expect modifiers
+  if (!resolved.metaOrCtrl && resolved.ctrl === undefined && resolved.meta === undefined) {
+    if (event.ctrlKey || event.metaKey) return false
+  }
+  if (resolved.shift === undefined) {
+    if (event.shiftKey) return false
+  }
+  if (resolved.alt === undefined) {
+    if (event.altKey) return false
+  }
+
   if (event.code !== resolved.code) return false
 
   return true

@@ -82,16 +82,7 @@ export default function VideoPreview({ item }: VideoPreviewProps) {
   }
 
   const handlePlayPause = () => {
-    if (!videoRef.current) return
-    if (videoRef.current.paused) {
-      videoRef.current
-        .play()
-        .then(() => setIsPlaying(true))
-        .catch(() => {})
-    } else {
-      videoRef.current.pause()
-      setIsPlaying(false)
-    }
+    window.dispatchEvent(new CustomEvent('media:togglePlay'))
   }
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -99,6 +90,7 @@ export default function VideoPreview({ item }: VideoPreviewProps) {
     const time = Number(e.target.value)
     videoRef.current.currentTime = time
     setCurrentTime(time)
+    window.dispatchEvent(new CustomEvent('media:seek', { detail: { time } }))
   }
 
   return (

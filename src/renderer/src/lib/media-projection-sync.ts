@@ -33,7 +33,8 @@ export function useMediaProjectionSync(): void {
     const unsub = useMediaProjectionStore.subscribe((state, prev) => {
       if (!state.isPresenting) return
       if (state.pdfViewMode !== prev.pdfViewMode) {
-        send('file:control', { action: 'pdfViewMode', value: state.pdfViewMode })
+        const viewModeValue = state.pdfViewMode === 'slide' ? 'single' : 'continuous'
+        send('file:control', { action: 'pdfViewMode', value: viewModeValue })
       }
     })
     return unsub

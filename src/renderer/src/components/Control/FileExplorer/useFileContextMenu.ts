@@ -43,23 +43,25 @@ export const useFileContextMenu = createFolderContextMenu({
     ]
   },
   extraFolderActions: (folder, t) => {
-    const { toggleFavorite } = useFileExplorerStore.getState()
+    const { toggleFavorite, getItems } = useFileExplorerStore.getState()
     const isFavorited = folder.isFavorited ?? false
-    return [
-      'separator',
-      {
+    const folderItems = getItems(folder.id)
+    const presentableFiles = getPresentableItems(folderItems)
+    const actions: Array<'separator' | { id: string; label: string; icon: React.ReactElement; onAction: () => void }> = []
+
+    if (presentableFiles.length > 0) {
+      actions.push('separator', {
         id: 'project',
         label: t('fileExplorer.contextMenu.project'),
         icon: React.createElement(Play, { size: 14 }),
         onAction: () => {
-          const { getItems } = useFileExplorerStore.getState()
-          const allItems = getItems(folder.id)
-          const presentableFiles = getPresentableItems(allItems)
-          if (presentableFiles.length > 0) {
-            useMediaProjectionStore.getState().startPresentation(presentableFiles, 0)
-          }
+          useMediaProjectionStore.getState().startPresentation(presentableFiles, 0)
         }
-      },
+      })
+    }
+
+    actions.push(
+      ...(actions.length === 0 ? ['separator' as const] : []),
       {
         id: isFavorited ? 'remove-favorite' : 'add-favorite',
         label: t(
@@ -70,6 +72,8 @@ export const useFileContextMenu = createFolderContextMenu({
         icon: React.createElement(isFavorited ? StarOff : Star, { size: 14 }),
         onAction: () => toggleFavorite(folder.id)
       }
-    ]
+    )
+
+    return actions
   }
 })
