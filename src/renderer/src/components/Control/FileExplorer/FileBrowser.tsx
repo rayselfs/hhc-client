@@ -16,6 +16,7 @@ import {
 import { SortableContext, arrayMove, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Folder, Upload } from 'lucide-react'
+import { toast } from '@heroui/react/toast'
 import { useTranslation } from 'react-i18next'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
@@ -510,6 +511,8 @@ export function FileBrowser({
         const idx = presentable.findIndex((f) => f.id === itemId)
         if (idx !== -1) {
           useMediaProjectionStore.getState().startPresentation(presentable, idx)
+        } else {
+          toast.warning(t('fileExplorer.noProjectableFiles'))
         }
       }
     },
@@ -577,6 +580,8 @@ export function FileBrowser({
           const presentable = getPresentableItems(fileItems)
           if (presentable.length > 0) {
             useMediaProjectionStore.getState().startPresentation(presentable, 0)
+          } else {
+            toast.warning(t('fileExplorer.noProjectableFiles'))
           }
         },
         preventDefault: true
@@ -585,7 +590,10 @@ export function FileBrowser({
         config: SHORTCUTS.MEDIA.START_FROM_CURRENT,
         handler: () => {
           const presentable = getPresentableItems(fileItems)
-          if (presentable.length === 0) return
+          if (presentable.length === 0) {
+            toast.warning(t('fileExplorer.noProjectableFiles'))
+            return
+          }
           const firstSelected = [...selectedIds].find((id) =>
             presentable.some((f) => f.id === id)
           )

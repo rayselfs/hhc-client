@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
+import { toast } from '@heroui/react/toast'
+import { useTranslation } from 'react-i18next'
 import type { FileItemRecord } from '@shared/types/folder'
 import { openFileExplorerDB, getFileBlob } from '@renderer/lib/file-explorer-db'
+import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 
 interface VideoPreviewProps {
   item: FileItemRecord
@@ -13,6 +16,7 @@ function formatTime(seconds: number): string {
 }
 
 export default function VideoPreview({ item }: VideoPreviewProps) {
+  const { t } = useTranslation()
   const videoRef = useRef<HTMLVideoElement>(null)
   const [videoSrc, setVideoSrc] = useState<string | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
@@ -30,6 +34,13 @@ export default function VideoPreview({ item }: VideoPreviewProps) {
       if (cancelled) return
       if (!blob) {
         setError(true)
+        toast.warning(t('fileExplorer.blobLoadFailed'))
+        const store = useMediaProjectionStore.getState()
+        if (store.canNext()) {
+          store.next()
+        } else {
+          store.exit()
+        }
         return
       }
       objectUrl = URL.createObjectURL(blob)

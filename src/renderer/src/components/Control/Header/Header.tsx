@@ -203,6 +203,9 @@ export default function Header(): React.JSX.Element {
                 if (presentable.length > 0) {
                   useMediaProjectionStore.getState().startPresentation(presentable, 0)
                   return
+                } else {
+                  toast.warning(t('fileExplorer.noProjectableFiles'))
+                  return
                 }
               }
               blankProjection(!isProjectionBlanked)

@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { toast } from '@heroui/react/toast'
+import { useTranslation } from 'react-i18next'
 import type { FileItemRecord } from '@shared/types/folder'
 import { openFileExplorerDB, getFileBlob } from '@renderer/lib/file-explorer-db'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
@@ -8,6 +10,7 @@ interface ImagePreviewProps {
 }
 
 export default function ImagePreview({ item }: ImagePreviewProps) {
+  const { t } = useTranslation()
   const [imgSrc, setImgSrc] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -32,6 +35,13 @@ export default function ImagePreview({ item }: ImagePreviewProps) {
       if (!blob) {
         setError(true)
         setLoading(false)
+        toast.warning(t('fileExplorer.blobLoadFailed'))
+        const store = useMediaProjectionStore.getState()
+        if (store.canNext()) {
+          store.next()
+        } else {
+          store.exit()
+        }
         return
       }
       objectUrl = URL.createObjectURL(blob)

@@ -461,7 +461,9 @@
       "project": "Project",
       "restore": "Restore",
       "permanentDelete": "Delete Permanently"
-    }
+    },
+    "noProjectableFiles": "No presentable files found",
+    "blobLoadFailed": "Failed to load file, skipping"
   },
   "projection": {
     "showButton": "Show projection",

@@ -461,7 +461,9 @@
       "project": "投影",
       "restore": "還原",
       "permanentDelete": "永久刪除"
-    }
+    },
+    "noProjectableFiles": "沒有可投影的檔案",
+    "blobLoadFailed": "檔案載入失敗，已跳過"
   },
   "projection": {
     "showButton": "顯示投影",

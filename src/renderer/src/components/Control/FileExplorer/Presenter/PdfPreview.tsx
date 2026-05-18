@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { toast } from '@heroui/react/toast'
+import { useTranslation } from 'react-i18next'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import type { FileItemRecord } from '@shared/types/folder'
 import { openFileExplorerDB, getFileBlob } from '@renderer/lib/file-explorer-db'
@@ -47,6 +49,7 @@ async function renderPage(
 }
 
 export default function PdfPreview({ item }: PdfPreviewProps) {
+  const { t } = useTranslation()
   const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageCount, setPageCount] = useState(0)
@@ -71,8 +74,17 @@ export default function PdfPreview({ item }: PdfPreviewProps) {
         const db = await openFileExplorerDB()
         const blob = await getFileBlob(db, item.id)
         if (cancelled || !blob) {
-          setError(true)
-          setLoading(false)
+          if (!cancelled) {
+            setError(true)
+            setLoading(false)
+            toast.warning(t('fileExplorer.blobLoadFailed'))
+            const store = useMediaProjectionStore.getState()
+            if (store.canNext()) {
+              store.next()
+            } else {
+              store.exit()
+            }
+          }
           return
         }
 
@@ -92,6 +104,13 @@ export default function PdfPreview({ item }: PdfPreviewProps) {
         if (!cancelled) {
           setError(true)
           setLoading(false)
+          toast.warning(t('fileExplorer.blobLoadFailed'))
+          const store = useMediaProjectionStore.getState()
+          if (store.canNext()) {
+            store.next()
+          } else {
+            store.exit()
+          }
         }
       }
     }
