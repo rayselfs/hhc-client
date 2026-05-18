@@ -1,0 +1,187 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { useMediaProjectionStore } from '@renderer/stores/media-projection'
+import type { FileItemRecord } from '@shared/types/folder'
+
+function makeFile(id: string, name: string, mimeType = 'image/png'): FileItemRecord {
+  return {
+    id,
+    name,
+    mimeType,
+    type: 'file',
+    sortIndex: 0,
+    parentId: 'root',
+    size: 1024,
+    url: `https://example.com/${id}`,
+    createdAt: Date.now(),
+    expiresAt: null
+  }
+}
+
+const files = [makeFile('a', 'a.png'), makeFile('b', 'b.png'), makeFile('c', 'c.png')]
+
+beforeEach(() => {
+  useMediaProjectionStore.setState({
+    playlist: [],
+    currentIndex: 0,
+    isPresenting: false,
+    showGrid: false,
+    pdfViewMode: 'slide',
+    zoomLevel: 1
+  })
+})
+
+describe('startPresentation', () => {
+  it('sets playlist, currentIndex, and isPresenting', () => {
+    useMediaProjectionStore.getState().startPresentation(files, 2)
+    const s = useMediaProjectionStore.getState()
+    expect(s.playlist).toEqual(files)
+    expect(s.currentIndex).toBe(2)
+    expect(s.isPresenting).toBe(true)
+  })
+})
+
+describe('exit', () => {
+  it('resets all state', () => {
+    useMediaProjectionStore.getState().startPresentation(files, 1)
+    useMediaProjectionStore.getState().exit()
+    const s = useMediaProjectionStore.getState()
+    expect(s.isPresenting).toBe(false)
+    expect(s.playlist).toEqual([])
+    expect(s.currentIndex).toBe(0)
+    expect(s.showGrid).toBe(false)
+  })
+})
+
+describe('next / prev', () => {
+  beforeEach(() => {
+    useMediaProjectionStore.getState().startPresentation(files, 0)
+  })
+
+  it('next() increments index', () => {
+    useMediaProjectionStore.getState().next()
+    expect(useMediaProjectionStore.getState().currentIndex).toBe(1)
+  })
+
+  it('next() stops at end', () => {
+    useMediaProjectionStore.setState({ currentIndex: 2 })
+    useMediaProjectionStore.getState().next()
+    expect(useMediaProjectionStore.getState().currentIndex).toBe(2)
+  })
+
+  it('prev() decrements index', () => {
+    useMediaProjectionStore.setState({ currentIndex: 2 })
+    useMediaProjectionStore.getState().prev()
+    expect(useMediaProjectionStore.getState().currentIndex).toBe(1)
+  })
+
+  it('prev() stops at start', () => {
+    useMediaProjectionStore.getState().prev()
+    expect(useMediaProjectionStore.getState().currentIndex).toBe(0)
+  })
+})
+
+describe('canNext / canPrev', () => {
+  it('canNext is false at last index', () => {
+    useMediaProjectionStore.getState().startPresentation(files, 2)
+    expect(useMediaProjectionStore.getState().canNext()).toBe(false)
+  })
+
+  it('canPrev is false at first index', () => {
+    useMediaProjectionStore.getState().startPresentation(files, 0)
+    expect(useMediaProjectionStore.getState().canPrev()).toBe(false)
+  })
+
+  it('canNext is true when not at end', () => {
+    useMediaProjectionStore.getState().startPresentation(files, 0)
+    expect(useMediaProjectionStore.getState().canNext()).toBe(true)
+  })
+
+  it('canPrev is true when not at start', () => {
+    useMediaProjectionStore.getState().startPresentation(files, 2)
+    expect(useMediaProjectionStore.getState().canPrev()).toBe(true)
+  })
+})
+
+describe('jumpTo', () => {
+  it('sets currentIndex', () => {
+    useMediaProjectionStore.getState().startPresentation(files, 0)
+    useMediaProjectionStore.getState().jumpTo(2)
+    expect(useMediaProjectionStore.getState().currentIndex).toBe(2)
+  })
+
+  it('clamps to valid range', () => {
+    useMediaProjectionStore.getState().startPresentation(files, 0)
+    useMediaProjectionStore.getState().jumpTo(99)
+    expect(useMediaProjectionStore.getState().currentIndex).toBe(2)
+    useMediaProjectionStore.getState().jumpTo(-5)
+    expect(useMediaProjectionStore.getState().currentIndex).toBe(0)
+  })
+})
+
+describe('toggleGrid', () => {
+  it('toggles showGrid', () => {
+    expect(useMediaProjectionStore.getState().showGrid).toBe(false)
+    useMediaProjectionStore.getState().toggleGrid()
+    expect(useMediaProjectionStore.getState().showGrid).toBe(true)
+    useMediaProjectionStore.getState().toggleGrid()
+    expect(useMediaProjectionStore.getState().showGrid).toBe(false)
+  })
+})
+
+describe('progress', () => {
+  it('returns "0 / 0" for empty playlist', () => {
+    expect(useMediaProjectionStore.getState().progress()).toBe('0 / 0')
+  })
+
+  it('returns "1 / 3" format', () => {
+    useMediaProjectionStore.getState().startPresentation(files, 0)
+    expect(useMediaProjectionStore.getState().progress()).toBe('1 / 3')
+  })
+
+  it('returns "3 / 3" at last item', () => {
+    useMediaProjectionStore.getState().startPresentation(files, 2)
+    expect(useMediaProjectionStore.getState().progress()).toBe('3 / 3')
+  })
+})
+
+describe('currentItem / nextItem / prevItem', () => {
+  it('currentItem returns correct file', () => {
+    useMediaProjectionStore.getState().startPresentation(files, 1)
+    expect(useMediaProjectionStore.getState().currentItem()).toEqual(files[1])
+  })
+
+  it('nextItem returns next file', () => {
+    useMediaProjectionStore.getState().startPresentation(files, 1)
+    expect(useMediaProjectionStore.getState().nextItem()).toEqual(files[2])
+  })
+
+  it('prevItem returns previous file', () => {
+    useMediaProjectionStore.getState().startPresentation(files, 1)
+    expect(useMediaProjectionStore.getState().prevItem()).toEqual(files[0])
+  })
+
+  it('currentItem returns null for empty playlist', () => {
+    expect(useMediaProjectionStore.getState().currentItem()).toBeNull()
+  })
+
+  it('nextItem returns null at end', () => {
+    useMediaProjectionStore.getState().startPresentation(files, 2)
+    expect(useMediaProjectionStore.getState().nextItem()).toBeNull()
+  })
+
+  it('prevItem returns null at start', () => {
+    useMediaProjectionStore.getState().startPresentation(files, 0)
+    expect(useMediaProjectionStore.getState().prevItem()).toBeNull()
+  })
+})
+
+describe('updateNotes', () => {
+  it('calls useFileExplorerStore.updateItem', async () => {
+    const { useFileExplorerStore } = await import('@renderer/stores/file-explorer')
+    const mockUpdateItem = vi.fn()
+    useFileExplorerStore.setState({ updateItem: mockUpdateItem } as any)
+
+    useMediaProjectionStore.getState().updateNotes('a', 'hello')
+    expect(mockUpdateItem).toHaveBeenCalledWith('a', { notes: 'hello' })
+  })
+})
