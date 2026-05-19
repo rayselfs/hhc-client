@@ -10,6 +10,18 @@ export async function loadPdfjsLib(): Promise<typeof import('pdfjs-dist')> {
     })
   }
 
+  if (!('sumPrecise' in Math)) {
+    Object.defineProperty(Math, 'sumPrecise', {
+      value(iter: Iterable<number>): number {
+        let sum = 0
+        for (const n of iter) sum += n
+        return sum
+      },
+      configurable: true,
+      writable: true
+    })
+  }
+
   const pdfjsLib = await import('pdfjs-dist')
   pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
     'pdfjs-dist/build/pdf.worker.mjs',
