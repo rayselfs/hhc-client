@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { X, LayoutGrid, ZoomIn, ArrowUp, ArrowDown, ArrowLeft, ArrowRight } from 'lucide-react'
+import { LayoutGrid, ZoomIn, ArrowUp, ArrowDown, ArrowLeft, ArrowRight } from 'lucide-react'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
 import { useTimerRuntimeStore } from '@renderer/stores/timer-runtime'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
@@ -12,35 +12,20 @@ import { setPresenterActive } from '@renderer/lib/shortcut-registry'
 import ImagePreview from './ImagePreview'
 import VideoPreview from './VideoPreview'
 import PdfPreview from './PdfPreview'
+import PresenterHeader from './PresenterHeader'
 import PresenterNavigation from './PresenterNavigation'
 import PresenterSidebar from './PresenterSidebar'
 import PresenterGrid from './PresenterGrid'
 import GlassDivider from '@renderer/components/Common/GlassDivider'
-
-function formatElapsed(seconds: number): string {
-  const h = Math.floor(seconds / 3600)
-  const m = Math.floor((seconds % 3600) / 60)
-  const s = seconds % 60
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-}
-
-function formatClock(date: Date): string {
-  const h = String(date.getHours()).padStart(2, '0')
-  const m = String(date.getMinutes()).padStart(2, '0')
-  const s = String(date.getSeconds()).padStart(2, '0')
-  return `${h}:${m}:${s}`
-}
 
 const PAN_STEP = 0.05
 
 export default function MediaPresenter(): React.JSX.Element {
   const { t } = useTranslation()
   const { claimProjection, blankProjection } = useProjection()
-  const [elapsed, setElapsed] = useState(0)
   const [showZoomInput, setShowZoomInput] = useState(false)
   const [zoomInputValue, setZoomInputValue] = useState('')
   const [hasZoomError, setHasZoomError] = useState(false)
-  const [clockTime, setClockTime] = useState(() => new Date())
 
   const previewBoxRef = useRef<HTMLDivElement>(null)
   const isDraggingRef = useRef(false)
@@ -76,20 +61,6 @@ export default function MediaPresenter(): React.JSX.Element {
     return () => {
       setPresenterActive(false)
     }
-  }, [])
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setElapsed((s) => s + 1)
-    }, 1000)
-    return () => clearInterval(interval)
-  }, [])
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setClockTime(new Date())
-    }, 1000)
-    return () => clearInterval(interval)
   }, [])
 
   useEffect(() => {
@@ -204,19 +175,7 @@ export default function MediaPresenter(): React.JSX.Element {
     >
       <div className="flex h-full">
         <div className="flex-[3] min-w-0 flex flex-col h-full">
-          <div className="flex items-center justify-between px-3 py-2 shrink-0">
-            <div className="flex items-center gap-2">
-              <button
-                className="text-white/70 hover:text-white p-1 rounded"
-                onClick={() => exit()}
-                aria-label={t('common.close')}
-              >
-                <X size={20} />
-              </button>
-              <span className="text-white/70 text-base font-mono">{formatElapsed(elapsed)}</span>
-            </div>
-            <span className="text-white/70 text-base font-mono">{formatClock(clockTime)}</span>
-          </div>
+          <PresenterHeader onExit={exit} />
 
           <div
             ref={previewBoxRef}
