@@ -11,28 +11,7 @@ interface PdfPreviewProps {
   item: FileItemRecord
 }
 
-async function ensurePdfjsPolyfill(): Promise<void> {
-  if (!('getOrInsertComputed' in Map.prototype)) {
-    Object.defineProperty(Map.prototype, 'getOrInsertComputed', {
-      value<K, V>(this: Map<K, V>, key: K, factory: (key: K) => V): V {
-        if (!this.has(key)) this.set(key, factory(key))
-        return this.get(key)!
-      },
-      configurable: true,
-      writable: true
-    })
-  }
-}
-
-async function loadPdfjsLib(): Promise<typeof import('pdfjs-dist')> {
-  await ensurePdfjsPolyfill()
-  const pdfjsLib = await import('pdfjs-dist')
-  pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-    'pdfjs-dist/build/pdf.worker.mjs',
-    import.meta.url
-  ).href
-  return pdfjsLib
-}
+import { loadPdfjsLib } from '@renderer/lib/pdfjs-loader'
 
 async function renderPage(
   pdf: PDFDocumentProxy,

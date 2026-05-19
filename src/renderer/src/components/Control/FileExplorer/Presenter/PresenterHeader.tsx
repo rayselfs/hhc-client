@@ -46,7 +46,6 @@ export default function PresenterHeader({ onExit }: PresenterHeaderProps): React
         <Button
           variant="ghost"
           isIconOnly
-          size="sm"
           onPress={onExit}
           aria-label={t('common.close')}
           className="text-white/70 hover:text-white"

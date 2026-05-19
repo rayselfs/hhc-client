@@ -189,7 +189,7 @@ export default function MediaPresenter(): React.JSX.Element {
             onMouseUp={handlePanEnd}
             onMouseLeave={handlePanEnd}
           >
-            <div className="aspect-video w-full overflow-hidden relative">
+            <div className="aspect-video w-full overflow-hidden relative rounded border border-white/20">
               {mediaType === 'image' && currentItem && <ImagePreview item={currentItem} />}
               {mediaType === 'video' && currentItem && <VideoPreview item={currentItem} />}
               {mediaType === 'pdf' && currentItem && <PdfPreview item={currentItem} />}

@@ -1,6 +1,6 @@
 const DB_NAME = 'hhc-thumbnails'
 const STORE_NAME = 'thumbnails'
-const DB_VERSION = 1
+const DB_VERSION = 2
 
 interface ThumbnailRecord {
   itemId: string
@@ -15,8 +15,11 @@ function openThumbnailDB(): Promise<IDBDatabase | null> {
   dbPromise ??= new Promise((resolve) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION)
 
-    request.onupgradeneeded = () => {
+    request.onupgradeneeded = (event) => {
       const db = request.result
+      if (event.oldVersion < 2 && db.objectStoreNames.contains(STORE_NAME)) {
+        db.deleteObjectStore(STORE_NAME)
+      }
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         db.createObjectStore(STORE_NAME, { keyPath: 'itemId' })
       }
