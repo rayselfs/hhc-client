@@ -38,7 +38,6 @@ export default function FileProjection({
     setZoom(1)
     setPan({ x: 0, y: 0 })
     setPdfState(null)
-
     const db = await openFileExplorerDB()
     const blob = await getFileBlob(db, fileId)
     if (!blob || currentFileIdRef.current !== fileId) return
@@ -121,6 +120,11 @@ export default function FileProjection({
           if (data.value <= 1) setPan({ x: 0, y: 0 })
         }
         break
+      case 'pan':
+        if (data.value && typeof data.value === 'object' && 'x' in data.value) {
+          setPan(data.value as { x: number; y: number })
+        }
+        break
       case 'pdfPage':
         if (typeof data.value === 'number') {
           setPdfState((prev) => (prev ? { ...prev, currentPage: data.value as number } : prev))
@@ -131,6 +135,12 @@ export default function FileProjection({
           setPdfState((prev) =>
             prev ? { ...prev, viewMode: data.value as 'single' | 'continuous' } : prev
           )
+        }
+        break
+      case 'volume':
+        if (videoRef.current && typeof data.value === 'number') {
+          videoRef.current.muted = false
+          videoRef.current.volume = Math.max(0, Math.min(1, data.value))
         }
         break
     }
@@ -167,21 +177,37 @@ export default function FileProjection({
     }
   }, [objectUrl])
 
-  const transform = zoom !== 1 ? `scale(${zoom}) translate(${pan.x}px, ${pan.y}px)` : undefined
+  const transform =
+    zoom !== 1
+      ? `scale(${zoom}) translate(${(pan.x / zoom) * 100}%, ${(pan.y / zoom) * 100}%)`
+      : undefined
 
   if (pdfState) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-black overflow-hidden">
         <div
-          ref={pdfContainerRef}
-          className="flex flex-col items-center overflow-auto max-h-full max-w-full"
-          style={{ transform, transformOrigin: 'center center' }}
+          style={{
+            aspectRatio: '16 / 9',
+            maxWidth: '100%',
+            maxHeight: '100%',
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            overflow: 'hidden'
+          }}
         >
-          {pdfState.viewMode === 'single' ? (
-            <PdfCanvas canvas={pdfState.pages[pdfState.currentPage - 1]} />
-          ) : (
-            pdfState.pages.map((canvas, i) => <PdfCanvas key={i} canvas={canvas} />)
-          )}
+          <div
+            ref={pdfContainerRef}
+            className="flex flex-col items-center overflow-auto max-h-full max-w-full"
+            style={{ transform, transformOrigin: 'center center' }}
+          >
+            {pdfState.viewMode === 'single' ? (
+              <PdfCanvas canvas={pdfState.pages[pdfState.currentPage - 1]} />
+            ) : (
+              pdfState.pages.map((canvas, i) => <PdfCanvas key={i} canvas={canvas} />)
+            )}
+          </div>
         </div>
       </div>
     )
@@ -190,12 +216,30 @@ export default function FileProjection({
   if (mimeType?.startsWith('image/') && objectUrl) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-black overflow-hidden">
-        <img
-          src={objectUrl}
-          alt={displayName}
-          className="max-h-full max-w-full object-contain"
-          style={{ transform, transformOrigin: 'center center' }}
-        />
+        <div
+          style={{
+            aspectRatio: '16 / 9',
+            maxWidth: '100%',
+            maxHeight: '100%',
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            overflow: 'hidden'
+          }}
+        >
+          <img
+            src={objectUrl}
+            alt={displayName}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+              transform,
+              transformOrigin: 'center center'
+            }}
+          />
+        </div>
       </div>
     )
   }
@@ -203,12 +247,28 @@ export default function FileProjection({
   if (mimeType?.startsWith('video/') && objectUrl) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-black overflow-hidden">
-        <video
-          ref={videoRef}
-          src={objectUrl}
-          className="max-h-full max-w-full object-contain"
-          muted
-        />
+        <div
+          style={{
+            aspectRatio: '16 / 9',
+            maxWidth: '100%',
+            maxHeight: '100%',
+            width: '100%',
+            overflow: 'hidden'
+          }}
+        >
+          <video
+            ref={videoRef}
+            src={objectUrl}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+              transform,
+              transformOrigin: 'center center'
+            }}
+            muted
+          />
+        </div>
       </div>
     )
   }

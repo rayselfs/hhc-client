@@ -54,8 +54,8 @@ export interface AppMessages {
   }
   /** File playback/control actions on projection */
   'file:control': {
-    action: 'play' | 'pause' | 'seek' | 'pdfPage' | 'pdfViewMode' | 'zoom'
-    value?: number | string
+    action: 'play' | 'pause' | 'seek' | 'pdfPage' | 'pdfViewMode' | 'zoom' | 'pan' | 'volume'
+    value?: number | string | { x: number; y: number }
   }
 }
 

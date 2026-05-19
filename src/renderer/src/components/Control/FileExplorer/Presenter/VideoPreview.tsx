@@ -1,6 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from '@heroui/react/toast'
 import { useTranslation } from 'react-i18next'
+import { Play, Pause, RotateCcw, Volume1, Volume2, VolumeX } from 'lucide-react'
 import type { FileItemRecord } from '@shared/types/folder'
 import { openFileExplorerDB, getFileBlob } from '@renderer/lib/file-explorer-db'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
@@ -19,10 +20,27 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
   const { t } = useTranslation()
   const videoRef = useRef<HTMLVideoElement>(null)
   const [videoSrc, setVideoSrc] = useState<string | null>(null)
+  const [error, setError] = useState(false)
+
+  const [hasStarted, setHasStarted] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
+  const [isEnded, setIsEnded] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
-  const [error, setError] = useState(false)
+  const [volume, setVolume] = useState(1)
+  const [isMuted, setIsMuted] = useState(false)
+  const [isVolumeHovered, setIsVolumeHovered] = useState(false)
+  const [isDraggingSeek, setIsDraggingSeek] = useState(false)
+  const [localSeekTime, setLocalSeekTime] = useState(0)
+
+  const hasStartedRef = useRef(false)
+
+  const zoomLevel = useMediaProjectionStore((s) => s.zoomLevel)
+  const pan = useMediaProjectionStore((s) => s.pan)
+  const transform =
+    zoomLevel !== 1
+      ? `scale(${zoomLevel}) translate(${(pan.x / zoomLevel) * 100}%, ${(pan.y / zoomLevel) * 100}%)`
+      : undefined
 
   useEffect(() => {
     let objectUrl: string | null = null
@@ -57,24 +75,57 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
     }
   }, [item.id, t])
 
+  const handlePlayPause = useCallback((): void => {
+    if (!videoRef.current) return
+    if (isEnded) {
+      videoRef.current.currentTime = 0
+      videoRef.current
+        .play()
+        .then(() => {
+          setIsEnded(false)
+          setIsPlaying(true)
+        })
+        .catch(() => {})
+      window.dispatchEvent(new CustomEvent('media:seek', { detail: { time: 0 } }))
+      window.dispatchEvent(new CustomEvent('media:play'))
+    } else if (isPlaying) {
+      videoRef.current.pause()
+      window.dispatchEvent(new CustomEvent('media:pause'))
+    } else {
+      videoRef.current
+        .play()
+        .then(() => setIsPlaying(true))
+        .catch(() => {})
+      window.dispatchEvent(new CustomEvent('media:play'))
+    }
+  }, [isEnded, isPlaying])
+
   useEffect(() => {
     const handleTogglePlay = (): void => {
-      if (!videoRef.current) return
-      if (videoRef.current.paused) {
-        videoRef.current
-          .play()
-          .then(() => setIsPlaying(true))
-          .catch((err: unknown) => {
-            console.error('Video play error:', err)
-          })
-      } else {
-        videoRef.current.pause()
-        setIsPlaying(false)
+      if (!hasStartedRef.current) {
+        hasStartedRef.current = true
+        setHasStarted(true)
       }
+      handlePlayPause()
     }
     window.addEventListener('media:togglePlay', handleTogglePlay)
     return () => window.removeEventListener('media:togglePlay', handleTogglePlay)
+  }, [handlePlayPause])
+
+  const handleVolumeChange = useCallback((val: number): void => {
+    setVolume(val)
+    setIsMuted(val === 0)
+    window.dispatchEvent(new CustomEvent('media:volumeChange', { detail: { volume: val } }))
   }, [])
+
+  const handleVolumeIconClick = useCallback((): void => {
+    const newMuted = !isMuted
+    setIsMuted(newMuted)
+    const effectiveVol = newMuted ? 0 : volume || 0.8
+    window.dispatchEvent(
+      new CustomEvent('media:volumeChange', { detail: { volume: effectiveVol } })
+    )
+  }, [isMuted, volume])
 
   if (error) {
     return (
@@ -84,21 +135,20 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
     )
   }
 
-  const handlePlayPause = (): void => {
-    window.dispatchEvent(new CustomEvent('media:togglePlay'))
-  }
-
-  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>): void => {
-    if (!videoRef.current) return
-    const time = Number(e.target.value)
-    videoRef.current.currentTime = time
-    setCurrentTime(time)
-    window.dispatchEvent(new CustomEvent('media:seek', { detail: { time } }))
-  }
-
   return (
-    <div className="w-full h-full flex flex-col bg-black">
-      <div className="flex-1 overflow-hidden flex items-center justify-center">
+    <div className="w-full h-full relative bg-black">
+      <div
+        style={{
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          transform,
+          transformOrigin: 'center center',
+          transition: 'transform 0.15s ease'
+        }}
+      >
         {videoSrc ? (
           <video
             ref={videoRef}
@@ -107,33 +157,144 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
             style={{ width: '100%', height: '100%', objectFit: 'contain' }}
             onTimeUpdate={() => setCurrentTime(videoRef.current?.currentTime ?? 0)}
             onDurationChange={() => setDuration(videoRef.current?.duration ?? 0)}
-            onEnded={() => setIsPlaying(false)}
+            onPlay={() => setIsPlaying(true)}
+            onPause={() => setIsPlaying(false)}
+            onEnded={() => {
+              setIsPlaying(false)
+              setIsEnded(true)
+            }}
           />
         ) : (
           <div className="w-full h-full" />
         )}
       </div>
-      <div className="flex items-center gap-2 px-3 py-2 bg-black/80">
+
+      {!hasStarted && (
         <button
-          type="button"
-          onClick={handlePlayPause}
-          className="text-white/80 hover:text-white text-sm px-1"
+          className="absolute inset-0 flex items-center justify-center z-10 cursor-pointer"
+          onClick={() => {
+            hasStartedRef.current = true
+            setHasStarted(true)
+            handlePlayPause()
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
         >
-          {isPlaying ? '⏸' : '▶'}
+          <div className="rounded-full p-4" style={{ background: 'var(--presenter-overlay-bg)' }}>
+            <Play size={40} className="text-white" />
+          </div>
         </button>
-        <input
-          type="range"
-          min={0}
-          max={duration}
-          step={0.1}
-          value={currentTime}
-          onChange={handleSeek}
-          className="flex-1 h-1 cursor-pointer"
+      )}
+
+      {hasStarted && isEnded && (
+        <button
+          className="absolute inset-0 flex items-center justify-center z-10 cursor-pointer"
+          onClick={handlePlayPause}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <div className="rounded-full p-4" style={{ background: 'var(--presenter-overlay-bg)' }}>
+            <RotateCcw size={40} className="text-white" />
+          </div>
+        </button>
+      )}
+
+      {hasStarted && !isEnded && (
+        <button
+          className="absolute inset-0 z-10 cursor-pointer"
+          aria-label="Toggle play"
+          onClick={handlePlayPause}
+          onMouseDown={(e) => e.stopPropagation()}
         />
-        <span className="text-white/60 text-xs tabular-nums">
-          {formatTime(currentTime)} / {formatTime(duration)}
-        </span>
-      </div>
+      )}
+
+      {hasStarted && (
+        <div
+          className="absolute bottom-0 left-0 right-0 z-20"
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <input
+            type="range"
+            min={0}
+            max={duration || 1}
+            step={0.1}
+            value={isDraggingSeek ? localSeekTime : currentTime}
+            className="w-full cursor-pointer accent-white px-2"
+            style={{ height: '4px' }}
+            onMouseDown={() => {
+              setIsDraggingSeek(true)
+              setLocalSeekTime(currentTime)
+            }}
+            onChange={(e) => setLocalSeekTime(Number(e.target.value))}
+            onMouseUp={(e) => {
+              const seekTo = Number((e.target as HTMLInputElement).value)
+              setIsDraggingSeek(false)
+              if (videoRef.current) videoRef.current.currentTime = seekTo
+              window.dispatchEvent(new CustomEvent('media:seek', { detail: { time: seekTo } }))
+            }}
+          />
+
+          <div className="flex justify-start pl-2 pb-2">
+            <div
+              className="inline-flex items-center gap-2 pl-1.5 pr-4 py-1.5 rounded-full"
+              style={{ background: 'var(--presenter-overlay-bg)' }}
+            >
+              <button
+                className="text-white/80 hover:text-white hover:bg-white/10 rounded-full p-1.5 transition-colors"
+                onClick={handlePlayPause}
+              >
+                {isEnded ? (
+                  <RotateCcw size={22} />
+                ) : isPlaying ? (
+                  <Pause size={22} />
+                ) : (
+                  <Play size={22} />
+                )}
+              </button>
+
+              <div
+                className={`flex items-center transition-all ${isVolumeHovered ? 'rounded-full px-1 bg-black/20' : ''}`}
+                onMouseEnter={() => setIsVolumeHovered(true)}
+                onMouseLeave={() => setIsVolumeHovered(false)}
+              >
+                <button
+                  className="text-white/80 hover:text-white p-1"
+                  onClick={handleVolumeIconClick}
+                >
+                  {isMuted || volume === 0 ? (
+                    <VolumeX size={22} />
+                  ) : volume < 0.4 ? (
+                    <Volume1 size={22} />
+                  ) : (
+                    <Volume2 size={22} />
+                  )}
+                </button>
+                <div
+                  className="flex items-center"
+                  style={{
+                    width: isVolumeHovered ? '80px' : '0',
+                    overflow: 'hidden',
+                    transition: 'width 0.25s ease',
+                    opacity: isVolumeHovered ? 1 : 0
+                  }}
+                >
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={isMuted ? 0 : volume}
+                    className="vol-range w-full cursor-pointer"
+                    onChange={(e) => handleVolumeChange(Number(e.target.value))}
+                  />
+                </div>
+              </div>
+
+              <span className="text-white/60 text-sm tabular-nums">
+                {formatTime(currentTime)} / {formatTime(duration)}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

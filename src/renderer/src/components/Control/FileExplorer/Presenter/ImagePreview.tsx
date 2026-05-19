@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { toast } from '@heroui/react/toast'
 import { useTranslation } from 'react-i18next'
 import type { FileItemRecord } from '@shared/types/folder'
@@ -16,11 +16,7 @@ export default function ImagePreview({ item }: ImagePreviewProps): React.JSX.Ele
   const [error, setError] = useState(false)
 
   const zoomLevel = useMediaProjectionStore((s) => s.zoomLevel)
-
-  const [panX, setPanX] = useState(0)
-  const [panY, setPanY] = useState(0)
-  const [dragging, setDragging] = useState(false)
-  const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 })
+  const pan = useMediaProjectionStore((s) => s.pan)
 
   useEffect(() => {
     let objectUrl: string | null = null
@@ -58,47 +54,6 @@ export default function ImagePreview({ item }: ImagePreviewProps): React.JSX.Ele
     }
   }, [item.id, t])
 
-  useEffect(() => {
-    const raf = requestAnimationFrame(() => {
-      setPanX(0)
-      setPanY(0)
-    })
-    return () => cancelAnimationFrame(raf)
-  }, [item.id])
-
-  useEffect(() => {
-    if (zoomLevel === 1) {
-      const raf = requestAnimationFrame(() => {
-        setPanX(0)
-        setPanY(0)
-      })
-      return () => cancelAnimationFrame(raf)
-    }
-    return undefined
-  }, [zoomLevel])
-
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      if (zoomLevel <= 1) return
-      setDragging(true)
-      dragStart.current = { x: e.clientX, y: e.clientY, panX, panY }
-    },
-    [zoomLevel, panX, panY]
-  )
-
-  const handleMouseMove = useCallback(
-    (e: React.MouseEvent) => {
-      if (!dragging) return
-      setPanX(dragStart.current.panX + (e.clientX - dragStart.current.x))
-      setPanY(dragStart.current.panY + (e.clientY - dragStart.current.y))
-    },
-    [dragging]
-  )
-
-  const handleMouseUp = useCallback(() => {
-    setDragging(false)
-  }, [])
-
   if (loading) {
     return (
       <div className="w-full h-full flex items-center justify-center text-white/50">
@@ -115,19 +70,10 @@ export default function ImagePreview({ item }: ImagePreviewProps): React.JSX.Ele
     )
   }
 
-  const transform = `scale(${zoomLevel}) translate(${panX / zoomLevel}px, ${panY / zoomLevel}px)`
-  const transition = dragging ? 'none' : 'transform 0.15s ease'
-  const cursor = zoomLevel === 1 ? 'default' : dragging ? 'grabbing' : 'grab'
+  const transform = `scale(${zoomLevel}) translate(${(pan.x / zoomLevel) * 100}%, ${(pan.y / zoomLevel) * 100}%)`
 
   return (
-    <div
-      className="w-full h-full overflow-hidden relative"
-      style={{ userSelect: 'none' }}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
-    >
+    <div className="w-full h-full overflow-hidden">
       <img
         src={imgSrc}
         style={{
@@ -136,8 +82,8 @@ export default function ImagePreview({ item }: ImagePreviewProps): React.JSX.Ele
           objectFit: 'contain',
           transform,
           transformOrigin: 'center center',
-          transition,
-          cursor
+          transition: 'transform 0.15s ease',
+          cursor: zoomLevel > 1 ? 'grab' : 'default'
         }}
         draggable={false}
         alt={item.name}

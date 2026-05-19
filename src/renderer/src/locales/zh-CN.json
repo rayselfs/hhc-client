@@ -663,6 +663,7 @@
     "zoom": "缩放",
     "next": "下一张",
     "prev": "上一张",
+    "slideInfo": "第 {{current}} 张投影片（共 {{total}} 张）",
     "endOfSlides": "投影结束",
     "noPreview": "无预览",
     "notes": "备注",

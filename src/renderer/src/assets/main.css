@@ -45,6 +45,7 @@
 :root {
   --eclipse: oklch(0.35 0.005 286);
   --cursor-interactive: default;
+  --presenter-overlay-bg: rgba(0, 0, 0, 0.35);
 }
 
 .dark,
@@ -113,4 +114,29 @@ body {
 .breadcrumbs .breadcrumbs__link[data-focus-visible='true'],
 .breadcrumbs .breadcrumbs__link[data-pressed='true'] {
   background: transparent;
+}
+
+.vol-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 2px;
+}
+.vol-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: white;
+  cursor: pointer;
+  margin-top: -4px;
+}
+.vol-range::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: white;
+  cursor: pointer;
+  border: none;
 }

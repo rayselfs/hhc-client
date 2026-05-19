@@ -663,6 +663,7 @@
     "zoom": "Zoom",
     "next": "Next",
     "prev": "Prev",
+    "slideInfo": "Slide {{current}} of {{total}}",
     "endOfSlides": "End of slides",
     "noPreview": "No preview",
     "notes": "Notes",

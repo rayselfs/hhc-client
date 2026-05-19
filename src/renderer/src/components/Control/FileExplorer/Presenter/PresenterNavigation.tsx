@@ -1,34 +1,62 @@
 import React from 'react'
 import { useTranslation } from 'react-i18next'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { Button, ProgressBar } from '@heroui/react'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 
 export default function PresenterNavigation(): React.JSX.Element {
   const { t } = useTranslation()
   const canNext = useMediaProjectionStore((s) => s.canNext())
   const canPrev = useMediaProjectionStore((s) => s.canPrev())
-  const progress = useMediaProjectionStore((s) => s.progress())
+  const currentIndex = useMediaProjectionStore((s) => s.currentIndex)
+  const total = useMediaProjectionStore((s) => s.playlist.length)
   const next = useMediaProjectionStore((s) => s.next)
   const prev = useMediaProjectionStore((s) => s.prev)
 
+  const progressPercent = total > 0 ? ((currentIndex + 1) / total) * 100 : 0
+
   return (
-    <div className="flex items-center justify-between px-4 py-3 border-t border-white/10">
-      <button
-        className="text-white/70 hover:text-white disabled:text-white/20 disabled:cursor-not-allowed px-3 py-1 rounded text-sm"
-        onClick={() => prev()}
-        disabled={!canPrev}
-      >
-        ← {t('presenter.prev')}
-      </button>
+    <div className="pb-4 shrink-0 flex justify-center">
+      <div className="flex items-center gap-3 w-80">
+        <Button
+          variant="outline"
+          isIconOnly
+          isDisabled={!canPrev}
+          onPress={() => prev()}
+          className="w-12 h-12 rounded-full shrink-0"
+          aria-label={t('presenter.prev')}
+        >
+          <ChevronLeft className="w-7 h-7" />
+        </Button>
 
-      <span className="text-white/70 text-sm font-mono">{progress}</span>
+        <div className="flex-1 flex flex-col justify-center gap-1">
+          <div className="text-white/60 text-sm text-center">
+            {t('presenter.slideInfo', { current: currentIndex + 1, total })}
+          </div>
+          <ProgressBar
+            value={progressPercent}
+            minValue={0}
+            maxValue={100}
+            aria-label="progress"
+            className="w-full"
+          >
+            <ProgressBar.Track>
+              <ProgressBar.Fill />
+            </ProgressBar.Track>
+          </ProgressBar>
+        </div>
 
-      <button
-        className="text-white/70 hover:text-white disabled:text-white/20 disabled:cursor-not-allowed px-3 py-1 rounded text-sm"
-        onClick={() => next()}
-        disabled={!canNext}
-      >
-        {t('presenter.next')} →
-      </button>
+        <Button
+          variant="outline"
+          isIconOnly
+          isDisabled={!canNext}
+          onPress={() => next()}
+          className="w-12 h-12 rounded-full shrink-0 size-5"
+          aria-label={t('presenter.next')}
+        >
+          <ChevronRight className="w-7 h-7" />
+        </Button>
+      </div>
     </div>
   )
 }

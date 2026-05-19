@@ -71,3 +71,13 @@ export function getRegistered(): RegistryEntry[] {
 export function clearRegistry(): void {
   registry.clear()
 }
+
+let presenterActive = false
+
+export function setPresenterActive(active: boolean): void {
+  presenterActive = active
+}
+
+export function isPresenterActive(): boolean {
+  return presenterActive
+}

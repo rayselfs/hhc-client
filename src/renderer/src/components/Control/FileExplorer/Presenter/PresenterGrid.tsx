@@ -11,7 +11,7 @@ export default function PresenterGrid(): React.JSX.Element {
 
   return (
     <div
-      className="fixed inset-0 bg-black/90 z-[10000] overflow-y-auto p-6"
+      className="fixed inset-0 bg-black z-[10000] overflow-y-auto p-6"
       onClick={(e) => {
         if (e.target === e.currentTarget) toggleGrid()
       }}

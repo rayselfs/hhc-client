@@ -1,6 +1,10 @@
 import { useEffect, useRef } from 'react'
 import { isMac } from '@renderer/lib/env'
-import { registerShortcut, unregisterShortcut } from '@renderer/lib/shortcut-registry'
+import {
+  registerShortcut,
+  unregisterShortcut,
+  isPresenterActive
+} from '@renderer/lib/shortcut-registry'
 import { useOptionalShortcutScope } from '@renderer/contexts/ShortcutScopeContext'
 
 export interface ShortcutConfig {
@@ -120,6 +124,7 @@ export function useKeyboardShortcuts(
     const handleKeydown = (event: KeyboardEvent): void => {
       if (event.isComposing || event.keyCode === 229) return
       if (!enabledRef.current) return
+      if (isPresenterActive() && sectionKeyRef.current !== 'media') return
       if (isEditableTarget(event.target)) return
 
       if (event.code === 'Escape' && document.querySelector('[role="menu"]')) {

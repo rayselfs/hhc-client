@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { toast } from '@heroui/react/toast'
 import { useTranslation } from 'react-i18next'
+import { ChevronLeft, ChevronRight, AlignJustify, Maximize2 } from 'lucide-react'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import type { FileItemRecord } from '@shared/types/folder'
 import { openFileExplorerDB, getFileBlob } from '@renderer/lib/file-explorer-db'
@@ -61,6 +62,7 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
 
   const pdfViewMode = useMediaProjectionStore((s) => s.pdfViewMode)
   const zoomLevel = useMediaProjectionStore((s) => s.zoomLevel)
+  const pan = useMediaProjectionStore((s) => s.pan)
 
   useEffect(() => {
     let cancelled = false
@@ -204,30 +206,88 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
 
   if (pdfViewMode === 'scroll') {
     return (
-      <div className="w-full h-full overflow-y-auto bg-black flex flex-col items-center gap-4 py-4">
-        {Array.from({ length: pageCount }, (_, i) => (
-          <canvas
-            key={i + 1}
-            ref={(el) => {
-              scrollCanvasRefs.current[i] = el
-            }}
-            style={{ maxWidth: '100%' }}
-          />
-        ))}
+      <div className="w-full h-full relative bg-black">
+        <div className="w-full h-full overflow-y-auto flex flex-col items-center gap-4 py-4">
+          {Array.from({ length: pageCount }, (_, i) => (
+            <canvas
+              key={i + 1}
+              ref={(el) => {
+                scrollCanvasRefs.current[i] = el
+              }}
+              style={{ maxWidth: '100%' }}
+            />
+          ))}
+        </div>
+        <div className="absolute bottom-2 left-2 z-20" onMouseDown={(e) => e.stopPropagation()}>
+          <button
+            className="inline-flex items-center rounded-full p-2 text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+            style={{ background: 'var(--presenter-overlay-bg)' }}
+            onClick={() => useMediaProjectionStore.getState().setPdfViewMode('slide')}
+          >
+            <Maximize2 size={20} />
+          </button>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center bg-black">
-      <div style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'center center' }}>
+    <div className="w-full h-full relative flex flex-col items-center justify-center bg-black">
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: '100%',
+          height: '100%',
+          transform:
+            zoomLevel !== 1
+              ? `scale(${zoomLevel}) translate(${(pan.x / zoomLevel) * 100}%, ${(pan.y / zoomLevel) * 100}%)`
+              : undefined,
+          transformOrigin: 'center center',
+          transition: 'transform 0.15s ease'
+        }}
+      >
         <canvas
           ref={slideCanvasRef}
-          style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+          style={{ display: 'block', maxWidth: '100%', maxHeight: '100%' }}
         />
       </div>
-      <div className="text-white/70 text-sm mt-2">
-        {currentPage} / {pageCount}
+      <div
+        className="absolute bottom-0 left-0 right-0 z-20"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="flex justify-start pl-2 pb-2">
+          <div
+            className="inline-flex items-center gap-1 pl-2 pr-3 py-1.5 rounded-full"
+            style={{ background: 'var(--presenter-overlay-bg)' }}
+          >
+            <button
+              className="text-white/80 hover:text-white hover:bg-white/10 rounded-full p-1.5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              onClick={() => window.dispatchEvent(new CustomEvent('media:pdfPrevPage'))}
+              disabled={currentPage <= 1}
+            >
+              <ChevronLeft size={20} />
+            </button>
+            <span className="text-white/70 text-sm tabular-nums px-1">
+              {currentPage} / {pageCount}
+            </span>
+            <button
+              className="text-white/80 hover:text-white hover:bg-white/10 rounded-full p-1.5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              onClick={() => window.dispatchEvent(new CustomEvent('media:pdfNextPage'))}
+              disabled={currentPage >= pageCount}
+            >
+              <ChevronRight size={20} />
+            </button>
+            <div className="w-px h-4 bg-white/20 mx-1" />
+            <button
+              className="text-white/80 hover:text-white hover:bg-white/10 rounded-full p-1.5 transition-colors"
+              onClick={() => useMediaProjectionStore.getState().setPdfViewMode('scroll')}
+            >
+              <AlignJustify size={20} />
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   )

@@ -43,6 +43,16 @@ export function useMediaProjectionSync(): void {
   useEffect(() => {
     const unsub = useMediaProjectionStore.subscribe((state, prev) => {
       if (!state.isPresenting) return
+      if (state.pan !== prev.pan) {
+        send('file:control', { action: 'pan', value: state.pan })
+      }
+    })
+    return unsub
+  }, [send])
+
+  useEffect(() => {
+    const unsub = useMediaProjectionStore.subscribe((state, prev) => {
+      if (!state.isPresenting) return
       if (state.zoomLevel !== prev.zoomLevel) {
         send('file:control', { action: 'zoom', value: state.zoomLevel })
       }
@@ -60,15 +70,35 @@ export function useMediaProjectionSync(): void {
   }, [blankProjection])
 
   useEffect(() => {
-    let videoPlaying = false
-
-    const onTogglePlay = (): void => {
-      videoPlaying = !videoPlaying
-      send('file:control', { action: videoPlaying ? 'play' : 'pause' })
+    const onPlay = (): void => {
+      send('file:control', { action: 'play' })
     }
+    const onPause = (): void => {
+      send('file:control', { action: 'pause' })
+    }
+    window.addEventListener('media:play', onPlay)
+    window.addEventListener('media:pause', onPause)
+    return () => {
+      window.removeEventListener('media:play', onPlay)
+      window.removeEventListener('media:pause', onPause)
+    }
+  }, [send])
 
-    window.addEventListener('media:togglePlay', onTogglePlay)
-    return () => window.removeEventListener('media:togglePlay', onTogglePlay)
+  useEffect(() => {
+    let volumeTimer: ReturnType<typeof setTimeout> | null = null
+    const onVolumeChange = (e: Event): void => {
+      const detail = (e as CustomEvent<{ volume: number }>).detail
+      if (!detail) return
+      if (volumeTimer) clearTimeout(volumeTimer)
+      volumeTimer = setTimeout(() => {
+        send('file:control', { action: 'volume', value: detail.volume })
+      }, 100)
+    }
+    window.addEventListener('media:volumeChange', onVolumeChange)
+    return () => {
+      window.removeEventListener('media:volumeChange', onVolumeChange)
+      if (volumeTimer) clearTimeout(volumeTimer)
+    }
   }, [send])
 
   useEffect(() => {

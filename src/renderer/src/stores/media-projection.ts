@@ -11,6 +11,7 @@ export interface MediaProjectionStore {
   showGrid: boolean
   pdfViewMode: PdfViewMode
   zoomLevel: number
+  pan: { x: number; y: number }
 
   currentItem: () => FileItemRecord | null
   nextItem: () => FileItemRecord | null
@@ -28,6 +29,7 @@ export interface MediaProjectionStore {
   setPdfViewMode: (mode: PdfViewMode) => void
   setZoomLevel: (level: number) => void
   resetZoom: () => void
+  setPan: (x: number, y: number) => void
   updateNotes: (itemId: string, notes: string) => void
 }
 
@@ -37,7 +39,8 @@ const initialState = {
   isPresenting: false,
   showGrid: false,
   pdfViewMode: 'slide' as PdfViewMode,
-  zoomLevel: 1
+  zoomLevel: 1,
+  pan: { x: 0, y: 0 }
 }
 
 export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get) => ({
@@ -85,19 +88,19 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
   next: () => {
     const s = get()
     if (!s.canNext()) return
-    set({ currentIndex: s.currentIndex + 1 })
+    set({ currentIndex: s.currentIndex + 1, zoomLevel: 1, pan: { x: 0, y: 0 } })
   },
 
   prev: () => {
     const s = get()
     if (!s.canPrev()) return
-    set({ currentIndex: s.currentIndex - 1 })
+    set({ currentIndex: s.currentIndex - 1, zoomLevel: 1, pan: { x: 0, y: 0 } })
   },
 
   jumpTo: (index: number) => {
     const { playlist } = get()
     const clamped = Math.max(0, Math.min(index, playlist.length - 1))
-    set({ currentIndex: clamped })
+    set({ currentIndex: clamped, zoomLevel: 1, pan: { x: 0, y: 0 } })
   },
 
   toggleGrid: () => {
@@ -109,11 +112,19 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
   },
 
   setZoomLevel: (level: number) => {
-    set({ zoomLevel: level })
+    if (level <= 1) {
+      set({ zoomLevel: 1, pan: { x: 0, y: 0 } })
+    } else {
+      set({ zoomLevel: level })
+    }
   },
 
   resetZoom: () => {
-    set({ zoomLevel: 1 })
+    set({ zoomLevel: 1, pan: { x: 0, y: 0 } })
+  },
+
+  setPan: (x: number, y: number) => {
+    set({ pan: { x, y } })
   },
 
   updateNotes: (itemId: string, notes: string) => {
