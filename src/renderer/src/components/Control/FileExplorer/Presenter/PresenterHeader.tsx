@@ -41,7 +41,7 @@ export default function PresenterHeader({ onExit }: PresenterHeaderProps): React
   }, [])
 
   return (
-    <div className="flex items-center justify-between px-3 py-2 shrink-0">
+    <div className="flex items-center justify-between px-3 h-12 shrink-0">
       <div className="flex items-center gap-2">
         <Button
           variant="ghost"

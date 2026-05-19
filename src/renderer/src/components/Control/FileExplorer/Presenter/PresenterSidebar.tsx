@@ -30,7 +30,7 @@ export default function PresenterSidebar(): React.JSX.Element {
   return (
     <div className="flex flex-col h-full bg-black/50">
       <div className="shrink-0">
-        <div className="text-white/50 text-xs uppercase tracking-wide px-3 pt-3 pb-1">
+        <div className="h-12 flex items-center px-3 text-white/60 text-sm font-medium">
           {t('presenter.next')}
         </div>
         <div className="px-4 pb-4">
