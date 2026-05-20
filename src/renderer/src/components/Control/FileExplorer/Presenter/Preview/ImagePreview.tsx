@@ -70,6 +70,37 @@ export default function ImagePreview({ item }: ImagePreviewProps): React.JSX.Ele
     )
   }
 
+  if (zoomLevel > 1) {
+    const viewportWidth = (1 / zoomLevel) * 100
+    const viewportHeight = (1 / zoomLevel) * 100
+    const viewportLeft = (0.5 - (0.5 + pan.x) / zoomLevel) * 100
+    const viewportTop = (0.5 - (0.5 + pan.y) / zoomLevel) * 100
+
+    return (
+      <div className="w-full h-full overflow-hidden relative">
+        <img
+          src={imgSrc}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain'
+          }}
+          draggable={false}
+          alt={item.name}
+        />
+        <div
+          className="absolute border-2 border-accent bg-accent/20 pointer-events-none transition-all duration-100"
+          style={{
+            left: `${viewportLeft}%`,
+            top: `${viewportTop}%`,
+            width: `${viewportWidth}%`,
+            height: `${viewportHeight}%`
+          }}
+        />
+      </div>
+    )
+  }
+
   const transform = `scale(${zoomLevel}) translate(${(pan.x / zoomLevel) * 100}%, ${(pan.y / zoomLevel) * 100}%)`
 
   return (

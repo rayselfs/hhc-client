@@ -5,6 +5,7 @@ import { Play, Pause, RotateCcw, Volume1, Volume2, VolumeX } from 'lucide-react'
 import type { FileItemRecord } from '@shared/types/folder'
 import { openFileExplorerDB, getFileBlob } from '@renderer/lib/file-explorer-db'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
+import { usePresenterCommands } from '@renderer/contexts/PresenterCommandContext'
 
 interface VideoPreviewProps {
   item: FileItemRecord
@@ -18,6 +19,7 @@ function formatTime(seconds: number): string {
 
 export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Element {
   const { t } = useTranslation()
+  const { sendCommand } = usePresenterCommands()
   const videoRef = useRef<HTMLVideoElement>(null)
   const [videoSrc, setVideoSrc] = useState<string | null>(null)
   const [error, setError] = useState(false)
@@ -34,6 +36,7 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
   const [localSeekTime, setLocalSeekTime] = useState(0)
 
   const hasStartedRef = useRef(false)
+  const volumeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const zoomLevel = useMediaProjectionStore((s) => s.zoomLevel)
   const pan = useMediaProjectionStore((s) => s.pan)
@@ -72,6 +75,7 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
       setVideoSrc(null)
       const video = videoRef.current
       if (video) video.pause()
+      if (volumeDebounceRef.current) clearTimeout(volumeDebounceRef.current)
     }
   }, [item.id, t])
 
@@ -86,19 +90,19 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
           setIsPlaying(true)
         })
         .catch(() => {})
-      window.dispatchEvent(new CustomEvent('media:seek', { detail: { time: 0 } }))
-      window.dispatchEvent(new CustomEvent('media:play'))
+      sendCommand({ action: 'seek', value: 0 })
+      sendCommand({ action: 'play' })
     } else if (isPlaying) {
       videoRef.current.pause()
-      window.dispatchEvent(new CustomEvent('media:pause'))
+      sendCommand({ action: 'pause' })
     } else {
       videoRef.current
         .play()
         .then(() => setIsPlaying(true))
         .catch(() => {})
-      window.dispatchEvent(new CustomEvent('media:play'))
+      sendCommand({ action: 'play' })
     }
-  }, [isEnded, isPlaying])
+  }, [isEnded, isPlaying, sendCommand])
 
   useEffect(() => {
     const handleTogglePlay = (): void => {
@@ -112,20 +116,27 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
     return () => window.removeEventListener('media:togglePlay', handleTogglePlay)
   }, [handlePlayPause])
 
-  const handleVolumeChange = useCallback((val: number): void => {
-    setVolume(val)
-    setIsMuted(val === 0)
-    window.dispatchEvent(new CustomEvent('media:volumeChange', { detail: { volume: val } }))
-  }, [])
+  const handleVolumeChange = useCallback(
+    (val: number): void => {
+      setVolume(val)
+      setIsMuted(val === 0)
+      if (volumeDebounceRef.current) clearTimeout(volumeDebounceRef.current)
+      volumeDebounceRef.current = setTimeout(() => {
+        sendCommand({ action: 'volume', value: val })
+      }, 100)
+    },
+    [sendCommand]
+  )
 
   const handleVolumeIconClick = useCallback((): void => {
     const newMuted = !isMuted
     setIsMuted(newMuted)
     const effectiveVol = newMuted ? 0 : volume || 0.8
-    window.dispatchEvent(
-      new CustomEvent('media:volumeChange', { detail: { volume: effectiveVol } })
-    )
-  }, [isMuted, volume])
+    if (volumeDebounceRef.current) clearTimeout(volumeDebounceRef.current)
+    volumeDebounceRef.current = setTimeout(() => {
+      sendCommand({ action: 'volume', value: effectiveVol })
+    }, 100)
+  }, [isMuted, volume, sendCommand])
 
   if (error) {
     return (
@@ -179,8 +190,8 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
           }}
           onMouseDown={(e) => e.stopPropagation()}
         >
-          <div className="rounded-full p-4" style={{ background: 'var(--presenter-overlay-bg)' }}>
-            <Play size={40} className="text-white" />
+          <div className="rounded-full p-4 presenter-media-control">
+            <Play size={40} className="text-foreground" />
           </div>
         </button>
       )}
@@ -191,8 +202,8 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
           onClick={handlePlayPause}
           onMouseDown={(e) => e.stopPropagation()}
         >
-          <div className="rounded-full p-4" style={{ background: 'var(--presenter-overlay-bg)' }}>
-            <RotateCcw size={40} className="text-white" />
+          <div className="rounded-full p-4 presenter-media-control">
+            <RotateCcw size={40} className="text-foreground" />
           </div>
         </button>
       )}
@@ -217,8 +228,12 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
             max={duration || 1}
             step={0.1}
             value={isDraggingSeek ? localSeekTime : currentTime}
-            className="w-full cursor-pointer accent-white px-2"
-            style={{ height: '4px' }}
+            className="video-seek-range w-full"
+            style={
+              {
+                '--seek-fill': `${(((isDraggingSeek ? localSeekTime : currentTime) / (duration || 1)) * 100).toFixed(2)}%`
+              } as React.CSSProperties
+            }
             onMouseDown={() => {
               setIsDraggingSeek(true)
               setLocalSeekTime(currentTime)
@@ -228,67 +243,66 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
               const seekTo = Number((e.target as HTMLInputElement).value)
               setIsDraggingSeek(false)
               if (videoRef.current) videoRef.current.currentTime = seekTo
-              window.dispatchEvent(new CustomEvent('media:seek', { detail: { time: seekTo } }))
+              sendCommand({ action: 'seek', value: seekTo })
             }}
           />
 
-          <div className="flex justify-start pl-2 pb-2">
-            <div
-              className="inline-flex items-center gap-2 pl-1.5 pr-4 py-1.5 rounded-full"
-              style={{ background: 'var(--presenter-overlay-bg)' }}
-            >
+          <div className="flex items-center pl-2 pb-2 gap-2">
+            <div className="inline-flex rounded-full video-control-pill">
               <button
-                className="text-white/80 hover:text-white hover:bg-white/10 rounded-full p-1.5 transition-colors"
+                className="text-white/80 hover:text-white px-3 py-2 rounded-full transition-colors"
                 onClick={handlePlayPause}
               >
                 {isEnded ? (
-                  <RotateCcw size={22} />
+                  <RotateCcw size={20} />
                 ) : isPlaying ? (
-                  <Pause size={22} />
+                  <Pause size={20} />
                 ) : (
-                  <Play size={22} />
+                  <Play size={20} />
                 )}
               </button>
+            </div>
 
-              <div
-                className={`flex items-center transition-all ${isVolumeHovered ? 'rounded-full px-1 bg-black/20' : ''}`}
-                onMouseEnter={() => setIsVolumeHovered(true)}
-                onMouseLeave={() => setIsVolumeHovered(false)}
+            <div
+              className="inline-flex items-center rounded-full video-control-pill"
+              onMouseEnter={() => setIsVolumeHovered(true)}
+              onMouseLeave={() => setIsVolumeHovered(false)}
+            >
+              <button
+                className="text-white/80 hover:text-white px-3 py-2 rounded-full transition-colors"
+                onClick={handleVolumeIconClick}
               >
-                <button
-                  className="text-white/80 hover:text-white p-1"
-                  onClick={handleVolumeIconClick}
-                >
-                  {isMuted || volume === 0 ? (
-                    <VolumeX size={22} />
-                  ) : volume < 0.4 ? (
-                    <Volume1 size={22} />
-                  ) : (
-                    <Volume2 size={22} />
-                  )}
-                </button>
-                <div
-                  className="flex items-center"
-                  style={{
-                    width: isVolumeHovered ? '80px' : '0',
-                    overflow: 'hidden',
-                    transition: 'width 0.25s ease',
-                    opacity: isVolumeHovered ? 1 : 0
-                  }}
-                >
-                  <input
-                    type="range"
-                    min={0}
-                    max={1}
-                    step={0.01}
-                    value={isMuted ? 0 : volume}
-                    className="vol-range w-full cursor-pointer"
-                    onChange={(e) => handleVolumeChange(Number(e.target.value))}
-                  />
-                </div>
+                {isMuted || volume === 0 ? (
+                  <VolumeX size={20} />
+                ) : volume < 0.4 ? (
+                  <Volume1 size={20} />
+                ) : (
+                  <Volume2 size={20} />
+                )}
+              </button>
+              <div
+                style={{
+                  width: isVolumeHovered ? '80px' : '0',
+                  overflow: 'hidden',
+                  transition: 'width 0.25s ease, padding-right 0.25s ease',
+                  opacity: isVolumeHovered ? 1 : 0,
+                  paddingRight: isVolumeHovered ? '8px' : '0'
+                }}
+              >
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={isMuted ? 0 : volume}
+                  className="vol-range w-full cursor-pointer"
+                  onChange={(e) => handleVolumeChange(Number(e.target.value))}
+                />
               </div>
+            </div>
 
-              <span className="text-white/60 text-sm tabular-nums">
+            <div className="inline-flex items-center rounded-full video-control-pill px-3 py-2">
+              <span className="text-white/70 text-sm tabular-nums whitespace-nowrap">
                 {formatTime(currentTime)} / {formatTime(duration)}
               </span>
             </div>

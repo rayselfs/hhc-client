@@ -47,9 +47,7 @@ function NextImagePreview({ item }: { item: FileItemRecord }): React.JSX.Element
       </span>
     )
 
-  return (
-    <img src={src} alt={item.name} className="absolute inset-0 w-full h-full object-contain" />
-  )
+  return <img src={src} alt={item.name} className="absolute inset-0 w-full h-full object-contain" />
 }
 
 function NextVideoPreview({ item }: { item: FileItemRecord }): React.JSX.Element {

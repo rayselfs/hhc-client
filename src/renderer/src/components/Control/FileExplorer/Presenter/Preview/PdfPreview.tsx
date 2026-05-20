@@ -6,6 +6,7 @@ import type { PDFDocumentProxy } from 'pdfjs-dist'
 import type { FileItemRecord } from '@shared/types/folder'
 import { openFileExplorerDB, getFileBlob } from '@renderer/lib/file-explorer-db'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
+import { usePresenterCommands } from '@renderer/contexts/PresenterCommandContext'
 
 interface PdfPreviewProps {
   item: FileItemRecord
@@ -30,6 +31,7 @@ async function renderPage(
 
 export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element {
   const { t } = useTranslation()
+  const { sendCommand } = usePresenterCommands()
   const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageCount, setPageCount] = useState(0)
@@ -39,7 +41,7 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
   const slideCanvasRef = useRef<HTMLCanvasElement>(null)
   const scrollCanvasRefs = useRef<(HTMLCanvasElement | null)[]>([])
 
-  const pdfViewMode = useMediaProjectionStore((s) => s.pdfViewMode)
+  const pdfViewMode = useMediaProjectionStore((s) => s.typeStates['pdf']?.viewMode ?? 'slide')
   const zoomLevel = useMediaProjectionStore((s) => s.zoomLevel)
   const pan = useMediaProjectionStore((s) => s.pan)
 
@@ -144,18 +146,14 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
     const handleNext = (): void => {
       setCurrentPage((p) => {
         const next = Math.min(p + 1, pageCount)
-        window.dispatchEvent(
-          new CustomEvent('media:pdfPageChanged', { detail: { page: next } })
-        )
+        sendCommand({ action: 'pdfPage', value: next })
         return next
       })
     }
     const handlePrev = (): void => {
       setCurrentPage((p) => {
         const prev = Math.max(p - 1, 1)
-        window.dispatchEvent(
-          new CustomEvent('media:pdfPageChanged', { detail: { page: prev } })
-        )
+        sendCommand({ action: 'pdfPage', value: prev })
         return prev
       })
     }
@@ -165,11 +163,11 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
       window.removeEventListener('media:pdfNextPage', handleNext)
       window.removeEventListener('media:pdfPrevPage', handlePrev)
     }
-  }, [pageCount])
+  }, [pageCount, sendCommand])
 
   if (loading) {
     return (
-      <div className="w-full h-full flex items-center justify-center text-white/50">
+      <div className="w-full h-full flex items-center justify-center text-foreground/50">
         {t('presenter.loading')}
       </div>
     )
@@ -177,7 +175,7 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
 
   if (error || !pdfDoc) {
     return (
-      <div className="w-full h-full flex items-center justify-center text-white/50">
+      <div className="w-full h-full flex items-center justify-center text-foreground/50">
         {t('presenter.pdfLoadFailed')}
       </div>
     )
@@ -199,9 +197,11 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
         </div>
         <div className="absolute bottom-2 left-2 z-20" onMouseDown={(e) => e.stopPropagation()}>
           <button
-            className="inline-flex items-center rounded-full p-2 text-white/80 hover:text-white hover:bg-white/10 transition-colors"
-            style={{ background: 'var(--presenter-overlay-bg)' }}
-            onClick={() => useMediaProjectionStore.getState().setPdfViewMode('slide')}
+            className="inline-flex items-center rounded-full p-2 presenter-media-control text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+            onClick={() => {
+              useMediaProjectionStore.getState().setTypeState('pdf', { viewMode: 'slide' })
+              sendCommand({ action: 'pdfViewMode', value: 'single' })
+            }}
           >
             <Maximize2 size={20} />
           </button>
@@ -237,10 +237,7 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex justify-start pl-2 pb-2">
-          <div
-            className="inline-flex items-center gap-1 pl-2 pr-3 py-1.5 rounded-full"
-            style={{ background: 'var(--presenter-overlay-bg)' }}
-          >
+          <div className="inline-flex items-center gap-1 pl-2 pr-3 py-1.5 rounded-full presenter-media-control">
             <button
               className="text-white/80 hover:text-white hover:bg-white/10 rounded-full p-1.5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
               onClick={() => window.dispatchEvent(new CustomEvent('media:pdfPrevPage'))}
@@ -261,7 +258,10 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
             <div className="w-px h-4 bg-white/20 mx-1" />
             <button
               className="text-white/80 hover:text-white hover:bg-white/10 rounded-full p-1.5 transition-colors"
-              onClick={() => useMediaProjectionStore.getState().setPdfViewMode('scroll')}
+              onClick={() => {
+                useMediaProjectionStore.getState().setTypeState('pdf', { viewMode: 'scroll' })
+                sendCommand({ action: 'pdfViewMode', value: 'continuous' })
+              }}
             >
               <AlignJustify size={20} />
             </button>

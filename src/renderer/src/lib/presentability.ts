@@ -5,7 +5,13 @@ const PRESENTABLE_IMAGE_PREFIXES = ['image/']
 const PRESENTABLE_VIDEO_MIMES = ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime']
 const PRESENTABLE_OTHER_MIMES = ['application/pdf']
 
-export type MediaType = 'image' | 'video' | 'pdf'
+export type MediaTypeStateMap = {
+  image: Record<string, never>
+  video: Record<string, never>
+  pdf: { viewMode: 'slide' | 'scroll' }
+}
+
+export type MediaType = keyof MediaTypeStateMap
 
 export function isPresentable(mimeType: string): boolean {
   return (

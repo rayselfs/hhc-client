@@ -45,13 +45,28 @@
 :root {
   --eclipse: oklch(0.35 0.005 286);
   --cursor-interactive: default;
-  --presenter-overlay-bg: rgba(0, 0, 0, 0.35);
 }
+
 
 .dark,
 [data-theme='dark'] {
   --warning: oklch(0.42 0.1006 79.22);
   --accent: oklch(0.35 0.1 245);
+}
+
+.presenter-media-control {
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(8px);
+}
+
+.dark .presenter-media-control,
+[data-theme='dark'] .presenter-media-control {
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.video-control-pill {
+  background: rgba(8, 8, 8, 0.65);
+  backdrop-filter: blur(8px);
 }
 
 .timer-digits {
@@ -119,7 +134,13 @@ body {
 .vol-range {
   -webkit-appearance: none;
   appearance: none;
-  height: 4px;
+  height: 16px;
+  background: transparent;
+  outline: none;
+  cursor: pointer;
+}
+.vol-range::-webkit-slider-runnable-track {
+  height: 3px;
   background: rgba(255, 255, 255, 0.3);
   border-radius: 2px;
 }
@@ -130,13 +151,66 @@ body {
   border-radius: 50%;
   background: white;
   cursor: pointer;
-  margin-top: -4px;
+  margin-top: -4.5px;
+}
+.vol-range::-moz-range-track {
+  height: 3px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 2px;
 }
 .vol-range::-moz-range-thumb {
   width: 12px;
   height: 12px;
   border-radius: 50%;
   background: white;
+  cursor: pointer;
+  border: none;
+}
+
+.video-seek-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 16px;
+  background: transparent;
+  outline: none;
+  cursor: pointer;
+  padding: 0 8px;
+  box-sizing: border-box;
+}
+.video-seek-range::-webkit-slider-runnable-track {
+  height: 3px;
+  background: linear-gradient(
+    to right,
+    var(--accent) 0% var(--seek-fill, 0%),
+    rgba(255, 255, 255, 0.3) var(--seek-fill, 0%) 100%
+  );
+  border-radius: 2px;
+}
+.video-seek-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  margin-top: -4.5px;
+}
+.video-seek-range::-moz-range-track {
+  height: 3px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 2px;
+}
+.video-seek-range::-moz-range-progress {
+  height: 3px;
+  background: var(--accent);
+  border-radius: 2px;
+}
+.video-seek-range::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
   cursor: pointer;
   border: none;
 }

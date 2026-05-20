@@ -25,7 +25,7 @@ beforeEach(() => {
     currentIndex: 0,
     isPresenting: false,
     showGrid: false,
-    pdfViewMode: 'slide',
+    typeStates: { pdf: { viewMode: 'slide' } },
     zoomLevel: 1
   })
 })

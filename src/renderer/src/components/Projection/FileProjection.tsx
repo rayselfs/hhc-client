@@ -1,10 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createProjectionAdapter } from '@renderer/lib/projection-adapter'
 import { openFileExplorerDB, getFileBlob } from '@renderer/lib/file-explorer-db'
-import type { AppMessages } from '@shared/projection-messages'
+import type { AppMessages, FileControlPayload } from '@shared/projection-messages'
 
 type FileShowPayload = AppMessages['file:show']
-type FileControlPayload = AppMessages['file:control']
 
 type FileProjectionProps = {
   fileName?: string
@@ -110,35 +109,23 @@ export default function FileProjection({
         videoRef.current?.pause()
         break
       case 'seek':
-        if (videoRef.current && typeof data.value === 'number') {
-          videoRef.current.currentTime = data.value
-        }
+        if (videoRef.current) videoRef.current.currentTime = data.value
         break
       case 'zoom':
-        if (typeof data.value === 'number') {
-          setZoom(data.value)
-          if (data.value <= 1) setPan({ x: 0, y: 0 })
-        }
+        setZoom(data.value)
+        if (data.value <= 1) setPan({ x: 0, y: 0 })
         break
       case 'pan':
-        if (data.value && typeof data.value === 'object' && 'x' in data.value) {
-          setPan(data.value as { x: number; y: number })
-        }
+        setPan(data.value)
         break
       case 'pdfPage':
-        if (typeof data.value === 'number') {
-          setPdfState((prev) => (prev ? { ...prev, currentPage: data.value as number } : prev))
-        }
+        setPdfState((prev) => (prev ? { ...prev, currentPage: data.value } : prev))
         break
       case 'pdfViewMode':
-        if (data.value === 'single' || data.value === 'continuous') {
-          setPdfState((prev) =>
-            prev ? { ...prev, viewMode: data.value as 'single' | 'continuous' } : prev
-          )
-        }
+        setPdfState((prev) => (prev ? { ...prev, viewMode: data.value } : prev))
         break
       case 'volume':
-        if (videoRef.current && typeof data.value === 'number') {
+        if (videoRef.current) {
           videoRef.current.muted = false
           videoRef.current.volume = Math.max(0, Math.min(1, data.value))
         }

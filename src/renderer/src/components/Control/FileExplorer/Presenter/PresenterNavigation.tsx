@@ -30,7 +30,7 @@ export default function PresenterNavigation(): React.JSX.Element {
         </Button>
 
         <div className="flex-1 flex flex-col justify-center gap-1">
-          <div className="text-white/60 text-sm text-center">
+          <div className="text-foreground/60 text-base text-center">
             {t('presenter.slideInfo', { current: currentIndex + 1, total })}
           </div>
           <ProgressBar

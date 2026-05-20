@@ -48,13 +48,13 @@ export default function PresenterHeader({ onExit }: PresenterHeaderProps): React
           isIconOnly
           onPress={onExit}
           aria-label={t('common.close')}
-          className="text-white/70 hover:text-white"
+          className="text-foreground/70 hover:text-foreground"
         >
           <X size={20} />
         </Button>
-        <span className="text-white/70 text-base font-mono">{formatElapsed(elapsed)}</span>
+        <span className="text-foreground/70 text-lg font-mono">{formatElapsed(elapsed)}</span>
       </div>
-      <span className="text-white/70 text-base font-mono">{formatClock(clockTime)}</span>
+      <span className="text-foreground/70 text-lg font-mono">{formatClock(clockTime)}</span>
     </div>
   )
 }

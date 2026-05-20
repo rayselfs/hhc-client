@@ -1,15 +1,14 @@
 import { create } from 'zustand'
 import type { FileItemRecord } from '@shared/types/folder'
+import type { MediaType, MediaTypeStateMap } from '@renderer/lib/presentability'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
-
-export type PdfViewMode = 'slide' | 'scroll'
 
 export interface MediaProjectionStore {
   playlist: FileItemRecord[]
   currentIndex: number
   isPresenting: boolean
   showGrid: boolean
-  pdfViewMode: PdfViewMode
+  typeStates: Partial<{ [K in MediaType]: MediaTypeStateMap[K] }>
   zoomLevel: number
   pan: { x: number; y: number }
 
@@ -26,11 +25,16 @@ export interface MediaProjectionStore {
   prev: () => void
   jumpTo: (index: number) => void
   toggleGrid: () => void
-  setPdfViewMode: (mode: PdfViewMode) => void
+  getTypeState: <K extends MediaType>(type: K) => MediaTypeStateMap[K] | undefined
+  setTypeState: <K extends MediaType>(type: K, value: MediaTypeStateMap[K]) => void
   setZoomLevel: (level: number) => void
   resetZoom: () => void
   setPan: (x: number, y: number) => void
   updateNotes: (itemId: string, notes: string) => void
+}
+
+const initialTypeStates: Partial<{ [K in MediaType]: MediaTypeStateMap[K] }> = {
+  pdf: { viewMode: 'slide' as const }
 }
 
 const initialState = {
@@ -38,7 +42,7 @@ const initialState = {
   currentIndex: 0,
   isPresenting: false,
   showGrid: false,
-  pdfViewMode: 'slide' as PdfViewMode,
+  typeStates: initialTypeStates,
   zoomLevel: 1,
   pan: { x: 0, y: 0 }
 }
@@ -78,7 +82,7 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
   },
 
   startPresentation: (files: FileItemRecord[], startIndex: number) => {
-    set({ playlist: files, currentIndex: startIndex, isPresenting: true })
+    set({ playlist: files, currentIndex: startIndex, isPresenting: true, typeStates: initialTypeStates })
   },
 
   exit: () => {
@@ -107,8 +111,14 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
     set((state) => ({ showGrid: !state.showGrid }))
   },
 
-  setPdfViewMode: (mode: PdfViewMode) => {
-    set({ pdfViewMode: mode })
+  getTypeState: <K extends MediaType>(type: K) => {
+    return get().typeStates[type] as MediaTypeStateMap[K] | undefined
+  },
+
+  setTypeState: <K extends MediaType>(type: K, value: MediaTypeStateMap[K]) => {
+    set((s) => ({
+      typeStates: { ...s.typeStates, [type]: value } as Partial<{ [T in MediaType]: MediaTypeStateMap[T] }>
+    }))
   },
 
   setZoomLevel: (level: number) => {
