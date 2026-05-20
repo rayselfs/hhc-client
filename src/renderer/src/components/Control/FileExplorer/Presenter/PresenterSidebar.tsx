@@ -12,8 +12,8 @@ export default function PresenterSidebar(): React.JSX.Element {
   const updateNotes = useMediaProjectionStore((s) => s.updateNotes)
 
   const [notes, setNotes] = useState(currentItem?.notes ?? '')
-  const [notesFontSize, setNotesFontSize] = useState(
-    () => parseInt(localStorage.getItem('hhc-notes-font-size') ?? '14', 10)
+  const [notesFontSize, setNotesFontSize] = useState(() =>
+    parseInt(localStorage.getItem('hhc-notes-font-size') ?? '14', 10)
   )
 
   useEffect(() => {

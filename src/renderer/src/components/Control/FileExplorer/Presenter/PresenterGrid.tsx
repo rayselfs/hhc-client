@@ -27,7 +27,7 @@ export default function PresenterGrid(): React.JSX.Element {
   }, [focusedIndex])
 
   const handleKeyDown = (e: React.KeyboardEvent): void => {
-    const cols = window.innerWidth >= 1024 ? 8 : 6
+    const cols = window.innerWidth >= 1280 ? 8 : window.innerWidth >= 1024 ? 6 : 4
     switch (e.key) {
       case 'ArrowRight':
         e.preventDefault()
@@ -80,7 +80,7 @@ export default function PresenterGrid(): React.JSX.Element {
         className="flex-1 overflow-y-auto p-6 outline-none"
         onKeyDown={handleKeyDown}
       >
-        <div className="grid gap-3 grid-cols-6 lg:grid-cols-8">
+        <div className="grid gap-3 grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
           {playlist.map((item, index) => (
             <button
               key={item.id}

@@ -204,12 +204,7 @@ export default function NextItemPreview({ item }: NextItemPreviewProps): React.J
     <>
       {content}
       <div className="absolute bottom-1 inset-x-0 flex justify-center px-3 pointer-events-none">
-        <span
-          className="text-foreground/90 text-sm truncate"
-          style={{ textShadow: '0 1px 4px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.6)' }}
-        >
-          {item.name}
-        </span>
+        <span>{item.name}</span>
       </div>
     </>
   )
