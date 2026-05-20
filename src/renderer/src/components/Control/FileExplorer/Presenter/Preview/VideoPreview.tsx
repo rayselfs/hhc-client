@@ -1,7 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from '@heroui/react/toast'
 import { useTranslation } from 'react-i18next'
-import { Play, Pause, RotateCcw, Volume1, Volume2, VolumeX } from 'lucide-react'
+import {
+  Play,
+  Pause,
+  ArrowCounterClockwise,
+  SpeakerHigh,
+  SpeakerLow,
+  SpeakerX
+} from '@phosphor-icons/react'
 import type { FileItemRecord } from '@shared/types/folder'
 import { openFileExplorerDB, getFileBlob } from '@renderer/lib/file-explorer-db'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
@@ -34,9 +41,14 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
   const [isVolumeHovered, setIsVolumeHovered] = useState(false)
   const [isDraggingSeek, setIsDraggingSeek] = useState(false)
   const [localSeekTime, setLocalSeekTime] = useState(0)
+  const [flashState, setFlashState] = useState<{ icon: 'play' | 'pause'; key: number } | null>(
+    null
+  )
 
   const hasStartedRef = useRef(false)
   const volumeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const flashTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const flashKeyRef = useRef(0)
 
   const zoomLevel = useMediaProjectionStore((s) => s.zoomLevel)
   const pan = useMediaProjectionStore((s) => s.pan)
@@ -76,12 +88,21 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
       const video = videoRef.current
       if (video) video.pause()
       if (volumeDebounceRef.current) clearTimeout(volumeDebounceRef.current)
+      if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current)
     }
   }, [item.id, t])
+
+  const triggerFlash = useCallback((icon: 'play' | 'pause'): void => {
+    if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current)
+    flashKeyRef.current += 1
+    setFlashState({ icon, key: flashKeyRef.current })
+    flashTimeoutRef.current = setTimeout(() => setFlashState(null), 1100)
+  }, [])
 
   const handlePlayPause = useCallback((): void => {
     if (!videoRef.current) return
     if (isEnded) {
+      triggerFlash('play')
       videoRef.current.currentTime = 0
       videoRef.current
         .play()
@@ -93,16 +114,18 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
       sendCommand({ action: 'seek', value: 0 })
       sendCommand({ action: 'play' })
     } else if (isPlaying) {
+      triggerFlash('pause')
       videoRef.current.pause()
       sendCommand({ action: 'pause' })
     } else {
+      if (hasStartedRef.current) triggerFlash('play')
       videoRef.current
         .play()
         .then(() => setIsPlaying(true))
         .catch(() => {})
       sendCommand({ action: 'play' })
     }
-  }, [isEnded, isPlaying, sendCommand])
+  }, [isEnded, isPlaying, sendCommand, triggerFlash])
 
   useEffect(() => {
     const handleTogglePlay = (): void => {
@@ -191,21 +214,24 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
           onMouseDown={(e) => e.stopPropagation()}
         >
           <div className="rounded-full p-4 presenter-media-control">
-            <Play size={70} />
+            <Play size={70} weight="fill" />
           </div>
         </button>
       )}
 
-      {hasStarted && isEnded && (
-        <button
-          className="absolute inset-0 flex items-center justify-center z-10 cursor-pointer"
-          onClick={handlePlayPause}
-          onMouseDown={(e) => e.stopPropagation()}
+      {flashState && (
+        <div
+          key={flashState.key}
+          className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none video-flash-icon"
         >
           <div className="rounded-full p-4 presenter-media-control">
-            <RotateCcw size={40} className="text-foreground" />
+            {flashState.icon === 'play' ? (
+              <Play size={70} weight="fill" />
+            ) : (
+              <Pause size={70} weight="fill" />
+            )}
           </div>
-        </button>
+        </div>
       )}
 
       {hasStarted && !isEnded && (
@@ -247,18 +273,18 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
             }}
           />
 
-          <div className="flex items-center pl-2 pb-2 gap-2">
+          <div className="flex items-stretch pl-2 pb-2 gap-2">
             <div className="inline-flex rounded-full presenter-media-control">
               <button
-                className="text-white/80 hover:text-white px-3 py-2 rounded-full transition-colors"
+                className="text-white/80 hover:text-white px-4 py-2.5 rounded-full transition-colors"
                 onClick={handlePlayPause}
               >
                 {isEnded ? (
-                  <RotateCcw size={20} />
+                  <ArrowCounterClockwise size={24} weight="fill" />
                 ) : isPlaying ? (
-                  <Pause size={20} />
+                  <Pause size={24} weight="fill" />
                 ) : (
-                  <Play size={20} />
+                  <Play size={24} weight="fill" />
                 )}
               </button>
             </div>
@@ -269,15 +295,15 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
               onMouseLeave={() => setIsVolumeHovered(false)}
             >
               <button
-                className="text-white/80 hover:text-white px-3 py-2 rounded-full transition-colors"
+                className="text-white/80 hover:text-white px-4 py-2.5 rounded-full transition-colors"
                 onClick={handleVolumeIconClick}
               >
                 {isMuted || volume === 0 ? (
-                  <VolumeX size={20} />
+                  <SpeakerX size={24} weight="fill" />
                 ) : volume < 0.4 ? (
-                  <Volume1 size={20} />
+                  <SpeakerLow size={24} weight="fill" />
                 ) : (
-                  <Volume2 size={20} />
+                  <SpeakerHigh size={24} weight="fill" />
                 )}
               </button>
               <div
@@ -296,13 +322,18 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
                   step={0.01}
                   value={isMuted ? 0 : volume}
                   className="vol-range w-full cursor-pointer"
+                  style={
+                    {
+                      '--vol-fill': `${((isMuted ? 0 : volume) * 100).toFixed(1)}%`
+                    } as React.CSSProperties
+                  }
                   onChange={(e) => handleVolumeChange(Number(e.target.value))}
                 />
               </div>
             </div>
 
-            <div className="inline-flex items-center rounded-full presenter-media-control px-3 py-2">
-              <span className="text-white/70 text-sm tabular-nums whitespace-nowrap">
+            <div className="inline-flex items-center rounded-full presenter-media-control px-4 py-2.5">
+              <span className="text-white/70 text-base tabular-nums whitespace-nowrap">
                 {formatTime(currentTime)} / {formatTime(duration)}
               </span>
             </div>
