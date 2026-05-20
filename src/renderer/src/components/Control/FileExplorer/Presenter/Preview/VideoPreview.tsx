@@ -41,9 +41,7 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
   const [isVolumeHovered, setIsVolumeHovered] = useState(false)
   const [isDraggingSeek, setIsDraggingSeek] = useState(false)
   const [localSeekTime, setLocalSeekTime] = useState(0)
-  const [flashState, setFlashState] = useState<{ icon: 'play' | 'pause'; key: number } | null>(
-    null
-  )
+  const [flashState, setFlashState] = useState<{ icon: 'play' | 'pause'; key: number } | null>(null)
 
   const hasStartedRef = useRef(false)
   const volumeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -308,7 +306,7 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
               </button>
               <div
                 style={{
-                  width: isVolumeHovered ? '80px' : '0',
+                  width: isVolumeHovered ? '100px' : '0',
                   overflow: 'hidden',
                   transition: 'width 0.25s ease, padding-right 0.25s ease',
                   opacity: isVolumeHovered ? 1 : 0,
@@ -321,7 +319,7 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
                   max={1}
                   step={0.01}
                   value={isMuted ? 0 : volume}
-                  className="vol-range w-full cursor-pointer"
+                  className="vol-range w-full cursor-pointer pr-3"
                   style={
                     {
                       '--vol-fill': `${((isMuted ? 0 : volume) * 100).toFixed(1)}%`

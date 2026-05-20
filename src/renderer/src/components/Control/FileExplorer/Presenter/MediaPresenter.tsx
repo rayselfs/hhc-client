@@ -15,7 +15,7 @@ import PresenterNavigation from './PresenterNavigation'
 import PresenterSidebar from './PresenterSidebar'
 import PresenterGrid from './PresenterGrid'
 import MediaPreview from './Preview/MediaPreview'
-import MediaToolbar from './Preview/MediaToolbar'
+import MediaToolbar from './MediaToolbar'
 import GlassDivider from '@renderer/components/Common/GlassDivider'
 
 export default function MediaPresenter(): React.JSX.Element {
