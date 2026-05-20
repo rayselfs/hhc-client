@@ -193,9 +193,24 @@ interface NextItemPreviewProps {
 export default function NextItemPreview({ item }: NextItemPreviewProps): React.JSX.Element | null {
   const mediaType = getMediaType(item.mimeType)
 
-  if (mediaType === 'image') return <NextImagePreview item={item} />
-  if (mediaType === 'video') return <NextVideoPreview item={item} />
-  if (mediaType === 'pdf') return <NextPdfPreview item={item} />
+  let content: React.JSX.Element | null = null
+  if (mediaType === 'image') content = <NextImagePreview item={item} />
+  else if (mediaType === 'video') content = <NextVideoPreview item={item} />
+  else if (mediaType === 'pdf') content = <NextPdfPreview item={item} />
 
-  return null
+  if (!content) return null
+
+  return (
+    <>
+      {content}
+      <div className="absolute bottom-1 inset-x-0 flex justify-center px-3 pointer-events-none">
+        <span
+          className="text-foreground/90 text-sm truncate"
+          style={{ textShadow: '0 1px 4px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.6)' }}
+        >
+          {item.name}
+        </span>
+      </div>
+    </>
+  )
 }

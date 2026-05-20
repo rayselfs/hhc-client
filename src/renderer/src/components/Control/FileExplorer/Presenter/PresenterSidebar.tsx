@@ -38,7 +38,7 @@ export default function PresenterSidebar(): React.JSX.Element {
         </div>
         <div className="px-4 pb-4">
           <div
-            className="relative aspect-video bg-surface-secondary rounded-2xl overflow-hidden shadow-xl cursor-default"
+            className="relative aspect-video bg-surface-secondary rounded-2xl overflow-hidden cursor-default"
             onClick={() => useMediaProjectionStore.getState().next()}
           >
             {nextItem === null && (
@@ -47,16 +47,6 @@ export default function PresenterSidebar(): React.JSX.Element {
               </span>
             )}
             {nextItem && <NextItemPreview item={nextItem} />}
-            {nextItem && (
-              <div className="absolute bottom-1 inset-x-0 flex justify-center px-3 pointer-events-none">
-                <span
-                  className="text-foreground/90 text-sm truncate"
-                  style={{ textShadow: '0 1px 4px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.6)' }}
-                >
-                  {nextItem.name}
-                </span>
-              </div>
-            )}
           </div>
         </div>
       </div>
