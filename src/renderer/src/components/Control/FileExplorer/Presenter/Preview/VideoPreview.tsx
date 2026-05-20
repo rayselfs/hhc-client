@@ -191,7 +191,7 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
           onMouseDown={(e) => e.stopPropagation()}
         >
           <div className="rounded-full p-4 presenter-media-control">
-            <Play size={40} className="text-foreground" />
+            <Play size={70} />
           </div>
         </button>
       )}
@@ -248,7 +248,7 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
           />
 
           <div className="flex items-center pl-2 pb-2 gap-2">
-            <div className="inline-flex rounded-full video-control-pill">
+            <div className="inline-flex rounded-full presenter-media-control">
               <button
                 className="text-white/80 hover:text-white px-3 py-2 rounded-full transition-colors"
                 onClick={handlePlayPause}
@@ -264,7 +264,7 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
             </div>
 
             <div
-              className="inline-flex items-center rounded-full video-control-pill"
+              className="inline-flex items-center rounded-full presenter-media-control"
               onMouseEnter={() => setIsVolumeHovered(true)}
               onMouseLeave={() => setIsVolumeHovered(false)}
             >
@@ -301,7 +301,7 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
               </div>
             </div>
 
-            <div className="inline-flex items-center rounded-full video-control-pill px-3 py-2">
+            <div className="inline-flex items-center rounded-full presenter-media-control px-3 py-2">
               <span className="text-white/70 text-sm tabular-nums whitespace-nowrap">
                 {formatTime(currentTime)} / {formatTime(duration)}
               </span>

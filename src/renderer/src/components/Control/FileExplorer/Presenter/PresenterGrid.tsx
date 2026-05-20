@@ -59,7 +59,7 @@ export default function PresenterGrid(): React.JSX.Element {
   }
 
   return (
-    <div className="fixed inset-0 bg-background z-[10000] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 bg-background z-10000 flex flex-col overflow-hidden">
       <div className="shrink-0 flex items-center px-4 py-2 bg-background">
         <Button
           isIconOnly
@@ -80,7 +80,7 @@ export default function PresenterGrid(): React.JSX.Element {
         className="flex-1 overflow-y-auto p-6 outline-none"
         onKeyDown={handleKeyDown}
       >
-        <div className="grid gap-3 grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
+        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
           {playlist.map((item, index) => (
             <button
               key={item.id}

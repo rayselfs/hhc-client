@@ -55,18 +55,9 @@
 }
 
 .presenter-media-control {
-  background: rgba(255, 255, 255, 0.55);
-  backdrop-filter: blur(8px);
-}
-
-.dark .presenter-media-control,
-[data-theme='dark'] .presenter-media-control {
-  background: rgba(0, 0, 0, 0.35);
-}
-
-.video-control-pill {
-  background: rgba(8, 8, 8, 0.65);
-  backdrop-filter: blur(8px);
+  background: rgba(8, 8, 8, 0.2);
+  backdrop-filter: blur(1px);
+  color: white;
 }
 
 .timer-digits {
