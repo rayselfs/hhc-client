@@ -33,6 +33,7 @@ export interface FolderStoreState {
   navigateToRoot: () => void
   navigateUp: () => void
   cleanupExpired: () => Promise<void>
+  softDeleteExpired: () => void
   ensureItemsLoaded: (parentId: string) => Promise<void>
   toggleFavorite: (folderId: string) => void
   softDeleteFolder: (folderId: string) => void
@@ -474,6 +475,9 @@ export function createFolderStore(config: FolderStoreConfig) {
         const newItems = { ...state.items }
         for (const id of folderIds) delete newFolders[id]
         for (const id of itemIds) delete newItems[id]
+        for (const item of Object.values(newItems)) {
+          if (folderIds.includes(item.parentId)) delete newItems[item.id]
+        }
         return {
           folders: newFolders,
           items: newItems,
@@ -497,6 +501,9 @@ export function createFolderStore(config: FolderStoreConfig) {
         cascadeFolderIds = [...cascadeFolderIds, ...getDescendantFolderIds(fid, folders)]
       }
       const allExpiredFolderIds = [...expiredFolderIds, ...cascadeFolderIds]
+      for (const fid of expiredFolderIds) {
+        await ops.deleteItemsByParent(fid)
+      }
       if (cascadeFolderIds.length > 0) {
         await ops.deleteFolders(cascadeFolderIds)
         for (const fid of cascadeFolderIds) {
@@ -521,6 +528,26 @@ export function createFolderStore(config: FolderStoreConfig) {
           _itemsArray: Object.values(newItems)
         }
       })
+    },
+
+    softDeleteExpired: () => {
+      const now = Date.now()
+      const { folders, items } = get()
+      for (const folder of Object.values(folders)) {
+        if (
+          folder.expiresAt != null &&
+          folder.expiresAt < now &&
+          !folder.deletedAt &&
+          folder.id !== config.rootId
+        ) {
+          get().softDeleteFolder(folder.id)
+        }
+      }
+      for (const item of Object.values(items)) {
+        if (item.expiresAt != null && item.expiresAt < now && !item.deletedAt) {
+          get().softDeleteItem(item.id)
+        }
+      }
     },
 
     getChildFolders: (parentId) => {
