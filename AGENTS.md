@@ -1,7 +1,7 @@
 # PROJECT KNOWLEDGE BASE
 
-**Updated:** 2026-04-26
-**Commit:** 1b5e6d6
+**Updated:** 2026-05-23
+**Commit:** 272ee9e
 **Branch:** main
 
 ## OVERVIEW
@@ -82,8 +82,10 @@ hhc-client-v2/
 │       │   ├── timer.ts / timer-config.ts / timer-runtime.ts
 │       │   ├── stopwatch.ts
 │       │   ├── settings.ts
-│       │   ├── bible.ts / bible-history.ts / bible-search.ts / bible-settings.ts
+│       │   ├── bible.ts / bible-history.ts / bible-search.ts / bible-settings.ts / bible-speech.ts
 │       │   ├── folder.ts
+│       │   ├── file-explorer.ts
+│       │   ├── media-projection.ts
 │       │   ├── update.ts
 │       │   └── selectors/   # folder.ts, stopwatch.ts, update.ts
 │       ├── workers/         # Web Workers
@@ -91,6 +93,9 @@ hhc-client-v2/
 │       ├── pages/           # Route pages
 │       │   ├── TimerPage.tsx
 │       │   ├── BiblePage.tsx
+│       │   ├── FilesPage.tsx
+│       │   ├── FavoritesPage.tsx
+│       │   ├── TrashPage.tsx        # File Explorer trash (soft-deleted items)
 │       │   ├── ProjectionPage.tsx
 │       │   └── WelcomePage.tsx
 │       ├── i18n/            # react-i18next setup
@@ -114,6 +119,10 @@ hhc-client-v2/
 | Shared types & constants       | `src/shared/`                                                       | IPC channels, projection messages, API paths, shared types                          |
 | Expose API to renderer         | `src/preload/index.ts`                                              | contextBridge; update `index.d.ts` for types                                        |
 | UI / React components          | `src/renderer/src/components/`                                      | Control/ (domain panels), Common/ (reusable), Projection/ (display)                 |
+| File Explorer (files/folders)  | `src/renderer/src/pages/FilesPage.tsx` + `stores/file-explorer.ts`  | File upload, folder CRUD, favorites, trash; uses `createFolderStore`                |
+| Trash / deletion flow          | `src/renderer/src/pages/TrashPage.tsx` + `lib/app-init.ts`          | Soft-deleted items; see deletion flow design note below                             |
+| Folder store base              | `src/renderer/src/stores/folder.ts`                                 | `createFolderStore` factory shared by File Explorer + Bible                         |
+| Folder IndexedDB ops           | `src/renderer/src/lib/folder-db.ts`                                 | All IndexedDB reads/writes for folder-records + folder-items                        |
 | Timer engine (adapter bridge)  | `src/renderer/src/contexts/TimerEngineContext.tsx`                  | Bridges adapter ↔ Zustand stores                                                    |
 | Timer adapter (dual-mode)      | `src/renderer/src/lib/timer-adapter.ts`                             | BrowserTimerAdapter (Worker) vs ElectronTimerAdapter (IPC)                          |
 | Timer Worker                   | `src/renderer/src/workers/timer.worker.ts`                          | setInterval(100ms) tick loop for browser mode                                       |
@@ -303,6 +312,9 @@ adapter.onTick → store.tick(Date.now())
 - **Mac build skips typecheck**: `build:mac` runs `electron-vite build` directly — intentional.
 - **PresetChips right-click**: Intentionally bypasses ContextMenu system — right-click directly removes preset without confirmation menu. This is by design for quick interaction.
 - **Context menu**: Generic infrastructure in `ContextMenuContext` + `ContextMenuOverlay`. Domain-specific hooks use `createFolderContextMenu` factory. See `useBibleContextMenu`/`useFolderContextMenu` for patterns.
+- **Deletion flow design — two different paths by store**:
+  - **`useBibleFolderStore`** (Bible): `cleanupExpired()` on startup → **direct hard delete** based on `expiresAt`. No trash UI, no soft-delete user flow. Bible context menu calls `removeItem()` / `deleteFolder()` (hard delete).
+  - **`useFileExplorerStore`** (Files): `softDeleteExpired()` on startup → moves expired items to **trash** (sets `deletedAt`). Then `purgeTrash(retentionDays × ms)` permanently deletes from IDB after retention period. Users can recover items from `/trash` before purge. Do **not** call `cleanupExpired()` for File Explorer — it bypasses trash and hard-deletes directly.
 
 ## COMMANDS
 
