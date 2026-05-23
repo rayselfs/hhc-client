@@ -168,7 +168,10 @@ export function createFolderDB(
       const expiredItems = allItems.filter((i) => i.deletedAt != null && i.deletedAt < cutoff)
       const folderIds = expiredFolders.map((f) => f.id)
       const itemIds = expiredItems.map((i) => i.id)
-      if (folderIds.length > 0) await deleteFolders(folderIds)
+      if (folderIds.length > 0) {
+        for (const fid of folderIds) await deleteItemsByParent(fid)
+        await deleteFolders(folderIds)
+      }
       if (itemIds.length > 0) await deleteItems(itemIds)
       return { folderIds, itemIds }
     } catch (error) {
