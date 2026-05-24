@@ -4,13 +4,18 @@ import type { FileItemRecord } from '@shared/types/folder'
 import { getMediaType } from '@renderer/lib/presentability'
 import { openFileExplorerDB, getFileBlob } from '@renderer/lib/file-explorer-db'
 import { loadPdfjsLib } from '@renderer/lib/pdfjs-loader'
+import { useThumbnails } from '@renderer/hooks/useThumbnails'
 
 function NextImagePreview({ item }: { item: FileItemRecord }): React.JSX.Element {
   const { t } = useTranslation()
+  const thumbnails = useThumbnails([item])
+  const thumbnailUrl = thumbnails[item.id] ?? null
   const [src, setSrc] = useState<string | null>(null)
   const [error, setError] = useState(false)
 
   useEffect(() => {
+    if (thumbnailUrl !== null) return
+
     let objectUrl: string | null = null
     let cancelled = false
 
@@ -31,7 +36,13 @@ function NextImagePreview({ item }: { item: FileItemRecord }): React.JSX.Element
       cancelled = true
       if (objectUrl) URL.revokeObjectURL(objectUrl)
     }
-  }, [item.id])
+  }, [item.id, thumbnailUrl])
+
+  if (thumbnailUrl !== null) {
+    return (
+      <img src={thumbnailUrl} alt={item.name} className="absolute inset-0 w-full h-full object-contain" />
+    )
+  }
 
   if (error)
     return (
@@ -52,10 +63,14 @@ function NextImagePreview({ item }: { item: FileItemRecord }): React.JSX.Element
 
 function NextVideoPreview({ item }: { item: FileItemRecord }): React.JSX.Element {
   const { t } = useTranslation()
+  const thumbnails = useThumbnails([item])
+  const thumbnailUrl = thumbnails[item.id] ?? null
   const [src, setSrc] = useState<string | null>(null)
   const [error, setError] = useState(false)
 
   useEffect(() => {
+    if (thumbnailUrl !== null) return
+
     let objectUrl: string | null = null
     let cancelled = false
 
@@ -76,7 +91,13 @@ function NextVideoPreview({ item }: { item: FileItemRecord }): React.JSX.Element
       cancelled = true
       if (objectUrl) URL.revokeObjectURL(objectUrl)
     }
-  }, [item.id])
+  }, [item.id, thumbnailUrl])
+
+  if (thumbnailUrl !== null) {
+    return (
+      <img src={thumbnailUrl} alt={item.name} className="absolute inset-0 w-full h-full object-contain" />
+    )
+  }
 
   if (error)
     return (
@@ -108,11 +129,18 @@ function NextVideoPreview({ item }: { item: FileItemRecord }): React.JSX.Element
 
 function NextPdfPreview({ item }: { item: FileItemRecord }): React.JSX.Element {
   const { t } = useTranslation()
+  const thumbnails = useThumbnails([item])
+  const thumbnailUrl = thumbnails[item.id] ?? null
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
 
   useEffect(() => {
+    if (thumbnailUrl !== null) {
+      setLoading(false)
+      return
+    }
+
     let cancelled = false
     let objectUrl: string | null = null
 
@@ -167,7 +195,13 @@ function NextPdfPreview({ item }: { item: FileItemRecord }): React.JSX.Element {
       cancelled = true
       if (objectUrl) URL.revokeObjectURL(objectUrl)
     }
-  }, [item.id])
+  }, [item.id, thumbnailUrl])
+
+  if (thumbnailUrl !== null) {
+    return (
+      <img src={thumbnailUrl} alt={item.name} className="absolute inset-0 w-full h-full object-contain" />
+    )
+  }
 
   return (
     <>

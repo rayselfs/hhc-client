@@ -70,6 +70,12 @@ interface SpeechAPI {
   deleteKey: (provider: string) => Promise<void>
 }
 
+interface NativeFsAPI {
+  store: (id: string, buffer: ArrayBuffer) => Promise<void>
+  read: (id: string) => Promise<ArrayBuffer>
+  delete: (id: string) => Promise<void>
+}
+
 declare global {
   interface Window {
     api: {
@@ -80,6 +86,7 @@ declare global {
       app: AppAPI
       update: UpdateAPI
       speech: SpeechAPI
+      nativeFs: NativeFsAPI
     }
   }
 }

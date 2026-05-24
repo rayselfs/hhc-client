@@ -2,6 +2,19 @@ import { useEffect } from 'react'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 
+function playlistContentChanged(
+  prev: { id: string; mimeType: string; name: string }[],
+  next: { id: string; mimeType: string; name: string }[]
+): boolean {
+  if (prev.length !== next.length) return true
+  for (let i = 0; i < prev.length; i++) {
+    const p = prev[i]
+    const n = next[i]
+    if (p.id !== n.id || p.mimeType !== n.mimeType || p.name !== n.name) return true
+  }
+  return false
+}
+
 export function useMediaProjectionSync(): void {
   const { send, blankProjection } = useProjection()
 
@@ -10,7 +23,7 @@ export function useMediaProjectionSync(): void {
       if (!state.isPresenting) return
 
       const indexChanged = state.currentIndex !== prev.currentIndex
-      const playlistChanged = state.playlist !== prev.playlist
+      const playlistChanged = playlistContentChanged(prev.playlist, state.playlist)
 
       if (indexChanged || playlistChanged) {
         const item = state.playlist[state.currentIndex]

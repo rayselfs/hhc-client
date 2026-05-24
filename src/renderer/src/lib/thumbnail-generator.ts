@@ -1,7 +1,15 @@
 import { loadPdfjsLib } from './pdfjs-loader'
 
+declare const scheduler: { yield?: () => Promise<void> } | undefined
+
 const THUMBNAIL_MAX_SIZE = 256
 const JPEG_QUALITY = 0.8
+const MAX_PDF_THUMBNAIL_SIZE = 50 * 1024 * 1024
+
+const yieldToMain = (): Promise<void> =>
+  typeof scheduler !== 'undefined' && typeof scheduler.yield === 'function'
+    ? scheduler.yield()
+    : new Promise<void>((resolve) => setTimeout(resolve, 0))
 
 function createCanvas(width = THUMBNAIL_MAX_SIZE, height = THUMBNAIL_MAX_SIZE): HTMLCanvasElement {
   const canvas = document.createElement('canvas')
@@ -57,7 +65,9 @@ function loadImage(file: File): Promise<HTMLImageElement> {
 
 async function generateImageThumbnail(file: File): Promise<string | null> {
   const image = await loadImage(file)
-  return drawContainFit(image, image.naturalWidth, image.naturalHeight)
+  const dataUrl = drawContainFit(image, image.naturalWidth, image.naturalHeight)
+  await yieldToMain()
+  return dataUrl
 }
 
 function waitForVideoEvent(video: HTMLVideoElement, eventName: string): Promise<void> {
@@ -96,7 +106,9 @@ async function generateVideoThumbnail(file: File): Promise<string | null> {
     video.currentTime = targetTime
     await waitForVideoEvent(video, 'seeked')
 
-    return drawContainFit(video, video.videoWidth, video.videoHeight)
+    const dataUrl = drawContainFit(video, video.videoWidth, video.videoHeight)
+    await yieldToMain()
+    return dataUrl
   } finally {
     video.removeAttribute('src')
     video.load()
@@ -105,6 +117,8 @@ async function generateVideoThumbnail(file: File): Promise<string | null> {
 }
 
 async function generatePdfThumbnail(file: File): Promise<string | null> {
+  if (file.size > MAX_PDF_THUMBNAIL_SIZE) return null
+
   const pdfjsLib = await loadPdfjsLib()
 
   const buffer = await file.arrayBuffer()

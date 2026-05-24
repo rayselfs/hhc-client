@@ -1,22 +1,97 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { X } from 'lucide-react'
 import { Button } from '@heroui/react'
 import { useTranslation } from 'react-i18next'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 import { useThumbnails } from '@renderer/hooks/useThumbnails'
 import GlassDivider from '@renderer/components/Common/GlassDivider'
+import type { FileItemRecord } from '@shared/types/folder'
+
+interface GridItemProps {
+  item: FileItemRecord
+  index: number
+  isFocused: boolean
+  thumbnail: string | null
+  jumpTo: (index: number) => void
+  toggleGrid: () => void
+  onMouseEnter: (index: number) => void
+  buttonRef?: React.Ref<HTMLButtonElement>
+}
+
+export const GridItem = React.memo(function GridItem({
+  item,
+  index,
+  isFocused,
+  thumbnail,
+  jumpTo,
+  toggleGrid,
+  onMouseEnter,
+  buttonRef
+}: GridItemProps) {
+  const isActive = useMediaProjectionStore((s) => s.currentIndex === index)
+  
+  const renderCount = useRef(0)
+  useEffect(() => {
+    renderCount.current++
+  })
+
+  return (
+    <button
+      ref={buttonRef}
+      data-testid={`grid-item-${index}`}
+      data-render={renderCount.current}
+      className={`relative aspect-video rounded overflow-hidden border-3 transition-colors ${
+        isActive
+          ? 'border-accent'
+          : isFocused
+            ? 'border-accent/80'
+            : 'border-transparent hover:border-accent'
+      }`}
+      onMouseEnter={() => onMouseEnter(index)}
+      onClick={() => {
+        jumpTo(index)
+        toggleGrid()
+      }}
+    >
+      {thumbnail ? (
+        <img src={thumbnail} className="w-full h-full object-cover" alt={item.name} />
+      ) : (
+        <div className="w-full h-full bg-default-200 flex items-center justify-center text-foreground/50 text-xs">
+          {item.name}
+        </div>
+      )}
+      {isActive && (
+        <div className="absolute inset-0 bg-primary/10 flex items-center justify-center">
+          <div className="w-3 h-3 rounded-full bg-primary" />
+        </div>
+      )}
+      <div className="absolute bottom-1 right-1 text-foreground/70 text-xs bg-background/70 px-1 rounded">
+        {index + 1}
+      </div>
+    </button>
+  )
+})
 
 export default function PresenterGrid(): React.JSX.Element {
   const { t } = useTranslation()
   const playlist = useMediaProjectionStore((s) => s.playlist)
-  const currentIndex = useMediaProjectionStore((s) => s.currentIndex)
   const jumpTo = useMediaProjectionStore((s) => s.jumpTo)
   const toggleGrid = useMediaProjectionStore((s) => s.toggleGrid)
   const thumbnails = useThumbnails(playlist)
 
-  const [focusedIndex, setFocusedIndex] = useState(currentIndex)
+  const [focusedIndex, setFocusedIndex] = useState(() => useMediaProjectionStore.getState().currentIndex)
   const containerRef = useRef<HTMLDivElement>(null)
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([])
+  
+  const getButtonRefCallbacks = useMemo(() => {
+    const callbacks: Array<(el: HTMLButtonElement | null) => void> = []
+    for (let i = 0; i < playlist.length; i++) {
+      callbacks.push((el) => {
+        buttonRefs.current[i] = el
+      })
+    }
+    return callbacks
+  }, [playlist.length])
 
   useEffect(() => {
     containerRef.current?.focus()
@@ -58,6 +133,10 @@ export default function PresenterGrid(): React.JSX.Element {
     }
   }
 
+  const handleMouseEnter = useCallback((index: number) => {
+    setFocusedIndex(index)
+  }, [])
+
   return (
     <div className="fixed inset-0 bg-background z-10000 flex flex-col overflow-hidden">
       <div className="shrink-0 flex items-center px-4 py-2 bg-background">
@@ -82,44 +161,17 @@ export default function PresenterGrid(): React.JSX.Element {
       >
         <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
           {playlist.map((item, index) => (
-            <button
+            <GridItem
               key={item.id}
-              ref={(el) => {
-                buttonRefs.current[index] = el
-              }}
-              className={`relative aspect-video rounded overflow-hidden border-3 transition-colors ${
-                index === currentIndex
-                  ? 'border-accent'
-                  : index === focusedIndex
-                    ? 'border-accent/80'
-                    : 'border-transparent hover:border-accent'
-              }`}
-              onMouseEnter={() => setFocusedIndex(index)}
-              onClick={() => {
-                jumpTo(index)
-                toggleGrid()
-              }}
-            >
-              {thumbnails[item.id] ? (
-                <img
-                  src={thumbnails[item.id]!}
-                  className="w-full h-full object-cover"
-                  alt={item.name}
-                />
-              ) : (
-                <div className="w-full h-full bg-default-200 flex items-center justify-center text-foreground/50 text-xs">
-                  {item.name}
-                </div>
-              )}
-              {index === currentIndex && (
-                <div className="absolute inset-0 bg-primary/10 flex items-center justify-center">
-                  <div className="w-3 h-3 rounded-full bg-primary" />
-                </div>
-              )}
-              <div className="absolute bottom-1 right-1 text-foreground/70 text-xs bg-background/70 px-1 rounded">
-                {index + 1}
-              </div>
-            </button>
+              item={item}
+              index={index}
+              isFocused={index === focusedIndex}
+              thumbnail={thumbnails[item.id] ?? null}
+              jumpTo={jumpTo}
+              toggleGrid={toggleGrid}
+              onMouseEnter={handleMouseEnter}
+              buttonRef={getButtonRefCallbacks[index]}
+            />
           ))}
         </div>
       </div>

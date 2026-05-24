@@ -12,6 +12,7 @@ const mockDeleteItems = vi.fn()
 const mockDeleteItemsByParent = vi.fn()
 const mockDeleteExpiredFolders = vi.fn()
 const mockDeleteExpiredItems = vi.fn()
+const mockPurgeTrashOlderThan = vi.fn()
 
 vi.mock('@renderer/lib/folder-db', () => ({
   createFolderDB: () => ({
@@ -26,7 +27,8 @@ vi.mock('@renderer/lib/folder-db', () => ({
     deleteItems: (...args: unknown[]) => mockDeleteItems(...args),
     deleteItemsByParent: (...args: unknown[]) => mockDeleteItemsByParent(...args),
     deleteExpiredFolders: (...args: unknown[]) => mockDeleteExpiredFolders(...args),
-    deleteExpiredItems: (...args: unknown[]) => mockDeleteExpiredItems(...args)
+    deleteExpiredItems: (...args: unknown[]) => mockDeleteExpiredItems(...args),
+    purgeTrashOlderThan: (...args: unknown[]) => mockPurgeTrashOlderThan(...args)
   })
 }))
 
@@ -79,6 +81,7 @@ beforeEach(() => {
   mockDeleteItems.mockResolvedValue(undefined)
   mockLoadAllFolders.mockResolvedValue([rootFolder])
   mockLoadItemsByParent.mockResolvedValue([])
+  mockPurgeTrashOlderThan.mockResolvedValue({ folderIds: [], itemIds: [] })
 })
 
 describe('initialize()', () => {
@@ -354,5 +357,134 @@ describe('current folder via folders[currentFolderId]', () => {
     const { folders, currentFolderId } = useBibleFolderStore.getState()
     expect(folders[currentFolderId].id).toBe(folderId)
     expect(folders[currentFolderId].name).toBe('Deep')
+  })
+})
+
+describe('getDescendantFolderIds (via deleteFolder cascade)', () => {
+  it('returns all descendants in a 100-folder 3-level tree', () => {
+    const level1Ids: string[] = []
+    const level2Ids: string[] = []
+    const level3Ids: string[] = []
+
+    for (let i = 0; i < 10; i++) {
+      const l1Id = useBibleFolderStore.getState().addFolder(`L1-${i}`)
+      level1Ids.push(l1Id)
+      for (let j = 0; j < 3; j++) {
+        const l2Id = useBibleFolderStore.getState().addFolder(`L2-${i}-${j}`, l1Id)
+        level2Ids.push(l2Id)
+        for (let k = 0; k < 3; k++) {
+          const l3Id = useBibleFolderStore.getState().addFolder(`L3-${i}-${j}-${k}`, l2Id)
+          level3Ids.push(l3Id)
+        }
+      }
+    }
+
+    const targetL1 = level1Ids[0]
+    useBibleFolderStore.getState().deleteFolder(targetL1)
+
+    expect(useBibleFolderStore.getState().folders[targetL1]).toBeUndefined()
+
+    const expectedDeletedL2 = level2Ids.slice(0, 3)
+    const expectedDeletedL3 = level3Ids.slice(0, 9)
+    for (const id of [...expectedDeletedL2, ...expectedDeletedL3]) {
+      expect(useBibleFolderStore.getState().folders[id]).toBeUndefined()
+    }
+
+    for (const id of level1Ids.slice(1)) {
+      expect(useBibleFolderStore.getState().folders[id]).toBeDefined()
+    }
+  })
+})
+
+describe('deleteFolder() — items in subfolder removed, sibling items preserved', () => {
+  it('removes items in deleted subfolder but keeps items in sibling folder', () => {
+    const targetId = useBibleFolderStore.getState().addFolder('Target')
+    const siblingId = useBibleFolderStore.getState().addFolder('Sibling')
+
+    useBibleFolderStore.getState().addItem({ ...makeVerse('in-target'), parentId: targetId })
+    useBibleFolderStore.getState().addItem({ ...makeVerse('in-sibling'), parentId: siblingId })
+
+    const targetItemId = useBibleFolderStore.getState().getItems(targetId)[0].id
+    const siblingItemId = useBibleFolderStore.getState().getItems(siblingId)[0].id
+
+    useBibleFolderStore.getState().deleteFolder(targetId)
+
+    expect(useBibleFolderStore.getState().items[targetItemId]).toBeUndefined()
+    expect(useBibleFolderStore.getState().items[siblingItemId]).toBeDefined()
+  })
+
+  it('removes items in nested subfolders when parent is deleted', () => {
+    const parentId = useBibleFolderStore.getState().addFolder('Parent')
+    const childId = useBibleFolderStore.getState().addFolder('Child', parentId)
+
+    useBibleFolderStore.getState().addItem({ ...makeVerse('in-child'), parentId: childId })
+    const childItemId = useBibleFolderStore.getState().getItems(childId)[0].id
+
+    useBibleFolderStore.getState().deleteFolder(parentId)
+
+    expect(useBibleFolderStore.getState().items[childItemId]).toBeUndefined()
+  })
+})
+
+describe('purgeTrash() — correct items purged via Set lookup', () => {
+  it('removes purged folder and its items from state', async () => {
+    const deletedFolderId = 'deleted-folder-1'
+    const deletedItemId = 'deleted-item-1'
+    const survivingItemId = 'surviving-item-1'
+
+    const deletedFolder: FolderRecord = {
+      id: deletedFolderId,
+      name: 'Deleted',
+      parentId: ROOT_ID,
+      sortIndex: 0,
+      createdAt: Date.now(),
+      expiresAt: null,
+      deletedAt: Date.now() - 100000
+    }
+
+    useBibleFolderStore.setState((state) => ({
+      folders: { ...state.folders, [deletedFolderId]: deletedFolder },
+      _foldersArray: [...state._foldersArray, deletedFolder],
+      items: {
+        [deletedItemId]: {
+          id: deletedItemId,
+          type: 'verse' as const,
+          parentId: deletedFolderId,
+          sortIndex: 0,
+          createdAt: Date.now(),
+          expiresAt: null,
+          versionId: 1,
+          bookNumber: 1,
+          chapter: 1,
+          verse: 1,
+          text: 'deleted verse'
+        },
+        [survivingItemId]: {
+          id: survivingItemId,
+          type: 'verse' as const,
+          parentId: ROOT_ID,
+          sortIndex: 0,
+          createdAt: Date.now(),
+          expiresAt: null,
+          versionId: 1,
+          bookNumber: 1,
+          chapter: 1,
+          verse: 1,
+          text: 'surviving verse'
+        }
+      },
+      _itemsArray: []
+    }))
+
+    mockPurgeTrashOlderThan.mockResolvedValue({
+      folderIds: [deletedFolderId],
+      itemIds: []
+    })
+
+    await useBibleFolderStore.getState().purgeTrash(86400000)
+
+    expect(useBibleFolderStore.getState().folders[deletedFolderId]).toBeUndefined()
+    expect(useBibleFolderStore.getState().items[deletedItemId]).toBeUndefined()
+    expect(useBibleFolderStore.getState().items[survivingItemId]).toBeDefined()
   })
 })

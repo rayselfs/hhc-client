@@ -137,8 +137,10 @@ export function removeFileItemFromStore(id: string): void {
 
 export async function permanentDeleteFileItemFromStore(id: string): Promise<void> {
   const db = await openFileExplorerDB()
+  const item = useFileExplorerStore.getState().items[id]
+  const blobId = item?.type === 'file' ? item.url.replace(/^blob:/, '') : id
   useFileExplorerStore.getState().removeItem(id)
-  await Promise.all([deleteFileBlob(db, id), deleteThumbnail(id)])
+  await Promise.all([deleteFileBlob(db, blobId), deleteThumbnail(id)])
 }
 
 export function deleteFolderFromStore(folderId: string): void {
@@ -149,14 +151,16 @@ export async function permanentDeleteFolderFromStore(folderId: string): Promise<
   const state = useFileExplorerStore.getState()
   const db = await openFileExplorerDB()
 
-  const itemIds: string[] = []
+  const blobIds: string[] = []
+  const thumbnailIds: string[] = []
   const queue: string[] = [folderId]
 
   while (queue.length > 0) {
     const currentId = queue.shift()!
     for (const item of state._itemsArray) {
       if (item.parentId === currentId && item.type === 'file') {
-        itemIds.push(item.id)
+        blobIds.push(item.url.replace(/^blob:/, ''))
+        thumbnailIds.push(item.id)
       }
     }
     for (const folder of state._foldersArray) {
@@ -166,7 +170,8 @@ export async function permanentDeleteFolderFromStore(folderId: string): Promise<
     }
   }
 
-  await Promise.all(itemIds.flatMap((id) => [deleteFileBlob(db, id), deleteThumbnail(id)]))
+  await Promise.all(blobIds.map((id) => deleteFileBlob(db, id)))
+  await Promise.all(thumbnailIds.map((id) => deleteThumbnail(id)))
 
   state.deleteFolder(folderId)
 }

@@ -21,7 +21,6 @@ import {
 import type { ClipboardState } from '@renderer/components/Control/FileExplorer'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
 import { getThumbnail, saveThumbnail } from '@renderer/lib/thumbnail-db'
-import { openFileExplorerDB, getFileBlob, storeFileBlob } from '@renderer/lib/file-explorer-db'
 import MediaPresenter from '@renderer/components/Control/FileExplorer/Presenter/MediaPresenter'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 
@@ -35,8 +34,8 @@ export default function FilesPage(): React.JSX.Element {
   const getChildFolders = useFileExplorerStore((state) => state.getChildFolders)
   const addFolder = useFileExplorerStore((state) => state.addFolder)
   const moveItem = useFileExplorerStore((state) => state.moveItem)
+  const copyItem = useFileExplorerStore((state) => state.copyItem)
   const moveFolder = useFileExplorerStore((state) => state.moveFolder)
-  const addItem = useFileExplorerStore((state) => state.addItem)
   const updateFolder = useFileExplorerStore((state) => state.updateFolder)
   const updateItem = useFileExplorerStore((state) => state.updateItem)
   const { showItemMenu, showFolderMenu, showMultiSelectMenu, showEmptyAreaMenu } =
@@ -139,9 +138,9 @@ export default function FilesPage(): React.JSX.Element {
       for (const id of targetIds) {
         const state = useFileExplorerStore.getState()
         if (state.folders[id]) {
-          await deleteFolderFromStore(id)
+          deleteFolderFromStore(id)
         } else {
-          await removeFileItemFromStore(id)
+          removeFileItemFromStore(id)
         }
       }
       setSelectedIds(new Set())
@@ -162,15 +161,8 @@ export default function FilesPage(): React.JSX.Element {
         }
       } else if (state.items[id]) {
         if (clipboard.mode === 'copy') {
-          const item = state.items[id]
-          if (item.type !== 'file') continue
-          const newId = crypto.randomUUID()
-          const { id: _id, sortIndex: _si, createdAt: _ca, expiresAt: _ea, ...rest } = item
-          const db = await openFileExplorerDB()
-          const blob = await getFileBlob(db, id)
-          if (blob) await storeFileBlob(db, newId, blob)
-          const newUrl = { url: `blob:${newId}` }
-          addItem({ ...rest, ...newUrl, id: newId, parentId: currentFolderId })
+          const newId = await copyItem(id, currentFolderId)
+          if (!newId) continue
           const dataUrl = await getThumbnail(id)
           if (dataUrl) {
             await saveThumbnail(newId, dataUrl)
@@ -186,7 +178,7 @@ export default function FilesPage(): React.JSX.Element {
 
     if (clipboard.mode === 'cut') setClipboard(null)
     setSelectedIds(new Set())
-  }, [clipboard, currentFolderId, addFolder, addItem, moveFolder, moveItem])
+  }, [clipboard, currentFolderId, addFolder, copyItem, moveFolder, moveItem])
 
   const openEditModal = useCallback((id: string): void => {
     const state = useFileExplorerStore.getState()

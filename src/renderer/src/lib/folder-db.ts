@@ -141,10 +141,8 @@ export function createFolderDB(
   async function deleteExpiredItems(now: number): Promise<string[]> {
     try {
       const db = await getDB()
-      const all: AnyItemRecord[] = await db.getAll('folder-items')
-      const expired = all.filter(
-        (i) => i.parentId === rootId && i.expiresAt != null && i.expiresAt < now
-      )
+      const items: AnyItemRecord[] = await db.getAllFromIndex('folder-items', 'by-parent', rootId)
+      const expired = items.filter((i) => i.expiresAt != null && i.expiresAt < now)
       if (expired.length === 0) return []
       const ids = expired.map((i) => i.id)
       await deleteItems(ids)
@@ -164,6 +162,7 @@ export function createFolderDB(
       const allFolders = await loadAllFolders()
       const expiredFolders = allFolders.filter((f) => f.deletedAt != null && f.deletedAt < cutoff)
       const db = await getDB()
+      // No index on deletedAt — full scan required without a schema change
       const allItems: AnyItemRecord[] = await db.getAll('folder-items')
       const expiredItems = allItems.filter((i) => i.deletedAt != null && i.deletedAt < cutoff)
       const folderIds = expiredFolders.map((f) => f.id)

@@ -122,24 +122,41 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
     }
   }, [pdfDoc, currentPage, pdfViewMode])
 
+  const renderedPagesRef = useRef<Set<number>>(new Set())
+
   useEffect(() => {
     if (!pdfDoc || pdfViewMode !== 'scroll') return
-    let cancelled = false
 
-    async function renderAll(): Promise<void> {
-      for (let i = 0; i < pdfDoc!.numPages; i++) {
-        if (cancelled) return
-        const canvas = scrollCanvasRefs.current[i]
-        if (canvas) {
-          await renderPage(pdfDoc!, i + 1, canvas)
+    renderedPagesRef.current = new Set()
+
+    const firstCanvas = scrollCanvasRefs.current[0]
+    if (firstCanvas) {
+      renderedPagesRef.current.add(0)
+      void renderPage(pdfDoc, 1, firstCanvas)
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            const canvas = entry.target as HTMLCanvasElement
+            const pageIndex = Number(canvas.dataset.pageIndex)
+            if (!renderedPagesRef.current.has(pageIndex)) {
+              renderedPagesRef.current.add(pageIndex)
+              void renderPage(pdfDoc!, pageIndex + 1, canvas)
+            }
+            observer.unobserve(canvas)
+          }
         }
-      }
-    }
+      },
+      { rootMargin: '200px' }
+    )
 
-    void renderAll()
-    return () => {
-      cancelled = true
-    }
+    scrollCanvasRefs.current.forEach((canvas) => {
+      if (canvas) observer.observe(canvas)
+    })
+
+    return () => observer.disconnect()
   }, [pdfDoc, pdfViewMode, pageCount])
 
   useEffect(() => {
@@ -191,6 +208,7 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
               ref={(el) => {
                 scrollCanvasRefs.current[i] = el
               }}
+              data-page-index={i}
               style={{ maxWidth: '100%' }}
             />
           ))}

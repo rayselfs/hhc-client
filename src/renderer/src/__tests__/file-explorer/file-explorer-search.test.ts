@@ -68,7 +68,9 @@ function makeStoreState(items: AnyItemRecord[], folders: FolderRecord[] = []): F
     getChildFolders: vi.fn().mockReturnValue([]),
     getItems: vi.fn().mockReturnValue([]),
     getFolderPath: vi.fn().mockReturnValue([]),
-    isItemsLoaded: vi.fn().mockReturnValue(false)
+    isItemsLoaded: vi.fn().mockReturnValue(false),
+    copyItem: vi.fn(),
+    softDeleteExpired: vi.fn()
   }
 }
 

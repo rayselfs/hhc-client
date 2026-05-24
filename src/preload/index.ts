@@ -93,6 +93,12 @@ const speechApi = {
   deleteKey: (provider: string) => typedInvoke('speech:deleteKey', provider)
 }
 
+const nativeFsApi = {
+  store: (id: string, buffer: ArrayBuffer) => ipcRenderer.invoke('native-fs:store-file', id, buffer),
+  read: (id: string) => ipcRenderer.invoke('native-fs:read-file', id) as Promise<ArrayBuffer>,
+  delete: (id: string) => ipcRenderer.invoke('native-fs:delete-file', id)
+}
+
 const api = {
   projection: projectionApi,
   theme: themeApi,
@@ -100,7 +106,8 @@ const api = {
   bible: bibleApi,
   app: appApi,
   update: updateApi,
-  speech: speechApi
+  speech: speechApi,
+  nativeFs: nativeFsApi
 }
 
 try {

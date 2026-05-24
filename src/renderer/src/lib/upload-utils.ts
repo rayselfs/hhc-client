@@ -1,6 +1,35 @@
+import { toast } from '@heroui/react/toast'
 import { addFileItemToStore, useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { generateThumbnail } from '@renderer/lib/thumbnail-generator'
 import { saveThumbnail } from '@renderer/lib/thumbnail-db'
+import { isWeb } from '@renderer/lib/env'
+
+export const MAX_FILE_SIZE_WEB = 2 * 1024 * 1024 * 1024
+
+function createSemaphore(limit: number): { acquire(): Promise<() => void> } {
+  let active = 0
+  const queue: Array<() => void> = []
+  return {
+    acquire(): Promise<() => void> {
+      return new Promise((resolve) => {
+        const tryAcquire = () => {
+          if (active < limit) {
+            active++
+            resolve(() => {
+              active--
+              queue.shift()?.()
+            })
+          } else {
+            queue.push(tryAcquire)
+          }
+        }
+        tryAcquire()
+      })
+    }
+  }
+}
+
+const UPLOAD_CONCURRENCY = 3
 
 async function readAllEntries(reader: FileSystemDirectoryReader): Promise<FileSystemEntry[]> {
   const all: FileSystemEntry[] = []
@@ -56,18 +85,29 @@ export function canGenerateThumbnail(mimeType: string): boolean {
 }
 
 export async function uploadFiles(files: File[], parentId: string): Promise<void> {
-  const ids = await Promise.all(files.map((f) => addFileItemToStore(f, parentId)))
-  files.forEach((file, i) => {
-    const itemId = ids[i]
-    if (canGenerateThumbnail(file.type)) {
-      void generateThumbnail(file).then(async (dataUrl) => {
-        if (dataUrl) await saveThumbnail(itemId, dataUrl)
-        window.dispatchEvent(
-          new CustomEvent('hhc:thumbnail-ready', { detail: { itemId, dataUrl } })
-        )
-      })
-    }
-  })
+  const semaphore = createSemaphore(UPLOAD_CONCURRENCY)
+
+  await Promise.all(
+    files.map(async (file) => {
+      if (isWeb() && file.size > MAX_FILE_SIZE_WEB) {
+        toast.danger(`File "${file.name}" exceeds 2GB limit`)
+        return
+      }
+      const release = await semaphore.acquire()
+      try {
+        const id = await addFileItemToStore(file, parentId)
+        if (canGenerateThumbnail(file.type)) {
+          const dataUrl = await generateThumbnail(file)
+          if (dataUrl) {
+            await saveThumbnail(id, dataUrl)
+          }
+          window.dispatchEvent(new CustomEvent('hhc:thumbnail-ready', { detail: { itemId: id, dataUrl } }))
+        }
+      } finally {
+        release()
+      }
+    })
+  )
 }
 
 export async function uploadFolderFiles(

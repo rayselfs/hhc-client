@@ -1,13 +1,17 @@
 import type { DBSchema, IDBPDatabase } from 'idb'
 import { openDB, unwrap } from 'idb'
 import type { AnyItemRecord, FolderRecord } from '@shared/types/folder'
+import { isElectron } from './env'
 
 interface FileBlobRecord {
   id: string
-  blob: Blob
+  blob?: Blob
+  storage?: 'indexed-db' | 'native-fs'
+  size?: number
+  refCount?: number
 }
 
-interface FileExplorerDBSchema extends DBSchema {
+export interface FileExplorerDBSchema extends DBSchema {
   'file-blobs': {
     key: string
     value: FileBlobRecord
@@ -25,7 +29,8 @@ interface FileExplorerDBSchema extends DBSchema {
 }
 
 const DB_NAME = 'hhc-file-explorer'
-const DB_VERSION = 2
+const DB_VERSION = 3
+export const NATIVE_FS_THRESHOLD = 100 * 1024 * 1024
 
 let fileExplorerDBPromise: Promise<IDBPDatabase<FileExplorerDBSchema>> | null = null
 
@@ -68,7 +73,13 @@ export async function storeFileBlob(
   id: string,
   blob: Blob
 ): Promise<void> {
-  await db.put('file-blobs', { id, blob })
+  if (isElectron() && blob.size > NATIVE_FS_THRESHOLD) {
+    await window.api.nativeFs.store(id, await blob.arrayBuffer())
+    await db.put('file-blobs', { id, storage: 'native-fs', size: blob.size, refCount: 1 })
+    return
+  }
+
+  await db.put('file-blobs', { id, blob, refCount: 1 })
 }
 
 export async function getFileBlob(
@@ -76,6 +87,11 @@ export async function getFileBlob(
   id: string
 ): Promise<Blob | null> {
   const record = await db.get('file-blobs', id)
+  if (record?.storage === 'native-fs') {
+    const buffer = await window.api.nativeFs.read(id)
+    return new Blob([buffer])
+  }
+
   return record?.blob ?? null
 }
 
@@ -83,5 +99,26 @@ export async function deleteFileBlob(
   db: IDBPDatabase<FileExplorerDBSchema>,
   id: string
 ): Promise<void> {
-  await db.delete('file-blobs', id)
+  const record = await db.get('file-blobs', id)
+  if (!record) return
+
+  if (record.refCount === undefined || record.refCount <= 1) {
+    if (record.storage === 'native-fs' && isElectron()) {
+      await window.api.nativeFs.delete(id)
+    }
+    await db.delete('file-blobs', id)
+    return
+  }
+
+  await db.put('file-blobs', { ...record, refCount: record.refCount - 1 })
+}
+
+export async function incrementBlobRef(
+  db: IDBPDatabase<FileExplorerDBSchema>,
+  id: string
+): Promise<void> {
+  const record = await db.get('file-blobs', id)
+  if (!record) throw new Error(`File blob not found: ${id}`)
+
+  await db.put('file-blobs', { ...record, refCount: (record.refCount ?? 1) + 1 })
 }

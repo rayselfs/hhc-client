@@ -1,10 +1,12 @@
 const DB_NAME = 'hhc-thumbnails'
 const STORE_NAME = 'thumbnails'
-const DB_VERSION = 2
+export const DB_VERSION = 3
 
 interface ThumbnailRecord {
   itemId: string
-  dataUrl: string
+  dataUrl?: string
+  blob?: Blob
+  format?: 'dataUrl' | 'blob'
 }
 
 let dbPromise: Promise<IDBDatabase | null> | null = null
@@ -17,7 +19,7 @@ function openThumbnailDB(): Promise<IDBDatabase | null> {
 
     request.onupgradeneeded = (event) => {
       const db = request.result
-      if (event.oldVersion < 2 && db.objectStoreNames.contains(STORE_NAME)) {
+      if (event.oldVersion < 3 && db.objectStoreNames.contains(STORE_NAME)) {
         db.deleteObjectStore(STORE_NAME)
       }
       if (!db.objectStoreNames.contains(STORE_NAME)) {
@@ -85,10 +87,13 @@ async function withThumbnailStore<T>(
 }
 
 export async function saveThumbnail(itemId: string, dataUrl: string): Promise<void> {
+  const response = await fetch(dataUrl)
+  const blob = await response.blob()
+
   await withThumbnailStore<void>(
     'readwrite',
     (store) => {
-      store.put({ itemId, dataUrl } satisfies ThumbnailRecord)
+      store.put({ itemId, blob, format: 'blob' } satisfies ThumbnailRecord)
     },
     undefined
   )
@@ -101,7 +106,12 @@ export async function getThumbnail(itemId: string): Promise<string | null> {
     undefined
   )
 
-  return record?.dataUrl ?? null
+  if (!record) return null
+  if (record.format === 'blob' && record.blob) {
+    return URL.createObjectURL(record.blob)
+  }
+
+  return record.dataUrl ?? null
 }
 
 export async function deleteThumbnail(itemId: string): Promise<void> {

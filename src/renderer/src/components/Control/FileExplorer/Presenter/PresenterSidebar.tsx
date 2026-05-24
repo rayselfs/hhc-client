@@ -1,9 +1,25 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@heroui/react'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 import GlassDivider from '@renderer/components/Common/GlassDivider'
 import NextItemPreview from './Preview/NextItemPreview'
+
+function debounce<Args extends unknown[]>(
+  fn: (...args: Args) => void,
+  ms: number
+): ((...args: Args) => void) & { cancel: () => void } {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const debounced = (...args: Args): void => {
+    if (timer) clearTimeout(timer)
+    timer = setTimeout(() => fn(...args), ms)
+  }
+  debounced.cancel = (): void => {
+    if (timer) clearTimeout(timer)
+    timer = undefined
+  }
+  return debounced
+}
 
 export default function PresenterSidebar(): React.JSX.Element {
   const { t } = useTranslation()
@@ -16,6 +32,14 @@ export default function PresenterSidebar(): React.JSX.Element {
     parseInt(localStorage.getItem('hhc-notes-font-size') ?? '14', 10)
   )
 
+  const debouncedUpdateNotes = useMemo(
+    () =>
+      debounce((itemId: string, value: string) => {
+        updateNotes(itemId, value)
+      }, 300),
+    [updateNotes]
+  )
+
   useEffect(() => {
     const raf = requestAnimationFrame(() => {
       setNotes(currentItem?.notes ?? '')
@@ -23,10 +47,16 @@ export default function PresenterSidebar(): React.JSX.Element {
     return () => cancelAnimationFrame(raf)
   }, [currentItem?.id, currentItem?.notes])
 
+  useEffect(() => {
+    return () => {
+      debouncedUpdateNotes.cancel()
+    }
+  }, [debouncedUpdateNotes])
+
   const handleNotesChange = (value: string): void => {
     setNotes(value)
     if (currentItem) {
-      updateNotes(currentItem.id, value)
+      debouncedUpdateNotes(currentItem.id, value)
     }
   }
 

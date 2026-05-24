@@ -2,6 +2,20 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 import type { FileItemRecord } from '@shared/types/folder'
 
+vi.mock('@renderer/lib/file-explorer-db', () => ({
+  openFileExplorerDB: vi.fn(async () => ({} as IDBDatabase)),
+  getFileBlob: vi.fn(async () => null)
+}))
+
+vi.mock('@renderer/lib/thumbnail-db', () => ({
+  getThumbnail: vi.fn(async () => null),
+  saveThumbnail: vi.fn(async () => undefined)
+}))
+
+vi.mock('@renderer/lib/thumbnail-generator', () => ({
+  generateThumbnail: vi.fn(async () => null)
+}))
+
 function makeFile(id: string, name: string, mimeType = 'image/png'): FileItemRecord {
   return {
     id,
@@ -186,5 +200,24 @@ describe('updateNotes', () => {
 
     useMediaProjectionStore.getState().updateNotes('a', 'hello')
     expect(mockUpdateItem).toHaveBeenCalledWith('a', { notes: 'hello' })
+  })
+
+  it('preserves other item references when updating notes', async () => {
+    const { useFileExplorerStore } = await import('@renderer/stores/file-explorer')
+    useFileExplorerStore.setState({ updateItem: vi.fn() } as Pick<
+      ReturnType<typeof useFileExplorerStore.getState>,
+      'updateItem'
+    >)
+
+    useMediaProjectionStore.getState().startPresentation(files, 1)
+    const before = useMediaProjectionStore.getState().playlist
+
+    useMediaProjectionStore.getState().updateNotes('b', 'new notes')
+
+    const after = useMediaProjectionStore.getState().playlist
+    expect(after[0]).toBe(before[0])
+    expect(after[2]).toBe(before[2])
+    expect(after[1]).not.toBe(before[1])
+    expect(after[1]).toMatchObject({ id: 'b', notes: 'new notes' })
   })
 })

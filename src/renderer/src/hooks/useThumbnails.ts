@@ -9,6 +9,39 @@ export function canHaveThumbnail(mimeType: string | undefined): boolean {
   )
 }
 
+function revokeIfBlobUrl(url: string | null): void {
+  if (url?.startsWith('blob:')) URL.revokeObjectURL(url)
+}
+
+function createSemaphore(limit: number) {
+  let active = 0
+  const queue: Array<() => void> = []
+
+  function acquire(): Promise<() => void> {
+    return new Promise((resolve) => {
+      const tryAcquire = () => {
+        if (active < limit) {
+          active++
+          resolve(() => {
+            active--
+            if (queue.length > 0) {
+              const next = queue.shift()!
+              next()
+            }
+          })
+        } else {
+          queue.push(tryAcquire)
+        }
+      }
+      tryAcquire()
+    })
+  }
+
+  return { acquire }
+}
+
+const THUMBNAIL_LOAD_CONCURRENCY = 5
+
 interface ThumbnailItem {
   id: string
   mimeType?: string
@@ -37,21 +70,52 @@ export function useThumbnails(
     [allThumbnails, thumbnailItemIds]
   )
 
+  // Prune stale keys when items change
+  useEffect(() => {
+    setAllThumbnails((prev) => {
+      const idsSet = thumbnailItemIds
+      const pruned: Record<string, string | null> = {}
+      for (const [id, url] of Object.entries(prev)) {
+        if (idsSet.has(id)) {
+          pruned[id] = url
+        } else {
+          revokeIfBlobUrl(url)
+        }
+      }
+      return pruned
+    })
+  }, [thumbnailItemIds])
+
   useEffect(() => {
     let cancelled = false
     const thumbnailItems = items.filter((item) => canHaveThumbnail(item.mimeType))
     const now = Date.now()
+    const semaphore = createSemaphore(THUMBNAIL_LOAD_CONCURRENCY)
 
     async function loadThumbnails(): Promise<void> {
-      for (const item of thumbnailItems) {
-        if (cancelled) return
-        const dataUrl = await getThumbnail(item.id)
-        if (dataUrl !== null) {
-          setAllThumbnails((prev) => ({ ...prev, [item.id]: dataUrl }))
-        } else if (pendingAgeMs === undefined || now - (item.createdAt ?? 0) > pendingAgeMs) {
-          setAllThumbnails((prev) => ({ ...prev, [item.id]: null }))
-        }
-      }
+      await Promise.all(
+        thumbnailItems.map(async (item) => {
+          const release = await semaphore.acquire()
+          try {
+            if (cancelled) return
+            const dataUrl = await getThumbnail(item.id)
+            if (cancelled) return
+            if (dataUrl !== null) {
+              setAllThumbnails((prev) => {
+                revokeIfBlobUrl(prev[item.id] ?? null)
+                return { ...prev, [item.id]: dataUrl }
+              })
+            } else if (pendingAgeMs === undefined || now - (item.createdAt ?? 0) > pendingAgeMs) {
+              setAllThumbnails((prev) => {
+                revokeIfBlobUrl(prev[item.id] ?? null)
+                return { ...prev, [item.id]: null }
+              })
+            }
+          } finally {
+            release()
+          }
+        })
+      )
     }
 
     void loadThumbnails()
@@ -65,7 +129,10 @@ export function useThumbnails(
     const onThumbnailReady = (e: Event): void => {
       const { itemId, dataUrl } = (e as CustomEvent<{ itemId: string; dataUrl: string | null }>)
         .detail
-      setAllThumbnails((prev) => ({ ...prev, [itemId]: dataUrl }))
+      setAllThumbnails((prev) => {
+        revokeIfBlobUrl(prev[itemId] ?? null)
+        return { ...prev, [itemId]: dataUrl }
+      })
     }
     window.addEventListener('hhc:thumbnail-ready', onThumbnailReady)
     return () => window.removeEventListener('hhc:thumbnail-ready', onThumbnailReady)

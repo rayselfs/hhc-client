@@ -3,6 +3,7 @@ import type { FolderRecord, AnyItemRecord, FolderStoreConfig } from '@shared/typ
 import { FOLDER_DURATION_MS } from '@shared/types/folder'
 import { createFolderDB } from '@renderer/lib/folder-db'
 import { openBibleDB } from '@renderer/lib/bible-db'
+import { incrementBlobRef, openFileExplorerDB } from '@renderer/lib/file-explorer-db'
 
 export interface FolderStoreState {
   folders: Record<string, FolderRecord>
@@ -26,6 +27,7 @@ export interface FolderStoreState {
   ) => void
   removeItem: (id: string) => void
   moveItem: (itemId: string, targetFolderId: string) => void
+  copyItem: (itemId: string, targetFolderId: string) => Promise<string | null>
   moveFolder: (folderId: string, targetFolderId: string) => void
   reorderItems: (parentId: string, orderedIds: string[]) => void
   reorderFolders: (parentId: string, orderedIds: string[]) => void
@@ -189,20 +191,21 @@ export function createFolderStore(config: FolderStoreConfig) {
 
       const descendantIds = getDescendantFolderIds(id, folders)
       const allFolderIds = [id, ...descendantIds]
+      const folderIdSet = new Set(allFolderIds)
 
       const newFolders = { ...folders }
-      const newItems = { ...items }
-      const itemIdsToDelete: string[] = []
+      for (const fid of allFolderIds) delete newFolders[fid]
 
-      for (const fid of allFolderIds) {
-        delete newFolders[fid]
-        for (const item of Object.values(newItems)) {
-          if (item.parentId === fid) {
+      const itemIdsToDelete: string[] = []
+      const newItems = Object.fromEntries(
+        Object.entries(items).filter(([, item]) => {
+          if (folderIdSet.has(item.parentId)) {
             itemIdsToDelete.push(item.id)
-            delete newItems[item.id]
+            return false
           }
-        }
-      }
+          return true
+        })
+      )
 
       const nextCurrentId = allFolderIds.includes(currentFolderId) ? config.rootId : currentFolderId
 
@@ -268,6 +271,36 @@ export function createFolderStore(config: FolderStoreConfig) {
         }
       })
       ops.saveItem(updated)
+    },
+
+    copyItem: async (itemId, targetFolderId) => {
+      const sourceItem = get().items[itemId]
+      if (!sourceItem || sourceItem.type !== 'file') return null
+
+      const blobId = sourceItem.url.replace(/^blob:/, '')
+      const newId = crypto.randomUUID()
+      const targetSiblings = get().getItems(targetFolderId)
+      const now = Date.now()
+      const copiedItem: AnyItemRecord = {
+        ...sourceItem,
+        id: newId,
+        parentId: targetFolderId,
+        sortIndex: targetSiblings.length,
+        createdAt: now,
+        expiresAt: targetFolderId === config.rootId ? now + FOLDER_DURATION_MS['1day'] : null,
+        deletedAt: undefined,
+        originalParentId: undefined
+      }
+
+      const db = await openFileExplorerDB()
+      await incrementBlobRef(db, blobId)
+
+      set((state) => ({
+        items: { ...state.items, [copiedItem.id]: copiedItem },
+        _itemsArray: [...state._itemsArray, copiedItem]
+      }))
+      ops.saveItem(copiedItem)
+      return newId
     },
 
     moveFolder: (folderId, targetFolderId) => {
@@ -373,17 +406,7 @@ export function createFolderStore(config: FolderStoreConfig) {
       const folder = folders[folderId]
       if (!folder) return
 
-      const queue: string[] = [folderId]
-      const visited = new Set<string>()
-      while (queue.length > 0) {
-        const current = queue.shift()!
-        if (visited.has(current)) continue
-        visited.add(current)
-        for (const f of Object.values(folders)) {
-          if (f.parentId === current) queue.push(f.id)
-        }
-      }
-      visited.delete(folderId)
+      const descendantIds = getDescendantFolderIds(folderId, folders)
 
       const updated: FolderRecord = {
         ...folder,
@@ -393,7 +416,7 @@ export function createFolderStore(config: FolderStoreConfig) {
       }
 
       const descendantUpdates: FolderRecord[] = []
-      for (const id of visited) {
+      for (const id of descendantIds) {
         const f = folders[id]
         if (f?.isFavorited) descendantUpdates.push({ ...f, isFavorited: false })
       }
@@ -473,10 +496,11 @@ export function createFolderStore(config: FolderStoreConfig) {
       set((state) => {
         const newFolders = { ...state.folders }
         const newItems = { ...state.items }
+        const folderIdSet = new Set(folderIds)
         for (const id of folderIds) delete newFolders[id]
         for (const id of itemIds) delete newItems[id]
         for (const item of Object.values(newItems)) {
-          if (folderIds.includes(item.parentId)) delete newItems[item.id]
+          if (folderIdSet.has(item.parentId)) delete newItems[item.id]
         }
         return {
           folders: newFolders,
@@ -583,16 +607,23 @@ export function createFolderStore(config: FolderStoreConfig) {
 }
 
 function getDescendantFolderIds(folderId: string, folders: Record<string, FolderRecord>): string[] {
+  // Build adjacency map once: O(n)
+  const childrenByParent = new Map<string, string[]>()
+  for (const f of Object.values(folders)) {
+    if (f.parentId) {
+      const list = childrenByParent.get(f.parentId) ?? []
+      list.push(f.id)
+      childrenByParent.set(f.parentId, list)
+    }
+  }
+  // O(n) BFS
   const result: string[] = []
-  const queue = [folderId]
+  const queue = [...(childrenByParent.get(folderId) ?? [])]
   while (queue.length > 0) {
     const current = queue.shift()!
-    for (const f of Object.values(folders)) {
-      if (f.parentId === current && f.id !== folderId) {
-        result.push(f.id)
-        queue.push(f.id)
-      }
-    }
+    result.push(current)
+    const children = childrenByParent.get(current)
+    if (children) queue.push(...children)
   }
   return result
 }

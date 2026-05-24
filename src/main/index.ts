@@ -6,6 +6,7 @@ import { registerTimerHandlers } from './ipc/timer'
 import { registerBibleApiHandlers } from './ipc/bible-api'
 import { registerAppIpc, registerLocalModelProtocol } from './ipc/app'
 import { registerSpeechKeyStorageHandlers } from './ipc/speech-key-storage'
+import { registerNativeFsHandlers } from './ipc/native-fs'
 import { isKnownWindow, validateTheme } from './ipc/validate'
 import { registerUpdateService } from './updateService'
 
@@ -59,6 +60,7 @@ app.whenReady().then(() => {
   registerAppIpc(wm)
   registerLocalModelProtocol()
   registerSpeechKeyStorageHandlers(wm)
+  registerNativeFsHandlers()
   wm.createMainWindow()
   wm.createProjectionWindow()
   registerUpdateService(wm)
