@@ -370,7 +370,7 @@ export function FileBrowser({
       const nameB = b.kind === 'file' ? b.item.name : b.folder.name
       return nameA.localeCompare(nameB)
     })
-  }, [searchQuery, t])
+  }, [searchQuery, rawItems, rawFolders, t])
 
   const thumbnails = useThumbnails(fileItems, { pendingAgeMs: 2 * 60 * 1000 })
 
