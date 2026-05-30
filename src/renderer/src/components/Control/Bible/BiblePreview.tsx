@@ -41,6 +41,8 @@ export function BiblePreview({
   const { t, i18n } = useTranslation()
   const currentPassage = useBibleStore((s) => s.currentPassage)
   const versions = useBibleStore((s) => s.versions)
+  // re-render when content finishes loading (async fetchVersionContent) so getters return fresh data
+  useBibleStore((s) => s.isInitialized)
   // re-render when version changes so getters return the selected version's content
   const selectedVersionId = useBibleSettingsStore((s) => s.selectedVersionId)
   const currentVersionLocale = versions.find((v) => v.id === selectedVersionId)?.locale

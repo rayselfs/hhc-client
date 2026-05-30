@@ -157,16 +157,14 @@ export async function permanentDeleteFolderFromStore(folderId: string): Promise<
 
   while (queue.length > 0) {
     const currentId = queue.shift()!
-    for (const item of state._itemsArray) {
-      if (item.parentId === currentId && item.type === 'file') {
+    for (const item of state._itemsByParent[currentId] ?? []) {
+      if (item.type === 'file') {
         blobIds.push(item.url.replace(/^blob:/, ''))
         thumbnailIds.push(item.id)
       }
     }
-    for (const folder of state._foldersArray) {
-      if (folder.parentId === currentId) {
-        queue.push(folder.id)
-      }
+    for (const folder of state._childFoldersByParent[currentId] ?? []) {
+      queue.push(folder.id)
     }
   }
 
