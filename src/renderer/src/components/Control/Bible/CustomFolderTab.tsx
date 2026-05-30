@@ -32,7 +32,7 @@ export function CustomFolderTab({
   onModalOpenChange = () => {},
   onProjected
 }: CustomFolderTabProps): React.JSX.Element {
-  const { currentFolderId } = useBibleFolderStore()
+  const currentFolderId = useBibleFolderStore((s) => s.currentFolderId)
   const { navigateTo } = useBibleStore.getState()
   const { claimProjection, project } = useProjection()
   const { t } = useTranslation()

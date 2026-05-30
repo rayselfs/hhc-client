@@ -1,7 +1,8 @@
-import React from 'react'
+import React, { useRef } from 'react'
 import { Folder, Star } from 'lucide-react'
 import { Skeleton } from '@heroui/react/skeleton'
 import { useTranslation } from 'react-i18next'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { getFileIcon } from './getFileIcon'
 
 export interface GridViewItem {
@@ -59,7 +60,7 @@ export interface GridViewProps {
   renderItemWrapper?: (item: GridViewItem, children: React.ReactNode) => React.ReactNode
 }
 
-export function GridView({
+export const GridView = React.memo(function GridView({
   items,
   viewMode,
   onItemClick,
@@ -69,6 +70,7 @@ export function GridView({
   renderItemWrapper
 }: GridViewProps): React.JSX.Element {
   const { t } = useTranslation()
+  const containerRef = useRef<HTMLDivElement>(null)
 
   if (items.length === 0) {
     return (
@@ -86,74 +88,118 @@ export function GridView({
   let gridColsClass = ''
   let iconSize = 32
   let nameClass = ''
+  let cols = 5
+  let estimateSize = 140
 
   switch (viewMode) {
     case 'large-icon':
       gridColsClass = 'grid-cols-[repeat(auto-fill,192px)]'
       iconSize = 96
       nameClass = 'line-clamp-2 text-base mt-2'
+      cols = 5
+      estimateSize = 140
       break
     case 'medium-icon':
       gridColsClass = 'grid-cols-[repeat(auto-fill,128px)]'
       iconSize = 64
       nameClass = 'line-clamp-2 text-sm mt-2'
+      cols = 7
+      estimateSize = 110
       break
     case 'small-icon':
       gridColsClass = 'grid-cols-[repeat(auto-fill,88px)]'
       iconSize = 40
       nameClass = 'line-clamp-2 text-xs mt-1'
+      cols = 10
+      estimateSize = 90
       break
   }
 
-  return (
-    <div className={`grid gap-4 p-4 ${gridColsClass}`}>
-      {items.map((item) => {
-        const content = (
-          <div
-            data-file-item
-            data-item-id={item.id}
-            className={`group relative flex flex-col items-center justify-start rounded-lg p-2 cursor-default transition-colors hover:bg-content2/60 ${
-              item.isSelected ? 'bg-surface' : ''
-            }`}
-            onClick={(e) => onItemClick(item.id, e)}
-            onDoubleClick={(e) => onItemDoubleClick(item.id, e)}
-            onContextMenu={(e) => onItemContextMenu(item.id, e)}
-          >
-            {item.isFolder && onItemFavoriteToggle && (
-              <button
-                className={`absolute top-1 right-1 rounded p-0.5 transition-opacity ${
-                  item.isFavorited
-                    ? 'opacity-100 text-yellow-400'
-                    : 'opacity-0 group-hover:opacity-100 text-default-400 hover:text-yellow-400'
-                }`}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onItemFavoriteToggle(item.id)
-                }}
-                aria-label={item.isFavorited ? 'Remove from favorites' : 'Add to favorites'}
-              >
-                <Star
-                  size={16}
-                  className={item.isFavorited ? 'fill-yellow-400 drop-shadow-sm' : ''}
-                />
-              </button>
-            )}
-            <div className="flex items-center justify-center">{renderGridIcon(item, iconSize)}</div>
-            <span
-              className={`w-full text-center text-foreground break-words ${nameClass}`}
-              title={item.name}
-            >
-              {item.name}
-            </span>
-          </div>
-        )
+  const count = Math.ceil(items.length / cols)
+  const rowVirtualizer = useVirtualizer({
+    count,
+    getScrollElement: () => containerRef.current,
+    estimateSize: () => estimateSize,
+    overscan: 2
+  })
 
-        return (
-          <React.Fragment key={item.id}>
-            {renderItemWrapper?.(item, content) ?? content}
-          </React.Fragment>
-        )
-      })}
+  return (
+    <div ref={containerRef} className="overflow-y-auto h-full p-4">
+      <div
+        style={{
+          height: `${rowVirtualizer.getTotalSize()}px`,
+          width: '100%',
+          position: 'relative'
+        }}
+      >
+        {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+          const startIndex = virtualRow.index * cols
+          const rowItems = items.slice(startIndex, startIndex + cols)
+
+          return (
+            <div
+              key={virtualRow.key}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: `${virtualRow.size}px`,
+                transform: `translateY(${virtualRow.start}px)`
+              }}
+              className={`grid gap-4 ${gridColsClass}`}
+            >
+              {rowItems.map((item) => {
+                const content = (
+                  <div
+                    data-file-item
+                    data-item-id={item.id}
+                    className={`group relative flex flex-col items-center justify-start rounded-lg p-2 cursor-default transition-colors hover:bg-content2/60 ${
+                      item.isSelected ? 'bg-surface' : ''
+                    }`}
+                    onClick={(e) => onItemClick(item.id, e)}
+                    onDoubleClick={(e) => onItemDoubleClick(item.id, e)}
+                    onContextMenu={(e) => onItemContextMenu(item.id, e)}
+                  >
+                    {item.isFolder && onItemFavoriteToggle && (
+                      <button
+                        className={`absolute top-1 right-1 rounded p-0.5 transition-opacity ${
+                          item.isFavorited
+                            ? 'opacity-100 text-yellow-400'
+                            : 'opacity-0 group-hover:opacity-100 text-default-400 hover:text-yellow-400'
+                        }`}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onItemFavoriteToggle(item.id)
+                        }}
+                        aria-label={item.isFavorited ? 'Remove from favorites' : 'Add to favorites'}
+                      >
+                        <Star
+                          size={16}
+                          className={item.isFavorited ? 'fill-yellow-400 drop-shadow-sm' : ''}
+                        />
+                      </button>
+                    )}
+                    <div className="flex items-center justify-center">{renderGridIcon(item, iconSize)}</div>
+                    <span
+                      className={`w-full text-center text-foreground break-words ${nameClass}`}
+                      title={item.name}
+                    >
+                      {item.name}
+                    </span>
+                  </div>
+                )
+
+                return (
+                  <React.Fragment key={item.id}>
+                    {renderItemWrapper?.(item, content) ?? content}
+                  </React.Fragment>
+                )
+              })}
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
-}
+})

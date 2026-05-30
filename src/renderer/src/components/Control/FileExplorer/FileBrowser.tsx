@@ -308,8 +308,8 @@ export function FileBrowser({
   const { t } = useTranslation()
   const confirm = useConfirm()
   const currentFolderId = useFileExplorerStore((state) => state.currentFolderId)
-  const foldersArray = useFileExplorerStore((state) => state._foldersArray)
-  const itemsArray = useFileExplorerStore((state) => state._itemsArray)
+  const rawFolders = useFileExplorerStore((s) => s._childFoldersByParent[s.currentFolderId] ?? [])
+  const rawItems = useFileExplorerStore((s) => s._itemsByParent[s.currentFolderId] ?? [])
   const navigateToFolder = useFileExplorerStore((state) => state.navigateToFolder)
   const toggleFavorite = useFileExplorerStore((state) => state.toggleFavorite)
   const moveItem = useFileExplorerStore((state) => state.moveItem)
@@ -341,20 +341,20 @@ export function FileBrowser({
 
   const folders = useMemo(
     () =>
-      foldersArray
-        .filter((folder) => folder.parentId === currentFolderId && !folder.deletedAt)
+      rawFolders
+        .filter((folder) => !folder.deletedAt)
         .sort((a, b) => a.sortIndex - b.sortIndex),
-    [foldersArray, currentFolderId]
+    [rawFolders]
   )
   const fileItems = useMemo(
     () =>
-      itemsArray
+      rawItems
         .filter(
           (item): item is FileItemRecord =>
-            item.parentId === currentFolderId && isFileItemRecord(item) && !item.deletedAt
+            isFileItemRecord(item) && !item.deletedAt
         )
         .sort((a, b) => a.sortIndex - b.sortIndex),
-    [itemsArray, currentFolderId]
+    [rawItems]
   )
 
   const searchResults = useMemo(() => {
@@ -369,7 +369,7 @@ export function FileBrowser({
       const nameB = b.kind === 'file' ? b.item.name : b.folder.name
       return nameA.localeCompare(nameB)
     })
-  }, [searchQuery, itemsArray, foldersArray, t])
+  }, [searchQuery, t])
 
   const thumbnails = useThumbnails(fileItems, { pendingAgeMs: 2 * 60 * 1000 })
 

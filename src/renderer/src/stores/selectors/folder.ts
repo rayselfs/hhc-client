@@ -19,25 +19,11 @@ export function createFolderSelectors(useStore: FolderStore) {
   }
 
   function useChildFolders(parentId: string): FolderRecord[] {
-    const folders = useStore((s: FolderStoreState) => s.folders)
-    return useMemo(
-      () =>
-        Object.values(folders)
-          .filter((f) => f.parentId === parentId)
-          .sort((a, b) => a.sortIndex - b.sortIndex),
-      [folders, parentId]
-    )
+    return useStore((s: FolderStoreState) => s._childFoldersByParent[parentId] ?? [])
   }
 
   function useItems(parentId: string): AnyItemRecord[] {
-    const items = useStore((s: FolderStoreState) => s.items)
-    return useMemo(
-      () =>
-        Object.values(items)
-          .filter((i) => i.parentId === parentId)
-          .sort((a, b) => a.sortIndex - b.sortIndex),
-      [items, parentId]
-    )
+    return useStore((s: FolderStoreState) => s._itemsByParent[parentId] ?? [])
   }
 
   function useFolderPath(folderId: string): FolderRecord[] {

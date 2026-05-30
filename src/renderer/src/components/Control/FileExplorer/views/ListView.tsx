@@ -1,6 +1,7 @@
-import React, { useCallback } from 'react'
+import React, { useCallback, useRef } from 'react'
 import { Folder, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { formatFileKind } from '@renderer/lib/format-file-kind'
 import type { SortField, SortDir } from '@renderer/stores/file-explorer'
 import { getFileIcon } from './getFileIcon'
@@ -37,7 +38,7 @@ function formatFileSize(bytes: number | undefined): string {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`
 }
 
-export function ListView({
+export const ListView = React.memo(function ListView({
   items,
   sortField,
   sortDir,
@@ -50,6 +51,7 @@ export function ListView({
   renderItemWrapper
 }: ListViewProps): React.JSX.Element {
   const { t } = useTranslation()
+  const containerRef = useRef<HTMLDivElement>(null)
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent, col: 'created' | 'size' | 'kind') => {
@@ -82,6 +84,13 @@ export function ListView({
     return sortDir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
   }
 
+  const rowVirtualizer = useVirtualizer({
+    count: items.length,
+    getScrollElement: () => containerRef.current,
+    estimateSize: () => 40,
+    overscan: 3
+  })
+
   if (items.length === 0) {
     return (
       <div className="flex h-full flex-col items-center justify-center text-center p-4">
@@ -96,7 +105,7 @@ export function ListView({
   }
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col h-full">
       <div className="sticky top-0 bg-background z-10 border-b border-default-200">
         <div className="flex items-center px-3 py-1.5">
           <div className="w-6 flex-shrink-0 mr-3" />
@@ -149,60 +158,79 @@ export function ListView({
         </div>
       </div>
 
-      <div className="flex flex-col p-2">
-        {items.map((item) => {
-          const content = (
-            <div
-              data-file-item
-              data-item-id={item.id}
-              className={`flex items-center rounded-md px-3 py-2 cursor-default transition-colors hover:bg-content2/60 ${
-                item.isSelected ? 'bg-surface' : ''
-              }`}
-              onClick={(e) => onItemClick(item.id, e)}
-              onDoubleClick={(e) => onItemDoubleClick(item.id, e)}
-              onContextMenu={(e) => onItemContextMenu(item.id, e)}
-            >
-              <div className="flex-shrink-0 w-6 flex items-center justify-center mr-3">
-                {item.isFolder ? (
-                  <Folder size={20} className="text-accent" fill="currentColor" />
-                ) : (
-                  <div className="text-danger">{getFileIcon(item.mimeType, item.isFolder, 20)}</div>
-                )}
-              </div>
-              <div className="flex-1 truncate text-base text-foreground" title={item.name}>
-                {item.name}
-              </div>
-              <div className="w-1 flex-shrink-0" />
+      <div ref={containerRef} className="flex-1 overflow-y-auto p-2">
+        <div
+          style={{
+            height: `${rowVirtualizer.getTotalSize()}px`,
+            width: '100%',
+            position: 'relative'
+          }}
+        >
+          {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+            const item = items[virtualRow.index]
+            const content = (
               <div
-                className="flex-shrink-0 text-sm text-default-400 pl-2"
-                style={{ width: colWidths.created }}
+                data-file-item
+                data-item-id={item.id}
+                className={`flex items-center rounded-md px-3 py-2 cursor-default transition-colors hover:bg-content2/60 ${
+                  item.isSelected ? 'bg-surface' : ''
+                }`}
+                onClick={(e) => onItemClick(item.id, e)}
+                onDoubleClick={(e) => onItemDoubleClick(item.id, e)}
+                onContextMenu={(e) => onItemContextMenu(item.id, e)}
               >
-                {formatDate(item.createdAt)}
+                <div className="flex-shrink-0 w-6 flex items-center justify-center mr-3">
+                  {item.isFolder ? (
+                    <Folder size={20} className="text-accent" fill="currentColor" />
+                  ) : (
+                    <div className="text-danger">{getFileIcon(item.mimeType, item.isFolder, 20)}</div>
+                  )}
+                </div>
+                <div className="flex-1 truncate text-base text-foreground" title={item.name}>
+                  {item.name}
+                </div>
+                <div className="w-1 flex-shrink-0" />
+                <div
+                  className="flex-shrink-0 text-sm text-default-400 pl-2"
+                  style={{ width: colWidths.created }}
+                >
+                  {formatDate(item.createdAt)}
+                </div>
+                <div className="w-1 flex-shrink-0" />
+                <div
+                  className="flex-shrink-0 text-sm text-default-400 pl-2"
+                  style={{ width: colWidths.size }}
+                >
+                  {item.isFolder ? '—' : formatFileSize(item.size)}
+                </div>
+                <div className="w-1 flex-shrink-0" />
+                <div
+                  className="flex-shrink-0 text-sm text-default-400 truncate pl-2"
+                  style={{ width: colWidths.kind }}
+                >
+                  {formatFileKind(item.mimeType, item.isFolder, t)}
+                </div>
               </div>
-              <div className="w-1 flex-shrink-0" />
-              <div
-                className="flex-shrink-0 text-sm text-default-400 pl-2"
-                style={{ width: colWidths.size }}
-              >
-                {item.isFolder ? '—' : formatFileSize(item.size)}
-              </div>
-              <div className="w-1 flex-shrink-0" />
-              <div
-                className="flex-shrink-0 text-sm text-default-400 truncate pl-2"
-                style={{ width: colWidths.kind }}
-              >
-                {formatFileKind(item.mimeType, item.isFolder, t)}
-              </div>
-            </div>
-          )
+            )
 
-          return (
-            <React.Fragment key={item.id}>
-              {renderItemWrapper?.(item, content) ?? content}
-            </React.Fragment>
-          )
-        })}
+            return (
+              <div
+                key={virtualRow.key}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: `${virtualRow.size}px`,
+                  transform: `translateY(${virtualRow.start}px)`
+                }}
+              >
+                {renderItemWrapper?.(item, content) ?? content}
+              </div>
+            )
+          })}
+        </div>
       </div>
     </div>
   )
-}
+})
