@@ -181,6 +181,7 @@ function formatSearchFileSize(bytes: number | undefined): string {
 }
 
 const SEARCH_COL = { created: 90, size: 72, kind: 96, path: 200 }
+const EMPTY_ARRAY: never[] = []
 
 function SearchResultsList({
   results,
@@ -308,8 +309,8 @@ export function FileBrowser({
   const { t } = useTranslation()
   const confirm = useConfirm()
   const currentFolderId = useFileExplorerStore((state) => state.currentFolderId)
-  const rawFolders = useFileExplorerStore((s) => s._childFoldersByParent[s.currentFolderId] ?? [])
-  const rawItems = useFileExplorerStore((s) => s._itemsByParent[s.currentFolderId] ?? [])
+  const rawFolders = useFileExplorerStore((s) => s._childFoldersByParent[s.currentFolderId] ?? EMPTY_ARRAY)
+  const rawItems = useFileExplorerStore((s) => s._itemsByParent[s.currentFolderId] ?? EMPTY_ARRAY)
   const navigateToFolder = useFileExplorerStore((state) => state.navigateToFolder)
   const toggleFavorite = useFileExplorerStore((state) => state.toggleFavorite)
   const moveItem = useFileExplorerStore((state) => state.moveItem)
