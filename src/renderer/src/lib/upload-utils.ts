@@ -31,6 +31,8 @@ function createSemaphore(limit: number): { acquire(): Promise<() => void> } {
 
 const UPLOAD_CONCURRENCY = 3
 
+const uploadSemaphore = createSemaphore(UPLOAD_CONCURRENCY)
+
 async function readAllEntries(reader: FileSystemDirectoryReader): Promise<FileSystemEntry[]> {
   const all: FileSystemEntry[] = []
   const readBatch = (): Promise<void> =>
@@ -85,15 +87,13 @@ export function canGenerateThumbnail(mimeType: string): boolean {
 }
 
 export async function uploadFiles(files: File[], parentId: string): Promise<void> {
-  const semaphore = createSemaphore(UPLOAD_CONCURRENCY)
-
   await Promise.all(
     files.map(async (file) => {
       if (isWeb() && file.size > MAX_FILE_SIZE_WEB) {
         toast.danger(`File "${file.name}" exceeds 2GB limit`)
         return
       }
-      const release = await semaphore.acquire()
+      const release = await uploadSemaphore.acquire()
       try {
         const id = await addFileItemToStore(file, parentId)
         if (canGenerateThumbnail(file.type)) {

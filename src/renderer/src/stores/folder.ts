@@ -10,6 +10,8 @@ export interface FolderStoreState {
   items: Record<string, AnyItemRecord>
   _foldersArray: FolderRecord[]
   _itemsArray: AnyItemRecord[]
+  _childFoldersByParent: Record<string, FolderRecord[]>
+  _itemsByParent: Record<string, AnyItemRecord[]>
   loadedParents: Set<string>
   currentFolderId: string
   isLoading: boolean
@@ -53,11 +55,18 @@ export interface FolderStoreState {
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export function createFolderStore(config: FolderStoreConfig) {
   const ops = createFolderDB(config.getDB, config.rootId)
+
+  function sortByIndex<T extends { sortIndex: number }>(arr: T[]): T[] {
+    return arr.slice().sort((a, b) => a.sortIndex - b.sortIndex)
+  }
+
   return create<FolderStoreState>()((set, get) => ({
     folders: {},
     items: {},
     _foldersArray: [],
     _itemsArray: [],
+    _childFoldersByParent: {},
+    _itemsByParent: {},
     loadedParents: new Set<string>(),
     currentFolderId: config.rootId,
     isLoading: true,
@@ -104,11 +113,25 @@ export function createFolderStore(config: FolderStoreConfig) {
           itemMap[item.id] = item
         }
 
+        const childFoldersByParent: Record<string, FolderRecord[]> = {}
+        for (const f of Object.values(folderMap)) {
+          if (f.parentId !== null) {
+            const list = childFoldersByParent[f.parentId] ?? []
+            list.push(f)
+            childFoldersByParent[f.parentId] = list
+          }
+        }
+        for (const key of Object.keys(childFoldersByParent)) {
+          childFoldersByParent[key] = sortByIndex(childFoldersByParent[key])
+        }
+
         set({
           folders: folderMap,
           items: itemMap,
           _foldersArray: Object.values(folderMap),
           _itemsArray: Object.values(itemMap),
+          _childFoldersByParent: childFoldersByParent,
+          _itemsByParent: { [config.rootId]: sortByIndex(rootItems) },
           loadedParents: new Set([config.rootId]),
           isLoading: false
         })
@@ -128,7 +151,13 @@ export function createFolderStore(config: FolderStoreConfig) {
         }
         const newLoaded = new Set(state.loadedParents)
         newLoaded.add(parentId)
-        return { items: newItems, _itemsArray: Object.values(newItems), loadedParents: newLoaded }
+        const forParent = Object.values(newItems).filter((i) => i.parentId === parentId)
+        return {
+          items: newItems,
+          _itemsArray: Object.values(newItems),
+          loadedParents: newLoaded,
+          _itemsByParent: { ...state._itemsByParent, [parentId]: sortByIndex(forParent) }
+        }
       })
     },
 
@@ -150,7 +179,14 @@ export function createFolderStore(config: FolderStoreConfig) {
       }
       set((state) => ({
         folders: { ...state.folders, [newFolder.id]: newFolder },
-        _foldersArray: [...state._foldersArray, newFolder]
+        _foldersArray: [...state._foldersArray, newFolder],
+        _childFoldersByParent: {
+          ...state._childFoldersByParent,
+          [resolvedParentId]: sortByIndex([
+            ...(state._childFoldersByParent[resolvedParentId] ?? []),
+            newFolder
+          ])
+        }
       }))
       ops.saveFolder(newFolder)
       return newFolder.id
@@ -163,9 +199,16 @@ export function createFolderStore(config: FolderStoreConfig) {
       const updated = { ...folder, ...updates }
       set((state) => {
         const newFoldersArray = state._foldersArray.map((f) => (f.id === id ? updated : f))
+        const newChildFolders = { ...state._childFoldersByParent }
+        if (updated.parentId !== null) {
+          newChildFolders[updated.parentId] = (newChildFolders[updated.parentId] ?? []).map((f) =>
+            f.id === id ? updated : f
+          )
+        }
         return {
           folders: { ...state.folders, [id]: updated },
-          _foldersArray: newFoldersArray
+          _foldersArray: newFoldersArray,
+          _childFoldersByParent: newChildFolders
         }
       })
       ops.saveFolder(updated)
@@ -177,9 +220,18 @@ export function createFolderStore(config: FolderStoreConfig) {
       const updated = { ...item, ...updates } as AnyItemRecord
       set((state) => {
         const newItemsArray = state._itemsArray.map((entry) => (entry.id === id ? updated : entry))
+        const newItemsByParent = item.parentId
+          ? {
+              ...state._itemsByParent,
+              [item.parentId]: (state._itemsByParent[item.parentId] ?? []).map((i) =>
+                i.id === id ? updated : i
+              )
+            }
+          : state._itemsByParent
         return {
           items: { ...state.items, [id]: updated },
-          _itemsArray: newItemsArray
+          _itemsArray: newItemsArray,
+          _itemsByParent: newItemsByParent
         }
       })
       ops.saveItem(updated)
@@ -209,12 +261,37 @@ export function createFolderStore(config: FolderStoreConfig) {
 
       const nextCurrentId = allFolderIds.includes(currentFolderId) ? config.rootId : currentFolderId
 
-      set({
-        folders: newFolders,
-        items: newItems,
-        _foldersArray: Object.values(newFolders),
-        _itemsArray: Object.values(newItems),
-        currentFolderId: nextCurrentId
+      set((state) => {
+        const newChildFoldersByParent: Record<string, FolderRecord[]> = {}
+        for (const f of Object.values(newFolders)) {
+          if (f.parentId !== null) {
+            const list = newChildFoldersByParent[f.parentId] ?? []
+            list.push(f)
+            newChildFoldersByParent[f.parentId] = list
+          }
+        }
+        for (const k of Object.keys(newChildFoldersByParent)) {
+          newChildFoldersByParent[k] = sortByIndex(newChildFoldersByParent[k])
+        }
+        const newLoadedParents = new Set<string>()
+        const newItemsByParent: Record<string, AnyItemRecord[]> = {}
+        for (const parentId of state.loadedParents) {
+          if (folderIdSet.has(parentId)) continue
+          newLoadedParents.add(parentId)
+          newItemsByParent[parentId] = sortByIndex(
+            Object.values(newItems).filter((i) => i.parentId === parentId)
+          )
+        }
+        return {
+          folders: newFolders,
+          items: newItems,
+          _foldersArray: Object.values(newFolders),
+          _itemsArray: Object.values(newItems),
+          _childFoldersByParent: newChildFoldersByParent,
+          _itemsByParent: newItemsByParent,
+          loadedParents: newLoadedParents,
+          currentFolderId: nextCurrentId
+        }
       })
       ops.deleteFolders(allFolderIds)
       if (itemIdsToDelete.length > 0) ops.deleteItems(itemIdsToDelete)
@@ -239,16 +316,27 @@ export function createFolderStore(config: FolderStoreConfig) {
       } as AnyItemRecord
       set((state) => ({
         items: { ...state.items, [item.id]: item },
-        _itemsArray: [...state._itemsArray, item]
+        _itemsArray: [...state._itemsArray, item],
+        _itemsByParent: {
+          ...state._itemsByParent,
+          [parentId]: sortByIndex([...(state._itemsByParent[parentId] ?? []), item])
+        }
       }))
       ops.saveItem(item)
     },
 
     removeItem: (id) => {
       set((state) => {
+        const removedItem = state.items[id]
         const newItems = { ...state.items }
         delete newItems[id]
-        return { items: newItems, _itemsArray: Object.values(newItems) }
+        const newItemsByParent = { ...state._itemsByParent }
+        if (removedItem?.parentId) {
+          newItemsByParent[removedItem.parentId] = (
+            newItemsByParent[removedItem.parentId] ?? []
+          ).filter((i) => i.id !== id)
+        }
+        return { items: newItems, _itemsArray: Object.values(newItems), _itemsByParent: newItemsByParent }
       })
       ops.deleteItem(id)
     },
@@ -265,9 +353,20 @@ export function createFolderStore(config: FolderStoreConfig) {
       }
       set((state) => {
         const newItemsArray = state._itemsArray.map((i) => (i.id === itemId ? updated : i))
+        const newItemsByParent = { ...state._itemsByParent }
+        if (newItemsByParent[item.parentId]) {
+          newItemsByParent[item.parentId] = newItemsByParent[item.parentId].filter(
+            (i) => i.id !== itemId
+          )
+        }
+        newItemsByParent[targetFolderId] = sortByIndex([
+          ...(newItemsByParent[targetFolderId] ?? []),
+          updated
+        ])
         return {
           items: { ...state.items, [itemId]: updated },
-          _itemsArray: newItemsArray
+          _itemsArray: newItemsArray,
+          _itemsByParent: newItemsByParent
         }
       })
       ops.saveItem(updated)
@@ -297,7 +396,14 @@ export function createFolderStore(config: FolderStoreConfig) {
 
       set((state) => ({
         items: { ...state.items, [copiedItem.id]: copiedItem },
-        _itemsArray: [...state._itemsArray, copiedItem]
+        _itemsArray: [...state._itemsArray, copiedItem],
+        _itemsByParent: {
+          ...state._itemsByParent,
+          [targetFolderId]: sortByIndex([
+            ...(state._itemsByParent[targetFolderId] ?? []),
+            copiedItem
+          ])
+        }
       }))
       ops.saveItem(copiedItem)
       return newId
@@ -319,15 +425,26 @@ export function createFolderStore(config: FolderStoreConfig) {
       }
       set((state) => {
         const newFoldersArray = state._foldersArray.map((f) => (f.id === folderId ? updated : f))
+        const newChildFolders = { ...state._childFoldersByParent }
+        if (folder.parentId !== null && newChildFolders[folder.parentId]) {
+          newChildFolders[folder.parentId] = newChildFolders[folder.parentId].filter(
+            (f) => f.id !== folderId
+          )
+        }
+        newChildFolders[targetFolderId] = sortByIndex([
+          ...(newChildFolders[targetFolderId] ?? []),
+          updated
+        ])
         return {
           folders: { ...state.folders, [folderId]: updated },
-          _foldersArray: newFoldersArray
+          _foldersArray: newFoldersArray,
+          _childFoldersByParent: newChildFolders
         }
       })
       ops.saveFolder(updated)
     },
 
-    reorderItems: (_parentId, orderedIds) => {
+    reorderItems: (parentId, orderedIds) => {
       const { items } = get()
       const updated: AnyItemRecord[] = []
       for (let i = 0; i < orderedIds.length; i++) {
@@ -341,12 +458,18 @@ export function createFolderStore(config: FolderStoreConfig) {
         for (const item of updated) {
           newItems[item.id] = item
         }
-        return { items: newItems, _itemsArray: Object.values(newItems) }
+        const newItemsByParent = { ...state._itemsByParent }
+        if (state.loadedParents.has(parentId)) {
+          newItemsByParent[parentId] = sortByIndex(
+            Object.values(newItems).filter((i) => i.parentId === parentId)
+          )
+        }
+        return { items: newItems, _itemsArray: Object.values(newItems), _itemsByParent: newItemsByParent }
       })
       ops.saveItems(updated)
     },
 
-    reorderFolders: (_parentId, orderedIds) => {
+    reorderFolders: (parentId, orderedIds) => {
       const { folders } = get()
       const updated: FolderRecord[] = []
       for (let i = 0; i < orderedIds.length; i++) {
@@ -360,7 +483,15 @@ export function createFolderStore(config: FolderStoreConfig) {
         for (const folder of updated) {
           newFolders[folder.id] = folder
         }
-        return { folders: newFolders, _foldersArray: Object.values(newFolders) }
+        const newChildFolders = { ...state._childFoldersByParent }
+        newChildFolders[parentId] = sortByIndex(
+          Object.values(newFolders).filter((f) => f.parentId === parentId)
+        )
+        return {
+          folders: newFolders,
+          _foldersArray: Object.values(newFolders),
+          _childFoldersByParent: newChildFolders
+        }
       })
       ops.saveFolders(updated)
     },
@@ -395,7 +526,16 @@ export function createFolderStore(config: FolderStoreConfig) {
       }
       set((state) => ({
         folders: { ...state.folders, [folderId]: updated },
-        _foldersArray: state._foldersArray.map((f) => (f.id === folderId ? updated : f))
+        _foldersArray: state._foldersArray.map((f) => (f.id === folderId ? updated : f)),
+        _childFoldersByParent:
+          updated.parentId !== null
+            ? {
+                ...state._childFoldersByParent,
+                [updated.parentId]: (state._childFoldersByParent[updated.parentId] ?? []).map(
+                  (f) => (f.id === folderId ? updated : f)
+                )
+              }
+            : state._childFoldersByParent
       }))
       ops.saveFolder(updated)
     },
@@ -424,9 +564,23 @@ export function createFolderStore(config: FolderStoreConfig) {
       set((state) => {
         const newFolders = { ...state.folders, [folderId]: updated }
         for (const f of descendantUpdates) newFolders[f.id] = f
+        const newChildFolders = { ...state._childFoldersByParent }
+        if (updated.parentId !== null) {
+          newChildFolders[updated.parentId] = (newChildFolders[updated.parentId] ?? []).map((f) =>
+            f.id === folderId ? updated : f
+          )
+        }
+        for (const f of descendantUpdates) {
+          if (f.parentId !== null && newChildFolders[f.parentId]) {
+            newChildFolders[f.parentId] = newChildFolders[f.parentId].map((existing) =>
+              existing.id === f.id ? f : existing
+            )
+          }
+        }
         return {
           folders: newFolders,
-          _foldersArray: state._foldersArray.map((f) => newFolders[f.id] ?? f)
+          _foldersArray: state._foldersArray.map((f) => newFolders[f.id] ?? f),
+          _childFoldersByParent: newChildFolders
         }
       })
 
@@ -444,7 +598,15 @@ export function createFolderStore(config: FolderStoreConfig) {
       }
       set((state) => ({
         items: { ...state.items, [itemId]: updated },
-        _itemsArray: state._itemsArray.map((i) => (i.id === itemId ? updated : i))
+        _itemsArray: state._itemsArray.map((i) => (i.id === itemId ? updated : i)),
+        _itemsByParent: item.parentId
+          ? {
+              ...state._itemsByParent,
+              [item.parentId]: (state._itemsByParent[item.parentId] ?? []).map((i) =>
+                i.id === itemId ? updated : i
+              )
+            }
+          : state._itemsByParent
       }))
       ops.saveItem(updated)
     },
@@ -463,10 +625,24 @@ export function createFolderStore(config: FolderStoreConfig) {
         deletedAt: undefined,
         originalParentId: undefined
       }
-      set((state) => ({
-        folders: { ...state.folders, [folderId]: updated },
-        _foldersArray: state._foldersArray.map((f) => (f.id === folderId ? updated : f))
-      }))
+      set((state) => {
+        const oldParentId = folder.parentId
+        const newChildFolders = { ...state._childFoldersByParent }
+        if (oldParentId !== null && newChildFolders[oldParentId]) {
+          newChildFolders[oldParentId] = newChildFolders[oldParentId].filter(
+            (f) => f.id !== folderId
+          )
+        }
+        newChildFolders[targetParentId] = sortByIndex([
+          ...(newChildFolders[targetParentId] ?? []),
+          updated
+        ])
+        return {
+          folders: { ...state.folders, [folderId]: updated },
+          _foldersArray: state._foldersArray.map((f) => (f.id === folderId ? updated : f)),
+          _childFoldersByParent: newChildFolders
+        }
+      })
       ops.saveFolder(updated)
     },
 
@@ -483,10 +659,23 @@ export function createFolderStore(config: FolderStoreConfig) {
         deletedAt: undefined,
         originalParentId: undefined
       }
-      set((state) => ({
-        items: { ...state.items, [itemId]: updated },
-        _itemsArray: state._itemsArray.map((i) => (i.id === itemId ? updated : i))
-      }))
+      set((state) => {
+        const newItemsByParent = { ...state._itemsByParent }
+        if (item.parentId && newItemsByParent[item.parentId]) {
+          newItemsByParent[item.parentId] = newItemsByParent[item.parentId].filter(
+            (i) => i.id !== itemId
+          )
+        }
+        newItemsByParent[targetParentId] = sortByIndex([
+          ...(newItemsByParent[targetParentId] ?? []),
+          updated
+        ])
+        return {
+          items: { ...state.items, [itemId]: updated },
+          _itemsArray: state._itemsArray.map((i) => (i.id === itemId ? updated : i)),
+          _itemsByParent: newItemsByParent
+        }
+      })
       ops.saveItem(updated)
     },
 
@@ -502,11 +691,34 @@ export function createFolderStore(config: FolderStoreConfig) {
         for (const item of Object.values(newItems)) {
           if (folderIdSet.has(item.parentId)) delete newItems[item.id]
         }
+        const newChildFoldersByParent: Record<string, FolderRecord[]> = {}
+        for (const f of Object.values(newFolders)) {
+          if (f.parentId !== null) {
+            const list = newChildFoldersByParent[f.parentId] ?? []
+            list.push(f)
+            newChildFoldersByParent[f.parentId] = list
+          }
+        }
+        for (const k of Object.keys(newChildFoldersByParent)) {
+          newChildFoldersByParent[k] = sortByIndex(newChildFoldersByParent[k])
+        }
+        const newLoadedParents = new Set<string>()
+        const newItemsByParent: Record<string, AnyItemRecord[]> = {}
+        for (const parentId of state.loadedParents) {
+          if (folderIdSet.has(parentId)) continue
+          newLoadedParents.add(parentId)
+          newItemsByParent[parentId] = sortByIndex(
+            Object.values(newItems).filter((i) => i.parentId === parentId)
+          )
+        }
         return {
           folders: newFolders,
           items: newItems,
           _foldersArray: Object.values(newFolders),
-          _itemsArray: Object.values(newItems)
+          _itemsArray: Object.values(newItems),
+          _childFoldersByParent: newChildFoldersByParent,
+          _itemsByParent: newItemsByParent,
+          loadedParents: newLoadedParents
         }
       })
     },
@@ -538,18 +750,42 @@ export function createFolderStore(config: FolderStoreConfig) {
       set((state) => {
         const newFolders = { ...state.folders }
         const newItems = { ...state.items }
+        const expiredFolderIdSet = new Set(allExpiredFolderIds)
         for (const id of allExpiredFolderIds) delete newFolders[id]
         for (const id of expiredItemIds) delete newItems[id]
         for (const item of Object.values(newItems)) {
-          if (allExpiredFolderIds.includes(item.parentId)) {
+          if (expiredFolderIdSet.has(item.parentId)) {
             delete newItems[item.id]
           }
+        }
+        const newChildFoldersByParent: Record<string, FolderRecord[]> = {}
+        for (const f of Object.values(newFolders)) {
+          if (f.parentId !== null) {
+            const list = newChildFoldersByParent[f.parentId] ?? []
+            list.push(f)
+            newChildFoldersByParent[f.parentId] = list
+          }
+        }
+        for (const k of Object.keys(newChildFoldersByParent)) {
+          newChildFoldersByParent[k] = sortByIndex(newChildFoldersByParent[k])
+        }
+        const newLoadedParents = new Set<string>()
+        const newItemsByParent: Record<string, AnyItemRecord[]> = {}
+        for (const parentId of state.loadedParents) {
+          if (expiredFolderIdSet.has(parentId)) continue
+          newLoadedParents.add(parentId)
+          newItemsByParent[parentId] = sortByIndex(
+            Object.values(newItems).filter((i) => i.parentId === parentId)
+          )
         }
         return {
           folders: newFolders,
           items: newItems,
           _foldersArray: Object.values(newFolders),
-          _itemsArray: Object.values(newItems)
+          _itemsArray: Object.values(newItems),
+          _childFoldersByParent: newChildFoldersByParent,
+          _itemsByParent: newItemsByParent,
+          loadedParents: newLoadedParents
         }
       })
     },
@@ -557,6 +793,8 @@ export function createFolderStore(config: FolderStoreConfig) {
     softDeleteExpired: () => {
       const now = Date.now()
       const { folders, items } = get()
+
+      const expiredFolders: FolderRecord[] = []
       for (const folder of Object.values(folders)) {
         if (
           folder.expiresAt != null &&
@@ -564,28 +802,82 @@ export function createFolderStore(config: FolderStoreConfig) {
           !folder.deletedAt &&
           folder.id !== config.rootId
         ) {
-          get().softDeleteFolder(folder.id)
+          expiredFolders.push(folder)
         }
       }
+
+      const expiredItems: AnyItemRecord[] = []
       for (const item of Object.values(items)) {
         if (item.expiresAt != null && item.expiresAt < now && !item.deletedAt) {
-          get().softDeleteItem(item.id)
+          expiredItems.push(item)
         }
       }
+
+      if (expiredFolders.length === 0 && expiredItems.length === 0) return
+
+      const deletedAt = now
+      const folderUpdates: FolderRecord[] = []
+      const descendantUnfavorites: FolderRecord[] = []
+      for (const folder of expiredFolders) {
+        folderUpdates.push({
+          ...folder,
+          isFavorited: false,
+          deletedAt,
+          originalParentId: folder.parentId ?? config.rootId
+        })
+        for (const id of getDescendantFolderIds(folder.id, folders)) {
+          const f = folders[id]
+          if (f?.isFavorited) descendantUnfavorites.push({ ...f, isFavorited: false })
+        }
+      }
+
+      const itemUpdates: AnyItemRecord[] = expiredItems.map((item) => ({
+        ...item,
+        deletedAt,
+        originalParentId: item.parentId
+      }))
+
+      set((state) => {
+        const newFolders = { ...state.folders }
+        const newItems = { ...state.items }
+        for (const f of [...folderUpdates, ...descendantUnfavorites]) newFolders[f.id] = f
+        for (const i of itemUpdates) newItems[i.id] = i
+        const newChildFolders = { ...state._childFoldersByParent }
+        for (const f of [...folderUpdates, ...descendantUnfavorites]) {
+          if (f.parentId !== null && newChildFolders[f.parentId]) {
+            newChildFolders[f.parentId] = newChildFolders[f.parentId].map((existing) =>
+              existing.id === f.id ? f : existing
+            )
+          }
+        }
+        const newItemsByParent = { ...state._itemsByParent }
+        for (const i of itemUpdates) {
+          if (i.parentId && newItemsByParent[i.parentId]) {
+            newItemsByParent[i.parentId] = newItemsByParent[i.parentId].map((existing) =>
+              existing.id === i.id ? i : existing
+            )
+          }
+        }
+        return {
+          folders: newFolders,
+          items: newItems,
+          _foldersArray: Object.values(newFolders),
+          _itemsArray: Object.values(newItems),
+          _childFoldersByParent: newChildFolders,
+          _itemsByParent: newItemsByParent
+        }
+      })
+
+      if (folderUpdates.length > 0) ops.saveFolders([...folderUpdates, ...descendantUnfavorites])
+      if (itemUpdates.length > 0) ops.saveItems(itemUpdates)
     },
 
     getChildFolders: (parentId) => {
-      const { _foldersArray } = get()
-      return _foldersArray
-        .filter((f) => f.parentId === parentId)
-        .sort((a, b) => a.sortIndex - b.sortIndex)
+      return get()._childFoldersByParent[parentId] ?? []
     },
 
     getItems: (parentId) => {
-      const { _itemsArray } = get()
-      return _itemsArray
-        .filter((i) => i.parentId === parentId)
-        .sort((a, b) => a.sortIndex - b.sortIndex)
+      return get()._itemsByParent[parentId] ?? []
     },
 
     getFolderPath: (folderId) => {

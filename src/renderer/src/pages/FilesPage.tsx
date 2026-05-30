@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FileExplorerShell, useFileContextMenu } from '@renderer/components/Control/FileExplorer'
 import FileBrowser from '@renderer/components/Control/FileExplorer/FileBrowser'
@@ -14,7 +14,6 @@ import { uploadFiles, uploadFolderFiles } from '@renderer/lib/upload-utils'
 import {
   computeExpiresAt,
   inferDuration,
-  type AnyItemRecord,
   type FolderDuration,
   type FolderRecord
 } from '@shared/types/folder'
@@ -29,8 +28,6 @@ export default function FilesPage(): React.JSX.Element {
   const confirm = useConfirm()
   const isPresenting = useMediaProjectionStore((s) => s.isPresenting)
   const currentFolderId = useFileExplorerStore((state) => state.currentFolderId)
-  const itemsArray = useFileExplorerStore((state) => state._itemsArray)
-  const foldersArray = useFileExplorerStore((state) => state._foldersArray)
   const getChildFolders = useFileExplorerStore((state) => state.getChildFolders)
   const addFolder = useFileExplorerStore((state) => state.addFolder)
   const moveItem = useFileExplorerStore((state) => state.moveItem)
@@ -55,11 +52,13 @@ export default function FilesPage(): React.JSX.Element {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
 
-  const itemCount = useMemo(
-    () =>
-      itemsArray.filter((item: AnyItemRecord) => item.parentId === currentFolderId).length +
-      foldersArray.filter((folder) => folder.parentId === currentFolderId).length,
-    [itemsArray, foldersArray, currentFolderId]
+  const itemCount = useFileExplorerStore(
+    useCallback(
+      (state) =>
+        state._itemsArray.filter((item) => item.parentId === currentFolderId).length +
+        state._foldersArray.filter((folder) => folder.parentId === currentFolderId).length,
+      [currentFolderId]
+    )
   )
   const selectedCount = selectedIds.size
 

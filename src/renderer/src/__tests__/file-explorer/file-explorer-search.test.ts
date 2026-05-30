@@ -41,6 +41,8 @@ function makeStoreState(items: AnyItemRecord[], folders: FolderRecord[] = []): F
     items: {},
     _foldersArray: folders,
     _itemsArray: items,
+    _childFoldersByParent: {},
+    _itemsByParent: {},
     loadedParents: new Set(),
     currentFolderId: 'file-root',
     isLoading: false,

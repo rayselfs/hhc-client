@@ -24,12 +24,12 @@ export interface FileExplorerDBSchema extends DBSchema {
   'folder-items': {
     key: string
     value: AnyItemRecord
-    indexes: { 'by-parent': string }
+    indexes: { 'by-parent': string; 'by-deleted-at': number }
   }
 }
 
 const DB_NAME = 'hhc-file-explorer'
-const DB_VERSION = 3
+const DB_VERSION = 4
 export const NATIVE_FS_THRESHOLD = 100 * 1024 * 1024
 
 let fileExplorerDBPromise: Promise<IDBPDatabase<FileExplorerDBSchema>> | null = null
@@ -37,7 +37,7 @@ let fileExplorerDBPromise: Promise<IDBPDatabase<FileExplorerDBSchema>> | null = 
 function getFileExplorerDB(): Promise<IDBPDatabase<FileExplorerDBSchema>> {
   if (!fileExplorerDBPromise) {
     fileExplorerDBPromise = openDB<FileExplorerDBSchema>(DB_NAME, DB_VERSION, {
-      upgrade(db, oldVersion) {
+      upgrade(db, oldVersion, _newVersion, tx) {
         if (!db.objectStoreNames.contains('file-blobs')) {
           db.createObjectStore('file-blobs', { keyPath: 'id' })
         }
@@ -56,6 +56,13 @@ function getFileExplorerDB(): Promise<IDBPDatabase<FileExplorerDBSchema>> {
           const nativeDb: IDBDatabase = unwrap(db)
           if (nativeDb.objectStoreNames.contains('folders')) nativeDb.deleteObjectStore('folders')
           if (nativeDb.objectStoreNames.contains('items')) nativeDb.deleteObjectStore('items')
+        }
+
+        if (oldVersion < 4) {
+          const itemStore = tx.objectStore('folder-items')
+          if (!itemStore.indexNames.contains('by-deleted-at')) {
+            itemStore.createIndex('by-deleted-at', 'deletedAt')
+          }
         }
       }
     })

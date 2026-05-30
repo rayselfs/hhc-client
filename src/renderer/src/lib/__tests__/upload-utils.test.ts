@@ -92,6 +92,29 @@ describe('uploadFiles — concurrency semaphore', () => {
     expect(addFileItemToStore).toHaveBeenCalledTimes(10)
   })
 
+  it('T3: concurrent uploadFiles calls share one global limit of 3', async () => {
+    vi.mocked(isWeb).mockReturnValue(false)
+
+    let active = 0
+    let maxActive = 0
+
+    vi.mocked(addFileItemToStore).mockImplementation(async () => {
+      active++
+      maxActive = Math.max(maxActive, active)
+      await new Promise((r) => setTimeout(r, 50))
+      active--
+      return 'mock-id'
+    })
+
+    const filesA = Array.from({ length: 3 }, (_, i) => makeFile(`a${i}.txt`, 100, 'text/plain'))
+    const filesB = Array.from({ length: 3 }, (_, i) => makeFile(`b${i}.txt`, 100, 'text/plain'))
+
+    await Promise.all([uploadFiles(filesA, 'parent-1'), uploadFiles(filesB, 'parent-2')])
+
+    expect(maxActive).toBeLessThanOrEqual(3)
+    expect(addFileItemToStore).toHaveBeenCalledTimes(6)
+  })
+
   it('T3: single file — completes successfully', async () => {
     vi.mocked(isWeb).mockReturnValue(false)
     const file = makeFile('single.png', 512)

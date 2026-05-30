@@ -67,6 +67,8 @@ beforeEach(() => {
     items: {},
     _foldersArray: [rootFolder],
     _itemsArray: [],
+    _childFoldersByParent: {},
+    _itemsByParent: {},
     loadedParents: new Set([ROOT_ID]),
     currentFolderId: ROOT_ID,
     isLoading: false

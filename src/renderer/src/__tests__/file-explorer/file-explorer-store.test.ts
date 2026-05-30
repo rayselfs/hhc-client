@@ -49,6 +49,8 @@ const initialStoreState = {
   items: {},
   _foldersArray: [],
   _itemsArray: [],
+  _childFoldersByParent: {},
+  _itemsByParent: {},
   loadedParents: new Set<string>(),
   currentFolderId: 'file-root',
   isLoading: true

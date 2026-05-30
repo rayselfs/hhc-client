@@ -162,9 +162,18 @@ export function createFolderDB(
       const allFolders = await loadAllFolders()
       const expiredFolders = allFolders.filter((f) => f.deletedAt != null && f.deletedAt < cutoff)
       const db = await getDB()
-      // No index on deletedAt — full scan required without a schema change
-      const allItems: AnyItemRecord[] = await db.getAll('folder-items')
-      const expiredItems = allItems.filter((i) => i.deletedAt != null && i.deletedAt < cutoff)
+
+      let expiredItems: AnyItemRecord[]
+      try {
+        const range = IDBKeyRange.upperBound(cutoff)
+        expiredItems = await db.getAllFromIndex('folder-items', 'by-deleted-at', range)
+        expiredItems = expiredItems.filter((i) => i.deletedAt != null)
+      } catch {
+        // Index not available (e.g. bible-db) — full scan fallback
+        const allItems: AnyItemRecord[] = await db.getAll('folder-items')
+        expiredItems = allItems.filter((i) => i.deletedAt != null && i.deletedAt < cutoff)
+      }
+
       const folderIds = expiredFolders.map((f) => f.id)
       const itemIds = expiredItems.map((i) => i.id)
       if (folderIds.length > 0) {
