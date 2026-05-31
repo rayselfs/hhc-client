@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from '@heroui/react/toast'
 import { useTranslation } from 'react-i18next'
 import { ChevronLeft, ChevronRight, AlignJustify, Maximize2 } from 'lucide-react'
@@ -7,6 +7,7 @@ import type { FileItemRecord } from '@shared/types/folder'
 import { openFileExplorerDB, getFileBlob } from '@renderer/lib/file-explorer-db'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 import { usePresenterCommands } from '@renderer/contexts/PresenterCommandContext'
+import { usePreviewCacheContext } from '@renderer/contexts/PreviewCacheContext'
 
 interface PdfPreviewProps {
   item: FileItemRecord
@@ -32,6 +33,7 @@ async function renderPage(
 export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element {
   const { t } = useTranslation()
   const { sendCommand } = usePresenterCommands()
+  const { pdfPageThumbs } = usePreviewCacheContext()
   const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageCount, setPageCount] = useState(0)
@@ -40,10 +42,14 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
 
   const slideCanvasRef = useRef<HTMLCanvasElement>(null)
   const scrollCanvasRefs = useRef<(HTMLCanvasElement | null)[]>([])
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const rafRef = useRef<number | null>(null)
 
   const pdfViewMode = useMediaProjectionStore((s) => s.typeStates['pdf']?.viewMode ?? 'slide')
   const zoomLevel = useMediaProjectionStore((s) => s.zoomLevel)
   const pan = useMediaProjectionStore((s) => s.pan)
+
+  const thumbs = pdfPageThumbs[item.id] ?? []
 
   useEffect(() => {
     let cancelled = false
@@ -182,6 +188,23 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
     }
   }, [pageCount, sendCommand])
 
+  const handleScroll = useCallback(() => {
+    if (rafRef.current !== null) return
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null
+      const el = scrollContainerRef.current
+      if (!el) return
+      const ratio = el.scrollTop / Math.max(1, el.scrollHeight - el.clientHeight)
+      sendCommand({ action: 'pdfScroll', value: ratio })
+    })
+  }, [sendCommand])
+
+  useEffect(() => {
+    return () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
+    }
+  }, [])
+
   if (loading) {
     return (
       <div className="w-full h-full flex items-center justify-center text-foreground/50">
@@ -201,7 +224,11 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
   if (pdfViewMode === 'scroll') {
     return (
       <div className="w-full h-full relative bg-black">
-        <div className="w-full h-full overflow-y-auto flex flex-col items-center gap-4 py-4">
+        <div
+          ref={scrollContainerRef}
+          className="w-full h-full overflow-y-auto flex flex-col items-center gap-4 py-4"
+          onScroll={handleScroll}
+        >
           {Array.from({ length: pageCount }, (_, i) => (
             <canvas
               key={i + 1}
@@ -229,7 +256,7 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
   }
 
   return (
-    <div className="w-full h-full relative flex flex-col items-center justify-center bg-black">
+    <div className="w-full h-full relative flex items-center justify-center bg-black overflow-hidden">
       <div
         style={{
           display: 'flex',
@@ -250,20 +277,42 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
           style={{ display: 'block', maxWidth: '100%', maxHeight: '100%' }}
         />
       </div>
-      <div
-        className="absolute bottom-0 left-0 right-0 z-20"
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        <div className="flex justify-start pl-2 pb-2">
-          <div className="inline-flex items-center gap-1 pl-2 pr-3 py-1.5 rounded-full presenter-media-control">
+
+      {thumbs.length > 0 && (
+        <div
+          className="absolute top-0 left-0 bottom-0 z-20 flex flex-col bg-black/70 backdrop-blur-sm overflow-hidden"
+          style={{ width: 'calc(7 * 100% / 24)' }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <div className="flex-1 overflow-y-auto flex flex-col gap-1 p-1">
+            {thumbs.map((url, i) => (
+              <button
+                key={i}
+                className={`relative rounded overflow-hidden border-2 transition-colors shrink-0 ${
+                  currentPage === i + 1 ? 'border-white/80' : 'border-transparent'
+                }`}
+                onClick={() => {
+                  setCurrentPage(i + 1)
+                  sendCommand({ action: 'pdfPage', value: i + 1 })
+                }}
+              >
+                <img src={url} alt={`page ${i + 1}`} style={{ width: '100%', display: 'block' }} />
+                <span className="absolute bottom-0.5 right-1 text-white/60 text-xs">{i + 1}</span>
+              </button>
+            ))}
+          </div>
+
+          <div
+            className="shrink-0 flex items-center justify-center gap-1 p-1.5 border-t border-white/10"
+          >
             <button
               className="text-white/80 hover:text-white hover:bg-white/10 rounded-full p-1.5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
               onClick={() => window.dispatchEvent(new CustomEvent('media:pdfPrevPage'))}
               disabled={currentPage <= 1}
             >
-              <ChevronLeft size={20} />
+              <ChevronLeft size={16} />
             </button>
-            <span className="text-white/70 text-sm tabular-nums px-1">
+            <span className="text-white/60 text-xs tabular-nums px-0.5">
               {currentPage} / {pageCount}
             </span>
             <button
@@ -271,9 +320,9 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
               onClick={() => window.dispatchEvent(new CustomEvent('media:pdfNextPage'))}
               disabled={currentPage >= pageCount}
             >
-              <ChevronRight size={20} />
+              <ChevronRight size={16} />
             </button>
-            <div className="w-px h-4 bg-white/20 mx-1" />
+            <div className="w-px h-3 bg-white/20 mx-0.5" />
             <button
               className="text-white/80 hover:text-white hover:bg-white/10 rounded-full p-1.5 transition-colors"
               onClick={() => {
@@ -281,11 +330,50 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
                 sendCommand({ action: 'pdfViewMode', value: 'continuous' })
               }}
             >
-              <AlignJustify size={20} />
+              <AlignJustify size={16} />
             </button>
           </div>
         </div>
-      </div>
+      )}
+
+      {thumbs.length === 0 && (
+        <div
+          className="absolute bottom-0 left-0 right-0 z-20"
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <div className="flex justify-start pl-2 pb-2">
+            <div className="inline-flex items-center gap-1 pl-2 pr-3 py-1.5 rounded-full presenter-media-control">
+              <button
+                className="text-white/80 hover:text-white hover:bg-white/10 rounded-full p-1.5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                onClick={() => window.dispatchEvent(new CustomEvent('media:pdfPrevPage'))}
+                disabled={currentPage <= 1}
+              >
+                <ChevronLeft size={20} />
+              </button>
+              <span className="text-white/70 text-sm tabular-nums px-1">
+                {currentPage} / {pageCount}
+              </span>
+              <button
+                className="text-white/80 hover:text-white hover:bg-white/10 rounded-full p-1.5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                onClick={() => window.dispatchEvent(new CustomEvent('media:pdfNextPage'))}
+                disabled={currentPage >= pageCount}
+              >
+                <ChevronRight size={20} />
+              </button>
+              <div className="w-px h-4 bg-white/20 mx-1" />
+              <button
+                className="text-white/80 hover:text-white hover:bg-white/10 rounded-full p-1.5 transition-colors"
+                onClick={() => {
+                  useMediaProjectionStore.getState().setTypeState('pdf', { viewMode: 'scroll' })
+                  sendCommand({ action: 'pdfViewMode', value: 'continuous' })
+                }}
+              >
+                <AlignJustify size={20} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

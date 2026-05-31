@@ -72,19 +72,6 @@ export const GridView = React.memo(function GridView({
   const { t } = useTranslation()
   const containerRef = useRef<HTMLDivElement>(null)
 
-  if (items.length === 0) {
-    return (
-      <div className="flex h-full flex-col items-center justify-center text-center p-4">
-        <h3 className="text-lg font-medium text-foreground">
-          {t('fileExplorer.empty.title', 'No files yet')}
-        </h3>
-        <p className="text-sm text-default-400 mt-1">
-          {t('fileExplorer.empty.description', 'Upload files to get started')}
-        </p>
-      </div>
-    )
-  }
-
   let gridColsClass = ''
   let iconSize = 32
   let nameClass = ''
@@ -122,6 +109,19 @@ export const GridView = React.memo(function GridView({
     estimateSize: () => estimateSize,
     overscan: 2
   })
+
+  if (items.length === 0) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center text-center p-4">
+        <h3 className="text-lg font-medium text-foreground">
+          {t('fileExplorer.empty.title', 'No files yet')}
+        </h3>
+        <p className="text-sm text-default-400 mt-1">
+          {t('fileExplorer.empty.description', 'Upload files to get started')}
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div ref={containerRef} className="overflow-y-auto h-full p-4">

@@ -7,11 +7,13 @@ import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 interface MediaPreviewProps {
   currentItem: FileItemRecord | null
   descriptor: MediaTypeDescriptor | null
+  isEnded?: boolean
 }
 
 export default function MediaPreview({
   currentItem,
-  descriptor
+  descriptor,
+  isEnded = false
 }: MediaPreviewProps): React.JSX.Element {
   const { t } = useTranslation()
   const previewBoxRef = useRef<HTMLDivElement>(null)
@@ -20,7 +22,7 @@ export default function MediaPreview({
   const panDragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0, w: 1, h: 1, zoom: 1 })
 
   const zoomLevel = useMediaProjectionStore((s) => s.zoomLevel)
-  const { next } = useMediaProjectionStore.getState()
+  const { next, exit } = useMediaProjectionStore.getState()
 
   useEffect(() => {
     const el = previewBoxRef.current
@@ -94,6 +96,10 @@ export default function MediaPreview({
       <div
         className="aspect-video w-full overflow-hidden relative rounded-2xl bg-surface-secondary border border-default-300"
         onClick={() => {
+          if (isEnded) {
+            exit()
+            return
+          }
           if (descriptor?.clickToAdvance && zoomLevel <= 1) next()
         }}
       >
@@ -102,6 +108,13 @@ export default function MediaPreview({
         ) : (
           <div className="text-foreground/50 text-center w-full h-full flex items-center justify-center">
             {t('presenter.noMediaSelected')}
+          </div>
+        )}
+        {isEnded && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black">
+            <span className="text-white/10 text-4xl font-bold tracking-widest">
+              {t('presenter.endOfSlides')}
+            </span>
           </div>
         )}
       </div>

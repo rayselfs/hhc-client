@@ -70,6 +70,16 @@ export function useMediaProjectionSync(): void {
   }, [blankProjection])
 
   useEffect(() => {
+    const unsub = useMediaProjectionStore.subscribe((state, prev) => {
+      if (!state.isPresenting) return
+      if (state.isEnded && !prev.isEnded) {
+        send('file:end', null)
+      }
+    })
+    return unsub
+  }, [send])
+
+  useEffect(() => {
     const state = useMediaProjectionStore.getState()
     if (!state.isPresenting) return
     const item = state.playlist[state.currentIndex]

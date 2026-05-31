@@ -27,6 +27,7 @@ export default function FileProjection({
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [pdfState, setPdfState] = useState<PdfState | null>(null)
+  const [isEnded, setIsEnded] = useState(false)
   const [displayName, setDisplayName] = useState(fileName ?? '')
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const pdfContainerRef = useRef<HTMLDivElement | null>(null)
@@ -37,6 +38,7 @@ export default function FileProjection({
     setZoom(1)
     setPan({ x: 0, y: 0 })
     setPdfState(null)
+    setIsEnded(false)
     const db = await openFileExplorerDB()
     const blob = await getFileBlob(db, fileId)
     if (!blob || currentFileIdRef.current !== fileId) return
@@ -121,6 +123,14 @@ export default function FileProjection({
       case 'pdfPage':
         setPdfState((prev) => (prev ? { ...prev, currentPage: data.value } : prev))
         break
+      case 'pdfScroll': {
+        const el = pdfContainerRef.current
+        if (el) {
+          const maxScroll = el.scrollHeight - el.clientHeight
+          el.scrollTop = data.value * maxScroll
+        }
+        break
+      }
       case 'pdfViewMode':
         setPdfState((prev) => (prev ? { ...prev, viewMode: data.value } : prev))
         break
@@ -145,9 +155,14 @@ export default function FileProjection({
       handleControl(data)
     })
 
+    const unsubEnd = adapter.on('file:end', () => {
+      setIsEnded(true)
+    })
+
     return () => {
       unsubShow()
       unsubControl()
+      unsubEnd()
       adapter.dispose()
     }
   }, [loadFile, handleControl])
@@ -169,6 +184,14 @@ export default function FileProjection({
       ? `scale(${zoom}) translate(${(pan.x / zoom) * 100}%, ${(pan.y / zoom) * 100}%)`
       : undefined
 
+  if (isEnded) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-black">
+        <span className="text-white/10 text-4xl font-bold tracking-widest">投影結束</span>
+      </div>
+    )
+  }
+
   if (pdfState) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-black overflow-hidden">
@@ -186,7 +209,7 @@ export default function FileProjection({
         >
           <div
             ref={pdfContainerRef}
-            className="flex flex-col items-center overflow-auto max-h-full max-w-full"
+            className="flex flex-col items-center overflow-hidden max-h-full max-w-full"
             style={{ transform, transformOrigin: 'center center' }}
           >
             {pdfState.viewMode === 'single' ? (
@@ -280,7 +303,7 @@ function PdfCanvas({
     container.innerHTML = ''
     Object.assign(canvas.style, {
       maxWidth: '100%',
-      maxHeight: '100vh',
+      maxHeight: '100%',
       objectFit: 'contain'
     })
     container.appendChild(canvas)

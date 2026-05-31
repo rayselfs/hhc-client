@@ -21,7 +21,11 @@ function debounce<Args extends unknown[]>(
   return debounced
 }
 
-export default function PresenterSidebar(): React.JSX.Element {
+interface PresenterSidebarProps {
+  previewCache: Record<string, string>
+}
+
+export default function PresenterSidebar({ previewCache }: PresenterSidebarProps): React.JSX.Element {
   const { t } = useTranslation()
   const nextItem = useMediaProjectionStore((s) => s.nextItem())
   const currentItem = useMediaProjectionStore((s) => s.currentItem())
@@ -76,7 +80,7 @@ export default function PresenterSidebar(): React.JSX.Element {
                 {t('presenter.endOfSlides')}
               </span>
             )}
-            {nextItem && <NextItemPreview item={nextItem} />}
+            {nextItem && <NextItemPreview item={nextItem} previewCache={previewCache} />}
           </div>
         </div>
       </div>

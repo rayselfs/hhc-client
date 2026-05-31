@@ -19,7 +19,7 @@ import {
 } from '@shared/types/folder'
 import type { ClipboardState } from '@renderer/components/Control/FileExplorer'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
-import { getThumbnail, saveThumbnail } from '@renderer/lib/thumbnail-db'
+import { getThumbnail, copyThumbnail } from '@renderer/lib/thumbnail-db'
 import MediaPresenter from '@renderer/components/Control/FileExplorer/Presenter/MediaPresenter'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 
@@ -162,9 +162,9 @@ export default function FilesPage(): React.JSX.Element {
         if (clipboard.mode === 'copy') {
           const newId = await copyItem(id, currentFolderId)
           if (!newId) continue
-          const dataUrl = await getThumbnail(id)
-          if (dataUrl) {
-            await saveThumbnail(newId, dataUrl)
+          const copied = await copyThumbnail(id, newId)
+          if (copied) {
+            const dataUrl = await getThumbnail(newId)
             window.dispatchEvent(
               new CustomEvent('hhc:thumbnail-ready', { detail: { itemId: newId, dataUrl } })
             )

@@ -207,7 +207,8 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
           onClick={() => {
             hasStartedRef.current = true
             setHasStarted(true)
-            handlePlayPause()
+            videoRef.current?.play().then(() => setIsPlaying(true)).catch(() => {})
+            sendCommand({ action: 'play' })
           }}
           onMouseDown={(e) => e.stopPropagation()}
         >

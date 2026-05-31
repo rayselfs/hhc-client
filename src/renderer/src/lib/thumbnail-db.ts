@@ -86,9 +86,19 @@ async function withThumbnailStore<T>(
   }
 }
 
+function dataUrlToBlob(dataUrl: string): Blob {
+  const [header, data] = dataUrl.split(',')
+  const mime = header.match(/:(.*?);/)?.[1] ?? 'image/jpeg'
+  const binary = atob(data)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i)
+  }
+  return new Blob([bytes], { type: mime })
+}
+
 export async function saveThumbnail(itemId: string, dataUrl: string): Promise<void> {
-  const response = await fetch(dataUrl)
-  const blob = await response.blob()
+  const blob = dataUrlToBlob(dataUrl)
 
   await withThumbnailStore<void>(
     'readwrite',
@@ -122,4 +132,24 @@ export async function deleteThumbnail(itemId: string): Promise<void> {
     },
     undefined
   )
+}
+
+export async function copyThumbnail(fromId: string, toId: string): Promise<boolean> {
+  const record = await withThumbnailStore<ThumbnailRecord | undefined>(
+    'readonly',
+    (store) => store.get(fromId),
+    undefined
+  )
+
+  if (!record) return false
+
+  await withThumbnailStore<void>(
+    'readwrite',
+    (store) => {
+      store.put({ ...record, itemId: toId })
+    },
+    undefined
+  )
+
+  return true
 }

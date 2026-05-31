@@ -38,6 +38,7 @@ beforeEach(() => {
     playlist: [],
     currentIndex: 0,
     isPresenting: false,
+    isEnded: false,
     showGrid: false,
     typeStates: { pdf: { viewMode: 'slide' } },
     zoomLevel: 1
@@ -95,9 +96,9 @@ describe('next / prev', () => {
 })
 
 describe('canNext / canPrev', () => {
-  it('canNext is false at last index', () => {
+  it('canNext is always true', () => {
     useMediaProjectionStore.getState().startPresentation(files, 2)
-    expect(useMediaProjectionStore.getState().canNext()).toBe(false)
+    expect(useMediaProjectionStore.getState().canNext()).toBe(true)
   })
 
   it('canPrev is false at first index', () => {

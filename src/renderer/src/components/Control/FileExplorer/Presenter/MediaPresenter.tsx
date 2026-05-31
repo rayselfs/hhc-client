@@ -8,6 +8,7 @@ import { useMediaProjectionSync } from '@renderer/lib/media-projection-sync'
 import { setPresenterActive } from '@renderer/lib/shortcut-registry'
 import { getDescriptor } from '@renderer/lib/presenter-registry'
 import { PresenterCommandContext } from '@renderer/contexts/PresenterCommandContext'
+import { PreviewCacheProvider } from '@renderer/contexts/PreviewCacheContext'
 import { ShortcutScope } from '@renderer/contexts/ShortcutScopeContext'
 import type { FileControlPayload } from '@shared/projection-messages'
 import PresenterHeader from './PresenterHeader'
@@ -17,6 +18,7 @@ import PresenterGrid from './PresenterGrid'
 import MediaPreview from './Preview/MediaPreview'
 import MediaToolbar from './MediaToolbar'
 import GlassDivider from '@renderer/components/Common/GlassDivider'
+import { usePreviewCache } from '@renderer/hooks/usePreviewCache'
 
 export default function MediaPresenter(): React.JSX.Element {
   const { claimProjection, blankProjection, send } = useProjection()
@@ -24,8 +26,10 @@ export default function MediaPresenter(): React.JSX.Element {
   useMediaProjectionSync()
 
   const playlist = useMediaProjectionStore((s) => s.playlist)
+  const { thumbnails, pdfPageThumbs } = usePreviewCache(playlist)
   const showGrid = useMediaProjectionStore((s) => s.showGrid)
   const zoomLevel = useMediaProjectionStore((s) => s.zoomLevel)
+  const isEnded = useMediaProjectionStore((s) => s.isEnded)
   const currentItem = useMediaProjectionStore((s) => s.currentItem())
 
   const { exit, next, prev, jumpTo, toggleGrid, setZoomLevel, resetZoom } =
@@ -129,32 +133,34 @@ export default function MediaPresenter(): React.JSX.Element {
 
   return (
     <PresenterCommandContext.Provider value={{ sendCommand }}>
-      <div
-        className="media-presenter fixed inset-0 z-9999 bg-surface"
-        data-testid="media-presenter"
-      >
-        <div className="flex h-full">
-          <div className="flex-3 lg:flex-2 min-w-0 flex flex-col h-full">
-            <PresenterHeader onExit={exit} />
-            <MediaPreview currentItem={currentItem} descriptor={descriptor} />
-            <MediaToolbar />
-            <div className="flex-1" />
-            <PresenterNavigation />
+      <PreviewCacheProvider pdfPageThumbs={pdfPageThumbs}>
+        <div
+          className="media-presenter fixed inset-0 z-9999 bg-surface"
+          data-testid="media-presenter"
+        >
+          <div className="flex h-full">
+            <div className="flex-3 lg:flex-2 min-w-0 flex flex-col h-full">
+              <PresenterHeader onExit={exit} />
+              <MediaPreview currentItem={currentItem} descriptor={descriptor} isEnded={isEnded} />
+              <MediaToolbar />
+              <div className="flex-1" />
+              <PresenterNavigation />
+            </div>
+
+            <GlassDivider vertical />
+
+            <div className="flex-2 lg:flex-1 min-w-0 h-full">
+              <PresenterSidebar previewCache={thumbnails} />
+            </div>
           </div>
 
-          <GlassDivider vertical />
-
-          <div className="flex-2 lg:flex-1 min-w-0 h-full">
-            <PresenterSidebar />
-          </div>
+          {showGrid && (
+            <ShortcutScope name="grid">
+              <PresenterGrid />
+            </ShortcutScope>
+          )}
         </div>
-
-        {showGrid && (
-          <ShortcutScope name="grid">
-            <PresenterGrid />
-          </ShortcutScope>
-        )}
-      </div>
+      </PreviewCacheProvider>
     </PresenterCommandContext.Provider>
   )
 }

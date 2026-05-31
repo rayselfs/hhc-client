@@ -54,6 +54,8 @@ export interface AppMessages {
   }
   /** File playback/control actions on projection */
   'file:control': FileControlPayload
+  /** Presentation ended — show end screen on projection */
+  'file:end': null
 }
 
 export type FileControlPayload =
@@ -62,6 +64,7 @@ export type FileControlPayload =
   | { action: 'seek'; value: number }
   | { action: 'volume'; value: number }
   | { action: 'pdfPage'; value: number }
+  | { action: 'pdfScroll'; value: number }
   | { action: 'pdfViewMode'; value: 'single' | 'continuous' }
   | { action: 'zoom'; value: number }
   | { action: 'pan'; value: { x: number; y: number } }

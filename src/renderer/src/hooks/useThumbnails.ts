@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { getThumbnail } from '@renderer/lib/thumbnail-db'
 
 export function canHaveThumbnail(mimeType: string | undefined): boolean {
@@ -70,6 +70,18 @@ export function useThumbnails(
     [allThumbnails, thumbnailItemIds]
   )
 
+  const itemsKey = useMemo(
+    () =>
+      items
+        .filter((item) => canHaveThumbnail(item.mimeType))
+        .map((i) => `${i.id}:${i.createdAt ?? 0}`)
+        .join(','),
+    [items]
+  )
+
+  const itemsRef = useRef(items)
+  itemsRef.current = items
+
   // Prune stale keys when items change
   useEffect(() => {
     setAllThumbnails((prev) => {
@@ -88,7 +100,7 @@ export function useThumbnails(
 
   useEffect(() => {
     let cancelled = false
-    const thumbnailItems = items.filter((item) => canHaveThumbnail(item.mimeType))
+    const thumbnailItems = itemsRef.current.filter((item) => canHaveThumbnail(item.mimeType))
     const now = Date.now()
     const semaphore = createSemaphore(THUMBNAIL_LOAD_CONCURRENCY)
 
@@ -123,7 +135,7 @@ export function useThumbnails(
     return () => {
       cancelled = true
     }
-  }, [items, pendingAgeMs])
+  }, [itemsKey, pendingAgeMs])
 
   useEffect(() => {
     const onThumbnailReady = (e: Event): void => {
