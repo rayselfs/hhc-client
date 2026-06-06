@@ -35,7 +35,7 @@ export interface MediaProjectionStore {
 }
 
 const initialTypeStates: Partial<{ [K in MediaType]: MediaTypeStateMap[K] }> = {
-  pdf: { viewMode: 'slide' as const }
+  pdf: { viewMode: 'slide' as const, thumbsCollapsed: false }
 }
 
 const initialState = {

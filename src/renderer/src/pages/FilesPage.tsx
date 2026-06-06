@@ -14,6 +14,7 @@ import { uploadFiles, uploadFolderFiles } from '@renderer/lib/upload-utils'
 import {
   computeExpiresAt,
   inferDuration,
+  isFileItem,
   type FolderDuration,
   type FolderRecord
 } from '@shared/types/folder'
@@ -79,10 +80,6 @@ export default function FilesPage(): React.JSX.Element {
     )
   )
   const selectedCount = selectedIds.size
-
-  useEffect(() => {
-    void useFileExplorerStore.getState().initialize()
-  }, [])
 
   useEffect(() => {
     const el = folderInputRef.current
@@ -197,7 +194,9 @@ export default function FilesPage(): React.JSX.Element {
     const usedFolderNames = new Set(
       state.getChildFolders(currentFolderId).map((f) => f.name)
     )
-    const usedItemNames = new Set(state.getItems(currentFolderId).map((i) => i.name))
+    const usedItemNames = new Set(
+      state.getItems(currentFolderId).filter(isFileItem).map((i) => i.name)
+    )
 
     for (const id of clipboard.itemIds) {
       if (state.folders[id]) {
@@ -209,12 +208,14 @@ export default function FilesPage(): React.JSX.Element {
           moveFolder(id, currentFolderId)
         }
       } else if (state.items[id]) {
+        const item = state.items[id]
+        if (!isFileItem(item)) continue
         if (clipboard.mode === 'copy') {
-          const uniqueName = resolveUniqueFileName(state.items[id].name, [...usedItemNames])
+          const uniqueName = resolveUniqueFileName(item.name, [...usedItemNames])
           usedItemNames.add(uniqueName)
           const newId = await copyItem(id, currentFolderId)
           if (!newId) continue
-          if (uniqueName !== state.items[id].name) {
+          if (uniqueName !== item.name) {
             useFileExplorerStore.getState().updateItem?.(newId, { name: uniqueName })
           }
           const copied = await copyThumbnail(id, newId)

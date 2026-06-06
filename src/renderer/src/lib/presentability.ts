@@ -8,7 +8,7 @@ const PRESENTABLE_OTHER_MIMES = ['application/pdf']
 export type MediaTypeStateMap = {
   image: Record<string, never>
   video: Record<string, never>
-  pdf: { viewMode: 'slide' | 'scroll' }
+  pdf: { viewMode: 'slide' | 'scroll'; thumbsCollapsed?: boolean }
 }
 
 export type MediaType = keyof MediaTypeStateMap

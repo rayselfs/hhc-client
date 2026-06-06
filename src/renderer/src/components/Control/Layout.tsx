@@ -1,5 +1,6 @@
 import { Outlet } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
+import AppLoadingScreen from '@renderer/components/Control/AppLoadingScreen'
 import { useTranslation } from 'react-i18next'
 import Sidebar from '@renderer/components/Control/Sidebar'
 import Header from '@renderer/components/Control/Header/Header'
@@ -50,7 +51,6 @@ export default function Layout(): React.JSX.Element {
   useAutoUpdateCheck()
 
   useEffect(() => {
-    void import('@renderer/pages/FilesPage')
     const cleanup = initializeApp()
     const timerId = setTimeout(() => {
       if (useBibleStore.getState().isInitialized) {
@@ -66,6 +66,8 @@ export default function Layout(): React.JSX.Element {
       unsub()
     }
   }, [])
+
+  if (!initialized) return <AppLoadingScreen />
 
   return (
     <AppInitContext.Provider value={initialized}>

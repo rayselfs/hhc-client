@@ -15,6 +15,7 @@ export interface FolderStoreState {
   loadedParents: Set<string>
   currentFolderId: string
   isLoading: boolean
+  isInitialized: boolean
 
   initialize: () => Promise<void>
   addFolder: (name: string, parentId?: string, expiresAt?: number | null) => string
@@ -55,6 +56,7 @@ export interface FolderStoreState {
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export function createFolderStore(config: FolderStoreConfig) {
   const ops = createFolderDB(config.getDB, config.rootId)
+  let isInitializing = false
 
   function sortByIndex<T extends { sortIndex: number }>(arr: T[]): T[] {
     return arr.slice().sort((a, b) => a.sortIndex - b.sortIndex)
@@ -70,9 +72,11 @@ export function createFolderStore(config: FolderStoreConfig) {
     loadedParents: new Set<string>(),
     currentFolderId: config.rootId,
     isLoading: true,
+    isInitialized: false,
 
     initialize: async () => {
-      if (get()._foldersArray.length > 0) return
+      if (get().isInitialized || isInitializing) return
+      isInitializing = true
       set({ isLoading: true })
       try {
         const allFolders = await ops.loadAllFolders()
@@ -133,10 +137,13 @@ export function createFolderStore(config: FolderStoreConfig) {
           _childFoldersByParent: childFoldersByParent,
           _itemsByParent: { [config.rootId]: sortByIndex(rootItems) },
           loadedParents: new Set([config.rootId]),
-          isLoading: false
+          isLoading: false,
+          isInitialized: true
         })
       } catch {
         set({ isLoading: false })
+      } finally {
+        isInitializing = false
       }
     },
 

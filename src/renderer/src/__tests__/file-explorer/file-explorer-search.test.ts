@@ -46,6 +46,7 @@ function makeStoreState(items: AnyItemRecord[], folders: FolderRecord[] = []): F
     loadedParents: new Set(),
     currentFolderId: 'file-root',
     isLoading: false,
+    isInitialized: false,
     initialize: vi.fn(),
     addFolder: vi.fn(),
     updateFolder: vi.fn(),
