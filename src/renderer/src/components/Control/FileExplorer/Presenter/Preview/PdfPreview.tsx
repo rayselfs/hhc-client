@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { ScrollShadow } from '@heroui/react'
 import { toast } from '@heroui/react/toast'
 import { useTranslation } from 'react-i18next'
 import { ChevronLeft, ChevronRight, AlignJustify, Maximize2 } from 'lucide-react'
@@ -268,7 +267,7 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
         </div>
         <div className="absolute bottom-2 left-2 z-20" onMouseDown={(e) => e.stopPropagation()}>
           <button
-            className="inline-flex items-center rounded-full p-2 presenter-media-control text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+            className="inline-flex items-center rounded-full p-2 pdf-sidebar-bg text-white/80 hover:text-white hover:bg-white/10 transition-colors"
             onClick={() => {
               setPdfState({ viewMode: 'slide' })
               sendCommand({ action: 'pdfViewMode', value: 'single' })
@@ -313,7 +312,7 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
           className="w-full h-full flex flex-col pdf-sidebar-bg rounded-tr-xl rounded-br-xl transition-transform duration-200 ease-in-out"
           style={{ transform: thumbsCollapsed ? 'translateX(-100%)' : 'translateX(0)' }}
         >
-          <ScrollShadow className="flex-1 flex flex-col gap-1 p-3" hideScrollBar>
+          <div className="flex-1 overflow-y-auto flex flex-col gap-2 p-4">
             {thumbs.map((url, i) => (
               <button
                 key={i}
@@ -332,7 +331,7 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
                 <span className="absolute bottom-0.5 right-1 text-white/60 text-xs">{i + 1}</span>
               </button>
             ))}
-          </ScrollShadow>
+          </div>
 
           <div className="shrink-0 flex items-center justify-center gap-1 p-1.5 border-t border-white/10">
             <button
