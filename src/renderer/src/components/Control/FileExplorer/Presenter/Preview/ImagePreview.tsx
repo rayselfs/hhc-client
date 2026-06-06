@@ -73,8 +73,8 @@ export default function ImagePreview({ item }: ImagePreviewProps): React.JSX.Ele
   if (zoomLevel > 1) {
     const viewportWidth = (1 / zoomLevel) * 100
     const viewportHeight = (1 / zoomLevel) * 100
-    const viewportLeft = (0.5 - (0.5 + pan.x) / zoomLevel) * 100
-    const viewportTop = (0.5 - (0.5 + pan.y) / zoomLevel) * 100
+    const viewportLeft = (0.5 - (0.5 - pan.x) / zoomLevel) * 100
+    const viewportTop = (0.5 - (0.5 - pan.y) / zoomLevel) * 100
 
     return (
       <div className="w-full h-full overflow-hidden relative">
