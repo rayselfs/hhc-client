@@ -309,7 +309,7 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div
-          className="w-full h-full flex flex-col presenter-media-control rounded-tr-xl rounded-br-xl transition-transform duration-200 ease-in-out"
+          className="w-full h-full flex flex-col pdf-sidebar-bg rounded-tr-xl rounded-br-xl transition-transform duration-200 ease-in-out"
           style={{ transform: thumbsCollapsed ? 'translateX(-100%)' : 'translateX(0)' }}
         >
           <div className="flex-1 overflow-y-auto flex flex-col gap-1 p-3">
@@ -339,9 +339,9 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
               onClick={() => window.dispatchEvent(new CustomEvent('media:pdfPrevPage'))}
               disabled={currentPage <= 1}
             >
-              <ChevronLeft size={16} />
+              <ChevronLeft size={20} />
             </button>
-            <span className="text-white/60 text-xs tabular-nums px-0.5">
+            <span className="text-white/70 text-sm tabular-nums px-1">
               {currentPage} / {pageCount}
             </span>
             <button
@@ -349,9 +349,9 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
               onClick={() => window.dispatchEvent(new CustomEvent('media:pdfNextPage'))}
               disabled={currentPage >= pageCount}
             >
-              <ChevronRight size={16} />
+              <ChevronRight size={20} />
             </button>
-            <div className="w-px h-3 bg-white/20 mx-0.5" />
+            <div className="w-px h-4 bg-white/20 mx-1" />
             <button
               className="text-white/80 hover:text-white hover:bg-white/10 rounded-full p-1.5 transition-colors"
               onClick={() => {
@@ -359,7 +359,7 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
                 sendCommand({ action: 'pdfViewMode', value: 'continuous' })
               }}
             >
-              <AlignJustify size={16} />
+              <AlignJustify size={20} />
             </button>
           </div>
         </div>
