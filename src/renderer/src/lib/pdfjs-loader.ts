@@ -24,7 +24,7 @@ export async function loadPdfjsLib(): Promise<typeof import('pdfjs-dist')> {
 
   const pdfjsLib = await import('pdfjs-dist')
   pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-    'pdfjs-dist/build/pdf.worker.mjs',
+    './pdf-worker-polyfill.worker.ts',
     import.meta.url
   ).href
   return pdfjsLib

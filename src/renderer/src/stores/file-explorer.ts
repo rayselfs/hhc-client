@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { UseBoundStore, StoreApi } from 'zustand'
 import { deleteFileBlob, openFileExplorerDB, storeFileBlob } from '@renderer/lib/file-explorer-db'
-import { deleteThumbnail } from '@renderer/lib/thumbnail-db'
+import { deleteThumbnail, deletePdfPageThumbs } from '@renderer/lib/thumbnail-db'
 import { hhcPersistStorage, createPersistName } from '@renderer/lib/persist-storage'
 import { createFolderStore } from '@renderer/stores/folder'
 import type { FileExplorerViewMode, FileItemRecord } from '@shared/types/folder'
@@ -140,7 +140,7 @@ export async function permanentDeleteFileItemFromStore(id: string): Promise<void
   const item = useFileExplorerStore.getState().items[id]
   const blobId = item?.type === 'file' ? item.url.replace(/^blob:/, '') : id
   useFileExplorerStore.getState().removeItem(id)
-  await Promise.all([deleteFileBlob(db, blobId), deleteThumbnail(id)])
+  await Promise.all([deleteFileBlob(db, blobId), deleteThumbnail(id), deletePdfPageThumbs(id)])
 }
 
 export function deleteFolderFromStore(folderId: string): void {
@@ -169,7 +169,10 @@ export async function permanentDeleteFolderFromStore(folderId: string): Promise<
   }
 
   await Promise.all(blobIds.map((id) => deleteFileBlob(db, id)))
-  await Promise.all(thumbnailIds.map((id) => deleteThumbnail(id)))
+  await Promise.all([
+    ...thumbnailIds.map((id) => deleteThumbnail(id)),
+    ...thumbnailIds.map((id) => deletePdfPageThumbs(id))
+  ])
 
   state.deleteFolder(folderId)
 }

@@ -24,8 +24,9 @@ export function useMediaProjectionSync(): void {
 
       const indexChanged = state.currentIndex !== prev.currentIndex
       const playlistChanged = playlistContentChanged(prev.playlist, state.playlist)
+      const endedCleared = prev.isEnded && !state.isEnded
 
-      if (indexChanged || playlistChanged) {
+      if (indexChanged || playlistChanged || endedCleared) {
         const item = state.playlist[state.currentIndex]
         if (!item) return
         send('file:show', {

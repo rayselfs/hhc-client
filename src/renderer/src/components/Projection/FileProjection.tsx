@@ -47,7 +47,7 @@ export default function FileProjection({
     setMimeType(fileMimeType)
 
     if (fileMimeType === 'application/pdf') {
-      await loadPdf(blob)
+      await loadPdf(blob, fileId)
     } else {
       const url = URL.createObjectURL(blob)
       setObjectUrl((prev) => {
@@ -57,7 +57,7 @@ export default function FileProjection({
     }
   }, [])
 
-  const loadPdf = useCallback(async (blob: Blob) => {
+  const loadPdf = useCallback(async (blob: Blob, fileId: string) => {
     const pdfjsLib = await loadPdfjsLib()
 
     const buffer = await blob.arrayBuffer()
@@ -66,6 +66,7 @@ export default function FileProjection({
     try {
       const pages: HTMLCanvasElement[] = []
       for (let i = 1; i <= pdf.numPages; i++) {
+        if (currentFileIdRef.current !== fileId) return
         const page = await pdf.getPage(i)
         const viewport = page.getViewport({ scale: 2 })
         const canvas = document.createElement('canvas')
@@ -79,6 +80,7 @@ export default function FileProjection({
         }
         pages.push(canvas)
       }
+      if (currentFileIdRef.current !== fileId) return
       setPdfState({ pages, currentPage: 1, viewMode: 'single' })
     } finally {
       await pdf.destroy()

@@ -68,7 +68,8 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
   },
 
   canNext: () => {
-    return true
+    const { currentIndex, playlist, isEnded } = get()
+    return !isEnded && currentIndex < playlist.length - 1
   },
 
   canPrev: () => {
