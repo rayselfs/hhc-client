@@ -59,8 +59,8 @@ export default function MediaPreview({
       const { setPan: storePan } = useMediaProjectionStore.getState()
       const d = panDragStart.current
       storePan(
-        d.panX - ((ev.clientX - d.x) / d.w) * d.zoom,
-        d.panY - ((ev.clientY - d.y) / d.h) * d.zoom
+        d.panX + ((ev.clientX - d.x) / d.w) * d.zoom,
+        d.panY + ((ev.clientY - d.y) / d.h) * d.zoom
       )
     }
 
@@ -103,18 +103,17 @@ export default function MediaPreview({
           if (descriptor?.clickToAdvance && zoomLevel <= 1) next()
         }}
       >
-        {PreviewComponent && currentItem ? (
+        {isEnded ? (
+          <div className="w-full h-full flex items-center justify-center bg-black">
+            <span className="text-white/10 text-4xl font-bold tracking-widest">
+              {t('presenter.endOfSlides')}
+            </span>
+          </div>
+        ) : PreviewComponent && currentItem ? (
           <PreviewComponent item={currentItem} />
         ) : (
           <div className="text-foreground/50 text-center w-full h-full flex items-center justify-center">
             {t('presenter.noMediaSelected')}
-          </div>
-        )}
-        {isEnded && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black">
-            <span className="text-white/10 text-4xl font-bold tracking-widest">
-              {t('presenter.endOfSlides')}
-            </span>
           </div>
         )}
       </div>

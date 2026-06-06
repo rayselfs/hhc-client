@@ -27,7 +27,12 @@ async function renderPage(
   canvas.height = viewport.height
   const ctx = canvas.getContext('2d')
   if (!ctx) return
-  await page.render({ canvasContext: ctx, viewport, canvas }).promise
+  try {
+    await page.render({ canvasContext: ctx, viewport, canvas }).promise
+  } catch (e) {
+    if ((e as { name?: string })?.name === 'RenderingCancelledException') return
+    throw e
+  }
 }
 
 export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element {
@@ -256,7 +261,7 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
   }
 
   return (
-    <div className="w-full h-full relative flex items-center justify-center bg-black overflow-hidden">
+    <div className="w-full h-full relative flex items-center justify-center overflow-hidden">
       <div
         style={{
           display: 'flex',
@@ -280,11 +285,11 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
 
       {thumbs.length > 0 && (
         <div
-          className="absolute top-0 left-0 bottom-0 z-20 flex flex-col bg-black/70 backdrop-blur-sm overflow-hidden"
-          style={{ width: 'calc(7 * 100% / 24)' }}
+          className="absolute top-0 left-0 bottom-0 z-20 flex flex-col presenter-media-control overflow-hidden rounded-tr-xl rounded-br-xl"
+          style={{ width: '25%' }}
           onMouseDown={(e) => e.stopPropagation()}
         >
-          <div className="flex-1 overflow-y-auto flex flex-col gap-1 p-1">
+          <div className="flex-1 overflow-y-auto flex flex-col gap-1 p-3">
             {thumbs.map((url, i) => (
               <button
                 key={i}
@@ -302,9 +307,7 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
             ))}
           </div>
 
-          <div
-            className="shrink-0 flex items-center justify-center gap-1 p-1.5 border-t border-white/10"
-          >
+          <div className="shrink-0 flex items-center justify-center gap-1 p-1.5 border-t border-white/10">
             <button
               className="text-white/80 hover:text-white hover:bg-white/10 rounded-full p-1.5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
               onClick={() => window.dispatchEvent(new CustomEvent('media:pdfPrevPage'))}

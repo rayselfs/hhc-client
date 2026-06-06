@@ -422,6 +422,14 @@ export function FileBrowser({
     return [...ordered, ...newFolders, ...newFiles]
   }, [allItems, sortField, sortDir, currentFolderId, customOrders])
 
+  const sortedFileItems = useMemo(() => {
+    const fileItemMap = new Map(fileItems.map((f) => [f.id, f]))
+    return sortedItems
+      .filter((item) => !item.isFolder)
+      .map((item) => fileItemMap.get(item.id))
+      .filter((item): item is FileItemRecord => item !== undefined)
+  }, [sortedItems, fileItems])
+
   const allIds = useMemo(() => sortedItems.map((item) => item.id), [sortedItems])
   const folderIds = useMemo(
     () => sortedItems.filter((item) => item.isFolder).map((item) => item.id),
@@ -508,7 +516,7 @@ export function FileBrowser({
       }
       const file = fileItems.find((entry) => entry.id === itemId)
       if (file && isPresentable(file.mimeType)) {
-        const presentable = getPresentableItems(fileItems)
+        const presentable = getPresentableItems(sortedFileItems)
         const idx = presentable.findIndex((f) => f.id === itemId)
         if (idx !== -1) {
           useMediaProjectionStore.getState().startPresentation(presentable, idx)
@@ -517,7 +525,7 @@ export function FileBrowser({
         }
       }
     },
-    [sortedItems, fileItems, navigateToFolder]
+    [sortedItems, sortedFileItems, fileItems, navigateToFolder]
   )
 
   const handleDeleteSelected = useCallback(async (): Promise<void> => {
@@ -578,7 +586,7 @@ export function FileBrowser({
       {
         config: SHORTCUTS.MEDIA.START_PRESENTATION,
         handler: () => {
-          const presentable = getPresentableItems(fileItems)
+          const presentable = getPresentableItems(sortedFileItems)
           if (presentable.length > 0) {
             useMediaProjectionStore.getState().startPresentation(presentable, 0)
           } else {
@@ -590,7 +598,7 @@ export function FileBrowser({
       {
         config: SHORTCUTS.MEDIA.START_FROM_CURRENT,
         handler: () => {
-          const presentable = getPresentableItems(fileItems)
+          const presentable = getPresentableItems(sortedFileItems)
           if (presentable.length === 0) {
             toast.warning(t('fileExplorer.noProjectableFiles'))
             return

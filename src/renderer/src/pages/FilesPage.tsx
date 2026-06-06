@@ -23,6 +23,23 @@ import { getThumbnail, copyThumbnail } from '@renderer/lib/thumbnail-db'
 import MediaPresenter from '@renderer/components/Control/FileExplorer/Presenter/MediaPresenter'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 
+function resolveUniqueName(baseName: string, existingNames: string[]): string {
+  if (!existingNames.includes(baseName)) return baseName
+  let n = 2
+  while (existingNames.includes(`${baseName} ${n}`)) n++
+  return `${baseName} ${n}`
+}
+
+function resolveUniqueFileName(name: string, existingNames: string[]): string {
+  if (!existingNames.includes(name)) return name
+  const lastDot = name.lastIndexOf('.')
+  const base = lastDot > 0 ? name.slice(0, lastDot) : name
+  const ext = lastDot > 0 ? name.slice(lastDot) : ''
+  let n = 2
+  while (existingNames.includes(`${base} ${n}${ext}`)) n++
+  return `${base} ${n}${ext}`
+}
+
 export default function FilesPage(): React.JSX.Element {
   const { t } = useTranslation()
   const confirm = useConfirm()
@@ -45,6 +62,7 @@ export default function FilesPage(): React.JSX.Element {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editModalName, setEditModalName] = useState('')
+  const [editingExtension, setEditingExtension] = useState('')
   const [editModalDuration, setEditModalDuration] = useState<FolderDuration>('1day')
   const [editingIsFavorited, setEditingIsFavorited] = useState(false)
   const [editingHideDuration, setEditingHideDuration] = useState(false)
@@ -149,19 +167,56 @@ export default function FilesPage(): React.JSX.Element {
 
   const handlePaste = useCallback(async (): Promise<void> => {
     if (!clipboard) return
+
+    async function copyFolderRecursive(
+      sourceId: string,
+      targetParentId: string,
+      folderName: string,
+      expiresAt: number | null | undefined
+    ): Promise<void> {
+      const newFolderId = addFolder(folderName, targetParentId, expiresAt)
+      await useFileExplorerStore.getState().ensureItemsLoaded(sourceId)
+      const s = useFileExplorerStore.getState()
+      for (const item of s.getItems(sourceId)) {
+        const newId = await copyItem(item.id, newFolderId)
+        if (!newId) continue
+        const copied = await copyThumbnail(item.id, newId)
+        if (copied) {
+          const dataUrl = await getThumbnail(newId)
+          window.dispatchEvent(
+            new CustomEvent('hhc:thumbnail-ready', { detail: { itemId: newId, dataUrl } })
+          )
+        }
+      }
+      for (const sub of s.getChildFolders(sourceId)) {
+        await copyFolderRecursive(sub.id, newFolderId, sub.name, sub.expiresAt)
+      }
+    }
+
     const state = useFileExplorerStore.getState()
+    const usedFolderNames = new Set(
+      state.getChildFolders(currentFolderId).map((f) => f.name)
+    )
+    const usedItemNames = new Set(state.getItems(currentFolderId).map((i) => i.name))
 
     for (const id of clipboard.itemIds) {
       if (state.folders[id]) {
         if (clipboard.mode === 'copy') {
-          addFolder(state.folders[id].name, currentFolderId, state.folders[id].expiresAt)
+          const uniqueName = resolveUniqueName(state.folders[id].name, [...usedFolderNames])
+          usedFolderNames.add(uniqueName)
+          await copyFolderRecursive(id, currentFolderId, uniqueName, state.folders[id].expiresAt)
         } else {
           moveFolder(id, currentFolderId)
         }
       } else if (state.items[id]) {
         if (clipboard.mode === 'copy') {
+          const uniqueName = resolveUniqueFileName(state.items[id].name, [...usedItemNames])
+          usedItemNames.add(uniqueName)
           const newId = await copyItem(id, currentFolderId)
           if (!newId) continue
+          if (uniqueName !== state.items[id].name) {
+            useFileExplorerStore.getState().updateItem?.(newId, { name: uniqueName })
+          }
           const copied = await copyThumbnail(id, newId)
           if (copied) {
             const dataUrl = await getThumbnail(newId)
@@ -186,7 +241,19 @@ export default function FilesPage(): React.JSX.Element {
     const isFileItemInSubfolder =
       !state.folders[id] && !!state.items[id] && state.items[id].parentId !== FILE_EXPLORER_ROOT_ID
     setEditingId(id)
-    setEditModalName(target.name)
+    if (!state.folders[id] && state.items[id]) {
+      const lastDot = target.name.lastIndexOf('.')
+      if (lastDot > 0) {
+        setEditModalName(target.name.slice(0, lastDot))
+        setEditingExtension(target.name.slice(lastDot))
+      } else {
+        setEditModalName(target.name)
+        setEditingExtension('')
+      }
+    } else {
+      setEditModalName(target.name)
+      setEditingExtension('')
+    }
     setEditModalDuration(inferDuration(target.expiresAt, target.createdAt ?? Date.now()))
     setEditingIsFavorited(state.folders[id]?.isFavorited ?? false)
     setEditingHideDuration(isFileItemInSubfolder)
@@ -203,13 +270,13 @@ export default function FilesPage(): React.JSX.Element {
     } else if (state.items[editingId]) {
       const isRoot = state.items[editingId].parentId === FILE_EXPLORER_ROOT_ID
       updateItem?.(editingId, {
-        name,
+        name: name + editingExtension,
         expiresAt: isRoot ? computeExpiresAt(editModalDuration) : null
       })
     }
     setIsEditModalOpen(false)
     setEditingId(null)
-  }, [editingId, editModalName, editModalDuration, updateFolder, updateItem])
+  }, [editingId, editModalName, editingExtension, editModalDuration, updateFolder, updateItem])
 
   const handleItemContextMenu = useCallback(
     (itemId: string, event: React.MouseEvent): void => {

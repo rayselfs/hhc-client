@@ -50,6 +50,7 @@ export default function Layout(): React.JSX.Element {
   useAutoUpdateCheck()
 
   useEffect(() => {
+    void import('@renderer/pages/FilesPage')
     const cleanup = initializeApp()
     const timerId = setTimeout(() => {
       if (useBibleStore.getState().isInitialized) {

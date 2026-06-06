@@ -193,6 +193,21 @@ export default function FileProjection({
   }
 
   if (pdfState) {
+    if (pdfState.viewMode === 'continuous') {
+      return (
+        <div className="flex h-screen w-full bg-black overflow-hidden">
+          <div
+            ref={pdfContainerRef}
+            className="w-full h-full overflow-y-auto flex flex-col items-center gap-4 py-4"
+          >
+            {pdfState.pages.map((canvas, i) => (
+              <PdfCanvas key={i} canvas={canvas} continuous />
+            ))}
+          </div>
+        </div>
+      )
+    }
+
     return (
       <div className="flex h-screen w-full items-center justify-center bg-black overflow-hidden">
         <div
@@ -209,14 +224,10 @@ export default function FileProjection({
         >
           <div
             ref={pdfContainerRef}
-            className="flex flex-col items-center overflow-hidden max-h-full max-w-full"
+            className="flex flex-col items-center overflow-hidden w-full h-full"
             style={{ transform, transformOrigin: 'center center' }}
           >
-            {pdfState.viewMode === 'single' ? (
-              <PdfCanvas canvas={pdfState.pages[pdfState.currentPage - 1]} />
-            ) : (
-              pdfState.pages.map((canvas, i) => <PdfCanvas key={i} canvas={canvas} />)
-            )}
+            <PdfCanvas canvas={pdfState.pages[pdfState.currentPage - 1]} />
           </div>
         </div>
       </div>
@@ -291,9 +302,11 @@ export default function FileProjection({
 }
 
 function PdfCanvas({
-  canvas
+  canvas,
+  continuous = false
 }: {
   canvas: HTMLCanvasElement | undefined
+  continuous?: boolean
 }): React.JSX.Element | null {
   const containerRef = useRef<HTMLDivElement | null>(null)
 
@@ -303,15 +316,20 @@ function PdfCanvas({
     container.innerHTML = ''
     Object.assign(canvas.style, {
       maxWidth: '100%',
-      maxHeight: '100%',
+      maxHeight: continuous ? 'none' : '100%',
       objectFit: 'contain'
     })
     container.appendChild(canvas)
     return () => {
       container.innerHTML = ''
     }
-  }, [canvas])
+  }, [canvas, continuous])
 
   if (!canvas) return null
-  return <div ref={containerRef} className="flex items-center justify-center" />
+  return (
+    <div
+      ref={containerRef}
+      className={`flex items-center justify-center w-full${continuous ? '' : ' h-full'}`}
+    />
+  )
 }
