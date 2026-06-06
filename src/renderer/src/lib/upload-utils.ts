@@ -1,7 +1,7 @@
 import { toast } from '@heroui/react/toast'
 import { addFileItemToStore, useFileExplorerStore } from '@renderer/stores/file-explorer'
-import { generateThumbnail } from '@renderer/lib/thumbnail-generator'
-import { saveThumbnail } from '@renderer/lib/thumbnail-db'
+import { generateThumbnail, generateAllPdfPageThumbnails } from '@renderer/lib/thumbnail-generator'
+import { saveThumbnail, savePdfPageThumbs } from '@renderer/lib/thumbnail-db'
 import { isWeb } from '@renderer/lib/env'
 
 export const MAX_FILE_SIZE_WEB = 2 * 1024 * 1024 * 1024
@@ -94,8 +94,9 @@ export async function uploadFiles(files: File[], parentId: string): Promise<void
         return
       }
       const release = await uploadSemaphore.acquire()
+      let id: string | undefined
       try {
-        const id = await addFileItemToStore(file, parentId)
+        id = await addFileItemToStore(file, parentId)
         if (canGenerateThumbnail(file.type)) {
           const dataUrl = await generateThumbnail(file)
           if (dataUrl) {
@@ -105,6 +106,14 @@ export async function uploadFiles(files: File[], parentId: string): Promise<void
         }
       } finally {
         release()
+      }
+      if (id && file.type === 'application/pdf') {
+        const itemId = id
+        void generateAllPdfPageThumbnails(file).then(async (dataUrls) => {
+          if (dataUrls.length > 0) {
+            await savePdfPageThumbs(itemId, dataUrls)
+          }
+        })
       }
     })
   )

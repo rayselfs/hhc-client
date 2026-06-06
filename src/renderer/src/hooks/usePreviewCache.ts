@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FileItemRecord } from '@shared/types/folder'
 import { openFileExplorerDB, getFileBlob } from '@renderer/lib/file-explorer-db'
 import { loadPdfjsLib } from '@renderer/lib/pdfjs-loader'
+import { getPdfPageThumbs } from '@renderer/lib/thumbnail-db'
 
 function canPreload(mimeType: string | undefined): boolean {
   return (
@@ -192,6 +193,17 @@ export function usePreviewCache(playlist: FileItemRecord[]): PreviewCacheResult 
                 thumbUrlsRef.current.push(thumbUrl)
                 setThumbnails((prev) => ({ ...prev, [item.id]: thumbUrl }))
               } else if (item.mimeType === 'application/pdf') {
+                const cachedThumbs = await getPdfPageThumbs(item.id)
+                if (signal.aborted) {
+                  cachedThumbs.forEach((u) => URL.revokeObjectURL(u))
+                  return
+                }
+                if (cachedThumbs.length > 0) {
+                  thumbUrlsRef.current.push(...cachedThumbs)
+                  setPdfPageThumbs((prev) => ({ ...prev, [item.id]: cachedThumbs }))
+                  setThumbnails((prev) => ({ ...prev, [item.id]: cachedThumbs[0] }))
+                  return
+                }
                 const thumbs = await renderPdfPageThumb(blob, signal)
                 if (signal.aborted) {
                   thumbs.forEach((u) => URL.revokeObjectURL(u))

@@ -1,12 +1,18 @@
 const DB_NAME = 'hhc-thumbnails'
 const STORE_NAME = 'thumbnails'
-export const DB_VERSION = 3
+const PDF_PAGE_STORE_NAME = 'pdf-page-thumbs'
+export const DB_VERSION = 4
 
 interface ThumbnailRecord {
   itemId: string
   dataUrl?: string
   blob?: Blob
   format?: 'dataUrl' | 'blob'
+}
+
+interface PdfPageRecord {
+  itemId: string
+  blobs: Blob[]
 }
 
 let dbPromise: Promise<IDBDatabase | null> | null = null
@@ -25,6 +31,9 @@ function openThumbnailDB(): Promise<IDBDatabase | null> {
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         db.createObjectStore(STORE_NAME, { keyPath: 'itemId' })
       }
+      if (!db.objectStoreNames.contains(PDF_PAGE_STORE_NAME)) {
+        db.createObjectStore(PDF_PAGE_STORE_NAME, { keyPath: 'itemId' })
+      }
     }
 
     request.onsuccess = () => resolve(request.result)
@@ -41,7 +50,8 @@ function openThumbnailDB(): Promise<IDBDatabase | null> {
   return dbPromise
 }
 
-async function withThumbnailStore<T>(
+async function withStore<T>(
+  storeName: string,
   mode: IDBTransactionMode,
   callback: (store: IDBObjectStore) => IDBRequest<T> | void,
   fallback: T
@@ -51,8 +61,8 @@ async function withThumbnailStore<T>(
     if (!db) return fallback
 
     return await new Promise<T>((resolve) => {
-      const transaction = db.transaction(STORE_NAME, mode)
-      const store = transaction.objectStore(STORE_NAME)
+      const transaction = db.transaction(storeName, mode)
+      const store = transaction.objectStore(storeName)
       const request = callback(store)
       let settled = false
 
@@ -84,6 +94,14 @@ async function withThumbnailStore<T>(
     console.error('Thumbnail database operation failed', error)
     return fallback
   }
+}
+
+async function withThumbnailStore<T>(
+  mode: IDBTransactionMode,
+  callback: (store: IDBObjectStore) => IDBRequest<T> | void,
+  fallback: T
+): Promise<T> {
+  return withStore(STORE_NAME, mode, callback, fallback)
 }
 
 function dataUrlToBlob(dataUrl: string): Blob {
@@ -152,4 +170,38 @@ export async function copyThumbnail(fromId: string, toId: string): Promise<boole
   )
 
   return true
+}
+
+export async function savePdfPageThumbs(itemId: string, dataUrls: string[]): Promise<void> {
+  const blobs = dataUrls.map(dataUrlToBlob)
+  await withStore<void>(
+    PDF_PAGE_STORE_NAME,
+    'readwrite',
+    (store) => {
+      store.put({ itemId, blobs } satisfies PdfPageRecord)
+    },
+    undefined
+  )
+}
+
+export async function getPdfPageThumbs(itemId: string): Promise<string[]> {
+  const record = await withStore<PdfPageRecord | undefined>(
+    PDF_PAGE_STORE_NAME,
+    'readonly',
+    (store) => store.get(itemId),
+    undefined
+  )
+  if (!record) return []
+  return record.blobs.map((blob) => URL.createObjectURL(blob))
+}
+
+export async function deletePdfPageThumbs(itemId: string): Promise<void> {
+  await withStore<void>(
+    PDF_PAGE_STORE_NAME,
+    'readwrite',
+    (store) => {
+      store.delete(itemId)
+    },
+    undefined
+  )
 }

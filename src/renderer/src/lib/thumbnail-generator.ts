@@ -158,3 +158,46 @@ export async function generateThumbnail(file: File): Promise<string | null> {
     return null
   }
 }
+
+export async function generateAllPdfPageThumbnails(file: File): Promise<string[]> {
+  if (file.size > MAX_PDF_THUMBNAIL_SIZE) return []
+
+  try {
+    const pdfjsLib = await loadPdfjsLib()
+    const buffer = await file.arrayBuffer()
+    const pdf = await pdfjsLib.getDocument({ data: buffer }).promise
+
+    const dataUrls: string[] = []
+    try {
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i)
+        const viewport = page.getViewport({ scale: 1 })
+        const scale = Math.min(
+          THUMBNAIL_MAX_SIZE / viewport.width,
+          THUMBNAIL_MAX_SIZE / viewport.height
+        )
+        const renderViewport = page.getViewport({ scale })
+        const canvas = createCanvas(
+          Math.ceil(renderViewport.width),
+          Math.ceil(renderViewport.height)
+        )
+        const context = canvas.getContext('2d')
+        if (context) {
+          context.fillStyle = '#ffffff'
+          context.fillRect(0, 0, canvas.width, canvas.height)
+          await page.render({ canvas, canvasContext: context, viewport: renderViewport }).promise
+          const dataUrl = drawContainFit(canvas, canvas.width, canvas.height, '#ffffff')
+          if (dataUrl) dataUrls.push(dataUrl)
+        }
+        await yieldToMain()
+      }
+    } finally {
+      await pdf.destroy()
+    }
+
+    return dataUrls
+  } catch (error) {
+    console.error('Failed to generate PDF page thumbnails', error)
+    return []
+  }
+}

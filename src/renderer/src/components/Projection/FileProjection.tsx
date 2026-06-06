@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createProjectionAdapter } from '@renderer/lib/projection-adapter'
 import { openFileExplorerDB, getFileBlob } from '@renderer/lib/file-explorer-db'
+import { loadPdfjsLib } from '@renderer/lib/pdfjs-loader'
 import type { AppMessages, FileControlPayload } from '@shared/projection-messages'
 
 type FileShowPayload = AppMessages['file:show']
@@ -57,22 +58,7 @@ export default function FileProjection({
   }, [])
 
   const loadPdf = useCallback(async (blob: Blob) => {
-    if (!('getOrInsertComputed' in Map.prototype)) {
-      Object.defineProperty(Map.prototype, 'getOrInsertComputed', {
-        value<K, V>(this: Map<K, V>, key: K, factory: (key: K) => V): V {
-          if (!this.has(key)) this.set(key, factory(key))
-          return this.get(key)!
-        },
-        configurable: true,
-        writable: true
-      })
-    }
-
-    const pdfjsLib = await import('pdfjs-dist')
-    pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-      'pdfjs-dist/build/pdf.worker.mjs',
-      import.meta.url
-    ).href
+    const pdfjsLib = await loadPdfjsLib()
 
     const buffer = await blob.arrayBuffer()
     const pdf = await pdfjsLib.getDocument({ data: buffer }).promise
