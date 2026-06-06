@@ -49,6 +49,7 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
   const scrollCanvasRefs = useRef<(HTMLCanvasElement | null)[]>([])
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const rafRef = useRef<number | null>(null)
+  const thumbButtonRefs = useRef<(HTMLButtonElement | null)[]>([])
 
   const pdfViewMode = useMediaProjectionStore((s) => s.typeStates['pdf']?.viewMode ?? 'slide')
   const thumbsCollapsed = useMediaProjectionStore((s) => s.typeStates['pdf']?.thumbsCollapsed ?? false)
@@ -223,6 +224,12 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
     }
   }, [])
 
+  useEffect(() => {
+    if (thumbsCollapsed) return
+    const el = thumbButtonRefs.current[currentPage - 1]
+    if (el) el.scrollIntoView({ block: 'start', behavior: 'smooth' })
+  }, [currentPage, thumbsCollapsed])
+
   if (loading) {
     return (
       <div className="w-full h-full flex items-center justify-center text-foreground/50">
@@ -297,56 +304,64 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
       </div>
 
       <div
-        className="absolute top-0 left-0 bottom-0 z-20 flex flex-col presenter-media-control overflow-hidden rounded-tr-xl rounded-br-xl transition-[width] duration-200 ease-in-out"
-        style={{ width: thumbsCollapsed ? 0 : '25%' }}
+        className="absolute top-0 left-0 bottom-0 z-20 overflow-hidden"
+        style={{ width: '25%', pointerEvents: thumbsCollapsed ? 'none' : 'auto' }}
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="flex-1 overflow-y-auto flex flex-col gap-1 p-3">
-          {thumbs.map((url, i) => (
+        <div
+          className="w-full h-full flex flex-col presenter-media-control rounded-tr-xl rounded-br-xl transition-transform duration-200 ease-in-out"
+          style={{ transform: thumbsCollapsed ? 'translateX(-100%)' : 'translateX(0)' }}
+        >
+          <div className="flex-1 overflow-y-auto flex flex-col gap-1 p-3">
+            {thumbs.map((url, i) => (
+              <button
+                key={i}
+                ref={(el) => {
+                  thumbButtonRefs.current[i] = el
+                }}
+                className={`relative rounded overflow-hidden border-2 transition-colors shrink-0 ${
+                  currentPage === i + 1 ? 'border-white/80' : 'border-transparent'
+                }`}
+                onClick={() => {
+                  setCurrentPage(i + 1)
+                  sendCommand({ action: 'pdfPage', value: i + 1 })
+                }}
+              >
+                <img src={url} alt={`page ${i + 1}`} style={{ width: '100%', display: 'block' }} />
+                <span className="absolute bottom-0.5 right-1 text-white/60 text-xs">{i + 1}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="shrink-0 flex items-center justify-center gap-1 p-1.5 border-t border-white/10">
             <button
-              key={i}
-              className={`relative rounded overflow-hidden border-2 transition-colors shrink-0 ${
-                currentPage === i + 1 ? 'border-white/80' : 'border-transparent'
-              }`}
+              className="text-white/80 hover:text-white hover:bg-white/10 rounded-full p-1.5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              onClick={() => window.dispatchEvent(new CustomEvent('media:pdfPrevPage'))}
+              disabled={currentPage <= 1}
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span className="text-white/60 text-xs tabular-nums px-0.5">
+              {currentPage} / {pageCount}
+            </span>
+            <button
+              className="text-white/80 hover:text-white hover:bg-white/10 rounded-full p-1.5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              onClick={() => window.dispatchEvent(new CustomEvent('media:pdfNextPage'))}
+              disabled={currentPage >= pageCount}
+            >
+              <ChevronRight size={16} />
+            </button>
+            <div className="w-px h-3 bg-white/20 mx-0.5" />
+            <button
+              className="text-white/80 hover:text-white hover:bg-white/10 rounded-full p-1.5 transition-colors"
               onClick={() => {
-                setCurrentPage(i + 1)
-                sendCommand({ action: 'pdfPage', value: i + 1 })
+                setPdfState({ viewMode: 'scroll' })
+                sendCommand({ action: 'pdfViewMode', value: 'continuous' })
               }}
             >
-              <img src={url} alt={`page ${i + 1}`} style={{ width: '100%', display: 'block' }} />
-              <span className="absolute bottom-0.5 right-1 text-white/60 text-xs">{i + 1}</span>
+              <AlignJustify size={16} />
             </button>
-          ))}
-        </div>
-
-        <div className="shrink-0 flex items-center justify-center gap-1 p-1.5 border-t border-white/10">
-          <button
-            className="text-white/80 hover:text-white hover:bg-white/10 rounded-full p-1.5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-            onClick={() => window.dispatchEvent(new CustomEvent('media:pdfPrevPage'))}
-            disabled={currentPage <= 1}
-          >
-            <ChevronLeft size={16} />
-          </button>
-          <span className="text-white/60 text-xs tabular-nums px-0.5">
-            {currentPage} / {pageCount}
-          </span>
-          <button
-            className="text-white/80 hover:text-white hover:bg-white/10 rounded-full p-1.5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-            onClick={() => window.dispatchEvent(new CustomEvent('media:pdfNextPage'))}
-            disabled={currentPage >= pageCount}
-          >
-            <ChevronRight size={16} />
-          </button>
-          <div className="w-px h-3 bg-white/20 mx-0.5" />
-          <button
-            className="text-white/80 hover:text-white hover:bg-white/10 rounded-full p-1.5 transition-colors"
-            onClick={() => {
-              setPdfState({ viewMode: 'scroll' })
-              sendCommand({ action: 'pdfViewMode', value: 'continuous' })
-            }}
-          >
-            <AlignJustify size={16} />
-          </button>
+          </div>
         </div>
       </div>
 
@@ -363,44 +378,44 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
         </button>
       </div>
 
-      {thumbsCollapsed && (
-        <div
-          className="absolute bottom-0 left-0 right-0 z-20"
-          onMouseDown={(e) => e.stopPropagation()}
-        >
-          <div className="flex justify-start pl-2 pb-2">
-            <div className="inline-flex items-center gap-1 pl-2 pr-3 py-1.5 rounded-full presenter-media-control">
-              <button
-                className="text-white/80 hover:text-white hover:bg-white/10 rounded-full p-1.5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                onClick={() => window.dispatchEvent(new CustomEvent('media:pdfPrevPage'))}
-                disabled={currentPage <= 1}
-              >
-                <ChevronLeft size={20} />
-              </button>
-              <span className="text-white/70 text-sm tabular-nums px-1">
-                {currentPage} / {pageCount}
-              </span>
-              <button
-                className="text-white/80 hover:text-white hover:bg-white/10 rounded-full p-1.5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                onClick={() => window.dispatchEvent(new CustomEvent('media:pdfNextPage'))}
-                disabled={currentPage >= pageCount}
-              >
-                <ChevronRight size={20} />
-              </button>
-              <div className="w-px h-4 bg-white/20 mx-1" />
-              <button
-                className="text-white/80 hover:text-white hover:bg-white/10 rounded-full p-1.5 transition-colors"
-                onClick={() => {
-                  setPdfState({ viewMode: 'scroll' })
-                  sendCommand({ action: 'pdfViewMode', value: 'continuous' })
-                }}
-              >
-                <AlignJustify size={20} />
-              </button>
-            </div>
+      <div
+        className={`absolute bottom-0 left-0 right-0 z-20 transition-opacity duration-200 ${
+          thumbsCollapsed ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        }`}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="flex justify-start pl-2 pb-2">
+          <div className="inline-flex items-center gap-1 pl-2 pr-3 py-1.5 rounded-full presenter-media-control">
+            <button
+              className="text-white/80 hover:text-white hover:bg-white/10 rounded-full p-1.5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              onClick={() => window.dispatchEvent(new CustomEvent('media:pdfPrevPage'))}
+              disabled={currentPage <= 1}
+            >
+              <ChevronLeft size={20} />
+            </button>
+            <span className="text-white/70 text-sm tabular-nums px-1">
+              {currentPage} / {pageCount}
+            </span>
+            <button
+              className="text-white/80 hover:text-white hover:bg-white/10 rounded-full p-1.5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              onClick={() => window.dispatchEvent(new CustomEvent('media:pdfNextPage'))}
+              disabled={currentPage >= pageCount}
+            >
+              <ChevronRight size={20} />
+            </button>
+            <div className="w-px h-4 bg-white/20 mx-1" />
+            <button
+              className="text-white/80 hover:text-white hover:bg-white/10 rounded-full p-1.5 transition-colors"
+              onClick={() => {
+                setPdfState({ viewMode: 'scroll' })
+                sendCommand({ action: 'pdfViewMode', value: 'continuous' })
+              }}
+            >
+              <AlignJustify size={20} />
+            </button>
           </div>
         </div>
-      )}
+      </div>
     </div>
   )
 }
