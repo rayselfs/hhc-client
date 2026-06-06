@@ -196,6 +196,11 @@ export default function FileProjection({
       ? `scale(${zoom}) translate(${(pan.x / zoom) * 100}%, ${(pan.y / zoom) * 100}%)`
       : undefined
 
+  const imageTransform =
+    zoom !== 1
+      ? `scale(${zoom}) translate(${(-pan.x / zoom) * 100}%, ${(-pan.y / zoom) * 100}%)`
+      : undefined
+
   if (isEnded) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-black">
@@ -268,7 +273,7 @@ export default function FileProjection({
               width: '100%',
               height: '100%',
               objectFit: 'contain',
-              transform,
+              transform: imageTransform,
               transformOrigin: 'center center'
             }}
           />
