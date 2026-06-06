@@ -212,9 +212,20 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
     rafRef.current = requestAnimationFrame(() => {
       rafRef.current = null
       const el = scrollContainerRef.current
-      if (!el) return
-      const ratio = el.scrollTop / Math.max(1, el.scrollHeight - el.clientHeight)
-      sendCommand({ action: 'pdfScroll', value: ratio })
+      const canvases = scrollCanvasRefs.current
+      if (!el || !canvases.length) return
+      const containerTop = el.getBoundingClientRect().top
+      for (let i = 0; i < canvases.length; i++) {
+        const canvas = canvases[i]
+        if (!canvas) continue
+        const rect = canvas.getBoundingClientRect()
+        if (rect.bottom > containerTop && rect.height > 0) {
+          const fraction = Math.max(0, (containerTop - rect.top)) / rect.height
+          sendCommand({ action: 'pdfScroll', value: i + fraction })
+          return
+        }
+      }
+      sendCommand({ action: 'pdfScroll', value: Math.max(0, canvases.length - 1) })
     })
   }, [sendCommand])
 

@@ -126,8 +126,20 @@ export default function FileProjection({
       case 'pdfScroll': {
         const el = pdfContainerRef.current
         if (el) {
-          const maxScroll = el.scrollHeight - el.clientHeight
-          el.scrollTop = data.value * maxScroll
+          const pageFloat = data.value
+          const pageIndex = Math.floor(Math.max(0, pageFloat))
+          const fraction = pageFloat - pageIndex
+          const PY = 16  // py-4
+          const GAP = 16 // gap-4
+          const children = el.children
+          let target = PY
+          for (let i = 0; i < pageIndex && i < children.length; i++) {
+            target += (children[i] as HTMLElement).clientHeight + GAP
+          }
+          if (pageIndex < children.length) {
+            target += fraction * (children[pageIndex] as HTMLElement).clientHeight
+          }
+          el.scrollTop = target
         }
         break
       }
