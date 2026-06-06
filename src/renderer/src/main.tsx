@@ -7,6 +7,10 @@ import { ErrorBoundary } from '@renderer/components/ErrorBoundary'
 import { RouterProvider } from 'react-router-dom'
 import { router } from '@renderer/router'
 import { Toast } from '@heroui/react/toast'
+import { startEarlyInit, prefetchRouteChunks } from '@renderer/lib/app-init'
+
+startEarlyInit()
+prefetchRouteChunks()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

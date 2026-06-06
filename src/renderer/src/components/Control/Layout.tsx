@@ -15,8 +15,9 @@ import { ShortcutScopeProvider } from '@renderer/contexts/ShortcutScopeContext'
 import { AppInitContext } from '@renderer/contexts/AppInitContext'
 import { isWeb } from '@renderer/lib/env'
 import { toast } from '@heroui/react/toast'
-import { initializeApp } from '@renderer/lib/app-init'
-import { useBibleStore } from '@renderer/stores/bible'
+import { initializeApp, prefetchRouteChunks } from '@renderer/lib/app-init'
+import { useFileExplorerStore } from '@renderer/stores/file-explorer'
+import { useBibleFolderStore } from '@renderer/stores/folder'
 import { useAutoUpdateCheck } from '@renderer/hooks/useAutoUpdateCheck'
 
 function ProjectionAutoOpen(): null {
@@ -52,18 +53,28 @@ export default function Layout(): React.JSX.Element {
 
   useEffect(() => {
     const cleanup = initializeApp()
-    const timerId = setTimeout(() => {
-      if (useBibleStore.getState().isInitialized) {
-        setInitialized(true)
-      }
-    }, 0)
-    const unsub = useBibleStore.subscribe((state) => {
-      if (state.isInitialized) setInitialized(true)
-    })
+
+    const isCoreReady = (): boolean =>
+      useFileExplorerStore.getState().isInitialized && useBibleFolderStore.getState().isInitialized
+
+    let cancelled = false
+    const setReady = (): void => {
+      if (!cancelled) setInitialized(true)
+    }
+    const trySetReady = (): void => {
+      if (cancelled || !isCoreReady()) return
+      void prefetchRouteChunks().then(setReady)
+    }
+
+    const timerId = setTimeout(trySetReady, 0)
+    const unsub = useFileExplorerStore.subscribe(trySetReady)
+    const unsub2 = useBibleFolderStore.subscribe(trySetReady)
     return () => {
+      cancelled = true
       clearTimeout(timerId)
       cleanup()
       unsub()
+      unsub2()
     }
   }, [])
 

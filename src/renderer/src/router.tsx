@@ -3,15 +3,14 @@ import { createHashRouter, Navigate } from 'react-router-dom'
 import ProjectionPage from '@renderer/pages/ProjectionPage'
 import Layout from '@renderer/components/Control/Layout'
 import RouteError from '@renderer/components/RouteError'
-import LoadingFallback from '@renderer/components/Control/LoadingFallback'
 import { isOnboarded } from '@renderer/lib/onboarding'
+import WelcomePage from '@renderer/pages/WelcomePage'
 
 const TimerPage = lazy(() => import('@renderer/pages/TimerPage'))
 const BiblePage = lazy(() => import('@renderer/pages/BiblePage'))
 const FilesPage = lazy(() => import('@renderer/pages/FilesPage'))
 const FavoritesPage = lazy(() => import('@renderer/pages/FavoritesPage'))
 const TrashPage = lazy(() => import('@renderer/pages/TrashPage'))
-const WelcomePage = lazy(() => import('@renderer/pages/WelcomePage'))
 
 // eslint-disable-next-line react-refresh/only-export-components
 function OnboardingGuard({ children }: { children: React.JSX.Element }): React.JSX.Element {
@@ -32,58 +31,34 @@ const routes = [
       { index: true, element: <Navigate to="/timer" replace /> },
       {
         path: 'timer',
-        element: (
-          <Suspense fallback={<LoadingFallback />}>
-            <TimerPage />
-          </Suspense>
-        ),
+        element: <Suspense fallback={null}><TimerPage /></Suspense>,
         ErrorBoundary: RouteError
       },
       {
         path: 'bible',
-        element: (
-          <Suspense fallback={<LoadingFallback />}>
-            <BiblePage />
-          </Suspense>
-        ),
+        element: <Suspense fallback={null}><BiblePage /></Suspense>,
         ErrorBoundary: RouteError
       },
       {
         path: 'files',
-        element: (
-          <Suspense fallback={<LoadingFallback />}>
-            <FilesPage />
-          </Suspense>
-        ),
+        element: <Suspense fallback={null}><FilesPage /></Suspense>,
         ErrorBoundary: RouteError
       },
       {
         path: 'favorites',
-        element: (
-          <Suspense fallback={<LoadingFallback />}>
-            <FavoritesPage />
-          </Suspense>
-        ),
+        element: <Suspense fallback={null}><FavoritesPage /></Suspense>,
         ErrorBoundary: RouteError
       },
       {
         path: 'trash',
-        element: (
-          <Suspense fallback={<LoadingFallback />}>
-            <TrashPage />
-          </Suspense>
-        ),
+        element: <Suspense fallback={null}><TrashPage /></Suspense>,
         ErrorBoundary: RouteError
       }
     ]
   },
   {
     path: '/welcome',
-    element: (
-      <Suspense fallback={<LoadingFallback />}>
-        <WelcomePage />
-      </Suspense>
-    )
+    element: <WelcomePage />
   },
   { path: '/projection', Component: ProjectionPage, ErrorBoundary: RouteError }
 ]

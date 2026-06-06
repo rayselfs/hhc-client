@@ -8,7 +8,37 @@ import { isElectron } from '@renderer/lib/env'
 import { toast } from '@heroui/react/toast'
 import i18n from '@renderer/i18n'
 
-let initialized = false
+let earlyInitStarted = false
+let subscriptionsInitialized = false
+let chunksReadyPromise: Promise<void> | null = null
+
+/**
+ * Kick off async store initializations as early as possible (called from main.tsx
+ * before React renders). Idempotent — safe to call multiple times.
+ */
+export function startEarlyInit(): void {
+  if (earlyInitStarted) return
+  earlyInitStarted = true
+
+  useBibleStore.getState().initialize()
+  useBibleFolderStore.getState().initialize()
+  useFileExplorerStore.getState().initialize()
+}
+
+export function prefetchRouteChunks(): Promise<void> {
+  if (!chunksReadyPromise) {
+    chunksReadyPromise = Promise.all([
+      import('@renderer/pages/TimerPage'),
+      import('@renderer/pages/BiblePage'),
+      import('@renderer/pages/FilesPage'),
+      import('@renderer/pages/FavoritesPage'),
+      import('@renderer/pages/TrashPage')
+    ])
+      .then(() => undefined)
+      .catch(() => undefined)
+  }
+  return chunksReadyPromise
+}
 
 async function initWhisperModelDir(): Promise<void> {
   if (!isElectron()) return
@@ -25,9 +55,16 @@ async function initWhisperModelDir(): Promise<void> {
   }
 }
 
+/**
+ * Set up app-level subscriptions and side-effects. Called from Layout.useEffect.
+ * Calls startEarlyInit() internally as a fallback so this function remains safe
+ * to call without a prior startEarlyInit() call.
+ */
 export function initializeApp(): () => void {
-  if (initialized) return () => {}
-  initialized = true
+  startEarlyInit()
+
+  if (subscriptionsInitialized) return () => {}
+  subscriptionsInitialized = true
 
   void initWhisperModelDir()
 
@@ -58,18 +95,14 @@ export function initializeApp(): () => void {
   const current = useBibleStore.getState()
   if (current.isInitialized) {
     tryInitSearch(current)
-  } else {
-    useBibleStore.getState().initialize()
   }
 
-  useBibleFolderStore.getState().initialize()
   useBibleFolderStore.subscribe((state, prev) => {
     if (prev.isLoading && !state.isLoading) {
       void useBibleFolderStore.getState().cleanupExpired()
     }
   })
 
-  useFileExplorerStore.getState().initialize()
   useFileExplorerStore.subscribe((state, prev) => {
     if (prev.isLoading && !state.isLoading) {
       useFileExplorerStore.getState().softDeleteExpired()
@@ -99,7 +132,7 @@ export function initializeApp(): () => void {
     unsubWhisper()
     window.removeEventListener('online', handleOnline)
     window.removeEventListener('offline', handleOffline)
-    initialized = false
+    subscriptionsInitialized = false
     const s = useBibleStore.getState()
     if (s.isLoading && !s.isInitialized) {
       useBibleStore.setState({ isLoading: false })
