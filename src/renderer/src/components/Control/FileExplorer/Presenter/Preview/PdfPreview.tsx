@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { ScrollShadow } from '@heroui/react'
 import { toast } from '@heroui/react/toast'
 import { useTranslation } from 'react-i18next'
 import { ChevronLeft, ChevronRight, AlignJustify, Maximize2 } from 'lucide-react'
@@ -312,7 +313,7 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
           className="w-full h-full flex flex-col pdf-sidebar-bg rounded-tr-xl rounded-br-xl transition-transform duration-200 ease-in-out"
           style={{ transform: thumbsCollapsed ? 'translateX(-100%)' : 'translateX(0)' }}
         >
-          <div className="flex-1 overflow-y-auto flex flex-col gap-1 p-3">
+          <ScrollShadow className="flex-1 flex flex-col gap-1 p-3" hideScrollBar>
             {thumbs.map((url, i) => (
               <button
                 key={i}
@@ -331,7 +332,7 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
                 <span className="absolute bottom-0.5 right-1 text-white/60 text-xs">{i + 1}</span>
               </button>
             ))}
-          </div>
+          </ScrollShadow>
 
           <div className="shrink-0 flex items-center justify-center gap-1 p-1.5 border-t border-white/10">
             <button
@@ -371,7 +372,7 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
         onMouseDown={(e) => e.stopPropagation()}
       >
         <button
-          className="flex items-center justify-center w-5 h-10 presenter-media-control rounded-r-lg text-white/70 hover:text-white transition-colors"
+          className="flex items-center justify-center w-5 h-10 pdf-sidebar-bg rounded-r-lg text-white/70 hover:text-white transition-colors"
           onClick={() => setPdfState({ thumbsCollapsed: !thumbsCollapsed })}
         >
           {thumbsCollapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
@@ -385,7 +386,7 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex justify-start pl-2 pb-2">
-          <div className="inline-flex items-center gap-1 pl-2 pr-3 py-1.5 rounded-full presenter-media-control">
+          <div className="inline-flex items-center gap-1 pl-2 pr-3 py-1.5 rounded-full pdf-sidebar-bg">
             <button
               className="text-white/80 hover:text-white hover:bg-white/10 rounded-full p-1.5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
               onClick={() => window.dispatchEvent(new CustomEvent('media:pdfPrevPage'))}
