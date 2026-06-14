@@ -17,6 +17,8 @@ export function PreviewCacheProvider({
   )
 }
 
+// This hook intentionally shares the provider's private context.
+// eslint-disable-next-line react-refresh/only-export-components
 export function usePreviewCacheContext(): PreviewCacheContextValue {
   return useContext(PreviewCacheContext)
 }

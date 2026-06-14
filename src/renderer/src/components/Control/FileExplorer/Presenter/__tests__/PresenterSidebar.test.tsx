@@ -11,7 +11,15 @@ vi.mock('react-i18next', () => ({
 }))
 
 vi.mock('@heroui/react', () => ({
-  Button: ({ children, onPress, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { onPress?: () => void }) => (
+  Button: ({
+    children,
+    onPress,
+    isIconOnly: _isIconOnly,
+    ...props
+  }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+    onPress?: () => void
+    isIconOnly?: boolean
+  }) => (
     <button {...props} onClick={onPress}>
       {children}
     </button>

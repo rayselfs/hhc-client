@@ -12,7 +12,7 @@ function createSemaphore(limit: number): { acquire(): Promise<() => void> } {
   return {
     acquire(): Promise<() => void> {
       return new Promise((resolve) => {
-        const tryAcquire = () => {
+        const tryAcquire = (): void => {
           if (active < limit) {
             active++
             resolve(() => {

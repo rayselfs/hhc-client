@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react'
+import { act, render, screen, fireEvent } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { describe, it, expect } from 'vitest'
 import '@renderer/i18n'
@@ -47,7 +47,7 @@ describe('Sidebar', () => {
     renderWithRouter(['/'])
     expect(screen.getByText('計時器')).toBeInTheDocument()
     expect(screen.getByText('聖經')).toBeInTheDocument()
-    await i18n.changeLanguage('en')
+    await act(() => i18n.changeLanguage('en'))
   })
 
   it('renders UserMenu with guest name', async () => {

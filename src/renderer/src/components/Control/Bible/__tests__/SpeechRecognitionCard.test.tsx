@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import SpeechRecognitionCard from '../SpeechRecognitionCard'
 import { createSpeechAdapter, AzureSpeechAdapter } from '@renderer/lib/speech-adapter'
@@ -276,7 +276,9 @@ describe('SpeechRecognitionCard', () => {
         writable: true,
         value: false
       })
-      window.dispatchEvent(new Event('offline'))
+      act(() => {
+        window.dispatchEvent(new Event('offline'))
+      })
 
       await waitFor(() => {
         expect(mockAdapter.stop).toHaveBeenCalled()
@@ -298,7 +300,9 @@ describe('SpeechRecognitionCard', () => {
       })
 
       // Simulate recognition result
-      eventListeners.recognized({ text: '使徒行傳1章1節' })
+      act(() => {
+        eventListeners.recognized({ text: '使徒行傳1章1節' })
+      })
 
       await waitFor(() => {
         expect(screen.getByText('Acts 1:1')).toBeInTheDocument()
@@ -306,7 +310,9 @@ describe('SpeechRecognitionCard', () => {
       })
 
       // Add another verse
-      eventListeners.recognized({ text: '使徒行傳1章2節' })
+      act(() => {
+        eventListeners.recognized({ text: '使徒行傳1章2節' })
+      })
 
       await waitFor(() => {
         const verseItems = screen.getAllByText(/Acts 1/)
@@ -327,7 +333,9 @@ describe('SpeechRecognitionCard', () => {
       })
 
       // Simulate recognition result for a verse not in the mock store
-      eventListeners.recognized({ text: '創世記1章1節' })
+      act(() => {
+        eventListeners.recognized({ text: '創世記1章1節' })
+      })
 
       // Should not add item if book not found in content
       await waitFor(() => {
@@ -347,7 +355,9 @@ describe('SpeechRecognitionCard', () => {
       })
 
       // Simulate invalid recognition result
-      eventListeners.recognized({ text: 'hello world' })
+      act(() => {
+        eventListeners.recognized({ text: 'hello world' })
+      })
 
       // Should not add any items
       await waitFor(() => {
@@ -373,7 +383,9 @@ describe('SpeechRecognitionCard', () => {
         expect(mockAdapter.start).toHaveBeenCalled()
       })
 
-      eventListeners.recognized({ text: '使徒行傳1章1節' })
+      act(() => {
+        eventListeners.recognized({ text: '使徒行傳1章1節' })
+      })
 
       await waitFor(() => {
         expect(screen.getByText('Acts 1:1')).toBeInTheDocument()
@@ -403,7 +415,9 @@ describe('SpeechRecognitionCard', () => {
         expect(mockAdapter.start).toHaveBeenCalled()
       })
 
-      eventListeners.recognized({ text: '使徒行傳1章1節' })
+      act(() => {
+        eventListeners.recognized({ text: '使徒行傳1章1節' })
+      })
 
       await waitFor(() => {
         expect(screen.getByText('Acts 1:1')).toBeInTheDocument()
@@ -429,8 +443,10 @@ describe('SpeechRecognitionCard', () => {
         expect(mockAdapter.start).toHaveBeenCalled()
       })
 
-      eventListeners.recognized({ text: '使徒行傳1章1節' })
-      eventListeners.recognized({ text: '使徒行傳1章2節' })
+      act(() => {
+        eventListeners.recognized({ text: '使徒行傳1章1節' })
+        eventListeners.recognized({ text: '使徒行傳1章2節' })
+      })
 
       await waitFor(() => {
         expect(screen.getByText('Acts 1:1')).toBeInTheDocument()
@@ -474,9 +490,11 @@ describe('SpeechRecognitionCard', () => {
       })
 
       // Simulate error event
-      eventListeners.error({
-        error: new Error('Speech service error'),
-        message: 'Speech service error'
+      act(() => {
+        eventListeners.error({
+          error: new Error('Speech service error'),
+          message: 'Speech service error'
+        })
       })
 
       await waitFor(() => {
@@ -496,7 +514,9 @@ describe('SpeechRecognitionCard', () => {
       })
 
       // Simulate sessionStopped event
-      eventListeners.sessionStopped({})
+      act(() => {
+        eventListeners.sessionStopped({})
+      })
 
       await waitFor(() => {
         // Button should change back to "start"

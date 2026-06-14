@@ -293,15 +293,15 @@ describe('thumbnail-db', () => {
     expect(createObjectUrl).not.toHaveBeenCalled()
   })
 
-  it('opens the thumbnail database at version 3 after migration', async () => {
+  it('opens the thumbnail database at the current version after migration', async () => {
     const { DB_VERSION, saveThumbnail } = await loadModule()
 
     await saveThumbnail('item-3', 'data:text/plain;base64,aGk=')
     const db = await openDatabase(DB_VERSION)
 
     try {
-      expect(DB_VERSION).toBe(3)
-      expect(db.version).toBe(3)
+      expect(DB_VERSION).toBe(4)
+      expect(db.version).toBe(DB_VERSION)
     } finally {
       db.close()
     }

@@ -18,6 +18,8 @@ interface GridItemProps {
   buttonRef?: React.Ref<HTMLButtonElement>
 }
 
+const gridItemRenderCounts = new Map<string, number>()
+
 export const GridItem = React.memo(function GridItem({
   item,
   index,
@@ -29,17 +31,14 @@ export const GridItem = React.memo(function GridItem({
   buttonRef
 }: GridItemProps) {
   const isActive = useMediaProjectionStore((s) => s.currentIndex === index)
-  
-  const renderCount = useRef(0)
-  useEffect(() => {
-    renderCount.current++
-  })
+  const renderCount = (gridItemRenderCounts.get(item.id) ?? 0) + 1
+  gridItemRenderCounts.set(item.id, renderCount)
 
   return (
     <button
       ref={buttonRef}
       data-testid={`grid-item-${index}`}
-      data-render={renderCount.current}
+      data-render={renderCount}
       className={`relative aspect-video rounded overflow-hidden border-3 transition-colors ${
         isActive
           ? 'border-accent'

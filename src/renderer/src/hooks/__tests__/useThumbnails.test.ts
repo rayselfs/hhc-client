@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { useThumbnails } from '../useThumbnails'
 import * as thumbnailDb from '@renderer/lib/thumbnail-db'
@@ -9,7 +9,11 @@ vi.mock('@renderer/lib/thumbnail-db', () => ({
 
 const mockGetThumbnail = vi.mocked(thumbnailDb.getThumbnail)
 
-function makeItem(id: string, mimeType = 'image/jpeg', createdAt = 0) {
+function makeItem(
+  id: string,
+  mimeType = 'image/jpeg',
+  createdAt = 0
+): { id: string; mimeType: string; createdAt: number } {
   return { id, mimeType, createdAt }
 }
 
@@ -53,8 +57,10 @@ describe('useThumbnails', () => {
 
       // Resolve all pending and let the rest run
       while (resolvers.length > 0) {
-        resolvers.splice(0).forEach((r) => r())
-        await new Promise((r) => setTimeout(r, 0))
+        await act(async () => {
+          resolvers.splice(0).forEach((resolve) => resolve())
+          await new Promise((resolve) => setTimeout(resolve, 0))
+        })
       }
 
       await waitFor(() => expect(totalStarted).toBe(20))

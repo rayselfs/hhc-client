@@ -71,7 +71,8 @@ beforeEach(() => {
     _itemsByParent: {},
     loadedParents: new Set([ROOT_ID]),
     currentFolderId: ROOT_ID,
-    isLoading: false
+    isLoading: false,
+    isInitialized: false
   })
   vi.clearAllMocks()
   mockSaveFolder.mockResolvedValue(undefined)

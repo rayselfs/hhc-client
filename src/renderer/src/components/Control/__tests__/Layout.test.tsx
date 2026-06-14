@@ -6,6 +6,17 @@ import i18n from '@renderer/i18n'
 import routes from '@renderer/router'
 import { ThemeProvider } from '@renderer/contexts/ThemeContext'
 import { ONBOARDED_KEY } from '@renderer/lib/onboarding'
+import { useFileExplorerStore } from '@renderer/stores/file-explorer'
+import { useBibleFolderStore } from '@renderer/stores/folder'
+
+vi.mock('@renderer/lib/app-init', () => ({
+  initializeApp: vi.fn(() => vi.fn()),
+  prefetchRouteChunks: vi.fn(() => Promise.resolve())
+}))
+
+vi.mock('@renderer/pages/BiblePage', () => ({
+  default: () => <div data-testid="bible-page" />
+}))
 
 vi.mock('@renderer/lib/timer-adapter', () => ({
   createTimerAdapter: vi.fn(() => ({
@@ -46,6 +57,8 @@ function renderWithRouter(initialEntries: string[] = ['/']): ReturnType<typeof r
 describe('Layout', () => {
   beforeEach(() => {
     localStorage.setItem(ONBOARDED_KEY, 'true')
+    useFileExplorerStore.setState({ isInitialized: true, isLoading: false })
+    useBibleFolderStore.setState({ isInitialized: true, isLoading: false })
   })
 
   afterEach(() => {
@@ -55,12 +68,14 @@ describe('Layout', () => {
   it('renders a header element', async () => {
     await i18n.changeLanguage('en')
     renderWithRouter(['/'])
+    await screen.findByTestId('timer-page')
     expect(document.querySelector('header')).toBeInTheDocument()
   })
 
   it('renders a main element', async () => {
     await i18n.changeLanguage('en')
     renderWithRouter(['/'])
+    await screen.findByTestId('timer-page')
     expect(document.querySelector('main')).toBeInTheDocument()
   })
 
@@ -79,6 +94,7 @@ describe('Layout', () => {
   it('renders sidebar timer and bible labels', async () => {
     await i18n.changeLanguage('en')
     renderWithRouter(['/'])
+    await screen.findByTestId('timer-page')
     expect(screen.getByRole('link', { name: /timer/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /bible/i })).toBeInTheDocument()
   })
@@ -86,6 +102,7 @@ describe('Layout', () => {
   it('does not have a divider between header and main (no border-b on header)', async () => {
     await i18n.changeLanguage('en')
     renderWithRouter(['/'])
+    await screen.findByTestId('timer-page')
     const header = document.querySelector('header')
     expect(header).not.toBeNull()
     expect(header!.classList.contains('border-b')).toBe(false)
@@ -94,6 +111,7 @@ describe('Layout', () => {
   it('does not render an hr element between header and main', async () => {
     await i18n.changeLanguage('en')
     renderWithRouter(['/'])
+    await screen.findByTestId('timer-page')
     expect(document.querySelector('hr')).not.toBeInTheDocument()
   })
 })

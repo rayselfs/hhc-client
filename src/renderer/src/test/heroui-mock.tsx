@@ -1,5 +1,36 @@
 import React from 'react'
 
+const ButtonMock = ({
+  children,
+  onPress,
+  isDisabled,
+  isIconOnly: _isIconOnly,
+  ...props
+}: {
+  children?: React.ReactNode
+  onPress?: () => void
+  isDisabled?: boolean
+  isIconOnly?: boolean
+  [key: string]: unknown
+}): React.JSX.Element => (
+  <button
+    disabled={isDisabled}
+    onClick={onPress}
+    {...(props as React.ButtonHTMLAttributes<HTMLButtonElement>)}
+  >
+    {children}
+  </button>
+)
+
+const ButtonGroupMock = Object.assign(
+  ({ children }: { children?: React.ReactNode }): React.JSX.Element => <div>{children}</div>,
+  {
+    Separator: ({ className }: { className?: string }): React.JSX.Element => (
+      <span className={className} />
+    )
+  }
+)
+
 // Module-level variables capture Tabs props during parent render so child Tab renders can read them
 let capturedOnSelectionChange: ((key: string) => void) | undefined
 let capturedSelectedKey: string | undefined
@@ -314,6 +345,7 @@ const SelectMock = Object.assign(
     onChange,
     selectedKey: _sk1,
     onSelectionChange,
+    isDisabled,
     ...props
   }: {
     children?: React.ReactNode
@@ -322,12 +354,14 @@ const SelectMock = Object.assign(
     onChange?: (key: React.Key) => void
     selectedKey?: React.Key
     onSelectionChange?: (key: React.Key) => void
+    isDisabled?: boolean
     [key: string]: unknown
   }) => (
     <SelectContext value={{ onChange: onChange ?? onSelectionChange }}>
       <div
         className={className}
         data-testid="select-root"
+        aria-disabled={isDisabled}
         {...(props as React.HTMLAttributes<HTMLDivElement>)}
       >
         {children}
@@ -342,6 +376,7 @@ const SelectMock = Object.assign(
       onChange,
       selectedKey: _sk2,
       onSelectionChange,
+      isDisabled,
       ...props
     }: {
       children?: React.ReactNode
@@ -350,12 +385,14 @@ const SelectMock = Object.assign(
       onChange?: (key: React.Key) => void
       selectedKey?: React.Key
       onSelectionChange?: (key: React.Key) => void
+      isDisabled?: boolean
       [key: string]: unknown
     }) => (
       <SelectContext value={{ onChange: onChange ?? onSelectionChange }}>
         <div
           className={className}
           data-testid="select-root"
+          aria-disabled={isDisabled}
           {...(props as React.HTMLAttributes<HTMLDivElement>)}
         >
           {children}
@@ -463,18 +500,24 @@ const ListboxMock = Object.assign(
     Item: ({
       children,
       id,
+      isDisabled,
+      textValue: _textValue,
       ...props
     }: {
       children?: React.ReactNode
       id?: string
+      isDisabled?: boolean
+      textValue?: string
       [key: string]: unknown
     }) => {
       const selectCtx = React.useContext(SelectContext)
       return (
         <li
           role="option"
+          aria-disabled={isDisabled}
           aria-selected={id ? capturedListboxSelectedKeys?.has(id) : false}
           onClick={() => {
+            if (isDisabled) return
             if (id && capturedListboxOnSelectionChange) {
               capturedListboxOnSelectionChange(new Set([id]))
             }
@@ -513,6 +556,8 @@ const AlertDialogMock = Object.assign(
 )
 
 export {
+  ButtonMock,
+  ButtonGroupMock,
   TabsMock,
   ModalMock,
   PopoverMock,

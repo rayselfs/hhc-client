@@ -4,6 +4,17 @@ import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import routes from '../router'
 import { ThemeProvider } from '@renderer/contexts/ThemeContext'
 import { ONBOARDED_KEY } from '@renderer/lib/onboarding'
+import { useFileExplorerStore } from '@renderer/stores/file-explorer'
+import { useBibleFolderStore } from '@renderer/stores/folder'
+
+vi.mock('@renderer/lib/app-init', () => ({
+  initializeApp: vi.fn(() => vi.fn()),
+  prefetchRouteChunks: vi.fn(() => Promise.resolve())
+}))
+
+vi.mock('@renderer/pages/BiblePage', () => ({
+  default: () => <div data-testid="bible-page" />
+}))
 
 vi.mock('@renderer/lib/timer-adapter', () => ({
   createTimerAdapter: vi.fn(() => ({
@@ -44,6 +55,8 @@ function renderWithRouter(initialEntries: string[] = ['/']): ReturnType<typeof r
 describe('Router', () => {
   beforeEach(() => {
     localStorage.setItem(ONBOARDED_KEY, 'true')
+    useFileExplorerStore.setState({ isInitialized: true, isLoading: false })
+    useBibleFolderStore.setState({ isInitialized: true, isLoading: false })
   })
 
   afterEach(() => {

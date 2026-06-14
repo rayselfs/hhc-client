@@ -213,16 +213,26 @@ vi.mock('@heroui/react/button', () => ({
     children,
     onPress,
     disabled,
+    isDisabled,
+    isIconOnly: _isIconOnly,
     'aria-label': ariaLabel,
     ...rest
   }: {
     children: React.ReactNode
     onPress?: () => void
     disabled?: boolean
+    isDisabled?: boolean
+    isIconOnly?: boolean
     'aria-label'?: string
     [key: string]: unknown
   }) => (
-    <button type="button" onClick={onPress} disabled={disabled} aria-label={ariaLabel} {...rest}>
+    <button
+      type="button"
+      onClick={onPress}
+      disabled={disabled ?? isDisabled}
+      aria-label={ariaLabel}
+      {...rest}
+    >
       {children}
     </button>
   )

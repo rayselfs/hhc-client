@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { describe, it, expect, beforeEach } from 'vitest'
@@ -151,7 +151,7 @@ describe('Header', () => {
     })
     renderWithRouter(['/'])
     expect(screen.getByRole('button', { name: '關閉投影視窗' })).toBeInTheDocument()
-    await i18n.changeLanguage('en')
+    await act(() => i18n.changeLanguage('en'))
   })
 
   describe('blank toggle button', () => {
@@ -276,7 +276,7 @@ describe('Header', () => {
       })
       renderWithRouter(['/'])
       expect(screen.getByRole('button', { name: '關閉投影' })).toBeInTheDocument()
-      await i18n.changeLanguage('en')
+      await act(() => i18n.changeLanguage('en'))
     })
   })
 

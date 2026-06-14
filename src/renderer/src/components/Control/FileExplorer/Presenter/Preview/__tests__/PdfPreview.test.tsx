@@ -72,8 +72,8 @@ function setupIntersectionObserverMock(): void {
     observe(el: Element): void {
       capturedObservedElements.push(el)
     }
-    unobserve(_el: Element): void {}
-    disconnect(): void {}
+    unobserve = vi.fn()
+    disconnect = vi.fn()
   }
 
   vi.stubGlobal('IntersectionObserver', MockIntersectionObserver)

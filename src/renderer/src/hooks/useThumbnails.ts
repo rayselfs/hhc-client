@@ -13,13 +13,13 @@ function revokeIfBlobUrl(url: string | null): void {
   if (url?.startsWith('blob:')) URL.revokeObjectURL(url)
 }
 
-function createSemaphore(limit: number) {
+function createSemaphore(limit: number): { acquire(): Promise<() => void> } {
   let active = 0
   const queue: Array<() => void> = []
 
   function acquire(): Promise<() => void> {
     return new Promise((resolve) => {
-      const tryAcquire = () => {
+      const tryAcquire = (): void => {
         if (active < limit) {
           active++
           resolve(() => {

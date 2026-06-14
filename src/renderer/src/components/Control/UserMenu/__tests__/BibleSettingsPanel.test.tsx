@@ -188,6 +188,7 @@ describe('BibleSettingsPanel', () => {
 
   it('shows error toast when save fails', async () => {
     const user = userEvent.setup()
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     vi.mocked(speechKeyStorage.saveSpeechKey).mockRejectedValue(new Error('Save failed'))
 
     renderPanel()
@@ -212,6 +213,11 @@ describe('BibleSettingsPanel', () => {
     await waitFor(() => {
       expect(vi.mocked(toast).danger).toHaveBeenCalledWith('Failed to save Azure Speech settings')
     })
+    expect(consoleError).toHaveBeenCalledWith(
+      '[BibleSettings] Failed to save Azure settings:',
+      expect.any(Error)
+    )
+    consoleError.mockRestore()
   })
 
   it('disables save button when no changes', async () => {
@@ -244,6 +250,7 @@ describe('BibleSettingsPanel', () => {
   })
 
   it('disables test button while loading', async () => {
+    vi.mocked(speechKeyStorage.loadSpeechKey).mockReturnValue(new Promise(() => {}))
     renderPanel()
 
     const testButton = screen.getByText('Test Connection')

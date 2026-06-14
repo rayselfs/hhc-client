@@ -89,7 +89,7 @@ describe('T5 — generateImageThumbnail yield', () => {
     })
 
     let storedOnload: (() => void) | undefined
-    function MockImage(this: { naturalWidth: number; naturalHeight: number }) {
+    function MockImage(this: { naturalWidth: number; naturalHeight: number }): void {
       this.naturalWidth = 200
       this.naturalHeight = 150
       Object.defineProperty(this, 'onload', {
