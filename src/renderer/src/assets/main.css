@@ -4,9 +4,6 @@
 @import '@fontsource-variable/noto-sans-sc';
 /* Inter Variable — latin UI font for English */
 @import '@fontsource-variable/inter';
-/* LXGW WenKai — Simplified Chinese Bible text font */
-@import 'lxgw-wenkai-webfont/lxgwwenkai-regular.css';
-@import 'lxgw-wenkai-webfont/lxgwwenkai-bold.css';
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import '@heroui/styles';
@@ -123,7 +120,7 @@
 }
 
 :lang(zh-CN) {
-  --font-sans: 'LXGW WenKai', 'Noto Sans SC Variable', 'Inter Variable', sans-serif;
+  --font-sans: 'Noto Sans SC Variable', 'Inter Variable', sans-serif;
 }
 
 :lang(en) {
