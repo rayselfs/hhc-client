@@ -71,8 +71,8 @@ interface SpeechAPI {
 }
 
 interface NativeFsAPI {
-  store: (id: string, buffer: ArrayBuffer) => Promise<void>
-  read: (id: string) => Promise<ArrayBuffer>
+  importFile: (id: string, file: File) => Promise<{ size: number }>
+  getUrl: (id: string, mimeType: string) => string
   delete: (id: string) => Promise<void>
 }
 

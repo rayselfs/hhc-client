@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type {
   IpcInvokeChannel,
   IpcInvokeMap,
@@ -94,9 +94,13 @@ const speechApi = {
 }
 
 const nativeFsApi = {
-  store: (id: string, buffer: ArrayBuffer) => ipcRenderer.invoke('native-fs:store-file', id, buffer),
-  read: (id: string) => ipcRenderer.invoke('native-fs:read-file', id) as Promise<ArrayBuffer>,
-  delete: (id: string) => ipcRenderer.invoke('native-fs:delete-file', id)
+  importFile: (id: string, file: File) => {
+    const sourcePath = webUtils.getPathForFile(file)
+    return typedInvoke('native-fs:import-file', id, sourcePath)
+  },
+  getUrl: (id: string, mimeType: string) =>
+    `hhc-media://file/${encodeURIComponent(id)}?type=${encodeURIComponent(mimeType)}`,
+  delete: (id: string) => typedInvoke('native-fs:delete-file', id)
 }
 
 const api = {

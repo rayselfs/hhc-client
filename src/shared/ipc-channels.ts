@@ -71,6 +71,8 @@ export interface IpcInvokeMap {
   'app:set-model-dir': { args: [string]; result: void }
   'app:check-whisper-dir': { args: [string]; result: WhisperDirInfo }
   'app:download-whisper-model': { args: [WhisperModel, string]; result: void }
+  'native-fs:import-file': { args: [string, string]; result: { size: number } }
+  'native-fs:delete-file': { args: [string]; result: void }
 }
 
 export type IpcInvokeChannel = keyof IpcInvokeMap

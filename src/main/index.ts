@@ -6,12 +6,22 @@ import { registerTimerHandlers } from './ipc/timer'
 import { registerBibleApiHandlers } from './ipc/bible-api'
 import { registerAppIpc, registerLocalModelProtocol } from './ipc/app'
 import { registerSpeechKeyStorageHandlers } from './ipc/speech-key-storage'
-import { registerNativeFsHandlers } from './ipc/native-fs'
+import { registerNativeFsHandlers, registerNativeMediaProtocol } from './ipc/native-fs'
 import { isKnownWindow, validateTheme } from './ipc/validate'
 import { registerUpdateService } from './updateService'
 
 protocol.registerSchemesAsPrivileged([
-  { scheme: 'local-model', privileges: { secure: true, supportFetchAPI: true, stream: true } }
+  { scheme: 'local-model', privileges: { secure: true, supportFetchAPI: true, stream: true } },
+  {
+    scheme: 'hhc-media',
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      stream: true,
+      corsEnabled: true
+    }
+  }
 ])
 
 process.on('uncaughtException', (error) => {
@@ -60,7 +70,8 @@ app.whenReady().then(() => {
   registerAppIpc(wm)
   registerLocalModelProtocol()
   registerSpeechKeyStorageHandlers(wm)
-  registerNativeFsHandlers()
+  registerNativeFsHandlers(wm)
+  registerNativeMediaProtocol()
   wm.createMainWindow()
   wm.createProjectionWindow()
   registerUpdateService(wm)

@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { ChevronLeft, ChevronRight, AlignJustify, Maximize2 } from 'lucide-react'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import type { FileItemRecord } from '@shared/types/folder'
-import { openFileExplorerDB, getFileBlob } from '@renderer/lib/file-explorer-db'
+import { getFileSource, openFileExplorerDB } from '@renderer/lib/file-explorer-db'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 import { usePresenterCommands } from '@renderer/contexts/PresenterCommandContext'
 import { usePreviewCacheContext } from '@renderer/contexts/PreviewCacheContext'
@@ -72,7 +72,7 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
 
   useEffect(() => {
     let cancelled = false
-    let objectUrl: string | null = null
+    let revokeSource: (() => void) | null = null
     let doc: PDFDocumentProxy | null = null
 
     async function load(): Promise<void> {
@@ -80,8 +80,12 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
       setError(false)
       try {
         const db = await openFileExplorerDB()
-        const blob = await getFileBlob(db, item.id)
-        if (cancelled || !blob) {
+        const source = await getFileSource(db, item.id, item.mimeType)
+        if (cancelled) {
+          source?.revoke()
+          return
+        }
+        if (!source) {
           if (!cancelled) {
             setError(true)
             setLoading(false)
@@ -96,9 +100,9 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
           return
         }
 
-        objectUrl = URL.createObjectURL(blob)
+        revokeSource = source.revoke
         const pdfjsLib = await loadPdfjsLib()
-        const pdf = await pdfjsLib.getDocument(objectUrl).promise
+        const pdf = await pdfjsLib.getDocument(source.url).promise
         if (cancelled) {
           pdf.destroy()
           return
@@ -126,11 +130,11 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
     void load()
     return () => {
       cancelled = true
-      if (objectUrl) URL.revokeObjectURL(objectUrl)
+      revokeSource?.()
       if (doc) doc.destroy()
       setPdfDoc(null)
     }
-  }, [item.id, t])
+  }, [item.id, item.mimeType, t])
 
   useEffect(() => {
     if (!pdfDoc || pdfViewMode !== 'slide') return

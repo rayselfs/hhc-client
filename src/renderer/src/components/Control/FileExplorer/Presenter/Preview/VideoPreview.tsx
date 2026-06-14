@@ -10,7 +10,7 @@ import {
   SpeakerX
 } from '@phosphor-icons/react'
 import type { FileItemRecord } from '@shared/types/folder'
-import { openFileExplorerDB, getFileBlob } from '@renderer/lib/file-explorer-db'
+import { getFileSource, openFileExplorerDB } from '@renderer/lib/file-explorer-db'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 import { usePresenterCommands } from '@renderer/contexts/PresenterCommandContext'
 
@@ -56,14 +56,17 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
       : undefined
 
   useEffect(() => {
-    let objectUrl: string | null = null
+    let revokeSource: (() => void) | null = null
     let cancelled = false
 
     async function load(): Promise<void> {
       const db = await openFileExplorerDB()
-      const blob = await getFileBlob(db, item.id)
-      if (cancelled) return
-      if (!blob) {
+      const source = await getFileSource(db, item.id, item.mimeType)
+      if (cancelled) {
+        source?.revoke()
+        return
+      }
+      if (!source) {
         setError(true)
         toast.warning(t('fileExplorer.blobLoadFailed'))
         const store = useMediaProjectionStore.getState()
@@ -74,21 +77,21 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
         }
         return
       }
-      objectUrl = URL.createObjectURL(blob)
-      setVideoSrc(objectUrl)
+      revokeSource = source.revoke
+      setVideoSrc(source.url)
     }
 
     void load()
     return () => {
       cancelled = true
-      if (objectUrl) URL.revokeObjectURL(objectUrl)
+      revokeSource?.()
       setVideoSrc(null)
       const video = videoRef.current
       if (video) video.pause()
       if (volumeDebounceRef.current) clearTimeout(volumeDebounceRef.current)
       if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current)
     }
-  }, [item.id, t])
+  }, [item.id, item.mimeType, t])
 
   const triggerFlash = useCallback((icon: 'play' | 'pause'): void => {
     if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current)

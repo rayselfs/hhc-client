@@ -30,7 +30,6 @@ export interface FileExplorerDBSchema extends DBSchema {
 
 const DB_NAME = 'hhc-file-explorer'
 const DB_VERSION = 4
-export const NATIVE_FS_THRESHOLD = 100 * 1024 * 1024
 
 let fileExplorerDBPromise: Promise<IDBPDatabase<FileExplorerDBSchema>> | null = null
 
@@ -78,15 +77,25 @@ export async function openFileExplorerDB(): Promise<IDBPDatabase<FileExplorerDBS
 export async function storeFileBlob(
   db: IDBPDatabase<FileExplorerDBSchema>,
   id: string,
-  blob: Blob
+  file: File
 ): Promise<void> {
-  if (isElectron() && blob.size > NATIVE_FS_THRESHOLD) {
-    await window.api.nativeFs.store(id, await blob.arrayBuffer())
-    await db.put('file-blobs', { id, storage: 'native-fs', size: blob.size, refCount: 1 })
+  if (isElectron()) {
+    const imported = await window.api.nativeFs.importFile(id, file)
+    try {
+      await db.put('file-blobs', {
+        id,
+        storage: 'native-fs',
+        size: imported.size,
+        refCount: 1
+      })
+    } catch (error) {
+      await window.api.nativeFs.delete(id).catch(() => undefined)
+      throw error
+    }
     return
   }
 
-  await db.put('file-blobs', { id, blob, refCount: 1 })
+  await db.put('file-blobs', { id, blob: file, refCount: 1 })
 }
 
 export async function getFileBlob(
@@ -94,12 +103,36 @@ export async function getFileBlob(
   id: string
 ): Promise<Blob | null> {
   const record = await db.get('file-blobs', id)
-  if (record?.storage === 'native-fs') {
-    const buffer = await window.api.nativeFs.read(id)
-    return new Blob([buffer])
+  return record?.blob ?? null
+}
+
+export interface FileSource {
+  url: string
+  revoke: () => void
+}
+
+export async function getFileSource(
+  db: IDBPDatabase<FileExplorerDBSchema>,
+  id: string,
+  mimeType: string
+): Promise<FileSource | null> {
+  const record = await db.get('file-blobs', id)
+  if (!record) return null
+
+  if (record.storage === 'native-fs') {
+    if (!isElectron()) return null
+    return {
+      url: window.api.nativeFs.getUrl(id, mimeType),
+      revoke: () => undefined
+    }
   }
 
-  return record?.blob ?? null
+  if (!record.blob) return null
+  const url = URL.createObjectURL(record.blob)
+  return {
+    url,
+    revoke: () => URL.revokeObjectURL(url)
+  }
 }
 
 export async function deleteFileBlob(

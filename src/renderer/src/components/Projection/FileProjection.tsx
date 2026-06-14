@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createProjectionAdapter } from '@renderer/lib/projection-adapter'
-import { openFileExplorerDB, getFileBlob } from '@renderer/lib/file-explorer-db'
+import { getFileSource, openFileExplorerDB } from '@renderer/lib/file-explorer-db'
 import { loadPdfjsLib } from '@renderer/lib/pdfjs-loader'
 import type { AppMessages, FileControlPayload } from '@shared/projection-messages'
 
@@ -33,35 +33,11 @@ export default function FileProjection({
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const pdfContainerRef = useRef<HTMLDivElement | null>(null)
   const currentFileIdRef = useRef<string | null>(null)
+  const sourceRevokeRef = useRef<(() => void) | null>(null)
 
-  const loadFile = useCallback(async (fileId: string, fileMimeType: string) => {
-    currentFileIdRef.current = fileId
-    setZoom(1)
-    setPan({ x: 0, y: 0 })
-    setPdfState(null)
-    setIsEnded(false)
-    const db = await openFileExplorerDB()
-    const blob = await getFileBlob(db, fileId)
-    if (!blob || currentFileIdRef.current !== fileId) return
-
-    setMimeType(fileMimeType)
-
-    if (fileMimeType === 'application/pdf') {
-      await loadPdf(blob, fileId)
-    } else {
-      const url = URL.createObjectURL(blob)
-      setObjectUrl((prev) => {
-        if (prev) URL.revokeObjectURL(prev)
-        return url
-      })
-    }
-  }, [])
-
-  const loadPdf = useCallback(async (blob: Blob, fileId: string) => {
+  const loadPdf = useCallback(async (sourceUrl: string, fileId: string) => {
     const pdfjsLib = await loadPdfjsLib()
-
-    const buffer = await blob.arrayBuffer()
-    const pdf = await pdfjsLib.getDocument({ data: buffer }).promise
+    const pdf = await pdfjsLib.getDocument(sourceUrl).promise
 
     try {
       const pages: HTMLCanvasElement[] = []
@@ -86,6 +62,35 @@ export default function FileProjection({
       await pdf.destroy()
     }
   }, [])
+
+  const loadFile = useCallback(
+    async (fileId: string, fileMimeType: string) => {
+      currentFileIdRef.current = fileId
+      sourceRevokeRef.current?.()
+      sourceRevokeRef.current = null
+      setObjectUrl(null)
+      setZoom(1)
+      setPan({ x: 0, y: 0 })
+      setPdfState(null)
+      setIsEnded(false)
+      const db = await openFileExplorerDB()
+      const source = await getFileSource(db, fileId, fileMimeType)
+      if (!source || currentFileIdRef.current !== fileId) {
+        source?.revoke()
+        return
+      }
+
+      sourceRevokeRef.current = source.revoke
+      setMimeType(fileMimeType)
+
+      if (fileMimeType === 'application/pdf') {
+        await loadPdf(source.url, fileId)
+      } else {
+        setObjectUrl(source.url)
+      }
+    },
+    [loadPdf]
+  )
 
   const handleControl = useCallback((data: FileControlPayload) => {
     switch (data.action) {
@@ -117,7 +122,7 @@ export default function FileProjection({
           const pageFloat = data.value
           const pageIndex = Math.floor(Math.max(0, pageFloat))
           const fraction = pageFloat - pageIndex
-          const PY = 16  // py-4
+          const PY = 16 // py-4
           const GAP = 16 // gap-4
           const children = el.children
           let target = PY
@@ -171,13 +176,15 @@ export default function FileProjection({
     if (initialFileId && initialMimeType) {
       loadFile(initialFileId, initialMimeType)
     }
-  }, [])
+  }, [initialFileId, initialMimeType, loadFile])
 
-  useEffect(() => {
-    return () => {
-      if (objectUrl) URL.revokeObjectURL(objectUrl)
-    }
-  }, [objectUrl])
+  useEffect(
+    () => () => {
+      sourceRevokeRef.current?.()
+      sourceRevokeRef.current = null
+    },
+    []
+  )
 
   const transform =
     zoom !== 1

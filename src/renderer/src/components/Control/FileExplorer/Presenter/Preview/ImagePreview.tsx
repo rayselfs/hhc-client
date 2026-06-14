@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { toast } from '@heroui/react/toast'
 import { useTranslation } from 'react-i18next'
 import type { FileItemRecord } from '@shared/types/folder'
-import { openFileExplorerDB, getFileBlob } from '@renderer/lib/file-explorer-db'
+import { getFileSource, openFileExplorerDB } from '@renderer/lib/file-explorer-db'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 
 interface ImagePreviewProps {
@@ -19,16 +19,19 @@ export default function ImagePreview({ item }: ImagePreviewProps): React.JSX.Ele
   const pan = useMediaProjectionStore((s) => s.pan)
 
   useEffect(() => {
-    let objectUrl: string | null = null
+    let revokeSource: (() => void) | null = null
     let cancelled = false
 
     async function load(): Promise<void> {
       setLoading(true)
       setError(false)
       const db = await openFileExplorerDB()
-      const blob = await getFileBlob(db, item.id)
-      if (cancelled) return
-      if (!blob) {
+      const source = await getFileSource(db, item.id, item.mimeType)
+      if (cancelled) {
+        source?.revoke()
+        return
+      }
+      if (!source) {
         setError(true)
         setLoading(false)
         toast.warning(t('fileExplorer.blobLoadFailed'))
@@ -40,8 +43,8 @@ export default function ImagePreview({ item }: ImagePreviewProps): React.JSX.Ele
         }
         return
       }
-      objectUrl = URL.createObjectURL(blob)
-      setImgSrc(objectUrl)
+      revokeSource = source.revoke
+      setImgSrc(source.url)
       setLoading(false)
     }
 
@@ -49,10 +52,10 @@ export default function ImagePreview({ item }: ImagePreviewProps): React.JSX.Ele
 
     return () => {
       cancelled = true
-      if (objectUrl) URL.revokeObjectURL(objectUrl)
+      revokeSource?.()
       setImgSrc(null)
     }
-  }, [item.id, t])
+  }, [item.id, item.mimeType, t])
 
   if (loading) {
     return (

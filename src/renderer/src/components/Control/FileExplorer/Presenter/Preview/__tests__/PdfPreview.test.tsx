@@ -17,7 +17,10 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('@renderer/lib/file-explorer-db', () => ({
   openFileExplorerDB: vi.fn().mockResolvedValue({}),
-  getFileBlob: vi.fn().mockResolvedValue(new Blob(['pdf'], { type: 'application/pdf' }))
+  getFileSource: vi.fn().mockResolvedValue({
+    url: 'blob:fake-pdf',
+    revoke: vi.fn()
+  })
 }))
 
 vi.mock('@heroui/react/toast', () => ({
@@ -51,8 +54,9 @@ const mockStoreState = {
 }
 
 vi.mock('@renderer/stores/media-projection', () => ({
-  useMediaProjectionStore: vi.fn((selector: (s: typeof mockStoreState) => unknown) =>
-    selector(mockStoreState)
+  useMediaProjectionStore: Object.assign(
+    vi.fn((selector: (s: typeof mockStoreState) => unknown) => selector(mockStoreState)),
+    { getState: () => mockStoreState }
   )
 }))
 
@@ -99,8 +103,6 @@ describe('PdfPreview scroll mode lazy rendering', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     setupIntersectionObserverMock()
-    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:fake-pdf')
-    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
   })
 
   afterEach(() => {

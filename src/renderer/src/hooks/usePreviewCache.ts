@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FileItemRecord } from '@shared/types/folder'
-import { openFileExplorerDB, getFileBlob } from '@renderer/lib/file-explorer-db'
+import { getFileSource, openFileExplorerDB } from '@renderer/lib/file-explorer-db'
 import { loadPdfjsLib } from '@renderer/lib/pdfjs-loader'
 import { getPdfPageThumbs } from '@renderer/lib/thumbnail-db'
 
@@ -36,16 +36,14 @@ function createSemaphore(limit: number): { acquire(): Promise<() => void> } {
   }
 }
 
-async function captureVideoThumb(videoBlob: Blob, signal: AbortSignal): Promise<string | null> {
+async function captureVideoThumb(sourceUrl: string, signal: AbortSignal): Promise<string | null> {
   return new Promise((resolve) => {
-    const url = URL.createObjectURL(videoBlob)
     const video = document.createElement('video')
     video.muted = true
     video.playsInline = true
     video.preload = 'metadata'
 
     const cleanup = (): void => {
-      URL.revokeObjectURL(url)
       video.src = ''
     }
 
@@ -94,18 +92,15 @@ async function captureVideoThumb(videoBlob: Blob, signal: AbortSignal): Promise<
       resolve(null)
     }
 
-    video.src = url
+    video.src = sourceUrl
   })
 }
 
-async function renderPdfPageThumb(pdfBlob: Blob, signal: AbortSignal): Promise<string[]> {
+async function renderPdfPageThumb(sourceUrl: string, signal: AbortSignal): Promise<string[]> {
   const pdfjsLib = await loadPdfjsLib()
   if (signal.aborted) return []
 
-  const buffer = await pdfBlob.arrayBuffer()
-  if (signal.aborted) return []
-
-  const pdf = await pdfjsLib.getDocument({ data: buffer }).promise
+  const pdf = await pdfjsLib.getDocument(sourceUrl).promise
   if (signal.aborted) {
     pdf.destroy()
     return []
@@ -154,6 +149,7 @@ export function usePreviewCache(playlist: FileItemRecord[]): PreviewCacheResult 
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({})
   const [pdfPageThumbs, setPdfPageThumbs] = useState<Record<string, string[]>>({})
   const thumbUrlsRef = useRef<string[]>([])
+  const sourceReleasesRef = useRef<Array<() => void>>([])
 
   const playlistKey = useMemo(
     () => playlist.map((i) => `${i.id}:${i.mimeType}`).join(','),
@@ -176,26 +172,11 @@ export function usePreviewCache(playlist: FileItemRecord[]): PreviewCacheResult 
             const release = await semaphore.acquire()
             try {
               if (signal.aborted) return
-              const blob = await getFileBlob(db, item.id)
-              if (!blob || signal.aborted) return
 
-              if (item.mimeType?.startsWith('image/')) {
-                const url = URL.createObjectURL(blob)
-                thumbUrlsRef.current.push(url)
-                if (signal.aborted) {
-                  URL.revokeObjectURL(url)
-                  return
-                }
-                setThumbnails((prev) => ({ ...prev, [item.id]: url }))
-              } else if (item.mimeType?.startsWith('video/')) {
-                const thumbUrl = await captureVideoThumb(blob, signal)
-                if (!thumbUrl || signal.aborted) return
-                thumbUrlsRef.current.push(thumbUrl)
-                setThumbnails((prev) => ({ ...prev, [item.id]: thumbUrl }))
-              } else if (item.mimeType === 'application/pdf') {
+              if (item.mimeType === 'application/pdf') {
                 const cachedThumbs = await getPdfPageThumbs(item.id)
                 if (signal.aborted) {
-                  cachedThumbs.forEach((u) => URL.revokeObjectURL(u))
+                  cachedThumbs.forEach((url) => URL.revokeObjectURL(url))
                   return
                 }
                 if (cachedThumbs.length > 0) {
@@ -204,9 +185,35 @@ export function usePreviewCache(playlist: FileItemRecord[]): PreviewCacheResult 
                   setThumbnails((prev) => ({ ...prev, [item.id]: cachedThumbs[0] }))
                   return
                 }
-                const thumbs = await renderPdfPageThumb(blob, signal)
+              }
+
+              const source = await getFileSource(db, item.id, item.mimeType ?? '')
+              if (!source || signal.aborted) {
+                source?.revoke()
+                return
+              }
+
+              if (item.mimeType?.startsWith('image/')) {
+                sourceReleasesRef.current.push(source.revoke)
+                setThumbnails((prev) => ({ ...prev, [item.id]: source.url }))
+              } else if (item.mimeType?.startsWith('video/')) {
+                try {
+                  const thumbUrl = await captureVideoThumb(source.url, signal)
+                  if (!thumbUrl || signal.aborted) return
+                  thumbUrlsRef.current.push(thumbUrl)
+                  setThumbnails((prev) => ({ ...prev, [item.id]: thumbUrl }))
+                } finally {
+                  source.revoke()
+                }
+              } else if (item.mimeType === 'application/pdf') {
+                let thumbs: string[]
+                try {
+                  thumbs = await renderPdfPageThumb(source.url, signal)
+                } finally {
+                  source.revoke()
+                }
                 if (signal.aborted) {
-                  thumbs.forEach((u) => URL.revokeObjectURL(u))
+                  thumbs.forEach((url) => URL.revokeObjectURL(url))
                   return
                 }
                 thumbUrlsRef.current.push(...thumbs)
@@ -229,6 +236,8 @@ export function usePreviewCache(playlist: FileItemRecord[]): PreviewCacheResult 
       setThumbnails({})
       setPdfPageThumbs({})
       setTimeout(() => {
+        sourceReleasesRef.current.forEach((release) => release())
+        sourceReleasesRef.current = []
         thumbUrlsRef.current.forEach((url) => URL.revokeObjectURL(url))
         thumbUrlsRef.current = []
       }, 0)

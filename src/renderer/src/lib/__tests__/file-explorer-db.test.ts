@@ -1,12 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+const { envState, mockImportFile, mockGetUrl, mockDeleteNativeFile } = vi.hoisted(() => ({
+  envState: { isElectron: false },
+  mockImportFile: vi.fn(),
+  mockGetUrl: vi.fn(),
+  mockDeleteNativeFile: vi.fn()
+}))
+
 vi.mock('@renderer/lib/env', () => ({
-  isElectron: () => false
+  isElectron: () => envState.isElectron
 }))
 
 interface StoredFileBlobRecord {
   id: string
   blob?: Blob
+  storage?: 'indexed-db' | 'native-fs'
+  size?: number
   refCount?: number
 }
 
@@ -60,15 +69,83 @@ describe('file-explorer-db blob refCount', () => {
   beforeEach(() => {
     db = new FakeFileExplorerDB()
     vi.clearAllMocks()
+    envState.isElectron = false
+    mockImportFile.mockResolvedValue({ size: 5 })
+    mockGetUrl.mockImplementation(
+      (id: string, mimeType: string) => `hhc-media://file/${id}?type=${mimeType}`
+    )
+    mockDeleteNativeFile.mockResolvedValue(undefined)
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: {
+        nativeFs: {
+          importFile: mockImportFile,
+          getUrl: mockGetUrl,
+          delete: mockDeleteNativeFile
+        }
+      }
+    })
   })
 
   it('storeFileBlob writes refCount=1', async () => {
     const { storeFileBlob } = await import('../file-explorer-db')
-    const blob = new Blob(['hello'])
+    const file = new File(['hello'], 'hello.txt', { type: 'text/plain' })
 
-    await storeFileBlob(db as never, 'file-1', blob)
+    await storeFileBlob(db as never, 'file-1', file)
 
-    expect(db.records.get('file-1')).toMatchObject({ id: 'file-1', blob, refCount: 1 })
+    expect(db.records.get('file-1')).toMatchObject({ id: 'file-1', blob: file, refCount: 1 })
+  })
+
+  it('stores every Electron upload in native filesystem metadata', async () => {
+    envState.isElectron = true
+    const { storeFileBlob } = await import('../file-explorer-db')
+    const file = new File(['hello'], 'hello.txt', { type: 'text/plain' })
+
+    await storeFileBlob(db as never, 'file-1', file)
+
+    expect(mockImportFile).toHaveBeenCalledWith('file-1', file)
+    expect(db.records.get('file-1')).toEqual({
+      id: 'file-1',
+      storage: 'native-fs',
+      size: 5,
+      refCount: 1
+    })
+  })
+
+  it('uses the same native import path for Electron files larger than 2GB', async () => {
+    envState.isElectron = true
+    const size = 3 * 1024 ** 3
+    mockImportFile.mockResolvedValue({ size })
+    const { storeFileBlob } = await import('../file-explorer-db')
+    const file = new File([], 'large-video.mp4', { type: 'video/mp4' })
+    Object.defineProperty(file, 'size', { value: size })
+    const arrayBufferSpy = vi.spyOn(file, 'arrayBuffer')
+
+    await storeFileBlob(db as never, 'file-large', file)
+
+    expect(mockImportFile).toHaveBeenCalledWith('file-large', file)
+    expect(arrayBufferSpy).not.toHaveBeenCalled()
+    expect(db.records.get('file-large')).toMatchObject({
+      storage: 'native-fs',
+      size
+    })
+  })
+
+  it('returns a protocol URL for native media without creating an object URL', async () => {
+    envState.isElectron = true
+    const createObjectUrlSpy = vi.spyOn(URL, 'createObjectURL')
+    db.records.set('file-1', {
+      id: 'file-1',
+      storage: 'native-fs',
+      size: 5,
+      refCount: 1
+    })
+    const { getFileSource } = await import('../file-explorer-db')
+
+    const source = await getFileSource(db as never, 'file-1', 'video/mp4')
+
+    expect(source?.url).toBe('hhc-media://file/file-1?type=video/mp4')
+    expect(createObjectUrlSpy).not.toHaveBeenCalled()
   })
 
   it('incrementBlobRef increments refCount to 2', async () => {
@@ -100,6 +177,24 @@ describe('file-explorer-db blob refCount', () => {
 
     expect(db.records.has('file-1')).toBe(false)
     expect(db.deleteCalls).toEqual(['file-1'])
+  })
+
+  it('deletes a native file only when its final reference is removed', async () => {
+    envState.isElectron = true
+    const { deleteFileBlob } = await import('../file-explorer-db')
+    db.records.set('file-1', {
+      id: 'file-1',
+      storage: 'native-fs',
+      size: 5,
+      refCount: 2
+    })
+
+    await deleteFileBlob(db as never, 'file-1')
+    expect(mockDeleteNativeFile).not.toHaveBeenCalled()
+
+    await deleteFileBlob(db as never, 'file-1')
+    expect(mockDeleteNativeFile).toHaveBeenCalledWith('file-1')
+    expect(db.records.has('file-1')).toBe(false)
   })
 
   it('deleteFileBlob deletes legacy blob records without refCount', async () => {
