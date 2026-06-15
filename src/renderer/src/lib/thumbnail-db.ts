@@ -172,35 +172,39 @@ export async function copyThumbnail(fromId: string, toId: string): Promise<boole
   return true
 }
 
-export async function savePdfPageThumbs(itemId: string, dataUrls: string[]): Promise<void> {
+export async function savePdfPageThumbs(blobId: string, dataUrls: string[]): Promise<void> {
   const blobs = dataUrls.map(dataUrlToBlob)
+  await savePdfPageThumbBlobs(blobId, blobs)
+}
+
+export async function savePdfPageThumbBlobs(blobId: string, blobs: Blob[]): Promise<void> {
   await withStore<void>(
     PDF_PAGE_STORE_NAME,
     'readwrite',
     (store) => {
-      store.put({ itemId, blobs } satisfies PdfPageRecord)
+      store.put({ itemId: blobId, blobs } satisfies PdfPageRecord)
     },
     undefined
   )
 }
 
-export async function getPdfPageThumbs(itemId: string): Promise<string[]> {
+export async function getPdfPageThumbs(blobId: string): Promise<string[]> {
   const record = await withStore<PdfPageRecord | undefined>(
     PDF_PAGE_STORE_NAME,
     'readonly',
-    (store) => store.get(itemId),
+    (store) => store.get(blobId),
     undefined
   )
   if (!record) return []
   return record.blobs.map((blob) => URL.createObjectURL(blob))
 }
 
-export async function deletePdfPageThumbs(itemId: string): Promise<void> {
+export async function deletePdfPageThumbs(blobId: string): Promise<void> {
   await withStore<void>(
     PDF_PAGE_STORE_NAME,
     'readwrite',
     (store) => {
-      store.delete(itemId)
+      store.delete(blobId)
     },
     undefined
   )

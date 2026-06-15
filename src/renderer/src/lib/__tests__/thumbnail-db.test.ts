@@ -2,11 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const DB_NAME = 'hhc-thumbnails'
 const STORE_NAME = 'thumbnails'
+const PDF_PAGE_STORE_NAME = 'pdf-page-thumbs'
 
 interface StoredThumbnailRecord {
   itemId: string
   dataUrl?: string
   blob?: Blob
+  blobs?: Blob[]
   format?: 'dataUrl' | 'blob'
 }
 
@@ -305,5 +307,22 @@ describe('thumbnail-db', () => {
     } finally {
       db.close()
     }
+  })
+
+  it('persists PDF page thumbnails by blob identity across module reloads', async () => {
+    const { savePdfPageThumbBlobs } = await loadModule()
+    await savePdfPageThumbBlobs('original-blob-id', [new Blob(['page-1']), new Blob(['page-2'])])
+
+    vi.resetModules()
+    const { getPdfPageThumbs } = await loadModule()
+
+    await expect(getPdfPageThumbs('copy-item-id')).resolves.toEqual([])
+    await expect(getPdfPageThumbs('original-blob-id')).resolves.toEqual([
+      'blob:test-6',
+      'blob:test-6'
+    ])
+    expect(
+      fakeDatabases.get(DB_NAME)?.stores.get(PDF_PAGE_STORE_NAME)?.has('original-blob-id')
+    ).toBe(true)
   })
 })

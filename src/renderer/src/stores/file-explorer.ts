@@ -141,7 +141,11 @@ export async function permanentDeleteFileItemFromStore(id: string): Promise<void
   const item = useFileExplorerStore.getState().items[id]
   const blobId = item?.type === 'file' ? getBlobId(item) : id
   useFileExplorerStore.getState().removeItem(id)
-  await Promise.all([deleteFileBlob(db, blobId), deleteThumbnail(id), deletePdfPageThumbs(id)])
+  const deletedFinalBlobReference = await deleteFileBlob(db, blobId)
+  await Promise.all([
+    deleteThumbnail(id),
+    deletedFinalBlobReference ? deletePdfPageThumbs(blobId) : Promise.resolve()
+  ])
 }
 
 export function deleteFolderFromStore(folderId: string): void {

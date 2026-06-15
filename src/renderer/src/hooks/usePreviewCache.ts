@@ -3,7 +3,7 @@ import type { FileItemRecord } from '@shared/types/folder'
 import { getFileSource, openFileExplorerDB } from '@renderer/lib/file-explorer-db'
 import { getBlobId } from '@renderer/lib/blob-identity'
 import { loadPdfjsLib } from '@renderer/lib/pdfjs-loader'
-import { getPdfPageThumbs } from '@renderer/lib/thumbnail-db'
+import { getPdfPageThumbs, savePdfPageThumbBlobs } from '@renderer/lib/thumbnail-db'
 
 function canPreload(mimeType: string | undefined): boolean {
   return (
@@ -97,17 +97,26 @@ async function captureVideoThumb(sourceUrl: string, signal: AbortSignal): Promis
   })
 }
 
-async function renderPdfPageThumb(sourceUrl: string, signal: AbortSignal): Promise<string[]> {
+interface RenderedPdfThumbs {
+  blobs: Blob[]
+  urls: string[]
+}
+
+async function renderPdfPageThumb(
+  sourceUrl: string,
+  signal: AbortSignal
+): Promise<RenderedPdfThumbs> {
   const pdfjsLib = await loadPdfjsLib()
-  if (signal.aborted) return []
+  if (signal.aborted) return { blobs: [], urls: [] }
 
   const pdf = await pdfjsLib.getDocument(sourceUrl).promise
   if (signal.aborted) {
     pdf.destroy()
-    return []
+    return { blobs: [], urls: [] }
   }
 
-  const thumbUrls: string[] = []
+  const blobs: Blob[] = []
+  const urls: string[] = []
   try {
     for (let i = 1; i <= pdf.numPages; i++) {
       if (signal.aborted) break
@@ -125,7 +134,8 @@ async function renderPdfPageThumb(sourceUrl: string, signal: AbortSignal): Promi
         canvas.toBlob(
           (blob) => {
             if (blob && !signal.aborted) {
-              thumbUrls.push(URL.createObjectURL(blob))
+              blobs.push(blob)
+              urls.push(URL.createObjectURL(blob))
             }
             resolve()
           },
@@ -138,7 +148,7 @@ async function renderPdfPageThumb(sourceUrl: string, signal: AbortSignal): Promi
     pdf.destroy()
   }
 
-  return thumbUrls
+  return { blobs, urls }
 }
 
 export type PreviewCacheResult = {
@@ -175,7 +185,8 @@ export function usePreviewCache(playlist: FileItemRecord[]): PreviewCacheResult 
               if (signal.aborted) return
 
               if (item.mimeType === 'application/pdf') {
-                const cachedThumbs = await getPdfPageThumbs(item.id)
+                const blobId = getBlobId(item)
+                const cachedThumbs = await getPdfPageThumbs(blobId)
                 if (signal.aborted) {
                   cachedThumbs.forEach((url) => URL.revokeObjectURL(url))
                   return
@@ -207,16 +218,22 @@ export function usePreviewCache(playlist: FileItemRecord[]): PreviewCacheResult 
                   source.revoke()
                 }
               } else if (item.mimeType === 'application/pdf') {
-                let thumbs: string[]
+                let rendered: RenderedPdfThumbs
                 try {
-                  thumbs = await renderPdfPageThumb(source.url, signal)
+                  rendered = await renderPdfPageThumb(source.url, signal)
                 } finally {
                   source.revoke()
                 }
                 if (signal.aborted) {
-                  thumbs.forEach((url) => URL.revokeObjectURL(url))
+                  rendered.urls.forEach((url) => URL.revokeObjectURL(url))
                   return
                 }
+                await savePdfPageThumbBlobs(getBlobId(item), rendered.blobs)
+                if (signal.aborted) {
+                  rendered.urls.forEach((url) => URL.revokeObjectURL(url))
+                  return
+                }
+                const thumbs = rendered.urls
                 thumbUrlsRef.current.push(...thumbs)
                 setPdfPageThumbs((prev) => ({ ...prev, [item.id]: thumbs }))
                 if (thumbs.length > 0) {

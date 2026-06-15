@@ -163,8 +163,9 @@ describe('file-explorer-db blob refCount', () => {
     const blob = new Blob(['hello'])
     db.records.set('file-1', { id: 'file-1', blob, refCount: 2 })
 
-    await deleteFileBlob(db as never, 'file-1')
+    const deleted = await deleteFileBlob(db as never, 'file-1')
 
+    expect(deleted).toBe(false)
     expect(db.records.get('file-1')).toMatchObject({ id: 'file-1', blob, refCount: 1 })
     expect(db.deleteCalls).toEqual([])
   })
@@ -173,8 +174,9 @@ describe('file-explorer-db blob refCount', () => {
     const { deleteFileBlob } = await import('../file-explorer-db')
     db.records.set('file-1', { id: 'file-1', blob: new Blob(['hello']), refCount: 1 })
 
-    await deleteFileBlob(db as never, 'file-1')
+    const deleted = await deleteFileBlob(db as never, 'file-1')
 
+    expect(deleted).toBe(true)
     expect(db.records.has('file-1')).toBe(false)
     expect(db.deleteCalls).toEqual(['file-1'])
   })
@@ -201,8 +203,9 @@ describe('file-explorer-db blob refCount', () => {
     const { deleteFileBlob } = await import('../file-explorer-db')
     db.records.set('legacy-file', { id: 'legacy-file', blob: new Blob(['legacy']) })
 
-    await deleteFileBlob(db as never, 'legacy-file')
+    const deleted = await deleteFileBlob(db as never, 'legacy-file')
 
+    expect(deleted).toBe(true)
     expect(db.records.has('legacy-file')).toBe(false)
     expect(db.deleteCalls).toEqual(['legacy-file'])
   })

@@ -138,19 +138,20 @@ export async function getFileSource(
 export async function deleteFileBlob(
   db: IDBPDatabase<FileExplorerDBSchema>,
   id: string
-): Promise<void> {
+): Promise<boolean> {
   const record = await db.get('file-blobs', id)
-  if (!record) return
+  if (!record) return false
 
   if (record.refCount === undefined || record.refCount <= 1) {
     if (record.storage === 'native-fs' && isElectron()) {
       await window.api.nativeFs.delete(id)
     }
     await db.delete('file-blobs', id)
-    return
+    return true
   }
 
   await db.put('file-blobs', { ...record, refCount: record.refCount - 1 })
+  return false
 }
 
 export async function incrementBlobRef(
