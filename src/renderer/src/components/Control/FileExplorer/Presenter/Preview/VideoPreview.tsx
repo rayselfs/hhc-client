@@ -30,6 +30,7 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
   const { t } = useTranslation()
   const { sendCommand } = usePresenterCommands()
   const videoRef = useRef<HTMLVideoElement>(null)
+  const seekInputRef = useRef<HTMLInputElement>(null)
   const [videoSrc, setVideoSrc] = useState<string | null>(null)
   const [error, setError] = useState(false)
   const [retryToken, setRetryToken] = useState(0)
@@ -48,6 +49,7 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
   const [flashState, setFlashState] = useState<{ icon: 'play' | 'pause'; key: number } | null>(null)
 
   const hasStartedRef = useRef(false)
+  const isDraggingSeekRef = useRef(false)
   const volumeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const flashTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const flashKeyRef = useRef(0)
@@ -85,8 +87,8 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
       cancelled = true
       revokeSource?.()
       setVideoSrc(null)
-      const video = videoRef.current
-      if (video) video.pause()
+      isDraggingSeekRef.current = false
+      setIsDraggingSeek(false)
       if (volumeDebounceRef.current) clearTimeout(volumeDebounceRef.current)
       if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current)
     }
@@ -161,6 +163,22 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
     }, 100)
   }, [isMuted, volume, sendCommand])
 
+  const commitSeek = useCallback(
+    (seekTo: number): void => {
+      isDraggingSeekRef.current = false
+      setIsDraggingSeek(false)
+      if (videoRef.current) videoRef.current.currentTime = seekTo
+      sendCommand({ action: 'seek', value: seekTo })
+    },
+    [sendCommand]
+  )
+
+  const releaseSeekPointer = useCallback((target: HTMLInputElement, pointerId: number): void => {
+    if (target.hasPointerCapture(pointerId)) {
+      target.releasePointerCapture(pointerId)
+    }
+  }, [])
+
   if (error) {
     return (
       <PreviewLoadError
@@ -211,7 +229,10 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
           onClick={() => {
             hasStartedRef.current = true
             setHasStarted(true)
-            videoRef.current?.play().then(() => setIsPlaying(true)).catch(() => {})
+            videoRef.current
+              ?.play()
+              .then(() => setIsPlaying(true))
+              .catch(() => {})
             sendCommand({ action: 'play' })
           }}
           onMouseDown={(e) => e.stopPropagation()}
@@ -258,28 +279,45 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
             step={0.1}
             value={isDraggingSeek ? localSeekTime : currentTime}
             className="video-seek-range w-full"
+            ref={seekInputRef}
             style={
               {
                 '--seek-fill': `${(((isDraggingSeek ? localSeekTime : currentTime) / (duration || 1)) * 100).toFixed(2)}%`
               } as React.CSSProperties
             }
-            onMouseDown={() => {
+            onPointerDown={(e) => {
+              isDraggingSeekRef.current = true
               setIsDraggingSeek(true)
               setLocalSeekTime(currentTime)
+              e.currentTarget.setPointerCapture(e.pointerId)
             }}
-            onChange={(e) => setLocalSeekTime(Number(e.target.value))}
-            onMouseUp={(e) => {
+            onChange={(e) => {
+              const value = Number(e.target.value)
+              setLocalSeekTime(value)
+              if (!isDraggingSeekRef.current) {
+                commitSeek(value)
+              }
+            }}
+            onPointerUp={(e) => {
               const seekTo = Number((e.target as HTMLInputElement).value)
+              releaseSeekPointer(e.currentTarget, e.pointerId)
+              commitSeek(seekTo)
+            }}
+            onPointerCancel={(e) => {
+              releaseSeekPointer(e.currentTarget, e.pointerId)
+              isDraggingSeekRef.current = false
               setIsDraggingSeek(false)
-              if (videoRef.current) videoRef.current.currentTime = seekTo
-              sendCommand({ action: 'seek', value: seekTo })
+            }}
+            onLostPointerCapture={() => {
+              isDraggingSeekRef.current = false
+              setIsDraggingSeek(false)
             }}
           />
 
           <div className="flex items-stretch pl-2 pb-2 gap-2">
             <div className="inline-flex rounded-full presenter-media-control">
               <button
-                className="text-white/80 hover:text-white px-4 py-2.5 rounded-full transition-colors"
+                className="w-11 h-11 inline-flex items-center justify-center text-white/80 hover:text-white rounded-full transition-colors"
                 onClick={handlePlayPause}
               >
                 {isEnded ? (
@@ -298,7 +336,7 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
               onMouseLeave={() => setIsVolumeHovered(false)}
             >
               <button
-                className="text-white/80 hover:text-white px-4 py-2.5 rounded-full transition-colors"
+                className="w-11 h-11 inline-flex items-center justify-center text-white/80 hover:text-white rounded-full transition-colors"
                 onClick={handleVolumeIconClick}
               >
                 {isMuted || volume === 0 ? (

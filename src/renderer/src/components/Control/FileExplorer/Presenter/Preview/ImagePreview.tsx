@@ -92,7 +92,7 @@ export default function ImagePreview({ item }: ImagePreviewProps): React.JSX.Ele
           alt={item.name}
         />
         <div
-          className="absolute border-2 border-accent bg-accent/20 pointer-events-none transition-all duration-100"
+          className="absolute border-2 border-accent bg-accent/20 pointer-events-none"
           style={{
             left: `${viewportLeft}%`,
             top: `${viewportTop}%`,

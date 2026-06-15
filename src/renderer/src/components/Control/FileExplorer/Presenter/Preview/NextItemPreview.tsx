@@ -5,7 +5,7 @@ import { getMediaType } from '@renderer/lib/presentability'
 
 interface NextItemPreviewProps {
   item: FileItemRecord
-  previewCache?: Record<string, string>
+  previewCache?: Record<string, string | null>
 }
 
 export default function NextItemPreview({
@@ -14,14 +14,14 @@ export default function NextItemPreview({
 }: NextItemPreviewProps): React.JSX.Element | null {
   const { t } = useTranslation()
   const mediaType = getMediaType(item.mimeType)
-  const thumbnailUrl = previewCache?.[item.id]
+  const thumbnailUrl = previewCache?.[item.id] ?? null
 
   if (!mediaType) return null
 
   if (!thumbnailUrl) {
     return (
       <span className="absolute inset-0 flex items-center justify-center text-white/30 text-xs">
-        {t('presenter.loading')}
+        {item.name || t('presenter.loading')}
       </span>
     )
   }

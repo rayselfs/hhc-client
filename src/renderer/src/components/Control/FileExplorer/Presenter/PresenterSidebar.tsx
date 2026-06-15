@@ -22,10 +22,12 @@ function debounce<Args extends unknown[]>(
 }
 
 interface PresenterSidebarProps {
-  previewCache: Record<string, string>
+  previewCache: Record<string, string | null>
 }
 
-export default function PresenterSidebar({ previewCache }: PresenterSidebarProps): React.JSX.Element {
+export default function PresenterSidebar({
+  previewCache
+}: PresenterSidebarProps): React.JSX.Element {
   const { t } = useTranslation()
   const nextItem = useMediaProjectionStore((s) => s.nextItem())
   const currentItem = useMediaProjectionStore((s) => s.currentItem())

@@ -19,6 +19,7 @@ import MediaPreview from './Preview/MediaPreview'
 import MediaToolbar from './MediaToolbar'
 import GlassDivider from '@renderer/components/Common/GlassDivider'
 import { usePreviewCache } from '@renderer/hooks/usePreviewCache'
+import { useThumbnails } from '@renderer/hooks/useThumbnails'
 
 export default function MediaPresenter(): React.JSX.Element {
   const { claimProjection, blankProjection, send } = useProjection()
@@ -26,7 +27,8 @@ export default function MediaPresenter(): React.JSX.Element {
   useMediaProjectionSync()
 
   const playlist = useMediaProjectionStore((s) => s.playlist)
-  const { thumbnails, pdfPageThumbs } = usePreviewCache(playlist)
+  const { pdfPageThumbs } = usePreviewCache(playlist)
+  const coverThumbnails = useThumbnails(playlist)
   const showGrid = useMediaProjectionStore((s) => s.showGrid)
   const zoomLevel = useMediaProjectionStore((s) => s.zoomLevel)
   const isEnded = useMediaProjectionStore((s) => s.isEnded)
@@ -37,10 +39,7 @@ export default function MediaPresenter(): React.JSX.Element {
 
   const descriptor = currentItem ? getDescriptor(currentItem.mimeType) : null
 
-  const sendCommand = useCallback(
-    (cmd: FileControlPayload) => send('file:control', cmd),
-    [send]
-  )
+  const sendCommand = useCallback((cmd: FileControlPayload) => send('file:control', cmd), [send])
 
   useEffect(() => {
     const timerStatus = useTimerRuntimeStore.getState().status
@@ -150,13 +149,13 @@ export default function MediaPresenter(): React.JSX.Element {
             <GlassDivider vertical />
 
             <div className="flex-2 lg:flex-1 min-w-0 h-full">
-              <PresenterSidebar previewCache={thumbnails} />
+              <PresenterSidebar previewCache={coverThumbnails} />
             </div>
           </div>
 
           {showGrid && (
             <ShortcutScope name="grid">
-              <PresenterGrid />
+              <PresenterGrid previewCache={coverThumbnails} />
             </ShortcutScope>
           )}
         </div>

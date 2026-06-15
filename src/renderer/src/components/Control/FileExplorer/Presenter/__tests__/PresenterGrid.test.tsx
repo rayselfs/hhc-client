@@ -100,4 +100,11 @@ describe('PresenterGrid Rendering Optimization', () => {
     }
   })
 
+  it('limits the grid to six columns', () => {
+    render(<PresenterGrid />)
+
+    const grid = screen.getByTestId('grid-item-0').parentElement
+    expect(grid?.className).toContain('lg:grid-cols-6')
+    expect(grid?.className).not.toContain('xl:grid-cols-8')
+  })
 })

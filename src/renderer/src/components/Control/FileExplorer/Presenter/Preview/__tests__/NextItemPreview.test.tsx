@@ -53,30 +53,32 @@ describe('NextImagePreview', () => {
     const item = makeItem()
     mockGetMediaType.mockReturnValue('image')
 
-    render(<NextItemPreview item={item} previewCache={{ 'item-1': 'data:image/jpeg;base64,abc' }} />)
+    render(
+      <NextItemPreview item={item} previewCache={{ 'item-1': 'data:image/jpeg;base64,abc' }} />
+    )
 
     const img = await screen.findByRole('img')
     expect(img).toHaveAttribute('src', 'data:image/jpeg;base64,abc')
     expect(mockGetFileBlob).not.toHaveBeenCalled()
   })
 
-  it('shows loading state when previewCache has no entry', () => {
+  it('shows item name fallback when previewCache has no entry', () => {
     const item = makeItem()
     mockGetMediaType.mockReturnValue('image')
 
     render(<NextItemPreview item={item} previewCache={{}} />)
 
-    expect(screen.getByText('presenter.loading')).toBeTruthy()
+    expect(screen.getByText('test.jpg')).toBeTruthy()
     expect(mockGetFileBlob).not.toHaveBeenCalled()
   })
 
-  it('shows loading state when previewCache is undefined', () => {
+  it('shows item name fallback when previewCache is undefined', () => {
     const item = makeItem()
     mockGetMediaType.mockReturnValue('image')
 
     render(<NextItemPreview item={item} />)
 
-    expect(screen.getByText('presenter.loading')).toBeTruthy()
+    expect(screen.getByText('test.jpg')).toBeTruthy()
     expect(mockGetFileBlob).not.toHaveBeenCalled()
   })
 })
@@ -90,20 +92,22 @@ describe('NextVideoPreview', () => {
     const item = makeItem({ mimeType: 'video/mp4', name: 'test.mp4' })
     mockGetMediaType.mockReturnValue('video')
 
-    render(<NextItemPreview item={item} previewCache={{ 'item-1': 'data:image/jpeg;base64,vidthumb' }} />)
+    render(
+      <NextItemPreview item={item} previewCache={{ 'item-1': 'data:image/jpeg;base64,vidthumb' }} />
+    )
 
     const img = await screen.findByRole('img')
     expect(img).toHaveAttribute('src', 'data:image/jpeg;base64,vidthumb')
     expect(mockGetFileBlob).not.toHaveBeenCalled()
   })
 
-  it('shows loading state when no thumbnail', () => {
+  it('shows item name fallback when no thumbnail', () => {
     const item = makeItem({ mimeType: 'video/mp4', name: 'test.mp4' })
     mockGetMediaType.mockReturnValue('video')
 
     render(<NextItemPreview item={item} previewCache={{}} />)
 
-    expect(screen.getByText('presenter.loading')).toBeTruthy()
+    expect(screen.getByText('test.mp4')).toBeTruthy()
     expect(mockGetFileBlob).not.toHaveBeenCalled()
   })
 })
@@ -117,20 +121,22 @@ describe('NextPdfPreview', () => {
     const item = makeItem({ mimeType: 'application/pdf', name: 'test.pdf' })
     mockGetMediaType.mockReturnValue('pdf')
 
-    render(<NextItemPreview item={item} previewCache={{ 'item-1': 'data:image/jpeg;base64,pdfthumb' }} />)
+    render(
+      <NextItemPreview item={item} previewCache={{ 'item-1': 'data:image/jpeg;base64,pdfthumb' }} />
+    )
 
     const img = await screen.findByRole('img')
     expect(img).toHaveAttribute('src', 'data:image/jpeg;base64,pdfthumb')
     expect(mockGetFileBlob).not.toHaveBeenCalled()
   })
 
-  it('shows loading state when no thumbnail', () => {
+  it('shows item name fallback when no thumbnail', () => {
     const item = makeItem({ mimeType: 'application/pdf', name: 'test.pdf' })
     mockGetMediaType.mockReturnValue('pdf')
 
     render(<NextItemPreview item={item} previewCache={{}} />)
 
-    expect(screen.getByText('presenter.loading')).toBeTruthy()
+    expect(screen.getByText('test.pdf')).toBeTruthy()
     expect(mockGetFileBlob).not.toHaveBeenCalled()
   })
 })

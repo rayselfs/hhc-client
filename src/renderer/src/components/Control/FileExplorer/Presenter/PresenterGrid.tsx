@@ -18,6 +18,10 @@ interface GridItemProps {
   buttonRef?: React.Ref<HTMLButtonElement>
 }
 
+interface PresenterGridProps {
+  previewCache?: Record<string, string | null>
+}
+
 const gridItemRenderCounts = new Map<string, number>()
 
 export const GridItem = React.memo(function GridItem({
@@ -71,17 +75,20 @@ export const GridItem = React.memo(function GridItem({
   )
 })
 
-export default function PresenterGrid(): React.JSX.Element {
+export default function PresenterGrid({ previewCache }: PresenterGridProps): React.JSX.Element {
   const { t } = useTranslation()
   const playlist = useMediaProjectionStore((s) => s.playlist)
   const jumpTo = useMediaProjectionStore((s) => s.jumpTo)
   const toggleGrid = useMediaProjectionStore((s) => s.toggleGrid)
-  const thumbnails = useThumbnails(playlist)
+  const fallbackThumbnails = useThumbnails(playlist)
+  const thumbnails = previewCache ?? fallbackThumbnails
 
-  const [focusedIndex, setFocusedIndex] = useState(() => useMediaProjectionStore.getState().currentIndex)
+  const [focusedIndex, setFocusedIndex] = useState(
+    () => useMediaProjectionStore.getState().currentIndex
+  )
   const containerRef = useRef<HTMLDivElement>(null)
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([])
-  
+
   const getButtonRefCallbacks = useMemo(() => {
     const callbacks: Array<(el: HTMLButtonElement | null) => void> = []
     for (let i = 0; i < playlist.length; i++) {
@@ -101,7 +108,7 @@ export default function PresenterGrid(): React.JSX.Element {
   }, [focusedIndex])
 
   const handleKeyDown = (e: React.KeyboardEvent): void => {
-    const cols = window.innerWidth >= 1280 ? 8 : window.innerWidth >= 1024 ? 6 : 4
+    const cols = window.innerWidth >= 1024 ? 6 : 4
     switch (e.key) {
       case 'ArrowRight':
         e.preventDefault()
@@ -158,7 +165,7 @@ export default function PresenterGrid(): React.JSX.Element {
         className="flex-1 overflow-y-auto p-6 outline-none"
         onKeyDown={handleKeyDown}
       >
-        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
+        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-6">
           {playlist.map((item, index) => (
             <GridItem
               key={item.id}
