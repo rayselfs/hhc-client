@@ -11,6 +11,7 @@ import {
 } from '@renderer/lib/media-capabilities'
 import { mediaJobQueue } from '@renderer/lib/media-job-queue'
 import { getFileBlob, getFileSource, openFileExplorerDB } from '@renderer/lib/file-explorer-db'
+import { resolveUniqueName } from '@renderer/lib/file-naming'
 
 export const MAX_FILE_SIZE_WEB = 2 * 1024 * 1024 * 1024
 
@@ -212,6 +213,19 @@ export async function uploadFolderFiles(
   if (candidates.length === 0) return 0
 
   const pathToFolderId = new Map<string, string>()
+  const usedNamesByParent = new Map<string, Set<string>>()
+  const store = useFileExplorerStore.getState()
+
+  function reserveFolderName(parentId: string, requestedName: string): string {
+    const usedNames =
+      usedNamesByParent.get(parentId) ??
+      new Set(store.getChildFolders(parentId).map((folder) => folder.name))
+    const uniqueName = resolveUniqueName(requestedName, usedNames)
+    usedNames.add(uniqueName)
+    usedNamesByParent.set(parentId, usedNames)
+    return uniqueName
+  }
+
   for (const { file } of candidates) {
     const parts = file.webkitRelativePath.split('/')
     for (let depth = 1; depth < parts.length; depth++) {
@@ -220,7 +234,7 @@ export async function uploadFolderFiles(
         const parentPath = parts.slice(0, depth - 1).join('/')
         const parentId =
           depth === 1 ? currentFolderId : (pathToFolderId.get(parentPath) ?? currentFolderId)
-        const id = addFolder(parts[depth - 1], parentId)
+        const id = addFolder(reserveFolderName(parentId, parts[depth - 1]), parentId)
         pathToFolderId.set(folderPath, id)
       }
     }
@@ -262,6 +276,19 @@ export async function uploadFromDataTransfer(
     filesWithPaths.map(({ file, relativePath }) => [file, relativePath])
   )
   const { addFolder } = useFileExplorerStore.getState()
+  const store = useFileExplorerStore.getState()
+  const usedNamesByParent = new Map<string, Set<string>>()
+
+  function reserveFolderName(parentId: string, requestedName: string): string {
+    const usedNames =
+      usedNamesByParent.get(parentId) ??
+      new Set(store.getChildFolders(parentId).map((folder) => folder.name))
+    const uniqueName = resolveUniqueName(requestedName, usedNames)
+    usedNames.add(uniqueName)
+    usedNamesByParent.set(parentId, usedNames)
+    return uniqueName
+  }
+
   const pathToFolderId = new Map<string, string>()
 
   for (const { file } of candidates) {
@@ -272,7 +299,7 @@ export async function uploadFromDataTransfer(
         const parentPath = parts.slice(0, depth - 1).join('/')
         const parentId =
           depth === 1 ? targetFolderId : (pathToFolderId.get(parentPath) ?? targetFolderId)
-        const id = addFolder(parts[depth - 1], parentId)
+        const id = addFolder(reserveFolderName(parentId, parts[depth - 1]), parentId)
         pathToFolderId.set(folderPath, id)
       }
     }

@@ -65,7 +65,8 @@ beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(addFileItemToStore).mockResolvedValue('mock-id')
   vi.mocked(useFileExplorerStore.getState).mockReturnValue({
-    addFolder: vi.fn()
+    addFolder: vi.fn(),
+    getChildFolders: vi.fn(() => [])
   } as never)
   vi.mocked(mediaJobQueue.enqueue).mockResolvedValue({ id: 'job-id' } as never)
   setStorageEstimate()
@@ -113,6 +114,26 @@ describe('uploadFiles web preflight', () => {
 
     expect(addFolder).not.toHaveBeenCalled()
     expect(addFileItemToStore).not.toHaveBeenCalled()
+  })
+
+  it('auto-renames existing and same-batch folder conflicts', async () => {
+    vi.mocked(isWeb).mockReturnValue(false)
+    const addFolder = vi.fn((name: string) => `id-${name}`)
+    vi.mocked(useFileExplorerStore.getState).mockReturnValue({
+      addFolder,
+      getChildFolders: vi.fn((parentId: string) =>
+        parentId === 'root' ? [{ id: 'existing', name: 'Sunday', parentId: 'root' }] : []
+      )
+    } as never)
+    const files = [
+      setRelativePath(makeFile('a.png', 100), 'Sunday/a.png'),
+      setRelativePath(makeFile('b.png', 100), 'sunday/b.png')
+    ]
+
+    await uploadFolderFiles(files, 'root', addFolder)
+
+    expect(addFolder).toHaveBeenNthCalledWith(1, 'Sunday 2', 'root')
+    expect(addFolder).toHaveBeenNthCalledWith(2, 'sunday 3', 'root')
   })
 
   it('applies the Web size limit to drag-and-drop entries', async () => {

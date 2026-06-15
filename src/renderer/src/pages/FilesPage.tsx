@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from '@heroui/react/toast'
 import { FileExplorerShell, useFileContextMenu } from '@renderer/components/Control/FileExplorer'
 import FileBrowser from '@renderer/components/Control/FileExplorer/FileBrowser'
 import FileExplorerFAB from '@renderer/components/Control/FileExplorer/FileExplorerFAB'
@@ -23,23 +24,12 @@ import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
 import MediaPresenter from '@renderer/components/Control/FileExplorer/Presenter/MediaPresenter'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 import { getMediaFileAcceptAttribute } from '@renderer/lib/media-capabilities'
-
-function resolveUniqueName(baseName: string, existingNames: string[]): string {
-  if (!existingNames.includes(baseName)) return baseName
-  let n = 2
-  while (existingNames.includes(`${baseName} ${n}`)) n++
-  return `${baseName} ${n}`
-}
-
-function resolveUniqueFileName(name: string, existingNames: string[]): string {
-  if (!existingNames.includes(name)) return name
-  const lastDot = name.lastIndexOf('.')
-  const base = lastDot > 0 ? name.slice(0, lastDot) : name
-  const ext = lastDot > 0 ? name.slice(lastDot) : ''
-  let n = 2
-  while (existingNames.includes(`${base} ${n}${ext}`)) n++
-  return `${base} ${n}${ext}`
-}
+import {
+  hasNameConflict,
+  resolveUniqueFileName,
+  resolveUniqueName,
+  validateDisplayName
+} from '@renderer/lib/file-naming'
 
 export default function FilesPage(): React.JSX.Element {
   const { t } = useTranslation()
@@ -62,6 +52,8 @@ export default function FilesPage(): React.JSX.Element {
   const [createFolderDuration, setCreateFolderDuration] = useState<FolderDuration>('1day')
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingKind, setEditingKind] = useState<'folder' | 'file'>('folder')
+  const [renameItemRequestId, setRenameItemRequestId] = useState<string | null>(null)
   const [editModalName, setEditModalName] = useState('')
   const [editingExtension, setEditingExtension] = useState('')
   const [editModalDuration, setEditModalDuration] = useState<FolderDuration>('1day')
@@ -226,10 +218,11 @@ export default function FilesPage(): React.JSX.Element {
     const state = useFileExplorerStore.getState()
     const target = state.folders[id] ?? state.items[id]
     if (!target) return
-    const isFileItemInSubfolder =
-      !state.folders[id] && !!state.items[id] && state.items[id].parentId !== FILE_EXPLORER_ROOT_ID
+    const file = state.items[id]
+    const isFile = !!file && isFileItem(file)
     setEditingId(id)
-    if (!state.folders[id] && state.items[id]) {
+    setEditingKind(isFile ? 'file' : 'folder')
+    if (isFile) {
       const lastDot = target.name.lastIndexOf('.')
       if (lastDot > 0) {
         setEditModalName(target.name.slice(0, lastDot))
@@ -244,27 +237,51 @@ export default function FilesPage(): React.JSX.Element {
     }
     setEditModalDuration(inferDuration(target.expiresAt, target.createdAt ?? Date.now()))
     setEditingIsFavorited(state.folders[id]?.isFavorited ?? false)
-    setEditingHideDuration(isFileItemInSubfolder)
+    setEditingHideDuration(isFile && file.parentId !== FILE_EXPLORER_ROOT_ID)
     setIsEditModalOpen(true)
   }, [])
 
   const handleEditSubmit = useCallback((): void => {
     if (!editingId) return
     const name = editModalName.trim()
-    if (!name) return
+    if (!validateDisplayName(name)) {
+      toast.danger(t('fileExplorer.invalidName', 'Invalid name'))
+      return
+    }
     const state = useFileExplorerStore.getState()
-    if (state.folders[editingId]) {
+    const folder = state.folders[editingId]
+    if (folder) {
+      const siblingNames = state
+        .getChildFolders(folder.parentId ?? FILE_EXPLORER_ROOT_ID)
+        .map((entry) => entry.name)
+      if (hasNameConflict(name, siblingNames, { excludeName: folder.name })) {
+        toast.danger(
+          t('fileExplorer.folderAlreadyExists', 'A folder with this name already exists')
+        )
+        return
+      }
       updateFolder(editingId, { name, expiresAt: computeExpiresAt(editModalDuration) })
-    } else if (state.items[editingId]) {
-      const isRoot = state.items[editingId].parentId === FILE_EXPLORER_ROOT_ID
+    } else {
+      const item = state.items[editingId]
+      if (!item || !isFileItem(item)) return
+      const nextName = `${name}${editingExtension}`
+      const siblingNames = state
+        .getItems(item.parentId)
+        .filter(isFileItem)
+        .map((entry) => entry.name)
+      if (hasNameConflict(nextName, siblingNames, { excludeName: item.name })) {
+        toast.danger(t('fileExplorer.fileAlreadyExists', 'A file with this name already exists'))
+        return
+      }
       updateItem?.(editingId, {
-        name: name + editingExtension,
-        expiresAt: isRoot ? computeExpiresAt(editModalDuration) : null
+        name: nextName,
+        expiresAt:
+          item.parentId === FILE_EXPLORER_ROOT_ID ? computeExpiresAt(editModalDuration) : null
       })
     }
     setIsEditModalOpen(false)
     setEditingId(null)
-  }, [editingId, editModalName, editingExtension, editModalDuration, updateFolder, updateItem])
+  }, [editingId, editModalName, editingExtension, editModalDuration, updateFolder, updateItem, t])
 
   const handleItemContextMenu = useCallback(
     (itemId: string, event: React.MouseEvent): void => {
@@ -292,7 +309,10 @@ export default function FilesPage(): React.JSX.Element {
         onCopy: handleCopy,
         onCut: handleCut,
         onDelete: handleDelete,
-        onEdit: (targetItem) => openEditModal(targetItem.id)
+        onEdit: (targetItem) => setRenameItemRequestId(targetItem.id),
+        ...(item.parentId === FILE_EXPLORER_ROOT_ID
+          ? { onEditDetails: (targetItem) => openEditModal(targetItem.id) }
+          : {})
       })
     },
     [
@@ -352,23 +372,25 @@ export default function FilesPage(): React.JSX.Element {
   const openCreateFolderModal = useCallback((): void => {
     const existingNames = getChildFolders(currentFolderId).map((f) => f.name)
     const base = t('folder.untitledFolder')
-    let name = base
-    let n = 2
-    while (existingNames.includes(name)) {
-      name = `${base} ${n}`
-      n++
-    }
-    setCreateFolderName(name)
+    setCreateFolderName(resolveUniqueName(base, existingNames))
     setCreateFolderDuration('1day')
     setIsCreateFolderModalOpen(true)
   }, [getChildFolders, currentFolderId, t])
 
   const handleCreateFolderSubmit = useCallback((): void => {
     const name = createFolderName.trim()
-    if (!name) return
+    if (!validateDisplayName(name)) {
+      toast.danger(t('fileExplorer.invalidName', 'Invalid name'))
+      return
+    }
+    const siblingNames = getChildFolders(currentFolderId).map((folder) => folder.name)
+    if (hasNameConflict(name, siblingNames)) {
+      toast.danger(t('fileExplorer.folderAlreadyExists', 'A folder with this name already exists'))
+      return
+    }
     addFolder(name, currentFolderId, computeExpiresAt(createFolderDuration))
     setIsCreateFolderModalOpen(false)
-  }, [createFolderName, createFolderDuration, addFolder, currentFolderId])
+  }, [createFolderName, createFolderDuration, addFolder, currentFolderId, getChildFolders, t])
 
   const handleEmptyAreaContextMenu = useCallback(
     (event: React.MouseEvent): void => {
@@ -420,6 +442,8 @@ export default function FilesPage(): React.JSX.Element {
           onPaste={() => void handlePaste()}
           clipboard={clipboard}
           onEscape={handleEscape}
+          renameItemRequestId={renameItemRequestId}
+          onRenameItemRequestHandled={() => setRenameItemRequestId(null)}
         />
       </FileExplorerShell>
       <FileExplorerFAB onUploadFiles={handleUploadFiles} onUploadFolder={handleUploadFolder} />
@@ -440,18 +464,14 @@ export default function FilesPage(): React.JSX.Element {
           setEditingId(null)
         }}
         onSubmit={handleEditSubmit}
-        editingFolder={
-          editingId
-            ? ((useFileExplorerStore.getState().folders[editingId] as FolderRecord | undefined) ??
-              ({ id: editingId, name: editModalName } as FolderRecord))
-            : null
-        }
+        editingFolder={editingId ? ({ id: editingId, name: editModalName } as FolderRecord) : null}
         folderName={editModalName}
         onFolderNameChange={setEditModalName}
         folderDuration={editModalDuration}
         onFolderDurationChange={setEditModalDuration}
         isRetentionLocked={editingIsFavorited}
         hideDuration={editingHideDuration}
+        i18nPrefix={editingKind === 'file' ? 'fileExplorer.editFileModal' : undefined}
       />
       {isPresenting && <MediaPresenter />}
     </>

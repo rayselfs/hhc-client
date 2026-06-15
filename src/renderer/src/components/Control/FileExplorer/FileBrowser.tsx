@@ -44,6 +44,7 @@ import { formatFileKind } from '@renderer/lib/format-file-kind'
 import { isPresentable, getPresentableItems } from '@renderer/lib/presentability'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 import type { SortField } from '@renderer/stores/file-explorer'
+import { hasNameConflict, splitFileName, validateDisplayName } from '@renderer/lib/file-naming'
 
 export interface FileBrowserProps {
   onItemContextMenu?: (itemId: string, event: React.MouseEvent) => void
@@ -55,6 +56,8 @@ export interface FileBrowserProps {
   onPaste?: () => void
   clipboard?: ClipboardState | null
   onEscape?: () => void
+  renameItemRequestId?: string | null
+  onRenameItemRequestHandled?: () => void
 }
 
 type FileExplorerDndData =
@@ -70,6 +73,8 @@ interface SortableViewItemProps {
   isMultiDrag: boolean
   isCut?: boolean
   isOsDragTarget?: boolean
+  onPointerDown?: (itemId: string, event: React.PointerEvent) => void
+  onPointerMove?: (itemId: string, event: React.PointerEvent) => void
   children: React.ReactNode
 }
 
@@ -93,6 +98,8 @@ function SortableViewItem({
   isMultiDrag,
   isCut,
   isOsDragTarget,
+  onPointerDown,
+  onPointerMove,
   children
 }: SortableViewItemProps): React.JSX.Element {
   const sortable = useSortable({
@@ -129,6 +136,8 @@ function SortableViewItem({
       data-item-id={item.id}
       {...(item.isFolder ? { 'data-folder-id': item.id } : {})}
       className={`touch-none rounded-lg${isOsDragTarget ? ' ring-2 ring-inset ring-primary/50' : ''}${droppable.isOver && item.isFolder ? ' bg-surface' : ''}`}
+      onPointerDown={(event) => onPointerDown?.(item.id, event)}
+      onPointerMove={(event) => onPointerMove?.(item.id, event)}
       {...sortable.attributes}
       {...sortable.listeners}
     >
@@ -304,12 +313,16 @@ export function FileBrowser({
   onCut,
   onPaste,
   clipboard,
-  onEscape
+  onEscape,
+  renameItemRequestId,
+  onRenameItemRequestHandled
 }: FileBrowserProps): React.JSX.Element {
   const { t } = useTranslation()
   const confirm = useConfirm()
   const currentFolderId = useFileExplorerStore((state) => state.currentFolderId)
-  const rawFolders = useFileExplorerStore((s) => s._childFoldersByParent[s.currentFolderId] ?? EMPTY_ARRAY)
+  const rawFolders = useFileExplorerStore(
+    (s) => s._childFoldersByParent[s.currentFolderId] ?? EMPTY_ARRAY
+  )
   const rawItems = useFileExplorerStore((s) => s._itemsByParent[s.currentFolderId] ?? EMPTY_ARRAY)
   const navigateToFolder = useFileExplorerStore((state) => state.navigateToFolder)
   const toggleFavorite = useFileExplorerStore((state) => state.toggleFavorite)
@@ -330,6 +343,14 @@ export function FileBrowser({
   const [activeId, setActiveId] = useState<string | null>(null)
   const [draggedIds, setDraggedIds] = useState<Set<string>>(new Set())
   const [selectedSearchId, setSelectedSearchId] = useState<string | null>(null)
+  const [renamingItemId, setRenamingItemId] = useState<string | null>(null)
+  const slowClickRef = React.useRef<{ itemId: string; at: number } | null>(null)
+  const pointerRef = React.useRef<{
+    itemId: string
+    x: number
+    y: number
+    moved: boolean
+  } | null>(null)
 
   const sensors = useSensors(
     useSensor(MouseSensor, {
@@ -342,23 +363,25 @@ export function FileBrowser({
 
   const folders = useMemo(
     () =>
-      rawFolders
-        .filter((folder) => !folder.deletedAt)
-        .sort((a, b) => a.sortIndex - b.sortIndex),
+      rawFolders.filter((folder) => !folder.deletedAt).sort((a, b) => a.sortIndex - b.sortIndex),
     [rawFolders]
   )
   const fileItems = useMemo(
     () =>
       rawItems
-        .filter(
-          (item): item is FileItemRecord =>
-            isFileItemRecord(item) && !item.deletedAt
-        )
+        .filter((item): item is FileItemRecord => isFileItemRecord(item) && !item.deletedAt)
         .sort((a, b) => a.sortIndex - b.sortIndex),
     [rawItems]
   )
+  const searchRevision = [
+    ...rawFolders.map((folder) => `${folder.id}:${folder.name}:${folder.deletedAt ?? ''}`),
+    ...rawItems.map(
+      (item) => `${item.id}:${'name' in item ? item.name : ''}:${item.deletedAt ?? ''}`
+    )
+  ].join('|')
 
   const searchResults = useMemo(() => {
+    void searchRevision
     if (!searchQuery.trim()) return []
     const raw = searchAllItems(
       searchQuery,
@@ -370,7 +393,7 @@ export function FileBrowser({
       const nameB = b.kind === 'file' ? b.item.name : b.folder.name
       return nameA.localeCompare(nameB)
     })
-  }, [searchQuery, rawItems, rawFolders, t])
+  }, [searchQuery, searchRevision, t])
 
   const thumbnails = useThumbnails(fileItems, { pendingAgeMs: 2 * 60 * 1000 })
 
@@ -477,10 +500,36 @@ export function FileBrowser({
     setSelectedSearchId(null)
   }, [searchQuery])
 
+  useEffect(() => {
+    if (!renameItemRequestId) return
+    const file = fileItems.find((item) => item.id === renameItemRequestId)
+    if (file) {
+      setSelectedIds(new Set([renameItemRequestId]))
+      setRenamingItemId(renameItemRequestId)
+    }
+    onRenameItemRequestHandled?.()
+  }, [renameItemRequestId, fileItems, setSelectedIds, onRenameItemRequestHandled])
+
+  useEffect(() => {
+    slowClickRef.current = null
+    setRenamingItemId(null)
+  }, [currentFolderId, viewMode])
+
+  useEffect(() => {
+    const previous = slowClickRef.current
+    if (previous && (!selectedIds.has(previous.itemId) || selectedIds.size !== 1)) {
+      slowClickRef.current = null
+    }
+  }, [selectedIds])
+
   const handleEscape = useCallback((): void => {
+    if (renamingItemId) {
+      setRenamingItemId(null)
+      return
+    }
     clearSelection()
     onEscape?.()
-  }, [clearSelection, onEscape])
+  }, [clearSelection, onEscape, renamingItemId])
 
   const handleContainerContextMenu = useCallback(
     (event: React.MouseEvent): void => {
@@ -508,6 +557,7 @@ export function FileBrowser({
 
   const handleItemDoubleClick = useCallback(
     (itemId: string, event: React.MouseEvent): void => {
+      slowClickRef.current = null
       event.stopPropagation()
       const item = sortedItems.find((entry) => entry.id === itemId)
       if (item?.isFolder) {
@@ -525,7 +575,103 @@ export function FileBrowser({
         }
       }
     },
-    [sortedItems, sortedFileItems, fileItems, navigateToFolder]
+    [sortedItems, sortedFileItems, fileItems, navigateToFolder, t]
+  )
+
+  const handleRenameSubmit = useCallback(
+    (itemId: string, baseName: string): void => {
+      const file = fileItems.find((item) => item.id === itemId)
+      if (!file) {
+        setRenamingItemId(null)
+        return
+      }
+
+      const trimmedBase = baseName.trim()
+      if (!validateDisplayName(trimmedBase)) {
+        toast.danger(t('fileExplorer.invalidName', 'Invalid name'))
+        return
+      }
+
+      const { extension } = splitFileName(file.name)
+      const nextName = `${trimmedBase}${extension}`
+      const siblingNames = fileItems
+        .filter((item) => item.parentId === file.parentId)
+        .map((item) => item.name)
+      if (hasNameConflict(nextName, siblingNames, { excludeName: file.name })) {
+        toast.danger(t('fileExplorer.fileAlreadyExists', 'A file with this name already exists'))
+        return
+      }
+
+      useFileExplorerStore.getState().updateItem?.(itemId, { name: nextName })
+      setRenamingItemId(null)
+    },
+    [fileItems, t]
+  )
+
+  const handleRenameCancel = useCallback((): void => {
+    setRenamingItemId(null)
+  }, [])
+
+  const handleItemPointerDown = useCallback((itemId: string, event: React.PointerEvent): void => {
+    if (event.button !== 0 || event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) {
+      pointerRef.current = null
+      slowClickRef.current = null
+      return
+    }
+
+    pointerRef.current = {
+      itemId,
+      x: event.clientX,
+      y: event.clientY,
+      moved: false
+    }
+  }, [])
+
+  const handleItemPointerMove = useCallback((itemId: string, event: React.PointerEvent): void => {
+    const pointer = pointerRef.current
+    if (!pointer || pointer.itemId !== itemId) return
+    if (Math.hypot(event.clientX - pointer.x, event.clientY - pointer.y) > 4) {
+      pointer.moved = true
+      slowClickRef.current = null
+    }
+  }, [])
+
+  const handleViewItemClick = useCallback(
+    (itemId: string, event: React.MouseEvent): void => {
+      const wasAlreadySelected = selectedIds.has(itemId) && selectedIds.size === 1
+      const now = Date.now()
+      const previous = slowClickRef.current
+      const pointer = pointerRef.current
+      const hadPointerMovement = pointer?.itemId === itemId && pointer.moved
+      handleItemClick(itemId, event)
+
+      if (
+        event.button !== 0 ||
+        event.detail > 1 ||
+        event.shiftKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.altKey ||
+        hadPointerMovement
+      ) {
+        slowClickRef.current = null
+        return
+      }
+
+      if (!wasAlreadySelected) {
+        slowClickRef.current = { itemId, at: now }
+        return
+      }
+
+      const elapsed = previous?.itemId === itemId ? now - previous.at : 0
+      slowClickRef.current = { itemId, at: now }
+      const item = sortedItems.find((entry) => entry.id === itemId)
+      if (!item || item.isFolder) return
+      if (elapsed >= 500 && elapsed <= 1200) {
+        setRenamingItemId(itemId)
+      }
+    },
+    [handleItemClick, selectedIds, sortedItems]
   )
 
   const handleDeleteSelected = useCallback(async (): Promise<void> => {
@@ -628,6 +774,9 @@ export function FileBrowser({
 
   const handleDragStart = useCallback(
     (event: DragStartEvent): void => {
+      setRenamingItemId(null)
+      slowClickRef.current = null
+      pointerRef.current = null
       const nextActiveId = String(event.active.id)
       setActiveId(nextActiveId)
 
@@ -720,12 +869,23 @@ export function FileBrowser({
           isMultiDrag={isMultiDrag}
           isCut={isCut}
           isOsDragTarget={isOsDragTarget}
+          onPointerDown={handleItemPointerDown}
+          onPointerMove={handleItemPointerMove}
         >
           {children}
         </SortableViewItem>
       )
     },
-    [folders, fileItems, draggedIds, isMultiDrag, clipboard, osDragTargetFolderId]
+    [
+      folders,
+      fileItems,
+      draggedIds,
+      isMultiDrag,
+      clipboard,
+      osDragTargetFolderId,
+      handleItemPointerDown,
+      handleItemPointerMove
+    ]
   )
 
   if (searchQuery.trim()) {
@@ -785,19 +945,25 @@ export function FileBrowser({
                 onSortChange={handleSortChange}
                 colWidths={colWidths}
                 onColWidthChange={(col, w) => setColWidths({ [col]: w })}
-                onItemClick={handleItemClick}
+                onItemClick={handleViewItemClick}
                 onItemDoubleClick={handleItemDoubleClick}
                 onItemContextMenu={handleItemContextMenu}
+                renamingItemId={renamingItemId}
+                onRenameSubmit={handleRenameSubmit}
+                onRenameCancel={handleRenameCancel}
                 renderItemWrapper={renderItemWrapper}
               />
             ) : (
               <GridView
                 items={sortedItemsWithSelection}
                 viewMode={viewMode}
-                onItemClick={handleItemClick}
+                onItemClick={handleViewItemClick}
                 onItemDoubleClick={handleItemDoubleClick}
                 onItemContextMenu={handleItemContextMenu}
                 onItemFavoriteToggle={toggleFavorite}
+                renamingItemId={renamingItemId}
+                onRenameSubmit={handleRenameSubmit}
+                onRenameCancel={handleRenameCancel}
                 renderItemWrapper={renderItemWrapper}
               />
             )}

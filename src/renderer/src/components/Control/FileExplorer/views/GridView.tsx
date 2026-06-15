@@ -5,6 +5,8 @@ import { useTranslation } from 'react-i18next'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { getFileIcon } from './getFileIcon'
 import { canHaveThumbnail } from '@renderer/hooks/useThumbnails'
+import { InlineRenameInput } from '../InlineRenameInput'
+import { splitFileName } from '@renderer/lib/file-naming'
 
 export interface GridViewItem {
   id: string
@@ -50,6 +52,9 @@ export interface GridViewProps {
   onItemDoubleClick: (id: string, event: React.MouseEvent) => void
   onItemContextMenu: (id: string, event: React.MouseEvent) => void
   onItemFavoriteToggle?: (id: string) => void
+  renamingItemId?: string | null
+  onRenameSubmit?: (id: string, baseName: string) => void
+  onRenameCancel?: () => void
   renderItemWrapper?: (item: GridViewItem, children: React.ReactNode) => React.ReactNode
 }
 
@@ -60,6 +65,9 @@ export const GridView = React.memo(function GridView({
   onItemDoubleClick,
   onItemContextMenu,
   onItemFavoriteToggle,
+  renamingItemId,
+  onRenameSubmit,
+  onRenameCancel,
   renderItemWrapper
 }: GridViewProps): React.JSX.Element {
   const { t } = useTranslation()
@@ -143,6 +151,8 @@ export const GridView = React.memo(function GridView({
               className={`grid gap-4 ${gridColsClass}`}
             >
               {rowItems.map((item) => {
+                const isRenaming = renamingItemId === item.id && !item.isFolder
+                const splitName = splitFileName(item.name)
                 const content = (
                   <div
                     data-file-item
@@ -176,12 +186,23 @@ export const GridView = React.memo(function GridView({
                     <div className="flex items-center justify-center">
                       {renderGridIcon(item, iconSize)}
                     </div>
-                    <span
-                      className={`w-full text-center text-foreground break-words ${nameClass}`}
-                      title={item.name}
-                    >
-                      {item.name}
-                    </span>
+                    {isRenaming ? (
+                      <div className="mt-2 w-full" onClick={(event) => event.stopPropagation()}>
+                        <InlineRenameInput
+                          initialValue={splitName.base}
+                          ariaLabel={t('fileExplorer.renameFile', 'Rename file')}
+                          onSubmit={(value) => onRenameSubmit?.(item.id, value)}
+                          onCancel={() => onRenameCancel?.()}
+                        />
+                      </div>
+                    ) : (
+                      <span
+                        className={`w-full text-center text-foreground break-words ${nameClass}`}
+                        title={item.name}
+                      >
+                        {item.name}
+                      </span>
+                    )}
                   </div>
                 )
 

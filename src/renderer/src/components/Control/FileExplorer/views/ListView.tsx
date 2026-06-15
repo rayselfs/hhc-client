@@ -6,6 +6,8 @@ import { formatFileKind } from '@renderer/lib/format-file-kind'
 import type { SortField, SortDir } from '@renderer/stores/file-explorer'
 import { getFileIcon } from './getFileIcon'
 import type { GridViewItem } from './GridView'
+import { InlineRenameInput } from '../InlineRenameInput'
+import { splitFileName } from '@renderer/lib/file-naming'
 
 export interface ListViewProps {
   items: GridViewItem[]
@@ -17,6 +19,9 @@ export interface ListViewProps {
   onItemClick: (id: string, event: React.MouseEvent) => void
   onItemDoubleClick: (id: string, event: React.MouseEvent) => void
   onItemContextMenu: (id: string, event: React.MouseEvent) => void
+  renamingItemId?: string | null
+  onRenameSubmit?: (id: string, baseName: string) => void
+  onRenameCancel?: () => void
   renderItemWrapper?: (item: GridViewItem, children: React.ReactNode) => React.ReactNode
 }
 
@@ -48,6 +53,9 @@ export const ListView = React.memo(function ListView({
   onItemClick,
   onItemDoubleClick,
   onItemContextMenu,
+  renamingItemId,
+  onRenameSubmit,
+  onRenameCancel,
   renderItemWrapper
 }: ListViewProps): React.JSX.Element {
   const { t } = useTranslation()
@@ -168,6 +176,8 @@ export const ListView = React.memo(function ListView({
         >
           {rowVirtualizer.getVirtualItems().map((virtualRow) => {
             const item = items[virtualRow.index]
+            const isRenaming = renamingItemId === item.id && !item.isFolder
+            const splitName = splitFileName(item.name)
             const content = (
               <div
                 data-file-item
@@ -183,12 +193,25 @@ export const ListView = React.memo(function ListView({
                   {item.isFolder ? (
                     <Folder size={20} className="text-accent" fill="currentColor" />
                   ) : (
-                    <div className="text-danger">{getFileIcon(item.mimeType, item.isFolder, 20)}</div>
+                    <div className="text-danger">
+                      {getFileIcon(item.mimeType, item.isFolder, 20)}
+                    </div>
                   )}
                 </div>
-                <div className="flex-1 truncate text-base text-foreground" title={item.name}>
-                  {item.name}
-                </div>
+                {isRenaming ? (
+                  <div className="flex-1" onClick={(event) => event.stopPropagation()}>
+                    <InlineRenameInput
+                      initialValue={splitName.base}
+                      ariaLabel={t('fileExplorer.renameFile', 'Rename file')}
+                      onSubmit={(value) => onRenameSubmit?.(item.id, value)}
+                      onCancel={() => onRenameCancel?.()}
+                    />
+                  </div>
+                ) : (
+                  <div className="flex-1 truncate text-base text-foreground" title={item.name}>
+                    {item.name}
+                  </div>
+                )}
                 <div className="w-1 flex-shrink-0" />
                 <div
                   className="flex-shrink-0 text-sm text-default-400 pl-2"

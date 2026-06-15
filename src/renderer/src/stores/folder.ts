@@ -5,6 +5,7 @@ import { createFolderDB } from '@renderer/lib/folder-db'
 import { openBibleDB } from '@renderer/lib/bible-db'
 import { incrementBlobRef, openFileExplorerDB } from '@renderer/lib/file-explorer-db'
 import { getBlobId } from '@renderer/lib/blob-identity'
+import { resolveUniqueName } from '@renderer/lib/file-naming'
 
 export interface FolderStoreState {
   folders: Record<string, FolderRecord>
@@ -185,9 +186,13 @@ export function createFolderStore(config: FolderStoreConfig) {
     addFolder: (name, parentId, expiresAt) => {
       const resolvedParentId = parentId ?? get().currentFolderId
       const siblings = get().getChildFolders(resolvedParentId)
+      const resolvedName = resolveUniqueName(
+        name,
+        siblings.map((folder) => folder.name)
+      )
       const newFolder: FolderRecord = {
         id: crypto.randomUUID(),
-        name,
+        name: resolvedName,
         parentId: resolvedParentId,
         sortIndex: siblings.length,
         createdAt: Date.now(),
@@ -357,7 +362,11 @@ export function createFolderStore(config: FolderStoreConfig) {
             newItemsByParent[removedItem.parentId] ?? []
           ).filter((i) => i.id !== id)
         }
-        return { items: newItems, _itemsArray: Object.values(newItems), _itemsByParent: newItemsByParent }
+        return {
+          items: newItems,
+          _itemsArray: Object.values(newItems),
+          _itemsByParent: newItemsByParent
+        }
       })
       ops.deleteItem(id)
     },
@@ -485,7 +494,11 @@ export function createFolderStore(config: FolderStoreConfig) {
             Object.values(newItems).filter((i) => i.parentId === parentId)
           )
         }
-        return { items: newItems, _itemsArray: Object.values(newItems), _itemsByParent: newItemsByParent }
+        return {
+          items: newItems,
+          _itemsArray: Object.values(newItems),
+          _itemsByParent: newItemsByParent
+        }
       })
       ops.saveItems(updated)
     },
