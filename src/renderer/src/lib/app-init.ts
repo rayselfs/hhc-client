@@ -97,13 +97,13 @@ export function initializeApp(): () => void {
     tryInitSearch(current)
   }
 
-  useBibleFolderStore.subscribe((state, prev) => {
+  const unsubBibleFolders = useBibleFolderStore.subscribe((state, prev) => {
     if (prev.isLoading && !state.isLoading) {
       void useBibleFolderStore.getState().cleanupExpired()
     }
   })
 
-  useFileExplorerStore.subscribe((state, prev) => {
+  const unsubFileExplorer = useFileExplorerStore.subscribe((state, prev) => {
     if (prev.isLoading && !state.isLoading) {
       useFileExplorerStore.getState().softDeleteExpired()
       const retentionDays = useSettingsStore.getState().trashRetentionDays
@@ -130,6 +130,8 @@ export function initializeApp(): () => void {
   return () => {
     unsubscribe()
     unsubWhisper()
+    unsubBibleFolders()
+    unsubFileExplorer()
     window.removeEventListener('online', handleOnline)
     window.removeEventListener('offline', handleOffline)
     subscriptionsInitialized = false

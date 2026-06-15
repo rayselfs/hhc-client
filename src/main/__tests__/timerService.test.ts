@@ -1,13 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
-vi.mock('electron', () => ({
-  BrowserWindow: {
-    getAllWindows: vi.fn().mockReturnValue([])
-  }
-}))
-
-import { BrowserWindow } from 'electron'
 import { TimerService } from '../timerService'
+import type { WindowManager } from '../windowManager'
 
 function makeMockWindow(): {
   isDestroyed: () => boolean
@@ -21,10 +15,18 @@ function makeMockWindow(): {
 
 describe('TimerService', () => {
   let service: TimerService
+  let mainWindow: ReturnType<typeof makeMockWindow> | null
+  let projectionWindow: ReturnType<typeof makeMockWindow> | null
 
   beforeEach(() => {
     vi.useFakeTimers()
+    mainWindow = null
+    projectionWindow = null
     service = new TimerService()
+    service.setWindowManager({
+      getMainWindow: () => mainWindow,
+      getProjectionWindow: () => projectionWindow
+    } as unknown as WindowManager)
   })
 
   afterEach(() => {
@@ -153,8 +155,7 @@ describe('TimerService', () => {
 
   describe('broadcast bug fix — lastBroadcastRemaining updated after broadcast', () => {
     it('updates lastBroadcastRemaining to match current remainingSeconds after start', () => {
-      const win = makeMockWindow()
-      vi.mocked(BrowserWindow.getAllWindows).mockReturnValue([win as never])
+      mainWindow = makeMockWindow()
 
       service.handleCommand({ type: 'start' })
 
@@ -163,18 +164,25 @@ describe('TimerService', () => {
       expect(lastBroadcast).toBe(service.getState().remainingSeconds)
     })
 
-    it('sends timer-tick to all non-destroyed windows', () => {
-      const win = makeMockWindow()
-      vi.mocked(BrowserWindow.getAllWindows).mockReturnValue([win as never])
+    it('sends timer-tick only to WindowManager-managed windows', () => {
+      mainWindow = makeMockWindow()
+      projectionWindow = makeMockWindow()
 
       service.handleCommand({ type: 'start' })
 
-      expect(win.webContents.send).toHaveBeenCalledWith('timer-tick', expect.any(Object))
+      expect(mainWindow.webContents.send).toHaveBeenCalledWith('timer-tick', expect.any(Object))
+      expect(projectionWindow.webContents.send).toHaveBeenCalledWith(
+        'timer-tick',
+        expect.any(Object)
+      )
     })
 
     it('skips destroyed windows during broadcast', () => {
-      const destroyedWin = { isDestroyed: () => true, webContents: { send: vi.fn() } }
-      vi.mocked(BrowserWindow.getAllWindows).mockReturnValue([destroyedWin as never])
+      const destroyedWin = {
+        isDestroyed: () => true,
+        webContents: { send: vi.fn(), isDestroyed: () => false }
+      }
+      mainWindow = destroyedWin
 
       service.handleCommand({ type: 'start' })
 
@@ -307,6 +315,30 @@ describe('TimerService', () => {
       service.dispose()
       vi.advanceTimersByTime(500)
       expect(tickSpy).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('interval lifecycle', () => {
+    it('does not run an interval while idle', () => {
+      expect(vi.getTimerCount()).toBe(0)
+    })
+
+    it('starts on timer start and stops on timer pause', () => {
+      service.handleCommand({ type: 'start' })
+      expect(vi.getTimerCount()).toBe(1)
+
+      service.handleCommand({ type: 'pause' })
+      expect(vi.getTimerCount()).toBe(0)
+    })
+
+    it('keeps running while either timer or stopwatch is active', () => {
+      service.handleCommand({ type: 'start' })
+      service.handleCommand({ type: 'startStopwatch' })
+      service.handleCommand({ type: 'pause' })
+      expect(vi.getTimerCount()).toBe(1)
+
+      service.handleCommand({ type: 'pauseStopwatch' })
+      expect(vi.getTimerCount()).toBe(0)
     })
   })
 

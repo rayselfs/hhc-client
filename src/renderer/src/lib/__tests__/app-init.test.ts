@@ -9,6 +9,9 @@ const mockFolderCleanupExpired = vi.fn().mockResolvedValue(undefined)
 const mockFileExplorerInitialize = vi.fn()
 const mockFileExplorerCleanupExpired = vi.fn().mockResolvedValue(undefined)
 const mockInitializeSearchIndexes = vi.fn()
+const mockUnsubscribeBible = vi.fn()
+const mockUnsubscribeBibleFolders = vi.fn()
+const mockUnsubscribeFileExplorer = vi.fn()
 
 const bibleState = {
   isInitialized: false,
@@ -45,7 +48,7 @@ vi.mock('@renderer/stores/bible', () => ({
     (selector: (s: typeof bibleState) => unknown) => selector(bibleState),
     {
       getState: () => bibleState,
-      subscribe: vi.fn(() => vi.fn()),
+      subscribe: vi.fn(() => mockUnsubscribeBible),
       setState: vi.fn()
     }
   )
@@ -56,7 +59,7 @@ vi.mock('@renderer/stores/folder', () => ({
     (selector: (s: typeof folderState) => unknown) => selector(folderState),
     {
       getState: () => folderState,
-      subscribe: vi.fn(() => vi.fn())
+      subscribe: vi.fn(() => mockUnsubscribeBibleFolders)
     }
   )
 }))
@@ -66,7 +69,7 @@ vi.mock('@renderer/stores/file-explorer', () => ({
     (selector: (s: typeof fileExplorerState) => unknown) => selector(fileExplorerState),
     {
       getState: () => fileExplorerState,
-      subscribe: vi.fn(() => vi.fn())
+      subscribe: vi.fn(() => mockUnsubscribeFileExplorer)
     }
   )
 }))
@@ -160,5 +163,18 @@ describe('initializeApp — online handler', () => {
     window.dispatchEvent(new Event('offline'))
 
     expect(mockToastWarning).not.toHaveBeenCalled()
+  })
+
+  it('unsubscribes all app-level store subscriptions on cleanup', async () => {
+    const { initializeApp } = await import('../app-init')
+    const cleanup = initializeApp()
+    const bibleCalls = mockUnsubscribeBible.mock.calls.length
+    const folderCalls = mockUnsubscribeBibleFolders.mock.calls.length
+    const fileExplorerCalls = mockUnsubscribeFileExplorer.mock.calls.length
+    cleanup()
+
+    expect(mockUnsubscribeBible).toHaveBeenCalledTimes(bibleCalls + 1)
+    expect(mockUnsubscribeBibleFolders).toHaveBeenCalledTimes(folderCalls + 1)
+    expect(mockUnsubscribeFileExplorer).toHaveBeenCalledTimes(fileExplorerCalls + 1)
   })
 })

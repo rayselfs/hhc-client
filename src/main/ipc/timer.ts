@@ -4,6 +4,8 @@ import type { WindowManager } from '../windowManager'
 import { isKnownWindow, validateTimerCommand, validateTimerSettings } from './validate'
 
 export function registerTimerHandlers(wm: WindowManager): void {
+  timerService.setWindowManager(wm)
+
   ipcMain.handle('timer:command', (event, cmd: unknown) => {
     if (!isKnownWindow(wm, event)) return
     if (!validateTimerCommand(cmd)) return

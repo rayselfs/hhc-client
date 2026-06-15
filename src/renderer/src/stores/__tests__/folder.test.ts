@@ -129,6 +129,27 @@ describe('initialize()', () => {
   })
 })
 
+describe('ensureItemsLoaded()', () => {
+  it('shares one database request between concurrent loads for the same folder', async () => {
+    let resolveLoad: (items: VerseItemRecord[]) => void = () => {}
+    mockLoadItemsByParent.mockImplementation(
+      () =>
+        new Promise<VerseItemRecord[]>((resolve) => {
+          resolveLoad = resolve
+        })
+    )
+
+    const firstLoad = useBibleFolderStore.getState().ensureItemsLoaded('folder-1')
+    const secondLoad = useBibleFolderStore.getState().ensureItemsLoaded('folder-1')
+
+    expect(mockLoadItemsByParent).toHaveBeenCalledOnce()
+
+    resolveLoad([])
+    await Promise.all([firstLoad, secondLoad])
+    expect(useBibleFolderStore.getState().loadedParents.has('folder-1')).toBe(true)
+  })
+})
+
 describe('addFolder()', () => {
   it('creates a new folder at root level', () => {
     useBibleFolderStore.getState().addFolder('My Folder')

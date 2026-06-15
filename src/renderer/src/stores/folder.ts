@@ -58,6 +58,7 @@ export interface FolderStoreState {
 export function createFolderStore(config: FolderStoreConfig) {
   const ops = createFolderDB(config.getDB, config.rootId)
   let isInitializing = false
+  const itemsLoadPromises = new Map<string, Promise<void>>()
 
   function sortByIndex<T extends { sortIndex: number }>(arr: T[]): T[] {
     return arr.slice().sort((a, b) => a.sortIndex - b.sortIndex)
@@ -151,22 +152,34 @@ export function createFolderStore(config: FolderStoreConfig) {
     ensureItemsLoaded: async (parentId: string) => {
       const { loadedParents } = get()
       if (loadedParents.has(parentId)) return
-      const items = await ops.loadItemsByParent(parentId)
-      set((state) => {
-        const newItems = { ...state.items }
-        for (const item of items) {
-          newItems[item.id] = item
-        }
-        const newLoaded = new Set(state.loadedParents)
-        newLoaded.add(parentId)
-        const forParent = Object.values(newItems).filter((i) => i.parentId === parentId)
-        return {
-          items: newItems,
-          _itemsArray: Object.values(newItems),
-          loadedParents: newLoaded,
-          _itemsByParent: { ...state._itemsByParent, [parentId]: sortByIndex(forParent) }
-        }
-      })
+      const existingLoad = itemsLoadPromises.get(parentId)
+      if (existingLoad) return existingLoad
+
+      const loadPromise = ops
+        .loadItemsByParent(parentId)
+        .then((items) => {
+          set((state) => {
+            const newItems = { ...state.items }
+            for (const item of items) {
+              newItems[item.id] = item
+            }
+            const newLoaded = new Set(state.loadedParents)
+            newLoaded.add(parentId)
+            const forParent = Object.values(newItems).filter((i) => i.parentId === parentId)
+            return {
+              items: newItems,
+              _itemsArray: Object.values(newItems),
+              loadedParents: newLoaded,
+              _itemsByParent: { ...state._itemsByParent, [parentId]: sortByIndex(forParent) }
+            }
+          })
+        })
+        .finally(() => {
+          itemsLoadPromises.delete(parentId)
+        })
+
+      itemsLoadPromises.set(parentId, loadPromise)
+      return loadPromise
     },
 
     addFolder: (name, parentId, expiresAt) => {
