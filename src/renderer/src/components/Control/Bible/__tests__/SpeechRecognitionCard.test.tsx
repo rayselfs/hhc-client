@@ -1,7 +1,7 @@
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import SpeechRecognitionCard from '../SpeechRecognitionCard'
-import { createSpeechAdapter, AzureSpeechAdapter } from '@renderer/lib/speech-adapter'
+import { createSpeechAdapter } from '@renderer/lib/speech-adapter'
 import { loadSpeechKey } from '@renderer/lib/speech-key-storage'
 import { useSettingsStore } from '@renderer/stores/settings'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
@@ -65,10 +65,7 @@ describe('SpeechRecognitionCard', () => {
       dispose: vi.fn()
     }
 
-    vi.mocked(createSpeechAdapter).mockReturnValue(mockAdapter)
-    vi.mocked(AzureSpeechAdapter).mockImplementation(function () {
-      return mockAdapter as unknown as InstanceType<typeof AzureSpeechAdapter>
-    })
+    vi.mocked(createSpeechAdapter).mockResolvedValue(mockAdapter)
     vi.mocked(loadSpeechKey).mockResolvedValue('mock-api-key')
 
     mockSettingsState = {
@@ -209,7 +206,7 @@ describe('SpeechRecognitionCard', () => {
 
       await waitFor(() => {
         expect(loadSpeechKey).toHaveBeenCalled()
-        expect(AzureSpeechAdapter).toHaveBeenCalledWith(
+        expect(createSpeechAdapter).toHaveBeenCalledWith(
           expect.objectContaining({
             subscriptionKey: 'mock-api-key',
             region: 'eastasia',
@@ -538,7 +535,7 @@ describe('SpeechRecognitionCard', () => {
       fireEvent.click(startButton)
 
       await waitFor(() => {
-        expect(AzureSpeechAdapter).toHaveBeenCalledWith(
+        expect(createSpeechAdapter).toHaveBeenCalledWith(
           expect.objectContaining({
             language: 'zh-TW'
           })
@@ -558,7 +555,7 @@ describe('SpeechRecognitionCard', () => {
       fireEvent.click(startButton)
 
       await waitFor(() => {
-        expect(AzureSpeechAdapter).toHaveBeenCalledWith(
+        expect(createSpeechAdapter).toHaveBeenCalledWith(
           expect.objectContaining({
             language: 'zh-CN'
           })
@@ -578,7 +575,7 @@ describe('SpeechRecognitionCard', () => {
       fireEvent.click(startButton)
 
       await waitFor(() => {
-        expect(AzureSpeechAdapter).toHaveBeenCalledWith(
+        expect(createSpeechAdapter).toHaveBeenCalledWith(
           expect.objectContaining({
             language: 'en-US'
           })

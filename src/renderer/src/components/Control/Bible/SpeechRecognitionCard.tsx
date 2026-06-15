@@ -10,7 +10,7 @@ import { useBibleStore } from '@renderer/stores/bible'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 import { useBibleSpeechStore } from '@renderer/stores/bible-speech'
 import { loadSpeechKey } from '@renderer/lib/speech-key-storage'
-import { createSpeechAdapter, AzureSpeechAdapter } from '@renderer/lib/speech-adapter'
+import { createSpeechAdapter } from '@renderer/lib/speech-adapter'
 import type { SpeechAdapter } from '@renderer/lib/speech-adapter/speech-adapter.interface'
 import { parseVerseReference } from '@renderer/lib/verse-parser'
 import { matchBookName, getBookConfig } from '@renderer/lib/bible-book-matcher'
@@ -164,7 +164,7 @@ export default function SpeechRecognitionCard(): React.JSX.Element {
         }
         const locale =
           i18n.language === 'zh-TW' ? 'zh-TW' : i18n.language === 'zh-CN' ? 'zh-CN' : 'en-US'
-        newAdapter = new AzureSpeechAdapter({
+        newAdapter = await createSpeechAdapter({
           subscriptionKey: apiKey,
           region: speech.azure.region,
           language: locale as 'zh-TW' | 'zh-CN',
@@ -175,11 +175,11 @@ export default function SpeechRecognitionCard(): React.JSX.Element {
           setError('config-required')
           return
         }
-        newAdapter = createSpeechAdapter(provider, speech, {
+        newAdapter = await createSpeechAdapter(provider, speech, {
           maxSessionMs: speechMaxSessionSec * 1000
         })
       } else {
-        newAdapter = createSpeechAdapter(provider, speech, {
+        newAdapter = await createSpeechAdapter(provider, speech, {
           maxSessionMs: speechMaxSessionSec * 1000
         })
       }

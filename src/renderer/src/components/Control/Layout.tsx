@@ -15,7 +15,7 @@ import { ShortcutScopeProvider } from '@renderer/contexts/ShortcutScopeContext'
 import { AppInitContext } from '@renderer/contexts/AppInitContext'
 import { isWeb } from '@renderer/lib/env'
 import { toast } from '@heroui/react/toast'
-import { initializeApp, prefetchRouteChunks } from '@renderer/lib/app-init'
+import { initializeApp } from '@renderer/lib/app-init'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { useBibleFolderStore } from '@renderer/stores/folder'
 import { useAutoUpdateCheck } from '@renderer/hooks/useAutoUpdateCheck'
@@ -63,7 +63,7 @@ export default function Layout(): React.JSX.Element {
     }
     const trySetReady = (): void => {
       if (cancelled || !isCoreReady()) return
-      void prefetchRouteChunks().then(setReady)
+      setReady()
     }
 
     const timerId = setTimeout(trySetReady, 0)

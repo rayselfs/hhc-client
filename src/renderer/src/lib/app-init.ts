@@ -11,6 +11,7 @@ import i18n from '@renderer/i18n'
 let earlyInitStarted = false
 let subscriptionsInitialized = false
 let chunksReadyPromise: Promise<void> | null = null
+let routePrefetchScheduled = false
 
 /**
  * Kick off async store initializations as early as possible (called from main.tsx
@@ -25,7 +26,7 @@ export function startEarlyInit(): void {
   useFileExplorerStore.getState().initialize()
 }
 
-export function prefetchRouteChunks(): Promise<void> {
+function loadRouteChunks(): Promise<void> {
   if (!chunksReadyPromise) {
     chunksReadyPromise = Promise.all([
       import('@renderer/pages/TimerPage'),
@@ -38,6 +39,20 @@ export function prefetchRouteChunks(): Promise<void> {
       .catch(() => undefined)
   }
   return chunksReadyPromise
+}
+
+export function prefetchRouteChunks(): void {
+  if (routePrefetchScheduled) return
+  routePrefetchScheduled = true
+
+  const run = (): void => {
+    void loadRouteChunks()
+  }
+  if ('requestIdleCallback' in window) {
+    window.requestIdleCallback(run, { timeout: 5000 })
+  } else {
+    setTimeout(run, 2000)
+  }
 }
 
 async function initWhisperModelDir(): Promise<void> {

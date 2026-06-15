@@ -71,9 +71,31 @@ export default defineConfig({
           ]
         },
         workbox: {
-          globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+          globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+          globIgnores: [
+            '**/assets/pdf-*.js',
+            '**/assets/transformers-*.js',
+            '**/assets/microsoft.cognitiveservices.speech.sdk-*.js'
+          ],
           navigateFallback: '/index.html',
-          navigateFallbackDenylist: [/^\/api\//]
+          navigateFallbackDenylist: [/^\/api\//],
+          runtimeCaching: [
+            {
+              urlPattern: ({ url }) =>
+                url.pathname.endsWith('.woff2') ||
+                /\/assets\/(pdf|transformers|microsoft\.cognitiveservices\.speech\.sdk)-/.test(
+                  url.pathname
+                ),
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'hhc-optional-assets',
+                expiration: {
+                  maxEntries: 300,
+                  maxAgeSeconds: 60 * 60 * 24 * 30
+                }
+              }
+            }
+          ]
         }
       }),
       visualizer({
