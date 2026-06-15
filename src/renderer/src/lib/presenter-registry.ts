@@ -1,6 +1,6 @@
 import type React from 'react'
 import type { FileItemRecord } from '@shared/types/folder'
-import type { MediaType, MediaTypeStateMap } from './presentability'
+import { getMediaType, type MediaType, type MediaTypeStateMap } from './presentability'
 import ImagePreview from '../components/Control/FileExplorer/Presenter/Preview/ImagePreview'
 import VideoPreview from '../components/Control/FileExplorer/Presenter/Preview/VideoPreview'
 import PdfPreview from '../components/Control/FileExplorer/Presenter/Preview/PdfPreview'
@@ -18,12 +18,10 @@ export interface MediaTypeDescriptor<K extends MediaType = MediaType> {
   initialTypeState: MediaTypeStateMap[K]
 }
 
-const PRESENTABLE_VIDEO_MIMES = new Set(['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime'])
-
 const DESCRIPTORS: MediaTypeDescriptor[] = [
   {
     type: 'image',
-    matches: (m) => m.startsWith('image/'),
+    matches: (m) => getMediaType(m) === 'image',
     supportsZoomPan: true,
     clickToAdvance: true,
     PreviewComponent: ImagePreview,
@@ -31,7 +29,7 @@ const DESCRIPTORS: MediaTypeDescriptor[] = [
   },
   {
     type: 'video',
-    matches: (m) => PRESENTABLE_VIDEO_MIMES.has(m),
+    matches: (m) => getMediaType(m) === 'video',
     supportsZoomPan: false,
     clickToAdvance: false,
     PreviewComponent: VideoPreview,
@@ -39,7 +37,7 @@ const DESCRIPTORS: MediaTypeDescriptor[] = [
   },
   {
     type: 'pdf',
-    matches: (m) => m === 'application/pdf',
+    matches: (m) => getMediaType(m) === 'pdf',
     supportsZoomPan: true,
     clickToAdvance: false,
     PreviewComponent: PdfPreview,

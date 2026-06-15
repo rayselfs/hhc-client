@@ -4,6 +4,7 @@ import { Skeleton } from '@heroui/react/skeleton'
 import { useTranslation } from 'react-i18next'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { getFileIcon } from './getFileIcon'
+import { canHaveThumbnail } from '@renderer/hooks/useThumbnails'
 
 export interface GridViewItem {
   id: string
@@ -15,14 +16,6 @@ export interface GridViewItem {
   thumbnailUrl?: string | null
   isSelected: boolean
   isFavorited?: boolean
-}
-
-function canHaveThumbnail(mimeType: string | undefined): boolean {
-  return (
-    mimeType?.startsWith('image/') === true ||
-    mimeType?.startsWith('video/') === true ||
-    mimeType === 'application/pdf'
-  )
 }
 
 function renderGridIcon(item: GridViewItem, iconSize: number): React.ReactNode {
@@ -180,7 +173,9 @@ export const GridView = React.memo(function GridView({
                         />
                       </button>
                     )}
-                    <div className="flex items-center justify-center">{renderGridIcon(item, iconSize)}</div>
+                    <div className="flex items-center justify-center">
+                      {renderGridIcon(item, iconSize)}
+                    </div>
                     <span
                       className={`w-full text-center text-foreground break-words ${nameClass}`}
                       title={item.name}

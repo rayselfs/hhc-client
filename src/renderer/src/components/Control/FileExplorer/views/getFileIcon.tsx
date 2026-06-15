@@ -1,5 +1,6 @@
 import { Image, Video, FileText, File, Folder } from 'lucide-react'
 import React from 'react'
+import { resolveMediaCapability } from '@renderer/lib/media-capabilities'
 
 export function getFileIcon(
   mimeType: string | undefined,
@@ -10,21 +11,11 @@ export function getFileIcon(
     return <Folder size={size} />
   }
 
-  if (!mimeType) {
-    return <File size={size} />
-  }
-
-  if (mimeType.startsWith('image/')) {
-    return <Image size={size} />
-  }
-
-  if (mimeType.startsWith('video/')) {
-    return <Video size={size} />
-  }
-
-  if (mimeType === 'application/pdf' || mimeType.startsWith('application/vnd.')) {
+  const capability = resolveMediaCapability({ mimeType })
+  if (capability?.kind === 'image') return <Image size={size} />
+  if (capability?.kind === 'video') return <Video size={size} />
+  if (capability?.kind === 'pdf' || capability?.kind === 'document') {
     return <FileText size={size} />
   }
-
   return <File size={size} />
 }

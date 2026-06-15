@@ -1,12 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { getThumbnail } from '@renderer/lib/thumbnail-db'
+import { canGenerateMediaThumbnail, resolveMediaCapability } from '@renderer/lib/media-capabilities'
 
 export function canHaveThumbnail(mimeType: string | undefined): boolean {
-  return (
-    mimeType?.startsWith('image/') === true ||
-    mimeType?.startsWith('video/') === true ||
-    mimeType === 'application/pdf'
-  )
+  return canGenerateMediaThumbnail(resolveMediaCapability({ mimeType }))
 }
 
 function revokeIfBlobUrl(url: string | null): void {

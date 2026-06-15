@@ -3,6 +3,7 @@ import { addFileItemToStore, useFileExplorerStore } from '@renderer/stores/file-
 import { generateThumbnail, generateAllPdfPageThumbnails } from '@renderer/lib/thumbnail-generator'
 import { saveThumbnail, savePdfPageThumbs } from '@renderer/lib/thumbnail-db'
 import { isWeb } from '@renderer/lib/env'
+import { canGenerateMediaThumbnail, resolveMediaCapability } from '@renderer/lib/media-capabilities'
 
 export const MAX_FILE_SIZE_WEB = 2 * 1024 * 1024 * 1024
 
@@ -70,20 +71,12 @@ async function collectFromEntry(
   return []
 }
 
-const SUPPORTED_EXTENSIONS = new Set(['pdf', 'pptx', 'ppt', 'key', 'odp'])
-
 export function isSupportedFile(file: File): boolean {
-  const { type, name } = file
-  if (type.startsWith('image/') || type.startsWith('video/')) return true
-  if (type === 'application/pdf' || type.startsWith('application/vnd.')) return true
-  const ext = name.split('.').pop()?.toLowerCase() ?? ''
-  return SUPPORTED_EXTENSIONS.has(ext)
+  return resolveMediaCapability({ mimeType: file.type, fileName: file.name }) !== null
 }
 
 export function canGenerateThumbnail(mimeType: string): boolean {
-  return (
-    mimeType.startsWith('image/') || mimeType.startsWith('video/') || mimeType === 'application/pdf'
-  )
+  return canGenerateMediaThumbnail(resolveMediaCapability({ mimeType }))
 }
 
 export async function uploadFiles(files: File[], parentId: string): Promise<void> {
@@ -102,7 +95,9 @@ export async function uploadFiles(files: File[], parentId: string): Promise<void
           if (dataUrl) {
             await saveThumbnail(id, dataUrl)
           }
-          window.dispatchEvent(new CustomEvent('hhc:thumbnail-ready', { detail: { itemId: id, dataUrl } }))
+          window.dispatchEvent(
+            new CustomEvent('hhc:thumbnail-ready', { detail: { itemId: id, dataUrl } })
+          )
         }
       } finally {
         release()
