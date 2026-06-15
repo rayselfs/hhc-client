@@ -20,7 +20,6 @@ import {
 } from '@shared/types/folder'
 import type { ClipboardState } from '@renderer/components/Control/FileExplorer'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
-import { getThumbnail, copyThumbnail } from '@renderer/lib/thumbnail-db'
 import MediaPresenter from '@renderer/components/Control/FileExplorer/Presenter/MediaPresenter'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 
@@ -177,13 +176,6 @@ export default function FilesPage(): React.JSX.Element {
       for (const item of s.getItems(sourceId)) {
         const newId = await copyItem(item.id, newFolderId)
         if (!newId) continue
-        const copied = await copyThumbnail(item.id, newId)
-        if (copied) {
-          const dataUrl = await getThumbnail(newId)
-          window.dispatchEvent(
-            new CustomEvent('hhc:thumbnail-ready', { detail: { itemId: newId, dataUrl } })
-          )
-        }
       }
       for (const sub of s.getChildFolders(sourceId)) {
         await copyFolderRecursive(sub.id, newFolderId, sub.name, sub.expiresAt)
@@ -191,11 +183,12 @@ export default function FilesPage(): React.JSX.Element {
     }
 
     const state = useFileExplorerStore.getState()
-    const usedFolderNames = new Set(
-      state.getChildFolders(currentFolderId).map((f) => f.name)
-    )
+    const usedFolderNames = new Set(state.getChildFolders(currentFolderId).map((f) => f.name))
     const usedItemNames = new Set(
-      state.getItems(currentFolderId).filter(isFileItem).map((i) => i.name)
+      state
+        .getItems(currentFolderId)
+        .filter(isFileItem)
+        .map((i) => i.name)
     )
 
     for (const id of clipboard.itemIds) {
@@ -217,13 +210,6 @@ export default function FilesPage(): React.JSX.Element {
           if (!newId) continue
           if (uniqueName !== item.name) {
             useFileExplorerStore.getState().updateItem?.(newId, { name: uniqueName })
-          }
-          const copied = await copyThumbnail(id, newId)
-          if (copied) {
-            const dataUrl = await getThumbnail(newId)
-            window.dispatchEvent(
-              new CustomEvent('hhc:thumbnail-ready', { detail: { itemId: newId, dataUrl } })
-            )
           }
         } else {
           moveItem(id, currentFolderId)

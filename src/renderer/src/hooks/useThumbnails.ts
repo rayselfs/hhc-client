@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { getBlobId } from '@renderer/lib/blob-identity'
 import { getThumbnail } from '@renderer/lib/thumbnail-db'
 import { canGenerateMediaThumbnail, resolveMediaCapability } from '@renderer/lib/media-capabilities'
 
@@ -41,6 +42,7 @@ const THUMBNAIL_LOAD_CONCURRENCY = 5
 
 interface ThumbnailItem {
   id: string
+  url: string
   mimeType?: string
   createdAt?: number
 }
@@ -71,13 +73,15 @@ export function useThumbnails(
     () =>
       items
         .filter((item) => canHaveThumbnail(item.mimeType))
-        .map((i) => `${i.id}:${i.createdAt ?? 0}`)
+        .map((i) => `${i.id}:${i.url}:${i.createdAt ?? 0}`)
         .join(','),
     [items]
   )
 
   const itemsRef = useRef(items)
   itemsRef.current = items
+  const thumbnailsRef = useRef(allThumbnails)
+  thumbnailsRef.current = allThumbnails
 
   // Prune stale keys when items change
   useEffect(() => {
@@ -107,7 +111,7 @@ export function useThumbnails(
           const release = await semaphore.acquire()
           try {
             if (cancelled) return
-            const dataUrl = await getThumbnail(item.id)
+            const dataUrl = await getThumbnail(item.id, getBlobId(item))
             if (cancelled) return
             if (dataUrl !== null) {
               setAllThumbnails((prev) => {
@@ -146,6 +150,15 @@ export function useThumbnails(
     window.addEventListener('hhc:thumbnail-ready', onThumbnailReady)
     return () => window.removeEventListener('hhc:thumbnail-ready', onThumbnailReady)
   }, [])
+
+  useEffect(
+    () => () => {
+      for (const url of Object.values(thumbnailsRef.current)) {
+        revokeIfBlobUrl(url)
+      }
+    },
+    []
+  )
 
   return thumbnails
 }

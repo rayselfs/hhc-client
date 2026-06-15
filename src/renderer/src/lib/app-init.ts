@@ -7,6 +7,7 @@ import { initializeSearchIndexes } from '@renderer/lib/bible-search'
 import { isElectron } from '@renderer/lib/env'
 import { toast } from '@heroui/react/toast'
 import i18n from '@renderer/i18n'
+import { mediaJobQueue } from '@renderer/lib/media-job-queue'
 
 let earlyInitStarted = false
 let subscriptionsInitialized = false
@@ -24,6 +25,10 @@ export function startEarlyInit(): void {
   useBibleStore.getState().initialize()
   useBibleFolderStore.getState().initialize()
   useFileExplorerStore.getState().initialize()
+  void mediaJobQueue
+    .recoverStaleJobs()
+    .then(() => mediaJobQueue.removeExpiredHistory())
+    .catch(() => undefined)
 }
 
 function loadRouteChunks(): Promise<void> {

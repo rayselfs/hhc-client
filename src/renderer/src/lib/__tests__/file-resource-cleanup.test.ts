@@ -1,13 +1,18 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { envState, mockDeleteThumbnail, mockDeletePdfPageThumbs, mockDeleteNativeFile } = vi.hoisted(
-  () => ({
-    envState: { isElectron: false },
-    mockDeleteThumbnail: vi.fn(),
-    mockDeletePdfPageThumbs: vi.fn(),
-    mockDeleteNativeFile: vi.fn()
-  })
-)
+const {
+  envState,
+  mockDeleteThumbnail,
+  mockDeletePdfPageThumbs,
+  mockDeleteDerivedAssets,
+  mockDeleteNativeFile
+} = vi.hoisted(() => ({
+  envState: { isElectron: false },
+  mockDeleteThumbnail: vi.fn(),
+  mockDeletePdfPageThumbs: vi.fn(),
+  mockDeleteDerivedAssets: vi.fn(),
+  mockDeleteNativeFile: vi.fn()
+}))
 
 vi.mock('@renderer/lib/env', () => ({
   isElectron: () => envState.isElectron
@@ -18,8 +23,13 @@ vi.mock('@renderer/lib/thumbnail-db', () => ({
   deletePdfPageThumbs: mockDeletePdfPageThumbs
 }))
 
+vi.mock('@renderer/lib/media-work-db', () => ({
+  deleteDerivedAssetsForSource: mockDeleteDerivedAssets
+}))
+
 import { cleanupFileResources, purgeExpiredFileTrash } from '../file-resource-cleanup'
 import { openFileExplorerDB } from '../file-explorer-db'
+import { lockMediaResources, resetMediaResourceLocksForTests } from '../media-resource-locks'
 
 const originalBlobId = '123e4567-e89b-12d3-a456-426614174000'
 const nativeBlobId = '223e4567-e89b-12d3-a456-426614174000'
@@ -37,6 +47,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  resetMediaResourceLocksForTests()
   envState.isElectron = false
   mockDeleteNativeFile.mockResolvedValue(undefined)
 })
@@ -86,6 +97,7 @@ describe('file resource cleanup', () => {
     await expect(db.get('folder-items', 'deep-item')).resolves.toBeUndefined()
     await expect(db.get('file-blobs', originalBlobId)).resolves.toBeUndefined()
     expect(mockDeleteThumbnail).toHaveBeenCalledWith('deep-item')
+    expect(mockDeleteDerivedAssets).toHaveBeenCalledWith(originalBlobId)
     expect(mockDeletePdfPageThumbs).toHaveBeenCalledWith(originalBlobId)
   })
 
@@ -113,11 +125,46 @@ describe('file resource cleanup', () => {
 
     await cleanupFileResources({ itemIds: ['original-item'] })
     await expect(db.get('file-blobs', originalBlobId)).resolves.toMatchObject({ refCount: 1 })
+    expect(mockDeleteDerivedAssets).not.toHaveBeenCalled()
     expect(mockDeletePdfPageThumbs).not.toHaveBeenCalled()
 
     await cleanupFileResources({ itemIds: ['copy-item'] })
     await expect(db.get('file-blobs', originalBlobId)).resolves.toBeUndefined()
+    expect(mockDeleteDerivedAssets).toHaveBeenCalledWith(originalBlobId)
     expect(mockDeletePdfPageThumbs).toHaveBeenCalledWith(originalBlobId)
+  })
+
+  it('defers final source and derived-asset cleanup while projection holds a lock', async () => {
+    const release = lockMediaResources([originalBlobId])
+    const db = await openFileExplorerDB()
+    await db.put('folder-items', {
+      id: 'presenting-item',
+      parentId: 'file-root',
+      type: 'file',
+      sortIndex: 0,
+      createdAt: 1,
+      expiresAt: null,
+      name: 'presenting.png',
+      url: `blob:${originalBlobId}`,
+      size: 1,
+      mimeType: 'image/png'
+    })
+    await db.put('file-blobs', {
+      id: originalBlobId,
+      blob: new Blob(['image']),
+      refCount: 1
+    })
+
+    await cleanupFileResources({ itemIds: ['presenting-item'] })
+
+    await expect(db.get('file-blobs', originalBlobId)).resolves.toMatchObject({ refCount: 0 })
+    expect(mockDeleteDerivedAssets).not.toHaveBeenCalled()
+
+    release()
+    await vi.waitFor(async () => {
+      await expect(db.get('file-blobs', originalBlobId)).resolves.toBeUndefined()
+    })
+    expect(mockDeleteDerivedAssets).toHaveBeenCalledWith(originalBlobId)
   })
 
   it('cleans native and legacy storage through the same automatic purge path', async () => {

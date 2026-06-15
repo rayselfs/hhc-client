@@ -1,3 +1,12 @@
+import {
+  deleteCustomCoverOverride,
+  deleteDerivedAsset,
+  getCustomCoverOverride,
+  getDerivedAsset,
+  putCustomCoverOverride,
+  putDerivedAsset
+} from './media-work-db'
+
 const DB_NAME = 'hhc-thumbnails'
 const STORE_NAME = 'thumbnails'
 const PDF_PAGE_STORE_NAME = 'pdf-page-thumbs'
@@ -115,34 +124,73 @@ function dataUrlToBlob(dataUrl: string): Blob {
   return new Blob([bytes], { type: mime })
 }
 
-export async function saveThumbnail(itemId: string, dataUrl: string): Promise<void> {
-  const blob = dataUrlToBlob(dataUrl)
-
-  await withThumbnailStore<void>(
-    'readwrite',
-    (store) => {
-      store.put({ itemId, blob, format: 'blob' } satisfies ThumbnailRecord)
-    },
-    undefined
-  )
+function thumbnailRecordToBlob(record: ThumbnailRecord): Blob | null {
+  if (record.format === 'blob' && record.blob) return record.blob
+  if (record.dataUrl) return dataUrlToBlob(record.dataUrl)
+  return null
 }
 
-export async function getThumbnail(itemId: string): Promise<string | null> {
-  const record = await withThumbnailStore<ThumbnailRecord | undefined>(
+async function getLegacyThumbnail(itemId: string): Promise<ThumbnailRecord | undefined> {
+  return withThumbnailStore<ThumbnailRecord | undefined>(
     'readonly',
     (store) => store.get(itemId),
     undefined
   )
+}
 
-  if (!record) return null
-  if (record.format === 'blob' && record.blob) {
-    return URL.createObjectURL(record.blob)
+export async function saveThumbnail(sourceBlobId: string, dataUrl: string): Promise<void> {
+  const blob = dataUrlToBlob(dataUrl)
+  await putDerivedAsset({
+    sourceBlobId,
+    kind: 'cover-thumbnail',
+    variant: 'default',
+    storage: 'indexed-db',
+    mimeType: blob.type || 'image/jpeg',
+    size: blob.size,
+    status: 'ready',
+    blob
+  })
+}
+
+export async function saveCustomThumbnail(itemId: string, dataUrl: string): Promise<void> {
+  await putCustomCoverOverride(itemId, dataUrlToBlob(dataUrl))
+}
+
+export async function getThumbnail(itemId: string, sourceBlobId = itemId): Promise<string | null> {
+  const customCover = await getCustomCoverOverride(itemId)
+  if (customCover) return URL.createObjectURL(customCover.blob)
+
+  const generatedCover = await getDerivedAsset(sourceBlobId, 'cover-thumbnail')
+  if (generatedCover?.status === 'ready' && generatedCover.blob) {
+    return URL.createObjectURL(generatedCover.blob)
   }
 
-  return record.dataUrl ?? null
+  const itemRecord = await getLegacyThumbnail(itemId)
+  if (itemRecord && itemId !== sourceBlobId) {
+    const blob = thumbnailRecordToBlob(itemRecord)
+    if (blob) await putCustomCoverOverride(itemId, blob)
+    return itemRecord.dataUrl ?? (blob ? URL.createObjectURL(blob) : null)
+  }
+
+  const sourceRecord = itemRecord ?? (await getLegacyThumbnail(sourceBlobId))
+  const blob = sourceRecord ? thumbnailRecordToBlob(sourceRecord) : null
+  if (!sourceRecord || !blob) return null
+
+  await putDerivedAsset({
+    sourceBlobId,
+    kind: 'cover-thumbnail',
+    variant: 'default',
+    storage: 'indexed-db',
+    mimeType: blob.type || 'image/jpeg',
+    size: blob.size,
+    status: 'ready',
+    blob
+  })
+  return sourceRecord.dataUrl ?? URL.createObjectURL(blob)
 }
 
 export async function deleteThumbnail(itemId: string): Promise<void> {
+  await deleteCustomCoverOverride(itemId)
   await withThumbnailStore<void>(
     'readwrite',
     (store) => {
@@ -152,43 +200,30 @@ export async function deleteThumbnail(itemId: string): Promise<void> {
   )
 }
 
-export async function copyThumbnail(fromId: string, toId: string): Promise<boolean> {
-  const record = await withThumbnailStore<ThumbnailRecord | undefined>(
-    'readonly',
-    (store) => store.get(fromId),
-    undefined
-  )
-
-  if (!record) return false
-
-  await withThumbnailStore<void>(
-    'readwrite',
-    (store) => {
-      store.put({ ...record, itemId: toId })
-    },
-    undefined
-  )
-
-  return true
-}
-
 export async function savePdfPageThumbs(blobId: string, dataUrls: string[]): Promise<void> {
   const blobs = dataUrls.map(dataUrlToBlob)
   await savePdfPageThumbBlobs(blobId, blobs)
 }
 
 export async function savePdfPageThumbBlobs(blobId: string, blobs: Blob[]): Promise<void> {
-  await withStore<void>(
-    PDF_PAGE_STORE_NAME,
-    'readwrite',
-    (store) => {
-      store.put({ itemId: blobId, blobs } satisfies PdfPageRecord)
-    },
-    undefined
-  )
+  await putDerivedAsset({
+    sourceBlobId: blobId,
+    kind: 'pdf-page-thumbnails',
+    variant: 'default',
+    storage: 'indexed-db',
+    mimeType: 'image/jpeg',
+    size: blobs.reduce((total, blob) => total + blob.size, 0),
+    status: 'ready',
+    blobs
+  })
 }
 
 export async function getPdfPageThumbs(blobId: string): Promise<string[]> {
+  const asset = await getDerivedAsset(blobId, 'pdf-page-thumbnails')
+  if (asset?.status === 'ready' && asset.blobs) {
+    return asset.blobs.map((blob) => URL.createObjectURL(blob))
+  }
+
   const record = await withStore<PdfPageRecord | undefined>(
     PDF_PAGE_STORE_NAME,
     'readonly',
@@ -196,10 +231,22 @@ export async function getPdfPageThumbs(blobId: string): Promise<string[]> {
     undefined
   )
   if (!record) return []
+
+  await putDerivedAsset({
+    sourceBlobId: blobId,
+    kind: 'pdf-page-thumbnails',
+    variant: 'default',
+    storage: 'indexed-db',
+    mimeType: record.blobs[0]?.type || 'image/jpeg',
+    size: record.blobs.reduce((total, blob) => total + blob.size, 0),
+    status: 'ready',
+    blobs: record.blobs
+  })
   return record.blobs.map((blob) => URL.createObjectURL(blob))
 }
 
 export async function deletePdfPageThumbs(blobId: string): Promise<void> {
+  await deleteDerivedAsset(blobId, 'pdf-page-thumbnails')
   await withStore<void>(
     PDF_PAGE_STORE_NAME,
     'readwrite',
@@ -208,4 +255,16 @@ export async function deletePdfPageThumbs(blobId: string): Promise<void> {
     },
     undefined
   )
+}
+
+export async function resetThumbnailDBForTests(): Promise<void> {
+  const db = await dbPromise
+  db?.close()
+  dbPromise = null
+  await new Promise<void>((resolve, reject) => {
+    const request = indexedDB.deleteDatabase(DB_NAME)
+    request.onsuccess = () => resolve()
+    request.onerror = () => reject(request.error)
+    request.onblocked = () => reject(new Error('Thumbnail database deletion blocked'))
+  })
 }

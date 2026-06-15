@@ -12,6 +12,8 @@ const mockInitializeSearchIndexes = vi.fn()
 const mockUnsubscribeBible = vi.fn()
 const mockUnsubscribeBibleFolders = vi.fn()
 const mockUnsubscribeFileExplorer = vi.fn()
+const mockRecoverStaleJobs = vi.fn().mockResolvedValue(0)
+const mockRemoveExpiredHistory = vi.fn().mockResolvedValue(0)
 
 const bibleState = {
   isInitialized: false,
@@ -82,6 +84,13 @@ vi.mock('@renderer/stores/bible-settings', () => ({
 
 vi.mock('@renderer/lib/bible-search', () => ({
   initializeSearchIndexes: mockInitializeSearchIndexes
+}))
+
+vi.mock('@renderer/lib/media-job-queue', () => ({
+  mediaJobQueue: {
+    recoverStaleJobs: mockRecoverStaleJobs,
+    removeExpiredHistory: mockRemoveExpiredHistory
+  }
 }))
 
 describe('initializeApp — online handler', () => {

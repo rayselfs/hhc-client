@@ -2,6 +2,8 @@ import type { AnyItemRecord, FileItemRecord, FolderRecord } from '@shared/types/
 import { getBlobId } from './blob-identity'
 import { isElectron } from './env'
 import { openFileExplorerDB } from './file-explorer-db'
+import { deleteDerivedAssetsForSource } from './media-work-db'
+import { deferMediaResourceCleanup, isMediaResourceLocked } from './media-resource-locks'
 import { deletePdfPageThumbs, deleteThumbnail } from './thumbnail-db'
 
 export interface CleanupResult {
@@ -40,6 +42,30 @@ function collectDescendantFolderIds(rootIds: string[], folders: FolderRecord[]):
   return result
 }
 
+async function deleteExternalBlobResources(
+  blobId: string,
+  storage: 'indexed-db' | 'native-fs' | undefined
+): Promise<void> {
+  if (storage === 'native-fs' && isElectron()) {
+    await window.api.nativeFs.delete(blobId).catch(() => undefined)
+  }
+  await deleteDerivedAssetsForSource(blobId)
+  await deletePdfPageThumbs(blobId)
+}
+
+async function finalizeDeferredBlobCleanup(blobId: string): Promise<void> {
+  const db = await openFileExplorerDB()
+  const tx = db.transaction('file-blobs', 'readwrite')
+  const record = await tx.store.get(blobId)
+  if (!record || (record.refCount ?? 0) > 0) {
+    await tx.done
+    return
+  }
+  await tx.store.delete(blobId)
+  await tx.done
+  await deleteExternalBlobResources(blobId, record.storage)
+}
+
 export async function cleanupFileResources(request: CleanupRequest): Promise<CleanupResult> {
   const db = await openFileExplorerDB()
   const tx = db.transaction(['folder-records', 'folder-items', 'file-blobs'], 'readwrite')
@@ -62,15 +88,21 @@ export async function cleanupFileResources(request: CleanupRequest): Promise<Cle
   }
 
   const deletedBlobIds: string[] = []
-  const deletedNativeBlobIds: string[] = []
+  const deletedBlobStorage = new Map<string, 'indexed-db' | 'native-fs' | undefined>()
+  const deferredBlobIds: string[] = []
   for (const [blobId, removedReferences] of blobReferenceRemovals) {
     const record = await blobStore.get(blobId)
     if (!record) continue
     const remainingReferences = (record.refCount ?? 1) - removedReferences
     if (remainingReferences <= 0) {
-      await blobStore.delete(blobId)
-      deletedBlobIds.push(blobId)
-      if (record.storage === 'native-fs') deletedNativeBlobIds.push(blobId)
+      if (isMediaResourceLocked(blobId)) {
+        await blobStore.put({ ...record, refCount: 0 })
+        deferredBlobIds.push(blobId)
+      } else {
+        await blobStore.delete(blobId)
+        deletedBlobIds.push(blobId)
+        deletedBlobStorage.set(blobId, record.storage)
+      }
     } else {
       await blobStore.put({ ...record, refCount: remainingReferences })
     }
@@ -82,16 +114,15 @@ export async function cleanupFileResources(request: CleanupRequest): Promise<Cle
   ])
   await tx.done
 
-  if (isElectron()) {
-    await Promise.all(
-      deletedNativeBlobIds.map((blobId) =>
-        window.api.nativeFs.delete(blobId).catch(() => undefined)
-      )
-    )
+  for (const blobId of deferredBlobIds) {
+    const deferred = deferMediaResourceCleanup(blobId, () => finalizeDeferredBlobCleanup(blobId))
+    if (!deferred) await finalizeDeferredBlobCleanup(blobId)
   }
   await Promise.all([
     ...targetItems.map((item) => deleteThumbnail(item.id)),
-    ...deletedBlobIds.map((blobId) => deletePdfPageThumbs(blobId))
+    ...deletedBlobIds.map((blobId) =>
+      deleteExternalBlobResources(blobId, deletedBlobStorage.get(blobId))
+    )
   ])
 
   return {

@@ -2,6 +2,8 @@ import { create } from 'zustand'
 import type { FileItemRecord } from '@shared/types/folder'
 import type { MediaType, MediaTypeStateMap } from '@renderer/lib/presentability'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
+import { getBlobId } from '@renderer/lib/blob-identity'
+import { lockMediaResources } from '@renderer/lib/media-resource-locks'
 
 export interface MediaProjectionStore {
   playlist: FileItemRecord[]
@@ -49,6 +51,8 @@ const initialState = {
   pan: { x: 0, y: 0 }
 }
 
+let releaseProjectionLocks: (() => void) | null = null
+
 export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get) => ({
   ...initialState,
 
@@ -84,10 +88,19 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
   },
 
   startPresentation: (files: FileItemRecord[], startIndex: number) => {
-    set({ playlist: files, currentIndex: startIndex, isPresenting: true, typeStates: initialTypeStates })
+    releaseProjectionLocks?.()
+    releaseProjectionLocks = lockMediaResources(files.map(getBlobId))
+    set({
+      playlist: files,
+      currentIndex: startIndex,
+      isPresenting: true,
+      typeStates: initialTypeStates
+    })
   },
 
   exit: () => {
+    releaseProjectionLocks?.()
+    releaseProjectionLocks = null
     set({ ...initialState })
   },
 
@@ -130,7 +143,9 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
 
   setTypeState: <K extends MediaType>(type: K, value: MediaTypeStateMap[K]) => {
     set((s) => ({
-      typeStates: { ...s.typeStates, [type]: value } as Partial<{ [T in MediaType]: MediaTypeStateMap[T] }>
+      typeStates: { ...s.typeStates, [type]: value } as Partial<{
+        [T in MediaType]: MediaTypeStateMap[T]
+      }>
     }))
   },
 

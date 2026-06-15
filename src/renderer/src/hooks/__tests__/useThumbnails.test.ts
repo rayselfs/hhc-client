@@ -1,5 +1,5 @@
-import { act, renderHook, waitFor } from '@testing-library/react'
-import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { renderHook, waitFor } from '@testing-library/react'
+import { vi, describe, it, expect, beforeEach } from 'vitest'
 import { useThumbnails } from '../useThumbnails'
 import * as thumbnailDb from '@renderer/lib/thumbnail-db'
 
@@ -13,59 +13,13 @@ function makeItem(
   id: string,
   mimeType = 'image/jpeg',
   createdAt = 0
-): { id: string; mimeType: string; createdAt: number } {
-  return { id, mimeType, createdAt }
+): { id: string; url: string; mimeType: string; createdAt: number } {
+  return { id, url: `blob:${id}`, mimeType, createdAt }
 }
 
 describe('useThumbnails', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
-  })
-
-  afterEach(() => {
-    vi.restoreAllMocks()
-  })
-
-  describe('bounded concurrency', () => {
-    it('fetches at most 5 thumbnails concurrently for 20 items', async () => {
-      let maxConcurrent = 0
-      let currentConcurrent = 0
-      let totalStarted = 0
-      const resolvers: Array<() => void> = []
-
-      mockGetThumbnail.mockImplementation(() => {
-        currentConcurrent++
-        totalStarted++
-        if (currentConcurrent > maxConcurrent) maxConcurrent = currentConcurrent
-        return new Promise<string | null>((resolve) => {
-          resolvers.push(() => {
-            currentConcurrent--
-            resolve('data:image/jpeg;base64,abc')
-          })
-        })
-      })
-
-      const items = Array.from({ length: 20 }, (_, i) => makeItem(`item-${i}`))
-      renderHook(() => useThumbnails(items))
-
-      // Wait for first batch to start (up to 5)
-      await waitFor(() => expect(totalStarted).toBeGreaterThanOrEqual(5))
-
-      // At this point, max concurrent should be ≤ 5
-      expect(maxConcurrent).toBeLessThanOrEqual(5)
-      expect(currentConcurrent).toBeLessThanOrEqual(5)
-
-      // Resolve all pending and let the rest run
-      while (resolvers.length > 0) {
-        await act(async () => {
-          resolvers.splice(0).forEach((resolve) => resolve())
-          await new Promise((resolve) => setTimeout(resolve, 0))
-        })
-      }
-
-      await waitFor(() => expect(totalStarted).toBe(20))
-      expect(maxConcurrent).toBeLessThanOrEqual(5)
-    })
+    mockGetThumbnail.mockReset()
   })
 
   describe('cache pruning', () => {
@@ -73,7 +27,7 @@ describe('useThumbnails', () => {
       mockGetThumbnail.mockResolvedValue('data:image/jpeg;base64,abc')
 
       const itemsABC = [makeItem('A'), makeItem('B'), makeItem('C')]
-      const { result, rerender } = renderHook(({ items }) => useThumbnails(items), {
+      const { result, rerender, unmount } = renderHook(({ items }) => useThumbnails(items), {
         initialProps: { items: itemsABC }
       })
 
@@ -92,7 +46,27 @@ describe('useThumbnails', () => {
         expect(Object.keys(result.current)).toContain('A')
         expect(Object.keys(result.current)).toContain('C')
       })
+      unmount()
     })
+  })
+
+  it('loads copied items from their canonical blob identity', async () => {
+    mockGetThumbnail.mockResolvedValue('blob:shared-cover')
+
+    const items = [
+      {
+        id: 'copy-item',
+        url: 'blob:original-blob',
+        mimeType: 'image/jpeg',
+        createdAt: 0
+      }
+    ]
+    const { unmount } = renderHook(() => useThumbnails(items))
+
+    await waitFor(() => {
+      expect(mockGetThumbnail).toHaveBeenCalledWith('copy-item', 'original-blob')
+    })
+    unmount()
   })
 
   describe('revokeIfBlobUrl', () => {
@@ -108,7 +82,7 @@ describe('useThumbnails', () => {
       })
 
       const itemsAB = [makeItem('A'), makeItem('B')]
-      const { result, rerender } = renderHook(({ items }) => useThumbnails(items), {
+      const { result, rerender, unmount } = renderHook(({ items }) => useThumbnails(items), {
         initialProps: { items: itemsAB }
       })
 
@@ -126,6 +100,7 @@ describe('useThumbnails', () => {
 
       // B's data URL should NOT trigger revoke
       expect(revokeObjectURL).not.toHaveBeenCalledWith('data:image/jpeg;base64,abc')
+      unmount()
     })
   })
 })

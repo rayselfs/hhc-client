@@ -1,9 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
+import {
+  isMediaResourceLocked,
+  resetMediaResourceLocksForTests
+} from '@renderer/lib/media-resource-locks'
 import type { FileItemRecord } from '@shared/types/folder'
 
 vi.mock('@renderer/lib/file-explorer-db', () => ({
-  openFileExplorerDB: vi.fn(async () => ({} as IDBDatabase)),
+  openFileExplorerDB: vi.fn(async () => ({}) as IDBDatabase),
   getFileBlob: vi.fn(async () => null)
 }))
 
@@ -34,6 +38,8 @@ function makeFile(id: string, name: string, mimeType = 'image/png'): FileItemRec
 const files = [makeFile('a', 'a.png'), makeFile('b', 'b.png'), makeFile('c', 'c.png')]
 
 beforeEach(() => {
+  useMediaProjectionStore.getState().exit()
+  resetMediaResourceLocksForTests()
   useMediaProjectionStore.setState({
     playlist: [],
     currentIndex: 0,
@@ -64,6 +70,17 @@ describe('exit', () => {
     expect(s.playlist).toEqual([])
     expect(s.currentIndex).toBe(0)
     expect(s.showGrid).toBe(false)
+  })
+
+  it('releases source blobs locked by the active playlist', () => {
+    useMediaProjectionStore.getState().startPresentation(files, 0)
+    expect(isMediaResourceLocked('a')).toBe(true)
+    expect(isMediaResourceLocked('b')).toBe(true)
+
+    useMediaProjectionStore.getState().exit()
+
+    expect(isMediaResourceLocked('a')).toBe(false)
+    expect(isMediaResourceLocked('b')).toBe(false)
   })
 })
 
