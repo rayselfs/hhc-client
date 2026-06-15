@@ -19,7 +19,8 @@ export default function ProjectionPage(): React.JSX.Element {
   const [bibleChapter, setBibleChapter] = useState<BibleChapterData | null>(null)
   const [bibleFontSize, setBibleFontSize] = useState(90)
   const [fileData, setFileData] = useState<{
-    fileId: string
+    itemId: string
+    blobId: string
     fileName: string
     mimeType: string
   } | null>(null)
@@ -55,7 +56,12 @@ export default function ProjectionPage(): React.JSX.Element {
     })
 
     const unsubFileShow = adapter.on('file:show', (data) => {
-      setFileData({ fileId: data.fileId, fileName: data.fileName, mimeType: data.mimeType })
+      setFileData({
+        itemId: data.itemId,
+        blobId: data.blobId,
+        fileName: data.fileName,
+        mimeType: data.mimeType
+      })
       setActiveContent('file')
     })
 
@@ -120,7 +126,8 @@ export default function ProjectionPage(): React.JSX.Element {
     return (
       <FileProjection
         fileName={fileData.fileName}
-        initialFileId={fileData.fileId}
+        initialItemId={fileData.itemId}
+        initialBlobId={fileData.blobId}
         initialMimeType={fileData.mimeType}
       />
     )

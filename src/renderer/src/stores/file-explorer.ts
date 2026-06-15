@@ -6,6 +6,7 @@ import { deleteThumbnail, deletePdfPageThumbs } from '@renderer/lib/thumbnail-db
 import { hhcPersistStorage, createPersistName } from '@renderer/lib/persist-storage'
 import { createFolderStore } from '@renderer/stores/folder'
 import type { FileExplorerViewMode, FileItemRecord } from '@shared/types/folder'
+import { getBlobId } from '@renderer/lib/blob-identity'
 
 export type SortField = 'name' | 'createdAt' | 'size' | 'kind'
 export type SortDir = 'asc' | 'desc' | 'none'
@@ -138,7 +139,7 @@ export function removeFileItemFromStore(id: string): void {
 export async function permanentDeleteFileItemFromStore(id: string): Promise<void> {
   const db = await openFileExplorerDB()
   const item = useFileExplorerStore.getState().items[id]
-  const blobId = item?.type === 'file' ? item.url.replace(/^blob:/, '') : id
+  const blobId = item?.type === 'file' ? getBlobId(item) : id
   useFileExplorerStore.getState().removeItem(id)
   await Promise.all([deleteFileBlob(db, blobId), deleteThumbnail(id), deletePdfPageThumbs(id)])
 }
@@ -159,7 +160,7 @@ export async function permanentDeleteFolderFromStore(folderId: string): Promise<
     const currentId = queue.shift()!
     for (const item of state._itemsByParent[currentId] ?? []) {
       if (item.type === 'file') {
-        blobIds.push(item.url.replace(/^blob:/, ''))
+        blobIds.push(getBlobId(item))
         thumbnailIds.push(item.id)
       }
     }

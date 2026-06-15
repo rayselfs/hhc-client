@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
+import { getBlobId } from '@renderer/lib/blob-identity'
 
 function playlistContentChanged(
   prev: { id: string; mimeType: string; name: string }[],
@@ -30,7 +31,8 @@ export function useMediaProjectionSync(): void {
         const item = state.playlist[state.currentIndex]
         if (!item) return
         send('file:show', {
-          fileId: item.id,
+          itemId: item.id,
+          blobId: getBlobId(item),
           fileName: item.name,
           mimeType: item.mimeType,
           playlist: state.playlist.map((f) => ({ id: f.id, name: f.name, mimeType: f.mimeType })),
@@ -86,7 +88,8 @@ export function useMediaProjectionSync(): void {
     const item = state.playlist[state.currentIndex]
     if (!item) return
     send('file:show', {
-      fileId: item.id,
+      itemId: item.id,
+      blobId: getBlobId(item),
       fileName: item.name,
       mimeType: item.mimeType,
       playlist: state.playlist.map((f) => ({ id: f.id, name: f.name, mimeType: f.mimeType })),

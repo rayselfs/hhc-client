@@ -665,6 +665,7 @@
     "prev": "上一張",
     "slideInfo": "第 {{current}} 張投影片（共 {{total}} 張）",
     "endOfSlides": "投影結束",
+    "retry": "重試",
     "noPreview": "無預覽",
     "notes": "備註",
     "notesPlaceholder": "新增備註...",

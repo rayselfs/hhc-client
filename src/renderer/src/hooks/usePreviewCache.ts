@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FileItemRecord } from '@shared/types/folder'
 import { getFileSource, openFileExplorerDB } from '@renderer/lib/file-explorer-db'
+import { getBlobId } from '@renderer/lib/blob-identity'
 import { loadPdfjsLib } from '@renderer/lib/pdfjs-loader'
 import { getPdfPageThumbs } from '@renderer/lib/thumbnail-db'
 
@@ -187,7 +188,7 @@ export function usePreviewCache(playlist: FileItemRecord[]): PreviewCacheResult 
                 }
               }
 
-              const source = await getFileSource(db, item.id, item.mimeType ?? '')
+              const source = await getFileSource(db, getBlobId(item), item.mimeType ?? '')
               if (!source || signal.aborted) {
                 source?.revoke()
                 return

@@ -4,6 +4,7 @@ import { FOLDER_DURATION_MS } from '@shared/types/folder'
 import { createFolderDB } from '@renderer/lib/folder-db'
 import { openBibleDB } from '@renderer/lib/bible-db'
 import { incrementBlobRef, openFileExplorerDB } from '@renderer/lib/file-explorer-db'
+import { getBlobId } from '@renderer/lib/blob-identity'
 
 export interface FolderStoreState {
   folders: Record<string, FolderRecord>
@@ -383,7 +384,7 @@ export function createFolderStore(config: FolderStoreConfig) {
       const sourceItem = get().items[itemId]
       if (!sourceItem || sourceItem.type !== 'file') return null
 
-      const blobId = sourceItem.url.replace(/^blob:/, '')
+      const blobId = getBlobId(sourceItem)
       const newId = crypto.randomUUID()
       const targetSiblings = get().getItems(targetFolderId)
       const now = Date.now()

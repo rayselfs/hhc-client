@@ -665,6 +665,7 @@
     "prev": "Prev",
     "slideInfo": "Slide {{current}} of {{total}}",
     "endOfSlides": "End of slides",
+    "retry": "Retry",
     "noPreview": "No preview",
     "notes": "Notes",
     "notesPlaceholder": "Add notes...",

@@ -46,7 +46,8 @@ export interface AppMessages {
   'bible:settings': { fontSize: number }
   /** File item to display on projection (stub — coming soon) */
   'file:show': {
-    fileId: string
+    itemId: string
+    blobId: string
     fileName: string
     mimeType: string
     playlist: Array<{ id: string; name: string; mimeType: string }>

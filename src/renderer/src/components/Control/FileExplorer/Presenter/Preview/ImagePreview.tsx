@@ -3,7 +3,9 @@ import { toast } from '@heroui/react/toast'
 import { useTranslation } from 'react-i18next'
 import type { FileItemRecord } from '@shared/types/folder'
 import { getFileSource, openFileExplorerDB } from '@renderer/lib/file-explorer-db'
+import { getBlobId } from '@renderer/lib/blob-identity'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
+import PreviewLoadError from './PreviewLoadError'
 
 interface ImagePreviewProps {
   item: FileItemRecord
@@ -14,6 +16,8 @@ export default function ImagePreview({ item }: ImagePreviewProps): React.JSX.Ele
   const [imgSrc, setImgSrc] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
+  const [retryToken, setRetryToken] = useState(0)
+  const blobId = getBlobId(item)
 
   const zoomLevel = useMediaProjectionStore((s) => s.zoomLevel)
   const pan = useMediaProjectionStore((s) => s.pan)
@@ -26,7 +30,7 @@ export default function ImagePreview({ item }: ImagePreviewProps): React.JSX.Ele
       setLoading(true)
       setError(false)
       const db = await openFileExplorerDB()
-      const source = await getFileSource(db, item.id, item.mimeType)
+      const source = await getFileSource(db, blobId, item.mimeType)
       if (cancelled) {
         source?.revoke()
         return
@@ -35,12 +39,6 @@ export default function ImagePreview({ item }: ImagePreviewProps): React.JSX.Ele
         setError(true)
         setLoading(false)
         toast.warning(t('fileExplorer.blobLoadFailed'))
-        const store = useMediaProjectionStore.getState()
-        if (store.canNext()) {
-          store.next()
-        } else {
-          store.exit()
-        }
         return
       }
       revokeSource = source.revoke
@@ -55,7 +53,7 @@ export default function ImagePreview({ item }: ImagePreviewProps): React.JSX.Ele
       revokeSource?.()
       setImgSrc(null)
     }
-  }, [item.id, item.mimeType, t])
+  }, [blobId, item.mimeType, retryToken, t])
 
   if (loading) {
     return (
@@ -67,9 +65,11 @@ export default function ImagePreview({ item }: ImagePreviewProps): React.JSX.Ele
 
   if (error || !imgSrc) {
     return (
-      <div className="w-full h-full flex items-center justify-center text-white/50">
-        {t('presenter.imageLoadFailed')}
-      </div>
+      <PreviewLoadError
+        message={t('presenter.imageLoadFailed')}
+        retryLabel={t('presenter.retry')}
+        onRetry={() => setRetryToken((value) => value + 1)}
+      />
     )
   }
 

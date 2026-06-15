@@ -19,7 +19,7 @@ function renderSync(): void {
   renderHook(() => useMediaProjectionSync())
 }
 
-function makeFile(id: string, name: string, mimeType = 'image/png'): FileItemRecord {
+function makeFile(id: string, name: string, mimeType = 'image/png', blobId = id): FileItemRecord {
   return {
     id,
     name,
@@ -28,7 +28,7 @@ function makeFile(id: string, name: string, mimeType = 'image/png'): FileItemRec
     sortIndex: 0,
     parentId: 'root',
     size: 1,
-    url: `https://example.com/${id}`,
+    url: `blob:${blobId}`,
     createdAt: Date.now(),
     expiresAt: null
   }
@@ -69,7 +69,22 @@ describe('media projection sync', () => {
 
     expect(mockSend).toHaveBeenCalledWith(
       'file:show',
-      expect.objectContaining({ currentIndex: 1, fileId: 'b' })
+      expect.objectContaining({ currentIndex: 1, itemId: 'b', blobId: 'b' })
+    )
+  })
+
+  it('sends separate item and blob identities for copied media', () => {
+    useMediaProjectionStore.setState({
+      playlist: [makeFile('copy-id', 'copy.png', 'image/png', 'original-id')],
+      currentIndex: 0,
+      isPresenting: true
+    })
+
+    renderSync()
+
+    expect(mockSend).toHaveBeenCalledWith(
+      'file:show',
+      expect.objectContaining({ itemId: 'copy-id', blobId: 'original-id' })
     )
   })
 })

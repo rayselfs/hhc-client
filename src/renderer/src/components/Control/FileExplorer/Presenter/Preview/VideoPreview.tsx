@@ -11,8 +11,10 @@ import {
 } from '@phosphor-icons/react'
 import type { FileItemRecord } from '@shared/types/folder'
 import { getFileSource, openFileExplorerDB } from '@renderer/lib/file-explorer-db'
+import { getBlobId } from '@renderer/lib/blob-identity'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 import { usePresenterCommands } from '@renderer/contexts/PresenterCommandContext'
+import PreviewLoadError from './PreviewLoadError'
 
 interface VideoPreviewProps {
   item: FileItemRecord
@@ -30,6 +32,8 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
   const videoRef = useRef<HTMLVideoElement>(null)
   const [videoSrc, setVideoSrc] = useState<string | null>(null)
   const [error, setError] = useState(false)
+  const [retryToken, setRetryToken] = useState(0)
+  const blobId = getBlobId(item)
 
   const [hasStarted, setHasStarted] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
@@ -60,8 +64,9 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
     let cancelled = false
 
     async function load(): Promise<void> {
+      setError(false)
       const db = await openFileExplorerDB()
-      const source = await getFileSource(db, item.id, item.mimeType)
+      const source = await getFileSource(db, blobId, item.mimeType)
       if (cancelled) {
         source?.revoke()
         return
@@ -69,12 +74,6 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
       if (!source) {
         setError(true)
         toast.warning(t('fileExplorer.blobLoadFailed'))
-        const store = useMediaProjectionStore.getState()
-        if (store.canNext()) {
-          store.next()
-        } else {
-          store.exit()
-        }
         return
       }
       revokeSource = source.revoke
@@ -91,7 +90,7 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
       if (volumeDebounceRef.current) clearTimeout(volumeDebounceRef.current)
       if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current)
     }
-  }, [item.id, item.mimeType, t])
+  }, [blobId, item.mimeType, retryToken, t])
 
   const triggerFlash = useCallback((icon: 'play' | 'pause'): void => {
     if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current)
@@ -164,9 +163,11 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
 
   if (error) {
     return (
-      <div className="w-full h-full flex items-center justify-center bg-black">
-        <div className="text-white/50 text-center">{t('presenter.videoLoadFailed')}</div>
-      </div>
+      <PreviewLoadError
+        message={t('presenter.videoLoadFailed')}
+        retryLabel={t('presenter.retry')}
+        onRetry={() => setRetryToken((value) => value + 1)}
+      />
     )
   }
 

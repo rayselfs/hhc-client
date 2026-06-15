@@ -3,12 +3,12 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
 import type { FileItemRecord } from '@shared/types/folder'
 import PdfPreview from '../PdfPreview'
 
-const { getPageMock } = vi.hoisted(() => {
+const { getPageMock, mockGetFileSource } = vi.hoisted(() => {
   const getPageMock = vi.fn().mockResolvedValue({
     getViewport: vi.fn().mockReturnValue({ width: 100, height: 140 }),
     render: vi.fn().mockReturnValue({ promise: Promise.resolve() })
   })
-  return { getPageMock }
+  return { getPageMock, mockGetFileSource: vi.fn() }
 })
 
 vi.mock('react-i18next', () => ({
@@ -17,10 +17,7 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('@renderer/lib/file-explorer-db', () => ({
   openFileExplorerDB: vi.fn().mockResolvedValue({}),
-  getFileSource: vi.fn().mockResolvedValue({
-    url: 'blob:fake-pdf',
-    revoke: vi.fn()
-  })
+  getFileSource: mockGetFileSource
 }))
 
 vi.mock('@heroui/react/toast', () => ({
@@ -92,7 +89,7 @@ function makeItem(overrides: Partial<FileItemRecord> = {}): FileItemRecord {
     createdAt: Date.now(),
     expiresAt: null,
     name: 'test.pdf',
-    url: '',
+    url: 'blob:original-pdf-id',
     size: 5000,
     mimeType: 'application/pdf',
     ...overrides
@@ -102,6 +99,10 @@ function makeItem(overrides: Partial<FileItemRecord> = {}): FileItemRecord {
 describe('PdfPreview scroll mode lazy rendering', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockGetFileSource.mockResolvedValue({
+      url: 'blob:fake-pdf',
+      revoke: vi.fn()
+    })
     setupIntersectionObserverMock()
   })
 
@@ -119,6 +120,7 @@ describe('PdfPreview scroll mode lazy rendering', () => {
 
     expect(getPageMock).toHaveBeenCalledTimes(1)
     expect(getPageMock).toHaveBeenCalledWith(1)
+    expect(mockGetFileSource).toHaveBeenCalledWith({}, 'original-pdf-id', 'application/pdf')
   })
 
   it('renders page 2 when IntersectionObserver fires for canvas with data-page-index=1', async () => {

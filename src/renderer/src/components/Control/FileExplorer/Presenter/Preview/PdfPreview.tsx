@@ -5,9 +5,11 @@ import { ChevronLeft, ChevronRight, AlignJustify, Maximize2 } from 'lucide-react
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import type { FileItemRecord } from '@shared/types/folder'
 import { getFileSource, openFileExplorerDB } from '@renderer/lib/file-explorer-db'
+import { getBlobId } from '@renderer/lib/blob-identity'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 import { usePresenterCommands } from '@renderer/contexts/PresenterCommandContext'
 import { usePreviewCacheContext } from '@renderer/contexts/PreviewCacheContext'
+import PreviewLoadError from './PreviewLoadError'
 
 interface PdfPreviewProps {
   item: FileItemRecord
@@ -44,6 +46,8 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
   const [pageCount, setPageCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
+  const [retryToken, setRetryToken] = useState(0)
+  const blobId = getBlobId(item)
 
   const slideCanvasRef = useRef<HTMLCanvasElement>(null)
   const scrollCanvasRefs = useRef<(HTMLCanvasElement | null)[]>([])
@@ -80,7 +84,7 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
       setError(false)
       try {
         const db = await openFileExplorerDB()
-        const source = await getFileSource(db, item.id, item.mimeType)
+        const source = await getFileSource(db, blobId, item.mimeType)
         if (cancelled) {
           source?.revoke()
           return
@@ -90,12 +94,6 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
             setError(true)
             setLoading(false)
             toast.warning(t('fileExplorer.blobLoadFailed'))
-            const store = useMediaProjectionStore.getState()
-            if (store.canNext()) {
-              store.next()
-            } else {
-              store.exit()
-            }
           }
           return
         }
@@ -117,12 +115,6 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
           setError(true)
           setLoading(false)
           toast.warning(t('fileExplorer.blobLoadFailed'))
-          const store = useMediaProjectionStore.getState()
-          if (store.canNext()) {
-            store.next()
-          } else {
-            store.exit()
-          }
         }
       }
     }
@@ -134,7 +126,7 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
       if (doc) doc.destroy()
       setPdfDoc(null)
     }
-  }, [item.id, item.mimeType, t])
+  }, [blobId, item.mimeType, retryToken, t])
 
   useEffect(() => {
     if (!pdfDoc || pdfViewMode !== 'slide') return
@@ -255,9 +247,11 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
 
   if (error || !pdfDoc) {
     return (
-      <div className="w-full h-full flex items-center justify-center text-foreground/50">
-        {t('presenter.pdfLoadFailed')}
-      </div>
+      <PreviewLoadError
+        message={t('presenter.pdfLoadFailed')}
+        retryLabel={t('presenter.retry')}
+        onRetry={() => setRetryToken((value) => value + 1)}
+      />
     )
   }
 
