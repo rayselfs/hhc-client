@@ -1,12 +1,15 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { UseBoundStore, StoreApi } from 'zustand'
-import { deleteFileBlob, openFileExplorerDB, storeFileBlob } from '@renderer/lib/file-explorer-db'
-import { deleteThumbnail, deletePdfPageThumbs } from '@renderer/lib/thumbnail-db'
+import { openFileExplorerDB, storeFileBlob } from '@renderer/lib/file-explorer-db'
 import { hhcPersistStorage, createPersistName } from '@renderer/lib/persist-storage'
 import { createFolderStore } from '@renderer/stores/folder'
 import type { FileExplorerViewMode, FileItemRecord } from '@shared/types/folder'
-import { getBlobId } from '@renderer/lib/blob-identity'
+import {
+  cleanupFileResources,
+  purgeExpiredFileTrash,
+  type CleanupResult
+} from '@renderer/lib/file-resource-cleanup'
 
 export type SortField = 'name' | 'createdAt' | 'size' | 'kind'
 export type SortDir = 'asc' | 'desc' | 'none'
@@ -136,16 +139,43 @@ export function removeFileItemFromStore(id: string): void {
   useFileExplorerStore.getState().softDeleteItem(id)
 }
 
+function removeCleanedEntriesFromStore(result: CleanupResult): void {
+  const folderIds = new Set(result.folderIds)
+  const itemIds = new Set(result.itemIds)
+  useFileExplorerStore.setState((state) => {
+    const folders = Object.fromEntries(
+      Object.entries(state.folders).filter(([id]) => !folderIds.has(id))
+    )
+    const items = Object.fromEntries(Object.entries(state.items).filter(([id]) => !itemIds.has(id)))
+    const childFoldersByParent: typeof state._childFoldersByParent = {}
+    for (const folder of Object.values(folders)) {
+      if (folder.parentId === null) continue
+      const list = childFoldersByParent[folder.parentId] ?? []
+      list.push(folder)
+      childFoldersByParent[folder.parentId] = list
+    }
+    const itemsByParent: typeof state._itemsByParent = {}
+    for (const [parentId, loadedItems] of Object.entries(state._itemsByParent)) {
+      if (folderIds.has(parentId)) continue
+      itemsByParent[parentId] = loadedItems.filter((item) => !itemIds.has(item.id))
+    }
+    return {
+      folders,
+      items,
+      _foldersArray: Object.values(folders),
+      _itemsArray: Object.values(items),
+      _childFoldersByParent: childFoldersByParent,
+      _itemsByParent: itemsByParent,
+      loadedParents: new Set([...state.loadedParents].filter((id) => !folderIds.has(id))),
+      currentFolderId: folderIds.has(state.currentFolderId)
+        ? FILE_EXPLORER_ROOT_ID
+        : state.currentFolderId
+    }
+  })
+}
+
 export async function permanentDeleteFileItemFromStore(id: string): Promise<void> {
-  const db = await openFileExplorerDB()
-  const item = useFileExplorerStore.getState().items[id]
-  const blobId = item?.type === 'file' ? getBlobId(item) : id
-  useFileExplorerStore.getState().removeItem(id)
-  const deletedFinalBlobReference = await deleteFileBlob(db, blobId)
-  await Promise.all([
-    deleteThumbnail(id),
-    deletedFinalBlobReference ? deletePdfPageThumbs(blobId) : Promise.resolve()
-  ])
+  removeCleanedEntriesFromStore(await cleanupFileResources({ itemIds: [id] }))
 }
 
 export function deleteFolderFromStore(folderId: string): void {
@@ -153,31 +183,9 @@ export function deleteFolderFromStore(folderId: string): void {
 }
 
 export async function permanentDeleteFolderFromStore(folderId: string): Promise<void> {
-  const state = useFileExplorerStore.getState()
-  const db = await openFileExplorerDB()
+  removeCleanedEntriesFromStore(await cleanupFileResources({ folderIds: [folderId] }))
+}
 
-  const blobIds: string[] = []
-  const thumbnailIds: string[] = []
-  const queue: string[] = [folderId]
-
-  while (queue.length > 0) {
-    const currentId = queue.shift()!
-    for (const item of state._itemsByParent[currentId] ?? []) {
-      if (item.type === 'file') {
-        blobIds.push(getBlobId(item))
-        thumbnailIds.push(item.id)
-      }
-    }
-    for (const folder of state._childFoldersByParent[currentId] ?? []) {
-      queue.push(folder.id)
-    }
-  }
-
-  await Promise.all(blobIds.map((id) => deleteFileBlob(db, id)))
-  await Promise.all([
-    ...thumbnailIds.map((id) => deleteThumbnail(id)),
-    ...thumbnailIds.map((id) => deletePdfPageThumbs(id))
-  ])
-
-  state.deleteFolder(folderId)
+export async function purgeExpiredTrashFromStore(retentionMs: number): Promise<void> {
+  removeCleanedEntriesFromStore(await purgeExpiredFileTrash(retentionMs))
 }

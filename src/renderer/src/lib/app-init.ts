@@ -2,7 +2,7 @@ import { useBibleStore } from '@renderer/stores/bible'
 import { useBibleFolderStore } from '@renderer/stores/folder'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 import { useSettingsStore } from '@renderer/stores/settings'
-import { useFileExplorerStore } from '@renderer/stores/file-explorer'
+import { purgeExpiredTrashFromStore, useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { initializeSearchIndexes } from '@renderer/lib/bible-search'
 import { isElectron } from '@renderer/lib/env'
 import { toast } from '@heroui/react/toast'
@@ -108,7 +108,7 @@ export function initializeApp(): () => void {
       useFileExplorerStore.getState().softDeleteExpired()
       const retentionDays = useSettingsStore.getState().trashRetentionDays
       if (retentionDays > 0) {
-        void useFileExplorerStore.getState().purgeTrash(retentionDays * 86_400_000)
+        void purgeExpiredTrashFromStore(retentionDays * 86_400_000)
       }
     }
   })
