@@ -15,6 +15,12 @@ export interface MediaCapability {
   kindLabelFallback?: string
 }
 
+export interface ClassifiedFile {
+  kind: MediaKind | 'unsupported'
+  mimeType: string
+  extension: string
+}
+
 const CAPABILITIES: readonly MediaCapability[] = [
   {
     kind: 'image',
@@ -314,6 +320,31 @@ export function resolveMediaCapability(input: {
   return null
 }
 
+export function classifyFile(file: Pick<File, 'name' | 'type'>): ClassifiedFile {
+  const capability = resolveMediaCapability({ mimeType: file.type, fileName: file.name })
+  const normalizedMimeType = normalizeMimeType(file.type)
+  if (!capability) {
+    return {
+      kind: 'unsupported',
+      mimeType: normalizedMimeType || 'application/octet-stream',
+      extension: getFileExtension(file.name)
+    }
+  }
+
+  const isUploadable =
+    capability.kind === 'document' ||
+    capability.web !== 'unsupported' ||
+    capability.electron !== 'unsupported'
+  return {
+    kind: isUploadable ? capability.kind : 'unsupported',
+    mimeType:
+      capability.canonicalMimeType.endsWith('/*') && normalizedMimeType
+        ? normalizedMimeType
+        : capability.canonicalMimeType,
+    extension: getFileExtension(file.name)
+  }
+}
+
 export function getMediaSupport(
   capability: MediaCapability,
   platform: MediaPlatform
@@ -323,6 +354,16 @@ export function getMediaSupport(
 
 export function canGenerateMediaThumbnail(capability: MediaCapability | null): boolean {
   return capability !== null && capability.thumbnail !== 'none'
+}
+
+export function getMediaFileAcceptAttribute(): string {
+  const extensions = CAPABILITIES.filter(
+    (capability) =>
+      capability.kind === 'document' ||
+      capability.web !== 'unsupported' ||
+      capability.electron !== 'unsupported'
+  ).flatMap((capability) => capability.extensions.map((extension) => `.${extension}`))
+  return ['image/*', 'video/*', ...new Set(extensions)].join(',')
 }
 
 export function validateMediaCapabilityRegistry(): void {

@@ -22,6 +22,7 @@ import type { ClipboardState } from '@renderer/components/Control/FileExplorer'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
 import MediaPresenter from '@renderer/components/Control/FileExplorer/Presenter/MediaPresenter'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
+import { getMediaFileAcceptAttribute } from '@renderer/lib/media-capabilities'
 
 function resolveUniqueName(baseName: string, existingNames: string[]): string {
   if (!existingNames.includes(baseName)) return baseName
@@ -396,7 +397,7 @@ export default function FilesPage(): React.JSX.Element {
         ref={fileInputRef}
         type="file"
         multiple
-        accept="image/*,video/*,.pdf,.pptx,.ppt,.key,.odp"
+        accept={getMediaFileAcceptAttribute()}
         className="hidden"
         onChange={(e) => void handleFileChange(e)}
       />
@@ -404,6 +405,7 @@ export default function FilesPage(): React.JSX.Element {
         ref={folderInputRef}
         type="file"
         multiple
+        accept={getMediaFileAcceptAttribute()}
         className="hidden"
         onChange={(e) => void handleFolderChange(e)}
       />

@@ -3,9 +3,25 @@ import { addFileItemToStore, useFileExplorerStore } from '@renderer/stores/file-
 import { generateThumbnail, generateAllPdfPageThumbnails } from '@renderer/lib/thumbnail-generator'
 import { saveThumbnail, savePdfPageThumbs } from '@renderer/lib/thumbnail-db'
 import { isWeb } from '@renderer/lib/env'
-import { canGenerateMediaThumbnail, resolveMediaCapability } from '@renderer/lib/media-capabilities'
+import {
+  canGenerateMediaThumbnail,
+  classifyFile,
+  resolveMediaCapability,
+  type ClassifiedFile
+} from '@renderer/lib/media-capabilities'
+import { mediaJobQueue } from '@renderer/lib/media-job-queue'
+import { getFileBlob, getFileSource, openFileExplorerDB } from '@renderer/lib/file-explorer-db'
 
 export const MAX_FILE_SIZE_WEB = 2 * 1024 * 1024 * 1024
+
+interface UploadCandidate {
+  file: File
+  classification: ClassifiedFile
+}
+
+interface UploadDestination extends UploadCandidate {
+  parentId: string
+}
 
 function createSemaphore(limit: number): { acquire(): Promise<() => void> } {
   let active = 0
@@ -31,8 +47,8 @@ function createSemaphore(limit: number): { acquire(): Promise<() => void> } {
 }
 
 const UPLOAD_CONCURRENCY = 3
-
 const uploadSemaphore = createSemaphore(UPLOAD_CONCURRENCY)
+const pendingPdfFiles = new Map<string, File>()
 
 async function readAllEntries(reader: FileSystemDirectoryReader): Promise<FileSystemEntry[]> {
   const all: FileSystemEntry[] = []
@@ -53,7 +69,7 @@ async function readAllEntries(reader: FileSystemDirectoryReader): Promise<FileSy
 
 async function collectFromEntry(
   entry: FileSystemEntry,
-  prefix: string = ''
+  prefix = ''
 ): Promise<{ file: File; relativePath: string }[]> {
   if (entry.isFile) {
     const file = await new Promise<File>((resolve, reject) => {
@@ -65,36 +81,96 @@ async function collectFromEntry(
     const reader = (entry as FileSystemDirectoryEntry).createReader()
     const children = await readAllEntries(reader)
     const newPrefix = prefix ? `${prefix}/${entry.name}` : entry.name
-    const nested = await Promise.all(children.map((c) => collectFromEntry(c, newPrefix)))
+    const nested = await Promise.all(children.map((child) => collectFromEntry(child, newPrefix)))
     return nested.flat()
   }
   return []
 }
 
 export function isSupportedFile(file: File): boolean {
-  return resolveMediaCapability({ mimeType: file.type, fileName: file.name }) !== null
+  return classifyFile(file).kind !== 'unsupported'
 }
 
-export function canGenerateThumbnail(mimeType: string): boolean {
-  return canGenerateMediaThumbnail(resolveMediaCapability({ mimeType }))
+export function canGenerateThumbnail(mimeType: string, fileName?: string): boolean {
+  return canGenerateMediaThumbnail(resolveMediaCapability({ mimeType, fileName }))
 }
 
-export async function uploadFiles(files: File[], parentId: string): Promise<void> {
+async function hasWebStorageCapacity(files: File[]): Promise<boolean> {
+  if (!isWeb() || !navigator.storage?.estimate) return true
+
+  try {
+    const { quota, usage } = await navigator.storage.estimate()
+    if (quota === undefined) return true
+    const available = Math.max(0, quota - (usage ?? 0))
+    return files.reduce((total, file) => total + file.size, 0) <= available
+  } catch {
+    return true
+  }
+}
+
+async function prepareUploadCandidates(files: File[]): Promise<UploadCandidate[]> {
+  const candidates: UploadCandidate[] = []
+  for (const file of files) {
+    const classification = classifyFile(file)
+    if (classification.kind === 'unsupported') continue
+    if (isWeb() && file.size > MAX_FILE_SIZE_WEB) {
+      toast.danger(`File "${file.name}" exceeds 2GB limit`)
+      continue
+    }
+    candidates.push({ file, classification })
+  }
+
+  if (!(await hasWebStorageCapacity(candidates.map((candidate) => candidate.file)))) {
+    toast.danger('The selected files exceed available browser storage')
+    return []
+  }
+  return candidates
+}
+
+async function loadPdfJobFile(sourceBlobId: string, itemId: string): Promise<File | null> {
+  const db = await openFileExplorerDB()
+  const item = await db.get('folder-items', itemId)
+  if (!item || item.type !== 'file') return null
+
+  const blob = await getFileBlob(db, sourceBlobId)
+  if (blob) return new File([blob], item.name, { type: item.mimeType })
+
+  const source = await getFileSource(db, sourceBlobId, item.mimeType)
+  if (!source) return null
+  try {
+    const response = await fetch(source.url)
+    if (!response.ok) throw new Error(`Failed to read PDF source: ${response.status}`)
+    return new File([await response.blob()], item.name, { type: item.mimeType })
+  } finally {
+    source.revoke()
+  }
+}
+
+mediaJobQueue.registerExecutor('pdf-pages', async (job, { signal }) => {
+  if (!job.sourceBlobId || !job.itemId) throw new Error('PDF page job is missing source identity')
+  try {
+    const file =
+      pendingPdfFiles.get(job.sourceBlobId) ?? (await loadPdfJobFile(job.sourceBlobId, job.itemId))
+    if (!file) throw new Error('PDF source is unavailable')
+    const dataUrls = await generateAllPdfPageThumbnails(file, { signal, throwOnError: true })
+    if (dataUrls.length > 0) await savePdfPageThumbs(job.sourceBlobId, dataUrls)
+  } finally {
+    pendingPdfFiles.delete(job.sourceBlobId)
+  }
+})
+
+async function uploadPreparedFiles(destinations: UploadDestination[]): Promise<number> {
+  let uploadedCount = 0
   await Promise.all(
-    files.map(async (file) => {
-      if (isWeb() && file.size > MAX_FILE_SIZE_WEB) {
-        toast.danger(`File "${file.name}" exceeds 2GB limit`)
-        return
-      }
+    destinations.map(async ({ file, classification, parentId }) => {
       const release = await uploadSemaphore.acquire()
       let id: string | undefined
       try {
-        id = await addFileItemToStore(file, parentId)
-        if (canGenerateThumbnail(file.type)) {
-          const dataUrl = await generateThumbnail(file)
-          if (dataUrl) {
-            await saveThumbnail(id, dataUrl)
-          }
+        id = await addFileItemToStore(file, parentId, classification.mimeType)
+        uploadedCount++
+        if (canGenerateThumbnail(classification.mimeType, file.name)) {
+          const dataUrl = await generateThumbnail(file, classification.mimeType)
+          if (dataUrl) await saveThumbnail(id, dataUrl)
           window.dispatchEvent(
             new CustomEvent('hhc:thumbnail-ready', { detail: { itemId: id, dataUrl } })
           )
@@ -102,29 +178,41 @@ export async function uploadFiles(files: File[], parentId: string): Promise<void
       } finally {
         release()
       }
-      if (id && file.type === 'application/pdf') {
-        const itemId = id
-        void generateAllPdfPageThumbnails(file).then(async (dataUrls) => {
-          if (dataUrls.length > 0) {
-            await savePdfPageThumbs(itemId, dataUrls)
-          }
-        })
+
+      if (id && classification.kind === 'pdf') {
+        pendingPdfFiles.set(id, file)
+        try {
+          await mediaJobQueue.enqueue({
+            type: 'pdf-pages',
+            sourceBlobId: id,
+            itemId: id,
+            dedupeKey: `pdf-pages:${id}`
+          })
+        } catch (error) {
+          pendingPdfFiles.delete(id)
+          throw error
+        }
       }
     })
   )
+  return uploadedCount
+}
+
+export async function uploadFiles(files: File[], parentId: string): Promise<number> {
+  const candidates = await prepareUploadCandidates(files)
+  return uploadPreparedFiles(candidates.map((candidate) => ({ ...candidate, parentId })))
 }
 
 export async function uploadFolderFiles(
   allFiles: File[],
   currentFolderId: string,
   addFolder: (name: string, parentId: string) => string
-): Promise<void> {
-  const filteredFiles = allFiles.filter(isSupportedFile)
-  if (filteredFiles.length === 0) return
+): Promise<number> {
+  const candidates = await prepareUploadCandidates(allFiles)
+  if (candidates.length === 0) return 0
 
   const pathToFolderId = new Map<string, string>()
-
-  for (const file of filteredFiles) {
+  for (const { file } of candidates) {
     const parts = file.webkitRelativePath.split('/')
     for (let depth = 1; depth < parts.length; depth++) {
       const folderPath = parts.slice(0, depth).join('/')
@@ -138,48 +226,46 @@ export async function uploadFolderFiles(
     }
   }
 
-  const byParent = new Map<string, File[]>()
-  for (const file of filteredFiles) {
-    const parts = file.webkitRelativePath.split('/')
+  const destinations = candidates.map((candidate) => {
+    const parts = candidate.file.webkitRelativePath.split('/')
     const folderPath = parts.slice(0, parts.length - 1).join('/')
-    const parentId = pathToFolderId.get(folderPath) ?? currentFolderId
-    const group = byParent.get(parentId) ?? []
-    group.push(file)
-    byParent.set(parentId, group)
-  }
-
-  await Promise.all(
-    Array.from(byParent.entries()).map(([parentId, files]) => uploadFiles(files, parentId))
-  )
+    return {
+      ...candidate,
+      parentId: pathToFolderId.get(folderPath) ?? currentFolderId
+    }
+  })
+  return uploadPreparedFiles(destinations)
 }
 
 export async function uploadFolderFilesFromStore(
   allFiles: File[],
   currentFolderId: string
-): Promise<void> {
-  const addFolder = useFileExplorerStore.getState().addFolder
-  await uploadFolderFiles(allFiles, currentFolderId, addFolder)
+): Promise<number> {
+  return uploadFolderFiles(allFiles, currentFolderId, useFileExplorerStore.getState().addFolder)
 }
 
 export async function uploadFromDataTransfer(
   items: DataTransferItemList,
   targetFolderId: string
-): Promise<void> {
+): Promise<number> {
   const entries: FileSystemEntry[] = []
-  for (let i = 0; i < items.length; i++) {
-    const entry = items[i].webkitGetAsEntry?.()
+  for (let index = 0; index < items.length; index++) {
+    const entry = items[index].webkitGetAsEntry?.()
     if (entry) entries.push(entry)
   }
 
-  const filesWithPaths = (await Promise.all(entries.map((e) => collectFromEntry(e)))).flat()
-  const supported = filesWithPaths.filter((fp) => isSupportedFile(fp.file))
-  if (supported.length === 0) return
+  const filesWithPaths = (await Promise.all(entries.map((entry) => collectFromEntry(entry)))).flat()
+  const candidates = await prepareUploadCandidates(filesWithPaths.map(({ file }) => file))
+  if (candidates.length === 0) return 0
 
+  const relativePaths = new Map(
+    filesWithPaths.map(({ file, relativePath }) => [file, relativePath])
+  )
   const { addFolder } = useFileExplorerStore.getState()
   const pathToFolderId = new Map<string, string>()
 
-  for (const { relativePath } of supported) {
-    const parts = relativePath.split('/')
+  for (const { file } of candidates) {
+    const parts = (relativePaths.get(file) ?? file.name).split('/')
     for (let depth = 1; depth < parts.length; depth++) {
       const folderPath = parts.slice(0, depth).join('/')
       if (!pathToFolderId.has(folderPath)) {
@@ -192,19 +278,13 @@ export async function uploadFromDataTransfer(
     }
   }
 
-  const byParent = new Map<string, File[]>()
-  for (const { file, relativePath } of supported) {
-    const parts = relativePath.split('/')
+  const destinations = candidates.map((candidate) => {
+    const parts = (relativePaths.get(candidate.file) ?? candidate.file.name).split('/')
     const folderPath = parts.slice(0, parts.length - 1).join('/')
-    const parentId = folderPath
-      ? (pathToFolderId.get(folderPath) ?? targetFolderId)
-      : targetFolderId
-    const group = byParent.get(parentId) ?? []
-    group.push(file)
-    byParent.set(parentId, group)
-  }
-
-  await Promise.all(
-    Array.from(byParent.entries()).map(([parentId, files]) => uploadFiles(files, parentId))
-  )
+    return {
+      ...candidate,
+      parentId: folderPath ? (pathToFolderId.get(folderPath) ?? targetFolderId) : targetFolderId
+    }
+  })
+  return uploadPreparedFiles(destinations)
 }

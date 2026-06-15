@@ -1,7 +1,11 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { uploadFiles, MAX_FILE_SIZE_WEB } from '../upload-utils'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  MAX_FILE_SIZE_WEB,
+  uploadFiles,
+  uploadFolderFiles,
+  uploadFromDataTransfer
+} from '../upload-utils'
 
-// Mock modules
 vi.mock('@heroui/react/toast', () => ({
   toast: { success: vi.fn(), danger: vi.fn(), warning: vi.fn() }
 }))
@@ -12,20 +16,32 @@ vi.mock('@renderer/stores/file-explorer', () => ({
 }))
 
 vi.mock('@renderer/lib/thumbnail-generator', () => ({
-  generateThumbnail: vi.fn().mockResolvedValue(null)
+  generateThumbnail: vi.fn().mockResolvedValue(null),
+  generateAllPdfPageThumbnails: vi.fn().mockResolvedValue([])
 }))
 
 vi.mock('@renderer/lib/thumbnail-db', () => ({
-  saveThumbnail: vi.fn()
+  saveThumbnail: vi.fn(),
+  savePdfPageThumbs: vi.fn()
 }))
 
 vi.mock('@renderer/lib/env', () => ({
   isWeb: vi.fn()
 }))
 
+vi.mock('@renderer/lib/media-job-queue', () => ({
+  mediaJobQueue: {
+    registerExecutor: vi.fn(),
+    enqueue: vi.fn().mockResolvedValue({ id: 'job-id' })
+  }
+}))
+
 import { toast } from '@heroui/react/toast'
 import { addFileItemToStore } from '@renderer/stores/file-explorer'
+import { generateThumbnail } from '@renderer/lib/thumbnail-generator'
 import { isWeb } from '@renderer/lib/env'
+import { mediaJobQueue } from '@renderer/lib/media-job-queue'
+import { useFileExplorerStore } from '@renderer/stores/file-explorer'
 
 function makeFile(name: string, size: number, type = 'image/png'): File {
   const file = new File([], name, { type })
@@ -33,95 +49,152 @@ function makeFile(name: string, size: number, type = 'image/png'): File {
   return file
 }
 
+function setRelativePath(file: File, relativePath: string): File {
+  Object.defineProperty(file, 'webkitRelativePath', { value: relativePath })
+  return file
+}
+
+function setStorageEstimate(estimate?: StorageEstimate): void {
+  Object.defineProperty(navigator, 'storage', {
+    configurable: true,
+    value: estimate ? { estimate: vi.fn().mockResolvedValue(estimate) } : undefined
+  })
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(addFileItemToStore).mockResolvedValue('mock-id')
+  vi.mocked(useFileExplorerStore.getState).mockReturnValue({
+    addFolder: vi.fn()
+  } as never)
+  vi.mocked(mediaJobQueue.enqueue).mockResolvedValue({ id: 'job-id' } as never)
+  setStorageEstimate()
 })
 
-describe('uploadFiles — web mode size limit', () => {
-  it('T1: web mode — file > 2GB is skipped, toast.danger called, addFileItemToStore NOT called', async () => {
+describe('uploadFiles web preflight', () => {
+  it('skips files over 2 GiB in Web mode', async () => {
     vi.mocked(isWeb).mockReturnValue(true)
     const bigFile = makeFile('big.png', MAX_FILE_SIZE_WEB + 1)
 
-    await uploadFiles([bigFile], 'parent-1')
+    await expect(uploadFiles([bigFile], 'parent-1')).resolves.toBe(0)
 
     expect(toast.danger).toHaveBeenCalledWith('File "big.png" exceeds 2GB limit')
     expect(addFileItemToStore).not.toHaveBeenCalled()
   })
 
-  it('T1: electron mode — file > 2GB NOT skipped, addFileItemToStore IS called', async () => {
+  it('accepts files over 2 GiB in Electron mode', async () => {
     vi.mocked(isWeb).mockReturnValue(false)
     const bigFile = makeFile('big.png', MAX_FILE_SIZE_WEB + 1)
 
-    await uploadFiles([bigFile], 'parent-1')
+    await expect(uploadFiles([bigFile], 'parent-1')).resolves.toBe(1)
 
     expect(toast.danger).not.toHaveBeenCalled()
-    expect(addFileItemToStore).toHaveBeenCalledWith(bigFile, 'parent-1')
+    expect(addFileItemToStore).toHaveBeenCalledWith(bigFile, 'parent-1', 'image/png')
   })
 
-  it('T1: web mode — file < 2GB accepted, addFileItemToStore IS called', async () => {
+  it('rejects a Web batch that clearly exceeds available quota', async () => {
     vi.mocked(isWeb).mockReturnValue(true)
-    const smallFile = makeFile('small.png', 1024)
+    setStorageEstimate({ quota: 1000, usage: 900 })
+    const files = [makeFile('a.png', 60), makeFile('b.png', 60)]
 
-    await uploadFiles([smallFile], 'parent-1')
+    await expect(uploadFiles(files, 'parent-1')).resolves.toBe(0)
 
-    expect(toast.danger).not.toHaveBeenCalled()
-    expect(addFileItemToStore).toHaveBeenCalledWith(smallFile, 'parent-1')
+    expect(toast.danger).toHaveBeenCalledWith('The selected files exceed available browser storage')
+    expect(addFileItemToStore).not.toHaveBeenCalled()
+  })
+
+  it('rejects folder input before creating folders when quota is insufficient', async () => {
+    vi.mocked(isWeb).mockReturnValue(true)
+    setStorageEstimate({ quota: 1000, usage: 950 })
+    const file = setRelativePath(makeFile('slide.png', 100), 'Sunday/slide.png')
+    const addFolder = vi.fn()
+
+    await expect(uploadFolderFiles([file], 'root', addFolder)).resolves.toBe(0)
+
+    expect(addFolder).not.toHaveBeenCalled()
+    expect(addFileItemToStore).not.toHaveBeenCalled()
+  })
+
+  it('applies the Web size limit to drag-and-drop entries', async () => {
+    vi.mocked(isWeb).mockReturnValue(true)
+    const file = makeFile('big.png', MAX_FILE_SIZE_WEB + 1)
+    const entry = {
+      isFile: true,
+      isDirectory: false,
+      name: file.name,
+      file: (resolve: (value: File) => void) => resolve(file)
+    }
+    const items = {
+      0: { webkitGetAsEntry: () => entry },
+      length: 1
+    } as unknown as DataTransferItemList
+
+    await expect(uploadFromDataTransfer(items, 'root')).resolves.toBe(0)
+
+    expect(addFileItemToStore).not.toHaveBeenCalled()
   })
 })
 
-describe('uploadFiles — concurrency semaphore', () => {
-  it('T3: 10 files, max concurrent ≤ 3', async () => {
+describe('uploadFiles classification', () => {
+  beforeEach(() => {
     vi.mocked(isWeb).mockReturnValue(false)
-
-    let active = 0
-    let maxActive = 0
-
-    vi.mocked(addFileItemToStore).mockImplementation(async () => {
-      active++
-      maxActive = Math.max(maxActive, active)
-      await new Promise((r) => setTimeout(r, 50))
-      active--
-      return 'mock-id'
-    })
-
-    const files = Array.from({ length: 10 }, (_, i) => makeFile(`file${i}.txt`, 100, 'text/plain'))
-    await uploadFiles(files, 'parent-1')
-
-    expect(maxActive).toBeLessThanOrEqual(3)
-    expect(addFileItemToStore).toHaveBeenCalledTimes(10)
   })
 
-  it('T3: concurrent uploadFiles calls share one global limit of 3', async () => {
-    vi.mocked(isWeb).mockReturnValue(false)
+  it.each([
+    ['slides.PDF', 'application/pdf'],
+    ['photo.PNG', 'image/png'],
+    ['movie.MP4', 'video/mp4']
+  ])('persists canonical MIME for empty-MIME %s', async (name, canonicalMimeType) => {
+    const file = makeFile(name, 100, '')
 
+    await uploadFiles([file], 'parent-1')
+
+    expect(addFileItemToStore).toHaveBeenCalledWith(file, 'parent-1', canonicalMimeType)
+    expect(generateThumbnail).toHaveBeenCalledWith(file, canonicalMimeType)
+  })
+
+  it('skips unsupported files', async () => {
+    const file = makeFile('notes.txt', 100, '')
+
+    await expect(uploadFiles([file], 'parent-1')).resolves.toBe(0)
+
+    expect(addFileItemToStore).not.toHaveBeenCalled()
+  })
+
+  it('enqueues PDF page rendering with canonical identities', async () => {
+    const file = makeFile('slides.PDF', 100, '')
+
+    await uploadFiles([file], 'parent-1')
+
+    expect(mediaJobQueue.enqueue).toHaveBeenCalledWith({
+      type: 'pdf-pages',
+      sourceBlobId: 'mock-id',
+      itemId: 'mock-id',
+      dedupeKey: 'pdf-pages:mock-id'
+    })
+  })
+})
+
+describe('uploadFiles concurrency', () => {
+  it('limits shared upload work to 3 files', async () => {
+    vi.mocked(isWeb).mockReturnValue(false)
     let active = 0
     let maxActive = 0
 
     vi.mocked(addFileItemToStore).mockImplementation(async () => {
       active++
       maxActive = Math.max(maxActive, active)
-      await new Promise((r) => setTimeout(r, 50))
+      await new Promise((resolve) => setTimeout(resolve, 20))
       active--
-      return 'mock-id'
+      return crypto.randomUUID()
     })
 
-    const filesA = Array.from({ length: 3 }, (_, i) => makeFile(`a${i}.txt`, 100, 'text/plain'))
-    const filesB = Array.from({ length: 3 }, (_, i) => makeFile(`b${i}.txt`, 100, 'text/plain'))
+    const filesA = Array.from({ length: 5 }, (_, index) => makeFile(`a${index}.png`, 100))
+    const filesB = Array.from({ length: 5 }, (_, index) => makeFile(`b${index}.png`, 100))
 
     await Promise.all([uploadFiles(filesA, 'parent-1'), uploadFiles(filesB, 'parent-2')])
 
     expect(maxActive).toBeLessThanOrEqual(3)
-    expect(addFileItemToStore).toHaveBeenCalledTimes(6)
-  })
-
-  it('T3: single file — completes successfully', async () => {
-    vi.mocked(isWeb).mockReturnValue(false)
-    const file = makeFile('single.png', 512)
-
-    await uploadFiles([file], 'parent-1')
-
-    expect(addFileItemToStore).toHaveBeenCalledTimes(1)
-    expect(addFileItemToStore).toHaveBeenCalledWith(file, 'parent-1')
+    expect(addFileItemToStore).toHaveBeenCalledTimes(10)
   })
 })

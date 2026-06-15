@@ -20,6 +20,10 @@ describe('T2 — PDF size guard', () => {
     vi.clearAllMocks()
   })
 
+  it('does not load PDF.js during module initialization', () => {
+    expect(mockLoadPdfjsLib).not.toHaveBeenCalled()
+  })
+
   it('returns null for PDF > 50MB without calling loadPdfjsLib', async () => {
     const bigPdf = makeFile('big.pdf', 100 * 1024 * 1024, 'application/pdf')
     const arrayBufferSpy = vi.spyOn(bigPdf, 'arrayBuffer')
@@ -93,11 +97,17 @@ describe('T5 — generateImageThumbnail yield', () => {
       this.naturalWidth = 200
       this.naturalHeight = 150
       Object.defineProperty(this, 'onload', {
-        get() { return storedOnload },
-        set(fn: () => void) { storedOnload = fn }
+        get() {
+          return storedOnload
+        },
+        set(fn: () => void) {
+          storedOnload = fn
+        }
       })
       Object.defineProperty(this, 'src', {
-        set(_val: string) { storedOnload?.() }
+        set(_val: string) {
+          storedOnload?.()
+        }
       })
     }
     vi.stubGlobal('Image', MockImage)

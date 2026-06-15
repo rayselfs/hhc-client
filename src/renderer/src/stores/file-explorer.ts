@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { UseBoundStore, StoreApi } from 'zustand'
-import { openFileExplorerDB, storeFileBlob } from '@renderer/lib/file-explorer-db'
+import { deleteFileBlob, openFileExplorerDB, storeFileBlob } from '@renderer/lib/file-explorer-db'
 import { hhcPersistStorage, createPersistName } from '@renderer/lib/persist-storage'
 import { createFolderStore } from '@renderer/stores/folder'
 import type { FileExplorerViewMode, FileItemRecord } from '@shared/types/folder'
@@ -115,7 +115,11 @@ export const useFileExplorerCustomOrder = create<FileExplorerCustomOrderState>()
   )
 )
 
-export async function addFileItemToStore(file: File, parentId: string): Promise<string> {
+export async function addFileItemToStore(
+  file: File,
+  parentId: string,
+  canonicalMimeType = file.type || 'application/octet-stream'
+): Promise<string> {
   const db = await openFileExplorerDB()
   const id = crypto.randomUUID()
 
@@ -128,10 +132,19 @@ export async function addFileItemToStore(file: File, parentId: string): Promise<
     name: file.name,
     url: `blob:${id}`,
     size: file.size,
-    mimeType: file.type || 'application/octet-stream'
+    mimeType: canonicalMimeType
   }
 
   useFileExplorerStore.getState().addItem(item)
+  const storedItem = useFileExplorerStore.getState().items[id]
+  try {
+    if (!storedItem) throw new Error(`Failed to create file metadata: ${id}`)
+    await db.put('folder-items', storedItem)
+  } catch (error) {
+    useFileExplorerStore.getState().removeItem(id)
+    await deleteFileBlob(db, id).catch(() => undefined)
+    throw error
+  }
   return id
 }
 

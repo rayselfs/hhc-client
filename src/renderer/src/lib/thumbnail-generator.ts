@@ -147,11 +147,14 @@ async function generatePdfThumbnail(file: File): Promise<string | null> {
   }
 }
 
-export async function generateThumbnail(file: File): Promise<string | null> {
+export async function generateThumbnail(
+  file: File,
+  canonicalMimeType = file.type
+): Promise<string | null> {
   try {
-    if (file.type.startsWith('image/')) return await generateImageThumbnail(file)
-    if (file.type.startsWith('video/')) return await generateVideoThumbnail(file)
-    if (file.type === 'application/pdf') return await generatePdfThumbnail(file)
+    if (canonicalMimeType.startsWith('image/')) return await generateImageThumbnail(file)
+    if (canonicalMimeType.startsWith('video/')) return await generateVideoThumbnail(file)
+    if (canonicalMimeType === 'application/pdf') return await generatePdfThumbnail(file)
     return null
   } catch (error) {
     console.error('Failed to generate thumbnail', error)
@@ -159,7 +162,10 @@ export async function generateThumbnail(file: File): Promise<string | null> {
   }
 }
 
-export async function generateAllPdfPageThumbnails(file: File): Promise<string[]> {
+export async function generateAllPdfPageThumbnails(
+  file: File,
+  options: { signal?: AbortSignal; throwOnError?: boolean } = {}
+): Promise<string[]> {
   if (file.size > MAX_PDF_THUMBNAIL_SIZE) return []
 
   try {
@@ -170,6 +176,7 @@ export async function generateAllPdfPageThumbnails(file: File): Promise<string[]
     const dataUrls: string[] = []
     try {
       for (let i = 1; i <= pdf.numPages; i++) {
+        options.signal?.throwIfAborted()
         const page = await pdf.getPage(i)
         const viewport = page.getViewport({ scale: 1 })
         const scale = Math.min(
@@ -197,6 +204,7 @@ export async function generateAllPdfPageThumbnails(file: File): Promise<string[]
 
     return dataUrls
   } catch (error) {
+    if (options.throwOnError) throw error
     console.error('Failed to generate PDF page thumbnails', error)
     return []
   }

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   canGenerateMediaThumbnail,
+  classifyFile,
+  getMediaFileAcceptAttribute,
   getFileExtension,
   getMediaSupport,
   resolveMediaCapability,
@@ -61,5 +63,30 @@ describe('media capability registry', () => {
     ['no-extension', '']
   ])('extracts extension from %s', (fileName, expected) => {
     expect(getFileExtension(fileName)).toBe(expected)
+  })
+
+  it.each([
+    ['slides.PDF', '', 'pdf', 'application/pdf'],
+    ['photo.PNG', 'application/octet-stream', 'image', 'image/png'],
+    ['movie.MP4', '', 'video', 'video/mp4'],
+    ['movie.mkv', '', 'video', 'video/x-matroska'],
+    ['movie.mpg', '', 'unsupported', 'video/mpeg'],
+    ['movie.bin', 'video/unknown', 'unsupported', 'video/unknown'],
+    ['notes.txt', '', 'unsupported', 'application/octet-stream']
+  ])('classifies %s with MIME %s', (name, type, kind, mimeType) => {
+    expect(classifyFile({ name, type })).toEqual({
+      kind,
+      mimeType,
+      extension: getFileExtension(name)
+    })
+  })
+
+  it('derives the file input filter from registered capabilities', () => {
+    const accept = getMediaFileAcceptAttribute()
+    expect(accept).toContain('image/*')
+    expect(accept).toContain('.pdf')
+    expect(accept).toContain('.mkv')
+    expect(accept).toContain('.pptx')
+    expect(accept).not.toContain('.mpg')
   })
 })
