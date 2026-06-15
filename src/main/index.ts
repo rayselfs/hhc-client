@@ -36,7 +36,7 @@ process.on('unhandledRejection', (reason) => {
 const wm = WindowManager.getInstance()
 
 app.whenReady().then(() => {
-  electronApp.setAppUserModelId('com.electron')
+  electronApp.setAppUserModelId('tw.org.alive.client')
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
