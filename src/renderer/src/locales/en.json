@@ -514,8 +514,13 @@
     "title": "Preferences",
     "categories": {
       "general": "General",
+      "timer": "Timer",
       "media": "Media",
       "bible": "Bible"
+    },
+    "timer": {
+      "reminderModeLabel": "Time Warning Calculation",
+      "reminderModeSwitchLabel": "Add"
     },
     "language": "Language",
     "timezone": "Timezone",

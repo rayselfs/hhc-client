@@ -25,6 +25,8 @@ vi.mock('@renderer/stores/settings', () => ({
     const store = {
       timezone: 'Asia/Taipei',
       hardwareAcceleration: true,
+      reminderMode: 'subtract' as const,
+      setReminderMode: vi.fn(),
       speech: {
         activeProvider: 'azure' as const,
         azure: { region: 'eastasia', language: 'zh-TW' as const },
@@ -83,6 +85,7 @@ describe('PreferencesDialog', () => {
   it('renders when isOpen is true', () => {
     renderDialog(true)
     expect(screen.getByTestId('category-general')).toBeInTheDocument()
+    expect(screen.getByTestId('category-timer')).toBeInTheDocument()
     expect(screen.getByTestId('category-bible')).toBeInTheDocument()
     expect(screen.getByTestId('category-media')).toBeInTheDocument()
   })
@@ -95,8 +98,21 @@ describe('PreferencesDialog', () => {
   it('shows general settings by default', () => {
     renderDialog(true)
     expect(screen.getByLabelText('Language')).toBeInTheDocument()
-    expect(screen.getByLabelText('Timezone')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Timezone')).not.toBeInTheDocument()
     expect(screen.getByLabelText('Dark Mode')).toBeInTheDocument()
+  })
+
+  it('navigates to timer category and shows Timer settings', async () => {
+    const user = userEvent.setup()
+    renderDialog(true)
+
+    await user.click(screen.getByTestId('category-timer'))
+    expect(screen.getByLabelText('Timezone')).toBeInTheDocument()
+    expect(screen.getByLabelText('Time Warning Calculation')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Language')).not.toBeInTheDocument()
+
+    await user.click(screen.getByTestId('category-general'))
+    expect(screen.getByLabelText('Language')).toBeInTheDocument()
   })
 
   it('navigates to media category and back', async () => {
@@ -150,6 +166,8 @@ describe('PreferencesDialog', () => {
         setTimerRingColor: vi.fn(),
         timerRingColorEnabled: false,
         setTimerRingColorEnabled: vi.fn(),
+        reminderMode: 'subtract' as const,
+        setReminderMode: vi.fn(),
         speech: {
           activeProvider: 'azure' as const,
           azure: { region: 'eastasia', language: 'zh-TW' as const },
@@ -164,6 +182,9 @@ describe('PreferencesDialog', () => {
     })
 
     renderDialog(true)
+
+    // Navigate to timer category
+    await user.click(screen.getByTestId('category-timer'))
 
     const londonButton = screen.getByText('London (UTC+0/+1)')
     await user.click(londonButton)
@@ -224,6 +245,8 @@ describe('PreferencesDialog', () => {
         setTimerRingColor: vi.fn(),
         timerRingColorEnabled: false,
         setTimerRingColorEnabled: vi.fn(),
+        reminderMode: 'subtract' as const,
+        setReminderMode: vi.fn(),
         speech: {
           activeProvider: 'azure' as const,
           azure: { region: 'eastasia', language: 'zh-TW' as const },
@@ -271,6 +294,8 @@ describe('PreferencesDialog', () => {
         setTimerRingColor: vi.fn(),
         timerRingColorEnabled: false,
         setTimerRingColorEnabled: vi.fn(),
+        reminderMode: 'subtract' as const,
+        setReminderMode: vi.fn(),
         speech: {
           activeProvider: 'azure' as const,
           azure: { region: 'eastasia', language: 'zh-TW' as const },

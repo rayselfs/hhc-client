@@ -4,6 +4,7 @@ import { useTimerRuntimeStore, formatTime, computeProgress } from './timer-runti
 import type { TimerConfigState } from './timer-config'
 import type { TimerRuntimeState } from './timer-runtime'
 import type { TimerMode, TimerStatus, TimerPhase } from '@shared/types/timer'
+import { useSettingsStore } from './settings'
 
 export { useTimerConfigStore } from './timer-config'
 export { useTimerRuntimeStore } from './timer-runtime'
@@ -156,9 +157,13 @@ export function getDisplayValues(
     reminderEnabled
   } = state
 
+  const reminderMode = useSettingsStore.getState().reminderMode
+
   if (phase === 'idle') {
     if (reminderEnabled) {
-      const mainSeconds = totalDuration - reminderDuration
+      const mainSeconds = reminderMode === 'add'
+        ? totalDuration
+        : totalDuration - reminderDuration
       return {
         mainDisplay: formatTime(Math.max(0, mainSeconds)),
         subDisplay: formatTime(reminderDuration),

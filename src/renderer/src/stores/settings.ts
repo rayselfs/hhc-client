@@ -62,6 +62,7 @@ const DEFAULT_THEME_PREFERENCE: ThemePreference = 'system'
 const DEFAULT_TIMER_RING_COLOR = '#3b82f6'
 const DEFAULT_TIMER_RING_COLOR_ENABLED = false
 const DEFAULT_TRASH_RETENTION_DAYS = 30
+const DEFAULT_REMINDER_MODE = 'subtract'
 const RELOAD_DELAY_MS = 500
 
 export type SpeechProvider = 'azure' | 'gcp' | 'webSpeech' | 'whisper'
@@ -102,6 +103,7 @@ export interface SettingsStore {
   timerRingColorEnabled: boolean
   speech: SpeechSettings
   trashRetentionDays: number
+  reminderMode: 'subtract' | 'add'
   setTimezone: (tz: string) => void
   setHardwareAcceleration: (enabled: boolean) => void
   setThemePreference: (pref: ThemePreference) => void
@@ -109,6 +111,7 @@ export interface SettingsStore {
   setTimerRingColorEnabled: (enabled: boolean) => void
   setSpeech: (settings: SpeechSettings) => void
   setTrashRetentionDays: (days: number) => void
+  setReminderMode: (mode: 'subtract' | 'add') => void
   resetToDefaults: () => void
 }
 
@@ -122,6 +125,7 @@ export const useSettingsStore = create<SettingsStore>()(
       timerRingColorEnabled: DEFAULT_TIMER_RING_COLOR_ENABLED,
       speech: DEFAULT_SPEECH,
       trashRetentionDays: DEFAULT_TRASH_RETENTION_DAYS,
+      reminderMode: DEFAULT_REMINDER_MODE,
 
       setTimezone: (tz: string) => {
         set({ timezone: tz })
@@ -151,6 +155,10 @@ export const useSettingsStore = create<SettingsStore>()(
         set({ trashRetentionDays: days })
       },
 
+      setReminderMode: (mode: 'subtract' | 'add') => {
+        set({ reminderMode: mode })
+      },
+
       resetToDefaults: () => {
         clearAllSiteData()
         toast.success(i18n.t('toast.settingsReset'))
@@ -164,7 +172,7 @@ export const useSettingsStore = create<SettingsStore>()(
     {
       name: createKey('settings'),
       storage: hhcPersistStorage,
-      version: 7,
+      version: 8,
       migrate: (persistedState, version) => {
         const state = persistedState as Record<string, unknown>
         if (version < 1) {
@@ -212,6 +220,9 @@ export const useSettingsStore = create<SettingsStore>()(
         if (version < 7) {
           state.trashRetentionDays = DEFAULT_TRASH_RETENTION_DAYS
         }
+        if (version < 8) {
+          state.reminderMode = DEFAULT_REMINDER_MODE
+        }
         return state
       },
       partialize: (state) => ({
@@ -221,7 +232,8 @@ export const useSettingsStore = create<SettingsStore>()(
         timerRingColor: state.timerRingColor,
         timerRingColorEnabled: state.timerRingColorEnabled,
         speech: state.speech,
-        trashRetentionDays: state.trashRetentionDays
+        trashRetentionDays: state.trashRetentionDays,
+        reminderMode: state.reminderMode
       })
     }
   )

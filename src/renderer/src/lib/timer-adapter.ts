@@ -127,6 +127,9 @@ export class ElectronTimerAdapter implements TimerAdapter {
   private prevPhase: string | null = null
 
   sendCommand(cmd: WorkerIncomingMessage): void {
+    if (cmd.type === 'start') {
+      window.api.timer.timerCommand({ type: 'setDuration', seconds: cmd.durationMs / 1000 })
+    }
     window.api.timer.timerCommand(toTimerCommand(cmd))
   }
 

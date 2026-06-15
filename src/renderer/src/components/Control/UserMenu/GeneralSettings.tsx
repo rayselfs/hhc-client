@@ -5,29 +5,14 @@ import { ListBox } from '@heroui/react/list-box'
 import { Button } from '@heroui/react/button'
 import { Label } from 'react-aria-components'
 import { useTheme } from '@renderer/contexts/ThemeContext'
-import { useSettingsStore, TIMEZONE_OPTIONS } from '@renderer/stores/settings'
+import { useSettingsStore } from '@renderer/stores/settings'
 import { isElectron } from '@renderer/lib/env'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
-
-const TIMEZONE_LABEL_KEYS = {
-  'timezones.taipei': 'timezones.taipei',
-  'timezones.tokyo': 'timezones.tokyo',
-  'timezones.newYork': 'timezones.newYork',
-  'timezones.losAngeles': 'timezones.losAngeles',
-  'timezones.malaysia': 'timezones.malaysia',
-  'timezones.athens': 'timezones.athens',
-  'timezones.melbourne': 'timezones.melbourne',
-  'timezones.london': 'timezones.london'
-} as const
-
-type TimezoneKey = keyof typeof TIMEZONE_LABEL_KEYS
 
 export default function GeneralSettings(): React.JSX.Element {
   const { t, i18n } = useTranslation()
   const { resolved, setPreference } = useTheme()
-  const timezone = useSettingsStore((s) => s.timezone)
   const hardwareAcceleration = useSettingsStore((s) => s.hardwareAcceleration)
-  const setTimezone = useSettingsStore((s) => s.setTimezone)
   const setHardwareAcceleration = useSettingsStore((s) => s.setHardwareAcceleration)
   const resetToDefaults = useSettingsStore((s) => s.resetToDefaults)
   const confirm = useConfirm()
@@ -78,37 +63,6 @@ export default function GeneralSettings(): React.JSX.Element {
         </Select.Popover>
       </Select>
 
-      <Select
-        variant="secondary"
-        value={timezone}
-        onChange={(key) => setTimezone(String(key))}
-        aria-label={t('preferences.timezone')}
-      >
-        <Label>{t('preferences.timezone')}</Label>
-        <Select.Trigger className="rounded-full pl-5">
-          <Select.Value />
-          <Select.Indicator />
-        </Select.Trigger>
-        <Select.Popover>
-          <ListBox>
-            {TIMEZONE_OPTIONS.map((tz) => {
-              const key = tz.labelKey as TimezoneKey
-              const resolvedKey = TIMEZONE_LABEL_KEYS[key] ?? 'timezones.taipei'
-              const label = t(resolvedKey)
-              return (
-                <ListBox.Item
-                  key={tz.value}
-                  id={tz.value}
-                  textValue={String(label)}
-                  className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
-                >
-                  {String(label)}
-                </ListBox.Item>
-              )
-            })}
-          </ListBox>
-        </Select.Popover>
-      </Select>
 
       <div>
         <label className="mb-2 block text-sm font-medium">{t('preferences.darkMode')}</label>

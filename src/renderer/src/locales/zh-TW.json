@@ -514,8 +514,13 @@
     "title": "偏好設定",
     "categories": {
       "general": "一般",
+      "timer": "計時器",
       "media": "多媒體",
       "bible": "聖經"
+    },
+    "timer": {
+      "reminderModeLabel": "時間提醒計算方式",
+      "reminderModeSwitchLabel": "累加"
     },
     "language": "語言",
     "timezone": "時區",

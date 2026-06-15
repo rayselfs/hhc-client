@@ -2,8 +2,9 @@ import { useState } from 'react'
 import { Modal } from '@heroui/react/modal'
 import { useOverlayState } from '@renderer/lib/use-overlay-state'
 import { useTranslation } from 'react-i18next'
-import { Settings, Film, BookOpen } from 'lucide-react'
+import { Settings, Film, BookOpen, Timer } from 'lucide-react'
 import GeneralSettings from '@renderer/components/Control/UserMenu/GeneralSettings'
+import TimerSettings from '@renderer/components/Control/UserMenu/TimerSettings'
 import BibleSettingsPanel from '@renderer/components/Control/UserMenu/BibleSettingsPanel'
 import MediaSettings from '@renderer/components/Control/UserMenu/MediaSettings'
 import { ShortcutScope } from '@renderer/contexts/ShortcutScopeContext'
@@ -13,19 +14,21 @@ interface PreferencesDialogProps {
   onOpenChange: (open: boolean) => void
 }
 
-type Category = 'general' | 'media' | 'bible'
+type Category = 'general' | 'timer' | 'bible' | 'media'
 
 interface CategoryItem {
   id: Category
   icon: React.ComponentType<{ className?: string }>
   labelKey:
     | 'preferences.categories.general'
+    | 'preferences.categories.timer'
     | 'preferences.categories.media'
     | 'preferences.categories.bible'
 }
 
 const categories: CategoryItem[] = [
   { id: 'general', icon: Settings, labelKey: 'preferences.categories.general' },
+  { id: 'timer', icon: Timer, labelKey: 'preferences.categories.timer' },
   { id: 'bible', icon: BookOpen, labelKey: 'preferences.categories.bible' },
   { id: 'media', icon: Film, labelKey: 'preferences.categories.media' }
 ]
@@ -76,6 +79,7 @@ export default function PreferencesDialog({
                   </nav>
                   <div className="flex-1 overflow-y-auto p-5">
                     {activeCategory === 'general' && <GeneralSettings />}
+                    {activeCategory === 'timer' && <TimerSettings />}
                     {activeCategory === 'bible' && <BibleSettingsPanel />}
                     {activeCategory === 'media' && <MediaSettings />}
                   </div>
