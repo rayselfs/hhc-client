@@ -1,7 +1,6 @@
 import { ipcMain } from 'electron'
 import { WindowManager } from '../windowManager'
-import { isKnownWindow, isMainWindow } from './validate'
-import type { ProjectionMessageTuple } from '@shared/projection-messages'
+import { isKnownWindow, isMainWindow, validateProjectionMessageTuple } from './validate'
 
 export function registerProjectionHandlers(windowManager: WindowManager): void {
   ipcMain.handle('projection:check', (event) => {
@@ -24,13 +23,15 @@ export function registerProjectionHandlers(windowManager: WindowManager): void {
     return { closed: true }
   })
 
-  ipcMain.on('projection:send', (event, ...args: [...ProjectionMessageTuple]) => {
+  ipcMain.on('projection:send', (event, ...args: unknown[]) => {
     if (!isMainWindow(windowManager, event)) return
+    if (!validateProjectionMessageTuple(args)) return
     windowManager.sendToProjection('projection:message', ...args)
   })
 
-  ipcMain.on('projection:send-to-main', (event, ...args: [...ProjectionMessageTuple]) => {
+  ipcMain.on('projection:send-to-main', (event, ...args: unknown[]) => {
     if (!isKnownWindow(windowManager, event)) return
+    if (!validateProjectionMessageTuple(args)) return
     windowManager.sendToMain('projection:message', ...args)
   })
 

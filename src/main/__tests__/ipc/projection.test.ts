@@ -143,11 +143,22 @@ describe('projection:send', () => {
   it('main window forwards to sendToProjection', () => {
     vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockMainWindow as never)
     const handler = getOnHandler('projection:send')
-    handler(makeEvent(), 'timer:tick', { data: 'test' })
+    const payload = {
+      mode: 'timer',
+      remainingSeconds: 10,
+      phase: 'main',
+      mainDisplay: '00:10',
+      subDisplay: null,
+      progress: 0.5,
+      overtimeSeconds: 0,
+      overtimeMessage: null,
+      reminderColor: null
+    }
+    handler(makeEvent(), 'timer:tick', payload)
     expect(mockWindowManager.sendToProjection).toHaveBeenCalledWith(
       'projection:message',
       'timer:tick',
-      { data: 'test' }
+      payload
     )
   })
 
@@ -155,6 +166,13 @@ describe('projection:send', () => {
     vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockProjectionWindow as never)
     const handler = getOnHandler('projection:send')
     handler(makeEvent(), 'timer:tick', { data: 'test' })
+    expect(mockWindowManager.sendToProjection).not.toHaveBeenCalled()
+  })
+
+  it('malformed payload does NOT forward', () => {
+    vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockMainWindow as never)
+    const handler = getOnHandler('projection:send')
+    handler(makeEvent(), 'file:control', { action: 'seek', value: 'invalid' })
     expect(mockWindowManager.sendToProjection).not.toHaveBeenCalled()
   })
 })

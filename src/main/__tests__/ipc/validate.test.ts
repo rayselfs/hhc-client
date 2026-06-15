@@ -94,21 +94,32 @@ describe('validateTheme', () => {
 
 describe('validateTimerCommand', () => {
   it.each([
-    'start',
-    'pause',
-    'resume',
-    'reset',
-    'setDuration',
-    'addTime',
-    'removeTime',
-    'setMode',
-    'setReminder',
-    'setOvertimeMessage',
-    'startStopwatch',
-    'pauseStopwatch',
-    'resetStopwatch'
-  ])('returns true for valid command "%s"', (type) => {
-    expect(validateTimerCommand({ type })).toBe(true)
+    { type: 'start' },
+    { type: 'pause' },
+    { type: 'resume' },
+    { type: 'reset' },
+    { type: 'setDuration', seconds: 300 },
+    { type: 'addTime', seconds: 30 },
+    { type: 'removeTime', seconds: 30 },
+    { type: 'setMode', mode: 'timer' },
+    { type: 'setReminder', enabled: true, durationSeconds: 60 },
+    { type: 'setOvertimeMessage', enabled: true, message: 'Overtime' },
+    { type: 'startStopwatch' },
+    { type: 'pauseStopwatch' },
+    { type: 'resetStopwatch' }
+  ])('returns true for valid command $type', (command) => {
+    expect(validateTimerCommand(command)).toBe(true)
+  })
+
+  it.each([
+    { type: 'setDuration' },
+    { type: 'addTime', seconds: -1 },
+    { type: 'removeTime', seconds: Number.NaN },
+    { type: 'setMode', mode: 'invalid' },
+    { type: 'setReminder', enabled: true },
+    { type: 'setOvertimeMessage', enabled: true, message: 42 }
+  ])('returns false for malformed command $type', (command) => {
+    expect(validateTimerCommand(command)).toBe(false)
   })
 
   it('returns false for unknown type', () => {
