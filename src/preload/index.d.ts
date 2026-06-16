@@ -5,7 +5,9 @@ import type {
   WhisperModel,
   WhisperDownloadProgress,
   WhisperDirInfo,
-  FfmpegConfigInfo
+  FfmpegConfigInfo,
+  VideoTranscodeRunRequest,
+  VideoTranscodeRunResult
 } from '../shared/ipc-channels'
 import type {
   TimerCommand,
@@ -82,6 +84,8 @@ interface VideoTranscodeAPI {
   selectFfmpeg: () => Promise<FfmpegConfigInfo | null>
   validateFfmpeg: () => Promise<FfmpegConfigInfo>
   removeFfmpegConfig: () => Promise<FfmpegConfigInfo>
+  run: (request: VideoTranscodeRunRequest) => Promise<VideoTranscodeRunResult>
+  cancel: (jobId: string) => Promise<void>
 }
 
 declare global {

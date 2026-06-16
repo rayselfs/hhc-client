@@ -1,13 +1,18 @@
 import { app, dialog, ipcMain } from 'electron'
-import { spawn } from 'child_process'
+import { randomUUID } from 'crypto'
+import { spawn, type ChildProcess } from 'child_process'
 import { constants as fsConstants, promises as fs } from 'fs'
 import { basename, dirname, extname, isAbsolute, join } from 'path'
+import { isValidNativeFileId } from '../../shared/native-media'
 import type {
   FfmpegCapabilityInfo,
   FfmpegConfigInfo,
-  FfmpegConfigStatus
+  FfmpegConfigStatus,
+  VideoTranscodeRunRequest,
+  VideoTranscodeRunResult
 } from '../../shared/ipc-channels'
 import type { WindowManager } from '../windowManager'
+import { getNativeFilePath } from './native-fs'
 import { isMainWindow } from './validate'
 
 interface StoredFfmpegConfig {
@@ -22,6 +27,7 @@ const CONFIG_FILE_NAME = 'ffmpeg-config.json'
 const VALIDATION_TIMEOUT_MS = 5000
 const MAX_PROCESS_OUTPUT_LENGTH = 1024 * 1024
 const WINDOWS_EXECUTABLE_EXTENSIONS = new Set(['.exe', '.cmd', '.bat'])
+const activeTranscodes = new Map<string, { child: ChildProcess; temporaryPath: string }>()
 
 function getConfigPath(): string {
   return join(app.getPath('userData'), CONFIG_FILE_NAME)
@@ -103,6 +109,47 @@ function runExecutable(executablePath: string, args: string[]): Promise<string> 
         resolve(output)
       } else {
         reject(new Error(`FFmpeg exited with code ${code ?? 'unknown'}`))
+      }
+    })
+  })
+}
+
+function runTranscodeProcess(
+  jobId: string,
+  executablePath: string,
+  args: string[],
+  temporaryPath: string
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (activeTranscodes.has(jobId)) {
+      reject(new Error('Transcode job is already running'))
+      return
+    }
+
+    const child = spawn(executablePath, args, {
+      shell: false,
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'pipe']
+    })
+    activeTranscodes.set(jobId, { child, temporaryPath })
+    let stderr = ''
+
+    const appendError = (chunk: Buffer): void => {
+      if (stderr.length < MAX_PROCESS_OUTPUT_LENGTH) stderr += chunk.toString('utf8')
+    }
+
+    child.stdout.on('data', () => undefined)
+    child.stderr.on('data', appendError)
+    child.on('error', (error) => {
+      activeTranscodes.delete(jobId)
+      reject(error)
+    })
+    child.on('close', (code) => {
+      activeTranscodes.delete(jobId)
+      if (code === 0) {
+        resolve()
+      } else {
+        reject(new Error(stderr.trim() || `FFmpeg exited with code ${code ?? 'unknown'}`))
       }
     })
   })
@@ -190,6 +237,89 @@ async function validateExecutablePath(executablePath: unknown): Promise<{
   }
 }
 
+async function readReadyConfigForTranscode(): Promise<StoredFfmpegConfig> {
+  const stored = await readStoredConfig()
+  if (!stored) throw new Error('FFmpeg is not configured')
+
+  const validation = await validateExecutablePath(stored.executablePath)
+  if (!validation.stored) {
+    throw new Error(validation.info.message ?? validation.info.status)
+  }
+  await writeStoredConfig(validation.stored)
+  return validation.stored
+}
+
+function validateRunRequest(input: unknown): VideoTranscodeRunRequest {
+  if (typeof input !== 'object' || input === null) throw new Error('Invalid transcode request')
+  const request = input as Partial<VideoTranscodeRunRequest>
+  if (typeof request.jobId !== 'string' || request.jobId.length === 0) {
+    throw new Error('Invalid transcode job id')
+  }
+  if (!isValidNativeFileId(request.sourceFileId)) throw new Error('Invalid transcode source id')
+  if (!isValidNativeFileId(request.outputFileId)) throw new Error('Invalid transcode output id')
+  if (request.sourceFileId === request.outputFileId) {
+    throw new Error('Transcode source and output ids must differ')
+  }
+  return {
+    jobId: request.jobId,
+    sourceFileId: request.sourceFileId,
+    outputFileId: request.outputFileId
+  }
+}
+
+async function runTranscode(input: unknown): Promise<VideoTranscodeRunResult> {
+  const request = validateRunRequest(input)
+  const config = await readReadyConfigForTranscode()
+  const sourcePath = getNativeFilePath(request.sourceFileId)
+  const outputPath = getNativeFilePath(request.outputFileId)
+  const temporaryPath = join(
+    dirname(outputPath),
+    `.${request.outputFileId}.${randomUUID()}.tmp.mp4`
+  )
+
+  await fs.mkdir(dirname(outputPath), { recursive: true })
+  const args = [
+    '-hide_banner',
+    '-y',
+    '-i',
+    sourcePath,
+    '-map',
+    '0:v:0',
+    '-map',
+    '0:a:0?',
+    '-c:v',
+    'libx264',
+    '-pix_fmt',
+    'yuv420p',
+    '-c:a',
+    'aac',
+    '-movflags',
+    '+faststart',
+    '-f',
+    'mp4',
+    temporaryPath
+  ]
+
+  try {
+    await runTranscodeProcess(request.jobId, config.executablePath, args, temporaryPath)
+    const stat = await fs.stat(temporaryPath)
+    if (!stat.isFile() || stat.size <= 0) throw new Error('Transcoded output is empty')
+    await fs.rename(temporaryPath, outputPath)
+    return { outputFileId: request.outputFileId, size: stat.size }
+  } catch (error) {
+    await fs.rm(temporaryPath, { force: true }).catch(() => undefined)
+    throw error
+  }
+}
+
+async function cancelTranscode(jobId: unknown): Promise<void> {
+  if (typeof jobId !== 'string' || jobId.length === 0) throw new Error('Invalid transcode job id')
+  const active = activeTranscodes.get(jobId)
+  if (!active) return
+  active.child.kill()
+  await fs.rm(active.temporaryPath, { force: true }).catch(() => undefined)
+}
+
 export function registerVideoTranscodeHandlers(wm: WindowManager): void {
   ipcMain.handle('video-transcode:get-ffmpeg-config', async (event): Promise<FfmpegConfigInfo> => {
     if (!isMainWindow(wm, event)) throw new Error('Unauthorized FFmpeg configuration access')
@@ -234,4 +364,17 @@ export function registerVideoTranscodeHandlers(wm: WindowManager): void {
       return { status: 'not-configured' }
     }
   )
+
+  ipcMain.handle(
+    'video-transcode:run',
+    async (event, request: unknown): Promise<VideoTranscodeRunResult> => {
+      if (!isMainWindow(wm, event)) throw new Error('Unauthorized FFmpeg transcode access')
+      return runTranscode(request)
+    }
+  )
+
+  ipcMain.handle('video-transcode:cancel', async (event, jobId: unknown): Promise<void> => {
+    if (!isMainWindow(wm, event)) throw new Error('Unauthorized FFmpeg transcode access')
+    await cancelTranscode(jobId)
+  })
 }

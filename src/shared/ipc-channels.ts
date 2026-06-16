@@ -52,6 +52,17 @@ export interface FfmpegConfigInfo {
   validatedAt?: number
 }
 
+export interface VideoTranscodeRunRequest {
+  jobId: string
+  sourceFileId: string
+  outputFileId: string
+}
+
+export interface VideoTranscodeRunResult {
+  outputFileId: string
+  size: number
+}
+
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
 
@@ -99,6 +110,8 @@ export interface IpcInvokeMap {
   'video-transcode:select-ffmpeg': { args: []; result: FfmpegConfigInfo | null }
   'video-transcode:validate-ffmpeg': { args: []; result: FfmpegConfigInfo }
   'video-transcode:remove-ffmpeg-config': { args: []; result: FfmpegConfigInfo }
+  'video-transcode:run': { args: [VideoTranscodeRunRequest]; result: VideoTranscodeRunResult }
+  'video-transcode:cancel': { args: [string]; result: void }
 }
 
 export type IpcInvokeChannel = keyof IpcInvokeMap

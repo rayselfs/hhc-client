@@ -111,7 +111,10 @@ const videoTranscodeApi = {
     typedInvoke('video-transcode:select-ffmpeg'),
   validateFfmpeg: (): Promise<FfmpegConfigInfo> => typedInvoke('video-transcode:validate-ffmpeg'),
   removeFfmpegConfig: (): Promise<FfmpegConfigInfo> =>
-    typedInvoke('video-transcode:remove-ffmpeg-config')
+    typedInvoke('video-transcode:remove-ffmpeg-config'),
+  run: (request: IpcInvokeMap['video-transcode:run']['args'][0]) =>
+    typedInvoke('video-transcode:run', request),
+  cancel: (jobId: string) => typedInvoke('video-transcode:cancel', jobId)
 }
 
 const api = {

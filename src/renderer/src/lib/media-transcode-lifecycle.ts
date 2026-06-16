@@ -1,6 +1,6 @@
 import { isValidNativeFileId } from '@shared/native-media'
 import { isElectron } from './env'
-import { mediaJobQueue } from './media-job-queue'
+import { MediaJobBlockedError, mediaJobQueue } from './media-job-queue'
 import {
   getDerivedAsset,
   putDerivedAsset,
@@ -158,3 +158,41 @@ export async function getReadyTranscodedVideo(
   )
   return asset?.status === 'ready' ? asset : null
 }
+
+mediaJobQueue.registerExecutor('transcode', async (job, { signal }) => {
+  if (!job.sourceBlobId || !job.itemId) throw new Error('Transcode job is missing source identity')
+  if (!isElectron())
+    throw new MediaJobBlockedError('configuration', 'Transcoding requires Electron')
+
+  const config = await window.api.videoTranscode.getFfmpegConfig()
+  if (config.status !== 'ready') {
+    throw new MediaJobBlockedError('configuration', config.status)
+  }
+
+  const outputFileId = crypto.randomUUID()
+  const cancel = (): void => {
+    void window.api.videoTranscode.cancel(job.id)
+  }
+  signal.addEventListener('abort', cancel, { once: true })
+  try {
+    const result = await window.api.videoTranscode.run({
+      jobId: job.id,
+      sourceFileId: job.sourceBlobId,
+      outputFileId
+    })
+    if (signal.aborted) {
+      await window.api.nativeFs.delete(result.outputFileId).catch(() => undefined)
+      return
+    }
+    await markTranscodedVideoReady({
+      sourceBlobId: job.sourceBlobId,
+      nativeFileId: result.outputFileId,
+      size: result.size
+    })
+  } catch (error) {
+    await markTranscodedVideoFailed(job.sourceBlobId)
+    throw error
+  } finally {
+    signal.removeEventListener('abort', cancel)
+  }
+})

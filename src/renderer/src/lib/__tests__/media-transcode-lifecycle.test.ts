@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createTranscodeDedupeKey,
   enqueueTranscodeJob,
@@ -64,9 +64,48 @@ describe('media transcode lifecycle', () => {
       blockedReason: 'configuration',
       errorCode: 'not-configured'
     })
-    await expect(getMediaJob(job.id)).resolves.toMatchObject({
-      status: 'blocked',
-      blockedReason: 'configuration'
+    await vi.waitFor(async () => {
+      await expect(getMediaJob(job.id)).resolves.toMatchObject({
+        status: 'blocked',
+        blockedReason: 'configuration'
+      })
+    })
+  })
+
+  it('runs Electron transcode jobs and stores the ready derivative', async () => {
+    const sourceBlobId = '123e4567-e89b-12d3-a456-426614174000'
+    const outputFileId = '223e4567-e89b-12d3-a456-426614174000'
+    const run = vi.fn().mockResolvedValue({ outputFileId, size: 4096 })
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: {
+        videoTranscode: {
+          getFfmpegConfig: async () => ({ status: 'ready' }),
+          run,
+          cancel: vi.fn()
+        },
+        nativeFs: {
+          delete: vi.fn()
+        }
+      }
+    })
+
+    const job = await enqueueTranscodeJob({
+      sourceBlobId,
+      itemId: 'original-item'
+    })
+
+    await vi.waitFor(async () => {
+      await expect(getReadyTranscodedVideo(sourceBlobId)).resolves.toMatchObject({
+        status: 'ready',
+        nativeFileId: outputFileId,
+        size: 4096
+      })
+    })
+    expect(run).toHaveBeenCalledWith({
+      jobId: job.id,
+      sourceFileId: sourceBlobId,
+      outputFileId: expect.any(String)
     })
   })
 

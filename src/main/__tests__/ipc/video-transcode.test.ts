@@ -105,6 +105,33 @@ function spawnSuccess(output: string): ReturnType<typeof mockSpawn> {
   return child
 }
 
+function spawnPending(): ReturnType<typeof mockSpawn> & { kill: () => void } {
+  const child = new EventEmitter() as ReturnType<typeof mockSpawn> & {
+    stdout: EventEmitter
+    stderr: EventEmitter
+    kill: () => void
+  }
+  child.stdout = new EventEmitter()
+  child.stderr = new EventEmitter()
+  child.kill = vi.fn(() => {
+    process.nextTick(() => child.emit('close', 1))
+    return true
+  })
+  return child
+}
+
+const storedConfig = JSON.stringify({
+  executablePath: '/opt/homebrew/bin/ffmpeg',
+  executableName: 'ffmpeg',
+  version: '7.1',
+  capabilities: {
+    hasH264Encoder: true,
+    hasAacEncoder: true,
+    hasMp4Muxer: true
+  },
+  validatedAt: 1
+})
+
 beforeEach(() => {
   vi.clearAllMocks()
   handleHandlers.clear()
@@ -113,7 +140,7 @@ beforeEach(() => {
   mockRename.mockResolvedValue(undefined)
   mockRm.mockResolvedValue(undefined)
   mockAccess.mockResolvedValue(undefined)
-  mockStat.mockResolvedValue({ isFile: () => true })
+  mockStat.mockResolvedValue({ isFile: () => true, size: 4096 })
   mockRealpath.mockImplementation(async (value: string) => value)
   mockReadFile.mockRejectedValue(Object.assign(new Error('missing'), { code: 'ENOENT' }))
   vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockMainWindow as never)
@@ -203,5 +230,85 @@ describe('video transcode FFmpeg configuration IPC', () => {
       status: 'not-configured'
     })
     expect(mockRm).toHaveBeenCalledWith('/tmp/hhc-user-data/ffmpeg-config.json', { force: true })
+  })
+
+  it('transcodes a managed native source to a temporary file before atomic rename', async () => {
+    const sourceId = '123e4567-e89b-12d3-a456-426614174000'
+    const outputId = '223e4567-e89b-12d3-a456-426614174000'
+    mockReadFile.mockResolvedValue(storedConfig)
+    mockSpawn
+      .mockImplementationOnce(() => spawnSuccess('ffmpeg version 7.1 Copyright'))
+      .mockImplementationOnce(() =>
+        spawnSuccess(' V..... libx264 H.264 encoder\n A..... aac AAC encoder')
+      )
+      .mockImplementationOnce(() => spawnSuccess(' E mp4 MP4 muxer'))
+      .mockImplementationOnce(() => spawnSuccess(''))
+
+    const result = await getHandler('video-transcode:run')(makeEvent(), {
+      jobId: 'job-1',
+      sourceFileId: sourceId,
+      outputFileId: outputId
+    })
+
+    expect(result).toEqual({ outputFileId: outputId, size: 4096 })
+    const transcodeCall = mockSpawn.mock.calls.at(-1)!
+    expect(transcodeCall[0]).toBe('/opt/homebrew/bin/ffmpeg')
+    expect(transcodeCall[1]).toEqual(
+      expect.arrayContaining([
+        '-i',
+        `/tmp/hhc-user-data/native-files/${sourceId}`,
+        '-c:v',
+        'libx264',
+        '-pix_fmt',
+        'yuv420p',
+        '-c:a',
+        'aac',
+        '-movflags',
+        '+faststart',
+        '-f',
+        'mp4'
+      ])
+    )
+    expect(mockRename).toHaveBeenCalledWith(
+      expect.stringMatching(/\/native-files\/\.223e4567-.+\.tmp\.mp4$/),
+      `/tmp/hhc-user-data/native-files/${outputId}`
+    )
+  })
+
+  it('rejects traversal output ids before spawning FFmpeg', async () => {
+    await expect(
+      getHandler('video-transcode:run')(makeEvent(), {
+        jobId: 'job-1',
+        sourceFileId: '123e4567-e89b-12d3-a456-426614174000',
+        outputFileId: '../escaped'
+      })
+    ).rejects.toThrow('Invalid transcode output id')
+    expect(mockSpawn).not.toHaveBeenCalled()
+  })
+
+  it('cancels an active transcode and removes its temporary output', async () => {
+    const sourceId = '123e4567-e89b-12d3-a456-426614174000'
+    const outputId = '223e4567-e89b-12d3-a456-426614174000'
+    const child = spawnPending()
+    mockReadFile.mockResolvedValue(storedConfig)
+    mockSpawn
+      .mockImplementationOnce(() => spawnSuccess('ffmpeg version 7.1 Copyright'))
+      .mockImplementationOnce(() =>
+        spawnSuccess(' V..... libx264 H.264 encoder\n A..... aac AAC encoder')
+      )
+      .mockImplementationOnce(() => spawnSuccess(' E mp4 MP4 muxer'))
+      .mockImplementationOnce(() => child)
+
+    const runPromise = getHandler('video-transcode:run')(makeEvent(), {
+      jobId: 'job-1',
+      sourceFileId: sourceId,
+      outputFileId: outputId
+    }) as Promise<unknown>
+    await vi.waitFor(() => expect(mockSpawn).toHaveBeenCalledTimes(4))
+    await getHandler('video-transcode:cancel')(makeEvent(), 'job-1')
+
+    expect(child.kill).toHaveBeenCalled()
+    expect(mockRm).toHaveBeenCalledWith(expect.stringMatching(/\.tmp\.mp4$/), { force: true })
+    await expect(runPromise).rejects.toThrow()
   })
 })
