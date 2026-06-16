@@ -83,13 +83,14 @@ export default function MediaPreview({
       className="relative shrink-0 w-full overflow-hidden px-4"
       style={{
         userSelect: 'none',
-        cursor: zoomLevel > 1
-          ? isDragging
-            ? 'grabbing'
-            : 'grab'
-          : descriptor?.clickToAdvance
-            ? 'pointer'
-            : 'default'
+        cursor:
+          zoomLevel > 1
+            ? isDragging
+              ? 'grabbing'
+              : 'grab'
+            : descriptor?.clickToAdvance
+              ? 'pointer'
+              : 'default'
       }}
       onMouseDown={handlePanStart}
     >
@@ -110,7 +111,7 @@ export default function MediaPreview({
             </span>
           </div>
         ) : PreviewComponent && currentItem ? (
-          <PreviewComponent item={currentItem} />
+          <PreviewComponent key={currentItem.id} item={currentItem} />
         ) : (
           <div className="text-foreground/50 text-center w-full h-full flex items-center justify-center">
             {t('presenter.noMediaSelected')}

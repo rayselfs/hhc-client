@@ -32,6 +32,7 @@ vi.mock('@renderer/contexts/PresenterCommandContext', () => ({
 const storeState = {
   zoomLevel: 1,
   pan: { x: 0, y: 0 },
+  setTypeState: vi.fn(),
   next: mockNext,
   exit: mockExit,
   canNext: () => true
@@ -102,6 +103,22 @@ describe('copied media preview identity', () => {
 
     expect(video.currentTime).toBe(35)
     expect(mockSendCommand).toHaveBeenCalledWith({ action: 'seek', value: 35 })
+  })
+
+  it('pauses a playing video through the pause-only media event', async () => {
+    const { container } = render(<VideoPreview item={makeCopy('video/mp4', 'copy.mp4')} />)
+
+    const video = await waitFor(() => {
+      const element = container.querySelector('video')
+      expect(element).not.toBeNull()
+      return element!
+    })
+    fireEvent.play(video)
+
+    window.dispatchEvent(new CustomEvent('media:pauseVideo'))
+
+    expect(video.pause).toHaveBeenCalled()
+    expect(mockSendCommand).toHaveBeenCalledWith({ action: 'pause' })
   })
 
   it('keeps the presenter open and retries a failed media load', async () => {

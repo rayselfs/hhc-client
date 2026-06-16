@@ -33,11 +33,14 @@ export default function MediaPresenter(): React.JSX.Element {
   const zoomLevel = useMediaProjectionStore((s) => s.zoomLevel)
   const isEnded = useMediaProjectionStore((s) => s.isEnded)
   const currentItem = useMediaProjectionStore((s) => s.currentItem())
+  const videoState = useMediaProjectionStore((s) => s.typeStates.video)
 
   const { exit, next, prev, jumpTo, toggleGrid, setZoomLevel, resetZoom } =
     useMediaProjectionStore.getState()
 
   const descriptor = currentItem ? getDescriptor(currentItem.mimeType) : null
+  const canSeekVideo =
+    descriptor?.type === 'video' && !!videoState?.hasStarted && !videoState?.isEnded
 
   const sendCommand = useCallback((cmd: FileControlPayload) => send('file:control', cmd), [send])
 
@@ -65,7 +68,9 @@ export default function MediaPresenter(): React.JSX.Element {
       {
         config: SHORTCUTS.MEDIA.ESCAPE,
         handler: () => {
-          if (showGrid) {
+          if (descriptor?.type === 'video' && videoState?.isPlaying) {
+            window.dispatchEvent(new CustomEvent('media:pauseVideo'))
+          } else if (showGrid) {
             toggleGrid()
           } else if (zoomLevel > 1) {
             resetZoom()
@@ -77,7 +82,7 @@ export default function MediaPresenter(): React.JSX.Element {
       {
         config: SHORTCUTS.MEDIA.NEXT_SLIDE,
         handler: () => {
-          if (descriptor?.type === 'video') {
+          if (canSeekVideo) {
             window.dispatchEvent(
               new CustomEvent('media:videoSeekRelative', { detail: { seconds: 5 } })
             )
@@ -90,7 +95,7 @@ export default function MediaPresenter(): React.JSX.Element {
       {
         config: SHORTCUTS.MEDIA.PREV_SLIDE,
         handler: () => {
-          if (descriptor?.type === 'video') {
+          if (canSeekVideo) {
             window.dispatchEvent(
               new CustomEvent('media:videoSeekRelative', { detail: { seconds: -5 } })
             )

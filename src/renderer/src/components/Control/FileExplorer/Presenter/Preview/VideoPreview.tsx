@@ -57,10 +57,16 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
 
   const zoomLevel = useMediaProjectionStore((s) => s.zoomLevel)
   const pan = useMediaProjectionStore((s) => s.pan)
+  const setTypeState = useMediaProjectionStore((s) => s.setTypeState)
   const transform =
     zoomLevel !== 1
       ? `scale(${zoomLevel}) translate(${(pan.x / zoomLevel) * 100}%, ${(pan.y / zoomLevel) * 100}%)`
       : undefined
+
+  useEffect(() => {
+    hasStartedRef.current = false
+    setTypeState('video', { hasStarted: false, isPlaying: false, isEnded: false })
+  }, [item.id, setTypeState])
 
   useEffect(() => {
     let revokeSource: (() => void) | null = null
@@ -130,6 +136,13 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
     }
   }, [isEnded, isPlaying, sendCommand, triggerFlash])
 
+  const pauseVideo = useCallback((): void => {
+    if (!videoRef.current || !isPlaying) return
+    triggerFlash('pause')
+    videoRef.current.pause()
+    sendCommand({ action: 'pause' })
+  }, [isPlaying, sendCommand, triggerFlash])
+
   useEffect(() => {
     const handleTogglePlay = (): void => {
       if (!hasStartedRef.current) {
@@ -139,8 +152,16 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
       handlePlayPause()
     }
     window.addEventListener('media:togglePlay', handleTogglePlay)
-    return () => window.removeEventListener('media:togglePlay', handleTogglePlay)
-  }, [handlePlayPause])
+    window.addEventListener('media:pauseVideo', pauseVideo)
+    return () => {
+      window.removeEventListener('media:togglePlay', handleTogglePlay)
+      window.removeEventListener('media:pauseVideo', pauseVideo)
+    }
+  }, [handlePlayPause, pauseVideo])
+
+  useEffect(() => {
+    setTypeState('video', { hasStarted, isPlaying, isEnded })
+  }, [hasStarted, isEnded, isPlaying, setTypeState])
 
   const handleVolumeChange = useCallback(
     (val: number): void => {
@@ -248,6 +269,7 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
           onClick={() => {
             hasStartedRef.current = true
             setHasStarted(true)
+            setIsEnded(false)
             videoRef.current
               ?.play()
               .then(() => setIsPlaying(true))

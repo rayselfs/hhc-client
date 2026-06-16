@@ -4,7 +4,7 @@ import { getMediaSupport, resolveMediaCapability } from './media-capabilities'
 
 export type MediaTypeStateMap = {
   image: Record<string, never>
-  video: Record<string, never>
+  video: { hasStarted?: boolean; isPlaying?: boolean; isEnded?: boolean }
   pdf: { viewMode: 'slide' | 'scroll'; thumbsCollapsed?: boolean }
 }
 
