@@ -6,6 +6,7 @@ import { openBibleDB } from '@renderer/lib/bible-db'
 import { incrementBlobRef, openFileExplorerDB } from '@renderer/lib/file-explorer-db'
 import { getBlobId } from '@renderer/lib/blob-identity'
 import { resolveUniqueName } from '@renderer/lib/file-naming'
+import { isFolderReadOnlyBySyncLink } from '@renderer/lib/sync-readonly'
 
 export interface FolderStoreState {
   folders: Record<string, FolderRecord>
@@ -53,6 +54,19 @@ export interface FolderStoreState {
   getItems: (parentId: string) => AnyItemRecord[]
   getFolderPath: (folderId: string) => FolderRecord[]
   isItemsLoaded: (parentId: string) => boolean
+}
+
+function isFolderReadOnly(folderId: string, folders: Record<string, FolderRecord>): boolean {
+  return isFolderReadOnlyBySyncLink(folderId, folders)
+}
+
+function isItemInReadOnlyFolder(
+  itemId: string,
+  items: Record<string, AnyItemRecord>,
+  folders: Record<string, FolderRecord>
+): boolean {
+  const item = items[itemId]
+  return item ? isFolderReadOnly(item.parentId, folders) : false
 }
 
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
@@ -185,6 +199,7 @@ export function createFolderStore(config: FolderStoreConfig) {
 
     addFolder: (name, parentId, expiresAt) => {
       const resolvedParentId = parentId ?? get().currentFolderId
+      if (isFolderReadOnly(resolvedParentId, get().folders)) return ''
       const siblings = get().getChildFolders(resolvedParentId)
       const resolvedName = resolveUniqueName(
         name,
@@ -222,6 +237,7 @@ export function createFolderStore(config: FolderStoreConfig) {
       if (id === config.rootId) return
       const folder = get().folders[id]
       if (!folder) return
+      if (isFolderReadOnly(id, get().folders)) return
       const updated = { ...folder, ...updates }
       set((state) => {
         const newFoldersArray = state._foldersArray.map((f) => (f.id === id ? updated : f))
@@ -243,6 +259,8 @@ export function createFolderStore(config: FolderStoreConfig) {
     updateItem: (id, updates) => {
       const item = get().items[id]
       if (!item) return
+      if (isFolderReadOnly(item.parentId, get().folders)) return
+      if (updates.parentId && isFolderReadOnly(updates.parentId, get().folders)) return
       const updated = { ...item, ...updates } as AnyItemRecord
       set((state) => {
         const newItemsArray = state._itemsArray.map((entry) => (entry.id === id ? updated : entry))
@@ -265,6 +283,7 @@ export function createFolderStore(config: FolderStoreConfig) {
 
     deleteFolder: (id) => {
       if (id === config.rootId) return
+      if (isFolderReadOnly(id, get().folders)) return
       const { folders, items, currentFolderId } = get()
 
       const descendantIds = getDescendantFolderIds(id, folders)
@@ -325,6 +344,7 @@ export function createFolderStore(config: FolderStoreConfig) {
 
     addItem: (itemData) => {
       const parentId = itemData.parentId || get().currentFolderId
+      if (isFolderReadOnly(parentId, get().folders)) return
       const isRoot = parentId === config.rootId
       const siblings = get().getItems(parentId)
       const item: AnyItemRecord = {
@@ -352,6 +372,8 @@ export function createFolderStore(config: FolderStoreConfig) {
     },
 
     removeItem: (id) => {
+      const { items, folders } = get()
+      if (isItemInReadOnlyFolder(id, items, folders)) return
       set((state) => {
         const removedItem = state.items[id]
         const newItems = { ...state.items }
@@ -374,6 +396,12 @@ export function createFolderStore(config: FolderStoreConfig) {
     moveItem: (itemId, targetFolderId) => {
       const item = get().items[itemId]
       if (!item || item.parentId === targetFolderId) return
+      if (
+        isFolderReadOnly(item.parentId, get().folders) ||
+        isFolderReadOnly(targetFolderId, get().folders)
+      ) {
+        return
+      }
       const targetSiblings = get().getItems(targetFolderId)
       const updated: AnyItemRecord = {
         ...item,
@@ -405,6 +433,7 @@ export function createFolderStore(config: FolderStoreConfig) {
     copyItem: async (itemId, targetFolderId) => {
       const sourceItem = get().items[itemId]
       if (!sourceItem || sourceItem.type !== 'file') return null
+      if (isFolderReadOnly(targetFolderId, get().folders)) return null
 
       const blobId = getBlobId(sourceItem)
       const newId = crypto.randomUUID()
@@ -443,6 +472,12 @@ export function createFolderStore(config: FolderStoreConfig) {
       if (folderId === config.rootId || folderId === targetFolderId) return
       const folder = get().folders[folderId]
       if (!folder) return
+      if (
+        isFolderReadOnly(folderId, get().folders) ||
+        isFolderReadOnly(targetFolderId, get().folders)
+      ) {
+        return
+      }
 
       const descendants = getDescendantFolderIds(folderId, get().folders)
       if (descendants.includes(targetFolderId)) return
@@ -475,6 +510,7 @@ export function createFolderStore(config: FolderStoreConfig) {
     },
 
     reorderItems: (parentId, orderedIds) => {
+      if (isFolderReadOnly(parentId, get().folders)) return
       const { items } = get()
       const updated: AnyItemRecord[] = []
       for (let i = 0; i < orderedIds.length; i++) {
@@ -504,6 +540,7 @@ export function createFolderStore(config: FolderStoreConfig) {
     },
 
     reorderFolders: (parentId, orderedIds) => {
+      if (isFolderReadOnly(parentId, get().folders)) return
       const { folders } = get()
       const updated: FolderRecord[] = []
       for (let i = 0; i < orderedIds.length; i++) {
@@ -576,6 +613,7 @@ export function createFolderStore(config: FolderStoreConfig) {
 
     softDeleteFolder: (folderId) => {
       if (folderId === config.rootId) return
+      if (isFolderReadOnly(folderId, get().folders)) return
       const { folders } = get()
       const folder = folders[folderId]
       if (!folder) return
@@ -625,6 +663,7 @@ export function createFolderStore(config: FolderStoreConfig) {
     softDeleteItem: (itemId) => {
       const item = get().items[itemId]
       if (!item) return
+      if (isFolderReadOnly(item.parentId, get().folders)) return
       const updated: AnyItemRecord = {
         ...item,
         deletedAt: Date.now(),
@@ -652,6 +691,7 @@ export function createFolderStore(config: FolderStoreConfig) {
       const parentId = folder.originalParentId
       const targetParentId =
         parentId && folders[parentId] && !folders[parentId].deletedAt ? parentId : config.rootId
+      if (isFolderReadOnly(targetParentId, folders)) return
       const updated: FolderRecord = {
         ...folder,
         isFavorited: false,
@@ -687,6 +727,7 @@ export function createFolderStore(config: FolderStoreConfig) {
       const parentId = item.originalParentId
       const targetParentId =
         parentId && folders[parentId] && !folders[parentId].deletedAt ? parentId : config.rootId
+      if (isFolderReadOnly(targetParentId, folders)) return
       const updated: AnyItemRecord = {
         ...item,
         parentId: targetParentId,

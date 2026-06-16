@@ -9,12 +9,14 @@ import { FolderModal } from '@renderer/components/Control/Folder/FolderModal'
 export interface FileExplorerFABProps {
   onUploadFiles?: () => void
   onUploadFolder?: () => void
+  isReadOnly?: boolean
 }
 
 export default function FileExplorerFAB({
   onUploadFiles,
-  onUploadFolder
-}: FileExplorerFABProps): React.JSX.Element {
+  onUploadFolder,
+  isReadOnly = false
+}: FileExplorerFABProps): React.JSX.Element | null {
   const { t } = useTranslation()
 
   const currentFolderId = useFileExplorerStore((state) => state.currentFolderId)
@@ -26,6 +28,7 @@ export default function FileExplorerFAB({
   const [folderDuration, setFolderDuration] = useState<FolderDuration>('1day')
 
   function openCreateFolderModal(): void {
+    if (isReadOnly) return
     const existingNames = getChildFolders(currentFolderId).map((f) => f.name)
     const base = t('folder.untitledFolder')
     let name = base
@@ -40,11 +43,14 @@ export default function FileExplorerFAB({
   }
 
   function handleModalSubmit(): void {
+    if (isReadOnly) return
     const name = folderName.trim()
     if (!name) return
     addFolder(name, currentFolderId, computeExpiresAt(folderDuration))
     setIsModalOpen(false)
   }
+
+  if (isReadOnly) return null
 
   return (
     <>
@@ -71,36 +77,41 @@ export default function FileExplorerFAB({
           <Dropdown.Popover>
             <Dropdown.Menu
               onAction={(key) => {
+                if (isReadOnly) return
                 if (key === 'newFolder') openCreateFolderModal()
                 if (key === 'uploadFiles') onUploadFiles?.()
                 if (key === 'uploadFolder') onUploadFolder?.()
               }}
             >
               <Dropdown.Section>
-                <Dropdown.Item
-                  id="newFolder"
-                  className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
-                >
-                  <FolderPlus size={16} />
-                  {t('fileExplorer.contextMenu.newFolder')}
-                </Dropdown.Item>
+                {!isReadOnly && (
+                  <Dropdown.Item
+                    id="newFolder"
+                    className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
+                  >
+                    <FolderPlus size={16} />
+                    {t('fileExplorer.contextMenu.newFolder')}
+                  </Dropdown.Item>
+                )}
               </Dropdown.Section>
-              <Dropdown.Section>
-                <Dropdown.Item
-                  id="uploadFiles"
-                  className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
-                >
-                  <Upload size={16} />
-                  {t('fileExplorer.contextMenu.uploadFiles')}
-                </Dropdown.Item>
-                <Dropdown.Item
-                  id="uploadFolder"
-                  className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
-                >
-                  <Folder size={16} />
-                  {t('fileExplorer.contextMenu.uploadFolder')}
-                </Dropdown.Item>
-              </Dropdown.Section>
+              {!isReadOnly && (
+                <Dropdown.Section>
+                  <Dropdown.Item
+                    id="uploadFiles"
+                    className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
+                  >
+                    <Upload size={16} />
+                    {t('fileExplorer.contextMenu.uploadFiles')}
+                  </Dropdown.Item>
+                  <Dropdown.Item
+                    id="uploadFolder"
+                    className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
+                  >
+                    <Folder size={16} />
+                    {t('fileExplorer.contextMenu.uploadFolder')}
+                  </Dropdown.Item>
+                </Dropdown.Section>
+              )}
             </Dropdown.Menu>
           </Dropdown.Popover>
         </Dropdown.Root>

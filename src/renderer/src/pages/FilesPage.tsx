@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from '@heroui/react/toast'
 import { FileExplorerShell, useFileContextMenu } from '@renderer/components/Control/FileExplorer'
@@ -30,12 +30,14 @@ import {
   resolveUniqueName,
   validateDisplayName
 } from '@renderer/lib/file-naming'
+import { isFolderReadOnlyBySyncLink } from '@renderer/lib/sync-readonly'
 
 export default function FilesPage(): React.JSX.Element {
   const { t } = useTranslation()
   const confirm = useConfirm()
   const isPresenting = useMediaProjectionStore((s) => s.isPresenting)
   const currentFolderId = useFileExplorerStore((state) => state.currentFolderId)
+  const foldersById = useFileExplorerStore((state) => state.folders)
   const getChildFolders = useFileExplorerStore((state) => state.getChildFolders)
   const addFolder = useFileExplorerStore((state) => state.addFolder)
   const moveItem = useFileExplorerStore((state) => state.moveItem)
@@ -69,6 +71,21 @@ export default function FilesPage(): React.JSX.Element {
   )
   const selectedCount = selectedIds.size
   const fileAccept = getMediaFileAcceptAttribute(getUploadMediaPlatform())
+  const isCurrentFolderReadOnly = useMemo(
+    () => isFolderReadOnlyBySyncLink(currentFolderId, foldersById),
+    [currentFolderId, foldersById]
+  )
+
+  const areIdsReadOnly = useCallback((ids: Set<string>): boolean => {
+    const state = useFileExplorerStore.getState()
+    for (const id of ids) {
+      const folder = state.folders[id]
+      if (folder && isFolderReadOnlyBySyncLink(folder.id, state.folders)) return true
+      const item = state.items[id]
+      if (item && isFolderReadOnlyBySyncLink(item.parentId, state.folders)) return true
+    }
+    return false
+  }, [])
 
   useEffect(() => {
     const el = folderInputRef.current
@@ -79,31 +96,35 @@ export default function FilesPage(): React.JSX.Element {
   }, [])
 
   const handleUploadFiles = useCallback((): void => {
+    if (isCurrentFolderReadOnly) return
     fileInputRef.current?.click()
-  }, [])
+  }, [isCurrentFolderReadOnly])
 
   const handleUploadFolder = useCallback((): void => {
+    if (isCurrentFolderReadOnly) return
     folderInputRef.current?.click()
-  }, [])
+  }, [isCurrentFolderReadOnly])
 
   const handleFileChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
       const files = Array.from(e.target.files ?? [])
       if (files.length === 0) return
+      if (isCurrentFolderReadOnly) return
       await uploadFiles(files, currentFolderId)
       if (fileInputRef.current) fileInputRef.current.value = ''
     },
-    [currentFolderId]
+    [currentFolderId, isCurrentFolderReadOnly]
   )
 
   const handleFolderChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
       const allFiles = Array.from(e.target.files ?? [])
       if (allFiles.length === 0) return
+      if (isCurrentFolderReadOnly) return
       await uploadFolderFiles(allFiles, currentFolderId, addFolder)
       if (folderInputRef.current) folderInputRef.current.value = ''
     },
-    [currentFolderId, addFolder]
+    [currentFolderId, addFolder, isCurrentFolderReadOnly]
   )
 
   const handleSelectionChange = useCallback((nextSelectedIds: Set<string>): void => {
@@ -115,10 +136,14 @@ export default function FilesPage(): React.JSX.Element {
     setClipboard({ itemIds: new Set(targetIds), mode: 'copy' })
   }, [])
 
-  const handleCut = useCallback((targetIds: Set<string>): void => {
-    if (targetIds.size === 0) return
-    setClipboard({ itemIds: new Set(targetIds), mode: 'cut' })
-  }, [])
+  const handleCut = useCallback(
+    (targetIds: Set<string>): void => {
+      if (targetIds.size === 0) return
+      if (areIdsReadOnly(targetIds)) return
+      setClipboard({ itemIds: new Set(targetIds), mode: 'cut' })
+    },
+    [areIdsReadOnly]
+  )
 
   const handleEscape = useCallback((): void => {
     if (clipboard?.mode === 'cut') {
@@ -129,6 +154,7 @@ export default function FilesPage(): React.JSX.Element {
   const handleDelete = useCallback(
     async (targetIds: Set<string>): Promise<void> => {
       if (targetIds.size === 0) return
+      if (areIdsReadOnly(targetIds)) return
       const confirmed = await confirm({
         title: t('folder.deleteSelectedTitle', {
           count: targetIds.size,
@@ -148,11 +174,12 @@ export default function FilesPage(): React.JSX.Element {
       }
       setSelectedIds(new Set())
     },
-    [confirm, t]
+    [confirm, t, areIdsReadOnly]
   )
 
   const handlePaste = useCallback(async (): Promise<void> => {
     if (!clipboard) return
+    if (isCurrentFolderReadOnly) return
 
     async function copyFolderRecursive(
       sourceId: string,
@@ -209,12 +236,21 @@ export default function FilesPage(): React.JSX.Element {
 
     if (clipboard.mode === 'cut') setClipboard(null)
     setSelectedIds(new Set())
-  }, [clipboard, currentFolderId, addFolder, copyItem, moveFolder, moveItem])
+  }, [
+    clipboard,
+    currentFolderId,
+    addFolder,
+    copyItem,
+    moveFolder,
+    moveItem,
+    isCurrentFolderReadOnly
+  ])
 
   const openEditModal = useCallback((id: string): void => {
     const state = useFileExplorerStore.getState()
     const target = state.folders[id]
     if (!target) return
+    if (isFolderReadOnlyBySyncLink(target.id, state.folders)) return
     setEditingId(id)
     setEditModalName(target.name)
     setEditModalDuration(inferDuration(target.expiresAt, target.createdAt ?? Date.now()))
@@ -232,6 +268,7 @@ export default function FilesPage(): React.JSX.Element {
     const state = useFileExplorerStore.getState()
     const folder = state.folders[editingId]
     if (folder) {
+      if (isFolderReadOnlyBySyncLink(folder.id, state.folders)) return
       const siblingNames = state
         .getChildFolders(folder.parentId ?? FILE_EXPLORER_ROOT_ID)
         .map((entry) => entry.name)
@@ -255,16 +292,19 @@ export default function FilesPage(): React.JSX.Element {
 
       const isAlreadySelected = selectedIds.has(itemId)
       if (selectedIds.size > 1 && isAlreadySelected) {
+        const isReadOnly = areIdsReadOnly(selectedIds)
         showMultiSelectMenu({
           selectedIds,
           event,
           onCopy: handleCopy,
           onCut: handleCut,
-          onDelete: handleDelete
+          onDelete: handleDelete,
+          isReadOnly
         })
         return
       }
 
+      const isReadOnly = isFolderReadOnlyBySyncLink(item.parentId, state.folders)
       showItemMenu({
         item,
         isAlreadySelected,
@@ -273,10 +313,19 @@ export default function FilesPage(): React.JSX.Element {
         onCopy: handleCopy,
         onCut: handleCut,
         onDelete: handleDelete,
-        onEdit: (targetItem) => setRenameItemRequestId(targetItem.id)
+        onEdit: (targetItem) => setRenameItemRequestId(targetItem.id),
+        isReadOnly
       })
     },
-    [selectedIds, showMultiSelectMenu, showItemMenu, handleCopy, handleCut, handleDelete]
+    [
+      selectedIds,
+      showMultiSelectMenu,
+      showItemMenu,
+      handleCopy,
+      handleCut,
+      handleDelete,
+      areIdsReadOnly
+    ]
   )
 
   const handleFolderContextMenu = useCallback(
@@ -286,16 +335,22 @@ export default function FilesPage(): React.JSX.Element {
 
       const isAlreadySelected = selectedIds.has(folderId)
       if (selectedIds.size > 1 && isAlreadySelected) {
+        const isReadOnly = areIdsReadOnly(selectedIds)
         showMultiSelectMenu({
           selectedIds,
           event,
           onCopy: handleCopy,
           onCut: handleCut,
-          onDelete: handleDelete
+          onDelete: handleDelete,
+          isReadOnly
         })
         return
       }
 
+      const isReadOnly = isFolderReadOnlyBySyncLink(
+        folder.id,
+        useFileExplorerStore.getState().folders
+      )
       showFolderMenu({
         folder,
         isAlreadySelected,
@@ -306,7 +361,8 @@ export default function FilesPage(): React.JSX.Element {
         onCut: handleCut,
         onPaste: handlePaste,
         onDelete: handleDelete,
-        onEdit: (targetFolder) => openEditModal(targetFolder.id)
+        onEdit: (targetFolder) => openEditModal(targetFolder.id),
+        isReadOnly
       })
     },
     [
@@ -318,20 +374,23 @@ export default function FilesPage(): React.JSX.Element {
       handleCut,
       handlePaste,
       handleDelete,
-      openEditModal
+      openEditModal,
+      areIdsReadOnly
     ]
   )
 
   const openCreateFolderModal = useCallback((): void => {
+    if (isCurrentFolderReadOnly) return
     const existingNames = getChildFolders(currentFolderId).map((f) => f.name)
     const base = t('folder.untitledFolder')
     setCreateFolderName(resolveUniqueName(base, existingNames))
     setCreateFolderDuration('1day')
     setIsCreateFolderModalOpen(true)
-  }, [getChildFolders, currentFolderId, t])
+  }, [getChildFolders, currentFolderId, t, isCurrentFolderReadOnly])
 
   const handleCreateFolderSubmit = useCallback((): void => {
     const name = createFolderName.trim()
+    if (isCurrentFolderReadOnly) return
     if (!validateDisplayName(name)) {
       toast.danger(t('fileExplorer.invalidName', 'Invalid name'))
       return
@@ -343,7 +402,15 @@ export default function FilesPage(): React.JSX.Element {
     }
     addFolder(name, currentFolderId, computeExpiresAt(createFolderDuration))
     setIsCreateFolderModalOpen(false)
-  }, [createFolderName, createFolderDuration, addFolder, currentFolderId, getChildFolders, t])
+  }, [
+    createFolderName,
+    createFolderDuration,
+    addFolder,
+    currentFolderId,
+    getChildFolders,
+    t,
+    isCurrentFolderReadOnly
+  ])
 
   const handleEmptyAreaContextMenu = useCallback(
     (event: React.MouseEvent): void => {
@@ -353,7 +420,8 @@ export default function FilesPage(): React.JSX.Element {
         onPaste: handlePaste,
         onNewFolder: openCreateFolderModal,
         onUploadFiles: handleUploadFiles,
-        onUploadFolder: handleUploadFolder
+        onUploadFolder: handleUploadFolder,
+        isReadOnly: isCurrentFolderReadOnly
       })
     },
     [
@@ -362,7 +430,8 @@ export default function FilesPage(): React.JSX.Element {
       handlePaste,
       openCreateFolderModal,
       handleUploadFiles,
-      handleUploadFolder
+      handleUploadFolder,
+      isCurrentFolderReadOnly
     ]
   )
 
@@ -397,9 +466,14 @@ export default function FilesPage(): React.JSX.Element {
           onEscape={handleEscape}
           renameItemRequestId={renameItemRequestId}
           onRenameItemRequestHandled={() => setRenameItemRequestId(null)}
+          isCurrentFolderReadOnly={isCurrentFolderReadOnly}
         />
       </FileExplorerShell>
-      <FileExplorerFAB onUploadFiles={handleUploadFiles} onUploadFolder={handleUploadFolder} />
+      <FileExplorerFAB
+        onUploadFiles={handleUploadFiles}
+        onUploadFolder={handleUploadFolder}
+        isReadOnly={isCurrentFolderReadOnly}
+      />
       <FolderModal
         isOpen={isCreateFolderModalOpen}
         onClose={() => setIsCreateFolderModalOpen(false)}

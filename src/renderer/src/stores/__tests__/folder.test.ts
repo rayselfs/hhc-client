@@ -61,6 +61,56 @@ const makeVerse = (id: string): Omit<VerseItemRecord, 'id' | 'sortIndex' | 'crea
   expiresAt: null
 })
 
+const makeSyncedFolder = (id = 'synced-folder', parentId = ROOT_ID): FolderRecord => ({
+  id,
+  name: 'Synced Folder',
+  parentId,
+  sortIndex: 0,
+  createdAt: Date.now(),
+  expiresAt: null,
+  syncLink: {
+    providerConnectionId: 'connection-1',
+    remoteFolderId: 'remote-folder-1',
+    providerType: 'onedrive',
+    offlinePolicy: 'on-demand'
+  }
+})
+
+function addFolderRecord(folder: FolderRecord): void {
+  useBibleFolderStore.setState((state) => ({
+    folders: { ...state.folders, [folder.id]: folder },
+    _foldersArray: [...state._foldersArray, folder],
+    _childFoldersByParent:
+      folder.parentId === null
+        ? state._childFoldersByParent
+        : {
+            ...state._childFoldersByParent,
+            [folder.parentId]: [...(state._childFoldersByParent[folder.parentId] ?? []), folder]
+          }
+  }))
+}
+
+function addVerseRecord(item: VerseItemRecord): void {
+  useBibleFolderStore.setState((state) => ({
+    items: { ...state.items, [item.id]: item },
+    _itemsArray: [...state._itemsArray, item],
+    _itemsByParent: {
+      ...state._itemsByParent,
+      [item.parentId]: [...(state._itemsByParent[item.parentId] ?? []), item]
+    }
+  }))
+}
+
+function makeVerseRecord(id: string, parentId = ROOT_ID, sortIndex = 0): VerseItemRecord {
+  return {
+    ...makeVerse(id),
+    id,
+    parentId,
+    sortIndex,
+    createdAt: Date.now()
+  }
+}
+
 beforeEach(() => {
   useBibleFolderStore.setState({
     folders: { [ROOT_ID]: rootFolder },
@@ -170,6 +220,18 @@ describe('addFolder()', () => {
     useBibleFolderStore.getState().addFolder('Test')
     expect(mockSaveFolder).toHaveBeenCalled()
   })
+
+  it('does not create folders inside read-only sync folders', () => {
+    const synced = makeSyncedFolder()
+    addFolderRecord(synced)
+    mockSaveFolder.mockClear()
+
+    const id = useBibleFolderStore.getState().addFolder('Blocked', synced.id)
+
+    expect(id).toBe('')
+    expect(useBibleFolderStore.getState().getChildFolders(synced.id)).toHaveLength(0)
+    expect(mockSaveFolder).not.toHaveBeenCalled()
+  })
 })
 
 describe('updateFolder()', () => {
@@ -191,6 +253,20 @@ describe('updateFolder()', () => {
     const folderId = useBibleFolderStore.getState().getChildFolders(ROOT_ID)[0].id
     useBibleFolderStore.getState().updateFolder(folderId, { name: 'Y' })
     expect(mockSaveFolder).toHaveBeenCalled()
+  })
+
+  it('does not rename read-only sync folders or descendants', () => {
+    const synced = makeSyncedFolder()
+    const child = makeSyncedFolder('synced-child', synced.id)
+    child.syncLink = undefined
+    addFolderRecord(synced)
+    addFolderRecord(child)
+    mockSaveFolder.mockClear()
+
+    useBibleFolderStore.getState().updateFolder(child.id, { name: 'Blocked Rename' })
+
+    expect(useBibleFolderStore.getState().folders[child.id].name).toBe('Synced Folder')
+    expect(mockSaveFolder).not.toHaveBeenCalled()
   })
 })
 
@@ -215,6 +291,17 @@ describe('deleteFolder()', () => {
     expect(useBibleFolderStore.getState().currentFolderId).toBe(folderId)
     useBibleFolderStore.getState().deleteFolder(folderId)
     expect(useBibleFolderStore.getState().currentFolderId).toBe(ROOT_ID)
+  })
+
+  it('does not hard delete read-only sync folders', () => {
+    const synced = makeSyncedFolder()
+    addFolderRecord(synced)
+    mockDeleteFolders.mockClear()
+
+    useBibleFolderStore.getState().deleteFolder(synced.id)
+
+    expect(useBibleFolderStore.getState().folders[synced.id]).toBeDefined()
+    expect(mockDeleteFolders).not.toHaveBeenCalled()
   })
 })
 
@@ -245,6 +332,17 @@ describe('addItem()', () => {
     useBibleFolderStore.getState().addItem(makeVerse('v1'))
     expect(mockSaveItem).toHaveBeenCalled()
   })
+
+  it('does not add items inside read-only sync folders', () => {
+    const synced = makeSyncedFolder()
+    addFolderRecord(synced)
+    mockSaveItem.mockClear()
+
+    useBibleFolderStore.getState().addItem({ ...makeVerse('blocked'), parentId: synced.id })
+
+    expect(useBibleFolderStore.getState().getItems(synced.id)).toHaveLength(0)
+    expect(mockSaveItem).not.toHaveBeenCalled()
+  })
 })
 
 describe('removeItem()', () => {
@@ -267,6 +365,19 @@ describe('removeItem()', () => {
     const nestedId = useBibleFolderStore.getState().getItems(folderId)[0].id
     useBibleFolderStore.getState().removeItem(nestedId)
     expect(useBibleFolderStore.getState().getItems(folderId)).toHaveLength(0)
+  })
+
+  it('does not remove items from read-only sync folders', () => {
+    const synced = makeSyncedFolder()
+    addFolderRecord(synced)
+    const item = makeVerseRecord('synced-item', synced.id)
+    addVerseRecord(item)
+    mockDeleteItem.mockClear()
+
+    useBibleFolderStore.getState().removeItem(item.id)
+
+    expect(useBibleFolderStore.getState().items[item.id]).toBeDefined()
+    expect(mockDeleteItem).not.toHaveBeenCalled()
   })
 })
 
@@ -297,6 +408,23 @@ describe('moveItem()', () => {
     const targetId = useBibleFolderStore.getState().getChildFolders(ROOT_ID)[0].id
     mockSaveItem.mockClear()
     useBibleFolderStore.getState().moveItem('nonexistent', targetId)
+    expect(mockSaveItem).not.toHaveBeenCalled()
+  })
+
+  it('does not move items into or out of read-only sync folders', () => {
+    const synced = makeSyncedFolder()
+    addFolderRecord(synced)
+    useBibleFolderStore.getState().addItem(makeVerse('normal'))
+    const syncedItem = makeVerseRecord('synced-item', synced.id)
+    addVerseRecord(syncedItem)
+    const normalItemId = useBibleFolderStore.getState().getItems(ROOT_ID)[0].id
+    mockSaveItem.mockClear()
+
+    useBibleFolderStore.getState().moveItem(normalItemId, synced.id)
+    useBibleFolderStore.getState().moveItem(syncedItem.id, ROOT_ID)
+
+    expect(useBibleFolderStore.getState().items[normalItemId].parentId).toBe(ROOT_ID)
+    expect(useBibleFolderStore.getState().items[syncedItem.id].parentId).toBe(synced.id)
     expect(mockSaveItem).not.toHaveBeenCalled()
   })
 })
@@ -330,6 +458,113 @@ describe('reorderItems()', () => {
     mockSaveItems.mockClear()
     useBibleFolderStore.getState().reorderItems(ROOT_ID, [idB, idA])
     expect(mockSaveItems).toHaveBeenCalled()
+  })
+
+  it('does not reorder items inside read-only sync folders', () => {
+    const synced = makeSyncedFolder()
+    addFolderRecord(synced)
+    addVerseRecord(makeVerseRecord('synced-a', synced.id, 0))
+    addVerseRecord(makeVerseRecord('synced-b', synced.id, 1))
+    const [idA, idB] = useBibleFolderStore
+      .getState()
+      .getItems(synced.id)
+      .map((i) => i.id)
+    mockSaveItems.mockClear()
+
+    useBibleFolderStore.getState().reorderItems(synced.id, [idB, idA])
+
+    expect(
+      useBibleFolderStore
+        .getState()
+        .getItems(synced.id)
+        .map((i) => i.id)
+    ).toEqual([idA, idB])
+    expect(mockSaveItems).not.toHaveBeenCalled()
+  })
+})
+
+describe('read-only sync folder mutations', () => {
+  it('does not update items inside read-only sync folders', () => {
+    const synced = makeSyncedFolder()
+    addFolderRecord(synced)
+    const item = makeVerseRecord('synced-update', synced.id)
+    addVerseRecord(item)
+    mockSaveItem.mockClear()
+
+    useBibleFolderStore.getState().updateItem?.(item.id, { text: 'blocked' })
+
+    expect((useBibleFolderStore.getState().items[item.id] as VerseItemRecord).text).toBe(
+      'Verse synced-update'
+    )
+    expect(mockSaveItem).not.toHaveBeenCalled()
+  })
+
+  it('does not move folders into or out of read-only sync folders', () => {
+    const synced = makeSyncedFolder()
+    const normal = {
+      ...makeSyncedFolder('normal-folder'),
+      name: 'Normal',
+      syncLink: undefined
+    }
+    const syncedChild = {
+      ...makeSyncedFolder('synced-child', synced.id),
+      syncLink: undefined
+    }
+    addFolderRecord(synced)
+    addFolderRecord(normal)
+    addFolderRecord(syncedChild)
+    mockSaveFolder.mockClear()
+
+    useBibleFolderStore.getState().moveFolder(normal.id, synced.id)
+    useBibleFolderStore.getState().moveFolder(syncedChild.id, ROOT_ID)
+
+    expect(useBibleFolderStore.getState().folders[normal.id].parentId).toBe(ROOT_ID)
+    expect(useBibleFolderStore.getState().folders[syncedChild.id].parentId).toBe(synced.id)
+    expect(mockSaveFolder).not.toHaveBeenCalled()
+  })
+
+  it('does not reorder child folders inside read-only sync folders', () => {
+    const synced = makeSyncedFolder()
+    const first = {
+      ...makeSyncedFolder('synced-child-a', synced.id),
+      syncLink: undefined
+    }
+    const second = {
+      ...makeSyncedFolder('synced-child-b', synced.id),
+      sortIndex: 1,
+      syncLink: undefined
+    }
+    addFolderRecord(synced)
+    addFolderRecord(first)
+    addFolderRecord(second)
+    mockSaveFolders.mockClear()
+
+    useBibleFolderStore.getState().reorderFolders(synced.id, [second.id, first.id])
+
+    expect(
+      useBibleFolderStore
+        .getState()
+        .getChildFolders(synced.id)
+        .map((f) => f.id)
+    ).toEqual([first.id, second.id])
+    expect(mockSaveFolders).not.toHaveBeenCalled()
+  })
+
+  it('does not soft delete read-only sync folders or items', () => {
+    const synced = makeSyncedFolder()
+    addFolderRecord(synced)
+    const item = makeVerseRecord('synced-soft-delete', synced.id)
+    addVerseRecord(item)
+    mockSaveFolder.mockClear()
+    mockSaveItem.mockClear()
+
+    useBibleFolderStore.getState().softDeleteFolder(synced.id)
+    useBibleFolderStore.getState().softDeleteItem(item.id)
+
+    expect(useBibleFolderStore.getState().folders[synced.id].deletedAt).toBeUndefined()
+    expect(useBibleFolderStore.getState().items[item.id].deletedAt).toBeUndefined()
+    expect(mockSaveFolder).not.toHaveBeenCalled()
+    expect(mockSaveItem).not.toHaveBeenCalled()
   })
 })
 

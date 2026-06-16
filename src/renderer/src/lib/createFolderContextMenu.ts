@@ -28,6 +28,7 @@ export interface ShowItemMenuOptions {
   onCut: (targetIds: Set<string>) => void
   onDelete: (targetIds: Set<string>) => void
   onEdit?: (item: FolderItem) => void
+  isReadOnly?: boolean
 }
 
 export interface ShowFolderMenuOptions {
@@ -41,6 +42,7 @@ export interface ShowFolderMenuOptions {
   onPaste: () => void
   onDelete: (targetIds: Set<string>) => void
   onEdit?: (folder: FolderRecord) => void
+  isReadOnly?: boolean
 }
 
 export interface ShowMultiSelectMenuOptions {
@@ -49,6 +51,7 @@ export interface ShowMultiSelectMenuOptions {
   onCopy: (targetIds: Set<string>) => void
   onCut: (targetIds: Set<string>) => void
   onDelete: (targetIds: Set<string>) => void
+  isReadOnly?: boolean
 }
 
 export interface ShowEmptyAreaMenuOptions {
@@ -58,6 +61,7 @@ export interface ShowEmptyAreaMenuOptions {
   onNewFolder: () => void
   onUploadFiles?: () => void
   onUploadFolder?: () => void
+  isReadOnly?: boolean
 }
 
 export interface UseFolderContextMenu {
@@ -87,7 +91,8 @@ export function createFolderContextMenu(
       onCopy,
       onCut,
       onDelete,
-      onEdit
+      onEdit,
+      isReadOnly = false
     }: ShowItemMenuOptions): void => {
       if (!isAlreadySelected) {
         setSelected(new Set([item.id]))
@@ -95,7 +100,7 @@ export function createFolderContextMenu(
 
       const targetIds = new Set([item.id])
       const editItems: ContextMenuEntry[] = []
-      if (onEdit) {
+      if (onEdit && !isReadOnly) {
         editItems.push({
           id: 'rename',
           label: tKey('rename'),
@@ -114,20 +119,24 @@ export function createFolderContextMenu(
           icon: React.createElement(Copy, { size: 14 }),
           onAction: () => onCopy(targetIds)
         },
-        {
-          id: 'cut',
-          label: tKey('cut'),
-          icon: React.createElement(Scissors, { size: 14 }),
-          onAction: () => onCut(targetIds)
-        },
-        'separator',
-        {
-          id: 'delete',
-          label: tKey('delete'),
-          icon: React.createElement(Trash2, { size: 14 }),
-          variant: 'danger',
-          onAction: () => onDelete(targetIds)
-        }
+        ...(isReadOnly
+          ? []
+          : [
+              {
+                id: 'cut',
+                label: tKey('cut'),
+                icon: React.createElement(Scissors, { size: 14 }),
+                onAction: () => onCut(targetIds)
+              },
+              'separator' as const,
+              {
+                id: 'delete',
+                label: tKey('delete'),
+                icon: React.createElement(Trash2, { size: 14 }),
+                variant: 'danger' as const,
+                onAction: () => onDelete(targetIds)
+              }
+            ])
       ]
 
       const extra = config?.extraItemActions?.(item.id, t as (key: string) => string) ?? []
@@ -144,35 +153,38 @@ export function createFolderContextMenu(
       onCut,
       onPaste,
       onDelete,
-      onEdit
+      onEdit,
+      isReadOnly = false
     }: ShowFolderMenuOptions): void => {
       if (!isAlreadySelected) {
         setSelected(new Set([folder.id]))
       }
 
       const targetIds = new Set([folder.id])
-      const pasteItems: ContextMenuEntry[] = clipboard
-        ? [
-            {
-              id: 'paste',
-              label: tKey('paste'),
-              icon: React.createElement(Clipboard, { size: 14 }),
-              onAction: onPaste
-            }
-          ]
-        : []
+      const pasteItems: ContextMenuEntry[] =
+        clipboard && !isReadOnly
+          ? [
+              {
+                id: 'paste',
+                label: tKey('paste'),
+                icon: React.createElement(Clipboard, { size: 14 }),
+                onAction: onPaste
+              }
+            ]
+          : []
 
-      const editItems: ContextMenuEntry[] = onEdit
-        ? [
-            {
-              id: 'edit',
-              label: tKey('edit'),
-              icon: React.createElement(Pencil, { size: 14 }),
-              onAction: () => onEdit(folder)
-            },
-            'separator'
-          ]
-        : []
+      const editItems: ContextMenuEntry[] =
+        onEdit && !isReadOnly
+          ? [
+              {
+                id: 'edit',
+                label: tKey('edit'),
+                icon: React.createElement(Pencil, { size: 14 }),
+                onAction: () => onEdit(folder)
+              },
+              'separator'
+            ]
+          : []
 
       const baseItems: ContextMenuEntry[] = [
         ...editItems,
@@ -182,21 +194,29 @@ export function createFolderContextMenu(
           icon: React.createElement(Copy, { size: 14 }),
           onAction: () => onCopy(targetIds)
         },
-        {
-          id: 'cut',
-          label: tKey('cut'),
-          icon: React.createElement(Scissors, { size: 14 }),
-          onAction: () => onCut(targetIds)
-        },
+        ...(isReadOnly
+          ? []
+          : [
+              {
+                id: 'cut',
+                label: tKey('cut'),
+                icon: React.createElement(Scissors, { size: 14 }),
+                onAction: () => onCut(targetIds)
+              }
+            ]),
         ...pasteItems,
-        'separator',
-        {
-          id: 'delete',
-          label: tKey('delete'),
-          icon: React.createElement(Trash2, { size: 14 }),
-          variant: 'danger',
-          onAction: () => onDelete(targetIds)
-        }
+        ...(isReadOnly
+          ? []
+          : [
+              'separator' as const,
+              {
+                id: 'delete',
+                label: tKey('delete'),
+                icon: React.createElement(Trash2, { size: 14 }),
+                variant: 'danger' as const,
+                onAction: () => onDelete(targetIds)
+              }
+            ])
       ]
 
       const extra = config?.extraFolderActions?.(folder, t as (key: string) => string) ?? []
@@ -208,7 +228,8 @@ export function createFolderContextMenu(
       event,
       onCopy,
       onCut,
-      onDelete
+      onDelete,
+      isReadOnly = false
     }: ShowMultiSelectMenuOptions): void => {
       const items: ContextMenuEntry[] = [
         {
@@ -217,20 +238,24 @@ export function createFolderContextMenu(
           icon: React.createElement(Copy, { size: 14 }),
           onAction: () => onCopy(selectedIds)
         },
-        {
-          id: 'cut',
-          label: tKey('cut'),
-          icon: React.createElement(Scissors, { size: 14 }),
-          onAction: () => onCut(selectedIds)
-        },
-        'separator',
-        {
-          id: 'delete',
-          label: tKey('delete'),
-          icon: React.createElement(Trash2, { size: 14 }),
-          variant: 'danger',
-          onAction: () => onDelete(selectedIds)
-        }
+        ...(isReadOnly
+          ? []
+          : [
+              {
+                id: 'cut',
+                label: tKey('cut'),
+                icon: React.createElement(Scissors, { size: 14 }),
+                onAction: () => onCut(selectedIds)
+              },
+              'separator' as const,
+              {
+                id: 'delete',
+                label: tKey('delete'),
+                icon: React.createElement(Trash2, { size: 14 }),
+                variant: 'danger' as const,
+                onAction: () => onDelete(selectedIds)
+              }
+            ])
       ]
 
       showMenu(items, event)
@@ -242,22 +267,24 @@ export function createFolderContextMenu(
       onPaste,
       onNewFolder,
       onUploadFiles,
-      onUploadFolder
+      onUploadFolder,
+      isReadOnly = false
     }: ShowEmptyAreaMenuOptions): void => {
-      const pasteItems: ContextMenuEntry[] = clipboard
-        ? [
-            {
-              id: 'paste',
-              label: tKey('paste'),
-              icon: React.createElement(Clipboard, { size: 14 }),
-              onAction: onPaste
-            },
-            'separator'
-          ]
-        : []
+      const pasteItems: ContextMenuEntry[] =
+        clipboard && !isReadOnly
+          ? [
+              {
+                id: 'paste',
+                label: tKey('paste'),
+                icon: React.createElement(Clipboard, { size: 14 }),
+                onAction: onPaste
+              },
+              'separator'
+            ]
+          : []
 
       const uploadItems: ContextMenuEntry[] =
-        onUploadFiles || onUploadFolder
+        !isReadOnly && (onUploadFiles || onUploadFolder)
           ? [
               'separator',
               ...(onUploadFiles
@@ -285,12 +312,16 @@ export function createFolderContextMenu(
 
       const baseItems: ContextMenuEntry[] = [
         ...pasteItems,
-        {
-          id: 'new-folder',
-          label: tKey('newFolder'),
-          icon: React.createElement(FolderPlus, { size: 14 }),
-          onAction: onNewFolder
-        },
+        ...(isReadOnly
+          ? []
+          : [
+              {
+                id: 'new-folder',
+                label: tKey('newFolder'),
+                icon: React.createElement(FolderPlus, { size: 14 }),
+                onAction: onNewFolder
+              }
+            ]),
         ...uploadItems
       ]
 

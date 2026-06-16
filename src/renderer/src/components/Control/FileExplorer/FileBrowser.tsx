@@ -58,6 +58,7 @@ export interface FileBrowserProps {
   onEscape?: () => void
   renameItemRequestId?: string | null
   onRenameItemRequestHandled?: () => void
+  isCurrentFolderReadOnly?: boolean
 }
 
 type FileExplorerDndData =
@@ -332,7 +333,8 @@ export function FileBrowser({
   clipboard,
   onEscape,
   renameItemRequestId,
-  onRenameItemRequestHandled
+  onRenameItemRequestHandled,
+  isCurrentFolderReadOnly = false
 }: FileBrowserProps): React.JSX.Element {
   const { t } = useTranslation()
   const confirm = useConfirm()
@@ -497,6 +499,7 @@ export function FileBrowser({
     handlers: osDragHandlers
   } = useOsFileDrop(containerRef, {
     onDrop: async (dataTransfer, targetId) => {
+      if (isCurrentFolderReadOnly) return
       await uploadFromDataTransfer(dataTransfer.items, targetId ?? currentFolderId)
     }
   })
@@ -531,10 +534,16 @@ export function FileBrowser({
     const file = fileItems.find((item) => item.id === renameItemRequestId)
     if (file) {
       setSelectedIds(new Set([renameItemRequestId]))
-      setRenamingItemId(renameItemRequestId)
+      if (!isCurrentFolderReadOnly) setRenamingItemId(renameItemRequestId)
     }
     onRenameItemRequestHandled?.()
-  }, [renameItemRequestId, fileItems, setSelectedIds, onRenameItemRequestHandled])
+  }, [
+    renameItemRequestId,
+    fileItems,
+    setSelectedIds,
+    onRenameItemRequestHandled,
+    isCurrentFolderReadOnly
+  ])
 
   useEffect(() => {
     cancelPendingRename()
@@ -618,6 +627,10 @@ export function FileBrowser({
 
   const handleRenameSubmit = useCallback(
     (itemId: string, baseName: string): void => {
+      if (isCurrentFolderReadOnly) {
+        setRenamingItemId(null)
+        return
+      }
       const file = fileItems.find((item) => item.id === itemId)
       if (!file) {
         setRenamingItemId(null)
@@ -643,7 +656,7 @@ export function FileBrowser({
       useFileExplorerStore.getState().updateItem?.(itemId, { name: nextName })
       setRenamingItemId(null)
     },
-    [fileItems, t]
+    [fileItems, t, isCurrentFolderReadOnly]
   )
 
   const handleRenameCancel = useCallback((): void => {
@@ -709,7 +722,7 @@ export function FileBrowser({
 
       const item = sortedItems.find((entry) => entry.id === itemId)
       if (!item || item.isFolder) return
-      if (isNameRegion) {
+      if (isNameRegion && !isCurrentFolderReadOnly) {
         cancelPendingRename()
         pendingRenameItemIdRef.current = itemId
         renameClickTimerRef.current = setTimeout(() => {
@@ -719,10 +732,11 @@ export function FileBrowser({
         }, SLOW_CLICK_RENAME_MIN_MS)
       }
     },
-    [cancelPendingRename, handleItemClick, selectedIds, sortedItems]
+    [cancelPendingRename, handleItemClick, selectedIds, sortedItems, isCurrentFolderReadOnly]
   )
 
   const handleDeleteSelected = useCallback(async (): Promise<void> => {
+    if (isCurrentFolderReadOnly) return
     if (selectedIds.size === 0) return
 
     const confirmed = await confirm({
@@ -744,7 +758,7 @@ export function FileBrowser({
       }
     }
     clearSelection()
-  }, [selectedIds, confirm, t, folderIds, clearSelection])
+  }, [selectedIds, confirm, t, folderIds, clearSelection, isCurrentFolderReadOnly])
 
   const handleCopySelected = useCallback((): void => {
     if (selectedIds.size === 0) return
@@ -752,13 +766,15 @@ export function FileBrowser({
   }, [selectedIds, onCopy])
 
   const handleCutSelected = useCallback((): void => {
+    if (isCurrentFolderReadOnly) return
     if (selectedIds.size === 0) return
     onCut?.(selectedIds)
-  }, [selectedIds, onCut])
+  }, [selectedIds, onCut, isCurrentFolderReadOnly])
 
   const handlePasteSelected = useCallback((): void => {
+    if (isCurrentFolderReadOnly) return
     onPaste?.()
-  }, [onPaste])
+  }, [onPaste, isCurrentFolderReadOnly])
 
   useKeyboardShortcuts(
     [
@@ -822,6 +838,7 @@ export function FileBrowser({
 
   const handleDragStart = useCallback(
     (event: DragStartEvent): void => {
+      if (isCurrentFolderReadOnly) return
       setRenamingItemId(null)
       cancelPendingRename()
       pointerRef.current = null
@@ -835,13 +852,14 @@ export function FileBrowser({
         setDraggedIds(new Set([nextActiveId]))
       }
     },
-    [cancelPendingRename, selectedIds, setSelectedIds]
+    [cancelPendingRename, selectedIds, setSelectedIds, isCurrentFolderReadOnly]
   )
 
   const handleDragOver = useCallback((): void => {}, [])
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent): void => {
+      if (isCurrentFolderReadOnly) return
       const currentDraggedIds = draggedIds
       setActiveId(null)
       setDraggedIds(new Set())
@@ -886,7 +904,8 @@ export function FileBrowser({
       moveFolder,
       moveItem,
       setCustomOrder,
-      setSortDir
+      setSortDir,
+      isCurrentFolderReadOnly
     ]
   )
 
@@ -974,7 +993,7 @@ export function FileBrowser({
       onDragEnter={osDragHandlers.onDragEnter}
       onDragOver={osDragHandlers.onDragOver}
       onDragLeave={osDragHandlers.onDragLeave}
-      onDrop={osDragHandlers.onDrop}
+      onDrop={isCurrentFolderReadOnly ? undefined : osDragHandlers.onDrop}
     >
       <DndContext
         sensors={sensors}
