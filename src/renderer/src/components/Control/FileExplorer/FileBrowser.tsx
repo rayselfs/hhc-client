@@ -616,7 +616,14 @@ export function FileBrowser({
         const presentable = getPresentableItems(sortedFileItems)
         const idx = presentable.findIndex((f) => f.id === itemId)
         if (idx !== -1) {
-          useMediaProjectionStore.getState().startPresentation(presentable, idx)
+          void useMediaProjectionStore
+            .getState()
+            .startPresentationWithReadiness(presentable, idx)
+            .then((report) => {
+              if (report.summary.ready === 0) {
+                toast.warning(t('fileExplorer.noProjectableFiles'))
+              }
+            })
         } else {
           toast.warning(t('fileExplorer.noProjectableFiles'))
         }
@@ -798,7 +805,14 @@ export function FileBrowser({
         handler: () => {
           const presentable = getPresentableItems(sortedFileItems)
           if (presentable.length > 0) {
-            useMediaProjectionStore.getState().startPresentation(presentable, 0)
+            void useMediaProjectionStore
+              .getState()
+              .startPresentationWithReadiness(presentable, 0)
+              .then((report) => {
+                if (report.summary.ready === 0) {
+                  toast.warning(t('fileExplorer.noProjectableFiles'))
+                }
+              })
           } else {
             toast.warning(t('fileExplorer.noProjectableFiles'))
           }
@@ -815,7 +829,14 @@ export function FileBrowser({
           }
           const firstSelected = [...selectedIds].find((id) => presentable.some((f) => f.id === id))
           const idx = firstSelected ? presentable.findIndex((f) => f.id === firstSelected) : 0
-          useMediaProjectionStore.getState().startPresentation(presentable, Math.max(0, idx))
+          void useMediaProjectionStore
+            .getState()
+            .startPresentationWithReadiness(presentable, Math.max(0, idx))
+            .then((report) => {
+              if (report.summary.ready === 0) {
+                toast.warning(t('fileExplorer.noProjectableFiles'))
+              }
+            })
         },
         preventDefault: true
       }

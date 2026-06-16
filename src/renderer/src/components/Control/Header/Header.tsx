@@ -201,7 +201,14 @@ export default function Header(): React.JSX.Element {
                 )
                 const presentable = getPresentableItems(items)
                 if (presentable.length > 0) {
-                  useMediaProjectionStore.getState().startPresentation(presentable, 0)
+                  void useMediaProjectionStore
+                    .getState()
+                    .startPresentationWithReadiness(presentable, 0)
+                    .then((report) => {
+                      if (report.summary.ready === 0) {
+                        toast.warning(t('fileExplorer.noProjectableFiles'))
+                      }
+                    })
                   return
                 } else {
                   toast.warning(t('fileExplorer.noProjectableFiles'))
