@@ -14,6 +14,11 @@ const mockUnsubscribeBibleFolders = vi.fn()
 const mockUnsubscribeFileExplorer = vi.fn()
 const mockRecoverStaleJobs = vi.fn().mockResolvedValue(0)
 const mockRemoveExpiredHistory = vi.fn().mockResolvedValue(0)
+const mockRecoverPendingSyncResourceCleanups = vi.fn().mockResolvedValue({
+  folderIds: [],
+  itemIds: [],
+  tombstoneCount: 0
+})
 
 const bibleState = {
   isInitialized: false,
@@ -91,6 +96,10 @@ vi.mock('@renderer/lib/media-job-queue', () => ({
     recoverStaleJobs: mockRecoverStaleJobs,
     removeExpiredHistory: mockRemoveExpiredHistory
   }
+}))
+
+vi.mock('@renderer/lib/sync-unlink', () => ({
+  recoverPendingSyncResourceCleanups: mockRecoverPendingSyncResourceCleanups
 }))
 
 describe('initializeApp — online handler', () => {

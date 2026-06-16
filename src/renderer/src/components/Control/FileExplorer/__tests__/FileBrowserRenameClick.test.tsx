@@ -87,12 +87,19 @@ vi.mock('@renderer/contexts/ConfirmDialogContext', () => ({
 }))
 
 const mockStartPresentation = vi.fn()
+const mockStartPresentationWithReadiness = vi.fn().mockResolvedValue({
+  summary: { ready: 1, preparing: 0, unsupported: 0, missing: 0, failed: 0 },
+  items: []
+})
 
 vi.mock('@renderer/stores/media-projection', () => ({
   useMediaProjectionStore: Object.assign(
     vi.fn(() => false),
     {
-      getState: () => ({ startPresentation: mockStartPresentation })
+      getState: () => ({
+        startPresentation: mockStartPresentation,
+        startPresentationWithReadiness: mockStartPresentationWithReadiness
+      })
     }
   )
 }))
@@ -169,6 +176,7 @@ describe('FileBrowser slow-click inline rename', () => {
     vi.useFakeTimers()
     updateItem.mockClear()
     mockStartPresentation.mockClear()
+    mockStartPresentationWithReadiness.mockClear()
     viewMode = 'medium-icon'
   })
 
@@ -222,7 +230,7 @@ describe('FileBrowser slow-click inline rename', () => {
     flushRenameDelay()
 
     expect(screen.queryByLabelText('Rename file')).toBeNull()
-    expect(mockStartPresentation).toHaveBeenCalledOnce()
+    expect(mockStartPresentationWithReadiness).toHaveBeenCalledOnce()
   })
 
   it('does not start rename after pointer movement', () => {
