@@ -4,8 +4,10 @@ import type { MediaType, MediaTypeStateMap } from '@renderer/lib/presentability'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { lockMediaResources } from '@renderer/lib/media-resource-locks'
 import {
+  analyzePresentationReadiness,
   createPresentationSnapshot,
   getPresentationSnapshotResourceIds,
+  type PresentationReadinessReport,
   type PresentationSnapshot
 } from '@renderer/lib/presentation-readiness'
 
@@ -39,6 +41,10 @@ export interface MediaProjectionStore {
   resetZoom: () => void
   setPan: (x: number, y: number) => void
   updateNotes: (itemId: string, notes: string) => void
+  startPresentationWithReadiness: (
+    files: FileItemRecord[],
+    startIndex: number
+  ) => Promise<PresentationReadinessReport>
 }
 
 const initialTypeStates: Partial<{ [K in MediaType]: MediaTypeStateMap[K] }> = {
@@ -104,6 +110,48 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
       snapshot,
       typeStates: initialTypeStates
     })
+  },
+
+  startPresentationWithReadiness: async (
+    files: FileItemRecord[],
+    startIndex: number
+  ): Promise<PresentationReadinessReport> => {
+    const report = await analyzePresentationReadiness(files)
+    const readyItemIds = new Set(
+      report.items.filter((item) => item.status === 'ready').map((item) => item.itemId)
+    )
+    const readyFiles = files.filter((file) => readyItemIds.has(file.id))
+    if (readyFiles.length === 0) return report
+
+    const requestedItem = files[startIndex]
+    const requestedReadyIndex = requestedItem
+      ? readyFiles.findIndex((file) => file.id === requestedItem.id)
+      : -1
+    const fallbackReadyIndex = readyFiles.findIndex(
+      (file) => files.findIndex((candidate) => candidate.id === file.id) >= startIndex
+    )
+    const resolvedIndex =
+      requestedReadyIndex >= 0
+        ? requestedReadyIndex
+        : fallbackReadyIndex >= 0
+          ? fallbackReadyIndex
+          : readyFiles.length - 1
+
+    releaseProjectionLocks?.()
+    const snapshot = createPresentationSnapshot(readyFiles, report.items)
+    releaseProjectionLocks = lockMediaResources(getPresentationSnapshotResourceIds(snapshot))
+    set({
+      playlist: readyFiles,
+      currentIndex: resolvedIndex,
+      isPresenting: true,
+      isEnded: false,
+      showGrid: false,
+      snapshot,
+      typeStates: initialTypeStates,
+      zoomLevel: 1,
+      pan: { x: 0, y: 0 }
+    })
+    return report
   },
 
   exit: () => {

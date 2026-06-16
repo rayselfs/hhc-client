@@ -78,6 +78,38 @@ describe('startPresentation', () => {
   })
 })
 
+describe('startPresentationWithReadiness', () => {
+  it('starts only ready items and returns the readiness report', async () => {
+    const playlist = [
+      makeFile('bad', 'bad.xyz', 'application/x-unsupported'),
+      makeFile('ready-a', 'ready-a.png'),
+      makeFile('ready-b', 'ready-b.png')
+    ]
+
+    const report = await useMediaProjectionStore
+      .getState()
+      .startPresentationWithReadiness(playlist, 0)
+    const state = useMediaProjectionStore.getState()
+
+    expect(report.summary).toMatchObject({ ready: 2, unsupported: 1 })
+    expect(state.isPresenting).toBe(true)
+    expect(state.playlist.map((item) => item.id)).toEqual(['ready-a', 'ready-b'])
+    expect(state.currentIndex).toBe(0)
+    expect(state.snapshot?.entries.map((entry) => entry.itemId)).toEqual(['ready-a', 'ready-b'])
+  })
+
+  it('does not start when no items are ready', async () => {
+    const report = await useMediaProjectionStore
+      .getState()
+      .startPresentationWithReadiness([makeFile('bad', 'bad.xyz', 'application/x-unsupported')], 0)
+    const state = useMediaProjectionStore.getState()
+
+    expect(report.summary.ready).toBe(0)
+    expect(state.isPresenting).toBe(false)
+    expect(state.playlist).toEqual([])
+  })
+})
+
 describe('exit', () => {
   it('resets all state', () => {
     useMediaProjectionStore.getState().startPresentation(files, 1)
