@@ -587,6 +587,27 @@
         "remove": "Remove configuration",
         "installGuide": "HHC Client does not download or update FFmpeg. Install FFmpeg yourself and select the executable here.",
         "installLink": "FFmpeg downloads"
+      },
+      "storage": {
+        "title": "Media Storage",
+        "description": "Review source media, generated assets, sync cache, and browser quota without deleting original files.",
+        "refresh": "Refresh",
+        "total": "Total",
+        "browserEstimate": "Browser storage: {{usage}} used of {{quota}}. Persistent storage: {{persisted}}.",
+        "persistedYes": "enabled",
+        "persistedNo": "not enabled",
+        "buckets": {
+          "electronNativeSourceMedia": "Electron native source media",
+          "webIndexedDbSourceBlobs": "Web IndexedDB source blobs",
+          "legacyElectronIndexedDbBlobs": "Legacy Electron IndexedDB blobs",
+          "generatedCoverThumbnails": "Generated cover thumbnails",
+          "customCoverOverrides": "Custom cover overrides",
+          "pdfPageThumbnails": "PDF page thumbnails",
+          "videoPosters": "Video posters",
+          "transcodedDerivatives": "Transcoded derivatives",
+          "syncCache": "Sync cache",
+          "temporaryAndFailedJobFiles": "Temporary and failed-job files"
+        }
       }
     },
     "languageNames": {

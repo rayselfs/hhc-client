@@ -587,6 +587,27 @@
         "remove": "移除設定",
         "installGuide": "HHC Client 不會下載或更新 FFmpeg。請自行安裝 FFmpeg，並在此選擇執行檔。",
         "installLink": "FFmpeg 下載"
+      },
+      "storage": {
+        "title": "媒體儲存空間",
+        "description": "檢視原始媒體、產生資產、同步快取與瀏覽器配額；這裡不會刪除原始檔案。",
+        "refresh": "重新整理",
+        "total": "總計",
+        "browserEstimate": "瀏覽器儲存空間：已使用 {{usage}} / {{quota}}。持久化儲存：{{persisted}}。",
+        "persistedYes": "已啟用",
+        "persistedNo": "未啟用",
+        "buckets": {
+          "electronNativeSourceMedia": "Electron 原生檔案媒體",
+          "webIndexedDbSourceBlobs": "Web IndexedDB 原始 Blob",
+          "legacyElectronIndexedDbBlobs": "舊 Electron IndexedDB Blob",
+          "generatedCoverThumbnails": "產生的封面縮圖",
+          "customCoverOverrides": "自訂封面覆寫",
+          "pdfPageThumbnails": "PDF 頁面縮圖",
+          "videoPosters": "影片封面",
+          "transcodedDerivatives": "轉檔衍生檔",
+          "syncCache": "同步快取",
+          "temporaryAndFailedJobFiles": "暫存與失敗工作檔案"
+        }
       }
     },
     "languageNames": {

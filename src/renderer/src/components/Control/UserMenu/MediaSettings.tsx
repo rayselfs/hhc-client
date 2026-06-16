@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@heroui/react/button'
 import { Select } from '@heroui/react/select'
@@ -13,11 +13,35 @@ import {
   type OneDriveSettings
 } from '@renderer/stores/settings'
 import { isElectron } from '@renderer/lib/env'
+import {
+  getMediaStorageAccounting,
+  type MediaStorageAccountingReport,
+  type MediaStorageUsage
+} from '@renderer/lib/media-storage-accounting'
 import type { FfmpegConfigInfo } from '@shared/ipc-channels'
 import type { SyncOfflinePolicy } from '@shared/types/folder'
 
 const RETENTION_DAY_OPTIONS = [7, 14, 30, 60, 90, 0] as const
 const OFFLINE_POLICY_OPTIONS: SyncOfflinePolicy[] = ['online-only', 'on-demand', 'always-offline']
+const STORAGE_USAGE_KEYS: (keyof MediaStorageUsage)[] = [
+  'electronNativeSourceMedia',
+  'webIndexedDbSourceBlobs',
+  'legacyElectronIndexedDbBlobs',
+  'generatedCoverThumbnails',
+  'customCoverOverrides',
+  'pdfPageThumbnails',
+  'videoPosters',
+  'transcodedDerivatives',
+  'syncCache',
+  'temporaryAndFailedJobFiles'
+]
+
+function formatBytes(bytes: number): string {
+  if (bytes <= 0) return '0 B'
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
+  return `${(bytes / 1024 ** index).toFixed(index === 0 ? 0 : 1)} ${units[index]}`
+}
 
 export default function MediaSettings(): React.JSX.Element {
   const { t } = useTranslation()
@@ -28,6 +52,8 @@ export default function MediaSettings(): React.JSX.Element {
   const [ffmpegConfig, setFfmpegConfig] = useState<FfmpegConfigInfo>({ status: 'not-configured' })
   const [isCheckingFfmpeg, setIsCheckingFfmpeg] = useState(false)
   const [oneDriveDraft, setOneDriveDraft] = useState<OneDriveSettings>(oneDrive)
+  const [storageReport, setStorageReport] = useState<MediaStorageAccountingReport | null>(null)
+  const [isLoadingStorage, setIsLoadingStorage] = useState(false)
   const canConfigureFfmpeg = isElectron()
   const effectiveOneDriveClientId = getEffectiveOneDriveClientId(oneDriveDraft)
   const customClientIdValid =
@@ -44,6 +70,19 @@ export default function MediaSettings(): React.JSX.Element {
       cancelled = true
     }
   }, [canConfigureFfmpeg])
+
+  const refreshStorageReport = useCallback(async (): Promise<void> => {
+    setIsLoadingStorage(true)
+    try {
+      setStorageReport(await getMediaStorageAccounting())
+    } finally {
+      setIsLoadingStorage(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void refreshStorageReport()
+  }, [refreshStorageReport])
 
   async function runFfmpegAction(action: () => Promise<FfmpegConfigInfo | null>): Promise<void> {
     setIsCheckingFfmpeg(true)
@@ -277,6 +316,50 @@ export default function MediaSettings(): React.JSX.Element {
               </a>
             </p>
           </>
+        )}
+      </section>
+
+      <section className="space-y-3 rounded-2xl border border-default-200 p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold">{t('preferences.media.storage.title')}</h3>
+            <p className="mt-1 text-xs text-gray-500">
+              {t('preferences.media.storage.description')}
+            </p>
+          </div>
+          <Button
+            variant="secondary"
+            className="rounded-full"
+            isDisabled={isLoadingStorage}
+            onPress={() => void refreshStorageReport()}
+          >
+            {t('preferences.media.storage.refresh')}
+          </Button>
+        </div>
+
+        <dl className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-2 text-sm">
+          {STORAGE_USAGE_KEYS.map((key) => (
+            <div key={key} className="contents">
+              <dt className="text-gray-500">{t(`preferences.media.storage.buckets.${key}`)}</dt>
+              <dd>{formatBytes(storageReport?.usage[key] ?? 0)}</dd>
+            </div>
+          ))}
+          <div className="contents font-semibold">
+            <dt>{t('preferences.media.storage.total')}</dt>
+            <dd>{formatBytes(storageReport?.total ?? 0)}</dd>
+          </div>
+        </dl>
+
+        {storageReport?.browser && (
+          <div className="rounded-xl bg-default-100 px-3 py-2 text-xs text-gray-600">
+            {t('preferences.media.storage.browserEstimate', {
+              usage: formatBytes(storageReport.browser.usage ?? 0),
+              quota: formatBytes(storageReport.browser.quota ?? 0),
+              persisted: storageReport.browser.persisted
+                ? t('preferences.media.storage.persistedYes')
+                : t('preferences.media.storage.persistedNo')
+            })}
+          </div>
         )}
       </section>
     </div>
