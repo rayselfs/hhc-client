@@ -346,6 +346,7 @@ export function FileBrowser({
   const [selectedSearchId, setSelectedSearchId] = useState<string | null>(null)
   const [renamingItemId, setRenamingItemId] = useState<string | null>(null)
   const slowClickRef = React.useRef<{ itemId: string; at: number } | null>(null)
+  const renameClickTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const pointerRef = React.useRef<{
     itemId: string
     x: number
@@ -489,6 +490,13 @@ export function FileBrowser({
     [sortedItems, selectedIds]
   )
 
+  const cancelPendingRename = useCallback((): void => {
+    if (renameClickTimerRef.current) {
+      clearTimeout(renameClickTimerRef.current)
+      renameClickTimerRef.current = null
+    }
+  }, [])
+
   useEffect(() => {
     onSelectionChange?.(selectedIds)
   }, [selectedIds, onSelectionChange])
@@ -512,16 +520,22 @@ export function FileBrowser({
   }, [renameItemRequestId, fileItems, setSelectedIds, onRenameItemRequestHandled])
 
   useEffect(() => {
+    cancelPendingRename()
     slowClickRef.current = null
     setRenamingItemId(null)
-  }, [currentFolderId, viewMode])
+  }, [cancelPendingRename, currentFolderId, viewMode])
 
   useEffect(() => {
     const previous = slowClickRef.current
     if (previous && (!selectedIds.has(previous.itemId) || selectedIds.size !== 1)) {
+      cancelPendingRename()
       slowClickRef.current = null
     }
-  }, [selectedIds])
+  }, [cancelPendingRename, selectedIds])
+
+  useEffect(() => {
+    return () => cancelPendingRename()
+  }, [cancelPendingRename])
 
   const handleEscape = useCallback((): void => {
     if (renamingItemId) {
@@ -545,6 +559,7 @@ export function FileBrowser({
     (itemId: string, event: React.MouseEvent): void => {
       event.preventDefault()
       event.stopPropagation()
+      cancelPendingRename()
       if (!selectedIds.has(itemId)) setSelectedIds(new Set([itemId]))
       const item = sortedItems.find((entry) => entry.id === itemId)
       if (item?.isFolder) {
@@ -553,11 +568,19 @@ export function FileBrowser({
         onItemContextMenu?.(itemId, event)
       }
     },
-    [sortedItems, selectedIds, setSelectedIds, onFolderContextMenu, onItemContextMenu]
+    [
+      sortedItems,
+      selectedIds,
+      setSelectedIds,
+      onFolderContextMenu,
+      onItemContextMenu,
+      cancelPendingRename
+    ]
   )
 
   const handleItemDoubleClick = useCallback(
     (itemId: string, event: React.MouseEvent): void => {
+      cancelPendingRename()
       slowClickRef.current = null
       event.stopPropagation()
       const item = sortedItems.find((entry) => entry.id === itemId)
@@ -576,7 +599,7 @@ export function FileBrowser({
         }
       }
     },
-    [sortedItems, sortedFileItems, fileItems, navigateToFolder, t]
+    [cancelPendingRename, sortedItems, sortedFileItems, fileItems, navigateToFolder, t]
   )
 
   const handleRenameSubmit = useCallback(
@@ -610,32 +633,41 @@ export function FileBrowser({
   )
 
   const handleRenameCancel = useCallback((): void => {
+    cancelPendingRename()
     setRenamingItemId(null)
-  }, [])
+  }, [cancelPendingRename])
 
-  const handleItemPointerDown = useCallback((itemId: string, event: React.PointerEvent): void => {
-    if (event.button !== 0 || event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) {
-      pointerRef.current = null
-      slowClickRef.current = null
-      return
-    }
+  const handleItemPointerDown = useCallback(
+    (itemId: string, event: React.PointerEvent): void => {
+      if (event.button !== 0 || event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) {
+        pointerRef.current = null
+        cancelPendingRename()
+        slowClickRef.current = null
+        return
+      }
 
-    pointerRef.current = {
-      itemId,
-      x: event.clientX,
-      y: event.clientY,
-      moved: false
-    }
-  }, [])
+      pointerRef.current = {
+        itemId,
+        x: event.clientX,
+        y: event.clientY,
+        moved: false
+      }
+    },
+    [cancelPendingRename]
+  )
 
-  const handleItemPointerMove = useCallback((itemId: string, event: React.PointerEvent): void => {
-    const pointer = pointerRef.current
-    if (!pointer || pointer.itemId !== itemId) return
-    if (Math.hypot(event.clientX - pointer.x, event.clientY - pointer.y) > 4) {
-      pointer.moved = true
-      slowClickRef.current = null
-    }
-  }, [])
+  const handleItemPointerMove = useCallback(
+    (itemId: string, event: React.PointerEvent): void => {
+      const pointer = pointerRef.current
+      if (!pointer || pointer.itemId !== itemId) return
+      if (Math.hypot(event.clientX - pointer.x, event.clientY - pointer.y) > 4) {
+        pointer.moved = true
+        cancelPendingRename()
+        slowClickRef.current = null
+      }
+    },
+    [cancelPendingRename]
+  )
 
   const handleViewItemClick = useCallback(
     (itemId: string, event: React.MouseEvent): void => {
@@ -656,11 +688,13 @@ export function FileBrowser({
         event.altKey ||
         hadPointerMovement
       ) {
+        cancelPendingRename()
         slowClickRef.current = null
         return
       }
 
       if (!wasAlreadySelected) {
+        cancelPendingRename()
         slowClickRef.current = { itemId, at: now }
         return
       }
@@ -670,10 +704,14 @@ export function FileBrowser({
       const item = sortedItems.find((entry) => entry.id === itemId)
       if (!item || item.isFolder) return
       if (isNameRegion && elapsed >= SLOW_CLICK_RENAME_MIN_MS) {
-        setRenamingItemId(itemId)
+        cancelPendingRename()
+        renameClickTimerRef.current = setTimeout(() => {
+          setRenamingItemId(itemId)
+          renameClickTimerRef.current = null
+        }, SLOW_CLICK_RENAME_MIN_MS)
       }
     },
-    [handleItemClick, selectedIds, sortedItems]
+    [cancelPendingRename, handleItemClick, selectedIds, sortedItems]
   )
 
   const handleDeleteSelected = useCallback(async (): Promise<void> => {
@@ -777,6 +815,7 @@ export function FileBrowser({
   const handleDragStart = useCallback(
     (event: DragStartEvent): void => {
       setRenamingItemId(null)
+      cancelPendingRename()
       slowClickRef.current = null
       pointerRef.current = null
       const nextActiveId = String(event.active.id)
@@ -789,7 +828,7 @@ export function FileBrowser({
         setDraggedIds(new Set([nextActiveId]))
       }
     },
-    [selectedIds, setSelectedIds]
+    [cancelPendingRename, selectedIds, setSelectedIds]
   )
 
   const handleDragOver = useCallback((): void => {}, [])

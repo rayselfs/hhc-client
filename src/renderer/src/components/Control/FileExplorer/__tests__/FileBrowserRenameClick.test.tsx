@@ -156,6 +156,12 @@ function click(target: Element, now: number): void {
   fireEvent.click(target, { button: 0, detail: 1 })
 }
 
+function flushRenameDelay(): void {
+  act(() => {
+    vi.advanceTimersByTime(320)
+  })
+}
+
 describe('FileBrowser slow-click inline rename', () => {
   beforeEach(() => {
     vi.useFakeTimers()
@@ -176,6 +182,7 @@ describe('FileBrowser slow-click inline rename', () => {
     expect(screen.queryByLabelText('Rename file')).toBeNull()
 
     click(fileName, 2500)
+    flushRenameDelay()
 
     expect(screen.getByLabelText('Rename file')).toHaveValue('slides')
   })
@@ -189,7 +196,28 @@ describe('FileBrowser slow-click inline rename', () => {
       vi.advanceTimersByTime(5000)
     })
     click(fileName, 6000)
+    flushRenameDelay()
 
     expect(screen.getByLabelText('Rename file')).toHaveValue('slides')
+  })
+
+  it('does not start rename when the selected file name is double-clicked', () => {
+    render(<FileBrowser />)
+
+    const fileName = screen.getByText('slides.pdf')
+    click(fileName, 1000)
+
+    act(() => {
+      vi.advanceTimersByTime(1000)
+    })
+
+    vi.setSystemTime(2200)
+    fireEvent.pointerDown(fileName, { button: 0, clientX: 1, clientY: 1 })
+    fireEvent.click(fileName, { button: 0, detail: 1 })
+    fireEvent.click(fileName, { button: 0, detail: 2 })
+    fireEvent.doubleClick(fileName, { button: 0, detail: 2 })
+    flushRenameDelay()
+
+    expect(screen.queryByLabelText('Rename file')).toBeNull()
   })
 })
