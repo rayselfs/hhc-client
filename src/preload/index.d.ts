@@ -7,7 +7,9 @@ import type {
   WhisperDirInfo,
   FfmpegConfigInfo,
   VideoTranscodeRunRequest,
-  VideoTranscodeRunResult
+  VideoTranscodeRunResult,
+  LocalSyncConnectionInfo,
+  LocalSyncRemoteItem
 } from '../shared/ipc-channels'
 import type {
   TimerCommand,
@@ -88,6 +90,13 @@ interface VideoTranscodeAPI {
   cancel: (jobId: string) => Promise<void>
 }
 
+interface LocalSyncAPI {
+  selectFolder: () => Promise<LocalSyncConnectionInfo | null>
+  listFolders: () => Promise<LocalSyncConnectionInfo[]>
+  scanFolder: (connectionId: string) => Promise<LocalSyncRemoteItem[]>
+  disconnectFolder: (connectionId: string) => Promise<void>
+}
+
 declare global {
   interface Window {
     api: {
@@ -100,6 +109,7 @@ declare global {
       speech: SpeechAPI
       nativeFs: NativeFsAPI
       videoTranscode: VideoTranscodeAPI
+      localSync: LocalSyncAPI
     }
   }
 }

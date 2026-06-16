@@ -117,6 +117,14 @@ const videoTranscodeApi = {
   cancel: (jobId: string) => typedInvoke('video-transcode:cancel', jobId)
 }
 
+const localSyncApi = {
+  selectFolder: () => typedInvoke('local-sync:select-folder'),
+  listFolders: () => typedInvoke('local-sync:list-folders'),
+  scanFolder: (connectionId: string) => typedInvoke('local-sync:scan-folder', connectionId),
+  disconnectFolder: (connectionId: string) =>
+    typedInvoke('local-sync:disconnect-folder', connectionId)
+}
+
 const api = {
   projection: projectionApi,
   theme: themeApi,
@@ -126,7 +134,8 @@ const api = {
   update: updateApi,
   speech: speechApi,
   nativeFs: nativeFsApi,
-  videoTranscode: videoTranscodeApi
+  videoTranscode: videoTranscodeApi,
+  localSync: localSyncApi
 }
 
 try {

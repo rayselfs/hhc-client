@@ -8,6 +8,7 @@ import { registerAppIpc, registerLocalModelProtocol } from './ipc/app'
 import { registerSpeechKeyStorageHandlers } from './ipc/speech-key-storage'
 import { registerNativeFsHandlers, registerNativeMediaProtocol } from './ipc/native-fs'
 import { registerVideoTranscodeHandlers } from './ipc/video-transcode'
+import { registerLocalSyncHandlers } from './ipc/local-sync'
 import { isKnownWindow, validateTheme } from './ipc/validate'
 import { registerUpdateService } from './updateService'
 
@@ -73,6 +74,7 @@ app.whenReady().then(() => {
   registerSpeechKeyStorageHandlers(wm)
   registerNativeFsHandlers(wm)
   registerVideoTranscodeHandlers(wm)
+  registerLocalSyncHandlers(wm)
   registerNativeMediaProtocol()
   wm.createMainWindow()
   wm.createProjectionWindow()

@@ -63,6 +63,24 @@ export interface VideoTranscodeRunResult {
   size: number
 }
 
+export interface LocalSyncConnectionInfo {
+  id: string
+  displayName: string
+  rootName: string
+  createdAt: number
+  updatedAt: number
+}
+
+export interface LocalSyncRemoteItem {
+  remoteItemId: string
+  parentRemoteItemId: string | null
+  kind: 'folder' | 'file'
+  name: string
+  mimeType?: string
+  size?: number
+  etag?: string
+}
+
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
 
@@ -112,6 +130,10 @@ export interface IpcInvokeMap {
   'video-transcode:remove-ffmpeg-config': { args: []; result: FfmpegConfigInfo }
   'video-transcode:run': { args: [VideoTranscodeRunRequest]; result: VideoTranscodeRunResult }
   'video-transcode:cancel': { args: [string]; result: void }
+  'local-sync:select-folder': { args: []; result: LocalSyncConnectionInfo | null }
+  'local-sync:list-folders': { args: []; result: LocalSyncConnectionInfo[] }
+  'local-sync:scan-folder': { args: [string]; result: LocalSyncRemoteItem[] }
+  'local-sync:disconnect-folder': { args: [string]; result: void }
 }
 
 export type IpcInvokeChannel = keyof IpcInvokeMap
