@@ -197,6 +197,7 @@ export const GridView = React.memo(function GridView({
                       </div>
                     ) : (
                       <span
+                        data-file-name-region
                         className={`w-full text-center text-foreground break-words ${nameClass}`}
                         title={item.name}
                       >

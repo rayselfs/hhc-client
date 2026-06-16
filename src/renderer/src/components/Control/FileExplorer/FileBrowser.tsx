@@ -192,7 +192,6 @@ function formatSearchFileSize(bytes: number | undefined): string {
 const SEARCH_COL = { created: 90, size: 72, kind: 96, path: 200 }
 const EMPTY_ARRAY: never[] = []
 const SLOW_CLICK_RENAME_MIN_MS = 320
-const SLOW_CLICK_RENAME_MAX_MS = 1200
 
 function SearchResultsList({
   results,
@@ -641,6 +640,7 @@ export function FileBrowser({
   const handleViewItemClick = useCallback(
     (itemId: string, event: React.MouseEvent): void => {
       const wasAlreadySelected = selectedIds.has(itemId) && selectedIds.size === 1
+      const isNameRegion = (event.target as Element).closest('[data-file-name-region]') !== null
       const now = Date.now()
       const previous = slowClickRef.current
       const pointer = pointerRef.current
@@ -669,7 +669,7 @@ export function FileBrowser({
       slowClickRef.current = { itemId, at: now }
       const item = sortedItems.find((entry) => entry.id === itemId)
       if (!item || item.isFolder) return
-      if (elapsed >= SLOW_CLICK_RENAME_MIN_MS && elapsed <= SLOW_CLICK_RENAME_MAX_MS) {
+      if (isNameRegion && elapsed >= SLOW_CLICK_RENAME_MIN_MS) {
         setRenamingItemId(itemId)
       }
     },

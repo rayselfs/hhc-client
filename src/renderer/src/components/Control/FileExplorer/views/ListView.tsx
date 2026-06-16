@@ -208,7 +208,11 @@ export const ListView = React.memo(function ListView({
                     />
                   </div>
                 ) : (
-                  <div className="flex-1 truncate text-base text-foreground" title={item.name}>
+                  <div
+                    data-file-name-region
+                    className="flex-1 truncate text-base text-foreground"
+                    title={item.name}
+                  >
                     {item.name}
                   </div>
                 )}
