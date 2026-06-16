@@ -238,6 +238,35 @@ describe('ProjectionContext — web mode', () => {
     })
   })
 
+  it('project() preserves pending file control command order', async () => {
+    const { result } = renderProjection()
+
+    await act(async () => {
+      await result.current.project('file:control', {
+        action: 'seek',
+        itemId: 'video-1',
+        value: 5
+      })
+      await result.current.project('file:control', { action: 'play', itemId: 'video-1' })
+    })
+
+    expect(mockAdapter.send).not.toHaveBeenCalledWith('file:control', expect.anything())
+
+    act(() => {
+      mockAdapter._trigger('__system:ready', null)
+    })
+
+    expect(mockAdapter.send).toHaveBeenNthCalledWith(1, 'file:control', {
+      action: 'seek',
+      itemId: 'video-1',
+      value: 5
+    })
+    expect(mockAdapter.send).toHaveBeenNthCalledWith(2, 'file:control', {
+      action: 'play',
+      itemId: 'video-1'
+    })
+  })
+
   it('project() timeout: pending cleared after 5s if ready never arrives', async () => {
     const { result } = renderProjection()
 

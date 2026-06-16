@@ -72,6 +72,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
   const isProjectionBlankedRef = useRef(true)
   const isProjectionOpenRef = useRef(false)
   const pendingPayloadsRef = useRef(new Map<string, { channel: string; data: unknown }>())
+  const pendingSequenceRef = useRef(0)
   const autoOpenTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const setIsProjectionBlanked = useCallback((blanked: boolean): void => {
@@ -243,6 +244,14 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
     []
   )
 
+  const getPendingPayloadKey = useCallback((channel: ProjectionChannel): string => {
+    if (channel === 'file:control') {
+      pendingSequenceRef.current += 1
+      return `${channel}:${pendingSequenceRef.current}`
+    }
+    return channel
+  }, [])
+
   const claimProjection = useCallback(
     (owner: ProjectionOwner, options?: { unblank?: boolean }): void => {
       setActiveOwner(owner)
@@ -277,7 +286,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       options?: ProjectOptions
     ): Promise<void> => {
       if (!isReadyRef.current) {
-        pendingPayloadsRef.current.set(channel, { channel, data })
+        pendingPayloadsRef.current.set(getPendingPayloadKey(channel), { channel, data })
 
         if (options?.autoOpen && !isProjectionOpenRef.current) {
           openProjection().catch(() => {
@@ -298,7 +307,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
 
       getAdapter(adapterRef).send(channel, data)
     },
-    [openProjection, clearPending]
+    [openProjection, clearPending, getPendingPayloadKey]
   )
 
   const on = useCallback(

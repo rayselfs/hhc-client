@@ -4,11 +4,13 @@ import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 import type { FileItemRecord } from '@shared/types/folder'
 
 const mockSend = vi.fn()
+const mockProject = vi.fn()
 const mockBlankProjection = vi.fn()
 
 vi.mock('@renderer/contexts/ProjectionContext', () => ({
   useProjection: () => ({
     send: mockSend,
+    project: mockProject,
     blankProjection: mockBlankProjection
   })
 }))
@@ -50,24 +52,24 @@ beforeEach(() => {
 describe('media projection sync', () => {
   it('does not send file:show for notes-only updates', () => {
     renderSync()
-    mockSend.mockClear()
+    mockProject.mockClear()
 
     act(() => {
       useMediaProjectionStore.getState().updateNotes('b', 'new notes')
     })
 
-    expect(mockSend).not.toHaveBeenCalledWith('file:show', expect.anything())
+    expect(mockProject).not.toHaveBeenCalledWith('file:show', expect.anything())
   })
 
   it('sends file:show when jumpTo changes currentIndex', () => {
     renderSync()
-    mockSend.mockClear()
+    mockProject.mockClear()
 
     act(() => {
       useMediaProjectionStore.getState().jumpTo(1)
     })
 
-    expect(mockSend).toHaveBeenCalledWith(
+    expect(mockProject).toHaveBeenCalledWith(
       'file:show',
       expect.objectContaining({ currentIndex: 1, itemId: 'b', blobId: 'b' })
     )
@@ -82,7 +84,7 @@ describe('media projection sync', () => {
 
     renderSync()
 
-    expect(mockSend).toHaveBeenCalledWith(
+    expect(mockProject).toHaveBeenCalledWith(
       'file:show',
       expect.objectContaining({ itemId: 'copy-id', blobId: 'original-id' })
     )

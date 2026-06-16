@@ -17,7 +17,7 @@ function playlistContentChanged(
 }
 
 export function useMediaProjectionSync(): void {
-  const { send, blankProjection } = useProjection()
+  const { project, send, blankProjection } = useProjection()
 
   useEffect(() => {
     const unsub = useMediaProjectionStore.subscribe((state, prev) => {
@@ -30,7 +30,7 @@ export function useMediaProjectionSync(): void {
       if (indexChanged || playlistChanged || endedCleared) {
         const item = state.playlist[state.currentIndex]
         if (!item) return
-        send('file:show', {
+        void project('file:show', {
           itemId: item.id,
           blobId: getBlobId(item),
           fileName: item.name,
@@ -41,7 +41,7 @@ export function useMediaProjectionSync(): void {
       }
     })
     return unsub
-  }, [send])
+  }, [project])
 
   useEffect(() => {
     const unsub = useMediaProjectionStore.subscribe((state, prev) => {
@@ -87,7 +87,7 @@ export function useMediaProjectionSync(): void {
     if (!state.isPresenting) return
     const item = state.playlist[state.currentIndex]
     if (!item) return
-    send('file:show', {
+    void project('file:show', {
       itemId: item.id,
       blobId: getBlobId(item),
       fileName: item.name,
@@ -95,5 +95,5 @@ export function useMediaProjectionSync(): void {
       playlist: state.playlist.map((f) => ({ id: f.id, name: f.name, mimeType: f.mimeType })),
       currentIndex: state.currentIndex
     })
-  }, [send])
+  }, [project])
 }

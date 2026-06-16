@@ -22,7 +22,7 @@ import { usePreviewCache } from '@renderer/hooks/usePreviewCache'
 import { useThumbnails } from '@renderer/hooks/useThumbnails'
 
 export default function MediaPresenter(): React.JSX.Element {
-  const { claimProjection, blankProjection, send } = useProjection()
+  const { claimProjection, blankProjection, send, project } = useProjection()
 
   useMediaProjectionSync()
 
@@ -39,7 +39,12 @@ export default function MediaPresenter(): React.JSX.Element {
 
   const descriptor = currentItem ? getDescriptor(currentItem.mimeType) : null
 
-  const sendCommand = useCallback((cmd: FileControlPayload) => send('file:control', cmd), [send])
+  const sendCommand = useCallback(
+    (cmd: FileControlPayload) => {
+      void project('file:control', cmd)
+    },
+    [project]
+  )
 
   const getCurrentKeyboardVideoState = useCallback(() => {
     const state = useMediaProjectionStore.getState()
