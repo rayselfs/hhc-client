@@ -219,6 +219,14 @@ export async function deleteDerivedAssetsForSource(sourceBlobId: string): Promis
   await tx.done
 }
 
+export async function listDerivedAssets(): Promise<DerivedAssetRecord[]> {
+  return (await getMediaWorkDB()).getAll('derived-assets')
+}
+
+export async function listCustomCoverOverrides(): Promise<CustomCoverOverrideRecord[]> {
+  return (await getMediaWorkDB()).getAll('custom-cover-overrides')
+}
+
 export async function getCustomCoverOverride(
   itemId: string
 ): Promise<CustomCoverOverrideRecord | undefined> {

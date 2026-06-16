@@ -244,6 +244,10 @@ export async function getSyncEntryByRemoteItem(
   )
 }
 
+export async function listSyncEntries(): Promise<SyncEntryRecord[]> {
+  return (await getSyncDB()).getAll('sync-entries')
+}
+
 export async function putSyncEntryPreference(
   record: Omit<SyncEntryPreferenceRecord, 'id' | 'updatedAt'> & {
     updatedAt?: number
@@ -286,6 +290,10 @@ export async function putSyncTombstone(
   } as SyncTombstoneRecord & { remoteLookupKey: string }
   await (await getSyncDB()).put('sync-tombstones', value)
   return value
+}
+
+export async function listSyncTombstones(): Promise<SyncTombstoneRecord[]> {
+  return (await getSyncDB()).getAll('sync-tombstones')
 }
 
 export async function resetSyncDBForTests(): Promise<void> {

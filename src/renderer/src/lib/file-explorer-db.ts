@@ -4,7 +4,7 @@ import type { AnyItemRecord, FolderRecord } from '@shared/types/folder'
 import { isElectron } from './env'
 import { getReadyTranscodedVideo } from './media-transcode-lifecycle'
 
-interface FileBlobRecord {
+export interface FileBlobRecord {
   id: string
   blob?: Blob
   storage?: 'indexed-db' | 'native-fs'
@@ -73,6 +73,10 @@ function getFileExplorerDB(): Promise<IDBPDatabase<FileExplorerDBSchema>> {
 
 export async function openFileExplorerDB(): Promise<IDBPDatabase<FileExplorerDBSchema>> {
   return getFileExplorerDB()
+}
+
+export async function listFileBlobRecords(): Promise<FileBlobRecord[]> {
+  return (await getFileExplorerDB()).getAll('file-blobs')
 }
 
 export async function storeFileBlob(
@@ -173,4 +177,16 @@ export async function incrementBlobRef(
   if (!record) throw new Error(`File blob not found: ${id}`)
 
   await db.put('file-blobs', { ...record, refCount: (record.refCount ?? 1) + 1 })
+}
+
+export async function resetFileExplorerDBForTests(): Promise<void> {
+  const db = await fileExplorerDBPromise
+  db?.close()
+  fileExplorerDBPromise = null
+  await new Promise<void>((resolve, reject) => {
+    const request = indexedDB.deleteDatabase(DB_NAME)
+    request.onsuccess = () => resolve()
+    request.onerror = () => reject(request.error)
+    request.onblocked = () => reject(new Error('File explorer database deletion blocked'))
+  })
 }
