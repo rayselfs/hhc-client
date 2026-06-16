@@ -37,8 +37,10 @@ export const SHORTCUTS = {
     ZOOM_IN: { code: 'Equal', metaOrCtrl: true },
     ZOOM_OUT: { code: 'Minus', metaOrCtrl: true },
     VIDEO_TOGGLE_PLAY: { code: 'Space' },
-    PDF_NEXT_PAGE: { code: 'ArrowRight', metaOrCtrl: true },
-    PDF_PREV_PAGE: { code: 'ArrowLeft', metaOrCtrl: true },
+    VIDEO_SEEK_FORWARD: { code: 'ArrowRight', metaOrCtrl: true },
+    VIDEO_SEEK_BACKWARD: { code: 'ArrowLeft', metaOrCtrl: true },
+    PDF_NEXT_PAGE: { code: 'ArrowDown', metaOrCtrl: true },
+    PDF_PREV_PAGE: { code: 'ArrowUp', metaOrCtrl: true },
     PDF_TOGGLE_VIEW_MODE: { code: 'KeyV' },
     START_PRESENTATION: { code: 'F5' },
     START_FROM_CURRENT: { code: 'F5', shift: true }

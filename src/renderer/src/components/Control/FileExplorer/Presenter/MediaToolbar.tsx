@@ -4,12 +4,16 @@ import { Button } from '@heroui/react'
 import { useTranslation } from 'react-i18next'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 
-export default function MediaToolbar(): React.JSX.Element {
+interface MediaToolbarProps {
+  onToggleGrid: () => void
+}
+
+export default function MediaToolbar({ onToggleGrid }: MediaToolbarProps): React.JSX.Element {
   const { t } = useTranslation()
   const zoomLevel = useMediaProjectionStore((s) => s.zoomLevel)
   const currentMimeType = useMediaProjectionStore((s) => s.currentItem()?.mimeType ?? '')
   const pdfViewMode = useMediaProjectionStore((s) => s.typeStates['pdf']?.viewMode ?? 'slide')
-  const { toggleGrid, resetZoom, setZoomLevel } = useMediaProjectionStore.getState()
+  const { resetZoom, setZoomLevel } = useMediaProjectionStore.getState()
 
   const zoomDisabled = currentMimeType === 'application/pdf' && pdfViewMode === 'scroll'
 
@@ -18,7 +22,7 @@ export default function MediaToolbar(): React.JSX.Element {
       <Button
         isIconOnly
         variant="ghost"
-        onPress={() => toggleGrid()}
+        onPress={onToggleGrid}
         aria-label={t('presenter.grid')}
         className="w-12 h-12 rounded-full"
       >

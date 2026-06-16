@@ -544,6 +544,12 @@
       }
     },
     "media": {
+      "sections": {
+        "general": "常规",
+        "oneDrive": "OneDrive",
+        "video": "视频",
+        "storage": "存储空间"
+      },
       "oneDrive": {
         "title": "OneDrive",
         "description": "OneDrive 文件夹是只读来源。HHC Client 不会上传、重命名、移动或删除远程文件。",

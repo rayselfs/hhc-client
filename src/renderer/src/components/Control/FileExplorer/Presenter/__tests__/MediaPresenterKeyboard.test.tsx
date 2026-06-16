@@ -47,6 +47,7 @@ const {
       showGrid: false,
       zoomLevel: 1,
       isEnded: false,
+      currentFile: videoItem,
       typeStates: {
         video: { hasStarted: false, isPlaying: false, isEnded: false },
         pdf: { viewMode: 'slide' as const }
@@ -145,11 +146,22 @@ function findShortcut(code: string): ShortcutHandler {
   return shortcut
 }
 
+function findShortcutByConfig(config: { code: string; metaOrCtrl?: boolean }): ShortcutHandler {
+  const shortcut = mockShortcuts.find(
+    (item) =>
+      item.config.code === config.code &&
+      Boolean(item.config.metaOrCtrl) === Boolean(config.metaOrCtrl)
+  )
+  if (!shortcut) throw new Error(`Missing shortcut ${config.code}`)
+  return shortcut
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   mockShortcuts.length = 0
   storeState.showGrid = false
   storeState.zoomLevel = 1
+  storeState.currentItem = () => storeState.currentFile
   storeState.typeStates.video = { hasStarted: false, isPlaying: false, isEnded: false }
 })
 
@@ -164,7 +176,7 @@ describe('MediaPresenter video keyboard behavior', () => {
     expect(mockPrev).toHaveBeenCalledOnce()
   })
 
-  it('seeks left and right only while video has started and is not ended', () => {
+  it('uses item navigation for single left and right even while video is playing', () => {
     storeState.typeStates.video = { hasStarted: true, isPlaying: true, isEnded: false }
     const dispatchSpy = vi.spyOn(window, 'dispatchEvent')
     render(<MediaPresenter />)
@@ -172,24 +184,49 @@ describe('MediaPresenter video keyboard behavior', () => {
     findShortcut('ArrowRight').handler(new KeyboardEvent('keydown', { code: 'ArrowRight' }))
     findShortcut('ArrowLeft').handler(new KeyboardEvent('keydown', { code: 'ArrowLeft' }))
 
-    expect(mockNext).not.toHaveBeenCalled()
-    expect(mockPrev).not.toHaveBeenCalled()
-    expect(dispatchSpy).toHaveBeenCalledWith(
+    expect(mockNext).toHaveBeenCalledOnce()
+    expect(mockPrev).toHaveBeenCalledOnce()
+    expect(dispatchSpy).not.toHaveBeenCalledWith(
       expect.objectContaining({ type: 'media:videoSeekRelative' })
     )
     dispatchSpy.mockRestore()
   })
 
-  it('reads the latest video state during keydown even before rerendered shortcuts refresh', () => {
+  it('seeks video with modifier left and right after playback starts', () => {
+    storeState.typeStates.video = { hasStarted: true, isPlaying: true, isEnded: false }
     const dispatchSpy = vi.spyOn(window, 'dispatchEvent')
     render(<MediaPresenter />)
 
-    storeState.typeStates.video = { hasStarted: true, isPlaying: true, isEnded: false }
-
-    findShortcut('ArrowRight').handler(new KeyboardEvent('keydown', { code: 'ArrowRight' }))
+    findShortcutByConfig({ code: 'ArrowRight', metaOrCtrl: true }).handler(
+      new KeyboardEvent('keydown', { code: 'ArrowRight', metaKey: true })
+    )
+    findShortcutByConfig({ code: 'ArrowLeft', metaOrCtrl: true }).handler(
+      new KeyboardEvent('keydown', { code: 'ArrowLeft', metaKey: true })
+    )
 
     expect(mockNext).not.toHaveBeenCalled()
-    expect(dispatchSpy).toHaveBeenCalledWith(
+    expect(mockPrev).not.toHaveBeenCalled()
+    expect(dispatchSpy).toHaveBeenCalledTimes(2)
+    expect(dispatchSpy).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ type: 'media:videoSeekRelative' })
+    )
+    expect(dispatchSpy).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ type: 'media:videoSeekRelative' })
+    )
+    dispatchSpy.mockRestore()
+  })
+
+  it('ignores modifier video seek before playback starts', () => {
+    const dispatchSpy = vi.spyOn(window, 'dispatchEvent')
+    render(<MediaPresenter />)
+
+    findShortcutByConfig({ code: 'ArrowRight', metaOrCtrl: true }).handler(
+      new KeyboardEvent('keydown', { code: 'ArrowRight', metaKey: true })
+    )
+
+    expect(dispatchSpy).not.toHaveBeenCalledWith(
       expect.objectContaining({ type: 'media:videoSeekRelative' })
     )
     dispatchSpy.mockRestore()
@@ -220,6 +257,47 @@ describe('MediaPresenter video keyboard behavior', () => {
 
     expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'media:pauseVideo' }))
     expect(mockExit).not.toHaveBeenCalled()
+    dispatchSpy.mockRestore()
+  })
+
+  it('pauses a playing video before opening the grid', () => {
+    storeState.typeStates.video = { hasStarted: true, isPlaying: true, isEnded: false }
+    const dispatchSpy = vi.spyOn(window, 'dispatchEvent')
+    render(<MediaPresenter />)
+
+    findShortcut('KeyG').handler(new KeyboardEvent('keydown', { code: 'KeyG' }))
+
+    expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'media:pauseVideo' }))
+    expect(mockToggleGrid).toHaveBeenCalledOnce()
+    dispatchSpy.mockRestore()
+  })
+
+  it('uses modifier up and down for PDF pages', () => {
+    const pdfItem: FileItemRecord = {
+      id: 'pdf-1',
+      parentId: 'root',
+      type: 'file',
+      sortIndex: 1,
+      createdAt: 1,
+      expiresAt: null,
+      name: 'slides.pdf',
+      url: 'blob:pdf-1',
+      size: 10,
+      mimeType: 'application/pdf'
+    }
+    storeState.currentItem = () => pdfItem
+    const dispatchSpy = vi.spyOn(window, 'dispatchEvent')
+    render(<MediaPresenter />)
+
+    findShortcutByConfig({ code: 'ArrowDown', metaOrCtrl: true }).handler(
+      new KeyboardEvent('keydown', { code: 'ArrowDown', metaKey: true })
+    )
+    findShortcutByConfig({ code: 'ArrowUp', metaOrCtrl: true }).handler(
+      new KeyboardEvent('keydown', { code: 'ArrowUp', metaKey: true })
+    )
+
+    expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'media:pdfNextPage' }))
+    expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'media:pdfPrevPage' }))
     dispatchSpy.mockRestore()
   })
 })

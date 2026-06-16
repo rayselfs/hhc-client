@@ -548,6 +548,12 @@
       }
     },
     "media": {
+      "sections": {
+        "general": "一般",
+        "oneDrive": "OneDrive",
+        "video": "影片",
+        "storage": "儲存空間"
+      },
       "oneDrive": {
         "title": "OneDrive",
         "description": "OneDrive 資料夾是唯讀來源。HHC Client 不會上傳、重新命名、移動或刪除遠端檔案。",

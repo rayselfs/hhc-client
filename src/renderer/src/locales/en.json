@@ -548,6 +548,12 @@
       }
     },
     "media": {
+      "sections": {
+        "general": "General",
+        "oneDrive": "OneDrive",
+        "video": "Video",
+        "storage": "Storage"
+      },
       "oneDrive": {
         "title": "OneDrive",
         "description": "OneDrive folders are read-only sources. HHC Client never uploads, renames, moves, or deletes remote files.",

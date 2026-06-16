@@ -20,6 +20,30 @@ vi.mock('@renderer/lib/speech-key-storage', () => ({
   deleteSpeechKey: vi.fn().mockResolvedValue(undefined)
 }))
 
+vi.mock('@renderer/lib/media-storage-accounting', () => ({
+  getMediaStorageAccounting: vi.fn().mockResolvedValue({
+    usage: {
+      electronNativeSourceMedia: 0,
+      webIndexedDbSourceBlobs: 0,
+      legacyElectronIndexedDbBlobs: 0,
+      generatedCoverThumbnails: 0,
+      customCoverOverrides: 0,
+      pdfPageThumbnails: 0,
+      videoPosters: 0,
+      transcodedDerivatives: 0,
+      syncCache: 0,
+      temporaryAndFailedJobFiles: 0
+    },
+    total: 0,
+    browser: null
+  })
+}))
+
+vi.mock('@renderer/lib/media-storage-cleanup', () => ({
+  clearRegenerableDerivedAssets: vi.fn().mockResolvedValue(undefined),
+  removeUnusedDerivedAssets: vi.fn().mockResolvedValue(undefined)
+}))
+
 vi.mock('@renderer/stores/settings', () => ({
   DEFAULT_ONEDRIVE: { customClientId: '', defaultOfflinePolicy: 'on-demand', cacheBudgetMb: 2048 },
   HHC_DEFAULT_ONEDRIVE_CLIENT_ID: '4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02',
@@ -133,10 +157,32 @@ describe('PreferencesDialog', () => {
 
     await user.click(screen.getByTestId('category-media'))
     expect(screen.getByLabelText('Trash Retention Period')).toBeInTheDocument()
+    expect(screen.getByTestId('category-media-general')).toBeInTheDocument()
+    expect(screen.getByTestId('category-media-oneDrive')).toBeInTheDocument()
+    expect(screen.getByTestId('category-media-video')).toBeInTheDocument()
+    expect(screen.getByTestId('category-media-storage')).toBeInTheDocument()
     expect(screen.queryByLabelText('Language')).not.toBeInTheDocument()
 
     await user.click(screen.getByTestId('category-general'))
     expect(screen.getByLabelText('Language')).toBeInTheDocument()
+  })
+
+  it('navigates between media child sections', async () => {
+    const user = userEvent.setup()
+    renderDialog(true)
+
+    await user.click(screen.getByTestId('category-media'))
+    await user.click(screen.getByTestId('category-media-oneDrive'))
+    expect(screen.getByLabelText('Azure Application Client ID')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Trash Retention Period')).not.toBeInTheDocument()
+
+    await user.click(screen.getByTestId('category-media-video'))
+    expect(screen.getByText('Video Transcoding')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Azure Application Client ID')).not.toBeInTheDocument()
+
+    await user.click(screen.getByTestId('category-media-storage'))
+    expect(screen.getByText('Media Storage')).toBeInTheDocument()
+    expect(screen.queryByText('Video Transcoding')).not.toBeInTheDocument()
   })
 
   it('navigates to bible category and shows Bible settings', async () => {

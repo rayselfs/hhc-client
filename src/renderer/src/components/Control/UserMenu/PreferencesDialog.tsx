@@ -6,7 +6,9 @@ import { Settings, Film, BookOpen, Timer } from 'lucide-react'
 import GeneralSettings from '@renderer/components/Control/UserMenu/GeneralSettings'
 import TimerSettings from '@renderer/components/Control/UserMenu/TimerSettings'
 import BibleSettingsPanel from '@renderer/components/Control/UserMenu/BibleSettingsPanel'
-import MediaSettings from '@renderer/components/Control/UserMenu/MediaSettings'
+import MediaSettings, {
+  type MediaSettingsSection
+} from '@renderer/components/Control/UserMenu/MediaSettings'
 import { ShortcutScope } from '@renderer/contexts/ShortcutScopeContext'
 
 interface PreferencesDialogProps {
@@ -15,6 +17,16 @@ interface PreferencesDialogProps {
 }
 
 type Category = 'general' | 'timer' | 'bible' | 'media'
+type PreferenceRoute = 'general' | 'timer' | 'bible' | `media.${MediaSettingsSection}`
+
+interface CategoryChildItem {
+  id: PreferenceRoute
+  labelKey:
+    | 'preferences.media.sections.general'
+    | 'preferences.media.sections.oneDrive'
+    | 'preferences.media.sections.video'
+    | 'preferences.media.sections.storage'
+}
 
 interface CategoryItem {
   id: Category
@@ -24,13 +36,26 @@ interface CategoryItem {
     | 'preferences.categories.timer'
     | 'preferences.categories.media'
     | 'preferences.categories.bible'
+  route: PreferenceRoute
+  children?: CategoryChildItem[]
 }
 
 const categories: CategoryItem[] = [
-  { id: 'general', icon: Settings, labelKey: 'preferences.categories.general' },
-  { id: 'timer', icon: Timer, labelKey: 'preferences.categories.timer' },
-  { id: 'bible', icon: BookOpen, labelKey: 'preferences.categories.bible' },
-  { id: 'media', icon: Film, labelKey: 'preferences.categories.media' }
+  { id: 'general', icon: Settings, labelKey: 'preferences.categories.general', route: 'general' },
+  { id: 'timer', icon: Timer, labelKey: 'preferences.categories.timer', route: 'timer' },
+  { id: 'bible', icon: BookOpen, labelKey: 'preferences.categories.bible', route: 'bible' },
+  {
+    id: 'media',
+    icon: Film,
+    labelKey: 'preferences.categories.media',
+    route: 'media.general',
+    children: [
+      { id: 'media.general', labelKey: 'preferences.media.sections.general' },
+      { id: 'media.oneDrive', labelKey: 'preferences.media.sections.oneDrive' },
+      { id: 'media.video', labelKey: 'preferences.media.sections.video' },
+      { id: 'media.storage', labelKey: 'preferences.media.sections.storage' }
+    ]
+  }
 ]
 
 export default function PreferencesDialog({
@@ -38,7 +63,7 @@ export default function PreferencesDialog({
   onOpenChange
 }: PreferencesDialogProps): React.JSX.Element {
   const { t } = useTranslation()
-  const [activeCategory, setActiveCategory] = useState<Category>('general')
+  const [activeRoute, setActiveRoute] = useState<PreferenceRoute>('general')
 
   const state = useOverlayState({ isOpen, onOpenChange })
 
@@ -54,7 +79,9 @@ export default function PreferencesDialog({
                   <nav className="flex w-44 shrink-0 flex-col gap-2 rounded-tr-3xl rounded-br-3xl bg-surface-secondary text-foreground py-2 px-2">
                     <ul className="flex flex-col gap-1">
                       {categories.map((cat) => {
-                        const active = activeCategory === cat.id
+                        const active =
+                          activeRoute === cat.route ||
+                          (cat.id === 'media' && activeRoute.startsWith('media.'))
                         const Icon = cat.icon
                         return (
                           <li key={cat.id}>
@@ -66,22 +93,49 @@ export default function PreferencesDialog({
                                   ? 'bg-accent text-accent-foreground'
                                   : 'text-muted hover:opacity-70'
                               }`}
-                              onClick={() => setActiveCategory(cat.id)}
+                              onClick={() => setActiveRoute(cat.route)}
                               data-testid={`category-${cat.id}`}
                             >
                               <Icon className="size-4" />
                               <span>{t(cat.labelKey)}</span>
                             </button>
+                            {cat.children && active && (
+                              <ul className="mt-1 flex flex-col gap-1 pl-7">
+                                {cat.children.map((child) => {
+                                  const childActive = activeRoute === child.id
+                                  return (
+                                    <li key={child.id}>
+                                      <button
+                                        type="button"
+                                        aria-pressed={childActive}
+                                        className={`w-full rounded-full px-3 py-1.5 text-left text-xs font-medium transition-colors ${
+                                          childActive
+                                            ? 'bg-accent/15 text-foreground'
+                                            : 'text-muted hover:opacity-70'
+                                        }`}
+                                        onClick={() => setActiveRoute(child.id)}
+                                        data-testid={`category-${child.id.replace('.', '-')}`}
+                                      >
+                                        {t(child.labelKey)}
+                                      </button>
+                                    </li>
+                                  )
+                                })}
+                              </ul>
+                            )}
                           </li>
                         )
                       })}
                     </ul>
                   </nav>
                   <div className="flex-1 overflow-y-auto p-5">
-                    {activeCategory === 'general' && <GeneralSettings />}
-                    {activeCategory === 'timer' && <TimerSettings />}
-                    {activeCategory === 'bible' && <BibleSettingsPanel />}
-                    {activeCategory === 'media' && <MediaSettings />}
+                    {activeRoute === 'general' && <GeneralSettings />}
+                    {activeRoute === 'timer' && <TimerSettings />}
+                    {activeRoute === 'bible' && <BibleSettingsPanel />}
+                    {activeRoute === 'media.general' && <MediaSettings section="general" />}
+                    {activeRoute === 'media.oneDrive' && <MediaSettings section="oneDrive" />}
+                    {activeRoute === 'media.video' && <MediaSettings section="video" />}
+                    {activeRoute === 'media.storage' && <MediaSettings section="storage" />}
                   </div>
                 </div>
               </ShortcutScope>

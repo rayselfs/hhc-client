@@ -56,6 +56,20 @@ export default function MediaPresenter(): React.JSX.Element {
     }
   }, [])
 
+  const pauseCurrentVideoIfPlaying = useCallback((): void => {
+    const { isVideo, videoState } = getCurrentKeyboardVideoState()
+    if (isVideo && videoState?.isPlaying) {
+      window.dispatchEvent(new CustomEvent('media:pauseVideo'))
+    }
+  }, [getCurrentKeyboardVideoState])
+
+  const toggleGridWithMediaPause = useCallback((): void => {
+    if (!useMediaProjectionStore.getState().showGrid) {
+      pauseCurrentVideoIfPlaying()
+    }
+    toggleGrid()
+  }, [pauseCurrentVideoIfPlaying, toggleGrid])
+
   useEffect(() => {
     const timerStatus = useTimerRuntimeStore.getState().status
     if (timerStatus === 'running') {
@@ -95,13 +109,6 @@ export default function MediaPresenter(): React.JSX.Element {
       {
         config: SHORTCUTS.MEDIA.NEXT_SLIDE,
         handler: () => {
-          const { isVideo, videoState } = getCurrentKeyboardVideoState()
-          if (isVideo && videoState?.hasStarted && !videoState?.isEnded) {
-            window.dispatchEvent(
-              new CustomEvent('media:videoSeekRelative', { detail: { seconds: 5 } })
-            )
-            return
-          }
           next()
         }
       },
@@ -109,20 +116,13 @@ export default function MediaPresenter(): React.JSX.Element {
       {
         config: SHORTCUTS.MEDIA.PREV_SLIDE,
         handler: () => {
-          const { isVideo, videoState } = getCurrentKeyboardVideoState()
-          if (isVideo && videoState?.hasStarted && !videoState?.isEnded) {
-            window.dispatchEvent(
-              new CustomEvent('media:videoSeekRelative', { detail: { seconds: -5 } })
-            )
-            return
-          }
           prev()
         }
       },
       { config: SHORTCUTS.MEDIA.PREV_SLIDE_ALT, handler: () => prev() },
       { config: SHORTCUTS.MEDIA.FIRST_SLIDE, handler: () => jumpTo(0) },
       { config: SHORTCUTS.MEDIA.LAST_SLIDE, handler: () => jumpTo(playlist.length - 1) },
-      { config: SHORTCUTS.MEDIA.TOGGLE_GRID, handler: () => toggleGrid() },
+      { config: SHORTCUTS.MEDIA.TOGGLE_GRID, handler: toggleGridWithMediaPause },
       {
         config: SHORTCUTS.MEDIA.TOGGLE_ZOOM,
         handler: () => (zoomLevel > 1 ? resetZoom() : setZoomLevel(1.2))
@@ -140,6 +140,26 @@ export default function MediaPresenter(): React.JSX.Element {
             {
               config: SHORTCUTS.MEDIA.VIDEO_TOGGLE_PLAY,
               handler: () => window.dispatchEvent(new CustomEvent('media:togglePlay'))
+            },
+            {
+              config: SHORTCUTS.MEDIA.VIDEO_SEEK_FORWARD,
+              handler: () => {
+                const { videoState } = getCurrentKeyboardVideoState()
+                if (!videoState?.hasStarted || videoState.isEnded) return
+                window.dispatchEvent(
+                  new CustomEvent('media:videoSeekRelative', { detail: { seconds: 5 } })
+                )
+              }
+            },
+            {
+              config: SHORTCUTS.MEDIA.VIDEO_SEEK_BACKWARD,
+              handler: () => {
+                const { videoState } = getCurrentKeyboardVideoState()
+                if (!videoState?.hasStarted || videoState.isEnded) return
+                window.dispatchEvent(
+                  new CustomEvent('media:videoSeekRelative', { detail: { seconds: -5 } })
+                )
+              }
             }
           ]
         : []),
@@ -183,7 +203,7 @@ export default function MediaPresenter(): React.JSX.Element {
             <div className="flex-3 lg:flex-2 min-w-0 flex flex-col h-full">
               <PresenterHeader onExit={exit} />
               <MediaPreview currentItem={currentItem} descriptor={descriptor} isEnded={isEnded} />
-              <MediaToolbar />
+              <MediaToolbar onToggleGrid={toggleGridWithMediaPause} />
               <div className="flex-1" />
               <PresenterNavigation />
             </div>
