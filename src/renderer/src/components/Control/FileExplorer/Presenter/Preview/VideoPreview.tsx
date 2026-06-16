@@ -20,6 +20,14 @@ interface VideoPreviewProps {
   item: FileItemRecord
 }
 
+type SeekFlashDirection = 'backward' | 'forward'
+
+interface SeekFlashState {
+  direction: SeekFlashDirection
+  seconds: number
+  key: number
+}
+
 function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60)
   const s = Math.floor(seconds % 60)
@@ -47,6 +55,7 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
   const [isDraggingSeek, setIsDraggingSeek] = useState(false)
   const [localSeekTime, setLocalSeekTime] = useState(0)
   const [flashState, setFlashState] = useState<{ icon: 'play' | 'pause'; key: number } | null>(null)
+  const [seekFlashState, setSeekFlashState] = useState<SeekFlashState | null>(null)
 
   const hasStartedRef = useRef(false)
   const playbackStateRef = useRef({ hasStarted: false, isPlaying: false, isEnded: false })
@@ -57,6 +66,12 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
   const volumeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const flashTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const flashKeyRef = useRef(0)
+  const seekFlashTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const seekFlashKeyRef = useRef(0)
+  const seekFlashAccumulatorRef = useRef<{
+    direction: SeekFlashDirection
+    seconds: number
+  } | null>(null)
 
   const zoomLevel = useMediaProjectionStore((s) => s.zoomLevel)
   const pan = useMediaProjectionStore((s) => s.pan)
@@ -121,6 +136,7 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
       setIsDraggingSeek(false)
       if (volumeDebounceRef.current) clearTimeout(volumeDebounceRef.current)
       if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current)
+      if (seekFlashTimeoutRef.current) clearTimeout(seekFlashTimeoutRef.current)
     }
   }, [blobId, item.mimeType, retryToken, t])
 
@@ -129,6 +145,25 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
     flashKeyRef.current += 1
     setFlashState({ icon, key: flashKeyRef.current })
     flashTimeoutRef.current = setTimeout(() => setFlashState(null), 1100)
+  }, [])
+
+  const triggerSeekFlash = useCallback((offsetSeconds: number): void => {
+    if (offsetSeconds === 0) return
+    const direction: SeekFlashDirection = offsetSeconds > 0 ? 'forward' : 'backward'
+    const previous = seekFlashAccumulatorRef.current
+    const seconds =
+      previous?.direction === direction
+        ? previous.seconds + Math.abs(offsetSeconds)
+        : Math.abs(offsetSeconds)
+
+    if (seekFlashTimeoutRef.current) clearTimeout(seekFlashTimeoutRef.current)
+    seekFlashAccumulatorRef.current = { direction, seconds }
+    seekFlashKeyRef.current += 1
+    setSeekFlashState({ direction, seconds, key: seekFlashKeyRef.current })
+    seekFlashTimeoutRef.current = setTimeout(() => {
+      seekFlashAccumulatorRef.current = null
+      setSeekFlashState(null)
+    }, 1100)
   }, [])
 
   const handlePlayPause = useCallback((): void => {
@@ -238,11 +273,12 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
           ? videoRef.current.currentTime
           : currentTimeRef.current
       commitSeek(base + offset)
+      triggerSeekFlash(offset)
     }
 
     window.addEventListener('media:videoSeekRelative', handleRelativeSeek)
     return () => window.removeEventListener('media:videoSeekRelative', handleRelativeSeek)
-  }, [commitSeek])
+  }, [commitSeek, triggerSeekFlash])
 
   const releaseSeekPointer = useCallback((target: HTMLInputElement, pointerId: number): void => {
     if (target.hasPointerCapture?.(pointerId)) {
@@ -329,6 +365,23 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
             ) : (
               <Pause size={70} weight="fill" />
             )}
+          </div>
+        </div>
+      )}
+
+      {seekFlashState && (
+        <div
+          className={`absolute top-1/2 z-20 -translate-y-1/2 pointer-events-none ${
+            seekFlashState.direction === 'forward' ? 'right-[18%]' : 'left-[18%]'
+          }`}
+          data-testid="video-seek-flash"
+        >
+          <div
+            key={seekFlashState.key}
+            className="rounded-full px-5 py-3 presenter-media-control text-white text-3xl font-semibold tabular-nums video-flash-icon"
+          >
+            {seekFlashState.direction === 'forward' ? '+' : '-'}
+            {seekFlashState.seconds}
           </div>
         </div>
       )}

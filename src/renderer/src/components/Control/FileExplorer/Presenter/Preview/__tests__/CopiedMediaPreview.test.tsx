@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { FileItemRecord } from '@shared/types/folder'
 import ImagePreview from '../ImagePreview'
@@ -60,6 +60,25 @@ function makeCopy(mimeType: string, name: string): FileItemRecord {
   }
 }
 
+function seekRelative(seconds: number): void {
+  act(() => {
+    window.dispatchEvent(new CustomEvent('media:videoSeekRelative', { detail: { seconds } }))
+  })
+}
+
+async function getLoadedVideo(container: HTMLElement): Promise<HTMLVideoElement> {
+  const video = await waitFor(() => {
+    const element = container.querySelector('video')
+    expect(element).not.toBeNull()
+    return element!
+  })
+  Object.defineProperty(video, 'readyState', { configurable: true, value: 1 })
+  Object.defineProperty(video, 'duration', { configurable: true, value: 100 })
+  fireEvent.loadedMetadata(video)
+  video.currentTime = 30
+  return video
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   mockGetFileSource.mockResolvedValue({
@@ -111,20 +130,48 @@ describe('copied media preview identity', () => {
   it('seeks a video relative to the current playback time', async () => {
     const { container } = render(<VideoPreview item={makeCopy('video/mp4', 'copy.mp4')} />)
 
-    const video = await waitFor(() => {
-      const element = container.querySelector('video')
-      expect(element).not.toBeNull()
-      return element!
-    })
-    Object.defineProperty(video, 'readyState', { configurable: true, value: 1 })
-    Object.defineProperty(video, 'duration', { configurable: true, value: 100 })
-    fireEvent.loadedMetadata(video)
-    video.currentTime = 30
+    const video = await getLoadedVideo(container)
 
-    window.dispatchEvent(new CustomEvent('media:videoSeekRelative', { detail: { seconds: 5 } }))
+    seekRelative(5)
 
     expect(video.currentTime).toBe(35)
     expect(mockSendCommand).toHaveBeenCalledWith({ action: 'seek', itemId: 'copy-id', value: 35 })
+  })
+
+  it('shows accumulated video seek feedback for repeated same-direction jumps', async () => {
+    const { container } = render(<VideoPreview item={makeCopy('video/mp4', 'copy.mp4')} />)
+    await getLoadedVideo(container)
+
+    seekRelative(5)
+    expect(screen.getByTestId('video-seek-flash')).toHaveTextContent('+5')
+
+    seekRelative(5)
+    expect(screen.getByTestId('video-seek-flash')).toHaveTextContent('+10')
+
+    seekRelative(-5)
+    expect(screen.getByTestId('video-seek-flash')).toHaveTextContent('-5')
+  })
+
+  it('resets accumulated video seek feedback after the flash timeout', async () => {
+    const { container } = render(<VideoPreview item={makeCopy('video/mp4', 'copy.mp4')} />)
+    await getLoadedVideo(container)
+
+    vi.useFakeTimers()
+    try {
+      seekRelative(5)
+      seekRelative(5)
+      expect(screen.getByTestId('video-seek-flash')).toHaveTextContent('+10')
+
+      act(() => {
+        vi.advanceTimersByTime(1100)
+      })
+      expect(screen.queryByTestId('video-seek-flash')).toBeNull()
+
+      seekRelative(5)
+      expect(screen.getByTestId('video-seek-flash')).toHaveTextContent('+5')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('blurs the seek range after pointer release so keyboard shortcuts resume', async () => {
