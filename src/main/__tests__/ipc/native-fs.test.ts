@@ -7,7 +7,8 @@ const {
   mockMkdir,
   mockCopyFile,
   mockRename,
-  mockUnlink
+  mockUnlink,
+  mockCreateReadStream
 } = vi.hoisted(() => ({
   handleHandlers: new Map<string, (...args: unknown[]) => unknown>(),
   protocolHandlers: new Map<string, (request: Request) => Promise<Response>>(),
@@ -15,7 +16,8 @@ const {
   mockMkdir: vi.fn(),
   mockCopyFile: vi.fn(),
   mockRename: vi.fn(),
-  mockUnlink: vi.fn()
+  mockUnlink: vi.fn(),
+  mockCreateReadStream: vi.fn()
 }))
 
 const mockMainWindow = { id: 1 }
@@ -33,7 +35,8 @@ vi.mock('fs', () => {
     unlink: mockUnlink
   }
   return {
-    default: { promises },
+    default: { createReadStream: mockCreateReadStream, promises },
+    createReadStream: mockCreateReadStream,
     promises
   }
 })
@@ -50,9 +53,6 @@ vi.mock('electron', () => ({
       handleHandlers.set(channel, handler)
     })
   },
-  net: {
-    fetch: vi.fn()
-  },
   protocol: {
     handle: vi.fn((scheme: string, handler: (request: Request) => Promise<Response>) => {
       protocolHandlers.set(scheme, handler)
@@ -60,7 +60,8 @@ vi.mock('electron', () => ({
   }
 }))
 
-import { BrowserWindow, net } from 'electron'
+import { BrowserWindow } from 'electron'
+import { Readable } from 'stream'
 import type { WindowManager } from '../../windowManager'
 import {
   getNativeFilePath,
@@ -90,6 +91,7 @@ beforeEach(() => {
   mockCopyFile.mockResolvedValue(undefined)
   mockRename.mockResolvedValue(undefined)
   mockUnlink.mockResolvedValue(undefined)
+  mockCreateReadStream.mockReturnValue(Readable.from(['partial']))
   registerNativeFsHandlers(wm)
 })
 
@@ -173,13 +175,8 @@ describe('native media protocol', () => {
     expect(() => getNativeFilePath('../escape')).toThrow('Invalid native file id')
   })
 
-  it('streams the managed file and forwards range headers', async () => {
-    vi.mocked(net.fetch).mockResolvedValue(
-      new Response('partial', {
-        status: 206,
-        headers: { 'Content-Range': 'bytes 0-6/100' }
-      }) as never
-    )
+  it('streams the managed file with byte range response headers', async () => {
+    mockStat.mockResolvedValueOnce({ isFile: () => true, size: 100 })
     const handler = protocolHandlers.get('hhc-media')
     const request = new Request(`hhc-media://file/${validId}?type=video%2Fmp4`, {
       headers: { Range: 'bytes=0-6' }
@@ -187,13 +184,47 @@ describe('native media protocol', () => {
 
     const response = await handler!(request)
 
-    expect(net.fetch).toHaveBeenCalledWith(
-      `file:///tmp/hhc-user-data/native-files/${validId}`,
-      expect.objectContaining({ headers: request.headers })
+    expect(mockCreateReadStream).toHaveBeenCalledWith(
+      `/tmp/hhc-user-data/native-files/${validId}`,
+      { start: 0, end: 6 }
     )
     expect(response.status).toBe(206)
+    expect(response.headers.get('Accept-Ranges')).toBe('bytes')
+    expect(response.headers.get('Content-Length')).toBe('7')
     expect(response.headers.get('Content-Type')).toBe('video/mp4')
     expect(response.headers.get('Content-Range')).toBe('bytes 0-6/100')
+  })
+
+  it('streams the full managed file with seekable media headers', async () => {
+    mockStat.mockResolvedValueOnce({ isFile: () => true, size: 100 })
+    const handler = protocolHandlers.get('hhc-media')
+
+    const response = await handler!(new Request(`hhc-media://file/${validId}?type=video%2Fmp4`))
+
+    expect(mockCreateReadStream).toHaveBeenCalledWith(
+      `/tmp/hhc-user-data/native-files/${validId}`,
+      { start: 0, end: 99 }
+    )
+    expect(response.status).toBe(200)
+    expect(response.headers.get('Accept-Ranges')).toBe('bytes')
+    expect(response.headers.get('Content-Length')).toBe('100')
+    expect(response.headers.get('Content-Type')).toBe('video/mp4')
+    expect(response.headers.get('Content-Range')).toBeNull()
+  })
+
+  it('returns 416 for invalid media byte ranges', async () => {
+    mockStat.mockResolvedValueOnce({ isFile: () => true, size: 100 })
+    const handler = protocolHandlers.get('hhc-media')
+    const request = new Request(`hhc-media://file/${validId}?type=video%2Fmp4`, {
+      headers: { Range: 'bytes=200-300' }
+    })
+
+    const response = await handler!(request)
+
+    expect(response.status).toBe(416)
+    expect(response.headers.get('Accept-Ranges')).toBe('bytes')
+    expect(response.headers.get('Content-Range')).toBe('bytes */100')
+    expect(mockCreateReadStream).not.toHaveBeenCalled()
   })
 
   it('rejects traversal before accessing the filesystem', async () => {
@@ -201,11 +232,11 @@ describe('native media protocol', () => {
     const response = await handler!(new Request('hhc-media://file/..%2Fescape?type=video%2Fmp4'))
 
     expect(response.status).toBe(400)
-    expect(net.fetch).not.toHaveBeenCalled()
+    expect(mockCreateReadStream).not.toHaveBeenCalled()
   })
 
   it('returns 404 when the managed file cannot be read', async () => {
-    vi.mocked(net.fetch).mockRejectedValueOnce(new Error('missing'))
+    mockStat.mockRejectedValueOnce(new Error('missing'))
     const handler = protocolHandlers.get('hhc-media')
     const response = await handler!(new Request(`hhc-media://file/${validId}?type=video%2Fmp4`))
 

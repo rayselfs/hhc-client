@@ -1,8 +1,8 @@
-import { app, ipcMain, net, protocol } from 'electron'
+import { app, ipcMain, protocol } from 'electron'
 import { randomUUID } from 'crypto'
-import { promises as fs } from 'fs'
+import { createReadStream, promises as fs } from 'fs'
 import { dirname, isAbsolute, join, resolve } from 'path'
-import { pathToFileURL } from 'url'
+import { Readable } from 'stream'
 import { isValidNativeFileId } from '../../shared/native-media'
 import type { WindowManager } from '../windowManager'
 import { isMainWindow } from './validate'
@@ -10,6 +10,7 @@ import { isMainWindow } from './validate'
 const NATIVE_MEDIA_SCHEME = 'hhc-media:'
 const NATIVE_MEDIA_HOST = 'file'
 const MIME_TYPE_PATTERN = /^[a-z0-9][a-z0-9!#$&^_.+-]*\/[a-z0-9][a-z0-9!#$&^_.+-]*$/i
+const RANGE_PATTERN = /^bytes=(\d*)-(\d*)$/
 
 function getNativeFsDir(): string {
   return resolve(app.getPath('userData'), 'native-files')
@@ -41,6 +42,73 @@ export function parseNativeMediaUrl(requestUrl: string): { id: string; mimeType:
   } catch {
     return null
   }
+}
+
+type ByteRange = {
+  start: number
+  end: number
+}
+
+function parseRangeHeader(rangeHeader: string | null, size: number): ByteRange | null {
+  if (!rangeHeader) return { start: 0, end: size - 1 }
+
+  const match = RANGE_PATTERN.exec(rangeHeader.trim())
+  if (!match) return null
+
+  const [, rawStart, rawEnd] = match
+  if (!rawStart && !rawEnd) return null
+
+  if (!rawStart) {
+    const suffixLength = Number(rawEnd)
+    if (!Number.isInteger(suffixLength) || suffixLength <= 0) return null
+    return {
+      start: Math.max(0, size - suffixLength),
+      end: size - 1
+    }
+  }
+
+  const start = Number(rawStart)
+  const end = rawEnd ? Number(rawEnd) : size - 1
+  if (!Number.isInteger(start) || !Number.isInteger(end)) return null
+  if (start < 0 || end < start || start >= size) return null
+
+  return { start, end: Math.min(end, size - 1) }
+}
+
+async function createNativeMediaResponse(
+  filePath: string,
+  mimeType: string,
+  rangeHeader: string | null
+): Promise<Response> {
+  const stat = await fs.stat(filePath)
+  if (!stat.isFile()) return new Response('Media not found', { status: 404 })
+
+  const size = stat.size
+  const range = parseRangeHeader(rangeHeader, size)
+  if (!range || size <= 0) {
+    return new Response(null, {
+      status: 416,
+      headers: {
+        'Accept-Ranges': 'bytes',
+        'Content-Range': `bytes */${size}`
+      }
+    })
+  }
+
+  const isPartial = rangeHeader !== null
+  const contentLength = range.end - range.start + 1
+  const stream = createReadStream(filePath, { start: range.start, end: range.end })
+  const headers = new Headers({
+    'Accept-Ranges': 'bytes',
+    'Content-Length': String(contentLength),
+    'Content-Type': mimeType
+  })
+  if (isPartial) headers.set('Content-Range', `bytes ${range.start}-${range.end}/${size}`)
+
+  return new Response(Readable.toWeb(stream) as ReadableStream, {
+    status: isPartial ? 206 : 200,
+    headers
+  })
 }
 
 export function registerNativeFsHandlers(wm: WindowManager): void {
@@ -93,16 +161,11 @@ export function registerNativeMediaProtocol(): void {
 
     try {
       const filePath = getNativeFilePath(parsed.id)
-      const response = await net.fetch(pathToFileURL(filePath).toString(), {
-        headers: request.headers
-      })
-      const headers = new Headers(response.headers)
-      headers.set('Content-Type', parsed.mimeType)
-      return new Response(response.body, {
-        status: response.status,
-        statusText: response.statusText,
-        headers
-      })
+      return await createNativeMediaResponse(
+        filePath,
+        parsed.mimeType,
+        request.headers.get('range')
+      )
     } catch {
       return new Response('Media not found', { status: 404 })
     }
