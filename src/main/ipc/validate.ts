@@ -114,6 +114,9 @@ export function validateProjectionMessageTuple(args: unknown[]): args is Project
       )
     case 'file:control':
       if (typeof obj.action !== 'string') return false
+      if ('itemId' in obj && obj.itemId !== undefined && typeof obj.itemId !== 'string') {
+        return false
+      }
       if (['play', 'pause'].includes(obj.action)) return true
       if (['seek', 'volume', 'pdfPage', 'pdfScroll', 'zoom'].includes(obj.action)) {
         return isFiniteNumber(obj.value)

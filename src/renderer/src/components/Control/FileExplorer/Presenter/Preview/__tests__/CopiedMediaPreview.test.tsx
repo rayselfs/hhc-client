@@ -122,7 +122,7 @@ describe('copied media preview identity', () => {
     window.dispatchEvent(new CustomEvent('media:videoSeekRelative', { detail: { seconds: 5 } }))
 
     expect(video.currentTime).toBe(35)
-    expect(mockSendCommand).toHaveBeenCalledWith({ action: 'seek', value: 35 })
+    expect(mockSendCommand).toHaveBeenCalledWith({ action: 'seek', itemId: 'copy-id', value: 35 })
   })
 
   it('pauses a playing video through the pause-only media event', async () => {
@@ -138,7 +138,7 @@ describe('copied media preview identity', () => {
     window.dispatchEvent(new CustomEvent('media:pauseVideo'))
 
     expect(video.pause).toHaveBeenCalled()
-    expect(mockSendCommand).toHaveBeenCalledWith({ action: 'pause' })
+    expect(mockSendCommand).toHaveBeenCalledWith({ action: 'pause', itemId: 'copy-id' })
   })
 
   it('keeps the presenter open and retries a failed media load', async () => {

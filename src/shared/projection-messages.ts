@@ -59,11 +59,13 @@ export interface AppMessages {
   'file:end': null
 }
 
+type FileControlTarget = { itemId?: string }
+
 export type FileControlPayload =
-  | { action: 'play' }
-  | { action: 'pause' }
-  | { action: 'seek'; value: number }
-  | { action: 'volume'; value: number }
+  | ({ action: 'play' } & FileControlTarget)
+  | ({ action: 'pause' } & FileControlTarget)
+  | ({ action: 'seek'; value: number } & FileControlTarget)
+  | ({ action: 'volume'; value: number } & FileControlTarget)
   | { action: 'pdfPage'; value: number }
   | { action: 'pdfScroll'; value: number }
   | { action: 'pdfViewMode'; value: 'single' | 'continuous' }

@@ -19,6 +19,15 @@ type PdfState = {
   viewMode: 'single' | 'continuous'
 }
 
+type PendingVideoControl = {
+  itemId: string | null
+  seekTo?: number
+  shouldPlay?: boolean
+  volume?: number
+}
+
+const HAVE_METADATA = 1
+
 export default function FileProjection({
   fileName,
   initialItemId,
@@ -36,6 +45,77 @@ export default function FileProjection({
   const pdfContainerRef = useRef<HTMLDivElement | null>(null)
   const currentItemIdRef = useRef<string | null>(null)
   const sourceRevokeRef = useRef<(() => void) | null>(null)
+  const pendingVideoControlRef = useRef<PendingVideoControl | null>(null)
+
+  const isControlForCurrentItem = useCallback((data: FileControlPayload): boolean => {
+    if (!('itemId' in data) || data.itemId === undefined) return true
+    return data.itemId === currentItemIdRef.current
+  }, [])
+
+  const clampVideoTime = useCallback((video: HTMLVideoElement, value: number): number => {
+    const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : value
+    return Math.max(0, Math.min(value, duration))
+  }, [])
+
+  const applyPendingVideoControl = useCallback((): void => {
+    const pending = pendingVideoControlRef.current
+    const video = videoRef.current
+    if (!pending || !video) return
+    if (pending.itemId && pending.itemId !== currentItemIdRef.current) {
+      pendingVideoControlRef.current = null
+      return
+    }
+
+    if (pending.volume !== undefined) {
+      video.muted = false
+      video.volume = Math.max(0, Math.min(1, pending.volume))
+      delete pending.volume
+    }
+
+    if (pending.seekTo !== undefined) {
+      if (video.readyState < HAVE_METADATA) return
+      try {
+        video.currentTime = clampVideoTime(video, pending.seekTo)
+        delete pending.seekTo
+      } catch {
+        return
+      }
+    }
+
+    if (pending.shouldPlay !== undefined) {
+      if (pending.shouldPlay) {
+        if (video.readyState < HAVE_METADATA) return
+        video.muted = false
+        video.play().catch(() => {})
+      } else {
+        video.pause()
+      }
+      delete pending.shouldPlay
+    }
+
+    if (
+      pending.seekTo === undefined &&
+      pending.shouldPlay === undefined &&
+      pending.volume === undefined
+    ) {
+      pendingVideoControlRef.current = null
+    }
+  }, [clampVideoTime])
+
+  const queueVideoControl = useCallback(
+    (data: FileControlPayload, control: Omit<PendingVideoControl, 'itemId'>): void => {
+      if (!isControlForCurrentItem(data)) return
+      const itemId =
+        'itemId' in data && data.itemId !== undefined ? data.itemId : currentItemIdRef.current
+      pendingVideoControlRef.current = {
+        ...(pendingVideoControlRef.current ?? {}),
+        itemId,
+        ...control
+      }
+      applyPendingVideoControl()
+    },
+    [applyPendingVideoControl, isControlForCurrentItem]
+  )
 
   const loadPdf = useCallback(async (sourceUrl: string, itemId: string) => {
     const pdfjsLib = await loadPdfjsLib()
@@ -68,6 +148,7 @@ export default function FileProjection({
   const loadFile = useCallback(
     async (itemId: string, blobId: string, fileMimeType: string) => {
       currentItemIdRef.current = itemId
+      pendingVideoControlRef.current = null
       sourceRevokeRef.current?.()
       sourceRevokeRef.current = null
       setObjectUrl(null)
@@ -94,61 +175,58 @@ export default function FileProjection({
     [loadPdf]
   )
 
-  const handleControl = useCallback((data: FileControlPayload) => {
-    switch (data.action) {
-      case 'play':
-        if (videoRef.current) {
-          videoRef.current.muted = false
-          videoRef.current.play().catch(() => {})
-        }
-        break
-      case 'pause':
-        videoRef.current?.pause()
-        break
-      case 'seek':
-        if (videoRef.current) videoRef.current.currentTime = data.value
-        break
-      case 'zoom':
-        setZoom(data.value)
-        if (data.value <= 1) setPan({ x: 0, y: 0 })
-        break
-      case 'pan':
-        setPan(data.value)
-        break
-      case 'pdfPage':
-        setPdfState((prev) => (prev ? { ...prev, currentPage: data.value } : prev))
-        break
-      case 'pdfScroll': {
-        const el = pdfContainerRef.current
-        if (el) {
-          const pageFloat = data.value
-          const pageIndex = Math.floor(Math.max(0, pageFloat))
-          const fraction = pageFloat - pageIndex
-          const PY = 16 // py-4
-          const GAP = 16 // gap-4
-          const children = el.children
-          let target = PY
-          for (let i = 0; i < pageIndex && i < children.length; i++) {
-            target += (children[i] as HTMLElement).clientHeight + GAP
+  const handleControl = useCallback(
+    (data: FileControlPayload) => {
+      switch (data.action) {
+        case 'play':
+          queueVideoControl(data, { shouldPlay: true })
+          break
+        case 'pause':
+          queueVideoControl(data, { shouldPlay: false })
+          break
+        case 'seek':
+          queueVideoControl(data, { seekTo: data.value })
+          break
+        case 'zoom':
+          setZoom(data.value)
+          if (data.value <= 1) setPan({ x: 0, y: 0 })
+          break
+        case 'pan':
+          setPan(data.value)
+          break
+        case 'pdfPage':
+          setPdfState((prev) => (prev ? { ...prev, currentPage: data.value } : prev))
+          break
+        case 'pdfScroll': {
+          const el = pdfContainerRef.current
+          if (el) {
+            const pageFloat = data.value
+            const pageIndex = Math.floor(Math.max(0, pageFloat))
+            const fraction = pageFloat - pageIndex
+            const PY = 16 // py-4
+            const GAP = 16 // gap-4
+            const children = el.children
+            let target = PY
+            for (let i = 0; i < pageIndex && i < children.length; i++) {
+              target += (children[i] as HTMLElement).clientHeight + GAP
+            }
+            if (pageIndex < children.length) {
+              target += fraction * (children[pageIndex] as HTMLElement).clientHeight
+            }
+            el.scrollTop = target
           }
-          if (pageIndex < children.length) {
-            target += fraction * (children[pageIndex] as HTMLElement).clientHeight
-          }
-          el.scrollTop = target
+          break
         }
-        break
+        case 'pdfViewMode':
+          setPdfState((prev) => (prev ? { ...prev, viewMode: data.value } : prev))
+          break
+        case 'volume':
+          queueVideoControl(data, { volume: data.value })
+          break
       }
-      case 'pdfViewMode':
-        setPdfState((prev) => (prev ? { ...prev, viewMode: data.value } : prev))
-        break
-      case 'volume':
-        if (videoRef.current) {
-          videoRef.current.muted = false
-          videoRef.current.volume = Math.max(0, Math.min(1, data.value))
-        }
-        break
-    }
-  }, [])
+    },
+    [queueVideoControl]
+  )
 
   useEffect(() => {
     const adapter = createProjectionAdapter('projection')
@@ -302,6 +380,8 @@ export default function FileProjection({
               transformOrigin: 'center center'
             }}
             muted
+            onLoadedMetadata={applyPendingVideoControl}
+            onCanPlay={applyPendingVideoControl}
           />
         </div>
       </div>

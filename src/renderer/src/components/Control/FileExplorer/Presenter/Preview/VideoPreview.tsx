@@ -50,6 +50,8 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
 
   const hasStartedRef = useRef(false)
   const playbackStateRef = useRef({ hasStarted: false, isPlaying: false, isEnded: false })
+  const currentTimeRef = useRef(0)
+  const durationRef = useRef(0)
   const isDraggingSeekRef = useRef(false)
   const localSeekTimeRef = useRef(0)
   const volumeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -138,13 +140,13 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
         .play()
         .then(() => setPlaybackState({ hasStarted: true, isPlaying: true, isEnded: false }))
         .catch(() => setPlaybackState({ isPlaying: false }))
-      sendCommand({ action: 'seek', value: 0 })
-      sendCommand({ action: 'play' })
+      sendCommand({ action: 'seek', itemId: item.id, value: 0 })
+      sendCommand({ action: 'play', itemId: item.id })
     } else if (isPlaying) {
       triggerFlash('pause')
       setPlaybackState({ isPlaying: false })
       videoRef.current.pause()
-      sendCommand({ action: 'pause' })
+      sendCommand({ action: 'pause', itemId: item.id })
     } else {
       if (hasStartedRef.current) triggerFlash('play')
       setPlaybackState({ hasStarted: true, isPlaying: true, isEnded: false })
@@ -152,17 +154,17 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
         .play()
         .then(() => setPlaybackState({ hasStarted: true, isPlaying: true, isEnded: false }))
         .catch(() => setPlaybackState({ isPlaying: false }))
-      sendCommand({ action: 'play' })
+      sendCommand({ action: 'play', itemId: item.id })
     }
-  }, [isEnded, isPlaying, sendCommand, setPlaybackState, triggerFlash])
+  }, [isEnded, isPlaying, item.id, sendCommand, setPlaybackState, triggerFlash])
 
   const pauseVideo = useCallback((): void => {
     if (!videoRef.current || !isPlaying) return
     triggerFlash('pause')
     setPlaybackState({ isPlaying: false })
     videoRef.current.pause()
-    sendCommand({ action: 'pause' })
-  }, [isPlaying, sendCommand, setPlaybackState, triggerFlash])
+    sendCommand({ action: 'pause', itemId: item.id })
+  }, [isPlaying, item.id, sendCommand, setPlaybackState, triggerFlash])
 
   useEffect(() => {
     const handleTogglePlay = (): void => {
@@ -182,10 +184,10 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
       setIsMuted(val === 0)
       if (volumeDebounceRef.current) clearTimeout(volumeDebounceRef.current)
       volumeDebounceRef.current = setTimeout(() => {
-        sendCommand({ action: 'volume', value: val })
+        sendCommand({ action: 'volume', itemId: item.id, value: val })
       }, 100)
     },
-    [sendCommand]
+    [item.id, sendCommand]
   )
 
   const handleVolumeIconClick = useCallback((): void => {
@@ -194,23 +196,25 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
     const effectiveVol = newMuted ? 0 : volume || 0.8
     if (volumeDebounceRef.current) clearTimeout(volumeDebounceRef.current)
     volumeDebounceRef.current = setTimeout(() => {
-      sendCommand({ action: 'volume', value: effectiveVol })
+      sendCommand({ action: 'volume', itemId: item.id, value: effectiveVol })
     }, 100)
-  }, [isMuted, volume, sendCommand])
+  }, [isMuted, item.id, volume, sendCommand])
 
   const commitSeek = useCallback(
     (seekTo: number): void => {
-      const max = Number.isFinite(duration) && duration > 0 ? duration : seekTo
+      const durationValue = durationRef.current
+      const max = Number.isFinite(durationValue) && durationValue > 0 ? durationValue : seekTo
       const clamped = Math.max(0, Math.min(seekTo, max))
       isDraggingSeekRef.current = false
       setIsDraggingSeek(false)
+      currentTimeRef.current = clamped
       localSeekTimeRef.current = clamped
       setLocalSeekTime(clamped)
       setCurrentTime(clamped)
       if (videoRef.current) videoRef.current.currentTime = clamped
-      sendCommand({ action: 'seek', value: clamped })
+      sendCommand({ action: 'seek', itemId: item.id, value: clamped })
     },
-    [duration, sendCommand]
+    [item.id, sendCommand]
   )
 
   useEffect(() => {
@@ -218,13 +222,13 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
       const detail = (event as CustomEvent<{ seconds?: number }>).detail
       const offset = detail?.seconds
       if (typeof offset !== 'number' || !Number.isFinite(offset)) return
-      const base = videoRef.current?.currentTime ?? currentTime
+      const base = videoRef.current?.currentTime ?? currentTimeRef.current
       commitSeek(base + offset)
     }
 
     window.addEventListener('media:videoSeekRelative', handleRelativeSeek)
     return () => window.removeEventListener('media:videoSeekRelative', handleRelativeSeek)
-  }, [commitSeek, currentTime])
+  }, [commitSeek])
 
   const releaseSeekPointer = useCallback((target: HTMLInputElement, pointerId: number): void => {
     if (target.hasPointerCapture(pointerId)) {
@@ -262,8 +266,16 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
             src={videoSrc}
             muted
             style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-            onTimeUpdate={() => setCurrentTime(videoRef.current?.currentTime ?? 0)}
-            onDurationChange={() => setDuration(videoRef.current?.duration ?? 0)}
+            onTimeUpdate={() => {
+              const value = videoRef.current?.currentTime ?? 0
+              currentTimeRef.current = value
+              setCurrentTime(value)
+            }}
+            onDurationChange={() => {
+              const value = videoRef.current?.duration ?? 0
+              durationRef.current = value
+              setDuration(value)
+            }}
             onPlay={() => setPlaybackState({ hasStarted: true, isPlaying: true, isEnded: false })}
             onPause={() => setPlaybackState({ isPlaying: false })}
             onEnded={() => {
@@ -284,7 +296,7 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
               ?.play()
               .then(() => setPlaybackState({ hasStarted: true, isPlaying: true, isEnded: false }))
               .catch(() => setPlaybackState({ isPlaying: false }))
-            sendCommand({ action: 'play' })
+            sendCommand({ action: 'play', itemId: item.id })
           }}
           onMouseDown={(e) => e.stopPropagation()}
         >
