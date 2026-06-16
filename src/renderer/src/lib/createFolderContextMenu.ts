@@ -1,17 +1,7 @@
 import { useContextMenu } from '@renderer/contexts/ContextMenuContext'
 import type { ContextMenuEntry } from '@renderer/contexts/ContextMenuContext'
 import type { FolderRecord, FolderItem } from '@shared/types/folder'
-import {
-  Copy,
-  Scissors,
-  Clipboard,
-  Trash2,
-  FolderPlus,
-  Pencil,
-  Settings2,
-  Upload,
-  Folder
-} from 'lucide-react'
+import { Copy, Scissors, Clipboard, Trash2, FolderPlus, Pencil, Upload, Folder } from 'lucide-react'
 import React from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -38,7 +28,6 @@ export interface ShowItemMenuOptions {
   onCut: (targetIds: Set<string>) => void
   onDelete: (targetIds: Set<string>) => void
   onEdit?: (item: FolderItem) => void
-  onEditDetails?: (item: FolderItem) => void
 }
 
 export interface ShowFolderMenuOptions {
@@ -98,8 +87,7 @@ export function createFolderContextMenu(
       onCopy,
       onCut,
       onDelete,
-      onEdit,
-      onEditDetails
+      onEdit
     }: ShowItemMenuOptions): void => {
       if (!isAlreadySelected) {
         setSelected(new Set([item.id]))
@@ -113,14 +101,6 @@ export function createFolderContextMenu(
           label: tKey('rename'),
           icon: React.createElement(Pencil, { size: 14 }),
           onAction: () => onEdit(item)
-        })
-      }
-      if (onEditDetails) {
-        editItems.push({
-          id: 'edit-details',
-          label: tKey('editDetails'),
-          icon: React.createElement(Settings2, { size: 14 }),
-          onAction: () => onEditDetails(item)
         })
       }
       if (editItems.length > 0) {

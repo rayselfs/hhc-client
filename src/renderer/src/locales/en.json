@@ -454,7 +454,6 @@
       "cut": "Cut",
       "paste": "Paste",
       "edit": "Edit",
-      "editDetails": "Edit Details",
       "uploadFiles": "Upload Files",
       "uploadFolder": "Upload Folder",
       "addFavorite": "Add to Favorites",
@@ -468,17 +467,6 @@
     "folderAlreadyExists": "A folder with this name already exists",
     "fileAlreadyExists": "A file with this name already exists",
     "renameFile": "Rename file",
-    "editFileModal": {
-      "editFolder": "Edit File",
-      "folderName": "File Name",
-      "retention": "Retention",
-      "duration": {
-        "1day": "1 day",
-        "1week": "1 week",
-        "1month": "1 month",
-        "permanent": "Permanent"
-      }
-    },
     "blobLoadFailed": "Failed to load file, skipping"
   },
   "projection": {
