@@ -1,9 +1,13 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
+  deleteSyncCursorsByProviderConnection,
+  deleteSyncEntriesByProviderConnection,
+  deleteSyncEntryPreferencesByProviderConnection,
   getProviderConnection,
   getSyncCursor,
   getSyncEntryByRemoteItem,
   getSyncEntryPreference,
+  listSyncEntriesByProviderConnection,
   putProviderConnection,
   putSyncCursor,
   putSyncEntry,
@@ -116,6 +120,56 @@ describe('sync-db', () => {
       itemId: 'item-1',
       blobId: 'blob-1',
       reason: 'remote-delete'
+    })
+  })
+
+  it('deletes sync metadata scoped to one provider connection', async () => {
+    await putSyncCursor({
+      providerConnectionId: 'connection-1',
+      remoteFolderId: 'folder',
+      cursor: 'cursor-a',
+      updatedAt: 1
+    })
+    await putSyncCursor({
+      providerConnectionId: 'connection-2',
+      remoteFolderId: 'folder',
+      cursor: 'cursor-b',
+      updatedAt: 1
+    })
+    await putSyncEntry({
+      providerConnectionId: 'connection-1',
+      remoteItemId: 'remote-file-1',
+      parentRemoteItemId: null,
+      kind: 'file',
+      name: 'one.mp4',
+      status: 'remote-only'
+    })
+    await putSyncEntry({
+      providerConnectionId: 'connection-2',
+      remoteItemId: 'remote-file-2',
+      parentRemoteItemId: null,
+      kind: 'file',
+      name: 'two.mp4',
+      status: 'remote-only'
+    })
+    await putSyncEntryPreference({
+      providerConnectionId: 'connection-1',
+      remoteItemId: 'remote-file-1',
+      offlinePolicyOverride: 'always-offline'
+    })
+
+    await deleteSyncEntriesByProviderConnection('connection-1')
+    await deleteSyncEntryPreferencesByProviderConnection('connection-1')
+    await deleteSyncCursorsByProviderConnection('connection-1')
+
+    await expect(listSyncEntriesByProviderConnection('connection-1')).resolves.toEqual([])
+    await expect(getSyncEntryByRemoteItem('connection-2', 'remote-file-2')).resolves.toMatchObject({
+      providerConnectionId: 'connection-2'
+    })
+    await expect(getSyncEntryPreference('connection-1', 'remote-file-1')).resolves.toBeUndefined()
+    await expect(getSyncCursor('connection-1', 'folder')).resolves.toBeUndefined()
+    await expect(getSyncCursor('connection-2', 'folder')).resolves.toMatchObject({
+      cursor: 'cursor-b'
     })
   })
 })

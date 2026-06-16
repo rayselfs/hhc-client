@@ -248,6 +248,26 @@ export async function listSyncEntries(): Promise<SyncEntryRecord[]> {
   return (await getSyncDB()).getAll('sync-entries')
 }
 
+export async function listSyncEntriesByProviderConnection(
+  providerConnectionId: string
+): Promise<SyncEntryRecord[]> {
+  return (await getSyncDB()).getAllFromIndex(
+    'sync-entries',
+    'by-provider-connection',
+    providerConnectionId
+  )
+}
+
+export async function deleteSyncEntriesByProviderConnection(
+  providerConnectionId: string
+): Promise<void> {
+  const db = await getSyncDB()
+  const entries = await listSyncEntriesByProviderConnection(providerConnectionId)
+  const tx = db.transaction('sync-entries', 'readwrite')
+  await Promise.all(entries.map((entry) => tx.store.delete(entry.id)))
+  await tx.done
+}
+
 export async function putSyncEntryPreference(
   record: Omit<SyncEntryPreferenceRecord, 'id' | 'updatedAt'> & {
     updatedAt?: number
@@ -276,6 +296,20 @@ export async function getSyncEntryPreference(
   )
 }
 
+export async function deleteSyncEntryPreferencesByProviderConnection(
+  providerConnectionId: string
+): Promise<void> {
+  const db = await getSyncDB()
+  const preferences = await db.getAllFromIndex(
+    'sync-entry-preferences',
+    'by-provider-connection',
+    providerConnectionId
+  )
+  const tx = db.transaction('sync-entry-preferences', 'readwrite')
+  await Promise.all(preferences.map((preference) => tx.store.delete(preference.id)))
+  await tx.done
+}
+
 export async function putSyncTombstone(
   record: Omit<SyncTombstoneRecord, 'id' | 'createdAt'> & {
     id?: string
@@ -294,6 +328,20 @@ export async function putSyncTombstone(
 
 export async function listSyncTombstones(): Promise<SyncTombstoneRecord[]> {
   return (await getSyncDB()).getAll('sync-tombstones')
+}
+
+export async function deleteSyncCursorsByProviderConnection(
+  providerConnectionId: string
+): Promise<void> {
+  const db = await getSyncDB()
+  const cursors = await db.getAllFromIndex(
+    'sync-cursors',
+    'by-provider-connection',
+    providerConnectionId
+  )
+  const tx = db.transaction('sync-cursors', 'readwrite')
+  await Promise.all(cursors.map((cursor) => tx.store.delete(cursor.id)))
+  await tx.done
 }
 
 export async function resetSyncDBForTests(): Promise<void> {
