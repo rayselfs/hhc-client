@@ -66,6 +66,7 @@ beforeEach(() => {
     url: 'blob:resolved-source',
     revoke: vi.fn()
   })
+  HTMLMediaElement.prototype.play = vi.fn().mockResolvedValue(undefined)
   HTMLMediaElement.prototype.pause = vi.fn()
 })
 
@@ -86,6 +87,25 @@ describe('copied media preview identity', () => {
       expect(mockGetFileSource).toHaveBeenCalledWith({}, 'original-id', 'video/mp4')
     })
     expect(container.querySelector('video')).toHaveAttribute('src', 'blob:resolved-source')
+  })
+
+  it('syncs video playback state immediately on first play', async () => {
+    const { container } = render(<VideoPreview item={makeCopy('video/mp4', 'copy.mp4')} />)
+
+    await waitFor(() => {
+      expect(container.querySelector('video')).toHaveAttribute('src', 'blob:resolved-source')
+    })
+    storeState.setTypeState.mockClear()
+
+    const playButton = container.querySelector('button')
+    expect(playButton).not.toBeNull()
+    fireEvent.click(playButton!)
+
+    expect(storeState.setTypeState).toHaveBeenCalledWith('video', {
+      hasStarted: true,
+      isPlaying: true,
+      isEnded: false
+    })
   })
 
   it('seeks a video relative to the current playback time', async () => {

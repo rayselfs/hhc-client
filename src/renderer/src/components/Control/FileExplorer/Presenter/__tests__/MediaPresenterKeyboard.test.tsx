@@ -177,6 +177,37 @@ describe('MediaPresenter video keyboard behavior', () => {
     dispatchSpy.mockRestore()
   })
 
+  it('reads the latest video state during keydown even before rerendered shortcuts refresh', () => {
+    const dispatchSpy = vi.spyOn(window, 'dispatchEvent')
+    render(<MediaPresenter />)
+
+    storeState.typeStates.video = { hasStarted: true, isPlaying: true, isEnded: false }
+
+    findShortcut('ArrowRight').handler(new KeyboardEvent('keydown', { code: 'ArrowRight' }))
+
+    expect(mockNext).not.toHaveBeenCalled()
+    expect(dispatchSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'media:videoSeekRelative' })
+    )
+    dispatchSpy.mockRestore()
+  })
+
+  it('uses item navigation after video playback has ended', () => {
+    storeState.typeStates.video = { hasStarted: true, isPlaying: false, isEnded: true }
+    const dispatchSpy = vi.spyOn(window, 'dispatchEvent')
+    render(<MediaPresenter />)
+
+    findShortcut('ArrowRight').handler(new KeyboardEvent('keydown', { code: 'ArrowRight' }))
+    findShortcut('ArrowLeft').handler(new KeyboardEvent('keydown', { code: 'ArrowLeft' }))
+
+    expect(mockNext).toHaveBeenCalledOnce()
+    expect(mockPrev).toHaveBeenCalledOnce()
+    expect(dispatchSpy).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'media:videoSeekRelative' })
+    )
+    dispatchSpy.mockRestore()
+  })
+
   it('pauses the video on Escape only when video is playing', () => {
     storeState.typeStates.video = { hasStarted: true, isPlaying: true, isEnded: false }
     const dispatchSpy = vi.spyOn(window, 'dispatchEvent')

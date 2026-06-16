@@ -49,6 +49,7 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
   const [flashState, setFlashState] = useState<{ icon: 'play' | 'pause'; key: number } | null>(null)
 
   const hasStartedRef = useRef(false)
+  const playbackStateRef = useRef({ hasStarted: false, isPlaying: false, isEnded: false })
   const isDraggingSeekRef = useRef(false)
   const localSeekTimeRef = useRef(0)
   const volumeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -63,7 +64,26 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
       ? `scale(${zoomLevel}) translate(${(pan.x / zoomLevel) * 100}%, ${(pan.y / zoomLevel) * 100}%)`
       : undefined
 
+  const setPlaybackState = useCallback(
+    (next: { hasStarted?: boolean; isPlaying?: boolean; isEnded?: boolean }): void => {
+      const current = playbackStateRef.current
+      const resolved = {
+        hasStarted: next.hasStarted ?? current.hasStarted,
+        isPlaying: next.isPlaying ?? current.isPlaying,
+        isEnded: next.isEnded ?? current.isEnded
+      }
+      playbackStateRef.current = resolved
+      hasStartedRef.current = resolved.hasStarted
+      setHasStarted(resolved.hasStarted)
+      setIsPlaying(resolved.isPlaying)
+      setIsEnded(resolved.isEnded)
+      setTypeState('video', resolved)
+    },
+    [setTypeState]
+  )
+
   useEffect(() => {
+    playbackStateRef.current = { hasStarted: false, isPlaying: false, isEnded: false }
     hasStartedRef.current = false
     setTypeState('video', { hasStarted: false, isPlaying: false, isEnded: false })
   }, [item.id, setTypeState])
@@ -113,42 +133,39 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
     if (isEnded) {
       triggerFlash('play')
       videoRef.current.currentTime = 0
+      setPlaybackState({ hasStarted: true, isPlaying: true, isEnded: false })
       videoRef.current
         .play()
-        .then(() => {
-          setIsEnded(false)
-          setIsPlaying(true)
-        })
-        .catch(() => {})
+        .then(() => setPlaybackState({ hasStarted: true, isPlaying: true, isEnded: false }))
+        .catch(() => setPlaybackState({ isPlaying: false }))
       sendCommand({ action: 'seek', value: 0 })
       sendCommand({ action: 'play' })
     } else if (isPlaying) {
       triggerFlash('pause')
+      setPlaybackState({ isPlaying: false })
       videoRef.current.pause()
       sendCommand({ action: 'pause' })
     } else {
       if (hasStartedRef.current) triggerFlash('play')
+      setPlaybackState({ hasStarted: true, isPlaying: true, isEnded: false })
       videoRef.current
         .play()
-        .then(() => setIsPlaying(true))
-        .catch(() => {})
+        .then(() => setPlaybackState({ hasStarted: true, isPlaying: true, isEnded: false }))
+        .catch(() => setPlaybackState({ isPlaying: false }))
       sendCommand({ action: 'play' })
     }
-  }, [isEnded, isPlaying, sendCommand, triggerFlash])
+  }, [isEnded, isPlaying, sendCommand, setPlaybackState, triggerFlash])
 
   const pauseVideo = useCallback((): void => {
     if (!videoRef.current || !isPlaying) return
     triggerFlash('pause')
+    setPlaybackState({ isPlaying: false })
     videoRef.current.pause()
     sendCommand({ action: 'pause' })
-  }, [isPlaying, sendCommand, triggerFlash])
+  }, [isPlaying, sendCommand, setPlaybackState, triggerFlash])
 
   useEffect(() => {
     const handleTogglePlay = (): void => {
-      if (!hasStartedRef.current) {
-        hasStartedRef.current = true
-        setHasStarted(true)
-      }
       handlePlayPause()
     }
     window.addEventListener('media:togglePlay', handleTogglePlay)
@@ -158,10 +175,6 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
       window.removeEventListener('media:pauseVideo', pauseVideo)
     }
   }, [handlePlayPause, pauseVideo])
-
-  useEffect(() => {
-    setTypeState('video', { hasStarted, isPlaying, isEnded })
-  }, [hasStarted, isEnded, isPlaying, setTypeState])
 
   const handleVolumeChange = useCallback(
     (val: number): void => {
@@ -251,11 +264,10 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
             style={{ width: '100%', height: '100%', objectFit: 'contain' }}
             onTimeUpdate={() => setCurrentTime(videoRef.current?.currentTime ?? 0)}
             onDurationChange={() => setDuration(videoRef.current?.duration ?? 0)}
-            onPlay={() => setIsPlaying(true)}
-            onPause={() => setIsPlaying(false)}
+            onPlay={() => setPlaybackState({ hasStarted: true, isPlaying: true, isEnded: false })}
+            onPause={() => setPlaybackState({ isPlaying: false })}
             onEnded={() => {
-              setIsPlaying(false)
-              setIsEnded(true)
+              setPlaybackState({ isPlaying: false, isEnded: true })
             }}
           />
         ) : (
@@ -267,13 +279,11 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
         <button
           className="absolute inset-0 flex items-center justify-center z-10 cursor-pointer"
           onClick={() => {
-            hasStartedRef.current = true
-            setHasStarted(true)
-            setIsEnded(false)
+            setPlaybackState({ hasStarted: true, isPlaying: true, isEnded: false })
             videoRef.current
               ?.play()
-              .then(() => setIsPlaying(true))
-              .catch(() => {})
+              .then(() => setPlaybackState({ hasStarted: true, isPlaying: true, isEnded: false }))
+              .catch(() => setPlaybackState({ isPlaying: false }))
             sendCommand({ action: 'play' })
           }}
           onMouseDown={(e) => e.stopPropagation()}
