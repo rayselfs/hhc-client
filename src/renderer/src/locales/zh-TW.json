@@ -606,6 +606,7 @@
         "refresh": "重新整理",
         "removeOrphans": "移除孤立產生資產",
         "clearRegenerable": "清除可重建縮圖",
+        "clearSyncCache": "清除未釘選同步快取",
         "cleanupHint": "清理動作只會移除產生資產。原始媒體仍只透過垃圾桶與永久刪除流程移除。",
         "total": "總計",
         "browserEstimate": "瀏覽器儲存空間：已使用 {{usage}} / {{quota}}。持久化儲存：{{persisted}}。",

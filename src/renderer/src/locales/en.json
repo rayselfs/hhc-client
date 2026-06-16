@@ -606,6 +606,7 @@
         "refresh": "Refresh",
         "removeOrphans": "Remove orphan assets",
         "clearRegenerable": "Clear regenerable thumbnails",
+        "clearSyncCache": "Clear unpinned sync cache",
         "cleanupHint": "Cleanup actions remove only generated assets. Original media stays in the normal trash and permanent-delete flow.",
         "total": "Total",
         "browserEstimate": "Browser storage: {{usage}} used of {{quota}}. Persistent storage: {{persisted}}.",

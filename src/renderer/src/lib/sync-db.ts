@@ -244,6 +244,12 @@ export async function getSyncEntryByRemoteItem(
   )
 }
 
+export async function getSyncEntryByLocalItem(
+  itemId: string
+): Promise<SyncEntryRecord | undefined> {
+  return (await getSyncDB()).getFromIndex('sync-entries', 'by-local-item', itemId)
+}
+
 export async function listSyncEntries(): Promise<SyncEntryRecord[]> {
   return (await getSyncDB()).getAll('sync-entries')
 }

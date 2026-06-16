@@ -1,4 +1,4 @@
-import { listFileBlobRecords } from './file-explorer-db'
+import { deleteFileBlob, listFileBlobRecords, openFileExplorerDB } from './file-explorer-db'
 import {
   deleteDerivedAsset,
   listDerivedAssets,
@@ -6,9 +6,11 @@ import {
   type DerivedAssetRecord
 } from './media-work-db'
 import { isMediaResourceLocked } from './media-resource-locks'
+import { getSyncEntryPreference, listSyncEntries, putSyncEntry } from './sync-db'
 
 export interface MediaStorageCleanupResult {
   deletedAssetIds: string[]
+  deletedSyncBlobIds?: string[]
 }
 
 const REGENERABLE_ASSET_KINDS: ReadonlySet<DerivedAssetKind> = new Set([
@@ -49,6 +51,33 @@ export async function evictRegenerableDerivedAssetsToBudget(
     remaining -= getDerivedAssetSize(asset)
   }
   return deleteDerivedAssets(toDelete)
+}
+
+export async function clearUnpinnedSyncCache(): Promise<MediaStorageCleanupResult> {
+  const entries = await listSyncEntries()
+  const db = await openFileExplorerDB()
+  const deletedSyncBlobIds: string[] = []
+
+  for (const entry of entries) {
+    if (!entry.blobId) continue
+    if (!['available-offline', 'outdated', 'deleted-pending-release'].includes(entry.status)) {
+      continue
+    }
+    if (isMediaResourceLocked(entry.blobId)) continue
+    const preference = await getSyncEntryPreference(entry.providerConnectionId, entry.remoteItemId)
+    if (preference?.offlinePolicyOverride === 'always-offline') continue
+
+    await deleteFileBlob(db, entry.blobId)
+    await putSyncEntry({
+      ...entry,
+      blobId: undefined,
+      size: undefined,
+      status: 'remote-only'
+    })
+    deletedSyncBlobIds.push(entry.blobId)
+  }
+
+  return { deletedAssetIds: [], deletedSyncBlobIds }
 }
 
 async function deleteDerivedAssets(

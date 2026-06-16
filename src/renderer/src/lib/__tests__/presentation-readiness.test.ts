@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { FileItemRecord } from '@shared/types/folder'
-import { putDerivedAsset } from '../media-work-db'
+import { putDerivedAsset, resetMediaWorkDBForTests } from '../media-work-db'
 import {
   analyzePresentationReadiness,
   createPresentationSnapshot,
   getPresentationSnapshotResourceIds
 } from '../presentation-readiness'
 import { TRANSCODE_COMPATIBILITY_PROFILE } from '../media-transcode-lifecycle'
+import { putProviderConnection, putSyncEntry, resetSyncDBForTests } from '../sync-db'
 
 function file(id: string, name: string, mimeType: string, url = `blob:${id}`): FileItemRecord {
   return {
@@ -23,8 +24,9 @@ function file(id: string, name: string, mimeType: string, url = `blob:${id}`): F
   }
 }
 
-beforeEach(() => {
-  indexedDB.deleteDatabase('hhc-media-work')
+beforeEach(async () => {
+  await resetMediaWorkDBForTests()
+  await resetSyncDBForTests()
 })
 
 describe('analyzePresentationReadiness', () => {
@@ -86,6 +88,35 @@ describe('analyzePresentationReadiness', () => {
       status: 'ready',
       reason: 'ready-transcoded-derivative',
       derivativeId: asset.id
+    })
+  })
+
+  it('marks remote-only sync items as preparing', async () => {
+    await putProviderConnection({
+      id: 'connection-1',
+      providerType: 'onedrive',
+      displayName: 'OneDrive'
+    })
+    await putSyncEntry({
+      providerConnectionId: 'connection-1',
+      remoteItemId: 'remote-file',
+      parentRemoteItemId: null,
+      kind: 'file',
+      name: 'remote.png',
+      itemId: 'remote-item',
+      blobId: 'remote-blob',
+      status: 'remote-only'
+    })
+
+    const report = await analyzePresentationReadiness(
+      [file('remote-item', 'remote.png', 'image/png', 'blob:remote-blob')],
+      'web'
+    )
+
+    expect(report.summary).toMatchObject({ ready: 0, preparing: 1 })
+    expect(report.items[0]).toMatchObject({
+      status: 'preparing',
+      reason: 'sync-remote-only'
     })
   })
 })

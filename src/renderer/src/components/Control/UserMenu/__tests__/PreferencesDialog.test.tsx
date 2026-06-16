@@ -41,6 +41,7 @@ vi.mock('@renderer/lib/media-storage-accounting', () => ({
 
 vi.mock('@renderer/lib/media-storage-cleanup', () => ({
   clearRegenerableDerivedAssets: vi.fn().mockResolvedValue(undefined),
+  clearUnpinnedSyncCache: vi.fn().mockResolvedValue(undefined),
   removeUnusedDerivedAssets: vi.fn().mockResolvedValue(undefined)
 }))
 

@@ -9,6 +9,7 @@ import {
   type MediaPlatform,
   type MediaSupportMode
 } from './media-capabilities'
+import { getSyncEntryByLocalItem } from './sync-db'
 
 export type PresentationReadinessStatus =
   | 'ready'
@@ -123,6 +124,26 @@ async function analyzePresentationItem(
       blobId: null,
       status: 'missing',
       reason: 'missing-source',
+      support: null
+    }
+  }
+
+  const syncEntry = await getSyncEntryByLocalItem(item.id)
+  if (syncEntry && syncEntry.status !== 'available-offline') {
+    if (syncEntry.status === 'failed' || syncEntry.status === 'insufficient-storage') {
+      return {
+        itemId: item.id,
+        blobId,
+        status: 'failed',
+        reason: `sync-${syncEntry.status}`,
+        support: null
+      }
+    }
+    return {
+      itemId: item.id,
+      blobId,
+      status: syncEntry.status === 'deleted-pending-release' ? 'missing' : 'preparing',
+      reason: `sync-${syncEntry.status}`,
       support: null
     }
   }

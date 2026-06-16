@@ -602,6 +602,7 @@
         "refresh": "刷新",
         "removeOrphans": "移除孤立生成资产",
         "clearRegenerable": "清除可重建缩略图",
+        "clearSyncCache": "清除未固定同步缓存",
         "cleanupHint": "清理操作只会移除生成资产。原始媒体仍只通过垃圾桶与永久删除流程移除。",
         "total": "总计",
         "browserEstimate": "浏览器存储空间：已使用 {{usage}} / {{quota}}。持久化存储：{{persisted}}。",

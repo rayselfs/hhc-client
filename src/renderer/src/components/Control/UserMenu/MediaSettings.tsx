@@ -20,6 +20,7 @@ import {
 } from '@renderer/lib/media-storage-accounting'
 import {
   clearRegenerableDerivedAssets,
+  clearUnpinnedSyncCache,
   removeUnusedDerivedAssets
 } from '@renderer/lib/media-storage-cleanup'
 import type { FfmpegConfigInfo } from '@shared/ipc-channels'
@@ -417,6 +418,14 @@ export default function MediaSettings({
               onPress={() => void runStorageCleanup(clearRegenerableDerivedAssets)}
             >
               {t('preferences.media.storage.clearRegenerable')}
+            </Button>
+            <Button
+              variant="secondary"
+              className="rounded-full"
+              isDisabled={isCleaningStorage}
+              onPress={() => void runStorageCleanup(clearUnpinnedSyncCache)}
+            >
+              {t('preferences.media.storage.clearSyncCache')}
             </Button>
           </div>
           <p className="text-xs text-gray-500">{t('preferences.media.storage.cleanupHint')}</p>

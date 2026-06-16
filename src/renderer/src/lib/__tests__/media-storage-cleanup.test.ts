@@ -4,13 +4,22 @@ import { lockMediaResources, resetMediaResourceLocksForTests } from '../media-re
 import { getDerivedAsset, putDerivedAsset, resetMediaWorkDBForTests } from '../media-work-db'
 import {
   clearRegenerableDerivedAssets,
+  clearUnpinnedSyncCache,
   evictRegenerableDerivedAssetsToBudget,
   removeUnusedDerivedAssets
 } from '../media-storage-cleanup'
+import {
+  getSyncEntryByRemoteItem,
+  putProviderConnection,
+  putSyncEntry,
+  putSyncEntryPreference,
+  resetSyncDBForTests
+} from '../sync-db'
 
 beforeEach(async () => {
   await resetFileExplorerDBForTests()
   await resetMediaWorkDBForTests()
+  await resetSyncDBForTests()
   resetMediaResourceLocksForTests()
 })
 
@@ -154,6 +163,73 @@ describe('media storage cleanup', () => {
     })
     await expect(getDerivedAsset('source', 'transcoded-video', 'mp4')).resolves.toMatchObject({
       id: transcoded.id
+    })
+    release()
+  })
+
+  it('clears unpinned sync cache while preserving pinned and locked entries', async () => {
+    const db = await openFileExplorerDB()
+    await putProviderConnection({
+      id: 'connection-1',
+      providerType: 'onedrive',
+      displayName: 'OneDrive'
+    })
+    await db.put('file-blobs', { id: 'evict-blob', blob: new Blob(['a']), refCount: 1 })
+    await db.put('file-blobs', { id: 'pinned-blob', blob: new Blob(['b']), refCount: 1 })
+    await db.put('file-blobs', { id: 'locked-blob', blob: new Blob(['c']), refCount: 1 })
+    await putSyncEntry({
+      providerConnectionId: 'connection-1',
+      remoteItemId: 'remote-evict',
+      parentRemoteItemId: null,
+      kind: 'file',
+      name: 'evict.mp4',
+      itemId: 'item-evict',
+      blobId: 'evict-blob',
+      status: 'available-offline',
+      size: 1
+    })
+    await putSyncEntry({
+      providerConnectionId: 'connection-1',
+      remoteItemId: 'remote-pinned',
+      parentRemoteItemId: null,
+      kind: 'file',
+      name: 'pinned.mp4',
+      itemId: 'item-pinned',
+      blobId: 'pinned-blob',
+      status: 'available-offline',
+      size: 1
+    })
+    await putSyncEntryPreference({
+      providerConnectionId: 'connection-1',
+      remoteItemId: 'remote-pinned',
+      offlinePolicyOverride: 'always-offline'
+    })
+    await putSyncEntry({
+      providerConnectionId: 'connection-1',
+      remoteItemId: 'remote-locked',
+      parentRemoteItemId: null,
+      kind: 'file',
+      name: 'locked.mp4',
+      itemId: 'item-locked',
+      blobId: 'locked-blob',
+      status: 'available-offline',
+      size: 1
+    })
+    const release = lockMediaResources(['locked-blob'])
+
+    const result = await clearUnpinnedSyncCache()
+
+    expect(result.deletedSyncBlobIds).toEqual(['evict-blob'])
+    await expect(db.get('file-blobs', 'evict-blob')).resolves.toBeUndefined()
+    await expect(db.get('file-blobs', 'pinned-blob')).resolves.toBeDefined()
+    await expect(db.get('file-blobs', 'locked-blob')).resolves.toBeDefined()
+    await expect(getSyncEntryByRemoteItem('connection-1', 'remote-evict')).resolves.toMatchObject({
+      status: 'remote-only',
+      blobId: undefined
+    })
+    await expect(getSyncEntryByRemoteItem('connection-1', 'remote-pinned')).resolves.toMatchObject({
+      status: 'available-offline',
+      blobId: 'pinned-blob'
     })
     release()
   })
