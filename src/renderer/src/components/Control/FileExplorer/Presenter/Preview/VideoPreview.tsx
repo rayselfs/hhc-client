@@ -372,7 +372,7 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
       {seekFlashState && (
         <div
           className={`absolute top-1/2 z-20 -translate-y-1/2 pointer-events-none ${
-            seekFlashState.direction === 'forward' ? 'right-[18%]' : 'left-[18%]'
+            seekFlashState.direction === 'forward' ? 'right-6' : 'left-6'
           }`}
           data-testid="video-seek-flash"
         >
