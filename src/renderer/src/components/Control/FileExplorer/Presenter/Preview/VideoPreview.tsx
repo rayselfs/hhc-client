@@ -52,7 +52,6 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
   const playbackStateRef = useRef({ hasStarted: false, isPlaying: false, isEnded: false })
   const currentTimeRef = useRef(0)
   const durationRef = useRef(0)
-  const pendingLocalSeekRef = useRef<number | null>(null)
   const isDraggingSeekRef = useRef(false)
   const localSeekTimeRef = useRef(0)
   const volumeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -208,19 +207,6 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
     const nextDuration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0
     durationRef.current = nextDuration
     setDuration(nextDuration)
-
-    if (pendingLocalSeekRef.current !== null && video.readyState >= 1) {
-      const seekTo =
-        nextDuration > 0
-          ? Math.max(0, Math.min(pendingLocalSeekRef.current, nextDuration))
-          : Math.max(0, pendingLocalSeekRef.current)
-      pendingLocalSeekRef.current = null
-      video.currentTime = seekTo
-      currentTimeRef.current = seekTo
-      setCurrentTime(seekTo)
-      return
-    }
-
     currentTimeRef.current = video.currentTime
     setCurrentTime(video.currentTime)
   }, [])
@@ -236,13 +222,7 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
       localSeekTimeRef.current = clamped
       setLocalSeekTime(clamped)
       setCurrentTime(clamped)
-      if (videoRef.current) {
-        if (videoRef.current.readyState >= 1) {
-          videoRef.current.currentTime = clamped
-        } else {
-          pendingLocalSeekRef.current = clamped
-        }
-      }
+      if (videoRef.current) videoRef.current.currentTime = clamped
       sendCommand({ action: 'seek', itemId: item.id, value: clamped })
     },
     [item.id, sendCommand]

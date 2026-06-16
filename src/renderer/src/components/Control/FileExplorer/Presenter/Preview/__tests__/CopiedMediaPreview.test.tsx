@@ -127,29 +127,6 @@ describe('copied media preview identity', () => {
     expect(mockSendCommand).toHaveBeenCalledWith({ action: 'seek', itemId: 'copy-id', value: 35 })
   })
 
-  it('applies a relative video seek after metadata when the first seek happens too early', async () => {
-    const { container } = render(<VideoPreview item={makeCopy('video/mp4', 'copy.mp4')} />)
-
-    const video = await waitFor(() => {
-      const element = container.querySelector('video')
-      expect(element).not.toBeNull()
-      return element!
-    })
-    Object.defineProperty(video, 'readyState', { configurable: true, value: 0 })
-    Object.defineProperty(video, 'duration', { configurable: true, value: Number.NaN })
-
-    window.dispatchEvent(new CustomEvent('media:videoSeekRelative', { detail: { seconds: 5 } }))
-
-    expect(video.currentTime).toBe(0)
-    expect(mockSendCommand).toHaveBeenCalledWith({ action: 'seek', itemId: 'copy-id', value: 5 })
-
-    Object.defineProperty(video, 'readyState', { configurable: true, value: 1 })
-    Object.defineProperty(video, 'duration', { configurable: true, value: 100 })
-    fireEvent.loadedMetadata(video)
-
-    expect(video.currentTime).toBe(5)
-  })
-
   it('blurs the seek range after pointer release so keyboard shortcuts resume', async () => {
     const { container } = render(<VideoPreview item={makeCopy('video/mp4', 'copy.mp4')} />)
 
