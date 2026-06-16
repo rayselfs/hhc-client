@@ -41,7 +41,7 @@ vi.mock('@renderer/lib/pdfjs-loader', () => ({
 }))
 
 const mockStoreState = {
-  typeStates: { pdf: { viewMode: 'scroll' as const } },
+  typeStates: { pdf: { viewMode: 'scroll' as 'scroll' | 'slide' } },
   zoomLevel: 1,
   pan: { x: 0, y: 0 },
   canNext: vi.fn().mockReturnValue(false),
@@ -171,5 +171,34 @@ describe('PdfPreview scroll mode lazy rendering', () => {
     await new Promise((r) => setTimeout(r, 50))
 
     expect(getPageMock).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('PdfPreview slide sidebar', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockStoreState.typeStates.pdf.viewMode = 'slide'
+    mockGetFileSource.mockResolvedValue({
+      url: 'blob:fake-pdf',
+      revoke: vi.fn()
+    })
+    setupIntersectionObserverMock()
+  })
+
+  afterEach(() => {
+    mockStoreState.typeStates.pdf.viewMode = 'scroll'
+    vi.unstubAllGlobals()
+  })
+
+  it('keeps the thumbnail sidebar at least 190px wide', async () => {
+    const { container } = render(<PdfPreview item={makeItem()} />)
+
+    await waitFor(() => {
+      expect(getPageMock).toHaveBeenCalled()
+    })
+
+    const sidebar = container.querySelector('.pdf-sidebar-bg')?.parentElement
+    expect(sidebar).toHaveStyle({ minWidth: '190px' })
+    expect(sidebar).toHaveStyle({ width: 'max(25%, 190px)' })
   })
 })

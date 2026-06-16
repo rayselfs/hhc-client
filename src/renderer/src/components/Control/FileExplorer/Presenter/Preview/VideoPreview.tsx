@@ -50,6 +50,7 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
 
   const hasStartedRef = useRef(false)
   const isDraggingSeekRef = useRef(false)
+  const localSeekTimeRef = useRef(0)
   const volumeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const flashTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const flashKeyRef = useRef(0)
@@ -165,13 +166,31 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
 
   const commitSeek = useCallback(
     (seekTo: number): void => {
+      const max = Number.isFinite(duration) && duration > 0 ? duration : seekTo
+      const clamped = Math.max(0, Math.min(seekTo, max))
       isDraggingSeekRef.current = false
       setIsDraggingSeek(false)
-      if (videoRef.current) videoRef.current.currentTime = seekTo
-      sendCommand({ action: 'seek', value: seekTo })
+      localSeekTimeRef.current = clamped
+      setLocalSeekTime(clamped)
+      setCurrentTime(clamped)
+      if (videoRef.current) videoRef.current.currentTime = clamped
+      sendCommand({ action: 'seek', value: clamped })
     },
-    [sendCommand]
+    [duration, sendCommand]
   )
+
+  useEffect(() => {
+    const handleRelativeSeek = (event: Event): void => {
+      const detail = (event as CustomEvent<{ seconds?: number }>).detail
+      const offset = detail?.seconds
+      if (typeof offset !== 'number' || !Number.isFinite(offset)) return
+      const base = videoRef.current?.currentTime ?? currentTime
+      commitSeek(base + offset)
+    }
+
+    window.addEventListener('media:videoSeekRelative', handleRelativeSeek)
+    return () => window.removeEventListener('media:videoSeekRelative', handleRelativeSeek)
+  }, [commitSeek, currentTime])
 
   const releaseSeekPointer = useCallback((target: HTMLInputElement, pointerId: number): void => {
     if (target.hasPointerCapture(pointerId)) {
@@ -286,13 +305,16 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
               } as React.CSSProperties
             }
             onPointerDown={(e) => {
+              const value = Number(e.currentTarget.value)
               isDraggingSeekRef.current = true
               setIsDraggingSeek(true)
-              setLocalSeekTime(currentTime)
+              localSeekTimeRef.current = value
+              setLocalSeekTime(value)
               e.currentTarget.setPointerCapture(e.pointerId)
             }}
-            onChange={(e) => {
-              const value = Number(e.target.value)
+            onInput={(e) => {
+              const value = Number(e.currentTarget.value)
+              localSeekTimeRef.current = value
               setLocalSeekTime(value)
               if (!isDraggingSeekRef.current) {
                 commitSeek(value)
@@ -300,15 +322,12 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
             }}
             onPointerUp={(e) => {
               const seekTo = Number((e.target as HTMLInputElement).value)
+              localSeekTimeRef.current = seekTo
               releaseSeekPointer(e.currentTarget, e.pointerId)
-              commitSeek(seekTo)
+              commitSeek(localSeekTimeRef.current)
             }}
             onPointerCancel={(e) => {
               releaseSeekPointer(e.currentTarget, e.pointerId)
-              isDraggingSeekRef.current = false
-              setIsDraggingSeek(false)
-            }}
-            onLostPointerCapture={() => {
               isDraggingSeekRef.current = false
               setIsDraggingSeek(false)
             }}

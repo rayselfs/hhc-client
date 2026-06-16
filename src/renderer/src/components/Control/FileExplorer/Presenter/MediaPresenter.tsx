@@ -74,9 +74,31 @@ export default function MediaPresenter(): React.JSX.Element {
           }
         }
       },
-      { config: SHORTCUTS.MEDIA.NEXT_SLIDE, handler: () => next() },
+      {
+        config: SHORTCUTS.MEDIA.NEXT_SLIDE,
+        handler: () => {
+          if (descriptor?.type === 'video') {
+            window.dispatchEvent(
+              new CustomEvent('media:videoSeekRelative', { detail: { seconds: 5 } })
+            )
+            return
+          }
+          next()
+        }
+      },
       { config: SHORTCUTS.MEDIA.NEXT_SLIDE_ALT, handler: () => next() },
-      { config: SHORTCUTS.MEDIA.PREV_SLIDE, handler: () => prev() },
+      {
+        config: SHORTCUTS.MEDIA.PREV_SLIDE,
+        handler: () => {
+          if (descriptor?.type === 'video') {
+            window.dispatchEvent(
+              new CustomEvent('media:videoSeekRelative', { detail: { seconds: -5 } })
+            )
+            return
+          }
+          prev()
+        }
+      },
       { config: SHORTCUTS.MEDIA.PREV_SLIDE_ALT, handler: () => prev() },
       { config: SHORTCUTS.MEDIA.FIRST_SLIDE, handler: () => jumpTo(0) },
       { config: SHORTCUTS.MEDIA.LAST_SLIDE, handler: () => jumpTo(playlist.length - 1) },

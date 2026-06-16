@@ -4,11 +4,12 @@ import type { FileItemRecord } from '@shared/types/folder'
 import ImagePreview from '../ImagePreview'
 import VideoPreview from '../VideoPreview'
 
-const { mockGetFileSource, mockNext, mockExit, mockT } = vi.hoisted(() => ({
+const { mockGetFileSource, mockNext, mockExit, mockT, mockSendCommand } = vi.hoisted(() => ({
   mockGetFileSource: vi.fn(),
   mockNext: vi.fn(),
   mockExit: vi.fn(),
-  mockT: (key: string) => key
+  mockT: (key: string) => key,
+  mockSendCommand: vi.fn()
 }))
 
 vi.mock('react-i18next', () => ({
@@ -25,7 +26,7 @@ vi.mock('@renderer/lib/file-explorer-db', () => ({
 }))
 
 vi.mock('@renderer/contexts/PresenterCommandContext', () => ({
-  usePresenterCommands: () => ({ sendCommand: vi.fn() })
+  usePresenterCommands: () => ({ sendCommand: mockSendCommand })
 }))
 
 const storeState = {
@@ -84,6 +85,23 @@ describe('copied media preview identity', () => {
       expect(mockGetFileSource).toHaveBeenCalledWith({}, 'original-id', 'video/mp4')
     })
     expect(container.querySelector('video')).toHaveAttribute('src', 'blob:resolved-source')
+  })
+
+  it('seeks a video relative to the current playback time', async () => {
+    const { container } = render(<VideoPreview item={makeCopy('video/mp4', 'copy.mp4')} />)
+
+    const video = await waitFor(() => {
+      const element = container.querySelector('video')
+      expect(element).not.toBeNull()
+      return element!
+    })
+    Object.defineProperty(video, 'duration', { configurable: true, value: 100 })
+    video.currentTime = 30
+
+    window.dispatchEvent(new CustomEvent('media:videoSeekRelative', { detail: { seconds: 5 } }))
+
+    expect(video.currentTime).toBe(35)
+    expect(mockSendCommand).toHaveBeenCalledWith({ action: 'seek', value: 35 })
   })
 
   it('keeps the presenter open and retries a failed media load', async () => {

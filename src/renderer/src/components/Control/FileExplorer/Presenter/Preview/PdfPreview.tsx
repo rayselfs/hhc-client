@@ -56,7 +56,9 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
   const thumbButtonRefs = useRef<(HTMLButtonElement | null)[]>([])
 
   const pdfViewMode = useMediaProjectionStore((s) => s.typeStates['pdf']?.viewMode ?? 'slide')
-  const thumbsCollapsed = useMediaProjectionStore((s) => s.typeStates['pdf']?.thumbsCollapsed ?? false)
+  const thumbsCollapsed = useMediaProjectionStore(
+    (s) => s.typeStates['pdf']?.thumbsCollapsed ?? false
+  )
   const zoomLevel = useMediaProjectionStore((s) => s.zoomLevel)
   const pan = useMediaProjectionStore((s) => s.pan)
 
@@ -216,7 +218,7 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
         if (!canvas) continue
         const rect = canvas.getBoundingClientRect()
         if (rect.bottom > containerTop && rect.height > 0) {
-          const fraction = Math.max(0, (containerTop - rect.top)) / rect.height
+          const fraction = Math.max(0, containerTop - rect.top) / rect.height
           sendCommand({ action: 'pdfScroll', value: i + fraction })
           return
         }
@@ -314,7 +316,11 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
 
       <div
         className="absolute top-0 left-0 bottom-0 z-20 overflow-hidden"
-        style={{ width: '25%', pointerEvents: thumbsCollapsed ? 'none' : 'auto' }}
+        style={{
+          width: 'max(25%, 190px)',
+          minWidth: 190,
+          pointerEvents: thumbsCollapsed ? 'none' : 'auto'
+        }}
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div
@@ -376,7 +382,7 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
 
       <div
         className="absolute top-1/2 -translate-y-1/2 z-30 transition-[left] duration-200 ease-in-out"
-        style={{ left: thumbsCollapsed ? 0 : '25%' }}
+        style={{ left: thumbsCollapsed ? 0 : 'max(25%, 190px)' }}
         onMouseDown={(e) => e.stopPropagation()}
       >
         <button
