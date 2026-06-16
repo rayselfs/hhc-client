@@ -5,7 +5,9 @@ import {
   deleteSyncCursorsByProviderConnection,
   deleteSyncEntriesByProviderConnection,
   deleteSyncEntryPreferencesByProviderConnection,
+  deleteSyncTombstones,
   listSyncEntriesByProviderConnection,
+  listSyncTombstones,
   putSyncTombstone
 } from './sync-db'
 
@@ -17,6 +19,10 @@ export interface ConvertSyncedFolderResult {
   folderIds: string[]
   itemIds: string[]
   removedSyncEntryCount: number
+}
+
+export interface SyncResourceRecoveryResult extends CleanupResult {
+  tombstoneCount: number
 }
 
 export async function unlinkSyncConnectionFromApp(
@@ -92,5 +98,32 @@ export async function convertSyncConnectionToNormalFolder(
     folderIds,
     itemIds,
     removedSyncEntryCount: entries.length
+  }
+}
+
+export async function recoverPendingSyncResourceCleanups(): Promise<SyncResourceRecoveryResult> {
+  const tombstones = await listSyncTombstones()
+  if (tombstones.length === 0) {
+    return {
+      folderIds: [],
+      itemIds: [],
+      tombstoneCount: 0
+    }
+  }
+
+  const folderIds = tombstones.flatMap((tombstone) =>
+    tombstone.folderId ? [tombstone.folderId] : []
+  )
+  const itemIds = tombstones.flatMap((tombstone) => (tombstone.itemId ? [tombstone.itemId] : []))
+  const cleanupResult =
+    folderIds.length > 0 || itemIds.length > 0
+      ? await cleanupFileResources({ folderIds, itemIds })
+      : { folderIds: [], itemIds: [] }
+
+  await deleteSyncTombstones(tombstones.map((tombstone) => tombstone.id))
+
+  return {
+    ...cleanupResult,
+    tombstoneCount: tombstones.length
   }
 }

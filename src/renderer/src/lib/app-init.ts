@@ -8,6 +8,7 @@ import { isElectron } from '@renderer/lib/env'
 import { toast } from '@heroui/react/toast'
 import i18n from '@renderer/i18n'
 import { mediaJobQueue } from '@renderer/lib/media-job-queue'
+import { recoverPendingSyncResourceCleanups } from '@renderer/lib/sync-unlink'
 
 let earlyInitStarted = false
 let subscriptionsInitialized = false
@@ -130,6 +131,7 @@ export function initializeApp(): () => void {
       if (retentionDays > 0) {
         void purgeExpiredTrashFromStore(retentionDays * 86_400_000)
       }
+      void recoverPendingSyncResourceCleanups().catch(() => undefined)
     }
   })
 

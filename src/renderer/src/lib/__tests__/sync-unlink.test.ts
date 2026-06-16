@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { FileItemRecord, FolderRecord } from '@shared/types/folder'
-import { convertSyncConnectionToNormalFolder, unlinkSyncConnectionFromApp } from '../sync-unlink'
+import {
+  convertSyncConnectionToNormalFolder,
+  recoverPendingSyncResourceCleanups,
+  unlinkSyncConnectionFromApp
+} from '../sync-unlink'
 import { openFileExplorerDB, resetFileExplorerDBForTests } from '../file-explorer-db'
 import {
   getProviderConnection,
@@ -13,6 +17,7 @@ import {
   putSyncCursor,
   putSyncEntry,
   putSyncEntryPreference,
+  putSyncTombstone,
   resetSyncDBForTests
 } from '../sync-db'
 
@@ -218,5 +223,49 @@ describe('sync unlink', () => {
     )
     await expect(getProviderConnection('connection-1')).resolves.toBeDefined()
     await expect(listSyncEntriesByProviderConnection('connection-1')).resolves.toHaveLength(1)
+  })
+
+  it('recovers pending tombstone cleanup after restart', async () => {
+    await putSyncTombstone({
+      providerConnectionId: 'connection-1',
+      remoteItemId: 'remote-folder-1',
+      folderId: 'folder-1',
+      reason: 'unlink'
+    })
+    await putSyncTombstone({
+      providerConnectionId: 'connection-1',
+      remoteItemId: 'remote-file-1',
+      itemId: 'item-1',
+      blobId: 'blob-1',
+      reason: 'remote-delete'
+    })
+
+    const result = await recoverPendingSyncResourceCleanups()
+
+    expect(mockCleanupFileResources).toHaveBeenCalledWith({
+      folderIds: ['folder-1'],
+      itemIds: ['item-1']
+    })
+    expect(result).toEqual({
+      folderIds: ['folder-1'],
+      itemIds: ['item-1'],
+      tombstoneCount: 2
+    })
+    await expect(listSyncTombstones()).resolves.toEqual([])
+  })
+
+  it('keeps tombstones when restart cleanup fails so the next launch can retry', async () => {
+    mockCleanupFileResources.mockRejectedValueOnce(new Error('locked'))
+    await putSyncTombstone({
+      providerConnectionId: 'connection-1',
+      remoteItemId: 'remote-file-1',
+      itemId: 'item-1',
+      blobId: 'blob-1',
+      reason: 'remote-delete'
+    })
+
+    await expect(recoverPendingSyncResourceCleanups()).rejects.toThrow('locked')
+
+    await expect(listSyncTombstones()).resolves.toHaveLength(1)
   })
 })

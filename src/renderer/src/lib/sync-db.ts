@@ -330,6 +330,14 @@ export async function listSyncTombstones(): Promise<SyncTombstoneRecord[]> {
   return (await getSyncDB()).getAll('sync-tombstones')
 }
 
+export async function deleteSyncTombstones(ids: string[]): Promise<void> {
+  if (ids.length === 0) return
+  const db = await getSyncDB()
+  const tx = db.transaction('sync-tombstones', 'readwrite')
+  await Promise.all(ids.map((id) => tx.store.delete(id)))
+  await tx.done
+}
+
 export async function deleteSyncCursorsByProviderConnection(
   providerConnectionId: string
 ): Promise<void> {
