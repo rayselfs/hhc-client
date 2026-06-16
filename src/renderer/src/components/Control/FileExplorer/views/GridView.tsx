@@ -7,6 +7,8 @@ import { getFileIcon } from './getFileIcon'
 import { canHaveThumbnail } from '@renderer/hooks/useThumbnails'
 import { InlineRenameInput } from '../InlineRenameInput'
 import { splitFileName } from '@renderer/lib/file-naming'
+import type { SyncEntryStatus } from '@renderer/lib/sync-db'
+import { SyncStatusBadge } from './SyncStatusBadge'
 
 export interface GridViewItem {
   id: string
@@ -18,6 +20,7 @@ export interface GridViewItem {
   thumbnailUrl?: string | null
   isSelected: boolean
   isFavorited?: boolean
+  syncStatus?: SyncEntryStatus
 }
 
 function renderGridIcon(item: GridViewItem, iconSize: number): React.ReactNode {
@@ -164,6 +167,9 @@ export const GridView = React.memo(function GridView({
                     onDoubleClick={(e) => onItemDoubleClick(item.id, e)}
                     onContextMenu={(e) => onItemContextMenu(item.id, e)}
                   >
+                    <div className="absolute left-1 top-1 max-w-[calc(100%-0.5rem)]">
+                      <SyncStatusBadge status={item.syncStatus} compact />
+                    </div>
                     {item.isFolder && onItemFavoriteToggle && (
                       <button
                         className={`absolute top-1 right-1 rounded p-0.5 transition-opacity ${

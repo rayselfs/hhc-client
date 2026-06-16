@@ -77,4 +77,36 @@ describe('inline rename in file views', () => {
 
     expect(onRenameSubmit).toHaveBeenCalledWith('file-1', 'sermon')
   })
+
+  it('renders sync status in grid view', () => {
+    render(
+      <GridView
+        items={[{ ...items[0], syncStatus: 'remote-only' }]}
+        viewMode="large-icon"
+        onItemClick={vi.fn()}
+        onItemDoubleClick={vi.fn()}
+        onItemContextMenu={vi.fn()}
+      />
+    )
+
+    expect(screen.getByText('Remote only')).toBeInTheDocument()
+  })
+
+  it('renders sync status in list view', () => {
+    render(
+      <ListView
+        items={[{ ...items[0], syncStatus: 'available-offline' }]}
+        sortField="name"
+        sortDir="asc"
+        onSortChange={vi.fn()}
+        colWidths={{ created: 100, size: 80, kind: 120 }}
+        onColWidthChange={vi.fn()}
+        onItemClick={vi.fn()}
+        onItemDoubleClick={vi.fn()}
+        onItemContextMenu={vi.fn()}
+      />
+    )
+
+    expect(screen.getByText('Offline')).toBeInTheDocument()
+  })
 })

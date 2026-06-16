@@ -8,6 +8,7 @@ import { getFileIcon } from './getFileIcon'
 import type { GridViewItem } from './GridView'
 import { InlineRenameInput } from '../InlineRenameInput'
 import { splitFileName } from '@renderer/lib/file-naming'
+import { SyncStatusBadge } from './SyncStatusBadge'
 
 export interface ListViewProps {
   items: GridViewItem[]
@@ -208,12 +209,15 @@ export const ListView = React.memo(function ListView({
                     />
                   </div>
                 ) : (
-                  <div
-                    data-file-name-region
-                    className="flex-1 truncate text-base text-foreground"
-                    title={item.name}
-                  >
-                    {item.name}
+                  <div className="flex min-w-0 flex-1 items-center gap-2">
+                    <div
+                      data-file-name-region
+                      className="truncate text-base text-foreground"
+                      title={item.name}
+                    >
+                      {item.name}
+                    </div>
+                    <SyncStatusBadge status={item.syncStatus} compact />
                   </div>
                 )}
                 <div className="w-1 flex-shrink-0" />

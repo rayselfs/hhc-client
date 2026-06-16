@@ -45,6 +45,7 @@ import { isPresentable, getPresentableItems } from '@renderer/lib/presentability
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 import type { SortField } from '@renderer/stores/file-explorer'
 import { hasNameConflict, splitFileName, validateDisplayName } from '@renderer/lib/file-naming'
+import { listSyncEntries, type SyncEntryStatus } from '@renderer/lib/sync-db'
 
 export interface FileBrowserProps {
   onItemContextMenu?: (itemId: string, event: React.MouseEvent) => void
@@ -363,6 +364,7 @@ export function FileBrowser({
   const [draggedIds, setDraggedIds] = useState<Set<string>>(new Set())
   const [selectedSearchId, setSelectedSearchId] = useState<string | null>(null)
   const [renamingItemId, setRenamingItemId] = useState<string | null>(null)
+  const [syncStatuses, setSyncStatuses] = useState<Record<string, SyncEntryStatus>>({})
   const renameClickTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const pendingRenameItemIdRef = React.useRef<string | null>(null)
   const pointerRef = React.useRef<{
@@ -417,6 +419,36 @@ export function FileBrowser({
 
   const thumbnails = useThumbnails(fileItems, { pendingAgeMs: 2 * 60 * 1000 })
 
+  useEffect(() => {
+    let cancelled = false
+    async function loadSyncStatuses(): Promise<void> {
+      const ids = new Set([
+        ...folders.map((folder) => folder.id),
+        ...fileItems.map((item) => item.id)
+      ])
+      if (ids.size === 0) {
+        setSyncStatuses({})
+        return
+      }
+      try {
+        const entries = await listSyncEntries()
+        if (cancelled) return
+        const next: Record<string, SyncEntryStatus> = {}
+        for (const entry of entries) {
+          const localId = entry.itemId ?? entry.folderId
+          if (localId && ids.has(localId)) next[localId] = entry.status
+        }
+        setSyncStatuses(next)
+      } catch {
+        if (!cancelled) setSyncStatuses({})
+      }
+    }
+    void loadSyncStatuses()
+    return () => {
+      cancelled = true
+    }
+  }, [folders, fileItems])
+
   const allItems: GridViewItem[] = useMemo(
     () => [
       ...folders.map((folder) => ({
@@ -425,7 +457,8 @@ export function FileBrowser({
         isFolder: true,
         createdAt: folder.createdAt,
         isFavorited: folder.isFavorited,
-        isSelected: false
+        isSelected: false,
+        syncStatus: syncStatuses[folder.id]
       })),
       ...fileItems.map((item) => ({
         id: item.id,
@@ -435,10 +468,11 @@ export function FileBrowser({
         size: item.size,
         createdAt: item.createdAt,
         thumbnailUrl: canHaveThumbnail(item.mimeType) ? thumbnails[item.id] : null,
-        isSelected: false
+        isSelected: false,
+        syncStatus: syncStatuses[item.id]
       }))
     ],
-    [folders, fileItems, thumbnails]
+    [folders, fileItems, thumbnails, syncStatuses]
   )
 
   const sortedItems = useMemo(() => {
