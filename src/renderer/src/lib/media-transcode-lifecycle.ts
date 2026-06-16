@@ -1,8 +1,10 @@
 import { isValidNativeFileId } from '@shared/native-media'
+import { isElectron } from './env'
 import { mediaJobQueue } from './media-job-queue'
 import {
   getDerivedAsset,
   putDerivedAsset,
+  putMediaJob,
   type DerivedAssetMetadata,
   type DerivedAssetRecord,
   type MediaJobRecord
@@ -53,13 +55,42 @@ export async function enqueueTranscodeJob(input: {
     }
   })
 
-  return mediaJobQueue.enqueue({
+  const job = await mediaJobQueue.enqueue({
     type: 'transcode',
     sourceBlobId: input.sourceBlobId,
     itemId: input.itemId,
     priority: input.priority,
     dedupeKey: createTranscodeDedupeKey(input.sourceBlobId)
   })
+  return blockJobIfFfmpegIsNotReady(job)
+}
+
+async function blockJobIfFfmpegIsNotReady(job: MediaJobRecord): Promise<MediaJobRecord> {
+  if (!isElectron()) return job
+
+  try {
+    const config = await window.api.videoTranscode.getFfmpegConfig()
+    if (config.status === 'ready') return job
+    const blockedJob: MediaJobRecord = {
+      ...job,
+      status: 'blocked',
+      blockedReason: 'configuration',
+      errorCode: config.status,
+      updatedAt: Date.now()
+    }
+    await putMediaJob(blockedJob)
+    return blockedJob
+  } catch (error) {
+    const blockedJob: MediaJobRecord = {
+      ...job,
+      status: 'blocked',
+      blockedReason: 'configuration',
+      errorCode: error instanceof Error ? error.message : 'ffmpeg-config-unavailable',
+      updatedAt: Date.now()
+    }
+    await putMediaJob(blockedJob)
+    return blockedJob
+  }
 }
 
 export async function markTranscodedVideoReady(input: {

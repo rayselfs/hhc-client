@@ -547,6 +547,31 @@
         "0": "Forever"
       }
     },
+    "media": {
+      "videoTranscoding": {
+        "title": "Video Transcoding",
+        "description": "Use a user-selected FFmpeg executable to prepare AVI, MKV, and WMV files for presentation in Electron.",
+        "webUnsupported": "Native FFmpeg transcoding is available only in the desktop app. Web upload accepts browser-native video formats only.",
+        "status": "Status",
+        "statuses": {
+          "not-configured": "Not configured",
+          "ready": "Ready",
+          "invalid": "Invalid",
+          "missing": "Missing",
+          "unsupported-version": "Unsupported version"
+        },
+        "executable": "Executable",
+        "notSelected": "Not selected",
+        "version": "Version",
+        "capabilities": "Capabilities",
+        "capabilitySummary": "H.264: {{h264}} · AAC: {{aac}} · MP4: {{mp4}}",
+        "select": "Select FFmpeg",
+        "validate": "Validate again",
+        "remove": "Remove configuration",
+        "installGuide": "HHC Client does not download or update FFmpeg. Install FFmpeg yourself and select the executable here.",
+        "installLink": "FFmpeg downloads"
+      }
+    },
     "languageNames": {
       "en": "English",
       "zhTW": "繁體中文",

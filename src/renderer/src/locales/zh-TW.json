@@ -547,6 +547,31 @@
         "0": "永久"
       }
     },
+    "media": {
+      "videoTranscoding": {
+        "title": "影片轉檔",
+        "description": "在 Electron 桌面版使用您指定的 FFmpeg 執行檔，將 AVI、MKV、WMV 準備成可投影格式。",
+        "webUnsupported": "本機 FFmpeg 轉檔只支援桌面版。Web 上傳只接受瀏覽器原生可播放的影片格式。",
+        "status": "狀態",
+        "statuses": {
+          "not-configured": "未設定",
+          "ready": "可使用",
+          "invalid": "無效",
+          "missing": "找不到",
+          "unsupported-version": "版本不支援"
+        },
+        "executable": "執行檔",
+        "notSelected": "未選擇",
+        "version": "版本",
+        "capabilities": "能力",
+        "capabilitySummary": "H.264：{{h264}} · AAC：{{aac}} · MP4：{{mp4}}",
+        "select": "選擇 FFmpeg",
+        "validate": "重新驗證",
+        "remove": "移除設定",
+        "installGuide": "HHC Client 不會下載或更新 FFmpeg。請自行安裝 FFmpeg，並在此選擇執行檔。",
+        "installLink": "FFmpeg 下載"
+      }
+    },
     "languageNames": {
       "en": "English",
       "zhTW": "繁體中文",

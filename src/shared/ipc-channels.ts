@@ -30,6 +30,28 @@ export interface WhisperDirInfo {
   hasFiles: boolean
 }
 
+export type FfmpegConfigStatus =
+  | 'not-configured'
+  | 'ready'
+  | 'invalid'
+  | 'missing'
+  | 'unsupported-version'
+
+export interface FfmpegCapabilityInfo {
+  hasH264Encoder: boolean
+  hasAacEncoder: boolean
+  hasMp4Muxer: boolean
+}
+
+export interface FfmpegConfigInfo {
+  status: FfmpegConfigStatus
+  executableName?: string
+  version?: string
+  capabilities?: FfmpegCapabilityInfo
+  message?: string
+  validatedAt?: number
+}
+
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
 
@@ -73,6 +95,10 @@ export interface IpcInvokeMap {
   'app:download-whisper-model': { args: [WhisperModel, string]; result: void }
   'native-fs:import-file': { args: [string, string]; result: { size: number } }
   'native-fs:delete-file': { args: [string]; result: void }
+  'video-transcode:get-ffmpeg-config': { args: []; result: FfmpegConfigInfo }
+  'video-transcode:select-ffmpeg': { args: []; result: FfmpegConfigInfo | null }
+  'video-transcode:validate-ffmpeg': { args: []; result: FfmpegConfigInfo }
+  'video-transcode:remove-ffmpeg-config': { args: []; result: FfmpegConfigInfo }
 }
 
 export type IpcInvokeChannel = keyof IpcInvokeMap

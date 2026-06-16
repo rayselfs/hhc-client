@@ -7,7 +7,8 @@ import type {
   UpdateStatus,
   WhisperModel,
   WhisperDownloadProgress,
-  WhisperDirInfo
+  WhisperDirInfo,
+  FfmpegConfigInfo
 } from '../shared/ipc-channels'
 import type { ProjectionChannel, ProjectionPayload } from '../shared/projection-messages'
 import type { TimerTickPayload } from '../shared/types/timer'
@@ -103,6 +104,16 @@ const nativeFsApi = {
   delete: (id: string) => typedInvoke('native-fs:delete-file', id)
 }
 
+const videoTranscodeApi = {
+  getFfmpegConfig: (): Promise<FfmpegConfigInfo> =>
+    typedInvoke('video-transcode:get-ffmpeg-config'),
+  selectFfmpeg: (): Promise<FfmpegConfigInfo | null> =>
+    typedInvoke('video-transcode:select-ffmpeg'),
+  validateFfmpeg: (): Promise<FfmpegConfigInfo> => typedInvoke('video-transcode:validate-ffmpeg'),
+  removeFfmpegConfig: (): Promise<FfmpegConfigInfo> =>
+    typedInvoke('video-transcode:remove-ffmpeg-config')
+}
+
 const api = {
   projection: projectionApi,
   theme: themeApi,
@@ -111,7 +122,8 @@ const api = {
   app: appApi,
   update: updateApi,
   speech: speechApi,
-  nativeFs: nativeFsApi
+  nativeFs: nativeFsApi,
+  videoTranscode: videoTranscodeApi
 }
 
 try {

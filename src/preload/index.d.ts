@@ -4,7 +4,8 @@ import type {
   UpdateStatus,
   WhisperModel,
   WhisperDownloadProgress,
-  WhisperDirInfo
+  WhisperDirInfo,
+  FfmpegConfigInfo
 } from '../shared/ipc-channels'
 import type {
   TimerCommand,
@@ -76,6 +77,13 @@ interface NativeFsAPI {
   delete: (id: string) => Promise<void>
 }
 
+interface VideoTranscodeAPI {
+  getFfmpegConfig: () => Promise<FfmpegConfigInfo>
+  selectFfmpeg: () => Promise<FfmpegConfigInfo | null>
+  validateFfmpeg: () => Promise<FfmpegConfigInfo>
+  removeFfmpegConfig: () => Promise<FfmpegConfigInfo>
+}
+
 declare global {
   interface Window {
     api: {
@@ -87,6 +95,7 @@ declare global {
       update: UpdateAPI
       speech: SpeechAPI
       nativeFs: NativeFsAPI
+      videoTranscode: VideoTranscodeAPI
     }
   }
 }

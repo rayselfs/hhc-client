@@ -7,10 +7,14 @@ import {
   markTranscodedVideoReady,
   TRANSCODE_COMPATIBILITY_PROFILE
 } from '../media-transcode-lifecycle'
-import { getDerivedAsset, resetMediaWorkDBForTests } from '../media-work-db'
+import { getDerivedAsset, getMediaJob, resetMediaWorkDBForTests } from '../media-work-db'
 
 describe('media transcode lifecycle', () => {
   beforeEach(async () => {
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: undefined
+    })
     await resetMediaWorkDBForTests()
   })
 
@@ -37,6 +41,32 @@ describe('media transcode lifecycle', () => {
         videoCodec: 'h264',
         audioCodec: 'aac'
       }
+    })
+  })
+
+  it('blocks Electron transcode jobs when FFmpeg is not configured', async () => {
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: {
+        videoTranscode: {
+          getFfmpegConfig: async () => ({ status: 'not-configured' })
+        }
+      }
+    })
+
+    const job = await enqueueTranscodeJob({
+      sourceBlobId: 'source-blob-1',
+      itemId: 'original-item'
+    })
+
+    expect(job).toMatchObject({
+      status: 'blocked',
+      blockedReason: 'configuration',
+      errorCode: 'not-configured'
+    })
+    await expect(getMediaJob(job.id)).resolves.toMatchObject({
+      status: 'blocked',
+      blockedReason: 'configuration'
     })
   })
 
