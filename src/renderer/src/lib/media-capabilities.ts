@@ -19,6 +19,7 @@ export interface ClassifiedFile {
   kind: MediaKind | 'unsupported'
   mimeType: string
   extension: string
+  support: MediaSupportMode
 }
 
 const CAPABILITIES: readonly MediaCapability[] = [
@@ -159,7 +160,7 @@ const CAPABILITIES: readonly MediaCapability[] = [
     canonicalMimeType: 'video/x-msvideo',
     aliases: ['video/avi'],
     thumbnail: 'none',
-    web: 'transcode-required',
+    web: 'unsupported',
     electron: 'transcode-required',
     kindLabelKey: 'fileKind.aviVideo',
     kindLabelFallback: 'AVI Video'
@@ -169,7 +170,7 @@ const CAPABILITIES: readonly MediaCapability[] = [
     extensions: ['mkv'],
     canonicalMimeType: 'video/x-matroska',
     thumbnail: 'none',
-    web: 'transcode-required',
+    web: 'unsupported',
     electron: 'transcode-required',
     kindLabelKey: 'fileKind.mkvVideo',
     kindLabelFallback: 'MKV Video'
@@ -180,7 +181,7 @@ const CAPABILITIES: readonly MediaCapability[] = [
     canonicalMimeType: 'video/x-ms-wmv',
     aliases: ['video/x-ms-asf'],
     thumbnail: 'none',
-    web: 'transcode-required',
+    web: 'unsupported',
     electron: 'transcode-required',
     kindLabelKey: 'fileKind.wmvVideo',
     kindLabelFallback: 'WMV Video'
@@ -320,28 +321,30 @@ export function resolveMediaCapability(input: {
   return null
 }
 
-export function classifyFile(file: Pick<File, 'name' | 'type'>): ClassifiedFile {
+export function classifyFile(
+  file: Pick<File, 'name' | 'type'>,
+  platform: MediaPlatform = 'web'
+): ClassifiedFile {
   const capability = resolveMediaCapability({ mimeType: file.type, fileName: file.name })
   const normalizedMimeType = normalizeMimeType(file.type)
   if (!capability) {
     return {
       kind: 'unsupported',
       mimeType: normalizedMimeType || 'application/octet-stream',
-      extension: getFileExtension(file.name)
+      extension: getFileExtension(file.name),
+      support: 'unsupported'
     }
   }
 
-  const isUploadable =
-    capability.kind === 'document' ||
-    capability.web !== 'unsupported' ||
-    capability.electron !== 'unsupported'
+  const support = getMediaSupport(capability, platform)
   return {
-    kind: isUploadable ? capability.kind : 'unsupported',
+    kind: support !== 'unsupported' ? capability.kind : 'unsupported',
     mimeType:
       capability.canonicalMimeType.endsWith('/*') && normalizedMimeType
         ? normalizedMimeType
         : capability.canonicalMimeType,
-    extension: getFileExtension(file.name)
+    extension: getFileExtension(file.name),
+    support
   }
 }
 
@@ -356,14 +359,11 @@ export function canGenerateMediaThumbnail(capability: MediaCapability | null): b
   return capability !== null && capability.thumbnail !== 'none'
 }
 
-export function getMediaFileAcceptAttribute(): string {
+export function getMediaFileAcceptAttribute(platform: MediaPlatform): string {
   const extensions = CAPABILITIES.filter(
-    (capability) =>
-      capability.kind === 'document' ||
-      capability.web !== 'unsupported' ||
-      capability.electron !== 'unsupported'
+    (capability) => getMediaSupport(capability, platform) !== 'unsupported'
   ).flatMap((capability) => capability.extensions.map((extension) => `.${extension}`))
-  return ['image/*', 'video/*', ...new Set(extensions)].join(',')
+  return ['image/*', ...new Set(extensions)].join(',')
 }
 
 export function validateMediaCapabilityRegistry(): void {

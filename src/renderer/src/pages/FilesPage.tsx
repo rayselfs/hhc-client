@@ -11,7 +11,7 @@ import {
   useFileExplorerStore,
   FILE_EXPLORER_ROOT_ID
 } from '@renderer/stores/file-explorer'
-import { uploadFiles, uploadFolderFiles } from '@renderer/lib/upload-utils'
+import { getUploadMediaPlatform, uploadFiles, uploadFolderFiles } from '@renderer/lib/upload-utils'
 import {
   computeExpiresAt,
   inferDuration,
@@ -68,6 +68,7 @@ export default function FilesPage(): React.JSX.Element {
     )
   )
   const selectedCount = selectedIds.size
+  const fileAccept = getMediaFileAcceptAttribute(getUploadMediaPlatform())
 
   useEffect(() => {
     const el = folderInputRef.current
@@ -371,7 +372,7 @@ export default function FilesPage(): React.JSX.Element {
         ref={fileInputRef}
         type="file"
         multiple
-        accept={getMediaFileAcceptAttribute()}
+        accept={fileAccept}
         className="hidden"
         onChange={(e) => void handleFileChange(e)}
       />
@@ -379,7 +380,7 @@ export default function FilesPage(): React.JSX.Element {
         ref={folderInputRef}
         type="file"
         multiple
-        accept={getMediaFileAcceptAttribute()}
+        accept={fileAccept}
         className="hidden"
         onChange={(e) => void handleFolderChange(e)}
       />

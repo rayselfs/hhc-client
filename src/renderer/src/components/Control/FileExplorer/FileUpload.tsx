@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Upload } from 'lucide-react'
-import { uploadFiles } from '@renderer/lib/upload-utils'
+import { getUploadMediaPlatform, uploadFiles } from '@renderer/lib/upload-utils'
 import { getMediaFileAcceptAttribute } from '@renderer/lib/media-capabilities'
 
 interface FileUploadProps {
@@ -17,6 +17,7 @@ export function FileUpload({
 }: FileUploadProps): React.JSX.Element {
   const { t } = useTranslation()
   const inputRef = useRef<HTMLInputElement>(null)
+  const fileAccept = getMediaFileAcceptAttribute(getUploadMediaPlatform())
 
   function handleButtonClick(): void {
     inputRef.current?.click()
@@ -42,7 +43,7 @@ export function FileUpload({
         ref={inputRef}
         type="file"
         multiple
-        accept={getMediaFileAcceptAttribute()}
+        accept={fileAccept}
         className="hidden"
         onChange={handleChange}
       />

@@ -7,11 +7,13 @@ import {
   canGenerateMediaThumbnail,
   classifyFile,
   resolveMediaCapability,
-  type ClassifiedFile
+  type ClassifiedFile,
+  type MediaPlatform
 } from '@renderer/lib/media-capabilities'
 import { mediaJobQueue } from '@renderer/lib/media-job-queue'
 import { getFileBlob, getFileSource, openFileExplorerDB } from '@renderer/lib/file-explorer-db'
 import { resolveUniqueName } from '@renderer/lib/file-naming'
+import { enqueueTranscodeJob } from '@renderer/lib/media-transcode-lifecycle'
 
 export const MAX_FILE_SIZE_WEB = 2 * 1024 * 1024 * 1024
 
@@ -51,6 +53,10 @@ const UPLOAD_CONCURRENCY = 3
 const uploadSemaphore = createSemaphore(UPLOAD_CONCURRENCY)
 const pendingPdfFiles = new Map<string, File>()
 
+export function getUploadMediaPlatform(): MediaPlatform {
+  return isWeb() ? 'web' : 'electron'
+}
+
 async function readAllEntries(reader: FileSystemDirectoryReader): Promise<FileSystemEntry[]> {
   const all: FileSystemEntry[] = []
   const readBatch = (): Promise<void> =>
@@ -89,7 +95,7 @@ async function collectFromEntry(
 }
 
 export function isSupportedFile(file: File): boolean {
-  return classifyFile(file).kind !== 'unsupported'
+  return classifyFile(file, getUploadMediaPlatform()).kind !== 'unsupported'
 }
 
 export function canGenerateThumbnail(mimeType: string, fileName?: string): boolean {
@@ -111,8 +117,9 @@ async function hasWebStorageCapacity(files: File[]): Promise<boolean> {
 
 async function prepareUploadCandidates(files: File[]): Promise<UploadCandidate[]> {
   const candidates: UploadCandidate[] = []
+  const platform = getUploadMediaPlatform()
   for (const file of files) {
-    const classification = classifyFile(file)
+    const classification = classifyFile(file, platform)
     if (classification.kind === 'unsupported') continue
     if (isWeb() && file.size > MAX_FILE_SIZE_WEB) {
       toast.danger(`File "${file.name}" exceeds 2GB limit`)
@@ -193,6 +200,13 @@ async function uploadPreparedFiles(destinations: UploadDestination[]): Promise<n
           pendingPdfFiles.delete(id)
           throw error
         }
+      }
+
+      if (id && classification.support === 'transcode-required') {
+        await enqueueTranscodeJob({
+          sourceBlobId: id,
+          itemId: id
+        })
       }
     })
   )

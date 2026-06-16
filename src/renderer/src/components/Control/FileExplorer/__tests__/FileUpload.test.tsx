@@ -4,11 +4,13 @@ import { FileUpload } from '../FileUpload'
 import { uploadFiles } from '@renderer/lib/upload-utils'
 
 vi.mock('@renderer/lib/upload-utils', () => ({
+  getUploadMediaPlatform: () => 'electron',
   uploadFiles: vi.fn()
 }))
 
 vi.mock('@renderer/lib/media-capabilities', () => ({
-  getMediaFileAcceptAttribute: () => 'image/*,.pdf,.mkv'
+  getMediaFileAcceptAttribute: (platform: string) =>
+    platform === 'electron' ? 'image/*,.pdf,.mkv' : 'image/*,.pdf'
 }))
 
 describe('FileUpload', () => {

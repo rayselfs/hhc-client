@@ -18,8 +18,8 @@ describe('media capability registry', () => {
     ['image/jpg', undefined, 'image/jpeg', 'native'],
     ['VIDEO/MP4; codecs=avc1', undefined, 'video/mp4', 'native'],
     ['', 'slides.PDF', 'application/pdf', 'native'],
-    ['application/octet-stream', 'movie.MKV', 'video/x-matroska', 'transcode-required'],
-    ['', 'movie.wmv', 'video/x-ms-wmv', 'transcode-required']
+    ['application/octet-stream', 'movie.MKV', 'video/x-matroska', 'unsupported'],
+    ['', 'movie.wmv', 'video/x-ms-wmv', 'unsupported']
   ])(
     'resolves MIME %s and file %s consistently',
     (mimeType, fileName, canonicalMimeType, expectedSupport) => {
@@ -28,6 +28,14 @@ describe('media capability registry', () => {
       expect(capability && getMediaSupport(capability, 'web')).toBe(expectedSupport)
     }
   )
+
+  it('keeps transcode-required video formats Electron-only', () => {
+    const capability = resolveMediaCapability({ mimeType: '', fileName: 'movie.mkv' })
+
+    expect(capability?.canonicalMimeType).toBe('video/x-matroska')
+    expect(capability && getMediaSupport(capability, 'web')).toBe('unsupported')
+    expect(capability && getMediaSupport(capability, 'electron')).toBe('transcode-required')
+  })
 
   it('prefers recognized MIME over a conflicting extension', () => {
     const capability = resolveMediaCapability({
@@ -66,27 +74,49 @@ describe('media capability registry', () => {
   })
 
   it.each([
-    ['slides.PDF', '', 'pdf', 'application/pdf'],
-    ['photo.PNG', 'application/octet-stream', 'image', 'image/png'],
-    ['movie.MP4', '', 'video', 'video/mp4'],
-    ['movie.mkv', '', 'video', 'video/x-matroska'],
-    ['movie.mpg', '', 'unsupported', 'video/mpeg'],
-    ['movie.bin', 'video/unknown', 'unsupported', 'video/unknown'],
-    ['notes.txt', '', 'unsupported', 'application/octet-stream']
-  ])('classifies %s with MIME %s', (name, type, kind, mimeType) => {
-    expect(classifyFile({ name, type })).toEqual({
+    ['slides.PDF', '', 'pdf', 'application/pdf', 'native'],
+    ['photo.PNG', 'application/octet-stream', 'image', 'image/png', 'native'],
+    ['movie.MP4', '', 'video', 'video/mp4', 'native'],
+    ['movie.mkv', '', 'unsupported', 'video/x-matroska', 'unsupported'],
+    ['movie.mpg', '', 'unsupported', 'video/mpeg', 'unsupported'],
+    ['movie.bin', 'video/unknown', 'unsupported', 'video/unknown', 'unsupported'],
+    ['notes.txt', '', 'unsupported', 'application/octet-stream', 'unsupported']
+  ])('classifies %s with MIME %s for Web', (name, type, kind, mimeType, support) => {
+    expect(classifyFile({ name, type }, 'web')).toEqual({
       kind,
       mimeType,
-      extension: getFileExtension(name)
+      extension: getFileExtension(name),
+      support
     })
   })
 
-  it('derives the file input filter from registered capabilities', () => {
-    const accept = getMediaFileAcceptAttribute()
+  it('classifies transcode-required video for Electron upload', () => {
+    expect(classifyFile({ name: 'movie.mkv', type: '' }, 'electron')).toEqual({
+      kind: 'video',
+      mimeType: 'video/x-matroska',
+      extension: 'mkv',
+      support: 'transcode-required'
+    })
+  })
+
+  it('derives the Web file input filter from native browser capabilities only', () => {
+    const accept = getMediaFileAcceptAttribute('web')
+    expect(accept).toContain('image/*')
+    expect(accept).toContain('.pdf')
+    expect(accept).toContain('.mp4')
+    expect(accept).not.toContain('video/*')
+    expect(accept).not.toContain('.mkv')
+    expect(accept).not.toContain('.pptx')
+    expect(accept).not.toContain('.mpg')
+  })
+
+  it('derives the Electron file input filter with transcode candidates', () => {
+    const accept = getMediaFileAcceptAttribute('electron')
     expect(accept).toContain('image/*')
     expect(accept).toContain('.pdf')
     expect(accept).toContain('.mkv')
-    expect(accept).toContain('.pptx')
+    expect(accept).not.toContain('video/*')
+    expect(accept).not.toContain('.pptx')
     expect(accept).not.toContain('.mpg')
   })
 })

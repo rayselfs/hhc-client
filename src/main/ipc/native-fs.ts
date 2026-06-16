@@ -3,18 +3,13 @@ import { randomUUID } from 'crypto'
 import { promises as fs } from 'fs'
 import { dirname, isAbsolute, join, resolve } from 'path'
 import { pathToFileURL } from 'url'
+import { isValidNativeFileId } from '../../shared/native-media'
 import type { WindowManager } from '../windowManager'
 import { isMainWindow } from './validate'
 
 const NATIVE_MEDIA_SCHEME = 'hhc-media:'
 const NATIVE_MEDIA_HOST = 'file'
-const NATIVE_FILE_ID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const MIME_TYPE_PATTERN = /^[a-z0-9][a-z0-9!#$&^_.+-]*\/[a-z0-9][a-z0-9!#$&^_.+-]*$/i
-
-export function isValidNativeFileId(value: unknown): value is string {
-  return typeof value === 'string' && NATIVE_FILE_ID_PATTERN.test(value)
-}
 
 function getNativeFsDir(): string {
   return resolve(app.getPath('userData'), 'native-files')

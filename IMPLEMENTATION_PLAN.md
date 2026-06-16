@@ -63,7 +63,10 @@ interface MediaCapability {
 - Resolve capability from normalized MIME type first, then extension fallback.
 - Keep browser-playable and Electron-playable support explicit rather than assuming every `video/*`
   value is playable.
-- AVI, MKV, and WMV initially resolve to `transcode-required`.
+- AVI, MKV, and WMV resolve from the same registry, but platform policy differs:
+  - Web: `unsupported`, because Web transcoding is not part of the approved implementation.
+  - Electron: `transcode-required`, because the native FFmpeg flow can prepare compatible MP4
+    derivatives.
 - Derive upload filtering, canonical MIME metadata, icons, thumbnail eligibility, presentability, and
   transcode requirements from the registry.
 - Keep protocol MIME validation separate from capability lookup; the registry may provide a
@@ -222,8 +225,8 @@ interface ClassifiedFile {
   - PDF page thumbnail generation
   - Presenter eligibility
   - media protocol `Content-Type`
-- Keep the existing explicit browser-playable video MIME allowlist. AVI, MKV, and WMV are classified
-  as transcode-required video, not directly presentable video.
+- Keep the existing explicit browser-playable video MIME allowlist. AVI, MKV, and WMV are rejected
+  in Web mode and classified as Electron-only `transcode-required` video.
 
 ### Unified upload entry point
 
@@ -434,6 +437,21 @@ docs: evaluate extended video transcoding
 
 ## Phase 2B: Transcoding Data Model and Job Lifecycle
 
+Phase 2A decision: implement Electron-only transcoding through a user-managed FFmpeg executable.
+Web upload and sync must reject formats that require transcoding.
+
+### Platform-aware import policy
+
+- Keep one media capability registry, not separate Web/Electron extension whitelists.
+- Web upload, drag-and-drop, folder upload, and sync import accept only `native` capabilities.
+- Electron upload, drag-and-drop, folder upload, and sync import accept `native` and
+  `transcode-required` capabilities.
+- File input accept attributes must follow the same policy:
+  - Web includes browser-native media only and must not include `video/*` or transcode-only
+    extensions.
+  - Electron includes transcode candidates such as `.avi`, `.mkv`, and `.wmv`.
+- Unsupported document formats stay unsupported until a separate document conversion feature exists.
+
 ### Derivative records
 
 Do not use `${originalBlobId}-transcoded` as an ID. Native media IDs must remain UUIDs.
@@ -444,6 +462,8 @@ Do not use `${originalBlobId}-transcoded` as an ID. Native media IDs must remain
   derived-asset registry.
 - Add codec, container, dimensions, duration, and profile metadata needed to validate and reuse an
   output.
+- Use the deterministic compatibility profile `mp4-h264-aac-yuv420p-faststart` for the first
+  production implementation.
 - Deduplicate jobs by source Blob identity and selected transcode profile.
 - Copies share the same derivative through `sourceBlobId`.
 - A derivative does not need a separate item-level ref-count.
@@ -461,6 +481,8 @@ Do not use `${originalBlobId}-transcoded` as an ID. Native media IDs must remain
 ### Verification
 
 - Test schema migration and legacy records.
+- Test Web rejection and Electron acceptance for transcode-required extensions across file input,
+  direct upload, folder upload, drag-and-drop, and sync import policy.
 - Test job deduplication across copied items.
 - Test cancellation, failed jobs, restart recovery, atomic completion, and final-reference deletion.
 - Test that every native derivative ID passes native media ID validation.
@@ -576,7 +598,12 @@ feat: transcode unsupported video in electron
 
 ## Phase 2D: Web Transcoding
 
-Implement only if Phase 2A approves Web support.
+Skipped by Phase 2A decision. Web transcoding is not part of the approved roadmap because it adds
+large WASM assets, CSP/cross-origin isolation constraints, high memory pressure, and a second
+execution path for a lower-quality result. Web remains limited to browser-native media plus the
+existing 2 GiB product limit.
+
+Do not implement these items unless a future plan explicitly reopens Web transcoding:
 
 - Lazy-load all FFmpeg WASM assets only after explicit user action.
 - Enforce the measured size and memory limit from the feasibility spike.

@@ -38,6 +38,18 @@ export type DerivedAssetKind =
   | 'video-poster'
   | 'transcoded-video'
 
+export interface DerivedAssetMetadata {
+  container?: string
+  videoCodec?: string
+  audioCodec?: string
+  width?: number
+  height?: number
+  durationMs?: number
+  pixelFormat?: string
+  fastStart?: boolean
+  profile?: string
+}
+
 export interface DerivedAssetRecord {
   id: string
   lookupKey: string
@@ -51,6 +63,7 @@ export interface DerivedAssetRecord {
   blob?: Blob
   blobs?: Blob[]
   nativeFileId?: string
+  metadata?: DerivedAssetMetadata
   createdAt: number
   updatedAt: number
 }
