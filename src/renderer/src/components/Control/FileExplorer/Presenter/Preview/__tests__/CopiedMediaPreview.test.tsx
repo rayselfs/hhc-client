@@ -116,13 +116,64 @@ describe('copied media preview identity', () => {
       expect(element).not.toBeNull()
       return element!
     })
+    Object.defineProperty(video, 'readyState', { configurable: true, value: 1 })
     Object.defineProperty(video, 'duration', { configurable: true, value: 100 })
+    fireEvent.loadedMetadata(video)
     video.currentTime = 30
 
     window.dispatchEvent(new CustomEvent('media:videoSeekRelative', { detail: { seconds: 5 } }))
 
     expect(video.currentTime).toBe(35)
     expect(mockSendCommand).toHaveBeenCalledWith({ action: 'seek', itemId: 'copy-id', value: 35 })
+  })
+
+  it('applies a relative video seek after metadata when the first seek happens too early', async () => {
+    const { container } = render(<VideoPreview item={makeCopy('video/mp4', 'copy.mp4')} />)
+
+    const video = await waitFor(() => {
+      const element = container.querySelector('video')
+      expect(element).not.toBeNull()
+      return element!
+    })
+    Object.defineProperty(video, 'readyState', { configurable: true, value: 0 })
+    Object.defineProperty(video, 'duration', { configurable: true, value: Number.NaN })
+
+    window.dispatchEvent(new CustomEvent('media:videoSeekRelative', { detail: { seconds: 5 } }))
+
+    expect(video.currentTime).toBe(0)
+    expect(mockSendCommand).toHaveBeenCalledWith({ action: 'seek', itemId: 'copy-id', value: 5 })
+
+    Object.defineProperty(video, 'readyState', { configurable: true, value: 1 })
+    Object.defineProperty(video, 'duration', { configurable: true, value: 100 })
+    fireEvent.loadedMetadata(video)
+
+    expect(video.currentTime).toBe(5)
+  })
+
+  it('blurs the seek range after pointer release so keyboard shortcuts resume', async () => {
+    const { container } = render(<VideoPreview item={makeCopy('video/mp4', 'copy.mp4')} />)
+
+    const video = await waitFor(() => {
+      const element = container.querySelector('video')
+      expect(element).not.toBeNull()
+      return element!
+    })
+    Object.defineProperty(video, 'readyState', { configurable: true, value: 1 })
+    Object.defineProperty(video, 'duration', { configurable: true, value: 100 })
+    fireEvent.loadedMetadata(video)
+
+    const playButton = container.querySelector('button')
+    expect(playButton).not.toBeNull()
+    fireEvent.click(playButton!)
+
+    const seekRange = container.querySelector<HTMLInputElement>('input.video-seek-range')
+    expect(seekRange).not.toBeNull()
+    seekRange!.focus()
+    expect(document.activeElement).toBe(seekRange)
+
+    fireEvent.pointerUp(seekRange!, { pointerId: 1 })
+
+    expect(document.activeElement).not.toBe(seekRange)
   })
 
   it('pauses a playing video through the pause-only media event', async () => {
