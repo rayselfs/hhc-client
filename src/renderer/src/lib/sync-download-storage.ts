@@ -59,3 +59,53 @@ export async function saveWebOneDriveDownloadedContent(
     mimeType: metadata.mimeType ?? blob.type
   }
 }
+
+export async function saveElectronOneDriveDownloadedContent(
+  request: SyncDownloadRequest,
+  accessToken: string,
+  metadata: RemoteSyncItem
+): Promise<SyncDownloadResult> {
+  if (!isElectron()) {
+    throw new Error('Native OneDrive downloads are only available in Electron')
+  }
+
+  const downloaded = await window.api.oneDrive.downloadFile({
+    remoteItemId: request.remoteItemId,
+    targetFileId: request.targetBlobId,
+    accessToken,
+    expectedSize: metadata.size,
+    mimeType: metadata.mimeType
+  })
+  const db = await openFileExplorerDB()
+  try {
+    await db.put('file-blobs', {
+      id: request.targetBlobId,
+      storage: 'native-fs',
+      size: downloaded.size,
+      refCount: 1
+    })
+  } catch (error) {
+    await window.api.nativeFs.delete(request.targetBlobId).catch(() => undefined)
+    throw error
+  }
+
+  await putSyncEntry({
+    providerConnectionId: request.providerConnectionId,
+    remoteItemId: request.remoteItemId,
+    parentRemoteItemId: metadata.parentRemoteItemId,
+    kind: metadata.kind,
+    name: metadata.name,
+    blobId: request.targetBlobId,
+    mimeType: metadata.mimeType ?? downloaded.mimeType,
+    size: downloaded.size,
+    etag: metadata.etag,
+    contentHash: metadata.contentHash,
+    status: 'available-offline'
+  })
+
+  return {
+    blobId: request.targetBlobId,
+    size: downloaded.size,
+    mimeType: metadata.mimeType ?? downloaded.mimeType ?? ''
+  }
+}

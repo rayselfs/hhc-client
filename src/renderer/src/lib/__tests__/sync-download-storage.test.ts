@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { saveWebOneDriveDownloadedContent } from '../sync-download-storage'
+import {
+  saveElectronOneDriveDownloadedContent,
+  saveWebOneDriveDownloadedContent
+} from '../sync-download-storage'
 import { MAX_FILE_SIZE_WEB } from '../media-limits'
 import { openFileExplorerDB, resetFileExplorerDBForTests } from '../file-explorer-db'
 import { getSyncEntryByRemoteItem, resetSyncDBForTests } from '../sync-db'
@@ -37,6 +40,21 @@ beforeEach(async () => {
     configurable: true,
     value: {
       estimate: vi.fn(async () => ({ quota: 1024 * 1024, usage: 0 }))
+    }
+  })
+  Object.defineProperty(window, 'api', {
+    configurable: true,
+    value: {
+      oneDrive: {
+        downloadFile: vi.fn(async () => ({
+          fileId: request.targetBlobId,
+          size: 10,
+          mimeType: 'video/mp4'
+        }))
+      },
+      nativeFs: {
+        delete: vi.fn(async () => undefined)
+      }
     }
   })
 })
@@ -100,5 +118,55 @@ describe('saveWebOneDriveDownloadedContent', () => {
     await expect(
       saveWebOneDriveDownloadedContent(request, new Response(''), metadata)
     ).rejects.toThrow('Electron OneDrive downloads must use native streaming storage')
+  })
+
+  it('stores Electron native download metadata without reading the file into renderer memory', async () => {
+    vi.mocked(isElectron).mockReturnValue(true)
+
+    await expect(
+      saveElectronOneDriveDownloadedContent(request, 'access-token', metadata)
+    ).resolves.toEqual({
+      blobId: 'blob-1',
+      size: 10,
+      mimeType: 'video/mp4'
+    })
+
+    expect(window.api.oneDrive.downloadFile).toHaveBeenCalledWith({
+      remoteItemId: 'remote-file-1',
+      targetFileId: 'blob-1',
+      accessToken: 'access-token',
+      expectedSize: 10,
+      mimeType: 'video/mp4'
+    })
+    const db = await openFileExplorerDB()
+    await expect(db.get('file-blobs', 'blob-1')).resolves.toMatchObject({
+      id: 'blob-1',
+      storage: 'native-fs',
+      size: 10,
+      refCount: 1
+    })
+    await expect(getSyncEntryByRemoteItem('connection-1', 'remote-file-1')).resolves.toMatchObject({
+      blobId: 'blob-1',
+      status: 'available-offline'
+    })
+  })
+
+  it('removes the native file if metadata persistence fails', async () => {
+    vi.mocked(isElectron).mockReturnValue(true)
+    const db = await openFileExplorerDB()
+    const putSpy = vi.spyOn(db, 'put').mockRejectedValueOnce(new Error('db failed'))
+
+    await expect(
+      saveElectronOneDriveDownloadedContent(request, 'access-token', metadata)
+    ).rejects.toThrow('db failed')
+
+    expect(window.api.nativeFs.delete).toHaveBeenCalledWith('blob-1')
+    putSpy.mockRestore()
+  })
+
+  it('does not allow Web mode to use native download storage', async () => {
+    await expect(
+      saveElectronOneDriveDownloadedContent(request, 'access-token', metadata)
+    ).rejects.toThrow('Native OneDrive downloads are only available in Electron')
   })
 })
