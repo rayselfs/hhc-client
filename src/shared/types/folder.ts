@@ -1,3 +1,13 @@
+export type SyncProviderType = 'local-fs' | 'onedrive'
+export type SyncOfflinePolicy = 'online-only' | 'on-demand' | 'always-offline'
+
+export interface FolderSyncLink {
+  providerConnectionId: string
+  remoteFolderId: string
+  providerType: SyncProviderType
+  offlinePolicy?: SyncOfflinePolicy
+}
+
 export interface FolderRecord {
   id: string
   name: string
@@ -8,6 +18,7 @@ export interface FolderRecord {
   isFavorited?: boolean
   deletedAt?: number
   originalParentId?: string
+  syncLink?: FolderSyncLink
 }
 
 export interface ItemRecord {
