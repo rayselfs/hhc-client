@@ -79,6 +79,15 @@ export function createPresentationSnapshot(
   }
 }
 
+export function getPresentationSnapshotResourceIds(snapshot: PresentationSnapshot): string[] {
+  const ids = new Set<string>()
+  for (const entry of snapshot.entries) {
+    ids.add(entry.blobId)
+    if (entry.derivativeId) ids.add(entry.derivativeId)
+  }
+  return [...ids]
+}
+
 export async function analyzePresentationReadiness(
   items: FileItemRecord[],
   platform: MediaPlatform = getPresentationPlatform()

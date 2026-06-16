@@ -2,10 +2,10 @@ import { create } from 'zustand'
 import type { FileItemRecord } from '@shared/types/folder'
 import type { MediaType, MediaTypeStateMap } from '@renderer/lib/presentability'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
-import { getBlobId } from '@renderer/lib/blob-identity'
 import { lockMediaResources } from '@renderer/lib/media-resource-locks'
 import {
   createPresentationSnapshot,
+  getPresentationSnapshotResourceIds,
   type PresentationSnapshot
 } from '@renderer/lib/presentation-readiness'
 
@@ -95,12 +95,13 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
 
   startPresentation: (files: FileItemRecord[], startIndex: number) => {
     releaseProjectionLocks?.()
-    releaseProjectionLocks = lockMediaResources(files.map(getBlobId))
+    const snapshot = createPresentationSnapshot(files)
+    releaseProjectionLocks = lockMediaResources(getPresentationSnapshotResourceIds(snapshot))
     set({
       playlist: files,
       currentIndex: startIndex,
       isPresenting: true,
-      snapshot: createPresentationSnapshot(files),
+      snapshot,
       typeStates: initialTypeStates
     })
   },

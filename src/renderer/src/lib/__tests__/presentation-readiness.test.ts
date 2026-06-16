@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { FileItemRecord } from '@shared/types/folder'
 import { putDerivedAsset } from '../media-work-db'
-import { analyzePresentationReadiness, createPresentationSnapshot } from '../presentation-readiness'
+import {
+  analyzePresentationReadiness,
+  createPresentationSnapshot,
+  getPresentationSnapshotResourceIds
+} from '../presentation-readiness'
 import { TRANSCODE_COMPATIBILITY_PROFILE } from '../media-transcode-lifecycle'
 
 function file(id: string, name: string, mimeType: string, url = `blob:${id}`): FileItemRecord {
@@ -101,5 +105,24 @@ describe('createPresentationSnapshot', () => {
       name: 'Original.png',
       sourceUrl: 'blob:source-blob'
     })
+  })
+
+  it('reports every resource identity protected by the snapshot', () => {
+    const item = file('copy-id', 'Original.avi', 'video/x-msvideo', 'blob:source-blob')
+    const snapshot = createPresentationSnapshot(
+      [item],
+      [
+        {
+          itemId: 'copy-id',
+          blobId: 'source-blob',
+          status: 'ready',
+          reason: 'ready-transcoded-derivative',
+          support: 'transcode-required',
+          derivativeId: 'derived-video'
+        }
+      ]
+    )
+
+    expect(getPresentationSnapshotResourceIds(snapshot)).toEqual(['source-blob', 'derived-video'])
   })
 })
