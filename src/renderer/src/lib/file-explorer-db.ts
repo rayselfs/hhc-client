@@ -2,6 +2,7 @@ import type { DBSchema, IDBPDatabase } from 'idb'
 import { openDB, unwrap } from 'idb'
 import type { AnyItemRecord, FolderRecord } from '@shared/types/folder'
 import { isElectron } from './env'
+import { getReadyTranscodedVideo } from './media-transcode-lifecycle'
 
 interface FileBlobRecord {
   id: string
@@ -116,6 +117,16 @@ export async function getFileSource(
   id: string,
   mimeType: string
 ): Promise<FileSource | null> {
+  if (mimeType.startsWith('video/')) {
+    const transcoded = await getReadyTranscodedVideo(id)
+    if (transcoded?.storage === 'native-fs' && transcoded.nativeFileId && isElectron()) {
+      return {
+        url: window.api.nativeFs.getUrl(transcoded.nativeFileId, transcoded.mimeType),
+        revoke: () => undefined
+      }
+    }
+  }
+
   const record = await db.get('file-blobs', id)
   if (!record) return null
 
