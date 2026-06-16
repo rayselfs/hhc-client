@@ -9,6 +9,7 @@ import type {
   VideoTranscodeRunRequest,
   VideoTranscodeRunResult,
   LocalSyncConnectionInfo,
+  LocalSyncWatchStatus,
   LocalSyncRemoteItem,
   OneDriveCredentialInput,
   OneDriveCredentialStatus,
@@ -98,6 +99,9 @@ interface LocalSyncAPI {
   selectFolder: () => Promise<LocalSyncConnectionInfo | null>
   listFolders: () => Promise<LocalSyncConnectionInfo[]>
   scanFolder: (connectionId: string) => Promise<LocalSyncRemoteItem[]>
+  startWatch: (connectionId: string) => Promise<LocalSyncWatchStatus>
+  getWatchStatus: (connectionId: string) => Promise<LocalSyncWatchStatus>
+  stopWatch: (connectionId: string) => Promise<LocalSyncWatchStatus>
   disconnectFolder: (connectionId: string) => Promise<void>
 }
 

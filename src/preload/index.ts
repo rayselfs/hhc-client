@@ -121,6 +121,10 @@ const localSyncApi = {
   selectFolder: () => typedInvoke('local-sync:select-folder'),
   listFolders: () => typedInvoke('local-sync:list-folders'),
   scanFolder: (connectionId: string) => typedInvoke('local-sync:scan-folder', connectionId),
+  startWatch: (connectionId: string) => typedInvoke('local-sync:start-watch', connectionId),
+  getWatchStatus: (connectionId: string) =>
+    typedInvoke('local-sync:get-watch-status', connectionId),
+  stopWatch: (connectionId: string) => typedInvoke('local-sync:stop-watch', connectionId),
   disconnectFolder: (connectionId: string) =>
     typedInvoke('local-sync:disconnect-folder', connectionId)
 }

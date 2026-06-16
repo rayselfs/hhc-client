@@ -1,8 +1,12 @@
 import { app, dialog, ipcMain } from 'electron'
 import { randomUUID } from 'crypto'
-import { promises as fs } from 'fs'
+import { promises as fs, watch as watchFs, type FSWatcher } from 'fs'
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'path'
-import type { LocalSyncConnectionInfo, LocalSyncRemoteItem } from '../../shared/ipc-channels'
+import type {
+  LocalSyncConnectionInfo,
+  LocalSyncRemoteItem,
+  LocalSyncWatchStatus
+} from '../../shared/ipc-channels'
 import type { WindowManager } from '../windowManager'
 import { isMainWindow } from './validate'
 
@@ -17,10 +21,18 @@ interface LocalSyncDirent {
   isSymbolicLink: () => boolean
 }
 
+interface LocalSyncWatchRecord {
+  watcher: FSWatcher | null
+  status: LocalSyncWatchStatus
+  debounceTimer: NodeJS.Timeout | null
+}
+
 const CONFIG_FILE_NAME = 'local-sync-connections.json'
 const MAX_SCAN_ITEMS = 10_000
+const WATCH_DEBOUNCE_MS = 500
 const CONNECTION_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const watchRecords = new Map<string, LocalSyncWatchRecord>()
 
 function getConfigPath(): string {
   return join(app.getPath('userData'), CONFIG_FILE_NAME)
@@ -117,6 +129,80 @@ function isRecoverableScanError(error: unknown): boolean {
   return code === 'EACCES' || code === 'EPERM' || code === 'ENOENT' || code === 'ENOTDIR'
 }
 
+function createWatchStatus(
+  connectionId: string,
+  state: LocalSyncWatchStatus['state'],
+  reason?: LocalSyncWatchStatus['reason']
+): LocalSyncWatchStatus {
+  return {
+    connectionId,
+    state,
+    ...(reason && { reason }),
+    updatedAt: Date.now()
+  }
+}
+
+function closeWatchRecord(connectionId: string): void {
+  const record = watchRecords.get(connectionId)
+  if (!record) return
+  if (record.debounceTimer) clearTimeout(record.debounceTimer)
+  record.watcher?.close()
+  watchRecords.delete(connectionId)
+}
+
+function getWatchStatus(connectionId: string): LocalSyncWatchStatus {
+  return watchRecords.get(connectionId)?.status ?? createWatchStatus(connectionId, 'idle')
+}
+
+function scheduleWatchRescan(
+  connectionId: string,
+  reason: Extract<LocalSyncWatchStatus['reason'], 'change' | 'rename'>
+): void {
+  const record = watchRecords.get(connectionId)
+  if (!record) return
+  if (record.debounceTimer) clearTimeout(record.debounceTimer)
+  record.debounceTimer = setTimeout(() => {
+    const latest = watchRecords.get(connectionId)
+    if (!latest) return
+    latest.debounceTimer = null
+    latest.status = createWatchStatus(connectionId, 'rescan-needed', reason)
+  }, WATCH_DEBOUNCE_MS)
+}
+
+function markWatchRescanOverflow(connectionId: string): void {
+  const record = watchRecords.get(connectionId)
+  if (!record) return
+  if (record.debounceTimer) {
+    clearTimeout(record.debounceTimer)
+    record.debounceTimer = null
+  }
+  record.status = createWatchStatus(connectionId, 'overflow-rescan', 'overflow')
+}
+
+function markWatchUnavailable(connectionId: string): void {
+  const record = watchRecords.get(connectionId)
+  if (!record) return
+  if (record.debounceTimer) {
+    clearTimeout(record.debounceTimer)
+    record.debounceTimer = null
+  }
+  record.status = createWatchStatus(connectionId, 'unavailable', 'unavailable')
+}
+
+function clearWatchRescanStatus(connectionId: string): void {
+  const record = watchRecords.get(connectionId)
+  if (!record) return
+  if (record.status.state === 'rescan-needed' || record.status.state === 'overflow-rescan') {
+    record.status = createWatchStatus(connectionId, record.watcher ? 'watching' : 'idle')
+  }
+}
+
+async function findConnection(connectionId: string): Promise<StoredLocalSyncConnection> {
+  const connection = (await readConnections()).find((candidate) => candidate.id === connectionId)
+  if (!connection) throw new Error('Local sync connection not found')
+  return connection
+}
+
 async function scanDirectory(
   rootPath: string,
   currentPath = rootPath,
@@ -205,12 +291,76 @@ export function registerLocalSyncHandlers(wm: WindowManager): void {
       if (typeof connectionId !== 'string' || !isValidConnectionId(connectionId)) {
         throw new Error('Invalid local sync connection id')
       }
-      const connection = (await readConnections()).find(
-        (candidate) => candidate.id === connectionId
-      )
-      if (!connection) throw new Error('Local sync connection not found')
+      const connection = await findConnection(connectionId)
       await validateConnectedDirectory(connection.rootPath)
-      return scanDirectory(connection.rootPath)
+      const items = await scanDirectory(connection.rootPath)
+      clearWatchRescanStatus(connectionId)
+      return items
+    }
+  )
+
+  ipcMain.handle(
+    'local-sync:start-watch',
+    async (event, connectionId: unknown): Promise<LocalSyncWatchStatus> => {
+      if (!isMainWindow(wm, event)) throw new Error('Unauthorized local sync access')
+      if (typeof connectionId !== 'string' || !isValidConnectionId(connectionId)) {
+        throw new Error('Invalid local sync connection id')
+      }
+      const connection = await findConnection(connectionId)
+      await validateConnectedDirectory(connection.rootPath)
+      closeWatchRecord(connectionId)
+      const status = createWatchStatus(connectionId, 'watching')
+      const record: LocalSyncWatchRecord = {
+        watcher: null,
+        status,
+        debounceTimer: null
+      }
+      watchRecords.set(connectionId, record)
+      let watcher: FSWatcher
+      try {
+        watcher = watchFs(connection.rootPath, { recursive: true }, (eventType: string) => {
+          scheduleWatchRescan(connectionId, eventType === 'rename' ? 'rename' : 'change')
+        })
+      } catch {
+        watchRecords.set(connectionId, {
+          watcher: null,
+          status: createWatchStatus(connectionId, 'unavailable', 'unavailable'),
+          debounceTimer: null
+        })
+        return getWatchStatus(connectionId)
+      }
+      watcher.on('error', (error: NodeJS.ErrnoException) => {
+        if (error.code === 'ENOSPC' || error.code === 'ERR_FS_WATCHER_LIMIT') {
+          markWatchRescanOverflow(connectionId)
+          return
+        }
+        markWatchUnavailable(connectionId)
+      })
+      record.watcher = watcher
+      return record.status
+    }
+  )
+
+  ipcMain.handle(
+    'local-sync:get-watch-status',
+    async (event, connectionId: unknown): Promise<LocalSyncWatchStatus> => {
+      if (!isMainWindow(wm, event)) throw new Error('Unauthorized local sync access')
+      if (typeof connectionId !== 'string' || !isValidConnectionId(connectionId)) {
+        throw new Error('Invalid local sync connection id')
+      }
+      return getWatchStatus(connectionId)
+    }
+  )
+
+  ipcMain.handle(
+    'local-sync:stop-watch',
+    async (event, connectionId: unknown): Promise<LocalSyncWatchStatus> => {
+      if (!isMainWindow(wm, event)) throw new Error('Unauthorized local sync access')
+      if (typeof connectionId !== 'string' || !isValidConnectionId(connectionId)) {
+        throw new Error('Invalid local sync connection id')
+      }
+      closeWatchRecord(connectionId)
+      return createWatchStatus(connectionId, 'idle')
     }
   )
 
@@ -222,6 +372,7 @@ export function registerLocalSyncHandlers(wm: WindowManager): void {
         throw new Error('Invalid local sync connection id')
       }
       const connections = await readConnections()
+      closeWatchRecord(connectionId)
       await writeConnections(connections.filter((connection) => connection.id !== connectionId))
     }
   )

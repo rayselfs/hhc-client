@@ -81,6 +81,20 @@ export interface LocalSyncRemoteItem {
   etag?: string
 }
 
+export type LocalSyncWatchState =
+  | 'idle'
+  | 'watching'
+  | 'rescan-needed'
+  | 'overflow-rescan'
+  | 'unavailable'
+
+export interface LocalSyncWatchStatus {
+  connectionId: string
+  state: LocalSyncWatchState
+  reason?: 'change' | 'rename' | 'overflow' | 'unavailable'
+  updatedAt: number
+}
+
 export interface OneDriveCredentialInput {
   connectionId: string
   accessToken?: string
@@ -162,6 +176,9 @@ export interface IpcInvokeMap {
   'local-sync:select-folder': { args: []; result: LocalSyncConnectionInfo | null }
   'local-sync:list-folders': { args: []; result: LocalSyncConnectionInfo[] }
   'local-sync:scan-folder': { args: [string]; result: LocalSyncRemoteItem[] }
+  'local-sync:start-watch': { args: [string]; result: LocalSyncWatchStatus }
+  'local-sync:get-watch-status': { args: [string]; result: LocalSyncWatchStatus }
+  'local-sync:stop-watch': { args: [string]; result: LocalSyncWatchStatus }
   'local-sync:disconnect-folder': { args: [string]; result: void }
   'onedrive:save-credentials': { args: [OneDriveCredentialInput]; result: OneDriveCredentialStatus }
   'onedrive:get-credential-status': { args: [string]; result: OneDriveCredentialStatus }

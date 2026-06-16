@@ -9,7 +9,8 @@ const {
   mockMkdir,
   mockRealpath,
   mockStat,
-  mockReaddir
+  mockReaddir,
+  mockWatch
 } = vi.hoisted(() => ({
   handleHandlers: new Map<string, (...args: unknown[]) => unknown>(),
   mockShowOpenDialog: vi.fn(),
@@ -19,7 +20,8 @@ const {
   mockMkdir: vi.fn(),
   mockRealpath: vi.fn(),
   mockStat: vi.fn(),
-  mockReaddir: vi.fn()
+  mockReaddir: vi.fn(),
+  mockWatch: vi.fn()
 }))
 
 const mockMainWindow = { id: 1 }
@@ -60,8 +62,9 @@ vi.mock('fs', () => {
     readdir: mockReaddir
   }
   return {
-    default: { promises },
-    promises
+    default: { promises, watch: mockWatch },
+    promises,
+    watch: mockWatch
   }
 })
 
@@ -124,9 +127,44 @@ function symlink(name: string): {
   }
 }
 
+function storedConnectionJson(rootPath = '/Volumes/Media/Sermons'): string {
+  return JSON.stringify([
+    {
+      id: CONNECTION_ID,
+      rootPath,
+      rootName: 'Sermons',
+      displayName: 'Sermons',
+      createdAt: 1,
+      updatedAt: 1
+    }
+  ])
+}
+
+function makeWatcher(): {
+  watcher: {
+    on: ReturnType<typeof vi.fn>
+    close: ReturnType<typeof vi.fn>
+  }
+  emitError: (error: NodeJS.ErrnoException) => void
+} {
+  const handlers = new Map<string, (error: NodeJS.ErrnoException) => void>()
+  const watcher = {
+    on: vi.fn((eventName: string, handler: (error: NodeJS.ErrnoException) => void) => {
+      handlers.set(eventName, handler)
+      return watcher
+    }),
+    close: vi.fn()
+  }
+  return {
+    watcher,
+    emitError: (error) => handlers.get('error')?.(error)
+  }
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   handleHandlers.clear()
+  vi.useRealTimers()
   mockMkdir.mockResolvedValue(undefined)
   mockWriteFile.mockResolvedValue(undefined)
   mockRename.mockResolvedValue(undefined)
@@ -138,6 +176,7 @@ beforeEach(() => {
     size: 100,
     mtimeMs: 1
   })
+  mockWatch.mockImplementation(() => makeWatcher().watcher)
   vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockMainWindow as never)
   registerLocalSyncHandlers(wm)
 })
@@ -164,18 +203,7 @@ describe('local sync IPC', () => {
   })
 
   it('rejects overlapping selected directories', async () => {
-    mockReadFile.mockResolvedValue(
-      JSON.stringify([
-        {
-          id: CONNECTION_ID,
-          rootPath: '/Users/tester/Documents/Sermons',
-          rootName: 'Sermons',
-          displayName: 'Sermons',
-          createdAt: 1,
-          updatedAt: 1
-        }
-      ])
-    )
+    mockReadFile.mockResolvedValue(storedConnectionJson('/Users/tester/Documents/Sermons'))
     mockShowOpenDialog.mockResolvedValue({
       canceled: false,
       filePaths: ['/Users/tester/Documents/Sermons/Archive']
@@ -196,18 +224,7 @@ describe('local sync IPC', () => {
   })
 
   it('scans a connected folder without returning absolute paths', async () => {
-    mockReadFile.mockResolvedValue(
-      JSON.stringify([
-        {
-          id: CONNECTION_ID,
-          rootPath: '/Volumes/Media/Sermons',
-          rootName: 'Sermons',
-          displayName: 'Sermons',
-          createdAt: 1,
-          updatedAt: 1
-        }
-      ])
-    )
+    mockReadFile.mockResolvedValue(storedConnectionJson())
     mockReaddir.mockImplementation(async (path: string) => {
       if (path === '/Volumes/Media/Sermons') return [dir('Sunday'), file('intro.mp4')]
       if (path === '/Volumes/Media/Sermons/Sunday') return [file('message.mkv')]
@@ -243,18 +260,7 @@ describe('local sync IPC', () => {
   })
 
   it('rejects scans when the connected root is no longer a directory', async () => {
-    mockReadFile.mockResolvedValue(
-      JSON.stringify([
-        {
-          id: CONNECTION_ID,
-          rootPath: '/Volumes/Media/Sermons',
-          rootName: 'Sermons',
-          displayName: 'Sermons',
-          createdAt: 1,
-          updatedAt: 1
-        }
-      ])
-    )
+    mockReadFile.mockResolvedValue(storedConnectionJson())
     mockStat.mockResolvedValueOnce({
       isDirectory: () => false,
       isFile: () => true,
@@ -268,18 +274,7 @@ describe('local sync IPC', () => {
   })
 
   it('skips symlinks and unreadable descendants without aborting the scan', async () => {
-    mockReadFile.mockResolvedValue(
-      JSON.stringify([
-        {
-          id: CONNECTION_ID,
-          rootPath: '/Volumes/Media/Sermons',
-          rootName: 'Sermons',
-          displayName: 'Sermons',
-          createdAt: 1,
-          updatedAt: 1
-        }
-      ])
-    )
+    mockReadFile.mockResolvedValue(storedConnectionJson())
     mockReaddir.mockImplementation(async (path: string) => {
       if (path === '/Volumes/Media/Sermons') {
         return [
@@ -322,5 +317,114 @@ describe('local sync IPC', () => {
         expect.objectContaining({ name: 'Link' })
       ])
     )
+  })
+
+  it('starts a recursive watcher without exposing the root path', async () => {
+    mockReadFile.mockResolvedValue(storedConnectionJson())
+    const { watcher } = makeWatcher()
+    mockWatch.mockReturnValueOnce(watcher)
+
+    const result = await getHandler('local-sync:start-watch')(makeEvent(), CONNECTION_ID)
+
+    expect(result).toMatchObject({
+      connectionId: CONNECTION_ID,
+      state: 'watching'
+    })
+    expect(JSON.stringify(result)).not.toContain('/Volumes/Media/Sermons')
+    expect(mockWatch).toHaveBeenCalledWith(
+      '/Volumes/Media/Sermons',
+      { recursive: true },
+      expect.any(Function)
+    )
+  })
+
+  it('debounces watcher changes into a rescan status and clears it after scan', async () => {
+    vi.useFakeTimers()
+    mockReadFile.mockResolvedValue(storedConnectionJson())
+    mockReaddir.mockResolvedValue([])
+    const { watcher } = makeWatcher()
+    const watchCallbacks: Array<(eventType: string) => void> = []
+    mockWatch.mockImplementationOnce(
+      (_path: string, _options: unknown, callback: (eventType: string) => void) => {
+        watchCallbacks.push(callback)
+        return watcher
+      }
+    )
+
+    await getHandler('local-sync:start-watch')(makeEvent(), CONNECTION_ID)
+    expect(watchCallbacks).toHaveLength(1)
+    watchCallbacks[0]('rename')
+    watchCallbacks[0]('change')
+    expect(
+      await getHandler('local-sync:get-watch-status')(makeEvent(), CONNECTION_ID)
+    ).toMatchObject({
+      state: 'watching'
+    })
+
+    await vi.advanceTimersByTimeAsync(500)
+    expect(
+      await getHandler('local-sync:get-watch-status')(makeEvent(), CONNECTION_ID)
+    ).toMatchObject({
+      state: 'rescan-needed',
+      reason: 'change'
+    })
+
+    await getHandler('local-sync:scan-folder')(makeEvent(), CONNECTION_ID)
+    expect(
+      await getHandler('local-sync:get-watch-status')(makeEvent(), CONNECTION_ID)
+    ).toMatchObject({
+      state: 'watching'
+    })
+  })
+
+  it('marks watcher limit errors as overflow rescan', async () => {
+    mockReadFile.mockResolvedValue(storedConnectionJson())
+    const { watcher, emitError } = makeWatcher()
+    mockWatch.mockReturnValueOnce(watcher)
+
+    await getHandler('local-sync:start-watch')(makeEvent(), CONNECTION_ID)
+    emitError(Object.assign(new Error('watch limit'), { code: 'ENOSPC' }))
+
+    expect(
+      await getHandler('local-sync:get-watch-status')(makeEvent(), CONNECTION_ID)
+    ).toMatchObject({
+      state: 'overflow-rescan',
+      reason: 'overflow'
+    })
+  })
+
+  it('stops and closes an active watcher', async () => {
+    mockReadFile.mockResolvedValue(storedConnectionJson())
+    const { watcher } = makeWatcher()
+    mockWatch.mockReturnValueOnce(watcher)
+
+    await getHandler('local-sync:start-watch')(makeEvent(), CONNECTION_ID)
+    const result = await getHandler('local-sync:stop-watch')(makeEvent(), CONNECTION_ID)
+
+    expect(watcher.close).toHaveBeenCalledOnce()
+    expect(result).toMatchObject({ state: 'idle' })
+  })
+
+  it('scans files larger than 2 GiB as metadata without file content', async () => {
+    mockReadFile.mockResolvedValue(storedConnectionJson())
+    mockReaddir.mockResolvedValue([file('archive.mov')])
+    mockStat.mockImplementation(async (path: string) => {
+      if (path === '/Volumes/Media/Sermons') {
+        return { isDirectory: () => true, isFile: () => false, size: 0, mtimeMs: 1 }
+      }
+      return { isDirectory: () => false, isFile: () => true, size: 3 * 1024 ** 3, mtimeMs: 10 }
+    })
+
+    const result = await getHandler('local-sync:scan-folder')(makeEvent(), CONNECTION_ID)
+
+    expect(result).toEqual([
+      expect.objectContaining({
+        kind: 'file',
+        name: 'archive.mov',
+        size: 3 * 1024 ** 3,
+        etag: `${10}:${3 * 1024 ** 3}`
+      })
+    ])
+    expect(JSON.stringify(result)).not.toContain('/Volumes/Media/Sermons/archive.mov')
   })
 })
