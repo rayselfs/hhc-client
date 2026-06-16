@@ -18,6 +18,10 @@ import {
   type MediaStorageAccountingReport,
   type MediaStorageUsage
 } from '@renderer/lib/media-storage-accounting'
+import {
+  clearRegenerableDerivedAssets,
+  removeUnusedDerivedAssets
+} from '@renderer/lib/media-storage-cleanup'
 import type { FfmpegConfigInfo } from '@shared/ipc-channels'
 import type { SyncOfflinePolicy } from '@shared/types/folder'
 
@@ -54,6 +58,7 @@ export default function MediaSettings(): React.JSX.Element {
   const [oneDriveDraft, setOneDriveDraft] = useState<OneDriveSettings>(oneDrive)
   const [storageReport, setStorageReport] = useState<MediaStorageAccountingReport | null>(null)
   const [isLoadingStorage, setIsLoadingStorage] = useState(false)
+  const [isCleaningStorage, setIsCleaningStorage] = useState(false)
   const canConfigureFfmpeg = isElectron()
   const effectiveOneDriveClientId = getEffectiveOneDriveClientId(oneDriveDraft)
   const customClientIdValid =
@@ -91,6 +96,16 @@ export default function MediaSettings(): React.JSX.Element {
       if (result) setFfmpegConfig(result)
     } finally {
       setIsCheckingFfmpeg(false)
+    }
+  }
+
+  async function runStorageCleanup(action: () => Promise<unknown>): Promise<void> {
+    setIsCleaningStorage(true)
+    try {
+      await action()
+      await refreshStorageReport()
+    } finally {
+      setIsCleaningStorage(false)
     }
   }
 
@@ -361,6 +376,26 @@ export default function MediaSettings(): React.JSX.Element {
             })}
           </div>
         )}
+
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="secondary"
+            className="rounded-full"
+            isDisabled={isCleaningStorage}
+            onPress={() => void runStorageCleanup(removeUnusedDerivedAssets)}
+          >
+            {t('preferences.media.storage.removeOrphans')}
+          </Button>
+          <Button
+            variant="secondary"
+            className="rounded-full"
+            isDisabled={isCleaningStorage}
+            onPress={() => void runStorageCleanup(clearRegenerableDerivedAssets)}
+          >
+            {t('preferences.media.storage.clearRegenerable')}
+          </Button>
+        </div>
+        <p className="text-xs text-gray-500">{t('preferences.media.storage.cleanupHint')}</p>
       </section>
     </div>
   )
