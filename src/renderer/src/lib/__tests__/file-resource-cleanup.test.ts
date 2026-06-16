@@ -24,7 +24,8 @@ vi.mock('@renderer/lib/thumbnail-db', () => ({
 }))
 
 vi.mock('@renderer/lib/media-work-db', () => ({
-  deleteDerivedAssetsForSource: mockDeleteDerivedAssets
+  deleteDerivedAssetsForSource: mockDeleteDerivedAssets,
+  listMediaJobs: vi.fn(async () => [])
 }))
 
 import { cleanupFileResources, purgeExpiredFileTrash } from '../file-resource-cleanup'
