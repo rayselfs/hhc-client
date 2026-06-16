@@ -10,8 +10,17 @@ interface StoredLocalSyncConnection extends LocalSyncConnectionInfo {
   rootPath: string
 }
 
+interface LocalSyncDirent {
+  name: string
+  isDirectory: () => boolean
+  isFile: () => boolean
+  isSymbolicLink: () => boolean
+}
+
 const CONFIG_FILE_NAME = 'local-sync-connections.json'
 const MAX_SCAN_ITEMS = 10_000
+const CONNECTION_ID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 function getConfigPath(): string {
   return join(app.getPath('userData'), CONFIG_FILE_NAME)
@@ -35,6 +44,7 @@ async function readConnections(): Promise<StoredLocalSyncConnection[]> {
     return parsed.filter(
       (connection) =>
         typeof connection.id === 'string' &&
+        isValidConnectionId(connection.id) &&
         typeof connection.rootPath === 'string' &&
         typeof connection.displayName === 'string'
     )
@@ -50,6 +60,10 @@ async function writeConnections(connections: StoredLocalSyncConnection[]): Promi
   await fs.mkdir(dirname(configPath), { recursive: true })
   await fs.writeFile(temporaryPath, JSON.stringify(connections, null, 2), 'utf8')
   await fs.rename(temporaryPath, configPath)
+}
+
+function isValidConnectionId(value: string): boolean {
+  return CONNECTION_ID_PATTERN.test(value)
 }
 
 function isSameOrNested(candidate: string, existing: string): boolean {
@@ -89,8 +103,18 @@ async function validateSelectedDirectory(
   return rootPath
 }
 
+async function validateConnectedDirectory(rootPath: string): Promise<void> {
+  const stat = await fs.stat(rootPath)
+  if (!stat.isDirectory()) throw new Error('Local sync directory is unavailable')
+}
+
 function remoteIdForRelativePath(relativePath: string): string {
   return Buffer.from(relativePath || '.').toString('base64url')
+}
+
+function isRecoverableScanError(error: unknown): boolean {
+  const code = (error as NodeJS.ErrnoException).code
+  return code === 'EACCES' || code === 'EPERM' || code === 'ENOENT' || code === 'ENOTDIR'
 }
 
 async function scanDirectory(
@@ -100,7 +124,13 @@ async function scanDirectory(
   items: LocalSyncRemoteItem[] = []
 ): Promise<LocalSyncRemoteItem[]> {
   if (items.length >= MAX_SCAN_ITEMS) return items
-  const entries = await fs.readdir(currentPath, { withFileTypes: true })
+  let entries: LocalSyncDirent[]
+  try {
+    entries = await fs.readdir(currentPath, { withFileTypes: true })
+  } catch (error) {
+    if (currentPath !== rootPath && isRecoverableScanError(error)) return items
+    throw error
+  }
   for (const entry of entries) {
     if (items.length >= MAX_SCAN_ITEMS) break
     if (entry.isSymbolicLink()) continue
@@ -116,7 +146,13 @@ async function scanDirectory(
       })
       await scanDirectory(rootPath, fullPath, remoteItemId, items)
     } else if (entry.isFile()) {
-      const stat = await fs.stat(fullPath)
+      let stat: Awaited<ReturnType<typeof fs.stat>>
+      try {
+        stat = await fs.stat(fullPath)
+      } catch (error) {
+        if (isRecoverableScanError(error)) continue
+        throw error
+      }
       items.push({
         remoteItemId,
         parentRemoteItemId,
@@ -166,11 +202,14 @@ export function registerLocalSyncHandlers(wm: WindowManager): void {
     'local-sync:scan-folder',
     async (event, connectionId: unknown): Promise<LocalSyncRemoteItem[]> => {
       if (!isMainWindow(wm, event)) throw new Error('Unauthorized local sync access')
-      if (typeof connectionId !== 'string') throw new Error('Invalid local sync connection id')
+      if (typeof connectionId !== 'string' || !isValidConnectionId(connectionId)) {
+        throw new Error('Invalid local sync connection id')
+      }
       const connection = (await readConnections()).find(
         (candidate) => candidate.id === connectionId
       )
       if (!connection) throw new Error('Local sync connection not found')
+      await validateConnectedDirectory(connection.rootPath)
       return scanDirectory(connection.rootPath)
     }
   )
@@ -179,7 +218,9 @@ export function registerLocalSyncHandlers(wm: WindowManager): void {
     'local-sync:disconnect-folder',
     async (event, connectionId: unknown): Promise<void> => {
       if (!isMainWindow(wm, event)) throw new Error('Unauthorized local sync access')
-      if (typeof connectionId !== 'string') throw new Error('Invalid local sync connection id')
+      if (typeof connectionId !== 'string' || !isValidConnectionId(connectionId)) {
+        throw new Error('Invalid local sync connection id')
+      }
       const connections = await readConnections()
       await writeConnections(connections.filter((connection) => connection.id !== connectionId))
     }

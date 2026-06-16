@@ -70,6 +70,7 @@ import type { WindowManager } from '../../windowManager'
 import { registerLocalSyncHandlers } from '../../ipc/local-sync'
 
 const wm = mockWindowManager as unknown as WindowManager
+const CONNECTION_ID = '11111111-1111-4111-8111-111111111111'
 
 function makeEvent(): Electron.IpcMainInvokeEvent {
   return { sender: {} } as Electron.IpcMainInvokeEvent
@@ -106,6 +107,20 @@ function file(name: string): {
     isDirectory: () => false,
     isFile: () => true,
     isSymbolicLink: () => false
+  }
+}
+
+function symlink(name: string): {
+  name: string
+  isDirectory: () => boolean
+  isFile: () => boolean
+  isSymbolicLink: () => boolean
+} {
+  return {
+    name,
+    isDirectory: () => false,
+    isFile: () => false,
+    isSymbolicLink: () => true
   }
 }
 
@@ -152,7 +167,7 @@ describe('local sync IPC', () => {
     mockReadFile.mockResolvedValue(
       JSON.stringify([
         {
-          id: 'connection-1',
+          id: CONNECTION_ID,
           rootPath: '/Users/tester/Documents/Sermons',
           rootName: 'Sermons',
           displayName: 'Sermons',
@@ -184,7 +199,7 @@ describe('local sync IPC', () => {
     mockReadFile.mockResolvedValue(
       JSON.stringify([
         {
-          id: 'connection-1',
+          id: CONNECTION_ID,
           rootPath: '/Volumes/Media/Sermons',
           rootName: 'Sermons',
           displayName: 'Sermons',
@@ -198,14 +213,14 @@ describe('local sync IPC', () => {
       if (path === '/Volumes/Media/Sermons/Sunday') return [file('message.mkv')]
       return []
     })
-    mockStat.mockResolvedValue({
-      isDirectory: () => false,
-      isFile: () => true,
-      size: 2048,
-      mtimeMs: 5
+    mockStat.mockImplementation(async (path: string) => {
+      if (path === '/Volumes/Media/Sermons') {
+        return { isDirectory: () => true, isFile: () => false, size: 0, mtimeMs: 1 }
+      }
+      return { isDirectory: () => false, isFile: () => true, size: 2048, mtimeMs: 5 }
     })
 
-    const result = await getHandler('local-sync:scan-folder')(makeEvent(), 'connection-1')
+    const result = await getHandler('local-sync:scan-folder')(makeEvent(), CONNECTION_ID)
 
     expect(result).toEqual(
       expect.arrayContaining([
@@ -215,5 +230,97 @@ describe('local sync IPC', () => {
       ])
     )
     expect(JSON.stringify(result)).not.toContain('/Volumes/Media/Sermons')
+  })
+
+  it('rejects invalid connection ids before reading stored local sync paths', async () => {
+    await expect(getHandler('local-sync:scan-folder')(makeEvent(), '../escape')).rejects.toThrow(
+      'Invalid local sync connection id'
+    )
+    await expect(
+      getHandler('local-sync:disconnect-folder')(makeEvent(), 'not-a-uuid')
+    ).rejects.toThrow('Invalid local sync connection id')
+    expect(mockReadFile).not.toHaveBeenCalled()
+  })
+
+  it('rejects scans when the connected root is no longer a directory', async () => {
+    mockReadFile.mockResolvedValue(
+      JSON.stringify([
+        {
+          id: CONNECTION_ID,
+          rootPath: '/Volumes/Media/Sermons',
+          rootName: 'Sermons',
+          displayName: 'Sermons',
+          createdAt: 1,
+          updatedAt: 1
+        }
+      ])
+    )
+    mockStat.mockResolvedValueOnce({
+      isDirectory: () => false,
+      isFile: () => true,
+      size: 0,
+      mtimeMs: 1
+    })
+
+    await expect(getHandler('local-sync:scan-folder')(makeEvent(), CONNECTION_ID)).rejects.toThrow(
+      'Local sync directory is unavailable'
+    )
+  })
+
+  it('skips symlinks and unreadable descendants without aborting the scan', async () => {
+    mockReadFile.mockResolvedValue(
+      JSON.stringify([
+        {
+          id: CONNECTION_ID,
+          rootPath: '/Volumes/Media/Sermons',
+          rootName: 'Sermons',
+          displayName: 'Sermons',
+          createdAt: 1,
+          updatedAt: 1
+        }
+      ])
+    )
+    mockReaddir.mockImplementation(async (path: string) => {
+      if (path === '/Volumes/Media/Sermons') {
+        return [
+          dir('Readable'),
+          dir('Private'),
+          file('intro.mp4'),
+          file('missing.mp4'),
+          symlink('Link')
+        ]
+      }
+      if (path === '/Volumes/Media/Sermons/Readable') return [file('message.mp4')]
+      if (path === '/Volumes/Media/Sermons/Private') {
+        throw Object.assign(new Error('denied'), { code: 'EACCES' })
+      }
+      return []
+    })
+    mockStat.mockImplementation(async (path: string) => {
+      if (path === '/Volumes/Media/Sermons') {
+        return { isDirectory: () => true, isFile: () => false, size: 0, mtimeMs: 1 }
+      }
+      if (path.endsWith('missing.mp4')) {
+        throw Object.assign(new Error('missing'), { code: 'ENOENT' })
+      }
+      return { isDirectory: () => false, isFile: () => true, size: 2048, mtimeMs: 5 }
+    })
+
+    const result = await getHandler('local-sync:scan-folder')(makeEvent(), CONNECTION_ID)
+
+    expect(result).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: 'folder', name: 'Readable' }),
+        expect.objectContaining({ kind: 'folder', name: 'Private' }),
+        expect.objectContaining({ kind: 'file', name: 'intro.mp4' }),
+        expect.objectContaining({ kind: 'file', name: 'message.mp4' })
+      ])
+    )
+    expect(result).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'missing.mp4' }),
+        expect.objectContaining({ name: 'Link' })
+      ])
+    )
   })
 })
