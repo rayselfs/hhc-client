@@ -96,6 +96,20 @@ export interface OneDriveCredentialStatus {
   scope?: string
 }
 
+export interface OneDriveNativeDownloadRequest {
+  remoteItemId: string
+  targetFileId: string
+  accessToken: string
+  expectedSize?: number
+  mimeType?: string
+}
+
+export interface OneDriveNativeDownloadResult {
+  fileId: string
+  size: number
+  mimeType?: string
+}
+
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
 
@@ -152,6 +166,10 @@ export interface IpcInvokeMap {
   'onedrive:save-credentials': { args: [OneDriveCredentialInput]; result: OneDriveCredentialStatus }
   'onedrive:get-credential-status': { args: [string]; result: OneDriveCredentialStatus }
   'onedrive:delete-credentials': { args: [string]; result: void }
+  'onedrive:download-file': {
+    args: [OneDriveNativeDownloadRequest]
+    result: OneDriveNativeDownloadResult
+  }
 }
 
 export type IpcInvokeChannel = keyof IpcInvokeMap

@@ -131,7 +131,9 @@ const oneDriveApi = {
   getCredentialStatus: (connectionId: string) =>
     typedInvoke('onedrive:get-credential-status', connectionId),
   deleteCredentials: (connectionId: string) =>
-    typedInvoke('onedrive:delete-credentials', connectionId)
+    typedInvoke('onedrive:delete-credentials', connectionId),
+  downloadFile: (request: IpcInvokeMap['onedrive:download-file']['args'][0]) =>
+    typedInvoke('onedrive:download-file', request)
 }
 
 const api = {

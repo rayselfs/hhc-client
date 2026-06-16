@@ -10,6 +10,7 @@ import { registerNativeFsHandlers, registerNativeMediaProtocol } from './ipc/nat
 import { registerVideoTranscodeHandlers } from './ipc/video-transcode'
 import { registerLocalSyncHandlers } from './ipc/local-sync'
 import { registerOneDriveCredentialHandlers } from './ipc/onedrive-credentials'
+import { registerOneDriveDownloadHandlers } from './ipc/onedrive-download'
 import { isKnownWindow, validateTheme } from './ipc/validate'
 import { registerUpdateService } from './updateService'
 
@@ -77,6 +78,7 @@ app.whenReady().then(() => {
   registerVideoTranscodeHandlers(wm)
   registerLocalSyncHandlers(wm)
   registerOneDriveCredentialHandlers(wm)
+  registerOneDriveDownloadHandlers(wm)
   registerNativeMediaProtocol()
   wm.createMainWindow()
   wm.createProjectionWindow()

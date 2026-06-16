@@ -11,7 +11,9 @@ import type {
   LocalSyncConnectionInfo,
   LocalSyncRemoteItem,
   OneDriveCredentialInput,
-  OneDriveCredentialStatus
+  OneDriveCredentialStatus,
+  OneDriveNativeDownloadRequest,
+  OneDriveNativeDownloadResult
 } from '../shared/ipc-channels'
 import type {
   TimerCommand,
@@ -103,6 +105,7 @@ interface OneDriveAPI {
   saveCredentials: (input: OneDriveCredentialInput) => Promise<OneDriveCredentialStatus>
   getCredentialStatus: (connectionId: string) => Promise<OneDriveCredentialStatus>
   deleteCredentials: (connectionId: string) => Promise<void>
+  downloadFile: (request: OneDriveNativeDownloadRequest) => Promise<OneDriveNativeDownloadResult>
 }
 
 declare global {
