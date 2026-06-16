@@ -14,8 +14,9 @@ import { mediaJobQueue } from '@renderer/lib/media-job-queue'
 import { getFileBlob, getFileSource, openFileExplorerDB } from '@renderer/lib/file-explorer-db'
 import { resolveUniqueName } from '@renderer/lib/file-naming'
 import { enqueueTranscodeJob } from '@renderer/lib/media-transcode-lifecycle'
+import { MAX_FILE_SIZE_WEB } from '@renderer/lib/media-limits'
 
-export const MAX_FILE_SIZE_WEB = 2 * 1024 * 1024 * 1024
+export { MAX_FILE_SIZE_WEB }
 
 interface UploadCandidate {
   file: File
