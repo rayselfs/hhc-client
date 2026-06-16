@@ -191,6 +191,8 @@ function formatSearchFileSize(bytes: number | undefined): string {
 
 const SEARCH_COL = { created: 90, size: 72, kind: 96, path: 200 }
 const EMPTY_ARRAY: never[] = []
+const SLOW_CLICK_RENAME_MIN_MS = 320
+const SLOW_CLICK_RENAME_MAX_MS = 1200
 
 function SearchResultsList({
   results,
@@ -667,7 +669,7 @@ export function FileBrowser({
       slowClickRef.current = { itemId, at: now }
       const item = sortedItems.find((entry) => entry.id === itemId)
       if (!item || item.isFolder) return
-      if (elapsed >= 500 && elapsed <= 1200) {
+      if (elapsed >= SLOW_CLICK_RENAME_MIN_MS && elapsed <= SLOW_CLICK_RENAME_MAX_MS) {
         setRenamingItemId(itemId)
       }
     },
