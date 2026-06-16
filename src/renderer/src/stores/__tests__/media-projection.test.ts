@@ -47,7 +47,8 @@ beforeEach(() => {
     isEnded: false,
     showGrid: false,
     typeStates: { pdf: { viewMode: 'slide' } },
-    zoomLevel: 1
+    zoomLevel: 1,
+    snapshot: null
   })
 })
 
@@ -58,6 +59,22 @@ describe('startPresentation', () => {
     expect(s.playlist).toEqual(files)
     expect(s.currentIndex).toBe(2)
     expect(s.isPresenting).toBe(true)
+  })
+
+  it('creates an immutable presentation snapshot', () => {
+    const playlist = [makeFile('copy-id', 'Original.png')]
+    playlist[0].url = 'blob:source-blob'
+
+    useMediaProjectionStore.getState().startPresentation(playlist, 0)
+    playlist[0].name = 'Renamed.png'
+    playlist[0].url = 'blob:other-blob'
+
+    expect(useMediaProjectionStore.getState().snapshot?.entries[0]).toMatchObject({
+      itemId: 'copy-id',
+      blobId: 'source-blob',
+      name: 'Original.png',
+      sourceUrl: 'blob:source-blob'
+    })
   })
 })
 
@@ -70,6 +87,7 @@ describe('exit', () => {
     expect(s.playlist).toEqual([])
     expect(s.currentIndex).toBe(0)
     expect(s.showGrid).toBe(false)
+    expect(s.snapshot).toBeNull()
   })
 
   it('releases source blobs locked by the active playlist', () => {

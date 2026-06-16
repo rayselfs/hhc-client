@@ -4,6 +4,10 @@ import type { MediaType, MediaTypeStateMap } from '@renderer/lib/presentability'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { getBlobId } from '@renderer/lib/blob-identity'
 import { lockMediaResources } from '@renderer/lib/media-resource-locks'
+import {
+  createPresentationSnapshot,
+  type PresentationSnapshot
+} from '@renderer/lib/presentation-readiness'
 
 export interface MediaProjectionStore {
   playlist: FileItemRecord[]
@@ -11,6 +15,7 @@ export interface MediaProjectionStore {
   isPresenting: boolean
   isEnded: boolean
   showGrid: boolean
+  snapshot: PresentationSnapshot | null
   typeStates: Partial<{ [K in MediaType]: MediaTypeStateMap[K] }>
   zoomLevel: number
   pan: { x: number; y: number }
@@ -46,6 +51,7 @@ const initialState = {
   isPresenting: false,
   isEnded: false,
   showGrid: false,
+  snapshot: null as PresentationSnapshot | null,
   typeStates: initialTypeStates,
   zoomLevel: 1,
   pan: { x: 0, y: 0 }
@@ -94,6 +100,7 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
       playlist: files,
       currentIndex: startIndex,
       isPresenting: true,
+      snapshot: createPresentationSnapshot(files),
       typeStates: initialTypeStates
     })
   },

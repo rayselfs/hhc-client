@@ -1,0 +1,189 @@
+import type { FileItemRecord } from '@shared/types/folder'
+import { getBlobId } from './blob-identity'
+import { isElectron } from './env'
+import { getDerivedAsset } from './media-work-db'
+import { TRANSCODE_COMPATIBILITY_PROFILE } from './media-transcode-lifecycle'
+import {
+  getMediaSupport,
+  resolveMediaCapability,
+  type MediaPlatform,
+  type MediaSupportMode
+} from './media-capabilities'
+
+export type PresentationReadinessStatus =
+  | 'ready'
+  | 'preparing'
+  | 'unsupported'
+  | 'missing'
+  | 'failed'
+
+export interface PresentationReadiness {
+  ready: number
+  preparing: number
+  unsupported: number
+  missing: number
+  failed: number
+}
+
+export interface PresentationReadinessItem {
+  itemId: string
+  blobId: string | null
+  status: PresentationReadinessStatus
+  reason: string
+  support: MediaSupportMode | null
+  derivativeId?: string
+}
+
+export interface PresentationReadinessReport {
+  summary: PresentationReadiness
+  items: PresentationReadinessItem[]
+}
+
+export interface PresentationSnapshotEntry {
+  index: number
+  itemId: string
+  blobId: string
+  name: string
+  mimeType: string
+  sourceUrl: string
+  derivativeId?: string
+}
+
+export interface PresentationSnapshot {
+  id: string
+  createdAt: number
+  entries: PresentationSnapshotEntry[]
+}
+
+export function getPresentationPlatform(): MediaPlatform {
+  return isElectron() ? 'electron' : 'web'
+}
+
+export function createPresentationSnapshot(
+  items: FileItemRecord[],
+  readinessItems: PresentationReadinessItem[] = []
+): PresentationSnapshot {
+  const readinessByItemId = new Map(readinessItems.map((item) => [item.itemId, item]))
+  return {
+    id: crypto.randomUUID(),
+    createdAt: Date.now(),
+    entries: items.map((item, index) => ({
+      index,
+      itemId: item.id,
+      blobId: getBlobId(item),
+      name: item.name,
+      mimeType: item.mimeType,
+      sourceUrl: item.url,
+      derivativeId: readinessByItemId.get(item.id)?.derivativeId
+    }))
+  }
+}
+
+export async function analyzePresentationReadiness(
+  items: FileItemRecord[],
+  platform: MediaPlatform = getPresentationPlatform()
+): Promise<PresentationReadinessReport> {
+  const report: PresentationReadinessReport = {
+    summary: {
+      ready: 0,
+      preparing: 0,
+      unsupported: 0,
+      missing: 0,
+      failed: 0
+    },
+    items: []
+  }
+
+  for (const item of items) {
+    const result = await analyzePresentationItem(item, platform)
+    report.items.push(result)
+    report.summary[result.status] += 1
+  }
+
+  return report
+}
+
+async function analyzePresentationItem(
+  item: FileItemRecord,
+  platform: MediaPlatform
+): Promise<PresentationReadinessItem> {
+  const blobId = getBlobId(item)
+  if (!item.url || !blobId) {
+    return {
+      itemId: item.id,
+      blobId: null,
+      status: 'missing',
+      reason: 'missing-source',
+      support: null
+    }
+  }
+
+  const capability = resolveMediaCapability({ mimeType: item.mimeType, fileName: item.name })
+  if (!capability) {
+    return {
+      itemId: item.id,
+      blobId,
+      status: 'unsupported',
+      reason: 'unsupported-media',
+      support: null
+    }
+  }
+
+  const support = getMediaSupport(capability, platform)
+  if (support === 'unsupported') {
+    return {
+      itemId: item.id,
+      blobId,
+      status: 'unsupported',
+      reason: 'unsupported-platform',
+      support
+    }
+  }
+
+  if (support === 'transcode-required') {
+    const derivative = await getDerivedAsset(
+      blobId,
+      'transcoded-video',
+      TRANSCODE_COMPATIBILITY_PROFILE.variant
+    )
+
+    if (derivative?.status === 'ready' && derivative.nativeFileId) {
+      return {
+        itemId: item.id,
+        blobId,
+        status: 'ready',
+        reason: 'ready-transcoded-derivative',
+        support,
+        derivativeId: derivative.id
+      }
+    }
+
+    if (derivative?.status === 'failed') {
+      return {
+        itemId: item.id,
+        blobId,
+        status: 'failed',
+        reason: 'transcode-failed',
+        support,
+        derivativeId: derivative.id
+      }
+    }
+
+    return {
+      itemId: item.id,
+      blobId,
+      status: 'preparing',
+      reason: 'transcode-required',
+      support,
+      derivativeId: derivative?.id
+    }
+  }
+
+  return {
+    itemId: item.id,
+    blobId,
+    status: 'ready',
+    reason: 'ready-native',
+    support
+  }
+}
