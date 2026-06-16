@@ -4,19 +4,35 @@ import { Button } from '@heroui/react/button'
 import { Select } from '@heroui/react/select'
 import { ListBox } from '@heroui/react/list-box'
 import { Label } from 'react-aria-components'
-import { useSettingsStore } from '@renderer/stores/settings'
+import {
+  DEFAULT_ONEDRIVE,
+  getEffectiveOneDriveClientId,
+  HHC_DEFAULT_ONEDRIVE_CLIENT_ID,
+  useSettingsStore,
+  validateOneDriveClientId,
+  type OneDriveSettings
+} from '@renderer/stores/settings'
 import { isElectron } from '@renderer/lib/env'
 import type { FfmpegConfigInfo } from '@shared/ipc-channels'
+import type { SyncOfflinePolicy } from '@shared/types/folder'
 
 const RETENTION_DAY_OPTIONS = [7, 14, 30, 60, 90, 0] as const
+const OFFLINE_POLICY_OPTIONS: SyncOfflinePolicy[] = ['online-only', 'on-demand', 'always-offline']
 
 export default function MediaSettings(): React.JSX.Element {
   const { t } = useTranslation()
   const trashRetentionDays = useSettingsStore((s) => s.trashRetentionDays)
   const setTrashRetentionDays = useSettingsStore((s) => s.setTrashRetentionDays)
+  const oneDrive = useSettingsStore((s) => s.oneDrive)
+  const setOneDrive = useSettingsStore((s) => s.setOneDrive)
   const [ffmpegConfig, setFfmpegConfig] = useState<FfmpegConfigInfo>({ status: 'not-configured' })
   const [isCheckingFfmpeg, setIsCheckingFfmpeg] = useState(false)
+  const [oneDriveDraft, setOneDriveDraft] = useState<OneDriveSettings>(oneDrive)
   const canConfigureFfmpeg = isElectron()
+  const effectiveOneDriveClientId = getEffectiveOneDriveClientId(oneDriveDraft)
+  const customClientIdValid =
+    oneDriveDraft.customClientId.trim().length === 0 ||
+    validateOneDriveClientId(oneDriveDraft.customClientId)
 
   useEffect(() => {
     if (!canConfigureFfmpeg) return
@@ -37,6 +53,11 @@ export default function MediaSettings(): React.JSX.Element {
     } finally {
       setIsCheckingFfmpeg(false)
     }
+  }
+
+  function saveOneDriveDraft(next: OneDriveSettings): void {
+    setOneDriveDraft(next)
+    setOneDrive(next)
   }
 
   return (
@@ -68,6 +89,105 @@ export default function MediaSettings(): React.JSX.Element {
         </Select.Popover>
       </Select>
       <p className="text-xs text-gray-500">{t('preferences.trash.retentionDesc')}</p>
+
+      <section className="space-y-3 rounded-2xl border border-default-200 p-4">
+        <div>
+          <h3 className="text-sm font-semibold">{t('preferences.media.oneDrive.title')}</h3>
+          <p className="mt-1 text-xs text-gray-500">
+            {t('preferences.media.oneDrive.description')}
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <label className="block text-sm font-medium">
+            {t('preferences.media.oneDrive.clientId')}
+          </label>
+          <input
+            value={oneDriveDraft.customClientId}
+            onChange={(event) =>
+              setOneDriveDraft({ ...oneDriveDraft, customClientId: event.target.value })
+            }
+            onBlur={() => {
+              if (customClientIdValid) saveOneDriveDraft(oneDriveDraft)
+            }}
+            placeholder={HHC_DEFAULT_ONEDRIVE_CLIENT_ID}
+            className="w-full rounded-full border border-default-200 bg-transparent px-4 py-2 text-sm"
+            aria-invalid={!customClientIdValid}
+          />
+          <p className="text-xs text-gray-500">
+            {oneDriveDraft.customClientId.trim()
+              ? t('preferences.media.oneDrive.clientIdSourceCustom')
+              : t('preferences.media.oneDrive.clientIdSourceDefault')}
+            : {effectiveOneDriveClientId}
+          </p>
+          {!customClientIdValid && (
+            <p className="text-xs text-danger-700">
+              {t('preferences.media.oneDrive.invalidClientId')}
+            </p>
+          )}
+          <Button
+            variant="secondary"
+            className="rounded-full"
+            onPress={() =>
+              saveOneDriveDraft({
+                ...oneDriveDraft,
+                customClientId: DEFAULT_ONEDRIVE.customClientId
+              })
+            }
+          >
+            {t('preferences.media.oneDrive.restoreDefaultClientId')}
+          </Button>
+        </div>
+
+        <Select
+          variant="secondary"
+          value={oneDriveDraft.defaultOfflinePolicy}
+          onChange={(key) =>
+            saveOneDriveDraft({
+              ...oneDriveDraft,
+              defaultOfflinePolicy: String(key) as SyncOfflinePolicy
+            })
+          }
+          aria-label={t('preferences.media.oneDrive.defaultOfflinePolicy')}
+        >
+          <Label>{t('preferences.media.oneDrive.defaultOfflinePolicy')}</Label>
+          <Select.Trigger className="rounded-full pl-5">
+            <Select.Value />
+            <Select.Indicator />
+          </Select.Trigger>
+          <Select.Popover>
+            <ListBox>
+              {OFFLINE_POLICY_OPTIONS.map((policy) => (
+                <ListBox.Item
+                  key={policy}
+                  id={policy}
+                  textValue={t(`preferences.media.oneDrive.offlinePolicies.${policy}`)}
+                  className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
+                >
+                  {t(`preferences.media.oneDrive.offlinePolicies.${policy}`)}
+                </ListBox.Item>
+              ))}
+            </ListBox>
+          </Select.Popover>
+        </Select>
+
+        <label className="block text-sm font-medium">
+          {t('preferences.media.oneDrive.cacheBudget')}
+          <input
+            type="number"
+            min={0}
+            value={oneDriveDraft.cacheBudgetMb}
+            onChange={(event) =>
+              saveOneDriveDraft({
+                ...oneDriveDraft,
+                cacheBudgetMb: Number(event.target.value)
+              })
+            }
+            className="mt-2 w-full rounded-full border border-default-200 bg-transparent px-4 py-2 text-sm"
+          />
+        </label>
+        <p className="text-xs text-gray-500">{t('preferences.media.oneDrive.setupHint')}</p>
+      </section>
 
       <section className="space-y-3 rounded-2xl border border-default-200 p-4">
         <div>

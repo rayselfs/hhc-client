@@ -548,6 +548,23 @@
       }
     },
     "media": {
+      "oneDrive": {
+        "title": "OneDrive",
+        "description": "OneDrive 資料夾是唯讀來源。HHC Client 不會上傳、重新命名、移動或刪除遠端檔案。",
+        "clientId": "Azure Application Client ID",
+        "clientIdSourceDefault": "使用 HHC 預設值",
+        "clientIdSourceCustom": "使用自訂 Client ID",
+        "invalidClientId": "請輸入有效的 Azure Application Client ID。",
+        "restoreDefaultClientId": "恢復預設 Client ID",
+        "defaultOfflinePolicy": "預設離線策略",
+        "offlinePolicies": {
+          "online-only": "僅線上",
+          "on-demand": "需要時下載",
+          "always-offline": "永遠離線可用"
+        },
+        "cacheBudget": "同步快取容量 (MB)",
+        "setupHint": "變更 Client ID 後需要重新連接 OneDrive。Token 會分開儲存，不會進入偏好設定。"
+      },
       "videoTranscoding": {
         "title": "影片轉檔",
         "description": "在 Electron 桌面版使用您指定的 FFmpeg 執行檔，將 AVI、MKV、WMV 準備成可投影格式。",

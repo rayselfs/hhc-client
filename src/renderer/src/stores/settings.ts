@@ -7,6 +7,7 @@ import { clearAllSiteData } from '@renderer/lib/site-data'
 import { isElectron } from '@renderer/lib/env'
 import { ThemePreference } from '@renderer/types/theme'
 import type { WhisperModel } from '@shared/ipc-channels'
+import type { SyncOfflinePolicy } from '@shared/types/folder'
 
 export const TIMEZONE_OPTIONS = [
   { value: 'Asia/Taipei', labelKey: 'timezones.taipei' },
@@ -63,6 +64,8 @@ const DEFAULT_TIMER_RING_COLOR = '#3b82f6'
 const DEFAULT_TIMER_RING_COLOR_ENABLED = false
 const DEFAULT_TRASH_RETENTION_DAYS = 30
 const DEFAULT_REMINDER_MODE = 'subtract'
+export const HHC_DEFAULT_ONEDRIVE_CLIENT_ID = '4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02'
+const DEFAULT_ONEDRIVE_CACHE_BUDGET_MB = 2048
 const RELOAD_DELAY_MS = 500
 
 export type SpeechProvider = 'azure' | 'gcp' | 'webSpeech' | 'whisper'
@@ -88,11 +91,31 @@ export interface SpeechSettings {
   whisper: WhisperSpeechConfig
 }
 
+export interface OneDriveSettings {
+  customClientId: string
+  defaultOfflinePolicy: SyncOfflinePolicy
+  cacheBudgetMb: number
+}
+
 export const DEFAULT_SPEECH: SpeechSettings = {
   activeProvider: 'azure',
   azure: { region: 'eastasia', language: 'zh-TW' },
   gcp: { language: 'cmn-Hant-TW' },
   whisper: { modelDir: '', installedModel: null }
+}
+
+export const DEFAULT_ONEDRIVE: OneDriveSettings = {
+  customClientId: '',
+  defaultOfflinePolicy: 'on-demand',
+  cacheBudgetMb: DEFAULT_ONEDRIVE_CACHE_BUDGET_MB
+}
+
+export function validateOneDriveClientId(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value.trim())
+}
+
+export function getEffectiveOneDriveClientId(settings: OneDriveSettings): string {
+  return settings.customClientId.trim() || HHC_DEFAULT_ONEDRIVE_CLIENT_ID
 }
 
 export interface SettingsStore {
@@ -102,6 +125,7 @@ export interface SettingsStore {
   timerRingColor: string
   timerRingColorEnabled: boolean
   speech: SpeechSettings
+  oneDrive: OneDriveSettings
   trashRetentionDays: number
   reminderMode: 'subtract' | 'add'
   setTimezone: (tz: string) => void
@@ -110,6 +134,7 @@ export interface SettingsStore {
   setTimerRingColor: (color: string) => void
   setTimerRingColorEnabled: (enabled: boolean) => void
   setSpeech: (settings: SpeechSettings) => void
+  setOneDrive: (settings: OneDriveSettings) => void
   setTrashRetentionDays: (days: number) => void
   setReminderMode: (mode: 'subtract' | 'add') => void
   resetToDefaults: () => void
@@ -124,6 +149,7 @@ export const useSettingsStore = create<SettingsStore>()(
       timerRingColor: DEFAULT_TIMER_RING_COLOR,
       timerRingColorEnabled: DEFAULT_TIMER_RING_COLOR_ENABLED,
       speech: DEFAULT_SPEECH,
+      oneDrive: DEFAULT_ONEDRIVE,
       trashRetentionDays: DEFAULT_TRASH_RETENTION_DAYS,
       reminderMode: DEFAULT_REMINDER_MODE,
 
@@ -145,6 +171,18 @@ export const useSettingsStore = create<SettingsStore>()(
 
       setSpeech: (settings: SpeechSettings) => {
         set({ speech: settings })
+      },
+
+      setOneDrive: (settings: OneDriveSettings) => {
+        const customClientId = settings.customClientId.trim()
+        if (customClientId && !validateOneDriveClientId(customClientId)) return
+        set({
+          oneDrive: {
+            customClientId,
+            defaultOfflinePolicy: settings.defaultOfflinePolicy,
+            cacheBudgetMb: Math.max(0, Math.floor(settings.cacheBudgetMb))
+          }
+        })
       },
 
       setTimerRingColorEnabled: (enabled: boolean) => {
@@ -172,7 +210,7 @@ export const useSettingsStore = create<SettingsStore>()(
     {
       name: createKey('settings'),
       storage: hhcPersistStorage,
-      version: 8,
+      version: 9,
       migrate: (persistedState, version) => {
         const state = persistedState as Record<string, unknown>
         if (version < 1) {
@@ -223,6 +261,9 @@ export const useSettingsStore = create<SettingsStore>()(
         if (version < 8) {
           state.reminderMode = DEFAULT_REMINDER_MODE
         }
+        if (version < 9) {
+          state.oneDrive = DEFAULT_ONEDRIVE
+        }
         return state
       },
       partialize: (state) => ({
@@ -232,6 +273,7 @@ export const useSettingsStore = create<SettingsStore>()(
         timerRingColor: state.timerRingColor,
         timerRingColorEnabled: state.timerRingColorEnabled,
         speech: state.speech,
+        oneDrive: state.oneDrive,
         trashRetentionDays: state.trashRetentionDays,
         reminderMode: state.reminderMode
       })

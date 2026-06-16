@@ -21,6 +21,12 @@ vi.mock('@renderer/lib/speech-key-storage', () => ({
 }))
 
 vi.mock('@renderer/stores/settings', () => ({
+  DEFAULT_ONEDRIVE: { customClientId: '', defaultOfflinePolicy: 'on-demand', cacheBudgetMb: 2048 },
+  HHC_DEFAULT_ONEDRIVE_CLIENT_ID: '4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02',
+  getEffectiveOneDriveClientId: (settings: { customClientId: string }) =>
+    settings.customClientId || '4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02',
+  validateOneDriveClientId: (value: string) =>
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value),
   useSettingsStore: vi.fn((selector) => {
     const store = {
       timezone: 'Asia/Taipei',
@@ -36,6 +42,12 @@ vi.mock('@renderer/stores/settings', () => ({
       setTimezone: vi.fn(),
       setHardwareAcceleration: vi.fn(),
       setSpeech: vi.fn(),
+      oneDrive: {
+        customClientId: '',
+        defaultOfflinePolicy: 'on-demand' as const,
+        cacheBudgetMb: 2048
+      },
+      setOneDrive: vi.fn(),
       trashRetentionDays: 30,
       setTrashRetentionDays: vi.fn(),
       resetToDefaults: vi.fn()
@@ -175,6 +187,12 @@ describe('PreferencesDialog', () => {
           whisper: { modelDir: '', installedModel: null }
         },
         setSpeech: vi.fn(),
+        oneDrive: {
+          customClientId: '',
+          defaultOfflinePolicy: 'on-demand' as const,
+          cacheBudgetMb: 2048
+        },
+        setOneDrive: vi.fn(),
         trashRetentionDays: 30,
         setTrashRetentionDays: vi.fn()
       }
@@ -254,6 +272,12 @@ describe('PreferencesDialog', () => {
           whisper: { modelDir: '', installedModel: null }
         },
         setSpeech: vi.fn(),
+        oneDrive: {
+          customClientId: '',
+          defaultOfflinePolicy: 'on-demand' as const,
+          cacheBudgetMb: 2048
+        },
+        setOneDrive: vi.fn(),
         trashRetentionDays: 30,
         setTrashRetentionDays: vi.fn()
       }
@@ -303,6 +327,12 @@ describe('PreferencesDialog', () => {
           whisper: { modelDir: '', installedModel: null }
         },
         setSpeech: vi.fn(),
+        oneDrive: {
+          customClientId: '',
+          defaultOfflinePolicy: 'on-demand' as const,
+          cacheBudgetMb: 2048
+        },
+        setOneDrive: vi.fn(),
         trashRetentionDays: 30,
         setTrashRetentionDays: vi.fn()
       }

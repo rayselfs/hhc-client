@@ -548,6 +548,23 @@
       }
     },
     "media": {
+      "oneDrive": {
+        "title": "OneDrive",
+        "description": "OneDrive folders are read-only sources. HHC Client never uploads, renames, moves, or deletes remote files.",
+        "clientId": "Azure Application Client ID",
+        "clientIdSourceDefault": "Using HHC default",
+        "clientIdSourceCustom": "Using custom Client ID",
+        "invalidClientId": "Enter a valid Azure Application Client ID.",
+        "restoreDefaultClientId": "Restore default Client ID",
+        "defaultOfflinePolicy": "Default Offline Policy",
+        "offlinePolicies": {
+          "online-only": "Online only",
+          "on-demand": "On demand",
+          "always-offline": "Always available offline"
+        },
+        "cacheBudget": "Sync Cache Budget (MB)",
+        "setupHint": "Changing the Client ID requires reconnecting OneDrive. Tokens are stored separately and never in Preferences."
+      },
       "videoTranscoding": {
         "title": "Video Transcoding",
         "description": "Use a user-selected FFmpeg executable to prepare AVI, MKV, and WMV files for presentation in Electron.",

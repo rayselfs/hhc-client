@@ -23,7 +23,11 @@ import {
   useSettingsStore,
   TIMEZONE_OPTIONS,
   AZURE_REGION_OPTIONS,
-  DEFAULT_SPEECH
+  DEFAULT_SPEECH,
+  DEFAULT_ONEDRIVE,
+  getEffectiveOneDriveClientId,
+  HHC_DEFAULT_ONEDRIVE_CLIENT_ID,
+  validateOneDriveClientId
 } from '@renderer/stores/settings'
 import { clearAllSiteData } from '@renderer/lib/site-data'
 import { isElectron } from '@renderer/lib/env'
@@ -36,7 +40,8 @@ beforeEach(() => {
     hardwareAcceleration: true,
     themePreference: 'system',
     timerRingColor: '#3b82f6',
-    speech: DEFAULT_SPEECH
+    speech: DEFAULT_SPEECH,
+    oneDrive: DEFAULT_ONEDRIVE
   })
   mockToast.warning.mockClear()
   mockToast.success.mockClear()
@@ -92,7 +97,7 @@ describe('setTimezone', () => {
     expect(persisted).toBeTruthy()
     const parsed = JSON.parse(persisted!)
     expect(parsed.state.timezone).toBe('America/New_York')
-    expect(parsed.version).toBe(8)
+    expect(parsed.version).toBe(9)
 
     vi.unstubAllGlobals()
   })
@@ -129,7 +134,7 @@ describe('setHardwareAcceleration', () => {
     expect(persisted).toBeTruthy()
     const parsed = JSON.parse(persisted!)
     expect(parsed.state.hardwareAcceleration).toBe(false)
-    expect(parsed.version).toBe(8)
+    expect(parsed.version).toBe(9)
 
     vi.unstubAllGlobals()
   })
@@ -201,7 +206,7 @@ describe('persistence round-trip', () => {
     const parsed = JSON.parse(persisted!)
     expect(parsed.state.timezone).toBe('Europe/London')
     expect(parsed.state.hardwareAcceleration).toBe(false)
-    expect(parsed.version).toBe(8)
+    expect(parsed.version).toBe(9)
 
     vi.unstubAllGlobals()
   })
@@ -310,7 +315,7 @@ describe('themePreference', () => {
     expect(persisted).toBeTruthy()
     const parsed = JSON.parse(persisted!)
     expect(parsed.state.themePreference).toBe('dark')
-    expect(parsed.version).toBe(8)
+    expect(parsed.version).toBe(9)
 
     vi.unstubAllGlobals()
   })
@@ -360,9 +365,48 @@ describe('speech settings', () => {
     expect(persisted).toBeTruthy()
     const parsed = JSON.parse(persisted!)
     expect(parsed.state.speech.azure.region).toBe('japaneast')
-    expect(parsed.version).toBe(8)
+    expect(parsed.version).toBe(9)
 
     vi.unstubAllGlobals()
+  })
+})
+
+describe('OneDrive settings', () => {
+  it('uses the HHC default Client ID when custom override is empty', () => {
+    expect(getEffectiveOneDriveClientId(DEFAULT_ONEDRIVE)).toBe(HHC_DEFAULT_ONEDRIVE_CLIENT_ID)
+  })
+
+  it('validates Azure Application Client ID format', () => {
+    expect(validateOneDriveClientId('4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02')).toBe(true)
+    expect(validateOneDriveClientId('../not-a-client-id')).toBe(false)
+  })
+
+  it('persists non-sensitive OneDrive preferences only', () => {
+    useSettingsStore.getState().setOneDrive({
+      customClientId: '11111111-2222-3333-4444-555555555555',
+      defaultOfflinePolicy: 'always-offline',
+      cacheBudgetMb: 512
+    })
+
+    const state = useSettingsStore.getState()
+    expect(state.oneDrive).toMatchObject({
+      customClientId: '11111111-2222-3333-4444-555555555555',
+      defaultOfflinePolicy: 'always-offline',
+      cacheBudgetMb: 512
+    })
+    expect(state.oneDrive).not.toHaveProperty('accessToken')
+    expect(state.oneDrive).not.toHaveProperty('refreshToken')
+  })
+
+  it('rejects invalid custom Client ID updates', () => {
+    const before = useSettingsStore.getState().oneDrive
+    useSettingsStore.getState().setOneDrive({
+      customClientId: '../bad',
+      defaultOfflinePolicy: 'online-only',
+      cacheBudgetMb: 0
+    })
+
+    expect(useSettingsStore.getState().oneDrive).toEqual(before)
   })
 })
 
