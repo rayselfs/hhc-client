@@ -66,7 +66,12 @@ const DEFAULT_TRASH_RETENTION_DAYS = 30
 const DEFAULT_REMINDER_MODE = 'subtract'
 export const HHC_DEFAULT_ONEDRIVE_CLIENT_ID = '4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02'
 const DEFAULT_ONEDRIVE_CACHE_BUDGET_MB = 2048
+const MAX_ONEDRIVE_CACHE_BUDGET_MB = 1024 * 1024
 const RELOAD_DELAY_MS = 500
+const THEME_PREFERENCES: ThemePreference[] = ['system', 'light', 'dark']
+const OFFLINE_POLICIES: SyncOfflinePolicy[] = ['online-only', 'on-demand', 'always-offline']
+type ReminderMode = 'subtract' | 'add'
+const REMINDER_MODES: ReminderMode[] = ['subtract', 'add']
 
 export type SpeechProvider = 'azure' | 'gcp' | 'webSpeech' | 'whisper'
 
@@ -116,6 +121,128 @@ export function validateOneDriveClientId(value: string): boolean {
 
 export function getEffectiveOneDriveClientId(settings: OneDriveSettings): string {
   return settings.customClientId.trim() || HHC_DEFAULT_ONEDRIVE_CLIENT_ID
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function normalizePositiveInteger(
+  value: unknown,
+  fallback: number,
+  max = Number.MAX_SAFE_INTEGER
+): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback
+  return Math.min(max, Math.max(0, Math.floor(value)))
+}
+
+function normalizeOneDriveSettings(value: unknown): OneDriveSettings {
+  if (!isRecord(value)) return DEFAULT_ONEDRIVE
+
+  const customClientId =
+    typeof value.customClientId === 'string' && validateOneDriveClientId(value.customClientId)
+      ? value.customClientId.trim()
+      : DEFAULT_ONEDRIVE.customClientId
+  const defaultOfflinePolicy = OFFLINE_POLICIES.includes(
+    value.defaultOfflinePolicy as SyncOfflinePolicy
+  )
+    ? (value.defaultOfflinePolicy as SyncOfflinePolicy)
+    : DEFAULT_ONEDRIVE.defaultOfflinePolicy
+
+  return {
+    customClientId,
+    defaultOfflinePolicy,
+    cacheBudgetMb: normalizePositiveInteger(
+      value.cacheBudgetMb,
+      DEFAULT_ONEDRIVE_CACHE_BUDGET_MB,
+      MAX_ONEDRIVE_CACHE_BUDGET_MB
+    )
+  }
+}
+
+function normalizeSpeechSettings(value: unknown): SpeechSettings {
+  if (!isRecord(value)) return DEFAULT_SPEECH
+
+  const activeProvider =
+    value.activeProvider === 'azure' ||
+    value.activeProvider === 'gcp' ||
+    value.activeProvider === 'webSpeech' ||
+    value.activeProvider === 'whisper'
+      ? value.activeProvider
+      : DEFAULT_SPEECH.activeProvider
+  const azure = isRecord(value.azure) ? value.azure : {}
+  const gcp = isRecord(value.gcp) ? value.gcp : {}
+  const whisper = isRecord(value.whisper) ? value.whisper : {}
+
+  return {
+    activeProvider,
+    azure: {
+      region:
+        typeof azure.region === 'string' &&
+        AZURE_REGION_OPTIONS.some((option) => option.value === azure.region)
+          ? azure.region
+          : DEFAULT_SPEECH.azure.region,
+      language:
+        azure.language === 'zh-TW' || azure.language === 'zh-CN'
+          ? azure.language
+          : DEFAULT_SPEECH.azure.language
+    },
+    gcp: {
+      language:
+        gcp.language === 'cmn-Hant-TW' || gcp.language === 'cmn-Hans-CN'
+          ? gcp.language
+          : DEFAULT_SPEECH.gcp.language
+    },
+    whisper: {
+      modelDir: typeof whisper.modelDir === 'string' ? whisper.modelDir : '',
+      installedModel:
+        whisper.installedModel === 'whisper-base' ||
+        whisper.installedModel === 'whisper-small' ||
+        whisper.installedModel === 'whisper-medium'
+          ? whisper.installedModel
+          : null
+    }
+  }
+}
+
+export function normalizeSettingsState(value: unknown): Partial<SettingsStore> {
+  const state = isRecord(value) ? value : {}
+  const timezone =
+    typeof state.timezone === 'string' &&
+    TIMEZONE_OPTIONS.some((option) => option.value === state.timezone)
+      ? state.timezone
+      : DEFAULT_TIMEZONE
+  const themePreference = THEME_PREFERENCES.includes(state.themePreference as ThemePreference)
+    ? (state.themePreference as ThemePreference)
+    : DEFAULT_THEME_PREFERENCE
+  const timerRingColor =
+    typeof state.timerRingColor === 'string' && /^#[0-9a-f]{6}$/i.test(state.timerRingColor)
+      ? state.timerRingColor
+      : DEFAULT_TIMER_RING_COLOR
+  const reminderMode = REMINDER_MODES.includes(state.reminderMode as ReminderMode)
+    ? (state.reminderMode as ReminderMode)
+    : DEFAULT_REMINDER_MODE
+
+  return {
+    timezone,
+    hardwareAcceleration:
+      typeof state.hardwareAcceleration === 'boolean'
+        ? state.hardwareAcceleration
+        : DEFAULT_HW_ACCEL,
+    themePreference,
+    timerRingColor,
+    timerRingColorEnabled:
+      typeof state.timerRingColorEnabled === 'boolean'
+        ? state.timerRingColorEnabled
+        : DEFAULT_TIMER_RING_COLOR_ENABLED,
+    speech: normalizeSpeechSettings(state.speech),
+    oneDrive: normalizeOneDriveSettings(state.oneDrive),
+    trashRetentionDays: normalizePositiveInteger(
+      state.trashRetentionDays,
+      DEFAULT_TRASH_RETENTION_DAYS
+    ),
+    reminderMode
+  }
 }
 
 export interface SettingsStore {
@@ -264,8 +391,12 @@ export const useSettingsStore = create<SettingsStore>()(
         if (version < 9) {
           state.oneDrive = DEFAULT_ONEDRIVE
         }
-        return state
+        return normalizeSettingsState(state)
       },
+      merge: (persistedState, currentState) => ({
+        ...currentState,
+        ...normalizeSettingsState(persistedState)
+      }),
       partialize: (state) => ({
         timezone: state.timezone,
         hardwareAcceleration: state.hardwareAcceleration,

@@ -27,6 +27,7 @@ import {
   DEFAULT_ONEDRIVE,
   getEffectiveOneDriveClientId,
   HHC_DEFAULT_ONEDRIVE_CLIENT_ID,
+  normalizeSettingsState,
   validateOneDriveClientId
 } from '@renderer/stores/settings'
 import { clearAllSiteData } from '@renderer/lib/site-data'
@@ -407,6 +408,58 @@ describe('OneDrive settings', () => {
     })
 
     expect(useSettingsStore.getState().oneDrive).toEqual(before)
+  })
+
+  it('normalizes invalid persisted OneDrive preferences', () => {
+    const normalized = normalizeSettingsState({
+      oneDrive: {
+        customClientId: '../bad',
+        defaultOfflinePolicy: 'upload-everything',
+        cacheBudgetMb: Number.NaN
+      }
+    })
+
+    expect(normalized.oneDrive).toEqual(DEFAULT_ONEDRIVE)
+  })
+
+  it('normalizes valid persisted OneDrive preferences', () => {
+    const normalized = normalizeSettingsState({
+      oneDrive: {
+        customClientId: '11111111-2222-3333-4444-555555555555',
+        defaultOfflinePolicy: 'always-offline',
+        cacheBudgetMb: 512.9
+      }
+    })
+
+    expect(normalized.oneDrive).toEqual({
+      customClientId: '11111111-2222-3333-4444-555555555555',
+      defaultOfflinePolicy: 'always-offline',
+      cacheBudgetMb: 512
+    })
+  })
+})
+
+describe('settings normalization', () => {
+  it('restores documented defaults for invalid persisted values', () => {
+    const normalized = normalizeSettingsState({
+      timezone: 'Mars/Base',
+      hardwareAcceleration: 'yes',
+      themePreference: 'sepia',
+      timerRingColor: 'var(--accent)',
+      timerRingColorEnabled: 'true',
+      trashRetentionDays: -10,
+      reminderMode: 'multiply'
+    })
+
+    expect(normalized).toMatchObject({
+      timezone: 'Asia/Taipei',
+      hardwareAcceleration: true,
+      themePreference: 'system',
+      timerRingColor: '#3b82f6',
+      timerRingColorEnabled: false,
+      trashRetentionDays: 0,
+      reminderMode: 'subtract'
+    })
   })
 })
 
