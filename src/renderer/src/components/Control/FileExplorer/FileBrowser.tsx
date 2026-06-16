@@ -128,6 +128,22 @@ function SortableViewItem({
     opacity: sortable.isDragging || isDraggedAway ? 0.4 : isCut ? 0.4 : 1
   }
 
+  const handlePointerDown = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>): void => {
+      onPointerDown?.(item.id, event)
+      sortable.listeners?.onPointerDown?.(event)
+    },
+    [item.id, onPointerDown, sortable.listeners]
+  )
+
+  const handlePointerMove = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>): void => {
+      onPointerMove?.(item.id, event)
+      sortable.listeners?.onPointerMove?.(event)
+    },
+    [item.id, onPointerMove, sortable.listeners]
+  )
+
   return (
     <div
       ref={setRef}
@@ -136,10 +152,10 @@ function SortableViewItem({
       data-item-id={item.id}
       {...(item.isFolder ? { 'data-folder-id': item.id } : {})}
       className={`touch-none rounded-lg${isOsDragTarget ? ' ring-2 ring-inset ring-primary/50' : ''}${droppable.isOver && item.isFolder ? ' bg-surface' : ''}`}
-      onPointerDown={(event) => onPointerDown?.(item.id, event)}
-      onPointerMove={(event) => onPointerMove?.(item.id, event)}
       {...sortable.attributes}
       {...sortable.listeners}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
     >
       {children}
     </div>
@@ -345,8 +361,8 @@ export function FileBrowser({
   const [draggedIds, setDraggedIds] = useState<Set<string>>(new Set())
   const [selectedSearchId, setSelectedSearchId] = useState<string | null>(null)
   const [renamingItemId, setRenamingItemId] = useState<string | null>(null)
-  const slowClickRef = React.useRef<{ itemId: string; at: number } | null>(null)
   const renameClickTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingRenameItemIdRef = React.useRef<string | null>(null)
   const pointerRef = React.useRef<{
     itemId: string
     x: number
@@ -495,6 +511,7 @@ export function FileBrowser({
       clearTimeout(renameClickTimerRef.current)
       renameClickTimerRef.current = null
     }
+    pendingRenameItemIdRef.current = null
   }, [])
 
   useEffect(() => {
@@ -521,15 +538,13 @@ export function FileBrowser({
 
   useEffect(() => {
     cancelPendingRename()
-    slowClickRef.current = null
     setRenamingItemId(null)
   }, [cancelPendingRename, currentFolderId, viewMode])
 
   useEffect(() => {
-    const previous = slowClickRef.current
-    if (previous && (!selectedIds.has(previous.itemId) || selectedIds.size !== 1)) {
+    const pendingItemId = pendingRenameItemIdRef.current
+    if (pendingItemId && (!selectedIds.has(pendingItemId) || selectedIds.size !== 1)) {
       cancelPendingRename()
-      slowClickRef.current = null
     }
   }, [cancelPendingRename, selectedIds])
 
@@ -581,7 +596,6 @@ export function FileBrowser({
   const handleItemDoubleClick = useCallback(
     (itemId: string, event: React.MouseEvent): void => {
       cancelPendingRename()
-      slowClickRef.current = null
       event.stopPropagation()
       const item = sortedItems.find((entry) => entry.id === itemId)
       if (item?.isFolder) {
@@ -642,7 +656,6 @@ export function FileBrowser({
       if (event.button !== 0 || event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) {
         pointerRef.current = null
         cancelPendingRename()
-        slowClickRef.current = null
         return
       }
 
@@ -663,7 +676,6 @@ export function FileBrowser({
       if (Math.hypot(event.clientX - pointer.x, event.clientY - pointer.y) > 4) {
         pointer.moved = true
         cancelPendingRename()
-        slowClickRef.current = null
       }
     },
     [cancelPendingRename]
@@ -673,8 +685,6 @@ export function FileBrowser({
     (itemId: string, event: React.MouseEvent): void => {
       const wasAlreadySelected = selectedIds.has(itemId) && selectedIds.size === 1
       const isNameRegion = (event.target as Element).closest('[data-file-name-region]') !== null
-      const now = Date.now()
-      const previous = slowClickRef.current
       const pointer = pointerRef.current
       const hadPointerMovement = pointer?.itemId === itemId && pointer.moved
       handleItemClick(itemId, event)
@@ -689,25 +699,23 @@ export function FileBrowser({
         hadPointerMovement
       ) {
         cancelPendingRename()
-        slowClickRef.current = null
         return
       }
 
       if (!wasAlreadySelected) {
         cancelPendingRename()
-        slowClickRef.current = { itemId, at: now }
         return
       }
 
-      const elapsed = previous?.itemId === itemId ? now - previous.at : 0
-      slowClickRef.current = { itemId, at: now }
       const item = sortedItems.find((entry) => entry.id === itemId)
       if (!item || item.isFolder) return
-      if (isNameRegion && elapsed >= SLOW_CLICK_RENAME_MIN_MS) {
+      if (isNameRegion) {
         cancelPendingRename()
+        pendingRenameItemIdRef.current = itemId
         renameClickTimerRef.current = setTimeout(() => {
           setRenamingItemId(itemId)
           renameClickTimerRef.current = null
+          pendingRenameItemIdRef.current = null
         }, SLOW_CLICK_RENAME_MIN_MS)
       }
     },
@@ -816,7 +824,6 @@ export function FileBrowser({
     (event: DragStartEvent): void => {
       setRenamingItemId(null)
       cancelPendingRename()
-      slowClickRef.current = null
       pointerRef.current = null
       const nextActiveId = String(event.active.id)
       setActiveId(nextActiveId)

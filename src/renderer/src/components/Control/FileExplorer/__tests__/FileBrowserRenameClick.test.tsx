@@ -86,11 +86,13 @@ vi.mock('@renderer/contexts/ConfirmDialogContext', () => ({
   useConfirm: () => vi.fn()
 }))
 
+const mockStartPresentation = vi.fn()
+
 vi.mock('@renderer/stores/media-projection', () => ({
   useMediaProjectionStore: Object.assign(
     vi.fn(() => false),
     {
-      getState: () => ({ startPresentation: vi.fn() })
+      getState: () => ({ startPresentation: mockStartPresentation })
     }
   )
 }))
@@ -166,6 +168,7 @@ describe('FileBrowser slow-click inline rename', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     updateItem.mockClear()
+    mockStartPresentation.mockClear()
     viewMode = 'medium-icon'
   })
 
@@ -216,6 +219,26 @@ describe('FileBrowser slow-click inline rename', () => {
     fireEvent.click(fileName, { button: 0, detail: 1 })
     fireEvent.click(fileName, { button: 0, detail: 2 })
     fireEvent.doubleClick(fileName, { button: 0, detail: 2 })
+    flushRenameDelay()
+
+    expect(screen.queryByLabelText('Rename file')).toBeNull()
+    expect(mockStartPresentation).toHaveBeenCalledOnce()
+  })
+
+  it('does not start rename after pointer movement', () => {
+    render(<FileBrowser />)
+
+    const fileName = screen.getByText('slides.pdf')
+    click(fileName, 1000)
+
+    act(() => {
+      vi.advanceTimersByTime(1000)
+    })
+
+    vi.setSystemTime(2500)
+    fireEvent.pointerDown(fileName, { button: 0, clientX: 1, clientY: 1 })
+    fireEvent.pointerMove(fileName, { button: 0, clientX: 12, clientY: 1 })
+    fireEvent.click(fileName, { button: 0, detail: 1 })
     flushRenameDelay()
 
     expect(screen.queryByLabelText('Rename file')).toBeNull()
