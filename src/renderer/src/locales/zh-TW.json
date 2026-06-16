@@ -459,8 +459,14 @@
       "addFavorite": "加入我的最愛",
       "removeFavorite": "移除我的最愛",
       "project": "投影",
+      "rehearse": "彩排",
       "restore": "還原",
       "permanentDelete": "永久刪除"
+    },
+    "presenter": {
+      "rehearsal": "彩排",
+      "skippedItems": "已跳過 {{count}} 個",
+      "readinessSummary": "{{ready}} 個就緒，{{preparing}} 個準備中，{{unsupported}} 個不支援，{{missing}} 個遺失，{{failed}} 個失敗"
     },
     "noProjectableFiles": "沒有可投影的檔案",
     "invalidName": "名稱無效",

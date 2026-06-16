@@ -42,7 +42,11 @@ beforeEach(() => {
     playlist: [makeFile('a', 'a.png'), makeFile('b', 'b.png')],
     currentIndex: 0,
     isPresenting: true,
+    isRehearsal: false,
+    isEnded: false,
+    lastReadinessReport: null,
     showGrid: false,
+    snapshot: null,
     typeStates: { pdf: { viewMode: 'slide' } },
     zoomLevel: 1,
     pan: { x: 0, y: 0 }
@@ -79,7 +83,8 @@ describe('media projection sync', () => {
     useMediaProjectionStore.setState({
       playlist: [makeFile('copy-id', 'copy.png', 'image/png', 'original-id')],
       currentIndex: 0,
-      isPresenting: true
+      isPresenting: true,
+      isRehearsal: false
     })
 
     renderSync()
@@ -88,5 +93,19 @@ describe('media projection sync', () => {
       'file:show',
       expect.objectContaining({ itemId: 'copy-id', blobId: 'original-id' })
     )
+  })
+
+  it('does not send projection output during rehearsal', () => {
+    useMediaProjectionStore.setState({ isRehearsal: true })
+
+    renderSync()
+
+    expect(mockProject).not.toHaveBeenCalledWith('file:show', expect.anything())
+
+    act(() => {
+      useMediaProjectionStore.getState().jumpTo(1)
+    })
+
+    expect(mockProject).not.toHaveBeenCalledWith('file:show', expect.anything())
   })
 })

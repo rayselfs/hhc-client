@@ -21,7 +21,7 @@ export function useMediaProjectionSync(): void {
 
   useEffect(() => {
     const unsub = useMediaProjectionStore.subscribe((state, prev) => {
-      if (!state.isPresenting) return
+      if (!state.isPresenting || state.isRehearsal) return
 
       const indexChanged = state.currentIndex !== prev.currentIndex
       const playlistChanged = playlistContentChanged(prev.playlist, state.playlist)
@@ -45,7 +45,7 @@ export function useMediaProjectionSync(): void {
 
   useEffect(() => {
     const unsub = useMediaProjectionStore.subscribe((state, prev) => {
-      if (!state.isPresenting) return
+      if (!state.isPresenting || state.isRehearsal) return
       if (state.pan !== prev.pan) {
         send('file:control', { action: 'pan', value: state.pan })
       }
@@ -55,7 +55,7 @@ export function useMediaProjectionSync(): void {
 
   useEffect(() => {
     const unsub = useMediaProjectionStore.subscribe((state, prev) => {
-      if (!state.isPresenting) return
+      if (!state.isPresenting || state.isRehearsal) return
       if (state.zoomLevel !== prev.zoomLevel) {
         send('file:control', { action: 'zoom', value: state.zoomLevel })
       }
@@ -65,7 +65,7 @@ export function useMediaProjectionSync(): void {
 
   useEffect(() => {
     const unsub = useMediaProjectionStore.subscribe((state, prev) => {
-      if (prev.isPresenting && !state.isPresenting) {
+      if (prev.isPresenting && !prev.isRehearsal && !state.isPresenting) {
         blankProjection(true)
       }
     })
@@ -74,7 +74,7 @@ export function useMediaProjectionSync(): void {
 
   useEffect(() => {
     const unsub = useMediaProjectionStore.subscribe((state, prev) => {
-      if (!state.isPresenting) return
+      if (!state.isPresenting || state.isRehearsal) return
       if (state.isEnded && !prev.isEnded) {
         send('file:end', null)
       }
@@ -84,7 +84,7 @@ export function useMediaProjectionSync(): void {
 
   useEffect(() => {
     const state = useMediaProjectionStore.getState()
-    if (!state.isPresenting) return
+    if (!state.isPresenting || state.isRehearsal) return
     const item = state.playlist[state.currentIndex]
     if (!item) return
     void project('file:show', {

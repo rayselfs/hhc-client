@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { X } from 'lucide-react'
 import { Button } from '@heroui/react'
+import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 
 function formatElapsed(seconds: number): string {
   const h = Math.floor(seconds / 3600)
@@ -25,6 +26,11 @@ export default function PresenterHeader({ onExit }: PresenterHeaderProps): React
   const { t } = useTranslation()
   const [elapsed, setElapsed] = useState(0)
   const [clockTime, setClockTime] = useState(() => new Date())
+  const isRehearsal = useMediaProjectionStore((state) => state.isRehearsal)
+  const readiness = useMediaProjectionStore((state) => state.lastReadinessReport?.summary)
+  const skippedCount = readiness
+    ? readiness.preparing + readiness.unsupported + readiness.missing + readiness.failed
+    : 0
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -53,6 +59,29 @@ export default function PresenterHeader({ onExit }: PresenterHeaderProps): React
           <X size={20} />
         </Button>
         <span className="text-foreground/70 text-lg font-mono">{formatElapsed(elapsed)}</span>
+        {isRehearsal && (
+          <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+            {t('fileExplorer.presenter.rehearsal', 'Rehearsal')}
+          </span>
+        )}
+        {readiness && skippedCount > 0 && (
+          <span
+            className="rounded-full border border-warning/30 bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning-700"
+            title={t('fileExplorer.presenter.readinessSummary', {
+              defaultValue:
+                '{{ready}} ready, {{preparing}} preparing, {{unsupported}} unsupported, {{missing}} missing, {{failed}} failed',
+              ready: readiness.ready,
+              preparing: readiness.preparing,
+              unsupported: readiness.unsupported,
+              missing: readiness.missing,
+              failed: readiness.failed
+            })}
+          >
+            {t('fileExplorer.presenter.skippedItems', '{{count}} skipped', {
+              count: skippedCount
+            })}
+          </span>
+        )}
       </div>
       <span className="text-foreground/70 text-lg font-mono">{formatClock(clockTime)}</span>
     </div>
