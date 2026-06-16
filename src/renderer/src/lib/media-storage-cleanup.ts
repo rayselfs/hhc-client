@@ -5,6 +5,7 @@ import {
   type DerivedAssetKind,
   type DerivedAssetRecord
 } from './media-work-db'
+import { isMediaResourceLocked } from './media-resource-locks'
 
 export interface MediaStorageCleanupResult {
   deletedAssetIds: string[]
@@ -27,6 +28,29 @@ export async function clearRegenerableDerivedAssets(): Promise<MediaStorageClean
   return deleteDerivedAssets(assets.filter((asset) => REGENERABLE_ASSET_KINDS.has(asset.kind)))
 }
 
+export async function evictRegenerableDerivedAssetsToBudget(
+  maxBytes: number
+): Promise<MediaStorageCleanupResult> {
+  if (maxBytes < 0) throw new Error('Media storage budget must be non-negative')
+  const assets = (await listDerivedAssets()).filter(
+    (asset) =>
+      asset.status === 'ready' &&
+      REGENERABLE_ASSET_KINDS.has(asset.kind) &&
+      !isMediaResourceLocked(asset.sourceBlobId)
+  )
+  const total = assets.reduce((sum, asset) => sum + getDerivedAssetSize(asset), 0)
+  if (total <= maxBytes) return { deletedAssetIds: [] }
+
+  let remaining = total
+  const toDelete: DerivedAssetRecord[] = []
+  for (const asset of [...assets].sort((a, b) => a.updatedAt - b.updatedAt)) {
+    if (remaining <= maxBytes) break
+    toDelete.push(asset)
+    remaining -= getDerivedAssetSize(asset)
+  }
+  return deleteDerivedAssets(toDelete)
+}
+
 async function deleteDerivedAssets(
   assets: DerivedAssetRecord[]
 ): Promise<MediaStorageCleanupResult> {
@@ -36,4 +60,10 @@ async function deleteDerivedAssets(
     deletedAssetIds.push(asset.id)
   }
   return { deletedAssetIds }
+}
+
+function getDerivedAssetSize(asset: DerivedAssetRecord): number {
+  return (
+    asset.size ?? asset.blob?.size ?? asset.blobs?.reduce((sum, blob) => sum + blob.size, 0) ?? 0
+  )
 }
