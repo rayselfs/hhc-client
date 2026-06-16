@@ -125,6 +125,15 @@ const localSyncApi = {
     typedInvoke('local-sync:disconnect-folder', connectionId)
 }
 
+const oneDriveApi = {
+  saveCredentials: (input: IpcInvokeMap['onedrive:save-credentials']['args'][0]) =>
+    typedInvoke('onedrive:save-credentials', input),
+  getCredentialStatus: (connectionId: string) =>
+    typedInvoke('onedrive:get-credential-status', connectionId),
+  deleteCredentials: (connectionId: string) =>
+    typedInvoke('onedrive:delete-credentials', connectionId)
+}
+
 const api = {
   projection: projectionApi,
   theme: themeApi,
@@ -135,7 +144,8 @@ const api = {
   speech: speechApi,
   nativeFs: nativeFsApi,
   videoTranscode: videoTranscodeApi,
-  localSync: localSyncApi
+  localSync: localSyncApi,
+  oneDrive: oneDriveApi
 }
 
 try {

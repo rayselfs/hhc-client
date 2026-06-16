@@ -9,6 +9,7 @@ import { registerSpeechKeyStorageHandlers } from './ipc/speech-key-storage'
 import { registerNativeFsHandlers, registerNativeMediaProtocol } from './ipc/native-fs'
 import { registerVideoTranscodeHandlers } from './ipc/video-transcode'
 import { registerLocalSyncHandlers } from './ipc/local-sync'
+import { registerOneDriveCredentialHandlers } from './ipc/onedrive-credentials'
 import { isKnownWindow, validateTheme } from './ipc/validate'
 import { registerUpdateService } from './updateService'
 
@@ -75,6 +76,7 @@ app.whenReady().then(() => {
   registerNativeFsHandlers(wm)
   registerVideoTranscodeHandlers(wm)
   registerLocalSyncHandlers(wm)
+  registerOneDriveCredentialHandlers(wm)
   registerNativeMediaProtocol()
   wm.createMainWindow()
   wm.createProjectionWindow()

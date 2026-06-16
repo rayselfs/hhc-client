@@ -81,6 +81,21 @@ export interface LocalSyncRemoteItem {
   etag?: string
 }
 
+export interface OneDriveCredentialInput {
+  connectionId: string
+  accessToken?: string
+  refreshToken: string
+  expiresAt?: number
+  scope?: string
+  tokenType?: 'Bearer'
+}
+
+export interface OneDriveCredentialStatus {
+  hasRefreshToken: boolean
+  expiresAt?: number
+  scope?: string
+}
+
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
 
@@ -134,6 +149,9 @@ export interface IpcInvokeMap {
   'local-sync:list-folders': { args: []; result: LocalSyncConnectionInfo[] }
   'local-sync:scan-folder': { args: [string]; result: LocalSyncRemoteItem[] }
   'local-sync:disconnect-folder': { args: [string]; result: void }
+  'onedrive:save-credentials': { args: [OneDriveCredentialInput]; result: OneDriveCredentialStatus }
+  'onedrive:get-credential-status': { args: [string]; result: OneDriveCredentialStatus }
+  'onedrive:delete-credentials': { args: [string]; result: void }
 }
 
 export type IpcInvokeChannel = keyof IpcInvokeMap

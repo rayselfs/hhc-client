@@ -9,7 +9,9 @@ import type {
   VideoTranscodeRunRequest,
   VideoTranscodeRunResult,
   LocalSyncConnectionInfo,
-  LocalSyncRemoteItem
+  LocalSyncRemoteItem,
+  OneDriveCredentialInput,
+  OneDriveCredentialStatus
 } from '../shared/ipc-channels'
 import type {
   TimerCommand,
@@ -97,6 +99,12 @@ interface LocalSyncAPI {
   disconnectFolder: (connectionId: string) => Promise<void>
 }
 
+interface OneDriveAPI {
+  saveCredentials: (input: OneDriveCredentialInput) => Promise<OneDriveCredentialStatus>
+  getCredentialStatus: (connectionId: string) => Promise<OneDriveCredentialStatus>
+  deleteCredentials: (connectionId: string) => Promise<void>
+}
+
 declare global {
   interface Window {
     api: {
@@ -110,6 +118,7 @@ declare global {
       nativeFs: NativeFsAPI
       videoTranscode: VideoTranscodeAPI
       localSync: LocalSyncAPI
+      oneDrive: OneDriveAPI
     }
   }
 }
