@@ -601,7 +601,21 @@
         "executable": "Executable",
         "notSelected": "Not selected",
         "version": "Version",
+        "ffprobe": "FFprobe",
+        "resolution": "Resolution",
+        "quality": "Quality",
+        "resolutions": {
+          "4k": "4K",
+          "1080p": "1080p",
+          "720p": "720p"
+        },
+        "qualities": {
+          "high": "High",
+          "medium": "Medium",
+          "low": "Low"
+        },
         "select": "Select FFmpeg",
+        "selectFfprobe": "Select FFprobe",
         "installGuide": "Need an FFmpeg executable? Download it from",
         "installLink": "FFmpeg downloads"
       }

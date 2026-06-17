@@ -110,6 +110,8 @@ const videoTranscodeApi = {
     typedInvoke('video-transcode:get-ffmpeg-config'),
   selectFfmpeg: (): Promise<FfmpegConfigInfo | null> =>
     typedInvoke('video-transcode:select-ffmpeg'),
+  selectFfprobe: (): Promise<FfmpegConfigInfo | null> =>
+    typedInvoke('video-transcode:select-ffprobe'),
   validateFfmpeg: (): Promise<FfmpegConfigInfo> => typedInvoke('video-transcode:validate-ffmpeg'),
   removeFfmpegConfig: (): Promise<FfmpegConfigInfo> =>
     typedInvoke('video-transcode:remove-ffmpeg-config'),
@@ -118,6 +120,8 @@ const videoTranscodeApi = {
   cancel: (jobId: string) => typedInvoke('video-transcode:cancel', jobId),
   generatePoster: (request: IpcInvokeMap['video-transcode:generate-poster']['args'][0]) =>
     typedInvoke('video-transcode:generate-poster', request),
+  probe: (request: IpcInvokeMap['video-transcode:probe']['args'][0]) =>
+    typedInvoke('video-transcode:probe', request),
   startLive: (request: IpcInvokeMap['video-transcode:start-live']['args'][0]) =>
     typedInvoke('video-transcode:start-live', request),
   stopLive: (sessionId: string) => typedInvoke('video-transcode:stop-live', sessionId)

@@ -100,7 +100,7 @@ describe('setTimezone', () => {
     expect(persisted).toBeTruthy()
     const parsed = JSON.parse(persisted!)
     expect(parsed.state.timezone).toBe('America/New_York')
-    expect(parsed.version).toBe(10)
+    expect(parsed.version).toBe(11)
 
     vi.unstubAllGlobals()
   })
@@ -137,7 +137,7 @@ describe('setHardwareAcceleration', () => {
     expect(persisted).toBeTruthy()
     const parsed = JSON.parse(persisted!)
     expect(parsed.state.hardwareAcceleration).toBe(false)
-    expect(parsed.version).toBe(10)
+    expect(parsed.version).toBe(11)
 
     vi.unstubAllGlobals()
   })
@@ -223,7 +223,7 @@ describe('persistence round-trip', () => {
     const parsed = JSON.parse(persisted!)
     expect(parsed.state.timezone).toBe('Europe/London')
     expect(parsed.state.hardwareAcceleration).toBe(false)
-    expect(parsed.version).toBe(10)
+    expect(parsed.version).toBe(11)
 
     vi.unstubAllGlobals()
   })
@@ -332,7 +332,7 @@ describe('themePreference', () => {
     expect(persisted).toBeTruthy()
     const parsed = JSON.parse(persisted!)
     expect(parsed.state.themePreference).toBe('dark')
-    expect(parsed.version).toBe(10)
+    expect(parsed.version).toBe(11)
 
     vi.unstubAllGlobals()
   })
@@ -392,7 +392,7 @@ describe('speech settings', () => {
     expect(persisted).toBeTruthy()
     const parsed = JSON.parse(persisted!)
     expect(parsed.state.speech.azure.region).toBe('japaneast')
-    expect(parsed.version).toBe(10)
+    expect(parsed.version).toBe(11)
 
     vi.unstubAllGlobals()
   })

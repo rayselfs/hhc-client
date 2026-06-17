@@ -26,6 +26,7 @@ export default function ProjectionPage(): React.JSX.Element {
     mimeType: string
     streamUrl?: string
     seekable?: boolean
+    durationMs?: number
   } | null>(null)
   const [fileControlEvent, setFileControlEvent] = useState<{
     id: number
@@ -69,7 +70,8 @@ export default function ProjectionPage(): React.JSX.Element {
         fileName: data.fileName,
         mimeType: data.mimeType,
         streamUrl: data.streamUrl,
-        seekable: data.seekable
+        seekable: data.seekable,
+        durationMs: data.durationMs
       })
       setActiveContent('file')
     })
@@ -147,6 +149,7 @@ export default function ProjectionPage(): React.JSX.Element {
         initialMimeType={fileData.mimeType}
         initialStreamUrl={fileData.streamUrl}
         initialSeekable={fileData.seekable}
+        initialDurationMs={fileData.durationMs}
         controlEvent={fileControlEvent}
       />
     )

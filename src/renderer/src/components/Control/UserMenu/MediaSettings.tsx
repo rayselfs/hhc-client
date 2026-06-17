@@ -10,6 +10,7 @@ import {
   HHC_DEFAULT_ONEDRIVE_CLIENT_ID,
   useSettingsStore,
   validateOneDriveClientId,
+  type VideoTranscodeProfile,
   type OneDriveSettings
 } from '@renderer/stores/settings'
 import { isElectron } from '@renderer/lib/env'
@@ -17,6 +18,10 @@ import { backfillTranscodeVideoThumbnails } from '@renderer/lib/video-poster-job
 import { retryBlockedTranscodeJobs } from '@renderer/lib/media-transcode-lifecycle'
 import type { FfmpegConfigInfo } from '@shared/ipc-channels'
 import type { SyncOfflinePolicy } from '@shared/types/folder'
+import {
+  VIDEO_TRANSCODE_QUALITIES,
+  VIDEO_TRANSCODE_RESOLUTIONS
+} from '@shared/video-transcode-profile'
 
 const RETENTION_DAY_OPTIONS = [7, 14, 30, 60, 90, 0] as const
 const OFFLINE_POLICY_OPTIONS: SyncOfflinePolicy[] = ['online-only', 'on-demand', 'always-offline']
@@ -35,6 +40,8 @@ export default function MediaSettings({
   const setTrashRetentionDays = useSettingsStore((s) => s.setTrashRetentionDays)
   const oneDrive = useSettingsStore((s) => s.oneDrive)
   const setOneDrive = useSettingsStore((s) => s.setOneDrive)
+  const videoTranscode = useSettingsStore((s) => s.videoTranscode)
+  const setVideoTranscode = useSettingsStore((s) => s.setVideoTranscode)
   const [ffmpegConfig, setFfmpegConfig] = useState<FfmpegConfigInfo | null>(null)
   const [isCheckingFfmpeg, setIsCheckingFfmpeg] = useState(false)
   const [oneDriveDraft, setOneDriveDraft] = useState<OneDriveSettings>(oneDrive)
@@ -77,6 +84,10 @@ export default function MediaSettings({
   function saveOneDriveDraft(next: OneDriveSettings): void {
     setOneDriveDraft(next)
     setOneDrive(next)
+  }
+
+  function updateVideoTranscode(next: Partial<VideoTranscodeProfile>): void {
+    setVideoTranscode({ ...videoTranscode, ...next })
   }
 
   return (
@@ -223,7 +234,72 @@ export default function MediaSettings({
             </dd>
             <dt className="text-gray-500">{t('preferences.media.videoTranscoding.version')}</dt>
             <dd>{ffmpegConfig?.version ?? '-'}</dd>
+            <dt className="text-gray-500">{t('preferences.media.videoTranscoding.ffprobe')}</dt>
+            <dd>
+              {ffmpegConfig?.ffprobeExecutableName ??
+                t('preferences.media.videoTranscoding.notSelected')}
+            </dd>
           </dl>
+
+          <div className="border-t border-default-200 pt-4 space-y-3">
+            <Select
+              variant="secondary"
+              value={videoTranscode.resolution}
+              onChange={(key) =>
+                updateVideoTranscode({ resolution: String(key) as VideoTranscodeProfile['resolution'] })
+              }
+              aria-label={t('preferences.media.videoTranscoding.resolution')}
+            >
+              <Label>{t('preferences.media.videoTranscoding.resolution')}</Label>
+              <Select.Trigger className="rounded-full pl-5">
+                <Select.Value />
+                <Select.Indicator />
+              </Select.Trigger>
+              <Select.Popover>
+                <ListBox>
+                  {VIDEO_TRANSCODE_RESOLUTIONS.map((resolution) => (
+                    <ListBox.Item
+                      key={resolution}
+                      id={resolution}
+                      textValue={t(`preferences.media.videoTranscoding.resolutions.${resolution}`)}
+                      className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
+                    >
+                      {t(`preferences.media.videoTranscoding.resolutions.${resolution}`)}
+                    </ListBox.Item>
+                  ))}
+                </ListBox>
+              </Select.Popover>
+            </Select>
+
+            <Select
+              variant="secondary"
+              value={videoTranscode.quality}
+              onChange={(key) =>
+                updateVideoTranscode({ quality: String(key) as VideoTranscodeProfile['quality'] })
+              }
+              aria-label={t('preferences.media.videoTranscoding.quality')}
+            >
+              <Label>{t('preferences.media.videoTranscoding.quality')}</Label>
+              <Select.Trigger className="rounded-full pl-5">
+                <Select.Value />
+                <Select.Indicator />
+              </Select.Trigger>
+              <Select.Popover>
+                <ListBox>
+                  {VIDEO_TRANSCODE_QUALITIES.map((quality) => (
+                    <ListBox.Item
+                      key={quality}
+                      id={quality}
+                      textValue={t(`preferences.media.videoTranscoding.qualities.${quality}`)}
+                      className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
+                    >
+                      {t(`preferences.media.videoTranscoding.qualities.${quality}`)}
+                    </ListBox.Item>
+                  ))}
+                </ListBox>
+              </Select.Popover>
+            </Select>
+          </div>
 
           {ffmpegConfig?.message && (
             <p className="rounded-xl bg-danger-50 px-3 py-2 text-xs text-danger-700">
@@ -231,32 +307,48 @@ export default function MediaSettings({
             </p>
           )}
 
-          {ffmpegConfig && !usesSystemFfmpeg && (
+          {ffmpegConfig && (
             <>
               <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="primary"
-                  className="rounded-full"
-                  isDisabled={isCheckingFfmpeg}
-                  onPress={() =>
-                    void runFfmpegAction(() => window.api.videoTranscode.selectFfmpeg())
-                  }
-                >
-                  {t('preferences.media.videoTranscoding.select')}
-                </Button>
+                {!usesSystemFfmpeg && (
+                  <Button
+                    variant="primary"
+                    className="rounded-full"
+                    isDisabled={isCheckingFfmpeg}
+                    onPress={() =>
+                      void runFfmpegAction(() => window.api.videoTranscode.selectFfmpeg())
+                    }
+                  >
+                    {t('preferences.media.videoTranscoding.select')}
+                  </Button>
+                )}
+                {!ffmpegConfig.ffprobeExecutableName && (
+                  <Button
+                    variant="secondary"
+                    className="rounded-full"
+                    isDisabled={isCheckingFfmpeg}
+                    onPress={() =>
+                      void runFfmpegAction(() => window.api.videoTranscode.selectFfprobe())
+                    }
+                  >
+                    {t('preferences.media.videoTranscoding.selectFfprobe')}
+                  </Button>
+                )}
               </div>
 
-              <p className="text-xs text-gray-500">
-                {t('preferences.media.videoTranscoding.installGuide')}{' '}
-                <a
-                  href="https://ffmpeg.org/download.html"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-accent underline"
-                >
-                  {t('preferences.media.videoTranscoding.installLink')}
-                </a>
-              </p>
+              {!usesSystemFfmpeg && (
+                <p className="text-xs text-gray-500">
+                  {t('preferences.media.videoTranscoding.installGuide')}{' '}
+                  <a
+                    href="https://ffmpeg.org/download.html"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-accent underline"
+                  >
+                    {t('preferences.media.videoTranscoding.installLink')}
+                  </a>
+                </p>
+              )}
             </>
           )}
         </section>

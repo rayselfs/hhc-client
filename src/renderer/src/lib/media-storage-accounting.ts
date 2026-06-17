@@ -120,6 +120,8 @@ function getDerivedAssetBucket(kind: DerivedAssetKind): keyof MediaStorageUsage 
       return 'pdfPageThumbnails'
     case 'video-poster':
       return 'videoPosters'
+    case 'media-metadata':
+      return 'generatedCoverThumbnails'
     case 'transcoded-video':
       return 'transcodedDerivatives'
   }

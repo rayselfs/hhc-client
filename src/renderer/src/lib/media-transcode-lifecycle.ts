@@ -2,6 +2,7 @@ import { isValidNativeFileId } from '@shared/native-media'
 import { isElectron } from './env'
 import { getFileBlobRecord } from './file-explorer-db'
 import { MediaJobBlockedError, mediaJobQueue } from './media-job-queue'
+import { ensureSourceMediaMetadata } from './media-metadata'
 import {
   getDerivedAsset,
   listMediaJobs,
@@ -56,6 +57,11 @@ export async function enqueueTranscodeJob(input: {
       profile: TRANSCODE_COMPATIBILITY_PROFILE.variant
     }
   })
+  window.dispatchEvent?.(
+    new CustomEvent('hhc:transcode-status-changed', {
+      detail: { sourceBlobId: input.sourceBlobId, status: 'building' }
+    })
+  )
 
   const job = await mediaJobQueue.enqueue({
     type: 'transcode',
@@ -132,7 +138,7 @@ export async function markTranscodedVideoReady(input: {
     throw new Error('Invalid transcoded video native file id')
   }
 
-  return putDerivedAsset({
+  const asset = await putDerivedAsset({
     sourceBlobId: input.sourceBlobId,
     kind: 'transcoded-video',
     variant: TRANSCODE_COMPATIBILITY_PROFILE.variant,
@@ -153,13 +159,19 @@ export async function markTranscodedVideoReady(input: {
       profile: input.metadata?.profile ?? TRANSCODE_COMPATIBILITY_PROFILE.variant
     }
   })
+  window.dispatchEvent?.(
+    new CustomEvent('hhc:transcode-status-changed', {
+      detail: { sourceBlobId: input.sourceBlobId, status: 'ready' }
+    })
+  )
+  return asset
 }
 
 export async function markTranscodedVideoFailed(
   sourceBlobId: string,
   metadata?: Partial<TranscodedVideoMetadata>
 ): Promise<DerivedAssetRecord> {
-  return putDerivedAsset({
+  const asset = await putDerivedAsset({
     sourceBlobId,
     kind: 'transcoded-video',
     variant: TRANSCODE_COMPATIBILITY_PROFILE.variant,
@@ -175,6 +187,12 @@ export async function markTranscodedVideoFailed(
       profile: metadata?.profile ?? TRANSCODE_COMPATIBILITY_PROFILE.variant
     }
   })
+  window.dispatchEvent?.(
+    new CustomEvent('hhc:transcode-status-changed', {
+      detail: { sourceBlobId, status: 'failed' }
+    })
+  )
+  return asset
 }
 
 export async function getReadyTranscodedVideo(
@@ -215,10 +233,16 @@ mediaJobQueue.registerExecutor('transcode', async (job, { signal }) => {
   }
   signal.addEventListener('abort', cancel, { once: true })
   try {
+    const { useSettingsStore } = await import('@renderer/stores/settings')
+    const sourceMetadata =
+      (await ensureSourceMediaMetadata(job.sourceBlobId, sourceRecord.blob?.type ?? 'video/*')) ??
+      undefined
     const result = await window.api.videoTranscode.run({
       jobId: job.id,
       sourceFileId: job.sourceBlobId,
-      outputFileId
+      outputFileId,
+      profile: useSettingsStore.getState().videoTranscode,
+      sourceMetadata
     })
     if (signal.aborted) {
       await window.api.nativeFs.delete(result.outputFileId).catch(() => undefined)
@@ -227,7 +251,8 @@ mediaJobQueue.registerExecutor('transcode', async (job, { signal }) => {
     await markTranscodedVideoReady({
       sourceBlobId: job.sourceBlobId,
       nativeFileId: result.outputFileId,
-      size: result.size
+      size: result.size,
+      metadata: sourceMetadata
     })
   } catch (error) {
     await markTranscodedVideoFailed(job.sourceBlobId)

@@ -82,10 +82,14 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
       s.snapshot?.entries.find((entry) => entry.itemId === item.id)?.playbackMode ===
       'live-transcode'
   )
+  const metadataDuration = useMediaProjectionStore((s) => {
+    const durationMs = s.snapshot?.entries.find((entry) => entry.itemId === item.id)?.durationMs
+    return durationMs && durationMs > 0 ? durationMs / 1000 : undefined
+  })
   const displayedCurrentTime = isLiveTranscode
     ? (projectedVideoState?.currentTime ?? currentTime)
     : currentTime
-  const displayedDuration = isLiveTranscode ? (projectedVideoState?.duration ?? duration) : duration
+  const displayedDuration = metadataDuration ?? (isLiveTranscode ? (projectedVideoState?.duration ?? duration) : duration)
   const displayedHasStarted = isLiveTranscode
     ? hasStarted || Boolean(projectedVideoState?.hasStarted) || displayedCurrentTime > 0
     : hasStarted
@@ -280,12 +284,13 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
   const syncVideoMetadata = useCallback((): void => {
     const video = videoRef.current
     if (!video) return
-    const nextDuration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0
+    const nextDuration =
+      metadataDuration ?? (Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0)
     durationRef.current = nextDuration
     setDuration(nextDuration)
     currentTimeRef.current = video.currentTime
     setCurrentTime(video.currentTime)
-  }, [])
+  }, [metadataDuration])
 
   const commitSeek = useCallback(
     (seekTo: number): void => {

@@ -15,6 +15,11 @@ import type {
   TimerTickPayload
 } from './types/timer'
 import type { BibleVersion, BibleBook } from './types/bible'
+import type {
+  H264EncoderName,
+  VideoTranscodeProfile,
+  VideoTranscodeSourceMetadata
+} from './video-transcode-profile'
 
 export type WhisperModel = 'whisper-base' | 'whisper-small' | 'whisper-medium'
 
@@ -41,6 +46,7 @@ export interface FfmpegCapabilityInfo {
   hasH264Encoder: boolean
   hasAacEncoder: boolean
   hasMp4Muxer: boolean
+  h264Encoders?: H264EncoderName[]
 }
 
 export interface FfmpegConfigInfo {
@@ -48,6 +54,8 @@ export interface FfmpegConfigInfo {
   source?: 'stored' | 'system'
   executableName?: string
   version?: string
+  ffprobeExecutableName?: string
+  ffprobeVersion?: string
   capabilities?: FfmpegCapabilityInfo
   message?: string
   validatedAt?: number
@@ -57,6 +65,8 @@ export interface VideoTranscodeRunRequest {
   jobId: string
   sourceFileId: string
   outputFileId: string
+  profile?: VideoTranscodeProfile
+  sourceMetadata?: VideoTranscodeSourceMetadata
 }
 
 export interface VideoTranscodeRunResult {
@@ -74,6 +84,8 @@ export interface VideoPosterResult {
 
 export interface VideoLiveTranscodeStartRequest {
   sourceFileId: string
+  profile?: VideoTranscodeProfile
+  sourceMetadata?: VideoTranscodeSourceMetadata
 }
 
 export interface VideoLiveTranscodeStartResult {
@@ -81,6 +93,12 @@ export interface VideoLiveTranscodeStartResult {
   url: string
   mimeType: 'video/mp4'
 }
+
+export interface VideoProbeRequest {
+  sourceFileId: string
+}
+
+export interface VideoProbeResult extends VideoTranscodeSourceMetadata {}
 
 export interface LocalSyncConnectionInfo {
   id: string
@@ -191,11 +209,13 @@ export interface IpcInvokeMap {
   'native-fs:delete-file': { args: [string]; result: void }
   'video-transcode:get-ffmpeg-config': { args: []; result: FfmpegConfigInfo }
   'video-transcode:select-ffmpeg': { args: []; result: FfmpegConfigInfo | null }
+  'video-transcode:select-ffprobe': { args: []; result: FfmpegConfigInfo | null }
   'video-transcode:validate-ffmpeg': { args: []; result: FfmpegConfigInfo }
   'video-transcode:remove-ffmpeg-config': { args: []; result: FfmpegConfigInfo }
   'video-transcode:run': { args: [VideoTranscodeRunRequest]; result: VideoTranscodeRunResult }
   'video-transcode:cancel': { args: [string]; result: void }
   'video-transcode:generate-poster': { args: [VideoPosterRequest]; result: VideoPosterResult }
+  'video-transcode:probe': { args: [VideoProbeRequest]; result: VideoProbeResult }
   'video-transcode:start-live': {
     args: [VideoLiveTranscodeStartRequest]
     result: VideoLiveTranscodeStartResult

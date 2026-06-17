@@ -46,6 +46,9 @@ import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 import type { SortField } from '@renderer/stores/file-explorer'
 import { hasNameConflict, splitFileName, validateDisplayName } from '@renderer/lib/file-naming'
 import { listSyncEntries, type SyncEntryStatus } from '@renderer/lib/sync-db'
+import { getBlobId } from '@renderer/lib/blob-identity'
+import { getDerivedAsset } from '@renderer/lib/media-work-db'
+import { getMediaSupport, resolveMediaCapability } from '@renderer/lib/media-capabilities'
 
 export interface FileBrowserProps {
   onItemContextMenu?: (itemId: string, event: React.MouseEvent) => void
@@ -210,6 +213,49 @@ function formatSearchFileSize(bytes: number | undefined): string {
 const SEARCH_COL = { created: 90, size: 72, kind: 96, path: 200 }
 const EMPTY_ARRAY: never[] = []
 const SLOW_CLICK_RENAME_MIN_MS = 320
+const TRANSCODE_COMPATIBILITY_VARIANT = 'mp4-h264-aac-yuv420p-faststart'
+
+type TranscodeBadgeStatus = 'processing' | 'failed'
+
+function useTranscodeBadgeStatuses(fileItems: FileItemRecord[]): Record<string, TranscodeBadgeStatus> {
+  const [statuses, setStatuses] = useState<Record<string, TranscodeBadgeStatus>>({})
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function load(): Promise<void> {
+      const next: Record<string, TranscodeBadgeStatus> = {}
+      await Promise.all(
+        fileItems.map(async (item) => {
+          const capability = resolveMediaCapability({ mimeType: item.mimeType, fileName: item.name })
+          if (!capability || getMediaSupport(capability, 'electron') !== 'transcode-required') return
+          const blobId = getBlobId(item)
+          if (!blobId) return
+          const asset = await getDerivedAsset(
+            blobId,
+            'transcoded-video',
+            TRANSCODE_COMPATIBILITY_VARIANT
+          )
+          if (asset?.status === 'building') next[item.id] = 'processing'
+          if (asset?.status === 'failed') next[item.id] = 'failed'
+        })
+      )
+      if (!cancelled) setStatuses(next)
+    }
+
+    void load()
+    const handleStatusChanged = (): void => {
+      void load()
+    }
+    window.addEventListener('hhc:transcode-status-changed', handleStatusChanged)
+    return () => {
+      cancelled = true
+      window.removeEventListener('hhc:transcode-status-changed', handleStatusChanged)
+    }
+  }, [fileItems])
+
+  return statuses
+}
 
 function SearchResultsList({
   results,
@@ -418,6 +464,7 @@ export function FileBrowser({
   }, [searchQuery, searchRevision, t])
 
   const thumbnails = useThumbnails(fileItems, { pendingAgeMs: 2 * 60 * 1000 })
+  const transcodeBadgeStatuses = useTranscodeBadgeStatuses(fileItems)
 
   useEffect(() => {
     let cancelled = false
@@ -469,10 +516,11 @@ export function FileBrowser({
         createdAt: item.createdAt,
         thumbnailUrl: canHaveThumbnail(item.mimeType) ? thumbnails[item.id] : null,
         isSelected: false,
-        syncStatus: syncStatuses[item.id]
+        syncStatus: syncStatuses[item.id],
+        transcodeStatus: transcodeBadgeStatuses[item.id]
       }))
     ],
-    [folders, fileItems, thumbnails, syncStatuses]
+    [folders, fileItems, thumbnails, syncStatuses, transcodeBadgeStatuses]
   )
 
   const sortedItems = useMemo(() => {

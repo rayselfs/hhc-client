@@ -10,6 +10,8 @@ import type {
   VideoTranscodeRunResult,
   VideoPosterRequest,
   VideoPosterResult,
+  VideoProbeRequest,
+  VideoProbeResult,
   VideoLiveTranscodeStartRequest,
   VideoLiveTranscodeStartResult,
   LocalSyncConnectionInfo,
@@ -94,11 +96,13 @@ interface NativeFsAPI {
 interface VideoTranscodeAPI {
   getFfmpegConfig: () => Promise<FfmpegConfigInfo>
   selectFfmpeg: () => Promise<FfmpegConfigInfo | null>
+  selectFfprobe: () => Promise<FfmpegConfigInfo | null>
   validateFfmpeg: () => Promise<FfmpegConfigInfo>
   removeFfmpegConfig: () => Promise<FfmpegConfigInfo>
   run: (request: VideoTranscodeRunRequest) => Promise<VideoTranscodeRunResult>
   cancel: (jobId: string) => Promise<void>
   generatePoster: (request: VideoPosterRequest) => Promise<VideoPosterResult>
+  probe: (request: VideoProbeRequest) => Promise<VideoProbeResult>
   startLive: (request: VideoLiveTranscodeStartRequest) => Promise<VideoLiveTranscodeStartResult>
   stopLive: (sessionId: string) => Promise<void>
 }

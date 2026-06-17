@@ -13,6 +13,7 @@ const {
   mockToggleGrid,
   mockSend,
   mockProject,
+  mockOn,
   mockClaimProjection,
   mockBlankProjection,
   mockPauseTimer,
@@ -39,6 +40,7 @@ const {
     mockToggleGrid: vi.fn(),
     mockSend: vi.fn(),
     mockProject: vi.fn(),
+    mockOn: vi.fn(() => vi.fn()),
     mockClaimProjection: vi.fn(),
     mockBlankProjection: vi.fn(),
     mockPauseTimer: vi.fn(),
@@ -76,7 +78,8 @@ vi.mock('@renderer/contexts/ProjectionContext', () => ({
     claimProjection: mockClaimProjection,
     blankProjection: mockBlankProjection,
     send: mockSend,
-    project: mockProject
+    project: mockProject,
+    on: mockOn
   })
 }))
 

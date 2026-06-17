@@ -29,6 +29,8 @@ describe('media transcode lifecycle', () => {
   })
 
   it('deduplicates copied item transcode jobs by source blob identity', async () => {
+    const listener = vi.fn()
+    window.addEventListener('hhc:transcode-status-changed', listener)
     const first = await enqueueTranscodeJob({
       sourceBlobId: 'source-blob-1',
       itemId: 'original-item'
@@ -40,6 +42,12 @@ describe('media transcode lifecycle', () => {
 
     expect(second.id).toBe(first.id)
     expect(first.dedupeKey).toBe(createTranscodeDedupeKey('source-blob-1'))
+    expect(listener).toHaveBeenCalledWith(
+      expect.objectContaining({
+        detail: { sourceBlobId: 'source-blob-1', status: 'building' }
+      })
+    )
+    window.removeEventListener('hhc:transcode-status-changed', listener)
     await expect(
       getDerivedAsset('source-blob-1', 'transcoded-video', TRANSCODE_COMPATIBILITY_PROFILE.variant)
     ).resolves.toMatchObject({
@@ -125,7 +133,9 @@ describe('media transcode lifecycle', () => {
     expect(run).toHaveBeenCalledWith({
       jobId: job.id,
       sourceFileId: sourceBlobId,
-      outputFileId: expect.any(String)
+      outputFileId: expect.any(String),
+      profile: { resolution: '1080p', quality: 'high' },
+      sourceMetadata: undefined
     })
   })
 

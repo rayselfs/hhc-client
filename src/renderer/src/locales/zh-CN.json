@@ -597,7 +597,21 @@
         "executable": "执行文件",
         "notSelected": "未选择",
         "version": "版本",
+        "ffprobe": "FFprobe",
+        "resolution": "分辨率",
+        "quality": "质量",
+        "resolutions": {
+          "4k": "4K",
+          "1080p": "1080p",
+          "720p": "720p"
+        },
+        "qualities": {
+          "high": "高",
+          "medium": "中",
+          "low": "低"
+        },
         "select": "选择 FFmpeg",
+        "selectFfprobe": "选择 FFprobe",
         "installGuide": "需要 FFmpeg 执行文件，可至",
         "installLink": "FFmpeg 下载"
       }

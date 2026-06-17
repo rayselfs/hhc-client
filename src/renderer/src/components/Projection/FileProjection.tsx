@@ -11,12 +11,14 @@ type FileProjectionProps = {
   initialMimeType?: string
   initialStreamUrl?: string
   initialSeekable?: boolean
+  initialDurationMs?: number
   controlEvent?: { id: number; data: FileControlPayload } | null
 }
 
 type LoadFileOptions = {
   streamUrl?: string
   seekable?: boolean
+  durationMs?: number
 }
 
 type PdfState = {
@@ -41,6 +43,7 @@ export default function FileProjection({
   initialMimeType,
   initialStreamUrl,
   initialSeekable,
+  initialDurationMs,
   controlEvent
 }: FileProjectionProps): React.JSX.Element {
   const [objectUrl, setObjectUrl] = useState<string | null>(null)
@@ -57,6 +60,7 @@ export default function FileProjection({
   const sourceRevokeRef = useRef<(() => void) | null>(null)
   const pendingVideoControlRef = useRef<PendingVideoControl | null>(null)
   const seekableRef = useRef(true)
+  const durationMsRef = useRef<number | undefined>(initialDurationMs)
 
   const isControlForCurrentItem = useCallback((data: FileControlPayload): boolean => {
     if (!('itemId' in data) || data.itemId === undefined) return true
@@ -169,7 +173,12 @@ export default function FileProjection({
       const itemId = currentItemIdRef.current
       const send = adapterSendRef.current
       if (!video || !itemId || !send) return
-      const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0
+      const metadataDuration =
+        durationMsRef.current !== undefined && durationMsRef.current > 0
+          ? durationMsRef.current / 1000
+          : undefined
+      const duration =
+        metadataDuration ?? (Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0)
       send('file:playback-state', {
         itemId,
         currentTime: Number.isFinite(video.currentTime) ? video.currentTime : 0,
@@ -186,6 +195,7 @@ export default function FileProjection({
       currentItemIdRef.current = itemId
       pendingVideoControlRef.current = null
       seekableRef.current = options.seekable !== false
+      durationMsRef.current = options.durationMs
       sourceRevokeRef.current?.()
       sourceRevokeRef.current = null
       setObjectUrl(null)
@@ -289,7 +299,8 @@ export default function FileProjection({
       setDisplayName(fileName ?? '')
       loadFile(initialItemId, initialBlobId, initialMimeType, {
         streamUrl: initialStreamUrl,
-        seekable: initialSeekable
+        seekable: initialSeekable,
+        durationMs: initialDurationMs
       })
     }
   }, [
@@ -298,6 +309,7 @@ export default function FileProjection({
     initialItemId,
     initialMimeType,
     initialSeekable,
+    initialDurationMs,
     initialStreamUrl,
     loadFile
   ])

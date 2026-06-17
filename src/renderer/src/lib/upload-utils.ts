@@ -14,6 +14,7 @@ import { mediaJobQueue } from '@renderer/lib/media-job-queue'
 import { getFileBlob, getFileSource, openFileExplorerDB } from '@renderer/lib/file-explorer-db'
 import { resolveUniqueName } from '@renderer/lib/file-naming'
 import { enqueueTranscodeJob } from '@renderer/lib/media-transcode-lifecycle'
+import { ensureSourceMediaMetadata } from '@renderer/lib/media-metadata'
 import { enqueueVideoPosterJob } from '@renderer/lib/video-poster-jobs'
 import { MAX_FILE_SIZE_WEB } from '@renderer/lib/media-limits'
 
@@ -178,6 +179,18 @@ async function uploadPreparedFiles(destinations: UploadDestination[]): Promise<n
       try {
         id = await addFileItemToStore(file, parentId, classification.mimeType)
         uploadedCount++
+        if (
+          classification.kind === 'image' ||
+          classification.kind === 'video' ||
+          classification.kind === 'pdf'
+        ) {
+          void ensureSourceMediaMetadata(id, classification.mimeType).catch((error) => {
+            console.warn('[media-metadata] Failed to store upload metadata', {
+              blobId: id,
+              error
+            })
+          })
+        }
         if (canGenerateThumbnail(classification.mimeType, file.name)) {
           const dataUrl = await generateThumbnail(file, classification.mimeType)
           if (dataUrl) await saveThumbnail(id, dataUrl)

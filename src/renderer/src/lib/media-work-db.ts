@@ -37,18 +37,24 @@ export type DerivedAssetKind =
   | 'cover-thumbnail'
   | 'pdf-page-thumbnails'
   | 'video-poster'
+  | 'media-metadata'
   | 'transcoded-video'
 
 export interface DerivedAssetMetadata {
+  kind?: 'image' | 'video' | 'pdf'
   container?: string
   videoCodec?: string
   audioCodec?: string
   width?: number
   height?: number
   durationMs?: number
+  pageCount?: number
+  firstPageWidth?: number
+  firstPageHeight?: number
   pixelFormat?: string
   fastStart?: boolean
   profile?: string
+  frameRate?: number
 }
 
 export interface DerivedAssetRecord {

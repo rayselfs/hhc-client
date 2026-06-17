@@ -135,7 +135,9 @@ describe('media projection sync', () => {
 
     await vi.waitFor(() => {
       expect(window.api.videoTranscode.startLive).toHaveBeenCalledWith({
-        sourceFileId: 'source-blob'
+        sourceFileId: 'source-blob',
+        profile: { resolution: '1080p', quality: 'high' },
+        sourceMetadata: undefined
       })
       expect(mockProject).toHaveBeenCalledWith(
         'file:show',

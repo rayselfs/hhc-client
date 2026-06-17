@@ -75,6 +75,8 @@ vi.mock('@renderer/stores/settings', () => ({
         defaultOfflinePolicy: 'always-offline' as const
       },
       setOneDrive: vi.fn(),
+      videoTranscode: { resolution: '1080p' as const, quality: 'high' as const },
+      setVideoTranscode: vi.fn(),
       trashRetentionDays: 30,
       setTrashRetentionDays: vi.fn(),
       resetSettings: vi.fn(),
@@ -330,6 +332,8 @@ describe('PreferencesDialog', () => {
         setOneDrive: vi.fn(),
         trashRetentionDays: 30,
         setTrashRetentionDays: vi.fn(),
+        videoTranscode: { resolution: '1080p' as const, quality: 'high' as const },
+        setVideoTranscode: vi.fn(),
         projectionDisplayId: '',
         setProjectionDisplayId: vi.fn()
       }
@@ -437,6 +441,8 @@ describe('PreferencesDialog', () => {
         setOneDrive: vi.fn(),
         trashRetentionDays: 30,
         setTrashRetentionDays: vi.fn(),
+        videoTranscode: { resolution: '1080p' as const, quality: 'high' as const },
+        setVideoTranscode: vi.fn(),
         projectionDisplayId: '',
         setProjectionDisplayId: vi.fn()
       }
@@ -496,6 +502,8 @@ describe('PreferencesDialog', () => {
         setOneDrive: vi.fn(),
         trashRetentionDays: 30,
         setTrashRetentionDays: vi.fn(),
+        videoTranscode: { resolution: '1080p' as const, quality: 'high' as const },
+        setVideoTranscode: vi.fn(),
         projectionDisplayId: '',
         setProjectionDisplayId: vi.fn()
       }
@@ -546,6 +554,8 @@ describe('PreferencesDialog', () => {
         setOneDrive: vi.fn(),
         trashRetentionDays: 30,
         setTrashRetentionDays: vi.fn(),
+        videoTranscode: { resolution: '1080p' as const, quality: 'high' as const },
+        setVideoTranscode: vi.fn(),
         projectionDisplayId: '',
         setProjectionDisplayId: vi.fn()
       }

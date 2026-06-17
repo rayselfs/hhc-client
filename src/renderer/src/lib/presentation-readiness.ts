@@ -11,6 +11,7 @@ import {
 } from './media-capabilities'
 import { getSyncEntryByLocalItem } from './sync-db'
 import { getFileBlobRecord } from './file-explorer-db'
+import { ensureSourceMediaMetadata } from './media-metadata'
 
 export type PresentationReadinessStatus =
   | 'ready'
@@ -36,6 +37,7 @@ export interface PresentationReadinessItem {
   derivativeId?: string
   playbackMode?: 'native' | 'transcoded-derivative' | 'live-transcode'
   seekable?: boolean
+  durationMs?: number
 }
 
 export interface PresentationReadinessReport {
@@ -53,6 +55,7 @@ export interface PresentationSnapshotEntry {
   derivativeId?: string
   playbackMode?: 'native' | 'transcoded-derivative' | 'live-transcode'
   seekable?: boolean
+  durationMs?: number
 }
 
 export interface PresentationSnapshot {
@@ -82,7 +85,8 @@ export function createPresentationSnapshot(
       sourceUrl: item.url,
       derivativeId: readinessByItemId.get(item.id)?.derivativeId,
       playbackMode: readinessByItemId.get(item.id)?.playbackMode,
-      seekable: readinessByItemId.get(item.id)?.seekable
+      seekable: readinessByItemId.get(item.id)?.seekable,
+      durationMs: readinessByItemId.get(item.id)?.durationMs
     }))
   }
 }
@@ -177,6 +181,9 @@ async function analyzePresentationItem(
     }
   }
 
+  const metadata = capability.kind === 'video' ? await ensureSourceMediaMetadata(blobId, item.mimeType) : null
+  const durationMs = metadata?.durationMs
+
   if (support === 'transcode-required') {
     const derivative = await getDerivedAsset(
       blobId,
@@ -193,7 +200,8 @@ async function analyzePresentationItem(
         support,
         derivativeId: derivative.id,
         playbackMode: 'transcoded-derivative',
-        seekable: true
+        seekable: true,
+        durationMs
       }
     }
 
@@ -217,7 +225,8 @@ async function analyzePresentationItem(
         support,
         derivativeId: derivative?.id,
         playbackMode: 'live-transcode',
-        seekable: false
+        seekable: false,
+        durationMs
       }
     }
 
@@ -238,7 +247,8 @@ async function analyzePresentationItem(
     reason: 'ready-native',
     support,
     playbackMode: 'native',
-    seekable: true
+    seekable: true,
+    durationMs
   }
 }
 

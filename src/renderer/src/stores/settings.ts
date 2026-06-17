@@ -8,6 +8,11 @@ import { isElectron } from '@renderer/lib/env'
 import { ThemePreference } from '@renderer/types/theme'
 import type { WhisperModel } from '@shared/ipc-channels'
 import type { SyncOfflinePolicy } from '@shared/types/folder'
+import {
+  DEFAULT_VIDEO_TRANSCODE_PROFILE,
+  normalizeVideoTranscodeProfile,
+  type VideoTranscodeProfile
+} from '@shared/video-transcode-profile'
 
 export const TIMEZONE_OPTIONS = [
   { value: 'Asia/Taipei', labelKey: 'timezones.taipei' },
@@ -99,6 +104,8 @@ export interface OneDriveSettings {
   customClientId: string
   defaultOfflinePolicy: SyncOfflinePolicy
 }
+
+export type { VideoTranscodeProfile }
 
 export const DEFAULT_SPEECH: SpeechSettings = {
   activeProvider: 'azure',
@@ -239,6 +246,7 @@ export function normalizeSettingsState(value: unknown): Partial<SettingsStore> {
         : DEFAULT_TIMER_RING_COLOR_ENABLED,
     speech: normalizeSpeechSettings(state.speech),
     oneDrive: normalizeOneDriveSettings(state.oneDrive),
+    videoTranscode: normalizeVideoTranscodeProfile(state.videoTranscode),
     trashRetentionDays: normalizePositiveInteger(
       state.trashRetentionDays,
       DEFAULT_TRASH_RETENTION_DAYS
@@ -256,6 +264,7 @@ export interface SettingsStore {
   timerRingColorEnabled: boolean
   speech: SpeechSettings
   oneDrive: OneDriveSettings
+  videoTranscode: VideoTranscodeProfile
   trashRetentionDays: number
   reminderMode: 'subtract' | 'add'
   projectionDisplayId: string
@@ -266,6 +275,7 @@ export interface SettingsStore {
   setTimerRingColorEnabled: (enabled: boolean) => void
   setSpeech: (settings: SpeechSettings) => void
   setOneDrive: (settings: OneDriveSettings) => void
+  setVideoTranscode: (settings: VideoTranscodeProfile) => void
   setTrashRetentionDays: (days: number) => void
   setReminderMode: (mode: 'subtract' | 'add') => void
   setProjectionDisplayId: (displayId: string) => void
@@ -282,6 +292,7 @@ function getDefaultSettingsState(): Omit<
   | 'setTimerRingColorEnabled'
   | 'setSpeech'
   | 'setOneDrive'
+  | 'setVideoTranscode'
   | 'setTrashRetentionDays'
   | 'setReminderMode'
   | 'setProjectionDisplayId'
@@ -296,6 +307,7 @@ function getDefaultSettingsState(): Omit<
     timerRingColorEnabled: DEFAULT_TIMER_RING_COLOR_ENABLED,
     speech: getDefaultSpeechSettings(),
     oneDrive: DEFAULT_ONEDRIVE,
+    videoTranscode: DEFAULT_VIDEO_TRANSCODE_PROFILE,
     trashRetentionDays: DEFAULT_TRASH_RETENTION_DAYS,
     reminderMode: DEFAULT_REMINDER_MODE,
     projectionDisplayId: DEFAULT_PROJECTION_DISPLAY_ID
@@ -338,6 +350,10 @@ export const useSettingsStore = create<SettingsStore>()(
         })
       },
 
+      setVideoTranscode: (settings: VideoTranscodeProfile) => {
+        set({ videoTranscode: normalizeVideoTranscodeProfile(settings) })
+      },
+
       setTimerRingColorEnabled: (enabled: boolean) => {
         set({ timerRingColorEnabled: enabled })
       },
@@ -372,7 +388,7 @@ export const useSettingsStore = create<SettingsStore>()(
     {
       name: createKey('settings'),
       storage: hhcPersistStorage,
-      version: 10,
+      version: 11,
       migrate: (persistedState, version) => {
         const state = persistedState as Record<string, unknown>
         if (version < 1) {
@@ -429,6 +445,9 @@ export const useSettingsStore = create<SettingsStore>()(
         if (version < 10) {
           state.projectionDisplayId = DEFAULT_PROJECTION_DISPLAY_ID
         }
+        if (version < 11) {
+          state.videoTranscode = DEFAULT_VIDEO_TRANSCODE_PROFILE
+        }
         return normalizeSettingsState(state)
       },
       merge: (persistedState, currentState) => ({
@@ -443,6 +462,7 @@ export const useSettingsStore = create<SettingsStore>()(
         timerRingColorEnabled: state.timerRingColorEnabled,
         speech: state.speech,
         oneDrive: state.oneDrive,
+        videoTranscode: state.videoTranscode,
         trashRetentionDays: state.trashRetentionDays,
         reminderMode: state.reminderMode,
         projectionDisplayId: state.projectionDisplayId

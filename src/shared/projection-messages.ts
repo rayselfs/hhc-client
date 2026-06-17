@@ -55,6 +55,7 @@ export interface AppMessages {
     playbackMode?: 'native' | 'transcoded-derivative' | 'live-transcode'
     streamUrl?: string
     seekable?: boolean
+    durationMs?: number
   }
   /** File playback/control actions on projection */
   'file:control': FileControlPayload

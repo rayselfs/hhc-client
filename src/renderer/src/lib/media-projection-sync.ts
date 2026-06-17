@@ -4,6 +4,7 @@ import {
   useMediaProjectionStore,
   type MediaProjectionStore
 } from '@renderer/stores/media-projection'
+import { useSettingsStore } from '@renderer/stores/settings'
 import { getBlobId } from '@renderer/lib/blob-identity'
 import type { ProjectionPayload } from '@shared/projection-messages'
 
@@ -47,13 +48,21 @@ export function useMediaProjectionSync(): void {
         playlist: state.playlist.map((f) => ({ id: f.id, name: f.name, mimeType: f.mimeType })),
         currentIndex: state.currentIndex,
         playbackMode: snapshotEntry?.playbackMode,
-        seekable: snapshotEntry?.seekable
+        seekable: snapshotEntry?.seekable,
+        durationMs: snapshotEntry?.durationMs
       }
 
       if (snapshotEntry?.playbackMode === 'live-transcode') {
         let live: Awaited<ReturnType<typeof window.api.videoTranscode.startLive>>
         try {
-          live = await window.api.videoTranscode.startLive({ sourceFileId: blobId })
+          live = await window.api.videoTranscode.startLive({
+            sourceFileId: blobId,
+            profile: useSettingsStore.getState().videoTranscode,
+            sourceMetadata:
+              snapshotEntry?.durationMs !== undefined
+                ? { durationMs: snapshotEntry.durationMs }
+                : undefined
+          })
         } catch (error) {
           console.error('[media-projection] Failed to start live transcode', error)
           return
@@ -88,6 +97,7 @@ export function useMediaProjectionSync(): void {
       const endedCleared = prev.isEnded && !state.isEnded
 
       if (indexChanged || playlistChanged || endedCleared) {
+        if (indexChanged) void useMediaProjectionStore.getState().upgradeReadyTranscodedItems()
         void projectCurrentItem(state)
       }
     })
@@ -139,6 +149,17 @@ export function useMediaProjectionSync(): void {
     })
     return unsub
   }, [send, stopLiveSession])
+
+  useEffect(() => {
+    if (!window.addEventListener || !window.removeEventListener) return undefined
+    const handleTranscodeStatusChanged = (event: Event): void => {
+      const status = (event as CustomEvent<{ status?: string }>).detail?.status
+      if (status === 'ready') void useMediaProjectionStore.getState().upgradeReadyTranscodedItems()
+    }
+    window.addEventListener('hhc:transcode-status-changed', handleTranscodeStatusChanged)
+    return () =>
+      window.removeEventListener('hhc:transcode-status-changed', handleTranscodeStatusChanged)
+  }, [])
 
   useEffect(() => {
     const state = useMediaProjectionStore.getState()
