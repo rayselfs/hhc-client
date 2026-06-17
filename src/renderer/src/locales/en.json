@@ -540,9 +540,7 @@
     "hardwareAccelerationDesc": "Requires restarting the application",
     "projectionDisplay": {
       "label": "Projection Window Display",
-      "auto": "Automatic",
-      "primary": "Primary display",
-      "external": "External display {{index}}"
+      "auto": "Automatic"
     },
     "resetToDefaults": "Reset to Defaults",
     "resetBtn": "Reset",

@@ -536,9 +536,7 @@
     "hardwareAccelerationDesc": "需要重新启动应用程序",
     "projectionDisplay": {
       "label": "投影窗口屏幕",
-      "auto": "自动",
-      "primary": "主屏幕",
-      "external": "外接屏幕 {{index}}"
+      "auto": "自动"
     },
     "resetToDefaults": "重置为默认值",
     "resetBtn": "重置",

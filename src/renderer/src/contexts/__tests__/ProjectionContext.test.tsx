@@ -601,8 +601,12 @@ describe('ProjectionContext — electron mode', () => {
     })
   })
 
-  it('checks existing projection on mount', async () => {
+  it('opens and checks existing projection on mount', async () => {
     renderProjection()
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(mockEnsure).toHaveBeenCalledWith('auto')
     expect(mockCheck).toHaveBeenCalledOnce()
   })
 

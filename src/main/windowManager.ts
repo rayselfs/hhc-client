@@ -37,7 +37,9 @@ export class WindowManager {
     const primaryDisplay = screen.getPrimaryDisplay()
 
     if (displayId !== 'auto') {
-      const selected = displays.find((display) => String(display.id) === displayId)
+      const selected = displays.find(
+        (display) => String(display.id) === displayId && display.id !== primaryDisplay.id
+      )
       if (selected) return selected
     }
 

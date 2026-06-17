@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { TFunction } from 'i18next'
 import { Switch } from '@heroui/react/switch'
 import { Select } from '@heroui/react/select'
 import { ListBox } from '@heroui/react/list-box'
@@ -12,16 +11,10 @@ import { isElectron } from '@renderer/lib/env'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
 import type { DisplayInfo } from '@shared/ipc-channels'
 
-function formatDisplayLabel(
-  display: DisplayInfo,
-  externalIndex: number,
-  t: TFunction
-): string {
-  const kind = display.isPrimary
-    ? String(t('preferences.projectionDisplay.primary'))
-    : String(t('preferences.projectionDisplay.external', { index: externalIndex }))
-  const name = display.label ? ` · ${display.label}` : ''
-  return `${kind}${name} · ${display.bounds.width}×${display.bounds.height}`
+function formatDisplayLabel(display: DisplayInfo): string {
+  const name = display.label.trim()
+  const size = `${display.bounds.width}×${display.bounds.height}`
+  return name ? `${name} · ${size}` : size
 }
 
 export default function GeneralSettings(): React.JSX.Element {
@@ -34,11 +27,23 @@ export default function GeneralSettings(): React.JSX.Element {
   const resetToDefaults = useSettingsStore((s) => s.resetToDefaults)
   const confirm = useConfirm()
   const [displays, setDisplays] = useState<DisplayInfo[]>([])
+  const externalDisplays = displays.filter((display) => !display.isPrimary)
 
   useEffect(() => {
     if (!isElectron() || !window.api?.projection?.getDisplays) return
-    window.api.projection.getDisplays().then(setDisplays).catch(() => setDisplays([]))
-  }, [])
+    window.api.projection
+      .getDisplays()
+      .then((nextDisplays) => {
+        setDisplays(nextDisplays)
+        const selected = nextDisplays.some(
+          (display) => !display.isPrimary && String(display.id) === projectionDisplayId
+        )
+        if (projectionDisplayId !== 'auto' && !selected) {
+          setProjectionDisplayId('auto')
+        }
+      })
+      .catch(() => setDisplays([]))
+  }, [projectionDisplayId, setProjectionDisplayId])
 
   const languageOptions = [
     { value: 'en', label: t('preferences.languageNames.en') },
@@ -123,11 +128,8 @@ export default function GeneralSettings(): React.JSX.Element {
                 >
                   {t('preferences.projectionDisplay.auto')}
                 </ListBox.Item>
-                {displays.map((display, index) => {
-                  const externalIndex = displays
-                    .slice(0, index + 1)
-                    .filter((item) => !item.isPrimary).length
-                  const label = formatDisplayLabel(display, externalIndex, t)
+                {externalDisplays.map((display) => {
+                  const label = formatDisplayLabel(display)
                   return (
                     <ListBox.Item
                       key={display.id}

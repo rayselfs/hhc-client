@@ -81,7 +81,6 @@ app.whenReady().then(() => {
   registerOneDriveDownloadHandlers(wm)
   registerNativeMediaProtocol()
   wm.createMainWindow()
-  wm.createProjectionWindow()
   registerUpdateService(wm)
 
   app.on('activate', function () {

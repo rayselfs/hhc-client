@@ -66,6 +66,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
   const [projectionReadyCount, setProjectionReadyCount] = useState(0)
   const [activeOwner, setActiveOwner] = useState<ProjectionOwner>('timer')
   const projectionDisplayId = useSettingsStore((state) => state.projectionDisplayId)
+  const startupProjectionDisplayIdRef = useRef(projectionDisplayId)
   const adapterRef = useRef<ProjectionAdapter | null>(null)
   const projectionWindowRef = useRef<Window | null>(null)
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -127,10 +128,13 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
     const adapter = getAdapter(adapterRef)
 
     if (isElectron()) {
-      window.api.projection.check().then(({ exists }) => {
-        setIsProjectionOpen(exists)
-        if (exists) isReadyRef.current = true
-      })
+      window.api.projection
+        .ensure(startupProjectionDisplayIdRef.current)
+        .then(() => window.api.projection.check())
+        .then(({ exists }) => {
+          setIsProjectionOpen(exists)
+          if (exists) isReadyRef.current = true
+        })
 
       const unsubOpened = window.api.projection.onProjectionOpened(() => {
         setIsProjectionOpen(true)
