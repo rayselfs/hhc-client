@@ -129,6 +129,8 @@ export interface OneDriveNativeDownloadResult {
 
 export interface DisplayInfo {
   id: number
+  label: string
+  isPrimary: boolean
   bounds: { x: number; y: number; width: number; height: number }
   workArea: { x: number; y: number; width: number; height: number }
   scaleFactor: number
@@ -145,7 +147,7 @@ export type UpdateStatus =
 
 export interface IpcInvokeMap {
   'projection:check': { args: []; result: { exists: boolean } }
-  'projection:ensure': { args: []; result: { created: boolean } }
+  'projection:ensure': { args: [string?]; result: { created: boolean } }
   'projection:close': { args: []; result: { closed: boolean } }
   'projection:get-displays': { args: []; result: DisplayInfo[] }
   'theme:get': { args: []; result: { source: string; shouldUseDarkColors: boolean } }

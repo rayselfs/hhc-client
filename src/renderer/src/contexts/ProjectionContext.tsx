@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { createProjectionAdapter, type ProjectionAdapter } from '@renderer/lib/projection-adapter'
 import { isElectron } from '@renderer/lib/env'
+import { useSettingsStore } from '@renderer/stores/settings'
 import type { ProjectionChannel, ProjectionPayload } from '@shared/projection-messages'
 
 /** Channels that carry displayable content (not system messages). */
@@ -64,6 +65,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
   const [isProjectionBlanked, _setIsProjectionBlanked] = useState(true)
   const [projectionReadyCount, setProjectionReadyCount] = useState(0)
   const [activeOwner, setActiveOwner] = useState<ProjectionOwner>('timer')
+  const projectionDisplayId = useSettingsStore((state) => state.projectionDisplayId)
   const adapterRef = useRef<ProjectionAdapter | null>(null)
   const projectionWindowRef = useRef<Window | null>(null)
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -198,7 +200,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
 
   const openProjection = useCallback(async (): Promise<void> => {
     if (isElectron()) {
-      await window.api.projection.ensure()
+      await window.api.projection.ensure(projectionDisplayId)
       return
     }
 
@@ -216,7 +218,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
     if (!win) return
     projectionWindowRef.current = win
     startPolling()
-  }, [startPolling])
+  }, [projectionDisplayId, startPolling])
 
   const closeProjection = useCallback(async (): Promise<void> => {
     if (isElectron()) {

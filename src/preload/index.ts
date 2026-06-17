@@ -40,7 +40,7 @@ const themeApi = {
 
 const projectionApi = {
   check: () => typedInvoke('projection:check'),
-  ensure: () => typedInvoke('projection:ensure'),
+  ensure: (displayId?: string) => typedInvoke('projection:ensure', displayId),
   close: () => typedInvoke('projection:close'),
   send: <C extends ProjectionChannel>(channel: C, data: ProjectionPayload<C>) =>
     ipcRenderer.send('projection:send', channel, data),

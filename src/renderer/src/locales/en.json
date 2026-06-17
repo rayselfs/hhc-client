@@ -538,6 +538,12 @@
     "darkMode": "Dark Mode",
     "hardwareAcceleration": "Hardware Acceleration",
     "hardwareAccelerationDesc": "Requires restarting the application",
+    "projectionDisplay": {
+      "label": "Projection Window Display",
+      "auto": "Automatic",
+      "primary": "Primary display",
+      "external": "External display {{index}}"
+    },
     "resetToDefaults": "Reset to Defaults",
     "resetBtn": "Reset",
     "resetToDefaultsConfirm": "Reset all settings to their default values?",

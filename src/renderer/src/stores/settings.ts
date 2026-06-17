@@ -64,6 +64,7 @@ const DEFAULT_TIMER_RING_COLOR = '#3b82f6'
 const DEFAULT_TIMER_RING_COLOR_ENABLED = false
 const DEFAULT_TRASH_RETENTION_DAYS = 30
 const DEFAULT_REMINDER_MODE = 'subtract'
+const DEFAULT_PROJECTION_DISPLAY_ID = 'auto'
 export const HHC_DEFAULT_ONEDRIVE_CLIENT_ID = '4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02'
 const RELOAD_DELAY_MS = 500
 const THEME_PREFERENCES: ThemePreference[] = ['system', 'light', 'dark']
@@ -134,6 +135,13 @@ function normalizePositiveInteger(
 ): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) return fallback
   return Math.min(max, Math.max(0, Math.floor(value)))
+}
+
+function normalizeProjectionDisplayId(value: unknown): string {
+  if (typeof value !== 'string' || value.trim() === '') return DEFAULT_PROJECTION_DISPLAY_ID
+  return value === DEFAULT_PROJECTION_DISPLAY_ID || /^\d+$/.test(value)
+    ? value
+    : DEFAULT_PROJECTION_DISPLAY_ID
 }
 
 function normalizeOneDriveSettings(value: unknown): OneDriveSettings {
@@ -237,7 +245,8 @@ export function normalizeSettingsState(value: unknown): Partial<SettingsStore> {
       state.trashRetentionDays,
       DEFAULT_TRASH_RETENTION_DAYS
     ),
-    reminderMode
+    reminderMode,
+    projectionDisplayId: normalizeProjectionDisplayId(state.projectionDisplayId)
   }
 }
 
@@ -251,6 +260,7 @@ export interface SettingsStore {
   oneDrive: OneDriveSettings
   trashRetentionDays: number
   reminderMode: 'subtract' | 'add'
+  projectionDisplayId: string
   setTimezone: (tz: string) => void
   setHardwareAcceleration: (enabled: boolean) => void
   setThemePreference: (pref: ThemePreference) => void
@@ -260,6 +270,7 @@ export interface SettingsStore {
   setOneDrive: (settings: OneDriveSettings) => void
   setTrashRetentionDays: (days: number) => void
   setReminderMode: (mode: 'subtract' | 'add') => void
+  setProjectionDisplayId: (displayId: string) => void
   resetToDefaults: () => void
 }
 
@@ -275,6 +286,7 @@ export const useSettingsStore = create<SettingsStore>()(
       oneDrive: DEFAULT_ONEDRIVE,
       trashRetentionDays: DEFAULT_TRASH_RETENTION_DAYS,
       reminderMode: DEFAULT_REMINDER_MODE,
+      projectionDisplayId: DEFAULT_PROJECTION_DISPLAY_ID,
 
       setTimezone: (tz: string) => {
         set({ timezone: tz })
@@ -319,6 +331,10 @@ export const useSettingsStore = create<SettingsStore>()(
         set({ reminderMode: mode })
       },
 
+      setProjectionDisplayId: (displayId: string) => {
+        set({ projectionDisplayId: normalizeProjectionDisplayId(displayId) })
+      },
+
       resetToDefaults: () => {
         clearAllSiteData()
         toast.success(i18n.t('toast.settingsReset'))
@@ -332,7 +348,7 @@ export const useSettingsStore = create<SettingsStore>()(
     {
       name: createKey('settings'),
       storage: hhcPersistStorage,
-      version: 9,
+      version: 10,
       migrate: (persistedState, version) => {
         const state = persistedState as Record<string, unknown>
         if (version < 1) {
@@ -386,6 +402,9 @@ export const useSettingsStore = create<SettingsStore>()(
         if (version < 9) {
           state.oneDrive = DEFAULT_ONEDRIVE
         }
+        if (version < 10) {
+          state.projectionDisplayId = DEFAULT_PROJECTION_DISPLAY_ID
+        }
         return normalizeSettingsState(state)
       },
       merge: (persistedState, currentState) => ({
@@ -401,7 +420,8 @@ export const useSettingsStore = create<SettingsStore>()(
         speech: state.speech,
         oneDrive: state.oneDrive,
         trashRetentionDays: state.trashRetentionDays,
-        reminderMode: state.reminderMode
+        reminderMode: state.reminderMode,
+        projectionDisplayId: state.projectionDisplayId
       })
     }
   )

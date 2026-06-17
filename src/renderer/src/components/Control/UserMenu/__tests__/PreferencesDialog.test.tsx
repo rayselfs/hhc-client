@@ -300,7 +300,9 @@ describe('PreferencesDialog', () => {
         },
         setOneDrive: vi.fn(),
         trashRetentionDays: 30,
-        setTrashRetentionDays: vi.fn()
+        setTrashRetentionDays: vi.fn(),
+        projectionDisplayId: 'auto',
+        setProjectionDisplayId: vi.fn()
       }
       return selector ? selector(store) : store
     })
@@ -384,7 +386,9 @@ describe('PreferencesDialog', () => {
         },
         setOneDrive: vi.fn(),
         trashRetentionDays: 30,
-        setTrashRetentionDays: vi.fn()
+        setTrashRetentionDays: vi.fn(),
+        projectionDisplayId: 'auto',
+        setProjectionDisplayId: vi.fn()
       }
       return selector ? selector(store) : store
     })
@@ -438,7 +442,9 @@ describe('PreferencesDialog', () => {
         },
         setOneDrive: vi.fn(),
         trashRetentionDays: 30,
-        setTrashRetentionDays: vi.fn()
+        setTrashRetentionDays: vi.fn(),
+        projectionDisplayId: 'auto',
+        setProjectionDisplayId: vi.fn()
       }
       return selector ? selector(store) : store
     })

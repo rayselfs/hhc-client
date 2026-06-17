@@ -12,9 +12,11 @@ const mockWindowManager = {
   closeProjection: vi.fn(),
   sendToProjection: vi.fn(),
   sendToMain: vi.fn(),
+  getPrimaryDisplayId: vi.fn(() => 1),
   getDisplays: vi.fn(() => [
     {
       id: 1,
+      label: 'Built-in',
       bounds: { x: 0, y: 0, width: 1920, height: 1080 },
       workArea: { x: 0, y: 0, width: 1920, height: 1040 },
       scaleFactor: 1
@@ -106,6 +108,14 @@ describe('projection:ensure', () => {
     const result = getHandler('projection:ensure')(makeEvent())
     expect(result).toEqual({ created: true })
     expect(mockWindowManager.createProjectionWindow).toHaveBeenCalledOnce()
+  })
+
+  it('passes selected display id when creating projection', () => {
+    vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockMainWindow as never)
+    mockWindowManager.isProjectionOpen.mockReturnValue(false)
+    const result = getHandler('projection:ensure')(makeEvent(), '2')
+    expect(result).toEqual({ created: true })
+    expect(mockWindowManager.createProjectionWindow).toHaveBeenCalledWith('2')
   })
 
   it('main window returns { created: false } if already open', () => {
@@ -204,6 +214,8 @@ describe('projection:get-displays', () => {
     expect(result).toEqual([
       {
         id: 1,
+        label: 'Built-in',
+        isPrimary: true,
         bounds: { x: 0, y: 0, width: 1920, height: 1080 },
         workArea: { x: 0, y: 0, width: 1920, height: 1040 },
         scaleFactor: 1

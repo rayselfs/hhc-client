@@ -43,7 +43,8 @@ beforeEach(() => {
     themePreference: 'system',
     timerRingColor: '#3b82f6',
     speech: DEFAULT_SPEECH,
-    oneDrive: DEFAULT_ONEDRIVE
+    oneDrive: DEFAULT_ONEDRIVE,
+    projectionDisplayId: 'auto'
   })
   mockToast.warning.mockClear()
   mockToast.success.mockClear()
@@ -99,7 +100,7 @@ describe('setTimezone', () => {
     expect(persisted).toBeTruthy()
     const parsed = JSON.parse(persisted!)
     expect(parsed.state.timezone).toBe('America/New_York')
-    expect(parsed.version).toBe(9)
+    expect(parsed.version).toBe(10)
 
     vi.unstubAllGlobals()
   })
@@ -136,7 +137,7 @@ describe('setHardwareAcceleration', () => {
     expect(persisted).toBeTruthy()
     const parsed = JSON.parse(persisted!)
     expect(parsed.state.hardwareAcceleration).toBe(false)
-    expect(parsed.version).toBe(9)
+    expect(parsed.version).toBe(10)
 
     vi.unstubAllGlobals()
   })
@@ -208,7 +209,7 @@ describe('persistence round-trip', () => {
     const parsed = JSON.parse(persisted!)
     expect(parsed.state.timezone).toBe('Europe/London')
     expect(parsed.state.hardwareAcceleration).toBe(false)
-    expect(parsed.version).toBe(9)
+    expect(parsed.version).toBe(10)
 
     vi.unstubAllGlobals()
   })
@@ -317,7 +318,7 @@ describe('themePreference', () => {
     expect(persisted).toBeTruthy()
     const parsed = JSON.parse(persisted!)
     expect(parsed.state.themePreference).toBe('dark')
-    expect(parsed.version).toBe(9)
+    expect(parsed.version).toBe(10)
 
     vi.unstubAllGlobals()
   })
@@ -377,7 +378,7 @@ describe('speech settings', () => {
     expect(persisted).toBeTruthy()
     const parsed = JSON.parse(persisted!)
     expect(parsed.state.speech.azure.region).toBe('japaneast')
-    expect(parsed.version).toBe(9)
+    expect(parsed.version).toBe(10)
 
     vi.unstubAllGlobals()
   })
@@ -453,7 +454,8 @@ describe('settings normalization', () => {
       timerRingColor: 'var(--accent)',
       timerRingColorEnabled: 'true',
       trashRetentionDays: -10,
-      reminderMode: 'multiply'
+      reminderMode: 'multiply',
+      projectionDisplayId: '../bad'
     })
 
     expect(normalized).toMatchObject({
@@ -463,8 +465,14 @@ describe('settings normalization', () => {
       timerRingColor: '#3b82f6',
       timerRingColorEnabled: false,
       trashRetentionDays: 0,
-      reminderMode: 'subtract'
+      reminderMode: 'subtract',
+      projectionDisplayId: 'auto'
     })
+  })
+
+  it('normalizes valid projection display ids', () => {
+    expect(normalizeSettingsState({ projectionDisplayId: '2' }).projectionDisplayId).toBe('2')
+    expect(normalizeSettingsState({ projectionDisplayId: 'auto' }).projectionDisplayId).toBe('auto')
   })
 })
 

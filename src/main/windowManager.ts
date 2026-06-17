@@ -32,6 +32,18 @@ export class WindowManager {
     return externalDisplay
   }
 
+  private getProjectionDisplay(displayId = 'auto'): Electron.Display {
+    const displays = screen.getAllDisplays()
+    const primaryDisplay = screen.getPrimaryDisplay()
+
+    if (displayId !== 'auto') {
+      const selected = displays.find((display) => String(display.id) === displayId)
+      if (selected) return selected
+    }
+
+    return this.getExternalDisplay() || primaryDisplay
+  }
+
   createMainWindow(): void {
     screen.on('display-added', () => {
       _cachedDisplay = undefined
@@ -96,12 +108,12 @@ export class WindowManager {
     })
   }
 
-  createProjectionWindow(): void {
+  createProjectionWindow(displayId = 'auto'): void {
     if (this.isProjectionOpen()) return
 
-    const externalDisplay = this.getExternalDisplay()
-    const hasSecondScreen = externalDisplay !== undefined
-    const targetDisplay = externalDisplay || screen.getPrimaryDisplay()
+    const primaryDisplay = screen.getPrimaryDisplay()
+    const targetDisplay = this.getProjectionDisplay(displayId)
+    const hasSecondScreen = targetDisplay.id !== primaryDisplay.id
 
     this.projectionWindow = new BrowserWindow({
       width: hasSecondScreen ? targetDisplay.bounds.width : 800,
@@ -191,6 +203,10 @@ export class WindowManager {
 
   getDisplays(): Electron.Display[] {
     return screen.getAllDisplays()
+  }
+
+  getPrimaryDisplayId(): number {
+    return screen.getPrimaryDisplay().id
   }
 
   cleanup(): void {

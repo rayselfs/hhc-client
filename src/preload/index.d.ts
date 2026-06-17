@@ -33,7 +33,7 @@ interface ThemeAPI {
 
 interface ProjectionAPI {
   check: () => Promise<{ exists: boolean }>
-  ensure: () => Promise<{ created: boolean }>
+  ensure: (displayId?: string) => Promise<{ created: boolean }>
   close: () => Promise<{ closed: boolean }>
   send: <C extends ProjectionChannel>(channel: C, data: ProjectionPayload<C>) => void
   sendToMain: <C extends ProjectionChannel>(channel: C, data: ProjectionPayload<C>) => void

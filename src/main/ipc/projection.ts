@@ -8,11 +8,11 @@ export function registerProjectionHandlers(windowManager: WindowManager): void {
     return { exists: windowManager.isProjectionOpen() }
   })
 
-  ipcMain.handle('projection:ensure', (event) => {
+  ipcMain.handle('projection:ensure', (event, displayId?: string) => {
     if (!isMainWindow(windowManager, event)) return { created: false }
     const wasOpen = windowManager.isProjectionOpen()
     if (!wasOpen) {
-      windowManager.createProjectionWindow()
+      windowManager.createProjectionWindow(displayId)
     }
     return { created: !wasOpen }
   })
@@ -38,8 +38,11 @@ export function registerProjectionHandlers(windowManager: WindowManager): void {
   ipcMain.handle('projection:get-displays', (event) => {
     if (!isMainWindow(windowManager, event)) return []
     const displays = windowManager.getDisplays()
+    const primaryId = windowManager.getPrimaryDisplayId()
     return displays.map((display) => ({
       id: display.id,
+      label: display.label,
+      isPrimary: display.id === primaryId,
       bounds: display.bounds,
       workArea: display.workArea,
       scaleFactor: display.scaleFactor

@@ -649,7 +649,7 @@ describe('ProjectionContext — electron mode', () => {
     await act(async () => {
       await result.current.openProjection()
     })
-    expect(mockEnsure).toHaveBeenCalledOnce()
+    expect(mockEnsure).toHaveBeenCalledWith('auto')
   })
 
   it('closeProjection calls api.projection.close', async () => {

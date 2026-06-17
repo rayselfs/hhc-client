@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { Switch } from '@heroui/react/switch'
 import { Select } from '@heroui/react/select'
 import { ListBox } from '@heroui/react/list-box'
@@ -8,14 +10,35 @@ import { useTheme } from '@renderer/contexts/ThemeContext'
 import { useSettingsStore } from '@renderer/stores/settings'
 import { isElectron } from '@renderer/lib/env'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
+import type { DisplayInfo } from '@shared/ipc-channels'
+
+function formatDisplayLabel(
+  display: DisplayInfo,
+  externalIndex: number,
+  t: TFunction
+): string {
+  const kind = display.isPrimary
+    ? String(t('preferences.projectionDisplay.primary'))
+    : String(t('preferences.projectionDisplay.external', { index: externalIndex }))
+  const name = display.label ? ` · ${display.label}` : ''
+  return `${kind}${name} · ${display.bounds.width}×${display.bounds.height}`
+}
 
 export default function GeneralSettings(): React.JSX.Element {
   const { t, i18n } = useTranslation()
   const { resolved, setPreference } = useTheme()
   const hardwareAcceleration = useSettingsStore((s) => s.hardwareAcceleration)
   const setHardwareAcceleration = useSettingsStore((s) => s.setHardwareAcceleration)
+  const projectionDisplayId = useSettingsStore((s) => s.projectionDisplayId)
+  const setProjectionDisplayId = useSettingsStore((s) => s.setProjectionDisplayId)
   const resetToDefaults = useSettingsStore((s) => s.resetToDefaults)
   const confirm = useConfirm()
+  const [displays, setDisplays] = useState<DisplayInfo[]>([])
+
+  useEffect(() => {
+    if (!isElectron() || !window.api?.projection?.getDisplays) return
+    window.api.projection.getDisplays().then(setDisplays).catch(() => setDisplays([]))
+  }, [])
 
   const languageOptions = [
     { value: 'en', label: t('preferences.languageNames.en') },
@@ -79,23 +102,65 @@ export default function GeneralSettings(): React.JSX.Element {
       </div>
 
       {isElectron() && (
-        <div>
-          <label className="mb-2 block text-sm font-medium">
-            {t('preferences.hardwareAcceleration')}
-          </label>
-          <div className="mb-2">
-            <Switch
-              isSelected={hardwareAcceleration}
-              onChange={(checked) => setHardwareAcceleration(checked)}
-              aria-label={t('preferences.hardwareAcceleration')}
-            >
-              <Switch.Control>
-                <Switch.Thumb />
-              </Switch.Control>
-            </Switch>
+        <>
+          <Select
+            variant="secondary"
+            value={projectionDisplayId}
+            onChange={(key) => setProjectionDisplayId(String(key))}
+            aria-label={t('preferences.projectionDisplay.label')}
+          >
+            <Label>{t('preferences.projectionDisplay.label')}</Label>
+            <Select.Trigger className="rounded-full pl-5">
+              <Select.Value />
+              <Select.Indicator />
+            </Select.Trigger>
+            <Select.Popover>
+              <ListBox>
+                <ListBox.Item
+                  id="auto"
+                  textValue={t('preferences.projectionDisplay.auto')}
+                  className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
+                >
+                  {t('preferences.projectionDisplay.auto')}
+                </ListBox.Item>
+                {displays.map((display, index) => {
+                  const externalIndex = displays
+                    .slice(0, index + 1)
+                    .filter((item) => !item.isPrimary).length
+                  const label = formatDisplayLabel(display, externalIndex, t)
+                  return (
+                    <ListBox.Item
+                      key={display.id}
+                      id={String(display.id)}
+                      textValue={label}
+                      className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
+                    >
+                      {label}
+                    </ListBox.Item>
+                  )
+                })}
+              </ListBox>
+            </Select.Popover>
+          </Select>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium">
+              {t('preferences.hardwareAcceleration')}
+            </label>
+            <div className="mb-2">
+              <Switch
+                isSelected={hardwareAcceleration}
+                onChange={(checked) => setHardwareAcceleration(checked)}
+                aria-label={t('preferences.hardwareAcceleration')}
+              >
+                <Switch.Control>
+                  <Switch.Thumb />
+                </Switch.Control>
+              </Switch>
+            </div>
+            <p className="text-xs text-gray-500">{t('preferences.hardwareAccelerationDesc')}</p>
           </div>
-          <p className="text-xs text-gray-500">{t('preferences.hardwareAccelerationDesc')}</p>
-        </div>
+        </>
       )}
 
       <div className="pt-4 border-t">

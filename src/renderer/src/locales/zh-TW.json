@@ -538,6 +538,12 @@
     "darkMode": "深色模式",
     "hardwareAcceleration": "硬體加速",
     "hardwareAccelerationDesc": "需要重新啟動應用程式",
+    "projectionDisplay": {
+      "label": "投影視窗螢幕",
+      "auto": "自動",
+      "primary": "主螢幕",
+      "external": "外接螢幕 {{index}}"
+    },
     "resetToDefaults": "重設為預設值",
     "resetBtn": "重設",
     "resetToDefaultsConfirm": "將所有設定重設為預設值？",
