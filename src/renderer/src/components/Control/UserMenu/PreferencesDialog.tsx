@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Modal } from '@heroui/react/modal'
 import { useOverlayState } from '@renderer/lib/use-overlay-state'
 import { useTranslation } from 'react-i18next'
-import { Settings, Film, BookOpen, Timer } from 'lucide-react'
+import { Settings, Film, BookOpen, Timer, ChevronRight } from 'lucide-react'
 import GeneralSettings from '@renderer/components/Control/UserMenu/GeneralSettings'
 import TimerSettings from '@renderer/components/Control/UserMenu/TimerSettings'
 import BibleSettingsPanel from '@renderer/components/Control/UserMenu/BibleSettingsPanel'
@@ -64,6 +64,7 @@ export default function PreferencesDialog({
 }: PreferencesDialogProps): React.JSX.Element {
   const { t } = useTranslation()
   const [activeRoute, setActiveRoute] = useState<PreferenceRoute>('general')
+  const [expandedCategory, setExpandedCategory] = useState<Category | null>(null)
 
   const state = useOverlayState({ isOpen, onOpenChange })
 
@@ -79,9 +80,8 @@ export default function PreferencesDialog({
                   <nav className="flex w-44 shrink-0 flex-col gap-2 rounded-tr-3xl rounded-br-3xl bg-surface-secondary text-foreground py-2 px-2">
                     <ul className="flex flex-col gap-1">
                       {categories.map((cat) => {
-                        const active =
-                          activeRoute === cat.route ||
-                          (cat.id === 'media' && activeRoute.startsWith('media.'))
+                        const expanded = cat.children ? expandedCategory === cat.id : false
+                        const active = !cat.children && activeRoute === cat.route
                         const Icon = cat.icon
                         return (
                           <li key={cat.id}>
@@ -93,13 +93,30 @@ export default function PreferencesDialog({
                                   ? 'bg-accent text-accent-foreground'
                                   : 'text-muted hover:opacity-70'
                               }`}
-                              onClick={() => setActiveRoute(cat.route)}
+                              onClick={() => {
+                                if (cat.children) {
+                                  setExpandedCategory(expanded ? null : cat.id)
+                                  if (!expanded && !activeRoute.startsWith(`${cat.id}.`)) {
+                                    setActiveRoute(cat.route)
+                                  }
+                                  return
+                                }
+                                setExpandedCategory(null)
+                                setActiveRoute(cat.route)
+                              }}
                               data-testid={`category-${cat.id}`}
                             >
                               <Icon className="size-4" />
                               <span>{t(cat.labelKey)}</span>
+                              {cat.children && (
+                                <ChevronRight
+                                  className={`ml-auto size-4 transition-transform ${
+                                    expanded ? 'rotate-90' : ''
+                                  }`}
+                                />
+                              )}
                             </button>
-                            {cat.children && active && (
+                            {cat.children && expanded && (
                               <ul className="mt-1 flex flex-col gap-1 pl-7">
                                 {cat.children.map((child) => {
                                   const childActive = activeRoute === child.id
@@ -108,12 +125,15 @@ export default function PreferencesDialog({
                                       <button
                                         type="button"
                                         aria-pressed={childActive}
-                                        className={`w-full rounded-full px-3 py-1.5 text-left text-xs font-medium transition-colors ${
+                                        className={`w-full rounded-full px-3 py-2 text-left text-sm font-medium transition-colors ${
                                           childActive
-                                            ? 'bg-accent/15 text-foreground'
+                                            ? 'bg-accent text-accent-foreground'
                                             : 'text-muted hover:opacity-70'
                                         }`}
-                                        onClick={() => setActiveRoute(child.id)}
+                                        onClick={() => {
+                                          setExpandedCategory(cat.id)
+                                          setActiveRoute(child.id)
+                                        }}
                                         data-testid={`category-${child.id.replace('.', '-')}`}
                                       >
                                         {t(child.labelKey)}

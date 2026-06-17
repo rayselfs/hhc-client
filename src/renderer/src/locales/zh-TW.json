@@ -563,6 +563,7 @@
       "oneDrive": {
         "title": "OneDrive",
         "description": "OneDrive 資料夾是唯讀來源。HHC Client 不會上傳、重新命名、移動或刪除遠端檔案。",
+        "customClientId": "自定義 Client ID",
         "clientId": "Azure Application Client ID",
         "clientIdSourceDefault": "使用 HHC 預設值",
         "clientIdSourceCustom": "使用自訂 Client ID",
@@ -574,7 +575,6 @@
           "on-demand": "需要時下載",
           "always-offline": "永遠離線可用"
         },
-        "cacheBudget": "同步快取容量 (MB)",
         "setupHint": "變更 Client ID 後需要重新連接 OneDrive。Token 會分開儲存，不會進入偏好設定。"
       },
       "videoTranscoding": {
@@ -676,6 +676,7 @@
   },
   "toast": {
     "storageSaveFailed": "儲存設定失敗",
+    "syncStorageLimitReached": "同步已停止：儲存空間已達 80% 上限。",
     "projectionOpenFailed": "開啟投影視窗失敗",
     "projectionCloseFailed": "關閉投影視窗失敗",
     "settingsReset": "設定已重設為預設值",

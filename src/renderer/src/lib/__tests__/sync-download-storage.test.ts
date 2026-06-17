@@ -1,4 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const mockToast = vi.hoisted(() => ({ danger: vi.fn() }))
+vi.mock('@heroui/react/toast', () => ({ toast: mockToast }))
+vi.mock('@renderer/i18n', () => ({
+  default: { t: (key: string) => key }
+}))
+
 import {
   saveElectronOneDriveDownloadedContent,
   saveWebOneDriveDownloadedContent
@@ -35,6 +42,7 @@ const metadata = {
 beforeEach(async () => {
   await resetFileExplorerDBForTests()
   await resetSyncDBForTests()
+  mockToast.danger.mockClear()
   vi.mocked(isElectron).mockReturnValue(false)
   Object.defineProperty(navigator, 'storage', {
     configurable: true,
@@ -108,7 +116,27 @@ describe('saveWebOneDriveDownloadedContent', () => {
     })
 
     await expect(saveWebOneDriveDownloadedContent(request, response, metadata)).rejects.toThrow(
-      'Insufficient browser storage for OneDrive file'
+      'OneDrive sync storage has reached 80% usage'
+    )
+    expect(mockToast.danger).toHaveBeenCalledWith('toast.syncStorageLimitReached')
+    await expect(getSyncEntryByRemoteItem('connection-1', 'remote-file-1')).resolves.toMatchObject({
+      status: 'insufficient-storage'
+    })
+  })
+
+  it('rejects downloads that would push browser storage above 80 percent', async () => {
+    Object.defineProperty(navigator, 'storage', {
+      configurable: true,
+      value: {
+        estimate: vi.fn(async () => ({ quota: 100, usage: 75 }))
+      }
+    })
+    const response = new Response(new Blob(['video-bytes'], { type: 'video/mp4' }), {
+      headers: { 'Content-Length': '10' }
+    })
+
+    await expect(saveWebOneDriveDownloadedContent(request, response, metadata)).rejects.toThrow(
+      'OneDrive sync storage has reached 80% usage'
     )
   })
 
@@ -162,6 +190,22 @@ describe('saveWebOneDriveDownloadedContent', () => {
 
     expect(window.api.nativeFs.delete).toHaveBeenCalledWith('blob-1')
     putSpy.mockRestore()
+  })
+
+  it('marks Electron native downloads insufficient when storage limit is reached', async () => {
+    vi.mocked(isElectron).mockReturnValue(true)
+    vi.mocked(window.api.oneDrive.downloadFile).mockRejectedValueOnce(
+      new Error('OneDrive sync storage has reached 80% usage')
+    )
+
+    await expect(
+      saveElectronOneDriveDownloadedContent(request, 'access-token', metadata)
+    ).rejects.toThrow('OneDrive sync storage has reached 80% usage')
+
+    expect(mockToast.danger).toHaveBeenCalledWith('toast.syncStorageLimitReached')
+    await expect(getSyncEntryByRemoteItem('connection-1', 'remote-file-1')).resolves.toMatchObject({
+      status: 'insufficient-storage'
+    })
   })
 
   it('does not allow Web mode to use native download storage', async () => {

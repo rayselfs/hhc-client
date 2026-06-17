@@ -3,10 +3,10 @@ import { useTranslation } from 'react-i18next'
 import { Button } from '@heroui/react/button'
 import { Select } from '@heroui/react/select'
 import { ListBox } from '@heroui/react/list-box'
+import { Switch } from '@heroui/react/switch'
 import { Label } from 'react-aria-components'
 import {
   DEFAULT_ONEDRIVE,
-  getEffectiveOneDriveClientId,
   HHC_DEFAULT_ONEDRIVE_CLIENT_ID,
   useSettingsStore,
   validateOneDriveClientId,
@@ -65,11 +65,13 @@ export default function MediaSettings({
   const [ffmpegConfig, setFfmpegConfig] = useState<FfmpegConfigInfo>({ status: 'not-configured' })
   const [isCheckingFfmpeg, setIsCheckingFfmpeg] = useState(false)
   const [oneDriveDraft, setOneDriveDraft] = useState<OneDriveSettings>(oneDrive)
+  const [customClientIdEnabled, setCustomClientIdEnabled] = useState(
+    oneDrive.customClientId.trim().length > 0
+  )
   const [storageReport, setStorageReport] = useState<MediaStorageAccountingReport | null>(null)
   const [isLoadingStorage, setIsLoadingStorage] = useState(false)
   const [isCleaningStorage, setIsCleaningStorage] = useState(false)
   const canConfigureFfmpeg = isElectron()
-  const effectiveOneDriveClientId = getEffectiveOneDriveClientId(oneDriveDraft)
   const customClientIdValid =
     oneDriveDraft.customClientId.trim().length === 0 ||
     validateOneDriveClientId(oneDriveDraft.customClientId)
@@ -127,7 +129,7 @@ export default function MediaSettings({
   return (
     <div className="space-y-6">
       {section === 'general' && (
-        <section className="space-y-3 rounded-2xl border border-default-200 p-4">
+        <section className="space-y-3">
           <Select
             variant="secondary"
             value={trashRetentionDays}
@@ -159,55 +161,57 @@ export default function MediaSettings({
       )}
 
       {section === 'oneDrive' && (
-        <section className="space-y-3 rounded-2xl border border-default-200 p-4">
+        <section className="space-y-3">
+          <h3 className="text-sm font-semibold">{t('preferences.media.oneDrive.title')}</h3>
+
           <div>
-            <h3 className="text-sm font-semibold">{t('preferences.media.oneDrive.title')}</h3>
-            <p className="mt-1 text-xs text-gray-500">
-              {t('preferences.media.oneDrive.description')}
-            </p>
+            <label className="mb-2 block text-sm font-medium">
+              {t('preferences.media.oneDrive.customClientId')}
+            </label>
+            <Switch
+              isSelected={customClientIdEnabled}
+              onChange={(checked) => {
+                setCustomClientIdEnabled(checked)
+                if (!checked) {
+                  saveOneDriveDraft({
+                    ...oneDriveDraft,
+                    customClientId: DEFAULT_ONEDRIVE.customClientId
+                  })
+                }
+              }}
+              aria-label={t('preferences.media.oneDrive.customClientId')}
+            >
+              <Switch.Control>
+                <Switch.Thumb />
+              </Switch.Control>
+            </Switch>
           </div>
 
-          <div className="space-y-2">
-            <label className="block text-sm font-medium" htmlFor="onedrive-client-id">
-              {t('preferences.media.oneDrive.clientId')}
-            </label>
-            <input
-              id="onedrive-client-id"
-              value={oneDriveDraft.customClientId}
-              onChange={(event) =>
-                setOneDriveDraft({ ...oneDriveDraft, customClientId: event.target.value })
-              }
-              onBlur={() => {
-                if (customClientIdValid) saveOneDriveDraft(oneDriveDraft)
-              }}
-              placeholder={HHC_DEFAULT_ONEDRIVE_CLIENT_ID}
-              className="w-full rounded-full border border-default-200 bg-transparent px-4 py-2 text-sm"
-              aria-invalid={!customClientIdValid}
-            />
-            <p className="text-xs text-gray-500">
-              {oneDriveDraft.customClientId.trim()
-                ? t('preferences.media.oneDrive.clientIdSourceCustom')
-                : t('preferences.media.oneDrive.clientIdSourceDefault')}
-              : {effectiveOneDriveClientId}
-            </p>
-            {!customClientIdValid && (
-              <p className="text-xs text-danger-700">
-                {t('preferences.media.oneDrive.invalidClientId')}
-              </p>
-            )}
-            <Button
-              variant="secondary"
-              className="rounded-full"
-              onPress={() =>
-                saveOneDriveDraft({
-                  ...oneDriveDraft,
-                  customClientId: DEFAULT_ONEDRIVE.customClientId
-                })
-              }
-            >
-              {t('preferences.media.oneDrive.restoreDefaultClientId')}
-            </Button>
-          </div>
+          {customClientIdEnabled && (
+            <div className="space-y-2">
+              <label className="block text-sm font-medium" htmlFor="onedrive-client-id">
+                {t('preferences.media.oneDrive.clientId')}
+              </label>
+              <input
+                id="onedrive-client-id"
+                value={oneDriveDraft.customClientId}
+                onChange={(event) =>
+                  setOneDriveDraft({ ...oneDriveDraft, customClientId: event.target.value })
+                }
+                onBlur={() => {
+                  if (customClientIdValid) saveOneDriveDraft(oneDriveDraft)
+                }}
+                placeholder={HHC_DEFAULT_ONEDRIVE_CLIENT_ID}
+                className="w-full rounded-full border border-default-200 bg-transparent px-4 py-2 text-sm"
+                aria-invalid={!customClientIdValid}
+              />
+              {!customClientIdValid && (
+                <p className="text-xs text-danger-700">
+                  {t('preferences.media.oneDrive.invalidClientId')}
+                </p>
+              )}
+            </div>
+          )}
 
           <Select
             variant="secondary"
@@ -240,28 +244,11 @@ export default function MediaSettings({
               </ListBox>
             </Select.Popover>
           </Select>
-
-          <label className="block text-sm font-medium">
-            {t('preferences.media.oneDrive.cacheBudget')}
-            <input
-              type="number"
-              min={0}
-              value={oneDriveDraft.cacheBudgetMb}
-              onChange={(event) =>
-                saveOneDriveDraft({
-                  ...oneDriveDraft,
-                  cacheBudgetMb: Number(event.target.value)
-                })
-              }
-              className="mt-2 w-full rounded-full border border-default-200 bg-transparent px-4 py-2 text-sm"
-            />
-          </label>
-          <p className="text-xs text-gray-500">{t('preferences.media.oneDrive.setupHint')}</p>
         </section>
       )}
 
       {section === 'video' && (
-        <section className="space-y-3 rounded-2xl border border-default-200 p-4">
+        <section className="space-y-3">
           <div>
             <h3 className="text-sm font-semibold">
               {t('preferences.media.videoTranscoding.title')}
@@ -359,7 +346,7 @@ export default function MediaSettings({
       )}
 
       {section === 'storage' && (
-        <section className="space-y-3 rounded-2xl border border-default-200 p-4">
+        <section className="space-y-3">
           <div className="flex items-start justify-between gap-3">
             <div>
               <h3 className="text-sm font-semibold">{t('preferences.media.storage.title')}</h3>

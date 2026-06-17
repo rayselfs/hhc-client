@@ -10,6 +10,8 @@ import { getNativeFilePath } from './native-fs'
 import { isMainWindow } from './validate'
 
 const GRAPH_BASE_URL = 'https://graph.microsoft.com/v1.0'
+const STORAGE_USAGE_LIMIT_RATIO = 0.8
+const STORAGE_LIMIT_ERROR = 'OneDrive sync storage has reached 80% usage'
 
 function validateRemoteItemId(value: unknown): string {
   if (typeof value !== 'string' || value.trim().length === 0 || value.length > 512) {
@@ -77,6 +79,17 @@ async function writeResponseBodyToFile(response: Response, temporaryPath: string
   return size
 }
 
+async function assertNativeStorageCapacity(directory: string, incomingBytes = 0): Promise<void> {
+  const stats = await fs.statfs(directory)
+  const total = stats.blocks * stats.bsize
+  if (total <= 0) return
+  const available = stats.bavail * stats.bsize
+  const projectedUsage = total - available + incomingBytes
+  if (projectedUsage > total * STORAGE_USAGE_LIMIT_RATIO) {
+    throw new Error(STORAGE_LIMIT_ERROR)
+  }
+}
+
 export function registerOneDriveDownloadHandlers(wm: WindowManager): void {
   ipcMain.handle(
     'onedrive:download-file',
@@ -84,7 +97,10 @@ export function registerOneDriveDownloadHandlers(wm: WindowManager): void {
       if (!isMainWindow(wm, event)) throw new Error('Unauthorized OneDrive download access')
       const request = validateDownloadRequest(input)
       const targetPath = getNativeFilePath(request.targetFileId)
+      const targetDirectory = dirname(targetPath)
       const temporaryPath = `${targetPath}.${process.pid}.${Date.now()}.tmp`
+      await fs.mkdir(targetDirectory, { recursive: true })
+      await assertNativeStorageCapacity(targetDirectory, request.expectedSize ?? 0)
       const response = await net.fetch(createGraphContentUrl(request.remoteItemId), {
         headers: { Authorization: `Bearer ${request.accessToken}` }
       })
@@ -92,8 +108,8 @@ export function registerOneDriveDownloadHandlers(wm: WindowManager): void {
       if (!response.ok) throw new Error(`OneDrive download failed: ${response.status}`)
 
       try {
-        await fs.mkdir(dirname(targetPath), { recursive: true })
         const size = await writeResponseBodyToFile(response, temporaryPath)
+        await assertNativeStorageCapacity(targetDirectory)
         if (request.expectedSize !== undefined && size !== request.expectedSize) {
           throw new Error('OneDrive download size mismatch')
         }

@@ -46,7 +46,10 @@ vi.mock('@renderer/lib/media-storage-cleanup', () => ({
 }))
 
 vi.mock('@renderer/stores/settings', () => ({
-  DEFAULT_ONEDRIVE: { customClientId: '', defaultOfflinePolicy: 'on-demand', cacheBudgetMb: 2048 },
+  DEFAULT_ONEDRIVE: {
+    customClientId: '',
+    defaultOfflinePolicy: 'always-offline'
+  },
   HHC_DEFAULT_ONEDRIVE_CLIENT_ID: '4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02',
   getEffectiveOneDriveClientId: (settings: { customClientId: string }) =>
     settings.customClientId || '4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02',
@@ -69,8 +72,7 @@ vi.mock('@renderer/stores/settings', () => ({
       setSpeech: vi.fn(),
       oneDrive: {
         customClientId: '',
-        defaultOfflinePolicy: 'on-demand' as const,
-        cacheBudgetMb: 2048
+        defaultOfflinePolicy: 'always-offline' as const
       },
       setOneDrive: vi.fn(),
       trashRetentionDays: 30,
@@ -157,6 +159,7 @@ describe('PreferencesDialog', () => {
     renderDialog(true)
 
     await user.click(screen.getByTestId('category-media'))
+    expect(screen.getByTestId('category-media')).toHaveAttribute('aria-pressed', 'false')
     expect(screen.getByLabelText('Trash Retention Period')).toBeInTheDocument()
     expect(screen.getByTestId('category-media-general')).toBeInTheDocument()
     expect(screen.getByTestId('category-media-oneDrive')).toBeInTheDocument()
@@ -168,13 +171,28 @@ describe('PreferencesDialog', () => {
     expect(screen.getByLabelText('Language')).toBeInTheDocument()
   })
 
+  it('collapses media children when another top-level category is selected', async () => {
+    const user = userEvent.setup()
+    renderDialog(true)
+
+    await user.click(screen.getByTestId('category-media'))
+    expect(screen.getByTestId('category-media-general')).toBeInTheDocument()
+
+    await user.click(screen.getByTestId('category-timer'))
+    expect(screen.queryByTestId('category-media-general')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Timezone')).toBeInTheDocument()
+  })
+
   it('navigates between media child sections', async () => {
     const user = userEvent.setup()
     renderDialog(true)
 
     await user.click(screen.getByTestId('category-media'))
     await user.click(screen.getByTestId('category-media-oneDrive'))
-    expect(screen.getByLabelText('Azure Application Client ID')).toBeInTheDocument()
+    expect(screen.getByTestId('category-media')).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByTestId('category-media-oneDrive')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByLabelText('Custom Client ID')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Azure Application Client ID')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Trash Retention Period')).not.toBeInTheDocument()
 
     await user.click(screen.getByTestId('category-media-video'))
@@ -236,8 +254,7 @@ describe('PreferencesDialog', () => {
         setSpeech: vi.fn(),
         oneDrive: {
           customClientId: '',
-          defaultOfflinePolicy: 'on-demand' as const,
-          cacheBudgetMb: 2048
+          defaultOfflinePolicy: 'always-offline' as const
         },
         setOneDrive: vi.fn(),
         trashRetentionDays: 30,
@@ -321,8 +338,7 @@ describe('PreferencesDialog', () => {
         setSpeech: vi.fn(),
         oneDrive: {
           customClientId: '',
-          defaultOfflinePolicy: 'on-demand' as const,
-          cacheBudgetMb: 2048
+          defaultOfflinePolicy: 'always-offline' as const
         },
         setOneDrive: vi.fn(),
         trashRetentionDays: 30,
@@ -376,8 +392,7 @@ describe('PreferencesDialog', () => {
         setSpeech: vi.fn(),
         oneDrive: {
           customClientId: '',
-          defaultOfflinePolicy: 'on-demand' as const,
-          cacheBudgetMb: 2048
+          defaultOfflinePolicy: 'always-offline' as const
         },
         setOneDrive: vi.fn(),
         trashRetentionDays: 30,

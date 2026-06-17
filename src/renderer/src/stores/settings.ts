@@ -65,8 +65,6 @@ const DEFAULT_TIMER_RING_COLOR_ENABLED = false
 const DEFAULT_TRASH_RETENTION_DAYS = 30
 const DEFAULT_REMINDER_MODE = 'subtract'
 export const HHC_DEFAULT_ONEDRIVE_CLIENT_ID = '4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02'
-const DEFAULT_ONEDRIVE_CACHE_BUDGET_MB = 2048
-const MAX_ONEDRIVE_CACHE_BUDGET_MB = 1024 * 1024
 const RELOAD_DELAY_MS = 500
 const THEME_PREFERENCES: ThemePreference[] = ['system', 'light', 'dark']
 const OFFLINE_POLICIES: SyncOfflinePolicy[] = ['online-only', 'on-demand', 'always-offline']
@@ -99,7 +97,6 @@ export interface SpeechSettings {
 export interface OneDriveSettings {
   customClientId: string
   defaultOfflinePolicy: SyncOfflinePolicy
-  cacheBudgetMb: number
 }
 
 export const DEFAULT_SPEECH: SpeechSettings = {
@@ -111,8 +108,7 @@ export const DEFAULT_SPEECH: SpeechSettings = {
 
 export const DEFAULT_ONEDRIVE: OneDriveSettings = {
   customClientId: '',
-  defaultOfflinePolicy: 'on-demand',
-  cacheBudgetMb: DEFAULT_ONEDRIVE_CACHE_BUDGET_MB
+  defaultOfflinePolicy: 'always-offline'
 }
 
 export function validateOneDriveClientId(value: string): boolean {
@@ -151,12 +147,7 @@ function normalizeOneDriveSettings(value: unknown): OneDriveSettings {
 
   return {
     customClientId,
-    defaultOfflinePolicy,
-    cacheBudgetMb: normalizePositiveInteger(
-      value.cacheBudgetMb,
-      DEFAULT_ONEDRIVE_CACHE_BUDGET_MB,
-      MAX_ONEDRIVE_CACHE_BUDGET_MB
-    )
+    defaultOfflinePolicy
   }
 }
 
@@ -306,8 +297,7 @@ export const useSettingsStore = create<SettingsStore>()(
         set({
           oneDrive: {
             customClientId,
-            defaultOfflinePolicy: settings.defaultOfflinePolicy,
-            cacheBudgetMb: Math.max(0, Math.floor(settings.cacheBudgetMb))
+            defaultOfflinePolicy: settings.defaultOfflinePolicy
           }
         })
       },

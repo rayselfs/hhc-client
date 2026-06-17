@@ -385,15 +385,13 @@ describe('OneDrive settings', () => {
   it('persists non-sensitive OneDrive preferences only', () => {
     useSettingsStore.getState().setOneDrive({
       customClientId: '11111111-2222-3333-4444-555555555555',
-      defaultOfflinePolicy: 'always-offline',
-      cacheBudgetMb: 512
+      defaultOfflinePolicy: 'always-offline'
     })
 
     const state = useSettingsStore.getState()
     expect(state.oneDrive).toMatchObject({
       customClientId: '11111111-2222-3333-4444-555555555555',
-      defaultOfflinePolicy: 'always-offline',
-      cacheBudgetMb: 512
+      defaultOfflinePolicy: 'always-offline'
     })
     expect(state.oneDrive).not.toHaveProperty('accessToken')
     expect(state.oneDrive).not.toHaveProperty('refreshToken')
@@ -403,8 +401,7 @@ describe('OneDrive settings', () => {
     const before = useSettingsStore.getState().oneDrive
     useSettingsStore.getState().setOneDrive({
       customClientId: '../bad',
-      defaultOfflinePolicy: 'online-only',
-      cacheBudgetMb: 0
+      defaultOfflinePolicy: 'online-only'
     })
 
     expect(useSettingsStore.getState().oneDrive).toEqual(before)
@@ -414,8 +411,7 @@ describe('OneDrive settings', () => {
     const normalized = normalizeSettingsState({
       oneDrive: {
         customClientId: '../bad',
-        defaultOfflinePolicy: 'upload-everything',
-        cacheBudgetMb: Number.NaN
+        defaultOfflinePolicy: 'upload-everything'
       }
     })
 
@@ -426,15 +422,13 @@ describe('OneDrive settings', () => {
     const normalized = normalizeSettingsState({
       oneDrive: {
         customClientId: '11111111-2222-3333-4444-555555555555',
-        defaultOfflinePolicy: 'always-offline',
-        cacheBudgetMb: 512.9
+        defaultOfflinePolicy: 'always-offline'
       }
     })
 
     expect(normalized.oneDrive).toEqual({
       customClientId: '11111111-2222-3333-4444-555555555555',
-      defaultOfflinePolicy: 'always-offline',
-      cacheBudgetMb: 512
+      defaultOfflinePolicy: 'always-offline'
     })
   })
 })
