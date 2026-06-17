@@ -8,6 +8,8 @@ import type {
   FfmpegConfigInfo,
   VideoTranscodeRunRequest,
   VideoTranscodeRunResult,
+  VideoPosterRequest,
+  VideoPosterResult,
   LocalSyncConnectionInfo,
   LocalSyncWatchStatus,
   LocalSyncRemoteItem,
@@ -93,6 +95,7 @@ interface VideoTranscodeAPI {
   removeFfmpegConfig: () => Promise<FfmpegConfigInfo>
   run: (request: VideoTranscodeRunRequest) => Promise<VideoTranscodeRunResult>
   cancel: (jobId: string) => Promise<void>
+  generatePoster: (request: VideoPosterRequest) => Promise<VideoPosterResult>
 }
 
 interface LocalSyncAPI {

@@ -114,7 +114,9 @@ const videoTranscodeApi = {
     typedInvoke('video-transcode:remove-ffmpeg-config'),
   run: (request: IpcInvokeMap['video-transcode:run']['args'][0]) =>
     typedInvoke('video-transcode:run', request),
-  cancel: (jobId: string) => typedInvoke('video-transcode:cancel', jobId)
+  cancel: (jobId: string) => typedInvoke('video-transcode:cancel', jobId),
+  generatePoster: (request: IpcInvokeMap['video-transcode:generate-poster']['args'][0]) =>
+    typedInvoke('video-transcode:generate-poster', request)
 }
 
 const localSyncApi = {

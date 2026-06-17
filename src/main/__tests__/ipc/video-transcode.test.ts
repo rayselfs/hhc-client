@@ -154,6 +154,24 @@ describe('video transcode FFmpeg configuration IPC', () => {
     })
   })
 
+  it('auto-detects command-line FFmpeg without storing a path', async () => {
+    mockSpawn
+      .mockImplementationOnce(() => spawnSuccess('ffmpeg version 7.1 Copyright'))
+      .mockImplementationOnce(() =>
+        spawnSuccess(' V..... libx264 H.264 encoder\n A..... aac AAC encoder')
+      )
+      .mockImplementationOnce(() => spawnSuccess(' E mp4 MP4 muxer'))
+
+    await expect(
+      getHandler('video-transcode:get-ffmpeg-config')(makeEvent())
+    ).resolves.toMatchObject({
+      status: 'ready',
+      source: 'system',
+      executableName: 'ffmpeg'
+    })
+    expect(mockWriteFile).not.toHaveBeenCalled()
+  })
+
   it('rejects non-main window access', async () => {
     vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockProjectionWindow as never)
 
@@ -310,5 +328,38 @@ describe('video transcode FFmpeg configuration IPC', () => {
     expect(child.kill).toHaveBeenCalled()
     expect(mockRm).toHaveBeenCalledWith(expect.stringMatching(/\.tmp\.mp4$/), { force: true })
     await expect(runPromise).rejects.toThrow()
+  })
+
+  it('generates a JPEG poster from a managed native source', async () => {
+    const sourceId = '123e4567-e89b-12d3-a456-426614174000'
+    mockReadFile
+      .mockResolvedValueOnce(storedConfig)
+      .mockResolvedValueOnce(Buffer.from('poster-bytes'))
+    mockSpawn
+      .mockImplementationOnce(() => spawnSuccess('ffmpeg version 7.1 Copyright'))
+      .mockImplementationOnce(() =>
+        spawnSuccess(' V..... libx264 H.264 encoder\n A..... aac AAC encoder')
+      )
+      .mockImplementationOnce(() => spawnSuccess(' E mp4 MP4 muxer'))
+      .mockImplementationOnce(() => spawnSuccess(''))
+
+    const result = await getHandler('video-transcode:generate-poster')(makeEvent(), {
+      sourceFileId: sourceId
+    })
+
+    expect(result).toEqual({
+      dataUrl: `data:image/jpeg;base64,${Buffer.from('poster-bytes').toString('base64')}`
+    })
+    const posterCall = mockSpawn.mock.calls.at(-1)!
+    expect(posterCall[0]).toBe('/opt/homebrew/bin/ffmpeg')
+    expect(posterCall[1]).toEqual(
+      expect.arrayContaining([
+        '-i',
+        `/tmp/hhc-user-data/native-files/${sourceId}`,
+        '-frames:v',
+        '1'
+      ])
+    )
+    expect(mockRm).toHaveBeenCalledWith(expect.stringMatching(/\.poster\.jpg$/), { force: true })
   })
 })

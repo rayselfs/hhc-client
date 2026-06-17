@@ -13,6 +13,7 @@ import {
   type OneDriveSettings
 } from '@renderer/stores/settings'
 import { isElectron } from '@renderer/lib/env'
+import { backfillTranscodeVideoThumbnails } from '@renderer/lib/video-poster-jobs'
 import type { FfmpegConfigInfo } from '@shared/ipc-channels'
 import type { SyncOfflinePolicy } from '@shared/types/folder'
 
@@ -40,6 +41,7 @@ export default function MediaSettings({
     oneDrive.customClientId.trim().length > 0
   )
   const canConfigureFfmpeg = isElectron()
+  const usesSystemFfmpeg = ffmpegConfig.status === 'ready' && ffmpegConfig.source === 'system'
   const customClientIdValid =
     oneDriveDraft.customClientId.trim().length === 0 ||
     validateOneDriveClientId(oneDriveDraft.customClientId)
@@ -54,6 +56,11 @@ export default function MediaSettings({
       cancelled = true
     }
   }, [canConfigureFfmpeg, section])
+
+  useEffect(() => {
+    if (section !== 'video' || ffmpegConfig.status !== 'ready') return
+    void backfillTranscodeVideoThumbnails()
+  }, [ffmpegConfig.status, section])
 
   async function runFfmpegAction(action: () => Promise<FfmpegConfigInfo | null>): Promise<void> {
     setIsCheckingFfmpeg(true)
@@ -218,28 +225,34 @@ export default function MediaSettings({
             </p>
           )}
 
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="primary"
-              className="rounded-full"
-              isDisabled={isCheckingFfmpeg}
-              onPress={() => void runFfmpegAction(() => window.api.videoTranscode.selectFfmpeg())}
-            >
-              {t('preferences.media.videoTranscoding.select')}
-            </Button>
-          </div>
+          {!usesSystemFfmpeg && (
+            <>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="primary"
+                  className="rounded-full"
+                  isDisabled={isCheckingFfmpeg}
+                  onPress={() =>
+                    void runFfmpegAction(() => window.api.videoTranscode.selectFfmpeg())
+                  }
+                >
+                  {t('preferences.media.videoTranscoding.select')}
+                </Button>
+              </div>
 
-          <p className="text-xs text-gray-500">
-            {t('preferences.media.videoTranscoding.installGuide')}{' '}
-            <a
-              href="https://ffmpeg.org/download.html"
-              target="_blank"
-              rel="noreferrer"
-              className="text-accent underline"
-            >
-              {t('preferences.media.videoTranscoding.installLink')}
-            </a>
-          </p>
+              <p className="text-xs text-gray-500">
+                {t('preferences.media.videoTranscoding.installGuide')}{' '}
+                <a
+                  href="https://ffmpeg.org/download.html"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-accent underline"
+                >
+                  {t('preferences.media.videoTranscoding.installLink')}
+                </a>
+              </p>
+            </>
+          )}
         </section>
       )}
     </div>

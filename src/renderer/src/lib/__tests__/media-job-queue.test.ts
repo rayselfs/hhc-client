@@ -61,6 +61,7 @@ describe('MediaJobQueue', () => {
       import: 1,
       'cover-thumbnail': 1,
       'pdf-pages': 1,
+      'video-poster': 1,
       transcode: 1,
       'sync-download': 1
     })
@@ -109,6 +110,7 @@ describe('MediaJobQueue', () => {
       import: 1,
       'cover-thumbnail': 1,
       'pdf-pages': 1,
+      'video-poster': 1,
       transcode: 1,
       'sync-download': 1
     })

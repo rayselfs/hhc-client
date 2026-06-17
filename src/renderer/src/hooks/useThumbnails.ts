@@ -2,9 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { getBlobId } from '@renderer/lib/blob-identity'
 import { getThumbnail } from '@renderer/lib/thumbnail-db'
 import { canGenerateMediaThumbnail, resolveMediaCapability } from '@renderer/lib/media-capabilities'
+import { isElectron } from '@renderer/lib/env'
 
 export function canHaveThumbnail(mimeType: string | undefined): boolean {
-  return canGenerateMediaThumbnail(resolveMediaCapability({ mimeType }))
+  const capability = resolveMediaCapability({ mimeType })
+  return (
+    canGenerateMediaThumbnail(capability) ||
+    (isElectron() && capability?.kind === 'video' && capability.electron === 'transcode-required')
+  )
 }
 
 function revokeIfBlobUrl(url: string | null): void {

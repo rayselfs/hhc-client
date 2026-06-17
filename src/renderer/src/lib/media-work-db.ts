@@ -4,6 +4,7 @@ export type MediaJobType =
   | 'import'
   | 'cover-thumbnail'
   | 'pdf-pages'
+  | 'video-poster'
   | 'transcode'
   | 'sync-download'
 export type MediaJobStatus =

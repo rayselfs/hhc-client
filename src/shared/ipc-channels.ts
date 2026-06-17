@@ -45,6 +45,7 @@ export interface FfmpegCapabilityInfo {
 
 export interface FfmpegConfigInfo {
   status: FfmpegConfigStatus
+  source?: 'stored' | 'system'
   executableName?: string
   version?: string
   capabilities?: FfmpegCapabilityInfo
@@ -61,6 +62,14 @@ export interface VideoTranscodeRunRequest {
 export interface VideoTranscodeRunResult {
   outputFileId: string
   size: number
+}
+
+export interface VideoPosterRequest {
+  sourceFileId: string
+}
+
+export interface VideoPosterResult {
+  dataUrl: string
 }
 
 export interface LocalSyncConnectionInfo {
@@ -175,6 +184,7 @@ export interface IpcInvokeMap {
   'video-transcode:remove-ffmpeg-config': { args: []; result: FfmpegConfigInfo }
   'video-transcode:run': { args: [VideoTranscodeRunRequest]; result: VideoTranscodeRunResult }
   'video-transcode:cancel': { args: [string]; result: void }
+  'video-transcode:generate-poster': { args: [VideoPosterRequest]; result: VideoPosterResult }
   'local-sync:select-folder': { args: []; result: LocalSyncConnectionInfo | null }
   'local-sync:list-folders': { args: []; result: LocalSyncConnectionInfo[] }
   'local-sync:scan-folder': { args: [string]; result: LocalSyncRemoteItem[] }

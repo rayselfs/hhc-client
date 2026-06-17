@@ -8,6 +8,8 @@ import type {
   FfmpegCapabilityInfo,
   FfmpegConfigInfo,
   FfmpegConfigStatus,
+  VideoPosterRequest,
+  VideoPosterResult,
   VideoTranscodeRunRequest,
   VideoTranscodeRunResult
 } from '../../shared/ipc-channels'
@@ -36,6 +38,7 @@ function getConfigPath(): string {
 function toInfo(config: StoredFfmpegConfig): FfmpegConfigInfo {
   return {
     status: 'ready',
+    source: 'stored',
     executableName: config.executableName,
     version: config.version,
     capabilities: config.capabilities,
@@ -168,6 +171,57 @@ function parseCapabilities(encoders: string, muxers: string): FfmpegCapabilityIn
   }
 }
 
+async function validateRunnable(
+  executablePath: string,
+  executableName: string,
+  source: 'stored' | 'system' = 'stored'
+): Promise<{
+  info: FfmpegConfigInfo
+  stored?: StoredFfmpegConfig
+}> {
+  try {
+    const versionOutput = await runExecutable(executablePath, ['-version'])
+    const version = parseVersion(versionOutput)
+    if (!version)
+      return { info: createInfo('unsupported-version', 'Unable to detect FFmpeg version') }
+
+    const [encoders, muxers] = await Promise.all([
+      runExecutable(executablePath, ['-hide_banner', '-encoders']),
+      runExecutable(executablePath, ['-hide_banner', '-muxers'])
+    ])
+    const capabilities = parseCapabilities(encoders, muxers)
+    if (!capabilities.hasH264Encoder || !capabilities.hasAacEncoder || !capabilities.hasMp4Muxer) {
+      return {
+        info: {
+          status: 'invalid',
+          source,
+          executableName,
+          version,
+          capabilities,
+          message: 'FFmpeg is missing required H.264, AAC, or MP4 capabilities',
+          validatedAt: Date.now()
+        }
+      }
+    }
+
+    const stored: StoredFfmpegConfig = {
+      executablePath,
+      executableName,
+      version,
+      capabilities,
+      validatedAt: Date.now()
+    }
+    return { info: { ...toInfo(stored), source }, stored }
+  } catch (error) {
+    return {
+      info: createInfo(
+        'invalid',
+        error instanceof Error ? error.message : 'FFmpeg validation failed'
+      )
+    }
+  }
+}
+
 async function validateExecutablePath(executablePath: unknown): Promise<{
   info: FfmpegConfigInfo
   stored?: StoredFfmpegConfig
@@ -195,58 +249,31 @@ async function validateExecutablePath(executablePath: unknown): Promise<{
     return { info: createInfo('invalid', 'Selected FFmpeg executable cannot be used') }
   }
 
-  try {
-    const versionOutput = await runExecutable(resolvedPath, ['-version'])
-    const version = parseVersion(versionOutput)
-    if (!version)
-      return { info: createInfo('unsupported-version', 'Unable to detect FFmpeg version') }
+  return validateRunnable(resolvedPath, basename(resolvedPath), 'stored')
+}
 
-    const [encoders, muxers] = await Promise.all([
-      runExecutable(resolvedPath, ['-hide_banner', '-encoders']),
-      runExecutable(resolvedPath, ['-hide_banner', '-muxers'])
-    ])
-    const capabilities = parseCapabilities(encoders, muxers)
-    if (!capabilities.hasH264Encoder || !capabilities.hasAacEncoder || !capabilities.hasMp4Muxer) {
-      return {
-        info: {
-          status: 'invalid',
-          executableName: basename(resolvedPath),
-          version,
-          capabilities,
-          message: 'FFmpeg is missing required H.264, AAC, or MP4 capabilities',
-          validatedAt: Date.now()
-        }
-      }
-    }
+async function detectSystemFfmpeg(): Promise<StoredFfmpegConfig | null> {
+  const validation = await validateRunnable('ffmpeg', 'ffmpeg', 'system')
+  return validation.info.status === 'ready' && validation.stored ? validation.stored : null
+}
 
-    const stored: StoredFfmpegConfig = {
-      executablePath: resolvedPath,
-      executableName: basename(resolvedPath),
-      version,
-      capabilities,
-      validatedAt: Date.now()
-    }
-    return { info: toInfo(stored), stored }
-  } catch (error) {
-    return {
-      info: createInfo(
-        'invalid',
-        error instanceof Error ? error.message : 'FFmpeg validation failed'
-      )
+async function readReadyConfig(): Promise<StoredFfmpegConfig | null> {
+  const stored = await readStoredConfig()
+  if (stored) {
+    const validation = await validateExecutablePath(stored.executablePath)
+    if (validation.stored) {
+      await writeStoredConfig(validation.stored)
+      return validation.stored
     }
   }
+
+  return detectSystemFfmpeg()
 }
 
 async function readReadyConfigForTranscode(): Promise<StoredFfmpegConfig> {
-  const stored = await readStoredConfig()
-  if (!stored) throw new Error('FFmpeg is not configured')
-
-  const validation = await validateExecutablePath(stored.executablePath)
-  if (!validation.stored) {
-    throw new Error(validation.info.message ?? validation.info.status)
-  }
-  await writeStoredConfig(validation.stored)
-  return validation.stored
+  const config = await readReadyConfig()
+  if (!config) throw new Error('FFmpeg is not configured')
+  return config
 }
 
 function validateRunRequest(input: unknown): VideoTranscodeRunRequest {
@@ -312,6 +339,44 @@ async function runTranscode(input: unknown): Promise<VideoTranscodeRunResult> {
   }
 }
 
+function validatePosterRequest(input: unknown): VideoPosterRequest {
+  if (typeof input !== 'object' || input === null) throw new Error('Invalid poster request')
+  const request = input as Partial<VideoPosterRequest>
+  if (!isValidNativeFileId(request.sourceFileId)) throw new Error('Invalid poster source id')
+  return { sourceFileId: request.sourceFileId }
+}
+
+async function generatePoster(input: unknown): Promise<VideoPosterResult> {
+  const request = validatePosterRequest(input)
+  const config = await readReadyConfigForTranscode()
+  const sourcePath = getNativeFilePath(request.sourceFileId)
+  const temporaryPath = join(
+    dirname(sourcePath),
+    `.${request.sourceFileId}.${randomUUID()}.poster.jpg`
+  )
+  const args = [
+    '-hide_banner',
+    '-y',
+    '-ss',
+    '00:00:01',
+    '-i',
+    sourcePath,
+    '-frames:v',
+    '1',
+    '-vf',
+    'scale=640:-2',
+    temporaryPath
+  ]
+
+  try {
+    await runExecutable(config.executablePath, args)
+    const data = await fs.readFile(temporaryPath)
+    return { dataUrl: `data:image/jpeg;base64,${data.toString('base64')}` }
+  } finally {
+    await fs.rm(temporaryPath, { force: true }).catch(() => undefined)
+  }
+}
+
 async function cancelTranscode(jobId: unknown): Promise<void> {
   if (typeof jobId !== 'string' || jobId.length === 0) throw new Error('Invalid transcode job id')
   const active = activeTranscodes.get(jobId)
@@ -324,7 +389,9 @@ export function registerVideoTranscodeHandlers(wm: WindowManager): void {
   ipcMain.handle('video-transcode:get-ffmpeg-config', async (event): Promise<FfmpegConfigInfo> => {
     if (!isMainWindow(wm, event)) throw new Error('Unauthorized FFmpeg configuration access')
     const stored = await readStoredConfig()
-    return stored ? toInfo(stored) : { status: 'not-configured' }
+    if (stored) return toInfo(stored)
+    const detected = await detectSystemFfmpeg()
+    return detected ? { ...toInfo(detected), source: 'system' } : { status: 'not-configured' }
   })
 
   ipcMain.handle(
@@ -377,4 +444,12 @@ export function registerVideoTranscodeHandlers(wm: WindowManager): void {
     if (!isMainWindow(wm, event)) throw new Error('Unauthorized FFmpeg transcode access')
     await cancelTranscode(jobId)
   })
+
+  ipcMain.handle(
+    'video-transcode:generate-poster',
+    async (event, request: unknown): Promise<VideoPosterResult> => {
+      if (!isMainWindow(wm, event)) throw new Error('Unauthorized FFmpeg poster access')
+      return generatePoster(request)
+    }
+  )
 }
