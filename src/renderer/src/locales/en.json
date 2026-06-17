@@ -459,12 +459,10 @@
       "addFavorite": "Add to Favorites",
       "removeFavorite": "Remove from Favorites",
       "project": "Project",
-      "rehearse": "Rehearse",
       "restore": "Restore",
       "permanentDelete": "Delete Permanently"
     },
     "presenter": {
-      "rehearsal": "Rehearsal",
       "skippedItems": "{{count}} skipped",
       "readinessSummary": "{{ready}} ready, {{preparing}} preparing, {{unsupported}} unsupported, {{missing}} missing, {{failed}} failed"
     },
@@ -473,6 +471,7 @@
     "folderAlreadyExists": "A folder with this name already exists",
     "fileAlreadyExists": "A file with this name already exists",
     "renameFile": "Rename file",
+    "renameFolder": "Rename folder",
     "blobLoadFailed": "Failed to load file, skipping"
   },
   "projection": {
@@ -800,7 +799,8 @@
       "description": "Deleted files and folders will appear here"
     },
     "permanentDeleteTitle": "Delete Permanently?",
-    "permanentDeleteDescription": "This action cannot be undone."
+    "permanentDeleteDescription": "This action cannot be undone.",
+    "emptyTrash": "Empty Trash"
   },
   "presenter": {
     "noMediaSelected": "No media selected",

@@ -459,16 +459,19 @@
       "addFavorite": "加入我的收藏",
       "removeFavorite": "移除我的收藏",
       "project": "投影",
-      "rehearse": "彩排",
       "restore": "还原",
       "permanentDelete": "永久删除"
     },
     "presenter": {
-      "rehearsal": "彩排",
       "skippedItems": "已跳过 {{count}} 个",
       "readinessSummary": "{{ready}} 个就绪，{{preparing}} 个准备中，{{unsupported}} 个不支持，{{missing}} 个缺失，{{failed}} 个失败"
     },
     "noProjectableFiles": "没有可投影的文件",
+    "invalidName": "名称无效",
+    "folderAlreadyExists": "同层已存在相同名称的文件夹",
+    "fileAlreadyExists": "同层已存在相同名称的文件",
+    "renameFile": "重命名文件",
+    "renameFolder": "重命名文件夹",
     "blobLoadFailed": "文件加载失败，已跳过"
   },
   "projection": {
@@ -796,7 +799,8 @@
       "description": "已删除的文件与文件夹将显示在这里"
     },
     "permanentDeleteTitle": "永久删除？",
-    "permanentDeleteDescription": "此操作无法撤销。"
+    "permanentDeleteDescription": "此操作无法撤销。",
+    "emptyTrash": "清空回收站"
   },
   "presenter": {
     "noMediaSelected": "未选择媒体",

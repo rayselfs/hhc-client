@@ -128,6 +128,29 @@ export default function TrashPage(): React.JSX.Element {
     [gridItems, selectedIds]
   )
 
+  const permanentlyDeleteIds = useCallback(
+    async (ids: Set<string>): Promise<void> => {
+      if (ids.size === 0) return
+      const confirmed = await confirm({
+        title: t('trash.permanentDeleteTitle'),
+        description: t('trash.permanentDeleteDescription'),
+        status: 'danger'
+      })
+      if (!confirmed) return
+      for (const id of ids) {
+        const entry = entries.find((e) => (e.kind === 'folder' ? e.folder.id : e.item.id) === id)
+        if (!entry) continue
+        if (entry.kind === 'folder') {
+          await permanentDeleteFolderFromStore(entry.folder.id)
+        } else {
+          await permanentDeleteFileItemFromStore(entry.item.id)
+        }
+      }
+      clearSelection()
+    },
+    [clearSelection, confirm, entries, t]
+  )
+
   const handleContextMenu = useCallback(
     (id: string, event: React.MouseEvent): void => {
       event.preventDefault()
@@ -161,26 +184,7 @@ export default function TrashPage(): React.JSX.Element {
             label: t('fileExplorer.contextMenu.permanentDelete'),
             icon: React.createElement(Trash2, { size: 14 }),
             variant: 'danger',
-            onAction: async () => {
-              const confirmed = await confirm({
-                title: t('trash.permanentDeleteTitle'),
-                description: t('trash.permanentDeleteDescription'),
-                status: 'danger'
-              })
-              if (!confirmed) return
-              for (const eid of effectiveIds) {
-                const entry = entries.find(
-                  (e) => (e.kind === 'folder' ? e.folder.id : e.item.id) === eid
-                )
-                if (!entry) continue
-                if (entry.kind === 'folder') {
-                  await permanentDeleteFolderFromStore(entry.folder.id)
-                } else {
-                  await permanentDeleteFileItemFromStore(entry.item.id)
-                }
-              }
-              clearSelection()
-            }
+            onAction: () => void permanentlyDeleteIds(effectiveIds)
           }
         ],
         event
@@ -191,12 +195,32 @@ export default function TrashPage(): React.JSX.Element {
       t,
       restoreFolder,
       restoreItem,
-      confirm,
       entries,
       selectedIds,
       setSelectedIds,
-      clearSelection
+      clearSelection,
+      permanentlyDeleteIds
     ]
+  )
+
+  const handleContainerContextMenu = useCallback(
+    (event: React.MouseEvent): void => {
+      if ((event.target as Element).closest('[data-file-item]')) return
+      event.preventDefault()
+      showMenu(
+        [
+          {
+            id: 'empty-trash',
+            label: t('trash.emptyTrash'),
+            icon: React.createElement(Trash2, { size: 14 }),
+            variant: 'danger',
+            onAction: () => void permanentlyDeleteIds(new Set(allIds))
+          }
+        ],
+        event
+      )
+    },
+    [allIds, permanentlyDeleteIds, showMenu, t]
   )
 
   const handleSortChange = useCallback(
@@ -215,7 +239,17 @@ export default function TrashPage(): React.JSX.Element {
   useKeyboardShortcuts(
     [
       { config: SHORTCUTS.EDIT.SELECT_ALL, handler: selectAll, preventDefault: true },
-      { config: SHORTCUTS.EDIT.ESCAPE, handler: clearSelection, preventDefault: true }
+      { config: SHORTCUTS.EDIT.ESCAPE, handler: clearSelection, preventDefault: true },
+      {
+        config: SHORTCUTS.EDIT.DELETE,
+        handler: () => void permanentlyDeleteIds(selectedIds),
+        preventDefault: true
+      },
+      {
+        config: SHORTCUTS.EDIT.DELETE_ALT,
+        handler: () => void permanentlyDeleteIds(selectedIds),
+        preventDefault: true
+      }
     ],
     { enabled: true, sectionKey: 'trash' }
   )
@@ -238,6 +272,7 @@ export default function TrashPage(): React.JSX.Element {
         className="relative h-full overflow-auto"
         onClick={handleContainerClick}
         onMouseDown={handleContainerMouseDown}
+        onContextMenu={handleContainerContextMenu}
       >
         {viewMode === 'list' ? (
           <ListView

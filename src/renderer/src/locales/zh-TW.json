@@ -459,12 +459,10 @@
       "addFavorite": "加入我的最愛",
       "removeFavorite": "移除我的最愛",
       "project": "投影",
-      "rehearse": "彩排",
       "restore": "還原",
       "permanentDelete": "永久刪除"
     },
     "presenter": {
-      "rehearsal": "彩排",
       "skippedItems": "已跳過 {{count}} 個",
       "readinessSummary": "{{ready}} 個就緒，{{preparing}} 個準備中，{{unsupported}} 個不支援，{{missing}} 個遺失，{{failed}} 個失敗"
     },
@@ -473,6 +471,7 @@
     "folderAlreadyExists": "同層已存在相同名稱的資料夾",
     "fileAlreadyExists": "同層已存在相同名稱的檔案",
     "renameFile": "重新命名檔案",
+    "renameFolder": "重新命名資料夾",
     "blobLoadFailed": "檔案載入失敗，已跳過"
   },
   "projection": {
@@ -800,7 +799,8 @@
       "description": "已刪除的檔案與資料夾會顯示在這裡"
     },
     "permanentDeleteTitle": "永久刪除？",
-    "permanentDeleteDescription": "此操作無法復原。"
+    "permanentDeleteDescription": "此操作無法復原。",
+    "emptyTrash": "清空垃圾桶"
   },
   "presenter": {
     "noMediaSelected": "未選擇媒體",
