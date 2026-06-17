@@ -78,6 +78,19 @@ describe('ConfirmDialog', () => {
     expect(screen.queryByText('Are you sure?')).not.toBeInTheDocument()
   })
 
+  it('resolves true when Enter is pressed', async () => {
+    const user = userEvent.setup()
+    let result: boolean | undefined
+    renderWithProvider((v) => {
+      result = v
+    })
+    await user.click(screen.getByText('Open'))
+    await screen.findByText('Are you sure?')
+    await user.keyboard('{Enter}')
+    expect(result).toBe(true)
+    expect(screen.queryByText('Are you sure?')).not.toBeInTheDocument()
+  })
+
   it('resolves false and closes when Cancel is clicked', async () => {
     const user = userEvent.setup()
     let result: boolean | undefined
