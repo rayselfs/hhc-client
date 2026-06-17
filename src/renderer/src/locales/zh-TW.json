@@ -721,6 +721,7 @@
     "sections": {
       "bible": "聖經",
       "timer": "計時器",
+      "media": "多媒體",
       "edit": "編輯"
     },
     "bible": {
@@ -736,6 +737,27 @@
     "timer": {
       "toggle": "開始 / 停止",
       "reset": "重設"
+    },
+    "media": {
+      "escape": "關閉投影",
+      "next_slide": "下一個項目",
+      "prev_slide": "上一個項目",
+      "next_slide_alt": "下一個項目 (替代)",
+      "prev_slide_alt": "上一個項目 (替代)",
+      "first_slide": "第一個項目",
+      "last_slide": "最後一個項目",
+      "toggle_grid": "切換格狀檢視",
+      "toggle_zoom": "切換縮放",
+      "zoom_in": "放大",
+      "zoom_out": "縮小",
+      "video_toggle_play": "播放 / 暫停影片",
+      "video_seek_forward": "影片前進 5 秒",
+      "video_seek_backward": "影片後退 5 秒",
+      "pdf_next_page": "PDF 下一頁",
+      "pdf_prev_page": "PDF 上一頁",
+      "pdf_toggle_view_mode": "切換 PDF 檢視模式",
+      "start_presentation": "開始投影",
+      "start_from_current": "從目前項目開始投影"
     },
     "edit": {
       "copy": "複製",

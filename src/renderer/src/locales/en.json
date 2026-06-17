@@ -721,6 +721,7 @@
     "sections": {
       "bible": "Bible",
       "timer": "Timer",
+      "media": "Media",
       "edit": "Edit"
     },
     "bible": {
@@ -736,6 +737,27 @@
     "timer": {
       "toggle": "Start / Stop",
       "reset": "Reset"
+    },
+    "media": {
+      "escape": "Close presentation",
+      "next_slide": "Next item",
+      "prev_slide": "Previous item",
+      "next_slide_alt": "Next item (alternative)",
+      "prev_slide_alt": "Previous item (alternative)",
+      "first_slide": "First item",
+      "last_slide": "Last item",
+      "toggle_grid": "Toggle grid",
+      "toggle_zoom": "Toggle zoom",
+      "zoom_in": "Zoom in",
+      "zoom_out": "Zoom out",
+      "video_toggle_play": "Play / pause video",
+      "video_seek_forward": "Seek forward 5 seconds",
+      "video_seek_backward": "Seek backward 5 seconds",
+      "pdf_next_page": "Next PDF page",
+      "pdf_prev_page": "Previous PDF page",
+      "pdf_toggle_view_mode": "Toggle PDF view mode",
+      "start_presentation": "Start presentation",
+      "start_from_current": "Start from current item"
     },
     "edit": {
       "copy": "Copy",

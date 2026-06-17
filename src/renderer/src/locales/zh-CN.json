@@ -717,6 +717,7 @@
     "sections": {
       "bible": "圣经",
       "timer": "计时器",
+      "media": "多媒体",
       "edit": "编辑"
     },
     "bible": {
@@ -732,6 +733,27 @@
     "timer": {
       "toggle": "开始 / 停止",
       "reset": "重置"
+    },
+    "media": {
+      "escape": "关闭投影",
+      "next_slide": "下一个项目",
+      "prev_slide": "上一个项目",
+      "next_slide_alt": "下一个项目 (替代)",
+      "prev_slide_alt": "上一个项目 (替代)",
+      "first_slide": "第一个项目",
+      "last_slide": "最后一个项目",
+      "toggle_grid": "切换网格视图",
+      "toggle_zoom": "切换缩放",
+      "zoom_in": "放大",
+      "zoom_out": "缩小",
+      "video_toggle_play": "播放 / 暂停视频",
+      "video_seek_forward": "视频前进 5 秒",
+      "video_seek_backward": "视频后退 5 秒",
+      "pdf_next_page": "PDF 下一页",
+      "pdf_prev_page": "PDF 上一页",
+      "pdf_toggle_view_mode": "切换 PDF 查看模式",
+      "start_presentation": "开始投影",
+      "start_from_current": "从当前项目开始投影"
     },
     "edit": {
       "copy": "复制",

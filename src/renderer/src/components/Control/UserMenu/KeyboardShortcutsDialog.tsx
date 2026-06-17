@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Modal } from '@heroui/react/modal'
 import { useOverlayState } from '@renderer/lib/use-overlay-state'
 import { useTranslation } from 'react-i18next'
-import { Timer, BookOpen } from 'lucide-react'
+import { Timer, BookOpen, Film } from 'lucide-react'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
 import { getMetaKeyLabel } from '@renderer/lib/env'
 import { ShortcutConfig, getPlatformShortcut } from '@renderer/hooks/useKeyboardShortcuts'
@@ -40,7 +40,7 @@ const getDisplayKey = (code: string): string => {
   return code
 }
 
-type SectionId = 'timer' | 'bible'
+type SectionId = 'timer' | 'bible' | 'media'
 
 interface SectionItem {
   id: SectionId
@@ -51,7 +51,8 @@ interface SectionItem {
 
 const SECTIONS: SectionItem[] = [
   { id: 'timer', icon: Timer, labelKey: 'shortcuts.sections.timer', shortcuts: SHORTCUTS.TIMER },
-  { id: 'bible', icon: BookOpen, labelKey: 'shortcuts.sections.bible', shortcuts: SHORTCUTS.BIBLE }
+  { id: 'bible', icon: BookOpen, labelKey: 'shortcuts.sections.bible', shortcuts: SHORTCUTS.BIBLE },
+  { id: 'media', icon: Film, labelKey: 'shortcuts.sections.media', shortcuts: SHORTCUTS.MEDIA }
 ]
 
 function buildKeysFromConfig(config: ShortcutConfig): string[] {

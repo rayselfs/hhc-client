@@ -48,6 +48,7 @@ describe('KeyboardShortcutsDialog', () => {
 
     expect(screen.getAllByText('Timer').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Bible').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Media').length).toBeGreaterThan(0)
   })
 
   it('does not render when isOpen=false', () => {
@@ -73,5 +74,15 @@ describe('KeyboardShortcutsDialog', () => {
 
     expect(screen.getByText('Previous Verse')).toBeInTheDocument()
     expect(screen.getByText('Next Chapter')).toBeInTheDocument()
+  })
+
+  it('switches to media section on click', () => {
+    render(<KeyboardShortcutsDialog isOpen={true} onOpenChange={() => {}} />, { wrapper: Wrapper })
+
+    fireEvent.click(screen.getAllByText('Media')[0])
+
+    expect(screen.getByText('Next item')).toBeInTheDocument()
+    expect(screen.getByText('Seek forward 5 seconds')).toBeInTheDocument()
+    expect(screen.getByText('Next PDF page')).toBeInTheDocument()
   })
 })
