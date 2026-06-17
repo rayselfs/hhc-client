@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@heroui/react/button'
 import { Select } from '@heroui/react/select'
@@ -13,45 +13,16 @@ import {
   type OneDriveSettings
 } from '@renderer/stores/settings'
 import { isElectron } from '@renderer/lib/env'
-import {
-  getMediaStorageAccounting,
-  type MediaStorageAccountingReport,
-  type MediaStorageUsage
-} from '@renderer/lib/media-storage-accounting'
-import {
-  clearRegenerableDerivedAssets,
-  clearUnpinnedSyncCache,
-  removeUnusedDerivedAssets
-} from '@renderer/lib/media-storage-cleanup'
 import type { FfmpegConfigInfo } from '@shared/ipc-channels'
 import type { SyncOfflinePolicy } from '@shared/types/folder'
 
 const RETENTION_DAY_OPTIONS = [7, 14, 30, 60, 90, 0] as const
 const OFFLINE_POLICY_OPTIONS: SyncOfflinePolicy[] = ['online-only', 'on-demand', 'always-offline']
-const STORAGE_USAGE_KEYS: (keyof MediaStorageUsage)[] = [
-  'electronNativeSourceMedia',
-  'webIndexedDbSourceBlobs',
-  'legacyElectronIndexedDbBlobs',
-  'generatedCoverThumbnails',
-  'customCoverOverrides',
-  'pdfPageThumbnails',
-  'videoPosters',
-  'transcodedDerivatives',
-  'syncCache',
-  'temporaryAndFailedJobFiles'
-]
 
-export type MediaSettingsSection = 'general' | 'oneDrive' | 'video' | 'storage'
+export type MediaSettingsSection = 'general' | 'oneDrive' | 'video'
 
 interface MediaSettingsProps {
   section?: MediaSettingsSection
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes <= 0) return '0 B'
-  const units = ['B', 'KB', 'MB', 'GB', 'TB']
-  const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
-  return `${(bytes / 1024 ** index).toFixed(index === 0 ? 0 : 1)} ${units[index]}`
 }
 
 export default function MediaSettings({
@@ -68,9 +39,6 @@ export default function MediaSettings({
   const [customClientIdEnabled, setCustomClientIdEnabled] = useState(
     oneDrive.customClientId.trim().length > 0
   )
-  const [storageReport, setStorageReport] = useState<MediaStorageAccountingReport | null>(null)
-  const [isLoadingStorage, setIsLoadingStorage] = useState(false)
-  const [isCleaningStorage, setIsCleaningStorage] = useState(false)
   const canConfigureFfmpeg = isElectron()
   const customClientIdValid =
     oneDriveDraft.customClientId.trim().length === 0 ||
@@ -87,20 +55,6 @@ export default function MediaSettings({
     }
   }, [canConfigureFfmpeg, section])
 
-  const refreshStorageReport = useCallback(async (): Promise<void> => {
-    setIsLoadingStorage(true)
-    try {
-      setStorageReport(await getMediaStorageAccounting())
-    } finally {
-      setIsLoadingStorage(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (section !== 'storage') return
-    void refreshStorageReport()
-  }, [refreshStorageReport, section])
-
   async function runFfmpegAction(action: () => Promise<FfmpegConfigInfo | null>): Promise<void> {
     setIsCheckingFfmpeg(true)
     try {
@@ -111,23 +65,13 @@ export default function MediaSettings({
     }
   }
 
-  async function runStorageCleanup(action: () => Promise<unknown>): Promise<void> {
-    setIsCleaningStorage(true)
-    try {
-      await action()
-      await refreshStorageReport()
-    } finally {
-      setIsCleaningStorage(false)
-    }
-  }
-
   function saveOneDriveDraft(next: OneDriveSettings): void {
     setOneDriveDraft(next)
     setOneDrive(next)
   }
 
   return (
-    <div className="space-y-6">
+    <div className="p-5 space-y-6">
       {section === 'general' && (
         <section className="space-y-3">
           <Select
@@ -164,8 +108,8 @@ export default function MediaSettings({
         <section className="space-y-3">
           <h3 className="text-sm font-semibold">{t('preferences.media.oneDrive.title')}</h3>
 
-          <div>
-            <label className="mb-2 block text-sm font-medium">
+          <div className="flex items-center justify-between gap-3">
+            <label className="text-sm font-medium">
               {t('preferences.media.oneDrive.customClientId')}
             </label>
             <Switch
@@ -189,9 +133,6 @@ export default function MediaSettings({
 
           {customClientIdEnabled && (
             <div className="space-y-2">
-              <label className="block text-sm font-medium" htmlFor="onedrive-client-id">
-                {t('preferences.media.oneDrive.clientId')}
-              </label>
               <input
                 id="onedrive-client-id"
                 value={oneDriveDraft.customClientId}
@@ -213,41 +154,43 @@ export default function MediaSettings({
             </div>
           )}
 
-          <Select
-            variant="secondary"
-            value={oneDriveDraft.defaultOfflinePolicy}
-            onChange={(key) =>
-              saveOneDriveDraft({
-                ...oneDriveDraft,
-                defaultOfflinePolicy: String(key) as SyncOfflinePolicy
-              })
-            }
-            aria-label={t('preferences.media.oneDrive.defaultOfflinePolicy')}
-          >
-            <Label>{t('preferences.media.oneDrive.defaultOfflinePolicy')}</Label>
-            <Select.Trigger className="rounded-full pl-5">
-              <Select.Value />
-              <Select.Indicator />
-            </Select.Trigger>
-            <Select.Popover>
-              <ListBox>
-                {OFFLINE_POLICY_OPTIONS.map((policy) => (
-                  <ListBox.Item
-                    key={policy}
-                    id={policy}
-                    textValue={t(`preferences.media.oneDrive.offlinePolicies.${policy}`)}
-                    className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
-                  >
-                    {t(`preferences.media.oneDrive.offlinePolicies.${policy}`)}
-                  </ListBox.Item>
-                ))}
-              </ListBox>
-            </Select.Popover>
-          </Select>
+          <div className="border-t border-default-200 pt-4">
+            <Select
+              variant="secondary"
+              value={oneDriveDraft.defaultOfflinePolicy}
+              onChange={(key) =>
+                saveOneDriveDraft({
+                  ...oneDriveDraft,
+                  defaultOfflinePolicy: String(key) as SyncOfflinePolicy
+                })
+              }
+              aria-label={t('preferences.media.oneDrive.defaultOfflinePolicy')}
+            >
+              <Label>{t('preferences.media.oneDrive.defaultOfflinePolicy')}</Label>
+              <Select.Trigger className="rounded-full pl-5">
+                <Select.Value />
+                <Select.Indicator />
+              </Select.Trigger>
+              <Select.Popover>
+                <ListBox>
+                  {OFFLINE_POLICY_OPTIONS.map((policy) => (
+                    <ListBox.Item
+                      key={policy}
+                      id={policy}
+                      textValue={t(`preferences.media.oneDrive.offlinePolicies.${policy}`)}
+                      className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
+                    >
+                      {t(`preferences.media.oneDrive.offlinePolicies.${policy}`)}
+                    </ListBox.Item>
+                  ))}
+                </ListBox>
+              </Select.Popover>
+            </Select>
+          </div>
         </section>
       )}
 
-      {section === 'video' && (
+      {section === 'video' && canConfigureFfmpeg && (
         <section className="space-y-3">
           <div>
             <h3 className="text-sm font-semibold">
@@ -258,164 +201,75 @@ export default function MediaSettings({
             </p>
           </div>
 
-          {!canConfigureFfmpeg ? (
-            <p className="text-sm text-gray-500">
-              {t('preferences.media.videoTranscoding.webUnsupported')}
-            </p>
-          ) : (
-            <>
-              <dl className="grid grid-cols-[7rem_1fr] gap-x-3 gap-y-2 text-sm">
-                <dt className="text-gray-500">{t('preferences.media.videoTranscoding.status')}</dt>
-                <dd>{t(`preferences.media.videoTranscoding.statuses.${ffmpegConfig.status}`)}</dd>
-                <dt className="text-gray-500">
-                  {t('preferences.media.videoTranscoding.executable')}
-                </dt>
-                <dd>
-                  {ffmpegConfig.executableName ??
-                    t('preferences.media.videoTranscoding.notSelected')}
-                </dd>
-                <dt className="text-gray-500">{t('preferences.media.videoTranscoding.version')}</dt>
-                <dd>{ffmpegConfig.version ?? '-'}</dd>
-                <dt className="text-gray-500">
-                  {t('preferences.media.videoTranscoding.capabilities')}
-                </dt>
-                <dd>
-                  {ffmpegConfig.capabilities
-                    ? t('preferences.media.videoTranscoding.capabilitySummary', {
-                        h264: ffmpegConfig.capabilities.hasH264Encoder ? 'OK' : 'Missing',
-                        aac: ffmpegConfig.capabilities.hasAacEncoder ? 'OK' : 'Missing',
-                        mp4: ffmpegConfig.capabilities.hasMp4Muxer ? 'OK' : 'Missing'
-                      })
-                    : '-'}
-                </dd>
-              </dl>
-
-              {ffmpegConfig.message && (
-                <p className="rounded-xl bg-danger-50 px-3 py-2 text-xs text-danger-700">
-                  {ffmpegConfig.message}
-                </p>
-              )}
-
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="primary"
-                  className="rounded-full"
-                  isDisabled={isCheckingFfmpeg}
-                  onPress={() =>
-                    void runFfmpegAction(() => window.api.videoTranscode.selectFfmpeg())
-                  }
-                >
-                  {t('preferences.media.videoTranscoding.select')}
-                </Button>
-                <Button
-                  variant="secondary"
-                  className="rounded-full"
-                  isDisabled={isCheckingFfmpeg}
-                  onPress={() =>
-                    void runFfmpegAction(() => window.api.videoTranscode.validateFfmpeg())
-                  }
-                >
-                  {t('preferences.media.videoTranscoding.validate')}
-                </Button>
-                <Button
-                  variant="danger"
-                  className="rounded-full"
-                  isDisabled={isCheckingFfmpeg}
-                  onPress={() =>
-                    void runFfmpegAction(() => window.api.videoTranscode.removeFfmpegConfig())
-                  }
-                >
-                  {t('preferences.media.videoTranscoding.remove')}
-                </Button>
-              </div>
-
-              <p className="text-xs text-gray-500">
-                {t('preferences.media.videoTranscoding.installGuide')}{' '}
-                <a
-                  href="https://ffmpeg.org/download.html"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-accent underline"
-                >
-                  {t('preferences.media.videoTranscoding.installLink')}
-                </a>
-              </p>
-            </>
-          )}
-        </section>
-      )}
-
-      {section === 'storage' && (
-        <section className="space-y-3">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h3 className="text-sm font-semibold">{t('preferences.media.storage.title')}</h3>
-              <p className="mt-1 text-xs text-gray-500">
-                {t('preferences.media.storage.description')}
-              </p>
-            </div>
-            <Button
-              variant="secondary"
-              className="rounded-full"
-              isDisabled={isLoadingStorage}
-              onPress={() => void refreshStorageReport()}
-            >
-              {t('preferences.media.storage.refresh')}
-            </Button>
-          </div>
-
-          <dl className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-2 text-sm">
-            {STORAGE_USAGE_KEYS.map((key) => (
-              <div key={key} className="contents">
-                <dt className="text-gray-500">{t(`preferences.media.storage.buckets.${key}`)}</dt>
-                <dd>{formatBytes(storageReport?.usage[key] ?? 0)}</dd>
-              </div>
-            ))}
-            <div className="contents font-semibold">
-              <dt>{t('preferences.media.storage.total')}</dt>
-              <dd>{formatBytes(storageReport?.total ?? 0)}</dd>
-            </div>
+          <dl className="grid grid-cols-[7rem_1fr] gap-x-3 gap-y-2 text-sm">
+            <dt className="text-gray-500">{t('preferences.media.videoTranscoding.status')}</dt>
+            <dd>{t(`preferences.media.videoTranscoding.statuses.${ffmpegConfig.status}`)}</dd>
+            <dt className="text-gray-500">{t('preferences.media.videoTranscoding.executable')}</dt>
+            <dd>
+              {ffmpegConfig.executableName ?? t('preferences.media.videoTranscoding.notSelected')}
+            </dd>
+            <dt className="text-gray-500">{t('preferences.media.videoTranscoding.version')}</dt>
+            <dd>{ffmpegConfig.version ?? '-'}</dd>
+            <dt className="text-gray-500">
+              {t('preferences.media.videoTranscoding.capabilities')}
+            </dt>
+            <dd>
+              {ffmpegConfig.capabilities
+                ? t('preferences.media.videoTranscoding.capabilitySummary', {
+                    h264: ffmpegConfig.capabilities.hasH264Encoder ? 'OK' : 'Missing',
+                    aac: ffmpegConfig.capabilities.hasAacEncoder ? 'OK' : 'Missing',
+                    mp4: ffmpegConfig.capabilities.hasMp4Muxer ? 'OK' : 'Missing'
+                  })
+                : '-'}
+            </dd>
           </dl>
 
-          {storageReport?.browser && (
-            <div className="rounded-xl bg-default-100 px-3 py-2 text-xs text-gray-600">
-              {t('preferences.media.storage.browserEstimate', {
-                usage: formatBytes(storageReport.browser.usage ?? 0),
-                quota: formatBytes(storageReport.browser.quota ?? 0),
-                persisted: storageReport.browser.persisted
-                  ? t('preferences.media.storage.persistedYes')
-                  : t('preferences.media.storage.persistedNo')
-              })}
-            </div>
+          {ffmpegConfig.message && (
+            <p className="rounded-xl bg-danger-50 px-3 py-2 text-xs text-danger-700">
+              {ffmpegConfig.message}
+            </p>
           )}
 
           <div className="flex flex-wrap gap-2">
             <Button
-              variant="secondary"
+              variant="primary"
               className="rounded-full"
-              isDisabled={isCleaningStorage}
-              onPress={() => void runStorageCleanup(removeUnusedDerivedAssets)}
+              isDisabled={isCheckingFfmpeg}
+              onPress={() => void runFfmpegAction(() => window.api.videoTranscode.selectFfmpeg())}
             >
-              {t('preferences.media.storage.removeOrphans')}
+              {t('preferences.media.videoTranscoding.select')}
             </Button>
             <Button
               variant="secondary"
               className="rounded-full"
-              isDisabled={isCleaningStorage}
-              onPress={() => void runStorageCleanup(clearRegenerableDerivedAssets)}
+              isDisabled={isCheckingFfmpeg}
+              onPress={() => void runFfmpegAction(() => window.api.videoTranscode.validateFfmpeg())}
             >
-              {t('preferences.media.storage.clearRegenerable')}
+              {t('preferences.media.videoTranscoding.validate')}
             </Button>
             <Button
-              variant="secondary"
+              variant="danger"
               className="rounded-full"
-              isDisabled={isCleaningStorage}
-              onPress={() => void runStorageCleanup(clearUnpinnedSyncCache)}
+              isDisabled={isCheckingFfmpeg}
+              onPress={() =>
+                void runFfmpegAction(() => window.api.videoTranscode.removeFfmpegConfig())
+              }
             >
-              {t('preferences.media.storage.clearSyncCache')}
+              {t('preferences.media.videoTranscoding.remove')}
             </Button>
           </div>
-          <p className="text-xs text-gray-500">{t('preferences.media.storage.cleanupHint')}</p>
+
+          <p className="text-xs text-gray-500">
+            {t('preferences.media.videoTranscoding.installGuide')}{' '}
+            <a
+              href="https://ffmpeg.org/download.html"
+              target="_blank"
+              rel="noreferrer"
+              className="text-accent underline"
+            >
+              {t('preferences.media.videoTranscoding.installLink')}
+            </a>
+          </p>
         </section>
       )}
     </div>

@@ -113,6 +113,9 @@ describe('PreferencesDialog', () => {
     vi.clearAllMocks()
     await i18n.changeLanguage('en')
 
+    const { isElectron } = await import('@renderer/lib/env')
+    vi.mocked(isElectron).mockReturnValue(false)
+
     const { useTheme } = await import('@renderer/contexts/ThemeContext')
     vi.mocked(useTheme).mockReturnValue({
       preference: 'light',
@@ -127,6 +130,7 @@ describe('PreferencesDialog', () => {
     expect(screen.getByTestId('category-timer')).toBeInTheDocument()
     expect(screen.getByTestId('category-bible')).toBeInTheDocument()
     expect(screen.getByTestId('category-media')).toBeInTheDocument()
+    expect(screen.getByTestId('category-storage')).toBeInTheDocument()
   })
 
   it('does not render content when isOpen is false', () => {
@@ -163,8 +167,7 @@ describe('PreferencesDialog', () => {
     expect(screen.getByLabelText('Trash Retention Period')).toBeInTheDocument()
     expect(screen.getByTestId('category-media-general')).toBeInTheDocument()
     expect(screen.getByTestId('category-media-oneDrive')).toBeInTheDocument()
-    expect(screen.getByTestId('category-media-video')).toBeInTheDocument()
-    expect(screen.getByTestId('category-media-storage')).toBeInTheDocument()
+    expect(screen.queryByTestId('category-media-video')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Language')).not.toBeInTheDocument()
 
     await user.click(screen.getByTestId('category-general'))
@@ -191,17 +194,56 @@ describe('PreferencesDialog', () => {
     await user.click(screen.getByTestId('category-media-oneDrive'))
     expect(screen.getByTestId('category-media')).toHaveAttribute('aria-pressed', 'false')
     expect(screen.getByTestId('category-media-oneDrive')).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByLabelText('Custom Client ID')).toBeInTheDocument()
+    expect(screen.getByLabelText('Custom Azure Client ID')).toBeInTheDocument()
     expect(screen.queryByLabelText('Azure Application Client ID')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Trash Retention Period')).not.toBeInTheDocument()
+  })
+
+  it('shows video transcoding media section only on Electron', async () => {
+    const user = userEvent.setup()
+    const { isElectron } = await import('@renderer/lib/env')
+    vi.mocked(isElectron).mockReturnValue(true)
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: {
+        videoTranscode: {
+          getFfmpegConfig: vi.fn().mockResolvedValue({ status: 'not-configured' }),
+          selectFfmpeg: vi.fn(),
+          validateFfmpeg: vi.fn(),
+          removeFfmpegConfig: vi.fn()
+        }
+      }
+    })
+
+    renderDialog(true)
+
+    await user.click(screen.getByTestId('category-media'))
+    expect(screen.getByTestId('category-media-video')).toBeInTheDocument()
 
     await user.click(screen.getByTestId('category-media-video'))
-    expect(screen.getByText('Video Transcoding')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Video Transcoding' })).toBeInTheDocument()
     expect(screen.queryByLabelText('Azure Application Client ID')).not.toBeInTheDocument()
 
-    await user.click(screen.getByTestId('category-media-storage'))
-    expect(screen.getByText('Media Storage')).toBeInTheDocument()
+    vi.mocked(isElectron).mockReturnValue(false)
+  })
+
+  it('navigates between storage child sections', async () => {
+    const user = userEvent.setup()
+    renderDialog(true)
+
+    await user.click(screen.getByTestId('category-storage'))
+    expect(screen.getByTestId('category-storage')).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByTestId('category-storage-usage')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('heading', { name: 'Usage' })).toBeInTheDocument()
+    expect(screen.getByText('Original media files')).toBeInTheDocument()
     expect(screen.queryByText('Video Transcoding')).not.toBeInTheDocument()
+
+    await user.click(screen.getByTestId('category-storage-cleanup'))
+    expect(screen.getByTestId('category-storage')).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByTestId('category-storage-cleanup')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('heading', { name: 'Cache Cleanup' })).toBeInTheDocument()
+    expect(screen.getByText('Clear orphan derived assets')).toBeInTheDocument()
+    expect(screen.getByText(/covers, PDF previews, video posters/)).toBeInTheDocument()
   })
 
   it('navigates to bible category and shows Bible settings', async () => {

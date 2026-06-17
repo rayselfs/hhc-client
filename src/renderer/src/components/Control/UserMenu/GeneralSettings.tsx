@@ -35,7 +35,7 @@ export default function GeneralSettings(): React.JSX.Element {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="p-5 space-y-6">
       <Select
         variant="secondary"
         value={i18n.language}
@@ -62,7 +62,6 @@ export default function GeneralSettings(): React.JSX.Element {
           </ListBox>
         </Select.Popover>
       </Select>
-
 
       <div>
         <label className="mb-2 block text-sm font-medium">{t('preferences.darkMode')}</label>

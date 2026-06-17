@@ -26,6 +26,7 @@ import {
   DEFAULT_SPEECH,
   DEFAULT_ONEDRIVE,
   getEffectiveOneDriveClientId,
+  getDefaultSpeechSettings,
   HHC_DEFAULT_ONEDRIVE_CLIENT_ID,
   normalizeSettingsState,
   validateOneDriveClientId
@@ -323,6 +324,16 @@ describe('themePreference', () => {
 })
 
 describe('speech settings', () => {
+  it('defaults to Web Speech API on web', () => {
+    vi.mocked(isElectron).mockReturnValue(false)
+    expect(getDefaultSpeechSettings().activeProvider).toBe('webSpeech')
+  })
+
+  it('defaults to Azure Speech on Electron', () => {
+    vi.mocked(isElectron).mockReturnValue(true)
+    expect(getDefaultSpeechSettings().activeProvider).toBe('azure')
+  })
+
   it('initializes with default speech settings', () => {
     const state = useSettingsStore.getState()
     expect(state.speech).toEqual(DEFAULT_SPEECH)

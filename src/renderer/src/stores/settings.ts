@@ -106,6 +106,10 @@ export const DEFAULT_SPEECH: SpeechSettings = {
   whisper: { modelDir: '', installedModel: null }
 }
 
+export function getDefaultSpeechSettings(): SpeechSettings {
+  return isElectron() ? DEFAULT_SPEECH : { ...DEFAULT_SPEECH, activeProvider: 'webSpeech' }
+}
+
 export const DEFAULT_ONEDRIVE: OneDriveSettings = {
   customClientId: '',
   defaultOfflinePolicy: 'always-offline'
@@ -152,7 +156,8 @@ function normalizeOneDriveSettings(value: unknown): OneDriveSettings {
 }
 
 function normalizeSpeechSettings(value: unknown): SpeechSettings {
-  if (!isRecord(value)) return DEFAULT_SPEECH
+  const defaultSpeech = getDefaultSpeechSettings()
+  if (!isRecord(value)) return defaultSpeech
 
   const activeProvider =
     value.activeProvider === 'azure' ||
@@ -160,7 +165,7 @@ function normalizeSpeechSettings(value: unknown): SpeechSettings {
     value.activeProvider === 'webSpeech' ||
     value.activeProvider === 'whisper'
       ? value.activeProvider
-      : DEFAULT_SPEECH.activeProvider
+      : defaultSpeech.activeProvider
   const azure = isRecord(value.azure) ? value.azure : {}
   const gcp = isRecord(value.gcp) ? value.gcp : {}
   const whisper = isRecord(value.whisper) ? value.whisper : {}
@@ -172,17 +177,17 @@ function normalizeSpeechSettings(value: unknown): SpeechSettings {
         typeof azure.region === 'string' &&
         AZURE_REGION_OPTIONS.some((option) => option.value === azure.region)
           ? azure.region
-          : DEFAULT_SPEECH.azure.region,
+          : defaultSpeech.azure.region,
       language:
         azure.language === 'zh-TW' || azure.language === 'zh-CN'
           ? azure.language
-          : DEFAULT_SPEECH.azure.language
+          : defaultSpeech.azure.language
     },
     gcp: {
       language:
         gcp.language === 'cmn-Hant-TW' || gcp.language === 'cmn-Hans-CN'
           ? gcp.language
-          : DEFAULT_SPEECH.gcp.language
+          : defaultSpeech.gcp.language
     },
     whisper: {
       modelDir: typeof whisper.modelDir === 'string' ? whisper.modelDir : '',
@@ -266,7 +271,7 @@ export const useSettingsStore = create<SettingsStore>()(
       themePreference: DEFAULT_THEME_PREFERENCE,
       timerRingColor: DEFAULT_TIMER_RING_COLOR,
       timerRingColorEnabled: DEFAULT_TIMER_RING_COLOR_ENABLED,
-      speech: DEFAULT_SPEECH,
+      speech: getDefaultSpeechSettings(),
       oneDrive: DEFAULT_ONEDRIVE,
       trashRetentionDays: DEFAULT_TRASH_RETENTION_DAYS,
       reminderMode: DEFAULT_REMINDER_MODE,
@@ -356,7 +361,7 @@ export const useSettingsStore = create<SettingsStore>()(
           state.azureSpeech = null
         }
         if (version < 4) {
-          state.speech = DEFAULT_SPEECH
+          state.speech = getDefaultSpeechSettings()
         }
         if (version < 5) {
           const speech = state.speech as Record<string, unknown> | undefined

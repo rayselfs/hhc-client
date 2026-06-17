@@ -26,7 +26,7 @@ export default function TimerSettings(): React.JSX.Element {
   const setReminderMode = useSettingsStore((s) => s.setReminderMode)
 
   return (
-    <div className="space-y-6">
+    <div className="p-5 space-y-6">
       <Select
         variant="secondary"
         value={timezone}
@@ -60,7 +60,9 @@ export default function TimerSettings(): React.JSX.Element {
       </Select>
 
       <div className="space-y-2">
-        <label className="block text-sm font-medium">{t('preferences.timer.reminderModeLabel')}</label>
+        <label className="block text-sm font-medium">
+          {t('preferences.timer.reminderModeLabel')}
+        </label>
         <div className="flex flex-col gap-1">
           <Switch
             isSelected={reminderMode === 'add'}

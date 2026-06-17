@@ -526,7 +526,8 @@
       "general": "General",
       "timer": "Timer",
       "media": "Media",
-      "bible": "Bible"
+      "bible": "Bible",
+      "storage": "Storage"
     },
     "timer": {
       "reminderModeLabel": "Time Warning Calculation",
@@ -557,19 +558,18 @@
       "sections": {
         "general": "General",
         "oneDrive": "OneDrive",
-        "video": "Video",
-        "storage": "Storage"
+        "video": "Video Transcoding"
       },
       "oneDrive": {
         "title": "OneDrive",
         "description": "OneDrive folders are read-only sources. HHC Client never uploads, renames, moves, or deletes remote files.",
-        "customClientId": "Custom Client ID",
+        "customClientId": "Custom Azure Client ID",
         "clientId": "Azure Application Client ID",
         "clientIdSourceDefault": "Using HHC default",
         "clientIdSourceCustom": "Using custom Client ID",
         "invalidClientId": "Enter a valid Azure Application Client ID.",
         "restoreDefaultClientId": "Restore default Client ID",
-        "defaultOfflinePolicy": "Default Offline Policy",
+        "defaultOfflinePolicy": "Offline Policy",
         "offlinePolicies": {
           "online-only": "Online only",
           "on-demand": "On demand",
@@ -580,7 +580,6 @@
       "videoTranscoding": {
         "title": "Video Transcoding",
         "description": "Use a user-selected FFmpeg executable to prepare AVI, MKV, and WMV files for presentation in Electron.",
-        "webUnsupported": "Native FFmpeg transcoding is available only in the desktop app. Web upload accepts browser-native video formats only.",
         "status": "Status",
         "statuses": {
           "not-configured": "Not configured",
@@ -599,30 +598,45 @@
         "remove": "Remove configuration",
         "installGuide": "HHC Client does not download or update FFmpeg. Install FFmpeg yourself and select the executable here.",
         "installLink": "FFmpeg downloads"
+      }
+    },
+    "storage": {
+      "sections": {
+        "usage": "Usage",
+        "cleanup": "Cache Cleanup"
       },
-      "storage": {
-        "title": "Media Storage",
-        "description": "Review source media, generated assets, sync cache, and browser quota without deleting original files.",
-        "refresh": "Refresh",
-        "removeOrphans": "Remove orphan assets",
-        "clearRegenerable": "Clear regenerable thumbnails",
-        "clearSyncCache": "Clear unpinned sync cache",
-        "cleanupHint": "Cleanup actions remove only generated assets. Original media stays in the normal trash and permanent-delete flow.",
-        "total": "Total",
-        "browserEstimate": "Browser storage: {{usage}} used of {{quota}}. Persistent storage: {{persisted}}.",
-        "persistedYes": "enabled",
-        "persistedNo": "not enabled",
-        "buckets": {
-          "electronNativeSourceMedia": "Electron native source media",
-          "webIndexedDbSourceBlobs": "Web IndexedDB source blobs",
-          "legacyElectronIndexedDbBlobs": "Legacy Electron IndexedDB blobs",
-          "generatedCoverThumbnails": "Generated cover thumbnails",
-          "customCoverOverrides": "Custom cover overrides",
-          "pdfPageThumbnails": "PDF page thumbnails",
-          "videoPosters": "Video posters",
-          "transcodedDerivatives": "Transcoded derivatives",
-          "syncCache": "Sync cache",
-          "temporaryAndFailedJobFiles": "Temporary and failed-job files"
+      "refresh": "Refresh",
+      "total": "Total",
+      "browserEstimate": "Browser storage: {{usage}} used of {{quota}}. Persistent storage: {{persisted}}.",
+      "persistedYes": "enabled",
+      "persistedNo": "not enabled",
+      "usage": {
+        "title": "Usage",
+        "sourceMedia": "Original media files",
+        "coversAndPreviews": "Covers and previews",
+        "pdfPreviews": "PDF page previews",
+        "convertedVideos": "Converted video files",
+        "offlineSyncFiles": "Offline sync files",
+        "temporaryFiles": "Temporary and failed job files"
+      },
+      "cleanup": {
+        "title": "Cache Cleanup",
+        "actions": {
+          "removeOrphans": {
+            "title": "Clear orphan derived assets",
+            "description": "Clears covers, PDF previews, video posters, and converted files that no longer have an original file or reference. Original media files are not deleted.",
+            "button": "Clear"
+          },
+          "clearRegenerable": {
+            "title": "Clear regenerable assets",
+            "description": "Clears covers, PDF page previews, and video posters that can be rebuilt from the original files. They will be regenerated next time they are needed. Original media files are not deleted.",
+            "button": "Clear"
+          },
+          "clearSyncCache": {
+            "title": "Clear unpinned sync cache",
+            "description": "Clears synced temporary files that are not set to always available offline. Remote files are not deleted and will be downloaded again when needed.",
+            "button": "Clear"
+          }
         }
       }
     },

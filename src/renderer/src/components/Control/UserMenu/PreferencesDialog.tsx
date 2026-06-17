@@ -2,22 +2,31 @@ import { useState } from 'react'
 import { Modal } from '@heroui/react/modal'
 import { useOverlayState } from '@renderer/lib/use-overlay-state'
 import { useTranslation } from 'react-i18next'
-import { Settings, Film, BookOpen, Timer, ChevronRight } from 'lucide-react'
+import { Settings, Film, BookOpen, Timer, ChevronRight, HardDrive } from 'lucide-react'
 import GeneralSettings from '@renderer/components/Control/UserMenu/GeneralSettings'
 import TimerSettings from '@renderer/components/Control/UserMenu/TimerSettings'
 import BibleSettingsPanel from '@renderer/components/Control/UserMenu/BibleSettingsPanel'
 import MediaSettings, {
   type MediaSettingsSection
 } from '@renderer/components/Control/UserMenu/MediaSettings'
+import StorageSettings, {
+  type StorageSettingsSection
+} from '@renderer/components/Control/UserMenu/StorageSettings'
 import { ShortcutScope } from '@renderer/contexts/ShortcutScopeContext'
+import { isElectron } from '@renderer/lib/env'
 
 interface PreferencesDialogProps {
   isOpen: boolean
   onOpenChange: (open: boolean) => void
 }
 
-type Category = 'general' | 'timer' | 'bible' | 'media'
-type PreferenceRoute = 'general' | 'timer' | 'bible' | `media.${MediaSettingsSection}`
+type Category = 'general' | 'timer' | 'bible' | 'media' | 'storage'
+type PreferenceRoute =
+  | 'general'
+  | 'timer'
+  | 'bible'
+  | `media.${MediaSettingsSection}`
+  | `storage.${StorageSettingsSection}`
 
 interface CategoryChildItem {
   id: PreferenceRoute
@@ -25,7 +34,8 @@ interface CategoryChildItem {
     | 'preferences.media.sections.general'
     | 'preferences.media.sections.oneDrive'
     | 'preferences.media.sections.video'
-    | 'preferences.media.sections.storage'
+    | 'preferences.storage.sections.usage'
+    | 'preferences.storage.sections.cleanup'
 }
 
 interface CategoryItem {
@@ -36,27 +46,10 @@ interface CategoryItem {
     | 'preferences.categories.timer'
     | 'preferences.categories.media'
     | 'preferences.categories.bible'
+    | 'preferences.categories.storage'
   route: PreferenceRoute
   children?: CategoryChildItem[]
 }
-
-const categories: CategoryItem[] = [
-  { id: 'general', icon: Settings, labelKey: 'preferences.categories.general', route: 'general' },
-  { id: 'timer', icon: Timer, labelKey: 'preferences.categories.timer', route: 'timer' },
-  { id: 'bible', icon: BookOpen, labelKey: 'preferences.categories.bible', route: 'bible' },
-  {
-    id: 'media',
-    icon: Film,
-    labelKey: 'preferences.categories.media',
-    route: 'media.general',
-    children: [
-      { id: 'media.general', labelKey: 'preferences.media.sections.general' },
-      { id: 'media.oneDrive', labelKey: 'preferences.media.sections.oneDrive' },
-      { id: 'media.video', labelKey: 'preferences.media.sections.video' },
-      { id: 'media.storage', labelKey: 'preferences.media.sections.storage' }
-    ]
-  }
-]
 
 export default function PreferencesDialog({
   isOpen,
@@ -65,6 +58,35 @@ export default function PreferencesDialog({
   const { t } = useTranslation()
   const [activeRoute, setActiveRoute] = useState<PreferenceRoute>('general')
   const [expandedCategory, setExpandedCategory] = useState<Category | null>(null)
+  const mediaChildren: CategoryChildItem[] = [
+    { id: 'media.general', labelKey: 'preferences.media.sections.general' },
+    { id: 'media.oneDrive', labelKey: 'preferences.media.sections.oneDrive' }
+  ]
+  if (isElectron()) {
+    mediaChildren.push({ id: 'media.video', labelKey: 'preferences.media.sections.video' })
+  }
+  const categories: CategoryItem[] = [
+    { id: 'general', icon: Settings, labelKey: 'preferences.categories.general', route: 'general' },
+    { id: 'timer', icon: Timer, labelKey: 'preferences.categories.timer', route: 'timer' },
+    { id: 'bible', icon: BookOpen, labelKey: 'preferences.categories.bible', route: 'bible' },
+    {
+      id: 'media',
+      icon: Film,
+      labelKey: 'preferences.categories.media',
+      route: 'media.general',
+      children: mediaChildren
+    },
+    {
+      id: 'storage',
+      icon: HardDrive,
+      labelKey: 'preferences.categories.storage',
+      route: 'storage.usage',
+      children: [
+        { id: 'storage.usage', labelKey: 'preferences.storage.sections.usage' },
+        { id: 'storage.cleanup', labelKey: 'preferences.storage.sections.cleanup' }
+      ]
+    }
+  ]
 
   const state = useOverlayState({ isOpen, onOpenChange })
 
@@ -148,14 +170,15 @@ export default function PreferencesDialog({
                       })}
                     </ul>
                   </nav>
-                  <div className="flex-1 overflow-y-auto p-5">
+                  <div className="flex-1 overflow-y-auto p-0">
                     {activeRoute === 'general' && <GeneralSettings />}
                     {activeRoute === 'timer' && <TimerSettings />}
                     {activeRoute === 'bible' && <BibleSettingsPanel />}
                     {activeRoute === 'media.general' && <MediaSettings section="general" />}
                     {activeRoute === 'media.oneDrive' && <MediaSettings section="oneDrive" />}
                     {activeRoute === 'media.video' && <MediaSettings section="video" />}
-                    {activeRoute === 'media.storage' && <MediaSettings section="storage" />}
+                    {activeRoute === 'storage.usage' && <StorageSettings section="usage" />}
+                    {activeRoute === 'storage.cleanup' && <StorageSettings section="cleanup" />}
                   </div>
                 </div>
               </ShortcutScope>

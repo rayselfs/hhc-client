@@ -78,13 +78,16 @@ describe('BibleSettingsPanel', () => {
     vi.mocked(speechKeyStorage.deleteSpeechKey).mockResolvedValue(undefined)
   })
 
-  it('renders API key input and region select', async () => {
+  it('renders API key input and hides region select until key is entered', async () => {
+    const user = userEvent.setup()
     renderPanel()
 
     await waitFor(() => {
       expect(screen.getByPlaceholderText('Enter your API key')).toBeInTheDocument()
     })
 
+    expect(screen.queryByLabelText('Region')).not.toBeInTheDocument()
+    await user.type(screen.getByPlaceholderText('Enter your API key'), 'new-api-key')
     expect(screen.getByLabelText('Region')).toBeInTheDocument()
     expect(screen.getByText('Save')).toBeInTheDocument()
     expect(screen.getByText('Test Connection')).toBeInTheDocument()

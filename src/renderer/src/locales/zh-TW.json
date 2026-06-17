@@ -526,7 +526,8 @@
       "general": "一般",
       "timer": "計時器",
       "media": "多媒體",
-      "bible": "聖經"
+      "bible": "聖經",
+      "storage": "儲存空間"
     },
     "timer": {
       "reminderModeLabel": "時間提醒計算方式",
@@ -557,19 +558,18 @@
       "sections": {
         "general": "一般",
         "oneDrive": "OneDrive",
-        "video": "影片",
-        "storage": "儲存空間"
+        "video": "影片轉碼"
       },
       "oneDrive": {
         "title": "OneDrive",
         "description": "OneDrive 資料夾是唯讀來源。HHC Client 不會上傳、重新命名、移動或刪除遠端檔案。",
-        "customClientId": "自定義 Client ID",
+        "customClientId": "自定義 Azure Client ID",
         "clientId": "Azure Application Client ID",
         "clientIdSourceDefault": "使用 HHC 預設值",
         "clientIdSourceCustom": "使用自訂 Client ID",
         "invalidClientId": "請輸入有效的 Azure Application Client ID。",
         "restoreDefaultClientId": "恢復預設 Client ID",
-        "defaultOfflinePolicy": "預設離線策略",
+        "defaultOfflinePolicy": "離線策略",
         "offlinePolicies": {
           "online-only": "僅線上",
           "on-demand": "需要時下載",
@@ -580,7 +580,6 @@
       "videoTranscoding": {
         "title": "影片轉檔",
         "description": "在 Electron 桌面版使用您指定的 FFmpeg 執行檔，將 AVI、MKV、WMV 準備成可投影格式。",
-        "webUnsupported": "本機 FFmpeg 轉檔只支援桌面版。Web 上傳只接受瀏覽器原生可播放的影片格式。",
         "status": "狀態",
         "statuses": {
           "not-configured": "未設定",
@@ -599,30 +598,45 @@
         "remove": "移除設定",
         "installGuide": "HHC Client 不會下載或更新 FFmpeg。請自行安裝 FFmpeg，並在此選擇執行檔。",
         "installLink": "FFmpeg 下載"
+      }
+    },
+    "storage": {
+      "sections": {
+        "usage": "使用量",
+        "cleanup": "快取清理"
       },
-      "storage": {
-        "title": "媒體儲存空間",
-        "description": "檢視原始媒體、產生資產、同步快取與瀏覽器配額；這裡不會刪除原始檔案。",
-        "refresh": "重新整理",
-        "removeOrphans": "移除孤立產生資產",
-        "clearRegenerable": "清除可重建縮圖",
-        "clearSyncCache": "清除未釘選同步快取",
-        "cleanupHint": "清理動作只會移除產生資產。原始媒體仍只透過垃圾桶與永久刪除流程移除。",
-        "total": "總計",
-        "browserEstimate": "瀏覽器儲存空間：已使用 {{usage}} / {{quota}}。持久化儲存：{{persisted}}。",
-        "persistedYes": "已啟用",
-        "persistedNo": "未啟用",
-        "buckets": {
-          "electronNativeSourceMedia": "Electron 原生檔案媒體",
-          "webIndexedDbSourceBlobs": "Web IndexedDB 原始 Blob",
-          "legacyElectronIndexedDbBlobs": "舊 Electron IndexedDB Blob",
-          "generatedCoverThumbnails": "產生的封面縮圖",
-          "customCoverOverrides": "自訂封面覆寫",
-          "pdfPageThumbnails": "PDF 頁面縮圖",
-          "videoPosters": "影片封面",
-          "transcodedDerivatives": "轉檔衍生檔",
-          "syncCache": "同步快取",
-          "temporaryAndFailedJobFiles": "暫存與失敗工作檔案"
+      "refresh": "重新整理",
+      "total": "總計",
+      "browserEstimate": "瀏覽器儲存空間：已使用 {{usage}} / {{quota}}。持久化儲存：{{persisted}}。",
+      "persistedYes": "已啟用",
+      "persistedNo": "未啟用",
+      "usage": {
+        "title": "使用量",
+        "sourceMedia": "原始媒體檔案",
+        "coversAndPreviews": "封面與預覽圖",
+        "pdfPreviews": "PDF 頁面預覽",
+        "convertedVideos": "影片轉換檔",
+        "offlineSyncFiles": "同步離線檔案",
+        "temporaryFiles": "暫存與失敗工作檔案"
+      },
+      "cleanup": {
+        "title": "快取清理",
+        "actions": {
+          "removeOrphans": {
+            "title": "清除孤立衍生資產",
+            "description": "清除已經沒有對應原始檔案或引用關係的封面、PDF 預覽、影片封面與轉換檔。不會刪除原始媒體檔案。",
+            "button": "清除"
+          },
+          "clearRegenerable": {
+            "title": "清除可重新產生的資產",
+            "description": "清除可由原始檔重新建立的封面、PDF 頁面預覽與影片封面。下次使用時會重新產生，不會刪除原始媒體檔案。",
+            "button": "清除"
+          },
+          "clearSyncCache": {
+            "title": "清除未釘選同步快取",
+            "description": "清除沒有設定為永遠離線可用的同步暫存檔。遠端檔案不會被刪除，下次需要時會重新下載。",
+            "button": "清除"
+          }
         }
       }
     },
