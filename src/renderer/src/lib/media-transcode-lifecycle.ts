@@ -3,6 +3,7 @@ import { isElectron } from './env'
 import { MediaJobBlockedError, mediaJobQueue } from './media-job-queue'
 import {
   getDerivedAsset,
+  listMediaJobs,
   putDerivedAsset,
   putMediaJob,
   type DerivedAssetMetadata,
@@ -79,6 +80,12 @@ async function blockJobIfFfmpegIsNotReady(job: MediaJobRecord): Promise<MediaJob
       updatedAt: Date.now()
     }
     await putMediaJob(blockedJob)
+    console.warn('[media-transcode] Transcode job blocked', {
+      jobId: job.id,
+      sourceBlobId: job.sourceBlobId,
+      itemId: job.itemId,
+      reason: config.status
+    })
     return blockedJob
   } catch (error) {
     const blockedJob: MediaJobRecord = {
@@ -89,8 +96,29 @@ async function blockJobIfFfmpegIsNotReady(job: MediaJobRecord): Promise<MediaJob
       updatedAt: Date.now()
     }
     await putMediaJob(blockedJob)
+    console.warn('[media-transcode] Transcode job blocked', {
+      jobId: job.id,
+      sourceBlobId: job.sourceBlobId,
+      itemId: job.itemId,
+      reason: blockedJob.errorCode
+    })
     return blockedJob
   }
+}
+
+export async function retryBlockedTranscodeJobs(): Promise<number> {
+  if (!isElectron()) return 0
+
+  const config = await window.api.videoTranscode.getFfmpegConfig()
+  if (config.status !== 'ready') return 0
+
+  const jobs = await listMediaJobs()
+  const blockedJobs = jobs.filter(
+    (job) =>
+      job.type === 'transcode' && job.status === 'blocked' && job.blockedReason === 'configuration'
+  )
+  await Promise.all(blockedJobs.map((job) => mediaJobQueue.retry(job.id)))
+  return blockedJobs.length
 }
 
 export async function markTranscodedVideoReady(input: {
@@ -166,6 +194,12 @@ mediaJobQueue.registerExecutor('transcode', async (job, { signal }) => {
 
   const config = await window.api.videoTranscode.getFfmpegConfig()
   if (config.status !== 'ready') {
+    console.warn('[media-transcode] Transcode job blocked', {
+      jobId: job.id,
+      sourceBlobId: job.sourceBlobId,
+      itemId: job.itemId,
+      reason: config.status
+    })
     throw new MediaJobBlockedError('configuration', config.status)
   }
 
@@ -191,6 +225,12 @@ mediaJobQueue.registerExecutor('transcode', async (job, { signal }) => {
     })
   } catch (error) {
     await markTranscodedVideoFailed(job.sourceBlobId)
+    console.error('[media-transcode] Failed to transcode video', {
+      jobId: job.id,
+      sourceBlobId: job.sourceBlobId,
+      itemId: job.itemId,
+      error
+    })
     throw error
   } finally {
     signal.removeEventListener('abort', cancel)

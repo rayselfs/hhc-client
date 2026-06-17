@@ -145,6 +145,10 @@ function runTranscodeProcess(
     child.stderr.on('data', appendError)
     child.on('error', (error) => {
       activeTranscodes.delete(jobId)
+      console.error('[video-transcode] FFmpeg process failed to start', {
+        jobId,
+        error: error.message
+      })
       reject(error)
     })
     child.on('close', (code) => {
@@ -152,7 +156,13 @@ function runTranscodeProcess(
       if (code === 0) {
         resolve()
       } else {
-        reject(new Error(stderr.trim() || `FFmpeg exited with code ${code ?? 'unknown'}`))
+        const message = stderr.trim() || `FFmpeg exited with code ${code ?? 'unknown'}`
+        console.error('[video-transcode] FFmpeg process failed', {
+          jobId,
+          code,
+          error: message.split('\n').at(-1)
+        })
+        reject(new Error(message))
       }
     })
   })

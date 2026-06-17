@@ -14,6 +14,7 @@ const mockUnsubscribeBibleFolders = vi.fn()
 const mockUnsubscribeFileExplorer = vi.fn()
 const mockRecoverStaleJobs = vi.fn().mockResolvedValue(0)
 const mockRemoveExpiredHistory = vi.fn().mockResolvedValue(0)
+const mockRegisterExecutor = vi.fn()
 const mockRecoverPendingSyncResourceCleanups = vi.fn().mockResolvedValue({
   folderIds: [],
   itemIds: [],
@@ -94,7 +95,8 @@ vi.mock('@renderer/lib/bible-search', () => ({
 vi.mock('@renderer/lib/media-job-queue', () => ({
   mediaJobQueue: {
     recoverStaleJobs: mockRecoverStaleJobs,
-    removeExpiredHistory: mockRemoveExpiredHistory
+    removeExpiredHistory: mockRemoveExpiredHistory,
+    registerExecutor: mockRegisterExecutor
   }
 }))
 

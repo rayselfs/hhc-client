@@ -20,6 +20,11 @@ describe('isPresentable', () => {
   ])('isPresentable(%s) → %s', (mime, expected) => {
     expect(isPresentable(mime)).toBe(expected)
   })
+
+  it('allows Electron transcode-required videos as presentation candidates', () => {
+    expect(isPresentable('video/x-matroska', 'electron')).toBe(true)
+    expect(isPresentable('video/x-matroska', 'web')).toBe(false)
+  })
 })
 
 describe('getMediaType', () => {
@@ -33,6 +38,11 @@ describe('getMediaType', () => {
     ['audio/mpeg', null]
   ] as const)('getMediaType(%s) → %s', (mime, expected) => {
     expect(getMediaType(mime)).toBe(expected)
+  })
+
+  it('resolves Electron transcode-required videos to video', () => {
+    expect(getMediaType('video/x-matroska', 'electron')).toBe('video')
+    expect(getMediaType('video/x-matroska', 'web')).toBeNull()
   })
 })
 
@@ -75,6 +85,17 @@ describe('getPresentableItems', () => {
     expect(result).toHaveLength(2)
     expect(result[0].id).toBe('img')
     expect(result[1].id).toBe('vid')
+  })
+
+  it('includes Electron transcode-required video candidates', () => {
+    const items: AnyItemRecord[] = [
+      file('mkv', 'video/x-matroska'),
+      file('txt', 'text/plain'),
+      verse
+    ]
+    const result = getPresentableItems(items, 'electron')
+    expect(result).toHaveLength(1)
+    expect(result[0].id).toBe('mkv')
   })
 
   it('returns empty for no presentable items', () => {

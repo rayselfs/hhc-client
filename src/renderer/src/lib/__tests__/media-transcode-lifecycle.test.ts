@@ -5,12 +5,20 @@ import {
   getReadyTranscodedVideo,
   markTranscodedVideoFailed,
   markTranscodedVideoReady,
+  retryBlockedTranscodeJobs,
   TRANSCODE_COMPATIBILITY_PROFILE
 } from '../media-transcode-lifecycle'
-import { getDerivedAsset, getMediaJob, resetMediaWorkDBForTests } from '../media-work-db'
+import {
+  getDerivedAsset,
+  getMediaJob,
+  putMediaJob,
+  resetMediaWorkDBForTests
+} from '../media-work-db'
 
 describe('media transcode lifecycle', () => {
   beforeEach(async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
     Object.defineProperty(window, 'api', {
       configurable: true,
       value: undefined
@@ -106,6 +114,51 @@ describe('media transcode lifecycle', () => {
       jobId: job.id,
       sourceFileId: sourceBlobId,
       outputFileId: expect.any(String)
+    })
+  })
+
+  it('retries blocked transcode jobs when FFmpeg becomes ready', async () => {
+    const sourceBlobId = '323e4567-e89b-12d3-a456-426614174000'
+    const outputFileId = '423e4567-e89b-12d3-a456-426614174000'
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: {
+        videoTranscode: {
+          getFfmpegConfig: vi.fn().mockResolvedValue({ status: 'ready' }),
+          run: vi.fn().mockResolvedValue({ outputFileId, size: 8192 }),
+          cancel: vi.fn()
+        },
+        nativeFs: {
+          delete: vi.fn()
+        }
+      }
+    })
+
+    const job = {
+      id: 'blocked-transcode-job',
+      type: 'transcode' as const,
+      sourceBlobId,
+      itemId: 'original-item',
+      dedupeKey: createTranscodeDedupeKey(sourceBlobId),
+      priority: 0,
+      status: 'blocked' as const,
+      progress: 0,
+      attempt: 0,
+      blockedReason: 'configuration' as const,
+      errorCode: 'not-configured',
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    }
+    await putMediaJob(job)
+
+    expect(job.status).toBe('blocked')
+    await expect(retryBlockedTranscodeJobs()).resolves.toBe(1)
+    await vi.waitFor(async () => {
+      await expect(getReadyTranscodedVideo(sourceBlobId)).resolves.toMatchObject({
+        status: 'ready',
+        nativeFileId: outputFileId,
+        size: 8192
+      })
     })
   })
 

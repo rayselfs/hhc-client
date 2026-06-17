@@ -14,6 +14,7 @@ import {
 } from '@renderer/stores/settings'
 import { isElectron } from '@renderer/lib/env'
 import { backfillTranscodeVideoThumbnails } from '@renderer/lib/video-poster-jobs'
+import { retryBlockedTranscodeJobs } from '@renderer/lib/media-transcode-lifecycle'
 import type { FfmpegConfigInfo } from '@shared/ipc-channels'
 import type { SyncOfflinePolicy } from '@shared/types/folder'
 
@@ -60,6 +61,7 @@ export default function MediaSettings({
   useEffect(() => {
     if (section !== 'video' || ffmpegConfig?.status !== 'ready') return
     void backfillTranscodeVideoThumbnails()
+    void retryBlockedTranscodeJobs()
   }, [ffmpegConfig?.status, section])
 
   async function runFfmpegAction(action: () => Promise<FfmpegConfigInfo | null>): Promise<void> {

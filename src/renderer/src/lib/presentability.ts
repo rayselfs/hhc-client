@@ -1,6 +1,12 @@
 import type { AnyItemRecord, FileItemRecord } from '@shared/types/folder'
 import { isFileItem } from '@shared/types/folder'
-import { getMediaSupport, resolveMediaCapability } from './media-capabilities'
+import {
+  getMediaSupport,
+  resolveMediaCapability,
+  type MediaPlatform,
+  type MediaSupportMode
+} from './media-capabilities'
+import { isElectron } from './env'
 
 export type MediaTypeStateMap = {
   image: Record<string, never>
@@ -10,19 +16,33 @@ export type MediaTypeStateMap = {
 
 export type MediaType = keyof MediaTypeStateMap
 
-export function isPresentable(mimeType: string): boolean {
-  const capability = resolveMediaCapability({ mimeType })
-  return capability !== null && getMediaSupport(capability, 'web') === 'native'
+function getPresentabilityPlatform(): MediaPlatform {
+  return isElectron() ? 'electron' : 'web'
 }
 
-export function getMediaType(mimeType: string): MediaType | null {
+function canPresentSupport(support: MediaSupportMode): boolean {
+  return support === 'native' || support === 'transcode-required'
+}
+
+export function isPresentable(mimeType: string, platform = getPresentabilityPlatform()): boolean {
   const capability = resolveMediaCapability({ mimeType })
-  if (!capability || getMediaSupport(capability, 'web') !== 'native') return null
+  return capability !== null && canPresentSupport(getMediaSupport(capability, platform))
+}
+
+export function getMediaType(
+  mimeType: string,
+  platform = getPresentabilityPlatform()
+): MediaType | null {
+  const capability = resolveMediaCapability({ mimeType })
+  if (!capability || !canPresentSupport(getMediaSupport(capability, platform))) return null
   return capability.kind === 'document' ? null : capability.kind
 }
 
-export function getPresentableItems(items: AnyItemRecord[]): FileItemRecord[] {
+export function getPresentableItems(
+  items: AnyItemRecord[],
+  platform = getPresentabilityPlatform()
+): FileItemRecord[] {
   return items.filter(
-    (item): item is FileItemRecord => isFileItem(item) && isPresentable(item.mimeType)
+    (item): item is FileItemRecord => isFileItem(item) && isPresentable(item.mimeType, platform)
   )
 }
