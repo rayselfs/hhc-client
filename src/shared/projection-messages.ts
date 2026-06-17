@@ -52,6 +52,9 @@ export interface AppMessages {
     mimeType: string
     playlist: Array<{ id: string; name: string; mimeType: string }>
     currentIndex: number
+    playbackMode?: 'native' | 'transcoded-derivative' | 'live-transcode'
+    streamUrl?: string
+    seekable?: boolean
   }
   /** File playback/control actions on projection */
   'file:control': FileControlPayload

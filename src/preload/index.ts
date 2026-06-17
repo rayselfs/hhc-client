@@ -117,7 +117,10 @@ const videoTranscodeApi = {
     typedInvoke('video-transcode:run', request),
   cancel: (jobId: string) => typedInvoke('video-transcode:cancel', jobId),
   generatePoster: (request: IpcInvokeMap['video-transcode:generate-poster']['args'][0]) =>
-    typedInvoke('video-transcode:generate-poster', request)
+    typedInvoke('video-transcode:generate-poster', request),
+  startLive: (request: IpcInvokeMap['video-transcode:start-live']['args'][0]) =>
+    typedInvoke('video-transcode:start-live', request),
+  stopLive: (sessionId: string) => typedInvoke('video-transcode:stop-live', sessionId)
 }
 
 const localSyncApi = {

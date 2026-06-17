@@ -38,6 +38,18 @@ function makeFile(id: string, name: string, mimeType = 'image/png', blobId = id)
 
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.stubGlobal('window', {
+    api: {
+      videoTranscode: {
+        startLive: vi.fn().mockResolvedValue({
+          sessionId: 'live-session',
+          url: 'hhc-live-media://stream/live-session',
+          mimeType: 'video/mp4'
+        }),
+        stopLive: vi.fn().mockResolvedValue(undefined)
+      }
+    }
+  })
   useMediaProjectionStore.setState({
     playlist: [makeFile('a', 'a.png'), makeFile('b', 'b.png')],
     currentIndex: 0,
@@ -93,6 +105,49 @@ describe('media projection sync', () => {
       'file:show',
       expect.objectContaining({ itemId: 'copy-id', blobId: 'original-id' })
     )
+  })
+
+  it('starts a live transcode session before projecting an unconverted electron video', async () => {
+    useMediaProjectionStore.setState({
+      playlist: [makeFile('live-item', 'live.mkv', 'video/x-matroska', 'source-blob')],
+      currentIndex: 0,
+      isPresenting: true,
+      isRehearsal: false,
+      snapshot: {
+        id: 'snapshot',
+        createdAt: 1,
+        entries: [
+          {
+            index: 0,
+            itemId: 'live-item',
+            blobId: 'source-blob',
+            name: 'live.mkv',
+            mimeType: 'video/x-matroska',
+            sourceUrl: 'blob:source-blob',
+            playbackMode: 'live-transcode',
+            seekable: false
+          }
+        ]
+      }
+    })
+
+    renderSync()
+
+    await vi.waitFor(() => {
+      expect(window.api.videoTranscode.startLive).toHaveBeenCalledWith({
+        sourceFileId: 'source-blob'
+      })
+      expect(mockProject).toHaveBeenCalledWith(
+        'file:show',
+        expect.objectContaining({
+          itemId: 'live-item',
+          blobId: 'source-blob',
+          streamUrl: 'hhc-live-media://stream/live-session',
+          playbackMode: 'live-transcode',
+          seekable: false
+        })
+      )
+    })
   })
 
   it('does not send projection output during rehearsal', () => {

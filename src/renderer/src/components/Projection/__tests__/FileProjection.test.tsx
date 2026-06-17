@@ -94,6 +94,34 @@ describe('FileProjection copied media identity', () => {
     expect(video.currentTime).toBe(35)
   })
 
+  it('uses live stream URLs without loading a stored source and ignores seek controls', async () => {
+    const { container } = render(
+      <FileProjection
+        fileName="live.mkv"
+        initialItemId="live-id"
+        initialBlobId="source-id"
+        initialMimeType="video/x-matroska"
+        initialStreamUrl="hhc-live-media://stream/live-session"
+        initialSeekable={false}
+      />
+    )
+
+    const video = await waitFor(() => {
+      const element = container.querySelector('video')
+      expect(element).not.toBeNull()
+      return element!
+    })
+    Object.defineProperty(video, 'readyState', { configurable: true, value: 1 })
+    Object.defineProperty(video, 'duration', { configurable: true, value: 100 })
+
+    expect(mockGetFileSource).not.toHaveBeenCalled()
+    expect(video).toHaveAttribute('src', 'hhc-live-media://stream/live-session')
+
+    triggerProjection('file:control', { action: 'seek', itemId: 'live-id', value: 35 })
+
+    expect(video.currentTime).toBe(0)
+  })
+
   it('applies pending video seek before pending play', async () => {
     const { container } = render(
       <FileProjection

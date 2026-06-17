@@ -11,6 +11,13 @@ type FileProjectionProps = {
   initialItemId?: string
   initialBlobId?: string
   initialMimeType?: string
+  initialStreamUrl?: string
+  initialSeekable?: boolean
+}
+
+type LoadFileOptions = {
+  streamUrl?: string
+  seekable?: boolean
 }
 
 type PdfState = {
@@ -32,7 +39,9 @@ export default function FileProjection({
   fileName,
   initialItemId,
   initialBlobId,
-  initialMimeType
+  initialMimeType,
+  initialStreamUrl,
+  initialSeekable
 }: FileProjectionProps): React.JSX.Element {
   const [objectUrl, setObjectUrl] = useState<string | null>(null)
   const [mimeType, setMimeType] = useState<string | null>(null)
@@ -46,6 +55,7 @@ export default function FileProjection({
   const currentItemIdRef = useRef<string | null>(null)
   const sourceRevokeRef = useRef<(() => void) | null>(null)
   const pendingVideoControlRef = useRef<PendingVideoControl | null>(null)
+  const seekableRef = useRef(true)
 
   const isControlForCurrentItem = useCallback((data: FileControlPayload): boolean => {
     if (!('itemId' in data) || data.itemId === undefined) return true
@@ -73,12 +83,16 @@ export default function FileProjection({
     }
 
     if (pending.seekTo !== undefined) {
-      if (video.readyState < HAVE_METADATA) return
-      try {
-        video.currentTime = clampVideoTime(video, pending.seekTo)
+      if (!seekableRef.current) {
         delete pending.seekTo
-      } catch {
-        return
+      } else {
+        if (video.readyState < HAVE_METADATA) return
+        try {
+          video.currentTime = clampVideoTime(video, pending.seekTo)
+          delete pending.seekTo
+        } catch {
+          return
+        }
       }
     }
 
@@ -146,9 +160,10 @@ export default function FileProjection({
   }, [])
 
   const loadFile = useCallback(
-    async (itemId: string, blobId: string, fileMimeType: string) => {
+    async (itemId: string, blobId: string, fileMimeType: string, options: LoadFileOptions = {}) => {
       currentItemIdRef.current = itemId
       pendingVideoControlRef.current = null
+      seekableRef.current = options.seekable !== false
       sourceRevokeRef.current?.()
       sourceRevokeRef.current = null
       setObjectUrl(null)
@@ -156,6 +171,11 @@ export default function FileProjection({
       setPan({ x: 0, y: 0 })
       setPdfState(null)
       setIsEnded(false)
+      setMimeType(fileMimeType)
+      if (options.streamUrl) {
+        setObjectUrl(options.streamUrl)
+        return
+      }
       const db = await openFileExplorerDB()
       const source = await getFileSource(db, blobId, fileMimeType)
       if (!source || currentItemIdRef.current !== itemId) {
@@ -164,8 +184,6 @@ export default function FileProjection({
       }
 
       sourceRevokeRef.current = source.revoke
-      setMimeType(fileMimeType)
-
       if (fileMimeType === 'application/pdf') {
         await loadPdf(source.url, itemId)
       } else {
@@ -185,6 +203,7 @@ export default function FileProjection({
           queueVideoControl(data, { shouldPlay: false })
           break
         case 'seek':
+          if (!seekableRef.current) break
           queueVideoControl(data, { seekTo: data.value })
           break
         case 'zoom':
@@ -233,7 +252,10 @@ export default function FileProjection({
 
     const unsubShow = adapter.on('file:show', (data: FileShowPayload) => {
       setDisplayName(data.fileName)
-      loadFile(data.itemId, data.blobId, data.mimeType)
+      loadFile(data.itemId, data.blobId, data.mimeType, {
+        streamUrl: data.streamUrl,
+        seekable: data.seekable
+      })
     })
 
     const unsubControl = adapter.on('file:control', (data: FileControlPayload) => {
@@ -254,9 +276,12 @@ export default function FileProjection({
 
   useEffect(() => {
     if (initialItemId && initialBlobId && initialMimeType) {
-      loadFile(initialItemId, initialBlobId, initialMimeType)
+      loadFile(initialItemId, initialBlobId, initialMimeType, {
+        streamUrl: initialStreamUrl,
+        seekable: initialSeekable
+      })
     }
-  }, [initialBlobId, initialItemId, initialMimeType, loadFile])
+  }, [initialBlobId, initialItemId, initialMimeType, initialSeekable, initialStreamUrl, loadFile])
 
   useEffect(
     () => () => {

@@ -1,13 +1,16 @@
-import { app, dialog, ipcMain } from 'electron'
+import { app, dialog, ipcMain, protocol } from 'electron'
 import { randomUUID } from 'crypto'
 import { spawn, type ChildProcess } from 'child_process'
 import { constants as fsConstants, promises as fs } from 'fs'
 import { basename, dirname, extname, isAbsolute, join } from 'path'
+import { Readable } from 'stream'
 import { isValidNativeFileId } from '../../shared/native-media'
 import type {
   FfmpegCapabilityInfo,
   FfmpegConfigInfo,
   FfmpegConfigStatus,
+  VideoLiveTranscodeStartRequest,
+  VideoLiveTranscodeStartResult,
   VideoPosterRequest,
   VideoPosterResult,
   VideoTranscodeRunRequest,
@@ -30,6 +33,7 @@ const VALIDATION_TIMEOUT_MS = 5000
 const MAX_PROCESS_OUTPUT_LENGTH = 1024 * 1024
 const WINDOWS_EXECUTABLE_EXTENSIONS = new Set(['.exe', '.cmd', '.bat'])
 const activeTranscodes = new Map<string, { child: ChildProcess; temporaryPath: string }>()
+const activeLiveTranscodes = new Map<string, { child: ChildProcess; stderr: string }>()
 
 function getConfigPath(): string {
   return join(app.getPath('userData'), CONFIG_FILE_NAME)
@@ -356,6 +360,116 @@ function validatePosterRequest(input: unknown): VideoPosterRequest {
   return { sourceFileId: request.sourceFileId }
 }
 
+function validateLiveTranscodeRequest(input: unknown): VideoLiveTranscodeStartRequest {
+  if (typeof input !== 'object' || input === null) throw new Error('Invalid live transcode request')
+  const request = input as Partial<VideoLiveTranscodeStartRequest>
+  if (!isValidNativeFileId(request.sourceFileId))
+    throw new Error('Invalid live transcode source id')
+  return { sourceFileId: request.sourceFileId }
+}
+
+async function startLiveTranscode(input: unknown): Promise<VideoLiveTranscodeStartResult> {
+  const request = validateLiveTranscodeRequest(input)
+  const config = await readReadyConfigForTranscode()
+  const sourcePath = getNativeFilePath(request.sourceFileId)
+  const sessionId = randomUUID()
+  const args = [
+    '-hide_banner',
+    '-loglevel',
+    'error',
+    '-i',
+    sourcePath,
+    '-map',
+    '0:v:0',
+    '-map',
+    '0:a:0?',
+    '-c:v',
+    'libx264',
+    '-pix_fmt',
+    'yuv420p',
+    '-c:a',
+    'aac',
+    '-movflags',
+    'frag_keyframe+empty_moov+default_base_moof',
+    '-f',
+    'mp4',
+    'pipe:1'
+  ]
+
+  const child = spawn(config.executablePath, args, {
+    shell: false,
+    windowsHide: true,
+    stdio: ['ignore', 'pipe', 'pipe']
+  })
+
+  activeLiveTranscodes.set(sessionId, { child, stderr: '' })
+  child.stderr?.on('data', (chunk: Buffer) => {
+    const active = activeLiveTranscodes.get(sessionId)
+    if (!active || active.stderr.length >= MAX_PROCESS_OUTPUT_LENGTH) return
+    active.stderr += chunk.toString('utf8')
+  })
+  child.on('error', (error) => {
+    activeLiveTranscodes.delete(sessionId)
+    console.error('[video-transcode] Live FFmpeg failed to start', {
+      sessionId,
+      error: error.message
+    })
+  })
+  child.on('close', (code) => {
+    const active = activeLiveTranscodes.get(sessionId)
+    activeLiveTranscodes.delete(sessionId)
+    if (code !== 0 && code !== null) {
+      console.error('[video-transcode] Live FFmpeg stopped with error', {
+        sessionId,
+        code,
+        error: active?.stderr.trim().split('\n').at(-1)
+      })
+    }
+  })
+
+  return {
+    sessionId,
+    url: `hhc-live-media://stream/${encodeURIComponent(sessionId)}`,
+    mimeType: 'video/mp4'
+  }
+}
+
+async function stopLiveTranscode(sessionId: unknown): Promise<void> {
+  if (typeof sessionId !== 'string' || sessionId.length === 0) {
+    throw new Error('Invalid live transcode session id')
+  }
+  const active = activeLiveTranscodes.get(sessionId)
+  if (!active) return
+  activeLiveTranscodes.delete(sessionId)
+  active.child.kill()
+}
+
+function stopAllLiveTranscodes(): void {
+  for (const sessionId of activeLiveTranscodes.keys()) {
+    const active = activeLiveTranscodes.get(sessionId)
+    activeLiveTranscodes.delete(sessionId)
+    active?.child.kill()
+  }
+}
+
+export function registerLiveMediaProtocol(): void {
+  protocol.handle('hhc-live-media', (request) => {
+    const url = new URL(request.url)
+    if (url.hostname !== 'stream') return new Response('Not found', { status: 404 })
+    const sessionId = decodeURIComponent(url.pathname.replace(/^\//, ''))
+    const active = activeLiveTranscodes.get(sessionId)
+    if (!active || !active.child.stdout) return new Response('Not found', { status: 404 })
+
+    return new Response(Readable.toWeb(active.child.stdout) as ReadableStream, {
+      headers: {
+        'Content-Type': 'video/mp4',
+        'Cache-Control': 'no-store',
+        'Accept-Ranges': 'none'
+      }
+    })
+  })
+}
+
 async function generatePoster(input: unknown): Promise<VideoPosterResult> {
   const request = validatePosterRequest(input)
   const config = await readReadyConfigForTranscode()
@@ -462,4 +576,19 @@ export function registerVideoTranscodeHandlers(wm: WindowManager): void {
       return generatePoster(request)
     }
   )
+
+  ipcMain.handle(
+    'video-transcode:start-live',
+    async (event, request: unknown): Promise<VideoLiveTranscodeStartResult> => {
+      if (!isMainWindow(wm, event)) throw new Error('Unauthorized FFmpeg live transcode access')
+      return startLiveTranscode(request)
+    }
+  )
+
+  ipcMain.handle('video-transcode:stop-live', async (event, sessionId: unknown): Promise<void> => {
+    if (!isMainWindow(wm, event)) throw new Error('Unauthorized FFmpeg live transcode access')
+    await stopLiveTranscode(sessionId)
+  })
+
+  app.once('before-quit', stopAllLiveTranscodes)
 }

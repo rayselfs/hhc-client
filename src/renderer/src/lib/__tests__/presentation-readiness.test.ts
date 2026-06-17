@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { FileItemRecord } from '@shared/types/folder'
 import { putDerivedAsset, resetMediaWorkDBForTests } from '../media-work-db'
 import {
@@ -25,11 +25,36 @@ function file(id: string, name: string, mimeType: string, url = `blob:${id}`): F
 }
 
 beforeEach(async () => {
+  vi.unstubAllGlobals()
   await resetMediaWorkDBForTests()
   await resetSyncDBForTests()
 })
 
 describe('analyzePresentationReadiness', () => {
+  it('uses live transcode as the electron fallback while a derivative is not ready', async () => {
+    vi.stubGlobal('window', {
+      api: {
+        videoTranscode: {
+          getFfmpegConfig: vi.fn().mockResolvedValue({ status: 'ready' })
+        }
+      }
+    })
+
+    const report = await analyzePresentationReadiness(
+      [file('source-video', 'source.mkv', 'video/x-matroska')],
+      'electron'
+    )
+
+    expect(report.summary).toMatchObject({ ready: 1, preparing: 0 })
+    expect(report.items[0]).toMatchObject({
+      status: 'ready',
+      reason: 'ready-live-transcode',
+      support: 'transcode-required',
+      playbackMode: 'live-transcode',
+      seekable: false
+    })
+  })
+
   it('summarizes ready, unsupported, missing, preparing, and failed items', async () => {
     await putDerivedAsset({
       sourceBlobId: 'failed-video',

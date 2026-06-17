@@ -76,6 +76,11 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
   const zoomLevel = useMediaProjectionStore((s) => s.zoomLevel)
   const pan = useMediaProjectionStore((s) => s.pan)
   const setTypeState = useMediaProjectionStore((s) => s.setTypeState)
+  const isLiveTranscode = useMediaProjectionStore(
+    (s) =>
+      s.snapshot?.entries.find((entry) => entry.itemId === item.id)?.playbackMode ===
+      'live-transcode'
+  )
   const transform =
     zoomLevel !== 1
       ? `scale(${zoomLevel}) translate(${(pan.x / zoomLevel) * 100}%, ${(pan.y / zoomLevel) * 100}%)`
@@ -248,6 +253,7 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
 
   const commitSeek = useCallback(
     (seekTo: number): void => {
+      if (isLiveTranscode) return
       const durationValue = durationRef.current
       const max = Number.isFinite(durationValue) && durationValue > 0 ? durationValue : seekTo
       const clamped = Math.max(0, Math.min(seekTo, max))
@@ -260,12 +266,13 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
       if (videoRef.current) videoRef.current.currentTime = clamped
       sendCommand({ action: 'seek', itemId: item.id, value: clamped })
     },
-    [item.id, sendCommand]
+    [isLiveTranscode, item.id, sendCommand]
   )
 
   useEffect(() => {
     const handleRelativeSeek = (event: Event): void => {
       const detail = (event as CustomEvent<{ seconds?: number }>).detail
+      if (isLiveTranscode) return
       const offset = detail?.seconds
       if (typeof offset !== 'number' || !Number.isFinite(offset)) return
       const base =
@@ -278,7 +285,7 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
 
     window.addEventListener('media:videoSeekRelative', handleRelativeSeek)
     return () => window.removeEventListener('media:videoSeekRelative', handleRelativeSeek)
-  }, [commitSeek, triggerSeekFlash])
+  }, [commitSeek, isLiveTranscode, triggerSeekFlash])
 
   const releaseSeekPointer = useCallback((target: HTMLInputElement, pointerId: number): void => {
     if (target.hasPointerCapture?.(pointerId)) {
@@ -407,6 +414,7 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
             step={0.1}
             value={isDraggingSeek ? localSeekTime : currentTime}
             className="video-seek-range w-full"
+            disabled={isLiveTranscode}
             ref={seekInputRef}
             style={
               {

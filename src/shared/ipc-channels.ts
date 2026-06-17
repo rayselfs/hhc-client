@@ -72,6 +72,16 @@ export interface VideoPosterResult {
   dataUrl: string
 }
 
+export interface VideoLiveTranscodeStartRequest {
+  sourceFileId: string
+}
+
+export interface VideoLiveTranscodeStartResult {
+  sessionId: string
+  url: string
+  mimeType: 'video/mp4'
+}
+
 export interface LocalSyncConnectionInfo {
   id: string
   displayName: string
@@ -186,6 +196,11 @@ export interface IpcInvokeMap {
   'video-transcode:run': { args: [VideoTranscodeRunRequest]; result: VideoTranscodeRunResult }
   'video-transcode:cancel': { args: [string]; result: void }
   'video-transcode:generate-poster': { args: [VideoPosterRequest]; result: VideoPosterResult }
+  'video-transcode:start-live': {
+    args: [VideoLiveTranscodeStartRequest]
+    result: VideoLiveTranscodeStartResult
+  }
+  'video-transcode:stop-live': { args: [string]; result: void }
   'local-sync:select-folder': { args: []; result: LocalSyncConnectionInfo | null }
   'local-sync:list-folders': { args: []; result: LocalSyncConnectionInfo[] }
   'local-sync:scan-folder': { args: [string]; result: LocalSyncRemoteItem[] }

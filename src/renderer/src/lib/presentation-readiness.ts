@@ -33,6 +33,8 @@ export interface PresentationReadinessItem {
   reason: string
   support: MediaSupportMode | null
   derivativeId?: string
+  playbackMode?: 'native' | 'transcoded-derivative' | 'live-transcode'
+  seekable?: boolean
 }
 
 export interface PresentationReadinessReport {
@@ -48,6 +50,8 @@ export interface PresentationSnapshotEntry {
   mimeType: string
   sourceUrl: string
   derivativeId?: string
+  playbackMode?: 'native' | 'transcoded-derivative' | 'live-transcode'
+  seekable?: boolean
 }
 
 export interface PresentationSnapshot {
@@ -75,7 +79,9 @@ export function createPresentationSnapshot(
       name: item.name,
       mimeType: item.mimeType,
       sourceUrl: item.url,
-      derivativeId: readinessByItemId.get(item.id)?.derivativeId
+      derivativeId: readinessByItemId.get(item.id)?.derivativeId,
+      playbackMode: readinessByItemId.get(item.id)?.playbackMode,
+      seekable: readinessByItemId.get(item.id)?.seekable
     }))
   }
 }
@@ -184,7 +190,9 @@ async function analyzePresentationItem(
         status: 'ready',
         reason: 'ready-transcoded-derivative',
         support,
-        derivativeId: derivative.id
+        derivativeId: derivative.id,
+        playbackMode: 'transcoded-derivative',
+        seekable: true
       }
     }
 
@@ -196,6 +204,19 @@ async function analyzePresentationItem(
         reason: 'transcode-failed',
         support,
         derivativeId: derivative.id
+      }
+    }
+
+    if (await canUseLiveTranscode(platform)) {
+      return {
+        itemId: item.id,
+        blobId,
+        status: 'ready',
+        reason: 'ready-live-transcode',
+        support,
+        derivativeId: derivative?.id,
+        playbackMode: 'live-transcode',
+        seekable: false
       }
     }
 
@@ -214,6 +235,18 @@ async function analyzePresentationItem(
     blobId,
     status: 'ready',
     reason: 'ready-native',
-    support
+    support,
+    playbackMode: 'native',
+    seekable: true
+  }
+}
+
+async function canUseLiveTranscode(platform: MediaPlatform): Promise<boolean> {
+  if (platform !== 'electron') return false
+  try {
+    const config = await window.api.videoTranscode.getFfmpegConfig()
+    return config.status === 'ready'
+  } catch {
+    return false
   }
 }

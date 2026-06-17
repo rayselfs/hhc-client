@@ -10,6 +10,8 @@ import type {
   VideoTranscodeRunResult,
   VideoPosterRequest,
   VideoPosterResult,
+  VideoLiveTranscodeStartRequest,
+  VideoLiveTranscodeStartResult,
   LocalSyncConnectionInfo,
   LocalSyncWatchStatus,
   LocalSyncRemoteItem,
@@ -97,6 +99,8 @@ interface VideoTranscodeAPI {
   run: (request: VideoTranscodeRunRequest) => Promise<VideoTranscodeRunResult>
   cancel: (jobId: string) => Promise<void>
   generatePoster: (request: VideoPosterRequest) => Promise<VideoPosterResult>
+  startLive: (request: VideoLiveTranscodeStartRequest) => Promise<VideoLiveTranscodeStartResult>
+  stopLive: (sessionId: string) => Promise<void>
 }
 
 interface LocalSyncAPI {
