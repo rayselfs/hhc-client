@@ -217,6 +217,26 @@ describe('projection:send-to-main', () => {
     )
   })
 
+  it('forwards projection playback state to main window', () => {
+    vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockProjectionWindow as never)
+    const handler = getOnHandler('projection:send-to-main')
+    const payload = {
+      itemId: 'video-id',
+      currentTime: 12,
+      duration: 100,
+      isPlaying: true,
+      isEnded: false
+    }
+
+    handler(makeEvent(), 'file:playback-state', payload)
+
+    expect(mockWindowManager.sendToMain).toHaveBeenCalledWith(
+      'projection:message',
+      'file:playback-state',
+      payload
+    )
+  })
+
   it('unknown window does NOT forward', () => {
     vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockUnknownWindow as never)
     const handler = getOnHandler('projection:send-to-main')

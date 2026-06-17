@@ -22,7 +22,7 @@ import { usePreviewCache } from '@renderer/hooks/usePreviewCache'
 import { useThumbnails } from '@renderer/hooks/useThumbnails'
 
 export default function MediaPresenter(): React.JSX.Element {
-  const { claimProjection, blankProjection, send, project } = useProjection()
+  const { claimProjection, blankProjection, send, project, on } = useProjection()
 
   useMediaProjectionSync()
 
@@ -93,6 +93,22 @@ export default function MediaPresenter(): React.JSX.Element {
       setPresenterActive(false)
     }
   }, [])
+
+  useEffect(() => {
+    if (isRehearsal) return
+    return on('file:playback-state', (data) => {
+      const state = useMediaProjectionStore.getState()
+      if (state.currentItem()?.id !== data.itemId) return
+      const current = state.typeStates.video
+      state.setTypeState('video', {
+        hasStarted: current?.hasStarted ?? (data.currentTime > 0 || data.isPlaying),
+        isPlaying: data.isPlaying,
+        isEnded: data.isEnded,
+        currentTime: data.currentTime,
+        duration: data.duration
+      })
+    })
+  }, [isRehearsal, on])
 
   useKeyboardShortcuts(
     [

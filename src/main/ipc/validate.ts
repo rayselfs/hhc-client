@@ -134,6 +134,14 @@ export function validateProjectionMessageTuple(args: unknown[]): args is Project
         )
       }
       return false
+    case 'file:playback-state':
+      return (
+        typeof obj.itemId === 'string' &&
+        isFiniteNumber(obj.currentTime) &&
+        isFiniteNumber(obj.duration) &&
+        typeof obj.isPlaying === 'boolean' &&
+        typeof obj.isEnded === 'boolean'
+      )
     case 'timer:tick':
       return (
         typeof obj.mode === 'string' &&

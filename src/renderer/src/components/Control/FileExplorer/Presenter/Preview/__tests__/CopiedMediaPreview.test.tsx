@@ -35,6 +35,7 @@ const storeState = {
   snapshot: null as null | {
     entries: Array<{ itemId: string; playbackMode?: 'live-transcode'; seekable?: boolean }>
   },
+  typeStates: {} as { video?: { currentTime?: number; duration?: number } },
   setTypeState: vi.fn(),
   next: mockNext,
   exit: mockExit,
@@ -85,6 +86,7 @@ async function getLoadedVideo(container: HTMLElement): Promise<HTMLVideoElement>
 beforeEach(() => {
   vi.clearAllMocks()
   storeState.snapshot = null
+  storeState.typeStates = {}
   mockGetFileSource.mockResolvedValue({
     url: 'blob:resolved-source',
     revoke: vi.fn()
@@ -224,11 +226,14 @@ describe('copied media preview identity', () => {
     storeState.snapshot = {
       entries: [{ itemId: 'copy-id', playbackMode: 'live-transcode', seekable: false }]
     }
+    storeState.typeStates = { video: { currentTime: 12, duration: 100 } }
 
     const { container } = render(<VideoPreview item={makeCopy('video/x-matroska', 'copy.mkv')} />)
 
     expect(mockGetFileSource).not.toHaveBeenCalled()
     expect(screen.getByText('presenter.liveTranscodeActive')).toBeInTheDocument()
+    expect(screen.getByText('00:12 / 01:40')).toBeInTheDocument()
+    expect(container.querySelector('input.video-seek-range')).toBeDisabled()
 
     fireEvent.click(container.querySelector('button')!)
     seekRelative(5)

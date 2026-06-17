@@ -52,6 +52,7 @@ export default function FileProjection({
   const [displayName, setDisplayName] = useState(fileName ?? '')
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const pdfContainerRef = useRef<HTMLDivElement | null>(null)
+  const adapterSendRef = useRef<ReturnType<typeof createProjectionAdapter>['send'] | null>(null)
   const currentItemIdRef = useRef<string | null>(null)
   const sourceRevokeRef = useRef<(() => void) | null>(null)
   const pendingVideoControlRef = useRef<PendingVideoControl | null>(null)
@@ -159,6 +160,24 @@ export default function FileProjection({
     }
   }, [])
 
+  const sendVideoPlaybackState = useCallback(
+    (next?: { isPlaying?: boolean; isEnded?: boolean }): void => {
+      const video = videoRef.current
+      const itemId = currentItemIdRef.current
+      const send = adapterSendRef.current
+      if (!video || !itemId || !send) return
+      const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0
+      send('file:playback-state', {
+        itemId,
+        currentTime: Number.isFinite(video.currentTime) ? video.currentTime : 0,
+        duration,
+        isPlaying: next?.isPlaying ?? !video.paused,
+        isEnded: next?.isEnded ?? video.ended
+      })
+    },
+    []
+  )
+
   const loadFile = useCallback(
     async (itemId: string, blobId: string, fileMimeType: string, options: LoadFileOptions = {}) => {
       currentItemIdRef.current = itemId
@@ -249,6 +268,7 @@ export default function FileProjection({
 
   useEffect(() => {
     const adapter = createProjectionAdapter('projection')
+    adapterSendRef.current = adapter.send.bind(adapter)
 
     const unsubShow = adapter.on('file:show', (data: FileShowPayload) => {
       setDisplayName(data.fileName)
@@ -271,6 +291,7 @@ export default function FileProjection({
       unsubControl()
       unsubEnd()
       adapter.dispose()
+      adapterSendRef.current = null
     }
   }, [loadFile, handleControl])
 
@@ -405,8 +426,18 @@ export default function FileProjection({
               transformOrigin: 'center center'
             }}
             muted
-            onLoadedMetadata={applyPendingVideoControl}
-            onCanPlay={applyPendingVideoControl}
+            onLoadedMetadata={() => {
+              sendVideoPlaybackState()
+              applyPendingVideoControl()
+            }}
+            onCanPlay={() => {
+              sendVideoPlaybackState()
+              applyPendingVideoControl()
+            }}
+            onTimeUpdate={() => sendVideoPlaybackState()}
+            onPlay={() => sendVideoPlaybackState({ isPlaying: true, isEnded: false })}
+            onPause={() => sendVideoPlaybackState({ isPlaying: false })}
+            onEnded={() => sendVideoPlaybackState({ isPlaying: false, isEnded: true })}
           />
         </div>
       </div>

@@ -23,6 +23,8 @@ export default function ProjectionPage(): React.JSX.Element {
     blobId: string
     fileName: string
     mimeType: string
+    streamUrl?: string
+    seekable?: boolean
   } | null>(null)
   const [timerRingColor, setTimerRingColor] = useState<string | null>(() => {
     const s = useSettingsStore.getState()
@@ -60,7 +62,9 @@ export default function ProjectionPage(): React.JSX.Element {
         itemId: data.itemId,
         blobId: data.blobId,
         fileName: data.fileName,
-        mimeType: data.mimeType
+        mimeType: data.mimeType,
+        streamUrl: data.streamUrl,
+        seekable: data.seekable
       })
       setActiveContent('file')
     })
@@ -129,6 +133,8 @@ export default function ProjectionPage(): React.JSX.Element {
         initialItemId={fileData.itemId}
         initialBlobId={fileData.blobId}
         initialMimeType={fileData.mimeType}
+        initialStreamUrl={fileData.streamUrl}
+        initialSeekable={fileData.seekable}
       />
     )
   }

@@ -10,7 +10,13 @@ import { isElectron } from './env'
 
 export type MediaTypeStateMap = {
   image: Record<string, never>
-  video: { hasStarted?: boolean; isPlaying?: boolean; isEnded?: boolean }
+  video: {
+    hasStarted?: boolean
+    isPlaying?: boolean
+    isEnded?: boolean
+    currentTime?: number
+    duration?: number
+  }
   pdf: { viewMode: 'slide' | 'scroll'; thumbsCollapsed?: boolean }
 }
 

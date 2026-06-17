@@ -58,6 +58,14 @@ export interface AppMessages {
   }
   /** File playback/control actions on projection */
   'file:control': FileControlPayload
+  /** File playback state reported by projection video element */
+  'file:playback-state': {
+    itemId: string
+    currentTime: number
+    duration: number
+    isPlaying: boolean
+    isEnded: boolean
+  }
   /** Presentation ended — show end screen on projection */
   'file:end': null
 }

@@ -3,9 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import FileProjection from '../FileProjection'
 import type { ProjectionChannel, ProjectionPayload } from '@shared/projection-messages'
 
-const { mockGetFileSource, mockProjectionHandlers } = vi.hoisted(() => ({
+const { mockGetFileSource, mockProjectionHandlers, mockProjectionSend } = vi.hoisted(() => ({
   mockGetFileSource: vi.fn(),
-  mockProjectionHandlers: new Map<string, Array<(data: unknown) => void>>()
+  mockProjectionHandlers: new Map<string, Array<(data: unknown) => void>>(),
+  mockProjectionSend: vi.fn()
 }))
 
 vi.mock('@renderer/lib/file-explorer-db', () => ({
@@ -15,6 +16,7 @@ vi.mock('@renderer/lib/file-explorer-db', () => ({
 
 vi.mock('@renderer/lib/projection-adapter', () => ({
   createProjectionAdapter: () => ({
+    send: mockProjectionSend,
     on: vi.fn((channel: string, handler: (data: unknown) => void) => {
       const handlers = mockProjectionHandlers.get(channel) ?? []
       handlers.push(handler)
@@ -120,6 +122,37 @@ describe('FileProjection copied media identity', () => {
     triggerProjection('file:control', { action: 'seek', itemId: 'live-id', value: 35 })
 
     expect(video.currentTime).toBe(0)
+  })
+
+  it('reports video playback state from the projection video element', async () => {
+    const { container } = render(
+      <FileProjection
+        fileName="live.mkv"
+        initialItemId="live-id"
+        initialBlobId="source-id"
+        initialMimeType="video/x-matroska"
+        initialStreamUrl="hhc-live-media://stream/live-session"
+        initialSeekable={false}
+      />
+    )
+
+    const video = await waitFor(() => {
+      const element = container.querySelector('video')
+      expect(element).not.toBeNull()
+      return element!
+    })
+    Object.defineProperty(video, 'duration', { configurable: true, value: 100 })
+    video.currentTime = 12
+
+    fireEvent.timeUpdate(video)
+
+    expect(mockProjectionSend).toHaveBeenCalledWith('file:playback-state', {
+      itemId: 'live-id',
+      currentTime: 12,
+      duration: 100,
+      isPlaying: false,
+      isEnded: false
+    })
   })
 
   it('applies pending video seek before pending play', async () => {

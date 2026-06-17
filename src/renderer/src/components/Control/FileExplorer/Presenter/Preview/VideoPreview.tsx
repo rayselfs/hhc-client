@@ -76,11 +76,23 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
   const zoomLevel = useMediaProjectionStore((s) => s.zoomLevel)
   const pan = useMediaProjectionStore((s) => s.pan)
   const setTypeState = useMediaProjectionStore((s) => s.setTypeState)
+  const projectedVideoState = useMediaProjectionStore((s) => s.typeStates.video)
   const isLiveTranscode = useMediaProjectionStore(
     (s) =>
       s.snapshot?.entries.find((entry) => entry.itemId === item.id)?.playbackMode ===
       'live-transcode'
   )
+  const displayedCurrentTime = isLiveTranscode
+    ? (projectedVideoState?.currentTime ?? currentTime)
+    : currentTime
+  const displayedDuration = isLiveTranscode ? (projectedVideoState?.duration ?? duration) : duration
+  const displayedHasStarted = isLiveTranscode
+    ? hasStarted || Boolean(projectedVideoState?.hasStarted) || displayedCurrentTime > 0
+    : hasStarted
+  const displayedIsPlaying = isLiveTranscode
+    ? (projectedVideoState?.isPlaying ?? isPlaying)
+    : isPlaying
+  const displayedIsEnded = isLiveTranscode ? (projectedVideoState?.isEnded ?? isEnded) : isEnded
   const transform =
     zoomLevel !== 1
       ? `scale(${zoomLevel}) translate(${(pan.x / zoomLevel) * 100}%, ${(pan.y / zoomLevel) * 100}%)`
@@ -373,7 +385,7 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
         )}
       </div>
 
-      {!hasStarted && (
+      {!displayedHasStarted && (
         <button
           className="absolute inset-0 flex items-center justify-center z-10 cursor-pointer"
           onClick={() => {
@@ -426,7 +438,7 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
         </div>
       )}
 
-      {hasStarted && !isEnded && (
+      {displayedHasStarted && !displayedIsEnded && (
         <button
           className="absolute inset-0 z-10 cursor-pointer"
           aria-label="Toggle play"
@@ -435,7 +447,7 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
         />
       )}
 
-      {hasStarted && (
+      {displayedHasStarted && (
         <div
           className="absolute bottom-0 left-0 right-0 z-20"
           onMouseDown={(e) => e.stopPropagation()}
@@ -443,15 +455,17 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
           <input
             type="range"
             min={0}
-            max={duration || 1}
+            max={displayedDuration || 1}
             step={0.1}
-            value={isDraggingSeek ? localSeekTime : currentTime}
-            className="video-seek-range w-full"
+            value={
+              isLiveTranscode ? displayedCurrentTime : isDraggingSeek ? localSeekTime : currentTime
+            }
+            className={`video-seek-range w-full${isLiveTranscode ? ' cursor-not-allowed opacity-70' : ''}`}
             disabled={isLiveTranscode}
             ref={seekInputRef}
             style={
               {
-                '--seek-fill': `${(((isDraggingSeek ? localSeekTime : currentTime) / (duration || 1)) * 100).toFixed(2)}%`
+                '--seek-fill': `${(((isLiveTranscode ? displayedCurrentTime : isDraggingSeek ? localSeekTime : currentTime) / (displayedDuration || 1)) * 100).toFixed(2)}%`
               } as React.CSSProperties
             }
             onPointerDown={(e) => {
@@ -491,9 +505,9 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
                 className="w-11 h-11 inline-flex items-center justify-center text-white/80 hover:text-white rounded-full transition-colors"
                 onClick={handlePlayPause}
               >
-                {isEnded ? (
+                {displayedIsEnded ? (
                   <ArrowCounterClockwise size={24} weight="fill" />
-                ) : isPlaying ? (
+                ) : displayedIsPlaying ? (
                   <Pause size={24} weight="fill" />
                 ) : (
                   <Play size={24} weight="fill" />
@@ -548,7 +562,7 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
 
             <div className="inline-flex items-center rounded-full presenter-media-control px-4 py-2.5">
               <span className="text-white/70 text-base tabular-nums whitespace-nowrap">
-                {formatTime(currentTime)} / {formatTime(duration)}
+                {formatTime(displayedCurrentTime)} / {formatTime(displayedDuration)}
               </span>
             </div>
           </div>
