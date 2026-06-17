@@ -155,7 +155,7 @@ export const GridView = React.memo(function GridView({
               className={`grid gap-4 ${gridColsClass}`}
             >
               {rowItems.map((item) => {
-                const isRenaming = renamingItemId === item.id && !item.isFolder
+                const isRenaming = renamingItemId === item.id
                 const splitName = splitFileName(item.name)
                 const content = (
                   <div
@@ -203,22 +203,29 @@ export const GridView = React.memo(function GridView({
                       )}
                     </div>
                     {isRenaming ? (
-                      <div className="mt-2 w-full" onClick={(event) => event.stopPropagation()}>
+                      <div
+                        data-file-name-region
+                        className="mt-2 w-full"
+                        onClick={(event) => event.stopPropagation()}
+                      >
                         <InlineRenameInput
-                          initialValue={splitName.base}
-                          ariaLabel={t('fileExplorer.renameFile', 'Rename file')}
+                          initialValue={item.isFolder ? item.name : splitName.base}
+                          ariaLabel={
+                            item.isFolder
+                              ? t('fileExplorer.renameFolder', 'Rename folder')
+                              : t('fileExplorer.renameFile', 'Rename file')
+                          }
                           onSubmit={(value) => onRenameSubmit?.(item.id, value)}
                           onCancel={() => onRenameCancel?.()}
                         />
                       </div>
                     ) : (
-                      <span
+                      <div
                         data-file-name-region
-                        className={`w-full text-center text-foreground break-words ${nameClass}`}
-                        title={item.name}
+                        className={`w-full text-center text-foreground break-words ${nameClass.replace('mt-', 'pt-')}`}
                       >
-                        {item.name}
-                      </span>
+                        <span title={item.name}>{item.name}</span>
+                      </div>
                     )}
                   </div>
                 )

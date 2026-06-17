@@ -177,7 +177,7 @@ export const ListView = React.memo(function ListView({
         >
           {rowVirtualizer.getVirtualItems().map((virtualRow) => {
             const item = items[virtualRow.index]
-            const isRenaming = renamingItemId === item.id && !item.isFolder
+            const isRenaming = renamingItemId === item.id
             const splitName = splitFileName(item.name)
             const content = (
               <div
@@ -202,8 +202,12 @@ export const ListView = React.memo(function ListView({
                 {isRenaming ? (
                   <div className="flex-1" onClick={(event) => event.stopPropagation()}>
                     <InlineRenameInput
-                      initialValue={splitName.base}
-                      ariaLabel={t('fileExplorer.renameFile', 'Rename file')}
+                      initialValue={item.isFolder ? item.name : splitName.base}
+                      ariaLabel={
+                        item.isFolder
+                          ? t('fileExplorer.renameFolder', 'Rename folder')
+                          : t('fileExplorer.renameFile', 'Rename file')
+                      }
                       onSubmit={(value) => onRenameSubmit?.(item.id, value)}
                       onCancel={() => onRenameCancel?.()}
                     />

@@ -217,7 +217,9 @@ const TRANSCODE_COMPATIBILITY_VARIANT = 'mp4-h264-aac-yuv420p-faststart'
 
 type TranscodeBadgeStatus = 'processing' | 'failed'
 
-function useTranscodeBadgeStatuses(fileItems: FileItemRecord[]): Record<string, TranscodeBadgeStatus> {
+function useTranscodeBadgeStatuses(
+  fileItems: FileItemRecord[]
+): Record<string, TranscodeBadgeStatus> {
   const [statuses, setStatuses] = useState<Record<string, TranscodeBadgeStatus>>({})
 
   useEffect(() => {
@@ -227,8 +229,12 @@ function useTranscodeBadgeStatuses(fileItems: FileItemRecord[]): Record<string, 
       const next: Record<string, TranscodeBadgeStatus> = {}
       await Promise.all(
         fileItems.map(async (item) => {
-          const capability = resolveMediaCapability({ mimeType: item.mimeType, fileName: item.name })
-          if (!capability || getMediaSupport(capability, 'electron') !== 'transcode-required') return
+          const capability = resolveMediaCapability({
+            mimeType: item.mimeType,
+            fileName: item.name
+          })
+          if (!capability || getMediaSupport(capability, 'electron') !== 'transcode-required')
+            return
           const blobId = getBlobId(item)
           if (!blobId) return
           const asset = await getDerivedAsset(
@@ -613,15 +619,15 @@ export function FileBrowser({
 
   useEffect(() => {
     if (!renameItemRequestId) return
-    const file = fileItems.find((item) => item.id === renameItemRequestId)
-    if (file) {
+    const item = sortedItems.find((entry) => entry.id === renameItemRequestId)
+    if (item && !item.isFolder) {
       setSelectedIds(new Set([renameItemRequestId]))
       if (!isCurrentFolderReadOnly) setRenamingItemId(renameItemRequestId)
     }
     onRenameItemRequestHandled?.()
   }, [
     renameItemRequestId,
-    fileItems,
+    sortedItems,
     setSelectedIds,
     onRenameItemRequestHandled,
     isCurrentFolderReadOnly
@@ -720,8 +726,8 @@ export function FileBrowser({
         setRenamingItemId(null)
         return
       }
-      const file = fileItems.find((item) => item.id === itemId)
-      if (!file) {
+      const item = sortedItems.find((entry) => entry.id === itemId)
+      if (!item) {
         setRenamingItemId(null)
         return
       }
@@ -732,20 +738,42 @@ export function FileBrowser({
         return
       }
 
-      const { extension } = splitFileName(file.name)
-      const nextName = `${trimmedBase}${extension}`
-      const siblingNames = fileItems
-        .filter((item) => item.parentId === file.parentId)
-        .map((item) => item.name)
-      if (hasNameConflict(nextName, siblingNames, { excludeName: file.name })) {
-        toast.danger(t('fileExplorer.fileAlreadyExists', 'A file with this name already exists'))
-        return
+      if (item.isFolder) {
+        const folder = folders.find((entry) => entry.id === itemId)
+        if (!folder) {
+          setRenamingItemId(null)
+          return
+        }
+        const siblingNames = folders
+          .filter((entry) => entry.parentId === folder.parentId)
+          .map((entry) => entry.name)
+        if (hasNameConflict(trimmedBase, siblingNames, { excludeName: folder.name })) {
+          toast.danger(
+            t('fileExplorer.folderAlreadyExists', 'A folder with this name already exists')
+          )
+          return
+        }
+        useFileExplorerStore.getState().updateFolder(itemId, { name: trimmedBase })
+      } else {
+        const file = fileItems.find((entry) => entry.id === itemId)
+        if (!file) {
+          setRenamingItemId(null)
+          return
+        }
+        const { extension } = splitFileName(file.name)
+        const nextName = `${trimmedBase}${extension}`
+        const siblingNames = fileItems
+          .filter((entry) => entry.parentId === file.parentId)
+          .map((entry) => entry.name)
+        if (hasNameConflict(nextName, siblingNames, { excludeName: file.name })) {
+          toast.danger(t('fileExplorer.fileAlreadyExists', 'A file with this name already exists'))
+          return
+        }
+        useFileExplorerStore.getState().updateItem?.(itemId, { name: nextName })
       }
-
-      useFileExplorerStore.getState().updateItem?.(itemId, { name: nextName })
       setRenamingItemId(null)
     },
-    [fileItems, t, isCurrentFolderReadOnly]
+    [fileItems, folders, sortedItems, t, isCurrentFolderReadOnly]
   )
 
   const handleRenameCancel = useCallback((): void => {
@@ -810,7 +838,7 @@ export function FileBrowser({
       }
 
       const item = sortedItems.find((entry) => entry.id === itemId)
-      if (!item || item.isFolder) return
+      if (!item) return
       if (isNameRegion && !isCurrentFolderReadOnly) {
         cancelPendingRename()
         pendingRenameItemIdRef.current = itemId

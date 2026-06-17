@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import FileBrowser from '../FileBrowser'
-import type { FileItemRecord } from '@shared/types/folder'
+import type { FileItemRecord, FolderRecord } from '@shared/types/folder'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -106,6 +106,7 @@ vi.mock('@renderer/stores/media-projection', () => ({
 
 let viewMode = 'medium-icon'
 const updateItem = vi.fn()
+const updateFolder = vi.fn()
 
 const fileItem: FileItemRecord = {
   id: 'file-1',
@@ -120,22 +121,33 @@ const fileItem: FileItemRecord = {
   expiresAt: null
 }
 
+const folderItem: FolderRecord = {
+  id: 'folder-1',
+  parentId: 'file-root',
+  name: 'Drama Audio',
+  sortIndex: 0,
+  createdAt: 1,
+  expiresAt: null
+}
+
 vi.mock('@renderer/stores/file-explorer', () => {
   const store = (selector?: (state: Record<string, unknown>) => unknown): unknown => {
     const state = {
       currentFolderId: 'file-root',
-      _childFoldersByParent: { 'file-root': [] },
+      _childFoldersByParent: { 'file-root': [folderItem] },
       _itemsByParent: { 'file-root': [fileItem] },
       navigateToFolder: vi.fn(),
       toggleFavorite: vi.fn(),
       moveItem: vi.fn(),
       moveFolder: vi.fn(),
-      updateItem
+      updateItem,
+      updateFolder
     }
     return selector ? selector(state) : state
   }
   store.getState = () => ({
     updateItem,
+    updateFolder,
     getItems: () => [fileItem]
   })
   return {
@@ -175,6 +187,7 @@ describe('FileBrowser slow-click inline rename', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     updateItem.mockClear()
+    updateFolder.mockClear()
     mockStartPresentation.mockClear()
     mockStartPresentationWithReadiness.mockClear()
     viewMode = 'medium-icon'
@@ -196,6 +209,20 @@ describe('FileBrowser slow-click inline rename', () => {
     flushRenameDelay()
 
     expect(screen.getByLabelText('Rename file')).toHaveValue('slides')
+  })
+
+  it('starts rename from a selected folder name region', () => {
+    render(<FileBrowser />)
+
+    const folderName = screen.getByText('Drama Audio')
+    click(folderName, 1000)
+    act(() => {
+      vi.advanceTimersByTime(5000)
+    })
+    click(folderName, 6000)
+    flushRenameDelay()
+
+    expect(screen.getByLabelText('Rename folder')).toHaveValue('Drama Audio')
   })
 
   it('allows rename after the item has been selected for longer than the minimum delay', () => {

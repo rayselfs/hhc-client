@@ -16,12 +16,19 @@ export function InlineRenameInput({
   const [value, setValue] = useState(initialValue)
   const composingRef = useRef(false)
   const submittedRef = useRef(false)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     inputRef.current?.focus()
     inputRef.current?.select()
   }, [])
+
+  useEffect(() => {
+    const input = inputRef.current
+    if (!input) return
+    input.style.height = 'auto'
+    input.style.height = `${input.scrollHeight}px`
+  }, [value])
 
   const submit = (): void => {
     if (submittedRef.current) return
@@ -35,11 +42,12 @@ export function InlineRenameInput({
   }
 
   return (
-    <input
+    <textarea
       ref={inputRef}
       aria-label={ariaLabel}
       value={value}
-      className="w-full rounded border border-primary/40 bg-background px-1 text-center text-sm text-foreground outline-none"
+      rows={1}
+      className="max-h-24 w-full resize-none overflow-hidden rounded border border-primary/40 bg-background px-1 text-center text-sm text-foreground outline-none"
       onChange={(event) => setValue(event.target.value)}
       onClick={(event) => event.stopPropagation()}
       onDoubleClick={(event) => event.stopPropagation()}
