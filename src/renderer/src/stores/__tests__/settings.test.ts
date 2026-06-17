@@ -44,7 +44,7 @@ beforeEach(() => {
     timerRingColor: '#3b82f6',
     speech: DEFAULT_SPEECH,
     oneDrive: DEFAULT_ONEDRIVE,
-    projectionDisplayId: 'auto'
+    projectionDisplayId: ''
   })
   mockToast.warning.mockClear()
   mockToast.success.mockClear()
@@ -466,13 +466,13 @@ describe('settings normalization', () => {
       timerRingColorEnabled: false,
       trashRetentionDays: 0,
       reminderMode: 'subtract',
-      projectionDisplayId: 'auto'
+      projectionDisplayId: ''
     })
   })
 
   it('normalizes valid projection display ids', () => {
     expect(normalizeSettingsState({ projectionDisplayId: '2' }).projectionDisplayId).toBe('2')
-    expect(normalizeSettingsState({ projectionDisplayId: 'auto' }).projectionDisplayId).toBe('auto')
+    expect(normalizeSettingsState({ projectionDisplayId: '' }).projectionDisplayId).toBe('')
   })
 })
 

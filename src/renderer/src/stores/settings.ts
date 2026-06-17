@@ -64,7 +64,7 @@ const DEFAULT_TIMER_RING_COLOR = '#3b82f6'
 const DEFAULT_TIMER_RING_COLOR_ENABLED = false
 const DEFAULT_TRASH_RETENTION_DAYS = 30
 const DEFAULT_REMINDER_MODE = 'subtract'
-const DEFAULT_PROJECTION_DISPLAY_ID = 'auto'
+const DEFAULT_PROJECTION_DISPLAY_ID = ''
 export const HHC_DEFAULT_ONEDRIVE_CLIENT_ID = '4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02'
 const RELOAD_DELAY_MS = 500
 const THEME_PREFERENCES: ThemePreference[] = ['system', 'light', 'dark']
@@ -139,9 +139,7 @@ function normalizePositiveInteger(
 
 function normalizeProjectionDisplayId(value: unknown): string {
   if (typeof value !== 'string' || value.trim() === '') return DEFAULT_PROJECTION_DISPLAY_ID
-  return value === DEFAULT_PROJECTION_DISPLAY_ID || /^\d+$/.test(value)
-    ? value
-    : DEFAULT_PROJECTION_DISPLAY_ID
+  return /^\d+$/.test(value) ? value : DEFAULT_PROJECTION_DISPLAY_ID
 }
 
 function normalizeOneDriveSettings(value: unknown): OneDriveSettings {

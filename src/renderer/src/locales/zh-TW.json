@@ -540,7 +540,7 @@
     "hardwareAccelerationDesc": "需要重新啟動應用程式",
     "projectionDisplay": {
       "label": "投影視窗螢幕",
-      "auto": "自動"
+      "noExternalDisplay": "沒有外接螢幕"
     },
     "resetToDefaults": "重設為預設值",
     "resetBtn": "重設",

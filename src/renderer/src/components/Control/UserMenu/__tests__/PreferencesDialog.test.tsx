@@ -301,7 +301,7 @@ describe('PreferencesDialog', () => {
         setOneDrive: vi.fn(),
         trashRetentionDays: 30,
         setTrashRetentionDays: vi.fn(),
-        projectionDisplayId: 'auto',
+        projectionDisplayId: '',
         setProjectionDisplayId: vi.fn()
       }
       return selector ? selector(store) : store
@@ -349,6 +349,25 @@ describe('PreferencesDialog', () => {
     vi.mocked(isElectron).mockReturnValue(false)
   })
 
+  it('disables projection display selector when no external display exists', async () => {
+    const { isElectron } = await import('@renderer/lib/env')
+    vi.mocked(isElectron).mockReturnValue(true)
+    Object.defineProperty(window, 'api', {
+      value: { projection: { getDisplays: vi.fn().mockResolvedValue([]) } },
+      configurable: true
+    })
+
+    renderDialog(true)
+
+    expect(await screen.findByText('No external display')).toBeInTheDocument()
+    expect(screen.getByLabelText('Projection Window Display')).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    )
+
+    vi.mocked(isElectron).mockReturnValue(false)
+  })
+
   it('calls reset functions when reset confirmed via modal', async () => {
     const user = userEvent.setup()
     const { useSettingsStore } = await import('@renderer/stores/settings')
@@ -387,7 +406,7 @@ describe('PreferencesDialog', () => {
         setOneDrive: vi.fn(),
         trashRetentionDays: 30,
         setTrashRetentionDays: vi.fn(),
-        projectionDisplayId: 'auto',
+        projectionDisplayId: '',
         setProjectionDisplayId: vi.fn()
       }
       return selector ? selector(store) : store
@@ -443,7 +462,7 @@ describe('PreferencesDialog', () => {
         setOneDrive: vi.fn(),
         trashRetentionDays: 30,
         setTrashRetentionDays: vi.fn(),
-        projectionDisplayId: 'auto',
+        projectionDisplayId: '',
         setProjectionDisplayId: vi.fn()
       }
       return selector ? selector(store) : store

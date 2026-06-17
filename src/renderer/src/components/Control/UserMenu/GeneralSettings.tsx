@@ -28,6 +28,7 @@ export default function GeneralSettings(): React.JSX.Element {
   const confirm = useConfirm()
   const [displays, setDisplays] = useState<DisplayInfo[]>([])
   const externalDisplays = displays.filter((display) => !display.isPrimary)
+  const selectedProjectionDisplayId = externalDisplays.length > 0 ? projectionDisplayId : ''
 
   useEffect(() => {
     if (!isElectron() || !window.api?.projection?.getDisplays) return
@@ -35,11 +36,11 @@ export default function GeneralSettings(): React.JSX.Element {
       .getDisplays()
       .then((nextDisplays) => {
         setDisplays(nextDisplays)
-        const selected = nextDisplays.some(
-          (display) => !display.isPrimary && String(display.id) === projectionDisplayId
-        )
-        if (projectionDisplayId !== 'auto' && !selected) {
-          setProjectionDisplayId('auto')
+        const external = nextDisplays.filter((display) => !display.isPrimary)
+        const selected = external.some((display) => String(display.id) === projectionDisplayId)
+        const nextProjectionDisplayId = external[0] ? String(external[0].id) : ''
+        if (!selected && projectionDisplayId !== nextProjectionDisplayId) {
+          setProjectionDisplayId(nextProjectionDisplayId)
         }
       })
       .catch(() => setDisplays([]))
@@ -110,24 +111,22 @@ export default function GeneralSettings(): React.JSX.Element {
         <>
           <Select
             variant="secondary"
-            value={projectionDisplayId}
+            value={selectedProjectionDisplayId}
             onChange={(key) => setProjectionDisplayId(String(key))}
             aria-label={t('preferences.projectionDisplay.label')}
+            isDisabled={externalDisplays.length === 0}
           >
             <Label>{t('preferences.projectionDisplay.label')}</Label>
             <Select.Trigger className="rounded-full pl-5">
-              <Select.Value />
+              <Select.Value>
+                {externalDisplays.length === 0
+                  ? t('preferences.projectionDisplay.noExternalDisplay')
+                  : undefined}
+              </Select.Value>
               <Select.Indicator />
             </Select.Trigger>
             <Select.Popover>
               <ListBox>
-                <ListBox.Item
-                  id="auto"
-                  textValue={t('preferences.projectionDisplay.auto')}
-                  className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
-                >
-                  {t('preferences.projectionDisplay.auto')}
-                </ListBox.Item>
                 {externalDisplays.map((display) => {
                   const label = formatDisplayLabel(display)
                   return (

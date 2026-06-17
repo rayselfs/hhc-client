@@ -32,11 +32,11 @@ export class WindowManager {
     return externalDisplay
   }
 
-  private getProjectionDisplay(displayId = 'auto'): Electron.Display {
+  private getProjectionDisplay(displayId = ''): Electron.Display {
     const displays = screen.getAllDisplays()
     const primaryDisplay = screen.getPrimaryDisplay()
 
-    if (displayId !== 'auto') {
+    if (displayId) {
       const selected = displays.find(
         (display) => String(display.id) === displayId && display.id !== primaryDisplay.id
       )
@@ -110,7 +110,7 @@ export class WindowManager {
     })
   }
 
-  createProjectionWindow(displayId = 'auto'): void {
+  createProjectionWindow(displayId = ''): void {
     if (this.isProjectionOpen()) return
 
     const primaryDisplay = screen.getPrimaryDisplay()

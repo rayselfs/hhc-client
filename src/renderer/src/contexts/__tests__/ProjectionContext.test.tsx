@@ -606,7 +606,7 @@ describe('ProjectionContext — electron mode', () => {
     await act(async () => {
       await Promise.resolve()
     })
-    expect(mockEnsure).toHaveBeenCalledWith('auto')
+    expect(mockEnsure).toHaveBeenCalledWith('')
     expect(mockCheck).toHaveBeenCalledOnce()
   })
 
@@ -653,7 +653,7 @@ describe('ProjectionContext — electron mode', () => {
     await act(async () => {
       await result.current.openProjection()
     })
-    expect(mockEnsure).toHaveBeenCalledWith('auto')
+    expect(mockEnsure).toHaveBeenCalledWith('')
   })
 
   it('closeProjection calls api.projection.close', async () => {
