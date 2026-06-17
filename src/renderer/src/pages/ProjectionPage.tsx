@@ -8,6 +8,7 @@ import TimerProjection from '@renderer/components/Projection/TimerProjection'
 import FileProjection from '@renderer/components/Projection/FileProjection'
 import type { BibleChapterData } from '@renderer/components/Projection/BibleProjection'
 import type { TimerTickPayload, StopwatchTickPayload } from '@shared/types/timer'
+import type { FileControlPayload } from '@shared/projection-messages'
 
 type ActiveContent = 'timer' | 'bible' | 'file' | null
 
@@ -25,6 +26,10 @@ export default function ProjectionPage(): React.JSX.Element {
     mimeType: string
     streamUrl?: string
     seekable?: boolean
+  } | null>(null)
+  const [fileControlEvent, setFileControlEvent] = useState<{
+    id: number
+    data: FileControlPayload
   } | null>(null)
   const [timerRingColor, setTimerRingColor] = useState<string | null>(() => {
     const s = useSettingsStore.getState()
@@ -69,6 +74,12 @@ export default function ProjectionPage(): React.JSX.Element {
       setActiveContent('file')
     })
 
+    let fileControlEventId = 0
+    const unsubFileControl = adapter.on('file:control', (data) => {
+      fileControlEventId += 1
+      setFileControlEvent({ id: fileControlEventId, data })
+    })
+
     const unsubBibleSettings = adapter.on('bible:settings', ({ fontSize }) => {
       setBibleFontSize(fontSize)
     })
@@ -110,6 +121,7 @@ export default function ProjectionPage(): React.JSX.Element {
       unsubStopwatch()
       unsubBibleChapter()
       unsubFileShow()
+      unsubFileControl()
       unsubBibleSettings()
       unsubTimezone()
       unsubTimerRingColor()
@@ -135,6 +147,7 @@ export default function ProjectionPage(): React.JSX.Element {
         initialMimeType={fileData.mimeType}
         initialStreamUrl={fileData.streamUrl}
         initialSeekable={fileData.seekable}
+        controlEvent={fileControlEvent}
       />
     )
   }

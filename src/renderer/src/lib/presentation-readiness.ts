@@ -10,6 +10,7 @@ import {
   type MediaSupportMode
 } from './media-capabilities'
 import { getSyncEntryByLocalItem } from './sync-db'
+import { getFileBlobRecord } from './file-explorer-db'
 
 export type PresentationReadinessStatus =
   | 'ready'
@@ -207,7 +208,7 @@ async function analyzePresentationItem(
       }
     }
 
-    if (await canUseLiveTranscode(platform)) {
+    if (await canUseLiveTranscode(platform, blobId)) {
       return {
         itemId: item.id,
         blobId,
@@ -241,9 +242,11 @@ async function analyzePresentationItem(
   }
 }
 
-async function canUseLiveTranscode(platform: MediaPlatform): Promise<boolean> {
+async function canUseLiveTranscode(platform: MediaPlatform, blobId: string): Promise<boolean> {
   if (platform !== 'electron') return false
   try {
+    const record = await getFileBlobRecord(blobId)
+    if (record?.storage !== 'native-fs') return false
     const config = await window.api.videoTranscode.getFfmpegConfig()
     return config.status === 'ready'
   } catch {

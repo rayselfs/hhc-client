@@ -11,6 +11,12 @@ vi.mock('@renderer/components/Projection/DefaultProjection', () => ({
   default: () => <div data-testid="default-projection">Default</div>
 }))
 
+vi.mock('@renderer/components/Projection/FileProjection', () => ({
+  default: ({ controlEvent }: { controlEvent?: { data: { action: string } } | null }) => (
+    <div data-testid="file-projection" data-control-action={controlEvent?.data.action ?? ''} />
+  )
+}))
+
 const mockAdapter = (() => {
   const handlers = new Map<string, (data: unknown) => void>()
   return {
@@ -149,5 +155,26 @@ describe('ProjectionPage', () => {
       mockAdapter._trigger('settings:timer-ring-color', { color: '#ef4444' })
     })
     expect(container.querySelectorAll('circle')).toHaveLength(2)
+  })
+
+  it('keeps an early file control command until file projection mounts', () => {
+    render(<ProjectionPage />)
+
+    act(() => {
+      mockAdapter._trigger('__system:blank', { showDefault: false })
+      mockAdapter._trigger('file:control', { action: 'play', itemId: 'video-1' })
+      mockAdapter._trigger('file:show', {
+        itemId: 'video-1',
+        blobId: 'blob-1',
+        fileName: 'video.mkv',
+        mimeType: 'video/mp4',
+        playlist: [],
+        currentIndex: 0,
+        streamUrl: 'hhc-live-media://stream/live-session',
+        seekable: false
+      })
+    })
+
+    expect(screen.getByTestId('file-projection')).toHaveAttribute('data-control-action', 'play')
   })
 })

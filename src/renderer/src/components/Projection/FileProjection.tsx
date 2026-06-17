@@ -2,9 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { createProjectionAdapter } from '@renderer/lib/projection-adapter'
 import { getFileSource, openFileExplorerDB } from '@renderer/lib/file-explorer-db'
 import { loadPdfjsLib } from '@renderer/lib/pdfjs-loader'
-import type { AppMessages, FileControlPayload } from '@shared/projection-messages'
-
-type FileShowPayload = AppMessages['file:show']
+import type { FileControlPayload } from '@shared/projection-messages'
 
 type FileProjectionProps = {
   fileName?: string
@@ -13,6 +11,7 @@ type FileProjectionProps = {
   initialMimeType?: string
   initialStreamUrl?: string
   initialSeekable?: boolean
+  controlEvent?: { id: number; data: FileControlPayload } | null
 }
 
 type LoadFileOptions = {
@@ -41,7 +40,8 @@ export default function FileProjection({
   initialBlobId,
   initialMimeType,
   initialStreamUrl,
-  initialSeekable
+  initialSeekable,
+  controlEvent
 }: FileProjectionProps): React.JSX.Element {
   const [objectUrl, setObjectUrl] = useState<string | null>(null)
   const [mimeType, setMimeType] = useState<string | null>(null)
@@ -102,7 +102,9 @@ export default function FileProjection({
         const mustApplySeekBeforePlay = pending.seekTo !== undefined && seekableRef.current
         if (mustApplySeekBeforePlay && video.readyState < HAVE_METADATA) return
         video.muted = false
-        video.play().catch(() => {})
+        video.play().catch((error) => {
+          console.error('[file-projection] Video play failed', error)
+        })
       } else {
         video.pause()
       }
@@ -271,39 +273,38 @@ export default function FileProjection({
     const adapter = createProjectionAdapter('projection')
     adapterSendRef.current = adapter.send.bind(adapter)
 
-    const unsubShow = adapter.on('file:show', (data: FileShowPayload) => {
-      setDisplayName(data.fileName)
-      loadFile(data.itemId, data.blobId, data.mimeType, {
-        streamUrl: data.streamUrl,
-        seekable: data.seekable
-      })
-    })
-
-    const unsubControl = adapter.on('file:control', (data: FileControlPayload) => {
-      handleControl(data)
-    })
-
     const unsubEnd = adapter.on('file:end', () => {
       setIsEnded(true)
     })
 
     return () => {
-      unsubShow()
-      unsubControl()
       unsubEnd()
       adapter.dispose()
       adapterSendRef.current = null
     }
-  }, [loadFile, handleControl])
+  }, [])
 
   useEffect(() => {
     if (initialItemId && initialBlobId && initialMimeType) {
+      setDisplayName(fileName ?? '')
       loadFile(initialItemId, initialBlobId, initialMimeType, {
         streamUrl: initialStreamUrl,
         seekable: initialSeekable
       })
     }
-  }, [initialBlobId, initialItemId, initialMimeType, initialSeekable, initialStreamUrl, loadFile])
+  }, [
+    fileName,
+    initialBlobId,
+    initialItemId,
+    initialMimeType,
+    initialSeekable,
+    initialStreamUrl,
+    loadFile
+  ])
+
+  useEffect(() => {
+    if (controlEvent) handleControl(controlEvent.data)
+  }, [controlEvent, handleControl])
 
   useEffect(
     () => () => {
@@ -419,6 +420,7 @@ export default function FileProjection({
           <video
             ref={videoRef}
             src={objectUrl}
+            preload={seekableRef.current ? 'metadata' : 'none'}
             style={{
               width: '100%',
               height: '100%',

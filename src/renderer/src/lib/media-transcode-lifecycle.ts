@@ -1,5 +1,6 @@
 import { isValidNativeFileId } from '@shared/native-media'
 import { isElectron } from './env'
+import { getFileBlobRecord } from './file-explorer-db'
 import { MediaJobBlockedError, mediaJobQueue } from './media-job-queue'
 import {
   getDerivedAsset,
@@ -191,6 +192,11 @@ mediaJobQueue.registerExecutor('transcode', async (job, { signal }) => {
   if (!job.sourceBlobId || !job.itemId) throw new Error('Transcode job is missing source identity')
   if (!isElectron())
     throw new MediaJobBlockedError('configuration', 'Transcoding requires Electron')
+
+  const sourceRecord = await getFileBlobRecord(job.sourceBlobId)
+  if (sourceRecord?.storage !== 'native-fs') {
+    throw new Error('Transcode source is not available in native storage')
+  }
 
   const config = await window.api.videoTranscode.getFfmpegConfig()
   if (config.status !== 'ready') {

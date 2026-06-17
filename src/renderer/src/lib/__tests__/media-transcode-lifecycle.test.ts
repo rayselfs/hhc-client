@@ -14,6 +14,7 @@ import {
   putMediaJob,
   resetMediaWorkDBForTests
 } from '../media-work-db'
+import { openFileExplorerDB, resetFileExplorerDBForTests } from '../file-explorer-db'
 
 describe('media transcode lifecycle', () => {
   beforeEach(async () => {
@@ -24,6 +25,7 @@ describe('media transcode lifecycle', () => {
       value: undefined
     })
     await resetMediaWorkDBForTests()
+    await resetFileExplorerDBForTests()
   })
 
   it('deduplicates copied item transcode jobs by source blob identity', async () => {
@@ -61,6 +63,11 @@ describe('media transcode lifecycle', () => {
         }
       }
     })
+    await (await openFileExplorerDB()).put('file-blobs', {
+      id: 'source-blob-1',
+      storage: 'native-fs',
+      refCount: 1
+    })
 
     const job = await enqueueTranscodeJob({
       sourceBlobId: 'source-blob-1',
@@ -97,6 +104,11 @@ describe('media transcode lifecycle', () => {
         }
       }
     })
+    await (await openFileExplorerDB()).put('file-blobs', {
+      id: sourceBlobId,
+      storage: 'native-fs',
+      refCount: 1
+    })
 
     const job = await enqueueTranscodeJob({
       sourceBlobId,
@@ -115,6 +127,34 @@ describe('media transcode lifecycle', () => {
       sourceFileId: sourceBlobId,
       outputFileId: expect.any(String)
     })
+  })
+
+  it('does not run FFmpeg when the source is not native storage', async () => {
+    const sourceBlobId = '123e4567-e89b-12d3-a456-426614174000'
+    const run = vi.fn()
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: {
+        videoTranscode: {
+          getFfmpegConfig: async () => ({ status: 'ready' }),
+          run,
+          cancel: vi.fn()
+        },
+        nativeFs: {
+          delete: vi.fn()
+        }
+      }
+    })
+
+    const job = await enqueueTranscodeJob({
+      sourceBlobId,
+      itemId: 'original-item'
+    })
+
+    await vi.waitFor(async () => {
+      await expect(getMediaJob(job.id)).resolves.toMatchObject({ status: 'failed' })
+    })
+    expect(run).not.toHaveBeenCalled()
   })
 
   it('retries blocked transcode jobs when FFmpeg becomes ready', async () => {
@@ -150,6 +190,11 @@ describe('media transcode lifecycle', () => {
       updatedAt: Date.now()
     }
     await putMediaJob(job)
+    await (await openFileExplorerDB()).put('file-blobs', {
+      id: sourceBlobId,
+      storage: 'native-fs',
+      refCount: 1
+    })
 
     expect(job.status).toBe('blocked')
     await expect(retryBlockedTranscodeJobs()).resolves.toBe(1)

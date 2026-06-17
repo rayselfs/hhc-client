@@ -1,7 +1,6 @@
 import { fireEvent, render, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import FileProjection from '../FileProjection'
-import type { ProjectionChannel, ProjectionPayload } from '@shared/projection-messages'
 
 const { mockGetFileSource, mockProjectionHandlers, mockProjectionSend } = vi.hoisted(() => ({
   mockGetFileSource: vi.fn(),
@@ -32,15 +31,6 @@ vi.mock('@renderer/lib/projection-adapter', () => ({
   })
 }))
 
-function triggerProjection<C extends ProjectionChannel>(
-  channel: C,
-  data: ProjectionPayload<C>
-): void {
-  for (const handler of mockProjectionHandlers.get(channel) ?? []) {
-    handler(data)
-  }
-}
-
 describe('FileProjection copied media identity', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -70,7 +60,7 @@ describe('FileProjection copied media identity', () => {
   })
 
   it('applies video seek after metadata is available', async () => {
-    const { container } = render(
+    const { container, rerender } = render(
       <FileProjection
         fileName="copy.mp4"
         initialItemId="copy-id"
@@ -87,7 +77,15 @@ describe('FileProjection copied media identity', () => {
     Object.defineProperty(video, 'readyState', { configurable: true, value: 0 })
     Object.defineProperty(video, 'duration', { configurable: true, value: 100 })
 
-    triggerProjection('file:control', { action: 'seek', itemId: 'copy-id', value: 35 })
+    rerender(
+      <FileProjection
+        fileName="copy.mp4"
+        initialItemId="copy-id"
+        initialBlobId="original-id"
+        initialMimeType="video/mp4"
+        controlEvent={{ id: 1, data: { action: 'seek', itemId: 'copy-id', value: 35 } }}
+      />
+    )
     expect(video.currentTime).toBe(0)
 
     Object.defineProperty(video, 'readyState', { configurable: true, value: 1 })
@@ -97,7 +95,7 @@ describe('FileProjection copied media identity', () => {
   })
 
   it('uses live stream URLs without loading a stored source and ignores seek controls', async () => {
-    const { container } = render(
+    const { container, rerender } = render(
       <FileProjection
         fileName="live.mkv"
         initialItemId="live-id"
@@ -118,8 +116,19 @@ describe('FileProjection copied media identity', () => {
 
     expect(mockGetFileSource).not.toHaveBeenCalled()
     expect(video).toHaveAttribute('src', 'hhc-live-media://stream/live-session')
+    expect(video).toHaveAttribute('preload', 'none')
 
-    triggerProjection('file:control', { action: 'seek', itemId: 'live-id', value: 35 })
+    rerender(
+      <FileProjection
+        fileName="live.mkv"
+        initialItemId="live-id"
+        initialBlobId="source-id"
+        initialMimeType="video/x-matroska"
+        initialStreamUrl="hhc-live-media://stream/live-session"
+        initialSeekable={false}
+        controlEvent={{ id: 1, data: { action: 'seek', itemId: 'live-id', value: 35 } }}
+      />
+    )
 
     expect(video.currentTime).toBe(0)
   })
@@ -156,7 +165,7 @@ describe('FileProjection copied media identity', () => {
   })
 
   it('starts live stream playback even before metadata is available', async () => {
-    const { container } = render(
+    const { container, rerender } = render(
       <FileProjection
         fileName="live.mkv"
         initialItemId="live-id"
@@ -174,13 +183,23 @@ describe('FileProjection copied media identity', () => {
     })
     Object.defineProperty(video, 'readyState', { configurable: true, value: 0 })
 
-    triggerProjection('file:control', { action: 'play', itemId: 'live-id' })
+    rerender(
+      <FileProjection
+        fileName="live.mkv"
+        initialItemId="live-id"
+        initialBlobId="source-id"
+        initialMimeType="video/x-matroska"
+        initialStreamUrl="hhc-live-media://stream/live-session"
+        initialSeekable={false}
+        controlEvent={{ id: 1, data: { action: 'play', itemId: 'live-id' } }}
+      />
+    )
 
     expect(video.play).toHaveBeenCalledOnce()
   })
 
   it('applies pending video seek before pending play', async () => {
-    const { container } = render(
+    const { container, rerender } = render(
       <FileProjection
         fileName="copy.mp4"
         initialItemId="copy-id"
@@ -197,8 +216,24 @@ describe('FileProjection copied media identity', () => {
     Object.defineProperty(video, 'readyState', { configurable: true, value: 0 })
     Object.defineProperty(video, 'duration', { configurable: true, value: 100 })
 
-    triggerProjection('file:control', { action: 'seek', itemId: 'copy-id', value: 20 })
-    triggerProjection('file:control', { action: 'play', itemId: 'copy-id' })
+    rerender(
+      <FileProjection
+        fileName="copy.mp4"
+        initialItemId="copy-id"
+        initialBlobId="original-id"
+        initialMimeType="video/mp4"
+        controlEvent={{ id: 1, data: { action: 'seek', itemId: 'copy-id', value: 20 } }}
+      />
+    )
+    rerender(
+      <FileProjection
+        fileName="copy.mp4"
+        initialItemId="copy-id"
+        initialBlobId="original-id"
+        initialMimeType="video/mp4"
+        controlEvent={{ id: 2, data: { action: 'play', itemId: 'copy-id' } }}
+      />
+    )
 
     Object.defineProperty(video, 'readyState', { configurable: true, value: 1 })
     fireEvent.loadedMetadata(video)
@@ -208,7 +243,7 @@ describe('FileProjection copied media identity', () => {
   })
 
   it('ignores video control commands for a different item', async () => {
-    const { container } = render(
+    const { container, rerender } = render(
       <FileProjection
         fileName="copy.mp4"
         initialItemId="copy-id"
@@ -225,7 +260,15 @@ describe('FileProjection copied media identity', () => {
     Object.defineProperty(video, 'readyState', { configurable: true, value: 1 })
     Object.defineProperty(video, 'duration', { configurable: true, value: 100 })
 
-    triggerProjection('file:control', { action: 'seek', itemId: 'other-id', value: 35 })
+    rerender(
+      <FileProjection
+        fileName="copy.mp4"
+        initialItemId="copy-id"
+        initialBlobId="original-id"
+        initialMimeType="video/mp4"
+        controlEvent={{ id: 1, data: { action: 'seek', itemId: 'other-id', value: 35 } }}
+      />
+    )
 
     expect(video.currentTime).toBe(0)
   })

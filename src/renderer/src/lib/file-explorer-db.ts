@@ -2,7 +2,7 @@ import type { DBSchema, IDBPDatabase } from 'idb'
 import { openDB, unwrap } from 'idb'
 import type { AnyItemRecord, FolderRecord } from '@shared/types/folder'
 import { isElectron } from './env'
-import { getReadyTranscodedVideo } from './media-transcode-lifecycle'
+import { getDerivedAsset } from './media-work-db'
 
 export interface FileBlobRecord {
   id: string
@@ -31,6 +31,7 @@ export interface FileExplorerDBSchema extends DBSchema {
 
 const DB_NAME = 'hhc-file-explorer'
 const DB_VERSION = 4
+const TRANSCODE_COMPATIBILITY_VARIANT = 'mp4-h264-aac-yuv420p-faststart'
 
 let fileExplorerDBPromise: Promise<IDBPDatabase<FileExplorerDBSchema>> | null = null
 
@@ -79,6 +80,10 @@ export async function listFileBlobRecords(): Promise<FileBlobRecord[]> {
   return (await getFileExplorerDB()).getAll('file-blobs')
 }
 
+export async function getFileBlobRecord(id: string): Promise<FileBlobRecord | undefined> {
+  return (await getFileExplorerDB()).get('file-blobs', id)
+}
+
 export async function storeFileBlob(
   db: IDBPDatabase<FileExplorerDBSchema>,
   id: string,
@@ -122,7 +127,11 @@ export async function getFileSource(
   mimeType: string
 ): Promise<FileSource | null> {
   if (mimeType.startsWith('video/')) {
-    const transcoded = await getReadyTranscodedVideo(id)
+    const transcoded = await getDerivedAsset(
+      id,
+      'transcoded-video',
+      TRANSCODE_COMPATIBILITY_VARIANT
+    )
     if (transcoded?.storage === 'native-fs' && transcoded.nativeFileId && isElectron()) {
       return {
         url: window.api.nativeFs.getUrl(transcoded.nativeFileId, transcoded.mimeType),

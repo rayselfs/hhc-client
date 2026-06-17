@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { FileItemRecord } from '@shared/types/folder'
 import { putDerivedAsset, resetMediaWorkDBForTests } from '../media-work-db'
+import { openFileExplorerDB, resetFileExplorerDBForTests } from '../file-explorer-db'
 import {
   analyzePresentationReadiness,
   createPresentationSnapshot,
@@ -28,6 +29,7 @@ beforeEach(async () => {
   vi.unstubAllGlobals()
   await resetMediaWorkDBForTests()
   await resetSyncDBForTests()
+  await resetFileExplorerDBForTests()
 })
 
 describe('analyzePresentationReadiness', () => {
@@ -38,6 +40,11 @@ describe('analyzePresentationReadiness', () => {
           getFfmpegConfig: vi.fn().mockResolvedValue({ status: 'ready' })
         }
       }
+    })
+    await (await openFileExplorerDB()).put('file-blobs', {
+      id: 'source-video',
+      storage: 'native-fs',
+      refCount: 1
     })
 
     const report = await analyzePresentationReadiness(
@@ -52,6 +59,27 @@ describe('analyzePresentationReadiness', () => {
       support: 'transcode-required',
       playbackMode: 'live-transcode',
       seekable: false
+    })
+  })
+
+  it('does not use live transcode when the source is not in native storage', async () => {
+    vi.stubGlobal('window', {
+      api: {
+        videoTranscode: {
+          getFfmpegConfig: vi.fn().mockResolvedValue({ status: 'ready' })
+        }
+      }
+    })
+
+    const report = await analyzePresentationReadiness(
+      [file('legacy-video', 'legacy.mkv', 'video/x-matroska')],
+      'electron'
+    )
+
+    expect(report.summary).toMatchObject({ ready: 0, preparing: 1 })
+    expect(report.items[0]).toMatchObject({
+      status: 'preparing',
+      reason: 'transcode-required'
     })
   })
 
