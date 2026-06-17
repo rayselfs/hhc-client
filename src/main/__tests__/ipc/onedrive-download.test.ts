@@ -1,12 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { handleHandlers, mockMkdir, mockOpen, mockRename, mockRm, mockWrite, mockClose, mockFetch } =
-  vi.hoisted(() => ({
+const {
+  handleHandlers,
+  mockMkdir,
+  mockOpen,
+  mockRename,
+  mockRm,
+  mockStatfs,
+  mockWrite,
+  mockClose,
+  mockFetch
+} = vi.hoisted(() => ({
     handleHandlers: new Map<string, (...args: unknown[]) => unknown>(),
     mockMkdir: vi.fn(),
     mockOpen: vi.fn(),
     mockRename: vi.fn(),
     mockRm: vi.fn(),
+    mockStatfs: vi.fn(),
     mockWrite: vi.fn(),
     mockClose: vi.fn(),
     mockFetch: vi.fn()
@@ -43,7 +53,8 @@ vi.mock('fs', () => {
     mkdir: mockMkdir,
     open: mockOpen,
     rename: mockRename,
-    rm: mockRm
+    rm: mockRm,
+    statfs: mockStatfs
   }
   return { default: { promises }, promises }
 })
@@ -73,6 +84,7 @@ beforeEach(() => {
   mockClose.mockResolvedValue(undefined)
   mockRename.mockResolvedValue(undefined)
   mockRm.mockResolvedValue(undefined)
+  mockStatfs.mockResolvedValue({ blocks: 100, bsize: 100, bavail: 90 })
   mockOpen.mockResolvedValue({ write: mockWrite, close: mockClose })
   vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockMainWindow as never)
   registerOneDriveDownloadHandlers(wm)

@@ -118,6 +118,15 @@ export default defineConfig({
       rollupOptions: {
         output: {
           manualChunks: (id) => {
+            if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
+              return 'react-vendor'
+            }
+            if (id.includes('node_modules/@heroui') || id.includes('node_modules/react-aria')) {
+              return 'ui-vendor'
+            }
+            if (id.includes('node_modules/@phosphor-icons')) {
+              return 'icons'
+            }
             if (
               id.includes('node_modules/@react-aria/color') ||
               id.includes('node_modules/@react-stately/color')

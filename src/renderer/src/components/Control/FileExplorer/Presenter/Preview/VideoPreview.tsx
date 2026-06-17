@@ -116,6 +116,11 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
     let cancelled = false
 
     async function load(): Promise<void> {
+      if (isLiveTranscode) {
+        setError(false)
+        setVideoSrc(null)
+        return
+      }
       setError(false)
       const db = await openFileExplorerDB()
       const source = await getFileSource(db, blobId, item.mimeType)
@@ -143,7 +148,7 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
       if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current)
       if (seekFlashTimeoutRef.current) clearTimeout(seekFlashTimeoutRef.current)
     }
-  }, [blobId, item.mimeType, retryToken, t])
+  }, [blobId, isLiveTranscode, item.mimeType, retryToken, t])
 
   const triggerFlash = useCallback((icon: 'play' | 'pause'): void => {
     if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current)
@@ -172,6 +177,18 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
   }, [])
 
   const handlePlayPause = useCallback((): void => {
+    if (isLiveTranscode) {
+      if (isPlaying) {
+        triggerFlash('pause')
+        setPlaybackState({ isPlaying: false })
+        sendCommand({ action: 'pause', itemId: item.id })
+      } else {
+        if (hasStartedRef.current) triggerFlash('play')
+        setPlaybackState({ hasStarted: true, isPlaying: true, isEnded: false })
+        sendCommand({ action: 'play', itemId: item.id })
+      }
+      return
+    }
     if (!videoRef.current) return
     if (isEnded) {
       triggerFlash('play')
@@ -197,15 +214,22 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
         .catch(() => setPlaybackState({ isPlaying: false }))
       sendCommand({ action: 'play', itemId: item.id })
     }
-  }, [isEnded, isPlaying, item.id, sendCommand, setPlaybackState, triggerFlash])
+  }, [isEnded, isLiveTranscode, isPlaying, item.id, sendCommand, setPlaybackState, triggerFlash])
 
   const pauseVideo = useCallback((): void => {
+    if (isLiveTranscode) {
+      if (!isPlaying) return
+      triggerFlash('pause')
+      setPlaybackState({ isPlaying: false })
+      sendCommand({ action: 'pause', itemId: item.id })
+      return
+    }
     if (!videoRef.current || !isPlaying) return
     triggerFlash('pause')
     setPlaybackState({ isPlaying: false })
     videoRef.current.pause()
     sendCommand({ action: 'pause', itemId: item.id })
-  }, [isPlaying, item.id, sendCommand, setPlaybackState, triggerFlash])
+  }, [isLiveTranscode, isPlaying, item.id, sendCommand, setPlaybackState, triggerFlash])
 
   useEffect(() => {
     const handleTogglePlay = (): void => {
@@ -338,7 +362,14 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
             }}
           />
         ) : (
-          <div className="w-full h-full" />
+          <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-white/60">
+            {isLiveTranscode && (
+              <>
+                <div className="text-base font-semibold">{t('presenter.liveTranscodeActive')}</div>
+                <div className="text-sm">{t('presenter.liveTranscodeSeekDisabled')}</div>
+              </>
+            )}
+          </div>
         )}
       </div>
 
@@ -347,10 +378,12 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
           className="absolute inset-0 flex items-center justify-center z-10 cursor-pointer"
           onClick={() => {
             setPlaybackState({ hasStarted: true, isPlaying: true, isEnded: false })
-            videoRef.current
-              ?.play()
-              .then(() => setPlaybackState({ hasStarted: true, isPlaying: true, isEnded: false }))
-              .catch(() => setPlaybackState({ isPlaying: false }))
+            if (!isLiveTranscode) {
+              videoRef.current
+                ?.play()
+                .then(() => setPlaybackState({ hasStarted: true, isPlaying: true, isEnded: false }))
+                .catch(() => setPlaybackState({ isPlaying: false }))
+            }
             sendCommand({ action: 'play', itemId: item.id })
           }}
           onMouseDown={(e) => e.stopPropagation()}

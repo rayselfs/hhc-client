@@ -799,6 +799,8 @@
     "loading": "加载中...",
     "imageLoadFailed": "无法加载图片",
     "videoLoadFailed": "无法加载视频",
+    "liveTranscodeActive": "即时转码播放中",
+    "liveTranscodeSeekDisabled": "此格式只能顺播，无法跳转",
     "pdfLoadFailed": "无法加载 PDF"
   }
 }

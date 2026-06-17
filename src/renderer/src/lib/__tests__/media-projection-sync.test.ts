@@ -150,6 +150,44 @@ describe('media projection sync', () => {
     })
   })
 
+  it('logs and skips projection when live transcode startup fails', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    window.api.videoTranscode.startLive = vi.fn().mockRejectedValue(new Error('ffmpeg failed'))
+    useMediaProjectionStore.setState({
+      playlist: [makeFile('live-item', 'live.mkv', 'video/x-matroska', 'source-blob')],
+      currentIndex: 0,
+      isPresenting: true,
+      isRehearsal: false,
+      snapshot: {
+        id: 'snapshot',
+        createdAt: 1,
+        entries: [
+          {
+            index: 0,
+            itemId: 'live-item',
+            blobId: 'source-blob',
+            name: 'live.mkv',
+            mimeType: 'video/x-matroska',
+            sourceUrl: 'blob:source-blob',
+            playbackMode: 'live-transcode',
+            seekable: false
+          }
+        ]
+      }
+    })
+
+    renderSync()
+
+    await vi.waitFor(() => {
+      expect(errorSpy).toHaveBeenCalledWith(
+        '[media-projection] Failed to start live transcode',
+        expect.any(Error)
+      )
+    })
+    expect(mockProject).not.toHaveBeenCalledWith('file:show', expect.anything())
+    errorSpy.mockRestore()
+  })
+
   it('does not send projection output during rehearsal', () => {
     useMediaProjectionStore.setState({ isRehearsal: true })
 

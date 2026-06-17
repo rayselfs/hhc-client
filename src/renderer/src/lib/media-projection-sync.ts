@@ -51,7 +51,13 @@ export function useMediaProjectionSync(): void {
       }
 
       if (snapshotEntry?.playbackMode === 'live-transcode') {
-        const live = await window.api.videoTranscode.startLive({ sourceFileId: blobId })
+        let live: Awaited<ReturnType<typeof window.api.videoTranscode.startLive>>
+        try {
+          live = await window.api.videoTranscode.startLive({ sourceFileId: blobId })
+        } catch (error) {
+          console.error('[media-projection] Failed to start live transcode', error)
+          return
+        }
         if (sequence !== projectSequenceRef.current) {
           await window.api.videoTranscode.stopLive(live.sessionId).catch(() => undefined)
           return

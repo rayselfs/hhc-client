@@ -32,6 +32,9 @@ vi.mock('@renderer/contexts/PresenterCommandContext', () => ({
 const storeState = {
   zoomLevel: 1,
   pan: { x: 0, y: 0 },
+  snapshot: null as null | {
+    entries: Array<{ itemId: string; playbackMode?: 'live-transcode'; seekable?: boolean }>
+  },
   setTypeState: vi.fn(),
   next: mockNext,
   exit: mockExit,
@@ -81,6 +84,7 @@ async function getLoadedVideo(container: HTMLElement): Promise<HTMLVideoElement>
 
 beforeEach(() => {
   vi.clearAllMocks()
+  storeState.snapshot = null
   mockGetFileSource.mockResolvedValue({
     url: 'blob:resolved-source',
     revoke: vi.fn()
@@ -214,6 +218,25 @@ describe('copied media preview identity', () => {
 
     expect(video.pause).toHaveBeenCalled()
     expect(mockSendCommand).toHaveBeenCalledWith({ action: 'pause', itemId: 'copy-id' })
+  })
+
+  it('uses presenter controls without loading source media during live transcode playback', () => {
+    storeState.snapshot = {
+      entries: [{ itemId: 'copy-id', playbackMode: 'live-transcode', seekable: false }]
+    }
+
+    const { container } = render(<VideoPreview item={makeCopy('video/x-matroska', 'copy.mkv')} />)
+
+    expect(mockGetFileSource).not.toHaveBeenCalled()
+    expect(screen.getByText('presenter.liveTranscodeActive')).toBeInTheDocument()
+
+    fireEvent.click(container.querySelector('button')!)
+    seekRelative(5)
+
+    expect(mockSendCommand).toHaveBeenCalledWith({ action: 'play', itemId: 'copy-id' })
+    expect(mockSendCommand).not.toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'seek', itemId: 'copy-id' })
+    )
   })
 
   it('keeps the presenter open and retries a failed media load', async () => {

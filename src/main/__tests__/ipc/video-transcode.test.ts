@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events'
+import { PassThrough } from 'stream'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const {
@@ -12,9 +13,11 @@ const {
   mockRealpath,
   mockStat,
   mockAccess,
-  mockSpawn
+  mockSpawn,
+  protocolHandlers
 } = vi.hoisted(() => ({
   handleHandlers: new Map<string, (...args: unknown[]) => unknown>(),
+  protocolHandlers: new Map<string, (request: Request) => Response | Promise<Response>>(),
   mockShowOpenDialog: vi.fn(),
   mockReadFile: vi.fn(),
   mockWriteFile: vi.fn(),
@@ -35,7 +38,8 @@ const mockWindowManager = {
 
 vi.mock('electron', () => ({
   app: {
-    getPath: vi.fn(() => '/tmp/hhc-user-data')
+    getPath: vi.fn(() => '/tmp/hhc-user-data'),
+    once: vi.fn()
   },
   BrowserWindow: {
     fromWebContents: vi.fn()
@@ -46,6 +50,11 @@ vi.mock('electron', () => ({
   ipcMain: {
     handle: vi.fn((channel: string, handler: (...args: unknown[]) => unknown) => {
       handleHandlers.set(channel, handler)
+    })
+  },
+  protocol: {
+    handle: vi.fn((scheme: string, handler: (request: Request) => Response | Promise<Response>) => {
+      protocolHandlers.set(scheme, handler)
     })
   }
 }))
@@ -75,7 +84,10 @@ vi.mock('child_process', () => ({
 
 import { BrowserWindow } from 'electron'
 import type { WindowManager } from '../../windowManager'
-import { registerVideoTranscodeHandlers } from '../../ipc/video-transcode'
+import {
+  registerLiveMediaProtocol,
+  registerVideoTranscodeHandlers
+} from '../../ipc/video-transcode'
 
 const wm = mockWindowManager as unknown as WindowManager
 
@@ -107,12 +119,12 @@ function spawnSuccess(output: string): ReturnType<typeof mockSpawn> {
 
 function spawnPending(): ReturnType<typeof mockSpawn> & { kill: () => void } {
   const child = new EventEmitter() as ReturnType<typeof mockSpawn> & {
-    stdout: EventEmitter
-    stderr: EventEmitter
+    stdout: PassThrough
+    stderr: PassThrough
     kill: () => void
   }
-  child.stdout = new EventEmitter()
-  child.stderr = new EventEmitter()
+  child.stdout = new PassThrough()
+  child.stderr = new PassThrough()
   child.kill = vi.fn(() => {
     process.nextTick(() => child.emit('close', 1))
     return true
@@ -135,6 +147,7 @@ const storedConfig = JSON.stringify({
 beforeEach(() => {
   vi.clearAllMocks()
   handleHandlers.clear()
+  protocolHandlers.clear()
   mockMkdir.mockResolvedValue(undefined)
   mockWriteFile.mockResolvedValue(undefined)
   mockRename.mockResolvedValue(undefined)
@@ -361,5 +374,65 @@ describe('video transcode FFmpeg configuration IPC', () => {
       ])
     )
     expect(mockRm).toHaveBeenCalledWith(expect.stringMatching(/\.poster\.jpg$/), { force: true })
+  })
+
+  it('starts and stops a live transcode session for a managed native source', async () => {
+    const sourceId = '123e4567-e89b-12d3-a456-426614174000'
+    const child = spawnPending()
+    mockReadFile.mockResolvedValue(storedConfig)
+    mockSpawn
+      .mockImplementationOnce(() => spawnSuccess('ffmpeg version 7.1 Copyright'))
+      .mockImplementationOnce(() =>
+        spawnSuccess(' V..... libx264 H.264 encoder\n A..... aac AAC encoder')
+      )
+      .mockImplementationOnce(() => spawnSuccess(' E mp4 MP4 muxer'))
+      .mockImplementationOnce(() => child)
+
+    const result = (await getHandler('video-transcode:start-live')(makeEvent(), {
+      sourceFileId: sourceId
+    })) as { sessionId: string; url: string; mimeType: string }
+
+    expect(result).toMatchObject({ mimeType: 'video/mp4' })
+    expect(result.url).toMatch(/^hhc-live-media:\/\/stream\//)
+    expect(mockSpawn.mock.calls.at(-1)?.[1]).toEqual(
+      expect.arrayContaining([
+        '-i',
+        `/tmp/hhc-user-data/native-files/${sourceId}`,
+        '-movflags',
+        'frag_keyframe+empty_moov+default_base_moof',
+        '-f',
+        'mp4',
+        'pipe:1'
+      ])
+    )
+
+    await getHandler('video-transcode:stop-live')(makeEvent(), result.sessionId)
+
+    expect(child.kill).toHaveBeenCalled()
+  })
+
+  it('stops live transcode when the protocol request aborts', async () => {
+    const sourceId = '123e4567-e89b-12d3-a456-426614174000'
+    const child = spawnPending()
+    mockReadFile.mockResolvedValue(storedConfig)
+    mockSpawn
+      .mockImplementationOnce(() => spawnSuccess('ffmpeg version 7.1 Copyright'))
+      .mockImplementationOnce(() =>
+        spawnSuccess(' V..... libx264 H.264 encoder\n A..... aac AAC encoder')
+      )
+      .mockImplementationOnce(() => spawnSuccess(' E mp4 MP4 muxer'))
+      .mockImplementationOnce(() => child)
+    registerLiveMediaProtocol()
+    const result = (await getHandler('video-transcode:start-live')(makeEvent(), {
+      sourceFileId: sourceId
+    })) as { sessionId: string; url: string; mimeType: string }
+    const controller = new AbortController()
+
+    await protocolHandlers.get('hhc-live-media')!(
+      new Request(result.url, { signal: controller.signal })
+    )
+    controller.abort()
+
+    expect(child.kill).toHaveBeenCalled()
   })
 })

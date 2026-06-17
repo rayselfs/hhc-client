@@ -803,6 +803,8 @@
     "loading": "Loading...",
     "imageLoadFailed": "Failed to load image",
     "videoLoadFailed": "Failed to load video",
+    "liveTranscodeActive": "Live transcoding",
+    "liveTranscodeSeekDisabled": "This format can only play forward; seeking is disabled",
     "pdfLoadFailed": "Failed to load PDF"
   }
 }

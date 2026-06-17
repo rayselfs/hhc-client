@@ -418,7 +418,7 @@ async function startLiveTranscode(input: unknown): Promise<VideoLiveTranscodeSta
   child.on('close', (code) => {
     const active = activeLiveTranscodes.get(sessionId)
     activeLiveTranscodes.delete(sessionId)
-    if (code !== 0 && code !== null) {
+    if (active && code !== 0 && code !== null) {
       console.error('[video-transcode] Live FFmpeg stopped with error', {
         sessionId,
         code,
@@ -459,6 +459,9 @@ export function registerLiveMediaProtocol(): void {
     const sessionId = decodeURIComponent(url.pathname.replace(/^\//, ''))
     const active = activeLiveTranscodes.get(sessionId)
     if (!active || !active.child.stdout) return new Response('Not found', { status: 404 })
+    request.signal.addEventListener('abort', () => {
+      void stopLiveTranscode(sessionId).catch(() => undefined)
+    })
 
     return new Response(Readable.toWeb(active.child.stdout) as ReadableStream, {
       headers: {
