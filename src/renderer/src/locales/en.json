@@ -544,11 +544,9 @@
     },
     "reset": {
       "title": "Reset",
-      "settingsTitle": "Reset Settings",
       "settingsDesc": "Clear preferences and restore defaults while keeping media, Bible data, and user files.",
       "settingsButton": "Reset Settings",
       "settingsConfirm": "Reset app settings to their defaults while keeping user data?",
-      "allDataTitle": "Clear All Data",
       "allDataDesc": "Clear all settings, user data, media cache, and local data. This cannot be undone.",
       "allDataButton": "Clear All Data",
       "allDataConfirm": "Clear all settings, user data, media cache, and local data? This cannot be undone."

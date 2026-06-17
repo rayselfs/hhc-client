@@ -540,11 +540,9 @@
     },
     "reset": {
       "title": "重置",
-      "settingsTitle": "重置设置",
       "settingsDesc": "清除偏好设置并恢复默认值，保留多媒体、圣经资料与用户文件。",
       "settingsButton": "重置设置",
       "settingsConfirm": "将 App 设置重置为默认值并保留用户资料？",
-      "allDataTitle": "清除所有资料",
       "allDataDesc": "清除所有设置、用户资料、媒体缓存与本地资料。此操作无法复原。",
       "allDataButton": "清除所有资料",
       "allDataConfirm": "清除所有设置、用户资料、媒体缓存与本地资料？此操作无法复原。"

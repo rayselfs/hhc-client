@@ -178,31 +178,25 @@ export default function GeneralSettings(): React.JSX.Element {
 
       <section className="space-y-3 border-t pt-4">
         <h3 className="text-sm font-semibold">{t('preferences.reset.title')}</h3>
-        <div className="flex items-center justify-between gap-4 rounded-2xl bg-default-100 p-4">
-          <div>
-            <h4 className="text-sm font-medium">{t('preferences.reset.settingsTitle')}</h4>
-            <p className="mt-1 text-xs text-gray-500">{t('preferences.reset.settingsDesc')}</p>
-          </div>
+        <div className="space-y-2 rounded-2xl bg-default-100 p-4">
           <Button
             variant="danger"
             onPress={handleResetSettingsClick}
-            className="shrink-0 rounded-full"
+            className="rounded-full"
           >
             {t('preferences.reset.settingsButton')}
           </Button>
+          <p className="text-xs text-gray-500">{t('preferences.reset.settingsDesc')}</p>
         </div>
-        <div className="flex items-center justify-between gap-4 rounded-2xl bg-default-100 p-4">
-          <div>
-            <h4 className="text-sm font-medium">{t('preferences.reset.allDataTitle')}</h4>
-            <p className="mt-1 text-xs text-gray-500">{t('preferences.reset.allDataDesc')}</p>
-          </div>
+        <div className="space-y-2 rounded-2xl bg-default-100 p-4">
           <Button
             variant="danger"
             onPress={handleClearAllDataClick}
-            className="shrink-0 rounded-full"
+            className="rounded-full"
           >
             {t('preferences.reset.allDataButton')}
           </Button>
+          <p className="text-xs text-gray-500">{t('preferences.reset.allDataDesc')}</p>
         </div>
       </section>
     </div>
