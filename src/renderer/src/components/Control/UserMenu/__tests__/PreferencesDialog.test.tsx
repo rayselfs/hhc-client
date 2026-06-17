@@ -228,6 +228,33 @@ describe('PreferencesDialog', () => {
     vi.mocked(isElectron).mockReturnValue(false)
   })
 
+  it('does not show FFmpeg select action while config detection is pending', async () => {
+    const user = userEvent.setup()
+    const { isElectron } = await import('@renderer/lib/env')
+    vi.mocked(isElectron).mockReturnValue(true)
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: {
+        videoTranscode: {
+          getFfmpegConfig: vi.fn(() => new Promise(() => {})),
+          selectFfmpeg: vi.fn(),
+          validateFfmpeg: vi.fn(),
+          removeFfmpegConfig: vi.fn()
+        }
+      }
+    })
+
+    renderDialog(true)
+
+    await user.click(screen.getByTestId('category-media'))
+    await user.click(screen.getByTestId('category-media-video'))
+
+    expect(screen.getByRole('heading', { name: 'Video Transcoding' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Select FFmpeg' })).not.toBeInTheDocument()
+
+    vi.mocked(isElectron).mockReturnValue(false)
+  })
+
   it('navigates between storage child sections', async () => {
     const user = userEvent.setup()
     renderDialog(true)
@@ -280,7 +307,7 @@ describe('PreferencesDialog', () => {
         setTimezone,
         setHardwareAcceleration: vi.fn(),
         resetSettings: vi.fn(),
-      resetToDefaults: vi.fn(),
+        resetToDefaults: vi.fn(),
         themePreference: 'system' as const,
         setThemePreference: vi.fn(),
         timerRingColor: '#3b82f6',

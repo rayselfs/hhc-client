@@ -34,14 +34,14 @@ export default function MediaSettings({
   const setTrashRetentionDays = useSettingsStore((s) => s.setTrashRetentionDays)
   const oneDrive = useSettingsStore((s) => s.oneDrive)
   const setOneDrive = useSettingsStore((s) => s.setOneDrive)
-  const [ffmpegConfig, setFfmpegConfig] = useState<FfmpegConfigInfo>({ status: 'not-configured' })
+  const [ffmpegConfig, setFfmpegConfig] = useState<FfmpegConfigInfo | null>(null)
   const [isCheckingFfmpeg, setIsCheckingFfmpeg] = useState(false)
   const [oneDriveDraft, setOneDriveDraft] = useState<OneDriveSettings>(oneDrive)
   const [customClientIdEnabled, setCustomClientIdEnabled] = useState(
     oneDrive.customClientId.trim().length > 0
   )
   const canConfigureFfmpeg = isElectron()
-  const usesSystemFfmpeg = ffmpegConfig.status === 'ready' && ffmpegConfig.source === 'system'
+  const usesSystemFfmpeg = ffmpegConfig?.status === 'ready' && ffmpegConfig.source === 'system'
   const customClientIdValid =
     oneDriveDraft.customClientId.trim().length === 0 ||
     validateOneDriveClientId(oneDriveDraft.customClientId)
@@ -58,9 +58,9 @@ export default function MediaSettings({
   }, [canConfigureFfmpeg, section])
 
   useEffect(() => {
-    if (section !== 'video' || ffmpegConfig.status !== 'ready') return
+    if (section !== 'video' || ffmpegConfig?.status !== 'ready') return
     void backfillTranscodeVideoThumbnails()
-  }, [ffmpegConfig.status, section])
+  }, [ffmpegConfig?.status, section])
 
   async function runFfmpegAction(action: () => Promise<FfmpegConfigInfo | null>): Promise<void> {
     setIsCheckingFfmpeg(true)
@@ -210,22 +210,26 @@ export default function MediaSettings({
 
           <dl className="grid grid-cols-[7rem_1fr] gap-x-3 gap-y-2 text-sm">
             <dt className="text-gray-500">{t('preferences.media.videoTranscoding.status')}</dt>
-            <dd>{t(`preferences.media.videoTranscoding.statuses.${ffmpegConfig.status}`)}</dd>
+            <dd>
+              {ffmpegConfig
+                ? t(`preferences.media.videoTranscoding.statuses.${ffmpegConfig.status}`)
+                : '-'}
+            </dd>
             <dt className="text-gray-500">{t('preferences.media.videoTranscoding.executable')}</dt>
             <dd>
-              {ffmpegConfig.executableName ?? t('preferences.media.videoTranscoding.notSelected')}
+              {ffmpegConfig?.executableName ?? t('preferences.media.videoTranscoding.notSelected')}
             </dd>
             <dt className="text-gray-500">{t('preferences.media.videoTranscoding.version')}</dt>
-            <dd>{ffmpegConfig.version ?? '-'}</dd>
+            <dd>{ffmpegConfig?.version ?? '-'}</dd>
           </dl>
 
-          {ffmpegConfig.message && (
+          {ffmpegConfig?.message && (
             <p className="rounded-xl bg-danger-50 px-3 py-2 text-xs text-danger-700">
               {ffmpegConfig.message}
             </p>
           )}
 
-          {!usesSystemFfmpeg && (
+          {ffmpegConfig && !usesSystemFfmpeg && (
             <>
               <div className="flex flex-wrap gap-2">
                 <Button

@@ -75,6 +75,11 @@ export default function GeneralSettings(): React.JSX.Element {
     resetToDefaults()
   }
 
+  const handleProjectionDisplayChange = (displayId: string): void => {
+    setProjectionDisplayId(displayId)
+    void window.api.projection.moveToDisplay(displayId)
+  }
+
   return (
     <div className="p-5 space-y-6">
       <Select
@@ -124,7 +129,7 @@ export default function GeneralSettings(): React.JSX.Element {
           <Select
             variant="secondary"
             value={selectedProjectionDisplayId}
-            onChange={(key) => setProjectionDisplayId(String(key))}
+            onChange={(key) => handleProjectionDisplayChange(String(key))}
             aria-label={t('preferences.projectionDisplay.label')}
             isDisabled={externalDisplays.length === 0}
           >

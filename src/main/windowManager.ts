@@ -117,7 +117,7 @@ export class WindowManager {
     const targetDisplay = this.getProjectionDisplay(displayId)
     const hasSecondScreen = targetDisplay.id !== primaryDisplay.id
 
-    this.projectionWindow = new BrowserWindow({
+    const projectionWindow = new BrowserWindow({
       width: hasSecondScreen ? targetDisplay.bounds.width : 800,
       height: hasSecondScreen ? targetDisplay.bounds.height : 600,
       x: targetDisplay.bounds.x,
@@ -134,13 +134,14 @@ export class WindowManager {
       },
       title: 'Projection'
     })
+    this.projectionWindow = projectionWindow
 
-    optimizer.watchWindowShortcuts(this.projectionWindow)
+    optimizer.watchWindowShortcuts(projectionWindow)
 
     const loadPromise =
       is.dev && process.env['ELECTRON_RENDERER_URL']
-        ? this.projectionWindow.loadURL(process.env['ELECTRON_RENDERER_URL'] + '#/projection')
-        : this.projectionWindow.loadFile(join(__dirname, '../renderer/index.html'), {
+        ? projectionWindow.loadURL(process.env['ELECTRON_RENDERER_URL'] + '#/projection')
+        : projectionWindow.loadFile(join(__dirname, '../renderer/index.html'), {
             hash: '/projection'
           })
 
@@ -148,22 +149,33 @@ export class WindowManager {
       console.error('Failed to load projection window:', err)
     })
 
-    this.projectionWindow.webContents.on('render-process-gone', (_event, details) => {
+    projectionWindow.webContents.on('render-process-gone', (_event, details) => {
       console.error('Projection window renderer crashed:', details.reason)
     })
 
-    this.projectionWindow.once('ready-to-show', () => {
-      this.projectionWindow?.show()
+    projectionWindow.once('ready-to-show', () => {
+      projectionWindow.show()
     })
 
-    this.projectionWindow.webContents.on('did-finish-load', () => {
+    projectionWindow.webContents.on('did-finish-load', () => {
       this.sendToMain('projection:opened')
     })
 
-    this.projectionWindow.on('closed', () => {
+    projectionWindow.on('closed', () => {
+      if (this.projectionWindow !== projectionWindow) return
       this.sendToMain('projection:closed')
       this.projectionWindow = null
     })
+  }
+
+  moveProjectionWindow(displayId: string): boolean {
+    const projectionWindow = this.projectionWindow
+    if (!projectionWindow || projectionWindow.isDestroyed()) return false
+
+    this.projectionWindow = null
+    projectionWindow.close()
+    this.createProjectionWindow(displayId)
+    return true
   }
 
   getMainWindow(): BrowserWindow | null {

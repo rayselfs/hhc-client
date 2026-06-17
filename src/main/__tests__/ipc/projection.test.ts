@@ -9,6 +9,7 @@ const mockWindowManager = {
   getProjectionWindow: vi.fn(() => mockProjectionWindow),
   isProjectionOpen: vi.fn(() => false),
   createProjectionWindow: vi.fn(),
+  moveProjectionWindow: vi.fn(),
   closeProjection: vi.fn(),
   sendToProjection: vi.fn(),
   sendToMain: vi.fn(),
@@ -130,6 +131,23 @@ describe('projection:ensure', () => {
     vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockProjectionWindow as never)
     const result = getHandler('projection:ensure')(makeEvent())
     expect(result).toEqual({ created: false })
+  })
+})
+
+describe('projection:move-to-display', () => {
+  it('main window moves an open projection to the selected display', () => {
+    vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockMainWindow as never)
+    mockWindowManager.moveProjectionWindow.mockReturnValue(true)
+    const result = getHandler('projection:move-to-display')(makeEvent(), '2')
+    expect(result).toEqual({ moved: true })
+    expect(mockWindowManager.moveProjectionWindow).toHaveBeenCalledWith('2')
+  })
+
+  it('non-main window returns { moved: false }', () => {
+    vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockProjectionWindow as never)
+    const result = getHandler('projection:move-to-display')(makeEvent(), '2')
+    expect(result).toEqual({ moved: false })
+    expect(mockWindowManager.moveProjectionWindow).not.toHaveBeenCalled()
   })
 })
 

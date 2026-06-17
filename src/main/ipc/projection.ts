@@ -17,6 +17,11 @@ export function registerProjectionHandlers(windowManager: WindowManager): void {
     return { created: !wasOpen }
   })
 
+  ipcMain.handle('projection:move-to-display', (event, displayId: string) => {
+    if (!isMainWindow(windowManager, event)) return { moved: false }
+    return { moved: windowManager.moveProjectionWindow(displayId) }
+  })
+
   ipcMain.handle('projection:close', (event) => {
     if (!isMainWindow(windowManager, event)) return { closed: false }
     windowManager.closeProjection()

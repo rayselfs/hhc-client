@@ -157,6 +157,7 @@ export type UpdateStatus =
 export interface IpcInvokeMap {
   'projection:check': { args: []; result: { exists: boolean } }
   'projection:ensure': { args: [string?]; result: { created: boolean } }
+  'projection:move-to-display': { args: [string]; result: { moved: boolean } }
   'projection:close': { args: []; result: { closed: boolean } }
   'projection:get-displays': { args: []; result: DisplayInfo[] }
   'theme:get': { args: []; result: { source: string; shouldUseDarkColors: boolean } }
