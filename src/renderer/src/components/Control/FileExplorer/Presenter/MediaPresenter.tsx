@@ -32,7 +32,6 @@ export default function MediaPresenter(): React.JSX.Element {
   const showGrid = useMediaProjectionStore((s) => s.showGrid)
   const zoomLevel = useMediaProjectionStore((s) => s.zoomLevel)
   const isEnded = useMediaProjectionStore((s) => s.isEnded)
-  const isRehearsal = useMediaProjectionStore((s) => s.isRehearsal)
   const currentItem = useMediaProjectionStore((s) => s.currentItem())
 
   const { exit, next, prev, jumpTo, toggleGrid, setZoomLevel, resetZoom } =
@@ -76,16 +75,12 @@ export default function MediaPresenter(): React.JSX.Element {
     if (timerStatus === 'running') {
       useTimerRuntimeStore.getState().pause()
     }
-    if (!isRehearsal) {
-      claimProjection('media', { unblank: true })
-    }
+    claimProjection('media', { unblank: true })
 
     return () => {
-      if (!isRehearsal) {
-        blankProjection(true)
-      }
+      blankProjection(true)
     }
-  }, [blankProjection, claimProjection, isRehearsal])
+  }, [blankProjection, claimProjection])
 
   useEffect(() => {
     setPresenterActive(true)
@@ -95,7 +90,6 @@ export default function MediaPresenter(): React.JSX.Element {
   }, [])
 
   useEffect(() => {
-    if (isRehearsal) return
     return on('file:playback-state', (data) => {
       const state = useMediaProjectionStore.getState()
       if (state.currentItem()?.id !== data.itemId) return
@@ -108,7 +102,7 @@ export default function MediaPresenter(): React.JSX.Element {
         duration: data.duration
       })
     })
-  }, [isRehearsal, on])
+  }, [on])
 
   useKeyboardShortcuts(
     [

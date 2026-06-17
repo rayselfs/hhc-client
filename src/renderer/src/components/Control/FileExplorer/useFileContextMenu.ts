@@ -45,27 +45,6 @@ export const useFileContextMenu = createFolderContextMenu({
               })
           }
         }
-      },
-      {
-        id: 'rehearse',
-        label: t('fileExplorer.contextMenu.rehearse'),
-        icon: React.createElement(Play, { size: 14 }),
-        onAction: () => {
-          const { currentFolderId, getItems } = useFileExplorerStore.getState()
-          const allItems = getItems(currentFolderId)
-          const presentableFiles = getPresentableItems(allItems)
-          const targetIndex = presentableFiles.findIndex((f) => f.id === itemId)
-          if (presentableFiles.length > 0) {
-            void useMediaProjectionStore
-              .getState()
-              .startRehearsalWithReadiness(presentableFiles, Math.max(targetIndex, 0))
-              .then((report) => {
-                if (report.summary.ready === 0) {
-                  toast.warning(t('fileExplorer.noProjectableFiles'))
-                }
-              })
-          }
-        }
       }
     ]
   },
@@ -87,21 +66,6 @@ export const useFileContextMenu = createFolderContextMenu({
           void useMediaProjectionStore
             .getState()
             .startPresentationWithReadiness(presentableFiles, 0)
-            .then((report) => {
-              if (report.summary.ready === 0) {
-                toast.warning(t('fileExplorer.noProjectableFiles'))
-              }
-            })
-        }
-      })
-      actions.push({
-        id: 'rehearse',
-        label: t('fileExplorer.contextMenu.rehearse'),
-        icon: React.createElement(Play, { size: 14 }),
-        onAction: () => {
-          void useMediaProjectionStore
-            .getState()
-            .startRehearsalWithReadiness(presentableFiles, 0)
             .then((report) => {
               if (report.summary.ready === 0) {
                 toast.warning(t('fileExplorer.noProjectableFiles'))

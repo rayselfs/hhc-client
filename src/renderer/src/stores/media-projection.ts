@@ -18,7 +18,6 @@ export interface MediaProjectionStore {
   isPresenting: boolean
   isEnded: boolean
   showGrid: boolean
-  isRehearsal: boolean
   lastReadinessReport: PresentationReadinessReport | null
   snapshot: PresentationSnapshot | null
   typeStates: Partial<{ [K in MediaType]: MediaTypeStateMap[K] }>
@@ -48,10 +47,6 @@ export interface MediaProjectionStore {
     files: FileItemRecord[],
     startIndex: number
   ) => Promise<PresentationReadinessReport>
-  startRehearsalWithReadiness: (
-    files: FileItemRecord[],
-    startIndex: number
-  ) => Promise<PresentationReadinessReport>
   upgradeReadyTranscodedItems: () => Promise<void>
 }
 
@@ -65,7 +60,6 @@ const initialState = {
   isPresenting: false,
   isEnded: false,
   showGrid: false,
-  isRehearsal: false,
   lastReadinessReport: null as PresentationReadinessReport | null,
   snapshot: null as PresentationSnapshot | null,
   typeStates: initialTypeStates,
@@ -117,7 +111,6 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
       playlist: files,
       currentIndex: startIndex,
       isPresenting: true,
-      isRehearsal: false,
       lastReadinessReport: null,
       snapshot,
       typeStates: initialTypeStates
@@ -134,7 +127,7 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
     )
     const readyFiles = files.filter((file) => readyItemIds.has(file.id))
     if (readyFiles.length === 0) {
-      set({ lastReadinessReport: report, isRehearsal: false })
+      set({ lastReadinessReport: report })
       return report
     }
 
@@ -159,46 +152,6 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
       playlist: readyFiles,
       currentIndex: resolvedIndex,
       isPresenting: true,
-      isRehearsal: false,
-      lastReadinessReport: report,
-      isEnded: false,
-      showGrid: false,
-      snapshot,
-      typeStates: initialTypeStates,
-      zoomLevel: 1,
-      pan: { x: 0, y: 0 }
-    })
-    return report
-  },
-
-  startRehearsalWithReadiness: async (
-    files: FileItemRecord[],
-    startIndex: number
-  ): Promise<PresentationReadinessReport> => {
-    const report = await analyzePresentationReadiness(files)
-    const readyItemIds = new Set(
-      report.items.filter((item) => item.status === 'ready').map((item) => item.itemId)
-    )
-    const readyFiles = files.filter((file) => readyItemIds.has(file.id))
-    if (readyFiles.length === 0) {
-      set({ lastReadinessReport: report, isRehearsal: false })
-      return report
-    }
-
-    const requestedItem = files[startIndex]
-    const requestedReadyIndex = requestedItem
-      ? readyFiles.findIndex((file) => file.id === requestedItem.id)
-      : -1
-    const resolvedIndex = requestedReadyIndex >= 0 ? requestedReadyIndex : 0
-
-    releaseProjectionLocks?.()
-    const snapshot = createPresentationSnapshot(readyFiles, report.items)
-    releaseProjectionLocks = lockMediaResources(getPresentationSnapshotResourceIds(snapshot))
-    set({
-      playlist: readyFiles,
-      currentIndex: resolvedIndex,
-      isPresenting: true,
-      isRehearsal: true,
       lastReadinessReport: report,
       isEnded: false,
       showGrid: false,

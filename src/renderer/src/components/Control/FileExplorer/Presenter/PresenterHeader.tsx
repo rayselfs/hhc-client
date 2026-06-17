@@ -26,7 +26,6 @@ export default function PresenterHeader({ onExit }: PresenterHeaderProps): React
   const { t } = useTranslation()
   const [elapsed, setElapsed] = useState(0)
   const [clockTime, setClockTime] = useState(() => new Date())
-  const isRehearsal = useMediaProjectionStore((state) => state.isRehearsal)
   const readiness = useMediaProjectionStore((state) => state.lastReadinessReport?.summary)
   const skippedCount = readiness
     ? readiness.preparing + readiness.unsupported + readiness.missing + readiness.failed
@@ -59,11 +58,6 @@ export default function PresenterHeader({ onExit }: PresenterHeaderProps): React
           <X size={20} />
         </Button>
         <span className="text-foreground/70 text-lg font-mono">{formatElapsed(elapsed)}</span>
-        {isRehearsal && (
-          <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-            {t('fileExplorer.presenter.rehearsal', 'Rehearsal')}
-          </span>
-        )}
         {readiness && skippedCount > 0 && (
           <span
             className="rounded-full border border-warning/30 bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning-700"

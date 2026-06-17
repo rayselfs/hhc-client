@@ -54,7 +54,6 @@ beforeEach(() => {
     playlist: [makeFile('a', 'a.png'), makeFile('b', 'b.png')],
     currentIndex: 0,
     isPresenting: true,
-    isRehearsal: false,
     isEnded: false,
     lastReadinessReport: null,
     showGrid: false,
@@ -95,8 +94,7 @@ describe('media projection sync', () => {
     useMediaProjectionStore.setState({
       playlist: [makeFile('copy-id', 'copy.png', 'image/png', 'original-id')],
       currentIndex: 0,
-      isPresenting: true,
-      isRehearsal: false
+      isPresenting: true
     })
 
     renderSync()
@@ -112,7 +110,6 @@ describe('media projection sync', () => {
       playlist: [makeFile('live-item', 'live.mkv', 'video/x-matroska', 'source-blob')],
       currentIndex: 0,
       isPresenting: true,
-      isRehearsal: false,
       snapshot: {
         id: 'snapshot',
         createdAt: 1,
@@ -159,7 +156,6 @@ describe('media projection sync', () => {
       playlist: [makeFile('live-item', 'live.mkv', 'video/x-matroska', 'source-blob')],
       currentIndex: 0,
       isPresenting: true,
-      isRehearsal: false,
       snapshot: {
         id: 'snapshot',
         createdAt: 1,
@@ -188,19 +184,5 @@ describe('media projection sync', () => {
     })
     expect(mockProject).not.toHaveBeenCalledWith('file:show', expect.anything())
     errorSpy.mockRestore()
-  })
-
-  it('does not send projection output during rehearsal', () => {
-    useMediaProjectionStore.setState({ isRehearsal: true })
-
-    renderSync()
-
-    expect(mockProject).not.toHaveBeenCalledWith('file:show', expect.anything())
-
-    act(() => {
-      useMediaProjectionStore.getState().jumpTo(1)
-    })
-
-    expect(mockProject).not.toHaveBeenCalledWith('file:show', expect.anything())
   })
 })

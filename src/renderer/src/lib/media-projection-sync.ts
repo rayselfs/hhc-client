@@ -90,7 +90,7 @@ export function useMediaProjectionSync(): void {
 
   useEffect(() => {
     const unsub = useMediaProjectionStore.subscribe((state, prev) => {
-      if (!state.isPresenting || state.isRehearsal) return
+      if (!state.isPresenting) return
 
       const indexChanged = state.currentIndex !== prev.currentIndex
       const playlistChanged = playlistContentChanged(prev.playlist, state.playlist)
@@ -109,7 +109,7 @@ export function useMediaProjectionSync(): void {
 
   useEffect(() => {
     const unsub = useMediaProjectionStore.subscribe((state, prev) => {
-      if (!state.isPresenting || state.isRehearsal) return
+      if (!state.isPresenting) return
       if (state.pan !== prev.pan) {
         send('file:control', { action: 'pan', value: state.pan })
       }
@@ -119,7 +119,7 @@ export function useMediaProjectionSync(): void {
 
   useEffect(() => {
     const unsub = useMediaProjectionStore.subscribe((state, prev) => {
-      if (!state.isPresenting || state.isRehearsal) return
+      if (!state.isPresenting) return
       if (state.zoomLevel !== prev.zoomLevel) {
         send('file:control', { action: 'zoom', value: state.zoomLevel })
       }
@@ -129,7 +129,7 @@ export function useMediaProjectionSync(): void {
 
   useEffect(() => {
     const unsub = useMediaProjectionStore.subscribe((state, prev) => {
-      if (prev.isPresenting && !prev.isRehearsal && !state.isPresenting) {
+      if (prev.isPresenting && !state.isPresenting) {
         projectSequenceRef.current += 1
         void stopLiveSession()
         blankProjection(true)
@@ -140,7 +140,7 @@ export function useMediaProjectionSync(): void {
 
   useEffect(() => {
     const unsub = useMediaProjectionStore.subscribe((state, prev) => {
-      if (!state.isPresenting || state.isRehearsal) return
+      if (!state.isPresenting) return
       if (state.isEnded && !prev.isEnded) {
         projectSequenceRef.current += 1
         void stopLiveSession()
@@ -163,7 +163,7 @@ export function useMediaProjectionSync(): void {
 
   useEffect(() => {
     const state = useMediaProjectionStore.getState()
-    if (!state.isPresenting || state.isRehearsal) return
+    if (!state.isPresenting) return
     void projectCurrentItem(state)
   }, [projectCurrentItem])
 }
