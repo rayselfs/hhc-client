@@ -99,7 +99,8 @@ export default function FileProjection({
 
     if (pending.shouldPlay !== undefined) {
       if (pending.shouldPlay) {
-        if (video.readyState < HAVE_METADATA) return
+        const mustApplySeekBeforePlay = pending.seekTo !== undefined && seekableRef.current
+        if (mustApplySeekBeforePlay && video.readyState < HAVE_METADATA) return
         video.muted = false
         video.play().catch(() => {})
       } else {

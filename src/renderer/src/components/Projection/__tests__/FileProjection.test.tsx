@@ -155,6 +155,30 @@ describe('FileProjection copied media identity', () => {
     })
   })
 
+  it('starts live stream playback even before metadata is available', async () => {
+    const { container } = render(
+      <FileProjection
+        fileName="live.mkv"
+        initialItemId="live-id"
+        initialBlobId="source-id"
+        initialMimeType="video/x-matroska"
+        initialStreamUrl="hhc-live-media://stream/live-session"
+        initialSeekable={false}
+      />
+    )
+
+    const video = await waitFor(() => {
+      const element = container.querySelector('video')
+      expect(element).not.toBeNull()
+      return element!
+    })
+    Object.defineProperty(video, 'readyState', { configurable: true, value: 0 })
+
+    triggerProjection('file:control', { action: 'play', itemId: 'live-id' })
+
+    expect(video.play).toHaveBeenCalledOnce()
+  })
+
   it('applies pending video seek before pending play', async () => {
     const { container } = render(
       <FileProjection
