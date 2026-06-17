@@ -538,9 +538,17 @@
       "label": "投影窗口屏幕",
       "noExternalDisplay": "没有外接屏幕"
     },
-    "resetToDefaults": "重置为默认值",
-    "resetBtn": "重置",
-    "resetToDefaultsConfirm": "将所有设置重置为默认值？",
+    "reset": {
+      "title": "重置",
+      "settingsTitle": "重置设置",
+      "settingsDesc": "清除偏好设置并恢复默认值，保留多媒体、圣经资料与用户文件。",
+      "settingsButton": "重置设置",
+      "settingsConfirm": "将 App 设置重置为默认值并保留用户资料？",
+      "allDataTitle": "清除所有资料",
+      "allDataDesc": "清除所有设置、用户资料、媒体缓存与本地资料。此操作无法复原。",
+      "allDataButton": "清除所有资料",
+      "allDataConfirm": "清除所有设置、用户资料、媒体缓存与本地资料？此操作无法复原。"
+    },
     "mediaPlaceholder": "媒体设置即将推出",
     "trash": {
       "retentionLabel": "垃圾桶保留期限",
@@ -579,7 +587,7 @@
       },
       "videoTranscoding": {
         "title": "视频转码",
-        "description": "在 Electron 桌面版使用您指定的 FFmpeg 执行文件，将 AVI、MKV、WMV 准备成可投影格式。",
+        "description": "选择 FFmpeg 执行文件，将 AVI、MKV、WMV 准备成可投影格式。",
         "status": "状态",
         "statuses": {
           "not-configured": "未设置",
@@ -591,12 +599,8 @@
         "executable": "执行文件",
         "notSelected": "未选择",
         "version": "版本",
-        "capabilities": "能力",
-        "capabilitySummary": "H.264：{{h264}} · AAC：{{aac}} · MP4：{{mp4}}",
         "select": "选择 FFmpeg",
-        "validate": "重新验证",
-        "remove": "移除设置",
-        "installGuide": "HHC Client 不会下载或更新 FFmpeg。请自行安装 FFmpeg，并在此选择执行文件。",
+        "installGuide": "需要 FFmpeg 执行文件，可至",
         "installLink": "FFmpeg 下载"
       }
     },

@@ -24,6 +24,7 @@ export default function GeneralSettings(): React.JSX.Element {
   const setHardwareAcceleration = useSettingsStore((s) => s.setHardwareAcceleration)
   const projectionDisplayId = useSettingsStore((s) => s.projectionDisplayId)
   const setProjectionDisplayId = useSettingsStore((s) => s.setProjectionDisplayId)
+  const resetSettings = useSettingsStore((s) => s.resetSettings)
   const resetToDefaults = useSettingsStore((s) => s.resetToDefaults)
   const confirm = useConfirm()
   const [displays, setDisplays] = useState<DisplayInfo[]>([])
@@ -52,11 +53,22 @@ export default function GeneralSettings(): React.JSX.Element {
     { value: 'zh-CN', label: t('preferences.languageNames.zhCN') }
   ]
 
-  const handleResetClick = async (): Promise<void> => {
+  const handleResetSettingsClick = async (): Promise<void> => {
     const confirmed = await confirm({
       status: 'warning',
-      description: t('preferences.resetToDefaultsConfirm'),
-      confirmLabel: t('preferences.resetBtn'),
+      description: t('preferences.reset.settingsConfirm'),
+      confirmLabel: t('preferences.reset.settingsButton'),
+      cancelLabel: t('common.cancel')
+    })
+    if (!confirmed) return
+    resetSettings()
+  }
+
+  const handleClearAllDataClick = async (): Promise<void> => {
+    const confirmed = await confirm({
+      status: 'danger',
+      description: t('preferences.reset.allDataConfirm'),
+      confirmLabel: t('preferences.reset.allDataButton'),
       cancelLabel: t('common.cancel')
     })
     if (!confirmed) return
@@ -164,14 +176,35 @@ export default function GeneralSettings(): React.JSX.Element {
         </>
       )}
 
-      <div className="pt-4 border-t">
-        <label className="mb-2 block text-sm font-medium">{t('preferences.resetToDefaults')}</label>
-        <div>
-          <Button variant="danger" onPress={handleResetClick} className="rounded-full">
-            {t('preferences.resetBtn')}
+      <section className="space-y-3 border-t pt-4">
+        <h3 className="text-sm font-semibold">{t('preferences.reset.title')}</h3>
+        <div className="flex items-center justify-between gap-4 rounded-2xl bg-default-100 p-4">
+          <div>
+            <h4 className="text-sm font-medium">{t('preferences.reset.settingsTitle')}</h4>
+            <p className="mt-1 text-xs text-gray-500">{t('preferences.reset.settingsDesc')}</p>
+          </div>
+          <Button
+            variant="danger"
+            onPress={handleResetSettingsClick}
+            className="shrink-0 rounded-full"
+          >
+            {t('preferences.reset.settingsButton')}
           </Button>
         </div>
-      </div>
+        <div className="flex items-center justify-between gap-4 rounded-2xl bg-default-100 p-4">
+          <div>
+            <h4 className="text-sm font-medium">{t('preferences.reset.allDataTitle')}</h4>
+            <p className="mt-1 text-xs text-gray-500">{t('preferences.reset.allDataDesc')}</p>
+          </div>
+          <Button
+            variant="danger"
+            onPress={handleClearAllDataClick}
+            className="shrink-0 rounded-full"
+          >
+            {t('preferences.reset.allDataButton')}
+          </Button>
+        </div>
+      </section>
     </div>
   )
 }

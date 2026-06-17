@@ -269,22 +269,43 @@ export interface SettingsStore {
   setTrashRetentionDays: (days: number) => void
   setReminderMode: (mode: 'subtract' | 'add') => void
   setProjectionDisplayId: (displayId: string) => void
+  resetSettings: () => void
   resetToDefaults: () => void
+}
+
+function getDefaultSettingsState(): Omit<
+  SettingsStore,
+  | 'setTimezone'
+  | 'setHardwareAcceleration'
+  | 'setThemePreference'
+  | 'setTimerRingColor'
+  | 'setTimerRingColorEnabled'
+  | 'setSpeech'
+  | 'setOneDrive'
+  | 'setTrashRetentionDays'
+  | 'setReminderMode'
+  | 'setProjectionDisplayId'
+  | 'resetSettings'
+  | 'resetToDefaults'
+> {
+  return {
+    timezone: DEFAULT_TIMEZONE,
+    hardwareAcceleration: DEFAULT_HW_ACCEL,
+    themePreference: DEFAULT_THEME_PREFERENCE,
+    timerRingColor: DEFAULT_TIMER_RING_COLOR,
+    timerRingColorEnabled: DEFAULT_TIMER_RING_COLOR_ENABLED,
+    speech: getDefaultSpeechSettings(),
+    oneDrive: DEFAULT_ONEDRIVE,
+    trashRetentionDays: DEFAULT_TRASH_RETENTION_DAYS,
+    reminderMode: DEFAULT_REMINDER_MODE,
+    projectionDisplayId: DEFAULT_PROJECTION_DISPLAY_ID
+  }
 }
 
 export const useSettingsStore = create<SettingsStore>()(
   persist(
     (set) => ({
-      timezone: DEFAULT_TIMEZONE,
-      hardwareAcceleration: DEFAULT_HW_ACCEL,
-      themePreference: DEFAULT_THEME_PREFERENCE,
-      timerRingColor: DEFAULT_TIMER_RING_COLOR,
-      timerRingColorEnabled: DEFAULT_TIMER_RING_COLOR_ENABLED,
-      speech: getDefaultSpeechSettings(),
-      oneDrive: DEFAULT_ONEDRIVE,
-      trashRetentionDays: DEFAULT_TRASH_RETENTION_DAYS,
-      reminderMode: DEFAULT_REMINDER_MODE,
-      projectionDisplayId: DEFAULT_PROJECTION_DISPLAY_ID,
+      ...getDefaultSettingsState(),
 
       setTimezone: (tz: string) => {
         set({ timezone: tz })
@@ -331,6 +352,11 @@ export const useSettingsStore = create<SettingsStore>()(
 
       setProjectionDisplayId: (displayId: string) => {
         set({ projectionDisplayId: normalizeProjectionDisplayId(displayId) })
+      },
+
+      resetSettings: () => {
+        set(getDefaultSettingsState())
+        toast.success(i18n.t('toast.settingsReset'))
       },
 
       resetToDefaults: () => {

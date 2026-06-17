@@ -77,6 +77,7 @@ vi.mock('@renderer/stores/settings', () => ({
       setOneDrive: vi.fn(),
       trashRetentionDays: 30,
       setTrashRetentionDays: vi.fn(),
+      resetSettings: vi.fn(),
       resetToDefaults: vi.fn()
     }
     return selector ? selector(store) : store
@@ -278,7 +279,8 @@ describe('PreferencesDialog', () => {
         hardwareAcceleration: true,
         setTimezone,
         setHardwareAcceleration: vi.fn(),
-        resetToDefaults: vi.fn(),
+        resetSettings: vi.fn(),
+      resetToDefaults: vi.fn(),
         themePreference: 'system' as const,
         setThemePreference: vi.fn(),
         timerRingColor: '#3b82f6',
@@ -368,11 +370,12 @@ describe('PreferencesDialog', () => {
     vi.mocked(isElectron).mockReturnValue(false)
   })
 
-  it('calls reset functions when reset confirmed via modal', async () => {
+  it('calls resetSettings when reset settings confirmed via modal', async () => {
     const user = userEvent.setup()
     const { useSettingsStore } = await import('@renderer/stores/settings')
     const { useTheme } = await import('@renderer/contexts/ThemeContext')
 
+    const resetSettings = vi.fn()
     const resetToDefaults = vi.fn()
     const setPreference = vi.fn()
     const onOpenChange = vi.fn()
@@ -383,6 +386,7 @@ describe('PreferencesDialog', () => {
         hardwareAcceleration: true,
         setTimezone: vi.fn(),
         setHardwareAcceleration: vi.fn(),
+        resetSettings,
         resetToDefaults,
         themePreference: 'system' as const,
         setThemePreference: vi.fn(),
@@ -419,18 +423,20 @@ describe('PreferencesDialog', () => {
 
     renderDialog(true, onOpenChange)
 
-    const resetButton = screen.getByText('Reset')
+    const resetButton = screen.getAllByText('Reset Settings').at(-1)!
     await user.click(resetButton)
 
-    const allResetButtons = await screen.findAllByText('Reset')
+    const allResetButtons = await screen.findAllByText('Reset Settings')
     await user.click(allResetButtons[allResetButtons.length - 1])
 
-    expect(resetToDefaults).toHaveBeenCalled()
+    expect(resetSettings).toHaveBeenCalled()
+    expect(resetToDefaults).not.toHaveBeenCalled()
   })
 
-  it('does not reset when cancel clicked in modal', async () => {
+  it('calls resetToDefaults when clear all data confirmed via modal', async () => {
     const user = userEvent.setup()
     const { useSettingsStore } = await import('@renderer/stores/settings')
+
     const resetToDefaults = vi.fn()
 
     vi.mocked(useSettingsStore).mockImplementation((selector) => {
@@ -439,6 +445,7 @@ describe('PreferencesDialog', () => {
         hardwareAcceleration: true,
         setTimezone: vi.fn(),
         setHardwareAcceleration: vi.fn(),
+        resetSettings: vi.fn(),
         resetToDefaults,
         themePreference: 'system' as const,
         setThemePreference: vi.fn(),
@@ -470,7 +477,57 @@ describe('PreferencesDialog', () => {
 
     renderDialog(true)
 
-    const resetButton = screen.getByText('Reset')
+    await user.click(screen.getAllByText('Clear All Data').at(-1)!)
+    const allClearButtons = await screen.findAllByText('Clear All Data')
+    await user.click(allClearButtons[allClearButtons.length - 1])
+
+    expect(resetToDefaults).toHaveBeenCalled()
+  })
+
+  it('does not reset when cancel clicked in modal', async () => {
+    const user = userEvent.setup()
+    const { useSettingsStore } = await import('@renderer/stores/settings')
+    const resetToDefaults = vi.fn()
+
+    vi.mocked(useSettingsStore).mockImplementation((selector) => {
+      const store = {
+        timezone: 'Asia/Taipei',
+        hardwareAcceleration: true,
+        setTimezone: vi.fn(),
+        setHardwareAcceleration: vi.fn(),
+        resetSettings: vi.fn(),
+        resetToDefaults,
+        themePreference: 'system' as const,
+        setThemePreference: vi.fn(),
+        timerRingColor: '#3b82f6',
+        setTimerRingColor: vi.fn(),
+        timerRingColorEnabled: false,
+        setTimerRingColorEnabled: vi.fn(),
+        reminderMode: 'subtract' as const,
+        setReminderMode: vi.fn(),
+        speech: {
+          activeProvider: 'azure' as const,
+          azure: { region: 'eastasia', language: 'zh-TW' as const },
+          gcp: { language: 'cmn-Hant-TW' as const },
+          whisper: { modelDir: '', installedModel: null }
+        },
+        setSpeech: vi.fn(),
+        oneDrive: {
+          customClientId: '',
+          defaultOfflinePolicy: 'always-offline' as const
+        },
+        setOneDrive: vi.fn(),
+        trashRetentionDays: 30,
+        setTrashRetentionDays: vi.fn(),
+        projectionDisplayId: '',
+        setProjectionDisplayId: vi.fn()
+      }
+      return selector ? selector(store) : store
+    })
+
+    renderDialog(true)
+
+    const resetButton = screen.getAllByText('Reset Settings').at(-1)!
     await user.click(resetButton)
 
     const cancelButton = await screen.findByText('Cancel')

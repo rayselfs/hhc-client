@@ -542,9 +542,17 @@
       "label": "Projection Window Display",
       "noExternalDisplay": "No external display"
     },
-    "resetToDefaults": "Reset to Defaults",
-    "resetBtn": "Reset",
-    "resetToDefaultsConfirm": "Reset all settings to their default values?",
+    "reset": {
+      "title": "Reset",
+      "settingsTitle": "Reset Settings",
+      "settingsDesc": "Clear preferences and restore defaults while keeping media, Bible data, and user files.",
+      "settingsButton": "Reset Settings",
+      "settingsConfirm": "Reset app settings to their defaults while keeping user data?",
+      "allDataTitle": "Clear All Data",
+      "allDataDesc": "Clear all settings, user data, media cache, and local data. This cannot be undone.",
+      "allDataButton": "Clear All Data",
+      "allDataConfirm": "Clear all settings, user data, media cache, and local data? This cannot be undone."
+    },
     "mediaPlaceholder": "Media settings coming soon",
     "trash": {
       "retentionLabel": "Trash Retention Period",
@@ -583,7 +591,7 @@
       },
       "videoTranscoding": {
         "title": "Video Transcoding",
-        "description": "Use a user-selected FFmpeg executable to prepare AVI, MKV, and WMV files for presentation in Electron.",
+        "description": "Select an FFmpeg executable to prepare AVI, MKV, and WMV files for presentation.",
         "status": "Status",
         "statuses": {
           "not-configured": "Not configured",
@@ -595,12 +603,8 @@
         "executable": "Executable",
         "notSelected": "Not selected",
         "version": "Version",
-        "capabilities": "Capabilities",
-        "capabilitySummary": "H.264: {{h264}} · AAC: {{aac}} · MP4: {{mp4}}",
         "select": "Select FFmpeg",
-        "validate": "Validate again",
-        "remove": "Remove configuration",
-        "installGuide": "HHC Client does not download or update FFmpeg. Install FFmpeg yourself and select the executable here.",
+        "installGuide": "Need an FFmpeg executable? Download it from",
         "installLink": "FFmpeg downloads"
       }
     },

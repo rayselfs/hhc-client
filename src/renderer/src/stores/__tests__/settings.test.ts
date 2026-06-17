@@ -143,6 +143,20 @@ describe('setHardwareAcceleration', () => {
   })
 })
 
+describe('resetSettings', () => {
+  it('restores settings without clearing user data', () => {
+    useSettingsStore.getState().setHardwareAcceleration(false)
+    useSettingsStore.getState().resetSettings()
+    expect(useSettingsStore.getState().hardwareAcceleration).toBe(true)
+    expect(clearAllSiteData).not.toHaveBeenCalled()
+  })
+
+  it('shows success toast', () => {
+    useSettingsStore.getState().resetSettings()
+    expect(mockToast.success).toHaveBeenCalledWith('toast.settingsReset')
+  })
+})
+
 describe('resetToDefaults', () => {
   it('calls clearAllSiteData', () => {
     useSettingsStore.getState().resetToDefaults()

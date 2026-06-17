@@ -210,18 +210,6 @@ export default function MediaSettings({
             </dd>
             <dt className="text-gray-500">{t('preferences.media.videoTranscoding.version')}</dt>
             <dd>{ffmpegConfig.version ?? '-'}</dd>
-            <dt className="text-gray-500">
-              {t('preferences.media.videoTranscoding.capabilities')}
-            </dt>
-            <dd>
-              {ffmpegConfig.capabilities
-                ? t('preferences.media.videoTranscoding.capabilitySummary', {
-                    h264: ffmpegConfig.capabilities.hasH264Encoder ? 'OK' : 'Missing',
-                    aac: ffmpegConfig.capabilities.hasAacEncoder ? 'OK' : 'Missing',
-                    mp4: ffmpegConfig.capabilities.hasMp4Muxer ? 'OK' : 'Missing'
-                  })
-                : '-'}
-            </dd>
           </dl>
 
           {ffmpegConfig.message && (
@@ -238,24 +226,6 @@ export default function MediaSettings({
               onPress={() => void runFfmpegAction(() => window.api.videoTranscode.selectFfmpeg())}
             >
               {t('preferences.media.videoTranscoding.select')}
-            </Button>
-            <Button
-              variant="secondary"
-              className="rounded-full"
-              isDisabled={isCheckingFfmpeg}
-              onPress={() => void runFfmpegAction(() => window.api.videoTranscode.validateFfmpeg())}
-            >
-              {t('preferences.media.videoTranscoding.validate')}
-            </Button>
-            <Button
-              variant="danger"
-              className="rounded-full"
-              isDisabled={isCheckingFfmpeg}
-              onPress={() =>
-                void runFfmpegAction(() => window.api.videoTranscode.removeFfmpegConfig())
-              }
-            >
-              {t('preferences.media.videoTranscoding.remove')}
             </Button>
           </div>
 
