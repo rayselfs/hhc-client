@@ -123,6 +123,14 @@ POC 範圍：
 - macOS 和 Windows 各確認一條可行路徑
 - electron-vite dev / build path 都能找到 native library
 
+目前 macOS POC 結果：
+
+- `electron-vlc-player` native addon 可透過 `electron-rebuild` 成功編譯
+- VLC 3.0.x runtime 可使用 `/Applications/VLC.app/Contents/MacOS`
+- 獨立 Electron POC 視窗可播放 native-files 內的 MKV
+- log 顯示 VideoToolbox 硬體解碼已啟用
+- 這證明 libVLC embedded 路線可行，下一步才接現有 projection window
+
 不在 POC 範圍：
 
 - 不做完整 media service refactor
