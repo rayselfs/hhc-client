@@ -84,6 +84,20 @@ describe('video engine runtime resolver', () => {
     })
   })
 
+  it('does not fall back to system VLC in packaged builds', async () => {
+    mockApp.isPackaged = true
+    mockAccessSync.mockImplementation(() => {
+      throw new Error('missing')
+    })
+    mockProbeDefaultVlcDir.mockReturnValue('/Applications/VLC.app')
+    const { resolveVlcRuntime } = await import('../video-engine-runtime')
+
+    expect(resolveVlcRuntime()).toEqual({
+      status: 'missing',
+      message: 'Bundled VLC runtime not found'
+    })
+  })
+
   it('prefers packaged FFmpeg poster binary', async () => {
     mockAccessSync.mockReturnValue(undefined)
     const { resolveFfmpegPosterRuntime } = await import('../video-engine-runtime')
