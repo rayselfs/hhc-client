@@ -42,7 +42,10 @@ beforeEach(() => {
 describe('video engine runtime resolver', () => {
   it('prefers packaged VLC runtime over system fallback', async () => {
     mockApp.isPackaged = true
-    mockAccessSync.mockReturnValue(undefined)
+    mockAccessSync.mockImplementation((path: string) => {
+      if (path.endsWith('libvlc.dylib')) return undefined
+      throw new Error('missing')
+    })
     mockProbeDefaultVlcDir.mockReturnValue('/Applications/VLC.app')
     const { resolveVlcRuntime } = await import('../video-engine-runtime')
 
@@ -50,6 +53,20 @@ describe('video engine runtime resolver', () => {
       status: 'ready',
       path: `/resources/video-engine/vlc/${platformDir()}`,
       source: 'bundled'
+    })
+  })
+
+  it('does not treat a placeholder VLC directory as bundled runtime', async () => {
+    mockAccessSync.mockImplementation(() => {
+      throw new Error('missing')
+    })
+    mockProbeDefaultVlcDir.mockReturnValue('/Applications/VLC.app')
+    const { resolveVlcRuntime } = await import('../video-engine-runtime')
+
+    expect(resolveVlcRuntime()).toEqual({
+      status: 'ready',
+      path: '/Applications/VLC.app',
+      source: 'system'
     })
   })
 
