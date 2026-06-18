@@ -521,9 +521,11 @@
     "tagline": "Open-source presentation software for churches and live events.",
     "version": "Version",
     "license": "License",
-    "openSourceNotices": "Open source notices",
-    "viewOnline": "View online",
-    "noticesDescription": "LibrePresenter includes bundled open-source components. License notices are included with packaged builds and are also available online."
+    "openSourceLicenses": "Open Source Licenses",
+    "viewLicenses": "View licenses",
+    "licensesIntro": "Licenses for LibrePresenter and bundled video components.",
+    "source": "Source",
+    "back": "Back"
   },
   "preferences": {
     "title": "Preferences",

@@ -521,9 +521,11 @@
     "tagline": "为教会与现场活动打造的开源投影软件。",
     "version": "版本",
     "license": "授权",
-    "openSourceNotices": "开源授权声明",
-    "viewOnline": "在线查看",
-    "noticesDescription": "LibrePresenter 内含打包的开源组件。授权声明会随桌面版一并提供，也可以在线查看。"
+    "openSourceLicenses": "开源授权",
+    "viewLicenses": "查看授权",
+    "licensesIntro": "LibrePresenter 与内置视频组件使用的授权。",
+    "source": "来源",
+    "back": "返回"
   },
   "preferences": {
     "title": "偏好设置",
