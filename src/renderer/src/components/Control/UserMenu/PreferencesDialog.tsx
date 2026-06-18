@@ -13,7 +13,6 @@ import StorageSettings, {
   type StorageSettingsSection
 } from '@renderer/components/Control/UserMenu/StorageSettings'
 import { ShortcutScope } from '@renderer/contexts/ShortcutScopeContext'
-import { isElectron } from '@renderer/lib/env'
 
 interface PreferencesDialogProps {
   isOpen: boolean
@@ -33,7 +32,6 @@ interface CategoryChildItem {
   labelKey:
     | 'preferences.media.sections.general'
     | 'preferences.media.sections.oneDrive'
-    | 'preferences.media.sections.video'
     | 'preferences.storage.sections.usage'
     | 'preferences.storage.sections.cleanup'
 }
@@ -62,9 +60,6 @@ export default function PreferencesDialog({
     { id: 'media.general', labelKey: 'preferences.media.sections.general' },
     { id: 'media.oneDrive', labelKey: 'preferences.media.sections.oneDrive' }
   ]
-  if (isElectron()) {
-    mediaChildren.push({ id: 'media.video', labelKey: 'preferences.media.sections.video' })
-  }
   const categories: CategoryItem[] = [
     { id: 'general', icon: Settings, labelKey: 'preferences.categories.general', route: 'general' },
     { id: 'timer', icon: Timer, labelKey: 'preferences.categories.timer', route: 'timer' },
@@ -176,7 +171,6 @@ export default function PreferencesDialog({
                     {activeRoute === 'bible' && <BibleSettingsPanel />}
                     {activeRoute === 'media.general' && <MediaSettings section="general" />}
                     {activeRoute === 'media.oneDrive' && <MediaSettings section="oneDrive" />}
-                    {activeRoute === 'media.video' && <MediaSettings section="video" />}
                     {activeRoute === 'storage.usage' && <StorageSettings section="usage" />}
                     {activeRoute === 'storage.cleanup' && <StorageSettings section="cleanup" />}
                   </div>

@@ -202,61 +202,6 @@ describe('PreferencesDialog', () => {
     expect(screen.queryByLabelText('Trash Retention Period')).not.toBeInTheDocument()
   })
 
-  it('shows video transcoding media section only on Electron', async () => {
-    const user = userEvent.setup()
-    const { isElectron } = await import('@renderer/lib/env')
-    vi.mocked(isElectron).mockReturnValue(true)
-    Object.defineProperty(window, 'api', {
-      configurable: true,
-      value: {
-        videoTranscode: {
-          getFfmpegConfig: vi.fn().mockResolvedValue({ status: 'not-configured' }),
-          selectFfmpeg: vi.fn(),
-          validateFfmpeg: vi.fn(),
-          removeFfmpegConfig: vi.fn()
-        }
-      }
-    })
-
-    renderDialog(true)
-
-    await user.click(screen.getByTestId('category-media'))
-    expect(screen.getByTestId('category-media-video')).toBeInTheDocument()
-
-    await user.click(screen.getByTestId('category-media-video'))
-    expect(screen.getByRole('heading', { name: 'Video Transcoding' })).toBeInTheDocument()
-    expect(screen.queryByLabelText('Azure Application Client ID')).not.toBeInTheDocument()
-
-    vi.mocked(isElectron).mockReturnValue(false)
-  })
-
-  it('does not show FFmpeg select action while config detection is pending', async () => {
-    const user = userEvent.setup()
-    const { isElectron } = await import('@renderer/lib/env')
-    vi.mocked(isElectron).mockReturnValue(true)
-    Object.defineProperty(window, 'api', {
-      configurable: true,
-      value: {
-        videoTranscode: {
-          getFfmpegConfig: vi.fn(() => new Promise(() => {})),
-          selectFfmpeg: vi.fn(),
-          validateFfmpeg: vi.fn(),
-          removeFfmpegConfig: vi.fn()
-        }
-      }
-    })
-
-    renderDialog(true)
-
-    await user.click(screen.getByTestId('category-media'))
-    await user.click(screen.getByTestId('category-media-video'))
-
-    expect(screen.getByRole('heading', { name: 'Video Transcoding' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Select FFmpeg' })).not.toBeInTheDocument()
-
-    vi.mocked(isElectron).mockReturnValue(false)
-  })
-
   it('navigates between storage child sections', async () => {
     const user = userEvent.setup()
     renderDialog(true)
@@ -266,7 +211,6 @@ describe('PreferencesDialog', () => {
     expect(screen.getByTestId('category-storage-usage')).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('heading', { name: 'Usage' })).toBeInTheDocument()
     expect(screen.getByText('Original media files')).toBeInTheDocument()
-    expect(screen.queryByText('Video Transcoding')).not.toBeInTheDocument()
 
     await user.click(screen.getByTestId('category-storage-cleanup'))
     expect(screen.getByTestId('category-storage')).toHaveAttribute('aria-pressed', 'false')

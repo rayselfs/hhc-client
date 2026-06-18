@@ -566,8 +566,7 @@
     "media": {
       "sections": {
         "general": "General",
-        "oneDrive": "OneDrive",
-        "video": "Video Transcoding"
+        "oneDrive": "OneDrive"
       },
       "oneDrive": {
         "title": "OneDrive",
@@ -585,38 +584,6 @@
           "always-offline": "Always available offline"
         },
         "setupHint": "Changing the Client ID requires reconnecting OneDrive. Tokens are stored separately and never in Preferences."
-      },
-      "videoTranscoding": {
-        "title": "Video Transcoding",
-        "description": "Select an FFmpeg executable to prepare AVI, MKV, and WMV files for presentation.",
-        "status": "Status",
-        "statuses": {
-          "not-configured": "Not configured",
-          "ready": "Ready",
-          "invalid": "Invalid",
-          "missing": "Missing",
-          "unsupported-version": "Unsupported version"
-        },
-        "executable": "Executable",
-        "notSelected": "Not selected",
-        "version": "Version",
-        "ffprobe": "FFprobe",
-        "resolution": "Resolution",
-        "quality": "Quality",
-        "resolutions": {
-          "4k": "4K",
-          "1080p": "1080p",
-          "720p": "720p"
-        },
-        "qualities": {
-          "high": "High",
-          "medium": "Medium",
-          "low": "Low"
-        },
-        "select": "Select FFmpeg",
-        "selectFfprobe": "Select FFprobe",
-        "installGuide": "Need an FFmpeg executable? Download it from",
-        "installLink": "FFmpeg downloads"
       }
     },
     "storage": {

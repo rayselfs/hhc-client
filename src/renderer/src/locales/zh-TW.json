@@ -566,8 +566,7 @@
     "media": {
       "sections": {
         "general": "一般",
-        "oneDrive": "OneDrive",
-        "video": "影片轉碼"
+        "oneDrive": "OneDrive"
       },
       "oneDrive": {
         "title": "OneDrive",
@@ -585,38 +584,6 @@
           "always-offline": "永遠離線可用"
         },
         "setupHint": "變更 Client ID 後需要重新連接 OneDrive。Token 會分開儲存，不會進入偏好設定。"
-      },
-      "videoTranscoding": {
-        "title": "影片轉檔",
-        "description": "選擇 FFmpeg 執行檔，將 AVI、MKV、WMV 準備成可投影格式。",
-        "status": "狀態",
-        "statuses": {
-          "not-configured": "未設定",
-          "ready": "可使用",
-          "invalid": "無效",
-          "missing": "找不到",
-          "unsupported-version": "版本不支援"
-        },
-        "executable": "執行檔",
-        "notSelected": "未選擇",
-        "version": "版本",
-        "ffprobe": "FFprobe",
-        "resolution": "解析度",
-        "quality": "品質",
-        "resolutions": {
-          "4k": "4K",
-          "1080p": "1080p",
-          "720p": "720p"
-        },
-        "qualities": {
-          "high": "高",
-          "medium": "中",
-          "low": "低"
-        },
-        "select": "選擇 FFmpeg",
-        "selectFfprobe": "選擇 FFprobe",
-        "installGuide": "需要 FFmpeg 執行檔，可至",
-        "installLink": "FFmpeg 下載"
       }
     },
     "storage": {
