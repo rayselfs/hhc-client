@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { createProjectionAdapter } from '@renderer/lib/projection-adapter'
 import { getFileSource, openFileExplorerDB } from '@renderer/lib/file-explorer-db'
 import { loadPdfjsLib } from '@renderer/lib/pdfjs-loader'
+import { getThumbnail } from '@renderer/lib/thumbnail-db'
 import type { FileControlPayload } from '@shared/projection-messages'
 
 type FileProjectionProps = {
@@ -56,6 +57,7 @@ export default function FileProjection({
   const [pdfState, setPdfState] = useState<PdfState | null>(null)
   const [isEnded, setIsEnded] = useState(false)
   const [displayName, setDisplayName] = useState(fileName ?? '')
+  const [isVlcPosterHidden, setIsVlcPosterHidden] = useState(false)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const pdfContainerRef = useRef<HTMLDivElement | null>(null)
   const adapterSendRef = useRef<ReturnType<typeof createProjectionAdapter>['send'] | null>(null)
@@ -210,6 +212,7 @@ export default function FileProjection({
       setPan({ x: 0, y: 0 })
       setPdfState(null)
       setIsEnded(false)
+      setIsVlcPosterHidden(false)
       setMimeType(fileMimeType)
       if (options.playbackMode === 'vlc-embedded') {
         return
@@ -240,6 +243,7 @@ export default function FileProjection({
       switch (data.action) {
         case 'play':
           if (playbackModeRef.current === 'vlc-embedded') {
+            setIsVlcPosterHidden(true)
             void window.api?.projectionVlc?.control({ action: 'play', itemId: data.itemId })
             break
           }
@@ -500,9 +504,11 @@ export default function FileProjection({
     return (
       <div className="flex h-screen w-full items-center justify-center bg-black overflow-hidden">
         <VlcProjectionSurface
+          key={`${currentItemIdRef.current ?? ''}:${initialBlobId ?? ''}`}
           itemId={currentItemIdRef.current}
           blobId={initialBlobId}
           durationMs={durationMsRef.current}
+          hidePoster={isVlcPosterHidden}
         />
       </div>
     )
@@ -518,12 +524,38 @@ export default function FileProjection({
 function VlcProjectionSurface({
   itemId,
   blobId,
-  durationMs
+  durationMs,
+  hidePoster
 }: {
   itemId: string | null
   blobId?: string
   durationMs?: number
+  hidePoster: boolean
 }): React.JSX.Element {
+  const [posterUrl, setPosterUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    let loadedUrl: string | null = null
+
+    async function loadPoster(): Promise<void> {
+      if (!itemId || !blobId) return
+      loadedUrl = await getThumbnail(itemId, blobId)
+      if (cancelled) {
+        if (loadedUrl?.startsWith('blob:')) URL.revokeObjectURL(loadedUrl)
+        return
+      }
+      setPosterUrl(loadedUrl)
+    }
+
+    void loadPoster()
+
+    return () => {
+      cancelled = true
+      if (loadedUrl?.startsWith('blob:')) URL.revokeObjectURL(loadedUrl)
+    }
+  }, [blobId, itemId])
+
   useEffect(() => {
     if (!itemId || !blobId) return undefined
     void window.api?.projectionVlc
@@ -541,7 +573,18 @@ function VlcProjectionSurface({
     }
   }, [blobId, durationMs, itemId])
 
-  return <div id="vlc-player" className="h-full w-full bg-black" />
+  return (
+    <div className="relative h-full w-full bg-black">
+      <div id="vlc-player" className="h-full w-full bg-black" />
+      {posterUrl && !hidePoster ? (
+        <img
+          src={posterUrl}
+          alt=""
+          className="pointer-events-none absolute inset-0 h-full w-full object-contain"
+        />
+      ) : null}
+    </div>
+  )
 }
 
 function PdfCanvas({

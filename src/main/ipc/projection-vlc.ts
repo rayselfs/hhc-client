@@ -14,8 +14,82 @@ import { isValidNativeFileId } from '../../shared/native-media'
 import { resolveVlcRuntime } from '../video-engine-runtime'
 
 let player: VlcPlayer | null = null
+let playerListenerCleanup: (() => void) | null = null
 let currentItemId: string | null = null
 let currentDurationMs: number | undefined
+
+type ListenerTarget = {
+  listeners(event: string): unknown[]
+  removeListener(event: string, listener: EventListener): unknown
+}
+
+type EventListener = (...args: unknown[]) => void
+
+const VLC_WINDOW_EVENTS = [
+  'enter-full-screen',
+  'leave-full-screen',
+  'close',
+  'minimize',
+  'restore',
+  'hide',
+  'focus',
+  'blur',
+  'show',
+  'move'
+]
+
+const VLC_WEB_CONTENTS_EVENTS = ['paint', 'devtools-opened', 'did-finish-load']
+
+function captureListeners(
+  target: ListenerTarget,
+  events: string[]
+): Map<string, Set<EventListener>> {
+  return new Map(
+    events.map((event) => [event, new Set(target.listeners(event) as EventListener[])])
+  )
+}
+
+function captureAddedListeners(
+  target: ListenerTarget,
+  events: string[],
+  before: Map<string, Set<EventListener>>
+): Map<string, EventListener[]> {
+  return new Map(
+    events.map((event) => [
+      event,
+      (target.listeners(event) as EventListener[]).filter(
+        (listener) => !before.get(event)?.has(listener)
+      )
+    ])
+  )
+}
+
+function createListenerCleanup(
+  window: BrowserWindow,
+  beforeWindow: Map<string, Set<EventListener>>,
+  beforeWebContents: Map<string, Set<EventListener>>
+): () => void {
+  const addedWindow = captureAddedListeners(window, VLC_WINDOW_EVENTS, beforeWindow)
+  const addedWebContents = captureAddedListeners(
+    window.webContents,
+    VLC_WEB_CONTENTS_EVENTS,
+    beforeWebContents
+  )
+
+  return () => {
+    removeListeners(window, addedWindow)
+    if (!window.isDestroyed()) removeListeners(window.webContents, addedWebContents)
+  }
+}
+
+function removeListeners(
+  target: ListenerTarget,
+  addedListeners: Map<string, EventListener[]>
+): void {
+  for (const [event, listeners] of addedListeners) {
+    for (const listener of listeners) target.removeListener(event, listener)
+  }
+}
 
 function getVlcInfo(): ProjectionVlcInfo {
   const runtime = resolveVlcRuntime()
@@ -62,6 +136,8 @@ async function stopVlc(): Promise<void> {
   if (!player) return
   player.destroy()
   player = null
+  playerListenerCleanup?.()
+  playerListenerCleanup = null
 }
 
 async function startVlc(wm: WindowManager, request: ProjectionVlcStartRequest): Promise<void> {
@@ -75,6 +151,12 @@ async function startVlc(wm: WindowManager, request: ProjectionVlcStartRequest): 
     throw new Error(info.message ?? 'VLC runtime not found')
   }
 
+  await stopVlc()
+  const beforeWindowListeners = captureListeners(projectionWindow, VLC_WINDOW_EVENTS)
+  const beforeWebContentsListeners = captureListeners(
+    projectionWindow.webContents,
+    VLC_WEB_CONTENTS_EVENTS
+  )
   const nextPlayer = new VlcPlayer({
     window: projectionWindow,
     container: request.container,
@@ -87,8 +169,12 @@ async function startVlc(wm: WindowManager, request: ProjectionVlcStartRequest): 
     await nextPlayer.embed()
     if (!nextPlayer.isEmbedded()) throw new Error('VLC player failed to embed')
 
-    await stopVlc()
     player = nextPlayer
+    playerListenerCleanup = createListenerCleanup(
+      projectionWindow,
+      beforeWindowListeners,
+      beforeWebContentsListeners
+    )
     currentItemId = request.itemId
     currentDurationMs = request.durationMs
 
@@ -103,6 +189,7 @@ async function startVlc(wm: WindowManager, request: ProjectionVlcStartRequest): 
     sendState(wm, { isPlaying: false, isEnded: false })
   } catch (error) {
     nextPlayer.destroy()
+    createListenerCleanup(projectionWindow, beforeWindowListeners, beforeWebContentsListeners)()
     throw error
   }
 }
