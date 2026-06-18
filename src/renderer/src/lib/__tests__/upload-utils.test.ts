@@ -173,8 +173,7 @@ describe('uploadFiles classification', () => {
 
   it.each([
     ['slides.PDF', 'application/pdf'],
-    ['photo.PNG', 'image/png'],
-    ['movie.MP4', 'video/mp4']
+    ['photo.PNG', 'image/png']
   ])('persists canonical MIME for empty-MIME %s', async (name, canonicalMimeType) => {
     const file = makeFile(name, 100, '')
 
@@ -217,6 +216,37 @@ describe('uploadFiles classification', () => {
       itemId: 'mock-id',
       dedupeKey: 'video-poster:mock-id'
     })
+  })
+
+  it('uses poster jobs for Electron-native videos instead of browser thumbnails', async () => {
+    const file = makeFile('movie.MP4', 100, '')
+
+    await expect(uploadFiles([file], 'parent-1')).resolves.toBe(1)
+
+    expect(addFileItemToStore).toHaveBeenCalledWith(file, 'parent-1', 'video/mp4')
+    expect(generateThumbnail).not.toHaveBeenCalled()
+    expect(mediaJobQueue.enqueue).toHaveBeenCalledWith({
+      type: 'video-poster',
+      sourceBlobId: 'mock-id',
+      itemId: 'mock-id',
+      dedupeKey: 'video-poster:mock-id'
+    })
+  })
+})
+
+describe('uploadFiles web video thumbnails', () => {
+  beforeEach(() => {
+    vi.mocked(isWeb).mockReturnValue(true)
+  })
+
+  it('keeps browser-native video thumbnail generation in Web mode', async () => {
+    const file = makeFile('movie.MP4', 100, '')
+
+    await expect(uploadFiles([file], 'parent-1')).resolves.toBe(1)
+
+    expect(addFileItemToStore).toHaveBeenCalledWith(file, 'parent-1', 'video/mp4')
+    expect(generateThumbnail).toHaveBeenCalledWith(file, 'video/mp4')
+    expect(mediaJobQueue.enqueue).not.toHaveBeenCalled()
   })
 })
 

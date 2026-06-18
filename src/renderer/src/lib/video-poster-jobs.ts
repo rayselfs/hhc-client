@@ -6,9 +6,9 @@ import { getDerivedAsset } from './media-work-db'
 import { resolveMediaCapability } from './media-capabilities'
 import { saveThumbnail } from './thumbnail-db'
 
-function isTranscodeRequiredVideo(mimeType: string, name?: string): boolean {
+function isDesktopVideo(mimeType: string, name?: string): boolean {
   const capability = resolveMediaCapability({ mimeType, fileName: name })
-  return capability?.kind === 'video' && capability.electron === 'transcode-required'
+  return capability?.kind === 'video' && capability.electron !== 'unsupported'
 }
 
 export async function enqueueVideoPosterJob(input: {
@@ -36,7 +36,7 @@ export async function backfillTranscodeVideoThumbnails(): Promise<void> {
   const items = await db.getAll('folder-items')
   await Promise.all(
     items.map(async (item) => {
-      if (item.type !== 'file' || !isTranscodeRequiredVideo(item.mimeType, item.name)) return
+      if (item.type !== 'file' || !isDesktopVideo(item.mimeType, item.name)) return
       const blobId = getBlobId(item)
       const existing = await getDerivedAsset(blobId, 'cover-thumbnail')
       if (existing?.status === 'ready') return

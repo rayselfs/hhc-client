@@ -190,7 +190,8 @@ async function uploadPreparedFiles(destinations: UploadDestination[]): Promise<n
             })
           })
         }
-        if (canGenerateThumbnail(classification.mimeType, file.name)) {
+        const shouldUseBrowserThumbnail = classification.kind !== 'video' || isWeb()
+        if (shouldUseBrowserThumbnail && canGenerateThumbnail(classification.mimeType, file.name)) {
           const dataUrl = await generateThumbnail(file, classification.mimeType)
           if (dataUrl) await saveThumbnail(id, dataUrl)
           window.dispatchEvent(
@@ -216,7 +217,7 @@ async function uploadPreparedFiles(destinations: UploadDestination[]): Promise<n
         }
       }
 
-      if (id && classification.support === 'transcode-required') {
+      if (id && classification.kind === 'video' && !isWeb()) {
         await enqueueVideoPosterJob({
           sourceBlobId: id,
           itemId: id
