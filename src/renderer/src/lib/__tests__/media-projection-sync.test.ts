@@ -38,18 +38,6 @@ function makeFile(id: string, name: string, mimeType = 'image/png', blobId = id)
 
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.stubGlobal('window', {
-    api: {
-      videoTranscode: {
-        startLive: vi.fn().mockResolvedValue({
-          sessionId: 'live-session',
-          url: 'hhc-live-media://stream/live-session',
-          mimeType: 'video/mp4'
-        }),
-        stopLive: vi.fn().mockResolvedValue(undefined)
-      }
-    }
-  })
   useMediaProjectionStore.setState({
     playlist: [makeFile('a', 'a.png'), makeFile('b', 'b.png')],
     currentIndex: 0,
@@ -105,50 +93,6 @@ describe('media projection sync', () => {
     )
   })
 
-  it('starts a live transcode session before projecting an unconverted electron video', async () => {
-    useMediaProjectionStore.setState({
-      playlist: [makeFile('live-item', 'live.mkv', 'video/x-matroska', 'source-blob')],
-      currentIndex: 0,
-      isPresenting: true,
-      snapshot: {
-        id: 'snapshot',
-        createdAt: 1,
-        entries: [
-          {
-            index: 0,
-            itemId: 'live-item',
-            blobId: 'source-blob',
-            name: 'live.mkv',
-            mimeType: 'video/x-matroska',
-            sourceUrl: 'blob:source-blob',
-            playbackMode: 'live-transcode',
-            seekable: false
-          }
-        ]
-      }
-    })
-
-    renderSync()
-
-    await vi.waitFor(() => {
-      expect(window.api.videoTranscode.startLive).toHaveBeenCalledWith({
-        sourceFileId: 'source-blob',
-        profile: { resolution: '1080p', quality: 'high' },
-        sourceMetadata: undefined
-      })
-      expect(mockProject).toHaveBeenCalledWith(
-        'file:show',
-        expect.objectContaining({
-          itemId: 'live-item',
-          blobId: 'source-blob',
-          streamUrl: 'hhc-live-media://stream/live-session',
-          playbackMode: 'live-transcode',
-          seekable: false
-        })
-      )
-    })
-  })
-
   it('projects embedded VLC video without starting live transcode', async () => {
     useMediaProjectionStore.setState({
       playlist: [makeFile('vlc-item', 'vlc.mkv', 'video/x-matroska', 'source-blob')],
@@ -175,7 +119,6 @@ describe('media projection sync', () => {
 
     renderSync()
 
-    expect(window.api.videoTranscode.startLive).not.toHaveBeenCalled()
     expect(mockProject).toHaveBeenCalledWith(
       'file:show',
       expect.objectContaining({
@@ -186,42 +129,5 @@ describe('media projection sync', () => {
         durationMs: 15000
       })
     )
-  })
-
-  it('logs and skips projection when live transcode startup fails', async () => {
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
-    window.api.videoTranscode.startLive = vi.fn().mockRejectedValue(new Error('ffmpeg failed'))
-    useMediaProjectionStore.setState({
-      playlist: [makeFile('live-item', 'live.mkv', 'video/x-matroska', 'source-blob')],
-      currentIndex: 0,
-      isPresenting: true,
-      snapshot: {
-        id: 'snapshot',
-        createdAt: 1,
-        entries: [
-          {
-            index: 0,
-            itemId: 'live-item',
-            blobId: 'source-blob',
-            name: 'live.mkv',
-            mimeType: 'video/x-matroska',
-            sourceUrl: 'blob:source-blob',
-            playbackMode: 'live-transcode',
-            seekable: false
-          }
-        ]
-      }
-    })
-
-    renderSync()
-
-    await vi.waitFor(() => {
-      expect(errorSpy).toHaveBeenCalledWith(
-        '[media-projection] Failed to start live transcode',
-        expect.any(Error)
-      )
-    })
-    expect(mockProject).not.toHaveBeenCalledWith('file:show', expect.anything())
-    errorSpy.mockRestore()
   })
 })

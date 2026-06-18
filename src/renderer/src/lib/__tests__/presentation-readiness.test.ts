@@ -5,10 +5,12 @@ import { openFileExplorerDB, resetFileExplorerDBForTests } from '../file-explore
 import {
   analyzePresentationReadiness,
   createPresentationSnapshot,
-  getPresentationSnapshotResourceIds
+  getPresentationSnapshotResourceIds,
+  TRANSCODE_COMPATIBILITY_VARIANT
 } from '../presentation-readiness'
-import { TRANSCODE_COMPATIBILITY_PROFILE } from '../media-transcode-lifecycle'
 import { putProviderConnection, putSyncEntry, resetSyncDBForTests } from '../sync-db'
+
+const TRANSCODED_VIDEO_MIME_TYPE = 'video/mp4'
 
 function file(id: string, name: string, mimeType: string, url = `blob:${id}`): FileItemRecord {
   return {
@@ -121,9 +123,9 @@ describe('analyzePresentationReadiness', () => {
     await putDerivedAsset({
       sourceBlobId: 'failed-video',
       kind: 'transcoded-video',
-      variant: TRANSCODE_COMPATIBILITY_PROFILE.variant,
+      variant: TRANSCODE_COMPATIBILITY_VARIANT,
       storage: 'native-fs',
-      mimeType: TRANSCODE_COMPATIBILITY_PROFILE.mimeType,
+      mimeType: TRANSCODED_VIDEO_MIME_TYPE,
       status: 'failed'
     })
 
@@ -158,9 +160,9 @@ describe('analyzePresentationReadiness', () => {
     const asset = await putDerivedAsset({
       sourceBlobId: 'source-video',
       kind: 'transcoded-video',
-      variant: TRANSCODE_COMPATIBILITY_PROFILE.variant,
+      variant: TRANSCODE_COMPATIBILITY_VARIANT,
       storage: 'native-fs',
-      mimeType: TRANSCODE_COMPATIBILITY_PROFILE.mimeType,
+      mimeType: TRANSCODED_VIDEO_MIME_TYPE,
       status: 'ready',
       nativeFileId: 'native-output'
     })

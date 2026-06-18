@@ -10,7 +10,6 @@ import i18n from '@renderer/i18n'
 import { mediaJobQueue } from '@renderer/lib/media-job-queue'
 import { recoverPendingSyncResourceCleanups } from '@renderer/lib/sync-unlink'
 import '@renderer/lib/video-poster-jobs'
-import '@renderer/lib/media-transcode-lifecycle'
 
 let earlyInitStarted = false
 let subscriptionsInitialized = false

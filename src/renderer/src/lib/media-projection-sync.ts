@@ -4,7 +4,6 @@ import {
   useMediaProjectionStore,
   type MediaProjectionStore
 } from '@renderer/stores/media-projection'
-import { useSettingsStore } from '@renderer/stores/settings'
 import { getBlobId } from '@renderer/lib/blob-identity'
 import type { ProjectionPayload } from '@shared/projection-messages'
 
@@ -23,15 +22,7 @@ function playlistContentChanged(
 
 export function useMediaProjectionSync(): void {
   const { project, send, blankProjection } = useProjection()
-  const liveSessionIdRef = useRef<string | null>(null)
   const projectSequenceRef = useRef(0)
-
-  const stopLiveSession = useCallback((): Promise<void> | undefined => {
-    const sessionId = liveSessionIdRef.current
-    if (!sessionId) return undefined
-    liveSessionIdRef.current = null
-    return window.api.videoTranscode.stopLive(sessionId).catch(() => undefined)
-  }, [])
 
   const projectCurrentItem = useCallback(
     async (state: MediaProjectionStore): Promise<void> => {
@@ -52,40 +43,11 @@ export function useMediaProjectionSync(): void {
         durationMs: snapshotEntry?.durationMs
       }
 
-      if (snapshotEntry?.playbackMode === 'live-transcode') {
-        let live: Awaited<ReturnType<typeof window.api.videoTranscode.startLive>>
-        try {
-          live = await window.api.videoTranscode.startLive({
-            sourceFileId: blobId,
-            profile: useSettingsStore.getState().videoTranscode,
-            sourceMetadata:
-              snapshotEntry?.durationMs !== undefined
-                ? { durationMs: snapshotEntry.durationMs }
-                : undefined
-          })
-        } catch (error) {
-          console.error('[media-projection] Failed to start live transcode', error)
-          return
-        }
-        if (sequence !== projectSequenceRef.current) {
-          await window.api.videoTranscode.stopLive(live.sessionId).catch(() => undefined)
-          return
-        }
-        await stopLiveSession()
-        liveSessionIdRef.current = live.sessionId
-        payload.streamUrl = live.url
-        payload.mimeType = live.mimeType
-        payload.seekable = false
-      } else {
-        const stopped = stopLiveSession()
-        if (stopped) await stopped
-      }
-
       if (sequence === projectSequenceRef.current) {
         void project('file:show', payload)
       }
     },
-    [project, stopLiveSession]
+    [project]
   )
 
   useEffect(() => {
@@ -103,9 +65,8 @@ export function useMediaProjectionSync(): void {
     })
     return () => {
       unsub()
-      void stopLiveSession()
     }
-  }, [projectCurrentItem, stopLiveSession])
+  }, [projectCurrentItem])
 
   useEffect(() => {
     const unsub = useMediaProjectionStore.subscribe((state, prev) => {
@@ -131,35 +92,22 @@ export function useMediaProjectionSync(): void {
     const unsub = useMediaProjectionStore.subscribe((state, prev) => {
       if (prev.isPresenting && !state.isPresenting) {
         projectSequenceRef.current += 1
-        void stopLiveSession()
         blankProjection(true)
       }
     })
     return unsub
-  }, [blankProjection, stopLiveSession])
+  }, [blankProjection])
 
   useEffect(() => {
     const unsub = useMediaProjectionStore.subscribe((state, prev) => {
       if (!state.isPresenting) return
       if (state.isEnded && !prev.isEnded) {
         projectSequenceRef.current += 1
-        void stopLiveSession()
         send('file:end', null)
       }
     })
     return unsub
-  }, [send, stopLiveSession])
-
-  useEffect(() => {
-    if (!window.addEventListener || !window.removeEventListener) return undefined
-    const handleTranscodeStatusChanged = (event: Event): void => {
-      const status = (event as CustomEvent<{ status?: string }>).detail?.status
-      if (status === 'ready') void useMediaProjectionStore.getState().upgradeReadyTranscodedItems()
-    }
-    window.addEventListener('hhc:transcode-status-changed', handleTranscodeStatusChanged)
-    return () =>
-      window.removeEventListener('hhc:transcode-status-changed', handleTranscodeStatusChanged)
-  }, [])
+  }, [send])
 
   useEffect(() => {
     const state = useMediaProjectionStore.getState()

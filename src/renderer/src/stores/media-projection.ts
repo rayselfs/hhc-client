@@ -7,10 +7,11 @@ import {
   analyzePresentationReadiness,
   createPresentationSnapshot,
   getPresentationSnapshotResourceIds,
+  TRANSCODE_COMPATIBILITY_VARIANT,
   type PresentationReadinessReport,
   type PresentationSnapshot
 } from '@renderer/lib/presentation-readiness'
-import { getReadyTranscodedVideo } from '@renderer/lib/media-transcode-lifecycle'
+import { getDerivedAsset } from '@renderer/lib/media-work-db'
 
 export interface MediaProjectionStore {
   playlist: FileItemRecord[]
@@ -251,8 +252,12 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
         if (index === state.currentIndex || entry.playbackMode === 'transcoded-derivative') {
           return entry
         }
-        const ready = await getReadyTranscodedVideo(entry.blobId)
-        if (!ready?.nativeFileId) return entry
+        const ready = await getDerivedAsset(
+          entry.blobId,
+          'transcoded-video',
+          TRANSCODE_COMPATIBILITY_VARIANT
+        )
+        if (ready?.status !== 'ready' || !ready.nativeFileId) return entry
         changed = true
         return {
           ...entry,

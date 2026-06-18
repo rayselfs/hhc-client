@@ -2,7 +2,6 @@ import type { FileItemRecord } from '@shared/types/folder'
 import { getBlobId } from './blob-identity'
 import { isElectron } from './env'
 import { getDerivedAsset } from './media-work-db'
-import { TRANSCODE_COMPATIBILITY_PROFILE } from './media-transcode-lifecycle'
 import {
   getMediaSupport,
   resolveMediaCapability,
@@ -12,6 +11,8 @@ import {
 import { getSyncEntryByLocalItem } from './sync-db'
 import { getFileBlobRecord } from './file-explorer-db'
 import { ensureSourceMediaMetadata } from './media-metadata'
+
+export const TRANSCODE_COMPATIBILITY_VARIANT = 'mp4-h264-aac-yuv420p-faststart'
 
 export type PresentationReadinessStatus =
   | 'ready'
@@ -202,7 +203,7 @@ async function analyzePresentationItem(
     const derivative = await getDerivedAsset(
       blobId,
       'transcoded-video',
-      TRANSCODE_COMPATIBILITY_PROFILE.variant
+      TRANSCODE_COMPATIBILITY_VARIANT
     )
 
     if (derivative?.status === 'ready' && derivative.nativeFileId) {
