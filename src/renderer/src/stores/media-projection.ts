@@ -7,11 +7,9 @@ import {
   analyzePresentationReadiness,
   createPresentationSnapshot,
   getPresentationSnapshotResourceIds,
-  TRANSCODE_COMPATIBILITY_VARIANT,
   type PresentationReadinessReport,
   type PresentationSnapshot
 } from '@renderer/lib/presentation-readiness'
-import { getDerivedAsset } from '@renderer/lib/media-work-db'
 
 export interface MediaProjectionStore {
   playlist: FileItemRecord[]
@@ -48,7 +46,6 @@ export interface MediaProjectionStore {
     files: FileItemRecord[],
     startIndex: number
   ) => Promise<PresentationReadinessReport>
-  upgradeReadyTranscodedItems: () => Promise<void>
 }
 
 const initialTypeStates: Partial<{ [K in MediaType]: MediaTypeStateMap[K] }> = {
@@ -241,36 +238,5 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
       newPlaylist[idx] = { ...newPlaylist[idx], notes }
       return { playlist: newPlaylist }
     })
-  },
-
-  upgradeReadyTranscodedItems: async () => {
-    const state = get()
-    if (!state.snapshot) return
-    let changed = false
-    const entries = await Promise.all(
-      state.snapshot.entries.map(async (entry, index) => {
-        if (index === state.currentIndex || entry.playbackMode === 'transcoded-derivative') {
-          return entry
-        }
-        const ready = await getDerivedAsset(
-          entry.blobId,
-          'transcoded-video',
-          TRANSCODE_COMPATIBILITY_VARIANT
-        )
-        if (ready?.status !== 'ready' || !ready.nativeFileId) return entry
-        changed = true
-        return {
-          ...entry,
-          derivativeId: ready.id,
-          playbackMode: 'transcoded-derivative' as const,
-          seekable: true
-        }
-      })
-    )
-    if (!changed) return
-    const snapshot = { ...state.snapshot, entries }
-    releaseProjectionLocks?.()
-    releaseProjectionLocks = lockMediaResources(getPresentationSnapshotResourceIds(snapshot))
-    set({ snapshot })
   }
 }))

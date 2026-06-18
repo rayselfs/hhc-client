@@ -70,7 +70,7 @@ describe('media-work-db', () => {
   })
 
   it('deletes every derived asset owned by a final source blob', async () => {
-    for (const kind of ['cover-thumbnail', 'pdf-page-thumbnails', 'transcoded-video'] as const) {
+    for (const kind of ['cover-thumbnail', 'pdf-page-thumbnails', 'video-poster'] as const) {
       await putDerivedAsset({
         sourceBlobId: 'blob-1',
         kind,
@@ -85,6 +85,6 @@ describe('media-work-db', () => {
 
     await expect(getDerivedAsset('blob-1', 'cover-thumbnail')).resolves.toBeUndefined()
     await expect(getDerivedAsset('blob-1', 'pdf-page-thumbnails')).resolves.toBeUndefined()
-    await expect(getDerivedAsset('blob-1', 'transcoded-video')).resolves.toBeUndefined()
+    await expect(getDerivedAsset('blob-1', 'video-poster')).resolves.toBeUndefined()
   })
 })

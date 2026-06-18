@@ -62,7 +62,6 @@ describe('MediaJobQueue', () => {
       'cover-thumbnail': 1,
       'pdf-pages': 1,
       'video-poster': 1,
-      transcode: 1,
       'sync-download': 1
     })
     let active = 0
@@ -111,7 +110,6 @@ describe('MediaJobQueue', () => {
       'cover-thumbnail': 1,
       'pdf-pages': 1,
       'video-poster': 1,
-      transcode: 1,
       'sync-download': 1
     })
     const order: string[] = []
@@ -143,9 +141,9 @@ describe('MediaJobQueue', () => {
       .fn()
       .mockRejectedValueOnce(new MediaJobBlockedError('configuration'))
       .mockResolvedValueOnce(undefined)
-    queue.registerExecutor('transcode', executor)
+    queue.registerExecutor('video-poster', executor)
 
-    const job = await queue.enqueue({ type: 'transcode' })
+    const job = await queue.enqueue({ type: 'video-poster' })
     await expect(waitForJob(job.id, 'blocked')).resolves.toMatchObject({
       blockedReason: 'configuration',
       attempt: 1
@@ -177,14 +175,14 @@ describe('MediaJobQueue', () => {
   it('keeps paused active work resumable after aborting its executor', async () => {
     const queue = new MediaJobQueue()
     queue.registerExecutor(
-      'transcode',
+      'video-poster',
       (_, { signal }) =>
         new Promise<void>((_, reject) => {
           signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true })
         })
     )
 
-    const job = await queue.enqueue({ type: 'transcode' })
+    const job = await queue.enqueue({ type: 'video-poster' })
     await waitForJob(job.id, 'running')
     await queue.pause(job.id)
 

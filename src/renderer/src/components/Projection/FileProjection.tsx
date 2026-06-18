@@ -10,7 +10,7 @@ type FileProjectionProps = {
   initialBlobId?: string
   initialMimeType?: string
   initialStreamUrl?: string
-  initialPlaybackMode?: 'native' | 'transcoded-derivative' | 'vlc-embedded'
+  initialPlaybackMode?: 'native' | 'vlc-embedded'
   initialSeekable?: boolean
   initialDurationMs?: number
   controlEvent?: { id: number; data: FileControlPayload } | null
@@ -18,7 +18,7 @@ type FileProjectionProps = {
 
 type LoadFileOptions = {
   streamUrl?: string
-  playbackMode?: 'native' | 'transcoded-derivative' | 'vlc-embedded'
+  playbackMode?: 'native' | 'vlc-embedded'
   seekable?: boolean
   durationMs?: number
 }

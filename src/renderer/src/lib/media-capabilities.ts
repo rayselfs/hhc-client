@@ -1,6 +1,6 @@
 export type MediaKind = 'image' | 'video' | 'pdf' | 'document'
 export type MediaPlatform = 'web' | 'electron'
-export type MediaSupportMode = 'native' | 'transcode-required' | 'unsupported'
+export type MediaSupportMode = 'native' | 'desktop-engine' | 'unsupported'
 export type ThumbnailStrategy = 'image' | 'video' | 'pdf' | 'none'
 
 export interface MediaCapability {
@@ -161,7 +161,7 @@ const CAPABILITIES: readonly MediaCapability[] = [
     aliases: ['video/avi'],
     thumbnail: 'none',
     web: 'unsupported',
-    electron: 'transcode-required',
+    electron: 'desktop-engine',
     kindLabelKey: 'fileKind.aviVideo',
     kindLabelFallback: 'AVI Video'
   },
@@ -171,7 +171,7 @@ const CAPABILITIES: readonly MediaCapability[] = [
     canonicalMimeType: 'video/x-matroska',
     thumbnail: 'none',
     web: 'unsupported',
-    electron: 'transcode-required',
+    electron: 'desktop-engine',
     kindLabelKey: 'fileKind.mkvVideo',
     kindLabelFallback: 'MKV Video'
   },
@@ -182,7 +182,7 @@ const CAPABILITIES: readonly MediaCapability[] = [
     aliases: ['video/x-ms-asf'],
     thumbnail: 'none',
     web: 'unsupported',
-    electron: 'transcode-required',
+    electron: 'desktop-engine',
     kindLabelKey: 'fileKind.wmvVideo',
     kindLabelFallback: 'WMV Video'
   },

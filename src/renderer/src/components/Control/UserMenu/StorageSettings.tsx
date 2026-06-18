@@ -23,7 +23,6 @@ type StorageUsageLabelKey =
   | 'preferences.storage.usage.sourceMedia'
   | 'preferences.storage.usage.coversAndPreviews'
   | 'preferences.storage.usage.pdfPreviews'
-  | 'preferences.storage.usage.convertedVideos'
   | 'preferences.storage.usage.offlineSyncFiles'
   | 'preferences.storage.usage.temporaryFiles'
 
@@ -52,11 +51,6 @@ const STORAGE_USAGE_GROUPS: StorageUsageGroup[] = [
     key: 'pdfPreviews',
     labelKey: 'preferences.storage.usage.pdfPreviews',
     buckets: ['pdfPageThumbnails']
-  },
-  {
-    key: 'convertedVideos',
-    labelKey: 'preferences.storage.usage.convertedVideos',
-    buckets: ['transcodedDerivatives']
   },
   {
     key: 'offlineSyncFiles',

@@ -8,7 +8,7 @@ export function canHaveThumbnail(mimeType: string | undefined): boolean {
   const capability = resolveMediaCapability({ mimeType })
   return (
     canGenerateMediaThumbnail(capability) ||
-    (isElectron() && capability?.kind === 'video' && capability.electron === 'transcode-required')
+    (isElectron() && capability?.kind === 'video' && capability.electron === 'desktop-engine')
   )
 }
 

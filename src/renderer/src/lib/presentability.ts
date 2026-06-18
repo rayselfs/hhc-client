@@ -27,7 +27,7 @@ function getPresentabilityPlatform(): MediaPlatform {
 }
 
 function canPresentSupport(support: MediaSupportMode): boolean {
-  return support === 'native' || support === 'transcode-required'
+  return support === 'native' || support === 'desktop-engine'
 }
 
 export function isPresentable(mimeType: string, platform = getPresentabilityPlatform()): boolean {

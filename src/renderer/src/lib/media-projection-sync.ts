@@ -59,7 +59,6 @@ export function useMediaProjectionSync(): void {
       const endedCleared = prev.isEnded && !state.isEnded
 
       if (indexChanged || playlistChanged || endedCleared) {
-        if (indexChanged) void useMediaProjectionStore.getState().upgradeReadyTranscodedItems()
         void projectCurrentItem(state)
       }
     })

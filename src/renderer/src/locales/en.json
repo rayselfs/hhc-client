@@ -609,7 +609,6 @@
         "sourceMedia": "Original media files",
         "coversAndPreviews": "Covers and previews",
         "pdfPreviews": "PDF page previews",
-        "convertedVideos": "Converted video files",
         "offlineSyncFiles": "Offline sync files",
         "temporaryFiles": "Temporary and failed job files"
       },
@@ -618,7 +617,7 @@
         "actions": {
           "removeOrphans": {
             "title": "Clear orphan derived assets",
-            "description": "Clears covers, PDF previews, video posters, and converted files that no longer have an original file or reference. Original media files are not deleted.",
+            "description": "Clears covers, PDF previews, and video posters that no longer have an original file or reference. Original media files are not deleted.",
             "button": "Clear"
           },
           "clearRegenerable": {

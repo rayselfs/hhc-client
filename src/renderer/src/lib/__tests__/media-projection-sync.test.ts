@@ -93,7 +93,7 @@ describe('media projection sync', () => {
     )
   })
 
-  it('projects embedded VLC video without starting live transcode', async () => {
+  it('projects embedded VLC video through the desktop engine', async () => {
     useMediaProjectionStore.setState({
       playlist: [makeFile('vlc-item', 'vlc.mkv', 'video/x-matroska', 'source-blob')],
       currentIndex: 0,

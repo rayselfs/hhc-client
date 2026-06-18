@@ -61,7 +61,7 @@ describe('media storage cleanup', () => {
     await expect(db.get('file-blobs', 'kept-source')).resolves.toBeDefined()
   })
 
-  it('clears regenerable thumbnails and posters but preserves transcoded derivatives', async () => {
+  it('clears regenerable thumbnails and posters but preserves metadata assets', async () => {
     const cover = await putDerivedAsset({
       sourceBlobId: 'source',
       kind: 'cover-thumbnail',
@@ -80,24 +80,24 @@ describe('media storage cleanup', () => {
       status: 'ready',
       size: 1
     })
-    const transcoded = await putDerivedAsset({
+    const metadata = await putDerivedAsset({
       sourceBlobId: 'source',
-      kind: 'transcoded-video',
-      variant: 'mp4',
-      storage: 'native-fs',
-      mimeType: 'video/mp4',
+      kind: 'media-metadata',
+      variant: 'default',
+      storage: 'indexed-db',
+      mimeType: 'application/json',
       status: 'ready',
-      size: 10
+      size: 1
     })
 
     const result = await clearRegenerableDerivedAssets()
 
     expect(result.deletedAssetIds).toEqual(expect.arrayContaining([cover.id, pdf.id]))
-    expect(result.deletedAssetIds).not.toContain(transcoded.id)
+    expect(result.deletedAssetIds).not.toContain(metadata.id)
     await expect(getDerivedAsset('source', 'cover-thumbnail')).resolves.toBeUndefined()
     await expect(getDerivedAsset('source', 'pdf-page-thumbnails')).resolves.toBeUndefined()
-    await expect(getDerivedAsset('source', 'transcoded-video', 'mp4')).resolves.toMatchObject({
-      id: transcoded.id
+    await expect(getDerivedAsset('source', 'media-metadata')).resolves.toMatchObject({
+      id: metadata.id
     })
   })
 
@@ -132,7 +132,7 @@ describe('media storage cleanup', () => {
     })
   })
 
-  it('does not evict locked sources or transcoded derivatives for regenerable budgets', async () => {
+  it('does not evict locked sources or metadata assets for regenerable budgets', async () => {
     const release = lockMediaResources(['locked-source'])
     const locked = await putDerivedAsset({
       sourceBlobId: 'locked-source',
@@ -144,12 +144,12 @@ describe('media storage cleanup', () => {
       size: 5,
       updatedAt: 1
     })
-    const transcoded = await putDerivedAsset({
+    const metadata = await putDerivedAsset({
       sourceBlobId: 'source',
-      kind: 'transcoded-video',
-      variant: 'mp4',
-      storage: 'native-fs',
-      mimeType: 'video/mp4',
+      kind: 'media-metadata',
+      variant: 'default',
+      storage: 'indexed-db',
+      mimeType: 'application/json',
       status: 'ready',
       size: 5,
       updatedAt: 2
@@ -161,8 +161,8 @@ describe('media storage cleanup', () => {
     await expect(getDerivedAsset('locked-source', 'cover-thumbnail')).resolves.toMatchObject({
       id: locked.id
     })
-    await expect(getDerivedAsset('source', 'transcoded-video', 'mp4')).resolves.toMatchObject({
-      id: transcoded.id
+    await expect(getDerivedAsset('source', 'media-metadata')).resolves.toMatchObject({
+      id: metadata.id
     })
     release()
   })

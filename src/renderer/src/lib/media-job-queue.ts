@@ -33,7 +33,6 @@ const DEFAULT_CONCURRENCY: Record<MediaJobType, number> = {
   'cover-thumbnail': 3,
   'pdf-pages': 1,
   'video-poster': 1,
-  transcode: 1,
   'sync-download': 2
 }
 

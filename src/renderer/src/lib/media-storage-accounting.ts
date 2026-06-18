@@ -16,7 +16,6 @@ export interface MediaStorageUsage {
   customCoverOverrides: number
   pdfPageThumbnails: number
   videoPosters: number
-  transcodedDerivatives: number
   syncCache: number
   temporaryAndFailedJobFiles: number
 }
@@ -41,7 +40,6 @@ const EMPTY_USAGE: MediaStorageUsage = {
   customCoverOverrides: 0,
   pdfPageThumbnails: 0,
   videoPosters: 0,
-  transcodedDerivatives: 0,
   syncCache: 0,
   temporaryAndFailedJobFiles: 0
 }
@@ -122,8 +120,6 @@ function getDerivedAssetBucket(kind: DerivedAssetKind): keyof MediaStorageUsage 
       return 'videoPosters'
     case 'media-metadata':
       return 'generatedCoverThumbnails'
-    case 'transcoded-video':
-      return 'transcodedDerivatives'
   }
 }
 

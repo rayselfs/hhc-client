@@ -25,7 +25,7 @@ export default function ProjectionPage(): React.JSX.Element {
     fileName: string
     mimeType: string
     streamUrl?: string
-    playbackMode?: 'native' | 'transcoded-derivative' | 'vlc-embedded'
+    playbackMode?: 'native' | 'vlc-embedded'
     seekable?: boolean
     durationMs?: number
   } | null>(null)

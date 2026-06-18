@@ -1,7 +1,6 @@
 import type { FileItemRecord } from '@shared/types/folder'
 import { getBlobId } from './blob-identity'
 import { isElectron } from './env'
-import { getDerivedAsset } from './media-work-db'
 import {
   getMediaSupport,
   resolveMediaCapability,
@@ -11,8 +10,6 @@ import {
 import { getSyncEntryByLocalItem } from './sync-db'
 import { getFileBlobRecord } from './file-explorer-db'
 import { ensureSourceMediaMetadata } from './media-metadata'
-
-export const TRANSCODE_COMPATIBILITY_VARIANT = 'mp4-h264-aac-yuv420p-faststart'
 
 export type PresentationReadinessStatus =
   | 'ready'
@@ -36,7 +33,7 @@ export interface PresentationReadinessItem {
   reason: string
   support: MediaSupportMode | null
   derivativeId?: string
-  playbackMode?: 'native' | 'transcoded-derivative' | 'vlc-embedded'
+  playbackMode?: 'native' | 'vlc-embedded'
   seekable?: boolean
   durationMs?: number
 }
@@ -54,7 +51,7 @@ export interface PresentationSnapshotEntry {
   mimeType: string
   sourceUrl: string
   derivativeId?: string
-  playbackMode?: 'native' | 'transcoded-derivative' | 'vlc-embedded'
+  playbackMode?: 'native' | 'vlc-embedded'
   seekable?: boolean
   durationMs?: number
 }
@@ -186,7 +183,7 @@ async function analyzePresentationItem(
     capability.kind === 'video' ? await ensureSourceMediaMetadata(blobId, item.mimeType) : null
   const durationMs = metadata?.durationMs
 
-  if (support === 'transcode-required') {
+  if (support === 'desktop-engine') {
     if (await canUseVlcEmbedded(platform, blobId)) {
       return {
         itemId: item.id,
@@ -200,44 +197,12 @@ async function analyzePresentationItem(
       }
     }
 
-    const derivative = await getDerivedAsset(
-      blobId,
-      'transcoded-video',
-      TRANSCODE_COMPATIBILITY_VARIANT
-    )
-
-    if (derivative?.status === 'ready' && derivative.nativeFileId) {
-      return {
-        itemId: item.id,
-        blobId,
-        status: 'ready',
-        reason: 'ready-transcoded-derivative',
-        support,
-        derivativeId: derivative.id,
-        playbackMode: 'transcoded-derivative',
-        seekable: true,
-        durationMs
-      }
-    }
-
-    if (derivative?.status === 'failed') {
-      return {
-        itemId: item.id,
-        blobId,
-        status: 'failed',
-        reason: 'transcode-failed',
-        support,
-        derivativeId: derivative.id
-      }
-    }
-
     return {
       itemId: item.id,
       blobId,
-      status: 'preparing',
-      reason: 'transcode-required',
-      support,
-      derivativeId: derivative?.id
+      status: 'failed',
+      reason: 'video-engine-unavailable',
+      support
     }
   }
 

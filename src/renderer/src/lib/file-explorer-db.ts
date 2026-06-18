@@ -2,7 +2,6 @@ import type { DBSchema, IDBPDatabase } from 'idb'
 import { openDB, unwrap } from 'idb'
 import type { AnyItemRecord, FolderRecord } from '@shared/types/folder'
 import { isElectron } from './env'
-import { getDerivedAsset } from './media-work-db'
 
 export interface FileBlobRecord {
   id: string
@@ -31,7 +30,6 @@ export interface FileExplorerDBSchema extends DBSchema {
 
 const DB_NAME = 'hhc-file-explorer'
 const DB_VERSION = 4
-const TRANSCODE_COMPATIBILITY_VARIANT = 'mp4-h264-aac-yuv420p-faststart'
 
 let fileExplorerDBPromise: Promise<IDBPDatabase<FileExplorerDBSchema>> | null = null
 
@@ -126,20 +124,6 @@ export async function getFileSource(
   id: string,
   mimeType: string
 ): Promise<FileSource | null> {
-  if (mimeType.startsWith('video/')) {
-    const transcoded = await getDerivedAsset(
-      id,
-      'transcoded-video',
-      TRANSCODE_COMPATIBILITY_VARIANT
-    )
-    if (transcoded?.storage === 'native-fs' && transcoded.nativeFileId && isElectron()) {
-      return {
-        url: window.api.nativeFs.getUrl(transcoded.nativeFileId, transcoded.mimeType),
-        revoke: () => undefined
-      }
-    }
-  }
-
   const record = await db.get('file-blobs', id)
   if (!record) return null
 

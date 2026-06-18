@@ -1,16 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { FileItemRecord } from '@shared/types/folder'
-import { putDerivedAsset, resetMediaWorkDBForTests } from '../media-work-db'
+import { resetMediaWorkDBForTests } from '../media-work-db'
 import { openFileExplorerDB, resetFileExplorerDBForTests } from '../file-explorer-db'
 import {
   analyzePresentationReadiness,
   createPresentationSnapshot,
-  getPresentationSnapshotResourceIds,
-  TRANSCODE_COMPATIBILITY_VARIANT
+  getPresentationSnapshotResourceIds
 } from '../presentation-readiness'
 import { putProviderConnection, putSyncEntry, resetSyncDBForTests } from '../sync-db'
-
-const TRANSCODED_VIDEO_MIME_TYPE = 'video/mp4'
 
 function file(id: string, name: string, mimeType: string, url = `blob:${id}`): FileItemRecord {
   return {
@@ -61,14 +58,14 @@ describe('analyzePresentationReadiness', () => {
     expect(report.items[0]).toMatchObject({
       status: 'ready',
       reason: 'ready-vlc-embedded',
-      support: 'transcode-required',
+      support: 'desktop-engine',
       playbackMode: 'vlc-embedded',
       seekable: true,
       durationMs: 120000
     })
   })
 
-  it('waits when VLC is unavailable and no legacy derivative is ready', async () => {
+  it('fails when VLC is unavailable for Electron desktop-engine videos', async () => {
     vi.stubGlobal('window', {
       api: {
         projectionVlc: {
@@ -89,15 +86,15 @@ describe('analyzePresentationReadiness', () => {
       'electron'
     )
 
-    expect(report.summary).toMatchObject({ ready: 0, preparing: 1 })
+    expect(report.summary).toMatchObject({ ready: 0, failed: 1 })
     expect(report.items[0]).toMatchObject({
-      status: 'preparing',
-      reason: 'transcode-required',
-      support: 'transcode-required'
+      status: 'failed',
+      reason: 'video-engine-unavailable',
+      support: 'desktop-engine'
     })
   })
 
-  it('does not use live transcode when the source is not in native storage', async () => {
+  it('fails desktop-engine videos when the source is not in native storage', async () => {
     vi.stubGlobal('window', {
       api: {
         projectionVlc: {
@@ -111,29 +108,19 @@ describe('analyzePresentationReadiness', () => {
       'electron'
     )
 
-    expect(report.summary).toMatchObject({ ready: 0, preparing: 1 })
+    expect(report.summary).toMatchObject({ ready: 0, failed: 1 })
     expect(report.items[0]).toMatchObject({
-      status: 'preparing',
-      reason: 'transcode-required'
+      status: 'failed',
+      reason: 'video-engine-unavailable'
     })
   })
 
-  it('summarizes ready, unsupported, missing, preparing, and failed items', async () => {
-    await putDerivedAsset({
-      sourceBlobId: 'failed-video',
-      kind: 'transcoded-video',
-      variant: TRANSCODE_COMPATIBILITY_VARIANT,
-      storage: 'native-fs',
-      mimeType: TRANSCODED_VIDEO_MIME_TYPE,
-      status: 'failed'
-    })
-
+  it('summarizes ready, unsupported, missing, and failed items', async () => {
     const report = await analyzePresentationReadiness(
       [
         file('ready-image', 'ready.png', 'image/png'),
         file('unsupported-video', 'movie.mpeg', 'video/mpeg'),
         file('missing-source', 'missing.png', 'image/png', ''),
-        file('pending-video', 'pending.avi', 'video/x-msvideo'),
         file('failed-video', 'failed.avi', 'video/x-msvideo')
       ],
       'electron'
@@ -141,7 +128,7 @@ describe('analyzePresentationReadiness', () => {
 
     expect(report.summary).toEqual({
       ready: 1,
-      preparing: 1,
+      preparing: 0,
       unsupported: 1,
       missing: 1,
       failed: 1
@@ -150,33 +137,8 @@ describe('analyzePresentationReadiness', () => {
       'ready-native',
       'unsupported-platform',
       'missing-source',
-      'transcode-required',
-      'transcode-failed'
+      'video-engine-unavailable'
     ])
-  })
-
-  it('marks transcode-required video ready when the derivative exists', async () => {
-    const asset = await putDerivedAsset({
-      sourceBlobId: 'source-video',
-      kind: 'transcoded-video',
-      variant: TRANSCODE_COMPATIBILITY_VARIANT,
-      storage: 'native-fs',
-      mimeType: TRANSCODED_VIDEO_MIME_TYPE,
-      status: 'ready',
-      nativeFileId: 'native-output'
-    })
-
-    const report = await analyzePresentationReadiness(
-      [file('source-video', 'source.avi', 'video/x-msvideo')],
-      'electron'
-    )
-
-    expect(report.summary.ready).toBe(1)
-    expect(report.items[0]).toMatchObject({
-      status: 'ready',
-      reason: 'ready-transcoded-derivative',
-      derivativeId: asset.id
-    })
   })
 
   it('marks remote-only sync items as preparing', async () => {
@@ -235,13 +197,12 @@ describe('createPresentationSnapshot', () => {
           itemId: 'copy-id',
           blobId: 'source-blob',
           status: 'ready',
-          reason: 'ready-transcoded-derivative',
-          support: 'transcode-required',
-          derivativeId: 'derived-video'
+          reason: 'ready-vlc-embedded',
+          support: 'desktop-engine'
         }
       ]
     )
 
-    expect(getPresentationSnapshotResourceIds(snapshot)).toEqual(['source-blob', 'derived-video'])
+    expect(getPresentationSnapshotResourceIds(snapshot)).toEqual(['source-blob'])
   })
 })

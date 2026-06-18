@@ -45,12 +45,11 @@ describe('scanMediaStorageIntegrity', () => {
   it('reports derived assets and sync entries whose source Blob is missing', async () => {
     await putDerivedAsset({
       sourceBlobId: 'missing-source',
-      kind: 'transcoded-video',
-      variant: 'mp4',
-      storage: 'native-fs',
-      mimeType: 'video/mp4',
+      kind: 'video-poster',
+      variant: 'default',
+      storage: 'indexed-db',
+      mimeType: 'image/jpeg',
       status: 'ready',
-      nativeFileId: 'native-output',
       size: 10
     })
     await putSyncEntry({

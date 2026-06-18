@@ -148,34 +148,6 @@ describe('file-explorer-db blob refCount', () => {
     expect(createObjectUrlSpy).not.toHaveBeenCalled()
   })
 
-  it('prefers a ready transcoded video derivative for native media playback', async () => {
-    envState.isElectron = true
-    const outputId = '123e4567-e89b-12d3-a456-426614174000'
-    const { resetMediaWorkDBForTests, putDerivedAsset } = await import('../media-work-db')
-    const { getFileSource } = await import('../file-explorer-db')
-    await resetMediaWorkDBForTests()
-    db.records.set('source-file', {
-      id: 'source-file',
-      storage: 'native-fs',
-      size: 5,
-      refCount: 1
-    })
-    await putDerivedAsset({
-      sourceBlobId: 'source-file',
-      kind: 'transcoded-video',
-      variant: 'mp4-h264-aac-yuv420p-faststart',
-      storage: 'native-fs',
-      mimeType: 'video/mp4',
-      status: 'ready',
-      nativeFileId: outputId
-    })
-
-    const source = await getFileSource(db as never, 'source-file', 'video/x-matroska')
-
-    expect(source?.url).toBe(`hhc-media://file/${outputId}?type=video/mp4`)
-    expect(mockGetUrl).toHaveBeenCalledWith(outputId, 'video/mp4')
-  })
-
   it('incrementBlobRef increments refCount to 2', async () => {
     const { incrementBlobRef } = await import('../file-explorer-db')
     const blob = new Blob(['hello'])

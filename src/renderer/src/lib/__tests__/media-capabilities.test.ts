@@ -29,12 +29,12 @@ describe('media capability registry', () => {
     }
   )
 
-  it('keeps transcode-required video formats Electron-only', () => {
+  it('keeps desktop-engine video formats Electron-only', () => {
     const capability = resolveMediaCapability({ mimeType: '', fileName: 'movie.mkv' })
 
     expect(capability?.canonicalMimeType).toBe('video/x-matroska')
     expect(capability && getMediaSupport(capability, 'web')).toBe('unsupported')
-    expect(capability && getMediaSupport(capability, 'electron')).toBe('transcode-required')
+    expect(capability && getMediaSupport(capability, 'electron')).toBe('desktop-engine')
   })
 
   it('prefers recognized MIME over a conflicting extension', () => {
@@ -90,12 +90,12 @@ describe('media capability registry', () => {
     })
   })
 
-  it('classifies transcode-required video for Electron upload', () => {
+  it('classifies desktop-engine video for Electron upload', () => {
     expect(classifyFile({ name: 'movie.mkv', type: '' }, 'electron')).toEqual({
       kind: 'video',
       mimeType: 'video/x-matroska',
       extension: 'mkv',
-      support: 'transcode-required'
+      support: 'desktop-engine'
     })
   })
 
@@ -110,7 +110,7 @@ describe('media capability registry', () => {
     expect(accept).not.toContain('.mpg')
   })
 
-  it('derives the Electron file input filter with transcode candidates', () => {
+  it('derives the Electron file input filter with desktop video engine candidates', () => {
     const accept = getMediaFileAcceptAttribute('electron')
     expect(accept).toContain('image/*')
     expect(accept).toContain('.pdf')

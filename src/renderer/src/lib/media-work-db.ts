@@ -5,7 +5,6 @@ export type MediaJobType =
   | 'cover-thumbnail'
   | 'pdf-pages'
   | 'video-poster'
-  | 'transcode'
   | 'sync-download'
 export type MediaJobStatus =
   | 'queued'
@@ -38,7 +37,6 @@ export type DerivedAssetKind =
   | 'pdf-page-thumbnails'
   | 'video-poster'
   | 'media-metadata'
-  | 'transcoded-video'
 
 export interface DerivedAssetMetadata {
   kind?: 'image' | 'video' | 'pdf'

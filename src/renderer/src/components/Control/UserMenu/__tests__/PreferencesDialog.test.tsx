@@ -30,7 +30,6 @@ vi.mock('@renderer/lib/media-storage-accounting', () => ({
       customCoverOverrides: 0,
       pdfPageThumbnails: 0,
       videoPosters: 0,
-      transcodedDerivatives: 0,
       syncCache: 0,
       temporaryAndFailedJobFiles: 0
     },
@@ -215,7 +214,7 @@ describe('PreferencesDialog', () => {
     expect(screen.getByTestId('category-storage-cleanup')).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('heading', { name: 'Cache Cleanup' })).toBeInTheDocument()
     expect(screen.getByText('Clear orphan derived assets')).toBeInTheDocument()
-    expect(screen.getByText(/covers, PDF previews, video posters/)).toBeInTheDocument()
+    expect(screen.getByText(/covers, PDF previews, and video posters/)).toBeInTheDocument()
   })
 
   it('navigates to bible category and shows Bible settings', async () => {

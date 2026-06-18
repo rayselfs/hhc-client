@@ -55,10 +55,10 @@ describe('getMediaStorageAccounting', () => {
     })
     await putDerivedAsset({
       sourceBlobId: 'web-source',
-      kind: 'transcoded-video',
+      kind: 'video-poster',
       variant: 'default',
-      storage: 'native-fs',
-      mimeType: 'video/mp4',
+      storage: 'indexed-db',
+      mimeType: 'image/jpeg',
       status: 'failed',
       size: 33
     })

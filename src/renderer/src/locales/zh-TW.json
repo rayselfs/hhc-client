@@ -609,7 +609,6 @@
         "sourceMedia": "原始媒體檔案",
         "coversAndPreviews": "封面與預覽圖",
         "pdfPreviews": "PDF 頁面預覽",
-        "convertedVideos": "影片轉換檔",
         "offlineSyncFiles": "同步離線檔案",
         "temporaryFiles": "暫存與失敗工作檔案"
       },
@@ -618,7 +617,7 @@
         "actions": {
           "removeOrphans": {
             "title": "清除孤立衍生資產",
-            "description": "清除已經沒有對應原始檔案或引用關係的封面、PDF 預覽、影片封面與轉換檔。不會刪除原始媒體檔案。",
+            "description": "清除已經沒有對應原始檔案或引用關係的封面、PDF 預覽與影片封面。不會刪除原始媒體檔案。",
             "button": "清除"
           },
           "clearRegenerable": {

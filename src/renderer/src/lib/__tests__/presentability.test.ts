@@ -21,7 +21,7 @@ describe('isPresentable', () => {
     expect(isPresentable(mime)).toBe(expected)
   })
 
-  it('allows Electron transcode-required videos as presentation candidates', () => {
+  it('allows Electron desktop-engine videos as presentation candidates', () => {
     expect(isPresentable('video/x-matroska', 'electron')).toBe(true)
     expect(isPresentable('video/x-matroska', 'web')).toBe(false)
   })
@@ -40,7 +40,7 @@ describe('getMediaType', () => {
     expect(getMediaType(mime)).toBe(expected)
   })
 
-  it('resolves Electron transcode-required videos to video', () => {
+  it('resolves Electron desktop-engine videos to video', () => {
     expect(getMediaType('video/x-matroska', 'electron')).toBe('video')
     expect(getMediaType('video/x-matroska', 'web')).toBeNull()
   })
@@ -87,7 +87,7 @@ describe('getPresentableItems', () => {
     expect(result[1].id).toBe('vid')
   })
 
-  it('includes Electron transcode-required video candidates', () => {
+  it('includes Electron desktop-engine video candidates', () => {
     const items: AnyItemRecord[] = [
       file('mkv', 'video/x-matroska'),
       file('txt', 'text/plain'),
