@@ -40,9 +40,6 @@ describe('analyzePresentationReadiness', () => {
       api: {
         projectionVlc: {
           getInfo: vi.fn().mockResolvedValue({ status: 'ready' })
-        },
-        videoTranscode: {
-          getFfmpegConfig: vi.fn().mockResolvedValue({ status: 'ready' })
         }
       }
     })
