@@ -70,17 +70,21 @@ async function startVlc(wm: WindowManager, request: ProjectionVlcStartRequest): 
     autoAdvancePlaylist: false
   })
 
-  player.on('timeChanged', () => sendState(wm))
-  player.on('lengthChanged', () => sendState(wm))
-  player.on('playing', () => sendState(wm, { isPlaying: true, isEnded: false }))
-  player.on('paused', () => sendState(wm, { isPlaying: false }))
-  player.on('stopped', () => sendState(wm, { isPlaying: false }))
-  player.on('endReached', () => sendState(wm, { isPlaying: false, isEnded: true }))
-  player.on('error', () => sendState(wm, { isPlaying: false }))
-
-  await player.embed()
-  player.setSource(getNativeFilePath(request.sourceFileId), { autoplay: false })
-  sendState(wm, { isPlaying: false, isEnded: false })
+  try {
+    await player.embed()
+    player.on('timeChanged', () => sendState(wm))
+    player.on('lengthChanged', () => sendState(wm))
+    player.on('playing', () => sendState(wm, { isPlaying: true, isEnded: false }))
+    player.on('paused', () => sendState(wm, { isPlaying: false }))
+    player.on('stopped', () => sendState(wm, { isPlaying: false }))
+    player.on('endReached', () => sendState(wm, { isPlaying: false, isEnded: true }))
+    player.on('error', () => sendState(wm, { isPlaying: false }))
+    player.setSource(getNativeFilePath(request.sourceFileId), { autoplay: false })
+    sendState(wm, { isPlaying: false, isEnded: false })
+  } catch (error) {
+    await stopVlc()
+    throw error
+  }
 }
 
 function controlVlc(command: ProjectionVlcControlRequest): void {
