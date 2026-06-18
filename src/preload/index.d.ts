@@ -5,7 +5,7 @@ import type {
   WhisperModel,
   WhisperDownloadProgress,
   WhisperDirInfo,
-  FfmpegConfigInfo,
+  VideoPosterInfo,
   VideoPosterRequest,
   VideoPosterResult,
   ProjectionVlcControlRequest,
@@ -92,9 +92,9 @@ interface NativeFsAPI {
   delete: (id: string) => Promise<void>
 }
 
-interface VideoTranscodeAPI {
-  getFfmpegConfig: () => Promise<FfmpegConfigInfo>
-  generatePoster: (request: VideoPosterRequest) => Promise<VideoPosterResult>
+interface VideoPosterAPI {
+  getInfo: () => Promise<VideoPosterInfo>
+  generate: (request: VideoPosterRequest) => Promise<VideoPosterResult>
 }
 
 interface ProjectionVlcAPI {
@@ -133,7 +133,7 @@ declare global {
       update: UpdateAPI
       speech: SpeechAPI
       nativeFs: NativeFsAPI
-      videoTranscode: VideoTranscodeAPI
+      videoPoster: VideoPosterAPI
       projectionVlc: ProjectionVlcAPI
       localSync: LocalSyncAPI
       oneDrive: OneDriveAPI

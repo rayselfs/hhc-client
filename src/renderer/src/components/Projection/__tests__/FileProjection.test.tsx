@@ -101,7 +101,7 @@ describe('FileProjection copied media identity', () => {
         initialItemId="live-id"
         initialBlobId="source-id"
         initialMimeType="video/x-matroska"
-        initialStreamUrl="hhc-live-media://stream/live-session"
+        initialStreamUrl="hhc-media://native/source-id"
         initialSeekable={false}
       />
     )
@@ -115,7 +115,7 @@ describe('FileProjection copied media identity', () => {
     Object.defineProperty(video, 'duration', { configurable: true, value: 100 })
 
     expect(mockGetFileSource).not.toHaveBeenCalled()
-    expect(video).toHaveAttribute('src', 'hhc-live-media://stream/live-session')
+    expect(video).toHaveAttribute('src', 'hhc-media://native/source-id')
     expect(video).toHaveAttribute('preload', 'none')
 
     rerender(
@@ -124,7 +124,7 @@ describe('FileProjection copied media identity', () => {
         initialItemId="live-id"
         initialBlobId="source-id"
         initialMimeType="video/x-matroska"
-        initialStreamUrl="hhc-live-media://stream/live-session"
+        initialStreamUrl="hhc-media://native/source-id"
         initialSeekable={false}
         controlEvent={{ id: 1, data: { action: 'seek', itemId: 'live-id', value: 35 } }}
       />
@@ -140,7 +140,7 @@ describe('FileProjection copied media identity', () => {
         initialItemId="live-id"
         initialBlobId="source-id"
         initialMimeType="video/x-matroska"
-        initialStreamUrl="hhc-live-media://stream/live-session"
+        initialStreamUrl="hhc-media://native/source-id"
         initialSeekable={false}
       />
     )
@@ -171,7 +171,7 @@ describe('FileProjection copied media identity', () => {
         initialItemId="live-id"
         initialBlobId="source-id"
         initialMimeType="video/x-matroska"
-        initialStreamUrl="hhc-live-media://stream/live-session"
+        initialStreamUrl="hhc-media://native/source-id"
         initialSeekable={false}
       />
     )
@@ -189,7 +189,7 @@ describe('FileProjection copied media identity', () => {
         initialItemId="live-id"
         initialBlobId="source-id"
         initialMimeType="video/x-matroska"
-        initialStreamUrl="hhc-live-media://stream/live-session"
+        initialStreamUrl="hhc-media://native/source-id"
         initialSeekable={false}
         controlEvent={{ id: 1, data: { action: 'play', itemId: 'live-id' } }}
       />

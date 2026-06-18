@@ -7,8 +7,7 @@ import type {
   UpdateStatus,
   WhisperModel,
   WhisperDownloadProgress,
-  WhisperDirInfo,
-  FfmpegConfigInfo
+  WhisperDirInfo
 } from '../shared/ipc-channels'
 import type { ProjectionChannel, ProjectionPayload } from '../shared/projection-messages'
 import type { TimerTickPayload } from '../shared/types/timer'
@@ -105,11 +104,10 @@ const nativeFsApi = {
   delete: (id: string) => typedInvoke('native-fs:delete-file', id)
 }
 
-const videoTranscodeApi = {
-  getFfmpegConfig: (): Promise<FfmpegConfigInfo> =>
-    typedInvoke('video-transcode:get-ffmpeg-config'),
-  generatePoster: (request: IpcInvokeMap['video-transcode:generate-poster']['args'][0]) =>
-    typedInvoke('video-transcode:generate-poster', request)
+const videoPosterApi = {
+  getInfo: () => typedInvoke('video-poster:get-info'),
+  generate: (request: IpcInvokeMap['video-poster:generate']['args'][0]) =>
+    typedInvoke('video-poster:generate', request)
 }
 
 const projectionVlcApi = {
@@ -155,7 +153,7 @@ const api = {
   update: updateApi,
   speech: speechApi,
   nativeFs: nativeFsApi,
-  videoTranscode: videoTranscodeApi,
+  videoPoster: videoPosterApi,
   projectionVlc: projectionVlcApi,
   localSync: localSyncApi,
   oneDrive: oneDriveApi

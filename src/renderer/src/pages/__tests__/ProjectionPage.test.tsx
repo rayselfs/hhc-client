@@ -170,7 +170,7 @@ describe('ProjectionPage', () => {
         mimeType: 'video/mp4',
         playlist: [],
         currentIndex: 0,
-        streamUrl: 'hhc-live-media://stream/live-session',
+        streamUrl: 'hhc-media://native/source-id',
         seekable: false
       })
     })

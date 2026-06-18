@@ -15,11 +15,6 @@ import type {
   TimerTickPayload
 } from './types/timer'
 import type { BibleVersion, BibleBook } from './types/bible'
-import type {
-  H264EncoderName,
-  VideoTranscodeProfile,
-  VideoTranscodeSourceMetadata
-} from './video-transcode-profile'
 
 export type WhisperModel = 'whisper-base' | 'whisper-small' | 'whisper-medium'
 
@@ -35,45 +30,6 @@ export interface WhisperDirInfo {
   hasFiles: boolean
 }
 
-export type FfmpegConfigStatus =
-  | 'not-configured'
-  | 'ready'
-  | 'invalid'
-  | 'missing'
-  | 'unsupported-version'
-
-export interface FfmpegCapabilityInfo {
-  hasH264Encoder: boolean
-  hasAacEncoder: boolean
-  hasMp4Muxer: boolean
-  h264Encoders?: H264EncoderName[]
-}
-
-export interface FfmpegConfigInfo {
-  status: FfmpegConfigStatus
-  source?: 'stored' | 'system'
-  executableName?: string
-  version?: string
-  ffprobeExecutableName?: string
-  ffprobeVersion?: string
-  capabilities?: FfmpegCapabilityInfo
-  message?: string
-  validatedAt?: number
-}
-
-export interface VideoTranscodeRunRequest {
-  jobId: string
-  sourceFileId: string
-  outputFileId: string
-  profile?: VideoTranscodeProfile
-  sourceMetadata?: VideoTranscodeSourceMetadata
-}
-
-export interface VideoTranscodeRunResult {
-  outputFileId: string
-  size: number
-}
-
 export interface VideoPosterRequest {
   sourceFileId: string
 }
@@ -82,23 +38,13 @@ export interface VideoPosterResult {
   dataUrl: string
 }
 
-export interface VideoLiveTranscodeStartRequest {
-  sourceFileId: string
-  profile?: VideoTranscodeProfile
-  sourceMetadata?: VideoTranscodeSourceMetadata
+export interface VideoPosterInfo {
+  status: 'ready' | 'missing' | 'error'
+  source?: 'bundled' | 'system'
+  executableName?: string
+  version?: string
+  message?: string
 }
-
-export interface VideoLiveTranscodeStartResult {
-  sessionId: string
-  url: string
-  mimeType: 'video/mp4'
-}
-
-export interface VideoProbeRequest {
-  sourceFileId: string
-}
-
-export interface VideoProbeResult extends VideoTranscodeSourceMetadata {}
 
 export type ProjectionVlcStatus = 'ready' | 'missing' | 'error'
 
@@ -236,20 +182,8 @@ export interface IpcInvokeMap {
   'app:download-whisper-model': { args: [WhisperModel, string]; result: void }
   'native-fs:import-file': { args: [string, string]; result: { size: number } }
   'native-fs:delete-file': { args: [string]; result: void }
-  'video-transcode:get-ffmpeg-config': { args: []; result: FfmpegConfigInfo }
-  'video-transcode:select-ffmpeg': { args: []; result: FfmpegConfigInfo | null }
-  'video-transcode:select-ffprobe': { args: []; result: FfmpegConfigInfo | null }
-  'video-transcode:validate-ffmpeg': { args: []; result: FfmpegConfigInfo }
-  'video-transcode:remove-ffmpeg-config': { args: []; result: FfmpegConfigInfo }
-  'video-transcode:run': { args: [VideoTranscodeRunRequest]; result: VideoTranscodeRunResult }
-  'video-transcode:cancel': { args: [string]; result: void }
-  'video-transcode:generate-poster': { args: [VideoPosterRequest]; result: VideoPosterResult }
-  'video-transcode:probe': { args: [VideoProbeRequest]; result: VideoProbeResult }
-  'video-transcode:start-live': {
-    args: [VideoLiveTranscodeStartRequest]
-    result: VideoLiveTranscodeStartResult
-  }
-  'video-transcode:stop-live': { args: [string]; result: void }
+  'video-poster:get-info': { args: []; result: VideoPosterInfo }
+  'video-poster:generate': { args: [VideoPosterRequest]; result: VideoPosterResult }
   'projection-vlc:get-info': { args: []; result: ProjectionVlcInfo }
   'projection-vlc:start': { args: [ProjectionVlcStartRequest]; result: void }
   'projection-vlc:probe': { args: [ProjectionVlcProbeRequest]; result: ProjectionVlcProbeResult }

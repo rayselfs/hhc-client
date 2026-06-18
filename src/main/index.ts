@@ -8,7 +8,7 @@ import { registerAppIpc, registerLocalModelProtocol } from './ipc/app'
 import { registerSpeechKeyStorageHandlers } from './ipc/speech-key-storage'
 import { registerNativeFsHandlers, registerNativeMediaProtocol } from './ipc/native-fs'
 import { registerProjectionVlcHandlers } from './ipc/projection-vlc'
-import { registerLiveMediaProtocol, registerVideoTranscodeHandlers } from './ipc/video-transcode'
+import { registerVideoPosterHandlers } from './ipc/video-poster'
 import { registerLocalSyncHandlers } from './ipc/local-sync'
 import { registerOneDriveCredentialHandlers } from './ipc/onedrive-credentials'
 import { registerOneDriveDownloadHandlers } from './ipc/onedrive-download'
@@ -19,16 +19,6 @@ protocol.registerSchemesAsPrivileged([
   { scheme: 'local-model', privileges: { secure: true, supportFetchAPI: true, stream: true } },
   {
     scheme: 'hhc-media',
-    privileges: {
-      standard: true,
-      secure: true,
-      supportFetchAPI: true,
-      stream: true,
-      corsEnabled: true
-    }
-  },
-  {
-    scheme: 'hhc-live-media',
     privileges: {
       standard: true,
       secure: true,
@@ -87,12 +77,11 @@ app.whenReady().then(() => {
   registerSpeechKeyStorageHandlers(wm)
   registerNativeFsHandlers(wm)
   registerProjectionVlcHandlers(wm)
-  registerVideoTranscodeHandlers(wm)
+  registerVideoPosterHandlers(wm)
   registerLocalSyncHandlers(wm)
   registerOneDriveCredentialHandlers(wm)
   registerOneDriveDownloadHandlers(wm)
   registerNativeMediaProtocol()
-  registerLiveMediaProtocol()
   wm.createMainWindow()
   registerUpdateService(wm)
 

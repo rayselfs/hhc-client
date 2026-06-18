@@ -29,8 +29,8 @@ export async function enqueueVideoPosterJob(input: {
 
 export async function backfillTranscodeVideoThumbnails(): Promise<void> {
   if (isWeb()) return
-  const config = await window.api.videoTranscode.getFfmpegConfig()
-  if (config.status !== 'ready') return
+  const info = await window.api.videoPoster.getInfo()
+  if (info.status !== 'ready') return
 
   const db = await openFileExplorerDB()
   const items = await db.getAll('folder-items')
@@ -49,12 +49,12 @@ mediaJobQueue.registerExecutor('video-poster', async (job) => {
   if (!job.sourceBlobId || !job.itemId) throw new Error('Video poster job is missing source')
   if (isWeb()) throw new MediaJobBlockedError('configuration', 'Video posters require Electron')
 
-  const config = await window.api.videoTranscode.getFfmpegConfig()
-  if (config.status !== 'ready') {
-    throw new MediaJobBlockedError('configuration', config.status)
+  const info = await window.api.videoPoster.getInfo()
+  if (info.status !== 'ready') {
+    throw new MediaJobBlockedError('configuration', info.status)
   }
 
-  const result = await window.api.videoTranscode.generatePoster({ sourceFileId: job.sourceBlobId })
+  const result = await window.api.videoPoster.generate({ sourceFileId: job.sourceBlobId })
   await saveThumbnail(job.sourceBlobId, result.dataUrl)
   window.dispatchEvent(
     new CustomEvent('hhc:thumbnail-ready', {
