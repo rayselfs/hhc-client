@@ -4,10 +4,13 @@ import { promises as fs, watch as watchFs, type FSWatcher } from 'fs'
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'path'
 import type {
   LocalSyncConnectionInfo,
+  LocalSyncImportFileRequest,
   LocalSyncRemoteItem,
   LocalSyncWatchStatus
 } from '../../shared/ipc-channels'
+import { isValidNativeFileId } from '../../shared/native-media'
 import type { WindowManager } from '../windowManager'
+import { getNativeFilePath } from './native-fs'
 import { isMainWindow } from './validate'
 
 interface StoredLocalSyncConnection extends LocalSyncConnectionInfo {
@@ -124,6 +127,23 @@ function remoteIdForRelativePath(relativePath: string): string {
   return Buffer.from(relativePath || '.').toString('base64url')
 }
 
+function relativePathForRemoteId(remoteItemId: string): string {
+  let decoded = ''
+  try {
+    decoded = Buffer.from(remoteItemId, 'base64url').toString('utf8')
+  } catch {
+    throw new Error('Invalid local sync remote item id')
+  }
+  if (!decoded || decoded === '.' || isAbsolute(decoded)) {
+    throw new Error('Invalid local sync remote item id')
+  }
+  const parts = decoded.split(/[\\/]/)
+  if (parts.some((part) => !part || part === '.' || part === '..')) {
+    throw new Error('Invalid local sync remote item id')
+  }
+  return decoded
+}
+
 function isRecoverableScanError(error: unknown): boolean {
   const code = (error as NodeJS.ErrnoException).code
   return code === 'EACCES' || code === 'EPERM' || code === 'ENOENT' || code === 'ENOTDIR'
@@ -201,6 +221,27 @@ async function findConnection(connectionId: string): Promise<StoredLocalSyncConn
   const connection = (await readConnections()).find((candidate) => candidate.id === connectionId)
   if (!connection) throw new Error('Local sync connection not found')
   return connection
+}
+
+function resolveConnectedFilePath(rootPath: string, remoteItemId: string): string {
+  const relativePath = relativePathForRemoteId(remoteItemId)
+  const filePath = resolve(rootPath, relativePath)
+  if (!isSameOrNested(filePath, rootPath)) {
+    throw new Error('Local sync file path escapes connected directory')
+  }
+  return filePath
+}
+
+function isLocalSyncImportRequest(value: unknown): value is LocalSyncImportFileRequest {
+  if (typeof value !== 'object' || value === null) return false
+  const request = value as Partial<LocalSyncImportFileRequest>
+  return (
+    typeof request.connectionId === 'string' &&
+    isValidConnectionId(request.connectionId) &&
+    typeof request.remoteItemId === 'string' &&
+    typeof request.targetFileId === 'string' &&
+    isValidNativeFileId(request.targetFileId)
+  )
 }
 
 async function scanDirectory(
@@ -296,6 +337,37 @@ export function registerLocalSyncHandlers(wm: WindowManager): void {
       const items = await scanDirectory(connection.rootPath)
       clearWatchRescanStatus(connectionId)
       return items
+    }
+  )
+
+  ipcMain.handle(
+    'local-sync:import-file',
+    async (event, request: unknown): Promise<{ size: number }> => {
+      if (!isMainWindow(wm, event)) throw new Error('Unauthorized local sync access')
+      if (!isLocalSyncImportRequest(request)) throw new Error('Invalid local sync import request')
+
+      const connection = await findConnection(request.connectionId)
+      await validateConnectedDirectory(connection.rootPath)
+      const sourcePath = resolveConnectedFilePath(connection.rootPath, request.remoteItemId)
+      const sourceStat = await fs.stat(sourcePath)
+      if (!sourceStat.isFile()) throw new Error('Local sync source is not a file')
+
+      const destinationPath = getNativeFilePath(request.targetFileId)
+      const destinationDir = dirname(destinationPath)
+      await fs.mkdir(destinationDir, { recursive: true })
+      const temporaryPath = join(destinationDir, `.${request.targetFileId}.${process.pid}.tmp`)
+      try {
+        await fs.copyFile(sourcePath, temporaryPath)
+        const copiedStat = await fs.stat(temporaryPath)
+        if (!copiedStat.isFile() || copiedStat.size !== sourceStat.size) {
+          throw new Error('Local sync file copy verification failed')
+        }
+        await fs.rename(temporaryPath, destinationPath)
+        return { size: copiedStat.size }
+      } catch (error) {
+        await fs.unlink(temporaryPath).catch(() => undefined)
+        throw error
+      }
     }
   )
 

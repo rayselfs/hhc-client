@@ -14,6 +14,7 @@ import type {
   ProjectionVlcProbeResult,
   ProjectionVlcStartRequest,
   LocalSyncConnectionInfo,
+  LocalSyncImportFileRequest,
   LocalSyncWatchStatus,
   LocalSyncRemoteItem,
   OneDriveCredentialInput,
@@ -109,6 +110,7 @@ interface LocalSyncAPI {
   selectFolder: () => Promise<LocalSyncConnectionInfo | null>
   listFolders: () => Promise<LocalSyncConnectionInfo[]>
   scanFolder: (connectionId: string) => Promise<LocalSyncRemoteItem[]>
+  importFile: (request: LocalSyncImportFileRequest) => Promise<{ size: number }>
   startWatch: (connectionId: string) => Promise<LocalSyncWatchStatus>
   getWatchStatus: (connectionId: string) => Promise<LocalSyncWatchStatus>
   stopWatch: (connectionId: string) => Promise<LocalSyncWatchStatus>

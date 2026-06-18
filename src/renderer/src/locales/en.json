@@ -575,7 +575,8 @@
     "media": {
       "sections": {
         "general": "General",
-        "oneDrive": "OneDrive"
+        "oneDrive": "OneDrive",
+        "localSync": "Sync Folders"
       },
       "oneDrive": {
         "title": "OneDrive",
@@ -593,6 +594,19 @@
           "always-offline": "Always available offline"
         },
         "setupHint": "Changing the Client ID requires reconnecting OneDrive. Tokens are stored separately and never in Preferences."
+      },
+      "localSync": {
+        "title": "Sync Folders",
+        "description": "Sync folders are read-only sources. LibrePresenter uses the same media format policy as manual uploads; unsupported files stay listed but cannot be presented.",
+        "localFolder": "Local Folder",
+        "localFolderDescription": "After choosing a folder, LibrePresenter creates a read-only root folder and copies supported files into app-managed local media storage.",
+        "chooseFolder": "Choose Folder",
+        "connectedFolders": "Connected Folders",
+        "noFolders": "No local sync folders connected.",
+        "desktopOnly": "Local sync folders are available in the desktop app only.",
+        "connected": "Connected {{name}} and imported {{count}} file(s).",
+        "connectFailed": "Failed to connect sync folder.",
+        "unsupportedFiles": "{{count}} unsupported file(s) were kept but disabled."
       }
     },
     "storage": {

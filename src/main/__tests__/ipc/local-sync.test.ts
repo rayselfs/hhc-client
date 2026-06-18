@@ -10,7 +10,9 @@ const {
   mockRealpath,
   mockStat,
   mockReaddir,
-  mockWatch
+  mockWatch,
+  mockCopyFile,
+  mockUnlink
 } = vi.hoisted(() => ({
   handleHandlers: new Map<string, (...args: unknown[]) => unknown>(),
   mockShowOpenDialog: vi.fn(),
@@ -21,7 +23,9 @@ const {
   mockRealpath: vi.fn(),
   mockStat: vi.fn(),
   mockReaddir: vi.fn(),
-  mockWatch: vi.fn()
+  mockWatch: vi.fn(),
+  mockCopyFile: vi.fn(),
+  mockUnlink: vi.fn()
 }))
 
 const mockMainWindow = { id: 1 }
@@ -59,7 +63,9 @@ vi.mock('fs', () => {
     mkdir: mockMkdir,
     realpath: mockRealpath,
     stat: mockStat,
-    readdir: mockReaddir
+    readdir: mockReaddir,
+    copyFile: mockCopyFile,
+    unlink: mockUnlink
   }
   return {
     default: { promises, watch: mockWatch },
@@ -74,6 +80,7 @@ import { registerLocalSyncHandlers } from '../../ipc/local-sync'
 
 const wm = mockWindowManager as unknown as WindowManager
 const CONNECTION_ID = '11111111-1111-4111-8111-111111111111'
+const TARGET_FILE_ID = '123e4567-e89b-12d3-a456-426614174000'
 
 function makeEvent(): Electron.IpcMainInvokeEvent {
   return { sender: {} } as Electron.IpcMainInvokeEvent
@@ -140,6 +147,10 @@ function storedConnectionJson(rootPath = '/Volumes/Media/Sermons'): string {
   ])
 }
 
+function remoteId(relativePath: string): string {
+  return Buffer.from(relativePath).toString('base64url')
+}
+
 function makeWatcher(): {
   watcher: {
     on: ReturnType<typeof vi.fn>
@@ -168,6 +179,8 @@ beforeEach(() => {
   mockMkdir.mockResolvedValue(undefined)
   mockWriteFile.mockResolvedValue(undefined)
   mockRename.mockResolvedValue(undefined)
+  mockCopyFile.mockResolvedValue(undefined)
+  mockUnlink.mockResolvedValue(undefined)
   mockReadFile.mockRejectedValue(Object.assign(new Error('missing'), { code: 'ENOENT' }))
   mockRealpath.mockImplementation(async (value: string) => value)
   mockStat.mockResolvedValue({
@@ -426,5 +439,45 @@ describe('local sync IPC', () => {
       })
     ])
     expect(JSON.stringify(result)).not.toContain('/Volumes/Media/Sermons/archive.mov')
+  })
+
+  it('imports a connected file into native media storage without exposing source paths', async () => {
+    mockReadFile.mockResolvedValue(storedConnectionJson())
+    mockStat.mockImplementation(async (path: string) => {
+      if (path === '/Volumes/Media/Sermons') {
+        return { isDirectory: () => true, isFile: () => false, size: 0, mtimeMs: 1 }
+      }
+      return { isDirectory: () => false, isFile: () => true, size: 4096, mtimeMs: 10 }
+    })
+
+    const result = await getHandler('local-sync:import-file')(makeEvent(), {
+      connectionId: CONNECTION_ID,
+      remoteItemId: remoteId('Sunday/message.mkv'),
+      targetFileId: TARGET_FILE_ID
+    })
+
+    expect(result).toEqual({ size: 4096 })
+    expect(mockCopyFile).toHaveBeenCalledWith(
+      '/Volumes/Media/Sermons/Sunday/message.mkv',
+      expect.stringContaining(`/native-files/.${TARGET_FILE_ID}.`)
+    )
+    expect(mockRename).toHaveBeenCalledWith(
+      expect.stringContaining(`/native-files/.${TARGET_FILE_ID}.`),
+      `/tmp/hhc-user-data/native-files/${TARGET_FILE_ID}`
+    )
+  })
+
+  it('rejects encoded traversal when importing connected files', async () => {
+    mockReadFile.mockResolvedValue(storedConnectionJson())
+
+    await expect(
+      getHandler('local-sync:import-file')(makeEvent(), {
+        connectionId: CONNECTION_ID,
+        remoteItemId: remoteId('../secret.mov'),
+        targetFileId: TARGET_FILE_ID
+      })
+    ).rejects.toThrow('Invalid local sync remote item id')
+
+    expect(mockCopyFile).not.toHaveBeenCalled()
   })
 })

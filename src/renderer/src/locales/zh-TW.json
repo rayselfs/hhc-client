@@ -575,7 +575,8 @@
     "media": {
       "sections": {
         "general": "一般",
-        "oneDrive": "OneDrive"
+        "oneDrive": "OneDrive",
+        "localSync": "同步資料夾"
       },
       "oneDrive": {
         "title": "OneDrive",
@@ -593,6 +594,19 @@
           "always-offline": "永遠離線可用"
         },
         "setupHint": "變更 Client ID 後需要重新連接 OneDrive。Token 會分開儲存，不會進入偏好設定。"
+      },
+      "localSync": {
+        "title": "同步資料夾",
+        "description": "同步資料夾是唯讀來源。LibrePresenter 會使用和手動上傳相同的媒體格式政策；不支援的檔案會保留在清單中，但不能投影。",
+        "localFolder": "本機資料夾",
+        "localFolderDescription": "選擇資料夾後會建立一個唯讀根資料夾，支援格式會複製到 app 的本機媒體儲存空間。",
+        "chooseFolder": "選擇資料夾",
+        "connectedFolders": "已連接資料夾",
+        "noFolders": "尚未連接本機同步資料夾。",
+        "desktopOnly": "本機同步資料夾只支援桌面版。",
+        "connected": "已連接 {{name}}，匯入 {{count}} 個檔案。",
+        "connectFailed": "無法連接同步資料夾。",
+        "unsupportedFiles": "有 {{count}} 個檔案格式不支援，已保留但禁用。"
       }
     },
     "storage": {

@@ -125,6 +125,8 @@ const localSyncApi = {
   selectFolder: () => typedInvoke('local-sync:select-folder'),
   listFolders: () => typedInvoke('local-sync:list-folders'),
   scanFolder: (connectionId: string) => typedInvoke('local-sync:scan-folder', connectionId),
+  importFile: (request: IpcInvokeMap['local-sync:import-file']['args'][0]) =>
+    typedInvoke('local-sync:import-file', request),
   startWatch: (connectionId: string) => typedInvoke('local-sync:start-watch', connectionId),
   getWatchStatus: (connectionId: string) =>
     typedInvoke('local-sync:get-watch-status', connectionId),

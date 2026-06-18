@@ -93,6 +93,12 @@ export interface LocalSyncRemoteItem {
   etag?: string
 }
 
+export interface LocalSyncImportFileRequest {
+  connectionId: string
+  remoteItemId: string
+  targetFileId: string
+}
+
 export type LocalSyncWatchState =
   | 'idle'
   | 'watching'
@@ -192,6 +198,7 @@ export interface IpcInvokeMap {
   'local-sync:select-folder': { args: []; result: LocalSyncConnectionInfo | null }
   'local-sync:list-folders': { args: []; result: LocalSyncConnectionInfo[] }
   'local-sync:scan-folder': { args: [string]; result: LocalSyncRemoteItem[] }
+  'local-sync:import-file': { args: [LocalSyncImportFileRequest]; result: { size: number } }
   'local-sync:start-watch': { args: [string]; result: LocalSyncWatchStatus }
   'local-sync:get-watch-status': { args: [string]; result: LocalSyncWatchStatus }
   'local-sync:stop-watch': { args: [string]; result: LocalSyncWatchStatus }
