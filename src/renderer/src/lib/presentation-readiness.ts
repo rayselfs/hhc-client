@@ -230,20 +230,6 @@ async function analyzePresentationItem(
       }
     }
 
-    if (await canUseLiveTranscode(platform, blobId)) {
-      return {
-        itemId: item.id,
-        blobId,
-        status: 'ready',
-        reason: 'ready-live-transcode',
-        support,
-        derivativeId: derivative?.id,
-        playbackMode: 'live-transcode',
-        seekable: false,
-        durationMs
-      }
-    }
-
     return {
       itemId: item.id,
       blobId,
@@ -273,18 +259,6 @@ async function canUseVlcEmbedded(platform: MediaPlatform, blobId: string): Promi
     if (record?.storage !== 'native-fs') return false
     const info = await window.api.projectionVlc.getInfo()
     return info.status === 'ready'
-  } catch {
-    return false
-  }
-}
-
-async function canUseLiveTranscode(platform: MediaPlatform, blobId: string): Promise<boolean> {
-  if (platform !== 'electron') return false
-  try {
-    const record = await getFileBlobRecord(blobId)
-    if (record?.storage !== 'native-fs') return false
-    const config = await window.api.videoTranscode.getFfmpegConfig()
-    return config.status === 'ready'
   } catch {
     return false
   }

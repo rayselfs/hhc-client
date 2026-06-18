@@ -67,14 +67,11 @@ describe('analyzePresentationReadiness', () => {
     })
   })
 
-  it('uses live transcode as the electron fallback while a derivative is not ready', async () => {
+  it('waits when VLC is unavailable and no legacy derivative is ready', async () => {
     vi.stubGlobal('window', {
       api: {
         projectionVlc: {
           getInfo: vi.fn().mockResolvedValue({ status: 'missing' })
-        },
-        videoTranscode: {
-          getFfmpegConfig: vi.fn().mockResolvedValue({ status: 'ready' })
         }
       }
     })
@@ -91,13 +88,11 @@ describe('analyzePresentationReadiness', () => {
       'electron'
     )
 
-    expect(report.summary).toMatchObject({ ready: 1, preparing: 0 })
+    expect(report.summary).toMatchObject({ ready: 0, preparing: 1 })
     expect(report.items[0]).toMatchObject({
-      status: 'ready',
-      reason: 'ready-live-transcode',
-      support: 'transcode-required',
-      playbackMode: 'live-transcode',
-      seekable: false
+      status: 'preparing',
+      reason: 'transcode-required',
+      support: 'transcode-required'
     })
   })
 
@@ -106,9 +101,6 @@ describe('analyzePresentationReadiness', () => {
       api: {
         projectionVlc: {
           getInfo: vi.fn().mockResolvedValue({ status: 'missing' })
-        },
-        videoTranscode: {
-          getFfmpegConfig: vi.fn().mockResolvedValue({ status: 'ready' })
         }
       }
     })
