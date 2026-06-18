@@ -2,13 +2,30 @@
 
 Date: 2026-06-16
 
+## Current Status
+
+Superseded.
+
+The accepted product strategy is now:
+
+- Desktop playback: bundled VLC/libVLC.
+- Desktop posters: bundled FFmpeg used only for poster generation.
+- No user-selected FFmpeg.
+- No background MP4 transcode jobs.
+- No live transcode presentation path.
+- Web remains browser-native and does not support MKV/AVI/WMV.
+
+The original analysis below is retained as historical context for why Web
+transcoding was rejected and why the first Electron-only FFmpeg route was
+replaced.
+
 ## Decision
 
-Use **Electron-only background transcoding** with a user-selected FFmpeg executable. Web mode should
-keep its current import/playback limits and show a clear unsupported-file message for formats that
-require transcoding.
+Superseded decision: Electron-only background transcoding with a user-selected
+FFmpeg executable.
 
-Do not add `@ffmpeg/ffmpeg`, do not bundle FFmpeg, and do not download FFmpeg from the app.
+Current decision: bundle VLC/libVLC for playback and bundle FFmpeg only for
+poster generation.
 
 ## Why
 
