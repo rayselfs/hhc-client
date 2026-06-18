@@ -1,5 +1,5 @@
 import React, { useRef } from 'react'
-import { AlertTriangle, Folder, LoaderCircle, Star } from 'lucide-react'
+import { Folder, Star } from 'lucide-react'
 import { Skeleton } from '@heroui/react/skeleton'
 import { useTranslation } from 'react-i18next'
 import { useVirtualizer } from '@tanstack/react-virtual'
@@ -21,7 +21,6 @@ export interface GridViewItem {
   isSelected: boolean
   isFavorited?: boolean
   syncStatus?: SyncEntryStatus
-  transcodeStatus?: 'processing' | 'failed'
 }
 
 function renderGridIcon(item: GridViewItem, iconSize: number): React.ReactNode {
@@ -192,15 +191,6 @@ export const GridView = React.memo(function GridView({
                     )}
                     <div className="relative flex items-center justify-center">
                       {renderGridIcon(item, iconSize)}
-                      {item.transcodeStatus && (
-                        <div className="absolute bottom-1 right-1 rounded-full bg-black/70 p-1 text-white shadow">
-                          {item.transcodeStatus === 'processing' ? (
-                            <LoaderCircle size={14} className="animate-spin" />
-                          ) : (
-                            <AlertTriangle size={14} className="text-warning" />
-                          )}
-                        </div>
-                      )}
                     </div>
                     {isRenaming ? (
                       <div
