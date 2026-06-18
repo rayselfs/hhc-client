@@ -1,0 +1,10 @@
+{
+  "component": "VLC / libVLC",
+  "purpose": "desktop video playback engine",
+  "bundled": false,
+  "version": null,
+  "sourceUrl": "https://code.videolan.org/videolan/vlc",
+  "binarySourceUrl": null,
+  "license": "GPL-2.0-or-later / LGPL-2.1-or-later components",
+  "notes": "Fill version and binarySourceUrl when VLC runtime binaries are added."
+}

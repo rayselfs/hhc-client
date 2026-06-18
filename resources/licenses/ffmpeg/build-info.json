@@ -1,0 +1,11 @@
+{
+  "component": "FFmpeg",
+  "purpose": "desktop video poster generation only",
+  "bundled": false,
+  "version": null,
+  "sourceUrl": "https://git.ffmpeg.org/ffmpeg.git",
+  "binarySourceUrl": null,
+  "configure": null,
+  "license": "LGPL-2.1-or-later or GPL-2.0-or-later depending on build configuration",
+  "notes": "Fill version, binarySourceUrl, and configure flags when FFmpeg runtime binaries are added."
+}

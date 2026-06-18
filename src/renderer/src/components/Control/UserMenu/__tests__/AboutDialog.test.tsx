@@ -42,6 +42,8 @@ describe('AboutDialog', () => {
 
     expect(screen.getByText('LibrePresenter')).toBeInTheDocument()
     expect(screen.getByText(/^v/)).toBeInTheDocument()
+    expect(screen.getByText('GPL-3.0-or-later')).toBeInTheDocument()
+    expect(screen.getByText('Open source notices: THIRD_PARTY_NOTICES.md')).toBeInTheDocument()
     expect(screen.getByText('Projection software.')).toBeInTheDocument()
   })
 

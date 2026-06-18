@@ -31,6 +31,9 @@ export default function AboutDialog({ isOpen, onOpenChange }: AboutDialogProps):
                     <h2 className="text-lg font-semibold">LibrePresenter</h2>
                     <span className="text-sm text-muted">v{__APP_VERSION__}</span>
                     <span className="text-xs text-muted">GPL-3.0-or-later</span>
+                    <span className="text-xs text-muted">
+                      Open source notices: THIRD_PARTY_NOTICES.md
+                    </span>
                     <p className="text-sm text-muted mt-1">{t('about.description')}</p>
                   </div>
                 </div>
