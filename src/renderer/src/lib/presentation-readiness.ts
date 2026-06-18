@@ -36,7 +36,7 @@ export interface PresentationReadinessItem {
   reason: string
   support: MediaSupportMode | null
   derivativeId?: string
-  playbackMode?: 'native' | 'transcoded-derivative' | 'live-transcode' | 'vlc-embedded'
+  playbackMode?: 'native' | 'transcoded-derivative' | 'vlc-embedded'
   seekable?: boolean
   durationMs?: number
 }
@@ -54,7 +54,7 @@ export interface PresentationSnapshotEntry {
   mimeType: string
   sourceUrl: string
   derivativeId?: string
-  playbackMode?: 'native' | 'transcoded-derivative' | 'live-transcode' | 'vlc-embedded'
+  playbackMode?: 'native' | 'transcoded-derivative' | 'vlc-embedded'
   seekable?: boolean
   durationMs?: number
 }

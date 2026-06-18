@@ -76,27 +76,15 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
   const zoomLevel = useMediaProjectionStore((s) => s.zoomLevel)
   const pan = useMediaProjectionStore((s) => s.pan)
   const setTypeState = useMediaProjectionStore((s) => s.setTypeState)
-  const projectedVideoState = useMediaProjectionStore((s) => s.typeStates.video)
-  const isLiveTranscode = useMediaProjectionStore(
-    (s) =>
-      s.snapshot?.entries.find((entry) => entry.itemId === item.id)?.playbackMode ===
-      'live-transcode'
-  )
   const metadataDuration = useMediaProjectionStore((s) => {
     const durationMs = s.snapshot?.entries.find((entry) => entry.itemId === item.id)?.durationMs
     return durationMs && durationMs > 0 ? durationMs / 1000 : undefined
   })
-  const displayedCurrentTime = isLiveTranscode
-    ? (projectedVideoState?.currentTime ?? currentTime)
-    : currentTime
-  const displayedDuration = metadataDuration ?? (isLiveTranscode ? (projectedVideoState?.duration ?? duration) : duration)
-  const displayedHasStarted = isLiveTranscode
-    ? hasStarted || Boolean(projectedVideoState?.hasStarted) || displayedCurrentTime > 0
-    : hasStarted
-  const displayedIsPlaying = isLiveTranscode
-    ? (projectedVideoState?.isPlaying ?? isPlaying)
-    : isPlaying
-  const displayedIsEnded = isLiveTranscode ? (projectedVideoState?.isEnded ?? isEnded) : isEnded
+  const displayedCurrentTime = currentTime
+  const displayedDuration = metadataDuration ?? duration
+  const displayedHasStarted = hasStarted
+  const displayedIsPlaying = isPlaying
+  const displayedIsEnded = isEnded
   const transform =
     zoomLevel !== 1
       ? `scale(${zoomLevel}) translate(${(pan.x / zoomLevel) * 100}%, ${(pan.y / zoomLevel) * 100}%)`
@@ -132,11 +120,6 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
     let cancelled = false
 
     async function load(): Promise<void> {
-      if (isLiveTranscode) {
-        setError(false)
-        setVideoSrc(null)
-        return
-      }
       setError(false)
       const db = await openFileExplorerDB()
       const source = await getFileSource(db, blobId, item.mimeType)
@@ -164,7 +147,7 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
       if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current)
       if (seekFlashTimeoutRef.current) clearTimeout(seekFlashTimeoutRef.current)
     }
-  }, [blobId, isLiveTranscode, item.mimeType, retryToken, t])
+  }, [blobId, item.mimeType, retryToken, t])
 
   const triggerFlash = useCallback((icon: 'play' | 'pause'): void => {
     if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current)
@@ -193,18 +176,6 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
   }, [])
 
   const handlePlayPause = useCallback((): void => {
-    if (isLiveTranscode) {
-      if (isPlaying) {
-        triggerFlash('pause')
-        setPlaybackState({ isPlaying: false })
-        sendCommand({ action: 'pause', itemId: item.id })
-      } else {
-        if (hasStartedRef.current) triggerFlash('play')
-        setPlaybackState({ hasStarted: true, isPlaying: true, isEnded: false })
-        sendCommand({ action: 'play', itemId: item.id })
-      }
-      return
-    }
     if (!videoRef.current) return
     if (isEnded) {
       triggerFlash('play')
@@ -230,22 +201,15 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
         .catch(() => setPlaybackState({ isPlaying: false }))
       sendCommand({ action: 'play', itemId: item.id })
     }
-  }, [isEnded, isLiveTranscode, isPlaying, item.id, sendCommand, setPlaybackState, triggerFlash])
+  }, [isEnded, isPlaying, item.id, sendCommand, setPlaybackState, triggerFlash])
 
   const pauseVideo = useCallback((): void => {
-    if (isLiveTranscode) {
-      if (!isPlaying) return
-      triggerFlash('pause')
-      setPlaybackState({ isPlaying: false })
-      sendCommand({ action: 'pause', itemId: item.id })
-      return
-    }
     if (!videoRef.current || !isPlaying) return
     triggerFlash('pause')
     setPlaybackState({ isPlaying: false })
     videoRef.current.pause()
     sendCommand({ action: 'pause', itemId: item.id })
-  }, [isLiveTranscode, isPlaying, item.id, sendCommand, setPlaybackState, triggerFlash])
+  }, [isPlaying, item.id, sendCommand, setPlaybackState, triggerFlash])
 
   useEffect(() => {
     const handleTogglePlay = (): void => {
@@ -285,7 +249,8 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
     const video = videoRef.current
     if (!video) return
     const nextDuration =
-      metadataDuration ?? (Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0)
+      metadataDuration ??
+      (Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0)
     durationRef.current = nextDuration
     setDuration(nextDuration)
     currentTimeRef.current = video.currentTime
@@ -294,7 +259,6 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
 
   const commitSeek = useCallback(
     (seekTo: number): void => {
-      if (isLiveTranscode) return
       const durationValue = durationRef.current
       const max = Number.isFinite(durationValue) && durationValue > 0 ? durationValue : seekTo
       const clamped = Math.max(0, Math.min(seekTo, max))
@@ -307,13 +271,12 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
       if (videoRef.current) videoRef.current.currentTime = clamped
       sendCommand({ action: 'seek', itemId: item.id, value: clamped })
     },
-    [isLiveTranscode, item.id, sendCommand]
+    [item.id, sendCommand]
   )
 
   useEffect(() => {
     const handleRelativeSeek = (event: Event): void => {
       const detail = (event as CustomEvent<{ seconds?: number }>).detail
-      if (isLiveTranscode) return
       const offset = detail?.seconds
       if (typeof offset !== 'number' || !Number.isFinite(offset)) return
       const base =
@@ -326,7 +289,7 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
 
     window.addEventListener('media:videoSeekRelative', handleRelativeSeek)
     return () => window.removeEventListener('media:videoSeekRelative', handleRelativeSeek)
-  }, [commitSeek, isLiveTranscode, triggerSeekFlash])
+  }, [commitSeek, triggerSeekFlash])
 
   const releaseSeekPointer = useCallback((target: HTMLInputElement, pointerId: number): void => {
     if (target.hasPointerCapture?.(pointerId)) {
@@ -379,14 +342,7 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
             }}
           />
         ) : (
-          <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-white/60">
-            {isLiveTranscode && (
-              <>
-                <div className="text-base font-semibold">{t('presenter.liveTranscodeActive')}</div>
-                <div className="text-sm">{t('presenter.liveTranscodeSeekDisabled')}</div>
-              </>
-            )}
-          </div>
+          <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-white/60" />
         )}
       </div>
 
@@ -395,12 +351,10 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
           className="absolute inset-0 flex items-center justify-center z-10 cursor-pointer"
           onClick={() => {
             setPlaybackState({ hasStarted: true, isPlaying: true, isEnded: false })
-            if (!isLiveTranscode) {
-              videoRef.current
-                ?.play()
-                .then(() => setPlaybackState({ hasStarted: true, isPlaying: true, isEnded: false }))
-                .catch(() => setPlaybackState({ isPlaying: false }))
-            }
+            videoRef.current
+              ?.play()
+              .then(() => setPlaybackState({ hasStarted: true, isPlaying: true, isEnded: false }))
+              .catch(() => setPlaybackState({ isPlaying: false }))
             sendCommand({ action: 'play', itemId: item.id })
           }}
           onMouseDown={(e) => e.stopPropagation()}
@@ -462,15 +416,12 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
             min={0}
             max={displayedDuration || 1}
             step={0.1}
-            value={
-              isLiveTranscode ? displayedCurrentTime : isDraggingSeek ? localSeekTime : currentTime
-            }
-            className={`video-seek-range w-full${isLiveTranscode ? ' cursor-not-allowed opacity-70' : ''}`}
-            disabled={isLiveTranscode}
+            value={isDraggingSeek ? localSeekTime : currentTime}
+            className="video-seek-range w-full"
             ref={seekInputRef}
             style={
               {
-                '--seek-fill': `${(((isLiveTranscode ? displayedCurrentTime : isDraggingSeek ? localSeekTime : currentTime) / (displayedDuration || 1)) * 100).toFixed(2)}%`
+                '--seek-fill': `${(((isDraggingSeek ? localSeekTime : currentTime) / (displayedDuration || 1)) * 100).toFixed(2)}%`
               } as React.CSSProperties
             }
             onPointerDown={(e) => {

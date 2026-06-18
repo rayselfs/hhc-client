@@ -784,8 +784,6 @@
     "loading": "載入中...",
     "imageLoadFailed": "無法載入圖片",
     "videoLoadFailed": "無法載入影片",
-    "liveTranscodeActive": "即時轉碼播放中",
-    "liveTranscodeSeekDisabled": "此格式只能順播，無法跳轉",
     "pdfLoadFailed": "無法載入 PDF"
   }
 }

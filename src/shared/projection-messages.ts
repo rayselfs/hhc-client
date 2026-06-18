@@ -52,7 +52,7 @@ export interface AppMessages {
     mimeType: string
     playlist: Array<{ id: string; name: string; mimeType: string }>
     currentIndex: number
-    playbackMode?: 'native' | 'transcoded-derivative' | 'live-transcode' | 'vlc-embedded'
+    playbackMode?: 'native' | 'transcoded-derivative' | 'vlc-embedded'
     streamUrl?: string
     seekable?: boolean
     durationMs?: number
