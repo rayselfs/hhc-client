@@ -221,6 +221,18 @@ describe('addFolder()', () => {
     expect(mockSaveFolder).toHaveBeenCalled()
   })
 
+  it('does not use soft-deleted folders when resolving a new folder name', () => {
+    const firstId = useBibleFolderStore.getState().addFolder('Sunday')
+    useBibleFolderStore.getState().softDeleteFolder(firstId)
+
+    const secondId = useBibleFolderStore.getState().addFolder('Sunday')
+    const activeFolders = useBibleFolderStore.getState().getChildFolders(ROOT_ID)
+
+    expect(activeFolders).toHaveLength(1)
+    expect(activeFolders[0].id).toBe(secondId)
+    expect(activeFolders[0].name).toBe('Sunday')
+  })
+
   it('does not create folders inside read-only sync folders', () => {
     const synced = makeSyncedFolder()
     addFolderRecord(synced)
@@ -565,6 +577,15 @@ describe('read-only sync folder mutations', () => {
     expect(useBibleFolderStore.getState().items[item.id].deletedAt).toBeUndefined()
     expect(mockSaveFolder).not.toHaveBeenCalled()
     expect(mockSaveItem).not.toHaveBeenCalled()
+  })
+
+  it('hides soft-deleted items from active getters', () => {
+    useBibleFolderStore.getState().addItem(makeVerse('v1'))
+    const itemId = useBibleFolderStore.getState().getItems(ROOT_ID)[0].id
+
+    useBibleFolderStore.getState().softDeleteItem(itemId)
+
+    expect(useBibleFolderStore.getState().getItems(ROOT_ID)).toHaveLength(0)
   })
 })
 

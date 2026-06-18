@@ -948,11 +948,11 @@ export function createFolderStore(config: FolderStoreConfig) {
     },
 
     getChildFolders: (parentId) => {
-      return get()._childFoldersByParent[parentId] ?? []
+      return (get()._childFoldersByParent[parentId] ?? []).filter((folder) => !folder.deletedAt)
     },
 
     getItems: (parentId) => {
-      return get()._itemsByParent[parentId] ?? []
+      return (get()._itemsByParent[parentId] ?? []).filter((item) => !item.deletedAt)
     },
 
     getFolderPath: (folderId) => {

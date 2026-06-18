@@ -775,7 +775,10 @@
     },
     "permanentDeleteTitle": "永久删除？",
     "permanentDeleteDescription": "此操作无法撤销。",
-    "emptyTrash": "清空回收站"
+    "emptyTrash": "清空回收站",
+    "restoreNameConflictTitle": "还原前重命名",
+    "restoreNameConflictDescription": "还原位置已经有相同名称的项目。",
+    "restoreNameLabel": "名称"
   },
   "presenter": {
     "noMediaSelected": "未选择媒体",

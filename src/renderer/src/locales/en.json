@@ -775,7 +775,10 @@
     },
     "permanentDeleteTitle": "Delete Permanently?",
     "permanentDeleteDescription": "This action cannot be undone.",
-    "emptyTrash": "Empty Trash"
+    "emptyTrash": "Empty Trash",
+    "restoreNameConflictTitle": "Rename before restoring",
+    "restoreNameConflictDescription": "An item with this name already exists in the restore destination.",
+    "restoreNameLabel": "Name"
   },
   "presenter": {
     "noMediaSelected": "No media selected",

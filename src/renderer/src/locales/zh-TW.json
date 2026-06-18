@@ -775,7 +775,10 @@
     },
     "permanentDeleteTitle": "永久刪除？",
     "permanentDeleteDescription": "此操作無法復原。",
-    "emptyTrash": "清空垃圾桶"
+    "emptyTrash": "清空垃圾桶",
+    "restoreNameConflictTitle": "還原前重新命名",
+    "restoreNameConflictDescription": "還原位置已經有相同名稱的項目。",
+    "restoreNameLabel": "名稱"
   },
   "presenter": {
     "noMediaSelected": "未選擇媒體",

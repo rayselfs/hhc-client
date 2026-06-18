@@ -64,8 +64,9 @@ export default function FilesPage(): React.JSX.Element {
   const itemCount = useFileExplorerStore(
     useCallback(
       (state) =>
-        (state._itemsByParent[currentFolderId]?.length ?? 0) +
-        (state._childFoldersByParent[currentFolderId]?.length ?? 0),
+        (state._itemsByParent[currentFolderId]?.filter((item) => !item.deletedAt).length ?? 0) +
+        (state._childFoldersByParent[currentFolderId]?.filter((folder) => !folder.deletedAt)
+          .length ?? 0),
       [currentFolderId]
     )
   )
