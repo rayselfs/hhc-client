@@ -242,19 +242,32 @@ describe('ElectronProjectionAdapter', () => {
     expect(handler).not.toHaveBeenCalled()
   })
 
-  it('on() returns unsubscribe fn that calls the unsubscriber returned by api.onProjectionMessage', () => {
+  it('on() returns unsubscribe fn that removes only that channel handler', () => {
     const adapter = createProjectionAdapter()
-    const unsubscribe = adapter.on('timer:overtime-message', vi.fn())
+    const handler = vi.fn()
+    const unsubscribe = adapter.on('timer:overtime-message', handler)
 
     unsubscribe()
 
-    expect(mockProjectionUnsubscribe).toHaveBeenCalledOnce()
+    const registeredCallback = mockProjectionApi.onProjectionMessage.mock
+      .calls[0][0] as unknown as (ch: string, d: unknown) => void
+    registeredCallback('timer:overtime-message', 'payload-data')
+
+    expect(handler).not.toHaveBeenCalled()
+    expect(mockProjectionUnsubscribe).not.toHaveBeenCalled()
   })
 
-  it('dispose() calls all stored unsubscribers', () => {
+  it('on() shares one underlying projection:message listener', () => {
+    const adapter = createProjectionAdapter()
+    adapter.on('timer:overtime-message', vi.fn())
+    adapter.on('__system:pong', vi.fn())
+
+    expect(mockProjectionApi.onProjectionMessage).toHaveBeenCalledOnce()
+  })
+
+  it('dispose() calls the shared projection:message unsubscriber', () => {
     const unsub1 = vi.fn()
-    const unsub2 = vi.fn()
-    mockProjectionApi.onProjectionMessage.mockReturnValueOnce(unsub1).mockReturnValueOnce(unsub2)
+    mockProjectionApi.onProjectionMessage.mockReturnValueOnce(unsub1)
 
     const adapter = createProjectionAdapter()
     adapter.on('timer:overtime-message', vi.fn())
@@ -262,7 +275,6 @@ describe('ElectronProjectionAdapter', () => {
     adapter.dispose()
 
     expect(unsub1).toHaveBeenCalledOnce()
-    expect(unsub2).toHaveBeenCalledOnce()
   })
 })
 

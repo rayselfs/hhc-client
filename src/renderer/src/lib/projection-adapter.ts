@@ -14,12 +14,23 @@ interface ProjectionAdapter {
 
 class ElectronProjectionAdapter implements ProjectionAdapter {
   private api: Window['api']['projection']
-  private unsubscribers = new Set<() => void>()
+  private handlers = new Map<
+    ProjectionChannel,
+    Set<(data: ProjectionPayload<ProjectionChannel>) => void>
+  >()
   private role: AdapterRole
+  private unsubscribeProjectionMessage: (() => void) | null = null
 
   constructor(api: Window['api']['projection'], role: AdapterRole) {
     this.api = api
     this.role = role
+  }
+
+  private ensureSubscribed(): void {
+    if (this.unsubscribeProjectionMessage) return
+    this.unsubscribeProjectionMessage = this.api.onProjectionMessage((channel, data) => {
+      this.handlers.get(channel)?.forEach((handler) => handler(data))
+    })
   }
 
   send<C extends ProjectionChannel>(channel: C, data: ProjectionPayload<C>): void {
@@ -34,19 +45,21 @@ class ElectronProjectionAdapter implements ProjectionAdapter {
     channel: C,
     handler: (data: ProjectionPayload<C>) => void
   ): () => void {
-    const unsubscribe = this.api.onProjectionMessage((ch, d) => {
-      if ((ch as string) === channel) handler(d as ProjectionPayload<C>)
-    })
-    this.unsubscribers.add(unsubscribe)
+    this.ensureSubscribed()
+    const handlers = this.handlers.get(channel) ?? new Set()
+    const wrappedHandler = handler as (data: ProjectionPayload<ProjectionChannel>) => void
+    handlers.add(wrappedHandler)
+    this.handlers.set(channel, handlers)
     return () => {
-      unsubscribe()
-      this.unsubscribers.delete(unsubscribe)
+      handlers.delete(wrappedHandler)
+      if (handlers.size === 0) this.handlers.delete(channel)
     }
   }
 
   dispose(): void {
-    this.unsubscribers.forEach((unsub) => unsub())
-    this.unsubscribers.clear()
+    this.unsubscribeProjectionMessage?.()
+    this.unsubscribeProjectionMessage = null
+    this.handlers.clear()
   }
 }
 
