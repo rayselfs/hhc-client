@@ -1,5 +1,5 @@
-appId: tw.org.alive.client
-productName: HHC Client
+appId: org.librepresenter.app
+productName: LibrePresenter
 directories:
   buildResources: build
 files:
@@ -12,7 +12,7 @@ files:
 asarUnpack:
   - resources/**
 win:
-  executableName: hhc-client
+  executableName: libre-presenter
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}
@@ -42,4 +42,4 @@ npmRebuild: false
 publish:
   provider: github
   owner: rayselfs
-  repo: hhc-client
+  repo: libre-presenter

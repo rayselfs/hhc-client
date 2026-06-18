@@ -1,7 +1,8 @@
 {
-  "name": "hhc-client",
+  "name": "libre-presenter",
   "version": "2.1.0",
-  "description": "This software specifically serves the church projection function",
+  "description": "Open-source presentation software for churches and live events",
+  "license": "GPL-3.0-or-later",
   "main": "./out/main/index.js",
   "author": "rayselfs",
   "scripts": {

@@ -69,7 +69,7 @@ export class WindowManager {
         nodeIntegration: false,
         backgroundThrottling: false
       },
-      title: 'Console'
+      title: 'LibrePresenter'
     })
 
     optimizer.watchWindowShortcuts(this.mainWindow)

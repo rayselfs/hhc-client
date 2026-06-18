@@ -8,7 +8,7 @@
     "trash": "TRASH"
   },
   "welcome": {
-    "title": "Welcome to HHC",
+    "title": "Welcome to LibrePresenter",
     "subtitle": "Let's set up your preferences",
     "language": "Language",
     "timezone": "Timezone",
@@ -571,10 +571,10 @@
       },
       "oneDrive": {
         "title": "OneDrive",
-        "description": "OneDrive folders are read-only sources. HHC Client never uploads, renames, moves, or deletes remote files.",
+        "description": "OneDrive folders are read-only sources. LibrePresenter never uploads, renames, moves, or deletes remote files.",
         "customClientId": "Custom Azure Client ID",
         "clientId": "Azure Application Client ID",
-        "clientIdSourceDefault": "Using HHC default",
+        "clientIdSourceDefault": "Using LibrePresenter default",
         "clientIdSourceCustom": "Using custom Client ID",
         "invalidClientId": "Enter a valid Azure Application Client ID.",
         "restoreDefaultClientId": "Restore default Client ID",

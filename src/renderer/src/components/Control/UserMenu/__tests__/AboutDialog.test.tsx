@@ -36,11 +36,11 @@ describe('AboutDialog', () => {
   it('renders app icon, name, version, and description when open', () => {
     render(<AboutDialog isOpen={true} onOpenChange={() => {}} />, { wrapper: Wrapper })
 
-    const img = screen.getByAltText('HHC Client')
+    const img = screen.getByAltText('LibrePresenter')
     expect(img).toBeInTheDocument()
     expect(img.tagName).toBe('IMG')
 
-    expect(screen.getByText('HHC Client')).toBeInTheDocument()
+    expect(screen.getByText('LibrePresenter')).toBeInTheDocument()
     expect(screen.getByText(/^v/)).toBeInTheDocument()
     expect(screen.getByText('Projection software.')).toBeInTheDocument()
   })
@@ -56,7 +56,7 @@ describe('AboutDialog', () => {
   it('displays icon to the left of text content', () => {
     render(<AboutDialog isOpen={true} onOpenChange={() => {}} />, { wrapper: Wrapper })
 
-    const img = screen.getByAltText('HHC Client')
+    const img = screen.getByAltText('LibrePresenter')
     const container = img.parentElement!
     expect(container.classList.contains('flex')).toBe(true)
     expect(container.classList.contains('flex-col')).toBe(false)

@@ -8,7 +8,7 @@
     "trash": "回收站"
   },
   "welcome": {
-    "title": "欢迎使用 HHC",
+    "title": "欢迎使用 LibrePresenter",
     "subtitle": "让我们设置您的偏好",
     "language": "语言",
     "timezone": "时区",
@@ -571,10 +571,10 @@
       },
       "oneDrive": {
         "title": "OneDrive",
-        "description": "OneDrive 文件夹是只读来源。HHC Client 不会上传、重命名、移动或删除远程文件。",
+        "description": "OneDrive 文件夹是只读来源。LibrePresenter 不会上传、重命名、移动或删除远程文件。",
         "customClientId": "自定义 Azure Client ID",
         "clientId": "Azure Application Client ID",
-        "clientIdSourceDefault": "使用 HHC 默认值",
+        "clientIdSourceDefault": "使用 LibrePresenter 默认值",
         "clientIdSourceCustom": "使用自定义 Client ID",
         "invalidClientId": "请输入有效的 Azure Application Client ID。",
         "restoreDefaultClientId": "恢复默认 Client ID",

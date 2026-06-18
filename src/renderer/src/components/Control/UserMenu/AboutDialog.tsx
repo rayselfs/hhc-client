@@ -22,10 +22,15 @@ export default function AboutDialog({ isOpen, onOpenChange }: AboutDialogProps):
             <Modal.Body className="p-0">
               <ShortcutScope name="overlay">
                 <div className="flex items-center gap-5 py-8 px-6">
-                  <img src={appIcon} alt="HHC Client" className="size-16 shrink-0 rounded-2xl" />
+                  <img
+                    src={appIcon}
+                    alt="LibrePresenter"
+                    className="size-16 shrink-0 rounded-2xl"
+                  />
                   <div className="flex flex-col gap-1">
-                    <h2 className="text-lg font-semibold">HHC Client</h2>
+                    <h2 className="text-lg font-semibold">LibrePresenter</h2>
                     <span className="text-sm text-muted">v{__APP_VERSION__}</span>
+                    <span className="text-xs text-muted">GPL-3.0-or-later</span>
                     <p className="text-sm text-muted mt-1">{t('about.description')}</p>
                   </div>
                 </div>

@@ -55,9 +55,9 @@ export default defineConfig({
         registerType: 'autoUpdate',
         injectRegister: 'auto',
         manifest: {
-          name: 'HHC Client',
-          short_name: 'HHC',
-          description: 'Church projection client',
+          name: 'LibrePresenter',
+          short_name: 'LibrePresenter',
+          description: 'Open-source presentation software for churches and live events',
           theme_color: '#000000',
           background_color: '#000000',
           display: 'standalone',
