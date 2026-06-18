@@ -43,12 +43,19 @@ describe('AboutDialog', () => {
     expect(screen.getByText('LibrePresenter')).toBeInTheDocument()
     expect(screen.getByText(/^v/)).toBeInTheDocument()
     expect(screen.getByText('GPL-3.0-or-later')).toBeInTheDocument()
-    expect(screen.getByText(/bundled THIRD_PARTY_NOTICES\.md/)).toBeInTheDocument()
+    expect(
+      screen.getByText('Open-source presentation software for churches and live events.')
+    ).toBeInTheDocument()
+    expect(screen.getByText('Version')).toBeInTheDocument()
+    expect(screen.getByText('License')).toBeInTheDocument()
+    expect(screen.getByText('Open source notices')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'View online' })).toHaveAttribute(
       'href',
       'https://github.com/rayselfs/libre-presenter/blob/main/THIRD_PARTY_NOTICES.md'
     )
-    expect(screen.getByText('Projection software.')).toBeInTheDocument()
+    expect(
+      screen.getByText(/License notices are included with packaged builds/)
+    ).toBeInTheDocument()
   })
 
   it('does not render when isOpen=false', () => {
@@ -59,12 +66,12 @@ describe('AboutDialog', () => {
     expect(container.querySelector('[role="dialog"]')).not.toBeInTheDocument()
   })
 
-  it('displays icon to the left of text content', () => {
+  it('displays icon in the brand header', () => {
     render(<AboutDialog isOpen={true} onOpenChange={() => {}} />, { wrapper: Wrapper })
 
     const img = screen.getByAltText('LibrePresenter')
     const container = img.parentElement!
     expect(container.classList.contains('flex')).toBe(true)
-    expect(container.classList.contains('flex-col')).toBe(false)
+    expect(container.classList.contains('items-start')).toBe(true)
   })
 })

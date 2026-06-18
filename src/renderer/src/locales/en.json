@@ -517,7 +517,13 @@
   },
   "about": {
     "title": "About",
-    "description": "Projection software."
+    "description": "Projection software.",
+    "tagline": "Open-source presentation software for churches and live events.",
+    "version": "Version",
+    "license": "License",
+    "openSourceNotices": "Open source notices",
+    "viewOnline": "View online",
+    "noticesDescription": "LibrePresenter includes bundled open-source components. License notices are included with packaged builds and are also available online."
   },
   "preferences": {
     "title": "Preferences",

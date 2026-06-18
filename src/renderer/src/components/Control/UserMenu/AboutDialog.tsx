@@ -21,29 +21,46 @@ export default function AboutDialog({ isOpen, onOpenChange }: AboutDialogProps):
           <Modal.Dialog className="overflow-hidden p-0">
             <Modal.Body className="p-0">
               <ShortcutScope name="overlay">
-                <div className="flex items-center gap-5 py-8 px-6">
-                  <img
-                    src={appIcon}
-                    alt="LibrePresenter"
-                    className="size-16 shrink-0 rounded-2xl"
-                  />
-                  <div className="flex flex-col gap-1">
-                    <h2 className="text-lg font-semibold">LibrePresenter</h2>
-                    <span className="text-sm text-muted">v{__APP_VERSION__}</span>
-                    <span className="text-xs text-muted">GPL-3.0-or-later</span>
-                    <span className="text-xs text-muted">
-                      Open source notices: bundled THIRD_PARTY_NOTICES.md ·{' '}
-                      <a
-                        className="text-primary hover:underline"
-                        href="https://github.com/rayselfs/libre-presenter/blob/main/THIRD_PARTY_NOTICES.md"
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        View online
-                      </a>
-                    </span>
-                    <p className="text-sm text-muted mt-1">{t('about.description')}</p>
+                <div className="px-6 py-6">
+                  <div className="flex items-start gap-4 border-b border-divider pb-5">
+                    <img
+                      src={appIcon}
+                      alt="LibrePresenter"
+                      className="size-16 shrink-0 rounded-2xl"
+                    />
+                    <div className="min-w-0">
+                      <h2 className="text-xl font-semibold leading-tight">LibrePresenter</h2>
+                      <p className="mt-1 text-sm text-muted">{t('about.tagline')}</p>
+                    </div>
                   </div>
+
+                  <dl className="space-y-3 py-5 text-sm">
+                    <div className="flex items-center justify-between gap-4">
+                      <dt className="text-muted">{t('about.version')}</dt>
+                      <dd className="font-medium">v{__APP_VERSION__}</dd>
+                    </div>
+                    <div className="flex items-center justify-between gap-4">
+                      <dt className="text-muted">{t('about.license')}</dt>
+                      <dd className="font-medium">GPL-3.0-or-later</dd>
+                    </div>
+                    <div className="flex items-center justify-between gap-4">
+                      <dt className="text-muted">{t('about.openSourceNotices')}</dt>
+                      <dd>
+                        <a
+                          className="font-medium text-primary hover:underline"
+                          href="https://github.com/rayselfs/libre-presenter/blob/main/THIRD_PARTY_NOTICES.md"
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {t('about.viewOnline')}
+                        </a>
+                      </dd>
+                    </div>
+                  </dl>
+
+                  <p className="rounded-2xl bg-content2/60 px-4 py-3 text-xs leading-relaxed text-muted">
+                    {t('about.noticesDescription')}
+                  </p>
                 </div>
               </ShortcutScope>
             </Modal.Body>
