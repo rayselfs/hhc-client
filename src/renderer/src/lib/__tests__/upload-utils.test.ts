@@ -36,17 +36,12 @@ vi.mock('@renderer/lib/media-job-queue', () => ({
   }
 }))
 
-vi.mock('@renderer/lib/media-transcode-lifecycle', () => ({
-  enqueueTranscodeJob: vi.fn().mockResolvedValue({ id: 'transcode-job-id' })
-}))
-
 import { toast } from '@heroui/react/toast'
 import { addFileItemToStore } from '@renderer/stores/file-explorer'
 import { generateThumbnail } from '@renderer/lib/thumbnail-generator'
 import { isWeb } from '@renderer/lib/env'
 import { mediaJobQueue } from '@renderer/lib/media-job-queue'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
-import { enqueueTranscodeJob } from '@renderer/lib/media-transcode-lifecycle'
 
 function makeFile(name: string, size: number, type = 'image/png'): File {
   const file = new File([], name, { type })
@@ -167,7 +162,7 @@ describe('uploadFiles web preflight', () => {
     await expect(uploadFiles([file], 'parent-1')).resolves.toBe(0)
 
     expect(addFileItemToStore).not.toHaveBeenCalled()
-    expect(enqueueTranscodeJob).not.toHaveBeenCalled()
+    expect(mediaJobQueue.enqueue).not.toHaveBeenCalled()
   })
 })
 
@@ -210,15 +205,17 @@ describe('uploadFiles classification', () => {
     })
   })
 
-  it('accepts Electron transcode candidates and enqueues one transcode job', async () => {
+  it('accepts Electron desktop-video candidates and enqueues one poster job', async () => {
     const file = makeFile('message.MKV', 100, '')
 
     await expect(uploadFiles([file], 'parent-1')).resolves.toBe(1)
 
     expect(addFileItemToStore).toHaveBeenCalledWith(file, 'parent-1', 'video/x-matroska')
-    expect(enqueueTranscodeJob).toHaveBeenCalledWith({
+    expect(mediaJobQueue.enqueue).toHaveBeenCalledWith({
+      type: 'video-poster',
       sourceBlobId: 'mock-id',
-      itemId: 'mock-id'
+      itemId: 'mock-id',
+      dedupeKey: 'video-poster:mock-id'
     })
   })
 })

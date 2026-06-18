@@ -13,7 +13,6 @@ import {
 import { mediaJobQueue } from '@renderer/lib/media-job-queue'
 import { getFileBlob, getFileSource, openFileExplorerDB } from '@renderer/lib/file-explorer-db'
 import { resolveUniqueName } from '@renderer/lib/file-naming'
-import { enqueueTranscodeJob } from '@renderer/lib/media-transcode-lifecycle'
 import { ensureSourceMediaMetadata } from '@renderer/lib/media-metadata'
 import { enqueueVideoPosterJob } from '@renderer/lib/video-poster-jobs'
 import { MAX_FILE_SIZE_WEB } from '@renderer/lib/media-limits'
@@ -219,10 +218,6 @@ async function uploadPreparedFiles(destinations: UploadDestination[]): Promise<n
 
       if (id && classification.support === 'transcode-required') {
         await enqueueVideoPosterJob({
-          sourceBlobId: id,
-          itemId: id
-        })
-        await enqueueTranscodeJob({
           sourceBlobId: id,
           itemId: id
         })
