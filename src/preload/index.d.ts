@@ -8,10 +8,10 @@ import type {
   FfmpegConfigInfo,
   VideoPosterRequest,
   VideoPosterResult,
-  VideoProbeRequest,
-  VideoProbeResult,
   ProjectionVlcControlRequest,
   ProjectionVlcInfo,
+  ProjectionVlcProbeRequest,
+  ProjectionVlcProbeResult,
   ProjectionVlcStartRequest,
   LocalSyncConnectionInfo,
   LocalSyncWatchStatus,
@@ -95,12 +95,12 @@ interface NativeFsAPI {
 interface VideoTranscodeAPI {
   getFfmpegConfig: () => Promise<FfmpegConfigInfo>
   generatePoster: (request: VideoPosterRequest) => Promise<VideoPosterResult>
-  probe: (request: VideoProbeRequest) => Promise<VideoProbeResult>
 }
 
 interface ProjectionVlcAPI {
   getInfo: () => Promise<ProjectionVlcInfo>
   start: (request: ProjectionVlcStartRequest) => Promise<void>
+  probe: (request: ProjectionVlcProbeRequest) => Promise<ProjectionVlcProbeResult>
   control: (command: ProjectionVlcControlRequest) => Promise<void>
   stop: () => Promise<void>
 }

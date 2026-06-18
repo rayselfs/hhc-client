@@ -109,15 +109,15 @@ const videoTranscodeApi = {
   getFfmpegConfig: (): Promise<FfmpegConfigInfo> =>
     typedInvoke('video-transcode:get-ffmpeg-config'),
   generatePoster: (request: IpcInvokeMap['video-transcode:generate-poster']['args'][0]) =>
-    typedInvoke('video-transcode:generate-poster', request),
-  probe: (request: IpcInvokeMap['video-transcode:probe']['args'][0]) =>
-    typedInvoke('video-transcode:probe', request)
+    typedInvoke('video-transcode:generate-poster', request)
 }
 
 const projectionVlcApi = {
   getInfo: () => typedInvoke('projection-vlc:get-info'),
   start: (request: IpcInvokeMap['projection-vlc:start']['args'][0]) =>
     typedInvoke('projection-vlc:start', request),
+  probe: (request: IpcInvokeMap['projection-vlc:probe']['args'][0]) =>
+    typedInvoke('projection-vlc:probe', request),
   control: (command: IpcInvokeMap['projection-vlc:control']['args'][0]) =>
     typedInvoke('projection-vlc:control', command),
   stop: () => typedInvoke('projection-vlc:stop')

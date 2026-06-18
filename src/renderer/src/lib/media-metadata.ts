@@ -91,9 +91,9 @@ async function probeNativeVideo(blobId: string): Promise<DerivedAssetMetadata | 
   if (!isElectron()) return null
   const record = await getFileBlobRecord(blobId)
   if (record?.storage !== 'native-fs') return null
-  if (!window.api?.videoTranscode?.probe) return null
+  if (!window.api?.projectionVlc?.probe) return null
   try {
-    const result = await window.api.videoTranscode.probe({ sourceFileId: blobId })
+    const result = await window.api.projectionVlc.probe({ sourceFileId: blobId })
     return { kind: 'video', ...result }
   } catch (error) {
     console.warn('[media-metadata] Video probe failed', { blobId, error })

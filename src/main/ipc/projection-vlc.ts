@@ -1,8 +1,10 @@
 import { BrowserWindow, ipcMain } from 'electron'
-import { VlcPlayer, probeDefaultVlcDir } from 'electron-vlc-player'
+import { VlcPlayer, initLibVlc, probeDefaultVlcDir, probeMedia } from 'electron-vlc-player'
 import type {
   ProjectionVlcControlRequest,
   ProjectionVlcInfo,
+  ProjectionVlcProbeRequest,
+  ProjectionVlcProbeResult,
   ProjectionVlcStartRequest
 } from '@shared/ipc-channels'
 import type { WindowManager } from '../windowManager'
@@ -20,6 +22,20 @@ function getVlcInfo(): ProjectionVlcInfo {
     return { status: 'missing', message: 'VLC runtime not found' }
   }
   return { status: 'ready', vlcDir }
+}
+
+function probeVlcMedia(request: ProjectionVlcProbeRequest): ProjectionVlcProbeResult {
+  if (!isValidNativeFileId(request.sourceFileId)) throw new Error('Invalid VLC source id')
+  const info = getVlcInfo()
+  if (info.status !== 'ready' || !info.vlcDir) {
+    throw new Error(info.message ?? 'VLC runtime not found')
+  }
+
+  initLibVlc(info.vlcDir)
+  const result = probeMedia(getNativeFilePath(request.sourceFileId), 5000)
+  return {
+    durationMs: result.parsed && result.length > 0 ? result.length : undefined
+  }
 }
 
 function sendState(wm: WindowManager, next?: { isPlaying?: boolean; isEnded?: boolean }): void {
@@ -124,6 +140,11 @@ export function registerProjectionVlcHandlers(wm: WindowManager): void {
   ipcMain.handle('projection-vlc:start', async (event, request: ProjectionVlcStartRequest) => {
     if (!isProjectionOrMainWindow(wm, event)) throw new Error('Unauthorized VLC access')
     await startVlc(wm, request)
+  })
+
+  ipcMain.handle('projection-vlc:probe', (event, request: ProjectionVlcProbeRequest) => {
+    if (!isKnownWindow(wm, event)) throw new Error('Unauthorized VLC access')
+    return probeVlcMedia(request)
   })
 
   ipcMain.handle('projection-vlc:control', (event, command: ProjectionVlcControlRequest) => {

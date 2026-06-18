@@ -39,7 +39,8 @@ describe('analyzePresentationReadiness', () => {
     vi.stubGlobal('window', {
       api: {
         projectionVlc: {
-          getInfo: vi.fn().mockResolvedValue({ status: 'ready' })
+          getInfo: vi.fn().mockResolvedValue({ status: 'ready' }),
+          probe: vi.fn().mockResolvedValue({ durationMs: 120000 })
         }
       }
     })
@@ -62,7 +63,8 @@ describe('analyzePresentationReadiness', () => {
       reason: 'ready-vlc-embedded',
       support: 'transcode-required',
       playbackMode: 'vlc-embedded',
-      seekable: true
+      seekable: true,
+      durationMs: 120000
     })
   })
 
