@@ -16,6 +16,9 @@ const mockWindowManager = {
   getProjectionWindow: vi.fn(() => mockProjectionWindow),
   sendToMain: vi.fn()
 }
+const mockSetPlayerWindowVisible = vi.fn()
+const mockVlcPlayers: Array<{ destroy: ReturnType<typeof vi.fn>; playerId: number }> = []
+let mockEmbedImplementation: () => Promise<void> = () => Promise.resolve()
 
 const VLC_WINDOW_EVENTS = [
   'enter-full-screen',
@@ -49,19 +52,24 @@ vi.mock('electron', () => {
 })
 
 vi.mock('electron-vlc-player', () => ({
+  getBinding: vi.fn(() => ({
+    setPlayerWindowVisible: mockSetPlayerWindowVisible
+  })),
   initLibVlc: vi.fn(),
   probeMedia: vi.fn(() => ({ parsed: true, length: 1000 })),
   VlcPlayer: class MockVlcPlayer extends EventEmitter {
     window: typeof mockProjectionWindow
+    playerId = 7
 
     constructor(options: { window: typeof mockProjectionWindow }) {
       super()
       this.window = options.window
+      mockVlcPlayers.push(this)
       for (const event of VLC_WINDOW_EVENTS) this.window.on(event, () => {})
       for (const event of VLC_WEB_CONTENTS_EVENTS) this.window.webContents.on(event, () => {})
     }
 
-    embed = vi.fn().mockResolvedValue(undefined)
+    embed = vi.fn(() => mockEmbedImplementation())
     isEmbedded = vi.fn(() => true)
     setSource = vi.fn()
     destroy = vi.fn()
@@ -106,6 +114,8 @@ beforeEach(() => {
   ;(ipcMain as ExtendedIpcMain)._clearHandlers()
   mockProjectionWindow.removeAllListeners()
   mockProjectionWindow.webContents.removeAllListeners()
+  mockVlcPlayers.length = 0
+  mockEmbedImplementation = () => Promise.resolve()
   registerProjectionVlcHandlers(mockWindowManager as unknown as WindowManager)
 })
 
@@ -128,6 +138,47 @@ describe('projection-vlc listener cleanup', () => {
     }
     for (const event of VLC_WEB_CONTENTS_EVENTS) {
       expect(mockProjectionWindow.webContents.listenerCount(event)).toBe(0)
+    }
+  })
+
+  it('hides the native VLC window before destroying the embedded player', async () => {
+    const start = getHandler('projection-vlc:start')
+    const stop = getHandler('projection-vlc:stop')
+
+    await start(makeEvent(), {
+      itemId: 'item-1',
+      sourceFileId: '550e8400-e29b-41d4-a716-446655440000',
+      container: '#vlc-player'
+    })
+    await stop(makeEvent())
+
+    expect(mockSetPlayerWindowVisible).toHaveBeenCalledWith(7, false)
+  })
+
+  it('destroys a stale VLC player when stop runs while embed is pending', async () => {
+    const start = getHandler('projection-vlc:start')
+    const stop = getHandler('projection-vlc:stop')
+    let resolveEmbed: (() => void) | undefined
+    mockEmbedImplementation = () =>
+      new Promise<void>((resolve) => {
+        resolveEmbed = resolve
+      })
+
+    const startPromise = start(makeEvent(), {
+      itemId: 'item-1',
+      sourceFileId: '550e8400-e29b-41d4-a716-446655440000',
+      container: '#vlc-player'
+    })
+
+    await Promise.resolve()
+    await stop(makeEvent())
+    resolveEmbed?.()
+    await startPromise
+
+    expect(mockSetPlayerWindowVisible).toHaveBeenCalledWith(7, false)
+    expect(mockVlcPlayers[0].destroy).toHaveBeenCalled()
+    for (const event of VLC_WINDOW_EVENTS) {
+      expect(mockProjectionWindow.listenerCount(event)).toBe(0)
     }
   })
 })

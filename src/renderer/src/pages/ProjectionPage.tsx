@@ -136,6 +136,10 @@ export default function ProjectionPage(): React.JSX.Element {
     }
   }, [])
 
+  useEffect(() => {
+    if (showDefault || activeContent !== 'file') void window.api?.projectionVlc?.stop()
+  }, [activeContent, showDefault])
+
   if (showDefault) return <DefaultProjection />
 
   if (activeContent === 'bible' && bibleChapter) {

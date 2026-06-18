@@ -1,5 +1,5 @@
 import { BrowserWindow, ipcMain } from 'electron'
-import { VlcPlayer, initLibVlc, probeMedia } from 'electron-vlc-player'
+import { VlcPlayer, getBinding, initLibVlc, probeMedia } from 'electron-vlc-player'
 import type {
   ProjectionVlcControlRequest,
   ProjectionVlcInfo,
@@ -17,6 +17,7 @@ let player: VlcPlayer | null = null
 let playerListenerCleanup: (() => void) | null = null
 let currentItemId: string | null = null
 let currentDurationMs: number | undefined
+let lifecycleVersion = 0
 
 type ListenerTarget = {
   listeners(event: string): unknown[]
@@ -130,12 +131,24 @@ function sendState(wm: WindowManager, next?: { isPlaying?: boolean; isEnded?: bo
   })
 }
 
+function hideNativePlayerWindow(currentPlayer: VlcPlayer): void {
+  if (currentPlayer.playerId < 0) return
+  try {
+    getBinding().setPlayerWindowVisible(currentPlayer.playerId, false)
+  } catch {
+    // Window teardown can race with native view teardown.
+  }
+}
+
 async function stopVlc(): Promise<void> {
+  lifecycleVersion += 1
   currentItemId = null
   currentDurationMs = undefined
   if (!player) return
-  player.destroy()
+  const currentPlayer = player
   player = null
+  hideNativePlayerWindow(currentPlayer)
+  currentPlayer.destroy()
   playerListenerCleanup?.()
   playerListenerCleanup = null
 }
@@ -152,6 +165,8 @@ async function startVlc(wm: WindowManager, request: ProjectionVlcStartRequest): 
   }
 
   await stopVlc()
+  const startVersion = lifecycleVersion + 1
+  lifecycleVersion = startVersion
   const beforeWindowListeners = captureListeners(projectionWindow, VLC_WINDOW_EVENTS)
   const beforeWebContentsListeners = captureListeners(
     projectionWindow.webContents,
@@ -167,6 +182,12 @@ async function startVlc(wm: WindowManager, request: ProjectionVlcStartRequest): 
 
   try {
     await nextPlayer.embed()
+    if (startVersion !== lifecycleVersion) {
+      hideNativePlayerWindow(nextPlayer)
+      nextPlayer.destroy()
+      createListenerCleanup(projectionWindow, beforeWindowListeners, beforeWebContentsListeners)()
+      return
+    }
     if (!nextPlayer.isEmbedded()) throw new Error('VLC player failed to embed')
 
     player = nextPlayer

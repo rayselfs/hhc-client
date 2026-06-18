@@ -1,4 +1,4 @@
-import { render, screen, act } from '@testing-library/react'
+import { render, screen, act, waitFor } from '@testing-library/react'
 import type { TimerTickPayload, StopwatchTickPayload } from '@shared/types/timer'
 import { useSettingsStore } from '@renderer/stores/settings'
 
@@ -40,6 +40,8 @@ vi.mock('@renderer/lib/projection-adapter', () => ({
 
 import ProjectionPage from '../ProjectionPage'
 
+const mockProjectionVlcStop = vi.fn()
+
 const baseTimerTick: TimerTickPayload = {
   mode: 'timer',
   remainingSeconds: 120,
@@ -60,6 +62,14 @@ const baseStopwatchTick: StopwatchTickPayload = {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  Object.defineProperty(window, 'api', {
+    configurable: true,
+    value: {
+      projectionVlc: {
+        stop: mockProjectionVlcStop
+      }
+    }
+  })
 })
 
 describe('ProjectionPage', () => {
@@ -176,5 +186,30 @@ describe('ProjectionPage', () => {
     })
 
     expect(screen.getByTestId('file-projection')).toHaveAttribute('data-control-action', 'play')
+  })
+
+  it('stops VLC when blanking file projection back to default', async () => {
+    render(<ProjectionPage />)
+    mockProjectionVlcStop.mockClear()
+
+    act(() => {
+      mockAdapter._trigger('__system:blank', { showDefault: false })
+      mockAdapter._trigger('file:show', {
+        itemId: 'video-1',
+        blobId: 'blob-1',
+        fileName: 'video.mkv',
+        mimeType: 'video/x-matroska',
+        playbackMode: 'vlc-embedded'
+      })
+    })
+    expect(screen.getByTestId('file-projection')).toBeInTheDocument()
+
+    act(() => {
+      mockAdapter._trigger('__system:blank', { showDefault: true })
+    })
+
+    await waitFor(() => {
+      expect(mockProjectionVlcStop).toHaveBeenCalled()
+    })
   })
 })
