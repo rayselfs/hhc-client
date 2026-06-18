@@ -1,5 +1,5 @@
 import { BrowserWindow, ipcMain } from 'electron'
-import { VlcPlayer, initLibVlc, probeDefaultVlcDir, probeMedia } from 'electron-vlc-player'
+import { VlcPlayer, initLibVlc, probeMedia } from 'electron-vlc-player'
 import type {
   ProjectionVlcControlRequest,
   ProjectionVlcInfo,
@@ -11,17 +11,18 @@ import type { WindowManager } from '../windowManager'
 import { getNativeFilePath } from './native-fs'
 import { isKnownWindow } from './validate'
 import { isValidNativeFileId } from '../../shared/native-media'
+import { resolveVlcRuntime } from '../video-engine-runtime'
 
 let player: VlcPlayer | null = null
 let currentItemId: string | null = null
 let currentDurationMs: number | undefined
 
 function getVlcInfo(): ProjectionVlcInfo {
-  const vlcDir = probeDefaultVlcDir()
-  if (!vlcDir) {
-    return { status: 'missing', message: 'VLC runtime not found' }
+  const runtime = resolveVlcRuntime()
+  if (runtime.status !== 'ready' || !runtime.path) {
+    return { status: runtime.status, message: runtime.message ?? 'VLC runtime not found' }
   }
-  return { status: 'ready', vlcDir }
+  return { status: 'ready', vlcDir: runtime.path }
 }
 
 function probeVlcMedia(request: ProjectionVlcProbeRequest): ProjectionVlcProbeResult {

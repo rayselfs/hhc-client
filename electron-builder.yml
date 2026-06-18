@@ -11,6 +11,15 @@ files:
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
 asarUnpack:
   - resources/**
+extraResources:
+  - from: resources/video-engine
+    to: video-engine
+    filter:
+      - '**/*'
+  - from: resources/licenses
+    to: licenses
+    filter:
+      - '**/*'
 win:
   executableName: libre-presenter
 nsis:
