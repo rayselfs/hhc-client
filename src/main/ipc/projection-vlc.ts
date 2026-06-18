@@ -15,6 +15,7 @@ import { resolveVlcRuntime } from '../video-engine-runtime'
 
 let player: VlcPlayer | null = null
 let playerListenerCleanup: (() => void) | null = null
+let playerResizeCleanup: (() => void) | null = null
 let currentItemId: string | null = null
 let currentDurationMs: number | undefined
 let lifecycleVersion = 0
@@ -151,6 +152,8 @@ async function stopVlc(): Promise<void> {
   currentPlayer.destroy()
   playerListenerCleanup?.()
   playerListenerCleanup = null
+  playerResizeCleanup?.()
+  playerResizeCleanup = null
 }
 
 async function startVlc(wm: WindowManager, request: ProjectionVlcStartRequest): Promise<void> {
@@ -196,6 +199,13 @@ async function startVlc(wm: WindowManager, request: ProjectionVlcStartRequest): 
       beforeWindowListeners,
       beforeWebContentsListeners
     )
+    const notifyLayoutChange = (): void => nextPlayer.notifyLayoutChange()
+    projectionWindow.on('resize', notifyLayoutChange)
+    projectionWindow.on('resized', notifyLayoutChange)
+    playerResizeCleanup = () => {
+      projectionWindow.removeListener('resize', notifyLayoutChange)
+      projectionWindow.removeListener('resized', notifyLayoutChange)
+    }
     currentItemId = request.itemId
     currentDurationMs = request.durationMs
 

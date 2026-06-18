@@ -17,7 +17,11 @@ const mockWindowManager = {
   sendToMain: vi.fn()
 }
 const mockSetPlayerWindowVisible = vi.fn()
-const mockVlcPlayers: Array<{ destroy: ReturnType<typeof vi.fn>; playerId: number }> = []
+const mockVlcPlayers: Array<{
+  destroy: ReturnType<typeof vi.fn>
+  notifyLayoutChange: ReturnType<typeof vi.fn>
+  playerId: number
+}> = []
 let mockEmbedImplementation: () => Promise<void> = () => Promise.resolve()
 
 const VLC_WINDOW_EVENTS = [
@@ -73,6 +77,7 @@ vi.mock('electron-vlc-player', () => ({
     isEmbedded = vi.fn(() => true)
     setSource = vi.fn()
     destroy = vi.fn()
+    notifyLayoutChange = vi.fn()
     getTime = vi.fn(() => 0)
     getLength = vi.fn(() => 1000)
     isPlaying = vi.fn(() => false)
@@ -180,5 +185,25 @@ describe('projection-vlc listener cleanup', () => {
     for (const event of VLC_WINDOW_EVENTS) {
       expect(mockProjectionWindow.listenerCount(event)).toBe(0)
     }
+  })
+
+  it('syncs VLC native bounds when the projection window resizes', async () => {
+    const start = getHandler('projection-vlc:start')
+    const stop = getHandler('projection-vlc:stop')
+
+    await start(makeEvent(), {
+      itemId: 'item-1',
+      sourceFileId: '550e8400-e29b-41d4-a716-446655440000',
+      container: '#vlc-player'
+    })
+
+    mockProjectionWindow.emit('resize')
+    mockProjectionWindow.emit('resized')
+
+    expect(mockVlcPlayers[0].notifyLayoutChange).toHaveBeenCalledTimes(2)
+
+    await stop(makeEvent())
+    mockProjectionWindow.emit('resize')
+    expect(mockVlcPlayers[0].notifyLayoutChange).toHaveBeenCalledTimes(2)
   })
 })
