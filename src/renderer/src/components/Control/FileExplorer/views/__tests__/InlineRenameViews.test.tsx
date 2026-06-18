@@ -92,6 +92,27 @@ describe('inline rename in file views', () => {
     expect(screen.getByText('Remote only')).toBeInTheDocument()
   })
 
+  it('renders grid items in a single responsive grid', () => {
+    const manyItems = Array.from({ length: 8 }, (_, index) => ({
+      ...items[0],
+      id: `file-${index}`,
+      name: `file-${index}.pdf`
+    }))
+    const { container } = render(
+      <GridView
+        items={manyItems}
+        viewMode="medium-icon"
+        onItemClick={vi.fn()}
+        onItemDoubleClick={vi.fn()}
+        onItemContextMenu={vi.fn()}
+      />
+    )
+
+    const grid = container.querySelector('.grid')
+    expect(grid?.children).toHaveLength(8)
+    expect(container.querySelector('[style*="position: absolute"]')).not.toBeInTheDocument()
+  })
+
   it('renders sync status in list view', () => {
     render(
       <ListView
