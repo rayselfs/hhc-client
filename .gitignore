@@ -11,6 +11,7 @@ coverage
 bundle-report.html
 .omo
 .local-runtimes/
+docs/superpowers/
 resources/video-engine/**/*
 !resources/video-engine/**/
 !resources/video-engine/**/README.txt
