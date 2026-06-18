@@ -169,8 +169,8 @@ const CAPABILITIES: readonly MediaCapability[] = [
     kind: 'video',
     extensions: ['mkv'],
     canonicalMimeType: 'video/x-matroska',
-    thumbnail: 'none',
-    web: 'unsupported',
+    thumbnail: 'video',
+    web: 'native',
     electron: 'desktop-engine',
     kindLabelKey: 'fileKind.mkvVideo',
     kindLabelFallback: 'MKV Video'

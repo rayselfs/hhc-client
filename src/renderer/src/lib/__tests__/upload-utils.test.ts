@@ -155,14 +155,37 @@ describe('uploadFiles web preflight', () => {
     expect(addFileItemToStore).not.toHaveBeenCalled()
   })
 
-  it('rejects Electron-only transcode formats in Web mode', async () => {
+  it('accepts MKV as a Web video candidate', async () => {
     vi.mocked(isWeb).mockReturnValue(true)
     const file = makeFile('message.mkv', 100, '')
 
-    await expect(uploadFiles([file], 'parent-1')).resolves.toBe(0)
+    await expect(uploadFiles([file], 'parent-1')).resolves.toBe(1)
 
-    expect(addFileItemToStore).not.toHaveBeenCalled()
+    expect(addFileItemToStore).toHaveBeenCalledWith(file, 'parent-1', 'video/x-matroska')
+    expect(generateThumbnail).toHaveBeenCalledWith(file, 'video/x-matroska')
     expect(mediaJobQueue.enqueue).not.toHaveBeenCalled()
+  })
+
+  it('warns when unsupported files are skipped', async () => {
+    vi.mocked(isWeb).mockReturnValue(true)
+    const supported = setRelativePath(makeFile('slide.png', 100), 'Sunday/slide.png')
+    const unsupported = setRelativePath(makeFile('notes.txt', 100, ''), 'Sunday/notes.txt')
+
+    await expect(uploadFolderFiles([supported, unsupported], 'root', vi.fn())).resolves.toBe(1)
+
+    expect(toast.warning).toHaveBeenCalledWith('Skipped 1 unsupported file(s)')
+  })
+
+  it('silently ignores folder system files', async () => {
+    vi.mocked(isWeb).mockReturnValue(true)
+    const supported = setRelativePath(makeFile('movie.mkv', 100, ''), 'Sunday/movie.mkv')
+    const systemFile = setRelativePath(makeFile('.DS_Store', 100, ''), 'Sunday/.DS_Store')
+    const addFolder = vi.fn((name: string) => `id-${name}`)
+
+    await expect(uploadFolderFiles([supported, systemFile], 'root', addFolder)).resolves.toBe(1)
+
+    expect(addFileItemToStore).toHaveBeenCalledWith(supported, 'id-Sunday', 'video/x-matroska')
+    expect(toast.warning).not.toHaveBeenCalled()
   })
 })
 

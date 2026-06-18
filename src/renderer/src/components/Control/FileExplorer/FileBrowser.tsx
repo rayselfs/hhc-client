@@ -46,6 +46,9 @@ import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 import type { SortField } from '@renderer/stores/file-explorer'
 import { hasNameConflict, splitFileName, validateDisplayName } from '@renderer/lib/file-naming'
 import { listSyncEntries, type SyncEntryStatus } from '@renderer/lib/sync-db'
+import { getSourceMediaMetadata } from '@renderer/lib/media-metadata'
+import { getBlobId } from '@renderer/lib/blob-identity'
+import { isWeb } from '@renderer/lib/env'
 
 export interface FileBrowserProps {
   onItemContextMenu?: (itemId: string, event: React.MouseEvent) => void
@@ -365,6 +368,7 @@ export function FileBrowser({
   const [selectedSearchId, setSelectedSearchId] = useState<string | null>(null)
   const [renamingItemId, setRenamingItemId] = useState<string | null>(null)
   const [syncStatuses, setSyncStatuses] = useState<Record<string, SyncEntryStatus>>({})
+  const [unsupportedMediaIds, setUnsupportedMediaIds] = useState<Set<string>>(new Set())
   const renameClickTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const pendingRenameItemIdRef = React.useRef<string | null>(null)
   const pointerRef = React.useRef<{
@@ -420,6 +424,11 @@ export function FileBrowser({
   const thumbnails = useThumbnails(fileItems, { pendingAgeMs: 2 * 60 * 1000 })
 
   useEffect(() => {
+    if (!isWeb()) {
+      setUnsupportedMediaIds(new Set())
+      return
+    }
+
     let cancelled = false
     async function loadSyncStatuses(): Promise<void> {
       const ids = new Set([
@@ -449,6 +458,33 @@ export function FileBrowser({
     }
   }, [folders, fileItems])
 
+  useEffect(() => {
+    let cancelled = false
+    async function loadUnsupportedMedia(): Promise<void> {
+      const next = new Set<string>()
+      await Promise.all(
+        fileItems
+          .filter((item) => item.mimeType.startsWith('video/'))
+          .map(async (item) => {
+            const metadata = await getSourceMediaMetadata(getBlobId(item))
+            if (metadata?.browserPlayback === 'unplayable') next.add(item.id)
+          })
+      )
+      if (!cancelled) setUnsupportedMediaIds(next)
+    }
+
+    const onMetadataReady = (): void => {
+      void loadUnsupportedMedia()
+    }
+
+    void loadUnsupportedMedia()
+    window.addEventListener('hhc:media-metadata-ready', onMetadataReady)
+    return () => {
+      cancelled = true
+      window.removeEventListener('hhc:media-metadata-ready', onMetadataReady)
+    }
+  }, [fileItems])
+
   const allItems: GridViewItem[] = useMemo(
     () => [
       ...folders.map((folder) => ({
@@ -467,12 +503,17 @@ export function FileBrowser({
         mimeType: item.mimeType,
         size: item.size,
         createdAt: item.createdAt,
-        thumbnailUrl: canHaveThumbnail(item.mimeType) ? thumbnails[item.id] : null,
+        thumbnailUrl: unsupportedMediaIds.has(item.id)
+          ? null
+          : canHaveThumbnail(item.mimeType)
+            ? thumbnails[item.id]
+            : null,
         isSelected: false,
-        syncStatus: syncStatuses[item.id]
+        syncStatus: syncStatuses[item.id],
+        isUnsupportedMedia: unsupportedMediaIds.has(item.id)
       }))
     ],
-    [folders, fileItems, thumbnails, syncStatuses]
+    [folders, fileItems, thumbnails, syncStatuses, unsupportedMediaIds]
   )
 
   const sortedItems = useMemo(() => {

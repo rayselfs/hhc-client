@@ -13,7 +13,7 @@ describe('isPresentable', () => {
     ['video/ogg', true],
     ['video/quicktime', true],
     ['application/pdf', true],
-    ['video/x-matroska', false],
+    ['video/x-matroska', true],
     ['text/plain', false],
     ['application/json', false],
     ['audio/mpeg', false]
@@ -23,7 +23,7 @@ describe('isPresentable', () => {
 
   it('allows Electron desktop-engine videos as presentation candidates', () => {
     expect(isPresentable('video/x-matroska', 'electron')).toBe(true)
-    expect(isPresentable('video/x-matroska', 'web')).toBe(false)
+    expect(isPresentable('video/x-matroska', 'web')).toBe(true)
   })
 })
 
@@ -42,7 +42,7 @@ describe('getMediaType', () => {
 
   it('resolves Electron desktop-engine videos to video', () => {
     expect(getMediaType('video/x-matroska', 'electron')).toBe('video')
-    expect(getMediaType('video/x-matroska', 'web')).toBeNull()
+    expect(getMediaType('video/x-matroska', 'web')).toBe('video')
   })
 })
 

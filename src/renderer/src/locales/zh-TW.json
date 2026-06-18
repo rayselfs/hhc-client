@@ -470,6 +470,7 @@
     "invalidName": "名稱無效",
     "folderAlreadyExists": "同層已存在相同名稱的資料夾",
     "fileAlreadyExists": "同層已存在相同名稱的檔案",
+    "uploadSkippedUnsupported": "已略過 {{count}} 個不支援的檔案",
     "renameFile": "重新命名檔案",
     "renameFolder": "重新命名資料夾",
     "blobLoadFailed": "檔案載入失敗，已跳過"

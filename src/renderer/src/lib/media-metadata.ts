@@ -10,9 +10,7 @@ import { getDerivedAsset, putDerivedAsset, type DerivedAssetMetadata } from './m
 
 export const MEDIA_METADATA_VARIANT = 'source'
 
-export async function getSourceMediaMetadata(
-  blobId: string
-): Promise<DerivedAssetMetadata | null> {
+export async function getSourceMediaMetadata(blobId: string): Promise<DerivedAssetMetadata | null> {
   const asset = await getDerivedAsset(blobId, 'media-metadata', MEDIA_METADATA_VARIANT)
   return asset?.status === 'ready' ? (asset.metadata ?? null) : null
 }
@@ -61,6 +59,7 @@ async function readVideoMetadata(url: string): Promise<DerivedAssetMetadata> {
   video.load()
   return {
     kind: 'video',
+    browserPlayback: 'playable',
     width: video.videoWidth || undefined,
     height: video.videoHeight || undefined,
     durationMs:
@@ -121,7 +120,13 @@ export async function ensureSourceMediaMetadata(
     if (!source) return null
     metadata = await withSource(source, async (url) => {
       if (mimeType.startsWith('image/')) return readImageMetadata(url)
-      if (mimeType.startsWith('video/')) return readVideoMetadata(url)
+      if (mimeType.startsWith('video/')) {
+        try {
+          return await readVideoMetadata(url)
+        } catch {
+          return { kind: 'video', browserPlayback: 'unplayable' }
+        }
+      }
       if (mimeType === 'application/pdf') return readPdfMetadata(url)
       return null
     })

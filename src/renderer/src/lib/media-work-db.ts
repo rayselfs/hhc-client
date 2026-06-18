@@ -53,6 +53,7 @@ export interface DerivedAssetMetadata {
   fastStart?: boolean
   profile?: string
   frameRate?: number
+  browserPlayback?: 'playable' | 'unplayable'
 }
 
 export interface DerivedAssetRecord {

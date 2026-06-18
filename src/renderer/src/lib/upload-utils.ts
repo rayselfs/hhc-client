@@ -16,6 +16,7 @@ import { resolveUniqueName } from '@renderer/lib/file-naming'
 import { ensureSourceMediaMetadata } from '@renderer/lib/media-metadata'
 import { enqueueVideoPosterJob } from '@renderer/lib/video-poster-jobs'
 import { MAX_FILE_SIZE_WEB } from '@renderer/lib/media-limits'
+import i18n from '@renderer/i18n'
 
 export { MAX_FILE_SIZE_WEB }
 
@@ -54,6 +55,15 @@ function createSemaphore(limit: number): { acquire(): Promise<() => void> } {
 const UPLOAD_CONCURRENCY = 3
 const uploadSemaphore = createSemaphore(UPLOAD_CONCURRENCY)
 const pendingPdfFiles = new Map<string, File>()
+
+function isIgnoredSystemFile(file: File): boolean {
+  const path = file.webkitRelativePath || file.name
+  const parts = path.split('/').filter(Boolean)
+  return parts.some(
+    (part) =>
+      part === '__MACOSX' || part === '.DS_Store' || part === 'Thumbs.db' || part === 'desktop.ini'
+  )
+}
 
 export function getUploadMediaPlatform(): MediaPlatform {
   return isWeb() ? 'web' : 'electron'
@@ -120,14 +130,23 @@ async function hasWebStorageCapacity(files: File[]): Promise<boolean> {
 async function prepareUploadCandidates(files: File[]): Promise<UploadCandidate[]> {
   const candidates: UploadCandidate[] = []
   const platform = getUploadMediaPlatform()
+  let unsupportedCount = 0
   for (const file of files) {
+    if (isIgnoredSystemFile(file)) continue
     const classification = classifyFile(file, platform)
-    if (classification.kind === 'unsupported') continue
+    if (classification.kind === 'unsupported') {
+      unsupportedCount++
+      continue
+    }
     if (isWeb() && file.size > MAX_FILE_SIZE_WEB) {
       toast.danger(`File "${file.name}" exceeds 2GB limit`)
       continue
     }
     candidates.push({ file, classification })
+  }
+
+  if (unsupportedCount > 0) {
+    toast.warning(i18n.t('fileExplorer.uploadSkippedUnsupported', { count: unsupportedCount }))
   }
 
   if (!(await hasWebStorageCapacity(candidates.map((candidate) => candidate.file)))) {
@@ -183,12 +202,18 @@ async function uploadPreparedFiles(destinations: UploadDestination[]): Promise<n
           classification.kind === 'video' ||
           classification.kind === 'pdf'
         ) {
-          void ensureSourceMediaMetadata(id, classification.mimeType).catch((error) => {
-            console.warn('[media-metadata] Failed to store upload metadata', {
-              blobId: id,
-              error
+          void ensureSourceMediaMetadata(id, classification.mimeType)
+            .catch((error) => {
+              console.warn('[media-metadata] Failed to store upload metadata', {
+                blobId: id,
+                error
+              })
             })
-          })
+            .finally(() => {
+              window.dispatchEvent(
+                new CustomEvent('hhc:media-metadata-ready', { detail: { blobId: id } })
+              )
+            })
         }
         const shouldUseBrowserThumbnail = classification.kind !== 'video' || isWeb()
         if (shouldUseBrowserThumbnail && canGenerateThumbnail(classification.mimeType, file.name)) {

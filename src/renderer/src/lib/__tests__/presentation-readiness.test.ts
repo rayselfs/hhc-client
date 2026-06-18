@@ -8,6 +8,7 @@ import {
   getPresentationSnapshotResourceIds
 } from '../presentation-readiness'
 import { putProviderConnection, putSyncEntry, resetSyncDBForTests } from '../sync-db'
+import { putSourceMediaMetadata } from '../media-metadata'
 
 function file(id: string, name: string, mimeType: string, url = `blob:${id}`): FileItemRecord {
   return {
@@ -167,6 +168,24 @@ describe('analyzePresentationReadiness', () => {
     expect(report.items[0]).toMatchObject({
       status: 'preparing',
       reason: 'sync-remote-only'
+    })
+  })
+
+  it('excludes browser-unplayable Web videos', async () => {
+    await putSourceMediaMetadata('bad-video', {
+      kind: 'video',
+      browserPlayback: 'unplayable'
+    })
+
+    const report = await analyzePresentationReadiness(
+      [file('bad-video', 'bad.mkv', 'video/x-matroska')],
+      'web'
+    )
+
+    expect(report.summary).toMatchObject({ ready: 0, unsupported: 1 })
+    expect(report.items[0]).toMatchObject({
+      status: 'unsupported',
+      reason: 'browser-video-unplayable'
     })
   })
 })

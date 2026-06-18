@@ -20,11 +20,16 @@ export interface GridViewItem {
   isSelected: boolean
   isFavorited?: boolean
   syncStatus?: SyncEntryStatus
+  isUnsupportedMedia?: boolean
 }
 
 function renderGridIcon(item: GridViewItem, iconSize: number): React.ReactNode {
   if (item.isFolder) {
     return <Folder size={iconSize} className="text-accent" fill="currentColor" />
+  }
+
+  if (item.isUnsupportedMedia) {
+    return <div className="text-danger">{getFileIcon(item.mimeType, item.isFolder, iconSize)}</div>
   }
 
   if (item.thumbnailUrl) {

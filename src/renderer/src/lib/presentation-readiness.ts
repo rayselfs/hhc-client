@@ -183,6 +183,20 @@ async function analyzePresentationItem(
     capability.kind === 'video' ? await ensureSourceMediaMetadata(blobId, item.mimeType) : null
   const durationMs = metadata?.durationMs
 
+  if (
+    platform === 'web' &&
+    capability.kind === 'video' &&
+    metadata?.browserPlayback === 'unplayable'
+  ) {
+    return {
+      itemId: item.id,
+      blobId,
+      status: 'unsupported',
+      reason: 'browser-video-unplayable',
+      support
+    }
+  }
+
   if (support === 'desktop-engine') {
     if (await canUseVlcEmbedded(platform, blobId)) {
       return {

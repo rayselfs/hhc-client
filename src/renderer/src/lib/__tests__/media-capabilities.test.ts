@@ -18,7 +18,7 @@ describe('media capability registry', () => {
     ['image/jpg', undefined, 'image/jpeg', 'native'],
     ['VIDEO/MP4; codecs=avc1', undefined, 'video/mp4', 'native'],
     ['', 'slides.PDF', 'application/pdf', 'native'],
-    ['application/octet-stream', 'movie.MKV', 'video/x-matroska', 'unsupported'],
+    ['application/octet-stream', 'movie.MKV', 'video/x-matroska', 'native'],
     ['', 'movie.wmv', 'video/x-ms-wmv', 'unsupported']
   ])(
     'resolves MIME %s and file %s consistently',
@@ -29,11 +29,11 @@ describe('media capability registry', () => {
     }
   )
 
-  it('keeps desktop-engine video formats Electron-only', () => {
+  it('allows MKV as a Web native candidate and desktop-engine Electron candidate', () => {
     const capability = resolveMediaCapability({ mimeType: '', fileName: 'movie.mkv' })
 
     expect(capability?.canonicalMimeType).toBe('video/x-matroska')
-    expect(capability && getMediaSupport(capability, 'web')).toBe('unsupported')
+    expect(capability && getMediaSupport(capability, 'web')).toBe('native')
     expect(capability && getMediaSupport(capability, 'electron')).toBe('desktop-engine')
   })
 
@@ -61,7 +61,7 @@ describe('media capability registry', () => {
     )
     expect(
       canGenerateMediaThumbnail(resolveMediaCapability({ mimeType: 'video/x-matroska' }))
-    ).toBe(false)
+    ).toBe(true)
   })
 
   it.each([
@@ -77,7 +77,7 @@ describe('media capability registry', () => {
     ['slides.PDF', '', 'pdf', 'application/pdf', 'native'],
     ['photo.PNG', 'application/octet-stream', 'image', 'image/png', 'native'],
     ['movie.MP4', '', 'video', 'video/mp4', 'native'],
-    ['movie.mkv', '', 'unsupported', 'video/x-matroska', 'unsupported'],
+    ['movie.mkv', '', 'video', 'video/x-matroska', 'native'],
     ['movie.mpg', '', 'unsupported', 'video/mpeg', 'unsupported'],
     ['movie.bin', 'video/unknown', 'unsupported', 'video/unknown', 'unsupported'],
     ['notes.txt', '', 'unsupported', 'application/octet-stream', 'unsupported']
@@ -104,8 +104,9 @@ describe('media capability registry', () => {
     expect(accept).toContain('image/*')
     expect(accept).toContain('.pdf')
     expect(accept).toContain('.mp4')
+    expect(accept).toContain('.mkv')
     expect(accept).not.toContain('video/*')
-    expect(accept).not.toContain('.mkv')
+    expect(accept).not.toContain('.avi')
     expect(accept).not.toContain('.pptx')
     expect(accept).not.toContain('.mpg')
   })
