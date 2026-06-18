@@ -10,6 +10,7 @@ type FileProjectionProps = {
   initialBlobId?: string
   initialMimeType?: string
   initialStreamUrl?: string
+  initialPlaybackMode?: 'native' | 'transcoded-derivative' | 'live-transcode' | 'vlc-embedded'
   initialSeekable?: boolean
   initialDurationMs?: number
   controlEvent?: { id: number; data: FileControlPayload } | null
@@ -17,6 +18,7 @@ type FileProjectionProps = {
 
 type LoadFileOptions = {
   streamUrl?: string
+  playbackMode?: 'native' | 'transcoded-derivative' | 'live-transcode' | 'vlc-embedded'
   seekable?: boolean
   durationMs?: number
 }
@@ -42,6 +44,7 @@ export default function FileProjection({
   initialBlobId,
   initialMimeType,
   initialStreamUrl,
+  initialPlaybackMode,
   initialSeekable,
   initialDurationMs,
   controlEvent
@@ -60,6 +63,7 @@ export default function FileProjection({
   const sourceRevokeRef = useRef<(() => void) | null>(null)
   const pendingVideoControlRef = useRef<PendingVideoControl | null>(null)
   const seekableRef = useRef(true)
+  const playbackModeRef = useRef<FileProjectionProps['initialPlaybackMode']>('native')
   const durationMsRef = useRef<number | undefined>(initialDurationMs)
 
   const isControlForCurrentItem = useCallback((data: FileControlPayload): boolean => {
@@ -178,7 +182,8 @@ export default function FileProjection({
           ? durationMsRef.current / 1000
           : undefined
       const duration =
-        metadataDuration ?? (Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0)
+        metadataDuration ??
+        (Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0)
       send('file:playback-state', {
         itemId,
         currentTime: Number.isFinite(video.currentTime) ? video.currentTime : 0,
@@ -194,6 +199,8 @@ export default function FileProjection({
     async (itemId: string, blobId: string, fileMimeType: string, options: LoadFileOptions = {}) => {
       currentItemIdRef.current = itemId
       pendingVideoControlRef.current = null
+      void window.api?.projectionVlc?.stop()
+      playbackModeRef.current = options.playbackMode ?? 'native'
       seekableRef.current = options.seekable !== false
       durationMsRef.current = options.durationMs
       sourceRevokeRef.current?.()
@@ -204,6 +211,9 @@ export default function FileProjection({
       setPdfState(null)
       setIsEnded(false)
       setMimeType(fileMimeType)
+      if (options.playbackMode === 'vlc-embedded') {
+        return
+      }
       if (options.streamUrl) {
         setObjectUrl(options.streamUrl)
         return
@@ -229,13 +239,29 @@ export default function FileProjection({
     (data: FileControlPayload) => {
       switch (data.action) {
         case 'play':
+          if (playbackModeRef.current === 'vlc-embedded') {
+            void window.api?.projectionVlc?.control({ action: 'play', itemId: data.itemId })
+            break
+          }
           queueVideoControl(data, { shouldPlay: true })
           break
         case 'pause':
+          if (playbackModeRef.current === 'vlc-embedded') {
+            void window.api?.projectionVlc?.control({ action: 'pause', itemId: data.itemId })
+            break
+          }
           queueVideoControl(data, { shouldPlay: false })
           break
         case 'seek':
           if (!seekableRef.current) break
+          if (playbackModeRef.current === 'vlc-embedded') {
+            void window.api?.projectionVlc?.control({
+              action: 'seek',
+              itemId: data.itemId,
+              value: data.value
+            })
+            break
+          }
           queueVideoControl(data, { seekTo: data.value })
           break
         case 'zoom':
@@ -272,6 +298,14 @@ export default function FileProjection({
           setPdfState((prev) => (prev ? { ...prev, viewMode: data.value } : prev))
           break
         case 'volume':
+          if (playbackModeRef.current === 'vlc-embedded') {
+            void window.api?.projectionVlc?.control({
+              action: 'volume',
+              itemId: data.itemId,
+              value: data.value
+            })
+            break
+          }
           queueVideoControl(data, { volume: data.value })
           break
       }
@@ -299,6 +333,7 @@ export default function FileProjection({
       setDisplayName(fileName ?? '')
       loadFile(initialItemId, initialBlobId, initialMimeType, {
         streamUrl: initialStreamUrl,
+        playbackMode: initialPlaybackMode,
         seekable: initialSeekable,
         durationMs: initialDurationMs
       })
@@ -308,6 +343,7 @@ export default function FileProjection({
     initialBlobId,
     initialItemId,
     initialMimeType,
+    initialPlaybackMode,
     initialSeekable,
     initialDurationMs,
     initialStreamUrl,
@@ -322,6 +358,7 @@ export default function FileProjection({
     () => () => {
       sourceRevokeRef.current?.()
       sourceRevokeRef.current = null
+      void window.api?.projectionVlc?.stop()
     },
     []
   )
@@ -459,11 +496,52 @@ export default function FileProjection({
     )
   }
 
+  if (mimeType?.startsWith('video/') && playbackModeRef.current === 'vlc-embedded') {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-black overflow-hidden">
+        <VlcProjectionSurface
+          itemId={currentItemIdRef.current}
+          blobId={initialBlobId}
+          durationMs={durationMsRef.current}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="flex h-screen w-full items-center justify-center bg-black">
       <p className="text-white/30 text-sm">{displayName || 'No file loaded'}</p>
     </div>
   )
+}
+
+function VlcProjectionSurface({
+  itemId,
+  blobId,
+  durationMs
+}: {
+  itemId: string | null
+  blobId?: string
+  durationMs?: number
+}): React.JSX.Element {
+  useEffect(() => {
+    if (!itemId || !blobId) return undefined
+    void window.api?.projectionVlc
+      ?.start({
+        itemId,
+        sourceFileId: blobId,
+        container: '#vlc-player',
+        durationMs
+      })
+      .catch((error) => {
+        console.error('[projection-vlc] Failed to start embedded VLC playback', error)
+      })
+    return () => {
+      void window.api?.projectionVlc?.stop()
+    }
+  }, [blobId, durationMs, itemId])
+
+  return <div id="vlc-player" className="h-full w-full bg-black" />
 }
 
 function PdfCanvas({

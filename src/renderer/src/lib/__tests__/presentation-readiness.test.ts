@@ -33,15 +33,54 @@ beforeEach(async () => {
 })
 
 describe('analyzePresentationReadiness', () => {
-  it('uses live transcode as the electron fallback while a derivative is not ready', async () => {
+  it('uses embedded VLC for Electron native videos when available', async () => {
     vi.stubGlobal('window', {
       api: {
+        projectionVlc: {
+          getInfo: vi.fn().mockResolvedValue({ status: 'ready' })
+        },
         videoTranscode: {
           getFfmpegConfig: vi.fn().mockResolvedValue({ status: 'ready' })
         }
       }
     })
-    await (await openFileExplorerDB()).put('file-blobs', {
+    await (
+      await openFileExplorerDB()
+    ).put('file-blobs', {
+      id: 'source-video',
+      storage: 'native-fs',
+      refCount: 1
+    })
+
+    const report = await analyzePresentationReadiness(
+      [file('source-video', 'source.mkv', 'video/x-matroska')],
+      'electron'
+    )
+
+    expect(report.summary).toMatchObject({ ready: 1, preparing: 0 })
+    expect(report.items[0]).toMatchObject({
+      status: 'ready',
+      reason: 'ready-vlc-embedded',
+      support: 'transcode-required',
+      playbackMode: 'vlc-embedded',
+      seekable: true
+    })
+  })
+
+  it('uses live transcode as the electron fallback while a derivative is not ready', async () => {
+    vi.stubGlobal('window', {
+      api: {
+        projectionVlc: {
+          getInfo: vi.fn().mockResolvedValue({ status: 'missing' })
+        },
+        videoTranscode: {
+          getFfmpegConfig: vi.fn().mockResolvedValue({ status: 'ready' })
+        }
+      }
+    })
+    await (
+      await openFileExplorerDB()
+    ).put('file-blobs', {
       id: 'source-video',
       storage: 'native-fs',
       refCount: 1
@@ -65,6 +104,9 @@ describe('analyzePresentationReadiness', () => {
   it('does not use live transcode when the source is not in native storage', async () => {
     vi.stubGlobal('window', {
       api: {
+        projectionVlc: {
+          getInfo: vi.fn().mockResolvedValue({ status: 'missing' })
+        },
         videoTranscode: {
           getFfmpegConfig: vi.fn().mockResolvedValue({ status: 'ready' })
         }

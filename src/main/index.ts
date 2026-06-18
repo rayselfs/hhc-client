@@ -7,6 +7,7 @@ import { registerBibleApiHandlers } from './ipc/bible-api'
 import { registerAppIpc, registerLocalModelProtocol } from './ipc/app'
 import { registerSpeechKeyStorageHandlers } from './ipc/speech-key-storage'
 import { registerNativeFsHandlers, registerNativeMediaProtocol } from './ipc/native-fs'
+import { registerProjectionVlcHandlers } from './ipc/projection-vlc'
 import { registerLiveMediaProtocol, registerVideoTranscodeHandlers } from './ipc/video-transcode'
 import { registerLocalSyncHandlers } from './ipc/local-sync'
 import { registerOneDriveCredentialHandlers } from './ipc/onedrive-credentials'
@@ -85,6 +86,7 @@ app.whenReady().then(() => {
   registerLocalModelProtocol()
   registerSpeechKeyStorageHandlers(wm)
   registerNativeFsHandlers(wm)
+  registerProjectionVlcHandlers(wm)
   registerVideoTranscodeHandlers(wm)
   registerLocalSyncHandlers(wm)
   registerOneDriveCredentialHandlers(wm)

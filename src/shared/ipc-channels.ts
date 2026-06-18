@@ -100,6 +100,27 @@ export interface VideoProbeRequest {
 
 export interface VideoProbeResult extends VideoTranscodeSourceMetadata {}
 
+export type ProjectionVlcStatus = 'ready' | 'missing' | 'error'
+
+export interface ProjectionVlcInfo {
+  status: ProjectionVlcStatus
+  vlcDir?: string
+  message?: string
+}
+
+export interface ProjectionVlcStartRequest {
+  itemId: string
+  sourceFileId: string
+  container: string
+  durationMs?: number
+}
+
+export type ProjectionVlcControlRequest =
+  | { action: 'play'; itemId?: string }
+  | { action: 'pause'; itemId?: string }
+  | { action: 'seek'; itemId?: string; value: number }
+  | { action: 'volume'; itemId?: string; value: number }
+
 export interface LocalSyncConnectionInfo {
   id: string
   displayName: string
@@ -221,6 +242,10 @@ export interface IpcInvokeMap {
     result: VideoLiveTranscodeStartResult
   }
   'video-transcode:stop-live': { args: [string]; result: void }
+  'projection-vlc:get-info': { args: []; result: ProjectionVlcInfo }
+  'projection-vlc:start': { args: [ProjectionVlcStartRequest]; result: void }
+  'projection-vlc:control': { args: [ProjectionVlcControlRequest]; result: void }
+  'projection-vlc:stop': { args: []; result: void }
   'local-sync:select-folder': { args: []; result: LocalSyncConnectionInfo | null }
   'local-sync:list-folders': { args: []; result: LocalSyncConnectionInfo[] }
   'local-sync:scan-folder': { args: [string]; result: LocalSyncRemoteItem[] }

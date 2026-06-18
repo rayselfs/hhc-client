@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 const { app, BrowserWindow } = require('electron')
 const { VlcPlayer, probeDefaultVlcDir } = require('electron-vlc-player')
 
@@ -23,7 +24,8 @@ app.whenReady().then(async () => {
     backgroundColor: '#000000'
   })
 
-  await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(`
+  await win.loadURL(
+    `data:text/html;charset=utf-8,${encodeURIComponent(`
 <!doctype html>
 <html>
   <head>
@@ -41,7 +43,8 @@ app.whenReady().then(async () => {
     <div id="player"></div>
   </body>
 </html>
-`)}`)
+`)}`
+  )
 
   player = new VlcPlayer({
     window: win,

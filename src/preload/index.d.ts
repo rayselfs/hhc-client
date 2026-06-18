@@ -14,6 +14,9 @@ import type {
   VideoProbeResult,
   VideoLiveTranscodeStartRequest,
   VideoLiveTranscodeStartResult,
+  ProjectionVlcControlRequest,
+  ProjectionVlcInfo,
+  ProjectionVlcStartRequest,
   LocalSyncConnectionInfo,
   LocalSyncWatchStatus,
   LocalSyncRemoteItem,
@@ -107,6 +110,13 @@ interface VideoTranscodeAPI {
   stopLive: (sessionId: string) => Promise<void>
 }
 
+interface ProjectionVlcAPI {
+  getInfo: () => Promise<ProjectionVlcInfo>
+  start: (request: ProjectionVlcStartRequest) => Promise<void>
+  control: (command: ProjectionVlcControlRequest) => Promise<void>
+  stop: () => Promise<void>
+}
+
 interface LocalSyncAPI {
   selectFolder: () => Promise<LocalSyncConnectionInfo | null>
   listFolders: () => Promise<LocalSyncConnectionInfo[]>
@@ -136,6 +146,7 @@ declare global {
       speech: SpeechAPI
       nativeFs: NativeFsAPI
       videoTranscode: VideoTranscodeAPI
+      projectionVlc: ProjectionVlcAPI
       localSync: LocalSyncAPI
       oneDrive: OneDriveAPI
     }

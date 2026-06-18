@@ -25,6 +25,7 @@ export default function ProjectionPage(): React.JSX.Element {
     fileName: string
     mimeType: string
     streamUrl?: string
+    playbackMode?: 'native' | 'transcoded-derivative' | 'live-transcode' | 'vlc-embedded'
     seekable?: boolean
     durationMs?: number
   } | null>(null)
@@ -70,6 +71,7 @@ export default function ProjectionPage(): React.JSX.Element {
         fileName: data.fileName,
         mimeType: data.mimeType,
         streamUrl: data.streamUrl,
+        playbackMode: data.playbackMode,
         seekable: data.seekable,
         durationMs: data.durationMs
       })
@@ -148,6 +150,7 @@ export default function ProjectionPage(): React.JSX.Element {
         initialBlobId={fileData.blobId}
         initialMimeType={fileData.mimeType}
         initialStreamUrl={fileData.streamUrl}
+        initialPlaybackMode={fileData.playbackMode}
         initialSeekable={fileData.seekable}
         initialDurationMs={fileData.durationMs}
         controlEvent={fileControlEvent}

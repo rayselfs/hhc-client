@@ -35,7 +35,7 @@ export interface PresentationReadinessItem {
   reason: string
   support: MediaSupportMode | null
   derivativeId?: string
-  playbackMode?: 'native' | 'transcoded-derivative' | 'live-transcode'
+  playbackMode?: 'native' | 'transcoded-derivative' | 'live-transcode' | 'vlc-embedded'
   seekable?: boolean
   durationMs?: number
 }
@@ -53,7 +53,7 @@ export interface PresentationSnapshotEntry {
   mimeType: string
   sourceUrl: string
   derivativeId?: string
-  playbackMode?: 'native' | 'transcoded-derivative' | 'live-transcode'
+  playbackMode?: 'native' | 'transcoded-derivative' | 'live-transcode' | 'vlc-embedded'
   seekable?: boolean
   durationMs?: number
 }
@@ -181,10 +181,24 @@ async function analyzePresentationItem(
     }
   }
 
-  const metadata = capability.kind === 'video' ? await ensureSourceMediaMetadata(blobId, item.mimeType) : null
+  const metadata =
+    capability.kind === 'video' ? await ensureSourceMediaMetadata(blobId, item.mimeType) : null
   const durationMs = metadata?.durationMs
 
   if (support === 'transcode-required') {
+    if (await canUseVlcEmbedded(platform, blobId)) {
+      return {
+        itemId: item.id,
+        blobId,
+        status: 'ready',
+        reason: 'ready-vlc-embedded',
+        support,
+        playbackMode: 'vlc-embedded',
+        seekable: true,
+        durationMs
+      }
+    }
+
     const derivative = await getDerivedAsset(
       blobId,
       'transcoded-video',
@@ -249,6 +263,18 @@ async function analyzePresentationItem(
     playbackMode: 'native',
     seekable: true,
     durationMs
+  }
+}
+
+async function canUseVlcEmbedded(platform: MediaPlatform, blobId: string): Promise<boolean> {
+  if (platform !== 'electron') return false
+  try {
+    const record = await getFileBlobRecord(blobId)
+    if (record?.storage !== 'native-fs') return false
+    const info = await window.api.projectionVlc.getInfo()
+    return info.status === 'ready'
+  } catch {
+    return false
   }
 }
 

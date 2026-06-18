@@ -127,6 +127,15 @@ const videoTranscodeApi = {
   stopLive: (sessionId: string) => typedInvoke('video-transcode:stop-live', sessionId)
 }
 
+const projectionVlcApi = {
+  getInfo: () => typedInvoke('projection-vlc:get-info'),
+  start: (request: IpcInvokeMap['projection-vlc:start']['args'][0]) =>
+    typedInvoke('projection-vlc:start', request),
+  control: (command: IpcInvokeMap['projection-vlc:control']['args'][0]) =>
+    typedInvoke('projection-vlc:control', command),
+  stop: () => typedInvoke('projection-vlc:stop')
+}
+
 const localSyncApi = {
   selectFolder: () => typedInvoke('local-sync:select-folder'),
   listFolders: () => typedInvoke('local-sync:list-folders'),
@@ -160,6 +169,7 @@ const api = {
   speech: speechApi,
   nativeFs: nativeFsApi,
   videoTranscode: videoTranscodeApi,
+  projectionVlc: projectionVlcApi,
   localSync: localSyncApi,
   oneDrive: oneDriveApi
 }

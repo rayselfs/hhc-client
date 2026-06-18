@@ -149,6 +149,45 @@ describe('media projection sync', () => {
     })
   })
 
+  it('projects embedded VLC video without starting live transcode', async () => {
+    useMediaProjectionStore.setState({
+      playlist: [makeFile('vlc-item', 'vlc.mkv', 'video/x-matroska', 'source-blob')],
+      currentIndex: 0,
+      isPresenting: true,
+      snapshot: {
+        id: 'snapshot',
+        createdAt: 1,
+        entries: [
+          {
+            index: 0,
+            itemId: 'vlc-item',
+            blobId: 'source-blob',
+            name: 'vlc.mkv',
+            mimeType: 'video/x-matroska',
+            sourceUrl: 'blob:source-blob',
+            playbackMode: 'vlc-embedded',
+            seekable: true,
+            durationMs: 15000
+          }
+        ]
+      }
+    })
+
+    renderSync()
+
+    expect(window.api.videoTranscode.startLive).not.toHaveBeenCalled()
+    expect(mockProject).toHaveBeenCalledWith(
+      'file:show',
+      expect.objectContaining({
+        itemId: 'vlc-item',
+        blobId: 'source-blob',
+        playbackMode: 'vlc-embedded',
+        seekable: true,
+        durationMs: 15000
+      })
+    )
+  })
+
   it('logs and skips projection when live transcode startup fails', async () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     window.api.videoTranscode.startLive = vi.fn().mockRejectedValue(new Error('ffmpeg failed'))
