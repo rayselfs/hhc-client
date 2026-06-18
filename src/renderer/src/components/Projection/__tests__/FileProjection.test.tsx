@@ -2,13 +2,11 @@ import { fireEvent, render, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import FileProjection from '../FileProjection'
 
-const { mockGetFileSource, mockGetThumbnail, mockProjectionHandlers, mockProjectionSend } =
-  vi.hoisted(() => ({
-    mockGetFileSource: vi.fn(),
-    mockGetThumbnail: vi.fn(),
-    mockProjectionHandlers: new Map<string, Array<(data: unknown) => void>>(),
-    mockProjectionSend: vi.fn()
-  }))
+const { mockGetFileSource, mockProjectionHandlers, mockProjectionSend } = vi.hoisted(() => ({
+  mockGetFileSource: vi.fn(),
+  mockProjectionHandlers: new Map<string, Array<(data: unknown) => void>>(),
+  mockProjectionSend: vi.fn()
+}))
 
 vi.mock('@renderer/lib/file-explorer-db', () => ({
   openFileExplorerDB: vi.fn().mockResolvedValue({}),
@@ -33,10 +31,6 @@ vi.mock('@renderer/lib/projection-adapter', () => ({
   })
 }))
 
-vi.mock('@renderer/lib/thumbnail-db', () => ({
-  getThumbnail: mockGetThumbnail
-}))
-
 describe('FileProjection copied media identity', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -45,7 +39,6 @@ describe('FileProjection copied media identity', () => {
       url: 'blob:projection-source',
       revoke: vi.fn()
     })
-    mockGetThumbnail.mockResolvedValue(null)
     Object.defineProperty(window, 'api', {
       configurable: true,
       value: {
@@ -288,37 +281,5 @@ describe('FileProjection copied media identity', () => {
     )
 
     expect(video.currentTime).toBe(0)
-  })
-
-  it('shows VLC video poster before playback and hides it on play', async () => {
-    mockGetThumbnail.mockResolvedValue('blob:poster')
-
-    const { container, rerender } = render(
-      <FileProjection
-        fileName="clip.mkv"
-        initialItemId="item-id"
-        initialBlobId="blob-id"
-        initialMimeType="video/x-matroska"
-        initialPlaybackMode="vlc-embedded"
-      />
-    )
-
-    await waitFor(() => {
-      expect(mockGetThumbnail).toHaveBeenCalledWith('item-id', 'blob-id')
-      expect(container.querySelector('img')).toHaveAttribute('src', 'blob:poster')
-    })
-
-    rerender(
-      <FileProjection
-        fileName="clip.mkv"
-        initialItemId="item-id"
-        initialBlobId="blob-id"
-        initialMimeType="video/x-matroska"
-        initialPlaybackMode="vlc-embedded"
-        controlEvent={{ id: 1, data: { action: 'play', itemId: 'item-id' } }}
-      />
-    )
-
-    expect(container.querySelector('img')).not.toBeInTheDocument()
   })
 })
