@@ -32,7 +32,15 @@ export default function AboutDialog({ isOpen, onOpenChange }: AboutDialogProps):
                     <span className="text-sm text-muted">v{__APP_VERSION__}</span>
                     <span className="text-xs text-muted">GPL-3.0-or-later</span>
                     <span className="text-xs text-muted">
-                      Open source notices: THIRD_PARTY_NOTICES.md
+                      Open source notices: bundled THIRD_PARTY_NOTICES.md ·{' '}
+                      <a
+                        className="text-primary hover:underline"
+                        href="https://github.com/rayselfs/libre-presenter/blob/main/THIRD_PARTY_NOTICES.md"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        View online
+                      </a>
                     </span>
                     <p className="text-sm text-muted mt-1">{t('about.description')}</p>
                   </div>

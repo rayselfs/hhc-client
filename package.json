@@ -21,6 +21,8 @@
     "build:win": "npm run package:desktop -- --win",
     "build:mac": "npm run package:desktop -- --mac",
     "build:linux": "electron-vite build && electron-builder --linux",
+    "prepare:video-engine": "node scripts/prepare-video-engine-runtime.mjs",
+    "prepare:video-engine:strict": "node scripts/prepare-video-engine-runtime.mjs --strict",
     "poc:vlc": "electron scripts/vlc-poc.cjs",
     "test": "vitest run",
     "test:watch": "vitest",

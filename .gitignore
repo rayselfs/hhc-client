@@ -10,3 +10,7 @@ coverage
 *.tsbuildinfo
 bundle-report.html
 .omo
+.local-runtimes/
+resources/video-engine/**/*
+!resources/video-engine/**/
+!resources/video-engine/**/README.txt
