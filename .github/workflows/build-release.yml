@@ -87,6 +87,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Prepare video engine runtime
+        run: npm run prepare:video-engine:strict
+
       - name: Validate macOS signing secrets
         if: runner.os == 'macOS'
         shell: bash
