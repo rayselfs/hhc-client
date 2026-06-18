@@ -58,11 +58,7 @@ async function startVlc(wm: WindowManager, request: ProjectionVlcStartRequest): 
     throw new Error(info.message ?? 'VLC runtime not found')
   }
 
-  await stopVlc()
-  currentItemId = request.itemId
-  currentDurationMs = request.durationMs
-
-  player = new VlcPlayer({
+  const nextPlayer = new VlcPlayer({
     window: projectionWindow,
     container: request.container,
     vlcDir: info.vlcDir,
@@ -71,18 +67,25 @@ async function startVlc(wm: WindowManager, request: ProjectionVlcStartRequest): 
   })
 
   try {
-    await player.embed()
-    player.on('timeChanged', () => sendState(wm))
-    player.on('lengthChanged', () => sendState(wm))
-    player.on('playing', () => sendState(wm, { isPlaying: true, isEnded: false }))
-    player.on('paused', () => sendState(wm, { isPlaying: false }))
-    player.on('stopped', () => sendState(wm, { isPlaying: false }))
-    player.on('endReached', () => sendState(wm, { isPlaying: false, isEnded: true }))
-    player.on('error', () => sendState(wm, { isPlaying: false }))
-    player.setSource(getNativeFilePath(request.sourceFileId), { autoplay: false })
+    await nextPlayer.embed()
+    if (!nextPlayer.isEmbedded()) throw new Error('VLC player failed to embed')
+
+    await stopVlc()
+    player = nextPlayer
+    currentItemId = request.itemId
+    currentDurationMs = request.durationMs
+
+    nextPlayer.on('timeChanged', () => sendState(wm))
+    nextPlayer.on('lengthChanged', () => sendState(wm))
+    nextPlayer.on('playing', () => sendState(wm, { isPlaying: true, isEnded: false }))
+    nextPlayer.on('paused', () => sendState(wm, { isPlaying: false }))
+    nextPlayer.on('stopped', () => sendState(wm, { isPlaying: false }))
+    nextPlayer.on('endReached', () => sendState(wm, { isPlaying: false, isEnded: true }))
+    nextPlayer.on('error', () => sendState(wm, { isPlaying: false }))
+    nextPlayer.setSource(getNativeFilePath(request.sourceFileId), { autoplay: false })
     sendState(wm, { isPlaying: false, isEnded: false })
   } catch (error) {
-    await stopVlc()
+    nextPlayer.destroy()
     throw error
   }
 }
