@@ -65,6 +65,7 @@ export default function FileProjection({
   const seekableRef = useRef(true)
   const playbackModeRef = useRef<FileProjectionProps['initialPlaybackMode']>('native')
   const durationMsRef = useRef<number | undefined>(initialDurationMs)
+  const loadSequenceRef = useRef(0)
 
   const isControlForCurrentItem = useCallback((data: FileControlPayload): boolean => {
     if (!('itemId' in data) || data.itemId === undefined) return true
@@ -197,9 +198,16 @@ export default function FileProjection({
 
   const loadFile = useCallback(
     async (itemId: string, blobId: string, fileMimeType: string, options: LoadFileOptions = {}) => {
+      const loadSequence = loadSequenceRef.current + 1
+      loadSequenceRef.current = loadSequence
+      if (playbackModeRef.current === 'vlc-embedded') {
+        await window.api?.projectionVlc?.stop().catch((error) => {
+          console.error('[file-projection] Failed to stop VLC before loading next item', error)
+        })
+        if (loadSequenceRef.current !== loadSequence) return
+      }
       currentItemIdRef.current = itemId
       pendingVideoControlRef.current = null
-      void window.api?.projectionVlc?.stop()
       playbackModeRef.current = options.playbackMode ?? 'native'
       seekableRef.current = options.seekable !== false
       durationMsRef.current = options.durationMs

@@ -2,11 +2,13 @@ import { fireEvent, render, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import FileProjection from '../FileProjection'
 
-const { mockGetFileSource, mockProjectionHandlers, mockProjectionSend } = vi.hoisted(() => ({
-  mockGetFileSource: vi.fn(),
-  mockProjectionHandlers: new Map<string, Array<(data: unknown) => void>>(),
-  mockProjectionSend: vi.fn()
-}))
+const { mockGetFileSource, mockProjectionHandlers, mockProjectionSend, mockProjectionVlcStop } =
+  vi.hoisted(() => ({
+    mockGetFileSource: vi.fn(),
+    mockProjectionHandlers: new Map<string, Array<(data: unknown) => void>>(),
+    mockProjectionSend: vi.fn(),
+    mockProjectionVlcStop: vi.fn()
+  }))
 
 vi.mock('@renderer/lib/file-explorer-db', () => ({
   openFileExplorerDB: vi.fn().mockResolvedValue({}),
@@ -45,10 +47,11 @@ describe('FileProjection copied media identity', () => {
         projectionVlc: {
           start: vi.fn().mockResolvedValue(undefined),
           control: vi.fn().mockResolvedValue(undefined),
-          stop: vi.fn().mockResolvedValue(undefined)
+          stop: mockProjectionVlcStop
         }
       }
     })
+    mockProjectionVlcStop.mockResolvedValue(undefined)
     HTMLMediaElement.prototype.play = vi.fn().mockResolvedValue(undefined)
     HTMLMediaElement.prototype.pause = vi.fn()
   })
@@ -281,5 +284,42 @@ describe('FileProjection copied media identity', () => {
     )
 
     expect(video.currentTime).toBe(0)
+  })
+
+  it('waits for VLC to stop before loading the next non-VLC item', async () => {
+    let resolveStop: (() => void) | undefined
+    mockProjectionVlcStop.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        resolveStop = resolve
+      })
+    )
+
+    const { rerender } = render(
+      <FileProjection
+        fileName="clip.mkv"
+        initialItemId="video-id"
+        initialBlobId="video-blob"
+        initialMimeType="video/x-matroska"
+        initialPlaybackMode="vlc-embedded"
+      />
+    )
+
+    rerender(
+      <FileProjection
+        fileName="next.png"
+        initialItemId="image-id"
+        initialBlobId="image-blob"
+        initialMimeType="image/png"
+      />
+    )
+
+    expect(mockProjectionVlcStop).toHaveBeenCalled()
+    expect(mockGetFileSource).not.toHaveBeenCalledWith({}, 'image-blob', 'image/png')
+
+    resolveStop?.()
+
+    await waitFor(() => {
+      expect(mockGetFileSource).toHaveBeenCalledWith({}, 'image-blob', 'image/png')
+    })
   })
 })
