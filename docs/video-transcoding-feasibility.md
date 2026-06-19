@@ -1,150 +1,102 @@
-# Video Transcoding Feasibility Spike
+# Desktop Video Engine Decision
 
 Date: 2026-06-16
-
-## Current Status
-
-Superseded.
-
-The accepted product strategy is now:
-
-- Desktop playback: bundled VLC/libVLC.
-- Desktop posters: bundled FFmpeg used only for poster generation.
-- No user-selected FFmpeg.
-- No background MP4 transcode jobs.
-- No live transcode presentation path.
-- Web remains browser-native and does not support MKV/AVI/WMV.
-
-The original analysis below is retained as historical context for why Web
-transcoding was rejected and why the first Electron-only FFmpeg route was
-replaced.
+Updated: 2026-06-19
 
 ## Decision
 
-Superseded decision: Electron-only background transcoding with a user-selected
-FFmpeg executable.
+LibrePresenter no longer uses user-selected FFmpeg, background MP4 transcode
+jobs, or live transcode presentation.
 
-Current decision: bundle VLC/libVLC for playback and bundle FFmpeg only for
-poster generation.
+The accepted strategy is:
 
-## Why
+- Desktop playback uses bundled VLC/libVLC through the embedded projection
+  player.
+- Desktop video posters use bundled FFmpeg only for still poster generation.
+- Web playback stays browser-native and does not gain desktop codec support.
+- Unsupported Web videos may be uploaded for consistency, but they are marked
+  unsupported and excluded from presentation.
 
-- HHC already has a dual Electron/Web architecture, but transcoding is not just codec detection. It
-  needs long-running jobs, cancellation, restart recovery, temporary files, disk/quota checks, and
-  stable derivative cleanup.
-- Electron can run a native executable without sending whole media files through renderer IPC.
-- Web transcoding would add a large optional runtime, extra deployment headers, and quota/memory
-  risks that conflict with the current Web 2GB IndexedDB limit.
-- FFmpeg licensing and build options vary by executable. User-managed FFmpeg keeps HHC out of
-  redistribution and auto-update responsibility.
+## Why VLC For Desktop Playback
 
-## Sources Checked
+Church and live-event projection software needs predictable playback for common
+user-provided files: MP4, MOV, MKV, AVI, and other containers that Chromium may
+not support. Requiring users to manually install FFmpeg and wait for background
+transcodes does not match a professional desktop product.
 
-- FFmpeg docs describe the demuxer -> decoder -> filter -> encoder -> muxer pipeline and confirm
-  that transcoding is required when output stream properties need to change:
-  https://ffmpeg.org/ffmpeg.html
-- FFmpeg legal docs state FFmpeg is LGPL by default, while optional GPL parts change the effective
-  license when enabled:
-  https://www.ffmpeg.org/legal.html
-- FFmpeg format examples document MP4-compatible examples using `libx264` and `aac`:
-  https://ffmpeg.org/ffmpeg-formats.html
-- ffmpeg.wasm documents an approximately 31 MB core load for the single-thread example and notes
-  that the multi-thread version requires `SharedArrayBuffer` security requirements:
+VLC/libVLC keeps playback immediate and lets the desktop app support broader
+containers without inventing a media pipeline. The app still owns projection
+state, controls, storage, and cleanup.
+
+## Why FFmpeg Poster-Only
+
+VLC 3.x background snapshots are not reliable enough for deterministic poster
+generation. Bundled FFmpeg is therefore kept as an internal poster generator
+only.
+
+FFmpeg is not exposed in Preferences and is not used for:
+
+- background MP4 transcode jobs
+- live transcode presentation
+- user-selected executable paths
+- runtime playback decisions
+
+## Desktop Vs Web
+
+| Capability              | Desktop                   | Web                    |
+| ----------------------- | ------------------------- | ---------------------- |
+| MP4 / MOV playback      | VLC or browser-native     | browser-native         |
+| MKV / AVI / WMV         | VLC/libVLC                | unsupported            |
+| Video posters           | bundled FFmpeg poster job | browser canvas when OK |
+| User FFmpeg setting     | no                        | no                     |
+| Background transcode    | no                        | no                     |
+| Live transcode          | no                        | no                     |
+
+## Runtime Packaging
+
+Runtime binaries stay out of git and are prepared from `.local-runtimes/` into
+`resources/video-engine/` before desktop packaging.
+
+`npm run build` does not require runtime binaries. Desktop package commands run
+`prepare:video-engine:strict` and fail when the current platform runtime is
+missing.
+
+Expected local runtime layout:
+
+```text
+.local-runtimes/
+  vlc/darwin-arm64/
+  vlc/darwin-x64/
+  vlc/win32-x64/
+  ffmpeg/darwin-arm64/ffmpeg
+  ffmpeg/darwin-x64/ffmpeg
+  ffmpeg/win32-x64/ffmpeg.exe
+```
+
+## License Notes
+
+LibrePresenter is GPL-3.0-or-later. Bundled VLC/libVLC and FFmpeg notices live
+under `resources/licenses/` and are surfaced from the About dialog.
+
+This document is not legal advice. Before public release, verify the exact VLC
+and FFmpeg binary sources, build flags, and license notice requirements.
+
+## Rejected Approach
+
+The earlier plan used user-selected FFmpeg plus Electron-only MP4 derivatives.
+That approach was rejected because it added product friction and a large amount
+of state management: validation, cancellation, recovery, partial outputs,
+cleanup, profile tuning, and user-facing configuration.
+
+Web transcoding was also rejected because ffmpeg.wasm size, memory behavior,
+browser quota, and cross-origin isolation requirements are poor fits for the
+current Web mode.
+
+Reference material:
+
+- FFmpeg pipeline and CLI docs: https://ffmpeg.org/ffmpeg.html
+- FFmpeg legal notes: https://www.ffmpeg.org/legal.html
+- ffmpeg.wasm usage and runtime size notes:
   https://ffmpegwasm.netlify.app/docs/getting-started/usage
-- MDN documents that `SharedArrayBuffer` requires a secure context and cross-origin isolation:
+- SharedArrayBuffer cross-origin isolation requirements:
   https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/SharedArrayBuffer
-- MDN documents that cross-origin isolation requires COOP and COEP headers:
-  https://developer.mozilla.org/en-US/docs/Web/API/Window/crossOriginIsolated
-
-## Input Matrix
-
-The production test corpus should include:
-
-| Container   | Video codecs               | Audio codecs   | Notes                                                         |
-| ----------- | -------------------------- | -------------- | ------------------------------------------------------------- |
-| AVI         | H.264, MPEG-4 Part 2       | MP3, AAC, PCM  | Common legacy camera/export files                             |
-| MKV         | H.264, HEVC, MPEG-4 Part 2 | AAC, MP3, AC-3 | Often playable only after remux/transcode                     |
-| WMV/ASF     | WMV video                  | WMA/PCM        | Highest chance of requiring full transcode                    |
-| MP4 control | H.264                      | AAC            | Should pass through without transcode when already compatible |
-
-Each row needs short, long, low-resolution, and high-resolution samples. This repository currently
-does not include those samples, so no real throughput numbers are claimed in this spike.
-
-## Local Probe
-
-One local executable was probed only as evidence that the planned validation approach is practical:
-
-```text
-/opt/homebrew/bin/ffmpeg
-ffmpeg version 8.1
-```
-
-Detected capabilities:
-
-- Encoders: `libx264`, `libx264rgb`, `h264_videotoolbox`, `aac`, `aac_at`
-- Demuxers: `avi`, `matroska,webm`, `asf`, `asf_o`
-
-This does not prove Windows or Intel macOS support. The app must validate the selected executable on
-the user machine at startup and before each job.
-
-## Electron Design Constraint
-
-Minimum accepted output profile:
-
-```text
-container: mp4
-video: h264
-audio: aac
-pixel format: yuv420p
-flags: +faststart
-```
-
-Validation must require:
-
-- absolute, resolved regular executable file
-- no shell invocation
-- short `ffmpeg -version` timeout
-- required demuxers for accepted input containers
-- required decoder for the source stream
-- H.264 encoder capability, preferring `libx264`
-- AAC encoder capability
-- MP4 muxer
-- deterministic temporary file followed by atomic rename
-
-The renderer must never accept or store arbitrary executable paths. Preferences can display basename,
-status, detected version, and capability summary only.
-
-## Web Decision
-
-Do not implement Web transcoding in this plan.
-
-Reasons:
-
-- `@ffmpeg/ffmpeg` adds a large runtime even before processing user media.
-- Multi-thread ffmpeg.wasm requires `SharedArrayBuffer`, which requires cross-origin isolation.
-- Cross-origin isolation affects deployment headers and can break third-party embedded resources.
-- Browser quota and memory behavior for hundreds of MB files is unpredictable enough that a fixed
-  500 MB threshold would be misleading.
-
-Web should instead classify unsupported formats and show a clear message explaining that transcoding
-is currently available only in the Electron app after FFmpeg is configured.
-
-## Follow-Up Phases
-
-Phase 2B should implement the derivative/job model without assuming FFmpeg exists.
-
-Phase 2C should implement Electron native transcoding with:
-
-- Preferences > Media > Video Transcoding
-- Select FFmpeg, Validate again, Remove configuration
-- blocked job state when FFmpeg is missing or invalid
-- one concurrent transcode by default
-- startup and pre-job revalidation
-- no raw path exposure to renderer state, logs, LAN snapshots, or diagnostics
-
-## Acceptance Notes
-
-- No production dependency is added by this spike.
-- No automatic FFmpeg download is planned.
-- No bundled FFmpeg is planned.
-- No Web transcoding implementation is approved.
