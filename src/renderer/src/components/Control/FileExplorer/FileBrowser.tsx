@@ -424,11 +424,6 @@ export function FileBrowser({
   const thumbnails = useThumbnails(fileItems, { pendingAgeMs: 2 * 60 * 1000 })
 
   useEffect(() => {
-    if (!isWeb()) {
-      setUnsupportedMediaIds(new Set())
-      return
-    }
-
     let cancelled = false
     async function loadSyncStatuses(): Promise<void> {
       const ids = new Set([
@@ -459,6 +454,11 @@ export function FileBrowser({
   }, [folders, fileItems])
 
   useEffect(() => {
+    if (!isWeb()) {
+      setUnsupportedMediaIds(new Set())
+      return
+    }
+
     let cancelled = false
     async function loadUnsupportedMedia(): Promise<void> {
       const next = new Set<string>()

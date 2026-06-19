@@ -13,6 +13,7 @@ import {
 } from '@renderer/stores/file-explorer'
 import { getUploadMediaPlatform, uploadFiles, uploadFolderFiles } from '@renderer/lib/upload-utils'
 import { connectLocalSyncFolder } from '@renderer/lib/local-sync-import'
+import { connectOneDriveAccount } from '@renderer/lib/onedrive-connect'
 import { isElectron } from '@renderer/lib/env'
 import {
   computeExpiresAt,
@@ -125,8 +126,27 @@ export default function FilesPage(): React.JSX.Element {
     }
   }, [t])
 
-  const handleAddOneDrive = useCallback((): void => {
-    toast.warning(t('fileExplorer.syncSources.oneDriveComingSoon'))
+  const handleAddOneDrive = useCallback(async (): Promise<void> => {
+    try {
+      const result = await connectOneDriveAccount()
+      if (!result) return
+      toast.success(
+        t('fileExplorer.syncSources.oneDriveConnected', {
+          name: result.displayName,
+          count: result.itemCount
+        })
+      )
+    } catch (error) {
+      console.warn('[onedrive] Failed to connect account', error)
+      const message =
+        error instanceof Error && error.message === 'Only one OneDrive account can be connected'
+          ? 'oneDriveAlreadyConnected'
+          : error instanceof Error &&
+              error.message === 'OneDrive connection is currently available in the desktop app only'
+            ? 'oneDriveDesktopOnly'
+            : 'oneDriveConnectFailed'
+      toast.danger(t(`fileExplorer.syncSources.${message}`))
+    }
   }, [t])
 
   const handleFileChange = useCallback(
@@ -448,7 +468,7 @@ export default function FilesPage(): React.JSX.Element {
         onAddLocalSyncFolder: canAddLocalSyncFolder
           ? () => void handleAddLocalSyncFolder()
           : undefined,
-        onAddOneDrive: handleAddOneDrive,
+        onAddOneDrive: () => void handleAddOneDrive(),
         isReadOnly: isCurrentFolderReadOnly
       })
     },
@@ -506,7 +526,7 @@ export default function FilesPage(): React.JSX.Element {
         onAddLocalSyncFolder={
           canAddLocalSyncFolder ? () => void handleAddLocalSyncFolder() : undefined
         }
-        onAddOneDrive={handleAddOneDrive}
+        onAddOneDrive={() => void handleAddOneDrive()}
         isReadOnly={isCurrentFolderReadOnly}
       />
       <FolderModal

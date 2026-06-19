@@ -184,6 +184,20 @@ export async function getProviderConnection(
   return (await getSyncDB()).get('provider-connections', id)
 }
 
+export async function listProviderConnections(): Promise<ProviderConnectionRecord[]> {
+  return (await getSyncDB()).getAll('provider-connections')
+}
+
+export async function listProviderConnectionsByType(
+  providerType: SyncProviderType
+): Promise<ProviderConnectionRecord[]> {
+  return (await getSyncDB()).getAllFromIndex(
+    'provider-connections',
+    'by-provider-type',
+    providerType
+  )
+}
+
 export async function deleteProviderConnection(id: string): Promise<void> {
   await (await getSyncDB()).delete('provider-connections', id)
 }

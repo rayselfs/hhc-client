@@ -7,6 +7,7 @@ import {
   storeOneDriveProviderConnection
 } from '../onedrive-auth'
 import { getProviderConnection, resetSyncDBForTests } from '../sync-db'
+import { putProviderConnection } from '../sync-db'
 
 describe('onedrive-auth', () => {
   beforeEach(async () => {
@@ -91,5 +92,21 @@ describe('onedrive-auth', () => {
     expect(connection).not.toHaveProperty('refreshToken')
     expect(connection).not.toHaveProperty('authorizationCode')
     expect(connection).not.toHaveProperty('codeVerifier')
+  })
+
+  it('rejects connecting a second OneDrive account', async () => {
+    await putProviderConnection({
+      id: 'onedrive:account-1',
+      providerType: 'onedrive',
+      displayName: 'OneDrive - Alice'
+    })
+
+    await expect(
+      storeOneDriveProviderConnection({
+        id: 'account-2',
+        displayName: 'Bob',
+        userPrincipalName: 'bob@example.com'
+      })
+    ).rejects.toThrow('Only one OneDrive account can be connected')
   })
 })

@@ -479,7 +479,11 @@
     "syncSources": {
       "localSyncConnected": "Connected {{name}} and imported {{count}} file(s).",
       "localSyncConnectFailed": "Failed to connect sync folder.",
-      "oneDriveComingSoon": "OneDrive folder connection is not ready yet.",
+      "oneDriveCallbackPrompt": "After signing in, copy the final browser URL and paste it here.",
+      "oneDriveConnected": "Connected {{name}} and imported {{count}} item(s).",
+      "oneDriveAlreadyConnected": "Only one OneDrive account can be connected.",
+      "oneDriveDesktopOnly": "OneDrive connection is available in the desktop app only.",
+      "oneDriveConnectFailed": "Failed to connect OneDrive.",
       "unsupportedFiles": "{{count}} unsupported file(s) were kept but disabled."
     }
   },
@@ -594,6 +598,13 @@
         "clientIdSourceCustom": "Using custom Client ID",
         "invalidClientId": "Enter a valid Azure Application Client ID.",
         "restoreDefaultClientId": "Restore default Client ID",
+        "connectedAccount": "Connected Account",
+        "noConnectedAccount": "No OneDrive account connected.",
+        "disconnect": "Disconnect",
+        "disconnectTitle": "Disconnect OneDrive?",
+        "disconnectDescription": "This removes the OneDrive source from LibrePresenter and clears locally cached synced files. Remote files are not changed.",
+        "disconnected": "OneDrive disconnected.",
+        "disconnectFailed": "Failed to disconnect OneDrive.",
         "defaultOfflinePolicy": "Offline Policy",
         "offlinePolicies": {
           "online-only": "Online only",

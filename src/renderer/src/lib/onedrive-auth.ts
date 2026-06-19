@@ -1,5 +1,9 @@
 import { LIBREPRESENTER_DEFAULT_ONEDRIVE_CLIENT_ID } from '@renderer/stores/settings'
-import { putProviderConnection, type ProviderConnectionRecord } from './sync-db'
+import {
+  listProviderConnectionsByType,
+  putProviderConnection,
+  type ProviderConnectionRecord
+} from './sync-db'
 
 export const ONEDRIVE_AUTHORITY =
   'https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize'
@@ -145,9 +149,16 @@ export function createOneDriveTokenExchangeBody(
 export async function storeOneDriveProviderConnection(
   profile: OneDriveAccountProfile
 ): Promise<ProviderConnectionRecord> {
+  const existing = await listProviderConnectionsByType('onedrive')
+  const nextId = `onedrive:${profile.id}`
+  const existingOtherAccount = existing.find((connection) => connection.id !== nextId)
+  if (existingOtherAccount) {
+    throw new Error('Only one OneDrive account can be connected')
+  }
+
   const accountLabel = profile.userPrincipalName || profile.mail || profile.displayName
   return putProviderConnection({
-    id: `onedrive:${profile.id}`,
+    id: nextId,
     providerType: 'onedrive',
     displayName: profile.displayName ? `OneDrive - ${profile.displayName}` : 'OneDrive',
     accountLabel
