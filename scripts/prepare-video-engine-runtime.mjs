@@ -5,6 +5,8 @@ import { join } from 'node:path'
 const strict = process.argv.includes('--strict')
 const strictAll = process.argv.includes('--all')
 const root = process.cwd()
+const runtimePlatform = process.env.VIDEO_ENGINE_RUNTIME_PLATFORM ?? process.platform
+const runtimeArch = process.env.VIDEO_ENGINE_RUNTIME_ARCH ?? process.arch
 
 const targets = [
   {
@@ -68,7 +70,7 @@ async function exists(path) {
 }
 
 function isStrictTarget(target) {
-  return strictAll || (target.platform === process.platform && target.arch === process.arch)
+  return strictAll || (target.platform === runtimePlatform && target.arch === runtimeArch)
 }
 
 let missing = 0
