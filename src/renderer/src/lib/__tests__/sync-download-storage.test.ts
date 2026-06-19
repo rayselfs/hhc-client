@@ -22,7 +22,7 @@ vi.mock('../env', () => ({
 import { isElectron } from '../env'
 
 const request = {
-  providerConnectionId: 'connection-1',
+  providerConnectionId: 'onedrive:account-1',
   remoteItemId: 'remote-file-1',
   targetBlobId: 'blob-1',
   offlinePolicy: 'on-demand' as const
@@ -54,6 +54,12 @@ beforeEach(async () => {
     configurable: true,
     value: {
       oneDrive: {
+        getAccessToken: vi.fn(async () => ({
+          accessToken: 'access-token',
+          expiresAt: Date.now() + 3600_000,
+          scope: 'offline_access User.Read Files.Read',
+          tokenType: 'Bearer'
+        })),
         downloadFile: vi.fn(async () => ({
           fileId: request.targetBlobId,
           size: 10,
@@ -86,7 +92,9 @@ describe('saveWebOneDriveDownloadedContent', () => {
       size: 13,
       refCount: 1
     })
-    await expect(getSyncEntryByRemoteItem('connection-1', 'remote-file-1')).resolves.toMatchObject({
+    await expect(
+      getSyncEntryByRemoteItem('onedrive:account-1', 'remote-file-1')
+    ).resolves.toMatchObject({
       blobId: 'blob-1',
       status: 'available-offline',
       etag: 'etag-1',
@@ -119,7 +127,9 @@ describe('saveWebOneDriveDownloadedContent', () => {
       'OneDrive sync storage has reached 80% usage'
     )
     expect(mockToast.danger).toHaveBeenCalledWith('toast.syncStorageLimitReached')
-    await expect(getSyncEntryByRemoteItem('connection-1', 'remote-file-1')).resolves.toMatchObject({
+    await expect(
+      getSyncEntryByRemoteItem('onedrive:account-1', 'remote-file-1')
+    ).resolves.toMatchObject({
       status: 'insufficient-storage'
     })
   })
@@ -152,13 +162,21 @@ describe('saveWebOneDriveDownloadedContent', () => {
     vi.mocked(isElectron).mockReturnValue(true)
 
     await expect(
-      saveElectronOneDriveDownloadedContent(request, 'access-token', metadata)
+      saveElectronOneDriveDownloadedContent(
+        request,
+        '4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02',
+        metadata
+      )
     ).resolves.toEqual({
       blobId: 'blob-1',
       size: 10,
       mimeType: 'video/mp4'
     })
 
+    expect(window.api.oneDrive.getAccessToken).toHaveBeenCalledWith({
+      connectionId: 'onedrive:account-1',
+      clientId: '4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02'
+    })
     expect(window.api.oneDrive.downloadFile).toHaveBeenCalledWith({
       remoteItemId: 'remote-file-1',
       targetFileId: 'blob-1',
@@ -173,7 +191,9 @@ describe('saveWebOneDriveDownloadedContent', () => {
       size: 10,
       refCount: 1
     })
-    await expect(getSyncEntryByRemoteItem('connection-1', 'remote-file-1')).resolves.toMatchObject({
+    await expect(
+      getSyncEntryByRemoteItem('onedrive:account-1', 'remote-file-1')
+    ).resolves.toMatchObject({
       blobId: 'blob-1',
       status: 'available-offline'
     })
@@ -185,7 +205,11 @@ describe('saveWebOneDriveDownloadedContent', () => {
     const putSpy = vi.spyOn(db, 'put').mockRejectedValueOnce(new Error('db failed'))
 
     await expect(
-      saveElectronOneDriveDownloadedContent(request, 'access-token', metadata)
+      saveElectronOneDriveDownloadedContent(
+        request,
+        '4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02',
+        metadata
+      )
     ).rejects.toThrow('db failed')
 
     expect(window.api.nativeFs.delete).toHaveBeenCalledWith('blob-1')
@@ -199,18 +223,28 @@ describe('saveWebOneDriveDownloadedContent', () => {
     )
 
     await expect(
-      saveElectronOneDriveDownloadedContent(request, 'access-token', metadata)
+      saveElectronOneDriveDownloadedContent(
+        request,
+        '4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02',
+        metadata
+      )
     ).rejects.toThrow('OneDrive sync storage has reached 80% usage')
 
     expect(mockToast.danger).toHaveBeenCalledWith('toast.syncStorageLimitReached')
-    await expect(getSyncEntryByRemoteItem('connection-1', 'remote-file-1')).resolves.toMatchObject({
+    await expect(
+      getSyncEntryByRemoteItem('onedrive:account-1', 'remote-file-1')
+    ).resolves.toMatchObject({
       status: 'insufficient-storage'
     })
   })
 
   it('does not allow Web mode to use native download storage', async () => {
     await expect(
-      saveElectronOneDriveDownloadedContent(request, 'access-token', metadata)
+      saveElectronOneDriveDownloadedContent(
+        request,
+        '4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02',
+        metadata
+      )
     ).rejects.toThrow('Native OneDrive downloads are only available in Electron')
   })
 })

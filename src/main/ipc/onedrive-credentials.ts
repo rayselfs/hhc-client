@@ -1,7 +1,11 @@
-import { app, ipcMain, safeStorage } from 'electron'
+import { app, ipcMain, net, safeStorage } from 'electron'
 import { promises as fs } from 'fs'
 import { join } from 'path'
-import type { OneDriveCredentialStatus } from '@shared/ipc-channels'
+import type {
+  OneDriveAccessTokenRequest,
+  OneDriveAccessTokenResult,
+  OneDriveCredentialStatus
+} from '@shared/ipc-channels'
 import type { WindowManager } from '../windowManager'
 import { isMainWindow } from './validate'
 
@@ -16,6 +20,8 @@ interface StoredOneDriveCredential {
 }
 
 const CONNECTION_ID_PATTERN = /^onedrive:[A-Za-z0-9._~-]{1,160}$/
+const CLIENT_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const ONEDRIVE_TOKEN_ENDPOINT = 'https://login.microsoftonline.com/consumers/oauth2/v2.0/token'
 
 function validateConnectionId(connectionId: unknown): string {
   if (
@@ -26,6 +32,13 @@ function validateConnectionId(connectionId: unknown): string {
     throw new Error('Invalid OneDrive connection id')
   }
   return connectionId
+}
+
+function validateClientId(clientId: unknown): string {
+  if (typeof clientId !== 'string' || !CLIENT_ID_PATTERN.test(clientId.trim())) {
+    throw new Error('Invalid OneDrive Client ID')
+  }
+  return clientId.trim()
 }
 
 function getCredentialDir(): string {
@@ -69,6 +82,53 @@ function normalizeCredential(input: unknown): StoredOneDriveCredential {
   }
 }
 
+function normalizeAccessTokenRequest(input: unknown): OneDriveAccessTokenRequest {
+  if (typeof input !== 'object' || input === null) {
+    throw new Error('Invalid OneDrive access token request')
+  }
+  const value = input as Record<string, unknown>
+  return {
+    connectionId: validateConnectionId(value.connectionId),
+    clientId: validateClientId(value.clientId)
+  }
+}
+
+function normalizeTokenResponse(input: unknown): {
+  accessToken: string
+  refreshToken?: string
+  expiresAt?: number
+  scope?: string
+  tokenType?: 'Bearer'
+} {
+  if (typeof input !== 'object' || input === null) {
+    throw new Error('Invalid OneDrive token response')
+  }
+  const value = input as Record<string, unknown>
+  if (typeof value.access_token !== 'string' || value.access_token.trim().length === 0) {
+    throw new Error('Invalid OneDrive access token response')
+  }
+  if (value.refresh_token !== undefined && typeof value.refresh_token !== 'string') {
+    throw new Error('Invalid OneDrive refresh token response')
+  }
+  if (value.expires_in !== undefined && typeof value.expires_in !== 'number') {
+    throw new Error('Invalid OneDrive token expiry response')
+  }
+  if (value.scope !== undefined && typeof value.scope !== 'string') {
+    throw new Error('Invalid OneDrive token scope response')
+  }
+
+  return {
+    accessToken: value.access_token,
+    refreshToken: value.refresh_token,
+    expiresAt:
+      typeof value.expires_in === 'number' && Number.isFinite(value.expires_in)
+        ? Date.now() + value.expires_in * 1000
+        : undefined,
+    scope: value.scope,
+    tokenType: value.token_type === 'Bearer' ? 'Bearer' : undefined
+  }
+}
+
 function toStatus(credential: StoredOneDriveCredential | null): OneDriveCredentialStatus {
   if (!credential) return { hasRefreshToken: false }
   return {
@@ -105,6 +165,43 @@ async function writeCredential(credential: StoredOneDriveCredential): Promise<vo
   }
 }
 
+async function refreshAccessToken(
+  credential: StoredOneDriveCredential,
+  clientId: string
+): Promise<OneDriveAccessTokenResult> {
+  const body = new URLSearchParams()
+  body.set('client_id', clientId)
+  body.set('grant_type', 'refresh_token')
+  body.set('refresh_token', credential.refreshToken)
+  body.set('scope', 'offline_access User.Read Files.Read')
+
+  const response = await net.fetch(ONEDRIVE_TOKEN_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body
+  })
+  if (!response.ok) throw new Error(`OneDrive token refresh failed: ${response.status}`)
+
+  const token = normalizeTokenResponse(await response.json())
+  const updatedCredential: StoredOneDriveCredential = {
+    ...credential,
+    accessToken: token.accessToken,
+    refreshToken: token.refreshToken ?? credential.refreshToken,
+    expiresAt: token.expiresAt,
+    scope: token.scope,
+    tokenType: token.tokenType,
+    updatedAt: Date.now()
+  }
+  await writeCredential(updatedCredential)
+
+  return {
+    accessToken: token.accessToken,
+    expiresAt: token.expiresAt,
+    scope: token.scope,
+    tokenType: token.tokenType
+  }
+}
+
 export function registerOneDriveCredentialHandlers(wm: WindowManager): void {
   ipcMain.handle(
     'onedrive:save-credentials',
@@ -122,6 +219,17 @@ export function registerOneDriveCredentialHandlers(wm: WindowManager): void {
       if (!isMainWindow(wm, event)) throw new Error('Unauthorized OneDrive credential access')
       const validConnectionId = validateConnectionId(connectionId)
       return toStatus(await readCredential(validConnectionId))
+    }
+  )
+
+  ipcMain.handle(
+    'onedrive:get-access-token',
+    async (event, input: unknown): Promise<OneDriveAccessTokenResult> => {
+      if (!isMainWindow(wm, event)) throw new Error('Unauthorized OneDrive credential access')
+      const request = normalizeAccessTokenRequest(input)
+      const credential = await readCredential(request.connectionId)
+      if (!credential) throw new Error('OneDrive credentials not found')
+      return refreshAccessToken(credential, request.clientId)
     }
   )
 

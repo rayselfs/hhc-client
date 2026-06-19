@@ -109,7 +109,7 @@ export async function saveWebOneDriveDownloadedContent(
 
 export async function saveElectronOneDriveDownloadedContent(
   request: SyncDownloadRequest,
-  accessToken: string,
+  clientId: string,
   metadata: RemoteSyncItem
 ): Promise<SyncDownloadResult> {
   if (!isElectron()) {
@@ -118,10 +118,14 @@ export async function saveElectronOneDriveDownloadedContent(
 
   let downloaded: Awaited<ReturnType<typeof window.api.oneDrive.downloadFile>>
   try {
+    const token = await window.api.oneDrive.getAccessToken({
+      connectionId: request.providerConnectionId,
+      clientId
+    })
     downloaded = await window.api.oneDrive.downloadFile({
       remoteItemId: request.remoteItemId,
       targetFileId: request.targetBlobId,
-      accessToken,
+      accessToken: token.accessToken,
       expectedSize: metadata.size,
       mimeType: metadata.mimeType
     })

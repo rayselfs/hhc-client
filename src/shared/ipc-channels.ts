@@ -128,6 +128,18 @@ export interface OneDriveCredentialStatus {
   scope?: string
 }
 
+export interface OneDriveAccessTokenRequest {
+  connectionId: string
+  clientId: string
+}
+
+export interface OneDriveAccessTokenResult {
+  accessToken: string
+  expiresAt?: number
+  scope?: string
+  tokenType?: 'Bearer'
+}
+
 export interface OneDriveNativeDownloadRequest {
   remoteItemId: string
   targetFileId: string
@@ -205,6 +217,10 @@ export interface IpcInvokeMap {
   'local-sync:disconnect-folder': { args: [string]; result: void }
   'onedrive:save-credentials': { args: [OneDriveCredentialInput]; result: OneDriveCredentialStatus }
   'onedrive:get-credential-status': { args: [string]; result: OneDriveCredentialStatus }
+  'onedrive:get-access-token': {
+    args: [OneDriveAccessTokenRequest]
+    result: OneDriveAccessTokenResult
+  }
   'onedrive:delete-credentials': { args: [string]; result: void }
   'onedrive:download-file': {
     args: [OneDriveNativeDownloadRequest]

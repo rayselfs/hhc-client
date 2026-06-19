@@ -17,6 +17,8 @@ import type {
   LocalSyncImportFileRequest,
   LocalSyncWatchStatus,
   LocalSyncRemoteItem,
+  OneDriveAccessTokenRequest,
+  OneDriveAccessTokenResult,
   OneDriveCredentialInput,
   OneDriveCredentialStatus,
   OneDriveNativeDownloadRequest,
@@ -120,6 +122,7 @@ interface LocalSyncAPI {
 interface OneDriveAPI {
   saveCredentials: (input: OneDriveCredentialInput) => Promise<OneDriveCredentialStatus>
   getCredentialStatus: (connectionId: string) => Promise<OneDriveCredentialStatus>
+  getAccessToken: (request: OneDriveAccessTokenRequest) => Promise<OneDriveAccessTokenResult>
   deleteCredentials: (connectionId: string) => Promise<void>
   downloadFile: (request: OneDriveNativeDownloadRequest) => Promise<OneDriveNativeDownloadResult>
 }
