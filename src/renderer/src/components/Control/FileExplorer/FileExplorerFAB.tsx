@@ -11,6 +11,7 @@ export interface FileExplorerFABProps {
   onUploadFolder?: () => void
   onAddLocalSyncFolder?: () => void
   onAddOneDrive?: () => void
+  isAddOneDriveDisabled?: boolean
   isReadOnly?: boolean
 }
 
@@ -19,6 +20,7 @@ export default function FileExplorerFAB({
   onUploadFolder,
   onAddLocalSyncFolder,
   onAddOneDrive,
+  isAddOneDriveDisabled = false,
   isReadOnly = false
 }: FileExplorerFABProps): React.JSX.Element | null {
   const { t } = useTranslation()
@@ -88,7 +90,7 @@ export default function FileExplorerFAB({
                 if (key === 'uploadFiles' && !isReadOnly) onUploadFiles?.()
                 if (key === 'uploadFolder' && !isReadOnly) onUploadFolder?.()
                 if (key === 'addLocalSyncFolder') onAddLocalSyncFolder?.()
-                if (key === 'addOneDrive') onAddOneDrive?.()
+                if (key === 'addOneDrive' && !isAddOneDriveDisabled) onAddOneDrive?.()
               }}
             >
               {!isReadOnly && (
@@ -134,6 +136,7 @@ export default function FileExplorerFAB({
                   {onAddOneDrive && (
                     <Dropdown.Item
                       id="addOneDrive"
+                      isDisabled={isAddOneDriveDisabled}
                       className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
                     >
                       <Cloud size={16} />

@@ -74,6 +74,7 @@ export interface ShowEmptyAreaMenuOptions {
   onUploadFolder?: () => void
   onAddLocalSyncFolder?: () => void
   onAddOneDrive?: () => void
+  isAddOneDriveDisabled?: boolean
   isReadOnly?: boolean
 }
 
@@ -283,6 +284,7 @@ export function createFolderContextMenu(
       onUploadFolder,
       onAddLocalSyncFolder,
       onAddOneDrive,
+      isAddOneDriveDisabled = false,
       isReadOnly = false
     }: ShowEmptyAreaMenuOptions): void => {
       const pasteItems: ContextMenuEntry[] =
@@ -360,6 +362,7 @@ export function createFolderContextMenu(
                       id: 'add-onedrive',
                       label: tKey('addOneDrive'),
                       icon: React.createElement(Cloud, { size: 14 }),
+                      disabled: isAddOneDriveDisabled,
                       onAction: onAddOneDrive
                     } as ContextMenuEntry
                   ]

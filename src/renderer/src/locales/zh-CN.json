@@ -479,12 +479,19 @@
     "syncSources": {
       "localSyncConnected": "已连接 {{name}}，导入 {{count}} 个文件。",
       "localSyncConnectFailed": "无法连接同步文件夹。",
-      "oneDriveCallbackPrompt": "登录后，请复制浏览器最后停留的网址并粘贴到这里。",
-      "oneDriveConnected": "已连接 {{name}}，导入 {{count}} 个项目。",
-      "oneDriveAlreadyConnected": "只能连接一个 OneDrive 帐号。",
+      "oneDriveFolderImported": "已加入 {{name}}，导入 {{count}} 个项目。",
+      "oneDriveLoginRequired": "请先在偏好设置登录 OneDrive。",
       "oneDriveDesktopOnly": "OneDrive 连接目前只支持桌面版。",
-      "oneDriveConnectFailed": "无法连接 OneDrive。",
+      "oneDriveImportFailed": "无法加入 OneDrive 文件夹。",
       "unsupportedFiles": "有 {{count}} 个文件格式不支持，已保留但禁用。"
+    },
+    "oneDriveFolderPicker": {
+      "title": "选择 OneDrive 文件夹",
+      "back": "返回上一层",
+      "empty": "这里没有可加入的文件夹。",
+      "import": "加入文件夹",
+      "loadFailed": "无法加载 OneDrive 文件夹。",
+      "openFolder": "打开 {{name}}"
     }
   },
   "projection": {
@@ -600,6 +607,12 @@
         "restoreDefaultClientId": "恢复默认 Client ID",
         "connectedAccount": "已连接帐号",
         "noConnectedAccount": "尚未连接 OneDrive 帐号。",
+        "connect": "登录",
+        "connected": "已连接 OneDrive。",
+        "alreadyConnected": "只能连接一个 OneDrive 帐号。",
+        "desktopOnly": "OneDrive 连接目前只支持桌面版。",
+        "connectFailed": "无法连接 OneDrive。",
+        "callbackPrompt": "登录后，请复制浏览器最后停留的网址并粘贴到这里。",
         "disconnect": "断开连接",
         "disconnectTitle": "断开 OneDrive 连接？",
         "disconnectDescription": "这会从 LibrePresenter 移除 OneDrive 来源并清除本机同步缓存，不会更改远程文件。",

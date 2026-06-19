@@ -479,12 +479,19 @@
     "syncSources": {
       "localSyncConnected": "Connected {{name}} and imported {{count}} file(s).",
       "localSyncConnectFailed": "Failed to connect sync folder.",
-      "oneDriveCallbackPrompt": "After signing in, copy the final browser URL and paste it here.",
-      "oneDriveConnected": "Connected {{name}} and imported {{count}} item(s).",
-      "oneDriveAlreadyConnected": "Only one OneDrive account can be connected.",
+      "oneDriveFolderImported": "Added {{name}} and imported {{count}} item(s).",
+      "oneDriveLoginRequired": "Sign in to OneDrive in Preferences first.",
       "oneDriveDesktopOnly": "OneDrive connection is available in the desktop app only.",
-      "oneDriveConnectFailed": "Failed to connect OneDrive.",
+      "oneDriveImportFailed": "Failed to add OneDrive folder.",
       "unsupportedFiles": "{{count}} unsupported file(s) were kept but disabled."
+    },
+    "oneDriveFolderPicker": {
+      "title": "Choose OneDrive Folder",
+      "back": "Back",
+      "empty": "No folders are available here.",
+      "import": "Add Folder",
+      "loadFailed": "Failed to load OneDrive folders.",
+      "openFolder": "Open {{name}}"
     }
   },
   "projection": {
@@ -600,6 +607,12 @@
         "restoreDefaultClientId": "Restore default Client ID",
         "connectedAccount": "Connected Account",
         "noConnectedAccount": "No OneDrive account connected.",
+        "connect": "Sign in",
+        "connected": "OneDrive connected.",
+        "alreadyConnected": "Only one OneDrive account can be connected.",
+        "desktopOnly": "OneDrive connection is available in the desktop app only.",
+        "connectFailed": "Failed to connect OneDrive.",
+        "callbackPrompt": "After signing in, copy the final browser URL and paste it here.",
         "disconnect": "Disconnect",
         "disconnectTitle": "Disconnect OneDrive?",
         "disconnectDescription": "This removes the OneDrive source from LibrePresenter and clears locally cached synced files. Remote files are not changed.",

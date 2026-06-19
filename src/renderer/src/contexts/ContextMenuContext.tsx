@@ -6,6 +6,7 @@ export interface ContextMenuItem {
   label: string
   icon?: React.ReactNode
   variant?: 'default' | 'danger'
+  disabled?: boolean
   onAction: () => void
 }
 

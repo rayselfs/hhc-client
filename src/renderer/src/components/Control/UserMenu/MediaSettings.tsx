@@ -16,6 +16,7 @@ import {
 import type { SyncOfflinePolicy } from '@shared/types/folder'
 import { listProviderConnectionsByType, type ProviderConnectionRecord } from '@renderer/lib/sync-db'
 import { unlinkSyncConnectionFromApp } from '@renderer/lib/sync-unlink'
+import { loginOneDriveAccount } from '@renderer/lib/onedrive-connect'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
 import { isElectron } from '@renderer/lib/env'
 
@@ -59,6 +60,33 @@ export default function MediaSettings({
     setOneDriveConnection(connections[0] ?? null)
   }, [])
 
+  function notifyOneDriveConnectionChanged(): void {
+    window.dispatchEvent(new Event('onedrive-connection-changed'))
+  }
+
+  async function handleLoginOneDrive(): Promise<void> {
+    setOneDriveConnectionBusy(true)
+    try {
+      const connection = await loginOneDriveAccount()
+      if (!connection) return
+      await refreshOneDriveConnection()
+      notifyOneDriveConnectionChanged()
+      toast.success(t('preferences.media.oneDrive.connected'))
+    } catch (error) {
+      console.warn('[onedrive] Failed to connect account', error)
+      const message =
+        error instanceof Error && error.message === 'Only one OneDrive account can be connected'
+          ? 'alreadyConnected'
+          : error instanceof Error &&
+              error.message === 'OneDrive connection is currently available in the desktop app only'
+            ? 'desktopOnly'
+            : 'connectFailed'
+      toast.danger(t(`preferences.media.oneDrive.${message}`))
+    } finally {
+      setOneDriveConnectionBusy(false)
+    }
+  }
+
   async function handleDisconnectOneDrive(): Promise<void> {
     if (!oneDriveConnection) return
     const confirmed = await confirm({
@@ -75,6 +103,7 @@ export default function MediaSettings({
       }
       await unlinkSyncConnectionFromApp(oneDriveConnection.id)
       await refreshOneDriveConnection()
+      notifyOneDriveConnectionChanged()
       toast.success(t('preferences.media.oneDrive.disconnected'))
     } catch (error) {
       console.warn('[onedrive] Failed to disconnect account', error)
@@ -149,9 +178,19 @@ export default function MediaSettings({
                 </Button>
               </div>
             ) : (
-              <p className="text-xs text-muted">
-                {t('preferences.media.oneDrive.noConnectedAccount')}
-              </p>
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-xs text-muted">
+                  {t('preferences.media.oneDrive.noConnectedAccount')}
+                </p>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  isDisabled={oneDriveConnectionBusy || !isElectron()}
+                  onPress={() => void handleLoginOneDrive()}
+                >
+                  {t('preferences.media.oneDrive.connect')}
+                </Button>
+              </div>
             )}
           </div>
 

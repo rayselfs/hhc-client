@@ -14,8 +14,10 @@ import { resolveUniqueName } from './file-naming'
 import {
   listProviderConnectionsByType,
   deleteProviderConnection,
+  getProviderConnection,
   putSyncCursor,
   putSyncEntry,
+  type ProviderConnectionRecord,
   type SyncEntryRecord
 } from './sync-db'
 import { saveElectronOneDriveDownloadedContent } from './sync-download-storage'
@@ -50,12 +52,18 @@ export interface OneDriveConnectResult {
   disabledCount: number
 }
 
+export interface OneDriveRemoteFolder {
+  remoteItemId: string
+  name: string
+  parentRemoteItemId: string | null
+}
+
 function safeIdPart(value: string): string {
   return value.replace(/[^a-z0-9_-]/gi, '_')
 }
 
-function createRootFolderId(connectionId: string): string {
-  return `onedrive-folder-${safeIdPart(connectionId)}`
+function createRootFolderId(connectionId: string, remoteFolderId: string): string {
+  return `onedrive-folder-${safeIdPart(connectionId)}-${safeIdPart(remoteFolderId)}`
 }
 
 function createSyncedFolderId(connectionId: string, remoteItemId: string): string {
@@ -125,16 +133,17 @@ function mergeImportedRecordsIntoStore(folders: FolderRecord[], items: FileItemR
   })
 }
 
-function buildOneDriveImportPlan(input: {
+export function buildOneDriveImportPlan(input: {
   connectionId: string
   displayName: string
+  rootRemoteFolderId: string
   offlinePolicy: SyncOfflinePolicy
   remoteItems: RemoteSyncItem[]
   existingRootFolderNames: string[]
   platform: MediaPlatform
 }): OneDriveImportPlan {
   const now = Date.now()
-  const rootFolderId = createRootFolderId(input.connectionId)
+  const rootFolderId = createRootFolderId(input.connectionId, input.rootRemoteFolderId)
   const rootFolder: FolderRecord = {
     id: rootFolderId,
     name: resolveUniqueName(input.displayName, input.existingRootFolderNames),
@@ -144,7 +153,7 @@ function buildOneDriveImportPlan(input: {
     expiresAt: null,
     syncLink: {
       providerConnectionId: input.connectionId,
-      remoteFolderId: 'root',
+      remoteFolderId: input.rootRemoteFolderId,
       providerType: 'onedrive',
       offlinePolicy: input.offlinePolicy
     }
@@ -155,7 +164,7 @@ function buildOneDriveImportPlan(input: {
   const syncEntries: OneDriveImportPlan['syncEntries'] = [
     {
       providerConnectionId: input.connectionId,
-      remoteItemId: 'root',
+      remoteItemId: input.rootRemoteFolderId,
       parentRemoteItemId: null,
       kind: 'folder',
       name: input.displayName,
@@ -164,7 +173,10 @@ function buildOneDriveImportPlan(input: {
     }
   ]
   const downloadableItems: OneDriveImportPlan['downloadableItems'] = []
-  const remoteFolderToLocalId = new Map<string | null, string>([[null, rootFolderId]])
+  const remoteFolderToLocalId = new Map<string | null, string>([
+    [null, rootFolderId],
+    [input.rootRemoteFolderId, rootFolderId]
+  ])
   const folderSortCounts = new Map<string, number>([
     [FILE_EXPLORER_ROOT_ID, input.existingRootFolderNames.length + 1]
   ])
@@ -173,6 +185,7 @@ function buildOneDriveImportPlan(input: {
 
   for (const remoteItem of input.remoteItems) {
     if (remoteItem.kind !== 'folder' || remoteItem.deleted) continue
+    if (remoteItem.remoteItemId === input.rootRemoteFolderId) continue
     const parentId = remoteFolderToLocalId.get(remoteItem.parentRemoteItemId) ?? rootFolderId
     const folderId = createSyncedFolderId(input.connectionId, remoteItem.remoteItemId)
     const sortIndex = folderSortCounts.get(parentId) ?? 0
@@ -278,10 +291,35 @@ async function saveImportedRecords(
   ])
 }
 
-export async function connectOneDriveAccount(): Promise<OneDriveConnectResult | null> {
+function assertOneDriveAvailable(): void {
   if (!isElectron() || !window.api?.oneDrive) {
     throw new Error('OneDrive connection is currently available in the desktop app only')
   }
+}
+
+function getOneDriveClientId(): string {
+  return getEffectiveOneDriveClientId(useSettingsStore.getState().oneDrive)
+}
+
+function createStoredOneDriveProvider(connectionId: string): OneDriveReadonlyProvider {
+  const clientId = getOneDriveClientId()
+  return new OneDriveReadonlyProvider({
+    getAccessToken: async () => {
+      const token = await window.api.oneDrive.getAccessToken({ connectionId, clientId })
+      return token.accessToken
+    },
+    saveDownloadedContent: (downloadRequest, _response, metadata) =>
+      saveElectronOneDriveDownloadedContent(downloadRequest, clientId, metadata)
+  })
+}
+
+export async function getConnectedOneDriveAccount(): Promise<ProviderConnectionRecord | null> {
+  const connections = await listProviderConnectionsByType('onedrive')
+  return connections[0] ?? null
+}
+
+export async function loginOneDriveAccount(): Promise<ProviderConnectionRecord | null> {
+  assertOneDriveAvailable()
   const existing = await listProviderConnectionsByType('onedrive')
   if (existing.length > 0) {
     throw new Error('Only one OneDrive account can be connected')
@@ -295,7 +333,7 @@ export async function connectOneDriveAccount(): Promise<OneDriveConnectResult | 
     prompt: 'select_account'
   })
   window.open(request.authorizationUrl, '_blank', 'noopener,noreferrer')
-  const callbackUrl = window.prompt(i18n.t('fileExplorer.syncSources.oneDriveCallbackPrompt'))
+  const callbackUrl = window.prompt(i18n.t('preferences.media.oneDrive.callbackPrompt'))
   if (!callbackUrl) return null
 
   const callback = parseOneDriveAuthCallback(callbackUrl, request.state)
@@ -324,105 +362,132 @@ export async function connectOneDriveAccount(): Promise<OneDriveConnectResult | 
       scope: token.scope,
       tokenType: token.token_type
     })
-
-    const firstPage = await provider.initialScan(connection.id, 'root')
-    const remoteItems = [...firstPage.items]
-    let nextCursor = firstPage.nextCursor
-    let hasMore = firstPage.hasMore
-    while (hasMore && nextCursor) {
-      const nextPage = await provider.incrementalChanges({
-        providerConnectionId: connection.id,
-        remoteFolderId: 'root',
-        cursor: nextCursor
-      })
-      remoteItems.push(...nextPage.items)
-      nextCursor = nextPage.nextCursor
-      hasMore = nextPage.hasMore
-    }
-
-    const store = useFileExplorerStore.getState()
-    await store.initialize()
-    const plan = buildOneDriveImportPlan({
-      connectionId: connection.id,
-      displayName: connection.displayName,
-      offlinePolicy: oneDriveSettings.defaultOfflinePolicy,
-      remoteItems,
-      existingRootFolderNames: store
-        .getChildFolders(FILE_EXPLORER_ROOT_ID)
-        .map((folder) => folder.name),
-      platform: 'electron'
-    })
-    await saveImportedRecords(plan.folders, plan.items)
-    await Promise.all(plan.syncEntries.map((entry) => putSyncEntry(entry)))
-    if (nextCursor) {
-      await putSyncCursor({
-        providerConnectionId: connection.id,
-        remoteFolderId: 'root',
-        cursor: nextCursor,
-        updatedAt: Date.now()
-      })
-    }
-
-    let downloadedCount = 0
-    if (oneDriveSettings.defaultOfflinePolicy === 'always-offline') {
-      const remoteById = new Map(remoteItems.map((item) => [item.remoteItemId, item]))
-      for (const item of plan.downloadableItems) {
-        try {
-          await provider.downloadContent(
-            {
-              providerConnectionId: connection.id,
-              remoteItemId: item.remoteItemId,
-              targetBlobId: item.itemId,
-              offlinePolicy: 'always-offline'
-            },
-            new AbortController().signal
-          )
-          downloadedCount++
-        } catch (error) {
-          console.warn('[onedrive] Failed to download file for offline use', {
-            connectionId: connection.id,
-            remoteItemId: item.remoteItemId,
-            error
-          })
-          const remoteItem = remoteById.get(item.remoteItemId)
-          if (remoteItem) {
-            await putSyncEntry({
-              providerConnectionId: connection.id,
-              remoteItemId: item.remoteItemId,
-              parentRemoteItemId: remoteItem.parentRemoteItemId,
-              kind: 'file',
-              name: remoteItem.name,
-              itemId: item.itemId,
-              blobId: item.itemId,
-              mimeType: remoteItem.mimeType,
-              size: remoteItem.size,
-              etag: remoteItem.etag,
-              contentHash: remoteItem.contentHash,
-              status: 'failed'
-            })
-          }
-        }
-      }
-    }
-
-    mergeImportedRecordsIntoStore(plan.folders, plan.items)
-    if (plan.disabledCount > 0) {
-      toast.warning(
-        i18n.t('fileExplorer.syncSources.unsupportedFiles', { count: plan.disabledCount })
-      )
-    }
-
-    return {
-      connectionId: connection.id,
-      displayName: connection.displayName,
-      folderCount: plan.folders.length,
-      itemCount: plan.items.length,
-      downloadedCount,
-      disabledCount: plan.disabledCount
-    }
+    return (await getProviderConnection(connection.id)) ?? null
   } catch (error) {
     await window.api.oneDrive.deleteCredentials(connection.id).catch(() => undefined)
     await deleteProviderConnection(connection.id).catch(() => undefined)
     throw error
+  }
+}
+
+export async function listOneDriveFolders(
+  parentRemoteFolderId = 'root'
+): Promise<OneDriveRemoteFolder[]> {
+  assertOneDriveAvailable()
+  const connection = await getConnectedOneDriveAccount()
+  if (!connection) throw new Error('OneDrive account is not connected')
+  const provider = createStoredOneDriveProvider(connection.id)
+  const folders = await provider.listFolders(parentRemoteFolderId)
+  return folders.map((folder) => ({
+    remoteItemId: folder.remoteItemId,
+    parentRemoteItemId: folder.parentRemoteItemId,
+    name: folder.name
+  }))
+}
+
+export async function importOneDriveFolder(
+  remoteFolder: OneDriveRemoteFolder
+): Promise<OneDriveConnectResult> {
+  assertOneDriveAvailable()
+  const connection = await getConnectedOneDriveAccount()
+  if (!connection) throw new Error('OneDrive account is not connected')
+
+  const oneDriveSettings = useSettingsStore.getState().oneDrive
+  const provider = createStoredOneDriveProvider(connection.id)
+  const firstPage = await provider.initialScan(connection.id, remoteFolder.remoteItemId)
+  const remoteItems = [...firstPage.items]
+  let nextCursor = firstPage.nextCursor
+  let hasMore = firstPage.hasMore
+  while (hasMore && nextCursor) {
+    const nextPage = await provider.incrementalChanges({
+      providerConnectionId: connection.id,
+      remoteFolderId: remoteFolder.remoteItemId,
+      cursor: nextCursor
+    })
+    remoteItems.push(...nextPage.items)
+    nextCursor = nextPage.nextCursor
+    hasMore = nextPage.hasMore
+  }
+
+  const store = useFileExplorerStore.getState()
+  await store.initialize()
+  const plan = buildOneDriveImportPlan({
+    connectionId: connection.id,
+    displayName: remoteFolder.name,
+    rootRemoteFolderId: remoteFolder.remoteItemId,
+    offlinePolicy: oneDriveSettings.defaultOfflinePolicy,
+    remoteItems,
+    existingRootFolderNames: store
+      .getChildFolders(FILE_EXPLORER_ROOT_ID)
+      .map((folder) => folder.name),
+    platform: 'electron'
+  })
+  await saveImportedRecords(plan.folders, plan.items)
+  await Promise.all(plan.syncEntries.map((entry) => putSyncEntry(entry)))
+  if (nextCursor) {
+    await putSyncCursor({
+      providerConnectionId: connection.id,
+      remoteFolderId: remoteFolder.remoteItemId,
+      cursor: nextCursor,
+      updatedAt: Date.now()
+    })
+  }
+
+  let downloadedCount = 0
+  if (oneDriveSettings.defaultOfflinePolicy === 'always-offline') {
+    const remoteById = new Map(remoteItems.map((item) => [item.remoteItemId, item]))
+    for (const item of plan.downloadableItems) {
+      try {
+        await provider.downloadContent(
+          {
+            providerConnectionId: connection.id,
+            remoteItemId: item.remoteItemId,
+            targetBlobId: item.itemId,
+            offlinePolicy: 'always-offline'
+          },
+          new AbortController().signal
+        )
+        downloadedCount++
+      } catch (error) {
+        console.warn('[onedrive] Failed to download file for offline use', {
+          connectionId: connection.id,
+          remoteItemId: item.remoteItemId,
+          error
+        })
+        const remoteItem = remoteById.get(item.remoteItemId)
+        if (remoteItem) {
+          await putSyncEntry({
+            providerConnectionId: connection.id,
+            remoteItemId: item.remoteItemId,
+            parentRemoteItemId: remoteItem.parentRemoteItemId,
+            kind: 'file',
+            name: remoteItem.name,
+            itemId: item.itemId,
+            blobId: item.itemId,
+            mimeType: remoteItem.mimeType,
+            size: remoteItem.size,
+            etag: remoteItem.etag,
+            contentHash: remoteItem.contentHash,
+            status: 'failed'
+          })
+        }
+      }
+    }
+  }
+
+  mergeImportedRecordsIntoStore(plan.folders, plan.items)
+  if (plan.disabledCount > 0) {
+    toast.warning(
+      i18n.t('fileExplorer.syncSources.unsupportedFiles', { count: plan.disabledCount })
+    )
+  }
+
+  return {
+    connectionId: connection.id,
+    displayName: remoteFolder.name,
+    folderCount: plan.folders.length,
+    itemCount: plan.items.length,
+    downloadedCount,
+    disabledCount: plan.disabledCount
   }
 }

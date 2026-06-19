@@ -122,6 +122,23 @@ export class OneDriveReadonlyProvider implements ReadOnlySyncProvider {
     return normalizeGraphPage(await this.fetchJson(path))
   }
 
+  async listFolders(parentRemoteFolderId: string): Promise<RemoteSyncItem[]> {
+    const path =
+      parentRemoteFolderId === 'root'
+        ? '/me/drive/root/children'
+        : `/me/drive/items/${encodeGraphPathSegment(parentRemoteFolderId)}/children`
+    const folders: RemoteSyncItem[] = []
+    let nextPath: string | undefined = path
+
+    while (nextPath) {
+      const page = normalizeGraphPage(await this.fetchJson(nextPath))
+      folders.push(...page.items.filter((item) => item.kind === 'folder' && !item.deleted))
+      nextPath = page.hasMore ? page.nextCursor : undefined
+    }
+
+    return folders
+  }
+
   async incrementalChanges(input: {
     providerConnectionId: string
     remoteFolderId: string

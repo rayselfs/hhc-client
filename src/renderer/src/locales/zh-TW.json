@@ -479,12 +479,19 @@
     "syncSources": {
       "localSyncConnected": "已連接 {{name}}，匯入 {{count}} 個檔案。",
       "localSyncConnectFailed": "無法連接同步資料夾。",
-      "oneDriveCallbackPrompt": "登入後，請複製瀏覽器最後停留的網址並貼到這裡。",
-      "oneDriveConnected": "已連接 {{name}}，匯入 {{count}} 個項目。",
-      "oneDriveAlreadyConnected": "只能連結一個 OneDrive 帳號。",
+      "oneDriveFolderImported": "已加入 {{name}}，匯入 {{count}} 個項目。",
+      "oneDriveLoginRequired": "請先在偏好設定登入 OneDrive。",
       "oneDriveDesktopOnly": "OneDrive 連線目前只支援桌面版。",
-      "oneDriveConnectFailed": "無法連接 OneDrive。",
+      "oneDriveImportFailed": "無法加入 OneDrive 資料夾。",
       "unsupportedFiles": "有 {{count}} 個檔案格式不支援，已保留但禁用。"
+    },
+    "oneDriveFolderPicker": {
+      "title": "選擇 OneDrive 資料夾",
+      "back": "返回上一層",
+      "empty": "這裡沒有可加入的資料夾。",
+      "import": "加入資料夾",
+      "loadFailed": "無法載入 OneDrive 資料夾。",
+      "openFolder": "開啟 {{name}}"
     }
   },
   "projection": {
@@ -600,6 +607,12 @@
         "restoreDefaultClientId": "恢復預設 Client ID",
         "connectedAccount": "已連結帳號",
         "noConnectedAccount": "尚未連結 OneDrive 帳號。",
+        "connect": "登入",
+        "connected": "已連結 OneDrive。",
+        "alreadyConnected": "只能連結一個 OneDrive 帳號。",
+        "desktopOnly": "OneDrive 連線目前只支援桌面版。",
+        "connectFailed": "無法連接 OneDrive。",
+        "callbackPrompt": "登入後，請複製瀏覽器最後停留的網址並貼到這裡。",
         "disconnect": "解除連結",
         "disconnectTitle": "解除 OneDrive 連結？",
         "disconnectDescription": "這會從 LibrePresenter 移除 OneDrive 來源並清除本機同步快取，不會變更遠端檔案。",

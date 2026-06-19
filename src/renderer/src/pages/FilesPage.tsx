@@ -4,6 +4,7 @@ import { toast } from '@heroui/react/toast'
 import { FileExplorerShell, useFileContextMenu } from '@renderer/components/Control/FileExplorer'
 import FileBrowser from '@renderer/components/Control/FileExplorer/FileBrowser'
 import FileExplorerFAB from '@renderer/components/Control/FileExplorer/FileExplorerFAB'
+import OneDriveFolderPickerDialog from '@renderer/components/Control/FileExplorer/OneDriveFolderPickerDialog'
 import { FolderModal } from '@renderer/components/Control/Folder/FolderModal'
 import {
   deleteFolderFromStore,
@@ -13,7 +14,11 @@ import {
 } from '@renderer/stores/file-explorer'
 import { getUploadMediaPlatform, uploadFiles, uploadFolderFiles } from '@renderer/lib/upload-utils'
 import { connectLocalSyncFolder } from '@renderer/lib/local-sync-import'
-import { connectOneDriveAccount } from '@renderer/lib/onedrive-connect'
+import {
+  getConnectedOneDriveAccount,
+  importOneDriveFolder,
+  type OneDriveRemoteFolder
+} from '@renderer/lib/onedrive-connect'
 import { isElectron } from '@renderer/lib/env'
 import {
   computeExpiresAt,
@@ -60,6 +65,9 @@ export default function FilesPage(): React.JSX.Element {
   const [editModalName, setEditModalName] = useState('')
   const [editModalDuration, setEditModalDuration] = useState<FolderDuration>('1day')
   const [editingIsFavorited, setEditingIsFavorited] = useState(false)
+  const [hasOneDriveConnection, setHasOneDriveConnection] = useState(false)
+  const [isOneDrivePickerOpen, setIsOneDrivePickerOpen] = useState(false)
+  const [isOneDriveImporting, setIsOneDriveImporting] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
@@ -76,6 +84,7 @@ export default function FilesPage(): React.JSX.Element {
   const selectedCount = selectedIds.size
   const fileAccept = getMediaFileAcceptAttribute(getUploadMediaPlatform())
   const canAddLocalSyncFolder = isElectron()
+  const canAddOneDriveFolder = isElectron()
   const isCurrentFolderReadOnly = useMemo(
     () => isFolderReadOnlyBySyncLink(currentFolderId, foldersById),
     [currentFolderId, foldersById]
@@ -99,6 +108,25 @@ export default function FilesPage(): React.JSX.Element {
       el.setAttribute('directory', '')
     }
   }, [])
+
+  const refreshOneDriveConnection = useCallback(async (): Promise<void> => {
+    if (!canAddOneDriveFolder) {
+      setHasOneDriveConnection(false)
+      return
+    }
+    setHasOneDriveConnection(Boolean(await getConnectedOneDriveAccount()))
+  }, [canAddOneDriveFolder])
+
+  useEffect(() => {
+    void refreshOneDriveConnection()
+    const handleConnectionChanged = (): void => {
+      void refreshOneDriveConnection()
+    }
+    window.addEventListener('onedrive-connection-changed', handleConnectionChanged)
+    return () => {
+      window.removeEventListener('onedrive-connection-changed', handleConnectionChanged)
+    }
+  }, [refreshOneDriveConnection])
 
   const handleUploadFiles = useCallback((): void => {
     if (isCurrentFolderReadOnly) return
@@ -127,27 +155,39 @@ export default function FilesPage(): React.JSX.Element {
   }, [t])
 
   const handleAddOneDrive = useCallback(async (): Promise<void> => {
-    try {
-      const result = await connectOneDriveAccount()
-      if (!result) return
-      toast.success(
-        t('fileExplorer.syncSources.oneDriveConnected', {
-          name: result.displayName,
-          count: result.itemCount
-        })
-      )
-    } catch (error) {
-      console.warn('[onedrive] Failed to connect account', error)
-      const message =
-        error instanceof Error && error.message === 'Only one OneDrive account can be connected'
-          ? 'oneDriveAlreadyConnected'
-          : error instanceof Error &&
-              error.message === 'OneDrive connection is currently available in the desktop app only'
-            ? 'oneDriveDesktopOnly'
-            : 'oneDriveConnectFailed'
-      toast.danger(t(`fileExplorer.syncSources.${message}`))
+    if (!hasOneDriveConnection) {
+      toast.warning(t('fileExplorer.syncSources.oneDriveLoginRequired'))
+      return
     }
-  }, [t])
+    setIsOneDrivePickerOpen(true)
+  }, [hasOneDriveConnection, t])
+
+  const handleImportOneDriveFolder = useCallback(
+    async (folder: OneDriveRemoteFolder): Promise<void> => {
+      setIsOneDriveImporting(true)
+      try {
+        const result = await importOneDriveFolder(folder)
+        toast.success(
+          t('fileExplorer.syncSources.oneDriveFolderImported', {
+            name: result.displayName,
+            count: result.itemCount
+          })
+        )
+        setIsOneDrivePickerOpen(false)
+      } catch (error) {
+        console.warn('[onedrive] Failed to import folder', error)
+        const message =
+          error instanceof Error &&
+          error.message === 'OneDrive connection is currently available in the desktop app only'
+            ? 'oneDriveDesktopOnly'
+            : 'oneDriveImportFailed'
+        toast.danger(t(`fileExplorer.syncSources.${message}`))
+      } finally {
+        setIsOneDriveImporting(false)
+      }
+    },
+    [t]
+  )
 
   const handleFileChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
@@ -468,7 +508,8 @@ export default function FilesPage(): React.JSX.Element {
         onAddLocalSyncFolder: canAddLocalSyncFolder
           ? () => void handleAddLocalSyncFolder()
           : undefined,
-        onAddOneDrive: () => void handleAddOneDrive(),
+        onAddOneDrive: canAddOneDriveFolder ? () => void handleAddOneDrive() : undefined,
+        isAddOneDriveDisabled: !hasOneDriveConnection,
         isReadOnly: isCurrentFolderReadOnly
       })
     },
@@ -480,8 +521,10 @@ export default function FilesPage(): React.JSX.Element {
       handleUploadFiles,
       handleUploadFolder,
       canAddLocalSyncFolder,
+      canAddOneDriveFolder,
       handleAddLocalSyncFolder,
       handleAddOneDrive,
+      hasOneDriveConnection,
       isCurrentFolderReadOnly
     ]
   )
@@ -526,8 +569,15 @@ export default function FilesPage(): React.JSX.Element {
         onAddLocalSyncFolder={
           canAddLocalSyncFolder ? () => void handleAddLocalSyncFolder() : undefined
         }
-        onAddOneDrive={() => void handleAddOneDrive()}
+        onAddOneDrive={canAddOneDriveFolder ? () => void handleAddOneDrive() : undefined}
+        isAddOneDriveDisabled={!hasOneDriveConnection}
         isReadOnly={isCurrentFolderReadOnly}
+      />
+      <OneDriveFolderPickerDialog
+        isOpen={isOneDrivePickerOpen}
+        isImporting={isOneDriveImporting}
+        onClose={() => setIsOneDrivePickerOpen(false)}
+        onImport={(folder) => void handleImportOneDriveFolder(folder)}
       />
       <FolderModal
         isOpen={isCreateFolderModalOpen}

@@ -123,6 +123,77 @@ describe('OneDriveReadonlyProvider', () => {
     })
   })
 
+  it('lists OneDrive folders without files', async () => {
+    fetchImpl.mockResolvedValueOnce(
+      jsonResponse({
+        value: [
+          {
+            id: 'folder-1',
+            name: 'Media',
+            folder: {},
+            parentReference: { id: 'root' }
+          },
+          {
+            id: 'file-1',
+            name: 'clip.mp4',
+            file: { mimeType: 'video/mp4' },
+            parentReference: { id: 'root' }
+          }
+        ],
+        '@odata.nextLink': 'https://graph.microsoft.com/v1.0/me/drive/root/children?skip=2'
+      })
+    )
+    fetchImpl.mockResolvedValueOnce(
+      jsonResponse({
+        value: [
+          {
+            id: 'folder-2',
+            name: 'Drama',
+            folder: {},
+            parentReference: { id: 'root' }
+          }
+        ]
+      })
+    )
+
+    const folders = await createProvider().listFolders('root')
+
+    expect(fetchImpl).toHaveBeenNthCalledWith(
+      1,
+      'https://graph.microsoft.com/v1.0/me/drive/root/children',
+      expect.any(Object)
+    )
+    expect(fetchImpl).toHaveBeenNthCalledWith(
+      2,
+      'https://graph.microsoft.com/v1.0/me/drive/root/children?skip=2',
+      expect.any(Object)
+    )
+    expect(folders).toEqual([
+      {
+        remoteItemId: 'folder-1',
+        parentRemoteItemId: 'root',
+        kind: 'folder',
+        name: 'Media',
+        mimeType: undefined,
+        size: undefined,
+        etag: undefined,
+        contentHash: undefined,
+        deleted: false
+      },
+      {
+        remoteItemId: 'folder-2',
+        parentRemoteItemId: 'root',
+        kind: 'folder',
+        name: 'Drama',
+        mimeType: undefined,
+        size: undefined,
+        etag: undefined,
+        contentHash: undefined,
+        deleted: false
+      }
+    ])
+  })
+
   it('uses opaque next or delta cursors for incremental changes', async () => {
     fetchImpl.mockResolvedValueOnce(
       jsonResponse({
