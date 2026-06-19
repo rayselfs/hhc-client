@@ -9,7 +9,7 @@ import { Label } from 'react-aria-components'
 import { FolderSync } from 'lucide-react'
 import {
   DEFAULT_ONEDRIVE,
-  HHC_DEFAULT_ONEDRIVE_CLIENT_ID,
+  LIBREPRESENTER_DEFAULT_ONEDRIVE_CLIENT_ID,
   useSettingsStore,
   validateOneDriveClientId,
   type OneDriveSettings
@@ -157,7 +157,7 @@ export default function MediaSettings({
                 onBlur={() => {
                   if (customClientIdValid) saveOneDriveDraft(oneDriveDraft)
                 }}
-                placeholder={HHC_DEFAULT_ONEDRIVE_CLIENT_ID}
+                placeholder={LIBREPRESENTER_DEFAULT_ONEDRIVE_CLIENT_ID}
                 className="w-full rounded-full border border-default-200 bg-transparent px-4 py-2 text-sm"
                 aria-invalid={!customClientIdValid}
               />

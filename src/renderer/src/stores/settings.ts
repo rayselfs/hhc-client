@@ -65,7 +65,7 @@ const DEFAULT_TIMER_RING_COLOR_ENABLED = false
 const DEFAULT_TRASH_RETENTION_DAYS = 30
 const DEFAULT_REMINDER_MODE = 'subtract'
 const DEFAULT_PROJECTION_DISPLAY_ID = ''
-export const HHC_DEFAULT_ONEDRIVE_CLIENT_ID = '4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02'
+export const LIBREPRESENTER_DEFAULT_ONEDRIVE_CLIENT_ID = '4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02'
 const RELOAD_DELAY_MS = 500
 const THEME_PREFERENCES: ThemePreference[] = ['system', 'light', 'dark']
 const OFFLINE_POLICIES: SyncOfflinePolicy[] = ['online-only', 'on-demand', 'always-offline']
@@ -121,7 +121,7 @@ export function validateOneDriveClientId(value: string): boolean {
 }
 
 export function getEffectiveOneDriveClientId(settings: OneDriveSettings): string {
-  return settings.customClientId.trim() || HHC_DEFAULT_ONEDRIVE_CLIENT_ID
+  return settings.customClientId.trim() || LIBREPRESENTER_DEFAULT_ONEDRIVE_CLIENT_ID
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

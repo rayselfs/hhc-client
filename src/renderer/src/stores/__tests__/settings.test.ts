@@ -27,7 +27,7 @@ import {
   DEFAULT_ONEDRIVE,
   getEffectiveOneDriveClientId,
   getDefaultSpeechSettings,
-  HHC_DEFAULT_ONEDRIVE_CLIENT_ID,
+  LIBREPRESENTER_DEFAULT_ONEDRIVE_CLIENT_ID,
   normalizeSettingsState,
   validateOneDriveClientId
 } from '@renderer/stores/settings'
@@ -399,8 +399,10 @@ describe('speech settings', () => {
 })
 
 describe('OneDrive settings', () => {
-  it('uses the HHC default Client ID when custom override is empty', () => {
-    expect(getEffectiveOneDriveClientId(DEFAULT_ONEDRIVE)).toBe(HHC_DEFAULT_ONEDRIVE_CLIENT_ID)
+  it('uses the LibrePresenter default Client ID when custom override is empty', () => {
+    expect(getEffectiveOneDriveClientId(DEFAULT_ONEDRIVE)).toBe(
+      LIBREPRESENTER_DEFAULT_ONEDRIVE_CLIENT_ID
+    )
   })
 
   it('validates Azure Application Client ID format', () => {

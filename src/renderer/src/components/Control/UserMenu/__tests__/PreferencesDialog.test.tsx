@@ -49,7 +49,7 @@ vi.mock('@renderer/stores/settings', () => ({
     customClientId: '',
     defaultOfflinePolicy: 'always-offline'
   },
-  HHC_DEFAULT_ONEDRIVE_CLIENT_ID: '4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02',
+  LIBREPRESENTER_DEFAULT_ONEDRIVE_CLIENT_ID: '4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02',
   getEffectiveOneDriveClientId: (settings: { customClientId: string }) =>
     settings.customClientId || '4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02',
   validateOneDriveClientId: (value: string) =>
