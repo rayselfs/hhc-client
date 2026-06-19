@@ -1,12 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { toast } from '@heroui/react/toast'
-import { Button } from '@heroui/react/button'
 import { Select } from '@heroui/react/select'
 import { ListBox } from '@heroui/react/list-box'
 import { Switch } from '@heroui/react/switch'
 import { Label } from 'react-aria-components'
-import { FolderSync } from 'lucide-react'
 import {
   DEFAULT_ONEDRIVE,
   LIBREPRESENTER_DEFAULT_ONEDRIVE_CLIENT_ID,
@@ -14,15 +11,12 @@ import {
   validateOneDriveClientId,
   type OneDriveSettings
 } from '@renderer/stores/settings'
-import { isElectron } from '@renderer/lib/env'
-import { connectLocalSyncFolder } from '@renderer/lib/local-sync-import'
-import type { LocalSyncConnectionInfo } from '@shared/ipc-channels'
 import type { SyncOfflinePolicy } from '@shared/types/folder'
 
 const RETENTION_DAY_OPTIONS = [7, 14, 30, 60, 90, 0] as const
 const OFFLINE_POLICY_OPTIONS: SyncOfflinePolicy[] = ['online-only', 'on-demand', 'always-offline']
 
-export type MediaSettingsSection = 'general' | 'oneDrive' | 'localSync'
+export type MediaSettingsSection = 'general' | 'oneDrive'
 
 interface MediaSettingsProps {
   section?: MediaSettingsSection
@@ -37,8 +31,6 @@ export default function MediaSettings({
   const oneDrive = useSettingsStore((s) => s.oneDrive)
   const setOneDrive = useSettingsStore((s) => s.setOneDrive)
   const [oneDriveDraft, setOneDriveDraft] = useState<OneDriveSettings>(oneDrive)
-  const [localSyncFolders, setLocalSyncFolders] = useState<LocalSyncConnectionInfo[]>([])
-  const [localSyncBusy, setLocalSyncBusy] = useState(false)
   const [customClientIdEnabled, setCustomClientIdEnabled] = useState(
     oneDrive.customClientId.trim().length > 0
   )
@@ -49,40 +41,6 @@ export default function MediaSettings({
   function saveOneDriveDraft(next: OneDriveSettings): void {
     setOneDriveDraft(next)
     setOneDrive(next)
-  }
-
-  useEffect(() => {
-    if (section !== 'localSync' || !isElectron()) return
-    let cancelled = false
-    window.api.localSync
-      .listFolders()
-      .then((folders) => {
-        if (!cancelled) setLocalSyncFolders(folders)
-      })
-      .catch(() => undefined)
-    return () => {
-      cancelled = true
-    }
-  }, [section])
-
-  async function handleConnectLocalSyncFolder(): Promise<void> {
-    setLocalSyncBusy(true)
-    try {
-      const summary = await connectLocalSyncFolder()
-      if (!summary) return
-      setLocalSyncFolders(await window.api.localSync.listFolders())
-      toast.success(
-        t('preferences.media.localSync.connected', {
-          name: summary.connection.displayName,
-          count: summary.itemCount
-        })
-      )
-    } catch (error) {
-      console.warn('[local-sync] Failed to connect folder', error)
-      toast.danger(t('preferences.media.localSync.connectFailed'))
-    } finally {
-      setLocalSyncBusy(false)
-    }
   }
 
   return (
@@ -202,63 +160,6 @@ export default function MediaSettings({
               </Select.Popover>
             </Select>
           </div>
-        </section>
-      )}
-
-      {section === 'localSync' && (
-        <section className="space-y-5">
-          <div className="space-y-1">
-            <h3 className="text-sm font-semibold">{t('preferences.media.localSync.title')}</h3>
-            <p className="text-xs text-muted">{t('preferences.media.localSync.description')}</p>
-          </div>
-
-          {isElectron() ? (
-            <>
-              <div className="flex items-start justify-between gap-4 border-t border-default-200 pt-4">
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">
-                    {t('preferences.media.localSync.localFolder')}
-                  </p>
-                  <p className="text-xs text-muted">
-                    {t('preferences.media.localSync.localFolderDescription')}
-                  </p>
-                </div>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  isDisabled={localSyncBusy}
-                  onPress={handleConnectLocalSyncFolder}
-                >
-                  <FolderSync className="size-4" />
-                  {t('preferences.media.localSync.chooseFolder')}
-                </Button>
-              </div>
-
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-muted">
-                  {t('preferences.media.localSync.connectedFolders')}
-                </p>
-                {localSyncFolders.length === 0 ? (
-                  <p className="text-xs text-muted">{t('preferences.media.localSync.noFolders')}</p>
-                ) : (
-                  <ul className="space-y-2">
-                    {localSyncFolders.map((folder) => (
-                      <li
-                        key={folder.id}
-                        className="rounded-2xl bg-surface-secondary px-4 py-3 text-sm"
-                      >
-                        {folder.displayName}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </>
-          ) : (
-            <p className="rounded-2xl bg-surface-secondary px-4 py-3 text-sm text-muted">
-              {t('preferences.media.localSync.desktopOnly')}
-            </p>
-          )}
         </section>
       )}
     </div>

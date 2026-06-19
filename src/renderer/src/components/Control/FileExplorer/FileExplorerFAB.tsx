@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, FolderPlus, Upload, Folder } from 'lucide-react'
+import { Plus, FolderPlus, Upload, Folder, FolderSync, Cloud } from 'lucide-react'
 import { Dropdown } from '@heroui/react/dropdown'
 import { useTranslation } from 'react-i18next'
 import { computeExpiresAt, type FolderDuration } from '@shared/types/folder'
@@ -9,12 +9,16 @@ import { FolderModal } from '@renderer/components/Control/Folder/FolderModal'
 export interface FileExplorerFABProps {
   onUploadFiles?: () => void
   onUploadFolder?: () => void
+  onAddLocalSyncFolder?: () => void
+  onAddOneDrive?: () => void
   isReadOnly?: boolean
 }
 
 export default function FileExplorerFAB({
   onUploadFiles,
   onUploadFolder,
+  onAddLocalSyncFolder,
+  onAddOneDrive,
   isReadOnly = false
 }: FileExplorerFABProps): React.JSX.Element | null {
   const { t } = useTranslation()
@@ -50,7 +54,10 @@ export default function FileExplorerFAB({
     setIsModalOpen(false)
   }
 
-  if (isReadOnly) return null
+  const hasWritableActions = !isReadOnly
+  const hasSourceActions = Boolean(onAddLocalSyncFolder || onAddOneDrive)
+
+  if (!hasWritableActions && !hasSourceActions) return null
 
   return (
     <>
@@ -77,14 +84,15 @@ export default function FileExplorerFAB({
           <Dropdown.Popover>
             <Dropdown.Menu
               onAction={(key) => {
-                if (isReadOnly) return
-                if (key === 'newFolder') openCreateFolderModal()
-                if (key === 'uploadFiles') onUploadFiles?.()
-                if (key === 'uploadFolder') onUploadFolder?.()
+                if (key === 'newFolder' && !isReadOnly) openCreateFolderModal()
+                if (key === 'uploadFiles' && !isReadOnly) onUploadFiles?.()
+                if (key === 'uploadFolder' && !isReadOnly) onUploadFolder?.()
+                if (key === 'addLocalSyncFolder') onAddLocalSyncFolder?.()
+                if (key === 'addOneDrive') onAddOneDrive?.()
               }}
             >
-              <Dropdown.Section>
-                {!isReadOnly && (
+              {!isReadOnly && (
+                <Dropdown.Section>
                   <Dropdown.Item
                     id="newFolder"
                     className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
@@ -92,8 +100,8 @@ export default function FileExplorerFAB({
                     <FolderPlus size={16} />
                     {t('fileExplorer.contextMenu.newFolder')}
                   </Dropdown.Item>
-                )}
-              </Dropdown.Section>
+                </Dropdown.Section>
+              )}
               {!isReadOnly && (
                 <Dropdown.Section>
                   <Dropdown.Item
@@ -110,6 +118,28 @@ export default function FileExplorerFAB({
                     <Folder size={16} />
                     {t('fileExplorer.contextMenu.uploadFolder')}
                   </Dropdown.Item>
+                </Dropdown.Section>
+              )}
+              {hasSourceActions && (
+                <Dropdown.Section>
+                  {onAddLocalSyncFolder && (
+                    <Dropdown.Item
+                      id="addLocalSyncFolder"
+                      className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
+                    >
+                      <FolderSync size={16} />
+                      {t('fileExplorer.contextMenu.addLocalSyncFolder')}
+                    </Dropdown.Item>
+                  )}
+                  {onAddOneDrive && (
+                    <Dropdown.Item
+                      id="addOneDrive"
+                      className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
+                    >
+                      <Cloud size={16} />
+                      {t('fileExplorer.contextMenu.addOneDrive')}
+                    </Dropdown.Item>
+                  )}
                 </Dropdown.Section>
               )}
             </Dropdown.Menu>

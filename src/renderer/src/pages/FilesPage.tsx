@@ -12,6 +12,8 @@ import {
   FILE_EXPLORER_ROOT_ID
 } from '@renderer/stores/file-explorer'
 import { getUploadMediaPlatform, uploadFiles, uploadFolderFiles } from '@renderer/lib/upload-utils'
+import { connectLocalSyncFolder } from '@renderer/lib/local-sync-import'
+import { isElectron } from '@renderer/lib/env'
 import {
   computeExpiresAt,
   inferDuration,
@@ -72,6 +74,7 @@ export default function FilesPage(): React.JSX.Element {
   )
   const selectedCount = selectedIds.size
   const fileAccept = getMediaFileAcceptAttribute(getUploadMediaPlatform())
+  const canAddLocalSyncFolder = isElectron()
   const isCurrentFolderReadOnly = useMemo(
     () => isFolderReadOnlyBySyncLink(currentFolderId, foldersById),
     [currentFolderId, foldersById]
@@ -105,6 +108,26 @@ export default function FilesPage(): React.JSX.Element {
     if (isCurrentFolderReadOnly) return
     folderInputRef.current?.click()
   }, [isCurrentFolderReadOnly])
+
+  const handleAddLocalSyncFolder = useCallback(async (): Promise<void> => {
+    try {
+      const summary = await connectLocalSyncFolder()
+      if (!summary) return
+      toast.success(
+        t('fileExplorer.syncSources.localSyncConnected', {
+          name: summary.connection.displayName,
+          count: summary.itemCount
+        })
+      )
+    } catch (error) {
+      console.warn('[local-sync] Failed to connect folder', error)
+      toast.danger(t('fileExplorer.syncSources.localSyncConnectFailed'))
+    }
+  }, [t])
+
+  const handleAddOneDrive = useCallback((): void => {
+    toast.warning(t('fileExplorer.syncSources.oneDriveComingSoon'))
+  }, [t])
 
   const handleFileChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
@@ -422,6 +445,10 @@ export default function FilesPage(): React.JSX.Element {
         onNewFolder: openCreateFolderModal,
         onUploadFiles: handleUploadFiles,
         onUploadFolder: handleUploadFolder,
+        onAddLocalSyncFolder: canAddLocalSyncFolder
+          ? () => void handleAddLocalSyncFolder()
+          : undefined,
+        onAddOneDrive: handleAddOneDrive,
         isReadOnly: isCurrentFolderReadOnly
       })
     },
@@ -432,6 +459,9 @@ export default function FilesPage(): React.JSX.Element {
       openCreateFolderModal,
       handleUploadFiles,
       handleUploadFolder,
+      canAddLocalSyncFolder,
+      handleAddLocalSyncFolder,
+      handleAddOneDrive,
       isCurrentFolderReadOnly
     ]
   )
@@ -473,6 +503,10 @@ export default function FilesPage(): React.JSX.Element {
       <FileExplorerFAB
         onUploadFiles={handleUploadFiles}
         onUploadFolder={handleUploadFolder}
+        onAddLocalSyncFolder={
+          canAddLocalSyncFolder ? () => void handleAddLocalSyncFolder() : undefined
+        }
+        onAddOneDrive={handleAddOneDrive}
         isReadOnly={isCurrentFolderReadOnly}
       />
       <FolderModal

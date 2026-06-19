@@ -456,6 +456,8 @@
       "edit": "編輯",
       "uploadFiles": "檔案上傳",
       "uploadFolder": "資料夾上傳",
+      "addLocalSyncFolder": "新增同步資料夾",
+      "addOneDrive": "新增 OneDrive",
       "addFavorite": "加入我的最愛",
       "removeFavorite": "移除我的最愛",
       "project": "投影",
@@ -473,7 +475,13 @@
     "uploadSkippedUnsupported": "已略過 {{count}} 個不支援的檔案",
     "renameFile": "重新命名檔案",
     "renameFolder": "重新命名資料夾",
-    "blobLoadFailed": "檔案載入失敗，已跳過"
+    "blobLoadFailed": "檔案載入失敗，已跳過",
+    "syncSources": {
+      "localSyncConnected": "已連接 {{name}}，匯入 {{count}} 個檔案。",
+      "localSyncConnectFailed": "無法連接同步資料夾。",
+      "oneDriveComingSoon": "OneDrive 資料夾連接尚未完成。",
+      "unsupportedFiles": "有 {{count}} 個檔案格式不支援，已保留但禁用。"
+    }
   },
   "projection": {
     "showButton": "顯示投影",
@@ -575,8 +583,7 @@
     "media": {
       "sections": {
         "general": "一般",
-        "oneDrive": "OneDrive",
-        "localSync": "同步資料夾"
+        "oneDrive": "OneDrive"
       },
       "oneDrive": {
         "title": "OneDrive",
@@ -594,19 +601,6 @@
           "always-offline": "永遠離線可用"
         },
         "setupHint": "變更 Client ID 後需要重新連接 OneDrive。Token 會分開儲存，不會進入偏好設定。"
-      },
-      "localSync": {
-        "title": "同步資料夾",
-        "description": "同步資料夾是唯讀來源。LibrePresenter 會使用和手動上傳相同的媒體格式政策；不支援的檔案會保留在清單中，但不能投影。",
-        "localFolder": "本機資料夾",
-        "localFolderDescription": "選擇資料夾後會建立一個唯讀根資料夾，支援格式會複製到 app 的本機媒體儲存空間。",
-        "chooseFolder": "選擇資料夾",
-        "connectedFolders": "已連接資料夾",
-        "noFolders": "尚未連接本機同步資料夾。",
-        "desktopOnly": "本機同步資料夾只支援桌面版。",
-        "connected": "已連接 {{name}}，匯入 {{count}} 個檔案。",
-        "connectFailed": "無法連接同步資料夾。",
-        "unsupportedFiles": "有 {{count}} 個檔案格式不支援，已保留但禁用。"
       }
     },
     "storage": {

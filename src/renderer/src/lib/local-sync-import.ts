@@ -389,7 +389,7 @@ export async function connectLocalSyncFolder(): Promise<LocalSyncImportSummary |
   const summary = await importLocalSyncConnection(connection, remoteItems, 'electron')
   if (summary.disabledFileCount > 0) {
     toast.warning(
-      i18n.t('preferences.media.localSync.unsupportedFiles', {
+      i18n.t('fileExplorer.syncSources.unsupportedFiles', {
         count: summary.disabledFileCount
       })
     )

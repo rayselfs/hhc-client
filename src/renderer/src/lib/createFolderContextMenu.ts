@@ -1,7 +1,18 @@
 import { useContextMenu } from '@renderer/contexts/ContextMenuContext'
 import type { ContextMenuEntry } from '@renderer/contexts/ContextMenuContext'
 import type { FolderRecord, FolderItem } from '@shared/types/folder'
-import { Copy, Scissors, Clipboard, Trash2, FolderPlus, Pencil, Upload, Folder } from 'lucide-react'
+import {
+  Copy,
+  Scissors,
+  Clipboard,
+  Trash2,
+  FolderPlus,
+  Pencil,
+  Upload,
+  Folder,
+  FolderSync,
+  Cloud
+} from 'lucide-react'
 import React from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -61,6 +72,8 @@ export interface ShowEmptyAreaMenuOptions {
   onNewFolder: () => void
   onUploadFiles?: () => void
   onUploadFolder?: () => void
+  onAddLocalSyncFolder?: () => void
+  onAddOneDrive?: () => void
   isReadOnly?: boolean
 }
 
@@ -268,6 +281,8 @@ export function createFolderContextMenu(
       onNewFolder,
       onUploadFiles,
       onUploadFolder,
+      onAddLocalSyncFolder,
+      onAddOneDrive,
       isReadOnly = false
     }: ShowEmptyAreaMenuOptions): void => {
       const pasteItems: ContextMenuEntry[] =
@@ -325,8 +340,35 @@ export function createFolderContextMenu(
         ...uploadItems
       ]
 
+      const sourceItems: ContextMenuEntry[] =
+        onAddLocalSyncFolder || onAddOneDrive
+          ? [
+              ...(baseItems.length > 0 ? (['separator'] as ContextMenuEntry[]) : []),
+              ...(onAddLocalSyncFolder
+                ? [
+                    {
+                      id: 'add-local-sync-folder',
+                      label: tKey('addLocalSyncFolder'),
+                      icon: React.createElement(FolderSync, { size: 14 }),
+                      onAction: onAddLocalSyncFolder
+                    } as ContextMenuEntry
+                  ]
+                : []),
+              ...(onAddOneDrive
+                ? [
+                    {
+                      id: 'add-onedrive',
+                      label: tKey('addOneDrive'),
+                      icon: React.createElement(Cloud, { size: 14 }),
+                      onAction: onAddOneDrive
+                    } as ContextMenuEntry
+                  ]
+                : [])
+            ]
+          : []
+
       const extra = config?.extraEmptyAreaActions?.() ?? []
-      showMenu([...baseItems, ...extra], event)
+      showMenu([...baseItems, ...sourceItems, ...extra], event)
     }
 
     return { showItemMenu, showFolderMenu, showMultiSelectMenu, showEmptyAreaMenu }
