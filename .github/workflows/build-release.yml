@@ -129,7 +129,7 @@ jobs:
       - name: Upload desktop artifacts
         uses: actions/upload-artifact@v4.6.2
         with:
-          name: hhc-client-${{ matrix.artifact }}-${{ needs.prepare.outputs.version }}
+          name: libre-presenter-${{ matrix.artifact }}-${{ needs.prepare.outputs.version }}
           path: |
             dist/*.dmg
             dist/*.exe

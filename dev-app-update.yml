@@ -1,4 +1,4 @@
 provider: github
 owner: rayselfs
-repo: hhc-client
-updaterCacheDirName: hhc-client-updater
+repo: libre-presenter
+updaterCacheDirName: libre-presenter-updater
