@@ -50,6 +50,24 @@ npm run build:mac
 npm run build:win
 ```
 
+Desktop packages require local video engine binaries before packaging. Keep them
+outside git under `.local-runtimes/`, then run the package command:
+
+```text
+.local-runtimes/
+  vlc/darwin-arm64/
+  vlc/darwin-x64/
+  vlc/win32-x64/
+  ffmpeg/darwin-arm64/ffmpeg
+  ffmpeg/darwin-x64/ffmpeg
+  ffmpeg/win32-x64/ffmpeg.exe
+```
+
+`npm run build` does not require these binaries. `npm run build:unpack` and
+desktop packaging run `prepare:video-engine:strict` and fail if the current
+platform runtime is missing. Use `npm run prepare:video-engine:strict -- --all`
+to verify every packaged runtime directory.
+
 ## Architecture
 
 LibrePresenter is an Electron + React + TypeScript app.
