@@ -15,6 +15,7 @@ import {
   listProviderConnectionsByType,
   deleteProviderConnection,
   getProviderConnection,
+  listSyncEntriesByProviderConnection,
   putSyncCursor,
   putSyncEntry,
   type ProviderConnectionRecord,
@@ -23,6 +24,8 @@ import {
 import { saveElectronOneDriveDownloadedContent } from './sync-download-storage'
 import { getMediaSupport, resolveMediaCapability, type MediaPlatform } from './media-capabilities'
 import type { RemoteSyncItem } from './sync-provider'
+import { applySyncRefreshPlan, buildSyncRefreshPlan } from './sync-refresh'
+import { refreshImportedMediaAssets } from './local-sync-import'
 import i18n from '@renderer/i18n'
 
 const ONEDRIVE_NATIVE_REDIRECT_URI = 'https://login.microsoftonline.com/common/oauth2/nativeclient'
@@ -313,6 +316,28 @@ function createStoredOneDriveProvider(connectionId: string): OneDriveReadonlyPro
   })
 }
 
+async function scanOneDriveFolder(
+  provider: OneDriveReadonlyProvider,
+  connectionId: string,
+  remoteFolderId: string
+): Promise<{ remoteItems: RemoteSyncItem[]; nextCursor?: string }> {
+  const firstPage = await provider.initialScan(connectionId, remoteFolderId)
+  const remoteItems = [...firstPage.items]
+  let nextCursor = firstPage.nextCursor
+  let hasMore = firstPage.hasMore
+  while (hasMore && nextCursor) {
+    const nextPage = await provider.incrementalChanges({
+      providerConnectionId: connectionId,
+      remoteFolderId,
+      cursor: nextCursor
+    })
+    remoteItems.push(...nextPage.items)
+    nextCursor = nextPage.nextCursor
+    hasMore = nextPage.hasMore
+  }
+  return { remoteItems, nextCursor }
+}
+
 export async function getConnectedOneDriveAccount(): Promise<ProviderConnectionRecord | null> {
   const connections = await listProviderConnectionsByType('onedrive')
   return connections[0] ?? null
@@ -394,20 +419,11 @@ export async function importOneDriveFolder(
 
   const oneDriveSettings = useSettingsStore.getState().oneDrive
   const provider = createStoredOneDriveProvider(connection.id)
-  const firstPage = await provider.initialScan(connection.id, remoteFolder.remoteItemId)
-  const remoteItems = [...firstPage.items]
-  let nextCursor = firstPage.nextCursor
-  let hasMore = firstPage.hasMore
-  while (hasMore && nextCursor) {
-    const nextPage = await provider.incrementalChanges({
-      providerConnectionId: connection.id,
-      remoteFolderId: remoteFolder.remoteItemId,
-      cursor: nextCursor
-    })
-    remoteItems.push(...nextPage.items)
-    nextCursor = nextPage.nextCursor
-    hasMore = nextPage.hasMore
-  }
+  const { remoteItems, nextCursor } = await scanOneDriveFolder(
+    provider,
+    connection.id,
+    remoteFolder.remoteItemId
+  )
 
   const store = useFileExplorerStore.getState()
   await store.initialize()
@@ -490,4 +506,134 @@ export async function importOneDriveFolder(
     downloadedCount,
     disabledCount: plan.disabledCount
   }
+}
+
+export interface OneDriveRefreshSummary {
+  connectionId: string
+  rootFolderId: string
+  updatedItemCount: number
+  removedItemCount: number
+  removedFolderCount: number
+  downloadedCount: number
+  failedFileCount: number
+  disabledFileCount: number
+}
+
+export async function refreshOneDriveFolder(rootFolderId: string): Promise<OneDriveRefreshSummary> {
+  assertOneDriveAvailable()
+  const store = useFileExplorerStore.getState()
+  await store.initialize()
+  const db = await openFileExplorerDB()
+  const [folders, allItems] = await Promise.all([
+    db.getAll('folder-records'),
+    db.getAll('folder-items')
+  ])
+  const rootFolder = folders.find((folder) => folder.id === rootFolderId)
+  const syncLink = rootFolder?.syncLink
+  if (!rootFolder || !syncLink || syncLink.providerType !== 'onedrive') {
+    throw new Error('OneDrive root folder not found')
+  }
+
+  const provider = createStoredOneDriveProvider(syncLink.providerConnectionId)
+  const { remoteItems, nextCursor } = await scanOneDriveFolder(
+    provider,
+    syncLink.providerConnectionId,
+    syncLink.remoteFolderId
+  )
+  const existingEntries = await listSyncEntriesByProviderConnection(syncLink.providerConnectionId)
+  const offlinePolicy =
+    syncLink.offlinePolicy ?? useSettingsStore.getState().oneDrive.defaultOfflinePolicy
+  const plan = buildSyncRefreshPlan({
+    providerConnectionId: syncLink.providerConnectionId,
+    providerType: 'onedrive',
+    rootFolder,
+    rootRemoteFolderId: syncLink.remoteFolderId,
+    offlinePolicy,
+    platform: 'electron',
+    existingFolders: folders,
+    existingItems: allItems.filter((item): item is FileItemRecord => item.type === 'file'),
+    existingEntries,
+    remoteItems
+  })
+
+  await applySyncRefreshPlan(plan)
+  if (nextCursor) {
+    await putSyncCursor({
+      providerConnectionId: syncLink.providerConnectionId,
+      remoteFolderId: syncLink.remoteFolderId,
+      cursor: nextCursor,
+      updatedAt: Date.now()
+    })
+  }
+
+  const remoteById = new Map(remoteItems.map((item) => [item.remoteItemId, item]))
+  let downloadedCount = 0
+  let failedFileCount = 0
+  const downloadedItemIds: string[] = []
+  for (const transfer of plan.fileTransfers) {
+    try {
+      await provider.downloadContent(
+        {
+          providerConnectionId: syncLink.providerConnectionId,
+          remoteItemId: transfer.remoteItemId,
+          targetBlobId: transfer.itemId,
+          offlinePolicy
+        },
+        new AbortController().signal
+      )
+      downloadedCount++
+      downloadedItemIds.push(transfer.itemId)
+    } catch (error) {
+      failedFileCount++
+      const remoteItem = remoteById.get(transfer.remoteItemId)
+      if (remoteItem) {
+        await putSyncEntry({
+          providerConnectionId: syncLink.providerConnectionId,
+          remoteItemId: transfer.remoteItemId,
+          parentRemoteItemId: remoteItem.parentRemoteItemId,
+          kind: 'file',
+          name: remoteItem.name,
+          itemId: transfer.itemId,
+          blobId: transfer.itemId,
+          mimeType: transfer.mimeType,
+          size: remoteItem.size,
+          etag: remoteItem.etag,
+          contentHash: remoteItem.contentHash,
+          status: 'failed'
+        })
+      }
+      console.warn('[onedrive] Failed to refresh synced file', {
+        connectionId: syncLink.providerConnectionId,
+        remoteItemId: transfer.remoteItemId,
+        error
+      })
+    }
+  }
+  void refreshImportedMediaAssets(plan.items.filter((item) => downloadedItemIds.includes(item.id)))
+
+  return {
+    connectionId: syncLink.providerConnectionId,
+    rootFolderId,
+    updatedItemCount: plan.items.length,
+    removedItemCount: plan.removedItemIds.length,
+    removedFolderCount: plan.removedFolderIds.length,
+    downloadedCount,
+    failedFileCount,
+    disabledFileCount: plan.disabledCount
+  }
+}
+
+export async function refreshAllOneDriveFolders(): Promise<OneDriveRefreshSummary[]> {
+  assertOneDriveAvailable()
+  const db = await openFileExplorerDB()
+  const folders = await db.getAll('folder-records')
+  const roots = folders.filter(
+    (folder) =>
+      folder.parentId === FILE_EXPLORER_ROOT_ID && folder.syncLink?.providerType === 'onedrive'
+  )
+  const results: OneDriveRefreshSummary[] = []
+  for (const folder of roots) {
+    results.push(await refreshOneDriveFolder(folder.id))
+  }
+  return results
 }

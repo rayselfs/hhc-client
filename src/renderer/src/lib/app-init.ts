@@ -9,6 +9,7 @@ import { toast } from '@heroui/react/toast'
 import i18n from '@renderer/i18n'
 import { mediaJobQueue } from '@renderer/lib/media-job-queue'
 import { recoverPendingSyncResourceCleanups } from '@renderer/lib/sync-unlink'
+import { startSyncRuntime } from '@renderer/lib/sync-runtime'
 import '@renderer/lib/video-poster-jobs'
 
 let earlyInitStarted = false
@@ -89,6 +90,7 @@ export function initializeApp(): () => void {
   subscriptionsInitialized = true
 
   void initWhisperModelDir()
+  const stopSyncRuntime = startSyncRuntime()
 
   let prevModelDir = useSettingsStore.getState().speech.whisper.modelDir
   const unsubWhisper = useSettingsStore.subscribe((state) => {
@@ -155,6 +157,7 @@ export function initializeApp(): () => void {
     unsubWhisper()
     unsubBibleFolders()
     unsubFileExplorer()
+    stopSyncRuntime()
     window.removeEventListener('online', handleOnline)
     window.removeEventListener('offline', handleOffline)
     subscriptionsInitialized = false

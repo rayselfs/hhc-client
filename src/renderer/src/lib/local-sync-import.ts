@@ -14,10 +14,16 @@ import {
 } from '@renderer/lib/media-capabilities'
 import { ensureSourceMediaMetadata } from '@renderer/lib/media-metadata'
 import { enqueueVideoPosterJob } from '@renderer/lib/video-poster-jobs'
-import { putProviderConnection, putSyncEntry, type SyncEntryRecord } from '@renderer/lib/sync-db'
+import {
+  listSyncEntriesByProviderConnection,
+  putProviderConnection,
+  putSyncEntry,
+  type SyncEntryRecord
+} from '@renderer/lib/sync-db'
 import { generateThumbnail } from '@renderer/lib/thumbnail-generator'
 import { saveThumbnail } from '@renderer/lib/thumbnail-db'
 import i18n from '@renderer/i18n'
+import { applySyncRefreshPlan, buildSyncRefreshPlan, type SyncRefreshPlan } from './sync-refresh'
 
 interface SyncFilePolicy {
   kind: MediaKind | 'unsupported'
@@ -271,7 +277,7 @@ async function saveImportedRecords(
   ])
 }
 
-async function refreshImportedMediaAssets(items: FileItemRecord[]): Promise<void> {
+export async function refreshImportedMediaAssets(items: FileItemRecord[]): Promise<void> {
   await Promise.all(
     items.map(async (item) => {
       if (!item.url.startsWith('blob:')) return
@@ -387,6 +393,7 @@ export async function connectLocalSyncFolder(): Promise<LocalSyncImportSummary |
   if (!connection) return null
   const remoteItems = await window.api.localSync.scanFolder(connection.id)
   const summary = await importLocalSyncConnection(connection, remoteItems, 'electron')
+  await window.api.localSync.startWatch(connection.id).catch(() => undefined)
   if (summary.disabledFileCount > 0) {
     toast.warning(
       i18n.t('fileExplorer.syncSources.unsupportedFiles', {
@@ -395,4 +402,111 @@ export async function connectLocalSyncFolder(): Promise<LocalSyncImportSummary |
     )
   }
   return summary
+}
+
+export interface LocalSyncRefreshSummary {
+  connection: LocalSyncConnectionInfo
+  updatedItemCount: number
+  removedItemCount: number
+  removedFolderCount: number
+  failedFileCount: number
+  disabledFileCount: number
+}
+
+function markTransferStatus(
+  plan: SyncRefreshPlan,
+  remoteItemId: string,
+  status: 'available-offline' | 'failed'
+): void {
+  const entry = plan.syncEntries.find((candidate) => candidate.remoteItemId === remoteItemId)
+  if (!entry || entry.kind !== 'file') return
+  entry.status = status
+}
+
+export async function refreshLocalSyncConnection(
+  connectionId: string
+): Promise<LocalSyncRefreshSummary> {
+  if (isWeb()) throw new Error('Local sync folders are only available in Electron')
+  const connection = (await window.api.localSync.listFolders()).find(
+    (item) => item.id === connectionId
+  )
+  if (!connection) throw new Error('Local sync connection not found')
+
+  const store = useFileExplorerStore.getState()
+  await store.initialize()
+  const db = await openFileExplorerDB()
+  const [folders, allItems, existingEntries, remoteItems] = await Promise.all([
+    db.getAll('folder-records'),
+    db.getAll('folder-items'),
+    listSyncEntriesByProviderConnection(connection.id),
+    window.api.localSync.scanFolder(connection.id)
+  ])
+  const rootFolder = folders.find(
+    (folder) =>
+      folder.syncLink?.providerConnectionId === connection.id &&
+      folder.syncLink.remoteFolderId === '.'
+  )
+  if (!rootFolder) throw new Error('Local sync root folder not found')
+
+  const plan = buildSyncRefreshPlan({
+    providerConnectionId: connection.id,
+    providerType: 'local-fs',
+    rootFolder,
+    rootRemoteFolderId: '.',
+    offlinePolicy: 'always-offline',
+    platform: 'electron',
+    existingFolders: folders,
+    existingItems: allItems.filter((item): item is FileItemRecord => item.type === 'file'),
+    existingEntries,
+    remoteItems: remoteItems.map((item) => ({
+      remoteItemId: item.remoteItemId,
+      parentRemoteItemId: item.parentRemoteItemId,
+      kind: item.kind,
+      name: item.name,
+      mimeType: item.mimeType,
+      size: item.size,
+      etag: item.etag
+    }))
+  })
+
+  const blobs: FileBlobRecord[] = []
+  let failedFileCount = 0
+  for (const fileTransfer of plan.fileTransfers) {
+    try {
+      const result = await window.api.localSync.importFile({
+        connectionId: connection.id,
+        remoteItemId: fileTransfer.remoteItemId,
+        targetFileId: fileTransfer.itemId
+      })
+      blobs.push({
+        id: fileTransfer.itemId,
+        storage: 'native-fs',
+        size: result.size,
+        refCount: 1
+      })
+      markTransferStatus(plan, fileTransfer.remoteItemId, 'available-offline')
+    } catch (error) {
+      failedFileCount++
+      markTransferStatus(plan, fileTransfer.remoteItemId, 'failed')
+      console.warn('[local-sync] Failed to refresh synced file', {
+        connectionId: connection.id,
+        remoteItemId: fileTransfer.remoteItemId,
+        error
+      })
+    }
+  }
+
+  await applySyncRefreshPlan(plan, blobs)
+  void refreshImportedMediaAssets(
+    plan.items.filter((item) => blobs.some((blob) => blob.id === item.id))
+  )
+
+  return {
+    connection,
+    updatedItemCount: plan.items.length,
+    removedItemCount: plan.removedItemIds.length,
+    removedFolderCount: plan.removedFolderIds.length,
+    failedFileCount,
+    disabledFileCount: plan.disabledCount
+  }
 }
