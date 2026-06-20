@@ -8,6 +8,7 @@ import { isElectron } from '@renderer/lib/env'
 import { ThemePreference } from '@renderer/types/theme'
 import type { WhisperModel } from '@shared/ipc-channels'
 import type { SyncOfflinePolicy } from '@shared/types/folder'
+import { APP_CONFIG } from '@shared/app-config'
 
 export const TIMEZONE_OPTIONS = [
   { value: 'Asia/Taipei', labelKey: 'timezones.taipei' },
@@ -65,7 +66,7 @@ const DEFAULT_TIMER_RING_COLOR_ENABLED = false
 const DEFAULT_TRASH_RETENTION_DAYS = 30
 const DEFAULT_REMINDER_MODE = 'subtract'
 const DEFAULT_PROJECTION_DISPLAY_ID = ''
-export const LIBREPRESENTER_DEFAULT_ONEDRIVE_CLIENT_ID = '4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02'
+export const LIBREPRESENTER_DEFAULT_ONEDRIVE_CLIENT_ID = APP_CONFIG.oneDriveClientId
 const RELOAD_DELAY_MS = 500
 const THEME_PREFERENCES: ThemePreference[] = ['system', 'light', 'dark']
 const OFFLINE_POLICIES: SyncOfflinePolicy[] = ['online-only', 'on-demand', 'always-offline']

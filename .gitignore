@@ -3,6 +3,9 @@ dist
 out
 coverage
 .DS_Store
+.env
+.env.*
+!.env.example
 .eslintcache
 .sisyphus
 .playwright-mcp
