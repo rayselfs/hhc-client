@@ -35,6 +35,11 @@ jobs:
         run: npx vitest run
 
       - name: Build
+        env:
+          VITE_ONEDRIVE_CLIENT_ID: ${{ vars.VITE_ONEDRIVE_CLIENT_ID }}
+          VITE_BIBLE_API_HOST: ${{ vars.VITE_BIBLE_API_HOST }}
+          VITE_BIBLE_API_V1_PREFIX: ${{ vars.VITE_BIBLE_API_V1_PREFIX }}
+          VITE_BIBLE_API_V2_PREFIX: ${{ vars.VITE_BIBLE_API_V2_PREFIX }}
         run: npm run build
 
   prepare:
@@ -119,6 +124,10 @@ jobs:
 
       - name: Build signed desktop package
         env:
+          VITE_ONEDRIVE_CLIENT_ID: ${{ vars.VITE_ONEDRIVE_CLIENT_ID }}
+          VITE_BIBLE_API_HOST: ${{ vars.VITE_BIBLE_API_HOST }}
+          VITE_BIBLE_API_V1_PREFIX: ${{ vars.VITE_BIBLE_API_V1_PREFIX }}
+          VITE_BIBLE_API_V2_PREFIX: ${{ vars.VITE_BIBLE_API_V2_PREFIX }}
           CSC_LINK: ${{ runner.os == 'macOS' && secrets.MACOS_CSC_LINK || secrets.WINDOWS_CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ runner.os == 'macOS' && secrets.MACOS_CSC_KEY_PASSWORD || secrets.WINDOWS_CSC_KEY_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
