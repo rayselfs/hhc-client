@@ -79,8 +79,8 @@ function createSyncedFolderId(connectionId: string, remoteItemId: string): strin
   return `local-sync-folder-${safeIdPart(connectionId)}-${safeIdPart(remoteItemId)}`
 }
 
-function createSyncedItemId(connectionId: string, remoteItemId: string): string {
-  return `local-sync-item-${safeIdPart(connectionId)}-${safeIdPart(remoteItemId)}`
+function createSyncedItemId(): string {
+  return crypto.randomUUID()
 }
 
 export function classifySyncRemoteFile(
@@ -182,7 +182,7 @@ export function buildLocalSyncImportPlan(input: LocalSyncImportPlanInput): Local
     if (remoteItem.kind !== 'file') continue
     const parentId = remoteFolderToLocalId.get(remoteItem.parentRemoteItemId) ?? rootFolderId
     const policy = classifySyncRemoteFile(remoteItem, input.platform)
-    const itemId = createSyncedItemId(input.connection.id, remoteItem.remoteItemId)
+    const itemId = createSyncedItemId()
     const sortIndex = itemSortCounts.get(parentId) ?? 0
     itemSortCounts.set(parentId, sortIndex + 1)
     const item: FileItemRecord = {

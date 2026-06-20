@@ -4,6 +4,7 @@ import type {
   SyncOfflinePolicy,
   SyncProviderType
 } from '@shared/types/folder'
+import { isValidNativeFileId } from '@shared/native-media'
 import { FILE_EXPLORER_ROOT_ID, useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { cleanupFileResources } from './file-resource-cleanup'
 import { openFileExplorerDB, type FileBlobRecord } from './file-explorer-db'
@@ -67,13 +68,8 @@ function createFolderId(
   return `${prefix}-folder-${safeIdPart(connectionId)}-${safeIdPart(remoteItemId)}`
 }
 
-function createItemId(
-  providerType: SyncProviderType,
-  connectionId: string,
-  remoteItemId: string
-): string {
-  const prefix = providerType === 'onedrive' ? 'onedrive' : 'local-sync'
-  return `${prefix}-item-${safeIdPart(connectionId)}-${safeIdPart(remoteItemId)}`
+function createItemId(): string {
+  return crypto.randomUUID()
 }
 
 function classifyRemoteFile(
@@ -130,6 +126,7 @@ export function buildSyncRefreshPlan(input: BuildSyncRefreshPlanInput): SyncRefr
   const items: FileItemRecord[] = []
   const syncEntries: SyncRefreshPlan['syncEntries'] = []
   const fileTransfers: SyncFileTransfer[] = []
+  const replacedItemIds: string[] = []
   let disabledCount = 0
 
   for (const remoteItem of input.remoteItems) {
@@ -175,8 +172,8 @@ export function buildSyncRefreshPlan(input: BuildSyncRefreshPlanInput): SyncRefr
     const parentId = remoteFolderToLocalId.get(remoteItem.parentRemoteItemId) ?? input.rootFolder.id
     const existing = existingByRemoteId.get(remoteItem.remoteItemId)
     const itemId =
-      existing?.itemId ??
-      createItemId(input.providerType, input.providerConnectionId, remoteItem.remoteItemId)
+      existing?.itemId && isValidNativeFileId(existing.itemId) ? existing.itemId : createItemId()
+    if (existing?.itemId && existing.itemId !== itemId) replacedItemIds.push(existing.itemId)
     const sortIndex = itemSortCounts.get(parentId) ?? 0
     itemSortCounts.set(parentId, sortIndex + 1)
     const policy = classifyRemoteFile(remoteItem, input.platform)
@@ -236,9 +233,12 @@ export function buildSyncRefreshPlan(input: BuildSyncRefreshPlanInput): SyncRefr
     removedFolderIds: removedEntries
       .filter((entry) => entry.kind === 'folder' && entry.folderId)
       .map((entry) => entry.folderId!),
-    removedItemIds: removedEntries
-      .filter((entry) => entry.kind === 'file' && entry.itemId)
-      .map((entry) => entry.itemId!),
+    removedItemIds: [
+      ...replacedItemIds,
+      ...removedEntries
+        .filter((entry) => entry.kind === 'file' && entry.itemId)
+        .map((entry) => entry.itemId!)
+    ],
     removedEntries,
     disabledCount
   }

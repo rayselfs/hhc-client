@@ -3,6 +3,8 @@ import type { FolderRecord, FileItemRecord } from '@shared/types/folder'
 import type { SyncEntryRecord } from '../sync-db'
 import { buildSyncRefreshPlan } from '../sync-refresh'
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
 const rootFolder: FolderRecord = {
   id: 'root-sync-folder',
   name: 'Media',
@@ -19,14 +21,14 @@ const rootFolder: FolderRecord = {
 }
 
 const existingItem: FileItemRecord = {
-  id: 'local-sync-item-connection-1-old-file',
+  id: '11111111-1111-4111-8111-111111111111',
   parentId: rootFolder.id,
   type: 'file',
   sortIndex: 0,
   createdAt: 1,
   expiresAt: null,
   name: 'old.mp4',
-  url: 'blob:local-sync-item-connection-1-old-file',
+  url: 'blob:11111111-1111-4111-8111-111111111111',
   size: 100,
   mimeType: 'video/mp4'
 }
@@ -106,10 +108,12 @@ describe('buildSyncRefreshPlan', () => {
         url: expect.stringMatching(/^blob:/)
       })
     ])
+    const newItem = plan.items.find((item) => item.name === 'legacy.avi')
+    expect(newItem?.id).toMatch(UUID_PATTERN)
     expect(plan.fileTransfers).toEqual([
       { itemId: existingItem.id, remoteItemId: 'old-file', mimeType: 'video/mp4' },
       {
-        itemId: 'local-sync-item-connection-1-bad-file',
+        itemId: newItem?.id,
         remoteItemId: 'bad-file',
         mimeType: 'video/x-msvideo'
       }
@@ -153,5 +157,36 @@ describe('buildSyncRefreshPlan', () => {
         status: 'failed'
       })
     ])
+  })
+
+  it('replaces legacy non-native item ids before file transfer', () => {
+    const legacyItem = { ...existingItem, id: 'local-sync-item-connection-1-old-file' }
+    const plan = buildSyncRefreshPlan({
+      providerConnectionId: 'connection-1',
+      providerType: 'local-fs',
+      rootFolder,
+      rootRemoteFolderId: '.',
+      offlinePolicy: 'always-offline',
+      platform: 'electron',
+      existingFolders: [rootFolder],
+      existingItems: [legacyItem],
+      existingEntries: [{ ...existingEntry, itemId: legacyItem.id, blobId: legacyItem.id }],
+      remoteItems: [
+        {
+          remoteItemId: 'old-file',
+          parentRemoteItemId: null,
+          kind: 'file',
+          name: 'old.mp4',
+          mimeType: 'video/mp4',
+          size: 120,
+          etag: 'after'
+        }
+      ]
+    })
+
+    expect(plan.items[0].id).toMatch(UUID_PATTERN)
+    expect(plan.items[0].id).not.toBe(legacyItem.id)
+    expect(plan.fileTransfers[0].itemId).toBe(plan.items[0].id)
+    expect(plan.removedItemIds).toContain(legacyItem.id)
   })
 })

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { FILE_EXPLORER_ROOT_ID } from '@renderer/stores/file-explorer'
 import { buildOneDriveImportPlan } from '../onedrive-connect'
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
 describe('buildOneDriveImportPlan', () => {
   it('mounts the selected OneDrive folder instead of the account root', () => {
     const plan = buildOneDriveImportPlan({
@@ -30,8 +32,8 @@ describe('buildOneDriveImportPlan', () => {
           remoteItemId: 'file-1',
           parentRemoteItemId: 'child-folder-1',
           kind: 'file',
-          name: 'cue.mp3',
-          mimeType: 'audio/mpeg',
+          name: 'cue.mp4',
+          mimeType: 'video/mp4',
           size: 2048,
           deleted: false
         }
@@ -58,8 +60,10 @@ describe('buildOneDriveImportPlan', () => {
       parentId: plan.folders[0].id
     })
     expect(plan.items[0]).toMatchObject({
-      name: 'cue.mp3',
+      name: 'cue.mp4',
       parentId: plan.folders[1].id
     })
+    expect(plan.items[0].id).toMatch(UUID_PATTERN)
+    expect(plan.downloadableItems[0]).toMatchObject({ itemId: plan.items[0].id })
   })
 })

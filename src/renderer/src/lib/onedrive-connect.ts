@@ -73,8 +73,8 @@ function createSyncedFolderId(connectionId: string, remoteItemId: string): strin
   return `onedrive-folder-${safeIdPart(connectionId)}-${safeIdPart(remoteItemId)}`
 }
 
-function createSyncedItemId(connectionId: string, remoteItemId: string): string {
-  return `onedrive-item-${safeIdPart(connectionId)}-${safeIdPart(remoteItemId)}`
+function createSyncedItemId(): string {
+  return crypto.randomUUID()
 }
 
 function classifyRemoteFile(
@@ -222,7 +222,7 @@ export function buildOneDriveImportPlan(input: {
   for (const remoteItem of input.remoteItems) {
     if (remoteItem.kind !== 'file' || remoteItem.deleted) continue
     const parentId = remoteFolderToLocalId.get(remoteItem.parentRemoteItemId) ?? rootFolderId
-    const itemId = createSyncedItemId(input.connectionId, remoteItem.remoteItemId)
+    const itemId = createSyncedItemId()
     const sortIndex = itemSortCounts.get(parentId) ?? 0
     itemSortCounts.set(parentId, sortIndex + 1)
     const policy = classifyRemoteFile(remoteItem, input.platform)
