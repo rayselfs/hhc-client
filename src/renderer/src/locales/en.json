@@ -460,6 +460,8 @@
       "addOneDrive": "Add OneDrive",
       "addFavorite": "Add to Favorites",
       "removeFavorite": "Remove from Favorites",
+      "refreshSyncFolder": "Refresh Sync Folder",
+      "resyncFile": "Resync File",
       "project": "Project",
       "restore": "Restore",
       "permanentDelete": "Delete Permanently"
@@ -483,6 +485,8 @@
       "oneDriveLoginRequired": "Sign in to OneDrive in Preferences first.",
       "oneDriveDesktopOnly": "OneDrive connection is available in the desktop app only.",
       "oneDriveImportFailed": "Failed to add OneDrive folder.",
+      "refreshComplete": "Sync folder refreshed.",
+      "refreshFailed": "Failed to refresh sync folder.",
       "unsupportedFiles": "{{count}} unsupported file(s) were kept but disabled."
     },
     "oneDriveFolderPicker": {

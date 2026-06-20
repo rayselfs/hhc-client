@@ -40,6 +40,7 @@ export interface ShowItemMenuOptions {
   onDelete: (targetIds: Set<string>) => void
   onEdit?: (item: FolderItem) => void
   isReadOnly?: boolean
+  extraActions?: ContextMenuEntry[]
 }
 
 export interface ShowFolderMenuOptions {
@@ -54,6 +55,7 @@ export interface ShowFolderMenuOptions {
   onDelete: (targetIds: Set<string>) => void
   onEdit?: (folder: FolderRecord) => void
   isReadOnly?: boolean
+  extraActions?: ContextMenuEntry[]
 }
 
 export interface ShowMultiSelectMenuOptions {
@@ -106,7 +108,8 @@ export function createFolderContextMenu(
       onCut,
       onDelete,
       onEdit,
-      isReadOnly = false
+      isReadOnly = false,
+      extraActions = []
     }: ShowItemMenuOptions): void => {
       if (!isAlreadySelected) {
         setSelected(new Set([item.id]))
@@ -154,7 +157,7 @@ export function createFolderContextMenu(
       ]
 
       const extra = config?.extraItemActions?.(item.id, t as (key: string) => string) ?? []
-      showMenu([...baseItems, ...extra], event)
+      showMenu([...baseItems, ...extra, ...extraActions], event)
     }
 
     const showFolderMenu = ({
@@ -168,7 +171,8 @@ export function createFolderContextMenu(
       onPaste,
       onDelete,
       onEdit,
-      isReadOnly = false
+      isReadOnly = false,
+      extraActions = []
     }: ShowFolderMenuOptions): void => {
       if (!isAlreadySelected) {
         setSelected(new Set([folder.id]))
@@ -234,7 +238,7 @@ export function createFolderContextMenu(
       ]
 
       const extra = config?.extraFolderActions?.(folder, t as (key: string) => string) ?? []
-      showMenu([...baseItems, ...extra], event)
+      showMenu([...baseItems, ...extra, ...extraActions], event)
     }
 
     const showMultiSelectMenu = ({

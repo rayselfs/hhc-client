@@ -5,6 +5,7 @@ import { FileExplorerShell, useFileContextMenu } from '@renderer/components/Cont
 import FileBrowser from '@renderer/components/Control/FileExplorer/FileBrowser'
 import FileExplorerFAB from '@renderer/components/Control/FileExplorer/FileExplorerFAB'
 import OneDriveFolderPickerDialog from '@renderer/components/Control/FileExplorer/OneDriveFolderPickerDialog'
+import type { ContextMenuEntry } from '@renderer/contexts/ContextMenuContext'
 import { FolderModal } from '@renderer/components/Control/Folder/FolderModal'
 import {
   deleteFolderFromStore,
@@ -13,10 +14,12 @@ import {
   FILE_EXPLORER_ROOT_ID
 } from '@renderer/stores/file-explorer'
 import { getUploadMediaPlatform, uploadFiles, uploadFolderFiles } from '@renderer/lib/upload-utils'
-import { connectLocalSyncFolder } from '@renderer/lib/local-sync-import'
+import { RefreshCw } from 'lucide-react'
+import { connectLocalSyncFolder, refreshLocalSyncConnection } from '@renderer/lib/local-sync-import'
 import {
   getConnectedOneDriveAccount,
   importOneDriveFolder,
+  refreshOneDriveFolder,
   type OneDriveRemoteFolder
 } from '@renderer/lib/onedrive-connect'
 import { isElectron } from '@renderer/lib/env'
@@ -187,6 +190,70 @@ export default function FilesPage(): React.JSX.Element {
       }
     },
     [t]
+  )
+
+  const findSyncRootFolder = useCallback((folderId: string): FolderRecord | null => {
+    const state = useFileExplorerStore.getState()
+    let current = state.folders[folderId] ?? null
+    let root: FolderRecord | null = current?.syncLink ? current : null
+    while (current?.parentId) {
+      const parent = state.folders[current.parentId]
+      if (
+        !parent?.syncLink ||
+        !root?.syncLink ||
+        parent.syncLink.providerConnectionId !== root.syncLink.providerConnectionId
+      ) {
+        break
+      }
+      root = parent
+      current = parent
+    }
+    return root
+  }, [])
+
+  const handleRefreshSyncFolder = useCallback(
+    async (folderId: string): Promise<void> => {
+      const root = findSyncRootFolder(folderId)
+      const syncLink = root?.syncLink
+      if (!root || !syncLink) return
+      try {
+        if (syncLink.providerType === 'local-fs') {
+          await refreshLocalSyncConnection(syncLink.providerConnectionId)
+        } else {
+          await refreshOneDriveFolder(root.id)
+        }
+        toast.success(t('fileExplorer.syncSources.refreshComplete'))
+      } catch (error) {
+        console.warn('[sync] Failed to refresh sync source', error)
+        toast.danger(t('fileExplorer.syncSources.refreshFailed'))
+      }
+    },
+    [findSyncRootFolder, t]
+  )
+
+  const getRefreshSyncActions = useCallback(
+    (
+      folderId: string,
+      labelKey: 'refreshSyncFolder' | 'resyncFile' = 'refreshSyncFolder'
+    ): ContextMenuEntry[] => {
+      if (!isElectron()) return []
+      const root = findSyncRootFolder(folderId)
+      if (!root?.syncLink) return []
+      const label =
+        labelKey === 'resyncFile'
+          ? t('fileExplorer.contextMenu.resyncFile')
+          : t('fileExplorer.contextMenu.refreshSyncFolder')
+      return [
+        'separator',
+        {
+          id: 'refresh-sync-source',
+          label,
+          icon: React.createElement(RefreshCw, { size: 14 }),
+          onAction: () => void handleRefreshSyncFolder(root.id)
+        }
+      ]
+    },
+    [findSyncRootFolder, handleRefreshSyncFolder, t]
   )
 
   const handleFileChange = useCallback(
@@ -398,7 +465,8 @@ export default function FilesPage(): React.JSX.Element {
         onCut: handleCut,
         onDelete: handleDelete,
         onEdit: (targetItem) => setRenameItemRequestId(targetItem.id),
-        isReadOnly
+        isReadOnly,
+        extraActions: isReadOnly ? getRefreshSyncActions(item.parentId, 'resyncFile') : []
       })
     },
     [
@@ -408,6 +476,7 @@ export default function FilesPage(): React.JSX.Element {
       handleCopy,
       handleCut,
       handleDelete,
+      getRefreshSyncActions,
       areIdsReadOnly
     ]
   )
@@ -446,7 +515,8 @@ export default function FilesPage(): React.JSX.Element {
         onPaste: handlePaste,
         onDelete: handleDelete,
         onEdit: (targetFolder) => openEditModal(targetFolder.id),
-        isReadOnly
+        isReadOnly,
+        extraActions: getRefreshSyncActions(folder.id)
       })
     },
     [
@@ -459,6 +529,7 @@ export default function FilesPage(): React.JSX.Element {
       handlePaste,
       handleDelete,
       openEditModal,
+      getRefreshSyncActions,
       areIdsReadOnly
     ]
   )

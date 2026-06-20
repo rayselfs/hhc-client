@@ -460,6 +460,8 @@
       "addOneDrive": "新增 OneDrive",
       "addFavorite": "加入我的最愛",
       "removeFavorite": "移除我的最愛",
+      "refreshSyncFolder": "重新整理同步資料夾",
+      "resyncFile": "重新同步檔案",
       "project": "投影",
       "restore": "還原",
       "permanentDelete": "永久刪除"
@@ -483,6 +485,8 @@
       "oneDriveLoginRequired": "請先在偏好設定登入 OneDrive。",
       "oneDriveDesktopOnly": "OneDrive 連線目前只支援桌面版。",
       "oneDriveImportFailed": "無法加入 OneDrive 資料夾。",
+      "refreshComplete": "同步資料夾已重新整理。",
+      "refreshFailed": "無法重新整理同步資料夾。",
       "unsupportedFiles": "有 {{count}} 個檔案格式不支援，已保留但禁用。"
     },
     "oneDriveFolderPicker": {
