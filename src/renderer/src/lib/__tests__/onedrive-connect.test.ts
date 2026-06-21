@@ -10,6 +10,7 @@ import type { OneDriveReadonlyProvider } from '../onedrive-provider'
 import { openFileExplorerDB } from '../file-explorer-db'
 import { refreshImportedMediaAssets } from '../local-sync-import'
 import { listProviderConnectionsByType } from '../sync-db'
+import { resetSyncDownloadQueueForTests } from '../sync-download-queue'
 
 const providerMocks = vi.hoisted(() => ({
   connect: vi.fn(),
@@ -129,8 +130,20 @@ vi.mock('@renderer/i18n', () => ({
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
+function deferred<T>(): {
+  promise: Promise<T>
+  resolve: (value: T) => void
+} {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise
+  })
+  return { promise, resolve }
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
+  resetSyncDownloadQueueForTests()
   fileStoreMocks.state.folders = {}
   fileStoreMocks.state.items = {}
   fileStoreMocks.state._childFoldersByParent = {}
@@ -352,6 +365,54 @@ describe('scanOneDriveFolder', () => {
 })
 
 describe('importOneDriveFolder', () => {
+  it('returns after linking the folder without waiting for background downloads', async () => {
+    vi.mocked(listProviderConnectionsByType).mockResolvedValueOnce([
+      {
+        id: 'onedrive:account-1',
+        providerType: 'onedrive',
+        displayName: 'OneDrive - Alice',
+        createdAt: 1,
+        updatedAt: 1
+      }
+    ])
+    providerMocks.initialScan.mockResolvedValueOnce({
+      items: [
+        {
+          remoteItemId: 'remote-folder-1',
+          parentRemoteItemId: 'root',
+          kind: 'folder',
+          name: 'Media',
+          deleted: false
+        },
+        {
+          remoteItemId: 'file-1',
+          parentRemoteItemId: 'remote-folder-1',
+          kind: 'file',
+          name: 'one.png',
+          mimeType: 'image/png',
+          size: 100,
+          deleted: false
+        }
+      ],
+      nextCursor: 'cursor-1',
+      hasMore: false
+    })
+    const download = deferred<{ blobId: string; size: number; mimeType: string }>()
+    providerMocks.downloadContent.mockReturnValue(download.promise)
+
+    const result = await importOneDriveFolder({
+      remoteItemId: 'remote-folder-1',
+      parentRemoteItemId: null,
+      name: 'Media'
+    })
+
+    expect(result).toMatchObject({ itemCount: 1, downloadedCount: 0 })
+    await vi.waitFor(() => expect(providerMocks.downloadContent).toHaveBeenCalledTimes(1))
+
+    download.resolve({ blobId: 'file-1', size: 100, mimeType: 'image/png' })
+    await vi.waitFor(() => expect(refreshImportedMediaAssets).toHaveBeenCalledTimes(1))
+  })
+
   it('refreshes media assets after each downloaded file', async () => {
     vi.mocked(listProviderConnectionsByType).mockResolvedValueOnce([
       {

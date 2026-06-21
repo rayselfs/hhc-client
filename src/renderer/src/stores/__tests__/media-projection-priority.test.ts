@@ -3,7 +3,7 @@ import type { FileItemRecord } from '@shared/types/folder'
 import type { PresentationReadinessReport } from '@renderer/lib/presentation-readiness'
 
 const analyzePresentationReadiness = vi.fn()
-const ensureOneDriveItemAvailableForPresentation = vi.fn()
+const ensureSyncItemAvailableForPresentation = vi.fn()
 
 vi.mock('@renderer/lib/presentation-readiness', () => ({
   analyzePresentationReadiness,
@@ -22,8 +22,8 @@ vi.mock('@renderer/lib/presentation-readiness', () => ({
   getPresentationSnapshotResourceIds: vi.fn(() => [])
 }))
 
-vi.mock('@renderer/lib/onedrive-connect', () => ({
-  ensureOneDriveItemAvailableForPresentation
+vi.mock('@renderer/lib/cloud-provider', () => ({
+  ensureSyncItemAvailableForPresentation
 }))
 
 vi.mock('@renderer/lib/media-resource-locks', () => ({
@@ -89,13 +89,13 @@ describe('startPresentationWithReadiness priority', () => {
           { itemId: requested.id, status: 'ready' }
         ])
       )
-    ensureOneDriveItemAvailableForPresentation.mockResolvedValueOnce(true)
+    ensureSyncItemAvailableForPresentation.mockResolvedValueOnce(true)
 
     await useMediaProjectionStore
       .getState()
       .startPresentationWithReadiness([ready, requested], 1, { prioritizeStartItem: true })
 
-    expect(ensureOneDriveItemAvailableForPresentation).toHaveBeenCalledWith(requested)
+    expect(ensureSyncItemAvailableForPresentation).toHaveBeenCalledWith(requested)
     expect(useMediaProjectionStore.getState().playlist.map((item) => item.id)).toEqual([
       ready.id,
       requested.id

@@ -10,7 +10,7 @@ import {
   type PresentationReadinessReport,
   type PresentationSnapshot
 } from '@renderer/lib/presentation-readiness'
-import { ensureOneDriveItemAvailableForPresentation } from '@renderer/lib/onedrive-connect'
+import { ensureSyncItemAvailableForPresentation } from '@renderer/lib/cloud-provider'
 
 interface StartPresentationWithReadinessOptions {
   prioritizeStartItem?: boolean
@@ -133,7 +133,7 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
       if (
         requestedReadiness?.status === 'preparing' &&
         requestedReadiness.reason.startsWith('sync-') &&
-        (await ensureOneDriveItemAvailableForPresentation(requestedItem))
+        (await ensureSyncItemAvailableForPresentation(requestedItem))
       ) {
         report = await analyzePresentationReadiness(files)
       }

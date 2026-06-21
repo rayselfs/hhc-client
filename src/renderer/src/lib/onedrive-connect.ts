@@ -22,11 +22,9 @@ import {
   putSyncCursor,
   putSyncEntry,
   type ProviderConnectionRecord,
-  type SyncEntryRecord,
-  type SyncEntryStatus
+  type SyncEntryRecord
 } from './sync-db'
 import {
-  isSyncStorageLimitError,
   saveElectronOneDriveDownloadedContent,
   saveWebOneDriveDownloadedContent
 } from './sync-download-storage'
@@ -37,7 +35,8 @@ import {
 } from './onedrive-web-credentials'
 import type { MediaPlatform } from './media-capabilities'
 import { classifyMediaImport } from './media-import-policy'
-import type { RemoteSyncItem, SyncRetryClassification } from './sync-provider'
+import type { RemoteSyncItem } from './sync-provider'
+import { enqueueSyncDownload } from './sync-download-queue'
 import {
   applySyncRefreshPlan,
   buildSyncDeltaRefreshPlan,
@@ -427,55 +426,6 @@ function createStoredOneDriveProvider(connectionId: string): OneDriveReadonlyPro
   })
 }
 
-const RETRY_BACKOFF_MS = [30_000, 60_000, 2 * 60_000, 5 * 60_000, 15 * 60_000]
-const presentationDownloads = new Map<string, Promise<boolean>>()
-
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
-}
-
-function getRetryDelayMs(retryCount: number): number {
-  return RETRY_BACKOFF_MS[Math.min(Math.max(retryCount - 1, 0), RETRY_BACKOFF_MS.length - 1)]
-}
-
-function classifyDownloadFailure(
-  provider: OneDriveReadonlyProvider,
-  error: unknown,
-  previousEntry: SyncEntryRecord | undefined,
-  now = Date.now()
-): {
-  status: SyncEntryStatus
-  errorKind?: SyncRetryClassification
-  retryCount?: number
-  nextRetryAt?: number
-  lastError: string
-} {
-  if (isSyncStorageLimitError(error)) {
-    return {
-      status: 'insufficient-storage',
-      lastError: getErrorMessage(error)
-    }
-  }
-
-  const errorKind = provider.classifyError(error)
-  if (errorKind === 'retryable' || errorKind === 'offline') {
-    const retryCount = (previousEntry?.retryCount ?? 0) + 1
-    return {
-      status: 'failed',
-      errorKind,
-      retryCount,
-      nextRetryAt: now + getRetryDelayMs(retryCount),
-      lastError: getErrorMessage(error)
-    }
-  }
-
-  return {
-    status: 'failed',
-    errorKind,
-    lastError: getErrorMessage(error)
-  }
-}
-
 async function downloadOneDriveItemForPresentation(item: FileItemRecord): Promise<boolean> {
   const entry = await getSyncEntryByLocalItem(item.id)
   if (!entry || entry.status === 'available-offline') return true
@@ -491,29 +441,15 @@ async function downloadOneDriveItemForPresentation(item: FileItemRecord): Promis
   if (connection?.providerType !== 'onedrive') return false
 
   const provider = createStoredOneDriveProvider(entry.providerConnectionId)
-  try {
-    await putSyncEntry({
-      ...entry,
-      status: 'downloading',
-      errorKind: undefined,
-      retryCount: undefined,
-      nextRetryAt: undefined,
-      lastError: undefined
-    })
-    await provider.downloadContent(
-      {
-        providerConnectionId: entry.providerConnectionId,
-        remoteItemId: entry.remoteItemId,
-        targetBlobId: item.id,
-        offlinePolicy: 'always-offline'
-      },
-      new AbortController().signal
-    )
-    void refreshImportedMediaAssets([item])
-    return true
-  } catch (error) {
-    const failure = classifyDownloadFailure(provider, error, entry)
-    await putSyncEntry({
+  const result = await enqueueSyncDownload({
+    provider,
+    request: {
+      providerConnectionId: entry.providerConnectionId,
+      remoteItemId: entry.remoteItemId,
+      targetBlobId: item.id,
+      offlinePolicy: 'always-offline'
+    },
+    entry: {
       providerConnectionId: entry.providerConnectionId,
       remoteItemId: entry.remoteItemId,
       parentRemoteItemId: entry.parentRemoteItemId,
@@ -523,26 +459,17 @@ async function downloadOneDriveItemForPresentation(item: FileItemRecord): Promis
       mimeType: entry.mimeType,
       size: entry.size,
       etag: entry.etag,
-      contentHash: entry.contentHash,
-      ...failure
-    })
-    console.warn('[onedrive] Failed to prioritize file for presentation', {
-      connectionId: entry.providerConnectionId,
-      remoteItemId: entry.remoteItemId,
-      error
-    })
-    return false
-  }
+      contentHash: entry.contentHash
+    },
+    previousEntry: entry,
+    priority: 'presentation',
+    onDownloaded: () => refreshImportedMediaAssets([item])
+  })
+  return result !== null
 }
 
 export function ensureOneDriveItemAvailableForPresentation(item: FileItemRecord): Promise<boolean> {
-  const existing = presentationDownloads.get(item.id)
-  if (existing) return existing
-  const download = downloadOneDriveItemForPresentation(item).finally(() => {
-    presentationDownloads.delete(item.id)
-  })
-  presentationDownloads.set(item.id, download)
-  return download
+  return downloadOneDriveItemForPresentation(item)
 }
 
 async function downloadImportedOneDriveItems(input: {
@@ -555,56 +482,31 @@ async function downloadImportedOneDriveItems(input: {
 
   for (const item of input.plan.downloadableItems) {
     const remoteItem = remoteById.get(item.remoteItemId)
-    try {
-      if (remoteItem) {
-        await putSyncEntry({
-          providerConnectionId: input.connection.id,
-          remoteItemId: item.remoteItemId,
-          parentRemoteItemId: remoteItem.parentRemoteItemId,
-          kind: 'file',
-          name: remoteItem.name,
-          itemId: item.itemId,
-          mimeType: remoteItem.mimeType,
-          size: remoteItem.size,
-          etag: remoteItem.etag,
-          contentHash: remoteItem.contentHash,
-          status: 'downloading'
-        })
-      }
-      await input.provider.downloadContent(
-        {
-          providerConnectionId: input.connection.id,
-          remoteItemId: item.remoteItemId,
-          targetBlobId: item.itemId,
-          offlinePolicy: 'always-offline'
-        },
-        new AbortController().signal
-      )
-      const downloadedItem = input.plan.items.find((planItem) => planItem.id === item.itemId)
-      if (downloadedItem) void refreshImportedMediaAssets([downloadedItem])
-    } catch (error) {
-      console.warn('[onedrive] Failed to download file for offline use', {
-        connectionId: input.connection.id,
+    if (!remoteItem) continue
+    const downloadedItem = input.plan.items.find((planItem) => planItem.id === item.itemId)
+    void enqueueSyncDownload({
+      provider: input.provider,
+      request: {
+        providerConnectionId: input.connection.id,
         remoteItemId: item.remoteItemId,
-        error
-      })
-      if (remoteItem) {
-        const failure = classifyDownloadFailure(input.provider, error, undefined)
-        await putSyncEntry({
-          providerConnectionId: input.connection.id,
-          remoteItemId: item.remoteItemId,
-          parentRemoteItemId: remoteItem.parentRemoteItemId,
-          kind: 'file',
-          name: remoteItem.name,
-          itemId: item.itemId,
-          mimeType: remoteItem.mimeType,
-          size: remoteItem.size,
-          etag: remoteItem.etag,
-          contentHash: remoteItem.contentHash,
-          ...failure
-        })
-      }
-    }
+        targetBlobId: item.itemId,
+        offlinePolicy: 'always-offline'
+      },
+      entry: {
+        providerConnectionId: input.connection.id,
+        remoteItemId: item.remoteItemId,
+        parentRemoteItemId: remoteItem.parentRemoteItemId,
+        kind: 'file',
+        name: remoteItem.name,
+        itemId: item.itemId,
+        mimeType: remoteItem.mimeType,
+        size: remoteItem.size,
+        etag: remoteItem.etag,
+        contentHash: remoteItem.contentHash
+      },
+      priority: 'background',
+      onDownloaded: downloadedItem ? () => refreshImportedMediaAssets([downloadedItem]) : undefined
+    })
   }
 }
 
@@ -918,79 +820,46 @@ export async function refreshOneDriveFolder(
   const existingEntryByRemoteId = new Map(
     existingEntries.map((entry) => [entry.remoteItemId, entry])
   )
-  let downloadedCount = 0
-  let failedFileCount = 0
-  let retryableFileCount = plan.syncEntries.filter(
+  const downloadedCount = 0
+  const failedFileCount = 0
+  const retryableFileCount = plan.syncEntries.filter(
     (entry) =>
       entry.status === 'failed' &&
       (entry.errorKind === 'retryable' || entry.errorKind === 'offline')
   ).length
-  let nextRetryAt = plan.syncEntries
+  const nextRetryAt = plan.syncEntries
     .map((entry) => entry.nextRetryAt)
     .filter((value): value is number => typeof value === 'number')
     .sort((a, b) => a - b)[0]
   for (const transfer of plan.fileTransfers) {
     const remoteItem = remoteById.get(transfer.remoteItemId)
     const previousEntry = existingEntryByRemoteId.get(transfer.remoteItemId)
-    try {
-      if (remoteItem) {
-        await putSyncEntry({
-          providerConnectionId: syncLink.providerConnectionId,
-          remoteItemId: transfer.remoteItemId,
-          parentRemoteItemId: remoteItem.parentRemoteItemId,
-          kind: 'file',
-          name: remoteItem.name,
-          itemId: transfer.itemId,
-          mimeType: transfer.mimeType,
-          size: remoteItem.size,
-          etag: remoteItem.etag,
-          contentHash: remoteItem.contentHash,
-          status: 'downloading'
-        })
-      }
-      await provider.downloadContent(
-        {
-          providerConnectionId: syncLink.providerConnectionId,
-          remoteItemId: transfer.remoteItemId,
-          targetBlobId: transfer.itemId,
-          offlinePolicy
-        },
-        new AbortController().signal
-      )
-      downloadedCount++
-      const downloadedItem = plan.items.find((item) => item.id === transfer.itemId)
-      if (downloadedItem) void refreshImportedMediaAssets([downloadedItem])
-    } catch (error) {
-      failedFileCount++
-      if (remoteItem) {
-        const failure = classifyDownloadFailure(provider, error, previousEntry)
-        if (failure.nextRetryAt !== undefined) {
-          retryableFileCount++
-          nextRetryAt =
-            nextRetryAt === undefined
-              ? failure.nextRetryAt
-              : Math.min(nextRetryAt, failure.nextRetryAt)
-        }
-        await putSyncEntry({
-          providerConnectionId: syncLink.providerConnectionId,
-          remoteItemId: transfer.remoteItemId,
-          parentRemoteItemId: remoteItem.parentRemoteItemId,
-          kind: 'file',
-          name: remoteItem.name,
-          itemId: transfer.itemId,
-          mimeType: transfer.mimeType,
-          size: remoteItem.size,
-          etag: remoteItem.etag,
-          contentHash: remoteItem.contentHash,
-          ...failure
-        })
-      }
-      console.warn('[onedrive] Failed to refresh synced file', {
-        connectionId: syncLink.providerConnectionId,
+    if (!remoteItem) continue
+    const downloadedItem = plan.items.find((item) => item.id === transfer.itemId)
+    void enqueueSyncDownload({
+      provider,
+      request: {
+        providerConnectionId: syncLink.providerConnectionId,
         remoteItemId: transfer.remoteItemId,
-        error
-      })
-    }
+        targetBlobId: transfer.itemId,
+        offlinePolicy
+      },
+      entry: {
+        providerConnectionId: syncLink.providerConnectionId,
+        remoteItemId: transfer.remoteItemId,
+        parentRemoteItemId: remoteItem.parentRemoteItemId,
+        kind: 'file',
+        name: remoteItem.name,
+        itemId: transfer.itemId,
+        mimeType: transfer.mimeType,
+        size: remoteItem.size,
+        etag: remoteItem.etag,
+        contentHash: remoteItem.contentHash
+      },
+      previousEntry,
+      priority: 'background',
+      onDownloaded: downloadedItem ? () => refreshImportedMediaAssets([downloadedItem]) : undefined
+    })
   }
 
   const changedCount =

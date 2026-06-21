@@ -1,5 +1,8 @@
+import type { FileItemRecord } from '@shared/types/folder'
 import type { ProviderConnectionRecord } from './sync-db'
+import { getProviderConnection, getSyncEntryByLocalItem } from './sync-db'
 import {
+  ensureOneDriveItemAvailableForPresentation,
   getConnectedOneDriveAccount,
   importOneDriveFolder,
   listOneDriveFolders,
@@ -62,4 +65,16 @@ const ONEDRIVE_ADAPTER: CloudProviderAdapter = {
 export function getCloudProviderAdapter(providerId: CloudProviderId): CloudProviderAdapter {
   if (providerId === 'onedrive') return ONEDRIVE_ADAPTER
   throw new Error(`Unsupported cloud provider: ${providerId}`)
+}
+
+export async function ensureSyncItemAvailableForPresentation(
+  item: FileItemRecord
+): Promise<boolean> {
+  const entry = await getSyncEntryByLocalItem(item.id)
+  if (!entry || entry.status === 'available-offline') return true
+  const connection = await getProviderConnection(entry.providerConnectionId)
+  if (connection?.providerType === 'onedrive') {
+    return ensureOneDriveItemAvailableForPresentation(item)
+  }
+  return false
 }
