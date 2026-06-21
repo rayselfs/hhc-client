@@ -450,4 +450,48 @@ describe('buildSyncRefreshPlan', () => {
     expect(plan.items).toEqual([])
     expect(plan.fileTransfers).toEqual([])
   })
+
+  it('requests full scan fallback when existing downloads are still pending', () => {
+    const plan = buildSyncDeltaRefreshPlan({
+      providerConnectionId: 'connection-1',
+      providerType: 'local-fs',
+      rootFolder,
+      rootRemoteFolderId: '.',
+      offlinePolicy: 'always-offline',
+      platform: 'electron',
+      existingFolders: [rootFolder],
+      existingItems: [existingItem],
+      existingEntries: [{ ...existingEntry, status: 'downloading', blobId: undefined }],
+      remoteItems: []
+    })
+
+    expect(plan.needsFullScan).toBe(true)
+    expect(plan.removedItemIds).toEqual([])
+  })
+
+  it('requests full scan fallback when retryable failures are waiting for retry', () => {
+    const plan = buildSyncDeltaRefreshPlan({
+      providerConnectionId: 'connection-1',
+      providerType: 'local-fs',
+      rootFolder,
+      rootRemoteFolderId: '.',
+      offlinePolicy: 'always-offline',
+      platform: 'electron',
+      existingFolders: [rootFolder],
+      existingItems: [existingItem],
+      existingEntries: [
+        {
+          ...existingEntry,
+          status: 'failed',
+          blobId: undefined,
+          errorKind: 'retryable',
+          retryCount: 1,
+          nextRetryAt: Date.now() + 60_000
+        }
+      ],
+      remoteItems: []
+    })
+
+    expect(plan.needsFullScan).toBe(true)
+  })
 })

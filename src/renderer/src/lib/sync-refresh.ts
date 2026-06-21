@@ -151,6 +151,16 @@ function failureFields(existing: SyncEntryRecord | undefined): Partial<SyncEntry
   }
 }
 
+function isPendingDownload(entry: SyncEntryRecord, forceRetry: boolean): boolean {
+  if (entry.kind !== 'file') return false
+  if (entry.status === 'queued' || entry.status === 'downloading' || entry.status === 'outdated') {
+    return true
+  }
+  if (entry.status !== 'failed') return false
+  if (entry.errorKind === 'auth-required' || entry.errorKind === 'fatal') return forceRetry
+  return forceRetry || entry.errorKind === 'retryable' || entry.errorKind === 'offline'
+}
+
 export function buildSyncRefreshPlan(input: BuildSyncRefreshPlanInput): SyncRefreshPlan {
   const now = input.now ?? Date.now()
   const forceRetry = input.forceRetry ?? false
@@ -342,7 +352,7 @@ export function buildSyncDeltaRefreshPlan(input: BuildSyncRefreshPlanInput): Syn
   const removedEntryMap = new Map<string, SyncEntryRecord>()
   const ignoredRemoteIds = new Set<string>()
   let disabledCount = 0
-  let needsFullScan = false
+  let needsFullScan = input.existingEntries.some((entry) => isPendingDownload(entry, forceRetry))
 
   function addDeletedEntry(remoteItemId: string): void {
     const deletedRemoteIds = new Set([remoteItemId])
