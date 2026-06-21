@@ -16,12 +16,8 @@ import {
 import { getUploadMediaPlatform, uploadFiles, uploadFolderFiles } from '@renderer/lib/upload-utils'
 import { RefreshCw, Unlink } from 'lucide-react'
 import { connectLocalSyncFolder, refreshLocalSyncConnection } from '@renderer/lib/local-sync-import'
-import {
-  getConnectedOneDriveAccount,
-  importOneDriveFolder,
-  refreshOneDriveFolder,
-  type OneDriveRemoteFolder
-} from '@renderer/lib/onedrive-connect'
+import { getCloudProviderAdapter } from '@renderer/lib/cloud-provider'
+import type { OneDriveRemoteFolder } from '@renderer/lib/onedrive-connect'
 import { unlinkSyncRootFolderFromApp } from '@renderer/lib/sync-unlink'
 import { isElectron } from '@renderer/lib/env'
 import {
@@ -43,6 +39,8 @@ import {
   validateDisplayName
 } from '@renderer/lib/file-naming'
 import { isFolderReadOnlyBySyncLink } from '@renderer/lib/sync-readonly'
+
+const ONE_DRIVE_PROVIDER = getCloudProviderAdapter('onedrive')
 
 export default function FilesPage(): React.JSX.Element {
   const { t } = useTranslation()
@@ -119,7 +117,7 @@ export default function FilesPage(): React.JSX.Element {
       setHasOneDriveConnection(false)
       return
     }
-    setHasOneDriveConnection(Boolean(await getConnectedOneDriveAccount()))
+    setHasOneDriveConnection(Boolean(await ONE_DRIVE_PROVIDER.getConnectedAccount()))
   }, [canAddOneDriveFolder])
 
   useEffect(() => {
@@ -171,7 +169,7 @@ export default function FilesPage(): React.JSX.Element {
     async (folder: OneDriveRemoteFolder): Promise<void> => {
       setIsOneDriveImporting(true)
       try {
-        const result = await importOneDriveFolder(folder)
+        const result = await ONE_DRIVE_PROVIDER.importFolder(folder)
         toast.success(
           t('fileExplorer.syncSources.oneDriveFolderImported', {
             name: result.displayName,
@@ -252,7 +250,7 @@ export default function FilesPage(): React.JSX.Element {
         if (syncLink.providerType === 'local-fs') {
           await refreshLocalSyncConnection(syncLink.providerConnectionId)
         } else {
-          await refreshOneDriveFolder(root.id)
+          await ONE_DRIVE_PROVIDER.refreshFolder(root.id)
         }
         toast.success(t('fileExplorer.syncSources.refreshComplete'))
       } catch (error) {

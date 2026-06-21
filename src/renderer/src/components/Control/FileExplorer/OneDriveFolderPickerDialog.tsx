@@ -3,8 +3,11 @@ import { useTranslation } from 'react-i18next'
 import { Button } from '@heroui/react/button'
 import { Modal } from '@heroui/react/modal'
 import { ArrowLeft, ChevronRight, Folder, Loader2 } from 'lucide-react'
-import { listOneDriveFolders, type OneDriveRemoteFolder } from '@renderer/lib/onedrive-connect'
+import { getCloudProviderAdapter } from '@renderer/lib/cloud-provider'
+import type { OneDriveRemoteFolder } from '@renderer/lib/onedrive-connect'
 import { ShortcutScope } from '@renderer/contexts/ShortcutScopeContext'
+
+const ONE_DRIVE_PROVIDER = getCloudProviderAdapter('onedrive')
 
 interface FolderStackEntry {
   id: string
@@ -39,7 +42,7 @@ export default function OneDriveFolderPickerDialog({
       setIsLoading(true)
       setError(null)
       try {
-        setFolders(await listOneDriveFolders(remoteFolderId))
+        setFolders(await ONE_DRIVE_PROVIDER.listFolders(remoteFolderId))
       } catch (loadError) {
         console.warn('[onedrive] Failed to list folders', loadError)
         setFolders([])
