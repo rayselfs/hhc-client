@@ -21,6 +21,7 @@ import type {
   OneDriveAccessTokenResult,
   OneDriveCredentialInput,
   OneDriveCredentialStatus,
+  OneDriveAuthCallbackSession,
   OneDriveNativeDownloadRequest,
   OneDriveNativeDownloadResult
 } from '../shared/ipc-channels'
@@ -124,6 +125,9 @@ interface OneDriveAPI {
   getCredentialStatus: (connectionId: string) => Promise<OneDriveCredentialStatus>
   getAccessToken: (request: OneDriveAccessTokenRequest) => Promise<OneDriveAccessTokenResult>
   deleteCredentials: (connectionId: string) => Promise<void>
+  startAuthCallback: () => Promise<OneDriveAuthCallbackSession>
+  waitAuthCallback: (callbackId: string) => Promise<string | null>
+  cancelAuthCallback: (callbackId: string) => Promise<void>
   downloadFile: (request: OneDriveNativeDownloadRequest) => Promise<OneDriveNativeDownloadResult>
 }
 

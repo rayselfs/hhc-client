@@ -144,6 +144,10 @@ const oneDriveApi = {
     typedInvoke('onedrive:get-access-token', request),
   deleteCredentials: (connectionId: string) =>
     typedInvoke('onedrive:delete-credentials', connectionId),
+  startAuthCallback: () => typedInvoke('onedrive:start-auth-callback'),
+  waitAuthCallback: (callbackId: string) => typedInvoke('onedrive:wait-auth-callback', callbackId),
+  cancelAuthCallback: (callbackId: string) =>
+    typedInvoke('onedrive:cancel-auth-callback', callbackId),
   downloadFile: (request: IpcInvokeMap['onedrive:download-file']['args'][0]) =>
     typedInvoke('onedrive:download-file', request)
 }

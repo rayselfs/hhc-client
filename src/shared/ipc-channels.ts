@@ -154,6 +154,11 @@ export interface OneDriveNativeDownloadResult {
   mimeType?: string
 }
 
+export interface OneDriveAuthCallbackSession {
+  callbackId: string
+  redirectUri: string
+}
+
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
 
@@ -222,6 +227,9 @@ export interface IpcInvokeMap {
     result: OneDriveAccessTokenResult
   }
   'onedrive:delete-credentials': { args: [string]; result: void }
+  'onedrive:start-auth-callback': { args: []; result: OneDriveAuthCallbackSession }
+  'onedrive:wait-auth-callback': { args: [string]; result: string | null }
+  'onedrive:cancel-auth-callback': { args: [string]; result: void }
   'onedrive:download-file': {
     args: [OneDriveNativeDownloadRequest]
     result: OneDriveNativeDownloadResult

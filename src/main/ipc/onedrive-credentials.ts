@@ -1,9 +1,12 @@
 import { app, ipcMain, net, safeStorage } from 'electron'
+import { randomUUID } from 'crypto'
 import { promises as fs } from 'fs'
+import { createServer, type Server } from 'http'
 import { join } from 'path'
 import type {
   OneDriveAccessTokenRequest,
   OneDriveAccessTokenResult,
+  OneDriveAuthCallbackSession,
   OneDriveCredentialStatus
 } from '@shared/ipc-channels'
 import type { WindowManager } from '../windowManager'
@@ -22,6 +25,18 @@ interface StoredOneDriveCredential {
 const CONNECTION_ID_PATTERN = /^onedrive:[A-Za-z0-9._~-]{1,160}$/
 const CLIENT_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const ONEDRIVE_TOKEN_ENDPOINT = 'https://login.microsoftonline.com/common/oauth2/v2.0/token'
+const ONEDRIVE_CALLBACK_PATH = '/onedrive-callback'
+const AUTH_CALLBACK_TIMEOUT_MS = 5 * 60_000
+
+interface AuthCallbackState {
+  server: Server
+  redirectUri: string
+  resolve: (url: string | null) => void
+  promise: Promise<string | null>
+  timeout: NodeJS.Timeout
+}
+
+const authCallbacks = new Map<string, AuthCallbackState>()
 
 function validateConnectionId(connectionId: unknown): string {
   if (
@@ -39,6 +54,69 @@ function validateClientId(clientId: unknown): string {
     throw new Error('Invalid OneDrive Client ID')
   }
   return clientId.trim()
+}
+
+function validateCallbackId(value: unknown): string {
+  if (typeof value !== 'string' || !/^[0-9a-f-]{36}$/i.test(value)) {
+    throw new Error('Invalid OneDrive auth callback id')
+  }
+  return value
+}
+
+function closeAuthCallback(callbackId: string, result: string | null): void {
+  const state = authCallbacks.get(callbackId)
+  if (!state) return
+  authCallbacks.delete(callbackId)
+  clearTimeout(state.timeout)
+  state.server.close(() => undefined)
+  state.resolve(result)
+}
+
+function startAuthCallbackServer(): Promise<OneDriveAuthCallbackSession> {
+  const callbackId = randomUUID()
+  let resolvePromise: (url: string | null) => void = () => undefined
+  const promise = new Promise<string | null>((resolve) => {
+    resolvePromise = resolve
+  })
+  const server = createServer((req, res) => {
+    const host = req.headers.host
+    const url = new URL(req.url ?? '/', `http://${host ?? 'localhost'}`)
+    if (url.pathname !== ONEDRIVE_CALLBACK_PATH) {
+      res.writeHead(404)
+      res.end('Not found')
+      return
+    }
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
+    res.end(
+      '<!doctype html><title>LibrePresenter</title><body><p>OneDrive sign-in completed. You can close this window.</p></body>'
+    )
+    closeAuthCallback(callbackId, url.toString())
+  })
+
+  return new Promise((resolve, reject) => {
+    server.once('error', reject)
+    server.listen(0, 'localhost', () => {
+      server.off('error', reject)
+      const address = server.address()
+      if (!address || typeof address === 'string') {
+        server.close(() => undefined)
+        reject(new Error('Unable to start OneDrive auth callback server'))
+        return
+      }
+      const redirectUri = `http://localhost:${address.port}${ONEDRIVE_CALLBACK_PATH}`
+      const timeout = setTimeout(() => {
+        closeAuthCallback(callbackId, null)
+      }, AUTH_CALLBACK_TIMEOUT_MS)
+      authCallbacks.set(callbackId, {
+        server,
+        redirectUri,
+        resolve: resolvePromise,
+        promise,
+        timeout
+      })
+      resolve({ callbackId, redirectUri })
+    })
+  })
 }
 
 function getCredentialDir(): string {
@@ -237,5 +315,25 @@ export function registerOneDriveCredentialHandlers(wm: WindowManager): void {
     if (!isMainWindow(wm, event)) throw new Error('Unauthorized OneDrive credential access')
     const validConnectionId = validateConnectionId(connectionId)
     await fs.rm(getCredentialPath(validConnectionId), { force: true })
+  })
+
+  ipcMain.handle(
+    'onedrive:start-auth-callback',
+    async (event): Promise<OneDriveAuthCallbackSession> => {
+      if (!isMainWindow(wm, event)) throw new Error('Unauthorized OneDrive credential access')
+      return startAuthCallbackServer()
+    }
+  )
+
+  ipcMain.handle('onedrive:wait-auth-callback', async (event, callbackId: unknown) => {
+    if (!isMainWindow(wm, event)) throw new Error('Unauthorized OneDrive credential access')
+    const state = authCallbacks.get(validateCallbackId(callbackId))
+    if (!state) return null
+    return state.promise
+  })
+
+  ipcMain.handle('onedrive:cancel-auth-callback', async (event, callbackId: unknown) => {
+    if (!isMainWindow(wm, event)) throw new Error('Unauthorized OneDrive credential access')
+    closeAuthCallback(validateCallbackId(callbackId), null)
   })
 }

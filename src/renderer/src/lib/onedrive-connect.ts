@@ -325,6 +325,8 @@ function getOneDriveMediaPlatform(): MediaPlatform {
 }
 
 function waitForWebOneDriveCallback(authWindow: Window | null): Promise<string | null> {
+  if (!authWindow) return Promise.resolve(null)
+
   return new Promise((resolve) => {
     const cleanup = (): void => {
       window.removeEventListener('message', handleMessage)
@@ -349,11 +351,9 @@ function waitForWebOneDriveCallback(authWindow: Window | null): Promise<string |
       }
     }
     window.addEventListener('message', handleMessage)
-    const closeTimer = authWindow
-      ? window.setInterval(() => {
-          if (authWindow.closed) done(null)
-        }, 500)
-      : undefined
+    const closeTimer = window.setInterval(() => {
+      if (authWindow.closed) done(null)
+    }, 500)
   })
 }
 
@@ -414,16 +414,24 @@ export async function loginOneDriveAccount(options?: {
 
   const oneDriveSettings = useSettingsStore.getState().oneDrive
   const clientId = getEffectiveOneDriveClientId(oneDriveSettings)
+  const authCallback =
+    isElectron() && !options?.requestCallbackUrl
+      ? await window.api.oneDrive.startAuthCallback()
+      : null
   const request = await createOneDriveAuthRequest({
     clientId,
-    redirectUri: getOneDriveRedirectUri(),
+    redirectUri: authCallback?.redirectUri ?? getOneDriveRedirectUri(),
     prompt: 'select_account'
   })
-  const authWindow = window.open(request.authorizationUrl, '_blank', 'noopener,noreferrer')
+  const authWindow = window.open(
+    request.authorizationUrl,
+    '_blank',
+    isElectron() ? 'noopener,noreferrer' : 'popup,width=520,height=720'
+  )
   const callbackUrl = await (options?.requestCallbackUrl
     ? options.requestCallbackUrl()
     : isElectron()
-      ? Promise.resolve(null)
+      ? window.api.oneDrive.waitAuthCallback(authCallback?.callbackId ?? '')
       : waitForWebOneDriveCallback(authWindow))
   if (!callbackUrl) return null
 
