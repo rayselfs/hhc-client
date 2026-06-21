@@ -613,6 +613,7 @@
         "clientIdSourceDefault": "Using LibrePresenter default",
         "clientIdSourceCustom": "Using custom Client ID",
         "invalidClientId": "Enter a valid Azure Application Client ID.",
+        "clientIdHelp": "How to create an Azure Client ID",
         "restoreDefaultClientId": "Restore default Client ID",
         "connectedAccount": "Connected Account",
         "noConnectedAccount": "No OneDrive account connected.",

@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { Plus, FolderPlus, Upload, Folder, FolderSync, Cloud } from 'lucide-react'
+import { Plus, FolderPlus, Upload, Folder, FolderSync } from 'lucide-react'
 import { Dropdown } from '@heroui/react/dropdown'
 import { useTranslation } from 'react-i18next'
 import { computeExpiresAt, type FolderDuration } from '@shared/types/folder'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { FolderModal } from '@renderer/components/Control/Folder/FolderModal'
+import { OneDriveIcon } from '@renderer/components/icons/OneDriveIcon'
 
 export interface FileExplorerFABProps {
   onUploadFiles?: () => void
@@ -139,7 +140,7 @@ export default function FileExplorerFAB({
                       isDisabled={isAddOneDriveDisabled}
                       className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
                     >
-                      <Cloud size={16} />
+                      <OneDriveIcon className="size-4" />
                       {t('fileExplorer.contextMenu.addOneDrive')}
                     </Dropdown.Item>
                   )}

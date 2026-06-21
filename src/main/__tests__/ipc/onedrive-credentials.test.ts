@@ -213,6 +213,9 @@ describe('OneDrive credential IPC', () => {
     expect(JSON.stringify(result)).not.toContain('old-refresh-token')
 
     const [, init] = mockNetFetch.mock.calls[0]
+    expect(mockNetFetch.mock.calls[0][0]).toBe(
+      'https://login.microsoftonline.com/common/oauth2/v2.0/token'
+    )
     expect(init.method).toBe('POST')
     expect(init.body).toBeInstanceOf(URLSearchParams)
     expect(init.body.get('grant_type')).toBe('refresh_token')

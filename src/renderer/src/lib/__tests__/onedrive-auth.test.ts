@@ -26,6 +26,7 @@ describe('onedrive-auth', () => {
     const scope = url.searchParams.get('scope') ?? ''
 
     expect(url.origin).toBe('https://login.microsoftonline.com')
+    expect(url.pathname).toBe('/common/oauth2/v2.0/authorize')
     expect(url.searchParams.get('client_id')).toBe('11111111-2222-3333-4444-555555555555')
     expect(url.searchParams.get('response_type')).toBe('code')
     expect(url.searchParams.get('code_challenge_method')).toBe('S256')

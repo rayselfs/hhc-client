@@ -613,6 +613,7 @@
         "clientIdSourceDefault": "使用 LibrePresenter 預設值",
         "clientIdSourceCustom": "使用自訂 Client ID",
         "invalidClientId": "請輸入有效的 Azure Application Client ID。",
+        "clientIdHelp": "如何建立 Azure Client ID",
         "restoreDefaultClientId": "恢復預設 Client ID",
         "connectedAccount": "已連結帳號",
         "noConnectedAccount": "尚未連結 OneDrive 帳號。",

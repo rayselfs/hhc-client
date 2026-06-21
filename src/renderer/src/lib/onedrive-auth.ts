@@ -5,10 +5,8 @@ import {
   type ProviderConnectionRecord
 } from './sync-db'
 
-export const ONEDRIVE_AUTHORITY =
-  'https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize'
-export const ONEDRIVE_TOKEN_ENDPOINT =
-  'https://login.microsoftonline.com/consumers/oauth2/v2.0/token'
+export const ONEDRIVE_AUTHORITY = 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize'
+export const ONEDRIVE_TOKEN_ENDPOINT = 'https://login.microsoftonline.com/common/oauth2/v2.0/token'
 export const ONEDRIVE_READONLY_SCOPES = ['offline_access', 'User.Read', 'Files.Read'] as const
 
 export interface OneDriveAuthRequestInput {

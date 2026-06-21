@@ -6,6 +6,7 @@ import { Select } from '@heroui/react/select'
 import { ListBox } from '@heroui/react/list-box'
 import { Switch } from '@heroui/react/switch'
 import { Label } from 'react-aria-components'
+import { ExternalLink } from 'lucide-react'
 import {
   DEFAULT_ONEDRIVE,
   LIBREPRESENTER_DEFAULT_ONEDRIVE_CLIENT_ID,
@@ -22,6 +23,8 @@ import { isElectron } from '@renderer/lib/env'
 
 const RETENTION_DAY_OPTIONS = [7, 14, 30, 60, 90, 0] as const
 const OFFLINE_POLICY_OPTIONS: SyncOfflinePolicy[] = ['online-only', 'on-demand', 'always-offline']
+const ONEDRIVE_CLIENT_ID_DOC_URL =
+  'https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app'
 
 export type MediaSettingsSection = 'general' | 'oneDrive'
 
@@ -239,6 +242,16 @@ export default function MediaSettings({
               )}
             </div>
           )}
+
+          <a
+            href={ONEDRIVE_CLIENT_ID_DOC_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+          >
+            {t('preferences.media.oneDrive.clientIdHelp')}
+            <ExternalLink size={12} />
+          </a>
 
           <div className="border-t border-default-200 pt-4">
             <Select
