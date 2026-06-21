@@ -1,9 +1,10 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   deleteSyncCursorsByProviderConnection,
   deleteSyncEntriesByProviderConnection,
   deleteSyncEntryPreferencesByProviderConnection,
   getProviderConnection,
+  SYNC_ENTRY_CHANGED_EVENT,
   getSyncCursor,
   getSyncEntryByRemoteItem,
   getSyncEntryPreference,
@@ -90,6 +91,32 @@ describe('sync-db', () => {
       name: 'after.mkv',
       status: 'available-offline',
       blobId: 'blob-1'
+    })
+  })
+
+  it('dispatches an event when sync entries change', async () => {
+    const listener = vi.fn()
+    window.addEventListener(SYNC_ENTRY_CHANGED_EVENT, listener)
+
+    await putSyncEntry({
+      providerConnectionId: 'connection-1',
+      remoteItemId: 'remote-file-1',
+      parentRemoteItemId: null,
+      kind: 'file',
+      name: 'one.mp4',
+      itemId: 'item-1',
+      status: 'downloading'
+    })
+
+    window.removeEventListener(SYNC_ENTRY_CHANGED_EVENT, listener)
+    expect(listener).toHaveBeenCalledTimes(1)
+    expect(listener.mock.calls[0]?.[0]).toMatchObject({
+      detail: {
+        providerConnectionId: 'connection-1',
+        remoteItemId: 'remote-file-1',
+        itemId: 'item-1',
+        status: 'downloading'
+      }
     })
   })
 

@@ -48,6 +48,12 @@ interface BuildSyncRefreshPlanInput {
   existingEntries: SyncEntryRecord[]
   existingBlobIds?: ReadonlySet<string>
   remoteItems: RemoteSyncItem[]
+  forceRetry?: boolean
+  now?: number
+}
+
+export interface SyncDeltaRefreshPlan extends SyncRefreshPlan {
+  needsFullScan: boolean
 }
 
 function safeIdPart(value: string): string {
@@ -123,8 +129,31 @@ function nextStatus(
   return 'remote-only'
 }
 
+function shouldHoldFailure(
+  existing: SyncEntryRecord | undefined,
+  forceRetry: boolean,
+  now: number
+): boolean {
+  if (!existing || forceRetry) return false
+  if (existing.status === 'insufficient-storage') return true
+  if (existing.status !== 'failed') return false
+  if (existing.errorKind === 'auth-required' || existing.errorKind === 'fatal') return true
+  return typeof existing.nextRetryAt === 'number' && existing.nextRetryAt > now
+}
+
+function failureFields(existing: SyncEntryRecord | undefined): Partial<SyncEntryRecord> {
+  if (!existing) return {}
+  return {
+    errorKind: existing.errorKind,
+    retryCount: existing.retryCount,
+    nextRetryAt: existing.nextRetryAt,
+    lastError: existing.lastError
+  }
+}
+
 export function buildSyncRefreshPlan(input: BuildSyncRefreshPlanInput): SyncRefreshPlan {
-  const now = Date.now()
+  const now = input.now ?? Date.now()
+  const forceRetry = input.forceRetry ?? false
   const existingByRemoteId = new Map(
     input.existingEntries.map((entry) => [entry.remoteItemId, entry])
   )
@@ -200,11 +229,15 @@ export function buildSyncRefreshPlan(input: BuildSyncRefreshPlanInput): SyncRefr
     if (existing?.itemId && existing.itemId !== itemId) replacedItemIds.push(existing.itemId)
     const sortIndex = itemSortCounts.get(parentId) ?? 0
     itemSortCounts.set(parentId, sortIndex + 1)
+    const heldFailure = shouldHoldFailure(existing, forceRetry, now)
     const shouldTransfer =
       !policy.disabled &&
       input.offlinePolicy === 'always-offline' &&
+      !heldFailure &&
       contentChanged(existing, remoteItem, input.existingBlobIds)
-    const status = nextStatus(policy.disabled, input.offlinePolicy, shouldTransfer)
+    const status = heldFailure
+      ? (existing?.status ?? 'failed')
+      : nextStatus(policy.disabled, input.offlinePolicy, shouldTransfer)
     const blobId = status === 'available-offline' ? (existing?.blobId ?? itemId) : undefined
     if (policy.disabled) disabledCount++
     items.push({
@@ -238,7 +271,8 @@ export function buildSyncRefreshPlan(input: BuildSyncRefreshPlanInput): SyncRefr
       size: remoteItem.size,
       etag: remoteItem.etag,
       contentHash: remoteItem.contentHash,
-      status
+      status,
+      ...(heldFailure ? failureFields(existing) : {})
     })
   }
 
@@ -265,6 +299,217 @@ export function buildSyncRefreshPlan(input: BuildSyncRefreshPlanInput): SyncRefr
     ],
     removedEntries,
     disabledCount
+  }
+}
+
+export function buildSyncDeltaRefreshPlan(input: BuildSyncRefreshPlanInput): SyncDeltaRefreshPlan {
+  const now = input.now ?? Date.now()
+  const forceRetry = input.forceRetry ?? false
+  const existingByRemoteId = new Map(
+    input.existingEntries.map((entry) => [entry.remoteItemId, entry])
+  )
+  const remoteFolderToLocalId = new Map<string | null, string>([
+    [null, input.rootFolder.id],
+    [input.rootRemoteFolderId, input.rootFolder.id]
+  ])
+  for (const entry of input.existingEntries) {
+    if (entry.kind === 'folder' && entry.folderId) {
+      remoteFolderToLocalId.set(entry.remoteItemId, entry.folderId)
+    }
+  }
+
+  const folderSortCounts = new Map<string, number>()
+  const itemSortCounts = new Map<string, number>()
+  for (const folder of input.existingFolders) {
+    if (!folder.parentId) continue
+    folderSortCounts.set(
+      folder.parentId,
+      Math.max(folderSortCounts.get(folder.parentId) ?? 0, folder.sortIndex + 1)
+    )
+  }
+  for (const item of input.existingItems) {
+    itemSortCounts.set(
+      item.parentId,
+      Math.max(itemSortCounts.get(item.parentId) ?? 0, item.sortIndex + 1)
+    )
+  }
+
+  const folders: FolderRecord[] = []
+  const items: FileItemRecord[] = []
+  const syncEntries: SyncRefreshPlan['syncEntries'] = []
+  const fileTransfers: SyncFileTransfer[] = []
+  const replacedItemIds: string[] = []
+  const removedEntryMap = new Map<string, SyncEntryRecord>()
+  const ignoredRemoteIds = new Set<string>()
+  let disabledCount = 0
+  let needsFullScan = false
+
+  function addDeletedEntry(remoteItemId: string): void {
+    const deletedRemoteIds = new Set([remoteItemId])
+    let changed = true
+    while (changed) {
+      changed = false
+      for (const entry of input.existingEntries) {
+        if (
+          entry.parentRemoteItemId &&
+          deletedRemoteIds.has(entry.parentRemoteItemId) &&
+          !deletedRemoteIds.has(entry.remoteItemId)
+        ) {
+          deletedRemoteIds.add(entry.remoteItemId)
+          changed = true
+        }
+      }
+    }
+    for (const entry of input.existingEntries) {
+      if (
+        entry.remoteItemId !== input.rootRemoteFolderId &&
+        entry.status !== 'deleted-pending-release' &&
+        deletedRemoteIds.has(entry.remoteItemId)
+      ) {
+        removedEntryMap.set(entry.remoteItemId, entry)
+      }
+    }
+  }
+
+  for (const remoteItem of input.remoteItems) {
+    if (
+      isIgnoredSystemPath(remoteItem.name) ||
+      (remoteItem.parentRemoteItemId && ignoredRemoteIds.has(remoteItem.parentRemoteItemId))
+    ) {
+      ignoredRemoteIds.add(remoteItem.remoteItemId)
+      continue
+    }
+    if (remoteItem.deleted) {
+      addDeletedEntry(remoteItem.remoteItemId)
+      continue
+    }
+    if (remoteItem.kind !== 'folder' || remoteItem.remoteItemId === input.rootRemoteFolderId) {
+      continue
+    }
+    const parentId = remoteFolderToLocalId.get(remoteItem.parentRemoteItemId)
+    if (!parentId) {
+      needsFullScan = true
+      continue
+    }
+    const existing = existingByRemoteId.get(remoteItem.remoteItemId)
+    const folderId =
+      existing?.folderId ??
+      createFolderId(input.providerType, input.providerConnectionId, remoteItem.remoteItemId)
+    const existingFolder = input.existingFolders.find((folder) => folder.id === folderId)
+    const sortIndex = existingFolder?.sortIndex ?? folderSortCounts.get(parentId) ?? 0
+    folderSortCounts.set(parentId, Math.max(folderSortCounts.get(parentId) ?? 0, sortIndex + 1))
+    folders.push({
+      id: folderId,
+      name: remoteItem.name,
+      parentId,
+      sortIndex,
+      createdAt: existingFolder?.createdAt ?? now,
+      expiresAt: null,
+      syncLink: {
+        providerConnectionId: input.providerConnectionId,
+        remoteFolderId: remoteItem.remoteItemId,
+        providerType: input.providerType,
+        offlinePolicy: input.offlinePolicy
+      }
+    })
+    remoteFolderToLocalId.set(remoteItem.remoteItemId, folderId)
+    syncEntries.push({
+      providerConnectionId: input.providerConnectionId,
+      remoteItemId: remoteItem.remoteItemId,
+      parentRemoteItemId: remoteItem.parentRemoteItemId,
+      kind: 'folder',
+      name: remoteItem.name,
+      folderId,
+      status: input.offlinePolicy === 'always-offline' ? 'available-offline' : 'remote-only'
+    })
+  }
+
+  for (const remoteItem of input.remoteItems) {
+    if (ignoredRemoteIds.has(remoteItem.remoteItemId) || remoteItem.deleted) continue
+    if (remoteItem.kind !== 'file') continue
+    const policy = classifyRemoteFile(remoteItem, input.platform)
+    const existing = existingByRemoteId.get(remoteItem.remoteItemId)
+    if (policy.skip) {
+      if (existing) addDeletedEntry(remoteItem.remoteItemId)
+      continue
+    }
+    const parentId = remoteFolderToLocalId.get(remoteItem.parentRemoteItemId)
+    if (!parentId) {
+      needsFullScan = true
+      continue
+    }
+    const itemId =
+      existing?.itemId && isValidNativeFileId(existing.itemId) ? existing.itemId : createItemId()
+    if (existing?.itemId && existing.itemId !== itemId) replacedItemIds.push(existing.itemId)
+    const existingItem = input.existingItems.find((item) => item.id === itemId)
+    const sortIndex = existingItem?.sortIndex ?? itemSortCounts.get(parentId) ?? 0
+    itemSortCounts.set(parentId, Math.max(itemSortCounts.get(parentId) ?? 0, sortIndex + 1))
+    const heldFailure = shouldHoldFailure(existing, forceRetry, now)
+    const shouldTransfer =
+      !policy.disabled &&
+      input.offlinePolicy === 'always-offline' &&
+      !heldFailure &&
+      contentChanged(existing, remoteItem, input.existingBlobIds)
+    const status = heldFailure
+      ? (existing?.status ?? 'failed')
+      : nextStatus(policy.disabled, input.offlinePolicy, shouldTransfer)
+    const blobId = status === 'available-offline' ? (existing?.blobId ?? itemId) : undefined
+    if (policy.disabled) disabledCount++
+    items.push({
+      id: itemId,
+      parentId,
+      type: 'file',
+      sortIndex,
+      createdAt: existingItem?.createdAt ?? now,
+      expiresAt: null,
+      name: remoteItem.name,
+      url: policy.disabled ? `unsupported:${itemId}` : `blob:${itemId}`,
+      size: remoteItem.size ?? 0,
+      mimeType: policy.mimeType
+    })
+    if (shouldTransfer) {
+      fileTransfers.push({
+        itemId,
+        remoteItemId: remoteItem.remoteItemId,
+        mimeType: policy.mimeType
+      })
+    }
+    syncEntries.push({
+      providerConnectionId: input.providerConnectionId,
+      remoteItemId: remoteItem.remoteItemId,
+      parentRemoteItemId: remoteItem.parentRemoteItemId,
+      kind: 'file',
+      name: remoteItem.name,
+      itemId,
+      ...(blobId ? { blobId } : {}),
+      mimeType: policy.mimeType,
+      size: remoteItem.size,
+      etag: remoteItem.etag,
+      contentHash: remoteItem.contentHash,
+      status,
+      ...(heldFailure ? failureFields(existing) : {})
+    })
+  }
+
+  const removedEntries = [...removedEntryMap.values()]
+
+  return {
+    folders,
+    items,
+    syncEntries,
+    fileTransfers,
+    removedFolderIds: removedEntries
+      .filter((entry) => entry.kind === 'folder' && entry.folderId)
+      .map((entry) => entry.folderId!),
+    removedItemIds: [
+      ...replacedItemIds,
+      ...removedEntries
+        .filter((entry) => entry.kind === 'file' && entry.itemId)
+        .map((entry) => entry.itemId!)
+    ],
+    removedEntries,
+    disabledCount,
+    needsFullScan
   }
 }
 

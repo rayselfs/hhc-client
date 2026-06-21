@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { FolderRecord, FileItemRecord } from '@shared/types/folder'
 import type { SyncEntryRecord } from '../sync-db'
-import { buildSyncRefreshPlan } from '../sync-refresh'
+import { buildSyncDeltaRefreshPlan, buildSyncRefreshPlan } from '../sync-refresh'
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -274,5 +274,180 @@ describe('buildSyncRefreshPlan', () => {
       status: 'queued'
     })
     expect(plan.syncEntries[0]).not.toHaveProperty('blobId')
+  })
+
+  it('does not retry failed files before nextRetryAt unless forced', () => {
+    const nextRetryAt = Date.now() + 60_000
+    const plan = buildSyncRefreshPlan({
+      providerConnectionId: 'connection-1',
+      providerType: 'local-fs',
+      rootFolder,
+      rootRemoteFolderId: '.',
+      offlinePolicy: 'always-offline',
+      platform: 'electron',
+      existingFolders: [rootFolder],
+      existingItems: [existingItem],
+      existingEntries: [
+        {
+          ...existingEntry,
+          status: 'failed',
+          blobId: undefined,
+          errorKind: 'retryable',
+          retryCount: 1,
+          nextRetryAt,
+          lastError: '429'
+        }
+      ],
+      remoteItems: [
+        {
+          remoteItemId: 'old-file',
+          parentRemoteItemId: null,
+          kind: 'file',
+          name: 'old.mp4',
+          mimeType: 'video/mp4',
+          size: 100,
+          etag: 'before'
+        }
+      ]
+    })
+
+    expect(plan.fileTransfers).toEqual([])
+    expect(plan.syncEntries[0]).toMatchObject({
+      remoteItemId: 'old-file',
+      status: 'failed',
+      errorKind: 'retryable',
+      retryCount: 1,
+      nextRetryAt,
+      lastError: '429'
+    })
+
+    const forcedPlan = buildSyncRefreshPlan({
+      providerConnectionId: 'connection-1',
+      providerType: 'local-fs',
+      rootFolder,
+      rootRemoteFolderId: '.',
+      offlinePolicy: 'always-offline',
+      platform: 'electron',
+      existingFolders: [rootFolder],
+      existingItems: [existingItem],
+      existingEntries: [
+        {
+          ...existingEntry,
+          status: 'failed',
+          blobId: undefined,
+          errorKind: 'retryable',
+          retryCount: 1,
+          nextRetryAt,
+          lastError: '429'
+        }
+      ],
+      remoteItems: [
+        {
+          remoteItemId: 'old-file',
+          parentRemoteItemId: null,
+          kind: 'file',
+          name: 'old.mp4',
+          mimeType: 'video/mp4',
+          size: 100,
+          etag: 'before'
+        }
+      ],
+      forceRetry: true
+    })
+
+    expect(forcedPlan.fileTransfers).toEqual([
+      { itemId: existingItem.id, remoteItemId: 'old-file', mimeType: 'video/mp4' }
+    ])
+  })
+
+  it('applies delta changes without deleting entries that are absent from the delta page', () => {
+    const plan = buildSyncDeltaRefreshPlan({
+      providerConnectionId: 'connection-1',
+      providerType: 'local-fs',
+      rootFolder,
+      rootRemoteFolderId: '.',
+      offlinePolicy: 'always-offline',
+      platform: 'electron',
+      existingFolders: [rootFolder],
+      existingItems: [existingItem],
+      existingEntries: [existingEntry],
+      remoteItems: [
+        {
+          remoteItemId: 'new-file',
+          parentRemoteItemId: '.',
+          kind: 'file',
+          name: 'new.mp4',
+          mimeType: 'video/mp4',
+          size: 200,
+          etag: 'new'
+        }
+      ]
+    })
+
+    expect(plan.needsFullScan).toBe(false)
+    expect(plan.items).toEqual([expect.objectContaining({ name: 'new.mp4' })])
+    expect(plan.fileTransfers).toEqual([
+      {
+        itemId: plan.items[0].id,
+        remoteItemId: 'new-file',
+        mimeType: 'video/mp4'
+      }
+    ])
+    expect(plan.removedItemIds).toEqual([])
+  })
+
+  it('removes explicit deleted delta items', () => {
+    const plan = buildSyncDeltaRefreshPlan({
+      providerConnectionId: 'connection-1',
+      providerType: 'local-fs',
+      rootFolder,
+      rootRemoteFolderId: '.',
+      offlinePolicy: 'always-offline',
+      platform: 'electron',
+      existingFolders: [rootFolder],
+      existingItems: [existingItem],
+      existingEntries: [existingEntry],
+      remoteItems: [
+        {
+          remoteItemId: 'old-file',
+          parentRemoteItemId: null,
+          kind: 'file',
+          name: 'old.mp4',
+          deleted: true
+        }
+      ]
+    })
+
+    expect(plan.needsFullScan).toBe(false)
+    expect(plan.removedItemIds).toEqual([existingItem.id])
+    expect(plan.removedEntries).toEqual([existingEntry])
+  })
+
+  it('requests full scan fallback when delta parent cannot be mapped locally', () => {
+    const plan = buildSyncDeltaRefreshPlan({
+      providerConnectionId: 'connection-1',
+      providerType: 'local-fs',
+      rootFolder,
+      rootRemoteFolderId: '.',
+      offlinePolicy: 'always-offline',
+      platform: 'electron',
+      existingFolders: [rootFolder],
+      existingItems: [existingItem],
+      existingEntries: [existingEntry],
+      remoteItems: [
+        {
+          remoteItemId: 'new-file',
+          parentRemoteItemId: 'unknown-folder',
+          kind: 'file',
+          name: 'new.mp4',
+          mimeType: 'video/mp4',
+          size: 200
+        }
+      ]
+    })
+
+    expect(plan.needsFullScan).toBe(true)
+    expect(plan.items).toEqual([])
+    expect(plan.fileTransfers).toEqual([])
   })
 })

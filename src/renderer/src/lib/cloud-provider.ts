@@ -32,6 +32,12 @@ export interface CloudRefreshSummary {
   downloadedCount: number
   failedFileCount: number
   disabledFileCount: number
+  changedCount?: number
+  pendingFileCount?: number
+  retryableFileCount?: number
+  nextRetryAt?: number
+  usedCursor?: boolean
+  fullScanFallback?: boolean
 }
 
 export interface CloudProviderAdapter {
@@ -39,7 +45,10 @@ export interface CloudProviderAdapter {
   getConnectedAccount(): Promise<ProviderConnectionRecord | null>
   listFolders(parentRemoteFolderId?: string): Promise<CloudRemoteFolder[]>
   importFolder(folder: CloudRemoteFolder): Promise<CloudImportResult>
-  refreshFolder(rootFolderId: string): Promise<CloudRefreshSummary>
+  refreshFolder(
+    rootFolderId: string,
+    options?: { forceRetry?: boolean }
+  ): Promise<CloudRefreshSummary>
 }
 
 const ONEDRIVE_ADAPTER: CloudProviderAdapter = {

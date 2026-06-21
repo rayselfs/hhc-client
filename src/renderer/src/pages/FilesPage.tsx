@@ -249,7 +249,7 @@ export default function FilesPage(): React.JSX.Element {
         if (syncLink.providerType === 'local-fs') {
           await refreshLocalSyncConnection(syncLink.providerConnectionId)
         } else {
-          await ONE_DRIVE_PROVIDER.refreshFolder(root.id)
+          await ONE_DRIVE_PROVIDER.refreshFolder(root.id, { forceRetry: true })
         }
         toast.success(t('fileExplorer.syncSources.refreshComplete'))
       } catch (error) {

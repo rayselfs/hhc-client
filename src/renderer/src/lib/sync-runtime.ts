@@ -1,9 +1,10 @@
 import { isElectron } from './env'
 import { refreshLocalSyncConnection } from './local-sync-import'
-import { refreshAllOneDriveFolders } from './onedrive-connect'
+import { refreshAllOneDriveFolders, type OneDriveRefreshSummary } from './onedrive-connect'
 
 const LOCAL_SYNC_POLL_MS = 3_000
-const ONEDRIVE_REFRESH_MS = 5 * 60_000
+const ONEDRIVE_IDLE_REFRESH_MS = 5 * 60_000
+const ONEDRIVE_ACTIVE_REFRESH_MS = 15_000
 
 const localRefreshInFlight = new Set<string>()
 let oneDriveRefreshInFlight = false
@@ -43,11 +44,29 @@ async function refreshLocalSyncIfDirty(): Promise<void> {
   }
 }
 
-async function refreshOneDrive(): Promise<void> {
-  if (oneDriveRefreshInFlight) return
+function getNextOneDriveDelay(summaries: OneDriveRefreshSummary[], now = Date.now()): number {
+  const nextRetryAt = summaries
+    .map((summary) => summary.nextRetryAt)
+    .filter((value): value is number => typeof value === 'number')
+    .sort((a, b) => a - b)[0]
+  if (nextRetryAt !== undefined) {
+    return Math.max(
+      ONEDRIVE_ACTIVE_REFRESH_MS,
+      Math.min(ONEDRIVE_IDLE_REFRESH_MS, nextRetryAt - now)
+    )
+  }
+  const hasActiveWork = summaries.some(
+    (summary) =>
+      summary.changedCount > 0 || summary.pendingFileCount > 0 || summary.retryableFileCount > 0
+  )
+  return hasActiveWork ? ONEDRIVE_ACTIVE_REFRESH_MS : ONEDRIVE_IDLE_REFRESH_MS
+}
+
+async function refreshOneDrive(): Promise<OneDriveRefreshSummary[]> {
+  if (oneDriveRefreshInFlight) return []
   oneDriveRefreshInFlight = true
   try {
-    await refreshAllOneDriveFolders()
+    return await refreshAllOneDriveFolders()
   } finally {
     oneDriveRefreshInFlight = false
   }
@@ -66,18 +85,31 @@ export function startSyncRuntime(): () => void {
     }, LOCAL_SYNC_POLL_MS)
   }
 
-  void refreshOneDrive().catch((error) => {
-    console.warn('[sync] Failed to refresh OneDrive folders', error)
-  })
+  let stopped = false
+  let oneDriveTimeout: number | undefined
 
-  const oneDriveInterval = window.setInterval(() => {
-    void refreshOneDrive().catch((error) => {
+  const scheduleOneDrive = (delay: number): void => {
+    if (stopped) return
+    oneDriveTimeout = window.setTimeout(() => {
+      void runOneDriveRefresh()
+    }, delay)
+  }
+
+  const runOneDriveRefresh = async (): Promise<void> => {
+    try {
+      const summaries = await refreshOneDrive()
+      scheduleOneDrive(getNextOneDriveDelay(summaries))
+    } catch (error) {
       console.warn('[sync] Failed to refresh OneDrive folders', error)
-    })
-  }, ONEDRIVE_REFRESH_MS)
+      scheduleOneDrive(ONEDRIVE_ACTIVE_REFRESH_MS)
+    }
+  }
+
+  void runOneDriveRefresh()
 
   return () => {
+    stopped = true
     if (localInterval !== undefined) window.clearInterval(localInterval)
-    window.clearInterval(oneDriveInterval)
+    if (oneDriveTimeout !== undefined) window.clearTimeout(oneDriveTimeout)
   }
 }

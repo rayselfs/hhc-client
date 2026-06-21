@@ -31,7 +31,7 @@ async function ensureWebCapacity(size: number): Promise<void> {
   }
 }
 
-function isStorageLimitError(error: unknown): boolean {
+export function isSyncStorageLimitError(error: unknown): boolean {
   return (
     error instanceof SyncStorageLimitError ||
     (error instanceof Error && error.message === STORAGE_LIMIT_ERROR)
@@ -48,6 +48,7 @@ async function markInsufficientStorage(
     parentRemoteItemId: metadata.parentRemoteItemId,
     kind: metadata.kind,
     name: metadata.name,
+    itemId: request.targetBlobId,
     mimeType: metadata.mimeType,
     size: metadata.size,
     etag: metadata.etag,
@@ -103,7 +104,7 @@ export async function saveWebOneDriveDownloadedContent(
       mimeType: metadata.mimeType ?? blob.type
     }
   } catch (error) {
-    if (isStorageLimitError(error)) await markInsufficientStorage(request, metadata)
+    if (isSyncStorageLimitError(error)) await markInsufficientStorage(request, metadata)
     throw error
   }
 }
@@ -131,7 +132,7 @@ export async function saveElectronOneDriveDownloadedContent(
       mimeType: metadata.mimeType
     })
   } catch (error) {
-    if (isStorageLimitError(error)) await markInsufficientStorage(request, metadata)
+    if (isSyncStorageLimitError(error)) await markInsufficientStorage(request, metadata)
     throw error
   }
   const db = await openFileExplorerDB()

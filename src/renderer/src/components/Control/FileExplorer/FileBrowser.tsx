@@ -46,7 +46,11 @@ import { isPresentable, getPresentableItems } from '@renderer/lib/presentability
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 import type { SortField } from '@renderer/stores/file-explorer'
 import { hasNameConflict, splitFileName, validateDisplayName } from '@renderer/lib/file-naming'
-import { listSyncEntries, type SyncEntryStatus } from '@renderer/lib/sync-db'
+import {
+  listSyncEntries,
+  SYNC_ENTRY_CHANGED_EVENT,
+  type SyncEntryStatus
+} from '@renderer/lib/sync-db'
 import { getSourceMediaMetadata } from '@renderer/lib/media-metadata'
 import { getBlobId } from '@renderer/lib/blob-identity'
 import { isWeb } from '@renderer/lib/env'
@@ -450,9 +454,14 @@ export function FileBrowser({
         if (!cancelled) setSyncStatuses({})
       }
     }
+    const handleSyncEntryChanged = (): void => {
+      void loadSyncStatuses()
+    }
     void loadSyncStatuses()
+    window.addEventListener(SYNC_ENTRY_CHANGED_EVENT, handleSyncEntryChanged)
     return () => {
       cancelled = true
+      window.removeEventListener(SYNC_ENTRY_CHANGED_EVENT, handleSyncEntryChanged)
     }
   }, [folders, fileItems])
 

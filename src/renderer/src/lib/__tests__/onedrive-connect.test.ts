@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { FILE_EXPLORER_ROOT_ID } from '@renderer/stores/file-explorer'
-import { buildOneDriveImportPlan, loginOneDriveAccount } from '../onedrive-connect'
+import {
+  buildOneDriveImportPlan,
+  loginOneDriveAccount,
+  scanOneDriveFolder
+} from '../onedrive-connect'
+import type { OneDriveReadonlyProvider } from '../onedrive-provider'
 
 vi.mock('../env', () => ({
   isElectron: vi.fn(() => true),
@@ -50,6 +55,7 @@ vi.mock('../sync-db', () => ({
     createdAt: 1,
     updatedAt: 1
   })),
+  getSyncCursor: vi.fn(async () => undefined),
   listProviderConnectionsByType: vi.fn(async () => []),
   listSyncEntriesByProviderConnection: vi.fn(async () => []),
   putProviderConnection: vi.fn(async (record) => ({
@@ -236,6 +242,40 @@ describe('buildOneDriveImportPlan', () => {
       status: 'remote-only'
     })
     expect(plan.disabledCount).toBe(1)
+  })
+})
+
+describe('scanOneDriveFolder', () => {
+  it('starts from incremental changes when a cursor is available', async () => {
+    const provider = {
+      initialScan: vi.fn(),
+      incrementalChanges: vi.fn().mockResolvedValueOnce({
+        items: [
+          {
+            remoteItemId: 'file-1',
+            parentRemoteItemId: 'folder-1',
+            kind: 'file',
+            name: 'one.mp4'
+          }
+        ],
+        nextCursor: 'cursor-2',
+        hasMore: false
+      })
+    } as unknown as OneDriveReadonlyProvider
+
+    await expect(
+      scanOneDriveFolder(provider, 'connection-1', 'folder-1', 'cursor-1')
+    ).resolves.toMatchObject({
+      usedCursor: true,
+      nextCursor: 'cursor-2',
+      remoteItems: [expect.objectContaining({ remoteItemId: 'file-1' })]
+    })
+    expect(provider.initialScan).not.toHaveBeenCalled()
+    expect(provider.incrementalChanges).toHaveBeenCalledWith({
+      providerConnectionId: 'connection-1',
+      remoteFolderId: 'folder-1',
+      cursor: 'cursor-1'
+    })
   })
 })
 

@@ -1,5 +1,6 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
 import type { SyncOfflinePolicy, SyncProviderType } from '@shared/types/folder'
+import type { SyncRetryClassification } from './sync-provider'
 
 export type SyncEntryKind = 'folder' | 'file'
 export type SyncEntryStatus =
@@ -11,6 +12,8 @@ export type SyncEntryStatus =
   | 'failed'
   | 'insufficient-storage'
   | 'deleted-pending-release'
+
+export const SYNC_ENTRY_CHANGED_EVENT = 'hhc:sync-entry-changed'
 
 export interface ProviderConnectionRecord {
   id: string
@@ -44,6 +47,10 @@ export interface SyncEntryRecord {
   etag?: string
   contentHash?: string
   status: SyncEntryStatus
+  errorKind?: SyncRetryClassification
+  retryCount?: number
+  nextRetryAt?: number
+  lastError?: string
   createdAt: number
   updatedAt: number
 }
@@ -244,7 +251,23 @@ export async function putSyncEntry(
   } as SyncEntryRecord & { remoteLookupKey: string }
   await tx.store.put(value)
   await tx.done
+  dispatchSyncEntryChanged(value)
   return value
+}
+
+function dispatchSyncEntryChanged(entry: SyncEntryRecord): void {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(
+    new CustomEvent(SYNC_ENTRY_CHANGED_EVENT, {
+      detail: {
+        providerConnectionId: entry.providerConnectionId,
+        remoteItemId: entry.remoteItemId,
+        itemId: entry.itemId,
+        folderId: entry.folderId,
+        status: entry.status
+      }
+    })
+  )
 }
 
 export async function getSyncEntryByRemoteItem(

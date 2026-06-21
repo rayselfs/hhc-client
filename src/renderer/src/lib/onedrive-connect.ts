@@ -16,13 +16,16 @@ import {
   deleteProviderConnection,
   getProviderConnection,
   listSyncEntriesByProviderConnection,
+  getSyncCursor,
   putProviderConnection,
   putSyncCursor,
   putSyncEntry,
   type ProviderConnectionRecord,
-  type SyncEntryRecord
+  type SyncEntryRecord,
+  type SyncEntryStatus
 } from './sync-db'
 import {
+  isSyncStorageLimitError,
   saveElectronOneDriveDownloadedContent,
   saveWebOneDriveDownloadedContent
 } from './sync-download-storage'
@@ -33,8 +36,12 @@ import {
 } from './onedrive-web-credentials'
 import type { MediaPlatform } from './media-capabilities'
 import { classifyMediaImport } from './media-import-policy'
-import type { RemoteSyncItem } from './sync-provider'
-import { applySyncRefreshPlan, buildSyncRefreshPlan } from './sync-refresh'
+import type { RemoteSyncItem, SyncRetryClassification } from './sync-provider'
+import {
+  applySyncRefreshPlan,
+  buildSyncDeltaRefreshPlan,
+  buildSyncRefreshPlan
+} from './sync-refresh'
 import { refreshImportedMediaAssets } from './local-sync-import'
 import { isIgnoredSystemPath } from '@shared/file-ignore-policy'
 
@@ -419,6 +426,54 @@ function createStoredOneDriveProvider(connectionId: string): OneDriveReadonlyPro
   })
 }
 
+const RETRY_BACKOFF_MS = [30_000, 60_000, 2 * 60_000, 5 * 60_000, 15 * 60_000]
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
+function getRetryDelayMs(retryCount: number): number {
+  return RETRY_BACKOFF_MS[Math.min(Math.max(retryCount - 1, 0), RETRY_BACKOFF_MS.length - 1)]
+}
+
+function classifyDownloadFailure(
+  provider: OneDriveReadonlyProvider,
+  error: unknown,
+  previousEntry: SyncEntryRecord | undefined,
+  now = Date.now()
+): {
+  status: SyncEntryStatus
+  errorKind?: SyncRetryClassification
+  retryCount?: number
+  nextRetryAt?: number
+  lastError: string
+} {
+  if (isSyncStorageLimitError(error)) {
+    return {
+      status: 'insufficient-storage',
+      lastError: getErrorMessage(error)
+    }
+  }
+
+  const errorKind = provider.classifyError(error)
+  if (errorKind === 'retryable' || errorKind === 'offline') {
+    const retryCount = (previousEntry?.retryCount ?? 0) + 1
+    return {
+      status: 'failed',
+      errorKind,
+      retryCount,
+      nextRetryAt: now + getRetryDelayMs(retryCount),
+      lastError: getErrorMessage(error)
+    }
+  }
+
+  return {
+    status: 'failed',
+    errorKind,
+    lastError: getErrorMessage(error)
+  }
+}
+
 async function downloadImportedOneDriveItems(input: {
   connection: ProviderConnectionRecord
   provider: OneDriveReadonlyProvider
@@ -463,6 +518,7 @@ async function downloadImportedOneDriveItems(input: {
         error
       })
       if (remoteItem) {
+        const failure = classifyDownloadFailure(input.provider, error, undefined)
         await putSyncEntry({
           providerConnectionId: input.connection.id,
           remoteItemId: item.remoteItemId,
@@ -474,7 +530,7 @@ async function downloadImportedOneDriveItems(input: {
           size: remoteItem.size,
           etag: remoteItem.etag,
           contentHash: remoteItem.contentHash,
-          status: 'failed'
+          ...failure
         })
       }
     }
@@ -487,12 +543,20 @@ async function downloadImportedOneDriveItems(input: {
   }
 }
 
-async function scanOneDriveFolder(
+export async function scanOneDriveFolder(
   provider: OneDriveReadonlyProvider,
   connectionId: string,
-  remoteFolderId: string
-): Promise<{ remoteItems: RemoteSyncItem[]; nextCursor?: string }> {
-  const firstPage = await provider.initialScan(connectionId, remoteFolderId)
+  remoteFolderId: string,
+  cursor?: string
+): Promise<{ remoteItems: RemoteSyncItem[]; nextCursor?: string; usedCursor: boolean }> {
+  const usedCursor = Boolean(cursor)
+  const firstPage = cursor
+    ? await provider.incrementalChanges({
+        providerConnectionId: connectionId,
+        remoteFolderId,
+        cursor
+      })
+    : await provider.initialScan(connectionId, remoteFolderId)
   const remoteItems = [...firstPage.items]
   let nextCursor = firstPage.nextCursor
   let hasMore = firstPage.hasMore
@@ -506,7 +570,7 @@ async function scanOneDriveFolder(
     nextCursor = nextPage.nextCursor
     hasMore = nextPage.hasMore
   }
-  return { remoteItems, nextCursor }
+  return { remoteItems, nextCursor, usedCursor }
 }
 
 export async function getConnectedOneDriveAccount(): Promise<ProviderConnectionRecord | null> {
@@ -689,9 +753,25 @@ export interface OneDriveRefreshSummary {
   downloadedCount: number
   failedFileCount: number
   disabledFileCount: number
+  changedCount: number
+  pendingFileCount: number
+  retryableFileCount: number
+  nextRetryAt?: number
+  usedCursor: boolean
+  fullScanFallback: boolean
 }
 
-export async function refreshOneDriveFolder(rootFolderId: string): Promise<OneDriveRefreshSummary> {
+function isExpiredCursorError(error: unknown): boolean {
+  if (typeof error === 'object' && error !== null && 'status' in error) {
+    return (error as { status?: unknown }).status === 410
+  }
+  return error instanceof Error && error.message.includes('410')
+}
+
+export async function refreshOneDriveFolder(
+  rootFolderId: string,
+  options: { forceRetry?: boolean } = {}
+): Promise<OneDriveRefreshSummary> {
   const store = useFileExplorerStore.getState()
   await store.initialize()
   const db = await openFileExplorerDB()
@@ -707,17 +787,33 @@ export async function refreshOneDriveFolder(rootFolderId: string): Promise<OneDr
   }
 
   const provider = createStoredOneDriveProvider(syncLink.providerConnectionId)
-  const { remoteItems, nextCursor } = await scanOneDriveFolder(
-    provider,
-    syncLink.providerConnectionId,
-    syncLink.remoteFolderId
-  )
+  const cursor = await getSyncCursor(syncLink.providerConnectionId, syncLink.remoteFolderId)
   const existingEntries = await listSyncEntriesByProviderConnection(syncLink.providerConnectionId)
   const offlinePolicy =
     syncLink.offlinePolicy ?? useSettingsStore.getState().defaultSyncOfflinePolicy
-  const plan = buildSyncRefreshPlan({
+
+  let scan: Awaited<ReturnType<typeof scanOneDriveFolder>>
+  let fullScanFallback = false
+  try {
+    scan = await scanOneDriveFolder(
+      provider,
+      syncLink.providerConnectionId,
+      syncLink.remoteFolderId,
+      cursor?.cursor
+    )
+  } catch (error) {
+    if (!cursor?.cursor || !isExpiredCursorError(error)) throw error
+    fullScanFallback = true
+    scan = await scanOneDriveFolder(
+      provider,
+      syncLink.providerConnectionId,
+      syncLink.remoteFolderId
+    )
+  }
+
+  const basePlanInput = {
     providerConnectionId: syncLink.providerConnectionId,
-    providerType: 'onedrive',
+    providerType: 'onedrive' as const,
     rootFolder,
     rootRemoteFolderId: syncLink.remoteFolderId,
     offlinePolicy,
@@ -726,25 +822,52 @@ export async function refreshOneDriveFolder(rootFolderId: string): Promise<OneDr
     existingItems: allItems.filter((item): item is FileItemRecord => item.type === 'file'),
     existingEntries,
     existingBlobIds: new Set(fileBlobs.map((blob) => blob.id)),
-    remoteItems
-  })
+    forceRetry: options.forceRetry
+  }
+
+  let plan = scan.usedCursor
+    ? buildSyncDeltaRefreshPlan({ ...basePlanInput, remoteItems: scan.remoteItems })
+    : buildSyncRefreshPlan({ ...basePlanInput, remoteItems: scan.remoteItems })
+
+  if ('needsFullScan' in plan && plan.needsFullScan) {
+    fullScanFallback = true
+    scan = await scanOneDriveFolder(
+      provider,
+      syncLink.providerConnectionId,
+      syncLink.remoteFolderId
+    )
+    plan = buildSyncRefreshPlan({ ...basePlanInput, remoteItems: scan.remoteItems })
+  }
 
   await applySyncRefreshPlan(plan)
-  if (nextCursor) {
+  if (scan.nextCursor) {
     await putSyncCursor({
       providerConnectionId: syncLink.providerConnectionId,
       remoteFolderId: syncLink.remoteFolderId,
-      cursor: nextCursor,
+      cursor: scan.nextCursor,
       updatedAt: Date.now()
     })
   }
 
-  const remoteById = new Map(remoteItems.map((item) => [item.remoteItemId, item]))
+  const remoteById = new Map(scan.remoteItems.map((item) => [item.remoteItemId, item]))
+  const existingEntryByRemoteId = new Map(
+    existingEntries.map((entry) => [entry.remoteItemId, entry])
+  )
   let downloadedCount = 0
   let failedFileCount = 0
+  let retryableFileCount = plan.syncEntries.filter(
+    (entry) =>
+      entry.status === 'failed' &&
+      (entry.errorKind === 'retryable' || entry.errorKind === 'offline')
+  ).length
+  let nextRetryAt = plan.syncEntries
+    .map((entry) => entry.nextRetryAt)
+    .filter((value): value is number => typeof value === 'number')
+    .sort((a, b) => a - b)[0]
   const downloadedItemIds: string[] = []
   for (const transfer of plan.fileTransfers) {
     const remoteItem = remoteById.get(transfer.remoteItemId)
+    const previousEntry = existingEntryByRemoteId.get(transfer.remoteItemId)
     try {
       if (remoteItem) {
         await putSyncEntry({
@@ -775,6 +898,14 @@ export async function refreshOneDriveFolder(rootFolderId: string): Promise<OneDr
     } catch (error) {
       failedFileCount++
       if (remoteItem) {
+        const failure = classifyDownloadFailure(provider, error, previousEntry)
+        if (failure.nextRetryAt !== undefined) {
+          retryableFileCount++
+          nextRetryAt =
+            nextRetryAt === undefined
+              ? failure.nextRetryAt
+              : Math.min(nextRetryAt, failure.nextRetryAt)
+        }
         await putSyncEntry({
           providerConnectionId: syncLink.providerConnectionId,
           remoteItemId: transfer.remoteItemId,
@@ -786,7 +917,7 @@ export async function refreshOneDriveFolder(rootFolderId: string): Promise<OneDr
           size: remoteItem.size,
           etag: remoteItem.etag,
           contentHash: remoteItem.contentHash,
-          status: 'failed'
+          ...failure
         })
       }
       console.warn('[onedrive] Failed to refresh synced file', {
@@ -798,6 +929,13 @@ export async function refreshOneDriveFolder(rootFolderId: string): Promise<OneDr
   }
   void refreshImportedMediaAssets(plan.items.filter((item) => downloadedItemIds.includes(item.id)))
 
+  const changedCount =
+    plan.folders.length +
+    plan.items.length +
+    plan.removedFolderIds.length +
+    plan.removedItemIds.length
+  const pendingFileCount = plan.fileTransfers.length - downloadedCount
+
   return {
     connectionId: syncLink.providerConnectionId,
     rootFolderId,
@@ -806,11 +944,19 @@ export async function refreshOneDriveFolder(rootFolderId: string): Promise<OneDr
     removedFolderCount: plan.removedFolderIds.length,
     downloadedCount,
     failedFileCount,
-    disabledFileCount: plan.disabledCount
+    disabledFileCount: plan.disabledCount,
+    changedCount,
+    pendingFileCount,
+    retryableFileCount,
+    nextRetryAt,
+    usedCursor: scan.usedCursor && !fullScanFallback,
+    fullScanFallback
   }
 }
 
-export async function refreshAllOneDriveFolders(): Promise<OneDriveRefreshSummary[]> {
+export async function refreshAllOneDriveFolders(
+  options: { forceRetry?: boolean } = {}
+): Promise<OneDriveRefreshSummary[]> {
   const db = await openFileExplorerDB()
   const folders = await db.getAll('folder-records')
   const roots = folders.filter(
@@ -819,7 +965,7 @@ export async function refreshAllOneDriveFolders(): Promise<OneDriveRefreshSummar
   )
   const results: OneDriveRefreshSummary[] = []
   for (const folder of roots) {
-    results.push(await refreshOneDriveFolder(folder.id))
+    results.push(await refreshOneDriveFolder(folder.id, options))
   }
   return results
 }
