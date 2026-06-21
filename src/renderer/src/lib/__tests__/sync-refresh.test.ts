@@ -206,4 +206,73 @@ describe('buildSyncRefreshPlan', () => {
     expect(plan.fileTransfers[0].itemId).toBe(plan.items[0].id)
     expect(plan.removedItemIds).toContain(legacyItem.id)
   })
+
+  it('requeues queued files instead of marking them available offline', () => {
+    const plan = buildSyncRefreshPlan({
+      providerConnectionId: 'connection-1',
+      providerType: 'local-fs',
+      rootFolder,
+      rootRemoteFolderId: '.',
+      offlinePolicy: 'always-offline',
+      platform: 'electron',
+      existingFolders: [rootFolder],
+      existingItems: [existingItem],
+      existingEntries: [{ ...existingEntry, status: 'queued' }],
+      remoteItems: [
+        {
+          remoteItemId: 'old-file',
+          parentRemoteItemId: null,
+          kind: 'file',
+          name: 'old.mp4',
+          mimeType: 'video/mp4',
+          size: 100,
+          etag: 'before'
+        }
+      ]
+    })
+
+    expect(plan.fileTransfers).toEqual([
+      { itemId: existingItem.id, remoteItemId: 'old-file', mimeType: 'video/mp4' }
+    ])
+    expect(plan.syncEntries[0]).toMatchObject({
+      remoteItemId: 'old-file',
+      status: 'queued'
+    })
+    expect(plan.syncEntries[0]).not.toHaveProperty('blobId')
+  })
+
+  it('requeues available-offline files when the stored blob is missing', () => {
+    const plan = buildSyncRefreshPlan({
+      providerConnectionId: 'connection-1',
+      providerType: 'local-fs',
+      rootFolder,
+      rootRemoteFolderId: '.',
+      offlinePolicy: 'always-offline',
+      platform: 'electron',
+      existingFolders: [rootFolder],
+      existingItems: [existingItem],
+      existingEntries: [existingEntry],
+      existingBlobIds: new Set(),
+      remoteItems: [
+        {
+          remoteItemId: 'old-file',
+          parentRemoteItemId: null,
+          kind: 'file',
+          name: 'old.mp4',
+          mimeType: 'video/mp4',
+          size: 100,
+          etag: 'before'
+        }
+      ]
+    })
+
+    expect(plan.fileTransfers).toEqual([
+      { itemId: existingItem.id, remoteItemId: 'old-file', mimeType: 'video/mp4' }
+    ])
+    expect(plan.syncEntries[0]).toMatchObject({
+      remoteItemId: 'old-file',
+      status: 'queued'
+    })
+    expect(plan.syncEntries[0]).not.toHaveProperty('blobId')
+  })
 })

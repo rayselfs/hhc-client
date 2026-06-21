@@ -467,6 +467,11 @@ function markTransferStatus(
   const entry = plan.syncEntries.find((candidate) => candidate.remoteItemId === remoteItemId)
   if (!entry || entry.kind !== 'file') return
   entry.status = status
+  if (status === 'available-offline' && entry.itemId) {
+    entry.blobId = entry.itemId
+  } else {
+    delete entry.blobId
+  }
 }
 
 export async function refreshLocalSyncConnection(
@@ -481,11 +486,12 @@ export async function refreshLocalSyncConnection(
   const store = useFileExplorerStore.getState()
   await store.initialize()
   const db = await openFileExplorerDB()
-  const [folders, allItems, existingEntries, remoteItems] = await Promise.all([
+  const [folders, allItems, existingEntries, remoteItems, fileBlobs] = await Promise.all([
     db.getAll('folder-records'),
     db.getAll('folder-items'),
     listSyncEntriesByProviderConnection(connection.id),
-    window.api.localSync.scanFolder(connection.id)
+    window.api.localSync.scanFolder(connection.id),
+    db.getAll('file-blobs')
   ])
   const rootFolder = folders.find(
     (folder) =>
@@ -504,6 +510,7 @@ export async function refreshLocalSyncConnection(
     existingFolders: folders,
     existingItems: allItems.filter((item): item is FileItemRecord => item.type === 'file'),
     existingEntries,
+    existingBlobIds: new Set(fileBlobs.map((blob) => blob.id)),
     remoteItems: remoteItems.map((item) => ({
       remoteItemId: item.remoteItemId,
       parentRemoteItemId: item.parentRemoteItemId,

@@ -46,6 +46,7 @@ interface BuildSyncRefreshPlanInput {
   existingFolders: FolderRecord[]
   existingItems: FileItemRecord[]
   existingEntries: SyncEntryRecord[]
+  existingBlobIds?: ReadonlySet<string>
   remoteItems: RemoteSyncItem[]
 }
 
@@ -83,7 +84,11 @@ function classifyRemoteFile(
   }
 }
 
-function contentChanged(existing: SyncEntryRecord | undefined, item: RemoteSyncItem): boolean {
+function contentChanged(
+  existing: SyncEntryRecord | undefined,
+  item: RemoteSyncItem,
+  existingBlobIds?: ReadonlySet<string>
+): boolean {
   if (!existing || item.kind !== 'file') return true
   if (item.etag && existing.etag && item.etag !== existing.etag) return true
   if (item.contentHash && existing.contentHash && item.contentHash !== existing.contentHash) {
@@ -96,7 +101,16 @@ function contentChanged(existing: SyncEntryRecord | undefined, item: RemoteSyncI
   ) {
     return true
   }
-  return !existing.blobId || existing.status === 'failed' || existing.status === 'outdated'
+  if (
+    existing.status === 'queued' ||
+    existing.status === 'downloading' ||
+    existing.status === 'failed' ||
+    existing.status === 'outdated'
+  ) {
+    return true
+  }
+  if (!existing.blobId) return true
+  return existingBlobIds ? !existingBlobIds.has(existing.blobId) : false
 }
 
 function nextStatus(
@@ -189,8 +203,9 @@ export function buildSyncRefreshPlan(input: BuildSyncRefreshPlanInput): SyncRefr
     const shouldTransfer =
       !policy.disabled &&
       input.offlinePolicy === 'always-offline' &&
-      contentChanged(existing, remoteItem)
+      contentChanged(existing, remoteItem, input.existingBlobIds)
     const status = nextStatus(policy.disabled, input.offlinePolicy, shouldTransfer)
+    const blobId = status === 'available-offline' ? (existing?.blobId ?? itemId) : undefined
     if (policy.disabled) disabledCount++
     items.push({
       id: itemId,
@@ -218,7 +233,7 @@ export function buildSyncRefreshPlan(input: BuildSyncRefreshPlanInput): SyncRefr
       kind: 'file',
       name: remoteItem.name,
       itemId,
-      blobId: policy.disabled ? undefined : itemId,
+      ...(blobId ? { blobId } : {}),
       mimeType: policy.mimeType,
       size: remoteItem.size,
       etag: remoteItem.etag,

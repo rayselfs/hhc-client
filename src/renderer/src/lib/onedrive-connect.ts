@@ -289,7 +289,6 @@ export function buildOneDriveImportPlan(input: {
       kind: 'file',
       name: remoteItem.name,
       itemId,
-      blobId: itemId,
       mimeType: policy.mimeType,
       size: remoteItem.size,
       etag: remoteItem.etag,
@@ -430,7 +429,23 @@ async function downloadImportedOneDriveItems(input: {
   const downloadedItemIds: string[] = []
 
   for (const item of input.plan.downloadableItems) {
+    const remoteItem = remoteById.get(item.remoteItemId)
     try {
+      if (remoteItem) {
+        await putSyncEntry({
+          providerConnectionId: input.connection.id,
+          remoteItemId: item.remoteItemId,
+          parentRemoteItemId: remoteItem.parentRemoteItemId,
+          kind: 'file',
+          name: remoteItem.name,
+          itemId: item.itemId,
+          mimeType: remoteItem.mimeType,
+          size: remoteItem.size,
+          etag: remoteItem.etag,
+          contentHash: remoteItem.contentHash,
+          status: 'downloading'
+        })
+      }
       await input.provider.downloadContent(
         {
           providerConnectionId: input.connection.id,
@@ -447,7 +462,6 @@ async function downloadImportedOneDriveItems(input: {
         remoteItemId: item.remoteItemId,
         error
       })
-      const remoteItem = remoteById.get(item.remoteItemId)
       if (remoteItem) {
         await putSyncEntry({
           providerConnectionId: input.connection.id,
@@ -456,7 +470,6 @@ async function downloadImportedOneDriveItems(input: {
           kind: 'file',
           name: remoteItem.name,
           itemId: item.itemId,
-          blobId: item.itemId,
           mimeType: remoteItem.mimeType,
           size: remoteItem.size,
           etag: remoteItem.etag,
@@ -682,9 +695,10 @@ export async function refreshOneDriveFolder(rootFolderId: string): Promise<OneDr
   const store = useFileExplorerStore.getState()
   await store.initialize()
   const db = await openFileExplorerDB()
-  const [folders, allItems] = await Promise.all([
+  const [folders, allItems, fileBlobs] = await Promise.all([
     db.getAll('folder-records'),
-    db.getAll('folder-items')
+    db.getAll('folder-items'),
+    db.getAll('file-blobs')
   ])
   const rootFolder = folders.find((folder) => folder.id === rootFolderId)
   const syncLink = rootFolder?.syncLink
@@ -711,6 +725,7 @@ export async function refreshOneDriveFolder(rootFolderId: string): Promise<OneDr
     existingFolders: folders,
     existingItems: allItems.filter((item): item is FileItemRecord => item.type === 'file'),
     existingEntries,
+    existingBlobIds: new Set(fileBlobs.map((blob) => blob.id)),
     remoteItems
   })
 
@@ -729,7 +744,23 @@ export async function refreshOneDriveFolder(rootFolderId: string): Promise<OneDr
   let failedFileCount = 0
   const downloadedItemIds: string[] = []
   for (const transfer of plan.fileTransfers) {
+    const remoteItem = remoteById.get(transfer.remoteItemId)
     try {
+      if (remoteItem) {
+        await putSyncEntry({
+          providerConnectionId: syncLink.providerConnectionId,
+          remoteItemId: transfer.remoteItemId,
+          parentRemoteItemId: remoteItem.parentRemoteItemId,
+          kind: 'file',
+          name: remoteItem.name,
+          itemId: transfer.itemId,
+          mimeType: transfer.mimeType,
+          size: remoteItem.size,
+          etag: remoteItem.etag,
+          contentHash: remoteItem.contentHash,
+          status: 'downloading'
+        })
+      }
       await provider.downloadContent(
         {
           providerConnectionId: syncLink.providerConnectionId,
@@ -743,7 +774,6 @@ export async function refreshOneDriveFolder(rootFolderId: string): Promise<OneDr
       downloadedItemIds.push(transfer.itemId)
     } catch (error) {
       failedFileCount++
-      const remoteItem = remoteById.get(transfer.remoteItemId)
       if (remoteItem) {
         await putSyncEntry({
           providerConnectionId: syncLink.providerConnectionId,
@@ -752,7 +782,6 @@ export async function refreshOneDriveFolder(rootFolderId: string): Promise<OneDr
           kind: 'file',
           name: remoteItem.name,
           itemId: transfer.itemId,
-          blobId: transfer.itemId,
           mimeType: transfer.mimeType,
           size: remoteItem.size,
           etag: remoteItem.etag,

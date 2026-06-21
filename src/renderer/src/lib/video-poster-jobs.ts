@@ -2,7 +2,7 @@ import { getBlobId } from './blob-identity'
 import { isWeb } from './env'
 import { openFileExplorerDB } from './file-explorer-db'
 import { MediaJobBlockedError, mediaJobQueue } from './media-job-queue'
-import { getDerivedAsset } from './media-work-db'
+import { findMediaJobByDedupeKey, getDerivedAsset } from './media-work-db'
 import { resolveMediaCapability } from './media-capabilities'
 import { saveThumbnail } from './thumbnail-db'
 
@@ -17,13 +17,19 @@ export async function enqueueVideoPosterJob(input: {
   priority?: number
 }): Promise<void> {
   if (isWeb()) return
+  const dedupeKey = `video-poster:${input.sourceBlobId}`
+  const existing = await findMediaJobByDedupeKey(dedupeKey)
+  if (existing && ['failed', 'blocked', 'paused'].includes(existing.status)) {
+    await mediaJobQueue.retry(existing.id)
+    return
+  }
 
   await mediaJobQueue.enqueue({
     type: 'video-poster',
     sourceBlobId: input.sourceBlobId,
     itemId: input.itemId,
     priority: input.priority,
-    dedupeKey: `video-poster:${input.sourceBlobId}`
+    dedupeKey
   })
 }
 
@@ -33,11 +39,13 @@ export async function backfillTranscodeVideoThumbnails(): Promise<void> {
   if (info.status !== 'ready') return
 
   const db = await openFileExplorerDB()
-  const items = await db.getAll('folder-items')
+  const [items, fileBlobs] = await Promise.all([db.getAll('folder-items'), db.getAll('file-blobs')])
+  const availableBlobIds = new Set(fileBlobs.map((blob) => blob.id))
   await Promise.all(
     items.map(async (item) => {
       if (item.type !== 'file' || !isDesktopVideo(item.mimeType, item.name)) return
       const blobId = getBlobId(item)
+      if (!availableBlobIds.has(blobId)) return
       const existing = await getDerivedAsset(blobId, 'cover-thumbnail')
       if (existing?.status === 'ready') return
       await enqueueVideoPosterJob({ sourceBlobId: blobId, itemId: item.id })

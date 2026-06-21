@@ -156,6 +156,12 @@ describe('buildOneDriveImportPlan', () => {
     expect(plan.items.find((item) => item.name === '.DS_Store')).toBeUndefined()
     expect(plan.items[0].id).toMatch(UUID_PATTERN)
     expect(plan.downloadableItems[0]).toMatchObject({ itemId: plan.items[0].id })
+    const fileEntry = plan.syncEntries.find((entry) => entry.remoteItemId === 'file-1')
+    expect(fileEntry).toMatchObject({
+      itemId: plan.items[0].id,
+      status: 'queued'
+    })
+    expect(fileEntry).not.toHaveProperty('blobId')
   })
 
   it('uses the shared media policy for Web OneDrive imports', () => {
@@ -217,6 +223,12 @@ describe('buildOneDriveImportPlan', () => {
     expect(plan.items.find((item) => item.name === 'clip.mkv')).toMatchObject({
       mimeType: 'video/x-matroska'
     })
+    const mkvEntry = plan.syncEntries.find((entry) => entry.remoteItemId === 'mkv-file')
+    expect(mkvEntry).toMatchObject({
+      itemId: plan.items.find((item) => item.name === 'clip.mkv')?.id,
+      status: 'queued'
+    })
+    expect(mkvEntry).not.toHaveProperty('blobId')
     expect(plan.items.find((item) => item.name === 'legacy.avi')).toMatchObject({
       url: expect.stringMatching(/^unsupported:/)
     })
