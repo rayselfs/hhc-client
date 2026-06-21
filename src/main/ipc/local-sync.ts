@@ -12,6 +12,7 @@ import { isValidNativeFileId } from '../../shared/native-media'
 import type { WindowManager } from '../windowManager'
 import { getNativeFilePath } from './native-fs'
 import { isMainWindow } from './validate'
+import { isIgnoredSystemPath } from '../../shared/file-ignore-policy'
 
 interface StoredLocalSyncConnection extends LocalSyncConnectionInfo {
   rootPath: string
@@ -263,6 +264,7 @@ async function scanDirectory(
     if (entry.isSymbolicLink()) continue
     const fullPath = join(currentPath, entry.name)
     const relativePath = relative(rootPath, fullPath)
+    if (isIgnoredSystemPath(relativePath)) continue
     const remoteItemId = remoteIdForRelativePath(relativePath)
     if (entry.isDirectory()) {
       items.push({

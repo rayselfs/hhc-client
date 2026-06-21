@@ -1,14 +1,21 @@
+import type { FolderRecord } from '@shared/types/folder'
+import { isElectron } from './env'
 import { cleanupFileResources, type CleanupResult } from './file-resource-cleanup'
 import { openFileExplorerDB } from './file-explorer-db'
+import { removeCleanedEntriesFromStore } from '@renderer/stores/file-explorer'
 import {
   deleteProviderConnection,
+  deleteSyncCursor,
   deleteSyncCursorsByProviderConnection,
+  deleteSyncEntries,
   deleteSyncEntriesByProviderConnection,
+  deleteSyncEntryPreferences,
   deleteSyncEntryPreferencesByProviderConnection,
   deleteSyncTombstones,
   listSyncEntriesByProviderConnection,
   listSyncTombstones,
-  putSyncTombstone
+  putSyncTombstone,
+  type SyncEntryRecord
 } from './sync-db'
 
 export interface UnlinkSyncConnectionResult extends CleanupResult {
@@ -23,6 +30,24 @@ export interface ConvertSyncedFolderResult {
 
 export interface SyncResourceRecoveryResult extends CleanupResult {
   tombstoneCount: number
+}
+
+function collectEntrySubtree(
+  entries: SyncEntryRecord[],
+  rootRemoteItemId: string
+): SyncEntryRecord[] {
+  const result = new Set<string>([rootRemoteItemId])
+  let changed = true
+  while (changed) {
+    changed = false
+    for (const entry of entries) {
+      if (entry.parentRemoteItemId && result.has(entry.parentRemoteItemId)) {
+        changed ||= !result.has(entry.remoteItemId)
+        result.add(entry.remoteItemId)
+      }
+    }
+  }
+  return entries.filter((entry) => result.has(entry.remoteItemId))
 }
 
 export async function unlinkSyncConnectionFromApp(
@@ -46,6 +71,7 @@ export async function unlinkSyncConnectionFromApp(
   )
 
   const cleanupResult = await cleanupFileResources({ folderIds, itemIds })
+  removeCleanedEntriesFromStore(cleanupResult)
 
   await Promise.all([
     deleteSyncEntriesByProviderConnection(providerConnectionId),
@@ -57,6 +83,55 @@ export async function unlinkSyncConnectionFromApp(
   return {
     ...cleanupResult,
     tombstoneCount: entries.length
+  }
+}
+
+export async function unlinkSyncRootFolderFromApp(
+  rootFolder: FolderRecord
+): Promise<UnlinkSyncConnectionResult> {
+  const syncLink = rootFolder.syncLink
+  if (!syncLink) throw new Error('Folder is not a sync root')
+
+  if (syncLink.providerType === 'local-fs') {
+    const result = await unlinkSyncConnectionFromApp(syncLink.providerConnectionId)
+    if (isElectron() && window.api?.localSync) {
+      await window.api.localSync.disconnectFolder(syncLink.providerConnectionId)
+    }
+    return result
+  }
+
+  const entries = await listSyncEntriesByProviderConnection(syncLink.providerConnectionId)
+  const targetEntries = collectEntrySubtree(entries, syncLink.remoteFolderId)
+  const folderIds = targetEntries.flatMap((entry) => (entry.folderId ? [entry.folderId] : []))
+  const itemIds = targetEntries.flatMap((entry) => (entry.itemId ? [entry.itemId] : []))
+
+  await Promise.all(
+    targetEntries.map((entry) =>
+      putSyncTombstone({
+        providerConnectionId: entry.providerConnectionId,
+        remoteItemId: entry.remoteItemId,
+        itemId: entry.itemId,
+        folderId: entry.folderId,
+        blobId: entry.blobId,
+        reason: 'unlink'
+      })
+    )
+  )
+
+  const cleanupResult = await cleanupFileResources({ folderIds, itemIds })
+  removeCleanedEntriesFromStore(cleanupResult)
+  await Promise.all([
+    deleteSyncEntries(targetEntries.map((entry) => entry.id)),
+    deleteSyncEntryPreferences(
+      syncLink.providerConnectionId,
+      targetEntries.map((entry) => entry.remoteItemId)
+    ),
+    deleteSyncCursor(syncLink.providerConnectionId, syncLink.remoteFolderId)
+  ])
+
+  return {
+    ...cleanupResult,
+    tombstoneCount: targetEntries.length
   }
 }
 

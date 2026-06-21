@@ -26,6 +26,7 @@ import { getMediaSupport, resolveMediaCapability, type MediaPlatform } from './m
 import type { RemoteSyncItem } from './sync-provider'
 import { applySyncRefreshPlan, buildSyncRefreshPlan } from './sync-refresh'
 import { refreshImportedMediaAssets } from './local-sync-import'
+import { isIgnoredSystemPath } from '@shared/file-ignore-policy'
 import i18n from '@renderer/i18n'
 
 const ONEDRIVE_NATIVE_REDIRECT_URI = 'https://login.microsoftonline.com/common/oauth2/nativeclient'
@@ -184,9 +185,17 @@ export function buildOneDriveImportPlan(input: {
     [FILE_EXPLORER_ROOT_ID, input.existingRootFolderNames.length + 1]
   ])
   const itemSortCounts = new Map<string, number>()
+  const ignoredRemoteIds = new Set<string>()
   let disabledCount = 0
 
   for (const remoteItem of input.remoteItems) {
+    if (
+      isIgnoredSystemPath(remoteItem.name) ||
+      (remoteItem.parentRemoteItemId && ignoredRemoteIds.has(remoteItem.parentRemoteItemId))
+    ) {
+      ignoredRemoteIds.add(remoteItem.remoteItemId)
+      continue
+    }
     if (remoteItem.kind !== 'folder' || remoteItem.deleted) continue
     if (remoteItem.remoteItemId === input.rootRemoteFolderId) continue
     const parentId = remoteFolderToLocalId.get(remoteItem.parentRemoteItemId) ?? rootFolderId
@@ -220,6 +229,7 @@ export function buildOneDriveImportPlan(input: {
   }
 
   for (const remoteItem of input.remoteItems) {
+    if (ignoredRemoteIds.has(remoteItem.remoteItemId)) continue
     if (remoteItem.kind !== 'file' || remoteItem.deleted) continue
     const parentId = remoteFolderToLocalId.get(remoteItem.parentRemoteItemId) ?? rootFolderId
     const itemId = createSyncedItemId()

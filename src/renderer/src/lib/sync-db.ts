@@ -288,6 +288,14 @@ export async function deleteSyncEntriesByProviderConnection(
   await tx.done
 }
 
+export async function deleteSyncEntries(ids: string[]): Promise<void> {
+  if (ids.length === 0) return
+  const db = await getSyncDB()
+  const tx = db.transaction('sync-entries', 'readwrite')
+  await Promise.all(ids.map((id) => tx.store.delete(id)))
+  await tx.done
+}
+
 export async function putSyncEntryPreference(
   record: Omit<SyncEntryPreferenceRecord, 'id' | 'updatedAt'> & {
     updatedAt?: number
@@ -327,6 +335,21 @@ export async function deleteSyncEntryPreferencesByProviderConnection(
   )
   const tx = db.transaction('sync-entry-preferences', 'readwrite')
   await Promise.all(preferences.map((preference) => tx.store.delete(preference.id)))
+  await tx.done
+}
+
+export async function deleteSyncEntryPreferences(
+  providerConnectionId: string,
+  remoteItemIds: string[]
+): Promise<void> {
+  if (remoteItemIds.length === 0) return
+  const db = await getSyncDB()
+  const tx = db.transaction('sync-entry-preferences', 'readwrite')
+  await Promise.all(
+    remoteItemIds.map((remoteItemId) =>
+      tx.store.delete(createRemoteKey(providerConnectionId, remoteItemId))
+    )
+  )
   await tx.done
 }
 
@@ -370,6 +393,15 @@ export async function deleteSyncCursorsByProviderConnection(
   const tx = db.transaction('sync-cursors', 'readwrite')
   await Promise.all(cursors.map((cursor) => tx.store.delete(cursor.id)))
   await tx.done
+}
+
+export async function deleteSyncCursor(
+  providerConnectionId: string,
+  remoteFolderId: string
+): Promise<void> {
+  await (
+    await getSyncDB()
+  ).delete('sync-cursors', createRemoteKey(providerConnectionId, remoteFolderId))
 }
 
 export async function resetSyncDBForTests(): Promise<void> {

@@ -487,7 +487,12 @@
       "oneDriveImportFailed": "Failed to add OneDrive folder.",
       "refreshComplete": "Sync folder refreshed.",
       "refreshFailed": "Failed to refresh sync folder.",
-      "unsupportedFiles": "{{count}} unsupported file(s) were kept but disabled."
+      "unsupportedFiles": "{{count}} unsupported file(s) were kept but disabled.",
+      "unlink": "Disconnect",
+      "unlinkTitle": "Disconnect {{name}}?",
+      "unlinkDescription": "This removes the sync source from LibrePresenter and clears local synced cache. Original local or cloud files are not changed.",
+      "unlinked": "Sync folder disconnected.",
+      "unlinkFailed": "Failed to disconnect sync folder."
     },
     "oneDriveFolderPicker": {
       "title": "Choose OneDrive Folder",

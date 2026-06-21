@@ -487,7 +487,12 @@
       "oneDriveImportFailed": "无法加入 OneDrive 文件夹。",
       "refreshComplete": "同步文件夹已重新整理。",
       "refreshFailed": "无法重新整理同步文件夹。",
-      "unsupportedFiles": "有 {{count}} 个文件格式不支持，已保留但禁用。"
+      "unsupportedFiles": "有 {{count}} 个文件格式不支持，已保留但禁用。",
+      "unlink": "取消连接",
+      "unlinkTitle": "取消连接 {{name}}？",
+      "unlinkDescription": "这会从 LibrePresenter 移除同步来源并清除本机同步缓存，不会更改原始本机或云端文件。",
+      "unlinked": "已取消同步文件夹连接。",
+      "unlinkFailed": "无法取消同步文件夹连接。"
     },
     "oneDriveFolderPicker": {
       "title": "选择 OneDrive 文件夹",

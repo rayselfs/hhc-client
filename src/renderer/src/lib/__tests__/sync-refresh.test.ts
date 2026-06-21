@@ -84,6 +84,13 @@ describe('buildSyncRefreshPlan', () => {
           kind: 'file',
           name: 'legacy.avi',
           size: 20
+        },
+        {
+          remoteItemId: 'system-file',
+          parentRemoteItemId: 'folder-1',
+          kind: 'file',
+          name: '.DS_Store',
+          size: 20
         }
       ]
     })
@@ -109,6 +116,7 @@ describe('buildSyncRefreshPlan', () => {
       })
     ])
     const newItem = plan.items.find((item) => item.name === 'legacy.avi')
+    expect(plan.items.find((item) => item.name === '.DS_Store')).toBeUndefined()
     expect(newItem?.id).toMatch(UUID_PATTERN)
     expect(plan.fileTransfers).toEqual([
       { itemId: existingItem.id, remoteItemId: 'old-file', mimeType: 'video/mp4' },

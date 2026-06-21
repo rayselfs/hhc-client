@@ -1,4 +1,5 @@
 import React from 'react'
+import { AlertTriangle, CheckCircle2, Cloud, Loader2, RefreshCw, XCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import type { SyncEntryStatus } from '@renderer/lib/sync-db'
@@ -60,6 +61,33 @@ export function SyncStatusBadge({
       aria-label={label}
     >
       {label}
+    </span>
+  )
+}
+
+export function SyncStatusIcon({ status }: { status?: SyncEntryStatus }): React.JSX.Element | null {
+  const { t } = useTranslation()
+  if (!status) return null
+  const label = getStatusLabel(status, t)
+  const className = 'drop-shadow-sm'
+  const icon =
+    status === 'available-offline' ? (
+      <CheckCircle2 size={18} className={`${className} fill-success text-white`} />
+    ) : status === 'failed' || status === 'insufficient-storage' ? (
+      <XCircle size={18} className={`${className} fill-danger text-white`} />
+    ) : status === 'queued' || status === 'downloading' ? (
+      <Loader2 size={18} className={`${className} animate-spin text-primary`} />
+    ) : status === 'remote-only' ? (
+      <Cloud size={18} className={`${className} text-primary`} />
+    ) : status === 'outdated' ? (
+      <RefreshCw size={18} className={`${className} text-warning`} />
+    ) : (
+      <AlertTriangle size={18} className={`${className} text-default-500`} />
+    )
+
+  return (
+    <span title={label} aria-label={label} className="inline-flex">
+      {icon}
     </span>
   )
 }

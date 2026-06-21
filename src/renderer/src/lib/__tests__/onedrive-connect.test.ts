@@ -36,6 +36,14 @@ describe('buildOneDriveImportPlan', () => {
           mimeType: 'video/mp4',
           size: 2048,
           deleted: false
+        },
+        {
+          remoteItemId: 'system-file',
+          parentRemoteItemId: 'child-folder-1',
+          kind: 'file',
+          name: '.DS_Store',
+          size: 100,
+          deleted: false
         }
       ]
     })
@@ -63,6 +71,7 @@ describe('buildOneDriveImportPlan', () => {
       name: 'cue.mp4',
       parentId: plan.folders[1].id
     })
+    expect(plan.items.find((item) => item.name === '.DS_Store')).toBeUndefined()
     expect(plan.items[0].id).toMatch(UUID_PATTERN)
     expect(plan.downloadableItems[0]).toMatchObject({ itemId: plan.items[0].id })
   })

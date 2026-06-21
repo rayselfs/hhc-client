@@ -16,6 +16,7 @@ import { resolveUniqueName } from '@renderer/lib/file-naming'
 import { ensureSourceMediaMetadata } from '@renderer/lib/media-metadata'
 import { enqueueVideoPosterJob } from '@renderer/lib/video-poster-jobs'
 import { MAX_FILE_SIZE_WEB } from '@renderer/lib/media-limits'
+import { isIgnoredSystemFile } from '@shared/file-ignore-policy'
 import i18n from '@renderer/i18n'
 
 export { MAX_FILE_SIZE_WEB }
@@ -55,15 +56,6 @@ function createSemaphore(limit: number): { acquire(): Promise<() => void> } {
 const UPLOAD_CONCURRENCY = 3
 const uploadSemaphore = createSemaphore(UPLOAD_CONCURRENCY)
 const pendingPdfFiles = new Map<string, File>()
-
-function isIgnoredSystemFile(file: File): boolean {
-  const path = file.webkitRelativePath || file.name
-  const parts = path.split('/').filter(Boolean)
-  return parts.some(
-    (part) =>
-      part === '__MACOSX' || part === '.DS_Store' || part === 'Thumbs.db' || part === 'desktop.ini'
-  )
-}
 
 export function getUploadMediaPlatform(): MediaPlatform {
   return isWeb() ? 'web' : 'electron'

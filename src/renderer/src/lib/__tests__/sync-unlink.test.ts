@@ -3,7 +3,8 @@ import type { FileItemRecord, FolderRecord } from '@shared/types/folder'
 import {
   convertSyncConnectionToNormalFolder,
   recoverPendingSyncResourceCleanups,
-  unlinkSyncConnectionFromApp
+  unlinkSyncConnectionFromApp,
+  unlinkSyncRootFolderFromApp
 } from '../sync-unlink'
 import { openFileExplorerDB, resetFileExplorerDBForTests } from '../file-explorer-db'
 import {
@@ -110,6 +111,88 @@ describe('sync unlink', () => {
         })
       ])
     )
+  })
+
+  it('disconnects one OneDrive mounted folder without removing the account connection', async () => {
+    await putProviderConnection({
+      id: 'connection-1',
+      providerType: 'onedrive',
+      displayName: 'OneDrive'
+    })
+    await putSyncCursor({
+      providerConnectionId: 'connection-1',
+      remoteFolderId: 'root-a',
+      cursor: 'cursor-a',
+      updatedAt: 1
+    })
+    await putSyncCursor({
+      providerConnectionId: 'connection-1',
+      remoteFolderId: 'root-b',
+      cursor: 'cursor-b',
+      updatedAt: 1
+    })
+    await putSyncEntry({
+      providerConnectionId: 'connection-1',
+      remoteItemId: 'root-a',
+      parentRemoteItemId: null,
+      kind: 'folder',
+      name: 'A',
+      folderId: 'folder-a',
+      status: 'remote-only'
+    })
+    await putSyncEntry({
+      providerConnectionId: 'connection-1',
+      remoteItemId: 'child-a',
+      parentRemoteItemId: 'root-a',
+      kind: 'folder',
+      name: 'Child',
+      folderId: 'folder-child-a',
+      status: 'remote-only'
+    })
+    await putSyncEntry({
+      providerConnectionId: 'connection-1',
+      remoteItemId: 'file-a',
+      parentRemoteItemId: 'child-a',
+      kind: 'file',
+      name: 'clip.mp4',
+      itemId: 'item-a',
+      blobId: 'item-a',
+      mimeType: 'video/mp4',
+      status: 'available-offline'
+    })
+    await putSyncEntry({
+      providerConnectionId: 'connection-1',
+      remoteItemId: 'root-b',
+      parentRemoteItemId: null,
+      kind: 'folder',
+      name: 'B',
+      folderId: 'folder-b',
+      status: 'remote-only'
+    })
+
+    await unlinkSyncRootFolderFromApp({
+      id: 'folder-a',
+      name: 'A',
+      parentId: 'file-root',
+      sortIndex: 0,
+      createdAt: 1,
+      expiresAt: null,
+      syncLink: {
+        providerConnectionId: 'connection-1',
+        remoteFolderId: 'root-a',
+        providerType: 'onedrive'
+      }
+    })
+
+    expect(mockCleanupFileResources).toHaveBeenCalledWith({
+      folderIds: expect.arrayContaining(['folder-a', 'folder-child-a']),
+      itemIds: ['item-a']
+    })
+    await expect(getProviderConnection('connection-1')).resolves.toBeDefined()
+    await expect(getSyncCursor('connection-1', 'root-a')).resolves.toBeUndefined()
+    await expect(getSyncCursor('connection-1', 'root-b')).resolves.toBeDefined()
+    await expect(getSyncEntryByRemoteItem('connection-1', 'root-a')).resolves.toBeUndefined()
+    await expect(getSyncEntryByRemoteItem('connection-1', 'root-b')).resolves.toBeDefined()
   })
 
   it('converts a fully downloaded sync connection into normal local files', async () => {

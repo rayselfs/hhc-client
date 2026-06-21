@@ -89,7 +89,7 @@ describe('inline rename in file views', () => {
       />
     )
 
-    expect(screen.getByText('Remote only')).toBeInTheDocument()
+    expect(screen.getByLabelText('Remote only')).toBeInTheDocument()
   })
 
   it('renders grid items in a single responsive grid', () => {

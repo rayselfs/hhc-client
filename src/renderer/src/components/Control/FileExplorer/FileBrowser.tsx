@@ -27,6 +27,7 @@ import { useThumbnails, canHaveThumbnail } from '@renderer/hooks/useThumbnails'
 import { compareByField } from '@renderer/lib/file-explorer-sort'
 import { searchAllItems } from '@renderer/lib/file-explorer-search'
 import {
+  FILE_EXPLORER_ROOT_ID,
   deleteFolderFromStore,
   removeFileItemFromStore,
   useFileExplorerCustomOrder,
@@ -57,6 +58,7 @@ export interface FileBrowserProps {
   onSelectionChange?: (selectedIds: Set<string>) => void
   onCopy?: (selectedIds: Set<string>) => void
   onCut?: (selectedIds: Set<string>) => void
+  onDelete?: (selectedIds: Set<string>) => void | Promise<void>
   onPaste?: () => void
   clipboard?: ClipboardState | null
   onEscape?: () => void
@@ -333,6 +335,7 @@ export function FileBrowser({
   onSelectionChange,
   onCopy,
   onCut,
+  onDelete,
   onPaste,
   clipboard,
   onEscape,
@@ -494,7 +497,9 @@ export function FileBrowser({
         createdAt: folder.createdAt,
         isFavorited: folder.isFavorited,
         isSelected: false,
-        syncStatus: syncStatuses[folder.id]
+        syncStatus: syncStatuses[folder.id],
+        syncProviderType:
+          folder.parentId === FILE_EXPLORER_ROOT_ID ? folder.syncLink?.providerType : undefined
       })),
       ...fileItems.map((item) => ({
         id: item.id,
@@ -842,6 +847,11 @@ export function FileBrowser({
   const handleDeleteSelected = useCallback(async (): Promise<void> => {
     if (isCurrentFolderReadOnly) return
     if (selectedIds.size === 0) return
+    if (onDelete) {
+      await onDelete(new Set(selectedIds))
+      clearSelection()
+      return
+    }
 
     const confirmed = await confirm({
       title: t('folder.deleteSelectedTitle', {
@@ -862,7 +872,7 @@ export function FileBrowser({
       }
     }
     clearSelection()
-  }, [selectedIds, confirm, t, folderIds, clearSelection, isCurrentFolderReadOnly])
+  }, [selectedIds, onDelete, confirm, t, folderIds, clearSelection, isCurrentFolderReadOnly])
 
   const handleCopySelected = useCallback((): void => {
     if (selectedIds.size === 0) return

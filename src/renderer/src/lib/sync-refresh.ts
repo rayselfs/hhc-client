@@ -13,6 +13,7 @@ import {
   resolveMediaCapability,
   type MediaPlatform
 } from '@renderer/lib/media-capabilities'
+import { isIgnoredSystemPath } from '@shared/file-ignore-policy'
 import type { RemoteSyncItem } from './sync-provider'
 import {
   putSyncEntry,
@@ -127,9 +128,17 @@ export function buildSyncRefreshPlan(input: BuildSyncRefreshPlanInput): SyncRefr
   const syncEntries: SyncRefreshPlan['syncEntries'] = []
   const fileTransfers: SyncFileTransfer[] = []
   const replacedItemIds: string[] = []
+  const ignoredRemoteIds = new Set<string>()
   let disabledCount = 0
 
   for (const remoteItem of input.remoteItems) {
+    if (
+      isIgnoredSystemPath(remoteItem.name) ||
+      (remoteItem.parentRemoteItemId && ignoredRemoteIds.has(remoteItem.parentRemoteItemId))
+    ) {
+      ignoredRemoteIds.add(remoteItem.remoteItemId)
+      continue
+    }
     if (remoteItem.deleted || remoteItem.kind !== 'folder') continue
     remoteIds.add(remoteItem.remoteItemId)
     if (remoteItem.remoteItemId === input.rootRemoteFolderId) continue
@@ -167,6 +176,7 @@ export function buildSyncRefreshPlan(input: BuildSyncRefreshPlanInput): SyncRefr
   }
 
   for (const remoteItem of input.remoteItems) {
+    if (ignoredRemoteIds.has(remoteItem.remoteItemId)) continue
     if (remoteItem.deleted || remoteItem.kind !== 'file') continue
     remoteIds.add(remoteItem.remoteItemId)
     const parentId = remoteFolderToLocalId.get(remoteItem.parentRemoteItemId) ?? input.rootFolder.id

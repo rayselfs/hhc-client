@@ -12,6 +12,7 @@ import {
   type MediaPlatform,
   type MediaSupportMode
 } from '@renderer/lib/media-capabilities'
+import { isIgnoredSystemPath } from '@shared/file-ignore-policy'
 import { ensureSourceMediaMetadata } from '@renderer/lib/media-metadata'
 import { enqueueVideoPosterJob } from '@renderer/lib/video-poster-jobs'
 import {
@@ -143,9 +144,17 @@ export function buildLocalSyncImportPlan(input: LocalSyncImportPlanInput): Local
     [FILE_EXPLORER_ROOT_ID, input.existingRootFolderNames.length + 1]
   ])
   const itemSortCounts = new Map<string, number>()
+  const ignoredRemoteIds = new Set<string>()
   let disabledCount = 0
 
   for (const remoteItem of input.remoteItems) {
+    if (
+      isIgnoredSystemPath(remoteItem.name) ||
+      (remoteItem.parentRemoteItemId && ignoredRemoteIds.has(remoteItem.parentRemoteItemId))
+    ) {
+      ignoredRemoteIds.add(remoteItem.remoteItemId)
+      continue
+    }
     if (remoteItem.kind !== 'folder') continue
     const parentId = remoteFolderToLocalId.get(remoteItem.parentRemoteItemId) ?? rootFolderId
     const localFolderId = createSyncedFolderId(input.connection.id, remoteItem.remoteItemId)
@@ -179,6 +188,7 @@ export function buildLocalSyncImportPlan(input: LocalSyncImportPlanInput): Local
   }
 
   for (const remoteItem of input.remoteItems) {
+    if (ignoredRemoteIds.has(remoteItem.remoteItemId)) continue
     if (remoteItem.kind !== 'file') continue
     const parentId = remoteFolderToLocalId.get(remoteItem.parentRemoteItemId) ?? rootFolderId
     const policy = classifySyncRemoteFile(remoteItem, input.platform)

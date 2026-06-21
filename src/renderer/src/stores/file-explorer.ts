@@ -152,7 +152,7 @@ export function removeFileItemFromStore(id: string): void {
   useFileExplorerStore.getState().softDeleteItem(id)
 }
 
-function removeCleanedEntriesFromStore(result: CleanupResult): void {
+export function removeCleanedEntriesFromStore(result: CleanupResult): void {
   const folderIds = new Set(result.folderIds)
   const itemIds = new Set(result.itemIds)
   useFileExplorerStore.setState((state) => {

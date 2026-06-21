@@ -58,6 +58,13 @@ describe('buildLocalSyncImportPlan', () => {
         kind: 'file',
         name: 'clip.avi',
         size: 20
+      },
+      {
+        remoteItemId: 'system-file',
+        parentRemoteItemId: 'folder-a',
+        kind: 'file',
+        name: '.DS_Store',
+        size: 20
       }
     ]
 
@@ -76,6 +83,7 @@ describe('buildLocalSyncImportPlan', () => {
     })
     expect(plan.folders).toHaveLength(2)
     expect(plan.items).toHaveLength(2)
+    expect(plan.items.find((item) => item.name === '.DS_Store')).toBeUndefined()
     expect(plan.fileImports.map((entry) => entry.remoteItemId)).toEqual(['mkv-1'])
     expect(plan.fileImports[0].itemId).toMatch(UUID_PATTERN)
     expect(plan.items.find((item) => item.name === 'clip.mkv')).toMatchObject({

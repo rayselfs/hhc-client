@@ -14,7 +14,7 @@ import {
   FILE_EXPLORER_ROOT_ID
 } from '@renderer/stores/file-explorer'
 import { getUploadMediaPlatform, uploadFiles, uploadFolderFiles } from '@renderer/lib/upload-utils'
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw, Unlink } from 'lucide-react'
 import { connectLocalSyncFolder, refreshLocalSyncConnection } from '@renderer/lib/local-sync-import'
 import {
   getConnectedOneDriveAccount,
@@ -22,6 +22,7 @@ import {
   refreshOneDriveFolder,
   type OneDriveRemoteFolder
 } from '@renderer/lib/onedrive-connect'
+import { unlinkSyncRootFolderFromApp } from '@renderer/lib/sync-unlink'
 import { isElectron } from '@renderer/lib/env'
 import {
   computeExpiresAt,
@@ -86,8 +87,9 @@ export default function FilesPage(): React.JSX.Element {
   )
   const selectedCount = selectedIds.size
   const fileAccept = getMediaFileAcceptAttribute(getUploadMediaPlatform())
-  const canAddLocalSyncFolder = isElectron()
-  const canAddOneDriveFolder = isElectron()
+  const canAddSyncSourceHere = currentFolderId === FILE_EXPLORER_ROOT_ID
+  const canAddLocalSyncFolder = isElectron() && canAddSyncSourceHere
+  const canAddOneDriveFolder = isElectron() && canAddSyncSourceHere
   const isCurrentFolderReadOnly = useMemo(
     () => isFolderReadOnlyBySyncLink(currentFolderId, foldersById),
     [currentFolderId, foldersById]
@@ -211,6 +213,41 @@ export default function FilesPage(): React.JSX.Element {
     return root
   }, [])
 
+  const isSyncRootFolder = useCallback((folder: FolderRecord): boolean => {
+    return folder.parentId === FILE_EXPLORER_ROOT_ID && Boolean(folder.syncLink)
+  }, [])
+
+  const findSingleSelectedSyncRoot = useCallback(
+    (targetIds: Set<string>): FolderRecord | null => {
+      if (targetIds.size !== 1) return null
+      const folder = useFileExplorerStore.getState().folders[[...targetIds][0]]
+      return folder && isSyncRootFolder(folder) ? folder : null
+    },
+    [isSyncRootFolder]
+  )
+
+  const handleUnlinkSyncRoot = useCallback(
+    async (root: FolderRecord): Promise<void> => {
+      const confirmed = await confirm({
+        title: t('fileExplorer.syncSources.unlinkTitle', { name: root.name }),
+        description: t('fileExplorer.syncSources.unlinkDescription'),
+        confirmLabel: t('fileExplorer.syncSources.unlink'),
+        status: 'danger'
+      })
+      if (!confirmed) return
+
+      try {
+        await unlinkSyncRootFolderFromApp(root)
+        setSelectedIds(new Set())
+        toast.success(t('fileExplorer.syncSources.unlinked'))
+      } catch (error) {
+        console.warn('[sync] Failed to unlink sync source', error)
+        toast.danger(t('fileExplorer.syncSources.unlinkFailed'))
+      }
+    },
+    [confirm, t]
+  )
+
   const handleRefreshSyncFolder = useCallback(
     async (folderId: string): Promise<void> => {
       const root = findSyncRootFolder(folderId)
@@ -305,6 +342,11 @@ export default function FilesPage(): React.JSX.Element {
   const handleDelete = useCallback(
     async (targetIds: Set<string>): Promise<void> => {
       if (targetIds.size === 0) return
+      const syncRoot = findSingleSelectedSyncRoot(targetIds)
+      if (syncRoot) {
+        await handleUnlinkSyncRoot(syncRoot)
+        return
+      }
       if (areIdsReadOnly(targetIds)) return
       const confirmed = await confirm({
         title: t('folder.deleteSelectedTitle', {
@@ -325,7 +367,7 @@ export default function FilesPage(): React.JSX.Element {
       }
       setSelectedIds(new Set())
     },
-    [confirm, t, areIdsReadOnly]
+    [confirm, t, areIdsReadOnly, findSingleSelectedSyncRoot, handleUnlinkSyncRoot]
   )
 
   const handlePaste = useCallback(async (): Promise<void> => {
@@ -516,7 +558,21 @@ export default function FilesPage(): React.JSX.Element {
         onDelete: handleDelete,
         onEdit: (targetFolder) => openEditModal(targetFolder.id),
         isReadOnly,
-        extraActions: getRefreshSyncActions(folder.id)
+        extraActions: [
+          ...getRefreshSyncActions(folder.id),
+          ...(isSyncRootFolder(folder)
+            ? [
+                'separator' as const,
+                {
+                  id: 'unlink-sync-source',
+                  label: t('fileExplorer.syncSources.unlink'),
+                  icon: React.createElement(Unlink, { size: 14 }),
+                  variant: 'danger' as const,
+                  onAction: () => void handleUnlinkSyncRoot(folder)
+                }
+              ]
+            : [])
+        ]
       })
     },
     [
@@ -530,7 +586,10 @@ export default function FilesPage(): React.JSX.Element {
       handleDelete,
       openEditModal,
       getRefreshSyncActions,
-      areIdsReadOnly
+      handleUnlinkSyncRoot,
+      isSyncRootFolder,
+      areIdsReadOnly,
+      t
     ]
   )
 
@@ -626,6 +685,7 @@ export default function FilesPage(): React.JSX.Element {
           onSelectionChange={handleSelectionChange}
           onCopy={handleCopy}
           onCut={handleCut}
+          onDelete={handleDelete}
           onPaste={() => void handlePaste()}
           clipboard={clipboard}
           onEscape={handleEscape}

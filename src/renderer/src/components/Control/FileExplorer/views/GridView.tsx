@@ -1,5 +1,5 @@
 import React from 'react'
-import { Folder, Star } from 'lucide-react'
+import { Cloud, Folder, FolderSync, Star } from 'lucide-react'
 import { Skeleton } from '@heroui/react/skeleton'
 import { useTranslation } from 'react-i18next'
 import { getFileIcon } from './getFileIcon'
@@ -7,7 +7,8 @@ import { canHaveThumbnail } from '@renderer/hooks/useThumbnails'
 import { InlineRenameInput } from '../InlineRenameInput'
 import { splitFileName } from '@renderer/lib/file-naming'
 import type { SyncEntryStatus } from '@renderer/lib/sync-db'
-import { SyncStatusBadge } from './SyncStatusBadge'
+import type { SyncProviderType } from '@shared/types/folder'
+import { SyncStatusIcon } from './SyncStatusBadge'
 
 export interface GridViewItem {
   id: string
@@ -20,6 +21,7 @@ export interface GridViewItem {
   isSelected: boolean
   isFavorited?: boolean
   syncStatus?: SyncEntryStatus
+  syncProviderType?: SyncProviderType
   isUnsupportedMedia?: boolean
 }
 
@@ -49,6 +51,18 @@ function renderGridIcon(item: GridViewItem, iconSize: number): React.ReactNode {
 
   return (
     <div className="text-default-500">{getFileIcon(item.mimeType, item.isFolder, iconSize)}</div>
+  )
+}
+
+function renderSyncProviderIcon(providerType?: SyncProviderType): React.ReactNode {
+  if (!providerType) return null
+  const Icon = providerType === 'onedrive' ? Cloud : FolderSync
+  return (
+    <span className="absolute inset-0 flex items-center justify-center text-white drop-shadow-sm">
+      <span className="rounded-full bg-primary/90 p-1">
+        <Icon size={18} />
+      </span>
+    </span>
   )
 }
 
@@ -131,9 +145,6 @@ export const GridView = React.memo(function GridView({
               onDoubleClick={(e) => onItemDoubleClick(item.id, e)}
               onContextMenu={(e) => onItemContextMenu(item.id, e)}
             >
-              <div className="absolute left-1 top-1 max-w-[calc(100%-0.5rem)]">
-                <SyncStatusBadge status={item.syncStatus} compact />
-              </div>
               {item.isFolder && onItemFavoriteToggle && (
                 <button
                   className={`absolute top-1 right-1 rounded p-0.5 transition-opacity ${
@@ -155,6 +166,12 @@ export const GridView = React.memo(function GridView({
               )}
               <div className="relative flex items-center justify-center">
                 {renderGridIcon(item, iconSize)}
+                {item.isFolder ? renderSyncProviderIcon(item.syncProviderType) : null}
+                {!item.isFolder && item.syncStatus ? (
+                  <span className="absolute -bottom-1 -right-1 rounded-full bg-background/90">
+                    <SyncStatusIcon status={item.syncStatus} />
+                  </span>
+                ) : null}
               </div>
               {isRenaming ? (
                 <div

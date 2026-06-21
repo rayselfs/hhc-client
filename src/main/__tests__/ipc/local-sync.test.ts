@@ -240,7 +240,7 @@ describe('local sync IPC', () => {
     mockReadFile.mockResolvedValue(storedConnectionJson())
     mockReaddir.mockImplementation(async (path: string) => {
       if (path === '/Volumes/Media/Sermons') return [dir('Sunday'), file('intro.mp4')]
-      if (path === '/Volumes/Media/Sermons/Sunday') return [file('message.mkv')]
+      if (path === '/Volumes/Media/Sermons/Sunday') return [file('message.mkv'), file('.DS_Store')]
       return []
     })
     mockStat.mockImplementation(async (path: string) => {
@@ -260,6 +260,9 @@ describe('local sync IPC', () => {
       ])
     )
     expect(JSON.stringify(result)).not.toContain('/Volumes/Media/Sermons')
+    expect(result).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: '.DS_Store' })])
+    )
   })
 
   it('rejects invalid connection ids before reading stored local sync paths', async () => {
