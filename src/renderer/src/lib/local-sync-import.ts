@@ -3,7 +3,11 @@ import type { LocalSyncConnectionInfo, LocalSyncRemoteItem } from '@shared/ipc-c
 import type { FileItemRecord, FolderRecord } from '@shared/types/folder'
 import { FILE_EXPLORER_ROOT_ID, useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { isWeb } from '@renderer/lib/env'
-import { openFileExplorerDB, type FileBlobRecord } from '@renderer/lib/file-explorer-db'
+import {
+  getFileSource,
+  openFileExplorerDB,
+  type FileBlobRecord
+} from '@renderer/lib/file-explorer-db'
 import { resolveUniqueName } from '@renderer/lib/file-naming'
 import {
   getMediaSupport,
@@ -290,30 +294,46 @@ async function saveImportedRecords(
 export async function refreshImportedMediaAssets(items: FileItemRecord[]): Promise<void> {
   await Promise.all(
     items.map(async (item) => {
-      if (!item.url.startsWith('blob:')) return
-      const capability = resolveMediaCapability({ mimeType: item.mimeType, fileName: item.name })
-      if (!capability) return
-      void ensureSourceMediaMetadata(item.id, item.mimeType).catch((error) => {
-        console.warn('[local-sync] Failed to store synced media metadata', {
+      try {
+        if (!item.url.startsWith('blob:')) return
+        const capability = resolveMediaCapability({ mimeType: item.mimeType, fileName: item.name })
+        if (!capability) return
+        void ensureSourceMediaMetadata(item.id, item.mimeType).catch((error) => {
+          console.warn('[sync] Failed to store synced media metadata', {
+            itemId: item.id,
+            error
+          })
+        })
+        if (capability.kind === 'video' && !isWeb()) {
+          await enqueueVideoPosterJob({ sourceBlobId: item.id, itemId: item.id })
+          return
+        }
+        if (capability.thumbnail === 'none') return
+
+        const db = await openFileExplorerDB()
+        const source = await getFileSource(db, item.id, item.mimeType)
+        if (!source) return
+        try {
+          const response = await fetch(source.url)
+          if (!response.ok) return
+          const file = new File([await response.blob()], item.name, { type: item.mimeType })
+          const thumbnail = await generateThumbnail(file, item.mimeType)
+          if (!thumbnail) return
+          await saveThumbnail(item.id, thumbnail)
+          window.dispatchEvent(
+            new CustomEvent('hhc:thumbnail-ready', {
+              detail: { itemId: item.id, dataUrl: thumbnail }
+            })
+          )
+        } finally {
+          source.revoke()
+        }
+      } catch (error) {
+        console.warn('[sync] Failed to refresh synced media asset', {
           itemId: item.id,
           error
         })
-      })
-      if (capability.kind === 'video' && !isWeb()) {
-        await enqueueVideoPosterJob({ sourceBlobId: item.id, itemId: item.id })
-        return
       }
-      if (capability.thumbnail === 'none') return
-      const url = window.api.nativeFs.getUrl(item.id, item.mimeType)
-      const response = await fetch(url)
-      if (!response.ok) return
-      const file = new File([await response.blob()], item.name, { type: item.mimeType })
-      const thumbnail = await generateThumbnail(file, item.mimeType)
-      if (!thumbnail) return
-      await saveThumbnail(item.id, thumbnail)
-      window.dispatchEvent(
-        new CustomEvent('hhc:thumbnail-ready', { detail: { itemId: item.id, dataUrl: thumbnail } })
-      )
     })
   )
 }
