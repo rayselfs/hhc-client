@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from '@heroui/react/toast'
 import { Button } from '@heroui/react/button'
@@ -51,6 +51,9 @@ export default function MediaSettings({
     null
   )
   const [oneDriveConnectionBusy, setOneDriveConnectionBusy] = useState(false)
+  const [oneDriveCallbackUrl, setOneDriveCallbackUrl] = useState('')
+  const [isOneDriveCallbackVisible, setIsOneDriveCallbackVisible] = useState(false)
+  const oneDriveCallbackResolver = useRef<((url: string | null) => void) | null>(null)
   const customClientIdValid =
     oneDriveDraft.customClientId.trim().length === 0 ||
     validateOneDriveClientId(oneDriveDraft.customClientId)
@@ -69,10 +72,27 @@ export default function MediaSettings({
     window.dispatchEvent(new Event('onedrive-connection-changed'))
   }
 
+  function requestOneDriveCallbackUrl(): Promise<string | null> {
+    setOneDriveCallbackUrl('')
+    setIsOneDriveCallbackVisible(true)
+    return new Promise((resolve) => {
+      oneDriveCallbackResolver.current = resolve
+    })
+  }
+
+  function resolveOneDriveCallback(url: string | null): void {
+    oneDriveCallbackResolver.current?.(url)
+    oneDriveCallbackResolver.current = null
+    setIsOneDriveCallbackVisible(false)
+    setOneDriveCallbackUrl('')
+  }
+
   async function handleLoginOneDrive(): Promise<void> {
     setOneDriveConnectionBusy(true)
     try {
-      const connection = await loginOneDriveAccount()
+      const connection = await loginOneDriveAccount({
+        requestCallbackUrl: requestOneDriveCallbackUrl
+      })
       if (!connection) return
       await refreshOneDriveConnection()
       notifyOneDriveConnectionChanged()
@@ -220,11 +240,48 @@ export default function MediaSettings({
                   isDisabled={oneDriveConnectionBusy || !isElectron()}
                   onPress={() => void handleLoginOneDrive()}
                 >
-                  {t('preferences.media.oneDrive.connect')}
+                  {oneDriveConnectionBusy
+                    ? t('preferences.media.oneDrive.connecting')
+                    : t('preferences.media.oneDrive.connect')}
                 </Button>
               </div>
             )}
           </div>
+
+          {isOneDriveCallbackVisible && (
+            <div className="space-y-2 rounded-2xl bg-surface-secondary px-4 py-3">
+              <label className="text-sm font-medium" htmlFor="onedrive-callback-url">
+                {t('preferences.media.oneDrive.callbackUrlLabel')}
+              </label>
+              <input
+                id="onedrive-callback-url"
+                value={oneDriveCallbackUrl}
+                onChange={(event) => setOneDriveCallbackUrl(event.target.value)}
+                placeholder={t('preferences.media.oneDrive.callbackUrlPlaceholder')}
+                className="w-full rounded-full border border-default-200 bg-transparent px-4 py-2 text-sm"
+              />
+              <p className="text-xs text-muted">
+                {t('preferences.media.oneDrive.callbackPrompt')}
+              </p>
+              <div className="flex justify-end gap-2">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onPress={() => resolveOneDriveCallback(null)}
+                >
+                  {t('common.cancel')}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  isDisabled={!oneDriveCallbackUrl.trim()}
+                  onPress={() => resolveOneDriveCallback(oneDriveCallbackUrl.trim())}
+                >
+                  {t('common.confirm')}
+                </Button>
+              </div>
+            </div>
+          )}
 
           <div className="flex items-center justify-between gap-3">
             <label className="text-sm font-medium">

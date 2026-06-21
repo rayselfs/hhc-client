@@ -1,6 +1,83 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { FILE_EXPLORER_ROOT_ID } from '@renderer/stores/file-explorer'
-import { buildOneDriveImportPlan } from '../onedrive-connect'
+import { buildOneDriveImportPlan, loginOneDriveAccount } from '../onedrive-connect'
+
+vi.mock('../env', () => ({
+  isElectron: vi.fn(() => true),
+  isWeb: vi.fn(() => false)
+}))
+
+vi.mock('@renderer/stores/settings', () => ({
+  getEffectiveOneDriveClientId: () => '11111111-2222-3333-4444-555555555555',
+  useSettingsStore: {
+    getState: () => ({
+      oneDrive: { customClientId: '' },
+      defaultSyncOfflinePolicy: 'always-offline'
+    })
+  }
+}))
+
+vi.mock('../onedrive-auth', async () => {
+  const actual = await vi.importActual<typeof import('../onedrive-auth')>('../onedrive-auth')
+  return {
+    ...actual,
+    createOneDriveAuthRequest: vi.fn(async () => ({
+      authorizationUrl: 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize',
+      clientId: '11111111-2222-3333-4444-555555555555',
+      redirectUri: 'https://login.microsoftonline.com/common/oauth2/nativeclient',
+      state: 'state-1',
+      codeVerifier: 'verifier-1',
+      scopes: ['offline_access', 'User.Read', 'Files.Read']
+    }))
+  }
+})
+
+vi.mock('../onedrive-provider', () => {
+  class MockOneDriveReadonlyProvider {
+    connect = vi.fn(async () => ({
+      id: 'onedrive:account-1',
+      providerType: 'onedrive',
+      displayName: 'OneDrive - Alice',
+      accountLabel: 'alice@example.com'
+    }))
+  }
+  return {
+    OneDriveReadonlyProvider: MockOneDriveReadonlyProvider
+  }
+})
+
+vi.mock('../sync-db', () => ({
+  deleteProviderConnection: vi.fn(async () => undefined),
+  getProviderConnection: vi.fn(async () => ({
+    id: 'onedrive:account-1',
+    providerType: 'onedrive',
+    displayName: 'OneDrive - Alice',
+    accountLabel: 'alice@example.com',
+    createdAt: 1,
+    updatedAt: 1
+  })),
+  listProviderConnectionsByType: vi.fn(async () => []),
+  listSyncEntriesByProviderConnection: vi.fn(async () => []),
+  putSyncCursor: vi.fn(async () => undefined),
+  putSyncEntry: vi.fn(async () => undefined)
+}))
+
+vi.mock('../file-explorer-db', () => ({
+  openFileExplorerDB: vi.fn()
+}))
+
+vi.mock('../sync-download-storage', () => ({
+  saveElectronOneDriveDownloadedContent: vi.fn(),
+  saveWebOneDriveDownloadedContent: vi.fn()
+}))
+
+vi.mock('@heroui/react/toast', () => ({
+  toast: { warning: vi.fn() }
+}))
+
+vi.mock('@renderer/i18n', () => ({
+  default: { t: (key: string) => key }
+}))
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -74,5 +151,47 @@ describe('buildOneDriveImportPlan', () => {
     expect(plan.items.find((item) => item.name === '.DS_Store')).toBeUndefined()
     expect(plan.items[0].id).toMatch(UUID_PATTERN)
     expect(plan.downloadableItems[0]).toMatchObject({ itemId: plan.items[0].id })
+  })
+})
+
+describe('loginOneDriveAccount', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: {
+        oneDrive: {
+          saveCredentials: vi.fn(async () => ({ exists: true })),
+          deleteCredentials: vi.fn(async () => undefined)
+        }
+      }
+    })
+    window.open = vi.fn()
+    window.prompt = vi.fn()
+    global.fetch = vi.fn(async () =>
+      Response.json({
+        access_token: 'access-token',
+        refresh_token: 'refresh-token',
+        expires_in: 3600,
+        token_type: 'Bearer'
+      })
+    )
+  })
+
+  it('uses an app-provided callback URL instead of window.prompt in Electron', async () => {
+    const callbackUrl =
+      'https://login.microsoftonline.com/common/oauth2/nativeclient?code=code-1&state=state-1'
+
+    await expect(
+      loginOneDriveAccount({
+        requestCallbackUrl: vi.fn(async () => callbackUrl)
+      })
+    ).resolves.toMatchObject({ id: 'onedrive:account-1' })
+
+    expect(window.prompt).not.toHaveBeenCalled()
+    expect(fetch).toHaveBeenCalledWith(
+      'https://login.microsoftonline.com/common/oauth2/v2.0/token',
+      expect.any(Object)
+    )
   })
 })

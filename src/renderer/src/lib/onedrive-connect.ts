@@ -6,6 +6,7 @@ import { isElectron } from './env'
 import {
   createOneDriveAuthRequest,
   createOneDriveTokenExchangeBody,
+  ONEDRIVE_TOKEN_ENDPOINT,
   parseOneDriveAuthCallback
 } from './onedrive-auth'
 import { OneDriveReadonlyProvider } from './onedrive-provider'
@@ -278,7 +279,7 @@ async function exchangeToken(input: {
   code: string
   codeVerifier: string
 }): Promise<TokenResponse> {
-  const response = await fetch('https://login.microsoftonline.com/consumers/oauth2/v2.0/token', {
+  const response = await fetch(ONEDRIVE_TOKEN_ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: createOneDriveTokenExchangeBody(input)
@@ -353,7 +354,9 @@ export async function getConnectedOneDriveAccount(): Promise<ProviderConnectionR
   return connections[0] ?? null
 }
 
-export async function loginOneDriveAccount(): Promise<ProviderConnectionRecord | null> {
+export async function loginOneDriveAccount(options?: {
+  requestCallbackUrl?: () => Promise<string | null>
+}): Promise<ProviderConnectionRecord | null> {
   assertOneDriveAvailable()
   const existing = await listProviderConnectionsByType('onedrive')
   if (existing.length > 0) {
@@ -368,7 +371,7 @@ export async function loginOneDriveAccount(): Promise<ProviderConnectionRecord |
     prompt: 'select_account'
   })
   window.open(request.authorizationUrl, '_blank', 'noopener,noreferrer')
-  const callbackUrl = window.prompt(i18n.t('preferences.media.oneDrive.callbackPrompt'))
+  const callbackUrl = await options?.requestCallbackUrl?.()
   if (!callbackUrl) return null
 
   const callback = parseOneDriveAuthCallback(callbackUrl, request.state)
