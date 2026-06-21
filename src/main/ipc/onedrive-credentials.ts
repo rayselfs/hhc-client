@@ -27,6 +27,7 @@ const ONEDRIVE_TOKEN_ENDPOINT = 'https://login.microsoftonline.com/common/oauth2
 const MICROSOFT_GRAPH_ME_ENDPOINT = 'https://graph.microsoft.com/v1.0/me'
 export const ONEDRIVE_AUTH_REDIRECT_URI = 'librepresenter://auth/onedrive'
 const AUTH_CALLBACK_TIMEOUT_MS = 5 * 60_000
+const ACCESS_TOKEN_EXPIRY_SKEW_MS = 5 * 60_000
 
 interface OneDriveAccountProfile {
   id?: unknown
@@ -43,6 +44,7 @@ interface AuthCallbackWaiter {
 
 let authCallbackWaiter: AuthCallbackWaiter | null = null
 let queuedAuthCallbackUrl: string | null = null
+const refreshesByConnection = new Map<string, Promise<OneDriveAccessTokenResult>>()
 
 function validateConnectionId(connectionId: unknown): string {
   if (
@@ -230,6 +232,25 @@ function toStatus(credential: StoredOneDriveCredential | null): OneDriveCredenti
   }
 }
 
+function hasFreshAccessToken(credential: StoredOneDriveCredential): boolean {
+  return (
+    typeof credential.accessToken === 'string' &&
+    credential.accessToken.length > 0 &&
+    typeof credential.expiresAt === 'number' &&
+    credential.expiresAt - Date.now() > ACCESS_TOKEN_EXPIRY_SKEW_MS
+  )
+}
+
+function toAccessTokenResult(credential: StoredOneDriveCredential): OneDriveAccessTokenResult {
+  if (!credential.accessToken) throw new Error('OneDrive credentials not found')
+  return {
+    accessToken: credential.accessToken,
+    expiresAt: credential.expiresAt,
+    scope: credential.scope,
+    tokenType: credential.tokenType
+  }
+}
+
 async function readCredential(connectionId: string): Promise<StoredOneDriveCredential | null> {
   try {
     const encrypted = await fs.readFile(getCredentialPath(connectionId))
@@ -371,6 +392,22 @@ async function refreshAccessToken(
   }
 }
 
+function getFreshAccessToken(
+  credential: StoredOneDriveCredential,
+  clientId: string
+): Promise<OneDriveAccessTokenResult> {
+  if (hasFreshAccessToken(credential)) return Promise.resolve(toAccessTokenResult(credential))
+
+  const existing = refreshesByConnection.get(credential.connectionId)
+  if (existing) return existing
+
+  const refresh = refreshAccessToken(credential, clientId).finally(() => {
+    refreshesByConnection.delete(credential.connectionId)
+  })
+  refreshesByConnection.set(credential.connectionId, refresh)
+  return refresh
+}
+
 export function registerOneDriveCredentialHandlers(wm: WindowManager): void {
   ipcMain.handle(
     'onedrive:get-credential-status',
@@ -388,7 +425,7 @@ export function registerOneDriveCredentialHandlers(wm: WindowManager): void {
       const request = normalizeAccessTokenRequest(input)
       const credential = await readCredential(request.connectionId)
       if (!credential) throw new Error('OneDrive credentials not found')
-      return refreshAccessToken(credential, request.clientId)
+      return getFreshAccessToken(credential, request.clientId)
     }
   )
 

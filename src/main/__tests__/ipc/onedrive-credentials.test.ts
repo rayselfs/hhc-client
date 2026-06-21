@@ -201,6 +201,62 @@ describe('OneDrive credential IPC', () => {
     )
   })
 
+  it('returns a cached access token while it is still fresh', async () => {
+    const expiresAt = Date.now() + 10 * 60_000
+    mockReadFile.mockResolvedValueOnce(
+      Buffer.from(
+        `encrypted:${JSON.stringify({
+          connectionId: 'onedrive:account-1',
+          accessToken: 'cached-access-token',
+          refreshToken: 'refresh-token',
+          expiresAt,
+          scope: 'offline_access User.Read Files.Read',
+          tokenType: 'Bearer',
+          updatedAt: 1
+        })}`
+      )
+    )
+
+    const result = await getHandler('onedrive:get-access-token')(makeEvent(), {
+      connectionId: 'onedrive:account-1',
+      clientId: '4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02'
+    })
+
+    expect(result).toMatchObject({
+      accessToken: 'cached-access-token',
+      expiresAt,
+      scope: 'offline_access User.Read Files.Read',
+      tokenType: 'Bearer'
+    })
+    expect(mockNetFetch).not.toHaveBeenCalled()
+    expect(mockWriteFile).not.toHaveBeenCalled()
+  })
+
+  it('coalesces concurrent token refreshes for the same connection', async () => {
+    mockReadFile.mockResolvedValue(
+      Buffer.from(
+        `encrypted:${JSON.stringify({
+          connectionId: 'onedrive:account-1',
+          refreshToken: 'old-refresh-token',
+          updatedAt: 1
+        })}`
+      )
+    )
+
+    const request = {
+      connectionId: 'onedrive:account-1',
+      clientId: '4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02'
+    }
+    const [first, second] = await Promise.all([
+      getHandler('onedrive:get-access-token')(makeEvent(), request),
+      getHandler('onedrive:get-access-token')(makeEvent(), request)
+    ])
+
+    expect(first).toMatchObject({ accessToken: 'new-access-token' })
+    expect(second).toMatchObject({ accessToken: 'new-access-token' })
+    expect(mockNetFetch).toHaveBeenCalledTimes(1)
+  })
+
   it('completes auth in main without returning token material', async () => {
     mockNetFetch
       .mockResolvedValueOnce(

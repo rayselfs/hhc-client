@@ -2,18 +2,54 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { FILE_EXPLORER_ROOT_ID } from '@renderer/stores/file-explorer'
 import {
   buildOneDriveImportPlan,
+  importOneDriveFolder,
   loginOneDriveAccount,
   scanOneDriveFolder
 } from '../onedrive-connect'
 import type { OneDriveReadonlyProvider } from '../onedrive-provider'
+import { openFileExplorerDB } from '../file-explorer-db'
+import { refreshImportedMediaAssets } from '../local-sync-import'
+import { listProviderConnectionsByType } from '../sync-db'
+
+const providerMocks = vi.hoisted(() => ({
+  connect: vi.fn(),
+  initialScan: vi.fn(),
+  downloadContent: vi.fn()
+}))
+
+const fileStoreMocks = vi.hoisted(() => ({
+  state: {
+    folders: {},
+    items: {},
+    _childFoldersByParent: {},
+    _itemsByParent: {},
+    _foldersArray: [],
+    _itemsArray: [],
+    loadedParents: new Set<string>(),
+    initialize: vi.fn(async () => undefined),
+    getChildFolders: vi.fn(() => [])
+  },
+  setState: vi.fn()
+}))
 
 vi.mock('../env', () => ({
   isElectron: vi.fn(() => true),
   isWeb: vi.fn(() => false)
 }))
 
+vi.mock('@renderer/stores/file-explorer', () => ({
+  FILE_EXPLORER_ROOT_ID: 'root',
+  useFileExplorerStore: {
+    getState: () => fileStoreMocks.state,
+    setState: fileStoreMocks.setState
+  }
+}))
+
 vi.mock('@renderer/stores/settings', () => ({
-  getEffectiveOneDriveClientId: () => '11111111-2222-3333-4444-555555555555'
+  getEffectiveOneDriveClientId: () => '11111111-2222-3333-4444-555555555555',
+  useSettingsStore: {
+    getState: () => ({ defaultSyncOfflinePolicy: 'always-offline' })
+  }
 }))
 
 vi.mock('../onedrive-auth', async () => {
@@ -33,12 +69,9 @@ vi.mock('../onedrive-auth', async () => {
 
 vi.mock('../onedrive-provider', () => {
   class MockOneDriveReadonlyProvider {
-    connect = vi.fn(async () => ({
-      id: 'onedrive:account-1',
-      providerType: 'onedrive',
-      displayName: 'OneDrive - Alice',
-      accountLabel: 'alice@example.com'
-    }))
+    connect = providerMocks.connect
+    initialScan = providerMocks.initialScan
+    downloadContent = providerMocks.downloadContent
   }
   return {
     OneDriveReadonlyProvider: MockOneDriveReadonlyProvider
@@ -71,6 +104,10 @@ vi.mock('../file-explorer-db', () => ({
   openFileExplorerDB: vi.fn()
 }))
 
+vi.mock('../local-sync-import', () => ({
+  refreshImportedMediaAssets: vi.fn(async () => undefined)
+}))
+
 vi.mock('../sync-download-storage', () => ({
   saveElectronOneDriveDownloadedContent: vi.fn(),
   saveWebOneDriveDownloadedContent: vi.fn()
@@ -91,6 +128,41 @@ vi.mock('@renderer/i18n', () => ({
 }))
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  fileStoreMocks.state.folders = {}
+  fileStoreMocks.state.items = {}
+  fileStoreMocks.state._childFoldersByParent = {}
+  fileStoreMocks.state._itemsByParent = {}
+  fileStoreMocks.state._foldersArray = []
+  fileStoreMocks.state._itemsArray = []
+  fileStoreMocks.state.loadedParents = new Set()
+  fileStoreMocks.state.getChildFolders.mockReturnValue([])
+  fileStoreMocks.setState.mockImplementation((updater: unknown) => {
+    const next =
+      typeof updater === 'function'
+        ? (updater as (state: typeof fileStoreMocks.state) => Partial<typeof fileStoreMocks.state>)(
+            fileStoreMocks.state
+          )
+        : updater
+    if (typeof next === 'object' && next !== null) Object.assign(fileStoreMocks.state, next)
+  })
+  providerMocks.connect.mockResolvedValue({
+    id: 'onedrive:account-1',
+    providerType: 'onedrive',
+    displayName: 'OneDrive - Alice',
+    accountLabel: 'alice@example.com'
+  })
+  vi.mocked(openFileExplorerDB).mockResolvedValue({
+    transaction: () => ({
+      objectStore: () => ({
+        put: vi.fn(async () => undefined)
+      }),
+      done: Promise.resolve()
+    })
+  } as never)
+})
 
 describe('buildOneDriveImportPlan', () => {
   it('mounts the selected OneDrive folder instead of the account root', () => {
@@ -279,9 +351,78 @@ describe('scanOneDriveFolder', () => {
   })
 })
 
+describe('importOneDriveFolder', () => {
+  it('refreshes media assets after each downloaded file', async () => {
+    vi.mocked(listProviderConnectionsByType).mockResolvedValueOnce([
+      {
+        id: 'onedrive:account-1',
+        providerType: 'onedrive',
+        displayName: 'OneDrive - Alice',
+        createdAt: 1,
+        updatedAt: 1
+      }
+    ])
+    providerMocks.initialScan.mockResolvedValueOnce({
+      items: [
+        {
+          remoteItemId: 'remote-folder-1',
+          parentRemoteItemId: 'root',
+          kind: 'folder',
+          name: 'Media',
+          deleted: false
+        },
+        {
+          remoteItemId: 'file-1',
+          parentRemoteItemId: 'remote-folder-1',
+          kind: 'file',
+          name: 'one.png',
+          mimeType: 'image/png',
+          size: 100,
+          deleted: false
+        },
+        {
+          remoteItemId: 'file-2',
+          parentRemoteItemId: 'remote-folder-1',
+          kind: 'file',
+          name: 'two.png',
+          mimeType: 'image/png',
+          size: 100,
+          deleted: false
+        }
+      ],
+      nextCursor: 'cursor-1',
+      hasMore: false
+    })
+    providerMocks.downloadContent.mockResolvedValue({
+      blobId: 'blob-1',
+      size: 100,
+      mimeType: 'image/png'
+    })
+
+    await importOneDriveFolder({
+      remoteItemId: 'remote-folder-1',
+      parentRemoteItemId: null,
+      name: 'Media'
+    })
+
+    await vi.waitFor(() => expect(refreshImportedMediaAssets).toHaveBeenCalledTimes(2))
+    expect(
+      vi
+        .mocked(refreshImportedMediaAssets)
+        .mock.calls.map(([items]) => items.map((item) => item.name))
+    ).toEqual([['one.png'], ['two.png']])
+  })
+})
+
 describe('loginOneDriveAccount', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    providerMocks.connect.mockResolvedValue({
+      id: 'onedrive:account-1',
+      providerType: 'onedrive',
+      displayName: 'OneDrive - Alice',
+      accountLabel: 'alice@example.com'
+    })
     Object.defineProperty(window, 'api', {
       configurable: true,
       value: {

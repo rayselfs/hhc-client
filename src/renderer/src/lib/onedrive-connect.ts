@@ -481,7 +481,6 @@ async function downloadImportedOneDriveItems(input: {
   plan: OneDriveImportPlan
 }): Promise<void> {
   const remoteById = new Map(input.remoteItems.map((item) => [item.remoteItemId, item]))
-  const downloadedItemIds: string[] = []
 
   for (const item of input.plan.downloadableItems) {
     const remoteItem = remoteById.get(item.remoteItemId)
@@ -510,7 +509,8 @@ async function downloadImportedOneDriveItems(input: {
         },
         new AbortController().signal
       )
-      downloadedItemIds.push(item.itemId)
+      const downloadedItem = input.plan.items.find((planItem) => planItem.id === item.itemId)
+      if (downloadedItem) void refreshImportedMediaAssets([downloadedItem])
     } catch (error) {
       console.warn('[onedrive] Failed to download file for offline use', {
         connectionId: input.connection.id,
@@ -534,12 +534,6 @@ async function downloadImportedOneDriveItems(input: {
         })
       }
     }
-  }
-
-  if (downloadedItemIds.length > 0) {
-    void refreshImportedMediaAssets(
-      input.plan.items.filter((item) => downloadedItemIds.includes(item.id))
-    )
   }
 }
 
@@ -864,7 +858,6 @@ export async function refreshOneDriveFolder(
     .map((entry) => entry.nextRetryAt)
     .filter((value): value is number => typeof value === 'number')
     .sort((a, b) => a - b)[0]
-  const downloadedItemIds: string[] = []
   for (const transfer of plan.fileTransfers) {
     const remoteItem = remoteById.get(transfer.remoteItemId)
     const previousEntry = existingEntryByRemoteId.get(transfer.remoteItemId)
@@ -894,7 +887,8 @@ export async function refreshOneDriveFolder(
         new AbortController().signal
       )
       downloadedCount++
-      downloadedItemIds.push(transfer.itemId)
+      const downloadedItem = plan.items.find((item) => item.id === transfer.itemId)
+      if (downloadedItem) void refreshImportedMediaAssets([downloadedItem])
     } catch (error) {
       failedFileCount++
       if (remoteItem) {
@@ -927,7 +921,6 @@ export async function refreshOneDriveFolder(
       })
     }
   }
-  void refreshImportedMediaAssets(plan.items.filter((item) => downloadedItemIds.includes(item.id)))
 
   const changedCount =
     plan.folders.length +
