@@ -246,7 +246,7 @@ export interface SettingsStore {
   setReminderMode: (mode: 'subtract' | 'add') => void
   setProjectionDisplayId: (displayId: string) => void
   resetSettings: () => void
-  resetToDefaults: () => void
+  resetToDefaults: () => Promise<void>
 }
 
 function getDefaultSettingsState(): Omit<
@@ -328,8 +328,8 @@ export const useSettingsStore = create<SettingsStore>()(
         toast.success(i18n.t('toast.settingsReset'))
       },
 
-      resetToDefaults: () => {
-        clearAllSiteData()
+      resetToDefaults: async () => {
+        await clearAllSiteData()
         toast.success(i18n.t('toast.settingsReset'))
         if (isElectron()) {
           setTimeout(() => window.api.app.relaunch(), RELOAD_DELAY_MS)

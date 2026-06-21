@@ -427,7 +427,7 @@ export async function deleteSyncCursor(
   ).delete('sync-cursors', createRemoteKey(providerConnectionId, remoteFolderId))
 }
 
-export async function resetSyncDBForTests(): Promise<void> {
+export async function resetSyncDB(): Promise<void> {
   const db = await dbPromise
   db?.close()
   dbPromise = null
@@ -438,3 +438,5 @@ export async function resetSyncDBForTests(): Promise<void> {
     request.onblocked = () => reject(new Error('Sync database deletion blocked'))
   })
 }
+
+export const resetSyncDBForTests = resetSyncDB

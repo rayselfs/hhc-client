@@ -35,6 +35,18 @@ function openCredentialDB(): Promise<IDBPDatabase<WebOneDriveCredentialDB>> {
   return dbPromise
 }
 
+export async function resetWebOneDriveCredentialDB(): Promise<void> {
+  const db = await dbPromise
+  db?.close()
+  dbPromise = null
+  await new Promise<void>((resolve, reject) => {
+    const request = indexedDB.deleteDatabase(DB_NAME)
+    request.onsuccess = () => resolve()
+    request.onerror = () => reject(request.error)
+    request.onblocked = () => reject(new Error('OneDrive credential database deletion blocked'))
+  })
+}
+
 export async function saveWebOneDriveCredentials(input: {
   connectionId: string
   accessToken: string

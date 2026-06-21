@@ -260,7 +260,7 @@ export async function deleteCustomCoverOverride(itemId: string): Promise<void> {
   await (await getMediaWorkDB()).delete('custom-cover-overrides', itemId)
 }
 
-export async function resetMediaWorkDBForTests(): Promise<void> {
+export async function resetMediaWorkDB(): Promise<void> {
   const db = await dbPromise
   db?.close()
   dbPromise = null
@@ -271,3 +271,5 @@ export async function resetMediaWorkDBForTests(): Promise<void> {
     request.onblocked = () => reject(new Error('Media work database deletion blocked'))
   })
 }
+
+export const resetMediaWorkDBForTests = resetMediaWorkDB

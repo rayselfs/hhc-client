@@ -1,4 +1,35 @@
-const KNOWN_INDEXED_DBS = ['hhc-bible']
+import { resetBibleDB } from './bible-db'
+import { resetFileExplorerDB } from './file-explorer-db'
+import { resetMediaWorkDB } from './media-work-db'
+import { resetSyncDB } from './sync-db'
+import { resetThumbnailDB } from './thumbnail-db'
+import { resetWebOneDriveCredentialDB } from './onedrive-web-credentials'
+
+const KNOWN_INDEXED_DBS = [
+  'hhc-bible',
+  'hhc-file-explorer',
+  'hhc-media-work',
+  'hhc-sync',
+  'hhc-thumbnails',
+  'libre-presenter-onedrive-web-credentials'
+]
+
+async function deleteIndexedDB(name: string): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const request = indexedDB.deleteDatabase(name)
+    request.onsuccess = () => resolve()
+    request.onerror = () => reject(request.error)
+    request.onblocked = () => reject(new Error(`IndexedDB deletion blocked: ${name}`))
+  })
+}
+
+async function runCleanupTasks(tasks: Promise<void>[]): Promise<void> {
+  const results = await Promise.allSettled(tasks)
+  const failure = results.find(
+    (result): result is PromiseRejectedResult => result.status === 'rejected'
+  )
+  if (failure) throw failure.reason
+}
 
 function clearLocalStorage(): void {
   try {
@@ -16,42 +47,41 @@ function clearSessionStorage(): void {
   }
 }
 
-function clearIndexedDB(): void {
+async function clearIndexedDB(): Promise<void> {
   if (typeof indexedDB === 'undefined') return
 
+  await runCleanupTasks([
+    resetBibleDB(),
+    resetFileExplorerDB(),
+    resetMediaWorkDB(),
+    resetSyncDB(),
+    resetThumbnailDB(),
+    resetWebOneDriveCredentialDB()
+  ])
+
+  let dbNames = KNOWN_INDEXED_DBS
   if (indexedDB.databases) {
-    indexedDB
-      .databases()
-      .then((dbs) => {
-        for (const db of dbs) {
-          if (db.name) indexedDB.deleteDatabase(db.name)
-        }
-      })
-      .catch((e) => {
-        console.warn('[site-data] indexedDB.databases() failed, using fallback:', e)
-        for (const name of KNOWN_INDEXED_DBS) {
-          indexedDB.deleteDatabase(name)
-        }
-      })
-  } else {
-    for (const name of KNOWN_INDEXED_DBS) {
-      indexedDB.deleteDatabase(name)
+    try {
+      const discoveredNames = (await indexedDB.databases())
+        .map((db) => db.name)
+        .filter((name): name is string => Boolean(name))
+      dbNames = Array.from(new Set([...KNOWN_INDEXED_DBS, ...discoveredNames]))
+    } catch (e) {
+      console.warn('[site-data] indexedDB.databases() failed, using fallback:', e)
     }
   }
+
+  await runCleanupTasks(dbNames.map((name) => deleteIndexedDB(name)))
 }
 
-function clearCacheAPI(): void {
+async function clearCacheAPI(): Promise<void> {
   if (typeof caches === 'undefined') return
-  caches
-    .keys()
-    .then((names) => {
-      for (const name of names) {
-        caches.delete(name)
-      }
-    })
-    .catch((e) => {
-      console.warn('[site-data] Failed to clear Cache API:', e)
-    })
+  try {
+    const names = await caches.keys()
+    await runCleanupTasks(names.map((name) => caches.delete(name).then(() => undefined)))
+  } catch (e) {
+    console.warn('[site-data] Failed to clear Cache API:', e)
+  }
 }
 
 function clearCookies(): void {
@@ -67,10 +97,10 @@ function clearCookies(): void {
   }
 }
 
-export function clearAllSiteData(): void {
+export async function clearAllSiteData(): Promise<void> {
   clearLocalStorage()
   clearSessionStorage()
-  clearIndexedDB()
-  clearCacheAPI()
+  await clearIndexedDB()
+  await clearCacheAPI()
   clearCookies()
 }

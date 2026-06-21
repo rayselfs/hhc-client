@@ -75,12 +75,12 @@ export default function GeneralSettings(): React.JSX.Element {
     if (!confirmed) return
     try {
       if (isElectron()) await window.api.app.clearUserData()
+      await resetToDefaults()
     } catch (error) {
-      console.warn('[settings] Failed to clear Electron user data', error)
+      console.warn('[settings] Failed to clear app data', error)
       toast.danger(t('preferences.reset.clearAllDataFailed', 'Unable to clear all app data.'))
       return
     }
-    resetToDefaults()
   }
 
   const handleProjectionDisplayChange = (displayId: string): void => {

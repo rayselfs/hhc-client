@@ -172,7 +172,7 @@ export async function incrementBlobRef(
   await db.put('file-blobs', { ...record, refCount: (record.refCount ?? 1) + 1 })
 }
 
-export async function resetFileExplorerDBForTests(): Promise<void> {
+export async function resetFileExplorerDB(): Promise<void> {
   const db = await fileExplorerDBPromise
   db?.close()
   fileExplorerDBPromise = null
@@ -183,3 +183,5 @@ export async function resetFileExplorerDBForTests(): Promise<void> {
     request.onblocked = () => reject(new Error('File explorer database deletion blocked'))
   })
 }
+
+export const resetFileExplorerDBForTests = resetFileExplorerDB

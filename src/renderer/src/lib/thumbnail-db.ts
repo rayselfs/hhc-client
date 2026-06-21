@@ -257,7 +257,7 @@ export async function deletePdfPageThumbs(blobId: string): Promise<void> {
   )
 }
 
-export async function resetThumbnailDBForTests(): Promise<void> {
+export async function resetThumbnailDB(): Promise<void> {
   const db = await dbPromise
   db?.close()
   dbPromise = null
@@ -268,3 +268,5 @@ export async function resetThumbnailDBForTests(): Promise<void> {
     request.onblocked = () => reject(new Error('Thumbnail database deletion blocked'))
   })
 }
+
+export const resetThumbnailDBForTests = resetThumbnailDB

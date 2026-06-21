@@ -155,27 +155,27 @@ describe('resetSettings', () => {
 })
 
 describe('resetToDefaults', () => {
-  it('calls clearAllSiteData', () => {
-    useSettingsStore.getState().resetToDefaults()
+  it('calls clearAllSiteData', async () => {
+    await useSettingsStore.getState().resetToDefaults()
     expect(clearAllSiteData).toHaveBeenCalledOnce()
   })
 
-  it('shows success toast', () => {
-    useSettingsStore.getState().resetToDefaults()
+  it('shows success toast', async () => {
+    await useSettingsStore.getState().resetToDefaults()
     expect(mockToast.success).toHaveBeenCalledWith('toast.settingsReset')
   })
 
-  it('reloads page after delay (web mode)', () => {
+  it('reloads page after delay (web mode)', async () => {
     vi.useFakeTimers()
     vi.mocked(isElectron).mockReturnValue(false)
-    useSettingsStore.getState().resetToDefaults()
+    await useSettingsStore.getState().resetToDefaults()
     expect(mockReload).not.toHaveBeenCalled()
     vi.advanceTimersByTime(500)
     expect(mockReload).toHaveBeenCalledOnce()
     vi.useRealTimers()
   })
 
-  it('calls app.relaunch after delay (electron mode)', () => {
+  it('calls app.relaunch after delay (electron mode)', async () => {
     vi.useFakeTimers()
     vi.mocked(isElectron).mockReturnValue(true)
     const mockRelaunch = vi.fn()
@@ -183,10 +183,31 @@ describe('resetToDefaults', () => {
       value: { app: { relaunch: mockRelaunch } },
       writable: true
     })
-    useSettingsStore.getState().resetToDefaults()
+    await useSettingsStore.getState().resetToDefaults()
     expect(mockRelaunch).not.toHaveBeenCalled()
     vi.advanceTimersByTime(500)
     expect(mockRelaunch).toHaveBeenCalledOnce()
+    vi.useRealTimers()
+  })
+
+  it('waits for site data cleanup before scheduling reload', async () => {
+    vi.useFakeTimers()
+    vi.mocked(isElectron).mockReturnValue(false)
+    let resolveCleanup!: () => void
+    vi.mocked(clearAllSiteData).mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        resolveCleanup = resolve
+      })
+    )
+
+    const reset = useSettingsStore.getState().resetToDefaults()
+    await vi.advanceTimersByTimeAsync(500)
+    expect(mockReload).not.toHaveBeenCalled()
+
+    resolveCleanup()
+    await reset
+    await vi.advanceTimersByTimeAsync(500)
+    expect(mockReload).toHaveBeenCalledOnce()
     vi.useRealTimers()
   })
 })
@@ -254,8 +275,8 @@ describe('TIMEZONE_OPTIONS', () => {
 })
 
 describe('resetToDefaults toast', () => {
-  it('shows toast.success on settings reset', () => {
-    useSettingsStore.getState().resetToDefaults()
+  it('shows toast.success on settings reset', async () => {
+    await useSettingsStore.getState().resetToDefaults()
     expect(mockToast.success).toHaveBeenCalledWith('toast.settingsReset')
   })
 })
@@ -293,11 +314,11 @@ describe('themePreference', () => {
     expect(useSettingsStore.getState().themePreference).toBe('light')
   })
 
-  it('resetToDefaults calls clearAllSiteData and reloads', () => {
+  it('resetToDefaults calls clearAllSiteData and reloads', async () => {
     vi.useFakeTimers()
     vi.mocked(isElectron).mockReturnValue(false)
     useSettingsStore.getState().setThemePreference('dark')
-    useSettingsStore.getState().resetToDefaults()
+    await useSettingsStore.getState().resetToDefaults()
     expect(clearAllSiteData).toHaveBeenCalled()
     vi.advanceTimersByTime(500)
     expect(mockReload).toHaveBeenCalled()
