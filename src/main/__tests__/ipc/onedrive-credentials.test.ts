@@ -227,6 +227,33 @@ describe('OneDrive credential IPC', () => {
     )
   })
 
+  it('exchanges an auth code through main-process net.fetch', async () => {
+    const result = (await getHandler('onedrive:exchange-auth-code')(makeEvent(), {
+      clientId: '4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02',
+      redirectUri: 'http://localhost:49152/onedrive-callback',
+      code: 'code-1',
+      codeVerifier: 'verifier-1'
+    })) as { accessToken: string; refreshToken: string; expiresIn?: number; tokenType?: 'Bearer' }
+
+    expect(result).toMatchObject({
+      accessToken: 'new-access-token',
+      refreshToken: 'new-refresh-token',
+      expiresIn: 3600,
+      tokenType: 'Bearer'
+    })
+
+    const [, init] = mockNetFetch.mock.calls[0]
+    expect(mockNetFetch.mock.calls[0][0]).toBe(
+      'https://login.microsoftonline.com/common/oauth2/v2.0/token'
+    )
+    expect(init.method).toBe('POST')
+    expect(init.body).toBeInstanceOf(URLSearchParams)
+    expect(init.body.get('grant_type')).toBe('authorization_code')
+    expect(init.body.get('redirect_uri')).toBe('http://localhost:49152/onedrive-callback')
+    expect(init.body.get('code')).toBe('code-1')
+    expect(init.body.get('code_verifier')).toBe('verifier-1')
+  })
+
   it('rejects access token refresh when credential is missing', async () => {
     await expect(
       getHandler('onedrive:get-access-token')(makeEvent(), {

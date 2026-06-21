@@ -19,6 +19,8 @@ import type {
   LocalSyncRemoteItem,
   OneDriveAccessTokenRequest,
   OneDriveAccessTokenResult,
+  OneDriveAuthCodeExchangeRequest,
+  OneDriveAuthCodeExchangeResult,
   OneDriveCredentialInput,
   OneDriveCredentialStatus,
   OneDriveAuthCallbackSession,
@@ -124,6 +126,9 @@ interface OneDriveAPI {
   saveCredentials: (input: OneDriveCredentialInput) => Promise<OneDriveCredentialStatus>
   getCredentialStatus: (connectionId: string) => Promise<OneDriveCredentialStatus>
   getAccessToken: (request: OneDriveAccessTokenRequest) => Promise<OneDriveAccessTokenResult>
+  exchangeAuthCode: (
+    request: OneDriveAuthCodeExchangeRequest
+  ) => Promise<OneDriveAuthCodeExchangeResult>
   deleteCredentials: (connectionId: string) => Promise<void>
   startAuthCallback: () => Promise<OneDriveAuthCallbackSession>
   waitAuthCallback: (callbackId: string) => Promise<string | null>

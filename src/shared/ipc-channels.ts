@@ -140,6 +140,21 @@ export interface OneDriveAccessTokenResult {
   tokenType?: 'Bearer'
 }
 
+export interface OneDriveAuthCodeExchangeRequest {
+  clientId: string
+  redirectUri: string
+  code: string
+  codeVerifier: string
+}
+
+export interface OneDriveAuthCodeExchangeResult {
+  accessToken: string
+  refreshToken: string
+  expiresIn?: number
+  scope?: string
+  tokenType?: 'Bearer'
+}
+
 export interface OneDriveNativeDownloadRequest {
   remoteItemId: string
   targetFileId: string
@@ -225,6 +240,10 @@ export interface IpcInvokeMap {
   'onedrive:get-access-token': {
     args: [OneDriveAccessTokenRequest]
     result: OneDriveAccessTokenResult
+  }
+  'onedrive:exchange-auth-code': {
+    args: [OneDriveAuthCodeExchangeRequest]
+    result: OneDriveAuthCodeExchangeResult
   }
   'onedrive:delete-credentials': { args: [string]; result: void }
   'onedrive:start-auth-callback': { args: []; result: OneDriveAuthCallbackSession }

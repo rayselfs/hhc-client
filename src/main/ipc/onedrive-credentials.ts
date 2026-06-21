@@ -6,6 +6,8 @@ import { join } from 'path'
 import type {
   OneDriveAccessTokenRequest,
   OneDriveAccessTokenResult,
+  OneDriveAuthCodeExchangeRequest,
+  OneDriveAuthCodeExchangeResult,
   OneDriveAuthCallbackSession,
   OneDriveCredentialStatus
 } from '@shared/ipc-channels'
@@ -171,6 +173,28 @@ function normalizeAccessTokenRequest(input: unknown): OneDriveAccessTokenRequest
   }
 }
 
+function normalizeAuthCodeExchangeRequest(input: unknown): OneDriveAuthCodeExchangeRequest {
+  if (typeof input !== 'object' || input === null) {
+    throw new Error('Invalid OneDrive auth code exchange request')
+  }
+  const value = input as Record<string, unknown>
+  if (typeof value.redirectUri !== 'string' || !value.redirectUri.startsWith('http://localhost:')) {
+    throw new Error('Invalid OneDrive redirect URI')
+  }
+  if (typeof value.code !== 'string' || value.code.trim().length === 0) {
+    throw new Error('Invalid OneDrive auth code')
+  }
+  if (typeof value.codeVerifier !== 'string' || value.codeVerifier.trim().length === 0) {
+    throw new Error('Invalid OneDrive code verifier')
+  }
+  return {
+    clientId: validateClientId(value.clientId),
+    redirectUri: value.redirectUri,
+    code: value.code,
+    codeVerifier: value.codeVerifier
+  }
+}
+
 function normalizeTokenResponse(input: unknown): {
   accessToken: string
   refreshToken?: string
@@ -243,6 +267,37 @@ async function writeCredential(credential: StoredOneDriveCredential): Promise<vo
   }
 }
 
+async function exchangeAuthCode(
+  request: OneDriveAuthCodeExchangeRequest
+): Promise<OneDriveAuthCodeExchangeResult> {
+  const body = new URLSearchParams()
+  body.set('client_id', request.clientId)
+  body.set('grant_type', 'authorization_code')
+  body.set('code', request.code)
+  body.set('redirect_uri', request.redirectUri)
+  body.set('code_verifier', request.codeVerifier)
+  body.set('scope', 'offline_access User.Read Files.Read')
+
+  const response = await net.fetch(ONEDRIVE_TOKEN_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body
+  })
+  if (!response.ok) throw new Error(`OneDrive token exchange failed: ${response.status}`)
+
+  const token = normalizeTokenResponse(await response.json())
+  if (!token.refreshToken) throw new Error('Invalid OneDrive token response')
+  return {
+    accessToken: token.accessToken,
+    refreshToken: token.refreshToken,
+    expiresIn: token.expiresAt
+      ? Math.max(0, Math.floor((token.expiresAt - Date.now()) / 1000))
+      : undefined,
+    scope: token.scope,
+    tokenType: token.tokenType
+  }
+}
+
 async function refreshAccessToken(
   credential: StoredOneDriveCredential,
   clientId: string
@@ -308,6 +363,14 @@ export function registerOneDriveCredentialHandlers(wm: WindowManager): void {
       const credential = await readCredential(request.connectionId)
       if (!credential) throw new Error('OneDrive credentials not found')
       return refreshAccessToken(credential, request.clientId)
+    }
+  )
+
+  ipcMain.handle(
+    'onedrive:exchange-auth-code',
+    async (event, input: unknown): Promise<OneDriveAuthCodeExchangeResult> => {
+      if (!isMainWindow(wm, event)) throw new Error('Unauthorized OneDrive credential access')
+      return exchangeAuthCode(normalizeAuthCodeExchangeRequest(input))
     }
   )
 

@@ -231,6 +231,12 @@ describe('loginOneDriveAccount', () => {
           waitAuthCallback: vi.fn(
             async () => 'http://localhost:49152/onedrive-callback?code=code-1&state=state-1'
           ),
+          exchangeAuthCode: vi.fn(async () => ({
+            accessToken: 'access-token',
+            refreshToken: 'refresh-token',
+            expiresIn: 3600,
+            tokenType: 'Bearer'
+          })),
           cancelAuthCallback: vi.fn(async () => undefined)
         }
       }
@@ -258,10 +264,13 @@ describe('loginOneDriveAccount', () => {
     ).resolves.toMatchObject({ id: 'onedrive:account-1' })
 
     expect(window.prompt).not.toHaveBeenCalled()
-    expect(fetch).toHaveBeenCalledWith(
-      'https://login.microsoftonline.com/common/oauth2/v2.0/token',
-      expect.any(Object)
-    )
+    expect(window.api.oneDrive.exchangeAuthCode).toHaveBeenCalledWith({
+      clientId: '11111111-2222-3333-4444-555555555555',
+      redirectUri: 'https://login.microsoftonline.com/common/oauth2/nativeclient',
+      code: 'code-1',
+      codeVerifier: 'verifier-1'
+    })
+    expect(fetch).not.toHaveBeenCalled()
   })
 
   it('uses a localhost callback server for the default Electron flow', async () => {
@@ -276,6 +285,13 @@ describe('loginOneDriveAccount', () => {
     expect(window.api.oneDrive.waitAuthCallback).toHaveBeenCalledWith(
       '11111111-1111-4111-8111-111111111111'
     )
+    expect(window.api.oneDrive.exchangeAuthCode).toHaveBeenCalledWith({
+      clientId: '11111111-2222-3333-4444-555555555555',
+      redirectUri: 'http://localhost:49152/onedrive-callback',
+      code: 'code-1',
+      codeVerifier: 'verifier-1'
+    })
+    expect(fetch).not.toHaveBeenCalled()
   })
 
   it('supports Web login with the same callback flow', async () => {

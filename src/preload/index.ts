@@ -142,6 +142,8 @@ const oneDriveApi = {
     typedInvoke('onedrive:get-credential-status', connectionId),
   getAccessToken: (request: IpcInvokeMap['onedrive:get-access-token']['args'][0]) =>
     typedInvoke('onedrive:get-access-token', request),
+  exchangeAuthCode: (request: IpcInvokeMap['onedrive:exchange-auth-code']['args'][0]) =>
+    typedInvoke('onedrive:exchange-auth-code', request),
   deleteCredentials: (connectionId: string) =>
     typedInvoke('onedrive:delete-credentials', connectionId),
   startAuthCallback: () => typedInvoke('onedrive:start-auth-callback'),

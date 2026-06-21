@@ -11,6 +11,7 @@ import { storeOneDriveProviderConnection, type OneDriveAccountProfile } from './
 interface OneDriveProviderOptions {
   getAccessToken: () => Promise<string>
   fetchImpl?: typeof fetch
+  fetchContentBeforeSave?: boolean
   saveDownloadedContent: (
     request: SyncDownloadRequest,
     response: Response,
@@ -89,11 +90,13 @@ export class OneDriveReadonlyProvider implements ReadOnlySyncProvider {
 
   private readonly getAccessToken: () => Promise<string>
   private readonly fetchImpl: typeof fetch
+  private readonly fetchContentBeforeSave: boolean
   private readonly saveDownloadedContent: OneDriveProviderOptions['saveDownloadedContent']
 
   constructor(options: OneDriveProviderOptions) {
     this.getAccessToken = options.getAccessToken
-    this.fetchImpl = options.fetchImpl ?? fetch
+    this.fetchImpl = options.fetchImpl ?? ((...args) => window.fetch(...args))
+    this.fetchContentBeforeSave = options.fetchContentBeforeSave ?? true
     this.saveDownloadedContent = options.saveDownloadedContent
   }
 
@@ -163,6 +166,10 @@ export class OneDriveReadonlyProvider implements ReadOnlySyncProvider {
     signal: AbortSignal
   ): Promise<SyncDownloadResult> {
     const metadata = await this.getMetadata(request.providerConnectionId, request.remoteItemId)
+    if (!this.fetchContentBeforeSave) {
+      return this.saveDownloadedContent(request, new Response(null, { status: 204 }), metadata)
+    }
+
     const response = await this.request(
       `/me/drive/items/${encodeGraphPathSegment(request.remoteItemId)}/content`,
       { signal }

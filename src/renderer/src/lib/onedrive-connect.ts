@@ -288,6 +288,17 @@ async function exchangeToken(input: {
   code: string
   codeVerifier: string
 }): Promise<TokenResponse> {
+  if (isElectron()) {
+    const token = await window.api.oneDrive.exchangeAuthCode(input)
+    return {
+      access_token: token.accessToken,
+      refresh_token: token.refreshToken,
+      expires_in: token.expiresIn,
+      scope: token.scope,
+      token_type: token.tokenType
+    }
+  }
+
   const response = await fetch(ONEDRIVE_TOKEN_ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -373,7 +384,8 @@ function createStoredOneDriveProvider(connectionId: string): OneDriveReadonlyPro
     saveDownloadedContent: (downloadRequest, _response, metadata) =>
       isElectron()
         ? saveElectronOneDriveDownloadedContent(downloadRequest, clientId, metadata)
-        : saveWebOneDriveDownloadedContent(downloadRequest, _response, metadata)
+        : saveWebOneDriveDownloadedContent(downloadRequest, _response, metadata),
+    fetchContentBeforeSave: !isElectron()
   })
 }
 
@@ -447,7 +459,8 @@ export async function loginOneDriveAccount(options?: {
     saveDownloadedContent: (downloadRequest, _response, metadata) =>
       isElectron()
         ? saveElectronOneDriveDownloadedContent(downloadRequest, request.clientId, metadata)
-        : saveWebOneDriveDownloadedContent(downloadRequest, _response, metadata)
+        : saveWebOneDriveDownloadedContent(downloadRequest, _response, metadata),
+    fetchContentBeforeSave: !isElectron()
   })
 
   const connection = await provider.connect()

@@ -87,7 +87,11 @@ export default function MediaSettings({
               error.message === 'OneDrive connection is currently available in the desktop app only'
             ? 'desktopOnly'
             : 'connectFailed'
-      toast.danger(t(`preferences.media.oneDrive.${message}`))
+      toast.danger(
+        message === 'connectFailed' && error instanceof Error
+          ? error.message
+          : t(`preferences.media.oneDrive.${message}`)
+      )
     } finally {
       setOneDriveConnectionBusy(false)
     }

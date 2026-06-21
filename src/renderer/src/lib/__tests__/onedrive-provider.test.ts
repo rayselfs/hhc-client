@@ -260,6 +260,47 @@ describe('OneDriveReadonlyProvider', () => {
     )
   })
 
+  it('can leave content downloading to the injected storage callback', async () => {
+    fetchImpl.mockResolvedValueOnce(
+      jsonResponse({
+        id: 'file-1',
+        name: 'image.png',
+        file: { mimeType: 'image/png' },
+        parentReference: { id: 'root' },
+        size: 1024
+      })
+    )
+
+    const provider = new OneDriveReadonlyProvider({
+      getAccessToken,
+      fetchImpl,
+      fetchContentBeforeSave: false,
+      saveDownloadedContent
+    })
+    const request = {
+      providerConnectionId: 'connection-1',
+      remoteItemId: 'file-1',
+      targetBlobId: 'target-blob',
+      offlinePolicy: 'always-offline' as const
+    }
+
+    await expect(provider.downloadContent(request, new AbortController().signal)).resolves.toEqual({
+      blobId: 'target-blob',
+      size: 1024,
+      mimeType: 'video/mp4'
+    })
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+    expect(fetchImpl).toHaveBeenCalledWith(
+      'https://graph.microsoft.com/v1.0/me/drive/items/file-1',
+      expect.any(Object)
+    )
+    expect(saveDownloadedContent).toHaveBeenCalledWith(
+      request,
+      expect.objectContaining({ status: 204 }),
+      expect.objectContaining({ remoteItemId: 'file-1', mimeType: 'image/png' })
+    )
+  })
+
   it('classifies auth, retryable, offline, and fatal errors', () => {
     const provider = createProvider()
 
