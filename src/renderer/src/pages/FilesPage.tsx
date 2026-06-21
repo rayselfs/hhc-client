@@ -16,8 +16,7 @@ import {
 import { getUploadMediaPlatform, uploadFiles, uploadFolderFiles } from '@renderer/lib/upload-utils'
 import { RefreshCw, Unlink } from 'lucide-react'
 import { connectLocalSyncFolder, refreshLocalSyncConnection } from '@renderer/lib/local-sync-import'
-import { getCloudProviderAdapter } from '@renderer/lib/cloud-provider'
-import type { OneDriveRemoteFolder } from '@renderer/lib/onedrive-connect'
+import { getCloudProviderAdapter, type CloudRemoteFolder } from '@renderer/lib/cloud-provider'
 import { unlinkSyncRootFolderFromApp } from '@renderer/lib/sync-unlink'
 import { isElectron } from '@renderer/lib/env'
 import {
@@ -166,7 +165,7 @@ export default function FilesPage(): React.JSX.Element {
   }, [hasOneDriveConnection, t])
 
   const handleImportOneDriveFolder = useCallback(
-    async (folder: OneDriveRemoteFolder): Promise<void> => {
+    async (folder: CloudRemoteFolder): Promise<void> => {
       setIsOneDriveImporting(true)
       try {
         const result = await ONE_DRIVE_PROVIDER.importFolder(folder)

@@ -58,6 +58,11 @@ vi.mock('../sync-db', () => ({
   })),
   listProviderConnectionsByType: vi.fn(async () => []),
   listSyncEntriesByProviderConnection: vi.fn(async () => []),
+  putProviderConnection: vi.fn(async (record) => ({
+    ...record,
+    createdAt: 1,
+    updatedAt: 1
+  })),
   putSyncCursor: vi.fn(async () => undefined),
   putSyncEntry: vi.fn(async () => undefined)
 }))
@@ -222,7 +227,6 @@ describe('loginOneDriveAccount', () => {
       configurable: true,
       value: {
         oneDrive: {
-          saveCredentials: vi.fn(async () => ({ exists: true })),
           deleteCredentials: vi.fn(async () => undefined),
           startAuthCallback: vi.fn(async () => ({
             callbackId: '11111111-1111-4111-8111-111111111111',
@@ -231,11 +235,11 @@ describe('loginOneDriveAccount', () => {
           waitAuthCallback: vi.fn(
             async () => 'http://localhost:49152/onedrive-callback?code=code-1&state=state-1'
           ),
-          exchangeAuthCode: vi.fn(async () => ({
-            accessToken: 'access-token',
-            refreshToken: 'refresh-token',
-            expiresIn: 3600,
-            tokenType: 'Bearer'
+          completeAuth: vi.fn(async () => ({
+            id: 'onedrive:account-1',
+            providerType: 'onedrive',
+            displayName: 'OneDrive - Alice',
+            accountLabel: 'alice@example.com'
           })),
           cancelAuthCallback: vi.fn(async () => undefined)
         }
@@ -253,26 +257,6 @@ describe('loginOneDriveAccount', () => {
     )
   })
 
-  it('uses an app-provided callback URL instead of window.prompt in Electron', async () => {
-    const callbackUrl =
-      'https://login.microsoftonline.com/common/oauth2/nativeclient?code=code-1&state=state-1'
-
-    await expect(
-      loginOneDriveAccount({
-        requestCallbackUrl: vi.fn(async () => callbackUrl)
-      })
-    ).resolves.toMatchObject({ id: 'onedrive:account-1' })
-
-    expect(window.prompt).not.toHaveBeenCalled()
-    expect(window.api.oneDrive.exchangeAuthCode).toHaveBeenCalledWith({
-      clientId: '11111111-2222-3333-4444-555555555555',
-      redirectUri: 'https://login.microsoftonline.com/common/oauth2/nativeclient',
-      code: 'code-1',
-      codeVerifier: 'verifier-1'
-    })
-    expect(fetch).not.toHaveBeenCalled()
-  })
-
   it('uses a localhost callback server for the default Electron flow', async () => {
     await expect(loginOneDriveAccount()).resolves.toMatchObject({ id: 'onedrive:account-1' })
 
@@ -285,7 +269,7 @@ describe('loginOneDriveAccount', () => {
     expect(window.api.oneDrive.waitAuthCallback).toHaveBeenCalledWith(
       '11111111-1111-4111-8111-111111111111'
     )
-    expect(window.api.oneDrive.exchangeAuthCode).toHaveBeenCalledWith({
+    expect(window.api.oneDrive.completeAuth).toHaveBeenCalledWith({
       clientId: '11111111-2222-3333-4444-555555555555',
       redirectUri: 'http://localhost:49152/onedrive-callback',
       code: 'code-1',

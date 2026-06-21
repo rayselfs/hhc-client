@@ -3,8 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Button } from '@heroui/react/button'
 import { Modal } from '@heroui/react/modal'
 import { ArrowLeft, ChevronRight, Folder, Loader2 } from 'lucide-react'
-import { getCloudProviderAdapter } from '@renderer/lib/cloud-provider'
-import type { OneDriveRemoteFolder } from '@renderer/lib/onedrive-connect'
+import { getCloudProviderAdapter, type CloudRemoteFolder } from '@renderer/lib/cloud-provider'
 import { ShortcutScope } from '@renderer/contexts/ShortcutScopeContext'
 
 const ONE_DRIVE_PROVIDER = getCloudProviderAdapter('onedrive')
@@ -18,7 +17,7 @@ export interface OneDriveFolderPickerDialogProps {
   isOpen: boolean
   isImporting?: boolean
   onClose: () => void
-  onImport: (folder: OneDriveRemoteFolder) => void
+  onImport: (folder: CloudRemoteFolder) => void
 }
 
 export default function OneDriveFolderPickerDialog({
@@ -31,8 +30,8 @@ export default function OneDriveFolderPickerDialog({
   const [folderStack, setFolderStack] = useState<FolderStackEntry[]>([
     { id: 'root', name: 'OneDrive' }
   ])
-  const [folders, setFolders] = useState<OneDriveRemoteFolder[]>([])
-  const [selectedFolder, setSelectedFolder] = useState<OneDriveRemoteFolder | null>(null)
+  const [folders, setFolders] = useState<CloudRemoteFolder[]>([])
+  const [selectedFolder, setSelectedFolder] = useState<CloudRemoteFolder | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const currentFolder = folderStack[folderStack.length - 1]
@@ -61,7 +60,7 @@ export default function OneDriveFolderPickerDialog({
     void loadFolders('root')
   }, [isOpen, loadFolders])
 
-  function openFolder(folder: OneDriveRemoteFolder): void {
+  function openFolder(folder: CloudRemoteFolder): void {
     setFolderStack((current) => [...current, { id: folder.remoteItemId, name: folder.name }])
     setSelectedFolder(null)
     void loadFolders(folder.remoteItemId)

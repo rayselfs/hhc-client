@@ -20,10 +20,9 @@ import type {
   OneDriveAccessTokenRequest,
   OneDriveAccessTokenResult,
   OneDriveAuthCodeExchangeRequest,
-  OneDriveAuthCodeExchangeResult,
-  OneDriveCredentialInput,
   OneDriveCredentialStatus,
   OneDriveAuthCallbackSession,
+  OneDriveConnectedAccount,
   OneDriveNativeDownloadRequest,
   OneDriveNativeDownloadResult
 } from '../shared/ipc-channels'
@@ -123,12 +122,9 @@ interface LocalSyncAPI {
 }
 
 interface OneDriveAPI {
-  saveCredentials: (input: OneDriveCredentialInput) => Promise<OneDriveCredentialStatus>
   getCredentialStatus: (connectionId: string) => Promise<OneDriveCredentialStatus>
   getAccessToken: (request: OneDriveAccessTokenRequest) => Promise<OneDriveAccessTokenResult>
-  exchangeAuthCode: (
-    request: OneDriveAuthCodeExchangeRequest
-  ) => Promise<OneDriveAuthCodeExchangeResult>
+  completeAuth: (request: OneDriveAuthCodeExchangeRequest) => Promise<OneDriveConnectedAccount>
   deleteCredentials: (connectionId: string) => Promise<void>
   startAuthCallback: () => Promise<OneDriveAuthCallbackSession>
   waitAuthCallback: (callbackId: string) => Promise<string | null>

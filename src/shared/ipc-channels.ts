@@ -113,15 +113,6 @@ export interface LocalSyncWatchStatus {
   updatedAt: number
 }
 
-export interface OneDriveCredentialInput {
-  connectionId: string
-  accessToken?: string
-  refreshToken: string
-  expiresAt?: number
-  scope?: string
-  tokenType?: 'Bearer'
-}
-
 export interface OneDriveCredentialStatus {
   hasRefreshToken: boolean
   expiresAt?: number
@@ -147,12 +138,11 @@ export interface OneDriveAuthCodeExchangeRequest {
   codeVerifier: string
 }
 
-export interface OneDriveAuthCodeExchangeResult {
-  accessToken: string
-  refreshToken: string
-  expiresIn?: number
-  scope?: string
-  tokenType?: 'Bearer'
+export interface OneDriveConnectedAccount {
+  id: string
+  providerType: 'onedrive'
+  displayName: string
+  accountLabel?: string
 }
 
 export interface OneDriveNativeDownloadRequest {
@@ -235,15 +225,14 @@ export interface IpcInvokeMap {
   'local-sync:get-watch-status': { args: [string]; result: LocalSyncWatchStatus }
   'local-sync:stop-watch': { args: [string]; result: LocalSyncWatchStatus }
   'local-sync:disconnect-folder': { args: [string]; result: void }
-  'onedrive:save-credentials': { args: [OneDriveCredentialInput]; result: OneDriveCredentialStatus }
   'onedrive:get-credential-status': { args: [string]; result: OneDriveCredentialStatus }
   'onedrive:get-access-token': {
     args: [OneDriveAccessTokenRequest]
     result: OneDriveAccessTokenResult
   }
-  'onedrive:exchange-auth-code': {
+  'onedrive:complete-auth': {
     args: [OneDriveAuthCodeExchangeRequest]
-    result: OneDriveAuthCodeExchangeResult
+    result: OneDriveConnectedAccount
   }
   'onedrive:delete-credentials': { args: [string]; result: void }
   'onedrive:start-auth-callback': { args: []; result: OneDriveAuthCallbackSession }

@@ -113,40 +113,11 @@ beforeEach(() => {
 })
 
 describe('OneDrive credential IPC', () => {
-  it('saves encrypted credentials and returns only status', async () => {
-    const result = await getHandler('onedrive:save-credentials')(makeEvent(), {
-      connectionId: 'onedrive:account-1',
-      accessToken: 'access-token',
-      refreshToken: 'refresh-token',
-      expiresAt: 1000,
-      scope: 'offline_access User.Read Files.Read',
-      tokenType: 'Bearer'
-    })
-
-    expect(result).toEqual({
-      hasRefreshToken: true,
-      expiresAt: 1000,
-      scope: 'offline_access User.Read Files.Read'
-    })
-    expect(JSON.stringify(result)).not.toContain('refresh-token')
-    expect(mockWriteFile).toHaveBeenCalledWith(
-      expect.stringContaining('onedrive%3Aaccount-1.enc.'),
-      expect.any(Buffer)
-    )
-    expect(mockRename).toHaveBeenCalledWith(
-      expect.stringContaining('onedrive%3Aaccount-1.enc.'),
-      '/tmp/hhc-user-data/onedrive-credentials/onedrive%3Aaccount-1.enc'
-    )
-  })
-
   it('rejects non-main window access', async () => {
     vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockProjectionWindow as never)
 
     await expect(
-      getHandler('onedrive:save-credentials')(makeEvent(), {
-        connectionId: 'onedrive:account-1',
-        refreshToken: 'refresh-token'
-      })
+      getHandler('onedrive:get-credential-status')(makeEvent(), 'onedrive:account-1')
     ).rejects.toThrow('Unauthorized OneDrive credential access')
   })
 
@@ -227,20 +198,51 @@ describe('OneDrive credential IPC', () => {
     )
   })
 
-  it('exchanges an auth code through main-process net.fetch', async () => {
-    const result = (await getHandler('onedrive:exchange-auth-code')(makeEvent(), {
+  it('completes auth in main without returning token material', async () => {
+    mockNetFetch
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            access_token: 'new-access-token',
+            refresh_token: 'new-refresh-token',
+            expires_in: 3600,
+            scope: 'offline_access User.Read Files.Read',
+            token_type: 'Bearer'
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            id: 'account-1',
+            displayName: 'Alice',
+            userPrincipalName: 'alice@example.com'
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      )
+
+    const result = (await getHandler('onedrive:complete-auth')(makeEvent(), {
       clientId: '4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02',
       redirectUri: 'http://localhost:49152/onedrive-callback',
       code: 'code-1',
       codeVerifier: 'verifier-1'
-    })) as { accessToken: string; refreshToken: string; expiresIn?: number; tokenType?: 'Bearer' }
+    })) as {
+      id: string
+      providerType: 'onedrive'
+      displayName: string
+      accountLabel?: string
+    }
 
     expect(result).toMatchObject({
-      accessToken: 'new-access-token',
-      refreshToken: 'new-refresh-token',
-      expiresIn: 3600,
-      tokenType: 'Bearer'
+      id: 'onedrive:account-1',
+      providerType: 'onedrive',
+      displayName: 'OneDrive - Alice',
+      accountLabel: 'alice@example.com'
     })
+    expect(JSON.stringify(result)).not.toContain('new-access-token')
+    expect(JSON.stringify(result)).not.toContain('new-refresh-token')
 
     const [, init] = mockNetFetch.mock.calls[0]
     expect(mockNetFetch.mock.calls[0][0]).toBe(
@@ -252,6 +254,11 @@ describe('OneDrive credential IPC', () => {
     expect(init.body.get('redirect_uri')).toBe('http://localhost:49152/onedrive-callback')
     expect(init.body.get('code')).toBe('code-1')
     expect(init.body.get('code_verifier')).toBe('verifier-1')
+    expect(mockNetFetch.mock.calls[1][0]).toBe('https://graph.microsoft.com/v1.0/me')
+    expect(mockWriteFile).toHaveBeenCalledWith(
+      expect.stringContaining('onedrive%3Aaccount-1.enc.'),
+      expect.any(Buffer)
+    )
   })
 
   it('rejects access token refresh when credential is missing', async () => {

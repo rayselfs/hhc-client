@@ -17,6 +17,7 @@ import {
   deleteProviderConnection,
   getProviderConnection,
   listSyncEntriesByProviderConnection,
+  putProviderConnection,
   putSyncCursor,
   putSyncEntry,
   type ProviderConnectionRecord,
@@ -38,7 +39,6 @@ import { refreshImportedMediaAssets } from './local-sync-import'
 import { isIgnoredSystemPath } from '@shared/file-ignore-policy'
 import i18n from '@renderer/i18n'
 
-const ONEDRIVE_NATIVE_REDIRECT_URI = 'https://login.microsoftonline.com/common/oauth2/nativeclient'
 const ONEDRIVE_WEB_CALLBACK_PATH = '/onedrive-callback.html'
 
 interface TokenResponse {
@@ -282,23 +282,12 @@ export function buildOneDriveImportPlan(input: {
   return { folders, items, syncEntries, downloadableItems, disabledCount }
 }
 
-async function exchangeToken(input: {
+async function exchangeWebToken(input: {
   clientId: string
   redirectUri: string
   code: string
   codeVerifier: string
 }): Promise<TokenResponse> {
-  if (isElectron()) {
-    const token = await window.api.oneDrive.exchangeAuthCode(input)
-    return {
-      access_token: token.accessToken,
-      refresh_token: token.refreshToken,
-      expires_in: token.expiresIn,
-      scope: token.scope,
-      token_type: token.tokenType
-    }
-  }
-
   const response = await fetch(ONEDRIVE_TOKEN_ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -326,9 +315,7 @@ async function saveImportedRecords(
 }
 
 function getOneDriveRedirectUri(): string {
-  return isElectron()
-    ? ONEDRIVE_NATIVE_REDIRECT_URI
-    : `${window.location.origin}${ONEDRIVE_WEB_CALLBACK_PATH}`
+  return `${window.location.origin}${ONEDRIVE_WEB_CALLBACK_PATH}`
 }
 
 function getOneDriveMediaPlatform(): MediaPlatform {
@@ -426,10 +413,8 @@ export async function loginOneDriveAccount(options?: {
 
   const oneDriveSettings = useSettingsStore.getState().oneDrive
   const clientId = getEffectiveOneDriveClientId(oneDriveSettings)
-  const authCallback =
-    isElectron() && !options?.requestCallbackUrl
-      ? await window.api.oneDrive.startAuthCallback()
-      : null
+  const electronMode = isElectron()
+  const authCallback = electronMode ? await window.api.oneDrive.startAuthCallback() : null
   const request = await createOneDriveAuthRequest({
     clientId,
     redirectUri: authCallback?.redirectUri ?? getOneDriveRedirectUri(),
@@ -448,7 +433,36 @@ export async function loginOneDriveAccount(options?: {
   if (!callbackUrl) return null
 
   const callback = parseOneDriveAuthCallback(callbackUrl, request.state)
-  const token = await exchangeToken({
+  if (electronMode) {
+    let connectionIdToDelete: string | null = null
+    try {
+      if (!window.api?.oneDrive) throw new Error('OneDrive desktop API is not available')
+      const connectedAccount = await window.api.oneDrive.completeAuth({
+        clientId: request.clientId,
+        redirectUri: request.redirectUri,
+        code: callback.code,
+        codeVerifier: request.codeVerifier
+      })
+      connectionIdToDelete = connectedAccount.id
+      const latestConnections = await listProviderConnectionsByType('onedrive')
+      if (latestConnections.some((connection) => connection.id !== connectedAccount.id)) {
+        throw new Error('Only one OneDrive account can be connected')
+      }
+      return putProviderConnection({
+        id: connectedAccount.id,
+        providerType: connectedAccount.providerType,
+        displayName: connectedAccount.displayName,
+        accountLabel: connectedAccount.accountLabel
+      })
+    } catch (error) {
+      if (connectionIdToDelete) {
+        await window.api.oneDrive.deleteCredentials(connectionIdToDelete).catch(() => undefined)
+      }
+      throw error
+    }
+  }
+
+  const token = await exchangeWebToken({
     clientId: request.clientId,
     redirectUri: request.redirectUri,
     code: callback.code,
@@ -457,10 +471,8 @@ export async function loginOneDriveAccount(options?: {
   const provider = new OneDriveReadonlyProvider({
     getAccessToken: async () => token.access_token,
     saveDownloadedContent: (downloadRequest, _response, metadata) =>
-      isElectron()
-        ? saveElectronOneDriveDownloadedContent(downloadRequest, request.clientId, metadata)
-        : saveWebOneDriveDownloadedContent(downloadRequest, _response, metadata),
-    fetchContentBeforeSave: !isElectron()
+      saveWebOneDriveDownloadedContent(downloadRequest, _response, metadata),
+    fetchContentBeforeSave: true
   })
 
   const connection = await provider.connect()
@@ -476,19 +488,10 @@ export async function loginOneDriveAccount(options?: {
       scope: token.scope,
       tokenType: token.token_type
     }
-    if (isElectron()) {
-      if (!window.api?.oneDrive) throw new Error('OneDrive desktop API is not available')
-      await window.api.oneDrive.saveCredentials(credentials)
-    } else {
-      await saveWebOneDriveCredentials(credentials)
-    }
+    await saveWebOneDriveCredentials(credentials)
     return (await getProviderConnection(connection.id)) ?? null
   } catch (error) {
-    if (isElectron()) {
-      await window.api?.oneDrive?.deleteCredentials(connection.id).catch(() => undefined)
-    } else {
-      await deleteWebOneDriveCredentials(connection.id).catch(() => undefined)
-    }
+    await deleteWebOneDriveCredentials(connection.id).catch(() => undefined)
     await deleteProviderConnection(connection.id).catch(() => undefined)
     throw error
   }
@@ -547,6 +550,7 @@ export async function importOneDriveFolder(
   }
 
   let downloadedCount = 0
+  const downloadedItemIds: string[] = []
   if (defaultSyncOfflinePolicy === 'always-offline') {
     const remoteById = new Map(remoteItems.map((item) => [item.remoteItemId, item]))
     for (const item of plan.downloadableItems) {
@@ -561,6 +565,7 @@ export async function importOneDriveFolder(
           new AbortController().signal
         )
         downloadedCount++
+        downloadedItemIds.push(item.itemId)
       } catch (error) {
         console.warn('[onedrive] Failed to download file for offline use', {
           connectionId: connection.id,
@@ -589,6 +594,11 @@ export async function importOneDriveFolder(
   }
 
   mergeImportedRecordsIntoStore(plan.folders, plan.items)
+  if (downloadedItemIds.length > 0) {
+    void refreshImportedMediaAssets(
+      plan.items.filter((item) => downloadedItemIds.includes(item.id))
+    )
+  }
   if (plan.disabledCount > 0) {
     toast.warning(
       i18n.t('fileExplorer.syncSources.unsupportedFiles', { count: plan.disabledCount })

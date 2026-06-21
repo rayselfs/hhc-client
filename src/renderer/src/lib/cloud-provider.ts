@@ -3,20 +3,43 @@ import {
   getConnectedOneDriveAccount,
   importOneDriveFolder,
   listOneDriveFolders,
-  refreshOneDriveFolder,
-  type OneDriveConnectResult,
-  type OneDriveRefreshSummary,
-  type OneDriveRemoteFolder
+  refreshOneDriveFolder
 } from './onedrive-connect'
 
 export type CloudProviderId = 'onedrive'
 
+export interface CloudRemoteFolder {
+  remoteItemId: string
+  name: string
+  parentRemoteItemId: string | null
+}
+
+export interface CloudImportResult {
+  connectionId: string
+  displayName: string
+  folderCount: number
+  itemCount: number
+  downloadedCount: number
+  disabledCount: number
+}
+
+export interface CloudRefreshSummary {
+  connectionId: string
+  rootFolderId: string
+  updatedItemCount: number
+  removedItemCount: number
+  removedFolderCount: number
+  downloadedCount: number
+  failedFileCount: number
+  disabledFileCount: number
+}
+
 export interface CloudProviderAdapter {
   id: CloudProviderId
   getConnectedAccount(): Promise<ProviderConnectionRecord | null>
-  listFolders(parentRemoteFolderId?: string): Promise<OneDriveRemoteFolder[]>
-  importFolder(folder: OneDriveRemoteFolder): Promise<OneDriveConnectResult>
-  refreshFolder(rootFolderId: string): Promise<OneDriveRefreshSummary>
+  listFolders(parentRemoteFolderId?: string): Promise<CloudRemoteFolder[]>
+  importFolder(folder: CloudRemoteFolder): Promise<CloudImportResult>
+  refreshFolder(rootFolderId: string): Promise<CloudRefreshSummary>
 }
 
 const ONEDRIVE_ADAPTER: CloudProviderAdapter = {

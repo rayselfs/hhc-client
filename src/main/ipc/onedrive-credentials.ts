@@ -7,8 +7,8 @@ import type {
   OneDriveAccessTokenRequest,
   OneDriveAccessTokenResult,
   OneDriveAuthCodeExchangeRequest,
-  OneDriveAuthCodeExchangeResult,
   OneDriveAuthCallbackSession,
+  OneDriveConnectedAccount,
   OneDriveCredentialStatus
 } from '@shared/ipc-channels'
 import type { WindowManager } from '../windowManager'
@@ -27,8 +27,16 @@ interface StoredOneDriveCredential {
 const CONNECTION_ID_PATTERN = /^onedrive:[A-Za-z0-9._~-]{1,160}$/
 const CLIENT_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const ONEDRIVE_TOKEN_ENDPOINT = 'https://login.microsoftonline.com/common/oauth2/v2.0/token'
+const MICROSOFT_GRAPH_ME_ENDPOINT = 'https://graph.microsoft.com/v1.0/me'
 const ONEDRIVE_CALLBACK_PATH = '/onedrive-callback'
 const AUTH_CALLBACK_TIMEOUT_MS = 5 * 60_000
+
+interface OneDriveAccountProfile {
+  id?: unknown
+  displayName?: unknown
+  userPrincipalName?: unknown
+  mail?: unknown
+}
 
 interface AuthCallbackState {
   server: Server
@@ -267,9 +275,13 @@ async function writeCredential(credential: StoredOneDriveCredential): Promise<vo
   }
 }
 
-async function exchangeAuthCode(
-  request: OneDriveAuthCodeExchangeRequest
-): Promise<OneDriveAuthCodeExchangeResult> {
+async function exchangeAuthCode(request: OneDriveAuthCodeExchangeRequest): Promise<{
+  accessToken: string
+  refreshToken: string
+  expiresAt?: number
+  scope?: string
+  tokenType?: 'Bearer'
+}> {
   const body = new URLSearchParams()
   body.set('client_id', request.clientId)
   body.set('grant_type', 'authorization_code')
@@ -290,12 +302,54 @@ async function exchangeAuthCode(
   return {
     accessToken: token.accessToken,
     refreshToken: token.refreshToken,
-    expiresIn: token.expiresAt
-      ? Math.max(0, Math.floor((token.expiresAt - Date.now()) / 1000))
-      : undefined,
+    expiresAt: token.expiresAt,
     scope: token.scope,
     tokenType: token.tokenType
   }
+}
+
+function normalizeAccountProfile(input: OneDriveAccountProfile): OneDriveConnectedAccount {
+  if (typeof input.id !== 'string' || input.id.trim().length === 0) {
+    throw new Error('Invalid OneDrive account profile')
+  }
+  const displayName = typeof input.displayName === 'string' ? input.displayName.trim() : ''
+  const userPrincipalName =
+    typeof input.userPrincipalName === 'string' ? input.userPrincipalName.trim() : ''
+  const mail = typeof input.mail === 'string' ? input.mail.trim() : ''
+  const accountLabel = userPrincipalName || mail || displayName || undefined
+
+  return {
+    id: `onedrive:${input.id.trim()}`,
+    providerType: 'onedrive',
+    displayName: displayName ? `OneDrive - ${displayName}` : 'OneDrive',
+    accountLabel
+  }
+}
+
+async function fetchConnectedAccount(accessToken: string): Promise<OneDriveConnectedAccount> {
+  const response = await net.fetch(MICROSOFT_GRAPH_ME_ENDPOINT, {
+    headers: { Authorization: `Bearer ${accessToken}` }
+  })
+  if (!response.ok) throw new Error(`OneDrive profile fetch failed: ${response.status}`)
+  return normalizeAccountProfile((await response.json()) as OneDriveAccountProfile)
+}
+
+async function completeAuth(
+  request: OneDriveAuthCodeExchangeRequest
+): Promise<OneDriveConnectedAccount> {
+  const token = await exchangeAuthCode(request)
+  const account = await fetchConnectedAccount(token.accessToken)
+  const connectionId = validateConnectionId(account.id)
+  await writeCredential({
+    connectionId,
+    accessToken: token.accessToken,
+    refreshToken: token.refreshToken,
+    expiresAt: token.expiresAt,
+    scope: token.scope,
+    tokenType: token.tokenType,
+    updatedAt: Date.now()
+  })
+  return account
 }
 
 async function refreshAccessToken(
@@ -337,16 +391,6 @@ async function refreshAccessToken(
 
 export function registerOneDriveCredentialHandlers(wm: WindowManager): void {
   ipcMain.handle(
-    'onedrive:save-credentials',
-    async (event, input: unknown): Promise<OneDriveCredentialStatus> => {
-      if (!isMainWindow(wm, event)) throw new Error('Unauthorized OneDrive credential access')
-      const credential = normalizeCredential(input)
-      await writeCredential(credential)
-      return toStatus(credential)
-    }
-  )
-
-  ipcMain.handle(
     'onedrive:get-credential-status',
     async (event, connectionId: unknown): Promise<OneDriveCredentialStatus> => {
       if (!isMainWindow(wm, event)) throw new Error('Unauthorized OneDrive credential access')
@@ -367,10 +411,10 @@ export function registerOneDriveCredentialHandlers(wm: WindowManager): void {
   )
 
   ipcMain.handle(
-    'onedrive:exchange-auth-code',
-    async (event, input: unknown): Promise<OneDriveAuthCodeExchangeResult> => {
+    'onedrive:complete-auth',
+    async (event, input: unknown): Promise<OneDriveConnectedAccount> => {
       if (!isMainWindow(wm, event)) throw new Error('Unauthorized OneDrive credential access')
-      return exchangeAuthCode(normalizeAuthCodeExchangeRequest(input))
+      return completeAuth(normalizeAuthCodeExchangeRequest(input))
     }
   )
 
