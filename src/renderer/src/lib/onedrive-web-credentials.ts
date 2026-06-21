@@ -1,8 +1,5 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
-import {
-  createOneDriveRefreshTokenBody,
-  ONEDRIVE_TOKEN_ENDPOINT
-} from './onedrive-auth'
+import { createOneDriveRefreshTokenBody, ONEDRIVE_TOKEN_ENDPOINT } from './onedrive-auth'
 
 interface WebOneDriveCredentialRecord {
   connectionId: string

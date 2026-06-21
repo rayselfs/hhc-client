@@ -263,15 +263,9 @@ export default function MediaSettings({
                 placeholder={t('preferences.media.oneDrive.callbackUrlPlaceholder')}
                 className="w-full rounded-full border border-default-200 bg-transparent px-4 py-2 text-sm"
               />
-              <p className="text-xs text-muted">
-                {t('preferences.media.oneDrive.callbackPrompt')}
-              </p>
+              <p className="text-xs text-muted">{t('preferences.media.oneDrive.callbackPrompt')}</p>
               <div className="flex justify-end gap-2">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onPress={() => resolveOneDriveCallback(null)}
-                >
+                <Button size="sm" variant="ghost" onPress={() => resolveOneDriveCallback(null)}>
                   {t('common.cancel')}
                 </Button>
                 <Button

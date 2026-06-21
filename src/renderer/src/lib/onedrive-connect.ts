@@ -315,7 +315,9 @@ async function saveImportedRecords(
 }
 
 function getOneDriveRedirectUri(): string {
-  return isElectron() ? ONEDRIVE_NATIVE_REDIRECT_URI : `${window.location.origin}${ONEDRIVE_WEB_CALLBACK_PATH}`
+  return isElectron()
+    ? ONEDRIVE_NATIVE_REDIRECT_URI
+    : `${window.location.origin}${ONEDRIVE_WEB_CALLBACK_PATH}`
 }
 
 function getOneDriveMediaPlatform(): MediaPlatform {
