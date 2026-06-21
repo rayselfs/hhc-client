@@ -8,7 +8,9 @@ import { RouterProvider } from 'react-router-dom'
 import { router } from '@renderer/router'
 import { Toast } from '@heroui/react/toast'
 import { startEarlyInit, prefetchRouteChunks } from '@renderer/lib/app-init'
+import { suppressBenignTransitionAbortErrors } from '@renderer/lib/suppress-benign-rejections'
 
+suppressBenignTransitionAbortErrors()
 startEarlyInit()
 prefetchRouteChunks()
 
