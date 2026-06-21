@@ -158,6 +158,61 @@ describe('buildOneDriveImportPlan', () => {
     expect(plan.items[0].id).toMatch(UUID_PATTERN)
     expect(plan.downloadableItems[0]).toMatchObject({ itemId: plan.items[0].id })
   })
+
+  it('uses the shared media policy for Web OneDrive imports', () => {
+    const plan = buildOneDriveImportPlan({
+      connectionId: 'onedrive:account-1',
+      displayName: 'Videos',
+      rootRemoteFolderId: 'remote-folder-1',
+      offlinePolicy: 'always-offline',
+      existingRootFolderNames: [],
+      platform: 'web',
+      remoteItems: [
+        {
+          remoteItemId: 'remote-folder-1',
+          parentRemoteItemId: 'root',
+          kind: 'folder',
+          name: 'Videos',
+          deleted: false
+        },
+        {
+          remoteItemId: 'mkv-file',
+          parentRemoteItemId: 'remote-folder-1',
+          kind: 'file',
+          name: 'clip.mkv',
+          mimeType: 'video/x-matroska',
+          size: 100,
+          deleted: false
+        },
+        {
+          remoteItemId: 'avi-file',
+          parentRemoteItemId: 'remote-folder-1',
+          kind: 'file',
+          name: 'legacy.avi',
+          mimeType: 'video/x-msvideo',
+          size: 100,
+          deleted: false
+        },
+        {
+          remoteItemId: 'system-file',
+          parentRemoteItemId: 'remote-folder-1',
+          kind: 'file',
+          name: '.DS_Store',
+          size: 100,
+          deleted: false
+        }
+      ]
+    })
+
+    expect(plan.items.map((item) => item.name)).toEqual(['clip.mkv', 'legacy.avi'])
+    expect(plan.items.find((item) => item.name === 'clip.mkv')).toMatchObject({
+      mimeType: 'video/x-matroska'
+    })
+    expect(plan.items.find((item) => item.name === 'legacy.avi')).toMatchObject({
+      url: expect.stringMatching(/^unsupported:/)
+    })
+    expect(plan.disabledCount).toBe(1)
+  })
 })
 
 describe('loginOneDriveAccount', () => {
