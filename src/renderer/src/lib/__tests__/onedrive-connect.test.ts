@@ -287,20 +287,16 @@ describe('loginOneDriveAccount', () => {
       value: {
         oneDrive: {
           deleteCredentials: vi.fn(async () => undefined),
-          startAuthCallback: vi.fn(async () => ({
-            callbackId: '11111111-1111-4111-8111-111111111111',
-            redirectUri: 'http://localhost:49152/onedrive-callback'
-          })),
+          getAuthRedirectUri: vi.fn(async () => 'librepresenter://auth/onedrive'),
           waitAuthCallback: vi.fn(
-            async () => 'http://localhost:49152/onedrive-callback?code=code-1&state=state-1'
+            async () => 'librepresenter://auth/onedrive?code=code-1&state=state-1'
           ),
           completeAuth: vi.fn(async () => ({
             id: 'onedrive:account-1',
             providerType: 'onedrive',
             displayName: 'OneDrive - Alice',
             accountLabel: 'alice@example.com'
-          })),
-          cancelAuthCallback: vi.fn(async () => undefined)
+          }))
         }
       }
     })
@@ -316,21 +312,19 @@ describe('loginOneDriveAccount', () => {
     )
   })
 
-  it('uses a localhost callback server for the default Electron flow', async () => {
+  it('uses a custom protocol callback for the default Electron flow', async () => {
     await expect(loginOneDriveAccount()).resolves.toMatchObject({ id: 'onedrive:account-1' })
 
-    expect(window.api.oneDrive.startAuthCallback).toHaveBeenCalled()
+    expect(window.api.oneDrive.getAuthRedirectUri).toHaveBeenCalled()
     expect(window.open).toHaveBeenCalledWith(
       'https://login.microsoftonline.com/common/oauth2/v2.0/authorize',
       '_blank',
       'noopener,noreferrer'
     )
-    expect(window.api.oneDrive.waitAuthCallback).toHaveBeenCalledWith(
-      '11111111-1111-4111-8111-111111111111'
-    )
+    expect(window.api.oneDrive.waitAuthCallback).toHaveBeenCalled()
     expect(window.api.oneDrive.completeAuth).toHaveBeenCalledWith({
       clientId: '11111111-2222-3333-4444-555555555555',
-      redirectUri: 'http://localhost:49152/onedrive-callback',
+      redirectUri: 'librepresenter://auth/onedrive',
       code: 'code-1',
       codeVerifier: 'verifier-1'
     })

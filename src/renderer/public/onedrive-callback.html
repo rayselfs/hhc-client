@@ -1,28 +1,122 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-Hant">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>OneDrive Sign In</title>
+    <link rel="icon" href="/favicon.ico" />
+    <title>OneDrive Sign In | LibrePresenter</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
+        background: #070b12;
+        color: #f8fafc;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        min-height: 100vh;
+        margin: 0;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        background:
+          radial-gradient(circle at top, rgba(14, 165, 233, 0.24), transparent 34rem),
+          linear-gradient(135deg, #020617, #0f172a 55%, #111827);
+      }
+
+      main {
+        width: min(100%, 440px);
+        padding: 32px;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        border-radius: 28px;
+        background: rgba(15, 23, 42, 0.78);
+        box-shadow: 0 24px 80px rgba(0, 0, 0, 0.36);
+        text-align: center;
+        backdrop-filter: blur(18px);
+      }
+
+      img {
+        width: 56px;
+        height: 56px;
+        margin-bottom: 18px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 24px;
+        line-height: 1.2;
+      }
+
+      p {
+        margin: 12px 0 0;
+        color: #94a3b8;
+        font-size: 15px;
+        line-height: 1.65;
+      }
+
+      .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 24px;
+        padding: 10px 14px;
+        border-radius: 999px;
+        background: rgba(14, 165, 233, 0.14);
+        color: #bae6fd;
+        font-size: 14px;
+      }
+
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: #38bdf8;
+        box-shadow: 0 0 18px #38bdf8;
+      }
+    </style>
   </head>
   <body>
+    <main>
+      <img src="/favicon.ico" alt="" />
+      <h1>OneDrive 登入完成</h1>
+      <p id="message">正在回到 LibrePresenter。若視窗沒有自動關閉，可以直接關閉此頁。</p>
+      <div class="status" aria-live="polite">
+        <span class="dot" aria-hidden="true"></span>
+        <span id="status">正在連結帳號</span>
+      </div>
+    </main>
+
     <script>
+      const callbackUrl = window.location.href
       const payload = {
         type: 'libre-presenter:onedrive-callback',
-        url: window.location.href
+        url: callbackUrl
       }
 
       try {
-        localStorage.setItem('libre-presenter:onedrive-callback', window.location.href)
+        localStorage.setItem('libre-presenter:onedrive-callback', callbackUrl)
       } catch {}
 
       if (window.opener) {
         window.opener.postMessage(payload, window.location.origin)
-        window.close()
+        document.getElementById('status').textContent = '可以關閉此視窗'
+        setTimeout(() => window.close(), 500)
       } else {
-        window.location.replace('/')
+        document.getElementById('message').textContent = '登入結果已保存。正在返回 LibrePresenter。'
+        document.getElementById('status').textContent = '正在返回'
+        setTimeout(() => window.location.replace('/'), 1200)
       }
     </script>
-    <p>You can close this window and return to LibrePresenter.</p>
   </body>
 </html>

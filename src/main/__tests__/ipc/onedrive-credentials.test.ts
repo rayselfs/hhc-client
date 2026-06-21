@@ -22,7 +22,7 @@ const {
   mockDecryptString: vi.fn()
 }))
 
-const mockMainWindow = { id: 1 }
+const mockMainWindow = { id: 1, show: vi.fn(), focus: vi.fn() }
 const mockProjectionWindow = { id: 2 }
 const mockWindowManager = {
   getMainWindow: vi.fn(() => mockMainWindow)
@@ -62,7 +62,10 @@ vi.mock('fs', () => {
 
 import { BrowserWindow } from 'electron'
 import type { WindowManager } from '../../windowManager'
-import { registerOneDriveCredentialHandlers } from '../../ipc/onedrive-credentials'
+import {
+  handleOneDriveAuthCallbackUrl,
+  registerOneDriveCredentialHandlers
+} from '../../ipc/onedrive-credentials'
 
 const wm = mockWindowManager as unknown as WindowManager
 
@@ -225,7 +228,7 @@ describe('OneDrive credential IPC', () => {
 
     const result = (await getHandler('onedrive:complete-auth')(makeEvent(), {
       clientId: '4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02',
-      redirectUri: 'http://localhost:49152/onedrive-callback',
+      redirectUri: 'librepresenter://auth/onedrive',
       code: 'code-1',
       codeVerifier: 'verifier-1'
     })) as {
@@ -251,7 +254,7 @@ describe('OneDrive credential IPC', () => {
     expect(init.method).toBe('POST')
     expect(init.body).toBeInstanceOf(URLSearchParams)
     expect(init.body.get('grant_type')).toBe('authorization_code')
-    expect(init.body.get('redirect_uri')).toBe('http://localhost:49152/onedrive-callback')
+    expect(init.body.get('redirect_uri')).toBe('librepresenter://auth/onedrive')
     expect(init.body.get('code')).toBe('code-1')
     expect(init.body.get('code_verifier')).toBe('verifier-1')
     expect(mockNetFetch.mock.calls[1][0]).toBe('https://graph.microsoft.com/v1.0/me')
@@ -285,5 +288,21 @@ describe('OneDrive credential IPC', () => {
       '/tmp/hhc-user-data/onedrive-credentials/onedrive%3Aaccount-1.enc',
       { force: true }
     )
+  })
+
+  it('returns the custom protocol auth redirect URI', async () => {
+    await expect(getHandler('onedrive:get-auth-redirect-uri')(makeEvent())).resolves.toBe(
+      'librepresenter://auth/onedrive'
+    )
+  })
+
+  it('resolves auth callback from the custom protocol URL', async () => {
+    const waiting = getHandler('onedrive:wait-auth-callback')(makeEvent()) as Promise<string | null>
+
+    handleOneDriveAuthCallbackUrl('librepresenter://auth/onedrive?code=code-1&state=state-1', wm)
+
+    await expect(waiting).resolves.toBe('librepresenter://auth/onedrive?code=code-1&state=state-1')
+    expect(mockMainWindow.show).toHaveBeenCalled()
+    expect(mockMainWindow.focus).toHaveBeenCalled()
   })
 })

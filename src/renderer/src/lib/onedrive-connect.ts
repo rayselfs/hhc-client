@@ -588,11 +588,11 @@ export async function loginOneDriveAccount(options?: {
 
   const clientId = getEffectiveOneDriveClientId()
   const electronMode = isElectron()
-  const authCallback = electronMode ? await window.api.oneDrive.startAuthCallback() : null
+  const electronRedirectUri = electronMode ? await window.api.oneDrive.getAuthRedirectUri() : null
   if (!electronMode) clearStoredWebOneDriveCallback()
   const request = await createOneDriveAuthRequest({
     clientId,
-    redirectUri: authCallback?.redirectUri ?? getOneDriveRedirectUri(),
+    redirectUri: electronRedirectUri ?? getOneDriveRedirectUri(),
     prompt: 'select_account'
   })
   const authWindow = window.open(
@@ -603,7 +603,7 @@ export async function loginOneDriveAccount(options?: {
   const callbackUrl = await (options?.requestCallbackUrl
     ? options.requestCallbackUrl()
     : isElectron()
-      ? window.api.oneDrive.waitAuthCallback(authCallback?.callbackId ?? '')
+      ? window.api.oneDrive.waitAuthCallback()
       : waitForWebOneDriveCallback(authWindow))
   if (!callbackUrl) return null
 

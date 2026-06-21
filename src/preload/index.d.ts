@@ -21,7 +21,6 @@ import type {
   OneDriveAccessTokenResult,
   OneDriveAuthCodeExchangeRequest,
   OneDriveCredentialStatus,
-  OneDriveAuthCallbackSession,
   OneDriveConnectedAccount,
   OneDriveNativeDownloadRequest,
   OneDriveNativeDownloadResult
@@ -127,9 +126,8 @@ interface OneDriveAPI {
   getAccessToken: (request: OneDriveAccessTokenRequest) => Promise<OneDriveAccessTokenResult>
   completeAuth: (request: OneDriveAuthCodeExchangeRequest) => Promise<OneDriveConnectedAccount>
   deleteCredentials: (connectionId: string) => Promise<void>
-  startAuthCallback: () => Promise<OneDriveAuthCallbackSession>
-  waitAuthCallback: (callbackId: string) => Promise<string | null>
-  cancelAuthCallback: (callbackId: string) => Promise<void>
+  getAuthRedirectUri: () => Promise<string>
+  waitAuthCallback: () => Promise<string | null>
   downloadFile: (request: OneDriveNativeDownloadRequest) => Promise<OneDriveNativeDownloadResult>
 }
 

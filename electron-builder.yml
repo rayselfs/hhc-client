@@ -1,5 +1,9 @@
 appId: org.librepresenter.app
 productName: LibrePresenter
+protocols:
+  name: LibrePresenter
+  schemes:
+    - librepresenter
 directories:
   buildResources: build
 files:

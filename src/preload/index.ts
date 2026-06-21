@@ -145,10 +145,8 @@ const oneDriveApi = {
     typedInvoke('onedrive:complete-auth', request),
   deleteCredentials: (connectionId: string) =>
     typedInvoke('onedrive:delete-credentials', connectionId),
-  startAuthCallback: () => typedInvoke('onedrive:start-auth-callback'),
-  waitAuthCallback: (callbackId: string) => typedInvoke('onedrive:wait-auth-callback', callbackId),
-  cancelAuthCallback: (callbackId: string) =>
-    typedInvoke('onedrive:cancel-auth-callback', callbackId),
+  getAuthRedirectUri: () => typedInvoke('onedrive:get-auth-redirect-uri'),
+  waitAuthCallback: () => typedInvoke('onedrive:wait-auth-callback'),
   downloadFile: (request: IpcInvokeMap['onedrive:download-file']['args'][0]) =>
     typedInvoke('onedrive:download-file', request)
 }

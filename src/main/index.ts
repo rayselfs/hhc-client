@@ -10,7 +10,11 @@ import { registerNativeFsHandlers, registerNativeMediaProtocol } from './ipc/nat
 import { registerProjectionVlcHandlers } from './ipc/projection-vlc'
 import { registerVideoPosterHandlers } from './ipc/video-poster'
 import { registerLocalSyncHandlers } from './ipc/local-sync'
-import { registerOneDriveCredentialHandlers } from './ipc/onedrive-credentials'
+import {
+  handleOneDriveAuthCallbackUrl,
+  isOneDriveAuthCallbackUrl,
+  registerOneDriveCredentialHandlers
+} from './ipc/onedrive-credentials'
 import { registerOneDriveDownloadHandlers } from './ipc/onedrive-download'
 import { isKnownWindow, validateTheme } from './ipc/validate'
 import { registerUpdateService } from './updateService'
@@ -40,62 +44,98 @@ process.on('unhandledRejection', (reason) => {
 
 const wm = WindowManager.getInstance()
 
-app.whenReady().then(() => {
-  electronApp.setAppUserModelId('org.librepresenter.app')
+function registerAppProtocol(): void {
+  if (process.defaultApp && process.argv.length >= 2) {
+    app.setAsDefaultProtocolClient('librepresenter', process.execPath, [process.argv[1]])
+    return
+  }
+  app.setAsDefaultProtocolClient('librepresenter')
+}
 
-  app.on('browser-window-created', (_, window) => {
-    optimizer.watchWindowShortcuts(window)
-  })
+const gotSingleInstanceLock = app.requestSingleInstanceLock()
 
-  ipcMain.handle('theme:get', (event) => {
-    if (!isKnownWindow(wm, event)) return { source: 'system', shouldUseDarkColors: false }
-    return {
-      source: nativeTheme.themeSource,
-      shouldUseDarkColors: nativeTheme.shouldUseDarkColors
+if (!gotSingleInstanceLock) {
+  app.quit()
+} else {
+  app.on('second-instance', (_event, argv) => {
+    const callbackUrl = argv.find(isOneDriveAuthCallbackUrl)
+    if (callbackUrl) {
+      handleOneDriveAuthCallbackUrl(callbackUrl, wm)
+      return
     }
+    const mainWindow = wm.getMainWindow()
+    mainWindow?.show()
+    mainWindow?.focus()
   })
 
-  ipcMain.handle('theme:set', (event, theme: unknown) => {
-    if (!isKnownWindow(wm, event)) return
-    if (!validateTheme(theme)) return
-    nativeTheme.themeSource = theme as 'light' | 'dark' | 'system'
+  app.on('open-url', (event, url) => {
+    event.preventDefault()
+    handleOneDriveAuthCallbackUrl(url, wm)
   })
+}
 
-  nativeTheme.on('updated', () => {
-    BrowserWindow.getAllWindows().forEach((win) => {
-      win.webContents.send('theme:changed', {
+if (gotSingleInstanceLock) {
+  app.whenReady().then(() => {
+    electronApp.setAppUserModelId('org.librepresenter.app')
+    registerAppProtocol()
+
+    app.on('browser-window-created', (_, window) => {
+      optimizer.watchWindowShortcuts(window)
+    })
+
+    ipcMain.handle('theme:get', (event) => {
+      if (!isKnownWindow(wm, event)) return { source: 'system', shouldUseDarkColors: false }
+      return {
+        source: nativeTheme.themeSource,
         shouldUseDarkColors: nativeTheme.shouldUseDarkColors
+      }
+    })
+
+    ipcMain.handle('theme:set', (event, theme: unknown) => {
+      if (!isKnownWindow(wm, event)) return
+      if (!validateTheme(theme)) return
+      nativeTheme.themeSource = theme as 'light' | 'dark' | 'system'
+    })
+
+    nativeTheme.on('updated', () => {
+      BrowserWindow.getAllWindows().forEach((win) => {
+        win.webContents.send('theme:changed', {
+          shouldUseDarkColors: nativeTheme.shouldUseDarkColors
+        })
       })
+    })
+
+    registerProjectionHandlers(wm)
+    registerTimerHandlers(wm)
+    registerBibleApiHandlers(wm)
+    registerAppIpc(wm)
+    registerLocalModelProtocol()
+    registerSpeechKeyStorageHandlers(wm)
+    registerNativeFsHandlers(wm)
+    registerProjectionVlcHandlers(wm)
+    registerVideoPosterHandlers(wm)
+    registerLocalSyncHandlers(wm)
+    registerOneDriveCredentialHandlers(wm)
+    registerOneDriveDownloadHandlers(wm)
+    registerNativeMediaProtocol()
+    wm.createMainWindow()
+    registerUpdateService(wm)
+
+    const initialCallbackUrl = process.argv.find(isOneDriveAuthCallbackUrl)
+    if (initialCallbackUrl) handleOneDriveAuthCallbackUrl(initialCallbackUrl, wm)
+
+    app.on('activate', function () {
+      if (BrowserWindow.getAllWindows().length === 0) wm.createMainWindow()
     })
   })
 
-  registerProjectionHandlers(wm)
-  registerTimerHandlers(wm)
-  registerBibleApiHandlers(wm)
-  registerAppIpc(wm)
-  registerLocalModelProtocol()
-  registerSpeechKeyStorageHandlers(wm)
-  registerNativeFsHandlers(wm)
-  registerProjectionVlcHandlers(wm)
-  registerVideoPosterHandlers(wm)
-  registerLocalSyncHandlers(wm)
-  registerOneDriveCredentialHandlers(wm)
-  registerOneDriveDownloadHandlers(wm)
-  registerNativeMediaProtocol()
-  wm.createMainWindow()
-  registerUpdateService(wm)
-
-  app.on('activate', function () {
-    if (BrowserWindow.getAllWindows().length === 0) wm.createMainWindow()
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') {
+      app.quit()
+    }
   })
-})
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit()
-  }
-})
-
-app.on('before-quit', () => {
-  wm.cleanup()
-})
+  app.on('before-quit', () => {
+    wm.cleanup()
+  })
+}
