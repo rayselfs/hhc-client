@@ -96,10 +96,6 @@ export interface SpeechSettings {
   whisper: WhisperSpeechConfig
 }
 
-export interface OneDriveSettings {
-  customClientId: string
-}
-
 export const DEFAULT_SPEECH: SpeechSettings = {
   activeProvider: 'azure',
   azure: { region: 'eastasia', language: 'zh-TW' },
@@ -111,18 +107,10 @@ export function getDefaultSpeechSettings(): SpeechSettings {
   return isElectron() ? DEFAULT_SPEECH : { ...DEFAULT_SPEECH, activeProvider: 'webSpeech' }
 }
 
-export const DEFAULT_ONEDRIVE: OneDriveSettings = {
-  customClientId: ''
-}
-
 export const DEFAULT_SYNC_OFFLINE_POLICY: SyncOfflinePolicy = 'always-offline'
 
-export function validateOneDriveClientId(value: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value.trim())
-}
-
-export function getEffectiveOneDriveClientId(settings: OneDriveSettings): string {
-  return settings.customClientId.trim() || LIBREPRESENTER_DEFAULT_ONEDRIVE_CLIENT_ID
+export function getEffectiveOneDriveClientId(): string {
+  return LIBREPRESENTER_DEFAULT_ONEDRIVE_CLIENT_ID
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -141,19 +129,6 @@ function normalizePositiveInteger(
 function normalizeProjectionDisplayId(value: unknown): string {
   if (typeof value !== 'string' || value.trim() === '') return DEFAULT_PROJECTION_DISPLAY_ID
   return /^\d+$/.test(value) ? value : DEFAULT_PROJECTION_DISPLAY_ID
-}
-
-function normalizeOneDriveSettings(value: unknown): OneDriveSettings {
-  if (!isRecord(value)) return DEFAULT_ONEDRIVE
-
-  const customClientId =
-    typeof value.customClientId === 'string' && validateOneDriveClientId(value.customClientId)
-      ? value.customClientId.trim()
-      : DEFAULT_ONEDRIVE.customClientId
-
-  return {
-    customClientId
-  }
 }
 
 function normalizeSyncOfflinePolicy(value: unknown): SyncOfflinePolicy {
@@ -239,7 +214,6 @@ export function normalizeSettingsState(value: unknown): Partial<SettingsStore> {
         ? state.timerRingColorEnabled
         : DEFAULT_TIMER_RING_COLOR_ENABLED,
     speech: normalizeSpeechSettings(state.speech),
-    oneDrive: normalizeOneDriveSettings(state.oneDrive),
     defaultSyncOfflinePolicy: normalizeSyncOfflinePolicy(state.defaultSyncOfflinePolicy),
     trashRetentionDays: normalizePositiveInteger(
       state.trashRetentionDays,
@@ -257,7 +231,6 @@ export interface SettingsStore {
   timerRingColor: string
   timerRingColorEnabled: boolean
   speech: SpeechSettings
-  oneDrive: OneDriveSettings
   defaultSyncOfflinePolicy: SyncOfflinePolicy
   trashRetentionDays: number
   reminderMode: 'subtract' | 'add'
@@ -268,7 +241,6 @@ export interface SettingsStore {
   setTimerRingColor: (color: string) => void
   setTimerRingColorEnabled: (enabled: boolean) => void
   setSpeech: (settings: SpeechSettings) => void
-  setOneDrive: (settings: OneDriveSettings) => void
   setDefaultSyncOfflinePolicy: (policy: SyncOfflinePolicy) => void
   setTrashRetentionDays: (days: number) => void
   setReminderMode: (mode: 'subtract' | 'add') => void
@@ -285,7 +257,6 @@ function getDefaultSettingsState(): Omit<
   | 'setTimerRingColor'
   | 'setTimerRingColorEnabled'
   | 'setSpeech'
-  | 'setOneDrive'
   | 'setDefaultSyncOfflinePolicy'
   | 'setTrashRetentionDays'
   | 'setReminderMode'
@@ -300,7 +271,6 @@ function getDefaultSettingsState(): Omit<
     timerRingColor: DEFAULT_TIMER_RING_COLOR,
     timerRingColorEnabled: DEFAULT_TIMER_RING_COLOR_ENABLED,
     speech: getDefaultSpeechSettings(),
-    oneDrive: DEFAULT_ONEDRIVE,
     defaultSyncOfflinePolicy: DEFAULT_SYNC_OFFLINE_POLICY,
     trashRetentionDays: DEFAULT_TRASH_RETENTION_DAYS,
     reminderMode: DEFAULT_REMINDER_MODE,
@@ -331,16 +301,6 @@ export const useSettingsStore = create<SettingsStore>()(
 
       setSpeech: (settings: SpeechSettings) => {
         set({ speech: settings })
-      },
-
-      setOneDrive: (settings: OneDriveSettings) => {
-        const customClientId = settings.customClientId.trim()
-        if (customClientId && !validateOneDriveClientId(customClientId)) return
-        set({
-          oneDrive: {
-            customClientId
-          }
-        })
       },
 
       setDefaultSyncOfflinePolicy: (policy: SyncOfflinePolicy) => {
@@ -432,9 +392,6 @@ export const useSettingsStore = create<SettingsStore>()(
         if (version < 8) {
           state.reminderMode = DEFAULT_REMINDER_MODE
         }
-        if (version < 9) {
-          state.oneDrive = DEFAULT_ONEDRIVE
-        }
         if (version < 10) {
           state.projectionDisplayId = DEFAULT_PROJECTION_DISPLAY_ID
         }
@@ -451,7 +408,6 @@ export const useSettingsStore = create<SettingsStore>()(
         timerRingColor: state.timerRingColor,
         timerRingColorEnabled: state.timerRingColorEnabled,
         speech: state.speech,
-        oneDrive: state.oneDrive,
         defaultSyncOfflinePolicy: state.defaultSyncOfflinePolicy,
         trashRetentionDays: state.trashRetentionDays,
         reminderMode: state.reminderMode,

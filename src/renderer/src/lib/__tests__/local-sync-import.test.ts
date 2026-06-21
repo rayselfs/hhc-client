@@ -60,6 +60,14 @@ describe('buildLocalSyncImportPlan', () => {
         size: 20
       },
       {
+        remoteItemId: 'psd-1',
+        parentRemoteItemId: 'folder-a',
+        kind: 'file',
+        name: 'layout.psd',
+        mimeType: 'image/vnd.adobe.photoshop',
+        size: 20
+      },
+      {
         remoteItemId: 'system-file',
         parentRemoteItemId: 'folder-a',
         kind: 'file',
@@ -84,6 +92,7 @@ describe('buildLocalSyncImportPlan', () => {
     expect(plan.folders).toHaveLength(2)
     expect(plan.items).toHaveLength(2)
     expect(plan.items.find((item) => item.name === '.DS_Store')).toBeUndefined()
+    expect(plan.items.find((item) => item.name === 'layout.psd')).toBeUndefined()
     expect(plan.fileImports.map((entry) => entry.remoteItemId)).toEqual(['mkv-1'])
     expect(plan.fileImports[0].itemId).toMatch(UUID_PATTERN)
     expect(plan.items.find((item) => item.name === 'clip.mkv')).toMatchObject({
@@ -94,6 +103,9 @@ describe('buildLocalSyncImportPlan', () => {
     expect(plan.items.find((item) => item.name === 'clip.avi')).toMatchObject({
       mimeType: 'video/x-msvideo',
       url: expect.stringMatching(/^unsupported:/)
+    })
+    expect(plan.syncEntries.find((entry) => entry.remoteItemId === 'avi-1')).toMatchObject({
+      status: 'remote-only'
     })
   })
 })

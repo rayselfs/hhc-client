@@ -8,13 +8,7 @@ vi.mock('../env', () => ({
 }))
 
 vi.mock('@renderer/stores/settings', () => ({
-  getEffectiveOneDriveClientId: () => '11111111-2222-3333-4444-555555555555',
-  useSettingsStore: {
-    getState: () => ({
-      oneDrive: { customClientId: '' },
-      defaultSyncOfflinePolicy: 'always-offline'
-    })
-  }
+  getEffectiveOneDriveClientId: () => '11111111-2222-3333-4444-555555555555'
 }))
 
 vi.mock('../onedrive-auth', async () => {
@@ -199,6 +193,15 @@ describe('buildOneDriveImportPlan', () => {
           deleted: false
         },
         {
+          remoteItemId: 'psd-file',
+          parentRemoteItemId: 'remote-folder-1',
+          kind: 'file',
+          name: 'layout.psd',
+          mimeType: 'image/vnd.adobe.photoshop',
+          size: 100,
+          deleted: false
+        },
+        {
           remoteItemId: 'system-file',
           parentRemoteItemId: 'remote-folder-1',
           kind: 'file',
@@ -210,11 +213,15 @@ describe('buildOneDriveImportPlan', () => {
     })
 
     expect(plan.items.map((item) => item.name)).toEqual(['clip.mkv', 'legacy.avi'])
+    expect(plan.items.find((item) => item.name === 'layout.psd')).toBeUndefined()
     expect(plan.items.find((item) => item.name === 'clip.mkv')).toMatchObject({
       mimeType: 'video/x-matroska'
     })
     expect(plan.items.find((item) => item.name === 'legacy.avi')).toMatchObject({
       url: expect.stringMatching(/^unsupported:/)
+    })
+    expect(plan.syncEntries.find((entry) => entry.remoteItemId === 'avi-file')).toMatchObject({
+      status: 'remote-only'
     })
     expect(plan.disabledCount).toBe(1)
   })

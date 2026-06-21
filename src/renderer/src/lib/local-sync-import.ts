@@ -1,4 +1,3 @@
-import { toast } from '@heroui/react/toast'
 import type { LocalSyncConnectionInfo, LocalSyncRemoteItem } from '@shared/ipc-channels'
 import type { FileItemRecord, FolderRecord } from '@shared/types/folder'
 import { FILE_EXPLORER_ROOT_ID, useFileExplorerStore } from '@renderer/stores/file-explorer'
@@ -10,12 +9,12 @@ import {
 } from '@renderer/lib/file-explorer-db'
 import { resolveUniqueName } from '@renderer/lib/file-naming'
 import {
-  getMediaSupport,
   resolveMediaCapability,
   type MediaKind,
   type MediaPlatform,
   type MediaSupportMode
 } from '@renderer/lib/media-capabilities'
+import { classifyMediaImport } from '@renderer/lib/media-import-policy'
 import { isIgnoredSystemPath } from '@shared/file-ignore-policy'
 import { ensureSourceMediaMetadata } from '@renderer/lib/media-metadata'
 import { enqueueVideoPosterJob } from '@renderer/lib/video-poster-jobs'
@@ -27,7 +26,6 @@ import {
 } from '@renderer/lib/sync-db'
 import { generateThumbnail } from '@renderer/lib/thumbnail-generator'
 import { saveThumbnail } from '@renderer/lib/thumbnail-db'
-import i18n from '@renderer/i18n'
 import { applySyncRefreshPlan, buildSyncRefreshPlan, type SyncRefreshPlan } from './sync-refresh'
 
 interface SyncFilePolicy {
@@ -35,6 +33,7 @@ interface SyncFilePolicy {
   mimeType: string
   support: MediaSupportMode
   disabled: boolean
+  skip: boolean
 }
 
 interface LocalSyncImportPlanInput {
@@ -92,22 +91,33 @@ export function classifySyncRemoteFile(
   item: Pick<LocalSyncRemoteItem, 'name' | 'mimeType'>,
   platform: MediaPlatform
 ): SyncFilePolicy {
-  const capability = resolveMediaCapability({ mimeType: item.mimeType, fileName: item.name })
-  if (!capability) {
+  const decision = classifyMediaImport({ name: item.name, mimeType: item.mimeType }, platform)
+  if (decision.action === 'skip') {
     return {
       kind: 'unsupported',
-      mimeType: item.mimeType ?? 'application/octet-stream',
+      mimeType: decision.mimeType,
       support: 'unsupported',
-      disabled: true
+      disabled: true,
+      skip: true
     }
   }
 
-  const support = getMediaSupport(capability, platform)
+  if (decision.action === 'platform-unsupported') {
+    return {
+      kind: decision.kind,
+      mimeType: decision.mimeType,
+      support: decision.support,
+      disabled: true,
+      skip: false
+    }
+  }
+
   return {
-    kind: support === 'unsupported' ? 'unsupported' : capability.kind,
-    mimeType: capability.canonicalMimeType,
-    support,
-    disabled: support === 'unsupported'
+    kind: decision.kind,
+    mimeType: decision.mimeType,
+    support: decision.support,
+    disabled: false,
+    skip: false
   }
 }
 
@@ -196,6 +206,7 @@ export function buildLocalSyncImportPlan(input: LocalSyncImportPlanInput): Local
     if (remoteItem.kind !== 'file') continue
     const parentId = remoteFolderToLocalId.get(remoteItem.parentRemoteItemId) ?? rootFolderId
     const policy = classifySyncRemoteFile(remoteItem, input.platform)
+    if (policy.skip) continue
     const itemId = createSyncedItemId()
     const sortIndex = itemSortCounts.get(parentId) ?? 0
     itemSortCounts.set(parentId, sortIndex + 1)
@@ -214,6 +225,18 @@ export function buildLocalSyncImportPlan(input: LocalSyncImportPlanInput): Local
     items.push(item)
     if (policy.disabled) {
       disabledCount++
+      syncEntries.push({
+        providerConnectionId: input.connection.id,
+        remoteItemId: remoteItem.remoteItemId,
+        parentRemoteItemId: remoteItem.parentRemoteItemId,
+        kind: 'file',
+        name: remoteItem.name,
+        itemId,
+        mimeType: policy.mimeType,
+        size: remoteItem.size,
+        etag: remoteItem.etag,
+        status: 'remote-only'
+      })
       continue
     }
     fileImports.push({ itemId, remoteItemId: remoteItem.remoteItemId, mimeType: policy.mimeType })
@@ -424,13 +447,6 @@ export async function connectLocalSyncFolder(): Promise<LocalSyncImportSummary |
   const remoteItems = await window.api.localSync.scanFolder(connection.id)
   const summary = await importLocalSyncConnection(connection, remoteItems, 'electron')
   await window.api.localSync.startWatch(connection.id).catch(() => undefined)
-  if (summary.disabledFileCount > 0) {
-    toast.warning(
-      i18n.t('fileExplorer.syncSources.unsupportedFiles', {
-        count: summary.disabledFileCount
-      })
-    )
-  }
   return summary
 }
 

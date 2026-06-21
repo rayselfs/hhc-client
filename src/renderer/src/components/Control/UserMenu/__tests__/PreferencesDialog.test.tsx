@@ -9,6 +9,8 @@ import ConfirmDialog from '../../../Common/ConfirmDialog'
 import PreferencesDialog from '../PreferencesDialog'
 import { ShortcutScopeProvider } from '@renderer/contexts/ShortcutScopeContext'
 
+const mockListProviderConnectionsByType = vi.hoisted(() => vi.fn(async () => []))
+
 vi.mock('@renderer/lib/env', () => ({
   isElectron: vi.fn().mockReturnValue(false),
   isWeb: vi.fn().mockReturnValue(true)
@@ -48,15 +50,21 @@ vi.mock('@renderer/lib/onedrive-connect', () => ({
   loginOneDriveAccount: vi.fn(async () => null)
 }))
 
+vi.mock('@renderer/lib/sync-db', () => ({
+  listProviderConnectionsByType: mockListProviderConnectionsByType
+}))
+
+vi.mock('@renderer/lib/sync-unlink', () => ({
+  unlinkSyncConnectionFromApp: vi.fn(async () => undefined)
+}))
+
+vi.mock('@renderer/lib/onedrive-web-credentials', () => ({
+  deleteWebOneDriveCredentials: vi.fn(async () => undefined)
+}))
+
 vi.mock('@renderer/stores/settings', () => ({
-  DEFAULT_ONEDRIVE: {
-    customClientId: ''
-  },
   LIBREPRESENTER_DEFAULT_ONEDRIVE_CLIENT_ID: '4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02',
-  getEffectiveOneDriveClientId: (settings: { customClientId: string }) =>
-    settings.customClientId || '4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02',
-  validateOneDriveClientId: (value: string) =>
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value),
+  getEffectiveOneDriveClientId: () => '4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02',
   useSettingsStore: vi.fn((selector) => {
     const store = {
       timezone: 'Asia/Taipei',
@@ -72,10 +80,6 @@ vi.mock('@renderer/stores/settings', () => ({
       setTimezone: vi.fn(),
       setHardwareAcceleration: vi.fn(),
       setSpeech: vi.fn(),
-      oneDrive: {
-        customClientId: ''
-      },
-      setOneDrive: vi.fn(),
       defaultSyncOfflinePolicy: 'always-offline' as const,
       setDefaultSyncOfflinePolicy: vi.fn(),
       trashRetentionDays: 30,
@@ -199,8 +203,8 @@ describe('PreferencesDialog', () => {
     await user.click(screen.getByTestId('category-media-oneDrive'))
     expect(screen.getByTestId('category-media')).toHaveAttribute('aria-pressed', 'false')
     expect(screen.getByTestId('category-media-oneDrive')).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByLabelText('Custom Azure Client ID')).toBeInTheDocument()
-    expect(screen.queryByLabelText('Azure Application Client ID')).not.toBeInTheDocument()
+    expect(screen.getByText('Connected Account')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Custom Azure Client ID')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Offline Policy')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Trash Retention Period')).not.toBeInTheDocument()
   })
@@ -226,6 +230,26 @@ describe('PreferencesDialog', () => {
 
     expect(screen.getByRole('button', { name: 'Signing in' })).toBeDisabled()
     resolveLogin(null)
+  })
+
+  it('shows Logout for a connected OneDrive account', async () => {
+    const user = userEvent.setup()
+    mockListProviderConnectionsByType.mockResolvedValueOnce([
+      {
+        id: 'onedrive:account-1',
+        providerType: 'onedrive',
+        displayName: 'OneDrive - Alice',
+        accountLabel: 'alice@example.com',
+        createdAt: 1,
+        updatedAt: 1
+      }
+    ] as never)
+    renderDialog(true)
+
+    await user.click(screen.getByTestId('category-media'))
+    await user.click(screen.getByTestId('category-media-oneDrive'))
+
+    expect(await screen.findByRole('button', { name: 'Logout' })).toBeInTheDocument()
   })
 
   it('navigates between storage child sections', async () => {
@@ -295,10 +319,6 @@ describe('PreferencesDialog', () => {
           whisper: { modelDir: '', installedModel: null }
         },
         setSpeech: vi.fn(),
-        oneDrive: {
-          customClientId: ''
-        },
-        setOneDrive: vi.fn(),
         defaultSyncOfflinePolicy: 'always-offline' as const,
         setDefaultSyncOfflinePolicy: vi.fn(),
         trashRetentionDays: 30,
@@ -403,10 +423,6 @@ describe('PreferencesDialog', () => {
           whisper: { modelDir: '', installedModel: null }
         },
         setSpeech: vi.fn(),
-        oneDrive: {
-          customClientId: ''
-        },
-        setOneDrive: vi.fn(),
         defaultSyncOfflinePolicy: 'always-offline' as const,
         setDefaultSyncOfflinePolicy: vi.fn(),
         trashRetentionDays: 30,
@@ -463,10 +479,6 @@ describe('PreferencesDialog', () => {
           whisper: { modelDir: '', installedModel: null }
         },
         setSpeech: vi.fn(),
-        oneDrive: {
-          customClientId: ''
-        },
-        setOneDrive: vi.fn(),
         defaultSyncOfflinePolicy: 'always-offline' as const,
         setDefaultSyncOfflinePolicy: vi.fn(),
         trashRetentionDays: 30,
@@ -514,10 +526,6 @@ describe('PreferencesDialog', () => {
           whisper: { modelDir: '', installedModel: null }
         },
         setSpeech: vi.fn(),
-        oneDrive: {
-          customClientId: ''
-        },
-        setOneDrive: vi.fn(),
         defaultSyncOfflinePolicy: 'always-offline' as const,
         setDefaultSyncOfflinePolicy: vi.fn(),
         trashRetentionDays: 30,

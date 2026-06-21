@@ -176,6 +176,16 @@ describe('uploadFiles web preflight', () => {
     expect(toast.warning).toHaveBeenCalledWith('Skipped 1 unsupported file(s)')
   })
 
+  it('does not accept PSD files through generic image MIME fallback', async () => {
+    vi.mocked(isWeb).mockReturnValue(true)
+    const psd = makeFile('layout.psd', 100, 'image/vnd.adobe.photoshop')
+
+    await expect(uploadFiles([psd], 'parent-1')).resolves.toBe(0)
+
+    expect(addFileItemToStore).not.toHaveBeenCalled()
+    expect(toast.warning).toHaveBeenCalledWith('Skipped 1 unsupported file(s)')
+  })
+
   it('silently ignores folder system files', async () => {
     vi.mocked(isWeb).mockReturnValue(true)
     const supported = setRelativePath(makeFile('movie.mkv', 100, ''), 'Sunday/movie.mkv')

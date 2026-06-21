@@ -1,4 +1,3 @@
-import { toast } from '@heroui/react/toast'
 import type { FileItemRecord, FolderRecord, SyncOfflinePolicy } from '@shared/types/folder'
 import { FILE_EXPLORER_ROOT_ID, useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { getEffectiveOneDriveClientId, useSettingsStore } from '@renderer/stores/settings'
@@ -32,12 +31,12 @@ import {
   getWebOneDriveAccessToken,
   saveWebOneDriveCredentials
 } from './onedrive-web-credentials'
-import { getMediaSupport, resolveMediaCapability, type MediaPlatform } from './media-capabilities'
+import type { MediaPlatform } from './media-capabilities'
+import { classifyMediaImport } from './media-import-policy'
 import type { RemoteSyncItem } from './sync-provider'
 import { applySyncRefreshPlan, buildSyncRefreshPlan } from './sync-refresh'
 import { refreshImportedMediaAssets } from './local-sync-import'
 import { isIgnoredSystemPath } from '@shared/file-ignore-policy'
-import i18n from '@renderer/i18n'
 
 const ONEDRIVE_WEB_CALLBACK_PATH = '/onedrive-callback.html'
 const ONEDRIVE_WEB_CALLBACK_STORAGE_KEY = 'libre-presenter:onedrive-callback'
@@ -96,11 +95,15 @@ function classifyRemoteFile(
 ): {
   mimeType: string
   disabled: boolean
+  skip: boolean
 } {
-  const capability = resolveMediaCapability({ mimeType: item.mimeType, fileName: item.name })
-  if (!capability) return { mimeType: item.mimeType ?? 'application/octet-stream', disabled: true }
-  const support = getMediaSupport(capability, platform)
-  return { mimeType: capability.canonicalMimeType, disabled: support === 'unsupported' }
+  const decision = classifyMediaImport({ name: item.name, mimeType: item.mimeType }, platform)
+  if (decision.action === 'skip') return { mimeType: decision.mimeType, disabled: true, skip: true }
+  return {
+    mimeType: decision.mimeType,
+    disabled: decision.action === 'platform-unsupported',
+    skip: false
+  }
 }
 
 function sortByIndex<T extends { sortIndex: number }>(items: T[]): T[] {
@@ -244,10 +247,11 @@ export function buildOneDriveImportPlan(input: {
     if (ignoredRemoteIds.has(remoteItem.remoteItemId)) continue
     if (remoteItem.kind !== 'file' || remoteItem.deleted) continue
     const parentId = remoteFolderToLocalId.get(remoteItem.parentRemoteItemId) ?? rootFolderId
+    const policy = classifyRemoteFile(remoteItem, input.platform)
+    if (policy.skip) continue
     const itemId = createSyncedItemId()
     const sortIndex = itemSortCounts.get(parentId) ?? 0
     itemSortCounts.set(parentId, sortIndex + 1)
-    const policy = classifyRemoteFile(remoteItem, input.platform)
     items.push({
       id: itemId,
       parentId,
@@ -262,6 +266,19 @@ export function buildOneDriveImportPlan(input: {
     })
     if (policy.disabled) {
       disabledCount++
+      syncEntries.push({
+        providerConnectionId: input.connectionId,
+        remoteItemId: remoteItem.remoteItemId,
+        parentRemoteItemId: remoteItem.parentRemoteItemId,
+        kind: 'file',
+        name: remoteItem.name,
+        itemId,
+        mimeType: policy.mimeType,
+        size: remoteItem.size,
+        etag: remoteItem.etag,
+        contentHash: remoteItem.contentHash,
+        status: 'remote-only'
+      })
       continue
     }
     downloadableItems.push({ itemId, remoteItemId: remoteItem.remoteItemId })
@@ -383,7 +400,7 @@ function readStoredWebOneDriveCallback(): string | null {
 }
 
 function getOneDriveClientId(): string {
-  return getEffectiveOneDriveClientId(useSettingsStore.getState().oneDrive)
+  return getEffectiveOneDriveClientId()
 }
 
 function createStoredOneDriveProvider(connectionId: string): OneDriveReadonlyProvider {
@@ -438,8 +455,7 @@ export async function loginOneDriveAccount(options?: {
     throw new Error('Only one OneDrive account can be connected')
   }
 
-  const oneDriveSettings = useSettingsStore.getState().oneDrive
-  const clientId = getEffectiveOneDriveClientId(oneDriveSettings)
+  const clientId = getEffectiveOneDriveClientId()
   const electronMode = isElectron()
   const authCallback = electronMode ? await window.api.oneDrive.startAuthCallback() : null
   if (!electronMode) clearStoredWebOneDriveCallback()
@@ -627,12 +643,6 @@ export async function importOneDriveFolder(
       plan.items.filter((item) => downloadedItemIds.includes(item.id))
     )
   }
-  if (plan.disabledCount > 0) {
-    toast.warning(
-      i18n.t('fileExplorer.syncSources.unsupportedFiles', { count: plan.disabledCount })
-    )
-  }
-
   return {
     connectionId: connection.id,
     displayName: remoteFolder.name,

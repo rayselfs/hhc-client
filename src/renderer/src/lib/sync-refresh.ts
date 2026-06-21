@@ -8,11 +8,8 @@ import { isValidNativeFileId } from '@shared/native-media'
 import { FILE_EXPLORER_ROOT_ID, useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { cleanupFileResources } from './file-resource-cleanup'
 import { openFileExplorerDB, type FileBlobRecord } from './file-explorer-db'
-import {
-  getMediaSupport,
-  resolveMediaCapability,
-  type MediaPlatform
-} from '@renderer/lib/media-capabilities'
+import type { MediaPlatform } from '@renderer/lib/media-capabilities'
+import { classifyMediaImport } from '@renderer/lib/media-import-policy'
 import { isIgnoredSystemPath } from '@shared/file-ignore-policy'
 import type { RemoteSyncItem } from './sync-provider'
 import {
@@ -76,12 +73,13 @@ function createItemId(): string {
 function classifyRemoteFile(
   item: RemoteSyncItem,
   platform: MediaPlatform
-): { mimeType: string; disabled: boolean } {
-  const capability = resolveMediaCapability({ mimeType: item.mimeType, fileName: item.name })
-  if (!capability) return { mimeType: item.mimeType ?? 'application/octet-stream', disabled: true }
+): { mimeType: string; disabled: boolean; skip: boolean } {
+  const decision = classifyMediaImport({ name: item.name, mimeType: item.mimeType }, platform)
+  if (decision.action === 'skip') return { mimeType: decision.mimeType, disabled: true, skip: true }
   return {
-    mimeType: capability.canonicalMimeType,
-    disabled: getMediaSupport(capability, platform) === 'unsupported'
+    mimeType: decision.mimeType,
+    disabled: decision.action === 'platform-unsupported',
+    skip: false
   }
 }
 
@@ -106,7 +104,7 @@ function nextStatus(
   offlinePolicy: SyncOfflinePolicy,
   shouldTransfer: boolean
 ): SyncEntryStatus {
-  if (disabled) return 'failed'
+  if (disabled) return 'remote-only'
   if (offlinePolicy === 'always-offline') return shouldTransfer ? 'queued' : 'available-offline'
   return 'remote-only'
 }
@@ -178,6 +176,8 @@ export function buildSyncRefreshPlan(input: BuildSyncRefreshPlanInput): SyncRefr
   for (const remoteItem of input.remoteItems) {
     if (ignoredRemoteIds.has(remoteItem.remoteItemId)) continue
     if (remoteItem.deleted || remoteItem.kind !== 'file') continue
+    const policy = classifyRemoteFile(remoteItem, input.platform)
+    if (policy.skip) continue
     remoteIds.add(remoteItem.remoteItemId)
     const parentId = remoteFolderToLocalId.get(remoteItem.parentRemoteItemId) ?? input.rootFolder.id
     const existing = existingByRemoteId.get(remoteItem.remoteItemId)
@@ -186,7 +186,6 @@ export function buildSyncRefreshPlan(input: BuildSyncRefreshPlanInput): SyncRefr
     if (existing?.itemId && existing.itemId !== itemId) replacedItemIds.push(existing.itemId)
     const sortIndex = itemSortCounts.get(parentId) ?? 0
     itemSortCounts.set(parentId, sortIndex + 1)
-    const policy = classifyRemoteFile(remoteItem, input.platform)
     const shouldTransfer =
       !policy.disabled &&
       input.offlinePolicy === 'always-offline' &&

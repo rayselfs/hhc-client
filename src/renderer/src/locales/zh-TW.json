@@ -614,13 +614,6 @@
       "oneDrive": {
         "title": "OneDrive",
         "description": "OneDrive 資料夾是唯讀來源。LibrePresenter 不會上傳、重新命名、移動或刪除遠端檔案。",
-        "customClientId": "自定義 Azure Client ID",
-        "clientId": "Azure Application Client ID",
-        "clientIdSourceDefault": "使用 LibrePresenter 預設值",
-        "clientIdSourceCustom": "使用自訂 Client ID",
-        "invalidClientId": "請輸入有效的 Azure Application Client ID。",
-        "clientIdHelp": "如何建立 Azure Client ID",
-        "restoreDefaultClientId": "恢復預設 Client ID",
         "connectedAccount": "已連結帳號",
         "noConnectedAccount": "尚未連結 OneDrive 帳號。",
         "connect": "登入",
@@ -629,12 +622,11 @@
         "alreadyConnected": "只能連結一個 OneDrive 帳號。",
         "desktopOnly": "OneDrive 連線目前只支援桌面版。",
         "connectFailed": "無法連接 OneDrive。",
-        "disconnect": "解除連結",
-        "disconnectTitle": "解除 OneDrive 連結？",
+        "disconnect": "登出",
+        "disconnectTitle": "登出 OneDrive？",
         "disconnectDescription": "這會從 LibrePresenter 移除 OneDrive 來源並清除本機同步快取，不會變更遠端檔案。",
-        "disconnected": "已解除 OneDrive 連結。",
-        "disconnectFailed": "無法解除 OneDrive 連結。",
-        "setupHint": "變更 Client ID 後需要重新連接 OneDrive。Token 會分開儲存，不會進入偏好設定。"
+        "disconnected": "已登出 OneDrive。",
+        "disconnectFailed": "無法登出 OneDrive。"
       }
     },
     "storage": {

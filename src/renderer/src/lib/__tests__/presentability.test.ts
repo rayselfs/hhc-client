@@ -98,6 +98,13 @@ describe('getPresentableItems', () => {
     expect(result[0].id).toBe('mkv')
   })
 
+  it('excludes unsupported placeholder items from presentation candidates', () => {
+    const unsupported = file('avi', 'video/x-msvideo')
+    unsupported.url = `unsupported:${unsupported.id}`
+
+    expect(getPresentableItems([unsupported], 'electron')).toHaveLength(0)
+  })
+
   it('returns empty for no presentable items', () => {
     const items: AnyItemRecord[] = [file('txt', 'text/plain'), verse]
     expect(getPresentableItems(items)).toHaveLength(0)

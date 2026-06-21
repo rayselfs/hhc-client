@@ -508,14 +508,15 @@ export function FileBrowser({
         mimeType: item.mimeType,
         size: item.size,
         createdAt: item.createdAt,
-        thumbnailUrl: unsupportedMediaIds.has(item.id)
-          ? null
-          : canHaveThumbnail(item.mimeType)
-            ? thumbnails[item.id]
-            : null,
+        thumbnailUrl:
+          unsupportedMediaIds.has(item.id) || item.url.startsWith('unsupported:')
+            ? null
+            : canHaveThumbnail(item.mimeType)
+              ? thumbnails[item.id]
+              : null,
         isSelected: false,
         syncStatus: syncStatuses[item.id],
-        isUnsupportedMedia: unsupportedMediaIds.has(item.id)
+        isUnsupportedMedia: unsupportedMediaIds.has(item.id) || item.url.startsWith('unsupported:')
       }))
     ],
     [folders, fileItems, thumbnails, syncStatuses, unsupportedMediaIds]

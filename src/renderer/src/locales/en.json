@@ -614,13 +614,6 @@
       "oneDrive": {
         "title": "OneDrive",
         "description": "OneDrive folders are read-only sources. LibrePresenter never uploads, renames, moves, or deletes remote files.",
-        "customClientId": "Custom Azure Client ID",
-        "clientId": "Azure Application Client ID",
-        "clientIdSourceDefault": "Using LibrePresenter default",
-        "clientIdSourceCustom": "Using custom Client ID",
-        "invalidClientId": "Enter a valid Azure Application Client ID.",
-        "clientIdHelp": "How to create an Azure Client ID",
-        "restoreDefaultClientId": "Restore default Client ID",
         "connectedAccount": "Connected Account",
         "noConnectedAccount": "No OneDrive account connected.",
         "connect": "Sign in",
@@ -629,12 +622,11 @@
         "alreadyConnected": "Only one OneDrive account can be connected.",
         "desktopOnly": "OneDrive connection is available in the desktop app only.",
         "connectFailed": "Failed to connect OneDrive.",
-        "disconnect": "Disconnect",
-        "disconnectTitle": "Disconnect OneDrive?",
+        "disconnect": "Logout",
+        "disconnectTitle": "Logout from OneDrive?",
         "disconnectDescription": "This removes the OneDrive source from LibrePresenter and clears locally cached synced files. Remote files are not changed.",
-        "disconnected": "OneDrive disconnected.",
-        "disconnectFailed": "Failed to disconnect OneDrive.",
-        "setupHint": "Changing the Client ID requires reconnecting OneDrive. Tokens are stored separately and never in Preferences."
+        "disconnected": "Logged out of OneDrive.",
+        "disconnectFailed": "Failed to logout from OneDrive."
       }
     },
     "storage": {

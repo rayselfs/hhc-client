@@ -129,7 +129,7 @@ describe('buildSyncRefreshPlan', () => {
     expect(plan.removedItemIds).toEqual([])
   })
 
-  it('marks web-unsupported files disabled and removes entries missing from a full scan', () => {
+  it('keeps web-unsupported files remote-only and skips app-unsupported files', () => {
     const plan = buildSyncRefreshPlan({
       providerConnectionId: 'connection-1',
       providerType: 'local-fs',
@@ -147,6 +147,14 @@ describe('buildSyncRefreshPlan', () => {
           kind: 'file',
           name: 'legacy.avi',
           size: 20
+        },
+        {
+          remoteItemId: 'psd-file',
+          parentRemoteItemId: null,
+          kind: 'file',
+          name: 'layout.psd',
+          mimeType: 'image/vnd.adobe.photoshop',
+          size: 20
         }
       ]
     })
@@ -157,12 +165,13 @@ describe('buildSyncRefreshPlan', () => {
         url: expect.stringMatching(/^unsupported:/)
       })
     ])
+    expect(plan.items.find((item) => item.name === 'layout.psd')).toBeUndefined()
     expect(plan.fileTransfers).toEqual([])
     expect(plan.removedItemIds).toEqual([existingItem.id])
     expect(plan.syncEntries).toEqual([
       expect.objectContaining({
         remoteItemId: 'bad-file',
-        status: 'failed'
+        status: 'remote-only'
       })
     ])
   })

@@ -127,6 +127,16 @@ async function analyzePresentationItem(
   platform: MediaPlatform
 ): Promise<PresentationReadinessItem> {
   const blobId = getBlobId(item)
+  if (item.url.startsWith('unsupported:')) {
+    return {
+      itemId: item.id,
+      blobId,
+      status: 'unsupported',
+      reason: 'unsupported-placeholder',
+      support: null
+    }
+  }
+
   if (!item.url || !blobId) {
     return {
       itemId: item.id,

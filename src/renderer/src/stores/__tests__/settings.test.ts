@@ -24,12 +24,10 @@ import {
   TIMEZONE_OPTIONS,
   AZURE_REGION_OPTIONS,
   DEFAULT_SPEECH,
-  DEFAULT_ONEDRIVE,
   getEffectiveOneDriveClientId,
   getDefaultSpeechSettings,
   LIBREPRESENTER_DEFAULT_ONEDRIVE_CLIENT_ID,
-  normalizeSettingsState,
-  validateOneDriveClientId
+  normalizeSettingsState
 } from '@renderer/stores/settings'
 import { clearAllSiteData } from '@renderer/lib/site-data'
 import { isElectron } from '@renderer/lib/env'
@@ -43,7 +41,6 @@ beforeEach(() => {
     themePreference: 'system',
     timerRingColor: '#3b82f6',
     speech: DEFAULT_SPEECH,
-    oneDrive: DEFAULT_ONEDRIVE,
     projectionDisplayId: ''
   })
   mockToast.warning.mockClear()
@@ -399,48 +396,8 @@ describe('speech settings', () => {
 })
 
 describe('OneDrive settings', () => {
-  it('uses the LibrePresenter default Client ID when custom override is empty', () => {
-    expect(getEffectiveOneDriveClientId(DEFAULT_ONEDRIVE)).toBe(
-      LIBREPRESENTER_DEFAULT_ONEDRIVE_CLIENT_ID
-    )
-  })
-
-  it('validates Azure Application Client ID format', () => {
-    expect(validateOneDriveClientId('4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02')).toBe(true)
-    expect(validateOneDriveClientId('../not-a-client-id')).toBe(false)
-  })
-
-  it('persists non-sensitive OneDrive preferences only', () => {
-    useSettingsStore.getState().setOneDrive({
-      customClientId: '11111111-2222-3333-4444-555555555555'
-    })
-
-    const state = useSettingsStore.getState()
-    expect(state.oneDrive).toMatchObject({
-      customClientId: '11111111-2222-3333-4444-555555555555'
-    })
-    expect(state.oneDrive).not.toHaveProperty('accessToken')
-    expect(state.oneDrive).not.toHaveProperty('refreshToken')
-  })
-
-  it('rejects invalid custom Client ID updates', () => {
-    const before = useSettingsStore.getState().oneDrive
-    useSettingsStore.getState().setOneDrive({
-      customClientId: '../bad'
-    })
-
-    expect(useSettingsStore.getState().oneDrive).toEqual(before)
-  })
-
-  it('normalizes invalid persisted OneDrive preferences', () => {
-    const normalized = normalizeSettingsState({
-      oneDrive: {
-        customClientId: '../bad',
-        defaultOfflinePolicy: 'upload-everything'
-      }
-    })
-
-    expect(normalized.oneDrive).toEqual(DEFAULT_ONEDRIVE)
+  it('uses the configured LibrePresenter Client ID', () => {
+    expect(getEffectiveOneDriveClientId()).toBe(LIBREPRESENTER_DEFAULT_ONEDRIVE_CLIENT_ID)
   })
 
   it('normalizes shared sync offline policy', () => {
@@ -449,18 +406,6 @@ describe('OneDrive settings', () => {
     })
 
     expect(normalized.defaultSyncOfflinePolicy).toBe('online-only')
-  })
-
-  it('normalizes valid persisted OneDrive preferences', () => {
-    const normalized = normalizeSettingsState({
-      oneDrive: {
-        customClientId: '11111111-2222-3333-4444-555555555555'
-      }
-    })
-
-    expect(normalized.oneDrive).toEqual({
-      customClientId: '11111111-2222-3333-4444-555555555555'
-    })
   })
 })
 

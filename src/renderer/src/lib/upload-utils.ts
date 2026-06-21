@@ -5,11 +5,11 @@ import { saveThumbnail, savePdfPageThumbs } from '@renderer/lib/thumbnail-db'
 import { isWeb } from '@renderer/lib/env'
 import {
   canGenerateMediaThumbnail,
-  classifyFile,
   resolveMediaCapability,
-  type ClassifiedFile,
+  type MediaKind,
   type MediaPlatform
 } from '@renderer/lib/media-capabilities'
+import { classifyMediaImport } from '@renderer/lib/media-import-policy'
 import { mediaJobQueue } from '@renderer/lib/media-job-queue'
 import { getFileBlob, getFileSource, openFileExplorerDB } from '@renderer/lib/file-explorer-db'
 import { resolveUniqueName } from '@renderer/lib/file-naming'
@@ -23,7 +23,10 @@ export { MAX_FILE_SIZE_WEB }
 
 interface UploadCandidate {
   file: File
-  classification: ClassifiedFile
+  classification: {
+    kind: MediaKind
+    mimeType: string
+  }
 }
 
 interface UploadDestination extends UploadCandidate {
@@ -99,7 +102,7 @@ async function collectFromEntry(
 }
 
 export function isSupportedFile(file: File): boolean {
-  return classifyFile(file, getUploadMediaPlatform()).kind !== 'unsupported'
+  return classifyMediaImport(file, getUploadMediaPlatform()).action === 'accept'
 }
 
 export function canGenerateThumbnail(mimeType: string, fileName?: string): boolean {
@@ -125,8 +128,12 @@ async function prepareUploadCandidates(files: File[]): Promise<UploadCandidate[]
   let unsupportedCount = 0
   for (const file of files) {
     if (isIgnoredSystemFile(file)) continue
-    const classification = classifyFile(file, platform)
-    if (classification.kind === 'unsupported') {
+    const classification = classifyMediaImport(file, platform)
+    if (classification.action === 'skip') {
+      if (classification.reason === 'app-unsupported') unsupportedCount++
+      continue
+    }
+    if (classification.action === 'platform-unsupported') {
       unsupportedCount++
       continue
     }

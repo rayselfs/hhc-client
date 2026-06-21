@@ -4,16 +4,8 @@ import { toast } from '@heroui/react/toast'
 import { Button } from '@heroui/react/button'
 import { Select } from '@heroui/react/select'
 import { ListBox } from '@heroui/react/list-box'
-import { Switch } from '@heroui/react/switch'
 import { Label } from 'react-aria-components'
-import { ExternalLink } from 'lucide-react'
-import {
-  DEFAULT_ONEDRIVE,
-  LIBREPRESENTER_DEFAULT_ONEDRIVE_CLIENT_ID,
-  useSettingsStore,
-  validateOneDriveClientId,
-  type OneDriveSettings
-} from '@renderer/stores/settings'
+import { useSettingsStore } from '@renderer/stores/settings'
 import type { SyncOfflinePolicy } from '@shared/types/folder'
 import { listProviderConnectionsByType, type ProviderConnectionRecord } from '@renderer/lib/sync-db'
 import { unlinkSyncConnectionFromApp } from '@renderer/lib/sync-unlink'
@@ -24,9 +16,6 @@ import { isElectron } from '@renderer/lib/env'
 
 const RETENTION_DAY_OPTIONS = [7, 14, 30, 60, 90, 0] as const
 const OFFLINE_POLICY_OPTIONS: SyncOfflinePolicy[] = ['online-only', 'on-demand', 'always-offline']
-const ONEDRIVE_CLIENT_ID_DOC_URL =
-  'https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app'
-
 export type MediaSettingsSection = 'general' | 'oneDrive'
 
 interface MediaSettingsProps {
@@ -40,26 +29,12 @@ export default function MediaSettings({
   const confirm = useConfirm()
   const trashRetentionDays = useSettingsStore((s) => s.trashRetentionDays)
   const setTrashRetentionDays = useSettingsStore((s) => s.setTrashRetentionDays)
-  const oneDrive = useSettingsStore((s) => s.oneDrive)
-  const setOneDrive = useSettingsStore((s) => s.setOneDrive)
   const defaultSyncOfflinePolicy = useSettingsStore((s) => s.defaultSyncOfflinePolicy)
   const setDefaultSyncOfflinePolicy = useSettingsStore((s) => s.setDefaultSyncOfflinePolicy)
-  const [oneDriveDraft, setOneDriveDraft] = useState<OneDriveSettings>(oneDrive)
-  const [customClientIdEnabled, setCustomClientIdEnabled] = useState(
-    oneDrive.customClientId.trim().length > 0
-  )
   const [oneDriveConnection, setOneDriveConnection] = useState<ProviderConnectionRecord | null>(
     null
   )
   const [oneDriveConnectionBusy, setOneDriveConnectionBusy] = useState(false)
-  const customClientIdValid =
-    oneDriveDraft.customClientId.trim().length === 0 ||
-    validateOneDriveClientId(oneDriveDraft.customClientId)
-
-  function saveOneDriveDraft(next: OneDriveSettings): void {
-    setOneDriveDraft(next)
-    setOneDrive(next)
-  }
 
   const refreshOneDriveConnection = useCallback(async (): Promise<void> => {
     const connections = await listProviderConnectionsByType('onedrive')
@@ -194,7 +169,7 @@ export default function MediaSettings({
       )}
 
       {section === 'oneDrive' && (
-        <section className="space-y-3">
+        <section>
           <div className="space-y-2 rounded-2xl bg-surface-secondary px-4 py-3">
             <p className="text-sm font-medium">
               {t('preferences.media.oneDrive.connectedAccount')}
@@ -234,62 +209,6 @@ export default function MediaSettings({
               </div>
             )}
           </div>
-
-          <div className="flex items-center justify-between gap-3">
-            <label className="text-sm font-medium">
-              {t('preferences.media.oneDrive.customClientId')}
-            </label>
-            <Switch
-              isSelected={customClientIdEnabled}
-              onChange={(checked) => {
-                setCustomClientIdEnabled(checked)
-                if (!checked) {
-                  saveOneDriveDraft({
-                    ...oneDriveDraft,
-                    customClientId: DEFAULT_ONEDRIVE.customClientId
-                  })
-                }
-              }}
-              aria-label={t('preferences.media.oneDrive.customClientId')}
-            >
-              <Switch.Control>
-                <Switch.Thumb />
-              </Switch.Control>
-            </Switch>
-          </div>
-
-          {customClientIdEnabled && (
-            <div className="space-y-2">
-              <input
-                id="onedrive-client-id"
-                value={oneDriveDraft.customClientId}
-                onChange={(event) =>
-                  setOneDriveDraft({ ...oneDriveDraft, customClientId: event.target.value })
-                }
-                onBlur={() => {
-                  if (customClientIdValid) saveOneDriveDraft(oneDriveDraft)
-                }}
-                placeholder={LIBREPRESENTER_DEFAULT_ONEDRIVE_CLIENT_ID}
-                className="w-full rounded-full border border-default-200 bg-transparent px-4 py-2 text-sm"
-                aria-invalid={!customClientIdValid}
-              />
-              {!customClientIdValid && (
-                <p className="text-xs text-danger-700">
-                  {t('preferences.media.oneDrive.invalidClientId')}
-                </p>
-              )}
-            </div>
-          )}
-
-          <a
-            href={ONEDRIVE_CLIENT_ID_DOC_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-          >
-            {t('preferences.media.oneDrive.clientIdHelp')}
-            <ExternalLink size={12} />
-          </a>
         </section>
       )}
     </div>

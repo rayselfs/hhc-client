@@ -49,6 +49,9 @@ export function getPresentableItems(
   platform = getPresentabilityPlatform()
 ): FileItemRecord[] {
   return items.filter(
-    (item): item is FileItemRecord => isFileItem(item) && isPresentable(item.mimeType, platform)
+    (item): item is FileItemRecord =>
+      isFileItem(item) &&
+      !item.url.startsWith('unsupported:') &&
+      isPresentable(item.mimeType, platform)
   )
 }
