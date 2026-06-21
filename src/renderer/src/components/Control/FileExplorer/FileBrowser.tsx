@@ -49,8 +49,10 @@ import { hasNameConflict, splitFileName, validateDisplayName } from '@renderer/l
 import {
   listSyncEntries,
   SYNC_ENTRY_CHANGED_EVENT,
+  type SyncEntryRecord,
   type SyncEntryStatus
 } from '@renderer/lib/sync-db'
+import { deriveSyncFolderHealth, type SyncFolderHealth } from '@renderer/lib/sync-folder-health'
 import { getSourceMediaMetadata } from '@renderer/lib/media-metadata'
 import { getBlobId } from '@renderer/lib/blob-identity'
 import { isWeb } from '@renderer/lib/env'
@@ -93,6 +95,19 @@ interface SyncItemViewState {
   status: SyncEntryStatus
   downloadedBytes?: number
   downloadTotalBytes?: number
+}
+
+function formatSyncFolderHealthTooltip(health: SyncFolderHealth): string {
+  const parts = [
+    `Last sync: ${health.lastSyncedAt ? new Date(health.lastSyncedAt).toLocaleString() : 'Unknown'}`,
+    `Downloading: ${health.downloadingCount}`,
+    `Queued: ${health.queuedCount}`,
+    `Failed: ${health.failedCount}`
+  ]
+  if (health.nextRetryAt) {
+    parts.push(`Next retry: ${new Date(health.nextRetryAt).toLocaleString()}`)
+  }
+  return parts.join('\n')
 }
 
 function isFileItemRecord(item: unknown): item is FileItemRecord {
@@ -381,6 +396,7 @@ export function FileBrowser({
   const [selectedSearchId, setSelectedSearchId] = useState<string | null>(null)
   const [renamingItemId, setRenamingItemId] = useState<string | null>(null)
   const [syncStates, setSyncStates] = useState<Record<string, SyncItemViewState>>({})
+  const [syncEntries, setSyncEntries] = useState<SyncEntryRecord[]>([])
   const [unsupportedMediaIds, setUnsupportedMediaIds] = useState<Set<string>>(new Set())
   const renameClickTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const pendingRenameItemIdRef = React.useRef<string | null>(null)
@@ -436,6 +452,15 @@ export function FileBrowser({
 
   const thumbnails = useThumbnails(fileItems, { pendingAgeMs: 2 * 60 * 1000 })
 
+  const syncFolderHealthById = useMemo(() => {
+    const next: Record<string, SyncFolderHealth> = {}
+    for (const folder of folders) {
+      if (folder.parentId !== FILE_EXPLORER_ROOT_ID || !folder.syncLink) continue
+      next[folder.id] = deriveSyncFolderHealth(syncEntries, folder.id)
+    }
+    return next
+  }, [folders, syncEntries])
+
   useEffect(() => {
     let cancelled = false
     async function loadSyncStatuses(): Promise<void> {
@@ -445,11 +470,13 @@ export function FileBrowser({
       ])
       if (ids.size === 0) {
         setSyncStates({})
+        setSyncEntries([])
         return
       }
       try {
         const entries = await listSyncEntries()
         if (cancelled) return
+        setSyncEntries(entries)
         const next: Record<string, SyncItemViewState> = {}
         for (const entry of entries) {
           const localId = entry.itemId ?? entry.folderId
@@ -463,7 +490,10 @@ export function FileBrowser({
         }
         setSyncStates(next)
       } catch {
-        if (!cancelled) setSyncStates({})
+        if (!cancelled) {
+          setSyncStates({})
+          setSyncEntries([])
+        }
       }
     }
     const handleSyncEntryChanged = (): void => {
@@ -512,6 +542,10 @@ export function FileBrowser({
   const allItems: GridViewItem[] = useMemo(
     () => [
       ...folders.map((folder) => ({
+        syncFolderHealth: syncFolderHealthById[folder.id]?.status,
+        syncFolderHealthTooltip: syncFolderHealthById[folder.id]
+          ? formatSyncFolderHealthTooltip(syncFolderHealthById[folder.id])
+          : undefined,
         id: folder.id,
         name: folder.name,
         isFolder: true,
@@ -544,7 +578,7 @@ export function FileBrowser({
         isUnsupportedMedia: unsupportedMediaIds.has(item.id) || item.url.startsWith('unsupported:')
       }))
     ],
-    [folders, fileItems, thumbnails, syncStates, unsupportedMediaIds]
+    [folders, fileItems, syncFolderHealthById, thumbnails, syncStates, unsupportedMediaIds]
   )
 
   const sortedItems = useMemo(() => {

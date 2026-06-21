@@ -113,6 +113,30 @@ describe('inline rename in file views', () => {
     expect(screen.getByLabelText('Downloading 50%')).toBeInTheDocument()
   })
 
+  it('renders folder sync health in grid view', () => {
+    render(
+      <GridView
+        items={[
+          {
+            id: 'folder-1',
+            name: 'OneDrive',
+            isFolder: true,
+            isSelected: false,
+            syncProviderType: 'onedrive',
+            syncFolderHealth: 'syncing',
+            syncFolderHealthTooltip: 'Downloading: 1'
+          }
+        ]}
+        viewMode="large-icon"
+        onItemClick={vi.fn()}
+        onItemDoubleClick={vi.fn()}
+        onItemContextMenu={vi.fn()}
+      />
+    )
+
+    expect(screen.getByLabelText('Syncing')).toBeInTheDocument()
+  })
+
   it('renders grid items in a single responsive grid', () => {
     const manyItems = Array.from({ length: 8 }, (_, index) => ({
       ...items[0],
