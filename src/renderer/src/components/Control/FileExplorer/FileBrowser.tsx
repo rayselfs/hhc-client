@@ -708,7 +708,7 @@ export function FileBrowser({
         if (idx !== -1) {
           void useMediaProjectionStore
             .getState()
-            .startPresentationWithReadiness(presentable, idx)
+            .startPresentationWithReadiness(presentable, idx, { prioritizeStartItem: true })
             .then((report) => {
               if (report.summary.ready === 0) {
                 toast.warning(t('fileExplorer.noProjectableFiles'))
@@ -948,7 +948,9 @@ export function FileBrowser({
           const idx = firstSelected ? presentable.findIndex((f) => f.id === firstSelected) : 0
           void useMediaProjectionStore
             .getState()
-            .startPresentationWithReadiness(presentable, Math.max(0, idx))
+            .startPresentationWithReadiness(presentable, Math.max(0, idx), {
+              prioritizeStartItem: true
+            })
             .then((report) => {
               if (report.summary.ready === 0) {
                 toast.warning(t('fileExplorer.noProjectableFiles'))

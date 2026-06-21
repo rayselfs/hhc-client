@@ -15,6 +15,7 @@ import {
   listProviderConnectionsByType,
   deleteProviderConnection,
   getProviderConnection,
+  getSyncEntryByLocalItem,
   listSyncEntriesByProviderConnection,
   getSyncCursor,
   putProviderConnection,
@@ -427,6 +428,7 @@ function createStoredOneDriveProvider(connectionId: string): OneDriveReadonlyPro
 }
 
 const RETRY_BACKOFF_MS = [30_000, 60_000, 2 * 60_000, 5 * 60_000, 15 * 60_000]
+const presentationDownloads = new Map<string, Promise<boolean>>()
 
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
@@ -472,6 +474,75 @@ function classifyDownloadFailure(
     errorKind,
     lastError: getErrorMessage(error)
   }
+}
+
+async function downloadOneDriveItemForPresentation(item: FileItemRecord): Promise<boolean> {
+  const entry = await getSyncEntryByLocalItem(item.id)
+  if (!entry || entry.status === 'available-offline') return true
+  if (
+    entry.kind !== 'file' ||
+    entry.status === 'insufficient-storage' ||
+    entry.status === 'deleted-pending-release'
+  ) {
+    return false
+  }
+
+  const connection = await getProviderConnection(entry.providerConnectionId)
+  if (connection?.providerType !== 'onedrive') return false
+
+  const provider = createStoredOneDriveProvider(entry.providerConnectionId)
+  try {
+    await putSyncEntry({
+      ...entry,
+      status: 'downloading',
+      errorKind: undefined,
+      retryCount: undefined,
+      nextRetryAt: undefined,
+      lastError: undefined
+    })
+    await provider.downloadContent(
+      {
+        providerConnectionId: entry.providerConnectionId,
+        remoteItemId: entry.remoteItemId,
+        targetBlobId: item.id,
+        offlinePolicy: 'always-offline'
+      },
+      new AbortController().signal
+    )
+    void refreshImportedMediaAssets([item])
+    return true
+  } catch (error) {
+    const failure = classifyDownloadFailure(provider, error, entry)
+    await putSyncEntry({
+      providerConnectionId: entry.providerConnectionId,
+      remoteItemId: entry.remoteItemId,
+      parentRemoteItemId: entry.parentRemoteItemId,
+      kind: 'file',
+      name: entry.name,
+      itemId: item.id,
+      mimeType: entry.mimeType,
+      size: entry.size,
+      etag: entry.etag,
+      contentHash: entry.contentHash,
+      ...failure
+    })
+    console.warn('[onedrive] Failed to prioritize file for presentation', {
+      connectionId: entry.providerConnectionId,
+      remoteItemId: entry.remoteItemId,
+      error
+    })
+    return false
+  }
+}
+
+export function ensureOneDriveItemAvailableForPresentation(item: FileItemRecord): Promise<boolean> {
+  const existing = presentationDownloads.get(item.id)
+  if (existing) return existing
+  const download = downloadOneDriveItemForPresentation(item).finally(() => {
+    presentationDownloads.delete(item.id)
+  })
+  presentationDownloads.set(item.id, download)
+  return download
 }
 
 async function downloadImportedOneDriveItems(input: {

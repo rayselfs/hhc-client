@@ -10,6 +10,11 @@ import {
   type PresentationReadinessReport,
   type PresentationSnapshot
 } from '@renderer/lib/presentation-readiness'
+import { ensureOneDriveItemAvailableForPresentation } from '@renderer/lib/onedrive-connect'
+
+interface StartPresentationWithReadinessOptions {
+  prioritizeStartItem?: boolean
+}
 
 export interface MediaProjectionStore {
   playlist: FileItemRecord[]
@@ -44,7 +49,8 @@ export interface MediaProjectionStore {
   updateNotes: (itemId: string, notes: string) => void
   startPresentationWithReadiness: (
     files: FileItemRecord[],
-    startIndex: number
+    startIndex: number,
+    options?: StartPresentationWithReadinessOptions
   ) => Promise<PresentationReadinessReport>
 }
 
@@ -117,22 +123,38 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
 
   startPresentationWithReadiness: async (
     files: FileItemRecord[],
-    startIndex: number
+    startIndex: number,
+    options: StartPresentationWithReadinessOptions = {}
   ): Promise<PresentationReadinessReport> => {
-    const report = await analyzePresentationReadiness(files)
+    let report = await analyzePresentationReadiness(files)
+    const requestedItem = files[startIndex]
+    if (options.prioritizeStartItem && requestedItem) {
+      const requestedReadiness = report.items.find((item) => item.itemId === requestedItem.id)
+      if (
+        requestedReadiness?.status === 'preparing' &&
+        requestedReadiness.reason.startsWith('sync-') &&
+        (await ensureOneDriveItemAvailableForPresentation(requestedItem))
+      ) {
+        report = await analyzePresentationReadiness(files)
+      }
+    }
+
     const readyItemIds = new Set(
       report.items.filter((item) => item.status === 'ready').map((item) => item.itemId)
     )
     const readyFiles = files.filter((file) => readyItemIds.has(file.id))
+    const requestedReadyIndex = requestedItem
+      ? readyFiles.findIndex((file) => file.id === requestedItem.id)
+      : -1
+    if (options.prioritizeStartItem && requestedItem && requestedReadyIndex === -1) {
+      set({ lastReadinessReport: report })
+      return report
+    }
     if (readyFiles.length === 0) {
       set({ lastReadinessReport: report })
       return report
     }
 
-    const requestedItem = files[startIndex]
-    const requestedReadyIndex = requestedItem
-      ? readyFiles.findIndex((file) => file.id === requestedItem.id)
-      : -1
     const fallbackReadyIndex = readyFiles.findIndex(
       (file) => files.findIndex((candidate) => candidate.id === file.id) >= startIndex
     )

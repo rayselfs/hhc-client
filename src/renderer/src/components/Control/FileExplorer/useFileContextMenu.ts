@@ -37,7 +37,9 @@ export const useFileContextMenu = createFolderContextMenu({
           if (presentableFiles.length > 0) {
             void useMediaProjectionStore
               .getState()
-              .startPresentationWithReadiness(presentableFiles, Math.max(targetIndex, 0))
+              .startPresentationWithReadiness(presentableFiles, Math.max(targetIndex, 0), {
+                prioritizeStartItem: true
+              })
               .then((report) => {
                 if (report.summary.ready === 0) {
                   toast.warning(t('fileExplorer.noProjectableFiles'))
