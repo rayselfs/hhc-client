@@ -47,13 +47,13 @@ describe('startSyncRuntime', () => {
     stop()
   })
 
-  it('uses the idle delay when OneDrive has no work', async () => {
+  it('uses the 60 second idle delay when OneDrive has no work', async () => {
     const stop = startSyncRuntime()
 
     await flushMicrotasks()
     expect(refreshAllOneDriveFolders).toHaveBeenCalledTimes(1)
 
-    await vi.advanceTimersByTimeAsync(5 * 60_000 - 1)
+    await vi.advanceTimersByTimeAsync(60_000 - 1)
     expect(refreshAllOneDriveFolders).toHaveBeenCalledTimes(1)
 
     await vi.advanceTimersByTimeAsync(1)

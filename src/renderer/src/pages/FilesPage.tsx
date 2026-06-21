@@ -18,6 +18,7 @@ import { RefreshCw, Unlink } from 'lucide-react'
 import { connectLocalSyncFolder, refreshLocalSyncConnection } from '@renderer/lib/local-sync-import'
 import { getCloudProviderAdapter, type CloudRemoteFolder } from '@renderer/lib/cloud-provider'
 import { unlinkSyncRootFolderFromApp } from '@renderer/lib/sync-unlink'
+import { refreshSyncFolderOnNavigation } from '@renderer/lib/sync-folder-refresh'
 import { isElectron } from '@renderer/lib/env'
 import {
   computeExpiresAt,
@@ -204,6 +205,12 @@ export default function FilesPage(): React.JSX.Element {
     }
     return root
   }, [])
+
+  useEffect(() => {
+    const root = findSyncRootFolder(currentFolderId)
+    if (!root?.syncLink) return
+    void refreshSyncFolderOnNavigation(root.id)
+  }, [currentFolderId, findSyncRootFolder])
 
   const isSyncRootFolder = useCallback((folder: FolderRecord): boolean => {
     return folder.parentId === FILE_EXPLORER_ROOT_ID && Boolean(folder.syncLink)

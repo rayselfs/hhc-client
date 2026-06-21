@@ -3,7 +3,7 @@ import { refreshLocalSyncConnection } from './local-sync-import'
 import { refreshAllOneDriveFolders, type OneDriveRefreshSummary } from './onedrive-connect'
 
 const LOCAL_SYNC_POLL_MS = 3_000
-const ONEDRIVE_IDLE_REFRESH_MS = 5 * 60_000
+const ONEDRIVE_IDLE_REFRESH_MS = 60_000
 const ONEDRIVE_ACTIVE_REFRESH_MS = 15_000
 
 const localRefreshInFlight = new Set<string>()
