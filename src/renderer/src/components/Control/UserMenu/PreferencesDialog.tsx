@@ -56,6 +56,7 @@ export default function PreferencesDialog({
   const { t } = useTranslation()
   const [activeRoute, setActiveRoute] = useState<PreferenceRoute>('general')
   const [expandedCategory, setExpandedCategory] = useState<Category | null>(null)
+  const [isClearingAllData, setIsClearingAllData] = useState(false)
   const mediaChildren: CategoryChildItem[] = [
     { id: 'media.general', labelKey: 'preferences.media.sections.general' },
     { id: 'media.oneDrive', labelKey: 'preferences.media.sections.oneDrive' }
@@ -105,6 +106,7 @@ export default function PreferencesDialog({
                             <button
                               type="button"
                               aria-pressed={active}
+                              disabled={isClearingAllData}
                               className={`flex w-full items-center gap-3 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
                                 active
                                   ? 'bg-accent text-accent-foreground'
@@ -142,6 +144,7 @@ export default function PreferencesDialog({
                                       <button
                                         type="button"
                                         aria-pressed={childActive}
+                                        disabled={isClearingAllData}
                                         className={`w-full rounded-full px-3 py-2 text-left text-sm font-medium transition-colors ${
                                           childActive
                                             ? 'bg-accent text-accent-foreground'
@@ -166,7 +169,12 @@ export default function PreferencesDialog({
                     </ul>
                   </nav>
                   <div className="flex-1 overflow-y-auto p-0">
-                    {activeRoute === 'general' && <GeneralSettings />}
+                    {activeRoute === 'general' && (
+                      <GeneralSettings
+                        isClearingAllData={isClearingAllData}
+                        onClearingAllDataChange={setIsClearingAllData}
+                      />
+                    )}
                     {activeRoute === 'timer' && <TimerSettings />}
                     {activeRoute === 'bible' && <BibleSettingsPanel />}
                     {activeRoute === 'media.general' && <MediaSettings section="general" />}

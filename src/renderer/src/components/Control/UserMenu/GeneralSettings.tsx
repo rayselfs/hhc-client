@@ -12,13 +12,21 @@ import { isElectron } from '@renderer/lib/env'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
 import type { DisplayInfo } from '@shared/ipc-channels'
 
+interface GeneralSettingsProps {
+  isClearingAllData?: boolean
+  onClearingAllDataChange?: (isClearing: boolean) => void
+}
+
 function formatDisplayLabel(display: DisplayInfo): string {
   const name = display.label.trim()
   const size = `${display.bounds.width}×${display.bounds.height}`
   return name ? `${name} · ${size}` : size
 }
 
-export default function GeneralSettings(): React.JSX.Element {
+export default function GeneralSettings({
+  isClearingAllData = false,
+  onClearingAllDataChange
+}: GeneralSettingsProps): React.JSX.Element {
   const { t, i18n } = useTranslation()
   const { resolved, setPreference } = useTheme()
   const hardwareAcceleration = useSettingsStore((s) => s.hardwareAcceleration)
@@ -55,6 +63,7 @@ export default function GeneralSettings(): React.JSX.Element {
   ]
 
   const handleResetSettingsClick = async (): Promise<void> => {
+    if (isClearingAllData) return
     const confirmed = await confirm({
       status: 'warning',
       description: t('preferences.reset.settingsConfirm'),
@@ -66,6 +75,7 @@ export default function GeneralSettings(): React.JSX.Element {
   }
 
   const handleClearAllDataClick = async (): Promise<void> => {
+    if (isClearingAllData) return
     const confirmed = await confirm({
       status: 'danger',
       description: t('preferences.reset.allDataConfirm'),
@@ -73,12 +83,14 @@ export default function GeneralSettings(): React.JSX.Element {
       cancelLabel: t('common.cancel')
     })
     if (!confirmed) return
+    onClearingAllDataChange?.(true)
     try {
       if (isElectron()) await window.api.app.clearUserData()
       await resetToDefaults()
     } catch (error) {
       console.warn('[settings] Failed to clear app data', error)
       toast.danger(t('preferences.reset.clearAllDataFailed', 'Unable to clear all app data.'))
+      onClearingAllDataChange?.(false)
       return
     }
   }
@@ -89,12 +101,13 @@ export default function GeneralSettings(): React.JSX.Element {
   }
 
   return (
-    <div className="p-5 space-y-6">
+    <div className="p-5 space-y-6" aria-busy={isClearingAllData}>
       <Select
         variant="secondary"
         value={i18n.language}
         onChange={(key) => i18n.changeLanguage(String(key))}
         aria-label={t('preferences.language')}
+        isDisabled={isClearingAllData}
       >
         <Label>{t('preferences.language')}</Label>
         <Select.Trigger className="rounded-full pl-5">
@@ -124,6 +137,7 @@ export default function GeneralSettings(): React.JSX.Element {
             isSelected={resolved === 'dark'}
             onChange={(checked) => setPreference(checked ? 'dark' : 'light')}
             aria-label={t('preferences.darkMode')}
+            isDisabled={isClearingAllData}
           >
             <Switch.Control>
               <Switch.Thumb />
@@ -139,7 +153,7 @@ export default function GeneralSettings(): React.JSX.Element {
             value={selectedProjectionDisplayId}
             onChange={(key) => handleProjectionDisplayChange(String(key))}
             aria-label={t('preferences.projectionDisplay.label')}
-            isDisabled={externalDisplays.length === 0}
+            isDisabled={isClearingAllData || externalDisplays.length === 0}
           >
             <Label>{t('preferences.projectionDisplay.label')}</Label>
             <Select.Trigger className="rounded-full pl-5">
@@ -178,6 +192,7 @@ export default function GeneralSettings(): React.JSX.Element {
                 isSelected={hardwareAcceleration}
                 onChange={(checked) => setHardwareAcceleration(checked)}
                 aria-label={t('preferences.hardwareAcceleration')}
+                isDisabled={isClearingAllData}
               >
                 <Switch.Control>
                   <Switch.Thumb />
@@ -192,13 +207,23 @@ export default function GeneralSettings(): React.JSX.Element {
       <section className="space-y-3 border-t pt-4">
         <h3 className="text-sm font-semibold">{t('preferences.reset.title')}</h3>
         <div className="space-y-2 rounded-2xl bg-default-100">
-          <Button variant="danger" onPress={handleResetSettingsClick} className="rounded-full">
+          <Button
+            variant="danger"
+            onPress={handleResetSettingsClick}
+            className="rounded-full"
+            isDisabled={isClearingAllData}
+          >
             {t('preferences.reset.settingsButton')}
           </Button>
           <p className="text-xs text-gray-500 pl-1">{t('preferences.reset.settingsDesc')}</p>
         </div>
         <div className="space-y-2 rounded-2xl bg-default-100">
-          <Button variant="danger" onPress={handleClearAllDataClick} className="rounded-full">
+          <Button
+            variant="danger"
+            onPress={handleClearAllDataClick}
+            className="rounded-full"
+            isDisabled={isClearingAllData}
+          >
             {t('preferences.reset.allDataButton')}
           </Button>
           <p className="text-xs text-gray-500 pl-1">{t('preferences.reset.allDataDesc')}</p>

@@ -498,6 +498,63 @@ describe('PreferencesDialog', () => {
     expect(resetToDefaults).toHaveBeenCalled()
   })
 
+  it('disables reset actions while clearing all data', async () => {
+    const user = userEvent.setup()
+    const { useSettingsStore } = await import('@renderer/stores/settings')
+
+    const resetToDefaults = vi.fn(
+      () =>
+        new Promise<void>(() => {
+          // Keep pending so the clearing state is observable.
+        })
+    )
+
+    vi.mocked(useSettingsStore).mockImplementation((selector) => {
+      const store = {
+        timezone: 'Asia/Taipei',
+        hardwareAcceleration: true,
+        setTimezone: vi.fn(),
+        setHardwareAcceleration: vi.fn(),
+        resetSettings: vi.fn(),
+        resetToDefaults,
+        themePreference: 'system' as const,
+        setThemePreference: vi.fn(),
+        timerRingColor: '#3b82f6',
+        setTimerRingColor: vi.fn(),
+        timerRingColorEnabled: false,
+        setTimerRingColorEnabled: vi.fn(),
+        reminderMode: 'subtract' as const,
+        setReminderMode: vi.fn(),
+        speech: {
+          activeProvider: 'azure' as const,
+          azure: { region: 'eastasia', language: 'zh-TW' as const },
+          gcp: { language: 'cmn-Hant-TW' as const },
+          whisper: { modelDir: '', installedModel: null }
+        },
+        setSpeech: vi.fn(),
+        defaultSyncOfflinePolicy: 'always-offline' as const,
+        setDefaultSyncOfflinePolicy: vi.fn(),
+        trashRetentionDays: 30,
+        setTrashRetentionDays: vi.fn(),
+        projectionDisplayId: '',
+        setProjectionDisplayId: vi.fn()
+      }
+      return selector ? selector(store) : store
+    })
+
+    const { container } = renderDialog(true)
+
+    await user.click(screen.getAllByText('Clear All Data').at(-1)!)
+    const confirmButtons = await screen.findAllByText('Clear All Data')
+    await user.click(confirmButtons[confirmButtons.length - 1])
+
+    expect(container.querySelector('[aria-busy="true"]')).not.toBeNull()
+    expect(screen.getByTestId('select-root')).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByTestId('category-timer')).toBeDisabled()
+    expect(screen.getAllByText('Reset Settings').at(-1)).toBeDisabled()
+    expect(screen.getAllByText('Clear All Data').at(-1)).toBeDisabled()
+  })
+
   it('does not reset when cancel clicked in modal', async () => {
     const user = userEvent.setup()
     const { useSettingsStore } = await import('@renderer/stores/settings')
