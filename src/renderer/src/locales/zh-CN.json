@@ -500,6 +500,13 @@
       "empty": "这里没有可加入的文件夹。",
       "import": "加入文件夹",
       "loadFailed": "无法加载 OneDrive 文件夹。"
+    },
+    "cloudFolderPicker": {
+      "title": "选择 {{provider}} 文件夹",
+      "back": "返回上一层",
+      "empty": "这里没有可加入的文件夹。",
+      "import": "加入文件夹",
+      "loadFailed": "无法加载 {{provider}} 文件夹。"
     }
   },
   "projection": {

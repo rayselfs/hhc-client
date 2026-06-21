@@ -500,6 +500,13 @@
       "empty": "這裡沒有可加入的資料夾。",
       "import": "加入資料夾",
       "loadFailed": "無法載入 OneDrive 資料夾。"
+    },
+    "cloudFolderPicker": {
+      "title": "選擇 {{provider}} 資料夾",
+      "back": "返回上一層",
+      "empty": "這裡沒有可加入的資料夾。",
+      "import": "加入資料夾",
+      "loadFailed": "無法載入 {{provider}} 資料夾。"
     }
   },
   "projection": {

@@ -2,26 +2,32 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import '@renderer/i18n'
-import OneDriveFolderPickerDialog from '../OneDriveFolderPickerDialog'
+import CloudFolderPickerDialog, { type CloudFolderPickerProvider } from '../CloudFolderPickerDialog'
 import { ShortcutScopeProvider } from '@renderer/contexts/ShortcutScopeContext'
 
 const mockListFolders = vi.hoisted(() => vi.fn())
 
-vi.mock('@renderer/lib/cloud-provider', () => ({
-  getCloudProviderAdapter: () => ({
-    listFolders: mockListFolders
-  })
-}))
-
 function renderDialog(): ReturnType<typeof render> {
+  const provider: CloudFolderPickerProvider = {
+    providerType: 'onedrive',
+    displayName: 'OneDrive',
+    icon: null,
+    listFolders: mockListFolders,
+    importFolder: vi.fn()
+  }
   return render(
     <ShortcutScopeProvider>
-      <OneDriveFolderPickerDialog isOpen onClose={() => undefined} onImport={() => undefined} />
+      <CloudFolderPickerDialog
+        provider={provider}
+        isOpen
+        onClose={() => undefined}
+        onImport={() => undefined}
+      />
     </ShortcutScopeProvider>
   )
 }
 
-describe('OneDriveFolderPickerDialog', () => {
+describe('CloudFolderPickerDialog', () => {
   beforeEach(() => {
     mockListFolders.mockReset()
     mockListFolders.mockImplementation(async (folderId: string) =>

@@ -1,34 +1,47 @@
+import type { ReactNode } from 'react'
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@heroui/react/button'
 import { Modal } from '@heroui/react/modal'
 import { ArrowLeft, Folder, Loader2 } from 'lucide-react'
-import { getCloudProviderAdapter, type CloudRemoteFolder } from '@renderer/lib/cloud-provider'
+import type {
+  CloudImportResult,
+  CloudProviderId,
+  CloudRemoteFolder
+} from '@renderer/lib/cloud-provider'
 import { ShortcutScope } from '@renderer/contexts/ShortcutScopeContext'
 
-const ONE_DRIVE_PROVIDER = getCloudProviderAdapter('onedrive')
+export interface CloudFolderPickerProvider {
+  providerType: CloudProviderId
+  displayName: string
+  icon: ReactNode
+  listFolders(parentRemoteFolderId?: string): Promise<CloudRemoteFolder[]>
+  importFolder(folder: CloudRemoteFolder): Promise<CloudImportResult>
+}
 
 interface FolderStackEntry {
   id: string
   name: string
 }
 
-export interface OneDriveFolderPickerDialogProps {
+export interface CloudFolderPickerDialogProps {
+  provider: CloudFolderPickerProvider
   isOpen: boolean
   isImporting?: boolean
   onClose: () => void
   onImport: (folder: CloudRemoteFolder) => void
 }
 
-export default function OneDriveFolderPickerDialog({
+export default function CloudFolderPickerDialog({
+  provider,
   isOpen,
   isImporting = false,
   onClose,
   onImport
-}: OneDriveFolderPickerDialogProps): React.JSX.Element | null {
+}: CloudFolderPickerDialogProps): React.JSX.Element | null {
   const { t } = useTranslation()
   const [folderStack, setFolderStack] = useState<FolderStackEntry[]>([
-    { id: 'root', name: 'OneDrive' }
+    { id: 'root', name: provider.displayName }
   ])
   const [folders, setFolders] = useState<CloudRemoteFolder[]>([])
   const [selectedFolder, setSelectedFolder] = useState<CloudRemoteFolder | null>(null)
@@ -41,24 +54,31 @@ export default function OneDriveFolderPickerDialog({
       setIsLoading(true)
       setError(null)
       try {
-        setFolders(await ONE_DRIVE_PROVIDER.listFolders(remoteFolderId))
+        setFolders(await provider.listFolders(remoteFolderId))
       } catch (loadError) {
-        console.warn('[onedrive] Failed to list folders', loadError)
+        console.warn('[cloud-sync] Failed to list folders', {
+          providerType: provider.providerType,
+          error: loadError
+        })
         setFolders([])
-        setError(t('fileExplorer.oneDriveFolderPicker.loadFailed'))
+        setError(
+          t('fileExplorer.cloudFolderPicker.loadFailed', {
+            provider: provider.displayName
+          })
+        )
       } finally {
         setIsLoading(false)
       }
     },
-    [t]
+    [provider, t]
   )
 
   useEffect(() => {
     if (!isOpen) return
-    setFolderStack([{ id: 'root', name: 'OneDrive' }])
+    setFolderStack([{ id: 'root', name: provider.displayName }])
     setSelectedFolder(null)
     void loadFolders('root')
-  }, [isOpen, loadFolders])
+  }, [isOpen, loadFolders, provider.displayName])
 
   function openFolder(folder: CloudRemoteFolder): void {
     setFolderStack((current) => [...current, { id: folder.remoteItemId, name: folder.name }])
@@ -82,7 +102,14 @@ export default function OneDriveFolderPickerDialog({
         <Modal.Container size="sm">
           <Modal.Dialog className="p-5">
             <Modal.Header>
-              <Modal.Heading>{t('fileExplorer.oneDriveFolderPicker.title')}</Modal.Heading>
+              <Modal.Heading>
+                <span className="flex items-center gap-2">
+                  {provider.icon}
+                  {t('fileExplorer.cloudFolderPicker.title', {
+                    provider: provider.displayName
+                  })}
+                </span>
+              </Modal.Heading>
             </Modal.Header>
             <Modal.Body>
               <ShortcutScope name="overlay">
@@ -93,7 +120,7 @@ export default function OneDriveFolderPickerDialog({
                       variant="tertiary"
                       isDisabled={folderStack.length <= 1 || isLoading || isImporting}
                       onPress={goBack}
-                      aria-label={t('fileExplorer.oneDriveFolderPicker.back')}
+                      aria-label={t('fileExplorer.cloudFolderPicker.back')}
                     >
                       <ArrowLeft size={16} />
                     </Button>
@@ -111,7 +138,7 @@ export default function OneDriveFolderPickerDialog({
                       </div>
                     ) : folders.length === 0 ? (
                       <div className="flex h-56 items-center justify-center text-sm text-muted">
-                        {t('fileExplorer.oneDriveFolderPicker.empty')}
+                        {t('fileExplorer.cloudFolderPicker.empty')}
                       </div>
                     ) : (
                       <div className="space-y-1">
@@ -155,7 +182,7 @@ export default function OneDriveFolderPickerDialog({
                 {isImporting ? (
                   <Loader2 size={16} className="animate-spin" />
                 ) : (
-                  t('fileExplorer.oneDriveFolderPicker.import')
+                  t('fileExplorer.cloudFolderPicker.import')
                 )}
               </Button>
             </Modal.Footer>

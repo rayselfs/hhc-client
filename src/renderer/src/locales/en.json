@@ -500,6 +500,13 @@
       "empty": "No folders are available here.",
       "import": "Add Folder",
       "loadFailed": "Failed to load OneDrive folders."
+    },
+    "cloudFolderPicker": {
+      "title": "Choose {{provider}} Folder",
+      "back": "Back",
+      "empty": "No folders are available here.",
+      "import": "Add Folder",
+      "loadFailed": "Failed to load {{provider}} folders."
     }
   },
   "projection": {

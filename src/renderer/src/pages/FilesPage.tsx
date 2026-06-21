@@ -4,7 +4,9 @@ import { toast } from '@heroui/react/toast'
 import { FileExplorerShell, useFileContextMenu } from '@renderer/components/Control/FileExplorer'
 import FileBrowser from '@renderer/components/Control/FileExplorer/FileBrowser'
 import FileExplorerFAB from '@renderer/components/Control/FileExplorer/FileExplorerFAB'
-import OneDriveFolderPickerDialog from '@renderer/components/Control/FileExplorer/OneDriveFolderPickerDialog'
+import CloudFolderPickerDialog, {
+  type CloudFolderPickerProvider
+} from '@renderer/components/Control/FileExplorer/CloudFolderPickerDialog'
 import type { ContextMenuEntry } from '@renderer/contexts/ContextMenuContext'
 import { FolderModal } from '@renderer/components/Control/Folder/FolderModal'
 import {
@@ -39,8 +41,16 @@ import {
   validateDisplayName
 } from '@renderer/lib/file-naming'
 import { isFolderReadOnlyBySyncLink } from '@renderer/lib/sync-readonly'
+import { OneDriveIcon } from '@renderer/components/icons/OneDriveIcon'
 
 const ONE_DRIVE_PROVIDER = getCloudProviderAdapter('onedrive')
+const ONE_DRIVE_FOLDER_PICKER_PROVIDER: CloudFolderPickerProvider = {
+  providerType: 'onedrive',
+  displayName: 'OneDrive',
+  icon: React.createElement(OneDriveIcon, { className: 'size-5' }),
+  listFolders: ONE_DRIVE_PROVIDER.listFolders,
+  importFolder: ONE_DRIVE_PROVIDER.importFolder
+}
 
 export default function FilesPage(): React.JSX.Element {
   const { t } = useTranslation()
@@ -703,7 +713,8 @@ export default function FilesPage(): React.JSX.Element {
         isAddOneDriveDisabled={!hasOneDriveConnection}
         isReadOnly={isCurrentFolderReadOnly}
       />
-      <OneDriveFolderPickerDialog
+      <CloudFolderPickerDialog
+        provider={ONE_DRIVE_FOLDER_PICKER_PROVIDER}
         isOpen={isOneDrivePickerOpen}
         isImporting={isOneDriveImporting}
         onClose={() => setIsOneDrivePickerOpen(false)}
