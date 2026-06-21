@@ -18,6 +18,8 @@ import { classifyMediaImport } from '@renderer/lib/media-import-policy'
 import { isIgnoredSystemPath } from '@shared/file-ignore-policy'
 import { ensureSourceMediaMetadata } from '@renderer/lib/media-metadata'
 import { enqueueVideoPosterJob } from '@renderer/lib/video-poster-jobs'
+import { getBlobId } from '@renderer/lib/blob-identity'
+import { getDerivedAsset } from '@renderer/lib/media-work-db'
 import {
   listSyncEntriesByProviderConnection,
   putProviderConnection,
@@ -319,22 +321,25 @@ export async function refreshImportedMediaAssets(items: FileItemRecord[]): Promi
     items.map(async (item) => {
       try {
         if (!item.url.startsWith('blob:')) return
+        const blobId = getBlobId(item)
         const capability = resolveMediaCapability({ mimeType: item.mimeType, fileName: item.name })
         if (!capability) return
-        void ensureSourceMediaMetadata(item.id, item.mimeType).catch((error) => {
+        void ensureSourceMediaMetadata(blobId, item.mimeType).catch((error) => {
           console.warn('[sync] Failed to store synced media metadata', {
             itemId: item.id,
             error
           })
         })
+        const existingCover = await getDerivedAsset(blobId, 'cover-thumbnail')
+        if (existingCover?.status === 'ready') return
         if (capability.kind === 'video' && !isWeb()) {
-          await enqueueVideoPosterJob({ sourceBlobId: item.id, itemId: item.id })
+          await enqueueVideoPosterJob({ sourceBlobId: blobId, itemId: item.id })
           return
         }
         if (capability.thumbnail === 'none') return
 
         const db = await openFileExplorerDB()
-        const source = await getFileSource(db, item.id, item.mimeType)
+        const source = await getFileSource(db, blobId, item.mimeType)
         if (!source) return
         try {
           const response = await fetch(source.url)
@@ -342,7 +347,7 @@ export async function refreshImportedMediaAssets(items: FileItemRecord[]): Promi
           const file = new File([await response.blob()], item.name, { type: item.mimeType })
           const thumbnail = await generateThumbnail(file, item.mimeType)
           if (!thumbnail) return
-          await saveThumbnail(item.id, thumbnail)
+          await saveThumbnail(blobId, thumbnail)
           window.dispatchEvent(
             new CustomEvent('hhc:thumbnail-ready', {
               detail: { itemId: item.id, dataUrl: thumbnail }
@@ -358,6 +363,20 @@ export async function refreshImportedMediaAssets(items: FileItemRecord[]): Promi
         })
       }
     })
+  )
+}
+
+export async function backfillImportedMediaAssets(): Promise<void> {
+  const db = await openFileExplorerDB()
+  const [items, fileBlobs] = await Promise.all([db.getAll('folder-items'), db.getAll('file-blobs')])
+  const availableBlobIds = new Set(fileBlobs.map((blob) => blob.id))
+  await refreshImportedMediaAssets(
+    items.filter(
+      (item): item is FileItemRecord =>
+        item.type === 'file' &&
+        item.url.startsWith('blob:') &&
+        availableBlobIds.has(getBlobId(item))
+    )
   )
 }
 

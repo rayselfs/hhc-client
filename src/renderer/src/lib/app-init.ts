@@ -10,7 +10,7 @@ import i18n from '@renderer/i18n'
 import { mediaJobQueue } from '@renderer/lib/media-job-queue'
 import { recoverPendingSyncResourceCleanups } from '@renderer/lib/sync-unlink'
 import { startSyncRuntime } from '@renderer/lib/sync-runtime'
-import { backfillTranscodeVideoThumbnails } from '@renderer/lib/video-poster-jobs'
+import { backfillImportedMediaAssets } from '@renderer/lib/local-sync-import'
 
 let earlyInitStarted = false
 let subscriptionsInitialized = false
@@ -31,7 +31,7 @@ export function startEarlyInit(): void {
   void mediaJobQueue
     .recoverStaleJobs()
     .then(() => mediaJobQueue.removeExpiredHistory())
-    .then(() => backfillTranscodeVideoThumbnails())
+    .then(() => backfillImportedMediaAssets())
     .catch(() => undefined)
 }
 
