@@ -1,11 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { ipcHandlers, protocolHandlers, mockReadFileSync, mockRmSync } = vi.hoisted(() => ({
-  ipcHandlers: new Map<string, (...args: unknown[]) => unknown>(),
-  protocolHandlers: new Map<string, (request: Request) => Response>(),
-  mockReadFileSync: vi.fn(),
-  mockRmSync: vi.fn()
-}))
+const { ipcHandlers, protocolHandlers, mockReadFileSync, mockRmSync, mockClearData } = vi.hoisted(
+  () => ({
+    ipcHandlers: new Map<string, (...args: unknown[]) => unknown>(),
+    protocolHandlers: new Map<string, (request: Request) => Response>(),
+    mockReadFileSync: vi.fn(),
+    mockRmSync: vi.fn(),
+    mockClearData: vi.fn()
+  })
+)
 
 const mockMainWindow = { id: 1 }
 const mockProjectionWindow = { id: 2 }
@@ -23,6 +26,7 @@ vi.mock('electron', () => ({
       ipcHandlers.set(channel, handler)
     })
   },
+  session: { defaultSession: { clearData: mockClearData } },
   protocol: {
     handle: vi.fn((scheme: string, handler: (request: Request) => Response) => {
       protocolHandlers.set(scheme, handler)
@@ -66,6 +70,7 @@ function makeEvent(): Electron.IpcMainInvokeEvent {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mockClearData.mockResolvedValue(undefined)
   ipcHandlers.clear()
   protocolHandlers.clear()
   registerAppIpc(wm)
@@ -82,6 +87,7 @@ describe('model IPC security', () => {
       force: true,
       recursive: true
     })
+    expect(mockClearData).toHaveBeenCalledWith()
   })
 
   it('rejects relative model directories', () => {

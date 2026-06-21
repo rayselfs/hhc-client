@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, protocol } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, protocol, session } from 'electron'
 import { is } from '@electron-toolkit/utils'
 import path from 'path'
 import fs from 'fs'
@@ -153,7 +153,7 @@ function downloadFile(
 
 let whisperModelDir: string | null = null
 
-function clearMainProcessUserData(): void {
+async function clearMainProcessUserData(): Promise<void> {
   const userData = app.getPath('userData')
   for (const entry of [
     'native-files',
@@ -164,6 +164,7 @@ function clearMainProcessUserData(): void {
   ]) {
     fs.rmSync(path.join(userData, entry), { recursive: true, force: true })
   }
+  await session.defaultSession.clearData()
 }
 
 function resolveContainedPath(baseDir: string, relativePath: string): string | null {
@@ -195,9 +196,9 @@ export function registerAppIpc(wm: WindowManager): void {
     }
   })
 
-  ipcMain.handle('app:clear-user-data', (event) => {
+  ipcMain.handle('app:clear-user-data', async (event) => {
     if (!isMainWindow(wm, event)) return
-    clearMainProcessUserData()
+    await clearMainProcessUserData()
   })
 
   ipcMain.handle('app:select-directory', async (event) => {

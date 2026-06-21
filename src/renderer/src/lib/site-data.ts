@@ -23,11 +23,21 @@ async function deleteIndexedDB(name: string): Promise<void> {
   })
 }
 
+function isBlockedIndexedDBDeletion(error: unknown): boolean {
+  return error instanceof Error && error.message.toLowerCase().includes('deletion blocked')
+}
+
 async function runCleanupTasks(tasks: Promise<void>[]): Promise<void> {
   const results = await Promise.allSettled(tasks)
-  const failure = results.find(
+  const failures = results.filter(
     (result): result is PromiseRejectedResult => result.status === 'rejected'
   )
+  for (const failure of failures) {
+    if (isBlockedIndexedDBDeletion(failure.reason)) {
+      console.warn('[site-data] IndexedDB deletion blocked by an open connection:', failure.reason)
+    }
+  }
+  const failure = failures.find((result) => !isBlockedIndexedDBDeletion(result.reason))
   if (failure) throw failure.reason
 }
 
