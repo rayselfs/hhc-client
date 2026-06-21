@@ -38,6 +38,11 @@ export interface OneDriveTokenExchangeInput {
   codeVerifier: string
 }
 
+export interface OneDriveRefreshTokenInput {
+  clientId: string
+  refreshToken: string
+}
+
 export interface OneDriveAccountProfile {
   id: string
   displayName?: string
@@ -140,6 +145,15 @@ export function createOneDriveTokenExchangeBody(
   body.set('code', input.code)
   body.set('redirect_uri', input.redirectUri)
   body.set('code_verifier', input.codeVerifier)
+  body.set('scope', ONEDRIVE_READONLY_SCOPES.join(' '))
+  return body
+}
+
+export function createOneDriveRefreshTokenBody(input: OneDriveRefreshTokenInput): URLSearchParams {
+  const body = new URLSearchParams()
+  body.set('client_id', input.clientId)
+  body.set('grant_type', 'refresh_token')
+  body.set('refresh_token', input.refreshToken)
   body.set('scope', ONEDRIVE_READONLY_SCOPES.join(' '))
   return body
 }

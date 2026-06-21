@@ -22,7 +22,15 @@ import {
   type ProviderConnectionRecord,
   type SyncEntryRecord
 } from './sync-db'
-import { saveElectronOneDriveDownloadedContent } from './sync-download-storage'
+import {
+  saveElectronOneDriveDownloadedContent,
+  saveWebOneDriveDownloadedContent
+} from './sync-download-storage'
+import {
+  deleteWebOneDriveCredentials,
+  getWebOneDriveAccessToken,
+  saveWebOneDriveCredentials
+} from './onedrive-web-credentials'
 import { getMediaSupport, resolveMediaCapability, type MediaPlatform } from './media-capabilities'
 import type { RemoteSyncItem } from './sync-provider'
 import { applySyncRefreshPlan, buildSyncRefreshPlan } from './sync-refresh'
@@ -31,6 +39,7 @@ import { isIgnoredSystemPath } from '@shared/file-ignore-policy'
 import i18n from '@renderer/i18n'
 
 const ONEDRIVE_NATIVE_REDIRECT_URI = 'https://login.microsoftonline.com/common/oauth2/nativeclient'
+const ONEDRIVE_WEB_CALLBACK_PATH = '/onedrive-callback.html'
 
 interface TokenResponse {
   access_token: string
@@ -305,10 +314,45 @@ async function saveImportedRecords(
   ])
 }
 
-function assertOneDriveAvailable(): void {
-  if (!isElectron() || !window.api?.oneDrive) {
-    throw new Error('OneDrive connection is currently available in the desktop app only')
-  }
+function getOneDriveRedirectUri(): string {
+  return isElectron() ? ONEDRIVE_NATIVE_REDIRECT_URI : `${window.location.origin}${ONEDRIVE_WEB_CALLBACK_PATH}`
+}
+
+function getOneDriveMediaPlatform(): MediaPlatform {
+  return isElectron() ? 'electron' : 'web'
+}
+
+function waitForWebOneDriveCallback(authWindow: Window | null): Promise<string | null> {
+  return new Promise((resolve) => {
+    const cleanup = (): void => {
+      window.removeEventListener('message', handleMessage)
+      if (closeTimer !== undefined) window.clearInterval(closeTimer)
+    }
+    const done = (url: string | null): void => {
+      cleanup()
+      resolve(url)
+    }
+    const handleMessage = (event: MessageEvent): void => {
+      if (event.origin !== window.location.origin) return
+      const data = event.data
+      if (
+        typeof data === 'object' &&
+        data !== null &&
+        'type' in data &&
+        data.type === 'libre-presenter:onedrive-callback' &&
+        'url' in data &&
+        typeof data.url === 'string'
+      ) {
+        done(data.url)
+      }
+    }
+    window.addEventListener('message', handleMessage)
+    const closeTimer = authWindow
+      ? window.setInterval(() => {
+          if (authWindow.closed) done(null)
+        }, 500)
+      : undefined
+  })
 }
 
 function getOneDriveClientId(): string {
@@ -319,11 +363,15 @@ function createStoredOneDriveProvider(connectionId: string): OneDriveReadonlyPro
   const clientId = getOneDriveClientId()
   return new OneDriveReadonlyProvider({
     getAccessToken: async () => {
+      if (!isElectron()) return getWebOneDriveAccessToken({ connectionId, clientId })
+      if (!window.api?.oneDrive) throw new Error('OneDrive desktop API is not available')
       const token = await window.api.oneDrive.getAccessToken({ connectionId, clientId })
       return token.accessToken
     },
     saveDownloadedContent: (downloadRequest, _response, metadata) =>
-      saveElectronOneDriveDownloadedContent(downloadRequest, clientId, metadata)
+      isElectron()
+        ? saveElectronOneDriveDownloadedContent(downloadRequest, clientId, metadata)
+        : saveWebOneDriveDownloadedContent(downloadRequest, _response, metadata)
   })
 }
 
@@ -357,7 +405,6 @@ export async function getConnectedOneDriveAccount(): Promise<ProviderConnectionR
 export async function loginOneDriveAccount(options?: {
   requestCallbackUrl?: () => Promise<string | null>
 }): Promise<ProviderConnectionRecord | null> {
-  assertOneDriveAvailable()
   const existing = await listProviderConnectionsByType('onedrive')
   if (existing.length > 0) {
     throw new Error('Only one OneDrive account can be connected')
@@ -367,11 +414,15 @@ export async function loginOneDriveAccount(options?: {
   const clientId = getEffectiveOneDriveClientId(oneDriveSettings)
   const request = await createOneDriveAuthRequest({
     clientId,
-    redirectUri: ONEDRIVE_NATIVE_REDIRECT_URI,
+    redirectUri: getOneDriveRedirectUri(),
     prompt: 'select_account'
   })
-  window.open(request.authorizationUrl, '_blank', 'noopener,noreferrer')
-  const callbackUrl = await options?.requestCallbackUrl?.()
+  const authWindow = window.open(request.authorizationUrl, '_blank', 'noopener,noreferrer')
+  const callbackUrl = await (options?.requestCallbackUrl
+    ? options.requestCallbackUrl()
+    : isElectron()
+      ? Promise.resolve(null)
+      : waitForWebOneDriveCallback(authWindow))
   if (!callbackUrl) return null
 
   const callback = parseOneDriveAuthCallback(callbackUrl, request.state)
@@ -384,12 +435,14 @@ export async function loginOneDriveAccount(options?: {
   const provider = new OneDriveReadonlyProvider({
     getAccessToken: async () => token.access_token,
     saveDownloadedContent: (downloadRequest, _response, metadata) =>
-      saveElectronOneDriveDownloadedContent(downloadRequest, request.clientId, metadata)
+      isElectron()
+        ? saveElectronOneDriveDownloadedContent(downloadRequest, request.clientId, metadata)
+        : saveWebOneDriveDownloadedContent(downloadRequest, _response, metadata)
   })
 
   const connection = await provider.connect()
   try {
-    await window.api.oneDrive.saveCredentials({
+    const credentials = {
       connectionId: connection.id,
       accessToken: token.access_token,
       refreshToken: token.refresh_token,
@@ -399,10 +452,20 @@ export async function loginOneDriveAccount(options?: {
           : undefined,
       scope: token.scope,
       tokenType: token.token_type
-    })
+    }
+    if (isElectron()) {
+      if (!window.api?.oneDrive) throw new Error('OneDrive desktop API is not available')
+      await window.api.oneDrive.saveCredentials(credentials)
+    } else {
+      await saveWebOneDriveCredentials(credentials)
+    }
     return (await getProviderConnection(connection.id)) ?? null
   } catch (error) {
-    await window.api.oneDrive.deleteCredentials(connection.id).catch(() => undefined)
+    if (isElectron()) {
+      await window.api?.oneDrive?.deleteCredentials(connection.id).catch(() => undefined)
+    } else {
+      await deleteWebOneDriveCredentials(connection.id).catch(() => undefined)
+    }
     await deleteProviderConnection(connection.id).catch(() => undefined)
     throw error
   }
@@ -411,7 +474,6 @@ export async function loginOneDriveAccount(options?: {
 export async function listOneDriveFolders(
   parentRemoteFolderId = 'root'
 ): Promise<OneDriveRemoteFolder[]> {
-  assertOneDriveAvailable()
   const connection = await getConnectedOneDriveAccount()
   if (!connection) throw new Error('OneDrive account is not connected')
   const provider = createStoredOneDriveProvider(connection.id)
@@ -426,7 +488,6 @@ export async function listOneDriveFolders(
 export async function importOneDriveFolder(
   remoteFolder: OneDriveRemoteFolder
 ): Promise<OneDriveConnectResult> {
-  assertOneDriveAvailable()
   const connection = await getConnectedOneDriveAccount()
   if (!connection) throw new Error('OneDrive account is not connected')
 
@@ -449,7 +510,7 @@ export async function importOneDriveFolder(
     existingRootFolderNames: store
       .getChildFolders(FILE_EXPLORER_ROOT_ID)
       .map((folder) => folder.name),
-    platform: 'electron'
+    platform: getOneDriveMediaPlatform()
   })
   await saveImportedRecords(plan.folders, plan.items)
   await Promise.all(plan.syncEntries.map((entry) => putSyncEntry(entry)))
@@ -533,7 +594,6 @@ export interface OneDriveRefreshSummary {
 }
 
 export async function refreshOneDriveFolder(rootFolderId: string): Promise<OneDriveRefreshSummary> {
-  assertOneDriveAvailable()
   const store = useFileExplorerStore.getState()
   await store.initialize()
   const db = await openFileExplorerDB()
@@ -562,7 +622,7 @@ export async function refreshOneDriveFolder(rootFolderId: string): Promise<OneDr
     rootFolder,
     rootRemoteFolderId: syncLink.remoteFolderId,
     offlinePolicy,
-    platform: 'electron',
+    platform: getOneDriveMediaPlatform(),
     existingFolders: folders,
     existingItems: allItems.filter((item): item is FileItemRecord => item.type === 'file'),
     existingEntries,
@@ -637,7 +697,6 @@ export async function refreshOneDriveFolder(rootFolderId: string): Promise<OneDr
 }
 
 export async function refreshAllOneDriveFolders(): Promise<OneDriveRefreshSummary[]> {
-  assertOneDriveAvailable()
   const db = await openFileExplorerDB()
   const folders = await db.getAll('folder-records')
   const roots = folders.filter(

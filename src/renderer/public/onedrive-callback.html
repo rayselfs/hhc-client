@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OneDrive Sign In</title>
+  </head>
+  <body>
+    <script>
+      const payload = {
+        type: 'libre-presenter:onedrive-callback',
+        url: window.location.href
+      }
+
+      if (window.opener) {
+        window.opener.postMessage(payload, window.location.origin)
+        window.close()
+      } else {
+        sessionStorage.setItem('libre-presenter:onedrive-callback', window.location.href)
+        window.location.replace('/')
+      }
+    </script>
+    <p>You can close this window and return to LibrePresenter.</p>
+  </body>
+</html>

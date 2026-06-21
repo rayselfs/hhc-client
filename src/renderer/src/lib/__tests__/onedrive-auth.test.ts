@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
   createOneDriveAuthRequest,
+  createOneDriveRefreshTokenBody,
   createOneDriveTokenExchangeBody,
   ONEDRIVE_READONLY_SCOPES,
   parseOneDriveAuthCallback,
@@ -74,6 +75,18 @@ describe('onedrive-auth', () => {
     expect(body.get('scope')?.split(' ')).toEqual([...ONEDRIVE_READONLY_SCOPES])
     expect(body.has('client_secret')).toBe(false)
     expect([...body.keys()].join(' ')).not.toMatch(/refresh_token|access_token/i)
+  })
+
+  it('creates a refresh-token body without a client secret', () => {
+    const body = createOneDriveRefreshTokenBody({
+      clientId: '11111111-2222-3333-4444-555555555555',
+      refreshToken: 'refresh-token'
+    })
+
+    expect(body.get('grant_type')).toBe('refresh_token')
+    expect(body.get('refresh_token')).toBe('refresh-token')
+    expect(body.get('scope')?.split(' ')).toEqual([...ONEDRIVE_READONLY_SCOPES])
+    expect(body.has('client_secret')).toBe(false)
   })
 
   it('stores only OneDrive connection metadata', async () => {

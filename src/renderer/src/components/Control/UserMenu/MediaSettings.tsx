@@ -18,6 +18,7 @@ import type { SyncOfflinePolicy } from '@shared/types/folder'
 import { listProviderConnectionsByType, type ProviderConnectionRecord } from '@renderer/lib/sync-db'
 import { unlinkSyncConnectionFromApp } from '@renderer/lib/sync-unlink'
 import { loginOneDriveAccount } from '@renderer/lib/onedrive-connect'
+import { deleteWebOneDriveCredentials } from '@renderer/lib/onedrive-web-credentials'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
 import { isElectron } from '@renderer/lib/env'
 
@@ -90,9 +91,9 @@ export default function MediaSettings({
   async function handleLoginOneDrive(): Promise<void> {
     setOneDriveConnectionBusy(true)
     try {
-      const connection = await loginOneDriveAccount({
-        requestCallbackUrl: requestOneDriveCallbackUrl
-      })
+      const connection = await loginOneDriveAccount(
+        isElectron() ? { requestCallbackUrl: requestOneDriveCallbackUrl } : undefined
+      )
       if (!connection) return
       await refreshOneDriveConnection()
       notifyOneDriveConnectionChanged()
@@ -125,6 +126,8 @@ export default function MediaSettings({
     try {
       if (isElectron() && window.api?.oneDrive) {
         await window.api.oneDrive.deleteCredentials(oneDriveConnection.id)
+      } else {
+        await deleteWebOneDriveCredentials(oneDriveConnection.id)
       }
       await unlinkSyncConnectionFromApp(oneDriveConnection.id)
       await refreshOneDriveConnection()
@@ -237,7 +240,7 @@ export default function MediaSettings({
                 <Button
                   size="sm"
                   variant="primary"
-                  isDisabled={oneDriveConnectionBusy || !isElectron()}
+                  isDisabled={oneDriveConnectionBusy}
                   onPress={() => void handleLoginOneDrive()}
                 >
                   {oneDriveConnectionBusy

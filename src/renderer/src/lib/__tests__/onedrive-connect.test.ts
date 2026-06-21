@@ -71,6 +71,12 @@ vi.mock('../sync-download-storage', () => ({
   saveWebOneDriveDownloadedContent: vi.fn()
 }))
 
+vi.mock('../onedrive-web-credentials', () => ({
+  deleteWebOneDriveCredentials: vi.fn(async () => undefined),
+  getWebOneDriveAccessToken: vi.fn(async () => 'access-token'),
+  saveWebOneDriveCredentials: vi.fn(async () => undefined)
+}))
+
 vi.mock('@heroui/react/toast', () => ({
   toast: { warning: vi.fn() }
 }))
@@ -193,5 +199,21 @@ describe('loginOneDriveAccount', () => {
       'https://login.microsoftonline.com/common/oauth2/v2.0/token',
       expect.any(Object)
     )
+  })
+
+  it('supports Web login with the same callback flow', async () => {
+    const { isElectron } = await import('../env')
+    vi.mocked(isElectron).mockReturnValue(false)
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: undefined
+    })
+    const callbackUrl = `${window.location.origin}/onedrive-callback.html?code=code-1&state=state-1`
+
+    await expect(
+      loginOneDriveAccount({
+        requestCallbackUrl: vi.fn(async () => callbackUrl)
+      })
+    ).resolves.toMatchObject({ id: 'onedrive:account-1' })
   })
 })

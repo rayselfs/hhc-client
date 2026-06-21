@@ -44,6 +44,10 @@ vi.mock('@renderer/lib/media-storage-cleanup', () => ({
   removeUnusedDerivedAssets: vi.fn().mockResolvedValue(undefined)
 }))
 
+vi.mock('@renderer/lib/onedrive-connect', () => ({
+  loginOneDriveAccount: vi.fn(async () => null)
+}))
+
 vi.mock('@renderer/stores/settings', () => ({
   DEFAULT_ONEDRIVE: {
     customClientId: ''
@@ -199,6 +203,29 @@ describe('PreferencesDialog', () => {
     expect(screen.queryByLabelText('Azure Application Client ID')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Offline Policy')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Trash Retention Period')).not.toBeInTheDocument()
+  })
+
+  it('allows OneDrive login from web and disables the button while login is pending', async () => {
+    const user = userEvent.setup()
+    const { loginOneDriveAccount } = await import('@renderer/lib/onedrive-connect')
+    let resolveLogin: (value: null) => void = () => undefined
+    vi.mocked(loginOneDriveAccount).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveLogin = resolve
+        })
+    )
+    renderDialog(true)
+
+    await user.click(screen.getByTestId('category-media'))
+    await user.click(screen.getByTestId('category-media-oneDrive'))
+    const loginButton = screen.getByRole('button', { name: 'Sign in' })
+    expect(loginButton).not.toBeDisabled()
+
+    await user.click(loginButton)
+
+    expect(screen.getByRole('button', { name: 'Signing in' })).toBeDisabled()
+    resolveLogin(null)
   })
 
   it('navigates between storage child sections', async () => {

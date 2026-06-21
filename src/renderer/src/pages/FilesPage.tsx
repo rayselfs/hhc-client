@@ -89,7 +89,7 @@ export default function FilesPage(): React.JSX.Element {
   const fileAccept = getMediaFileAcceptAttribute(getUploadMediaPlatform())
   const canAddSyncSourceHere = currentFolderId === FILE_EXPLORER_ROOT_ID
   const canAddLocalSyncFolder = isElectron() && canAddSyncSourceHere
-  const canAddOneDriveFolder = isElectron() && canAddSyncSourceHere
+  const canAddOneDriveFolder = canAddSyncSourceHere
   const isCurrentFolderReadOnly = useMemo(
     () => isFolderReadOnlyBySyncLink(currentFolderId, foldersById),
     [currentFolderId, foldersById]
@@ -181,12 +181,7 @@ export default function FilesPage(): React.JSX.Element {
         setIsOneDrivePickerOpen(false)
       } catch (error) {
         console.warn('[onedrive] Failed to import folder', error)
-        const message =
-          error instanceof Error &&
-          error.message === 'OneDrive connection is currently available in the desktop app only'
-            ? 'oneDriveDesktopOnly'
-            : 'oneDriveImportFailed'
-        toast.danger(t(`fileExplorer.syncSources.${message}`))
+        toast.danger(t('fileExplorer.syncSources.oneDriveImportFailed'))
       } finally {
         setIsOneDriveImporting(false)
       }
@@ -273,9 +268,9 @@ export default function FilesPage(): React.JSX.Element {
       folderId: string,
       labelKey: 'refreshSyncFolder' | 'resyncFile' = 'refreshSyncFolder'
     ): ContextMenuEntry[] => {
-      if (!isElectron()) return []
       const root = findSyncRootFolder(folderId)
       if (!root?.syncLink) return []
+      if (root.syncLink.providerType === 'local-fs' && !isElectron()) return []
       const label =
         labelKey === 'resyncFile'
           ? t('fileExplorer.contextMenu.resyncFile')
