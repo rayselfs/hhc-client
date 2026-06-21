@@ -314,7 +314,7 @@ describe('loginOneDriveAccount', () => {
     )
   })
 
-  it('unblocks Web login when the OAuth popup is closed without a callback', async () => {
+  it('unblocks Web login when no OAuth callback arrives', async () => {
     vi.useFakeTimers()
     const { isElectron } = await import('../env')
     vi.mocked(isElectron).mockReturnValue(false)
@@ -322,17 +322,15 @@ describe('loginOneDriveAccount', () => {
       configurable: true,
       value: undefined
     })
-    let popupClosed = false
     const popup = {
-      get closed() {
-        return popupClosed
+      get closed(): boolean {
+        throw new Error('window.closed should not be read for Web OAuth popups')
       }
     } as Window
     window.open = vi.fn(() => popup)
 
     const login = loginOneDriveAccount()
-    popupClosed = true
-    await vi.advanceTimersByTimeAsync(500)
+    await vi.advanceTimersByTimeAsync(2 * 60_000)
 
     await expect(login).resolves.toBeNull()
     vi.useRealTimers()

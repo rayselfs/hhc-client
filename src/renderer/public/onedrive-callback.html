@@ -12,11 +12,14 @@
         url: window.location.href
       }
 
+      try {
+        localStorage.setItem('libre-presenter:onedrive-callback', window.location.href)
+      } catch {}
+
       if (window.opener) {
         window.opener.postMessage(payload, window.location.origin)
         window.close()
       } else {
-        sessionStorage.setItem('libre-presenter:onedrive-callback', window.location.href)
         window.location.replace('/')
       }
     </script>

@@ -40,6 +40,8 @@ import { isIgnoredSystemPath } from '@shared/file-ignore-policy'
 import i18n from '@renderer/i18n'
 
 const ONEDRIVE_WEB_CALLBACK_PATH = '/onedrive-callback.html'
+const ONEDRIVE_WEB_CALLBACK_STORAGE_KEY = 'libre-presenter:onedrive-callback'
+const ONEDRIVE_WEB_CALLBACK_TIMEOUT_MS = 2 * 60_000
 
 interface TokenResponse {
   access_token: string
@@ -328,11 +330,18 @@ function waitForWebOneDriveCallback(authWindow: Window | null): Promise<string |
   return new Promise((resolve) => {
     const cleanup = (): void => {
       window.removeEventListener('message', handleMessage)
-      if (closeTimer !== undefined) window.clearInterval(closeTimer)
+      window.removeEventListener('storage', handleStorage)
+      window.clearTimeout(timeout)
     }
     const done = (url: string | null): void => {
       cleanup()
+      if (url) clearStoredWebOneDriveCallback()
       resolve(url)
+    }
+    const handleStorage = (event: StorageEvent): void => {
+      if (event.key === ONEDRIVE_WEB_CALLBACK_STORAGE_KEY && typeof event.newValue === 'string') {
+        done(event.newValue)
+      }
     }
     const handleMessage = (event: MessageEvent): void => {
       if (event.origin !== window.location.origin) return
@@ -349,10 +358,28 @@ function waitForWebOneDriveCallback(authWindow: Window | null): Promise<string |
       }
     }
     window.addEventListener('message', handleMessage)
-    const closeTimer = window.setInterval(() => {
-      if (authWindow.closed) done(null)
-    }, 500)
+    window.addEventListener('storage', handleStorage)
+    const timeout = window.setTimeout(
+      () => done(readStoredWebOneDriveCallback()),
+      ONEDRIVE_WEB_CALLBACK_TIMEOUT_MS
+    )
   })
+}
+
+function clearStoredWebOneDriveCallback(): void {
+  try {
+    localStorage.removeItem(ONEDRIVE_WEB_CALLBACK_STORAGE_KEY)
+  } catch {
+    // Ignore storage errors; postMessage still handles the normal callback path.
+  }
+}
+
+function readStoredWebOneDriveCallback(): string | null {
+  try {
+    return localStorage.getItem(ONEDRIVE_WEB_CALLBACK_STORAGE_KEY)
+  } catch {
+    return null
+  }
 }
 
 function getOneDriveClientId(): string {
@@ -415,6 +442,7 @@ export async function loginOneDriveAccount(options?: {
   const clientId = getEffectiveOneDriveClientId(oneDriveSettings)
   const electronMode = isElectron()
   const authCallback = electronMode ? await window.api.oneDrive.startAuthCallback() : null
+  if (!electronMode) clearStoredWebOneDriveCallback()
   const request = await createOneDriveAuthRequest({
     clientId,
     redirectUri: authCallback?.redirectUri ?? getOneDriveRedirectUri(),
