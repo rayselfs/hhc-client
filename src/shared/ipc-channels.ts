@@ -159,6 +159,12 @@ export interface OneDriveNativeDownloadResult {
   mimeType?: string
 }
 
+export interface OneDriveNativeDownloadProgress {
+  targetFileId: string
+  downloadedBytes: number
+  downloadTotalBytes?: number
+}
+
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
 
@@ -264,6 +270,7 @@ export interface IpcMainToRendererMap {
   'timer-tick': [TimerTickPayload]
   'update:status-changed': [{ status: UpdateStatus; version?: string; error?: string }]
   'app:download-progress': [WhisperDownloadProgress]
+  'onedrive:download-progress': [OneDriveNativeDownloadProgress]
 }
 
 export type IpcMainToRendererChannel = keyof IpcMainToRendererMap

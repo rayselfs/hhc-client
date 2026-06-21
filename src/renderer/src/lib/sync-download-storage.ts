@@ -4,7 +4,7 @@ import type { RemoteSyncItem, SyncDownloadRequest, SyncDownloadResult } from './
 import { openFileExplorerDB } from './file-explorer-db'
 import { isElectron } from './env'
 import { MAX_FILE_SIZE_WEB } from './media-limits'
-import { putSyncEntry } from './sync-db'
+import { putSyncEntry, updateSyncDownloadProgress } from './sync-db'
 
 const STORAGE_USAGE_LIMIT_RATIO = 0.8
 const STORAGE_LIMIT_ERROR = 'OneDrive sync storage has reached 80% usage'
@@ -58,6 +58,38 @@ async function markInsufficientStorage(
   toast.danger(i18n.t('toast.syncStorageLimitReached'))
 }
 
+async function readResponseBlobWithProgress(
+  request: SyncDownloadRequest,
+  response: Response,
+  metadata: RemoteSyncItem,
+  totalBytes: number
+): Promise<Blob> {
+  if (!response.body) return response.blob()
+  const reader = response.body.getReader()
+  const chunks: BlobPart[] = []
+  let downloadedBytes = 0
+  await updateSyncDownloadProgress(
+    { providerConnectionId: request.providerConnectionId, remoteItemId: request.remoteItemId },
+    0,
+    totalBytes || metadata.size
+  )
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    if (!value) continue
+    downloadedBytes += value.byteLength
+    chunks.push(value.slice())
+    await updateSyncDownloadProgress(
+      { providerConnectionId: request.providerConnectionId, remoteItemId: request.remoteItemId },
+      downloadedBytes,
+      totalBytes || metadata.size
+    )
+  }
+  return new Blob(chunks, {
+    type: metadata.mimeType ?? response.headers.get('Content-Type') ?? undefined
+  })
+}
+
 export async function saveWebOneDriveDownloadedContent(
   request: SyncDownloadRequest,
   response: Response,
@@ -72,7 +104,7 @@ export async function saveWebOneDriveDownloadedContent(
   try {
     await ensureWebCapacity(size)
 
-    const blob = await response.blob()
+    const blob = await readResponseBlobWithProgress(request, response, metadata, size)
     await ensureWebCapacity(blob.size)
 
     const db = await openFileExplorerDB()
@@ -95,7 +127,9 @@ export async function saveWebOneDriveDownloadedContent(
       size: blob.size,
       etag: metadata.etag,
       contentHash: metadata.contentHash,
-      status: 'available-offline'
+      status: 'available-offline',
+      downloadedBytes: blob.size,
+      downloadTotalBytes: blob.size
     })
 
     return {
@@ -124,13 +158,28 @@ export async function saveElectronOneDriveDownloadedContent(
       connectionId: request.providerConnectionId,
       clientId
     })
-    downloaded = await window.api.oneDrive.downloadFile({
-      remoteItemId: request.remoteItemId,
-      targetFileId: request.targetBlobId,
-      accessToken: token.accessToken,
-      expectedSize: metadata.size,
-      mimeType: metadata.mimeType
+    const unsubscribe = window.api.oneDrive.onDownloadProgress((progress) => {
+      if (progress.targetFileId !== request.targetBlobId) return
+      void updateSyncDownloadProgress(
+        {
+          providerConnectionId: request.providerConnectionId,
+          remoteItemId: request.remoteItemId
+        },
+        progress.downloadedBytes,
+        progress.downloadTotalBytes
+      )
     })
+    try {
+      downloaded = await window.api.oneDrive.downloadFile({
+        remoteItemId: request.remoteItemId,
+        targetFileId: request.targetBlobId,
+        accessToken: token.accessToken,
+        expectedSize: metadata.size,
+        mimeType: metadata.mimeType
+      })
+    } finally {
+      unsubscribe()
+    }
   } catch (error) {
     if (isSyncStorageLimitError(error)) await markInsufficientStorage(request, metadata)
     throw error
@@ -160,7 +209,9 @@ export async function saveElectronOneDriveDownloadedContent(
     size: downloaded.size,
     etag: metadata.etag,
     contentHash: metadata.contentHash,
-    status: 'available-offline'
+    status: 'available-offline',
+    downloadedBytes: downloaded.size,
+    downloadTotalBytes: downloaded.size
   })
 
   return {

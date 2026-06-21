@@ -89,6 +89,12 @@ interface SortableViewItemProps {
   children: React.ReactNode
 }
 
+interface SyncItemViewState {
+  status: SyncEntryStatus
+  downloadedBytes?: number
+  downloadTotalBytes?: number
+}
+
 function isFileItemRecord(item: unknown): item is FileItemRecord {
   return (
     typeof item === 'object' &&
@@ -374,7 +380,7 @@ export function FileBrowser({
   const [draggedIds, setDraggedIds] = useState<Set<string>>(new Set())
   const [selectedSearchId, setSelectedSearchId] = useState<string | null>(null)
   const [renamingItemId, setRenamingItemId] = useState<string | null>(null)
-  const [syncStatuses, setSyncStatuses] = useState<Record<string, SyncEntryStatus>>({})
+  const [syncStates, setSyncStates] = useState<Record<string, SyncItemViewState>>({})
   const [unsupportedMediaIds, setUnsupportedMediaIds] = useState<Set<string>>(new Set())
   const renameClickTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const pendingRenameItemIdRef = React.useRef<string | null>(null)
@@ -438,20 +444,26 @@ export function FileBrowser({
         ...fileItems.map((item) => item.id)
       ])
       if (ids.size === 0) {
-        setSyncStatuses({})
+        setSyncStates({})
         return
       }
       try {
         const entries = await listSyncEntries()
         if (cancelled) return
-        const next: Record<string, SyncEntryStatus> = {}
+        const next: Record<string, SyncItemViewState> = {}
         for (const entry of entries) {
           const localId = entry.itemId ?? entry.folderId
-          if (localId && ids.has(localId)) next[localId] = entry.status
+          if (localId && ids.has(localId)) {
+            next[localId] = {
+              status: entry.status,
+              downloadedBytes: entry.downloadedBytes,
+              downloadTotalBytes: entry.downloadTotalBytes
+            }
+          }
         }
-        setSyncStatuses(next)
+        setSyncStates(next)
       } catch {
-        if (!cancelled) setSyncStatuses({})
+        if (!cancelled) setSyncStates({})
       }
     }
     const handleSyncEntryChanged = (): void => {
@@ -506,7 +518,9 @@ export function FileBrowser({
         createdAt: folder.createdAt,
         isFavorited: folder.isFavorited,
         isSelected: false,
-        syncStatus: syncStatuses[folder.id],
+        syncStatus: syncStates[folder.id]?.status,
+        downloadedBytes: syncStates[folder.id]?.downloadedBytes,
+        downloadTotalBytes: syncStates[folder.id]?.downloadTotalBytes,
         syncProviderType:
           folder.parentId === FILE_EXPLORER_ROOT_ID ? folder.syncLink?.providerType : undefined
       })),
@@ -524,11 +538,13 @@ export function FileBrowser({
               ? thumbnails[item.id]
               : null,
         isSelected: false,
-        syncStatus: syncStatuses[item.id],
+        syncStatus: syncStates[item.id]?.status,
+        downloadedBytes: syncStates[item.id]?.downloadedBytes,
+        downloadTotalBytes: syncStates[item.id]?.downloadTotalBytes,
         isUnsupportedMedia: unsupportedMediaIds.has(item.id) || item.url.startsWith('unsupported:')
       }))
     ],
-    [folders, fileItems, thumbnails, syncStatuses, unsupportedMediaIds]
+    [folders, fileItems, thumbnails, syncStates, unsupportedMediaIds]
   )
 
   const sortedItems = useMemo(() => {

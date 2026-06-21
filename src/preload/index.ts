@@ -148,7 +148,10 @@ const oneDriveApi = {
   getAuthRedirectUri: () => typedInvoke('onedrive:get-auth-redirect-uri'),
   waitAuthCallback: () => typedInvoke('onedrive:wait-auth-callback'),
   downloadFile: (request: IpcInvokeMap['onedrive:download-file']['args'][0]) =>
-    typedInvoke('onedrive:download-file', request)
+    typedInvoke('onedrive:download-file', request),
+  onDownloadProgress: (
+    callback: (data: IpcMainToRendererMap['onedrive:download-progress'][0]) => void
+  ) => typedOn('onedrive:download-progress', callback)
 }
 
 const api = {

@@ -60,7 +60,11 @@ function createGraphContentUrl(remoteItemId: string): string {
   return `${GRAPH_BASE_URL}/me/drive/items/${encoded}/content`
 }
 
-async function writeResponseBodyToFile(response: Response, temporaryPath: string): Promise<number> {
+async function writeResponseBodyToFile(
+  response: Response,
+  temporaryPath: string,
+  onProgress?: (downloadedBytes: number) => void
+): Promise<number> {
   if (!response.body) throw new Error('OneDrive response is not streamable')
   const handle = await fs.open(temporaryPath, 'w')
   let size = 0
@@ -72,6 +76,7 @@ async function writeResponseBodyToFile(response: Response, temporaryPath: string
       if (!value) continue
       size += value.byteLength
       await handle.write(Buffer.from(value))
+      onProgress?.(size)
     }
   } finally {
     await handle.close()
@@ -108,7 +113,13 @@ export function registerOneDriveDownloadHandlers(wm: WindowManager): void {
       if (!response.ok) throw new Error(`OneDrive download failed: ${response.status}`)
 
       try {
-        const size = await writeResponseBodyToFile(response, temporaryPath)
+        const size = await writeResponseBodyToFile(response, temporaryPath, (downloadedBytes) => {
+          event.sender.send('onedrive:download-progress', {
+            targetFileId: request.targetFileId,
+            downloadedBytes,
+            downloadTotalBytes: request.expectedSize
+          })
+        })
         await assertNativeStorageCapacity(targetDirectory)
         if (request.expectedSize !== undefined && size !== request.expectedSize) {
           throw new Error('OneDrive download size mismatch')

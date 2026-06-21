@@ -23,7 +23,8 @@ import type {
   OneDriveCredentialStatus,
   OneDriveConnectedAccount,
   OneDriveNativeDownloadRequest,
-  OneDriveNativeDownloadResult
+  OneDriveNativeDownloadResult,
+  OneDriveNativeDownloadProgress
 } from '../shared/ipc-channels'
 import type {
   TimerCommand,
@@ -129,6 +130,7 @@ interface OneDriveAPI {
   getAuthRedirectUri: () => Promise<string>
   waitAuthCallback: () => Promise<string | null>
   downloadFile: (request: OneDriveNativeDownloadRequest) => Promise<OneDriveNativeDownloadResult>
+  onDownloadProgress: (callback: (data: OneDriveNativeDownloadProgress) => void) => () => void
 }
 
 declare global {

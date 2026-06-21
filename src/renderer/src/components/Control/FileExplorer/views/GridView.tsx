@@ -22,6 +22,8 @@ export interface GridViewItem {
   isSelected: boolean
   isFavorited?: boolean
   syncStatus?: SyncEntryStatus
+  downloadedBytes?: number
+  downloadTotalBytes?: number
   syncProviderType?: SyncProviderType
   isUnsupportedMedia?: boolean
 }
@@ -173,7 +175,11 @@ export const GridView = React.memo(function GridView({
                 {item.isFolder ? renderSyncProviderIcon(item.syncProviderType) : null}
                 {!item.isFolder && item.syncStatus ? (
                   <span className="absolute -bottom-1 -right-1 rounded-full bg-background/90">
-                    <SyncStatusIcon status={item.syncStatus} />
+                    <SyncStatusIcon
+                      status={item.syncStatus}
+                      downloadedBytes={item.downloadedBytes}
+                      downloadTotalBytes={item.downloadTotalBytes}
+                    />
                   </span>
                 ) : null}
               </div>

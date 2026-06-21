@@ -92,6 +92,27 @@ describe('inline rename in file views', () => {
     expect(screen.getByLabelText('Remote only')).toBeInTheDocument()
   })
 
+  it('renders download progress in grid view', () => {
+    render(
+      <GridView
+        items={[
+          {
+            ...items[0],
+            syncStatus: 'downloading',
+            downloadedBytes: 50,
+            downloadTotalBytes: 100
+          }
+        ]}
+        viewMode="large-icon"
+        onItemClick={vi.fn()}
+        onItemDoubleClick={vi.fn()}
+        onItemContextMenu={vi.fn()}
+      />
+    )
+
+    expect(screen.getByLabelText('Downloading 50%')).toBeInTheDocument()
+  })
+
   it('renders grid items in a single responsive grid', () => {
     const manyItems = Array.from({ length: 8 }, (_, index) => ({
       ...items[0],

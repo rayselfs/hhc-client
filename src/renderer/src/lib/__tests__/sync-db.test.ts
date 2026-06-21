@@ -14,7 +14,8 @@ import {
   putSyncEntry,
   putSyncEntryPreference,
   putSyncTombstone,
-  resetSyncDBForTests
+  resetSyncDBForTests,
+  updateSyncDownloadProgress
 } from '../sync-db'
 
 describe('sync-db', () => {
@@ -117,6 +118,29 @@ describe('sync-db', () => {
         itemId: 'item-1',
         status: 'downloading'
       }
+    })
+  })
+
+  it('updates download progress for an existing sync entry', async () => {
+    await putSyncEntry({
+      providerConnectionId: 'connection-1',
+      remoteItemId: 'remote-file-1',
+      parentRemoteItemId: null,
+      kind: 'file',
+      name: 'one.mp4',
+      itemId: 'item-1',
+      status: 'downloading'
+    })
+
+    await updateSyncDownloadProgress(
+      { providerConnectionId: 'connection-1', remoteItemId: 'remote-file-1' },
+      40,
+      100
+    )
+
+    await expect(getSyncEntryByRemoteItem('connection-1', 'remote-file-1')).resolves.toMatchObject({
+      downloadedBytes: 40,
+      downloadTotalBytes: 100
     })
   })
 

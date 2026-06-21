@@ -6,6 +6,8 @@ import type { SyncEntryStatus } from '@renderer/lib/sync-db'
 
 interface SyncStatusBadgeProps {
   status?: SyncEntryStatus
+  downloadedBytes?: number
+  downloadTotalBytes?: number
   compact?: boolean
 }
 
@@ -24,7 +26,31 @@ function translateStatus(t: TFunction, key: string, fallback: string): string {
   return String(t(key, fallback))
 }
 
-function getStatusLabel(status: SyncEntryStatus, t: TFunction): string {
+function getDownloadPercent(downloadedBytes?: number, downloadTotalBytes?: number): number | null {
+  if (
+    typeof downloadedBytes !== 'number' ||
+    typeof downloadTotalBytes !== 'number' ||
+    downloadTotalBytes <= 0
+  ) {
+    return null
+  }
+  return Math.max(0, Math.min(100, Math.round((downloadedBytes / downloadTotalBytes) * 100)))
+}
+
+function getStatusLabel(
+  status: SyncEntryStatus,
+  t: TFunction,
+  downloadedBytes?: number,
+  downloadTotalBytes?: number
+): string {
+  const percent = getDownloadPercent(downloadedBytes, downloadTotalBytes)
+  if (status === 'downloading' && percent !== null) {
+    return translateStatus(
+      t,
+      'fileExplorer.syncStatus.downloadingProgress',
+      `Downloading ${percent}%`
+    )
+  }
   switch (status) {
     case 'remote-only':
       return translateStatus(t, 'fileExplorer.syncStatus.remoteOnly', 'Remote only')
@@ -47,11 +73,13 @@ function getStatusLabel(status: SyncEntryStatus, t: TFunction): string {
 
 export function SyncStatusBadge({
   status,
+  downloadedBytes,
+  downloadTotalBytes,
   compact = false
 }: SyncStatusBadgeProps): React.JSX.Element | null {
   const { t } = useTranslation()
   if (!status) return null
-  const label = getStatusLabel(status, t)
+  const label = getStatusLabel(status, t, downloadedBytes, downloadTotalBytes)
   return (
     <span
       className={`inline-flex max-w-full items-center rounded-full border font-medium leading-none ${STATUS_STYLES[status]} ${
@@ -65,16 +93,58 @@ export function SyncStatusBadge({
   )
 }
 
-export function SyncStatusIcon({ status }: { status?: SyncEntryStatus }): React.JSX.Element | null {
+function ProgressCircle({ percent }: { percent: number }): React.JSX.Element {
+  const radius = 8
+  const circumference = 2 * Math.PI * radius
+  const offset = circumference - (percent / 100) * circumference
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" className="drop-shadow-sm text-primary">
+      <circle
+        cx="9"
+        cy="9"
+        r={radius}
+        fill="var(--color-background)"
+        stroke="currentColor"
+        strokeOpacity="0.2"
+        strokeWidth="2"
+      />
+      <circle
+        cx="9"
+        cy="9"
+        r={radius}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeDasharray={circumference}
+        strokeDashoffset={offset}
+        transform="rotate(-90 9 9)"
+      />
+    </svg>
+  )
+}
+
+export function SyncStatusIcon({
+  status,
+  downloadedBytes,
+  downloadTotalBytes
+}: {
+  status?: SyncEntryStatus
+  downloadedBytes?: number
+  downloadTotalBytes?: number
+}): React.JSX.Element | null {
   const { t } = useTranslation()
   if (!status) return null
-  const label = getStatusLabel(status, t)
+  const label = getStatusLabel(status, t, downloadedBytes, downloadTotalBytes)
   const className = 'drop-shadow-sm'
+  const percent = getDownloadPercent(downloadedBytes, downloadTotalBytes)
   const icon =
     status === 'available-offline' ? (
       <CheckCircle2 size={18} className={`${className} fill-success text-white`} />
     ) : status === 'failed' || status === 'insufficient-storage' ? (
       <XCircle size={18} className={`${className} fill-danger text-white`} />
+    ) : status === 'downloading' && percent !== null ? (
+      <ProgressCircle percent={percent} />
     ) : status === 'queued' || status === 'downloading' ? (
       <Loader2 size={18} className={`${className} animate-spin text-primary`} />
     ) : status === 'remote-only' ? (

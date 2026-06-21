@@ -51,6 +51,8 @@ export interface SyncEntryRecord {
   retryCount?: number
   nextRetryAt?: number
   lastError?: string
+  downloadedBytes?: number
+  downloadTotalBytes?: number
   createdAt: number
   updatedAt: number
 }
@@ -264,10 +266,26 @@ function dispatchSyncEntryChanged(entry: SyncEntryRecord): void {
         remoteItemId: entry.remoteItemId,
         itemId: entry.itemId,
         folderId: entry.folderId,
-        status: entry.status
+        status: entry.status,
+        downloadedBytes: entry.downloadedBytes,
+        downloadTotalBytes: entry.downloadTotalBytes
       }
     })
   )
+}
+
+export async function updateSyncDownloadProgress(
+  entryKey: { providerConnectionId: string; remoteItemId: string },
+  downloadedBytes: number,
+  downloadTotalBytes?: number
+): Promise<void> {
+  const entry = await getSyncEntryByRemoteItem(entryKey.providerConnectionId, entryKey.remoteItemId)
+  if (!entry) return
+  await putSyncEntry({
+    ...entry,
+    downloadedBytes,
+    downloadTotalBytes
+  })
 }
 
 export async function getSyncEntryByRemoteItem(

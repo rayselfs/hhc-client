@@ -9,18 +9,20 @@ const {
   mockStatfs,
   mockWrite,
   mockClose,
-  mockFetch
+  mockFetch,
+  mockSend
 } = vi.hoisted(() => ({
-    handleHandlers: new Map<string, (...args: unknown[]) => unknown>(),
-    mockMkdir: vi.fn(),
-    mockOpen: vi.fn(),
-    mockRename: vi.fn(),
-    mockRm: vi.fn(),
-    mockStatfs: vi.fn(),
-    mockWrite: vi.fn(),
-    mockClose: vi.fn(),
-    mockFetch: vi.fn()
-  }))
+  handleHandlers: new Map<string, (...args: unknown[]) => unknown>(),
+  mockMkdir: vi.fn(),
+  mockOpen: vi.fn(),
+  mockRename: vi.fn(),
+  mockRm: vi.fn(),
+  mockStatfs: vi.fn(),
+  mockWrite: vi.fn(),
+  mockClose: vi.fn(),
+  mockFetch: vi.fn(),
+  mockSend: vi.fn()
+}))
 
 const mockMainWindow = { id: 1 }
 const mockProjectionWindow = { id: 2 }
@@ -67,7 +69,7 @@ const wm = mockWindowManager as unknown as WindowManager
 const validFileId = '123e4567-e89b-12d3-a456-426614174000'
 
 function makeEvent(): Electron.IpcMainInvokeEvent {
-  return { sender: {} } as Electron.IpcMainInvokeEvent
+  return { sender: { send: mockSend } } as unknown as Electron.IpcMainInvokeEvent
 }
 
 function getHandler(channel: string): (...args: unknown[]) => unknown {
@@ -117,6 +119,27 @@ describe('OneDrive native download IPC', () => {
       expect.stringContaining(`/native-files/${validFileId}.`),
       `/tmp/hhc-user-data/native-files/${validFileId}`
     )
+  })
+
+  it('sends progress events while streaming content', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(new Blob(['video-bytes'], { type: 'video/mp4' }), {
+        headers: { 'Content-Type': 'video/mp4' }
+      })
+    )
+
+    await getHandler('onedrive:download-file')(makeEvent(), {
+      remoteItemId: 'remote-file-1',
+      targetFileId: validFileId,
+      accessToken: 'access-token',
+      expectedSize: 13
+    })
+
+    expect(mockSend).toHaveBeenCalledWith('onedrive:download-progress', {
+      targetFileId: validFileId,
+      downloadedBytes: 13,
+      downloadTotalBytes: 13
+    })
   })
 
   it('rejects non-main window access', async () => {

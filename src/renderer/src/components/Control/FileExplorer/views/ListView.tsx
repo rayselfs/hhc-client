@@ -221,7 +221,12 @@ export const ListView = React.memo(function ListView({
                     >
                       {item.name}
                     </div>
-                    <SyncStatusBadge status={item.syncStatus} compact />
+                    <SyncStatusBadge
+                      status={item.syncStatus}
+                      downloadedBytes={item.downloadedBytes}
+                      downloadTotalBytes={item.downloadTotalBytes}
+                      compact
+                    />
                   </div>
                 )}
                 <div className="w-1 flex-shrink-0" />

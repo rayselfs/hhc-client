@@ -64,7 +64,8 @@ beforeEach(async () => {
           fileId: request.targetBlobId,
           size: 10,
           mimeType: 'video/mp4'
-        }))
+        })),
+        onDownloadProgress: vi.fn(() => () => undefined)
       },
       nativeFs: {
         delete: vi.fn(async () => undefined)
@@ -99,6 +100,21 @@ describe('saveWebOneDriveDownloadedContent', () => {
       status: 'available-offline',
       etag: 'etag-1',
       contentHash: 'hash-1'
+    })
+  })
+
+  it('records Web download progress while streaming content', async () => {
+    const response = new Response(new Blob(['video-bytes'], { type: 'video/mp4' }), {
+      headers: { 'Content-Length': '11' }
+    })
+
+    await saveWebOneDriveDownloadedContent(request, response, metadata)
+
+    await expect(
+      getSyncEntryByRemoteItem('onedrive:account-1', 'remote-file-1')
+    ).resolves.toMatchObject({
+      downloadedBytes: 13,
+      downloadTotalBytes: 13
     })
   })
 
