@@ -98,7 +98,6 @@ export interface SpeechSettings {
 
 export interface OneDriveSettings {
   customClientId: string
-  defaultOfflinePolicy: SyncOfflinePolicy
 }
 
 export const DEFAULT_SPEECH: SpeechSettings = {
@@ -113,9 +112,10 @@ export function getDefaultSpeechSettings(): SpeechSettings {
 }
 
 export const DEFAULT_ONEDRIVE: OneDriveSettings = {
-  customClientId: '',
-  defaultOfflinePolicy: 'always-offline'
+  customClientId: ''
 }
+
+export const DEFAULT_SYNC_OFFLINE_POLICY: SyncOfflinePolicy = 'always-offline'
 
 export function validateOneDriveClientId(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value.trim())
@@ -150,16 +150,16 @@ function normalizeOneDriveSettings(value: unknown): OneDriveSettings {
     typeof value.customClientId === 'string' && validateOneDriveClientId(value.customClientId)
       ? value.customClientId.trim()
       : DEFAULT_ONEDRIVE.customClientId
-  const defaultOfflinePolicy = OFFLINE_POLICIES.includes(
-    value.defaultOfflinePolicy as SyncOfflinePolicy
-  )
-    ? (value.defaultOfflinePolicy as SyncOfflinePolicy)
-    : DEFAULT_ONEDRIVE.defaultOfflinePolicy
 
   return {
-    customClientId,
-    defaultOfflinePolicy
+    customClientId
   }
+}
+
+function normalizeSyncOfflinePolicy(value: unknown): SyncOfflinePolicy {
+  return OFFLINE_POLICIES.includes(value as SyncOfflinePolicy)
+    ? (value as SyncOfflinePolicy)
+    : DEFAULT_SYNC_OFFLINE_POLICY
 }
 
 function normalizeSpeechSettings(value: unknown): SpeechSettings {
@@ -240,6 +240,7 @@ export function normalizeSettingsState(value: unknown): Partial<SettingsStore> {
         : DEFAULT_TIMER_RING_COLOR_ENABLED,
     speech: normalizeSpeechSettings(state.speech),
     oneDrive: normalizeOneDriveSettings(state.oneDrive),
+    defaultSyncOfflinePolicy: normalizeSyncOfflinePolicy(state.defaultSyncOfflinePolicy),
     trashRetentionDays: normalizePositiveInteger(
       state.trashRetentionDays,
       DEFAULT_TRASH_RETENTION_DAYS
@@ -257,6 +258,7 @@ export interface SettingsStore {
   timerRingColorEnabled: boolean
   speech: SpeechSettings
   oneDrive: OneDriveSettings
+  defaultSyncOfflinePolicy: SyncOfflinePolicy
   trashRetentionDays: number
   reminderMode: 'subtract' | 'add'
   projectionDisplayId: string
@@ -267,6 +269,7 @@ export interface SettingsStore {
   setTimerRingColorEnabled: (enabled: boolean) => void
   setSpeech: (settings: SpeechSettings) => void
   setOneDrive: (settings: OneDriveSettings) => void
+  setDefaultSyncOfflinePolicy: (policy: SyncOfflinePolicy) => void
   setTrashRetentionDays: (days: number) => void
   setReminderMode: (mode: 'subtract' | 'add') => void
   setProjectionDisplayId: (displayId: string) => void
@@ -283,6 +286,7 @@ function getDefaultSettingsState(): Omit<
   | 'setTimerRingColorEnabled'
   | 'setSpeech'
   | 'setOneDrive'
+  | 'setDefaultSyncOfflinePolicy'
   | 'setTrashRetentionDays'
   | 'setReminderMode'
   | 'setProjectionDisplayId'
@@ -297,6 +301,7 @@ function getDefaultSettingsState(): Omit<
     timerRingColorEnabled: DEFAULT_TIMER_RING_COLOR_ENABLED,
     speech: getDefaultSpeechSettings(),
     oneDrive: DEFAULT_ONEDRIVE,
+    defaultSyncOfflinePolicy: DEFAULT_SYNC_OFFLINE_POLICY,
     trashRetentionDays: DEFAULT_TRASH_RETENTION_DAYS,
     reminderMode: DEFAULT_REMINDER_MODE,
     projectionDisplayId: DEFAULT_PROJECTION_DISPLAY_ID
@@ -333,10 +338,13 @@ export const useSettingsStore = create<SettingsStore>()(
         if (customClientId && !validateOneDriveClientId(customClientId)) return
         set({
           oneDrive: {
-            customClientId,
-            defaultOfflinePolicy: settings.defaultOfflinePolicy
+            customClientId
           }
         })
+      },
+
+      setDefaultSyncOfflinePolicy: (policy: SyncOfflinePolicy) => {
+        set({ defaultSyncOfflinePolicy: normalizeSyncOfflinePolicy(policy) })
       },
 
       setTimerRingColorEnabled: (enabled: boolean) => {
@@ -444,6 +452,7 @@ export const useSettingsStore = create<SettingsStore>()(
         timerRingColorEnabled: state.timerRingColorEnabled,
         speech: state.speech,
         oneDrive: state.oneDrive,
+        defaultSyncOfflinePolicy: state.defaultSyncOfflinePolicy,
         trashRetentionDays: state.trashRetentionDays,
         reminderMode: state.reminderMode,
         projectionDisplayId: state.projectionDisplayId

@@ -41,6 +41,8 @@ export default function MediaSettings({
   const setTrashRetentionDays = useSettingsStore((s) => s.setTrashRetentionDays)
   const oneDrive = useSettingsStore((s) => s.oneDrive)
   const setOneDrive = useSettingsStore((s) => s.setOneDrive)
+  const defaultSyncOfflinePolicy = useSettingsStore((s) => s.defaultSyncOfflinePolicy)
+  const setDefaultSyncOfflinePolicy = useSettingsStore((s) => s.setDefaultSyncOfflinePolicy)
   const [oneDriveDraft, setOneDriveDraft] = useState<OneDriveSettings>(oneDrive)
   const [customClientIdEnabled, setCustomClientIdEnabled] = useState(
     oneDrive.customClientId.trim().length > 0
@@ -124,7 +126,7 @@ export default function MediaSettings({
   return (
     <div className="p-5 space-y-6">
       {section === 'general' && (
-        <section className="space-y-3">
+        <section className="space-y-4">
           <Select
             variant="secondary"
             value={trashRetentionDays}
@@ -152,13 +154,40 @@ export default function MediaSettings({
             </Select.Popover>
           </Select>
           <p className="text-xs text-gray-500">{t('preferences.trash.retentionDesc')}</p>
+
+          <div className="border-t border-default-200 pt-4">
+            <Select
+              variant="secondary"
+              value={defaultSyncOfflinePolicy}
+              onChange={(key) => setDefaultSyncOfflinePolicy(String(key) as SyncOfflinePolicy)}
+              aria-label={t('preferences.media.defaultOfflinePolicy')}
+            >
+              <Label>{t('preferences.media.defaultOfflinePolicy')}</Label>
+              <Select.Trigger className="rounded-full pl-5">
+                <Select.Value />
+                <Select.Indicator />
+              </Select.Trigger>
+              <Select.Popover>
+                <ListBox>
+                  {OFFLINE_POLICY_OPTIONS.map((policy) => (
+                    <ListBox.Item
+                      key={policy}
+                      id={policy}
+                      textValue={t(`preferences.media.offlinePolicies.${policy}`)}
+                      className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
+                    >
+                      {t(`preferences.media.offlinePolicies.${policy}`)}
+                    </ListBox.Item>
+                  ))}
+                </ListBox>
+              </Select.Popover>
+            </Select>
+          </div>
         </section>
       )}
 
       {section === 'oneDrive' && (
         <section className="space-y-3">
-          <h3 className="text-sm font-semibold">{t('preferences.media.oneDrive.title')}</h3>
-
           <div className="space-y-2 rounded-2xl bg-surface-secondary px-4 py-3">
             <p className="text-sm font-medium">
               {t('preferences.media.oneDrive.connectedAccount')}
@@ -252,40 +281,6 @@ export default function MediaSettings({
             {t('preferences.media.oneDrive.clientIdHelp')}
             <ExternalLink size={12} />
           </a>
-
-          <div className="border-t border-default-200 pt-4">
-            <Select
-              variant="secondary"
-              value={oneDriveDraft.defaultOfflinePolicy}
-              onChange={(key) =>
-                saveOneDriveDraft({
-                  ...oneDriveDraft,
-                  defaultOfflinePolicy: String(key) as SyncOfflinePolicy
-                })
-              }
-              aria-label={t('preferences.media.oneDrive.defaultOfflinePolicy')}
-            >
-              <Label>{t('preferences.media.oneDrive.defaultOfflinePolicy')}</Label>
-              <Select.Trigger className="rounded-full pl-5">
-                <Select.Value />
-                <Select.Indicator />
-              </Select.Trigger>
-              <Select.Popover>
-                <ListBox>
-                  {OFFLINE_POLICY_OPTIONS.map((policy) => (
-                    <ListBox.Item
-                      key={policy}
-                      id={policy}
-                      textValue={t(`preferences.media.oneDrive.offlinePolicies.${policy}`)}
-                      className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
-                    >
-                      {t(`preferences.media.oneDrive.offlinePolicies.${policy}`)}
-                    </ListBox.Item>
-                  ))}
-                </ListBox>
-              </Select.Popover>
-            </Select>
-          </div>
         </section>
       )}
     </div>

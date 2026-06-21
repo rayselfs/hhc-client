@@ -46,8 +46,7 @@ vi.mock('@renderer/lib/media-storage-cleanup', () => ({
 
 vi.mock('@renderer/stores/settings', () => ({
   DEFAULT_ONEDRIVE: {
-    customClientId: '',
-    defaultOfflinePolicy: 'always-offline'
+    customClientId: ''
   },
   LIBREPRESENTER_DEFAULT_ONEDRIVE_CLIENT_ID: '4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02',
   getEffectiveOneDriveClientId: (settings: { customClientId: string }) =>
@@ -70,10 +69,11 @@ vi.mock('@renderer/stores/settings', () => ({
       setHardwareAcceleration: vi.fn(),
       setSpeech: vi.fn(),
       oneDrive: {
-        customClientId: '',
-        defaultOfflinePolicy: 'always-offline' as const
+        customClientId: ''
       },
       setOneDrive: vi.fn(),
+      defaultSyncOfflinePolicy: 'always-offline' as const,
+      setDefaultSyncOfflinePolicy: vi.fn(),
       trashRetentionDays: 30,
       setTrashRetentionDays: vi.fn(),
       resetSettings: vi.fn(),
@@ -191,11 +191,13 @@ describe('PreferencesDialog', () => {
     renderDialog(true)
 
     await user.click(screen.getByTestId('category-media'))
+    expect(screen.getByLabelText('Offline Policy')).toBeInTheDocument()
     await user.click(screen.getByTestId('category-media-oneDrive'))
     expect(screen.getByTestId('category-media')).toHaveAttribute('aria-pressed', 'false')
     expect(screen.getByTestId('category-media-oneDrive')).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByLabelText('Custom Azure Client ID')).toBeInTheDocument()
     expect(screen.queryByLabelText('Azure Application Client ID')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Offline Policy')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Trash Retention Period')).not.toBeInTheDocument()
   })
 
@@ -206,13 +208,13 @@ describe('PreferencesDialog', () => {
     await user.click(screen.getByTestId('category-storage'))
     expect(screen.getByTestId('category-storage')).toHaveAttribute('aria-pressed', 'false')
     expect(screen.getByTestId('category-storage-usage')).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('heading', { name: 'Usage' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Usage' })).not.toBeInTheDocument()
     expect(screen.getByText('Original media files')).toBeInTheDocument()
 
     await user.click(screen.getByTestId('category-storage-cleanup'))
     expect(screen.getByTestId('category-storage')).toHaveAttribute('aria-pressed', 'false')
     expect(screen.getByTestId('category-storage-cleanup')).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('heading', { name: 'Cache Cleanup' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Cache Cleanup' })).not.toBeInTheDocument()
     expect(screen.getByText('Clear orphan derived assets')).toBeInTheDocument()
     expect(screen.getByText(/covers, PDF previews, and video posters/)).toBeInTheDocument()
   })
@@ -267,10 +269,11 @@ describe('PreferencesDialog', () => {
         },
         setSpeech: vi.fn(),
         oneDrive: {
-          customClientId: '',
-          defaultOfflinePolicy: 'always-offline' as const
+          customClientId: ''
         },
         setOneDrive: vi.fn(),
+        defaultSyncOfflinePolicy: 'always-offline' as const,
+        setDefaultSyncOfflinePolicy: vi.fn(),
         trashRetentionDays: 30,
         setTrashRetentionDays: vi.fn(),
         projectionDisplayId: '',
@@ -374,10 +377,11 @@ describe('PreferencesDialog', () => {
         },
         setSpeech: vi.fn(),
         oneDrive: {
-          customClientId: '',
-          defaultOfflinePolicy: 'always-offline' as const
+          customClientId: ''
         },
         setOneDrive: vi.fn(),
+        defaultSyncOfflinePolicy: 'always-offline' as const,
+        setDefaultSyncOfflinePolicy: vi.fn(),
         trashRetentionDays: 30,
         setTrashRetentionDays: vi.fn(),
         projectionDisplayId: '',
@@ -433,10 +437,11 @@ describe('PreferencesDialog', () => {
         },
         setSpeech: vi.fn(),
         oneDrive: {
-          customClientId: '',
-          defaultOfflinePolicy: 'always-offline' as const
+          customClientId: ''
         },
         setOneDrive: vi.fn(),
+        defaultSyncOfflinePolicy: 'always-offline' as const,
+        setDefaultSyncOfflinePolicy: vi.fn(),
         trashRetentionDays: 30,
         setTrashRetentionDays: vi.fn(),
         projectionDisplayId: '',
@@ -483,10 +488,11 @@ describe('PreferencesDialog', () => {
         },
         setSpeech: vi.fn(),
         oneDrive: {
-          customClientId: '',
-          defaultOfflinePolicy: 'always-offline' as const
+          customClientId: ''
         },
         setOneDrive: vi.fn(),
+        defaultSyncOfflinePolicy: 'always-offline' as const,
+        setDefaultSyncOfflinePolicy: vi.fn(),
         trashRetentionDays: 30,
         setTrashRetentionDays: vi.fn(),
         projectionDisplayId: '',

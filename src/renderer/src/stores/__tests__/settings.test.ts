@@ -412,14 +412,12 @@ describe('OneDrive settings', () => {
 
   it('persists non-sensitive OneDrive preferences only', () => {
     useSettingsStore.getState().setOneDrive({
-      customClientId: '11111111-2222-3333-4444-555555555555',
-      defaultOfflinePolicy: 'always-offline'
+      customClientId: '11111111-2222-3333-4444-555555555555'
     })
 
     const state = useSettingsStore.getState()
     expect(state.oneDrive).toMatchObject({
-      customClientId: '11111111-2222-3333-4444-555555555555',
-      defaultOfflinePolicy: 'always-offline'
+      customClientId: '11111111-2222-3333-4444-555555555555'
     })
     expect(state.oneDrive).not.toHaveProperty('accessToken')
     expect(state.oneDrive).not.toHaveProperty('refreshToken')
@@ -428,8 +426,7 @@ describe('OneDrive settings', () => {
   it('rejects invalid custom Client ID updates', () => {
     const before = useSettingsStore.getState().oneDrive
     useSettingsStore.getState().setOneDrive({
-      customClientId: '../bad',
-      defaultOfflinePolicy: 'online-only'
+      customClientId: '../bad'
     })
 
     expect(useSettingsStore.getState().oneDrive).toEqual(before)
@@ -446,17 +443,23 @@ describe('OneDrive settings', () => {
     expect(normalized.oneDrive).toEqual(DEFAULT_ONEDRIVE)
   })
 
+  it('normalizes shared sync offline policy', () => {
+    const normalized = normalizeSettingsState({
+      defaultSyncOfflinePolicy: 'online-only'
+    })
+
+    expect(normalized.defaultSyncOfflinePolicy).toBe('online-only')
+  })
+
   it('normalizes valid persisted OneDrive preferences', () => {
     const normalized = normalizeSettingsState({
       oneDrive: {
-        customClientId: '11111111-2222-3333-4444-555555555555',
-        defaultOfflinePolicy: 'always-offline'
+        customClientId: '11111111-2222-3333-4444-555555555555'
       }
     })
 
     expect(normalized.oneDrive).toEqual({
-      customClientId: '11111111-2222-3333-4444-555555555555',
-      defaultOfflinePolicy: 'always-offline'
+      customClientId: '11111111-2222-3333-4444-555555555555'
     })
   })
 })

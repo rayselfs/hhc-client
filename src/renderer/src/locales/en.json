@@ -605,6 +605,12 @@
         "general": "General",
         "oneDrive": "OneDrive"
       },
+      "defaultOfflinePolicy": "Offline Policy",
+      "offlinePolicies": {
+        "online-only": "Online only",
+        "on-demand": "On demand",
+        "always-offline": "Always available offline"
+      },
       "oneDrive": {
         "title": "OneDrive",
         "description": "OneDrive folders are read-only sources. LibrePresenter never uploads, renames, moves, or deletes remote files.",
@@ -628,12 +634,6 @@
         "disconnectDescription": "This removes the OneDrive source from LibrePresenter and clears locally cached synced files. Remote files are not changed.",
         "disconnected": "OneDrive disconnected.",
         "disconnectFailed": "Failed to disconnect OneDrive.",
-        "defaultOfflinePolicy": "Offline Policy",
-        "offlinePolicies": {
-          "online-only": "Online only",
-          "on-demand": "On demand",
-          "always-offline": "Always available offline"
-        },
         "setupHint": "Changing the Client ID requires reconnecting OneDrive. Tokens are stored separately and never in Preferences."
       }
     },

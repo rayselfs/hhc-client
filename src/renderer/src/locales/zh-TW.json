@@ -605,6 +605,12 @@
         "general": "一般",
         "oneDrive": "OneDrive"
       },
+      "defaultOfflinePolicy": "離線策略",
+      "offlinePolicies": {
+        "online-only": "僅線上",
+        "on-demand": "需要時下載",
+        "always-offline": "永遠離線可用"
+      },
       "oneDrive": {
         "title": "OneDrive",
         "description": "OneDrive 資料夾是唯讀來源。LibrePresenter 不會上傳、重新命名、移動或刪除遠端檔案。",
@@ -628,12 +634,6 @@
         "disconnectDescription": "這會從 LibrePresenter 移除 OneDrive 來源並清除本機同步快取，不會變更遠端檔案。",
         "disconnected": "已解除 OneDrive 連結。",
         "disconnectFailed": "無法解除 OneDrive 連結。",
-        "defaultOfflinePolicy": "離線策略",
-        "offlinePolicies": {
-          "online-only": "僅線上",
-          "on-demand": "需要時下載",
-          "always-offline": "永遠離線可用"
-        },
         "setupHint": "變更 Client ID 後需要重新連接 OneDrive。Token 會分開儲存，不會進入偏好設定。"
       }
     },

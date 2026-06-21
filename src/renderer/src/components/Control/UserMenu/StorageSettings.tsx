@@ -121,8 +121,7 @@ export default function StorageSettings({
   if (section === 'cleanup') {
     return (
       <section className="p-5">
-        <h3 className="text-sm font-semibold">{t('preferences.storage.cleanup.title')}</h3>
-        <div className="mt-3">
+        <div>
           {CLEANUP_ACTIONS.map((item) => (
             <div key={item.key} className="border-t border-default-200 py-4 first:border-t-0">
               <div className="flex items-start justify-between gap-4">
@@ -152,8 +151,7 @@ export default function StorageSettings({
 
   return (
     <section className="p-2 relative space-y-3">
-      <div className="flex items-center justify-between">
-        <h3 className="pl-3 pt-1 text-sm font-semibold">{t('preferences.storage.usage.title')}</h3>
+      <div className="flex justify-end">
         <Button
           variant="ghost"
           className="rounded-full h-10 w-10"

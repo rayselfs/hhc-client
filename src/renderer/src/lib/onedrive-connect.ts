@@ -427,7 +427,7 @@ export async function importOneDriveFolder(
   const connection = await getConnectedOneDriveAccount()
   if (!connection) throw new Error('OneDrive account is not connected')
 
-  const oneDriveSettings = useSettingsStore.getState().oneDrive
+  const { defaultSyncOfflinePolicy } = useSettingsStore.getState()
   const provider = createStoredOneDriveProvider(connection.id)
   const { remoteItems, nextCursor } = await scanOneDriveFolder(
     provider,
@@ -441,7 +441,7 @@ export async function importOneDriveFolder(
     connectionId: connection.id,
     displayName: remoteFolder.name,
     rootRemoteFolderId: remoteFolder.remoteItemId,
-    offlinePolicy: oneDriveSettings.defaultOfflinePolicy,
+    offlinePolicy: defaultSyncOfflinePolicy,
     remoteItems,
     existingRootFolderNames: store
       .getChildFolders(FILE_EXPLORER_ROOT_ID)
@@ -460,7 +460,7 @@ export async function importOneDriveFolder(
   }
 
   let downloadedCount = 0
-  if (oneDriveSettings.defaultOfflinePolicy === 'always-offline') {
+  if (defaultSyncOfflinePolicy === 'always-offline') {
     const remoteById = new Map(remoteItems.map((item) => [item.remoteItemId, item]))
     for (const item of plan.downloadableItems) {
       try {
@@ -552,7 +552,7 @@ export async function refreshOneDriveFolder(rootFolderId: string): Promise<OneDr
   )
   const existingEntries = await listSyncEntriesByProviderConnection(syncLink.providerConnectionId)
   const offlinePolicy =
-    syncLink.offlinePolicy ?? useSettingsStore.getState().oneDrive.defaultOfflinePolicy
+    syncLink.offlinePolicy ?? useSettingsStore.getState().defaultSyncOfflinePolicy
   const plan = buildSyncRefreshPlan({
     providerConnectionId: syncLink.providerConnectionId,
     providerType: 'onedrive',
