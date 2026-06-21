@@ -499,8 +499,7 @@
       "back": "Back",
       "empty": "No folders are available here.",
       "import": "Add Folder",
-      "loadFailed": "Failed to load OneDrive folders.",
-      "openFolder": "Open {{name}}"
+      "loadFailed": "Failed to load OneDrive folders."
     }
   },
   "projection": {

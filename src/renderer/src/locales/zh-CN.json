@@ -499,8 +499,7 @@
       "back": "返回上一层",
       "empty": "这里没有可加入的文件夹。",
       "import": "加入文件夹",
-      "loadFailed": "无法加载 OneDrive 文件夹。",
-      "openFolder": "打开 {{name}}"
+      "loadFailed": "无法加载 OneDrive 文件夹。"
     }
   },
   "projection": {

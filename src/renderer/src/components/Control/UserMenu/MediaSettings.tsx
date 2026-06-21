@@ -170,7 +170,7 @@ export default function MediaSettings({
 
       {section === 'oneDrive' && (
         <section>
-          <div className="space-y-2 rounded-2xl bg-surface-secondary px-4 py-3">
+          <div className="space-y-2">
             <p className="text-sm font-medium">
               {t('preferences.media.oneDrive.connectedAccount')}
             </p>

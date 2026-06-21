@@ -166,6 +166,7 @@ export default function FilesPage(): React.JSX.Element {
 
   const handleImportOneDriveFolder = useCallback(
     async (folder: CloudRemoteFolder): Promise<void> => {
+      setIsOneDrivePickerOpen(false)
       setIsOneDriveImporting(true)
       try {
         const result = await ONE_DRIVE_PROVIDER.importFolder(folder)
@@ -175,7 +176,6 @@ export default function FilesPage(): React.JSX.Element {
             count: result.itemCount
           })
         )
-        setIsOneDrivePickerOpen(false)
       } catch (error) {
         console.warn('[onedrive] Failed to import folder', error)
         toast.danger(t('fileExplorer.syncSources.oneDriveImportFailed'))

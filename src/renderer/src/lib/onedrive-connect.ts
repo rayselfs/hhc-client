@@ -420,6 +420,60 @@ function createStoredOneDriveProvider(connectionId: string): OneDriveReadonlyPro
   })
 }
 
+async function downloadImportedOneDriveItems(input: {
+  connection: ProviderConnectionRecord
+  provider: OneDriveReadonlyProvider
+  remoteItems: RemoteSyncItem[]
+  plan: OneDriveImportPlan
+}): Promise<void> {
+  const remoteById = new Map(input.remoteItems.map((item) => [item.remoteItemId, item]))
+  const downloadedItemIds: string[] = []
+
+  for (const item of input.plan.downloadableItems) {
+    try {
+      await input.provider.downloadContent(
+        {
+          providerConnectionId: input.connection.id,
+          remoteItemId: item.remoteItemId,
+          targetBlobId: item.itemId,
+          offlinePolicy: 'always-offline'
+        },
+        new AbortController().signal
+      )
+      downloadedItemIds.push(item.itemId)
+    } catch (error) {
+      console.warn('[onedrive] Failed to download file for offline use', {
+        connectionId: input.connection.id,
+        remoteItemId: item.remoteItemId,
+        error
+      })
+      const remoteItem = remoteById.get(item.remoteItemId)
+      if (remoteItem) {
+        await putSyncEntry({
+          providerConnectionId: input.connection.id,
+          remoteItemId: item.remoteItemId,
+          parentRemoteItemId: remoteItem.parentRemoteItemId,
+          kind: 'file',
+          name: remoteItem.name,
+          itemId: item.itemId,
+          blobId: item.itemId,
+          mimeType: remoteItem.mimeType,
+          size: remoteItem.size,
+          etag: remoteItem.etag,
+          contentHash: remoteItem.contentHash,
+          status: 'failed'
+        })
+      }
+    }
+  }
+
+  if (downloadedItemIds.length > 0) {
+    void refreshImportedMediaAssets(
+      input.plan.items.filter((item) => downloadedItemIds.includes(item.id))
+    )
+  }
+}
+
 async function scanOneDriveFolder(
   provider: OneDriveReadonlyProvider,
   connectionId: string,
@@ -593,62 +647,22 @@ export async function importOneDriveFolder(
     })
   }
 
-  let downloadedCount = 0
-  const downloadedItemIds: string[] = []
-  if (defaultSyncOfflinePolicy === 'always-offline') {
-    const remoteById = new Map(remoteItems.map((item) => [item.remoteItemId, item]))
-    for (const item of plan.downloadableItems) {
-      try {
-        await provider.downloadContent(
-          {
-            providerConnectionId: connection.id,
-            remoteItemId: item.remoteItemId,
-            targetBlobId: item.itemId,
-            offlinePolicy: 'always-offline'
-          },
-          new AbortController().signal
-        )
-        downloadedCount++
-        downloadedItemIds.push(item.itemId)
-      } catch (error) {
-        console.warn('[onedrive] Failed to download file for offline use', {
-          connectionId: connection.id,
-          remoteItemId: item.remoteItemId,
-          error
-        })
-        const remoteItem = remoteById.get(item.remoteItemId)
-        if (remoteItem) {
-          await putSyncEntry({
-            providerConnectionId: connection.id,
-            remoteItemId: item.remoteItemId,
-            parentRemoteItemId: remoteItem.parentRemoteItemId,
-            kind: 'file',
-            name: remoteItem.name,
-            itemId: item.itemId,
-            blobId: item.itemId,
-            mimeType: remoteItem.mimeType,
-            size: remoteItem.size,
-            etag: remoteItem.etag,
-            contentHash: remoteItem.contentHash,
-            status: 'failed'
-          })
-        }
-      }
-    }
-  }
-
   mergeImportedRecordsIntoStore(plan.folders, plan.items)
-  if (downloadedItemIds.length > 0) {
-    void refreshImportedMediaAssets(
-      plan.items.filter((item) => downloadedItemIds.includes(item.id))
+
+  if (defaultSyncOfflinePolicy === 'always-offline') {
+    void downloadImportedOneDriveItems({ connection, provider, remoteItems, plan }).catch(
+      (error) => {
+        console.warn('[onedrive] Failed to finish offline downloads', error)
+      }
     )
   }
+
   return {
     connectionId: connection.id,
     displayName: remoteFolder.name,
     folderCount: plan.folders.length,
     itemCount: plan.items.length,
-    downloadedCount,
+    downloadedCount: 0,
     disabledCount: plan.disabledCount
   }
 }

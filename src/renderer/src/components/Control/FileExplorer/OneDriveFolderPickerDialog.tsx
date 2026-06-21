@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@heroui/react/button'
 import { Modal } from '@heroui/react/modal'
-import { ArrowLeft, ChevronRight, Folder, Loader2 } from 'lucide-react'
+import { ArrowLeft, Folder, Loader2 } from 'lucide-react'
 import { getCloudProviderAdapter, type CloudRemoteFolder } from '@renderer/lib/cloud-provider'
 import { ShortcutScope } from '@renderer/contexts/ShortcutScopeContext'
 
@@ -118,34 +118,21 @@ export default function OneDriveFolderPickerDialog({
                         {folders.map((folder) => {
                           const isSelected = selectedFolder?.remoteItemId === folder.remoteItemId
                           return (
-                            <div
+                            <button
                               key={folder.remoteItemId}
+                              type="button"
                               className={[
-                                'flex items-center gap-2 rounded-2xl px-3 py-2 text-left text-sm',
+                                'flex w-full min-w-0 items-center gap-2 rounded-2xl px-3 py-2 text-left text-sm',
                                 isSelected
                                   ? 'bg-accent text-accent-foreground'
                                   : 'hover:bg-accent hover:text-accent-foreground'
                               ].join(' ')}
+                              onClick={() => setSelectedFolder(folder)}
+                              onDoubleClick={() => openFolder(folder)}
                             >
-                              <button
-                                type="button"
-                                className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                                onClick={() => setSelectedFolder(folder)}
-                              >
-                                <Folder size={16} className="shrink-0" />
-                                <span className="truncate">{folder.name}</span>
-                              </button>
-                              <button
-                                type="button"
-                                className="shrink-0 rounded-full p-1 hover:bg-black/10"
-                                onClick={() => openFolder(folder)}
-                                aria-label={t('fileExplorer.oneDriveFolderPicker.openFolder', {
-                                  name: folder.name
-                                })}
-                              >
-                                <ChevronRight size={16} />
-                              </button>
-                            </div>
+                              <Folder size={16} className="shrink-0" />
+                              <span className="truncate">{folder.name}</span>
+                            </button>
                           )
                         })}
                       </div>
