@@ -54,20 +54,22 @@ async function refreshOneDrive(): Promise<void> {
 }
 
 export function startSyncRuntime(): () => void {
-  if (!isElectron()) return () => undefined
+  let localInterval: number | undefined
+  if (isElectron()) {
+    void refreshAllLocalSyncFolders().catch((error) => {
+      console.warn('[sync] Failed to start local sync runtime', error)
+    })
+    localInterval = window.setInterval(() => {
+      void refreshLocalSyncIfDirty().catch((error) => {
+        console.warn('[sync] Failed to refresh local sync folders', error)
+      })
+    }, LOCAL_SYNC_POLL_MS)
+  }
 
-  void refreshAllLocalSyncFolders().catch((error) => {
-    console.warn('[sync] Failed to start local sync runtime', error)
-  })
   void refreshOneDrive().catch((error) => {
     console.warn('[sync] Failed to refresh OneDrive folders', error)
   })
 
-  const localInterval = window.setInterval(() => {
-    void refreshLocalSyncIfDirty().catch((error) => {
-      console.warn('[sync] Failed to refresh local sync folders', error)
-    })
-  }, LOCAL_SYNC_POLL_MS)
   const oneDriveInterval = window.setInterval(() => {
     void refreshOneDrive().catch((error) => {
       console.warn('[sync] Failed to refresh OneDrive folders', error)
@@ -75,7 +77,7 @@ export function startSyncRuntime(): () => void {
   }, ONEDRIVE_REFRESH_MS)
 
   return () => {
-    window.clearInterval(localInterval)
+    if (localInterval !== undefined) window.clearInterval(localInterval)
     window.clearInterval(oneDriveInterval)
   }
 }
