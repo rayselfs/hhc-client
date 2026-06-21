@@ -70,6 +70,7 @@ interface BibleAPI {
 
 interface AppAPI {
   relaunch: () => Promise<void>
+  clearUserData: () => Promise<void>
   selectDirectory: () => Promise<string | null>
   setModelDir: (dir: string) => Promise<void>
   checkWhisperDir: (dir: string) => Promise<WhisperDirInfo>

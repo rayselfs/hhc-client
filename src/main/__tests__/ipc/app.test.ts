@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { ipcHandlers, protocolHandlers, mockReadFileSync } = vi.hoisted(() => ({
+const { ipcHandlers, protocolHandlers, mockReadFileSync, mockRmSync } = vi.hoisted(() => ({
   ipcHandlers: new Map<string, (...args: unknown[]) => unknown>(),
   protocolHandlers: new Map<string, (request: Request) => Response>(),
-  mockReadFileSync: vi.fn()
+  mockReadFileSync: vi.fn(),
+  mockRmSync: vi.fn()
 }))
 
 const mockMainWindow = { id: 1 }
@@ -14,7 +15,7 @@ const mockWindowManager = {
 }
 
 vi.mock('electron', () => ({
-  app: { relaunch: vi.fn(), exit: vi.fn() },
+  app: { relaunch: vi.fn(), exit: vi.fn(), getPath: vi.fn(() => '/tmp/hhc-user-data') },
   BrowserWindow: { fromWebContents: vi.fn() },
   dialog: { showOpenDialog: vi.fn() },
   ipcMain: {
@@ -38,7 +39,7 @@ vi.mock('fs', () => ({
     createWriteStream: vi.fn(),
     statSync: vi.fn(),
     renameSync: vi.fn(),
-    rmSync: vi.fn()
+    rmSync: mockRmSync
   }
 }))
 
@@ -72,6 +73,17 @@ beforeEach(() => {
 })
 
 describe('model IPC security', () => {
+  it('clears native uploaded files from app user data', async () => {
+    vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockMainWindow as never)
+
+    await ipcHandlers.get('app:clear-user-data')!(makeEvent())
+
+    expect(mockRmSync).toHaveBeenCalledWith('/tmp/hhc-user-data/native-files', {
+      force: true,
+      recursive: true
+    })
+  })
+
   it('rejects relative model directories', () => {
     vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockMainWindow as never)
 

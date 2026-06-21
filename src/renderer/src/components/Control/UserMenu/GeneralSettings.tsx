@@ -4,6 +4,7 @@ import { Switch } from '@heroui/react/switch'
 import { Select } from '@heroui/react/select'
 import { ListBox } from '@heroui/react/list-box'
 import { Button } from '@heroui/react/button'
+import { toast } from '@heroui/react/toast'
 import { Label } from 'react-aria-components'
 import { useTheme } from '@renderer/contexts/ThemeContext'
 import { useSettingsStore } from '@renderer/stores/settings'
@@ -72,6 +73,13 @@ export default function GeneralSettings(): React.JSX.Element {
       cancelLabel: t('common.cancel')
     })
     if (!confirmed) return
+    try {
+      if (isElectron()) await window.api.app.clearUserData()
+    } catch (error) {
+      console.warn('[settings] Failed to clear Electron user data', error)
+      toast.danger(t('preferences.reset.clearAllDataFailed', 'Unable to clear all app data.'))
+      return
+    }
     resetToDefaults()
   }
 

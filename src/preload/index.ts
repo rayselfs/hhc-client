@@ -70,6 +70,7 @@ const bibleApi = {
 
 const appApi = {
   relaunch: () => typedInvoke('app:relaunch'),
+  clearUserData: () => typedInvoke('app:clear-user-data'),
   selectDirectory: () => typedInvoke('app:select-directory'),
   setModelDir: (dir: string) => typedInvoke('app:set-model-dir', dir),
   checkWhisperDir: (dir: string): Promise<WhisperDirInfo> =>

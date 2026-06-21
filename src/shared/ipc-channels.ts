@@ -199,6 +199,7 @@ export interface IpcInvokeMap {
   'bible:get-versions': { args: []; result: BibleVersion[] }
   'bible:get-content': { args: [number]; result: BibleBook[] }
   'app:relaunch': { args: []; result: void }
+  'app:clear-user-data': { args: []; result: void }
   'update:check': { args: []; result: { updateAvailable: boolean; version?: string } }
   'update:download-and-install': { args: []; result: void }
   'speech:saveKey': { args: [string, string]; result: void }

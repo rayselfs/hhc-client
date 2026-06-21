@@ -153,6 +153,19 @@ function downloadFile(
 
 let whisperModelDir: string | null = null
 
+function clearMainProcessUserData(): void {
+  const userData = app.getPath('userData')
+  for (const entry of [
+    'native-files',
+    'onedrive-credentials',
+    'local-sync-connections.json',
+    'speech-api-key-azure.enc',
+    'speech-api-key-gcp.enc'
+  ]) {
+    fs.rmSync(path.join(userData, entry), { recursive: true, force: true })
+  }
+}
+
 function resolveContainedPath(baseDir: string, relativePath: string): string | null {
   const base = path.resolve(baseDir)
   const resolved = path.resolve(base, relativePath)
@@ -180,6 +193,11 @@ export function registerAppIpc(wm: WindowManager): void {
       app.relaunch()
       app.exit(0)
     }
+  })
+
+  ipcMain.handle('app:clear-user-data', (event) => {
+    if (!isMainWindow(wm, event)) return
+    clearMainProcessUserData()
   })
 
   ipcMain.handle('app:select-directory', async (event) => {
