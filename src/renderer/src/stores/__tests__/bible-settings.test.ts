@@ -19,7 +19,6 @@ beforeEach(() => {
     fontSize: 90,
     selectedVersionId: 0,
     speechMaxSessionSec: 3600,
-    scriptureDisplayMode: 'full-screen',
     scriptureTemplateId: 'dark-stage'
   })
 })
@@ -37,8 +36,7 @@ describe('initial state', () => {
     expect(useBibleSettingsStore.getState().speechMaxSessionSec).toBe(3600)
   })
 
-  it('starts with full-screen scripture projection settings', () => {
-    expect(useBibleSettingsStore.getState().scriptureDisplayMode).toBe('full-screen')
+  it('starts with default scripture template', () => {
     expect(useBibleSettingsStore.getState().scriptureTemplateId).toBe('dark-stage')
   })
 })
@@ -96,7 +94,6 @@ describe('persistence round-trip', () => {
       fontSize: 90,
       selectedVersionId: 0,
       speechMaxSessionSec: 3600,
-      scriptureDisplayMode: 'full-screen',
       scriptureTemplateId: 'dark-stage'
     })
   })
@@ -150,11 +147,6 @@ describe('setSpeechMaxSessionSec()', () => {
 })
 
 describe('scripture projection settings', () => {
-  it('updates display mode', () => {
-    useBibleSettingsStore.getState().setScriptureDisplayMode('lower-third')
-    expect(useBibleSettingsStore.getState().scriptureDisplayMode).toBe('lower-third')
-  })
-
   it('updates template id', () => {
     useBibleSettingsStore.getState().setScriptureTemplateId('warm-sermon')
     expect(useBibleSettingsStore.getState().scriptureTemplateId).toBe('warm-sermon')
@@ -184,7 +176,6 @@ describe('migration', () => {
       fontSize: 90,
       selectedVersionId: 0,
       speechMaxSessionSec: 3600,
-      scriptureDisplayMode: 'full-screen',
       scriptureTemplateId: 'dark-stage'
     })
   })

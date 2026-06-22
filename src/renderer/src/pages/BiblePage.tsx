@@ -33,7 +33,6 @@ export default function BiblePage(): React.JSX.Element {
     prevChapter
   } = useBibleStore.getState()
   const fontSize = useBibleSettingsStore((s) => s.fontSize)
-  const scriptureDisplayMode = useBibleSettingsStore((s) => s.scriptureDisplayMode)
   const scriptureTemplateId = useBibleSettingsStore((s) => s.scriptureTemplateId)
   const speechEnabled = useBibleSettingsStore((s) => s.speechEnabled)
   const [isSelectorOpen, setSelectorOpen] = useState(false)
@@ -53,7 +52,7 @@ export default function BiblePage(): React.JSX.Element {
     const settings = getBibleProjectionSettingsPayload()
     useBibleProjectionStore.getState().updateSettingsPayload(settings)
     if (isProjectionOpen) project('bible:settings', settings)
-  }, [fontSize, scriptureDisplayMode, scriptureTemplateId, isProjectionOpen, project])
+  }, [fontSize, scriptureTemplateId, isProjectionOpen, project])
 
   useEffect(() => {
     const handler = (): void => setSelectorOpen(true)

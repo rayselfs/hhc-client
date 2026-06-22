@@ -195,9 +195,6 @@
     },
     "settings": {
       "fontSize": "Projection Font Size",
-      "displayMode": "Scripture Display",
-      "displayModeFull": "Full Screen",
-      "displayModeLowerThird": "Lower Third",
       "template": "Scripture Template"
     },
     "contextMenu": {

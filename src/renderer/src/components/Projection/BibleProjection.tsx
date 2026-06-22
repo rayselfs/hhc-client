@@ -23,7 +23,7 @@ export default function BibleProjection({
 }: BibleProjectionProps): React.JSX.Element {
   const { t, i18n } = useTranslation()
   const { bookNumber, chapter, chapterVerses, currentVerse, versionLocale } = data
-  const { fontSize, displayMode = 'full-screen', templateTheme } = settings
+  const { fontSize, templateTheme } = settings
   const containerRef = useRef<HTMLDivElement>(null)
   const prevChapterKeyRef = useRef<string>('')
   const isFirstRenderRef = useRef(true)
@@ -61,41 +61,9 @@ export default function BibleProjection({
     i18n.language
   )
   const referenceSize = Math.max(16, fontSize * 0.35)
-  const currentVerseData = chapterVerses.find((verse) => verse.number === currentVerse)
   const backgroundColor = templateTheme?.backgroundColor ?? '#000000'
   const textColor = templateTheme?.textColor ?? '#ffffff'
-  const accentColor = templateTheme?.accentColor ?? '#0ea5e9'
   const fontFamily = templateTheme?.fontFamily
-
-  if (displayMode === 'lower-third') {
-    return (
-      <div
-        data-testid="bible-projection"
-        className="h-screen w-full flex items-end justify-center overflow-hidden p-[5vw]"
-        style={{ backgroundColor, fontFamily }}
-      >
-        <div
-          data-testid="bible-lower-third"
-          className="w-full rounded-3xl border px-[4vw] py-[3vh] shadow-2xl"
-          style={{
-            backgroundColor: `${backgroundColor}e6`,
-            borderColor: accentColor,
-            color: textColor
-          }}
-        >
-          <div
-            className="mb-3 font-semibold tracking-wide"
-            style={{ color: accentColor, fontSize: `${Math.max(18, fontSize * 0.32)}px` }}
-          >
-            {reference}
-          </div>
-          <div className="leading-tight" lang={versionLocale} style={{ fontSize: `${fontSize}px` }}>
-            {currentVerseData?.text ?? ''}
-          </div>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div

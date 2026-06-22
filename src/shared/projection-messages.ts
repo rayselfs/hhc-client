@@ -46,7 +46,6 @@ export interface AppMessages {
   /** Bible display settings (font size, etc.) — sent independently from verse content */
   'bible:settings': {
     fontSize: number
-    displayMode?: 'full-screen' | 'lower-third'
     templateTheme?: SlideTheme
   }
   /** File item to display on projection (stub — coming soon) */

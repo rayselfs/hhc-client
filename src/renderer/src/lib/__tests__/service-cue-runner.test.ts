@@ -27,7 +27,6 @@ describe('projectServiceCue', () => {
     useBibleSettingsStore.setState({
       selectedVersionId: 1,
       fontSize: 88,
-      scriptureDisplayMode: 'full-screen',
       scriptureTemplateId: 'dark-stage'
     })
     useBibleStore.setState({
@@ -145,8 +144,7 @@ describe('projectServiceCue', () => {
       [
         'bible:settings',
         expect.objectContaining({
-          fontSize: 88,
-          displayMode: 'full-screen'
+          fontSize: 88
         })
       ],
       [

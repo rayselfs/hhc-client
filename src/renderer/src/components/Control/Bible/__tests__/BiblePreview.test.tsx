@@ -82,7 +82,6 @@ vi.mock('@renderer/stores/bible-settings', () => ({
       getState: () => ({
         fontSize: 90,
         selectedVersionId: 1,
-        scriptureDisplayMode: 'full-screen',
         scriptureTemplateId: 'dark-stage'
       })
     }
@@ -263,8 +262,7 @@ describe('BiblePreview', () => {
       [
         'bible:settings',
         expect.objectContaining({
-          fontSize: 90,
-          displayMode: 'full-screen'
+          fontSize: 90
         })
       ],
       [
@@ -281,8 +279,7 @@ describe('BiblePreview', () => {
       [
         'bible:settings',
         expect.objectContaining({
-          fontSize: 90,
-          displayMode: 'full-screen'
+          fontSize: 90
         })
       ],
       [

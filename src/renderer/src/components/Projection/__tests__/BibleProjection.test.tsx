@@ -28,13 +28,12 @@ const chapterData: BibleChapterData = {
 }
 
 describe('BibleProjection', () => {
-  it('renders full-screen scripture with template colors', () => {
+  it('renders scripture with template colors', () => {
     render(
       <BibleProjection
         data={chapterData}
         settings={{
           fontSize: 88,
-          displayMode: 'full-screen',
           templateTheme: {
             id: 'test',
             name: 'Test',
@@ -53,29 +52,5 @@ describe('BibleProjection', () => {
     expect(screen.getByText('For God so loved the world')).toHaveStyle({
       color: '#fff7ed'
     })
-  })
-
-  it('renders lower-third scripture with the current verse only', () => {
-    render(
-      <BibleProjection
-        data={chapterData}
-        settings={{
-          fontSize: 72,
-          displayMode: 'lower-third',
-          templateTheme: {
-            id: 'test',
-            name: 'Test',
-            fontFamily: 'Inter Variable',
-            textColor: '#ffffff',
-            backgroundColor: '#050505',
-            accentColor: '#0ea5e9'
-          }
-        }}
-      />
-    )
-
-    expect(screen.getByTestId('bible-lower-third')).toBeInTheDocument()
-    expect(screen.getByText('For God so loved the world')).toBeInTheDocument()
-    expect(screen.queryByText('For God sent not his Son')).not.toBeInTheDocument()
   })
 })

@@ -195,9 +195,6 @@
     },
     "settings": {
       "fontSize": "投影字体大小",
-      "displayMode": "经文显示方式",
-      "displayModeFull": "全屏幕",
-      "displayModeLowerThird": "下三分之一",
       "template": "经文模板"
     },
     "contextMenu": {

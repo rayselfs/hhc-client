@@ -8,7 +8,6 @@ export function getBibleProjectionSettingsPayload(): ProjectionPayload<'bible:se
 
   return {
     fontSize: settings.fontSize,
-    displayMode: settings.scriptureDisplayMode,
     templateTheme: template?.theme
   }
 }
