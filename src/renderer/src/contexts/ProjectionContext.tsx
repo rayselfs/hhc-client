@@ -23,8 +23,9 @@ interface ProjectionDiagnosticSession {
  * - 'timer': TimerProjectionBridge drives the projection (default)
  * - 'bible': Bible page has taken over
  * - 'media': Media page has taken over (reserved for future use)
+ * - 'slide': Native slide documents have taken over
  */
-export type ProjectionOwner = 'timer' | 'bible' | 'media'
+export type ProjectionOwner = 'timer' | 'bible' | 'media' | 'slide'
 
 interface ProjectOptions {
   /** When true, auto-reopen projection if it's closed. Default: false. */
