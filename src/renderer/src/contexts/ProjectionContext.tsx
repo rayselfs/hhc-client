@@ -6,6 +6,9 @@ import type { ProjectionChannel, ProjectionPayload } from '@shared/projection-me
 
 /** Channels that carry displayable content (not system messages). */
 type ContentChannel = Exclude<ProjectionChannel, `__system:${string}`>
+type ContentMessageTuple = {
+  [C in ContentChannel]: [channel: C, data: ProjectionPayload<C>]
+}[ContentChannel]
 
 /**
  * Who currently "owns" the projection display.
@@ -31,6 +34,8 @@ interface ProjectionContextValue {
    * Pass `unblank: true` to also unblank (use for explicit user actions only).
    */
   claimProjection: (owner: ProjectionOwner, options?: { unblank?: boolean }) => void
+  startProjection: (owner: ProjectionOwner, payloads?: ContentMessageTuple[]) => Promise<void>
+  stopProjection: () => Promise<void>
   openProjection: () => Promise<void>
   closeProjection: () => Promise<void>
   blankProjection: (blank: boolean) => void
@@ -66,7 +71,6 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
   const [projectionReadyCount, setProjectionReadyCount] = useState(0)
   const [activeOwner, setActiveOwner] = useState<ProjectionOwner>('timer')
   const projectionDisplayId = useSettingsStore((state) => state.projectionDisplayId)
-  const startupProjectionDisplayIdRef = useRef(projectionDisplayId)
   const adapterRef = useRef<ProjectionAdapter | null>(null)
   const projectionWindowRef = useRef<Window | null>(null)
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -103,6 +107,16 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
     }
   }, [])
 
+  const startReadyTimeout = useCallback((): void => {
+    if (autoOpenTimeoutRef.current) return
+    autoOpenTimeoutRef.current = setTimeout(() => {
+      if (!isReadyRef.current) {
+        console.warn('[Projection] Ready timeout — discarding pending payloads')
+        clearPending()
+      }
+    }, 5000)
+  }, [clearPending])
+
   const flushPendingPayloads = useCallback((): void => {
     const adapter = getAdapter(adapterRef)
     pendingPayloadsRef.current.forEach(({ channel, data }) => {
@@ -129,8 +143,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
 
     if (isElectron()) {
       window.api.projection
-        .ensure(startupProjectionDisplayIdRef.current)
-        .then(() => window.api.projection.check())
+        .check()
         .then(({ exists }) => {
           setIsProjectionOpen(exists)
           if (exists) isReadyRef.current = true
@@ -250,6 +263,21 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
     []
   )
 
+  const queuePayload = useCallback(
+    <C extends ProjectionChannel>(
+      key: string,
+      channel: C,
+      data: ProjectionPayload<C>
+    ): void => {
+      if (isReadyRef.current) {
+        getAdapter(adapterRef).send(channel, data)
+      } else {
+        pendingPayloadsRef.current.set(key, { channel, data })
+      }
+    },
+    []
+  )
+
   const getPendingPayloadKey = useCallback((channel: ProjectionChannel): string => {
     if (channel === 'file:control') {
       pendingSequenceRef.current += 1
@@ -278,6 +306,29 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
     [setIsProjectionBlanked, sendOrBuffer]
   )
 
+  const startProjection = useCallback(
+    async (owner: ProjectionOwner, payloads: ContentMessageTuple[] = []): Promise<void> => {
+      setActiveOwner(owner)
+      setIsProjectionBlanked(false)
+      queuePayload('__system:active-owner', '__system:active-owner', { owner })
+      queuePayload('__system:blank', '__system:blank', { showDefault: false })
+      payloads.forEach(([channel, data]) => {
+        queuePayload(getPendingPayloadKey(channel), channel, data)
+      })
+
+      if (!isProjectionOpenRef.current) {
+        await openProjection()
+      }
+      if (!isReadyRef.current) startReadyTimeout()
+    },
+    [getPendingPayloadKey, openProjection, queuePayload, setIsProjectionBlanked, startReadyTimeout]
+  )
+
+  const stopProjection = useCallback(async (): Promise<void> => {
+    await window.api?.projectionVlc?.stop?.().catch(() => {})
+    await closeProjection()
+  }, [closeProjection])
+
   const send = useCallback(
     <C extends ProjectionChannel>(channel: C, data: ProjectionPayload<C>): void => {
       getAdapter(adapterRef).send(channel, data)
@@ -299,21 +350,14 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
             console.warn('[Projection] Auto-reopen failed')
             pendingPayloadsRef.current.delete(channel)
           })
-          if (!autoOpenTimeoutRef.current) {
-            autoOpenTimeoutRef.current = setTimeout(() => {
-              if (!isReadyRef.current) {
-                console.warn('[Projection] Ready timeout — discarding pending payloads')
-                clearPending()
-              }
-            }, 5000)
-          }
+          startReadyTimeout()
         }
         return
       }
 
       getAdapter(adapterRef).send(channel, data)
     },
-    [openProjection, clearPending, getPendingPayloadKey]
+    [openProjection, getPendingPayloadKey, startReadyTimeout]
   )
 
   const on = useCallback(
@@ -333,6 +377,8 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       projectionReadyCount,
       activeOwner,
       claimProjection,
+      startProjection,
+      stopProjection,
       openProjection,
       closeProjection,
       blankProjection,
@@ -346,6 +392,8 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       projectionReadyCount,
       activeOwner,
       claimProjection,
+      startProjection,
+      stopProjection,
       openProjection,
       closeProjection,
       blankProjection,

@@ -216,6 +216,31 @@ describe('ProjectionContext — web mode', () => {
     })
   })
 
+  it('startProjection opens, unblanks, claims owner, and flushes initial payloads on ready', async () => {
+    const { result } = renderProjection()
+
+    await act(async () => {
+      await result.current.startProjection('media', [
+        ['timer:overtime-message', { message: 'show' }]
+      ])
+    })
+
+    expect(mockWindowOpen).toHaveBeenCalledOnce()
+    expect(result.current.activeOwner).toBe('media')
+    expect(result.current.isProjectionBlanked).toBe(false)
+    expect(mockAdapter.send).not.toHaveBeenCalledWith('timer:overtime-message', {
+      message: 'show'
+    })
+
+    act(() => {
+      mockAdapter._trigger('__system:ready', null)
+    })
+
+    expect(mockAdapter.send).toHaveBeenCalledWith('__system:active-owner', { owner: 'media' })
+    expect(mockAdapter.send).toHaveBeenCalledWith('__system:blank', { showDefault: false })
+    expect(mockAdapter.send).toHaveBeenCalledWith('timer:overtime-message', { message: 'show' })
+  })
+
   it('project() latest-wins: second call to same channel replaces first', async () => {
     const { result } = renderProjection()
 
@@ -594,6 +619,9 @@ describe('ProjectionContext — electron mode', () => {
             return unsubClosed
           }),
           onProjectionMessage: vi.fn(() => vi.fn())
+        },
+        projectionVlc: {
+          stop: vi.fn(() => Promise.resolve())
         }
       },
       writable: true,
@@ -601,13 +629,13 @@ describe('ProjectionContext — electron mode', () => {
     })
   })
 
-  it('opens and checks existing projection on mount', async () => {
+  it('checks existing projection on mount without opening it', async () => {
     renderProjection()
     await act(async () => {
       await Promise.resolve()
     })
-    expect(mockEnsure).toHaveBeenCalledWith('')
     expect(mockCheck).toHaveBeenCalledOnce()
+    expect(mockEnsure).not.toHaveBeenCalled()
   })
 
   it('does not call window.open in electron mode', () => {

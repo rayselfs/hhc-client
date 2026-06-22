@@ -13,6 +13,8 @@ const mockClaimProjection = vi.fn()
 vi.mock('@renderer/contexts/ProjectionContext', () => ({
   useProjection: vi.fn(() => ({
     claimProjection: mockClaimProjection,
+    startProjection: vi.fn(),
+    stopProjection: vi.fn(),
     project: vi.fn(),
     send: vi.fn(),
     on: vi.fn(),

@@ -76,6 +76,8 @@ vi.mock('@renderer/hooks/useKeyboardShortcuts', () => ({
 vi.mock('@renderer/contexts/ProjectionContext', () => ({
   useProjection: () => ({
     claimProjection: mockClaimProjection,
+    startProjection: vi.fn(),
+    stopProjection: vi.fn(),
     blankProjection: mockBlankProjection,
     send: mockSend,
     project: mockProject,
