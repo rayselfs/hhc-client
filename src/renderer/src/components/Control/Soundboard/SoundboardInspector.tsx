@@ -76,6 +76,42 @@ export default function SoundboardInspector(): React.JSX.Element {
           className="h-9 rounded-md border border-border bg-background"
         />
       </label>
+      <label className="grid gap-1 text-xs font-medium">
+        MIDI note
+        <input
+          aria-label="MIDI note"
+          type="number"
+          min={0}
+          max={127}
+          value={pad.midiNote?.note ?? ''}
+          onChange={(event) =>
+            updatePad(pad.id, {
+              midiNote: event.target.value
+                ? { inputId: 'default', channel: 1, note: Number(event.target.value) }
+                : null
+            })
+          }
+          className="rounded-md border border-border bg-background px-2 py-1 text-sm"
+        />
+      </label>
+      <label className="grid gap-1 text-xs font-medium">
+        MIDI volume CC
+        <input
+          aria-label="MIDI volume CC"
+          type="number"
+          min={0}
+          max={127}
+          value={pad.midiVolume?.controller ?? ''}
+          onChange={(event) =>
+            updatePad(pad.id, {
+              midiVolume: event.target.value
+                ? { inputId: 'default', channel: 1, controller: Number(event.target.value) }
+                : null
+            })
+          }
+          className="rounded-md border border-border bg-background px-2 py-1 text-sm"
+        />
+      </label>
       <div className="rounded-md border border-border p-2 text-xs">
         <div className="font-medium">Asset</div>
         <div className="mt-1 truncate text-muted">{pad.asset?.name ?? 'No audio assigned'}</div>

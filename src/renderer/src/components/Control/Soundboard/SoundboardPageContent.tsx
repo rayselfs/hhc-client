@@ -9,6 +9,12 @@ import {
   createSoundboardAudioEngine,
   type SoundboardAudioEngine
 } from '@renderer/lib/soundboard-audio'
+import {
+  ccValueToVolume,
+  parseMidiMessage,
+  requestMidiAccess,
+  type SoundboardMidiInput
+} from '@renderer/lib/soundboard-midi'
 import { useSoundboardStore } from '@renderer/stores/soundboard'
 
 export default function SoundboardPageContent(): React.JSX.Element {
@@ -102,6 +108,72 @@ export default function SoundboardPageContent(): React.JSX.Element {
       setPadLiveState(padId, { status: 'idle', startedAt: null, error: null })
     }
   }, [setPadLiveState, settings.globalFadeMs])
+
+  useEffect(() => {
+    if (!settings.midiEnabled) return
+    let mounted = true
+    let inputs: SoundboardMidiInput[] = []
+
+    void requestMidiAccess()
+      .then((access) => {
+        if (!mounted || !access) return
+        inputs = [...access.inputs.values()]
+
+        for (const input of inputs) {
+          input.onmidimessage = (event) => {
+            if (!event.data) return
+            const message = parseMidiMessage(event.data)
+            if (!message) return
+            const state = useSoundboardStore.getState()
+            const scene = state.getSelectedScene()
+            if (!scene) return
+
+            for (const pad of Object.values(scene.pads)) {
+              const noteInputMatches =
+                pad.midiNote?.inputId === 'default' || pad.midiNote?.inputId === input.id
+              const ccInputMatches =
+                pad.midiVolume?.inputId === 'default' || pad.midiVolume?.inputId === input.id
+
+              if (
+                message.type === 'note-on' &&
+                noteInputMatches &&
+                pad.midiNote?.channel === message.channel &&
+                pad.midiNote.note === message.note
+              ) {
+                void triggerPad(pad.id)
+              }
+
+              if (
+                message.type === 'note-off' &&
+                noteInputMatches &&
+                pad.triggerMode === 'hold' &&
+                pad.midiNote?.channel === message.channel &&
+                pad.midiNote.note === message.note
+              ) {
+                releasePad(pad.id)
+              }
+
+              if (
+                message.type === 'cc' &&
+                ccInputMatches &&
+                pad.midiVolume?.channel === message.channel &&
+                pad.midiVolume.controller === message.controller
+              ) {
+                state.updatePad(pad.id, { volume: ccValueToVolume(message.value) })
+              }
+            }
+          }
+        }
+      })
+      .catch((error) => {
+        console.warn('[soundboard-midi] Failed to initialize MIDI access', error)
+      })
+
+    return () => {
+      mounted = false
+      for (const input of inputs) input.onmidimessage = null
+    }
+  }, [releasePad, settings.midiEnabled, triggerPad])
 
   return (
     <main
