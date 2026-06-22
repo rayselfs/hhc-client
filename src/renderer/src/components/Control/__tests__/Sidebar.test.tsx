@@ -18,7 +18,8 @@ function renderWithRouter(initialEntries: string[] = ['/']): ReturnType<typeof r
           { path: 'timer', element: <Sidebar /> },
           { path: 'bible', element: <Sidebar /> },
           { path: 'service', element: <Sidebar /> },
-          { path: 'slides', element: <Sidebar /> }
+          { path: 'slides', element: <Sidebar /> },
+          { path: 'soundboard', element: <Sidebar /> }
         ]
       }
     ],
@@ -44,6 +45,7 @@ describe('Sidebar', () => {
     expect(screen.getByText('BIBLE')).toBeInTheDocument()
     expect(screen.getByText('SERVICE')).toBeInTheDocument()
     expect(screen.getByText('SLIDES')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /soundboard/i })).toHaveAttribute('href', '/soundboard')
   })
 
   it('renders Timer, Bible, Service, and Slides labels in zh-TW', async () => {
@@ -53,6 +55,7 @@ describe('Sidebar', () => {
     expect(screen.getByText('聖經')).toBeInTheDocument()
     expect(screen.getByText('流程')).toBeInTheDocument()
     expect(screen.getByText('投影片')).toBeInTheDocument()
+    expect(screen.getByText('音效板')).toBeInTheDocument()
     await act(() => i18n.changeLanguage('en'))
   })
 

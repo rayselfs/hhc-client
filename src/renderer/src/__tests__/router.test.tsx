@@ -24,6 +24,10 @@ vi.mock('@renderer/pages/SlidesPage', () => ({
   default: () => <div data-testid="slides-page" />
 }))
 
+vi.mock('@renderer/pages/SoundboardPage', () => ({
+  default: () => <div data-testid="soundboard-page" />
+}))
+
 vi.mock('@renderer/lib/timer-adapter', () => ({
   createTimerAdapter: vi.fn(() => ({
     onTick: vi.fn(),
@@ -94,6 +98,11 @@ describe('Router', () => {
   it('renders slides page at /slides route', async () => {
     renderWithRouter(['/slides'])
     expect(await screen.findByTestId('slides-page')).toBeInTheDocument()
+  })
+
+  it('renders soundboard page at /soundboard route', async () => {
+    renderWithRouter(['/soundboard'])
+    expect(await screen.findByTestId('soundboard-page')).toBeInTheDocument()
   })
 
   it('navigates from timer to bible via sidebar link', async () => {
