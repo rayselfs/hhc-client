@@ -3,13 +3,14 @@ import { Card } from '@heroui/react/card'
 import { Tabs } from '@heroui/react/tabs'
 import { Button } from '@heroui/react/button'
 import { Breadcrumbs } from '@heroui/react/breadcrumbs'
-import { Trash2, FolderPlus, ChevronLeft, Clock, FolderOpen } from 'lucide-react'
+import { Trash2, FolderPlus, ChevronLeft, Clock, FolderOpen, ListTodo } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import GlassDivider from '@renderer/components/Common/GlassDivider'
 import { useBibleHistoryStore } from '@renderer/stores/bible-history'
 import { useBibleFolderStore } from '@renderer/stores/folder'
 import { HistoryTab } from './HistoryTab'
 import { CustomFolderTab } from './CustomFolderTab'
+import { BibleQueueTab } from './BibleQueueTab'
 
 interface BibleMultiFunctionProps {
   onProjected?: (passage: { bookNumber: number; chapter: number; verse: number }) => void
@@ -57,6 +58,14 @@ export default function BibleMultiFunction({
               >
                 <span className="max-lg:hidden">{t('bible.custom.title')}</span>
                 <FolderOpen size={18} className="lg:hidden" />
+                <Tabs.Indicator className="bg-accent" />
+              </Tabs.Tab>
+              <Tabs.Tab
+                id="queue"
+                className="data-[selected=true]:text-accent-foreground max-lg:w-8 max-lg:px-0"
+              >
+                <span className="max-lg:hidden">{t('bible.queue.title')}</span>
+                <ListTodo size={18} className="lg:hidden" />
                 <Tabs.Indicator className="bg-accent" />
               </Tabs.Tab>
             </Tabs.List>
@@ -136,6 +145,8 @@ export default function BibleMultiFunction({
       <Card.Content className="flex-1 min-h-0 overflow-hidden p-0">
         {activeTab === 'history' ? (
           <HistoryTab />
+        ) : activeTab === 'queue' ? (
+          <BibleQueueTab onProjected={onProjected} />
         ) : (
           <CustomFolderTab
             isModalOpen={isAddFolderModalOpen}

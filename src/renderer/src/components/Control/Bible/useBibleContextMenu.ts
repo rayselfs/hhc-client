@@ -4,10 +4,11 @@ import { useBibleHistoryStore } from '@renderer/stores/bible-history'
 import { useBibleFolderStore } from '@renderer/stores/folder'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 import { useServicePlaylistStore } from '@renderer/stores/service-playlist'
+import { useBibleLiveQueueStore } from '@renderer/stores/bible-live-queue'
 import { buildBibleServiceCueInput } from '@renderer/lib/bible-service-cue'
-import { formatVerseReferenceForCopy } from '@renderer/lib/bible-utils'
+import { formatVerseReferenceForCopy, formatVerseReferenceShort } from '@renderer/lib/bible-utils'
 import type { VerseItem } from '@shared/types/folder'
-import { Copy, Trash2, FolderPlus, ListPlus } from 'lucide-react'
+import { Copy, Trash2, FolderPlus, ListPlus, ListTodo } from 'lucide-react'
 import React from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
@@ -53,6 +54,21 @@ function getFormattedReference(item: VerseItem, t: TFunction, locale: string): s
   )
 }
 
+function addVerseToQueue(
+  t: TFunction,
+  verse: VerseMenuData,
+  versionId = useBibleSettingsStore.getState().selectedVersionId
+): void {
+  useBibleLiveQueueStore.getState().addItem({
+    versionId,
+    bookNumber: verse.bookNumber,
+    chapter: verse.chapter,
+    verse: verse.verse,
+    text: verse.text,
+    reference: formatVerseReferenceShort(t, verse.bookNumber, verse.chapter, verse.verse)
+  })
+}
+
 export function useBibleContextMenu(): UseBibleContextMenu {
   const { t, i18n } = useTranslation()
   const { showMenu } = useContextMenu()
@@ -83,6 +99,12 @@ export function useBibleContextMenu(): UseBibleContextMenu {
         }
       },
       {
+        id: 'add-to-queue',
+        label: t('bible.contextMenu.addToQueue'),
+        icon: React.createElement(ListTodo, { size: 14 }),
+        onAction: () => addVerseToQueue(t, verse)
+      },
+      {
         id: 'copy',
         label: t('bible.contextMenu.copyText'),
         icon: React.createElement(Copy, { size: 14 }),
@@ -110,6 +132,22 @@ export function useBibleContextMenu(): UseBibleContextMenu {
             })
           )
         }
+      },
+      {
+        id: 'add-to-queue',
+        label: t('bible.contextMenu.addToQueue'),
+        icon: React.createElement(ListTodo, { size: 14 }),
+        onAction: () =>
+          addVerseToQueue(
+            t,
+            {
+              bookNumber: item.bookNumber,
+              chapter: item.chapter,
+              verse: item.verse,
+              text: item.text
+            },
+            item.versionId
+          )
       },
       {
         id: 'add-to-folder',
@@ -157,6 +195,22 @@ export function useBibleContextMenu(): UseBibleContextMenu {
             })
           )
         }
+      },
+      {
+        id: 'add-to-queue',
+        label: t('bible.contextMenu.addToQueue'),
+        icon: React.createElement(ListTodo, { size: 14 }),
+        onAction: () =>
+          addVerseToQueue(
+            t,
+            {
+              bookNumber: item.bookNumber,
+              chapter: item.chapter,
+              verse: item.verse,
+              text: item.text
+            },
+            item.versionId
+          )
       },
       {
         id: 'copy',

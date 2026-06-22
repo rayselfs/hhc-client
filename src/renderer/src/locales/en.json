@@ -172,6 +172,16 @@
       "title": "Custom",
       "home": "Home"
     },
+    "queue": {
+      "title": "Queue",
+      "empty": "No queued verses",
+      "description": "Prepare verses for live scripture projection.",
+      "current": "Current",
+      "next": "Next",
+      "project": "Project queued verse",
+      "remove": "Remove from queue",
+      "clear": "Clear queue"
+    },
     "search": {
       "title": "Search",
       "placeholder": "Search verses...",
@@ -204,6 +214,7 @@
       "addToHistory": "Add to History",
       "addToFolder": "Add to Folder",
       "addToService": "Add to Service",
+      "addToQueue": "Add to Queue",
       "copyText": "Copy Text",
       "removeFromHistory": "Remove from History",
       "removeFromFolder": "Remove from Folder"
