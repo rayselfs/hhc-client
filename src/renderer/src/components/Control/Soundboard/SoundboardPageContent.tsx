@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from 'react'
 import SoundboardGrid from '@renderer/components/Control/Soundboard/SoundboardGrid'
 import SoundboardInspector from '@renderer/components/Control/Soundboard/SoundboardInspector'
 import SoundboardLibrary from '@renderer/components/Control/Soundboard/SoundboardLibrary'
+import SoundboardMixer from '@renderer/components/Control/Soundboard/SoundboardMixer'
 import { getFileBlob, getFileSource, openFileExplorerDB } from '@renderer/lib/file-explorer-db'
 import {
   createSoundboardAudioEngine,
@@ -89,6 +90,21 @@ export default function SoundboardPageContent(): React.JSX.Element {
     [setPadLiveState, settings.globalFadeMs]
   )
 
+  const stopAll = useCallback((): void => {
+    engineRef.current?.stopAll()
+    for (const padId of Object.keys(useSoundboardStore.getState().live)) {
+      setPadLiveState(padId, { status: 'idle', startedAt: null, error: null })
+    }
+  }, [setPadLiveState])
+
+  const fadeAll = useCallback((): void => {
+    const live = useSoundboardStore.getState().live
+    for (const padId of Object.keys(live)) {
+      engineRef.current?.fadeOut(padId, settings.globalFadeMs)
+      setPadLiveState(padId, { status: 'idle', startedAt: null, error: null })
+    }
+  }, [setPadLiveState, settings.globalFadeMs])
+
   return (
     <main
       className="flex h-full min-h-0 flex-col bg-background text-foreground"
@@ -117,6 +133,7 @@ export default function SoundboardPageContent(): React.JSX.Element {
         />
         {mode === 'edit' && <SoundboardInspector />}
       </div>
+      <SoundboardMixer onStopAll={stopAll} onFadeAll={fadeAll} />
     </main>
   )
 }
