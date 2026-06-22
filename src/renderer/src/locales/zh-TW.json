@@ -20,6 +20,7 @@
     "title": "流程",
     "subtitle": "建立聚會流程，依序安排多媒體、聖經、計時器與未來的投影片 cue。",
     "addMedia": "新增媒體",
+    "addSlide": "新增投影片",
     "addBible": "新增聖經",
     "addTimer": "新增計時器",
     "projectCurrentCue": "投影目前 Cue",
@@ -44,6 +45,7 @@
     "currentCue": "目前",
     "nextCue": "下一個",
     "missingMediaSource": "找不到媒體來源",
+    "missingSlideSource": "找不到投影片來源",
     "notImplementedYet": "尚未實作",
     "projectErrors": {
       "missingSource": "這個 Cue 找不到來源。",

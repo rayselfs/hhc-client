@@ -20,6 +20,7 @@
     "title": "SERVICE",
     "subtitle": "Build a live rundown with media, Bible, timer, and future slide cues.",
     "addMedia": "Add Media",
+    "addSlide": "Add Slide",
     "addBible": "Add Bible",
     "addTimer": "Add Timer",
     "projectCurrentCue": "Project Current",
@@ -44,6 +45,7 @@
     "currentCue": "Current",
     "nextCue": "Next",
     "missingMediaSource": "Missing media source",
+    "missingSlideSource": "Missing slide source",
     "notImplementedYet": "Not implemented yet",
     "projectErrors": {
       "missingSource": "This cue is missing its source.",

@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { createPersistName, hhcPersistStorage } from '@renderer/lib/persist-storage'
 
-export type ServiceCueType = 'media' | 'bible' | 'timer' | 'placeholder'
+export type ServiceCueType = 'media' | 'bible' | 'timer' | 'slide' | 'placeholder'
 
 interface ServiceCueBase {
   id: string
@@ -34,12 +34,25 @@ export interface TimerServiceCue extends ServiceCueBase {
   durationSeconds?: number
 }
 
+export interface SlideServiceCue extends ServiceCueBase {
+  type: 'slide'
+  documentId: string
+  slideId: string
+  documentTitle: string
+  slideTitle: string
+}
+
 export interface PlaceholderServiceCue extends ServiceCueBase {
   type: 'placeholder'
   sourceType: 'slide' | 'song'
 }
 
-export type ServiceCue = MediaServiceCue | BibleServiceCue | TimerServiceCue | PlaceholderServiceCue
+export type ServiceCue =
+  | MediaServiceCue
+  | BibleServiceCue
+  | TimerServiceCue
+  | SlideServiceCue
+  | PlaceholderServiceCue
 
 type GeneratedCueFields = 'id' | 'completed' | 'createdAt' | 'updatedAt'
 
@@ -47,6 +60,7 @@ type CreateCueInput =
   | Omit<MediaServiceCue, GeneratedCueFields>
   | Omit<BibleServiceCue, GeneratedCueFields>
   | Omit<TimerServiceCue, GeneratedCueFields>
+  | Omit<SlideServiceCue, GeneratedCueFields>
   | Omit<PlaceholderServiceCue, GeneratedCueFields>
 
 interface ServicePlaylistState {

@@ -6,6 +6,7 @@ import i18n from '@renderer/i18n'
 import ServiceWorkspace from '../ServiceWorkspace'
 import { useServicePlaylistStore } from '@renderer/stores/service-playlist'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
+import { useSlidesStore } from '@renderer/stores/slides'
 
 const projectionMocks = vi.hoisted(() => ({
   startProjection: vi.fn(() => Promise.resolve())
@@ -22,6 +23,7 @@ describe('ServiceWorkspace', () => {
     await i18n.changeLanguage('en')
     useServicePlaylistStore.getState().clear()
     useFileExplorerStore.setState({ items: {} })
+    useSlidesStore.getState().clear()
     projectionMocks.startProjection.mockClear()
   })
 
@@ -77,5 +79,23 @@ describe('ServiceWorkspace', () => {
 
     expect(projectionMocks.startProjection).toHaveBeenCalledWith('timer')
     expect(await screen.findByText('Projection started.')).toBeInTheDocument()
+  })
+
+  it('adds the currently selected native slide as a cue', async () => {
+    const user = userEvent.setup()
+    const documentId = useSlidesStore.getState().createDocument('Sunday Deck')
+    const slideId = useSlidesStore.getState().selectedSlideId
+    if (!slideId) throw new Error('Expected selected slide')
+    useSlidesStore.getState().updateSlideTitle(documentId, slideId, 'Welcome')
+    render(<ServiceWorkspace />)
+
+    await user.click(screen.getByRole('button', { name: 'Add Slide' }))
+
+    expect(useServicePlaylistStore.getState().cues[0]).toMatchObject({
+      type: 'slide',
+      title: 'Welcome',
+      documentId,
+      slideId
+    })
   })
 })
