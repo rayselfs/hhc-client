@@ -73,6 +73,14 @@ const initialState = {
 
 let releaseProjectionLocks: (() => void) | null = null
 
+function withoutVideoRuntimeState(
+  typeStates: MediaProjectionStore['typeStates']
+): MediaProjectionStore['typeStates'] {
+  const next = { ...typeStates }
+  delete next.video
+  return next
+}
+
 export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get) => ({
   ...initialState,
 
@@ -199,7 +207,12 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
       set({ isEnded: true })
       return
     }
-    set({ currentIndex: s.currentIndex + 1, zoomLevel: 1, pan: { x: 0, y: 0 } })
+    set({
+      currentIndex: s.currentIndex + 1,
+      zoomLevel: 1,
+      pan: { x: 0, y: 0 },
+      typeStates: withoutVideoRuntimeState(s.typeStates)
+    })
   },
 
   prev: () => {
@@ -209,13 +222,27 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
       return
     }
     if (s.currentIndex <= 0) return
-    set({ currentIndex: s.currentIndex - 1, zoomLevel: 1, pan: { x: 0, y: 0 } })
+    set({
+      currentIndex: s.currentIndex - 1,
+      zoomLevel: 1,
+      pan: { x: 0, y: 0 },
+      typeStates: withoutVideoRuntimeState(s.typeStates)
+    })
   },
 
   jumpTo: (index: number) => {
     const { playlist } = get()
     const clamped = Math.max(0, Math.min(index, playlist.length - 1))
-    set({ currentIndex: clamped, isEnded: false, zoomLevel: 1, pan: { x: 0, y: 0 } })
+    set((state) => ({
+      currentIndex: clamped,
+      isEnded: false,
+      zoomLevel: 1,
+      pan: { x: 0, y: 0 },
+      typeStates:
+        clamped === state.currentIndex
+          ? state.typeStates
+          : withoutVideoRuntimeState(state.typeStates)
+    }))
   },
 
   toggleGrid: () => {

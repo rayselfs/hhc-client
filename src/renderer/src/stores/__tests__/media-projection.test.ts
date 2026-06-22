@@ -148,6 +148,21 @@ describe('next / prev', () => {
     expect(useMediaProjectionStore.getState().currentIndex).toBe(1)
   })
 
+  it('next() clears stale video runtime state while preserving pdf state', () => {
+    useMediaProjectionStore.setState({
+      typeStates: {
+        pdf: { viewMode: 'scroll' },
+        video: { hasStarted: true, isPlaying: true, isEnded: false }
+      }
+    })
+
+    useMediaProjectionStore.getState().next()
+
+    expect(useMediaProjectionStore.getState().typeStates).toEqual({
+      pdf: { viewMode: 'scroll' }
+    })
+  })
+
   it('next() stops at end', () => {
     useMediaProjectionStore.setState({ currentIndex: 2 })
     useMediaProjectionStore.getState().next()
@@ -193,6 +208,24 @@ describe('jumpTo', () => {
     useMediaProjectionStore.getState().startPresentation(files, 0)
     useMediaProjectionStore.getState().jumpTo(2)
     expect(useMediaProjectionStore.getState().currentIndex).toBe(2)
+  })
+
+  it('jumpTo() clears stale video runtime state only when index changes', () => {
+    useMediaProjectionStore.getState().startPresentation(files, 0)
+    useMediaProjectionStore.setState({
+      typeStates: {
+        pdf: { viewMode: 'slide' },
+        video: { hasStarted: true, isPlaying: false, isEnded: false }
+      }
+    })
+
+    useMediaProjectionStore.getState().jumpTo(0)
+    expect(useMediaProjectionStore.getState().typeStates.video).toBeDefined()
+
+    useMediaProjectionStore.getState().jumpTo(1)
+    expect(useMediaProjectionStore.getState().typeStates).toEqual({
+      pdf: { viewMode: 'slide' }
+    })
   })
 
   it('clamps to valid range', () => {
