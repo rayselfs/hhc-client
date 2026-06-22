@@ -12,6 +12,7 @@ import { TimerEngineProvider } from '@renderer/contexts/TimerEngineContext'
 import { ContextMenuProvider } from '@renderer/contexts/ContextMenuContext'
 import { ConfirmDialogProvider } from '@renderer/contexts/ConfirmDialogContext'
 import { ShortcutScopeProvider } from '@renderer/contexts/ShortcutScopeContext'
+import LanRemoteBridge from '@renderer/contexts/LanRemoteBridge'
 import { AppInitContext } from '@renderer/contexts/AppInitContext'
 import { initializeApp } from '@renderer/lib/app-init'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
@@ -73,6 +74,7 @@ export default function Layout(): React.JSX.Element {
                 </div>
                 <ConfirmDialog />
                 <TimerProjectionBridge />
+                <LanRemoteBridge />
               </ConfirmDialogProvider>
             </ContextMenuProvider>
           </ProjectionProvider>
