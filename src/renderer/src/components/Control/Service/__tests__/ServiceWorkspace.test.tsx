@@ -1,17 +1,28 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import '@renderer/i18n'
 import i18n from '@renderer/i18n'
 import ServiceWorkspace from '../ServiceWorkspace'
 import { useServicePlaylistStore } from '@renderer/stores/service-playlist'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
 
+const projectionMocks = vi.hoisted(() => ({
+  startProjection: vi.fn(() => Promise.resolve())
+}))
+
+vi.mock('@renderer/contexts/ProjectionContext', () => ({
+  useProjection: () => ({
+    startProjection: projectionMocks.startProjection
+  })
+}))
+
 describe('ServiceWorkspace', () => {
   beforeEach(async () => {
     await i18n.changeLanguage('en')
     useServicePlaylistStore.getState().clear()
     useFileExplorerStore.setState({ items: {} })
+    projectionMocks.startProjection.mockClear()
   })
 
   it('renders the empty service workspace', () => {
@@ -55,5 +66,16 @@ describe('ServiceWorkspace', () => {
 
     await user.click(screen.getAllByLabelText('Remove cue')[0])
     expect(useServicePlaylistStore.getState().cues).toHaveLength(2)
+  })
+
+  it('projects the current timer cue', async () => {
+    const user = userEvent.setup()
+    render(<ServiceWorkspace />)
+
+    await user.click(screen.getByRole('button', { name: 'Add Timer' }))
+    await user.click(screen.getByRole('button', { name: 'Project Current' }))
+
+    expect(projectionMocks.startProjection).toHaveBeenCalledWith('timer')
+    expect(await screen.findByText('Projection started.')).toBeInTheDocument()
   })
 })

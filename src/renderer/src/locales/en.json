@@ -21,6 +21,10 @@
     "addMedia": "Add Media",
     "addBible": "Add Bible",
     "addTimer": "Add Timer",
+    "projectCurrentCue": "Project Current",
+    "projectCue": "Project cue",
+    "projecting": "Projecting...",
+    "projectionStarted": "Projection started.",
     "defaultTimerCue": "Timer Cue",
     "defaultBibleCue": "Bible Cue",
     "defaultMediaCue": "Media Cue",
@@ -40,6 +44,12 @@
     "nextCue": "Next",
     "missingMediaSource": "Missing media source",
     "notImplementedYet": "Not implemented yet",
+    "projectErrors": {
+      "missingSource": "This cue is missing its source.",
+      "unsupported": "This cue source cannot be projected on this platform.",
+      "notReady": "This cue source is not ready yet.",
+      "notImplemented": "This cue type is not implemented yet."
+    },
     "cueTypes": {
       "media": "Media",
       "bible": "Bible",

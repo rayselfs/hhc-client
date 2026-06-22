@@ -6,7 +6,7 @@ import type { ProjectionChannel, ProjectionPayload } from '@shared/projection-me
 
 /** Channels that carry displayable content (not system messages). */
 type ContentChannel = Exclude<ProjectionChannel, `__system:${string}`>
-type ContentMessageTuple = {
+export type ContentMessageTuple = {
   [C in ContentChannel]: [channel: C, data: ProjectionPayload<C>]
 }[ContentChannel]
 

@@ -31,8 +31,6 @@ import {
 } from '@shared/types/folder'
 import type { ClipboardState } from '@renderer/components/Control/FileExplorer'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
-import MediaPresenter from '@renderer/components/Control/FileExplorer/Presenter/MediaPresenter'
-import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 import { getMediaFileAcceptAttribute } from '@renderer/lib/media-capabilities'
 import {
   hasNameConflict,
@@ -55,7 +53,6 @@ const ONE_DRIVE_FOLDER_PICKER_PROVIDER: CloudFolderPickerProvider = {
 export default function FilesPage(): React.JSX.Element {
   const { t } = useTranslation()
   const confirm = useConfirm()
-  const isPresenting = useMediaProjectionStore((s) => s.isPresenting)
   const currentFolderId = useFileExplorerStore((state) => state.currentFolderId)
   const foldersById = useFileExplorerStore((state) => state.folders)
   const getChildFolders = useFileExplorerStore((state) => state.getChildFolders)
@@ -744,7 +741,6 @@ export default function FilesPage(): React.JSX.Element {
         onFolderDurationChange={setEditModalDuration}
         isRetentionLocked={editingIsFavorited}
       />
-      {isPresenting && <MediaPresenter />}
     </>
   )
 }

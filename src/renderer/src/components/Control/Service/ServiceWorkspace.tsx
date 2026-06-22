@@ -1,8 +1,13 @@
-import { useMemo, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Check, Copy, ListTodo, Plus, Trash2, ArrowUp, ArrowDown, Eye } from 'lucide-react'
+import { Check, Copy, ListTodo, Plus, Trash2, ArrowUp, ArrowDown, Eye, Play } from 'lucide-react'
 import { useServicePlaylistStore, type ServiceCue } from '@renderer/stores/service-playlist'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
+import { useProjection } from '@renderer/contexts/ProjectionContext'
+import {
+  projectServiceCue,
+  type ServiceCueProjectionResult
+} from '@renderer/lib/service-cue-runner'
 
 type TranslationFn = ReturnType<typeof useTranslation>['t']
 
@@ -25,8 +30,21 @@ function cueSourceStatus(cue: ServiceCue, mediaExists: boolean, t: TranslationFn
   return null
 }
 
+function projectionResultMessage(
+  result: ServiceCueProjectionResult,
+  t: TranslationFn
+): string | null {
+  if (result.status === 'projected') return t('service.projectionStarted')
+  if (result.status === 'missing-source') return t('service.projectErrors.missingSource')
+  if (result.status === 'unsupported') return t('service.projectErrors.unsupported')
+  if (result.status === 'not-ready') return t('service.projectErrors.notReady')
+  if (result.status === 'not-implemented') return t('service.projectErrors.notImplemented')
+  return null
+}
+
 export default function ServiceWorkspace(): React.JSX.Element {
   const { t } = useTranslation()
+  const { startProjection } = useProjection()
   const cues = useServicePlaylistStore((state) => state.cues)
   const currentCueId = useServicePlaylistStore((state) => state.currentCueId)
   const selectedCueId = useServicePlaylistStore((state) => state.selectedCueId)
@@ -36,6 +54,8 @@ export default function ServiceWorkspace(): React.JSX.Element {
   const currentCue = useServicePlaylistStore((state) => state.currentCue())
   const nextCue = useServicePlaylistStore((state) => state.nextCue())
   const previewCue = useServicePlaylistStore((state) => state.previewCue())
+  const [projectingCueId, setProjectingCueId] = useState<string | null>(null)
+  const [projectionMessage, setProjectionMessage] = useState<string | null>(null)
 
   const actions = useServicePlaylistStore.getState()
 
@@ -77,6 +97,18 @@ export default function ServiceWorkspace(): React.JSX.Element {
     })
   }
 
+  const handleProjectCue = async (cue: ServiceCue): Promise<void> => {
+    actions.jumpToCue(cue.id)
+    setProjectingCueId(cue.id)
+    setProjectionMessage(null)
+    try {
+      const result = await projectServiceCue(cue, { startProjection })
+      setProjectionMessage(projectionResultMessage(result, t))
+    } finally {
+      setProjectingCueId(null)
+    }
+  }
+
   return (
     <div className="flex h-full min-h-0 flex-col gap-4">
       <header className="flex flex-wrap items-center justify-between gap-3">
@@ -85,6 +117,17 @@ export default function ServiceWorkspace(): React.JSX.Element {
           <p className="text-sm text-muted">{t('service.subtitle')}</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              if (currentCue) void handleProjectCue(currentCue)
+            }}
+            disabled={!currentCue || projectingCueId !== null}
+            className="inline-flex items-center gap-2 rounded-full bg-accent px-4 py-2 text-sm text-accent-foreground hover:opacity-90 disabled:opacity-40"
+          >
+            <Play className="size-4" />
+            {projectingCueId ? t('service.projecting') : t('service.projectCurrentCue')}
+          </button>
           <button
             type="button"
             onClick={addMediaCue}
@@ -111,6 +154,11 @@ export default function ServiceWorkspace(): React.JSX.Element {
           </button>
         </div>
       </header>
+      {projectionMessage && (
+        <div className="rounded-2xl bg-surface px-4 py-3 text-sm text-muted">
+          {projectionMessage}
+        </div>
+      )}
 
       <section className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_280px] gap-4 max-xl:grid-cols-1">
         <div className="min-h-0 rounded-3xl bg-surface p-3">
@@ -167,6 +215,13 @@ export default function ServiceWorkspace(): React.JSX.Element {
                         {status && <p className="text-sm text-warning">{status}</p>}
                       </button>
                       <div className="flex shrink-0 items-center gap-1">
+                        <IconButton
+                          label={t('service.projectCue')}
+                          onClick={() => void handleProjectCue(cue)}
+                          disabled={projectingCueId !== null}
+                        >
+                          <Play className="size-4" />
+                        </IconButton>
                         <IconButton
                           label={t('service.previewCue')}
                           onClick={() => actions.previewCueById(cue.id)}

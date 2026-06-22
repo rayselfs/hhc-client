@@ -21,6 +21,10 @@
     "addMedia": "新增媒體",
     "addBible": "新增聖經",
     "addTimer": "新增計時器",
+    "projectCurrentCue": "投影目前 Cue",
+    "projectCue": "投影 Cue",
+    "projecting": "投影中...",
+    "projectionStarted": "已開始投影。",
     "defaultTimerCue": "計時器 Cue",
     "defaultBibleCue": "聖經 Cue",
     "defaultMediaCue": "媒體 Cue",
@@ -40,6 +44,12 @@
     "nextCue": "下一個",
     "missingMediaSource": "找不到媒體來源",
     "notImplementedYet": "尚未實作",
+    "projectErrors": {
+      "missingSource": "這個 Cue 找不到來源。",
+      "unsupported": "目前平台無法投影這個 Cue 來源。",
+      "notReady": "這個 Cue 來源尚未準備完成。",
+      "notImplemented": "這個 Cue 類型尚未實作。"
+    },
     "cueTypes": {
       "media": "媒體",
       "bible": "聖經",

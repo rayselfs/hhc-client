@@ -6,6 +6,7 @@ import Header from '@renderer/components/Control/Header/Header'
 import FloatingTimer from '@renderer/components/Control/Timer/FloatingTimer'
 import ConfirmDialog from '@renderer/components/Common/ConfirmDialog'
 import TimerProjectionBridge from '@renderer/components/Control/Bridge/TimerProjectionBridge'
+import MediaPresenter from '@renderer/components/Control/FileExplorer/Presenter/MediaPresenter'
 import { ProjectionProvider } from '@renderer/contexts/ProjectionContext'
 import { TimerEngineProvider } from '@renderer/contexts/TimerEngineContext'
 import { ContextMenuProvider } from '@renderer/contexts/ContextMenuContext'
@@ -15,10 +16,12 @@ import { AppInitContext } from '@renderer/contexts/AppInitContext'
 import { initializeApp } from '@renderer/lib/app-init'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { useBibleFolderStore } from '@renderer/stores/folder'
+import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 import { useAutoUpdateCheck } from '@renderer/hooks/useAutoUpdateCheck'
 
 export default function Layout(): React.JSX.Element {
   const [initialized, setInitialized] = useState(false)
+  const isPresentingMedia = useMediaProjectionStore((state) => state.isPresenting)
   useAutoUpdateCheck()
 
   useEffect(() => {
@@ -66,6 +69,7 @@ export default function Layout(): React.JSX.Element {
                     </main>
                   </div>
                   <FloatingTimer />
+                  {isPresentingMedia && <MediaPresenter />}
                 </div>
                 <ConfirmDialog />
                 <TimerProjectionBridge />
