@@ -1,8 +1,8 @@
 import '@testing-library/jest-dom/vitest'
 import 'fake-indexeddb/auto'
-
-;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
-  .IS_REACT_ACT_ENVIRONMENT = true
+;(
+  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true
 
 vi.mock('@heroui/react', async () => {
   const actual = await vi.importActual<typeof import('@heroui/react')>('@heroui/react')

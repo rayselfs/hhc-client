@@ -60,8 +60,17 @@ describe('KeyboardShortcutsDialog', () => {
     expect(container.querySelector('[role="dialog"]')).not.toBeInTheDocument()
   })
 
-  it('shows timer shortcuts by default', () => {
+  it('shows projection shortcuts by default', () => {
     render(<KeyboardShortcutsDialog isOpen={true} onOpenChange={() => {}} />, { wrapper: Wrapper })
+
+    expect(screen.getByText('Start projection')).toBeInTheDocument()
+    expect(screen.getByText('F5')).toBeInTheDocument()
+  })
+
+  it('switches to timer section on click', () => {
+    render(<KeyboardShortcutsDialog isOpen={true} onOpenChange={() => {}} />, { wrapper: Wrapper })
+
+    fireEvent.click(screen.getAllByText('Timer')[0])
 
     expect(screen.getByText('Start / Stop')).toBeInTheDocument()
     expect(screen.getByText('Reset')).toBeInTheDocument()

@@ -88,10 +88,7 @@ describe('media projection sync', () => {
     renderSync()
 
     expect(mockStartProjection).toHaveBeenCalledWith('media', [
-      [
-        'file:show',
-        expect.objectContaining({ itemId: 'copy-id', blobId: 'original-id' })
-      ]
+      ['file:show', expect.objectContaining({ itemId: 'copy-id', blobId: 'original-id' })]
     ])
   })
 

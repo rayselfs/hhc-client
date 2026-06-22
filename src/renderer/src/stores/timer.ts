@@ -161,9 +161,7 @@ export function getDisplayValues(
 
   if (phase === 'idle') {
     if (reminderEnabled) {
-      const mainSeconds = reminderMode === 'add'
-        ? totalDuration
-        : totalDuration - reminderDuration
+      const mainSeconds = reminderMode === 'add' ? totalDuration : totalDuration - reminderDuration
       return {
         mainDisplay: formatTime(Math.max(0, mainSeconds)),
         subDisplay: formatTime(reminderDuration),

@@ -900,10 +900,14 @@
   "shortcuts": {
     "title": "鍵盤快速鍵",
     "sections": {
+      "projection": "投影",
       "bible": "聖經",
       "timer": "計時器",
       "media": "多媒體",
       "edit": "編輯"
+    },
+    "projection": {
+      "start": "開始投影"
     },
     "bible": {
       "prev_verse": "上一節",
@@ -937,7 +941,6 @@
       "pdf_next_page": "PDF 下一頁",
       "pdf_prev_page": "PDF 上一頁",
       "pdf_toggle_view_mode": "切換 PDF 檢視模式",
-      "start_presentation": "開始投影",
       "start_from_current": "從目前項目開始投影"
     },
     "edit": {

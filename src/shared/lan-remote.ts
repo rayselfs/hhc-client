@@ -25,7 +25,6 @@ export type LanRemoteCommand =
   | { requestId: string; type: 'presentation:jump'; index: number; requiredRevision?: number }
   | { requestId: string; type: 'media:play' }
   | { requestId: string; type: 'media:pause' }
-  | { requestId: string; type: 'projection:blank'; enabled: boolean }
   | { requestId: string; type: 'timer:command'; command: TimerCommand }
 
 export interface LanRemoteSnapshot {
@@ -41,7 +40,6 @@ export interface LanRemoteSnapshot {
   }
   projection: {
     isOpen: boolean
-    isBlanked: boolean
   }
   timer: {
     status: string
@@ -158,9 +156,6 @@ export function parseLanRemoteCommand(value: unknown): LanRemoteCommand | null {
   if (value.type === 'media:play' || value.type === 'media:pause') {
     return { requestId, type: value.type }
   }
-  if (value.type === 'projection:blank' && typeof value.enabled === 'boolean') {
-    return { requestId, type: 'projection:blank', enabled: value.enabled }
-  }
   if (value.type === 'timer:command') {
     const command = parseTimerCommand(value.command)
     return command ? { requestId, type: 'timer:command', command } : null
@@ -187,8 +182,7 @@ export function sanitizeLanRemoteSnapshot(snapshot: unknown): LanRemoteSnapshot 
       isPlaying: booleanOrFalse(presentation.isPlaying)
     },
     projection: {
-      isOpen: booleanOrFalse(projection.isOpen),
-      isBlanked: booleanOrFalse(projection.isBlanked)
+      isOpen: booleanOrFalse(projection.isOpen)
     },
     timer: {
       status: stringOrEmpty(timer.status),

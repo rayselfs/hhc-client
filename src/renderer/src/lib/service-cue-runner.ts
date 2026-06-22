@@ -7,6 +7,12 @@ import type { ServiceCue } from '@renderer/stores/service-playlist'
 import { useSlidesStore } from '@renderer/stores/slides'
 import { getBibleProjectionSettingsPayload } from '@renderer/lib/bible-projection-settings'
 import { isPresentable } from '@renderer/lib/presentability'
+import {
+  startBibleProjection,
+  startMediaProjection,
+  startSlideProjection,
+  startTimerProjection
+} from '@renderer/lib/projection-actions'
 import { isFileItem, type FileItemRecord } from '@shared/types/folder'
 
 export type ServiceCueProjectionStatus =
@@ -54,7 +60,12 @@ async function projectMediaCue(
   if (!isPresentable(item.mimeType)) return { status: 'unsupported' }
 
   const startMediaPresentation = deps.startMediaPresentation ?? getDefaultMediaProjectionStart()
-  const report = await startMediaPresentation([item], 0, { prioritizeStartItem: true })
+  const report = await startMediaProjection(
+    [item],
+    0,
+    { startMediaPresentation },
+    { prioritizeStartItem: true }
+  )
   const itemReadiness = report.items.find((entry) => entry.itemId === item.id)
   if (!itemReadiness || itemReadiness.status !== 'ready') {
     return {
@@ -93,19 +104,22 @@ async function projectBibleCue(
     verse: targetVerse
   })
 
-  await deps.startProjection('bible', [
-    ['bible:settings', getBibleProjectionSettingsPayload()],
+  await startBibleProjection(
     [
-      'bible:chapter',
-      {
-        bookNumber: cue.bookNumber,
-        chapter: cue.chapter,
-        chapterVerses: chapter.verses.map((item) => ({ number: item.number, text: item.text })),
-        currentVerse: targetVerse,
-        versionLocale: version?.locale
-      }
-    ]
-  ])
+      ['bible:settings', getBibleProjectionSettingsPayload()],
+      [
+        'bible:chapter',
+        {
+          bookNumber: cue.bookNumber,
+          chapter: cue.chapter,
+          chapterVerses: chapter.verses.map((item) => ({ number: item.number, text: item.text })),
+          currentVerse: targetVerse,
+          versionLocale: version?.locale
+        }
+      ]
+    ],
+    deps
+  )
   return { status: 'projected' }
 }
 
@@ -117,7 +131,7 @@ async function projectSlideCue(
   const slideIndex = document?.slides.findIndex((slide) => slide.id === cue.slideId) ?? -1
   if (!document || slideIndex < 0) return { status: 'missing-source' }
 
-  await deps.startProjection('slide', [['slide:show', { document, slideIndex }]])
+  await startSlideProjection(document, slideIndex, deps)
   return { status: 'projected' }
 }
 
@@ -131,7 +145,7 @@ export async function projectServiceCue(
     case 'bible':
       return projectBibleCue(cue, deps)
     case 'timer':
-      await deps.startProjection('timer')
+      await startTimerProjection(deps)
       return { status: 'projected' }
     case 'slide':
       return projectSlideCue(cue, deps)

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Plus, Presentation, Type, Trash2 } from 'lucide-react'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
 import { useSlidesStore } from '@renderer/stores/slides'
+import { startSlideProjection } from '@renderer/lib/projection-actions'
 import { BUILT_IN_SLIDE_TEMPLATES } from '@renderer/lib/slide-templates'
 import { importPptxSlideDocument } from '@renderer/lib/slide-pptx-import'
 import type { SlideDocument, SlideElement, SlideRecord } from '@shared/types/slides'
@@ -105,9 +106,7 @@ export default function SlidesWorkspace(): React.JSX.Element {
     if (!currentDocument || selectedSlideIndex < 0) return
     setIsProjecting(true)
     try {
-      await startProjection('slide', [
-        ['slide:show', { document: currentDocument, slideIndex: selectedSlideIndex }]
-      ])
+      await startSlideProjection(currentDocument, selectedSlideIndex, { startProjection })
     } finally {
       setIsProjecting(false)
     }

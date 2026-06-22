@@ -54,11 +54,6 @@ export async function executeLanRemoteCommand(command: LanRemoteCommand): Promis
         isPlaying: false
       })
       return accept(command.requestId)
-    case 'projection:blank':
-      window.dispatchEvent(
-        new CustomEvent('librepresenter:lan-remote-blank', { detail: command.enabled })
-      )
-      return accept(command.requestId)
     case 'timer:command':
       if (!window.api?.timer) return rejected(command.requestId, 'timer-api-unavailable')
       await window.api.timer.timerCommand(command.command)
@@ -66,10 +61,7 @@ export async function executeLanRemoteCommand(command: LanRemoteCommand): Promis
   }
 }
 
-export function createLanRemoteSnapshot(
-  isProjectionOpen: boolean,
-  isProjectionBlanked: boolean
-): LanRemoteSnapshot {
+export function createLanRemoteSnapshot(isProjectionOpen: boolean): LanRemoteSnapshot {
   const projection = useMediaProjectionStore.getState()
   const timer = useTimerStore.getState()
   const stopwatch = useStopwatchStore.getState()
@@ -88,8 +80,7 @@ export function createLanRemoteSnapshot(
       isPlaying: projection.isPresenting
     },
     projection: {
-      isOpen: isProjectionOpen,
-      isBlanked: isProjectionBlanked
+      isOpen: isProjectionOpen
     },
     timer: {
       status: timer.status,

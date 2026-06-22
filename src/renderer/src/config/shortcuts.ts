@@ -1,6 +1,9 @@
 import type { ShortcutConfig } from '@renderer/hooks/useKeyboardShortcuts'
 
 export const SHORTCUTS = {
+  PROJECTION: {
+    START: { code: 'F5', mac: { code: 'Enter', meta: true, shift: true } }
+  },
   BIBLE: {
     PREV_VERSE: { code: 'ArrowUp' },
     NEXT_VERSE: { code: 'ArrowDown' },
@@ -42,7 +45,6 @@ export const SHORTCUTS = {
     PDF_NEXT_PAGE: { code: 'ArrowDown', metaOrCtrl: true },
     PDF_PREV_PAGE: { code: 'ArrowUp', metaOrCtrl: true },
     PDF_TOGGLE_VIEW_MODE: { code: 'KeyV' },
-    START_PRESENTATION: { code: 'F5' },
-    START_FROM_CURRENT: { code: 'F5', shift: true }
+    START_FROM_CURRENT: { code: 'F5', shift: true, mac: { code: 'Enter', meta: true } }
   }
 } as const satisfies Record<string, Record<string, ShortcutConfig>>

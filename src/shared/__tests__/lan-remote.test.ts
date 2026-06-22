@@ -21,6 +21,9 @@ describe('LAN remote contract', () => {
     expect(
       parseLanRemoteCommand({ requestId: 'r3', type: 'filesystem:delete', path: '/tmp/x' })
     ).toBeNull()
+    expect(
+      parseLanRemoteCommand({ requestId: 'r4', type: 'projection:blank', enabled: true })
+    ).toBeNull()
   })
 
   it('sanitizes snapshots by whitelisting fields', () => {
@@ -44,6 +47,7 @@ describe('LAN remote contract', () => {
 
     expect(JSON.stringify(snapshot)).not.toContain('nativeUrl')
     expect(JSON.stringify(snapshot)).not.toContain('hidden')
+    expect(snapshot.projection).toEqual({ isOpen: true })
     expect(snapshot.presentation.currentName).toBe('Slide')
   })
 

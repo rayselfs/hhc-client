@@ -93,6 +93,8 @@ export const ListView = React.memo(function ListView({
     return sortDir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
   }
 
+  // TanStack Virtual returns helper functions React Compiler cannot memoize safely.
+  // eslint-disable-next-line react-hooks/incompatible-library
   const rowVirtualizer = useVirtualizer({
     count: items.length,
     getScrollElement: () => containerRef.current,

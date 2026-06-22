@@ -36,11 +36,13 @@ vi.mock('../Preview/NextItemPreview', () => ({
 
 vi.mock('@renderer/stores/media-projection', () => ({
   useMediaProjectionStore: Object.assign(
-    (selector: (state: {
-      nextItem: typeof mockNextItem
-      currentItem: typeof mockCurrentItem
-      updateNotes: typeof mockUpdateNotes
-    }) => unknown) =>
+    (
+      selector: (state: {
+        nextItem: typeof mockNextItem
+        currentItem: typeof mockCurrentItem
+        updateNotes: typeof mockUpdateNotes
+      }) => unknown
+    ) =>
       selector({
         nextItem: mockNextItem,
         currentItem: mockCurrentItem,

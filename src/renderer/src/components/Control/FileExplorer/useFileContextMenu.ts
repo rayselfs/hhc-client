@@ -4,7 +4,7 @@ import { Play, Star, StarOff } from 'lucide-react'
 import { createFolderContextMenu } from '@renderer/lib/createFolderContextMenu'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { isPresentable, getPresentableItems } from '@renderer/lib/presentability'
-import { useMediaProjectionStore } from '@renderer/stores/media-projection'
+import { startMediaProjection } from '@renderer/lib/projection-actions'
 import { isFileItem } from '@shared/types/folder'
 
 export type {
@@ -35,16 +35,12 @@ export const useFileContextMenu = createFolderContextMenu({
           const presentableFiles = getPresentableItems(allItems)
           const targetIndex = presentableFiles.findIndex((f) => f.id === itemId)
           if (presentableFiles.length > 0) {
-            void useMediaProjectionStore
-              .getState()
-              .startPresentationWithReadiness(presentableFiles, Math.max(targetIndex, 0), {
-                prioritizeStartItem: true
-              })
-              .then((report) => {
-                if (report.summary.ready === 0) {
-                  toast.warning(t('fileExplorer.noProjectableFiles'))
-                }
-              })
+            void startMediaProjection(
+              presentableFiles,
+              Math.max(targetIndex, 0),
+              { onNoProjectableFiles: () => toast.warning(t('fileExplorer.noProjectableFiles')) },
+              { prioritizeStartItem: true }
+            )
           }
         }
       }
@@ -65,14 +61,9 @@ export const useFileContextMenu = createFolderContextMenu({
         label: t('fileExplorer.contextMenu.project'),
         icon: React.createElement(Play, { size: 14 }),
         onAction: () => {
-          void useMediaProjectionStore
-            .getState()
-            .startPresentationWithReadiness(presentableFiles, 0)
-            .then((report) => {
-              if (report.summary.ready === 0) {
-                toast.warning(t('fileExplorer.noProjectableFiles'))
-              }
-            })
+          void startMediaProjection(presentableFiles, 0, {
+            onNoProjectableFiles: () => toast.warning(t('fileExplorer.noProjectableFiles'))
+          })
         }
       })
     }

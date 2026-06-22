@@ -77,7 +77,10 @@ describe('ServiceWorkspace', () => {
     await user.click(screen.getByRole('button', { name: 'Add Timer' }))
     await user.click(screen.getByRole('button', { name: 'Project Current' }))
 
-    expect(projectionMocks.startProjection).toHaveBeenCalledWith('timer')
+    expect(projectionMocks.startProjection).toHaveBeenCalledWith(
+      'timer',
+      expect.arrayContaining([['timer:tick', expect.objectContaining({ mode: 'timer' })]])
+    )
     expect(await screen.findByText('Projection started.')).toBeInTheDocument()
   })
 

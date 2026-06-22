@@ -128,6 +128,10 @@ vi.mock('@renderer/contexts/ProjectionContext', () => ({
   })
 }))
 
+vi.mock('@renderer/lib/projection-actions', () => ({
+  startBibleProjection: vi.fn((payloads, deps) => deps.startProjection('bible', payloads))
+}))
+
 vi.mock('@renderer/contexts/ContextMenuContext', () => ({
   useContextMenu: () => ({
     contextMenu: null,

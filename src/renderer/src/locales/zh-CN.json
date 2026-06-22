@@ -900,10 +900,14 @@
   "shortcuts": {
     "title": "键盘快捷键",
     "sections": {
+      "projection": "投影",
       "bible": "圣经",
       "timer": "计时器",
       "media": "多媒体",
       "edit": "编辑"
+    },
+    "projection": {
+      "start": "开始投影"
     },
     "bible": {
       "prev_verse": "上一节",
@@ -937,7 +941,6 @@
       "pdf_next_page": "PDF 下一页",
       "pdf_prev_page": "PDF 上一页",
       "pdf_toggle_view_mode": "切换 PDF 查看模式",
-      "start_presentation": "开始投影",
       "start_from_current": "从当前项目开始投影"
     },
     "edit": {

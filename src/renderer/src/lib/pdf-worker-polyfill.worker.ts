@@ -13,7 +13,7 @@ if (!('getOrInsertComputed' in Map.prototype)) {
       return this.get(key)!
     },
     configurable: true,
-    writable: true,
+    writable: true
   })
 }
 
@@ -25,7 +25,7 @@ if (!('sumPrecise' in Math)) {
       return sum
     },
     configurable: true,
-    writable: true,
+    writable: true
   })
 }
 

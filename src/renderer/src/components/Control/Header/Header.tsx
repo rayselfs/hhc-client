@@ -1,8 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { useLocation } from 'react-router-dom'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
-import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
-import { useMemo } from 'react'
+import { useCallback, useMemo } from 'react'
 import { ButtonGroup } from '@heroui/react/button-group'
 import { Button } from '@heroui/react/button'
 import { toast } from '@heroui/react/toast'
@@ -32,13 +31,18 @@ import {
 import { getPresentableItems } from '@renderer/lib/presentability'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 import { useBibleProjectionStore } from '@renderer/stores/bible-projection'
-import { getProjectionHeaderState, startProjectionForRoute } from '@renderer/lib/projection-actions'
+import {
+  getProjectionHeaderState,
+  startProjectionForRoute,
+  stopProjectionSession
+} from '@renderer/lib/projection-actions'
+import { SHORTCUTS } from '@renderer/config/shortcuts'
+import { useKeyboardShortcuts } from '@renderer/hooks/useKeyboardShortcuts'
 
 export default function Header(): React.JSX.Element {
   const { t } = useTranslation()
   const location = useLocation()
   const { isProjectionOpen, startProjection, stopProjection } = useProjection()
-  const confirm = useConfirm()
   const mode = useTimerStore((s) => s.mode)
 
   const currentFolderId = useFileExplorerStore((state) => state.currentFolderId)
@@ -111,29 +115,48 @@ export default function Header(): React.JSX.Element {
       ? trashSetSortFieldAndDir
       : setSortFieldAndDir
 
+  const startCurrentRouteProjection = useCallback(async (): Promise<void> => {
+    if (isProjectionOpen || projectionHeaderState.disabled) return
+    await startProjectionForRoute({
+      pathname: location.pathname,
+      startProjection,
+      biblePayloads,
+      presentableItems,
+      startMediaPresentation: (items, startIndex) =>
+        useMediaProjectionStore.getState().startPresentationWithReadiness(items, startIndex),
+      onNoProjectableFiles: () => toast.warning(t('fileExplorer.noProjectableFiles'))
+    })
+  }, [
+    biblePayloads,
+    isProjectionOpen,
+    location.pathname,
+    presentableItems,
+    projectionHeaderState.disabled,
+    startProjection,
+    t
+  ])
+
+  useKeyboardShortcuts(
+    [
+      {
+        config: SHORTCUTS.PROJECTION.START,
+        handler: () => {
+          void startCurrentRouteProjection()
+        },
+        id: 'projection.start',
+        description: t('shortcuts.projection.start')
+      }
+    ],
+    { sectionKey: 'projection' }
+  )
+
   const handleProjectionAction = async (): Promise<void> => {
     if (!isProjectionOpen) {
-      await startProjectionForRoute({
-        pathname: location.pathname,
-        startProjection,
-        biblePayloads,
-        presentableItems,
-        startMediaPresentation: (items, startIndex) =>
-          useMediaProjectionStore.getState().startPresentationWithReadiness(items, startIndex),
-        onNoProjectableFiles: () => toast.warning(t('fileExplorer.noProjectableFiles'))
-      })
+      await startCurrentRouteProjection()
       return
     }
 
-    const confirmed = await confirm({
-      status: 'warning',
-      title: t('projection.closeTitle'),
-      description: t('projection.closeConfirm'),
-      confirmLabel: t('common.close'),
-      cancelLabel: t('common.cancel')
-    })
-    if (!confirmed) return
-    await stopProjection().catch(() => {
+    await stopProjectionSession({ stopProjection }).catch(() => {
       toast.danger(t('toast.projectionCloseFailed'))
     })
   }

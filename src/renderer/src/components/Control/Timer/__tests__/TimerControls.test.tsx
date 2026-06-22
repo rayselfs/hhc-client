@@ -183,7 +183,10 @@ describe('TimerControls — projection integration', () => {
     useTimerStore.setState({ status: 'stopped' })
     renderWithI18n('timer')
     await user.click(screen.getByTestId('btn-start'))
-    expect(mockStartProjection).toHaveBeenCalledWith('timer')
+    expect(mockStartProjection).toHaveBeenCalledWith(
+      'timer',
+      expect.arrayContaining([['timer:tick', expect.objectContaining({ mode: 'timer' })]])
+    )
   })
 
   it('clicking Resume starts the timer projection session', async () => {
@@ -191,7 +194,10 @@ describe('TimerControls — projection integration', () => {
     useTimerStore.setState({ status: 'paused' })
     renderWithI18n('timer')
     await user.click(screen.getByTestId('btn-resume'))
-    expect(mockStartProjection).toHaveBeenCalledWith('timer')
+    expect(mockStartProjection).toHaveBeenCalledWith(
+      'timer',
+      expect.arrayContaining([['timer:tick', expect.objectContaining({ mode: 'timer' })]])
+    )
   })
 
   it('clicking Pause does NOT start a projection session', async () => {
@@ -215,7 +221,12 @@ describe('TimerControls — projection integration', () => {
     useStopwatchStore.setState({ status: 'stopped' })
     renderWithI18n('stopwatch')
     await user.click(screen.getByTestId('btn-start'))
-    expect(mockStartProjection).toHaveBeenCalledWith('timer')
+    expect(mockStartProjection).toHaveBeenCalledWith(
+      'timer',
+      expect.arrayContaining([
+        ['timer:tick', expect.objectContaining({ phase: expect.any(String) })]
+      ])
+    )
   })
 
   it('stopwatch Resume also starts the timer projection session', async () => {
@@ -223,7 +234,12 @@ describe('TimerControls — projection integration', () => {
     useStopwatchStore.setState({ status: 'paused' })
     renderWithI18n('stopwatch')
     await user.click(screen.getByTestId('btn-resume'))
-    expect(mockStartProjection).toHaveBeenCalledWith('timer')
+    expect(mockStartProjection).toHaveBeenCalledWith(
+      'timer',
+      expect.arrayContaining([
+        ['timer:tick', expect.objectContaining({ phase: expect.any(String) })]
+      ])
+    )
   })
 })
 

@@ -16,6 +16,7 @@ import { SHORTCUTS } from '@renderer/config/shortcuts'
 import { EVENTS } from '@renderer/config/events'
 import { buildVerseHistoryItem } from '@renderer/lib/bible-utils'
 import { getBibleProjectionSettingsPayload } from '@renderer/lib/bible-projection-settings'
+import { startBibleProjection } from '@renderer/lib/projection-actions'
 import type { BiblePassage } from '@shared/types/bible'
 import type { ContentMessageTuple } from '@renderer/contexts/ProjectionContext'
 
@@ -101,8 +102,7 @@ export default function BiblePage(): React.JSX.Element {
           }
         ]
       ] satisfies ContentMessageTuple[]
-      useBibleProjectionStore.getState().setLastPayloads(payloads)
-      void startProjection('bible', payloads)
+      void startBibleProjection(payloads, { startProjection })
       navigateTo({ bookNumber: book.number, chapter: chapter.number, verse: verse.number })
       setSelectedVerseIndex(clamped)
       setProjectedPassage({ bookNumber: book.number, chapter: chapter.number, verse: verse.number })

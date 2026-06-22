@@ -74,7 +74,10 @@ describe('projectServiceCue', () => {
     await expect(projectServiceCue(cue, { startProjection })).resolves.toEqual({
       status: 'projected'
     })
-    expect(startProjection).toHaveBeenCalledWith('timer')
+    expect(startProjection).toHaveBeenCalledWith(
+      'timer',
+      expect.arrayContaining([['timer:tick', expect.objectContaining({ mode: 'timer' })]])
+    )
   })
 
   it('starts media presentation for media cues', async () => {

@@ -740,6 +740,23 @@ describe('ProjectionContext — electron mode', () => {
     expect(mockClose).toHaveBeenCalledOnce()
   })
 
+  it('closeProjection clears open state immediately in electron mode', async () => {
+    const { result } = renderProjection()
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    act(() => {
+      openedCallback?.()
+    })
+    expect(result.current.isProjectionOpen).toBe(true)
+
+    await act(async () => {
+      await result.current.closeProjection()
+    })
+    expect(result.current.isProjectionOpen).toBe(false)
+  })
+
   it('cleanup unsubscribes from IPC events', () => {
     const { unmount } = renderProjection()
     unmount()

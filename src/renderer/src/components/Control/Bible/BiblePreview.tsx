@@ -10,10 +10,10 @@ import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 import { useBibleFolderStore } from '@renderer/stores/folder'
 import { useServicePlaylistStore } from '@renderer/stores/service-playlist'
 import { useBibleLiveQueueStore } from '@renderer/stores/bible-live-queue'
-import { useBibleProjectionStore } from '@renderer/stores/bible-projection'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
 import { buildBibleServiceCueInput } from '@renderer/lib/bible-service-cue'
 import { getBibleProjectionSettingsPayload } from '@renderer/lib/bible-projection-settings'
+import { startBibleProjection } from '@renderer/lib/projection-actions'
 import {
   getBookConfig,
   buildVerseHistoryItem,
@@ -148,8 +148,7 @@ export function BiblePreview({
         }
       ]
     ] satisfies ContentMessageTuple[]
-    useBibleProjectionStore.getState().setLastPayloads(payloads)
-    void startProjection('bible', payloads)
+    void startBibleProjection(payloads, { startProjection })
     navigateTo({ bookNumber: book.number, chapter: chapter.number, verse: verseNumber })
     scrollBehaviorRef.current = 'smooth'
     onSelectedVerseIndexChange(verseIndex)

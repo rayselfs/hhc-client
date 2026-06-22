@@ -304,6 +304,12 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
   const closeProjection = useCallback(async (): Promise<void> => {
     if (isElectron()) {
       await window.api.projection.close()
+      setIsProjectionOpen(false)
+      setIsProjectionBlanked(true)
+      isReadyRef.current = false
+      readyResolveRef.current = null
+      clearPending()
+      stopPolling()
     } else {
       getAdapter(adapterRef).send('__system:close', null)
       projectionWindowRef.current = null

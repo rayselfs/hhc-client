@@ -900,10 +900,14 @@
   "shortcuts": {
     "title": "Keyboard Shortcuts",
     "sections": {
+      "projection": "Projection",
       "bible": "Bible",
       "timer": "Timer",
       "media": "Media",
       "edit": "Edit"
+    },
+    "projection": {
+      "start": "Start projection"
     },
     "bible": {
       "prev_verse": "Previous Verse",
@@ -937,7 +941,6 @@
       "pdf_next_page": "Next PDF page",
       "pdf_prev_page": "Previous PDF page",
       "pdf_toggle_view_mode": "Toggle PDF view mode",
-      "start_presentation": "Start presentation",
       "start_from_current": "Start from current item"
     },
     "edit": {

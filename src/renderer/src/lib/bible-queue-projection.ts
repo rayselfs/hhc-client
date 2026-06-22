@@ -2,7 +2,7 @@ import type { ContentMessageTuple, ProjectionOwner } from '@renderer/contexts/Pr
 import { getBibleProjectionSettingsPayload } from '@renderer/lib/bible-projection-settings'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 import { useBibleStore } from '@renderer/stores/bible'
-import { useBibleProjectionStore } from '@renderer/stores/bible-projection'
+import { startBibleProjection } from '@renderer/lib/projection-actions'
 import type { BibleQueueItem } from '@renderer/stores/bible-live-queue'
 
 interface ProjectBibleQueueItemDependencies {
@@ -58,8 +58,7 @@ export async function projectBibleQueueItem(
       }
     ]
   ] satisfies ContentMessageTuple[]
-  useBibleProjectionStore.getState().setLastPayloads(payloads)
-  await deps.startProjection('bible', payloads)
+  await startBibleProjection(payloads, deps)
 
   return true
 }

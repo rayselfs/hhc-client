@@ -2,9 +2,9 @@ import React, { useCallback } from 'react'
 import { useBibleFolderStore } from '@renderer/stores/folder'
 import { useBibleStore } from '@renderer/stores/bible'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
-import { useBibleProjectionStore } from '@renderer/stores/bible-projection'
 import { formatVerseReferenceShort } from '@renderer/lib/bible-utils'
 import { getBibleProjectionSettingsPayload } from '@renderer/lib/bible-projection-settings'
+import { startBibleProjection } from '@renderer/lib/projection-actions'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
 import type { VerseItemRecord, FolderRecord, AnyItemRecord } from '@shared/types/folder'
 import { isVerseItem, isFolderRecord } from '@shared/types/folder'
@@ -74,8 +74,7 @@ export function CustomFolderTab({
           }
         ]
       ] satisfies ContentMessageTuple[]
-      useBibleProjectionStore.getState().setLastPayloads(payloads)
-      void startProjection('bible', payloads)
+      void startBibleProjection(payloads, { startProjection })
       onProjected?.({ bookNumber: item.bookNumber, chapter: item.chapter, verse: item.verse })
     },
     [navigateTo, startProjection, onProjected]

@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
@@ -113,7 +113,26 @@ describe('Header', () => {
     renderWithRouter(['/timer'])
     const user = userEvent.setup()
     await user.click(screen.getByRole('button', { name: 'Start projection' }))
-    expect(startProjection).toHaveBeenCalledWith('timer')
+    expect(startProjection).toHaveBeenCalledWith(
+      'timer',
+      expect.arrayContaining([['timer:tick', expect.objectContaining({ mode: 'timer' })]])
+    )
+  })
+
+  it('starts timer projection from the timer route with F5', async () => {
+    await i18n.changeLanguage('en')
+    const startProjection = vi.fn(() => Promise.resolve())
+    await mockProjectionContext({ isProjectionOpen: false, startProjection })
+    renderWithRouter(['/timer'])
+
+    fireEvent.keyDown(document, { code: 'F5', key: 'F5' })
+
+    await waitFor(() =>
+      expect(startProjection).toHaveBeenCalledWith(
+        'timer',
+        expect.arrayContaining([['timer:tick', expect.objectContaining({ mode: 'timer' })]])
+      )
+    )
   })
 
   it('disables bible projection start until a bible payload exists', async () => {
@@ -121,6 +140,17 @@ describe('Header', () => {
     await mockProjectionContext({ isProjectionOpen: false })
     renderWithRouter(['/bible'])
     expect(screen.getByRole('button', { name: 'Start projection' })).toBeDisabled()
+  })
+
+  it('does not start bible projection with F5 until a bible payload exists', async () => {
+    await i18n.changeLanguage('en')
+    const startProjection = vi.fn(() => Promise.resolve())
+    await mockProjectionContext({ isProjectionOpen: false, startProjection })
+    renderWithRouter(['/bible'])
+
+    fireEvent.keyDown(document, { code: 'F5', key: 'F5' })
+
+    expect(startProjection).not.toHaveBeenCalled()
   })
 
   it('replays the last bible projection payload from the bible route', async () => {
@@ -148,11 +178,51 @@ describe('Header', () => {
     expect(startProjection).toHaveBeenCalledWith('bible', payloads)
   })
 
+  it('replays the last bible projection payload from the bible route with F5', async () => {
+    await i18n.changeLanguage('en')
+    const startProjection = vi.fn(() => Promise.resolve())
+    const payloads: ContentMessageTuple[] = [
+      ['bible:settings', { fontSize: 90 }],
+      [
+        'bible:chapter',
+        {
+          bookNumber: 43,
+          chapter: 3,
+          chapterVerses: [{ number: 16, text: 'For God so loved the world' }],
+          currentVerse: 16
+        }
+      ]
+    ]
+    useBibleProjectionStore.getState().setLastPayloads(payloads)
+    await mockProjectionContext({ isProjectionOpen: false, startProjection })
+    renderWithRouter(['/bible'])
+
+    fireEvent.keyDown(document, { code: 'F5', key: 'F5' })
+
+    await waitFor(() => expect(startProjection).toHaveBeenCalledWith('bible', payloads))
+  })
+
   it('disables files projection start when the current folder has no presentable item', async () => {
     await i18n.changeLanguage('en')
     await mockProjectionContext({ isProjectionOpen: false })
     renderWithRouter(['/files'])
     expect(screen.getByRole('button', { name: 'Start projection' })).toBeDisabled()
+  })
+
+  it('does not start files projection with F5 when the current folder has no presentable item', async () => {
+    await i18n.changeLanguage('en')
+    await mockProjectionContext({ isProjectionOpen: false })
+    const startPresentationWithReadiness = vi.fn(() =>
+      Promise.resolve({ summary: { ready: 1, unsupported: 0, failed: 0 } })
+    )
+    useMediaProjectionStore.setState({
+      startPresentationWithReadiness
+    } as never)
+    renderWithRouter(['/files'])
+
+    fireEvent.keyDown(document, { code: 'F5', key: 'F5' })
+
+    expect(startPresentationWithReadiness).not.toHaveBeenCalled()
   })
 
   it('starts presentation from the current files folder', async () => {
@@ -179,6 +249,31 @@ describe('Header', () => {
     )
   })
 
+  it('starts current folder presentation with F5 from the files route', async () => {
+    await i18n.changeLanguage('en')
+    await mockProjectionContext({ isProjectionOpen: false })
+    const startPresentationWithReadiness = vi.fn(() =>
+      Promise.resolve({ summary: { ready: 1, unsupported: 0, failed: 0 } })
+    )
+    useFileExplorerStore.setState({
+      currentFolderId: 'file-root',
+      _itemsArray: [makeFile('image-1')]
+    })
+    useMediaProjectionStore.setState({
+      startPresentationWithReadiness
+    } as never)
+    renderWithRouter(['/files'])
+
+    fireEvent.keyDown(document, { code: 'F5', key: 'F5' })
+
+    await waitFor(() =>
+      expect(startPresentationWithReadiness).toHaveBeenCalledWith(
+        [expect.objectContaining({ id: 'image-1' })],
+        0
+      )
+    )
+  })
+
   it('renders stop projection button with correct aria-label in English when open', async () => {
     await i18n.changeLanguage('en')
     await mockProjectionContext({ isProjectionOpen: true, isProjectionBlanked: false })
@@ -186,7 +281,7 @@ describe('Header', () => {
     expect(screen.getByRole('button', { name: 'Stop projection' })).toBeInTheDocument()
   })
 
-  it('calls stopProjection after confirmation when projection is open', async () => {
+  it('calls stopProjection without confirmation when projection is open', async () => {
     await i18n.changeLanguage('en')
     const stopProjection = vi.fn(() => Promise.resolve())
     await mockProjectionContext({ isProjectionOpen: true, stopProjection })
@@ -194,9 +289,22 @@ describe('Header', () => {
     renderWithRouter(['/'])
     const user = userEvent.setup()
     await user.click(screen.getByRole('button', { name: 'Stop projection' }))
-    await user.click(await screen.findByRole('button', { name: 'Close' }))
 
     expect(stopProjection).toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument()
+  })
+
+  it('does not stop or switch projection with F5 when projection is already open', async () => {
+    await i18n.changeLanguage('en')
+    const stopProjection = vi.fn(() => Promise.resolve())
+    const startProjection = vi.fn(() => Promise.resolve())
+    await mockProjectionContext({ isProjectionOpen: true, stopProjection, startProjection })
+    renderWithRouter(['/timer'])
+
+    fireEvent.keyDown(document, { code: 'F5', key: 'F5' })
+
+    expect(stopProjection).not.toHaveBeenCalled()
+    expect(startProjection).not.toHaveBeenCalled()
   })
 
   it.each(['/timer', '/bible', '/files'])(
@@ -210,7 +318,6 @@ describe('Header', () => {
       renderWithRouter([route])
       const user = userEvent.setup()
       await user.click(screen.getByRole('button', { name: 'Stop projection' }))
-      await user.click(await screen.findByRole('button', { name: 'Close' }))
 
       expect(stopProjection).toHaveBeenCalled()
       expect(startProjection).not.toHaveBeenCalled()

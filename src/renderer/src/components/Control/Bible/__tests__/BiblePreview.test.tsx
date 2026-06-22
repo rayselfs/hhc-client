@@ -63,6 +63,19 @@ vi.mock('@renderer/contexts/ProjectionContext', () => ({
   })
 }))
 
+vi.mock('@renderer/lib/projection-actions', async () => {
+  const { useBibleProjectionStore } =
+    await vi.importActual<typeof import('@renderer/stores/bible-projection')>(
+      '@renderer/stores/bible-projection'
+    )
+  return {
+    startBibleProjection: vi.fn((payloads, deps) => {
+      useBibleProjectionStore.getState().setLastPayloads(payloads)
+      return deps.startProjection('bible', payloads)
+    })
+  }
+})
+
 vi.mock('@renderer/stores/bible-settings', () => ({
   useBibleSettingsStore: Object.assign(
     (selector?: (state: { fontSize: number }) => unknown) =>
@@ -172,6 +185,7 @@ vi.mock('@renderer/lib/bible-utils', () => ({
 }))
 
 vi.mock('react-i18next', () => ({
+  initReactI18next: { type: '3rdParty', init: () => {} },
   useTranslation: () => ({
     t: (key: string) => {
       const map: Record<string, string> = {

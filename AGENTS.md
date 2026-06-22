@@ -104,6 +104,8 @@ Every feature must work in both Electron and browser.
 - **HeroUI v3** (react-aria-components based) — API differs from v2, check node_modules or use MCP
 - No pre-commit hooks — lint/format are manual
 - Vitest: jsdom environment, `globals: true`, run with `npx vitest run`
+- **Projection owner rule**: Header/page navigation must not switch projection content just because the operator visits Bible or Media. Content switches only on explicit projection actions such as selecting a verse, presenting media, running a slide, or service cue. **Timer is the deliberate exception**: when projection is already open, navigating back to the Timer page may reclaim projection immediately so a countdown can keep showing while the operator searches Bible/media, and returning from Bible/media to Timer is one-step.
+- **Projection fallback rule**: LAN remote blank control is removed. `DefaultProjection` is an internal fallback only: projection route has no content yet, web `window.close()` is blocked, or an invalid/no payload reaches projection. Do not expose blank as a user-facing projection mode.
 - **Deletion flow — two paths**:
   - `useBibleFolderStore`: hard delete via `cleanupExpired()` on startup, no trash UI
   - `useFileExplorerStore`: soft-delete via `softDeleteExpired()` → trash → `purgeTrash()` after retention. Do **not** call `cleanupExpired()` here.

@@ -90,9 +90,10 @@ export const useTimerRuntimeStore = create<TimerRuntimeState>()((set, get) => ({
     if (s.status === 'running') return
     const cfg = useTimerConfigStore.getState()
     const settings = useSettingsStore.getState()
-    const total = settings.reminderMode === 'add' && cfg.reminderEnabled
-      ? cfg.totalDuration + cfg.reminderDuration
-      : cfg.totalDuration
+    const total =
+      settings.reminderMode === 'add' && cfg.reminderEnabled
+        ? cfg.totalDuration + cfg.reminderDuration
+        : cfg.totalDuration
     const duration = s.phase === 'overtime' ? total : s.remainingSeconds
     const now = Date.now()
     set({
@@ -132,9 +133,10 @@ export const useTimerRuntimeStore = create<TimerRuntimeState>()((set, get) => ({
   reset: () => {
     const cfg = useTimerConfigStore.getState()
     const settings = useSettingsStore.getState()
-    const total = settings.reminderMode === 'add' && cfg.reminderEnabled
-      ? cfg.totalDuration + cfg.reminderDuration
-      : cfg.totalDuration
+    const total =
+      settings.reminderMode === 'add' && cfg.reminderEnabled
+        ? cfg.totalDuration + cfg.reminderDuration
+        : cfg.totalDuration
     set({
       status: 'stopped',
       phase: 'idle',
@@ -158,9 +160,10 @@ export const useTimerRuntimeStore = create<TimerRuntimeState>()((set, get) => ({
       ...(autoDisableReminder ? { reminderEnabled: false } : {})
     })
     const settings = useSettingsStore.getState()
-    const total = settings.reminderMode === 'add' && updatedReminderEnabled
-      ? clamped + cfg.reminderDuration
-      : clamped
+    const total =
+      settings.reminderMode === 'add' && updatedReminderEnabled
+        ? clamped + cfg.reminderDuration
+        : clamped
     set({
       remainingSeconds: total,
       progress: computeProgress(total, total),
@@ -173,17 +176,19 @@ export const useTimerRuntimeStore = create<TimerRuntimeState>()((set, get) => ({
     const s = get()
     const cfg = useTimerConfigStore.getState()
     const settings = useSettingsStore.getState()
-    const total = settings.reminderMode === 'add' && cfg.reminderEnabled
-      ? cfg.totalDuration + cfg.reminderDuration
-      : cfg.totalDuration
+    const total =
+      settings.reminderMode === 'add' && cfg.reminderEnabled
+        ? cfg.totalDuration + cfg.reminderDuration
+        : cfg.totalDuration
     const newRemaining = Math.min(MAX_DURATION_SECONDS, s.remainingSeconds + seconds)
 
     if (s.status === 'stopped') {
       const newTotal = Math.min(MAX_DURATION_SECONDS, cfg.totalDuration + seconds)
       useTimerConfigStore.setState({ totalDuration: newTotal })
-      const updatedTotal = settings.reminderMode === 'add' && cfg.reminderEnabled
-        ? newTotal + cfg.reminderDuration
-        : newTotal
+      const updatedTotal =
+        settings.reminderMode === 'add' && cfg.reminderEnabled
+          ? newTotal + cfg.reminderDuration
+          : newTotal
       set({
         remainingSeconds: updatedTotal,
         progress: computeProgress(updatedTotal, updatedTotal),
@@ -208,9 +213,10 @@ export const useTimerRuntimeStore = create<TimerRuntimeState>()((set, get) => ({
     const s = get()
     const cfg = useTimerConfigStore.getState()
     const settings = useSettingsStore.getState()
-    const total = settings.reminderMode === 'add' && cfg.reminderEnabled
-      ? cfg.totalDuration + cfg.reminderDuration
-      : cfg.totalDuration
+    const total =
+      settings.reminderMode === 'add' && cfg.reminderEnabled
+        ? cfg.totalDuration + cfg.reminderDuration
+        : cfg.totalDuration
     const newRemaining = Math.max(0, s.remainingSeconds - seconds)
 
     if (s.status === 'stopped') {
@@ -221,9 +227,10 @@ export const useTimerRuntimeStore = create<TimerRuntimeState>()((set, get) => ({
         totalDuration: newTotal,
         ...(autoDisableReminder ? { reminderEnabled: false } : {})
       })
-      const updatedTotal = settings.reminderMode === 'add' && updatedReminderEnabled
-        ? newTotal + cfg.reminderDuration
-        : newTotal
+      const updatedTotal =
+        settings.reminderMode === 'add' && updatedReminderEnabled
+          ? newTotal + cfg.reminderDuration
+          : newTotal
       set({
         remainingSeconds: updatedTotal,
         progress: computeProgress(updatedTotal, updatedTotal),
@@ -260,9 +267,10 @@ export const useTimerRuntimeStore = create<TimerRuntimeState>()((set, get) => ({
 
     const cfg = useTimerConfigStore.getState()
     const settings = useSettingsStore.getState()
-    const total = settings.reminderMode === 'add' && cfg.reminderEnabled
-      ? cfg.totalDuration + cfg.reminderDuration
-      : cfg.totalDuration
+    const total =
+      settings.reminderMode === 'add' && cfg.reminderEnabled
+        ? cfg.totalDuration + cfg.reminderDuration
+        : cfg.totalDuration
     const remainingMs = s.targetEndTime - currentMs
     const rawRemainingSeconds = remainingMs / 1000
 
@@ -306,9 +314,10 @@ export const useTimerRuntimeStore = create<TimerRuntimeState>()((set, get) => ({
     if (s.status === 'stopped') {
       const settings = useSettingsStore.getState()
       const cfg = useTimerConfigStore.getState()
-      const total = settings.reminderMode === 'add' && enabled
-        ? cfg.totalDuration + durationSeconds
-        : cfg.totalDuration
+      const total =
+        settings.reminderMode === 'add' && enabled
+          ? cfg.totalDuration + durationSeconds
+          : cfg.totalDuration
       set({
         remainingSeconds: total,
         progress: computeProgress(total, total),
@@ -337,9 +346,10 @@ useSettingsStore.subscribe((state, prevState) => {
     const s = useTimerRuntimeStore.getState()
     if (s.status === 'stopped') {
       const cfg = useTimerConfigStore.getState()
-      const total = state.reminderMode === 'add' && cfg.reminderEnabled
-        ? cfg.totalDuration + cfg.reminderDuration
-        : cfg.totalDuration
+      const total =
+        state.reminderMode === 'add' && cfg.reminderEnabled
+          ? cfg.totalDuration + cfg.reminderDuration
+          : cfg.totalDuration
       useTimerRuntimeStore.setState({
         remainingSeconds: total,
         progress: computeProgress(total, total),

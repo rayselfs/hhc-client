@@ -9,7 +9,7 @@ import {
 const SNAPSHOT_INTERVAL_MS = 1000
 
 export default function LanRemoteBridge(): null {
-  const { isProjectionOpen, isProjectionBlanked, blankProjection } = useProjection()
+  const { isProjectionOpen } = useProjection()
 
   useEffect(() => {
     if (!isElectron() || !window.api?.lanRemote) return
@@ -19,23 +19,12 @@ export default function LanRemoteBridge(): null {
   }, [])
 
   useEffect(() => {
-    const handleBlank = (event: Event): void => {
-      const enabled = event instanceof CustomEvent ? Boolean(event.detail) : false
-      blankProjection(enabled)
-    }
-    window.addEventListener('librepresenter:lan-remote-blank', handleBlank)
-    return () => window.removeEventListener('librepresenter:lan-remote-blank', handleBlank)
-  }, [blankProjection])
-
-  useEffect(() => {
     if (!isElectron() || !window.api?.lanRemote) return
     const intervalId = window.setInterval(() => {
-      void window.api.lanRemote.publishState(
-        createLanRemoteSnapshot(isProjectionOpen, isProjectionBlanked)
-      )
+      void window.api.lanRemote.publishState(createLanRemoteSnapshot(isProjectionOpen))
     }, SNAPSHOT_INTERVAL_MS)
     return () => window.clearInterval(intervalId)
-  }, [isProjectionOpen, isProjectionBlanked])
+  }, [isProjectionOpen])
 
   return null
 }

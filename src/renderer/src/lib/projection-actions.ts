@@ -1,6 +1,14 @@
 import type { ContentMessageTuple, ProjectionOwner } from '@renderer/contexts/ProjectionContext'
 import { isBibleRoute, isFilesRoute, isTimerRoute } from '@renderer/lib/routes'
+import { useBibleProjectionStore } from '@renderer/stores/bible-projection'
+import { useMediaProjectionStore } from '@renderer/stores/media-projection'
+import { useSettingsStore } from '@renderer/stores/settings'
+import { useStopwatchStore } from '@renderer/stores/stopwatch'
+import { selectFormattedTime } from '@renderer/stores/selectors/stopwatch'
+import { getDisplayValues, useTimerStore } from '@renderer/stores/timer'
+import type { PresentationReadinessReport } from '@renderer/lib/presentation-readiness'
 import type { FileItemRecord } from '@shared/types/folder'
+import type { SlideDocument } from '@shared/types/slides'
 
 export type ProjectionHeaderDisabledReason =
   | 'no-bible-payload'
@@ -19,8 +27,21 @@ interface ProjectionHeaderStateInput {
   presentableItems: FileItemRecord[]
 }
 
-interface MediaStartReport {
-  summary: { ready: number }
+interface ProjectionStartDeps {
+  startProjection: (owner: ProjectionOwner, payloads?: ContentMessageTuple[]) => Promise<void>
+}
+
+interface ProjectionStopDeps {
+  stopProjection: () => Promise<void>
+}
+
+interface StartMediaProjectionDeps {
+  startMediaPresentation?: (
+    items: FileItemRecord[],
+    startIndex: number,
+    options?: { prioritizeStartItem?: boolean }
+  ) => Promise<PresentationReadinessReport>
+  onNoProjectableFiles?: () => void
 }
 
 interface StartProjectionForRouteInput {
@@ -28,7 +49,11 @@ interface StartProjectionForRouteInput {
   startProjection: (owner: ProjectionOwner, payloads?: ContentMessageTuple[]) => Promise<void>
   biblePayloads: ContentMessageTuple[] | null
   presentableItems: FileItemRecord[]
-  startMediaPresentation: (items: FileItemRecord[], startIndex: number) => Promise<MediaStartReport>
+  startMediaPresentation: (
+    items: FileItemRecord[],
+    startIndex: number,
+    options?: { prioritizeStartItem?: boolean }
+  ) => Promise<PresentationReadinessReport>
   onNoProjectableFiles: () => void
 }
 
@@ -51,6 +76,96 @@ export function getProjectionHeaderState({
   return { disabled: true, reason: 'unsupported-route' }
 }
 
+export function getTimerProjectionPayloads(): ContentMessageTuple[] {
+  const timer = useTimerStore.getState()
+  const stopwatch = useStopwatchStore.getState()
+  const settings = useSettingsStore.getState()
+  const displayValues = getDisplayValues({
+    phase: timer.phase,
+    remainingSeconds: timer.remainingSeconds,
+    reminderDuration: timer.reminderDuration,
+    overtimeSeconds: timer.overtimeSeconds,
+    totalDuration: timer.totalDuration,
+    reminderEnabled: timer.reminderEnabled
+  })
+  const projectionMode =
+    timer.mode === 'stopwatch' && !stopwatch.showOnProjection ? 'clock' : timer.mode
+  const payloads: ContentMessageTuple[] = [
+    ['settings:timezone', { timezone: settings.timezone }],
+    [
+      'settings:timer-ring-color',
+      { color: settings.timerRingColorEnabled ? settings.timerRingColor : null }
+    ],
+    [
+      'timer:tick',
+      {
+        mode: projectionMode,
+        remainingSeconds: timer.remainingSeconds,
+        phase: timer.phase,
+        mainDisplay: displayValues.mainDisplay,
+        subDisplay: displayValues.subDisplay,
+        progress: timer.progress,
+        overtimeSeconds: timer.overtimeSeconds,
+        overtimeMessage: timer.overtimeMessageEnabled ? timer.overtimeMessage : null,
+        reminderColor: timer.reminderEnabled ? timer.reminderColor : null
+      }
+    ]
+  ]
+
+  if (timer.mode === 'stopwatch' && stopwatch.showOnProjection) {
+    payloads.push([
+      'timer:stopwatch',
+      {
+        elapsedMs: stopwatch.elapsedMs,
+        formattedTime: selectFormattedTime(stopwatch),
+        status: stopwatch.status
+      }
+    ])
+  }
+
+  return payloads
+}
+
+export async function startTimerProjection({
+  startProjection
+}: ProjectionStartDeps): Promise<void> {
+  await startProjection('timer', getTimerProjectionPayloads())
+}
+
+export async function startBibleProjection(
+  payloads: ContentMessageTuple[],
+  { startProjection }: ProjectionStartDeps
+): Promise<void> {
+  useBibleProjectionStore.getState().setLastPayloads(payloads)
+  await startProjection('bible', payloads)
+}
+
+export async function startMediaProjection(
+  items: FileItemRecord[],
+  startIndex: number,
+  deps: StartMediaProjectionDeps = {},
+  options?: { prioritizeStartItem?: boolean }
+): Promise<PresentationReadinessReport> {
+  const startMediaPresentation =
+    deps.startMediaPresentation ?? useMediaProjectionStore.getState().startPresentationWithReadiness
+  const report = await startMediaPresentation(items, startIndex, options)
+  if (report.summary.ready === 0) deps.onNoProjectableFiles?.()
+  return report
+}
+
+export async function startSlideProjection(
+  document: SlideDocument,
+  slideIndex: number,
+  { startProjection }: ProjectionStartDeps,
+  resolvedImageUrls?: Record<string, string>
+): Promise<void> {
+  await startProjection('slide', [['slide:show', { document, slideIndex, resolvedImageUrls }]])
+}
+
+export async function stopProjectionSession({ stopProjection }: ProjectionStopDeps): Promise<void> {
+  await stopProjection()
+}
+
 export async function startProjectionForRoute({
   pathname,
   startProjection,
@@ -60,17 +175,19 @@ export async function startProjectionForRoute({
   onNoProjectableFiles
 }: StartProjectionForRouteInput): Promise<void> {
   if (isTimerRoute(pathname)) {
-    await startProjection('timer')
+    await startTimerProjection({ startProjection })
     return
   }
 
   if (isBibleRoute(pathname)) {
-    if (biblePayloads) await startProjection('bible', biblePayloads)
+    if (biblePayloads) await startBibleProjection(biblePayloads, { startProjection })
     return
   }
 
   if (isFilesRoute(pathname) && presentableItems.length > 0) {
-    const report = await startMediaPresentation(presentableItems, 0)
-    if (report.summary.ready === 0) onNoProjectableFiles()
+    await startMediaProjection(presentableItems, 0, {
+      startMediaPresentation,
+      onNoProjectableFiles
+    })
   }
 }

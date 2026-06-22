@@ -6,6 +6,7 @@ import { useTimerStore } from '@renderer/stores/timer'
 import { useStopwatchStore } from '@renderer/stores/stopwatch'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
 import { formatAriaShortcut } from '@renderer/lib/aria'
+import { startTimerProjection } from '@renderer/lib/projection-actions'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
 import type { TimerMode } from '@renderer/stores/timer'
 
@@ -65,13 +66,16 @@ export default function TimerControls({
   }, [])
 
   const handleStart = (): void => {
-    if (mode === 'clock') setMode('both')
-    startProjection('timer').catch(() => {})
+    const nextMode = mode === 'clock' ? 'both' : mode
+    if (useTimerStore.getState().mode !== nextMode) setMode(nextMode)
+    startTimerProjection({ startProjection }).catch(() => {})
     start()
   }
 
   const handleResume = (): void => {
-    startProjection('timer').catch(() => {})
+    const nextMode = mode === 'clock' ? 'both' : mode
+    if (useTimerStore.getState().mode !== nextMode) setMode(nextMode)
+    startTimerProjection({ startProjection }).catch(() => {})
     resume()
   }
 

@@ -7,7 +7,6 @@ interface PresenterCommandContextValue {
 
 export const PresenterCommandContext = createContext<PresenterCommandContextValue | null>(null)
 
-// eslint-disable-next-line react-refresh/only-export-components
 export function usePresenterCommands(): PresenterCommandContextValue {
   const ctx = useContext(PresenterCommandContext)
   if (!ctx) {

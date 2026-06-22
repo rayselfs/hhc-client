@@ -43,7 +43,7 @@ import { GridView, ListView, type GridViewItem } from './views'
 import type { SearchResult } from '@renderer/lib/file-explorer-search'
 import { formatFileKind } from '@renderer/lib/format-file-kind'
 import { isPresentable, getPresentableItems } from '@renderer/lib/presentability'
-import { useMediaProjectionStore } from '@renderer/stores/media-projection'
+import { startMediaProjection } from '@renderer/lib/projection-actions'
 import type { SortField } from '@renderer/stores/file-explorer'
 import { hasNameConflict, splitFileName, validateDisplayName } from '@renderer/lib/file-naming'
 import {
@@ -756,14 +756,12 @@ export function FileBrowser({
         const presentable = getPresentableItems(sortedFileItems)
         const idx = presentable.findIndex((f) => f.id === itemId)
         if (idx !== -1) {
-          void useMediaProjectionStore
-            .getState()
-            .startPresentationWithReadiness(presentable, idx, { prioritizeStartItem: true })
-            .then((report) => {
-              if (report.summary.ready === 0) {
-                toast.warning(t('fileExplorer.noProjectableFiles'))
-              }
-            })
+          void startMediaProjection(
+            presentable,
+            idx,
+            { onNoProjectableFiles: () => toast.warning(t('fileExplorer.noProjectableFiles')) },
+            { prioritizeStartItem: true }
+          )
         } else {
           toast.warning(t('fileExplorer.noProjectableFiles'))
         }
@@ -968,25 +966,6 @@ export function FileBrowser({
         preventDefault: true
       },
       {
-        config: SHORTCUTS.MEDIA.START_PRESENTATION,
-        handler: () => {
-          const presentable = getPresentableItems(sortedFileItems)
-          if (presentable.length > 0) {
-            void useMediaProjectionStore
-              .getState()
-              .startPresentationWithReadiness(presentable, 0)
-              .then((report) => {
-                if (report.summary.ready === 0) {
-                  toast.warning(t('fileExplorer.noProjectableFiles'))
-                }
-              })
-          } else {
-            toast.warning(t('fileExplorer.noProjectableFiles'))
-          }
-        },
-        preventDefault: true
-      },
-      {
         config: SHORTCUTS.MEDIA.START_FROM_CURRENT,
         handler: () => {
           const presentable = getPresentableItems(sortedFileItems)
@@ -996,16 +975,12 @@ export function FileBrowser({
           }
           const firstSelected = [...selectedIds].find((id) => presentable.some((f) => f.id === id))
           const idx = firstSelected ? presentable.findIndex((f) => f.id === firstSelected) : 0
-          void useMediaProjectionStore
-            .getState()
-            .startPresentationWithReadiness(presentable, Math.max(0, idx), {
-              prioritizeStartItem: true
-            })
-            .then((report) => {
-              if (report.summary.ready === 0) {
-                toast.warning(t('fileExplorer.noProjectableFiles'))
-              }
-            })
+          void startMediaProjection(
+            presentable,
+            Math.max(0, idx),
+            { onNoProjectableFiles: () => toast.warning(t('fileExplorer.noProjectableFiles')) },
+            { prioritizeStartItem: true }
+          )
         },
         preventDefault: true
       }
