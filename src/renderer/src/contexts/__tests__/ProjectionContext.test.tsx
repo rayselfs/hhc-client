@@ -33,15 +33,18 @@ import { ProjectionProvider, useProjection } from '../ProjectionContext'
 
 const mockWindowOpen = vi.fn<(url?: string, target?: string) => Window | null>()
 const originalOpen = window.open
+let consoleInfoSpy: ReturnType<typeof vi.spyOn>
 
 beforeEach(() => {
   vi.clearAllMocks()
   vi.useFakeTimers()
+  consoleInfoSpy = vi.spyOn(console, 'info').mockImplementation(() => undefined)
   window.open = mockWindowOpen as unknown as typeof window.open
   mockWindowOpen.mockReturnValue({ closed: false, close: vi.fn() } as unknown as Window)
 })
 
 afterEach(() => {
+  consoleInfoSpy.mockRestore()
   vi.useRealTimers()
   window.open = originalOpen
 })
@@ -239,6 +242,47 @@ describe('ProjectionContext — web mode', () => {
     expect(mockAdapter.send).toHaveBeenCalledWith('__system:active-owner', { owner: 'media' })
     expect(mockAdapter.send).toHaveBeenCalledWith('__system:blank', { showDefault: false })
     expect(mockAdapter.send).toHaveBeenCalledWith('timer:overtime-message', { message: 'show' })
+  })
+
+  it('logs cold-start diagnostics from start through payload flush', async () => {
+    const { result } = renderProjection()
+
+    await act(async () => {
+      await result.current.startProjection('media', [
+        ['timer:overtime-message', { message: 'show' }]
+      ])
+    })
+
+    expect(consoleInfoSpy).toHaveBeenCalledWith(
+      '[ProjectionDiagnostics]',
+      expect.objectContaining({
+        event: 'start',
+        owner: 'media',
+        coldStart: true,
+        initialPayloadCount: 1,
+        environment: 'web'
+      })
+    )
+
+    act(() => {
+      mockAdapter._trigger('__system:ready', null)
+    })
+
+    expect(consoleInfoSpy).toHaveBeenCalledWith(
+      '[ProjectionDiagnostics]',
+      expect.objectContaining({
+        event: 'ready',
+        owner: 'media'
+      })
+    )
+    expect(consoleInfoSpy).toHaveBeenCalledWith(
+      '[ProjectionDiagnostics]',
+      expect.objectContaining({
+        event: 'payloads-flushed',
+        owner: 'media',
+        payloadCount: 3
+      })
+    )
   })
 
   it('project() latest-wins: second call to same channel replaces first', async () => {

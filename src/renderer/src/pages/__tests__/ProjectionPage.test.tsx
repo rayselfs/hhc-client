@@ -41,6 +41,7 @@ vi.mock('@renderer/lib/projection-adapter', () => ({
 import ProjectionPage from '../ProjectionPage'
 
 const mockProjectionVlcStop = vi.fn()
+let consoleInfoSpy: ReturnType<typeof vi.spyOn>
 
 const baseTimerTick: TimerTickPayload = {
   mode: 'timer',
@@ -62,6 +63,7 @@ const baseStopwatchTick: StopwatchTickPayload = {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  consoleInfoSpy = vi.spyOn(console, 'info').mockImplementation(() => undefined)
   Object.defineProperty(window, 'api', {
     configurable: true,
     value: {
@@ -72,10 +74,27 @@ beforeEach(() => {
   })
 })
 
+afterEach(() => {
+  consoleInfoSpy.mockRestore()
+})
+
 describe('ProjectionPage', () => {
   it('renders default content when no timer data received', () => {
     render(<ProjectionPage />)
     expect(screen.getByTestId('default-projection')).toBeInTheDocument()
+  })
+
+  it('logs projection route readiness diagnostics', () => {
+    render(<ProjectionPage />)
+
+    expect(consoleInfoSpy).toHaveBeenCalledWith(
+      '[ProjectionDiagnostics]',
+      expect.objectContaining({
+        event: 'projection-route-ready',
+        environment: 'web'
+      })
+    )
+    expect(mockAdapter.send).toHaveBeenCalledWith('__system:ready', null)
   })
 
   it('shows TimerDisplay when receiving timer:tick with mode=timer', () => {
