@@ -73,6 +73,7 @@
     "defaultDeckTitle": "未命名投影片組",
     "defaultText": "新增文字",
     "slideCount": "{{count}} 張投影片",
+    "slideCount_other": "{{count}} 張投影片",
     "deckTitle": "投影片組名稱",
     "template": "模板",
     "addSlide": "新增投影片",
