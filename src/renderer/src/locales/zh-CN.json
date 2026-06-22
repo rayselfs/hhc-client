@@ -653,6 +653,7 @@
       "timer": "计时器",
       "media": "多媒体",
       "bible": "圣经",
+      "soundboard": "音效板",
       "storage": "存储空间"
     },
     "timer": {
@@ -678,6 +679,14 @@
       "allDataConfirm": "清除所有设置、用户资料、媒体缓存与本地资料？此操作无法复原。"
     },
     "mediaPlaceholder": "媒体设置即将推出",
+    "soundboard": {
+      "playback": "播放",
+      "defaultTriggerMode": "默认触发模式",
+      "globalFade": "全局淡出",
+      "masterVolumeDefault": "默认主音量",
+      "midi": "MIDI",
+      "enableMidi": "启用 MIDI"
+    },
     "trash": {
       "retentionLabel": "垃圾桶保留期限",
       "retentionDesc": "垃圾桶中的项目将在此期限后永久删除",

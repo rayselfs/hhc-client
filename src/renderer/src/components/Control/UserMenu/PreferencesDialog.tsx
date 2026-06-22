@@ -2,10 +2,19 @@ import { useState } from 'react'
 import { Modal } from '@heroui/react/modal'
 import { useOverlayState } from '@renderer/lib/use-overlay-state'
 import { useTranslation } from 'react-i18next'
-import { Settings, Film, BookOpen, Timer, ChevronRight, HardDrive } from 'lucide-react'
+import {
+  Settings,
+  Film,
+  BookOpen,
+  Timer,
+  ChevronRight,
+  HardDrive,
+  SlidersHorizontal
+} from 'lucide-react'
 import GeneralSettings from '@renderer/components/Control/UserMenu/GeneralSettings'
 import TimerSettings from '@renderer/components/Control/UserMenu/TimerSettings'
 import BibleSettingsPanel from '@renderer/components/Control/UserMenu/BibleSettingsPanel'
+import SoundboardSettings from '@renderer/components/Control/UserMenu/SoundboardSettings'
 import MediaSettings, {
   type MediaSettingsSection
 } from '@renderer/components/Control/UserMenu/MediaSettings'
@@ -19,11 +28,12 @@ interface PreferencesDialogProps {
   onOpenChange: (open: boolean) => void
 }
 
-type Category = 'general' | 'timer' | 'bible' | 'media' | 'storage'
+type Category = 'general' | 'timer' | 'bible' | 'soundboard' | 'media' | 'storage'
 type PreferenceRoute =
   | 'general'
   | 'timer'
   | 'bible'
+  | 'soundboard'
   | `media.${MediaSettingsSection}`
   | `storage.${StorageSettingsSection}`
 
@@ -44,6 +54,7 @@ interface CategoryItem {
     | 'preferences.categories.timer'
     | 'preferences.categories.media'
     | 'preferences.categories.bible'
+    | 'preferences.categories.soundboard'
     | 'preferences.categories.storage'
   route: PreferenceRoute
   children?: CategoryChildItem[]
@@ -65,6 +76,12 @@ export default function PreferencesDialog({
     { id: 'general', icon: Settings, labelKey: 'preferences.categories.general', route: 'general' },
     { id: 'timer', icon: Timer, labelKey: 'preferences.categories.timer', route: 'timer' },
     { id: 'bible', icon: BookOpen, labelKey: 'preferences.categories.bible', route: 'bible' },
+    {
+      id: 'soundboard',
+      icon: SlidersHorizontal,
+      labelKey: 'preferences.categories.soundboard',
+      route: 'soundboard'
+    },
     {
       id: 'media',
       icon: Film,
@@ -177,6 +194,7 @@ export default function PreferencesDialog({
                     )}
                     {activeRoute === 'timer' && <TimerSettings />}
                     {activeRoute === 'bible' && <BibleSettingsPanel />}
+                    {activeRoute === 'soundboard' && <SoundboardSettings />}
                     {activeRoute === 'media.general' && <MediaSettings section="general" />}
                     {activeRoute === 'media.oneDrive' && <MediaSettings section="oneDrive" />}
                     {activeRoute === 'storage.usage' && <StorageSettings section="usage" />}

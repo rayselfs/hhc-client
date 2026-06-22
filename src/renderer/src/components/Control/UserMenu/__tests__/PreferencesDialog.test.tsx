@@ -282,6 +282,16 @@ describe('PreferencesDialog', () => {
     expect(screen.getByLabelText('Language')).toBeInTheDocument()
   })
 
+  it('opens soundboard preferences', async () => {
+    const user = userEvent.setup()
+    renderDialog(true)
+
+    await user.click(screen.getByTestId('category-soundboard'))
+
+    expect(screen.getByLabelText(/default trigger mode/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/global fade/i)).toBeInTheDocument()
+  })
+
   it('calls i18n.changeLanguage when language option clicked', async () => {
     const user = userEvent.setup()
     const changeLanguageSpy = vi.spyOn(i18n, 'changeLanguage')
