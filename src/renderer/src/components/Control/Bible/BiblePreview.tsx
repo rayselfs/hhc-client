@@ -8,7 +8,9 @@ import { useBibleSearchStore } from '@renderer/stores/bible-search'
 import { useBibleHistoryStore } from '@renderer/stores/bible-history'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 import { useBibleFolderStore } from '@renderer/stores/folder'
+import { useServicePlaylistStore } from '@renderer/stores/service-playlist'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
+import { buildBibleServiceCueInput } from '@renderer/lib/bible-service-cue'
 import {
   getBookConfig,
   buildVerseHistoryItem,
@@ -18,7 +20,7 @@ import {
 import { buildVerseItem } from './useBibleContextMenu'
 import type { MouseEvent } from 'react'
 import React, { useRef, useEffect, useState, type RefObject } from 'react'
-import { ChevronLeft, ChevronRight, CirclePlus } from 'lucide-react'
+import { ChevronLeft, ChevronRight, CirclePlus, ListPlus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 interface BiblePreviewProps {
@@ -75,6 +77,17 @@ export function BiblePreview({
       text: verseText
     })
     useBibleFolderStore.getState().addItem(item)
+  }
+
+  const handleAddToService = (verseNumber: number, e: React.MouseEvent): void => {
+    e.stopPropagation()
+    if (!book || !chapter) return
+    const cue = buildBibleServiceCueInput(t, {
+      bookNumber: book.number,
+      chapter: chapter.number,
+      verse: verseNumber
+    })
+    useServicePlaylistStore.getState().addCue(cue)
   }
 
   const scrollContainerCallbackRef = (node: HTMLDivElement | null): void => {
@@ -270,10 +283,19 @@ export function BiblePreview({
                   >
                     {verse.number}
                   </span>
-                  <span className="flex-1 text-xl pr-9" lang={currentVersionLocale}>
+                  <span className="flex-1 text-xl pr-20" lang={currentVersionLocale}>
                     {verse.text}
                   </span>
                 </button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={(e) => handleAddToService(verse.number, e)}
+                  className="absolute right-14 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer hover:bg-transparent!"
+                  aria-label={t('bible.contextMenu.addToService')}
+                >
+                  <ListPlus size={14} className="text-muted" />
+                </Button>
                 <Button
                   variant="ghost"
                   size="sm"

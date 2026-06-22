@@ -10,6 +10,7 @@ const mockNavigateTo = vi.fn()
 const mockNextChapter = vi.fn()
 const mockPrevChapter = vi.fn()
 const mockRetry = vi.fn()
+const mockAddCue = vi.fn()
 
 const storeSingleton: BibleStore = {
   versions: [],
@@ -114,7 +115,19 @@ vi.mock('@renderer/stores/bible-history', () => ({
   )
 }))
 
+vi.mock('@renderer/stores/service-playlist', () => ({
+  useServicePlaylistStore: Object.assign(vi.fn(), {
+    getState: () => ({
+      addCue: mockAddCue
+    })
+  })
+}))
+
 vi.mock('@renderer/lib/bible-utils', () => ({
+  formatVerseReferenceShort: vi.fn(
+    (_t: unknown, _bookNum: number, chapter: number, verse: number) =>
+      `MockBook ${chapter}:${verse}`
+  ),
   formatVerseReference: vi.fn(
     (_t: unknown, _bookNum: number, chapter: number, verse: number) =>
       `MockBook ${chapter}:${verse}`
@@ -125,6 +138,7 @@ vi.mock('@renderer/lib/bible-utils', () => ({
     chapterCount: bookNumber === 1 ? 50 : 40
   }),
   shouldShowChapterNumber: () => true,
+  toChineseChapterNumber: (chapter: number) => String(chapter),
   buildVerseHistoryItem: vi.fn(() => ({
     id: 'mock-verse-item',
     type: 'verse',
@@ -147,10 +161,12 @@ vi.mock('react-i18next', () => ({
         'bible.books.gen.name': '創世記',
         'bible.chapterUnit.default': '章',
         'bible.chapterUnit.psa': '篇',
-        'bible.preview.noContent': '尚未載入經文內容'
+        'bible.preview.noContent': '尚未載入經文內容',
+        'bible.contextMenu.addToService': '加入流程'
       }
       return map[key] ?? key
-    }
+    },
+    i18n: { language: 'zh-TW' }
   })
 }))
 
@@ -241,6 +257,21 @@ describe('BiblePreview', () => {
       .closest('button')!
     fireEvent.click(verseBtn)
     expect(mockNavigateTo).toHaveBeenCalledWith({ bookNumber: 1, chapter: 1, verse: 1 })
+  })
+
+  it('adds a verse to the service playlist', () => {
+    renderBiblePreview()
+    const addButtons = screen.getAllByLabelText('加入流程')
+    fireEvent.click(addButtons[0])
+    expect(mockAddCue).toHaveBeenCalledWith({
+      type: 'bible',
+      title: 'MockBook 1:1',
+      bookNumber: 1,
+      chapter: 1,
+      verse: 1,
+      reference: 'MockBook 1:1',
+      notes: ''
+    })
   })
 
   it('calls nextChapter when next chapter button pressed', () => {
