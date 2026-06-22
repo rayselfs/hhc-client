@@ -1,6 +1,5 @@
 import { lazy, Suspense } from 'react'
 import { createHashRouter, Navigate } from 'react-router-dom'
-import ProjectionPage from '@renderer/pages/ProjectionPage'
 import Layout from '@renderer/components/Control/Layout'
 import RouteError from '@renderer/components/RouteError'
 import { isOnboarded } from '@renderer/lib/onboarding'
@@ -59,8 +58,7 @@ const routes = [
   {
     path: '/welcome',
     element: <WelcomePage />
-  },
-  { path: '/projection', Component: ProjectionPage, ErrorBoundary: RouteError }
+  }
 ]
 
 export default routes

@@ -19,7 +19,11 @@ const DARK_ONLY: ThemeContextValue = {
   setPreference: () => {}
 }
 
-function ProjectionThemeProvider({ children }: { children: React.ReactNode }): React.JSX.Element {
+export function ProjectionThemeProvider({
+  children
+}: {
+  children: React.ReactNode
+}): React.JSX.Element {
   useEffect(() => {
     document.documentElement.classList.add('dark')
     document.documentElement.style.colorScheme = 'dark'
