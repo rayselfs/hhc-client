@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { useLocation } from 'react-router-dom'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
+import { useMemo } from 'react'
 import { ButtonGroup } from '@heroui/react/button-group'
 import { Button } from '@heroui/react/button'
 import { toast } from '@heroui/react/toast'
@@ -30,15 +31,19 @@ import {
 } from '@renderer/stores/file-explorer'
 import { getPresentableItems } from '@renderer/lib/presentability'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
+import { useBibleProjectionStore } from '@renderer/stores/bible-projection'
+import { getProjectionHeaderState, startProjectionForRoute } from '@renderer/lib/projection-actions'
 
 export default function Header(): React.JSX.Element {
   const { t } = useTranslation()
   const location = useLocation()
-  const { isProjectionOpen, stopProjection } = useProjection()
+  const { isProjectionOpen, startProjection, stopProjection } = useProjection()
   const confirm = useConfirm()
   const mode = useTimerStore((s) => s.mode)
 
   const currentFolderId = useFileExplorerStore((state) => state.currentFolderId)
+  const fileItems = useFileExplorerStore((state) => state._itemsArray)
+  const biblePayloads = useBibleProjectionStore((state) => state.lastPayloads)
   const getFolderPath = useFileExplorerStore((state) => state.getFolderPath)
   const navigateToFolder = useFileExplorerStore((state) => state.navigateToFolder)
   const navigateToRoot = useFileExplorerStore((state) => state.navigateToRoot)
@@ -66,6 +71,19 @@ export default function Header(): React.JSX.Element {
   const showFavoritesControls = isFavoritesRoute(location.pathname)
   const showTrashControls = isTrashRoute(location.pathname)
   const showExplorerControls = showFilesControls || showFavoritesControls || showTrashControls
+  const presentableItems = useMemo(
+    () =>
+      getPresentableItems(
+        fileItems.filter((item) => item.parentId === currentFolderId && !item.deletedAt)
+      ),
+    [currentFolderId, fileItems]
+  )
+  const projectionHeaderState = getProjectionHeaderState({
+    pathname: location.pathname,
+    isProjectionOpen,
+    biblePayloads,
+    presentableItems
+  })
 
   const activeViewMode = showFavoritesControls
     ? favViewMode
@@ -93,30 +111,17 @@ export default function Header(): React.JSX.Element {
       ? trashSetSortFieldAndDir
       : setSortFieldAndDir
 
-  const startCurrentFolderProjection = async (): Promise<void> => {
-    const state = useFileExplorerStore.getState()
-    const items = state._itemsArray.filter(
-      (item) => item.parentId === state.currentFolderId && !item.deletedAt
-    )
-    const presentable = getPresentableItems(items)
-    if (presentable.length === 0) {
-      toast.warning(t('fileExplorer.noProjectableFiles'))
-      return
-    }
-
-    const report = await useMediaProjectionStore
-      .getState()
-      .startPresentationWithReadiness(presentable, 0)
-    if (report.summary.ready === 0) {
-      toast.warning(t('fileExplorer.noProjectableFiles'))
-    }
-  }
-
   const handleProjectionAction = async (): Promise<void> => {
     if (!isProjectionOpen) {
-      if (showFilesControls) {
-        await startCurrentFolderProjection()
-      }
+      await startProjectionForRoute({
+        pathname: location.pathname,
+        startProjection,
+        biblePayloads,
+        presentableItems,
+        startMediaPresentation: (items, startIndex) =>
+          useMediaProjectionStore.getState().startPresentationWithReadiness(items, startIndex),
+        onNoProjectableFiles: () => toast.warning(t('fileExplorer.noProjectableFiles'))
+      })
       return
     }
 
@@ -208,7 +213,7 @@ export default function Header(): React.JSX.Element {
             variant="outline"
             className={isProjectionOpen ? 'text-danger px-6' : 'text-default-foreground px-6'}
             onPress={() => void handleProjectionAction()}
-            isDisabled={!isProjectionOpen && !showFilesControls}
+            isDisabled={!isProjectionOpen && projectionHeaderState.disabled}
             aria-label={t(isProjectionOpen ? 'projection.stopButton' : 'projection.startButton')}
           >
             {isProjectionOpen ? <X className="size-4" /> : <Monitor className="size-4" />}

@@ -2,6 +2,7 @@ import React, { useCallback } from 'react'
 import { useBibleFolderStore } from '@renderer/stores/folder'
 import { useBibleStore } from '@renderer/stores/bible'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
+import { useBibleProjectionStore } from '@renderer/stores/bible-projection'
 import { formatVerseReferenceShort } from '@renderer/lib/bible-utils'
 import { getBibleProjectionSettingsPayload } from '@renderer/lib/bible-projection-settings'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
@@ -12,6 +13,7 @@ import { Button } from '@heroui/react/button'
 import { Folder as FolderIcon, X, BookOpen } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
+import type { ContentMessageTuple } from '@renderer/contexts/ProjectionContext'
 import { useFolderContextMenu } from '@renderer/components/Control/Folder/useFolderContextMenu'
 import {
   FolderBrowser,
@@ -60,7 +62,7 @@ export function CustomFolderTab({
       const book = books?.find((b) => b.number === item.bookNumber)
       const chapter = book?.chapters.find((c) => c.number === item.chapter)
       if (!chapter) return
-      void startProjection('bible', [
+      const payloads = [
         ['bible:settings', getBibleProjectionSettingsPayload()],
         [
           'bible:chapter',
@@ -71,7 +73,9 @@ export function CustomFolderTab({
             currentVerse: item.verse
           }
         ]
-      ])
+      ] satisfies ContentMessageTuple[]
+      useBibleProjectionStore.getState().setLastPayloads(payloads)
+      void startProjection('bible', payloads)
       onProjected?.({ bookNumber: item.bookNumber, chapter: item.chapter, verse: item.verse })
     },
     [navigateTo, startProjection, onProjected]

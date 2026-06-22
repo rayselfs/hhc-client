@@ -9,6 +9,7 @@ import { BibleSelectorDialog } from '@renderer/components/Control/Bible/BibleSel
 import { useBibleContextMenu } from '@renderer/components/Control/Bible/useBibleContextMenu'
 import type { VerseMenuData } from '@renderer/components/Control/Bible/useBibleContextMenu'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
+import { useBibleProjectionStore } from '@renderer/stores/bible-projection'
 import { useAppInit } from '@renderer/contexts/AppInitContext'
 import { useKeyboardShortcuts } from '@renderer/hooks/useKeyboardShortcuts'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
@@ -16,6 +17,7 @@ import { EVENTS } from '@renderer/config/events'
 import { buildVerseHistoryItem } from '@renderer/lib/bible-utils'
 import { getBibleProjectionSettingsPayload } from '@renderer/lib/bible-projection-settings'
 import type { BiblePassage } from '@shared/types/bible'
+import type { ContentMessageTuple } from '@renderer/contexts/ProjectionContext'
 
 type ProjectedPassage = { bookNumber: number; chapter: number; verse: number }
 
@@ -38,7 +40,7 @@ export default function BiblePage(): React.JSX.Element {
   const [projectedPassage, setProjectedPassage] = useState<ProjectedPassage | null>(null)
   const scrollBehaviorRef = useRef<ScrollBehavior>('instant')
   const { showPreviewMenu } = useBibleContextMenu()
-  const { project, startProjection } = useProjection()
+  const { project, startProjection, isProjectionOpen } = useProjection()
 
   const selectedVerseIndexRef = useRef(0)
 
@@ -47,8 +49,10 @@ export default function BiblePage(): React.JSX.Element {
   })
 
   useEffect(() => {
-    project('bible:settings', getBibleProjectionSettingsPayload())
-  }, [fontSize, scriptureDisplayMode, scriptureTemplateId, project])
+    const settings = getBibleProjectionSettingsPayload()
+    useBibleProjectionStore.getState().updateSettingsPayload(settings)
+    if (isProjectionOpen) project('bible:settings', settings)
+  }, [fontSize, scriptureDisplayMode, scriptureTemplateId, isProjectionOpen, project])
 
   useEffect(() => {
     const handler = (): void => setSelectorOpen(true)
@@ -85,7 +89,7 @@ export default function BiblePage(): React.JSX.Element {
       const chapter = getCurrentChapter()
       if (!book || !chapter) return
 
-      void startProjection('bible', [
+      const payloads = [
         ['bible:settings', getBibleProjectionSettingsPayload()],
         [
           'bible:chapter',
@@ -96,7 +100,9 @@ export default function BiblePage(): React.JSX.Element {
             currentVerse: verse.number
           }
         ]
-      ])
+      ] satisfies ContentMessageTuple[]
+      useBibleProjectionStore.getState().setLastPayloads(payloads)
+      void startProjection('bible', payloads)
       navigateTo({ bookNumber: book.number, chapter: chapter.number, verse: verse.number })
       setSelectedVerseIndex(clamped)
       setProjectedPassage({ bookNumber: book.number, chapter: chapter.number, verse: verse.number })

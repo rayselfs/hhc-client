@@ -2,6 +2,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useRef } from 'react'
 import type { BibleStore } from '@renderer/stores/bible'
+import { useBibleProjectionStore } from '@renderer/stores/bible-projection'
 import { BiblePreview } from '../BiblePreview'
 
 const mockProject = vi.fn()
@@ -233,6 +234,7 @@ describe('BiblePreview', () => {
         { id: 2, number: 2, text: 'Now the earth was formless and empty.' }
       ]
     })
+    useBibleProjectionStore.getState().clearLastPayloads()
   })
 
   it('renders verse list when content is loaded', () => {
@@ -272,6 +274,23 @@ describe('BiblePreview', () => {
       ]
     ])
     expect(mockProject).not.toHaveBeenCalled()
+    expect(useBibleProjectionStore.getState().lastPayloads).toEqual([
+      [
+        'bible:settings',
+        expect.objectContaining({
+          fontSize: 90,
+          displayMode: 'full-screen'
+        })
+      ],
+      [
+        'bible:chapter',
+        expect.objectContaining({
+          bookNumber: 1,
+          chapter: 1,
+          currentVerse: 1
+        })
+      ]
+    ])
   })
 
   it('clicking a verse calls navigateTo with correct passage', () => {

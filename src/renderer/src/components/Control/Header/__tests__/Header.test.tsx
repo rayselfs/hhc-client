@@ -7,7 +7,9 @@ import i18n from '@renderer/i18n'
 import { useTimerStore } from '@renderer/stores/timer'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
+import { useBibleProjectionStore } from '@renderer/stores/bible-projection'
 import type { FileItemRecord } from '@shared/types/folder'
+import type { ContentMessageTuple } from '@renderer/contexts/ProjectionContext'
 import { ConfirmDialogProvider } from '@renderer/contexts/ConfirmDialogContext'
 import { ShortcutScopeProvider } from '@renderer/contexts/ShortcutScopeContext'
 import type { useProjection as useProjectionHook } from '@renderer/contexts/ProjectionContext'
@@ -79,6 +81,7 @@ function renderWithRouter(initialEntries: string[] = ['/']): ReturnType<typeof r
     [
       { path: '/', element },
       { path: '/timer', element },
+      { path: '/bible', element },
       { path: '/files', element }
     ],
     { initialEntries }
@@ -93,6 +96,7 @@ describe('Header', () => {
       currentFolderId: 'file-root',
       _itemsArray: []
     })
+    useBibleProjectionStore.getState().clearLastPayloads()
   })
 
   it('renders a header element', async () => {
@@ -102,10 +106,52 @@ describe('Header', () => {
     expect(document.querySelector('header')).toBeInTheDocument()
   })
 
-  it('renders a disabled start projection button outside the files route', async () => {
+  it('starts timer projection from the timer route', async () => {
+    await i18n.changeLanguage('en')
+    const startProjection = vi.fn(() => Promise.resolve())
+    await mockProjectionContext({ isProjectionOpen: false, startProjection })
+    renderWithRouter(['/timer'])
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Start projection' }))
+    expect(startProjection).toHaveBeenCalledWith('timer')
+  })
+
+  it('disables bible projection start until a bible payload exists', async () => {
     await i18n.changeLanguage('en')
     await mockProjectionContext({ isProjectionOpen: false })
-    renderWithRouter(['/timer'])
+    renderWithRouter(['/bible'])
+    expect(screen.getByRole('button', { name: 'Start projection' })).toBeDisabled()
+  })
+
+  it('replays the last bible projection payload from the bible route', async () => {
+    await i18n.changeLanguage('en')
+    const startProjection = vi.fn(() => Promise.resolve())
+    const payloads: ContentMessageTuple[] = [
+      ['bible:settings', { fontSize: 90 }],
+      [
+        'bible:chapter',
+        {
+          bookNumber: 43,
+          chapter: 3,
+          chapterVerses: [{ number: 16, text: 'For God so loved the world' }],
+          currentVerse: 16
+        }
+      ]
+    ]
+    useBibleProjectionStore.getState().setLastPayloads(payloads)
+    await mockProjectionContext({ isProjectionOpen: false, startProjection })
+
+    renderWithRouter(['/bible'])
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Start projection' }))
+
+    expect(startProjection).toHaveBeenCalledWith('bible', payloads)
+  })
+
+  it('disables files projection start when the current folder has no presentable item', async () => {
+    await i18n.changeLanguage('en')
+    await mockProjectionContext({ isProjectionOpen: false })
+    renderWithRouter(['/files'])
     expect(screen.getByRole('button', { name: 'Start projection' })).toBeDisabled()
   })
 
@@ -152,6 +198,24 @@ describe('Header', () => {
 
     expect(stopProjection).toHaveBeenCalled()
   })
+
+  it.each(['/timer', '/bible', '/files'])(
+    'only stops projection from %s when projection is already open',
+    async (route) => {
+      await i18n.changeLanguage('en')
+      const stopProjection = vi.fn(() => Promise.resolve())
+      const startProjection = vi.fn(() => Promise.resolve())
+      await mockProjectionContext({ isProjectionOpen: true, stopProjection, startProjection })
+
+      renderWithRouter([route])
+      const user = userEvent.setup()
+      await user.click(screen.getByRole('button', { name: 'Stop projection' }))
+      await user.click(await screen.findByRole('button', { name: 'Close' }))
+
+      expect(stopProjection).toHaveBeenCalled()
+      expect(startProjection).not.toHaveBeenCalled()
+    }
+  )
 
   it('renders stop projection button with correct aria-label in zh-TW', async () => {
     await i18n.changeLanguage('zh-TW')

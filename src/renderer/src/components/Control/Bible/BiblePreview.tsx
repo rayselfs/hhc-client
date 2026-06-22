@@ -10,6 +10,7 @@ import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 import { useBibleFolderStore } from '@renderer/stores/folder'
 import { useServicePlaylistStore } from '@renderer/stores/service-playlist'
 import { useBibleLiveQueueStore } from '@renderer/stores/bible-live-queue'
+import { useBibleProjectionStore } from '@renderer/stores/bible-projection'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
 import { buildBibleServiceCueInput } from '@renderer/lib/bible-service-cue'
 import { getBibleProjectionSettingsPayload } from '@renderer/lib/bible-projection-settings'
@@ -22,6 +23,7 @@ import {
 import { buildVerseItem } from './useBibleContextMenu'
 import type { MouseEvent } from 'react'
 import React, { useRef, useEffect, useState, type RefObject } from 'react'
+import type { ContentMessageTuple } from '@renderer/contexts/ProjectionContext'
 import { ChevronLeft, ChevronRight, CirclePlus, ListPlus, ListTodo } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
@@ -133,7 +135,7 @@ export function BiblePreview({
 
   const handleVerseClick = (verseIndex: number, verseNumber: number, _verseText: string): void => {
     if (!book || !chapter) return
-    void startProjection('bible', [
+    const payloads = [
       ['bible:settings', getBibleProjectionSettingsPayload()],
       [
         'bible:chapter',
@@ -145,7 +147,9 @@ export function BiblePreview({
           versionLocale: currentVersionLocale
         }
       ]
-    ])
+    ] satisfies ContentMessageTuple[]
+    useBibleProjectionStore.getState().setLastPayloads(payloads)
+    void startProjection('bible', payloads)
     navigateTo({ bookNumber: book.number, chapter: chapter.number, verse: verseNumber })
     scrollBehaviorRef.current = 'smooth'
     onSelectedVerseIndexChange(verseIndex)

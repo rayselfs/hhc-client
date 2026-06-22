@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { projectBibleQueueItem } from '../bible-queue-projection'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 import { useBibleStore } from '@renderer/stores/bible'
+import { useBibleProjectionStore } from '@renderer/stores/bible-projection'
 import type { BibleQueueItem } from '@renderer/stores/bible-live-queue'
 
 const queueItem: BibleQueueItem = {
@@ -49,6 +50,7 @@ describe('projectBibleQueueItem', () => {
       ]),
       currentPassage: null
     })
+    useBibleProjectionStore.getState().clearLastPayloads()
   })
 
   it('projects a queued bible item', async () => {
@@ -83,5 +85,22 @@ describe('projectBibleQueueItem', () => {
       chapter: 3,
       verse: 16
     })
+    expect(useBibleProjectionStore.getState().lastPayloads).toEqual([
+      [
+        'bible:settings',
+        expect.objectContaining({
+          fontSize: 88,
+          displayMode: 'lower-third'
+        })
+      ],
+      [
+        'bible:chapter',
+        expect.objectContaining({
+          bookNumber: 43,
+          chapter: 3,
+          currentVerse: 16
+        })
+      ]
+    ])
   })
 })

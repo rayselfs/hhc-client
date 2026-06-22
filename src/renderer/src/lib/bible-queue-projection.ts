@@ -2,6 +2,7 @@ import type { ContentMessageTuple, ProjectionOwner } from '@renderer/contexts/Pr
 import { getBibleProjectionSettingsPayload } from '@renderer/lib/bible-projection-settings'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 import { useBibleStore } from '@renderer/stores/bible'
+import { useBibleProjectionStore } from '@renderer/stores/bible-projection'
 import type { BibleQueueItem } from '@renderer/stores/bible-live-queue'
 
 interface ProjectBibleQueueItemDependencies {
@@ -41,7 +42,7 @@ export async function projectBibleQueueItem(
     verse: item.verse
   })
 
-  await deps.startProjection('bible', [
+  const payloads = [
     ['bible:settings', getBibleProjectionSettingsPayload()],
     [
       'bible:chapter',
@@ -56,7 +57,9 @@ export async function projectBibleQueueItem(
         versionLocale: version?.locale
       }
     ]
-  ])
+  ] satisfies ContentMessageTuple[]
+  useBibleProjectionStore.getState().setLastPayloads(payloads)
+  await deps.startProjection('bible', payloads)
 
   return true
 }
