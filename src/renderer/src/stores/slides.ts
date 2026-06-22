@@ -9,6 +9,7 @@ import {
   updateSlideInDocument,
   upsertSlideElement
 } from '@renderer/lib/slide-document'
+import { applySlideTemplate, getSlideTemplate } from '@renderer/lib/slide-templates'
 import type { SlideDocument, SlideRecord, SlideTextElement } from '@shared/types/slides'
 
 interface SlidesStoreState {
@@ -23,6 +24,7 @@ interface SlidesStoreState {
   createDocument: (title?: string) => string
   selectDocument: (documentId: string) => void
   updateDocumentTitle: (documentId: string, title: string) => void
+  applyTemplate: (documentId: string, templateId: string) => void
   addSlide: (documentId: string) => string | null
   selectSlide: (slideId: string) => void
   updateSlideTitle: (documentId: string, slideId: string, title: string) => void
@@ -109,6 +111,14 @@ export const useSlidesStore = create<SlidesStoreState>()(
             title,
             updatedAt: Date.now()
           }))
+        )
+      },
+
+      applyTemplate: (documentId, templateId) => {
+        const template = getSlideTemplate(templateId)
+        if (!template) return
+        set((state) =>
+          updateDocument(state, documentId, (document) => applySlideTemplate(document, template))
         )
       },
 

@@ -40,6 +40,7 @@ describe('SlidesWorkspace', () => {
     await user.click(screen.getByRole('button', { name: 'Create Deck' }))
     await user.clear(screen.getByLabelText('Deck title'))
     await user.type(screen.getByLabelText('Deck title'), 'Sunday Lyrics')
+    await user.selectOptions(screen.getByLabelText('Template'), 'clean-light')
     await user.clear(screen.getByLabelText('Slide title'))
     await user.type(screen.getByLabelText('Slide title'), 'Verse 1')
     await user.click(screen.getByRole('button', { name: 'Add Text' }))
@@ -48,6 +49,7 @@ describe('SlidesWorkspace', () => {
 
     const document = useSlidesStore.getState().currentDocument()
     expect(document?.title).toBe('Sunday Lyrics')
+    expect(document?.theme.id).toBe('clean-light')
     expect(useSlidesStore.getState().selectedSlide()?.title).toBe('Verse 1')
     expect(useSlidesStore.getState().selectedSlide()?.elements[0]).toMatchObject({
       type: 'text',

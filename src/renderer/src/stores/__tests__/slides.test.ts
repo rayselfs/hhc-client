@@ -62,4 +62,13 @@ describe('slides store', () => {
     expect(useSlidesStore.getState().selectedSlideId).toBe(firstSlideId)
     expect(useSlidesStore.getState().selectedSlideIndex()).toBe(0)
   })
+
+  it('applies built-in templates to the current document', () => {
+    const documentId = useSlidesStore.getState().createDocument('Deck')
+    useSlidesStore.getState().applyTemplate(documentId, 'clean-light')
+
+    const document = useSlidesStore.getState().documents[documentId]
+    expect(document.theme.id).toBe('clean-light')
+    expect(document.slides[0].background).toEqual({ type: 'color', color: '#f8fafc' })
+  })
 })

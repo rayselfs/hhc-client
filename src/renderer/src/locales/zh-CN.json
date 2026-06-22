@@ -67,6 +67,7 @@
     "defaultText": "新增文字",
     "slideCount": "{{count}} 张幻灯片",
     "deckTitle": "幻灯片组名称",
+    "template": "模板",
     "addSlide": "新增幻灯片",
     "projectSlide": "投影幻灯片",
     "projecting": "投影中...",

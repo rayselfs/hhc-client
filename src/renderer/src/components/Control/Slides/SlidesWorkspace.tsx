@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Plus, Presentation, Type, Trash2 } from 'lucide-react'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
 import { useSlidesStore } from '@renderer/stores/slides'
+import { BUILT_IN_SLIDE_TEMPLATES } from '@renderer/lib/slide-templates'
 import type { SlideDocument, SlideElement, SlideRecord } from '@shared/types/slides'
 
 function getSlideBackgroundColor(slide: SlideRecord): string {
@@ -172,6 +173,20 @@ export default function SlidesWorkspace(): React.JSX.Element {
               }
               className="mt-1 w-full rounded-2xl bg-background/60 px-4 py-2 text-lg font-semibold outline-none"
             />
+          </label>
+          <label className="min-w-44">
+            <span className="text-sm text-muted">{t('slides.template')}</span>
+            <select
+              value={currentDocument.theme.id}
+              onChange={(event) => actions.applyTemplate(currentDocument.id, event.target.value)}
+              className="mt-1 w-full rounded-2xl bg-background/60 px-4 py-2 outline-none"
+            >
+              {BUILT_IN_SLIDE_TEMPLATES.map((template) => (
+                <option key={template.id} value={template.id}>
+                  {template.name}
+                </option>
+              ))}
+            </select>
           </label>
           <div className="flex gap-2">
             <button

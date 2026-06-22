@@ -67,6 +67,7 @@
     "defaultText": "新增文字",
     "slideCount": "{{count}} 張投影片",
     "deckTitle": "投影片組名稱",
+    "template": "模板",
     "addSlide": "新增投影片",
     "projectSlide": "投影投影片",
     "projecting": "投影中...",

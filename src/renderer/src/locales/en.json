@@ -68,6 +68,7 @@
     "slideCount": "{{count}} slide",
     "slideCount_other": "{{count}} slides",
     "deckTitle": "Deck title",
+    "template": "Template",
     "addSlide": "Add Slide",
     "projectSlide": "Project Slide",
     "projecting": "Projecting...",
