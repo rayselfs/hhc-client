@@ -3,6 +3,7 @@
     "timer": "計時器",
     "bible": "聖經",
     "service": "流程",
+    "slides": "投影片",
     "files": "文件",
     "media": "多媒體",
     "favorites": "我的最愛",
@@ -57,6 +58,26 @@
       "song": "歌曲",
       "slide": "投影片"
     }
+  },
+  "slides": {
+    "title": "投影片",
+    "emptyDescription": "建立 LibrePresenter 原生投影片，用於詩歌、公告與聚會流程。",
+    "createDeck": "建立投影片組",
+    "defaultDeckTitle": "未命名投影片組",
+    "defaultText": "新增文字",
+    "slideCount": "{{count}} 張投影片",
+    "deckTitle": "投影片組名稱",
+    "addSlide": "新增投影片",
+    "projectSlide": "投影投影片",
+    "projecting": "投影中...",
+    "slideTitle": "投影片名稱",
+    "backgroundColor": "背景顏色",
+    "addText": "新增文字",
+    "elements": "元素",
+    "noTextElements": "尚未建立文字元素。",
+    "textContent": "文字內容",
+    "fontSize": "字級",
+    "removeElement": "移除元素"
   },
   "timer": {
     "title": "計時器",

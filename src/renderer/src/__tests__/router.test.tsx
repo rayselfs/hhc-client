@@ -20,6 +20,10 @@ vi.mock('@renderer/pages/ServicePage', () => ({
   default: () => <div data-testid="service-page" />
 }))
 
+vi.mock('@renderer/pages/SlidesPage', () => ({
+  default: () => <div data-testid="slides-page" />
+}))
+
 vi.mock('@renderer/lib/timer-adapter', () => ({
   createTimerAdapter: vi.fn(() => ({
     onTick: vi.fn(),
@@ -87,6 +91,11 @@ describe('Router', () => {
     expect(await screen.findByTestId('service-page')).toBeInTheDocument()
   })
 
+  it('renders slides page at /slides route', async () => {
+    renderWithRouter(['/slides'])
+    expect(await screen.findByTestId('slides-page')).toBeInTheDocument()
+  })
+
   it('navigates from timer to bible via sidebar link', async () => {
     const user = userEvent.setup()
     const router = createMemoryRouter(routes, { initialEntries: ['/'] })
@@ -120,6 +129,24 @@ describe('Router', () => {
     await user.click(serviceLink)
 
     expect(await screen.findByTestId('service-page')).toBeInTheDocument()
+    expect(screen.queryByTestId('timer-page')).not.toBeInTheDocument()
+  })
+
+  it('navigates from timer to slides via sidebar link', async () => {
+    const user = userEvent.setup()
+    const router = createMemoryRouter(routes, { initialEntries: ['/'] })
+    render(
+      <ThemeProvider>
+        <RouterProvider router={router} />
+      </ThemeProvider>
+    )
+
+    expect(await screen.findByTestId('timer-page')).toBeInTheDocument()
+
+    const slidesLink = screen.getByRole('link', { name: /slides/i })
+    await user.click(slidesLink)
+
+    expect(await screen.findByTestId('slides-page')).toBeInTheDocument()
     expect(screen.queryByTestId('timer-page')).not.toBeInTheDocument()
   })
 

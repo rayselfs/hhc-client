@@ -10,7 +10,8 @@ import {
   Star,
   Trash2,
   Files,
-  ListTodo
+  ListTodo,
+  Presentation
 } from 'lucide-react'
 import { Dropdown } from '@heroui/react/dropdown'
 import UserMenu from '@renderer/components/Control/UserMenu/UserMenu'
@@ -57,7 +58,8 @@ export default function Sidebar(): React.JSX.Element {
   const topItems: NavItem[] = [
     { to: '/timer', icon: Timer, label: t('nav.timer') },
     { to: '/bible', icon: BookOpen, label: t('nav.bible') },
-    { to: '/service', icon: ListTodo, label: t('nav.service') }
+    { to: '/service', icon: ListTodo, label: t('nav.service') },
+    { to: '/slides', icon: Presentation, label: t('nav.slides') }
   ]
 
   const isActive = (to: string): boolean => location.pathname === to

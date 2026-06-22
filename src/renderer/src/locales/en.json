@@ -3,6 +3,7 @@
     "timer": "TIMER",
     "bible": "BIBLE",
     "service": "SERVICE",
+    "slides": "SLIDES",
     "files": "FILES",
     "media": "MEDIA",
     "favorites": "FAVORITES",
@@ -57,6 +58,27 @@
       "song": "Song",
       "slide": "Slide"
     }
+  },
+  "slides": {
+    "title": "SLIDES",
+    "emptyDescription": "Create native LibrePresenter slides for songs, announcements, and service moments.",
+    "createDeck": "Create Deck",
+    "defaultDeckTitle": "Untitled Slide Deck",
+    "defaultText": "New text",
+    "slideCount": "{{count}} slide",
+    "slideCount_other": "{{count}} slides",
+    "deckTitle": "Deck title",
+    "addSlide": "Add Slide",
+    "projectSlide": "Project Slide",
+    "projecting": "Projecting...",
+    "slideTitle": "Slide title",
+    "backgroundColor": "Background color",
+    "addText": "Add Text",
+    "elements": "Elements",
+    "noTextElements": "No text elements yet.",
+    "textContent": "Text content",
+    "fontSize": "Font size",
+    "removeElement": "Remove element"
   },
   "timer": {
     "title": "TIMER",

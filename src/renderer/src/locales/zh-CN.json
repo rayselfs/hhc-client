@@ -3,6 +3,7 @@
     "timer": "计时器",
     "bible": "圣经",
     "service": "流程",
+    "slides": "幻灯片",
     "files": "文件",
     "media": "多媒体",
     "favorites": "我的收藏",
@@ -57,6 +58,26 @@
       "song": "歌曲",
       "slide": "幻灯片"
     }
+  },
+  "slides": {
+    "title": "幻灯片",
+    "emptyDescription": "建立 LibrePresenter 原生幻灯片，用于诗歌、公告与聚会流程。",
+    "createDeck": "建立幻灯片组",
+    "defaultDeckTitle": "未命名幻灯片组",
+    "defaultText": "新增文字",
+    "slideCount": "{{count}} 张幻灯片",
+    "deckTitle": "幻灯片组名称",
+    "addSlide": "新增幻灯片",
+    "projectSlide": "投影幻灯片",
+    "projecting": "投影中...",
+    "slideTitle": "幻灯片名称",
+    "backgroundColor": "背景颜色",
+    "addText": "新增文字",
+    "elements": "元素",
+    "noTextElements": "尚未建立文字元素。",
+    "textContent": "文字内容",
+    "fontSize": "字号",
+    "removeElement": "移除元素"
   },
   "timer": {
     "title": "计时器",
