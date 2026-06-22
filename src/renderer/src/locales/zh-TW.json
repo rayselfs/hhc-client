@@ -802,6 +802,43 @@
       "speechEnabled": "開啟語音辨識"
     }
   },
+  "recovery": {
+    "empty": "目前沒有需要修復的問題",
+    "dismiss": "忽略",
+    "filters": {
+      "all": "全部",
+      "media": "媒體",
+      "sync": "同步",
+      "storage": "儲存空間",
+      "projection": "投影"
+    },
+    "actions": {
+      "retryJob": "重試",
+      "cancelJob": "取消工作",
+      "retrySyncDownload": "重試下載",
+      "runIntegrityRepair": "執行修復掃描",
+      "reopenProjection": "重新開啟投影",
+      "exportDiagnostics": "匯出診斷"
+    },
+    "issues": {
+      "jobFailed": {
+        "title": "媒體工作需要處理",
+        "detail": "背景媒體工作失敗或被阻擋。"
+      },
+      "storageIntegrity": {
+        "title": "儲存完整性問題",
+        "detail": "媒體儲存有缺失或孤立記錄。"
+      },
+      "syncDownload": {
+        "title": "同步下載失敗",
+        "detail": "同步項目無法快取到本機。"
+      },
+      "syncAuth": {
+        "title": "同步帳號需要處理",
+        "detail": "需要重新連結雲端帳號才能繼續同步。"
+      }
+    }
+  },
   "error": {
     "somethingWentWrong": "發生錯誤",
     "tryAgain": "重試",

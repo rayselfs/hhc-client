@@ -76,8 +76,8 @@ it('sorts errors before warnings and newest within severity', () => {
       id: 'w-old',
       kind: 'job-failed',
       severity: 'warning',
-      titleKey: 'x',
-      detailKey: 'x',
+      titleKey: 'recovery.issues.jobFailed.title',
+      detailKey: 'recovery.issues.jobFailed.detail',
       occurredAt: 1,
       actions: []
     },
@@ -85,8 +85,8 @@ it('sorts errors before warnings and newest within severity', () => {
       id: 'e-old',
       kind: 'media-missing',
       severity: 'error',
-      titleKey: 'x',
-      detailKey: 'x',
+      titleKey: 'recovery.issues.storageIntegrity.title',
+      detailKey: 'recovery.issues.storageIntegrity.detail',
       occurredAt: 1,
       actions: []
     },
@@ -94,8 +94,8 @@ it('sorts errors before warnings and newest within severity', () => {
       id: 'e-new',
       kind: 'asset-failed',
       severity: 'error',
-      titleKey: 'x',
-      detailKey: 'x',
+      titleKey: 'recovery.issues.storageIntegrity.title',
+      detailKey: 'recovery.issues.storageIntegrity.detail',
       occurredAt: 2,
       actions: []
     }

@@ -802,6 +802,43 @@
       "speechEnabled": "开启语音识别"
     }
   },
+  "recovery": {
+    "empty": "目前没有需要修复的问题",
+    "dismiss": "忽略",
+    "filters": {
+      "all": "全部",
+      "media": "媒体",
+      "sync": "同步",
+      "storage": "存储空间",
+      "projection": "投影"
+    },
+    "actions": {
+      "retryJob": "重试",
+      "cancelJob": "取消任务",
+      "retrySyncDownload": "重试下载",
+      "runIntegrityRepair": "执行修复扫描",
+      "reopenProjection": "重新打开投影",
+      "exportDiagnostics": "导出诊断"
+    },
+    "issues": {
+      "jobFailed": {
+        "title": "媒体任务需要处理",
+        "detail": "后台媒体任务失败或被阻挡。"
+      },
+      "storageIntegrity": {
+        "title": "存储完整性问题",
+        "detail": "媒体存储有缺失或孤立记录。"
+      },
+      "syncDownload": {
+        "title": "同步下载失败",
+        "detail": "同步项目无法缓存到本机。"
+      },
+      "syncAuth": {
+        "title": "同步帐号需要处理",
+        "detail": "需要重新连接云端帐号才能继续同步。"
+      }
+    }
+  },
   "error": {
     "somethingWentWrong": "出现错误",
     "tryAgain": "重试",

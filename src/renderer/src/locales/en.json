@@ -802,6 +802,43 @@
       "speechEnabled": "Enable Voice Recognition"
     }
   },
+  "recovery": {
+    "empty": "No current recovery issues",
+    "dismiss": "Dismiss",
+    "filters": {
+      "all": "All",
+      "media": "Media",
+      "sync": "Sync",
+      "storage": "Storage",
+      "projection": "Projection"
+    },
+    "actions": {
+      "retryJob": "Retry",
+      "cancelJob": "Cancel job",
+      "retrySyncDownload": "Retry download",
+      "runIntegrityRepair": "Run repair scan",
+      "reopenProjection": "Reopen projection",
+      "exportDiagnostics": "Export diagnostics"
+    },
+    "issues": {
+      "jobFailed": {
+        "title": "Media job needs attention",
+        "detail": "A background media task failed or is blocked."
+      },
+      "storageIntegrity": {
+        "title": "Storage integrity issue",
+        "detail": "Media storage has a missing or orphaned record."
+      },
+      "syncDownload": {
+        "title": "Sync download failed",
+        "detail": "A synced item could not be cached locally."
+      },
+      "syncAuth": {
+        "title": "Sync account needs attention",
+        "detail": "A cloud account needs to be reconnected before sync can continue."
+      }
+    }
+  },
   "error": {
     "somethingWentWrong": "Something went wrong",
     "tryAgain": "Try again",
