@@ -154,7 +154,7 @@ export class WindowManager {
     })
 
     projectionWindow.once('ready-to-show', () => {
-      projectionWindow.show()
+      projectionWindow.showInactive()
     })
 
     projectionWindow.webContents.on('did-finish-load', () => {

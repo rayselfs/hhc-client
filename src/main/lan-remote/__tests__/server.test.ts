@@ -55,7 +55,7 @@ it('pairs a browser session and accepts authorized commands', async () => {
   server.publishState({
     revision: 1,
     presentation: { currentIndex: 0, total: 1, currentName: 'A', canNext: false },
-    projection: { isOpen: true, isBlanked: false }
+    projection: { isOpen: true }
   })
   const stateResponse = await fetch(`http://127.0.0.1:${port}/state`, {
     headers: { 'x-libre-presenter-session': token! }

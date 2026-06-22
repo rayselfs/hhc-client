@@ -10,14 +10,6 @@ export type ContentMessageTuple = {
   [C in ContentChannel]: [channel: C, data: ProjectionPayload<C>]
 }[ContentChannel]
 
-interface ProjectionDiagnosticSession {
-  id: number
-  owner: ProjectionOwner
-  startedAt: number
-  coldStart: boolean
-  initialPayloadCount: number
-}
-
 /**
  * Who currently "owns" the projection display.
  * - 'timer': TimerProjectionBridge drives the projection (default)
@@ -74,10 +66,6 @@ function getAdapter(ref: React.RefObject<ProjectionAdapter | null>): ProjectionA
   return ref.current
 }
 
-function getDiagnosticNow(): number {
-  return performance?.now?.() ?? Date.now()
-}
-
 export function ProjectionProvider({ children }: { children: React.ReactNode }): React.JSX.Element {
   const [isProjectionOpen, _setIsProjectionOpen] = useState(false)
   const [isProjectionBlanked, _setIsProjectionBlanked] = useState(true)
@@ -94,8 +82,6 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
   const pendingPayloadsRef = useRef(new Map<string, { channel: string; data: unknown }>())
   const pendingSequenceRef = useRef(0)
   const autoOpenTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const diagnosticSequenceRef = useRef(0)
-  const diagnosticSessionRef = useRef<ProjectionDiagnosticSession | null>(null)
 
   const setIsProjectionBlanked = useCallback((blanked: boolean): void => {
     isProjectionBlankedRef.current = blanked
@@ -122,61 +108,23 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
     }
   }, [])
 
-  const logProjectionDiagnostic = useCallback(
-    (event: string, details: Record<string, unknown> = {}): void => {
-      const session = diagnosticSessionRef.current
-      if (!session) return
-      console.info('[ProjectionDiagnostics]', {
-        event,
-        sessionId: session.id,
-        owner: session.owner,
-        coldStart: session.coldStart,
-        initialPayloadCount: session.initialPayloadCount,
-        elapsedMs: Math.round(getDiagnosticNow() - session.startedAt),
-        environment: isElectron() ? 'electron' : 'web',
-        ...details
-      })
-    },
-    []
-  )
-
-  const beginProjectionDiagnostic = useCallback(
-    (owner: ProjectionOwner, initialPayloadCount: number, coldStart: boolean): void => {
-      diagnosticSequenceRef.current += 1
-      diagnosticSessionRef.current = {
-        id: diagnosticSequenceRef.current,
-        owner,
-        startedAt: getDiagnosticNow(),
-        coldStart,
-        initialPayloadCount
-      }
-      logProjectionDiagnostic('start')
-    },
-    [logProjectionDiagnostic]
-  )
-
   const startReadyTimeout = useCallback((): void => {
     if (autoOpenTimeoutRef.current) return
     autoOpenTimeoutRef.current = setTimeout(() => {
       if (!isReadyRef.current) {
-        logProjectionDiagnostic('ready-timeout')
         console.warn('[Projection] Ready timeout — discarding pending payloads')
         clearPending()
       }
     }, 5000)
-  }, [clearPending, logProjectionDiagnostic])
+  }, [clearPending])
 
   const flushPendingPayloads = useCallback((): void => {
     const adapter = getAdapter(adapterRef)
-    const payloadCount = pendingPayloadsRef.current.size
     pendingPayloadsRef.current.forEach(({ channel, data }) => {
       adapter.send(channel as ContentChannel, data as ProjectionPayload<ContentChannel>)
     })
-    if (payloadCount > 0) {
-      logProjectionDiagnostic('payloads-flushed', { payloadCount })
-    }
     clearPending()
-  }, [clearPending, logProjectionDiagnostic])
+  }, [clearPending])
 
   const startPolling = useCallback((): void => {
     if (pollTimerRef.current) return
@@ -204,7 +152,6 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
         setIsProjectionOpen(true)
       })
       const unsubClosed = window.api.projection.onProjectionClosed(() => {
-        logProjectionDiagnostic('closed')
         setIsProjectionOpen(false)
         setIsProjectionBlanked(true)
         isReadyRef.current = false
@@ -217,7 +164,6 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
         readyResolveRef.current?.()
         readyResolveRef.current = null
         setProjectionReadyCount((c) => c + 1)
-        logProjectionDiagnostic('ready')
         flushPendingPayloads()
       })
 
@@ -234,7 +180,6 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       setIsProjectionOpen(true)
     })
     const unsubClosed = adapter.on('__system:closed', () => {
-      logProjectionDiagnostic('closed')
       setIsProjectionOpen(false)
       setIsProjectionBlanked(true)
       isReadyRef.current = false
@@ -248,7 +193,6 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       readyResolveRef.current?.()
       readyResolveRef.current = null
       setProjectionReadyCount((c) => c + 1)
-      logProjectionDiagnostic('ready')
       flushPendingPayloads()
     })
 
@@ -268,18 +212,10 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       adapter.dispose()
       adapterRef.current = null
     }
-  }, [
-    stopPolling,
-    setIsProjectionOpen,
-    setIsProjectionBlanked,
-    clearPending,
-    flushPendingPayloads,
-    logProjectionDiagnostic
-  ])
+  }, [stopPolling, setIsProjectionOpen, setIsProjectionBlanked, clearPending, flushPendingPayloads])
 
   const openProjection = useCallback(async (): Promise<void> => {
     if (isElectron()) {
-      logProjectionDiagnostic('window-ensure-requested', { displayId: projectionDisplayId })
       await window.api.projection.ensure(projectionDisplayId)
       return
     }
@@ -296,10 +232,9 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       `popup,width=${width},height=${height},left=0,top=0`
     )
     if (!win) return
-    logProjectionDiagnostic('window-opened', { width, height })
     projectionWindowRef.current = win
     startPolling()
-  }, [logProjectionDiagnostic, projectionDisplayId, startPolling])
+  }, [projectionDisplayId, startPolling])
 
   const closeProjection = useCallback(async (): Promise<void> => {
     if (isElectron()) {
@@ -374,7 +309,6 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
 
   const startProjection = useCallback(
     async (owner: ProjectionOwner, payloads: ContentMessageTuple[] = []): Promise<void> => {
-      beginProjectionDiagnostic(owner, payloads.length, !isProjectionOpenRef.current)
       setActiveOwner(owner)
       setIsProjectionBlanked(false)
       queuePayload('__system:active-owner', '__system:active-owner', { owner })
@@ -388,21 +322,13 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       }
       if (!isReadyRef.current) startReadyTimeout()
     },
-    [
-      beginProjectionDiagnostic,
-      getPendingPayloadKey,
-      openProjection,
-      queuePayload,
-      setIsProjectionBlanked,
-      startReadyTimeout
-    ]
+    [getPendingPayloadKey, openProjection, queuePayload, setIsProjectionBlanked, startReadyTimeout]
   )
 
   const stopProjection = useCallback(async (): Promise<void> => {
-    logProjectionDiagnostic('stop-requested')
     await window.api?.projectionVlc?.stop?.().catch(() => {})
     await closeProjection()
-  }, [closeProjection, logProjectionDiagnostic])
+  }, [closeProjection])
 
   const send = useCallback(
     <C extends ProjectionChannel>(channel: C, data: ProjectionPayload<C>): void => {

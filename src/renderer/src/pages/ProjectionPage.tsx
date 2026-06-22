@@ -47,7 +47,6 @@ export default function ProjectionPage(): React.JSX.Element {
   })
 
   useEffect(() => {
-    const mountedAt = performance?.now?.() ?? Date.now()
     const adapter = createProjectionAdapter('projection')
 
     const unsubBlank = adapter.on('__system:blank', ({ showDefault: blank }) => {
@@ -124,11 +123,6 @@ export default function ProjectionPage(): React.JSX.Element {
       adapter.send('__system:pong', null)
     }
 
-    console.info('[ProjectionDiagnostics]', {
-      event: 'projection-route-ready',
-      elapsedMs: Math.round((performance?.now?.() ?? Date.now()) - mountedAt),
-      environment: isWeb() ? 'web' : 'electron'
-    })
     adapter.send('__system:ready', null)
 
     const handleBeforeUnload = (): void => {

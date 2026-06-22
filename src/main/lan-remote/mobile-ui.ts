@@ -17,8 +17,6 @@ export function getLanRemoteMobileHtml(sessionToken: string | null = null): stri
     <button data-command="presentation:next">Next</button>
     <input id="jumpIndex" type="number" min="1" value="1" aria-label="Jump item number">
     <button data-command="presentation:jump">Jump</button>
-    <button data-command="projection:blank">Blank</button>
-    <button data-command="projection:unblank">Unblank</button>
     <button data-command="timer:start">Start Timer</button>
     <button data-command="timer:pause">Pause Timer</button>
     <button data-command="timer:reset">Reset Timer</button>
@@ -37,7 +35,7 @@ export function getLanRemoteMobileHtml(sessionToken: string | null = null): stri
           ? { requestId: crypto.randomUUID(), type: 'timer:command', command: { type: type.slice(10) + 'Stopwatch' } }
           : type === 'presentation:jump'
             ? { requestId: crypto.randomUUID(), type, index: Math.max(0, Number(document.getElementById('jumpIndex').value) - 1) }
-          : { requestId: crypto.randomUUID(), type: type.replace(':unblank', ':blank'), enabled: type !== 'projection:unblank' }
+            : { requestId: crypto.randomUUID(), type }
       const response = await fetch('/command', {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-libre-presenter-session': sessionToken },

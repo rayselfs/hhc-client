@@ -64,10 +64,9 @@ vi.mock('@renderer/contexts/ProjectionContext', () => ({
 }))
 
 vi.mock('@renderer/lib/projection-actions', async () => {
-  const { useBibleProjectionStore } =
-    await vi.importActual<typeof import('@renderer/stores/bible-projection')>(
-      '@renderer/stores/bible-projection'
-    )
+  const { useBibleProjectionStore } = await vi.importActual<
+    typeof import('@renderer/stores/bible-projection')
+  >('@renderer/stores/bible-projection')
   return {
     startBibleProjection: vi.fn((payloads, deps) => {
       useBibleProjectionStore.getState().setLastPayloads(payloads)
