@@ -1,6 +1,10 @@
 import { randomBytes } from 'node:crypto'
 import { createServer, type Server } from 'node:http'
-import type { LanRemoteAck, LanRemoteCommand } from '../../shared/lan-remote'
+import {
+  isPrivateLanAddress,
+  type LanRemoteAck,
+  type LanRemoteCommand
+} from '../../shared/lan-remote'
 import { getLanRemoteMobileHtml } from './mobile-ui'
 
 export interface LanRemoteServerStartOptions {
@@ -45,6 +49,9 @@ export function createLanRemoteServer(_options: LanRemoteServerOptions): LanRemo
   return {
     async start(options: LanRemoteServerStartOptions): Promise<void> {
       if (server) return
+      if (!isPrivateLanAddress(options.host)) {
+        throw new Error('LAN remote requires a private LAN interface')
+      }
 
       host = options.host
       port = options.port
