@@ -510,16 +510,11 @@
     }
   },
   "projection": {
-    "showButton": "Show projection",
-    "blankButton": "Blank projection",
-    "openButton": "Open projection window",
-    "closeButton": "Close projection window",
-    "closeTitle": "Close Projection",
-    "closeConfirm": "Are you sure you want to close the projection window?",
-    "waiting": "Waiting for content...",
-    "openTitle": "Open Projection",
-    "openMessage": "Open the projection window to display content on a second screen.",
-    "open": "Open"
+    "startButton": "Start projection",
+    "stopButton": "Stop projection",
+    "closeTitle": "Stop Projection",
+    "closeConfirm": "Stop the current projection and close the output window?",
+    "waiting": "Waiting for content..."
   },
   "common": {
     "cancel": "Cancel",

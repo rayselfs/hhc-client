@@ -510,16 +510,11 @@
     }
   },
   "projection": {
-    "showButton": "顯示投影",
-    "blankButton": "關閉投影",
-    "openButton": "開啟投影視窗",
-    "closeButton": "關閉投影視窗",
-    "closeTitle": "關閉投影",
-    "closeConfirm": "確定要關閉投影視窗嗎？",
-    "waiting": "等待內容...",
-    "openTitle": "開啟投影",
-    "openMessage": "開啟投影視窗以在第二螢幕上顯示內容。",
-    "open": "開啟"
+    "startButton": "開始投影",
+    "stopButton": "停止投影",
+    "closeTitle": "停止投影",
+    "closeConfirm": "要停止目前投影並關閉輸出視窗嗎？",
+    "waiting": "等待內容..."
   },
   "common": {
     "cancel": "取消",

@@ -5,7 +5,7 @@ import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
 import { ButtonGroup } from '@heroui/react/button-group'
 import { Button } from '@heroui/react/button'
 import { toast } from '@heroui/react/toast'
-import { X, Monitor, MonitorOff, ExternalLink } from 'lucide-react'
+import { X, Monitor } from 'lucide-react'
 import ModeSelector from '@renderer/components/Control/Timer/ModeSelector'
 import SettingsPopover from '@renderer/components/Control/Header/SettingsPopover/SettingsPopover'
 import BibleSelector from '@renderer/components/Control/Bible/BibleSelector'
@@ -34,13 +34,7 @@ import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 export default function Header(): React.JSX.Element {
   const { t } = useTranslation()
   const location = useLocation()
-  const {
-    isProjectionOpen,
-    isProjectionBlanked,
-    openProjection,
-    closeProjection,
-    blankProjection
-  } = useProjection()
+  const { isProjectionOpen, stopProjection } = useProjection()
   const confirm = useConfirm()
   const mode = useTimerStore((s) => s.mode)
 
@@ -99,13 +93,33 @@ export default function Header(): React.JSX.Element {
       ? trashSetSortFieldAndDir
       : setSortFieldAndDir
 
-  const handleCloseOrOpenProjection = async (): Promise<void> => {
-    if (!isProjectionOpen) {
-      await openProjection().catch(() => {
-        toast.danger(t('toast.projectionOpenFailed'))
-      })
+  const startCurrentFolderProjection = async (): Promise<void> => {
+    const state = useFileExplorerStore.getState()
+    const items = state._itemsArray.filter(
+      (item) => item.parentId === state.currentFolderId && !item.deletedAt
+    )
+    const presentable = getPresentableItems(items)
+    if (presentable.length === 0) {
+      toast.warning(t('fileExplorer.noProjectableFiles'))
       return
     }
+
+    const report = await useMediaProjectionStore
+      .getState()
+      .startPresentationWithReadiness(presentable, 0)
+    if (report.summary.ready === 0) {
+      toast.warning(t('fileExplorer.noProjectableFiles'))
+    }
+  }
+
+  const handleProjectionAction = async (): Promise<void> => {
+    if (!isProjectionOpen) {
+      if (showFilesControls) {
+        await startCurrentFolderProjection()
+      }
+      return
+    }
+
     const confirmed = await confirm({
       status: 'warning',
       title: t('projection.closeTitle'),
@@ -114,7 +128,7 @@ export default function Header(): React.JSX.Element {
       cancelLabel: t('common.cancel')
     })
     if (!confirmed) return
-    await closeProjection().catch(() => {
+    await stopProjection().catch(() => {
       toast.danger(t('toast.projectionCloseFailed'))
     })
   }
@@ -192,49 +206,12 @@ export default function Header(): React.JSX.Element {
           <Button
             isIconOnly
             variant="outline"
-            className={isProjectionBlanked ? 'text-default-foreground px-6' : 'text-danger px-6'}
-            onPress={() => {
-              if (isProjectionBlanked && showFilesControls) {
-                const state = useFileExplorerStore.getState()
-                const items = state._itemsArray.filter(
-                  (item) => item.parentId === state.currentFolderId && !item.deletedAt
-                )
-                const presentable = getPresentableItems(items)
-                if (presentable.length > 0) {
-                  void useMediaProjectionStore
-                    .getState()
-                    .startPresentationWithReadiness(presentable, 0)
-                    .then((report) => {
-                      if (report.summary.ready === 0) {
-                        toast.warning(t('fileExplorer.noProjectableFiles'))
-                      }
-                    })
-                  return
-                } else {
-                  toast.warning(t('fileExplorer.noProjectableFiles'))
-                  return
-                }
-              }
-              blankProjection(!isProjectionBlanked)
-            }}
-            isDisabled={!isProjectionOpen}
-            aria-label={t(isProjectionBlanked ? 'projection.showButton' : 'projection.blankButton')}
-          >
-            {isProjectionBlanked ? (
-              <Monitor className="size-4" />
-            ) : (
-              <MonitorOff className="size-4" />
-            )}
-          </Button>
-          <Button
-            isIconOnly
-            variant="outline"
             className={isProjectionOpen ? 'text-danger px-6' : 'text-default-foreground px-6'}
-            onPress={handleCloseOrOpenProjection}
-            aria-label={t(isProjectionOpen ? 'projection.closeButton' : 'projection.openButton')}
+            onPress={() => void handleProjectionAction()}
+            isDisabled={!isProjectionOpen && !showFilesControls}
+            aria-label={t(isProjectionOpen ? 'projection.stopButton' : 'projection.startButton')}
           >
-            {isProjectionOpen ? <X className="size-4" /> : <ExternalLink className="size-4" />}
-            <ButtonGroup.Separator className="text-default-foreground" />
+            {isProjectionOpen ? <X className="size-4" /> : <Monitor className="size-4" />}
           </Button>
         </ButtonGroup>
       </div>

@@ -1,51 +1,21 @@
 import { Outlet } from 'react-router-dom'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import AppLoadingScreen from '@renderer/components/Control/AppLoadingScreen'
-import { useTranslation } from 'react-i18next'
 import Sidebar from '@renderer/components/Control/Sidebar'
 import Header from '@renderer/components/Control/Header/Header'
 import FloatingTimer from '@renderer/components/Control/Timer/FloatingTimer'
 import ConfirmDialog from '@renderer/components/Common/ConfirmDialog'
 import TimerProjectionBridge from '@renderer/components/Control/Bridge/TimerProjectionBridge'
-import { ProjectionProvider, useProjection } from '@renderer/contexts/ProjectionContext'
+import { ProjectionProvider } from '@renderer/contexts/ProjectionContext'
 import { TimerEngineProvider } from '@renderer/contexts/TimerEngineContext'
 import { ContextMenuProvider } from '@renderer/contexts/ContextMenuContext'
-import { ConfirmDialogProvider, useConfirm } from '@renderer/contexts/ConfirmDialogContext'
+import { ConfirmDialogProvider } from '@renderer/contexts/ConfirmDialogContext'
 import { ShortcutScopeProvider } from '@renderer/contexts/ShortcutScopeContext'
 import { AppInitContext } from '@renderer/contexts/AppInitContext'
-import { isWeb } from '@renderer/lib/env'
-import { toast } from '@heroui/react/toast'
 import { initializeApp } from '@renderer/lib/app-init'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { useBibleFolderStore } from '@renderer/stores/folder'
 import { useAutoUpdateCheck } from '@renderer/hooks/useAutoUpdateCheck'
-
-function ProjectionAutoOpen(): null {
-  const { t } = useTranslation()
-  const { isProjectionOpen, openProjection } = useProjection()
-  const confirm = useConfirm()
-  const hasPrompted = useRef(false)
-
-  useEffect(() => {
-    if (!isWeb() || isProjectionOpen || hasPrompted.current) return
-    hasPrompted.current = true
-
-    confirm({
-      status: 'info',
-      title: t('projection.openTitle'),
-      description: t('projection.openMessage'),
-      confirmLabel: t('projection.open'),
-      cancelLabel: t('common.cancel')
-    }).then((confirmed) => {
-      if (!confirmed) return
-      openProjection().catch(() => {
-        toast.danger(t('toast.projectionOpenFailed'))
-      })
-    })
-  }, [confirm, isProjectionOpen, openProjection, t])
-
-  return null
-}
 
 export default function Layout(): React.JSX.Element {
   const [initialized, setInitialized] = useState(false)
@@ -99,7 +69,6 @@ export default function Layout(): React.JSX.Element {
                 </div>
                 <ConfirmDialog />
                 <TimerProjectionBridge />
-                <ProjectionAutoOpen />
               </ConfirmDialogProvider>
             </ContextMenuProvider>
           </ProjectionProvider>

@@ -1,11 +1,16 @@
 import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import '@renderer/i18n'
 import i18n from '@renderer/i18n'
 import { useTimerStore } from '@renderer/stores/timer'
+import { useFileExplorerStore } from '@renderer/stores/file-explorer'
+import { useMediaProjectionStore } from '@renderer/stores/media-projection'
+import type { FileItemRecord } from '@shared/types/folder'
 import { ConfirmDialogProvider } from '@renderer/contexts/ConfirmDialogContext'
+import { ShortcutScopeProvider } from '@renderer/contexts/ShortcutScopeContext'
+import type { useProjection as useProjectionHook } from '@renderer/contexts/ProjectionContext'
 import ConfirmDialog from '../../../Common/ConfirmDialog'
 import Header from '../Header'
 
@@ -17,27 +22,64 @@ vi.mock('@renderer/contexts/ProjectionContext', async (importOriginal) => {
   }
 })
 
+type MockProjectionContext = ReturnType<typeof useProjectionHook>
+
+function makeFile(id: string): FileItemRecord {
+  return {
+    id,
+    name: `${id}.png`,
+    mimeType: 'image/png',
+    type: 'file',
+    sortIndex: 0,
+    parentId: 'file-root',
+    size: 1,
+    url: `blob:${id}`,
+    createdAt: Date.now(),
+    expiresAt: null
+  }
+}
+
+async function mockProjectionContext(
+  overrides: Partial<MockProjectionContext> = {}
+): Promise<MockProjectionContext> {
+  const { useProjection } = await import('@renderer/contexts/ProjectionContext')
+  const context = { ...baseProjectionContext(), ...overrides }
+  vi.mocked(useProjection).mockReturnValue(context)
+  return context
+}
+
+function baseProjectionContext(): MockProjectionContext {
+  return {
+    isProjectionOpen: false,
+    isProjectionBlanked: true,
+    projectionReadyCount: 0,
+    activeOwner: 'timer' as const,
+    claimProjection: vi.fn<MockProjectionContext['claimProjection']>(),
+    startProjection: vi.fn<MockProjectionContext['startProjection']>(() => Promise.resolve()),
+    stopProjection: vi.fn<MockProjectionContext['stopProjection']>(() => Promise.resolve()),
+    openProjection: vi.fn<MockProjectionContext['openProjection']>(() => Promise.resolve()),
+    closeProjection: vi.fn<MockProjectionContext['closeProjection']>(() => Promise.resolve()),
+    blankProjection: vi.fn<MockProjectionContext['blankProjection']>(),
+    project: vi.fn<MockProjectionContext['project']>(() => Promise.resolve()),
+    send: vi.fn<MockProjectionContext['send']>(),
+    on: vi.fn(() => vi.fn()) as MockProjectionContext['on']
+  }
+}
+
 function renderWithRouter(initialEntries: string[] = ['/']): ReturnType<typeof render> {
+  const element = (
+    <ShortcutScopeProvider>
+      <ConfirmDialogProvider>
+        <Header />
+        <ConfirmDialog />
+      </ConfirmDialogProvider>
+    </ShortcutScopeProvider>
+  )
   const router = createMemoryRouter(
     [
-      {
-        path: '/',
-        element: (
-          <ConfirmDialogProvider>
-            <Header />
-            <ConfirmDialog />
-          </ConfirmDialogProvider>
-        )
-      },
-      {
-        path: '/timer',
-        element: (
-          <ConfirmDialogProvider>
-            <Header />
-            <ConfirmDialog />
-          </ConfirmDialogProvider>
-        )
-      }
+      { path: '/', element },
+      { path: '/timer', element },
+      { path: '/files', element }
     ],
     { initialEntries }
   )
@@ -47,281 +89,83 @@ function renderWithRouter(initialEntries: string[] = ['/']): ReturnType<typeof r
 describe('Header', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    useFileExplorerStore.setState({
+      currentFolderId: 'file-root',
+      _itemsArray: []
+    })
   })
 
   it('renders a header element', async () => {
     await i18n.changeLanguage('en')
-    const { useProjection } = await import('@renderer/contexts/ProjectionContext')
-    vi.mocked(useProjection).mockReturnValue({
-      isProjectionOpen: false,
-      isProjectionBlanked: true,
-      projectionReadyCount: 0,
-      activeOwner: 'timer',
-      claimProjection: vi.fn(),
-      startProjection: vi.fn(),
-      stopProjection: vi.fn(),
-      openProjection: vi.fn(),
-      closeProjection: vi.fn(),
-      blankProjection: vi.fn(),
-      project: vi.fn(),
-      send: vi.fn(),
-      on: vi.fn()
-    })
+    await mockProjectionContext()
     renderWithRouter(['/'])
     expect(document.querySelector('header')).toBeInTheDocument()
   })
 
-  it('renders close projection button with correct aria-label in English when open', async () => {
+  it('renders a disabled start projection button outside the files route', async () => {
     await i18n.changeLanguage('en')
-    const { useProjection } = await import('@renderer/contexts/ProjectionContext')
-    vi.mocked(useProjection).mockReturnValue({
-      isProjectionOpen: true,
-      isProjectionBlanked: false,
-      projectionReadyCount: 0,
-      activeOwner: 'timer',
-      claimProjection: vi.fn(),
-      startProjection: vi.fn(),
-      stopProjection: vi.fn(),
-      openProjection: vi.fn(),
-      closeProjection: vi.fn(),
-      blankProjection: vi.fn(),
-      project: vi.fn(),
-      send: vi.fn(),
-      on: vi.fn()
-    })
-    renderWithRouter(['/'])
-    expect(screen.getByRole('button', { name: 'Close projection window' })).toBeInTheDocument()
+    await mockProjectionContext({ isProjectionOpen: false })
+    renderWithRouter(['/timer'])
+    expect(screen.getByRole('button', { name: 'Start projection' })).toBeDisabled()
   })
 
-  it('renders open projection button when projection is not open', async () => {
+  it('starts presentation from the current files folder', async () => {
     await i18n.changeLanguage('en')
-    const { useProjection } = await import('@renderer/contexts/ProjectionContext')
-    vi.mocked(useProjection).mockReturnValue({
-      isProjectionOpen: false,
-      isProjectionBlanked: true,
-      projectionReadyCount: 0,
-      activeOwner: 'timer',
-      claimProjection: vi.fn(),
-      startProjection: vi.fn(),
-      stopProjection: vi.fn(),
-      openProjection: vi.fn(),
-      closeProjection: vi.fn(),
-      blankProjection: vi.fn(),
-      project: vi.fn(),
-      send: vi.fn(),
-      on: vi.fn()
+    await mockProjectionContext({ isProjectionOpen: false })
+    const startPresentationWithReadiness = vi.fn(() =>
+      Promise.resolve({ summary: { ready: 1, unsupported: 0, failed: 0 } })
+    )
+    useFileExplorerStore.setState({
+      currentFolderId: 'file-root',
+      _itemsArray: [makeFile('image-1')]
     })
-    renderWithRouter(['/'])
-    expect(screen.getByRole('button', { name: 'Open projection window' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Open projection window' })).not.toBeDisabled()
+    useMediaProjectionStore.setState({
+      startPresentationWithReadiness
+    } as never)
+
+    renderWithRouter(['/files'])
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Start projection' }))
+
+    expect(startPresentationWithReadiness).toHaveBeenCalledWith(
+      [expect.objectContaining({ id: 'image-1' })],
+      0
+    )
   })
 
-  it('calls openProjection when projection is closed and open-btn pressed', async () => {
+  it('renders stop projection button with correct aria-label in English when open', async () => {
     await i18n.changeLanguage('en')
-    const { useProjection } = await import('@renderer/contexts/ProjectionContext')
-    const openProjection = vi.fn().mockResolvedValue(undefined)
-    vi.mocked(useProjection).mockReturnValue({
-      isProjectionOpen: false,
-      isProjectionBlanked: true,
-      projectionReadyCount: 0,
-      activeOwner: 'timer',
-      claimProjection: vi.fn(),
-      startProjection: vi.fn(),
-      stopProjection: vi.fn(),
-      openProjection,
-      closeProjection: vi.fn(),
-      blankProjection: vi.fn(),
-      project: vi.fn(),
-      send: vi.fn(),
-      on: vi.fn()
-    })
+    await mockProjectionContext({ isProjectionOpen: true, isProjectionBlanked: false })
+    renderWithRouter(['/'])
+    expect(screen.getByRole('button', { name: 'Stop projection' })).toBeInTheDocument()
+  })
+
+  it('calls stopProjection after confirmation when projection is open', async () => {
+    await i18n.changeLanguage('en')
+    const stopProjection = vi.fn(() => Promise.resolve())
+    await mockProjectionContext({ isProjectionOpen: true, stopProjection })
+
     renderWithRouter(['/'])
     const user = userEvent.setup()
-    await user.click(screen.getByRole('button', { name: 'Open projection window' }))
-    expect(openProjection).toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: 'Stop projection' }))
+    await user.click(await screen.findByRole('button', { name: 'Close' }))
+
+    expect(stopProjection).toHaveBeenCalled()
   })
 
-  it('renders close projection button with correct aria-label in zh-TW', async () => {
+  it('renders stop projection button with correct aria-label in zh-TW', async () => {
     await i18n.changeLanguage('zh-TW')
-    const { useProjection } = await import('@renderer/contexts/ProjectionContext')
-    vi.mocked(useProjection).mockReturnValue({
-      isProjectionOpen: true,
-      isProjectionBlanked: false,
-      projectionReadyCount: 0,
-      activeOwner: 'timer',
-      claimProjection: vi.fn(),
-      startProjection: vi.fn(),
-      stopProjection: vi.fn(),
-      openProjection: vi.fn(),
-      closeProjection: vi.fn(),
-      blankProjection: vi.fn(),
-      project: vi.fn(),
-      send: vi.fn(),
-      on: vi.fn()
-    })
+    await mockProjectionContext({ isProjectionOpen: true, isProjectionBlanked: false })
     renderWithRouter(['/'])
-    expect(screen.getByRole('button', { name: '關閉投影視窗' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '停止投影' })).toBeInTheDocument()
     await act(() => i18n.changeLanguage('en'))
-  })
-
-  describe('blank toggle button', () => {
-    it('renders with "Blank projection" label when not blanked', async () => {
-      await i18n.changeLanguage('en')
-      const { useProjection } = await import('@renderer/contexts/ProjectionContext')
-      vi.mocked(useProjection).mockReturnValue({
-        isProjectionOpen: true,
-        isProjectionBlanked: false,
-        projectionReadyCount: 0,
-        activeOwner: 'timer',
-        claimProjection: vi.fn(),
-        startProjection: vi.fn(),
-        stopProjection: vi.fn(),
-        openProjection: vi.fn(),
-        closeProjection: vi.fn(),
-        blankProjection: vi.fn(),
-        project: vi.fn(),
-        send: vi.fn(),
-        on: vi.fn()
-      })
-      renderWithRouter(['/'])
-      expect(screen.getByRole('button', { name: 'Blank projection' })).toBeInTheDocument()
-    })
-
-    it('renders with "Show projection" label when blanked', async () => {
-      await i18n.changeLanguage('en')
-      const { useProjection } = await import('@renderer/contexts/ProjectionContext')
-      vi.mocked(useProjection).mockReturnValue({
-        isProjectionOpen: true,
-        isProjectionBlanked: true,
-        projectionReadyCount: 0,
-        activeOwner: 'timer',
-        claimProjection: vi.fn(),
-        startProjection: vi.fn(),
-        stopProjection: vi.fn(),
-        openProjection: vi.fn(),
-        closeProjection: vi.fn(),
-        blankProjection: vi.fn(),
-        project: vi.fn(),
-        send: vi.fn(),
-        on: vi.fn()
-      })
-      renderWithRouter(['/'])
-      expect(screen.getByRole('button', { name: 'Show projection' })).toBeInTheDocument()
-    })
-
-    it('is disabled when projection is not open', async () => {
-      await i18n.changeLanguage('en')
-      const { useProjection } = await import('@renderer/contexts/ProjectionContext')
-      vi.mocked(useProjection).mockReturnValue({
-        isProjectionOpen: false,
-        isProjectionBlanked: true,
-        projectionReadyCount: 0,
-        activeOwner: 'timer',
-        claimProjection: vi.fn(),
-        startProjection: vi.fn(),
-        stopProjection: vi.fn(),
-        openProjection: vi.fn(),
-        closeProjection: vi.fn(),
-        blankProjection: vi.fn(),
-        project: vi.fn(),
-        send: vi.fn(),
-        on: vi.fn()
-      })
-      renderWithRouter(['/'])
-      expect(screen.getByRole('button', { name: 'Show projection' })).toBeDisabled()
-    })
-
-    it('is enabled when projection is open', async () => {
-      await i18n.changeLanguage('en')
-      const { useProjection } = await import('@renderer/contexts/ProjectionContext')
-      vi.mocked(useProjection).mockReturnValue({
-        isProjectionOpen: true,
-        isProjectionBlanked: false,
-        projectionReadyCount: 0,
-        activeOwner: 'timer',
-        claimProjection: vi.fn(),
-        startProjection: vi.fn(),
-        stopProjection: vi.fn(),
-        openProjection: vi.fn(),
-        closeProjection: vi.fn(),
-        blankProjection: vi.fn(),
-        project: vi.fn(),
-        send: vi.fn(),
-        on: vi.fn()
-      })
-      renderWithRouter(['/'])
-      expect(screen.getByRole('button', { name: 'Blank projection' })).not.toBeDisabled()
-    })
-
-    it('calls blankProjection with toggled value on press', async () => {
-      await i18n.changeLanguage('en')
-      const { useProjection } = await import('@renderer/contexts/ProjectionContext')
-      const blankProjection = vi.fn()
-      vi.mocked(useProjection).mockReturnValue({
-        isProjectionOpen: true,
-        isProjectionBlanked: false,
-        projectionReadyCount: 0,
-        activeOwner: 'timer',
-        claimProjection: vi.fn(),
-        startProjection: vi.fn(),
-        stopProjection: vi.fn(),
-        openProjection: vi.fn(),
-        closeProjection: vi.fn(),
-        blankProjection,
-        project: vi.fn(),
-        send: vi.fn(),
-        on: vi.fn()
-      })
-      renderWithRouter(['/'])
-      const user = userEvent.setup()
-      await user.click(screen.getByRole('button', { name: 'Blank projection' }))
-      expect(blankProjection).toHaveBeenCalledWith(true)
-    })
-
-    it('renders with correct aria-label in zh-TW', async () => {
-      await i18n.changeLanguage('zh-TW')
-      const { useProjection } = await import('@renderer/contexts/ProjectionContext')
-      vi.mocked(useProjection).mockReturnValue({
-        isProjectionOpen: true,
-        isProjectionBlanked: false,
-        projectionReadyCount: 0,
-        activeOwner: 'timer',
-        claimProjection: vi.fn(),
-        startProjection: vi.fn(),
-        stopProjection: vi.fn(),
-        openProjection: vi.fn(),
-        closeProjection: vi.fn(),
-        blankProjection: vi.fn(),
-        project: vi.fn(),
-        send: vi.fn(),
-        on: vi.fn()
-      })
-      renderWithRouter(['/'])
-      expect(screen.getByRole('button', { name: '關閉投影' })).toBeInTheDocument()
-      await act(() => i18n.changeLanguage('en'))
-    })
   })
 
   describe('route-aware ModeSelector', () => {
     it('shows ModeSelector tabs on /timer route', async () => {
       await i18n.changeLanguage('en')
       useTimerStore.setState({ mode: 'timer' })
-      const { useProjection } = await import('@renderer/contexts/ProjectionContext')
-      vi.mocked(useProjection).mockReturnValue({
-        isProjectionOpen: false,
-        isProjectionBlanked: true,
-        projectionReadyCount: 0,
-        activeOwner: 'timer',
-        claimProjection: vi.fn(),
-        startProjection: vi.fn(),
-        stopProjection: vi.fn(),
-        openProjection: vi.fn(),
-        closeProjection: vi.fn(),
-        blankProjection: vi.fn(),
-        project: vi.fn(),
-        send: vi.fn(),
-        on: vi.fn()
-      })
+      await mockProjectionContext()
       renderWithRouter(['/timer'])
       expect(screen.getByTestId('mode-timer')).toBeInTheDocument()
       expect(screen.getByTestId('mode-clock')).toBeInTheDocument()
@@ -331,24 +175,8 @@ describe('Header', () => {
 
     it('hides ModeSelector on non-timer routes via opacity', async () => {
       await i18n.changeLanguage('en')
-      const { useProjection } = await import('@renderer/contexts/ProjectionContext')
-      vi.mocked(useProjection).mockReturnValue({
-        isProjectionOpen: false,
-        isProjectionBlanked: true,
-        projectionReadyCount: 0,
-        activeOwner: 'timer',
-        claimProjection: vi.fn(),
-        startProjection: vi.fn(),
-        stopProjection: vi.fn(),
-        openProjection: vi.fn(),
-        closeProjection: vi.fn(),
-        blankProjection: vi.fn(),
-        project: vi.fn(),
-        send: vi.fn(),
-        on: vi.fn()
-      })
+      await mockProjectionContext()
       renderWithRouter(['/'])
-      // ModeSelector is always rendered but hidden via CSS opacity on non-timer routes
       const wrapper = screen.getByTestId('mode-timer')?.closest('.absolute')
       expect(wrapper?.className).toContain('opacity-0')
     })
