@@ -4,8 +4,7 @@ import {
   useMediaProjectionStore,
   type MediaProjectionStore
 } from '@renderer/stores/media-projection'
-import { getBlobId } from '@renderer/lib/blob-identity'
-import type { ProjectionPayload } from '@shared/projection-messages'
+import { buildFileProjectionPayload } from '@renderer/lib/media-projection-payload'
 
 function playlistContentChanged(
   prev: { id: string; mimeType: string; name: string }[],
@@ -27,21 +26,8 @@ export function useMediaProjectionSync(): void {
   const projectCurrentItem = useCallback(
     async (state: MediaProjectionStore, startSession = false): Promise<void> => {
       const sequence = ++projectSequenceRef.current
-      const item = state.playlist[state.currentIndex]
-      if (!item) return
-      const snapshotEntry = state.snapshot?.entries.find((entry) => entry.itemId === item.id)
-      const blobId = snapshotEntry?.blobId ?? getBlobId(item)
-      const payload: ProjectionPayload<'file:show'> = {
-        itemId: item.id,
-        blobId,
-        fileName: item.name,
-        mimeType: item.mimeType,
-        playlist: state.playlist.map((f) => ({ id: f.id, name: f.name, mimeType: f.mimeType })),
-        currentIndex: state.currentIndex,
-        playbackMode: snapshotEntry?.playbackMode,
-        seekable: snapshotEntry?.seekable,
-        durationMs: snapshotEntry?.durationMs
-      }
+      const payload = buildFileProjectionPayload(state)
+      if (!payload) return
 
       if (sequence === projectSequenceRef.current) {
         if (startSession) {
