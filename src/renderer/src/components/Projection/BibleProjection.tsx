@@ -89,11 +89,7 @@ export default function BibleProjection({
           >
             {reference}
           </div>
-          <div
-            className="leading-tight"
-            lang={versionLocale}
-            style={{ fontSize: `${fontSize}px` }}
-          >
+          <div className="leading-tight" lang={versionLocale} style={{ fontSize: `${fontSize}px` }}>
             {currentVerseData?.text ?? ''}
           </div>
         </div>
@@ -107,10 +103,7 @@ export default function BibleProjection({
       className="h-screen w-full flex flex-col overflow-hidden"
       style={{ backgroundColor, fontFamily }}
     >
-      <div
-        className="shrink-0 flex items-center justify-center px-8"
-        style={{ height: '60px' }}
-      >
+      <div className="shrink-0 flex items-center justify-center px-8" style={{ height: '60px' }}>
         <span className="font-bold" style={{ fontSize: `${referenceSize}px`, color: textColor }}>
           {reference}
         </span>

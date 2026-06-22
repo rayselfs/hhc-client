@@ -15,12 +15,7 @@ export function buildBibleServiceCueInput(
     verse: number
   }
 ): BibleServiceCueInput {
-  const reference = formatVerseReferenceShort(
-    t,
-    passage.bookNumber,
-    passage.chapter,
-    passage.verse
-  )
+  const reference = formatVerseReferenceShort(t, passage.bookNumber, passage.chapter, passage.verse)
 
   return {
     type: 'bible',

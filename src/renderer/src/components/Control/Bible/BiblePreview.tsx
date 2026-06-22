@@ -92,11 +92,7 @@ export function BiblePreview({
     useServicePlaylistStore.getState().addCue(cue)
   }
 
-  const handleAddToQueue = (
-    verseNumber: number,
-    verseText: string,
-    e: React.MouseEvent
-  ): void => {
+  const handleAddToQueue = (verseNumber: number, verseText: string, e: React.MouseEvent): void => {
     e.stopPropagation()
     if (!book || !chapter) return
     const { selectedVersionId } = useBibleSettingsStore.getState()
