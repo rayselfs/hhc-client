@@ -24,6 +24,7 @@ import {
   TIMEZONE_OPTIONS,
   AZURE_REGION_OPTIONS,
   DEFAULT_SPEECH,
+  DEFAULT_LAN_REMOTE,
   getEffectiveOneDriveClientId,
   getDefaultSpeechSettings,
   LIBREPRESENTER_DEFAULT_ONEDRIVE_CLIENT_ID,
@@ -97,7 +98,7 @@ describe('setTimezone', () => {
     expect(persisted).toBeTruthy()
     const parsed = JSON.parse(persisted!)
     expect(parsed.state.timezone).toBe('America/New_York')
-    expect(parsed.version).toBe(11)
+    expect(parsed.version).toBe(12)
 
     vi.unstubAllGlobals()
   })
@@ -134,7 +135,7 @@ describe('setHardwareAcceleration', () => {
     expect(persisted).toBeTruthy()
     const parsed = JSON.parse(persisted!)
     expect(parsed.state.hardwareAcceleration).toBe(false)
-    expect(parsed.version).toBe(11)
+    expect(parsed.version).toBe(12)
 
     vi.unstubAllGlobals()
   })
@@ -241,7 +242,7 @@ describe('persistence round-trip', () => {
     const parsed = JSON.parse(persisted!)
     expect(parsed.state.timezone).toBe('Europe/London')
     expect(parsed.state.hardwareAcceleration).toBe(false)
-    expect(parsed.version).toBe(11)
+    expect(parsed.version).toBe(12)
 
     vi.unstubAllGlobals()
   })
@@ -350,7 +351,7 @@ describe('themePreference', () => {
     expect(persisted).toBeTruthy()
     const parsed = JSON.parse(persisted!)
     expect(parsed.state.themePreference).toBe('dark')
-    expect(parsed.version).toBe(11)
+    expect(parsed.version).toBe(12)
 
     vi.unstubAllGlobals()
   })
@@ -410,7 +411,7 @@ describe('speech settings', () => {
     expect(persisted).toBeTruthy()
     const parsed = JSON.parse(persisted!)
     expect(parsed.state.speech.azure.region).toBe('japaneast')
-    expect(parsed.version).toBe(11)
+    expect(parsed.version).toBe(12)
 
     vi.unstubAllGlobals()
   })
@@ -427,6 +428,21 @@ describe('OneDrive settings', () => {
     })
 
     expect(normalized.defaultSyncOfflinePolicy).toBe('online-only')
+  })
+})
+
+describe('LAN remote settings', () => {
+  it('normalizes LAN remote settings', () => {
+    const normalized = normalizeSettingsState({
+      lanRemote: { enabled: true, trustDurationDays: 999, allowTrustedDevices: true }
+    })
+
+    expect(normalized.lanRemote).toEqual({
+      ...DEFAULT_LAN_REMOTE,
+      enabled: true,
+      allowTrustedDevices: true,
+      trustDurationDays: 90
+    })
   })
 })
 

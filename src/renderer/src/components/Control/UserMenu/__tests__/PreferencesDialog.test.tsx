@@ -348,7 +348,14 @@ describe('PreferencesDialog', () => {
         trashRetentionDays: 30,
         setTrashRetentionDays: vi.fn(),
         projectionDisplayId: '',
-        setProjectionDisplayId: vi.fn()
+        setProjectionDisplayId: vi.fn(),
+        lanRemote: {
+          enabled: false,
+          selectedHost: '',
+          allowTrustedDevices: false,
+          trustDurationDays: 30
+        },
+        setLanRemote: vi.fn()
       }
       return selector ? selector(store) : store
     })
@@ -452,7 +459,14 @@ describe('PreferencesDialog', () => {
         trashRetentionDays: 30,
         setTrashRetentionDays: vi.fn(),
         projectionDisplayId: '',
-        setProjectionDisplayId: vi.fn()
+        setProjectionDisplayId: vi.fn(),
+        lanRemote: {
+          enabled: false,
+          selectedHost: '',
+          allowTrustedDevices: false,
+          trustDurationDays: 30
+        },
+        setLanRemote: vi.fn()
       }
       return selector ? selector(store) : store
     })
@@ -508,7 +522,14 @@ describe('PreferencesDialog', () => {
         trashRetentionDays: 30,
         setTrashRetentionDays: vi.fn(),
         projectionDisplayId: '',
-        setProjectionDisplayId: vi.fn()
+        setProjectionDisplayId: vi.fn(),
+        lanRemote: {
+          enabled: false,
+          selectedHost: '',
+          allowTrustedDevices: false,
+          trustDurationDays: 30
+        },
+        setLanRemote: vi.fn()
       }
       return selector ? selector(store) : store
     })
@@ -561,7 +582,14 @@ describe('PreferencesDialog', () => {
         trashRetentionDays: 30,
         setTrashRetentionDays: vi.fn(),
         projectionDisplayId: '',
-        setProjectionDisplayId: vi.fn()
+        setProjectionDisplayId: vi.fn(),
+        lanRemote: {
+          enabled: false,
+          selectedHost: '',
+          allowTrustedDevices: false,
+          trustDurationDays: 30
+        },
+        setLanRemote: vi.fn()
       }
       return selector ? selector(store) : store
     })
@@ -612,7 +640,14 @@ describe('PreferencesDialog', () => {
         trashRetentionDays: 30,
         setTrashRetentionDays: vi.fn(),
         projectionDisplayId: '',
-        setProjectionDisplayId: vi.fn()
+        setProjectionDisplayId: vi.fn(),
+        lanRemote: {
+          enabled: false,
+          selectedHost: '',
+          allowTrustedDevices: false,
+          trustDurationDays: 30
+        },
+        setLanRemote: vi.fn()
       }
       return selector ? selector(store) : store
     })

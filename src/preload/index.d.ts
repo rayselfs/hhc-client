@@ -24,8 +24,11 @@ import type {
   OneDriveConnectedAccount,
   OneDriveNativeDownloadRequest,
   OneDriveNativeDownloadResult,
-  OneDriveNativeDownloadProgress
+  OneDriveNativeDownloadProgress,
+  LanRemotePairingInfo,
+  LanRemoteStatus
 } from '../shared/ipc-channels'
+import type { LanRemoteAck, LanRemoteCommand, LanRemoteSnapshot } from '../shared/lan-remote'
 import type {
   TimerCommand,
   TimerSettings,
@@ -134,6 +137,17 @@ interface OneDriveAPI {
   onDownloadProgress: (callback: (data: OneDriveNativeDownloadProgress) => void) => () => void
 }
 
+interface LanRemoteAPI {
+  start: (options: { host: string; port: number }) => Promise<LanRemoteStatus>
+  stop: () => Promise<LanRemoteStatus>
+  getStatus: () => Promise<LanRemoteStatus>
+  createPairing: (deviceName: string) => Promise<LanRemotePairingInfo>
+  publishState: (snapshot: LanRemoteSnapshot) => Promise<void>
+  publishAck: (ack: LanRemoteAck) => Promise<void>
+  onCommand: (callback: (command: LanRemoteCommand) => void) => () => void
+  onAck: (callback: (ack: LanRemoteAck) => void) => () => void
+}
+
 declare global {
   interface Window {
     api: {
@@ -149,6 +163,7 @@ declare global {
       projectionVlc: ProjectionVlcAPI
       localSync: LocalSyncAPI
       oneDrive: OneDriveAPI
+      lanRemote: LanRemoteAPI
     }
   }
 }

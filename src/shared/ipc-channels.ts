@@ -7,6 +7,7 @@
  */
 
 import type { ProjectionMessageTuple } from './projection-messages'
+import type { LanRemoteAck, LanRemoteCommand, LanRemoteSnapshot } from './lan-remote'
 import type {
   TimerCommand,
   TimerSettings,
@@ -165,6 +166,18 @@ export interface OneDriveNativeDownloadProgress {
   downloadTotalBytes?: number
 }
 
+export interface LanRemoteStatus {
+  enabled: boolean
+  host: string
+  port: number
+}
+
+export interface LanRemotePairingInfo {
+  url: string
+  secret: string
+  expiresAt: number
+}
+
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
 
@@ -244,6 +257,12 @@ export interface IpcInvokeMap {
     args: [OneDriveNativeDownloadRequest]
     result: OneDriveNativeDownloadResult
   }
+  'lan-remote:start': { args: [{ host: string; port: number }]; result: LanRemoteStatus }
+  'lan-remote:stop': { args: []; result: LanRemoteStatus }
+  'lan-remote:get-status': { args: []; result: LanRemoteStatus }
+  'lan-remote:create-pairing': { args: [string]; result: LanRemotePairingInfo }
+  'lan-remote:publish-state': { args: [LanRemoteSnapshot]; result: void }
+  'lan-remote:publish-ack': { args: [LanRemoteAck]; result: void }
 }
 
 export type IpcInvokeChannel = keyof IpcInvokeMap
@@ -272,6 +291,8 @@ export interface IpcMainToRendererMap {
   'update:status-changed': [{ status: UpdateStatus; version?: string; error?: string }]
   'app:download-progress': [WhisperDownloadProgress]
   'onedrive:download-progress': [OneDriveNativeDownloadProgress]
+  'lan-remote:command': [LanRemoteCommand]
+  'lan-remote:ack': [LanRemoteAck]
 }
 
 export type IpcMainToRendererChannel = keyof IpcMainToRendererMap

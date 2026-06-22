@@ -109,6 +109,20 @@ export function getDefaultSpeechSettings(): SpeechSettings {
 
 export const DEFAULT_SYNC_OFFLINE_POLICY: SyncOfflinePolicy = 'always-offline'
 
+export interface LanRemoteSettings {
+  enabled: boolean
+  selectedHost: string
+  allowTrustedDevices: boolean
+  trustDurationDays: number
+}
+
+export const DEFAULT_LAN_REMOTE: LanRemoteSettings = {
+  enabled: false,
+  selectedHost: '',
+  allowTrustedDevices: false,
+  trustDurationDays: 30
+}
+
 export function getEffectiveOneDriveClientId(): string {
   return LIBREPRESENTER_DEFAULT_ONEDRIVE_CLIENT_ID
 }
@@ -135,6 +149,22 @@ function normalizeSyncOfflinePolicy(value: unknown): SyncOfflinePolicy {
   return OFFLINE_POLICIES.includes(value as SyncOfflinePolicy)
     ? (value as SyncOfflinePolicy)
     : DEFAULT_SYNC_OFFLINE_POLICY
+}
+
+function normalizeLanRemoteSettings(value: unknown): LanRemoteSettings {
+  if (!isRecord(value)) return DEFAULT_LAN_REMOTE
+  return {
+    enabled: typeof value.enabled === 'boolean' ? value.enabled : DEFAULT_LAN_REMOTE.enabled,
+    selectedHost: typeof value.selectedHost === 'string' ? value.selectedHost : '',
+    allowTrustedDevices:
+      typeof value.allowTrustedDevices === 'boolean'
+        ? value.allowTrustedDevices
+        : DEFAULT_LAN_REMOTE.allowTrustedDevices,
+    trustDurationDays: Math.min(
+      90,
+      Math.max(1, normalizePositiveInteger(value.trustDurationDays, 30))
+    )
+  }
 }
 
 function normalizeSpeechSettings(value: unknown): SpeechSettings {
@@ -220,7 +250,8 @@ export function normalizeSettingsState(value: unknown): Partial<SettingsStore> {
       DEFAULT_TRASH_RETENTION_DAYS
     ),
     reminderMode,
-    projectionDisplayId: normalizeProjectionDisplayId(state.projectionDisplayId)
+    projectionDisplayId: normalizeProjectionDisplayId(state.projectionDisplayId),
+    lanRemote: normalizeLanRemoteSettings(state.lanRemote)
   }
 }
 
@@ -235,6 +266,7 @@ export interface SettingsStore {
   trashRetentionDays: number
   reminderMode: 'subtract' | 'add'
   projectionDisplayId: string
+  lanRemote: LanRemoteSettings
   setTimezone: (tz: string) => void
   setHardwareAcceleration: (enabled: boolean) => void
   setThemePreference: (pref: ThemePreference) => void
@@ -245,6 +277,7 @@ export interface SettingsStore {
   setTrashRetentionDays: (days: number) => void
   setReminderMode: (mode: 'subtract' | 'add') => void
   setProjectionDisplayId: (displayId: string) => void
+  setLanRemote: (settings: LanRemoteSettings) => void
   resetSettings: () => void
   resetToDefaults: () => Promise<void>
 }
@@ -261,6 +294,7 @@ function getDefaultSettingsState(): Omit<
   | 'setTrashRetentionDays'
   | 'setReminderMode'
   | 'setProjectionDisplayId'
+  | 'setLanRemote'
   | 'resetSettings'
   | 'resetToDefaults'
 > {
@@ -274,7 +308,8 @@ function getDefaultSettingsState(): Omit<
     defaultSyncOfflinePolicy: DEFAULT_SYNC_OFFLINE_POLICY,
     trashRetentionDays: DEFAULT_TRASH_RETENTION_DAYS,
     reminderMode: DEFAULT_REMINDER_MODE,
-    projectionDisplayId: DEFAULT_PROJECTION_DISPLAY_ID
+    projectionDisplayId: DEFAULT_PROJECTION_DISPLAY_ID,
+    lanRemote: DEFAULT_LAN_REMOTE
   }
 }
 
@@ -323,6 +358,10 @@ export const useSettingsStore = create<SettingsStore>()(
         set({ projectionDisplayId: normalizeProjectionDisplayId(displayId) })
       },
 
+      setLanRemote: (settings: LanRemoteSettings) => {
+        set({ lanRemote: normalizeLanRemoteSettings(settings) })
+      },
+
       resetSettings: () => {
         set(getDefaultSettingsState())
         toast.success(i18n.t('toast.settingsReset'))
@@ -341,7 +380,7 @@ export const useSettingsStore = create<SettingsStore>()(
     {
       name: createKey('settings'),
       storage: hhcPersistStorage,
-      version: 11,
+      version: 12,
       migrate: (persistedState, version) => {
         const state = persistedState as Record<string, unknown>
         if (version < 1) {
@@ -395,6 +434,9 @@ export const useSettingsStore = create<SettingsStore>()(
         if (version < 10) {
           state.projectionDisplayId = DEFAULT_PROJECTION_DISPLAY_ID
         }
+        if (version < 12) {
+          state.lanRemote = DEFAULT_LAN_REMOTE
+        }
         return normalizeSettingsState(state)
       },
       merge: (persistedState, currentState) => ({
@@ -411,7 +453,8 @@ export const useSettingsStore = create<SettingsStore>()(
         defaultSyncOfflinePolicy: state.defaultSyncOfflinePolicy,
         trashRetentionDays: state.trashRetentionDays,
         reminderMode: state.reminderMode,
-        projectionDisplayId: state.projectionDisplayId
+        projectionDisplayId: state.projectionDisplayId,
+        lanRemote: state.lanRemote
       })
     }
   )

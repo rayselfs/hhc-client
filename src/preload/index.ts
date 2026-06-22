@@ -156,6 +156,22 @@ const oneDriveApi = {
   ) => typedOn('onedrive:download-progress', callback)
 }
 
+const lanRemoteApi = {
+  start: (options: IpcInvokeMap['lan-remote:start']['args'][0]) =>
+    typedInvoke('lan-remote:start', options),
+  stop: () => typedInvoke('lan-remote:stop'),
+  getStatus: () => typedInvoke('lan-remote:get-status'),
+  createPairing: (deviceName: string) => typedInvoke('lan-remote:create-pairing', deviceName),
+  publishState: (snapshot: IpcInvokeMap['lan-remote:publish-state']['args'][0]) =>
+    typedInvoke('lan-remote:publish-state', snapshot),
+  publishAck: (ack: IpcInvokeMap['lan-remote:publish-ack']['args'][0]) =>
+    typedInvoke('lan-remote:publish-ack', ack),
+  onCommand: (callback: (command: IpcMainToRendererMap['lan-remote:command'][0]) => void) =>
+    typedOn('lan-remote:command', callback),
+  onAck: (callback: (ack: IpcMainToRendererMap['lan-remote:ack'][0]) => void) =>
+    typedOn('lan-remote:ack', callback)
+}
+
 const api = {
   projection: projectionApi,
   theme: themeApi,
@@ -168,7 +184,8 @@ const api = {
   videoPoster: videoPosterApi,
   projectionVlc: projectionVlcApi,
   localSync: localSyncApi,
-  oneDrive: oneDriveApi
+  oneDrive: oneDriveApi,
+  lanRemote: lanRemoteApi
 }
 
 try {

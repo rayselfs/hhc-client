@@ -10,6 +10,7 @@ import { registerNativeFsHandlers, registerNativeMediaProtocol } from './ipc/nat
 import { registerProjectionVlcHandlers } from './ipc/projection-vlc'
 import { registerVideoPosterHandlers } from './ipc/video-poster'
 import { registerLocalSyncHandlers } from './ipc/local-sync'
+import { registerLanRemoteIpc } from './ipc/lan-remote'
 import {
   handleOneDriveAuthCallbackUrl,
   isOneDriveAuthCallbackUrl,
@@ -115,6 +116,7 @@ if (gotSingleInstanceLock) {
     registerProjectionVlcHandlers(wm)
     registerVideoPosterHandlers(wm)
     registerLocalSyncHandlers(wm)
+    registerLanRemoteIpc(wm)
     registerOneDriveCredentialHandlers(wm)
     registerOneDriveDownloadHandlers(wm)
     registerNativeMediaProtocol()
