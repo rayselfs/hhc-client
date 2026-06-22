@@ -89,6 +89,13 @@ vi.mock('@renderer/stores/settings', () => ({
       setDefaultSyncOfflinePolicy: vi.fn(),
       trashRetentionDays: 30,
       setTrashRetentionDays: vi.fn(),
+      lanRemote: {
+        enabled: false,
+        selectedHost: '',
+        allowTrustedDevices: false,
+        trustDurationDays: 30
+      },
+      setLanRemote: vi.fn(),
       resetSettings: vi.fn(),
       resetToDefaults: vi.fn()
     }
@@ -212,6 +219,19 @@ describe('PreferencesDialog', () => {
     expect(screen.queryByLabelText('Custom Azure Client ID')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Offline Policy')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Trash Retention Period')).not.toBeInTheDocument()
+  })
+
+  it('opens LAN remote media preferences in Electron', async () => {
+    const user = userEvent.setup()
+    const { isElectron } = await import('@renderer/lib/env')
+    vi.mocked(isElectron).mockReturnValue(true)
+
+    renderDialog(true)
+
+    await user.click(screen.getByTestId('category-media'))
+    await user.click(screen.getByTestId('category-media-lanRemote'))
+
+    expect(screen.getByLabelText('Enable LAN remote')).toBeInTheDocument()
   })
 
   it('allows OneDrive login from web and disables the button while login is pending', async () => {

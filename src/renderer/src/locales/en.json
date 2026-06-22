@@ -705,7 +705,8 @@
     "media": {
       "sections": {
         "general": "General",
-        "oneDrive": "OneDrive"
+        "oneDrive": "OneDrive",
+        "lanRemote": "LAN Remote Control"
       },
       "defaultOfflinePolicy": "Offline Policy",
       "offlinePolicies": {
@@ -729,6 +730,16 @@
         "disconnectDescription": "This removes the OneDrive source from LibrePresenter and clears locally cached synced files. Remote files are not changed.",
         "disconnected": "Logged out of OneDrive.",
         "disconnectFailed": "Failed to logout from OneDrive."
+      },
+      "lanRemote": {
+        "enable": "Enable LAN remote",
+        "privateInterface": "Private interface address",
+        "allowTrustedDevices": "Allow trusted devices",
+        "trustDurationDays": "Trust duration days",
+        "running": "Remote running at {{host}}:{{port}}",
+        "disabled": "LAN remote is disabled",
+        "hostRequired": "Choose a private LAN address before enabling LAN remote.",
+        "updateFailed": "Failed to update LAN remote."
       }
     },
     "storage": {

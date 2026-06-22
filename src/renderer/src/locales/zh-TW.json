@@ -705,7 +705,8 @@
     "media": {
       "sections": {
         "general": "一般",
-        "oneDrive": "OneDrive"
+        "oneDrive": "OneDrive",
+        "lanRemote": "LAN 遙控"
       },
       "defaultOfflinePolicy": "離線策略",
       "offlinePolicies": {
@@ -729,6 +730,16 @@
         "disconnectDescription": "這會從 LibrePresenter 移除 OneDrive 來源並清除本機同步快取，不會變更遠端檔案。",
         "disconnected": "已登出 OneDrive。",
         "disconnectFailed": "無法登出 OneDrive。"
+      },
+      "lanRemote": {
+        "enable": "啟用 LAN 遙控",
+        "privateInterface": "私人網路介面位址",
+        "allowTrustedDevices": "允許信任裝置",
+        "trustDurationDays": "信任天數",
+        "running": "遙控已啟動於 {{host}}:{{port}}",
+        "disabled": "LAN 遙控已停用",
+        "hostRequired": "啟用 LAN 遙控前，請先選擇私人網路位址。",
+        "updateFailed": "無法更新 LAN 遙控。"
       }
     },
     "storage": {

@@ -24,6 +24,7 @@ import StorageSettings, {
   type StorageSettingsSection
 } from '@renderer/components/Control/UserMenu/StorageSettings'
 import { ShortcutScope } from '@renderer/contexts/ShortcutScopeContext'
+import { isElectron } from '@renderer/lib/env'
 
 interface PreferencesDialogProps {
   isOpen: boolean
@@ -45,6 +46,7 @@ interface CategoryChildItem {
   labelKey:
     | 'preferences.media.sections.general'
     | 'preferences.media.sections.oneDrive'
+    | 'preferences.media.sections.lanRemote'
     | 'preferences.storage.sections.usage'
     | 'preferences.storage.sections.cleanup'
 }
@@ -74,7 +76,12 @@ export default function PreferencesDialog({
   const [isClearingAllData, setIsClearingAllData] = useState(false)
   const mediaChildren: CategoryChildItem[] = [
     { id: 'media.general', labelKey: 'preferences.media.sections.general' },
-    { id: 'media.oneDrive', labelKey: 'preferences.media.sections.oneDrive' }
+    { id: 'media.oneDrive', labelKey: 'preferences.media.sections.oneDrive' },
+    ...(isElectron()
+      ? ([
+          { id: 'media.lanRemote', labelKey: 'preferences.media.sections.lanRemote' }
+        ] satisfies CategoryChildItem[])
+      : [])
   ]
   const categories: CategoryItem[] = [
     { id: 'general', icon: Settings, labelKey: 'preferences.categories.general', route: 'general' },
@@ -207,6 +214,7 @@ export default function PreferencesDialog({
                     {activeRoute === 'soundboard' && <SoundboardSettings />}
                     {activeRoute === 'media.general' && <MediaSettings section="general" />}
                     {activeRoute === 'media.oneDrive' && <MediaSettings section="oneDrive" />}
+                    {activeRoute === 'media.lanRemote' && <MediaSettings section="lanRemote" />}
                     {activeRoute === 'storage.usage' && <StorageSettings section="usage" />}
                     {activeRoute === 'storage.cleanup' && <StorageSettings section="cleanup" />}
                     {activeRoute === 'recovery' && <RecoveryCenterSettings />}

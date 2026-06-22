@@ -4,8 +4,10 @@ import { toast } from '@heroui/react/toast'
 import { Button } from '@heroui/react/button'
 import { Select } from '@heroui/react/select'
 import { ListBox } from '@heroui/react/list-box'
+import { Switch } from '@heroui/react/switch'
 import { Label } from 'react-aria-components'
 import { useSettingsStore } from '@renderer/stores/settings'
+import type { LanRemoteStatus } from '@shared/ipc-channels'
 import type { SyncOfflinePolicy } from '@shared/types/folder'
 import { listProviderConnectionsByType, type ProviderConnectionRecord } from '@renderer/lib/sync-db'
 import { unlinkSyncConnectionFromApp } from '@renderer/lib/sync-unlink'
@@ -16,7 +18,7 @@ import { isElectron } from '@renderer/lib/env'
 
 const RETENTION_DAY_OPTIONS = [7, 14, 30, 60, 90, 0] as const
 const OFFLINE_POLICY_OPTIONS: SyncOfflinePolicy[] = ['online-only', 'on-demand', 'always-offline']
-export type MediaSettingsSection = 'general' | 'oneDrive'
+export type MediaSettingsSection = 'general' | 'oneDrive' | 'lanRemote'
 
 interface MediaSettingsProps {
   section?: MediaSettingsSection
@@ -31,10 +33,14 @@ export default function MediaSettings({
   const setTrashRetentionDays = useSettingsStore((s) => s.setTrashRetentionDays)
   const defaultSyncOfflinePolicy = useSettingsStore((s) => s.defaultSyncOfflinePolicy)
   const setDefaultSyncOfflinePolicy = useSettingsStore((s) => s.setDefaultSyncOfflinePolicy)
+  const lanRemote = useSettingsStore((s) => s.lanRemote)
+  const setLanRemote = useSettingsStore((s) => s.setLanRemote)
   const [oneDriveConnection, setOneDriveConnection] = useState<ProviderConnectionRecord | null>(
     null
   )
   const [oneDriveConnectionBusy, setOneDriveConnectionBusy] = useState(false)
+  const [lanRemoteStatus, setLanRemoteStatus] = useState<LanRemoteStatus | null>(null)
+  const [lanRemoteBusy, setLanRemoteBusy] = useState(false)
 
   const refreshOneDriveConnection = useCallback(async (): Promise<void> => {
     const connections = await listProviderConnectionsByType('onedrive')
@@ -104,6 +110,35 @@ export default function MediaSettings({
     if (section !== 'oneDrive') return
     void refreshOneDriveConnection()
   }, [section, refreshOneDriveConnection])
+
+  useEffect(() => {
+    if (section !== 'lanRemote' || !isElectron() || !window.api?.lanRemote) return
+    void window.api.lanRemote.getStatus().then(setLanRemoteStatus)
+  }, [section])
+
+  async function handleLanRemoteEnabledChange(enabled: boolean): Promise<void> {
+    if (!isElectron() || !window.api?.lanRemote) return
+    if (enabled && lanRemote.selectedHost.trim() === '') {
+      setLanRemote({ ...lanRemote, enabled: false })
+      toast.danger(t('preferences.media.lanRemote.hostRequired'))
+      return
+    }
+
+    setLanRemoteBusy(true)
+    try {
+      const status = enabled
+        ? await window.api.lanRemote.start({ host: lanRemote.selectedHost, port: 0 })
+        : await window.api.lanRemote.stop()
+      setLanRemote({ ...lanRemote, enabled: status.enabled })
+      setLanRemoteStatus(status)
+    } catch (error) {
+      console.warn('[lan-remote] Failed to update LAN remote state', error)
+      setLanRemote({ ...lanRemote, enabled: false })
+      toast.danger(t('preferences.media.lanRemote.updateFailed'))
+    } finally {
+      setLanRemoteBusy(false)
+    }
+  }
 
   return (
     <div className="p-5 space-y-6">
@@ -209,6 +244,75 @@ export default function MediaSettings({
               </div>
             )}
           </div>
+        </section>
+      )}
+
+      {section === 'lanRemote' && isElectron() && (
+        <section className="space-y-5">
+          <div>
+            <label className="mb-2 block text-sm font-medium">
+              {t('preferences.media.lanRemote.enable')}
+            </label>
+            <Switch
+              isSelected={lanRemote.enabled}
+              isDisabled={lanRemoteBusy}
+              onChange={(checked) => void handleLanRemoteEnabledChange(checked)}
+              aria-label={t('preferences.media.lanRemote.enable')}
+            >
+              <Switch.Control>
+                <Switch.Thumb />
+              </Switch.Control>
+            </Switch>
+          </div>
+
+          <label className="block text-sm font-medium">
+            {t('preferences.media.lanRemote.privateInterface')}
+            <input
+              value={lanRemote.selectedHost}
+              onChange={(event) =>
+                setLanRemote({ ...lanRemote, selectedHost: event.currentTarget.value })
+              }
+              className="mt-2 w-full rounded-full border border-default-200 bg-transparent px-4 py-2 text-sm"
+            />
+          </label>
+
+          <div className="border-t border-default-200 pt-4">
+            <label className="mb-2 block text-sm font-medium">
+              {t('preferences.media.lanRemote.allowTrustedDevices')}
+            </label>
+            <Switch
+              isSelected={lanRemote.allowTrustedDevices}
+              onChange={(checked) => setLanRemote({ ...lanRemote, allowTrustedDevices: checked })}
+              aria-label={t('preferences.media.lanRemote.allowTrustedDevices')}
+            >
+              <Switch.Control>
+                <Switch.Thumb />
+              </Switch.Control>
+            </Switch>
+          </div>
+
+          <label className="block text-sm font-medium">
+            {t('preferences.media.lanRemote.trustDurationDays')}
+            <input
+              type="number"
+              min={1}
+              max={90}
+              value={lanRemote.trustDurationDays}
+              onChange={(event) =>
+                setLanRemote({ ...lanRemote, trustDurationDays: Number(event.currentTarget.value) })
+              }
+              className="mt-2 w-full rounded-full border border-default-200 bg-transparent px-4 py-2 text-sm"
+            />
+          </label>
+
+          <p className="text-xs text-gray-500">
+            {lanRemoteStatus?.enabled
+              ? t('preferences.media.lanRemote.running', {
+                  host: lanRemoteStatus.host,
+                  port: lanRemoteStatus.port
+                })
+              : t('preferences.media.lanRemote.disabled')}
+          </p>
         </section>
       )}
     </div>
