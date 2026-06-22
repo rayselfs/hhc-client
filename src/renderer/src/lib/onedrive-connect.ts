@@ -9,7 +9,7 @@ import {
   parseOneDriveAuthCallback
 } from './onedrive-auth'
 import { OneDriveReadonlyProvider } from './onedrive-provider'
-import { openFileExplorerDB } from './file-explorer-db'
+import { collectAvailableFileBlobIds, openFileExplorerDB } from './file-explorer-db'
 import { resolveUniqueName } from './file-naming'
 import {
   listProviderConnectionsByType,
@@ -570,7 +570,7 @@ export async function loginOneDriveAccount(options?: {
   const callbackUrl = await (options?.requestCallbackUrl
     ? options.requestCallbackUrl()
     : isElectron()
-      ? window.api.oneDrive.waitAuthCallback()
+      ? window.api.oneDrive.waitAuthCallback(request.state)
       : waitForWebOneDriveCallback(authWindow))
   if (!callbackUrl) return null
 
@@ -728,6 +728,8 @@ export interface OneDriveRefreshSummary {
   fullScanFallback: boolean
 }
 
+const oneDriveRefreshesInFlight = new Map<string, Promise<OneDriveRefreshSummary>>()
+
 function isExpiredCursorError(error: unknown): boolean {
   if (typeof error === 'object' && error !== null && 'status' in error) {
     return (error as { status?: unknown }).status === 410
@@ -736,6 +738,23 @@ function isExpiredCursorError(error: unknown): boolean {
 }
 
 export async function refreshOneDriveFolder(
+  rootFolderId: string,
+  options: { forceRetry?: boolean } = {}
+): Promise<OneDriveRefreshSummary> {
+  const existing = oneDriveRefreshesInFlight.get(rootFolderId)
+  if (existing) return existing
+  const refresh = runOneDriveFolderRefresh(rootFolderId, options)
+  oneDriveRefreshesInFlight.set(rootFolderId, refresh)
+  try {
+    return await refresh
+  } finally {
+    if (oneDriveRefreshesInFlight.get(rootFolderId) === refresh) {
+      oneDriveRefreshesInFlight.delete(rootFolderId)
+    }
+  }
+}
+
+async function runOneDriveFolderRefresh(
   rootFolderId: string,
   options: { forceRetry?: boolean } = {}
 ): Promise<OneDriveRefreshSummary> {
@@ -788,7 +807,7 @@ export async function refreshOneDriveFolder(
     existingFolders: folders,
     existingItems: allItems.filter((item): item is FileItemRecord => item.type === 'file'),
     existingEntries,
-    existingBlobIds: new Set(fileBlobs.map((blob) => blob.id)),
+    existingBlobIds: await collectAvailableFileBlobIds(fileBlobs),
     forceRetry: options.forceRetry
   }
 

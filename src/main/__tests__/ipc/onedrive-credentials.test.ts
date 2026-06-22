@@ -353,12 +353,29 @@ describe('OneDrive credential IPC', () => {
   })
 
   it('resolves auth callback from the custom protocol URL', async () => {
-    const waiting = getHandler('onedrive:wait-auth-callback')(makeEvent()) as Promise<string | null>
+    const waiting = getHandler('onedrive:wait-auth-callback')(makeEvent(), 'state-1') as Promise<
+      string | null
+    >
 
     handleOneDriveAuthCallbackUrl('librepresenter://auth/onedrive?code=code-1&state=state-1', wm)
 
     await expect(waiting).resolves.toBe('librepresenter://auth/onedrive?code=code-1&state=state-1')
     expect(mockMainWindow.show).toHaveBeenCalled()
     expect(mockMainWindow.focus).toHaveBeenCalled()
+  })
+
+  it('ignores stale queued auth callbacks with a different state', async () => {
+    handleOneDriveAuthCallbackUrl(
+      'librepresenter://auth/onedrive?code=old-code&state=old-state',
+      wm
+    )
+
+    const waiting = getHandler('onedrive:wait-auth-callback')(makeEvent(), 'state-1') as Promise<
+      string | null
+    >
+
+    handleOneDriveAuthCallbackUrl('librepresenter://auth/onedrive?code=code-1&state=state-1', wm)
+
+    await expect(waiting).resolves.toBe('librepresenter://auth/onedrive?code=code-1&state=state-1')
   })
 })

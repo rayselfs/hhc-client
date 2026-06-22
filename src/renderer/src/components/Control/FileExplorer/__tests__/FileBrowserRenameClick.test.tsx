@@ -155,6 +155,7 @@ vi.mock('@renderer/stores/file-explorer', () => {
     getItems: () => [fileItem]
   })
   return {
+    FILE_EXPLORER_ROOT_ID: 'file-root',
     deleteFolderFromStore: vi.fn(),
     removeFileItemFromStore: vi.fn(),
     useFileExplorerCustomOrder: (selector: (state: Record<string, unknown>) => unknown) =>

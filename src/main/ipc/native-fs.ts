@@ -143,6 +143,18 @@ export function registerNativeFsHandlers(wm: WindowManager): void {
     }
   )
 
+  ipcMain.handle('native-fs:file-exists', async (event, id: unknown): Promise<boolean> => {
+    if (!isMainWindow(wm, event)) throw new Error('Unauthorized native file stat')
+    const filePath = getNativeFilePath(id)
+    try {
+      const stat = await fs.stat(filePath)
+      return stat.isFile()
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false
+      throw error
+    }
+  })
+
   ipcMain.handle('native-fs:delete-file', async (event, id: unknown): Promise<void> => {
     if (!isMainWindow(wm, event)) throw new Error('Unauthorized native file deletion')
     const filePath = getNativeFilePath(id)

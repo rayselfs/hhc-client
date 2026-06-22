@@ -102,6 +102,7 @@ const nativeFsApi = {
   },
   getUrl: (id: string, mimeType: string) =>
     `hhc-media://file/${encodeURIComponent(id)}?type=${encodeURIComponent(mimeType)}`,
+  exists: (id: string) => typedInvoke('native-fs:file-exists', id),
   delete: (id: string) => typedInvoke('native-fs:delete-file', id)
 }
 
@@ -146,7 +147,8 @@ const oneDriveApi = {
   deleteCredentials: (connectionId: string) =>
     typedInvoke('onedrive:delete-credentials', connectionId),
   getAuthRedirectUri: () => typedInvoke('onedrive:get-auth-redirect-uri'),
-  waitAuthCallback: () => typedInvoke('onedrive:wait-auth-callback'),
+  waitAuthCallback: (expectedState?: string) =>
+    typedInvoke('onedrive:wait-auth-callback', expectedState),
   downloadFile: (request: IpcInvokeMap['onedrive:download-file']['args'][0]) =>
     typedInvoke('onedrive:download-file', request),
   onDownloadProgress: (

@@ -82,6 +82,29 @@ export async function getFileBlobRecord(id: string): Promise<FileBlobRecord | un
   return (await getFileExplorerDB()).get('file-blobs', id)
 }
 
+export async function isFileBlobRecordAvailable(
+  record: FileBlobRecord | undefined
+): Promise<boolean> {
+  if (!record) return false
+  if (record.storage === 'native-fs') {
+    if (!isElectron()) return false
+    return window.api.nativeFs.exists(record.id)
+  }
+  return Boolean(record.blob)
+}
+
+export async function isFileBlobAvailable(id: string): Promise<boolean> {
+  return isFileBlobRecordAvailable(await getFileBlobRecord(id))
+}
+
+export async function collectAvailableFileBlobIds(records: FileBlobRecord[]): Promise<Set<string>> {
+  const ids = new Set<string>()
+  for (const record of records) {
+    if (await isFileBlobRecordAvailable(record)) ids.add(record.id)
+  }
+  return ids
+}
+
 export async function storeFileBlob(
   db: IDBPDatabase<FileExplorerDBSchema>,
   id: string,
@@ -119,16 +142,24 @@ export interface FileSource {
   revoke: () => void
 }
 
+export interface GetFileSourceOptions {
+  verifyNativeFile?: boolean
+}
+
 export async function getFileSource(
   db: IDBPDatabase<FileExplorerDBSchema>,
   id: string,
-  mimeType: string
+  mimeType: string,
+  options: GetFileSourceOptions = {}
 ): Promise<FileSource | null> {
   const record = await db.get('file-blobs', id)
   if (!record) return null
 
+  if (record.storage !== 'native-fs' || options.verifyNativeFile !== false) {
+    if (!(await isFileBlobRecordAvailable(record))) return null
+  }
+
   if (record.storage === 'native-fs') {
-    if (!isElectron()) return null
     return {
       url: window.api.nativeFs.getUrl(id, mimeType),
       revoke: () => undefined

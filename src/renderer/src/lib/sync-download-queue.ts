@@ -4,7 +4,13 @@ import type {
   SyncDownloadResult,
   SyncRetryClassification
 } from './sync-provider'
-import { putSyncEntry, type SyncEntryRecord, type SyncEntryStatus } from './sync-db'
+import { getFileBlobRecord, isFileBlobRecordAvailable } from './file-explorer-db'
+import {
+  getSyncEntryByRemoteItem,
+  putSyncEntry,
+  type SyncEntryRecord,
+  type SyncEntryStatus
+} from './sync-db'
 import { isSyncStorageLimitError } from './sync-download-storage'
 
 export const SYNC_DOWNLOAD_CONCURRENCY = 1
@@ -72,6 +78,46 @@ function getErrorMessage(error: unknown): string {
 
 function getRetryDelayMs(retryCount: number): number {
   return RETRY_BACKOFF_MS[Math.min(Math.max(retryCount - 1, 0), RETRY_BACKOFF_MS.length - 1)]
+}
+
+function hasSameContentIdentity(current: SyncEntryRecord, entry: SyncDownloadEntry): boolean {
+  if (current.etag && entry.etag && current.etag !== entry.etag) return false
+  if (current.contentHash && entry.contentHash && current.contentHash !== entry.contentHash) {
+    return false
+  }
+  if (
+    typeof current.size === 'number' &&
+    typeof entry.size === 'number' &&
+    current.size !== entry.size
+  ) {
+    return false
+  }
+  return true
+}
+
+async function getAlreadyAvailableResult(
+  job: SyncDownloadQueueJob
+): Promise<SyncDownloadResult | null> {
+  const current = await getSyncEntryByRemoteItem(
+    job.entry.providerConnectionId,
+    job.entry.remoteItemId
+  )
+  if (
+    current?.kind !== 'file' ||
+    current.status !== 'available-offline' ||
+    !current.blobId ||
+    current.itemId !== job.entry.itemId ||
+    !hasSameContentIdentity(current, job.entry)
+  ) {
+    return null
+  }
+  const record = await getFileBlobRecord(current.blobId)
+  if (!record || !(await isFileBlobRecordAvailable(record))) return null
+  return {
+    blobId: current.blobId,
+    size: record.size ?? current.size ?? 0,
+    mimeType: current.mimeType ?? job.entry.mimeType ?? ''
+  }
 }
 
 export function classifySyncDownloadFailure(
@@ -152,6 +198,11 @@ function pumpSyncDownloadQueue(): void {
 
 async function runSyncDownloadJob(job: SyncDownloadQueueJob): Promise<void> {
   try {
+    const alreadyAvailable = await getAlreadyAvailableResult(job)
+    if (alreadyAvailable) {
+      job.resolve(alreadyAvailable)
+      return
+    }
     await putSyncEntry({
       ...job.entry,
       status: 'downloading',

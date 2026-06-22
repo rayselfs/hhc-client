@@ -15,6 +15,7 @@ const mockUnsubscribeFileExplorer = vi.fn()
 const mockRecoverStaleJobs = vi.fn().mockResolvedValue(0)
 const mockRemoveExpiredHistory = vi.fn().mockResolvedValue(0)
 const mockRegisterExecutor = vi.fn()
+const mockBackfillImportedMediaAssets = vi.fn().mockResolvedValue(undefined)
 const mockRecoverPendingSyncResourceCleanups = vi.fn().mockResolvedValue({
   folderIds: [],
   itemIds: [],
@@ -103,6 +104,32 @@ vi.mock('@renderer/lib/media-job-queue', () => ({
 vi.mock('@renderer/lib/sync-unlink', () => ({
   recoverPendingSyncResourceCleanups: mockRecoverPendingSyncResourceCleanups
 }))
+
+vi.mock('@renderer/lib/local-sync-import', () => ({
+  backfillImportedMediaAssets: mockBackfillImportedMediaAssets
+}))
+
+describe('startEarlyInit', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    vi.clearAllMocks()
+    window.location.hash = ''
+  })
+
+  it('skips control-window initialization on the projection route', async () => {
+    window.location.hash = '#/projection'
+    const { startEarlyInit } = await import('../app-init')
+
+    startEarlyInit()
+    await Promise.resolve()
+
+    expect(mockInitialize).not.toHaveBeenCalled()
+    expect(mockFolderInitialize).not.toHaveBeenCalled()
+    expect(mockFileExplorerInitialize).not.toHaveBeenCalled()
+    expect(mockRecoverStaleJobs).not.toHaveBeenCalled()
+    expect(mockBackfillImportedMediaAssets).not.toHaveBeenCalled()
+  })
+})
 
 describe('initializeApp — online handler', () => {
   beforeEach(async () => {

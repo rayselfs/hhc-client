@@ -17,11 +17,16 @@ let subscriptionsInitialized = false
 let chunksReadyPromise: Promise<void> | null = null
 let routePrefetchScheduled = false
 
+function isProjectionRoute(): boolean {
+  return window.location.hash.startsWith('#/projection')
+}
+
 /**
  * Kick off async store initializations as early as possible (called from main.tsx
  * before React renders). Idempotent — safe to call multiple times.
  */
 export function startEarlyInit(): void {
+  if (isProjectionRoute()) return
   if (earlyInitStarted) return
   earlyInitStarted = true
 

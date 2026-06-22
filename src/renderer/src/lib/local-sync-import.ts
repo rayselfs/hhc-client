@@ -3,6 +3,7 @@ import type { FileItemRecord, FolderRecord } from '@shared/types/folder'
 import { FILE_EXPLORER_ROOT_ID, useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { isWeb } from '@renderer/lib/env'
 import {
+  collectAvailableFileBlobIds,
   getFileSource,
   openFileExplorerDB,
   type FileBlobRecord
@@ -369,7 +370,7 @@ export async function refreshImportedMediaAssets(items: FileItemRecord[]): Promi
 export async function backfillImportedMediaAssets(): Promise<void> {
   const db = await openFileExplorerDB()
   const [items, fileBlobs] = await Promise.all([db.getAll('folder-items'), db.getAll('file-blobs')])
-  const availableBlobIds = new Set(fileBlobs.map((blob) => blob.id))
+  const availableBlobIds = await collectAvailableFileBlobIds(fileBlobs)
   await refreshImportedMediaAssets(
     items.filter(
       (item): item is FileItemRecord =>
@@ -529,7 +530,7 @@ export async function refreshLocalSyncConnection(
     existingFolders: folders,
     existingItems: allItems.filter((item): item is FileItemRecord => item.type === 'file'),
     existingEntries,
-    existingBlobIds: new Set(fileBlobs.map((blob) => blob.id)),
+    existingBlobIds: await collectAvailableFileBlobIds(fileBlobs),
     remoteItems: remoteItems.map((item) => ({
       remoteItemId: item.remoteItemId,
       parentRemoteItemId: item.parentRemoteItemId,

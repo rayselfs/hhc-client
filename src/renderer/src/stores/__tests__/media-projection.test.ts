@@ -8,7 +8,8 @@ import type { FileItemRecord } from '@shared/types/folder'
 
 vi.mock('@renderer/lib/file-explorer-db', () => ({
   openFileExplorerDB: vi.fn(async () => ({}) as IDBDatabase),
-  getFileBlob: vi.fn(async () => null)
+  getFileBlob: vi.fn(async () => null),
+  isFileBlobAvailable: vi.fn(async () => true)
 }))
 
 vi.mock('@renderer/lib/thumbnail-db', () => ({

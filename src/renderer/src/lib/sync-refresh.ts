@@ -7,12 +7,17 @@ import type {
 import { isValidNativeFileId } from '@shared/native-media'
 import { FILE_EXPLORER_ROOT_ID, useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { cleanupFileResources } from './file-resource-cleanup'
-import { openFileExplorerDB, type FileBlobRecord } from './file-explorer-db'
+import {
+  isFileBlobRecordAvailable,
+  openFileExplorerDB,
+  type FileBlobRecord
+} from './file-explorer-db'
 import type { MediaPlatform } from '@renderer/lib/media-capabilities'
 import { classifyMediaImport } from '@renderer/lib/media-import-policy'
 import { isIgnoredSystemPath } from '@shared/file-ignore-policy'
 import type { RemoteSyncItem } from './sync-provider'
 import {
+  getSyncEntryByRemoteItem,
   putSyncEntry,
   putSyncTombstone,
   type SyncEntryRecord,
@@ -535,7 +540,10 @@ export async function applySyncRefreshPlan(
     ...blobs.map((blob) => tx.objectStore('file-blobs').put(blob)),
     tx.done
   ])
-  await Promise.all(plan.syncEntries.map((entry) => putSyncEntry(entry)))
+  for (const entry of plan.syncEntries) {
+    if (await isStalePendingEntry(db, entry)) continue
+    await putSyncEntry(entry)
+  }
   await Promise.all(
     plan.removedEntries.map(async (entry) => {
       await putSyncTombstone({
@@ -568,6 +576,45 @@ export async function applySyncRefreshPlan(
     itemIds: plan.removedItemIds
   })
   mergeSyncRefreshIntoStore(plan)
+}
+
+type PlannedSyncEntry = SyncRefreshPlan['syncEntries'][number]
+
+function isPendingStatus(status: SyncEntryStatus): boolean {
+  return status === 'queued' || status === 'downloading' || status === 'outdated'
+}
+
+function hasSameContentIdentity(current: SyncEntryRecord, planned: PlannedSyncEntry): boolean {
+  if (current.etag && planned.etag && current.etag !== planned.etag) return false
+  if (current.contentHash && planned.contentHash && current.contentHash !== planned.contentHash) {
+    return false
+  }
+  if (
+    typeof current.size === 'number' &&
+    typeof planned.size === 'number' &&
+    current.size !== planned.size
+  ) {
+    return false
+  }
+  return true
+}
+
+async function isStalePendingEntry(
+  db: Awaited<ReturnType<typeof openFileExplorerDB>>,
+  planned: PlannedSyncEntry
+): Promise<boolean> {
+  if (planned.kind !== 'file' || !isPendingStatus(planned.status)) return false
+  const current = await getSyncEntryByRemoteItem(planned.providerConnectionId, planned.remoteItemId)
+  if (
+    current?.kind !== 'file' ||
+    current.status !== 'available-offline' ||
+    !current.blobId ||
+    current.itemId !== planned.itemId ||
+    !hasSameContentIdentity(current, planned)
+  ) {
+    return false
+  }
+  return isFileBlobRecordAvailable(await db.get('file-blobs', current.blobId))
 }
 
 function mergeSyncRefreshIntoStore(plan: SyncRefreshPlan): void {

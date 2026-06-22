@@ -8,7 +8,7 @@ import {
   type MediaSupportMode
 } from './media-capabilities'
 import { getSyncEntryByLocalItem } from './sync-db'
-import { getFileBlobRecord } from './file-explorer-db'
+import { getFileBlobRecord, isFileBlobAvailable } from './file-explorer-db'
 import { ensureSourceMediaMetadata } from './media-metadata'
 
 export type PresentationReadinessStatus =
@@ -185,6 +185,16 @@ async function analyzePresentationItem(
       blobId,
       status: 'unsupported',
       reason: 'unsupported-platform',
+      support
+    }
+  }
+
+  if (!(await isFileBlobAvailable(blobId))) {
+    return {
+      itemId: item.id,
+      blobId,
+      status: syncEntry ? 'preparing' : 'missing',
+      reason: syncEntry ? 'sync-missing-source' : 'missing-source',
       support
     }
   }

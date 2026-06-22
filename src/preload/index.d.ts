@@ -95,6 +95,7 @@ interface SpeechAPI {
 interface NativeFsAPI {
   importFile: (id: string, file: File) => Promise<{ size: number }>
   getUrl: (id: string, mimeType: string) => string
+  exists: (id: string) => Promise<boolean>
   delete: (id: string) => Promise<void>
 }
 
@@ -128,7 +129,7 @@ interface OneDriveAPI {
   completeAuth: (request: OneDriveAuthCodeExchangeRequest) => Promise<OneDriveConnectedAccount>
   deleteCredentials: (connectionId: string) => Promise<void>
   getAuthRedirectUri: () => Promise<string>
-  waitAuthCallback: () => Promise<string | null>
+  waitAuthCallback: (expectedState?: string) => Promise<string | null>
   downloadFile: (request: OneDriveNativeDownloadRequest) => Promise<OneDriveNativeDownloadResult>
   onDownloadProgress: (callback: (data: OneDriveNativeDownloadProgress) => void) => () => void
 }

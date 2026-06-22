@@ -5,7 +5,8 @@ import {
   resetSyncDownloadQueueForTests,
   SYNC_DOWNLOAD_CONCURRENCY
 } from '../sync-download-queue'
-import { getSyncEntryByRemoteItem, resetSyncDBForTests } from '../sync-db'
+import { openFileExplorerDB, resetFileExplorerDBForTests } from '../file-explorer-db'
+import { getSyncEntryByRemoteItem, putSyncEntry, resetSyncDBForTests } from '../sync-db'
 
 function deferred<T>(): {
   promise: Promise<T>
@@ -65,8 +66,17 @@ function makeProvider(
 describe('sync download queue', () => {
   beforeEach(async () => {
     resetSyncDownloadQueueForTests()
+    await resetFileExplorerDBForTests()
     await resetSyncDBForTests()
     vi.clearAllMocks()
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: {
+        nativeFs: {
+          exists: vi.fn(async () => true)
+        }
+      }
+    })
   })
 
   it('uses one concurrent download', () => {
@@ -173,6 +183,94 @@ describe('sync download queue', () => {
       { blobId: 'item-1', size: 100, mimeType: 'image/png' },
       { blobId: 'item-1', size: 100, mimeType: 'image/png' }
     ])
+    expect(provider.downloadContent).toHaveBeenCalledTimes(1)
+  })
+
+  it('skips a stale queued job when the file is already available offline', async () => {
+    const db = await openFileExplorerDB()
+    await db.put('file-blobs', {
+      id: 'item-1',
+      storage: 'native-fs',
+      size: 100,
+      refCount: 1
+    })
+    await putSyncEntry({
+      ...makeEntry('remote-1', 'item-1'),
+      blobId: 'item-1',
+      etag: 'etag-1',
+      contentHash: 'hash-1',
+      status: 'available-offline',
+      downloadedBytes: 100,
+      downloadTotalBytes: 100
+    })
+    const provider = makeProvider(vi.fn())
+
+    await expect(
+      enqueueSyncDownload({
+        provider,
+        request: {
+          providerConnectionId: 'connection-1',
+          remoteItemId: 'remote-1',
+          targetBlobId: 'item-1',
+          offlinePolicy: 'always-offline'
+        },
+        entry: {
+          ...makeEntry('remote-1', 'item-1'),
+          etag: 'etag-1',
+          contentHash: 'hash-1'
+        },
+        priority: 'background'
+      })
+    ).resolves.toEqual({ blobId: 'item-1', size: 100, mimeType: 'image/png' })
+
+    expect(provider.downloadContent).not.toHaveBeenCalled()
+    await expect(getSyncEntryByRemoteItem('connection-1', 'remote-1')).resolves.toMatchObject({
+      status: 'available-offline',
+      blobId: 'item-1'
+    })
+  })
+
+  it('does not skip a stale queued job when the native file is missing', async () => {
+    const db = await openFileExplorerDB()
+    await db.put('file-blobs', {
+      id: 'item-1',
+      storage: 'native-fs',
+      size: 100,
+      refCount: 1
+    })
+    await putSyncEntry({
+      ...makeEntry('remote-1', 'item-1'),
+      blobId: 'item-1',
+      etag: 'etag-1',
+      status: 'available-offline'
+    })
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: {
+        nativeFs: {
+          exists: vi.fn(async () => false)
+        }
+      }
+    })
+    const provider = makeProvider(
+      vi.fn(async () => ({ blobId: 'item-1', size: 100, mimeType: 'image/png' }))
+    )
+
+    await enqueueSyncDownload({
+      provider,
+      request: {
+        providerConnectionId: 'connection-1',
+        remoteItemId: 'remote-1',
+        targetBlobId: 'item-1',
+        offlinePolicy: 'always-offline'
+      },
+      entry: {
+        ...makeEntry('remote-1', 'item-1'),
+        etag: 'etag-1'
+      },
+      priority: 'background'
+    })
+
     expect(provider.downloadContent).toHaveBeenCalledTimes(1)
   })
 

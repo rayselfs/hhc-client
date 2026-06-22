@@ -161,6 +161,31 @@ describe('native file import', () => {
   })
 })
 
+describe('native file availability', () => {
+  it('reports whether a managed native file exists', async () => {
+    mockStat.mockResolvedValueOnce({ isFile: () => true, size: 10 })
+    vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockMainWindow as never)
+
+    await expect(getHandler('native-fs:file-exists')(makeEvent(), validId)).resolves.toBe(true)
+    expect(mockStat).toHaveBeenCalledWith(`/tmp/hhc-user-data/native-files/${validId}`)
+  })
+
+  it('returns false when a managed native file is missing', async () => {
+    mockStat.mockRejectedValueOnce(Object.assign(new Error('missing'), { code: 'ENOENT' }))
+    vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockMainWindow as never)
+
+    await expect(getHandler('native-fs:file-exists')(makeEvent(), validId)).resolves.toBe(false)
+  })
+
+  it('rejects file availability checks from non-main windows', async () => {
+    vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockProjectionWindow as never)
+
+    await expect(getHandler('native-fs:file-exists')(makeEvent(), validId)).rejects.toThrow(
+      'Unauthorized native file stat'
+    )
+  })
+})
+
 describe('native media protocol', () => {
   beforeEach(() => {
     registerNativeMediaProtocol()

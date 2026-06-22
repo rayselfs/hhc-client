@@ -67,7 +67,9 @@ describe('FileProjection copied media identity', () => {
     )
 
     await waitFor(() => {
-      expect(mockGetFileSource).toHaveBeenCalledWith({}, 'original-id', 'image/png')
+      expect(mockGetFileSource).toHaveBeenCalledWith({}, 'original-id', 'image/png', {
+        verifyNativeFile: false
+      })
     })
     expect(getByAltText('copy.png')).toHaveAttribute('src', 'blob:projection-source')
   })
@@ -314,12 +316,16 @@ describe('FileProjection copied media identity', () => {
     )
 
     expect(mockProjectionVlcStop).toHaveBeenCalled()
-    expect(mockGetFileSource).not.toHaveBeenCalledWith({}, 'image-blob', 'image/png')
+    expect(mockGetFileSource).not.toHaveBeenCalledWith({}, 'image-blob', 'image/png', {
+      verifyNativeFile: false
+    })
 
     resolveStop?.()
 
     await waitFor(() => {
-      expect(mockGetFileSource).toHaveBeenCalledWith({}, 'image-blob', 'image/png')
+      expect(mockGetFileSource).toHaveBeenCalledWith({}, 'image-blob', 'image/png', {
+        verifyNativeFile: false
+      })
     })
   })
 })

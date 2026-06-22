@@ -40,6 +40,7 @@ interface AuthCallbackWaiter {
   resolve: (url: string | null) => void
   promise: Promise<string | null>
   timeout: NodeJS.Timeout
+  expectedState?: string
 }
 
 let authCallbackWaiter: AuthCallbackWaiter | null = null
@@ -83,24 +84,46 @@ function settleAuthCallback(result: string | null): void {
   waiter.resolve(result)
 }
 
+function getAuthCallbackState(value: string): string | null {
+  try {
+    return new URL(value).searchParams.get('state')
+  } catch {
+    return null
+  }
+}
+
+function matchesExpectedAuthState(value: string, expectedState?: string): boolean {
+  return !expectedState || getAuthCallbackState(value) === expectedState
+}
+
 export function handleOneDriveAuthCallbackUrl(value: string, wm?: WindowManager): boolean {
   if (!isOneDriveAuthCallbackUrl(value)) return false
   const mainWindow = wm?.getMainWindow()
   mainWindow?.show()
   mainWindow?.focus()
   if (authCallbackWaiter) {
-    settleAuthCallback(value)
+    if (matchesExpectedAuthState(value, authCallbackWaiter.expectedState)) {
+      settleAuthCallback(value)
+    }
   } else {
     queuedAuthCallbackUrl = value
   }
   return true
 }
 
-function waitForAuthCallback(): Promise<string | null> {
+function validateExpectedAuthState(value: unknown): string | undefined {
+  if (value === undefined) return undefined
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    throw new Error('Invalid OneDrive OAuth state')
+  }
+  return value.trim()
+}
+
+function waitForAuthCallback(expectedState?: string): Promise<string | null> {
   if (queuedAuthCallbackUrl) {
     const callbackUrl = queuedAuthCallbackUrl
     queuedAuthCallbackUrl = null
-    return Promise.resolve(callbackUrl)
+    if (matchesExpectedAuthState(callbackUrl, expectedState)) return Promise.resolve(callbackUrl)
   }
   if (authCallbackWaiter) return authCallbackWaiter.promise
 
@@ -109,7 +132,7 @@ function waitForAuthCallback(): Promise<string | null> {
     resolvePromise = resolve
   })
   const timeout = setTimeout(() => settleAuthCallback(null), AUTH_CALLBACK_TIMEOUT_MS)
-  authCallbackWaiter = { resolve: resolvePromise, promise, timeout }
+  authCallbackWaiter = { resolve: resolvePromise, promise, timeout, expectedState }
   return promise
 }
 
@@ -448,8 +471,8 @@ export function registerOneDriveCredentialHandlers(wm: WindowManager): void {
     return ONEDRIVE_AUTH_REDIRECT_URI
   })
 
-  ipcMain.handle('onedrive:wait-auth-callback', async (event) => {
+  ipcMain.handle('onedrive:wait-auth-callback', async (event, expectedState: unknown) => {
     if (!isMainWindow(wm, event)) throw new Error('Unauthorized OneDrive credential access')
-    return waitForAuthCallback()
+    return waitForAuthCallback(validateExpectedAuthState(expectedState))
   })
 }

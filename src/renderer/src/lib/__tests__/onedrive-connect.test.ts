@@ -4,6 +4,7 @@ import {
   buildOneDriveImportPlan,
   importOneDriveFolder,
   loginOneDriveAccount,
+  refreshOneDriveFolder,
   scanOneDriveFolder
 } from '../onedrive-connect'
 import type { OneDriveReadonlyProvider } from '../onedrive-provider'
@@ -90,6 +91,7 @@ vi.mock('../sync-db', () => ({
     updatedAt: 1
   })),
   getSyncCursor: vi.fn(async () => undefined),
+  getSyncEntryByRemoteItem: vi.fn(async () => undefined),
   listProviderConnectionsByType: vi.fn(async () => []),
   listSyncEntriesByProviderConnection: vi.fn(async () => []),
   putProviderConnection: vi.fn(async (record) => ({
@@ -102,6 +104,10 @@ vi.mock('../sync-db', () => ({
 }))
 
 vi.mock('../file-explorer-db', () => ({
+  collectAvailableFileBlobIds: vi.fn(async (records: Array<{ id: string }>) => {
+    return new Set(records.map((record) => record.id))
+  }),
+  getFileBlobRecord: vi.fn(async () => undefined),
   openFileExplorerDB: vi.fn()
 }))
 
@@ -110,6 +116,7 @@ vi.mock('../local-sync-import', () => ({
 }))
 
 vi.mock('../sync-download-storage', () => ({
+  isSyncStorageLimitError: vi.fn(() => false),
   saveElectronOneDriveDownloadedContent: vi.fn(),
   saveWebOneDriveDownloadedContent: vi.fn()
 }))
@@ -364,6 +371,51 @@ describe('scanOneDriveFolder', () => {
   })
 })
 
+describe('refreshOneDriveFolder', () => {
+  it('coalesces concurrent refreshes for the same root folder', async () => {
+    const scan = deferred<{ items: []; nextCursor: string; hasMore: false }>()
+    const rootFolder = {
+      id: 'onedrive-root',
+      name: 'OneDrive',
+      parentId: FILE_EXPLORER_ROOT_ID,
+      sortIndex: 0,
+      createdAt: 1,
+      expiresAt: null,
+      syncLink: {
+        providerConnectionId: 'onedrive:account-1',
+        remoteFolderId: 'remote-folder-1',
+        providerType: 'onedrive' as const,
+        offlinePolicy: 'always-offline' as const
+      }
+    }
+    vi.mocked(openFileExplorerDB).mockResolvedValue({
+      getAll: vi.fn(async (store: string) => {
+        if (store === 'folder-records') return [rootFolder]
+        return []
+      }),
+      transaction: () => ({
+        objectStore: () => ({
+          delete: vi.fn(async () => undefined),
+          get: vi.fn(async () => undefined),
+          getAll: vi.fn(async () => []),
+          put: vi.fn(async () => undefined)
+        }),
+        done: Promise.resolve()
+      })
+    } as never)
+    providerMocks.initialScan.mockReturnValue(scan.promise)
+
+    const first = refreshOneDriveFolder('onedrive-root')
+    const second = refreshOneDriveFolder('onedrive-root')
+
+    await vi.waitFor(() => expect(providerMocks.initialScan).toHaveBeenCalled())
+    expect(providerMocks.initialScan).toHaveBeenCalledTimes(1)
+
+    scan.resolve({ items: [], nextCursor: 'cursor-1', hasMore: false })
+    await expect(Promise.all([first, second])).resolves.toHaveLength(2)
+  })
+})
+
 describe('importOneDriveFolder', () => {
   it('returns after linking the folder without waiting for background downloads', async () => {
     vi.mocked(listProviderConnectionsByType).mockResolvedValueOnce([
@@ -523,7 +575,7 @@ describe('loginOneDriveAccount', () => {
       '_blank',
       'noopener,noreferrer'
     )
-    expect(window.api.oneDrive.waitAuthCallback).toHaveBeenCalled()
+    expect(window.api.oneDrive.waitAuthCallback).toHaveBeenCalledWith('state-1')
     expect(window.api.oneDrive.completeAuth).toHaveBeenCalledWith({
       clientId: '11111111-2222-3333-4444-555555555555',
       redirectUri: 'librepresenter://auth/onedrive',

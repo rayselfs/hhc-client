@@ -1,7 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import type { FolderRecord, FileItemRecord } from '@shared/types/folder'
 import type { SyncEntryRecord } from '../sync-db'
-import { buildSyncDeltaRefreshPlan, buildSyncRefreshPlan } from '../sync-refresh'
+import { openFileExplorerDB, resetFileExplorerDBForTests } from '../file-explorer-db'
+import { getSyncEntryByRemoteItem, putSyncEntry, resetSyncDBForTests } from '../sync-db'
+import {
+  applySyncRefreshPlan,
+  buildSyncDeltaRefreshPlan,
+  buildSyncRefreshPlan
+} from '../sync-refresh'
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -49,6 +55,11 @@ const existingEntry: SyncEntryRecord = {
   createdAt: 1,
   updatedAt: 1
 }
+
+beforeEach(async () => {
+  await resetFileExplorerDBForTests()
+  await resetSyncDBForTests()
+})
 
 describe('buildSyncRefreshPlan', () => {
   it('updates synced records, queues changed files, and removes missing files', () => {
@@ -127,6 +138,56 @@ describe('buildSyncRefreshPlan', () => {
       }
     ])
     expect(plan.removedItemIds).toEqual([])
+  })
+
+  it('does not let a stale refresh plan downgrade a completed download', async () => {
+    const db = await openFileExplorerDB()
+    await db.put('file-blobs', {
+      id: existingItem.id,
+      blob: new Blob(['ready']),
+      refCount: 1
+    })
+    await putSyncEntry({
+      ...existingEntry,
+      downloadedBytes: existingItem.size,
+      downloadTotalBytes: existingItem.size
+    })
+
+    await applySyncRefreshPlan({
+      folders: [],
+      items: [],
+      syncEntries: [
+        {
+          providerConnectionId: existingEntry.providerConnectionId,
+          remoteItemId: existingEntry.remoteItemId,
+          parentRemoteItemId: existingEntry.parentRemoteItemId,
+          kind: 'file',
+          name: existingEntry.name,
+          itemId: existingEntry.itemId,
+          mimeType: existingEntry.mimeType,
+          size: existingEntry.size,
+          etag: existingEntry.etag,
+          contentHash: existingEntry.contentHash,
+          status: 'queued'
+        }
+      ],
+      fileTransfers: [
+        { itemId: existingItem.id, remoteItemId: existingEntry.remoteItemId, mimeType: 'video/mp4' }
+      ],
+      removedFolderIds: [],
+      removedItemIds: [],
+      removedEntries: [],
+      disabledCount: 0
+    })
+
+    await expect(
+      getSyncEntryByRemoteItem(existingEntry.providerConnectionId, existingEntry.remoteItemId)
+    ).resolves.toMatchObject({
+      status: 'available-offline',
+      blobId: existingItem.id,
+      downloadedBytes: existingItem.size,
+      downloadTotalBytes: existingItem.size
+    })
   })
 
   it('keeps web-unsupported files remote-only and skips app-unsupported files', () => {

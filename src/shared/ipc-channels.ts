@@ -211,6 +211,7 @@ export interface IpcInvokeMap {
   'app:check-whisper-dir': { args: [string]; result: WhisperDirInfo }
   'app:download-whisper-model': { args: [WhisperModel, string]; result: void }
   'native-fs:import-file': { args: [string, string]; result: { size: number } }
+  'native-fs:file-exists': { args: [string]; result: boolean }
   'native-fs:delete-file': { args: [string]; result: void }
   'video-poster:get-info': { args: []; result: VideoPosterInfo }
   'video-poster:generate': { args: [VideoPosterRequest]; result: VideoPosterResult }
@@ -238,7 +239,7 @@ export interface IpcInvokeMap {
   }
   'onedrive:delete-credentials': { args: [string]; result: void }
   'onedrive:get-auth-redirect-uri': { args: []; result: string }
-  'onedrive:wait-auth-callback': { args: []; result: string | null }
+  'onedrive:wait-auth-callback': { args: [string?]; result: string | null }
   'onedrive:download-file': {
     args: [OneDriveNativeDownloadRequest]
     result: OneDriveNativeDownloadResult

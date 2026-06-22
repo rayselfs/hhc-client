@@ -227,7 +227,7 @@ export default function FileProjection({
         return
       }
       const db = await openFileExplorerDB()
-      const source = await getFileSource(db, blobId, fileMimeType)
+      const source = await getFileSource(db, blobId, fileMimeType, { verifyNativeFile: false })
       if (!source || currentItemIdRef.current !== itemId) {
         source?.revoke()
         return

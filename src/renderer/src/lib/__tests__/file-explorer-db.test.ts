@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { envState, mockImportFile, mockGetUrl, mockDeleteNativeFile } = vi.hoisted(() => ({
-  envState: { isElectron: false },
-  mockImportFile: vi.fn(),
-  mockGetUrl: vi.fn(),
-  mockDeleteNativeFile: vi.fn()
-}))
+const { envState, mockImportFile, mockGetUrl, mockDeleteNativeFile, mockNativeFileExists } =
+  vi.hoisted(() => ({
+    envState: { isElectron: false },
+    mockImportFile: vi.fn(),
+    mockGetUrl: vi.fn(),
+    mockDeleteNativeFile: vi.fn(),
+    mockNativeFileExists: vi.fn()
+  }))
 
 vi.mock('@renderer/lib/env', () => ({
   isElectron: () => envState.isElectron
@@ -75,13 +77,15 @@ describe('file-explorer-db blob refCount', () => {
       (id: string, mimeType: string) => `hhc-media://file/${id}?type=${mimeType}`
     )
     mockDeleteNativeFile.mockResolvedValue(undefined)
+    mockNativeFileExists.mockResolvedValue(true)
     Object.defineProperty(window, 'api', {
       configurable: true,
       value: {
         nativeFs: {
           importFile: mockImportFile,
           getUrl: mockGetUrl,
-          delete: mockDeleteNativeFile
+          delete: mockDeleteNativeFile,
+          exists: mockNativeFileExists
         }
       }
     })
@@ -146,6 +150,40 @@ describe('file-explorer-db blob refCount', () => {
 
     expect(source?.url).toBe('hhc-media://file/file-1?type=video/mp4')
     expect(createObjectUrlSpy).not.toHaveBeenCalled()
+  })
+
+  it('does not return a native media source when the native file is missing', async () => {
+    envState.isElectron = true
+    mockNativeFileExists.mockResolvedValue(false)
+    db.records.set('file-1', {
+      id: 'file-1',
+      storage: 'native-fs',
+      size: 5,
+      refCount: 1
+    })
+    const { getFileSource, isFileBlobAvailable } = await import('../file-explorer-db')
+
+    await expect(isFileBlobAvailable('file-1')).resolves.toBe(false)
+    await expect(getFileSource(db as never, 'file-1', 'image/png')).resolves.toBeNull()
+  })
+
+  it('can create a native media URL without statting from projection renderers', async () => {
+    envState.isElectron = true
+    mockNativeFileExists.mockResolvedValue(false)
+    db.records.set('file-1', {
+      id: 'file-1',
+      storage: 'native-fs',
+      size: 5,
+      refCount: 1
+    })
+    const { getFileSource } = await import('../file-explorer-db')
+
+    const source = await getFileSource(db as never, 'file-1', 'image/png', {
+      verifyNativeFile: false
+    })
+
+    expect(source?.url).toBe('hhc-media://file/file-1?type=image/png')
+    expect(mockNativeFileExists).not.toHaveBeenCalled()
   })
 
   it('incrementBlobRef increments refCount to 2', async () => {

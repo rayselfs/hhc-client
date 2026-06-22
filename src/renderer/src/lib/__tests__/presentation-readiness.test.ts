@@ -36,6 +36,9 @@ describe('analyzePresentationReadiness', () => {
   it('uses embedded VLC for Electron native videos when available', async () => {
     vi.stubGlobal('window', {
       api: {
+        nativeFs: {
+          exists: vi.fn().mockResolvedValue(true)
+        },
         projectionVlc: {
           getInfo: vi.fn().mockResolvedValue({ status: 'ready' }),
           probe: vi.fn().mockResolvedValue({ durationMs: 120000 })
@@ -69,6 +72,9 @@ describe('analyzePresentationReadiness', () => {
   it('fails when VLC is unavailable for Electron desktop-engine videos', async () => {
     vi.stubGlobal('window', {
       api: {
+        nativeFs: {
+          exists: vi.fn().mockResolvedValue(true)
+        },
         projectionVlc: {
           getInfo: vi.fn().mockResolvedValue({ status: 'missing' })
         }
@@ -103,6 +109,17 @@ describe('analyzePresentationReadiness', () => {
         }
       }
     })
+    await (
+      await openFileExplorerDB()
+    ).put('file-blobs', {
+      id: 'legacy-video',
+      blob: new Blob(['video']),
+      refCount: 1
+    })
+    await putSourceMediaMetadata('legacy-video', {
+      kind: 'video',
+      durationMs: 1000
+    })
 
     const report = await analyzePresentationReadiness(
       [file('legacy-video', 'legacy.mkv', 'video/x-matroska')],
@@ -117,6 +134,22 @@ describe('analyzePresentationReadiness', () => {
   })
 
   it('summarizes ready, unsupported, missing, and failed items', async () => {
+    const db = await openFileExplorerDB()
+    await db.put('file-blobs', {
+      id: 'ready-image',
+      blob: new Blob(['image']),
+      refCount: 1
+    })
+    await db.put('file-blobs', {
+      id: 'failed-video',
+      blob: new Blob(['video']),
+      refCount: 1
+    })
+    await putSourceMediaMetadata('failed-video', {
+      kind: 'video',
+      durationMs: 1000
+    })
+
     const report = await analyzePresentationReadiness(
       [
         file('ready-image', 'ready.png', 'image/png'),
@@ -171,7 +204,54 @@ describe('analyzePresentationReadiness', () => {
     })
   })
 
+  it('marks available-offline sync items as preparing when the native file is missing', async () => {
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: {
+        nativeFs: {
+          exists: vi.fn().mockResolvedValue(false)
+        }
+      }
+    })
+    await (
+      await openFileExplorerDB()
+    ).put('file-blobs', {
+      id: 'remote-blob',
+      storage: 'native-fs',
+      size: 100,
+      refCount: 1
+    })
+    await putSyncEntry({
+      providerConnectionId: 'connection-1',
+      remoteItemId: 'remote-file',
+      parentRemoteItemId: null,
+      kind: 'file',
+      name: 'remote.png',
+      itemId: 'remote-item',
+      blobId: 'remote-blob',
+      status: 'available-offline'
+    })
+
+    const report = await analyzePresentationReadiness(
+      [file('remote-item', 'remote.png', 'image/png', 'blob:remote-blob')],
+      'electron'
+    )
+
+    expect(report.summary).toMatchObject({ ready: 0, preparing: 1 })
+    expect(report.items[0]).toMatchObject({
+      status: 'preparing',
+      reason: 'sync-missing-source'
+    })
+  })
+
   it('excludes browser-unplayable Web videos', async () => {
+    await (
+      await openFileExplorerDB()
+    ).put('file-blobs', {
+      id: 'bad-video',
+      blob: new Blob(['video']),
+      refCount: 1
+    })
     await putSourceMediaMetadata('bad-video', {
       kind: 'video',
       browserPlayback: 'unplayable'
