@@ -1,8 +1,13 @@
+import SoundboardGrid from '@renderer/components/Control/Soundboard/SoundboardGrid'
+import SoundboardInspector from '@renderer/components/Control/Soundboard/SoundboardInspector'
+import SoundboardLibrary from '@renderer/components/Control/Soundboard/SoundboardLibrary'
 import { useSoundboardStore } from '@renderer/stores/soundboard'
 
 export default function SoundboardPageContent(): React.JSX.Element {
   const board = useSoundboardStore((state) => state.getSelectedBoard())
   const scene = useSoundboardStore((state) => state.getSelectedScene())
+  const mode = useSoundboardStore((state) => state.mode)
+  const setMode = useSoundboardStore((state) => state.setMode)
 
   return (
     <main
@@ -16,9 +21,18 @@ export default function SoundboardPageContent(): React.JSX.Element {
             {board.name} / {scene?.name ?? 'No scene'}
           </p>
         </div>
+        <button
+          type="button"
+          className="rounded-md border border-border px-3 py-1 text-sm"
+          onClick={() => setMode(mode === 'performance' ? 'edit' : 'performance')}
+        >
+          {mode === 'performance' ? 'Performance' : 'Edit'}
+        </button>
       </div>
-      <div className="grid min-h-0 flex-1 place-items-center text-sm text-muted">
-        Soundboard workspace
+      <div className="flex min-h-0 flex-1">
+        {mode === 'edit' && <SoundboardLibrary />}
+        <SoundboardGrid onTriggerPad={() => undefined} onReleasePad={() => undefined} />
+        {mode === 'edit' && <SoundboardInspector />}
       </div>
     </main>
   )
