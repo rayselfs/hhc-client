@@ -15,12 +15,14 @@ import {
   useFileExplorerStore,
   FILE_EXPLORER_ROOT_ID
 } from '@renderer/stores/file-explorer'
+import { useSoundboardStore } from '@renderer/stores/soundboard'
 import { getUploadMediaPlatform, uploadFiles, uploadFolderFiles } from '@renderer/lib/upload-utils'
 import { RefreshCw, Unlink } from 'lucide-react'
 import { connectLocalSyncFolder, refreshLocalSyncConnection } from '@renderer/lib/local-sync-import'
 import { getCloudProviderAdapter, type CloudRemoteFolder } from '@renderer/lib/cloud-provider'
 import { unlinkSyncRootFolderFromApp } from '@renderer/lib/sync-unlink'
 import { refreshSyncFolderOnNavigation } from '@renderer/lib/sync-folder-refresh'
+import { openFileExplorerDB } from '@renderer/lib/file-explorer-db'
 import { isElectron } from '@renderer/lib/env'
 import {
   computeExpiresAt,
@@ -48,6 +50,54 @@ const ONE_DRIVE_FOLDER_PICKER_PROVIDER: CloudFolderPickerProvider = {
   icon: React.createElement(OneDriveIcon, { className: 'size-5' }),
   listFolders: ONE_DRIVE_PROVIDER.listFolders,
   importFolder: ONE_DRIVE_PROVIDER.importFolder
+}
+
+function isInsideAnyFolder(
+  folderId: string,
+  targetFolderIds: Set<string>,
+  foldersById: Record<string, FolderRecord>
+): boolean {
+  let currentId: string | null = folderId
+  while (currentId) {
+    if (targetFolderIds.has(currentId)) return true
+    currentId = foldersById[currentId]?.parentId ?? null
+  }
+  return false
+}
+
+async function collectDeletedFileIds(targetIds: Set<string>): Promise<Set<string>> {
+  const state = useFileExplorerStore.getState()
+  const targetFolderIds = new Set<string>()
+  const targetFileIds = new Set<string>()
+
+  for (const id of targetIds) {
+    if (state.folders[id]) {
+      targetFolderIds.add(id)
+    } else if (state.items[id] && isFileItem(state.items[id])) {
+      targetFileIds.add(id)
+    }
+  }
+
+  if (targetFolderIds.size === 0) return targetFileIds
+
+  const db = await openFileExplorerDB()
+  const items = await db.getAll('folder-items')
+  for (const item of items) {
+    if (item.deletedAt || !isFileItem(item)) continue
+    if (isInsideAnyFolder(item.parentId, targetFolderIds, state.folders)) {
+      targetFileIds.add(item.id)
+    }
+  }
+
+  return targetFileIds
+}
+
+async function countDeletedSoundboardPadUsages(targetIds: Set<string>): Promise<number> {
+  const fileIds = await collectDeletedFileIds(targetIds)
+  return Array.from(fileIds).reduce(
+    (count, fileId) => count + useSoundboardStore.getState().findPadsUsingAsset(fileId).length,
+    0
+  )
 }
 
 export default function FilesPage(): React.JSX.Element {
@@ -354,12 +404,20 @@ export default function FilesPage(): React.JSX.Element {
         return
       }
       if (areIdsReadOnly(targetIds)) return
+      const soundboardUsageCount = await countDeletedSoundboardPadUsages(targetIds)
       const confirmed = await confirm({
         title: t('folder.deleteSelectedTitle', {
           count: targetIds.size,
           defaultValue: `Delete ${targetIds.size} item(s)?`
         }),
-        description: t('folder.deleteItemDescription', 'This action cannot be undone.'),
+        description:
+          soundboardUsageCount > 0
+            ? t('folder.deleteSoundboardAssetDescription', {
+                count: soundboardUsageCount,
+                defaultValue:
+                  'This removes audio assigned to {{count}} soundboard pad(s). This action cannot be undone.'
+              })
+            : t('folder.deleteItemDescription', 'This action cannot be undone.'),
         status: 'danger'
       })
       if (!confirmed) return

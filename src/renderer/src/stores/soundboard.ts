@@ -34,6 +34,12 @@ export const DEFAULT_SOUNDBOARD_SETTINGS: SoundboardSettings = {
   preferredMidiInputId: null
 }
 
+export interface SoundboardAssetUsage {
+  boardId: string
+  sceneId: string
+  padId: string
+}
+
 function createPad(row: number, column: number): SoundboardPad {
   const id = `pad-${row + 1}-${column + 1}`
   return {
@@ -103,6 +109,7 @@ interface SoundboardStore {
   updatePad: (padId: string, patch: Partial<SoundboardPad>) => void
   assignPadAsset: (padId: string, asset: SoundboardAssetRef) => void
   clearPadAsset: (padId: string) => void
+  findPadsUsingAsset: (assetId: string) => SoundboardAssetUsage[]
   setPadLiveState: (padId: string, state: SoundboardLivePadState) => void
   setMasterVolume: (volume: number) => void
   setGlobalFadeMs: (fadeMs: number) => void
@@ -299,6 +306,19 @@ export const useSoundboardStore = create<SoundboardStore>()(
           label: get().getSelectedScene()?.pads[padId]?.label || asset.name
         }),
       clearPadAsset: (padId) => get().updatePad(padId, { asset: null }),
+      findPadsUsingAsset: (assetId) => {
+        const usages: SoundboardAssetUsage[] = []
+        for (const board of Object.values(get().boards)) {
+          for (const scene of Object.values(board.scenes)) {
+            for (const pad of Object.values(scene.pads)) {
+              if (pad.asset?.assetId === assetId) {
+                usages.push({ boardId: board.id, sceneId: scene.id, padId: pad.id })
+              }
+            }
+          }
+        }
+        return usages
+      },
       setPadLiveState: (padId, state) =>
         set((current) => ({ live: { ...current.live, [padId]: state } })),
       setMasterVolume: (volume) =>

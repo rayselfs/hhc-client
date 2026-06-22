@@ -446,6 +446,7 @@
     "deleteTitle": "删除 {{name}} ?",
     "deleteFolderDescription": "此操作无法撤销。文件夹中的所有项目将被删除。",
     "deleteItemDescription": "此操作无法撤销。",
+    "deleteSoundboardAssetDescription": "这会移除已指定到 {{count}} 个音效板 pad 的音频。此操作无法撤销。",
     "deleteSelectedTitle": "删除 {{count}} 个项目?",
     "contextMenu": {
       "copy": "复制",

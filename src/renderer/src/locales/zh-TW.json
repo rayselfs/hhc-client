@@ -446,6 +446,7 @@
     "deleteTitle": "刪除 {{name}} ?",
     "deleteFolderDescription": "此動作無法復原。資料夾中的所有項目將被刪除。",
     "deleteItemDescription": "此動作無法復原。",
+    "deleteSoundboardAssetDescription": "這會移除已指定到 {{count}} 個音效板 pad 的音訊。此動作無法復原。",
     "deleteSelectedTitle": "刪除 {{count}} 個項目?",
     "contextMenu": {
       "copy": "複製",
