@@ -91,7 +91,13 @@ interface SoundboardStore {
   getSelectedBoard: () => SoundboardBoard
   getSelectedScene: () => SoundboardScene | null
   setMode: (mode: SoundboardMode) => void
+  createBoard: (name: string) => string
+  renameBoard: (boardId: string, name: string) => void
   selectBoard: (boardId: string) => void
+  createScene: (name: string) => string
+  renameScene: (sceneId: string, name: string) => void
+  duplicateScene: (sceneId: string) => string | null
+  deleteScene: (sceneId: string) => void
   selectScene: (sceneId: string) => void
   selectPad: (padId: string | null) => void
   updatePad: (padId: string, patch: Partial<SoundboardPad>) => void
@@ -150,6 +156,32 @@ export const useSoundboardStore = create<SoundboardStore>()(
         return board?.scenes[get().selectedSceneId] ?? null
       },
       setMode: (mode) => set({ mode }),
+      createBoard: (name) => {
+        const scene = createDefaultScene()
+        const id = crypto.randomUUID()
+        const board: SoundboardBoard = {
+          id,
+          name: name.trim() || 'Untitled Board',
+          scenes: { [scene.id]: scene },
+          sceneOrder: [scene.id]
+        }
+        set((state) => ({
+          boards: { ...state.boards, [id]: board },
+          boardOrder: [...state.boardOrder, id]
+        }))
+        return id
+      },
+      renameBoard: (boardId, name) =>
+        set((state) => {
+          const board = state.boards[boardId]
+          if (!board) return {}
+          return {
+            boards: {
+              ...state.boards,
+              [boardId]: { ...board, name: name.trim() || board.name }
+            }
+          }
+        }),
       selectBoard: (boardId) =>
         set((state) => {
           const board = state.boards[boardId]
@@ -158,6 +190,86 @@ export const useSoundboardStore = create<SoundboardStore>()(
             selectedBoardId: boardId,
             selectedSceneId: board.sceneOrder[0],
             selectedPadId: null
+          }
+        }),
+      createScene: (name) => {
+        const scene = {
+          ...createDefaultScene(),
+          id: crypto.randomUUID(),
+          name: name.trim() || 'Untitled Scene'
+        }
+        set((state) => {
+          const board = state.boards[state.selectedBoardId]
+          if (!board) return {}
+          return {
+            boards: {
+              ...state.boards,
+              [board.id]: {
+                ...board,
+                scenes: { ...board.scenes, [scene.id]: scene },
+                sceneOrder: [...board.sceneOrder, scene.id]
+              }
+            }
+          }
+        })
+        return scene.id
+      },
+      renameScene: (sceneId, name) =>
+        set((state) => {
+          const board = state.boards[state.selectedBoardId]
+          const scene = board?.scenes[sceneId]
+          if (!board || !scene) return {}
+          return {
+            boards: {
+              ...state.boards,
+              [board.id]: {
+                ...board,
+                scenes: {
+                  ...board.scenes,
+                  [sceneId]: { ...scene, name: name.trim() || scene.name }
+                }
+              }
+            }
+          }
+        }),
+      duplicateScene: (sceneId) => {
+        const state = get()
+        const board = state.boards[state.selectedBoardId]
+        const scene = board?.scenes[sceneId]
+        if (!board || !scene) return null
+        const id = crypto.randomUUID()
+        const copy: SoundboardScene = {
+          ...scene,
+          id,
+          name: `${scene.name} Copy`,
+          pads: Object.fromEntries(
+            Object.entries(scene.pads).map(([padId, pad]) => [padId, { ...pad }])
+          )
+        }
+        set({
+          boards: {
+            ...state.boards,
+            [board.id]: {
+              ...board,
+              scenes: { ...board.scenes, [id]: copy },
+              sceneOrder: [...board.sceneOrder, id]
+            }
+          }
+        })
+        return id
+      },
+      deleteScene: (sceneId) =>
+        set((state) => {
+          const board = state.boards[state.selectedBoardId]
+          if (!board || board.sceneOrder.length <= 1 || !board.scenes[sceneId]) return {}
+          const scenes = { ...board.scenes }
+          delete scenes[sceneId]
+          const sceneOrder = board.sceneOrder.filter((id) => id !== sceneId)
+          return {
+            boards: { ...state.boards, [board.id]: { ...board, scenes, sceneOrder } },
+            selectedSceneId:
+              state.selectedSceneId === sceneId ? sceneOrder[0] : state.selectedSceneId,
+            selectedPadId: state.selectedSceneId === sceneId ? null : state.selectedPadId
           }
         }),
       selectScene: (sceneId) =>
