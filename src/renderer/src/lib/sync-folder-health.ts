@@ -61,12 +61,13 @@ export function deriveSyncFolderHealth(
     }
   }
 
-  const downloadingCount = rootEntries.filter((entry) => entry.status === 'downloading').length
-  const queuedCount = rootEntries.filter((entry) => entry.status === 'queued').length
-  const failedCount = rootEntries.filter(
+  const fileEntries = rootEntries.filter((entry) => entry.kind === 'file')
+  const downloadingCount = fileEntries.filter((entry) => entry.status === 'downloading').length
+  const queuedCount = fileEntries.filter((entry) => entry.status === 'queued').length
+  const failedCount = fileEntries.filter(
     (entry) => entry.status === 'failed' || entry.status === 'insufficient-storage'
   ).length
-  const warningCount = rootEntries.filter(
+  const warningCount = fileEntries.filter(
     (entry) =>
       entry.status === 'remote-only' || entry.status === 'outdated' || isRetryableFailure(entry)
   ).length
@@ -79,7 +80,7 @@ export function deriveSyncFolderHealth(
     .filter((value): value is number => typeof value === 'number')
     .sort((a, b) => b - a)[0]
 
-  if (rootEntries.some(isErrorEntry)) {
+  if (fileEntries.some(isErrorEntry)) {
     return {
       status: 'error',
       lastSyncedAt,

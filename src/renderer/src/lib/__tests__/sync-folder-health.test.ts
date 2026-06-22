@@ -116,4 +116,28 @@ describe('deriveSyncFolderHealth', () => {
 
     expect(health).toMatchObject({ status: 'ok', lastSyncedAt: 30 })
   })
+
+  it('does not warn when only folder entries are remote-only', () => {
+    const health = deriveSyncFolderHealth(
+      [
+        entry({
+          remoteItemId: 'root-remote',
+          parentRemoteItemId: null,
+          folderId: 'sync-root',
+          kind: 'folder',
+          status: 'remote-only'
+        }),
+        entry({
+          remoteItemId: 'file-1',
+          parentRemoteItemId: 'root-remote',
+          itemId: 'file-1',
+          kind: 'file',
+          status: 'available-offline'
+        })
+      ],
+      'sync-root'
+    )
+
+    expect(health).toMatchObject({ status: 'ok', warningCount: 0 })
+  })
 })
