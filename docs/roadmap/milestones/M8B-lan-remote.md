@@ -6,7 +6,7 @@
 
 **Goal:** Build an Electron-only LAN mobile browser remote for presentation, projection blanking, timer, and stopwatch controls without cloud relay or file access.
 
-**Architecture:** The Electron main process owns the disabled-by-default LAN HTTP/WebSocket service, pairing secrets, sessions, trusted-device storage, and network-interface binding. The renderer owns the command gateway and sanitized state snapshots so mobile commands reuse existing Zustand stores, projection context, and timer adapter paths instead of calling IPC or projection windows directly.
+**Architecture:** The Electron main process owns the disabled-by-default LAN HTTP service, pairing secrets, sessions, trusted-device storage, and network-interface binding. The renderer owns the command gateway and sanitized state snapshots so mobile commands reuse existing Zustand stores, projection context, and timer adapter paths instead of calling IPC or projection windows directly.
 
 **Tech Stack:** Electron main/preload IPC, Node `http`/`crypto`/`os`, `ws` already installed, React 19, TypeScript, Zustand settings persistence, Vitest, Electron IPC tests.
 
@@ -23,7 +23,7 @@
 ## File Structure
 
 - Create `src/shared/lan-remote.ts`: runtime-independent command/state/session contract and validators.
-- Create `src/main/lan-remote/server.ts`: local HTTP/WebSocket service, pairing, sessions, rate limits.
+- Create `src/main/lan-remote/server.ts`: local HTTP service, pairing, sessions, and request limits.
 - Create `src/main/lan-remote/trusted-devices.ts`: hashed trusted credential persistence.
 - Create `src/main/lan-remote/mobile-ui.ts`: bundled static mobile UI response.
 - Create `src/main/ipc/lan-remote.ts`: typed IPC handlers for Preferences and renderer bridge.
@@ -297,41 +297,7 @@ Expected: FAIL because server module does not exist.
 
 - [ ] **Step 3: Add static mobile UI**
 
-Create `src/main/lan-remote/mobile-ui.ts`:
-
-```typescript
-export function getLanRemoteMobileHtml(): string {
-  return `<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>HHC Remote</title>
-  <style>
-    body{font-family:system-ui;margin:0;background:#111;color:#fff}
-    main{display:grid;gap:12px;padding:16px}
-    button{font-size:20px;padding:16px;border-radius:10px;border:0}
-  </style>
-</head>
-<body>
-  <main>
-    <button data-command="presentation:prev">Previous</button>
-    <button data-command="presentation:next">Next</button>
-    <button data-command="projection:blank">Blank</button>
-    <pre id="state">Disconnected</pre>
-  </main>
-  <script>
-    const state = document.getElementById('state')
-    const ws = new WebSocket(location.origin.replace('http', 'ws') + '/ws')
-    ws.onmessage = event => { state.textContent = event.data }
-    document.querySelectorAll('button').forEach(button => {
-      button.onclick = () => ws.send(JSON.stringify({ requestId: crypto.randomUUID(), type: button.dataset.command, enabled: true }))
-    })
-  </script>
-</body>
-</html>`
-}
-```
+Create `src/main/lan-remote/mobile-ui.ts` with a small static HTML page. The first implementation uses same-origin `fetch()` POST commands and 1-second state polling; WebSocket can wait until a real latency problem appears.
 
 - [ ] **Step 4: Implement server skeleton**
 
@@ -1075,12 +1041,10 @@ if (!isPrivateLanAddress(options.host)) {
 }
 ```
 
-Add connection limit, payload size limit, heartbeat, and rate limit in the WebSocket task if WebSocket code is added in this task. Keep constants local:
+Add a payload size limit in the HTTP command endpoint. Keep constants local:
 
 ```typescript
-const MAX_CONNECTIONS = 8
 const MAX_PAYLOAD_BYTES = 4096
-const COMMANDS_PER_MINUTE = 120
 ```
 
 - [ ] **Step 5: Run security tests**

@@ -739,6 +739,9 @@
         "running": "遥控已启动于 {{host}}:{{port}}",
         "disabled": "LAN 遥控已停用",
         "hostRequired": "启用 LAN 遥控前，请先选择私人网络地址。",
+        "createPairing": "建立配对链接",
+        "pairingUrl": "配对链接",
+        "pairingFailed": "无法建立配对链接。",
         "updateFailed": "无法更新 LAN 遥控。"
       }
     },

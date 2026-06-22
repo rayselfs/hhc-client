@@ -41,6 +41,7 @@ export default function MediaSettings({
   const [oneDriveConnectionBusy, setOneDriveConnectionBusy] = useState(false)
   const [lanRemoteStatus, setLanRemoteStatus] = useState<LanRemoteStatus | null>(null)
   const [lanRemoteBusy, setLanRemoteBusy] = useState(false)
+  const [lanRemotePairingUrl, setLanRemotePairingUrl] = useState('')
 
   const refreshOneDriveConnection = useCallback(async (): Promise<void> => {
     const connections = await listProviderConnectionsByType('onedrive')
@@ -135,6 +136,19 @@ export default function MediaSettings({
       console.warn('[lan-remote] Failed to update LAN remote state', error)
       setLanRemote({ ...lanRemote, enabled: false })
       toast.danger(t('preferences.media.lanRemote.updateFailed'))
+    } finally {
+      setLanRemoteBusy(false)
+    }
+  }
+
+  async function handleCreateLanRemotePairing(): Promise<void> {
+    if (!isElectron() || !window.api?.lanRemote) return
+    setLanRemoteBusy(true)
+    try {
+      const pairing = await window.api.lanRemote.createPairing('Mobile device')
+      setLanRemotePairingUrl(pairing.url)
+    } catch {
+      toast.danger(t('preferences.media.lanRemote.pairingFailed'))
     } finally {
       setLanRemoteBusy(false)
     }
@@ -313,6 +327,25 @@ export default function MediaSettings({
                 })
               : t('preferences.media.lanRemote.disabled')}
           </p>
+
+          <div className="space-y-2 border-t border-default-200 pt-4">
+            <Button
+              size="sm"
+              variant="secondary"
+              isDisabled={!lanRemoteStatus?.enabled || lanRemoteBusy}
+              onPress={() => void handleCreateLanRemotePairing()}
+            >
+              {t('preferences.media.lanRemote.createPairing')}
+            </Button>
+            {lanRemotePairingUrl ? (
+              <input
+                readOnly
+                value={lanRemotePairingUrl}
+                className="w-full rounded-full border border-default-200 bg-transparent px-4 py-2 text-sm"
+                aria-label={t('preferences.media.lanRemote.pairingUrl')}
+              />
+            ) : null}
+          </div>
         </section>
       )}
     </div>

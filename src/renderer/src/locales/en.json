@@ -739,6 +739,9 @@
         "running": "Remote running at {{host}}:{{port}}",
         "disabled": "LAN remote is disabled",
         "hostRequired": "Choose a private LAN address before enabling LAN remote.",
+        "createPairing": "Create pairing link",
+        "pairingUrl": "Pairing URL",
+        "pairingFailed": "Failed to create pairing link.",
         "updateFailed": "Failed to update LAN remote."
       }
     },

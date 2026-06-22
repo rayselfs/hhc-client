@@ -60,11 +60,12 @@ export function registerLanRemoteIpc(wm: WindowManager): void {
 
   ipcMain.handle('lan-remote:publish-state', (event, snapshot: unknown) => {
     if (!isMainWindow(wm, event)) return
-    sanitizeLanRemoteSnapshot(snapshot)
+    server.publishState(sanitizeLanRemoteSnapshot(snapshot))
   })
 
   ipcMain.handle('lan-remote:publish-ack', (event, ack: unknown) => {
     if (!isMainWindow(wm, event) || !isLanRemoteAck(ack)) return
+    server.publishAck(ack)
     wm.sendToMain('lan-remote:ack', ack)
   })
 }
