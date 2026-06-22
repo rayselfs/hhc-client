@@ -2,12 +2,15 @@ import { describe, expect, it } from 'vitest'
 import {
   canGenerateMediaThumbnail,
   classifyFile,
+  getAudioFileAcceptAttribute,
   getMediaFileAcceptAttribute,
   getFileExtension,
   getMediaSupport,
+  isAudioMediaItem,
   resolveMediaCapability,
   validateMediaCapabilityRegistry
 } from '../media-capabilities'
+import type { FileItemRecord } from '@shared/types/folder'
 
 describe('media capability registry', () => {
   it('has no duplicate MIME or extension registrations', () => {
@@ -102,10 +105,11 @@ describe('media capability registry', () => {
   it('derives the Web file input filter from native browser capabilities only', () => {
     const accept = getMediaFileAcceptAttribute('web')
     expect(accept).toContain('image/*')
+    expect(accept).toContain('video/*')
+    expect(accept).toContain('audio/*')
     expect(accept).toContain('.pdf')
     expect(accept).toContain('.mp4')
     expect(accept).toContain('.mkv')
-    expect(accept).not.toContain('video/*')
     expect(accept).not.toContain('.avi')
     expect(accept).not.toContain('.pptx')
     expect(accept).not.toContain('.mpg')
@@ -114,10 +118,56 @@ describe('media capability registry', () => {
   it('derives the Electron file input filter with desktop video engine candidates', () => {
     const accept = getMediaFileAcceptAttribute('electron')
     expect(accept).toContain('image/*')
+    expect(accept).toContain('video/*')
+    expect(accept).toContain('audio/*')
     expect(accept).toContain('.pdf')
     expect(accept).toContain('.mkv')
-    expect(accept).not.toContain('video/*')
     expect(accept).not.toContain('.pptx')
     expect(accept).not.toContain('.mpg')
+  })
+})
+
+describe('audio media capabilities', () => {
+  it('classifies common audio files as native media', () => {
+    expect(classifyFile({ name: 'storm.mp3', type: 'audio/mpeg' }, 'web')).toMatchObject({
+      kind: 'audio',
+      mimeType: 'audio/mpeg',
+      support: 'native'
+    })
+    expect(classifyFile({ name: 'bed.wav', type: 'audio/wav' }, 'electron')).toMatchObject({
+      kind: 'audio',
+      mimeType: 'audio/wav',
+      support: 'native'
+    })
+    expect(classifyFile({ name: 'cue.m4a', type: '' }, 'web')).toMatchObject({
+      kind: 'audio',
+      mimeType: 'audio/mp4',
+      support: 'native'
+    })
+  })
+
+  it('includes audio in the general accept attribute and exposes audio-only accept', () => {
+    expect(getMediaFileAcceptAttribute('web')).toContain('audio/*')
+    expect(getAudioFileAcceptAttribute('web')).toBe('audio/*,.mp3,.wav,.m4a,.aac,.ogg')
+  })
+
+  it('detects audio file explorer items', () => {
+    const item: FileItemRecord = {
+      id: 'file-1',
+      parentId: 'file-root',
+      type: 'file',
+      sortIndex: 0,
+      createdAt: 1,
+      expiresAt: null,
+      name: 'rain.mp3',
+      url: 'blob:file-1',
+      size: 10,
+      mimeType: 'audio/mpeg'
+    }
+
+    expect(isAudioMediaItem(item)).toBe(true)
+    expect(resolveMediaCapability({ mimeType: item.mimeType, fileName: item.name })?.kind).toBe(
+      'audio'
+    )
   })
 })

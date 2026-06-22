@@ -30,9 +30,17 @@ function canPresentSupport(support: MediaSupportMode): boolean {
   return support === 'native' || support === 'desktop-engine'
 }
 
+function isProjectionMediaKind(kind: string): kind is MediaType {
+  return kind === 'image' || kind === 'video' || kind === 'pdf'
+}
+
 export function isPresentable(mimeType: string, platform = getPresentabilityPlatform()): boolean {
   const capability = resolveMediaCapability({ mimeType })
-  return capability !== null && canPresentSupport(getMediaSupport(capability, platform))
+  return (
+    capability !== null &&
+    isProjectionMediaKind(capability.kind) &&
+    canPresentSupport(getMediaSupport(capability, platform))
+  )
 }
 
 export function getMediaType(
@@ -40,8 +48,14 @@ export function getMediaType(
   platform = getPresentabilityPlatform()
 ): MediaType | null {
   const capability = resolveMediaCapability({ mimeType })
-  if (!capability || !canPresentSupport(getMediaSupport(capability, platform))) return null
-  return capability.kind === 'document' ? null : capability.kind
+  if (
+    !capability ||
+    !isProjectionMediaKind(capability.kind) ||
+    !canPresentSupport(getMediaSupport(capability, platform))
+  ) {
+    return null
+  }
+  return capability.kind
 }
 
 export function getPresentableItems(

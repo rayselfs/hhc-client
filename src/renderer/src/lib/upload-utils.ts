@@ -9,7 +9,7 @@ import {
   type MediaKind,
   type MediaPlatform
 } from '@renderer/lib/media-capabilities'
-import { classifyMediaImport } from '@renderer/lib/media-import-policy'
+import { classifyMediaImport, type MediaImportDecision } from '@renderer/lib/media-import-policy'
 import { mediaJobQueue } from '@renderer/lib/media-job-queue'
 import { getFileBlob, getFileSource, openFileExplorerDB } from '@renderer/lib/file-explorer-db'
 import { resolveUniqueName } from '@renderer/lib/file-naming'
@@ -21,12 +21,11 @@ import i18n from '@renderer/i18n'
 
 export { MAX_FILE_SIZE_WEB }
 
-interface UploadCandidate {
+type AcceptedMediaImportDecision = Extract<MediaImportDecision, { action: 'accept' }>
+
+export interface UploadCandidate {
   file: File
-  classification: {
-    kind: MediaKind
-    mimeType: string
-  }
+  classification: AcceptedMediaImportDecision
 }
 
 interface UploadDestination extends UploadCandidate {
@@ -254,6 +253,23 @@ async function uploadPreparedFiles(destinations: UploadDestination[]): Promise<n
 
 export async function uploadFiles(files: File[], parentId: string): Promise<number> {
   const candidates = await prepareUploadCandidates(files)
+  return uploadPreparedFiles(candidates.map((candidate) => ({ ...candidate, parentId })))
+}
+
+export async function prepareUploadFilesForKind(
+  files: File[],
+  kind: Exclude<MediaKind, 'document'>
+): Promise<UploadCandidate[]> {
+  const candidates = await prepareUploadCandidates(files)
+  return candidates.filter((candidate) => candidate.classification.kind === kind)
+}
+
+export async function uploadFilesForKind(
+  files: File[],
+  parentId: string,
+  kind: Exclude<MediaKind, 'document'>
+): Promise<number> {
+  const candidates = await prepareUploadFilesForKind(files, kind)
   return uploadPreparedFiles(candidates.map((candidate) => ({ ...candidate, parentId })))
 }
 

@@ -1,4 +1,6 @@
-export type MediaKind = 'image' | 'video' | 'pdf' | 'document'
+import type { FileItemRecord } from '@shared/types/folder'
+
+export type MediaKind = 'image' | 'video' | 'audio' | 'pdf' | 'document'
 export type MediaPlatform = 'web' | 'electron'
 export type MediaSupportMode = 'native' | 'desktop-engine' | 'unsupported'
 export type ThumbnailStrategy = 'image' | 'video' | 'pdf' | 'none'
@@ -115,6 +117,60 @@ const CAPABILITIES: readonly MediaCapability[] = [
     kindLabelFallback: 'HEIF Image'
   },
   {
+    kind: 'audio',
+    extensions: ['mp3'],
+    canonicalMimeType: 'audio/mpeg',
+    aliases: ['audio/mp3'],
+    thumbnail: 'none',
+    web: 'native',
+    electron: 'native',
+    kindLabelKey: 'fileKind.mp3Audio',
+    kindLabelFallback: 'MP3 Audio'
+  },
+  {
+    kind: 'audio',
+    extensions: ['wav'],
+    canonicalMimeType: 'audio/wav',
+    aliases: ['audio/x-wav', 'audio/wave'],
+    thumbnail: 'none',
+    web: 'native',
+    electron: 'native',
+    kindLabelKey: 'fileKind.wavAudio',
+    kindLabelFallback: 'WAV Audio'
+  },
+  {
+    kind: 'audio',
+    extensions: ['m4a'],
+    canonicalMimeType: 'audio/mp4',
+    aliases: ['audio/x-m4a'],
+    thumbnail: 'none',
+    web: 'native',
+    electron: 'native',
+    kindLabelKey: 'fileKind.m4aAudio',
+    kindLabelFallback: 'M4A Audio'
+  },
+  {
+    kind: 'audio',
+    extensions: ['aac'],
+    canonicalMimeType: 'audio/aac',
+    thumbnail: 'none',
+    web: 'native',
+    electron: 'native',
+    kindLabelKey: 'fileKind.aacAudio',
+    kindLabelFallback: 'AAC Audio'
+  },
+  {
+    kind: 'audio',
+    extensions: ['ogg'],
+    canonicalMimeType: 'audio/ogg',
+    aliases: ['application/ogg'],
+    thumbnail: 'none',
+    web: 'native',
+    electron: 'native',
+    kindLabelKey: 'fileKind.oggAudio',
+    kindLabelFallback: 'OGG Audio'
+  },
+  {
     kind: 'video',
     extensions: ['mp4', 'm4v'],
     canonicalMimeType: 'video/mp4',
@@ -146,7 +202,7 @@ const CAPABILITIES: readonly MediaCapability[] = [
   },
   {
     kind: 'video',
-    extensions: ['ogv', 'ogg'],
+    extensions: ['ogv'],
     canonicalMimeType: 'video/ogg',
     thumbnail: 'video',
     web: 'native',
@@ -266,6 +322,15 @@ const GENERIC_VIDEO_CAPABILITY: MediaCapability = {
   electron: 'unsupported'
 }
 
+const GENERIC_AUDIO_CAPABILITY: MediaCapability = {
+  kind: 'audio',
+  extensions: [],
+  canonicalMimeType: 'audio/*',
+  thumbnail: 'none',
+  web: 'native',
+  electron: 'native'
+}
+
 function normalizeMimeType(mimeType: string | undefined): string {
   return mimeType?.split(';', 1)[0].trim().toLowerCase() ?? ''
 }
@@ -318,6 +383,7 @@ export function resolveMediaCapability(input: {
 
   if (mimeType.startsWith('image/')) return GENERIC_IMAGE_CAPABILITY
   if (mimeType.startsWith('video/')) return GENERIC_VIDEO_CAPABILITY
+  if (mimeType.startsWith('audio/')) return GENERIC_AUDIO_CAPABILITY
   return null
 }
 
@@ -359,11 +425,24 @@ export function canGenerateMediaThumbnail(capability: MediaCapability | null): b
   return capability !== null && capability.thumbnail !== 'none'
 }
 
-export function getMediaFileAcceptAttribute(platform: MediaPlatform): string {
-  const extensions = CAPABILITIES.filter(
-    (capability) => getMediaSupport(capability, platform) !== 'unsupported'
+function getSupportedExtensions(platform: MediaPlatform, kind?: MediaKind): string[] {
+  return CAPABILITIES.filter(
+    (capability) =>
+      getMediaSupport(capability, platform) !== 'unsupported' &&
+      (kind === undefined || capability.kind === kind)
   ).flatMap((capability) => capability.extensions.map((extension) => `.${extension}`))
-  return ['image/*', ...new Set(extensions)].join(',')
+}
+
+export function getMediaFileAcceptAttribute(platform: MediaPlatform): string {
+  return ['image/*', 'video/*', 'audio/*', ...new Set(getSupportedExtensions(platform))].join(',')
+}
+
+export function getAudioFileAcceptAttribute(platform: MediaPlatform): string {
+  return ['audio/*', ...new Set(getSupportedExtensions(platform, 'audio'))].join(',')
+}
+
+export function isAudioMediaItem(item: FileItemRecord): boolean {
+  return resolveMediaCapability({ mimeType: item.mimeType, fileName: item.name })?.kind === 'audio'
 }
 
 export function validateMediaCapabilityRegistry(): void {

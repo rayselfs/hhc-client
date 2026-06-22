@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   MAX_FILE_SIZE_WEB,
+  prepareUploadFilesForKind,
   uploadFiles,
   uploadFolderFiles,
   uploadFromDataTransfer
@@ -264,6 +265,25 @@ describe('uploadFiles classification', () => {
       itemId: 'mock-id',
       dedupeKey: 'video-poster:mock-id'
     })
+  })
+})
+
+describe('prepareUploadFilesForKind', () => {
+  beforeEach(() => {
+    vi.mocked(isWeb).mockReturnValue(false)
+  })
+
+  it('keeps only audio files when requested', async () => {
+    const files = [
+      new File(['x'], 'cue.mp3', { type: 'audio/mpeg' }),
+      new File(['x'], 'slide.png', { type: 'image/png' })
+    ]
+
+    const candidates = await prepareUploadFilesForKind(files, 'audio')
+
+    expect(candidates).toHaveLength(1)
+    expect(candidates[0].file.name).toBe('cue.mp3')
+    expect(candidates[0].classification.kind).toBe('audio')
   })
 })
 
