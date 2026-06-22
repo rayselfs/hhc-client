@@ -22,6 +22,7 @@ interface SlidesStoreState {
   selectedSlideIndex: () => number
 
   createDocument: (title?: string) => string
+  importDocument: (document: SlideDocument) => string
   selectDocument: (documentId: string) => void
   updateDocumentTitle: (documentId: string, title: string) => void
   applyTemplate: (documentId: string, templateId: string) => void
@@ -86,6 +87,16 @@ export const useSlidesStore = create<SlidesStoreState>()(
 
       createDocument: (title = 'Untitled Slide Deck') => {
         const document = createSlideDocument({ title })
+        const firstSlideId = document.slides[0]?.id ?? null
+        set((state) => ({
+          documents: { ...state.documents, [document.id]: document },
+          currentDocumentId: document.id,
+          selectedSlideId: firstSlideId
+        }))
+        return document.id
+      },
+
+      importDocument: (document) => {
         const firstSlideId = document.slides[0]?.id ?? null
         set((state) => ({
           documents: { ...state.documents, [document.id]: document },

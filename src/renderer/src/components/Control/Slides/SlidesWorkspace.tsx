@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Plus, Presentation, Type, Trash2 } from 'lucide-react'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
 import { useSlidesStore } from '@renderer/stores/slides'
 import { BUILT_IN_SLIDE_TEMPLATES } from '@renderer/lib/slide-templates'
+import { importPptxSlideDocument } from '@renderer/lib/slide-pptx-import'
 import type { SlideDocument, SlideElement, SlideRecord } from '@shared/types/slides'
 
 function getSlideBackgroundColor(slide: SlideRecord): string {
@@ -90,6 +91,9 @@ export default function SlidesWorkspace(): React.JSX.Element {
   const selectedSlideIndex = useSlidesStore((state) => state.selectedSlideIndex())
   const actions = useSlidesStore.getState()
   const [isProjecting, setIsProjecting] = useState(false)
+  const [isImporting, setIsImporting] = useState(false)
+  const [importError, setImportError] = useState<string | null>(null)
+  const pptxInputRef = useRef<HTMLInputElement>(null)
 
   const documentList = Object.values(documents).sort((a, b) => b.updatedAt - a.updatedAt)
 
@@ -109,6 +113,21 @@ export default function SlidesWorkspace(): React.JSX.Element {
     }
   }
 
+  const handleImportPptxFile = async (file: File): Promise<void> => {
+    setIsImporting(true)
+    setImportError(null)
+    try {
+      const title = file.name.replace(/\.pptx$/i, '') || t('slides.importedDeckTitle')
+      const document = await importPptxSlideDocument(await file.arrayBuffer(), { title })
+      actions.importDocument(document)
+    } catch {
+      setImportError(t('slides.importFailed'))
+    } finally {
+      setIsImporting(false)
+      if (pptxInputRef.current) pptxInputRef.current.value = ''
+    }
+  }
+
   if (!currentDocument || !selectedSlide || !currentDocumentId || !selectedSlideId) {
     return (
       <div className="flex h-full min-h-[420px] flex-col items-center justify-center gap-4 text-center">
@@ -125,6 +144,26 @@ export default function SlidesWorkspace(): React.JSX.Element {
           <Plus className="size-4" />
           {t('slides.createDeck')}
         </button>
+        <button
+          type="button"
+          onClick={() => pptxInputRef.current?.click()}
+          disabled={isImporting}
+          className="inline-flex items-center gap-2 rounded-full bg-surface-secondary px-4 py-2 disabled:opacity-40"
+        >
+          <Presentation className="size-4" />
+          {isImporting ? t('slides.importing') : t('slides.importPptx')}
+        </button>
+        <input
+          ref={pptxInputRef}
+          type="file"
+          accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+          className="hidden"
+          onChange={(event) => {
+            const file = event.target.files?.[0]
+            if (file) void handleImportPptxFile(file)
+          }}
+        />
+        {importError && <p className="text-sm text-danger">{importError}</p>}
       </div>
     )
   }
@@ -144,7 +183,26 @@ export default function SlidesWorkspace(): React.JSX.Element {
           >
             <Plus className="size-4" />
           </button>
+          <button
+            type="button"
+            onClick={() => pptxInputRef.current?.click()}
+            disabled={isImporting}
+            className="rounded-full bg-surface-secondary px-3 py-2 text-sm disabled:opacity-40"
+          >
+            {isImporting ? t('slides.importing') : t('slides.importPptx')}
+          </button>
         </div>
+        <input
+          ref={pptxInputRef}
+          type="file"
+          accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+          className="hidden"
+          onChange={(event) => {
+            const file = event.target.files?.[0]
+            if (file) void handleImportPptxFile(file)
+          }}
+        />
+        {importError && <p className="text-sm text-danger">{importError}</p>}
         <div className="flex min-h-0 flex-col gap-2 overflow-y-auto">
           {documentList.map((document) => (
             <button

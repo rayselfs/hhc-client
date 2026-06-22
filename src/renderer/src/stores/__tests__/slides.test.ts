@@ -71,4 +71,15 @@ describe('slides store', () => {
     expect(document.theme.id).toBe('clean-light')
     expect(document.slides[0].background).toEqual({ type: 'color', color: '#f8fafc' })
   })
+
+  it('imports native slide documents and selects them', () => {
+    const documentId = useSlidesStore.getState().createDocument('Imported')
+    const document = useSlidesStore.getState().documents[documentId]
+    useSlidesStore.getState().clear()
+
+    useSlidesStore.getState().importDocument(document)
+
+    expect(useSlidesStore.getState().currentDocumentId).toBe(documentId)
+    expect(useSlidesStore.getState().selectedSlideId).toBe(document.slides[0]?.id)
+  })
 })
