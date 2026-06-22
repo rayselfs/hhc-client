@@ -2,17 +2,27 @@ import { fireEvent, render, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import FileProjection from '../FileProjection'
 
-const { mockGetFileSource, mockProjectionHandlers, mockProjectionSend, mockProjectionVlcStop } =
-  vi.hoisted(() => ({
-    mockGetFileSource: vi.fn(),
-    mockProjectionHandlers: new Map<string, Array<(data: unknown) => void>>(),
-    mockProjectionSend: vi.fn(),
-    mockProjectionVlcStop: vi.fn()
-  }))
+const {
+  mockGetFileSource,
+  mockLoadPdfjsLib,
+  mockProjectionHandlers,
+  mockProjectionSend,
+  mockProjectionVlcStop
+} = vi.hoisted(() => ({
+  mockGetFileSource: vi.fn(),
+  mockLoadPdfjsLib: vi.fn(),
+  mockProjectionHandlers: new Map<string, Array<(data: unknown) => void>>(),
+  mockProjectionSend: vi.fn(),
+  mockProjectionVlcStop: vi.fn()
+}))
 
 vi.mock('@renderer/lib/file-explorer-db', () => ({
   openFileExplorerDB: vi.fn().mockResolvedValue({}),
   getFileSource: mockGetFileSource
+}))
+
+vi.mock('@renderer/lib/pdfjs-loader', () => ({
+  loadPdfjsLib: mockLoadPdfjsLib
 }))
 
 vi.mock('@renderer/lib/projection-adapter', () => ({
@@ -40,6 +50,15 @@ describe('FileProjection copied media identity', () => {
     mockGetFileSource.mockResolvedValue({
       url: 'blob:projection-source',
       revoke: vi.fn()
+    })
+    mockLoadPdfjsLib.mockResolvedValue({
+      getDocument: vi.fn(() => ({
+        promise: Promise.resolve({
+          numPages: 0,
+          getPage: vi.fn(),
+          destroy: vi.fn(() => Promise.resolve())
+        })
+      }))
     })
     Object.defineProperty(window, 'api', {
       configurable: true,
@@ -326,6 +345,51 @@ describe('FileProjection copied media identity', () => {
       expect(mockGetFileSource).toHaveBeenCalledWith({}, 'image-blob', 'image/png', {
         verifyNativeFile: false
       })
+    })
+  })
+
+  it('shows the first PDF page before later pages finish rendering', async () => {
+    type MockPdfPage = {
+      getViewport: () => { width: number; height: number }
+      render: () => { promise: Promise<void> }
+    }
+    let resolveSecondPage: ((value: MockPdfPage) => void) | undefined
+    const makePage = (): MockPdfPage => ({
+      getViewport: () => ({ width: 640, height: 360 }),
+      render: vi.fn(() => ({ promise: Promise.resolve() }))
+    })
+    const firstPage = makePage()
+    const secondPagePromise = new Promise<MockPdfPage>((resolve) => {
+      resolveSecondPage = resolve
+    })
+    const pdf = {
+      numPages: 2,
+      getPage: vi.fn((pageNum: number) =>
+        pageNum === 1 ? Promise.resolve(firstPage) : secondPagePromise
+      ),
+      destroy: vi.fn(() => Promise.resolve())
+    }
+    mockLoadPdfjsLib.mockResolvedValue({
+      getDocument: vi.fn(() => ({ promise: Promise.resolve(pdf) }))
+    })
+
+    const { container } = render(
+      <FileProjection
+        fileName="slides.pdf"
+        initialItemId="pdf-id"
+        initialBlobId="pdf-blob"
+        initialMimeType="application/pdf"
+      />
+    )
+
+    await waitFor(() => {
+      expect(container.querySelector('canvas')).not.toBeNull()
+    })
+    expect(pdf.getPage).toHaveBeenCalledWith(2)
+
+    resolveSecondPage?.(makePage())
+    await waitFor(() => {
+      expect(pdf.destroy).toHaveBeenCalled()
     })
   })
 })

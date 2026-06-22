@@ -24,7 +24,7 @@ type LoadFileOptions = {
 }
 
 type PdfState = {
-  pages: HTMLCanvasElement[]
+  pages: Array<HTMLCanvasElement | undefined>
   currentPage: number
   viewMode: 'single' | 'continuous'
 }
@@ -148,25 +148,40 @@ export default function FileProjection({
     const pdfjsLib = await loadPdfjsLib()
     const pdf = await pdfjsLib.getDocument(sourceUrl).promise
 
+    const renderPage = async (pageNum: number): Promise<HTMLCanvasElement> => {
+      const page = await pdf.getPage(pageNum)
+      const viewport = page.getViewport({ scale: 2 })
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.ceil(viewport.width)
+      canvas.height = Math.ceil(viewport.height)
+      const context = canvas.getContext('2d')
+      if (context) {
+        context.fillStyle = '#ffffff'
+        context.fillRect(0, 0, canvas.width, canvas.height)
+        await page.render({ canvas, canvasContext: context, viewport }).promise
+      }
+      return canvas
+    }
+
     try {
-      const pages: HTMLCanvasElement[] = []
       for (let i = 1; i <= pdf.numPages; i++) {
         if (currentItemIdRef.current !== itemId) return
-        const page = await pdf.getPage(i)
-        const viewport = page.getViewport({ scale: 2 })
-        const canvas = document.createElement('canvas')
-        canvas.width = Math.ceil(viewport.width)
-        canvas.height = Math.ceil(viewport.height)
-        const context = canvas.getContext('2d')
-        if (context) {
-          context.fillStyle = '#ffffff'
-          context.fillRect(0, 0, canvas.width, canvas.height)
-          await page.render({ canvas, canvasContext: context, viewport }).promise
-        }
-        pages.push(canvas)
+        const canvas = await renderPage(i)
+        if (currentItemIdRef.current !== itemId) return
+
+        setPdfState((prev) => {
+          const pages =
+            prev?.pages.length === pdf.numPages
+              ? [...prev.pages]
+              : new Array<HTMLCanvasElement | undefined>(pdf.numPages).fill(undefined)
+          pages[i - 1] = canvas
+          return {
+            pages,
+            currentPage: prev?.currentPage ?? 1,
+            viewMode: prev?.viewMode ?? 'single'
+          }
+        })
       }
-      if (currentItemIdRef.current !== itemId) return
-      setPdfState({ pages, currentPage: 1, viewMode: 'single' })
     } finally {
       await pdf.destroy()
     }
