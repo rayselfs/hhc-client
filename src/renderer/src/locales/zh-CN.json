@@ -192,7 +192,11 @@
       "errorRetryExceeded": "连续错误过多，已自动停止检测"
     },
     "settings": {
-      "fontSize": "投影字体大小"
+      "fontSize": "投影字体大小",
+      "displayMode": "经文显示方式",
+      "displayModeFull": "全屏幕",
+      "displayModeLowerThird": "下三分之一",
+      "template": "经文模板"
     },
     "contextMenu": {
       "project": "投影",

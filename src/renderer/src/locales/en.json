@@ -193,7 +193,11 @@
       "errorRetryExceeded": "Too many consecutive errors, recognition stopped"
     },
     "settings": {
-      "fontSize": "Projection Font Size"
+      "fontSize": "Projection Font Size",
+      "displayMode": "Scripture Display",
+      "displayModeFull": "Full Screen",
+      "displayModeLowerThird": "Lower Third",
+      "template": "Scripture Template"
     },
     "contextMenu": {
       "project": "Project",

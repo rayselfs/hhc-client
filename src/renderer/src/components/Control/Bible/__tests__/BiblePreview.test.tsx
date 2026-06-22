@@ -65,7 +65,14 @@ vi.mock('@renderer/stores/bible-settings', () => ({
   useBibleSettingsStore: Object.assign(
     (selector?: (state: { fontSize: number }) => unknown) =>
       selector ? selector({ fontSize: 90 }) : { fontSize: 90 },
-    { getState: () => ({ fontSize: 90, selectedVersionId: 'mock-version' }) }
+    {
+      getState: () => ({
+        fontSize: 90,
+        selectedVersionId: 'mock-version',
+        scriptureDisplayMode: 'full-screen',
+        scriptureTemplateId: 'dark-stage'
+      })
+    }
   )
 }))
 
@@ -238,6 +245,13 @@ describe('BiblePreview', () => {
       .closest('button')!
     fireEvent.click(verseBtn)
     expect(mockStartProjection).toHaveBeenCalledWith('bible', [
+      [
+        'bible:settings',
+        expect.objectContaining({
+          fontSize: 90,
+          displayMode: 'full-screen'
+        })
+      ],
       [
         'bible:chapter',
         expect.objectContaining({

@@ -3,6 +3,7 @@ import { useBibleFolderStore } from '@renderer/stores/folder'
 import { useBibleStore } from '@renderer/stores/bible'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 import { formatVerseReferenceShort } from '@renderer/lib/bible-utils'
+import { getBibleProjectionSettingsPayload } from '@renderer/lib/bible-projection-settings'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
 import type { VerseItemRecord, FolderRecord, AnyItemRecord } from '@shared/types/folder'
 import { isVerseItem, isFolderRecord } from '@shared/types/folder'
@@ -60,6 +61,7 @@ export function CustomFolderTab({
       const chapter = book?.chapters.find((c) => c.number === item.chapter)
       if (!chapter) return
       void startProjection('bible', [
+        ['bible:settings', getBibleProjectionSettingsPayload()],
         [
           'bible:chapter',
           {

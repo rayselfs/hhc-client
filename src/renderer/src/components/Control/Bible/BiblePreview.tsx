@@ -11,6 +11,7 @@ import { useBibleFolderStore } from '@renderer/stores/folder'
 import { useServicePlaylistStore } from '@renderer/stores/service-playlist'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
 import { buildBibleServiceCueInput } from '@renderer/lib/bible-service-cue'
+import { getBibleProjectionSettingsPayload } from '@renderer/lib/bible-projection-settings'
 import {
   getBookConfig,
   buildVerseHistoryItem,
@@ -118,6 +119,7 @@ export function BiblePreview({
   const handleVerseClick = (verseIndex: number, verseNumber: number, _verseText: string): void => {
     if (!book || !chapter) return
     void startProjection('bible', [
+      ['bible:settings', getBibleProjectionSettingsPayload()],
       [
         'bible:chapter',
         {

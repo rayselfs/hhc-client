@@ -14,6 +14,7 @@ import { useKeyboardShortcuts } from '@renderer/hooks/useKeyboardShortcuts'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
 import { EVENTS } from '@renderer/config/events'
 import { buildVerseHistoryItem } from '@renderer/lib/bible-utils'
+import { getBibleProjectionSettingsPayload } from '@renderer/lib/bible-projection-settings'
 import type { BiblePassage } from '@shared/types/bible'
 
 type ProjectedPassage = { bookNumber: number; chapter: number; verse: number }
@@ -29,6 +30,8 @@ export default function BiblePage(): React.JSX.Element {
     prevChapter
   } = useBibleStore.getState()
   const fontSize = useBibleSettingsStore((s) => s.fontSize)
+  const scriptureDisplayMode = useBibleSettingsStore((s) => s.scriptureDisplayMode)
+  const scriptureTemplateId = useBibleSettingsStore((s) => s.scriptureTemplateId)
   const speechEnabled = useBibleSettingsStore((s) => s.speechEnabled)
   const [isSelectorOpen, setSelectorOpen] = useState(false)
   const [selectedVerseIndex, setSelectedVerseIndex] = useState(0)
@@ -44,8 +47,8 @@ export default function BiblePage(): React.JSX.Element {
   })
 
   useEffect(() => {
-    project('bible:settings', { fontSize })
-  }, [fontSize, project])
+    project('bible:settings', getBibleProjectionSettingsPayload())
+  }, [fontSize, scriptureDisplayMode, scriptureTemplateId, project])
 
   useEffect(() => {
     const handler = (): void => setSelectorOpen(true)
@@ -83,7 +86,7 @@ export default function BiblePage(): React.JSX.Element {
       if (!book || !chapter) return
 
       void startProjection('bible', [
-        ['bible:settings', { fontSize }],
+        ['bible:settings', getBibleProjectionSettingsPayload()],
         [
           'bible:chapter',
           {
@@ -110,7 +113,7 @@ export default function BiblePage(): React.JSX.Element {
         useBibleHistoryStore.getState().addToHistory(historyItem)
       }
     },
-    [getCurrentVerses, getCurrentBook, getCurrentChapter, fontSize, startProjection, navigateTo]
+    [getCurrentVerses, getCurrentBook, getCurrentChapter, startProjection, navigateTo]
   )
 
   const handleNextVerse = useCallback(() => {

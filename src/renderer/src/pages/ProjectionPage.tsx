@@ -9,10 +9,11 @@ import FileProjection from '@renderer/components/Projection/FileProjection'
 import SlideProjection from '@renderer/components/Projection/SlideProjection'
 import type { BibleChapterData } from '@renderer/components/Projection/BibleProjection'
 import type { TimerTickPayload, StopwatchTickPayload } from '@shared/types/timer'
-import type { FileControlPayload } from '@shared/projection-messages'
+import type { FileControlPayload, ProjectionPayload } from '@shared/projection-messages'
 import type { SlideDocument } from '@shared/types/slides'
 
 type ActiveContent = 'timer' | 'bible' | 'file' | 'slide' | null
+type BibleProjectionSettings = ProjectionPayload<'bible:settings'>
 
 export default function ProjectionPage(): React.JSX.Element {
   const [showDefault, setShowDefault] = useState(true)
@@ -20,7 +21,7 @@ export default function ProjectionPage(): React.JSX.Element {
   const [timerData, setTimerData] = useState<TimerTickPayload | null>(null)
   const [stopwatchData, setStopwatchData] = useState<StopwatchTickPayload | null>(null)
   const [bibleChapter, setBibleChapter] = useState<BibleChapterData | null>(null)
-  const [bibleFontSize, setBibleFontSize] = useState(90)
+  const [bibleSettings, setBibleSettings] = useState<BibleProjectionSettings>({ fontSize: 90 })
   const [fileData, setFileData] = useState<{
     itemId: string
     blobId: string
@@ -98,8 +99,8 @@ export default function ProjectionPage(): React.JSX.Element {
       setFileControlEvent({ id: fileControlEventId, data })
     })
 
-    const unsubBibleSettings = adapter.on('bible:settings', ({ fontSize }) => {
-      setBibleFontSize(fontSize)
+    const unsubBibleSettings = adapter.on('bible:settings', (settings) => {
+      setBibleSettings(settings)
     })
 
     const unsubTimezone = adapter.on('settings:timezone', ({ timezone }) => {
@@ -163,7 +164,7 @@ export default function ProjectionPage(): React.JSX.Element {
   if (showDefault) return <DefaultProjection />
 
   if (activeContent === 'bible' && bibleChapter) {
-    return <BibleProjection data={bibleChapter} fontSize={bibleFontSize} />
+    return <BibleProjection data={bibleChapter} settings={bibleSettings} />
   }
 
   if (activeContent === 'file' && fileData) {

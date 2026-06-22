@@ -24,7 +24,12 @@ function makeFile(id: string, mimeType = 'video/mp4'): FileItemRecord {
 describe('projectServiceCue', () => {
   beforeEach(() => {
     useSlidesStore.getState().clear()
-    useBibleSettingsStore.setState({ selectedVersionId: 1, fontSize: 88 })
+    useBibleSettingsStore.setState({
+      selectedVersionId: 1,
+      fontSize: 88,
+      scriptureDisplayMode: 'full-screen',
+      scriptureTemplateId: 'dark-stage'
+    })
     useBibleStore.setState({
       versions: [{ id: 1, code: 'kjv', name: 'KJV', locale: 'en', updatedAt: 0 }],
       content: new Map([
@@ -134,7 +139,13 @@ describe('projectServiceCue', () => {
       status: 'projected'
     })
     expect(startProjection).toHaveBeenCalledWith('bible', [
-      ['bible:settings', { fontSize: 88 }],
+      [
+        'bible:settings',
+        expect.objectContaining({
+          fontSize: 88,
+          displayMode: 'full-screen'
+        })
+      ],
       [
         'bible:chapter',
         {

@@ -5,6 +5,7 @@ import { useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 import type { ServiceCue } from '@renderer/stores/service-playlist'
 import { useSlidesStore } from '@renderer/stores/slides'
+import { getBibleProjectionSettingsPayload } from '@renderer/lib/bible-projection-settings'
 import { isPresentable } from '@renderer/lib/presentability'
 import { isFileItem, type FileItemRecord } from '@shared/types/folder'
 
@@ -93,7 +94,7 @@ async function projectBibleCue(
   })
 
   await deps.startProjection('bible', [
-    ['bible:settings', { fontSize: settings.fontSize }],
+    ['bible:settings', getBibleProjectionSettingsPayload()],
     [
       'bible:chapter',
       {

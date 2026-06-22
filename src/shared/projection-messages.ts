@@ -10,7 +10,7 @@
  */
 
 import type { TimerTickPayload, TimerSyncPayload, StopwatchTickPayload } from './types/timer'
-import type { SlideDocument } from './types/slides'
+import type { SlideDocument, SlideTheme } from './types/slides'
 
 export interface SystemMessages {
   '__system:ready': null
@@ -44,7 +44,11 @@ export interface AppMessages {
     versionLocale?: string
   }
   /** Bible display settings (font size, etc.) — sent independently from verse content */
-  'bible:settings': { fontSize: number }
+  'bible:settings': {
+    fontSize: number
+    displayMode?: 'full-screen' | 'lower-third'
+    templateTheme?: SlideTheme
+  }
   /** File item to display on projection (stub — coming soon) */
   'file:show': {
     itemId: string
