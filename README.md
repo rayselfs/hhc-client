@@ -65,8 +65,13 @@ outside git under `.local-runtimes/`, then run the package command:
 
 `npm run build` does not require these binaries. `npm run build:unpack` and
 desktop packaging run `prepare:video-engine:strict` and fail if the current
-platform runtime is missing. Use `npm run prepare:video-engine:strict -- --all`
-to verify every packaged runtime directory.
+platform runtime is missing. `npm run build:unpack` also verifies that the
+unpacked app contains the bundled video runtime and license notices.
+
+Release packaging is currently unsigned. See
+[`docs/release/unsigned-desktop-releases.md`](docs/release/unsigned-desktop-releases.md)
+for GitHub Actions runtime archive variables, OS warning expectations, and the
+future signing/notarization path.
 
 ## Architecture
 

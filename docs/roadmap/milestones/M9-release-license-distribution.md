@@ -11,6 +11,8 @@ Prepare LibrePresenter for public unsigned GitHub releases without paying for pl
 - Add release documentation for unsigned macOS and Windows builds.
 - Keep Apple notarization and Windows code signing as optional future phases.
 - Verify packaged runtime assets before release.
+- Download release runtime archives from verified repository variables instead of committing binaries.
+- Verify unpacked app resources with `npm run check:packaged-runtime`.
 - Keep README professional and accurate; do not promise store distribution.
 
 ## Acceptance Criteria
@@ -20,6 +22,8 @@ Prepare LibrePresenter for public unsigned GitHub releases without paying for pl
 - Docs explain OS warnings for unsigned builds.
 - Build fails if required bundled runtime assets are missing.
 - CI quality gates run before release publishing.
+- Release workflow does not require Apple or Windows signing secrets.
+- Runtime archive checksums are validated before packaging.
 
 ## Verification
 

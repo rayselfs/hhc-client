@@ -1,0 +1,185 @@
+/* eslint-disable @typescript-eslint/explicit-function-return-type */
+import { access, readdir, stat } from 'node:fs/promises'
+import { basename, join } from 'node:path'
+
+const args = new Set(process.argv.slice(2))
+const root = process.cwd()
+const distDir = process.env.PACKAGE_DIST_DIR ?? join(root, 'dist')
+const currentTarget = `${process.platform}-${process.arch}`
+const targetArg = process.argv.find((arg) => arg.startsWith('--target='))
+const requestedTarget = targetArg ? targetArg.slice('--target='.length) : currentTarget
+const checkAll = args.has('--all')
+
+const licenseFiles = [
+  'licenses/vlc/LICENSE.GPL-2.0',
+  'licenses/vlc/LICENSE.LGPL-2.1',
+  'licenses/ffmpeg/LICENSE.LGPL-2.1',
+  'licenses/electron-vlc-player/LICENSE.MIT'
+]
+
+const targetChecks = {
+  'darwin-arm64': {
+    vlcDir: 'video-engine/vlc/darwin-arm64',
+    vlcFiles: ['libvlc.dylib', 'libvlc.5.dylib'],
+    ffmpegDir: 'video-engine/ffmpeg/darwin-arm64',
+    ffmpegFiles: ['ffmpeg']
+  },
+  'darwin-x64': {
+    vlcDir: 'video-engine/vlc/darwin-x64',
+    vlcFiles: ['libvlc.dylib', 'libvlc.5.dylib'],
+    ffmpegDir: 'video-engine/ffmpeg/darwin-x64',
+    ffmpegFiles: ['ffmpeg']
+  },
+  'win32-x64': {
+    vlcDir: 'video-engine/vlc/win32-x64',
+    vlcFiles: ['libvlc.dll'],
+    ffmpegDir: 'video-engine/ffmpeg/win32-x64',
+    ffmpegFiles: ['ffmpeg.exe']
+  }
+}
+
+async function exists(path) {
+  try {
+    await access(path)
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function listDirectories(path) {
+  try {
+    const entries = await readdir(path, { withFileTypes: true })
+    return entries.filter((entry) => entry.isDirectory()).map((entry) => join(path, entry.name))
+  } catch {
+    return []
+  }
+}
+
+function toPosix(path) {
+  return path.split('\\').join('/')
+}
+
+function isMacResourceRoot(path) {
+  const normalized = toPosix(path)
+  return normalized.endsWith('.app/Contents/Resources')
+}
+
+function isWinResourceRoot(path) {
+  const normalized = toPosix(path)
+  return /\/win(?:32|-x64)?-unpacked\/resources$/.test(normalized)
+}
+
+function resourceRootTarget(path) {
+  const normalized = toPosix(path)
+  if (normalized.includes('/mac-arm64/')) return 'darwin-arm64'
+  if (normalized.includes('/mac-x64/') || normalized.includes('/mac/')) return 'darwin-x64'
+  if (normalized.includes('/win-unpacked/') || normalized.includes('/win-x64-unpacked/')) {
+    return 'win32-x64'
+  }
+  return null
+}
+
+async function findResourceRoots(dir) {
+  const roots = []
+  const pending = [dir]
+
+  while (pending.length > 0) {
+    const next = pending.pop()
+    if (!next) continue
+
+    if (isMacResourceRoot(next) || isWinResourceRoot(next)) {
+      roots.push(next)
+      continue
+    }
+
+    const depth = toPosix(next).replace(toPosix(dir), '').split('/').filter(Boolean).length
+    if (depth >= 6) continue
+    pending.push(...(await listDirectories(next)))
+  }
+
+  return roots
+}
+
+async function hasAnyFile(dir, files) {
+  for (const file of files) {
+    if (await exists(join(dir, file))) return true
+  }
+  return false
+}
+
+async function checkResourceRoot(resourceRoot, target) {
+  const failures = []
+  const checks = targetChecks[target]
+
+  if (!checks) {
+    failures.push(`Unsupported package target: ${target}`)
+    return failures
+  }
+
+  for (const file of licenseFiles) {
+    if (!(await exists(join(resourceRoot, file)))) {
+      failures.push(`Missing license notice: ${file}`)
+    }
+  }
+
+  if (!(await hasAnyFile(join(resourceRoot, checks.vlcDir), checks.vlcFiles))) {
+    failures.push(`Missing bundled VLC runtime in ${checks.vlcDir}`)
+  }
+
+  if (!(await hasAnyFile(join(resourceRoot, checks.ffmpegDir), checks.ffmpegFiles))) {
+    failures.push(`Missing bundled FFmpeg poster runtime in ${checks.ffmpegDir}`)
+  }
+
+  return failures
+}
+
+async function main() {
+  try {
+    await stat(distDir)
+  } catch {
+    console.error(`Package dist directory not found: ${distDir}`)
+    process.exitCode = 1
+    return
+  }
+
+  const roots = await findResourceRoots(distDir)
+  const rootsToCheck = checkAll
+    ? roots
+    : roots.filter((resourceRoot) => resourceRootTarget(resourceRoot) === requestedTarget)
+
+  if (rootsToCheck.length === 0) {
+    console.error(
+      `No packaged app resources found for ${checkAll ? 'any target' : requestedTarget}`
+    )
+    process.exitCode = 1
+    return
+  }
+
+  let failureCount = 0
+  for (const resourceRoot of rootsToCheck) {
+    const target = resourceRootTarget(resourceRoot)
+    if (!target) {
+      console.warn(`Skipping unknown package layout: ${resourceRoot}`)
+      continue
+    }
+
+    const failures = await checkResourceRoot(resourceRoot, target)
+    if (failures.length === 0) {
+      console.log(`ready: ${basename(resourceRoot)} (${target})`)
+      continue
+    }
+
+    failureCount += failures.length
+    console.error(`Invalid packaged runtime resources: ${resourceRoot}`)
+    for (const failure of failures) {
+      console.error(`- ${failure}`)
+    }
+  }
+
+  if (failureCount > 0) {
+    process.exitCode = 1
+  }
+}
+
+await main()

@@ -58,6 +58,9 @@ export function resolveFfmpegPosterRuntime(): VideoEngineRuntimeInfo {
   const executable = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg'
   const bundled = bundledPath('ffmpeg', platformDir(), executable)
   if (canExecute(bundled)) return { status: 'ready', path: bundled, source: 'bundled' }
+  if (app.isPackaged) {
+    return { status: 'missing', message: 'Bundled FFmpeg poster runtime not found' }
+  }
 
   return {
     status: 'ready',

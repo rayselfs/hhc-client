@@ -46,5 +46,9 @@ The app also uses Electron, React, Vite, pdfjs-dist, HeroUI, i18next, Zustand,
 and other npm dependencies. Their exact package versions are tracked in
 `package-lock.json`.
 
+VLC/libVLC and FFmpeg binaries are supplied to release packaging through
+verified runtime archives, not committed to git. Exact binary source, version,
+and checksum details should be recorded with each published release.
+
 Before publishing a release, run the package license check and ensure this file
 and bundled binary notices are included in the packaged app.

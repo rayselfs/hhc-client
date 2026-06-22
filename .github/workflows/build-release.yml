@@ -92,48 +92,44 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Prepare video engine runtime
-        run: npm run prepare:video-engine:strict
-
-      - name: Validate macOS signing secrets
+      - name: Download macOS video engine runtime
         if: runner.os == 'macOS'
         shell: bash
         env:
-          CSC_LINK: ${{ secrets.MACOS_CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.MACOS_CSC_KEY_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          VLC_URL: ${{ vars.VIDEO_ENGINE_VLC_DARWIN_ARM64_URL }}
+          VLC_SHA256: ${{ vars.VIDEO_ENGINE_VLC_DARWIN_ARM64_SHA256 }}
+          FFMPEG_URL: ${{ vars.VIDEO_ENGINE_FFMPEG_DARWIN_ARM64_URL }}
+          FFMPEG_SHA256: ${{ vars.VIDEO_ENGINE_FFMPEG_DARWIN_ARM64_SHA256 }}
         run: |
-          for name in CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do
-            if [[ -z "${!name}" ]]; then
-              echo "Missing required macOS signing secret: ${name}"
-              exit 1
-            fi
-          done
+          node scripts/download-video-engine-runtime.mjs --component=vlc --platform=darwin --arch=arm64 --url="${VLC_URL}" --sha256="${VLC_SHA256}"
+          node scripts/download-video-engine-runtime.mjs --component=ffmpeg --platform=darwin --arch=arm64 --url="${FFMPEG_URL}" --sha256="${FFMPEG_SHA256}"
 
-      - name: Validate Windows signing secrets
+      - name: Download Windows video engine runtime
         if: runner.os == 'Windows'
-        shell: pwsh
+        shell: bash
         env:
-          CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
+          VLC_URL: ${{ vars.VIDEO_ENGINE_VLC_WIN32_X64_URL }}
+          VLC_SHA256: ${{ vars.VIDEO_ENGINE_VLC_WIN32_X64_SHA256 }}
+          FFMPEG_URL: ${{ vars.VIDEO_ENGINE_FFMPEG_WIN32_X64_URL }}
+          FFMPEG_SHA256: ${{ vars.VIDEO_ENGINE_FFMPEG_WIN32_X64_SHA256 }}
         run: |
-          if (-not $env:CSC_LINK) { throw 'Missing required Windows signing secret: CSC_LINK' }
-          if (-not $env:CSC_KEY_PASSWORD) { throw 'Missing required Windows signing secret: CSC_KEY_PASSWORD' }
+          node scripts/download-video-engine-runtime.mjs --component=vlc --platform=win32 --arch=x64 --url="${VLC_URL}" --sha256="${VLC_SHA256}"
+          node scripts/download-video-engine-runtime.mjs --component=ffmpeg --platform=win32 --arch=x64 --url="${FFMPEG_URL}" --sha256="${FFMPEG_SHA256}"
 
-      - name: Build signed desktop package
+      - name: Prepare video engine runtime
+        run: npm run prepare:video-engine:strict
+
+      - name: Build unsigned desktop package
         env:
           VITE_ONEDRIVE_CLIENT_ID: ${{ vars.VITE_ONEDRIVE_CLIENT_ID }}
           VITE_BIBLE_API_HOST: ${{ vars.VITE_BIBLE_API_HOST }}
           VITE_BIBLE_API_V1_PREFIX: ${{ vars.VITE_BIBLE_API_V1_PREFIX }}
           VITE_BIBLE_API_V2_PREFIX: ${{ vars.VITE_BIBLE_API_V2_PREFIX }}
-          CSC_LINK: ${{ runner.os == 'macOS' && secrets.MACOS_CSC_LINK || secrets.WINDOWS_CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ runner.os == 'macOS' && secrets.MACOS_CSC_KEY_PASSWORD || secrets.WINDOWS_CSC_KEY_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          CSC_IDENTITY_AUTO_DISCOVERY: false
         run: npm run package:desktop -- ${{ matrix.target }} --publish never
+
+      - name: Verify packaged runtime and notices
+        run: npm run check:packaged-runtime
 
       - name: Upload desktop artifacts
         uses: actions/upload-artifact@v4.6.2

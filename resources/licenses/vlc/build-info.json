@@ -1,10 +1,10 @@
 {
   "component": "VLC / libVLC",
   "purpose": "desktop video playback engine",
-  "bundled": false,
-  "version": null,
+  "bundled": true,
+  "version": "provided by release runtime archive",
   "sourceUrl": "https://code.videolan.org/videolan/vlc",
-  "binarySourceUrl": null,
+  "binarySourceUrl": "configured through VIDEO_ENGINE_VLC_*_URL repository variables",
   "license": "GPL-2.0-or-later / LGPL-2.1-or-later components",
-  "notes": "Fill version and binarySourceUrl when VLC runtime binaries are added."
+  "notes": "Release builds must use verified runtime archives and publish their source/version details with the release."
 }

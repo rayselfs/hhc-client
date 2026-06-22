@@ -123,4 +123,17 @@ describe('video engine runtime resolver', () => {
       source: 'system'
     })
   })
+
+  it('does not fall back to system FFmpeg in packaged builds', async () => {
+    mockApp.isPackaged = true
+    mockAccessSync.mockImplementation(() => {
+      throw new Error('missing')
+    })
+    const { resolveFfmpegPosterRuntime } = await import('../video-engine-runtime')
+
+    expect(resolveFfmpegPosterRuntime()).toEqual({
+      status: 'missing',
+      message: 'Bundled FFmpeg poster runtime not found'
+    })
+  })
 })

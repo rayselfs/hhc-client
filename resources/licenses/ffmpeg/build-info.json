@@ -1,11 +1,11 @@
 {
   "component": "FFmpeg",
   "purpose": "desktop video poster generation only",
-  "bundled": false,
-  "version": null,
+  "bundled": true,
+  "version": "provided by release runtime archive",
   "sourceUrl": "https://git.ffmpeg.org/ffmpeg.git",
-  "binarySourceUrl": null,
+  "binarySourceUrl": "configured through VIDEO_ENGINE_FFMPEG_*_URL repository variables",
   "configure": null,
   "license": "LGPL-2.1-or-later or GPL-2.0-or-later depending on build configuration",
-  "notes": "Fill version, binarySourceUrl, and configure flags when FFmpeg runtime binaries are added."
+  "notes": "Release builds must use verified runtime archives and publish their source/version/configure details with the release."
 }
