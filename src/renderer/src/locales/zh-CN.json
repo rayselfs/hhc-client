@@ -656,7 +656,8 @@
       "media": "多媒体",
       "bible": "圣经",
       "soundboard": "音效板",
-      "storage": "存储空间"
+      "storage": "存储空间",
+      "recovery": "修复中心"
     },
     "timer": {
       "reminderModeLabel": "时间提醒计算方式",

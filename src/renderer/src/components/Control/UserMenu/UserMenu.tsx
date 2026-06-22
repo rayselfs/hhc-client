@@ -6,6 +6,7 @@ import { LogIn, LogOut, Settings, RefreshCw, Keyboard, Power, CircleUser, Info }
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
 import KeyboardShortcutsDialog from '@renderer/components/Control/UserMenu/KeyboardShortcutsDialog'
 import AboutDialog from '@renderer/components/Control/UserMenu/AboutDialog'
+import RecoveryIndicator from '@renderer/components/Control/RecoveryCenter/RecoveryIndicator'
 import { isElectron } from '@renderer/lib/env'
 import { useUpdateStore } from '@renderer/stores/update'
 import {
@@ -58,6 +59,7 @@ export default function UserMenu({ onOpenPreferences }: UserMenuProps): React.JS
               </Avatar.Fallback>
             </Avatar.Root>
             <span className="max-lg:hidden">{t('userMenu.guest')}</span>
+            <RecoveryIndicator />
           </div>
         </Dropdown.Trigger>
         <Dropdown.Popover>

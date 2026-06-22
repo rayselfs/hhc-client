@@ -50,6 +50,11 @@ vi.mock('@renderer/lib/onedrive-connect', () => ({
   loginOneDriveAccount: vi.fn(async () => null)
 }))
 
+vi.mock('@renderer/lib/recovery-center', () => ({
+  collectRecoveryIssues: vi.fn(async () => []),
+  runRecoveryAction: vi.fn(async () => undefined)
+}))
+
 vi.mock('@renderer/lib/sync-db', () => ({
   listProviderConnectionsByType: mockListProviderConnectionsByType
 }))
@@ -290,6 +295,15 @@ describe('PreferencesDialog', () => {
 
     expect(screen.getByLabelText(/default trigger mode/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/global fade/i)).toBeInTheDocument()
+  })
+
+  it('opens recovery center preferences page', async () => {
+    const user = userEvent.setup()
+    renderDialog(true)
+
+    await user.click(screen.getByTestId('category-recovery'))
+
+    expect(await screen.findByText('No current recovery issues')).toBeInTheDocument()
   })
 
   it('calls i18n.changeLanguage when language option clicked', async () => {

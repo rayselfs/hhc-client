@@ -7,6 +7,10 @@ import ConfirmDialog from '../../../Common/ConfirmDialog'
 import UserMenu from '../UserMenu'
 import { ShortcutScopeProvider } from '@renderer/contexts/ShortcutScopeContext'
 
+vi.mock('@renderer/lib/recovery-center', () => ({
+  collectRecoveryIssues: vi.fn(async () => [])
+}))
+
 function renderUserMenu(props: { onOpenPreferences?: () => void } = {}): ReturnType<typeof render> {
   return render(
     <ShortcutScopeProvider>

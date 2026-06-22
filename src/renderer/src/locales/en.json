@@ -656,7 +656,8 @@
       "media": "Media",
       "bible": "Bible",
       "soundboard": "Soundboard",
-      "storage": "Storage"
+      "storage": "Storage",
+      "recovery": "Recovery"
     },
     "timer": {
       "reminderModeLabel": "Time Warning Calculation",

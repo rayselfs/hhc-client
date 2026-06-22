@@ -9,12 +9,14 @@ import {
   Timer,
   ChevronRight,
   HardDrive,
-  SlidersHorizontal
+  SlidersHorizontal,
+  AlertTriangle
 } from 'lucide-react'
 import GeneralSettings from '@renderer/components/Control/UserMenu/GeneralSettings'
 import TimerSettings from '@renderer/components/Control/UserMenu/TimerSettings'
 import BibleSettingsPanel from '@renderer/components/Control/UserMenu/BibleSettingsPanel'
 import SoundboardSettings from '@renderer/components/Control/UserMenu/SoundboardSettings'
+import RecoveryCenterSettings from '@renderer/components/Control/UserMenu/RecoveryCenterSettings'
 import MediaSettings, {
   type MediaSettingsSection
 } from '@renderer/components/Control/UserMenu/MediaSettings'
@@ -28,12 +30,13 @@ interface PreferencesDialogProps {
   onOpenChange: (open: boolean) => void
 }
 
-type Category = 'general' | 'timer' | 'bible' | 'soundboard' | 'media' | 'storage'
+type Category = 'general' | 'timer' | 'bible' | 'soundboard' | 'media' | 'storage' | 'recovery'
 type PreferenceRoute =
   | 'general'
   | 'timer'
   | 'bible'
   | 'soundboard'
+  | 'recovery'
   | `media.${MediaSettingsSection}`
   | `storage.${StorageSettingsSection}`
 
@@ -56,6 +59,7 @@ interface CategoryItem {
     | 'preferences.categories.bible'
     | 'preferences.categories.soundboard'
     | 'preferences.categories.storage'
+    | 'preferences.categories.recovery'
   route: PreferenceRoute
   children?: CategoryChildItem[]
 }
@@ -98,6 +102,12 @@ export default function PreferencesDialog({
         { id: 'storage.usage', labelKey: 'preferences.storage.sections.usage' },
         { id: 'storage.cleanup', labelKey: 'preferences.storage.sections.cleanup' }
       ]
+    },
+    {
+      id: 'recovery',
+      icon: AlertTriangle,
+      labelKey: 'preferences.categories.recovery',
+      route: 'recovery'
     }
   ]
 
@@ -199,6 +209,7 @@ export default function PreferencesDialog({
                     {activeRoute === 'media.oneDrive' && <MediaSettings section="oneDrive" />}
                     {activeRoute === 'storage.usage' && <StorageSettings section="usage" />}
                     {activeRoute === 'storage.cleanup' && <StorageSettings section="cleanup" />}
+                    {activeRoute === 'recovery' && <RecoveryCenterSettings />}
                   </div>
                 </div>
               </ShortcutScope>
