@@ -1,7 +1,17 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useLocation, Link, useNavigate } from 'react-router-dom'
-import { Timer, BookOpen, ChevronDown, ChevronRight, Film, Star, Trash2, Files } from 'lucide-react'
+import {
+  Timer,
+  BookOpen,
+  ChevronDown,
+  ChevronRight,
+  Film,
+  Star,
+  Trash2,
+  Files,
+  ListTodo
+} from 'lucide-react'
 import { Dropdown } from '@heroui/react/dropdown'
 import UserMenu from '@renderer/components/Control/UserMenu/UserMenu'
 import PreferencesDialog from '@renderer/components/Control/UserMenu/PreferencesDialog'
@@ -46,7 +56,8 @@ export default function Sidebar(): React.JSX.Element {
 
   const topItems: NavItem[] = [
     { to: '/timer', icon: Timer, label: t('nav.timer') },
-    { to: '/bible', icon: BookOpen, label: t('nav.bible') }
+    { to: '/bible', icon: BookOpen, label: t('nav.bible') },
+    { to: '/service', icon: ListTodo, label: t('nav.service') }
   ]
 
   const isActive = (to: string): boolean => location.pathname === to

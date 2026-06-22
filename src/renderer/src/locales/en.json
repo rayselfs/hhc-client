@@ -2,6 +2,7 @@
   "nav": {
     "timer": "TIMER",
     "bible": "BIBLE",
+    "service": "SERVICE",
     "files": "FILES",
     "media": "MEDIA",
     "favorites": "FAVORITES",
@@ -13,6 +14,39 @@
     "language": "Language",
     "timezone": "Timezone",
     "confirm": "Get Started"
+  },
+  "service": {
+    "title": "SERVICE",
+    "subtitle": "Build a live rundown with media, Bible, timer, and future slide cues.",
+    "addMedia": "Add Media",
+    "addBible": "Add Bible",
+    "addTimer": "Add Timer",
+    "defaultTimerCue": "Timer Cue",
+    "defaultBibleCue": "Bible Cue",
+    "defaultMediaCue": "Media Cue",
+    "selectMediaLater": "Select media later",
+    "emptyTitle": "No cues yet",
+    "emptyDescription": "Add cues to build the service order.",
+    "completed": "Completed",
+    "previewing": "Previewing",
+    "jumpToCue": "Jump to cue",
+    "previewCue": "Preview cue",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "duplicateCue": "Duplicate cue",
+    "completeCue": "Mark complete",
+    "removeCue": "Remove cue",
+    "currentCue": "Current",
+    "nextCue": "Next",
+    "missingMediaSource": "Missing media source",
+    "notImplementedYet": "Not implemented yet",
+    "cueTypes": {
+      "media": "Media",
+      "bible": "Bible",
+      "timer": "Timer",
+      "song": "Song",
+      "slide": "Slide"
+    }
   },
   "timer": {
     "title": "TIMER",
