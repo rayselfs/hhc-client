@@ -9,7 +9,6 @@ import { useBibleHistoryStore } from '@renderer/stores/bible-history'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 import { useBibleFolderStore } from '@renderer/stores/folder'
 import { useServicePlaylistStore } from '@renderer/stores/service-playlist'
-import { useBibleLiveQueueStore } from '@renderer/stores/bible-live-queue'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
 import { buildBibleServiceCueInput } from '@renderer/lib/bible-service-cue'
 import { getBibleProjectionSettingsPayload } from '@renderer/lib/bible-projection-settings'
@@ -24,7 +23,7 @@ import { buildVerseItem } from './useBibleContextMenu'
 import type { MouseEvent } from 'react'
 import React, { useRef, useEffect, useState, type RefObject } from 'react'
 import type { ContentMessageTuple } from '@renderer/contexts/ProjectionContext'
-import { ChevronLeft, ChevronRight, CirclePlus, ListPlus, ListTodo } from 'lucide-react'
+import { ChevronLeft, ChevronRight, CirclePlus, ListPlus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 interface BiblePreviewProps {
@@ -92,20 +91,6 @@ export function BiblePreview({
       verse: verseNumber
     })
     useServicePlaylistStore.getState().addCue(cue)
-  }
-
-  const handleAddToQueue = (verseNumber: number, verseText: string, e: React.MouseEvent): void => {
-    e.stopPropagation()
-    if (!book || !chapter) return
-    const { selectedVersionId } = useBibleSettingsStore.getState()
-    useBibleLiveQueueStore.getState().addItem({
-      versionId: selectedVersionId,
-      bookNumber: book.number,
-      chapter: chapter.number,
-      verse: verseNumber,
-      text: verseText,
-      reference: formatVerseReferenceShort(t, book.number, chapter.number, verseNumber)
-    })
   }
 
   const scrollContainerCallbackRef = (node: HTMLDivElement | null): void => {
@@ -303,19 +288,10 @@ export function BiblePreview({
                   >
                     {verse.number}
                   </span>
-                  <span className="flex-1 text-xl pr-32" lang={currentVersionLocale}>
+                  <span className="flex-1 text-xl pr-24" lang={currentVersionLocale}>
                     {verse.text}
                   </span>
                 </button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={(e) => handleAddToQueue(verse.number, verse.text, e)}
-                  className="absolute right-24 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer hover:bg-transparent!"
-                  aria-label={t('bible.contextMenu.addToQueue')}
-                >
-                  <ListTodo size={14} className="text-muted" />
-                </Button>
                 <Button
                   variant="ghost"
                   size="sm"

@@ -173,16 +173,6 @@
       "title": "自定",
       "home": "首页"
     },
-    "queue": {
-      "title": "待播",
-      "empty": "暂无待播经文",
-      "description": "先排好待会要投影的经文。",
-      "current": "目前",
-      "next": "下一段",
-      "project": "投影待播经文",
-      "remove": "从待播移除",
-      "clear": "清空待播"
-    },
     "search": {
       "title": "搜索",
       "placeholder": "搜索经文...",
@@ -215,7 +205,6 @@
       "addToHistory": "加入历史",
       "addToFolder": "加入文件夹",
       "addToService": "加入流程",
-      "addToQueue": "加入待播",
       "copyText": "复制经文",
       "removeFromHistory": "从历史移除",
       "removeFromFolder": "从文件夹移除"

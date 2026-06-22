@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, within } from '@testing-library/react'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useRef } from 'react'
 import type { BibleStore } from '@renderer/stores/bible'
@@ -12,7 +12,6 @@ const mockNextChapter = vi.fn()
 const mockPrevChapter = vi.fn()
 const mockRetry = vi.fn()
 const mockAddCue = vi.fn()
-const mockAddQueueItem = vi.fn()
 
 const storeSingleton: BibleStore = {
   versions: [],
@@ -144,14 +143,6 @@ vi.mock('@renderer/stores/service-playlist', () => ({
   })
 }))
 
-vi.mock('@renderer/stores/bible-live-queue', () => ({
-  useBibleLiveQueueStore: Object.assign(vi.fn(), {
-    getState: () => ({
-      addItem: mockAddQueueItem
-    })
-  })
-}))
-
 vi.mock('@renderer/lib/bible-utils', () => ({
   formatVerseReferenceShort: vi.fn(
     (_t: unknown, _bookNum: number, chapter: number, verse: number) =>
@@ -192,8 +183,7 @@ vi.mock('react-i18next', () => ({
         'bible.chapterUnit.default': '章',
         'bible.chapterUnit.psa': '篇',
         'bible.preview.noContent': '尚未載入經文內容',
-        'bible.contextMenu.addToService': '加入流程',
-        'bible.contextMenu.addToQueue': '加入待播'
+        'bible.contextMenu.addToService': '加入流程'
       }
       return map[key] ?? key
     },
@@ -330,18 +320,12 @@ describe('BiblePreview', () => {
     })
   })
 
-  it('adds a verse to the live queue', () => {
+  it('renders two quick actions per verse', () => {
     renderBiblePreview()
-    const addButtons = screen.getAllByLabelText('加入待播')
-    fireEvent.click(addButtons[0])
-    expect(mockAddQueueItem).toHaveBeenCalledWith({
-      versionId: 1,
-      bookNumber: 1,
-      chapter: 1,
-      verse: 1,
-      text: 'In the beginning God created the heavens and the earth.',
-      reference: 'MockBook 1:1'
-    })
+    const verseRow = screen
+      .getByText('In the beginning God created the heavens and the earth.')
+      .closest('.group') as HTMLElement
+    expect(within(verseRow).getAllByRole('button')).toHaveLength(3)
   })
 
   it('calls nextChapter when next chapter button pressed', () => {

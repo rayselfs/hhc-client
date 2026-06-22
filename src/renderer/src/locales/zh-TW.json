@@ -173,16 +173,6 @@
       "title": "自訂",
       "home": "首頁"
     },
-    "queue": {
-      "title": "待播",
-      "empty": "尚無待播經文",
-      "description": "先排好待會要投影的經文。",
-      "current": "目前",
-      "next": "下一段",
-      "project": "投影待播經文",
-      "remove": "從待播移除",
-      "clear": "清空待播"
-    },
     "search": {
       "title": "搜尋",
       "placeholder": "搜尋經文...",
@@ -215,7 +205,6 @@
       "addToHistory": "加入歷史",
       "addToFolder": "加入資料夾",
       "addToService": "加入流程",
-      "addToQueue": "加入待播",
       "copyText": "複製經文",
       "removeFromHistory": "從歷史移除",
       "removeFromFolder": "從資料夾移除"
