@@ -5,7 +5,7 @@ import type { BibleStore } from '@renderer/stores/bible'
 import { BiblePreview } from '../BiblePreview'
 
 const mockProject = vi.fn()
-const mockClaimProjection = vi.fn()
+const mockStartProjection = vi.fn(() => Promise.resolve())
 const mockNavigateTo = vi.fn()
 const mockNextChapter = vi.fn()
 const mockPrevChapter = vi.fn()
@@ -48,8 +48,8 @@ vi.mock('@renderer/contexts/ProjectionContext', () => ({
     isProjectionBlanked: false,
     projectionReadyCount: 0,
     activeOwner: 'bible',
-    claimProjection: mockClaimProjection,
-    startProjection: vi.fn(),
+    claimProjection: vi.fn(),
+    startProjection: mockStartProjection,
     stopProjection: vi.fn(),
     openProjection: vi.fn(),
     closeProjection: vi.fn(),
@@ -215,22 +215,23 @@ describe('BiblePreview', () => {
     expect(screen.getByText(/創世記/)).toBeInTheDocument()
   })
 
-  it('clicking a verse calls claimProjection and project', () => {
+  it('clicking a verse starts bible projection with the chapter payload', () => {
     renderBiblePreview()
     const verseBtn = screen
       .getByText('In the beginning God created the heavens and the earth.')
       .closest('button')!
     fireEvent.click(verseBtn)
-    expect(mockClaimProjection).toHaveBeenCalledWith('bible', { unblank: true })
-    expect(mockProject).toHaveBeenCalledWith(
-      'bible:chapter',
-      expect.objectContaining({
-        bookNumber: 1,
-        chapter: 1,
-        currentVerse: 1
-      }),
-      { autoOpen: true }
-    )
+    expect(mockStartProjection).toHaveBeenCalledWith('bible', [
+      [
+        'bible:chapter',
+        expect.objectContaining({
+          bookNumber: 1,
+          chapter: 1,
+          currentVerse: 1
+        })
+      ]
+    ])
+    expect(mockProject).not.toHaveBeenCalled()
   })
 
   it('clicking a verse calls navigateTo with correct passage', () => {

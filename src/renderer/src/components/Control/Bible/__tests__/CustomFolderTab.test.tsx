@@ -116,7 +116,7 @@ vi.mock('@renderer/contexts/ProjectionContext', () => ({
     projectionReadyCount: 0,
     activeOwner: 'timer',
     claimProjection: vi.fn(),
-    startProjection: vi.fn(),
+    startProjection: vi.fn(() => Promise.resolve()),
     stopProjection: vi.fn(),
     releaseOwnership: vi.fn(),
     project: vi.fn(),

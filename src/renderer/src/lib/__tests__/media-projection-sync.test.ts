@@ -3,15 +3,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 import type { FileItemRecord } from '@shared/types/folder'
 
-const mockSend = vi.fn()
 const mockProject = vi.fn()
-const mockBlankProjection = vi.fn()
+const mockStartProjection = vi.fn(() => Promise.resolve())
+const mockStopProjection = vi.fn(() => Promise.resolve())
 
 vi.mock('@renderer/contexts/ProjectionContext', () => ({
   useProjection: () => ({
-    send: mockSend,
     project: mockProject,
-    blankProjection: mockBlankProjection
+    startProjection: mockStartProjection,
+    stopProjection: mockStopProjection
   })
 }))
 
@@ -87,10 +87,12 @@ describe('media projection sync', () => {
 
     renderSync()
 
-    expect(mockProject).toHaveBeenCalledWith(
-      'file:show',
-      expect.objectContaining({ itemId: 'copy-id', blobId: 'original-id' })
-    )
+    expect(mockStartProjection).toHaveBeenCalledWith('media', [
+      [
+        'file:show',
+        expect.objectContaining({ itemId: 'copy-id', blobId: 'original-id' })
+      ]
+    ])
   })
 
   it('projects embedded VLC video through the desktop engine', async () => {
@@ -119,15 +121,17 @@ describe('media projection sync', () => {
 
     renderSync()
 
-    expect(mockProject).toHaveBeenCalledWith(
-      'file:show',
-      expect.objectContaining({
-        itemId: 'vlc-item',
-        blobId: 'source-blob',
-        playbackMode: 'vlc-embedded',
-        seekable: true,
-        durationMs: 15000
-      })
-    )
+    expect(mockStartProjection).toHaveBeenCalledWith('media', [
+      [
+        'file:show',
+        expect.objectContaining({
+          itemId: 'vlc-item',
+          blobId: 'source-blob',
+          playbackMode: 'vlc-embedded',
+          seekable: true,
+          durationMs: 15000
+        })
+      ]
+    ])
   })
 })

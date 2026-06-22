@@ -35,7 +35,7 @@ export default function BiblePage(): React.JSX.Element {
   const [projectedPassage, setProjectedPassage] = useState<ProjectedPassage | null>(null)
   const scrollBehaviorRef = useRef<ScrollBehavior>('instant')
   const { showPreviewMenu } = useBibleContextMenu()
-  const { claimProjection, project } = useProjection()
+  const { project, startProjection } = useProjection()
 
   const selectedVerseIndexRef = useRef(0)
 
@@ -82,17 +82,18 @@ export default function BiblePage(): React.JSX.Element {
       const chapter = getCurrentChapter()
       if (!book || !chapter) return
 
-      claimProjection('bible', { unblank: true })
-      project(
-        'bible:chapter',
-        {
-          bookNumber: book.number,
-          chapter: chapter.number,
-          chapterVerses: verses.map((v) => ({ number: v.number, text: v.text })),
-          currentVerse: verse.number
-        },
-        { autoOpen: true }
-      )
+      void startProjection('bible', [
+        ['bible:settings', { fontSize }],
+        [
+          'bible:chapter',
+          {
+            bookNumber: book.number,
+            chapter: chapter.number,
+            chapterVerses: verses.map((v) => ({ number: v.number, text: v.text })),
+            currentVerse: verse.number
+          }
+        ]
+      ])
       navigateTo({ bookNumber: book.number, chapter: chapter.number, verse: verse.number })
       setSelectedVerseIndex(clamped)
       setProjectedPassage({ bookNumber: book.number, chapter: chapter.number, verse: verse.number })
@@ -109,7 +110,7 @@ export default function BiblePage(): React.JSX.Element {
         useBibleHistoryStore.getState().addToHistory(historyItem)
       }
     },
-    [getCurrentVerses, getCurrentBook, getCurrentChapter, claimProjection, project, navigateTo]
+    [getCurrentVerses, getCurrentBook, getCurrentChapter, fontSize, startProjection, navigateTo]
   )
 
   const handleNextVerse = useCallback(() => {

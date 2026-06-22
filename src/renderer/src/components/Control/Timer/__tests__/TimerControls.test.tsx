@@ -8,12 +8,12 @@ import TimerControls from '@renderer/components/Control/Timer/TimerControls'
 import { useTimerStore } from '@renderer/stores/timer'
 import { useStopwatchStore } from '@renderer/stores/stopwatch'
 
-const mockClaimProjection = vi.fn()
+const mockStartProjection = vi.fn(() => Promise.resolve())
 
 vi.mock('@renderer/contexts/ProjectionContext', () => ({
   useProjection: vi.fn(() => ({
-    claimProjection: mockClaimProjection,
-    startProjection: vi.fn(),
+    claimProjection: vi.fn(),
+    startProjection: mockStartProjection,
     stopProjection: vi.fn(),
     project: vi.fn(),
     send: vi.fn(),
@@ -31,7 +31,7 @@ vi.mock('@renderer/contexts/ProjectionContext', () => ({
 beforeEach(() => {
   useTimerStore.setState({ status: 'stopped' })
   useStopwatchStore.setState({ status: 'stopped' })
-  mockClaimProjection.mockClear()
+  mockStartProjection.mockClear()
 })
 
 function renderWithI18n(mode: 'timer' | 'clock' | 'both' | 'stopwatch' = 'timer'): RenderResult {
@@ -175,55 +175,55 @@ describe('TimerControls — clock/both modes use timerStore', () => {
 
 describe('TimerControls — projection integration', () => {
   beforeEach(() => {
-    mockClaimProjection.mockClear()
+    mockStartProjection.mockClear()
   })
 
-  it('clicking Start calls claimProjection("timer", { unblank: true })', async () => {
+  it('clicking Start starts the timer projection session', async () => {
     const user = userEvent.setup()
     useTimerStore.setState({ status: 'stopped' })
     renderWithI18n('timer')
     await user.click(screen.getByTestId('btn-start'))
-    expect(mockClaimProjection).toHaveBeenCalledWith('timer', { unblank: true })
+    expect(mockStartProjection).toHaveBeenCalledWith('timer')
   })
 
-  it('clicking Resume calls claimProjection("timer", { unblank: true })', async () => {
+  it('clicking Resume starts the timer projection session', async () => {
     const user = userEvent.setup()
     useTimerStore.setState({ status: 'paused' })
     renderWithI18n('timer')
     await user.click(screen.getByTestId('btn-resume'))
-    expect(mockClaimProjection).toHaveBeenCalledWith('timer', { unblank: true })
+    expect(mockStartProjection).toHaveBeenCalledWith('timer')
   })
 
-  it('clicking Pause does NOT call claimProjection', async () => {
+  it('clicking Pause does NOT start a projection session', async () => {
     const user = userEvent.setup()
     useTimerStore.setState({ status: 'running' })
     renderWithI18n('timer')
     await user.click(screen.getByTestId('btn-pause'))
-    expect(mockClaimProjection).not.toHaveBeenCalled()
+    expect(mockStartProjection).not.toHaveBeenCalled()
   })
 
-  it('clicking Reset does NOT call claimProjection', async () => {
+  it('clicking Reset does NOT start a projection session', async () => {
     const user = userEvent.setup()
     useTimerStore.setState({ status: 'running' })
     renderWithI18n('timer')
     await user.click(screen.getByTestId('btn-reset'))
-    expect(mockClaimProjection).not.toHaveBeenCalled()
+    expect(mockStartProjection).not.toHaveBeenCalled()
   })
 
-  it('stopwatch Start also calls claimProjection("timer", { unblank: true })', async () => {
+  it('stopwatch Start also starts the timer projection session', async () => {
     const user = userEvent.setup()
     useStopwatchStore.setState({ status: 'stopped' })
     renderWithI18n('stopwatch')
     await user.click(screen.getByTestId('btn-start'))
-    expect(mockClaimProjection).toHaveBeenCalledWith('timer', { unblank: true })
+    expect(mockStartProjection).toHaveBeenCalledWith('timer')
   })
 
-  it('stopwatch Resume also calls claimProjection("timer", { unblank: true })', async () => {
+  it('stopwatch Resume also starts the timer projection session', async () => {
     const user = userEvent.setup()
     useStopwatchStore.setState({ status: 'paused' })
     renderWithI18n('stopwatch')
     await user.click(screen.getByTestId('btn-resume'))
-    expect(mockClaimProjection).toHaveBeenCalledWith('timer', { unblank: true })
+    expect(mockStartProjection).toHaveBeenCalledWith('timer')
   })
 })
 

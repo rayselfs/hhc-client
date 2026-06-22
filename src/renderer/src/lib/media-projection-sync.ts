@@ -21,11 +21,11 @@ function playlistContentChanged(
 }
 
 export function useMediaProjectionSync(): void {
-  const { project, send, blankProjection } = useProjection()
+  const { project, startProjection, stopProjection } = useProjection()
   const projectSequenceRef = useRef(0)
 
   const projectCurrentItem = useCallback(
-    async (state: MediaProjectionStore): Promise<void> => {
+    async (state: MediaProjectionStore, startSession = false): Promise<void> => {
       const sequence = ++projectSequenceRef.current
       const item = state.playlist[state.currentIndex]
       if (!item) return
@@ -44,22 +44,27 @@ export function useMediaProjectionSync(): void {
       }
 
       if (sequence === projectSequenceRef.current) {
-        void project('file:show', payload)
+        if (startSession) {
+          void startProjection('media', [['file:show', payload]])
+        } else {
+          void project('file:show', payload)
+        }
       }
     },
-    [project]
+    [project, startProjection]
   )
 
   useEffect(() => {
     const unsub = useMediaProjectionStore.subscribe((state, prev) => {
       if (!state.isPresenting) return
 
+      const started = !prev.isPresenting && state.isPresenting
       const indexChanged = state.currentIndex !== prev.currentIndex
       const playlistChanged = playlistContentChanged(prev.playlist, state.playlist)
       const endedCleared = prev.isEnded && !state.isEnded
 
-      if (indexChanged || playlistChanged || endedCleared) {
-        void projectCurrentItem(state)
+      if (started || indexChanged || playlistChanged || endedCleared) {
+        void projectCurrentItem(state, started)
       }
     })
     return () => {
@@ -71,46 +76,46 @@ export function useMediaProjectionSync(): void {
     const unsub = useMediaProjectionStore.subscribe((state, prev) => {
       if (!state.isPresenting) return
       if (state.pan !== prev.pan) {
-        send('file:control', { action: 'pan', value: state.pan })
+        void project('file:control', { action: 'pan', value: state.pan })
       }
     })
     return unsub
-  }, [send])
+  }, [project])
 
   useEffect(() => {
     const unsub = useMediaProjectionStore.subscribe((state, prev) => {
       if (!state.isPresenting) return
       if (state.zoomLevel !== prev.zoomLevel) {
-        send('file:control', { action: 'zoom', value: state.zoomLevel })
+        void project('file:control', { action: 'zoom', value: state.zoomLevel })
       }
     })
     return unsub
-  }, [send])
+  }, [project])
 
   useEffect(() => {
     const unsub = useMediaProjectionStore.subscribe((state, prev) => {
       if (prev.isPresenting && !state.isPresenting) {
         projectSequenceRef.current += 1
-        blankProjection(true)
+        void stopProjection()
       }
     })
     return unsub
-  }, [blankProjection])
+  }, [stopProjection])
 
   useEffect(() => {
     const unsub = useMediaProjectionStore.subscribe((state, prev) => {
       if (!state.isPresenting) return
       if (state.isEnded && !prev.isEnded) {
         projectSequenceRef.current += 1
-        send('file:end', null)
+        void project('file:end', null)
       }
     })
     return unsub
-  }, [send])
+  }, [project])
 
   useEffect(() => {
     const state = useMediaProjectionStore.getState()
     if (!state.isPresenting) return
-    void projectCurrentItem(state)
+    void projectCurrentItem(state, true)
   }, [projectCurrentItem])
 }

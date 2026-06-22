@@ -21,7 +21,7 @@ export default function TimerControls({
   className
 }: TimerControlsProps): React.JSX.Element {
   const { t } = useTranslation()
-  const { claimProjection, openProjection } = useProjection()
+  const { startProjection } = useProjection()
   const isStopwatch = mode === 'stopwatch'
 
   const timerStatus = useTimerStore((s) => s.status)
@@ -66,14 +66,12 @@ export default function TimerControls({
 
   const handleStart = (): void => {
     if (mode === 'clock') setMode('both')
-    openProjection().catch(() => {})
-    claimProjection('timer', { unblank: true })
+    startProjection('timer').catch(() => {})
     start()
   }
 
   const handleResume = (): void => {
-    openProjection().catch(() => {})
-    claimProjection('timer', { unblank: true })
+    startProjection('timer').catch(() => {})
     resume()
   }
 

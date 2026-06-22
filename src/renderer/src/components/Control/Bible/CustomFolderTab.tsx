@@ -34,7 +34,7 @@ export function CustomFolderTab({
 }: CustomFolderTabProps): React.JSX.Element {
   const currentFolderId = useBibleFolderStore((s) => s.currentFolderId)
   const { navigateTo } = useBibleStore.getState()
-  const { claimProjection, project } = useProjection()
+  const { startProjection } = useProjection()
   const { t } = useTranslation()
 
   const contextMenu = useFolderContextMenu()
@@ -59,20 +59,20 @@ export function CustomFolderTab({
       const book = books?.find((b) => b.number === item.bookNumber)
       const chapter = book?.chapters.find((c) => c.number === item.chapter)
       if (!chapter) return
-      claimProjection('bible', { unblank: true })
-      project(
-        'bible:chapter',
-        {
-          bookNumber: item.bookNumber,
-          chapter: item.chapter,
-          chapterVerses: chapter.verses.map((v) => ({ number: v.number, text: v.text })),
-          currentVerse: item.verse
-        },
-        { autoOpen: true }
-      )
+      void startProjection('bible', [
+        [
+          'bible:chapter',
+          {
+            bookNumber: item.bookNumber,
+            chapter: item.chapter,
+            chapterVerses: chapter.verses.map((v) => ({ number: v.number, text: v.text })),
+            currentVerse: item.verse
+          }
+        ]
+      ])
       onProjected?.({ bookNumber: item.bookNumber, chapter: item.chapter, verse: item.verse })
     },
-    [navigateTo, claimProjection, project, onProjected]
+    [navigateTo, startProjection, onProjected]
   )
 
   const getItemReference = useCallback(

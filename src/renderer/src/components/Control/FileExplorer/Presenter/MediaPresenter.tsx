@@ -22,7 +22,7 @@ import { usePreviewCache } from '@renderer/hooks/usePreviewCache'
 import { useThumbnails } from '@renderer/hooks/useThumbnails'
 
 export default function MediaPresenter(): React.JSX.Element {
-  const { claimProjection, blankProjection, send, project, on } = useProjection()
+  const { stopProjection, project, on } = useProjection()
 
   useMediaProjectionSync()
 
@@ -75,12 +75,10 @@ export default function MediaPresenter(): React.JSX.Element {
     if (timerStatus === 'running') {
       useTimerRuntimeStore.getState().pause()
     }
-    claimProjection('media', { unblank: true })
-
     return () => {
-      blankProjection(true)
+      void stopProjection()
     }
-  }, [blankProjection, claimProjection])
+  }, [stopProjection])
 
   useEffect(() => {
     setPresenterActive(true)
@@ -195,7 +193,7 @@ export default function MediaPresenter(): React.JSX.Element {
                   useMediaProjectionStore.getState().typeStates['pdf']?.viewMode ?? 'slide'
                 const newMode = currentViewMode === 'slide' ? 'scroll' : 'slide'
                 useMediaProjectionStore.getState().setTypeState('pdf', { viewMode: newMode })
-                send('file:control', {
+                void project('file:control', {
                   action: 'pdfViewMode',
                   value: newMode === 'slide' ? 'single' : 'continuous'
                 })

@@ -55,7 +55,7 @@ export function BiblePreview({
     navigateTo
   } = useBibleStore.getState()
 
-  const { claimProjection, project } = useProjection()
+  const { startProjection } = useProjection()
   const verseRefs = useRef<Map<number, HTMLButtonElement>>(new Map())
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const prevSelectedVerseIndexRef = useRef<number>(selectedVerseIndex)
@@ -104,18 +104,18 @@ export function BiblePreview({
 
   const handleVerseClick = (verseIndex: number, verseNumber: number, _verseText: string): void => {
     if (!book || !chapter) return
-    claimProjection('bible', { unblank: true })
-    project(
-      'bible:chapter',
-      {
-        bookNumber: book.number,
-        chapter: chapter.number,
-        chapterVerses: verses.map((v) => ({ number: v.number, text: v.text })),
-        currentVerse: verseNumber,
-        versionLocale: currentVersionLocale
-      },
-      { autoOpen: true }
-    )
+    void startProjection('bible', [
+      [
+        'bible:chapter',
+        {
+          bookNumber: book.number,
+          chapter: chapter.number,
+          chapterVerses: verses.map((v) => ({ number: v.number, text: v.text })),
+          currentVerse: verseNumber,
+          versionLocale: currentVersionLocale
+        }
+      ]
+    ])
     navigateTo({ bookNumber: book.number, chapter: chapter.number, verse: verseNumber })
     scrollBehaviorRef.current = 'smooth'
     onSelectedVerseIndexChange(verseIndex)
