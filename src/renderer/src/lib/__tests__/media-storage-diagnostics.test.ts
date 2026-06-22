@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { openFileExplorerDB, resetFileExplorerDBForTests } from '../file-explorer-db'
-import { createMediaStorageDiagnosticsReport } from '../media-storage-diagnostics'
+import {
+  createMediaStorageDiagnosticsReport,
+  stringifyRedactedDiagnostics
+} from '../media-storage-diagnostics'
 import { resetMediaWorkDBForTests } from '../media-work-db'
 import { resetSyncDBForTests } from '../sync-db'
 
@@ -53,5 +56,22 @@ describe('createMediaStorageDiagnosticsReport', () => {
     expect(serialized).not.toContain('secret-token')
     expect(serialized).not.toContain('accessToken')
     expect(serialized).not.toContain('refreshToken')
+  })
+
+  it('stringifies diagnostics without paths, tokens, or stack traces', () => {
+    const output = stringifyRedactedDiagnostics({
+      schemaVersion: 1,
+      generatedAt: 1,
+      usage: {} as never,
+      total: 0,
+      integrity: {
+        checkedAt: 1,
+        issueCount: 1,
+        issues: [{ kind: 'file-item-missing-blob', severity: 'error', count: 1 }]
+      }
+    })
+
+    expect(output).not.toMatch(/\/Users|C:\\|accessToken|refreshToken|Error:/)
+    expect(JSON.parse(output).schemaVersion).toBe(1)
   })
 })

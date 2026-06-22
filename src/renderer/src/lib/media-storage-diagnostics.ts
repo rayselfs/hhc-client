@@ -49,6 +49,10 @@ export async function createMediaStorageDiagnosticsReport(
   }
 }
 
+export function stringifyRedactedDiagnostics(report: MediaStorageDiagnosticsReport): string {
+  return JSON.stringify(report, null, 2)
+}
+
 function summarizeIntegrityIssues(
   issues: Awaited<ReturnType<typeof scanMediaStorageIntegrity>>['issues']
 ): MediaStorageDiagnosticsIssueSummary[] {
