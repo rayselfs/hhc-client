@@ -49,12 +49,20 @@
 :root {
   --eclipse: oklch(0.35 0.005 286);
   --cursor-interactive: default;
+  --presentation-native-control-bg: #f4f4f5;
+  --presentation-native-control-fg: #18181b;
+  --presentation-native-control-menu-bg: #ffffff;
+  --presentation-native-control-menu-fg: #18181b;
 }
 
 .dark,
 [data-theme='dark'] {
   --warning: oklch(0.42 0.1006 79.22);
   --accent: oklch(0.35 0.1 245);
+  --presentation-native-control-bg: #27272a;
+  --presentation-native-control-fg: #f4f4f5;
+  --presentation-native-control-menu-bg: #18181b;
+  --presentation-native-control-menu-fg: #f4f4f5;
 }
 
 .presenter-media-control {
@@ -98,12 +106,19 @@
 }
 
 .presentation-native-control {
-  color-scheme: light dark;
+  background-color: var(--presentation-native-control-bg);
+  color: var(--presentation-native-control-fg);
+  color-scheme: light;
+}
+
+.dark .presentation-native-control,
+[data-theme='dark'] .presentation-native-control {
+  color-scheme: dark;
 }
 
 .presentation-native-control option {
-  background: var(--content1);
-  color: var(--foreground);
+  background-color: var(--presentation-native-control-menu-bg);
+  color: var(--presentation-native-control-menu-fg);
 }
 
 .presentation-range {
