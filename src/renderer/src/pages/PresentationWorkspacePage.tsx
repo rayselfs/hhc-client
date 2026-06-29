@@ -16,6 +16,7 @@ import { Button } from '@heroui/react/button'
 import { Spinner } from '@heroui/react/spinner'
 import { getBlobId } from '@renderer/lib/blob-identity'
 import { getFileSource, openFileExplorerDB } from '@renderer/lib/file-explorer-db'
+import { ensurePresentationPageDocument } from '@renderer/lib/presentation-page-document'
 import { openPptxViewer, type PptxViewerHandle } from '@renderer/lib/pptx-renderer-service'
 import { getPresentationWorkspacePath, isPresentationItem } from '@renderer/lib/presentation-media'
 import {
@@ -168,6 +169,10 @@ function PresentationDocumentView({
         viewerRef.current = handle
         setViewer(handle)
         setSlideCount(deckItemId, handle.slideCount)
+        void ensurePresentationPageDocument(
+          { id: deckItemId, url: deckUrl },
+          handle.slideCount
+        ).catch(() => undefined)
         setStatus('ready')
       } catch (loadError) {
         if (cancelled) return

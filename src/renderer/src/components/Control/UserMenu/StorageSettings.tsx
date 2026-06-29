@@ -45,7 +45,12 @@ const STORAGE_USAGE_GROUPS: StorageUsageGroup[] = [
   {
     key: 'coversAndPreviews',
     labelKey: 'preferences.storage.usage.coversAndPreviews',
-    buckets: ['generatedCoverThumbnails', 'customCoverOverrides', 'videoPosters']
+    buckets: [
+      'generatedCoverThumbnails',
+      'customCoverOverrides',
+      'videoPosters',
+      'presentationDocuments'
+    ]
   },
   {
     key: 'pdfPreviews',

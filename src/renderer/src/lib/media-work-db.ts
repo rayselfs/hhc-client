@@ -37,6 +37,7 @@ export type DerivedAssetKind =
   | 'pdf-page-thumbnails'
   | 'video-poster'
   | 'media-metadata'
+  | 'presentation-page-document'
 
 export interface DerivedAssetMetadata {
   kind?: 'image' | 'video' | 'pdf'
@@ -54,6 +55,7 @@ export interface DerivedAssetMetadata {
   profile?: string
   frameRate?: number
   browserPlayback?: 'playable' | 'unplayable'
+  presentationDocumentJson?: string
 }
 
 export interface DerivedAssetRecord {

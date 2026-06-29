@@ -62,6 +62,16 @@ describe('getMediaStorageAccounting', () => {
       status: 'failed',
       size: 33
     })
+    await putDerivedAsset({
+      sourceBlobId: 'web-source',
+      kind: 'presentation-page-document',
+      variant: 'document:item-1',
+      storage: 'indexed-db',
+      mimeType: 'application/json',
+      status: 'ready',
+      size: 7,
+      blob: new Blob(['slides'])
+    })
     await putCustomCoverOverride('item-1', new Blob(['custom']))
 
     const report = await getMediaStorageAccounting()
@@ -69,6 +79,7 @@ describe('getMediaStorageAccounting', () => {
     expect(report.usage.webIndexedDbSourceBlobs).toBe(6)
     expect(report.usage.generatedCoverThumbnails).toBe(5)
     expect(report.usage.pdfPageThumbnails).toBe(4)
+    expect(report.usage.presentationDocuments).toBe(7)
     expect(report.usage.temporaryAndFailedJobFiles).toBe(33)
     expect(Number.isNaN(report.usage.customCoverOverrides)).toBe(false)
   })

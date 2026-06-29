@@ -32,6 +32,7 @@ vi.mock('@renderer/lib/media-storage-accounting', () => ({
       customCoverOverrides: 0,
       pdfPageThumbnails: 0,
       videoPosters: 0,
+      presentationDocuments: 0,
       syncCache: 0,
       temporaryAndFailedJobFiles: 0
     },
