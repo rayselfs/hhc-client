@@ -5,9 +5,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Circle,
-  Copy,
   FileText,
-  Home,
+  FolderOpen,
   ImagePlus,
   Minus,
   Palette,
@@ -15,7 +14,6 @@ import {
   Plus,
   Redo2,
   Square,
-  Trash2,
   Type,
   Undo2,
   X
@@ -31,9 +29,7 @@ import {
   createShapeElement,
   createTextElement,
   duplicateEditableSlide,
-  duplicateElementInSlide,
   loadEditablePresentation,
-  moveEditableSlide,
   removeElementFromSlide,
   removeEditableSlide,
   saveEditablePresentation,
@@ -41,8 +37,7 @@ import {
   type EditableImageElement,
   type EditablePresentationDocument,
   type EditablePresentationElement,
-  type EditableTextAlign,
-  type EditableTextElement
+  type EditableTextAlign
 } from '@renderer/lib/editable-presentation'
 import { openFileExplorerDB } from '@renderer/lib/file-explorer-db'
 import { ensurePresentationPageDocument } from '@renderer/lib/presentation-page-document'
@@ -60,26 +55,10 @@ import { isFileItem } from '@shared/types/folder'
 import type { SlideHandle } from '@aiden0z/pptx-renderer'
 
 type LoadStatus = 'idle' | 'loading' | 'ready' | 'failed'
+type RibbonTab = 'home' | 'insert' | 'design'
 
-function RibbonButton({
-  icon,
-  label,
-  onClick
-}: {
-  icon: React.ReactNode
-  label: string
-  onClick?: () => void
-}): React.JSX.Element {
-  return (
-    <button
-      className="flex h-14 min-w-20 flex-col items-center justify-center gap-1 rounded-lg px-3 text-xs text-default-500 transition-colors hover:bg-content2 hover:text-foreground"
-      onClick={onClick}
-    >
-      {icon}
-      <span>{label}</span>
-    </button>
-  )
-}
+const FONT_FAMILIES = ['Inter Variable', 'Noto Sans TC Variable', 'Noto Sans SC Variable', 'Arial']
+const FONT_SIZES = [12, 14, 16, 18, 24, 32, 44, 56, 72, 96]
 
 function SlideThumbnail({
   viewer,
@@ -139,7 +118,13 @@ function SlideThumbnail({
   )
 }
 
-function PptxDocumentView({ deck }: { deck: PresentationWorkspaceDocument }): React.JSX.Element {
+function PptxDocumentView({
+  deck,
+  onPresent
+}: {
+  deck: PresentationWorkspaceDocument
+  onPresent: () => void
+}): React.JSX.Element {
   const { t } = useTranslation()
   const setSlideCount = usePresentationWorkspaceStore((state) => state.setSlideCount)
   const setActiveSlide = usePresentationWorkspaceStore((state) => state.setActiveSlide)
@@ -220,7 +205,7 @@ function PptxDocumentView({ deck }: { deck: PresentationWorkspaceDocument }): Re
   const canGoNext = activeSlide < slideIndexes.length - 1
 
   return (
-    <div className="grid min-h-0 flex-1 grid-cols-[220px_minmax(0,1fr)_280px] bg-background">
+    <div className="grid min-h-0 flex-1 grid-cols-[220px_minmax(0,1fr)] bg-background">
       <aside className="min-h-0 overflow-y-auto border-r border-divider bg-content1/40 p-3">
         <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-default-400">
           {t('presentationWorkspace.slides')}
@@ -259,64 +244,58 @@ function PptxDocumentView({ deck }: { deck: PresentationWorkspaceDocument }): Re
             )}
           </div>
         </div>
-        <div className="flex h-14 items-center justify-center gap-3 border-t border-divider bg-content1/70">
-          <Button
-            isIconOnly
-            size="sm"
-            variant="tertiary"
-            isDisabled={!canGoPrev}
-            onPress={() => setActiveSlide(deck.itemId, activeSlide - 1)}
-            aria-label={t('presentationWorkspace.previousSlide')}
-          >
-            <ChevronLeft size={18} />
-          </Button>
-          <span className="min-w-24 text-center text-sm tabular-nums text-default-500">
-            {slideIndexes.length === 0 ? '0 / 0' : `${activeSlide + 1} / ${slideIndexes.length}`}
-          </span>
-          <Button
-            isIconOnly
-            size="sm"
-            variant="tertiary"
-            isDisabled={!canGoNext}
-            onPress={() => setActiveSlide(deck.itemId, activeSlide + 1)}
-            aria-label={t('presentationWorkspace.nextSlide')}
-          >
-            <ChevronRight size={18} />
-          </Button>
+        <div className="grid h-14 grid-cols-[1fr_auto_1fr] items-center border-t border-divider bg-content1/70 px-4">
+          <span />
+          <div className="flex items-center justify-center gap-3">
+            <Button
+              isIconOnly
+              size="sm"
+              variant="tertiary"
+              isDisabled={!canGoPrev}
+              onPress={() => setActiveSlide(deck.itemId, activeSlide - 1)}
+              aria-label={t('presentationWorkspace.previousSlide')}
+            >
+              <ChevronLeft size={18} />
+            </Button>
+            <span className="min-w-24 text-center text-sm tabular-nums text-default-500">
+              {slideIndexes.length === 0 ? '0 / 0' : `${activeSlide + 1} / ${slideIndexes.length}`}
+            </span>
+            <Button
+              isIconOnly
+              size="sm"
+              variant="tertiary"
+              isDisabled={!canGoNext}
+              onPress={() => setActiveSlide(deck.itemId, activeSlide + 1)}
+              aria-label={t('presentationWorkspace.nextSlide')}
+            >
+              <ChevronRight size={18} />
+            </Button>
+          </div>
+          <div className="flex justify-end">
+            <Button
+              isIconOnly
+              size="sm"
+              variant="primary"
+              onPress={onPresent}
+              aria-label={t('presentationWorkspace.present')}
+            >
+              <Play size={18} />
+            </Button>
+          </div>
         </div>
       </main>
-
-      <aside className="min-h-0 overflow-y-auto border-l border-divider bg-content1/40 p-4">
-        <div className="mb-4 text-xs font-semibold uppercase tracking-wide text-default-400">
-          {t('presentationWorkspace.inspector')}
-        </div>
-        <dl className="space-y-4 text-sm">
-          <div>
-            <dt className="text-default-400">{t('presentationWorkspace.fileName')}</dt>
-            <dd className="mt-1 break-words text-foreground">{deck.name}</dd>
-          </div>
-          <div>
-            <dt className="text-default-400">{t('presentationWorkspace.slideCount')}</dt>
-            <dd className="mt-1 text-foreground">{slideIndexes.length || '—'}</dd>
-          </div>
-          <div>
-            <dt className="text-default-400">{t('presentationWorkspace.dimensions')}</dt>
-            <dd className="mt-1 text-foreground">
-              {viewer
-                ? `${Math.round(viewer.slideWidth)} × ${Math.round(viewer.slideHeight)}`
-                : '—'}
-            </dd>
-          </div>
-        </dl>
-      </aside>
     </div>
   )
 }
 
 function EditableDocumentView({
-  deck
+  deck,
+  activeRibbon,
+  onPresent
 }: {
   deck: PresentationWorkspaceDocument
+  activeRibbon: RibbonTab
+  onPresent: () => void
 }): React.JSX.Element {
   const { t } = useTranslation()
   const setSlideCount = usePresentationWorkspaceStore((state) => state.setSlideCount)
@@ -330,6 +309,8 @@ function EditableDocumentView({
   const [future, setFuture] = useState<EditablePresentationDocument[]>([])
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null)
   const [copiedElement, setCopiedElement] = useState<EditablePresentationElement | null>(null)
+  const [copiedSlideId, setCopiedSlideId] = useState<string | null>(null)
+  const [insertionIndex, setInsertionIndex] = useState<number | null>(null)
   const [status, setStatus] = useState<LoadStatus>('loading')
   const [error, setError] = useState<string | null>(null)
 
@@ -412,12 +393,29 @@ function EditableDocumentView({
     setSelectedElementId(null)
   }
 
-  const duplicateSlide = (): void => {
-    if (!document || !activeSlideId) return
-    const nextDocument = duplicateEditableSlide(document, activeSlideId)
-    commitDocument(nextDocument)
-    setActiveSlide(deck.itemId, nextDocument.slideOrder.indexOf(activeSlideId) + 1)
+  const duplicateSlideAt = (sourceSlideId: string, targetIndex: number): void => {
+    if (!document) return
+    const sourceIndex = document.slideOrder.indexOf(sourceSlideId)
+    if (sourceIndex === -1) return
+    const duplicated = duplicateEditableSlide(document, sourceSlideId)
+    const newSlideId = duplicated.slideOrder[sourceIndex + 1]
+    if (!newSlideId) return
+    const slideOrderWithoutNew = duplicated.slideOrder.filter((slideId) => slideId !== newSlideId)
+    const safeIndex = Math.max(0, Math.min(targetIndex, slideOrderWithoutNew.length))
+    const slideOrder = [
+      ...slideOrderWithoutNew.slice(0, safeIndex),
+      newSlideId,
+      ...slideOrderWithoutNew.slice(safeIndex)
+    ]
+    commitDocument({ ...duplicated, slideOrder, updatedAt: Date.now() })
+    setActiveSlide(deck.itemId, safeIndex)
     setSelectedElementId(null)
+  }
+
+  const pasteSlide = (): void => {
+    if (!copiedSlideId || !document) return
+    duplicateSlideAt(copiedSlideId, insertionIndex ?? activeSlideIndex + 1)
+    setInsertionIndex(null)
   }
 
   const deleteSlide = (): void => {
@@ -426,20 +424,6 @@ function EditableDocumentView({
     commitDocument(removeEditableSlide(document, activeSlideId))
     setActiveSlide(deck.itemId, nextIndex)
     setSelectedElementId(null)
-  }
-
-  const moveSlide = (direction: -1 | 1): void => {
-    if (!document || !activeSlideId) return
-    const nextDocument = moveEditableSlide(document, activeSlideId, direction)
-    commitDocument(nextDocument)
-    setActiveSlide(deck.itemId, nextDocument.slideOrder.indexOf(activeSlideId))
-  }
-
-  const duplicateElement = (): void => {
-    if (!document || !activeSlideId || !selectedElementId) return
-    const result = duplicateElementInSlide(document, activeSlideId, selectedElementId)
-    commitDocument(result.document)
-    setSelectedElementId(result.elementId)
   }
 
   const deleteElement = (): void => {
@@ -509,93 +493,25 @@ function EditableDocumentView({
     setSelectedElementId(element.id)
   }
 
-  if (status === 'loading') {
-    return (
-      <div className="flex flex-1 items-center justify-center">
-        <Spinner />
-      </div>
-    )
+  const selectedTextElement = selectedElement?.type === 'text' ? selectedElement : null
+
+  const updateSelectedNumber = (key: 'x' | 'y' | 'width' | 'height', value: string): void => {
+    const next = Number(value)
+    if (Number.isFinite(next))
+      updateSelectedElement({ [key]: next } as Partial<EditablePresentationElement>)
   }
 
-  if (status === 'failed' || !document || !activeSlideId) {
-    return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
-        <FileText className="text-danger" size={36} />
-        <p className="text-sm font-semibold text-danger">{t('presentationWorkspace.loadFailed')}</p>
-        {error && <p className="max-w-lg text-xs text-default-400">{error}</p>}
-      </div>
-    )
+  const updateSlideSize = (value: string): void => {
+    if (!document) return
+    const [width, height] = value.split(':').map(Number)
+    if (!width || !height) return
+    commitDocument({ ...document, width, height, updatedAt: Date.now() })
   }
 
-  return (
-    <div className="grid min-h-0 flex-1 grid-cols-[220px_minmax(0,1fr)_280px] bg-background">
-      <input
-        ref={imageInputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={(event) => {
-          const file = event.currentTarget.files?.[0]
-          event.currentTarget.value = ''
-          if (file) void addImage(file)
-        }}
-      />
-      <aside className="min-h-0 overflow-y-auto border-r border-divider bg-content1/40 p-3">
-        <div className="mb-3 flex items-center justify-between">
-          <span className="text-xs font-semibold uppercase tracking-wide text-default-400">
-            {t('presentationWorkspace.slides')}
-          </span>
-          <Button isIconOnly size="sm" variant="tertiary" onPress={addSlide} aria-label="Add slide">
-            <Plus size={16} />
-          </Button>
-        </div>
-        <div className="space-y-2">
-          {document.slideOrder.map((slideId, index) => (
-            <button
-              key={slideId}
-              className={`flex w-full gap-3 rounded-xl border p-2 text-left transition-colors ${
-                index === activeSlideIndex
-                  ? 'border-primary bg-primary/10 text-foreground'
-                  : 'border-transparent bg-content1/40 text-default-500 hover:bg-content2'
-              }`}
-              onClick={() => {
-                setActiveSlide(deck.itemId, index)
-                setSelectedElementId(null)
-              }}
-            >
-              <span className="w-6 pt-1 text-right text-xs tabular-nums">{index + 1}</span>
-              <span className="flex h-16 w-28 overflow-hidden rounded-md bg-black shadow-sm">
-                <EditableSlideSurface
-                  document={document}
-                  slideId={slideId}
-                  className="pointer-events-none"
-                />
-              </span>
-            </button>
-          ))}
-        </div>
-      </aside>
-
-      <main className="flex min-h-0 flex-col bg-[#111217]">
-        <div className="flex h-14 shrink-0 items-center gap-2 border-b border-divider bg-content1/70 px-3">
-          <Button size="sm" variant="tertiary" onPress={undo} isDisabled={past.length === 0}>
-            <Undo2 size={16} />
-          </Button>
-          <Button size="sm" variant="tertiary" onPress={redo} isDisabled={future.length === 0}>
-            <Redo2 size={16} />
-          </Button>
-          <span className="mx-1 h-6 w-px bg-divider" />
-          <label className="flex items-center gap-2 rounded-lg px-2 text-xs text-default-500">
-            <Palette size={16} />
-            <input
-              className="h-7 w-8 rounded bg-transparent"
-              type="color"
-              value={activeSlide?.background.color ?? '#111827'}
-              onChange={(event) => updateActiveSlideBackground(event.currentTarget.value)}
-              aria-label="Slide background"
-            />
-          </label>
-          <span className="mx-1 h-6 w-px bg-divider" />
+  const renderRibbon = (): React.JSX.Element => {
+    if (activeRibbon === 'insert') {
+      return (
+        <div className="flex h-16 items-center gap-2 border-b border-divider bg-content1/80 px-4">
           <Button size="sm" variant="tertiary" onPress={() => addElement(createTextElement())}>
             <Type size={16} />
             {t('presentationWorkspace.text', 'Text')}
@@ -621,297 +537,361 @@ function EditableDocumentView({
           <Button size="sm" variant="tertiary" onPress={() => addElement(createLineElement())}>
             <Minus size={16} />
           </Button>
-          <span className="mx-1 h-6 w-px bg-divider" />
-          <Button size="sm" variant="tertiary" onPress={duplicateSlide}>
-            <Copy size={16} />
-            {t('presentationWorkspace.copyPage')}
-          </Button>
-          <Button
-            size="sm"
-            variant="tertiary"
-            onPress={() => moveSlide(-1)}
-            isDisabled={activeSlideIndex <= 0}
-          >
-            {t('presentationWorkspace.moveSlideUp', 'Move Up')}
-          </Button>
-          <Button
-            size="sm"
-            variant="tertiary"
-            onPress={() => moveSlide(1)}
-            isDisabled={activeSlideIndex >= document.slideOrder.length - 1}
-          >
-            {t('presentationWorkspace.moveSlideDown', 'Move Down')}
-          </Button>
-          <Button
-            size="sm"
-            variant="tertiary"
-            className="text-danger"
-            onPress={deleteSlide}
-            isDisabled={document.slideOrder.length <= 1}
-          >
-            <Trash2 size={16} />
-          </Button>
-          <span className="mx-1 h-6 w-px bg-divider" />
-          <Button
-            size="sm"
-            variant="tertiary"
-            isDisabled={!selectedElement}
-            onPress={() => selectedElement && setCopiedElement(selectedElement)}
-          >
-            {t('presentationWorkspace.copyElement', 'Copy Element')}
-          </Button>
-          <Button
-            size="sm"
-            variant="tertiary"
-            isDisabled={!selectedElement}
-            onPress={duplicateElement}
-          >
-            <Copy size={16} />
-          </Button>
-          <Button size="sm" variant="tertiary" isDisabled={!copiedElement} onPress={pasteElement}>
-            {t('presentationWorkspace.pasteElement', 'Paste')}
-          </Button>
-          <Button
-            size="sm"
-            variant="tertiary"
-            className="text-danger"
-            isDisabled={!selectedElement}
-            onPress={deleteElement}
-          >
-            {t('presentationWorkspace.deleteElement', 'Delete')}
-          </Button>
         </div>
-        <div className="flex flex-1 items-center justify-center overflow-auto p-8">
-          <div className="w-full max-w-5xl rounded-2xl bg-black/30 p-4 shadow-2xl">
-            <EditableSlideSurface
-              document={document}
-              slideId={activeSlideId}
-              editable
-              selectedElementId={selectedElementId}
-              onSelectElement={setSelectedElementId}
-              onUpdateElement={(slideId, elementId, updates) =>
-                commitDocument(updateElementInSlide(document, slideId, elementId, updates))
-              }
-            />
-          </div>
-        </div>
-        <div className="flex h-14 items-center justify-center gap-3 border-t border-divider bg-content1/70">
-          <Button
-            isIconOnly
-            size="sm"
-            variant="tertiary"
-            isDisabled={activeSlideIndex <= 0}
-            onPress={() => setActiveSlide(deck.itemId, activeSlideIndex - 1)}
-            aria-label={t('presentationWorkspace.previousSlide')}
-          >
-            <ChevronLeft size={18} />
-          </Button>
-          <span className="min-w-24 text-center text-sm tabular-nums text-default-500">
-            {activeSlideIndex + 1} / {document.slideOrder.length}
-          </span>
-          <Button
-            isIconOnly
-            size="sm"
-            variant="tertiary"
-            isDisabled={activeSlideIndex >= document.slideOrder.length - 1}
-            onPress={() => setActiveSlide(deck.itemId, activeSlideIndex + 1)}
-            aria-label={t('presentationWorkspace.nextSlide')}
-          >
-            <ChevronRight size={18} />
-          </Button>
-        </div>
-      </main>
+      )
+    }
 
-      <aside className="min-h-0 overflow-y-auto border-l border-divider bg-content1/40 p-4">
-        <div className="mb-4 text-xs font-semibold uppercase tracking-wide text-default-400">
-          {t('presentationWorkspace.inspector')}
-        </div>
-        <EditableInspector element={selectedElement} onUpdate={updateSelectedElement} />
-      </aside>
-    </div>
-  )
-}
-
-function EditableInspector({
-  element,
-  onUpdate
-}: {
-  element: EditablePresentationElement | null
-  onUpdate: (updates: Partial<EditablePresentationElement>) => void
-}): React.JSX.Element {
-  if (!element) {
-    return <p className="text-sm text-default-400">Select an element to edit its properties.</p>
-  }
-
-  const updateNumber = (key: 'x' | 'y' | 'width' | 'height', value: string): void => {
-    const next = Number(value)
-    if (Number.isFinite(next)) onUpdate({ [key]: next } as Partial<EditablePresentationElement>)
-  }
-
-  return (
-    <div className="space-y-4 text-sm">
-      <div className="grid grid-cols-2 gap-2">
-        {(['x', 'y', 'width', 'height'] as const).map((key) => (
-          <label key={key} className="space-y-1">
-            <span className="text-xs uppercase text-default-400">{key}</span>
+    if (activeRibbon === 'design') {
+      return (
+        <div className="flex h-16 items-center gap-3 border-b border-divider bg-content1/80 px-4 text-sm">
+          <label className="flex items-center gap-2 text-default-500">
+            <Palette size={16} />
+            <span>{t('presentationWorkspace.background', 'Background')}</span>
             <input
-              className="h-9 w-full rounded-lg bg-content2 px-2 text-sm outline-none"
-              type="number"
-              value={Math.round(element[key])}
-              onChange={(event) => updateNumber(key, event.currentTarget.value)}
+              className="h-8 w-10 rounded bg-transparent"
+              type="color"
+              value={activeSlide?.background.color ?? '#111827'}
+              onChange={(event) => updateActiveSlideBackground(event.currentTarget.value)}
             />
           </label>
-        ))}
-      </div>
-
-      {element.type === 'text' && <TextInspector element={element} onUpdate={onUpdate} />}
-      {element.type === 'shape' && (
-        <div className="grid grid-cols-2 gap-2">
-          <ColorInput
-            label="Fill"
-            value={element.fillColor}
-            onChange={(fillColor) =>
-              onUpdate({ fillColor } as Partial<EditablePresentationElement>)
-            }
-          />
-          <ColorInput
-            label="Stroke"
-            value={element.strokeColor}
-            onChange={(strokeColor) =>
-              onUpdate({ strokeColor } as Partial<EditablePresentationElement>)
-            }
-          />
+          <label className="flex items-center gap-2 text-default-500">
+            <span>{t('presentationWorkspace.slideSize', 'Slide Size')}</span>
+            <select
+              className="h-9 rounded-lg bg-content2 px-3 text-sm text-foreground outline-none"
+              value={`${document?.width ?? 1920}:${document?.height ?? 1080}`}
+              onChange={(event) => updateSlideSize(event.currentTarget.value)}
+            >
+              <option value="1920:1080">16:9</option>
+              <option value="1440:1080">4:3</option>
+            </select>
+          </label>
         </div>
-      )}
-      {element.type === 'line' && (
-        <ColorInput
-          label="Stroke"
-          value={element.strokeColor}
-          onChange={(strokeColor) =>
-            onUpdate({ strokeColor } as Partial<EditablePresentationElement>)
-          }
-        />
-      )}
-    </div>
-  )
-}
+      )
+    }
 
-function TextInspector({
-  element,
-  onUpdate
-}: {
-  element: EditableTextElement
-  onUpdate: (updates: Partial<EditablePresentationElement>) => void
-}): React.JSX.Element {
-  return (
-    <div className="space-y-3">
-      <label className="space-y-1">
-        <span className="text-xs uppercase text-default-400">Font family</span>
-        <input
-          className="h-9 w-full rounded-lg bg-content2 px-2 text-sm outline-none"
-          value={element.fontFamily}
+    return (
+      <div className="flex h-16 items-center gap-2 border-b border-divider bg-content1/80 px-4">
+        <Button size="sm" variant="tertiary" onPress={undo} isDisabled={past.length === 0}>
+          <Undo2 size={16} />
+        </Button>
+        <Button size="sm" variant="tertiary" onPress={redo} isDisabled={future.length === 0}>
+          <Redo2 size={16} />
+        </Button>
+        <span className="mx-1 h-8 w-px bg-divider" />
+        <select
+          className="h-9 w-44 rounded-lg bg-content2 px-3 text-sm text-foreground outline-none disabled:opacity-40"
+          disabled={!selectedTextElement}
+          value={selectedTextElement?.fontFamily ?? FONT_FAMILIES[0]}
           onChange={(event) =>
-            onUpdate({
-              fontFamily: event.currentTarget.value || element.fontFamily
+            updateSelectedElement({
+              fontFamily: event.currentTarget.value
             } as Partial<EditablePresentationElement>)
           }
-        />
-      </label>
-      <label className="space-y-1">
-        <span className="text-xs uppercase text-default-400">Font size</span>
-        <input
-          className="h-9 w-full rounded-lg bg-content2 px-2 text-sm outline-none"
-          type="number"
-          value={element.fontSize}
+        >
+          {FONT_FAMILIES.map((fontFamily) => (
+            <option key={fontFamily} value={fontFamily}>
+              {fontFamily}
+            </option>
+          ))}
+        </select>
+        <select
+          className="h-9 w-20 rounded-lg bg-content2 px-3 text-sm text-foreground outline-none disabled:opacity-40"
+          disabled={!selectedTextElement}
+          value={selectedTextElement?.fontSize ?? 44}
           onChange={(event) =>
-            onUpdate({
-              fontSize: Number(event.currentTarget.value) || element.fontSize
+            updateSelectedElement({
+              fontSize: Number(event.currentTarget.value)
             } as Partial<EditablePresentationElement>)
           }
-        />
-      </label>
-      <label className="space-y-1">
-        <span className="text-xs uppercase text-default-400">Line height</span>
-        <input
-          className="h-9 w-full rounded-lg bg-content2 px-2 text-sm outline-none"
-          type="number"
-          step="0.05"
-          min="0.7"
-          value={element.lineHeight}
-          onChange={(event) =>
-            onUpdate({
-              lineHeight: Number(event.currentTarget.value) || element.lineHeight
-            } as Partial<EditablePresentationElement>)
-          }
-        />
-      </label>
-      <ColorInput
-        label="Text color"
-        value={element.color}
-        onChange={(color) => onUpdate({ color } as Partial<EditablePresentationElement>)}
-      />
-      <div className="grid grid-cols-3 gap-1">
-        {(['left', 'center', 'right'] as EditableTextAlign[]).map((align) => (
-          <Button
-            key={align}
-            size="sm"
-            variant={element.align === align ? 'primary' : 'tertiary'}
-            onPress={() => onUpdate({ align } as Partial<EditablePresentationElement>)}
-          >
-            {align}
-          </Button>
-        ))}
-      </div>
-      <div className="grid grid-cols-3 gap-1">
+        >
+          {FONT_SIZES.map((fontSize) => (
+            <option key={fontSize} value={fontSize}>
+              {fontSize}
+            </option>
+          ))}
+        </select>
         <Button
           size="sm"
-          variant={element.bold ? 'primary' : 'tertiary'}
-          onPress={() => onUpdate({ bold: !element.bold } as Partial<EditablePresentationElement>)}
+          variant={selectedTextElement?.bold ? 'primary' : 'tertiary'}
+          isDisabled={!selectedTextElement}
+          onPress={() =>
+            selectedTextElement &&
+            updateSelectedElement({
+              bold: !selectedTextElement.bold
+            } as Partial<EditablePresentationElement>)
+          }
         >
           B
         </Button>
         <Button
           size="sm"
-          variant={element.italic ? 'primary' : 'tertiary'}
+          variant={selectedTextElement?.italic ? 'primary' : 'tertiary'}
+          isDisabled={!selectedTextElement}
           onPress={() =>
-            onUpdate({ italic: !element.italic } as Partial<EditablePresentationElement>)
+            selectedTextElement &&
+            updateSelectedElement({
+              italic: !selectedTextElement.italic
+            } as Partial<EditablePresentationElement>)
           }
         >
           I
         </Button>
         <Button
           size="sm"
-          variant={element.underline ? 'primary' : 'tertiary'}
+          variant={selectedTextElement?.underline ? 'primary' : 'tertiary'}
+          isDisabled={!selectedTextElement}
           onPress={() =>
-            onUpdate({ underline: !element.underline } as Partial<EditablePresentationElement>)
+            selectedTextElement &&
+            updateSelectedElement({
+              underline: !selectedTextElement.underline
+            } as Partial<EditablePresentationElement>)
           }
         >
           U
         </Button>
+        <input
+          className="h-8 w-10 rounded bg-transparent disabled:opacity-40"
+          type="color"
+          disabled={!selectedTextElement}
+          value={selectedTextElement?.color ?? '#ffffff'}
+          onChange={(event) =>
+            updateSelectedElement({
+              color: event.currentTarget.value
+            } as Partial<EditablePresentationElement>)
+          }
+        />
+        {(['left', 'center', 'right'] as EditableTextAlign[]).map((align) => (
+          <Button
+            key={align}
+            size="sm"
+            variant={selectedTextElement?.align === align ? 'primary' : 'tertiary'}
+            isDisabled={!selectedTextElement}
+            onPress={() => updateSelectedElement({ align } as Partial<EditablePresentationElement>)}
+          >
+            {align}
+          </Button>
+        ))}
+        <span className="mx-1 h-8 w-px bg-divider" />
+        {selectedElement &&
+          (['x', 'y', 'width', 'height'] as const).map((key) => (
+            <label key={key} className="flex items-center gap-1 text-xs uppercase text-default-400">
+              {key}
+              <input
+                className="h-8 w-16 rounded-lg bg-content2 px-2 text-sm text-foreground outline-none"
+                type="number"
+                value={Math.round(selectedElement[key])}
+                onChange={(event) => updateSelectedNumber(key, event.currentTarget.value)}
+              />
+            </label>
+          ))}
+      </div>
+    )
+  }
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      const target = event.target as HTMLElement | null
+      const isEditingText =
+        target?.isContentEditable ||
+        target?.tagName === 'INPUT' ||
+        target?.tagName === 'SELECT' ||
+        target?.tagName === 'TEXTAREA'
+      if (isEditingText) return
+
+      const command = event.metaKey || event.ctrlKey
+      if (command && event.key.toLowerCase() === 'c') {
+        event.preventDefault()
+        if (selectedElement) {
+          setCopiedElement(selectedElement)
+          setCopiedSlideId(null)
+        } else if (activeSlideId) {
+          setCopiedSlideId(activeSlideId)
+          setCopiedElement(null)
+        }
+      }
+      if (command && event.key.toLowerCase() === 'v') {
+        event.preventDefault()
+        if (copiedElement) {
+          pasteElement()
+        } else {
+          pasteSlide()
+        }
+      }
+      if (event.key === 'Delete' || event.key === 'Backspace') {
+        if (selectedElementId) {
+          event.preventDefault()
+          deleteElement()
+        } else if (document && document.slideOrder.length > 1) {
+          event.preventDefault()
+          deleteSlide()
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  })
+
+  if (status === 'loading') {
+    return (
+      <div className="flex flex-1 items-center justify-center">
+        <Spinner />
+      </div>
+    )
+  }
+
+  if (status === 'failed' || !document || !activeSlideId) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
+        <FileText className="text-danger" size={36} />
+        <p className="text-sm font-semibold text-danger">{t('presentationWorkspace.loadFailed')}</p>
+        {error && <p className="max-w-lg text-xs text-default-400">{error}</p>}
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col bg-background">
+      <input
+        ref={imageInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(event) => {
+          const file = event.currentTarget.files?.[0]
+          event.currentTarget.value = ''
+          if (file) void addImage(file)
+        }}
+      />
+      {renderRibbon()}
+      <div className="grid min-h-0 flex-1 grid-cols-[240px_minmax(0,1fr)]">
+        <aside className="min-h-0 overflow-y-auto border-r border-divider bg-content1/40 p-3">
+          <div className="mb-3 flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wide text-default-400">
+              {t('presentationWorkspace.slides')}
+            </span>
+            <Button
+              isIconOnly
+              size="sm"
+              variant="tertiary"
+              onPress={addSlide}
+              aria-label="Add slide"
+            >
+              <Plus size={16} />
+            </Button>
+          </div>
+          <div className="space-y-1">
+            {document.slideOrder.map((slideId, index) => (
+              <React.Fragment key={slideId}>
+                <button
+                  type="button"
+                  className="flex h-4 w-full items-center px-2"
+                  onClick={() => setInsertionIndex(index)}
+                  aria-label={`Insert before slide ${index + 1}`}
+                >
+                  <span
+                    className={`h-0.5 w-full rounded-full ${
+                      insertionIndex === index ? 'bg-primary' : 'bg-transparent hover:bg-primary/40'
+                    }`}
+                  />
+                </button>
+                <button
+                  className={`flex w-full gap-3 rounded-xl border p-2 text-left transition-colors ${
+                    index === activeSlideIndex
+                      ? 'border-primary bg-primary/10 text-foreground'
+                      : 'border-transparent bg-content1/40 text-default-500 hover:bg-content2'
+                  }`}
+                  onClick={() => {
+                    setActiveSlide(deck.itemId, index)
+                    setSelectedElementId(null)
+                    setInsertionIndex(null)
+                  }}
+                >
+                  <span className="w-6 pt-1 text-right text-xs tabular-nums">{index + 1}</span>
+                  <span className="flex h-[90px] w-40 overflow-hidden rounded-md bg-black shadow-sm">
+                    <EditableSlideSurface
+                      document={document}
+                      slideId={slideId}
+                      className="pointer-events-none"
+                    />
+                  </span>
+                </button>
+              </React.Fragment>
+            ))}
+            <button
+              type="button"
+              className="flex h-4 w-full items-center px-2"
+              onClick={() => setInsertionIndex(document.slideOrder.length)}
+              aria-label="Insert after last slide"
+            >
+              <span
+                className={`h-0.5 w-full rounded-full ${
+                  insertionIndex === document.slideOrder.length
+                    ? 'bg-primary'
+                    : 'bg-transparent hover:bg-primary/40'
+                }`}
+              />
+            </button>
+          </div>
+        </aside>
+
+        <main className="flex min-h-0 flex-col bg-[#111217]">
+          <div className="flex flex-1 items-center justify-center overflow-auto p-8">
+            <div className="w-full max-w-5xl rounded-2xl bg-black/30 p-4 shadow-2xl">
+              <EditableSlideSurface
+                document={document}
+                slideId={activeSlideId}
+                editable
+                selectedElementId={selectedElementId}
+                onSelectElement={setSelectedElementId}
+                onUpdateElement={(slideId, elementId, updates) =>
+                  commitDocument(updateElementInSlide(document, slideId, elementId, updates))
+                }
+              />
+            </div>
+          </div>
+          <div className="grid h-14 grid-cols-[1fr_auto_1fr] items-center border-t border-divider bg-content1/70 px-4">
+            <span />
+            <div className="flex items-center justify-center gap-3">
+              <Button
+                isIconOnly
+                size="sm"
+                variant="tertiary"
+                isDisabled={activeSlideIndex <= 0}
+                onPress={() => setActiveSlide(deck.itemId, activeSlideIndex - 1)}
+                aria-label={t('presentationWorkspace.previousSlide')}
+              >
+                <ChevronLeft size={18} />
+              </Button>
+              <span className="min-w-24 text-center text-sm tabular-nums text-default-500">
+                {activeSlideIndex + 1} / {document.slideOrder.length}
+              </span>
+              <Button
+                isIconOnly
+                size="sm"
+                variant="tertiary"
+                isDisabled={activeSlideIndex >= document.slideOrder.length - 1}
+                onPress={() => setActiveSlide(deck.itemId, activeSlideIndex + 1)}
+                aria-label={t('presentationWorkspace.nextSlide')}
+              >
+                <ChevronRight size={18} />
+              </Button>
+            </div>
+            <div className="flex justify-end">
+              <Button
+                isIconOnly
+                size="sm"
+                variant="primary"
+                onPress={onPresent}
+                aria-label={t('presentationWorkspace.present')}
+              >
+                <Play size={18} />
+              </Button>
+            </div>
+          </div>
+        </main>
       </div>
     </div>
-  )
-}
-
-function ColorInput({
-  label,
-  value,
-  onChange
-}: {
-  label: string
-  value: string
-  onChange: (value: string) => void
-}): React.JSX.Element {
-  return (
-    <label className="space-y-1">
-      <span className="text-xs uppercase text-default-400">{label}</span>
-      <input
-        className="h-9 w-full rounded-lg bg-content2 px-2"
-        type="color"
-        value={value}
-        onChange={(event) => onChange(event.currentTarget.value)}
-      />
-    </label>
   )
 }
 
@@ -934,6 +914,7 @@ export default function PresentationWorkspacePage(): React.JSX.Element {
   const closeDocument = usePresentationWorkspaceStore((state) => state.closeDocument)
   const setActiveDocument = usePresentationWorkspaceStore((state) => state.setActiveDocument)
   const activeDocument = usePresentationWorkspaceStore((state) => state.getActiveDocument())
+  const [activeRibbon, setActiveRibbon] = useState<RibbonTab>('home')
 
   useEffect(() => {
     if (!itemId) return
@@ -985,32 +966,26 @@ export default function PresentationWorkspacePage(): React.JSX.Element {
 
   return (
     <div className="flex h-full flex-col bg-background text-foreground">
-      <div className="flex h-20 shrink-0 items-center gap-2 border-b border-divider bg-content1/80 px-4">
-        <div className="mr-4">
-          <p className="text-sm font-semibold">{t('presentationWorkspace.title')}</p>
-          <p className="text-xs text-default-400">{t('presentationWorkspace.subtitle')}</p>
-        </div>
-        <RibbonButton icon={<Home size={18} />} label={t('presentationWorkspace.home')} />
-        <RibbonButton icon={<ImagePlus size={18} />} label={t('presentationWorkspace.insert')} />
-        <RibbonButton icon={<Palette size={18} />} label={t('presentationWorkspace.design')} />
-        <RibbonButton
-          icon={<Play size={18} />}
-          label={t('presentationWorkspace.present')}
-          onClick={() => void handlePresentActiveDocument()}
-        />
-        <RibbonButton icon={<Copy size={18} />} label={t('presentationWorkspace.copyPage')} />
-      </div>
-
-      <div className="flex h-11 shrink-0 items-center gap-1 border-b border-divider bg-content1 px-3">
+      <div className="flex h-12 shrink-0 items-end gap-1 border-b border-divider bg-content1/80 px-3">
+        <Button
+          isIconOnly
+          size="sm"
+          variant="tertiary"
+          className="mb-1"
+          onPress={() => navigate('/files')}
+          aria-label={t('presentationWorkspace.backToFiles')}
+        >
+          <FolderOpen size={18} />
+        </Button>
         {documents.map((deck) => (
           <div
             key={deck.itemId}
             role="button"
             tabIndex={0}
-            className={`flex h-8 max-w-56 items-center gap-2 rounded-lg px-3 text-sm ${
+            className={`flex h-10 max-w-56 items-center gap-2 rounded-t-xl border px-3 text-sm ${
               deck.itemId === activeItemId
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-content2 text-default-500 hover:text-foreground'
+                ? 'border-divider border-b-background bg-background text-foreground'
+                : 'border-transparent bg-content2 text-default-500 hover:text-foreground'
             }`}
             onClick={() => handleActivate(deck.itemId)}
             onKeyDown={(event) => {
@@ -1043,11 +1018,35 @@ export default function PresentationWorkspacePage(): React.JSX.Element {
         ))}
       </div>
 
+      <div className="flex h-10 shrink-0 items-end gap-1 border-b border-divider bg-background px-4">
+        {(['home', 'insert', 'design'] as const).map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            className={`h-9 rounded-t-lg px-4 text-sm transition-colors ${
+              activeRibbon === tab
+                ? 'bg-content1 text-foreground'
+                : 'text-default-500 hover:bg-content1/60 hover:text-foreground'
+            }`}
+            onClick={() => setActiveRibbon(tab)}
+          >
+            {t(`presentationWorkspace.${tab}`)}
+          </button>
+        ))}
+      </div>
+
       {activeDocument ? (
         activeDocument.mode === 'editable' ? (
-          <EditableDocumentView deck={activeDocument} />
+          <EditableDocumentView
+            deck={activeDocument}
+            activeRibbon={activeRibbon}
+            onPresent={() => void handlePresentActiveDocument()}
+          />
         ) : (
-          <PptxDocumentView deck={activeDocument} />
+          <PptxDocumentView
+            deck={activeDocument}
+            onPresent={() => void handlePresentActiveDocument()}
+          />
         )
       ) : (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">

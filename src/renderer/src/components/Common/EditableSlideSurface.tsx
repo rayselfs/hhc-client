@@ -1,4 +1,4 @@
-import React, { useMemo, useRef } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import type {
   EditablePresentationDocument,
   EditablePresentationElement,
@@ -37,8 +37,10 @@ export default function EditableSlideSurface({
   onUpdateElement
 }: EditableSlideSurfaceProps): React.JSX.Element {
   const slide = document.slides[slideId]
+  const surfaceRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<DragState | null>(null)
   const scaleRef = useRef({ x: 1, y: 1 })
+  const [surfaceScale, setSurfaceScale] = useState(1)
 
   const orderedElements = useMemo(() => {
     if (!slide) return []
@@ -46,6 +48,20 @@ export default function EditableSlideSurface({
       .map((elementId) => slide.elements[elementId])
       .filter((element): element is EditablePresentationElement => Boolean(element))
   }, [slide])
+
+  useEffect(() => {
+    const surface = surfaceRef.current
+    if (!surface) return
+    const updateScale = (): void => {
+      const rect = surface.getBoundingClientRect()
+      if (rect.width > 0) setSurfaceScale(rect.width / document.width)
+    }
+    updateScale()
+    if (!('ResizeObserver' in window)) return
+    const observer = new ResizeObserver(updateScale)
+    observer.observe(surface)
+    return () => observer.disconnect()
+  }, [document.width])
 
   if (!slide) {
     return <div className={`h-full w-full bg-black ${className ?? ''}`} />
@@ -59,7 +75,7 @@ export default function EditableSlideSurface({
     if (!editable || element.locked) return
     event.preventDefault()
     event.stopPropagation()
-    const rect = event.currentTarget.closest('[data-slide-surface]')?.getBoundingClientRect()
+    const rect = surfaceRef.current?.getBoundingClientRect()
     if (rect) {
       scaleRef.current = {
         x: document.width / rect.width,
@@ -105,6 +121,7 @@ export default function EditableSlideSurface({
   return (
     <div
       data-slide-surface
+      ref={surfaceRef}
       className={`relative aspect-video w-full overflow-hidden bg-black ${className ?? ''}`}
       style={{
         background: slide.background.type === 'color' ? slide.background.color : undefined,
@@ -112,22 +129,32 @@ export default function EditableSlideSurface({
       }}
       onPointerDown={() => editable && onSelectElement?.(null)}
     >
-      {orderedElements.map((element) => (
-        <SlideElement
-          key={element.id}
-          document={document}
-          slide={slide}
-          element={element}
-          editable={editable}
-          selected={element.id === selectedElementId}
-          onSelect={() => onSelectElement?.(element.id)}
-          onPointerDown={(event) => startDrag(event, element, 'move')}
-          onPointerMove={updateDrag}
-          onPointerUp={endDrag}
-          onUpdateElement={onUpdateElement}
-          onResizePointerDown={(event) => startDrag(event, element, 'resize')}
-        />
-      ))}
+      <div
+        className="absolute left-0 top-0"
+        style={{
+          width: document.width,
+          height: document.height,
+          transform: `scale(${surfaceScale})`,
+          transformOrigin: 'top left'
+        }}
+      >
+        {orderedElements.map((element) => (
+          <SlideElement
+            key={element.id}
+            document={document}
+            slide={slide}
+            element={element}
+            editable={editable}
+            selected={element.id === selectedElementId}
+            onSelect={() => onSelectElement?.(element.id)}
+            onPointerDown={(event) => startDrag(event, element, 'move')}
+            onPointerMove={updateDrag}
+            onPointerUp={endDrag}
+            onUpdateElement={onUpdateElement}
+            onResizePointerDown={(event) => startDrag(event, element, 'resize')}
+          />
+        ))}
+      </div>
     </div>
   )
 }
@@ -162,10 +189,10 @@ function SlideElement({
   onResizePointerDown: (event: React.PointerEvent) => void
 }): React.JSX.Element {
   const commonStyle: React.CSSProperties = {
-    left: `${(element.x / document.width) * 100}%`,
-    top: `${(element.y / document.height) * 100}%`,
-    width: `${(element.width / document.width) * 100}%`,
-    height: `${(element.height / document.height) * 100}%`,
+    left: element.x,
+    top: element.y,
+    width: element.width,
+    height: element.height,
     transform: `rotate(${element.rotation}deg)`,
     opacity: element.opacity
   }
