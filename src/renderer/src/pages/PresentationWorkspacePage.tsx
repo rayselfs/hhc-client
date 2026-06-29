@@ -87,8 +87,9 @@ const NATIVE_CONTROL_CLASS =
   'presentation-native-control rounded-lg border border-divider bg-content2 px-3 text-sm text-foreground outline-none'
 const RANGE_CLASS = 'presentation-range w-full'
 const RIBBON_ICON_BUTTON_CLASS =
-  'inline-flex h-8 min-w-8 items-center justify-center rounded-md px-2 text-default-500 transition-colors hover:bg-content2 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30'
-const RIBBON_ICON_BUTTON_ACTIVE_CLASS = 'bg-content2 text-foreground'
+  'inline-flex h-8 min-w-8 items-center justify-center rounded-md border border-transparent px-2 text-default-500 transition-[background-color,border-color,color,box-shadow,transform] hover:border-divider hover:bg-content2/80 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/50 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:border-transparent disabled:hover:bg-transparent'
+const RIBBON_ICON_BUTTON_ACTIVE_CLASS =
+  'border-primary/40 bg-primary/15 text-primary shadow-inner hover:bg-primary/20 hover:text-primary'
 const RIBBON_SEPARATOR_CLASS = 'mx-2 h-14 w-px bg-divider'
 
 function SlideThumbnail({
@@ -304,8 +305,19 @@ function EditableDocumentView({
   const [isLineSpacingOptionsOpen, setIsLineSpacingOptionsOpen] = useState(false)
   const [lineSpacingDraft, setLineSpacingDraft] = useState(1.15)
   const [editingElementId, setEditingElementId] = useState<string | null>(null)
+  const [pressedRibbonAction, setPressedRibbonAction] = useState<string | null>(null)
+  const pressedRibbonTimeoutRef = useRef<number | null>(null)
   const [status, setStatus] = useState<LoadStatus>('loading')
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(
+    () => () => {
+      if (pressedRibbonTimeoutRef.current !== null) {
+        window.clearTimeout(pressedRibbonTimeoutRef.current)
+      }
+    },
+    []
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -673,6 +685,17 @@ function EditableDocumentView({
     commitDocument({ ...document, width, height, updatedAt: Date.now() })
   }
 
+  const flashRibbonAction = (actionId: string): void => {
+    setPressedRibbonAction(actionId)
+    if (pressedRibbonTimeoutRef.current !== null) {
+      window.clearTimeout(pressedRibbonTimeoutRef.current)
+    }
+    pressedRibbonTimeoutRef.current = window.setTimeout(() => {
+      setPressedRibbonAction((current) => (current === actionId ? null : current))
+      pressedRibbonTimeoutRef.current = null
+    }, 140)
+  }
+
   const renderRibbon = (): React.JSX.Element => {
     if (activeRibbon === 'insert') {
       return (
@@ -734,8 +757,12 @@ function EditableDocumentView({
     }
 
     const textDisabled = !selectedTextElement
-    const textButtonClass = (active = false): string =>
-      `${RIBBON_ICON_BUTTON_CLASS} ${active ? RIBBON_ICON_BUTTON_ACTIVE_CLASS : ''}`
+    const textButtonClass = (active = false, actionId?: string): string =>
+      `${RIBBON_ICON_BUTTON_CLASS} ${
+        active || (actionId !== undefined && pressedRibbonAction === actionId)
+          ? RIBBON_ICON_BUTTON_ACTIVE_CLASS
+          : ''
+      }`
     const changeFontSize = (delta: number): void => {
       if (!selectedTextElement) return
       updateSelectedTextElement({
@@ -791,9 +818,12 @@ function EditableDocumentView({
             </select>
             <button
               type="button"
-              className={RIBBON_ICON_BUTTON_CLASS}
+              className={textButtonClass(false, 'increase-font-size')}
               disabled={textDisabled}
-              onClick={() => changeFontSize(2)}
+              onClick={() => {
+                flashRibbonAction('increase-font-size')
+                changeFontSize(2)
+              }}
               aria-label={t('presentationWorkspace.increaseFontSize', 'Increase font size')}
             >
               <span className="text-xl leading-none">A</span>
@@ -801,9 +831,12 @@ function EditableDocumentView({
             </button>
             <button
               type="button"
-              className={RIBBON_ICON_BUTTON_CLASS}
+              className={textButtonClass(false, 'decrease-font-size')}
               disabled={textDisabled}
-              onClick={() => changeFontSize(-2)}
+              onClick={() => {
+                flashRibbonAction('decrease-font-size')
+                changeFontSize(-2)
+              }}
               aria-label={t('presentationWorkspace.decreaseFontSize', 'Decrease font size')}
             >
               <span className="text-sm leading-none">A</span>
@@ -811,9 +844,12 @@ function EditableDocumentView({
             </button>
             <button
               type="button"
-              className={RIBBON_ICON_BUTTON_CLASS}
+              className={textButtonClass(false, 'clear-formatting')}
               disabled={textDisabled}
-              onClick={clearTextFormatting}
+              onClick={() => {
+                flashRibbonAction('clear-formatting')
+                clearTextFormatting()
+              }}
               aria-label={t('presentationWorkspace.clearFormatting', 'Clear formatting')}
             >
               <Eraser size={18} />
@@ -967,9 +1003,12 @@ function EditableDocumentView({
             </button>
             <button
               type="button"
-              className={RIBBON_ICON_BUTTON_CLASS}
+              className={textButtonClass(false, 'line-spacing')}
               disabled={textDisabled}
-              onClick={showLineSpacingMenu}
+              onClick={(event) => {
+                flashRibbonAction('line-spacing')
+                showLineSpacingMenu(event)
+              }}
               aria-label={t('presentationWorkspace.lineSpacing', 'Line spacing')}
             >
               <WrapText size={19} />
