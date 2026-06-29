@@ -627,6 +627,10 @@
     "increaseIndent": "Increase indent",
     "lineSpacing": "Line spacing",
     "lineSpacingOptions": "Line Spacing Options",
+    "bringToFront": "Bring to Front",
+    "bringForward": "Bring Forward",
+    "sendBackward": "Send Backward",
+    "sendToBack": "Send to Back",
     "align": {
       "left": "Align left",
       "center": "Center",

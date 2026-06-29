@@ -52,6 +52,7 @@ import {
   normalizeSlideBackground,
   removeElementFromSlide,
   removeEditableSlides,
+  reorderElementInSlide,
   resetSlideBackground,
   saveEditablePresentation,
   updateElementInSlide,
@@ -302,6 +303,7 @@ function EditableDocumentView({
   const [isBackgroundPanelOpen, setIsBackgroundPanelOpen] = useState(false)
   const [isLineSpacingOptionsOpen, setIsLineSpacingOptionsOpen] = useState(false)
   const [lineSpacingDraft, setLineSpacingDraft] = useState(1.15)
+  const [editingElementId, setEditingElementId] = useState<string | null>(null)
   const [status, setStatus] = useState<LoadStatus>('loading')
   const [error, setError] = useState<string | null>(null)
 
@@ -374,6 +376,23 @@ function EditableDocumentView({
     if (!document || !activeSlideId) return
     commitDocument(addElementToSlide(document, activeSlideId, element))
     setSelectedElementId(element.id)
+  }
+
+  const addTextElement = (point?: { x: number; y: number }): void => {
+    if (!document || !activeSlideId) return
+    const element = createTextElement(
+      point
+        ? {
+            x: Math.max(0, Math.min(document.width - 120, point.x)),
+            y: Math.max(0, Math.min(document.height - 40, point.y)),
+            width: 120,
+            text: ''
+          }
+        : { text: '' }
+    )
+    commitDocument(addElementToSlide(document, activeSlideId, element))
+    setSelectedElementId(element.id)
+    setEditingElementId(element.id)
   }
 
   const addSlide = (): void => {
@@ -499,6 +518,47 @@ function EditableDocumentView({
     setSelectedElementId(element.id)
   }
 
+  const reorderElement = (
+    elementId: string,
+    action: 'bring-forward' | 'bring-to-front' | 'send-backward' | 'send-to-back'
+  ): void => {
+    if (!document || !activeSlideId) return
+    commitDocument(reorderElementInSlide(document, activeSlideId, elementId, action))
+  }
+
+  const showElementContextMenu = (
+    event: React.MouseEvent,
+    element: EditablePresentationElement
+  ): void => {
+    setSelectedElementId(element.id)
+    showMenu(
+      [
+        {
+          id: 'bring-to-front',
+          label: t('presentationWorkspace.bringToFront', 'Bring to Front'),
+          onAction: () => reorderElement(element.id, 'bring-to-front')
+        },
+        {
+          id: 'bring-forward',
+          label: t('presentationWorkspace.bringForward', 'Bring Forward'),
+          onAction: () => reorderElement(element.id, 'bring-forward')
+        },
+        'separator',
+        {
+          id: 'send-backward',
+          label: t('presentationWorkspace.sendBackward', 'Send Backward'),
+          onAction: () => reorderElement(element.id, 'send-backward')
+        },
+        {
+          id: 'send-to-back',
+          label: t('presentationWorkspace.sendToBack', 'Send to Back'),
+          onAction: () => reorderElement(element.id, 'send-to-back')
+        }
+      ],
+      event
+    )
+  }
+
   const undo = useCallback((): void => {
     const previous = past[past.length - 1]
     if (!document || !previous) return
@@ -591,6 +651,11 @@ function EditableDocumentView({
     )
   }
 
+  const collapseSlideSelectionToActive = (): void => {
+    if (!activeSlideId || selectedSlideIds.size <= 1) return
+    setSelectedSlideIds(new Set([activeSlideId]))
+  }
+
   const updateSelectedNumber = (key: 'x' | 'y' | 'width' | 'height', value: string): void => {
     const next = Number(value)
     if (!Number.isFinite(next)) return
@@ -612,7 +677,7 @@ function EditableDocumentView({
     if (activeRibbon === 'insert') {
       return (
         <div className="flex h-16 items-center gap-2 border-b border-divider bg-content1/80 px-4">
-          <Button size="sm" variant="tertiary" onPress={() => addElement(createTextElement())}>
+          <Button size="sm" variant="tertiary" onPress={() => addTextElement()}>
             <Type size={16} />
             {t('presentationWorkspace.text', 'Text')}
           </Button>
@@ -1042,7 +1107,14 @@ function EditableDocumentView({
 
   return (
     <>
-      <div className="flex min-h-0 flex-1 flex-col bg-background">
+      <div
+        className="flex min-h-0 flex-1 flex-col bg-background"
+        onPointerDownCapture={(event) => {
+          const target = event.target as HTMLElement | null
+          if (target?.closest('[data-slide-sidebar]')) return
+          collapseSlideSelectionToActive()
+        }}
+      >
         <input
           ref={imageInputRef}
           type="file"
@@ -1083,20 +1155,20 @@ function EditableDocumentView({
                   <React.Fragment key={slideId}>
                     <button
                       type="button"
-                      className="group flex h-4 w-full items-center px-2"
+                      className="group flex h-5 w-full items-center px-1"
                       onClick={() => setInsertionIndex(index)}
                       aria-label={`Insert before slide ${index + 1}`}
                     >
                       <span
-                        className={`h-0.5 w-full rounded-full ${
+                        className={`h-1 w-full rounded-full ${
                           insertionIndex === index
-                            ? 'animate-pulse bg-primary'
-                            : 'bg-transparent group-hover:bg-primary/40 group-focus-visible:bg-primary/60'
+                            ? 'animate-pulse bg-[#f59e0b]'
+                            : 'bg-transparent group-hover:bg-[#f59e0b]/50 group-focus-visible:bg-[#f59e0b]/70'
                         }`}
                       />
                     </button>
                     <button
-                      className="flex w-full gap-2 rounded-xl px-1 py-2 text-left text-default-500 transition-colors hover:bg-content2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/60"
+                      className="flex w-full gap-2 px-1 py-2 text-left text-default-500 transition-colors hover:bg-content2 focus-visible:outline-none"
                       onClick={(event) => selectSlide(index, event)}
                       onKeyDown={(event) => {
                         if (event.key === 'Enter') {
@@ -1117,7 +1189,7 @@ function EditableDocumentView({
                       <span
                         className={`flex h-[99px] w-44 overflow-hidden border bg-black shadow-sm ${
                           isSelected
-                            ? 'border-primary ring-2 ring-primary/40'
+                            ? 'border-[#f59e0b] ring-2 ring-[#f59e0b]/50'
                             : 'border-transparent'
                         }`}
                       >
@@ -1133,15 +1205,15 @@ function EditableDocumentView({
               })}
               <button
                 type="button"
-                className="group flex h-4 w-full items-center px-2"
+                className="group flex h-5 w-full items-center px-1"
                 onClick={() => setInsertionIndex(document.slideOrder.length)}
                 aria-label="Insert after last slide"
               >
                 <span
-                  className={`h-0.5 w-full rounded-full ${
+                  className={`h-1 w-full rounded-full ${
                     insertionIndex === document.slideOrder.length
-                      ? 'animate-pulse bg-primary'
-                      : 'bg-transparent group-hover:bg-primary/40 group-focus-visible:bg-primary/60'
+                      ? 'animate-pulse bg-[#f59e0b]'
+                      : 'bg-transparent group-hover:bg-[#f59e0b]/50 group-focus-visible:bg-[#f59e0b]/70'
                   }`}
                 />
               </button>
@@ -1157,7 +1229,14 @@ function EditableDocumentView({
                   editable
                   showBorder
                   selectedElementId={selectedElementId}
-                  onSelectElement={setSelectedElementId}
+                  editingElementId={editingElementId}
+                  onSelectElement={(elementId) => {
+                    setSelectedElementId(elementId)
+                    if (elementId !== editingElementId) setEditingElementId(null)
+                  }}
+                  onEditingElementChange={setEditingElementId}
+                  onInsertText={addTextElement}
+                  onElementContextMenu={showElementContextMenu}
                   onUpdateElement={(slideId, elementId, updates) =>
                     commitDocument(updateElementInSlide(document, slideId, elementId, updates))
                   }

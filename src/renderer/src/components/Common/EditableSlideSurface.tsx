@@ -15,8 +15,12 @@ interface EditableSlideSurfaceProps {
   editable?: boolean
   showBorder?: boolean
   selectedElementId?: string | null
+  editingElementId?: string | null
   className?: string
   onSelectElement?: (elementId: string | null) => void
+  onEditingElementChange?: (elementId: string | null) => void
+  onInsertText?: (point: { x: number; y: number }) => void
+  onElementContextMenu?: (event: React.MouseEvent, element: EditablePresentationElement) => void
   onUpdateElement?: (
     slideId: string,
     elementId: string,
@@ -41,8 +45,12 @@ export default function EditableSlideSurface({
   editable = false,
   showBorder = false,
   selectedElementId = null,
+  editingElementId = null,
   className,
   onSelectElement,
+  onEditingElementChange,
+  onInsertText,
+  onElementContextMenu,
   onUpdateElement
 }: EditableSlideSurfaceProps): React.JSX.Element {
   const slide = document.slides[slideId]
@@ -50,7 +58,6 @@ export default function EditableSlideSurface({
   const dragRef = useRef<DragState | null>(null)
   const scaleRef = useRef({ x: 1, y: 1 })
   const [surfaceScale, setSurfaceScale] = useState(1)
-  const [editingTextElementId, setEditingTextElementId] = useState<string | null>(null)
 
   const orderedElements = useMemo(() => {
     if (!slide) return []
@@ -85,6 +92,16 @@ export default function EditableSlideSurface({
     mode: DragState['mode']
   ): void => {
     if (!editable || element.locked) return
+    const target = event.target as HTMLElement | null
+    if (
+      mode === 'move' &&
+      element.type === 'text' &&
+      target?.closest('[data-text-content]') &&
+      event.detail > 1
+    ) {
+      onSelectElement?.(element.id)
+      return
+    }
     event.preventDefault()
     event.stopPropagation()
     const rect = surfaceRef.current?.getBoundingClientRect()
@@ -101,7 +118,7 @@ export default function EditableSlideSurface({
       startY: event.clientY,
       original: element
     }
-    setEditingTextElementId(null)
+    onEditingElementChange?.(null)
     onSelectElement?.(element.id)
     event.currentTarget.setPointerCapture(event.pointerId)
   }
@@ -133,7 +150,30 @@ export default function EditableSlideSurface({
   const endDrag = (event: React.PointerEvent): void => {
     if (!dragRef.current) return
     dragRef.current = null
-    event.currentTarget.releasePointerCapture(event.pointerId)
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+  }
+
+  const insertTextAtPointer = (event: React.MouseEvent): void => {
+    if (!editable || !onInsertText) return
+    const target = event.target as HTMLElement | null
+    if (target?.closest('[data-slide-element]')) return
+    const rect = surfaceRef.current?.getBoundingClientRect()
+    if (!rect) return
+    event.preventDefault()
+    const scaleX = document.width / rect.width
+    const scaleY = document.height / rect.height
+    onInsertText({
+      x: Math.max(
+        0,
+        Math.min(document.width - TEXT_MIN_WIDTH, (event.clientX - rect.left) * scaleX)
+      ),
+      y: Math.max(
+        0,
+        Math.min(document.height - TEXT_MIN_HEIGHT, (event.clientY - rect.top) * scaleY)
+      )
+    })
   }
 
   return (
@@ -148,9 +188,10 @@ export default function EditableSlideSurface({
       }}
       onPointerDown={() => {
         if (!editable) return
-        setEditingTextElementId(null)
+        onEditingElementChange?.(null)
         onSelectElement?.(null)
       }}
+      onDoubleClick={insertTextAtPointer}
     >
       <div
         className="absolute left-0 top-0"
@@ -168,19 +209,20 @@ export default function EditableSlideSurface({
             slide={slide}
             element={element}
             editable={editable}
-            editing={element.id === editingTextElementId}
+            editing={element.id === editingElementId}
             selected={element.id === selectedElementId}
             onSelect={() => onSelectElement?.(element.id)}
             onPointerDown={(event) => startDrag(event, element, 'move')}
             onPointerMove={updateDrag}
             onPointerUp={endDrag}
+            onContextMenu={(event) => onElementContextMenu?.(event, element)}
             onUpdateElement={onUpdateElement}
             onResizePointerDown={(event) => startDrag(event, element, 'resize')}
             onStartTextEdit={() => {
               onSelectElement?.(element.id)
-              setEditingTextElementId(element.id)
+              onEditingElementChange?.(element.id)
             }}
-            onFinishTextEdit={() => setEditingTextElementId(null)}
+            onFinishTextEdit={() => onEditingElementChange?.(null)}
           />
         ))}
       </div>
@@ -209,6 +251,7 @@ function SlideElement({
   onPointerDown,
   onPointerMove,
   onPointerUp,
+  onContextMenu,
   onUpdateElement,
   onResizePointerDown,
   onStartTextEdit,
@@ -224,6 +267,7 @@ function SlideElement({
   onPointerDown: (event: React.PointerEvent) => void
   onPointerMove: (event: React.PointerEvent) => void
   onPointerUp: (event: React.PointerEvent) => void
+  onContextMenu?: (event: React.MouseEvent) => void
   onUpdateElement?: (
     slideId: string,
     elementId: string,
@@ -244,6 +288,7 @@ function SlideElement({
 
   return (
     <div
+      data-slide-element
       className={`absolute ${editable ? 'cursor-move' : ''} ${
         selected ? 'ring-2 ring-primary ring-offset-2 ring-offset-black' : ''
       }`}
@@ -254,6 +299,7 @@ function SlideElement({
       }}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
+      onContextMenu={onContextMenu}
       onClick={(event) => {
         event.stopPropagation()
         onSelect()
@@ -274,11 +320,13 @@ function SlideElement({
           type="button"
           className={
             element.type === 'text'
-              ? 'absolute -right-2 top-1/2 size-4 -translate-y-1/2 cursor-ew-resize rounded-full border border-white bg-primary'
-              : 'absolute -bottom-2 -right-2 size-4 cursor-nwse-resize rounded-full border border-white bg-primary'
+              ? 'absolute -right-2 top-1/2 size-5 -translate-y-1/2 cursor-ew-resize rounded-full border border-white bg-primary'
+              : 'absolute -bottom-2 -right-2 size-5 cursor-nwse-resize rounded-full border border-white bg-primary'
           }
           aria-label={element.type === 'text' ? 'Resize text box width' : 'Resize element'}
           onPointerDown={onResizePointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
         />
       )}
     </div>
@@ -399,10 +447,27 @@ function TextElementContent({
     onUpdateElement(slideId, element.id, updates)
   }, [document.width, editable, element, onUpdateElement, slideId])
 
+  useLayoutEffect(() => {
+    if (!editing || element.locked) return
+    const content = contentRef.current
+    if (!content) return
+    content.focus()
+    const selection = window.getSelection()
+    if (!selection) return
+    const range = window.document.createRange()
+    range.selectNodeContents(content)
+    range.collapse(false)
+    selection.removeAllRanges()
+    selection.addRange(range)
+  }, [editing, element.locked])
+
   return (
     <div
+      data-text-content
       ref={contentRef}
-      className="h-full w-full whitespace-pre-wrap break-words outline-none"
+      className={`h-full w-full whitespace-pre-wrap break-words outline-none ${
+        editable ? 'cursor-text' : ''
+      }`}
       contentEditable={editing && !element.locked}
       suppressContentEditableWarning
       style={{

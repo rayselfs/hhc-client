@@ -627,6 +627,10 @@
     "increaseIndent": "增加縮排",
     "lineSpacing": "行距",
     "lineSpacingOptions": "行距選項",
+    "bringToFront": "移到最上層",
+    "bringForward": "上移一層",
+    "sendBackward": "下移一層",
+    "sendToBack": "移到最下層",
     "align": {
       "left": "靠左對齊",
       "center": "置中",

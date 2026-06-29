@@ -313,7 +313,7 @@ export function createTextElement(
     height: input.height ?? Math.ceil(fontSize * lineHeight),
     rotation: input.rotation ?? 0,
     opacity: input.opacity ?? 1,
-    text: input.text ?? 'Text',
+    text: input.text ?? '',
     fontFamily: input.fontFamily ?? DEFAULT_FONT_FAMILY,
     fontSize,
     bold: input.bold ?? false,
@@ -402,6 +402,40 @@ export function updateElementInSlide(
           ...slide.elements,
           [elementId]: { ...element, ...updates } as EditablePresentationElement
         }
+      }
+    },
+    updatedAt: Date.now()
+  }
+}
+
+export function reorderElementInSlide(
+  document: EditablePresentationDocument,
+  slideId: string,
+  elementId: string,
+  action: 'bring-forward' | 'bring-to-front' | 'send-backward' | 'send-to-back'
+): EditablePresentationDocument {
+  const slide = document.slides[slideId]
+  if (!slide || !slide.elements[elementId]) return document
+  const currentIndex = slide.elementOrder.indexOf(elementId)
+  if (currentIndex === -1) return document
+
+  const elementOrder = [...slide.elementOrder]
+  elementOrder.splice(currentIndex, 1)
+  const nextIndex = (() => {
+    if (action === 'bring-to-front') return elementOrder.length
+    if (action === 'send-to-back') return 0
+    if (action === 'bring-forward') return Math.min(elementOrder.length, currentIndex + 1)
+    return Math.max(0, currentIndex - 1)
+  })()
+
+  elementOrder.splice(nextIndex, 0, elementId)
+  return {
+    ...document,
+    slides: {
+      ...document.slides,
+      [slideId]: {
+        ...slide,
+        elementOrder
       }
     },
     updatedAt: Date.now()
