@@ -4,6 +4,7 @@ import { getMediaType, type MediaType, type MediaTypeStateMap } from './presenta
 import ImagePreview from '../components/Control/FileExplorer/Presenter/Preview/ImagePreview'
 import VideoPreview from '../components/Control/FileExplorer/Presenter/Preview/VideoPreview'
 import PdfPreview from '../components/Control/FileExplorer/Presenter/Preview/PdfPreview'
+import PresentationPreview from '../components/Control/FileExplorer/Presenter/Preview/PresentationPreview'
 
 export interface PreviewComponentProps {
   item: FileItemRecord
@@ -42,6 +43,14 @@ const DESCRIPTORS: MediaTypeDescriptor[] = [
     clickToAdvance: false,
     PreviewComponent: PdfPreview,
     initialTypeState: { viewMode: 'slide' as const }
+  },
+  {
+    type: 'presentation',
+    matches: (m) => getMediaType(m) === 'presentation',
+    supportsZoomPan: false,
+    clickToAdvance: true,
+    PreviewComponent: PresentationPreview,
+    initialTypeState: { slideIndex: 0 }
   }
 ]
 

@@ -3,6 +3,8 @@ import { createProjectionAdapter } from '@renderer/lib/projection-adapter'
 import { getFileSource, openFileExplorerDB } from '@renderer/lib/file-explorer-db'
 import { loadPdfjsLib } from '@renderer/lib/pdfjs-loader'
 import type { FileControlPayload } from '@shared/projection-messages'
+import PptxSlideSurface from '@renderer/components/Common/PptxSlideSurface'
+import { isPresentationMimeType } from '@renderer/lib/presentation-media'
 
 type FileProjectionProps = {
   fileName?: string
@@ -13,6 +15,10 @@ type FileProjectionProps = {
   initialPlaybackMode?: 'native' | 'vlc-embedded'
   initialSeekable?: boolean
   initialDurationMs?: number
+  initialPresentation?: {
+    slideIndex: number
+    slideCount?: number
+  }
   controlEvent?: { id: number; data: FileControlPayload } | null
 }
 
@@ -47,6 +53,7 @@ export default function FileProjection({
   initialPlaybackMode,
   initialSeekable,
   initialDurationMs,
+  initialPresentation,
   controlEvent
 }: FileProjectionProps): React.JSX.Element {
   const [objectUrl, setObjectUrl] = useState<string | null>(null)
@@ -241,6 +248,7 @@ export default function FileProjection({
         setObjectUrl(options.streamUrl)
         return
       }
+      if (isPresentationMimeType(fileMimeType)) return
       const db = await openFileExplorerDB()
       const source = await getFileSource(db, blobId, fileMimeType, { verifyNativeFile: false })
       if (!source || currentItemIdRef.current !== itemId) {
@@ -527,6 +535,25 @@ export default function FileProjection({
           blobId={initialBlobId}
           durationMs={durationMsRef.current}
         />
+      </div>
+    )
+  }
+
+  if (isPresentationMimeType(mimeType ?? undefined) && initialItemId && initialBlobId) {
+    const presentationMimeType =
+      mimeType ?? 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+    return (
+      <div className="flex h-screen w-full items-center justify-center overflow-hidden bg-black">
+        <div className="h-full w-full">
+          <PptxSlideSurface
+            source={{
+              id: initialItemId,
+              url: `blob:${initialBlobId}`,
+              mimeType: presentationMimeType
+            }}
+            slideIndex={initialPresentation?.slideIndex ?? 0}
+          />
+        </div>
       </div>
     )
   }

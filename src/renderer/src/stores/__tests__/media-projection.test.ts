@@ -37,6 +37,11 @@ function makeFile(id: string, name: string, mimeType = 'image/png'): FileItemRec
 }
 
 const files = [makeFile('a', 'a.png'), makeFile('b', 'b.png'), makeFile('c', 'c.png')]
+const pptxFile = makeFile(
+  'deck',
+  'deck.pptx',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+)
 
 beforeEach(() => {
   useMediaProjectionStore.getState().exit()
@@ -163,6 +168,25 @@ describe('next / prev', () => {
     })
   })
 
+  it('next() advances PPTX slides before moving to the next media item', () => {
+    useMediaProjectionStore.getState().startPresentation([pptxFile, files[1]], 0)
+    useMediaProjectionStore.getState().setTypeState('presentation', {
+      slideIndex: 0,
+      slideCount: 2
+    })
+
+    useMediaProjectionStore.getState().next()
+    expect(useMediaProjectionStore.getState().currentIndex).toBe(0)
+    expect(useMediaProjectionStore.getState().typeStates.presentation).toEqual({
+      slideIndex: 1,
+      slideCount: 2
+    })
+
+    useMediaProjectionStore.getState().next()
+    expect(useMediaProjectionStore.getState().currentIndex).toBe(1)
+    expect(useMediaProjectionStore.getState().typeStates.presentation).toBeUndefined()
+  })
+
   it('next() stops at end', () => {
     useMediaProjectionStore.setState({ currentIndex: 2 })
     useMediaProjectionStore.getState().next()
@@ -173,6 +197,25 @@ describe('next / prev', () => {
     useMediaProjectionStore.setState({ currentIndex: 2 })
     useMediaProjectionStore.getState().prev()
     expect(useMediaProjectionStore.getState().currentIndex).toBe(1)
+  })
+
+  it('prev() moves within PPTX slides before moving to the previous media item', () => {
+    useMediaProjectionStore.getState().startPresentation([files[0], pptxFile], 1)
+    useMediaProjectionStore.getState().setTypeState('presentation', {
+      slideIndex: 1,
+      slideCount: 2
+    })
+
+    useMediaProjectionStore.getState().prev()
+    expect(useMediaProjectionStore.getState().currentIndex).toBe(1)
+    expect(useMediaProjectionStore.getState().typeStates.presentation).toEqual({
+      slideIndex: 0,
+      slideCount: 2
+    })
+
+    useMediaProjectionStore.getState().prev()
+    expect(useMediaProjectionStore.getState().currentIndex).toBe(0)
+    expect(useMediaProjectionStore.getState().typeStates.presentation).toBeUndefined()
   })
 
   it('prev() stops at start', () => {
@@ -194,6 +237,15 @@ describe('canNext / canPrev', () => {
 
   it('canNext is true when not at end', () => {
     useMediaProjectionStore.getState().startPresentation(files, 0)
+    expect(useMediaProjectionStore.getState().canNext()).toBe(true)
+  })
+
+  it('canNext is true inside a PPTX deck even when it is the last media item', () => {
+    useMediaProjectionStore.getState().startPresentation([pptxFile], 0)
+    useMediaProjectionStore.getState().setTypeState('presentation', {
+      slideIndex: 0,
+      slideCount: 2
+    })
     expect(useMediaProjectionStore.getState().canNext()).toBe(true)
   })
 
@@ -260,6 +312,15 @@ describe('progress', () => {
   it('returns "3 / 3" at last item', () => {
     useMediaProjectionStore.getState().startPresentation(files, 2)
     expect(useMediaProjectionStore.getState().progress()).toBe('3 / 3')
+  })
+
+  it('returns PPTX slide progress while presenting a deck', () => {
+    useMediaProjectionStore.getState().startPresentation([pptxFile], 0)
+    useMediaProjectionStore.getState().setTypeState('presentation', {
+      slideIndex: 1,
+      slideCount: 4
+    })
+    expect(useMediaProjectionStore.getState().progress()).toBe('2 / 4')
   })
 })
 

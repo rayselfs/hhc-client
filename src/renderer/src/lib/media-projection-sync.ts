@@ -5,6 +5,7 @@ import {
   type MediaProjectionStore
 } from '@renderer/stores/media-projection'
 import { buildFileProjectionPayload } from '@renderer/lib/media-projection-payload'
+import { isPresentationMimeType } from '@renderer/lib/presentation-media'
 
 function playlistContentChanged(
   prev: { id: string; mimeType: string; name: string }[],
@@ -48,8 +49,11 @@ export function useMediaProjectionSync(): void {
       const indexChanged = state.currentIndex !== prev.currentIndex
       const playlistChanged = playlistContentChanged(prev.playlist, state.playlist)
       const endedCleared = prev.isEnded && !state.isEnded
+      const presentationChanged =
+        isPresentationMimeType(state.currentItem()?.mimeType) &&
+        state.typeStates.presentation !== prev.typeStates.presentation
 
-      if (started || indexChanged || playlistChanged || endedCleared) {
+      if (started || indexChanged || playlistChanged || endedCleared || presentationChanged) {
         void projectCurrentItem(state, started)
       }
     })

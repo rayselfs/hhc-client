@@ -60,6 +60,10 @@ export interface AppMessages {
     streamUrl?: string
     seekable?: boolean
     durationMs?: number
+    presentation?: {
+      slideIndex: number
+      slideCount?: number
+    }
   }
   /** File playback/control actions on projection */
   'file:control': FileControlPayload

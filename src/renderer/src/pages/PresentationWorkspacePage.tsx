@@ -14,49 +14,38 @@ import {
 } from 'lucide-react'
 import { Button } from '@heroui/react/button'
 import { Spinner } from '@heroui/react/spinner'
-import { getBlobId } from '@renderer/lib/blob-identity'
-import { getFileSource, openFileExplorerDB } from '@renderer/lib/file-explorer-db'
+import { toast } from '@heroui/react/toast'
+import { openFileExplorerDB } from '@renderer/lib/file-explorer-db'
 import { ensurePresentationPageDocument } from '@renderer/lib/presentation-page-document'
+import { readPresentationArrayBuffer } from '@renderer/lib/presentation-source'
 import { openPptxViewer, type PptxViewerHandle } from '@renderer/lib/pptx-renderer-service'
 import { getPresentationWorkspacePath, isPresentationItem } from '@renderer/lib/presentation-media'
+import { startMediaProjection } from '@renderer/lib/projection-actions'
 import {
   usePresentationWorkspaceStore,
   type PresentationWorkspaceDocument
 } from '@renderer/stores/presentation-workspace'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
+import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 import { isFileItem } from '@shared/types/folder'
 import type { SlideHandle } from '@aiden0z/pptx-renderer'
 
 type LoadStatus = 'idle' | 'loading' | 'ready' | 'failed'
 
-async function readPresentationBuffer(
-  deck: Pick<PresentationWorkspaceDocument, 'itemId' | 'url' | 'mimeType'>
-): Promise<ArrayBuffer> {
-  const db = await openFileExplorerDB()
-  const source = await getFileSource(
-    db,
-    getBlobId({ id: deck.itemId, url: deck.url }),
-    deck.mimeType
-  )
-  if (!source) throw new Error('Presentation source is unavailable')
-  try {
-    const response = await fetch(source.url)
-    if (!response.ok) throw new Error(`Failed to read presentation source: ${response.status}`)
-    return response.arrayBuffer()
-  } finally {
-    source.revoke()
-  }
-}
-
 function RibbonButton({
   icon,
-  label
+  label,
+  onClick
 }: {
   icon: React.ReactNode
   label: string
+  onClick?: () => void
 }): React.JSX.Element {
   return (
-    <button className="flex h-14 min-w-20 flex-col items-center justify-center gap-1 rounded-lg px-3 text-xs text-default-500 transition-colors hover:bg-content2 hover:text-foreground">
+    <button
+      className="flex h-14 min-w-20 flex-col items-center justify-center gap-1 rounded-lg px-3 text-xs text-default-500 transition-colors hover:bg-content2 hover:text-foreground"
+      onClick={onClick}
+    >
       {icon}
       <span>{label}</span>
     </button>
@@ -155,8 +144,8 @@ function PresentationDocumentView({
       setStatus('loading')
       setError(null)
       try {
-        const buffer = await readPresentationBuffer({
-          itemId: deckItemId,
+        const buffer = await readPresentationArrayBuffer({
+          id: deckItemId,
           url: deckUrl,
           mimeType: deckMimeType
         })
@@ -338,6 +327,26 @@ export default function PresentationWorkspacePage(): React.JSX.Element {
     navigate(nextActiveItemId ? getPresentationWorkspacePath(nextActiveItemId) : '/files')
   }
 
+  const handlePresentActiveDocument = async (): Promise<void> => {
+    if (!activeDocument) return
+    const db = await openFileExplorerDB()
+    const item = await db.get('folder-items', activeDocument.itemId)
+    if (!item || !isFileItem(item) || !isPresentationItem(item)) return
+    const slideIndex = usePresentationWorkspaceStore.getState().getActiveSlide(item.id)
+    const report = await startMediaProjection(
+      [item],
+      0,
+      { onNoProjectableFiles: () => toast.warning(t('fileExplorer.noProjectableFiles')) },
+      { prioritizeStartItem: true }
+    )
+    if (report.summary.ready > 0) {
+      useMediaProjectionStore.getState().setTypeState('presentation', {
+        slideIndex,
+        slideCount: activeDocument.slideCount
+      })
+    }
+  }
+
   return (
     <div className="flex h-full flex-col bg-background text-foreground">
       <div className="flex h-20 shrink-0 items-center gap-2 border-b border-divider bg-content1/80 px-4">
@@ -348,7 +357,11 @@ export default function PresentationWorkspacePage(): React.JSX.Element {
         <RibbonButton icon={<Home size={18} />} label={t('presentationWorkspace.home')} />
         <RibbonButton icon={<ImagePlus size={18} />} label={t('presentationWorkspace.insert')} />
         <RibbonButton icon={<Palette size={18} />} label={t('presentationWorkspace.design')} />
-        <RibbonButton icon={<Play size={18} />} label={t('presentationWorkspace.present')} />
+        <RibbonButton
+          icon={<Play size={18} />}
+          label={t('presentationWorkspace.present')}
+          onClick={() => void handlePresentActiveDocument()}
+        />
         <RibbonButton icon={<Copy size={18} />} label={t('presentationWorkspace.copyPage')} />
       </div>
 

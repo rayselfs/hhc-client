@@ -18,6 +18,7 @@ export type MediaTypeStateMap = {
     duration?: number
   }
   pdf: { viewMode: 'slide' | 'scroll'; thumbsCollapsed?: boolean }
+  presentation: { slideIndex: number; slideCount?: number }
 }
 
 export type MediaType = keyof MediaTypeStateMap
@@ -31,7 +32,7 @@ function canPresentSupport(support: MediaSupportMode): boolean {
 }
 
 function isProjectionMediaKind(kind: string): kind is MediaType {
-  return kind === 'image' || kind === 'video' || kind === 'pdf'
+  return kind === 'image' || kind === 'video' || kind === 'pdf' || kind === 'presentation'
 }
 
 export function isPresentable(mimeType: string, platform = getPresentabilityPlatform()): boolean {

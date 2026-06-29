@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { FileItemRecord } from '@shared/types/folder'
-import type { MediaType, MediaTypeStateMap } from '@renderer/lib/presentability'
+import { getMediaType, type MediaType, type MediaTypeStateMap } from '@renderer/lib/presentability'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { lockMediaResources } from '@renderer/lib/media-resource-locks'
 import {
@@ -73,12 +73,21 @@ const initialState = {
 
 let releaseProjectionLocks: (() => void) | null = null
 
-function withoutVideoRuntimeState(
+function withoutTransientMediaRuntimeState(
   typeStates: MediaProjectionStore['typeStates']
 ): MediaProjectionStore['typeStates'] {
   const next = { ...typeStates }
   delete next.video
+  delete next.presentation
   return next
+}
+
+function getCurrentPresentationState(
+  state: Pick<MediaProjectionStore, 'playlist' | 'currentIndex' | 'typeStates'>
+): MediaTypeStateMap['presentation'] | null {
+  const item = state.playlist[state.currentIndex]
+  if (!item || getMediaType(item.mimeType) !== 'presentation') return null
+  return state.typeStates.presentation ?? { slideIndex: 0 }
 }
 
 export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get) => ({
@@ -100,17 +109,34 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
   },
 
   canNext: () => {
-    const { currentIndex, playlist, isEnded } = get()
+    const state = get()
+    const { currentIndex, playlist, isEnded } = state
+    const presentation = getCurrentPresentationState(state)
+    if (
+      presentation &&
+      presentation.slideCount !== undefined &&
+      presentation.slideIndex < presentation.slideCount - 1
+    ) {
+      return true
+    }
     return !isEnded && currentIndex < playlist.length - 1
   },
 
   canPrev: () => {
-    const { currentIndex } = get()
+    const state = get()
+    const { currentIndex } = state
+    const presentation = getCurrentPresentationState(state)
+    if (presentation && presentation.slideIndex > 0) return true
     return currentIndex > 0
   },
 
   progress: () => {
-    const { playlist, currentIndex } = get()
+    const state = get()
+    const { playlist, currentIndex } = state
+    const presentation = getCurrentPresentationState(state)
+    if (presentation?.slideCount !== undefined && presentation.slideCount > 0) {
+      return `${presentation.slideIndex + 1} / ${presentation.slideCount}`
+    }
     if (playlist.length === 0) return '0 / 0'
     return `${currentIndex + 1} / ${playlist.length}`
   },
@@ -203,6 +229,23 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
       s.exit()
       return
     }
+    const presentation = getCurrentPresentationState(s)
+    if (
+      presentation &&
+      presentation.slideCount !== undefined &&
+      presentation.slideIndex < presentation.slideCount - 1
+    ) {
+      set({
+        typeStates: {
+          ...s.typeStates,
+          presentation: {
+            ...presentation,
+            slideIndex: presentation.slideIndex + 1
+          }
+        }
+      })
+      return
+    }
     if (s.currentIndex >= s.playlist.length - 1) {
       set({ isEnded: true })
       return
@@ -211,7 +254,7 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
       currentIndex: s.currentIndex + 1,
       zoomLevel: 1,
       pan: { x: 0, y: 0 },
-      typeStates: withoutVideoRuntimeState(s.typeStates)
+      typeStates: withoutTransientMediaRuntimeState(s.typeStates)
     })
   },
 
@@ -221,12 +264,25 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
       set({ isEnded: false })
       return
     }
+    const presentation = getCurrentPresentationState(s)
+    if (presentation && presentation.slideIndex > 0) {
+      set({
+        typeStates: {
+          ...s.typeStates,
+          presentation: {
+            ...presentation,
+            slideIndex: presentation.slideIndex - 1
+          }
+        }
+      })
+      return
+    }
     if (s.currentIndex <= 0) return
     set({
       currentIndex: s.currentIndex - 1,
       zoomLevel: 1,
       pan: { x: 0, y: 0 },
-      typeStates: withoutVideoRuntimeState(s.typeStates)
+      typeStates: withoutTransientMediaRuntimeState(s.typeStates)
     })
   },
 
@@ -241,7 +297,7 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
       typeStates:
         clamped === state.currentIndex
           ? state.typeStates
-          : withoutVideoRuntimeState(state.typeStates)
+          : withoutTransientMediaRuntimeState(state.typeStates)
     }))
   },
 

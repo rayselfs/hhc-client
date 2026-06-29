@@ -131,4 +131,36 @@ describe('media projection sync', () => {
       ]
     ])
   })
+
+  it('sends file:show when a PPTX slide changes', () => {
+    useMediaProjectionStore.setState({
+      playlist: [
+        makeFile(
+          'deck',
+          'deck.pptx',
+          'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+        )
+      ],
+      currentIndex: 0,
+      isPresenting: true,
+      typeStates: { pdf: { viewMode: 'slide' }, presentation: { slideIndex: 0, slideCount: 5 } }
+    })
+    renderSync()
+    mockProject.mockClear()
+
+    act(() => {
+      useMediaProjectionStore.getState().setTypeState('presentation', {
+        slideIndex: 1,
+        slideCount: 5
+      })
+    })
+
+    expect(mockProject).toHaveBeenCalledWith(
+      'file:show',
+      expect.objectContaining({
+        itemId: 'deck',
+        presentation: { slideIndex: 1, slideCount: 5 }
+      })
+    )
+  })
 })

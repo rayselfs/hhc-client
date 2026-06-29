@@ -55,4 +55,25 @@ describe('buildFileProjectionPayload', () => {
   it('returns null when the current index has no item', () => {
     expect(buildFileProjectionPayload({ playlist: [], currentIndex: 0 })).toBeNull()
   })
+
+  it('includes presentation slide state for PPTX media', () => {
+    const playlist = [
+      {
+        ...makeFile('deck-id'),
+        name: 'deck.pptx',
+        mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+      }
+    ]
+
+    expect(
+      buildFileProjectionPayload({
+        playlist,
+        currentIndex: 0,
+        typeStates: { presentation: { slideIndex: 3, slideCount: 12 } }
+      })
+    ).toMatchObject({
+      itemId: 'deck-id',
+      presentation: { slideIndex: 3, slideCount: 12 }
+    })
+  })
 })

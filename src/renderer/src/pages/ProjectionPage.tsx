@@ -29,6 +29,7 @@ export default function ProjectionPage(): React.JSX.Element {
     playbackMode?: 'native' | 'vlc-embedded'
     seekable?: boolean
     durationMs?: number
+    presentation?: ProjectionPayload<'file:show'>['presentation']
   } | null>(null)
   const [fileControlEvent, setFileControlEvent] = useState<{
     id: number
@@ -74,7 +75,8 @@ export default function ProjectionPage(): React.JSX.Element {
         streamUrl: data.streamUrl,
         playbackMode: data.playbackMode,
         seekable: data.seekable,
-        durationMs: data.durationMs
+        durationMs: data.durationMs,
+        presentation: data.presentation
       })
       setActiveContent('file')
     })
@@ -158,6 +160,7 @@ export default function ProjectionPage(): React.JSX.Element {
         initialPlaybackMode={fileData.playbackMode}
         initialSeekable={fileData.seekable}
         initialDurationMs={fileData.durationMs}
+        initialPresentation={fileData.presentation}
         controlEvent={fileControlEvent}
       />
     )
