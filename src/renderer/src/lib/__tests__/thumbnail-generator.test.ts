@@ -165,4 +165,25 @@ describe('PPTX thumbnail generation', () => {
     expect(result).toBe('data:image/jpeg;base64,pptx')
     expect(mockGeneratePptxFirstSlideThumbnail).toHaveBeenCalledWith(pptxFile)
   })
+
+  it('falls back silently when PPTX thumbnail canvas is tainted', async () => {
+    const pptxFile = makeFile(
+      'sermon.pptx',
+      4096,
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+    )
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    mockGeneratePptxFirstSlideThumbnail.mockRejectedValue(
+      Object.assign(new Error('tainted'), { name: 'SecurityError' })
+    )
+
+    const result = await generateThumbnail(
+      pptxFile,
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+    )
+
+    expect(result).toBeNull()
+    expect(consoleError).not.toHaveBeenCalled()
+    consoleError.mockRestore()
+  })
 })

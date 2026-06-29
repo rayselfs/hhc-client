@@ -19,6 +19,10 @@ function createCanvas(width = THUMBNAIL_MAX_SIZE, height = THUMBNAIL_MAX_SIZE): 
   return canvas
 }
 
+function isCanvasSecurityError(error: unknown): boolean {
+  return error instanceof Error && error.name === 'SecurityError'
+}
+
 function drawContainFit(
   source: CanvasImageSource,
   sourceWidth: number,
@@ -164,6 +168,7 @@ export async function generateThumbnail(
     }
     return null
   } catch (error) {
+    if (isCanvasSecurityError(error)) return null
     console.error('Failed to generate thumbnail', error)
     return null
   }
