@@ -42,6 +42,17 @@ Bundled notices:
 
 ## Runtime Dependencies
 
+### @aiden0z/pptx-renderer
+
+Web-compatible PPTX preview and projection rendering uses
+`@aiden0z/pptx-renderer`, distributed under Apache-2.0.
+
+Bundled notices:
+
+- `resources/licenses/pptx-renderer/LICENSE.Apache-2.0`
+- `resources/licenses/pptx-renderer/source-url.txt`
+- `resources/licenses/pptx-renderer/build-info.json`
+
 The app also uses Electron, React, Vite, pdfjs-dist, HeroUI, i18next, Zustand,
 and other npm dependencies. Their exact package versions are tracked in
 `package-lock.json`.

@@ -17,7 +17,7 @@ LibrePresenter is open-source presentation software for churches and live events
 | M1 | Implemented | `milestones/M1-projection-core.md` | Projection window/session lifecycle is reliable, lazy-opened, and fast enough for live use. |
 | M2 | Implemented | `milestones/M2-media-library-sync.md` | Media library and sync status are understandable and recoverable. |
 | M3 | Implemented | `milestones/M3-service-playlist-cue-workflow.md` | Operators can build and run a service rundown instead of presenting directly from folders. |
-| M4 | Implemented | `milestones/M4-slide-ppt-template-system.md` | LibrePresenter can create and present native slides and import PPTX into that model. |
+| M4 | Implemented | `milestones/M4-slide-ppt-template-system.md` | PPTX is a media item with a PowerPoint-like workspace, page-level document model, and media projection integration. |
 | M5 | Implemented | `milestones/M5-bible-professional-workflow.md` | Existing Bible tools become a live scripture workflow integrated with cues and templates. |
 | M6 | Implemented | `milestones/M6-professional-media-playback.md` | Image, PDF, and video playback are production-grade and reusable across features. |
 | M7 | Implemented | `milestones/M7-soundboard-midi.md` | Soundboard with mouse-first operation and optional MIDI support. |
