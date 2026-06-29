@@ -968,13 +968,13 @@ export default function PresentationWorkspacePage(): React.JSX.Element {
 
   return (
     <div className="flex h-full flex-col bg-background text-foreground">
-      <div className="relative flex h-10 shrink-0 items-end gap-1 bg-background px-4">
+      <div className="relative flex h-10 shrink-0 items-end bg-background px-4">
         {RIBBON_TABS.map((tab) => (
           <button
             key={tab}
             type="button"
             aria-selected={activeRibbon === tab}
-            className={`h-9 w-20 rounded-t-lg text-sm transition-colors ${
+            className={`h-9 w-14 rounded-t-lg text-sm transition-colors ${
               activeRibbon === tab
                 ? 'bg-content1 text-foreground'
                 : 'text-default-500 hover:bg-content1/60 hover:text-foreground'
@@ -985,8 +985,8 @@ export default function PresentationWorkspacePage(): React.JSX.Element {
           </button>
         ))}
         <span
-          className="pointer-events-none absolute bottom-0 left-8 z-10 h-1 w-12 rounded-full bg-[#0ea5e9] transition-transform duration-200 ease-out"
-          style={{ transform: `translateX(${activeRibbonIndex * 84}px)` }}
+          className="pointer-events-none absolute bottom-0 left-4 z-10 h-1 w-14 bg-[#0ea5e9] transition-transform duration-200 ease-out"
+          style={{ transform: `translateX(${activeRibbonIndex * 56}px)` }}
         />
       </div>
 
