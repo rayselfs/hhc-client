@@ -4,16 +4,22 @@ import { getDerivedAsset, resetMediaWorkDBForTests } from '../media-work-db'
 import { resetThumbnailDBForTests } from '../thumbnail-db'
 import {
   EDITABLE_PRESENTATION_DOCUMENT_KIND,
+  addBlankEditableSlide,
   addElementToSlide,
+  applySlideBackgroundToAllSlides,
   createBlankEditablePresentationDocument,
   createEditablePresentation,
   createTextElement,
   duplicateEditableSlide,
   duplicateElementInSlide,
+  generateEditablePresentationThumbnail,
   getEditablePresentationDocumentVariant,
+  getSlideBackgroundCss,
   loadEditablePresentation,
   moveEditableSlide,
-  removeElementFromSlide
+  removeElementFromSlide,
+  resetSlideBackground,
+  updateSlideBackground
 } from '../editable-presentation'
 import { EDITABLE_PRESENTATION_MIME_TYPE } from '../presentation-media'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
@@ -44,7 +50,113 @@ describe('editable presentation documents', () => {
     expect(document.name).toBe('Sunday')
     expect(document.width).toBe(1920)
     expect(document.height).toBe(1080)
+    expect(document.slides[slideId].background).toEqual({
+      type: 'solid',
+      color: '#ffffff',
+      transparency: 0
+    })
     expect(document.slides[slideId].elementOrder).toEqual([])
+  })
+
+  it('adds blank slides with the same white default background', () => {
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const updated = addBlankEditableSlide(document)
+    const slideId = updated.slideOrder[1]
+
+    expect(updated.slides[slideId].background).toEqual({
+      type: 'solid',
+      color: '#ffffff',
+      transparency: 0
+    })
+  })
+
+  it('renders solid fill transparency against the white slide base', () => {
+    expect(
+      getSlideBackgroundCss({
+        type: 'solid',
+        color: '#800000',
+        transparency: 50
+      })
+    ).toBe('#c08080')
+  })
+
+  it('updates, resets, and applies slide backgrounds with native-like fill controls', () => {
+    const document = addBlankEditableSlide(createBlankEditablePresentationDocument('Sunday'))
+    const firstSlideId = document.slideOrder[0]
+    const secondSlideId = document.slideOrder[1]
+    const withGradient = updateSlideBackground(document, firstSlideId, {
+      type: 'gradient',
+      gradientType: 'linear',
+      direction: 'diagonal',
+      angle: 45,
+      stops: [
+        { color: '#111827', position: 0, transparency: 10, brightness: -5 },
+        { color: '#2563eb', position: 100, transparency: 20, brightness: 15 }
+      ]
+    })
+    const applied = applySlideBackgroundToAllSlides(
+      withGradient,
+      withGradient.slides[firstSlideId].background
+    )
+    const reset = resetSlideBackground(applied, firstSlideId)
+
+    expect(applied.slides[secondSlideId].background).toEqual({
+      type: 'gradient',
+      gradientType: 'linear',
+      direction: 'diagonal',
+      angle: 45,
+      stops: [
+        { color: '#111827', position: 0, transparency: 10, brightness: -5 },
+        { color: '#2563eb', position: 100, transparency: 20, brightness: 15 }
+      ]
+    })
+    expect(reset.slides[firstSlideId].background).toEqual(applied.slides[firstSlideId].background)
+    expect(reset.slides[secondSlideId].background).toEqual(applied.slides[secondSlideId].background)
+  })
+
+  it('uses the applied-all background as the default for new slides', () => {
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const firstSlideId = document.slideOrder[0]
+    const withBackground = updateSlideBackground(document, firstSlideId, {
+      type: 'solid',
+      color: '#800000',
+      transparency: 25
+    })
+    const applied = applySlideBackgroundToAllSlides(
+      withBackground,
+      withBackground.slides[firstSlideId].background
+    )
+    const withNewSlide = addBlankEditableSlide(applied)
+    const newSlideId = withNewSlide.slideOrder[1]
+
+    expect(withNewSlide.slides[newSlideId].background).toEqual({
+      type: 'solid',
+      color: '#800000',
+      transparency: 25
+    })
+  })
+
+  it('renders gradient backgrounds in generated thumbnails against the white slide base', () => {
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const slideId = document.slideOrder[0]
+    const updated = updateSlideBackground(document, slideId, {
+      type: 'gradient',
+      gradientType: 'linear',
+      direction: 'top-bottom',
+      angle: 180,
+      stops: [
+        { color: '#ffffff', position: 0, transparency: 0, brightness: 0 },
+        { color: '#111827', position: 100, transparency: 50, brightness: 10 }
+      ]
+    })
+    const dataUrl = generateEditablePresentationThumbnail(updated)
+    const svg = decodeURIComponent(
+      escape(atob(dataUrl.replace(/^data:image\/svg\+xml;base64,/, '')))
+    )
+
+    expect(svg).toContain('<linearGradient')
+    expect(svg).toContain('stop-color="#94979e"')
+    expect(svg).not.toContain('stop-opacity=')
   })
 
   it('duplicates slides without reusing element ids', () => {

@@ -21,6 +21,7 @@ interface PresentationWorkspaceState {
   openDocument: (item: FileItemRecord) => void
   closeDocument: (itemId: string) => void
   setActiveDocument: (itemId: string) => void
+  updateDocumentName: (itemId: string, name: string) => void
   setActiveSlide: (itemId: string, slideIndex: number) => void
   setSlideCount: (itemId: string, slideCount: number) => void
   getActiveDocument: () => PresentationWorkspaceDocument | null
@@ -75,6 +76,13 @@ export const usePresentationWorkspaceStore = create<PresentationWorkspaceState>(
     }),
 
   setActiveDocument: (itemId) => set({ activeItemId: itemId }),
+
+  updateDocumentName: (itemId, name) =>
+    set((state) => ({
+      documents: state.documents.map((document) =>
+        document.itemId === itemId ? { ...document, name } : document
+      )
+    })),
 
   setActiveSlide: (itemId, slideIndex) =>
     set((state) => ({

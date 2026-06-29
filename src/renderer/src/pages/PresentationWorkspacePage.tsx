@@ -2,39 +2,46 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
-  ChevronLeft,
-  ChevronRight,
   Circle,
   FileText,
   ImagePlus,
   Minus,
   Palette,
-  Play,
   Plus,
   Redo2,
   Square,
   Type,
-  Undo2
+  Undo2,
+  X
 } from 'lucide-react'
 import { Button } from '@heroui/react/button'
 import { Spinner } from '@heroui/react/spinner'
 import { toast } from '@heroui/react/toast'
 import EditableSlideSurface from '@renderer/components/Common/EditableSlideSurface'
+import { useContextMenu } from '@renderer/contexts/ContextMenuContext'
 import {
   addBlankEditableSlide,
   addElementToSlide,
+  applySlideBackgroundToAllSlides,
   createLineElement,
   createShapeElement,
   createTextElement,
+  DEFAULT_GRADIENT_BACKGROUND,
   duplicateEditableSlide,
+  getSlideBackgroundPrimaryColor,
   loadEditablePresentation,
+  normalizeSlideBackground,
   removeElementFromSlide,
   removeEditableSlide,
+  resetSlideBackground,
   saveEditablePresentation,
   updateElementInSlide,
+  updateSlideBackground,
+  type EditableGradientDirection,
   type EditableImageElement,
   type EditablePresentationDocument,
   type EditablePresentationElement,
+  type EditableSlideBackground,
   type EditableTextAlign
 } from '@renderer/lib/editable-presentation'
 import { openFileExplorerDB } from '@renderer/lib/file-explorer-db'
@@ -42,13 +49,11 @@ import { ensurePresentationPageDocument } from '@renderer/lib/presentation-page-
 import { readPresentationArrayBuffer } from '@renderer/lib/presentation-source'
 import { openPptxViewer, type PptxViewerHandle } from '@renderer/lib/pptx-renderer-service'
 import { isPresentationItem } from '@renderer/lib/presentation-media'
-import { startMediaProjection } from '@renderer/lib/projection-actions'
 import {
   usePresentationWorkspaceStore,
   type PresentationWorkspaceDocument
 } from '@renderer/stores/presentation-workspace'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
-import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 import { isFileItem } from '@shared/types/folder'
 import type { SlideHandle } from '@aiden0z/pptx-renderer'
 
@@ -58,6 +63,9 @@ type RibbonTab = 'home' | 'insert' | 'design'
 const FONT_FAMILIES = ['Inter Variable', 'Noto Sans TC Variable', 'Noto Sans SC Variable', 'Arial']
 const FONT_SIZES = [12, 14, 16, 18, 24, 32, 44, 56, 72, 96]
 const RIBBON_TABS: RibbonTab[] = ['home', 'insert', 'design']
+const NATIVE_CONTROL_CLASS =
+  'presentation-native-control rounded-lg border border-divider bg-content2 px-3 text-sm text-foreground outline-none'
+const RANGE_CLASS = 'presentation-range w-full'
 
 function SlideThumbnail({
   viewer,
@@ -91,7 +99,7 @@ function SlideThumbnail({
     const container = containerRef.current
     container.innerHTML = ''
     const handle: SlideHandle | null = viewer.viewer.renderThumbnailToContainer(index, container, {
-      width: 112
+      width: 144
     })
     return () => {
       handle?.dispose()
@@ -101,29 +109,29 @@ function SlideThumbnail({
 
   return (
     <button
-      className={`flex w-full gap-3 rounded-xl border p-2 text-left transition-colors ${
-        active
-          ? 'border-primary bg-primary/10 text-foreground'
-          : 'border-transparent bg-content1/40 text-default-500 hover:bg-content2'
-      }`}
+      className="flex w-full gap-2 rounded-xl px-1 py-2 text-left text-default-500 transition-colors hover:bg-content2"
       onClick={onSelect}
     >
-      <span className="w-6 pt-1 text-right text-xs tabular-nums">{index + 1}</span>
+      <span
+        className={
+          active
+            ? 'w-4 pt-1 text-right text-xs tabular-nums text-foreground'
+            : 'w-4 pt-1 text-right text-xs tabular-nums'
+        }
+      >
+        {index + 1}
+      </span>
       <span
         ref={containerRef}
-        className="flex h-16 w-28 items-center justify-center overflow-hidden rounded-md bg-white shadow-sm"
+        className={`flex h-[81px] w-36 items-center justify-center overflow-hidden border bg-white shadow-sm ${
+          active ? 'border-primary ring-2 ring-primary/40' : 'border-transparent'
+        }`}
       />
     </button>
   )
 }
 
-function PptxDocumentView({
-  deck,
-  onPresent
-}: {
-  deck: PresentationWorkspaceDocument
-  onPresent: () => void
-}): React.JSX.Element {
+function PptxDocumentView({ deck }: { deck: PresentationWorkspaceDocument }): React.JSX.Element {
   const { t } = useTranslation()
   const setSlideCount = usePresentationWorkspaceStore((state) => state.setSlideCount)
   const setActiveSlide = usePresentationWorkspaceStore((state) => state.setActiveSlide)
@@ -200,15 +208,10 @@ function PptxDocumentView({
     () => Array.from({ length: viewer?.slideCount ?? deck.slideCount ?? 0 }, (_, index) => index),
     [deck.slideCount, viewer?.slideCount]
   )
-  const canGoPrev = activeSlide > 0
-  const canGoNext = activeSlide < slideIndexes.length - 1
 
   return (
     <div className="grid min-h-0 flex-1 grid-cols-[220px_minmax(0,1fr)] bg-background">
-      <aside className="min-h-0 overflow-y-auto border-r border-divider bg-content1/40 p-3">
-        <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-default-400">
-          {t('presentationWorkspace.slides')}
-        </div>
+      <aside className="min-h-0 overflow-y-auto border-r border-divider bg-content1/40 px-2 py-3">
         <div className="space-y-2">
           {viewer &&
             slideIndexes.map((index) => (
@@ -243,44 +246,6 @@ function PptxDocumentView({
             )}
           </div>
         </div>
-        <div className="grid h-14 grid-cols-[1fr_auto_1fr] items-center border-t border-divider bg-content1/70 px-4">
-          <span />
-          <div className="flex items-center justify-center gap-3">
-            <Button
-              isIconOnly
-              size="sm"
-              variant="tertiary"
-              isDisabled={!canGoPrev}
-              onPress={() => setActiveSlide(deck.itemId, activeSlide - 1)}
-              aria-label={t('presentationWorkspace.previousSlide')}
-            >
-              <ChevronLeft size={18} />
-            </Button>
-            <span className="min-w-24 text-center text-sm tabular-nums text-default-500">
-              {slideIndexes.length === 0 ? '0 / 0' : `${activeSlide + 1} / ${slideIndexes.length}`}
-            </span>
-            <Button
-              isIconOnly
-              size="sm"
-              variant="tertiary"
-              isDisabled={!canGoNext}
-              onPress={() => setActiveSlide(deck.itemId, activeSlide + 1)}
-              aria-label={t('presentationWorkspace.nextSlide')}
-            >
-              <ChevronRight size={18} />
-            </Button>
-          </div>
-          <div className="flex justify-end">
-            <Button
-              isIconOnly
-              variant="primary"
-              onPress={onPresent}
-              aria-label={t('presentationWorkspace.present')}
-            >
-              <Play size={18} />
-            </Button>
-          </div>
-        </div>
       </main>
     </div>
   )
@@ -289,15 +254,14 @@ function PptxDocumentView({
 function EditableDocumentView({
   deck,
   activeRibbon,
-  isRibbonOpen,
-  onPresent
+  isRibbonOpen
 }: {
   deck: PresentationWorkspaceDocument
   activeRibbon: RibbonTab
   isRibbonOpen: boolean
-  onPresent: () => void
 }): React.JSX.Element {
   const { t } = useTranslation()
+  const { showMenu } = useContextMenu()
   const setSlideCount = usePresentationWorkspaceStore((state) => state.setSlideCount)
   const setActiveSlide = usePresentationWorkspaceStore((state) => state.setActiveSlide)
   const activeSlideIndex = usePresentationWorkspaceStore((state) =>
@@ -311,6 +275,7 @@ function EditableDocumentView({
   const [copiedElement, setCopiedElement] = useState<EditablePresentationElement | null>(null)
   const [copiedSlideId, setCopiedSlideId] = useState<string | null>(null)
   const [insertionIndex, setInsertionIndex] = useState<number | null>(null)
+  const [isBackgroundPanelOpen, setIsBackgroundPanelOpen] = useState(false)
   const [status, setStatus] = useState<LoadStatus>('loading')
   const [error, setError] = useState<string | null>(null)
 
@@ -364,19 +329,19 @@ function EditableDocumentView({
     commitDocument(updateElementInSlide(document, activeSlideId, selectedElementId, updates))
   }
 
-  const updateActiveSlideBackground = (color: string): void => {
-    if (!document || !activeSlideId || !activeSlide) return
-    commitDocument({
-      ...document,
-      slides: {
-        ...document.slides,
-        [activeSlideId]: {
-          ...activeSlide,
-          background: { type: 'color', color }
-        }
-      },
-      updatedAt: Date.now()
-    })
+  const setActiveSlideBackground = (background: EditableSlideBackground): void => {
+    if (!document || !activeSlideId) return
+    commitDocument(updateSlideBackground(document, activeSlideId, background))
+  }
+
+  const applyActiveBackgroundToAllSlides = (): void => {
+    if (!document || !activeSlide) return
+    commitDocument(applySlideBackgroundToAllSlides(document, activeSlide.background))
+  }
+
+  const resetActiveSlideBackground = (): void => {
+    if (!document || !activeSlideId) return
+    commitDocument(resetSlideBackground(document, activeSlideId))
   }
 
   const addElement = (element: EditablePresentationElement): void => {
@@ -391,6 +356,20 @@ function EditableDocumentView({
     commitDocument(nextDocument)
     setActiveSlide(deck.itemId, nextDocument.slideOrder.length - 1)
     setSelectedElementId(null)
+  }
+
+  const showSlideSidebarMenu = (event: React.MouseEvent): void => {
+    showMenu(
+      [
+        {
+          id: 'new-slide',
+          label: t('presentationWorkspace.newSlide'),
+          icon: <Plus size={16} />,
+          onAction: addSlide
+        }
+      ],
+      event
+    )
   }
 
   const duplicateSlideAt = (sourceSlideId: string, targetIndex: number): void => {
@@ -544,20 +523,19 @@ function EditableDocumentView({
     if (activeRibbon === 'design') {
       return (
         <div className="flex h-16 items-center gap-3 border-b border-divider bg-content1/80 px-4 text-sm">
-          <label className="flex items-center gap-2 text-default-500">
+          <Button
+            size="sm"
+            variant={isBackgroundPanelOpen ? 'primary' : 'tertiary'}
+            isDisabled={!activeSlide}
+            onPress={() => setIsBackgroundPanelOpen(true)}
+          >
             <Palette size={16} />
-            <span>{t('presentationWorkspace.background', 'Background')}</span>
-            <input
-              className="h-8 w-10 rounded bg-transparent"
-              type="color"
-              value={activeSlide?.background.color ?? '#111827'}
-              onChange={(event) => updateActiveSlideBackground(event.currentTarget.value)}
-            />
-          </label>
+            {t('presentationWorkspace.formatBackground', 'Format Background')}
+          </Button>
           <label className="flex items-center gap-2 text-default-500">
             <span>{t('presentationWorkspace.slideSize', 'Slide Size')}</span>
             <select
-              className="h-9 rounded-lg bg-content2 px-3 text-sm text-foreground outline-none"
+              className={`h-9 ${NATIVE_CONTROL_CLASS}`}
               value={`${document?.width ?? 1920}:${document?.height ?? 1080}`}
               onChange={(event) => updateSlideSize(event.currentTarget.value)}
             >
@@ -579,7 +557,7 @@ function EditableDocumentView({
         </Button>
         <span className="mx-1 h-8 w-px bg-divider" />
         <select
-          className="h-9 w-44 rounded-lg bg-content2 px-3 text-sm text-foreground outline-none disabled:opacity-40"
+          className={`h-9 w-44 disabled:opacity-40 ${NATIVE_CONTROL_CLASS}`}
           disabled={!selectedTextElement}
           value={selectedTextElement?.fontFamily ?? FONT_FAMILIES[0]}
           onChange={(event) =>
@@ -595,7 +573,7 @@ function EditableDocumentView({
           ))}
         </select>
         <select
-          className="h-9 w-20 rounded-lg bg-content2 px-3 text-sm text-foreground outline-none disabled:opacity-40"
+          className={`h-9 w-20 disabled:opacity-40 ${NATIVE_CONTROL_CLASS}`}
           disabled={!selectedTextElement}
           value={selectedTextElement?.fontSize ?? 44}
           onChange={(event) =>
@@ -677,7 +655,7 @@ function EditableDocumentView({
             <label key={key} className="flex items-center gap-1 text-xs uppercase text-default-400">
               {key}
               <input
-                className="h-8 w-16 rounded-lg bg-content2 px-2 text-sm text-foreground outline-none"
+                className={`h-8 w-16 px-2 ${NATIVE_CONTROL_CLASS}`}
                 type="number"
                 value={Math.round(selectedElement[key])}
                 onChange={(event) => updateSelectedNumber(key, event.currentTarget.value)}
@@ -770,22 +748,17 @@ function EditableDocumentView({
       >
         {renderRibbon()}
       </div>
-      <div className="grid min-h-0 flex-1 grid-cols-[240px_minmax(0,1fr)]">
-        <aside className="min-h-0 overflow-y-auto border-r border-divider bg-content1/40 p-3">
-          <div className="mb-3 flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wide text-default-400">
-              {t('presentationWorkspace.slides')}
-            </span>
-            <Button
-              isIconOnly
-              size="sm"
-              variant="tertiary"
-              onPress={addSlide}
-              aria-label="Add slide"
-            >
-              <Plus size={16} />
-            </Button>
-          </div>
+      <div
+        className={`grid min-h-0 flex-1 ${
+          isBackgroundPanelOpen
+            ? 'grid-cols-[240px_minmax(0,1fr)_300px]'
+            : 'grid-cols-[240px_minmax(0,1fr)]'
+        }`}
+      >
+        <aside
+          className="min-h-0 overflow-y-auto border-r border-divider bg-content1/40 px-2 py-3"
+          onContextMenu={showSlideSidebarMenu}
+        >
           <div className="space-y-1">
             {document.slideOrder.map((slideId, index) => (
               <React.Fragment key={slideId}>
@@ -802,19 +775,29 @@ function EditableDocumentView({
                   />
                 </button>
                 <button
-                  className={`flex w-full gap-3 rounded-xl border p-2 text-left transition-colors ${
-                    index === activeSlideIndex
-                      ? 'border-primary bg-primary/10 text-foreground'
-                      : 'border-transparent bg-content1/40 text-default-500 hover:bg-content2'
-                  }`}
+                  className="flex w-full gap-2 rounded-xl px-1 py-2 text-left text-default-500 transition-colors hover:bg-content2"
                   onClick={() => {
                     setActiveSlide(deck.itemId, index)
                     setSelectedElementId(null)
                     setInsertionIndex(null)
                   }}
                 >
-                  <span className="w-6 pt-1 text-right text-xs tabular-nums">{index + 1}</span>
-                  <span className="flex h-[90px] w-40 overflow-hidden rounded-md bg-black shadow-sm">
+                  <span
+                    className={
+                      index === activeSlideIndex
+                        ? 'w-4 pt-1 text-right text-xs tabular-nums text-foreground'
+                        : 'w-4 pt-1 text-right text-xs tabular-nums'
+                    }
+                  >
+                    {index + 1}
+                  </span>
+                  <span
+                    className={`flex h-[99px] w-44 overflow-hidden border bg-black shadow-sm ${
+                      index === activeSlideIndex
+                        ? 'border-primary ring-2 ring-primary/40'
+                        : 'border-transparent'
+                    }`}
+                  >
                     <EditableSlideSurface
                       document={document}
                       slideId={slideId}
@@ -857,48 +840,344 @@ function EditableDocumentView({
               />
             </div>
           </div>
-          <div className="grid h-14 grid-cols-[1fr_auto_1fr] items-center border-t border-divider bg-content1/70 px-4">
-            <span />
-            <div className="flex items-center justify-center gap-3">
-              <Button
-                isIconOnly
-                size="sm"
-                variant="tertiary"
-                isDisabled={activeSlideIndex <= 0}
-                onPress={() => setActiveSlide(deck.itemId, activeSlideIndex - 1)}
-                aria-label={t('presentationWorkspace.previousSlide')}
-              >
-                <ChevronLeft size={18} />
-              </Button>
-              <span className="min-w-24 text-center text-sm tabular-nums text-default-500">
-                {activeSlideIndex + 1} / {document.slideOrder.length}
-              </span>
-              <Button
-                isIconOnly
-                size="sm"
-                variant="tertiary"
-                isDisabled={activeSlideIndex >= document.slideOrder.length - 1}
-                onPress={() => setActiveSlide(deck.itemId, activeSlideIndex + 1)}
-                aria-label={t('presentationWorkspace.nextSlide')}
-              >
-                <ChevronRight size={18} />
-              </Button>
-            </div>
-            <div className="flex justify-end">
-              <Button
-                isIconOnly
-                variant="primary"
-                onPress={onPresent}
-                aria-label={t('presentationWorkspace.present')}
-              >
-                <Play size={18} />
-              </Button>
-            </div>
-          </div>
         </main>
+        {isBackgroundPanelOpen && activeSlide && (
+          <FormatBackgroundPanel
+            background={activeSlide.background}
+            onChange={setActiveSlideBackground}
+            onApplyToAll={applyActiveBackgroundToAllSlides}
+            onReset={resetActiveSlideBackground}
+            onClose={() => setIsBackgroundPanelOpen(false)}
+          />
+        )}
       </div>
     </div>
   )
+}
+
+function FormatBackgroundPanel({
+  background,
+  onChange,
+  onApplyToAll,
+  onReset,
+  onClose
+}: {
+  background: EditableSlideBackground
+  onChange: (background: EditableSlideBackground) => void
+  onApplyToAll: () => void
+  onReset: () => void
+  onClose: () => void
+}): React.JSX.Element {
+  const { t } = useTranslation()
+  const [selectedStopIndex, setSelectedStopIndex] = useState(0)
+  const normalized = normalizeSlideBackground(background)
+  const isModernGradient = normalized.type === 'gradient' && 'stops' in normalized
+  const fillType = isModernGradient ? 'gradient' : 'solid'
+  const gradient = isModernGradient
+    ? normalized
+    : {
+        ...DEFAULT_GRADIENT_BACKGROUND,
+        stops: [
+          {
+            ...DEFAULT_GRADIENT_BACKGROUND.stops[0],
+            color: getSlideBackgroundPrimaryColor(normalized)
+          },
+          { ...DEFAULT_GRADIENT_BACKGROUND.stops[1] }
+        ]
+      }
+  const selectedStop = gradient.stops[Math.min(selectedStopIndex, gradient.stops.length - 1)]
+
+  const setFillType = (type: 'solid' | 'gradient'): void => {
+    if (type === fillType) return
+    if (type === 'solid') {
+      onChange({
+        type: 'solid',
+        color: getSlideBackgroundPrimaryColor(normalized),
+        transparency: 0
+      })
+      return
+    }
+    onChange({
+      ...DEFAULT_GRADIENT_BACKGROUND,
+      stops: [
+        {
+          ...DEFAULT_GRADIENT_BACKGROUND.stops[0],
+          color: getSlideBackgroundPrimaryColor(normalized)
+        },
+        { ...DEFAULT_GRADIENT_BACKGROUND.stops[1] }
+      ]
+    })
+    setSelectedStopIndex(0)
+  }
+
+  const updateSolid = (
+    updates: Partial<Extract<EditableSlideBackground, { type: 'solid' }>>
+  ): void => {
+    const solid =
+      normalized.type === 'solid'
+        ? normalized
+        : {
+            type: 'solid' as const,
+            color: getSlideBackgroundPrimaryColor(normalized),
+            transparency: 0
+          }
+    onChange({ ...solid, ...updates })
+  }
+
+  const updateGradient = (
+    updates: Partial<Extract<EditableSlideBackground, { type: 'gradient'; stops: unknown[] }>>
+  ): void => {
+    onChange({ ...gradient, ...updates })
+  }
+
+  const updateSelectedStop = (updates: Partial<(typeof gradient.stops)[number]>): void => {
+    const stops = gradient.stops.map((stop, index) =>
+      index === selectedStopIndex ? { ...stop, ...updates } : stop
+    )
+    updateGradient({ stops })
+  }
+
+  const addGradientStop = (): void => {
+    const nextStop = { color: '#ffffff', position: 50, transparency: 0, brightness: 0 }
+    const stops = [...gradient.stops, nextStop].sort((a, b) => a.position - b.position)
+    updateGradient({ stops })
+    setSelectedStopIndex(stops.indexOf(nextStop))
+  }
+
+  const removeSelectedStop = (): void => {
+    if (gradient.stops.length <= 2) return
+    const stops = gradient.stops.filter((_stop, index) => index !== selectedStopIndex)
+    updateGradient({ stops })
+    setSelectedStopIndex(Math.max(0, selectedStopIndex - 1))
+  }
+
+  return (
+    <aside className="flex min-h-0 flex-col border-l border-divider bg-content1/80">
+      <div className="flex items-center justify-between border-b border-divider px-4 py-3">
+        <h2 className="text-sm font-semibold text-foreground">
+          {t('presentationWorkspace.formatBackground', 'Format Background')}
+        </h2>
+        <Button
+          isIconOnly
+          size="sm"
+          variant="ghost"
+          onPress={onClose}
+          aria-label={t('common.close')}
+        >
+          <X size={16} />
+        </Button>
+      </div>
+
+      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-4">
+        <div role="radiogroup" className="space-y-2 text-sm text-default-500">
+          {(['solid', 'gradient'] as const).map((type) => (
+            <label
+              key={type}
+              className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-content2"
+            >
+              <input
+                type="radio"
+                name="presentation-background-fill"
+                checked={fillType === type}
+                onChange={() => setFillType(type)}
+              />
+              {type === 'solid'
+                ? t('presentationWorkspace.solidFill', 'Solid fill')
+                : t('presentationWorkspace.gradientFill', 'Gradient fill')}
+            </label>
+          ))}
+        </div>
+
+        {fillType === 'solid' ? (
+          <div className="space-y-4 text-sm text-default-500">
+            <label className="flex items-center justify-between gap-3">
+              <span>{t('presentationWorkspace.fillColor', 'Color')}</span>
+              <input
+                className="h-9 w-14 rounded bg-transparent"
+                type="color"
+                value={
+                  normalized.type === 'solid'
+                    ? normalized.color
+                    : getSlideBackgroundPrimaryColor(normalized)
+                }
+                onChange={(event) => updateSolid({ color: event.currentTarget.value })}
+              />
+            </label>
+            <ControlSlider
+              label={t('presentationWorkspace.transparency', 'Transparency')}
+              value={normalized.type === 'solid' ? normalized.transparency : 0}
+              min={0}
+              max={100}
+              suffix="%"
+              onChange={(value) => updateSolid({ transparency: value })}
+            />
+          </div>
+        ) : (
+          <div className="space-y-4 text-sm text-default-500">
+            <label className="block">
+              <span>{t('presentationWorkspace.gradientType', 'Type')}</span>
+              <select className={`mt-2 h-9 w-full ${NATIVE_CONTROL_CLASS}`} value="linear" disabled>
+                <option value="linear">Linear</option>
+              </select>
+            </label>
+            <label className="block">
+              <span>{t('presentationWorkspace.gradientDirection', 'Direction')}</span>
+              <select
+                className={`mt-2 h-9 w-full ${NATIVE_CONTROL_CLASS}`}
+                value={gradient.direction}
+                onChange={(event) =>
+                  updateGradient({
+                    direction: event.currentTarget.value as EditableGradientDirection,
+                    angle: getAngleForDirection(
+                      event.currentTarget.value as EditableGradientDirection
+                    )
+                  })
+                }
+              >
+                <option value="left-right">
+                  {t('presentationWorkspace.gradientLeftRight', 'Left to right')}
+                </option>
+                <option value="top-bottom">
+                  {t('presentationWorkspace.gradientTopBottom', 'Top to bottom')}
+                </option>
+                <option value="diagonal">
+                  {t('presentationWorkspace.gradientDiagonal', 'Diagonal')}
+                </option>
+              </select>
+            </label>
+            <ControlSlider
+              label={t('presentationWorkspace.gradientAngle', 'Angle')}
+              value={gradient.angle}
+              min={0}
+              max={360}
+              suffix="°"
+              onChange={(value) => updateGradient({ angle: value })}
+            />
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span>{t('presentationWorkspace.gradientStops', 'Gradient stops')}</span>
+                <div className="flex gap-1">
+                  <Button size="sm" variant="ghost" onPress={addGradientStop}>
+                    +
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    isDisabled={gradient.stops.length <= 2}
+                    onPress={removeSelectedStop}
+                  >
+                    -
+                  </Button>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                {gradient.stops.map((stop, index) => (
+                  <button
+                    key={`${stop.color}-${stop.position}-${index}`}
+                    type="button"
+                    className={`h-7 flex-1 rounded border ${
+                      selectedStopIndex === index ? 'border-primary' : 'border-divider'
+                    }`}
+                    style={{ backgroundColor: stop.color }}
+                    onClick={() => setSelectedStopIndex(index)}
+                    aria-label={`${t('presentationWorkspace.gradientStop', 'Gradient stop')} ${index + 1}`}
+                  />
+                ))}
+              </div>
+            </div>
+            {selectedStop && (
+              <div className="space-y-4 rounded-xl border border-divider bg-content2/50 p-3">
+                <label className="flex items-center justify-between gap-3">
+                  <span>{t('presentationWorkspace.fillColor', 'Color')}</span>
+                  <input
+                    className="h-9 w-14 rounded bg-transparent"
+                    type="color"
+                    value={selectedStop.color}
+                    onChange={(event) => updateSelectedStop({ color: event.currentTarget.value })}
+                  />
+                </label>
+                <ControlSlider
+                  label={t('presentationWorkspace.positionPercent', 'Position')}
+                  value={selectedStop.position}
+                  min={0}
+                  max={100}
+                  suffix="%"
+                  onChange={(value) => updateSelectedStop({ position: value })}
+                />
+                <ControlSlider
+                  label={t('presentationWorkspace.transparency', 'Transparency')}
+                  value={selectedStop.transparency}
+                  min={0}
+                  max={100}
+                  suffix="%"
+                  onChange={(value) => updateSelectedStop({ transparency: value })}
+                />
+                <ControlSlider
+                  label={t('presentationWorkspace.brightness', 'Brightness')}
+                  value={selectedStop.brightness}
+                  min={-100}
+                  max={100}
+                  suffix="%"
+                  onChange={(value) => updateSelectedStop({ brightness: value })}
+                />
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 border-t border-divider p-4">
+        <Button variant="primary" onPress={onApplyToAll}>
+          {t('presentationWorkspace.applyToAll', 'Apply to All')}
+        </Button>
+        <Button variant="tertiary" onPress={onReset}>
+          {t('presentationWorkspace.resetBackground', 'Reset Background')}
+        </Button>
+      </div>
+    </aside>
+  )
+}
+
+function ControlSlider({
+  label,
+  value,
+  min,
+  max,
+  suffix,
+  onChange
+}: {
+  label: string
+  value: number
+  min: number
+  max: number
+  suffix: string
+  onChange: (value: number) => void
+}): React.JSX.Element {
+  return (
+    <label className="block space-y-2">
+      <div className="flex items-center justify-between gap-3">
+        <span>{label}</span>
+        <span className="text-xs tabular-nums text-default-400">
+          {value}
+          {suffix}
+        </span>
+      </div>
+      <input
+        className={RANGE_CLASS}
+        type="range"
+        min={min}
+        max={max}
+        value={value}
+        onChange={(event) => onChange(Number(event.currentTarget.value))}
+      />
+    </label>
+  )
+}
+
+function getAngleForDirection(direction: EditableGradientDirection): number {
+  if (direction === 'left-right') return 90
+  if (direction === 'diagonal') return 135
+  return 180
 }
 
 function readFileAsDataUrl(file: File): Promise<string> {
@@ -936,26 +1215,6 @@ export default function PresentationWorkspacePage(): React.JSX.Element {
       cancelled = true
     }
   }, [itemId, openDocument])
-
-  const handlePresentActiveDocument = async (): Promise<void> => {
-    if (!activeDocument) return
-    const db = await openFileExplorerDB()
-    const item = await db.get('folder-items', activeDocument.itemId)
-    if (!item || !isFileItem(item) || !isPresentationItem(item)) return
-    const slideIndex = usePresentationWorkspaceStore.getState().getActiveSlide(item.id)
-    const report = await startMediaProjection(
-      [item],
-      0,
-      { onNoProjectableFiles: () => toast.warning(t('fileExplorer.noProjectableFiles')) },
-      { prioritizeStartItem: true }
-    )
-    if (report.summary.ready > 0) {
-      useMediaProjectionStore.getState().setTypeState('presentation', {
-        slideIndex,
-        slideCount: activeDocument.slideCount
-      })
-    }
-  }
 
   const handleRibbonTabClick = (tab: RibbonTab): void => {
     if (tab === activeRibbon) {
@@ -996,13 +1255,9 @@ export default function PresentationWorkspacePage(): React.JSX.Element {
             deck={activeDocument}
             activeRibbon={activeRibbon}
             isRibbonOpen={isRibbonOpen}
-            onPresent={() => void handlePresentActiveDocument()}
           />
         ) : (
-          <PptxDocumentView
-            deck={activeDocument}
-            onPresent={() => void handlePresentActiveDocument()}
-          />
+          <PptxDocumentView deck={activeDocument} />
         )
       ) : (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">

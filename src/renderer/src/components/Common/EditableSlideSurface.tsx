@@ -4,6 +4,10 @@ import type {
   EditablePresentationElement,
   EditablePresentationSlide
 } from '@renderer/lib/editable-presentation'
+import {
+  getSlideBackgroundCss,
+  getSlideBackgroundPrimaryColor
+} from '@renderer/lib/editable-presentation'
 
 interface EditableSlideSurfaceProps {
   document: EditablePresentationDocument
@@ -69,7 +73,7 @@ export default function EditableSlideSurface({
     return <div className={`h-full w-full bg-black ${className ?? ''}`} />
   }
 
-  const borderColor = getReadableBorderColor(slide.background.color)
+  const borderColor = getReadableBorderColor(getSlideBackgroundPrimaryColor(slide.background))
 
   const startDrag = (
     event: React.PointerEvent,
@@ -128,7 +132,7 @@ export default function EditableSlideSurface({
       ref={surfaceRef}
       className={`relative aspect-video w-full overflow-hidden bg-black ${className ?? ''}`}
       style={{
-        background: slide.background.type === 'color' ? slide.background.color : undefined,
+        background: getSlideBackgroundCss(slide.background),
         aspectRatio: `${document.width} / ${document.height}`,
         border: showBorder ? `1px solid ${borderColor}` : undefined
       }}

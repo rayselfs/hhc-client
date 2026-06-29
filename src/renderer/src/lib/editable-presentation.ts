@@ -15,6 +15,27 @@ export const EDITABLE_PRESENTATION_DOCUMENT_KIND = 'editable-presentation-docume
 export type EditablePresentationElementType = 'text' | 'image' | 'shape' | 'line' | 'locked'
 export type EditableTextAlign = 'left' | 'center' | 'right'
 export type EditableShapeKind = 'rectangle' | 'ellipse'
+export type EditableGradientDirection = 'left-right' | 'top-bottom' | 'diagonal'
+export type EditableGradientType = 'linear'
+
+export interface EditableGradientStop {
+  color: string
+  position: number
+  transparency: number
+  brightness: number
+}
+
+export type EditableSlideBackground =
+  | { type: 'solid'; color: string; transparency: number }
+  | {
+      type: 'gradient'
+      gradientType: EditableGradientType
+      direction: EditableGradientDirection
+      angle: number
+      stops: EditableGradientStop[]
+    }
+  | { type: 'gradient'; from: string; to: string; direction: EditableGradientDirection }
+  | { type: 'color'; color: string }
 
 export interface EditablePresentationAsset {
   id: string
@@ -83,7 +104,7 @@ export type EditablePresentationElement =
 export interface EditablePresentationSlide {
   id: string
   name: string
-  background: { type: 'color'; color: string }
+  background: EditableSlideBackground
   elementOrder: string[]
   elements: Record<string, EditablePresentationElement>
   notes: string
@@ -96,6 +117,7 @@ export interface EditablePresentationDocument {
   sourceBlobId?: string
   width: number
   height: number
+  defaultSlideBackground?: EditableSlideBackground
   slideOrder: string[]
   slides: Record<string, EditablePresentationSlide>
   assets: Record<string, EditablePresentationAsset>
@@ -108,6 +130,139 @@ type EditablePresentationSource = Pick<FileItemRecord, 'id' | 'url' | 'name'>
 const DEFAULT_WIDTH = 1920
 const DEFAULT_HEIGHT = 1080
 const DEFAULT_FONT_FAMILY = 'Inter Variable'
+export const DEFAULT_SLIDE_BACKGROUND_COLOR = '#ffffff'
+const DEFAULT_FOREGROUND_COLOR = '#111827'
+
+export const DEFAULT_GRADIENT_BACKGROUND: Extract<
+  EditableSlideBackground,
+  { type: 'gradient'; stops: EditableGradientStop[] }
+> = {
+  type: 'gradient',
+  gradientType: 'linear',
+  direction: 'top-bottom',
+  angle: 180,
+  stops: [
+    { color: DEFAULT_SLIDE_BACKGROUND_COLOR, position: 0, transparency: 0, brightness: 0 },
+    { color: '#dbeafe', position: 100, transparency: 0, brightness: 0 }
+  ]
+}
+
+export function createDefaultSlideBackground(): EditableSlideBackground {
+  return { type: 'solid', color: DEFAULT_SLIDE_BACKGROUND_COLOR, transparency: 0 }
+}
+
+export function normalizeSlideBackground(
+  background: EditableSlideBackground | undefined
+): EditableSlideBackground {
+  if (!background) return createDefaultSlideBackground()
+  if (background.type === 'color')
+    return { type: 'solid', color: background.color, transparency: 0 }
+  if (background.type === 'solid')
+    return { ...background, transparency: background.transparency ?? 0 }
+  if ('from' in background) {
+    return {
+      type: 'gradient',
+      gradientType: 'linear',
+      direction: background.direction,
+      angle: getGradientAngleFromDirection(background.direction),
+      stops: [
+        { color: background.from, position: 0, transparency: 0, brightness: 0 },
+        { color: background.to, position: 100, transparency: 0, brightness: 0 }
+      ]
+    }
+  }
+  return background
+}
+
+export function cloneSlideBackground(background: EditableSlideBackground): EditableSlideBackground {
+  const normalized = normalizeSlideBackground(background)
+  if (normalized.type === 'gradient' && 'stops' in normalized) {
+    return { ...normalized, stops: normalized.stops.map((stop) => ({ ...stop })) }
+  }
+  if (normalized.type === 'solid') return { ...normalized }
+  return { ...normalized }
+}
+
+export function getGradientAngleFromDirection(direction: EditableGradientDirection): number {
+  return {
+    'left-right': 90,
+    'top-bottom': 180,
+    diagonal: 135
+  }[direction]
+}
+
+export function getSortedGradientStops(stops: EditableGradientStop[]): EditableGradientStop[] {
+  return [...stops]
+    .map((stop) => ({
+      color: stop.color,
+      position: clampPercentage(stop.position),
+      transparency: clampPercentage(stop.transparency),
+      brightness: Math.max(-100, Math.min(100, stop.brightness))
+    }))
+    .sort((a, b) => a.position - b.position)
+}
+
+function clampPercentage(value: number): number {
+  if (!Number.isFinite(value)) return 0
+  return Math.max(0, Math.min(100, value))
+}
+
+function colorWithTransparency(color: string, transparency: number): string {
+  const rgb = parseHexColor(color)
+  if (!rgb) return color
+  const opacity = 1 - clampPercentage(transparency) / 100
+  const blend = (value: number): number => Math.round(value * opacity + 255 * (1 - opacity))
+  return rgbToHex(blend(rgb.red), blend(rgb.green), blend(rgb.blue))
+}
+
+function applyBrightness(color: string, brightness: number): string {
+  const rgb = parseHexColor(color)
+  if (!rgb || brightness === 0) return color
+  const amount = Math.max(-100, Math.min(100, brightness)) / 100
+  const adjust = (value: number): number => {
+    const next = amount >= 0 ? value + (255 - value) * amount : value * (1 + amount)
+    return Math.round(Math.max(0, Math.min(255, next)))
+  }
+  return rgbToHex(adjust(rgb.red), adjust(rgb.green), adjust(rgb.blue))
+}
+
+function parseHexColor(color: string): { red: number; green: number; blue: number } | null {
+  const match = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(color.trim())
+  if (!match) return null
+  return {
+    red: parseInt(match[1], 16),
+    green: parseInt(match[2], 16),
+    blue: parseInt(match[3], 16)
+  }
+}
+
+function rgbToHex(red: number, green: number, blue: number): string {
+  return `#${[red, green, blue].map((value) => value.toString(16).padStart(2, '0')).join('')}`
+}
+
+export function getSlideBackgroundPrimaryColor(background: EditableSlideBackground): string {
+  const normalized = normalizeSlideBackground(background)
+  if (normalized.type !== 'gradient') return normalized.color
+  if ('stops' in normalized) return normalized.stops[0]?.color ?? '#ffffff'
+  return normalized.from
+}
+
+export function getSlideBackgroundCss(background: EditableSlideBackground): string {
+  const normalized = normalizeSlideBackground(background)
+  if (normalized.type !== 'gradient') {
+    if (normalized.type !== 'solid') return DEFAULT_SLIDE_BACKGROUND_COLOR
+    return colorWithTransparency(normalized.color, normalized.transparency)
+  }
+  const modern = 'stops' in normalized ? normalized : normalizeSlideBackground(normalized)
+  if (modern.type !== 'gradient' || !('stops' in modern)) return '#ffffff'
+  const stops = getSortedGradientStops(modern.stops)
+    .map(
+      (stop) =>
+        `${colorWithTransparency(applyBrightness(stop.color, stop.brightness), stop.transparency)} ${stop.position}%`
+    )
+    .join(', ')
+  return `linear-gradient(${modern.angle}deg, ${stops})`
+}
 
 export function getEditablePresentationDocumentVariant(itemId: string): string {
   return `document:${itemId}`
@@ -124,12 +279,13 @@ export function createBlankEditablePresentationDocument(
     name,
     width: DEFAULT_WIDTH,
     height: DEFAULT_HEIGHT,
+    defaultSlideBackground: createDefaultSlideBackground(),
     slideOrder: [slideId],
     slides: {
       [slideId]: {
         id: slideId,
         name: 'Slide 1',
-        background: { type: 'color', color: '#111827' },
+        background: createDefaultSlideBackground(),
         elementOrder: [],
         elements: {},
         notes: ''
@@ -159,7 +315,7 @@ export function createTextElement(
     bold: input.bold ?? false,
     italic: input.italic ?? false,
     underline: input.underline ?? false,
-    color: input.color ?? '#ffffff',
+    color: input.color ?? DEFAULT_FOREGROUND_COLOR,
     align: input.align ?? 'left',
     lineHeight: input.lineHeight ?? 1.15
   }
@@ -180,7 +336,7 @@ export function createShapeElement(
     rotation: input.rotation ?? 0,
     opacity: input.opacity ?? 1,
     fillColor: input.fillColor ?? '#2563eb',
-    strokeColor: input.strokeColor ?? '#ffffff',
+    strokeColor: input.strokeColor ?? DEFAULT_FOREGROUND_COLOR,
     strokeWidth: input.strokeWidth ?? 0
   }
 }
@@ -197,7 +353,7 @@ export function createLineElement(
     height: input.height ?? 0,
     rotation: input.rotation ?? 0,
     opacity: input.opacity ?? 1,
-    strokeColor: input.strokeColor ?? '#ffffff',
+    strokeColor: input.strokeColor ?? DEFAULT_FOREGROUND_COLOR,
     strokeWidth: input.strokeWidth ?? 4
   }
 }
@@ -345,6 +501,9 @@ export function addBlankEditableSlide(
   document: EditablePresentationDocument
 ): EditablePresentationDocument {
   const slideId = crypto.randomUUID()
+  const background = cloneSlideBackground(
+    document.defaultSlideBackground ?? createDefaultSlideBackground()
+  )
   return {
     ...document,
     slideOrder: [...document.slideOrder, slideId],
@@ -353,7 +512,7 @@ export function addBlankEditableSlide(
       [slideId]: {
         id: slideId,
         name: `Slide ${document.slideOrder.length + 1}`,
-        background: { type: 'color', color: '#111827' },
+        background,
         elementOrder: [],
         elements: {},
         notes: ''
@@ -361,6 +520,54 @@ export function addBlankEditableSlide(
     },
     updatedAt: Date.now()
   }
+}
+
+export function updateSlideBackground(
+  document: EditablePresentationDocument,
+  slideId: string,
+  background: EditableSlideBackground
+): EditablePresentationDocument {
+  const slide = document.slides[slideId]
+  if (!slide) return document
+  return {
+    ...document,
+    slides: {
+      ...document.slides,
+      [slideId]: {
+        ...slide,
+        background: cloneSlideBackground(background)
+      }
+    },
+    updatedAt: Date.now()
+  }
+}
+
+export function applySlideBackgroundToAllSlides(
+  document: EditablePresentationDocument,
+  background: EditableSlideBackground
+): EditablePresentationDocument {
+  const normalized = cloneSlideBackground(background)
+  const slides: Record<string, EditablePresentationSlide> = {}
+  for (const [slideId, slide] of Object.entries(document.slides)) {
+    slides[slideId] = { ...slide, background: cloneSlideBackground(normalized) }
+  }
+  return {
+    ...document,
+    defaultSlideBackground: cloneSlideBackground(normalized),
+    slides,
+    updatedAt: Date.now()
+  }
+}
+
+export function resetSlideBackground(
+  document: EditablePresentationDocument,
+  slideId: string
+): EditablePresentationDocument {
+  return updateSlideBackground(
+    document,
+    slideId,
+    document.defaultSlideBackground ?? createDefaultSlideBackground()
+  )
 }
 
 export function removeEditableSlide(
@@ -459,6 +666,7 @@ function convertPresentationData(
     sourceBlobId: getBlobId(source),
     width: presentation.width,
     height: presentation.height,
+    defaultSlideBackground: createDefaultSlideBackground(),
     slideOrder,
     slides,
     assets,
@@ -484,7 +692,7 @@ function convertSlide(
   }
 
   return {
-    background: { type: 'color', color: '#ffffff' },
+    background: createDefaultSlideBackground(),
     elementOrder,
     elements,
     notes: ''
@@ -795,8 +1003,38 @@ export function generateEditablePresentationThumbnail(
         .filter((element): element is EditablePresentationElement => Boolean(element))
     : []
   const body = elements.map(renderElementSvg).join('')
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${document.width}" height="${document.height}" viewBox="0 0 ${document.width} ${document.height}"><rect width="100%" height="100%" fill="${escapeXml(slide?.background.color ?? '#111827')}"/>${body}</svg>`
+  const background = renderBackgroundSvg(slide?.background)
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${document.width}" height="${document.height}" viewBox="0 0 ${document.width} ${document.height}">${background}${body}</svg>`
   return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`
+}
+
+function renderBackgroundSvg(background: EditableSlideBackground | undefined): string {
+  const normalized = normalizeSlideBackground(background)
+  if (normalized.type !== 'gradient') {
+    if (normalized.type !== 'solid') {
+      return `<rect width="100%" height="100%" fill="${DEFAULT_SLIDE_BACKGROUND_COLOR}"/>`
+    }
+    return `<rect width="100%" height="100%" fill="${escapeXml(colorWithTransparency(normalized.color, normalized.transparency))}"/>`
+  }
+  const modern = 'stops' in normalized ? normalized : normalizeSlideBackground(normalized)
+  if (modern.type !== 'gradient' || !('stops' in modern)) {
+    return `<rect width="100%" height="100%" fill="${DEFAULT_SLIDE_BACKGROUND_COLOR}"/>`
+  }
+
+  const coordinates = {
+    'left-right': { x1: '0%', y1: '0%', x2: '100%', y2: '0%' },
+    'top-bottom': { x1: '0%', y1: '0%', x2: '0%', y2: '100%' },
+    diagonal: { x1: '0%', y1: '0%', x2: '100%', y2: '100%' }
+  } satisfies Record<EditableGradientDirection, { x1: string; y1: string; x2: string; y2: string }>
+
+  const { x1, y1, x2, y2 } = coordinates[modern.direction]
+  const stops = getSortedGradientStops(modern.stops)
+    .map(
+      (stop) =>
+        `<stop offset="${stop.position}%" stop-color="${escapeXml(colorWithTransparency(applyBrightness(stop.color, stop.brightness), stop.transparency))}"/>`
+    )
+    .join('')
+  return `<defs><linearGradient id="slide-bg" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}">${stops}</linearGradient></defs><rect width="100%" height="100%" fill="url(#slide-bg)"/>`
 }
 
 function renderElementSvg(element: EditablePresentationElement): string {
@@ -841,6 +1079,15 @@ function parseEditablePresentation(value: string): EditablePresentationDocument 
   ) {
     throw new Error('Invalid editable presentation document')
   }
+  const slides: Record<string, EditablePresentationSlide> = {}
+  for (const [slideId, slide] of Object.entries(
+    parsed.slides as Record<string, EditablePresentationSlide>
+  )) {
+    slides[slideId] = {
+      ...slide,
+      background: normalizeSlideBackground(slide.background)
+    }
+  }
   return {
     id: parsed.id,
     name: parsed.name,
@@ -849,7 +1096,7 @@ function parseEditablePresentation(value: string): EditablePresentationDocument 
     width: parsed.width,
     height: parsed.height,
     slideOrder: parsed.slideOrder,
-    slides: parsed.slides as Record<string, EditablePresentationSlide>,
+    slides,
     assets: parsed.assets ?? {},
     createdAt: parsed.createdAt ?? Date.now(),
     updatedAt: parsed.updatedAt ?? Date.now()

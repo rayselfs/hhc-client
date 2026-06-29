@@ -63,6 +63,19 @@ describe('presentation workspace store', () => {
     })
   })
 
+  it('updates an opened presentation tab name', () => {
+    usePresentationWorkspaceStore
+      .getState()
+      .openDocument(makeEditablePresentationItem('deck-1', 'Sunday'))
+
+    usePresentationWorkspaceStore.getState().updateDocumentName('deck-1', 'Sunday Service')
+
+    expect(usePresentationWorkspaceStore.getState().documents[0]).toMatchObject({
+      itemId: 'deck-1',
+      name: 'Sunday Service'
+    })
+  })
+
   it('activates the nearest remaining tab when closing the active presentation', () => {
     const first = makePresentationItem('pptx-1', 'Sunday.pptx')
     const second = makePresentationItem('pptx-2', 'Sermon.pptx')

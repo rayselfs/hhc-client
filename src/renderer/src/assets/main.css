@@ -51,7 +51,6 @@
   --cursor-interactive: default;
 }
 
-
 .dark,
 [data-theme='dark'] {
   --warning: oklch(0.42 0.1006 79.22);
@@ -96,6 +95,19 @@
 .timer-digits {
   font-family: 'Roboto Variable', 'Roboto', sans-serif;
   font-weight: 300;
+}
+
+.presentation-native-control {
+  color-scheme: light dark;
+}
+
+.presentation-native-control option {
+  background: var(--content1);
+  color: var(--foreground);
+}
+
+.presentation-range {
+  accent-color: var(--accent);
 }
 
 @container (min-inline-size: 200px) {
