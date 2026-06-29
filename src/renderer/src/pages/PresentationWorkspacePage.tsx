@@ -57,6 +57,7 @@ type RibbonTab = 'home' | 'insert' | 'design'
 
 const FONT_FAMILIES = ['Inter Variable', 'Noto Sans TC Variable', 'Noto Sans SC Variable', 'Arial']
 const FONT_SIZES = [12, 14, 16, 18, 24, 32, 44, 56, 72, 96]
+const RIBBON_TABS: RibbonTab[] = ['home', 'insert', 'design']
 
 function SlideThumbnail({
   viewer,
@@ -272,7 +273,6 @@ function PptxDocumentView({
           <div className="flex justify-end">
             <Button
               isIconOnly
-              size="sm"
               variant="primary"
               onPress={onPresent}
               aria-label={t('presentationWorkspace.present')}
@@ -289,10 +289,12 @@ function PptxDocumentView({
 function EditableDocumentView({
   deck,
   activeRibbon,
+  isRibbonOpen,
   onPresent
 }: {
   deck: PresentationWorkspaceDocument
   activeRibbon: RibbonTab
+  isRibbonOpen: boolean
   onPresent: () => void
 }): React.JSX.Element {
   const { t } = useTranslation()
@@ -761,7 +763,13 @@ function EditableDocumentView({
           if (file) void addImage(file)
         }}
       />
-      {renderRibbon()}
+      <div
+        className={`shrink-0 overflow-hidden transition-[height,opacity] duration-200 ${
+          isRibbonOpen ? 'h-16 opacity-100' : 'h-0 opacity-0'
+        }`}
+      >
+        {renderRibbon()}
+      </div>
       <div className="grid min-h-0 flex-1 grid-cols-[240px_minmax(0,1fr)]">
         <aside className="min-h-0 overflow-y-auto border-r border-divider bg-content1/40 p-3">
           <div className="mb-3 flex items-center justify-between">
@@ -878,7 +886,6 @@ function EditableDocumentView({
             <div className="flex justify-end">
               <Button
                 isIconOnly
-                size="sm"
                 variant="primary"
                 onPress={onPresent}
                 aria-label={t('presentationWorkspace.present')}
@@ -909,6 +916,8 @@ export default function PresentationWorkspacePage(): React.JSX.Element {
   const openDocument = usePresentationWorkspaceStore((state) => state.openDocument)
   const activeDocument = usePresentationWorkspaceStore((state) => state.getActiveDocument())
   const [activeRibbon, setActiveRibbon] = useState<RibbonTab>('home')
+  const [isRibbonOpen, setIsRibbonOpen] = useState(true)
+  const activeRibbonIndex = RIBBON_TABS.indexOf(activeRibbon)
 
   useEffect(() => {
     if (!itemId) return
@@ -947,23 +956,36 @@ export default function PresentationWorkspacePage(): React.JSX.Element {
     }
   }
 
+  const handleRibbonTabClick = (tab: RibbonTab): void => {
+    if (tab === activeRibbon) {
+      setIsRibbonOpen((open) => !open)
+      return
+    }
+    setActiveRibbon(tab)
+    setIsRibbonOpen(true)
+  }
+
   return (
     <div className="flex h-full flex-col bg-background text-foreground">
-      <div className="flex h-10 shrink-0 items-end gap-1 border-b border-divider bg-background px-4">
-        {(['home', 'insert', 'design'] as const).map((tab) => (
+      <div className="relative flex h-10 shrink-0 items-end gap-1 bg-background px-4">
+        {RIBBON_TABS.map((tab) => (
           <button
             key={tab}
             type="button"
-            className={`h-9 rounded-t-lg px-4 text-sm transition-colors ${
+            className={`h-9 w-20 rounded-t-lg text-sm transition-colors ${
               activeRibbon === tab
                 ? 'bg-content1 text-foreground'
                 : 'text-default-500 hover:bg-content1/60 hover:text-foreground'
             }`}
-            onClick={() => setActiveRibbon(tab)}
+            onClick={() => handleRibbonTabClick(tab)}
           >
             {t(`presentationWorkspace.${tab}`)}
           </button>
         ))}
+        <span
+          className="absolute bottom-0 left-8 h-0.5 w-12 rounded-full bg-primary transition-transform duration-200"
+          style={{ transform: `translateX(${activeRibbonIndex * 84}px)` }}
+        />
       </div>
 
       {activeDocument ? (
@@ -971,6 +993,7 @@ export default function PresentationWorkspacePage(): React.JSX.Element {
           <EditableDocumentView
             deck={activeDocument}
             activeRibbon={activeRibbon}
+            isRibbonOpen={isRibbonOpen}
             onPresent={() => void handlePresentActiveDocument()}
           />
         ) : (

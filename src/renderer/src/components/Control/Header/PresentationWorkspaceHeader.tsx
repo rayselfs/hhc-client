@@ -28,8 +28,7 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
     <header className="flex h-12 shrink-0 items-end gap-1 border-b border-divider bg-content1/80 px-3">
       <Button
         isIconOnly
-        size="sm"
-        variant="tertiary"
+        variant="ghost"
         className="mb-1"
         onPress={() => navigate('/files')}
         aria-label={t('presentationWorkspace.backToFiles')}
