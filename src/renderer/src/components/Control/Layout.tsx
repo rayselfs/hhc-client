@@ -1,8 +1,9 @@
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import AppLoadingScreen from '@renderer/components/Control/AppLoadingScreen'
 import Sidebar from '@renderer/components/Control/Sidebar'
 import Header from '@renderer/components/Control/Header/Header'
+import PresentationWorkspaceHeader from '@renderer/components/Control/Header/PresentationWorkspaceHeader'
 import FloatingTimer from '@renderer/components/Control/Timer/FloatingTimer'
 import ConfirmDialog from '@renderer/components/Common/ConfirmDialog'
 import TimerProjectionBridge from '@renderer/components/Control/Bridge/TimerProjectionBridge'
@@ -23,6 +24,8 @@ import { useAutoUpdateCheck } from '@renderer/hooks/useAutoUpdateCheck'
 export default function Layout(): React.JSX.Element {
   const [initialized, setInitialized] = useState(false)
   const isPresentingMedia = useMediaProjectionStore((state) => state.isPresenting)
+  const location = useLocation()
+  const isPresentationWorkspace = location.pathname.startsWith('/presentations')
   useAutoUpdateCheck()
 
   useEffect(() => {
@@ -64,8 +67,14 @@ export default function Layout(): React.JSX.Element {
                 <div className="flex h-screen overflow-hidden bg-background text-foreground">
                   <Sidebar />
                   <div className="flex flex-1 flex-col min-h-0">
-                    <Header />
-                    <main className="flex-1 overflow-y-auto py-4 px-3">
+                    {isPresentationWorkspace ? <PresentationWorkspaceHeader /> : <Header />}
+                    <main
+                      className={
+                        isPresentationWorkspace
+                          ? 'flex-1 overflow-hidden'
+                          : 'flex-1 overflow-y-auto py-4 px-3'
+                      }
+                    >
                       <Outlet />
                     </main>
                   </div>

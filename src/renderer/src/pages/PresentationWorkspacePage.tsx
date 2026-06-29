@@ -6,7 +6,6 @@ import {
   ChevronRight,
   Circle,
   FileText,
-  FolderOpen,
   ImagePlus,
   Minus,
   Palette,
@@ -15,8 +14,7 @@ import {
   Redo2,
   Square,
   Type,
-  Undo2,
-  X
+  Undo2
 } from 'lucide-react'
 import { Button } from '@heroui/react/button'
 import { Spinner } from '@heroui/react/spinner'
@@ -43,7 +41,7 @@ import { openFileExplorerDB } from '@renderer/lib/file-explorer-db'
 import { ensurePresentationPageDocument } from '@renderer/lib/presentation-page-document'
 import { readPresentationArrayBuffer } from '@renderer/lib/presentation-source'
 import { openPptxViewer, type PptxViewerHandle } from '@renderer/lib/pptx-renderer-service'
-import { getPresentationWorkspacePath, isPresentationItem } from '@renderer/lib/presentation-media'
+import { isPresentationItem } from '@renderer/lib/presentation-media'
 import { startMediaProjection } from '@renderer/lib/projection-actions'
 import {
   usePresentationWorkspaceStore,
@@ -908,11 +906,7 @@ export default function PresentationWorkspacePage(): React.JSX.Element {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { itemId } = useParams()
-  const documents = usePresentationWorkspaceStore((state) => state.documents)
-  const activeItemId = usePresentationWorkspaceStore((state) => state.activeItemId)
   const openDocument = usePresentationWorkspaceStore((state) => state.openDocument)
-  const closeDocument = usePresentationWorkspaceStore((state) => state.closeDocument)
-  const setActiveDocument = usePresentationWorkspaceStore((state) => state.setActiveDocument)
   const activeDocument = usePresentationWorkspaceStore((state) => state.getActiveDocument())
   const [activeRibbon, setActiveRibbon] = useState<RibbonTab>('home')
 
@@ -932,17 +926,6 @@ export default function PresentationWorkspacePage(): React.JSX.Element {
       cancelled = true
     }
   }, [itemId, openDocument])
-
-  const handleActivate = (targetItemId: string): void => {
-    setActiveDocument(targetItemId)
-    navigate(getPresentationWorkspacePath(targetItemId))
-  }
-
-  const handleClose = (targetItemId: string): void => {
-    closeDocument(targetItemId)
-    const nextActiveItemId = usePresentationWorkspaceStore.getState().activeItemId
-    navigate(nextActiveItemId ? getPresentationWorkspacePath(nextActiveItemId) : '/files')
-  }
 
   const handlePresentActiveDocument = async (): Promise<void> => {
     if (!activeDocument) return
@@ -966,58 +949,6 @@ export default function PresentationWorkspacePage(): React.JSX.Element {
 
   return (
     <div className="flex h-full flex-col bg-background text-foreground">
-      <div className="flex h-12 shrink-0 items-end gap-1 border-b border-divider bg-content1/80 px-3">
-        <Button
-          isIconOnly
-          size="sm"
-          variant="tertiary"
-          className="mb-1"
-          onPress={() => navigate('/files')}
-          aria-label={t('presentationWorkspace.backToFiles')}
-        >
-          <FolderOpen size={18} />
-        </Button>
-        {documents.map((deck) => (
-          <div
-            key={deck.itemId}
-            role="button"
-            tabIndex={0}
-            className={`flex h-10 max-w-56 items-center gap-2 rounded-t-xl border px-3 text-sm ${
-              deck.itemId === activeItemId
-                ? 'border-divider border-b-background bg-background text-foreground'
-                : 'border-transparent bg-content2 text-default-500 hover:text-foreground'
-            }`}
-            onClick={() => handleActivate(deck.itemId)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault()
-                handleActivate(deck.itemId)
-              }
-            }}
-          >
-            <span className="truncate">{deck.name}</span>
-            <button
-              type="button"
-              className="rounded p-0.5 hover:bg-black/10"
-              onClick={(event) => {
-                event.stopPropagation()
-                handleClose(deck.itemId)
-              }}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault()
-                  event.stopPropagation()
-                  handleClose(deck.itemId)
-                }
-              }}
-              aria-label={t('presentationWorkspace.closeTab')}
-            >
-              <X size={14} />
-            </button>
-          </div>
-        ))}
-      </div>
-
       <div className="flex h-10 shrink-0 items-end gap-1 border-b border-divider bg-background px-4">
         {(['home', 'insert', 'design'] as const).map((tab) => (
           <button
