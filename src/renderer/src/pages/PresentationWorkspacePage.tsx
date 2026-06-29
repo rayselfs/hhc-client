@@ -843,11 +843,12 @@ function EditableDocumentView({
 
         <main className="flex min-h-0 flex-col bg-[#111217]">
           <div className="flex flex-1 items-center justify-center overflow-auto p-8">
-            <div className="w-full max-w-5xl rounded-2xl bg-black/30 p-4 shadow-2xl">
+            <div className="w-full max-w-5xl">
               <EditableSlideSurface
                 document={document}
                 slideId={activeSlideId}
                 editable
+                showBorder
                 selectedElementId={selectedElementId}
                 onSelectElement={setSelectedElementId}
                 onUpdateElement={(slideId, elementId, updates) =>

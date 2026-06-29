@@ -9,6 +9,7 @@ interface EditableSlideSurfaceProps {
   document: EditablePresentationDocument
   slideId: string
   editable?: boolean
+  showBorder?: boolean
   selectedElementId?: string | null
   className?: string
   onSelectElement?: (elementId: string | null) => void
@@ -31,6 +32,7 @@ export default function EditableSlideSurface({
   document,
   slideId,
   editable = false,
+  showBorder = false,
   selectedElementId = null,
   className,
   onSelectElement,
@@ -66,6 +68,8 @@ export default function EditableSlideSurface({
   if (!slide) {
     return <div className={`h-full w-full bg-black ${className ?? ''}`} />
   }
+
+  const borderColor = getReadableBorderColor(slide.background.color)
 
   const startDrag = (
     event: React.PointerEvent,
@@ -125,7 +129,8 @@ export default function EditableSlideSurface({
       className={`relative aspect-video w-full overflow-hidden bg-black ${className ?? ''}`}
       style={{
         background: slide.background.type === 'color' ? slide.background.color : undefined,
-        aspectRatio: `${document.width} / ${document.height}`
+        aspectRatio: `${document.width} / ${document.height}`,
+        border: showBorder ? `1px solid ${borderColor}` : undefined
       }}
       onPointerDown={() => editable && onSelectElement?.(null)}
     >
@@ -157,6 +162,16 @@ export default function EditableSlideSurface({
       </div>
     </div>
   )
+}
+
+function getReadableBorderColor(color: string): string {
+  const match = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(color.trim())
+  if (!match) return '#ffffff'
+  const red = parseInt(match[1], 16)
+  const green = parseInt(match[2], 16)
+  const blue = parseInt(match[3], 16)
+  const luminance = (0.2126 * red + 0.7152 * green + 0.0722 * blue) / 255
+  return luminance > 0.55 ? '#000000' : '#ffffff'
 }
 
 function SlideElement({
