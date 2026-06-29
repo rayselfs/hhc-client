@@ -80,6 +80,13 @@ describe('media capability registry', () => {
     ['slides.PDF', '', 'pdf', 'application/pdf', 'native'],
     ['photo.PNG', 'application/octet-stream', 'image', 'image/png', 'native'],
     ['movie.MP4', '', 'video', 'video/mp4', 'native'],
+    [
+      'slides.pptx',
+      '',
+      'presentation',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'native'
+    ],
     ['movie.mkv', '', 'video', 'video/x-matroska', 'native'],
     ['movie.mpg', '', 'unsupported', 'video/mpeg', 'unsupported'],
     ['movie.bin', 'video/unknown', 'unsupported', 'video/unknown', 'unsupported'],
@@ -111,7 +118,7 @@ describe('media capability registry', () => {
     expect(accept).toContain('.mp4')
     expect(accept).toContain('.mkv')
     expect(accept).not.toContain('.avi')
-    expect(accept).not.toContain('.pptx')
+    expect(accept).toContain('.pptx')
     expect(accept).not.toContain('.mpg')
   })
 
@@ -122,7 +129,7 @@ describe('media capability registry', () => {
     expect(accept).toContain('audio/*')
     expect(accept).toContain('.pdf')
     expect(accept).toContain('.mkv')
-    expect(accept).not.toContain('.pptx')
+    expect(accept).toContain('.pptx')
     expect(accept).not.toContain('.mpg')
   })
 })

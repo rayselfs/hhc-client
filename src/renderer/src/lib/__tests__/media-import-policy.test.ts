@@ -52,12 +52,16 @@ describe('classifyMediaImport', () => {
     })
   })
 
-  it('skips known formats that no platform supports', () => {
+  it('accepts PPTX as a presentation media item', () => {
     expect(classifyMediaImport({ name: 'slides.pptx' }, 'web')).toMatchObject({
-      action: 'skip',
-      reason: 'app-unsupported',
-      extension: 'pptx'
+      action: 'accept',
+      kind: 'presentation',
+      mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      support: 'native'
     })
+  })
+
+  it('skips known formats that no platform supports', () => {
     expect(classifyMediaImport({ name: 'legacy.mpg' }, 'electron')).toMatchObject({
       action: 'skip',
       reason: 'app-unsupported',

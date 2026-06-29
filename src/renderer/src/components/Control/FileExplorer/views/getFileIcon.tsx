@@ -1,4 +1,4 @@
-import { Image, Video, FileText, File, Folder } from 'lucide-react'
+import { Image, Video, FileText, File, Folder, Presentation } from 'lucide-react'
 import React from 'react'
 import { resolveMediaCapability } from '@renderer/lib/media-capabilities'
 
@@ -14,6 +14,7 @@ export function getFileIcon(
   const capability = resolveMediaCapability({ mimeType })
   if (capability?.kind === 'image') return <Image size={size} />
   if (capability?.kind === 'video') return <Video size={size} />
+  if (capability?.kind === 'presentation') return <Presentation size={size} />
   if (capability?.kind === 'pdf' || capability?.kind === 'document') {
     return <FileText size={size} />
   }

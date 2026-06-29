@@ -13,6 +13,7 @@ describe('isPresentable', () => {
     ['video/ogg', true],
     ['video/quicktime', true],
     ['application/pdf', true],
+    ['application/vnd.openxmlformats-officedocument.presentationml.presentation', false],
     ['video/x-matroska', true],
     ['text/plain', false],
     ['application/json', false],
@@ -34,6 +35,7 @@ describe('getMediaType', () => {
     ['video/mp4', 'video'],
     ['video/webm', 'video'],
     ['application/pdf', 'pdf'],
+    ['application/vnd.openxmlformats-officedocument.presentationml.presentation', null],
     ['text/plain', null],
     ['audio/mpeg', null]
   ] as const)('getMediaType(%s) → %s', (mime, expected) => {
