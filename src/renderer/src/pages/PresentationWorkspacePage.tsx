@@ -20,19 +20,19 @@ import { toast } from '@heroui/react/toast'
 import EditableSlideSurface from '@renderer/components/Common/EditableSlideSurface'
 import { useContextMenu } from '@renderer/contexts/ContextMenuContext'
 import {
-  addBlankEditableSlide,
   addElementToSlide,
   applySlideBackgroundToAllSlides,
   createLineElement,
   createShapeElement,
   createTextElement,
   DEFAULT_GRADIENT_BACKGROUND,
-  duplicateEditableSlide,
+  duplicateEditableSlides,
   getSlideBackgroundPrimaryColor,
+  insertBlankEditableSlide,
   loadEditablePresentation,
   normalizeSlideBackground,
   removeElementFromSlide,
-  removeEditableSlide,
+  removeEditableSlides,
   resetSlideBackground,
   saveEditablePresentation,
   updateElementInSlide,
@@ -273,7 +273,9 @@ function EditableDocumentView({
   const [future, setFuture] = useState<EditablePresentationDocument[]>([])
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null)
   const [copiedElement, setCopiedElement] = useState<EditablePresentationElement | null>(null)
-  const [copiedSlideId, setCopiedSlideId] = useState<string | null>(null)
+  const [copiedSlideIds, setCopiedSlideIds] = useState<string[]>([])
+  const [selectedSlideIds, setSelectedSlideIds] = useState<Set<string>>(() => new Set())
+  const [selectionAnchorIndex, setSelectionAnchorIndex] = useState(0)
   const [insertionIndex, setInsertionIndex] = useState<number | null>(null)
   const [isBackgroundPanelOpen, setIsBackgroundPanelOpen] = useState(false)
   const [status, setStatus] = useState<LoadStatus>('loading')
@@ -352,10 +354,53 @@ function EditableDocumentView({
 
   const addSlide = (): void => {
     if (!document) return
-    const nextDocument = addBlankEditableSlide(document)
-    commitDocument(nextDocument)
-    setActiveSlide(deck.itemId, nextDocument.slideOrder.length - 1)
+    const result = insertBlankEditableSlide(document, document.slideOrder.length)
+    commitDocument(result.document)
+    setActiveSlide(deck.itemId, result.document.slideOrder.indexOf(result.slideId))
+    setSelectedSlideIds(new Set([result.slideId]))
     setSelectedElementId(null)
+  }
+
+  const addSlideAfter = (index: number): void => {
+    if (!document) return
+    const result = insertBlankEditableSlide(document, index + 1)
+    commitDocument(result.document)
+    setActiveSlide(deck.itemId, index + 1)
+    setSelectedSlideIds(new Set([result.slideId]))
+    setSelectionAnchorIndex(index + 1)
+    setSelectedElementId(null)
+    setInsertionIndex(null)
+  }
+
+  const selectSlide = (index: number, event: React.MouseEvent | React.KeyboardEvent): void => {
+    if (!document) return
+    const slideId = document.slideOrder[index]
+    if (!slideId) return
+
+    if (event.shiftKey) {
+      const start = Math.min(selectionAnchorIndex, index)
+      const end = Math.max(selectionAnchorIndex, index)
+      setSelectedSlideIds(new Set(document.slideOrder.slice(start, end + 1)))
+    } else if (event.metaKey || event.ctrlKey) {
+      setSelectedSlideIds((current) => {
+        const next = new Set(current)
+        if (next.has(slideId)) {
+          next.delete(slideId)
+        } else {
+          next.add(slideId)
+        }
+        if (next.size === 0) next.add(slideId)
+        return next
+      })
+      setSelectionAnchorIndex(index)
+    } else {
+      setSelectedSlideIds(new Set([slideId]))
+      setSelectionAnchorIndex(index)
+    }
+
+    setActiveSlide(deck.itemId, index)
+    setSelectedElementId(null)
+    setInsertionIndex(null)
   }
 
   const showSlideSidebarMenu = (event: React.MouseEvent): void => {
@@ -372,37 +417,44 @@ function EditableDocumentView({
     )
   }
 
-  const duplicateSlideAt = (sourceSlideId: string, targetIndex: number): void => {
-    if (!document) return
-    const sourceIndex = document.slideOrder.indexOf(sourceSlideId)
-    if (sourceIndex === -1) return
-    const duplicated = duplicateEditableSlide(document, sourceSlideId)
-    const newSlideId = duplicated.slideOrder[sourceIndex + 1]
-    if (!newSlideId) return
-    const slideOrderWithoutNew = duplicated.slideOrder.filter((slideId) => slideId !== newSlideId)
-    const safeIndex = Math.max(0, Math.min(targetIndex, slideOrderWithoutNew.length))
-    const slideOrder = [
-      ...slideOrderWithoutNew.slice(0, safeIndex),
-      newSlideId,
-      ...slideOrderWithoutNew.slice(safeIndex)
-    ]
-    commitDocument({ ...duplicated, slideOrder, updatedAt: Date.now() })
-    setActiveSlide(deck.itemId, safeIndex)
-    setSelectedElementId(null)
+  const getSelectedSlideIds = (): string[] => {
+    if (!document) return []
+    const selected = document.slideOrder.filter((slideId) => selectedSlideIds.has(slideId))
+    if (selected.length > 0) return selected
+    return activeSlideId ? [activeSlideId] : []
   }
 
   const pasteSlide = (): void => {
-    if (!copiedSlideId || !document) return
-    duplicateSlideAt(copiedSlideId, insertionIndex ?? activeSlideIndex + 1)
+    if (copiedSlideIds.length === 0 || !document) return
+    const targetIndex = insertionIndex ?? activeSlideIndex + 1
+    const result = duplicateEditableSlides(document, copiedSlideIds, targetIndex)
+    if (result.slideIds.length === 0) return
+    commitDocument(result.document)
+    setSelectedSlideIds(new Set(result.slideIds))
+    setActiveSlide(deck.itemId, result.document.slideOrder.indexOf(result.slideIds[0]))
     setInsertionIndex(null)
+    setSelectedElementId(null)
+  }
+
+  const copySelectedSlides = (): void => {
+    const slideIds = getSelectedSlideIds()
+    if (slideIds.length === 0) return
+    setCopiedSlideIds(slideIds)
+    setCopiedElement(null)
   }
 
   const deleteSlide = (): void => {
-    if (!document || !activeSlideId || document.slideOrder.length <= 1) return
-    const nextIndex = Math.max(0, activeSlideIndex - 1)
-    commitDocument(removeEditableSlide(document, activeSlideId))
+    if (!document || document.slideOrder.length <= 1) return
+    const removingIds = getSelectedSlideIds()
+    if (removingIds.length === 0) return
+    const nextDocument = removeEditableSlides(document, removingIds)
+    const nextIndex = Math.min(activeSlideIndex, Math.max(0, nextDocument.slideOrder.length - 1))
+    const nextSlideId = nextDocument.slideOrder[nextIndex]
+    commitDocument(nextDocument)
     setActiveSlide(deck.itemId, nextIndex)
+    setSelectedSlideIds(nextSlideId ? new Set([nextSlideId]) : new Set())
     setSelectedElementId(null)
+    setInsertionIndex(null)
   }
 
   const deleteElement = (): void => {
@@ -677,14 +729,23 @@ function EditableDocumentView({
       if (isEditingText) return
 
       const command = event.metaKey || event.ctrlKey
+      const isSlideSidebar = Boolean(target?.closest('[data-slide-sidebar]'))
+      if (isSlideSidebar && command && event.key.toLowerCase() === 'a') {
+        event.preventDefault()
+        if (document) {
+          setSelectedSlideIds(new Set(document.slideOrder))
+          setCopiedElement(null)
+          setSelectedElementId(null)
+        }
+        return
+      }
       if (command && event.key.toLowerCase() === 'c') {
         event.preventDefault()
         if (selectedElement) {
           setCopiedElement(selectedElement)
-          setCopiedSlideId(null)
-        } else if (activeSlideId) {
-          setCopiedSlideId(activeSlideId)
-          setCopiedElement(null)
+          setCopiedSlideIds([])
+        } else {
+          copySelectedSlides()
         }
       }
       if (command && event.key.toLowerCase() === 'v') {
@@ -699,7 +760,7 @@ function EditableDocumentView({
         if (selectedElementId) {
           event.preventDefault()
           deleteElement()
-        } else if (document && document.slideOrder.length > 1) {
+        } else if (isSlideSidebar && document && document.slideOrder.length > 1) {
           event.preventDefault()
           deleteSlide()
         }
@@ -756,68 +817,77 @@ function EditableDocumentView({
         }`}
       >
         <aside
+          data-slide-sidebar
           className="min-h-0 overflow-y-auto border-r border-divider bg-content1/40 px-2 py-3"
           onContextMenu={showSlideSidebarMenu}
         >
           <div className="space-y-1">
-            {document.slideOrder.map((slideId, index) => (
-              <React.Fragment key={slideId}>
-                <button
-                  type="button"
-                  className="flex h-4 w-full items-center px-2"
-                  onClick={() => setInsertionIndex(index)}
-                  aria-label={`Insert before slide ${index + 1}`}
-                >
-                  <span
-                    className={`h-0.5 w-full rounded-full ${
-                      insertionIndex === index ? 'bg-primary' : 'bg-transparent hover:bg-primary/40'
-                    }`}
-                  />
-                </button>
-                <button
-                  className="flex w-full gap-2 rounded-xl px-1 py-2 text-left text-default-500 transition-colors hover:bg-content2"
-                  onClick={() => {
-                    setActiveSlide(deck.itemId, index)
-                    setSelectedElementId(null)
-                    setInsertionIndex(null)
-                  }}
-                >
-                  <span
-                    className={
-                      index === activeSlideIndex
-                        ? 'w-4 pt-1 text-right text-xs tabular-nums text-foreground'
-                        : 'w-4 pt-1 text-right text-xs tabular-nums'
-                    }
+            {document.slideOrder.map((slideId, index) => {
+              const isSelected =
+                selectedSlideIds.size === 0
+                  ? index === activeSlideIndex
+                  : selectedSlideIds.has(slideId)
+              return (
+                <React.Fragment key={slideId}>
+                  <button
+                    type="button"
+                    className="group flex h-4 w-full items-center px-2"
+                    onClick={() => setInsertionIndex(index)}
+                    aria-label={`Insert before slide ${index + 1}`}
                   >
-                    {index + 1}
-                  </span>
-                  <span
-                    className={`flex h-[99px] w-44 overflow-hidden border bg-black shadow-sm ${
-                      index === activeSlideIndex
-                        ? 'border-primary ring-2 ring-primary/40'
-                        : 'border-transparent'
-                    }`}
-                  >
-                    <EditableSlideSurface
-                      document={document}
-                      slideId={slideId}
-                      className="pointer-events-none"
+                    <span
+                      className={`h-0.5 w-full rounded-full ${
+                        insertionIndex === index
+                          ? 'animate-pulse bg-primary'
+                          : 'bg-transparent group-hover:bg-primary/40 group-focus-visible:bg-primary/60'
+                      }`}
                     />
-                  </span>
-                </button>
-              </React.Fragment>
-            ))}
+                  </button>
+                  <button
+                    className="flex w-full gap-2 rounded-xl px-1 py-2 text-left text-default-500 transition-colors hover:bg-content2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/60"
+                    onClick={(event) => selectSlide(index, event)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault()
+                        addSlideAfter(index)
+                      }
+                    }}
+                  >
+                    <span
+                      className={
+                        isSelected
+                          ? 'w-4 pt-1 text-right text-xs tabular-nums text-foreground'
+                          : 'w-4 pt-1 text-right text-xs tabular-nums'
+                      }
+                    >
+                      {index + 1}
+                    </span>
+                    <span
+                      className={`flex h-[99px] w-44 overflow-hidden border bg-black shadow-sm ${
+                        isSelected ? 'border-primary ring-2 ring-primary/40' : 'border-transparent'
+                      }`}
+                    >
+                      <EditableSlideSurface
+                        document={document}
+                        slideId={slideId}
+                        className="pointer-events-none"
+                      />
+                    </span>
+                  </button>
+                </React.Fragment>
+              )
+            })}
             <button
               type="button"
-              className="flex h-4 w-full items-center px-2"
+              className="group flex h-4 w-full items-center px-2"
               onClick={() => setInsertionIndex(document.slideOrder.length)}
               aria-label="Insert after last slide"
             >
               <span
                 className={`h-0.5 w-full rounded-full ${
                   insertionIndex === document.slideOrder.length
-                    ? 'bg-primary'
-                    : 'bg-transparent hover:bg-primary/40'
+                    ? 'animate-pulse bg-primary'
+                    : 'bg-transparent group-hover:bg-primary/40 group-focus-visible:bg-primary/60'
                 }`}
               />
             </button>

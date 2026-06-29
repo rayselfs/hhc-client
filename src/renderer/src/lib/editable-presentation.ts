@@ -464,8 +464,15 @@ export function duplicateEditableSlide(
   document: EditablePresentationDocument,
   slideId: string
 ): EditablePresentationDocument {
-  const slide = document.slides[slideId]
-  if (!slide) return document
+  const index = document.slideOrder.indexOf(slideId)
+  if (index === -1) return document
+  return duplicateEditableSlides(document, [slideId], index + 1).document
+}
+
+function cloneEditableSlide(slide: EditablePresentationSlide): {
+  slide: EditablePresentationSlide
+  slideId: string
+} {
   const nextSlideId = crypto.randomUUID()
   const elementIdMap = new Map<string, string>()
   const elements: Record<string, EditablePresentationElement> = {}
@@ -476,24 +483,48 @@ export function duplicateEditableSlide(
     elementIdMap.set(sourceId, nextId)
     elements[nextId] = { ...element, id: nextId } as EditablePresentationElement
   }
-  const slideOrder = [...document.slideOrder]
-  slideOrder.splice(slideOrder.indexOf(slideId) + 1, 0, nextSlideId)
+  const nextSlide: EditablePresentationSlide = {
+    ...slide,
+    id: nextSlideId,
+    name: `${slide.name} Copy`,
+    elementOrder: slide.elementOrder
+      .map((sourceId) => elementIdMap.get(sourceId))
+      .filter((id): id is string => Boolean(id)),
+    elements
+  }
+  return { slide: nextSlide, slideId: nextSlideId }
+}
+
+export function duplicateEditableSlides(
+  document: EditablePresentationDocument,
+  slideIds: string[],
+  targetIndex: number
+): { document: EditablePresentationDocument; slideIds: string[] } {
+  const requestedIds = new Set(slideIds)
+  const sourceIds = document.slideOrder.filter((sourceId) => requestedIds.has(sourceId))
+  if (sourceIds.length === 0) return { document, slideIds: [] }
+
+  const safeIndex = Math.max(0, Math.min(targetIndex, document.slideOrder.length))
+  const slides = { ...document.slides }
+  const insertedSlideIds: string[] = []
+
+  for (const sourceId of sourceIds) {
+    const sourceSlide = document.slides[sourceId]
+    if (!sourceSlide) continue
+    const cloned = cloneEditableSlide(sourceSlide)
+    slides[cloned.slideId] = cloned.slide
+    insertedSlideIds.push(cloned.slideId)
+  }
+
+  const slideOrder = [
+    ...document.slideOrder.slice(0, safeIndex),
+    ...insertedSlideIds,
+    ...document.slideOrder.slice(safeIndex)
+  ]
+
   return {
-    ...document,
-    slideOrder,
-    slides: {
-      ...document.slides,
-      [nextSlideId]: {
-        ...slide,
-        id: nextSlideId,
-        name: `${slide.name} Copy`,
-        elementOrder: slide.elementOrder
-          .map((sourceId) => elementIdMap.get(sourceId))
-          .filter((id): id is string => Boolean(id)),
-        elements
-      }
-    },
-    updatedAt: Date.now()
+    document: { ...document, slideOrder, slides, updatedAt: Date.now() },
+    slideIds: insertedSlideIds
   }
 }
 
@@ -519,6 +550,40 @@ export function addBlankEditableSlide(
       }
     },
     updatedAt: Date.now()
+  }
+}
+
+export function insertBlankEditableSlide(
+  document: EditablePresentationDocument,
+  targetIndex: number
+): { document: EditablePresentationDocument; slideId: string } {
+  const slideId = crypto.randomUUID()
+  const background = cloneSlideBackground(
+    document.defaultSlideBackground ?? createDefaultSlideBackground()
+  )
+  const safeIndex = Math.max(0, Math.min(targetIndex, document.slideOrder.length))
+  return {
+    document: {
+      ...document,
+      slideOrder: [
+        ...document.slideOrder.slice(0, safeIndex),
+        slideId,
+        ...document.slideOrder.slice(safeIndex)
+      ],
+      slides: {
+        ...document.slides,
+        [slideId]: {
+          id: slideId,
+          name: `Slide ${document.slideOrder.length + 1}`,
+          background,
+          elementOrder: [],
+          elements: {},
+          notes: ''
+        }
+      },
+      updatedAt: Date.now()
+    },
+    slideId
   }
 }
 
@@ -579,6 +644,28 @@ export function removeEditableSlide(
   return {
     ...document,
     slideOrder: document.slideOrder.filter((id) => id !== slideId),
+    slides,
+    updatedAt: Date.now()
+  }
+}
+
+export function removeEditableSlides(
+  document: EditablePresentationDocument,
+  slideIds: string[]
+): EditablePresentationDocument {
+  if (document.slideOrder.length <= 1) return document
+  const requestedIds = new Set(slideIds)
+  if (requestedIds.size === 0) return document
+  if (document.slideOrder.every((id) => requestedIds.has(id))) {
+    requestedIds.delete(document.slideOrder[0])
+  }
+  const slideOrder = document.slideOrder.filter((id) => !requestedIds.has(id))
+  const slides = Object.fromEntries(
+    Object.entries(document.slides).filter(([id]) => !requestedIds.has(id))
+  )
+  return {
+    ...document,
+    slideOrder,
     slides,
     updatedAt: Date.now()
   }

@@ -47,6 +47,7 @@ export default function EditableSlideSurface({
   const dragRef = useRef<DragState | null>(null)
   const scaleRef = useRef({ x: 1, y: 1 })
   const [surfaceScale, setSurfaceScale] = useState(1)
+  const [editingTextElementId, setEditingTextElementId] = useState<string | null>(null)
 
   const orderedElements = useMemo(() => {
     if (!slide) return []
@@ -97,6 +98,7 @@ export default function EditableSlideSurface({
       startY: event.clientY,
       original: element
     }
+    setEditingTextElementId(null)
     onSelectElement?.(element.id)
     event.currentTarget.setPointerCapture(event.pointerId)
   }
@@ -136,7 +138,11 @@ export default function EditableSlideSurface({
         aspectRatio: `${document.width} / ${document.height}`,
         border: showBorder ? `1px solid ${borderColor}` : undefined
       }}
-      onPointerDown={() => editable && onSelectElement?.(null)}
+      onPointerDown={() => {
+        if (!editable) return
+        setEditingTextElementId(null)
+        onSelectElement?.(null)
+      }}
     >
       <div
         className="absolute left-0 top-0"
@@ -154,6 +160,7 @@ export default function EditableSlideSurface({
             slide={slide}
             element={element}
             editable={editable}
+            editing={element.id === editingTextElementId}
             selected={element.id === selectedElementId}
             onSelect={() => onSelectElement?.(element.id)}
             onPointerDown={(event) => startDrag(event, element, 'move')}
@@ -161,6 +168,11 @@ export default function EditableSlideSurface({
             onPointerUp={endDrag}
             onUpdateElement={onUpdateElement}
             onResizePointerDown={(event) => startDrag(event, element, 'resize')}
+            onStartTextEdit={() => {
+              onSelectElement?.(element.id)
+              setEditingTextElementId(element.id)
+            }}
+            onFinishTextEdit={() => setEditingTextElementId(null)}
           />
         ))}
       </div>
@@ -183,18 +195,22 @@ function SlideElement({
   slide,
   element,
   editable,
+  editing,
   selected,
   onSelect,
   onPointerDown,
   onPointerMove,
   onPointerUp,
   onUpdateElement,
-  onResizePointerDown
+  onResizePointerDown,
+  onStartTextEdit,
+  onFinishTextEdit
 }: {
   document: EditablePresentationDocument
   slide: EditablePresentationSlide
   element: EditablePresentationElement
   editable: boolean
+  editing: boolean
   selected: boolean
   onSelect: () => void
   onPointerDown: (event: React.PointerEvent) => void
@@ -206,6 +222,8 @@ function SlideElement({
     updates: Partial<EditablePresentationElement>
   ) => void
   onResizePointerDown: (event: React.PointerEvent) => void
+  onStartTextEdit: () => void
+  onFinishTextEdit: () => void
 }): React.JSX.Element {
   const commonStyle: React.CSSProperties = {
     left: element.x,
@@ -222,7 +240,10 @@ function SlideElement({
         selected ? 'ring-2 ring-primary ring-offset-2 ring-offset-black' : ''
       }`}
       style={commonStyle}
-      onPointerDown={onPointerDown}
+      onPointerDown={(event) => {
+        if (editing) return
+        onPointerDown(event)
+      }}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onClick={(event) => {
@@ -230,7 +251,16 @@ function SlideElement({
         onSelect()
       }}
     >
-      {renderElementContent(element, document, slide.id, editable, onUpdateElement)}
+      {renderElementContent(
+        element,
+        document,
+        slide.id,
+        editable,
+        editing,
+        onUpdateElement,
+        onStartTextEdit,
+        onFinishTextEdit
+      )}
       {editable && selected && !element.locked && (
         <button
           type="button"
@@ -248,17 +278,20 @@ function renderElementContent(
   document: EditablePresentationDocument,
   slideId: string,
   editable: boolean,
+  editing: boolean,
   onUpdateElement?: (
     slideId: string,
     elementId: string,
     updates: Partial<EditablePresentationElement>
-  ) => void
+  ) => void,
+  onStartTextEdit?: () => void,
+  onFinishTextEdit?: () => void
 ): React.ReactNode {
   if (element.type === 'text') {
     return (
       <div
         className="h-full w-full whitespace-pre-wrap break-words outline-none"
-        contentEditable={editable && !element.locked}
+        contentEditable={editing && !element.locked}
         suppressContentEditableWarning
         style={{
           color: element.color,
@@ -270,12 +303,18 @@ function renderElementContent(
           textAlign: element.align,
           lineHeight: element.lineHeight
         }}
-        onPointerDown={(event) => editable && event.stopPropagation()}
-        onBlur={(event) =>
+        onPointerDown={(event) => editing && event.stopPropagation()}
+        onDoubleClick={(event) => {
+          if (!editable || element.locked) return
+          event.stopPropagation()
+          onStartTextEdit?.()
+        }}
+        onBlur={(event) => {
           onUpdateElement?.(slideId, element.id, {
             text: event.currentTarget.textContent ?? ''
           } as Partial<EditablePresentationElement>)
-        }
+          onFinishTextEdit?.()
+        }}
       >
         {element.text}
       </div>

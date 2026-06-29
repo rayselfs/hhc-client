@@ -11,14 +11,17 @@ import {
   createEditablePresentation,
   createTextElement,
   duplicateEditableSlide,
+  duplicateEditableSlides,
   duplicateElementInSlide,
   generateEditablePresentationThumbnail,
   getEditablePresentationDocumentVariant,
   getSlideBackgroundCss,
+  insertBlankEditableSlide,
   loadEditablePresentation,
   moveEditableSlide,
   removeElementFromSlide,
   resetSlideBackground,
+  removeEditableSlides,
   updateSlideBackground
 } from '../editable-presentation'
 import { EDITABLE_PRESENTATION_MIME_TYPE } from '../presentation-media'
@@ -68,6 +71,19 @@ describe('editable presentation documents', () => {
       color: '#ffffff',
       transparency: 0
     })
+  })
+
+  it('inserts a blank slide after the focused slide', () => {
+    const first = createBlankEditablePresentationDocument('Sunday')
+    const second = addBlankEditableSlide(first)
+    const result = insertBlankEditableSlide(second, 1)
+
+    expect(result.document.slideOrder).toEqual([
+      first.slideOrder[0],
+      result.slideId,
+      second.slideOrder[1]
+    ])
+    expect(result.document.slides[result.slideId].background).toEqual(second.defaultSlideBackground)
   })
 
   it('renders solid fill transparency against the white slide base', () => {
@@ -174,6 +190,40 @@ describe('editable presentation documents', () => {
       type: 'text',
       text: 'Welcome'
     })
+  })
+
+  it('duplicates multiple selected slides into the requested insertion position', () => {
+    const blank = createBlankEditablePresentationDocument('Sunday')
+    const withSecond = addBlankEditableSlide(blank)
+    const withThird = addBlankEditableSlide(withSecond)
+    const text = createTextElement({ text: 'Welcome' })
+    const firstSlideId = withThird.slideOrder[0]
+    const thirdSlideId = withThird.slideOrder[2]
+    const withText = addElementToSlide(withThird, firstSlideId, text)
+    const duplicated = duplicateEditableSlides(withText, [thirdSlideId, firstSlideId], 1)
+
+    expect(duplicated.slideIds).toHaveLength(2)
+    expect(duplicated.document.slideOrder).toEqual([
+      firstSlideId,
+      duplicated.slideIds[0],
+      duplicated.slideIds[1],
+      withThird.slideOrder[1],
+      thirdSlideId
+    ])
+    expect(duplicated.slideIds[0]).not.toBe(firstSlideId)
+    expect(duplicated.document.slides[duplicated.slideIds[0]].elementOrder[0]).not.toBe(text.id)
+  })
+
+  it('removes multiple selected slides without deleting the last remaining slide', () => {
+    const first = createBlankEditablePresentationDocument('Sunday')
+    const second = addBlankEditableSlide(first)
+    const third = addBlankEditableSlide(second)
+    const removedMiddle = removeEditableSlides(third, [third.slideOrder[0], third.slideOrder[1]])
+    const removedAll = removeEditableSlides(third, third.slideOrder)
+
+    expect(removedMiddle.slideOrder).toEqual([third.slideOrder[2]])
+    expect(removedAll.slideOrder).toHaveLength(1)
+    expect(removedAll.slideOrder[0]).toBe(third.slideOrder[0])
   })
 
   it('moves slides and removes duplicated elements', () => {
