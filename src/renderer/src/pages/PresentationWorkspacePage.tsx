@@ -917,7 +917,6 @@ export default function PresentationWorkspacePage(): React.JSX.Element {
   const activeDocument = usePresentationWorkspaceStore((state) => state.getActiveDocument())
   const [activeRibbon, setActiveRibbon] = useState<RibbonTab>('home')
   const [isRibbonOpen, setIsRibbonOpen] = useState(true)
-  const activeRibbonIndex = RIBBON_TABS.indexOf(activeRibbon)
 
   useEffect(() => {
     if (!itemId) return
@@ -967,12 +966,12 @@ export default function PresentationWorkspacePage(): React.JSX.Element {
 
   return (
     <div className="flex h-full flex-col bg-background text-foreground">
-      <div className="relative flex h-10 shrink-0 items-end gap-1 bg-background px-4">
+      <div className="flex h-10 shrink-0 items-end gap-1 bg-background px-4">
         {RIBBON_TABS.map((tab) => (
           <button
             key={tab}
             type="button"
-            className={`h-9 w-20 rounded-t-lg text-sm transition-colors ${
+            className={`relative h-9 w-20 rounded-t-lg text-sm transition-colors ${
               activeRibbon === tab
                 ? 'bg-content1 text-foreground'
                 : 'text-default-500 hover:bg-content1/60 hover:text-foreground'
@@ -980,12 +979,13 @@ export default function PresentationWorkspacePage(): React.JSX.Element {
             onClick={() => handleRibbonTabClick(tab)}
           >
             {t(`presentationWorkspace.${tab}`)}
+            <span
+              className={`absolute bottom-1 left-1/2 h-0.5 w-10 -translate-x-1/2 rounded-full bg-primary transition-opacity duration-200 ${
+                activeRibbon === tab ? 'opacity-100' : 'opacity-0'
+              }`}
+            />
           </button>
         ))}
-        <span
-          className="absolute bottom-0 left-8 h-0.5 w-12 rounded-full bg-primary transition-transform duration-200"
-          style={{ transform: `translateX(${activeRibbonIndex * 84}px)` }}
-        />
       </div>
 
       {activeDocument ? (
