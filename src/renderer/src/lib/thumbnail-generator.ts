@@ -1,4 +1,5 @@
 import { loadPdfjsLib } from './pdfjs-loader'
+import { generatePptxFirstSlideThumbnail } from './pptx-renderer-service'
 
 declare const scheduler: { yield?: () => Promise<void> } | undefined
 
@@ -155,6 +156,12 @@ export async function generateThumbnail(
     if (canonicalMimeType.startsWith('image/')) return await generateImageThumbnail(file)
     if (canonicalMimeType.startsWith('video/')) return await generateVideoThumbnail(file)
     if (canonicalMimeType === 'application/pdf') return await generatePdfThumbnail(file)
+    if (
+      canonicalMimeType ===
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+    ) {
+      return await generatePptxFirstSlideThumbnail(file)
+    }
     return null
   } catch (error) {
     console.error('Failed to generate thumbnail', error)

@@ -3,7 +3,7 @@ import type { FileItemRecord } from '@shared/types/folder'
 export type MediaKind = 'image' | 'video' | 'audio' | 'pdf' | 'presentation' | 'document'
 export type MediaPlatform = 'web' | 'electron'
 export type MediaSupportMode = 'native' | 'desktop-engine' | 'unsupported'
-export type ThumbnailStrategy = 'image' | 'video' | 'pdf' | 'none'
+export type ThumbnailStrategy = 'image' | 'video' | 'pdf' | 'presentation' | 'none'
 
 export interface MediaCapability {
   kind: MediaKind
@@ -266,7 +266,7 @@ const CAPABILITIES: readonly MediaCapability[] = [
     kind: 'presentation',
     extensions: ['pptx'],
     canonicalMimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-    thumbnail: 'none',
+    thumbnail: 'presentation',
     web: 'native',
     electron: 'native',
     kindLabelKey: 'fileKind.powerpointPresentation',

@@ -65,6 +65,13 @@ describe('media capability registry', () => {
     expect(
       canGenerateMediaThumbnail(resolveMediaCapability({ mimeType: 'video/x-matroska' }))
     ).toBe(true)
+    expect(
+      canGenerateMediaThumbnail(
+        resolveMediaCapability({
+          mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+        })
+      )
+    ).toBe(true)
   })
 
   it.each([

@@ -4,10 +4,16 @@ vi.mock('../pdfjs-loader', () => ({
   loadPdfjsLib: vi.fn()
 }))
 
+vi.mock('../pptx-renderer-service', () => ({
+  generatePptxFirstSlideThumbnail: vi.fn()
+}))
+
 import { generateThumbnail } from '../thumbnail-generator'
 import { loadPdfjsLib } from '../pdfjs-loader'
+import { generatePptxFirstSlideThumbnail } from '../pptx-renderer-service'
 
 const mockLoadPdfjsLib = vi.mocked(loadPdfjsLib)
+const mockGeneratePptxFirstSlideThumbnail = vi.mocked(generatePptxFirstSlideThumbnail)
 
 function makeFile(name: string, size: number, type: string): File {
   const file = new File([], name, { type })
@@ -135,5 +141,28 @@ describe('T5 — generateImageThumbnail yield', () => {
 
     expect(typeof result).toBe('string')
     expect(result).toMatch(/^data:/)
+  })
+})
+
+describe('PPTX thumbnail generation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('delegates PPTX thumbnails to the browser-native renderer service', async () => {
+    const pptxFile = makeFile(
+      'sermon.pptx',
+      4096,
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+    )
+    mockGeneratePptxFirstSlideThumbnail.mockResolvedValue('data:image/jpeg;base64,pptx')
+
+    const result = await generateThumbnail(
+      pptxFile,
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+    )
+
+    expect(result).toBe('data:image/jpeg;base64,pptx')
+    expect(mockGeneratePptxFirstSlideThumbnail).toHaveBeenCalledWith(pptxFile)
   })
 })
