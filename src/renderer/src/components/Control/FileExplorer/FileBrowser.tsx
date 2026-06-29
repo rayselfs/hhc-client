@@ -18,6 +18,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { Folder, Upload } from 'lucide-react'
 import { toast } from '@heroui/react/toast'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
 import { useKeyboardShortcuts } from '@renderer/hooks/useKeyboardShortcuts'
@@ -56,6 +57,8 @@ import { deriveSyncFolderHealth, type SyncFolderHealth } from '@renderer/lib/syn
 import { getSourceMediaMetadata } from '@renderer/lib/media-metadata'
 import { getBlobId } from '@renderer/lib/blob-identity'
 import { isWeb } from '@renderer/lib/env'
+import { getPresentationWorkspacePath, isPresentationItem } from '@renderer/lib/presentation-media'
+import { usePresentationWorkspaceStore } from '@renderer/stores/presentation-workspace'
 
 export interface FileBrowserProps {
   onItemContextMenu?: (itemId: string, event: React.MouseEvent) => void
@@ -369,6 +372,7 @@ export function FileBrowser({
   isCurrentFolderReadOnly = false
 }: FileBrowserProps): React.JSX.Element {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const confirm = useConfirm()
   const currentFolderId = useFileExplorerStore((state) => state.currentFolderId)
   const rawFolders = useFileExplorerStore(
@@ -378,6 +382,7 @@ export function FileBrowser({
   const navigateToFolder = useFileExplorerStore((state) => state.navigateToFolder)
   const toggleFavorite = useFileExplorerStore((state) => state.toggleFavorite)
   const moveItem = useFileExplorerStore((state) => state.moveItem)
+  const openPresentationDocument = usePresentationWorkspaceStore((state) => state.openDocument)
   const moveFolder = useFileExplorerStore((state) => state.moveFolder)
   const customOrders = useFileExplorerCustomOrder((state) => state.orders)
   const setCustomOrder = useFileExplorerCustomOrder((state) => state.setOrder)
@@ -752,6 +757,11 @@ export function FileBrowser({
         return
       }
       const file = fileItems.find((entry) => entry.id === itemId)
+      if (file && isPresentationItem(file)) {
+        openPresentationDocument(file)
+        navigate(getPresentationWorkspacePath(file.id))
+        return
+      }
       if (file && isPresentable(file.mimeType)) {
         const presentable = getPresentableItems(sortedFileItems)
         const idx = presentable.findIndex((f) => f.id === itemId)
@@ -767,7 +777,16 @@ export function FileBrowser({
         }
       }
     },
-    [cancelPendingRename, sortedItems, sortedFileItems, fileItems, navigateToFolder, t]
+    [
+      cancelPendingRename,
+      sortedItems,
+      sortedFileItems,
+      fileItems,
+      navigateToFolder,
+      openPresentationDocument,
+      navigate,
+      t
+    ]
   )
 
   const handleRenameSubmit = useCallback(
@@ -1122,6 +1141,12 @@ export function FileBrowser({
 
   if (searchQuery.trim()) {
     const handleSearchFileClick = (result: SearchResult & { kind: 'file' }): void => {
+      if (isPresentationItem(result.item)) {
+        openPresentationDocument(result.item)
+        navigate(getPresentationWorkspacePath(result.item.id))
+        setSearchQuery('')
+        return
+      }
       void navigateToFolder(result.item.parentId)
       setSearchQuery('')
     }

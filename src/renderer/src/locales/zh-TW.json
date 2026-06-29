@@ -510,6 +510,7 @@
       "refreshSyncFolder": "重新整理同步資料夾",
       "resyncFile": "重新同步檔案",
       "project": "投影",
+      "openPresentation": "開啟簡報",
       "restore": "還原",
       "permanentDelete": "永久刪除"
     },
@@ -555,6 +556,27 @@
       "import": "加入資料夾",
       "loadFailed": "無法載入 {{provider}} 資料夾。"
     }
+  },
+  "presentationWorkspace": {
+    "title": "簡報工作區",
+    "subtitle": "開啟並整理 PPTX 簡報",
+    "home": "常用",
+    "insert": "插入",
+    "design": "設計",
+    "present": "投影",
+    "copyPage": "複製頁面",
+    "slides": "投影片",
+    "inspector": "檢查器",
+    "fileName": "檔名",
+    "slideCount": "投影片數",
+    "dimensions": "尺寸",
+    "previousSlide": "上一張投影片",
+    "nextSlide": "下一張投影片",
+    "closeTab": "關閉分頁",
+    "loadFailed": "無法載入簡報",
+    "emptyTitle": "沒有開啟的簡報",
+    "emptyDescription": "從檔案開啟 PPTX，即可開始使用簡報工作區。",
+    "backToFiles": "返回檔案"
   },
   "projection": {
     "startButton": "開始投影",

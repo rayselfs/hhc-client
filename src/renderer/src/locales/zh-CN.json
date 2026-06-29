@@ -510,6 +510,7 @@
       "refreshSyncFolder": "重新整理同步文件夹",
       "resyncFile": "重新同步文件",
       "project": "投影",
+      "openPresentation": "打开演示文稿",
       "restore": "还原",
       "permanentDelete": "永久删除"
     },
@@ -555,6 +556,27 @@
       "import": "加入文件夹",
       "loadFailed": "无法加载 {{provider}} 文件夹。"
     }
+  },
+  "presentationWorkspace": {
+    "title": "演示文稿工作区",
+    "subtitle": "打开并整理 PPTX 演示文稿",
+    "home": "常用",
+    "insert": "插入",
+    "design": "设计",
+    "present": "投影",
+    "copyPage": "复制页面",
+    "slides": "幻灯片",
+    "inspector": "检查器",
+    "fileName": "文件名",
+    "slideCount": "幻灯片数",
+    "dimensions": "尺寸",
+    "previousSlide": "上一张幻灯片",
+    "nextSlide": "下一张幻灯片",
+    "closeTab": "关闭标签页",
+    "loadFailed": "无法加载演示文稿",
+    "emptyTitle": "没有打开的演示文稿",
+    "emptyDescription": "从文件打开 PPTX，即可开始使用演示文稿工作区。",
+    "backToFiles": "返回文件"
   },
   "projection": {
     "startButton": "开始投影",

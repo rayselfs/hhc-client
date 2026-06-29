@@ -510,6 +510,7 @@
       "refreshSyncFolder": "Refresh Sync Folder",
       "resyncFile": "Resync File",
       "project": "Project",
+      "openPresentation": "Open Presentation",
       "restore": "Restore",
       "permanentDelete": "Delete Permanently"
     },
@@ -555,6 +556,27 @@
       "import": "Add Folder",
       "loadFailed": "Failed to load {{provider}} folders."
     }
+  },
+  "presentationWorkspace": {
+    "title": "Presentation Workspace",
+    "subtitle": "Open and arrange PPTX decks",
+    "home": "Home",
+    "insert": "Insert",
+    "design": "Design",
+    "present": "Present",
+    "copyPage": "Copy Page",
+    "slides": "Slides",
+    "inspector": "Inspector",
+    "fileName": "File name",
+    "slideCount": "Slides",
+    "dimensions": "Dimensions",
+    "previousSlide": "Previous slide",
+    "nextSlide": "Next slide",
+    "closeTab": "Close tab",
+    "loadFailed": "Failed to load presentation",
+    "emptyTitle": "No presentation open",
+    "emptyDescription": "Open a PPTX from Files to start editing the presentation workspace.",
+    "backToFiles": "Back to Files"
   },
   "projection": {
     "startButton": "Start projection",

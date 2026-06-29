@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 import { toast } from '@heroui/react/toast'
 import { FileExplorerShell, useFileContextMenu } from '@renderer/components/Control/FileExplorer'
 import FileBrowser from '@renderer/components/Control/FileExplorer/FileBrowser'
@@ -17,7 +18,7 @@ import {
 } from '@renderer/stores/file-explorer'
 import { useSoundboardStore } from '@renderer/stores/soundboard'
 import { getUploadMediaPlatform, uploadFiles, uploadFolderFiles } from '@renderer/lib/upload-utils'
-import { RefreshCw, Unlink } from 'lucide-react'
+import { Presentation, RefreshCw, Unlink } from 'lucide-react'
 import { connectLocalSyncFolder, refreshLocalSyncConnection } from '@renderer/lib/local-sync-import'
 import { getCloudProviderAdapter, type CloudRemoteFolder } from '@renderer/lib/cloud-provider'
 import { unlinkSyncRootFolderFromApp } from '@renderer/lib/sync-unlink'
@@ -28,12 +29,15 @@ import {
   computeExpiresAt,
   inferDuration,
   isFileItem,
+  type AnyItemRecord,
   type FolderDuration,
   type FolderRecord
 } from '@shared/types/folder'
 import type { ClipboardState } from '@renderer/components/Control/FileExplorer'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
 import { getMediaFileAcceptAttribute } from '@renderer/lib/media-capabilities'
+import { getPresentationWorkspacePath, isPresentationItem } from '@renderer/lib/presentation-media'
+import { usePresentationWorkspaceStore } from '@renderer/stores/presentation-workspace'
 import {
   hasNameConflict,
   resolveUniqueFileName,
@@ -102,6 +106,7 @@ async function countDeletedSoundboardPadUsages(targetIds: Set<string>): Promise<
 
 export default function FilesPage(): React.JSX.Element {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const confirm = useConfirm()
   const currentFolderId = useFileExplorerStore((state) => state.currentFolderId)
   const foldersById = useFileExplorerStore((state) => state.folders)
@@ -160,6 +165,25 @@ export default function FilesPage(): React.JSX.Element {
     }
     return false
   }, [])
+
+  const getPresentationItemActions = useCallback(
+    (item: AnyItemRecord): ContextMenuEntry[] => {
+      if (!isFileItem(item) || !isPresentationItem(item)) return []
+      return [
+        'separator',
+        {
+          id: 'open-presentation',
+          label: t('fileExplorer.contextMenu.openPresentation'),
+          icon: React.createElement(Presentation, { size: 14 }),
+          onAction: () => {
+            usePresentationWorkspaceStore.getState().openDocument(item)
+            navigate(getPresentationWorkspacePath(item.id))
+          }
+        }
+      ]
+    },
+    [navigate, t]
+  )
 
   useEffect(() => {
     const el = folderInputRef.current
@@ -572,7 +596,10 @@ export default function FilesPage(): React.JSX.Element {
         onDelete: handleDelete,
         onEdit: (targetItem) => setRenameItemRequestId(targetItem.id),
         isReadOnly,
-        extraActions: isReadOnly ? getRefreshSyncActions(item.parentId, 'resyncFile') : []
+        extraActions: [
+          ...getPresentationItemActions(item),
+          ...(isReadOnly ? getRefreshSyncActions(item.parentId, 'resyncFile') : [])
+        ]
       })
     },
     [
@@ -583,6 +610,7 @@ export default function FilesPage(): React.JSX.Element {
       handleCut,
       handleDelete,
       getRefreshSyncActions,
+      getPresentationItemActions,
       areIdsReadOnly
     ]
   )
