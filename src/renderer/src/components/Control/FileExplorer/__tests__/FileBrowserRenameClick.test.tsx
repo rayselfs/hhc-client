@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { MemoryRouter } from 'react-router-dom'
 import FileBrowser from '../FileBrowser'
 import type { FileItemRecord, FolderRecord } from '@shared/types/folder'
 
@@ -188,6 +189,14 @@ function flushRenameDelay(): void {
   })
 }
 
+function renderFileBrowser(): void {
+  render(
+    <MemoryRouter>
+      <FileBrowser />
+    </MemoryRouter>
+  )
+}
+
 describe('FileBrowser slow-click inline rename', () => {
   beforeEach(() => {
     vi.useFakeTimers()
@@ -199,7 +208,7 @@ describe('FileBrowser slow-click inline rename', () => {
   })
 
   it('only starts rename from the file name region', () => {
-    render(<FileBrowser />)
+    renderFileBrowser()
 
     const fileName = screen.getByText('slides.pdf')
     const item = fileName.closest('[data-file-item]')
@@ -217,7 +226,7 @@ describe('FileBrowser slow-click inline rename', () => {
   })
 
   it('starts rename from a selected folder name region', () => {
-    render(<FileBrowser />)
+    renderFileBrowser()
 
     const folderName = screen.getByText('Drama Audio')
     click(folderName, 1000)
@@ -231,7 +240,7 @@ describe('FileBrowser slow-click inline rename', () => {
   })
 
   it('allows rename after the item has been selected for longer than the minimum delay', () => {
-    render(<FileBrowser />)
+    renderFileBrowser()
 
     const fileName = screen.getByText('slides.pdf')
     click(fileName, 1000)
@@ -245,7 +254,7 @@ describe('FileBrowser slow-click inline rename', () => {
   })
 
   it('does not start rename when the selected file name is double-clicked', () => {
-    render(<FileBrowser />)
+    renderFileBrowser()
 
     const fileName = screen.getByText('slides.pdf')
     click(fileName, 1000)
@@ -266,7 +275,7 @@ describe('FileBrowser slow-click inline rename', () => {
   })
 
   it('does not start rename after pointer movement', () => {
-    render(<FileBrowser />)
+    renderFileBrowser()
 
     const fileName = screen.getByText('slides.pdf')
     click(fileName, 1000)
