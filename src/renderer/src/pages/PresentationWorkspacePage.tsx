@@ -1,19 +1,38 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
+  AlignCenter,
+  AlignJustify,
+  AlignLeft,
+  AlignRight,
+  Baseline,
+  Bold,
+  CaseSensitive,
+  ChevronDown,
   Circle,
+  Eraser,
   FileText,
+  Highlighter,
   ImagePlus,
+  IndentDecrease,
+  IndentIncrease,
+  Italic,
+  List,
+  ListOrdered,
   Minus,
   Palette,
   Plus,
-  Redo2,
   Square,
+  Strikethrough,
+  Subscript,
+  Superscript,
   Type,
-  Undo2,
+  Underline,
+  WrapText,
   X
 } from 'lucide-react'
+import { AlertDialog } from '@heroui/react/alert-dialog'
 import { Button } from '@heroui/react/button'
 import { Spinner } from '@heroui/react/spinner'
 import { toast } from '@heroui/react/toast'
@@ -41,8 +60,7 @@ import {
   type EditableImageElement,
   type EditablePresentationDocument,
   type EditablePresentationElement,
-  type EditableSlideBackground,
-  type EditableTextAlign
+  type EditableSlideBackground
 } from '@renderer/lib/editable-presentation'
 import { openFileExplorerDB } from '@renderer/lib/file-explorer-db'
 import { ensurePresentationPageDocument } from '@renderer/lib/presentation-page-document'
@@ -62,10 +80,15 @@ type RibbonTab = 'home' | 'insert' | 'design'
 
 const FONT_FAMILIES = ['Inter Variable', 'Noto Sans TC Variable', 'Noto Sans SC Variable', 'Arial']
 const FONT_SIZES = [12, 14, 16, 18, 24, 32, 44, 56, 72, 96]
+const LINE_SPACING_VALUES = [1, 1.15, 1.5, 2]
 const RIBBON_TABS: RibbonTab[] = ['home', 'insert', 'design']
 const NATIVE_CONTROL_CLASS =
   'presentation-native-control rounded-lg border border-divider bg-content2 px-3 text-sm text-foreground outline-none'
 const RANGE_CLASS = 'presentation-range w-full'
+const RIBBON_ICON_BUTTON_CLASS =
+  'inline-flex h-8 min-w-8 items-center justify-center rounded-md px-2 text-default-500 transition-colors hover:bg-content2 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30'
+const RIBBON_ICON_BUTTON_ACTIVE_CLASS = 'bg-content2 text-foreground'
+const RIBBON_SEPARATOR_CLASS = 'mx-2 h-14 w-px bg-divider'
 
 function SlideThumbnail({
   viewer,
@@ -270,7 +293,6 @@ function EditableDocumentView({
   const imageInputRef = useRef<HTMLInputElement>(null)
   const [document, setDocument] = useState<EditablePresentationDocument | null>(null)
   const [past, setPast] = useState<EditablePresentationDocument[]>([])
-  const [future, setFuture] = useState<EditablePresentationDocument[]>([])
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null)
   const [copiedElement, setCopiedElement] = useState<EditablePresentationElement | null>(null)
   const [copiedSlideIds, setCopiedSlideIds] = useState<string[]>([])
@@ -278,6 +300,8 @@ function EditableDocumentView({
   const [selectionAnchorIndex, setSelectionAnchorIndex] = useState(0)
   const [insertionIndex, setInsertionIndex] = useState<number | null>(null)
   const [isBackgroundPanelOpen, setIsBackgroundPanelOpen] = useState(false)
+  const [isLineSpacingOptionsOpen, setIsLineSpacingOptionsOpen] = useState(false)
+  const [lineSpacingDraft, setLineSpacingDraft] = useState(1.15)
   const [status, setStatus] = useState<LoadStatus>('loading')
   const [error, setError] = useState<string | null>(null)
 
@@ -292,6 +316,7 @@ function EditableDocumentView({
         .then((loadedDocument) => {
           if (cancelled) return
           setDocument(loadedDocument)
+          setPast([])
           setSlideCount(deck.itemId, loadedDocument.slideOrder.length)
           setStatus('ready')
         })
@@ -316,7 +341,6 @@ function EditableDocumentView({
   const commitDocument = (nextDocument: EditablePresentationDocument): void => {
     if (!document) return
     setPast((items) => [...items.slice(-29), document])
-    setFuture([])
     setDocument(nextDocument)
     setSlideCount(deck.itemId, nextDocument.slideOrder.length)
     void saveEditablePresentation({ id: deck.itemId, url: deck.url }, nextDocument).catch(
@@ -475,23 +499,13 @@ function EditableDocumentView({
     setSelectedElementId(element.id)
   }
 
-  const undo = (): void => {
+  const undo = useCallback((): void => {
     const previous = past[past.length - 1]
     if (!document || !previous) return
     setPast((items) => items.slice(0, -1))
-    setFuture((items) => [document, ...items])
     setDocument(previous)
     void saveEditablePresentation({ id: deck.itemId, url: deck.url }, previous)
-  }
-
-  const redo = (): void => {
-    const next = future[0]
-    if (!document || !next) return
-    setFuture((items) => items.slice(1))
-    setPast((items) => [...items.slice(-29), document])
-    setDocument(next)
-    void saveEditablePresentation({ id: deck.itemId, url: deck.url }, next)
-  }
+  }, [deck.itemId, deck.url, document, past])
 
   const addImage = async (file: File): Promise<void> => {
     if (!document || !activeSlideId) return
@@ -525,6 +539,57 @@ function EditableDocumentView({
   }
 
   const selectedTextElement = selectedElement?.type === 'text' ? selectedElement : null
+
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent('hhc:presentation-undo-state', {
+        detail: { itemId: deck.itemId, canUndo: past.length > 0 }
+      })
+    )
+  }, [deck.itemId, past.length])
+
+  useEffect(() => {
+    const handleUndoRequest = (event: Event): void => {
+      const detail = (event as CustomEvent<{ itemId: string }>).detail
+      if (detail?.itemId !== deck.itemId) return
+      undo()
+    }
+    window.addEventListener('hhc:presentation-undo-request', handleUndoRequest)
+    return () => window.removeEventListener('hhc:presentation-undo-request', handleUndoRequest)
+  }, [deck.itemId, undo])
+
+  const updateSelectedTextElement = (
+    updates: Partial<Extract<EditablePresentationElement, { type: 'text' }>>
+  ): void => {
+    if (!selectedTextElement) return
+    updateSelectedElement(updates as Partial<EditablePresentationElement>)
+  }
+
+  const openLineSpacingOptions = (): void => {
+    setLineSpacingDraft(selectedTextElement?.lineHeight ?? 1.15)
+    setIsLineSpacingOptionsOpen(true)
+  }
+
+  const showLineSpacingMenu = (event: React.MouseEvent): void => {
+    showMenu(
+      [
+        ...LINE_SPACING_VALUES.map((value) => ({
+          id: `line-spacing-${value}`,
+          label: String(value),
+          disabled: !selectedTextElement,
+          onAction: () => updateSelectedTextElement({ lineHeight: value })
+        })),
+        'separator',
+        {
+          id: 'line-spacing-options',
+          label: t('presentationWorkspace.lineSpacingOptions', 'Line Spacing Options...'),
+          disabled: !selectedTextElement,
+          onAction: openLineSpacingOptions
+        }
+      ],
+      event
+    )
+  }
 
   const updateSelectedNumber = (key: 'x' | 'y' | 'width' | 'height', value: string): void => {
     const next = Number(value)
@@ -603,124 +668,301 @@ function EditableDocumentView({
       )
     }
 
+    const textDisabled = !selectedTextElement
+    const textButtonClass = (active = false): string =>
+      `${RIBBON_ICON_BUTTON_CLASS} ${active ? RIBBON_ICON_BUTTON_ACTIVE_CLASS : ''}`
+    const changeFontSize = (delta: number): void => {
+      if (!selectedTextElement) return
+      updateSelectedTextElement({
+        fontSize: Math.max(6, Math.min(240, selectedTextElement.fontSize + delta))
+      })
+    }
+    const clearTextFormatting = (): void => {
+      updateSelectedTextElement({
+        bold: false,
+        italic: false,
+        underline: false,
+        color: '#111827',
+        align: 'left',
+        lineHeight: 1.15
+      })
+    }
+
     return (
-      <div className="flex h-16 items-center gap-2 border-b border-divider bg-content1/80 px-4">
-        <Button size="sm" variant="tertiary" onPress={undo} isDisabled={past.length === 0}>
-          <Undo2 size={16} />
-        </Button>
-        <Button size="sm" variant="tertiary" onPress={redo} isDisabled={future.length === 0}>
-          <Redo2 size={16} />
-        </Button>
-        <span className="mx-1 h-8 w-px bg-divider" />
-        <select
-          className={`h-9 w-44 disabled:opacity-40 ${NATIVE_CONTROL_CLASS}`}
-          disabled={!selectedTextElement}
-          value={selectedTextElement?.fontFamily ?? FONT_FAMILIES[0]}
-          onChange={(event) =>
-            updateSelectedElement({
-              fontFamily: event.currentTarget.value
-            } as Partial<EditablePresentationElement>)
-          }
-        >
-          {FONT_FAMILIES.map((fontFamily) => (
-            <option key={fontFamily} value={fontFamily}>
-              {fontFamily}
-            </option>
-          ))}
-        </select>
-        <select
-          className={`h-9 w-20 disabled:opacity-40 ${NATIVE_CONTROL_CLASS}`}
-          disabled={!selectedTextElement}
-          value={selectedTextElement?.fontSize ?? 44}
-          onChange={(event) =>
-            updateSelectedElement({
-              fontSize: Number(event.currentTarget.value)
-            } as Partial<EditablePresentationElement>)
-          }
-        >
-          {FONT_SIZES.map((fontSize) => (
-            <option key={fontSize} value={fontSize}>
-              {fontSize}
-            </option>
-          ))}
-        </select>
-        <Button
-          size="sm"
-          variant={selectedTextElement?.bold ? 'primary' : 'tertiary'}
-          isDisabled={!selectedTextElement}
-          onPress={() =>
-            selectedTextElement &&
-            updateSelectedElement({
-              bold: !selectedTextElement.bold
-            } as Partial<EditablePresentationElement>)
-          }
-        >
-          B
-        </Button>
-        <Button
-          size="sm"
-          variant={selectedTextElement?.italic ? 'primary' : 'tertiary'}
-          isDisabled={!selectedTextElement}
-          onPress={() =>
-            selectedTextElement &&
-            updateSelectedElement({
-              italic: !selectedTextElement.italic
-            } as Partial<EditablePresentationElement>)
-          }
-        >
-          I
-        </Button>
-        <Button
-          size="sm"
-          variant={selectedTextElement?.underline ? 'primary' : 'tertiary'}
-          isDisabled={!selectedTextElement}
-          onPress={() =>
-            selectedTextElement &&
-            updateSelectedElement({
-              underline: !selectedTextElement.underline
-            } as Partial<EditablePresentationElement>)
-          }
-        >
-          U
-        </Button>
-        <input
-          className="h-8 w-10 rounded bg-transparent disabled:opacity-40"
-          type="color"
-          disabled={!selectedTextElement}
-          value={selectedTextElement?.color ?? '#ffffff'}
-          onChange={(event) =>
-            updateSelectedElement({
-              color: event.currentTarget.value
-            } as Partial<EditablePresentationElement>)
-          }
-        />
-        {(['left', 'center', 'right'] as EditableTextAlign[]).map((align) => (
-          <Button
-            key={align}
-            size="sm"
-            variant={selectedTextElement?.align === align ? 'primary' : 'tertiary'}
-            isDisabled={!selectedTextElement}
-            onPress={() => updateSelectedElement({ align } as Partial<EditablePresentationElement>)}
-          >
-            {align}
-          </Button>
-        ))}
-        <span className="mx-1 h-8 w-px bg-divider" />
-        {selectedElement &&
-          (selectedElement.type === 'text'
-            ? (['x', 'y', 'width'] as const)
-            : (['x', 'y', 'width', 'height'] as const)
-          ).map((key) => (
-            <label key={key} className="flex items-center gap-1 text-xs uppercase text-default-400">
-              {key}
+      <div className="flex h-24 items-center gap-2 border-b border-divider bg-content1/80 px-4 py-2">
+        <div className="grid gap-2">
+          <div className="flex items-center gap-2">
+            <select
+              className={`h-9 w-72 disabled:opacity-40 ${NATIVE_CONTROL_CLASS}`}
+              disabled={textDisabled}
+              value={selectedTextElement?.fontFamily ?? FONT_FAMILIES[0]}
+              onChange={(event) =>
+                updateSelectedTextElement({
+                  fontFamily: event.currentTarget.value
+                })
+              }
+            >
+              {FONT_FAMILIES.map((fontFamily) => (
+                <option key={fontFamily} value={fontFamily}>
+                  {fontFamily}
+                </option>
+              ))}
+            </select>
+            <select
+              className={`h-9 w-24 disabled:opacity-40 ${NATIVE_CONTROL_CLASS}`}
+              disabled={textDisabled}
+              value={selectedTextElement?.fontSize ?? 44}
+              onChange={(event) =>
+                updateSelectedTextElement({
+                  fontSize: Number(event.currentTarget.value)
+                })
+              }
+            >
+              {FONT_SIZES.map((fontSize) => (
+                <option key={fontSize} value={fontSize}>
+                  {fontSize}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className={RIBBON_ICON_BUTTON_CLASS}
+              disabled={textDisabled}
+              onClick={() => changeFontSize(2)}
+              aria-label={t('presentationWorkspace.increaseFontSize', 'Increase font size')}
+            >
+              <span className="text-xl leading-none">A</span>
+              <ChevronDown className="size-3 rotate-180" />
+            </button>
+            <button
+              type="button"
+              className={RIBBON_ICON_BUTTON_CLASS}
+              disabled={textDisabled}
+              onClick={() => changeFontSize(-2)}
+              aria-label={t('presentationWorkspace.decreaseFontSize', 'Decrease font size')}
+            >
+              <span className="text-sm leading-none">A</span>
+              <ChevronDown className="size-3" />
+            </button>
+            <button
+              type="button"
+              className={RIBBON_ICON_BUTTON_CLASS}
+              disabled={textDisabled}
+              onClick={clearTextFormatting}
+              aria-label={t('presentationWorkspace.clearFormatting', 'Clear formatting')}
+            >
+              <Eraser size={18} />
+            </button>
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              className={textButtonClass(Boolean(selectedTextElement?.bold))}
+              disabled={textDisabled}
+              onClick={() => updateSelectedTextElement({ bold: !selectedTextElement?.bold })}
+              aria-label={t('presentationWorkspace.bold', 'Bold')}
+            >
+              <Bold size={18} />
+            </button>
+            <button
+              type="button"
+              className={textButtonClass(Boolean(selectedTextElement?.italic))}
+              disabled={textDisabled}
+              onClick={() => updateSelectedTextElement({ italic: !selectedTextElement?.italic })}
+              aria-label={t('presentationWorkspace.italic', 'Italic')}
+            >
+              <Italic size={18} />
+            </button>
+            <button
+              type="button"
+              className={textButtonClass(Boolean(selectedTextElement?.underline))}
+              disabled={textDisabled}
+              onClick={() =>
+                updateSelectedTextElement({ underline: !selectedTextElement?.underline })
+              }
+              aria-label={t('presentationWorkspace.underline', 'Underline')}
+            >
+              <Underline size={18} />
+            </button>
+            <button
+              type="button"
+              className={RIBBON_ICON_BUTTON_CLASS}
+              disabled
+              aria-label={t('presentationWorkspace.strikethrough', 'Strikethrough')}
+            >
+              <Strikethrough size={17} />
+            </button>
+            <button
+              type="button"
+              className={RIBBON_ICON_BUTTON_CLASS}
+              disabled
+              aria-label={t('presentationWorkspace.subscript', 'Subscript')}
+            >
+              <Subscript size={17} />
+            </button>
+            <button
+              type="button"
+              className={RIBBON_ICON_BUTTON_CLASS}
+              disabled
+              aria-label={t('presentationWorkspace.superscript', 'Superscript')}
+            >
+              <Superscript size={17} />
+            </button>
+            <button
+              type="button"
+              className={RIBBON_ICON_BUTTON_CLASS}
+              disabled
+              aria-label={t('presentationWorkspace.characterSpacing', 'Character spacing')}
+            >
+              <span className="text-sm font-semibold">AV</span>
+              <ChevronDown size={12} />
+            </button>
+            <button
+              type="button"
+              className={RIBBON_ICON_BUTTON_CLASS}
+              disabled
+              aria-label={t('presentationWorkspace.changeCase', 'Change case')}
+            >
+              <CaseSensitive size={18} />
+              <ChevronDown size={12} />
+            </button>
+            <button
+              type="button"
+              className={RIBBON_ICON_BUTTON_CLASS}
+              disabled
+              aria-label={t('presentationWorkspace.textHighlight', 'Text highlight color')}
+            >
+              <Highlighter size={18} />
+              <ChevronDown size={12} />
+            </button>
+            <label
+              className={`relative ${RIBBON_ICON_BUTTON_CLASS} ${
+                textDisabled ? 'cursor-not-allowed opacity-30 hover:bg-transparent' : ''
+              }`}
+              aria-label={t('presentationWorkspace.fontColor', 'Font color')}
+            >
+              <Baseline size={18} />
+              <ChevronDown size={12} />
+              <span
+                className="absolute bottom-1 left-1/2 h-0.5 w-5 -translate-x-1/2"
+                style={{ backgroundColor: selectedTextElement?.color ?? '#111827' }}
+              />
               <input
-                className={`h-8 w-16 px-2 ${NATIVE_CONTROL_CLASS}`}
-                type="number"
-                value={Math.round(selectedElement[key])}
-                onChange={(event) => updateSelectedNumber(key, event.currentTarget.value)}
+                className="sr-only"
+                type="color"
+                disabled={textDisabled}
+                value={selectedTextElement?.color ?? '#111827'}
+                onChange={(event) =>
+                  updateSelectedTextElement({
+                    color: event.currentTarget.value
+                  })
+                }
               />
             </label>
-          ))}
+          </div>
+        </div>
+
+        <span className={RIBBON_SEPARATOR_CLASS} />
+
+        <div className="grid gap-2">
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              className={RIBBON_ICON_BUTTON_CLASS}
+              disabled
+              aria-label={t('presentationWorkspace.bullets', 'Bullets')}
+            >
+              <List size={19} />
+              <ChevronDown size={12} />
+            </button>
+            <button
+              type="button"
+              className={RIBBON_ICON_BUTTON_CLASS}
+              disabled
+              aria-label={t('presentationWorkspace.numbering', 'Numbering')}
+            >
+              <ListOrdered size={19} />
+              <ChevronDown size={12} />
+            </button>
+            <button
+              type="button"
+              className={RIBBON_ICON_BUTTON_CLASS}
+              disabled
+              aria-label={t('presentationWorkspace.decreaseIndent', 'Decrease indent')}
+            >
+              <IndentDecrease size={19} />
+            </button>
+            <button
+              type="button"
+              className={RIBBON_ICON_BUTTON_CLASS}
+              disabled
+              aria-label={t('presentationWorkspace.increaseIndent', 'Increase indent')}
+            >
+              <IndentIncrease size={19} />
+            </button>
+            <button
+              type="button"
+              className={RIBBON_ICON_BUTTON_CLASS}
+              disabled={textDisabled}
+              onClick={showLineSpacingMenu}
+              aria-label={t('presentationWorkspace.lineSpacing', 'Line spacing')}
+            >
+              <WrapText size={19} />
+              <ChevronDown size={12} />
+            </button>
+          </div>
+          <div className="flex items-center gap-1">
+            {(
+              [
+                ['left', AlignLeft],
+                ['center', AlignCenter],
+                ['right', AlignRight]
+              ] as const
+            ).map(([align, Icon]) => (
+              <button
+                key={align}
+                type="button"
+                className={textButtonClass(selectedTextElement?.align === align)}
+                disabled={textDisabled}
+                onClick={() => updateSelectedTextElement({ align })}
+                aria-label={t(`presentationWorkspace.align.${align}`, align)}
+              >
+                <Icon size={19} />
+              </button>
+            ))}
+            <button
+              type="button"
+              className={RIBBON_ICON_BUTTON_CLASS}
+              disabled
+              aria-label={t('presentationWorkspace.align.justify', 'Justify')}
+            >
+              <AlignJustify size={19} />
+            </button>
+          </div>
+        </div>
+
+        <span className={RIBBON_SEPARATOR_CLASS} />
+
+        <div className="grid gap-2">
+          {selectedElement &&
+            (selectedElement.type === 'text'
+              ? (['x', 'y', 'width'] as const)
+              : (['x', 'y', 'width', 'height'] as const)
+            ).map((key) => (
+              <label
+                key={key}
+                className="flex items-center gap-1 text-xs uppercase text-default-400"
+              >
+                {key}
+                <input
+                  className={`h-8 w-16 px-2 ${NATIVE_CONTROL_CLASS}`}
+                  type="number"
+                  value={Math.round(selectedElement[key])}
+                  onChange={(event) => updateSelectedNumber(key, event.currentTarget.value)}
+                />
+              </label>
+            ))}
+        </div>
       </div>
     )
   }
@@ -796,139 +1038,222 @@ function EditableDocumentView({
     )
   }
 
+  const ribbonHeightClass = activeRibbon === 'home' ? 'h-24' : 'h-16'
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-background">
-      <input
-        ref={imageInputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={(event) => {
-          const file = event.currentTarget.files?.[0]
-          event.currentTarget.value = ''
-          if (file) void addImage(file)
+    <>
+      <div className="flex min-h-0 flex-1 flex-col bg-background">
+        <input
+          ref={imageInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(event) => {
+            const file = event.currentTarget.files?.[0]
+            event.currentTarget.value = ''
+            if (file) void addImage(file)
+          }}
+        />
+        <div
+          className={`shrink-0 overflow-hidden transition-[height,opacity] duration-200 ${
+            isRibbonOpen ? `${ribbonHeightClass} opacity-100` : 'h-0 opacity-0'
+          }`}
+        >
+          {renderRibbon()}
+        </div>
+        <div
+          className={`grid min-h-0 flex-1 ${
+            isBackgroundPanelOpen
+              ? 'grid-cols-[240px_minmax(0,1fr)_300px]'
+              : 'grid-cols-[240px_minmax(0,1fr)]'
+          }`}
+        >
+          <aside
+            data-slide-sidebar
+            className="min-h-0 overflow-y-auto border-r border-divider bg-content1/40 px-2 py-3"
+            onContextMenu={showSlideSidebarMenu}
+          >
+            <div className="space-y-1">
+              {document.slideOrder.map((slideId, index) => {
+                const isSelected =
+                  selectedSlideIds.size === 0
+                    ? index === activeSlideIndex
+                    : selectedSlideIds.has(slideId)
+                return (
+                  <React.Fragment key={slideId}>
+                    <button
+                      type="button"
+                      className="group flex h-4 w-full items-center px-2"
+                      onClick={() => setInsertionIndex(index)}
+                      aria-label={`Insert before slide ${index + 1}`}
+                    >
+                      <span
+                        className={`h-0.5 w-full rounded-full ${
+                          insertionIndex === index
+                            ? 'animate-pulse bg-primary'
+                            : 'bg-transparent group-hover:bg-primary/40 group-focus-visible:bg-primary/60'
+                        }`}
+                      />
+                    </button>
+                    <button
+                      className="flex w-full gap-2 rounded-xl px-1 py-2 text-left text-default-500 transition-colors hover:bg-content2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/60"
+                      onClick={(event) => selectSlide(index, event)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault()
+                          addSlideAfter(index)
+                        }
+                      }}
+                    >
+                      <span
+                        className={
+                          isSelected
+                            ? 'w-4 pt-1 text-right text-xs tabular-nums text-foreground'
+                            : 'w-4 pt-1 text-right text-xs tabular-nums'
+                        }
+                      >
+                        {index + 1}
+                      </span>
+                      <span
+                        className={`flex h-[99px] w-44 overflow-hidden border bg-black shadow-sm ${
+                          isSelected
+                            ? 'border-primary ring-2 ring-primary/40'
+                            : 'border-transparent'
+                        }`}
+                      >
+                        <EditableSlideSurface
+                          document={document}
+                          slideId={slideId}
+                          className="pointer-events-none"
+                        />
+                      </span>
+                    </button>
+                  </React.Fragment>
+                )
+              })}
+              <button
+                type="button"
+                className="group flex h-4 w-full items-center px-2"
+                onClick={() => setInsertionIndex(document.slideOrder.length)}
+                aria-label="Insert after last slide"
+              >
+                <span
+                  className={`h-0.5 w-full rounded-full ${
+                    insertionIndex === document.slideOrder.length
+                      ? 'animate-pulse bg-primary'
+                      : 'bg-transparent group-hover:bg-primary/40 group-focus-visible:bg-primary/60'
+                  }`}
+                />
+              </button>
+            </div>
+          </aside>
+
+          <main className="flex min-h-0 flex-col bg-[#111217]">
+            <div className="flex flex-1 items-center justify-center overflow-auto p-8">
+              <div className="w-full max-w-5xl">
+                <EditableSlideSurface
+                  document={document}
+                  slideId={activeSlideId}
+                  editable
+                  showBorder
+                  selectedElementId={selectedElementId}
+                  onSelectElement={setSelectedElementId}
+                  onUpdateElement={(slideId, elementId, updates) =>
+                    commitDocument(updateElementInSlide(document, slideId, elementId, updates))
+                  }
+                />
+              </div>
+            </div>
+          </main>
+          {isBackgroundPanelOpen && activeSlide && (
+            <FormatBackgroundPanel
+              background={activeSlide.background}
+              onChange={setActiveSlideBackground}
+              onApplyToAll={applyActiveBackgroundToAllSlides}
+              onReset={resetActiveSlideBackground}
+              onClose={() => setIsBackgroundPanelOpen(false)}
+            />
+          )}
+        </div>
+      </div>
+      <LineSpacingOptionsDialog
+        isOpen={isLineSpacingOptionsOpen}
+        value={lineSpacingDraft}
+        onValueChange={setLineSpacingDraft}
+        onClose={() => setIsLineSpacingOptionsOpen(false)}
+        onApply={() => {
+          const nextLineHeight = Math.max(
+            0.5,
+            Math.min(4, Number.isFinite(lineSpacingDraft) ? lineSpacingDraft : 1.15)
+          )
+          updateSelectedTextElement({ lineHeight: nextLineHeight })
+          setIsLineSpacingOptionsOpen(false)
         }}
       />
-      <div
-        className={`shrink-0 overflow-hidden transition-[height,opacity] duration-200 ${
-          isRibbonOpen ? 'h-16 opacity-100' : 'h-0 opacity-0'
-        }`}
-      >
-        {renderRibbon()}
-      </div>
-      <div
-        className={`grid min-h-0 flex-1 ${
-          isBackgroundPanelOpen
-            ? 'grid-cols-[240px_minmax(0,1fr)_300px]'
-            : 'grid-cols-[240px_minmax(0,1fr)]'
-        }`}
-      >
-        <aside
-          data-slide-sidebar
-          className="min-h-0 overflow-y-auto border-r border-divider bg-content1/40 px-2 py-3"
-          onContextMenu={showSlideSidebarMenu}
-        >
-          <div className="space-y-1">
-            {document.slideOrder.map((slideId, index) => {
-              const isSelected =
-                selectedSlideIds.size === 0
-                  ? index === activeSlideIndex
-                  : selectedSlideIds.has(slideId)
-              return (
-                <React.Fragment key={slideId}>
-                  <button
-                    type="button"
-                    className="group flex h-4 w-full items-center px-2"
-                    onClick={() => setInsertionIndex(index)}
-                    aria-label={`Insert before slide ${index + 1}`}
-                  >
-                    <span
-                      className={`h-0.5 w-full rounded-full ${
-                        insertionIndex === index
-                          ? 'animate-pulse bg-primary'
-                          : 'bg-transparent group-hover:bg-primary/40 group-focus-visible:bg-primary/60'
-                      }`}
-                    />
-                  </button>
-                  <button
-                    className="flex w-full gap-2 rounded-xl px-1 py-2 text-left text-default-500 transition-colors hover:bg-content2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/60"
-                    onClick={(event) => selectSlide(index, event)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') {
-                        event.preventDefault()
-                        addSlideAfter(index)
-                      }
-                    }}
-                  >
-                    <span
-                      className={
-                        isSelected
-                          ? 'w-4 pt-1 text-right text-xs tabular-nums text-foreground'
-                          : 'w-4 pt-1 text-right text-xs tabular-nums'
-                      }
-                    >
-                      {index + 1}
-                    </span>
-                    <span
-                      className={`flex h-[99px] w-44 overflow-hidden border bg-black shadow-sm ${
-                        isSelected ? 'border-primary ring-2 ring-primary/40' : 'border-transparent'
-                      }`}
-                    >
-                      <EditableSlideSurface
-                        document={document}
-                        slideId={slideId}
-                        className="pointer-events-none"
-                      />
-                    </span>
-                  </button>
-                </React.Fragment>
-              )
-            })}
-            <button
-              type="button"
-              className="group flex h-4 w-full items-center px-2"
-              onClick={() => setInsertionIndex(document.slideOrder.length)}
-              aria-label="Insert after last slide"
-            >
-              <span
-                className={`h-0.5 w-full rounded-full ${
-                  insertionIndex === document.slideOrder.length
-                    ? 'animate-pulse bg-primary'
-                    : 'bg-transparent group-hover:bg-primary/40 group-focus-visible:bg-primary/60'
-                }`}
-              />
-            </button>
-          </div>
-        </aside>
+    </>
+  )
+}
 
-        <main className="flex min-h-0 flex-col bg-[#111217]">
-          <div className="flex flex-1 items-center justify-center overflow-auto p-8">
-            <div className="w-full max-w-5xl">
-              <EditableSlideSurface
-                document={document}
-                slideId={activeSlideId}
-                editable
-                showBorder
-                selectedElementId={selectedElementId}
-                onSelectElement={setSelectedElementId}
-                onUpdateElement={(slideId, elementId, updates) =>
-                  commitDocument(updateElementInSlide(document, slideId, elementId, updates))
-                }
+function LineSpacingOptionsDialog({
+  isOpen,
+  value,
+  onValueChange,
+  onClose,
+  onApply
+}: {
+  isOpen: boolean
+  value: number
+  onValueChange: (value: number) => void
+  onClose: () => void
+  onApply: () => void
+}): React.JSX.Element {
+  const { t } = useTranslation()
+
+  return (
+    <AlertDialog.Backdrop isOpen={isOpen} isDismissable onOpenChange={(open) => !open && onClose()}>
+      <AlertDialog.Container size="sm">
+        <AlertDialog.Dialog className="p-5">
+          <AlertDialog.Header>
+            <AlertDialog.Heading>
+              {t('presentationWorkspace.lineSpacingOptions', 'Line Spacing Options')}
+            </AlertDialog.Heading>
+          </AlertDialog.Header>
+          <AlertDialog.Body>
+            <div className="space-y-4">
+              <label className="block text-sm text-default-500">
+                <span>{t('presentationWorkspace.lineSpacing', 'Line spacing')}</span>
+                <input
+                  className={`mt-2 h-10 w-full ${NATIVE_CONTROL_CLASS}`}
+                  type="number"
+                  min={0.5}
+                  max={4}
+                  step={0.05}
+                  value={value}
+                  onChange={(event) => onValueChange(Number(event.currentTarget.value))}
+                />
+              </label>
+              <input
+                className={RANGE_CLASS}
+                type="range"
+                min={0.5}
+                max={4}
+                step={0.05}
+                value={value}
+                onChange={(event) => onValueChange(Number(event.currentTarget.value))}
               />
             </div>
-          </div>
-        </main>
-        {isBackgroundPanelOpen && activeSlide && (
-          <FormatBackgroundPanel
-            background={activeSlide.background}
-            onChange={setActiveSlideBackground}
-            onApplyToAll={applyActiveBackgroundToAllSlides}
-            onReset={resetActiveSlideBackground}
-            onClose={() => setIsBackgroundPanelOpen(false)}
-          />
-        )}
-      </div>
-    </div>
+          </AlertDialog.Body>
+          <AlertDialog.Footer>
+            <Button variant="tertiary" onPress={onClose}>
+              {t('common.cancel')}
+            </Button>
+            <Button variant="primary" onPress={onApply}>
+              {t('common.confirm')}
+            </Button>
+          </AlertDialog.Footer>
+        </AlertDialog.Dialog>
+      </AlertDialog.Container>
+    </AlertDialog.Backdrop>
   )
 }
 

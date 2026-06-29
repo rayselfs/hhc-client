@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Button } from '@heroui/react/button'
 import { ButtonGroup } from '@heroui/react/button-group'
 import { toast } from '@heroui/react/toast'
-import { FolderOpen, Monitor, X } from 'lucide-react'
+import { Home, Monitor, Undo2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
@@ -36,7 +36,19 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
   const closeDocument = usePresentationWorkspaceStore((state) => state.closeDocument)
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
+  const [undoState, setUndoState] = useState<{ itemId: string; canUndo: boolean } | null>(null)
   const editInputRef = useRef<HTMLInputElement>(null)
+  const canUndo = undoState?.itemId === activeItemId && undoState.canUndo
+
+  useEffect(() => {
+    const handleUndoState = (event: Event): void => {
+      const detail = (event as CustomEvent<{ itemId: string; canUndo: boolean }>).detail
+      if (!detail || detail.itemId !== activeItemId) return
+      setUndoState(detail)
+    }
+    window.addEventListener('hhc:presentation-undo-state', handleUndoState)
+    return () => window.removeEventListener('hhc:presentation-undo-state', handleUndoState)
+  }, [activeItemId])
 
   useEffect(() => {
     if (!editingItemId) return
@@ -152,7 +164,24 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
         onPress={() => navigate('/files')}
         aria-label={t('presentationWorkspace.backToFiles')}
       >
-        <FolderOpen size={18} />
+        <Home size={18} />
+      </Button>
+      <Button
+        isIconOnly
+        variant="ghost"
+        className="mb-1"
+        isDisabled={!canUndo}
+        onPress={() => {
+          if (!activeItemId) return
+          window.dispatchEvent(
+            new CustomEvent('hhc:presentation-undo-request', {
+              detail: { itemId: activeItemId }
+            })
+          )
+        }}
+        aria-label={t('presentationWorkspace.undo', 'Undo')}
+      >
+        <Undo2 size={18} />
       </Button>
       {documents.map((deck) => (
         <div
