@@ -9,18 +9,22 @@ import {
   type ServiceCueProjectionResult
 } from '@renderer/lib/service-cue-runner'
 
-type TranslationFn = ReturnType<typeof useTranslation>['t']
+type TranslationFn = unknown
+
+function translate(t: TranslationFn, key: string): string {
+  return String((t as (key: string) => unknown)(key))
+}
 
 function cueTypeLabel(cue: ServiceCue, t: TranslationFn): string {
   switch (cue.type) {
     case 'media':
-      return t('service.cueTypes.media')
+      return translate(t, 'service.cueTypes.media')
     case 'bible':
-      return t('service.cueTypes.bible')
+      return translate(t, 'service.cueTypes.bible')
     case 'timer':
-      return t('service.cueTypes.timer')
+      return translate(t, 'service.cueTypes.timer')
     case 'placeholder':
-      return t('service.cueTypes.song')
+      return translate(t, 'service.cueTypes.song')
   }
 }
 
@@ -29,8 +33,8 @@ function cueSourceStatus(
   sourceExists: { media: boolean },
   t: TranslationFn
 ): string | null {
-  if (cue.type === 'media' && !sourceExists.media) return t('service.missingMediaSource')
-  if (cue.type === 'placeholder') return t('service.notImplementedYet')
+  if (cue.type === 'media' && !sourceExists.media) return translate(t, 'service.missingMediaSource')
+  if (cue.type === 'placeholder') return translate(t, 'service.notImplementedYet')
   return null
 }
 
@@ -38,11 +42,12 @@ function projectionResultMessage(
   result: ServiceCueProjectionResult,
   t: TranslationFn
 ): string | null {
-  if (result.status === 'projected') return t('service.projectionStarted')
-  if (result.status === 'missing-source') return t('service.projectErrors.missingSource')
-  if (result.status === 'unsupported') return t('service.projectErrors.unsupported')
-  if (result.status === 'not-ready') return t('service.projectErrors.notReady')
-  if (result.status === 'not-implemented') return t('service.projectErrors.notImplemented')
+  if (result.status === 'projected') return translate(t, 'service.projectionStarted')
+  if (result.status === 'missing-source') return translate(t, 'service.projectErrors.missingSource')
+  if (result.status === 'unsupported') return translate(t, 'service.projectErrors.unsupported')
+  if (result.status === 'not-ready') return translate(t, 'service.projectErrors.notReady')
+  if (result.status === 'not-implemented')
+    return translate(t, 'service.projectErrors.notImplemented')
   return null
 }
 
