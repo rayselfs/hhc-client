@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type {
   EditablePresentationDocument,
   EditablePresentationElement,
@@ -31,6 +31,9 @@ interface DragState {
   startY: number
   original: EditablePresentationElement
 }
+
+const TEXT_MIN_WIDTH = 60
+const TEXT_MIN_HEIGHT = 24
 
 export default function EditableSlideSurface({
   document,
@@ -113,6 +116,11 @@ export default function EditableSlideSurface({
       onUpdateElement?.(slideId, drag.elementId, {
         x: Math.max(0, drag.original.x + dx),
         y: Math.max(0, drag.original.y + dy)
+      } as Partial<EditablePresentationElement>)
+    } else if (drag.original.type === 'text') {
+      onUpdateElement?.(slideId, drag.elementId, {
+        width: Math.max(TEXT_MIN_WIDTH, drag.original.width + dx),
+        autoWidth: false
       } as Partial<EditablePresentationElement>)
     } else {
       onUpdateElement?.(slideId, drag.elementId, {
@@ -264,8 +272,12 @@ function SlideElement({
       {editable && selected && !element.locked && (
         <button
           type="button"
-          className="absolute -bottom-2 -right-2 size-4 rounded-full border border-white bg-primary"
-          aria-label="Resize element"
+          className={
+            element.type === 'text'
+              ? 'absolute -right-2 top-1/2 size-4 -translate-y-1/2 cursor-ew-resize rounded-full border border-white bg-primary'
+              : 'absolute -bottom-2 -right-2 size-4 cursor-nwse-resize rounded-full border border-white bg-primary'
+          }
+          aria-label={element.type === 'text' ? 'Resize text box width' : 'Resize element'}
           onPointerDown={onResizePointerDown}
         />
       )}
@@ -289,35 +301,16 @@ function renderElementContent(
 ): React.ReactNode {
   if (element.type === 'text') {
     return (
-      <div
-        className="h-full w-full whitespace-pre-wrap break-words outline-none"
-        contentEditable={editing && !element.locked}
-        suppressContentEditableWarning
-        style={{
-          color: element.color,
-          fontFamily: element.fontFamily,
-          fontSize: `${element.fontSize}px`,
-          fontWeight: element.bold ? 700 : 400,
-          fontStyle: element.italic ? 'italic' : 'normal',
-          textDecoration: element.underline ? 'underline' : 'none',
-          textAlign: element.align,
-          lineHeight: element.lineHeight
-        }}
-        onPointerDown={(event) => editing && event.stopPropagation()}
-        onDoubleClick={(event) => {
-          if (!editable || element.locked) return
-          event.stopPropagation()
-          onStartTextEdit?.()
-        }}
-        onBlur={(event) => {
-          onUpdateElement?.(slideId, element.id, {
-            text: event.currentTarget.textContent ?? ''
-          } as Partial<EditablePresentationElement>)
-          onFinishTextEdit?.()
-        }}
-      >
-        {element.text}
-      </div>
+      <TextElementContent
+        element={element}
+        document={document}
+        slideId={slideId}
+        editable={editable}
+        editing={editing}
+        onUpdateElement={onUpdateElement}
+        onStartTextEdit={onStartTextEdit}
+        onFinishTextEdit={onFinishTextEdit}
+      />
     )
   }
 
@@ -366,4 +359,124 @@ function renderElementContent(
       {element.label}
     </div>
   )
+}
+
+function TextElementContent({
+  element,
+  document,
+  slideId,
+  editable,
+  editing,
+  onUpdateElement,
+  onStartTextEdit,
+  onFinishTextEdit
+}: {
+  element: Extract<EditablePresentationElement, { type: 'text' }>
+  document: EditablePresentationDocument
+  slideId: string
+  editable: boolean
+  editing: boolean
+  onUpdateElement?: (
+    slideId: string,
+    elementId: string,
+    updates: Partial<EditablePresentationElement>
+  ) => void
+  onStartTextEdit?: () => void
+  onFinishTextEdit?: () => void
+}): React.JSX.Element {
+  const contentRef = useRef<HTMLDivElement>(null)
+
+  const fitToText = (text: string): Partial<EditablePresentationElement> => {
+    const updates = measureTextElement(contentRef.current, element, document.width, text)
+    if (!updates) return { text } as Partial<EditablePresentationElement>
+    return { text, ...updates } as Partial<EditablePresentationElement>
+  }
+
+  useLayoutEffect(() => {
+    if (!editable || element.locked || !onUpdateElement) return
+    const updates = measureTextElement(contentRef.current, element, document.width, element.text)
+    if (!updates) return
+    onUpdateElement(slideId, element.id, updates)
+  }, [document.width, editable, element, onUpdateElement, slideId])
+
+  return (
+    <div
+      ref={contentRef}
+      className="h-full w-full whitespace-pre-wrap break-words outline-none"
+      contentEditable={editing && !element.locked}
+      suppressContentEditableWarning
+      style={{
+        color: element.color,
+        fontFamily: element.fontFamily,
+        fontSize: `${element.fontSize}px`,
+        fontWeight: element.bold ? 700 : 400,
+        fontStyle: element.italic ? 'italic' : 'normal',
+        textDecoration: element.underline ? 'underline' : 'none',
+        textAlign: element.align,
+        lineHeight: element.lineHeight
+      }}
+      onInput={(event) => {
+        if (!editing) return
+        onUpdateElement?.(slideId, element.id, fitToText(event.currentTarget.textContent ?? ''))
+      }}
+      onPointerDown={(event) => editing && event.stopPropagation()}
+      onDoubleClick={(event) => {
+        if (!editable || element.locked) return
+        event.stopPropagation()
+        onStartTextEdit?.()
+      }}
+      onBlur={(event) => {
+        onUpdateElement?.(slideId, element.id, fitToText(event.currentTarget.textContent ?? ''))
+        onFinishTextEdit?.()
+      }}
+    >
+      {element.text}
+    </div>
+  )
+}
+
+function measureTextElement(
+  source: HTMLDivElement | null,
+  element: Extract<EditablePresentationElement, { type: 'text' }>,
+  slideWidth: number,
+  text: string
+): Partial<EditablePresentationElement> | null {
+  if (!source || !document.body) return null
+  const measure = source.cloneNode(false) as HTMLDivElement
+  measure.textContent = text || ' '
+  Object.assign(measure.style, {
+    position: 'absolute',
+    left: '-10000px',
+    top: '-10000px',
+    width: 'auto',
+    height: 'auto',
+    minWidth: '0',
+    maxWidth: 'none',
+    overflow: 'visible',
+    pointerEvents: 'none',
+    visibility: 'hidden',
+    whiteSpace: 'pre'
+  })
+  document.body.appendChild(measure)
+  const maxWidth = Math.max(TEXT_MIN_WIDTH, slideWidth - element.x)
+  const naturalWidth = Math.ceil(measure.scrollWidth)
+  const nextWidth =
+    element.autoWidth === false
+      ? element.width
+      : Math.max(TEXT_MIN_WIDTH, Math.min(maxWidth, naturalWidth))
+
+  measure.style.width = `${nextWidth}px`
+  measure.style.whiteSpace = 'pre-wrap'
+  measure.style.overflowWrap = 'break-word'
+  const nextHeight = Math.max(TEXT_MIN_HEIGHT, Math.ceil(measure.scrollHeight))
+  measure.remove()
+
+  const updates: Partial<EditablePresentationElement> = {}
+  if (element.autoWidth !== false && Math.abs(nextWidth - element.width) >= 1) {
+    updates.width = nextWidth
+  }
+  if (Math.abs(nextHeight - element.height) >= 1) {
+    updates.height = nextHeight
+  }
+  return Object.keys(updates).length > 0 ? updates : null
 }

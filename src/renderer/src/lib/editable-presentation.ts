@@ -58,6 +58,7 @@ interface EditableElementBase {
 
 export interface EditableTextElement extends EditableElementBase {
   type: 'text'
+  autoWidth?: boolean
   text: string
   fontFamily: string
   fontSize: number
@@ -300,24 +301,27 @@ export function createBlankEditablePresentationDocument(
 export function createTextElement(
   input: Partial<Omit<EditableTextElement, 'id' | 'type'>> = {}
 ): EditableTextElement {
+  const fontSize = input.fontSize ?? 64
+  const lineHeight = input.lineHeight ?? 1.15
   return {
     id: crypto.randomUUID(),
     type: 'text',
+    autoWidth: input.autoWidth ?? input.width == null,
     x: input.x ?? 260,
     y: input.y ?? 220,
-    width: input.width ?? 700,
-    height: input.height ?? 160,
+    width: input.width ?? 220,
+    height: input.height ?? Math.ceil(fontSize * lineHeight),
     rotation: input.rotation ?? 0,
     opacity: input.opacity ?? 1,
     text: input.text ?? 'Text',
     fontFamily: input.fontFamily ?? DEFAULT_FONT_FAMILY,
-    fontSize: input.fontSize ?? 64,
+    fontSize,
     bold: input.bold ?? false,
     italic: input.italic ?? false,
     underline: input.underline ?? false,
     color: input.color ?? DEFAULT_FOREGROUND_COLOR,
     align: input.align ?? 'left',
-    lineHeight: input.lineHeight ?? 1.15
+    lineHeight
   }
 }
 
@@ -843,6 +847,7 @@ function convertShapeNode(node: ShapeNodeData): EditablePresentationElement[] {
     elements.push({
       id: crypto.randomUUID(),
       type: 'text',
+      autoWidth: false,
       x: node.position.x,
       y: node.position.y,
       width: node.size.w,

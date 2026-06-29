@@ -528,8 +528,12 @@ function EditableDocumentView({
 
   const updateSelectedNumber = (key: 'x' | 'y' | 'width' | 'height', value: string): void => {
     const next = Number(value)
-    if (Number.isFinite(next))
-      updateSelectedElement({ [key]: next } as Partial<EditablePresentationElement>)
+    if (!Number.isFinite(next)) return
+    if (selectedElement?.type === 'text' && key === 'height') return
+    updateSelectedElement({
+      [key]: next,
+      ...(selectedElement?.type === 'text' && key === 'width' ? { autoWidth: false } : {})
+    } as Partial<EditablePresentationElement>)
   }
 
   const updateSlideSize = (value: string): void => {
@@ -703,7 +707,10 @@ function EditableDocumentView({
         ))}
         <span className="mx-1 h-8 w-px bg-divider" />
         {selectedElement &&
-          (['x', 'y', 'width', 'height'] as const).map((key) => (
+          (selectedElement.type === 'text'
+            ? (['x', 'y', 'width'] as const)
+            : (['x', 'y', 'width', 'height'] as const)
+          ).map((key) => (
             <label key={key} className="flex items-center gap-1 text-xs uppercase text-default-400">
               {key}
               <input

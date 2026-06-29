@@ -175,6 +175,19 @@ describe('editable presentation documents', () => {
     expect(svg).not.toContain('stop-opacity=')
   })
 
+  it('marks newly inserted text boxes as auto-width until a fixed width is provided', () => {
+    expect(createTextElement({ text: 'New text' })).toMatchObject({
+      type: 'text',
+      autoWidth: true
+    })
+
+    expect(createTextElement({ text: 'Imported text', width: 360 })).toMatchObject({
+      type: 'text',
+      width: 360,
+      autoWidth: false
+    })
+  })
+
   it('duplicates slides without reusing element ids', () => {
     const blank = createBlankEditablePresentationDocument('Sunday')
     const slideId = blank.slideOrder[0]
