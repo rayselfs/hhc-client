@@ -6,13 +6,11 @@ import DefaultProjection from '@renderer/components/Projection/DefaultProjection
 import BibleProjection from '@renderer/components/Projection/BibleProjection'
 import TimerProjection from '@renderer/components/Projection/TimerProjection'
 import FileProjection from '@renderer/components/Projection/FileProjection'
-import SlideProjection from '@renderer/components/Projection/SlideProjection'
 import type { BibleChapterData } from '@renderer/components/Projection/BibleProjection'
 import type { TimerTickPayload, StopwatchTickPayload } from '@shared/types/timer'
 import type { FileControlPayload, ProjectionPayload } from '@shared/projection-messages'
-import type { SlideDocument } from '@shared/types/slides'
 
-type ActiveContent = 'timer' | 'bible' | 'file' | 'slide' | null
+type ActiveContent = 'timer' | 'bible' | 'file' | null
 type BibleProjectionSettings = ProjectionPayload<'bible:settings'>
 
 export default function ProjectionPage(): React.JSX.Element {
@@ -36,11 +34,6 @@ export default function ProjectionPage(): React.JSX.Element {
     id: number
     data: FileControlPayload
   } | null>(null)
-  const [slideData, setSlideData] = useState<{
-    document: SlideDocument
-    slideIndex: number
-    resolvedImageUrls?: Record<string, string>
-  } | null>(null)
   const [timerRingColor, setTimerRingColor] = useState<string | null>(() => {
     const s = useSettingsStore.getState()
     return s.timerRingColorEnabled ? s.timerRingColor : null
@@ -56,7 +49,6 @@ export default function ProjectionPage(): React.JSX.Element {
     const unsubActiveOwner = adapter.on('__system:active-owner', ({ owner }) => {
       if (owner === 'bible') setActiveContent('bible')
       else if (owner === 'media') setActiveContent('file')
-      else if (owner === 'slide') setActiveContent('slide')
       else setActiveContent('timer')
     })
 
@@ -85,11 +77,6 @@ export default function ProjectionPage(): React.JSX.Element {
         durationMs: data.durationMs
       })
       setActiveContent('file')
-    })
-
-    const unsubSlideShow = adapter.on('slide:show', (data) => {
-      setSlideData(data)
-      setActiveContent('slide')
     })
 
     let fileControlEventId = 0
@@ -139,7 +126,6 @@ export default function ProjectionPage(): React.JSX.Element {
       unsubStopwatch()
       unsubBibleChapter()
       unsubFileShow()
-      unsubSlideShow()
       unsubFileControl()
       unsubBibleSettings()
       unsubTimezone()
@@ -173,16 +159,6 @@ export default function ProjectionPage(): React.JSX.Element {
         initialSeekable={fileData.seekable}
         initialDurationMs={fileData.durationMs}
         controlEvent={fileControlEvent}
-      />
-    )
-  }
-
-  if (activeContent === 'slide' && slideData) {
-    return (
-      <SlideProjection
-        document={slideData.document}
-        slideIndex={slideData.slideIndex}
-        resolvedImageUrls={slideData.resolvedImageUrls}
       />
     )
   }

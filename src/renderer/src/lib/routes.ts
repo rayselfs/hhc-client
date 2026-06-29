@@ -10,10 +10,6 @@ export function isServiceRoute(pathname: string): boolean {
   return pathname === '/service'
 }
 
-export function isSlidesRoute(pathname: string): boolean {
-  return pathname === '/slides'
-}
-
 export function isFilesRoute(pathname: string): boolean {
   return pathname === '/files'
 }

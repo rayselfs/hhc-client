@@ -8,7 +8,6 @@ import {
   projectServiceCue,
   type ServiceCueProjectionResult
 } from '@renderer/lib/service-cue-runner'
-import { useSlidesStore } from '@renderer/stores/slides'
 
 type TranslationFn = ReturnType<typeof useTranslation>['t']
 
@@ -20,20 +19,17 @@ function cueTypeLabel(cue: ServiceCue, t: TranslationFn): string {
       return t('service.cueTypes.bible')
     case 'timer':
       return t('service.cueTypes.timer')
-    case 'slide':
-      return t('service.cueTypes.slide')
     case 'placeholder':
-      return cue.sourceType === 'song' ? t('service.cueTypes.song') : t('service.cueTypes.slide')
+      return t('service.cueTypes.song')
   }
 }
 
 function cueSourceStatus(
   cue: ServiceCue,
-  sourceExists: { media: boolean; slide: boolean },
+  sourceExists: { media: boolean },
   t: TranslationFn
 ): string | null {
   if (cue.type === 'media' && !sourceExists.media) return t('service.missingMediaSource')
-  if (cue.type === 'slide' && !sourceExists.slide) return t('service.missingSlideSource')
   if (cue.type === 'placeholder') return t('service.notImplementedYet')
   return null
 }
@@ -58,13 +54,10 @@ export default function ServiceWorkspace(): React.JSX.Element {
   const selectedCueId = useServicePlaylistStore((state) => state.selectedCueId)
   const previewCueId = useServicePlaylistStore((state) => state.previewCueId)
   const mediaItems = useFileExplorerStore((state) => state.items)
-  const slideDocuments = useSlidesStore((state) => state.documents)
 
   const currentCue = useServicePlaylistStore((state) => state.currentCue())
   const nextCue = useServicePlaylistStore((state) => state.nextCue())
   const previewCue = useServicePlaylistStore((state) => state.previewCue())
-  const currentSlideDocument = useSlidesStore((state) => state.currentDocument())
-  const currentSlide = useSlidesStore((state) => state.selectedSlide())
   const [projectingCueId, setProjectingCueId] = useState<string | null>(null)
   const [projectionMessage, setProjectionMessage] = useState<string | null>(null)
 
@@ -75,12 +68,9 @@ export default function ServiceWorkspace(): React.JSX.Element {
       cues.map((cue, index) => ({
         cue,
         index,
-        mediaExists: cue.type !== 'media' || Boolean(mediaItems[cue.fileItemId]),
-        slideExists:
-          cue.type !== 'slide' ||
-          Boolean(slideDocuments[cue.documentId]?.slides.some((slide) => slide.id === cue.slideId))
+        mediaExists: cue.type !== 'media' || Boolean(mediaItems[cue.fileItemId])
       })),
-    [cues, mediaItems, slideDocuments]
+    [cues, mediaItems]
   )
 
   const addTimerCue = (): void => {
@@ -108,18 +98,6 @@ export default function ServiceWorkspace(): React.JSX.Element {
       title: t('service.defaultMediaCue'),
       fileItemId: 'missing-media-source',
       fileName: t('service.selectMediaLater')
-    })
-  }
-
-  const addSlideCue = (): void => {
-    if (!currentSlideDocument || !currentSlide) return
-    actions.addCue({
-      type: 'slide',
-      title: currentSlide.title,
-      documentId: currentSlideDocument.id,
-      slideId: currentSlide.id,
-      documentTitle: currentSlideDocument.title,
-      slideTitle: currentSlide.title
     })
   }
 
@@ -164,15 +142,6 @@ export default function ServiceWorkspace(): React.JSX.Element {
           </button>
           <button
             type="button"
-            onClick={addSlideCue}
-            disabled={!currentSlideDocument || !currentSlide}
-            className="inline-flex items-center gap-2 rounded-full bg-surface-secondary px-4 py-2 text-sm text-foreground hover:opacity-80 disabled:opacity-40"
-          >
-            <Plus className="size-4" />
-            {t('service.addSlide')}
-          </button>
-          <button
-            type="button"
             onClick={addBibleCue}
             className="inline-flex items-center gap-2 rounded-full bg-surface-secondary px-4 py-2 text-sm text-foreground hover:opacity-80"
           >
@@ -207,8 +176,8 @@ export default function ServiceWorkspace(): React.JSX.Element {
             </div>
           ) : (
             <ol className="flex flex-col gap-2">
-              {cueRows.map(({ cue, index, mediaExists, slideExists }) => {
-                const status = cueSourceStatus(cue, { media: mediaExists, slide: slideExists }, t)
+              {cueRows.map(({ cue, index, mediaExists }) => {
+                const status = cueSourceStatus(cue, { media: mediaExists }, t)
                 const isCurrent = cue.id === currentCueId
                 const isSelected = cue.id === selectedCueId
                 const isPreview = cue.id === previewCueId

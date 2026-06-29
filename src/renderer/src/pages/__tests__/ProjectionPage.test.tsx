@@ -17,12 +17,6 @@ vi.mock('@renderer/components/Projection/FileProjection', () => ({
   )
 }))
 
-vi.mock('@renderer/components/Projection/SlideProjection', () => ({
-  default: ({ slideIndex }: { slideIndex: number }) => (
-    <div data-testid="slide-projection" data-slide-index={slideIndex} />
-  )
-}))
-
 const mockAdapter = (() => {
   const handlers = new Map<string, (data: unknown) => void>()
   return {
@@ -198,36 +192,6 @@ describe('ProjectionPage', () => {
     })
 
     expect(screen.getByTestId('file-projection')).toHaveAttribute('data-control-action', 'play')
-  })
-
-  it('shows slide projection when receiving slide:show', () => {
-    render(<ProjectionPage />)
-
-    act(() => {
-      mockAdapter._trigger('__system:blank', { showDefault: false })
-      mockAdapter._trigger('slide:show', {
-        document: {
-          id: 'deck-1',
-          version: 1,
-          title: 'Deck',
-          size: { width: 1920, height: 1080 },
-          theme: {
-            id: 'default-dark',
-            name: 'Default Dark',
-            fontFamily: 'Inter Variable',
-            textColor: '#ffffff',
-            backgroundColor: '#050505',
-            accentColor: '#0ea5e9'
-          },
-          slides: [],
-          createdAt: 0,
-          updatedAt: 0
-        },
-        slideIndex: 2
-      })
-    })
-
-    expect(screen.getByTestId('slide-projection')).toHaveAttribute('data-slide-index', '2')
   })
 
   it('stops VLC when blanking file projection back to default', async () => {

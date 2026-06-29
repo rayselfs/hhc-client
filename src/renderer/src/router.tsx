@@ -8,7 +8,6 @@ import WelcomePage from '@renderer/pages/WelcomePage'
 const TimerPage = lazy(() => import('@renderer/pages/TimerPage'))
 const BiblePage = lazy(() => import('@renderer/pages/BiblePage'))
 const ServicePage = lazy(() => import('@renderer/pages/ServicePage'))
-const SlidesPage = lazy(() => import('@renderer/pages/SlidesPage'))
 const SoundboardPage = lazy(() => import('@renderer/pages/SoundboardPage'))
 const FilesPage = lazy(() => import('@renderer/pages/FilesPage'))
 const FavoritesPage = lazy(() => import('@renderer/pages/FavoritesPage'))
@@ -54,15 +53,6 @@ const routes = [
         element: (
           <Suspense fallback={null}>
             <ServicePage />
-          </Suspense>
-        ),
-        ErrorBoundary: RouteError
-      },
-      {
-        path: 'slides',
-        element: (
-          <Suspense fallback={null}>
-            <SlidesPage />
           </Suspense>
         ),
         ErrorBoundary: RouteError

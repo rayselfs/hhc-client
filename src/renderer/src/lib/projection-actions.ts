@@ -8,7 +8,6 @@ import { selectFormattedTime } from '@renderer/stores/selectors/stopwatch'
 import { getDisplayValues, useTimerStore } from '@renderer/stores/timer'
 import type { PresentationReadinessReport } from '@renderer/lib/presentation-readiness'
 import type { FileItemRecord } from '@shared/types/folder'
-import type { SlideDocument } from '@shared/types/slides'
 
 export type ProjectionHeaderDisabledReason =
   | 'no-bible-payload'
@@ -151,15 +150,6 @@ export async function startMediaProjection(
   const report = await startMediaPresentation(items, startIndex, options)
   if (report.summary.ready === 0) deps.onNoProjectableFiles?.()
   return report
-}
-
-export async function startSlideProjection(
-  document: SlideDocument,
-  slideIndex: number,
-  { startProjection }: ProjectionStartDeps,
-  resolvedImageUrls?: Record<string, string>
-): Promise<void> {
-  await startProjection('slide', [['slide:show', { document, slideIndex, resolvedImageUrls }]])
 }
 
 export async function stopProjectionSession({ stopProjection }: ProjectionStopDeps): Promise<void> {

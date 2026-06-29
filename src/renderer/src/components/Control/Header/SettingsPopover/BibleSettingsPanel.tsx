@@ -5,7 +5,7 @@ import { Switch } from '@heroui/react/switch'
 import { Select } from '@heroui/react/select'
 import { ListBox } from '@heroui/react/list-box'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
-import { BUILT_IN_SLIDE_TEMPLATES } from '@renderer/lib/slide-templates'
+import { BUILT_IN_BIBLE_PROJECTION_TEMPLATES } from '@renderer/lib/bible-projection-templates'
 
 export default function BibleSettingsPanel(): React.JSX.Element {
   const { t } = useTranslation()
@@ -44,7 +44,7 @@ export default function BibleSettingsPanel(): React.JSX.Element {
         </Select.Trigger>
         <Select.Popover>
           <ListBox>
-            {BUILT_IN_SLIDE_TEMPLATES.map((template) => (
+            {BUILT_IN_BIBLE_PROJECTION_TEMPLATES.map((template) => (
               <ListBox.Item
                 key={template.id}
                 id={template.id}

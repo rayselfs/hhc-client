@@ -86,24 +86,6 @@ describe('service playlist store', () => {
     expect(state.selectedCueId).toBe(duplicateId)
   })
 
-  it('adds slide cues for native slide documents', () => {
-    const cueId = useServicePlaylistStore.getState().addCue({
-      type: 'slide',
-      title: 'Welcome Slide',
-      documentId: 'deck-1',
-      slideId: 'slide-1',
-      documentTitle: 'Sunday Deck',
-      slideTitle: 'Welcome'
-    })
-
-    expect(useServicePlaylistStore.getState().cues[0]).toMatchObject({
-      id: cueId,
-      type: 'slide',
-      documentId: 'deck-1',
-      slideId: 'slide-1'
-    })
-  })
-
   it('removes current cue and selects the first remaining cue', () => {
     const firstId = addMediaCue('A')
     const secondId = addMediaCue('B')

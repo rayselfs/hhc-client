@@ -3,7 +3,6 @@
     "timer": "计时器",
     "bible": "圣经",
     "service": "流程",
-    "slides": "幻灯片",
     "soundboard": "音效板",
     "files": "文件",
     "media": "多媒体",
@@ -19,9 +18,8 @@
   },
   "service": {
     "title": "流程",
-    "subtitle": "建立聚会流程，依序安排多媒体、圣经、计时器与未来的幻灯片 cue。",
+    "subtitle": "建立聚会流程，依序安排多媒体、圣经、计时器。",
     "addMedia": "新增媒体",
-    "addSlide": "新增幻灯片",
     "addBible": "新增圣经",
     "addTimer": "新增计时器",
     "projectCurrentCue": "投影目前 Cue",
@@ -46,7 +44,6 @@
     "currentCue": "目前",
     "nextCue": "下一个",
     "missingMediaSource": "找不到媒体来源",
-    "missingSlideSource": "找不到幻灯片来源",
     "notImplementedYet": "尚未实现",
     "projectErrors": {
       "missingSource": "这个 Cue 找不到来源。",
@@ -58,35 +55,8 @@
       "media": "媒体",
       "bible": "圣经",
       "timer": "计时器",
-      "song": "歌曲",
-      "slide": "幻灯片"
+      "song": "歌曲"
     }
-  },
-  "slides": {
-    "title": "幻灯片",
-    "emptyDescription": "建立 LibrePresenter 原生幻灯片，用于诗歌、公告与聚会流程。",
-    "createDeck": "建立幻灯片组",
-    "importPptx": "导入 PPTX",
-    "importing": "导入中...",
-    "importFailed": "无法导入这个 PPTX 文件。",
-    "importedDeckTitle": "导入的 PPTX",
-    "defaultDeckTitle": "未命名幻灯片组",
-    "defaultText": "新增文字",
-    "slideCount": "{{count}} 张幻灯片",
-    "slideCount_other": "{{count}} 张幻灯片",
-    "deckTitle": "幻灯片组名称",
-    "template": "模板",
-    "addSlide": "新增幻灯片",
-    "projectSlide": "投影幻灯片",
-    "projecting": "投影中...",
-    "slideTitle": "幻灯片名称",
-    "backgroundColor": "背景颜色",
-    "addText": "新增文字",
-    "elements": "元素",
-    "noTextElements": "尚未建立文字元素。",
-    "textContent": "文字内容",
-    "fontSize": "字号",
-    "removeElement": "移除元素"
   },
   "timer": {
     "title": "计时器",
@@ -680,12 +650,12 @@
       "retentionLabel": "垃圾桶保留期限",
       "retentionDesc": "垃圾桶中的项目将在此期限后永久删除",
       "days": {
+        "0": "永久",
         "7": "7 天",
         "14": "14 天",
         "30": "30 天",
         "60": "60 天",
-        "90": "90 天",
-        "0": "永久"
+        "90": "90 天"
       }
     },
     "media": {

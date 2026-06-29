@@ -14,10 +14,9 @@ export type ContentMessageTuple = {
  * Who currently "owns" the projection display.
  * - 'timer': TimerProjectionBridge drives the projection (default)
  * - 'bible': Bible page has taken over
- * - 'media': Media page has taken over (reserved for future use)
- * - 'slide': Native slide documents have taken over
+ * - 'media': Media page has taken over
  */
-export type ProjectionOwner = 'timer' | 'bible' | 'media' | 'slide'
+export type ProjectionOwner = 'timer' | 'bible' | 'media'
 
 interface ProjectOptions {
   /** When true, auto-reopen projection if it's closed. Default: false. */

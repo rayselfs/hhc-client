@@ -10,7 +10,7 @@
  */
 
 import type { TimerTickPayload, TimerSyncPayload, StopwatchTickPayload } from './types/timer'
-import type { SlideDocument, SlideTheme } from './types/slides'
+import type { ProjectionTheme } from './types/projection-theme'
 
 export interface SystemMessages {
   '__system:ready': null
@@ -46,7 +46,7 @@ export interface AppMessages {
   /** Bible display settings (font size, etc.) — sent independently from verse content */
   'bible:settings': {
     fontSize: number
-    templateTheme?: SlideTheme
+    templateTheme?: ProjectionTheme
   }
   /** File item to display on projection (stub — coming soon) */
   'file:show': {
@@ -60,12 +60,6 @@ export interface AppMessages {
     streamUrl?: string
     seekable?: boolean
     durationMs?: number
-  }
-  /** Native LibrePresenter slide document to display on projection. */
-  'slide:show': {
-    document: SlideDocument
-    slideIndex: number
-    resolvedImageUrls?: Record<string, string>
   }
   /** File playback/control actions on projection */
   'file:control': FileControlPayload

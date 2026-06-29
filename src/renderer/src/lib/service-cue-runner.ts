@@ -4,13 +4,11 @@ import { useBibleStore } from '@renderer/stores/bible'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 import type { ServiceCue } from '@renderer/stores/service-playlist'
-import { useSlidesStore } from '@renderer/stores/slides'
 import { getBibleProjectionSettingsPayload } from '@renderer/lib/bible-projection-settings'
 import { isPresentable } from '@renderer/lib/presentability'
 import {
   startBibleProjection,
   startMediaProjection,
-  startSlideProjection,
   startTimerProjection
 } from '@renderer/lib/projection-actions'
 import { isFileItem, type FileItemRecord } from '@shared/types/folder'
@@ -123,18 +121,6 @@ async function projectBibleCue(
   return { status: 'projected' }
 }
 
-async function projectSlideCue(
-  cue: Extract<ServiceCue, { type: 'slide' }>,
-  deps: ProjectServiceCueDependencies
-): Promise<ServiceCueProjectionResult> {
-  const document = useSlidesStore.getState().documents[cue.documentId]
-  const slideIndex = document?.slides.findIndex((slide) => slide.id === cue.slideId) ?? -1
-  if (!document || slideIndex < 0) return { status: 'missing-source' }
-
-  await startSlideProjection(document, slideIndex, deps)
-  return { status: 'projected' }
-}
-
 export async function projectServiceCue(
   cue: ServiceCue,
   deps: ProjectServiceCueDependencies
@@ -147,8 +133,6 @@ export async function projectServiceCue(
     case 'timer':
       await startTimerProjection(deps)
       return { status: 'projected' }
-    case 'slide':
-      return projectSlideCue(cue, deps)
     case 'placeholder':
       return { status: 'not-implemented' }
   }

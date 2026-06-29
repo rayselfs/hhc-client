@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { projectServiceCue } from '../service-cue-runner'
 import { useBibleSettingsStore } from '@renderer/stores/bible-settings'
 import { useBibleStore } from '@renderer/stores/bible'
-import { useSlidesStore } from '@renderer/stores/slides'
 import type { ServiceCue } from '@renderer/stores/service-playlist'
 import type { FileItemRecord } from '@shared/types/folder'
 
@@ -23,7 +22,6 @@ function makeFile(id: string, mimeType = 'video/mp4'): FileItemRecord {
 
 describe('projectServiceCue', () => {
   beforeEach(() => {
-    useSlidesStore.getState().clear()
     useBibleSettingsStore.setState({
       selectedVersionId: 1,
       fontSize: 88,
@@ -166,33 +164,5 @@ describe('projectServiceCue', () => {
       chapter: 3,
       verse: 16
     })
-  })
-
-  it('projects native slide cues', async () => {
-    const documentId = useSlidesStore.getState().createDocument('Sunday Deck')
-    const document = useSlidesStore.getState().documents[documentId]
-    const slideId = document.slides[0]?.id
-    if (!slideId) throw new Error('Expected slide')
-    const startProjection = vi.fn(() => Promise.resolve())
-    const cue: ServiceCue = {
-      id: 'slide-cue',
-      type: 'slide',
-      title: 'Welcome',
-      documentId,
-      slideId,
-      documentTitle: 'Sunday Deck',
-      slideTitle: 'Welcome',
-      notes: '',
-      completed: false,
-      createdAt: 0,
-      updatedAt: 0
-    }
-
-    await expect(projectServiceCue(cue, { startProjection })).resolves.toEqual({
-      status: 'projected'
-    })
-    expect(startProjection).toHaveBeenCalledWith('slide', [
-      ['slide:show', { document, slideIndex: 0 }]
-    ])
   })
 })
