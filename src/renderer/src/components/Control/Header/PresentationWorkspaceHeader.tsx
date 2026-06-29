@@ -156,11 +156,12 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
   }
 
   return (
-    <header className="flex h-12 shrink-0 items-end gap-1 border-b border-divider bg-content1/80 px-3">
+    <header className="relative flex h-12 shrink-0 items-end gap-1 bg-content1/80 px-3">
+      <span className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-divider" />
       <Button
         isIconOnly
         variant="ghost"
-        className="mb-1"
+        className="relative z-10 mb-1"
         onPress={() => navigate('/files')}
         aria-label={t('presentationWorkspace.backToFiles')}
       >
@@ -169,7 +170,7 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
       <Button
         isIconOnly
         variant="ghost"
-        className="mb-1"
+        className="relative z-10 mb-1"
         isDisabled={!canUndo}
         onPress={() => {
           if (!activeItemId) return
@@ -188,10 +189,10 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
           key={deck.itemId}
           role="button"
           tabIndex={0}
-          className={`flex h-10 max-w-56 items-center gap-2 rounded-t-xl border px-3 text-sm ${
+          className={`relative flex h-10 max-w-56 items-center gap-2 rounded-t-xl border px-3 text-sm ${
             deck.itemId === activeItemId
-              ? 'border-divider border-b-background bg-background text-foreground'
-              : 'border-transparent bg-content2 text-default-500 hover:text-foreground'
+              ? 'z-20 -mb-px border-divider border-b-background bg-background text-foreground shadow-sm'
+              : 'z-10 mb-px border-transparent bg-content2 text-default-500 hover:text-foreground'
           }`}
           onClick={() => {
             if (editingItemId !== deck.itemId) activateDocument(deck.itemId)
@@ -250,7 +251,7 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
           </button>
         </div>
       ))}
-      <div className="mb-1 ml-auto flex items-center">
+      <div className="relative z-10 mb-1 ml-auto flex items-center">
         <ButtonGroup size="lg">
           <Button
             isIconOnly
