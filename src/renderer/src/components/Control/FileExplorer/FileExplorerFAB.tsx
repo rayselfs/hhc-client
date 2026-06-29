@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, FolderPlus, Upload, Folder, FolderSync } from 'lucide-react'
+import { Plus, FolderPlus, Upload, Folder, FolderSync, Presentation } from 'lucide-react'
 import { Dropdown } from '@heroui/react/dropdown'
 import { useTranslation } from 'react-i18next'
 import { computeExpiresAt, type FolderDuration } from '@shared/types/folder'
@@ -10,6 +10,7 @@ import { OneDriveIcon } from '@renderer/components/icons/OneDriveIcon'
 export interface FileExplorerFABProps {
   onUploadFiles?: () => void
   onUploadFolder?: () => void
+  onCreatePresentation?: () => void
   onAddLocalSyncFolder?: () => void
   onAddOneDrive?: () => void
   isAddOneDriveDisabled?: boolean
@@ -19,6 +20,7 @@ export interface FileExplorerFABProps {
 export default function FileExplorerFAB({
   onUploadFiles,
   onUploadFolder,
+  onCreatePresentation,
   onAddLocalSyncFolder,
   onAddOneDrive,
   isAddOneDriveDisabled = false,
@@ -88,6 +90,7 @@ export default function FileExplorerFAB({
             <Dropdown.Menu
               onAction={(key) => {
                 if (key === 'newFolder' && !isReadOnly) openCreateFolderModal()
+                if (key === 'createPresentation' && !isReadOnly) onCreatePresentation?.()
                 if (key === 'uploadFiles' && !isReadOnly) onUploadFiles?.()
                 if (key === 'uploadFolder' && !isReadOnly) onUploadFolder?.()
                 if (key === 'addLocalSyncFolder') onAddLocalSyncFolder?.()
@@ -107,6 +110,13 @@ export default function FileExplorerFAB({
               )}
               {!isReadOnly && (
                 <Dropdown.Section>
+                  <Dropdown.Item
+                    id="createPresentation"
+                    className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
+                  >
+                    <Presentation size={16} />
+                    {t('fileExplorer.contextMenu.createPresentation')}
+                  </Dropdown.Item>
                   <Dropdown.Item
                     id="uploadFiles"
                     className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"

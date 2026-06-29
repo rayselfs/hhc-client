@@ -273,6 +273,16 @@ const CAPABILITIES: readonly MediaCapability[] = [
     kindLabelFallback: 'PowerPoint Presentation'
   },
   {
+    kind: 'presentation',
+    extensions: ['lpdeck'],
+    canonicalMimeType: 'application/vnd.librepresenter.presentation+json',
+    thumbnail: 'presentation',
+    web: 'native',
+    electron: 'native',
+    kindLabelKey: 'fileKind.presentation',
+    kindLabelFallback: 'Presentation'
+  },
+  {
     kind: 'document',
     extensions: ['ppt'],
     canonicalMimeType: 'application/vnd.ms-powerpoint',

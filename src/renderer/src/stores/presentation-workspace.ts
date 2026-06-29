@@ -1,8 +1,10 @@
 import { create } from 'zustand'
+import { isEditablePresentationMimeType } from '@renderer/lib/presentation-media'
 import type { FileItemRecord } from '@shared/types/folder'
 
 export interface PresentationWorkspaceDocument {
   itemId: string
+  mode: 'pptx' | 'editable'
   name: string
   mimeType: string
   url: string
@@ -28,6 +30,7 @@ interface PresentationWorkspaceState {
 function toWorkspaceDocument(item: FileItemRecord): PresentationWorkspaceDocument {
   return {
     itemId: item.id,
+    mode: isEditablePresentationMimeType(item.mimeType) ? 'editable' : 'pptx',
     name: item.name,
     mimeType: item.mimeType,
     url: item.url,

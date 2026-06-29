@@ -4,7 +4,15 @@ import { getFileSource, openFileExplorerDB } from '@renderer/lib/file-explorer-d
 import { loadPdfjsLib } from '@renderer/lib/pdfjs-loader'
 import type { FileControlPayload } from '@shared/projection-messages'
 import PptxSlideSurface from '@renderer/components/Common/PptxSlideSurface'
-import { isPresentationMimeType } from '@renderer/lib/presentation-media'
+import EditableSlideSurface from '@renderer/components/Common/EditableSlideSurface'
+import {
+  loadEditablePresentation,
+  type EditablePresentationDocument
+} from '@renderer/lib/editable-presentation'
+import {
+  isEditablePresentationMimeType,
+  isPresentationMimeType
+} from '@renderer/lib/presentation-media'
 
 type FileProjectionProps = {
   fileName?: string
@@ -539,6 +547,17 @@ export default function FileProjection({
     )
   }
 
+  if (isEditablePresentationMimeType(mimeType ?? undefined) && initialItemId && initialBlobId) {
+    return (
+      <EditableProjectionSurface
+        itemId={initialItemId}
+        blobId={initialBlobId}
+        fileName={displayName}
+        slideIndex={initialPresentation?.slideIndex ?? 0}
+      />
+    )
+  }
+
   if (isPresentationMimeType(mimeType ?? undefined) && initialItemId && initialBlobId) {
     const presentationMimeType =
       mimeType ?? 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
@@ -561,6 +580,56 @@ export default function FileProjection({
   return (
     <div className="flex h-screen w-full items-center justify-center bg-black">
       <p className="text-white/30 text-sm">{displayName || 'No file loaded'}</p>
+    </div>
+  )
+}
+
+function EditableProjectionSurface({
+  itemId,
+  blobId,
+  fileName,
+  slideIndex
+}: {
+  itemId: string
+  blobId: string
+  fileName: string
+  slideIndex: number
+}): React.JSX.Element {
+  const [document, setDocument] = useState<EditablePresentationDocument | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    void loadEditablePresentation({ id: itemId, url: `blob:${blobId}`, name: fileName })
+      .then((loadedDocument) => {
+        if (!cancelled) setDocument(loadedDocument)
+      })
+      .catch((loadError) => {
+        if (!cancelled) setError(loadError instanceof Error ? loadError.message : String(loadError))
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [blobId, fileName, itemId])
+
+  const slideId =
+    document?.slideOrder[Math.min(slideIndex, Math.max(0, document.slideOrder.length - 1))]
+
+  if (error) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-black p-6 text-center">
+        <p className="text-sm text-danger">{error}</p>
+      </div>
+    )
+  }
+
+  if (!document || !slideId) {
+    return <div className="h-screen w-full bg-black" />
+  }
+
+  return (
+    <div className="flex h-screen w-full items-center justify-center overflow-hidden bg-black">
+      <EditableSlideSurface document={document} slideId={slideId} className="h-full max-h-screen" />
     </div>
   )
 }

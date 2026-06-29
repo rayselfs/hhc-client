@@ -11,7 +11,8 @@ import {
   Upload,
   Folder,
   FolderSync,
-  Cloud
+  Cloud,
+  Presentation
 } from 'lucide-react'
 import React from 'react'
 import { useTranslation } from 'react-i18next'
@@ -74,6 +75,7 @@ export interface ShowEmptyAreaMenuOptions {
   onNewFolder: () => void
   onUploadFiles?: () => void
   onUploadFolder?: () => void
+  onCreatePresentation?: () => void
   onAddLocalSyncFolder?: () => void
   onAddOneDrive?: () => void
   isAddOneDriveDisabled?: boolean
@@ -286,6 +288,7 @@ export function createFolderContextMenu(
       onNewFolder,
       onUploadFiles,
       onUploadFolder,
+      onCreatePresentation,
       onAddLocalSyncFolder,
       onAddOneDrive,
       isAddOneDriveDisabled = false,
@@ -305,9 +308,19 @@ export function createFolderContextMenu(
           : []
 
       const uploadItems: ContextMenuEntry[] =
-        !isReadOnly && (onUploadFiles || onUploadFolder)
+        !isReadOnly && (onUploadFiles || onUploadFolder || onCreatePresentation)
           ? [
               'separator',
+              ...(onCreatePresentation
+                ? [
+                    {
+                      id: 'create-presentation',
+                      label: tKey('createPresentation'),
+                      icon: React.createElement(Presentation, { size: 14 }),
+                      onAction: onCreatePresentation
+                    } as ContextMenuEntry
+                  ]
+                : []),
               ...(onUploadFiles
                 ? [
                     {

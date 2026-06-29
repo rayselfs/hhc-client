@@ -17,6 +17,13 @@ function makePresentationItem(id: string, name: string): FileItemRecord {
   }
 }
 
+function makeEditablePresentationItem(id: string, name: string): FileItemRecord {
+  return {
+    ...makePresentationItem(id, name),
+    mimeType: 'application/vnd.librepresenter.presentation+json'
+  }
+}
+
 describe('presentation workspace store', () => {
   beforeEach(() => {
     usePresentationWorkspaceStore.setState({
@@ -43,6 +50,17 @@ describe('presentation workspace store', () => {
     expect(usePresentationWorkspaceStore.getState().getActiveSlide(first.id)).toBe(3)
     expect(usePresentationWorkspaceStore.getState().getActiveSlide(second.id)).toBe(0)
     expect(usePresentationWorkspaceStore.getState().documents[1].slideCount).toBe(8)
+  })
+
+  it('marks native presentation documents as editable mode', () => {
+    usePresentationWorkspaceStore
+      .getState()
+      .openDocument(makeEditablePresentationItem('deck-1', 'Sunday'))
+
+    expect(usePresentationWorkspaceStore.getState().documents[0]).toMatchObject({
+      itemId: 'deck-1',
+      mode: 'editable'
+    })
   })
 
   it('activates the nearest remaining tab when closing the active presentation', () => {

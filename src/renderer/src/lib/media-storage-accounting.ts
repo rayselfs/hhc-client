@@ -123,6 +123,7 @@ function getDerivedAssetBucket(kind: DerivedAssetKind): keyof MediaStorageUsage 
     case 'media-metadata':
       return 'generatedCoverThumbnails'
     case 'presentation-page-document':
+    case 'editable-presentation-document':
       return 'presentationDocuments'
   }
 }

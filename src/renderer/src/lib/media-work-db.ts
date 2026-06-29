@@ -38,6 +38,7 @@ export type DerivedAssetKind =
   | 'video-poster'
   | 'media-metadata'
   | 'presentation-page-document'
+  | 'editable-presentation-document'
 
 export interface DerivedAssetMetadata {
   kind?: 'image' | 'video' | 'pdf'

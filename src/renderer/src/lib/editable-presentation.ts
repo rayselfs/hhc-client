@@ -1,0 +1,868 @@
+import { getBlobId } from './blob-identity'
+import { openFileExplorerDB } from './file-explorer-db'
+import { getDerivedAsset, putDerivedAsset } from './media-work-db'
+import { EDITABLE_PRESENTATION_MIME_TYPE } from './presentation-media'
+import { readPresentationArrayBuffer } from './presentation-source'
+import { saveThumbnail } from './thumbnail-db'
+import { useFileExplorerStore } from '@renderer/stores/file-explorer'
+import type { FileItemRecord } from '@shared/types/folder'
+import type { PresentationData } from '@aiden0z/pptx-renderer'
+import type { SlideData, SlideNode } from '@aiden0z/pptx-renderer'
+import type { PicNodeData, ShapeNodeData } from '@aiden0z/pptx-renderer'
+
+export const EDITABLE_PRESENTATION_DOCUMENT_KIND = 'editable-presentation-document'
+
+export type EditablePresentationElementType = 'text' | 'image' | 'shape' | 'line' | 'locked'
+export type EditableTextAlign = 'left' | 'center' | 'right'
+export type EditableShapeKind = 'rectangle' | 'ellipse'
+
+export interface EditablePresentationAsset {
+  id: string
+  name: string
+  mimeType: string
+  dataUrl: string
+}
+
+interface EditableElementBase {
+  id: string
+  type: EditablePresentationElementType
+  x: number
+  y: number
+  width: number
+  height: number
+  rotation: number
+  opacity: number
+  locked?: boolean
+}
+
+export interface EditableTextElement extends EditableElementBase {
+  type: 'text'
+  text: string
+  fontFamily: string
+  fontSize: number
+  bold: boolean
+  italic: boolean
+  underline: boolean
+  color: string
+  align: EditableTextAlign
+  lineHeight: number
+}
+
+export interface EditableImageElement extends EditableElementBase {
+  type: 'image'
+  assetId: string
+  crop?: { top: number; right: number; bottom: number; left: number }
+}
+
+export interface EditableShapeElement extends EditableElementBase {
+  type: 'shape'
+  shape: EditableShapeKind
+  fillColor: string
+  strokeColor: string
+  strokeWidth: number
+}
+
+export interface EditableLineElement extends EditableElementBase {
+  type: 'line'
+  strokeColor: string
+  strokeWidth: number
+}
+
+export interface EditableLockedElement extends EditableElementBase {
+  type: 'locked'
+  label: string
+}
+
+export type EditablePresentationElement =
+  | EditableTextElement
+  | EditableImageElement
+  | EditableShapeElement
+  | EditableLineElement
+  | EditableLockedElement
+
+export interface EditablePresentationSlide {
+  id: string
+  name: string
+  background: { type: 'color'; color: string }
+  elementOrder: string[]
+  elements: Record<string, EditablePresentationElement>
+  notes: string
+}
+
+export interface EditablePresentationDocument {
+  id: string
+  name: string
+  sourceItemId?: string
+  sourceBlobId?: string
+  width: number
+  height: number
+  slideOrder: string[]
+  slides: Record<string, EditablePresentationSlide>
+  assets: Record<string, EditablePresentationAsset>
+  createdAt: number
+  updatedAt: number
+}
+
+type EditablePresentationSource = Pick<FileItemRecord, 'id' | 'url' | 'name'>
+
+const DEFAULT_WIDTH = 1920
+const DEFAULT_HEIGHT = 1080
+const DEFAULT_FONT_FAMILY = 'Inter Variable'
+
+export function getEditablePresentationDocumentVariant(itemId: string): string {
+  return `document:${itemId}`
+}
+
+export function createBlankEditablePresentationDocument(
+  name: string,
+  id = crypto.randomUUID()
+): EditablePresentationDocument {
+  const slideId = crypto.randomUUID()
+  const now = Date.now()
+  return {
+    id,
+    name,
+    width: DEFAULT_WIDTH,
+    height: DEFAULT_HEIGHT,
+    slideOrder: [slideId],
+    slides: {
+      [slideId]: {
+        id: slideId,
+        name: 'Slide 1',
+        background: { type: 'color', color: '#111827' },
+        elementOrder: [],
+        elements: {},
+        notes: ''
+      }
+    },
+    assets: {},
+    createdAt: now,
+    updatedAt: now
+  }
+}
+
+export function createTextElement(
+  input: Partial<Omit<EditableTextElement, 'id' | 'type'>> = {}
+): EditableTextElement {
+  return {
+    id: crypto.randomUUID(),
+    type: 'text',
+    x: input.x ?? 260,
+    y: input.y ?? 220,
+    width: input.width ?? 700,
+    height: input.height ?? 160,
+    rotation: input.rotation ?? 0,
+    opacity: input.opacity ?? 1,
+    text: input.text ?? 'Text',
+    fontFamily: input.fontFamily ?? DEFAULT_FONT_FAMILY,
+    fontSize: input.fontSize ?? 64,
+    bold: input.bold ?? false,
+    italic: input.italic ?? false,
+    underline: input.underline ?? false,
+    color: input.color ?? '#ffffff',
+    align: input.align ?? 'left',
+    lineHeight: input.lineHeight ?? 1.15
+  }
+}
+
+export function createShapeElement(
+  shape: EditableShapeKind,
+  input: Partial<Omit<EditableShapeElement, 'id' | 'type' | 'shape'>> = {}
+): EditableShapeElement {
+  return {
+    id: crypto.randomUUID(),
+    type: 'shape',
+    shape,
+    x: input.x ?? 360,
+    y: input.y ?? 280,
+    width: input.width ?? 360,
+    height: input.height ?? 220,
+    rotation: input.rotation ?? 0,
+    opacity: input.opacity ?? 1,
+    fillColor: input.fillColor ?? '#2563eb',
+    strokeColor: input.strokeColor ?? '#ffffff',
+    strokeWidth: input.strokeWidth ?? 0
+  }
+}
+
+export function createLineElement(
+  input: Partial<Omit<EditableLineElement, 'id' | 'type'>> = {}
+): EditableLineElement {
+  return {
+    id: crypto.randomUUID(),
+    type: 'line',
+    x: input.x ?? 360,
+    y: input.y ?? 360,
+    width: input.width ?? 520,
+    height: input.height ?? 0,
+    rotation: input.rotation ?? 0,
+    opacity: input.opacity ?? 1,
+    strokeColor: input.strokeColor ?? '#ffffff',
+    strokeWidth: input.strokeWidth ?? 4
+  }
+}
+
+export function addElementToSlide(
+  document: EditablePresentationDocument,
+  slideId: string,
+  element: EditablePresentationElement
+): EditablePresentationDocument {
+  const slide = document.slides[slideId]
+  if (!slide) return document
+  return {
+    ...document,
+    slides: {
+      ...document.slides,
+      [slideId]: {
+        ...slide,
+        elementOrder: [...slide.elementOrder, element.id],
+        elements: { ...slide.elements, [element.id]: element }
+      }
+    },
+    updatedAt: Date.now()
+  }
+}
+
+export function updateElementInSlide(
+  document: EditablePresentationDocument,
+  slideId: string,
+  elementId: string,
+  updates: Partial<EditablePresentationElement>
+): EditablePresentationDocument {
+  const slide = document.slides[slideId]
+  const element = slide?.elements[elementId]
+  if (!slide || !element) return document
+  return {
+    ...document,
+    slides: {
+      ...document.slides,
+      [slideId]: {
+        ...slide,
+        elements: {
+          ...slide.elements,
+          [elementId]: { ...element, ...updates } as EditablePresentationElement
+        }
+      }
+    },
+    updatedAt: Date.now()
+  }
+}
+
+export function removeElementFromSlide(
+  document: EditablePresentationDocument,
+  slideId: string,
+  elementId: string
+): EditablePresentationDocument {
+  const slide = document.slides[slideId]
+  if (!slide?.elements[elementId]) return document
+  const { [elementId]: _removed, ...elements } = slide.elements
+  return {
+    ...document,
+    slides: {
+      ...document.slides,
+      [slideId]: {
+        ...slide,
+        elementOrder: slide.elementOrder.filter((id) => id !== elementId),
+        elements
+      }
+    },
+    updatedAt: Date.now()
+  }
+}
+
+export function duplicateElementInSlide(
+  document: EditablePresentationDocument,
+  slideId: string,
+  elementId: string
+): { document: EditablePresentationDocument; elementId: string } {
+  const slide = document.slides[slideId]
+  const element = slide?.elements[elementId]
+  if (!slide || !element) return { document, elementId }
+  const nextElement = {
+    ...element,
+    id: crypto.randomUUID(),
+    x: element.x + 24,
+    y: element.y + 24
+  } as EditablePresentationElement
+  return {
+    document: addElementToSlide(document, slideId, nextElement),
+    elementId: nextElement.id
+  }
+}
+
+export function moveEditableSlide(
+  document: EditablePresentationDocument,
+  slideId: string,
+  direction: -1 | 1
+): EditablePresentationDocument {
+  const index = document.slideOrder.indexOf(slideId)
+  const nextIndex = index + direction
+  if (index === -1 || nextIndex < 0 || nextIndex >= document.slideOrder.length) return document
+  const slideOrder = [...document.slideOrder]
+  const [moved] = slideOrder.splice(index, 1)
+  slideOrder.splice(nextIndex, 0, moved)
+  return { ...document, slideOrder, updatedAt: Date.now() }
+}
+
+export function duplicateEditableSlide(
+  document: EditablePresentationDocument,
+  slideId: string
+): EditablePresentationDocument {
+  const slide = document.slides[slideId]
+  if (!slide) return document
+  const nextSlideId = crypto.randomUUID()
+  const elementIdMap = new Map<string, string>()
+  const elements: Record<string, EditablePresentationElement> = {}
+  for (const sourceId of slide.elementOrder) {
+    const element = slide.elements[sourceId]
+    if (!element) continue
+    const nextId = crypto.randomUUID()
+    elementIdMap.set(sourceId, nextId)
+    elements[nextId] = { ...element, id: nextId } as EditablePresentationElement
+  }
+  const slideOrder = [...document.slideOrder]
+  slideOrder.splice(slideOrder.indexOf(slideId) + 1, 0, nextSlideId)
+  return {
+    ...document,
+    slideOrder,
+    slides: {
+      ...document.slides,
+      [nextSlideId]: {
+        ...slide,
+        id: nextSlideId,
+        name: `${slide.name} Copy`,
+        elementOrder: slide.elementOrder
+          .map((sourceId) => elementIdMap.get(sourceId))
+          .filter((id): id is string => Boolean(id)),
+        elements
+      }
+    },
+    updatedAt: Date.now()
+  }
+}
+
+export function addBlankEditableSlide(
+  document: EditablePresentationDocument
+): EditablePresentationDocument {
+  const slideId = crypto.randomUUID()
+  return {
+    ...document,
+    slideOrder: [...document.slideOrder, slideId],
+    slides: {
+      ...document.slides,
+      [slideId]: {
+        id: slideId,
+        name: `Slide ${document.slideOrder.length + 1}`,
+        background: { type: 'color', color: '#111827' },
+        elementOrder: [],
+        elements: {},
+        notes: ''
+      }
+    },
+    updatedAt: Date.now()
+  }
+}
+
+export function removeEditableSlide(
+  document: EditablePresentationDocument,
+  slideId: string
+): EditablePresentationDocument {
+  if (document.slideOrder.length <= 1) return document
+  const { [slideId]: _removed, ...slides } = document.slides
+  return {
+    ...document,
+    slideOrder: document.slideOrder.filter((id) => id !== slideId),
+    slides,
+    updatedAt: Date.now()
+  }
+}
+
+export async function createEditablePresentation(
+  name: string,
+  parentId: string
+): Promise<FileItemRecord> {
+  const itemId = crypto.randomUUID()
+  const normalizedName = name.trim() || 'Untitled Presentation'
+  const document = createBlankEditablePresentationDocument(normalizedName, itemId)
+  return createEditablePresentationItem(document, parentId)
+}
+
+export async function convertPptxToEditablePresentation(
+  item: FileItemRecord
+): Promise<FileItemRecord> {
+  const buffer = await readPresentationArrayBuffer(item)
+  const { parseZip, buildPresentation, materializeAllSlideNodes, RECOMMENDED_ZIP_LIMITS } =
+    await import('@aiden0z/pptx-renderer')
+  const files = await parseZip(buffer, RECOMMENDED_ZIP_LIMITS)
+  const presentation = buildPresentation(files)
+  materializeAllSlideNodes(presentation)
+  const document = convertPresentationData(item, presentation)
+  return createEditablePresentationItem(document, item.parentId)
+}
+
+async function createEditablePresentationItem(
+  document: EditablePresentationDocument,
+  parentId: string
+): Promise<FileItemRecord> {
+  const itemId = document.id
+  const blob = createDocumentBlob(document)
+  const db = await openFileExplorerDB()
+
+  await db.put('file-blobs', {
+    id: itemId,
+    blob,
+    size: blob.size,
+    refCount: 1
+  })
+
+  const itemData: Omit<FileItemRecord, 'sortIndex' | 'createdAt' | 'expiresAt'> = {
+    id: itemId,
+    parentId,
+    type: 'file',
+    name: document.name,
+    url: `blob:${itemId}`,
+    size: blob.size,
+    mimeType: EDITABLE_PRESENTATION_MIME_TYPE
+  }
+  useFileExplorerStore.getState().addItem(itemData)
+  const item = useFileExplorerStore.getState().items[itemId]
+  if (!item || item.type !== 'file') throw new Error('Failed to create presentation item')
+  await saveEditablePresentation(item, document)
+  return item
+}
+
+function convertPresentationData(
+  source: FileItemRecord,
+  presentation: PresentationData
+): EditablePresentationDocument {
+  const documentId = crypto.randomUUID()
+  const now = Date.now()
+  const slides: Record<string, EditablePresentationSlide> = {}
+  const slideOrder: string[] = []
+  const assets: Record<string, EditablePresentationAsset> = {}
+
+  for (const slide of presentation.slides) {
+    const slideId = crypto.randomUUID()
+    const convertedSlide = convertSlide(slide, presentation, assets)
+    slides[slideId] = {
+      ...convertedSlide,
+      id: slideId,
+      name: `Slide ${slide.index + 1}`
+    }
+    slideOrder.push(slideId)
+  }
+
+  return {
+    id: documentId,
+    name: `${stripPresentationExtension(source.name)} Editable`,
+    sourceItemId: source.id,
+    sourceBlobId: getBlobId(source),
+    width: presentation.width,
+    height: presentation.height,
+    slideOrder,
+    slides,
+    assets,
+    createdAt: now,
+    updatedAt: now
+  }
+}
+
+function convertSlide(
+  slide: SlideData,
+  presentation: PresentationData,
+  assets: Record<string, EditablePresentationAsset>
+): Omit<EditablePresentationSlide, 'id' | 'name'> {
+  const elementOrder: string[] = []
+  const elements: Record<string, EditablePresentationElement> = {}
+
+  for (const node of slide.nodes) {
+    const converted = convertNode(node, slide, presentation, assets)
+    for (const element of converted) {
+      elementOrder.push(element.id)
+      elements[element.id] = element
+    }
+  }
+
+  return {
+    background: { type: 'color', color: '#ffffff' },
+    elementOrder,
+    elements,
+    notes: ''
+  }
+}
+
+function convertNode(
+  node: SlideNode,
+  slide: SlideData,
+  presentation: PresentationData,
+  assets: Record<string, EditablePresentationAsset>
+): EditablePresentationElement[] {
+  if (node.nodeType === 'shape') return convertShapeNode(node)
+  if (node.nodeType === 'picture') return convertPictureNode(node, slide, presentation, assets)
+  return [createLockedElement(node, `${node.nodeType} object`)]
+}
+
+function convertShapeNode(node: ShapeNodeData): EditablePresentationElement[] {
+  const elements: EditablePresentationElement[] = []
+  const text = getShapeText(node)
+  const shape = getEditableShapeKind(node.presetGeometry)
+  const fillColor = readSrgbColor(node.fill) ?? 'transparent'
+  const strokeColor = readSrgbColor(node.line) ?? '#000000'
+  const strokeWidth = node.line?.exists() ? 1 : 0
+
+  if (shape && (fillColor !== 'transparent' || strokeWidth > 0)) {
+    elements.push({
+      id: crypto.randomUUID(),
+      type: 'shape',
+      shape,
+      x: node.position.x,
+      y: node.position.y,
+      width: node.size.w,
+      height: node.size.h,
+      rotation: node.rotation,
+      opacity: 1,
+      fillColor,
+      strokeColor,
+      strokeWidth
+    })
+  }
+
+  if (node.presetGeometry === 'line') {
+    elements.push({
+      id: crypto.randomUUID(),
+      type: 'line',
+      x: node.position.x,
+      y: node.position.y,
+      width: node.size.w,
+      height: node.size.h,
+      rotation: node.rotation,
+      opacity: 1,
+      strokeColor,
+      strokeWidth: Math.max(1, strokeWidth)
+    })
+  }
+
+  if (text) {
+    const firstParagraph = node.textBody?.paragraphs[0]
+    const firstRun = firstParagraph?.runs[0]
+    elements.push({
+      id: crypto.randomUUID(),
+      type: 'text',
+      x: node.position.x,
+      y: node.position.y,
+      width: node.size.w,
+      height: node.size.h,
+      rotation: node.rotation,
+      opacity: 1,
+      text,
+      fontFamily: 'Inter Variable',
+      fontSize: (firstRun?.properties?.numAttr('sz') ?? 3200) / 100,
+      bold: firstRun?.properties?.attr('b') === '1',
+      italic: firstRun?.properties?.attr('i') === '1',
+      underline: Boolean(firstRun?.properties?.attr('u')),
+      color: readSrgbColor(firstRun?.properties) ?? '#111827',
+      align: normalizeTextAlign(firstParagraph?.properties?.attr('algn')),
+      lineHeight: 1.15
+    })
+  }
+
+  if (elements.length === 0) return [createLockedElement(node, 'Shape')]
+  return elements
+}
+
+function convertPictureNode(
+  node: PicNodeData,
+  slide: SlideData,
+  presentation: PresentationData,
+  assets: Record<string, EditablePresentationAsset>
+): EditablePresentationElement[] {
+  const asset = resolvePictureAsset(node, slide, presentation, assets)
+  if (!asset) return [createLockedElement(node, 'Picture')]
+  return [
+    {
+      id: crypto.randomUUID(),
+      type: 'image',
+      assetId: asset.id,
+      x: node.position.x,
+      y: node.position.y,
+      width: node.size.w,
+      height: node.size.h,
+      rotation: node.rotation,
+      opacity: 1,
+      crop: node.crop
+    }
+  ]
+}
+
+function resolvePictureAsset(
+  node: PicNodeData,
+  slide: SlideData,
+  presentation: PresentationData,
+  assets: Record<string, EditablePresentationAsset>
+): EditablePresentationAsset | null {
+  if (!node.blipEmbed) return null
+  const rel = slide.rels.get(node.blipEmbed)
+  if (!rel || rel.targetMode) return null
+  const mediaPath = resolveRelTarget(getDirname(slide.slidePath), rel.target)
+  const bytes =
+    presentation.media.get(mediaPath) ??
+    presentation.media.get(mediaPath.replace(/^ppt\//, '')) ??
+    findMediaByBasename(presentation, mediaPath)
+  if (!bytes) return null
+  const assetId = crypto.randomUUID()
+  const mimeType = getMimeTypeFromPath(mediaPath)
+  const asset: EditablePresentationAsset = {
+    id: assetId,
+    name: mediaPath.split('/').at(-1) ?? 'image',
+    mimeType,
+    dataUrl: uint8ArrayToDataUrl(bytes, mimeType)
+  }
+  assets[assetId] = asset
+  return asset
+}
+
+function createLockedElement(node: SlideNode, label: string): EditableLockedElement {
+  return {
+    id: crypto.randomUUID(),
+    type: 'locked',
+    x: node.position.x,
+    y: node.position.y,
+    width: node.size.w,
+    height: node.size.h,
+    rotation: node.rotation,
+    opacity: 1,
+    locked: true,
+    label
+  }
+}
+
+function getShapeText(node: ShapeNodeData): string {
+  return (
+    node.textBody?.paragraphs
+      .map((paragraph) => paragraph.runs.map((run) => run.text).join(''))
+      .join('\n')
+      .trim() ?? ''
+  )
+}
+
+function getEditableShapeKind(presetGeometry: string | undefined): EditableShapeKind | null {
+  if (!presetGeometry || ['rect', 'roundRect'].includes(presetGeometry)) return 'rectangle'
+  if (['ellipse', 'oval'].includes(presetGeometry)) return 'ellipse'
+  return null
+}
+
+function normalizeTextAlign(value: string | undefined): EditableTextAlign {
+  if (value === 'ctr') return 'center'
+  if (value === 'r') return 'right'
+  return 'left'
+}
+
+function readSrgbColor(
+  node:
+    | {
+        child: (name: string) => {
+          child: (name: string) => { attr: (name: string) => string | undefined }
+        }
+      }
+    | undefined
+): string | null {
+  const value = node?.child('solidFill').child('srgbClr').attr('val')
+  return value ? `#${value}` : null
+}
+
+function resolveRelTarget(basePath: string, target: string): string {
+  const parts = `${basePath}/${target}`.split('/')
+  const resolved: string[] = []
+  for (const part of parts) {
+    if (!part || part === '.') continue
+    if (part === '..') {
+      resolved.pop()
+    } else {
+      resolved.push(part)
+    }
+  }
+  return resolved.join('/')
+}
+
+function getDirname(path: string): string {
+  const index = path.lastIndexOf('/')
+  return index === -1 ? '' : path.slice(0, index)
+}
+
+function findMediaByBasename(
+  presentation: PresentationData,
+  mediaPath: string
+): Uint8Array | undefined {
+  const basename = mediaPath.split('/').at(-1)
+  if (!basename) return undefined
+  for (const [key, value] of presentation.media) {
+    if (key.split('/').at(-1) === basename) return value
+  }
+  return undefined
+}
+
+function getMimeTypeFromPath(path: string): string {
+  const extension = path.split('.').at(-1)?.toLowerCase()
+  if (extension === 'jpg' || extension === 'jpeg') return 'image/jpeg'
+  if (extension === 'gif') return 'image/gif'
+  if (extension === 'webp') return 'image/webp'
+  if (extension === 'svg') return 'image/svg+xml'
+  return 'image/png'
+}
+
+function uint8ArrayToDataUrl(bytes: Uint8Array, mimeType: string): string {
+  let binary = ''
+  const chunkSize = 8192
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    binary += String.fromCharCode(...bytes.slice(index, index + chunkSize))
+  }
+  return `data:${mimeType};base64,${btoa(binary)}`
+}
+
+function stripPresentationExtension(name: string): string {
+  return name.replace(/\.(pptx|lpdeck)$/i, '')
+}
+
+export async function loadEditablePresentation(
+  source: EditablePresentationSource
+): Promise<EditablePresentationDocument> {
+  const blobId = getBlobId(source)
+  const asset = await getDerivedAsset(
+    blobId,
+    EDITABLE_PRESENTATION_DOCUMENT_KIND,
+    getEditablePresentationDocumentVariant(source.id)
+  )
+  if (asset?.metadata?.presentationDocumentJson) {
+    return parseEditablePresentation(asset.metadata.presentationDocumentJson)
+  }
+  if (asset?.blob) return parseEditablePresentation(await readBlobText(asset.blob))
+
+  const db = await openFileExplorerDB()
+  const record = await db.get('file-blobs', blobId)
+  if (record?.blob) return parseEditablePresentation(await readBlobText(record.blob))
+
+  throw new Error(`Editable presentation document is missing: ${source.id}`)
+}
+
+export async function saveEditablePresentation(
+  item: Pick<FileItemRecord, 'id' | 'url'>,
+  document: EditablePresentationDocument
+): Promise<void> {
+  const sourceBlobId = getBlobId(item)
+  const nextDocument = { ...document, updatedAt: Date.now() }
+  const body = JSON.stringify(nextDocument)
+  const blob = new Blob([body], { type: EDITABLE_PRESENTATION_MIME_TYPE })
+
+  await putDerivedAsset({
+    sourceBlobId,
+    kind: EDITABLE_PRESENTATION_DOCUMENT_KIND,
+    variant: getEditablePresentationDocumentVariant(item.id),
+    storage: 'indexed-db',
+    mimeType: EDITABLE_PRESENTATION_MIME_TYPE,
+    size: blob.size,
+    status: 'ready',
+    blob,
+    metadata: {
+      presentationDocumentJson: body
+    }
+  })
+
+  const db = await openFileExplorerDB()
+  const record = await db.get('file-blobs', sourceBlobId)
+  await db.put('file-blobs', {
+    id: sourceBlobId,
+    blob,
+    size: blob.size,
+    refCount: record?.refCount ?? 1
+  })
+  const thumbnail = generateEditablePresentationThumbnail(nextDocument)
+  await saveThumbnail(sourceBlobId, thumbnail)
+  window.dispatchEvent(
+    new CustomEvent('hhc:thumbnail-ready', {
+      detail: { itemId: item.id, dataUrl: thumbnail }
+    })
+  )
+}
+
+export function generateEditablePresentationThumbnail(
+  document: EditablePresentationDocument
+): string {
+  const slideId = document.slideOrder[0]
+  const slide = slideId ? document.slides[slideId] : null
+  const elements = slide
+    ? slide.elementOrder
+        .map((elementId) => slide.elements[elementId])
+        .filter((element): element is EditablePresentationElement => Boolean(element))
+    : []
+  const body = elements.map(renderElementSvg).join('')
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${document.width}" height="${document.height}" viewBox="0 0 ${document.width} ${document.height}"><rect width="100%" height="100%" fill="${escapeXml(slide?.background.color ?? '#111827')}"/>${body}</svg>`
+  return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`
+}
+
+function renderElementSvg(element: EditablePresentationElement): string {
+  const transform = `rotate(${element.rotation} ${element.x + element.width / 2} ${element.y + element.height / 2})`
+  if (element.type === 'text') {
+    return `<text x="${element.x}" y="${element.y + element.fontSize}" width="${element.width}" fill="${escapeXml(element.color)}" font-size="${element.fontSize}" font-family="${escapeXml(element.fontFamily)}" font-weight="${element.bold ? 700 : 400}" font-style="${element.italic ? 'italic' : 'normal'}" opacity="${element.opacity}" transform="${transform}">${escapeXml(element.text)}</text>`
+  }
+  if (element.type === 'shape') {
+    if (element.shape === 'ellipse') {
+      return `<ellipse cx="${element.x + element.width / 2}" cy="${element.y + element.height / 2}" rx="${element.width / 2}" ry="${element.height / 2}" fill="${escapeXml(element.fillColor)}" stroke="${escapeXml(element.strokeColor)}" stroke-width="${element.strokeWidth}" opacity="${element.opacity}" transform="${transform}"/>`
+    }
+    return `<rect x="${element.x}" y="${element.y}" width="${element.width}" height="${element.height}" fill="${escapeXml(element.fillColor)}" stroke="${escapeXml(element.strokeColor)}" stroke-width="${element.strokeWidth}" opacity="${element.opacity}" transform="${transform}"/>`
+  }
+  if (element.type === 'line') {
+    return `<line x1="${element.x}" y1="${element.y}" x2="${element.x + element.width}" y2="${element.y + element.height}" stroke="${escapeXml(element.strokeColor)}" stroke-width="${element.strokeWidth}" opacity="${element.opacity}" transform="${transform}"/>`
+  }
+  return ''
+}
+
+function escapeXml(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+}
+
+function createDocumentBlob(document: EditablePresentationDocument): Blob {
+  return new Blob([JSON.stringify(document)], { type: EDITABLE_PRESENTATION_MIME_TYPE })
+}
+
+function parseEditablePresentation(value: string): EditablePresentationDocument {
+  const parsed = JSON.parse(value) as Partial<EditablePresentationDocument>
+  if (
+    !parsed.id ||
+    !parsed.name ||
+    typeof parsed.width !== 'number' ||
+    typeof parsed.height !== 'number' ||
+    !Array.isArray(parsed.slideOrder) ||
+    typeof parsed.slides !== 'object' ||
+    !parsed.slides
+  ) {
+    throw new Error('Invalid editable presentation document')
+  }
+  return {
+    id: parsed.id,
+    name: parsed.name,
+    sourceItemId: parsed.sourceItemId,
+    sourceBlobId: parsed.sourceBlobId,
+    width: parsed.width,
+    height: parsed.height,
+    slideOrder: parsed.slideOrder,
+    slides: parsed.slides as Record<string, EditablePresentationSlide>,
+    assets: parsed.assets ?? {},
+    createdAt: parsed.createdAt ?? Date.now(),
+    updatedAt: parsed.updatedAt ?? Date.now()
+  }
+}
+
+function readBlobText(blob: Blob): Promise<string> {
+  if ('text' in blob && typeof blob.text === 'function') return blob.text()
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result ?? ''))
+    reader.onerror = () =>
+      reject(reader.error ?? new Error('Failed to read editable presentation document'))
+    reader.readAsText(blob)
+  })
+}

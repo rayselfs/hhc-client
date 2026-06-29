@@ -19,6 +19,10 @@ import {
 import { useSoundboardStore } from '@renderer/stores/soundboard'
 import { getUploadMediaPlatform, uploadFiles, uploadFolderFiles } from '@renderer/lib/upload-utils'
 import { Presentation, RefreshCw, Unlink } from 'lucide-react'
+import {
+  convertPptxToEditablePresentation,
+  createEditablePresentation
+} from '@renderer/lib/editable-presentation'
 import { connectLocalSyncFolder, refreshLocalSyncConnection } from '@renderer/lib/local-sync-import'
 import { getCloudProviderAdapter, type CloudRemoteFolder } from '@renderer/lib/cloud-provider'
 import { unlinkSyncRootFolderFromApp } from '@renderer/lib/sync-unlink'
@@ -36,7 +40,11 @@ import {
 import type { ClipboardState } from '@renderer/components/Control/FileExplorer'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
 import { getMediaFileAcceptAttribute } from '@renderer/lib/media-capabilities'
-import { getPresentationWorkspacePath, isPresentationItem } from '@renderer/lib/presentation-media'
+import {
+  getPresentationWorkspacePath,
+  isEditablePresentationMimeType,
+  isPresentationItem
+} from '@renderer/lib/presentation-media'
 import { usePresentationWorkspaceStore } from '@renderer/stores/presentation-workspace'
 import {
   hasNameConflict,
@@ -179,7 +187,26 @@ export default function FilesPage(): React.JSX.Element {
             usePresentationWorkspaceStore.getState().openDocument(item)
             navigate(getPresentationWorkspacePath(item.id))
           }
-        }
+        },
+        ...(!isEditablePresentationMimeType(item.mimeType)
+          ? [
+              {
+                id: 'convert-presentation',
+                label: t('fileExplorer.contextMenu.convertPresentation'),
+                icon: React.createElement(Presentation, { size: 14 }),
+                onAction: () => {
+                  void convertPptxToEditablePresentation(item)
+                    .then((createdItem) => {
+                      usePresentationWorkspaceStore.getState().openDocument(createdItem)
+                      navigate(getPresentationWorkspacePath(createdItem.id))
+                    })
+                    .catch((error) => {
+                      toast.danger(error instanceof Error ? error.message : String(error))
+                    })
+                }
+              } as ContextMenuEntry
+            ]
+          : [])
       ]
     },
     [navigate, t]
@@ -221,6 +248,26 @@ export default function FilesPage(): React.JSX.Element {
     if (isCurrentFolderReadOnly) return
     folderInputRef.current?.click()
   }, [isCurrentFolderReadOnly])
+
+  const handleCreatePresentation = useCallback(async (): Promise<void> => {
+    if (isCurrentFolderReadOnly) return
+    try {
+      const existingNames = useFileExplorerStore
+        .getState()
+        .getItems(currentFolderId)
+        .filter(isFileItem)
+        .map((item) => item.name)
+      const name = resolveUniqueFileName(
+        t('presentationWorkspace.untitledName', 'Untitled Presentation'),
+        existingNames
+      )
+      const item = await createEditablePresentation(name, currentFolderId)
+      usePresentationWorkspaceStore.getState().openDocument(item)
+      navigate(getPresentationWorkspacePath(item.id))
+    } catch (error) {
+      toast.danger(error instanceof Error ? error.message : String(error))
+    }
+  }, [currentFolderId, isCurrentFolderReadOnly, navigate, t])
 
   const handleAddLocalSyncFolder = useCallback(async (): Promise<void> => {
     try {
@@ -727,6 +774,7 @@ export default function FilesPage(): React.JSX.Element {
         onNewFolder: openCreateFolderModal,
         onUploadFiles: handleUploadFiles,
         onUploadFolder: handleUploadFolder,
+        onCreatePresentation: handleCreatePresentation,
         onAddLocalSyncFolder: canAddLocalSyncFolder
           ? () => void handleAddLocalSyncFolder()
           : undefined,
@@ -742,6 +790,7 @@ export default function FilesPage(): React.JSX.Element {
       openCreateFolderModal,
       handleUploadFiles,
       handleUploadFolder,
+      handleCreatePresentation,
       canAddLocalSyncFolder,
       canAddOneDriveFolder,
       handleAddLocalSyncFolder,
@@ -789,6 +838,7 @@ export default function FilesPage(): React.JSX.Element {
       <FileExplorerFAB
         onUploadFiles={handleUploadFiles}
         onUploadFolder={handleUploadFolder}
+        onCreatePresentation={handleCreatePresentation}
         onAddLocalSyncFolder={
           canAddLocalSyncFolder ? () => void handleAddLocalSyncFolder() : undefined
         }
