@@ -1,10 +1,14 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, vi } from 'vitest'
+import { useState } from 'react'
+import type { ComponentProps, JSX } from 'react'
 import EditableSlideSurface from '../EditableSlideSurface'
 import {
   addElementToSlide,
   createBlankEditablePresentationDocument,
-  createTextElement
+  createTextElement,
+  type EditablePresentationDocument,
+  type EditableImageElement
 } from '@renderer/lib/editable-presentation'
 
 describe('EditableSlideSurface', () => {
@@ -14,7 +18,7 @@ describe('EditableSlideSurface', () => {
     const text = createTextElement({ text: 'Drag me' })
     const withText = addElementToSlide(document, slideId, text)
 
-    render(<EditableSlideSurface document={withText} slideId={slideId} editable />)
+    render(<EditableSurfaceHarness document={withText} slideId={slideId} />)
 
     const textBox = screen.getByText('Drag me')
     expect(textBox).not.toHaveAttribute('contenteditable', 'true')
@@ -33,10 +37,9 @@ describe('EditableSlideSurface', () => {
     const withText = addElementToSlide(document, slideId, text)
 
     render(
-      <EditableSlideSurface
+      <EditableSurfaceHarness
         document={withText}
         slideId={slideId}
-        editable
         selectedElementId={text.id}
         onUpdateElement={handleUpdate}
       />
@@ -59,6 +62,44 @@ describe('EditableSlideSurface', () => {
     )
   })
 
+  it('does not commit text while the user is composing East Asian input', () => {
+    mockTextMeasurement()
+    const handleUpdate = vi.fn()
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const slideId = document.slideOrder[0]
+    const text = createTextElement({ text: '', width: 80, height: 30, autoWidth: true })
+    const withText = addElementToSlide(document, slideId, text)
+
+    render(
+      <EditableSurfaceHarness
+        document={withText}
+        slideId={slideId}
+        selectedElementId={text.id}
+        onUpdateElement={handleUpdate}
+      />
+    )
+
+    handleUpdate.mockClear()
+    const textBox = screen.getByRole('textbox')
+    fireEvent.doubleClick(textBox)
+    fireEvent.compositionStart(textBox)
+    textBox.textContent = 'ㄓ'
+    fireEvent.input(textBox)
+
+    expect(handleUpdate).not.toHaveBeenCalled()
+
+    textBox.textContent = '中'
+    fireEvent.compositionEnd(textBox)
+
+    expect(handleUpdate).toHaveBeenCalledWith(
+      slideId,
+      text.id,
+      expect.objectContaining({
+        text: '中'
+      })
+    )
+  })
+
   it('keeps manually-sized text boxes at fixed width and only grows height', () => {
     mockTextMeasurement()
     const handleUpdate = vi.fn()
@@ -68,10 +109,9 @@ describe('EditableSlideSurface', () => {
     const withText = addElementToSlide(document, slideId, text)
 
     render(
-      <EditableSlideSurface
+      <EditableSurfaceHarness
         document={withText}
         slideId={slideId}
-        editable
         selectedElementId={text.id}
         onUpdateElement={handleUpdate}
       />
@@ -112,7 +152,140 @@ describe('EditableSlideSurface', () => {
     expect(screen.getByLabelText('Resize text box width')).toBeInTheDocument()
     expect(screen.queryByLabelText('Resize element')).not.toBeInTheDocument()
   })
+
+  it('renders selected images with native-like resize handles and applied effects', () => {
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const slideId = document.slideOrder[0]
+    const image: EditableImageElement = {
+      id: 'image-1',
+      type: 'image',
+      assetId: 'asset-1',
+      x: 100,
+      y: 100,
+      width: 320,
+      height: 180,
+      rotation: 0,
+      opacity: 0.5,
+      borderColor: '#ff0000',
+      borderWidth: 6,
+      shadow: 'soft'
+    }
+    const withImage = addElementToSlide(
+      {
+        ...document,
+        assets: {
+          'asset-1': {
+            id: 'asset-1',
+            name: 'photo.png',
+            mimeType: 'image/png',
+            dataUrl: 'data:image/png;base64,AAA='
+          }
+        }
+      },
+      slideId,
+      image
+    )
+
+    render(
+      <EditableSlideSurface
+        document={withImage}
+        slideId={slideId}
+        editable
+        selectedElementId={image.id}
+      />
+    )
+
+    expect(screen.getAllByLabelText(/Resize image/)).toHaveLength(8)
+    const imageFrame = screen.getByAltText('photo.png').parentElement
+    expect(imageFrame?.style.borderWidth).toBe('6px')
+    expect(imageFrame?.style.borderStyle).toBe('solid')
+    expect(imageFrame?.style.borderColor).toBe('rgb(255, 0, 0)')
+  })
+
+  it('updates image crop percentages from crop handles', () => {
+    const handleUpdate = vi.fn()
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const slideId = document.slideOrder[0]
+    const image: EditableImageElement = {
+      id: 'image-1',
+      type: 'image',
+      assetId: 'asset-1',
+      x: 100,
+      y: 100,
+      width: 320,
+      height: 180,
+      rotation: 0,
+      opacity: 1
+    }
+    const withImage = addElementToSlide(
+      {
+        ...document,
+        assets: {
+          'asset-1': {
+            id: 'asset-1',
+            name: 'photo.png',
+            mimeType: 'image/png',
+            dataUrl: 'data:image/png;base64,AAA='
+          }
+        }
+      },
+      slideId,
+      image
+    )
+
+    render(
+      <EditableSlideSurface
+        document={withImage}
+        slideId={slideId}
+        editable
+        selectedElementId={image.id}
+        cropElementId={image.id}
+        onUpdateElement={handleUpdate}
+      />
+    )
+
+    const handle = screen.getByLabelText('Crop image left')
+    fireEvent.pointerDown(handle, { clientX: 0, clientY: 0, pointerId: 1 })
+    fireEvent.pointerMove(handle, { clientX: 32, clientY: 0, pointerId: 1 })
+
+    expect(handleUpdate).toHaveBeenCalledWith(
+      slideId,
+      image.id,
+      expect.objectContaining({
+        crop: expect.objectContaining({ left: 10 })
+      })
+    )
+  })
 })
+
+function EditableSurfaceHarness({
+  document,
+  slideId,
+  selectedElementId,
+  cropElementId,
+  onUpdateElement
+}: {
+  document: EditablePresentationDocument
+  slideId: string
+  selectedElementId?: string | null
+  cropElementId?: string | null
+  onUpdateElement?: ComponentProps<typeof EditableSlideSurface>['onUpdateElement']
+}): JSX.Element {
+  const [editingElementId, setEditingElementId] = useState<string | null>(null)
+
+  return (
+    <EditableSlideSurface
+      document={document}
+      slideId={slideId}
+      editable
+      selectedElementId={selectedElementId}
+      editingElementId={editingElementId}
+      cropElementId={cropElementId}
+      onEditingElementChange={setEditingElementId}
+      onUpdateElement={onUpdateElement}
+    />
+  )
+}
 
 function mockTextMeasurement(): void {
   vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockImplementation(function (

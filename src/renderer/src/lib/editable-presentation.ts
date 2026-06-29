@@ -17,6 +17,7 @@ export type EditableTextAlign = 'left' | 'center' | 'right'
 export type EditableShapeKind = 'rectangle' | 'ellipse'
 export type EditableGradientDirection = 'left-right' | 'top-bottom' | 'diagonal'
 export type EditableGradientType = 'linear'
+export type EditableImageShadow = 'none' | 'soft' | 'medium'
 
 export interface EditableGradientStop {
   color: string
@@ -74,6 +75,9 @@ export interface EditableImageElement extends EditableElementBase {
   type: 'image'
   assetId: string
   crop?: { top: number; right: number; bottom: number; left: number }
+  borderColor?: string
+  borderWidth?: number
+  shadow?: EditableImageShadow
 }
 
 export interface EditableShapeElement extends EditableElementBase {
@@ -1128,7 +1132,7 @@ export function generateEditablePresentationThumbnail(
         .map((elementId) => slide.elements[elementId])
         .filter((element): element is EditablePresentationElement => Boolean(element))
     : []
-  const body = elements.map(renderElementSvg).join('')
+  const body = elements.map((element) => renderElementSvg(element, document.assets)).join('')
   const background = renderBackgroundSvg(slide?.background)
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${document.width}" height="${document.height}" viewBox="0 0 ${document.width} ${document.height}">${background}${body}</svg>`
   return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`
@@ -1163,7 +1167,10 @@ function renderBackgroundSvg(background: EditableSlideBackground | undefined): s
   return `<defs><linearGradient id="slide-bg" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}">${stops}</linearGradient></defs><rect width="100%" height="100%" fill="url(#slide-bg)"/>`
 }
 
-function renderElementSvg(element: EditablePresentationElement): string {
+function renderElementSvg(
+  element: EditablePresentationElement,
+  assets: Record<string, EditablePresentationAsset>
+): string {
   const transform = `rotate(${element.rotation} ${element.x + element.width / 2} ${element.y + element.height / 2})`
   if (element.type === 'text') {
     return `<text x="${element.x}" y="${element.y + element.fontSize}" width="${element.width}" fill="${escapeXml(element.color)}" font-size="${element.fontSize}" font-family="${escapeXml(element.fontFamily)}" font-weight="${element.bold ? 700 : 400}" font-style="${element.italic ? 'italic' : 'normal'}" opacity="${element.opacity}" transform="${transform}">${escapeXml(element.text)}</text>`
@@ -1174,10 +1181,58 @@ function renderElementSvg(element: EditablePresentationElement): string {
     }
     return `<rect x="${element.x}" y="${element.y}" width="${element.width}" height="${element.height}" fill="${escapeXml(element.fillColor)}" stroke="${escapeXml(element.strokeColor)}" stroke-width="${element.strokeWidth}" opacity="${element.opacity}" transform="${transform}"/>`
   }
+  if (element.type === 'image') {
+    return renderImageElementSvg(element, assets[element.assetId])
+  }
   if (element.type === 'line') {
     return `<line x1="${element.x}" y1="${element.y}" x2="${element.x + element.width}" y2="${element.y + element.height}" stroke="${escapeXml(element.strokeColor)}" stroke-width="${element.strokeWidth}" opacity="${element.opacity}" transform="${transform}"/>`
   }
   return ''
+}
+
+function renderImageElementSvg(
+  element: EditableImageElement,
+  asset: EditablePresentationAsset | undefined
+): string {
+  if (!asset) return ''
+  const crop = normalizeImageCrop(element.crop)
+  const visibleWidth = Math.max(1, 100 - crop.left - crop.right)
+  const visibleHeight = Math.max(1, 100 - crop.top - crop.bottom)
+  const imageX = element.x - element.width * (crop.left / visibleWidth)
+  const imageY = element.y - element.height * (crop.top / visibleHeight)
+  const imageWidth = element.width * (100 / visibleWidth)
+  const imageHeight = element.height * (100 / visibleHeight)
+  const transform = `rotate(${element.rotation} ${element.x + element.width / 2} ${element.y + element.height / 2})`
+  const clipId = `clip-${element.id.replaceAll(/[^a-zA-Z0-9_-]/g, '')}`
+  const border =
+    element.borderWidth && element.borderWidth > 0
+      ? `<rect x="${element.x}" y="${element.y}" width="${element.width}" height="${element.height}" fill="none" stroke="${escapeXml(element.borderColor ?? '#ffffff')}" stroke-width="${element.borderWidth}" opacity="${element.opacity}" transform="${transform}"/>`
+      : ''
+  const shadowFilter = getImageShadowFilter(element.shadow, element.id)
+  const shadowFilterId = shadowFilter ? `filter="url(#shadow-${element.id})"` : ''
+
+  return `${shadowFilter ?? ''}<defs><clipPath id="${clipId}"><rect x="${element.x}" y="${element.y}" width="${element.width}" height="${element.height}"/></clipPath></defs><image href="${escapeXml(asset.dataUrl)}" x="${imageX}" y="${imageY}" width="${imageWidth}" height="${imageHeight}" opacity="${element.opacity}" transform="${transform}" clip-path="url(#${clipId})" ${shadowFilterId}/>${border}`
+}
+
+function normalizeImageCrop(
+  crop: EditableImageElement['crop']
+): NonNullable<EditableImageElement['crop']> {
+  return {
+    top: crop?.top ?? 0,
+    right: crop?.right ?? 0,
+    bottom: crop?.bottom ?? 0,
+    left: crop?.left ?? 0
+  }
+}
+
+function getImageShadowFilter(
+  shadow: EditableImageElement['shadow'],
+  elementId: string
+): string | null {
+  if (!shadow || shadow === 'none') return null
+  const blur = shadow === 'medium' ? 12 : 8
+  const offset = shadow === 'medium' ? 8 : 5
+  return `<filter id="shadow-${escapeXml(elementId)}" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="${offset}" stdDeviation="${blur}" flood-color="#000000" flood-opacity="0.28"/></filter>`
 }
 
 function escapeXml(value: string): string {

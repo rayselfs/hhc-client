@@ -175,6 +175,54 @@ describe('editable presentation documents', () => {
     expect(svg).not.toContain('stop-opacity=')
   })
 
+  it('renders image crop and effects in generated thumbnails', () => {
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const slideId = document.slideOrder[0]
+    const dataUrl = 'data:image/png;base64,AAA='
+    const withAsset = {
+      ...document,
+      assets: {
+        asset: {
+          id: 'asset',
+          name: 'photo.png',
+          mimeType: 'image/png',
+          dataUrl
+        }
+      }
+    }
+    const withImage = addElementToSlide(withAsset, slideId, {
+      id: 'image-1',
+      type: 'image',
+      assetId: 'asset',
+      x: 10,
+      y: 20,
+      width: 300,
+      height: 200,
+      rotation: 0,
+      opacity: 0.8,
+      crop: { top: 10, right: 20, bottom: 0, left: 5 },
+      borderColor: '#ff0000',
+      borderWidth: 4,
+      shadow: 'soft'
+    })
+    const svg = decodeURIComponent(
+      escape(
+        atob(
+          generateEditablePresentationThumbnail(withImage).replace(
+            /^data:image\/svg\+xml;base64,/,
+            ''
+          )
+        )
+      )
+    )
+
+    expect(svg).toContain(`href="${dataUrl}"`)
+    expect(svg).toContain('clipPath')
+    expect(svg).toContain('stroke="#ff0000"')
+    expect(svg).toContain('stroke-width="4"')
+    expect(svg).toContain('feDropShadow')
+  })
+
   it('marks newly inserted text boxes as auto-width until a fixed width is provided', () => {
     expect(createTextElement({ text: 'New text' })).toMatchObject({
       type: 'text',

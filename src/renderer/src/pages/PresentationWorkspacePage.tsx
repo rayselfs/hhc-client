@@ -11,6 +11,7 @@ import {
   CaseSensitive,
   ChevronDown,
   Circle,
+  Crop,
   Eraser,
   FileText,
   Highlighter,
@@ -77,19 +78,20 @@ import { isFileItem } from '@shared/types/folder'
 import type { SlideHandle } from '@aiden0z/pptx-renderer'
 
 type LoadStatus = 'idle' | 'loading' | 'ready' | 'failed'
-type RibbonTab = 'home' | 'insert' | 'design'
+type RibbonTab = 'home' | 'insert' | 'design' | 'picture'
+type PresentationElementType = EditablePresentationElement['type']
 
 const FONT_FAMILIES = ['Inter Variable', 'Noto Sans TC Variable', 'Noto Sans SC Variable', 'Arial']
 const FONT_SIZES = [12, 14, 16, 18, 24, 32, 44, 56, 72, 96]
 const LINE_SPACING_VALUES = [1, 1.15, 1.5, 2]
-const RIBBON_TABS: RibbonTab[] = ['home', 'insert', 'design']
+const BASE_RIBBON_TABS: RibbonTab[] = ['home', 'insert', 'design']
 const NATIVE_CONTROL_CLASS =
   'presentation-native-control rounded-lg border border-divider bg-content2 px-3 text-sm text-foreground outline-none'
 const RANGE_CLASS = 'presentation-range w-full'
 const RIBBON_ICON_BUTTON_CLASS =
   'inline-flex h-8 min-w-8 items-center justify-center rounded-md border border-transparent px-2 text-default-500 transition-[background-color,border-color,color,box-shadow,transform] hover:border-divider hover:bg-content2/80 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/50 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:border-transparent disabled:hover:bg-transparent'
 const RIBBON_ICON_BUTTON_ACTIVE_CLASS =
-  'border-primary/40 bg-primary/15 text-primary shadow-inner hover:bg-primary/20 hover:text-primary'
+  'border-primary bg-primary text-white shadow-inner hover:border-primary hover:bg-primary/90 hover:text-white'
 const RIBBON_SEPARATOR_CLASS = 'mx-2 h-14 w-px bg-divider'
 
 function SlideThumbnail({
@@ -279,11 +281,13 @@ function PptxDocumentView({ deck }: { deck: PresentationWorkspaceDocument }): Re
 function EditableDocumentView({
   deck,
   activeRibbon,
-  isRibbonOpen
+  isRibbonOpen,
+  onSelectedElementTypeChange
 }: {
   deck: PresentationWorkspaceDocument
   activeRibbon: RibbonTab
   isRibbonOpen: boolean
+  onSelectedElementTypeChange: (type: PresentationElementType | null) => void
 }): React.JSX.Element {
   const { t } = useTranslation()
   const { showMenu } = useContextMenu()
@@ -305,6 +309,7 @@ function EditableDocumentView({
   const [isLineSpacingOptionsOpen, setIsLineSpacingOptionsOpen] = useState(false)
   const [lineSpacingDraft, setLineSpacingDraft] = useState(1.15)
   const [editingElementId, setEditingElementId] = useState<string | null>(null)
+  const [isImageCropMode, setIsImageCropMode] = useState(false)
   const [pressedRibbonAction, setPressedRibbonAction] = useState<string | null>(null)
   const pressedRibbonTimeoutRef = useRef<number | null>(null)
   const [status, setStatus] = useState<LoadStatus>('loading')
@@ -351,6 +356,11 @@ function EditableDocumentView({
   const activeSlide = activeSlideId ? document?.slides[activeSlideId] : null
   const selectedElement =
     activeSlide && selectedElementId ? activeSlide.elements[selectedElementId] : null
+  const selectedImageElement = selectedElement?.type === 'image' ? selectedElement : null
+
+  useEffect(() => {
+    onSelectedElementTypeChange(selectedElement?.type ?? null)
+  }, [onSelectedElementTypeChange, selectedElement?.type])
 
   const commitDocument = (nextDocument: EditablePresentationDocument): void => {
     if (!document) return
@@ -436,6 +446,10 @@ function EditableDocumentView({
       const start = Math.min(selectionAnchorIndex, index)
       const end = Math.max(selectionAnchorIndex, index)
       setSelectedSlideIds(new Set(document.slideOrder.slice(start, end + 1)))
+      setSelectedElementId(null)
+      setEditingElementId(null)
+      setInsertionIndex(null)
+      return
     } else if (event.metaKey || event.ctrlKey) {
       setSelectedSlideIds((current) => {
         const next = new Set(current)
@@ -447,7 +461,10 @@ function EditableDocumentView({
         if (next.size === 0) next.add(slideId)
         return next
       })
-      setSelectionAnchorIndex(index)
+      setSelectedElementId(null)
+      setEditingElementId(null)
+      setInsertionIndex(null)
+      return
     } else {
       setSelectedSlideIds(new Set([slideId]))
       setSelectionAnchorIndex(index)
@@ -637,6 +654,13 @@ function EditableDocumentView({
     updateSelectedElement(updates as Partial<EditablePresentationElement>)
   }
 
+  const updateSelectedImageElement = (
+    updates: Partial<Extract<EditablePresentationElement, { type: 'image' }>>
+  ): void => {
+    if (!selectedImageElement) return
+    updateSelectedElement(updates as Partial<EditablePresentationElement>)
+  }
+
   const openLineSpacingOptions = (): void => {
     setLineSpacingDraft(selectedTextElement?.lineHeight ?? 1.15)
     setIsLineSpacingOptionsOpen(true)
@@ -697,6 +721,96 @@ function EditableDocumentView({
   }
 
   const renderRibbon = (): React.JSX.Element => {
+    if (activeRibbon === 'picture') {
+      return (
+        <div className="flex h-16 items-center gap-3 border-b border-divider bg-content1/80 px-4 text-sm">
+          <Button
+            size="sm"
+            variant={isImageCropMode ? 'primary' : 'tertiary'}
+            isDisabled={!selectedImageElement}
+            onPress={() => setIsImageCropMode((enabled) => !enabled)}
+          >
+            <Crop size={16} />
+            {t('presentationWorkspace.crop', 'Crop')}
+          </Button>
+          <ControlSlider
+            label={t('presentationWorkspace.transparency', 'Transparency')}
+            value={selectedImageElement ? Math.round((1 - selectedImageElement.opacity) * 100) : 0}
+            min={0}
+            max={100}
+            suffix="%"
+            onChange={(value) => updateSelectedImageElement({ opacity: 1 - value / 100 })}
+          />
+          <label className="flex items-center gap-2 text-default-500">
+            <span>{t('presentationWorkspace.borderColor', 'Border')}</span>
+            <input
+              className="h-9 w-12 rounded bg-transparent"
+              type="color"
+              disabled={!selectedImageElement}
+              value={selectedImageElement?.borderColor ?? '#ffffff'}
+              onChange={(event) =>
+                updateSelectedImageElement({ borderColor: event.currentTarget.value })
+              }
+            />
+          </label>
+          <label className="flex items-center gap-2 text-default-500">
+            <span>{t('presentationWorkspace.borderWidth', 'Width')}</span>
+            <select
+              className={`h-9 w-20 disabled:opacity-40 ${NATIVE_CONTROL_CLASS}`}
+              disabled={!selectedImageElement}
+              value={selectedImageElement?.borderWidth ?? 0}
+              onChange={(event) =>
+                updateSelectedImageElement({ borderWidth: Number(event.currentTarget.value) })
+              }
+            >
+              {[0, 1, 2, 4, 6, 8].map((width) => (
+                <option key={width} value={width}>
+                  {width}px
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex items-center gap-2 text-default-500">
+            <span>{t('presentationWorkspace.shadow', 'Shadow')}</span>
+            <select
+              className={`h-9 w-28 disabled:opacity-40 ${NATIVE_CONTROL_CLASS}`}
+              disabled={!selectedImageElement}
+              value={selectedImageElement?.shadow ?? 'none'}
+              onChange={(event) =>
+                updateSelectedImageElement({
+                  shadow: event.currentTarget.value as EditableImageElement['shadow']
+                })
+              }
+            >
+              <option value="none">{t('presentationWorkspace.shadowNone', 'None')}</option>
+              <option value="soft">{t('presentationWorkspace.shadowSoft', 'Soft')}</option>
+              <option value="medium">{t('presentationWorkspace.shadowMedium', 'Medium')}</option>
+            </select>
+          </label>
+          <Button
+            size="sm"
+            variant="tertiary"
+            isDisabled={!selectedImageElement}
+            onPress={() =>
+              selectedImageElement && reorderElement(selectedImageElement.id, 'bring-forward')
+            }
+          >
+            {t('presentationWorkspace.bringForward', 'Bring Forward')}
+          </Button>
+          <Button
+            size="sm"
+            variant="tertiary"
+            isDisabled={!selectedImageElement}
+            onPress={() =>
+              selectedImageElement && reorderElement(selectedImageElement.id, 'send-backward')
+            }
+          >
+            {t('presentationWorkspace.sendBackward', 'Send Backward')}
+          </Button>
+        </div>
+      )
+    }
+
     if (activeRibbon === 'insert') {
       return (
         <div className="flex h-16 items-center gap-2 border-b border-divider bg-content1/80 px-4">
@@ -860,6 +974,7 @@ function EditableDocumentView({
               type="button"
               className={textButtonClass(Boolean(selectedTextElement?.bold))}
               disabled={textDisabled}
+              aria-pressed={Boolean(selectedTextElement?.bold)}
               onClick={() => updateSelectedTextElement({ bold: !selectedTextElement?.bold })}
               aria-label={t('presentationWorkspace.bold', 'Bold')}
             >
@@ -869,6 +984,7 @@ function EditableDocumentView({
               type="button"
               className={textButtonClass(Boolean(selectedTextElement?.italic))}
               disabled={textDisabled}
+              aria-pressed={Boolean(selectedTextElement?.italic)}
               onClick={() => updateSelectedTextElement({ italic: !selectedTextElement?.italic })}
               aria-label={t('presentationWorkspace.italic', 'Italic')}
             >
@@ -878,6 +994,7 @@ function EditableDocumentView({
               type="button"
               className={textButtonClass(Boolean(selectedTextElement?.underline))}
               disabled={textDisabled}
+              aria-pressed={Boolean(selectedTextElement?.underline)}
               onClick={() =>
                 updateSelectedTextElement({ underline: !selectedTextElement?.underline })
               }
@@ -1028,6 +1145,7 @@ function EditableDocumentView({
                 type="button"
                 className={textButtonClass(selectedTextElement?.align === align)}
                 disabled={textDisabled}
+                aria-pressed={selectedTextElement?.align === align}
                 onClick={() => updateSelectedTextElement({ align })}
                 aria-label={t(`presentationWorkspace.align.${align}`, align)}
               >
@@ -1199,10 +1317,10 @@ function EditableDocumentView({
                       aria-label={`Insert before slide ${index + 1}`}
                     >
                       <span
-                        className={`h-1 w-full rounded-full ${
+                        className={`w-full rounded-full ${
                           insertionIndex === index
-                            ? 'animate-pulse bg-[#f59e0b]'
-                            : 'bg-transparent group-hover:bg-[#f59e0b]/50 group-focus-visible:bg-[#f59e0b]/70'
+                            ? 'h-[2px] animate-pulse bg-[#f59e0b]'
+                            : 'h-px bg-transparent group-hover:bg-[#f59e0b]/50 group-focus-visible:bg-[#f59e0b]/70'
                         }`}
                       />
                     </button>
@@ -1249,10 +1367,10 @@ function EditableDocumentView({
                 aria-label="Insert after last slide"
               >
                 <span
-                  className={`h-1 w-full rounded-full ${
+                  className={`w-full rounded-full ${
                     insertionIndex === document.slideOrder.length
-                      ? 'animate-pulse bg-[#f59e0b]'
-                      : 'bg-transparent group-hover:bg-[#f59e0b]/50 group-focus-visible:bg-[#f59e0b]/70'
+                      ? 'h-[2px] animate-pulse bg-[#f59e0b]'
+                      : 'h-px bg-transparent group-hover:bg-[#f59e0b]/50 group-focus-visible:bg-[#f59e0b]/70'
                   }`}
                 />
               </button>
@@ -1269,8 +1387,11 @@ function EditableDocumentView({
                   showBorder
                   selectedElementId={selectedElementId}
                   editingElementId={editingElementId}
+                  cropElementId={isImageCropMode ? (selectedImageElement?.id ?? null) : null}
                   onSelectElement={(elementId) => {
                     setSelectedElementId(elementId)
+                    const nextElement = elementId ? activeSlide?.elements[elementId] : null
+                    if (nextElement?.type !== 'image') setIsImageCropMode(false)
                     if (elementId !== editingElementId) setEditingElementId(null)
                   }}
                   onEditingElementChange={setEditingElementId}
@@ -1717,7 +1838,15 @@ export default function PresentationWorkspacePage(): React.JSX.Element {
   const activeDocument = usePresentationWorkspaceStore((state) => state.getActiveDocument())
   const [activeRibbon, setActiveRibbon] = useState<RibbonTab>('home')
   const [isRibbonOpen, setIsRibbonOpen] = useState(true)
-  const activeRibbonIndex = RIBBON_TABS.indexOf(activeRibbon)
+  const [selectedElementType, setSelectedElementType] = useState<PresentationElementType | null>(
+    null
+  )
+  const ribbonTabs = useMemo<RibbonTab[]>(
+    () => (selectedElementType === 'image' ? [...BASE_RIBBON_TABS, 'picture'] : BASE_RIBBON_TABS),
+    [selectedElementType]
+  )
+  const effectiveActiveRibbon = ribbonTabs.includes(activeRibbon) ? activeRibbon : 'home'
+  const activeRibbonIndex = Math.max(0, ribbonTabs.indexOf(effectiveActiveRibbon))
 
   useEffect(() => {
     if (!itemId) return
@@ -1745,27 +1874,37 @@ export default function PresentationWorkspacePage(): React.JSX.Element {
     setIsRibbonOpen(true)
   }
 
+  const getRibbonTabLabel = (tab: RibbonTab): string => {
+    const fallbacks: Record<RibbonTab, string> = {
+      home: '常用',
+      insert: '插入',
+      design: '設計',
+      picture: '圖片格式'
+    }
+    return t(`presentationWorkspace.${tab}`, fallbacks[tab])
+  }
+
   return (
     <div className="flex h-full flex-col bg-background text-foreground">
       <div className="relative flex h-10 shrink-0 items-end bg-background px-4">
-        {RIBBON_TABS.map((tab) => (
+        {ribbonTabs.map((tab) => (
           <button
             key={tab}
             type="button"
-            aria-selected={activeRibbon === tab}
-            className={`h-9 w-14 rounded-t-lg text-sm transition-colors ${
-              activeRibbon === tab
+            aria-selected={effectiveActiveRibbon === tab}
+            className={`h-9 w-16 rounded-t-lg text-sm transition-colors ${
+              effectiveActiveRibbon === tab
                 ? 'bg-content1 text-foreground'
                 : 'text-default-500 hover:bg-content1/60 hover:text-foreground'
             }`}
             onClick={() => handleRibbonTabClick(tab)}
           >
-            {t(`presentationWorkspace.${tab}`)}
+            {getRibbonTabLabel(tab)}
           </button>
         ))}
         <span
-          className="pointer-events-none absolute bottom-0 left-4 z-10 h-1 w-14 bg-[#0ea5e9] transition-transform duration-200 ease-out"
-          style={{ transform: `translateX(${activeRibbonIndex * 56}px)` }}
+          className="pointer-events-none absolute bottom-0 left-4 z-10 h-1 w-16 bg-[#0ea5e9] transition-transform duration-200 ease-out"
+          style={{ transform: `translateX(${activeRibbonIndex * 64}px)` }}
         />
       </div>
 
@@ -1773,8 +1912,9 @@ export default function PresentationWorkspacePage(): React.JSX.Element {
         activeDocument.mode === 'editable' ? (
           <EditableDocumentView
             deck={activeDocument}
-            activeRibbon={activeRibbon}
+            activeRibbon={effectiveActiveRibbon}
             isRibbonOpen={isRibbonOpen}
+            onSelectedElementTypeChange={setSelectedElementType}
           />
         ) : (
           <PptxDocumentView deck={activeDocument} />
