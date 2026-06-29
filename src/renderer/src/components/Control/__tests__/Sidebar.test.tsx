@@ -43,19 +43,19 @@ describe('Sidebar', () => {
     expect(screen.getByRole('navigation')).toBeInTheDocument()
     expect(screen.getByText('TIMER')).toBeInTheDocument()
     expect(screen.getByText('BIBLE')).toBeInTheDocument()
-    expect(screen.getByText('SERVICE')).toBeInTheDocument()
     expect(screen.getByText('SLIDES')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /soundboard/i })).toHaveAttribute('href', '/soundboard')
+    expect(screen.queryByRole('link', { name: /service/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /soundboard/i })).not.toBeInTheDocument()
   })
 
-  it('renders Timer, Bible, Service, and Slides labels in zh-TW', async () => {
+  it('renders Timer, Bible, and Slides labels in zh-TW', async () => {
     await i18n.changeLanguage('zh-TW')
     renderWithRouter(['/'])
     expect(screen.getByText('計時器')).toBeInTheDocument()
     expect(screen.getByText('聖經')).toBeInTheDocument()
-    expect(screen.getByText('流程')).toBeInTheDocument()
     expect(screen.getByText('投影片')).toBeInTheDocument()
-    expect(screen.getByText('音效板')).toBeInTheDocument()
+    expect(screen.queryByText('流程')).not.toBeInTheDocument()
+    expect(screen.queryByText('音效板')).not.toBeInTheDocument()
     await act(() => i18n.changeLanguage('en'))
   })
 

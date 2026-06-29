@@ -123,24 +123,6 @@ describe('Router', () => {
     expect(screen.queryByTestId('timer-page')).not.toBeInTheDocument()
   })
 
-  it('navigates from timer to service via sidebar link', async () => {
-    const user = userEvent.setup()
-    const router = createMemoryRouter(routes, { initialEntries: ['/'] })
-    render(
-      <ThemeProvider>
-        <RouterProvider router={router} />
-      </ThemeProvider>
-    )
-
-    expect(await screen.findByTestId('timer-page')).toBeInTheDocument()
-
-    const serviceLink = screen.getByRole('link', { name: /service/i })
-    await user.click(serviceLink)
-
-    expect(await screen.findByTestId('service-page')).toBeInTheDocument()
-    expect(screen.queryByTestId('timer-page')).not.toBeInTheDocument()
-  })
-
   it('navigates from timer to slides via sidebar link', async () => {
     const user = userEvent.setup()
     const router = createMemoryRouter(routes, { initialEntries: ['/'] })
