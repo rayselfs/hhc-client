@@ -116,7 +116,8 @@ export default defineConfig(({ mode }) => {
             globIgnores: [
               '**/assets/pdf-*.js',
               '**/assets/transformers-*.js',
-              '**/assets/microsoft.cognitiveservices.speech.sdk-*.js'
+              '**/assets/microsoft.cognitiveservices.speech.sdk-*.js',
+              '**/assets/aiden0z-pptx-renderer*.js'
             ],
             navigateFallback: '/index.html',
             navigateFallbackDenylist: [/^\/api\//],
@@ -126,7 +127,8 @@ export default defineConfig(({ mode }) => {
                   url.pathname.endsWith('.woff2') ||
                   /\/assets\/(pdf|transformers|microsoft\.cognitiveservices\.speech\.sdk)-/.test(
                     url.pathname
-                  ),
+                  ) ||
+                  /\/assets\/aiden0z-pptx-renderer/.test(url.pathname),
                 handler: 'CacheFirst',
                 options: {
                   cacheName: 'hhc-optional-assets',
