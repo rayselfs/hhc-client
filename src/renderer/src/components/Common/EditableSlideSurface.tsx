@@ -46,6 +46,7 @@ const MIN_ELEMENT_SIZE = 20
 const MAX_CROP_TOTAL = 95
 
 const IMAGE_HANDLES: ResizeHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
+const TEXT_HANDLES: ResizeHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
 
 export default function EditableSlideSurface({
   document,
@@ -149,9 +150,9 @@ export default function EditableSlideSurface({
       onUpdateElement?.(slideId, drag.elementId, {
         crop: calculateImageCrop(drag.original.crop, drag.handle, dx, dy, drag.original)
       } as Partial<EditablePresentationElement>)
-    } else if (drag.original.type === 'text') {
+    } else if (drag.original.type === 'text' && drag.handle) {
       onUpdateElement?.(slideId, drag.elementId, {
-        width: Math.max(TEXT_MIN_WIDTH, drag.original.width + dx),
+        ...calculateTextResize(drag.original, drag.handle, dx, dy),
         autoWidth: false
       } as Partial<EditablePresentationElement>)
     } else if (drag.original.type === 'image' && drag.handle) {
@@ -378,14 +379,19 @@ function ElementHandles({
 }): React.JSX.Element {
   if (element.type === 'text') {
     return (
-      <button
-        type="button"
-        className="absolute -right-2 top-1/2 size-5 -translate-y-1/2 cursor-ew-resize rounded-full border border-white bg-primary"
-        aria-label="Resize text box width"
-        onPointerDown={(event) => onResizePointerDown(event, 'e')}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-      />
+      <>
+        {TEXT_HANDLES.map((handle) => (
+          <button
+            key={`resize-text-${handle}`}
+            type="button"
+            className={`${getHandlePositionClass(handle)} ${getHandleCursorClass(handle)} absolute size-3 rounded-[2px] border border-white bg-primary`}
+            aria-label={`Resize text box ${handleToLabel(handle)}`}
+            onPointerDown={(event) => onResizePointerDown(event, handle)}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+          />
+        ))}
+      </>
     )
   }
 
@@ -535,6 +541,28 @@ function ImageElementContent({
   )
 }
 
+function calculateTextResize(
+  element: Extract<EditablePresentationElement, { type: 'text' }>,
+  handle: ResizeHandle,
+  dx: number,
+  dy: number
+): Partial<EditablePresentationElement> {
+  const hasWest = handle.includes('w')
+  const hasEast = handle.includes('e')
+  const hasNorth = handle.includes('n')
+  const hasSouth = handle.includes('s')
+
+  const width = Math.max(TEXT_MIN_WIDTH, element.width + (hasEast ? dx : hasWest ? -dx : 0))
+  const height = Math.max(TEXT_MIN_HEIGHT, element.height + (hasSouth ? dy : hasNorth ? -dy : 0))
+
+  return {
+    x: hasWest ? element.x + (element.width - width) : element.x,
+    y: hasNorth ? element.y + (element.height - height) : element.y,
+    width,
+    height
+  } as Partial<EditablePresentationElement>
+}
+
 function TextElementContent({
   element,
   document,
@@ -561,6 +589,7 @@ function TextElementContent({
   const contentRef = useRef<HTMLDivElement>(null)
   const isComposingRef = useRef(false)
   const initializedEditingElementRef = useRef<string | null>(null)
+  const blurFrameRef = useRef<number | null>(null)
 
   const fitToText = (text: string): Partial<EditablePresentationElement> => {
     const updates = measureTextElement(contentRef.current, element, document.width, text)
@@ -570,6 +599,17 @@ function TextElementContent({
 
   const commitText = (text: string): void => {
     onUpdateElement?.(slideId, element.id, fitToText(text))
+  }
+
+  const focusEditableContent = (content: HTMLDivElement): void => {
+    content.focus()
+    const selection = window.getSelection()
+    if (!selection) return
+    const range = window.document.createRange()
+    range.selectNodeContents(content)
+    range.collapse(false)
+    selection.removeAllRanges()
+    selection.addRange(range)
   }
 
   useLayoutEffect(() => {
@@ -586,20 +626,27 @@ function TextElementContent({
     if (initializedEditingElementRef.current === element.id) return
     initializedEditingElementRef.current = element.id
     content.textContent = element.text
-    content.focus()
-    const selection = window.getSelection()
-    if (!selection) return
-    const range = window.document.createRange()
-    range.selectNodeContents(content)
-    range.collapse(false)
-    selection.removeAllRanges()
-    selection.addRange(range)
+    focusEditableContent(content)
   }, [editing, element.id, element.locked, element.text])
+
+  useLayoutEffect(() => {
+    if (!editing || element.locked) return
+    const content = contentRef.current
+    if (!content) return
+    if (window.document.activeElement === content) return
+    focusEditableContent(content)
+  }, [editing, element.height, element.locked, element.width])
 
   useLayoutEffect(() => {
     if (editing) return
     initializedEditingElementRef.current = null
   }, [editing])
+
+  useEffect(() => {
+    return () => {
+      if (blurFrameRef.current != null) window.cancelAnimationFrame(blurFrameRef.current)
+    }
+  }, [])
 
   return (
     <div
@@ -641,9 +688,15 @@ function TextElementContent({
         onStartTextEdit?.()
       }}
       onBlur={(event) => {
-        isComposingRef.current = false
-        commitText(event.currentTarget.textContent ?? '')
-        onFinishTextEdit?.()
+        const target = event.currentTarget
+        if (blurFrameRef.current != null) window.cancelAnimationFrame(blurFrameRef.current)
+        blurFrameRef.current = window.requestAnimationFrame(() => {
+          blurFrameRef.current = null
+          if (window.document.activeElement === target) return
+          isComposingRef.current = false
+          commitText(target.textContent ?? '')
+          onFinishTextEdit?.()
+        })
       }}
     >
       {editing ? null : element.text}

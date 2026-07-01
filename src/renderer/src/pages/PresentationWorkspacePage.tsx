@@ -405,9 +405,10 @@ function EditableDocumentView({
     const element = createTextElement(
       point
         ? {
-            x: Math.max(0, Math.min(document.width - 120, point.x)),
+            x: Math.max(0, Math.min(document.width - 220, point.x)),
             y: Math.max(0, Math.min(document.height - 40, point.y)),
-            width: 120,
+            width: 220,
+            autoWidth: true,
             text: ''
           }
         : { text: '' }
