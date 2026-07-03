@@ -124,43 +124,6 @@ npm run build:mac        # Build + package for macOS
 npm run build:win        # Build + package for Windows
 ```
 
-<!-- CODEGRAPH_START -->
-
-## CodeGraph
-
-This project has a CodeGraph MCP server (`codegraph_*` tools) configured. CodeGraph is a tree-sitter-parsed knowledge graph of every symbol, edge, and file. Reads are sub-millisecond and return structural information grep cannot.
-
-### When to prefer codegraph over native search
-
-Use codegraph for **structural** questions — what calls what, what would break, where is X defined, what is X's signature. Use native grep/read only for **literal text** queries (string contents, comments, log messages) or after you already have a specific file open.
-
-| Question | Tool |
-| -------- | ---- |
-| "Where is X defined?" / "Find symbol named X" | `codegraph_search` |
-| "What calls function Y?" | `codegraph_callers` |
-| "What does Y call?" | `codegraph_callees` |
-| "What would break if I changed Z?" | `codegraph_impact` |
-| "Show me Y's signature / source / docstring" | `codegraph_node` |
-| "Give me focused context for a task/area" | `codegraph_context` |
-| "See several related symbols' source at once" | `codegraph_explore` |
-| "What files exist under path/" | `codegraph_files` |
-| "Is the index healthy?" | `codegraph_status` |
-
-### Rules of thumb
-
-- **Answer directly — don't delegate exploration.** Use `codegraph_context` first, then ONE `codegraph_explore` for sources. Don't spawn a sub-task/agent or run grep + read loops.
-- **Trust codegraph results.** Do NOT re-verify with grep.
-- **Don't grep first** for symbol lookup — `codegraph_search` is faster.
-- **Don't chain `codegraph_search` + `codegraph_node`** — use `codegraph_context` instead.
-- **Don't loop `codegraph_node`** over many symbols — one `codegraph_explore` call is far cheaper.
-- **Index lag**: ~500ms debounce after writes; don't re-query immediately after editing.
-
-### If `.codegraph/` doesn't exist
-
-Ask the user: _"I notice this project doesn't have CodeGraph initialized. Want me to run `codegraph init -i` to build the index?"_
-
-<!-- CODEGRAPH_END -->
-
 ## Language
 
 Respond in zh-TW (Traditional Chinese) when the user writes in Chinese.
