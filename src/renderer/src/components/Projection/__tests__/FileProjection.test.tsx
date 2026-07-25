@@ -392,4 +392,5 @@ describe('FileProjection copied media identity', () => {
       expect(pdf.destroy).toHaveBeenCalled()
     })
   })
+
 })

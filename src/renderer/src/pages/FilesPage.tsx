@@ -64,6 +64,56 @@ const ONE_DRIVE_FOLDER_PICKER_PROVIDER: CloudFolderPickerProvider = {
   importFolder: ONE_DRIVE_PROVIDER.importFolder
 }
 
+type PresentationItemActionOptions = {
+  readonly item: AnyItemRecord
+  readonly openLabel: string
+  readonly convertLabel: string
+  readonly openIcon: React.ReactNode
+  readonly navigate: (path: string) => void
+}
+
+export function buildPresentationItemActions({
+  item,
+  openLabel,
+  convertLabel,
+  openIcon,
+  navigate
+}: PresentationItemActionOptions): ContextMenuEntry[] {
+  if (!isFileItem(item)) return []
+  if (!isPresentationItem(item)) return []
+  return [
+    'separator',
+    {
+      id: 'open-presentation',
+      label: openLabel,
+      icon: openIcon,
+      onAction: () => {
+        usePresentationWorkspaceStore.getState().openDocument(item)
+        navigate(getPresentationWorkspacePath(item.id))
+      }
+    },
+    ...(!isEditablePresentationMimeType(item.mimeType)
+      ? [
+          {
+            id: 'convert-presentation',
+            label: convertLabel,
+            icon: openIcon,
+            onAction: () => {
+              void convertPptxToEditablePresentation(item)
+                .then((createdItem) => {
+                  usePresentationWorkspaceStore.getState().openDocument(createdItem)
+                  navigate(getPresentationWorkspacePath(createdItem.id))
+                })
+                .catch((error) => {
+                  toast.danger(error instanceof Error ? error.message : String(error))
+                })
+            }
+          } satisfies Exclude<ContextMenuEntry, 'separator'>
+        ]
+      : [])
+  ]
+}
+
 function isInsideAnyFolder(
   folderId: string,
   targetFolderIds: Set<string>,
@@ -176,38 +226,13 @@ export default function FilesPage(): React.JSX.Element {
 
   const getPresentationItemActions = useCallback(
     (item: AnyItemRecord): ContextMenuEntry[] => {
-      if (!isFileItem(item) || !isPresentationItem(item)) return []
-      return [
-        'separator',
-        {
-          id: 'open-presentation',
-          label: t('fileExplorer.contextMenu.openPresentation'),
-          icon: React.createElement(Presentation, { size: 14 }),
-          onAction: () => {
-            usePresentationWorkspaceStore.getState().openDocument(item)
-            navigate(getPresentationWorkspacePath(item.id))
-          }
-        },
-        ...(!isEditablePresentationMimeType(item.mimeType)
-          ? [
-              {
-                id: 'convert-presentation',
-                label: t('fileExplorer.contextMenu.convertPresentation'),
-                icon: React.createElement(Presentation, { size: 14 }),
-                onAction: () => {
-                  void convertPptxToEditablePresentation(item)
-                    .then((createdItem) => {
-                      usePresentationWorkspaceStore.getState().openDocument(createdItem)
-                      navigate(getPresentationWorkspacePath(createdItem.id))
-                    })
-                    .catch((error) => {
-                      toast.danger(error instanceof Error ? error.message : String(error))
-                    })
-                }
-              } as ContextMenuEntry
-            ]
-          : [])
-      ]
+      return buildPresentationItemActions({
+        item,
+        openLabel: t('fileExplorer.contextMenu.openPresentation'),
+        convertLabel: t('fileExplorer.contextMenu.convertPresentation'),
+        openIcon: React.createElement(Presentation, { size: 14 }),
+        navigate
+      })
     },
     [navigate, t]
   )

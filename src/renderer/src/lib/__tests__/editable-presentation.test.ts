@@ -1,4 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest'
+import { readFile } from 'node:fs/promises'
+import { resolve } from 'node:path'
+import { buildPresentation, materializeAllSlideNodes, parseZip } from '@aiden0z/pptx-renderer'
+import type { PresentationData } from '@aiden0z/pptx-renderer'
 import { resetFileExplorerDBForTests } from '../file-explorer-db'
 import { getDerivedAsset, resetMediaWorkDBForTests } from '../media-work-db'
 import { resetThumbnailDBForTests } from '../thumbnail-db'
@@ -9,7 +13,9 @@ import {
   applySlideBackgroundToAllSlides,
   createBlankEditablePresentationDocument,
   createEditablePresentation,
+  createImageElement,
   createTextElement,
+  convertPresentationData,
   duplicateEditableSlide,
   duplicateEditableSlides,
   duplicateElementInSlide,
@@ -22,10 +28,181 @@ import {
   removeElementFromSlide,
   resetSlideBackground,
   removeEditableSlides,
-  updateSlideBackground
+  saveEditablePresentation,
+  updateSlideBackground,
+type EditableTextElement
 } from '../editable-presentation'
-import { EDITABLE_PRESENTATION_MIME_TYPE } from '../presentation-media'
+import { EDITABLE_PRESENTATION_MIME_TYPE, PPTX_MIME_TYPE } from '../presentation-media'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
+import type { FileItemRecord } from '@shared/types/folder'
+
+const TEXT_PLACEHOLDER_FIXTURE = resolve(
+  process.cwd(),
+  'src/renderer/src/lib/__fixtures__/pptx/text-placeholder-layout.pptx'
+)
+
+const TEXT_PLACEHOLDER_SNIPPETS = [
+  '主愛永不止息',
+  'Amazing grace',
+  '耶穌基督是主',
+  'Holy Spirit come',
+  '祢信實何廣大',
+  'Great is Thy faithfulness',
+  '我要一生敬拜',
+  'Here I am to worship',
+  '祢愛拯救我',
+  'Your love never fails',
+  '在祢寶座前',
+  'Worthy is the Lamb',
+  '哈利路亞',
+  'Hallelujah',
+  '求祢更新我心',
+  'Create in me a clean heart',
+  '祢是道路真理生命',
+  'You are the way',
+  '天父我愛祢',
+  'Father we love You',
+  '願祢國降臨',
+  'Let Your kingdom come'
+] as const
+
+type MockXmlNodeInit = {
+  attrs?: Record<string, string>
+  children?: Record<string, MockXmlNodeInit>
+}
+
+type MockXmlNode = {
+  child: (name: string) => MockXmlNode
+  attr: (name: string) => string | undefined
+  numAttr: (name: string) => number | undefined
+  exists: () => boolean
+}
+
+const missingXmlNode: MockXmlNode = {
+  child: () => missingXmlNode,
+  attr: () => undefined,
+  numAttr: () => undefined,
+  exists: () => false
+}
+
+function mockXmlNode(init: MockXmlNodeInit = {}): MockXmlNode {
+  const children = new Map(
+    Object.entries(init.children ?? {}).map(([name, child]) => [name, mockXmlNode(child)])
+  )
+  return {
+    child: (name) => children.get(name) ?? missingXmlNode,
+    attr: (name) => init.attrs?.[name],
+    numAttr: (name) => {
+      const value = init.attrs?.[name]
+      return value === undefined ? undefined : Number(value)
+    },
+    exists: () => true
+  }
+}
+
+function mockSolidBackgroundSource(color: string): MockXmlNode {
+  return mockXmlNode({
+    children: {
+      cSld: {
+        children: {
+          bg: {
+            children: {
+              bgPr: {
+                children: {
+                  solidFill: {
+                    children: {
+                      srgbClr: { attrs: { val: color } }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  })
+}
+
+function mockCenteredWhiteTextShape(text: string): unknown {
+  return {
+    nodeType: 'shape',
+    name: 'Title',
+    presetGeometry: 'rect',
+    position: { x: 0, y: 0 },
+    size: { w: 1920, h: 1080 },
+    rotation: 0,
+    fill: missingXmlNode,
+    line: missingXmlNode,
+    source: mockXmlNode(),
+    textBody: {
+      paragraphs: [
+        {
+          properties: mockXmlNode({ attrs: { algn: 'ctr' } }),
+          endParaRPr: missingXmlNode,
+          runs: [
+            {
+              text,
+              properties: mockXmlNode({
+                attrs: { sz: '4400' },
+                children: {
+                  solidFill: {
+                    children: {
+                      srgbClr: { attrs: { val: 'FFFFFF' } }
+                    }
+                  }
+                }
+              })
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
+
+function mockSlide(index: number, layoutIndex: number, source: MockXmlNode): unknown {
+  return {
+    index,
+    slidePath: `ppt/slides/slide${index + 1}.xml`,
+    layoutIndex,
+    rels: new Map(),
+    source,
+    nodes: [mockCenteredWhiteTextShape(`Centered ${index + 1}`)]
+  }
+}
+
+function makePptxFileItem(overrides: Partial<FileItemRecord> = {}): FileItemRecord {
+  return {
+    id: 'pptx-source',
+    parentId: 'file-root',
+    type: 'file',
+    sortIndex: 0,
+    createdAt: 1,
+    expiresAt: null,
+    name: 'Text Placeholder Layout.pptx',
+    url: 'blob:pptx-source',
+    size: 100,
+    mimeType: PPTX_MIME_TYPE,
+    ...overrides
+  }
+}
+
+function getTextElements(documentSlideElements: Record<string, unknown>): EditableTextElement[] {
+  return Object.values(documentSlideElements).filter(
+    (element): element is EditableTextElement =>
+      typeof element === 'object' &&
+      element !== null &&
+      'type' in element &&
+      element.type === 'text'
+  )
+}
+
+function decodeSvgDataUrl(dataUrl: string): string {
+  const base64 = dataUrl.replace(/^data:image\/svg\+xml;base64,/, '')
+  const bytes = Uint8Array.from(atob(base64), (character) => character.charCodeAt(0))
+  return new TextDecoder().decode(bytes)
+}
 
 beforeEach(async () => {
   await resetFileExplorerDBForTests()
@@ -166,9 +343,7 @@ describe('editable presentation documents', () => {
       ]
     })
     const dataUrl = generateEditablePresentationThumbnail(updated)
-    const svg = decodeURIComponent(
-      escape(atob(dataUrl.replace(/^data:image\/svg\+xml;base64,/, '')))
-    )
+    const svg = decodeSvgDataUrl(dataUrl)
 
     expect(svg).toContain('<linearGradient')
     expect(svg).toContain('stop-color="#94979e"')
@@ -205,16 +380,7 @@ describe('editable presentation documents', () => {
       borderWidth: 4,
       shadow: 'soft'
     })
-    const svg = decodeURIComponent(
-      escape(
-        atob(
-          generateEditablePresentationThumbnail(withImage).replace(
-            /^data:image\/svg\+xml;base64,/,
-            ''
-          )
-        )
-      )
-    )
+    const svg = decodeSvgDataUrl(generateEditablePresentationThumbnail(withImage))
 
     expect(svg).toContain(`href="${dataUrl}"`)
     expect(svg).toContain('clipPath')
@@ -223,17 +389,116 @@ describe('editable presentation documents', () => {
     expect(svg).toContain('feDropShadow')
   })
 
-  it('marks newly inserted text boxes as auto-width until a fixed width is provided', () => {
+  it('marks newly inserted text boxes as content auto-sized until a fixed width is provided', () => {
     expect(createTextElement({ text: 'New text' })).toMatchObject({
       type: 'text',
-      autoWidth: true
+      autoWidth: true,
+      autoSize: 'content',
+      fontSize: 24,
+      width: 24,
+      height: 28
     })
 
     expect(createTextElement({ text: 'Imported text', width: 360 })).toMatchObject({
       type: 'text',
       width: 360,
-      autoWidth: false
+      autoWidth: false,
+      autoSize: 'fixed'
     })
+  })
+
+  it('centers inserted images within 60 percent of the slide while preserving aspect ratio', () => {
+    const wideImage = createImageElement({
+      assetId: 'asset-wide',
+      slideWidth: 1000,
+      slideHeight: 500,
+      sourceWidth: 2000,
+      sourceHeight: 1000
+    })
+    const tallImage = createImageElement({
+      assetId: 'asset-tall',
+      slideWidth: 1000,
+      slideHeight: 500,
+      sourceWidth: 1000,
+      sourceHeight: 2000
+    })
+
+    expect(wideImage).toMatchObject({
+      type: 'image',
+      assetId: 'asset-wide',
+      x: 200,
+      y: 100,
+      width: 600,
+      height: 300
+    })
+    expect(tallImage).toMatchObject({
+      assetId: 'asset-tall',
+      x: 425,
+      y: 100,
+      width: 150,
+      height: 300
+    })
+  })
+
+  it('persists inserted text and image edits across save, reload, and delete', async () => {
+    const document = createBlankEditablePresentationDocument(
+      'Sunday',
+      '00000000-0000-4000-8000-000000000003'
+    )
+    const slideId = document.slideOrder[0]
+    const asset = {
+      id: 'asset-1',
+      name: 'photo.png',
+      mimeType: 'image/png',
+      dataUrl: 'data:image/png;base64,AAA='
+    }
+    const text = createTextElement({
+      x: 12,
+      y: 34,
+      width: 220,
+      height: 40,
+      autoWidth: false,
+      text: 'Hello\nWorld'
+    })
+    const image = createImageElement({
+      assetId: asset.id,
+      slideWidth: document.width,
+      slideHeight: document.height,
+      sourceWidth: 800,
+      sourceHeight: 400
+    })
+    const source = { id: document.id, url: `blob:${document.id}` }
+    const withAssets = { ...document, assets: { [asset.id]: asset } }
+    const withElements = addElementToSlide(
+      addElementToSlide(withAssets, slideId, text),
+      slideId,
+      image
+    )
+
+    await saveEditablePresentation(source, withElements)
+    const reloaded = await loadEditablePresentation({ ...source, name: 'Sunday' })
+
+    expect(reloaded.slides[slideId].elements[text.id]).toMatchObject({
+      type: 'text',
+      text: 'Hello\nWorld',
+      x: 12,
+      y: 34,
+      width: 220,
+      height: 40
+    })
+    expect(reloaded.slides[slideId].elements[image.id]).toMatchObject({
+      type: 'image',
+      assetId: asset.id,
+      width: 800,
+      height: 400
+    })
+
+    const withoutImage = removeElementFromSlide(reloaded, slideId, image.id)
+    await saveEditablePresentation(source, withoutImage)
+    const afterDelete = await loadEditablePresentation({ ...source, name: 'Sunday' })
+
+    expect(afterDelete.slides[slideId].elements[image.id]).toBeUndefined()
+    expect(afterDelete.assets[asset.id]).toEqual(asset)
   })
 
   it('duplicates slides without reusing element ids', () => {
@@ -315,5 +580,88 @@ describe('editable presentation documents', () => {
     expect(item.url).toBe(`blob:${item.id}`)
     expect(loaded.name).toBe('Sunday')
     expect(asset?.status).toBe('ready')
+  })
+
+  it('imports the text-placeholder fixture as editable CSS-px text boxes', async () => {
+    const fileBytes = await readFile(TEXT_PLACEHOLDER_FIXTURE)
+    const buffer = await new Blob([fileBytes]).arrayBuffer()
+    const files = await parseZip(buffer)
+    const presentation = buildPresentation(files)
+    materializeAllSlideNodes(presentation)
+
+    const document = convertPresentationData(makePptxFileItem(), presentation)
+    const allText = document.slideOrder
+      .flatMap((slideId) => getTextElements(document.slides[slideId].elements))
+      .map((element) => element.text)
+      .join('\n')
+
+    expect(document.slideOrder).toHaveLength(22)
+    expect(document.width).toBeGreaterThan(0)
+    expect(document.height).toBeGreaterThan(0)
+    expect(document.width).toBeLessThan(4000)
+    expect(document.height).toBeLessThan(4000)
+    expect(document.width).not.toBe(12192000)
+    expect(document.height).not.toBe(6858000)
+
+    for (const slideId of document.slideOrder) {
+      const textElements = getTextElements(document.slides[slideId].elements)
+
+      expect(textElements.length).toBeGreaterThan(0)
+      for (const element of textElements) {
+        expect(element.width).toBeGreaterThan(0)
+        expect(element.height).toBeGreaterThan(0)
+        expect(element.width).toBeLessThan(4000)
+        expect(element.height).toBeLessThan(4000)
+        expect(element.autoWidth).toBe(false)
+        expect(element.locked).not.toBe(true)
+        expect(element.text).toContain('\n')
+      }
+    }
+    for (const snippet of TEXT_PLACEHOLDER_SNIPPETS) {
+      expect(allText).toContain(snippet)
+    }
+    expect(
+      getTextElements(document.slides[document.slideOrder[0]].elements)[0].fontSize
+    ).toBeCloseTo((88 * 96) / 72)
+  })
+
+  it('preserves direct slide, layout, and master solid black backgrounds with centered white text', () => {
+    const blackBackground = mockSolidBackgroundSource('000000')
+    const presentation = {
+      width: 1920,
+      height: 1080,
+      slides: [
+        mockSlide(0, 0, blackBackground),
+        mockSlide(1, 1, mockXmlNode()),
+        mockSlide(2, 2, mockXmlNode())
+      ],
+      layouts: new Map([
+        [1, { source: blackBackground, placeholders: [] }],
+        [2, { source: mockXmlNode(), placeholders: [] }]
+      ]),
+      masters: new Map([['master-1', { source: blackBackground, placeholders: [] }]]),
+      layoutToMaster: new Map([[2, 'master-1']]),
+      media: new Map()
+    } as unknown as PresentationData
+
+    const document = convertPresentationData(makePptxFileItem({ name: 'Black.pptx' }), presentation)
+
+    for (const slideId of document.slideOrder) {
+      const text = getTextElements(document.slides[slideId].elements)[0]
+
+      expect(document.slides[slideId].background).toEqual({
+        type: 'solid',
+        color: '#000000',
+        transparency: 0
+      })
+      expect(text).toMatchObject({
+        color: '#FFFFFF',
+        align: 'center',
+        x: 0,
+        y: 0,
+        width: 1920,
+        height: 1080
+      })
+    }
   })
 })

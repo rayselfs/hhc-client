@@ -1,0 +1,165 @@
+import { act, fireEvent, render, screen } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import FileBrowser from '../FileBrowser'
+import {
+  FILE_EXPLORER_ROOT_ID,
+  useFileExplorerSearch,
+  useFileExplorerSettings,
+  useFileExplorerStore
+} from '@renderer/stores/file-explorer'
+import { PPTX_MIME_TYPE } from '@renderer/lib/presentation-media'
+import { usePresentationWorkspaceStore } from '@renderer/stores/presentation-workspace'
+import type { FileItemRecord, FolderRecord } from '@shared/types/folder'
+
+const mocks = vi.hoisted(() => ({
+  navigate: vi.fn(),
+  startMediaProjection: vi.fn()
+}))
+
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom')
+  return {
+    ...actual,
+    useNavigate: () => mocks.navigate
+  }
+})
+
+vi.mock('@renderer/lib/projection-actions', () => ({
+  startMediaProjection: mocks.startMediaProjection
+}))
+
+vi.mock('@renderer/contexts/ConfirmDialogContext', () => ({
+  useConfirm: () => vi.fn(async () => true)
+}))
+
+vi.mock('@heroui/react/toast', () => ({
+  toast: {
+    warning: vi.fn(),
+    danger: vi.fn(),
+    success: vi.fn()
+  }
+}))
+
+vi.mock('@renderer/lib/sync-db', () => ({
+  SYNC_ENTRY_CHANGED_EVENT: 'hhc:test-sync-entry-changed',
+  listSyncEntries: vi.fn(() => new Promise(() => {}))
+}))
+
+vi.mock('@renderer/hooks/useThumbnails', () => ({
+  canHaveThumbnail: () => false,
+  useThumbnails: () => ({})
+}))
+
+function makeRootFolder(): FolderRecord {
+  return {
+    id: FILE_EXPLORER_ROOT_ID,
+    name: 'Files',
+    parentId: null,
+    sortIndex: 0,
+    createdAt: 1,
+    expiresAt: null
+  }
+}
+
+function makeFile(overrides: Partial<FileItemRecord>): FileItemRecord {
+  return {
+    id: 'file-1',
+    parentId: FILE_EXPLORER_ROOT_ID,
+    type: 'file',
+    sortIndex: 0,
+    createdAt: 1,
+    expiresAt: null,
+    name: 'file.png',
+    url: 'blob:file-1',
+    size: 100,
+    mimeType: 'image/png',
+    ...overrides
+  }
+}
+
+function renderWithItems(items: readonly FileItemRecord[]): void {
+  const root = makeRootFolder()
+  act(() => {
+    useFileExplorerStore.setState({
+      folders: { [root.id]: root },
+      items: Object.fromEntries(items.map((item) => [item.id, item])),
+      _foldersArray: [root],
+      _itemsArray: [...items],
+      _childFoldersByParent: { [FILE_EXPLORER_ROOT_ID]: [] },
+      _itemsByParent: { [FILE_EXPLORER_ROOT_ID]: [...items] },
+      loadedParents: new Set([FILE_EXPLORER_ROOT_ID]),
+      currentFolderId: FILE_EXPLORER_ROOT_ID,
+      isLoading: false,
+      isInitialized: true
+    })
+  })
+
+  render(<FileBrowser />)
+}
+
+describe('FileBrowser presentation open behavior', () => {
+  beforeEach(() => {
+    mocks.navigate.mockClear()
+    mocks.startMediaProjection.mockClear()
+    act(() => {
+      usePresentationWorkspaceStore.setState({
+        documents: [],
+        activeItemId: null,
+        activeSlideByItemId: {}
+      })
+      useFileExplorerSearch.setState({ searchQuery: '' })
+      useFileExplorerSettings.setState({
+        viewMode: 'medium-icon',
+        sortField: 'createdAt',
+        sortDir: 'none'
+      })
+    })
+  })
+
+  it('opens a PPTX in the presentation workspace when double-clicked', () => {
+    const deck = makeFile({ id: 'deck-1', name: 'Deck.pptx', mimeType: PPTX_MIME_TYPE })
+    renderWithItems([deck])
+
+    act(() => {
+      fireEvent.doubleClick(screen.getByText('Deck.pptx'))
+    })
+
+    expect(usePresentationWorkspaceStore.getState().activeItemId).toBe('deck-1')
+    expect(usePresentationWorkspaceStore.getState().documents[0]).toMatchObject({
+      itemId: 'deck-1',
+      mode: 'pptx'
+    })
+    expect(mocks.navigate).toHaveBeenCalledWith('/presentations/deck-1')
+    expect(mocks.startMediaProjection).not.toHaveBeenCalled()
+  })
+
+  it('keeps non-presentation media double-click behavior unchanged', () => {
+    const image = makeFile({ id: 'image-1', name: 'Photo.png', mimeType: 'image/png' })
+    renderWithItems([image])
+
+    act(() => {
+      fireEvent.doubleClick(screen.getByText('Photo.png'))
+    })
+
+    expect(mocks.startMediaProjection).toHaveBeenCalledOnce()
+    expect(usePresentationWorkspaceStore.getState().documents).toEqual([])
+    expect(mocks.navigate).not.toHaveBeenCalled()
+  })
+
+  it('opens a PPTX search result in the presentation workspace', () => {
+    const deck = makeFile({ id: 'deck-1', name: 'Deck.pptx', mimeType: PPTX_MIME_TYPE })
+    act(() => {
+      useFileExplorerSearch.setState({ searchQuery: 'Deck' })
+    })
+    renderWithItems([deck])
+
+    act(() => {
+      fireEvent.doubleClick(screen.getByText('Deck.pptx'))
+    })
+
+    expect(usePresentationWorkspaceStore.getState().activeItemId).toBe('deck-1')
+    expect(mocks.navigate).toHaveBeenCalledWith('/presentations/deck-1')
+    expect(mocks.startMediaProjection).not.toHaveBeenCalled()
+  })
+
+})

@@ -1,5 +1,18 @@
-import { describe, expect, it } from 'vitest'
-import { buildFileProjectionPayload } from '../media-projection-payload'
+import { beforeEach, describe, expect, it } from 'vitest'
+import {
+  buildFileProjectionPayload,
+  buildFileProjectionPayloadWithEditableSlide
+} from '../media-projection-payload'
+import { resetFileExplorerDBForTests } from '../file-explorer-db'
+import { resetMediaWorkDBForTests } from '../media-work-db'
+import {
+  addElementToSlide,
+  createBlankEditablePresentationDocument,
+  createImageElement,
+  createTextElement,
+  saveEditablePresentation
+} from '../editable-presentation'
+import { EDITABLE_PRESENTATION_MIME_TYPE } from '../presentation-media'
 import type { PresentationSnapshot } from '../presentation-readiness'
 import type { FileItemRecord } from '@shared/types/folder'
 
@@ -19,6 +32,11 @@ function makeFile(id: string, url = `blob:${id}`): FileItemRecord {
 }
 
 describe('buildFileProjectionPayload', () => {
+  beforeEach(async () => {
+    await resetFileExplorerDBForTests()
+    await resetMediaWorkDBForTests()
+  })
+
   it('builds a file projection payload from snapshot metadata', () => {
     const playlist = [makeFile('copy-id', 'blob:original-id')]
     const snapshot: PresentationSnapshot = {
@@ -75,5 +93,58 @@ describe('buildFileProjectionPayload', () => {
       itemId: 'deck-id',
       presentation: { slideIndex: 3, slideCount: 12 }
     })
+  })
+
+  it('includes active editable slide text and image content for projection', async () => {
+    const item = {
+      ...makeFile('editable-deck'),
+      name: 'Editable deck.lpdeck',
+      mimeType: EDITABLE_PRESENTATION_MIME_TYPE
+    }
+    const document = createBlankEditablePresentationDocument(
+      'Sunday',
+      '00000000-0000-4000-8000-000000000004'
+    )
+    const slideId = document.slideOrder[0]
+    const text = createTextElement({ text: 'Amazing grace\n主愛永不止息', width: 420 })
+    const asset = {
+      id: 'asset-1',
+      name: 'photo.png',
+      mimeType: 'image/png',
+      dataUrl: 'data:image/png;base64,AAA='
+    }
+    const image = createImageElement({
+      assetId: asset.id,
+      slideWidth: document.width,
+      slideHeight: document.height,
+      sourceWidth: 800,
+      sourceHeight: 400
+    })
+    const savedDocument = addElementToSlide(
+      addElementToSlide({ ...document, assets: { [asset.id]: asset } }, slideId, text),
+      slideId,
+      image
+    )
+    await saveEditablePresentation(item, savedDocument)
+
+    const payload = await buildFileProjectionPayloadWithEditableSlide({
+      playlist: [item],
+      currentIndex: 0,
+      typeStates: { presentation: { slideIndex: 0 } }
+    })
+
+    expect(payload?.editablePresentation).toMatchObject({
+      width: document.width,
+      height: document.height,
+      slide: {
+        id: slideId,
+        elements: {
+          [text.id]: expect.objectContaining({ type: 'text', text: 'Amazing grace\n主愛永不止息' }),
+          [image.id]: expect.objectContaining({ type: 'image', assetId: asset.id })
+        }
+      },
+      assets: { [asset.id]: asset }
+    })
+    expect(payload?.presentation).toEqual({ slideIndex: 0, slideCount: 1 })
   })
 })

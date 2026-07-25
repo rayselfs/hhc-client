@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
+import { useMediaProjectionStore, type MediaProjectionStore } from '@renderer/stores/media-projection'
 import {
-  useMediaProjectionStore,
-  type MediaProjectionStore
-} from '@renderer/stores/media-projection'
-import { buildFileProjectionPayload } from '@renderer/lib/media-projection-payload'
-import { isPresentationMimeType } from '@renderer/lib/presentation-media'
+  buildFileProjectionPayload,
+  buildFileProjectionPayloadWithEditableSlide
+} from '@renderer/lib/media-projection-payload'
+import { isEditablePresentationMimeType, isPresentationMimeType } from '@renderer/lib/presentation-media'
 
 function playlistContentChanged(
   prev: { id: string; mimeType: string; name: string }[],
@@ -27,7 +27,9 @@ export function useMediaProjectionSync(): void {
   const projectCurrentItem = useCallback(
     async (state: MediaProjectionStore, startSession = false): Promise<void> => {
       const sequence = ++projectSequenceRef.current
-      const payload = buildFileProjectionPayload(state)
+      const payload = isEditablePresentationMimeType(state.currentItem()?.mimeType)
+        ? await buildFileProjectionPayloadWithEditableSlide(state)
+        : buildFileProjectionPayload(state)
       if (!payload) return
 
       if (sequence === projectSequenceRef.current) {

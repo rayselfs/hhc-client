@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { createProjectionAdapter } from '@renderer/lib/projection-adapter'
 import { getFileSource, openFileExplorerDB } from '@renderer/lib/file-explorer-db'
 import { loadPdfjsLib } from '@renderer/lib/pdfjs-loader'
-import type { FileControlPayload } from '@shared/projection-messages'
+import type { FileControlPayload, ProjectionPayload } from '@shared/projection-messages'
 import PptxSlideSurface from '@renderer/components/Common/PptxSlideSurface'
 import EditableSlideSurface from '@renderer/components/Common/EditableSlideSurface'
 import {
@@ -27,6 +27,7 @@ type FileProjectionProps = {
     slideIndex: number
     slideCount?: number
   }
+  initialEditablePresentation?: ProjectionPayload<'file:show'>['editablePresentation']
   controlEvent?: { id: number; data: FileControlPayload } | null
 }
 
@@ -62,6 +63,7 @@ export default function FileProjection({
   initialSeekable,
   initialDurationMs,
   initialPresentation,
+  initialEditablePresentation,
   controlEvent
 }: FileProjectionProps): React.JSX.Element {
   const [objectUrl, setObjectUrl] = useState<string | null>(null)
@@ -554,6 +556,7 @@ export default function FileProjection({
         blobId={initialBlobId}
         fileName={displayName}
         slideIndex={initialPresentation?.slideIndex ?? 0}
+        editablePresentation={initialEditablePresentation}
       />
     )
   }
@@ -588,17 +591,41 @@ function EditableProjectionSurface({
   itemId,
   blobId,
   fileName,
-  slideIndex
+  slideIndex,
+  editablePresentation
 }: {
   itemId: string
   blobId: string
   fileName: string
   slideIndex: number
+  editablePresentation?: ProjectionPayload<'file:show'>['editablePresentation']
 }): React.JSX.Element {
+  const payloadDocument = useMemo(
+    () =>
+      editablePresentation
+        ? {
+            id: itemId,
+            name: fileName,
+            width: editablePresentation.width,
+            height: editablePresentation.height,
+            slideOrder: [editablePresentation.slide.id],
+            slides: { [editablePresentation.slide.id]: editablePresentation.slide },
+            assets: editablePresentation.assets,
+            createdAt: 0,
+            updatedAt: 0
+          }
+        : null,
+    [editablePresentation, fileName, itemId]
+  )
   const [document, setDocument] = useState<EditablePresentationDocument | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    if (payloadDocument) {
+      setDocument(payloadDocument)
+      setError(null)
+      return
+    }
     let cancelled = false
     void loadEditablePresentation({ id: itemId, url: `blob:${blobId}`, name: fileName })
       .then((loadedDocument) => {
@@ -610,7 +637,7 @@ function EditableProjectionSurface({
     return () => {
       cancelled = true
     }
-  }, [blobId, fileName, itemId])
+  }, [blobId, fileName, itemId, payloadDocument])
 
   const slideId =
     document?.slideOrder[Math.min(slideIndex, Math.max(0, document.slideOrder.length - 1))]

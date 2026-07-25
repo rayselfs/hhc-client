@@ -3,31 +3,17 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   AlignCenter,
-  AlignJustify,
   AlignLeft,
   AlignRight,
   Baseline,
   Bold,
-  CaseSensitive,
   ChevronDown,
-  Circle,
-  Crop,
   Eraser,
   FileText,
-  Highlighter,
   ImagePlus,
-  IndentDecrease,
-  IndentIncrease,
   Italic,
-  List,
-  ListOrdered,
-  Minus,
   Palette,
   Plus,
-  Square,
-  Strikethrough,
-  Subscript,
-  Superscript,
   Type,
   Underline,
   WrapText,
@@ -42,12 +28,15 @@ import { useContextMenu } from '@renderer/contexts/ContextMenuContext'
 import {
   addElementToSlide,
   applySlideBackgroundToAllSlides,
-  createLineElement,
-  createShapeElement,
+  createImageElement,
   createTextElement,
+  convertPptxToEditablePresentation,
   DEFAULT_GRADIENT_BACKGROUND,
   duplicateEditableSlides,
   getSlideBackgroundPrimaryColor,
+  INSERTED_TEXT_CLICK_SIZE,
+  INSERTED_TEXT_DRAG_MIN_SIZE,
+  INSERTED_TEXT_FONT_SIZE,
   insertBlankEditableSlide,
   loadEditablePresentation,
   normalizeSlideBackground,
@@ -62,19 +51,20 @@ import {
   type EditableImageElement,
   type EditablePresentationDocument,
   type EditablePresentationElement,
-  type EditableSlideBackground
+  type EditableSlideBackground,
+  type EditableTextInsertFrame
 } from '@renderer/lib/editable-presentation'
 import { openFileExplorerDB } from '@renderer/lib/file-explorer-db'
 import { ensurePresentationPageDocument } from '@renderer/lib/presentation-page-document'
 import { readPresentationArrayBuffer } from '@renderer/lib/presentation-source'
 import { openPptxViewer, type PptxViewerHandle } from '@renderer/lib/pptx-renderer-service'
-import { isPresentationItem } from '@renderer/lib/presentation-media'
+import { getPresentationWorkspacePath, isPresentationItem } from '@renderer/lib/presentation-media'
 import {
   usePresentationWorkspaceStore,
   type PresentationWorkspaceDocument
 } from '@renderer/stores/presentation-workspace'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
-import { isFileItem } from '@shared/types/folder'
+import { isFileItem, type FileItemRecord } from '@shared/types/folder'
 import type { SlideHandle } from '@aiden0z/pptx-renderer'
 
 type LoadStatus = 'idle' | 'loading' | 'ready' | 'failed'
@@ -158,8 +148,24 @@ function SlideThumbnail({
   )
 }
 
-function PptxDocumentView({ deck }: { deck: PresentationWorkspaceDocument }): React.JSX.Element {
+async function getPresentationSourceItem(itemId: string): Promise<FileItemRecord> {
+  const storeItem = useFileExplorerStore.getState().items[itemId]
+  if (storeItem && isFileItem(storeItem)) return storeItem
+
+  const db = await openFileExplorerDB()
+  const record = await db.get('folder-items', itemId)
+  if (record && isFileItem(record)) return record
+  throw new Error('Presentation source is unavailable')
+}
+
+export function PptxDocumentView({
+  deck
+}: {
+  deck: PresentationWorkspaceDocument
+}): React.JSX.Element {
   const { t } = useTranslation()
+  const navigate = useNavigate()
+  const openDocument = usePresentationWorkspaceStore((state) => state.openDocument)
   const setSlideCount = usePresentationWorkspaceStore((state) => state.setSlideCount)
   const setActiveSlide = usePresentationWorkspaceStore((state) => state.setActiveSlide)
   const activeSlide = usePresentationWorkspaceStore((state) => state.getActiveSlide(deck.itemId))
@@ -171,6 +177,7 @@ function PptxDocumentView({ deck }: { deck: PresentationWorkspaceDocument }): Re
   const [viewer, setViewer] = useState<PptxViewerHandle | null>(null)
   const [status, setStatus] = useState<LoadStatus>('idle')
   const [error, setError] = useState<string | null>(null)
+  const [isConverting, setIsConverting] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -236,6 +243,23 @@ function PptxDocumentView({ deck }: { deck: PresentationWorkspaceDocument }): Re
     [deck.slideCount, viewer?.slideCount]
   )
 
+  const editCopy = async (): Promise<void> => {
+    if (isConverting) return
+    setIsConverting(true)
+    try {
+      const item = await getPresentationSourceItem(deck.itemId)
+      const createdItem = await convertPptxToEditablePresentation(item)
+      openDocument(createdItem)
+      navigate(getPresentationWorkspacePath(createdItem.id))
+    } catch (conversionError) {
+      toast.danger(
+        conversionError instanceof Error ? conversionError.message : String(conversionError)
+      )
+    } finally {
+      setIsConverting(false)
+    }
+  }
+
   return (
     <div className="grid min-h-0 flex-1 grid-cols-[220px_minmax(0,1fr)] bg-background">
       <aside className="min-h-0 overflow-y-auto border-r border-divider bg-content1/40 px-2 py-3">
@@ -254,6 +278,19 @@ function PptxDocumentView({ deck }: { deck: PresentationWorkspaceDocument }): Re
       </aside>
 
       <main className="flex min-h-0 flex-col bg-[#111217]">
+        <div className="flex h-16 shrink-0 items-center justify-between border-b border-divider bg-content1/80 px-4">
+          <div>
+            <p className="text-sm font-semibold text-foreground">{deck.name}</p>
+            <p className="text-xs text-default-400">
+              {t('presentationWorkspace.readOnlyPptx', 'Read-only PPTX')}
+            </p>
+          </div>
+          <Button variant="primary" isDisabled={isConverting} onPress={() => void editCopy()}>
+            {isConverting
+              ? t('presentationWorkspace.editCopyConverting', 'Creating copy...')
+              : t('presentationWorkspace.editCopy', 'Edit a copy')}
+          </Button>
+        </div>
         <div className="flex flex-1 items-center justify-center overflow-auto p-8">
           <div className="relative flex min-h-[360px] w-full max-w-5xl items-center justify-center rounded-2xl bg-black/30 p-4 shadow-2xl">
             <div ref={canvasRef} className="w-full" />
@@ -309,7 +346,7 @@ function EditableDocumentView({
   const [isLineSpacingOptionsOpen, setIsLineSpacingOptionsOpen] = useState(false)
   const [lineSpacingDraft, setLineSpacingDraft] = useState(1.15)
   const [editingElementId, setEditingElementId] = useState<string | null>(null)
-  const [isImageCropMode, setIsImageCropMode] = useState(false)
+  const [isTextInsertMode, setIsTextInsertMode] = useState(false)
   const [pressedRibbonAction, setPressedRibbonAction] = useState<string | null>(null)
   const pressedRibbonTimeoutRef = useRef<number | null>(null)
   const [status, setStatus] = useState<LoadStatus>('loading')
@@ -394,28 +431,36 @@ function EditableDocumentView({
     commitDocument(resetSlideBackground(document, activeSlideId))
   }
 
-  const addElement = (element: EditablePresentationElement): void => {
+  const addTextElement = (frame?: EditableTextInsertFrame): void => {
     if (!document || !activeSlideId) return
-    commitDocument(addElementToSlide(document, activeSlideId, element))
-    setSelectedElementId(element.id)
-  }
-
-  const addTextElement = (point?: { x: number; y: number }): void => {
-    if (!document || !activeSlideId) return
-    const element = createTextElement(
-      point
-        ? {
-            x: Math.max(0, Math.min(document.width - 220, point.x)),
-            y: Math.max(0, Math.min(document.height - 40, point.y)),
-            width: 220,
-            autoWidth: true,
-            text: ''
-          }
-        : { text: '' }
-    )
+    const autoSize = frame?.autoSize ?? 'content'
+    const nextFrame = frame ?? {
+      x: 260,
+      y: 220,
+      width: INSERTED_TEXT_CLICK_SIZE.width,
+      height: INSERTED_TEXT_CLICK_SIZE.height,
+      autoSize
+    }
+    const width =
+      autoSize === 'content' ? nextFrame.width : Math.max(INSERTED_TEXT_DRAG_MIN_SIZE.width, nextFrame.width)
+    const height =
+      autoSize === 'content'
+        ? nextFrame.height
+        : Math.max(INSERTED_TEXT_DRAG_MIN_SIZE.height, nextFrame.height)
+    const element = createTextElement({
+      x: Math.max(0, Math.min(document.width - width, nextFrame.x)),
+      y: Math.max(0, Math.min(document.height - height, nextFrame.y)),
+      width,
+      height,
+      autoWidth: autoSize === 'content',
+      autoSize,
+      fontSize: INSERTED_TEXT_FONT_SIZE,
+      text: ''
+    })
     commitDocument(addElementToSlide(document, activeSlideId, element))
     setSelectedElementId(element.id)
     setEditingElementId(element.id)
+    setIsTextInsertMode(false)
   }
 
   const addSlide = (): void => {
@@ -449,6 +494,7 @@ function EditableDocumentView({
       setSelectedSlideIds(new Set(document.slideOrder.slice(start, end + 1)))
       setSelectedElementId(null)
       setEditingElementId(null)
+      setIsTextInsertMode(false)
       setInsertionIndex(null)
       return
     } else if (event.metaKey || event.ctrlKey) {
@@ -464,6 +510,7 @@ function EditableDocumentView({
       })
       setSelectedElementId(null)
       setEditingElementId(null)
+      setIsTextInsertMode(false)
       setInsertionIndex(null)
       return
     } else {
@@ -473,6 +520,7 @@ function EditableDocumentView({
 
     setActiveSlide(deck.itemId, index)
     setSelectedElementId(null)
+    setIsTextInsertMode(false)
     setInsertionIndex(null)
   }
 
@@ -531,6 +579,7 @@ function EditableDocumentView({
   }
 
   const deleteElement = (): void => {
+    if (editingElementId) return
     if (!document || !activeSlideId || !selectedElementId) return
     commitDocument(removeElementFromSlide(document, activeSlideId, selectedElementId))
     setSelectedElementId(null)
@@ -599,7 +648,7 @@ function EditableDocumentView({
 
   const addImage = async (file: File): Promise<void> => {
     if (!document || !activeSlideId) return
-    const dataUrl = await readFileAsDataUrl(file)
+    const { dataUrl, width, height } = await readImageFile(file)
     const assetId = crypto.randomUUID()
     const nextDocument: EditablePresentationDocument = {
       ...document,
@@ -613,19 +662,16 @@ function EditableDocumentView({
         }
       }
     }
-    const element: EditableImageElement = {
-      id: crypto.randomUUID(),
-      type: 'image',
+    const element = createImageElement({
       assetId,
-      x: 320,
-      y: 220,
-      width: 640,
-      height: 360,
-      rotation: 0,
-      opacity: 1
-    }
+      slideWidth: document.width,
+      slideHeight: document.height,
+      sourceWidth: width,
+      sourceHeight: height
+    })
     commitDocument(addElementToSlide(nextDocument, activeSlideId, element))
     setSelectedElementId(element.id)
+    setIsTextInsertMode(false)
   }
 
   const selectedTextElement = selectedElement?.type === 'text' ? selectedElement : null
@@ -696,10 +742,11 @@ function EditableDocumentView({
   const updateSelectedNumber = (key: 'x' | 'y' | 'width' | 'height', value: string): void => {
     const next = Number(value)
     if (!Number.isFinite(next)) return
-    if (selectedElement?.type === 'text' && key === 'height') return
     updateSelectedElement({
       [key]: next,
-      ...(selectedElement?.type === 'text' && key === 'width' ? { autoWidth: false } : {})
+      ...(selectedElement?.type === 'text' && (key === 'width' || key === 'height')
+        ? { autoWidth: false, autoSize: 'fixed' as const }
+        : {})
     } as Partial<EditablePresentationElement>)
   }
 
@@ -724,16 +771,7 @@ function EditableDocumentView({
   const renderRibbon = (): React.JSX.Element => {
     if (activeRibbon === 'picture') {
       return (
-        <div className="flex h-16 items-center gap-3 border-b border-divider bg-content1/80 px-4 text-sm">
-          <Button
-            size="sm"
-            variant={isImageCropMode ? 'primary' : 'tertiary'}
-            isDisabled={!selectedImageElement}
-            onPress={() => setIsImageCropMode((enabled) => !enabled)}
-          >
-            <Crop size={16} />
-            {t('presentationWorkspace.crop', 'Crop')}
-          </Button>
+        <div className="flex h-24 items-center gap-3 border-b border-divider bg-content1/80 px-4 text-sm">
           <ControlSlider
             label={t('presentationWorkspace.transparency', 'Transparency')}
             value={selectedImageElement ? Math.round((1 - selectedImageElement.opacity) * 100) : 0}
@@ -814,8 +852,12 @@ function EditableDocumentView({
 
     if (activeRibbon === 'insert') {
       return (
-        <div className="flex h-16 items-center gap-2 border-b border-divider bg-content1/80 px-4">
-          <Button size="sm" variant="tertiary" onPress={() => addTextElement()}>
+        <div className="flex h-24 items-center gap-2 border-b border-divider bg-content1/80 px-4">
+          <Button
+            size="sm"
+            variant={isTextInsertMode ? 'primary' : 'tertiary'}
+            onPress={() => setIsTextInsertMode((enabled) => !enabled)}
+          >
             <Type size={16} />
             {t('presentationWorkspace.text', 'Text')}
           </Button>
@@ -823,30 +865,13 @@ function EditableDocumentView({
             <ImagePlus size={16} />
             {t('presentationWorkspace.image', 'Image')}
           </Button>
-          <Button
-            size="sm"
-            variant="tertiary"
-            onPress={() => addElement(createShapeElement('rectangle'))}
-          >
-            <Square size={16} />
-          </Button>
-          <Button
-            size="sm"
-            variant="tertiary"
-            onPress={() => addElement(createShapeElement('ellipse'))}
-          >
-            <Circle size={16} />
-          </Button>
-          <Button size="sm" variant="tertiary" onPress={() => addElement(createLineElement())}>
-            <Minus size={16} />
-          </Button>
         </div>
       )
     }
 
     if (activeRibbon === 'design') {
       return (
-        <div className="flex h-16 items-center gap-3 border-b border-divider bg-content1/80 px-4 text-sm">
+        <div className="flex h-24 items-center gap-3 border-b border-divider bg-content1/80 px-4 text-sm">
           <Button
             size="sm"
             variant={isBackgroundPanelOpen ? 'primary' : 'tertiary'}
@@ -1003,57 +1028,6 @@ function EditableDocumentView({
             >
               <Underline size={18} />
             </button>
-            <button
-              type="button"
-              className={RIBBON_ICON_BUTTON_CLASS}
-              disabled
-              aria-label={t('presentationWorkspace.strikethrough', 'Strikethrough')}
-            >
-              <Strikethrough size={17} />
-            </button>
-            <button
-              type="button"
-              className={RIBBON_ICON_BUTTON_CLASS}
-              disabled
-              aria-label={t('presentationWorkspace.subscript', 'Subscript')}
-            >
-              <Subscript size={17} />
-            </button>
-            <button
-              type="button"
-              className={RIBBON_ICON_BUTTON_CLASS}
-              disabled
-              aria-label={t('presentationWorkspace.superscript', 'Superscript')}
-            >
-              <Superscript size={17} />
-            </button>
-            <button
-              type="button"
-              className={RIBBON_ICON_BUTTON_CLASS}
-              disabled
-              aria-label={t('presentationWorkspace.characterSpacing', 'Character spacing')}
-            >
-              <span className="text-sm font-semibold">AV</span>
-              <ChevronDown size={12} />
-            </button>
-            <button
-              type="button"
-              className={RIBBON_ICON_BUTTON_CLASS}
-              disabled
-              aria-label={t('presentationWorkspace.changeCase', 'Change case')}
-            >
-              <CaseSensitive size={18} />
-              <ChevronDown size={12} />
-            </button>
-            <button
-              type="button"
-              className={RIBBON_ICON_BUTTON_CLASS}
-              disabled
-              aria-label={t('presentationWorkspace.textHighlight', 'Text highlight color')}
-            >
-              <Highlighter size={18} />
-              <ChevronDown size={12} />
-            </button>
             <label
               className={`relative ${RIBBON_ICON_BUTTON_CLASS} ${
                 textDisabled ? 'cursor-not-allowed opacity-30 hover:bg-transparent' : ''
@@ -1085,40 +1059,6 @@ function EditableDocumentView({
 
         <div className="grid gap-2">
           <div className="flex items-center gap-1">
-            <button
-              type="button"
-              className={RIBBON_ICON_BUTTON_CLASS}
-              disabled
-              aria-label={t('presentationWorkspace.bullets', 'Bullets')}
-            >
-              <List size={19} />
-              <ChevronDown size={12} />
-            </button>
-            <button
-              type="button"
-              className={RIBBON_ICON_BUTTON_CLASS}
-              disabled
-              aria-label={t('presentationWorkspace.numbering', 'Numbering')}
-            >
-              <ListOrdered size={19} />
-              <ChevronDown size={12} />
-            </button>
-            <button
-              type="button"
-              className={RIBBON_ICON_BUTTON_CLASS}
-              disabled
-              aria-label={t('presentationWorkspace.decreaseIndent', 'Decrease indent')}
-            >
-              <IndentDecrease size={19} />
-            </button>
-            <button
-              type="button"
-              className={RIBBON_ICON_BUTTON_CLASS}
-              disabled
-              aria-label={t('presentationWorkspace.increaseIndent', 'Increase indent')}
-            >
-              <IndentIncrease size={19} />
-            </button>
             <button
               type="button"
               className={textButtonClass(false, 'line-spacing')}
@@ -1153,14 +1093,6 @@ function EditableDocumentView({
                 <Icon size={19} />
               </button>
             ))}
-            <button
-              type="button"
-              className={RIBBON_ICON_BUTTON_CLASS}
-              disabled
-              aria-label={t('presentationWorkspace.align.justify', 'Justify')}
-            >
-              <AlignJustify size={19} />
-            </button>
           </div>
         </div>
 
@@ -1168,10 +1100,7 @@ function EditableDocumentView({
 
         <div className="grid gap-2">
           {selectedElement &&
-            (selectedElement.type === 'text'
-              ? (['x', 'y', 'width'] as const)
-              : (['x', 'y', 'width', 'height'] as const)
-            ).map((key) => (
+            (['x', 'y', 'width', 'height'] as const).map((key) => (
               <label
                 key={key}
                 className="flex items-center gap-1 text-xs uppercase text-default-400"
@@ -1261,7 +1190,7 @@ function EditableDocumentView({
     )
   }
 
-  const ribbonHeightClass = activeRibbon === 'home' ? 'h-24' : 'h-16'
+  const ribbonHeightClass = 'h-24'
 
   return (
     <>
@@ -1281,10 +1210,15 @@ function EditableDocumentView({
           onChange={(event) => {
             const file = event.currentTarget.files?.[0]
             event.currentTarget.value = ''
-            if (file) void addImage(file)
+            if (file) {
+              void addImage(file).catch((imageError) => {
+                toast.danger(imageError instanceof Error ? imageError.message : String(imageError))
+              })
+            }
           }}
         />
         <div
+          data-testid="presentation-ribbon-frame"
           className={`shrink-0 overflow-hidden transition-[height,opacity] duration-200 ${
             isRibbonOpen ? `${ribbonHeightClass} opacity-100` : 'h-0 opacity-0'
           }`}
@@ -1388,12 +1322,11 @@ function EditableDocumentView({
                   showBorder
                   selectedElementId={selectedElementId}
                   editingElementId={editingElementId}
-                  cropElementId={isImageCropMode ? (selectedImageElement?.id ?? null) : null}
+                  isTextInsertMode={isTextInsertMode}
                   onSelectElement={(elementId) => {
                     setSelectedElementId(elementId)
-                    const nextElement = elementId ? activeSlide?.elements[elementId] : null
-                    if (nextElement?.type !== 'image') setIsImageCropMode(false)
                     if (elementId !== editingElementId) setEditingElementId(null)
+                    if (elementId) setIsTextInsertMode(false)
                   }}
                   onEditingElementChange={setEditingElementId}
                   onInsertText={addTextElement}
@@ -1822,12 +1755,37 @@ function getAngleForDirection(direction: EditableGradientDirection): number {
   return 180
 }
 
+async function readImageFile(
+  file: File
+): Promise<{ dataUrl: string; width: number; height: number }> {
+  const dataUrl = await readFileAsDataUrl(file)
+  const size = await readImageSize(dataUrl)
+  return { dataUrl, ...size }
+}
+
 function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => resolve(String(reader.result ?? ''))
     reader.onerror = () => reject(reader.error ?? new Error('Failed to read image'))
     reader.readAsDataURL(file)
+  })
+}
+
+function readImageSize(dataUrl: string): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const image = new Image()
+    image.onload = () => {
+      const width = image.naturalWidth
+      const height = image.naturalHeight
+      if (width <= 0 || height <= 0) {
+        reject(new Error('Unable to read image dimensions'))
+        return
+      }
+      resolve({ width, height })
+    }
+    image.onerror = () => reject(new Error('Unable to read image dimensions'))
+    image.src = dataUrl
   })
 }
 

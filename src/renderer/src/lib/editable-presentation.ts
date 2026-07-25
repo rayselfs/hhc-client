@@ -6,7 +6,7 @@ import { readPresentationArrayBuffer } from './presentation-source'
 import { saveThumbnail } from './thumbnail-db'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
 import type { FileItemRecord } from '@shared/types/folder'
-import type { PresentationData } from '@aiden0z/pptx-renderer'
+import type { PlaceholderInfo, PresentationData } from '@aiden0z/pptx-renderer'
 import type { SlideData, SlideNode } from '@aiden0z/pptx-renderer'
 import type { PicNodeData, ShapeNodeData } from '@aiden0z/pptx-renderer'
 
@@ -45,6 +45,22 @@ export interface EditablePresentationAsset {
   dataUrl: string
 }
 
+export interface EditableTextInsertFrame {
+  x: number
+  y: number
+  width: number
+  height: number
+  autoSize?: EditableTextAutoSize
+}
+
+export interface EditableImageInsertInput {
+  assetId: string
+  slideWidth: number
+  slideHeight: number
+  sourceWidth: number
+  sourceHeight: number
+}
+
 interface EditableElementBase {
   id: string
   type: EditablePresentationElementType
@@ -60,6 +76,7 @@ interface EditableElementBase {
 export interface EditableTextElement extends EditableElementBase {
   type: 'text'
   autoWidth?: boolean
+  autoSize?: EditableTextAutoSize
   text: string
   fontFamily: string
   fontSize: number
@@ -137,6 +154,47 @@ const DEFAULT_HEIGHT = 1080
 const DEFAULT_FONT_FAMILY = 'Inter Variable'
 export const DEFAULT_SLIDE_BACKGROUND_COLOR = '#ffffff'
 const DEFAULT_FOREGROUND_COLOR = '#111827'
+export type EditableTextAutoSize = 'content' | 'fixed'
+export const INSERTED_TEXT_FONT_SIZE = 24
+export const INSERTED_TEXT_CLICK_SIZE = { width: 24, height: 32 } as const
+export const INSERTED_TEXT_DRAG_MIN_SIZE = { width: 80, height: 40 } as const
+export const INSERTED_IMAGE_MAX_SLIDE_RATIO = 0.6
+const EMU_PER_INCH = 914400
+const CSS_PX_PER_INCH = 96
+const RAW_EMU_THRESHOLD = 100000
+
+type XmlNode = ShapeNodeData['source']
+
+type TextShapeFrame = {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+type TextShapeStyle = {
+  fontFamily: string
+  fontSize: number
+  bold: boolean
+  italic: boolean
+  underline: boolean
+  color: string
+  align: EditableTextAlign
+  lineHeight: number
+}
+
+type PlaceholderEntryCandidate = {
+  node: XmlNode
+  absoluteXfrm?: {
+    position: { x: number; y: number }
+    size: { w: number; h: number }
+  }
+}
+
+type MasterPlaceholderSource = {
+  placeholderEntries?: readonly PlaceholderEntryCandidate[]
+  placeholders: readonly XmlNode[]
+}
 
 export const DEFAULT_GRADIENT_BACKGROUND: Extract<
   EditableSlideBackground,
@@ -305,15 +363,21 @@ export function createBlankEditablePresentationDocument(
 export function createTextElement(
   input: Partial<Omit<EditableTextElement, 'id' | 'type'>> = {}
 ): EditableTextElement {
-  const fontSize = input.fontSize ?? 64
+  const autoSize: EditableTextAutoSize =
+    input.autoSize ??
+    (input.autoWidth === true || (input.autoWidth === undefined && input.width == null)
+      ? 'content'
+      : 'fixed')
+  const fontSize = input.fontSize ?? INSERTED_TEXT_FONT_SIZE
   const lineHeight = input.lineHeight ?? 1.15
   return {
     id: crypto.randomUUID(),
     type: 'text',
-    autoWidth: input.autoWidth ?? input.width == null,
+    autoWidth: input.autoWidth ?? autoSize === 'content',
+    autoSize,
     x: input.x ?? 260,
     y: input.y ?? 220,
-    width: input.width ?? 220,
+    width: input.width ?? (autoSize === 'content' ? INSERTED_TEXT_CLICK_SIZE.width : 220),
     height: input.height ?? Math.ceil(fontSize * lineHeight),
     rotation: input.rotation ?? 0,
     opacity: input.opacity ?? 1,
@@ -363,6 +427,28 @@ export function createLineElement(
     opacity: input.opacity ?? 1,
     strokeColor: input.strokeColor ?? DEFAULT_FOREGROUND_COLOR,
     strokeWidth: input.strokeWidth ?? 4
+  }
+}
+
+export function createImageElement(input: EditableImageInsertInput): EditableImageElement {
+  const sourceWidth = Math.max(1, input.sourceWidth)
+  const sourceHeight = Math.max(1, input.sourceHeight)
+  const maxWidth = input.slideWidth * INSERTED_IMAGE_MAX_SLIDE_RATIO
+  const maxHeight = input.slideHeight * INSERTED_IMAGE_MAX_SLIDE_RATIO
+  const scale = Math.min(maxWidth / sourceWidth, maxHeight / sourceHeight, 1)
+  const width = Math.round(sourceWidth * scale)
+  const height = Math.round(sourceHeight * scale)
+
+  return {
+    id: crypto.randomUUID(),
+    type: 'image',
+    assetId: input.assetId,
+    x: Math.round((input.slideWidth - width) / 2),
+    y: Math.round((input.slideHeight - height) / 2),
+    width,
+    height,
+    rotation: 0,
+    opacity: 1
   }
 }
 
@@ -767,7 +853,7 @@ async function createEditablePresentationItem(
   return item
 }
 
-function convertPresentationData(
+export function convertPresentationData(
   source: FileItemRecord,
   presentation: PresentationData
 ): EditablePresentationDocument {
@@ -793,8 +879,8 @@ function convertPresentationData(
     name: `${stripPresentationExtension(source.name)} Editable`,
     sourceItemId: source.id,
     sourceBlobId: getBlobId(source),
-    width: presentation.width,
-    height: presentation.height,
+    width: normalizeCanvasLength(presentation.width, DEFAULT_WIDTH),
+    height: normalizeCanvasLength(presentation.height, DEFAULT_HEIGHT),
     defaultSlideBackground: createDefaultSlideBackground(),
     slideOrder,
     slides,
@@ -821,11 +907,39 @@ function convertSlide(
   }
 
   return {
-    background: createDefaultSlideBackground(),
+    background: resolveSlideBackground(slide, presentation),
     elementOrder,
     elements,
     notes: ''
   }
+}
+
+function resolveSlideBackground(
+  slide: SlideData,
+  presentation: PresentationData
+): EditableSlideBackground {
+  const layout = presentation.layouts.get(slide.layoutIndex)
+  const masterId = presentation.layoutToMaster.get(slide.layoutIndex)
+  const master = masterId ? presentation.masters.get(masterId) : undefined
+  return (
+    readDirectSolidBackground(slide) ??
+    readDirectSolidBackground(layout) ??
+    readDirectSolidBackground(master) ??
+    createDefaultSlideBackground()
+  )
+}
+
+function readDirectSolidBackground(sourceOwner: unknown): EditableSlideBackground | null {
+  if (!sourceOwner || typeof sourceOwner !== 'object' || !('source' in sourceOwner)) return null
+  const source = sourceOwner.source
+  if (!isXmlNode(source)) return null
+  const backgroundProperties = source.child('cSld').child('bg').child('bgPr')
+  const color = readSrgbColor(backgroundProperties)
+  return color ? { type: 'solid', color, transparency: 0 } : null
+}
+
+function isXmlNode(value: unknown): value is XmlNode {
+  return typeof value === 'object' && value !== null && 'child' in value && typeof value.child === 'function'
 }
 
 function convertNode(
@@ -834,12 +948,16 @@ function convertNode(
   presentation: PresentationData,
   assets: Record<string, EditablePresentationAsset>
 ): EditablePresentationElement[] {
-  if (node.nodeType === 'shape') return convertShapeNode(node)
+  if (node.nodeType === 'shape') return convertShapeNode(node, slide, presentation)
   if (node.nodeType === 'picture') return convertPictureNode(node, slide, presentation, assets)
   return [createLockedElement(node, `${node.nodeType} object`)]
 }
 
-function convertShapeNode(node: ShapeNodeData): EditablePresentationElement[] {
+function convertShapeNode(
+  node: ShapeNodeData,
+  slide: SlideData,
+  presentation: PresentationData
+): EditablePresentationElement[] {
   const elements: EditablePresentationElement[] = []
   const text = getShapeText(node)
   const shape = getEditableShapeKind(node.presetGeometry)
@@ -880,27 +998,34 @@ function convertShapeNode(node: ShapeNodeData): EditablePresentationElement[] {
   }
 
   if (text) {
-    const firstParagraph = node.textBody?.paragraphs[0]
-    const firstRun = firstParagraph?.runs[0]
+    const frame = resolveTextShapeFrame(node, slide, presentation)
+    if (!frame) throw new Error(`Text placeholder frame is missing: ${node.name}`)
+    const style = resolveTextShapeStyle(node)
     elements.push({
       id: crypto.randomUUID(),
       type: 'text',
       autoWidth: false,
-      x: node.position.x,
-      y: node.position.y,
-      width: node.size.w,
-      height: node.size.h,
+      autoSize: 'fixed',
+      x: frame.x,
+      y: frame.y,
+      width: frame.width,
+      height: fitTextFrameHeight(
+        frame,
+        text,
+        style,
+        normalizeCanvasLength(presentation.height, DEFAULT_HEIGHT)
+      ),
       rotation: node.rotation,
       opacity: 1,
       text,
-      fontFamily: 'Inter Variable',
-      fontSize: (firstRun?.properties?.numAttr('sz') ?? 3200) / 100,
-      bold: firstRun?.properties?.attr('b') === '1',
-      italic: firstRun?.properties?.attr('i') === '1',
-      underline: Boolean(firstRun?.properties?.attr('u')),
-      color: readSrgbColor(firstRun?.properties) ?? '#111827',
-      align: normalizeTextAlign(firstParagraph?.properties?.attr('algn')),
-      lineHeight: 1.15
+      fontFamily: style.fontFamily,
+      fontSize: style.fontSize,
+      bold: style.bold,
+      italic: style.italic,
+      underline: style.underline,
+      color: style.color,
+      align: style.align,
+      lineHeight: style.lineHeight
     })
   }
 
@@ -993,6 +1118,171 @@ function normalizeTextAlign(value: string | undefined): EditableTextAlign {
   if (value === 'ctr') return 'center'
   if (value === 'r') return 'right'
   return 'left'
+}
+
+function resolveTextShapeFrame(
+  node: ShapeNodeData,
+  slide: SlideData,
+  presentation: PresentationData
+): TextShapeFrame | null {
+  const ownFrame = createTextShapeFrame(node.position.x, node.position.y, node.size.w, node.size.h)
+  if (ownFrame) return ownFrame
+  if (!node.placeholder) return null
+
+  const layout = presentation.layouts.get(slide.layoutIndex)
+  const layoutFrame = findPlaceholderFrame(layout?.placeholders, node.placeholder)
+  if (layoutFrame) return layoutFrame
+
+  const masterId = presentation.layoutToMaster.get(slide.layoutIndex)
+  const master = masterId ? presentation.masters.get(masterId) : undefined
+  return findPlaceholderFrame(getMasterPlaceholderEntries(master), node.placeholder)
+}
+
+function getMasterPlaceholderEntries(
+  master: MasterPlaceholderSource | undefined
+): readonly PlaceholderEntryCandidate[] {
+  return master?.placeholderEntries ?? master?.placeholders.map((node) => ({ node })) ?? []
+}
+
+function findPlaceholderFrame(
+  entries: readonly PlaceholderEntryCandidate[] | undefined,
+  placeholder: PlaceholderInfo
+): TextShapeFrame | null {
+  for (const entry of entries ?? []) {
+    if (!matchesPlaceholder(entry.node, placeholder)) continue
+    const absoluteFrame = entry.absoluteXfrm
+      ? createTextShapeFrame(
+          entry.absoluteXfrm.position.x,
+          entry.absoluteXfrm.position.y,
+          entry.absoluteXfrm.size.w,
+          entry.absoluteXfrm.size.h
+        )
+      : null
+    if (absoluteFrame) return absoluteFrame
+
+    const xfrmFrame = readXfrmFrame(entry.node)
+    if (xfrmFrame) return xfrmFrame
+  }
+  return null
+}
+
+function matchesPlaceholder(node: XmlNode, target: PlaceholderInfo): boolean {
+  const source = readPlaceholderInfo(node)
+  if (!source) return false
+  if (target.type && target.idx !== undefined) {
+    return source.type === target.type && source.idx === target.idx
+  }
+  if (target.idx !== undefined) return source.idx === target.idx
+  if (target.type) return source.type === target.type
+  return false
+}
+
+function readPlaceholderInfo(node: XmlNode): PlaceholderInfo | null {
+  for (const propertyName of ['nvSpPr', 'nvPicPr', 'nvGraphicFramePr', 'nvCxnSpPr'] as const) {
+    const placeholder = node.child(propertyName).child('nvPr').child('ph')
+    if (placeholder.exists()) {
+      return { type: placeholder.attr('type'), idx: placeholder.numAttr('idx') }
+    }
+  }
+  return null
+}
+
+function readXfrmFrame(node: XmlNode): TextShapeFrame | null {
+  const xfrm = node.child('spPr').child('xfrm')
+  if (!xfrm.exists()) return null
+  const offset = xfrm.child('off')
+  const extent = xfrm.child('ext')
+  return createTextShapeFrame(
+    offset.numAttr('x'),
+    offset.numAttr('y'),
+    extent.numAttr('cx'),
+    extent.numAttr('cy')
+  )
+}
+
+function createTextShapeFrame(
+  rawX: number | undefined,
+  rawY: number | undefined,
+  rawWidth: number | undefined,
+  rawHeight: number | undefined
+): TextShapeFrame | null {
+  const x = normalizeCanvasCoordinate(rawX)
+  const y = normalizeCanvasCoordinate(rawY)
+  const width = normalizeCanvasCoordinate(rawWidth)
+  const height = normalizeCanvasCoordinate(rawHeight)
+  if (x === null || y === null || width === null || height === null || width <= 0 || height <= 0) {
+    return null
+  }
+  return { x, y, width, height }
+}
+
+function resolveTextShapeStyle(node: ShapeNodeData): TextShapeStyle {
+  const firstParagraph = node.textBody?.paragraphs[0]
+  const firstRun = firstParagraph?.runs[0]
+  const runProperties = firstRun?.properties
+  const paragraphEndProperties = firstParagraph?.endParaRPr
+  const fontSize = fontSizeToPx(
+    runProperties?.numAttr('sz') ?? paragraphEndProperties?.numAttr('sz') ?? 3200
+  )
+
+  return {
+    fontFamily:
+      readFontFamily(runProperties) ??
+      readFontFamily(paragraphEndProperties) ??
+      DEFAULT_FONT_FAMILY,
+    fontSize,
+    bold: isXmlTrue(runProperties?.attr('b') ?? paragraphEndProperties?.attr('b')),
+    italic: isXmlTrue(runProperties?.attr('i') ?? paragraphEndProperties?.attr('i')),
+    underline: isUnderlineEnabled(runProperties?.attr('u') ?? paragraphEndProperties?.attr('u')),
+    color:
+      readSrgbColor(runProperties) ??
+      readSrgbColor(paragraphEndProperties) ??
+      DEFAULT_FOREGROUND_COLOR,
+    align: normalizeTextAlign(firstParagraph?.properties?.attr('algn')),
+    lineHeight: 1.15
+  }
+}
+
+function fitTextFrameHeight(
+  frame: TextShapeFrame,
+  text: string,
+  style: TextShapeStyle,
+  slideHeight: number
+): number {
+  const lineCount = Math.max(1, text.split('\n').length)
+  const requiredHeight = Math.ceil(lineCount * style.fontSize * style.lineHeight)
+  const maxHeight = Math.max(frame.height, slideHeight - frame.y)
+  return Math.max(frame.height, Math.min(requiredHeight, maxHeight))
+}
+
+function normalizeCanvasLength(value: number, fallback: number): number {
+  const normalized = normalizeCanvasCoordinate(value)
+  return normalized !== null && normalized > 0 ? normalized : fallback
+}
+
+function normalizeCanvasCoordinate(value: number | undefined): number | null {
+  if (value === undefined || !Number.isFinite(value)) return null
+  return Math.abs(value) > RAW_EMU_THRESHOLD ? emuToPx(value) : value
+}
+
+function emuToPx(emu: number): number {
+  return (emu / EMU_PER_INCH) * CSS_PX_PER_INCH
+}
+
+function fontSizeToPx(hundredthsOfPoint: number): number {
+  return (hundredthsOfPoint / 100) * (CSS_PX_PER_INCH / 72)
+}
+
+function isXmlTrue(value: string | undefined): boolean {
+  return value === '1' || value === 'true'
+}
+
+function isUnderlineEnabled(value: string | undefined): boolean {
+  return Boolean(value && value !== 'none')
+}
+
+function readFontFamily(node: XmlNode | undefined): string | null {
+  return node?.child('latin').attr('typeface') ?? node?.child('ea').attr('typeface') ?? null
 }
 
 function readSrgbColor(
@@ -1135,7 +1425,17 @@ export function generateEditablePresentationThumbnail(
   const body = elements.map((element) => renderElementSvg(element, document.assets)).join('')
   const background = renderBackgroundSvg(slide?.background)
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${document.width}" height="${document.height}" viewBox="0 0 ${document.width} ${document.height}">${background}${body}</svg>`
-  return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`
+  return `data:image/svg+xml;base64,${stringToBase64(svg)}`
+}
+
+function stringToBase64(value: string): string {
+  const bytes = new TextEncoder().encode(value)
+  let binary = ''
+  const chunkSize = 8192
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    binary += String.fromCharCode(...bytes.slice(index, index + chunkSize))
+  }
+  return btoa(binary)
 }
 
 function renderBackgroundSvg(background: EditableSlideBackground | undefined): string {

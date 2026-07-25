@@ -2,9 +2,12 @@ import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 're
 import type {
   EditablePresentationDocument,
   EditablePresentationElement,
-  EditablePresentationSlide
+  EditablePresentationSlide,
+  EditableTextInsertFrame
 } from '@renderer/lib/editable-presentation'
 import {
+  INSERTED_TEXT_CLICK_SIZE,
+  INSERTED_TEXT_DRAG_MIN_SIZE,
   getSlideBackgroundCss,
   getSlideBackgroundPrimaryColor
 } from '@renderer/lib/editable-presentation'
@@ -17,10 +20,11 @@ interface EditableSlideSurfaceProps {
   selectedElementId?: string | null
   editingElementId?: string | null
   cropElementId?: string | null
+  isTextInsertMode?: boolean
   className?: string
   onSelectElement?: (elementId: string | null) => void
   onEditingElementChange?: (elementId: string | null) => void
-  onInsertText?: (point: { x: number; y: number }) => void
+  onInsertText?: (frame: EditableTextInsertFrame) => void
   onElementContextMenu?: (event: React.MouseEvent, element: EditablePresentationElement) => void
   onUpdateElement?: (
     slideId: string,
@@ -38,10 +42,18 @@ interface DragState {
   original: EditablePresentationElement
 }
 
+interface TextInsertState {
+  pointerId: number
+  startX: number
+  startY: number
+}
+
 type ResizeHandle = 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw'
 
 const TEXT_MIN_WIDTH = 60
 const TEXT_MIN_HEIGHT = 24
+const TEXT_AUTO_MIN_WIDTH = INSERTED_TEXT_CLICK_SIZE.width
+const TEXT_FRAME_HIT_AREA = 6
 const MIN_ELEMENT_SIZE = 20
 const MAX_CROP_TOTAL = 95
 
@@ -56,6 +68,7 @@ export default function EditableSlideSurface({
   selectedElementId = null,
   editingElementId = null,
   cropElementId = null,
+  isTextInsertMode = false,
   className,
   onSelectElement,
   onEditingElementChange,
@@ -66,6 +79,7 @@ export default function EditableSlideSurface({
   const slide = document.slides[slideId]
   const surfaceRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<DragState | null>(null)
+  const textInsertRef = useRef<TextInsertState | null>(null)
   const scaleRef = useRef({ x: 1, y: 1 })
   const [surfaceScale, setSurfaceScale] = useState(1)
 
@@ -103,16 +117,6 @@ export default function EditableSlideSurface({
     handle?: ResizeHandle
   ): void => {
     if (!editable || element.locked) return
-    const target = event.target as HTMLElement | null
-    if (
-      mode === 'move' &&
-      element.type === 'text' &&
-      target?.closest('[data-text-content]') &&
-      event.detail > 1
-    ) {
-      onSelectElement?.(element.id)
-      return
-    }
     event.preventDefault()
     event.stopPropagation()
     const rect = surfaceRef.current?.getBoundingClientRect()
@@ -153,7 +157,8 @@ export default function EditableSlideSurface({
     } else if (drag.original.type === 'text' && drag.handle) {
       onUpdateElement?.(slideId, drag.elementId, {
         ...calculateTextResize(drag.original, drag.handle, dx, dy),
-        autoWidth: false
+        autoWidth: false,
+        autoSize: 'fixed'
       } as Partial<EditablePresentationElement>)
     } else if (drag.original.type === 'image' && drag.handle) {
       onUpdateElement?.(
@@ -182,24 +187,87 @@ export default function EditableSlideSurface({
     }
   }
 
+  const getCanvasPoint = (
+    event: React.PointerEvent | React.MouseEvent
+  ): { x: number; y: number } | null => {
+    const rect = surfaceRef.current?.getBoundingClientRect()
+    if (!rect || rect.width <= 0 || rect.height <= 0) return null
+    const scaleX = document.width / rect.width
+    const scaleY = document.height / rect.height
+    return {
+      x: Math.max(0, Math.min(document.width, (event.clientX - rect.left) * scaleX)),
+      y: Math.max(0, Math.min(document.height, (event.clientY - rect.top) * scaleY))
+    }
+  }
+
+  const startTextInsert = (event: React.PointerEvent): boolean => {
+    if (!editable || !isTextInsertMode || !onInsertText) return false
+    const target = event.target as HTMLElement | null
+    if (target?.closest('[data-slide-element]')) return false
+    const point = getCanvasPoint(event)
+    if (!point) return false
+
+    event.preventDefault()
+    event.stopPropagation()
+    textInsertRef.current = { pointerId: event.pointerId, startX: point.x, startY: point.y }
+    onEditingElementChange?.(null)
+    onSelectElement?.(null)
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+    return true
+  }
+
+  const finishTextInsert = (event: React.PointerEvent): void => {
+    const insert = textInsertRef.current
+    if (!insert || insert.pointerId !== event.pointerId) return
+    event.preventDefault()
+    event.stopPropagation()
+    textInsertRef.current = null
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+
+    const point = getCanvasPoint(event)
+    if (!point) return
+    const dx = point.x - insert.startX
+    const dy = point.y - insert.startY
+    const isDrag = Math.abs(dx) >= 1 || Math.abs(dy) >= 1
+    if (!isDrag) {
+      onInsertText?.({
+        x: Math.max(0, Math.min(document.width - INSERTED_TEXT_CLICK_SIZE.width, insert.startX)),
+        y: Math.max(0, Math.min(document.height - INSERTED_TEXT_CLICK_SIZE.height, insert.startY)),
+        width: INSERTED_TEXT_CLICK_SIZE.width,
+        height: INSERTED_TEXT_CLICK_SIZE.height,
+        autoSize: 'content'
+      })
+      return
+    }
+
+    const width = Math.max(INSERTED_TEXT_DRAG_MIN_SIZE.width, Math.abs(dx))
+    const height = Math.max(INSERTED_TEXT_DRAG_MIN_SIZE.height, Math.abs(dy))
+    const x = dx < 0 ? insert.startX - width : insert.startX
+    const y = dy < 0 ? insert.startY - height : insert.startY
+    onInsertText?.({
+      x: Math.max(0, Math.min(document.width - width, x)),
+      y: Math.max(0, Math.min(document.height - height, y)),
+      width,
+      height,
+      autoSize: 'fixed'
+    })
+  }
+
   const insertTextAtPointer = (event: React.MouseEvent): void => {
     if (!editable || !onInsertText) return
     const target = event.target as HTMLElement | null
     if (target?.closest('[data-slide-element]')) return
-    const rect = surfaceRef.current?.getBoundingClientRect()
-    if (!rect) return
+    const point = getCanvasPoint(event)
+    if (!point) return
     event.preventDefault()
-    const scaleX = document.width / rect.width
-    const scaleY = document.height / rect.height
     onInsertText({
-      x: Math.max(
-        0,
-        Math.min(document.width - TEXT_MIN_WIDTH, (event.clientX - rect.left) * scaleX)
-      ),
-      y: Math.max(
-        0,
-        Math.min(document.height - TEXT_MIN_HEIGHT, (event.clientY - rect.top) * scaleY)
-      )
+      x: Math.max(0, Math.min(document.width - INSERTED_TEXT_CLICK_SIZE.width, point.x)),
+      y: Math.max(0, Math.min(document.height - INSERTED_TEXT_CLICK_SIZE.height, point.y)),
+      width: INSERTED_TEXT_CLICK_SIZE.width,
+      height: INSERTED_TEXT_CLICK_SIZE.height,
+      autoSize: 'content'
     })
   }
 
@@ -207,17 +275,21 @@ export default function EditableSlideSurface({
     <div
       data-slide-surface
       ref={surfaceRef}
-      className={`relative aspect-video w-full overflow-hidden bg-black ${className ?? ''}`}
+      className={`relative aspect-video w-full overflow-hidden bg-black ${
+        isTextInsertMode ? 'cursor-crosshair' : ''
+      } ${className ?? ''}`}
       style={{
         background: getSlideBackgroundCss(slide.background),
         aspectRatio: `${document.width} / ${document.height}`,
         border: showBorder ? `1px solid ${borderColor}` : undefined
       }}
-      onPointerDown={() => {
+      onPointerDown={(event) => {
         if (!editable) return
+        if (startTextInsert(event)) return
         onEditingElementChange?.(null)
         onSelectElement?.(null)
       }}
+      onPointerUp={finishTextInsert}
       onDoubleClick={insertTextAtPointer}
     >
       <div
@@ -384,7 +456,7 @@ function ElementHandles({
           <button
             key={`resize-text-${handle}`}
             type="button"
-            className={`${getHandlePositionClass(handle)} ${getHandleCursorClass(handle)} absolute size-3 rounded-[2px] border border-white bg-primary`}
+            className={`${getHandlePositionClass(handle)} ${getHandleCursorClass(handle)} absolute size-4 rounded-[2px] border-2 border-primary bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.65)]`}
             aria-label={`Resize text box ${handleToLabel(handle)}`}
             onPointerDown={(event) => onResizePointerDown(event, handle)}
             onPointerMove={onPointerMove}
@@ -450,7 +522,6 @@ function renderElementContent(
     return (
       <TextElementContent
         element={element}
-        document={document}
         slideId={slideId}
         editable={editable}
         editing={editing}
@@ -563,9 +634,87 @@ function calculateTextResize(
   } as Partial<EditablePresentationElement>
 }
 
+function isContentAutoSizedText(
+  element: Extract<EditablePresentationElement, { type: 'text' }>
+): boolean {
+  return element.autoSize === 'content' || element.autoWidth === true
+}
+
+function measureAutoSizedTextElement(
+  source: HTMLDivElement | null,
+  element: Extract<EditablePresentationElement, { type: 'text' }>,
+  text: string
+): Partial<EditablePresentationElement> {
+  if (!source || !window.document.body) return {}
+  const measure = source.cloneNode(false) as HTMLDivElement
+  measure.textContent = text || ' '
+  Object.assign(measure.style, {
+    position: 'absolute',
+    left: '-10000px',
+    top: '-10000px',
+    width: 'auto',
+    height: 'auto',
+    minWidth: '0',
+    maxWidth: 'none',
+    overflow: 'visible',
+    pointerEvents: 'none',
+    visibility: 'hidden',
+    whiteSpace: 'pre'
+  })
+  window.document.body.appendChild(measure)
+
+  const width = Math.max(TEXT_AUTO_MIN_WIDTH, Math.ceil(measure.scrollWidth))
+  measure.style.width = `${width}px`
+  measure.style.whiteSpace = 'pre-wrap'
+  measure.style.overflowWrap = 'break-word'
+  const height = Math.max(
+    Math.ceil(element.fontSize * element.lineHeight),
+    Math.ceil(measure.scrollHeight)
+  )
+  measure.remove()
+
+  const updates: Partial<EditablePresentationElement> = {}
+  if (Math.abs(width - element.width) >= 1) updates.width = width
+  if (Math.abs(height - element.height) >= 1) updates.height = height
+  return updates
+}
+
+type CaretDocument = Document & {
+  caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null
+  caretRangeFromPoint?: (x: number, y: number) => Range | null
+}
+
+function createCaretRangeFromPoint(x: number, y: number, content: HTMLElement): Range | null {
+  const ownerDocument = window.document as CaretDocument
+  const position = ownerDocument.caretPositionFromPoint?.(x, y)
+  if (position && content.contains(position.offsetNode)) {
+    const range = ownerDocument.createRange()
+    range.setStart(position.offsetNode, position.offset)
+    range.collapse(true)
+    return range
+  }
+
+  const range = ownerDocument.caretRangeFromPoint?.(x, y) ?? null
+  return range && content.contains(range.startContainer) ? range : null
+}
+
+function isTextFramePointer(
+  event: React.PointerEvent<HTMLElement> | React.MouseEvent<HTMLElement>
+): boolean {
+  const rect = event.currentTarget.getBoundingClientRect()
+  if (rect.width <= 0 || rect.height <= 0) return false
+  const x = event.clientX - rect.left
+  const y = event.clientY - rect.top
+  return (
+    x <= TEXT_FRAME_HIT_AREA ||
+    y <= TEXT_FRAME_HIT_AREA ||
+    rect.width - x <= TEXT_FRAME_HIT_AREA ||
+    rect.height - y <= TEXT_FRAME_HIT_AREA
+  )
+}
+
 function TextElementContent({
   element,
-  document,
   slideId,
   editable,
   editing,
@@ -574,7 +723,6 @@ function TextElementContent({
   onFinishTextEdit
 }: {
   element: Extract<EditablePresentationElement, { type: 'text' }>
-  document: EditablePresentationDocument
   slideId: string
   editable: boolean
   editing: boolean
@@ -590,34 +738,39 @@ function TextElementContent({
   const isComposingRef = useRef(false)
   const initializedEditingElementRef = useRef<string | null>(null)
   const blurFrameRef = useRef<number | null>(null)
+  const pendingCaretPointRef = useRef<{ x: number; y: number } | null>(null)
 
-  const fitToText = (text: string): Partial<EditablePresentationElement> => {
-    const updates = measureTextElement(contentRef.current, element, document.width, text)
-    if (!updates) return { text } as Partial<EditablePresentationElement>
-    return { text, ...updates } as Partial<EditablePresentationElement>
+  const cancelPendingBlur = (): void => {
+    if (blurFrameRef.current == null) return
+    window.cancelAnimationFrame(blurFrameRef.current)
+    blurFrameRef.current = null
   }
 
   const commitText = (text: string): void => {
-    onUpdateElement?.(slideId, element.id, fitToText(text))
+    onUpdateElement?.(slideId, element.id, {
+      text,
+      ...(isContentAutoSizedText(element)
+        ? measureAutoSizedTextElement(contentRef.current, element, text)
+        : {})
+    } as Partial<EditablePresentationElement>)
   }
 
-  const focusEditableContent = (content: HTMLDivElement): void => {
+  const focusEditableContent = (
+    content: HTMLDivElement,
+    point: { x: number; y: number } | null = null
+  ): void => {
     content.focus()
+    const range = point ? createCaretRangeFromPoint(point.x, point.y, content) : null
     const selection = window.getSelection()
     if (!selection) return
-    const range = window.document.createRange()
-    range.selectNodeContents(content)
-    range.collapse(false)
+    const nextRange = range ?? window.document.createRange()
+    if (!range) {
+      nextRange.selectNodeContents(content)
+      nextRange.collapse(false)
+    }
     selection.removeAllRanges()
-    selection.addRange(range)
+    selection.addRange(nextRange)
   }
-
-  useLayoutEffect(() => {
-    if (!editable || editing || element.locked || !onUpdateElement) return
-    const updates = measureTextElement(contentRef.current, element, document.width, element.text)
-    if (!updates) return
-    onUpdateElement(slideId, element.id, updates)
-  }, [document.width, editable, editing, element, onUpdateElement, slideId])
 
   useLayoutEffect(() => {
     if (!editing || element.locked) return
@@ -626,7 +779,8 @@ function TextElementContent({
     if (initializedEditingElementRef.current === element.id) return
     initializedEditingElementRef.current = element.id
     content.textContent = element.text
-    focusEditableContent(content)
+    focusEditableContent(content, pendingCaretPointRef.current)
+    pendingCaretPointRef.current = null
   }, [editing, element.id, element.locked, element.text])
 
   useLayoutEffect(() => {
@@ -681,11 +835,25 @@ function TextElementContent({
         if (!editing) return
         commitText(event.currentTarget.textContent ?? '')
       }}
-      onPointerDown={(event) => editing && event.stopPropagation()}
-      onDoubleClick={(event) => {
-        if (!editable || element.locked) return
+      onPointerDown={(event) => {
+        if (!editable) return
+        cancelPendingBlur()
+        if (isTextFramePointer(event)) return
         event.stopPropagation()
-        onStartTextEdit?.()
+        if (!editing && !element.locked) {
+          pendingCaretPointRef.current = { x: event.clientX, y: event.clientY }
+          onStartTextEdit?.()
+        }
+      }}
+      onClick={(event) => {
+        if (!editable || element.locked) return
+        if (isTextFramePointer(event)) return
+        event.stopPropagation()
+        cancelPendingBlur()
+        if (!editing) {
+          pendingCaretPointRef.current = { x: event.clientX, y: event.clientY }
+          onStartTextEdit?.()
+        }
       }}
       onBlur={(event) => {
         const target = event.currentTarget
@@ -834,50 +1002,4 @@ function handleToLabel(handle: ResizeHandle): string {
     nw: 'top left'
   }
   return labels[handle]
-}
-
-function measureTextElement(
-  source: HTMLDivElement | null,
-  element: Extract<EditablePresentationElement, { type: 'text' }>,
-  slideWidth: number,
-  text: string
-): Partial<EditablePresentationElement> | null {
-  if (!source || !document.body) return null
-  const measure = source.cloneNode(false) as HTMLDivElement
-  measure.textContent = text || ' '
-  Object.assign(measure.style, {
-    position: 'absolute',
-    left: '-10000px',
-    top: '-10000px',
-    width: 'auto',
-    height: 'auto',
-    minWidth: '0',
-    maxWidth: 'none',
-    overflow: 'visible',
-    pointerEvents: 'none',
-    visibility: 'hidden',
-    whiteSpace: 'pre'
-  })
-  document.body.appendChild(measure)
-  const maxWidth = Math.max(TEXT_MIN_WIDTH, slideWidth - element.x)
-  const naturalWidth = Math.ceil(measure.scrollWidth)
-  const nextWidth =
-    element.autoWidth === false
-      ? element.width
-      : Math.max(TEXT_MIN_WIDTH, Math.min(maxWidth, naturalWidth))
-
-  measure.style.width = `${nextWidth}px`
-  measure.style.whiteSpace = 'pre-wrap'
-  measure.style.overflowWrap = 'break-word'
-  const nextHeight = Math.max(TEXT_MIN_HEIGHT, Math.ceil(measure.scrollHeight))
-  measure.remove()
-
-  const updates: Partial<EditablePresentationElement> = {}
-  if (element.autoWidth !== false && Math.abs(nextWidth - element.width) >= 1) {
-    updates.width = nextWidth
-  }
-  if (Math.abs(nextHeight - element.height) >= 1) {
-    updates.height = nextHeight
-  }
-  return Object.keys(updates).length > 0 ? updates : null
 }

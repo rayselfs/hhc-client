@@ -61,6 +61,14 @@ describe('classifyMediaImport', () => {
     })
   })
 
+  it('skips legacy PPT through the app-unsupported path', () => {
+    expect(classifyMediaImport({ name: 'legacy.ppt' }, 'electron')).toMatchObject({
+      action: 'skip',
+      reason: 'app-unsupported',
+      extension: 'ppt'
+    })
+  })
+
   it('skips known formats that no platform supports', () => {
     expect(classifyMediaImport({ name: 'legacy.mpg' }, 'electron')).toMatchObject({
       action: 'skip',

@@ -30,6 +30,7 @@ export default function ProjectionPage(): React.JSX.Element {
     seekable?: boolean
     durationMs?: number
     presentation?: ProjectionPayload<'file:show'>['presentation']
+    editablePresentation?: ProjectionPayload<'file:show'>['editablePresentation']
   } | null>(null)
   const [fileControlEvent, setFileControlEvent] = useState<{
     id: number
@@ -76,7 +77,8 @@ export default function ProjectionPage(): React.JSX.Element {
         playbackMode: data.playbackMode,
         seekable: data.seekable,
         durationMs: data.durationMs,
-        presentation: data.presentation
+        presentation: data.presentation,
+        editablePresentation: data.editablePresentation
       })
       setActiveContent('file')
     })
@@ -161,6 +163,7 @@ export default function ProjectionPage(): React.JSX.Element {
         initialSeekable={fileData.seekable}
         initialDurationMs={fileData.durationMs}
         initialPresentation={fileData.presentation}
+        initialEditablePresentation={fileData.editablePresentation}
         controlEvent={fileControlEvent}
       />
     )

@@ -12,6 +12,95 @@
 import type { TimerTickPayload, TimerSyncPayload, StopwatchTickPayload } from './types/timer'
 import type { ProjectionTheme } from './types/projection-theme'
 
+type EditableProjectionSlideBackground =
+  | { type: 'solid'; color: string; transparency: number }
+  | { type: 'color'; color: string }
+  | { type: 'gradient'; from: string; to: string; direction: 'left-right' | 'top-bottom' | 'diagonal' }
+  | {
+      type: 'gradient'
+      gradientType: 'linear'
+      direction: 'left-right' | 'top-bottom' | 'diagonal'
+      angle: number
+      stops: Array<{ color: string; position: number; transparency: number; brightness: number }>
+    }
+
+type EditableProjectionElementBase = {
+  id: string
+  x: number
+  y: number
+  width: number
+  height: number
+  rotation: number
+  opacity: number
+  locked?: boolean
+}
+
+type EditableProjectionTextElement = EditableProjectionElementBase & {
+  type: 'text'
+  autoWidth?: boolean
+  autoSize?: 'content' | 'fixed'
+  text: string
+  fontFamily: string
+  fontSize: number
+  bold: boolean
+  italic: boolean
+  underline: boolean
+  color: string
+  align: 'left' | 'center' | 'right'
+  lineHeight: number
+}
+
+type EditableProjectionImageElement = EditableProjectionElementBase & {
+  type: 'image'
+  assetId: string
+  crop?: { top: number; right: number; bottom: number; left: number }
+  borderColor?: string
+  borderWidth?: number
+  shadow?: 'none' | 'soft' | 'medium'
+}
+
+type EditableProjectionShapeElement = EditableProjectionElementBase & {
+  type: 'shape'
+  shape: 'rectangle' | 'ellipse'
+  fillColor: string
+  strokeColor: string
+  strokeWidth: number
+}
+
+type EditableProjectionLineElement = EditableProjectionElementBase & {
+  type: 'line'
+  strokeColor: string
+  strokeWidth: number
+}
+
+type EditableProjectionLockedElement = EditableProjectionElementBase & {
+  type: 'locked'
+  label: string
+}
+
+type EditableProjectionElement =
+  | EditableProjectionTextElement
+  | EditableProjectionImageElement
+  | EditableProjectionShapeElement
+  | EditableProjectionLineElement
+  | EditableProjectionLockedElement
+
+type EditableProjectionSlide = {
+  id: string
+  name: string
+  background: EditableProjectionSlideBackground
+  elementOrder: string[]
+  elements: Record<string, EditableProjectionElement>
+  notes: string
+}
+
+type EditableProjectionAsset = {
+  id: string
+  name: string
+  mimeType: string
+  dataUrl: string
+}
+
 export interface SystemMessages {
   '__system:ready': null
   '__system:pong': null
@@ -63,6 +152,12 @@ export interface AppMessages {
     presentation?: {
       slideIndex: number
       slideCount?: number
+    }
+    editablePresentation?: {
+      width: number
+      height: number
+      slide: EditableProjectionSlide
+      assets: Record<string, EditableProjectionAsset>
     }
   }
   /** File playback/control actions on projection */
