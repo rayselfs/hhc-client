@@ -41,6 +41,7 @@ const projectionApi = {
   check: () => typedInvoke('projection:check'),
   ensure: (displayId?: string) => typedInvoke('projection:ensure', displayId),
   moveToDisplay: (displayId: string) => typedInvoke('projection:move-to-display', displayId),
+  bringToFront: () => typedInvoke('projection:bring-to-front'),
   close: () => typedInvoke('projection:close'),
   send: <C extends ProjectionChannel>(channel: C, data: ProjectionPayload<C>) =>
     ipcRenderer.send('projection:send', channel, data),

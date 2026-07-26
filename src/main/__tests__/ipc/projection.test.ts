@@ -10,6 +10,7 @@ const mockWindowManager = {
   isProjectionOpen: vi.fn(() => false),
   createProjectionWindow: vi.fn(),
   moveProjectionWindow: vi.fn(),
+  bringProjectionToFront: vi.fn(),
   closeProjection: vi.fn(),
   sendToProjection: vi.fn(),
   sendToMain: vi.fn(),
@@ -148,6 +149,30 @@ describe('projection:move-to-display', () => {
     const result = getHandler('projection:move-to-display')(makeEvent(), '2')
     expect(result).toEqual({ moved: false })
     expect(mockWindowManager.moveProjectionWindow).not.toHaveBeenCalled()
+  })
+})
+
+describe('projection:bring-to-front', () => {
+  it('allows the main window to bring projection forward', () => {
+    vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockMainWindow as never)
+    mockWindowManager.bringProjectionToFront.mockReturnValue(true)
+
+    expect(getHandler('projection:bring-to-front')(makeEvent())).toEqual({
+      broughtToFront: true
+    })
+    expect(mockWindowManager.bringProjectionToFront).toHaveBeenCalledOnce()
+  })
+
+  it('rejects projection and unknown windows', () => {
+    for (const window of [mockProjectionWindow, mockUnknownWindow]) {
+      vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(window as never)
+
+      expect(getHandler('projection:bring-to-front')(makeEvent())).toEqual({
+        broughtToFront: false
+      })
+    }
+
+    expect(mockWindowManager.bringProjectionToFront).not.toHaveBeenCalled()
   })
 })
 
