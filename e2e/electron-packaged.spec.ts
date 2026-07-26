@@ -1,6 +1,7 @@
 import { _electron as electron, expect, test } from '@playwright/test'
 import type { ElectronApplication } from '@playwright/test'
 import { resolve } from 'node:path'
+import { completeOnboarding } from './helpers'
 
 let electronApp: ElectronApplication | null = null
 
@@ -28,6 +29,7 @@ test('launches packaged control and projection windows with timer payload delive
   const control = await test.step('open control window', async () => {
     const window = await electronApp!.firstWindow()
     await expect(window).toHaveTitle(/LibrePresenter/)
+    await completeOnboarding(window)
     return window
   })
 

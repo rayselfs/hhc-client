@@ -6,6 +6,7 @@ import tailwindcss from '@tailwindcss/vite'
 import { visualizer } from 'rollup-plugin-visualizer'
 import { VitePWA } from 'vite-plugin-pwa'
 import { loadEnv, type Plugin } from 'vite'
+import { rendererManualChunk } from './scripts/renderer-manual-chunk'
 
 const pkg = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf-8'))
 const DEFAULT_ONEDRIVE_CLIENT_ID = '4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02'
@@ -160,24 +161,7 @@ export default defineConfig(({ mode }) => {
       build: {
         rollupOptions: {
           output: {
-            manualChunks: (id) => {
-              if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
-                return 'react-vendor'
-              }
-              if (id.includes('node_modules/@heroui') || id.includes('node_modules/react-aria')) {
-                return 'ui-vendor'
-              }
-              if (id.includes('node_modules/@phosphor-icons')) {
-                return 'icons'
-              }
-              if (
-                id.includes('node_modules/@react-aria/color') ||
-                id.includes('node_modules/@react-stately/color')
-              ) {
-                return 'color-picker'
-              }
-              return undefined
-            }
+            manualChunks: rendererManualChunk
           }
         }
       }

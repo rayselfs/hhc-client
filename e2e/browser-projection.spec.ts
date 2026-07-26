@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { completeOnboarding } from './helpers'
 
 declare global {
   interface Window {
@@ -21,6 +22,7 @@ test('starts one projection popup and keeps passive timer ticks non-activating',
   })
 
   await page.goto('/')
+  await completeOnboarding(page)
 
   const projectionPromise = context.waitForEvent('page')
   await page.getByTestId('btn-start').click()
@@ -35,7 +37,7 @@ test('starts one projection popup and keeps passive timer ticks non-activating',
   expect(context.pages()).toHaveLength(2)
   expect(await page.evaluate(() => window.__projectionFocusCalls)).toBe(0)
 
-  await page.close()
+  await page.close({ runBeforeUnload: true })
   await expect.poll(() => projection.isClosed()).toBe(true)
 })
 
