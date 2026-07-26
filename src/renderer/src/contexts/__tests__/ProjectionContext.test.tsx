@@ -70,6 +70,24 @@ describe('ProjectionContext — web mode', () => {
     expect(mockWindowOpen).not.toHaveBeenCalled()
   })
 
+  it('does not focus a browser window for foreground intent', async () => {
+    const focusSpy = vi.spyOn(window, 'focus').mockImplementation(() => undefined)
+    const { result } = renderProjection()
+
+    await act(async () => {
+      await result.current.bringProjectionToFront()
+      await result.current.startProjection('timer')
+      await result.current.project(
+        'timer:overtime-message',
+        { message: 'hello' },
+        { bringToFront: true }
+      )
+    })
+
+    expect(focusSpy).not.toHaveBeenCalled()
+    focusSpy.mockRestore()
+  })
+
   it('isProjectionBlanked is true initially', () => {
     const { result } = renderProjection()
     expect(result.current.isProjectionBlanked).toBe(true)
@@ -589,6 +607,7 @@ describe('ProjectionContext — claimProjection', () => {
 describe('ProjectionContext — electron mode', () => {
   let mockCheck: ReturnType<typeof vi.fn>
   let mockEnsure: ReturnType<typeof vi.fn>
+  let mockBringToFront: ReturnType<typeof vi.fn>
   let mockClose: ReturnType<typeof vi.fn>
   let openedCallback: (() => void) | null
   let closedCallback: (() => void) | null
@@ -601,6 +620,7 @@ describe('ProjectionContext — electron mode', () => {
     closedCallback = null
     mockCheck = vi.fn(() => Promise.resolve({ exists: false }))
     mockEnsure = vi.fn(() => Promise.resolve({ created: true }))
+    mockBringToFront = vi.fn(() => Promise.resolve({ broughtToFront: true }))
     mockClose = vi.fn(() => Promise.resolve({ closed: true }))
 
     Object.defineProperty(window, 'api', {
@@ -608,6 +628,7 @@ describe('ProjectionContext — electron mode', () => {
         projection: {
           check: mockCheck,
           ensure: mockEnsure,
+          bringToFront: mockBringToFront,
           close: mockClose,
           send: vi.fn(),
           onProjectionOpened: vi.fn((cb: () => void) => {
@@ -651,6 +672,66 @@ describe('ProjectionContext — electron mode', () => {
       await Promise.resolve()
     })
     expect(result.current.isProjectionOpen).toBe(true)
+  })
+
+  it('brings an existing projection forward for an explicit start', async () => {
+    mockCheck.mockResolvedValue({ exists: true })
+    const { result } = renderProjection()
+
+    await act(async () => {
+      await Promise.resolve()
+      await result.current.startProjection('timer')
+    })
+
+    expect(mockBringToFront).toHaveBeenCalledOnce()
+    expect(mockEnsure).not.toHaveBeenCalled()
+  })
+
+  it('can replay an existing session without bringing projection forward', async () => {
+    mockCheck.mockResolvedValue({ exists: true })
+    const { result } = renderProjection()
+
+    await act(async () => {
+      await Promise.resolve()
+      await result.current.startProjection('media', [], { bringToFront: false })
+    })
+
+    expect(mockBringToFront).not.toHaveBeenCalled()
+  })
+
+  it('brings projection forward only when an incremental project opts in', async () => {
+    mockCheck.mockResolvedValue({ exists: true })
+    const { result } = renderProjection()
+
+    await act(async () => {
+      await Promise.resolve()
+      await result.current.project(
+        'file:show',
+        {
+          itemId: 'image-1',
+          blobId: 'image-1',
+          fileName: 'Image',
+          mimeType: 'image/png',
+          playlist: [{ id: 'image-1', name: 'Image', mimeType: 'image/png' }],
+          currentIndex: 0
+        },
+        { bringToFront: true }
+      )
+    })
+
+    expect(mockBringToFront).toHaveBeenCalledOnce()
+  })
+
+  it('does not bring projection forward for plain transport updates', async () => {
+    mockCheck.mockResolvedValue({ exists: true })
+    const { result } = renderProjection()
+
+    await act(async () => {
+      await Promise.resolve()
+      await result.current.project('timer:overtime-message', { message: 'hello' })
+    })
+
+    expect(mockBringToFront).not.toHaveBeenCalled()
   })
 
   it('responds to projection opened/closed IPC events', async () => {

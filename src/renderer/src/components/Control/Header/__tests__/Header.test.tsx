@@ -60,6 +60,9 @@ function baseProjectionContext(): MockProjectionContext {
     startProjection: vi.fn<MockProjectionContext['startProjection']>(() => Promise.resolve()),
     stopProjection: vi.fn<MockProjectionContext['stopProjection']>(() => Promise.resolve()),
     openProjection: vi.fn<MockProjectionContext['openProjection']>(() => Promise.resolve()),
+    bringProjectionToFront: vi.fn<MockProjectionContext['bringProjectionToFront']>(() =>
+      Promise.resolve()
+    ),
     closeProjection: vi.fn<MockProjectionContext['closeProjection']>(() => Promise.resolve()),
     blankProjection: vi.fn<MockProjectionContext['blankProjection']>(),
     project: vi.fn<MockProjectionContext['project']>(() => Promise.resolve()),

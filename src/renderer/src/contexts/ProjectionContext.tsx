@@ -21,6 +21,13 @@ export type ProjectionOwner = 'timer' | 'bible' | 'media'
 interface ProjectOptions {
   /** When true, auto-reopen projection if it's closed. Default: false. */
   autoOpen?: boolean
+  /** When true, request one non-activating Electron foreground operation. */
+  bringToFront?: boolean
+}
+
+interface StartProjectionOptions {
+  /** Defaults to true for explicit projection starts. */
+  bringToFront?: boolean
 }
 
 interface ProjectionContextValue {
@@ -34,9 +41,14 @@ interface ProjectionContextValue {
    * Pass `unblank: true` to also unblank (use for explicit user actions only).
    */
   claimProjection: (owner: ProjectionOwner, options?: { unblank?: boolean }) => void
-  startProjection: (owner: ProjectionOwner, payloads?: ContentMessageTuple[]) => Promise<void>
+  startProjection: (
+    owner: ProjectionOwner,
+    payloads?: ContentMessageTuple[],
+    options?: StartProjectionOptions
+  ) => Promise<void>
   stopProjection: () => Promise<void>
   openProjection: () => Promise<void>
+  bringProjectionToFront: () => Promise<void>
   closeProjection: () => Promise<void>
   blankProjection: (blank: boolean) => void
   /** Transport layer: send content to projection. Use claimProjection() for unblank/open. */
@@ -235,6 +247,13 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
     startPolling()
   }, [projectionDisplayId, startPolling])
 
+  const bringProjectionToFront = useCallback(async (): Promise<void> => {
+    if (!isElectron()) return
+    await window.api.projection.bringToFront().catch((error) => {
+      console.warn('[Projection] Bring to front failed:', error)
+    })
+  }, [])
+
   const closeProjection = useCallback(async (): Promise<void> => {
     if (isElectron()) {
       await window.api.projection.close()
@@ -307,7 +326,12 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
   )
 
   const startProjection = useCallback(
-    async (owner: ProjectionOwner, payloads: ContentMessageTuple[] = []): Promise<void> => {
+    async (
+      owner: ProjectionOwner,
+      payloads: ContentMessageTuple[] = [],
+      options?: StartProjectionOptions
+    ): Promise<void> => {
+      const wasOpen = isProjectionOpenRef.current
       setActiveOwner(owner)
       setIsProjectionBlanked(false)
       queuePayload('__system:active-owner', '__system:active-owner', { owner })
@@ -316,12 +340,21 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
         queuePayload(getPendingPayloadKey(channel), channel, data)
       })
 
-      if (!isProjectionOpenRef.current) {
+      if (!wasOpen) {
         await openProjection()
+      } else if (options?.bringToFront !== false) {
+        await bringProjectionToFront()
       }
       if (!isReadyRef.current) startReadyTimeout()
     },
-    [getPendingPayloadKey, openProjection, queuePayload, setIsProjectionBlanked, startReadyTimeout]
+    [
+      bringProjectionToFront,
+      getPendingPayloadKey,
+      openProjection,
+      queuePayload,
+      setIsProjectionBlanked,
+      startReadyTimeout
+    ]
   )
 
   const stopProjection = useCallback(async (): Promise<void> => {
@@ -342,6 +375,9 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       data: ProjectionPayload<C>,
       options?: ProjectOptions
     ): Promise<void> => {
+      const shouldBringToFront =
+        options?.bringToFront === true && isProjectionOpenRef.current
+
       if (!isReadyRef.current) {
         pendingPayloadsRef.current.set(getPendingPayloadKey(channel), { channel, data })
 
@@ -352,12 +388,14 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
           })
           startReadyTimeout()
         }
+        if (shouldBringToFront) await bringProjectionToFront()
         return
       }
 
       getAdapter(adapterRef).send(channel, data)
+      if (shouldBringToFront) await bringProjectionToFront()
     },
-    [openProjection, getPendingPayloadKey, startReadyTimeout]
+    [bringProjectionToFront, openProjection, getPendingPayloadKey, startReadyTimeout]
   )
 
   const on = useCallback(
@@ -380,6 +418,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       startProjection,
       stopProjection,
       openProjection,
+      bringProjectionToFront,
       closeProjection,
       blankProjection,
       project,
@@ -395,6 +434,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       startProjection,
       stopProjection,
       openProjection,
+      bringProjectionToFront,
       closeProjection,
       blankProjection,
       project,
