@@ -25,7 +25,11 @@ export function useMediaProjectionSync(): void {
   const projectSequenceRef = useRef(0)
 
   const projectCurrentItem = useCallback(
-    async (state: MediaProjectionStore, startSession = false): Promise<void> => {
+    async (
+      state: MediaProjectionStore,
+      startSession = false,
+      bringToFront = false
+    ): Promise<void> => {
       const sequence = ++projectSequenceRef.current
       const payload = isEditablePresentationMimeType(state.currentItem()?.mimeType)
         ? await buildFileProjectionPayloadWithEditableSlide(state)
@@ -34,9 +38,9 @@ export function useMediaProjectionSync(): void {
 
       if (sequence === projectSequenceRef.current) {
         if (startSession) {
-          void startProjection('media', [['file:show', payload]])
+          void startProjection('media', [['file:show', payload]], { bringToFront })
         } else {
-          void project('file:show', payload)
+          void project('file:show', payload, { bringToFront })
         }
       }
     },
@@ -56,7 +60,9 @@ export function useMediaProjectionSync(): void {
         state.typeStates.presentation !== prev.typeStates.presentation
 
       if (started || indexChanged || playlistChanged || endedCleared || presentationChanged) {
-        void projectCurrentItem(state, started)
+        const explicitContentChange =
+          started || indexChanged || endedCleared || presentationChanged
+        void projectCurrentItem(state, started, explicitContentChange)
       }
     })
     return () => {
@@ -108,6 +114,6 @@ export function useMediaProjectionSync(): void {
   useEffect(() => {
     const state = useMediaProjectionStore.getState()
     if (!state.isPresenting) return
-    void projectCurrentItem(state, true)
+    void projectCurrentItem(state, true, false)
   }, [projectCurrentItem])
 }

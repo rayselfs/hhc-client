@@ -74,7 +74,8 @@ describe('media projection sync', () => {
 
     expect(mockProject).toHaveBeenCalledWith(
       'file:show',
-      expect.objectContaining({ currentIndex: 1, itemId: 'b', blobId: 'b' })
+      expect.objectContaining({ currentIndex: 1, itemId: 'b', blobId: 'b' }),
+      { bringToFront: true }
     )
   })
 
@@ -87,9 +88,11 @@ describe('media projection sync', () => {
 
     renderSync()
 
-    expect(mockStartProjection).toHaveBeenCalledWith('media', [
-      ['file:show', expect.objectContaining({ itemId: 'copy-id', blobId: 'original-id' })]
-    ])
+    expect(mockStartProjection).toHaveBeenCalledWith(
+      'media',
+      [['file:show', expect.objectContaining({ itemId: 'copy-id', blobId: 'original-id' })]],
+      { bringToFront: false }
+    )
   })
 
   it('projects embedded VLC video through the desktop engine', async () => {
@@ -118,18 +121,22 @@ describe('media projection sync', () => {
 
     renderSync()
 
-    expect(mockStartProjection).toHaveBeenCalledWith('media', [
+    expect(mockStartProjection).toHaveBeenCalledWith(
+      'media',
       [
-        'file:show',
-        expect.objectContaining({
-          itemId: 'vlc-item',
-          blobId: 'source-blob',
-          playbackMode: 'vlc-embedded',
-          seekable: true,
-          durationMs: 15000
-        })
-      ]
-    ])
+        [
+          'file:show',
+          expect.objectContaining({
+            itemId: 'vlc-item',
+            blobId: 'source-blob',
+            playbackMode: 'vlc-embedded',
+            seekable: true,
+            durationMs: 15000
+          })
+        ]
+      ],
+      { bringToFront: false }
+    )
   })
 
   it('sends file:show when a PPTX slide changes', () => {
@@ -160,7 +167,38 @@ describe('media projection sync', () => {
       expect.objectContaining({
         itemId: 'deck',
         presentation: { slideIndex: 1, slideCount: 5 }
-      })
+      }),
+      { bringToFront: true }
+    )
+  })
+
+  it('foregrounds a newly started media session', () => {
+    useMediaProjectionStore.setState({ isPresenting: false })
+    renderSync()
+    mockStartProjection.mockClear()
+
+    act(() => {
+      useMediaProjectionStore.setState({ isPresenting: true })
+    })
+
+    expect(mockStartProjection).toHaveBeenCalledWith('media', expect.any(Array), {
+      bringToFront: true
+    })
+  })
+
+  it('does not foreground pan and zoom transport updates', () => {
+    renderSync()
+    mockProject.mockClear()
+
+    act(() => {
+      useMediaProjectionStore.getState().setPan({ x: 10, y: 20 })
+      useMediaProjectionStore.getState().setZoomLevel(1.5)
+    })
+
+    expect(mockProject).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      { bringToFront: true }
     )
   })
 })
