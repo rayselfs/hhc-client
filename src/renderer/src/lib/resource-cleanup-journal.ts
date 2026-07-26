@@ -89,9 +89,16 @@ export async function retryResourceCleanup(id: string): Promise<void> {
 
 export async function retryPendingResourceCleanups(): Promise<ResourceCleanupRetryResult> {
   const records = await listResourceCleanupRecords()
-  const results = await Promise.allSettled(records.map((record) => retryResourceCleanup(record.id)))
+  let failed = 0
+  for (const record of records) {
+    try {
+      await retryResourceCleanup(record.id)
+    } catch {
+      failed += 1
+    }
+  }
   return {
-    attempted: results.length,
-    failed: results.filter((result) => result.status === 'rejected').length
+    attempted: records.length,
+    failed
   }
 }
