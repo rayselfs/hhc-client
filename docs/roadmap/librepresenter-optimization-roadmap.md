@@ -127,6 +127,24 @@ write paths.
   confirmed transaction.
 - Failed native cleanup remains visible and retryable.
 
+### Progress — 2026-07-26
+
+- [x] Shared folder IndexedDB reads, writes, deletes, and trash operations propagate failures
+      instead of returning fabricated empty or successful results.
+- [x] Bible and File Explorer stores expose initializing, saving, degraded, pending, and retry
+      state without replacing a failed load with a new empty root.
+- [x] Optimistic folder/item mutations use a serialized retryable queue; failed operations retain
+      ordering and block later writes until retry succeeds.
+- [x] Lazy parent loads remain retryable and do not poison `loadedParents` after failure.
+- [x] Files and Bible custom folders show accessible load/save failure alerts and the appropriate
+      retry action.
+- [x] Focused R1 folder persistence verification: 106/106 tests, Node/Web typechecks, and touched
+      file ESLint pass.
+- [ ] Native/external resource cleanup journal and retry UI.
+- [ ] Compensatable editable-presentation creation across catalog, blob, document, and thumbnail
+      writes.
+- [ ] Orphan blob and reference-count audit derived from authoritative references.
+
 ## R2 — Presentation Trust Foundation
 
 ### Goal
