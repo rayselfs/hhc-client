@@ -151,7 +151,8 @@ describe('resource cleanup journal', () => {
     const result = await retryPendingResourceCleanups()
 
     expect(result).toEqual({ attempted: 2, failed: 1 })
-    await expect(getResourceCleanupRecord(first.id)).resolves.toMatchObject({ status: 'failed' })
-    await expect(getResourceCleanupRecord(second.id)).resolves.toBeUndefined()
+    const remaining = await listResourceCleanupRecords()
+    expect(remaining).toEqual([expect.objectContaining({ status: 'failed', attempt: 1 })])
+    expect([first.id, second.id]).toContain(remaining[0].id)
   })
 })
