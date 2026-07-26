@@ -36,16 +36,16 @@ The order is deliberate:
 
 ## Roadmap
 
-| Phase | Status | Outcome |
-| --- | --- | --- |
-| R0 | In progress | Projection foreground behavior is predictable and foundational risks are covered by real dual-mode gates. |
-| R1 | Planned | File and presentation persistence failures cannot silently lose or fabricate state. |
-| R2 | Design revision required | Presentation editing has transactional Undo/Redo, serialized saving, visible save state, and safe lifecycle gates. |
-| R3 | Planned | Projection survives reload, crash, display changes, and browser popup failures through session replay and recovery. |
-| R4 | Planned | Media projection remains active while the operator previews, searches, and prepares the next source. |
-| R5 | Planned | Presentation Workspace follows a PowerPoint-like desktop information architecture with essential editing operations. |
-| R6 | Planned | Media import, readiness, playback, storage, and slide delivery are observable, recoverable, and performant. |
-| R7 | Planned | Shared responsive workspace primitives replace fixed page-specific layouts; dead paths are removed and release gates cover packaged behavior. |
+| Phase | Status                   | Outcome                                                                                                                                       |
+| ----- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| R0    | Complete                 | Projection foreground behavior is predictable and foundational risks are covered by real dual-mode gates.                                     |
+| R1    | Planned                  | File and presentation persistence failures cannot silently lose or fabricate state.                                                           |
+| R2    | Design revision required | Presentation editing has transactional Undo/Redo, serialized saving, visible save state, and safe lifecycle gates.                            |
+| R3    | Planned                  | Projection survives reload, crash, display changes, and browser popup failures through session replay and recovery.                           |
+| R4    | Planned                  | Media projection remains active while the operator previews, searches, and prepares the next source.                                          |
+| R5    | Planned                  | Presentation Workspace follows a PowerPoint-like desktop information architecture with essential editing operations.                          |
+| R6    | Planned                  | Media import, readiness, playback, storage, and slide delivery are observable, recoverable, and performant.                                   |
+| R7    | Planned                  | Shared responsive workspace primitives replace fixed page-specific layouts; dead paths are removed and release gates cover packaged behavior. |
 
 ## R0 — Immediate projection behavior and quality baseline
 
@@ -81,15 +81,24 @@ coverage for later session work.
 - [x] Timer Space start/resume parity with the Timer buttons.
 - [x] Passive Timer ticks, Media pan/zoom, playlist metadata, and remount synchronization remain
       transport-only.
-- [x] Focused R0 regression suite: 156 tests passed.
-- [x] TypeScript checks and production build with bundle budgets passed.
-- [ ] Browser projection E2E in PR CI.
-- [ ] Packaged Electron projection smoke in release gates.
+- [x] One-shot foreground regression suite: 156 tests passed.
+- [x] Packaging and lifecycle regression suite: 24/24 tests passed.
+- [x] TypeScript checks, ESLint, and production build with bundle budgets passed.
+- [x] Browser production projection E2E runs in PR CI and passed locally.
+- [x] Windows and macOS packaged Electron projection smoke runs in release CI.
+- [x] Desktop packaging rejects a missing `electron-vlc-player` native binding before packaging,
+      and a damaged app can still boot with VLC reported unavailable.
+- [x] Windows VLC/FFmpeg runtimes are checksum-pinned; the unpacked Windows executable passed
+      runtime validation and the real Timer control/projection lifecycle smoke.
+- [x] macOS uses the official checksum-pinned VLC arm64 distribution and builds FFmpeg 8.1.2 from
+      checksum-pinned official source with LGPL-only configure flags on the arm64 release runner.
 
-The full Windows-hosted test run currently reports 1874 passing and 14 failures in six existing
-main-process test files whose expectations hard-code POSIX paths. The full repository lint baseline
-also retains two pre-existing errors in `FileProjection.tsx` and `FilesPage.tsx`; all files touched
-by this slice pass ESLint.
+The fresh full Windows-hosted test run still reports 14 failures outside the R0 focused gates:
+12 path assertions in six main-process test files remain hard-coded for POSIX paths, and two
+renderer tests time out only under full-suite parallel load. These are retained as test
+infrastructure follow-up work; R0's focused tests, browser lifecycle, Windows packaged lifecycle,
+typechecks, lint, and production build pass. The macOS packaged lifecycle is enforced by release CI
+and cannot be executed on this Windows host.
 
 ## R1 — Persistence integrity
 
