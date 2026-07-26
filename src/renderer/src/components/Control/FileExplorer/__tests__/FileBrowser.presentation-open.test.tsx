@@ -77,7 +77,7 @@ function makeFile(overrides: Partial<FileItemRecord>): FileItemRecord {
   }
 }
 
-function renderWithItems(items: readonly FileItemRecord[]): void {
+async function renderWithItems(items: readonly FileItemRecord[]): Promise<void> {
   const root = makeRootFolder()
   act(() => {
     useFileExplorerStore.setState({
@@ -95,6 +95,7 @@ function renderWithItems(items: readonly FileItemRecord[]): void {
   })
 
   render(<FileBrowser />)
+  await act(async () => undefined)
 }
 
 describe('FileBrowser presentation open behavior', () => {
@@ -116,9 +117,9 @@ describe('FileBrowser presentation open behavior', () => {
     })
   })
 
-  it('opens a PPTX in the presentation workspace when double-clicked', () => {
+  it('opens a PPTX in the presentation workspace when double-clicked', async () => {
     const deck = makeFile({ id: 'deck-1', name: 'Deck.pptx', mimeType: PPTX_MIME_TYPE })
-    renderWithItems([deck])
+    await renderWithItems([deck])
 
     act(() => {
       fireEvent.doubleClick(screen.getByText('Deck.pptx'))
@@ -133,9 +134,9 @@ describe('FileBrowser presentation open behavior', () => {
     expect(mocks.startMediaProjection).not.toHaveBeenCalled()
   })
 
-  it('keeps non-presentation media double-click behavior unchanged', () => {
+  it('keeps non-presentation media double-click behavior unchanged', async () => {
     const image = makeFile({ id: 'image-1', name: 'Photo.png', mimeType: 'image/png' })
-    renderWithItems([image])
+    await renderWithItems([image])
 
     act(() => {
       fireEvent.doubleClick(screen.getByText('Photo.png'))
@@ -146,12 +147,12 @@ describe('FileBrowser presentation open behavior', () => {
     expect(mocks.navigate).not.toHaveBeenCalled()
   })
 
-  it('opens a PPTX search result in the presentation workspace', () => {
+  it('opens a PPTX search result in the presentation workspace', async () => {
     const deck = makeFile({ id: 'deck-1', name: 'Deck.pptx', mimeType: PPTX_MIME_TYPE })
     act(() => {
       useFileExplorerSearch.setState({ searchQuery: 'Deck' })
     })
-    renderWithItems([deck])
+    await renderWithItems([deck])
 
     act(() => {
       fireEvent.doubleClick(screen.getByText('Deck.pptx'))
@@ -161,5 +162,4 @@ describe('FileBrowser presentation open behavior', () => {
     expect(mocks.navigate).toHaveBeenCalledWith('/presentations/deck-1')
     expect(mocks.startMediaProjection).not.toHaveBeenCalled()
   })
-
 })

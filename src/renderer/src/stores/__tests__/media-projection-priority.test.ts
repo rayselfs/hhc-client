@@ -1,9 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { FileItemRecord } from '@shared/types/folder'
 import type { PresentationReadinessReport } from '@renderer/lib/presentation-readiness'
+import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 
-const analyzePresentationReadiness = vi.fn()
-const ensureSyncItemAvailableForPresentation = vi.fn()
+const { analyzePresentationReadiness, ensureSyncItemAvailableForPresentation } = vi.hoisted(() => ({
+  analyzePresentationReadiness: vi.fn(),
+  ensureSyncItemAvailableForPresentation: vi.fn()
+}))
 
 vi.mock('@renderer/lib/presentation-readiness', () => ({
   analyzePresentationReadiness,
@@ -67,13 +70,12 @@ function report(
 }
 
 describe('startPresentationWithReadiness priority', () => {
-  beforeEach(async () => {
-    vi.resetModules()
+  beforeEach(() => {
+    useMediaProjectionStore.getState().exit()
     vi.clearAllMocks()
   })
 
   it('downloads the requested sync item instead of falling back to the last ready item', async () => {
-    const { useMediaProjectionStore } = await import('@renderer/stores/media-projection')
     const ready = makeFile('ready', 'ready.png')
     const requested = makeFile('requested', 'requested.png')
     analyzePresentationReadiness
