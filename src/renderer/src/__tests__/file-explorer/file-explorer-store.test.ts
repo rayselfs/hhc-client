@@ -1,4 +1,8 @@
-import { useFileExplorerStore, useFileExplorerSettings } from '@renderer/stores/file-explorer'
+import {
+  publishPersistedFileItem,
+  useFileExplorerStore,
+  useFileExplorerSettings
+} from '@renderer/stores/file-explorer'
 import type { FileItemRecord } from '@shared/types/folder'
 
 type AddFileItemData = Omit<FileItemRecord, 'id' | 'sortIndex' | 'createdAt' | 'expiresAt'> & {
@@ -159,6 +163,27 @@ describe('useFileExplorerStore', () => {
       })
       const { _itemsArray } = useFileExplorerStore.getState()
       expect(_itemsArray[0].id).toBeTruthy()
+    })
+
+    it('publishes an already-persisted item without scheduling another write', () => {
+      const item: FileItemRecord = {
+        id: 'persisted-item',
+        parentId: 'file-root',
+        type: 'file',
+        sortIndex: 0,
+        createdAt: 1,
+        expiresAt: null,
+        name: 'Sunday.lpdeck',
+        url: 'blob:persisted-item',
+        size: 10,
+        mimeType: 'application/x-hhc-presentation+json'
+      }
+
+      publishPersistedFileItem(item)
+
+      expect(useFileExplorerStore.getState().items[item.id]).toEqual(item)
+      expect(useFileExplorerStore.getState()._itemsByParent['file-root']).toEqual([item])
+      expect(useFileExplorerStore.getState().pendingPersistenceCount).toBe(0)
     })
   })
 

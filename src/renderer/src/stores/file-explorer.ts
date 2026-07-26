@@ -39,6 +39,24 @@ export const useFileExplorerStore = createFolderStore({
   getDB: () => openFileExplorerDB()
 })
 
+export function publishPersistedFileItem(item: FileItemRecord): void {
+  useFileExplorerStore.setState((state) => {
+    const items = { ...state.items, [item.id]: item }
+    const siblings = [
+      ...(state._itemsByParent[item.parentId] ?? []).filter((entry) => entry.id !== item.id),
+      item
+    ].sort((a, b) => a.sortIndex - b.sortIndex)
+    return {
+      items,
+      _itemsArray: Object.values(items),
+      _itemsByParent: {
+        ...state._itemsByParent,
+        [item.parentId]: siblings
+      }
+    }
+  })
+}
+
 function createExplorerSettingsStore(
   persistName: string,
   defaults: { sortField: SortField; sortDir: SortDir },

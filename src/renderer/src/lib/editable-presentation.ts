@@ -4,8 +4,8 @@ import { getDerivedAsset, putDerivedAsset } from './media-work-db'
 import { EDITABLE_PRESENTATION_MIME_TYPE } from './presentation-media'
 import { readPresentationArrayBuffer } from './presentation-source'
 import { saveThumbnail } from './thumbnail-db'
-import { useFileExplorerStore } from '@renderer/stores/file-explorer'
-import type { FileItemRecord } from '@shared/types/folder'
+import { persistEditablePresentationCreation } from './editable-presentation-creation'
+import { FOLDER_DURATION_MS, type FileItemRecord } from '@shared/types/folder'
 import type { PlaceholderInfo, PresentationData } from '@aiden0z/pptx-renderer'
 import type { SlideData, SlideNode } from '@aiden0z/pptx-renderer'
 import type { PicNodeData, ShapeNodeData } from '@aiden0z/pptx-renderer'
@@ -827,29 +827,32 @@ async function createEditablePresentationItem(
   parentId: string
 ): Promise<FileItemRecord> {
   const itemId = document.id
+  const documentBody = JSON.stringify(document)
   const blob = createDocumentBlob(document)
   const db = await openFileExplorerDB()
-
-  await db.put('file-blobs', {
-    id: itemId,
-    blob,
-    size: blob.size,
-    refCount: 1
-  })
-
-  const itemData: Omit<FileItemRecord, 'sortIndex' | 'createdAt' | 'expiresAt'> = {
+  const siblings = (await db.getAllFromIndex('folder-items', 'by-parent', parentId)).filter(
+    (item) => item.deletedAt == null
+  )
+  const now = Date.now()
+  const item: FileItemRecord = {
     id: itemId,
     parentId,
     type: 'file',
+    sortIndex: Math.max(-1, ...siblings.map((item) => item.sortIndex)) + 1,
+    createdAt: now,
+    expiresAt: parentId === 'file-root' ? now + FOLDER_DURATION_MS['1day'] : null,
     name: document.name,
     url: `blob:${itemId}`,
     size: blob.size,
     mimeType: EDITABLE_PRESENTATION_MIME_TYPE
   }
-  useFileExplorerStore.getState().addItem(itemData)
-  const item = useFileExplorerStore.getState().items[itemId]
-  if (!item || item.type !== 'file') throw new Error('Failed to create presentation item')
-  await saveEditablePresentation(item, document)
+  await persistEditablePresentationCreation({
+    item,
+    blob,
+    documentBody,
+    documentVariant: getEditablePresentationDocumentVariant(itemId),
+    thumbnail: generateEditablePresentationThumbnail(document)
+  })
   return item
 }
 
@@ -939,7 +942,12 @@ function readDirectSolidBackground(sourceOwner: unknown): EditableSlideBackgroun
 }
 
 function isXmlNode(value: unknown): value is XmlNode {
-  return typeof value === 'object' && value !== null && 'child' in value && typeof value.child === 'function'
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'child' in value &&
+    typeof value.child === 'function'
+  )
 }
 
 function convertNode(
