@@ -14,6 +14,7 @@ import { ensureSyncItemAvailableForPresentation } from '@renderer/lib/cloud-prov
 
 interface StartPresentationWithReadinessOptions {
   prioritizeStartItem?: boolean
+  presentationState?: MediaTypeStateMap['presentation']
 }
 
 export interface MediaProjectionStore {
@@ -210,7 +211,9 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
       isEnded: false,
       showGrid: false,
       snapshot,
-      typeStates: initialTypeStates,
+      typeStates: options.presentationState
+        ? { ...initialTypeStates, presentation: options.presentationState }
+        : initialTypeStates,
       zoomLevel: 1,
       pan: { x: 0, y: 0 }
     })

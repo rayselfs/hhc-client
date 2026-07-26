@@ -19,9 +19,7 @@ import {
   isPresentationItem
 } from '@renderer/lib/presentation-media'
 import { startMediaProjection, stopProjectionSession } from '@renderer/lib/projection-actions'
-import { loadEditablePresentation } from '@renderer/lib/editable-presentation'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
-import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 import { usePresentationWorkspaceStore } from '@renderer/stores/presentation-workspace'
 import { isFileItem } from '@shared/types/folder'
 import type { FileItemRecord } from '@shared/types/folder'
@@ -154,30 +152,38 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
 
     const activeSlideId = usePresentationWorkspaceStore.getState().getActiveSlideId(item.id)
     let slideIndex = 0
+    let slideCount = activeDocument.slideCount
     if (isEditablePresentationMimeType(item.mimeType)) {
-      const document = await loadEditablePresentation(item)
+      const session = registry.get(item.id)
+      if (!session) return
+      session.commitDraft()
+      await session.flush()
+      const document = session.getSnapshot().history.present
       slideIndex = Math.max(0, document.slideOrder.indexOf(activeSlideId ?? ''))
+      slideCount = document.slideOrder.length
     } else if (activeSlideId?.startsWith('pptx-slide-')) {
       const parsedIndex = Number(activeSlideId.slice('pptx-slide-'.length))
       if (Number.isInteger(parsedIndex) && parsedIndex >= 0) slideIndex = parsedIndex
     }
-    const report = await startMediaProjection(
+    await startMediaProjection(
       [item],
       0,
       { onNoProjectableFiles: () => toast.warning(t('fileExplorer.noProjectableFiles')) },
-      { prioritizeStartItem: true }
+      {
+        prioritizeStartItem: true,
+        presentationState: {
+          slideIndex,
+          slideCount
+        }
+      }
     )
-    if (report.summary.ready > 0) {
-      useMediaProjectionStore.getState().setTypeState('presentation', {
-        slideIndex,
-        slideCount: activeDocument.slideCount
-      })
-    }
   }
 
   const handleProjectionAction = async (): Promise<void> => {
     if (!isProjectionOpen) {
-      await presentActiveDocument()
+      await presentActiveDocument().catch(() => {
+        toast.danger(t('presentationWorkspace.saveFailed', 'Unable to save presentation'))
+      })
       return
     }
 

@@ -8,10 +8,12 @@ import {
   createTextElement
 } from '@renderer/lib/editable-presentation'
 import { EDITABLE_PRESENTATION_MIME_TYPE } from '@renderer/lib/presentation-media'
+import type { PresentationEditorSession } from '@renderer/lib/presentation-editor-session'
 import type { FileItemRecord } from '@shared/types/folder'
 
-const { mockLoadEditablePresentation, mockSetTypeState } = vi.hoisted(() => ({
+const { mockLoadEditablePresentation, mockRegistryGet, mockSetTypeState } = vi.hoisted(() => ({
   mockLoadEditablePresentation: vi.fn(),
+  mockRegistryGet: vi.fn(),
   mockSetTypeState: vi.fn()
 }))
 
@@ -21,6 +23,10 @@ vi.mock('@renderer/lib/editable-presentation', async () => {
   )
   return { ...actual, loadEditablePresentation: mockLoadEditablePresentation }
 })
+
+vi.mock('@renderer/contexts/PresentationSessionRegistryContext', () => ({
+  usePresentationSessionRegistry: () => ({ get: mockRegistryGet })
+}))
 
 const storeState = {
   typeStates: { presentation: { slideIndex: 0 } },
@@ -52,6 +58,7 @@ function makeItem(): FileItemRecord {
 describe('PresentationPreview', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockRegistryGet.mockReturnValue(undefined)
     storeState.typeStates.presentation = { slideIndex: 0 }
   })
 
@@ -73,7 +80,11 @@ describe('PresentationPreview', () => {
       sourceHeight: 400
     })
     mockLoadEditablePresentation.mockResolvedValue(
-      addElementToSlide(addElementToSlide({ ...document, assets: { [asset.id]: asset } }, slideId, text), slideId, image)
+      addElementToSlide(
+        addElementToSlide({ ...document, assets: { [asset.id]: asset } }, slideId, text),
+        slideId,
+        image
+      )
     )
 
     render(<PresentationPreview item={makeItem()} />)
@@ -86,5 +97,34 @@ describe('PresentationPreview', () => {
         slideCount: 1
       })
     })
+  })
+
+  it('renders an open session revision without loading its durable fallback', async () => {
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const slideId = document.slideOrder[0]
+    const text = createTextElement({ text: 'Latest session text' })
+    const latestDocument = addElementToSlide(document, slideId, text)
+    const snapshot = {
+      history: { past: [], present: latestDocument, future: [] },
+      save: {
+        status: 'saved' as const,
+        scheduledRevision: 1,
+        persistedRevision: 1,
+        error: null,
+        mirrorWarnings: []
+      },
+      draftKind: null,
+      renderedDocument: latestDocument
+    }
+    const session = {
+      subscribe: vi.fn(() => () => undefined),
+      getSnapshot: vi.fn(() => snapshot)
+    } as unknown as PresentationEditorSession
+    mockRegistryGet.mockReturnValue(session)
+
+    render(<PresentationPreview item={makeItem()} />)
+
+    expect(await screen.findByText('Latest session text')).toBeInTheDocument()
+    expect(mockLoadEditablePresentation).not.toHaveBeenCalled()
   })
 })

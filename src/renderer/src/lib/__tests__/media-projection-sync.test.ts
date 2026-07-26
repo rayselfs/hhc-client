@@ -1,8 +1,15 @@
-import { renderHook, act } from '@testing-library/react'
+import { renderHook, act, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { createBlankEditablePresentationDocument } from '@renderer/lib/editable-presentation'
+import { EDITABLE_PRESENTATION_MIME_TYPE } from '@renderer/lib/presentation-media'
+import type { PresentationEditorSession } from '@renderer/lib/presentation-editor-session'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
+import { usePresentationWorkspaceStore } from '@renderer/stores/presentation-workspace'
 import type { FileItemRecord } from '@shared/types/folder'
 
+const registryMocks = vi.hoisted(() => ({
+  get: vi.fn()
+}))
 const mockProject = vi.fn()
 const mockStartProjection = vi.fn(() => Promise.resolve())
 const mockStopProjection = vi.fn(() => Promise.resolve())
@@ -13,6 +20,10 @@ vi.mock('@renderer/contexts/ProjectionContext', () => ({
     startProjection: mockStartProjection,
     stopProjection: mockStopProjection
   })
+}))
+
+vi.mock('@renderer/contexts/PresentationSessionRegistryContext', () => ({
+  usePresentationSessionRegistry: () => registryMocks
 }))
 
 import { useMediaProjectionSync } from '../media-projection-sync'
@@ -38,6 +49,8 @@ function makeFile(id: string, name: string, mimeType = 'image/png', blobId = id)
 
 beforeEach(() => {
   vi.clearAllMocks()
+  registryMocks.get.mockReturnValue(undefined)
+  usePresentationWorkspaceStore.setState({ activeSlideIdByItemId: {} })
   useMediaProjectionStore.setState({
     playlist: [makeFile('a', 'a.png'), makeFile('b', 'b.png')],
     currentIndex: 0,
@@ -198,5 +211,70 @@ describe('media projection sync', () => {
     expect(mockProject).not.toHaveBeenCalledWith(expect.anything(), expect.anything(), {
       bringToFront: true
     })
+  })
+
+  it('flushes an open editable session before projecting its active slide ID', async () => {
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const activeSlideId = document.slideOrder[0]
+    const calls: string[] = []
+    const session = {
+      commitDraft: vi.fn(() => calls.push('commit')),
+      flush: vi.fn(async () => {
+        calls.push('flush')
+      }),
+      getSnapshot: vi.fn(() => {
+        calls.push('snapshot')
+        return { history: { present: document } }
+      })
+    } as unknown as PresentationEditorSession
+    registryMocks.get.mockReturnValue(session)
+    usePresentationWorkspaceStore.getState().setActiveSlideId('editable-deck', activeSlideId)
+    useMediaProjectionStore.setState({
+      playlist: [makeFile('editable-deck', 'Sunday.lpdeck', EDITABLE_PRESENTATION_MIME_TYPE)],
+      currentIndex: 0,
+      isPresenting: true,
+      typeStates: { presentation: { slideIndex: 0, slideCount: 1 } }
+    })
+
+    renderSync()
+
+    await waitFor(() => expect(mockStartProjection).toHaveBeenCalledTimes(1))
+    expect(calls).toEqual(['commit', 'flush', 'snapshot'])
+    expect(mockStartProjection).toHaveBeenCalledWith(
+      'media',
+      [
+        [
+          'file:show',
+          expect.objectContaining({
+            presentation: { slideIndex: 0, slideCount: 1 },
+            editablePresentation: expect.objectContaining({
+              slide: expect.objectContaining({ id: activeSlideId })
+            })
+          })
+        ]
+      ],
+      { bringToFront: false }
+    )
+  })
+
+  it('does not project when an open editable session cannot flush', async () => {
+    const session = {
+      commitDraft: vi.fn(),
+      flush: vi.fn().mockRejectedValue(new Error('quota exceeded')),
+      getSnapshot: vi.fn()
+    } as unknown as PresentationEditorSession
+    registryMocks.get.mockReturnValue(session)
+    useMediaProjectionStore.setState({
+      playlist: [makeFile('editable-deck', 'Sunday.lpdeck', EDITABLE_PRESENTATION_MIME_TYPE)],
+      currentIndex: 0,
+      isPresenting: true,
+      typeStates: { presentation: { slideIndex: 0, slideCount: 1 } }
+    })
+
+    renderSync()
+
+    await waitFor(() => expect(session.flush).toHaveBeenCalledTimes(1))
+    expect(session.getSnapshot).not.toHaveBeenCalled()
+    expect(mockStartProjection).not.toHaveBeenCalled()
   })
 })

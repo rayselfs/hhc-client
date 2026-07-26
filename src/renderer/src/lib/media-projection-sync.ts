@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
+import { usePresentationSessionRegistry } from '@renderer/contexts/PresentationSessionRegistryContext'
 import {
   useMediaProjectionStore,
   type MediaProjectionStore
 } from '@renderer/stores/media-projection'
+import { usePresentationWorkspaceStore } from '@renderer/stores/presentation-workspace'
 import {
+  buildEditableProjectionPayloadForSession,
   buildFileProjectionPayload,
   buildFileProjectionPayloadWithEditableSlide
 } from '@renderer/lib/media-projection-payload'
@@ -28,6 +31,7 @@ function playlistContentChanged(
 
 export function useMediaProjectionSync(): void {
   const { project, startProjection, stopProjection } = useProjection()
+  const registry = usePresentationSessionRegistry()
   const projectSequenceRef = useRef(0)
 
   const projectCurrentItem = useCallback(
@@ -37,9 +41,19 @@ export function useMediaProjectionSync(): void {
       bringToFront = false
     ): Promise<void> => {
       const sequence = ++projectSequenceRef.current
-      const payload = isEditablePresentationMimeType(state.currentItem()?.mimeType)
-        ? await buildFileProjectionPayloadWithEditableSlide(state)
-        : buildFileProjectionPayload(state)
+      const item = state.currentItem()
+      const basePayload = buildFileProjectionPayload(state)
+      let payload = basePayload
+      if (basePayload && item && isEditablePresentationMimeType(item.mimeType)) {
+        const session = registry.get(item.id)
+        payload = session
+          ? await buildEditableProjectionPayloadForSession(
+              basePayload,
+              session,
+              usePresentationWorkspaceStore.getState().getActiveSlideId(item.id) ?? ''
+            )
+          : await buildFileProjectionPayloadWithEditableSlide(state)
+      }
       if (!payload) return
 
       if (sequence === projectSequenceRef.current) {
@@ -50,7 +64,7 @@ export function useMediaProjectionSync(): void {
         }
       }
     },
-    [project, startProjection]
+    [project, registry, startProjection]
   )
 
   useEffect(() => {
@@ -67,7 +81,7 @@ export function useMediaProjectionSync(): void {
 
       if (started || indexChanged || playlistChanged || endedCleared || presentationChanged) {
         const explicitContentChange = started || indexChanged || endedCleared || presentationChanged
-        void projectCurrentItem(state, started, explicitContentChange)
+        void projectCurrentItem(state, started, explicitContentChange).catch(() => undefined)
       }
     })
     return () => {
@@ -119,6 +133,6 @@ export function useMediaProjectionSync(): void {
   useEffect(() => {
     const state = useMediaProjectionStore.getState()
     if (!state.isPresenting) return
-    void projectCurrentItem(state, true, false)
+    void projectCurrentItem(state, true, false).catch(() => undefined)
   }, [projectCurrentItem])
 }

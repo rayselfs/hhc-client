@@ -117,6 +117,17 @@ describe('startPresentationWithReadiness', () => {
     expect(state.playlist).toEqual([])
     expect(state.lastReadinessReport).toBe(report)
   })
+
+  it('starts a presentation with its requested slide state atomically', async () => {
+    await useMediaProjectionStore.getState().startPresentationWithReadiness([pptxFile], 0, {
+      presentationState: { slideIndex: 3, slideCount: 8 }
+    })
+
+    expect(useMediaProjectionStore.getState().typeStates.presentation).toEqual({
+      slideIndex: 3,
+      slideCount: 8
+    })
+  })
 })
 
 describe('exit', () => {

@@ -1,5 +1,6 @@
 import type { ContentMessageTuple, ProjectionOwner } from '@renderer/contexts/ProjectionContext'
 import { isBibleRoute, isFilesRoute, isTimerRoute } from '@renderer/lib/routes'
+import type { MediaTypeStateMap } from '@renderer/lib/presentability'
 import { useBibleProjectionStore } from '@renderer/stores/bible-projection'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 import { useSettingsStore } from '@renderer/stores/settings'
@@ -38,7 +39,10 @@ interface StartMediaProjectionDeps {
   startMediaPresentation?: (
     items: FileItemRecord[],
     startIndex: number,
-    options?: { prioritizeStartItem?: boolean }
+    options?: {
+      prioritizeStartItem?: boolean
+      presentationState?: MediaTypeStateMap['presentation']
+    }
   ) => Promise<PresentationReadinessReport>
   onNoProjectableFiles?: () => void
 }
@@ -143,7 +147,10 @@ export async function startMediaProjection(
   items: FileItemRecord[],
   startIndex: number,
   deps: StartMediaProjectionDeps = {},
-  options?: { prioritizeStartItem?: boolean }
+  options?: {
+    prioritizeStartItem?: boolean
+    presentationState?: MediaTypeStateMap['presentation']
+  }
 ): Promise<PresentationReadinessReport> {
   const startMediaPresentation =
     deps.startMediaPresentation ?? useMediaProjectionStore.getState().startPresentationWithReadiness

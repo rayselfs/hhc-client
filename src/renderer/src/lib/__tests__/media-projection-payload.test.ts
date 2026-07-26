@@ -1,18 +1,18 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
-  buildFileProjectionPayload,
-  buildFileProjectionPayloadWithEditableSlide
+  buildEditableProjectionPayloadForSession,
+  buildEditableSlideProjectionPayload,
+  buildFileProjectionPayload
 } from '../media-projection-payload'
-import { resetFileExplorerDBForTests } from '../file-explorer-db'
-import { resetMediaWorkDBForTests } from '../media-work-db'
 import {
   addElementToSlide,
   createBlankEditablePresentationDocument,
   createImageElement,
   createTextElement,
-  saveEditablePresentation
+  insertBlankEditableSlide
 } from '../editable-presentation'
 import { EDITABLE_PRESENTATION_MIME_TYPE } from '../presentation-media'
+import type { PresentationEditorSession } from '../presentation-editor-session'
 import type { PresentationSnapshot } from '../presentation-readiness'
 import type { FileItemRecord } from '@shared/types/folder'
 
@@ -32,11 +32,6 @@ function makeFile(id: string, url = `blob:${id}`): FileItemRecord {
 }
 
 describe('buildFileProjectionPayload', () => {
-  beforeEach(async () => {
-    await resetFileExplorerDBForTests()
-    await resetMediaWorkDBForTests()
-  })
-
   it('builds a file projection payload from snapshot metadata', () => {
     const playlist = [makeFile('copy-id', 'blob:original-id')]
     const snapshot: PresentationSnapshot = {
@@ -125,13 +120,12 @@ describe('buildFileProjectionPayload', () => {
       slideId,
       image
     )
-    await saveEditablePresentation(item, savedDocument)
-
-    const payload = await buildFileProjectionPayloadWithEditableSlide({
+    const basePayload = buildFileProjectionPayload({
       playlist: [item],
       currentIndex: 0,
       typeStates: { presentation: { slideIndex: 0 } }
-    })
+    })!
+    const payload = buildEditableSlideProjectionPayload(basePayload, savedDocument, slideId)
 
     expect(payload?.editablePresentation).toMatchObject({
       width: document.width,
@@ -146,5 +140,105 @@ describe('buildFileProjectionPayload', () => {
       assets: { [asset.id]: asset }
     })
     expect(payload?.presentation).toEqual({ slideIndex: 0, slideCount: 1 })
+  })
+
+  it('keeps the active editable slide by ID after an earlier insertion', () => {
+    const item = {
+      ...makeFile('editable-deck'),
+      name: 'Editable deck.lpdeck',
+      mimeType: EDITABLE_PRESENTATION_MIME_TYPE
+    }
+    let document = createBlankEditablePresentationDocument('Sunday')
+    document = insertBlankEditableSlide(document, 1).document
+    document = insertBlankEditableSlide(document, 2).document
+    const activeSlideId = document.slideOrder[1]
+    const inserted = insertBlankEditableSlide(document, 0).document
+    const basePayload = buildFileProjectionPayload({
+      playlist: [item],
+      currentIndex: 0
+    })!
+
+    const payload = buildEditableSlideProjectionPayload(basePayload, inserted, activeSlideId)
+
+    expect(payload.presentation?.slideIndex).toBe(2)
+    expect(payload.editablePresentation?.slide.id).toBe(activeSlideId)
+  })
+
+  it('selects the first editable slide when the active ID is missing', () => {
+    const item = {
+      ...makeFile('editable-deck'),
+      name: 'Editable deck.lpdeck',
+      mimeType: EDITABLE_PRESENTATION_MIME_TYPE
+    }
+    const document = insertBlankEditableSlide(
+      createBlankEditablePresentationDocument('Sunday'),
+      1
+    ).document
+    const basePayload = buildFileProjectionPayload({
+      playlist: [item],
+      currentIndex: 0
+    })!
+
+    const payload = buildEditableSlideProjectionPayload(basePayload, document, 'missing-slide')
+
+    expect(payload.presentation).toEqual({ slideIndex: 0, slideCount: 2 })
+    expect(payload.editablePresentation?.slide.id).toBe(document.slideOrder[0])
+  })
+
+  it('commits and flushes a session before reading its exact projection document', async () => {
+    const item = {
+      ...makeFile('editable-deck'),
+      name: 'Editable deck.lpdeck',
+      mimeType: EDITABLE_PRESENTATION_MIME_TYPE
+    }
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const calls: string[] = []
+    const session = {
+      commitDraft: vi.fn(() => calls.push('commit')),
+      flush: vi.fn(async () => {
+        calls.push('flush')
+      }),
+      getSnapshot: vi.fn(() => {
+        calls.push('snapshot')
+        return { history: { present: document } }
+      })
+    } as unknown as PresentationEditorSession
+    const basePayload = buildFileProjectionPayload({
+      playlist: [item],
+      currentIndex: 0
+    })!
+
+    const payload = await buildEditableProjectionPayloadForSession(
+      basePayload,
+      session,
+      document.slideOrder[0]
+    )
+
+    expect(calls).toEqual(['commit', 'flush', 'snapshot'])
+    expect(payload.editablePresentation?.slide.id).toBe(document.slideOrder[0])
+  })
+
+  it('does not read session state when the exact revision cannot flush', async () => {
+    const item = {
+      ...makeFile('editable-deck'),
+      name: 'Editable deck.lpdeck',
+      mimeType: EDITABLE_PRESENTATION_MIME_TYPE
+    }
+    const session = {
+      commitDraft: vi.fn(),
+      flush: vi.fn().mockRejectedValue(new Error('quota exceeded')),
+      getSnapshot: vi.fn()
+    } as unknown as PresentationEditorSession
+    const basePayload = buildFileProjectionPayload({
+      playlist: [item],
+      currentIndex: 0
+    })!
+
+    await expect(
+      buildEditableProjectionPayloadForSession(basePayload, session, 'slide-1')
+    ).rejects.toThrow('quota exceeded')
+
+    expect(session.commitDraft).toHaveBeenCalledTimes(1)
+    expect(session.getSnapshot).not.toHaveBeenCalled()
   })
 })

@@ -1,30 +1,45 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import { Spinner } from '@heroui/react/spinner'
 import EditableSlideSurface from '@renderer/components/Common/EditableSlideSurface'
 import PptxSlideSurface from '@renderer/components/Common/PptxSlideSurface'
+import { usePresentationSessionRegistry } from '@renderer/contexts/PresentationSessionRegistryContext'
 import {
   loadEditablePresentation,
   type EditablePresentationDocument
 } from '@renderer/lib/editable-presentation'
 import { isEditablePresentationMimeType } from '@renderer/lib/presentation-media'
+import type { PresentationEditorSession } from '@renderer/lib/presentation-editor-session'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 import type { PreviewComponentProps } from '@renderer/lib/presenter-registry'
 
 export default function PresentationPreview({ item }: PreviewComponentProps): React.JSX.Element {
+  const registry = usePresentationSessionRegistry()
   const presentationState = useMediaProjectionStore((s) => s.typeStates.presentation)
   const slideIndex = presentationState?.slideIndex ?? 0
 
   const handleReady = useCallback((info: { slideCount: number }) => {
     const state = useMediaProjectionStore.getState()
     const current = state.typeStates.presentation ?? { slideIndex: 0 }
-    state.setTypeState('presentation', {
-      slideIndex: Math.min(current.slideIndex, Math.max(0, info.slideCount - 1)),
-      slideCount: info.slideCount
-    })
+    const slideIndex = Math.min(current.slideIndex, Math.max(0, info.slideCount - 1))
+    if (current.slideIndex === slideIndex && current.slideCount === info.slideCount) return
+    state.setTypeState('presentation', { slideIndex, slideCount: info.slideCount })
   }, [])
 
   if (isEditablePresentationMimeType(item.mimeType)) {
-    return <EditablePresentationPreview item={item} slideIndex={slideIndex} onReady={handleReady} />
+    const session = registry.get(item.id)
+    return session ? (
+      <OpenEditablePresentationPreview
+        session={session}
+        slideIndex={slideIndex}
+        onReady={handleReady}
+      />
+    ) : (
+      <DurableEditablePresentationPreview
+        item={item}
+        slideIndex={slideIndex}
+        onReady={handleReady}
+      />
+    )
   }
 
   return (
@@ -37,7 +52,26 @@ export default function PresentationPreview({ item }: PreviewComponentProps): Re
   )
 }
 
-function EditablePresentationPreview({
+function OpenEditablePresentationPreview({
+  session,
+  slideIndex,
+  onReady
+}: {
+  session: PresentationEditorSession
+  slideIndex: number
+  onReady: (info: { slideCount: number }) => void
+}): React.JSX.Element {
+  const snapshot = useSyncExternalStore(session.subscribe, session.getSnapshot)
+  const document = snapshot.history.present
+
+  useEffect(() => {
+    onReady({ slideCount: document.slideOrder.length })
+  }, [document.slideOrder.length, onReady])
+
+  return <EditablePresentationSurface document={document} slideIndex={slideIndex} />
+}
+
+function DurableEditablePresentationPreview({
   item,
   slideIndex,
   onReady
@@ -59,8 +93,19 @@ function EditablePresentationPreview({
     }
   }, [item, onReady])
 
-  const slideId =
-    document?.slideOrder[Math.min(slideIndex, Math.max(0, document.slideOrder.length - 1))]
+  return <EditablePresentationSurface document={document} slideIndex={slideIndex} />
+}
+
+function EditablePresentationSurface({
+  document,
+  slideIndex
+}: {
+  document: EditablePresentationDocument | null
+  slideIndex: number
+}): React.JSX.Element {
+  const slideId = document
+    ? document.slideOrder[Math.min(slideIndex, Math.max(0, document.slideOrder.length - 1))]
+    : undefined
   if (!document || !slideId) {
     return (
       <div className="flex h-full w-full items-center justify-center rounded-2xl bg-black">

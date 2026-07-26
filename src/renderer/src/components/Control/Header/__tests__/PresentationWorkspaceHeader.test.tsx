@@ -12,6 +12,7 @@ import type {
 } from '@renderer/lib/presentation-editor-session'
 import type { PresentationSessionRegistry } from '@renderer/contexts/PresentationSessionRegistryContext'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
+import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 import { usePresentationWorkspaceStore } from '@renderer/stores/presentation-workspace'
 import type { FileItemRecord } from '@shared/types/folder'
 
@@ -179,6 +180,7 @@ describe('PresentationWorkspaceHeader', () => {
       items: { [item.id]: item },
       _itemsArray: [item]
     })
+    useMediaProjectionStore.getState().exit()
     usePresentationWorkspaceStore.setState({
       documents: [],
       activeItemId: null,
@@ -269,6 +271,35 @@ describe('PresentationWorkspaceHeader', () => {
     expect(mocks.loadEditablePresentation).not.toHaveBeenCalled()
     expect(mocks.saveEditablePresentation).not.toHaveBeenCalled()
     expect(usePresentationWorkspaceStore.getState().documents[0].name).toBe('Worship.lpdeck')
+  })
+
+  it('does not start projection when the active session cannot flush', async () => {
+    const user = userEvent.setup()
+    vi.mocked(session.flush).mockRejectedValue(new Error('quota exceeded'))
+    renderHeader()
+
+    await user.click(screen.getByRole('button', { name: 'projection.startButton' }))
+
+    await waitFor(() => expect(session.flush).toHaveBeenCalledTimes(1))
+    expect(session.commitDraft).toHaveBeenCalledTimes(1)
+    expect(mocks.startMediaProjection).not.toHaveBeenCalled()
+    expect(useMediaProjectionStore.getState().isPresenting).toBe(false)
+  })
+
+  it('starts projection with the flushed editable slide state in one store transition', async () => {
+    const user = userEvent.setup()
+    renderHeader()
+
+    await user.click(screen.getByRole('button', { name: 'projection.startButton' }))
+
+    await waitFor(() => {
+      expect(mocks.startMediaProjection).toHaveBeenCalledWith([item], 0, expect.any(Object), {
+        prioritizeStartItem: true,
+        presentationState: { slideIndex: 0, slideCount: 1 }
+      })
+    })
+    expect(session.commitDraft).toHaveBeenCalledTimes(1)
+    expect(session.flush).toHaveBeenCalledTimes(1)
   })
 
   it('keeps native text Undo while presentation shortcuts target the session', () => {
