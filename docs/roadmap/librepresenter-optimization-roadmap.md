@@ -41,7 +41,7 @@ The order is deliberate:
 | R0    | Complete | Projection foreground behavior is predictable and foundational risks are covered by real dual-mode gates.                                     |
 | R1    | Complete | File and presentation persistence failures cannot silently lose or fabricate state.                                                           |
 | R2    | Complete | Presentation editing has transactional Undo/Redo, serialized saving, visible save state, and safe lifecycle gates.                            |
-| R3    | Planned  | Projection survives reload, crash, display changes, and browser popup failures through session replay and recovery.                           |
+| R3    | Complete | Projection survives reload, crash, display changes, and browser popup failures through session replay and recovery.                           |
 | R4    | Planned  | Media projection remains active while the operator previews, searches, and prepares the next source.                                          |
 | R5    | Planned  | Presentation Workspace follows a PowerPoint-like desktop information architecture with essential editing operations.                          |
 | R6    | Planned  | Media import, readiness, playback, storage, and slide delivery are observable, recoverable, and performant.                                   |
@@ -240,6 +240,40 @@ Treat projection as a replayable session rather than a best-effort stream of tra
 - Projection reload/crash either recovers or presents an actionable operator error.
 - No command from a closed generation is applied to a new projection.
 - `DefaultProjection` remains an internal fallback, not a user-facing blank mode.
+
+### Progress — 2026-07-26
+
+- [x] Each Electron projection-window lifecycle has a monotonically increasing generation.
+      Reload, renderer crash, display move, explicit close, and recreation invalidate the prior
+      generation and its readiness.
+- [x] A route-independent session coordinator retains the latest projection owner and atomic
+      render snapshot, reduces replay-safe controls, and replays only after the matching
+      `__system:ready`.
+- [x] Timer, Bible, image, PDF, native video, and editable-presentation snapshots restore their
+      latest committed state. Native video restores seek and volume before resuming the saved
+      playing, paused, or ended state.
+- [x] Stale readiness and transport messages are rejected at the validator, IPC, adapter,
+      coordinator, and projection-page boundaries; the obsolete opened/closed lifecycle bypasses
+      were removed.
+- [x] Display moves and renderer reloads reproduce the current projection without foregrounding
+      it. The first renderer crash is recreated automatically; a repeated crash within 30 seconds
+      becomes a visible failed state with an explicit Retry action.
+- [x] Manual Retry resets the crash budget. Explicit projection close clears the replay snapshot
+      and generation so intentionally closed content cannot return.
+- [x] Browser popup blocking and readiness timeout produce visible recoverable states instead of
+      reporting a successful projection. Browser production E2E covers reload replay and popup
+      recovery.
+- [x] `DefaultProjection` remains an internal empty/invalid-payload fallback and is never stored as
+      user-selected projection content.
+- [x] R3 focused verification: 12 files and 207 tests passed.
+- [x] Full Windows-hosted regression: 198 files and 2,048 tests passed.
+- [x] Node/Web typechecks, ESLint with zero errors, production Electron/Vite build, PWA precache,
+      font, and largest-JS bundle budgets passed. Three existing formatting warnings remain in
+      unrelated test fixtures.
+- [x] Browser projection recovery E2E passed (2 tests).
+- [x] Fresh Windows unpacked packaging, native VLC/FFmpeg runtime validation, and packaged
+      control/projection lifecycle smoke passed. macOS packaged recovery remains enforced by
+      release CI because it cannot run on this Windows host.
 
 ## R4 — Persistent Media and projection workspace
 
