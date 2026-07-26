@@ -132,7 +132,13 @@ describe('WindowManager', () => {
 
   it('sendToMain does nothing when no main window', () => {
     const wm = WindowManager.getInstance()
-    expect(() => wm.sendToMain('projection:opened' as never, ...([] as never))).not.toThrow()
+    expect(() =>
+      wm.sendToMain('projection:lifecycle', {
+        generation: 0,
+        status: 'closed',
+        reason: 'user-close'
+      })
+    ).not.toThrow()
   })
 
   it('closeProjection does nothing when no projection window', () => {

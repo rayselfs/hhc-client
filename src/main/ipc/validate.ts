@@ -91,7 +91,7 @@ function isFiniteNumber(value: unknown): value is number {
 
 function validateProjectionPayload(channel: string, data: unknown): boolean {
   if (channel === '__system:ready') {
-    return data === null || (isRecord(data) && isValidProjectionGeneration(data.generation))
+    return isRecord(data) && isValidProjectionGeneration(data.generation)
   }
   if (channel === '__system:replay') {
     return (

@@ -254,8 +254,7 @@ export type ProjectionOperationResult =
     }
 
 export interface SystemMessages {
-  /** `null` remains temporarily supported by the legacy two-argument transport until migration. */
-  '__system:ready': { generation: number } | null
+  '__system:ready': { generation: number }
   '__system:replay': {
     generation: number
     snapshot: ProjectionSessionSnapshot

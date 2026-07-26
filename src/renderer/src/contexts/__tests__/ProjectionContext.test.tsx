@@ -231,9 +231,7 @@ describe('ProjectionContext Electron recovery', () => {
           onProjectionLifecycle: vi.fn((callback: (event: ProjectionLifecycleEvent) => void) => {
             lifecycleCallback = callback
             return unsubscribeLifecycle
-          }),
-          onProjectionOpened: vi.fn(() => vi.fn()),
-          onProjectionClosed: vi.fn(() => vi.fn())
+          })
         },
         projectionVlc: {
           stop: vi.fn(() => Promise.resolve())

@@ -22,6 +22,7 @@ import {
   validateTheme,
   validateTimerCommand,
   validateTimerSettings,
+  validateProjectionMessageTuple,
   validateProjectionTransportTuple
 } from '../../ipc/validate'
 import type { WindowManager } from '../../windowManager'
@@ -249,5 +250,11 @@ describe('validateProjectionTransportTuple', () => {
         }
       ])
     ).toBe(true)
+  })
+})
+
+describe('validateProjectionMessageTuple', () => {
+  it('rejects the removed null ready payload', () => {
+    expect(validateProjectionMessageTuple(['__system:ready', null])).toBe(false)
   })
 })

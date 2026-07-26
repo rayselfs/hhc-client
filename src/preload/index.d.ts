@@ -76,8 +76,6 @@ interface ProjectionAPI {
     ) => void
   ) => () => void
   onProjectionLifecycle: (callback: (event: ProjectionLifecycleEvent) => void) => () => void
-  onProjectionOpened: (callback: () => void) => () => void
-  onProjectionClosed: (callback: () => void) => () => void
 }
 
 interface TimerAPI {

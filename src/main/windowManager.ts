@@ -252,7 +252,6 @@ export class WindowManager {
         return
       }
       hasFinishedInitialLoad = true
-      this.sendToMain('projection:opened')
     })
 
     projectionWindow.on('closed', () => {
@@ -265,7 +264,6 @@ export class WindowManager {
         status: 'closed',
         reason: 'user-close'
       })
-      this.sendToMain('projection:closed')
     })
 
     return windowGeneration

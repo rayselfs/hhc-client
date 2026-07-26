@@ -35,7 +35,9 @@ vi.mock('@renderer/contexts/ProjectionContext', async (importOriginal) => {
     useProjection: vi.fn().mockReturnValue({
       isProjectionOpen: false,
       isProjectionBlanked: true,
+      recovery: { status: 'closed', generation: 0, failure: null },
       openProjection: vi.fn(),
+      retryProjection: vi.fn(),
       closeProjection: vi.fn(),
       blankProjection: vi.fn(),
       project: vi.fn(),

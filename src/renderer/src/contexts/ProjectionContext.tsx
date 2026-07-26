@@ -133,7 +133,6 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
     const syncRecovery = (): void => setRecovery(coordinator.getRecoveryState())
     const unsubscribeCoordinator = coordinator.subscribe(syncRecovery)
     const unsubscribeReady = adapter.on('__system:ready', (data) => {
-      if (!data) return
       if (
         !isElectron() &&
         coordinator.getRecoveryState().status === 'ready' &&

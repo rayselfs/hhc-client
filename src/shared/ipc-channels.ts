@@ -305,8 +305,6 @@ export type IpcSendChannel = keyof IpcSendMap
 export interface IpcMainToRendererMap {
   'projection:message': ProjectionTransportTuple
   'projection:lifecycle': [event: ProjectionLifecycleEvent]
-  'projection:opened': []
-  'projection:closed': []
   'theme:changed': [{ shouldUseDarkColors: boolean }]
   'timer-tick': [TimerTickPayload]
   'update:status-changed': [{ status: UpdateStatus; version?: string; error?: string }]

@@ -65,9 +65,7 @@ const projectionApi = {
     ) => void
   ) => typedOn('projection:message', callback),
   onProjectionLifecycle: (callback: (event: ProjectionLifecycleEvent) => void) =>
-    typedOn('projection:lifecycle', callback),
-  onProjectionOpened: (callback: () => void) => typedOn('projection:opened', callback),
-  onProjectionClosed: (callback: () => void) => typedOn('projection:closed', callback)
+    typedOn('projection:lifecycle', callback)
 }
 
 const timerApi = {
