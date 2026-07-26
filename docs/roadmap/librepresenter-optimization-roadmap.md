@@ -36,16 +36,16 @@ The order is deliberate:
 
 ## Roadmap
 
-| Phase | Status                   | Outcome                                                                                                                                       |
-| ----- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| R0    | Complete                 | Projection foreground behavior is predictable and foundational risks are covered by real dual-mode gates.                                     |
-| R1    | Complete                 | File and presentation persistence failures cannot silently lose or fabricate state.                                                           |
-| R2    | Design approval required | Presentation editing has transactional Undo/Redo, serialized saving, visible save state, and safe lifecycle gates.                            |
-| R3    | Planned                  | Projection survives reload, crash, display changes, and browser popup failures through session replay and recovery.                           |
-| R4    | Planned                  | Media projection remains active while the operator previews, searches, and prepares the next source.                                          |
-| R5    | Planned                  | Presentation Workspace follows a PowerPoint-like desktop information architecture with essential editing operations.                          |
-| R6    | Planned                  | Media import, readiness, playback, storage, and slide delivery are observable, recoverable, and performant.                                   |
-| R7    | Planned                  | Shared responsive workspace primitives replace fixed page-specific layouts; dead paths are removed and release gates cover packaged behavior. |
+| Phase | Status   | Outcome                                                                                                                                       |
+| ----- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| R0    | Complete | Projection foreground behavior is predictable and foundational risks are covered by real dual-mode gates.                                     |
+| R1    | Complete | File and presentation persistence failures cannot silently lose or fabricate state.                                                           |
+| R2    | Complete | Presentation editing has transactional Undo/Redo, serialized saving, visible save state, and safe lifecycle gates.                            |
+| R3    | Planned  | Projection survives reload, crash, display changes, and browser popup failures through session replay and recovery.                           |
+| R4    | Planned  | Media projection remains active while the operator previews, searches, and prepares the next source.                                          |
+| R5    | Planned  | Presentation Workspace follows a PowerPoint-like desktop information architecture with essential editing operations.                          |
+| R6    | Planned  | Media import, readiness, playback, storage, and slide delivery are observable, recoverable, and performant.                                   |
+| R7    | Planned  | Shared responsive workspace primitives replace fixed page-specific layouts; dead paths are removed and release gates cover packaged behavior. |
 
 ## R0 — Immediate projection behavior and quality baseline
 
@@ -93,12 +93,9 @@ coverage for later session work.
 - [x] macOS uses the official checksum-pinned VLC arm64 distribution and builds FFmpeg 8.1.2 from
       checksum-pinned official source with LGPL-only configure flags on the arm64 release runner.
 
-The fresh full Windows-hosted test run still reports 14 failures outside the R0 focused gates:
-12 path assertions in six main-process test files remain hard-coded for POSIX paths, and two
-renderer tests time out only under full-suite parallel load. These are retained as test
-infrastructure follow-up work; R0's focused tests, browser lifecycle, Windows packaged lifecycle,
-typechecks, lint, and production build pass. The macOS packaged lifecycle is enforced by release CI
-and cannot be executed on this Windows host.
+The Windows path-specific test assertions recorded during R0 were corrected during the R2
+closeout. The fresh full Windows-hosted suite now passes. The macOS packaged lifecycle remains
+enforced by release CI and cannot be executed on this Windows host.
 
 ## R1 — Persistence integrity
 
@@ -190,6 +187,36 @@ resolves the required corrections below and must be approved before implementati
 - Save status accurately reports scheduled, in-flight, persisted, and failed revisions.
 - Closing or navigating cannot silently discard an active draft.
 - Editing and immediately presenting always projects the latest committed content.
+
+### Progress — 2026-07-26
+
+- [x] Approved trust-foundation design implemented with one route-independent session per open
+      editable presentation; routed view remounts and tab switches preserve document history.
+- [x] Document-only history supports a 30-entry Undo boundary, stable Redo across tab switches, and
+      Redo invalidation only after a new committed edit.
+- [x] Pointer previews and continuous text editing use explicit draft begin/preview/commit/cancel
+      contracts, so one visible interaction creates one transaction and canceled drafts create
+      neither history nor persistence.
+- [x] One serialized save coordinator per session tracks dirty, saving, saved, failed, scheduled,
+      and persisted revisions; only the newest pending revision follows the single in-flight write.
+- [x] The source Blob and catalog item commit as the authoritative revision. Derived documents and
+      thumbnails are repairable revision-guarded mirrors whose failures remain visible and
+      retryable without overwriting newer content.
+- [x] Editable rename, tab activation, tab close, route navigation, browser unload warning, and
+      Electron main-window close all route through the session lifecycle contract. Electron uses a
+      typed one-shot close permit and leaves projection-window close behavior unchanged.
+- [x] `activeSlideIdByItemId` is the only workspace active-slide truth. Projection resolves the
+      stable slide ID, commits an active draft, flushes the exact revision, and starts from that
+      document without a stale slide-zero transition.
+- [x] Obsolete direct-save, presentation Undo event, and active-slide index APIs were removed; the
+      forbidden-writer search returns no matches under the renderer source.
+- [x] R2 focused verification: 17 files and 155 tests passed.
+- [x] Full Windows-hosted regression: 195 files and 2,022 tests passed.
+- [x] Node/Web typechecks, ESLint with zero errors, production Electron/Vite build, PWA precache,
+      font, and largest-JS bundle budgets passed.
+- [x] Browser projection E2E passed and confirmed passive Timer ticks remain non-activating.
+- [x] Windows unpacked packaging, native VLC/FFmpeg runtime validation, and packaged control plus
+      projection lifecycle smoke passed.
 
 ## R3 — Projection session recovery
 
