@@ -15,7 +15,11 @@ const { FakeBrowserWindow } = vi.hoisted(() => {
     once = vi.fn((event: string, handler: () => void) => {
       this.onceHandlers.set(event, handler)
     })
-    on = vi.fn()
+    on = vi.fn((event: string, handler: (...args: unknown[]) => void) => {
+      const handlers = this.onHandlers.get(event) ?? []
+      handlers.push(handler)
+      this.onHandlers.set(event, handlers)
+    })
     isDestroyed = vi.fn(() => false)
     isMinimized = vi.fn(() => false)
     isVisible = vi.fn(() => true)
@@ -29,6 +33,7 @@ const { FakeBrowserWindow } = vi.hoisted(() => {
     destroy = vi.fn()
 
     private onceHandlers = new Map<string, () => void>()
+    private onHandlers = new Map<string, Array<(...args: unknown[]) => void>>()
 
     constructor() {
       FakeBrowserWindow.instances.push(this)
@@ -36,6 +41,10 @@ const { FakeBrowserWindow } = vi.hoisted(() => {
 
     emitOnce(event: string): void {
       this.onceHandlers.get(event)?.()
+    }
+
+    emit(event: string, ...args: unknown[]): void {
+      for (const handler of this.onHandlers.get(event) ?? []) handler(...args)
     }
   }
 
@@ -191,5 +200,40 @@ describe('WindowManager', () => {
     expect(projection.focus).not.toHaveBeenCalled()
     expect(projection.show).not.toHaveBeenCalled()
     expect(projection.setAlwaysOnTop).not.toHaveBeenCalled()
+  })
+
+  it('consumes exactly one main-window close permit', () => {
+    const wm = WindowManager.getInstance()
+    wm.createMainWindow()
+    const mainWindow = FakeBrowserWindow.instances[0]
+    const firstClose = { preventDefault: vi.fn() }
+
+    mainWindow.emit('close', firstClose)
+
+    expect(firstClose.preventDefault).toHaveBeenCalledOnce()
+    expect(mainWindow.webContents.send).toHaveBeenCalledWith('app:close-requested')
+
+    expect(wm.confirmMainWindowClose()).toBe(true)
+    expect(mainWindow.close).toHaveBeenCalledOnce()
+
+    const permittedClose = { preventDefault: vi.fn() }
+    mainWindow.emit('close', permittedClose)
+    expect(permittedClose.preventDefault).not.toHaveBeenCalled()
+
+    const thirdClose = { preventDefault: vi.fn() }
+    mainWindow.emit('close', thirdClose)
+    expect(thirdClose.preventDefault).toHaveBeenCalledOnce()
+  })
+
+  it('does not guard projection-window close events', () => {
+    const wm = WindowManager.getInstance()
+    wm.createProjectionWindow()
+    const projectionWindow = FakeBrowserWindow.instances[0]
+    const closeEvent = { preventDefault: vi.fn() }
+
+    projectionWindow.emit('close', closeEvent)
+
+    expect(closeEvent.preventDefault).not.toHaveBeenCalled()
+    expect(projectionWindow.webContents.send).not.toHaveBeenCalledWith('app:close-requested')
   })
 })

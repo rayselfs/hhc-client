@@ -214,6 +214,7 @@ export interface IpcInvokeMap {
   'bible:get-versions': { args: []; result: BibleVersion[] }
   'bible:get-content': { args: [number]; result: BibleBook[] }
   'app:relaunch': { args: []; result: void }
+  'app:confirm-close': { args: []; result: { closing: boolean } }
   'app:clear-user-data': { args: []; result: void }
   'update:check': { args: []; result: { updateAvailable: boolean; version?: string } }
   'update:download-and-install': { args: []; result: void }
@@ -291,6 +292,7 @@ export interface IpcMainToRendererMap {
   'timer-tick': [TimerTickPayload]
   'update:status-changed': [{ status: UpdateStatus; version?: string; error?: string }]
   'app:download-progress': [WhisperDownloadProgress]
+  'app:close-requested': []
   'onedrive:download-progress': [OneDriveNativeDownloadProgress]
   'lan-remote:command': [LanRemoteCommand]
   'lan-remote:ack': [LanRemoteAck]

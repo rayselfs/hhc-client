@@ -71,6 +71,8 @@ const bibleApi = {
 
 const appApi = {
   relaunch: () => typedInvoke('app:relaunch'),
+  confirmClose: () => typedInvoke('app:confirm-close'),
+  onCloseRequested: (callback: () => void) => typedOn('app:close-requested', callback),
   clearUserData: () => typedInvoke('app:clear-user-data'),
   selectDirectory: () => typedInvoke('app:select-directory'),
   setModelDir: (dir: string) => typedInvoke('app:set-model-dir', dir),

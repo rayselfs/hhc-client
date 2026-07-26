@@ -74,6 +74,8 @@ interface BibleAPI {
 
 interface AppAPI {
   relaunch: () => Promise<void>
+  confirmClose: () => Promise<{ closing: boolean }>
+  onCloseRequested: (callback: () => void) => () => void
   clearUserData: () => Promise<void>
   selectDirectory: () => Promise<string | null>
   setModelDir: (dir: string) => Promise<void>

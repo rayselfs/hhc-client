@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import path from 'path'
 
 const { ipcHandlers, protocolHandlers, mockReadFileSync, mockRmSync, mockClearData } = vi.hoisted(
   () => ({
@@ -14,7 +15,8 @@ const mockMainWindow = { id: 1 }
 const mockProjectionWindow = { id: 2 }
 const mockWindowManager = {
   getMainWindow: vi.fn(() => mockMainWindow),
-  getProjectionWindow: vi.fn(() => mockProjectionWindow)
+  getProjectionWindow: vi.fn(() => mockProjectionWindow),
+  confirmMainWindowClose: vi.fn(() => true)
 }
 
 vi.mock('electron', () => ({
@@ -83,7 +85,7 @@ describe('model IPC security', () => {
 
     await ipcHandlers.get('app:clear-user-data')!(makeEvent())
 
-    expect(mockRmSync).toHaveBeenCalledWith('/tmp/hhc-user-data/native-files', {
+    expect(mockRmSync).toHaveBeenCalledWith(path.join('/tmp/hhc-user-data', 'native-files'), {
       force: true,
       recursive: true
     })
@@ -112,11 +114,27 @@ describe('model IPC security', () => {
 
     const valid = handler(new Request('local-model://model/whisper/config.json'))
     expect(valid.status).toBe(200)
-    expect(mockReadFileSync).toHaveBeenCalledWith('/models/whisper/config.json')
+    expect(mockReadFileSync).toHaveBeenCalledWith(path.resolve('/models/whisper/config.json'))
 
     mockReadFileSync.mockClear()
     const traversal = handler(new Request('local-model://model/..%2Fsecret.txt'))
     expect(traversal.status).toBe(400)
     expect(mockReadFileSync).not.toHaveBeenCalled()
+  })
+})
+
+describe('main window close IPC', () => {
+  it('confirms a pending close request from the main window', () => {
+    vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockMainWindow as never)
+
+    expect(ipcHandlers.get('app:confirm-close')!(makeEvent())).toEqual({ closing: true })
+    expect(mockWindowManager.confirmMainWindowClose).toHaveBeenCalledOnce()
+  })
+
+  it('rejects close confirmation from the projection window', () => {
+    vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockProjectionWindow as never)
+
+    expect(ipcHandlers.get('app:confirm-close')!(makeEvent())).toEqual({ closing: false })
+    expect(mockWindowManager.confirmMainWindowClose).not.toHaveBeenCalled()
   })
 })

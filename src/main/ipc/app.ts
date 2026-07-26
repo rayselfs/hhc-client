@@ -185,6 +185,11 @@ function detectInstalledModel(destDir: string): WhisperDirInfo {
 }
 
 export function registerAppIpc(wm: WindowManager): void {
+  ipcMain.handle('app:confirm-close', (event) => {
+    if (!isMainWindow(wm, event)) return { closing: false }
+    return { closing: wm.confirmMainWindowClose() }
+  })
+
   ipcMain.handle('app:relaunch', (event) => {
     if (!isMainWindow(wm, event)) return
     if (is.dev) {

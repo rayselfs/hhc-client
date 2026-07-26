@@ -15,6 +15,7 @@ import { TimerEngineProvider } from '@renderer/contexts/TimerEngineContext'
 import { ContextMenuProvider } from '@renderer/contexts/ContextMenuContext'
 import { ConfirmDialogProvider } from '@renderer/contexts/ConfirmDialogContext'
 import { PresentationCloseDecisionProvider } from '@renderer/contexts/PresentationCloseDecisionContext'
+import PresentationElectronCloseBridge from '@renderer/contexts/PresentationElectronCloseBridge'
 import { PresentationSessionRegistryProvider } from '@renderer/contexts/PresentationSessionRegistryContext'
 import { ShortcutScopeProvider } from '@renderer/contexts/ShortcutScopeContext'
 import LanRemoteBridge from '@renderer/contexts/LanRemoteBridge'
@@ -90,6 +91,7 @@ export default function Layout(): React.JSX.Element {
                     <ConfirmDialog />
                     <PresentationCloseDecisionDialog />
                     <PresentationNavigationGuard />
+                    <PresentationElectronCloseBridge />
                     <TimerProjectionBridge />
                     <LanRemoteBridge />
                   </PresentationCloseDecisionProvider>

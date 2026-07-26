@@ -9,6 +9,7 @@ export class WindowManager {
   private static instance: WindowManager
   private mainWindow: BrowserWindow | null = null
   private projectionWindow: BrowserWindow | null = null
+  private mainClosePermit = false
 
   // eslint-disable-next-line @typescript-eslint/no-empty-function -- singleton pattern requires private constructor
   private constructor() {}
@@ -92,6 +93,15 @@ export class WindowManager {
 
     this.mainWindow.webContents.on('render-process-gone', (_event, details) => {
       console.error('Main window renderer crashed:', details.reason)
+    })
+
+    this.mainWindow.on('close', (event) => {
+      if (this.mainClosePermit) {
+        this.mainClosePermit = false
+        return
+      }
+      event.preventDefault()
+      this.sendToMain('app:close-requested')
     })
 
     this.mainWindow.once('ready-to-show', () => {
@@ -202,6 +212,13 @@ export class WindowManager {
     return this.projectionWindow
   }
 
+  confirmMainWindowClose(): boolean {
+    if (!this.mainWindow || this.mainWindow.isDestroyed()) return false
+    this.mainClosePermit = true
+    this.mainWindow.close()
+    return true
+  }
+
   sendToProjection<C extends IpcMainToRendererChannel>(
     channel: C,
     ...args: IpcMainToRendererMap[C]
@@ -244,6 +261,7 @@ export class WindowManager {
       this.mainWindow.destroy()
     }
     this.mainWindow = null
+    this.mainClosePermit = false
 
     if (this.projectionWindow && !this.projectionWindow.isDestroyed()) {
       this.projectionWindow.destroy()
