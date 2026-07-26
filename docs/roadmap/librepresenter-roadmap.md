@@ -10,6 +10,12 @@ LibrePresenter is open-source presentation software for churches and live events
 - Service playlists/cues are the live workflow surface.
 - Roadmap source of truth lives under `docs/roadmap/**`.
 
+## Current Optimization Roadmap
+
+M1–M9 below record the first implemented product roadmap. Current reliability, Media, and
+PowerPoint-like Presentation work is tracked separately in
+[`librepresenter-optimization-roadmap.md`](librepresenter-optimization-roadmap.md).
+
 ## Milestones
 
 | Milestone | Status | Plan | Outcome |
