@@ -40,7 +40,7 @@ The order is deliberate:
 | ----- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | R0    | Complete                 | Projection foreground behavior is predictable and foundational risks are covered by real dual-mode gates.                                     |
 | R1    | Complete                 | File and presentation persistence failures cannot silently lose or fabricate state.                                                           |
-| R2    | Design revision required | Presentation editing has transactional Undo/Redo, serialized saving, visible save state, and safe lifecycle gates.                            |
+| R2    | Design approval required | Presentation editing has transactional Undo/Redo, serialized saving, visible save state, and safe lifecycle gates.                            |
 | R3    | Planned                  | Projection survives reload, crash, display changes, and browser popup failures through session replay and recovery.                           |
 | R4    | Planned                  | Media projection remains active while the operator previews, searches, and prepares the next source.                                          |
 | R5    | Planned                  | Presentation Workspace follows a PowerPoint-like desktop information architecture with essential editing operations.                          |
@@ -165,9 +165,9 @@ history, or stale projection output.
 
 ### Required design corrections
 
-The current
+The revised
 [`presentation-trust-foundation-design.md`](../superpowers/specs/2026-07-26-presentation-trust-foundation-design.md)
-must be revised before implementation:
+resolves the required corrections below and must be approved before implementation:
 
 - Own per-open-document sessions above the active routed view.
 - Gate tab activation, tab close, route navigation, browser reload, and Electron window close with
