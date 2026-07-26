@@ -75,6 +75,22 @@ coverage for later session work.
   change desktop z-order.
 - Browser mode never attempts desktop focus or z-order APIs.
 
+### Progress — 2026-07-26
+
+- [x] Electron one-shot foreground for explicit Timer, Bible, and Media output.
+- [x] Timer Space start/resume parity with the Timer buttons.
+- [x] Passive Timer ticks, Media pan/zoom, playlist metadata, and remount synchronization remain
+      transport-only.
+- [x] Focused R0 regression suite: 156 tests passed.
+- [x] TypeScript checks and production build with bundle budgets passed.
+- [ ] Browser projection E2E in PR CI.
+- [ ] Packaged Electron projection smoke in release gates.
+
+The full Windows-hosted test run currently reports 1874 passing and 14 failures in six existing
+main-process test files whose expectations hard-code POSIX paths. The full repository lint baseline
+also retains two pre-existing errors in `FileProjection.tsx` and `FilesPage.tsx`; all files touched
+by this slice pass ESLint.
+
 ## R1 — Persistence integrity
 
 ### Goal
