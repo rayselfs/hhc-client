@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import AppLoadingScreen from '@renderer/components/Control/AppLoadingScreen'
 import Sidebar from '@renderer/components/Control/Sidebar'
 import Header from '@renderer/components/Control/Header/Header'
+import PresentationCloseDecisionDialog from '@renderer/components/Control/Header/PresentationCloseDecisionDialog'
 import PresentationWorkspaceHeader from '@renderer/components/Control/Header/PresentationWorkspaceHeader'
 import FloatingTimer from '@renderer/components/Control/Timer/FloatingTimer'
 import ConfirmDialog from '@renderer/components/Common/ConfirmDialog'
@@ -12,6 +13,7 @@ import { ProjectionProvider } from '@renderer/contexts/ProjectionContext'
 import { TimerEngineProvider } from '@renderer/contexts/TimerEngineContext'
 import { ContextMenuProvider } from '@renderer/contexts/ContextMenuContext'
 import { ConfirmDialogProvider } from '@renderer/contexts/ConfirmDialogContext'
+import { PresentationCloseDecisionProvider } from '@renderer/contexts/PresentationCloseDecisionContext'
 import { PresentationSessionRegistryProvider } from '@renderer/contexts/PresentationSessionRegistryContext'
 import { ShortcutScopeProvider } from '@renderer/contexts/ShortcutScopeContext'
 import LanRemoteBridge from '@renderer/contexts/LanRemoteBridge'
@@ -66,26 +68,29 @@ export default function Layout(): React.JSX.Element {
             <ContextMenuProvider>
               <ConfirmDialogProvider>
                 <PresentationSessionRegistryProvider>
-                  <div className="flex h-screen overflow-hidden bg-background text-foreground">
-                    <Sidebar />
-                    <div className="flex flex-1 flex-col min-h-0">
-                      {isPresentationWorkspace ? <PresentationWorkspaceHeader /> : <Header />}
-                      <main
-                        className={
-                          isPresentationWorkspace
-                            ? 'flex-1 overflow-hidden'
-                            : 'flex-1 overflow-y-auto py-4 px-3'
-                        }
-                      >
-                        <Outlet />
-                      </main>
+                  <PresentationCloseDecisionProvider>
+                    <div className="flex h-screen overflow-hidden bg-background text-foreground">
+                      <Sidebar />
+                      <div className="flex flex-1 flex-col min-h-0">
+                        {isPresentationWorkspace ? <PresentationWorkspaceHeader /> : <Header />}
+                        <main
+                          className={
+                            isPresentationWorkspace
+                              ? 'flex-1 overflow-hidden'
+                              : 'flex-1 overflow-y-auto py-4 px-3'
+                          }
+                        >
+                          <Outlet />
+                        </main>
+                      </div>
+                      <FloatingTimer />
+                      {isPresentingMedia && <MediaPresenter />}
                     </div>
-                    <FloatingTimer />
-                    {isPresentingMedia && <MediaPresenter />}
-                  </div>
-                  <ConfirmDialog />
-                  <TimerProjectionBridge />
-                  <LanRemoteBridge />
+                    <ConfirmDialog />
+                    <PresentationCloseDecisionDialog />
+                    <TimerProjectionBridge />
+                    <LanRemoteBridge />
+                  </PresentationCloseDecisionProvider>
                 </PresentationSessionRegistryProvider>
               </ConfirmDialogProvider>
             </ContextMenuProvider>

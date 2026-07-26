@@ -4,6 +4,14 @@ export const SHORTCUTS = {
   PROJECTION: {
     START: { code: 'F5', mac: { code: 'Enter', meta: true, shift: true } }
   },
+  PRESENTATION: {
+    UNDO: { code: 'KeyZ', metaOrCtrl: true },
+    REDO: {
+      code: 'KeyY',
+      metaOrCtrl: true,
+      mac: { code: 'KeyZ', meta: true, shift: true }
+    }
+  },
   BIBLE: {
     PREV_VERSE: { code: 'ArrowUp' },
     NEXT_VERSE: { code: 'ArrowDown' },

@@ -2,10 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import { Button } from '@heroui/react/button'
 import { ButtonGroup } from '@heroui/react/button-group'
 import { toast } from '@heroui/react/toast'
-import { Home, Monitor, Undo2, X } from 'lucide-react'
+import { Home, Monitor, Redo2, Undo2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
+import { usePresentationCloseDecision } from '@renderer/contexts/PresentationCloseDecisionContext'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
+import { usePresentationSessionRegistry } from '@renderer/contexts/PresentationSessionRegistryContext'
+import { SHORTCUTS } from '@renderer/config/shortcuts'
+import { useKeyboardShortcuts } from '@renderer/hooks/useKeyboardShortcuts'
 import { hasNameConflict, splitFileName, validateDisplayName } from '@renderer/lib/file-naming'
 import { openFileExplorerDB } from '@renderer/lib/file-explorer-db'
 import {
@@ -14,10 +18,7 @@ import {
   isPresentationItem
 } from '@renderer/lib/presentation-media'
 import { startMediaProjection, stopProjectionSession } from '@renderer/lib/projection-actions'
-import {
-  loadEditablePresentation,
-  saveEditablePresentation
-} from '@renderer/lib/editable-presentation'
+import { loadEditablePresentation } from '@renderer/lib/editable-presentation'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 import { usePresentationWorkspaceStore } from '@renderer/stores/presentation-workspace'
@@ -28,27 +29,18 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { isProjectionOpen, stopProjection } = useProjection()
+  const registry = usePresentationSessionRegistry()
+  const requestCloseDecision = usePresentationCloseDecision()
   const documents = usePresentationWorkspaceStore((state) => state.documents)
   const activeItemId = usePresentationWorkspaceStore((state) => state.activeItemId)
   const activeDocument = usePresentationWorkspaceStore((state) => state.getActiveDocument())
-  const setActiveDocument = usePresentationWorkspaceStore((state) => state.setActiveDocument)
   const updateDocumentName = usePresentationWorkspaceStore((state) => state.updateDocumentName)
-  const closeDocument = usePresentationWorkspaceStore((state) => state.closeDocument)
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
-  const [undoState, setUndoState] = useState<{ itemId: string; canUndo: boolean } | null>(null)
   const editInputRef = useRef<HTMLInputElement>(null)
-  const canUndo = undoState?.itemId === activeItemId && undoState.canUndo
-
-  useEffect(() => {
-    const handleUndoState = (event: Event): void => {
-      const detail = (event as CustomEvent<{ itemId: string; canUndo: boolean }>).detail
-      if (!detail || detail.itemId !== activeItemId) return
-      setUndoState(detail)
-    }
-    window.addEventListener('hhc:presentation-undo-state', handleUndoState)
-    return () => window.removeEventListener('hhc:presentation-undo-state', handleUndoState)
-  }, [activeItemId])
+  const activeSession = activeItemId ? registry.get(activeItemId) : undefined
+  const canUndo = activeDocument?.canUndo === true
+  const canRedo = activeDocument?.canRedo === true
 
   useEffect(() => {
     if (!editingItemId) return
@@ -56,13 +48,19 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
     editInputRef.current?.select()
   }, [editingItemId])
 
-  const activateDocument = (itemId: string): void => {
-    setActiveDocument(itemId)
+  const activateDocument = async (itemId: string): Promise<void> => {
+    if (!(await registry.activate(itemId))) return
     navigate(getPresentationWorkspacePath(itemId))
   }
 
-  const closeTab = (itemId: string): void => {
-    closeDocument(itemId)
+  const closeTab = async (itemId: string): Promise<void> => {
+    let closed = await registry.close(itemId)
+    if (!closed) {
+      const decision = await requestCloseDecision([itemId])
+      if (decision === 'keep-editing') return
+      closed = await registry.close(itemId, decision)
+    }
+    if (!closed) return
     const nextActiveItemId = usePresentationWorkspaceStore.getState().activeItemId
     navigate(nextActiveItemId ? getPresentationWorkspacePath(nextActiveItemId) : '/files')
   }
@@ -110,17 +108,40 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
       return
     }
 
-    const updatedItem: FileItemRecord = { ...item, name: nextName }
-    await db.put('folder-items', updatedItem)
-    useFileExplorerStore.getState().updateItem?.(itemId, { name: nextName })
-    updateDocumentName(itemId, nextName)
-
+    let nextSize = item.size
     if (isEditablePresentationMimeType(item.mimeType)) {
-      const document = await loadEditablePresentation(item)
-      await saveEditablePresentation(updatedItem, { ...document, name: nextName })
+      const session = registry.get(itemId) ?? (await registry.open(item))
+      session.commitDraft()
+      session.rename(trimmedBase, nextName)
+      await session.flush()
+      nextSize = new Blob([JSON.stringify(session.getSnapshot().renderedDocument)]).size
     }
+    useFileExplorerStore.getState().updateItem?.(itemId, { name: nextName, size: nextSize })
+    updateDocumentName(itemId, nextName)
     cancelRename()
   }
+
+  useKeyboardShortcuts(
+    [
+      {
+        id: 'presentation-undo',
+        config: SHORTCUTS.PRESENTATION.UNDO,
+        description: t('presentationWorkspace.undo', 'Undo'),
+        handler: () => {
+          if (activeDocument?.canUndo) activeSession?.undo()
+        }
+      },
+      {
+        id: 'presentation-redo',
+        config: SHORTCUTS.PRESENTATION.REDO,
+        description: t('presentationWorkspace.redo', 'Redo'),
+        handler: () => {
+          if (activeDocument?.canRedo) activeSession?.redo()
+        }
+      }
+    ],
+    { enabled: Boolean(activeSession), sectionKey: 'presentation' }
+  )
 
   const presentActiveDocument = async (): Promise<void> => {
     if (!activeDocument) return
@@ -180,17 +201,20 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
         variant="ghost"
         className="relative z-10 mb-1"
         isDisabled={!canUndo}
-        onPress={() => {
-          if (!activeItemId) return
-          window.dispatchEvent(
-            new CustomEvent('hhc:presentation-undo-request', {
-              detail: { itemId: activeItemId }
-            })
-          )
-        }}
+        onPress={() => activeSession?.undo()}
         aria-label={t('presentationWorkspace.undo', 'Undo')}
       >
         <Undo2 size={18} />
+      </Button>
+      <Button
+        isIconOnly
+        variant="ghost"
+        className="relative z-10 mb-1"
+        isDisabled={!canRedo}
+        onPress={() => activeSession?.redo()}
+        aria-label={t('presentationWorkspace.redo', 'Redo')}
+      >
+        <Redo2 size={18} />
       </Button>
       {documents.map((deck) => (
         <div
@@ -203,12 +227,12 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
               : 'z-10 mb-px border-transparent bg-content2 text-default-500 hover:text-foreground'
           }`}
           onClick={() => {
-            if (editingItemId !== deck.itemId) activateDocument(deck.itemId)
+            if (editingItemId !== deck.itemId) void activateDocument(deck.itemId)
           }}
           onKeyDown={(event) => {
             if (event.key === 'Enter' || event.key === ' ') {
               event.preventDefault()
-              activateDocument(deck.itemId)
+              void activateDocument(deck.itemId)
             }
           }}
         >
@@ -251,14 +275,38 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
             className="rounded p-0.5 hover:bg-black/10"
             onClick={(event) => {
               event.stopPropagation()
-              closeTab(deck.itemId)
+              void closeTab(deck.itemId)
             }}
-            aria-label={t('presentationWorkspace.closeTab')}
+            aria-label={t('presentationWorkspace.closeTab', 'Close tab')}
           >
             <X size={14} />
           </button>
         </div>
       ))}
+      {activeDocument?.saveStatus && (
+        <div className="relative z-10 mb-1 ml-2 flex items-center gap-2 text-xs text-default-500">
+          <span role={activeDocument.saveStatus === 'error' ? 'alert' : undefined}>
+            {t(
+              `presentationWorkspace.saveStatus.${activeDocument.saveStatus}`,
+              activeDocument.saveStatus === 'dirty'
+                ? 'Unsaved'
+                : activeDocument.saveStatus === 'saving'
+                  ? 'Saving...'
+                  : activeDocument.saveStatus === 'error'
+                    ? 'Save failed'
+                    : 'Saved'
+            )}
+          </span>
+          {activeDocument.mirrorWarnings && activeDocument.mirrorWarnings.length > 0 && (
+            <span>{t('presentationWorkspace.previewWarning', 'Preview needs repair')}</span>
+          )}
+          {activeDocument.saveStatus === 'error' && (
+            <Button size="sm" variant="tertiary" onPress={() => activeSession?.retry()}>
+              {t('presentationWorkspace.retrySave', 'Retry save')}
+            </Button>
+          )}
+        </div>
+      )}
       <div className="relative z-10 mb-1 ml-auto flex items-center">
         <ButtonGroup size="lg">
           <Button
