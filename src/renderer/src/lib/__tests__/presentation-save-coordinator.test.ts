@@ -181,6 +181,34 @@ describe('presentation save coordinator', () => {
     })
   })
 
+  it('retries a warned mirror without creating a new revision', async () => {
+    const persist = vi
+      .fn<PersistPresentationRevision>()
+      .mockResolvedValueOnce({
+        revision: 1,
+        mirrorWarnings: ['derived-document']
+      })
+      .mockResolvedValueOnce({
+        revision: 1,
+        mirrorWarnings: []
+      })
+    const coordinator = createPresentationSaveCoordinator(initialDocument, persist)
+
+    coordinator.schedule({ ...initialDocument, name: 'Warned' })
+    await coordinator.flush()
+    coordinator.retry()
+    await coordinator.flush()
+
+    expect(persist).toHaveBeenCalledTimes(2)
+    expect(persist.mock.calls.map(([request]) => request.revision)).toEqual([1, 1])
+    expect(coordinator.getState()).toMatchObject({
+      status: 'saved',
+      scheduledRevision: 1,
+      persistedRevision: 1,
+      mirrorWarnings: []
+    })
+  })
+
   it('disposes its timer and prevents stale completion notifications', async () => {
     const write = deferred<{ revision: number; mirrorWarnings: [] }>()
     const persist = vi.fn<PersistPresentationRevision>().mockReturnValue(write.promise)

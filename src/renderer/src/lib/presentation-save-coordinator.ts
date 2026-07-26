@@ -174,7 +174,12 @@ export function createPresentationSaveCoordinator(
   }
 
   const retry = (): void => {
-    if (!latestRequest || state.persistedRevision === state.scheduledRevision) return
+    if (
+      !latestRequest ||
+      (state.persistedRevision === state.scheduledRevision && state.mirrorWarnings.length === 0)
+    ) {
+      return
+    }
     clearDebounce()
     pendingRequest = latestRequest
     lastError = null
