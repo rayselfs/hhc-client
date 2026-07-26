@@ -39,7 +39,7 @@ The order is deliberate:
 | Phase | Status                   | Outcome                                                                                                                                       |
 | ----- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | R0    | Complete                 | Projection foreground behavior is predictable and foundational risks are covered by real dual-mode gates.                                     |
-| R1    | Planned                  | File and presentation persistence failures cannot silently lose or fabricate state.                                                           |
+| R1    | Complete                 | File and presentation persistence failures cannot silently lose or fabricate state.                                                           |
 | R2    | Design revision required | Presentation editing has transactional Undo/Redo, serialized saving, visible save state, and safe lifecycle gates.                            |
 | R3    | Planned                  | Projection survives reload, crash, display changes, and browser popup failures through session replay and recovery.                           |
 | R4    | Planned                  | Media projection remains active while the operator previews, searches, and prepares the next source.                                          |
@@ -140,10 +140,21 @@ write paths.
       retry action.
 - [x] Focused R1 folder persistence verification: 106/106 tests, Node/Web typechecks, and touched
       file ESLint pass.
-- [ ] Native/external resource cleanup journal and retry UI.
-- [ ] Compensatable editable-presentation creation across catalog, blob, document, and thumbnail
+- [x] File Explorer database v5 persists a native/external cleanup journal in the same transaction
+      that removes the final catalog Blob reference; startup and Recovery Center retries retain
+      failures instead of swallowing them.
+- [x] Compensatable editable-presentation creation across catalog, blob, document, and thumbnail
       writes.
-- [ ] Orphan blob and reference-count audit derived from authoritative references.
+- [x] Orphan blob and reference-count audit derives expected counts from File Explorer file items
+      and sync entries; Recovery Center repair corrects mismatches and journals zero-reference
+      cleanup.
+- [x] Projection resource locks still defer final source cleanup; item thumbnails may be removed
+      immediately without invalidating the active projection source.
+- [x] Diagnostics report cleanup counts and attempts without exposing Blob IDs, native paths, or
+      raw cleanup errors.
+- [x] Final R1 verification: 87/87 focused tests across 11 files, Node/Web typechecks, touched-file
+      ESLint, production Electron/Vite build, PWA precache budget, font budget, and largest-JS
+      bundle budget passed.
 
 ## R2 — Presentation Trust Foundation
 
