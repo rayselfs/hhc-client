@@ -666,7 +666,18 @@
     "stopButton": "停止投影",
     "closeTitle": "停止投影",
     "closeConfirm": "要停止目前投影並關閉輸出視窗嗎？",
-    "waiting": "等待內容..."
+    "waiting": "等待內容...",
+    "recovery": {
+      "recoveringTitle": "正在復原投影",
+      "recoveringDescription": "輸出視窗正在重新啟動，並還原最後投影的內容。",
+      "popupBlockedTitle": "投影彈出視窗遭到封鎖",
+      "popupBlockedDescription": "請允許此網站開啟彈出視窗，然後重試。",
+      "readyTimeoutTitle": "投影視窗未能就緒",
+      "readyTimeoutDescription": "請重試開啟輸出視窗。",
+      "rendererCrashTitle": "投影意外停止",
+      "rendererCrashDescription": "重複發生錯誤，自動復原已停止。",
+      "retry": "重試投影"
+    }
   },
   "common": {
     "cancel": "取消",

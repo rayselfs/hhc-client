@@ -666,7 +666,18 @@
     "stopButton": "Stop projection",
     "closeTitle": "Stop Projection",
     "closeConfirm": "Stop the current projection and close the output window?",
-    "waiting": "Waiting for content..."
+    "waiting": "Waiting for content...",
+    "recovery": {
+      "recoveringTitle": "Restoring projection",
+      "recoveringDescription": "The output window is restarting with the last projected content.",
+      "popupBlockedTitle": "Projection popup was blocked",
+      "popupBlockedDescription": "Allow popups for this site, then retry.",
+      "readyTimeoutTitle": "Projection did not become ready",
+      "readyTimeoutDescription": "Retry opening the output window.",
+      "rendererCrashTitle": "Projection stopped unexpectedly",
+      "rendererCrashDescription": "Automatic recovery stopped after repeated failures.",
+      "retry": "Retry projection"
+    }
   },
   "common": {
     "cancel": "Cancel",

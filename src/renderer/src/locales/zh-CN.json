@@ -666,7 +666,18 @@
     "stopButton": "停止投影",
     "closeTitle": "停止投影",
     "closeConfirm": "要停止当前投影并关闭输出窗口吗？",
-    "waiting": "等待内容..."
+    "waiting": "等待内容...",
+    "recovery": {
+      "recoveringTitle": "正在恢复投影",
+      "recoveringDescription": "输出窗口正在重新启动，并恢复最后投影的内容。",
+      "popupBlockedTitle": "投影弹出窗口被拦截",
+      "popupBlockedDescription": "请允许此网站打开弹出窗口，然后重试。",
+      "readyTimeoutTitle": "投影窗口未能就绪",
+      "readyTimeoutDescription": "请重试打开输出窗口。",
+      "rendererCrashTitle": "投影意外停止",
+      "rendererCrashDescription": "重复发生错误，自动恢复已停止。",
+      "retry": "重试投影"
+    }
   },
   "common": {
     "cancel": "取消",
