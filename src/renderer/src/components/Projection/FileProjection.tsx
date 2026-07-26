@@ -617,27 +617,39 @@ function EditableProjectionSurface({
         : null,
     [editablePresentation, fileName, itemId]
   )
-  const [document, setDocument] = useState<EditablePresentationDocument | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const sourceKey = `${itemId}:${blobId}`
+  const [loaded, setLoaded] = useState<{
+    sourceKey: string
+    document: EditablePresentationDocument | null
+    error: string | null
+  } | null>(null)
 
   useEffect(() => {
-    if (payloadDocument) {
-      setDocument(payloadDocument)
-      setError(null)
-      return
-    }
+    if (payloadDocument) return
     let cancelled = false
     void loadEditablePresentation({ id: itemId, url: `blob:${blobId}`, name: fileName })
       .then((loadedDocument) => {
-        if (!cancelled) setDocument(loadedDocument)
+        if (!cancelled) {
+          setLoaded({ sourceKey, document: loadedDocument, error: null })
+        }
       })
       .catch((loadError) => {
-        if (!cancelled) setError(loadError instanceof Error ? loadError.message : String(loadError))
+        if (!cancelled) {
+          setLoaded({
+            sourceKey,
+            document: null,
+            error: loadError instanceof Error ? loadError.message : String(loadError)
+          })
+        }
       })
     return () => {
       cancelled = true
     }
-  }, [blobId, fileName, itemId, payloadDocument])
+  }, [blobId, fileName, itemId, payloadDocument, sourceKey])
+
+  const durableDocument = loaded?.sourceKey === sourceKey ? loaded.document : null
+  const document = payloadDocument ?? durableDocument
+  const error = payloadDocument || loaded?.sourceKey !== sourceKey ? null : loaded.error
 
   const slideId =
     document?.slideOrder[Math.min(slideIndex, Math.max(0, document.slideOrder.length - 1))]

@@ -29,10 +29,10 @@ import {
   removeElementFromSlide,
   resetSlideBackground,
   removeEditableSlides,
-  saveEditablePresentation,
   updateSlideBackground,
   type EditableTextElement
 } from '../editable-presentation'
+import { persistEditablePresentationRevision } from '../editable-presentation-persistence'
 import { EDITABLE_PRESENTATION_MIME_TYPE, PPTX_MIME_TYPE } from '../presentation-media'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
 import type { FileItemRecord } from '@shared/types/folder'
@@ -507,7 +507,13 @@ describe('editable presentation documents', () => {
       image
     )
 
-    await saveEditablePresentation(source, withElements)
+    await persistEditablePresentationRevision({
+      itemId: source.id,
+      sourceBlobId: document.id,
+      revision: 1,
+      document: withElements,
+      catalogName: withElements.name
+    })
     const reloaded = await loadEditablePresentation({ ...source, name: 'Sunday' })
 
     expect(reloaded.slides[slideId].elements[text.id]).toMatchObject({
@@ -526,7 +532,13 @@ describe('editable presentation documents', () => {
     })
 
     const withoutImage = removeElementFromSlide(reloaded, slideId, image.id)
-    await saveEditablePresentation(source, withoutImage)
+    await persistEditablePresentationRevision({
+      itemId: source.id,
+      sourceBlobId: document.id,
+      revision: 2,
+      document: withoutImage,
+      catalogName: withoutImage.name
+    })
     const afterDelete = await loadEditablePresentation({ ...source, name: 'Sunday' })
 
     expect(afterDelete.slides[slideId].elements[image.id]).toBeUndefined()

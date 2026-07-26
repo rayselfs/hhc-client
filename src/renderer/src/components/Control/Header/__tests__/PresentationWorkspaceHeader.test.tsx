@@ -22,7 +22,6 @@ const mocks = vi.hoisted(() => ({
   requestCloseDecision: vi.fn(),
   openFileExplorerDB: vi.fn(),
   loadEditablePresentation: vi.fn(),
-  saveEditablePresentation: vi.fn(),
   startMediaProjection: vi.fn(),
   stopProjectionSession: vi.fn()
 }))
@@ -71,8 +70,7 @@ vi.mock('@renderer/lib/editable-presentation', async () => {
   )
   return {
     ...actual,
-    loadEditablePresentation: mocks.loadEditablePresentation,
-    saveEditablePresentation: mocks.saveEditablePresentation
+    loadEditablePresentation: mocks.loadEditablePresentation
   }
 })
 
@@ -269,7 +267,6 @@ describe('PresentationWorkspaceHeader', () => {
       expect(session.flush).toHaveBeenCalledTimes(1)
     })
     expect(mocks.loadEditablePresentation).not.toHaveBeenCalled()
-    expect(mocks.saveEditablePresentation).not.toHaveBeenCalled()
     expect(usePresentationWorkspaceStore.getState().documents[0].name).toBe('Worship.lpdeck')
   })
 

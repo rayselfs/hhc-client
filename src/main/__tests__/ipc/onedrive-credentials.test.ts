@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import path from 'node:path'
 
 const {
   handleHandlers,
@@ -341,7 +342,7 @@ describe('OneDrive credential IPC', () => {
     ).resolves.toBeUndefined()
 
     expect(mockRm).toHaveBeenCalledWith(
-      '/tmp/hhc-user-data/onedrive-credentials/onedrive%3Aaccount-1.enc',
+      path.join('/tmp/hhc-user-data', 'onedrive-credentials', 'onedrive%3Aaccount-1.enc'),
       { force: true }
     )
   })

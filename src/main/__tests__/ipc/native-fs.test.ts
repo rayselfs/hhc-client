@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import path from 'node:path'
 
 const {
   handleHandlers,
@@ -72,6 +73,8 @@ import {
 
 const wm = mockWindowManager as unknown as WindowManager
 const validId = '123e4567-e89b-12d3-a456-426614174000'
+const nativeDir = path.resolve('/tmp/hhc-user-data', 'native-files')
+const nativeFilePath = path.join(nativeDir, validId)
 
 function makeEvent(): Electron.IpcMainInvokeEvent {
   return { sender: {} } as Electron.IpcMainInvokeEvent
@@ -112,11 +115,11 @@ describe('native file import', () => {
     expect(result).toEqual({ size })
     expect(mockCopyFile).toHaveBeenCalledWith(
       '/source/large-video.mp4',
-      expect.stringMatching(/\/native-files\/\.123e4567-.+\.tmp$/)
+      expect.stringContaining(path.join(nativeDir, `.${validId}.`))
     )
     expect(mockRename).toHaveBeenCalledWith(
-      expect.stringMatching(/\/native-files\/\.123e4567-.+\.tmp$/),
-      `/tmp/hhc-user-data/native-files/${validId}`
+      expect.stringContaining(path.join(nativeDir, `.${validId}.`)),
+      nativeFilePath
     )
   })
 
@@ -167,7 +170,7 @@ describe('native file availability', () => {
     vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockMainWindow as never)
 
     await expect(getHandler('native-fs:file-exists')(makeEvent(), validId)).resolves.toBe(true)
-    expect(mockStat).toHaveBeenCalledWith(`/tmp/hhc-user-data/native-files/${validId}`)
+    expect(mockStat).toHaveBeenCalledWith(nativeFilePath)
   })
 
   it('returns false when a managed native file is missing', async () => {
@@ -209,10 +212,7 @@ describe('native media protocol', () => {
 
     const response = await handler!(request)
 
-    expect(mockCreateReadStream).toHaveBeenCalledWith(
-      `/tmp/hhc-user-data/native-files/${validId}`,
-      { start: 0, end: 6 }
-    )
+    expect(mockCreateReadStream).toHaveBeenCalledWith(nativeFilePath, { start: 0, end: 6 })
     expect(response.status).toBe(206)
     expect(response.headers.get('Accept-Ranges')).toBe('bytes')
     expect(response.headers.get('Content-Length')).toBe('7')
@@ -226,10 +226,7 @@ describe('native media protocol', () => {
 
     const response = await handler!(new Request(`hhc-media://file/${validId}?type=video%2Fmp4`))
 
-    expect(mockCreateReadStream).toHaveBeenCalledWith(
-      `/tmp/hhc-user-data/native-files/${validId}`,
-      { start: 0, end: 99 }
-    )
+    expect(mockCreateReadStream).toHaveBeenCalledWith(nativeFilePath, { start: 0, end: 99 })
     expect(response.status).toBe(200)
     expect(response.headers.get('Accept-Ranges')).toBe('bytes')
     expect(response.headers.get('Content-Length')).toBe('100')

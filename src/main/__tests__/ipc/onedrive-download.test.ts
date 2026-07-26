@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import path from 'node:path'
 
 const {
   handleHandlers,
@@ -67,6 +68,8 @@ import { registerOneDriveDownloadHandlers } from '../../ipc/onedrive-download'
 
 const wm = mockWindowManager as unknown as WindowManager
 const validFileId = '123e4567-e89b-12d3-a456-426614174000'
+const nativeDir = path.resolve('/tmp/hhc-user-data', 'native-files')
+const nativeFilePath = path.join(nativeDir, validFileId)
 
 function makeEvent(): Electron.IpcMainInvokeEvent {
   return { sender: { send: mockSend } } as unknown as Electron.IpcMainInvokeEvent
@@ -116,8 +119,8 @@ describe('OneDrive native download IPC', () => {
     )
     expect(mockWrite).toHaveBeenCalledWith(expect.any(Buffer))
     expect(mockRename).toHaveBeenCalledWith(
-      expect.stringContaining(`/native-files/${validFileId}.`),
-      `/tmp/hhc-user-data/native-files/${validFileId}`
+      expect.stringContaining(path.join(nativeDir, `${validFileId}.`)),
+      nativeFilePath
     )
   })
 
@@ -178,9 +181,10 @@ describe('OneDrive native download IPC', () => {
       })
     ).rejects.toThrow('OneDrive download size mismatch')
 
-    expect(mockRm).toHaveBeenCalledWith(expect.stringContaining(`/native-files/${validFileId}.`), {
-      force: true
-    })
+    expect(mockRm).toHaveBeenCalledWith(
+      expect.stringContaining(path.join(nativeDir, `${validFileId}.`)),
+      { force: true }
+    )
     expect(mockRename).not.toHaveBeenCalled()
   })
 })

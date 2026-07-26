@@ -1386,26 +1386,6 @@ export async function loadEditablePresentation(
   return document
 }
 
-export async function saveEditablePresentation(
-  item: Pick<FileItemRecord, 'id' | 'url'>,
-  document: EditablePresentationDocument
-): Promise<void> {
-  const sourceBlobId = getBlobId(item)
-  const nextDocument = { ...document, updatedAt: Date.now() }
-  const db = await openFileExplorerDB()
-  const record = await db.get('file-blobs', sourceBlobId)
-  const { persistEditablePresentationRevision, refreshEditablePresentationThumbnail } =
-    await import('./editable-presentation-persistence')
-  await persistEditablePresentationRevision({
-    itemId: item.id,
-    sourceBlobId,
-    revision: (record?.revision ?? 0) + 1,
-    document: nextDocument,
-    catalogName: nextDocument.name
-  })
-  await refreshEditablePresentationThumbnail(nextDocument)
-}
-
 async function repairEditableDocumentMirror(
   itemId: string,
   sourceBlobId: string,

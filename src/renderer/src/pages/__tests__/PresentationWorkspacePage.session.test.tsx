@@ -19,8 +19,7 @@ import type { FileItemRecord } from '@shared/types/folder'
 const mocks = vi.hoisted(() => ({
   loadEditablePresentation: vi.fn(),
   persistEditablePresentationRevision: vi.fn(),
-  refreshEditablePresentationThumbnail: vi.fn(),
-  saveEditablePresentation: vi.fn()
+  refreshEditablePresentationThumbnail: vi.fn()
 }))
 
 vi.mock('react-i18next', async () => {
@@ -50,8 +49,7 @@ vi.mock('@renderer/lib/editable-presentation', async () => {
   )
   return {
     ...actual,
-    loadEditablePresentation: mocks.loadEditablePresentation,
-    saveEditablePresentation: mocks.saveEditablePresentation
+    loadEditablePresentation: mocks.loadEditablePresentation
   }
 })
 
@@ -99,7 +97,6 @@ describe('PresentationWorkspacePage session integration', () => {
     }))
     mocks.refreshEditablePresentationThumbnail.mockReset()
     mocks.refreshEditablePresentationThumbnail.mockResolvedValue(undefined)
-    mocks.saveEditablePresentation.mockReset()
     useFileExplorerStore.setState({
       items: { [item.id]: item },
       _itemsArray: [item]
@@ -141,6 +138,5 @@ describe('PresentationWorkspacePage session integration', () => {
 
     expect(await screen.findAllByText('Unsaved local text')).not.toHaveLength(0)
     expect(mocks.loadEditablePresentation).toHaveBeenCalledTimes(1)
-    expect(mocks.saveEditablePresentation).not.toHaveBeenCalled()
   })
 })

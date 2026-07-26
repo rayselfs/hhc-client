@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import path from 'node:path'
 
 const {
   handleHandlers,
@@ -81,6 +82,8 @@ import { registerLocalSyncHandlers } from '../../ipc/local-sync'
 const wm = mockWindowManager as unknown as WindowManager
 const CONNECTION_ID = '11111111-1111-4111-8111-111111111111'
 const TARGET_FILE_ID = '123e4567-e89b-12d3-a456-426614174000'
+const ROOT_PATH = path.resolve('/Volumes/Media/Sermons')
+const NATIVE_DIR = path.resolve('/tmp/hhc-user-data', 'native-files')
 
 function makeEvent(): Electron.IpcMainInvokeEvent {
   return { sender: {} } as Electron.IpcMainInvokeEvent
@@ -134,7 +137,7 @@ function symlink(name: string): {
   }
 }
 
-function storedConnectionJson(rootPath = '/Volumes/Media/Sermons'): string {
+function storedConnectionJson(rootPath = ROOT_PATH): string {
   return JSON.stringify([
     {
       id: CONNECTION_ID,
@@ -238,13 +241,15 @@ describe('local sync IPC', () => {
 
   it('scans a connected folder without returning absolute paths', async () => {
     mockReadFile.mockResolvedValue(storedConnectionJson())
-    mockReaddir.mockImplementation(async (path: string) => {
-      if (path === '/Volumes/Media/Sermons') return [dir('Sunday'), file('intro.mp4')]
-      if (path === '/Volumes/Media/Sermons/Sunday') return [file('message.mkv'), file('.DS_Store')]
+    mockReaddir.mockImplementation(async (filePath: string) => {
+      if (filePath === ROOT_PATH) return [dir('Sunday'), file('intro.mp4')]
+      if (filePath === path.join(ROOT_PATH, 'Sunday')) {
+        return [file('message.mkv'), file('.DS_Store')]
+      }
       return []
     })
-    mockStat.mockImplementation(async (path: string) => {
-      if (path === '/Volumes/Media/Sermons') {
+    mockStat.mockImplementation(async (filePath: string) => {
+      if (filePath === ROOT_PATH) {
         return { isDirectory: () => true, isFile: () => false, size: 0, mtimeMs: 1 }
       }
       return { isDirectory: () => false, isFile: () => true, size: 2048, mtimeMs: 5 }
@@ -259,7 +264,7 @@ describe('local sync IPC', () => {
         expect.objectContaining({ kind: 'file', name: 'message.mkv', size: 2048 })
       ])
     )
-    expect(JSON.stringify(result)).not.toContain('/Volumes/Media/Sermons')
+    expect(JSON.stringify(result)).not.toContain(ROOT_PATH)
     expect(result).not.toEqual(
       expect.arrayContaining([expect.objectContaining({ name: '.DS_Store' })])
     )
@@ -291,8 +296,8 @@ describe('local sync IPC', () => {
 
   it('skips symlinks and unreadable descendants without aborting the scan', async () => {
     mockReadFile.mockResolvedValue(storedConnectionJson())
-    mockReaddir.mockImplementation(async (path: string) => {
-      if (path === '/Volumes/Media/Sermons') {
+    mockReaddir.mockImplementation(async (filePath: string) => {
+      if (filePath === ROOT_PATH) {
         return [
           dir('Readable'),
           dir('Private'),
@@ -301,17 +306,17 @@ describe('local sync IPC', () => {
           symlink('Link')
         ]
       }
-      if (path === '/Volumes/Media/Sermons/Readable') return [file('message.mp4')]
-      if (path === '/Volumes/Media/Sermons/Private') {
+      if (filePath === path.join(ROOT_PATH, 'Readable')) return [file('message.mp4')]
+      if (filePath === path.join(ROOT_PATH, 'Private')) {
         throw Object.assign(new Error('denied'), { code: 'EACCES' })
       }
       return []
     })
-    mockStat.mockImplementation(async (path: string) => {
-      if (path === '/Volumes/Media/Sermons') {
+    mockStat.mockImplementation(async (filePath: string) => {
+      if (filePath === ROOT_PATH) {
         return { isDirectory: () => true, isFile: () => false, size: 0, mtimeMs: 1 }
       }
-      if (path.endsWith('missing.mp4')) {
+      if (filePath.endsWith('missing.mp4')) {
         throw Object.assign(new Error('missing'), { code: 'ENOENT' })
       }
       return { isDirectory: () => false, isFile: () => true, size: 2048, mtimeMs: 5 }
@@ -347,11 +352,7 @@ describe('local sync IPC', () => {
       state: 'watching'
     })
     expect(JSON.stringify(result)).not.toContain('/Volumes/Media/Sermons')
-    expect(mockWatch).toHaveBeenCalledWith(
-      '/Volumes/Media/Sermons',
-      { recursive: true },
-      expect.any(Function)
-    )
+    expect(mockWatch).toHaveBeenCalledWith(ROOT_PATH, { recursive: true }, expect.any(Function))
   })
 
   it('debounces watcher changes into a rescan status and clears it after scan', async () => {
@@ -424,8 +425,8 @@ describe('local sync IPC', () => {
   it('scans files larger than 2 GiB as metadata without file content', async () => {
     mockReadFile.mockResolvedValue(storedConnectionJson())
     mockReaddir.mockResolvedValue([file('archive.mov')])
-    mockStat.mockImplementation(async (path: string) => {
-      if (path === '/Volumes/Media/Sermons') {
+    mockStat.mockImplementation(async (filePath: string) => {
+      if (filePath === ROOT_PATH) {
         return { isDirectory: () => true, isFile: () => false, size: 0, mtimeMs: 1 }
       }
       return { isDirectory: () => false, isFile: () => true, size: 3 * 1024 ** 3, mtimeMs: 10 }
@@ -441,13 +442,13 @@ describe('local sync IPC', () => {
         etag: `${10}:${3 * 1024 ** 3}`
       })
     ])
-    expect(JSON.stringify(result)).not.toContain('/Volumes/Media/Sermons/archive.mov')
+    expect(JSON.stringify(result)).not.toContain(path.join(ROOT_PATH, 'archive.mov'))
   })
 
   it('imports a connected file into native media storage without exposing source paths', async () => {
     mockReadFile.mockResolvedValue(storedConnectionJson())
-    mockStat.mockImplementation(async (path: string) => {
-      if (path === '/Volumes/Media/Sermons') {
+    mockStat.mockImplementation(async (filePath: string) => {
+      if (filePath === ROOT_PATH) {
         return { isDirectory: () => true, isFile: () => false, size: 0, mtimeMs: 1 }
       }
       return { isDirectory: () => false, isFile: () => true, size: 4096, mtimeMs: 10 }
@@ -461,12 +462,12 @@ describe('local sync IPC', () => {
 
     expect(result).toEqual({ size: 4096 })
     expect(mockCopyFile).toHaveBeenCalledWith(
-      '/Volumes/Media/Sermons/Sunday/message.mkv',
-      expect.stringContaining(`/native-files/.${TARGET_FILE_ID}.`)
+      path.join(ROOT_PATH, 'Sunday', 'message.mkv'),
+      expect.stringContaining(path.join(NATIVE_DIR, `.${TARGET_FILE_ID}.`))
     )
     expect(mockRename).toHaveBeenCalledWith(
-      expect.stringContaining(`/native-files/.${TARGET_FILE_ID}.`),
-      `/tmp/hhc-user-data/native-files/${TARGET_FILE_ID}`
+      expect.stringContaining(path.join(NATIVE_DIR, `.${TARGET_FILE_ID}.`)),
+      path.join(NATIVE_DIR, TARGET_FILE_ID)
     )
   })
 

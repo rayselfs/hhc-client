@@ -15,7 +15,6 @@ import type { FileItemRecord } from '@shared/types/folder'
 const mocks = vi.hoisted(() => ({
   convertPptxToEditablePresentation: vi.fn(),
   loadEditablePresentation: vi.fn(),
-  saveEditablePresentation: vi.fn(),
   persistEditablePresentationRevision: vi.fn(),
   refreshEditablePresentationThumbnail: vi.fn(),
   navigate: vi.fn(),
@@ -60,8 +59,7 @@ vi.mock('@renderer/lib/editable-presentation', async () => {
   return {
     ...actual,
     convertPptxToEditablePresentation: mocks.convertPptxToEditablePresentation,
-    loadEditablePresentation: mocks.loadEditablePresentation,
-    saveEditablePresentation: mocks.saveEditablePresentation
+    loadEditablePresentation: mocks.loadEditablePresentation
   }
 })
 
@@ -130,8 +128,6 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
   beforeEach(() => {
     mocks.convertPptxToEditablePresentation.mockReset()
     mocks.loadEditablePresentation.mockReset()
-    mocks.saveEditablePresentation.mockReset()
-    mocks.saveEditablePresentation.mockResolvedValue(undefined)
     mocks.persistEditablePresentationRevision.mockReset()
     mocks.persistEditablePresentationRevision.mockImplementation(async (request) => ({
       revision: request.revision,
@@ -258,6 +254,5 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
         })
       )
     )
-    expect(mocks.saveEditablePresentation).not.toHaveBeenCalled()
   })
 })
