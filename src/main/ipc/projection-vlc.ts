@@ -1,5 +1,5 @@
 import { BrowserWindow, ipcMain } from 'electron'
-import { VlcPlayer, getBinding, initLibVlc, probeMedia } from 'electron-vlc-player'
+import type { VlcPlayer } from 'electron-vlc-player'
 import type {
   ProjectionVlcControlRequest,
   ProjectionVlcInfo,
@@ -12,8 +12,14 @@ import { getNativeFilePath } from './native-fs'
 import { isKnownWindow } from './validate'
 import { isValidNativeFileId } from '../../shared/native-media'
 import { resolveVlcRuntime } from '../video-engine-runtime'
+import {
+  loadVlcPlayerRuntime,
+  type VlcPlayerRuntime,
+  type VlcPlayerRuntimeResult
+} from '../vlc-player-runtime'
 
 let player: VlcPlayer | null = null
+let activeRuntime: VlcPlayerRuntime | null = null
 let playerListenerCleanup: (() => void) | null = null
 let playerResizeCleanup: (() => void) | null = null
 let currentItemId: string | null = null
@@ -93,23 +99,44 @@ function removeListeners(
   }
 }
 
-function getVlcInfo(): ProjectionVlcInfo {
-  const runtime = resolveVlcRuntime()
-  if (runtime.status !== 'ready' || !runtime.path) {
-    return { status: runtime.status, message: runtime.message ?? 'VLC runtime not found' }
+type LoadVlcPlayerRuntime = () => Promise<VlcPlayerRuntimeResult>
+
+async function resolveVlcInfo(
+  loadRuntime: LoadVlcPlayerRuntime
+): Promise<{ info: ProjectionVlcInfo; runtime?: VlcPlayerRuntime }> {
+  const loaded = await loadRuntime()
+  if (loaded.status === 'error') {
+    return { info: { status: 'error', message: loaded.message } }
   }
-  return { status: 'ready', vlcDir: runtime.path }
+  activeRuntime = loaded.runtime
+  const resolved = resolveVlcRuntime(loaded.runtime.probeDefaultVlcDir)
+  if (resolved.status !== 'ready' || !resolved.path) {
+    return {
+      info: {
+        status: resolved.status,
+        message: resolved.message ?? 'VLC runtime not found'
+      }
+    }
+  }
+  return {
+    info: { status: 'ready', vlcDir: resolved.path },
+    runtime: loaded.runtime
+  }
 }
 
-function probeVlcMedia(request: ProjectionVlcProbeRequest): ProjectionVlcProbeResult {
+async function probeVlcMedia(
+  loadRuntime: LoadVlcPlayerRuntime,
+  request: ProjectionVlcProbeRequest
+): Promise<ProjectionVlcProbeResult> {
   if (!isValidNativeFileId(request.sourceFileId)) throw new Error('Invalid VLC source id')
-  const info = getVlcInfo()
+  const { info, runtime } = await resolveVlcInfo(loadRuntime)
   if (info.status !== 'ready' || !info.vlcDir) {
     throw new Error(info.message ?? 'VLC runtime not found')
   }
+  if (!runtime) throw new Error('VLC native binding unavailable')
 
-  initLibVlc(info.vlcDir)
-  const result = probeMedia(getNativeFilePath(request.sourceFileId), 5000)
+  runtime.initLibVlc(info.vlcDir)
+  const result = runtime.probeMedia(getNativeFilePath(request.sourceFileId), 5000)
   return {
     durationMs: result.parsed && result.length > 0 ? result.length : undefined
   }
@@ -135,7 +162,7 @@ function sendState(wm: WindowManager, next?: { isPlaying?: boolean; isEnded?: bo
 function hideNativePlayerWindow(currentPlayer: VlcPlayer): void {
   if (currentPlayer.playerId < 0) return
   try {
-    getBinding().setPlayerWindowVisible(currentPlayer.playerId, false)
+    activeRuntime?.getBinding().setPlayerWindowVisible(currentPlayer.playerId, false)
   } catch {
     // Window teardown can race with native view teardown.
   }
@@ -156,16 +183,21 @@ async function stopVlc(): Promise<void> {
   playerResizeCleanup = null
 }
 
-async function startVlc(wm: WindowManager, request: ProjectionVlcStartRequest): Promise<void> {
+async function startVlc(
+  wm: WindowManager,
+  loadRuntime: LoadVlcPlayerRuntime,
+  request: ProjectionVlcStartRequest
+): Promise<void> {
   if (!isValidNativeFileId(request.sourceFileId)) throw new Error('Invalid VLC source id')
   const projectionWindow = wm.getProjectionWindow()
   if (!projectionWindow || projectionWindow.isDestroyed())
     throw new Error('Projection window not open')
 
-  const info = getVlcInfo()
+  const { info, runtime } = await resolveVlcInfo(loadRuntime)
   if (info.status !== 'ready' || !info.vlcDir) {
     throw new Error(info.message ?? 'VLC runtime not found')
   }
+  if (!runtime) throw new Error('VLC native binding unavailable')
 
   await stopVlc()
   const startVersion = lifecycleVersion + 1
@@ -175,7 +207,7 @@ async function startVlc(wm: WindowManager, request: ProjectionVlcStartRequest): 
     projectionWindow.webContents,
     VLC_WEB_CONTENTS_EVENTS
   )
-  const nextPlayer = new VlcPlayer({
+  const nextPlayer = new runtime.VlcPlayer({
     window: projectionWindow,
     container: request.container,
     vlcDir: info.vlcDir,
@@ -250,20 +282,23 @@ function isProjectionOrMainWindow(wm: WindowManager, event: Electron.IpcMainInvo
   return senderWindow === wm.getProjectionWindow() || isKnownWindow(wm, event)
 }
 
-export function registerProjectionVlcHandlers(wm: WindowManager): void {
-  ipcMain.handle('projection-vlc:get-info', (event): ProjectionVlcInfo => {
+export function registerProjectionVlcHandlers(
+  wm: WindowManager,
+  loadRuntime: LoadVlcPlayerRuntime = loadVlcPlayerRuntime
+): void {
+  ipcMain.handle('projection-vlc:get-info', async (event): Promise<ProjectionVlcInfo> => {
     if (!isKnownWindow(wm, event)) return { status: 'error', message: 'Unauthorized VLC access' }
-    return getVlcInfo()
+    return (await resolveVlcInfo(loadRuntime)).info
   })
 
   ipcMain.handle('projection-vlc:start', async (event, request: ProjectionVlcStartRequest) => {
     if (!isProjectionOrMainWindow(wm, event)) throw new Error('Unauthorized VLC access')
-    await startVlc(wm, request)
+    await startVlc(wm, loadRuntime, request)
   })
 
-  ipcMain.handle('projection-vlc:probe', (event, request: ProjectionVlcProbeRequest) => {
+  ipcMain.handle('projection-vlc:probe', async (event, request: ProjectionVlcProbeRequest) => {
     if (!isKnownWindow(wm, event)) throw new Error('Unauthorized VLC access')
-    return probeVlcMedia(request)
+    return probeVlcMedia(loadRuntime, request)
   })
 
   ipcMain.handle('projection-vlc:control', (event, command: ProjectionVlcControlRequest) => {

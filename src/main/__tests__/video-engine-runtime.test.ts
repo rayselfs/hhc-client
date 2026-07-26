@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { join } from 'node:path'
 
 const { mockAccessSync, mockProbeDefaultVlcDir, mockApp } = vi.hoisted(() => ({
   mockAccessSync: vi.fn(),
@@ -30,6 +31,12 @@ function platformDir(): string {
   return `${process.platform}-${process.arch}`
 }
 
+function vlcRuntimeFile(): string {
+  if (process.platform === 'win32') return 'libvlc.dll'
+  if (process.platform === 'darwin') return 'libvlc.dylib'
+  return 'libvlc.so'
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   mockApp.isPackaged = false
@@ -43,15 +50,15 @@ describe('video engine runtime resolver', () => {
   it('prefers packaged VLC runtime over system fallback', async () => {
     mockApp.isPackaged = true
     mockAccessSync.mockImplementation((path: string) => {
-      if (path.endsWith('libvlc.dylib')) return undefined
+      if (path.endsWith(vlcRuntimeFile())) return undefined
       throw new Error('missing')
     })
     mockProbeDefaultVlcDir.mockReturnValue('/Applications/VLC.app')
     const { resolveVlcRuntime } = await import('../video-engine-runtime')
 
-    expect(resolveVlcRuntime()).toEqual({
+    expect(resolveVlcRuntime(mockProbeDefaultVlcDir)).toEqual({
       status: 'ready',
-      path: `/resources/video-engine/vlc/${platformDir()}`,
+      path: join('/resources', 'video-engine', 'vlc', platformDir()),
       source: 'bundled'
     })
   })
@@ -63,7 +70,7 @@ describe('video engine runtime resolver', () => {
     mockProbeDefaultVlcDir.mockReturnValue('/Applications/VLC.app')
     const { resolveVlcRuntime } = await import('../video-engine-runtime')
 
-    expect(resolveVlcRuntime()).toEqual({
+    expect(resolveVlcRuntime(mockProbeDefaultVlcDir)).toEqual({
       status: 'ready',
       path: '/Applications/VLC.app',
       source: 'system'
@@ -77,7 +84,7 @@ describe('video engine runtime resolver', () => {
     mockProbeDefaultVlcDir.mockReturnValue('/Applications/VLC.app')
     const { resolveVlcRuntime } = await import('../video-engine-runtime')
 
-    expect(resolveVlcRuntime()).toEqual({
+    expect(resolveVlcRuntime(mockProbeDefaultVlcDir)).toEqual({
       status: 'ready',
       path: '/Applications/VLC.app',
       source: 'system'
@@ -105,7 +112,7 @@ describe('video engine runtime resolver', () => {
 
     expect(resolveFfmpegPosterRuntime()).toEqual({
       status: 'ready',
-      path: `/app/resources/video-engine/ffmpeg/${platformDir()}/${executable}`,
+      path: join('/app', 'resources', 'video-engine', 'ffmpeg', platformDir(), executable),
       source: 'bundled'
     })
   })

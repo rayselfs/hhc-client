@@ -56,6 +56,7 @@ vi.mock('electron', () => {
 })
 
 vi.mock('electron-vlc-player', () => ({
+  probeDefaultVlcDir: vi.fn(() => '/vlc'),
   getBinding: vi.fn(() => ({
     setPlayerWindowVisible: mockSetPlayerWindowVisible
   })),
@@ -125,6 +126,25 @@ beforeEach(() => {
 })
 
 describe('projection-vlc listener cleanup', () => {
+  it('reports a missing native binding without failing handler registration', async () => {
+    ;(ipcMain as ExtendedIpcMain)._clearHandlers()
+    const loadRuntime = vi.fn(async () => ({
+      status: 'error' as const,
+      message: 'VLC native binding unavailable: missing binding'
+    }))
+
+    registerProjectionVlcHandlers(mockWindowManager as unknown as WindowManager, loadRuntime)
+
+    await expect(
+      Promise.resolve(getHandler('projection-vlc:get-info')(makeEvent()))
+    ).resolves.toEqual({
+      status: 'error',
+      message: 'VLC native binding unavailable: missing binding'
+    })
+    expect(loadRuntime).toHaveBeenCalledTimes(1)
+    expect(mockVlcPlayers).toHaveLength(0)
+  })
+
   it('removes window listeners added by embedded VlcPlayer instances', async () => {
     const start = getHandler('projection-vlc:start')
     const stop = getHandler('projection-vlc:stop')
@@ -175,7 +195,7 @@ describe('projection-vlc listener cleanup', () => {
       container: '#vlc-player'
     })
 
-    await Promise.resolve()
+    await vi.waitFor(() => expect(mockVlcPlayers).toHaveLength(1))
     await stop(makeEvent())
     resolveEmbed?.()
     await startPromise

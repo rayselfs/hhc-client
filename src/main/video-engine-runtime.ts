@@ -1,7 +1,6 @@
 import { app } from 'electron'
 import { accessSync, constants } from 'fs'
 import { join } from 'path'
-import { probeDefaultVlcDir } from 'electron-vlc-player'
 
 export type VideoEngineRuntimeStatus = 'ready' | 'missing' | 'error'
 
@@ -43,12 +42,14 @@ function bundledPath(...parts: string[]): string {
   return join(resourcesRoot(), 'video-engine', ...parts)
 }
 
-export function resolveVlcRuntime(): VideoEngineRuntimeInfo {
+export function resolveVlcRuntime(
+  probeDefaultVlcDir?: () => string | null
+): VideoEngineRuntimeInfo {
   const bundled = bundledPath('vlc', platformDir())
   if (canUseBundledVlc(bundled)) return { status: 'ready', path: bundled, source: 'bundled' }
   if (app.isPackaged) return { status: 'missing', message: 'Bundled VLC runtime not found' }
 
-  const system = probeDefaultVlcDir()
+  const system = probeDefaultVlcDir?.() ?? null
   if (system) return { status: 'ready', path: system, source: 'system' }
 
   return { status: 'missing', message: 'VLC runtime not found' }
