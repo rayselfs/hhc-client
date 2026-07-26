@@ -5,6 +5,7 @@ import { Timer, BookOpen, ChevronDown, ChevronRight, Film, Star, Trash2, Files }
 import { Dropdown } from '@heroui/react/dropdown'
 import UserMenu from '@renderer/components/Control/UserMenu/UserMenu'
 import PreferencesDialog from '@renderer/components/Control/UserMenu/PreferencesDialog'
+import { usePresentationSafeAction } from '@renderer/components/Control/PresentationNavigationGuard'
 
 interface NavItem {
   to: string
@@ -40,6 +41,7 @@ export default function Sidebar(): React.JSX.Element {
   const { t } = useTranslation()
   const location = useLocation()
   const navigate = useNavigate()
+  const runPresentationSafeAction = usePresentationSafeAction()
   const isCollapsed = useIsCollapsed()
   const [prefsOpen, setPrefsOpen] = useState(false)
   const [mediaOpen, setMediaOpen] = useState(true)
@@ -53,6 +55,15 @@ export default function Sidebar(): React.JSX.Element {
 
   const activeSubItem = MEDIA_SUB_ITEMS.find((item) => location.pathname === item.to)
   const MediaGroupIcon = activeSubItem ? activeSubItem.icon : Film
+  const navigateSafely = (path: string): void => {
+    void runPresentationSafeAction(() => navigate(path))
+  }
+  const handleLinkClick = (event: React.MouseEvent, path: string): void => {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+      return
+    event.preventDefault()
+    navigateSafely(path)
+  }
 
   return (
     <nav className="shrink-0 flex flex-col rounded-tr-3xl rounded-br-3xl bg-surface text-foreground py-2 px-2 w-[180px] max-lg:w-[54px]">
@@ -65,6 +76,7 @@ export default function Sidebar(): React.JSX.Element {
               <Link
                 to={item.to}
                 draggable={false}
+                onClick={(event) => handleLinkClick(event, item.to)}
                 className={`flex cursor-default items-center gap-3 rounded-full px-3 py-2 max-lg:justify-center max-lg:px-2 ${active ? 'bg-accent text-accent-foreground' : 'text-muted hover:opacity-70'}`}
               >
                 <Icon className="size-5 shrink-0" />
@@ -85,7 +97,7 @@ export default function Sidebar(): React.JSX.Element {
                 </div>
               </Dropdown.Trigger>
               <Dropdown.Popover>
-                <Dropdown.Menu onAction={(key) => navigate(String(key))}>
+                <Dropdown.Menu onAction={(key) => navigateSafely(String(key))}>
                   {MEDIA_SUB_ITEMS.map(({ to, icon: Icon, labelKey, disabled }) => (
                     <Dropdown.Item
                       key={to}
@@ -136,6 +148,7 @@ export default function Sidebar(): React.JSX.Element {
                         <Link
                           to={to}
                           draggable={false}
+                          onClick={(event) => handleLinkClick(event, to)}
                           className={`flex cursor-default items-center gap-3 rounded-full py-1.5 pl-7 pr-3 text-sm ${isActive(to) ? 'bg-accent text-accent-foreground' : 'text-muted hover:opacity-70'}`}
                         >
                           <Icon className="size-4 shrink-0" />

@@ -3,6 +3,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { I18nextProvider } from 'react-i18next'
 import i18n from '@renderer/i18n'
 import { ConfirmDialogProvider } from '@renderer/contexts/ConfirmDialogContext'
+import { PresentationCloseDecisionProvider } from '@renderer/contexts/PresentationCloseDecisionContext'
+import { PresentationSessionRegistryProvider } from '@renderer/contexts/PresentationSessionRegistryContext'
 import ConfirmDialog from '../../../Common/ConfirmDialog'
 import UserMenu from '../UserMenu'
 import { ShortcutScopeProvider } from '@renderer/contexts/ShortcutScopeContext'
@@ -16,8 +18,12 @@ function renderUserMenu(props: { onOpenPreferences?: () => void } = {}): ReturnT
     <ShortcutScopeProvider>
       <I18nextProvider i18n={i18n}>
         <ConfirmDialogProvider>
-          <UserMenu {...props} />
-          <ConfirmDialog />
+          <PresentationSessionRegistryProvider>
+            <PresentationCloseDecisionProvider>
+              <UserMenu {...props} />
+              <ConfirmDialog />
+            </PresentationCloseDecisionProvider>
+          </PresentationSessionRegistryProvider>
         </ConfirmDialogProvider>
       </I18nextProvider>
     </ShortcutScopeProvider>

@@ -5,6 +5,7 @@ import { toast } from '@heroui/react/toast'
 import { Home, Monitor, Redo2, Undo2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
+import { usePresentationSafeAction } from '@renderer/components/Control/PresentationNavigationGuard'
 import { usePresentationCloseDecision } from '@renderer/contexts/PresentationCloseDecisionContext'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
 import { usePresentationSessionRegistry } from '@renderer/contexts/PresentationSessionRegistryContext'
@@ -31,6 +32,7 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
   const { isProjectionOpen, stopProjection } = useProjection()
   const registry = usePresentationSessionRegistry()
   const requestCloseDecision = usePresentationCloseDecision()
+  const runPresentationSafeAction = usePresentationSafeAction()
   const documents = usePresentationWorkspaceStore((state) => state.documents)
   const activeItemId = usePresentationWorkspaceStore((state) => state.activeItemId)
   const activeDocument = usePresentationWorkspaceStore((state) => state.getActiveDocument())
@@ -191,7 +193,7 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
         isIconOnly
         variant="ghost"
         className="relative z-10 mb-1"
-        onPress={() => navigate('/files')}
+        onPress={() => void runPresentationSafeAction(() => navigate('/files'))}
         aria-label={t('presentationWorkspace.backToFiles')}
       >
         <Home size={18} />

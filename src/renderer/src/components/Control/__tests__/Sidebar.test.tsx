@@ -6,6 +6,8 @@ import i18n from '@renderer/i18n'
 import Sidebar from '../Sidebar'
 import { ThemeProvider } from '@renderer/contexts/ThemeContext'
 import { ConfirmDialogProvider } from '@renderer/contexts/ConfirmDialogContext'
+import { PresentationCloseDecisionProvider } from '@renderer/contexts/PresentationCloseDecisionContext'
+import { PresentationSessionRegistryProvider } from '@renderer/contexts/PresentationSessionRegistryContext'
 import { ShortcutScopeProvider } from '@renderer/contexts/ShortcutScopeContext'
 
 function renderWithRouter(initialEntries: string[] = ['/']): ReturnType<typeof render> {
@@ -28,7 +30,11 @@ function renderWithRouter(initialEntries: string[] = ['/']): ReturnType<typeof r
     <ShortcutScopeProvider>
       <ThemeProvider>
         <ConfirmDialogProvider>
-          <RouterProvider router={router} />
+          <PresentationSessionRegistryProvider>
+            <PresentationCloseDecisionProvider>
+              <RouterProvider router={router} />
+            </PresentationCloseDecisionProvider>
+          </PresentationSessionRegistryProvider>
         </ConfirmDialogProvider>
       </ThemeProvider>
     </ShortcutScopeProvider>

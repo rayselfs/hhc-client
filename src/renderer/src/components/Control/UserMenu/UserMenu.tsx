@@ -7,6 +7,7 @@ import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
 import KeyboardShortcutsDialog from '@renderer/components/Control/UserMenu/KeyboardShortcutsDialog'
 import AboutDialog from '@renderer/components/Control/UserMenu/AboutDialog'
 import RecoveryIndicator from '@renderer/components/Control/RecoveryCenter/RecoveryIndicator'
+import { usePresentationSafeAction } from '@renderer/components/Control/PresentationNavigationGuard'
 import { isElectron } from '@renderer/lib/env'
 import { useUpdateStore } from '@renderer/stores/update'
 import {
@@ -32,6 +33,7 @@ export default function UserMenu({ onOpenPreferences }: UserMenuProps): React.JS
   const [isShortcutsOpen, setShortcutsOpen] = useState(false)
   const [isAboutOpen, setAboutOpen] = useState(false)
   const confirm = useConfirm()
+  const runPresentationSafeAction = usePresentationSafeAction()
   const status = useUpdateStore(selectUpdateStatus)
   const isUpdateAvailable = useUpdateStore(selectIsUpdateAvailable)
   const availableVersion = useUpdateStore(selectAvailableVersion)
@@ -45,7 +47,7 @@ export default function UserMenu({ onOpenPreferences }: UserMenuProps): React.JS
       cancelLabel: t('common.cancel')
     })
     if (!confirmed) return
-    window.close()
+    await runPresentationSafeAction(() => window.close())
   }
 
   return (

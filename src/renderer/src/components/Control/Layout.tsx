@@ -5,6 +5,7 @@ import Sidebar from '@renderer/components/Control/Sidebar'
 import Header from '@renderer/components/Control/Header/Header'
 import PresentationCloseDecisionDialog from '@renderer/components/Control/Header/PresentationCloseDecisionDialog'
 import PresentationWorkspaceHeader from '@renderer/components/Control/Header/PresentationWorkspaceHeader'
+import PresentationNavigationGuard from '@renderer/components/Control/PresentationNavigationGuard'
 import FloatingTimer from '@renderer/components/Control/Timer/FloatingTimer'
 import ConfirmDialog from '@renderer/components/Common/ConfirmDialog'
 import TimerProjectionBridge from '@renderer/components/Control/Bridge/TimerProjectionBridge'
@@ -88,6 +89,7 @@ export default function Layout(): React.JSX.Element {
                     </div>
                     <ConfirmDialog />
                     <PresentationCloseDecisionDialog />
+                    <PresentationNavigationGuard />
                     <TimerProjectionBridge />
                     <LanRemoteBridge />
                   </PresentationCloseDecisionProvider>
