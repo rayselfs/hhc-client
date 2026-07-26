@@ -29,8 +29,12 @@ vi.mock('@renderer/lib/media-work-db', () => ({
 }))
 
 import { cleanupFileResources, purgeExpiredFileTrash } from '../file-resource-cleanup'
-import { openFileExplorerDB } from '../file-explorer-db'
+import { openFileExplorerDB, resetFileExplorerDBForTests } from '../file-explorer-db'
 import { lockMediaResources, resetMediaResourceLocksForTests } from '../media-resource-locks'
+import {
+  listResourceCleanupRecords,
+  retryPendingResourceCleanups
+} from '../resource-cleanup-journal'
 
 const originalBlobId = '123e4567-e89b-12d3-a456-426614174000'
 const nativeBlobId = '223e4567-e89b-12d3-a456-426614174000'
@@ -46,7 +50,8 @@ beforeAll(() => {
   })
 })
 
-beforeEach(() => {
+beforeEach(async () => {
+  await resetFileExplorerDBForTests()
   vi.clearAllMocks()
   resetMediaResourceLocksForTests()
   envState.isElectron = false
@@ -128,6 +133,7 @@ describe('file resource cleanup', () => {
     await expect(db.get('file-blobs', originalBlobId)).resolves.toMatchObject({ refCount: 1 })
     expect(mockDeleteDerivedAssets).not.toHaveBeenCalled()
     expect(mockDeletePdfPageThumbs).not.toHaveBeenCalled()
+    expect(mockDeleteThumbnail).toHaveBeenCalledWith('original-item')
 
     await cleanupFileResources({ itemIds: ['copy-item'] })
     await expect(db.get('file-blobs', originalBlobId)).resolves.toBeUndefined()
@@ -216,5 +222,82 @@ describe('file resource cleanup', () => {
     expect(mockDeleteNativeFile).not.toHaveBeenCalledWith('legacy-blob-id')
     await expect(db.get('folder-items', 'expired-native')).resolves.toBeUndefined()
     await expect(db.get('file-blobs', nativeBlobId)).resolves.toBeUndefined()
+  })
+
+  it('retains failed native cleanup after the catalog transaction commits', async () => {
+    envState.isElectron = true
+    mockDeleteNativeFile.mockRejectedValueOnce(new Error('native file busy'))
+    const db = await openFileExplorerDB()
+    await db.put('folder-items', {
+      id: 'native-item',
+      parentId: 'file-root',
+      type: 'file',
+      sortIndex: 0,
+      createdAt: 1,
+      expiresAt: null,
+      name: 'native.mp4',
+      url: `blob:${nativeBlobId}`,
+      size: 1,
+      mimeType: 'video/mp4'
+    })
+    await db.put('file-blobs', {
+      id: nativeBlobId,
+      storage: 'native-fs',
+      size: 1,
+      refCount: 1
+    })
+
+    await expect(cleanupFileResources({ itemIds: ['native-item'] })).rejects.toThrow(
+      'native file busy'
+    )
+
+    await expect(db.get('folder-items', 'native-item')).resolves.toBeUndefined()
+    await expect(db.get('file-blobs', nativeBlobId)).resolves.toBeUndefined()
+    await expect(listResourceCleanupRecords()).resolves.toEqual([
+      expect.objectContaining({
+        blobId: nativeBlobId,
+        status: 'failed',
+        attempt: 1,
+        itemThumbnailIds: ['native-item']
+      })
+    ])
+
+    await retryPendingResourceCleanups()
+    await expect(listResourceCleanupRecords()).resolves.toEqual([])
+  })
+
+  it('journals source cleanup only after a projection lock is released', async () => {
+    const release = lockMediaResources([originalBlobId])
+    const db = await openFileExplorerDB()
+    await db.put('folder-items', {
+      id: 'locked-item',
+      parentId: 'file-root',
+      type: 'file',
+      sortIndex: 0,
+      createdAt: 1,
+      expiresAt: null,
+      name: 'locked.png',
+      url: `blob:${originalBlobId}`,
+      size: 1,
+      mimeType: 'image/png'
+    })
+    await db.put('file-blobs', {
+      id: originalBlobId,
+      blob: new Blob(['image']),
+      refCount: 1
+    })
+
+    await cleanupFileResources({ itemIds: ['locked-item'] })
+
+    await expect(db.get('file-blobs', originalBlobId)).resolves.toMatchObject({ refCount: 0 })
+    expect(mockDeleteThumbnail).toHaveBeenCalledWith('locked-item')
+    expect(mockDeleteDerivedAssets).not.toHaveBeenCalled()
+
+    release()
+    await vi.waitFor(() => {
+      expect(mockDeleteDerivedAssets).toHaveBeenCalledWith(originalBlobId)
+    })
+    await expect(db.get('file-blobs', originalBlobId)).resolves.toBeUndefined()
+    await expect(listResourceCleanupRecords()).resolves.toEqual([])
   })
 })

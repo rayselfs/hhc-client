@@ -1,10 +1,8 @@
 import type { AnyItemRecord, FileItemRecord, FolderRecord } from '@shared/types/folder'
 import { getBlobId } from './blob-identity'
-import { isElectron } from './env'
-import { openFileExplorerDB } from './file-explorer-db'
-import { deleteDerivedAssetsForSource } from './media-work-db'
+import { openFileExplorerDB, type ResourceCleanupJournalRecord } from './file-explorer-db'
 import { deferMediaResourceCleanup, isMediaResourceLocked } from './media-resource-locks'
-import { deletePdfPageThumbs, deleteThumbnail } from './thumbnail-db'
+import { createResourceCleanupRecord, retryResourceCleanup } from './resource-cleanup-journal'
 
 export interface CleanupResult {
   folderIds: string[]
@@ -42,36 +40,49 @@ function collectDescendantFolderIds(rootIds: string[], folders: FolderRecord[]):
   return result
 }
 
-async function deleteExternalBlobResources(
+function makeCleanupRecord(
   blobId: string,
-  storage: 'indexed-db' | 'native-fs' | undefined
-): Promise<void> {
-  if (storage === 'native-fs' && isElectron()) {
-    await window.api.nativeFs.delete(blobId).catch(() => undefined)
-  }
-  await deleteDerivedAssetsForSource(blobId)
-  await deletePdfPageThumbs(blobId)
+  storage: 'indexed-db' | 'native-fs' | undefined,
+  itemThumbnailIds: string[],
+  deleteSourceResources: boolean
+): ResourceCleanupJournalRecord {
+  return createResourceCleanupRecord({
+    blobId,
+    storage,
+    deleteNativeFile: deleteSourceResources && storage === 'native-fs',
+    deleteDerivedAssets: deleteSourceResources,
+    deletePdfPageThumbs: deleteSourceResources,
+    itemThumbnailIds
+  })
 }
 
 async function finalizeDeferredBlobCleanup(blobId: string): Promise<void> {
   const db = await openFileExplorerDB()
-  const tx = db.transaction('file-blobs', 'readwrite')
-  const record = await tx.store.get(blobId)
+  const tx = db.transaction(['file-blobs', 'resource-cleanup-journal'], 'readwrite')
+  const blobStore = tx.objectStore('file-blobs')
+  const journalStore = tx.objectStore('resource-cleanup-journal')
+  const record = await blobStore.get(blobId)
   if (!record || (record.refCount ?? 0) > 0) {
     await tx.done
     return
   }
-  await tx.store.delete(blobId)
+  const cleanupRecord = makeCleanupRecord(blobId, record.storage, [], true)
+  await blobStore.delete(blobId)
+  await journalStore.put(cleanupRecord)
   await tx.done
-  await deleteExternalBlobResources(blobId, record.storage)
+  await retryResourceCleanup(cleanupRecord.id)
 }
 
 export async function cleanupFileResources(request: CleanupRequest): Promise<CleanupResult> {
   const db = await openFileExplorerDB()
-  const tx = db.transaction(['folder-records', 'folder-items', 'file-blobs'], 'readwrite')
+  const tx = db.transaction(
+    ['folder-records', 'folder-items', 'file-blobs', 'resource-cleanup-journal'],
+    'readwrite'
+  )
   const folderStore = tx.objectStore('folder-records')
   const itemStore = tx.objectStore('folder-items')
   const blobStore = tx.objectStore('file-blobs')
+  const journalStore = tx.objectStore('resource-cleanup-journal')
   const [folders, items] = await Promise.all([folderStore.getAll(), itemStore.getAll()])
 
   const folderIds = collectDescendantFolderIds(request.folderIds ?? [], folders)
@@ -81,36 +92,50 @@ export async function cleanupFileResources(request: CleanupRequest): Promise<Cle
   )
 
   const blobReferenceRemovals = new Map<string, number>()
+  const thumbnailIdsByBlob = new Map<string, string[]>()
+  const nonFileThumbnailIds: string[] = []
   for (const item of targetItems) {
-    if (!isFileItem(item)) continue
+    if (!isFileItem(item)) {
+      nonFileThumbnailIds.push(item.id)
+      continue
+    }
     const blobId = getBlobId(item)
     blobReferenceRemovals.set(blobId, (blobReferenceRemovals.get(blobId) ?? 0) + 1)
+    thumbnailIdsByBlob.set(blobId, [...(thumbnailIdsByBlob.get(blobId) ?? []), item.id])
   }
 
-  const deletedBlobIds: string[] = []
-  const deletedBlobStorage = new Map<string, 'indexed-db' | 'native-fs' | undefined>()
   const deferredBlobIds: string[] = []
+  const cleanupRecords: ResourceCleanupJournalRecord[] = []
   for (const [blobId, removedReferences] of blobReferenceRemovals) {
     const record = await blobStore.get(blobId)
-    if (!record) continue
+    const itemThumbnailIds = thumbnailIdsByBlob.get(blobId) ?? []
+    if (!record) {
+      cleanupRecords.push(makeCleanupRecord(blobId, undefined, itemThumbnailIds, true))
+      continue
+    }
     const remainingReferences = (record.refCount ?? 1) - removedReferences
     if (remainingReferences <= 0) {
       if (isMediaResourceLocked(blobId)) {
         await blobStore.put({ ...record, refCount: 0 })
         deferredBlobIds.push(blobId)
+        cleanupRecords.push(makeCleanupRecord(blobId, record.storage, itemThumbnailIds, false))
       } else {
         await blobStore.delete(blobId)
-        deletedBlobIds.push(blobId)
-        deletedBlobStorage.set(blobId, record.storage)
+        cleanupRecords.push(makeCleanupRecord(blobId, record.storage, itemThumbnailIds, true))
       }
     } else {
       await blobStore.put({ ...record, refCount: remainingReferences })
+      cleanupRecords.push(makeCleanupRecord(blobId, record.storage, itemThumbnailIds, false))
     }
   }
+  cleanupRecords.push(
+    ...nonFileThumbnailIds.map((itemId) => makeCleanupRecord(itemId, undefined, [itemId], false))
+  )
 
   await Promise.all([
     ...targetItems.map((item) => itemStore.delete(item.id)),
-    ...[...folderIds].map((folderId) => folderStore.delete(folderId))
+    ...[...folderIds].map((folderId) => folderStore.delete(folderId)),
+    ...cleanupRecords.map((record) => journalStore.put(record))
   ])
   await tx.done
 
@@ -118,12 +143,7 @@ export async function cleanupFileResources(request: CleanupRequest): Promise<Cle
     const deferred = deferMediaResourceCleanup(blobId, () => finalizeDeferredBlobCleanup(blobId))
     if (!deferred) await finalizeDeferredBlobCleanup(blobId)
   }
-  await Promise.all([
-    ...targetItems.map((item) => deleteThumbnail(item.id)),
-    ...deletedBlobIds.map((blobId) =>
-      deleteExternalBlobResources(blobId, deletedBlobStorage.get(blobId))
-    )
-  ])
+  await Promise.all(cleanupRecords.map((record) => retryResourceCleanup(record.id)))
 
   return {
     folderIds: [...folderIds],
