@@ -4,15 +4,11 @@ import { optimizer, is } from '@electron-toolkit/utils'
 import type { IpcMainToRendererChannel, IpcMainToRendererMap } from '@shared/ipc-channels'
 import type {
   ProjectionLifecycleEvent,
-  ProjectionLifecycleReason
+  ProjectionLifecycleReason,
+  ProjectionWindowState
 } from '@shared/projection-messages'
 
 let _cachedDisplay: Electron.Display | null | undefined = undefined
-
-export interface ProjectionWindowState {
-  exists: boolean
-  lifecycle: ProjectionLifecycleEvent
-}
 
 export class WindowManager {
   private static instance: WindowManager

@@ -1,4 +1,9 @@
-import type { ProjectionChannel, ProjectionPayload } from '../shared/projection-messages'
+import type {
+  ProjectionChannel,
+  ProjectionLifecycleEvent,
+  ProjectionPayload,
+  ProjectionWindowState
+} from '../shared/projection-messages'
 import type {
   DisplayInfo,
   UpdateStatus,
@@ -45,17 +50,32 @@ interface ThemeAPI {
 }
 
 interface ProjectionAPI {
-  check: () => Promise<{ exists: boolean }>
-  ensure: (displayId?: string) => Promise<{ created: boolean }>
-  moveToDisplay: (displayId: string) => Promise<{ moved: boolean }>
+  check: () => Promise<ProjectionWindowState>
+  ensure: (displayId?: string) => Promise<{ created: boolean; generation: number }>
+  moveToDisplay: (displayId: string) => Promise<{ moved: boolean; generation: number }>
+  retry: () => Promise<{ retried: boolean; generation: number }>
+  getGeneration: () => Promise<{ generation: number }>
   bringToFront: () => Promise<{ broughtToFront: boolean }>
   close: () => Promise<{ closed: boolean }>
-  send: <C extends ProjectionChannel>(channel: C, data: ProjectionPayload<C>) => void
-  sendToMain: <C extends ProjectionChannel>(channel: C, data: ProjectionPayload<C>) => void
+  send: <C extends ProjectionChannel>(
+    generation: number,
+    channel: C,
+    data: ProjectionPayload<C>
+  ) => void
+  sendToMain: <C extends ProjectionChannel>(
+    generation: number,
+    channel: C,
+    data: ProjectionPayload<C>
+  ) => void
   getDisplays: () => Promise<DisplayInfo[]>
   onProjectionMessage: (
-    callback: (channel: ProjectionChannel, data: ProjectionPayload<ProjectionChannel>) => void
+    callback: (
+      generation: number,
+      channel: ProjectionChannel,
+      data: ProjectionPayload<ProjectionChannel>
+    ) => void
   ) => () => void
+  onProjectionLifecycle: (callback: (event: ProjectionLifecycleEvent) => void) => () => void
   onProjectionOpened: (callback: () => void) => () => void
   onProjectionClosed: (callback: () => void) => () => void
 }

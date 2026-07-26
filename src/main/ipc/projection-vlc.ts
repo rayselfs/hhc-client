@@ -144,13 +144,15 @@ async function probeVlcMedia(
 
 function sendState(wm: WindowManager, next?: { isPlaying?: boolean; isEnded?: boolean }): void {
   if (!player || !currentItemId) return
+  const generation = wm.getProjectionState().lifecycle.generation
+  if (!Number.isSafeInteger(generation) || generation <= 0) return
   const currentTime = Math.max(0, player.getTime()) / 1000
   const duration =
     currentDurationMs !== undefined && currentDurationMs > 0
       ? currentDurationMs / 1000
       : Math.max(0, player.getLength()) / 1000
 
-  wm.sendToMain('projection:message', 'file:playback-state', {
+  wm.sendToMain('projection:message', generation, 'file:playback-state', {
     itemId: currentItemId,
     currentTime,
     duration,

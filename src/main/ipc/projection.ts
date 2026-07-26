@@ -1,25 +1,46 @@
-import { ipcMain } from 'electron'
+import { BrowserWindow, ipcMain } from 'electron'
 import { WindowManager } from '../windowManager'
-import { isKnownWindow, isMainWindow, validateProjectionMessageTuple } from './validate'
+import { isKnownWindow, isMainWindow, validateProjectionTransportTuple } from './validate'
+
+const CLOSED_PROJECTION_STATE = {
+  exists: false,
+  lifecycle: {
+    generation: 0,
+    status: 'closed' as const,
+    reason: 'user-close' as const
+  }
+}
 
 export function registerProjectionHandlers(windowManager: WindowManager): void {
   ipcMain.handle('projection:check', (event) => {
-    if (!isKnownWindow(windowManager, event)) return { exists: false }
-    return { exists: windowManager.isProjectionOpen() }
+    if (!isKnownWindow(windowManager, event)) return CLOSED_PROJECTION_STATE
+    return windowManager.getProjectionState()
   })
 
   ipcMain.handle('projection:ensure', (event, displayId?: string) => {
-    if (!isMainWindow(windowManager, event)) return { created: false }
-    const wasOpen = windowManager.isProjectionOpen()
-    if (!wasOpen) {
-      windowManager.createProjectionWindow(displayId)
+    if (!isMainWindow(windowManager, event)) return { created: false, generation: 0 }
+    const state = windowManager.getProjectionState()
+    if (state.exists) {
+      return { created: false, generation: state.lifecycle.generation }
     }
-    return { created: !wasOpen }
+    const generation = windowManager.createProjectionWindow(displayId)
+    return { created: true, generation }
   })
 
   ipcMain.handle('projection:move-to-display', (event, displayId: string) => {
-    if (!isMainWindow(windowManager, event)) return { moved: false }
-    return { moved: windowManager.moveProjectionWindow(displayId) }
+    if (!isMainWindow(windowManager, event)) return { moved: false, generation: 0 }
+    return windowManager.moveProjectionWindow(displayId)
+  })
+
+  ipcMain.handle('projection:retry', (event) => {
+    if (!isMainWindow(windowManager, event)) return { retried: false, generation: 0 }
+    return windowManager.retryProjectionWindow()
+  })
+
+  ipcMain.handle('projection:get-generation', (event) => {
+    const senderWindow = BrowserWindow.fromWebContents(event.sender)
+    if (senderWindow !== windowManager.getProjectionWindow()) return { generation: 0 }
+    return { generation: windowManager.getProjectionState().lifecycle.generation }
   })
 
   ipcMain.handle('projection:bring-to-front', (event) => {
@@ -35,13 +56,17 @@ export function registerProjectionHandlers(windowManager: WindowManager): void {
 
   ipcMain.on('projection:send', (event, ...args: unknown[]) => {
     if (!isMainWindow(windowManager, event)) return
-    if (!validateProjectionMessageTuple(args)) return
+    if (!validateProjectionTransportTuple(args)) return
+    const [generation] = args
+    if (windowManager.getProjectionState().lifecycle.generation !== generation) return
     windowManager.sendToProjection('projection:message', ...args)
   })
 
   ipcMain.on('projection:send-to-main', (event, ...args: unknown[]) => {
-    if (!isKnownWindow(windowManager, event)) return
-    if (!validateProjectionMessageTuple(args)) return
+    if (!validateProjectionTransportTuple(args)) return
+    const [generation, channel] = args
+    if (!windowManager.isCurrentProjectionSender(event.sender, generation)) return
+    if (channel === '__system:ready' && !windowManager.markProjectionReady(generation)) return
     windowManager.sendToMain('projection:message', ...args)
   })
 

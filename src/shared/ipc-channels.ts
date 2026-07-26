@@ -6,7 +6,11 @@
  * names and payload shapes at compile time.
  */
 
-import type { ProjectionLifecycleEvent, ProjectionMessageTuple } from './projection-messages'
+import type {
+  ProjectionLifecycleEvent,
+  ProjectionTransportTuple,
+  ProjectionWindowState
+} from './projection-messages'
 import type { LanRemoteAck, LanRemoteCommand, LanRemoteSnapshot } from './lan-remote'
 import type {
   TimerCommand,
@@ -200,9 +204,20 @@ export type UpdateStatus =
   | 'error'
 
 export interface IpcInvokeMap {
-  'projection:check': { args: []; result: { exists: boolean } }
-  'projection:ensure': { args: [string?]; result: { created: boolean } }
-  'projection:move-to-display': { args: [string]; result: { moved: boolean } }
+  'projection:check': { args: []; result: ProjectionWindowState }
+  'projection:ensure': {
+    args: [string?]
+    result: { created: boolean; generation: number }
+  }
+  'projection:move-to-display': {
+    args: [string]
+    result: { moved: boolean; generation: number }
+  }
+  'projection:retry': {
+    args: []
+    result: { retried: boolean; generation: number }
+  }
+  'projection:get-generation': { args: []; result: { generation: number } }
   'projection:bring-to-front': { args: []; result: { broughtToFront: boolean } }
   'projection:close': { args: []; result: { closed: boolean } }
   'projection:get-displays': { args: []; result: DisplayInfo[] }
@@ -274,8 +289,8 @@ export type IpcInvokeChannel = keyof IpcInvokeMap
 // ---------------------------------------------------------------------------
 
 export interface IpcSendMap {
-  'projection:send': ProjectionMessageTuple
-  'projection:send-to-main': ProjectionMessageTuple
+  'projection:send': ProjectionTransportTuple
+  'projection:send-to-main': ProjectionTransportTuple
 }
 
 export type IpcSendChannel = keyof IpcSendMap
@@ -285,7 +300,7 @@ export type IpcSendChannel = keyof IpcSendMap
 // ---------------------------------------------------------------------------
 
 export interface IpcMainToRendererMap {
-  'projection:message': ProjectionMessageTuple
+  'projection:message': ProjectionTransportTuple
   'projection:lifecycle': [event: ProjectionLifecycleEvent]
   'projection:opened': []
   'projection:closed': []

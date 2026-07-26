@@ -201,6 +201,11 @@ export interface ProjectionLifecycleEvent {
   reason: ProjectionLifecycleReason
 }
 
+export interface ProjectionWindowState {
+  exists: boolean
+  lifecycle: ProjectionLifecycleEvent
+}
+
 export interface ProjectionFailure {
   generation: number
   reason: 'renderer-crash' | 'popup-blocked' | 'ready-timeout'

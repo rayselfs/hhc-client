@@ -8,7 +8,12 @@ vi.mock('@renderer/lib/env', () => ({
 const mockAdapter: ProjectionAdapter & { _trigger: (channel: string, data: unknown) => void } =
   (() => {
     const handlers = new Map<string, Set<(data: unknown) => void>>()
+    let generation = 0
     return {
+      setGeneration: vi.fn((nextGeneration: number) => {
+        generation = nextGeneration
+      }),
+      getGeneration: vi.fn(() => generation),
       send: vi.fn(),
       on: vi.fn((channel: string, handler: (data: unknown) => void) => {
         if (!handlers.has(channel)) handlers.set(channel, new Set())

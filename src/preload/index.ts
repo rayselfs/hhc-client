@@ -9,7 +9,11 @@ import type {
   WhisperDownloadProgress,
   WhisperDirInfo
 } from '../shared/ipc-channels'
-import type { ProjectionChannel, ProjectionPayload } from '../shared/projection-messages'
+import type {
+  ProjectionChannel,
+  ProjectionLifecycleEvent,
+  ProjectionPayload
+} from '../shared/projection-messages'
 import type { TimerTickPayload } from '../shared/types/timer'
 
 function typedInvoke<C extends IpcInvokeChannel>(
@@ -41,16 +45,27 @@ const projectionApi = {
   check: () => typedInvoke('projection:check'),
   ensure: (displayId?: string) => typedInvoke('projection:ensure', displayId),
   moveToDisplay: (displayId: string) => typedInvoke('projection:move-to-display', displayId),
+  retry: () => typedInvoke('projection:retry'),
+  getGeneration: () => typedInvoke('projection:get-generation'),
   bringToFront: () => typedInvoke('projection:bring-to-front'),
   close: () => typedInvoke('projection:close'),
-  send: <C extends ProjectionChannel>(channel: C, data: ProjectionPayload<C>) =>
-    ipcRenderer.send('projection:send', channel, data),
-  sendToMain: <C extends ProjectionChannel>(channel: C, data: ProjectionPayload<C>) =>
-    ipcRenderer.send('projection:send-to-main', channel, data),
+  send: <C extends ProjectionChannel>(generation: number, channel: C, data: ProjectionPayload<C>) =>
+    ipcRenderer.send('projection:send', generation, channel, data),
+  sendToMain: <C extends ProjectionChannel>(
+    generation: number,
+    channel: C,
+    data: ProjectionPayload<C>
+  ) => ipcRenderer.send('projection:send-to-main', generation, channel, data),
   getDisplays: () => typedInvoke('projection:get-displays'),
   onProjectionMessage: (
-    callback: (channel: ProjectionChannel, data: ProjectionPayload<ProjectionChannel>) => void
+    callback: (
+      generation: number,
+      channel: ProjectionChannel,
+      data: ProjectionPayload<ProjectionChannel>
+    ) => void
   ) => typedOn('projection:message', callback),
+  onProjectionLifecycle: (callback: (event: ProjectionLifecycleEvent) => void) =>
+    typedOn('projection:lifecycle', callback),
   onProjectionOpened: (callback: () => void) => typedOn('projection:opened', callback),
   onProjectionClosed: (callback: () => void) => typedOn('projection:closed', callback)
 }

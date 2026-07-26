@@ -14,6 +14,10 @@ mockProjectionWindow.isDestroyed = () => false
 const mockWindowManager = {
   getMainWindow: vi.fn(() => mockMainWindow),
   getProjectionWindow: vi.fn(() => mockProjectionWindow),
+  getProjectionState: vi.fn(() => ({
+    exists: true,
+    lifecycle: { generation: 4, status: 'ready', reason: 'created' }
+  })),
   sendToMain: vi.fn()
 }
 const mockSetPlayerWindowVisible = vi.fn()
@@ -122,6 +126,10 @@ beforeEach(() => {
   mockProjectionWindow.webContents.removeAllListeners()
   mockVlcPlayers.length = 0
   mockEmbedImplementation = () => Promise.resolve()
+  mockWindowManager.getProjectionState.mockReturnValue({
+    exists: true,
+    lifecycle: { generation: 4, status: 'ready', reason: 'created' }
+  })
   registerProjectionVlcHandlers(mockWindowManager as unknown as WindowManager)
 })
 
@@ -225,5 +233,35 @@ describe('projection-vlc listener cleanup', () => {
     await stop(makeEvent())
     mockProjectionWindow.emit('resize')
     expect(mockVlcPlayers[0].notifyLayoutChange).toHaveBeenCalledTimes(2)
+  })
+
+  it('reports VLC playback state with the current projection generation', async () => {
+    await getHandler('projection-vlc:start')(makeEvent(), {
+      itemId: 'item-1',
+      sourceFileId: '550e8400-e29b-41d4-a716-446655440000',
+      container: '#vlc-player'
+    })
+
+    expect(mockWindowManager.sendToMain).toHaveBeenCalledWith(
+      'projection:message',
+      4,
+      'file:playback-state',
+      expect.objectContaining({ itemId: 'item-1' })
+    )
+  })
+
+  it('does not report VLC state without a positive projection generation', async () => {
+    mockWindowManager.getProjectionState.mockReturnValue({
+      exists: false,
+      lifecycle: { generation: 0, status: 'closed', reason: 'user-close' }
+    })
+
+    await getHandler('projection-vlc:start')(makeEvent(), {
+      itemId: 'item-1',
+      sourceFileId: '550e8400-e29b-41d4-a716-446655440000',
+      container: '#vlc-player'
+    })
+
+    expect(mockWindowManager.sendToMain).not.toHaveBeenCalled()
   })
 })

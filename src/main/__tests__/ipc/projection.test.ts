@@ -7,9 +7,15 @@ const mockUnknownWindow = { id: 3 }
 const mockWindowManager = {
   getMainWindow: vi.fn(() => mockMainWindow),
   getProjectionWindow: vi.fn(() => mockProjectionWindow),
-  isProjectionOpen: vi.fn(() => false),
-  createProjectionWindow: vi.fn(),
-  moveProjectionWindow: vi.fn(),
+  getProjectionState: vi.fn(() => ({
+    exists: false,
+    lifecycle: { generation: 0, status: 'closed', reason: 'user-close' }
+  })),
+  createProjectionWindow: vi.fn(() => 4),
+  moveProjectionWindow: vi.fn(() => ({ moved: true, generation: 5 })),
+  retryProjectionWindow: vi.fn(() => ({ retried: true, generation: 5 })),
+  markProjectionReady: vi.fn(() => true),
+  isCurrentProjectionSender: vi.fn(() => true),
   bringProjectionToFront: vi.fn(),
   closeProjection: vi.fn(),
   sendToProjection: vi.fn(),
@@ -76,78 +82,89 @@ function getOnHandler(channel: string): (...args: unknown[]) => void {
 beforeEach(async () => {
   vi.clearAllMocks()
   ;(ipcMain as ExtendedIpcMain)._clearHandlers()
+  mockWindowManager.getProjectionState.mockReturnValue({
+    exists: false,
+    lifecycle: { generation: 0, status: 'closed', reason: 'user-close' }
+  })
+  mockWindowManager.createProjectionWindow.mockReturnValue(4)
+  mockWindowManager.moveProjectionWindow.mockReturnValue({ moved: true, generation: 5 })
+  mockWindowManager.retryProjectionWindow.mockReturnValue({ retried: true, generation: 5 })
+  mockWindowManager.markProjectionReady.mockReturnValue(true)
+  mockWindowManager.isCurrentProjectionSender.mockReturnValue(true)
 
   const { registerProjectionHandlers } = await import('../../ipc/projection')
   registerProjectionHandlers(wm)
 })
 
 describe('projection:check', () => {
-  it('known window returns { exists: true } when projection is open', () => {
+  it('known window returns current projection lifecycle state', () => {
     vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockMainWindow as never)
-    mockWindowManager.isProjectionOpen.mockReturnValue(true)
+    mockWindowManager.getProjectionState.mockReturnValue({
+      exists: true,
+      lifecycle: { generation: 4, status: 'ready', reason: 'created' }
+    })
     const result = getHandler('projection:check')(makeEvent())
-    expect(result).toEqual({ exists: true })
+    expect(result).toEqual({
+      exists: true,
+      lifecycle: { generation: 4, status: 'ready', reason: 'created' }
+    })
   })
 
-  it('known window returns { exists: false } when projection is closed', () => {
-    vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockMainWindow as never)
-    mockWindowManager.isProjectionOpen.mockReturnValue(false)
-    const result = getHandler('projection:check')(makeEvent())
-    expect(result).toEqual({ exists: false })
-  })
-
-  it('unknown window returns { exists: false }', () => {
+  it('unknown window returns a closed zero-generation state', () => {
     vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockUnknownWindow as never)
     const result = getHandler('projection:check')(makeEvent())
-    expect(result).toEqual({ exists: false })
+    expect(result).toEqual({
+      exists: false,
+      lifecycle: { generation: 0, status: 'closed', reason: 'user-close' }
+    })
   })
 })
 
 describe('projection:ensure', () => {
-  it('main window creates projection and returns { created: true }', () => {
+  it('main window creates projection and returns its generation', () => {
     vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockMainWindow as never)
-    mockWindowManager.isProjectionOpen.mockReturnValue(false)
     const result = getHandler('projection:ensure')(makeEvent())
-    expect(result).toEqual({ created: true })
+    expect(result).toEqual({ created: true, generation: 4 })
     expect(mockWindowManager.createProjectionWindow).toHaveBeenCalledOnce()
   })
 
   it('passes selected display id when creating projection', () => {
     vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockMainWindow as never)
-    mockWindowManager.isProjectionOpen.mockReturnValue(false)
     const result = getHandler('projection:ensure')(makeEvent(), '2')
-    expect(result).toEqual({ created: true })
+    expect(result).toEqual({ created: true, generation: 4 })
     expect(mockWindowManager.createProjectionWindow).toHaveBeenCalledWith('2')
   })
 
-  it('main window returns { created: false } if already open', () => {
+  it('main window returns the existing generation if already open', () => {
     vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockMainWindow as never)
-    mockWindowManager.isProjectionOpen.mockReturnValue(true)
+    mockWindowManager.getProjectionState.mockReturnValue({
+      exists: true,
+      lifecycle: { generation: 3, status: 'opening', reason: 'reload' }
+    })
     const result = getHandler('projection:ensure')(makeEvent())
-    expect(result).toEqual({ created: false })
+    expect(result).toEqual({ created: false, generation: 3 })
     expect(mockWindowManager.createProjectionWindow).not.toHaveBeenCalled()
   })
 
-  it('non-main window returns { created: false }', () => {
+  it('non-main window returns a zero generation', () => {
     vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockProjectionWindow as never)
     const result = getHandler('projection:ensure')(makeEvent())
-    expect(result).toEqual({ created: false })
+    expect(result).toEqual({ created: false, generation: 0 })
   })
 })
 
 describe('projection:move-to-display', () => {
   it('main window moves an open projection to the selected display', () => {
     vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockMainWindow as never)
-    mockWindowManager.moveProjectionWindow.mockReturnValue(true)
     const result = getHandler('projection:move-to-display')(makeEvent(), '2')
-    expect(result).toEqual({ moved: true })
+    expect(result).toEqual({ moved: true, generation: 5 })
     expect(mockWindowManager.moveProjectionWindow).toHaveBeenCalledWith('2')
   })
 
   it('non-main window returns { moved: false }', () => {
     vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockProjectionWindow as never)
     const result = getHandler('projection:move-to-display')(makeEvent(), '2')
-    expect(result).toEqual({ moved: false })
+    expect(result).toEqual({ moved: false, generation: 0 })
     expect(mockWindowManager.moveProjectionWindow).not.toHaveBeenCalled()
   })
 })
@@ -193,53 +210,67 @@ describe('projection:close', () => {
 })
 
 describe('projection:send', () => {
-  it('main window forwards to sendToProjection', () => {
+  it('forwards a matching-generation control message', () => {
     vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockMainWindow as never)
+    mockWindowManager.getProjectionState.mockReturnValue({
+      exists: true,
+      lifecycle: { generation: 4, status: 'ready', reason: 'created' }
+    })
     const handler = getOnHandler('projection:send')
-    const payload = {
-      mode: 'timer',
-      remainingSeconds: 10,
-      phase: 'main',
-      mainDisplay: '00:10',
-      subDisplay: null,
-      progress: 0.5,
-      overtimeSeconds: 0,
-      overtimeMessage: null,
-      reminderColor: null
-    }
-    handler(makeEvent(), 'timer:tick', payload)
+    const payload = { message: 'safe' }
+    handler(makeEvent(), 4, 'timer:overtime-message', payload)
     expect(mockWindowManager.sendToProjection).toHaveBeenCalledWith(
       'projection:message',
-      'timer:tick',
+      4,
+      'timer:overtime-message',
       payload
     )
+  })
+
+  it('rejects a stale generation', () => {
+    vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockMainWindow as never)
+    mockWindowManager.getProjectionState.mockReturnValue({
+      exists: true,
+      lifecycle: { generation: 4, status: 'ready', reason: 'created' }
+    })
+    getOnHandler('projection:send')(makeEvent(), 3, 'timer:overtime-message', { message: 'stale' })
+    expect(mockWindowManager.sendToProjection).not.toHaveBeenCalled()
   })
 
   it('non-main window does NOT forward', () => {
     vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockProjectionWindow as never)
     const handler = getOnHandler('projection:send')
-    handler(makeEvent(), 'timer:tick', { data: 'test' })
+    handler(makeEvent(), 4, 'timer:overtime-message', { message: 'test' })
     expect(mockWindowManager.sendToProjection).not.toHaveBeenCalled()
   })
 
   it('malformed payload does NOT forward', () => {
     vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockMainWindow as never)
     const handler = getOnHandler('projection:send')
-    handler(makeEvent(), 'file:control', { action: 'seek', value: 'invalid' })
+    handler(makeEvent(), 4, 'file:control', { action: 'seek', value: 'invalid' })
     expect(mockWindowManager.sendToProjection).not.toHaveBeenCalled()
   })
 })
 
 describe('projection:send-to-main', () => {
-  it('known window forwards to sendToMain', () => {
+  it('marks ready and forwards it from the current projection sender', () => {
     vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockProjectionWindow as never)
     const handler = getOnHandler('projection:send-to-main')
-    handler(makeEvent(), '__system:ready', null)
+    handler(makeEvent(), 4, '__system:ready', { generation: 4 })
+    expect(mockWindowManager.markProjectionReady).toHaveBeenCalledWith(4)
     expect(mockWindowManager.sendToMain).toHaveBeenCalledWith(
       'projection:message',
+      4,
       '__system:ready',
-      null
+      { generation: 4 }
     )
+  })
+
+  it('rejects ready from a stale or non-projection sender', () => {
+    mockWindowManager.isCurrentProjectionSender.mockReturnValue(false)
+    getOnHandler('projection:send-to-main')(makeEvent(), 3, '__system:ready', { generation: 3 })
+    expect(mockWindowManager.markProjectionReady).not.toHaveBeenCalled()
+    expect(mockWindowManager.sendToMain).not.toHaveBeenCalled()
   })
 
   it('forwards projection playback state to main window', () => {
@@ -253,10 +284,11 @@ describe('projection:send-to-main', () => {
       isEnded: false
     }
 
-    handler(makeEvent(), 'file:playback-state', payload)
+    handler(makeEvent(), 4, 'file:playback-state', payload)
 
     expect(mockWindowManager.sendToMain).toHaveBeenCalledWith(
       'projection:message',
+      4,
       'file:playback-state',
       payload
     )
@@ -265,8 +297,31 @@ describe('projection:send-to-main', () => {
   it('unknown window does NOT forward', () => {
     vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockUnknownWindow as never)
     const handler = getOnHandler('projection:send-to-main')
-    handler(makeEvent(), '__system:ready', null)
+    mockWindowManager.isCurrentProjectionSender.mockReturnValue(false)
+    handler(makeEvent(), 4, '__system:ready', { generation: 4 })
     expect(mockWindowManager.sendToMain).not.toHaveBeenCalled()
+  })
+})
+
+describe('projection recovery lifecycle invokes', () => {
+  it('allows main window to retry and returns the replacement generation', () => {
+    vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockMainWindow as never)
+    expect(getHandler('projection:retry')(makeEvent())).toEqual({
+      retried: true,
+      generation: 5
+    })
+  })
+
+  it('returns generation only to the current projection window', () => {
+    mockWindowManager.getProjectionState.mockReturnValue({
+      exists: true,
+      lifecycle: { generation: 4, status: 'ready', reason: 'created' }
+    })
+    vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockProjectionWindow as never)
+    expect(getHandler('projection:get-generation')(makeEvent())).toEqual({ generation: 4 })
+
+    vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockUnknownWindow as never)
+    expect(getHandler('projection:get-generation')(makeEvent())).toEqual({ generation: 0 })
   })
 })
 
