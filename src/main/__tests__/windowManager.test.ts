@@ -1,13 +1,20 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { FakeBrowserWindow } = vi.hoisted(() => {
   class FakeBrowserWindow {
     static instances: FakeBrowserWindow[] = []
 
+    options: Record<string, unknown>
+
     webContents = {
       setWindowOpenHandler: vi.fn(),
-      on: vi.fn(),
-      send: vi.fn()
+      on: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
+        const handlers = this.webContentsHandlers.get(event) ?? []
+        handlers.push(handler)
+        this.webContentsHandlers.set(event, handlers)
+      }),
+      send: vi.fn(),
+      isDestroyed: vi.fn(() => false)
     }
 
     loadURL = vi.fn(() => Promise.resolve())
@@ -34,8 +41,10 @@ const { FakeBrowserWindow } = vi.hoisted(() => {
 
     private onceHandlers = new Map<string, () => void>()
     private onHandlers = new Map<string, Array<(...args: unknown[]) => void>>()
+    private webContentsHandlers = new Map<string, Array<(...args: unknown[]) => void>>()
 
-    constructor() {
+    constructor(options: Record<string, unknown>) {
+      this.options = options
       FakeBrowserWindow.instances.push(this)
     }
 
@@ -45,6 +54,10 @@ const { FakeBrowserWindow } = vi.hoisted(() => {
 
     emit(event: string, ...args: unknown[]): void {
       for (const handler of this.onHandlers.get(event) ?? []) handler(...args)
+    }
+
+    emitWebContents(event: string, ...args: unknown[]): void {
+      for (const handler of this.webContentsHandlers.get(event) ?? []) handler(...args)
     }
   }
 
@@ -85,6 +98,10 @@ describe('WindowManager', () => {
     const instance = WindowManager.getInstance()
     instance.cleanup()
     FakeBrowserWindow.instances = []
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   it('getInstance returns a singleton', () => {
@@ -235,5 +252,184 @@ describe('WindowManager', () => {
 
     expect(closeEvent.preventDefault).not.toHaveBeenCalled()
     expect(projectionWindow.webContents.send).not.toHaveBeenCalledWith('app:close-requested')
+  })
+
+  it('allocates once for initial load and once for a later reload', () => {
+    const wm = WindowManager.getInstance()
+    const first = wm.createProjectionWindow()
+    const projection = FakeBrowserWindow.instances[0]
+    projection.emitWebContents('did-finish-load')
+    projection.emitWebContents('did-start-loading')
+
+    expect(first).toBe(1)
+    expect(wm.getProjectionState().lifecycle).toMatchObject({
+      generation: 2,
+      status: 'opening',
+      reason: 'reload'
+    })
+  })
+
+  it('marks only the current projection generation ready', () => {
+    const wm = WindowManager.getInstance()
+    wm.createProjectionWindow()
+
+    expect(wm.markProjectionReady(2)).toBe(false)
+    expect(wm.markProjectionReady(1)).toBe(true)
+    expect(wm.getProjectionState().lifecycle).toMatchObject({
+      generation: 1,
+      status: 'ready'
+    })
+  })
+
+  it('authorizes only the current projection sender and generation', () => {
+    const wm = WindowManager.getInstance()
+    wm.createProjectionWindow()
+    const projection = FakeBrowserWindow.instances[0]
+
+    expect(wm.isCurrentProjectionSender(projection.webContents as never, 1)).toBe(true)
+    expect(wm.isCurrentProjectionSender(projection.webContents as never, 2)).toBe(false)
+    expect(wm.isCurrentProjectionSender({} as never, 1)).toBe(false)
+  })
+
+  it('moves to another display with a new generation without reporting user close', () => {
+    const wm = WindowManager.getInstance()
+    wm.createProjectionWindow()
+
+    const result = wm.moveProjectionWindow('2')
+
+    expect(result).toEqual({ moved: true, generation: 2 })
+    expect(wm.getProjectionState()).toMatchObject({
+      exists: true,
+      lifecycle: {
+        generation: 2,
+        status: 'opening',
+        reason: 'display-move'
+      }
+    })
+    expect(FakeBrowserWindow.instances[1].options.x).toBe(1920)
+  })
+
+  it('recovers one renderer crash and fails the second inside 30 seconds', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(1_000)
+    const wm = WindowManager.getInstance()
+    wm.createProjectionWindow('2')
+    FakeBrowserWindow.instances[0].emitWebContents('render-process-gone', {}, { reason: 'crashed' })
+
+    expect(FakeBrowserWindow.instances).toHaveLength(2)
+    expect(wm.getProjectionState().lifecycle).toMatchObject({
+      generation: 2,
+      status: 'recovering',
+      reason: 'renderer-crash'
+    })
+    expect(FakeBrowserWindow.instances[1].options.x).toBe(1920)
+
+    vi.setSystemTime(20_000)
+    FakeBrowserWindow.instances[1].emitWebContents('render-process-gone', {}, { reason: 'crashed' })
+
+    expect(FakeBrowserWindow.instances).toHaveLength(2)
+    expect(wm.getProjectionState()).toMatchObject({
+      exists: false,
+      lifecycle: {
+        generation: 2,
+        status: 'failed',
+        reason: 'renderer-crash'
+      }
+    })
+  })
+
+  it('allows another automatic recovery after 30 seconds', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(1_000)
+    const wm = WindowManager.getInstance()
+    wm.createProjectionWindow('2')
+    FakeBrowserWindow.instances[0].emitWebContents('render-process-gone', {}, { reason: 'crashed' })
+
+    vi.setSystemTime(31_001)
+    FakeBrowserWindow.instances[1].emitWebContents('render-process-gone', {}, { reason: 'crashed' })
+
+    expect(FakeBrowserWindow.instances).toHaveLength(3)
+    expect(wm.getProjectionState().lifecycle).toMatchObject({
+      generation: 3,
+      status: 'recovering',
+      reason: 'renderer-crash'
+    })
+  })
+
+  it('recovers a clean renderer exit when no window close was requested', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(1_000)
+    const wm = WindowManager.getInstance()
+    wm.createProjectionWindow()
+
+    FakeBrowserWindow.instances[0].emitWebContents(
+      'render-process-gone',
+      {},
+      { reason: 'clean-exit' }
+    )
+
+    expect(FakeBrowserWindow.instances).toHaveLength(2)
+    expect(wm.getProjectionState().lifecycle).toMatchObject({
+      generation: 2,
+      status: 'recovering',
+      reason: 'renderer-crash'
+    })
+  })
+
+  it('manual Retry resets the automatic crash budget', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(1_000)
+    const wm = WindowManager.getInstance()
+    wm.createProjectionWindow()
+    FakeBrowserWindow.instances[0].emitWebContents('render-process-gone', {}, { reason: 'crashed' })
+    vi.setSystemTime(2_000)
+    FakeBrowserWindow.instances[1].emitWebContents('render-process-gone', {}, { reason: 'crashed' })
+
+    expect(wm.retryProjectionWindow()).toEqual({ retried: true, generation: 3 })
+    vi.setSystemTime(3_000)
+    FakeBrowserWindow.instances[2].emitWebContents('render-process-gone', {}, { reason: 'crashed' })
+
+    expect(FakeBrowserWindow.instances).toHaveLength(4)
+    expect(wm.getProjectionState().lifecycle.generation).toBe(4)
+  })
+
+  it('explicit close never recreates or retains the session generation', () => {
+    const wm = WindowManager.getInstance()
+    wm.createProjectionWindow()
+    const projection = FakeBrowserWindow.instances[0]
+
+    wm.closeProjection()
+    projection.emit('closed')
+    projection.emitWebContents('render-process-gone', {}, { reason: 'clean-exit' })
+
+    expect(FakeBrowserWindow.instances).toHaveLength(1)
+    expect(wm.getProjectionState()).toEqual({
+      exists: false,
+      lifecycle: {
+        generation: 0,
+        status: 'closed',
+        reason: 'user-close'
+      }
+    })
+  })
+
+  it('does not foreground a crash recovery or display replacement', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(1_000)
+    const wm = WindowManager.getInstance()
+    wm.createProjectionWindow()
+    wm.moveProjectionWindow('2')
+    const moved = FakeBrowserWindow.instances[1]
+    moved.emitOnce('ready-to-show')
+    moved.emitWebContents('render-process-gone', {}, { reason: 'crashed' })
+    const recovered = FakeBrowserWindow.instances[2]
+    recovered.emitOnce('ready-to-show')
+
+    expect(moved.moveTop).not.toHaveBeenCalled()
+    expect(recovered.moveTop).not.toHaveBeenCalled()
+    expect(moved.focus).not.toHaveBeenCalled()
+    expect(recovered.focus).not.toHaveBeenCalled()
+    expect(moved.setAlwaysOnTop).not.toHaveBeenCalled()
+    expect(recovered.setAlwaysOnTop).not.toHaveBeenCalled()
   })
 })

@@ -2,14 +2,32 @@ import { BrowserWindow, screen, app, shell } from 'electron'
 import { join } from 'path'
 import { optimizer, is } from '@electron-toolkit/utils'
 import type { IpcMainToRendererChannel, IpcMainToRendererMap } from '@shared/ipc-channels'
+import type {
+  ProjectionLifecycleEvent,
+  ProjectionLifecycleReason
+} from '@shared/projection-messages'
 
 let _cachedDisplay: Electron.Display | null | undefined = undefined
+
+export interface ProjectionWindowState {
+  exists: boolean
+  lifecycle: ProjectionLifecycleEvent
+}
 
 export class WindowManager {
   private static instance: WindowManager
   private mainWindow: BrowserWindow | null = null
   private projectionWindow: BrowserWindow | null = null
   private mainClosePermit = false
+  private projectionGeneration = 0
+  private projectionLifecycle: ProjectionLifecycleEvent = {
+    generation: 0,
+    status: 'closed',
+    reason: 'user-close'
+  }
+  private projectionDisplayId = ''
+  private lastAutomaticRecoveryAt: number | null = null
+  private closingProjectionWindows = new WeakSet<BrowserWindow>()
 
   // eslint-disable-next-line @typescript-eslint/no-empty-function -- singleton pattern requires private constructor
   private constructor() {}
@@ -120,12 +138,39 @@ export class WindowManager {
     })
   }
 
-  createProjectionWindow(displayId = ''): void {
-    if (this.isProjectionOpen()) return
+  private publishProjectionLifecycle(event: ProjectionLifecycleEvent): void {
+    this.projectionLifecycle = event
+    this.sendToMain('projection:lifecycle', event)
+  }
+
+  private nextProjectionGeneration(
+    status: 'opening' | 'recovering',
+    reason: ProjectionLifecycleReason
+  ): number {
+    this.projectionGeneration += 1
+    this.publishProjectionLifecycle({
+      generation: this.projectionGeneration,
+      status,
+      reason
+    })
+    return this.projectionGeneration
+  }
+
+  createProjectionWindow(
+    displayId = '',
+    reason: 'created' | 'display-move' | 'renderer-crash' = 'created'
+  ): number {
+    if (this.isProjectionOpen()) return this.projectionGeneration
 
     const primaryDisplay = screen.getPrimaryDisplay()
     const targetDisplay = this.getProjectionDisplay(displayId)
     const hasSecondScreen = targetDisplay.id !== primaryDisplay.id
+    this.projectionDisplayId = String(targetDisplay.id)
+    let windowGeneration = this.nextProjectionGeneration(
+      reason === 'renderer-crash' ? 'recovering' : 'opening',
+      reason
+    )
+    let hasFinishedInitialLoad = false
 
     const projectionWindow = new BrowserWindow({
       width: hasSecondScreen ? targetDisplay.bounds.width : 800,
@@ -160,33 +205,128 @@ export class WindowManager {
     })
 
     projectionWindow.webContents.on('render-process-gone', (_event, details) => {
+      if (
+        this.projectionWindow !== projectionWindow ||
+        this.projectionGeneration !== windowGeneration
+      ) {
+        return
+      }
       console.error('Projection window renderer crashed:', details.reason)
+      const wasClosing = this.closingProjectionWindows.has(projectionWindow)
+      this.projectionWindow = null
+      if (!projectionWindow.isDestroyed()) projectionWindow.destroy()
+      if (wasClosing) return
+
+      const now = Date.now()
+      if (this.lastAutomaticRecoveryAt !== null && now - this.lastAutomaticRecoveryAt < 30_000) {
+        this.publishProjectionLifecycle({
+          generation: windowGeneration,
+          status: 'failed',
+          reason: 'renderer-crash'
+        })
+        return
+      }
+
+      this.lastAutomaticRecoveryAt = now
+      this.createProjectionWindow(this.projectionDisplayId, 'renderer-crash')
     })
 
     projectionWindow.once('ready-to-show', () => {
       if (this.projectionWindow !== projectionWindow) return
-      this.bringProjectionToFront()
+      if (reason === 'created') this.bringProjectionToFront()
+    })
+
+    projectionWindow.webContents.on('did-start-loading', () => {
+      if (
+        !hasFinishedInitialLoad ||
+        this.projectionWindow !== projectionWindow ||
+        this.projectionGeneration !== windowGeneration
+      ) {
+        return
+      }
+      windowGeneration = this.nextProjectionGeneration('opening', 'reload')
+      hasFinishedInitialLoad = false
     })
 
     projectionWindow.webContents.on('did-finish-load', () => {
+      if (
+        this.projectionWindow !== projectionWindow ||
+        this.projectionGeneration !== windowGeneration
+      ) {
+        return
+      }
+      hasFinishedInitialLoad = true
       this.sendToMain('projection:opened')
     })
 
     projectionWindow.on('closed', () => {
       if (this.projectionWindow !== projectionWindow) return
-      this.sendToMain('projection:closed')
       this.projectionWindow = null
+      this.projectionGeneration = 0
+      this.lastAutomaticRecoveryAt = null
+      this.publishProjectionLifecycle({
+        generation: 0,
+        status: 'closed',
+        reason: 'user-close'
+      })
+      this.sendToMain('projection:closed')
     })
+
+    return windowGeneration
   }
 
-  moveProjectionWindow(displayId: string): boolean {
+  moveProjectionWindow(displayId: string): { moved: boolean; generation: number } {
     const projectionWindow = this.projectionWindow
-    if (!projectionWindow || projectionWindow.isDestroyed()) return false
+    if (!projectionWindow || projectionWindow.isDestroyed()) {
+      return { moved: false, generation: this.projectionGeneration }
+    }
 
+    this.closingProjectionWindows.add(projectionWindow)
     this.projectionWindow = null
     projectionWindow.close()
-    this.createProjectionWindow(displayId)
+    const generation = this.createProjectionWindow(displayId, 'display-move')
+    return { moved: true, generation }
+  }
+
+  retryProjectionWindow(): { retried: boolean; generation: number } {
+    if (this.projectionLifecycle.status !== 'failed') {
+      return { retried: false, generation: this.projectionGeneration }
+    }
+    this.lastAutomaticRecoveryAt = null
+    const generation = this.createProjectionWindow(this.projectionDisplayId, 'created')
+    return { retried: true, generation }
+  }
+
+  getProjectionState(): ProjectionWindowState {
+    return {
+      exists: this.isProjectionOpen(),
+      lifecycle: this.projectionLifecycle
+    }
+  }
+
+  markProjectionReady(generation: number): boolean {
+    if (
+      generation !== this.projectionGeneration ||
+      !this.isProjectionOpen() ||
+      this.projectionLifecycle.status === 'failed'
+    ) {
+      return false
+    }
+    this.publishProjectionLifecycle({
+      generation,
+      status: 'ready',
+      reason: this.projectionLifecycle.reason
+    })
     return true
+  }
+
+  isCurrentProjectionSender(sender: Electron.WebContents, generation: number): boolean {
+    return (
+      generation === this.projectionGeneration &&
+      this.projectionWindow !== null &&
+      !this.projectionWindow.isDestroyed() &&
+      this.projectionWindow.webContents === sender
+    )
   }
 
   bringProjectionToFront(): boolean {
@@ -238,10 +378,19 @@ export class WindowManager {
   }
 
   closeProjection(): void {
-    if (this.projectionWindow && !this.projectionWindow.isDestroyed()) {
-      this.projectionWindow.close()
+    const projectionWindow = this.projectionWindow
+    if (projectionWindow && !projectionWindow.isDestroyed()) {
+      this.closingProjectionWindows.add(projectionWindow)
       this.projectionWindow = null
+      projectionWindow.close()
     }
+    this.projectionGeneration = 0
+    this.lastAutomaticRecoveryAt = null
+    this.publishProjectionLifecycle({
+      generation: 0,
+      status: 'closed',
+      reason: 'user-close'
+    })
   }
 
   isProjectionOpen(): boolean {
@@ -267,6 +416,15 @@ export class WindowManager {
       this.projectionWindow.destroy()
     }
     this.projectionWindow = null
+    this.projectionGeneration = 0
+    this.projectionLifecycle = {
+      generation: 0,
+      status: 'closed',
+      reason: 'user-close'
+    }
+    this.projectionDisplayId = ''
+    this.lastAutomaticRecoveryAt = null
+    this.closingProjectionWindows = new WeakSet<BrowserWindow>()
   }
 }
 
