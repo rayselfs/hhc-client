@@ -154,7 +154,8 @@ export class WindowManager {
     })
 
     projectionWindow.once('ready-to-show', () => {
-      projectionWindow.showInactive()
+      if (this.projectionWindow !== projectionWindow) return
+      this.bringProjectionToFront()
     })
 
     projectionWindow.webContents.on('did-finish-load', () => {
@@ -176,6 +177,21 @@ export class WindowManager {
     projectionWindow.close()
     this.createProjectionWindow(displayId)
     return true
+  }
+
+  bringProjectionToFront(): boolean {
+    const projectionWindow = this.projectionWindow
+    if (!projectionWindow || projectionWindow.isDestroyed()) return false
+
+    try {
+      if (projectionWindow.isMinimized()) projectionWindow.restore()
+      if (!projectionWindow.isVisible()) projectionWindow.showInactive()
+      projectionWindow.moveTop()
+      return true
+    } catch (error) {
+      console.warn('Failed to bring projection window to front:', error)
+      return false
+    }
   }
 
   getMainWindow(): BrowserWindow | null {
