@@ -32,7 +32,7 @@ export function createFolderDB(
       return await db.getAll('folder-records')
     } catch (error) {
       console.error('[folder-db] Failed to load folders:', error)
-      return []
+      throw error
     }
   }
 
@@ -42,6 +42,7 @@ export function createFolderDB(
       await db.put('folder-records', folder)
     } catch (error) {
       console.error('[folder-db] Failed to save folder:', error)
+      throw error
     }
   }
 
@@ -52,6 +53,7 @@ export function createFolderDB(
       await Promise.all([...folders.map((f: FolderRecord) => tx.store.put(f)), tx.done])
     } catch (error) {
       console.error('[folder-db] Failed to save folders:', error)
+      throw error
     }
   }
 
@@ -62,6 +64,7 @@ export function createFolderDB(
       await Promise.all([...ids.map((id: string) => tx.store.delete(id)), tx.done])
     } catch (error) {
       console.error('[folder-db] Failed to delete folders:', error)
+      throw error
     }
   }
 
@@ -71,7 +74,7 @@ export function createFolderDB(
       return await db.getAllFromIndex('folder-items', 'by-parent', parentId)
     } catch (error) {
       console.error('[folder-db] Failed to load items:', error)
-      return []
+      throw error
     }
   }
 
@@ -81,6 +84,7 @@ export function createFolderDB(
       await db.put('folder-items', item)
     } catch (error) {
       console.error('[folder-db] Failed to save item:', error)
+      throw error
     }
   }
 
@@ -91,6 +95,7 @@ export function createFolderDB(
       await Promise.all([...items.map((i: AnyItemRecord) => tx.store.put(i)), tx.done])
     } catch (error) {
       console.error('[folder-db] Failed to save items:', error)
+      throw error
     }
   }
 
@@ -100,6 +105,7 @@ export function createFolderDB(
       await db.delete('folder-items', id)
     } catch (error) {
       console.error('[folder-db] Failed to delete item:', error)
+      throw error
     }
   }
 
@@ -110,6 +116,7 @@ export function createFolderDB(
       await Promise.all([...ids.map((id: string) => tx.store.delete(id)), tx.done])
     } catch (error) {
       console.error('[folder-db] Failed to delete items:', error)
+      throw error
     }
   }
 
@@ -121,6 +128,7 @@ export function createFolderDB(
       await Promise.all([...items.map((key: string) => tx.store.delete(key)), tx.done])
     } catch (error) {
       console.error('[folder-db] Failed to delete items by parent:', error)
+      throw error
     }
   }
 
@@ -134,7 +142,7 @@ export function createFolderDB(
       return ids
     } catch (error) {
       console.error('[folder-db] Failed to delete expired folders:', error)
-      return []
+      throw error
     }
   }
 
@@ -149,7 +157,7 @@ export function createFolderDB(
       return ids
     } catch (error) {
       console.error('[folder-db] Failed to delete expired items:', error)
-      return []
+      throw error
     }
   }
 
@@ -184,7 +192,7 @@ export function createFolderDB(
       return { folderIds, itemIds }
     } catch (error) {
       console.error('[folder-db] Failed to purge trash:', error)
-      return { folderIds: [], itemIds: [] }
+      throw error
     }
   }
 
