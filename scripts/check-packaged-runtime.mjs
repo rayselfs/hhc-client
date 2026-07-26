@@ -17,6 +17,9 @@ const licenseFiles = [
   'licenses/electron-vlc-player/LICENSE.MIT'
 ]
 
+const nativeBindingFile =
+  'app.asar.unpacked/node_modules/electron-vlc-player/build/Release/vlc_binding.node'
+
 const targetChecks = {
   'darwin-arm64': {
     vlcDir: 'video-engine/vlc/darwin-arm64',
@@ -121,6 +124,10 @@ async function checkResourceRoot(resourceRoot, target) {
     if (!(await exists(join(resourceRoot, file)))) {
       failures.push(`Missing license notice: ${file}`)
     }
+  }
+
+  if (!(await exists(join(resourceRoot, nativeBindingFile)))) {
+    failures.push(`Missing electron-vlc-player native binding: ${nativeBindingFile}`)
   }
 
   if (!(await hasAnyFile(join(resourceRoot, checks.vlcDir), checks.vlcFiles))) {
