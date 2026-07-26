@@ -1,6 +1,9 @@
 import { listMediaJobs } from '@renderer/lib/media-work-db'
 import { mediaJobQueue } from '@renderer/lib/media-job-queue'
-import { scanMediaStorageIntegrity } from '@renderer/lib/media-storage-integrity'
+import {
+  repairMediaStorageIntegrity,
+  scanMediaStorageIntegrity
+} from '@renderer/lib/media-storage-integrity'
 import { createMediaStorageDiagnosticsReport } from '@renderer/lib/media-storage-diagnostics'
 import { listSyncEntries, putSyncEntry } from '@renderer/lib/sync-db'
 import {
@@ -144,7 +147,7 @@ export async function runRecoveryAction(
   }
 
   if (type === 'run-integrity-repair') {
-    await scanMediaStorageIntegrity()
+    await repairMediaStorageIntegrity()
     return
   }
 

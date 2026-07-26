@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { openFileExplorerDB, resetFileExplorerDBForTests } from '../file-explorer-db'
-import { scanMediaStorageIntegrity } from '../media-storage-integrity'
-import { putDerivedAsset, resetMediaWorkDBForTests } from '../media-work-db'
+import { repairMediaStorageIntegrity, scanMediaStorageIntegrity } from '../media-storage-integrity'
+import { listDerivedAssets, putDerivedAsset, resetMediaWorkDBForTests } from '../media-work-db'
+import { listResourceCleanupRecords } from '../resource-cleanup-journal'
 import { putSyncEntry, resetSyncDBForTests } from '../sync-db'
 
 beforeEach(async () => {
@@ -98,6 +99,116 @@ describe('scanMediaStorageIntegrity', () => {
         resourceId: 'orphan-blob'
       })
     ])
+  })
+
+  it('reports authoritative reference-count mismatches and stale positive orphans', async () => {
+    const db = await openFileExplorerDB()
+    await db.put('file-blobs', {
+      id: 'shared-blob',
+      blob: new Blob(['source']),
+      refCount: 9
+    })
+    await db.put('file-blobs', {
+      id: 'stale-orphan',
+      blob: new Blob(['orphan']),
+      refCount: 4
+    })
+    for (const id of ['item-1']) {
+      await db.put('folder-items', {
+        id,
+        parentId: 'root',
+        type: 'file',
+        sortIndex: 0,
+        createdAt: 1,
+        expiresAt: null,
+        name: `${id}.png`,
+        mimeType: 'image/png',
+        size: 6,
+        url: 'blob:shared-blob'
+      })
+    }
+    await putSyncEntry({
+      providerConnectionId: 'connection-1',
+      remoteItemId: 'remote-file-1',
+      parentRemoteItemId: null,
+      kind: 'file',
+      name: 'cached.png',
+      blobId: 'shared-blob',
+      status: 'available-offline'
+    })
+
+    const report = await scanMediaStorageIntegrity()
+
+    expect(report.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'file-blob-ref-count-mismatch',
+          resourceId: 'shared-blob',
+          actualRefCount: 9,
+          expectedRefCount: 2
+        }),
+        expect.objectContaining({
+          kind: 'file-blob-unreferenced',
+          resourceId: 'stale-orphan'
+        }),
+        expect.objectContaining({
+          kind: 'file-blob-ref-count-mismatch',
+          resourceId: 'stale-orphan',
+          actualRefCount: 4,
+          expectedRefCount: 0
+        })
+      ])
+    )
+  })
+
+  it('repairs nonzero counts and routes zero-reference blobs through cleanup journal', async () => {
+    const db = await openFileExplorerDB()
+    await db.put('file-blobs', {
+      id: 'shared-blob',
+      blob: new Blob(['source']),
+      refCount: 1
+    })
+    await db.put('file-blobs', {
+      id: 'orphan-blob',
+      blob: new Blob(['orphan']),
+      refCount: 5
+    })
+    for (const id of ['item-1', 'item-2']) {
+      await db.put('folder-items', {
+        id,
+        parentId: 'root',
+        type: 'file',
+        sortIndex: 0,
+        createdAt: 1,
+        expiresAt: null,
+        name: `${id}.png`,
+        mimeType: 'image/png',
+        size: 6,
+        url: 'blob:shared-blob'
+      })
+    }
+    await putDerivedAsset({
+      sourceBlobId: 'orphan-blob',
+      kind: 'video-poster',
+      variant: 'default',
+      storage: 'indexed-db',
+      mimeType: 'image/jpeg',
+      status: 'ready',
+      size: 1,
+      blob: new Blob(['poster'])
+    })
+
+    const result = await repairMediaStorageIntegrity()
+
+    expect(result.correctedRefCounts).toEqual(['shared-blob'])
+    expect(result.cleanupJournalIds).toHaveLength(1)
+    await expect(db.get('file-blobs', 'shared-blob')).resolves.toMatchObject({ refCount: 2 })
+    await expect(db.get('file-blobs', 'orphan-blob')).resolves.toBeUndefined()
+    await expect(listDerivedAssets()).resolves.toEqual([])
+    await expect(listResourceCleanupRecords()).resolves.toEqual([])
+
+    const report = await scanMediaStorageIntegrity()
+    expect(report.issues).toEqual([])
   })
 
   it('does not report healthy referenced media records', async () => {

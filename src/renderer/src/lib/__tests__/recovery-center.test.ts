@@ -5,8 +5,12 @@ import {
   sortRecoveryIssues
 } from '@renderer/lib/recovery-center'
 
-const { mockRetryResourceCleanup } = vi.hoisted(() => ({
-  mockRetryResourceCleanup: vi.fn(async () => undefined)
+const { mockRetryResourceCleanup, mockRepairMediaStorageIntegrity } = vi.hoisted(() => ({
+  mockRetryResourceCleanup: vi.fn(async () => undefined),
+  mockRepairMediaStorageIntegrity: vi.fn(async () => ({
+    correctedRefCounts: [],
+    cleanupJournalIds: []
+  }))
 }))
 
 vi.mock('@renderer/lib/media-work-db', () => ({
@@ -25,6 +29,7 @@ vi.mock('@renderer/lib/media-work-db', () => ({
 }))
 
 vi.mock('@renderer/lib/media-storage-integrity', () => ({
+  repairMediaStorageIntegrity: mockRepairMediaStorageIntegrity,
   scanMediaStorageIntegrity: vi.fn(async () => ({
     checkedAt: 30,
     issueCount: 1,
@@ -97,6 +102,12 @@ it('retries the selected resource cleanup record', async () => {
   await runRecoveryAction('retry-resource-cleanup', 'cleanup-1')
 
   expect(mockRetryResourceCleanup).toHaveBeenCalledWith('cleanup-1')
+})
+
+it('runs an actual integrity repair instead of a scan-only action', async () => {
+  await runRecoveryAction('run-integrity-repair')
+
+  expect(mockRepairMediaStorageIntegrity).toHaveBeenCalledTimes(1)
 })
 
 it('sorts errors before warnings and newest within severity', () => {
