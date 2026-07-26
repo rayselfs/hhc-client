@@ -1,7 +1,7 @@
 import { BrowserWindow } from 'electron'
 import { MAX_DURATION_SECONDS } from '@shared/constants/timer'
 import type { WindowManager } from '../windowManager'
-import type { ProjectionMessageTuple } from '@shared/projection-messages'
+import type { ProjectionMessageTuple, ProjectionTransportTuple } from '@shared/projection-messages'
 
 const VALID_TIMER_COMMAND_TYPES = new Set([
   'start',
@@ -74,7 +74,6 @@ export function validateTimerCommand(cmd: unknown): boolean {
 }
 
 const NULL_PROJECTION_CHANNELS = new Set([
-  '__system:ready',
   '__system:pong',
   '__system:ping',
   '__system:close',
@@ -82,14 +81,28 @@ const NULL_PROJECTION_CHANNELS = new Set([
   'file:end'
 ])
 
-export function validateProjectionMessageTuple(args: unknown[]): args is ProjectionMessageTuple {
-  if (args.length !== 2 || typeof args[0] !== 'string') return false
-  const [channel, data] = args
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value)
+}
+
+function validateProjectionPayload(channel: string, data: unknown): boolean {
+  if (channel === '__system:ready') {
+    return data === null || (isRecord(data) && isValidProjectionGeneration(data.generation))
+  }
+  if (channel === '__system:replay') {
+    return (
+      isRecord(data) &&
+      isValidProjectionGeneration(data.generation) &&
+      validateProjectionReplayPayload(data.generation, data)
+    )
+  }
   if (NULL_PROJECTION_CHANNELS.has(channel)) return data === null
-  if (typeof data !== 'object' || data === null) return false
-  const obj = data as Record<string, unknown>
-  const isFiniteNumber = (value: unknown): value is number =>
-    typeof value === 'number' && Number.isFinite(value)
+  if (!isRecord(data)) return false
+  const obj = data
 
   switch (channel) {
     case '__system:blank':
@@ -186,6 +199,82 @@ export function validateProjectionMessageTuple(args: unknown[]): args is Project
     default:
       return false
   }
+}
+
+function validateNullablePayload(channel: string, value: unknown): boolean {
+  return value === null || validateProjectionPayload(channel, value)
+}
+
+function validateMediaReplayState(value: unknown): boolean {
+  if (!isRecord(value)) return false
+  if (!isRecord(value.pan)) return false
+  return (
+    typeof value.itemId === 'string' &&
+    isFiniteNumber(value.positionSeconds) &&
+    isFiniteNumber(value.durationSeconds) &&
+    typeof value.isPlaying === 'boolean' &&
+    typeof value.isEnded === 'boolean' &&
+    isFiniteNumber(value.volume) &&
+    isFiniteNumber(value.pdfPage) &&
+    isFiniteNumber(value.pdfScroll) &&
+    (value.pdfViewMode === 'single' || value.pdfViewMode === 'continuous') &&
+    isFiniteNumber(value.zoom) &&
+    isFiniteNumber(value.pan.x) &&
+    isFiniteNumber(value.pan.y)
+  )
+}
+
+function validateProjectionReplayPayload(generation: number, data: unknown): boolean {
+  if (!isRecord(data) || data.generation !== generation || !isRecord(data.snapshot)) return false
+  const snapshot = data.snapshot
+  if (
+    !['timer', 'bible', 'media'].includes(String(snapshot.owner)) ||
+    typeof snapshot.showDefault !== 'boolean' ||
+    !isRecord(snapshot.timer) ||
+    !isRecord(snapshot.bible) ||
+    !isRecord(snapshot.media)
+  ) {
+    return false
+  }
+
+  const timer = snapshot.timer
+  const bible = snapshot.bible
+  const media = snapshot.media
+  return (
+    validateNullablePayload('timer:tick', timer.tick) &&
+    validateNullablePayload('timer:stopwatch', timer.stopwatch) &&
+    validateNullablePayload('timer:overtime-message', timer.overtimeMessage) &&
+    validateNullablePayload('settings:timezone', timer.timezone) &&
+    validateNullablePayload('settings:timer-ring-color', timer.ringColor) &&
+    validateNullablePayload('bible:chapter', bible.chapter) &&
+    validateNullablePayload('bible:settings', bible.settings) &&
+    validateNullablePayload('file:show', media.show) &&
+    (media.state === null || validateMediaReplayState(media.state))
+  )
+}
+
+export function isValidProjectionGeneration(value: unknown): value is number {
+  return Number.isSafeInteger(value) && Number(value) > 0
+}
+
+export function validateProjectionTransportTuple(
+  args: unknown[]
+): args is ProjectionTransportTuple {
+  if (args.length !== 3 || !isValidProjectionGeneration(args[0])) return false
+  const [generation, channel, data] = args
+  if (typeof channel !== 'string') return false
+  if (channel === '__system:ready') {
+    return isRecord(data) && data.generation === generation
+  }
+  if (channel === '__system:replay') {
+    return validateProjectionReplayPayload(generation, data)
+  }
+  return validateProjectionPayload(channel, data)
+}
+
+export function validateProjectionMessageTuple(args: unknown[]): args is ProjectionMessageTuple {
+  if (args.length !== 2 || typeof args[0] !== 'string') return false
+  return validateProjectionPayload(args[0], args[1])
 }
 
 export function validateTimerSettings(settings: unknown): boolean {

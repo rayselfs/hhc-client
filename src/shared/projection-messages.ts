@@ -15,7 +15,12 @@ import type { ProjectionTheme } from './types/projection-theme'
 type EditableProjectionSlideBackground =
   | { type: 'solid'; color: string; transparency: number }
   | { type: 'color'; color: string }
-  | { type: 'gradient'; from: string; to: string; direction: 'left-right' | 'top-bottom' | 'diagonal' }
+  | {
+      type: 'gradient'
+      from: string
+      to: string
+      direction: 'left-right' | 'top-bottom' | 'diagonal'
+    }
   | {
       type: 'gradient'
       gradientType: 'linear'
@@ -101,16 +106,6 @@ type EditableProjectionAsset = {
   dataUrl: string
 }
 
-export interface SystemMessages {
-  '__system:ready': null
-  '__system:pong': null
-  '__system:ping': null
-  '__system:close': null
-  '__system:closed': null
-  '__system:blank': { showDefault: boolean }
-  '__system:active-owner': { owner: string }
-}
-
 export interface AppMessages {
   /** High-frequency timer tick data for projection display */
   'timer:tick': TimerTickPayload
@@ -187,6 +182,87 @@ export type FileControlPayload =
   | { action: 'zoom'; value: number }
   | { action: 'pan'; value: { x: number; y: number } }
 
+export type ProjectionOwner = 'timer' | 'bible' | 'media'
+
+export type ProjectionLifecycleStatus = 'closed' | 'opening' | 'ready' | 'recovering' | 'failed'
+
+export type ProjectionLifecycleReason =
+  | 'created'
+  | 'reload'
+  | 'display-move'
+  | 'renderer-crash'
+  | 'user-close'
+  | 'popup-blocked'
+  | 'ready-timeout'
+
+export interface ProjectionLifecycleEvent {
+  generation: number
+  status: ProjectionLifecycleStatus
+  reason: ProjectionLifecycleReason
+}
+
+export interface ProjectionFailure {
+  generation: number
+  reason: 'renderer-crash' | 'popup-blocked' | 'ready-timeout'
+}
+
+export interface ProjectionMediaReplayState {
+  itemId: string
+  positionSeconds: number
+  durationSeconds: number
+  isPlaying: boolean
+  isEnded: boolean
+  volume: number
+  pdfPage: number
+  pdfScroll: number
+  pdfViewMode: 'single' | 'continuous'
+  zoom: number
+  pan: { x: number; y: number }
+}
+
+export interface ProjectionSessionSnapshot {
+  owner: ProjectionOwner
+  showDefault: boolean
+  timer: {
+    tick: AppMessages['timer:tick'] | null
+    stopwatch: AppMessages['timer:stopwatch'] | null
+    overtimeMessage: AppMessages['timer:overtime-message'] | null
+    timezone: AppMessages['settings:timezone'] | null
+    ringColor: AppMessages['settings:timer-ring-color'] | null
+  }
+  bible: {
+    chapter: AppMessages['bible:chapter'] | null
+    settings: AppMessages['bible:settings'] | null
+  }
+  media: {
+    show: AppMessages['file:show'] | null
+    state: ProjectionMediaReplayState | null
+  }
+}
+
+export type ProjectionOperationResult =
+  | { ok: true; generation: number }
+  | {
+      ok: false
+      generation: number
+      reason: ProjectionFailure['reason']
+    }
+
+export interface SystemMessages {
+  /** `null` remains temporarily supported by the legacy two-argument transport until migration. */
+  '__system:ready': { generation: number } | null
+  '__system:replay': {
+    generation: number
+    snapshot: ProjectionSessionSnapshot
+  }
+  '__system:pong': null
+  '__system:ping': null
+  '__system:close': null
+  '__system:closed': null
+  '__system:blank': { showDefault: boolean }
+  '__system:active-owner': { owner: string }
+}
+
 /**
  * Maps every valid channel name to its payload type.
  * Extend by adding entries to SystemMessages, AppMessages,
@@ -205,3 +281,16 @@ export type ProjectionPayload<C extends ProjectionChannel> = ProjectionMessageMa
 export type ProjectionMessageTuple = {
   [C in ProjectionChannel]: [channel: C, data: ProjectionPayload<C>]
 }[ProjectionChannel]
+
+export type ProjectionTransportTuple = {
+  [C in ProjectionChannel]: [generation: number, channel: C, data: ProjectionPayload<C>]
+}[ProjectionChannel]
+
+export type ProjectionContentChannel = Exclude<
+  ProjectionChannel,
+  `__system:${string}` | 'file:playback-state'
+>
+
+export type ProjectionContentMessageTuple = {
+  [C in ProjectionContentChannel]: [channel: C, data: ProjectionPayload<C>]
+}[ProjectionContentChannel]

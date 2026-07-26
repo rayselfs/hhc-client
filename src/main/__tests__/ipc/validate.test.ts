@@ -21,7 +21,8 @@ import {
   isMainWindow,
   validateTheme,
   validateTimerCommand,
-  validateTimerSettings
+  validateTimerSettings,
+  validateProjectionTransportTuple
 } from '../../ipc/validate'
 import type { WindowManager } from '../../windowManager'
 
@@ -200,5 +201,53 @@ describe('validateTimerSettings', () => {
 
   it('returns false for non-string overtimeMessage', () => {
     expect(validateTimerSettings({ ...valid, overtimeMessage: null })).toBe(false)
+  })
+})
+
+describe('validateProjectionTransportTuple', () => {
+  it('accepts a positive generation with matching ready payload', () => {
+    expect(validateProjectionTransportTuple([4, '__system:ready', { generation: 4 }])).toBe(true)
+  })
+
+  it.each([0, -1, 1.5, Number.NaN, Number.MAX_SAFE_INTEGER + 1])(
+    'rejects invalid generation %s',
+    (generation) => {
+      expect(
+        validateProjectionTransportTuple([
+          generation,
+          'timer:overtime-message',
+          { message: 'test' }
+        ])
+      ).toBe(false)
+    }
+  )
+
+  it('rejects a ready payload for another generation', () => {
+    expect(validateProjectionTransportTuple([4, '__system:ready', { generation: 3 }])).toBe(false)
+  })
+
+  it('accepts a minimally valid replay snapshot', () => {
+    expect(
+      validateProjectionTransportTuple([
+        4,
+        '__system:replay',
+        {
+          generation: 4,
+          snapshot: {
+            owner: 'timer',
+            showDefault: false,
+            timer: {
+              tick: null,
+              stopwatch: null,
+              overtimeMessage: null,
+              timezone: null,
+              ringColor: null
+            },
+            bible: { chapter: null, settings: null },
+            media: { show: null, state: null }
+          }
+        }
+      ])
+    ).toBe(true)
   })
 })

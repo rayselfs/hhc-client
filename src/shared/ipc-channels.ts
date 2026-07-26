@@ -6,7 +6,7 @@
  * names and payload shapes at compile time.
  */
 
-import type { ProjectionMessageTuple } from './projection-messages'
+import type { ProjectionLifecycleEvent, ProjectionMessageTuple } from './projection-messages'
 import type { LanRemoteAck, LanRemoteCommand, LanRemoteSnapshot } from './lan-remote'
 import type {
   TimerCommand,
@@ -286,6 +286,7 @@ export type IpcSendChannel = keyof IpcSendMap
 
 export interface IpcMainToRendererMap {
   'projection:message': ProjectionMessageTuple
+  'projection:lifecycle': [event: ProjectionLifecycleEvent]
   'projection:opened': []
   'projection:closed': []
   'theme:changed': [{ shouldUseDarkColors: boolean }]
