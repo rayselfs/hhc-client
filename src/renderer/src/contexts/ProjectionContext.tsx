@@ -375,8 +375,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       data: ProjectionPayload<C>,
       options?: ProjectOptions
     ): Promise<void> => {
-      const shouldBringToFront =
-        options?.bringToFront === true && isProjectionOpenRef.current
+      const shouldBringToFront = options?.bringToFront === true && isProjectionOpenRef.current
 
       if (!isReadyRef.current) {
         pendingPayloadsRef.current.set(getPendingPayloadKey(channel), { channel, data })

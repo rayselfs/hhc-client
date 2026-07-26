@@ -191,14 +191,12 @@ describe('media projection sync', () => {
     mockProject.mockClear()
 
     act(() => {
-      useMediaProjectionStore.getState().setPan({ x: 10, y: 20 })
+      useMediaProjectionStore.getState().setPan(10, 20)
       useMediaProjectionStore.getState().setZoomLevel(1.5)
     })
 
-    expect(mockProject).not.toHaveBeenCalledWith(
-      expect.anything(),
-      expect.anything(),
-      { bringToFront: true }
-    )
+    expect(mockProject).not.toHaveBeenCalledWith(expect.anything(), expect.anything(), {
+      bringToFront: true
+    })
   })
 })

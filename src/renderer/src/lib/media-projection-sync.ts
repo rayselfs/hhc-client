@@ -1,11 +1,17 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
-import { useMediaProjectionStore, type MediaProjectionStore } from '@renderer/stores/media-projection'
+import {
+  useMediaProjectionStore,
+  type MediaProjectionStore
+} from '@renderer/stores/media-projection'
 import {
   buildFileProjectionPayload,
   buildFileProjectionPayloadWithEditableSlide
 } from '@renderer/lib/media-projection-payload'
-import { isEditablePresentationMimeType, isPresentationMimeType } from '@renderer/lib/presentation-media'
+import {
+  isEditablePresentationMimeType,
+  isPresentationMimeType
+} from '@renderer/lib/presentation-media'
 
 function playlistContentChanged(
   prev: { id: string; mimeType: string; name: string }[],
@@ -60,8 +66,7 @@ export function useMediaProjectionSync(): void {
         state.typeStates.presentation !== prev.typeStates.presentation
 
       if (started || indexChanged || playlistChanged || endedCleared || presentationChanged) {
-        const explicitContentChange =
-          started || indexChanged || endedCleared || presentationChanged
+        const explicitContentChange = started || indexChanged || endedCleared || presentationChanged
         void projectCurrentItem(state, started, explicitContentChange)
       }
     })
