@@ -39,3 +39,9 @@ jobs:
           VITE_BIBLE_API_V1_PREFIX: ${{ vars.VITE_BIBLE_API_V1_PREFIX }}
           VITE_BIBLE_API_V2_PREFIX: ${{ vars.VITE_BIBLE_API_V2_PREFIX }}
         run: npm run build
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Browser projection E2E
+        run: npm run test:e2e:browser
