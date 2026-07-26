@@ -43,7 +43,7 @@ describe('FilesPage presentation context actions', () => {
     usePresentationWorkspaceStore.setState({
       documents: [],
       activeItemId: null,
-      activeSlideByItemId: {}
+      activeSlideIdByItemId: {}
     })
   })
 

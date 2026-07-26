@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
@@ -38,13 +38,11 @@ import {
   INSERTED_TEXT_DRAG_MIN_SIZE,
   INSERTED_TEXT_FONT_SIZE,
   insertBlankEditableSlide,
-  loadEditablePresentation,
   normalizeSlideBackground,
   removeElementFromSlide,
   removeEditableSlides,
   reorderElementInSlide,
   resetSlideBackground,
-  saveEditablePresentation,
   updateElementInSlide,
   updateSlideBackground,
   type EditableGradientDirection,
@@ -55,6 +53,8 @@ import {
   type EditableTextInsertFrame
 } from '@renderer/lib/editable-presentation'
 import { openFileExplorerDB } from '@renderer/lib/file-explorer-db'
+import { usePresentationSessionRegistry } from '@renderer/contexts/PresentationSessionRegistryContext'
+import type { PresentationEditorSession } from '@renderer/lib/presentation-editor-session'
 import { ensurePresentationPageDocument } from '@renderer/lib/presentation-page-document'
 import { readPresentationArrayBuffer } from '@renderer/lib/presentation-source'
 import { openPptxViewer, type PptxViewerHandle } from '@renderer/lib/pptx-renderer-service'
@@ -83,6 +83,24 @@ const RIBBON_ICON_BUTTON_CLASS =
 const RIBBON_ICON_BUTTON_ACTIVE_CLASS =
   'border-primary bg-primary text-white shadow-inner hover:border-primary hover:bg-primary/90 hover:text-white'
 const RIBBON_SEPARATOR_CLASS = 'mx-2 h-14 w-px bg-divider'
+
+function getPptxSlideId(index: number): string {
+  return `pptx-slide-${index}`
+}
+
+function getPptxSlideIndex(slideId: string | null): number {
+  if (!slideId?.startsWith('pptx-slide-')) return 0
+  const index = Number(slideId.slice('pptx-slide-'.length))
+  return Number.isInteger(index) && index >= 0 ? index : 0
+}
+
+function resizePresentationDocument(
+  document: EditablePresentationDocument,
+  width: number,
+  height: number
+): EditablePresentationDocument {
+  return { ...document, width, height, updatedAt: Date.now() }
+}
 
 function SlideThumbnail({
   viewer,
@@ -167,8 +185,11 @@ export function PptxDocumentView({
   const navigate = useNavigate()
   const openDocument = usePresentationWorkspaceStore((state) => state.openDocument)
   const setSlideCount = usePresentationWorkspaceStore((state) => state.setSlideCount)
-  const setActiveSlide = usePresentationWorkspaceStore((state) => state.setActiveSlide)
-  const activeSlide = usePresentationWorkspaceStore((state) => state.getActiveSlide(deck.itemId))
+  const setActiveSlideId = usePresentationWorkspaceStore((state) => state.setActiveSlideId)
+  const activeSlideId = usePresentationWorkspaceStore((state) =>
+    state.getActiveSlideId(deck.itemId)
+  )
+  const activeSlide = getPptxSlideIndex(activeSlideId)
   const deckItemId = deck.itemId
   const deckMimeType = deck.mimeType
   const deckUrl = deck.url
@@ -209,6 +230,12 @@ export function PptxDocumentView({
         viewerRef.current = handle
         setViewer(handle)
         setSlideCount(deckItemId, handle.slideCount)
+        const storedSlideId = usePresentationWorkspaceStore.getState().getActiveSlideId(deckItemId)
+        const safeSlideIndex = Math.min(
+          getPptxSlideIndex(storedSlideId),
+          Math.max(0, handle.slideCount - 1)
+        )
+        setActiveSlideId(deckItemId, getPptxSlideId(safeSlideIndex))
         void ensurePresentationPageDocument(
           { id: deckItemId, url: deckUrl },
           handle.slideCount
@@ -227,7 +254,7 @@ export function PptxDocumentView({
       viewerRef.current?.destroy()
       viewerRef.current = null
     }
-  }, [deckItemId, deckMimeType, deckUrl, setSlideCount])
+  }, [deckItemId, deckMimeType, deckUrl, setActiveSlideId, setSlideCount])
 
   useEffect(() => {
     const current = viewerRef.current
@@ -271,7 +298,7 @@ export function PptxDocumentView({
                 viewer={viewer}
                 index={index}
                 active={index === activeSlide}
-                onSelect={() => setActiveSlide(deck.itemId, index)}
+                onSelect={() => setActiveSlideId(deck.itemId, getPptxSlideId(index))}
               />
             ))}
         </div>
@@ -326,16 +353,96 @@ function EditableDocumentView({
   isRibbonOpen: boolean
   onSelectedElementTypeChange: (type: PresentationElementType | null) => void
 }): React.JSX.Element {
+  const registry = usePresentationSessionRegistry()
+  const session = useSyncExternalStore(
+    registry.subscribe,
+    () => registry.get(deck.itemId),
+    () => registry.get(deck.itemId)
+  )
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (session) return
+    let cancelled = false
+    void getPresentationSourceItem(deck.itemId)
+      .then((item) => registry.open(item))
+      .catch((openError) => {
+        if (!cancelled) {
+          setError(openError instanceof Error ? openError.message : String(openError))
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [deck.itemId, registry, session])
+
+  if (error) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
+        <FileText className="text-danger" size={36} />
+        <p className="text-sm font-semibold text-danger">Failed to load presentation</p>
+        <p className="max-w-lg text-xs text-default-400">{error}</p>
+      </div>
+    )
+  }
+
+  if (!session) {
+    return (
+      <div className="flex flex-1 items-center justify-center">
+        <Spinner />
+      </div>
+    )
+  }
+
+  return (
+    <EditableSessionDocumentView
+      key={deck.itemId}
+      deck={deck}
+      session={session}
+      activeRibbon={activeRibbon}
+      isRibbonOpen={isRibbonOpen}
+      onSelectedElementTypeChange={onSelectedElementTypeChange}
+    />
+  )
+}
+
+function EditableSessionDocumentView({
+  deck,
+  session,
+  activeRibbon,
+  isRibbonOpen,
+  onSelectedElementTypeChange
+}: {
+  deck: PresentationWorkspaceDocument
+  session: PresentationEditorSession
+  activeRibbon: RibbonTab
+  isRibbonOpen: boolean
+  onSelectedElementTypeChange: (type: PresentationElementType | null) => void
+}): React.JSX.Element {
   const { t } = useTranslation()
   const { showMenu } = useContextMenu()
   const setSlideCount = usePresentationWorkspaceStore((state) => state.setSlideCount)
-  const setActiveSlide = usePresentationWorkspaceStore((state) => state.setActiveSlide)
-  const activeSlideIndex = usePresentationWorkspaceStore((state) =>
-    state.getActiveSlide(deck.itemId)
+  const setActiveSlideId = usePresentationWorkspaceStore((state) => state.setActiveSlideId)
+  const storedActiveSlideId = usePresentationWorkspaceStore((state) =>
+    state.getActiveSlideId(deck.itemId)
   )
+  const sessionSnapshot = useSyncExternalStore(
+    session.subscribe,
+    session.getSnapshot,
+    session.getSnapshot
+  )
+  const document = sessionSnapshot.renderedDocument
+  const storedActiveSlideIndex = document.slideOrder.indexOf(storedActiveSlideId ?? '')
+  const [lastActiveSlideIndex, setLastActiveSlideIndex] = useState(() =>
+    Math.max(0, storedActiveSlideIndex)
+  )
+  const activeSlideIndex =
+    storedActiveSlideIndex >= 0
+      ? storedActiveSlideIndex
+      : Math.min(lastActiveSlideIndex, Math.max(0, document.slideOrder.length - 1))
+  const activeSlideId = document.slideOrder[activeSlideIndex] ?? null
   const imageInputRef = useRef<HTMLInputElement>(null)
-  const [document, setDocument] = useState<EditablePresentationDocument | null>(null)
-  const [past, setPast] = useState<EditablePresentationDocument[]>([])
+  const textCommitTimerRef = useRef<number | null>(null)
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null)
   const [copiedElement, setCopiedElement] = useState<EditablePresentationElement | null>(null)
   const [copiedSlideIds, setCopiedSlideIds] = useState<string[]>([])
@@ -349,48 +456,43 @@ function EditableDocumentView({
   const [isTextInsertMode, setIsTextInsertMode] = useState(false)
   const [pressedRibbonAction, setPressedRibbonAction] = useState<string | null>(null)
   const pressedRibbonTimeoutRef = useRef<number | null>(null)
-  const [status, setStatus] = useState<LoadStatus>('loading')
-  const [error, setError] = useState<string | null>(null)
 
   useEffect(
     () => () => {
       if (pressedRibbonTimeoutRef.current !== null) {
         window.clearTimeout(pressedRibbonTimeoutRef.current)
       }
+      if (textCommitTimerRef.current !== null) {
+        window.clearTimeout(textCommitTimerRef.current)
+      }
     },
     []
   )
 
   useEffect(() => {
-    let cancelled = false
-    async function loadDocument(): Promise<void> {
-      await Promise.resolve()
-      if (cancelled) return
-      setStatus('loading')
-      setError(null)
-      await loadEditablePresentation({ id: deck.itemId, url: deck.url, name: deck.name })
-        .then((loadedDocument) => {
-          if (cancelled) return
-          setDocument(loadedDocument)
-          setPast([])
-          setSlideCount(deck.itemId, loadedDocument.slideOrder.length)
-          setStatus('ready')
-        })
-        .catch((loadError) => {
-          if (cancelled) return
-          setStatus('failed')
-          setError(loadError instanceof Error ? loadError.message : String(loadError))
-        })
+    setSlideCount(deck.itemId, document.slideOrder.length)
+    if (activeSlideId !== storedActiveSlideId) {
+      setActiveSlideId(deck.itemId, activeSlideId)
     }
-    void loadDocument()
-    return () => {
-      cancelled = true
-    }
-  }, [deck.itemId, deck.name, deck.url, setSlideCount])
+  }, [
+    activeSlideId,
+    activeSlideIndex,
+    deck.itemId,
+    document.slideOrder.length,
+    setActiveSlideId,
+    setSlideCount,
+    storedActiveSlideId
+  ])
 
-  const activeSlideId =
-    document?.slideOrder[Math.min(activeSlideIndex, Math.max(0, document.slideOrder.length - 1))]
-  const activeSlide = activeSlideId ? document?.slides[activeSlideId] : null
+  const activateSlide = (slideId: string | null): void => {
+    if (slideId) {
+      const index = document.slideOrder.indexOf(slideId)
+      if (index >= 0) setLastActiveSlideIndex(index)
+    }
+    setActiveSlideId(deck.itemId, slideId)
+  }
+
+  const activeSlide = activeSlideId ? document.slides[activeSlideId] : null
   const selectedElement =
     activeSlide && selectedElementId ? activeSlide.elements[selectedElementId] : null
   const selectedImageElement = selectedElement?.type === 'image' ? selectedElement : null
@@ -399,16 +501,35 @@ function EditableDocumentView({
     onSelectedElementTypeChange(selectedElement?.type ?? null)
   }, [onSelectedElementTypeChange, selectedElement?.type])
 
+  const clearTextCommitTimer = (): void => {
+    if (textCommitTimerRef.current === null) return
+    window.clearTimeout(textCommitTimerRef.current)
+    textCommitTimerRef.current = null
+  }
+
+  const commitTextDraft = (): void => {
+    clearTextCommitTimer()
+    if (session.getSnapshot().draftKind === 'text') session.commitDraft()
+  }
+
   const commitDocument = (nextDocument: EditablePresentationDocument): void => {
-    if (!document) return
-    setPast((items) => [...items.slice(-29), document])
-    setDocument(nextDocument)
-    setSlideCount(deck.itemId, nextDocument.slideOrder.length)
-    void saveEditablePresentation({ id: deck.itemId, url: deck.url }, nextDocument).catch(
-      (saveError) => {
-        toast.danger(saveError instanceof Error ? saveError.message : String(saveError))
-      }
-    )
+    clearTextCommitTimer()
+    session.commit(nextDocument)
+  }
+
+  const previewTextElement = (
+    slideId: string,
+    elementId: string,
+    updates: Partial<EditablePresentationElement>
+  ): void => {
+    if (session.getSnapshot().draftKind !== 'text') session.beginDraft('text')
+    const preview = session.getSnapshot().renderedDocument
+    session.previewDraft(updateElementInSlide(preview, slideId, elementId, updates))
+    clearTextCommitTimer()
+    textCommitTimerRef.current = window.setTimeout(() => {
+      textCommitTimerRef.current = null
+      if (session.getSnapshot().draftKind === 'text') session.commitDraft()
+    }, 750)
   }
 
   const updateSelectedElement = (updates: Partial<EditablePresentationElement>): void => {
@@ -442,7 +563,9 @@ function EditableDocumentView({
       autoSize
     }
     const width =
-      autoSize === 'content' ? nextFrame.width : Math.max(INSERTED_TEXT_DRAG_MIN_SIZE.width, nextFrame.width)
+      autoSize === 'content'
+        ? nextFrame.width
+        : Math.max(INSERTED_TEXT_DRAG_MIN_SIZE.width, nextFrame.width)
     const height =
       autoSize === 'content'
         ? nextFrame.height
@@ -467,7 +590,7 @@ function EditableDocumentView({
     if (!document) return
     const result = insertBlankEditableSlide(document, document.slideOrder.length)
     commitDocument(result.document)
-    setActiveSlide(deck.itemId, result.document.slideOrder.indexOf(result.slideId))
+    activateSlide(result.slideId)
     setSelectedSlideIds(new Set([result.slideId]))
     setSelectedElementId(null)
   }
@@ -476,7 +599,7 @@ function EditableDocumentView({
     if (!document) return
     const result = insertBlankEditableSlide(document, index + 1)
     commitDocument(result.document)
-    setActiveSlide(deck.itemId, index + 1)
+    activateSlide(result.slideId)
     setSelectedSlideIds(new Set([result.slideId]))
     setSelectionAnchorIndex(index + 1)
     setSelectedElementId(null)
@@ -484,9 +607,9 @@ function EditableDocumentView({
   }
 
   const selectSlide = (index: number, event: React.MouseEvent | React.KeyboardEvent): void => {
-    if (!document) return
     const slideId = document.slideOrder[index]
     if (!slideId) return
+    commitTextDraft()
 
     if (event.shiftKey) {
       const start = Math.min(selectionAnchorIndex, index)
@@ -518,7 +641,7 @@ function EditableDocumentView({
       setSelectionAnchorIndex(index)
     }
 
-    setActiveSlide(deck.itemId, index)
+    activateSlide(slideId)
     setSelectedElementId(null)
     setIsTextInsertMode(false)
     setInsertionIndex(null)
@@ -552,7 +675,7 @@ function EditableDocumentView({
     if (result.slideIds.length === 0) return
     commitDocument(result.document)
     setSelectedSlideIds(new Set(result.slideIds))
-    setActiveSlide(deck.itemId, result.document.slideOrder.indexOf(result.slideIds[0]))
+    activateSlide(result.slideIds[0])
     setInsertionIndex(null)
     setSelectedElementId(null)
   }
@@ -572,7 +695,7 @@ function EditableDocumentView({
     const nextIndex = Math.min(activeSlideIndex, Math.max(0, nextDocument.slideOrder.length - 1))
     const nextSlideId = nextDocument.slideOrder[nextIndex]
     commitDocument(nextDocument)
-    setActiveSlide(deck.itemId, nextIndex)
+    activateSlide(nextSlideId ?? null)
     setSelectedSlideIds(nextSlideId ? new Set([nextSlideId]) : new Set())
     setSelectedElementId(null)
     setInsertionIndex(null)
@@ -638,14 +761,6 @@ function EditableDocumentView({
     )
   }
 
-  const undo = useCallback((): void => {
-    const previous = past[past.length - 1]
-    if (!document || !previous) return
-    setPast((items) => items.slice(0, -1))
-    setDocument(previous)
-    void saveEditablePresentation({ id: deck.itemId, url: deck.url }, previous)
-  }, [deck.itemId, deck.url, document, past])
-
   const addImage = async (file: File): Promise<void> => {
     if (!document || !activeSlideId) return
     const { dataUrl, width, height } = await readImageFile(file)
@@ -675,24 +790,6 @@ function EditableDocumentView({
   }
 
   const selectedTextElement = selectedElement?.type === 'text' ? selectedElement : null
-
-  useEffect(() => {
-    window.dispatchEvent(
-      new CustomEvent('hhc:presentation-undo-state', {
-        detail: { itemId: deck.itemId, canUndo: past.length > 0 }
-      })
-    )
-  }, [deck.itemId, past.length])
-
-  useEffect(() => {
-    const handleUndoRequest = (event: Event): void => {
-      const detail = (event as CustomEvent<{ itemId: string }>).detail
-      if (detail?.itemId !== deck.itemId) return
-      undo()
-    }
-    window.addEventListener('hhc:presentation-undo-request', handleUndoRequest)
-    return () => window.removeEventListener('hhc:presentation-undo-request', handleUndoRequest)
-  }, [deck.itemId, undo])
 
   const updateSelectedTextElement = (
     updates: Partial<Extract<EditablePresentationElement, { type: 'text' }>>
@@ -754,7 +851,7 @@ function EditableDocumentView({
     if (!document) return
     const [width, height] = value.split(':').map(Number)
     if (!width || !height) return
-    commitDocument({ ...document, width, height, updatedAt: Date.now() })
+    commitDocument(resizePresentationDocument(document, width, height))
   }
 
   const flashRibbonAction = (actionId: string): void => {
@@ -1122,6 +1219,13 @@ function EditableDocumentView({
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
       const target = event.target as HTMLElement | null
+      if (event.key === 'Escape' && session.getSnapshot().draftKind !== null) {
+        event.preventDefault()
+        clearTextCommitTimer()
+        session.cancelDraft()
+        setEditingElementId(null)
+        return
+      }
       const isEditingText =
         target?.isContentEditable ||
         target?.tagName === 'INPUT' ||
@@ -1172,20 +1276,11 @@ function EditableDocumentView({
     return () => window.removeEventListener('keydown', handleKeyDown)
   })
 
-  if (status === 'loading') {
-    return (
-      <div className="flex flex-1 items-center justify-center">
-        <Spinner />
-      </div>
-    )
-  }
-
-  if (status === 'failed' || !document || !activeSlideId) {
+  if (!activeSlideId) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
         <FileText className="text-danger" size={36} />
         <p className="text-sm font-semibold text-danger">{t('presentationWorkspace.loadFailed')}</p>
-        {error && <p className="max-w-lg text-xs text-default-400">{error}</p>}
       </div>
     )
   }
@@ -1328,12 +1423,22 @@ function EditableDocumentView({
                     if (elementId !== editingElementId) setEditingElementId(null)
                     if (elementId) setIsTextInsertMode(false)
                   }}
-                  onEditingElementChange={setEditingElementId}
+                  onEditingElementChange={(elementId) => {
+                    if (elementId === null) commitTextDraft()
+                    setEditingElementId(elementId)
+                  }}
                   onInsertText={addTextElement}
                   onElementContextMenu={showElementContextMenu}
-                  onUpdateElement={(slideId, elementId, updates) =>
-                    commitDocument(updateElementInSlide(document, slideId, elementId, updates))
-                  }
+                  onTransformStart={() => session.beginDraft('pointer')}
+                  onTransformPreview={(elementId, updates) => {
+                    const preview = session.getSnapshot().renderedDocument
+                    session.previewDraft(
+                      updateElementInSlide(preview, activeSlideId, elementId, updates)
+                    )
+                  }}
+                  onTransformCommit={() => session.commitDraft()}
+                  onTransformCancel={() => session.cancelDraft()}
+                  onUpdateElement={previewTextElement}
                 />
               </div>
             </div>

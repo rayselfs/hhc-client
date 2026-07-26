@@ -129,7 +129,15 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
     const item = await db.get('folder-items', activeDocument.itemId)
     if (!item || !isFileItem(item) || !isPresentationItem(item)) return
 
-    const slideIndex = usePresentationWorkspaceStore.getState().getActiveSlide(item.id)
+    const activeSlideId = usePresentationWorkspaceStore.getState().getActiveSlideId(item.id)
+    let slideIndex = 0
+    if (isEditablePresentationMimeType(item.mimeType)) {
+      const document = await loadEditablePresentation(item)
+      slideIndex = Math.max(0, document.slideOrder.indexOf(activeSlideId ?? ''))
+    } else if (activeSlideId?.startsWith('pptx-slide-')) {
+      const parsedIndex = Number(activeSlideId.slice('pptx-slide-'.length))
+      if (Number.isInteger(parsedIndex) && parsedIndex >= 0) slideIndex = parsedIndex
+    }
     const report = await startMediaProjection(
       [item],
       0,

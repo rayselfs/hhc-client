@@ -106,7 +106,7 @@ describe('FileBrowser presentation open behavior', () => {
       usePresentationWorkspaceStore.setState({
         documents: [],
         activeItemId: null,
-        activeSlideByItemId: {}
+        activeSlideIdByItemId: {}
       })
       useFileExplorerSearch.setState({ searchQuery: '' })
       useFileExplorerSettings.setState({

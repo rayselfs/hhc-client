@@ -29,7 +29,7 @@ describe('presentation workspace store', () => {
     usePresentationWorkspaceStore.setState({
       documents: [],
       activeItemId: null,
-      activeSlideByItemId: {}
+      activeSlideIdByItemId: {}
     })
   })
 
@@ -38,7 +38,7 @@ describe('presentation workspace store', () => {
     const second = makePresentationItem('pptx-2', 'Sermon.pptx')
 
     usePresentationWorkspaceStore.getState().openDocument(first)
-    usePresentationWorkspaceStore.getState().setActiveSlide(first.id, 3)
+    usePresentationWorkspaceStore.getState().setActiveSlideId(first.id, 'slide-d')
     usePresentationWorkspaceStore.getState().openDocument(second)
     usePresentationWorkspaceStore.getState().setSlideCount(second.id, 8)
 
@@ -47,9 +47,33 @@ describe('presentation workspace store', () => {
       'pptx-2'
     ])
     expect(usePresentationWorkspaceStore.getState().activeItemId).toBe('pptx-2')
-    expect(usePresentationWorkspaceStore.getState().getActiveSlide(first.id)).toBe(3)
-    expect(usePresentationWorkspaceStore.getState().getActiveSlide(second.id)).toBe(0)
+    expect(usePresentationWorkspaceStore.getState().getActiveSlideId(first.id)).toBe('slide-d')
+    expect(usePresentationWorkspaceStore.getState().getActiveSlideId(second.id)).toBeNull()
     expect(usePresentationWorkspaceStore.getState().documents[1].slideCount).toBe(8)
+  })
+
+  it('updates editor metadata only for the target document', () => {
+    usePresentationWorkspaceStore
+      .getState()
+      .openDocument(makeEditablePresentationItem('deck-1', 'Sunday'))
+    usePresentationWorkspaceStore
+      .getState()
+      .openDocument(makeEditablePresentationItem('deck-2', 'Sermon'))
+
+    usePresentationWorkspaceStore.getState().updateEditorMetadata('deck-1', {
+      saveStatus: 'dirty',
+      mirrorWarnings: ['thumbnail'],
+      canUndo: true,
+      canRedo: false
+    })
+
+    expect(usePresentationWorkspaceStore.getState().documents[0]).toMatchObject({
+      saveStatus: 'dirty',
+      mirrorWarnings: ['thumbnail'],
+      canUndo: true,
+      canRedo: false
+    })
+    expect(usePresentationWorkspaceStore.getState().documents[1]).not.toHaveProperty('saveStatus')
   })
 
   it('marks native presentation documents as editable mode', () => {
@@ -84,6 +108,13 @@ describe('presentation workspace store', () => {
     usePresentationWorkspaceStore.getState().openDocument(first)
     usePresentationWorkspaceStore.getState().openDocument(second)
     usePresentationWorkspaceStore.getState().openDocument(third)
+    usePresentationWorkspaceStore.getState().setActiveSlideId(third.id, 'slide-c')
+    usePresentationWorkspaceStore.getState().updateEditorMetadata(third.id, {
+      saveStatus: 'saved',
+      mirrorWarnings: [],
+      canUndo: false,
+      canRedo: false
+    })
 
     usePresentationWorkspaceStore.getState().closeDocument(third.id)
 
@@ -92,5 +123,6 @@ describe('presentation workspace store', () => {
       first.id,
       second.id
     ])
+    expect(usePresentationWorkspaceStore.getState().getActiveSlideId(third.id)).toBeNull()
   })
 })

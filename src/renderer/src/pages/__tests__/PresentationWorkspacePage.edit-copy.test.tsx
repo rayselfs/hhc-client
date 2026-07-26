@@ -6,10 +6,8 @@ import {
   createBlankEditablePresentationDocument,
   createTextElement
 } from '@renderer/lib/editable-presentation'
-import {
-  EDITABLE_PRESENTATION_MIME_TYPE,
-  PPTX_MIME_TYPE
-} from '@renderer/lib/presentation-media'
+import { EDITABLE_PRESENTATION_MIME_TYPE, PPTX_MIME_TYPE } from '@renderer/lib/presentation-media'
+import { PresentationSessionRegistryProvider } from '@renderer/contexts/PresentationSessionRegistryContext'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { usePresentationWorkspaceStore } from '@renderer/stores/presentation-workspace'
 import type { FileItemRecord } from '@shared/types/folder'
@@ -18,6 +16,8 @@ const mocks = vi.hoisted(() => ({
   convertPptxToEditablePresentation: vi.fn(),
   loadEditablePresentation: vi.fn(),
   saveEditablePresentation: vi.fn(),
+  persistEditablePresentationRevision: vi.fn(),
+  refreshEditablePresentationThumbnail: vi.fn(),
   navigate: vi.fn(),
   toastDanger: vi.fn(),
   readPresentationArrayBuffer: vi.fn(),
@@ -64,6 +64,11 @@ vi.mock('@renderer/lib/editable-presentation', async () => {
     saveEditablePresentation: mocks.saveEditablePresentation
   }
 })
+
+vi.mock('@renderer/lib/editable-presentation-persistence', () => ({
+  persistEditablePresentationRevision: mocks.persistEditablePresentationRevision,
+  refreshEditablePresentationThumbnail: mocks.refreshEditablePresentationThumbnail
+}))
 
 function makeFile(overrides: Partial<FileItemRecord> = {}): FileItemRecord {
   return {
@@ -114,7 +119,11 @@ function renderEditableDeck(sourceItem: FileItemRecord): void {
     isInitialized: true
   })
   usePresentationWorkspaceStore.getState().openDocument(sourceItem)
-  render(<PresentationWorkspacePage />)
+  render(
+    <PresentationSessionRegistryProvider>
+      <PresentationWorkspacePage />
+    </PresentationSessionRegistryProvider>
+  )
 }
 
 describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
@@ -123,6 +132,13 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
     mocks.loadEditablePresentation.mockReset()
     mocks.saveEditablePresentation.mockReset()
     mocks.saveEditablePresentation.mockResolvedValue(undefined)
+    mocks.persistEditablePresentationRevision.mockReset()
+    mocks.persistEditablePresentationRevision.mockImplementation(async (request) => ({
+      revision: request.revision,
+      mirrorWarnings: []
+    }))
+    mocks.refreshEditablePresentationThumbnail.mockReset()
+    mocks.refreshEditablePresentationThumbnail.mockResolvedValue(undefined)
     mocks.navigate.mockReset()
     mocks.toastDanger.mockReset()
     mocks.readPresentationArrayBuffer.mockResolvedValue(new ArrayBuffer(8))
@@ -139,7 +155,7 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
     usePresentationWorkspaceStore.setState({
       documents: [],
       activeItemId: null,
-      activeSlideByItemId: {}
+      activeSlideIdByItemId: {}
     })
   })
 
@@ -156,7 +172,9 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
     renderReadOnlyDeck(sourceItem)
     fireEvent.click(screen.getByRole('button', { name: 'Edit a copy' }))
 
-    await waitFor(() => expect(mocks.convertPptxToEditablePresentation).toHaveBeenCalledWith(sourceItem))
+    await waitFor(() =>
+      expect(mocks.convertPptxToEditablePresentation).toHaveBeenCalledWith(sourceItem)
+    )
     expect(usePresentationWorkspaceStore.getState().activeItemId).toBe('editable-1')
     expect(usePresentationWorkspaceStore.getState().documents.at(-1)).toMatchObject({
       itemId: 'editable-1',
@@ -224,18 +242,22 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
     fireEvent.change(screen.getByLabelText('height'), { target: { value: '96' } })
 
     await waitFor(() =>
-      expect(mocks.saveEditablePresentation).toHaveBeenLastCalledWith(
-        { id: 'editable-deck', url: 'blob:editable-deck' },
+      expect(mocks.persistEditablePresentationRevision).toHaveBeenLastCalledWith(
         expect.objectContaining({
-          slides: expect.objectContaining({
-            [slideId]: expect.objectContaining({
-              elements: expect.objectContaining({
-                [text.id]: expect.objectContaining({ height: 96 })
+          itemId: 'editable-deck',
+          sourceBlobId: 'editable-deck',
+          document: expect.objectContaining({
+            slides: expect.objectContaining({
+              [slideId]: expect.objectContaining({
+                elements: expect.objectContaining({
+                  [text.id]: expect.objectContaining({ height: 96 })
+                })
               })
             })
           })
         })
       )
     )
+    expect(mocks.saveEditablePresentation).not.toHaveBeenCalled()
   })
 })

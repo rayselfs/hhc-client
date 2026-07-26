@@ -290,6 +290,89 @@ describe('EditableSlideSurface', () => {
     )
   })
 
+  it('groups pointer previews into one transform transaction', () => {
+    const onTransformStart = vi.fn()
+    const onTransformPreview = vi.fn()
+    const onTransformCommit = vi.fn()
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const slideId = document.slideOrder[0]
+    const text = createTextElement({
+      text: 'Move once',
+      x: 100,
+      y: 80,
+      width: 220,
+      height: 40,
+      autoWidth: false
+    })
+    const withText = addElementToSlide(document, slideId, text)
+
+    render(
+      <EditableSlideSurface
+        document={withText}
+        slideId={slideId}
+        editable
+        selectedElementId={text.id}
+        onTransformStart={onTransformStart}
+        onTransformPreview={onTransformPreview}
+        onTransformCommit={onTransformCommit}
+      />
+    )
+
+    const textBox = screen.getByText('Move once')
+    mockElementRect(textBox, { left: 100, top: 80, width: 220, height: 40 })
+    fireEvent.pointerDown(textBox, { clientX: 102, clientY: 100, pointerId: 1 })
+    for (let index = 1; index <= 100; index += 1) {
+      fireEvent.pointerMove(textBox, {
+        clientX: 102 + index,
+        clientY: 100 + index,
+        pointerId: 1
+      })
+    }
+    fireEvent.pointerUp(textBox, { clientX: 202, clientY: 200, pointerId: 1 })
+
+    expect(onTransformStart).toHaveBeenCalledTimes(1)
+    expect(onTransformPreview).toHaveBeenCalledTimes(100)
+    expect(onTransformCommit).toHaveBeenCalledTimes(1)
+  })
+
+  it('cancels a pointer transform without committing it', () => {
+    const onTransformStart = vi.fn()
+    const onTransformCommit = vi.fn()
+    const onTransformCancel = vi.fn()
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const slideId = document.slideOrder[0]
+    const text = createTextElement({
+      text: 'Cancel move',
+      x: 100,
+      y: 80,
+      width: 220,
+      height: 40,
+      autoWidth: false
+    })
+    const withText = addElementToSlide(document, slideId, text)
+
+    render(
+      <EditableSlideSurface
+        document={withText}
+        slideId={slideId}
+        editable
+        selectedElementId={text.id}
+        onTransformStart={onTransformStart}
+        onTransformCancel={onTransformCancel}
+        onTransformCommit={onTransformCommit}
+      />
+    )
+
+    const textBox = screen.getByText('Cancel move')
+    mockElementRect(textBox, { left: 100, top: 80, width: 220, height: 40 })
+    fireEvent.pointerDown(textBox, { clientX: 102, clientY: 100, pointerId: 1 })
+    fireEvent.pointerCancel(textBox, { pointerId: 1 })
+
+    expect(onTransformStart).toHaveBeenCalledTimes(1)
+    expect(onTransformCancel).toHaveBeenCalledTimes(1)
+    expect(onTransformCommit).not.toHaveBeenCalled()
+  })
+
   it('keeps manually-sized text boxes at fixed width and height while typing', () => {
     mockTextMeasurement()
     const handleUpdate = vi.fn()

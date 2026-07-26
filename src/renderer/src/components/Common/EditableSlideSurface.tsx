@@ -26,6 +26,10 @@ interface EditableSlideSurfaceProps {
   onEditingElementChange?: (elementId: string | null) => void
   onInsertText?: (frame: EditableTextInsertFrame) => void
   onElementContextMenu?: (event: React.MouseEvent, element: EditablePresentationElement) => void
+  onTransformStart?: () => void
+  onTransformPreview?: (elementId: string, updates: Partial<EditablePresentationElement>) => void
+  onTransformCommit?: () => void
+  onTransformCancel?: () => void
   onUpdateElement?: (
     slideId: string,
     elementId: string,
@@ -74,6 +78,10 @@ export default function EditableSlideSurface({
   onEditingElementChange,
   onInsertText,
   onElementContextMenu,
+  onTransformStart,
+  onTransformPreview,
+  onTransformCommit,
+  onTransformCancel,
   onUpdateElement
 }: EditableSlideSurfaceProps): React.JSX.Element {
   const slide = document.slides[slideId]
@@ -136,6 +144,7 @@ export default function EditableSlideSurface({
     }
     onEditingElementChange?.(null)
     onSelectElement?.(element.id)
+    onTransformStart?.()
     event.currentTarget.setPointerCapture?.(event.pointerId)
   }
 
@@ -145,37 +154,39 @@ export default function EditableSlideSurface({
     event.preventDefault()
     const dx = (event.clientX - drag.startX) * scaleRef.current.x
     const dy = (event.clientY - drag.startY) * scaleRef.current.y
+    let updates: Partial<EditablePresentationElement>
     if (drag.mode === 'move') {
-      onUpdateElement?.(slideId, drag.elementId, {
+      updates = {
         x: Math.max(0, drag.original.x + dx),
         y: Math.max(0, drag.original.y + dy)
-      } as Partial<EditablePresentationElement>)
+      } as Partial<EditablePresentationElement>
     } else if (drag.mode === 'crop' && drag.original.type === 'image' && drag.handle) {
-      onUpdateElement?.(slideId, drag.elementId, {
+      updates = {
         crop: calculateImageCrop(drag.original.crop, drag.handle, dx, dy, drag.original)
-      } as Partial<EditablePresentationElement>)
+      } as Partial<EditablePresentationElement>
     } else if (drag.original.type === 'text' && drag.handle) {
-      onUpdateElement?.(slideId, drag.elementId, {
+      updates = {
         ...calculateTextResize(drag.original, drag.handle, dx, dy),
         autoWidth: false,
         autoSize: 'fixed'
-      } as Partial<EditablePresentationElement>)
+      } as Partial<EditablePresentationElement>
     } else if (drag.original.type === 'image' && drag.handle) {
-      onUpdateElement?.(
-        slideId,
-        drag.elementId,
-        calculateImageResize(
-          drag.original,
-          drag.handle,
-          dx,
-          dy
-        ) as Partial<EditablePresentationElement>
-      )
+      updates = calculateImageResize(
+        drag.original,
+        drag.handle,
+        dx,
+        dy
+      ) as Partial<EditablePresentationElement>
     } else {
-      onUpdateElement?.(slideId, drag.elementId, {
+      updates = {
         width: Math.max(MIN_ELEMENT_SIZE, drag.original.width + dx),
         height: Math.max(MIN_ELEMENT_SIZE, drag.original.height + dy)
-      } as Partial<EditablePresentationElement>)
+      } as Partial<EditablePresentationElement>
+    }
+    if (onTransformPreview) {
+      onTransformPreview(drag.elementId, updates)
+    } else {
+      onUpdateElement?.(slideId, drag.elementId, updates)
     }
   }
 
@@ -185,6 +196,16 @@ export default function EditableSlideSurface({
     if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId)
     }
+    onTransformCommit?.()
+  }
+
+  const cancelDrag = (event: React.PointerEvent): void => {
+    if (!dragRef.current) return
+    dragRef.current = null
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+    onTransformCancel?.()
   }
 
   const getCanvasPoint = (
@@ -315,6 +336,7 @@ export default function EditableSlideSurface({
             onPointerDown={(event) => startDrag(event, element, 'move')}
             onPointerMove={updateDrag}
             onPointerUp={endDrag}
+            onPointerCancel={cancelDrag}
             onContextMenu={(event) => onElementContextMenu?.(event, element)}
             onUpdateElement={onUpdateElement}
             onResizePointerDown={(event, handle) => startDrag(event, element, 'resize', handle)}
@@ -353,6 +375,7 @@ function SlideElement({
   onPointerDown,
   onPointerMove,
   onPointerUp,
+  onPointerCancel,
   onContextMenu,
   onUpdateElement,
   onResizePointerDown,
@@ -371,6 +394,7 @@ function SlideElement({
   onPointerDown: (event: React.PointerEvent) => void
   onPointerMove: (event: React.PointerEvent) => void
   onPointerUp: (event: React.PointerEvent) => void
+  onPointerCancel: (event: React.PointerEvent) => void
   onContextMenu?: (event: React.MouseEvent) => void
   onUpdateElement?: (
     slideId: string,
@@ -404,6 +428,7 @@ function SlideElement({
       }}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
+      onPointerCancel={onPointerCancel}
       onContextMenu={onContextMenu}
       onClick={(event) => {
         event.stopPropagation()
@@ -428,6 +453,7 @@ function SlideElement({
           onCropPointerDown={onCropPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
+          onPointerCancel={onPointerCancel}
         />
       )}
     </div>
@@ -440,7 +466,8 @@ function ElementHandles({
   onResizePointerDown,
   onCropPointerDown,
   onPointerMove,
-  onPointerUp
+  onPointerUp,
+  onPointerCancel
 }: {
   element: EditablePresentationElement
   cropMode: boolean
@@ -448,6 +475,7 @@ function ElementHandles({
   onCropPointerDown: (event: React.PointerEvent, handle: ResizeHandle) => void
   onPointerMove: (event: React.PointerEvent) => void
   onPointerUp: (event: React.PointerEvent) => void
+  onPointerCancel: (event: React.PointerEvent) => void
 }): React.JSX.Element {
   if (element.type === 'text') {
     return (
@@ -461,6 +489,7 @@ function ElementHandles({
             onPointerDown={(event) => onResizePointerDown(event, handle)}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
+            onPointerCancel={onPointerCancel}
           />
         ))}
       </>
@@ -486,6 +515,7 @@ function ElementHandles({
             }
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
+            onPointerCancel={onPointerCancel}
           />
         ))}
       </>
@@ -500,6 +530,7 @@ function ElementHandles({
       onPointerDown={(event) => onResizePointerDown(event, 'se')}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
+      onPointerCancel={onPointerCancel}
     />
   )
 }

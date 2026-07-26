@@ -12,6 +12,7 @@ import { ProjectionProvider } from '@renderer/contexts/ProjectionContext'
 import { TimerEngineProvider } from '@renderer/contexts/TimerEngineContext'
 import { ContextMenuProvider } from '@renderer/contexts/ContextMenuContext'
 import { ConfirmDialogProvider } from '@renderer/contexts/ConfirmDialogContext'
+import { PresentationSessionRegistryProvider } from '@renderer/contexts/PresentationSessionRegistryContext'
 import { ShortcutScopeProvider } from '@renderer/contexts/ShortcutScopeContext'
 import LanRemoteBridge from '@renderer/contexts/LanRemoteBridge'
 import { AppInitContext } from '@renderer/contexts/AppInitContext'
@@ -64,26 +65,28 @@ export default function Layout(): React.JSX.Element {
           <ProjectionProvider>
             <ContextMenuProvider>
               <ConfirmDialogProvider>
-                <div className="flex h-screen overflow-hidden bg-background text-foreground">
-                  <Sidebar />
-                  <div className="flex flex-1 flex-col min-h-0">
-                    {isPresentationWorkspace ? <PresentationWorkspaceHeader /> : <Header />}
-                    <main
-                      className={
-                        isPresentationWorkspace
-                          ? 'flex-1 overflow-hidden'
-                          : 'flex-1 overflow-y-auto py-4 px-3'
-                      }
-                    >
-                      <Outlet />
-                    </main>
+                <PresentationSessionRegistryProvider>
+                  <div className="flex h-screen overflow-hidden bg-background text-foreground">
+                    <Sidebar />
+                    <div className="flex flex-1 flex-col min-h-0">
+                      {isPresentationWorkspace ? <PresentationWorkspaceHeader /> : <Header />}
+                      <main
+                        className={
+                          isPresentationWorkspace
+                            ? 'flex-1 overflow-hidden'
+                            : 'flex-1 overflow-y-auto py-4 px-3'
+                        }
+                      >
+                        <Outlet />
+                      </main>
+                    </div>
+                    <FloatingTimer />
+                    {isPresentingMedia && <MediaPresenter />}
                   </div>
-                  <FloatingTimer />
-                  {isPresentingMedia && <MediaPresenter />}
-                </div>
-                <ConfirmDialog />
-                <TimerProjectionBridge />
-                <LanRemoteBridge />
+                  <ConfirmDialog />
+                  <TimerProjectionBridge />
+                  <LanRemoteBridge />
+                </PresentationSessionRegistryProvider>
               </ConfirmDialogProvider>
             </ContextMenuProvider>
           </ProjectionProvider>

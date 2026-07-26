@@ -1,5 +1,9 @@
 import { create } from 'zustand'
 import { isEditablePresentationMimeType } from '@renderer/lib/presentation-media'
+import type {
+  PresentationMirrorWarning,
+  PresentationSaveStatus
+} from '@renderer/lib/presentation-save-coordinator'
 import type { FileItemRecord } from '@shared/types/folder'
 
 export interface PresentationWorkspaceDocument {
@@ -11,21 +15,31 @@ export interface PresentationWorkspaceDocument {
   size: number
   openedAt: number
   slideCount?: number
+  saveStatus?: PresentationSaveStatus
+  mirrorWarnings?: PresentationMirrorWarning[]
+  canUndo?: boolean
+  canRedo?: boolean
 }
+
+type PresentationEditorMetadata = Pick<
+  PresentationWorkspaceDocument,
+  'saveStatus' | 'mirrorWarnings' | 'canUndo' | 'canRedo'
+>
 
 interface PresentationWorkspaceState {
   documents: PresentationWorkspaceDocument[]
   activeItemId: string | null
-  activeSlideByItemId: Record<string, number>
+  activeSlideIdByItemId: Record<string, string | null>
 
   openDocument: (item: FileItemRecord) => void
   closeDocument: (itemId: string) => void
   setActiveDocument: (itemId: string) => void
   updateDocumentName: (itemId: string, name: string) => void
-  setActiveSlide: (itemId: string, slideIndex: number) => void
+  updateEditorMetadata: (itemId: string, patch: PresentationEditorMetadata) => void
+  setActiveSlideId: (itemId: string, slideId: string | null) => void
   setSlideCount: (itemId: string, slideCount: number) => void
   getActiveDocument: () => PresentationWorkspaceDocument | null
-  getActiveSlide: (itemId: string) => number
+  getActiveSlideId: (itemId: string) => string | null
 }
 
 function toWorkspaceDocument(item: FileItemRecord): PresentationWorkspaceDocument {
@@ -43,7 +57,7 @@ function toWorkspaceDocument(item: FileItemRecord): PresentationWorkspaceDocumen
 export const usePresentationWorkspaceStore = create<PresentationWorkspaceState>()((set, get) => ({
   documents: [],
   activeItemId: null,
-  activeSlideByItemId: {},
+  activeSlideIdByItemId: {},
 
   openDocument: (item) =>
     set((state) => {
@@ -56,9 +70,9 @@ export const usePresentationWorkspaceStore = create<PresentationWorkspaceState>(
       return {
         documents,
         activeItemId: item.id,
-        activeSlideByItemId: {
-          ...state.activeSlideByItemId,
-          [item.id]: state.activeSlideByItemId[item.id] ?? 0
+        activeSlideIdByItemId: {
+          ...state.activeSlideIdByItemId,
+          [item.id]: state.activeSlideIdByItemId[item.id] ?? null
         }
       }
     }),
@@ -67,12 +81,12 @@ export const usePresentationWorkspaceStore = create<PresentationWorkspaceState>(
     set((state) => {
       const index = state.documents.findIndex((document) => document.itemId === itemId)
       const documents = state.documents.filter((document) => document.itemId !== itemId)
-      const { [itemId]: _removed, ...activeSlideByItemId } = state.activeSlideByItemId
+      const { [itemId]: _removed, ...activeSlideIdByItemId } = state.activeSlideIdByItemId
       const activeItemId =
         state.activeItemId !== itemId
           ? state.activeItemId
           : ((documents[Math.max(0, index - 1)] ?? documents[index] ?? null)?.itemId ?? null)
-      return { documents, activeItemId, activeSlideByItemId }
+      return { documents, activeItemId, activeSlideIdByItemId }
     }),
 
   setActiveDocument: (itemId) => set({ activeItemId: itemId }),
@@ -84,11 +98,18 @@ export const usePresentationWorkspaceStore = create<PresentationWorkspaceState>(
       )
     })),
 
-  setActiveSlide: (itemId, slideIndex) =>
+  updateEditorMetadata: (itemId, patch) =>
     set((state) => ({
-      activeSlideByItemId: {
-        ...state.activeSlideByItemId,
-        [itemId]: Math.max(0, slideIndex)
+      documents: state.documents.map((document) =>
+        document.itemId === itemId ? { ...document, ...patch } : document
+      )
+    })),
+
+  setActiveSlideId: (itemId, slideId) =>
+    set((state) => ({
+      activeSlideIdByItemId: {
+        ...state.activeSlideIdByItemId,
+        [itemId]: slideId
       }
     })),
 
@@ -97,11 +118,7 @@ export const usePresentationWorkspaceStore = create<PresentationWorkspaceState>(
       documents: state.documents.map((document) => {
         if (document.itemId !== itemId || document.slideCount === slideCount) return document
         return { ...document, slideCount }
-      }),
-      activeSlideByItemId: {
-        ...state.activeSlideByItemId,
-        [itemId]: Math.min(state.activeSlideByItemId[itemId] ?? 0, Math.max(0, slideCount - 1))
-      }
+      })
     })),
 
   getActiveDocument: () => {
@@ -109,5 +126,5 @@ export const usePresentationWorkspaceStore = create<PresentationWorkspaceState>(
     return state.documents.find((document) => document.itemId === state.activeItemId) ?? null
   },
 
-  getActiveSlide: (itemId) => get().activeSlideByItemId[itemId] ?? 0
+  getActiveSlideId: (itemId) => get().activeSlideIdByItemId[itemId] ?? null
 }))
