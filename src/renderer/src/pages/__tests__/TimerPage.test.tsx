@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import type { RenderResult } from '@testing-library/react'
 import { I18nextProvider } from 'react-i18next'
 import i18n from '@renderer/i18n'
@@ -309,5 +309,71 @@ describe('TimerPage — projection ownership', () => {
     renderTimerPage()
 
     expect(mockClaimProjection).not.toHaveBeenCalled()
+  })
+})
+
+describe('TimerPage — Space projection action', () => {
+  function mockProjectionForShortcut(): ReturnType<typeof vi.fn> {
+    const startProjection = vi.fn(() => Promise.resolve())
+    vi.mocked(useProjection).mockReturnValue({
+      isProjectionOpen: true,
+      isProjectionBlanked: false,
+      projectionReadyCount: 1,
+      activeOwner: 'timer',
+      claimProjection: vi.fn(),
+      startProjection,
+      stopProjection: vi.fn(),
+      openProjection: vi.fn(),
+      bringProjectionToFront: vi.fn(),
+      closeProjection: vi.fn(),
+      blankProjection: vi.fn(),
+      project: vi.fn(),
+      send: vi.fn(),
+      on: vi.fn()
+    })
+    return startProjection
+  }
+
+  it('starts projection and timer when Space is pressed from stopped', () => {
+    const startProjection = mockProjectionForShortcut()
+    useTimerStore.setState({ status: 'stopped' })
+    renderTimerPage()
+
+    fireEvent.keyDown(document.body, { code: 'Space' })
+
+    expect(startProjection).toHaveBeenCalledWith(
+      'timer',
+      expect.arrayContaining([['timer:tick', expect.any(Object)]])
+    )
+    expect(useTimerStore.getState().status).toBe('running')
+  })
+
+  it('starts projection and resumes timer when Space is pressed from paused', () => {
+    const startProjection = mockProjectionForShortcut()
+    useTimerStore.setState({ status: 'paused', remainingSeconds: 30 })
+    renderTimerPage()
+
+    fireEvent.keyDown(document.body, { code: 'Space' })
+
+    expect(startProjection).toHaveBeenCalledWith(
+      'timer',
+      expect.arrayContaining([['timer:tick', expect.any(Object)]])
+    )
+    expect(useTimerStore.getState().status).toBe('running')
+  })
+
+  it('pauses without foregrounding when Space is pressed while running', () => {
+    const startProjection = mockProjectionForShortcut()
+    useTimerStore.setState({
+      status: 'running',
+      targetEndTime: Date.now() + 30_000,
+      remainingSeconds: 30
+    })
+    renderTimerPage()
+
+    fireEvent.keyDown(document.body, { code: 'Space' })
+
+    expect(startProjection).not.toHaveBeenCalled()
+    expect(useTimerStore.getState().status).toBe('paused')
   })
 })
