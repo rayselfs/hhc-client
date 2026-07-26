@@ -15,7 +15,7 @@ const targets = [
     arch: 'arm64',
     source: '.local-runtimes/vlc/darwin-arm64',
     dest: 'resources/video-engine/vlc/darwin-arm64',
-    required: ['libvlc.dylib', 'libvlc.5.dylib']
+    required: ['libvlc.dylib', 'libvlc.5.dylib', 'lib/libvlc.dylib', 'lib/libvlc.5.dylib']
   },
   {
     name: 'VLC macOS x64',
@@ -23,7 +23,7 @@ const targets = [
     arch: 'x64',
     source: '.local-runtimes/vlc/darwin-x64',
     dest: 'resources/video-engine/vlc/darwin-x64',
-    required: ['libvlc.dylib', 'libvlc.5.dylib']
+    required: ['libvlc.dylib', 'libvlc.5.dylib', 'lib/libvlc.dylib', 'lib/libvlc.5.dylib']
   },
   {
     name: 'VLC Windows x64',

@@ -43,12 +43,12 @@ describe('prepare video engine runtime script', () => {
 
   it('requires only the current platform runtime in strict mode', async () => {
     const root = await createTempRoot()
-    await writeRuntimeFile(root, '.local-runtimes/vlc/darwin-arm64/libvlc.dylib')
+    await writeRuntimeFile(root, '.local-runtimes/vlc/darwin-arm64/lib/libvlc.dylib')
     await writeRuntimeFile(root, '.local-runtimes/ffmpeg/darwin-arm64/ffmpeg')
 
     await expect(runPrepare(root, ['--strict'])).resolves.toBeUndefined()
     await expect(
-      access(join(root, 'resources/video-engine/vlc/darwin-arm64/libvlc.dylib'))
+      access(join(root, 'resources/video-engine/vlc/darwin-arm64/lib/libvlc.dylib'))
     ).resolves.toBeUndefined()
     await expect(
       access(join(root, 'resources/video-engine/ffmpeg/darwin-arm64/ffmpeg'))

@@ -30,7 +30,12 @@ function canExecute(path: string): boolean {
 
 function canUseBundledVlc(path: string): boolean {
   if (process.platform === 'darwin') {
-    return canExecute(join(path, 'libvlc.dylib')) || canExecute(join(path, 'libvlc.5.dylib'))
+    return [
+      'libvlc.dylib',
+      'libvlc.5.dylib',
+      join('lib', 'libvlc.dylib'),
+      join('lib', 'libvlc.5.dylib')
+    ].some((file) => canExecute(join(path, file)))
   }
   if (process.platform === 'win32') {
     return canExecute(join(path, 'libvlc.dll'))

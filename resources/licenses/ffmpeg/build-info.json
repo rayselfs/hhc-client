@@ -2,10 +2,23 @@
   "component": "FFmpeg",
   "purpose": "desktop video poster generation only",
   "bundled": true,
-  "version": "provided by release runtime archive",
+  "version": {
+    "darwin-arm64": "8.1.2",
+    "win32-x64": "8.1.2-21-gce3c09c101"
+  },
   "sourceUrl": "https://git.ffmpeg.org/ffmpeg.git",
-  "binarySourceUrl": "configured through VIDEO_ENGINE_FFMPEG_*_URL repository variables",
-  "configure": null,
-  "license": "LGPL-2.1-or-later or GPL-2.0-or-later depending on build configuration",
-  "notes": "Release builds must use verified runtime archives and publish their source/version/configure details with the release."
+  "binarySourceUrl": {
+    "darwin-arm64": "built from https://ffmpeg.org/releases/ffmpeg-8.1.2.tar.xz",
+    "win32-x64": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-06-30-13-34/ffmpeg-n8.1.2-21-gce3c09c101-win64-lgpl-8.1.zip"
+  },
+  "sha256": {
+    "darwin-arm64-source": "464beb5e7bf0c311e68b45ae2f04e9cc2af88851abb4082231742a74d97b524c",
+    "win32-x64": "3b9eceb438016b647e0755a51ce3a388cd4ed5679e2427cb83a01e1ae2cd0eba"
+  },
+  "configure": {
+    "darwin-arm64": "--disable-autodetect --disable-debug --disable-doc --disable-ffplay --disable-ffprobe --disable-network --disable-shared --enable-static --disable-gpl --disable-version3 --disable-nonfree",
+    "win32-x64": "BtbN LGPL build; see the matching upstream release metadata."
+  },
+  "license": "LGPL-2.1-or-later",
+  "notes": "Release builds verify sources or binaries before packaging. macOS is compiled from official source without GPL, version3, or nonfree components."
 }

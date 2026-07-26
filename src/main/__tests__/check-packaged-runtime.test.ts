@@ -31,7 +31,7 @@ async function writeValidMacPackage(root: string): Promise<string> {
     resourcesRoot,
     'app.asar.unpacked/node_modules/electron-vlc-player/build/Release/vlc_binding.node'
   )
-  await writeFileIn(resourcesRoot, 'video-engine/vlc/darwin-arm64/libvlc.dylib')
+  await writeFileIn(resourcesRoot, 'video-engine/vlc/darwin-arm64/lib/libvlc.dylib')
   await writeFileIn(resourcesRoot, 'video-engine/ffmpeg/darwin-arm64/ffmpeg')
   return resourcesRoot
 }
@@ -61,7 +61,7 @@ describe('check packaged runtime script', () => {
   it('rejects packaged apps missing runtime binaries', async () => {
     const root = await createTempRoot()
     const resourcesRoot = await writeValidMacPackage(root)
-    await rm(join(resourcesRoot, 'video-engine/vlc/darwin-arm64/libvlc.dylib'))
+    await rm(join(resourcesRoot, 'video-engine/vlc/darwin-arm64/lib/libvlc.dylib'))
 
     await expect(runChecker(root)).rejects.toMatchObject({ code: 1 })
   })

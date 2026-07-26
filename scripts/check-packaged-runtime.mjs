@@ -23,13 +23,13 @@ const nativeBindingFile =
 const targetChecks = {
   'darwin-arm64': {
     vlcDir: 'video-engine/vlc/darwin-arm64',
-    vlcFiles: ['libvlc.dylib', 'libvlc.5.dylib'],
+    vlcFiles: ['libvlc.dylib', 'libvlc.5.dylib', 'lib/libvlc.dylib', 'lib/libvlc.5.dylib'],
     ffmpegDir: 'video-engine/ffmpeg/darwin-arm64',
     ffmpegFiles: ['ffmpeg']
   },
   'darwin-x64': {
     vlcDir: 'video-engine/vlc/darwin-x64',
-    vlcFiles: ['libvlc.dylib', 'libvlc.5.dylib'],
+    vlcFiles: ['libvlc.dylib', 'libvlc.5.dylib', 'lib/libvlc.dylib', 'lib/libvlc.5.dylib'],
     ffmpegDir: 'video-engine/ffmpeg/darwin-x64',
     ffmpegFiles: ['ffmpeg']
   },

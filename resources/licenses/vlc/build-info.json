@@ -2,9 +2,16 @@
   "component": "VLC / libVLC",
   "purpose": "desktop video playback engine",
   "bundled": true,
-  "version": "provided by release runtime archive",
+  "version": "3.0.23",
   "sourceUrl": "https://code.videolan.org/videolan/vlc",
-  "binarySourceUrl": "configured through VIDEO_ENGINE_VLC_*_URL repository variables",
+  "binarySourceUrl": {
+    "darwin-arm64": "https://get.videolan.org/vlc/3.0.23/macosx/vlc-3.0.23-arm64.dmg",
+    "win32-x64": "https://get.videolan.org/vlc/3.0.23/win64/vlc-3.0.23-win64.zip"
+  },
+  "sha256": {
+    "darwin-arm64": "fc6fac08d87f538517d44aca0c5e7a244b67c8c4cb589bf478363a7315fd5e0d",
+    "win32-x64": "992d19dbd0b8a7cde9167d2f7780b1ef6f92acc8a71acfa736101a21f35181e1"
+  },
   "license": "GPL-2.0-or-later / LGPL-2.1-or-later components",
-  "notes": "Release builds must use verified runtime archives and publish their source/version details with the release."
+  "notes": "Release builds verify these platform archives before packaging."
 }

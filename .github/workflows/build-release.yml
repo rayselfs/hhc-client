@@ -72,7 +72,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14
+          - os: macos-15
             target: --mac
             artifact: macos
             smoke_executable: dist/mac-arm64/LibrePresenter.app/Contents/MacOS/LibrePresenter
@@ -100,11 +100,56 @@ jobs:
         env:
           VLC_URL: ${{ vars.VIDEO_ENGINE_VLC_DARWIN_ARM64_URL }}
           VLC_SHA256: ${{ vars.VIDEO_ENGINE_VLC_DARWIN_ARM64_SHA256 }}
-          FFMPEG_URL: ${{ vars.VIDEO_ENGINE_FFMPEG_DARWIN_ARM64_URL }}
-          FFMPEG_SHA256: ${{ vars.VIDEO_ENGINE_FFMPEG_DARWIN_ARM64_SHA256 }}
         run: |
-          node scripts/download-video-engine-runtime.mjs --component=vlc --platform=darwin --arch=arm64 --url="${VLC_URL}" --sha256="${VLC_SHA256}"
-          node scripts/download-video-engine-runtime.mjs --component=ffmpeg --platform=darwin --arch=arm64 --url="${FFMPEG_URL}" --sha256="${FFMPEG_SHA256}"
+          VLC_DMG="${RUNNER_TEMP}/vlc-arm64.dmg"
+          VLC_MOUNT="${RUNNER_TEMP}/vlc-volume"
+
+          curl --fail --location --silent --show-error "${VLC_URL}" --output "${VLC_DMG}"
+          printf '%s  %s\n' "${VLC_SHA256}" "${VLC_DMG}" | shasum --algorithm 256 --check
+          mkdir -p "${VLC_MOUNT}" .local-runtimes/vlc/darwin-arm64
+          hdiutil attach -nobrowse -readonly -mountpoint "${VLC_MOUNT}" "${VLC_DMG}"
+          trap 'hdiutil detach "${VLC_MOUNT}" >/dev/null 2>&1 || true' EXIT
+          cp -R "${VLC_MOUNT}/VLC.app/Contents/MacOS/." .local-runtimes/vlc/darwin-arm64/
+          hdiutil detach "${VLC_MOUNT}"
+          trap - EXIT
+
+      - name: Build LGPL FFmpeg runtime for macOS
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          FFMPEG_VERSION: 8.1.2
+          FFMPEG_SOURCE_SHA256: 464beb5e7bf0c311e68b45ae2f04e9cc2af88851abb4082231742a74d97b524c
+        run: |
+          FFMPEG_ARCHIVE="${RUNNER_TEMP}/ffmpeg-${FFMPEG_VERSION}.tar.xz"
+          FFMPEG_SOURCE_DIR="${RUNNER_TEMP}/ffmpeg-${FFMPEG_VERSION}"
+
+          curl --fail --location --silent --show-error \
+            "https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.xz" \
+            --output "${FFMPEG_ARCHIVE}"
+          printf '%s  %s\n' "${FFMPEG_SOURCE_SHA256}" "${FFMPEG_ARCHIVE}" \
+            | shasum --algorithm 256 --check
+          tar --extract --xz --file "${FFMPEG_ARCHIVE}" --directory "${RUNNER_TEMP}"
+
+          pushd "${FFMPEG_SOURCE_DIR}"
+          ./configure \
+            --disable-autodetect \
+            --disable-debug \
+            --disable-doc \
+            --disable-ffplay \
+            --disable-ffprobe \
+            --disable-network \
+            --disable-shared \
+            --enable-static \
+            --disable-gpl \
+            --disable-version3 \
+            --disable-nonfree
+          make -j"$(sysctl -n hw.logicalcpu)" ffmpeg
+          popd
+
+          mkdir -p .local-runtimes/ffmpeg/darwin-arm64
+          cp "${FFMPEG_SOURCE_DIR}/ffmpeg" .local-runtimes/ffmpeg/darwin-arm64/ffmpeg
+          chmod +x .local-runtimes/ffmpeg/darwin-arm64/ffmpeg
+          .local-runtimes/ffmpeg/darwin-arm64/ffmpeg -version
 
       - name: Download Windows video engine runtime
         if: runner.os == 'Windows'
