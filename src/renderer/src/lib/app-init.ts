@@ -11,9 +11,11 @@ import { mediaJobQueue } from '@renderer/lib/media-job-queue'
 import { recoverPendingSyncResourceCleanups } from '@renderer/lib/sync-unlink'
 import { startSyncRuntime } from '@renderer/lib/sync-runtime'
 import { backfillImportedMediaAssets } from '@renderer/lib/local-sync-import'
+import { retryPendingResourceCleanups } from '@renderer/lib/resource-cleanup-journal'
 
 let earlyInitStarted = false
 let subscriptionsInitialized = false
+let resourceCleanupReplayStarted = false
 let chunksReadyPromise: Promise<void> | null = null
 let routePrefetchScheduled = false
 
@@ -141,8 +143,16 @@ export function initializeApp(): () => void {
         void purgeExpiredTrashFromStore(retentionDays * 86_400_000)
       }
       void recoverPendingSyncResourceCleanups().catch(() => undefined)
+      if (!resourceCleanupReplayStarted) {
+        resourceCleanupReplayStarted = true
+        void retryPendingResourceCleanups().catch(() => undefined)
+      }
     }
   })
+  if (!useFileExplorerStore.getState().isLoading && !resourceCleanupReplayStarted) {
+    resourceCleanupReplayStarted = true
+    void retryPendingResourceCleanups().catch(() => undefined)
+  }
 
   const handleOnline = (): void => {
     toast.success(i18n.t('toast.networkRestored'))

@@ -7,6 +7,7 @@ import {
   scanMediaStorageIntegrity,
   type MediaStorageIntegrityIssueKind
 } from './media-storage-integrity'
+import { listResourceCleanupRecords } from './resource-cleanup-journal'
 
 export interface MediaStorageDiagnosticsIssueSummary {
   kind: MediaStorageIntegrityIssueKind
@@ -25,14 +26,20 @@ export interface MediaStorageDiagnosticsReport {
     issueCount: number
     issues: MediaStorageDiagnosticsIssueSummary[]
   }
+  cleanupJournal: {
+    pending: number
+    failed: number
+    maxAttempt: number
+  }
 }
 
 export async function createMediaStorageDiagnosticsReport(
   now = Date.now()
 ): Promise<MediaStorageDiagnosticsReport> {
-  const [accounting, integrity] = await Promise.all([
+  const [accounting, integrity, cleanupRecords] = await Promise.all([
     getMediaStorageAccounting(),
-    scanMediaStorageIntegrity(now)
+    scanMediaStorageIntegrity(now),
+    listResourceCleanupRecords()
   ])
 
   return {
@@ -45,6 +52,11 @@ export async function createMediaStorageDiagnosticsReport(
       checkedAt: integrity.checkedAt,
       issueCount: integrity.issueCount,
       issues: summarizeIntegrityIssues(integrity.issues)
+    },
+    cleanupJournal: {
+      pending: cleanupRecords.filter((record) => record.status === 'pending').length,
+      failed: cleanupRecords.filter((record) => record.status === 'failed').length,
+      maxAttempt: cleanupRecords.reduce((max, record) => Math.max(max, record.attempt), 0)
     }
   }
 }

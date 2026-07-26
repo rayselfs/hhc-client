@@ -880,6 +880,7 @@
       "cancelJob": "Cancel job",
       "retrySyncDownload": "Retry download",
       "runIntegrityRepair": "Run repair scan",
+      "retryResourceCleanup": "Retry cleanup",
       "reopenProjection": "Reopen projection",
       "exportDiagnostics": "Export diagnostics"
     },
@@ -891,6 +892,10 @@
       "storageIntegrity": {
         "title": "Storage integrity issue",
         "detail": "Media storage has a missing or orphaned record."
+      },
+      "resourceCleanupFailed": {
+        "title": "Media cleanup needs attention",
+        "detail": "A deleted media resource could not be fully removed. You can retry safely."
       },
       "syncDownload": {
         "title": "Sync download failed",

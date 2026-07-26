@@ -3,6 +3,10 @@ import { mediaJobQueue } from '@renderer/lib/media-job-queue'
 import { scanMediaStorageIntegrity } from '@renderer/lib/media-storage-integrity'
 import { createMediaStorageDiagnosticsReport } from '@renderer/lib/media-storage-diagnostics'
 import { listSyncEntries, putSyncEntry } from '@renderer/lib/sync-db'
+import {
+  listResourceCleanupRecords,
+  retryResourceCleanup
+} from '@renderer/lib/resource-cleanup-journal'
 import type { RecoveryActionType, RecoveryIssue } from '@renderer/types/recovery-center'
 
 const SEVERITY_RANK: Record<RecoveryIssue['severity'], number> = {
@@ -18,10 +22,11 @@ export function sortRecoveryIssues(issues: RecoveryIssue[]): RecoveryIssue[] {
 }
 
 export async function collectRecoveryIssues(): Promise<RecoveryIssue[]> {
-  const [jobs, integrity, syncEntries] = await Promise.all([
+  const [jobs, integrity, syncEntries, cleanupRecords] = await Promise.all([
     listMediaJobs(),
     scanMediaStorageIntegrity(),
-    listSyncEntries()
+    listSyncEntries(),
+    listResourceCleanupRecords()
   ])
 
   const issues: RecoveryIssue[] = []
@@ -85,6 +90,25 @@ export async function collectRecoveryIssues(): Promise<RecoveryIssue[]> {
     })
   }
 
+  for (const record of cleanupRecords) {
+    issues.push({
+      id: `resource-cleanup-failed:${record.id}`,
+      kind: 'resource-cleanup-failed',
+      severity: record.status === 'failed' ? 'error' : 'warning',
+      titleKey: 'recovery.issues.resourceCleanupFailed.title',
+      detailKey: 'recovery.issues.resourceCleanupFailed.detail',
+      sourceId: record.id,
+      occurredAt: record.updatedAt,
+      actions: [
+        {
+          type: 'retry-resource-cleanup',
+          labelKey: 'recovery.actions.retryResourceCleanup'
+        },
+        { type: 'export-diagnostics', labelKey: 'recovery.actions.exportDiagnostics' }
+      ]
+    })
+  }
+
   return sortRecoveryIssues(issues)
 }
 
@@ -121,6 +145,11 @@ export async function runRecoveryAction(
 
   if (type === 'run-integrity-repair') {
     await scanMediaStorageIntegrity()
+    return
+  }
+
+  if (type === 'retry-resource-cleanup' && sourceId) {
+    await retryResourceCleanup(sourceId)
     return
   }
 

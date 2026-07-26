@@ -21,6 +21,10 @@ const mockRecoverPendingSyncResourceCleanups = vi.fn().mockResolvedValue({
   itemIds: [],
   tombstoneCount: 0
 })
+const mockRetryPendingResourceCleanups = vi.fn().mockResolvedValue({
+  attempted: 0,
+  failed: 0
+})
 
 const bibleState = {
   isInitialized: false,
@@ -109,6 +113,10 @@ vi.mock('@renderer/lib/local-sync-import', () => ({
   backfillImportedMediaAssets: mockBackfillImportedMediaAssets
 }))
 
+vi.mock('@renderer/lib/resource-cleanup-journal', () => ({
+  retryPendingResourceCleanups: mockRetryPendingResourceCleanups
+}))
+
 describe('startEarlyInit', () => {
   beforeEach(() => {
     vi.resetModules()
@@ -128,6 +136,17 @@ describe('startEarlyInit', () => {
     expect(mockFileExplorerInitialize).not.toHaveBeenCalled()
     expect(mockRecoverStaleJobs).not.toHaveBeenCalled()
     expect(mockBackfillImportedMediaAssets).not.toHaveBeenCalled()
+  })
+
+  it('replays pending resource cleanup after File Explorer initialization', async () => {
+    const { initializeApp } = await import('../app-init')
+
+    const cleanup = initializeApp()
+
+    await vi.waitFor(() => {
+      expect(mockRetryPendingResourceCleanups).toHaveBeenCalledTimes(1)
+    })
+    cleanup()
   })
 })
 

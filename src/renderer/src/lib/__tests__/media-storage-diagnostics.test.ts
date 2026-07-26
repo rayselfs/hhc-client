@@ -5,6 +5,7 @@ import {
   stringifyRedactedDiagnostics
 } from '../media-storage-diagnostics'
 import { resetMediaWorkDBForTests } from '../media-work-db'
+import { createResourceCleanupRecord, putResourceCleanupRecord } from '../resource-cleanup-journal'
 import { resetSyncDBForTests } from '../sync-db'
 
 beforeEach(async () => {
@@ -32,6 +33,20 @@ describe('createMediaStorageDiagnosticsReport', () => {
       size: 10,
       url: 'blob:/Users/tester/secret-token'
     })
+    await putResourceCleanupRecord({
+      ...createResourceCleanupRecord({
+        blobId: 'C:\\private\\native-file',
+        storage: 'native-fs',
+        deleteNativeFile: true,
+        deleteDerivedAssets: true,
+        deletePdfPageThumbs: true,
+        itemThumbnailIds: ['secret-thumbnail']
+      }),
+      status: 'failed',
+      attempt: 3,
+      lastError: 'C:\\private\\native-file accessToken=secret',
+      updatedAt: 122
+    })
 
     const report = await createMediaStorageDiagnosticsReport(123)
     const serialized = JSON.stringify(report)
@@ -49,10 +64,16 @@ describe('createMediaStorageDiagnosticsReport', () => {
             count: 1
           }
         ]
+      },
+      cleanupJournal: {
+        pending: 0,
+        failed: 1,
+        maxAttempt: 3
       }
     })
     expect(serialized).not.toContain('item-secret-token')
     expect(serialized).not.toContain('/Users/tester')
+    expect(serialized).not.toContain('native-file')
     expect(serialized).not.toContain('secret-token')
     expect(serialized).not.toContain('accessToken')
     expect(serialized).not.toContain('refreshToken')
@@ -68,7 +89,8 @@ describe('createMediaStorageDiagnosticsReport', () => {
         checkedAt: 1,
         issueCount: 1,
         issues: [{ kind: 'file-item-missing-blob', severity: 'error', count: 1 }]
-      }
+      },
+      cleanupJournal: { pending: 0, failed: 0, maxAttempt: 0 }
     })
 
     expect(output).not.toMatch(/\/Users|C:\\|accessToken|refreshToken|Error:/)

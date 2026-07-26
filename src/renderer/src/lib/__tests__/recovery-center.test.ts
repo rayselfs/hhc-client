@@ -1,5 +1,13 @@
 import { expect, it, vi } from 'vitest'
-import { collectRecoveryIssues, sortRecoveryIssues } from '@renderer/lib/recovery-center'
+import {
+  collectRecoveryIssues,
+  runRecoveryAction,
+  sortRecoveryIssues
+} from '@renderer/lib/recovery-center'
+
+const { mockRetryResourceCleanup } = vi.hoisted(() => ({
+  mockRetryResourceCleanup: vi.fn(async () => undefined)
+}))
 
 vi.mock('@renderer/lib/media-work-db', () => ({
   listMediaJobs: vi.fn(async () => [
@@ -59,15 +67,36 @@ vi.mock('@renderer/lib/media-storage-diagnostics', () => ({
   createMediaStorageDiagnosticsReport: vi.fn(async () => ({}))
 }))
 
+vi.mock('@renderer/lib/resource-cleanup-journal', () => ({
+  listResourceCleanupRecords: vi.fn(async () => [
+    {
+      id: 'cleanup-1',
+      blobId: 'private-blob-id',
+      status: 'failed',
+      attempt: 1,
+      createdAt: 45,
+      updatedAt: 50
+    }
+  ]),
+  retryResourceCleanup: mockRetryResourceCleanup
+}))
+
 it('collects current actionable issues with stable ids', async () => {
   const issues = await collectRecoveryIssues()
 
   expect(issues.map((issue) => issue.id)).toEqual([
+    'resource-cleanup-failed:cleanup-1',
     'storage-integrity:file-item-missing-blob:file-1',
     'job-failed:job-1',
     'sync-download:sync-1'
   ])
   expect(issues.every((issue) => issue.titleKey.startsWith('recovery.'))).toBe(true)
+})
+
+it('retries the selected resource cleanup record', async () => {
+  await runRecoveryAction('retry-resource-cleanup', 'cleanup-1')
+
+  expect(mockRetryResourceCleanup).toHaveBeenCalledWith('cleanup-1')
 })
 
 it('sorts errors before warnings and newest within severity', () => {

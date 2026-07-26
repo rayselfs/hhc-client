@@ -880,6 +880,7 @@
       "cancelJob": "取消工作",
       "retrySyncDownload": "重試下載",
       "runIntegrityRepair": "執行修復掃描",
+      "retryResourceCleanup": "重試清理",
       "reopenProjection": "重新開啟投影",
       "exportDiagnostics": "匯出診斷"
     },
@@ -891,6 +892,10 @@
       "storageIntegrity": {
         "title": "儲存完整性問題",
         "detail": "媒體儲存有缺失或孤立記錄。"
+      },
+      "resourceCleanupFailed": {
+        "title": "媒體清理需要處理",
+        "detail": "已刪除的媒體資源尚未完整清除，可以安全地重新嘗試。"
       },
       "syncDownload": {
         "title": "同步下載失敗",

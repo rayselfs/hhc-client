@@ -24,7 +24,9 @@ function matchesFilter(issue: RecoveryIssue, filter: RecoveryFilter): boolean {
     return ['job-failed', 'media-missing', 'asset-failed'].includes(issue.kind)
   }
   if (filter === 'sync') return issue.kind.startsWith('sync-')
-  if (filter === 'storage') return issue.kind === 'storage-integrity'
+  if (filter === 'storage') {
+    return ['storage-integrity', 'resource-cleanup-failed'].includes(issue.kind)
+  }
   return issue.kind === 'projection-health'
 }
 
