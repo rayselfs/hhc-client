@@ -45,6 +45,8 @@ test('launches packaged control and projection windows with timer payload delive
     if (!projection) throw new Error('Projection window did not open')
     await expect(projection.locator('.timer-digits').first()).toBeVisible()
 
+    await projection.reload()
+    await expect(projection.locator('.timer-digits').first()).toBeVisible()
     await projection.waitForTimeout(1200)
     expect(electronApp!.windows()).toHaveLength(2)
   })
