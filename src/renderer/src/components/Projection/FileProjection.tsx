@@ -2,7 +2,11 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { createProjectionAdapter } from '@renderer/lib/projection-adapter'
 import { getFileSource, openFileExplorerDB } from '@renderer/lib/file-explorer-db'
 import { loadPdfjsLib } from '@renderer/lib/pdfjs-loader'
-import type { FileControlPayload, ProjectionPayload } from '@shared/projection-messages'
+import type {
+  FileControlPayload,
+  ProjectionMediaReplayState,
+  ProjectionPayload
+} from '@shared/projection-messages'
 import PptxSlideSurface from '@renderer/components/Common/PptxSlideSurface'
 import EditableSlideSurface from '@renderer/components/Common/EditableSlideSurface'
 import {
@@ -15,6 +19,8 @@ import {
 } from '@renderer/lib/presentation-media'
 
 type FileProjectionProps = {
+  generation?: number
+  initialReplayState?: ProjectionMediaReplayState | null
   fileName?: string
   initialItemId?: string
   initialBlobId?: string
@@ -54,6 +60,8 @@ type PendingVideoControl = {
 const HAVE_METADATA = 1
 
 export default function FileProjection({
+  generation = 0,
+  initialReplayState,
   fileName,
   initialItemId,
   initialBlobId,
@@ -83,6 +91,8 @@ export default function FileProjection({
   const playbackModeRef = useRef<FileProjectionProps['initialPlaybackMode']>('native')
   const durationMsRef = useRef<number | undefined>(initialDurationMs)
   const loadSequenceRef = useRef(0)
+  const replayStateRef = useRef(initialReplayState)
+  replayStateRef.current = initialReplayState
 
   const isControlForCurrentItem = useCallback((data: FileControlPayload): boolean => {
     if (!('itemId' in data) || data.itemId === undefined) return true
@@ -194,8 +204,8 @@ export default function FileProjection({
           pages[i - 1] = canvas
           return {
             pages,
-            currentPage: prev?.currentPage ?? 1,
-            viewMode: prev?.viewMode ?? 'single'
+            currentPage: prev?.currentPage ?? replayStateRef.current?.pdfPage ?? 1,
+            viewMode: prev?.viewMode ?? replayStateRef.current?.pdfViewMode ?? 'single'
           }
         })
       }
@@ -239,17 +249,25 @@ export default function FileProjection({
         if (loadSequenceRef.current !== loadSequence) return
       }
       currentItemIdRef.current = itemId
-      pendingVideoControlRef.current = null
+      const replay = replayStateRef.current?.itemId === itemId ? replayStateRef.current : null
+      pendingVideoControlRef.current = replay
+        ? {
+            itemId,
+            seekTo: replay.positionSeconds,
+            shouldPlay: replay.isPlaying && !replay.isEnded,
+            volume: replay.volume
+          }
+        : null
       playbackModeRef.current = options.playbackMode ?? 'native'
       seekableRef.current = options.seekable !== false
       durationMsRef.current = options.durationMs
       sourceRevokeRef.current?.()
       sourceRevokeRef.current = null
       setObjectUrl(null)
-      setZoom(1)
-      setPan({ x: 0, y: 0 })
+      setZoom(replay?.zoom ?? 1)
+      setPan(replay ? { ...replay.pan } : { x: 0, y: 0 })
       setPdfState(null)
-      setIsEnded(false)
+      setIsEnded(replay?.isEnded ?? false)
       setMimeType(fileMimeType)
       if (options.playbackMode === 'vlc-embedded') {
         return
@@ -356,6 +374,7 @@ export default function FileProjection({
 
   useEffect(() => {
     const adapter = createProjectionAdapter('projection')
+    adapter.setGeneration(generation)
     adapterSendRef.current = adapter.send.bind(adapter)
 
     const unsubEnd = adapter.on('file:end', () => {
@@ -367,7 +386,7 @@ export default function FileProjection({
       adapter.dispose()
       adapterSendRef.current = null
     }
-  }, [])
+  }, [generation])
 
   useEffect(() => {
     if (initialItemId && initialBlobId && initialMimeType) {
@@ -394,6 +413,32 @@ export default function FileProjection({
   useEffect(() => {
     if (controlEvent) handleControl(controlEvent.data)
   }, [controlEvent, handleControl])
+
+  useEffect(() => {
+    const replay = initialReplayState
+    const container = pdfContainerRef.current
+    if (
+      !replay ||
+      replay.itemId !== currentItemIdRef.current ||
+      replay.pdfViewMode !== 'continuous' ||
+      !container
+    ) {
+      return
+    }
+    const frame = requestAnimationFrame(() => {
+      const pageIndex = Math.floor(Math.max(0, replay.pdfScroll))
+      const fraction = replay.pdfScroll - pageIndex
+      let target = 16
+      for (let index = 0; index < pageIndex && index < container.children.length; index++) {
+        target += (container.children[index] as HTMLElement).clientHeight + 16
+      }
+      if (pageIndex < container.children.length) {
+        target += fraction * (container.children[pageIndex] as HTMLElement).clientHeight
+      }
+      container.scrollTop = target
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [initialReplayState, pdfState])
 
   useEffect(
     () => () => {
@@ -544,6 +589,7 @@ export default function FileProjection({
           itemId={currentItemIdRef.current}
           blobId={initialBlobId}
           durationMs={durationMsRef.current}
+          replayState={initialReplayState}
         />
       </div>
     )
@@ -676,11 +722,13 @@ function EditableProjectionSurface({
 function VlcProjectionSurface({
   itemId,
   blobId,
-  durationMs
+  durationMs,
+  replayState
 }: {
   itemId: string | null
   blobId?: string
   durationMs?: number
+  replayState?: ProjectionMediaReplayState | null
 }): React.JSX.Element {
   useEffect(() => {
     if (!itemId || !blobId) return undefined
@@ -689,7 +737,18 @@ function VlcProjectionSurface({
         itemId,
         sourceFileId: blobId,
         container: '#vlc-player',
-        durationMs
+        durationMs,
+        initialPositionSeconds:
+          replayState?.itemId === itemId ? replayState.positionSeconds : undefined,
+        initialVolume: replayState?.itemId === itemId ? replayState.volume : undefined,
+        initialPlaybackState:
+          replayState?.itemId !== itemId
+            ? undefined
+            : replayState.isEnded
+              ? 'ended'
+              : replayState.isPlaying
+                ? 'playing'
+                : 'paused'
       })
       .catch((error) => {
         console.error('[projection-vlc] Failed to start embedded VLC playback', error)
@@ -697,7 +756,7 @@ function VlcProjectionSurface({
     return () => {
       void window.api?.projectionVlc?.stop()
     }
-  }, [blobId, durationMs, itemId])
+  }, [blobId, durationMs, itemId, replayState])
 
   return <div id="vlc-player" className="h-full w-full bg-black" />
 }

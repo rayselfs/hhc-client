@@ -20,6 +20,8 @@ vi.mock('@renderer/components/Projection/FileProjection', () => ({
 const mockAdapter = (() => {
   const handlers = new Map<string, (data: unknown) => void>()
   return {
+    setGeneration: vi.fn(),
+    getGeneration: vi.fn(() => 4),
     send: vi.fn(),
     on: vi.fn((channel: string, handler: (data: unknown) => void) => {
       handlers.set(channel, handler)
@@ -62,6 +64,7 @@ const baseStopwatchTick: StopwatchTickPayload = {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  window.location.hash = '#/projection?generation=4'
   Object.defineProperty(window, 'api', {
     configurable: true,
     value: {
@@ -78,10 +81,13 @@ describe('ProjectionPage', () => {
     expect(screen.getByTestId('default-projection')).toBeInTheDocument()
   })
 
-  it('announces projection route readiness', () => {
+  it('announces projection route readiness with its generation', async () => {
     render(<ProjectionPage />)
 
-    expect(mockAdapter.send).toHaveBeenCalledWith('__system:ready', null)
+    await waitFor(() => {
+      expect(mockAdapter.setGeneration).toHaveBeenCalledWith(4)
+      expect(mockAdapter.send).toHaveBeenCalledWith('__system:ready', { generation: 4 })
+    })
   })
 
   it('shows TimerDisplay when receiving timer:tick with mode=timer', () => {

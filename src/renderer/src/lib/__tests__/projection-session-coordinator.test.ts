@@ -207,6 +207,23 @@ describe('ProjectionSessionCoordinator', () => {
     })
   })
 
+  it('replays again when the same browser generation explicitly reloads', () => {
+    const coordinator = createProjectionSessionCoordinator(send)
+    coordinator.startSession('timer', [['timer:tick', timerTick]])
+    coordinator.beginGeneration({ generation: 7, status: 'opening', reason: 'created' })
+    coordinator.ready(7)
+    send.mockClear()
+
+    coordinator.beginGeneration({ generation: 7, status: 'opening', reason: 'reload' })
+    coordinator.ready(7)
+
+    expect(send).toHaveBeenCalledOnce()
+    expect(send).toHaveBeenCalledWith('__system:replay', {
+      generation: 7,
+      snapshot: coordinator.getSnapshot()
+    })
+  })
+
   it('sends incremental and one-shot messages only while ready', () => {
     const coordinator = createProjectionSessionCoordinator(send)
     coordinator.startSession('media', [['file:show', fileShow]])

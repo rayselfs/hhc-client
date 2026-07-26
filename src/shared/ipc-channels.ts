@@ -64,6 +64,9 @@ export interface ProjectionVlcStartRequest {
   sourceFileId: string
   container: string
   durationMs?: number
+  initialPositionSeconds?: number
+  initialVolume?: number
+  initialPlaybackState?: 'playing' | 'paused' | 'ended'
 }
 
 export interface ProjectionVlcProbeRequest {

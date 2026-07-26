@@ -25,6 +25,10 @@ const mockVlcPlayers: Array<{
   destroy: ReturnType<typeof vi.fn>
   notifyLayoutChange: ReturnType<typeof vi.fn>
   playerId: number
+  setSource: ReturnType<typeof vi.fn>
+  setVolume: ReturnType<typeof vi.fn>
+  setTime: ReturnType<typeof vi.fn>
+  play: ReturnType<typeof vi.fn>
 }> = []
 let mockEmbedImplementation: () => Promise<void> = () => Promise.resolve()
 
@@ -263,5 +267,43 @@ describe('projection-vlc listener cleanup', () => {
     })
 
     expect(mockWindowManager.sendToMain).not.toHaveBeenCalled()
+  })
+
+  it('applies source, volume, position, then playing replay state in order', async () => {
+    await getHandler('projection-vlc:start')(makeEvent(), {
+      itemId: 'item-1',
+      sourceFileId: '550e8400-e29b-41d4-a716-446655440000',
+      container: '#vlc-player',
+      initialPositionSeconds: 18,
+      initialVolume: 0.35,
+      initialPlaybackState: 'playing'
+    })
+    const current = mockVlcPlayers[0]
+
+    expect(current.setVolume).toHaveBeenCalledWith(35)
+    expect(current.setTime).toHaveBeenCalledWith(18_000)
+    expect(current.play).toHaveBeenCalledOnce()
+    expect(current.setSource.mock.invocationCallOrder[0]).toBeLessThan(
+      current.setVolume.mock.invocationCallOrder[0]
+    )
+    expect(current.setVolume.mock.invocationCallOrder[0]).toBeLessThan(
+      current.setTime.mock.invocationCallOrder[0]
+    )
+    expect(current.setTime.mock.invocationCallOrder[0]).toBeLessThan(
+      current.play.mock.invocationCallOrder[0]
+    )
+  })
+
+  it('does not play a paused or ended VLC replay state', async () => {
+    const start = getHandler('projection-vlc:start')
+    for (const initialPlaybackState of ['paused', 'ended'] as const) {
+      await start(makeEvent(), {
+        itemId: initialPlaybackState,
+        sourceFileId: '550e8400-e29b-41d4-a716-446655440000',
+        container: '#vlc-player',
+        initialPlaybackState
+      })
+      expect(mockVlcPlayers.at(-1)?.play).not.toHaveBeenCalled()
+    }
   })
 })

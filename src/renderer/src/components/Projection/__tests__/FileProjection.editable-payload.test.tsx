@@ -17,6 +17,8 @@ vi.mock('@renderer/lib/pdfjs-loader', () => ({
 
 vi.mock('@renderer/lib/projection-adapter', () => ({
   createProjectionAdapter: () => ({
+    setGeneration: vi.fn(),
+    getGeneration: vi.fn(() => 0),
     send: vi.fn(),
     on: vi.fn(() => vi.fn()),
     dispose: vi.fn()

@@ -7,12 +7,14 @@ const {
   mockLoadPdfjsLib,
   mockProjectionHandlers,
   mockProjectionSend,
+  mockProjectionSetGeneration,
   mockProjectionVlcStop
 } = vi.hoisted(() => ({
   mockGetFileSource: vi.fn(),
   mockLoadPdfjsLib: vi.fn(),
   mockProjectionHandlers: new Map<string, Array<(data: unknown) => void>>(),
   mockProjectionSend: vi.fn(),
+  mockProjectionSetGeneration: vi.fn(),
   mockProjectionVlcStop: vi.fn()
 }))
 
@@ -27,6 +29,8 @@ vi.mock('@renderer/lib/pdfjs-loader', () => ({
 
 vi.mock('@renderer/lib/projection-adapter', () => ({
   createProjectionAdapter: () => ({
+    setGeneration: mockProjectionSetGeneration,
+    getGeneration: vi.fn(() => 4),
     send: mockProjectionSend,
     on: vi.fn((channel: string, handler: (data: unknown) => void) => {
       const handlers = mockProjectionHandlers.get(channel) ?? []
@@ -126,6 +130,80 @@ describe('FileProjection copied media identity', () => {
     fireEvent.loadedMetadata(video)
 
     expect(video.currentTime).toBe(35)
+  })
+
+  it('applies replay seek and volume before resuming a playing video', async () => {
+    const { container } = render(
+      <FileProjection
+        generation={4}
+        fileName="copy.mp4"
+        initialItemId="copy-id"
+        initialBlobId="original-id"
+        initialMimeType="video/mp4"
+        initialReplayState={{
+          itemId: 'copy-id',
+          positionSeconds: 18,
+          durationSeconds: 100,
+          isPlaying: true,
+          isEnded: false,
+          volume: 0.35,
+          pdfPage: 1,
+          pdfScroll: 0,
+          pdfViewMode: 'single',
+          zoom: 1,
+          pan: { x: 0, y: 0 }
+        }}
+      />
+    )
+    const video = await waitFor(() => {
+      const element = container.querySelector('video')
+      expect(element).not.toBeNull()
+      return element!
+    })
+    Object.defineProperty(video, 'readyState', { configurable: true, value: 1 })
+    Object.defineProperty(video, 'duration', { configurable: true, value: 100 })
+    fireEvent.loadedMetadata(video)
+
+    expect(mockProjectionSetGeneration).toHaveBeenCalledWith(4)
+    expect(video.currentTime).toBe(18)
+    expect(video.volume).toBe(0.35)
+    expect(video.play).toHaveBeenCalled()
+  })
+
+  it('passes replay state to embedded VLC startup', async () => {
+    render(
+      <FileProjection
+        generation={4}
+        fileName="clip.mkv"
+        initialItemId="video-id"
+        initialBlobId="video-blob"
+        initialMimeType="video/x-matroska"
+        initialPlaybackMode="vlc-embedded"
+        initialReplayState={{
+          itemId: 'video-id',
+          positionSeconds: 18,
+          durationSeconds: 100,
+          isPlaying: true,
+          isEnded: false,
+          volume: 0.35,
+          pdfPage: 1,
+          pdfScroll: 0,
+          pdfViewMode: 'single',
+          zoom: 1,
+          pan: { x: 0, y: 0 }
+        }}
+      />
+    )
+
+    await waitFor(() => {
+      expect(window.api.projectionVlc.start).toHaveBeenCalledWith(
+        expect.objectContaining({
+          initialPositionSeconds: 18,
+          initialVolume: 0.35,
+          initialPlaybackState: 'playing'
+        })
+      )
+    })
   })
 
   it('uses live stream URLs without loading a stored source and ignores seek controls', async () => {
@@ -392,5 +470,4 @@ describe('FileProjection copied media identity', () => {
       expect(pdf.destroy).toHaveBeenCalled()
     })
   })
-
 })

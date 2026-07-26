@@ -251,6 +251,13 @@ async function startVlc(
     nextPlayer.on('endReached', () => sendState(wm, { isPlaying: false, isEnded: true }))
     nextPlayer.on('error', () => sendState(wm, { isPlaying: false }))
     nextPlayer.setSource(getNativeFilePath(request.sourceFileId), { autoplay: false })
+    if (request.initialVolume !== undefined) {
+      nextPlayer.setVolume(Math.round(Math.max(0, Math.min(1, request.initialVolume)) * 100))
+    }
+    if (request.initialPositionSeconds !== undefined) {
+      nextPlayer.setTime(Math.max(0, Math.round(request.initialPositionSeconds * 1000)))
+    }
+    if (request.initialPlaybackState === 'playing') nextPlayer.play()
     sendState(wm, { isPlaying: false, isEnded: false })
   } catch (error) {
     nextPlayer.destroy()

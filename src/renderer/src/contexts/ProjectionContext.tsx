@@ -134,6 +134,17 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
     const unsubscribeCoordinator = coordinator.subscribe(syncRecovery)
     const unsubscribeReady = adapter.on('__system:ready', (data) => {
       if (!data) return
+      if (
+        !isElectron() &&
+        coordinator.getRecoveryState().status === 'ready' &&
+        coordinator.getRecoveryState().generation === data.generation
+      ) {
+        coordinator.beginGeneration({
+          generation: data.generation,
+          status: 'opening',
+          reason: 'reload'
+        })
+      }
       coordinator.ready(data.generation)
       setProjectionReadyCount((count) => count + 1)
     })

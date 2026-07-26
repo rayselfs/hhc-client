@@ -357,6 +357,12 @@ export function createProjectionSessionCoordinator(
         return
       }
 
+      if (
+        event.generation === recovery.generation &&
+        (event.status === 'opening' || event.status === 'recovering')
+      ) {
+        replayedGeneration = 0
+      }
       recovery = {
         status: event.status,
         generation: event.generation,
