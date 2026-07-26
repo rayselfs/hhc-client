@@ -11,6 +11,21 @@ export interface FileBlobRecord {
   refCount?: number
 }
 
+export interface ResourceCleanupJournalRecord {
+  id: string
+  blobId: string
+  storage?: 'indexed-db' | 'native-fs'
+  deleteNativeFile: boolean
+  deleteDerivedAssets: boolean
+  deletePdfPageThumbs: boolean
+  itemThumbnailIds: string[]
+  status: 'pending' | 'failed'
+  attempt: number
+  lastError?: string
+  createdAt: number
+  updatedAt: number
+}
+
 export interface FileExplorerDBSchema extends DBSchema {
   'file-blobs': {
     key: string
@@ -26,16 +41,20 @@ export interface FileExplorerDBSchema extends DBSchema {
     value: AnyItemRecord
     indexes: { 'by-parent': string; 'by-deleted-at': number }
   }
+  'resource-cleanup-journal': {
+    key: string
+    value: ResourceCleanupJournalRecord
+  }
 }
 
 const DB_NAME = 'hhc-file-explorer'
-const DB_VERSION = 4
+export const FILE_EXPLORER_DB_VERSION = 5
 
 let fileExplorerDBPromise: Promise<IDBPDatabase<FileExplorerDBSchema>> | null = null
 
 function getFileExplorerDB(): Promise<IDBPDatabase<FileExplorerDBSchema>> {
   if (!fileExplorerDBPromise) {
-    fileExplorerDBPromise = openDB<FileExplorerDBSchema>(DB_NAME, DB_VERSION, {
+    fileExplorerDBPromise = openDB<FileExplorerDBSchema>(DB_NAME, FILE_EXPLORER_DB_VERSION, {
       upgrade(db, oldVersion, _newVersion, tx) {
         if (!db.objectStoreNames.contains('file-blobs')) {
           db.createObjectStore('file-blobs', { keyPath: 'id' })
@@ -62,6 +81,10 @@ function getFileExplorerDB(): Promise<IDBPDatabase<FileExplorerDBSchema>> {
           if (!itemStore.indexNames.contains('by-deleted-at')) {
             itemStore.createIndex('by-deleted-at', 'deletedAt')
           }
+        }
+
+        if (!db.objectStoreNames.contains('resource-cleanup-journal')) {
+          db.createObjectStore('resource-cleanup-journal', { keyPath: 'id' })
         }
       }
     })
