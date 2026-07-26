@@ -19,6 +19,7 @@ import {
   FolderBrowser,
   type FolderBrowserHandlers
 } from '@renderer/components/Control/Folder/FolderBrowser'
+import { FolderPersistenceStatus } from '@renderer/components/Common/FolderPersistenceStatus'
 
 interface CustomFolderTabProps {
   isModalOpen?: boolean
@@ -43,6 +44,12 @@ export function CustomFolderTab({
   const contextMenu = useFolderContextMenu()
   const folders = useChildFolders(currentFolderId)
   const verses = useItems(currentFolderId)
+  const persistenceStatus = useBibleFolderStore((state) => state.persistenceStatus)
+  const persistenceError = useBibleFolderStore((state) => state.persistenceError)
+  const pendingPersistenceCount = useBibleFolderStore((state) => state.pendingPersistenceCount)
+  const isFolderStoreInitialized = useBibleFolderStore((state) => state.isInitialized)
+  const retryInitialization = useBibleFolderStore((state) => state.retryInitialization)
+  const retryPersistence = useBibleFolderStore((state) => state.retryPersistence)
 
   const handleVerseDoubleClick = useCallback(
     (item: VerseItemRecord) => {
@@ -251,17 +258,27 @@ export function CustomFolderTab({
   )
 
   return (
-    <FolderBrowser
-      store={useBibleFolderStore}
-      folders={folders}
-      items={verses}
-      contextMenu={contextMenu}
-      renderFolderContent={renderFolderContent}
-      renderItemContent={renderItemContent}
-      renderDragOverlay={renderDragOverlay}
-      getItemReference={getItemReference}
-      isModalOpen={isModalOpen}
-      onModalOpenChange={onModalOpenChange}
-    />
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
+      <FolderPersistenceStatus
+        status={persistenceStatus}
+        error={persistenceError}
+        pendingCount={pendingPersistenceCount}
+        isInitialized={isFolderStoreInitialized}
+        onRetryInitialization={retryInitialization}
+        onRetryPersistence={retryPersistence}
+      />
+      <FolderBrowser
+        store={useBibleFolderStore}
+        folders={folders}
+        items={verses}
+        contextMenu={contextMenu}
+        renderFolderContent={renderFolderContent}
+        renderItemContent={renderItemContent}
+        renderDragOverlay={renderDragOverlay}
+        getItemReference={getItemReference}
+        isModalOpen={isModalOpen}
+        onModalOpenChange={onModalOpenChange}
+      />
+    </div>
   )
 }

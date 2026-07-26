@@ -1,7 +1,7 @@
 import React from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ContextMenuEntry } from '@renderer/contexts/ContextMenuContext'
-import { buildPresentationItemActions } from '../FilesPage'
+import { buildPresentationItemActions } from '@renderer/lib/presentation-item-actions'
 import { PPTX_MIME_TYPE } from '@renderer/lib/presentation-media'
 import { usePresentationWorkspaceStore } from '@renderer/stores/presentation-workspace'
 import type { FileItemRecord } from '@shared/types/folder'
@@ -30,7 +30,9 @@ function makeFile(overrides: Partial<FileItemRecord>): FileItemRecord {
   }
 }
 
-function getOpenAction(actions: readonly ContextMenuEntry[]): Exclude<ContextMenuEntry, 'separator'> {
+function getOpenAction(
+  actions: readonly ContextMenuEntry[]
+): Exclude<ContextMenuEntry, 'separator'> {
   const action = actions.find((entry) => entry !== 'separator' && entry.id === 'open-presentation')
   if (!action || action === 'separator') throw new Error('open-presentation action not found')
   return action

@@ -405,6 +405,16 @@
     "deleteItemDescription": "This action cannot be undone.",
     "deleteSoundboardAssetDescription": "This removes audio assigned to {{count}} soundboard pad(s). This action cannot be undone.",
     "deleteSelectedTitle": "Delete {{count}} item(s)?",
+    "persistence": {
+      "loading": "Loading local library",
+      "loadingDescription": "Your saved folders and items are being loaded.",
+      "loadFailed": "Local library is unavailable",
+      "saveFailed": "Local changes were not saved",
+      "saving": "Saving local changes",
+      "pending": "{{count}} change(s) waiting to be saved.",
+      "unknownError": "Local storage is unavailable.",
+      "retry": "Retry"
+    },
     "contextMenu": {
       "copy": "Copy",
       "cut": "Cut",

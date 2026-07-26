@@ -19,10 +19,7 @@ import {
 import { useSoundboardStore } from '@renderer/stores/soundboard'
 import { getUploadMediaPlatform, uploadFiles, uploadFolderFiles } from '@renderer/lib/upload-utils'
 import { Presentation, RefreshCw, Unlink } from 'lucide-react'
-import {
-  convertPptxToEditablePresentation,
-  createEditablePresentation
-} from '@renderer/lib/editable-presentation'
+import { createEditablePresentation } from '@renderer/lib/editable-presentation'
 import { connectLocalSyncFolder, refreshLocalSyncConnection } from '@renderer/lib/local-sync-import'
 import { getCloudProviderAdapter, type CloudRemoteFolder } from '@renderer/lib/cloud-provider'
 import { unlinkSyncRootFolderFromApp } from '@renderer/lib/sync-unlink'
@@ -40,11 +37,7 @@ import {
 import type { ClipboardState } from '@renderer/components/Control/FileExplorer'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
 import { getMediaFileAcceptAttribute } from '@renderer/lib/media-capabilities'
-import {
-  getPresentationWorkspacePath,
-  isEditablePresentationMimeType,
-  isPresentationItem
-} from '@renderer/lib/presentation-media'
+import { getPresentationWorkspacePath } from '@renderer/lib/presentation-media'
 import { usePresentationWorkspaceStore } from '@renderer/stores/presentation-workspace'
 import {
   hasNameConflict,
@@ -54,6 +47,8 @@ import {
 } from '@renderer/lib/file-naming'
 import { isFolderReadOnlyBySyncLink } from '@renderer/lib/sync-readonly'
 import { OneDriveIcon } from '@renderer/components/icons/OneDriveIcon'
+import { FolderPersistenceStatus } from '@renderer/components/Common/FolderPersistenceStatus'
+import { buildPresentationItemActions } from '@renderer/lib/presentation-item-actions'
 
 const ONE_DRIVE_PROVIDER = getCloudProviderAdapter('onedrive')
 const ONE_DRIVE_FOLDER_PICKER_PROVIDER: CloudFolderPickerProvider = {
@@ -62,56 +57,6 @@ const ONE_DRIVE_FOLDER_PICKER_PROVIDER: CloudFolderPickerProvider = {
   icon: React.createElement(OneDriveIcon, { className: 'size-5' }),
   listFolders: ONE_DRIVE_PROVIDER.listFolders,
   importFolder: ONE_DRIVE_PROVIDER.importFolder
-}
-
-type PresentationItemActionOptions = {
-  readonly item: AnyItemRecord
-  readonly openLabel: string
-  readonly convertLabel: string
-  readonly openIcon: React.ReactNode
-  readonly navigate: (path: string) => void
-}
-
-export function buildPresentationItemActions({
-  item,
-  openLabel,
-  convertLabel,
-  openIcon,
-  navigate
-}: PresentationItemActionOptions): ContextMenuEntry[] {
-  if (!isFileItem(item)) return []
-  if (!isPresentationItem(item)) return []
-  return [
-    'separator',
-    {
-      id: 'open-presentation',
-      label: openLabel,
-      icon: openIcon,
-      onAction: () => {
-        usePresentationWorkspaceStore.getState().openDocument(item)
-        navigate(getPresentationWorkspacePath(item.id))
-      }
-    },
-    ...(!isEditablePresentationMimeType(item.mimeType)
-      ? [
-          {
-            id: 'convert-presentation',
-            label: convertLabel,
-            icon: openIcon,
-            onAction: () => {
-              void convertPptxToEditablePresentation(item)
-                .then((createdItem) => {
-                  usePresentationWorkspaceStore.getState().openDocument(createdItem)
-                  navigate(getPresentationWorkspacePath(createdItem.id))
-                })
-                .catch((error) => {
-                  toast.danger(error instanceof Error ? error.message : String(error))
-                })
-            }
-          } satisfies Exclude<ContextMenuEntry, 'separator'>
-        ]
-      : [])
-  ]
 }
 
 function isInsideAnyFolder(
@@ -174,6 +119,12 @@ export default function FilesPage(): React.JSX.Element {
   const copyItem = useFileExplorerStore((state) => state.copyItem)
   const moveFolder = useFileExplorerStore((state) => state.moveFolder)
   const updateFolder = useFileExplorerStore((state) => state.updateFolder)
+  const persistenceStatus = useFileExplorerStore((state) => state.persistenceStatus)
+  const persistenceError = useFileExplorerStore((state) => state.persistenceError)
+  const pendingPersistenceCount = useFileExplorerStore((state) => state.pendingPersistenceCount)
+  const isFolderStoreInitialized = useFileExplorerStore((state) => state.isInitialized)
+  const retryInitialization = useFileExplorerStore((state) => state.retryInitialization)
+  const retryPersistence = useFileExplorerStore((state) => state.retryPersistence)
   const { showItemMenu, showFolderMenu, showMultiSelectMenu, showEmptyAreaMenu } =
     useFileContextMenu()
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -844,6 +795,15 @@ export default function FilesPage(): React.JSX.Element {
         onChange={(e) => void handleFolderChange(e)}
       />
       <FileExplorerShell itemCount={itemCount} selectedCount={selectedCount}>
+        <FolderPersistenceStatus
+          className="mx-3 mt-3"
+          status={persistenceStatus}
+          error={persistenceError}
+          pendingCount={pendingPersistenceCount}
+          isInitialized={isFolderStoreInitialized}
+          onRetryInitialization={retryInitialization}
+          onRetryPersistence={retryPersistence}
+        />
         <FileBrowser
           onItemContextMenu={handleItemContextMenu}
           onFolderContextMenu={handleFolderContextMenu}

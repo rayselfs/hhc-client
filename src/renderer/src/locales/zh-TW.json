@@ -405,6 +405,16 @@
     "deleteItemDescription": "此動作無法復原。",
     "deleteSoundboardAssetDescription": "這會移除已指定到 {{count}} 個音效板 pad 的音訊。此動作無法復原。",
     "deleteSelectedTitle": "刪除 {{count}} 個項目?",
+    "persistence": {
+      "loading": "正在載入本機資料庫",
+      "loadingDescription": "正在讀取已儲存的資料夾與項目。",
+      "loadFailed": "無法使用本機資料庫",
+      "saveFailed": "本機變更尚未儲存",
+      "saving": "正在儲存本機變更",
+      "pending": "尚有 {{count}} 項變更等待儲存。",
+      "unknownError": "本機儲存空間無法使用。",
+      "retry": "重試"
+    },
     "contextMenu": {
       "copy": "複製",
       "cut": "剪下",

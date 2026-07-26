@@ -405,6 +405,16 @@
     "deleteItemDescription": "此操作无法撤销。",
     "deleteSoundboardAssetDescription": "这会移除已指定到 {{count}} 个音效板 pad 的音频。此操作无法撤销。",
     "deleteSelectedTitle": "删除 {{count}} 个项目?",
+    "persistence": {
+      "loading": "正在加载本地数据库",
+      "loadingDescription": "正在读取已保存的文件夹和项目。",
+      "loadFailed": "无法使用本地数据库",
+      "saveFailed": "本地更改尚未保存",
+      "saving": "正在保存本地更改",
+      "pending": "还有 {{count}} 项更改等待保存。",
+      "unknownError": "本地存储空间无法使用。",
+      "retry": "重试"
+    },
     "contextMenu": {
       "copy": "复制",
       "cut": "剪切",
