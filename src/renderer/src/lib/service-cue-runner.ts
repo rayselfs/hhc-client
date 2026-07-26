@@ -29,7 +29,7 @@ interface ProjectServiceCueDependencies {
   startProjection: (
     owner: ProjectionOwner,
     payloads?: ContentMessageTuple[] | undefined
-  ) => Promise<void>
+  ) => Promise<unknown>
   getFileItem?: (id: string) => FileItemRecord | undefined
   startMediaPresentation?: MediaProjectionStart
 }

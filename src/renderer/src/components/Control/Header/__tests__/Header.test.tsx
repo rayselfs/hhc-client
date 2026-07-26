@@ -42,10 +42,10 @@ function makeFile(id: string): FileItemRecord {
 }
 
 async function mockProjectionContext(
-  overrides: Partial<MockProjectionContext> = {}
+  overrides: Record<string, unknown> = {}
 ): Promise<MockProjectionContext> {
   const { useProjection } = await import('@renderer/contexts/ProjectionContext')
-  const context = { ...baseProjectionContext(), ...overrides }
+  const context = { ...baseProjectionContext(), ...overrides } as MockProjectionContext
   vi.mocked(useProjection).mockReturnValue(context)
   return context
 }
@@ -56,10 +56,18 @@ function baseProjectionContext(): MockProjectionContext {
     isProjectionBlanked: true,
     projectionReadyCount: 0,
     activeOwner: 'timer' as const,
+    recovery: { status: 'closed', generation: 0, failure: null },
     claimProjection: vi.fn<MockProjectionContext['claimProjection']>(),
-    startProjection: vi.fn<MockProjectionContext['startProjection']>(() => Promise.resolve()),
+    startProjection: vi.fn<MockProjectionContext['startProjection']>(() =>
+      Promise.resolve({ ok: true, generation: 1 })
+    ),
     stopProjection: vi.fn<MockProjectionContext['stopProjection']>(() => Promise.resolve()),
-    openProjection: vi.fn<MockProjectionContext['openProjection']>(() => Promise.resolve()),
+    openProjection: vi.fn<MockProjectionContext['openProjection']>(() =>
+      Promise.resolve({ ok: true, generation: 1 })
+    ),
+    retryProjection: vi.fn<MockProjectionContext['retryProjection']>(() =>
+      Promise.resolve({ ok: true, generation: 1 })
+    ),
     bringProjectionToFront: vi.fn<MockProjectionContext['bringProjectionToFront']>(() =>
       Promise.resolve()
     ),

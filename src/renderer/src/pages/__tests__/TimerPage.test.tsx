@@ -7,12 +7,18 @@ import { useStopwatchStore } from '@renderer/stores/stopwatch'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
 import TimerPage from '../TimerPage'
 
+const projectionRecoveryMock = {
+  recovery: { status: 'closed' as const, generation: 0, failure: null },
+  retryProjection: vi.fn()
+}
+
 vi.mock('@renderer/contexts/ProjectionContext', () => ({
   useProjection: vi.fn(() => ({
     isProjectionOpen: false,
     isProjectionBlanked: true,
     projectionReadyCount: 0,
     activeOwner: 'timer',
+    ...projectionRecoveryMock,
     claimProjection: vi.fn(),
     startProjection: vi.fn(),
     stopProjection: vi.fn(),
@@ -195,6 +201,7 @@ describe('TimerPage — projection ownership', () => {
       isProjectionBlanked: true,
       projectionReadyCount: 0,
       activeOwner: 'timer',
+      ...projectionRecoveryMock,
       claimProjection: mockClaimProjection,
       startProjection: vi.fn(),
       stopProjection: vi.fn(),
@@ -215,6 +222,7 @@ describe('TimerPage — projection ownership', () => {
       isProjectionBlanked: true,
       projectionReadyCount: 0,
       activeOwner: 'timer',
+      ...projectionRecoveryMock,
       claimProjection: mockClaimProjection,
       startProjection: vi.fn(),
       stopProjection: vi.fn(),
@@ -244,6 +252,7 @@ describe('TimerPage — projection ownership', () => {
       isProjectionBlanked: true,
       projectionReadyCount: 0,
       activeOwner: 'timer',
+      ...projectionRecoveryMock,
       claimProjection: mockClaimProjection,
       startProjection: vi.fn(),
       stopProjection: vi.fn(),
@@ -264,6 +273,7 @@ describe('TimerPage — projection ownership', () => {
       isProjectionBlanked: true,
       projectionReadyCount: 0,
       activeOwner: 'timer',
+      ...projectionRecoveryMock,
       claimProjection: mockClaimProjection,
       startProjection: vi.fn(),
       stopProjection: vi.fn(),
@@ -293,6 +303,7 @@ describe('TimerPage — projection ownership', () => {
       isProjectionBlanked: true,
       projectionReadyCount: 0,
       activeOwner: 'timer',
+      ...projectionRecoveryMock,
       claimProjection: mockClaimProjection,
       startProjection: vi.fn(),
       stopProjection: vi.fn(),
@@ -314,12 +325,13 @@ describe('TimerPage — projection ownership', () => {
 
 describe('TimerPage — Space projection action', () => {
   function mockProjectionForShortcut(): ReturnType<typeof vi.fn> {
-    const startProjection = vi.fn(() => Promise.resolve())
+    const startProjection = vi.fn(() => Promise.resolve({ ok: true as const, generation: 1 }))
     vi.mocked(useProjection).mockReturnValue({
       isProjectionOpen: true,
       isProjectionBlanked: false,
       projectionReadyCount: 1,
       activeOwner: 'timer',
+      ...projectionRecoveryMock,
       claimProjection: vi.fn(),
       startProjection,
       stopProjection: vi.fn(),

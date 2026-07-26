@@ -28,7 +28,7 @@ interface ProjectionHeaderStateInput {
 }
 
 interface ProjectionStartDeps {
-  startProjection: (owner: ProjectionOwner, payloads?: ContentMessageTuple[]) => Promise<void>
+  startProjection: (owner: ProjectionOwner, payloads?: ContentMessageTuple[]) => Promise<unknown>
 }
 
 interface ProjectionStopDeps {
@@ -49,7 +49,7 @@ interface StartMediaProjectionDeps {
 
 interface StartProjectionForRouteInput {
   pathname: string
-  startProjection: (owner: ProjectionOwner, payloads?: ContentMessageTuple[]) => Promise<void>
+  startProjection: (owner: ProjectionOwner, payloads?: ContentMessageTuple[]) => Promise<unknown>
   biblePayloads: ContentMessageTuple[] | null
   presentableItems: FileItemRecord[]
   startMediaPresentation: (

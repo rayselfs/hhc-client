@@ -1,32 +1,33 @@
-import { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { createProjectionAdapter, type ProjectionAdapter } from '@renderer/lib/projection-adapter'
 import { isElectron } from '@renderer/lib/env'
+import {
+  createProjectionSessionCoordinator,
+  type ProjectionRecoveryState,
+  type ProjectionSessionCoordinator,
+  type ReplayableProjectionChannel
+} from '@renderer/lib/projection-session-coordinator'
 import { useSettingsStore } from '@renderer/stores/settings'
-import type { ProjectionChannel, ProjectionPayload } from '@shared/projection-messages'
+import type {
+  ProjectionChannel,
+  ProjectionContentChannel,
+  ProjectionContentMessageTuple,
+  ProjectionOperationResult,
+  ProjectionOwner,
+  ProjectionPayload
+} from '@shared/projection-messages'
 
-/** Channels that carry displayable content (not system messages). */
-type ContentChannel = Exclude<ProjectionChannel, `__system:${string}`>
-export type ContentMessageTuple = {
-  [C in ContentChannel]: [channel: C, data: ProjectionPayload<C>]
-}[ContentChannel]
-
-/**
- * Who currently "owns" the projection display.
- * - 'timer': TimerProjectionBridge drives the projection (default)
- * - 'bible': Bible page has taken over
- * - 'media': Media page has taken over
- */
-export type ProjectionOwner = 'timer' | 'bible' | 'media'
+export type {
+  ProjectionContentMessageTuple as ContentMessageTuple,
+  ProjectionOwner
+} from '@shared/projection-messages'
 
 interface ProjectOptions {
-  /** When true, auto-reopen projection if it's closed. Default: false. */
   autoOpen?: boolean
-  /** When true, request one non-activating Electron foreground operation. */
   bringToFront?: boolean
 }
 
-interface StartProjectionOptions {
-  /** Defaults to true for explicit projection starts. */
+export interface StartProjectionOptions {
   bringToFront?: boolean
 }
 
@@ -34,25 +35,21 @@ interface ProjectionContextValue {
   isProjectionOpen: boolean
   isProjectionBlanked: boolean
   projectionReadyCount: number
-  /** Who currently controls what is displayed on the projection. */
   activeOwner: ProjectionOwner
-  /**
-   * Claim ownership of the projection display.
-   * Pass `unblank: true` to also unblank (use for explicit user actions only).
-   */
+  recovery: ProjectionRecoveryState
   claimProjection: (owner: ProjectionOwner, options?: { unblank?: boolean }) => void
   startProjection: (
     owner: ProjectionOwner,
-    payloads?: ContentMessageTuple[],
+    payloads?: ProjectionContentMessageTuple[],
     options?: StartProjectionOptions
-  ) => Promise<void>
+  ) => Promise<ProjectionOperationResult>
   stopProjection: () => Promise<void>
-  openProjection: () => Promise<void>
+  openProjection: () => Promise<ProjectionOperationResult>
+  retryProjection: () => Promise<ProjectionOperationResult>
   bringProjectionToFront: () => Promise<void>
   closeProjection: () => Promise<void>
   blankProjection: (blank: boolean) => void
-  /** Transport layer: send content to projection. Use claimProjection() for unblank/open. */
-  project: <C extends ContentChannel>(
+  project: <C extends ProjectionContentChannel>(
     channel: C,
     data: ProjectionPayload<C>,
     options?: ProjectOptions
@@ -64,149 +61,124 @@ interface ProjectionContextValue {
   ) => () => void
 }
 
+const CLOSED_RECOVERY_STATE: ProjectionRecoveryState = {
+  status: 'closed',
+  generation: 0,
+  failure: null
+}
+
 const ProjectionContext = createContext<ProjectionContextValue | null>(null)
 
-function getProjectionUrl(): string {
-  return location.origin + location.pathname + '#/projection'
+function getProjectionUrl(generation: number): string {
+  return `${location.origin}${location.pathname}#/projection?generation=${generation}`
 }
 
 function getAdapter(ref: React.RefObject<ProjectionAdapter | null>): ProjectionAdapter {
-  if (!ref.current) {
-    ref.current = createProjectionAdapter()
-  }
+  if (!ref.current) ref.current = createProjectionAdapter()
   return ref.current
 }
 
 export function ProjectionProvider({ children }: { children: React.ReactNode }): React.JSX.Element {
-  const [isProjectionOpen, _setIsProjectionOpen] = useState(false)
-  const [isProjectionBlanked, _setIsProjectionBlanked] = useState(true)
+  const [isProjectionOpen, setIsProjectionOpen] = useState(false)
+  const [isProjectionBlanked, setIsProjectionBlanked] = useState(true)
   const [projectionReadyCount, setProjectionReadyCount] = useState(0)
   const [activeOwner, setActiveOwner] = useState<ProjectionOwner>('timer')
+  const [recovery, setRecovery] = useState<ProjectionRecoveryState>(CLOSED_RECOVERY_STATE)
   const projectionDisplayId = useSettingsStore((state) => state.projectionDisplayId)
   const adapterRef = useRef<ProjectionAdapter | null>(null)
+  const coordinatorRef = useRef<ProjectionSessionCoordinator | null>(null)
   const projectionWindowRef = useRef<Window | null>(null)
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const readyResolveRef = useRef<(() => void) | null>(null)
-  const isReadyRef = useRef(false)
-  const isProjectionBlankedRef = useRef(true)
+  const browserGenerationRef = useRef(0)
   const isProjectionOpenRef = useRef(false)
-  const pendingPayloadsRef = useRef(new Map<string, { channel: string; data: unknown }>())
-  const pendingSequenceRef = useRef(0)
-  const autoOpenTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const setIsProjectionBlanked = useCallback((blanked: boolean): void => {
-    isProjectionBlankedRef.current = blanked
-    _setIsProjectionBlanked(blanked)
+  const updateOpen = useCallback((open: boolean): void => {
+    isProjectionOpenRef.current = open
+    setIsProjectionOpen(open)
   }, [])
 
-  const setIsProjectionOpen = useCallback((open: boolean): void => {
-    isProjectionOpenRef.current = open
-    _setIsProjectionOpen(open)
+  const getCoordinator = useCallback((): ProjectionSessionCoordinator => {
+    if (!coordinatorRef.current) {
+      coordinatorRef.current = createProjectionSessionCoordinator((channel, data) => {
+        getAdapter(adapterRef).send(channel, data)
+      })
+    }
+    return coordinatorRef.current
   }, [])
 
   const stopPolling = useCallback((): void => {
-    if (pollTimerRef.current) {
-      clearInterval(pollTimerRef.current)
-      pollTimerRef.current = null
-    }
+    if (pollTimerRef.current) clearInterval(pollTimerRef.current)
+    pollTimerRef.current = null
   }, [])
 
-  const clearPending = useCallback((): void => {
-    pendingPayloadsRef.current.clear()
-    if (autoOpenTimeoutRef.current) {
-      clearTimeout(autoOpenTimeoutRef.current)
-      autoOpenTimeoutRef.current = null
-    }
-  }, [])
-
-  const startReadyTimeout = useCallback((): void => {
-    if (autoOpenTimeoutRef.current) return
-    autoOpenTimeoutRef.current = setTimeout(() => {
-      if (!isReadyRef.current) {
-        console.warn('[Projection] Ready timeout — discarding pending payloads')
-        clearPending()
-      }
-    }, 5000)
-  }, [clearPending])
-
-  const flushPendingPayloads = useCallback((): void => {
-    const adapter = getAdapter(adapterRef)
-    pendingPayloadsRef.current.forEach(({ channel, data }) => {
-      adapter.send(channel as ContentChannel, data as ProjectionPayload<ContentChannel>)
-    })
-    clearPending()
-  }, [clearPending])
+  const endBrowserSession = useCallback((): void => {
+    getCoordinator().endSession()
+    getAdapter(adapterRef).setGeneration(0)
+    projectionWindowRef.current = null
+    updateOpen(false)
+    setIsProjectionBlanked(true)
+    stopPolling()
+  }, [getCoordinator, stopPolling, updateOpen])
 
   const startPolling = useCallback((): void => {
     if (pollTimerRef.current) return
     pollTimerRef.current = setInterval(() => {
-      if (projectionWindowRef.current?.closed) {
-        setIsProjectionOpen(false)
-        setIsProjectionBlanked(true)
-        isReadyRef.current = false
-        projectionWindowRef.current = null
-        stopPolling()
-      }
+      if (projectionWindowRef.current?.closed) endBrowserSession()
     }, 1000)
-  }, [stopPolling, setIsProjectionOpen, setIsProjectionBlanked])
+  }, [endBrowserSession])
 
   useEffect(() => {
     const adapter = getAdapter(adapterRef)
+    const coordinator = getCoordinator()
+    const syncRecovery = (): void => setRecovery(coordinator.getRecoveryState())
+    const unsubscribeCoordinator = coordinator.subscribe(syncRecovery)
+    const unsubscribeReady = adapter.on('__system:ready', (data) => {
+      if (!data) return
+      coordinator.ready(data.generation)
+      setProjectionReadyCount((count) => count + 1)
+    })
+    const unsubscribePlayback = adapter.on('file:playback-state', (data) => {
+      coordinator.recordPlayback(adapter.getGeneration(), data)
+    })
 
     if (isElectron()) {
-      window.api.projection.check().then(({ exists }) => {
-        setIsProjectionOpen(exists)
-        if (exists) isReadyRef.current = true
+      let active = true
+      void window.api.projection.check().then((state) => {
+        if (!active) return
+        updateOpen(state.exists)
+        if (state.lifecycle.generation > 0) {
+          adapter.setGeneration(state.lifecycle.generation)
+          coordinator.beginGeneration(state.lifecycle)
+        }
       })
-
-      const unsubOpened = window.api.projection.onProjectionOpened(() => {
-        setIsProjectionOpen(true)
-      })
-      const unsubClosed = window.api.projection.onProjectionClosed(() => {
-        setIsProjectionOpen(false)
-        setIsProjectionBlanked(true)
-        isReadyRef.current = false
-        readyResolveRef.current = null
-        clearPending()
-      })
-
-      const unsubReady = adapter.on('__system:ready', () => {
-        isReadyRef.current = true
-        readyResolveRef.current?.()
-        readyResolveRef.current = null
-        setProjectionReadyCount((c) => c + 1)
-        flushPendingPayloads()
+      const unsubscribeLifecycle = window.api.projection.onProjectionLifecycle((event) => {
+        if (event.generation > 0) adapter.setGeneration(event.generation)
+        coordinator.beginGeneration(event)
+        const open =
+          event.status === 'opening' || event.status === 'ready' || event.status === 'recovering'
+        updateOpen(open)
+        if (event.status === 'closed') {
+          coordinator.endSession()
+          adapter.setGeneration(0)
+          setIsProjectionBlanked(true)
+        }
       })
 
       return () => {
-        unsubOpened()
-        unsubClosed()
-        unsubReady()
+        active = false
+        unsubscribeLifecycle()
+        unsubscribeReady()
+        unsubscribePlayback()
+        unsubscribeCoordinator()
+        coordinator.dispose()
+        coordinatorRef.current = null
         adapter.dispose()
         adapterRef.current = null
       }
     }
 
-    const unsubPong = adapter.on('__system:pong', () => {
-      setIsProjectionOpen(true)
-    })
-    const unsubClosed = adapter.on('__system:closed', () => {
-      setIsProjectionOpen(false)
-      setIsProjectionBlanked(true)
-      isReadyRef.current = false
-      readyResolveRef.current = null
-      clearPending()
-      projectionWindowRef.current = null
-      stopPolling()
-    })
-    const unsubReady = adapter.on('__system:ready', () => {
-      isReadyRef.current = true
-      readyResolveRef.current?.()
-      readyResolveRef.current = null
-      setProjectionReadyCount((c) => c + 1)
-      flushPendingPayloads()
-    })
-
+    const unsubscribePong = adapter.on('__system:pong', () => updateOpen(true))
+    const unsubscribeClosed = adapter.on('__system:closed', endBrowserSession)
     const handleBeforeUnload = (): void => {
       adapter.send('__system:close', null)
       projectionWindowRef.current?.close()
@@ -214,38 +186,20 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
     window.addEventListener('beforeunload', handleBeforeUnload)
 
     return () => {
-      unsubPong()
-      unsubClosed()
-      unsubReady()
+      unsubscribePong()
+      unsubscribeClosed()
+      unsubscribeReady()
+      unsubscribePlayback()
+      unsubscribeCoordinator()
       stopPolling()
       window.removeEventListener('beforeunload', handleBeforeUnload)
       projectionWindowRef.current?.close()
+      coordinator.dispose()
+      coordinatorRef.current = null
       adapter.dispose()
       adapterRef.current = null
     }
-  }, [stopPolling, setIsProjectionOpen, setIsProjectionBlanked, clearPending, flushPendingPayloads])
-
-  const openProjection = useCallback(async (): Promise<void> => {
-    if (isElectron()) {
-      await window.api.projection.ensure(projectionDisplayId)
-      return
-    }
-
-    if (projectionWindowRef.current && !projectionWindowRef.current.closed) {
-      return
-    }
-
-    const width = screen.availWidth
-    const height = screen.availHeight
-    const win = window.open(
-      getProjectionUrl(),
-      'hhc-projection',
-      `popup,width=${width},height=${height},left=0,top=0`
-    )
-    if (!win) return
-    projectionWindowRef.current = win
-    startPolling()
-  }, [projectionDisplayId, startPolling])
+  }, [endBrowserSession, getCoordinator, stopPolling, updateOpen])
 
   const bringProjectionToFront = useCallback(async (): Promise<void> => {
     if (!isElectron()) return
@@ -254,107 +208,141 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
     })
   }, [])
 
+  const openBrowserProjection = useCallback(async (): Promise<ProjectionOperationResult> => {
+    const coordinator = getCoordinator()
+    const adapter = getAdapter(adapterRef)
+    if (projectionWindowRef.current && !projectionWindowRef.current.closed) {
+      const generation = adapter.getGeneration()
+      return coordinator.waitForReady(generation)
+    }
+
+    browserGenerationRef.current += 1
+    const generation = browserGenerationRef.current
+    adapter.setGeneration(generation)
+    coordinator.beginGeneration({ generation, status: 'opening', reason: 'created' })
+    const win = window.open(
+      getProjectionUrl(generation),
+      'hhc-projection',
+      `popup,width=${screen.availWidth},height=${screen.availHeight},left=0,top=0`
+    )
+    if (!win) {
+      coordinator.fail(generation, 'popup-blocked')
+      return { ok: false, generation, reason: 'popup-blocked' }
+    }
+    projectionWindowRef.current = win
+    updateOpen(true)
+    startPolling()
+    return coordinator.waitForReady(generation)
+  }, [getCoordinator, startPolling, updateOpen])
+
+  const openElectronProjection = useCallback(async (): Promise<ProjectionOperationResult> => {
+    const coordinator = getCoordinator()
+    const adapter = getAdapter(adapterRef)
+    const state = coordinator.getRecoveryState()
+    if (state.status === 'ready') return { ok: true, generation: state.generation }
+
+    const result =
+      state.status === 'failed'
+        ? await window.api.projection.retry()
+        : await window.api.projection.ensure(projectionDisplayId)
+    const generation = result.generation
+    if (generation <= 0) {
+      coordinator.fail(state.generation, 'ready-timeout')
+      return { ok: false, generation: state.generation, reason: 'ready-timeout' }
+    }
+    adapter.setGeneration(generation)
+    coordinator.beginGeneration({ generation, status: 'opening', reason: 'created' })
+    updateOpen(true)
+    return coordinator.waitForReady(generation)
+  }, [getCoordinator, projectionDisplayId, updateOpen])
+
+  const openProjection = useCallback(async (): Promise<ProjectionOperationResult> => {
+    return isElectron() ? openElectronProjection() : openBrowserProjection()
+  }, [openBrowserProjection, openElectronProjection])
+
+  const retryProjection = useCallback(async (): Promise<ProjectionOperationResult> => {
+    if (!isElectron()) {
+      projectionWindowRef.current = null
+      return openBrowserProjection()
+    }
+    const coordinator = getCoordinator()
+    const result = await window.api.projection.retry()
+    if (!result.retried || result.generation <= 0) {
+      const state = coordinator.getRecoveryState()
+      return {
+        ok: false,
+        generation: state.generation,
+        reason: state.failure?.reason ?? 'ready-timeout'
+      }
+    }
+    getAdapter(adapterRef).setGeneration(result.generation)
+    coordinator.beginGeneration({
+      generation: result.generation,
+      status: 'opening',
+      reason: 'created'
+    })
+    updateOpen(true)
+    return coordinator.waitForReady(result.generation)
+  }, [getCoordinator, openBrowserProjection, updateOpen])
+
   const closeProjection = useCallback(async (): Promise<void> => {
+    const coordinator = getCoordinator()
+    const adapter = getAdapter(adapterRef)
+    coordinator.endSession()
     if (isElectron()) {
       await window.api.projection.close()
-      setIsProjectionOpen(false)
-      setIsProjectionBlanked(true)
-      isReadyRef.current = false
-      readyResolveRef.current = null
-      clearPending()
-      stopPolling()
     } else {
-      getAdapter(adapterRef).send('__system:close', null)
+      adapter.send('__system:close', null)
+      projectionWindowRef.current?.close()
       projectionWindowRef.current = null
-      setIsProjectionOpen(false)
-      setIsProjectionBlanked(true)
-      isReadyRef.current = false
-      readyResolveRef.current = null
-      clearPending()
       stopPolling()
     }
-  }, [stopPolling, setIsProjectionOpen, setIsProjectionBlanked, clearPending])
-
-  const sendOrBuffer = useCallback(
-    <C extends ProjectionChannel>(channel: C, data: ProjectionPayload<C>): void => {
-      if (isReadyRef.current) {
-        getAdapter(adapterRef).send(channel, data)
-      } else {
-        pendingPayloadsRef.current.set(channel, { channel, data })
-      }
-    },
-    []
-  )
-
-  const queuePayload = useCallback(
-    <C extends ProjectionChannel>(key: string, channel: C, data: ProjectionPayload<C>): void => {
-      if (isReadyRef.current) {
-        getAdapter(adapterRef).send(channel, data)
-      } else {
-        pendingPayloadsRef.current.set(key, { channel, data })
-      }
-    },
-    []
-  )
-
-  const getPendingPayloadKey = useCallback((channel: ProjectionChannel): string => {
-    if (channel === 'file:control') {
-      pendingSequenceRef.current += 1
-      return `${channel}:${pendingSequenceRef.current}`
-    }
-    return channel
-  }, [])
+    adapter.setGeneration(0)
+    updateOpen(false)
+    setIsProjectionBlanked(true)
+  }, [getCoordinator, stopPolling, updateOpen])
 
   const claimProjection = useCallback(
     (owner: ProjectionOwner, options?: { unblank?: boolean }): void => {
       setActiveOwner(owner)
-      sendOrBuffer('__system:active-owner', { owner })
-      if (options?.unblank && isProjectionBlankedRef.current) {
-        setIsProjectionBlanked(false)
-        sendOrBuffer('__system:blank', { showDefault: false })
-      }
+      getCoordinator().claim(owner, options?.unblank)
+      if (options?.unblank) setIsProjectionBlanked(false)
     },
-    [setIsProjectionBlanked, sendOrBuffer]
+    [getCoordinator]
   )
 
   const blankProjection = useCallback(
     (blank: boolean): void => {
       setIsProjectionBlanked(blank)
-      sendOrBuffer('__system:blank', { showDefault: blank })
+      getCoordinator().blank(blank)
     },
-    [setIsProjectionBlanked, sendOrBuffer]
+    [getCoordinator]
   )
 
   const startProjection = useCallback(
     async (
       owner: ProjectionOwner,
-      payloads: ContentMessageTuple[] = [],
+      payloads: ProjectionContentMessageTuple[] = [],
       options?: StartProjectionOptions
-    ): Promise<void> => {
-      const wasOpen = isProjectionOpenRef.current
+    ): Promise<ProjectionOperationResult> => {
+      const coordinator = getCoordinator()
+      coordinator.startSession(owner, payloads)
       setActiveOwner(owner)
       setIsProjectionBlanked(false)
-      queuePayload('__system:active-owner', '__system:active-owner', { owner })
-      queuePayload('__system:blank', '__system:blank', { showDefault: false })
-      payloads.forEach(([channel, data]) => {
-        queuePayload(getPendingPayloadKey(channel), channel, data)
-      })
 
-      if (!wasOpen) {
-        await openProjection()
-      } else if (options?.bringToFront !== false) {
-        await bringProjectionToFront()
+      let result: ProjectionOperationResult
+      if (coordinator.getRecoveryState().status === 'ready') {
+        result = {
+          ok: true,
+          generation: coordinator.getRecoveryState().generation
+        }
+      } else {
+        result = await openProjection()
       }
-      if (!isReadyRef.current) startReadyTimeout()
+      if (result.ok && options?.bringToFront !== false) await bringProjectionToFront()
+      return result
     },
-    [
-      bringProjectionToFront,
-      getPendingPayloadKey,
-      openProjection,
-      queuePayload,
-      setIsProjectionBlanked,
-      startReadyTimeout
-    ]
+    [bringProjectionToFront, getCoordinator, openProjection]
   )
 
   const stopProjection = useCallback(async (): Promise<void> => {
@@ -364,46 +352,54 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
 
   const send = useCallback(
     <C extends ProjectionChannel>(channel: C, data: ProjectionPayload<C>): void => {
-      getAdapter(adapterRef).send(channel, data)
+      const coordinator = getCoordinator()
+      if (channel === 'file:playback-state') {
+        coordinator.recordPlayback(
+          getAdapter(adapterRef).getGeneration(),
+          data as ProjectionPayload<'file:playback-state'>
+        )
+      } else if (channel === 'file:end') {
+        coordinator.sendOneShot('file:end', null)
+      } else if (!channel.startsWith('__system:')) {
+        coordinator.project(
+          channel as ReplayableProjectionChannel,
+          data as ProjectionPayload<ReplayableProjectionChannel>
+        )
+      } else {
+        getAdapter(adapterRef).send(channel, data)
+      }
     },
-    []
+    [getCoordinator]
   )
 
   const project = useCallback(
-    async <C extends ContentChannel>(
+    async <C extends ProjectionContentChannel>(
       channel: C,
       data: ProjectionPayload<C>,
       options?: ProjectOptions
     ): Promise<void> => {
-      const shouldBringToFront = options?.bringToFront === true && isProjectionOpenRef.current
-
-      if (!isReadyRef.current) {
-        pendingPayloadsRef.current.set(getPendingPayloadKey(channel), { channel, data })
-
-        if (options?.autoOpen && !isProjectionOpenRef.current) {
-          openProjection().catch(() => {
-            console.warn('[Projection] Auto-reopen failed')
-            pendingPayloadsRef.current.delete(channel)
-          })
-          startReadyTimeout()
-        }
-        if (shouldBringToFront) await bringProjectionToFront()
-        return
+      const coordinator = getCoordinator()
+      if (channel === 'file:end') {
+        coordinator.sendOneShot('file:end', null)
+      } else {
+        coordinator.project(
+          channel as ReplayableProjectionChannel,
+          data as ProjectionPayload<ReplayableProjectionChannel>
+        )
       }
-
-      getAdapter(adapterRef).send(channel, data)
-      if (shouldBringToFront) await bringProjectionToFront()
+      if (options?.autoOpen && !isProjectionOpenRef.current) await openProjection()
+      if (options?.bringToFront && isProjectionOpenRef.current) {
+        await bringProjectionToFront()
+      }
     },
-    [bringProjectionToFront, openProjection, getPendingPayloadKey, startReadyTimeout]
+    [bringProjectionToFront, getCoordinator, openProjection]
   )
 
   const on = useCallback(
     <C extends ProjectionChannel>(
       channel: C,
       handler: (data: ProjectionPayload<C>) => void
-    ): (() => void) => {
-      return getAdapter(adapterRef).on(channel, handler)
-    },
+    ): (() => void) => getAdapter(adapterRef).on(channel, handler),
     []
   )
 
@@ -413,10 +409,12 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       isProjectionBlanked,
       projectionReadyCount,
       activeOwner,
+      recovery,
       claimProjection,
       startProjection,
       stopProjection,
       openProjection,
+      retryProjection,
       bringProjectionToFront,
       closeProjection,
       blankProjection,
@@ -429,10 +427,12 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       isProjectionBlanked,
       projectionReadyCount,
       activeOwner,
+      recovery,
       claimProjection,
       startProjection,
       stopProjection,
       openProjection,
+      retryProjection,
       bringProjectionToFront,
       closeProjection,
       blankProjection,
@@ -447,9 +447,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
 
 // eslint-disable-next-line react-refresh/only-export-components
 export function useProjection(): ProjectionContextValue {
-  const ctx = useContext(ProjectionContext)
-  if (!ctx) {
-    throw new Error('useProjection must be used within a ProjectionProvider')
-  }
-  return ctx
+  const context = useContext(ProjectionContext)
+  if (!context) throw new Error('useProjection must be used within a ProjectionProvider')
+  return context
 }
