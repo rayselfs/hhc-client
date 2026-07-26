@@ -25,10 +25,12 @@
     "prepare:video-engine:strict": "node scripts/prepare-video-engine-runtime.mjs --strict",
     "check:packaged-runtime": "node scripts/check-packaged-runtime.mjs",
     "poc:vlc": "electron scripts/vlc-poc.cjs",
+    "preview:web": "vite preview --config vite.web.config.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test"
+    "test:e2e": "npm run build && npm run test:e2e:browser",
+    "test:e2e:browser": "playwright test --project=chromium"
   },
   "dependencies": {
     "@aiden0z/pptx-renderer": "^1.2.2",
