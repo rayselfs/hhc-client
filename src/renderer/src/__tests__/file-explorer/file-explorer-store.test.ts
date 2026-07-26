@@ -53,7 +53,11 @@ const initialStoreState = {
   _itemsByParent: {},
   loadedParents: new Set<string>(),
   currentFolderId: 'file-root',
-  isLoading: true
+  isLoading: true,
+  isInitialized: false,
+  persistenceStatus: 'initializing' as const,
+  persistenceError: null,
+  pendingPersistenceCount: 0
 }
 
 describe('useFileExplorerStore', () => {

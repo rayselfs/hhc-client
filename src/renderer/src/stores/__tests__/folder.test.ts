@@ -122,7 +122,10 @@ beforeEach(() => {
     loadedParents: new Set([ROOT_ID]),
     currentFolderId: ROOT_ID,
     isLoading: false,
-    isInitialized: false
+    isInitialized: false,
+    persistenceStatus: 'initializing',
+    persistenceError: null,
+    pendingPersistenceCount: 0
   })
   vi.clearAllMocks()
   mockSaveFolder.mockResolvedValue(undefined)
@@ -176,6 +179,32 @@ describe('initialize()', () => {
   it('sets isLoading false after completion', async () => {
     await useBibleFolderStore.getState().initialize()
     expect(useBibleFolderStore.getState().isLoading).toBe(false)
+  })
+
+  it('keeps initialization failures visible and retries without fabricating an empty root', async () => {
+    mockLoadAllFolders.mockRejectedValueOnce(new Error('indexeddb unavailable'))
+
+    await useBibleFolderStore.getState().initialize()
+
+    expect(useBibleFolderStore.getState()).toMatchObject({
+      folders: {},
+      isInitialized: false,
+      isLoading: false,
+      persistenceStatus: 'degraded',
+      persistenceError: 'indexeddb unavailable'
+    })
+    expect(mockSaveFolder).not.toHaveBeenCalled()
+
+    mockLoadAllFolders.mockResolvedValueOnce([])
+    await useBibleFolderStore.getState().retryInitialization()
+
+    expect(useBibleFolderStore.getState()).toMatchObject({
+      isInitialized: true,
+      persistenceStatus: 'ready',
+      persistenceError: null
+    })
+    expect(useBibleFolderStore.getState().folders[ROOT_ID]).toBeDefined()
+    expect(mockSaveFolder).toHaveBeenCalledOnce()
   })
 })
 

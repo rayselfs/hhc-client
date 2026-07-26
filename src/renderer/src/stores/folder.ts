@@ -7,6 +7,9 @@ import { incrementBlobRef, openFileExplorerDB } from '@renderer/lib/file-explore
 import { getBlobId } from '@renderer/lib/blob-identity'
 import { resolveUniqueName } from '@renderer/lib/file-naming'
 import { isFolderReadOnlyBySyncLink } from '@renderer/lib/sync-readonly'
+import { createPersistenceOperationQueue } from '@renderer/lib/persistence-operation-queue'
+
+export type FolderPersistenceStatus = 'initializing' | 'ready' | 'saving' | 'degraded'
 
 export interface FolderStoreState {
   folders: Record<string, FolderRecord>
@@ -19,8 +22,13 @@ export interface FolderStoreState {
   currentFolderId: string
   isLoading: boolean
   isInitialized: boolean
+  persistenceStatus: FolderPersistenceStatus
+  persistenceError: string | null
+  pendingPersistenceCount: number
 
   initialize: () => Promise<void>
+  retryInitialization: () => Promise<void>
+  retryPersistence: () => Promise<void>
   addFolder: (name: string, parentId?: string, expiresAt?: number | null) => string
   updateFolder: (id: string, updates: { name?: string; expiresAt?: number | null }) => void
   updateItem?: (id: string, updates: Partial<AnyItemRecord>) => void
@@ -72,6 +80,7 @@ function isItemInReadOnlyFolder(
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export function createFolderStore(config: FolderStoreConfig) {
   const ops = createFolderDB(config.getDB, config.rootId)
+  const persistenceQueue = createPersistenceOperationQueue()
   let isInitializing = false
   const itemsLoadPromises = new Map<string, Promise<void>>()
 
@@ -90,11 +99,18 @@ export function createFolderStore(config: FolderStoreConfig) {
     currentFolderId: config.rootId,
     isLoading: true,
     isInitialized: false,
+    persistenceStatus: 'initializing',
+    persistenceError: null,
+    pendingPersistenceCount: 0,
 
     initialize: async () => {
       if (get().isInitialized || isInitializing) return
       isInitializing = true
-      set({ isLoading: true })
+      set({
+        isLoading: true,
+        persistenceStatus: 'initializing',
+        persistenceError: null
+      })
       try {
         const allFolders = await ops.loadAllFolders()
         const folderMap: Record<string, FolderRecord> = {}
@@ -155,14 +171,24 @@ export function createFolderStore(config: FolderStoreConfig) {
           _itemsByParent: { [config.rootId]: sortByIndex(rootItems) },
           loadedParents: new Set([config.rootId]),
           isLoading: false,
-          isInitialized: true
+          isInitialized: true,
+          persistenceStatus: 'ready',
+          persistenceError: null
         })
-      } catch {
-        set({ isLoading: false })
+      } catch (error) {
+        set({
+          isLoading: false,
+          isInitialized: false,
+          persistenceStatus: 'degraded',
+          persistenceError: error instanceof Error ? error.message : String(error)
+        })
       } finally {
         isInitializing = false
       }
     },
+
+    retryInitialization: () => get().initialize(),
+    retryPersistence: () => persistenceQueue.retry(),
 
     ensureItemsLoaded: async (parentId: string) => {
       const { loadedParents } = get()
