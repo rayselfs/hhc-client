@@ -227,6 +227,25 @@ describe('ensureItemsLoaded()', () => {
     await Promise.all([firstLoad, secondLoad])
     expect(useBibleFolderStore.getState().loadedParents.has('folder-1')).toBe(true)
   })
+
+  it('keeps a failed parent load retryable and reports the read failure', async () => {
+    mockLoadItemsByParent.mockRejectedValueOnce(new Error('read failed'))
+
+    await expect(useBibleFolderStore.getState().ensureItemsLoaded('folder-1')).rejects.toThrow(
+      'read failed'
+    )
+
+    expect(useBibleFolderStore.getState()).toMatchObject({
+      persistenceStatus: 'degraded',
+      persistenceError: 'read failed'
+    })
+    expect(useBibleFolderStore.getState().loadedParents.has('folder-1')).toBe(false)
+
+    mockLoadItemsByParent.mockResolvedValueOnce([])
+    await useBibleFolderStore.getState().ensureItemsLoaded('folder-1')
+
+    expect(useBibleFolderStore.getState().loadedParents.has('folder-1')).toBe(true)
+  })
 })
 
 describe('addFolder()', () => {

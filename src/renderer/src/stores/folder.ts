@@ -214,6 +214,20 @@ export function createFolderStore(config: FolderStoreConfig) {
               _itemsByParent: { ...state._itemsByParent, [parentId]: sortByIndex(forParent) }
             }
           })
+          const queueSnapshot = persistenceQueue.snapshot()
+          if (queueSnapshot.status !== 'failed') {
+            set({
+              persistenceStatus: queueSnapshot.status === 'saving' ? 'saving' : 'ready',
+              persistenceError: null
+            })
+          }
+        })
+        .catch((error) => {
+          set({
+            persistenceStatus: 'degraded',
+            persistenceError: error instanceof Error ? error.message : String(error)
+          })
+          throw error
         })
         .finally(() => {
           itemsLoadPromises.delete(parentId)
