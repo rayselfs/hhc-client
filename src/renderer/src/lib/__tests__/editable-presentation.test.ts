@@ -1,10 +1,11 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { Blob as NodeBlob } from 'node:buffer'
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { buildPresentation, materializeAllSlideNodes, parseZip } from '@aiden0z/pptx-renderer'
 import type { PresentationData } from '@aiden0z/pptx-renderer'
-import { resetFileExplorerDBForTests } from '../file-explorer-db'
-import { getDerivedAsset, resetMediaWorkDBForTests } from '../media-work-db'
+import { openFileExplorerDB, resetFileExplorerDBForTests } from '../file-explorer-db'
+import { getDerivedAsset, putDerivedAsset, resetMediaWorkDBForTests } from '../media-work-db'
 import { resetThumbnailDBForTests } from '../thumbnail-db'
 import {
   EDITABLE_PRESENTATION_DOCUMENT_KIND,
@@ -30,7 +31,7 @@ import {
   removeEditableSlides,
   saveEditablePresentation,
   updateSlideBackground,
-type EditableTextElement
+  type EditableTextElement
 } from '../editable-presentation'
 import { EDITABLE_PRESENTATION_MIME_TYPE, PPTX_MIME_TYPE } from '../presentation-media'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
@@ -204,6 +205,12 @@ function decodeSvgDataUrl(dataUrl: string): string {
   return new TextDecoder().decode(bytes)
 }
 
+function createStoredBlob(value: string): Blob {
+  return new NodeBlob([value], {
+    type: EDITABLE_PRESENTATION_MIME_TYPE
+  }) as unknown as Blob
+}
+
 beforeEach(async () => {
   await resetFileExplorerDBForTests()
   await resetMediaWorkDBForTests()
@@ -220,6 +227,10 @@ beforeEach(async () => {
     isLoading: false,
     isInitialized: false
   })
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
 })
 
 describe('editable presentation documents', () => {
@@ -441,6 +452,7 @@ describe('editable presentation documents', () => {
   })
 
   it('persists inserted text and image edits across save, reload, and delete', async () => {
+    vi.stubGlobal('Blob', NodeBlob)
     const document = createBlankEditablePresentationDocument(
       'Sunday',
       '00000000-0000-4000-8000-000000000003'
@@ -468,6 +480,26 @@ describe('editable presentation documents', () => {
       sourceHeight: 400
     })
     const source = { id: document.id, url: `blob:${document.id}` }
+    const db = await openFileExplorerDB()
+    await db.put('folder-items', {
+      id: document.id,
+      parentId: 'file-root',
+      type: 'file',
+      sortIndex: 0,
+      createdAt: 1,
+      expiresAt: null,
+      name: 'Sunday',
+      url: source.url,
+      size: 0,
+      mimeType: EDITABLE_PRESENTATION_MIME_TYPE
+    })
+    await db.put('file-blobs', {
+      id: document.id,
+      blob: new Blob([JSON.stringify(document)], { type: EDITABLE_PRESENTATION_MIME_TYPE }),
+      size: 0,
+      refCount: 1,
+      revision: 0
+    })
     const withAssets = { ...document, assets: { [asset.id]: asset } }
     const withElements = addElementToSlide(
       addElementToSlide(withAssets, slideId, text),
@@ -499,6 +531,92 @@ describe('editable presentation documents', () => {
 
     expect(afterDelete.slides[slideId].elements[image.id]).toBeUndefined()
     expect(afterDelete.assets[asset.id]).toEqual(asset)
+  })
+
+  it('loads the source document ahead of a stale derived mirror', async () => {
+    const sourceDocument = createBlankEditablePresentationDocument(
+      'Source',
+      '00000000-0000-4000-8000-000000000005'
+    )
+    const staleDocument = { ...sourceDocument, name: 'Stale mirror' }
+    const source = { id: 'deck-1', url: 'blob:deck-source', name: 'Deck' }
+    const db = await openFileExplorerDB()
+    await db.put('file-blobs', {
+      id: 'deck-source',
+      blob: createStoredBlob(JSON.stringify(sourceDocument)),
+      revision: 2
+    })
+    await putDerivedAsset({
+      sourceBlobId: 'deck-source',
+      kind: EDITABLE_PRESENTATION_DOCUMENT_KIND,
+      variant: getEditablePresentationDocumentVariant(source.id),
+      storage: 'indexed-db',
+      mimeType: EDITABLE_PRESENTATION_MIME_TYPE,
+      status: 'ready',
+      blob: createStoredBlob(JSON.stringify(staleDocument)),
+      metadata: {
+        presentationDocumentJson: JSON.stringify(staleDocument),
+        presentationRevision: 1
+      }
+    })
+
+    const loaded = await loadEditablePresentation(source)
+
+    expect(loaded.name).toBe('Source')
+  })
+
+  it('rejects a derived-only document when its source is missing', async () => {
+    const document = createBlankEditablePresentationDocument(
+      'Derived only',
+      '00000000-0000-4000-8000-000000000006'
+    )
+    const source = { id: 'deck-1', url: 'blob:missing-source', name: 'Deck' }
+    await putDerivedAsset({
+      sourceBlobId: 'missing-source',
+      kind: EDITABLE_PRESENTATION_DOCUMENT_KIND,
+      variant: getEditablePresentationDocumentVariant(source.id),
+      storage: 'indexed-db',
+      mimeType: EDITABLE_PRESENTATION_MIME_TYPE,
+      status: 'ready',
+      blob: createStoredBlob(JSON.stringify(document)),
+      metadata: {
+        presentationDocumentJson: JSON.stringify(document),
+        presentationRevision: 1
+      }
+    })
+
+    await expect(loadEditablePresentation(source)).rejects.toThrow(
+      'Editable presentation source is missing'
+    )
+  })
+
+  it('repairs a mismatched derived revision without blocking source load', async () => {
+    const document = createBlankEditablePresentationDocument(
+      'Source revision',
+      '00000000-0000-4000-8000-000000000007'
+    )
+    const source = { id: 'deck-1', url: 'blob:deck-source', name: 'Deck' }
+    const db = await openFileExplorerDB()
+    await db.put('file-blobs', {
+      id: 'deck-source',
+      blob: createStoredBlob(JSON.stringify(document)),
+      revision: 3
+    })
+
+    const loaded = await loadEditablePresentation(source)
+
+    expect(loaded.name).toBe('Source revision')
+    await vi.waitFor(async () => {
+      const repaired = await getDerivedAsset(
+        'deck-source',
+        EDITABLE_PRESENTATION_DOCUMENT_KIND,
+        getEditablePresentationDocumentVariant(source.id)
+      )
+      expect(repaired?.metadata).toMatchObject({
+        presentationRevision: 3,
+        presentationDocumentJson: expect.stringContaining('"name":"Source revision"')
+      })
+    })
   })
 
   it('duplicates slides without reusing element ids', () => {
@@ -568,6 +686,7 @@ describe('editable presentation documents', () => {
   })
 
   it('creates a file item and persists the editable deck asset', async () => {
+    vi.stubGlobal('Blob', NodeBlob)
     const item = await createEditablePresentation('Sunday', 'file-root')
     const loaded = await loadEditablePresentation(item)
     const asset = await getDerivedAsset(

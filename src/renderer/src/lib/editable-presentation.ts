@@ -3,7 +3,6 @@ import { openFileExplorerDB } from './file-explorer-db'
 import { getDerivedAsset, putDerivedAsset } from './media-work-db'
 import { EDITABLE_PRESENTATION_MIME_TYPE } from './presentation-media'
 import { readPresentationArrayBuffer } from './presentation-source'
-import { saveThumbnail } from './thumbnail-db'
 import { persistEditablePresentationCreation } from './editable-presentation-creation'
 import { FOLDER_DURATION_MS, type FileItemRecord } from '@shared/types/folder'
 import type { PlaceholderInfo, PresentationData } from '@aiden0z/pptx-renderer'
@@ -1363,21 +1362,28 @@ export async function loadEditablePresentation(
   source: EditablePresentationSource
 ): Promise<EditablePresentationDocument> {
   const blobId = getBlobId(source)
+  const db = await openFileExplorerDB()
+  const record = await db.get('file-blobs', blobId)
+  if (!record?.blob) {
+    throw new Error(`Editable presentation source is missing: ${source.id}`)
+  }
+  const body = await readBlobText(record.blob)
+  const document = parseEditablePresentation(body)
   const asset = await getDerivedAsset(
     blobId,
     EDITABLE_PRESENTATION_DOCUMENT_KIND,
     getEditablePresentationDocumentVariant(source.id)
   )
-  if (asset?.metadata?.presentationDocumentJson) {
-    return parseEditablePresentation(asset.metadata.presentationDocumentJson)
+  const metadata = asset?.metadata
+  if (
+    metadata?.presentationRevision !== record.revision ||
+    metadata?.presentationDocumentJson !== body
+  ) {
+    void repairEditableDocumentMirror(source.id, blobId, body, record.blob, record.revision).catch(
+      () => undefined
+    )
   }
-  if (asset?.blob) return parseEditablePresentation(await readBlobText(asset.blob))
-
-  const db = await openFileExplorerDB()
-  const record = await db.get('file-blobs', blobId)
-  if (record?.blob) return parseEditablePresentation(await readBlobText(record.blob))
-
-  throw new Error(`Editable presentation document is missing: ${source.id}`)
+  return document
 }
 
 export async function saveEditablePresentation(
@@ -1386,38 +1392,41 @@ export async function saveEditablePresentation(
 ): Promise<void> {
   const sourceBlobId = getBlobId(item)
   const nextDocument = { ...document, updatedAt: Date.now() }
-  const body = JSON.stringify(nextDocument)
-  const blob = new Blob([body], { type: EDITABLE_PRESENTATION_MIME_TYPE })
+  const db = await openFileExplorerDB()
+  const record = await db.get('file-blobs', sourceBlobId)
+  const { persistEditablePresentationRevision, refreshEditablePresentationThumbnail } =
+    await import('./editable-presentation-persistence')
+  await persistEditablePresentationRevision({
+    itemId: item.id,
+    sourceBlobId,
+    revision: (record?.revision ?? 0) + 1,
+    document: nextDocument,
+    catalogName: nextDocument.name
+  })
+  await refreshEditablePresentationThumbnail(nextDocument)
+}
 
+async function repairEditableDocumentMirror(
+  itemId: string,
+  sourceBlobId: string,
+  body: string,
+  blob: Blob,
+  revision: number | undefined
+): Promise<void> {
   await putDerivedAsset({
     sourceBlobId,
     kind: EDITABLE_PRESENTATION_DOCUMENT_KIND,
-    variant: getEditablePresentationDocumentVariant(item.id),
+    variant: getEditablePresentationDocumentVariant(itemId),
     storage: 'indexed-db',
     mimeType: EDITABLE_PRESENTATION_MIME_TYPE,
     size: blob.size,
     status: 'ready',
     blob,
     metadata: {
-      presentationDocumentJson: body
+      presentationDocumentJson: body,
+      presentationRevision: revision
     }
   })
-
-  const db = await openFileExplorerDB()
-  const record = await db.get('file-blobs', sourceBlobId)
-  await db.put('file-blobs', {
-    id: sourceBlobId,
-    blob,
-    size: blob.size,
-    refCount: record?.refCount ?? 1
-  })
-  const thumbnail = generateEditablePresentationThumbnail(nextDocument)
-  await saveThumbnail(sourceBlobId, thumbnail)
-  window.dispatchEvent(
-    new CustomEvent('hhc:thumbnail-ready', {
-      detail: { itemId: item.id, dataUrl: thumbnail }
-    })
-  )
 }
 
 export function generateEditablePresentationThumbnail(

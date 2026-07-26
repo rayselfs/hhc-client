@@ -9,6 +9,7 @@ export interface FileBlobRecord {
   storage?: 'indexed-db' | 'native-fs'
   size?: number
   refCount?: number
+  revision?: number
 }
 
 export interface ResourceCleanupJournalRecord {

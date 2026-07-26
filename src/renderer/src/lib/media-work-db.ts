@@ -57,6 +57,7 @@ export interface DerivedAssetMetadata {
   frameRate?: number
   browserPlayback?: 'playable' | 'unplayable'
   presentationDocumentJson?: string
+  presentationRevision?: number
 }
 
 export interface DerivedAssetRecord {
