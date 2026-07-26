@@ -88,7 +88,7 @@ export function createFolderStore(config: FolderStoreConfig) {
     return arr.slice().sort((a, b) => a.sortIndex - b.sortIndex)
   }
 
-  return create<FolderStoreState>()((set, get) => ({
+  const store = create<FolderStoreState>()((set, get) => ({
     folders: {},
     items: {},
     _foldersArray: [],
@@ -255,7 +255,7 @@ export function createFolderStore(config: FolderStoreConfig) {
           ])
         }
       }))
-      ops.saveFolder(newFolder)
+      persistenceQueue.enqueue(() => ops.saveFolder(newFolder))
       return newFolder.id
     },
 
@@ -279,7 +279,7 @@ export function createFolderStore(config: FolderStoreConfig) {
           _childFoldersByParent: newChildFolders
         }
       })
-      ops.saveFolder(updated)
+      persistenceQueue.enqueue(() => ops.saveFolder(updated))
     },
 
     updateItem: (id, updates) => {
@@ -304,7 +304,7 @@ export function createFolderStore(config: FolderStoreConfig) {
           _itemsByParent: newItemsByParent
         }
       })
-      ops.saveItem(updated)
+      persistenceQueue.enqueue(() => ops.saveItem(updated))
     },
 
     deleteFolder: (id) => {
@@ -364,8 +364,10 @@ export function createFolderStore(config: FolderStoreConfig) {
           currentFolderId: nextCurrentId
         }
       })
-      ops.deleteFolders(allFolderIds)
-      if (itemIdsToDelete.length > 0) ops.deleteItems(itemIdsToDelete)
+      persistenceQueue.enqueue(async () => {
+        await ops.deleteFolders(allFolderIds)
+        if (itemIdsToDelete.length > 0) await ops.deleteItems(itemIdsToDelete)
+      })
     },
 
     addItem: (itemData) => {
@@ -394,7 +396,7 @@ export function createFolderStore(config: FolderStoreConfig) {
           [parentId]: sortByIndex([...(state._itemsByParent[parentId] ?? []), item])
         }
       }))
-      ops.saveItem(item)
+      persistenceQueue.enqueue(() => ops.saveItem(item))
     },
 
     removeItem: (id) => {
@@ -416,7 +418,7 @@ export function createFolderStore(config: FolderStoreConfig) {
           _itemsByParent: newItemsByParent
         }
       })
-      ops.deleteItem(id)
+      persistenceQueue.enqueue(() => ops.deleteItem(id))
     },
 
     moveItem: (itemId, targetFolderId) => {
@@ -453,7 +455,7 @@ export function createFolderStore(config: FolderStoreConfig) {
           _itemsByParent: newItemsByParent
         }
       })
-      ops.saveItem(updated)
+      persistenceQueue.enqueue(() => ops.saveItem(updated))
     },
 
     copyItem: async (itemId, targetFolderId) => {
@@ -490,7 +492,7 @@ export function createFolderStore(config: FolderStoreConfig) {
           ])
         }
       }))
-      ops.saveItem(copiedItem)
+      persistenceQueue.enqueue(() => ops.saveItem(copiedItem))
       return newId
     },
 
@@ -532,7 +534,7 @@ export function createFolderStore(config: FolderStoreConfig) {
           _childFoldersByParent: newChildFolders
         }
       })
-      ops.saveFolder(updated)
+      persistenceQueue.enqueue(() => ops.saveFolder(updated))
     },
 
     reorderItems: (parentId, orderedIds) => {
@@ -562,7 +564,7 @@ export function createFolderStore(config: FolderStoreConfig) {
           _itemsByParent: newItemsByParent
         }
       })
-      ops.saveItems(updated)
+      persistenceQueue.enqueue(() => ops.saveItems(updated))
     },
 
     reorderFolders: (parentId, orderedIds) => {
@@ -590,7 +592,7 @@ export function createFolderStore(config: FolderStoreConfig) {
           _childFoldersByParent: newChildFolders
         }
       })
-      ops.saveFolders(updated)
+      persistenceQueue.enqueue(() => ops.saveFolders(updated))
     },
 
     navigateToFolder: async (folderId) => {
@@ -634,7 +636,7 @@ export function createFolderStore(config: FolderStoreConfig) {
               }
             : state._childFoldersByParent
       }))
-      ops.saveFolder(updated)
+      persistenceQueue.enqueue(() => ops.saveFolder(updated))
     },
 
     softDeleteFolder: (folderId) => {
@@ -682,8 +684,10 @@ export function createFolderStore(config: FolderStoreConfig) {
         }
       })
 
-      ops.saveFolder(updated)
-      if (descendantUpdates.length > 0) ops.saveFolders(descendantUpdates)
+      persistenceQueue.enqueue(async () => {
+        await ops.saveFolder(updated)
+        if (descendantUpdates.length > 0) await ops.saveFolders(descendantUpdates)
+      })
     },
 
     softDeleteItem: (itemId) => {
@@ -707,7 +711,7 @@ export function createFolderStore(config: FolderStoreConfig) {
             }
           : state._itemsByParent
       }))
-      ops.saveItem(updated)
+      persistenceQueue.enqueue(() => ops.saveItem(updated))
     },
 
     restoreFolder: (folderId) => {
@@ -743,7 +747,7 @@ export function createFolderStore(config: FolderStoreConfig) {
           _childFoldersByParent: newChildFolders
         }
       })
-      ops.saveFolder(updated)
+      persistenceQueue.enqueue(() => ops.saveFolder(updated))
     },
 
     restoreItem: (itemId) => {
@@ -777,7 +781,7 @@ export function createFolderStore(config: FolderStoreConfig) {
           _itemsByParent: newItemsByParent
         }
       })
-      ops.saveItem(updated)
+      persistenceQueue.enqueue(() => ops.saveItem(updated))
     },
 
     purgeTrash: async (retentionMs) => {
@@ -969,8 +973,12 @@ export function createFolderStore(config: FolderStoreConfig) {
         }
       })
 
-      if (folderUpdates.length > 0) ops.saveFolders([...folderUpdates, ...descendantUnfavorites])
-      if (itemUpdates.length > 0) ops.saveItems(itemUpdates)
+      persistenceQueue.enqueue(async () => {
+        if (folderUpdates.length > 0) {
+          await ops.saveFolders([...folderUpdates, ...descendantUnfavorites])
+        }
+        if (itemUpdates.length > 0) await ops.saveItems(itemUpdates)
+      })
     },
 
     getChildFolders: (parentId) => {
@@ -997,6 +1005,21 @@ export function createFolderStore(config: FolderStoreConfig) {
       return get().loadedParents.has(parentId)
     }
   }))
+
+  persistenceQueue.subscribe((snapshot) => {
+    store.setState({
+      persistenceStatus:
+        snapshot.status === 'failed'
+          ? 'degraded'
+          : snapshot.status === 'saving'
+            ? 'saving'
+            : 'ready',
+      persistenceError: snapshot.error,
+      pendingPersistenceCount: snapshot.pendingCount
+    })
+  })
+
+  return store
 }
 
 function getDescendantFolderIds(folderId: string, folders: Record<string, FolderRecord>): string[] {

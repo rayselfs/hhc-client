@@ -288,12 +288,13 @@ describe('updateFolder()', () => {
     expect(useBibleFolderStore.getState().folders[ROOT_ID].name).toBe('Bible Library')
   })
 
-  it('persists after rename', () => {
+  it('persists after rename', async () => {
     useBibleFolderStore.getState().addFolder('X')
+    await vi.waitFor(() => expect(useBibleFolderStore.getState().pendingPersistenceCount).toBe(0))
     mockSaveFolder.mockClear()
     const folderId = useBibleFolderStore.getState().getChildFolders(ROOT_ID)[0].id
     useBibleFolderStore.getState().updateFolder(folderId, { name: 'Y' })
-    expect(mockSaveFolder).toHaveBeenCalled()
+    await vi.waitFor(() => expect(mockSaveFolder).toHaveBeenCalled())
   })
 
   it('does not rename read-only sync folders or descendants', () => {
@@ -308,6 +309,33 @@ describe('updateFolder()', () => {
 
     expect(useBibleFolderStore.getState().folders[child.id].name).toBe('Synced Folder')
     expect(mockSaveFolder).not.toHaveBeenCalled()
+  })
+
+  it('retains failed folder writes and retries them before later writes', async () => {
+    mockSaveFolder.mockRejectedValueOnce(new Error('quota exceeded'))
+
+    const folderId = useBibleFolderStore.getState().addFolder('Before')
+    useBibleFolderStore.getState().updateFolder(folderId, { name: 'After' })
+
+    await vi.waitFor(() =>
+      expect(useBibleFolderStore.getState().persistenceStatus).toBe('degraded')
+    )
+    expect(useBibleFolderStore.getState()).toMatchObject({
+      persistenceError: 'quota exceeded',
+      pendingPersistenceCount: 2
+    })
+
+    mockSaveFolder.mockResolvedValue(undefined)
+    await useBibleFolderStore.getState().retryPersistence()
+
+    expect(useBibleFolderStore.getState()).toMatchObject({
+      persistenceStatus: 'ready',
+      persistenceError: null,
+      pendingPersistenceCount: 0
+    })
+    expect(mockSaveFolder).toHaveBeenLastCalledWith(
+      expect.objectContaining({ id: folderId, name: 'After' })
+    )
   })
 })
 
@@ -489,16 +517,17 @@ describe('reorderItems()', () => {
     expect(items[2].sortIndex).toBe(2)
   })
 
-  it('persists after reorder', () => {
+  it('persists after reorder', async () => {
     useBibleFolderStore.getState().addItem(makeVerse('a'))
     useBibleFolderStore.getState().addItem(makeVerse('b'))
     const [idA, idB] = useBibleFolderStore
       .getState()
       .getItems(ROOT_ID)
       .map((i) => i.id)
+    await vi.waitFor(() => expect(useBibleFolderStore.getState().pendingPersistenceCount).toBe(0))
     mockSaveItems.mockClear()
     useBibleFolderStore.getState().reorderItems(ROOT_ID, [idB, idA])
-    expect(mockSaveItems).toHaveBeenCalled()
+    await vi.waitFor(() => expect(mockSaveItems).toHaveBeenCalled())
   })
 
   it('does not reorder items inside read-only sync folders', () => {
