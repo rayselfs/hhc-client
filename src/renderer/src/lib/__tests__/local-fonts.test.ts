@@ -1,9 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import {
-  mergeFontFamilies,
-  queryLocalFontFamilies,
-  supportsLocalFontAccess
-} from '../local-fonts'
+import { mergeFontFamilies, queryLocalFontFamilies, supportsLocalFontAccess } from '../local-fonts'
 
 describe('local fonts', () => {
   it('reports unsupported environments without querying', async () => {
@@ -12,12 +8,14 @@ describe('local fonts', () => {
   })
 
   it('returns unique sorted font family names', async () => {
-    const queryLocalFonts = vi.fn().mockResolvedValue([
-      { family: 'PingFang TC' },
-      { family: ' Arial ' },
-      { family: '' },
-      { family: 'PingFang TC' }
-    ])
+    const queryLocalFonts = vi
+      .fn()
+      .mockResolvedValue([
+        { family: 'PingFang TC' },
+        { family: ' Arial ' },
+        { family: '' },
+        { family: 'PingFang TC' }
+      ])
 
     await expect(queryLocalFontFamilies({ queryLocalFonts })).resolves.toEqual([
       'Arial',
@@ -32,4 +30,3 @@ describe('local fonts', () => {
     ).toEqual(['Inter Variable', 'Arial', 'Aptos', 'PingFang TC'])
   })
 })
-

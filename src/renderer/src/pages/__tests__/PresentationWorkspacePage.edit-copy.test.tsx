@@ -254,10 +254,9 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
       mimeType: EDITABLE_PRESENTATION_MIME_TYPE
     })
     mocks.loadEditablePresentationSnapshot.mockResolvedValue({ document, revision: 0 })
-    const queryLocalFonts = vi.fn().mockResolvedValue([
-      { family: 'PingFang TC' },
-      { family: 'PingFang TC' }
-    ])
+    const queryLocalFonts = vi
+      .fn()
+      .mockResolvedValue([{ family: 'PingFang TC' }, { family: 'PingFang TC' }])
     Object.defineProperty(window, 'queryLocalFonts', {
       configurable: true,
       value: queryLocalFonts
