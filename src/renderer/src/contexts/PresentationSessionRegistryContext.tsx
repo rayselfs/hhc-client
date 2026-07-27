@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode } from 'react'
 import { getBlobId } from '@renderer/lib/blob-identity'
-import { loadEditablePresentation } from '@renderer/lib/editable-presentation'
+import { loadEditablePresentationSnapshot } from '@renderer/lib/editable-presentation'
 import {
   persistEditablePresentationRevision,
   refreshEditablePresentationThumbnail
@@ -64,9 +64,10 @@ export function PresentationSessionRegistryProvider({
       const opening = openingRef.current.get(item.id)
       if (opening) return opening
 
-      const promise = loadEditablePresentation(item).then((document) => {
+      const promise = loadEditablePresentationSnapshot(item).then(({ document, revision }) => {
         const session = createPresentationEditorSession({
           initialDocument: document,
+          initialRevision: revision,
           persist: (request) =>
             persistEditablePresentationRevision({
               ...request,

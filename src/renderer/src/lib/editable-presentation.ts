@@ -147,6 +147,11 @@ export interface EditablePresentationDocument {
 
 type EditablePresentationSource = Pick<FileItemRecord, 'id' | 'url' | 'name'>
 
+export interface EditablePresentationSnapshot {
+  document: EditablePresentationDocument
+  revision: number
+}
+
 const DEFAULT_WIDTH = 1920
 const DEFAULT_HEIGHT = 1080
 const DEFAULT_FONT_FAMILY = 'Inter Variable'
@@ -1367,9 +1372,9 @@ function stripPresentationExtension(name: string): string {
   return name.replace(/\.(pptx|lpdeck)$/i, '')
 }
 
-export async function loadEditablePresentation(
+export async function loadEditablePresentationSnapshot(
   source: EditablePresentationSource
-): Promise<EditablePresentationDocument> {
+): Promise<EditablePresentationSnapshot> {
   const blobId = getBlobId(source)
   const db = await openFileExplorerDB()
   const record = await db.get('file-blobs', blobId)
@@ -1381,7 +1386,7 @@ export async function loadEditablePresentation(
   if (cached) {
     editableDocumentCache.delete(cacheKey)
     editableDocumentCache.set(cacheKey, cached)
-    return cached
+    return { document: cached, revision: record.revision ?? 0 }
   }
   const body = await readBlobText(record.blob)
   const document = parseEditablePresentation(body)
@@ -1391,7 +1396,13 @@ export async function loadEditablePresentation(
     if (!oldestKey) break
     editableDocumentCache.delete(oldestKey)
   }
-  return document
+  return { document, revision: record.revision ?? 0 }
+}
+
+export async function loadEditablePresentation(
+  source: EditablePresentationSource
+): Promise<EditablePresentationDocument> {
+  return (await loadEditablePresentationSnapshot(source)).document
 }
 
 const EDITABLE_DOCUMENT_CACHE_LIMIT = 12

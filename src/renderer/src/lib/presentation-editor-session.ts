@@ -44,6 +44,7 @@ interface PresentationDraft {
 
 export function createPresentationEditorSession(options: {
   initialDocument: EditablePresentationDocument
+  initialRevision?: number
   persist: PersistPresentationRevision
   refreshThumbnail: (document: EditablePresentationDocument) => Promise<void>
 }): PresentationEditorSession {
@@ -61,7 +62,11 @@ export function createPresentationEditorSession(options: {
   let suppressCoordinatorNotifications = false
   let disposed = false
   const listeners = new Set<() => void>()
-  const coordinator = createPresentationSaveCoordinator(options.initialDocument, options.persist)
+  const coordinator = createPresentationSaveCoordinator(
+    options.initialDocument,
+    options.persist,
+    options.initialRevision
+  )
 
   const getSaveSnapshot = (): PresentationSaveState => {
     const save = coordinator.getState()

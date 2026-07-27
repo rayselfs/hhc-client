@@ -17,7 +17,7 @@ import { usePresentationWorkspaceStore } from '@renderer/stores/presentation-wor
 import type { FileItemRecord } from '@shared/types/folder'
 
 const mocks = vi.hoisted(() => ({
-  loadEditablePresentation: vi.fn(),
+  loadEditablePresentationSnapshot: vi.fn(),
   createPresentationEditorSession: vi.fn()
 }))
 
@@ -25,7 +25,7 @@ vi.mock('@renderer/lib/editable-presentation', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@renderer/lib/editable-presentation')>()
   return {
     ...actual,
-    loadEditablePresentation: mocks.loadEditablePresentation
+    loadEditablePresentationSnapshot: mocks.loadEditablePresentationSnapshot
   }
 })
 
@@ -122,7 +122,7 @@ function RegistryProbe({
 
 describe('PresentationSessionRegistryContext', () => {
   beforeEach(() => {
-    mocks.loadEditablePresentation.mockReset()
+    mocks.loadEditablePresentationSnapshot.mockReset()
     mocks.createPresentationEditorSession.mockReset()
     usePresentationWorkspaceStore.setState({
       documents: [],
@@ -135,7 +135,7 @@ describe('PresentationSessionRegistryContext', () => {
     const item = makeEditableItem('deck-1')
     const document = makeDocument('Sunday', item.id)
     const session = createFakeSession(document)
-    mocks.loadEditablePresentation.mockResolvedValue(document)
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({ document, revision: 4 })
     mocks.createPresentationEditorSession.mockReturnValue(session)
     let registry: PresentationSessionRegistry | null = null
     render(
@@ -149,8 +149,11 @@ describe('PresentationSessionRegistryContext', () => {
 
     expect(first).toBe(session)
     expect(second).toBe(session)
-    expect(mocks.loadEditablePresentation).toHaveBeenCalledTimes(1)
+    expect(mocks.loadEditablePresentationSnapshot).toHaveBeenCalledTimes(1)
     expect(mocks.createPresentationEditorSession).toHaveBeenCalledTimes(1)
+    expect(mocks.createPresentationEditorSession).toHaveBeenCalledWith(
+      expect.objectContaining({ initialRevision: 4 })
+    )
   })
 
   it('flushes the previous editable session before activating another tab', async () => {
@@ -158,9 +161,15 @@ describe('PresentationSessionRegistryContext', () => {
     const secondItem = makeEditableItem('deck-2')
     const firstSession = createFakeSession(makeDocument('First', firstItem.id), 'dirty')
     const secondSession = createFakeSession(makeDocument('Second', secondItem.id))
-    mocks.loadEditablePresentation
-      .mockResolvedValueOnce(firstSession.getSnapshot().renderedDocument)
-      .mockResolvedValueOnce(secondSession.getSnapshot().renderedDocument)
+    mocks.loadEditablePresentationSnapshot
+      .mockResolvedValueOnce({
+        document: firstSession.getSnapshot().renderedDocument,
+        revision: 0
+      })
+      .mockResolvedValueOnce({
+        document: secondSession.getSnapshot().renderedDocument,
+        revision: 0
+      })
     mocks.createPresentationEditorSession
       .mockReturnValueOnce(firstSession)
       .mockReturnValueOnce(secondSession)
@@ -188,9 +197,15 @@ describe('PresentationSessionRegistryContext', () => {
     const firstSession = createFakeSession(makeDocument('First', firstItem.id), 'dirty')
     vi.mocked(firstSession.flush).mockRejectedValue(new Error('save failed'))
     const secondSession = createFakeSession(makeDocument('Second', secondItem.id))
-    mocks.loadEditablePresentation
-      .mockResolvedValueOnce(firstSession.getSnapshot().renderedDocument)
-      .mockResolvedValueOnce(secondSession.getSnapshot().renderedDocument)
+    mocks.loadEditablePresentationSnapshot
+      .mockResolvedValueOnce({
+        document: firstSession.getSnapshot().renderedDocument,
+        revision: 0
+      })
+      .mockResolvedValueOnce({
+        document: secondSession.getSnapshot().renderedDocument,
+        revision: 0
+      })
     mocks.createPresentationEditorSession
       .mockReturnValueOnce(firstSession)
       .mockReturnValueOnce(secondSession)
@@ -216,7 +231,7 @@ describe('PresentationSessionRegistryContext', () => {
     const document = makeDocument('Sunday', item.id)
     const session = createFakeSession(document)
     session.getSnapshot().history.past.push({ ...document, name: 'Before' })
-    mocks.loadEditablePresentation.mockResolvedValue(document)
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({ document, revision: 0 })
     mocks.createPresentationEditorSession.mockReturnValue(session)
     let registry: PresentationSessionRegistry | null = null
     const { rerender } = render(
@@ -239,7 +254,10 @@ describe('PresentationSessionRegistryContext', () => {
   it('flushes and disposes a session before closing its tab', async () => {
     const item = makeEditableItem('deck-1')
     const session = createFakeSession(makeDocument('Sunday', item.id))
-    mocks.loadEditablePresentation.mockResolvedValue(session.getSnapshot().renderedDocument)
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({
+      document: session.getSnapshot().renderedDocument,
+      revision: 0
+    })
     mocks.createPresentationEditorSession.mockReturnValue(session)
     usePresentationWorkspaceStore.getState().openDocument(item)
     let registry: PresentationSessionRegistry | null = null
@@ -261,7 +279,10 @@ describe('PresentationSessionRegistryContext', () => {
   it('discards and disposes without flushing when explicitly requested', async () => {
     const item = makeEditableItem('deck-1')
     const session = createFakeSession(makeDocument('Sunday', item.id), 'error')
-    mocks.loadEditablePresentation.mockResolvedValue(session.getSnapshot().renderedDocument)
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({
+      document: session.getSnapshot().renderedDocument,
+      revision: 0
+    })
     mocks.createPresentationEditorSession.mockReturnValue(session)
     usePresentationWorkspaceStore.getState().openDocument(item)
     let registry: PresentationSessionRegistry | null = null
@@ -285,9 +306,15 @@ describe('PresentationSessionRegistryContext', () => {
     const firstSession = createFakeSession(makeDocument('First', firstItem.id), 'dirty')
     const secondSession = createFakeSession(makeDocument('Second', secondItem.id), 'error')
     vi.mocked(secondSession.flush).mockRejectedValue(new Error('save failed'))
-    mocks.loadEditablePresentation
-      .mockResolvedValueOnce(firstSession.getSnapshot().renderedDocument)
-      .mockResolvedValueOnce(secondSession.getSnapshot().renderedDocument)
+    mocks.loadEditablePresentationSnapshot
+      .mockResolvedValueOnce({
+        document: firstSession.getSnapshot().renderedDocument,
+        revision: 0
+      })
+      .mockResolvedValueOnce({
+        document: secondSession.getSnapshot().renderedDocument,
+        revision: 0
+      })
     mocks.createPresentationEditorSession
       .mockReturnValueOnce(firstSession)
       .mockReturnValueOnce(secondSession)
@@ -309,7 +336,10 @@ describe('PresentationSessionRegistryContext', () => {
   it('notifies subscribers when registry contents change', async () => {
     const item = makeEditableItem('deck-1')
     const session = createFakeSession(makeDocument('Sunday', item.id))
-    mocks.loadEditablePresentation.mockResolvedValue(session.getSnapshot().renderedDocument)
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({
+      document: session.getSnapshot().renderedDocument,
+      revision: 0
+    })
     mocks.createPresentationEditorSession.mockReturnValue(session)
     let registry: PresentationSessionRegistry | null = null
     render(

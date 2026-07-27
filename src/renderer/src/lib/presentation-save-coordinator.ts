@@ -44,16 +44,17 @@ function normalizeError(error: unknown): Error {
 export function createPresentationSaveCoordinator(
   initialDocument: EditablePresentationDocument,
   persist: PersistPresentationRevision,
+  initialRevision = 0,
   debounceMs = 250
 ): PresentationSaveCoordinator {
   let state: PresentationSaveState = {
     status: 'saved',
-    scheduledRevision: 0,
-    persistedRevision: 0,
+    scheduledRevision: initialRevision,
+    persistedRevision: initialRevision,
     error: null,
     mirrorWarnings: []
   }
-  let nextRevision = 0
+  let nextRevision = initialRevision
   let pendingRequest: PresentationSaveRequest | null = null
   let latestRequest: PresentationSaveRequest | null = null
   let inFlight: Promise<void> | null = null

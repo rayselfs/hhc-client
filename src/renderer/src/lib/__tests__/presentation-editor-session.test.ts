@@ -38,6 +38,7 @@ describe('presentation editor session', () => {
     options: {
       persist?: PersistPresentationRevision
       refreshThumbnail?: (document: typeof initialDocument) => Promise<void>
+      initialRevision?: number
     } = {}
   ): PresentationEditorSession {
     const persist: PersistPresentationRevision =
@@ -48,12 +49,21 @@ describe('presentation editor session', () => {
       }))
     const session = createPresentationEditorSession({
       initialDocument,
+      initialRevision: options.initialRevision,
       persist,
       refreshThumbnail: options.refreshThumbnail ?? vi.fn().mockResolvedValue(undefined)
     })
     sessions.push(session)
     return session
   }
+
+  it('continues scheduling after the persisted revision', () => {
+    const session = createSession({ initialRevision: 4 })
+
+    session.commit({ ...initialDocument, name: 'Changed' })
+
+    expect(session.getSnapshot().save.scheduledRevision).toBe(5)
+  })
 
   it('commits 120 pointer previews as one document transaction', () => {
     const session = createSession()

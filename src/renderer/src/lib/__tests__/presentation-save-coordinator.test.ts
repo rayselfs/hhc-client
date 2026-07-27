@@ -31,6 +31,17 @@ describe('presentation save coordinator', () => {
     vi.useRealTimers()
   })
 
+  it('continues from the persisted revision', () => {
+    const persist = vi.fn<PersistPresentationRevision>()
+    const coordinator = createPresentationSaveCoordinator(initialDocument, persist, 4)
+
+    expect(coordinator.getState()).toMatchObject({
+      scheduledRevision: 4,
+      persistedRevision: 4
+    })
+    expect(coordinator.schedule({ ...initialDocument, name: 'Changed' })).toBe(5)
+  })
+
   it('waits for the trailing debounce before persisting', async () => {
     const persist = vi.fn<PersistPresentationRevision>().mockResolvedValue({
       revision: 1,

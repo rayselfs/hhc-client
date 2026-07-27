@@ -36,7 +36,7 @@
 - Extends: `createPresentationEditorSession({ initialDocument, initialRevision, persist, refreshThumbnail })`
 - Extends: `createPresentationSaveCoordinator(initialDocument, persist, initialRevision?, debounceMs?)`
 
-- [ ] **Step 1: Add a failing loader snapshot test**
+- [x] **Step 1: Add a failing loader snapshot test**
 
 Seed `file-blobs` with revision `4`, call the new snapshot API, and assert:
 
@@ -47,7 +47,7 @@ await expect(loadEditablePresentationSnapshot(source)).resolves.toMatchObject({
 })
 ```
 
-- [ ] **Step 2: Run the loader test and verify RED**
+- [x] **Step 2: Run the loader test and verify RED**
 
 Run:
 
@@ -57,7 +57,7 @@ npx vitest run src/renderer/src/lib/__tests__/editable-presentation.test.ts
 
 Expected: FAIL because `loadEditablePresentationSnapshot` is not exported.
 
-- [ ] **Step 3: Add the minimal snapshot loader**
+- [x] **Step 3: Add the minimal snapshot loader**
 
 Move the existing IndexedDB read, cache lookup, blob parse, and cache population into:
 
@@ -82,7 +82,7 @@ export async function loadEditablePresentation(
 }
 ```
 
-- [ ] **Step 4: Run the loader test and verify GREEN**
+- [x] **Step 4: Run the loader test and verify GREEN**
 
 Run:
 
@@ -92,7 +92,7 @@ npx vitest run src/renderer/src/lib/__tests__/editable-presentation.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 5: Add failing coordinator and session tests**
+- [x] **Step 5: Add failing coordinator and session tests**
 
 Coordinator:
 
@@ -120,7 +120,7 @@ expect(session.getSnapshot().save.scheduledRevision).toBe(5)
 
 Registry test: mock `loadEditablePresentationSnapshot()` with revision `4`, open the item, and assert `createPresentationEditorSession()` receives `initialRevision: 4`.
 
-- [ ] **Step 6: Run the three tests and verify RED**
+- [x] **Step 6: Run the three tests and verify RED**
 
 Run:
 
@@ -133,13 +133,13 @@ npx vitest run \
 
 Expected: FAIL because the coordinator/session do not accept or forward `initialRevision`.
 
-- [ ] **Step 7: Implement revision seeding**
+- [x] **Step 7: Implement revision seeding**
 
 Initialize coordinator state and `nextRevision` from `initialRevision`. Add `initialRevision?: number`
 to the editor session options and forward it. Change the registry loader mock and production import
 from `loadEditablePresentation` to `loadEditablePresentationSnapshot`.
 
-- [ ] **Step 8: Run focused tests and verify GREEN**
+- [x] **Step 8: Run focused tests and verify GREEN**
 
 Run:
 
@@ -153,7 +153,7 @@ npx vitest run \
 
 Expected: PASS.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add \

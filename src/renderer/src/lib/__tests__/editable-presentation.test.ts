@@ -25,6 +25,7 @@ import {
   getSlideBackgroundCss,
   insertBlankEditableSlide,
   loadEditablePresentation,
+  loadEditablePresentationSnapshot,
   moveEditableSlide,
   removeElementFromSlide,
   resetSlideBackground,
@@ -605,6 +606,25 @@ describe('editable presentation documents', () => {
 
     expect(refreshed).not.toBe(first)
     expect(refreshed.name).toBe('Revision two')
+  })
+
+  it('loads the document and persisted revision from one source snapshot', async () => {
+    const document = createBlankEditablePresentationDocument(
+      'Sunday',
+      '00000000-0000-4000-8000-000000000016'
+    )
+    const source = { id: 'deck-snapshot', url: 'blob:deck-snapshot-source', name: 'Deck' }
+    const db = await openFileExplorerDB()
+    await db.put('file-blobs', {
+      id: 'deck-snapshot-source',
+      blob: createStoredBlob(JSON.stringify(document)),
+      revision: 4
+    })
+
+    await expect(loadEditablePresentationSnapshot(source)).resolves.toMatchObject({
+      revision: 4,
+      document: { name: 'Sunday' }
+    })
   })
 
   it('rejects a derived-only document when its source is missing', async () => {
