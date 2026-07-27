@@ -244,7 +244,7 @@ git commit -m "fix: reject stale presentation revisions"
 - Preserves: `retried: false` for `closed` and `ready`
 - Produces: a replacement generation for `opening`, `recovering`, and `failed`
 
-- [ ] **Step 1: Write the failing opening-Retry test**
+- [x] **Step 1: Write the failing opening-Retry test**
 
 Create a projection window and call Retry before it reports ready:
 
@@ -263,7 +263,7 @@ expect(FakeBrowserWindow.instances).toHaveLength(2)
 Assert the new lifecycle is `opening` and stale `closed`/renderer events from the first window do
 not clear the replacement.
 
-- [ ] **Step 2: Run the WindowManager test and verify RED**
+- [x] **Step 2: Run the WindowManager test and verify RED**
 
 Run:
 
@@ -273,7 +273,7 @@ npx vitest run src/main/__tests__/windowManager.test.ts
 
 Expected: FAIL with `retried: false`.
 
-- [ ] **Step 3: Implement non-ready replacement**
+- [x] **Step 3: Implement non-ready replacement**
 
 Return no-op for `closed` and `ready`. For an existing tracked window:
 
@@ -286,7 +286,7 @@ projectionWindow.close()
 Reset the automatic recovery budget and call `createProjectionWindow()` to allocate a new
 generation.
 
-- [ ] **Step 4: Run WindowManager tests and verify GREEN**
+- [x] **Step 4: Run WindowManager tests and verify GREEN**
 
 Run:
 
@@ -296,7 +296,7 @@ npx vitest run src/main/__tests__/windowManager.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/main/windowManager.ts src/main/__tests__/windowManager.test.ts

@@ -382,6 +382,38 @@ describe('WindowManager', () => {
     })
   })
 
+  it('replaces an opening projection when Retry is requested', () => {
+    const wm = WindowManager.getInstance()
+    const firstGeneration = wm.createProjectionWindow()
+    const firstWindow = FakeBrowserWindow.instances[0]
+
+    expect(wm.retryProjectionWindow()).toEqual({
+      retried: true,
+      generation: firstGeneration + 1
+    })
+    expect(firstWindow.close).toHaveBeenCalledOnce()
+    expect(FakeBrowserWindow.instances).toHaveLength(2)
+
+    const replacement = FakeBrowserWindow.instances[1]
+    firstWindow.emit('closed')
+    firstWindow.emitWebContents('render-process-gone', {}, { reason: 'clean-exit' })
+    expect(wm.getProjectionWindow()).toBe(replacement)
+    expect(wm.getProjectionState().lifecycle).toMatchObject({
+      generation: firstGeneration + 1,
+      status: 'opening'
+    })
+  })
+
+  it('does not Retry a closed or ready projection', () => {
+    const wm = WindowManager.getInstance()
+    expect(wm.retryProjectionWindow()).toEqual({ retried: false, generation: 0 })
+
+    const generation = wm.createProjectionWindow()
+    expect(wm.markProjectionReady(generation)).toBe(true)
+    expect(wm.retryProjectionWindow()).toEqual({ retried: false, generation })
+    expect(FakeBrowserWindow.instances).toHaveLength(1)
+  })
+
   it('manual Retry resets the automatic crash budget', () => {
     vi.useFakeTimers()
     vi.setSystemTime(1_000)

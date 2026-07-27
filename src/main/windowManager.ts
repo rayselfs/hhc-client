@@ -283,8 +283,19 @@ export class WindowManager {
   }
 
   retryProjectionWindow(): { retried: boolean; generation: number } {
-    if (this.projectionLifecycle.status !== 'failed') {
+    if (
+      this.projectionLifecycle.status === 'closed' ||
+      this.projectionLifecycle.status === 'ready'
+    ) {
       return { retried: false, generation: this.projectionGeneration }
+    }
+    const projectionWindow = this.projectionWindow
+    if (projectionWindow) {
+      this.projectionWindow = null
+      if (!projectionWindow.isDestroyed()) {
+        this.closingProjectionWindows.add(projectionWindow)
+        projectionWindow.close()
+      }
     }
     this.lastAutomaticRecoveryAt = null
     const generation = this.createProjectionWindow(this.projectionDisplayId, 'created')
