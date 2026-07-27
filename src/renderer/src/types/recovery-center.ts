@@ -6,10 +6,9 @@ export type RecoveryIssueKind =
   | 'sync-download'
   | 'storage-integrity'
   | 'resource-cleanup-failed'
-  | 'projection-health'
 
 export type RecoveryIssueSeverity = 'info' | 'warning' | 'error'
-export type RecoveryFilter = 'all' | 'media' | 'sync' | 'storage' | 'projection'
+export type RecoveryFilter = 'all' | 'media' | 'sync' | 'storage'
 
 export type RecoveryActionType =
   | 'retry-job'
@@ -17,7 +16,6 @@ export type RecoveryActionType =
   | 'retry-sync-download'
   | 'run-integrity-repair'
   | 'retry-resource-cleanup'
-  | 'reopen-projection'
   | 'export-diagnostics'
 
 export type RecoveryTranslationKey =
@@ -25,13 +23,11 @@ export type RecoveryTranslationKey =
   | 'recovery.filters.media'
   | 'recovery.filters.sync'
   | 'recovery.filters.storage'
-  | 'recovery.filters.projection'
   | 'recovery.actions.retryJob'
   | 'recovery.actions.cancelJob'
   | 'recovery.actions.retrySyncDownload'
   | 'recovery.actions.runIntegrityRepair'
   | 'recovery.actions.retryResourceCleanup'
-  | 'recovery.actions.reopenProjection'
   | 'recovery.actions.exportDiagnostics'
   | 'recovery.issues.jobFailed.title'
   | 'recovery.issues.jobFailed.detail'

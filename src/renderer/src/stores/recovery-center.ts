@@ -33,7 +33,12 @@ export const useRecoveryCenterStore = create<RecoveryCenterStore>()(
     {
       name: createPersistName('recovery-center'),
       storage: hhcPersistStorage,
-      version: 0,
+      version: 1,
+      migrate: (persisted, version) => {
+        const state = persisted as Record<string, unknown>
+        if (version < 1 && state.filter === 'projection') state.filter = 'all'
+        return state as unknown as RecoveryCenterStore
+      },
       partialize: (state) => ({
         dismissedIssueIds: state.dismissedIssueIds,
         filter: state.filter

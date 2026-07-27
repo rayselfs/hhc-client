@@ -32,3 +32,15 @@ it('persists only UI preferences and dismissals', () => {
     filter: 'sync'
   })
 })
+
+it('migrates the removed projection filter to all', async () => {
+  const migrate = useRecoveryCenterStore.persist.getOptions().migrate
+  const migrated = await Promise.resolve(
+    migrate?.({ dismissedIssueIds: ['issue-1'], filter: 'projection' }, 0)
+  )
+
+  expect(migrated).toMatchObject({
+    dismissedIssueIds: ['issue-1'],
+    filter: 'all'
+  })
+})

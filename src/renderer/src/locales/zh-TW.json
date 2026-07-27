@@ -898,8 +898,7 @@
       "all": "全部",
       "media": "媒體",
       "sync": "同步",
-      "storage": "儲存空間",
-      "projection": "投影"
+      "storage": "儲存空間"
     },
     "actions": {
       "retryJob": "重試",
@@ -907,9 +906,10 @@
       "retrySyncDownload": "重試下載",
       "runIntegrityRepair": "執行修復掃描",
       "retryResourceCleanup": "重試清理",
-      "reopenProjection": "重新開啟投影",
       "exportDiagnostics": "匯出診斷"
     },
+    "cancelJobConfirmTitle": "取消背景工作？",
+    "cancelJobConfirmDescription": "確定要取消這個背景工作嗎？目前進度將會捨棄。",
     "issues": {
       "jobFailed": {
         "title": "媒體工作需要處理",

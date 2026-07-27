@@ -898,8 +898,7 @@
       "all": "All",
       "media": "Media",
       "sync": "Sync",
-      "storage": "Storage",
-      "projection": "Projection"
+      "storage": "Storage"
     },
     "actions": {
       "retryJob": "Retry",
@@ -907,9 +906,10 @@
       "retrySyncDownload": "Retry download",
       "runIntegrityRepair": "Run repair scan",
       "retryResourceCleanup": "Retry cleanup",
-      "reopenProjection": "Reopen projection",
       "exportDiagnostics": "Export diagnostics"
     },
+    "cancelJobConfirmTitle": "Cancel background job?",
+    "cancelJobConfirmDescription": "Cancel this background job? Its current progress will be discarded.",
     "issues": {
       "jobFailed": {
         "title": "Media job needs attention",

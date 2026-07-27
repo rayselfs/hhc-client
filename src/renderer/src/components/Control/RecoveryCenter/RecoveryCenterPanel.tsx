@@ -3,19 +3,19 @@ import { useTranslation } from 'react-i18next'
 import { AlertTriangle } from 'lucide-react'
 import { collectRecoveryIssues, runRecoveryAction } from '@renderer/lib/recovery-center'
 import { useRecoveryCenterStore } from '@renderer/stores/recovery-center'
+import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
 import type {
   RecoveryFilter,
   RecoveryIssue,
   RecoveryTranslationKey
 } from '@renderer/types/recovery-center'
 
-const FILTERS: RecoveryFilter[] = ['all', 'media', 'sync', 'storage', 'projection']
+const FILTERS: RecoveryFilter[] = ['all', 'media', 'sync', 'storage']
 const FILTER_LABEL_KEYS: Record<RecoveryFilter, RecoveryTranslationKey> = {
   all: 'recovery.filters.all',
   media: 'recovery.filters.media',
   sync: 'recovery.filters.sync',
-  storage: 'recovery.filters.storage',
-  projection: 'recovery.filters.projection'
+  storage: 'recovery.filters.storage'
 }
 
 function matchesFilter(issue: RecoveryIssue, filter: RecoveryFilter): boolean {
@@ -24,14 +24,12 @@ function matchesFilter(issue: RecoveryIssue, filter: RecoveryFilter): boolean {
     return ['job-failed', 'media-missing', 'asset-failed'].includes(issue.kind)
   }
   if (filter === 'sync') return issue.kind.startsWith('sync-')
-  if (filter === 'storage') {
-    return ['storage-integrity', 'resource-cleanup-failed'].includes(issue.kind)
-  }
-  return issue.kind === 'projection-health'
+  return ['storage-integrity', 'resource-cleanup-failed'].includes(issue.kind)
 }
 
 export default function RecoveryCenterPanel(): React.JSX.Element {
   const { t } = useTranslation()
+  const confirm = useConfirm()
   const [issues, setIssues] = useState<RecoveryIssue[]>([])
   const dismissedIssueIds = useRecoveryCenterStore((state) => state.dismissedIssueIds)
   const dismissIssue = useRecoveryCenterStore((state) => state.dismissIssue)
@@ -65,6 +63,26 @@ export default function RecoveryCenterPanel(): React.JSX.Element {
     [issues, dismissedIssueIds, filter]
   )
 
+  const runAction = async (
+    issue: RecoveryIssue,
+    action: RecoveryIssue['actions'][number]
+  ): Promise<void> => {
+    if (
+      action.destructive &&
+      !(await confirm({
+        status: 'danger',
+        title: t('recovery.cancelJobConfirmTitle'),
+        description: t('recovery.cancelJobConfirmDescription'),
+        confirmLabel: t(action.labelKey),
+        cancelLabel: t('common.cancel')
+      }))
+    ) {
+      return
+    }
+    await runRecoveryAction(action.type, issue.sourceId)
+    await refresh()
+  }
+
   return (
     <section className="space-y-4 p-5">
       <div className="flex flex-wrap gap-2">
@@ -95,14 +113,16 @@ export default function RecoveryCenterPanel(): React.JSX.Element {
                   <h3 className="text-sm font-semibold">{t(issue.titleKey)}</h3>
                   <p className="text-xs text-muted">{t(issue.detailKey)}</p>
                   <div className="mt-3 flex gap-2">
-                    {issue.actions.slice(0, 1).map((action) => (
+                    {issue.actions.map((action) => (
                       <button
                         key={action.type}
                         type="button"
-                        className="rounded-md bg-accent px-2 py-1 text-xs text-accent-foreground"
-                        onClick={() =>
-                          void runRecoveryAction(action.type, issue.sourceId).then(refresh)
-                        }
+                        className={`rounded-md px-2 py-1 text-xs ${
+                          action.destructive
+                            ? 'bg-danger text-danger-foreground'
+                            : 'bg-accent text-accent-foreground'
+                        }`}
+                        onClick={() => void runAction(issue, action)}
                       >
                         {t(action.labelKey)}
                       </button>

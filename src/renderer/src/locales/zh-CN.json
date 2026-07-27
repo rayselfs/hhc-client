@@ -898,8 +898,7 @@
       "all": "全部",
       "media": "媒体",
       "sync": "同步",
-      "storage": "存储空间",
-      "projection": "投影"
+      "storage": "存储空间"
     },
     "actions": {
       "retryJob": "重试",
@@ -907,9 +906,10 @@
       "retrySyncDownload": "重试下载",
       "runIntegrityRepair": "执行修复扫描",
       "retryResourceCleanup": "重试清理",
-      "reopenProjection": "重新打开投影",
       "exportDiagnostics": "导出诊断"
     },
+    "cancelJobConfirmTitle": "取消后台任务？",
+    "cancelJobConfirmDescription": "确定要取消这个后台任务吗？当前进度将会丢弃。",
     "issues": {
       "jobFailed": {
         "title": "媒体任务需要处理",
