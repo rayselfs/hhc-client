@@ -45,7 +45,7 @@ The order is deliberate:
 | R4    | Complete | Media projection remains active while the operator previews, searches, and prepares the next source.                                          |
 | R5    | Complete | Presentation Workspace follows a PowerPoint-like desktop information architecture with essential editing operations.                          |
 | R6    | Complete | Media import, readiness, playback, storage, and slide delivery are observable, recoverable, and performant.                                   |
-| R7    | Planned  | Shared responsive workspace primitives replace fixed page-specific layouts; dead paths are removed and release gates cover packaged behavior. |
+| R7    | Complete | Shared responsive workspace primitives replace fixed page-specific layouts; dead paths are removed and release gates cover packaged behavior. |
 
 ## R0 — Immediate projection behavior and quality baseline
 
@@ -441,6 +441,21 @@ browser and packaged-desktop lifecycles.
 - Run browser projection E2E in PR CI.
 - Launch packaged Windows/macOS apps in release smoke tests and verify control window,
   projection start, payload delivery, replay, and close.
+
+### Completion evidence
+
+- [x] Media and Presentation use shared `WorkspaceShell`, `StageViewport`, `NavigatorRail`,
+      `InspectorPanel`, `ResponsivePanelGroup`, and `ProjectionSessionControl` primitives.
+- [x] Wide, medium, and compact modes preserve a primary stage while moving navigator and
+      inspector surfaces into contextual drawers where space requires it.
+- [x] Public blank/open projection context paths and stale projection state were removed after
+      explicit start, retry, blackout, resume, and close paths were verified.
+- [x] Browser projection E2E is part of PR CI; packaged projection smoke runs for both Windows and
+      macOS release matrix jobs.
+- [x] Full Vitest passed with 206 files and 2,100 tests, followed by Node/Web typechecks,
+      zero-error ESLint, production build, bundle budgets, and 3/3 browser projection E2E.
+- [x] A freshly unpacked Windows x64 build passed native/runtime checks and the packaged Electron
+      recovery lifecycle E2E. The equivalent macOS executable is covered by the release matrix.
 
 ## Execution order
 
