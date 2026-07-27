@@ -70,4 +70,23 @@ describe('BackgroundTaskTray', () => {
 
     expect(mediaJobQueue.retry).toHaveBeenCalledWith('job-1')
   })
+
+  it.each([
+    ['running', '1 active'],
+    ['failed', '1 need attention']
+  ] as const)('counts %s work beyond the 30 visible rows', (status, expected) => {
+    const completedJobs = Array.from({ length: 30 }, (_, index) => ({
+      ...runningJob,
+      id: `completed-${index}`,
+      status: 'completed' as const
+    }))
+    vi.mocked(useMediaJobs).mockReturnValue({
+      jobs: [...completedJobs, { ...runningJob, id: 'older-job', status }],
+      refresh: vi.fn()
+    })
+
+    render(<BackgroundTaskTray />)
+
+    expect(screen.getByText(expected)).toBeInTheDocument()
+  })
 })
