@@ -29,6 +29,7 @@ import { isElectron } from '@renderer/lib/env'
 interface PreferencesDialogProps {
   isOpen: boolean
   onOpenChange: (open: boolean) => void
+  initialRoute?: 'general' | 'recovery'
 }
 
 type Category = 'general' | 'timer' | 'bible' | 'soundboard' | 'media' | 'storage' | 'recovery'
@@ -68,10 +69,11 @@ interface CategoryItem {
 
 export default function PreferencesDialog({
   isOpen,
-  onOpenChange
+  onOpenChange,
+  initialRoute = 'general'
 }: PreferencesDialogProps): React.JSX.Element {
   const { t } = useTranslation()
-  const [activeRoute, setActiveRoute] = useState<PreferenceRoute>('general')
+  const [activeRoute, setActiveRoute] = useState<PreferenceRoute>(initialRoute)
   const [expandedCategory, setExpandedCategory] = useState<Category | null>(null)
   const [isClearingAllData, setIsClearingAllData] = useState(false)
   const mediaChildren: CategoryChildItem[] = [

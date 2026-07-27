@@ -44,7 +44,19 @@ export default function Sidebar(): React.JSX.Element {
   const runPresentationSafeAction = usePresentationSafeAction()
   const isCollapsed = useIsCollapsed()
   const [prefsOpen, setPrefsOpen] = useState(false)
+  const [initialPreferenceRoute, setInitialPreferenceRoute] = useState<'general' | 'recovery'>(
+    'general'
+  )
   const [mediaOpen, setMediaOpen] = useState(true)
+
+  useEffect(() => {
+    const openRecoveryCenter = (): void => {
+      setInitialPreferenceRoute('recovery')
+      setPrefsOpen(true)
+    }
+    window.addEventListener('hhc:open-recovery-center', openRecoveryCenter)
+    return () => window.removeEventListener('hhc:open-recovery-center', openRecoveryCenter)
+  }, [])
 
   const topItems: NavItem[] = [
     { to: '/timer', icon: Timer, label: t('nav.timer') },
@@ -165,9 +177,20 @@ export default function Sidebar(): React.JSX.Element {
       </ul>
 
       <div className="mt-auto">
-        <UserMenu onOpenPreferences={() => setPrefsOpen(true)} />
+        <UserMenu
+          onOpenPreferences={() => {
+            setInitialPreferenceRoute('general')
+            setPrefsOpen(true)
+          }}
+        />
       </div>
-      {prefsOpen && <PreferencesDialog isOpen={prefsOpen} onOpenChange={setPrefsOpen} />}
+      {prefsOpen && (
+        <PreferencesDialog
+          isOpen={prefsOpen}
+          onOpenChange={setPrefsOpen}
+          initialRoute={initialPreferenceRoute}
+        />
+      )}
     </nav>
   )
 }

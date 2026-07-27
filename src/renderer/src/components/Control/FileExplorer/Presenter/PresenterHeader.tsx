@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { X } from 'lucide-react'
+import { AlertTriangle, X } from 'lucide-react'
 import { Button } from '@heroui/react'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
+import ReadinessIssueDrawer from './ReadinessIssueDrawer'
 
 function formatElapsed(seconds: number): string {
   const h = Math.floor(seconds / 3600)
@@ -26,7 +27,9 @@ export default function PresenterHeader({ onExit }: PresenterHeaderProps): React
   const { t } = useTranslation()
   const [elapsed, setElapsed] = useState(0)
   const [clockTime, setClockTime] = useState(() => new Date())
-  const readiness = useMediaProjectionStore((state) => state.lastReadinessReport?.summary)
+  const [isReadinessOpen, setIsReadinessOpen] = useState(false)
+  const readinessReport = useMediaProjectionStore((state) => state.lastReadinessReport)
+  const readiness = readinessReport?.summary
   const skippedCount = readiness
     ? readiness.preparing + readiness.unsupported + readiness.missing + readiness.failed
     : 0
@@ -46,7 +49,7 @@ export default function PresenterHeader({ onExit }: PresenterHeaderProps): React
   }, [])
 
   return (
-    <div className="flex items-center justify-between px-3 h-12 shrink-0">
+    <div className="relative flex h-12 shrink-0 items-center justify-between px-3">
       <div className="flex items-center gap-2">
         <Button
           variant="ghost"
@@ -59,26 +62,33 @@ export default function PresenterHeader({ onExit }: PresenterHeaderProps): React
           <X size={20} />
         </Button>
         <span className="text-foreground/70 text-lg font-mono">{formatElapsed(elapsed)}</span>
-        {readiness && skippedCount > 0 && (
-          <span
-            className="rounded-full border border-warning/30 bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning-700"
+        {readinessReport && skippedCount > 0 && (
+          <button
+            type="button"
+            className="flex items-center gap-1 rounded-full border border-warning/30 bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning-700 hover:bg-warning/20"
             title={t('fileExplorer.presenter.readinessSummary', {
               defaultValue:
                 '{{ready}} ready, {{preparing}} preparing, {{unsupported}} unsupported, {{missing}} missing, {{failed}} failed',
-              ready: readiness.ready,
-              preparing: readiness.preparing,
-              unsupported: readiness.unsupported,
-              missing: readiness.missing,
-              failed: readiness.failed
+              ready: readinessReport.summary.ready,
+              preparing: readinessReport.summary.preparing,
+              unsupported: readinessReport.summary.unsupported,
+              missing: readinessReport.summary.missing,
+              failed: readinessReport.summary.failed
             })}
+            onClick={() => setIsReadinessOpen(true)}
+            aria-expanded={isReadinessOpen}
           >
+            <AlertTriangle size={12} />
             {t('fileExplorer.presenter.skippedItems', '{{count}} skipped', {
               count: skippedCount
             })}
-          </span>
+          </button>
         )}
       </div>
       <span className="text-foreground/70 text-lg font-mono">{formatClock(clockTime)}</span>
+      {isReadinessOpen && readinessReport && (
+        <ReadinessIssueDrawer report={readinessReport} onClose={() => setIsReadinessOpen(false)} />
+      )}
     </div>
   )
 }
