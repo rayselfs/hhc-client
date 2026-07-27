@@ -10,6 +10,7 @@ import ProjectionRecoveryNotice from '@renderer/components/Control/ProjectionRec
 import FloatingTimer from '@renderer/components/Control/Timer/FloatingTimer'
 import ConfirmDialog from '@renderer/components/Common/ConfirmDialog'
 import TimerProjectionBridge from '@renderer/components/Control/Bridge/TimerProjectionBridge'
+import MediaProjectionBridge from '@renderer/components/Control/Bridge/MediaProjectionBridge'
 import MediaPresenter from '@renderer/components/Control/FileExplorer/Presenter/MediaPresenter'
 import { ProjectionProvider } from '@renderer/contexts/ProjectionContext'
 import { TimerEngineProvider } from '@renderer/contexts/TimerEngineContext'
@@ -94,6 +95,7 @@ export default function Layout(): React.JSX.Element {
                     <PresentationNavigationGuard />
                     <PresentationElectronCloseBridge />
                     <TimerProjectionBridge />
+                    <MediaProjectionBridge />
                     <LanRemoteBridge />
                     <ProjectionRecoveryNotice />
                   </PresentationCloseDecisionProvider>

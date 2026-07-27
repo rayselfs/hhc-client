@@ -8,6 +8,12 @@ import { ThemeProvider } from '@renderer/contexts/ThemeContext'
 import { ONBOARDED_KEY } from '@renderer/lib/onboarding'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { useBibleFolderStore } from '@renderer/stores/folder'
+import { useMediaProjectionStore } from '@renderer/stores/media-projection'
+import type { ProjectionPayload } from '@shared/projection-messages'
+
+const projectionEvents = vi.hoisted(() => ({
+  playback: null as ((data: ProjectionPayload<'file:playback-state'>) => void) | null
+}))
 
 vi.mock('@renderer/lib/app-init', () => ({
   initializeApp: vi.fn(() => vi.fn()),
@@ -35,14 +41,34 @@ vi.mock('@renderer/contexts/ProjectionContext', async (importOriginal) => {
     useProjection: vi.fn().mockReturnValue({
       isProjectionOpen: false,
       isProjectionBlanked: true,
+      projectionReadyCount: 0,
+      activeOwner: 'timer',
       recovery: { status: 'closed', generation: 0, failure: null },
+      sessionSummary: {
+        owner: null,
+        status: 'closed',
+        label: null,
+        isBlackout: false,
+        failure: null
+      },
+      claimProjection: vi.fn(),
+      startProjection: vi.fn(() => Promise.resolve({ ok: true, generation: 1 })),
+      stopProjection: vi.fn(() => Promise.resolve()),
       openProjection: vi.fn(),
       retryProjection: vi.fn(),
+      bringProjectionToFront: vi.fn(),
       closeProjection: vi.fn(),
       blankProjection: vi.fn(),
+      blackoutProjection: vi.fn(),
+      getProjectionSnapshot: vi.fn(() => null),
       project: vi.fn(),
       send: vi.fn(),
-      on: vi.fn()
+      on: vi.fn(
+        (channel: string, handler: (data: ProjectionPayload<'file:playback-state'>) => void) => {
+          if (channel === 'file:playback-state') projectionEvents.playback = handler
+          return vi.fn()
+        }
+      )
     })
   }
 })
@@ -61,6 +87,7 @@ describe('Layout', () => {
     localStorage.setItem(ONBOARDED_KEY, 'true')
     useFileExplorerStore.setState({ isInitialized: true, isLoading: false })
     useBibleFolderStore.setState({ isInitialized: true, isLoading: false })
+    projectionEvents.playback = null
   })
 
   afterEach(() => {
@@ -115,5 +142,46 @@ describe('Layout', () => {
     renderWithRouter(['/'])
     await screen.findByTestId('timer-page')
     expect(document.querySelector('hr')).not.toBeInTheDocument()
+  })
+
+  it('keeps the global Media bridge subscribed outside the Media workspace', async () => {
+    useMediaProjectionStore.setState({
+      playlist: [
+        {
+          id: 'video-1',
+          parentId: 'root',
+          type: 'file',
+          sortIndex: 0,
+          createdAt: 1,
+          expiresAt: null,
+          name: 'clip.mp4',
+          url: 'blob:video-1',
+          size: 10,
+          mimeType: 'video/mp4'
+        }
+      ],
+      currentIndex: 0,
+      isPresenting: false,
+      typeStates: { pdf: { viewMode: 'slide' } }
+    })
+
+    renderWithRouter(['/timer'])
+    await screen.findByTestId('timer-page')
+
+    expect(projectionEvents.playback).not.toBeNull()
+    projectionEvents.playback?.({
+      itemId: 'video-1',
+      currentTime: 12,
+      duration: 60,
+      isPlaying: true,
+      isEnded: false
+    })
+
+    expect(useMediaProjectionStore.getState().typeStates.video).toMatchObject({
+      currentTime: 12,
+      duration: 60,
+      isPlaying: true,
+      isEnded: false
+    })
   })
 })

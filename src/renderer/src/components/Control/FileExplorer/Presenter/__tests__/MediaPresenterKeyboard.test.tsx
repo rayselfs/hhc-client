@@ -14,6 +14,7 @@ const {
   mockSend,
   mockProject,
   mockOn,
+  mockStopProjection,
   mockClaimProjection,
   mockBlankProjection,
   mockPauseTimer,
@@ -41,6 +42,7 @@ const {
     mockSend: vi.fn(),
     mockProject: vi.fn(),
     mockOn: vi.fn(() => vi.fn()),
+    mockStopProjection: vi.fn(),
     mockClaimProjection: vi.fn(),
     mockBlankProjection: vi.fn(),
     mockPauseTimer: vi.fn(),
@@ -77,7 +79,7 @@ vi.mock('@renderer/contexts/ProjectionContext', () => ({
   useProjection: () => ({
     claimProjection: mockClaimProjection,
     startProjection: vi.fn(),
-    stopProjection: vi.fn(),
+    stopProjection: mockStopProjection,
     blankProjection: mockBlankProjection,
     send: mockSend,
     project: mockProject,
@@ -171,6 +173,14 @@ beforeEach(() => {
 })
 
 describe('MediaPresenter video keyboard behavior', () => {
+  it('does not stop live output when the workspace unmounts', () => {
+    const { unmount } = render(<MediaPresenter />)
+
+    unmount()
+
+    expect(mockStopProjection).not.toHaveBeenCalled()
+  })
+
   it('uses item navigation before video playback starts', () => {
     render(<MediaPresenter />)
 

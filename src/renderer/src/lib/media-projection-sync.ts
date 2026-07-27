@@ -30,7 +30,7 @@ function playlistContentChanged(
 }
 
 export function useMediaProjectionSync(): void {
-  const { project, startProjection, stopProjection } = useProjection()
+  const { project, startProjection } = useProjection()
   const registry = usePresentationSessionRegistry()
   const projectSequenceRef = useRef(0)
 
@@ -108,16 +108,6 @@ export function useMediaProjectionSync(): void {
     })
     return unsub
   }, [project])
-
-  useEffect(() => {
-    const unsub = useMediaProjectionStore.subscribe((state, prev) => {
-      if (prev.isPresenting && !state.isPresenting) {
-        projectSequenceRef.current += 1
-        void stopProjection()
-      }
-    })
-    return unsub
-  }, [stopProjection])
 
   useEffect(() => {
     const unsub = useMediaProjectionStore.subscribe((state, prev) => {

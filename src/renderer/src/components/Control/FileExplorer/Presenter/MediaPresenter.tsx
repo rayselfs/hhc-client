@@ -4,7 +4,6 @@ import { useTimerRuntimeStore } from '@renderer/stores/timer-runtime'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 import { useKeyboardShortcuts } from '@renderer/hooks/useKeyboardShortcuts'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
-import { useMediaProjectionSync } from '@renderer/lib/media-projection-sync'
 import { setPresenterActive } from '@renderer/lib/shortcut-registry'
 import { getDescriptor } from '@renderer/lib/presenter-registry'
 import { PresenterCommandContext } from '@renderer/contexts/PresenterCommandContext'
@@ -22,9 +21,7 @@ import { usePreviewCache } from '@renderer/hooks/usePreviewCache'
 import { useThumbnails } from '@renderer/hooks/useThumbnails'
 
 export default function MediaPresenter(): React.JSX.Element {
-  const { stopProjection, project, on } = useProjection()
-
-  useMediaProjectionSync()
+  const { project } = useProjection()
 
   const playlist = useMediaProjectionStore((s) => s.playlist)
   const { pdfPageThumbs } = usePreviewCache(playlist)
@@ -75,10 +72,7 @@ export default function MediaPresenter(): React.JSX.Element {
     if (timerStatus === 'running') {
       useTimerRuntimeStore.getState().pause()
     }
-    return () => {
-      void stopProjection()
-    }
-  }, [stopProjection])
+  }, [])
 
   useEffect(() => {
     setPresenterActive(true)
@@ -86,21 +80,6 @@ export default function MediaPresenter(): React.JSX.Element {
       setPresenterActive(false)
     }
   }, [])
-
-  useEffect(() => {
-    return on('file:playback-state', (data) => {
-      const state = useMediaProjectionStore.getState()
-      if (state.currentItem()?.id !== data.itemId) return
-      const current = state.typeStates.video
-      state.setTypeState('video', {
-        hasStarted: current?.hasStarted ?? (data.currentTime > 0 || data.isPlaying),
-        isPlaying: data.isPlaying,
-        isEnded: data.isEnded,
-        currentTime: data.currentTime,
-        duration: data.duration
-      })
-    })
-  }, [on])
 
   useKeyboardShortcuts(
     [

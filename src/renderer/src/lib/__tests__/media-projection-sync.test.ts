@@ -199,6 +199,17 @@ describe('media projection sync', () => {
     })
   })
 
+  it('does not close projection when Media workspace state becomes inactive', () => {
+    renderSync()
+    mockStopProjection.mockClear()
+
+    act(() => {
+      useMediaProjectionStore.setState({ isPresenting: false })
+    })
+
+    expect(mockStopProjection).not.toHaveBeenCalled()
+  })
+
   it('does not foreground pan and zoom transport updates', () => {
     renderSync()
     mockProject.mockClear()

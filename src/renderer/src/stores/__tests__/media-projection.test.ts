@@ -154,6 +154,26 @@ describe('exit', () => {
   })
 })
 
+describe('live session lifecycle', () => {
+  it.each(['endLiveSession', 'markProjectionClosed'] as const)(
+    '%s clears live state and releases resource locks',
+    (action) => {
+      const state = useMediaProjectionStore.getState()
+      expect(state).toHaveProperty(action)
+      state.startPresentation(files, 1)
+
+      useMediaProjectionStore.getState()[action]()
+
+      const next = useMediaProjectionStore.getState()
+      expect(next.isPresenting).toBe(false)
+      expect(next.playlist).toEqual([])
+      expect(next.snapshot).toBeNull()
+      expect(isMediaResourceLocked('a')).toBe(false)
+      expect(isMediaResourceLocked('b')).toBe(false)
+    }
+  )
+})
+
 describe('next / prev', () => {
   beforeEach(() => {
     useMediaProjectionStore.getState().startPresentation(files, 0)

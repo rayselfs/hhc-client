@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { StoreApi } from 'zustand'
 import type { FileItemRecord } from '@shared/types/folder'
 import { getMediaType, type MediaType, type MediaTypeStateMap } from '@renderer/lib/presentability'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
@@ -38,6 +39,8 @@ export interface MediaProjectionStore {
 
   startPresentation: (files: FileItemRecord[], startIndex: number) => void
   exit: () => void
+  endLiveSession: () => void
+  markProjectionClosed: () => void
   next: () => void
   prev: () => void
   jumpTo: (index: number) => void
@@ -73,6 +76,12 @@ const initialState = {
 }
 
 let releaseProjectionLocks: (() => void) | null = null
+
+function clearLiveSession(set: StoreApi<MediaProjectionStore>['setState']): void {
+  releaseProjectionLocks?.()
+  releaseProjectionLocks = null
+  set({ ...initialState })
+}
 
 function withoutTransientMediaRuntimeState(
   typeStates: MediaProjectionStore['typeStates']
@@ -221,9 +230,15 @@ export const useMediaProjectionStore = create<MediaProjectionStore>()((set, get)
   },
 
   exit: () => {
-    releaseProjectionLocks?.()
-    releaseProjectionLocks = null
-    set({ ...initialState })
+    clearLiveSession(set)
+  },
+
+  endLiveSession: () => {
+    clearLiveSession(set)
+  },
+
+  markProjectionClosed: () => {
+    clearLiveSession(set)
   },
 
   next: () => {
