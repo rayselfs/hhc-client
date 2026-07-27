@@ -53,6 +53,7 @@ import {
   resetSlideBackground,
   updateElementInSlide,
   updateSlideBackground,
+  updateSlideNotes,
   type EditableGradientDirection,
   type EditableImageElement,
   type EditablePresentationDocument,
@@ -479,7 +480,7 @@ function EditableSessionDocumentView({
   const [railWidth, setRailWidth] = useState(240)
   const [zoomPercent, setZoomPercent] = useState(100)
   const [isNotesOpen, setIsNotesOpen] = useState(false)
-  const [notesDraft, setNotesDraft] = useState('')
+  const [notesDraftBySlideId, setNotesDraftBySlideId] = useState<Record<string, string>>({})
   const [cropElementId, setCropElementId] = useState<string | null>(null)
   const [snapGuides, setSnapGuides] = useState<{
     vertical?: number
@@ -538,9 +539,9 @@ function EditableSessionDocumentView({
       ? (projectedPresentationState?.slideIndex ?? 0)
       : -1
 
-  useEffect(() => {
-    setNotesDraft(activeSlide?.notes ?? '')
-  }, [activeSlide?.id, activeSlide?.notes])
+  const notesDraft = activeSlideId
+    ? (notesDraftBySlideId[activeSlideId] ?? activeSlide?.notes ?? '')
+    : ''
 
   useEffect(() => {
     onSelectedElementTypeChange(selectedElement?.type ?? null)
@@ -986,14 +987,7 @@ function EditableSessionDocumentView({
 
   const commitNotes = (): void => {
     if (!activeSlideId || notesDraft === activeSlide?.notes) return
-    commitDocument({
-      ...document,
-      slides: {
-        ...document.slides,
-        [activeSlideId]: { ...document.slides[activeSlideId], notes: notesDraft }
-      },
-      updatedAt: Date.now()
-    })
+    commitDocument(updateSlideNotes(document, activeSlideId, notesDraft))
   }
 
   const flashRibbonAction = (actionId: string): void => {
@@ -1807,7 +1801,13 @@ function EditableSessionDocumentView({
                 <textarea
                   className="h-20 w-full resize-none rounded-lg border border-divider bg-content2 p-2 text-sm text-foreground outline-none focus:border-primary"
                   value={notesDraft}
-                  onChange={(event) => setNotesDraft(event.currentTarget.value)}
+                  onChange={(event) => {
+                    const value = event.currentTarget.value
+                    setNotesDraftBySlideId((current) => ({
+                      ...current,
+                      [activeSlideId]: value
+                    }))
+                  }}
                   onBlur={commitNotes}
                   aria-label={t('presentationWorkspace.notes', 'Notes')}
                   placeholder={t(

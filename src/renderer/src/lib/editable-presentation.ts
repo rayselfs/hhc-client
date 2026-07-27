@@ -762,6 +762,23 @@ export function resetSlideBackground(
   )
 }
 
+export function updateSlideNotes(
+  document: EditablePresentationDocument,
+  slideId: string,
+  notes: string
+): EditablePresentationDocument {
+  const slide = document.slides[slideId]
+  if (!slide || slide.notes === notes) return document
+  return {
+    ...document,
+    slides: {
+      ...document.slides,
+      [slideId]: { ...slide, notes }
+    },
+    updatedAt: Date.now()
+  }
+}
+
 export function removeEditableSlide(
   document: EditablePresentationDocument,
   slideId: string

@@ -115,6 +115,16 @@ const DB_NAME = 'hhc-media-work'
 export const MEDIA_WORK_DB_VERSION = 1
 
 let dbPromise: Promise<IDBPDatabase<MediaWorkDBSchema>> | null = null
+const mediaJobListeners = new Set<() => void>()
+
+function notifyMediaJobListeners(): void {
+  mediaJobListeners.forEach((listener) => listener())
+}
+
+export function subscribeMediaJobs(listener: () => void): () => void {
+  mediaJobListeners.add(listener)
+  return () => mediaJobListeners.delete(listener)
+}
 
 function getMediaWorkDB(): Promise<IDBPDatabase<MediaWorkDBSchema>> {
   dbPromise ??= openDB<MediaWorkDBSchema>(DB_NAME, MEDIA_WORK_DB_VERSION, {
@@ -157,6 +167,7 @@ export async function listMediaJobs(): Promise<MediaJobRecord[]> {
 
 export async function putMediaJob(job: MediaJobRecord): Promise<void> {
   await (await getMediaWorkDB()).put('jobs', job)
+  notifyMediaJobListeners()
 }
 
 export async function findMediaJobByDedupeKey(
@@ -172,6 +183,7 @@ export async function findMediaJobByDedupeKey(
 
 export async function deleteMediaJob(id: string): Promise<void> {
   await (await getMediaWorkDB()).delete('jobs', id)
+  notifyMediaJobListeners()
 }
 
 export async function getDerivedAsset(
