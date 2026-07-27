@@ -122,14 +122,6 @@ function getPptxSlideIndex(slideId: string | null): number {
   return Number.isInteger(index) && index >= 0 ? index : 0
 }
 
-function resizePresentationDocument(
-  document: EditablePresentationDocument,
-  width: number,
-  height: number
-): EditablePresentationDocument {
-  return { ...document, width, height, updatedAt: Date.now() }
-}
-
 function SlideThumbnail({
   viewer,
   index,
@@ -987,13 +979,6 @@ function EditableSessionDocumentView({
     } as Partial<EditablePresentationElement>)
   }
 
-  const updateSlideSize = (value: string): void => {
-    if (!document) return
-    const [width, height] = value.split(':').map(Number)
-    if (!width || !height) return
-    commitDocument(resizePresentationDocument(document, width, height))
-  }
-
   const commitNotes = (): void => {
     if (!activeSlideId || notesDraft === activeSlide?.notes) return
     commitDocument(updateSlideNotes(document, activeSlideId, notesDraft))
@@ -1166,17 +1151,6 @@ function EditableSessionDocumentView({
             <Palette size={16} />
             {t('presentationWorkspace.formatBackground', 'Format Background')}
           </Button>
-          <label className="flex items-center gap-2 text-default-500">
-            <span>{t('presentationWorkspace.slideSize', 'Slide Size')}</span>
-            <select
-              className={`h-9 ${NATIVE_CONTROL_CLASS}`}
-              value={`${document?.width ?? 1920}:${document?.height ?? 1080}`}
-              onChange={(event) => updateSlideSize(event.currentTarget.value)}
-            >
-              <option value="1920:1080">16:9</option>
-              <option value="1440:1080">4:3</option>
-            </select>
-          </label>
         </div>
       )
     }

@@ -1585,6 +1585,9 @@ function parseEditablePresentation(value: string): EditablePresentationDocument 
     sourceBlobId: parsed.sourceBlobId,
     width: parsed.width,
     height: parsed.height,
+    defaultSlideBackground: normalizeSlideBackground(
+      parsed.defaultSlideBackground ?? createDefaultSlideBackground()
+    ),
     slideOrder: parsed.slideOrder,
     slides,
     assets: parsed.assets ?? {},

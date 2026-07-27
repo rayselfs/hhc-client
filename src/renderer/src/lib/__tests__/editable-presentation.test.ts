@@ -638,6 +638,32 @@ describe('editable presentation documents', () => {
     })
   })
 
+  it('preserves the persisted default slide background when loading', async () => {
+    const document = {
+      ...createBlankEditablePresentationDocument('Sunday', '00000000-0000-4000-8000-000000000017'),
+      defaultSlideBackground: {
+        type: 'solid' as const,
+        color: '#123456',
+        transparency: 20
+      }
+    }
+    const source = { id: 'deck-background', url: 'blob:deck-background-source', name: 'Deck' }
+    const db = await openFileExplorerDB()
+    await db.put('file-blobs', {
+      id: 'deck-background-source',
+      blob: createStoredBlob(JSON.stringify(document)),
+      revision: 1
+    })
+
+    const loaded = await loadEditablePresentation(source)
+
+    expect(loaded.defaultSlideBackground).toEqual({
+      type: 'solid',
+      color: '#123456',
+      transparency: 20
+    })
+  })
+
   it('rejects a derived-only document when its source is missing', async () => {
     const document = createBlankEditablePresentationDocument(
       'Derived only',

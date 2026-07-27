@@ -171,4 +171,17 @@ describe('PresentationWorkspacePage session integration', () => {
       expect(updated.type === 'text' ? updated.fontSize : null).toBe(144)
     })
   })
+
+  it('does not expose dimensions-only Slide Size controls', async () => {
+    render(
+      <PresentationSessionRegistryProvider>
+        <Workspace showPage onSession={() => undefined} />
+      </PresentationSessionRegistryProvider>
+    )
+    await screen.findByTestId('presentation-ribbon-frame')
+
+    fireEvent.click(screen.getByRole('button', { name: /Design|設計/ }))
+
+    expect(screen.queryByText(/Slide Size|投影片大小/)).not.toBeInTheDocument()
+  })
 })

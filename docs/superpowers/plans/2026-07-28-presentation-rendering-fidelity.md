@@ -67,10 +67,10 @@ with optional imported runs shared by DOM and SVG renderers.
 - Removes: current Design Ribbon Slide Size selector and local resize helper
 - Preserves: `defaultSlideBackground` through `loadEditablePresentationSnapshot`
 
-- [ ] Add failing tests that the selector is absent and a custom default background survives load.
-- [ ] Remove the dimensions-only resize path.
-- [ ] Normalize and return persisted `defaultSlideBackground` during parse.
-- [ ] Run focused tests and commit.
+- [x] Add failing tests that the selector is absent and a custom default background survives load.
+- [x] Remove the dimensions-only resize path.
+- [x] Normalize and return persisted `defaultSlideBackground` during parse.
+- [x] Run focused tests and commit.
 
 ### Task 4: Preserve Imported Fixed Frames
 
