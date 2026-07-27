@@ -401,6 +401,7 @@ export function createTextElement(
     rotation: input.rotation ?? 0,
     opacity: input.opacity ?? 1,
     text: input.text ?? '',
+    runs: input.runs,
     fontFamily: input.fontFamily ?? DEFAULT_FONT_FAMILY,
     fontSize,
     bold: input.bold ?? false,
@@ -1511,6 +1512,18 @@ function renderElementSvg(
 ): string {
   const transform = `rotate(${element.rotation} ${element.x + element.width / 2} ${element.y + element.height / 2})`
   if (element.type === 'text') {
+    if (element.runs?.length) {
+      const lineAdvance = element.fontSize * element.lineHeight
+      const body = element.runs
+        .flatMap((run) =>
+          run.text.split('\n').map((text, index) => {
+            const lineBreak = index > 0
+            return `<tspan${lineBreak ? ` x="${element.x}" dy="${lineAdvance}"` : ''} fill="${escapeXml(run.color)}" font-size="${run.fontSize}" font-family="${escapeXml(run.fontFamily)}" font-weight="${run.bold ? 700 : 400}" font-style="${run.italic ? 'italic' : 'normal'}"${run.underline ? ' text-decoration="underline"' : ''}>${escapeXml(text)}</tspan>`
+          })
+        )
+        .join('')
+      return `<text x="${element.x}" y="${element.y + element.fontSize}" width="${element.width}" opacity="${element.opacity}" transform="${transform}">${body}</text>`
+    }
     return `<text x="${element.x}" y="${element.y + element.fontSize}" width="${element.width}" fill="${escapeXml(element.color)}" font-size="${element.fontSize}" font-family="${escapeXml(element.fontFamily)}" font-weight="${element.bold ? 700 : 400}" font-style="${element.italic ? 'italic' : 'normal'}" opacity="${element.opacity}" transform="${transform}">${escapeXml(element.text)}</text>`
   }
   if (element.type === 'shape') {

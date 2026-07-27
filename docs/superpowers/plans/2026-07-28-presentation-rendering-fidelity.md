@@ -115,9 +115,9 @@ with optional imported runs shared by DOM and SVG renderers.
 - Consumes: `EditableTextElement.runs`
 - Produces: escaped SVG `tspan` nodes with run-specific font attributes
 
-- [ ] Add a failing thumbnail test for two differently styled runs.
-- [ ] Render run `tspan` nodes, retaining the uniform text fallback.
-- [ ] Run thumbnail and import tests and commit.
+- [x] Add a failing thumbnail test for two differently styled runs.
+- [x] Render run `tspan` nodes, retaining the uniform text fallback.
+- [x] Run thumbnail and import tests and commit.
 
 ### Task 7: Batch Verification
 

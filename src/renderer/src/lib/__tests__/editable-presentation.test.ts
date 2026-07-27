@@ -471,6 +471,47 @@ describe('editable presentation documents', () => {
     expect(svg).toContain('feDropShadow')
   })
 
+  it('renders imported text runs with their own SVG thumbnail styles', () => {
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const slideId = document.slideOrder[0]
+    const text = createTextElement({
+      text: 'Large & small',
+      runs: [
+        {
+          text: 'Large &',
+          fontFamily: 'Arial',
+          fontSize: 72,
+          bold: true,
+          italic: false,
+          underline: false,
+          color: '#FF0000'
+        },
+        {
+          text: ' small',
+          fontFamily: 'Calibri',
+          fontSize: 36,
+          bold: false,
+          italic: true,
+          underline: true,
+          color: '#0000FF'
+        }
+      ]
+    })
+    const svg = decodeSvgDataUrl(
+      generateEditablePresentationThumbnail(addElementToSlide(document, slideId, text))
+    )
+
+    expect(svg).toContain('<tspan')
+    expect(svg).toContain('font-size="72"')
+    expect(svg).toContain('font-family="Arial"')
+    expect(svg).toContain('font-weight="700"')
+    expect(svg).toContain('Large &amp;')
+    expect(svg).toContain('font-size="36"')
+    expect(svg).toContain('font-family="Calibri"')
+    expect(svg).toContain('font-style="italic"')
+    expect(svg).toContain('text-decoration="underline"')
+  })
+
   it('marks newly inserted text boxes as content auto-sized until a fixed width is provided', () => {
     expect(createTextElement({ text: 'New text' })).toMatchObject({
       type: 'text',
