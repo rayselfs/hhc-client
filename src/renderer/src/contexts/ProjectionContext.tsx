@@ -43,7 +43,6 @@ export interface ProjectionSessionSummary {
 
 interface ProjectionContextValue {
   isProjectionOpen: boolean
-  isProjectionBlanked: boolean
   projectionReadyCount: number
   activeOwner: ProjectionOwner
   recovery: ProjectionRecoveryState
@@ -55,11 +54,9 @@ interface ProjectionContextValue {
     options?: StartProjectionOptions
   ) => Promise<ProjectionOperationResult>
   stopProjection: () => Promise<void>
-  openProjection: () => Promise<ProjectionOperationResult>
   retryProjection: () => Promise<ProjectionOperationResult>
   bringProjectionToFront: () => Promise<void>
   closeProjection: () => Promise<void>
-  blankProjection: (blank: boolean) => void
   blackoutProjection: (enabled: boolean) => Promise<void>
   getProjectionSnapshot: () => ProjectionSessionSnapshot | null
   project: <C extends ProjectionContentChannel>(
@@ -93,7 +90,7 @@ function getAdapter(ref: React.RefObject<ProjectionAdapter | null>): ProjectionA
 
 export function ProjectionProvider({ children }: { children: React.ReactNode }): React.JSX.Element {
   const [isProjectionOpen, setIsProjectionOpen] = useState(false)
-  const [isProjectionBlanked, setIsProjectionBlanked] = useState(true)
+  const [, setIsProjectionBlanked] = useState(true)
   const [projectionReadyCount, setProjectionReadyCount] = useState(0)
   const [activeOwner, setActiveOwner] = useState<ProjectionOwner>('timer')
   const [recovery, setRecovery] = useState<ProjectionRecoveryState>(CLOSED_RECOVERY_STATE)
@@ -344,14 +341,6 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
     [getCoordinator]
   )
 
-  const blankProjection = useCallback(
-    (blank: boolean): void => {
-      setIsProjectionBlanked(blank)
-      getCoordinator().blank(blank)
-    },
-    [getCoordinator]
-  )
-
   const blackoutProjection = useCallback(
     async (enabled: boolean): Promise<void> => {
       if (enabled) await window.api?.projectionVlc?.stop?.().catch(() => {})
@@ -474,7 +463,6 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
   const contextValue = useMemo(
     () => ({
       isProjectionOpen,
-      isProjectionBlanked,
       projectionReadyCount,
       activeOwner,
       recovery,
@@ -482,11 +470,9 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       claimProjection,
       startProjection,
       stopProjection,
-      openProjection,
       retryProjection,
       bringProjectionToFront,
       closeProjection,
-      blankProjection,
       blackoutProjection,
       getProjectionSnapshot,
       project,
@@ -495,7 +481,6 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
     }),
     [
       isProjectionOpen,
-      isProjectionBlanked,
       projectionReadyCount,
       activeOwner,
       recovery,
@@ -503,11 +488,9 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       claimProjection,
       startProjection,
       stopProjection,
-      openProjection,
       retryProjection,
       bringProjectionToFront,
       closeProjection,
-      blankProjection,
       blackoutProjection,
       getProjectionSnapshot,
       project,

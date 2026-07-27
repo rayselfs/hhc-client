@@ -30,6 +30,12 @@ import { Button } from '@heroui/react/button'
 import { Spinner } from '@heroui/react/spinner'
 import { toast } from '@heroui/react/toast'
 import EditableSlideSurface from '@renderer/components/Common/EditableSlideSurface'
+import {
+  InspectorPanel,
+  NavigatorRail,
+  StageViewport,
+  WorkspaceShell
+} from '@renderer/components/Common/WorkspacePrimitives'
 import { useContextMenu } from '@renderer/contexts/ContextMenuContext'
 import {
   addElementToSlide,
@@ -482,6 +488,7 @@ function EditableSessionDocumentView({
   const [isNotesOpen, setIsNotesOpen] = useState(false)
   const [notesDraftBySlideId, setNotesDraftBySlideId] = useState<Record<string, string>>({})
   const [cropElementId, setCropElementId] = useState<string | null>(null)
+  const [isCompactRailOpen, setIsCompactRailOpen] = useState(false)
   const [snapGuides, setSnapGuides] = useState<{
     vertical?: number
     horizontal?: number
@@ -1542,18 +1549,34 @@ function EditableSessionDocumentView({
         </div>
         <div
           data-testid="presentation-workspace-grid"
-          className="grid min-h-0 flex-1"
-          style={{
-            gridTemplateColumns: isBackgroundPanelOpen
-              ? `${railWidth}px minmax(0, 1fr) 300px`
-              : `${railWidth}px minmax(0, 1fr)`
-          }}
+          className={`presentation-workspace-grid grid min-h-0 flex-1 ${
+            isBackgroundPanelOpen ? '' : 'workspace-two-panel'
+          }`}
+          style={
+            {
+              '--presentation-rail-width': `${railWidth}px`,
+              gridTemplateColumns: isBackgroundPanelOpen
+                ? `${railWidth}px minmax(0, 1fr) 300px`
+                : `${railWidth}px minmax(0, 1fr)`
+            } as React.CSSProperties
+          }
         >
-          <aside
+          <NavigatorRail
             data-slide-sidebar
-            className="relative min-h-0 overflow-y-auto border-r border-divider bg-content1/40 px-2 py-3"
+            data-compact-open={isCompactRailOpen || undefined}
+            className="presentation-slide-rail relative min-h-0 overflow-y-auto border-r border-divider bg-content1/40 px-2 py-3"
             onContextMenu={showSlideSidebarMenu}
           >
+            <Button
+              isIconOnly
+              size="sm"
+              variant="ghost"
+              className="absolute right-1 top-1 z-20 md:hidden"
+              onPress={() => setIsCompactRailOpen(false)}
+              aria-label={t('presentationWorkspace.closeSlideRail', 'Close slide rail')}
+            >
+              <X size={14} />
+            </Button>
             <div className="space-y-1">
               {document.slideOrder.map((slideId, index) => {
                 const isSelected =
@@ -1695,9 +1718,18 @@ function EditableSessionDocumentView({
               onPointerDown={startRailResize}
               aria-label={t('presentationWorkspace.resizeSlideRail', 'Resize slide rail')}
             />
-          </aside>
+          </NavigatorRail>
 
-          <main className="flex min-h-0 flex-col bg-[#111217]">
+          <StageViewport className="presentation-stage relative flex min-h-0 flex-col bg-[#111217]">
+            <Button
+              size="sm"
+              variant="tertiary"
+              className="absolute left-2 top-2 z-20 md:hidden"
+              onPress={() => setIsCompactRailOpen(true)}
+              aria-label={t('presentationWorkspace.openSlideRail', 'Open slide rail')}
+            >
+              {t('presentationWorkspace.slides', 'Slides')}
+            </Button>
             <div className="flex flex-1 items-center justify-center overflow-auto p-8">
               <div
                 className="relative max-w-none shrink-0 transition-[width] duration-150"
@@ -1885,15 +1917,17 @@ function EditableSessionDocumentView({
                 </Button>
               </div>
             </div>
-          </main>
+          </StageViewport>
           {isBackgroundPanelOpen && activeSlide && (
-            <FormatBackgroundPanel
-              background={activeSlide.background}
-              onChange={setActiveSlideBackground}
-              onApplyToAll={applyActiveBackgroundToAllSlides}
-              onReset={resetActiveSlideBackground}
-              onClose={() => setIsBackgroundPanelOpen(false)}
-            />
+            <InspectorPanel className="presentation-inspector">
+              <FormatBackgroundPanel
+                background={activeSlide.background}
+                onChange={setActiveSlideBackground}
+                onApplyToAll={applyActiveBackgroundToAllSlides}
+                onReset={resetActiveSlideBackground}
+                onClose={() => setIsBackgroundPanelOpen(false)}
+              />
+            </InspectorPanel>
           )}
         </div>
       </div>
@@ -2398,7 +2432,7 @@ export default function PresentationWorkspacePage(): React.JSX.Element {
   }
 
   return (
-    <div className="flex h-full flex-col bg-background text-foreground">
+    <WorkspaceShell className="bg-background text-foreground">
       <div className="relative flex h-10 shrink-0 items-end overflow-x-auto bg-background px-2 sm:px-4">
         {ribbonTabs.map((tab) => (
           <button
@@ -2446,6 +2480,6 @@ export default function PresentationWorkspacePage(): React.JSX.Element {
           </Button>
         </div>
       )}
-    </div>
+    </WorkspaceShell>
   )
 }

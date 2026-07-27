@@ -132,10 +132,10 @@ describe('ProjectionContext web recovery', () => {
 
   it('ignores stale ready and reports a five-second timeout', async () => {
     const { result } = renderProjection()
-    let operationPromise: ReturnType<typeof result.current.openProjection>
+    let operationPromise: ReturnType<typeof result.current.startProjection>
 
     act(() => {
-      operationPromise = result.current.openProjection()
+      operationPromise = result.current.startProjection('timer')
       mockAdapter._trigger('__system:ready', { generation: 2 })
     })
     await act(async () => {

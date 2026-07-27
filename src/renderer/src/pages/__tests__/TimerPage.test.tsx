@@ -24,17 +24,14 @@ const projectionRecoveryMock = {
 vi.mock('@renderer/contexts/ProjectionContext', () => ({
   useProjection: vi.fn(() => ({
     isProjectionOpen: false,
-    isProjectionBlanked: true,
     projectionReadyCount: 0,
     activeOwner: 'timer',
     ...projectionRecoveryMock,
     claimProjection: vi.fn(),
     startProjection: vi.fn(),
     stopProjection: vi.fn(),
-    openProjection: vi.fn(),
     bringProjectionToFront: vi.fn(),
     closeProjection: vi.fn(),
-    blankProjection: vi.fn(),
     project: vi.fn(),
     send: vi.fn(),
     on: vi.fn()
@@ -207,17 +204,14 @@ describe('TimerPage — projection ownership', () => {
 
     vi.mocked(useProjection).mockReturnValue({
       isProjectionOpen: false,
-      isProjectionBlanked: true,
       projectionReadyCount: 0,
       activeOwner: 'timer',
       ...projectionRecoveryMock,
       claimProjection: mockClaimProjection,
       startProjection: vi.fn(),
       stopProjection: vi.fn(),
-      openProjection: vi.fn(),
       bringProjectionToFront: vi.fn(),
       closeProjection: vi.fn(),
-      blankProjection: vi.fn(),
       project: vi.fn(),
       send: vi.fn(),
       on: vi.fn()
@@ -228,17 +222,14 @@ describe('TimerPage — projection ownership', () => {
 
     vi.mocked(useProjection).mockReturnValue({
       isProjectionOpen: true,
-      isProjectionBlanked: true,
       projectionReadyCount: 0,
       activeOwner: 'timer',
       ...projectionRecoveryMock,
       claimProjection: mockClaimProjection,
       startProjection: vi.fn(),
       stopProjection: vi.fn(),
-      openProjection: vi.fn(),
       bringProjectionToFront: vi.fn(),
       closeProjection: vi.fn(),
-      blankProjection: vi.fn(),
       project: vi.fn(),
       send: vi.fn(),
       on: vi.fn()
@@ -258,17 +249,14 @@ describe('TimerPage — projection ownership', () => {
 
     vi.mocked(useProjection).mockReturnValue({
       isProjectionOpen: false,
-      isProjectionBlanked: true,
       projectionReadyCount: 0,
       activeOwner: 'timer',
       ...projectionRecoveryMock,
       claimProjection: mockClaimProjection,
       startProjection: vi.fn(),
       stopProjection: vi.fn(),
-      openProjection: vi.fn(),
       bringProjectionToFront: vi.fn(),
       closeProjection: vi.fn(),
-      blankProjection: vi.fn(),
       project: vi.fn(),
       send: vi.fn(),
       on: vi.fn()
@@ -279,17 +267,14 @@ describe('TimerPage — projection ownership', () => {
 
     vi.mocked(useProjection).mockReturnValue({
       isProjectionOpen: true,
-      isProjectionBlanked: true,
       projectionReadyCount: 0,
       activeOwner: 'timer',
       ...projectionRecoveryMock,
       claimProjection: mockClaimProjection,
       startProjection: vi.fn(),
       stopProjection: vi.fn(),
-      openProjection: vi.fn(),
       bringProjectionToFront: vi.fn(),
       closeProjection: vi.fn(),
-      blankProjection: vi.fn(),
       project: vi.fn(),
       send: vi.fn(),
       on: vi.fn()
@@ -309,17 +294,14 @@ describe('TimerPage — projection ownership', () => {
 
     vi.mocked(useProjection).mockReturnValue({
       isProjectionOpen: false,
-      isProjectionBlanked: true,
       projectionReadyCount: 0,
       activeOwner: 'timer',
       ...projectionRecoveryMock,
       claimProjection: mockClaimProjection,
       startProjection: vi.fn(),
       stopProjection: vi.fn(),
-      openProjection: vi.fn(),
       bringProjectionToFront: vi.fn(),
       closeProjection: vi.fn(),
-      blankProjection: vi.fn(),
       project: vi.fn(),
       send: vi.fn(),
       on: vi.fn()
@@ -337,17 +319,14 @@ describe('TimerPage — Space projection action', () => {
     const startProjection = vi.fn(() => Promise.resolve({ ok: true as const, generation: 1 }))
     vi.mocked(useProjection).mockReturnValue({
       isProjectionOpen: true,
-      isProjectionBlanked: false,
       projectionReadyCount: 1,
       activeOwner: 'timer',
       ...projectionRecoveryMock,
       claimProjection: vi.fn(),
       startProjection,
       stopProjection: vi.fn(),
-      openProjection: vi.fn(),
       bringProjectionToFront: vi.fn(),
       closeProjection: vi.fn(),
-      blankProjection: vi.fn(),
       project: vi.fn(),
       send: vi.fn(),
       on: vi.fn()

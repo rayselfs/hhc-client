@@ -53,7 +53,6 @@ async function mockProjectionContext(
 function baseProjectionContext(): MockProjectionContext {
   return {
     isProjectionOpen: false,
-    isProjectionBlanked: true,
     projectionReadyCount: 0,
     activeOwner: 'timer' as const,
     recovery: { status: 'closed', generation: 0, failure: null },
@@ -69,9 +68,6 @@ function baseProjectionContext(): MockProjectionContext {
       Promise.resolve({ ok: true, generation: 1 })
     ),
     stopProjection: vi.fn<MockProjectionContext['stopProjection']>(() => Promise.resolve()),
-    openProjection: vi.fn<MockProjectionContext['openProjection']>(() =>
-      Promise.resolve({ ok: true, generation: 1 })
-    ),
     retryProjection: vi.fn<MockProjectionContext['retryProjection']>(() =>
       Promise.resolve({ ok: true, generation: 1 })
     ),
@@ -79,7 +75,6 @@ function baseProjectionContext(): MockProjectionContext {
       Promise.resolve()
     ),
     closeProjection: vi.fn<MockProjectionContext['closeProjection']>(() => Promise.resolve()),
-    blankProjection: vi.fn<MockProjectionContext['blankProjection']>(),
     blackoutProjection: vi.fn<MockProjectionContext['blackoutProjection']>(() => Promise.resolve()),
     getProjectionSnapshot: vi.fn<MockProjectionContext['getProjectionSnapshot']>(() => null),
     project: vi.fn<MockProjectionContext['project']>(() => Promise.resolve()),
@@ -296,7 +291,7 @@ describe('Header', () => {
 
   it('renders stop projection button with correct aria-label in English when open', async () => {
     await i18n.changeLanguage('en')
-    await mockProjectionContext({ isProjectionOpen: true, isProjectionBlanked: false })
+    await mockProjectionContext({ isProjectionOpen: true })
     renderWithRouter(['/'])
     expect(screen.getByRole('button', { name: 'Stop projection' })).toBeInTheDocument()
   })
@@ -346,7 +341,7 @@ describe('Header', () => {
 
   it('renders stop projection button with correct aria-label in zh-TW', async () => {
     await i18n.changeLanguage('zh-TW')
-    await mockProjectionContext({ isProjectionOpen: true, isProjectionBlanked: false })
+    await mockProjectionContext({ isProjectionOpen: true })
     renderWithRouter(['/'])
     expect(screen.getByRole('button', { name: '停止投影' })).toBeInTheDocument()
     await act(() => i18n.changeLanguage('en'))

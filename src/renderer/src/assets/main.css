@@ -274,3 +274,118 @@ body {
   cursor: pointer;
   border: none;
 }
+
+.workspace-panel-group {
+  display: grid;
+  grid-template-columns:
+    var(--workspace-navigator-width) minmax(0, 1fr)
+    var(--workspace-inspector-width);
+}
+
+.workspace-panel-group.workspace-two-panel {
+  grid-template-columns: var(--workspace-navigator-width) minmax(0, 1fr);
+}
+
+.workspace-compact-switcher,
+.workspace-overlay-close {
+  display: none;
+}
+
+.workspace-navigator-slot,
+.workspace-inspector-slot {
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+@media (max-width: 1279px) {
+  .workspace-panel-group {
+    grid-template-columns: var(--workspace-navigator-width) minmax(0, 1fr);
+  }
+
+  .workspace-inspector-slot {
+    display: none;
+  }
+
+  .workspace-compact-switcher {
+    display: flex;
+  }
+
+  .workspace-navigator-trigger {
+    display: none;
+  }
+
+  .workspace-inspector-slot.workspace-overlay-open {
+    position: absolute;
+    inset-block: 0;
+    right: 0;
+    z-index: 40;
+    display: block;
+    width: min(var(--workspace-inspector-width), 90%);
+    background: var(--background);
+    box-shadow: -12px 0 32px rgb(0 0 0 / 25%);
+  }
+
+  .workspace-overlay-close {
+    display: inline-flex;
+  }
+
+  .presentation-workspace-grid {
+    grid-template-columns: var(--presentation-rail-width, 240px) minmax(0, 1fr) !important;
+  }
+
+  .presentation-inspector {
+    position: absolute;
+    inset-block: 0;
+    right: 0;
+    z-index: 35;
+    width: min(300px, 90%);
+    background: var(--background);
+    box-shadow: -12px 0 32px rgb(0 0 0 / 25%);
+  }
+}
+
+@media (max-width: 767px) {
+  .workspace-navigator-trigger {
+    display: inline-flex;
+  }
+
+  .workspace-panel-group {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .workspace-navigator-slot {
+    display: none;
+  }
+
+  .workspace-navigator-slot.workspace-overlay-open {
+    position: absolute;
+    inset-block: 0;
+    left: 0;
+    z-index: 40;
+    display: block;
+    width: min(var(--workspace-navigator-width), 90%);
+    background: var(--background);
+    box-shadow: 12px 0 32px rgb(0 0 0 / 25%);
+  }
+
+  .presentation-workspace-grid {
+    position: relative;
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .presentation-slide-rail {
+    display: none;
+  }
+
+  .presentation-slide-rail[data-compact-open='true'] {
+    position: absolute;
+    inset-block: 0;
+    left: 0;
+    z-index: 40;
+    display: block;
+    width: min(280px, 90%);
+    background: var(--background);
+    box-shadow: 12px 0 32px rgb(0 0 0 / 25%);
+  }
+}
