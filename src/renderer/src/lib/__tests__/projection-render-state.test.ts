@@ -10,6 +10,7 @@ function snapshot(owner: ProjectionSessionSnapshot['owner']): ProjectionSessionS
   return {
     owner,
     showDefault: false,
+    isBlackout: false,
     timer: {
       tick: null,
       stopwatch: null,
@@ -58,6 +59,30 @@ it('applies a media replay in one reducer action', () => {
     fileData: mediaSnapshot.media.show,
     mediaReplayState: mediaSnapshot.media.state
   })
+})
+
+it('selects intentional blackout without losing retained content', () => {
+  const mediaSnapshot = snapshot('media')
+  mediaSnapshot.media.show = {
+    itemId: 'video-1',
+    blobId: 'blob-1',
+    fileName: 'video.mp4',
+    mimeType: 'video/mp4',
+    playlist: [],
+    currentIndex: 0
+  }
+  const replayed = reduceProjectionRenderState(initialProjectionRenderState, {
+    type: 'replay',
+    payload: { generation: 3, snapshot: mediaSnapshot }
+  })
+  const blackedOut = reduceProjectionRenderState(replayed, {
+    type: 'message',
+    channel: '__system:blackout',
+    data: { enabled: true }
+  })
+
+  expect(selectVisibleProjection(blackedOut)).toBe('blackout')
+  expect(blackedOut.fileData).toEqual(mediaSnapshot.media.show)
 })
 
 describe('selectVisibleProjection', () => {

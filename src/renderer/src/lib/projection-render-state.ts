@@ -7,6 +7,7 @@ import type {
 
 export interface ProjectionRenderState {
   showDefault: boolean
+  isBlackout: boolean
   activeContent: 'timer' | 'bible' | 'file' | null
   timerData: ProjectionPayload<'timer:tick'> | null
   stopwatchData: ProjectionPayload<'timer:stopwatch'> | null
@@ -29,6 +30,7 @@ export type ProjectionRenderAction =
 
 export const initialProjectionRenderState: ProjectionRenderState = {
   showDefault: true,
+  isBlackout: false,
   activeContent: null,
   timerData: null,
   stopwatchData: null,
@@ -49,6 +51,7 @@ export function reduceProjectionRenderState(
     const { generation, snapshot } = action.payload
     return {
       showDefault: snapshot.showDefault,
+      isBlackout: snapshot.isBlackout,
       activeContent:
         snapshot.owner === 'media' ? 'file' : snapshot.owner === 'bible' ? 'bible' : 'timer',
       timerData: snapshot.timer.tick,
@@ -69,6 +72,11 @@ export function reduceProjectionRenderState(
       return {
         ...state,
         showDefault: (data as ProjectionPayload<'__system:blank'>).showDefault
+      }
+    case '__system:blackout':
+      return {
+        ...state,
+        isBlackout: (data as ProjectionPayload<'__system:blackout'>).enabled
       }
     case '__system:active-owner': {
       const owner = (data as ProjectionPayload<'__system:active-owner'>).owner
@@ -120,7 +128,8 @@ export function reduceProjectionRenderState(
 
 export function selectVisibleProjection(
   state: ProjectionRenderState
-): 'default' | 'timer' | 'bible' | 'file' {
+): 'blackout' | 'default' | 'timer' | 'bible' | 'file' {
+  if (state.isBlackout) return 'blackout'
   if (state.showDefault) return 'default'
   if (state.activeContent === 'timer' && state.timerData) return 'timer'
   if (state.activeContent === 'bible' && state.bibleChapter) return 'bible'

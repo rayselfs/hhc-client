@@ -224,4 +224,26 @@ describe('ProjectionPage', () => {
       expect(mockProjectionVlcStop).toHaveBeenCalled()
     })
   })
+
+  it('renders intentional blackout instead of the internal default fallback', async () => {
+    render(<ProjectionPage />)
+
+    act(() => {
+      mockAdapter._trigger('__system:blank', { showDefault: false })
+      mockAdapter._trigger('file:show', {
+        itemId: 'video-1',
+        blobId: 'blob-1',
+        fileName: 'video.mkv',
+        mimeType: 'video/x-matroska',
+        playbackMode: 'vlc-embedded'
+      })
+      mockAdapter._trigger('__system:blackout', { enabled: true })
+    })
+
+    expect(screen.getByTestId('projection-blackout')).toBeInTheDocument()
+    expect(screen.queryByTestId('default-projection')).not.toBeInTheDocument()
+    await waitFor(() => {
+      expect(mockProjectionVlcStop).toHaveBeenCalled()
+    })
+  })
 })

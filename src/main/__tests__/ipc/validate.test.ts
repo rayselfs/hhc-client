@@ -237,6 +237,7 @@ describe('validateProjectionTransportTuple', () => {
           snapshot: {
             owner: 'timer',
             showDefault: false,
+            isBlackout: false,
             timer: {
               tick: null,
               stopwatch: null,
@@ -250,6 +251,31 @@ describe('validateProjectionTransportTuple', () => {
         }
       ])
     ).toBe(true)
+  })
+
+  it('rejects replay snapshots without an intentional-blackout state', () => {
+    expect(
+      validateProjectionTransportTuple([
+        4,
+        '__system:replay',
+        {
+          generation: 4,
+          snapshot: {
+            owner: 'timer',
+            showDefault: false,
+            timer: {
+              tick: null,
+              stopwatch: null,
+              overtimeMessage: null,
+              timezone: null,
+              ringColor: null
+            },
+            bible: { chapter: null, settings: null },
+            media: { show: null, state: null }
+          }
+        }
+      ])
+    ).toBe(false)
   })
 })
 

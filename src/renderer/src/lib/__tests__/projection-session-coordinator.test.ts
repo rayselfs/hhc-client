@@ -224,6 +224,49 @@ describe('ProjectionSessionCoordinator', () => {
     })
   })
 
+  it('replays intentional blackout without replacing the retained content', () => {
+    const coordinator = createProjectionSessionCoordinator(send)
+
+    expect(coordinator).toHaveProperty('blackout')
+
+    coordinator.startSession('media', [['file:show', fileShow]])
+    coordinator.blackout(true)
+    coordinator.beginGeneration({ generation: 8, status: 'opening', reason: 'reload' })
+    coordinator.ready(8)
+
+    expect(coordinator.getSnapshot()).toMatchObject({
+      owner: 'media',
+      isBlackout: true,
+      media: { show: fileShow }
+    })
+    expect(send).toHaveBeenLastCalledWith('__system:replay', {
+      generation: 8,
+      snapshot: coordinator.getSnapshot()
+    })
+  })
+
+  it('resumes retained content without changing its owner or media state', () => {
+    const coordinator = createProjectionSessionCoordinator(send)
+
+    expect(coordinator).toHaveProperty('blackout')
+
+    coordinator.startSession('media', [['file:show', fileShow]])
+    coordinator.beginGeneration({ generation: 8, status: 'opening', reason: 'created' })
+    coordinator.ready(8)
+    coordinator.blackout(true)
+    send.mockClear()
+
+    coordinator.blackout(false)
+
+    expect(coordinator.getSnapshot()).toMatchObject({
+      owner: 'media',
+      isBlackout: false,
+      media: { show: fileShow }
+    })
+    expect(send).toHaveBeenCalledOnce()
+    expect(send).toHaveBeenCalledWith('__system:blackout', { enabled: false })
+  })
+
   it('sends incremental and one-shot messages only while ready', () => {
     const coordinator = createProjectionSessionCoordinator(send)
     coordinator.startSession('media', [['file:show', fileShow]])

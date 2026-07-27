@@ -51,6 +51,7 @@ export default function ProjectionPage(): React.JSX.Element {
       )
       for (const channel of [
         '__system:blank',
+        '__system:blackout',
         '__system:active-owner',
         'timer:tick',
         'timer:stopwatch',
@@ -92,12 +93,15 @@ export default function ProjectionPage(): React.JSX.Element {
   }, [])
 
   useEffect(() => {
-    if (state.showDefault || state.activeContent !== 'file') {
+    if (state.isBlackout || state.showDefault || state.activeContent !== 'file') {
       void window.api?.projectionVlc?.stop()
     }
-  }, [state.activeContent, state.showDefault])
+  }, [state.activeContent, state.isBlackout, state.showDefault])
 
   const visible = selectVisibleProjection(state)
+  if (visible === 'blackout') {
+    return <div className="h-screen w-screen bg-black" data-testid="projection-blackout" />
+  }
   if (visible === 'bible' && state.bibleChapter) {
     return <BibleProjection data={state.bibleChapter} settings={state.bibleSettings} />
   }

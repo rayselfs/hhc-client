@@ -30,6 +30,7 @@ export interface ProjectionSessionCoordinator {
   startSession(owner: ProjectionOwner, payloads: ProjectionContentMessageTuple[]): void
   claim(owner: ProjectionOwner, unblank?: boolean): void
   blank(showDefault: boolean): void
+  blackout(enabled: boolean): void
   project<C extends ReplayableProjectionChannel>(channel: C, data: ProjectionPayload<C>): void
   sendOneShot<C extends 'file:end'>(channel: C, data: ProjectionPayload<C>): void
   recordPlayback(generation: number, data: ProjectionPayload<'file:playback-state'>): void
@@ -61,6 +62,7 @@ function createEmptySnapshot(owner: ProjectionOwner): ProjectionSessionSnapshot 
   return {
     owner,
     showDefault: false,
+    isBlackout: false,
     timer: {
       tick: null,
       stopwatch: null,
@@ -303,11 +305,15 @@ export function createProjectionSessionCoordinator(
       snapshot = {
         ...snapshot,
         owner,
-        showDefault: unblank ? false : snapshot.showDefault
+        showDefault: unblank ? false : snapshot.showDefault,
+        isBlackout: unblank ? false : snapshot.isBlackout
       }
       if (recovery.status === 'ready') {
         send('__system:active-owner', { owner })
-        if (unblank) send('__system:blank', { showDefault: false })
+        if (unblank) {
+          send('__system:blank', { showDefault: false })
+          send('__system:blackout', { enabled: false })
+        }
       }
       notify()
     },
@@ -317,6 +323,15 @@ export function createProjectionSessionCoordinator(
       snapshot = { ...snapshot, showDefault }
       if (recovery.status === 'ready') {
         send('__system:blank', { showDefault })
+      }
+      notify()
+    },
+
+    blackout(enabled) {
+      if (!snapshot) return
+      snapshot = { ...snapshot, isBlackout: enabled }
+      if (recovery.status === 'ready') {
+        send('__system:blackout', { enabled })
       }
       notify()
     },

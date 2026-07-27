@@ -107,6 +107,8 @@ function validateProjectionPayload(channel: string, data: unknown): boolean {
   switch (channel) {
     case '__system:blank':
       return typeof obj.showDefault === 'boolean'
+    case '__system:blackout':
+      return typeof obj.enabled === 'boolean'
     case '__system:active-owner':
       return typeof obj.owner === 'string'
     case 'settings:timezone':
@@ -230,6 +232,7 @@ function validateProjectionReplayPayload(generation: number, data: unknown): boo
   if (
     !['timer', 'bible', 'media'].includes(String(snapshot.owner)) ||
     typeof snapshot.showDefault !== 'boolean' ||
+    typeof snapshot.isBlackout !== 'boolean' ||
     !isRecord(snapshot.timer) ||
     !isRecord(snapshot.bible) ||
     !isRecord(snapshot.media)

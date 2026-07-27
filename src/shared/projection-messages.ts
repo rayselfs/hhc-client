@@ -228,6 +228,7 @@ export interface ProjectionMediaReplayState {
 export interface ProjectionSessionSnapshot {
   owner: ProjectionOwner
   showDefault: boolean
+  isBlackout: boolean
   timer: {
     tick: AppMessages['timer:tick'] | null
     stopwatch: AppMessages['timer:stopwatch'] | null
@@ -264,6 +265,7 @@ export interface SystemMessages {
   '__system:close': null
   '__system:closed': null
   '__system:blank': { showDefault: boolean }
+  '__system:blackout': { enabled: boolean }
   '__system:active-owner': { owner: string }
 }
 
