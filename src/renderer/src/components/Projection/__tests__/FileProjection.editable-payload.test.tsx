@@ -96,5 +96,10 @@ describe('FileProjection editable payload', () => {
     expect(mockGetFileSource).not.toHaveBeenCalled()
     expect(screen.getByText('Holy Spirit come')).toBeInTheDocument()
     expect(screen.getByAltText('photo.png')).toHaveAttribute('src', 'data:image/png;base64,AAA=')
+    const frame = document.querySelector('[data-editable-projection-frame]')
+    expect(frame).toHaveStyle({
+      width: 'min(100vw, calc(100vh * 1.7777777777777777))',
+      height: 'min(100vh, calc(100vw / 1.7777777777777777))'
+    })
   })
 })

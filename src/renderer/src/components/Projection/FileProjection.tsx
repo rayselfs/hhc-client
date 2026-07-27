@@ -712,9 +712,19 @@ function EditableProjectionSurface({
     return <div className="h-screen w-full bg-black" />
   }
 
+  const slideRatio = document.width / document.height
+
   return (
     <div className="flex h-screen w-full items-center justify-center overflow-hidden bg-black">
-      <EditableSlideSurface document={document} slideId={slideId} className="h-full max-h-screen" />
+      <div
+        data-editable-projection-frame
+        style={{
+          width: `min(100vw, calc(100vh * ${slideRatio}))`,
+          height: `min(100vh, calc(100vw / ${slideRatio}))`
+        }}
+      >
+        <EditableSlideSurface document={document} slideId={slideId} className="h-full w-full" />
+      </div>
     </div>
   )
 }

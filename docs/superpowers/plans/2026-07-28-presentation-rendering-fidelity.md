@@ -51,9 +51,9 @@ with optional imported runs shared by DOM and SVG renderers.
 - Consumes: editable document `width` and `height`
 - Produces: a viewport-bounded wrapper with `data-editable-projection-frame`
 
-- [ ] Add a failing test asserting the dynamic `min(100vw, ...)` width and height expressions.
-- [ ] Wrap `EditableSlideSurface` in the contain frame and let the surface fill it.
-- [ ] Run the focused projection test and commit.
+- [x] Add a failing test asserting the dynamic `min(100vw, ...)` width and height expressions.
+- [x] Wrap `EditableSlideSurface` in the contain frame and let the surface fill it.
+- [x] Run the focused projection test and commit.
 
 ### Task 3: Remove Unsafe Slide Size and Restore Default Background
 
