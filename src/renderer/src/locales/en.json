@@ -1047,6 +1047,18 @@
     "restoreNameConflictDescription": "An item with this name already exists in the restore destination.",
     "restoreNameLabel": "Name"
   },
+  "mediaPreview": {
+    "close": "Close preview",
+    "zoomOut": "Zoom out",
+    "zoomIn": "Zoom in",
+    "present": "Present",
+    "preparing": "Preparing…",
+    "errors": {
+      "not-presentable": "This item cannot be presented on this device.",
+      "not-ready": "This item is not ready to present.",
+      "missing-source": "The original media file is missing."
+    }
+  },
   "presenter": {
     "noMediaSelected": "No media selected",
     "grid": "Grid",

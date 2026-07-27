@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router-dom'
+import { Outlet, useNavigate } from 'react-router-dom'
 import { toast } from '@heroui/react/toast'
 import { FileExplorerShell, useFileContextMenu } from '@renderer/components/Control/FileExplorer'
 import FileBrowser from '@renderer/components/Control/FileExplorer/FileBrowser'
@@ -862,6 +862,7 @@ export default function FilesPage(): React.JSX.Element {
         onFolderDurationChange={setEditModalDuration}
         isRetentionLocked={editingIsFavorited}
       />
+      <Outlet />
     </>
   )
 }

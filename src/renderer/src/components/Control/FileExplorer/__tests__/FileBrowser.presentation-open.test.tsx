@@ -7,7 +7,7 @@ import {
   useFileExplorerSettings,
   useFileExplorerStore
 } from '@renderer/stores/file-explorer'
-import { PPTX_MIME_TYPE } from '@renderer/lib/presentation-media'
+import { EDITABLE_PRESENTATION_MIME_TYPE, PPTX_MIME_TYPE } from '@renderer/lib/presentation-media'
 import { usePresentationWorkspaceStore } from '@renderer/stores/presentation-workspace'
 import type { FileItemRecord, FolderRecord } from '@shared/types/folder'
 
@@ -117,7 +117,7 @@ describe('FileBrowser presentation open behavior', () => {
     })
   })
 
-  it('opens a PPTX in the presentation workspace when double-clicked', async () => {
+  it('opens an imported PPTX in the safe preview when double-clicked', async () => {
     const deck = makeFile({ id: 'deck-1', name: 'Deck.pptx', mimeType: PPTX_MIME_TYPE })
     await renderWithItems([deck])
 
@@ -125,16 +125,13 @@ describe('FileBrowser presentation open behavior', () => {
       fireEvent.doubleClick(screen.getByText('Deck.pptx'))
     })
 
-    expect(usePresentationWorkspaceStore.getState().activeItemId).toBe('deck-1')
-    expect(usePresentationWorkspaceStore.getState().documents[0]).toMatchObject({
-      itemId: 'deck-1',
-      mode: 'pptx'
-    })
-    expect(mocks.navigate).toHaveBeenCalledWith('/presentations/deck-1')
+    expect(usePresentationWorkspaceStore.getState().activeItemId).toBeNull()
+    expect(usePresentationWorkspaceStore.getState().documents).toEqual([])
+    expect(mocks.navigate).toHaveBeenCalledWith('/files/preview/deck-1')
     expect(mocks.startMediaProjection).not.toHaveBeenCalled()
   })
 
-  it('keeps non-presentation media double-click behavior unchanged', async () => {
+  it('opens ordinary media in the safe preview without projecting', async () => {
     const image = makeFile({ id: 'image-1', name: 'Photo.png', mimeType: 'image/png' })
     await renderWithItems([image])
 
@@ -142,12 +139,29 @@ describe('FileBrowser presentation open behavior', () => {
       fireEvent.doubleClick(screen.getByText('Photo.png'))
     })
 
-    expect(mocks.startMediaProjection).toHaveBeenCalledOnce()
+    expect(mocks.startMediaProjection).not.toHaveBeenCalled()
     expect(usePresentationWorkspaceStore.getState().documents).toEqual([])
-    expect(mocks.navigate).not.toHaveBeenCalled()
+    expect(mocks.navigate).toHaveBeenCalledWith('/files/preview/image-1')
   })
 
-  it('opens a PPTX search result in the presentation workspace', async () => {
+  it('opens an editable presentation in the presentation workspace', async () => {
+    const deck = makeFile({
+      id: 'deck-1',
+      name: 'Deck.presentation',
+      mimeType: EDITABLE_PRESENTATION_MIME_TYPE
+    })
+    await renderWithItems([deck])
+
+    act(() => {
+      fireEvent.doubleClick(screen.getByText('Deck.presentation'))
+    })
+
+    expect(usePresentationWorkspaceStore.getState().activeItemId).toBe('deck-1')
+    expect(mocks.navigate).toHaveBeenCalledWith('/presentations/deck-1')
+    expect(mocks.startMediaProjection).not.toHaveBeenCalled()
+  })
+
+  it('opens an imported PPTX search result in the safe preview', async () => {
     const deck = makeFile({ id: 'deck-1', name: 'Deck.pptx', mimeType: PPTX_MIME_TYPE })
     act(() => {
       useFileExplorerSearch.setState({ searchQuery: 'Deck' })
@@ -158,8 +172,8 @@ describe('FileBrowser presentation open behavior', () => {
       fireEvent.doubleClick(screen.getByText('Deck.pptx'))
     })
 
-    expect(usePresentationWorkspaceStore.getState().activeItemId).toBe('deck-1')
-    expect(mocks.navigate).toHaveBeenCalledWith('/presentations/deck-1')
+    expect(usePresentationWorkspaceStore.getState().activeItemId).toBeNull()
+    expect(mocks.navigate).toHaveBeenCalledWith('/files/preview/deck-1')
     expect(mocks.startMediaProjection).not.toHaveBeenCalled()
   })
 })

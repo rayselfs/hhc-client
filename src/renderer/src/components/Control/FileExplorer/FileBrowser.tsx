@@ -57,7 +57,10 @@ import { deriveSyncFolderHealth, type SyncFolderHealth } from '@renderer/lib/syn
 import { getSourceMediaMetadata } from '@renderer/lib/media-metadata'
 import { getBlobId } from '@renderer/lib/blob-identity'
 import { isWeb } from '@renderer/lib/env'
-import { getPresentationWorkspacePath, isPresentationItem } from '@renderer/lib/presentation-media'
+import {
+  getPresentationWorkspacePath,
+  isEditablePresentationMimeType
+} from '@renderer/lib/presentation-media'
 import { usePresentationWorkspaceStore } from '@renderer/stores/presentation-workspace'
 
 export interface FileBrowserProps {
@@ -757,30 +760,18 @@ export function FileBrowser({
         return
       }
       const file = fileItems.find((entry) => entry.id === itemId)
-      if (file && isPresentationItem(file)) {
+      if (file && isEditablePresentationMimeType(file.mimeType)) {
         openPresentationDocument(file)
         navigate(getPresentationWorkspacePath(file.id))
         return
       }
       if (file && isPresentable(file.mimeType)) {
-        const presentable = getPresentableItems(sortedFileItems)
-        const idx = presentable.findIndex((f) => f.id === itemId)
-        if (idx !== -1) {
-          void startMediaProjection(
-            presentable,
-            idx,
-            { onNoProjectableFiles: () => toast.warning(t('fileExplorer.noProjectableFiles')) },
-            { prioritizeStartItem: true }
-          )
-        } else {
-          toast.warning(t('fileExplorer.noProjectableFiles'))
-        }
+        navigate(`/files/preview/${encodeURIComponent(file.id)}`)
       }
     },
     [
       cancelPendingRename,
       sortedItems,
-      sortedFileItems,
       fileItems,
       navigateToFolder,
       openPresentationDocument,
@@ -1141,9 +1132,14 @@ export function FileBrowser({
 
   if (searchQuery.trim()) {
     const handleSearchFileClick = (result: SearchResult & { kind: 'file' }): void => {
-      if (isPresentationItem(result.item)) {
+      if (isEditablePresentationMimeType(result.item.mimeType)) {
         openPresentationDocument(result.item)
         navigate(getPresentationWorkspacePath(result.item.id))
+        setSearchQuery('')
+        return
+      }
+      if (isPresentable(result.item.mimeType)) {
+        navigate(`/files/preview/${encodeURIComponent(result.item.id)}`)
         setSearchQuery('')
         return
       }

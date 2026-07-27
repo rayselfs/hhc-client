@@ -1047,6 +1047,18 @@
     "restoreNameConflictDescription": "还原位置已经有相同名称的项目。",
     "restoreNameLabel": "名称"
   },
+  "mediaPreview": {
+    "close": "关闭预览",
+    "zoomOut": "缩小",
+    "zoomIn": "放大",
+    "present": "投影",
+    "preparing": "准备中…",
+    "errors": {
+      "not-presentable": "此项目无法在这台设备上投影。",
+      "not-ready": "此项目尚未准备完成。",
+      "missing-source": "找不到原始媒体文件。"
+    }
+  },
   "presenter": {
     "noMediaSelected": "未选择媒体",
     "grid": "网格",

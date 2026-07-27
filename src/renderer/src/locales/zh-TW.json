@@ -1047,6 +1047,18 @@
     "restoreNameConflictDescription": "還原位置已經有相同名稱的項目。",
     "restoreNameLabel": "名稱"
   },
+  "mediaPreview": {
+    "close": "關閉預覽",
+    "zoomOut": "縮小",
+    "zoomIn": "放大",
+    "present": "投影",
+    "preparing": "準備中…",
+    "errors": {
+      "not-presentable": "此項目無法在這台裝置上投影。",
+      "not-ready": "此項目尚未準備完成。",
+      "missing-source": "找不到原始媒體檔案。"
+    }
+  },
   "presenter": {
     "noMediaSelected": "未選擇媒體",
     "grid": "格狀",

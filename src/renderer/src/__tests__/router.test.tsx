@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { createMemoryRouter, RouterProvider } from 'react-router-dom'
+import { createMemoryRouter, Outlet, RouterProvider } from 'react-router-dom'
 import routes from '../router'
 import { ThemeProvider } from '@renderer/contexts/ThemeContext'
 import { ONBOARDED_KEY } from '@renderer/lib/onboarding'
@@ -22,6 +22,18 @@ vi.mock('@renderer/pages/ServicePage', () => ({
 
 vi.mock('@renderer/pages/SoundboardPage', () => ({
   default: () => <div data-testid="soundboard-page" />
+}))
+
+vi.mock('@renderer/pages/FilesPage', () => ({
+  default: () => (
+    <div data-testid="files-page">
+      <Outlet />
+    </div>
+  )
+}))
+
+vi.mock('@renderer/components/Control/FileExplorer/Preview/FilePreviewInspector', () => ({
+  default: () => <div data-testid="file-preview" />
 }))
 
 vi.mock('@renderer/pages/MediaWorkspacePage', () => ({
@@ -121,6 +133,13 @@ describe('Router', () => {
     renderWithRouter(['/media'])
 
     expect(await screen.findByTestId('media-presenter')).toBeInTheDocument()
+  })
+
+  it('keeps Files mounted under the nested safe preview route', async () => {
+    renderWithRouter(['/files/preview/image-1'])
+
+    expect(await screen.findByTestId('files-page')).toBeInTheDocument()
+    expect(await screen.findByTestId('file-preview')).toBeInTheDocument()
   })
 
   it('navigates from timer to bible via sidebar link', async () => {
