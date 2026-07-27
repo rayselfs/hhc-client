@@ -43,7 +43,7 @@ The order is deliberate:
 | R2    | Complete | Presentation editing has transactional Undo/Redo, serialized saving, visible save state, and safe lifecycle gates.                            |
 | R3    | Complete | Projection survives reload, crash, display changes, and browser popup failures through session replay and recovery.                           |
 | R4    | Complete | Media projection remains active while the operator previews, searches, and prepares the next source.                                          |
-| R5    | Planned  | Presentation Workspace follows a PowerPoint-like desktop information architecture with essential editing operations.                          |
+| R5    | Complete | Presentation Workspace follows a PowerPoint-like desktop information architecture with essential editing operations.                          |
 | R6    | Planned  | Media import, readiness, playback, storage, and slide delivery are observable, recoverable, and performant.                                   |
 | R7    | Planned  | Shared responsive workspace primitives replace fixed page-specific layouts; dead paths are removed and release gates cover packaged behavior. |
 
@@ -351,6 +351,21 @@ attempting full Microsoft PowerPoint parity.
 - Editing, preview, current projection, and next projection are never represented by one ambiguous
   state.
 - Ribbon and panels degrade intentionally at medium and compact widths.
+
+### Completion evidence
+
+- [x] The 44 px document bar exposes Undo, Redo, save state, tabs, Present from Current Slide, and
+      Present from Beginning; F5 and Shift+F5 preserve the exact session flush gate.
+- [x] The Ribbon includes Home, Insert, Design, Picture Format, and Text Format surfaces with
+      responsive overflow behavior.
+- [x] The resizable slide rail supports selected-block drag reorder, Alt+Arrow keyboard reorder,
+      insertion points, multi-select, copy/paste, duplicate, delete, and independent projected/next
+      markers.
+- [x] The stage supports marquee and modifier multi-selection, group movement, keyboard nudge,
+      snap guides, align/distribute, image crop, shapes, and lines.
+- [x] Centered 25–200% zoom, contextual numeric controls, collapsible Notes, and a status/zoom bar
+      are wired through the route-independent editor session.
+- [x] Full Vitest, Node/Web typechecks, zero-warning ESLint, and production build passed after R5.
 
 ## R6 — Professional Media observability and delivery
 
