@@ -2,12 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { Button } from '@heroui/react/button'
 import { ButtonGroup } from '@heroui/react/button-group'
 import { toast } from '@heroui/react/toast'
-import { Home, Monitor, Redo2, Undo2, X } from 'lucide-react'
+import { ChevronsLeft, Home, Monitor, Redo2, Undo2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { usePresentationSafeAction } from '@renderer/components/Control/PresentationNavigationGuard'
 import { usePresentationCloseDecision } from '@renderer/contexts/PresentationCloseDecisionContext'
-import { useProjection } from '@renderer/contexts/ProjectionContext'
 import { usePresentationSessionRegistry } from '@renderer/contexts/PresentationSessionRegistryContext'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
 import { useKeyboardShortcuts } from '@renderer/hooks/useKeyboardShortcuts'
@@ -18,7 +17,7 @@ import {
   isEditablePresentationMimeType,
   isPresentationItem
 } from '@renderer/lib/presentation-media'
-import { startMediaProjection, stopProjectionSession } from '@renderer/lib/projection-actions'
+import { startMediaProjection } from '@renderer/lib/projection-actions'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { usePresentationWorkspaceStore } from '@renderer/stores/presentation-workspace'
 import { isFileItem } from '@shared/types/folder'
@@ -27,7 +26,6 @@ import type { FileItemRecord } from '@shared/types/folder'
 export default function PresentationWorkspaceHeader(): React.JSX.Element {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const { isProjectionOpen, stopProjection } = useProjection()
   const registry = usePresentationSessionRegistry()
   const requestCloseDecision = usePresentationCloseDecision()
   const runPresentationSafeAction = usePresentationSafeAction()
@@ -121,29 +119,7 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
     cancelRename()
   }
 
-  useKeyboardShortcuts(
-    [
-      {
-        id: 'presentation-undo',
-        config: SHORTCUTS.PRESENTATION.UNDO,
-        description: t('presentationWorkspace.undo', 'Undo'),
-        handler: () => {
-          if (activeDocument?.canUndo) activeSession?.undo()
-        }
-      },
-      {
-        id: 'presentation-redo',
-        config: SHORTCUTS.PRESENTATION.REDO,
-        description: t('presentationWorkspace.redo', 'Redo'),
-        handler: () => {
-          if (activeDocument?.canRedo) activeSession?.redo()
-        }
-      }
-    ],
-    { enabled: Boolean(activeSession), sectionKey: 'presentation' }
-  )
-
-  const presentActiveDocument = async (): Promise<void> => {
+  const presentActiveDocument = async (from: 'beginning' | 'current'): Promise<void> => {
     if (!activeDocument) return
 
     const db = await openFileExplorerDB()
@@ -165,6 +141,7 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
       const parsedIndex = Number(activeSlideId.slice('pptx-slide-'.length))
       if (Number.isInteger(parsedIndex) && parsedIndex >= 0) slideIndex = parsedIndex
     }
+    if (from === 'beginning') slideIndex = 0
     await startMediaProjection(
       [item],
       0,
@@ -179,21 +156,52 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
     )
   }
 
-  const handleProjectionAction = async (): Promise<void> => {
-    if (!isProjectionOpen) {
-      await presentActiveDocument().catch(() => {
-        toast.danger(t('presentationWorkspace.saveFailed', 'Unable to save presentation'))
-      })
-      return
-    }
-
-    await stopProjectionSession({ stopProjection }).catch(() => {
-      toast.danger(t('toast.projectionCloseFailed'))
+  const runPresentAction = (from: 'beginning' | 'current'): void => {
+    void presentActiveDocument(from).catch(() => {
+      toast.danger(t('presentationWorkspace.saveFailed', 'Unable to save presentation'))
     })
   }
 
+  useKeyboardShortcuts(
+    [
+      {
+        id: 'presentation-start-beginning',
+        config: SHORTCUTS.PRESENTATION.START_FROM_BEGINNING,
+        description: t('presentationWorkspace.presentFromBeginning', 'Present from Beginning'),
+        handler: () => {
+          runPresentAction('beginning')
+        }
+      },
+      {
+        id: 'presentation-start-current',
+        config: SHORTCUTS.PRESENTATION.START_FROM_CURRENT,
+        description: t('presentationWorkspace.presentFromCurrent', 'Present from Current Slide'),
+        handler: () => {
+          runPresentAction('current')
+        }
+      },
+      {
+        id: 'presentation-undo',
+        config: SHORTCUTS.PRESENTATION.UNDO,
+        description: t('presentationWorkspace.undo', 'Undo'),
+        handler: () => {
+          if (activeDocument?.canUndo) activeSession?.undo()
+        }
+      },
+      {
+        id: 'presentation-redo',
+        config: SHORTCUTS.PRESENTATION.REDO,
+        description: t('presentationWorkspace.redo', 'Redo'),
+        handler: () => {
+          if (activeDocument?.canRedo) activeSession?.redo()
+        }
+      }
+    ],
+    { enabled: Boolean(activeSession), sectionKey: 'presentation' }
+  )
+
   return (
-    <header className="relative flex h-12 shrink-0 items-end gap-1 bg-content1/80 px-3">
+    <header className="relative flex h-11 shrink-0 items-end gap-1 bg-content1/80 px-3">
       <span className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-divider" />
       <Button
         isIconOnly
@@ -316,16 +324,26 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
         </div>
       )}
       <div className="relative z-10 mb-1 ml-auto flex items-center">
-        <ButtonGroup size="lg">
+        <ButtonGroup size="sm">
+          <Button
+            variant="primary"
+            onPress={() => runPresentAction('current')}
+            isDisabled={!activeDocument}
+            aria-label={t('presentationWorkspace.presentFromCurrent', 'Present from Current Slide')}
+          >
+            <Monitor className="size-4" />
+            <span className="hidden xl:inline">
+              {t('presentationWorkspace.presentFromCurrent', 'Present from Current Slide')}
+            </span>
+          </Button>
           <Button
             isIconOnly
             variant="outline"
-            className={isProjectionOpen ? 'text-danger px-6' : 'text-default-foreground px-6'}
-            onPress={() => void handleProjectionAction()}
-            isDisabled={!isProjectionOpen && !activeDocument}
-            aria-label={t(isProjectionOpen ? 'projection.stopButton' : 'projection.startButton')}
+            onPress={() => runPresentAction('beginning')}
+            isDisabled={!activeDocument}
+            aria-label={t('presentationWorkspace.presentFromBeginning', 'Present from Beginning')}
           >
-            {isProjectionOpen ? <X className="size-4" /> : <Monitor className="size-4" />}
+            <ChevronsLeft className="size-4" />
           </Button>
         </ButtonGroup>
       </div>

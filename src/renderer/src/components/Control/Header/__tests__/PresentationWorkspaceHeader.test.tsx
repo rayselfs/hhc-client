@@ -4,7 +4,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import PresentationWorkspaceHeader from '../PresentationWorkspaceHeader'
 import { ShortcutScopeProvider } from '@renderer/contexts/ShortcutScopeContext'
-import { createBlankEditablePresentationDocument } from '@renderer/lib/editable-presentation'
+import {
+  createBlankEditablePresentationDocument,
+  insertBlankEditableSlide
+} from '@renderer/lib/editable-presentation'
 import { EDITABLE_PRESENTATION_MIME_TYPE } from '@renderer/lib/presentation-media'
 import type {
   PresentationEditorSession,
@@ -95,7 +98,8 @@ function makeEditableItem(id = 'deck-1'): FileItemRecord {
 }
 
 function createFakeSession(item: FileItemRecord): PresentationEditorSession {
-  const document = { ...createBlankEditablePresentationDocument('Sunday'), id: item.id }
+  const blank = { ...createBlankEditablePresentationDocument('Sunday'), id: item.id }
+  const document = insertBlankEditableSlide(blank, 1).document
   const snapshot: PresentationSessionSnapshot = {
     history: { past: [], present: document, future: [] },
     save: {
@@ -275,7 +279,7 @@ describe('PresentationWorkspaceHeader', () => {
     vi.mocked(session.flush).mockRejectedValue(new Error('quota exceeded'))
     renderHeader()
 
-    await user.click(screen.getByRole('button', { name: 'projection.startButton' }))
+    await user.click(screen.getByRole('button', { name: 'Present from Current Slide' }))
 
     await waitFor(() => expect(session.flush).toHaveBeenCalledTimes(1))
     expect(session.commitDraft).toHaveBeenCalledTimes(1)
@@ -283,20 +287,56 @@ describe('PresentationWorkspaceHeader', () => {
     expect(useMediaProjectionStore.getState().isPresenting).toBe(false)
   })
 
-  it('starts projection with the flushed editable slide state in one store transition', async () => {
+  it('presents from the current slide or beginning through distinct actions', async () => {
     const user = userEvent.setup()
+    const deckDocument = session.getSnapshot().history.present
+    usePresentationWorkspaceStore.getState().setActiveSlideId(item.id, deckDocument.slideOrder[1])
     renderHeader()
 
-    await user.click(screen.getByRole('button', { name: 'projection.startButton' }))
+    await user.click(screen.getByRole('button', { name: 'Present from Current Slide' }))
 
     await waitFor(() => {
       expect(mocks.startMediaProjection).toHaveBeenCalledWith([item], 0, expect.any(Object), {
         prioritizeStartItem: true,
-        presentationState: { slideIndex: 0, slideCount: 1 }
+        presentationState: { slideIndex: 1, slideCount: 2 }
       })
     })
-    expect(session.commitDraft).toHaveBeenCalledTimes(1)
-    expect(session.flush).toHaveBeenCalledTimes(1)
+    mocks.startMediaProjection.mockClear()
+
+    await user.click(screen.getByRole('button', { name: 'Present from Beginning' }))
+
+    await waitFor(() => {
+      expect(mocks.startMediaProjection).toHaveBeenCalledWith([item], 0, expect.any(Object), {
+        prioritizeStartItem: true,
+        presentationState: { slideIndex: 0, slideCount: 2 }
+      })
+    })
+    expect(session.commitDraft).toHaveBeenCalledTimes(2)
+    expect(session.flush).toHaveBeenCalledTimes(2)
+  })
+
+  it('uses F5 for beginning and Shift+F5 for the current slide', async () => {
+    const deckDocument = session.getSnapshot().history.present
+    usePresentationWorkspaceStore.getState().setActiveSlideId(item.id, deckDocument.slideOrder[1])
+    renderHeader()
+
+    fireEvent.keyDown(document, { code: 'F5', key: 'F5' })
+    await waitFor(() => expect(mocks.startMediaProjection).toHaveBeenCalledTimes(1))
+    expect(mocks.startMediaProjection).toHaveBeenLastCalledWith(
+      [item],
+      0,
+      expect.any(Object),
+      expect.objectContaining({ presentationState: { slideIndex: 0, slideCount: 2 } })
+    )
+
+    fireEvent.keyDown(document, { code: 'F5', key: 'F5', shiftKey: true })
+    await waitFor(() => expect(mocks.startMediaProjection).toHaveBeenCalledTimes(2))
+    expect(mocks.startMediaProjection).toHaveBeenLastCalledWith(
+      [item],
+      0,
+      expect.any(Object),
+      expect.objectContaining({ presentationState: { slideIndex: 1, slideCount: 2 } })
+    )
   })
 
   it('keeps native text Undo while presentation shortcuts target the session', () => {

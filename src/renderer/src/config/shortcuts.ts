@@ -5,6 +5,8 @@ export const SHORTCUTS = {
     START: { code: 'F5', mac: { code: 'Enter', meta: true, shift: true } }
   },
   PRESENTATION: {
+    START_FROM_BEGINNING: { code: 'F5' },
+    START_FROM_CURRENT: { code: 'F5', shift: true, mac: { code: 'Enter', meta: true } },
     UNDO: { code: 'KeyZ', metaOrCtrl: true },
     REDO: {
       code: 'KeyY',
