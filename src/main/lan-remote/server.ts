@@ -102,9 +102,7 @@ export function createLanRemoteServer(
         throw new Error('LAN remote requires a private LAN interface')
       }
 
-      host = startOptions.host
-      port = startOptions.port
-      server = createServer((req, res) => {
+      const nextServer = createServer((req, res) => {
         if (req.method === 'GET' && req.url === '/') {
           res.setHeader('content-type', 'text/html; charset=utf-8')
           res.end(getLanRemoteMobileHtml())
@@ -160,11 +158,22 @@ export function createLanRemoteServer(
         res.end('Not found')
       })
 
-      await new Promise<void>((resolve) => server?.listen(port, resolve))
-      const address = server.address()
+      await new Promise<void>((resolve, reject) => {
+        const onError = (error: Error): void => reject(error)
+        nextServer.once('error', onError)
+        nextServer.listen(startOptions.port, startOptions.host, () => {
+          nextServer.off('error', onError)
+          resolve()
+        })
+      })
+
+      const address = nextServer.address()
+      host = startOptions.host
+      port = startOptions.port
       if (typeof address === 'object' && address) {
         port = address.port
       }
+      server = nextServer
     },
 
     async stop(): Promise<void> {
@@ -184,6 +193,7 @@ export function createLanRemoteServer(
       url: string
       expiresAt: number
     } {
+      if (!server) throw new Error('LAN remote is not running')
       const secret = randomBytes(32).toString('base64url')
       const expiresAt = Date.now() + 2 * 60 * 1000
       pairings.set(secret, { secret, deviceName, expiresAt })

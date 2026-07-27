@@ -1,5 +1,18 @@
+import { networkInterfaces } from 'node:os'
 import { expect, it, vi } from 'vitest'
+import { isPrivateLanAddress } from '../../../shared/lan-remote'
 import { createLanRemoteServer } from '../server'
+
+function getPrivateHost(): string {
+  for (const addresses of Object.values(networkInterfaces())) {
+    for (const address of addresses ?? []) {
+      if (address.family === 'IPv4' && !address.internal && isPrivateLanAddress(address.address)) {
+        return address.address
+      }
+    }
+  }
+  throw new Error('LAN remote tests require an assigned private IPv4 address')
+}
 
 it('starts disabled and creates one-use pairing secrets', async () => {
   const server = createLanRemoteServer({
@@ -7,8 +20,9 @@ it('starts disabled and creates one-use pairing secrets', async () => {
   })
 
   expect(server.getStatus().enabled).toBe(false)
+  expect(() => server.createPairingSecret('Device')).toThrow('not running')
 
-  await server.start({ host: '192.168.1.10', port: 0 })
+  await server.start({ host: getPrivateHost(), port: 0 })
   const pairing = server.createPairingSecret('Device')
 
   expect(server.getStatus().enabled).toBe(true)
@@ -26,20 +40,23 @@ it('pairs a browser session and accepts authorized commands', async () => {
     status: 'accepted' as const
   }))
   const server = createLanRemoteServer({ commandHandler })
+  const host = getPrivateHost()
 
-  await server.start({ host: '192.168.1.10', port: 0 })
+  await server.start({ host, port: 0 })
   const { port } = server.getStatus()
   const pairing = server.createPairingSecret('Phone')
-  const pairResponse = await fetch(`http://127.0.0.1:${port}/pair/${pairing.secret}`)
+  await expect(fetch(`http://127.0.0.1:${port}/`)).rejects.toThrow()
+
+  const pairResponse = await fetch(`http://${host}:${port}/pair/${pairing.secret}`)
   const html = await pairResponse.text()
   const token = html.match(/const sessionToken = "([^"]+)"/)?.[1]
 
   expect(token).toBeTruthy()
 
-  const unauthorized = await fetch(`http://127.0.0.1:${port}/state`)
+  const unauthorized = await fetch(`http://${host}:${port}/state`)
   expect(unauthorized.status).toBe(401)
 
-  const commandResponse = await fetch(`http://127.0.0.1:${port}/command`, {
+  const commandResponse = await fetch(`http://${host}:${port}/command`, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
@@ -57,7 +74,7 @@ it('pairs a browser session and accepts authorized commands', async () => {
     presentation: { currentIndex: 0, total: 1, currentName: 'A', canNext: false },
     projection: { isOpen: true }
   })
-  const stateResponse = await fetch(`http://127.0.0.1:${port}/state`, {
+  const stateResponse = await fetch(`http://${host}:${port}/state`, {
     headers: { 'x-libre-presenter-session': token! }
   })
   await expect(stateResponse.json()).resolves.toMatchObject({
