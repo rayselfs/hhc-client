@@ -27,10 +27,7 @@ export default function BackgroundTaskTray(): React.JSX.Element | null {
   const { jobs } = useMediaJobs()
   const [isOpen, setIsOpen] = useState(false)
   const items = useFileExplorerStore((state) => state.items)
-  const visibleJobs = useMemo(
-    () => jobs.filter((job) => job.status !== 'cancelled').slice(0, 30),
-    [jobs]
-  )
+  const visibleJobs = useMemo(() => jobs.slice(0, 30), [jobs])
   const activeCount = visibleJobs.filter((job) => ACTIVE_STATUSES.has(job.status)).length
   const issueCount = visibleJobs.filter((job) => ISSUE_STATUSES.has(job.status)).length
 
