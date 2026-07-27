@@ -41,7 +41,6 @@ export interface LanRemoteServerController {
   }
   consumePairingSecret(secret: string): LanRemotePairingRecord | null
   publishState(snapshot: unknown): void
-  publishAck(ack: LanRemoteAck): void
   getStatus(): LanRemoteServerStatus
 }
 
@@ -206,10 +205,6 @@ export function createLanRemoteServer(
 
     publishState(snapshot: unknown): void {
       latestSnapshot = sanitizeLanRemoteSnapshot(snapshot)
-    },
-
-    publishAck(ack: LanRemoteAck): void {
-      latestAck = ack
     },
 
     getStatus(): LanRemoteServerStatus {

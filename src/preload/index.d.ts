@@ -166,7 +166,6 @@ interface LanRemoteAPI {
   publishState: (snapshot: LanRemoteSnapshot) => Promise<void>
   publishAck: (ack: LanRemoteAck) => Promise<void>
   onCommand: (callback: (command: LanRemoteCommand) => void) => () => void
-  onAck: (callback: (ack: LanRemoteAck) => void) => () => void
 }
 
 declare global {

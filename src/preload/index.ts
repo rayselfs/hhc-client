@@ -183,9 +183,7 @@ const lanRemoteApi = {
   publishAck: (ack: IpcInvokeMap['lan-remote:publish-ack']['args'][0]) =>
     typedInvoke('lan-remote:publish-ack', ack),
   onCommand: (callback: (command: IpcMainToRendererMap['lan-remote:command'][0]) => void) =>
-    typedOn('lan-remote:command', callback),
-  onAck: (callback: (ack: IpcMainToRendererMap['lan-remote:ack'][0]) => void) =>
-    typedOn('lan-remote:ack', callback)
+    typedOn('lan-remote:command', callback)
 }
 
 const api = {

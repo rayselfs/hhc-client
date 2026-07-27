@@ -312,7 +312,6 @@ export interface IpcMainToRendererMap {
   'app:close-requested': []
   'onedrive:download-progress': [OneDriveNativeDownloadProgress]
   'lan-remote:command': [LanRemoteCommand]
-  'lan-remote:ack': [LanRemoteAck]
 }
 
 export type IpcMainToRendererChannel = keyof IpcMainToRendererMap
