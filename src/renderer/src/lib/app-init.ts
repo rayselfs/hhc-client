@@ -12,6 +12,7 @@ import { recoverPendingSyncResourceCleanups } from '@renderer/lib/sync-unlink'
 import { startSyncRuntime } from '@renderer/lib/sync-runtime'
 import { backfillImportedMediaAssets } from '@renderer/lib/local-sync-import'
 import { retryPendingResourceCleanups } from '@renderer/lib/resource-cleanup-journal'
+import { deleteDerivedAssetsByKind } from '@renderer/lib/media-work-db'
 
 let earlyInitStarted = false
 let subscriptionsInitialized = false
@@ -38,6 +39,7 @@ export function startEarlyInit(): void {
   void mediaJobQueue
     .recoverStaleJobs()
     .then(() => mediaJobQueue.removeExpiredHistory())
+    .then(() => deleteDerivedAssetsByKind('editable-presentation-document'))
     .then(() => backfillImportedMediaAssets())
     .catch(() => undefined)
 }

@@ -1,38 +1,34 @@
 import type { FileItemRecord } from '@shared/types/folder'
 import { openFileExplorerDB, type FileExplorerDBSchema } from './file-explorer-db'
-import { deleteDerivedAssetsForSource, putDerivedAsset } from './media-work-db'
 import {
   publishPersistedFileItem,
   removeCleanedEntriesFromStore
 } from '@renderer/stores/file-explorer'
 import { createResourceCleanupRecord } from './resource-cleanup-journal'
 import { deleteThumbnail, saveThumbnail } from './thumbnail-db'
+import { deleteDerivedAssetsForSource } from './media-work-db'
 import type { IDBPDatabase } from 'idb'
 
 export interface EditablePresentationCreationInput {
   item: FileItemRecord
   blob: Blob
-  documentBody: string
-  documentVariant: string
   thumbnail: string
 }
 
 interface EditablePresentationCreationDependencies {
   openFileExplorerDB: () => Promise<IDBPDatabase<FileExplorerDBSchema>>
-  putDerivedAsset: typeof putDerivedAsset
   saveThumbnail: typeof saveThumbnail
-  deleteDerivedAssetsForSource: typeof deleteDerivedAssetsForSource
   deleteThumbnail: typeof deleteThumbnail
+  deleteDerivedAssetsForSource: typeof deleteDerivedAssetsForSource
   publishItem: typeof publishPersistedFileItem
   removeItem: (itemId: string) => void
 }
 
 const defaultDependencies: EditablePresentationCreationDependencies = {
   openFileExplorerDB,
-  putDerivedAsset,
   saveThumbnail,
-  deleteDerivedAssetsForSource,
   deleteThumbnail,
+  deleteDerivedAssetsForSource,
   publishItem: publishPersistedFileItem,
   removeItem: (itemId) => {
     removeCleanedEntriesFromStore({ folderIds: [], itemIds: [itemId] })
@@ -61,19 +57,6 @@ export async function persistEditablePresentationCreation(
     await tx.done
     catalogCommitted = true
 
-    await dependencies.putDerivedAsset({
-      sourceBlobId: input.item.id,
-      kind: 'editable-presentation-document',
-      variant: input.documentVariant,
-      storage: 'indexed-db',
-      mimeType: input.item.mimeType,
-      size: input.blob.size,
-      status: 'ready',
-      blob: input.blob,
-      metadata: {
-        presentationDocumentJson: input.documentBody
-      }
-    })
     await dependencies.saveThumbnail(input.item.id, input.thumbnail)
     dependencies.publishItem(input.item)
   } catch (error) {

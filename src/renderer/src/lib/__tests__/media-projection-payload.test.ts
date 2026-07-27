@@ -108,6 +108,12 @@ describe('buildFileProjectionPayload', () => {
       mimeType: 'image/png',
       dataUrl: 'data:image/png;base64,AAA='
     }
+    const unusedAsset = {
+      id: 'asset-unused',
+      name: 'unused.png',
+      mimeType: 'image/png',
+      dataUrl: 'data:image/png;base64,BBB='
+    }
     const image = createImageElement({
       assetId: asset.id,
       slideWidth: document.width,
@@ -116,7 +122,11 @@ describe('buildFileProjectionPayload', () => {
       sourceHeight: 400
     })
     const savedDocument = addElementToSlide(
-      addElementToSlide({ ...document, assets: { [asset.id]: asset } }, slideId, text),
+      addElementToSlide(
+        { ...document, assets: { [asset.id]: asset, [unusedAsset.id]: unusedAsset } },
+        slideId,
+        text
+      ),
       slideId,
       image
     )
@@ -140,6 +150,7 @@ describe('buildFileProjectionPayload', () => {
       assets: { [asset.id]: asset }
     })
     expect(payload?.presentation).toEqual({ slideIndex: 0, slideCount: 1 })
+    expect(payload?.editablePresentation?.assets).not.toHaveProperty(unusedAsset.id)
   })
 
   it('keeps the active editable slide by ID after an earlier insertion', () => {

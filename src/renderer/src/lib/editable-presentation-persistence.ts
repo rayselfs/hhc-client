@@ -1,12 +1,7 @@
 import type { IDBPDatabase } from 'idb'
 import type { EditablePresentationDocument } from './editable-presentation'
-import {
-  EDITABLE_PRESENTATION_DOCUMENT_KIND,
-  generateEditablePresentationThumbnail,
-  getEditablePresentationDocumentVariant
-} from './editable-presentation'
+import { generateEditablePresentationThumbnail } from './editable-presentation'
 import { openFileExplorerDB, type FileExplorerDBSchema } from './file-explorer-db'
-import { putDerivedAsset } from './media-work-db'
 import { EDITABLE_PRESENTATION_MIME_TYPE } from './presentation-media'
 import { saveThumbnail } from './thumbnail-db'
 import { isFileItem } from '@shared/types/folder'
@@ -26,34 +21,10 @@ export interface EditablePresentationRevisionResult {
 
 interface EditablePresentationPersistenceDependencies {
   openFileExplorerDB: () => Promise<IDBPDatabase<FileExplorerDBSchema>>
-  putDerivedAsset: typeof putDerivedAsset
 }
 
 const defaultDependencies: EditablePresentationPersistenceDependencies = {
-  openFileExplorerDB,
-  putDerivedAsset
-}
-
-async function putEditableDocumentMirror(
-  write: EditablePresentationRevisionWrite,
-  body: string,
-  blob: Blob,
-  putAsset: typeof putDerivedAsset
-): Promise<void> {
-  await putAsset({
-    sourceBlobId: write.sourceBlobId,
-    kind: EDITABLE_PRESENTATION_DOCUMENT_KIND,
-    variant: getEditablePresentationDocumentVariant(write.itemId),
-    storage: 'indexed-db',
-    mimeType: EDITABLE_PRESENTATION_MIME_TYPE,
-    size: blob.size,
-    status: 'ready',
-    blob,
-    metadata: {
-      presentationDocumentJson: body,
-      presentationRevision: write.revision
-    }
-  })
+  openFileExplorerDB
 }
 
 export async function persistEditablePresentationRevision(
@@ -97,12 +68,7 @@ export async function persistEditablePresentationRevision(
   ])
   await tx.done
 
-  try {
-    await putEditableDocumentMirror(write, body, blob, dependencies.putDerivedAsset)
-    return { revision: write.revision, mirrorWarnings: [] }
-  } catch {
-    return { revision: write.revision, mirrorWarnings: ['derived-document'] }
-  }
+  return { revision: write.revision, mirrorWarnings: [] }
 }
 
 export async function refreshEditablePresentationThumbnail(

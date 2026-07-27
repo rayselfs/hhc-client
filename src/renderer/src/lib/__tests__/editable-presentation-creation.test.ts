@@ -26,8 +26,6 @@ const item: FileItemRecord = {
 const input: EditablePresentationCreationInput = {
   item,
   blob: new Blob([body], { type: item.mimeType }),
-  documentBody: body,
-  documentVariant: 'document:deck-1',
   thumbnail: 'data:image/svg+xml;base64,PHN2Zy8+'
 }
 
@@ -44,7 +42,7 @@ beforeEach(async () => {
 })
 
 describe('persistEditablePresentationCreation', () => {
-  it('persists the same canonical body before publishing the item', async () => {
+  it('persists one canonical body before publishing the item', async () => {
     await persistEditablePresentationCreation(input)
 
     const db = await openFileExplorerDB()
@@ -52,21 +50,16 @@ describe('persistEditablePresentationCreation', () => {
     const mirror = await getDerivedAsset(
       item.id,
       'editable-presentation-document',
-      input.documentVariant
+      'document:deck-1'
     )
 
     expect(source).toMatchObject({ id: item.id, size: input.blob.size, refCount: 1 })
-    expect(mirror?.metadata?.presentationDocumentJson).toBe(body)
-    expect(mirror?.size).toBe(input.blob.size)
+    expect(mirror).toBeUndefined()
     expect(useFileExplorerStore.getState().items[item.id]).toEqual(item)
   })
 
   it.each([
     ['catalog', { openFileExplorerDB: vi.fn(async () => Promise.reject(new Error('catalog'))) }],
-    [
-      'derived document',
-      { putDerivedAsset: vi.fn(async () => Promise.reject(new Error('derived'))) }
-    ],
     ['thumbnail', { saveThumbnail: vi.fn(async () => Promise.reject(new Error('thumbnail'))) }],
     [
       'publication',

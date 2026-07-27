@@ -104,10 +104,7 @@ describe('persistEditablePresentationRevision', () => {
     expect(source).toMatchObject({ revision: 4, refCount: 1 })
     expect(JSON.parse(await readBlobText(source?.blob))).toMatchObject({ name: 'Renamed' })
     expect(catalog).toMatchObject({ name: 'Renamed', size: source?.blob?.size })
-    expect(mirror?.metadata).toMatchObject({
-      presentationRevision: 4,
-      presentationDocumentJson: expect.stringContaining('"name":"Renamed"')
-    })
+    expect(mirror).toBeUndefined()
   })
 
   it('does not update the catalog when the source authority is missing', async () => {
@@ -144,17 +141,18 @@ describe('persistEditablePresentationRevision', () => {
     expect(JSON.parse(await readBlobText(unchanged?.blob))).toMatchObject({ name: 'Original' })
   })
 
-  it('reports a derived-document warning after authority commits', async () => {
+  it('does not create a duplicate derived document after authority commits', async () => {
     await seedAuthority()
 
-    const result = await persistEditablePresentationRevision(createWrite(), {
-      putDerivedAsset: vi.fn().mockRejectedValue(new Error('derived unavailable'))
-    })
+    const result = await persistEditablePresentationRevision(createWrite())
 
     const db = await openFileExplorerDB()
     await expect(db.get('file-blobs', 'deck-source')).resolves.toMatchObject({ revision: 4 })
     await expect(db.get('folder-items', item.id)).resolves.toMatchObject({ name: 'Renamed' })
-    expect(result).toEqual({ revision: 4, mirrorWarnings: ['derived-document'] })
+    await expect(
+      getDerivedAsset('deck-source', 'editable-presentation-document', `document:${item.id}`)
+    ).resolves.toBeUndefined()
+    expect(result).toEqual({ revision: 4, mirrorWarnings: [] })
   })
 })
 

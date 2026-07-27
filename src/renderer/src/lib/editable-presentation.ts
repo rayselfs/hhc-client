@@ -1,6 +1,5 @@
 import { getBlobId } from './blob-identity'
 import { openFileExplorerDB } from './file-explorer-db'
-import { getDerivedAsset, putDerivedAsset } from './media-work-db'
 import { EDITABLE_PRESENTATION_MIME_TYPE } from './presentation-media'
 import { readPresentationArrayBuffer } from './presentation-source'
 import { persistEditablePresentationCreation } from './editable-presentation-creation'
@@ -324,10 +323,6 @@ export function getSlideBackgroundCss(background: EditableSlideBackground): stri
     )
     .join(', ')
   return `linear-gradient(${modern.angle}deg, ${stops})`
-}
-
-export function getEditablePresentationDocumentVariant(itemId: string): string {
-  return `document:${itemId}`
 }
 
 export function createBlankEditablePresentationDocument(
@@ -843,7 +838,6 @@ async function createEditablePresentationItem(
   parentId: string
 ): Promise<FileItemRecord> {
   const itemId = document.id
-  const documentBody = JSON.stringify(document)
   const blob = createDocumentBlob(document)
   const db = await openFileExplorerDB()
   const siblings = (await db.getAllFromIndex('folder-items', 'by-parent', parentId)).filter(
@@ -865,8 +859,6 @@ async function createEditablePresentationItem(
   await persistEditablePresentationCreation({
     item,
     blob,
-    documentBody,
-    documentVariant: getEditablePresentationDocumentVariant(itemId),
     thumbnail: generateEditablePresentationThumbnail(document)
   })
   return item
@@ -1384,46 +1376,29 @@ export async function loadEditablePresentation(
   if (!record?.blob) {
     throw new Error(`Editable presentation source is missing: ${source.id}`)
   }
+  const cacheKey = `${blobId}:${record.revision ?? `size-${record.blob.size}`}`
+  const cached = editableDocumentCache.get(cacheKey)
+  if (cached) {
+    editableDocumentCache.delete(cacheKey)
+    editableDocumentCache.set(cacheKey, cached)
+    return cached
+  }
   const body = await readBlobText(record.blob)
   const document = parseEditablePresentation(body)
-  const asset = await getDerivedAsset(
-    blobId,
-    EDITABLE_PRESENTATION_DOCUMENT_KIND,
-    getEditablePresentationDocumentVariant(source.id)
-  )
-  const metadata = asset?.metadata
-  if (
-    metadata?.presentationRevision !== record.revision ||
-    metadata?.presentationDocumentJson !== body
-  ) {
-    void repairEditableDocumentMirror(source.id, blobId, body, record.blob, record.revision).catch(
-      () => undefined
-    )
+  editableDocumentCache.set(cacheKey, document)
+  while (editableDocumentCache.size > EDITABLE_DOCUMENT_CACHE_LIMIT) {
+    const oldestKey = editableDocumentCache.keys().next().value
+    if (!oldestKey) break
+    editableDocumentCache.delete(oldestKey)
   }
   return document
 }
 
-async function repairEditableDocumentMirror(
-  itemId: string,
-  sourceBlobId: string,
-  body: string,
-  blob: Blob,
-  revision: number | undefined
-): Promise<void> {
-  await putDerivedAsset({
-    sourceBlobId,
-    kind: EDITABLE_PRESENTATION_DOCUMENT_KIND,
-    variant: getEditablePresentationDocumentVariant(itemId),
-    storage: 'indexed-db',
-    mimeType: EDITABLE_PRESENTATION_MIME_TYPE,
-    size: blob.size,
-    status: 'ready',
-    blob,
-    metadata: {
-      presentationDocumentJson: body,
-      presentationRevision: revision
-    }
-  })
+const EDITABLE_DOCUMENT_CACHE_LIMIT = 12
+const editableDocumentCache = new Map<string, EditablePresentationDocument>()
+
+export function clearEditablePresentationCache(): void {
+  editableDocumentCache.clear()
 }
 
 export function generateEditablePresentationThumbnail(
