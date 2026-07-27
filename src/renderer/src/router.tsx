@@ -10,6 +10,7 @@ const BiblePage = lazy(() => import('@renderer/pages/BiblePage'))
 const ServicePage = lazy(() => import('@renderer/pages/ServicePage'))
 const SoundboardPage = lazy(() => import('@renderer/pages/SoundboardPage'))
 const FilesPage = lazy(() => import('@renderer/pages/FilesPage'))
+const MediaWorkspacePage = lazy(() => import('@renderer/pages/MediaWorkspacePage'))
 const PresentationWorkspacePage = lazy(() => import('@renderer/pages/PresentationWorkspacePage'))
 const FavoritesPage = lazy(() => import('@renderer/pages/FavoritesPage'))
 const TrashPage = lazy(() => import('@renderer/pages/TrashPage'))
@@ -72,6 +73,15 @@ const routes = [
         element: (
           <Suspense fallback={null}>
             <FilesPage />
+          </Suspense>
+        ),
+        ErrorBoundary: RouteError
+      },
+      {
+        path: 'media',
+        element: (
+          <Suspense fallback={null}>
+            <MediaWorkspacePage />
           </Suspense>
         ),
         ErrorBoundary: RouteError

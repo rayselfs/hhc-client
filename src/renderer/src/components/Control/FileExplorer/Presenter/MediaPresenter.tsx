@@ -20,7 +20,11 @@ import GlassDivider from '@renderer/components/Common/GlassDivider'
 import { usePreviewCache } from '@renderer/hooks/usePreviewCache'
 import { useThumbnails } from '@renderer/hooks/useThumbnails'
 
-export default function MediaPresenter(): React.JSX.Element {
+interface MediaPresenterProps {
+  onExit: () => void
+}
+
+export default function MediaPresenter({ onExit }: MediaPresenterProps): React.JSX.Element {
   const { project } = useProjection()
 
   const playlist = useMediaProjectionStore((s) => s.playlist)
@@ -31,7 +35,7 @@ export default function MediaPresenter(): React.JSX.Element {
   const isEnded = useMediaProjectionStore((s) => s.isEnded)
   const currentItem = useMediaProjectionStore((s) => s.currentItem())
 
-  const { exit, next, prev, jumpTo, toggleGrid, setZoomLevel, resetZoom } =
+  const { next, prev, jumpTo, toggleGrid, setZoomLevel, resetZoom } =
     useMediaProjectionStore.getState()
 
   const descriptor = currentItem ? getDescriptor(currentItem.mimeType) : null
@@ -94,7 +98,7 @@ export default function MediaPresenter(): React.JSX.Element {
           } else if (zoomLevel > 1) {
             resetZoom()
           } else {
-            exit()
+            onExit()
           }
         }
       },
@@ -187,13 +191,10 @@ export default function MediaPresenter(): React.JSX.Element {
   return (
     <PresenterCommandContext.Provider value={{ sendCommand }}>
       <PreviewCacheProvider pdfPageThumbs={pdfPageThumbs}>
-        <div
-          className="media-presenter fixed inset-0 z-9999 bg-surface"
-          data-testid="media-presenter"
-        >
+        <div className="media-presenter h-full min-h-0 bg-surface" data-testid="media-presenter">
           <div className="flex h-full">
             <div className="flex-3 lg:flex-2 min-w-0 flex flex-col h-full">
-              <PresenterHeader onExit={exit} />
+              <PresenterHeader onExit={onExit} />
               <MediaPreview currentItem={currentItem} descriptor={descriptor} isEnded={isEnded} />
               <MediaToolbar onToggleGrid={toggleGridWithMediaPause} />
               <div className="flex-1" />

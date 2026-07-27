@@ -11,7 +11,6 @@ import FloatingTimer from '@renderer/components/Control/Timer/FloatingTimer'
 import ConfirmDialog from '@renderer/components/Common/ConfirmDialog'
 import TimerProjectionBridge from '@renderer/components/Control/Bridge/TimerProjectionBridge'
 import MediaProjectionBridge from '@renderer/components/Control/Bridge/MediaProjectionBridge'
-import MediaPresenter from '@renderer/components/Control/FileExplorer/Presenter/MediaPresenter'
 import { ProjectionProvider } from '@renderer/contexts/ProjectionContext'
 import { TimerEngineProvider } from '@renderer/contexts/TimerEngineContext'
 import { ContextMenuProvider } from '@renderer/contexts/ContextMenuContext'
@@ -25,14 +24,13 @@ import { AppInitContext } from '@renderer/contexts/AppInitContext'
 import { initializeApp } from '@renderer/lib/app-init'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { useBibleFolderStore } from '@renderer/stores/folder'
-import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 import { useAutoUpdateCheck } from '@renderer/hooks/useAutoUpdateCheck'
 
 export default function Layout(): React.JSX.Element {
   const [initialized, setInitialized] = useState(false)
-  const isPresentingMedia = useMediaProjectionStore((state) => state.isPresenting)
   const location = useLocation()
   const isPresentationWorkspace = location.pathname.startsWith('/presentations')
+  const isMediaWorkspace = location.pathname === '/media'
   useAutoUpdateCheck()
 
   useEffect(() => {
@@ -76,10 +74,14 @@ export default function Layout(): React.JSX.Element {
                     <div className="flex h-screen overflow-hidden bg-background text-foreground">
                       <Sidebar />
                       <div className="flex flex-1 flex-col min-h-0">
-                        {isPresentationWorkspace ? <PresentationWorkspaceHeader /> : <Header />}
+                        {isPresentationWorkspace ? (
+                          <PresentationWorkspaceHeader />
+                        ) : isMediaWorkspace ? null : (
+                          <Header />
+                        )}
                         <main
                           className={
-                            isPresentationWorkspace
+                            isPresentationWorkspace || isMediaWorkspace
                               ? 'flex-1 overflow-hidden'
                               : 'flex-1 overflow-y-auto py-4 px-3'
                           }
@@ -88,7 +90,6 @@ export default function Layout(): React.JSX.Element {
                         </main>
                       </div>
                       <FloatingTimer />
-                      {isPresentingMedia && <MediaPresenter />}
                     </div>
                     <ConfirmDialog />
                     <PresentationCloseDecisionDialog />

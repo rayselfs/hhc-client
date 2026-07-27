@@ -24,6 +24,10 @@ vi.mock('@renderer/pages/SoundboardPage', () => ({
   default: () => <div data-testid="soundboard-page" />
 }))
 
+vi.mock('@renderer/pages/MediaWorkspacePage', () => ({
+  default: () => <div data-testid="media-presenter" />
+}))
+
 vi.mock('@renderer/lib/timer-adapter', () => ({
   createTimerAdapter: vi.fn(() => ({
     onTick: vi.fn(),
@@ -41,11 +45,26 @@ vi.mock('@renderer/contexts/ProjectionContext', async (importOriginal) => {
     useProjection: vi.fn().mockReturnValue({
       isProjectionOpen: false,
       isProjectionBlanked: true,
+      projectionReadyCount: 0,
+      activeOwner: 'timer',
       recovery: { status: 'closed', generation: 0, failure: null },
+      sessionSummary: {
+        owner: null,
+        status: 'closed',
+        label: null,
+        isBlackout: false,
+        failure: null
+      },
+      claimProjection: vi.fn(),
+      startProjection: vi.fn(() => Promise.resolve({ ok: true, generation: 1 })),
+      stopProjection: vi.fn(() => Promise.resolve()),
       openProjection: vi.fn(),
       retryProjection: vi.fn(),
+      bringProjectionToFront: vi.fn(),
       closeProjection: vi.fn(),
       blankProjection: vi.fn(),
+      blackoutProjection: vi.fn(),
+      getProjectionSnapshot: vi.fn(() => null),
       project: vi.fn(),
       send: vi.fn(),
       on: vi.fn()
@@ -96,6 +115,12 @@ describe('Router', () => {
   it('renders soundboard page at /soundboard route', async () => {
     renderWithRouter(['/soundboard'])
     expect(await screen.findByTestId('soundboard-page')).toBeInTheDocument()
+  })
+
+  it('renders the routed Media workspace at /media', async () => {
+    renderWithRouter(['/media'])
+
+    expect(await screen.findByTestId('media-presenter')).toBeInTheDocument()
   })
 
   it('navigates from timer to bible via sidebar link', async () => {

@@ -9,6 +9,7 @@ const {
   mockNext,
   mockPrev,
   mockExit,
+  mockEndSession,
   mockResetZoom,
   mockToggleGrid,
   mockSend,
@@ -37,6 +38,7 @@ const {
     mockNext: vi.fn(),
     mockPrev: vi.fn(),
     mockExit: vi.fn(),
+    mockEndSession: vi.fn(),
     mockResetZoom: vi.fn(),
     mockToggleGrid: vi.fn(),
     mockSend: vi.fn(),
@@ -101,7 +103,7 @@ vi.mock('@renderer/stores/media-projection', () => ({
         ...storeState,
         next: mockNext,
         prev: mockPrev,
-        exit: mockExit,
+        exit: mockEndSession,
         resetZoom: mockResetZoom,
         toggleGrid: mockToggleGrid
       })
@@ -174,7 +176,7 @@ beforeEach(() => {
 
 describe('MediaPresenter video keyboard behavior', () => {
   it('does not stop live output when the workspace unmounts', () => {
-    const { unmount } = render(<MediaPresenter />)
+    const { unmount } = render(<MediaPresenter onExit={mockExit} />)
 
     unmount()
 
@@ -182,7 +184,7 @@ describe('MediaPresenter video keyboard behavior', () => {
   })
 
   it('uses item navigation before video playback starts', () => {
-    render(<MediaPresenter />)
+    render(<MediaPresenter onExit={mockExit} />)
 
     findShortcut('ArrowRight').handler(new KeyboardEvent('keydown', { code: 'ArrowRight' }))
     findShortcut('ArrowLeft').handler(new KeyboardEvent('keydown', { code: 'ArrowLeft' }))
@@ -194,7 +196,7 @@ describe('MediaPresenter video keyboard behavior', () => {
   it('uses item navigation for single left and right even while video is playing', () => {
     storeState.typeStates.video = { hasStarted: true, isPlaying: true, isEnded: false }
     const dispatchSpy = vi.spyOn(window, 'dispatchEvent')
-    render(<MediaPresenter />)
+    render(<MediaPresenter onExit={mockExit} />)
 
     findShortcut('ArrowRight').handler(new KeyboardEvent('keydown', { code: 'ArrowRight' }))
     findShortcut('ArrowLeft').handler(new KeyboardEvent('keydown', { code: 'ArrowLeft' }))
@@ -210,7 +212,7 @@ describe('MediaPresenter video keyboard behavior', () => {
   it('seeks video with modifier left and right after playback starts', () => {
     storeState.typeStates.video = { hasStarted: true, isPlaying: true, isEnded: false }
     const dispatchSpy = vi.spyOn(window, 'dispatchEvent')
-    render(<MediaPresenter />)
+    render(<MediaPresenter onExit={mockExit} />)
 
     findShortcutByConfig({ code: 'ArrowRight', metaOrCtrl: true }).handler(
       new KeyboardEvent('keydown', { code: 'ArrowRight', metaKey: true })
@@ -235,7 +237,7 @@ describe('MediaPresenter video keyboard behavior', () => {
 
   it('ignores modifier video seek before playback starts', () => {
     const dispatchSpy = vi.spyOn(window, 'dispatchEvent')
-    render(<MediaPresenter />)
+    render(<MediaPresenter onExit={mockExit} />)
 
     findShortcutByConfig({ code: 'ArrowRight', metaOrCtrl: true }).handler(
       new KeyboardEvent('keydown', { code: 'ArrowRight', metaKey: true })
@@ -250,7 +252,7 @@ describe('MediaPresenter video keyboard behavior', () => {
   it('uses item navigation after video playback has ended', () => {
     storeState.typeStates.video = { hasStarted: true, isPlaying: false, isEnded: true }
     const dispatchSpy = vi.spyOn(window, 'dispatchEvent')
-    render(<MediaPresenter />)
+    render(<MediaPresenter onExit={mockExit} />)
 
     findShortcut('ArrowRight').handler(new KeyboardEvent('keydown', { code: 'ArrowRight' }))
     findShortcut('ArrowLeft').handler(new KeyboardEvent('keydown', { code: 'ArrowLeft' }))
@@ -266,7 +268,7 @@ describe('MediaPresenter video keyboard behavior', () => {
   it('pauses the video on Escape only when video is playing', () => {
     storeState.typeStates.video = { hasStarted: true, isPlaying: true, isEnded: false }
     const dispatchSpy = vi.spyOn(window, 'dispatchEvent')
-    render(<MediaPresenter />)
+    render(<MediaPresenter onExit={mockExit} />)
 
     findShortcut('Escape').handler(new KeyboardEvent('keydown', { code: 'Escape' }))
 
@@ -278,7 +280,7 @@ describe('MediaPresenter video keyboard behavior', () => {
   it('pauses a playing video before opening the grid', () => {
     storeState.typeStates.video = { hasStarted: true, isPlaying: true, isEnded: false }
     const dispatchSpy = vi.spyOn(window, 'dispatchEvent')
-    render(<MediaPresenter />)
+    render(<MediaPresenter onExit={mockExit} />)
 
     findShortcut('KeyG').handler(new KeyboardEvent('keydown', { code: 'KeyG' }))
 
@@ -302,7 +304,7 @@ describe('MediaPresenter video keyboard behavior', () => {
     }
     storeState.currentItem = () => pdfItem
     const dispatchSpy = vi.spyOn(window, 'dispatchEvent')
-    render(<MediaPresenter />)
+    render(<MediaPresenter onExit={mockExit} />)
 
     findShortcutByConfig({ code: 'ArrowDown', metaOrCtrl: true }).handler(
       new KeyboardEvent('keydown', { code: 'ArrowDown', metaKey: true })
@@ -314,5 +316,14 @@ describe('MediaPresenter video keyboard behavior', () => {
     expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'media:pdfNextPage' }))
     expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'media:pdfPrevPage' }))
     dispatchSpy.mockRestore()
+  })
+
+  it('returns to Files without ending the live session on final Escape', () => {
+    render(<MediaPresenter onExit={mockExit} />)
+
+    findShortcut('Escape').handler(new KeyboardEvent('keydown', { code: 'Escape' }))
+
+    expect(mockExit).toHaveBeenCalledOnce()
+    expect(mockEndSession).not.toHaveBeenCalled()
   })
 })
