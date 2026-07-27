@@ -20,6 +20,7 @@ import {
 
 type FileProjectionProps = {
   generation?: number
+  projectionSessionId?: string
   initialReplayState?: ProjectionMediaReplayState | null
   fileName?: string
   initialItemId?: string
@@ -61,6 +62,7 @@ const HAVE_METADATA = 1
 
 export default function FileProjection({
   generation = 0,
+  projectionSessionId,
   initialReplayState,
   fileName,
   initialItemId,
@@ -373,7 +375,7 @@ export default function FileProjection({
   )
 
   useEffect(() => {
-    const adapter = createProjectionAdapter('projection')
+    const adapter = createProjectionAdapter('projection', projectionSessionId)
     adapter.setGeneration(generation)
     adapterSendRef.current = adapter.send.bind(adapter)
 
@@ -386,7 +388,7 @@ export default function FileProjection({
       adapter.dispose()
       adapterSendRef.current = null
     }
-  }, [generation])
+  }, [generation, projectionSessionId])
 
   useEffect(() => {
     if (initialItemId && initialBlobId && initialMimeType) {

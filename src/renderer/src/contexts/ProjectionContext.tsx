@@ -79,12 +79,16 @@ const CLOSED_RECOVERY_STATE: ProjectionRecoveryState = {
 
 const ProjectionContext = createContext<ProjectionContextValue | null>(null)
 
-function getProjectionUrl(generation: number): string {
-  return `${location.origin}${location.pathname}#/projection?generation=${generation}`
+function getProjectionUrl(generation: number, sessionId: string): string {
+  const query = new URLSearchParams({ generation: String(generation), session: sessionId })
+  return `${location.origin}${location.pathname}#/projection?${query}`
 }
 
-function getAdapter(ref: React.RefObject<ProjectionAdapter | null>): ProjectionAdapter {
-  if (!ref.current) ref.current = createProjectionAdapter()
+function getAdapter(
+  ref: React.RefObject<ProjectionAdapter | null>,
+  browserSessionId: string
+): ProjectionAdapter {
+  if (!ref.current) ref.current = createProjectionAdapter('main', browserSessionId)
   return ref.current
 }
 
@@ -97,6 +101,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
     null
   )
   const projectionDisplayId = useSettingsStore((state) => state.projectionDisplayId)
+  const [browserSessionId] = useState(() => crypto.randomUUID())
   const adapterRef = useRef<ProjectionAdapter | null>(null)
   const coordinatorRef = useRef<ProjectionSessionCoordinator | null>(null)
   const projectionWindowRef = useRef<Window | null>(null)
@@ -112,11 +117,11 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
   const getCoordinator = useCallback((): ProjectionSessionCoordinator => {
     if (!coordinatorRef.current) {
       coordinatorRef.current = createProjectionSessionCoordinator((channel, data) => {
-        getAdapter(adapterRef).send(channel, data)
+        getAdapter(adapterRef, browserSessionId).send(channel, data)
       })
     }
     return coordinatorRef.current
-  }, [])
+  }, [browserSessionId])
 
   const stopPolling = useCallback((): void => {
     if (pollTimerRef.current) clearInterval(pollTimerRef.current)
@@ -125,11 +130,11 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
 
   const endBrowserSession = useCallback((): void => {
     getCoordinator().endSession()
-    getAdapter(adapterRef).setGeneration(0)
+    getAdapter(adapterRef, browserSessionId).setGeneration(0)
     projectionWindowRef.current = null
     updateOpen(false)
     stopPolling()
-  }, [getCoordinator, stopPolling, updateOpen])
+  }, [browserSessionId, getCoordinator, stopPolling, updateOpen])
 
   const startPolling = useCallback((): void => {
     if (pollTimerRef.current) return
@@ -139,7 +144,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
   }, [endBrowserSession])
 
   useEffect(() => {
-    const adapter = getAdapter(adapterRef)
+    const adapter = getAdapter(adapterRef, browserSessionId)
     const coordinator = getCoordinator()
     const syncCoordinatorState = (): void => {
       const next = coordinator.getRecoveryState()
@@ -226,7 +231,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       adapter.dispose()
       adapterRef.current = null
     }
-  }, [endBrowserSession, getCoordinator, stopPolling, updateOpen])
+  }, [browserSessionId, endBrowserSession, getCoordinator, stopPolling, updateOpen])
 
   const bringProjectionToFront = useCallback(async (): Promise<void> => {
     if (!isElectron()) return
@@ -237,7 +242,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
 
   const openBrowserProjection = useCallback(async (): Promise<ProjectionOperationResult> => {
     const coordinator = getCoordinator()
-    const adapter = getAdapter(adapterRef)
+    const adapter = getAdapter(adapterRef, browserSessionId)
     if (projectionWindowRef.current && !projectionWindowRef.current.closed) {
       const generation = adapter.getGeneration()
       return coordinator.waitForReady(generation)
@@ -248,8 +253,8 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
     adapter.setGeneration(generation)
     coordinator.beginGeneration({ generation, status: 'opening', reason: 'created' })
     const win = window.open(
-      getProjectionUrl(generation),
-      'hhc-projection',
+      getProjectionUrl(generation, browserSessionId),
+      `hhc-projection-${browserSessionId}`,
       `popup,width=${screen.availWidth},height=${screen.availHeight},left=0,top=0`
     )
     if (!win) {
@@ -260,11 +265,11 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
     updateOpen(true)
     startPolling()
     return coordinator.waitForReady(generation)
-  }, [getCoordinator, startPolling, updateOpen])
+  }, [browserSessionId, getCoordinator, startPolling, updateOpen])
 
   const openElectronProjection = useCallback(async (): Promise<ProjectionOperationResult> => {
     const coordinator = getCoordinator()
-    const adapter = getAdapter(adapterRef)
+    const adapter = getAdapter(adapterRef, browserSessionId)
     const state = coordinator.getRecoveryState()
     if (state.status === 'ready') return { ok: true, generation: state.generation }
 
@@ -281,7 +286,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
     coordinator.beginGeneration({ generation, status: 'opening', reason: 'created' })
     updateOpen(true)
     return coordinator.waitForReady(generation)
-  }, [getCoordinator, projectionDisplayId, updateOpen])
+  }, [browserSessionId, getCoordinator, projectionDisplayId, updateOpen])
 
   const openProjection = useCallback(async (): Promise<ProjectionOperationResult> => {
     return isElectron() ? openElectronProjection() : openBrowserProjection()
@@ -302,7 +307,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
         reason: state.failure?.reason ?? 'ready-timeout'
       }
     }
-    getAdapter(adapterRef).setGeneration(result.generation)
+    getAdapter(adapterRef, browserSessionId).setGeneration(result.generation)
     coordinator.beginGeneration({
       generation: result.generation,
       status: 'opening',
@@ -310,11 +315,11 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
     })
     updateOpen(true)
     return coordinator.waitForReady(result.generation)
-  }, [getCoordinator, openBrowserProjection, updateOpen])
+  }, [browserSessionId, getCoordinator, openBrowserProjection, updateOpen])
 
   const closeProjection = useCallback(async (): Promise<void> => {
     const coordinator = getCoordinator()
-    const adapter = getAdapter(adapterRef)
+    const adapter = getAdapter(adapterRef, browserSessionId)
     coordinator.endSession()
     if (isElectron()) {
       await window.api.projection.close()
@@ -326,7 +331,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
     }
     adapter.setGeneration(0)
     updateOpen(false)
-  }, [getCoordinator, stopPolling, updateOpen])
+  }, [browserSessionId, getCoordinator, stopPolling, updateOpen])
 
   const claimProjection = useCallback(
     (owner: ProjectionOwner, options?: { unblank?: boolean }): void => {
@@ -384,7 +389,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       const coordinator = getCoordinator()
       if (channel === 'file:playback-state') {
         coordinator.recordPlayback(
-          getAdapter(adapterRef).getGeneration(),
+          getAdapter(adapterRef, browserSessionId).getGeneration(),
           data as ProjectionPayload<'file:playback-state'>
         )
       } else if (channel === 'file:end') {
@@ -395,10 +400,10 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
           data as ProjectionPayload<ReplayableProjectionChannel>
         )
       } else {
-        getAdapter(adapterRef).send(channel, data)
+        getAdapter(adapterRef, browserSessionId).send(channel, data)
       }
     },
-    [getCoordinator]
+    [browserSessionId, getCoordinator]
   )
 
   const project = useCallback(
@@ -428,8 +433,8 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
     <C extends ProjectionChannel>(
       channel: C,
       handler: (data: ProjectionPayload<C>) => void
-    ): (() => void) => getAdapter(adapterRef).on(channel, handler),
-    []
+    ): (() => void) => getAdapter(adapterRef, browserSessionId).on(channel, handler),
+    [browserSessionId]
   )
 
   const sessionSummary = useMemo<ProjectionSessionSummary>(() => {

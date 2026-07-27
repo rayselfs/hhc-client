@@ -81,13 +81,17 @@ class ElectronProjectionAdapter implements ProjectionAdapter {
 class BroadcastChannelAdapter implements ProjectionAdapter {
   private bc: BroadcastChannel
   private windowId: string
+  private role: AdapterRole
+  private sessionId: string
   private listeners: Array<{ listener: (event: MessageEvent) => void }> = []
   private disposed = false
   private generation = 0
 
-  constructor() {
+  constructor(role: AdapterRole, sessionId?: string) {
     this.bc = new BroadcastChannel('hhc-projection')
     this.windowId = crypto.randomUUID()
+    this.role = role
+    this.sessionId = sessionId || (role === 'main' ? crypto.randomUUID() : '')
 
     this.bc.addEventListener('messageerror', () => {
       console.warn('[projection-adapter] Failed to deserialize BroadcastChannel message')
@@ -103,9 +107,11 @@ class BroadcastChannelAdapter implements ProjectionAdapter {
   }
 
   send<C extends ProjectionChannel>(channel: C, data: ProjectionPayload<C>): void {
-    if (this.disposed || this.generation <= 0) return
+    if (this.disposed || this.generation <= 0 || !this.sessionId) return
     this.bc.postMessage({
       generation: this.generation,
+      sessionId: this.sessionId,
+      senderRole: this.role,
       channel,
       data,
       sender: this.windowId
@@ -122,12 +128,16 @@ class BroadcastChannelAdapter implements ProjectionAdapter {
         !msg ||
         typeof msg !== 'object' ||
         !('generation' in msg) ||
+        !('sessionId' in msg) ||
+        !('senderRole' in msg) ||
         !('channel' in msg) ||
         !('sender' in msg)
       ) {
         return
       }
       if (msg.generation !== this.generation) return
+      if (msg.sessionId !== this.sessionId) return
+      if (msg.senderRole !== (this.role === 'main' ? 'projection' : 'main')) return
       if (msg.sender === this.windowId) return
       if (msg.channel === channel) handler(msg.data as ProjectionPayload<C>)
     }
@@ -148,9 +158,12 @@ class BroadcastChannelAdapter implements ProjectionAdapter {
   }
 }
 
-function createProjectionAdapter(role: AdapterRole = 'main'): ProjectionAdapter {
+function createProjectionAdapter(
+  role: AdapterRole = 'main',
+  browserSessionId?: string
+): ProjectionAdapter {
   if (isElectron()) return new ElectronProjectionAdapter(window.api.projection, role)
-  return new BroadcastChannelAdapter()
+  return new BroadcastChannelAdapter(role, browserSessionId)
 }
 
 export type { ProjectionAdapter }

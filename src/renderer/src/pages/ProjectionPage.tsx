@@ -13,17 +13,22 @@ import {
 import { useSettingsStore } from '@renderer/stores/settings'
 import type { ProjectionChannel, ProjectionPayload } from '@shared/projection-messages'
 
-function resolveBrowserProjectionGeneration(): number {
+function resolveBrowserProjectionSession(): { generation: number; sessionId: string } {
   const query = location.hash.split('?')[1] ?? ''
-  const generation = Number(new URLSearchParams(query).get('generation'))
-  return Number.isSafeInteger(generation) && generation > 0 ? generation : 0
+  const params = new URLSearchParams(query)
+  const generation = Number(params.get('generation'))
+  return {
+    generation: Number.isSafeInteger(generation) && generation > 0 ? generation : 0,
+    sessionId: params.get('session') ?? ''
+  }
 }
 
 export default function ProjectionPage(): React.JSX.Element {
   const [state, dispatch] = useReducer(reduceProjectionRenderState, initialProjectionRenderState)
+  const browserSession = resolveBrowserProjectionSession()
 
   useEffect(() => {
-    const adapter = createProjectionAdapter('projection')
+    const adapter = createProjectionAdapter('projection', browserSession.sessionId)
     const unsubscribers: Array<() => void> = []
     let active = true
 
@@ -82,7 +87,7 @@ export default function ProjectionPage(): React.JSX.Element {
     if (isElectron()) {
       void window.api.projection.getGeneration().then(({ generation }) => initialize(generation))
     } else {
-      initialize(resolveBrowserProjectionGeneration())
+      initialize(browserSession.generation)
     }
 
     return () => {
@@ -90,7 +95,7 @@ export default function ProjectionPage(): React.JSX.Element {
       for (const unsubscribe of unsubscribers) unsubscribe()
       adapter.dispose()
     }
-  }, [])
+  }, [browserSession.generation, browserSession.sessionId])
 
   useEffect(() => {
     if (state.isBlackout || state.showDefault || state.activeContent !== 'file') {
@@ -109,6 +114,7 @@ export default function ProjectionPage(): React.JSX.Element {
     return (
       <FileProjection
         generation={state.generation}
+        projectionSessionId={browserSession.sessionId}
         initialReplayState={state.mediaReplayState}
         fileName={state.fileData.fileName}
         initialItemId={state.fileData.itemId}

@@ -12,8 +12,18 @@ vi.mock('@renderer/components/Projection/DefaultProjection', () => ({
 }))
 
 vi.mock('@renderer/components/Projection/FileProjection', () => ({
-  default: ({ controlEvent }: { controlEvent?: { data: { action: string } } | null }) => (
-    <div data-testid="file-projection" data-control-action={controlEvent?.data.action ?? ''} />
+  default: ({
+    controlEvent,
+    projectionSessionId
+  }: {
+    controlEvent?: { data: { action: string } } | null
+    projectionSessionId?: string
+  }) => (
+    <div
+      data-testid="file-projection"
+      data-control-action={controlEvent?.data.action ?? ''}
+      data-projection-session={projectionSessionId}
+    />
   )
 }))
 
@@ -41,6 +51,7 @@ vi.mock('@renderer/lib/projection-adapter', () => ({
 }))
 
 import ProjectionPage from '../ProjectionPage'
+import { createProjectionAdapter } from '@renderer/lib/projection-adapter'
 
 const mockProjectionVlcStop = vi.fn()
 
@@ -64,7 +75,7 @@ const baseStopwatchTick: StopwatchTickPayload = {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  window.location.hash = '#/projection?generation=4'
+  window.location.hash = '#/projection?generation=4&session=session-1'
   Object.defineProperty(window, 'api', {
     configurable: true,
     value: {
@@ -85,6 +96,7 @@ describe('ProjectionPage', () => {
     render(<ProjectionPage />)
 
     await waitFor(() => {
+      expect(createProjectionAdapter).toHaveBeenCalledWith('projection', 'session-1')
       expect(mockAdapter.setGeneration).toHaveBeenCalledWith(4)
       expect(mockAdapter.send).toHaveBeenCalledWith('__system:ready', { generation: 4 })
     })
@@ -198,6 +210,10 @@ describe('ProjectionPage', () => {
     })
 
     expect(screen.getByTestId('file-projection')).toHaveAttribute('data-control-action', 'play')
+    expect(screen.getByTestId('file-projection')).toHaveAttribute(
+      'data-projection-session',
+      'session-1'
+    )
   })
 
   it('stops VLC when blanking file projection back to default', async () => {

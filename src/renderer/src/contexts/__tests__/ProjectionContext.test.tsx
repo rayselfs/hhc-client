@@ -1,5 +1,5 @@
 import { act, renderHook } from '@testing-library/react'
-import type { ProjectionAdapter } from '@renderer/lib/projection-adapter'
+import { createProjectionAdapter, type ProjectionAdapter } from '@renderer/lib/projection-adapter'
 import type {
   ProjectionChannel,
   ProjectionLifecycleEvent,
@@ -87,6 +87,20 @@ describe('ProjectionContext web recovery', () => {
   it('does not open projection on mount', () => {
     renderProjection()
     expect(mockWindowOpen).not.toHaveBeenCalled()
+  })
+
+  it('opens a session-isolated browser projection window', () => {
+    const { result } = renderProjection()
+
+    act(() => {
+      void result.current.startProjection('timer')
+    })
+
+    const [url, target] = mockWindowOpen.mock.calls[0]
+    const sessionId = new URLSearchParams(String(url).split('?')[1]).get('session')
+    expect(sessionId).toMatch(/^[0-9a-f-]+$/i)
+    expect(target).toBe(`hhc-projection-${sessionId}`)
+    expect(createProjectionAdapter).toHaveBeenCalledWith('main', sessionId)
   })
 
   it('returns popup-blocked and keeps a retryable failed state', async () => {

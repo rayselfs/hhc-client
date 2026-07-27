@@ -57,8 +57,8 @@ describe('BroadcastChannelAdapter', () => {
     vi.mocked(isElectron).mockReturnValue(false)
   })
 
-  it('send() calls bc.postMessage with { channel, data, sender }', () => {
-    const adapter = createProjectionAdapter()
+  it('send() includes the browser session and sender role', () => {
+    const adapter = createProjectionAdapter('main', 'session-1')
     adapter.setGeneration(5)
     const payload = { message: 'hello' }
     adapter.send('timer:overtime-message', payload)
@@ -68,6 +68,8 @@ describe('BroadcastChannelAdapter', () => {
     expect(arg.channel).toBe('timer:overtime-message')
     expect(arg.generation).toBe(5)
     expect(arg.data).toEqual(payload)
+    expect(arg.sessionId).toBe('session-1')
+    expect(arg.senderRole).toBe('main')
     expect(typeof arg.sender).toBe('string')
     expect(arg.sender.length).toBeGreaterThan(0)
   })
@@ -93,7 +95,7 @@ describe('BroadcastChannelAdapter', () => {
   })
 
   it('on() — handler is called when message arrives with matching channel and different sender', () => {
-    const adapter = createProjectionAdapter()
+    const adapter = createProjectionAdapter('main', 'session-1')
     adapter.setGeneration(5)
     const handler = vi.fn()
     adapter.on('timer:overtime-message', handler)
@@ -105,12 +107,62 @@ describe('BroadcastChannelAdapter', () => {
         generation: 5,
         channel: 'timer:overtime-message',
         data: payload,
-        sender: 'other-window-id'
+        sender: 'other-window-id',
+        senderRole: 'projection',
+        sessionId: 'session-1'
       }
     } as MessageEvent)
 
     expect(handler).toHaveBeenCalledOnce()
     expect(handler).toHaveBeenCalledWith(payload)
+  })
+
+  it('ignores messages from another browser projection session', () => {
+    const adapter = createProjectionAdapter('main', 'session-1')
+    adapter.setGeneration(5)
+    const handler = vi.fn()
+    adapter.on('timer:overtime-message', handler)
+    const [, listener] = mockAddEventListener.mock.calls[1] as [
+      string,
+      (event: MessageEvent) => void
+    ]
+
+    listener({
+      data: {
+        generation: 5,
+        channel: 'timer:overtime-message',
+        data: { message: 'wrong session' },
+        sender: 'other',
+        senderRole: 'projection',
+        sessionId: 'session-2'
+      }
+    } as MessageEvent)
+
+    expect(handler).not.toHaveBeenCalled()
+  })
+
+  it('ignores messages from the same browser role', () => {
+    const adapter = createProjectionAdapter('main', 'session-1')
+    adapter.setGeneration(5)
+    const handler = vi.fn()
+    adapter.on('timer:overtime-message', handler)
+    const [, listener] = mockAddEventListener.mock.calls[1] as [
+      string,
+      (event: MessageEvent) => void
+    ]
+
+    listener({
+      data: {
+        generation: 5,
+        channel: 'timer:overtime-message',
+        data: { message: 'another control tab' },
+        sender: 'other',
+        senderRole: 'main',
+        sessionId: 'session-1'
+      }
+    } as MessageEvent)
+
+    expect(handler).not.toHaveBeenCalled()
   })
 
   it('on() — handler is NOT called when sender === own windowId (self-filter)', () => {
