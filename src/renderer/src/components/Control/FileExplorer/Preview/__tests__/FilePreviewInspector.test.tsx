@@ -1,7 +1,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { PresentationReadinessReport } from '@renderer/lib/presentation-readiness'
+import { presentPreviewItem } from '@renderer/lib/projection-actions'
 import type { FileItemRecord } from '@shared/types/folder'
-import { FilePreviewInspector, presentPreviewItem } from '../FilePreviewInspector'
+import { FilePreviewInspector } from '../FilePreviewInspector'
 
 function makeFile(overrides: Partial<FileItemRecord> = {}): FileItemRecord {
   return {

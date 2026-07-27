@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 import FileBrowser from '../FileBrowser'
 import type { FileItemRecord, FolderRecord } from '@shared/types/folder'
 
@@ -190,9 +190,15 @@ function flushRenameDelay(): void {
 }
 
 function renderFileBrowser(): void {
+  function LocationProbe(): React.JSX.Element {
+    const location = useLocation()
+    return <output data-testid="location">{location.pathname}</output>
+  }
+
   render(
     <MemoryRouter>
       <FileBrowser />
+      <LocationProbe />
     </MemoryRouter>
   )
 }
@@ -271,7 +277,8 @@ describe('FileBrowser slow-click inline rename', () => {
     flushRenameDelay()
 
     expect(screen.queryByLabelText('Rename file')).toBeNull()
-    expect(mockStartPresentationWithReadiness).toHaveBeenCalledOnce()
+    expect(mockStartPresentationWithReadiness).not.toHaveBeenCalled()
+    expect(screen.getByTestId('location')).toHaveTextContent('/files/preview/file-1')
   })
 
   it('does not start rename after pointer movement', () => {

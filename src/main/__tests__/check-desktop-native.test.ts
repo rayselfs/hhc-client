@@ -41,10 +41,7 @@ describe('check desktop native script', () => {
 
   it('accepts a compiled VLC binding', async () => {
     const root = await createTempRoot()
-    await writeFileIn(
-      root,
-      'node_modules/electron-vlc-player/build/Release/vlc_binding.node'
-    )
+    await writeFileIn(root, 'node_modules/electron-vlc-player/build/Release/vlc_binding.node')
 
     await expect(runChecker(root)).resolves.toBeUndefined()
   })

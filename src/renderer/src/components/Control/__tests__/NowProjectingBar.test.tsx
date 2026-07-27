@@ -2,7 +2,8 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import '@renderer/i18n'
 import i18n from '@renderer/i18n'
-import NowProjectingBar, { closeProjectionAndMediaSession } from '../NowProjectingBar'
+import NowProjectingBar from '../NowProjectingBar'
+import { closeProjectionAndMediaSession } from '@renderer/lib/projection-actions'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 
 const mocks = vi.hoisted(() => {

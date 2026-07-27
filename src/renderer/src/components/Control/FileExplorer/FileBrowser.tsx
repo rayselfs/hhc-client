@@ -775,8 +775,7 @@ export function FileBrowser({
       fileItems,
       navigateToFolder,
       openPresentationDocument,
-      navigate,
-      t
+      navigate
     ]
   )
 

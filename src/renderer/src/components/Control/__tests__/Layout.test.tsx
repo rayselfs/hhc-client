@@ -14,6 +14,14 @@ import type { ProjectionPayload } from '@shared/projection-messages'
 const projectionEvents = vi.hoisted(() => ({
   playback: null as ((data: ProjectionPayload<'file:playback-state'>) => void) | null
 }))
+const projectionRuntime = vi.hoisted(() => ({
+  isProjectionOpen: false,
+  recovery: {
+    status: 'closed' as 'closed' | 'ready',
+    generation: 0,
+    failure: null
+  }
+}))
 
 vi.mock('@renderer/lib/app-init', () => ({
   initializeApp: vi.fn(() => vi.fn()),
@@ -38,12 +46,12 @@ vi.mock('@renderer/contexts/ProjectionContext', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@renderer/contexts/ProjectionContext')>()
   return {
     ...actual,
-    useProjection: vi.fn().mockReturnValue({
-      isProjectionOpen: false,
+    useProjection: vi.fn().mockImplementation(() => ({
+      isProjectionOpen: projectionRuntime.isProjectionOpen,
       isProjectionBlanked: true,
       projectionReadyCount: 0,
       activeOwner: 'timer',
-      recovery: { status: 'closed', generation: 0, failure: null },
+      recovery: projectionRuntime.recovery,
       sessionSummary: {
         owner: null,
         status: 'closed',
@@ -69,7 +77,7 @@ vi.mock('@renderer/contexts/ProjectionContext', async (importOriginal) => {
           return vi.fn()
         }
       )
-    })
+    }))
   }
 })
 
@@ -88,6 +96,8 @@ describe('Layout', () => {
     useFileExplorerStore.setState({ isInitialized: true, isLoading: false })
     useBibleFolderStore.setState({ isInitialized: true, isLoading: false })
     projectionEvents.playback = null
+    projectionRuntime.isProjectionOpen = false
+    projectionRuntime.recovery = { status: 'closed', generation: 0, failure: null }
   })
 
   afterEach(() => {
@@ -145,6 +155,8 @@ describe('Layout', () => {
   })
 
   it('keeps the global Media bridge subscribed outside the Media workspace', async () => {
+    projectionRuntime.isProjectionOpen = true
+    projectionRuntime.recovery = { status: 'ready', generation: 1, failure: null }
     useMediaProjectionStore.setState({
       playlist: [
         {

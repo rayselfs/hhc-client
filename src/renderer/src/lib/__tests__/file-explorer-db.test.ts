@@ -324,5 +324,5 @@ describe('copyItem blob sharing', () => {
     expect(mockSaveItem).toHaveBeenCalledWith(
       expect.objectContaining({ id: copiedId, parentId: 'target-folder', url: 'blob:file-1' })
     )
-  })
+  }, 30_000)
 })

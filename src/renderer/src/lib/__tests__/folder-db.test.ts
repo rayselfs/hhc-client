@@ -65,10 +65,7 @@ describe('persistence failure propagation', () => {
 
   it('propagates an item write failure instead of reporting success', async () => {
     const failure = new Error('quota exceeded')
-    const ops = createFolderDB(
-      async () => ({ put: vi.fn().mockRejectedValue(failure) }),
-      ROOT_ID
-    )
+    const ops = createFolderDB(async () => ({ put: vi.fn().mockRejectedValue(failure) }), ROOT_ID)
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
 
     await expect(ops.saveItem(makeItem())).rejects.toBe(failure)
@@ -102,10 +99,7 @@ describe('persistence failure propagation', () => {
 
   it('propagates the full-scan failure when the deleted-at index is unavailable', async () => {
     const failure = new Error('full scan failed')
-    const getAll = vi
-      .fn()
-      .mockResolvedValueOnce([])
-      .mockRejectedValueOnce(failure)
+    const getAll = vi.fn().mockResolvedValueOnce([]).mockRejectedValueOnce(failure)
     const ops = createFolderDB(
       async () => ({
         getAll,

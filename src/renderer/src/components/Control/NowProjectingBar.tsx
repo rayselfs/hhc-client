@@ -7,6 +7,7 @@ import {
   deriveNowProjectingStatus,
   type NowProjectingStatus
 } from '@renderer/lib/projection-session-summary'
+import { closeProjectionAndMediaSession } from '@renderer/lib/projection-actions'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 
 const STATUS_CLASS: Record<NowProjectingStatus, string> = {
@@ -16,17 +17,6 @@ const STATUS_CLASS: Record<NowProjectingStatus, string> = {
   projecting: 'text-success',
   degraded: 'text-warning',
   failed: 'text-danger'
-}
-
-export async function closeProjectionAndMediaSession({
-  closeProjection,
-  endLiveSession
-}: {
-  closeProjection: () => Promise<void>
-  endLiveSession: () => void
-}): Promise<void> {
-  await closeProjection()
-  endLiveSession()
 }
 
 export default function NowProjectingBar(): React.JSX.Element | null {

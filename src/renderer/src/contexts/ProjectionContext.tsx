@@ -97,6 +97,9 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
   const [projectionReadyCount, setProjectionReadyCount] = useState(0)
   const [activeOwner, setActiveOwner] = useState<ProjectionOwner>('timer')
   const [recovery, setRecovery] = useState<ProjectionRecoveryState>(CLOSED_RECOVERY_STATE)
+  const [projectionSnapshot, setProjectionSnapshot] = useState<ProjectionSessionSnapshot | null>(
+    null
+  )
   const projectionDisplayId = useSettingsStore((state) => state.projectionDisplayId)
   const adapterRef = useRef<ProjectionAdapter | null>(null)
   const coordinatorRef = useRef<ProjectionSessionCoordinator | null>(null)
@@ -143,14 +146,15 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
   useEffect(() => {
     const adapter = getAdapter(adapterRef)
     const coordinator = getCoordinator()
-    const syncRecovery = (): void => {
+    const syncCoordinatorState = (): void => {
       const next = coordinator.getRecoveryState()
       setRecovery({
         ...next,
         failure: next.failure ? { ...next.failure } : null
       })
+      setProjectionSnapshot(coordinator.getSnapshot())
     }
-    const unsubscribeCoordinator = coordinator.subscribe(syncRecovery)
+    const unsubscribeCoordinator = coordinator.subscribe(syncCoordinatorState)
     const unsubscribeReady = adapter.on('__system:ready', (data) => {
       if (
         !isElectron() &&
@@ -447,26 +451,25 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
   )
 
   const sessionSummary = useMemo<ProjectionSessionSummary>(() => {
-    const snapshot = getCoordinator().getSnapshot()
     const status: ProjectionSessionSummary['status'] =
       recovery.status === 'failed'
         ? 'failed'
         : recovery.status === 'opening' || recovery.status === 'recovering'
           ? 'opening'
           : recovery.status === 'ready' && isProjectionOpen
-            ? snapshot && !snapshot.isBlackout
+            ? projectionSnapshot && !projectionSnapshot.isBlackout
               ? 'projecting'
               : 'connected'
             : 'closed'
 
     return {
-      owner: snapshot?.owner ?? null,
+      owner: projectionSnapshot?.owner ?? null,
       status,
-      label: snapshot?.media.show?.fileName ?? null,
-      isBlackout: snapshot?.isBlackout ?? false,
+      label: projectionSnapshot?.media.show?.fileName ?? null,
+      isBlackout: projectionSnapshot?.isBlackout ?? false,
       failure: recovery.failure
     }
-  }, [getCoordinator, isProjectionOpen, recovery])
+  }, [isProjectionOpen, projectionSnapshot, recovery])
 
   const contextValue = useMemo(
     () => ({

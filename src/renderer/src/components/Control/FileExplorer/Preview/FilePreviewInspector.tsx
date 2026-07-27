@@ -5,8 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useThumbnails } from '@renderer/hooks/useThumbnails'
 import { getMediaType } from '@renderer/lib/presentability'
-import { startMediaProjection } from '@renderer/lib/projection-actions'
-import type { PresentationReadinessReport } from '@renderer/lib/presentation-readiness'
+import { presentPreviewItem, startMediaProjection } from '@renderer/lib/projection-actions'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { isFileItem, type FileItemRecord } from '@shared/types/folder'
 
@@ -17,35 +16,6 @@ interface FilePreviewInspectorProps {
   error: string | null
   onClose: () => void
   onPresent: () => Promise<void>
-}
-
-interface PresentPreviewInput {
-  item: FileItemRecord
-  playlist: FileItemRecord[]
-  start: (
-    items: FileItemRecord[],
-    startIndex: number,
-    deps: Record<string, never>,
-    options: { prioritizeStartItem: true }
-  ) => Promise<PresentationReadinessReport>
-  navigate: (path: string) => void
-}
-
-export async function presentPreviewItem({
-  item,
-  playlist,
-  start,
-  navigate
-}: PresentPreviewInput): Promise<string | null> {
-  const startIndex = playlist.findIndex((entry) => entry.id === item.id)
-  if (startIndex < 0) return 'not-presentable'
-
-  const report = await start(playlist, startIndex, {}, { prioritizeStartItem: true })
-  const requested = report.items.find((entry) => entry.itemId === item.id)
-  if (requested?.status !== 'ready') return requested?.reason ?? 'not-ready'
-
-  navigate('/media')
-  return null
 }
 
 function PreviewSurface({

@@ -35,6 +35,11 @@ interface ProjectionStopDeps {
   stopProjection: () => Promise<void>
 }
 
+interface CloseProjectionSessionDeps {
+  closeProjection: () => Promise<void>
+  endLiveSession: () => void
+}
+
 interface StartMediaProjectionDeps {
   startMediaPresentation?: (
     items: FileItemRecord[],
@@ -45,6 +50,18 @@ interface StartMediaProjectionDeps {
     }
   ) => Promise<PresentationReadinessReport>
   onNoProjectableFiles?: () => void
+}
+
+interface PresentPreviewInput {
+  item: FileItemRecord
+  playlist: FileItemRecord[]
+  start: (
+    items: FileItemRecord[],
+    startIndex: number,
+    deps: Record<string, never>,
+    options: { prioritizeStartItem: true }
+  ) => Promise<PresentationReadinessReport>
+  navigate: (path: string) => void
 }
 
 interface StartProjectionForRouteInput {
@@ -161,6 +178,31 @@ export async function startMediaProjection(
 
 export async function stopProjectionSession({ stopProjection }: ProjectionStopDeps): Promise<void> {
   await stopProjection()
+}
+
+export async function closeProjectionAndMediaSession({
+  closeProjection,
+  endLiveSession
+}: CloseProjectionSessionDeps): Promise<void> {
+  await closeProjection()
+  endLiveSession()
+}
+
+export async function presentPreviewItem({
+  item,
+  playlist,
+  start,
+  navigate
+}: PresentPreviewInput): Promise<string | null> {
+  const startIndex = playlist.findIndex((entry) => entry.id === item.id)
+  if (startIndex < 0) return 'not-presentable'
+
+  const report = await start(playlist, startIndex, {}, { prioritizeStartItem: true })
+  const requested = report.items.find((entry) => entry.itemId === item.id)
+  if (requested?.status !== 'ready') return requested?.reason ?? 'not-ready'
+
+  navigate('/media')
+  return null
 }
 
 export async function startProjectionForRoute({
