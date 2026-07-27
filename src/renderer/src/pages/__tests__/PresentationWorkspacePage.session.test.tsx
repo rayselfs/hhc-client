@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import PresentationWorkspacePage from '../PresentationWorkspacePage'
 import {
@@ -138,5 +138,37 @@ describe('PresentationWorkspacePage session integration', () => {
 
     expect(await screen.findAllByText('Unsaved local text')).not.toHaveLength(0)
     expect(mocks.loadEditablePresentationSnapshot).toHaveBeenCalledTimes(1)
+  })
+
+  it('stores Ribbon font sizes as canvas pixels derived from PowerPoint points', async () => {
+    let registry: PresentationSessionRegistry | null = null
+    render(
+      <PresentationSessionRegistryProvider>
+        <Workspace showPage onSession={(next) => (registry = next)} />
+      </PresentationSessionRegistryProvider>
+    )
+    await waitFor(() => expect(registry!.get('deck-1')).toBeDefined())
+    const session = registry!.get('deck-1')!
+    const document = session.getSnapshot().renderedDocument
+    const slideId = document.slideOrder[0]
+    const text = createTextElement({ text: 'Scale me', fontSize: 88 })
+
+    act(() => session.commit(addElementToSlide(document, slideId, text)))
+    const textElement = (await screen.findAllByText('Scale me'))
+      .at(-1)
+      ?.closest('[data-slide-element]')
+    expect(textElement).not.toBeNull()
+    fireEvent.pointerDown(textElement!, { clientX: 10, clientY: 10 })
+    const fontSizeSelect = screen
+      .getAllByRole('combobox')
+      .find((select) => select.querySelector('option[value="72"]'))
+    expect(fontSizeSelect).toBeDefined()
+
+    fireEvent.change(fontSizeSelect!, { target: { value: '72' } })
+
+    await waitFor(() => {
+      const updated = session.getSnapshot().renderedDocument.slides[slideId].elements[text.id]
+      expect(updated.type === 'text' ? updated.fontSize : null).toBe(144)
+    })
   })
 })

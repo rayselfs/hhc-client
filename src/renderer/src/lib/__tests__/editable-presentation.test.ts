@@ -27,6 +27,8 @@ import {
   loadEditablePresentation,
   loadEditablePresentationSnapshot,
   moveEditableSlide,
+  presentationCanvasPxToPoints,
+  presentationPointsToCanvasPx,
   removeElementFromSlide,
   resetSlideBackground,
   removeEditableSlides,
@@ -67,6 +69,15 @@ const TEXT_PLACEHOLDER_SNIPPETS = [
   '願祢國降臨',
   'Let Your kingdom come'
 ] as const
+
+describe('presentation point conversion', () => {
+  it('maps PowerPoint points to the current canvas width and round-trips', () => {
+    expect(presentationPointsToCanvasPx(72, 1920)).toBe(144)
+    expect(presentationPointsToCanvasPx(72, 1280)).toBe(96)
+    expect(presentationCanvasPxToPoints(144, 1920)).toBe(72)
+    expect(presentationCanvasPxToPoints(96, 1280)).toBe(72)
+  })
+})
 
 type MockXmlNodeInit = {
   attrs?: Record<string, string>

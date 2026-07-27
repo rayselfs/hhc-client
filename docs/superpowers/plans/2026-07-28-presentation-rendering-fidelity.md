@@ -30,16 +30,16 @@ with optional imported runs shared by DOM and SVG renderers.
 - Modify: `src/renderer/src/lib/editable-presentation.ts`
 - Modify: `src/renderer/src/pages/PresentationWorkspacePage.tsx`
 - Test: `src/renderer/src/lib/__tests__/editable-presentation.test.ts`
-- Create: `src/renderer/src/pages/__tests__/PresentationWorkspacePage.editable.test.tsx`
+- Test: `src/renderer/src/pages/__tests__/PresentationWorkspacePage.session.test.tsx`
 
 **Interfaces:**
 - Produces: `presentationPointsToCanvasPx(points, documentWidth): number`
 - Produces: `presentationCanvasPxToPoints(px, documentWidth): number`
 
-- [ ] Add failing helper tests for 72pt at widths 1920 and 1280 and round-trip conversion.
-- [ ] Add a failing workspace test that selects 72 and expects a 144px model value at width 1920.
-- [ ] Implement the two pure helpers and use them for Ribbon value, selection, and +/- changes.
-- [ ] Run focused tests and commit.
+- [x] Add failing helper tests for 72pt at widths 1920 and 1280 and round-trip conversion.
+- [x] Add a failing workspace test that selects 72 and expects a 144px model value at width 1920.
+- [x] Implement the two pure helpers and use them for Ribbon value, selection, and +/- changes.
+- [x] Run focused tests and commit.
 
 ### Task 2: Projection Contain Geometry
 
@@ -60,7 +60,7 @@ with optional imported runs shared by DOM and SVG renderers.
 **Files:**
 - Modify: `src/renderer/src/pages/PresentationWorkspacePage.tsx`
 - Modify: `src/renderer/src/lib/editable-presentation.ts`
-- Test: `src/renderer/src/pages/__tests__/PresentationWorkspacePage.editable.test.tsx`
+- Test: `src/renderer/src/pages/__tests__/PresentationWorkspacePage.session.test.tsx`
 - Test: `src/renderer/src/lib/__tests__/editable-presentation.test.ts`
 
 **Interfaces:**

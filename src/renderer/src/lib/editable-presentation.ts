@@ -165,6 +165,15 @@ export const INSERTED_IMAGE_MAX_SLIDE_RATIO = 0.6
 const EMU_PER_INCH = 914400
 const CSS_PX_PER_INCH = 96
 const RAW_EMU_THRESHOLD = 100000
+const POWERPOINT_STANDARD_WIDTH_POINTS = 960
+
+export function presentationPointsToCanvasPx(points: number, documentWidth: number): number {
+  return (points * documentWidth) / POWERPOINT_STANDARD_WIDTH_POINTS
+}
+
+export function presentationCanvasPxToPoints(px: number, documentWidth: number): number {
+  return (px * POWERPOINT_STANDARD_WIDTH_POINTS) / documentWidth
+}
 
 type XmlNode = ShapeNodeData['source']
 

@@ -53,6 +53,8 @@ import {
   INSERTED_TEXT_FONT_SIZE,
   insertBlankEditableSlide,
   normalizeSlideBackground,
+  presentationCanvasPxToPoints,
+  presentationPointsToCanvasPx,
   removeElementFromSlide,
   removeEditableSlides,
   reorderElementInSlide,
@@ -1187,9 +1189,14 @@ function EditableSessionDocumentView({
           : ''
       }`
     const changeFontSize = (delta: number): void => {
-      if (!selectedTextElement) return
+      if (!selectedTextElement || !document) return
+      const currentPoints = presentationCanvasPxToPoints(
+        selectedTextElement.fontSize,
+        document.width
+      )
+      const nextPoints = Math.max(6, Math.min(240, currentPoints + delta))
       updateSelectedTextElement({
-        fontSize: Math.max(6, Math.min(240, selectedTextElement.fontSize + delta))
+        fontSize: presentationPointsToCanvasPx(nextPoints, document.width)
       })
     }
     const clearTextFormatting = (): void => {
@@ -1226,10 +1233,17 @@ function EditableSessionDocumentView({
             <select
               className={`h-9 w-24 disabled:opacity-40 ${NATIVE_CONTROL_CLASS}`}
               disabled={textDisabled}
-              value={selectedTextElement?.fontSize ?? 44}
+              value={
+                selectedTextElement && document
+                  ? presentationCanvasPxToPoints(selectedTextElement.fontSize, document.width)
+                  : 44
+              }
               onChange={(event) =>
                 updateSelectedTextElement({
-                  fontSize: Number(event.currentTarget.value)
+                  fontSize: presentationPointsToCanvasPx(
+                    Number(event.currentTarget.value),
+                    document?.width ?? 1920
+                  )
                 })
               }
             >
