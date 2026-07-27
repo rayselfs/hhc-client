@@ -99,11 +99,11 @@ with optional imported runs shared by DOM and SVG renderers.
 - Produces: per-run non-editing DOM spans
 - Plain-text edit writes `runs: undefined`
 
-- [ ] Add failing conversion tests for mixed font size, bold, italic, underline, color, and paragraph
+- [x] Add failing conversion tests for mixed font size, bold, italic, underline, color, and paragraph
       breaks.
-- [ ] Add failing surface tests for styled spans and run clearing on input.
-- [ ] Add the optional run type, resolve imported run styles, render spans, and clear runs on edit.
-- [ ] Run focused import/surface tests and commit.
+- [x] Add failing surface tests for styled spans and run clearing on input.
+- [x] Add the optional run type, resolve imported run styles, render spans, and clear runs on edit.
+- [x] Run focused import/surface tests and commit.
 
 ### Task 6: Match SVG Thumbnail Run Rendering
 

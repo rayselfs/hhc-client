@@ -177,6 +177,61 @@ function mockCenteredWhiteTextShape(
   }
 }
 
+function mockMixedStyleTextShape(): unknown {
+  const runProperties = (
+    attrs: Record<string, string>,
+    typeface: string,
+    color: string
+  ): MockXmlNode =>
+    mockXmlNode({
+      attrs,
+      children: {
+        latin: { attrs: { typeface } },
+        solidFill: { children: { srgbClr: { attrs: { val: color } } } }
+      }
+    })
+
+  return {
+    nodeType: 'shape',
+    name: 'Mixed text',
+    presetGeometry: 'rect',
+    position: { x: 10, y: 20 },
+    size: { w: 800, h: 200 },
+    rotation: 0,
+    fill: missingXmlNode,
+    line: missingXmlNode,
+    source: mockXmlNode(),
+    textBody: {
+      paragraphs: [
+        {
+          properties: mockXmlNode({ attrs: { algn: 'ctr' } }),
+          endParaRPr: missingXmlNode,
+          runs: [
+            {
+              text: 'Bold',
+              properties: runProperties({ sz: '7200', b: '1', u: 'sng' }, 'Arial', 'FF0000')
+            },
+            {
+              text: ' italic',
+              properties: runProperties({ sz: '3600', i: '1' }, 'Calibri', '0000FF')
+            }
+          ]
+        },
+        {
+          properties: mockXmlNode({ attrs: { algn: 'ctr' } }),
+          endParaRPr: missingXmlNode,
+          runs: [
+            {
+              text: 'Second',
+              properties: runProperties({ sz: '2400' }, 'Aptos', '00AA00')
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
+
 function mockSlide(index: number, layoutIndex: number, source: MockXmlNode): unknown {
   return {
     index,
@@ -859,6 +914,57 @@ describe('editable presentation documents', () => {
 
     expect(text.autoSize).toBe('fixed')
     expect(text.height).toBe(40)
+  })
+
+  it('preserves mixed PPTX run formatting and paragraph breaks', () => {
+    const presentation = {
+      width: 1920,
+      height: 1080,
+      slides: [
+        {
+          ...(mockSlide(0, 0, mockXmlNode()) as Record<string, unknown>),
+          nodes: [mockMixedStyleTextShape()]
+        }
+      ],
+      layouts: new Map(),
+      masters: new Map(),
+      layoutToMaster: new Map(),
+      media: new Map()
+    } as unknown as PresentationData
+
+    const document = convertPresentationData(makePptxFileItem(), presentation)
+    const text = getTextElements(document.slides[document.slideOrder[0]].elements)[0]
+
+    expect(text.text).toBe('Bold italic\nSecond')
+    expect(text.runs).toEqual([
+      {
+        text: 'Bold',
+        fontFamily: 'Arial',
+        fontSize: 96,
+        bold: true,
+        italic: false,
+        underline: true,
+        color: '#FF0000'
+      },
+      {
+        text: ' italic',
+        fontFamily: 'Calibri',
+        fontSize: 48,
+        bold: false,
+        italic: true,
+        underline: false,
+        color: '#0000FF'
+      },
+      {
+        text: '\nSecond',
+        fontFamily: 'Aptos',
+        fontSize: 32,
+        bold: false,
+        italic: false,
+        underline: false,
+        color: '#00AA00'
+      }
+    ])
   })
 
   it('preserves direct slide, layout, and master solid black backgrounds with centered white text', () => {

@@ -1042,6 +1042,7 @@ function convertShapeNode(
     const frame = resolveTextShapeFrame(node, slide, presentation)
     if (!frame) throw new Error(`Text placeholder frame is missing: ${node.name}`)
     const style = resolveTextShapeStyle(node)
+    const runs = resolveTextRuns(node)
     elements.push({
       id: crypto.randomUUID(),
       type: 'text',
@@ -1054,6 +1055,7 @@ function convertShapeNode(
       rotation: node.rotation,
       opacity: 1,
       text,
+      runs,
       fontFamily: style.fontFamily,
       fontSize: style.fontSize,
       bold: style.bold,
@@ -1255,8 +1257,41 @@ function createTextShapeFrame(
 function resolveTextShapeStyle(node: ShapeNodeData): TextShapeStyle {
   const firstParagraph = node.textBody?.paragraphs[0]
   const firstRun = firstParagraph?.runs[0]
-  const runProperties = firstRun?.properties
-  const paragraphEndProperties = firstParagraph?.endParaRPr
+  return resolveTextStyle(
+    firstRun?.properties,
+    firstParagraph?.endParaRPr,
+    firstParagraph?.properties
+  )
+}
+
+function resolveTextRuns(node: ShapeNodeData): EditableTextRun[] | undefined {
+  const runs: EditableTextRun[] = []
+  for (const [paragraphIndex, paragraph] of (node.textBody?.paragraphs ?? []).entries()) {
+    for (const [runIndex, run] of paragraph.runs.entries()) {
+      const style = resolveTextStyle(run.properties, paragraph.endParaRPr, paragraph.properties)
+      runs.push({
+        text: `${paragraphIndex > 0 && runIndex === 0 ? '\n' : ''}${run.text}`,
+        fontFamily: style.fontFamily,
+        fontSize: style.fontSize,
+        bold: style.bold,
+        italic: style.italic,
+        underline: style.underline,
+        color: style.color
+      })
+    }
+  }
+  if (runs.length === 0) return undefined
+  runs[0] = { ...runs[0], text: runs[0].text.trimStart() }
+  const lastIndex = runs.length - 1
+  runs[lastIndex] = { ...runs[lastIndex], text: runs[lastIndex].text.trimEnd() }
+  return runs.filter((run) => run.text.length > 0)
+}
+
+function resolveTextStyle(
+  runProperties: XmlNode | undefined,
+  paragraphEndProperties: XmlNode | undefined,
+  paragraphProperties: XmlNode | undefined
+): TextShapeStyle {
   const fontSize = fontSizeToPx(
     runProperties?.numAttr('sz') ?? paragraphEndProperties?.numAttr('sz') ?? 3200
   )
@@ -1274,7 +1309,7 @@ function resolveTextShapeStyle(node: ShapeNodeData): TextShapeStyle {
       readSrgbColor(runProperties) ??
       readSrgbColor(paragraphEndProperties) ??
       DEFAULT_FOREGROUND_COLOR,
-    align: normalizeTextAlign(firstParagraph?.properties?.attr('algn')),
+    align: normalizeTextAlign(paragraphProperties?.attr('algn')),
     lineHeight: 1.15
   }
 }
