@@ -18,11 +18,19 @@ interface EditableSlideSurfaceProps {
   editable?: boolean
   showBorder?: boolean
   selectedElementId?: string | null
+  selectedElementIds?: ReadonlySet<string>
   editingElementId?: string | null
   cropElementId?: string | null
   isTextInsertMode?: boolean
   className?: string
-  onSelectElement?: (elementId: string | null) => void
+  onSelectElement?: (
+    elementId: string | null,
+    event?: React.MouseEvent | React.PointerEvent
+  ) => void
+  onMarqueeSelect?: (
+    bounds: { x: number; y: number; width: number; height: number },
+    additive: boolean
+  ) => void
   onEditingElementChange?: (elementId: string | null) => void
   onInsertText?: (frame: EditableTextInsertFrame) => void
   onElementContextMenu?: (event: React.MouseEvent, element: EditablePresentationElement) => void
@@ -52,6 +60,15 @@ interface TextInsertState {
   startY: number
 }
 
+interface MarqueeState {
+  pointerId: number
+  startX: number
+  startY: number
+  currentX: number
+  currentY: number
+  additive: boolean
+}
+
 type ResizeHandle = 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw'
 
 const TEXT_MIN_WIDTH = 60
@@ -70,11 +87,13 @@ export default function EditableSlideSurface({
   editable = false,
   showBorder = false,
   selectedElementId = null,
+  selectedElementIds,
   editingElementId = null,
   cropElementId = null,
   isTextInsertMode = false,
   className,
   onSelectElement,
+  onMarqueeSelect,
   onEditingElementChange,
   onInsertText,
   onElementContextMenu,
@@ -88,8 +107,10 @@ export default function EditableSlideSurface({
   const surfaceRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<DragState | null>(null)
   const textInsertRef = useRef<TextInsertState | null>(null)
+  const marqueeRef = useRef<MarqueeState | null>(null)
   const scaleRef = useRef({ x: 1, y: 1 })
   const [surfaceScale, setSurfaceScale] = useState(1)
+  const [marquee, setMarquee] = useState<MarqueeState | null>(null)
 
   const orderedElements = useMemo(() => {
     if (!slide) return []
@@ -143,7 +164,7 @@ export default function EditableSlideSurface({
       original: element
     }
     onEditingElementChange?.(null)
-    onSelectElement?.(element.id)
+    onSelectElement?.(element.id, event)
     onTransformStart?.()
     event.currentTarget.setPointerCapture?.(event.pointerId)
   }
@@ -276,6 +297,52 @@ export default function EditableSlideSurface({
     })
   }
 
+  const startMarquee = (event: React.PointerEvent): void => {
+    if (!editable || !onMarqueeSelect || isTextInsertMode) return
+    const target = event.target as HTMLElement | null
+    if (target?.closest('[data-slide-element]')) return
+    const point = getCanvasPoint(event)
+    if (!point) return
+    const next: MarqueeState = {
+      pointerId: event.pointerId,
+      startX: point.x,
+      startY: point.y,
+      currentX: point.x,
+      currentY: point.y,
+      additive: event.metaKey || event.ctrlKey
+    }
+    marqueeRef.current = next
+    setMarquee(next)
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+  }
+
+  const updateMarquee = (event: React.PointerEvent): void => {
+    const current = marqueeRef.current
+    if (!current || current.pointerId !== event.pointerId) return
+    const point = getCanvasPoint(event)
+    if (!point) return
+    const next = { ...current, currentX: point.x, currentY: point.y }
+    marqueeRef.current = next
+    setMarquee(next)
+  }
+
+  const finishMarquee = (event: React.PointerEvent): void => {
+    const current = marqueeRef.current
+    if (!current || current.pointerId !== event.pointerId) return
+    marqueeRef.current = null
+    setMarquee(null)
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+    const x = Math.min(current.startX, current.currentX)
+    const y = Math.min(current.startY, current.currentY)
+    const width = Math.abs(current.currentX - current.startX)
+    const height = Math.abs(current.currentY - current.startY)
+    if (width >= 4 || height >= 4) {
+      onMarqueeSelect?.({ x, y, width, height }, current.additive)
+    }
+  }
+
   const insertTextAtPointer = (event: React.MouseEvent): void => {
     if (!editable || !onInsertText) return
     const target = event.target as HTMLElement | null
@@ -308,9 +375,21 @@ export default function EditableSlideSurface({
         if (!editable) return
         if (startTextInsert(event)) return
         onEditingElementChange?.(null)
-        onSelectElement?.(null)
+        if (!(event.metaKey || event.ctrlKey)) onSelectElement?.(null, event)
+        startMarquee(event)
       }}
-      onPointerUp={finishTextInsert}
+      onPointerMove={updateMarquee}
+      onPointerUp={(event) => {
+        finishTextInsert(event)
+        finishMarquee(event)
+      }}
+      onPointerCancel={(event) => {
+        marqueeRef.current = null
+        setMarquee(null)
+        if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+          event.currentTarget.releasePointerCapture(event.pointerId)
+        }
+      }}
       onDoubleClick={insertTextAtPointer}
     >
       <div
@@ -331,8 +410,11 @@ export default function EditableSlideSurface({
             editable={editable}
             editing={element.id === editingElementId}
             cropMode={element.id === cropElementId}
-            selected={element.id === selectedElementId}
-            onSelect={() => onSelectElement?.(element.id)}
+            selected={
+              element.id === selectedElementId || Boolean(selectedElementIds?.has(element.id))
+            }
+            primarySelected={element.id === selectedElementId}
+            onSelect={(event) => onSelectElement?.(element.id, event)}
             onPointerDown={(event) => startDrag(event, element, 'move')}
             onPointerMove={updateDrag}
             onPointerUp={endDrag}
@@ -348,6 +430,18 @@ export default function EditableSlideSurface({
             onFinishTextEdit={() => onEditingElementChange?.(null)}
           />
         ))}
+        {marquee && (
+          <div
+            data-testid="element-marquee"
+            className="pointer-events-none absolute border border-primary bg-primary/15"
+            style={{
+              left: Math.min(marquee.startX, marquee.currentX),
+              top: Math.min(marquee.startY, marquee.currentY),
+              width: Math.abs(marquee.currentX - marquee.startX),
+              height: Math.abs(marquee.currentY - marquee.startY)
+            }}
+          />
+        )}
       </div>
     </div>
   )
@@ -371,6 +465,7 @@ function SlideElement({
   editing,
   cropMode,
   selected,
+  primarySelected,
   onSelect,
   onPointerDown,
   onPointerMove,
@@ -390,7 +485,8 @@ function SlideElement({
   editing: boolean
   cropMode: boolean
   selected: boolean
-  onSelect: () => void
+  primarySelected: boolean
+  onSelect: (event: React.MouseEvent) => void
   onPointerDown: (event: React.PointerEvent) => void
   onPointerMove: (event: React.PointerEvent) => void
   onPointerUp: (event: React.PointerEvent) => void
@@ -432,7 +528,7 @@ function SlideElement({
       onContextMenu={onContextMenu}
       onClick={(event) => {
         event.stopPropagation()
-        onSelect()
+        onSelect(event)
       }}
     >
       {renderElementContent(
@@ -445,7 +541,7 @@ function SlideElement({
         onStartTextEdit,
         onFinishTextEdit
       )}
-      {editable && selected && !element.locked && (
+      {editable && primarySelected && !element.locked && (
         <ElementHandles
           element={element}
           cropMode={cropMode}
