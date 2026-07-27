@@ -32,13 +32,13 @@ while exposing already-implemented actions.
 - Test: `src/renderer/src/contexts/__tests__/ProjectionContext.test.tsx`
 - Test: `src/renderer/src/pages/__tests__/ProjectionPage.test.tsx`
 
-- [ ] Add failing adapter tests for wrong session and same-role messages.
-- [ ] Add failing context/page tests for session URL and adapter propagation.
-- [ ] Run focused tests and confirm failures.
-- [ ] Add session ID and sender role to browser envelopes and strict receive checks.
-- [ ] Put the session ID in popup URL and window name.
-- [ ] Pass the parsed browser session to both projection-side adapters.
-- [ ] Run all projection transport tests and commit.
+- [x] Add failing adapter tests for wrong session and same-role messages.
+- [x] Add failing context/page tests for session URL and adapter propagation.
+- [x] Run focused tests and confirm failures.
+- [x] Add session ID and sender role to browser envelopes and strict receive checks.
+- [x] Put the session ID in popup URL and window name.
+- [x] Pass the parsed browser session to both projection-side adapters.
+- [x] Run all projection transport tests and commit.
 
 ### Task 2: VLC IPC Runtime Validation
 
@@ -46,10 +46,10 @@ while exposing already-implemented actions.
 - Modify: `src/main/ipc/projection-vlc.ts`
 - Test: `src/main/__tests__/ipc/projection-vlc.test.ts`
 
-- [ ] Add failing tests for malformed start, probe, seek, volume, and enum values.
-- [ ] Confirm invalid payloads currently reach runtime/player code.
-- [ ] Add minimal unknown-payload validators at handler registration.
-- [ ] Run the VLC handler tests and commit.
+- [x] Add failing tests for malformed start, probe, seek, volume, and enum values.
+- [x] Confirm invalid payloads currently reach runtime/player code.
+- [x] Add minimal unknown-payload validators at handler registration.
+- [x] Run the VLC handler tests and commit.
 
 ### Task 3: Background Task Counts
 
@@ -57,9 +57,9 @@ while exposing already-implemented actions.
 - Modify: `src/renderer/src/components/Control/BackgroundTaskTray.tsx`
 - Test: `src/renderer/src/components/Control/__tests__/BackgroundTaskTray.test.tsx`
 
-- [ ] Add a failing test with active and failed jobs after the first 30 rows.
-- [ ] Derive counts from all jobs while rendering only the first 30.
-- [ ] Run the focused test and commit.
+- [x] Add a failing test with active and failed jobs after the first 30 rows.
+- [x] Derive counts from all jobs while rendering only the first 30.
+- [x] Run the focused test and commit.
 
 ### Task 4: Recovery Reachability and Freshness
 
@@ -75,19 +75,18 @@ while exposing already-implemented actions.
 - Test: `src/renderer/src/components/Control/UserMenu/__tests__/UserMenu.test.tsx`
 - Test: `src/renderer/src/stores/__tests__/recovery-center.test.ts`
 
-- [ ] Add failing tests that all issue actions render and destructive cancel asks for confirmation.
-- [ ] Add failing assertions that Projection filter UI/types are absent and legacy state becomes
+- [x] Add failing tests that all issue actions render and destructive cancel asks for confirmation.
+- [x] Add failing assertions that Projection filter UI/types are absent and legacy state becomes
       `all`.
-- [ ] Add a failing indicator test for media-job notifications and dismissed issues.
-- [ ] Render all actions and route destructive actions through the existing confirm dialog.
-- [ ] Delete dead Projection recovery types and locale strings; migrate persisted state.
-- [ ] Refresh the indicator on media-job changes and window focus, excluding dismissed IDs.
-- [ ] Run Recovery tests and commit.
+- [x] Add a failing indicator test for media-job notifications and dismissed issues.
+- [x] Render all actions and route destructive actions through the existing confirm dialog.
+- [x] Delete dead Projection recovery types and locale strings; migrate persisted state.
+- [x] Refresh the indicator on media-job changes and window focus, excluding dismissed IDs.
+- [x] Run Recovery tests and commit.
 
 ### Task 5: Verification
 
-- [ ] Run all projection, VLC, background-task, Recovery, and Preferences tests.
-- [ ] Run `npm run typecheck`, `npm run lint`, and `git diff --check`.
-- [ ] Run `npx vitest run` and `npm run build`.
-- [ ] Mark this plan complete and inspect repository state.
-
+- [x] Run all projection, VLC, background-task, Recovery, and Preferences tests.
+- [x] Run `npm run typecheck`, `npm run lint`, and `git diff --check`.
+- [x] Run `npx vitest run` and `npm run build`.
+- [x] Mark this plan complete and inspect repository state.
