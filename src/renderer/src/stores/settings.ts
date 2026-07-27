@@ -439,10 +439,15 @@ export const useSettingsStore = create<SettingsStore>()(
         }
         return normalizeSettingsState(state)
       },
-      merge: (persistedState, currentState) => ({
-        ...currentState,
-        ...normalizeSettingsState(persistedState)
-      }),
+      merge: (persistedState, currentState) => {
+        const normalized = normalizeSettingsState(persistedState)
+        const lanRemote = normalized.lanRemote ?? currentState.lanRemote
+        return {
+          ...currentState,
+          ...normalized,
+          lanRemote: { ...lanRemote, enabled: false }
+        }
+      },
       partialize: (state) => ({
         timezone: state.timezone,
         hardwareAcceleration: state.hardwareAcceleration,
@@ -454,7 +459,7 @@ export const useSettingsStore = create<SettingsStore>()(
         trashRetentionDays: state.trashRetentionDays,
         reminderMode: state.reminderMode,
         projectionDisplayId: state.projectionDisplayId,
-        lanRemote: state.lanRemote
+        lanRemote: { ...state.lanRemote, enabled: false }
       })
     }
   )

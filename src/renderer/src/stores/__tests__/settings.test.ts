@@ -42,7 +42,8 @@ beforeEach(() => {
     themePreference: 'system',
     timerRingColor: '#3b82f6',
     speech: DEFAULT_SPEECH,
-    projectionDisplayId: ''
+    projectionDisplayId: '',
+    lanRemote: DEFAULT_LAN_REMOTE
   })
   mockToast.warning.mockClear()
   mockToast.success.mockClear()
@@ -442,6 +443,63 @@ describe('LAN remote settings', () => {
       enabled: true,
       allowTrustedDevices: true,
       trustDurationDays: 90
+    })
+  })
+
+  it('never persists the runtime enabled flag', () => {
+    let localStorageMock: Record<string, string> = {}
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => localStorageMock[key] || null,
+      setItem: (key: string, value: string) => {
+        localStorageMock[key] = value
+      },
+      removeItem: (key: string) => {
+        delete localStorageMock[key]
+      },
+      clear: () => {
+        localStorageMock = {}
+      },
+      length: 0,
+      key: (index: number) => Object.keys(localStorageMock)[index] || null
+    })
+
+    useSettingsStore.getState().setLanRemote({
+      ...DEFAULT_LAN_REMOTE,
+      enabled: true,
+      selectedHost: '192.168.1.10'
+    })
+
+    const persisted = JSON.parse(localStorage.getItem('hhc-settings')!)
+    expect(persisted.state.lanRemote).toEqual({
+      ...DEFAULT_LAN_REMOTE,
+      enabled: false,
+      selectedHost: '192.168.1.10'
+    })
+
+    vi.unstubAllGlobals()
+  })
+
+  it('rehydrates legacy enabled state as disabled', async () => {
+    localStorage.setItem(
+      'hhc-settings',
+      JSON.stringify({
+        version: 12,
+        state: {
+          lanRemote: {
+            ...DEFAULT_LAN_REMOTE,
+            enabled: true,
+            selectedHost: '192.168.1.10'
+          }
+        }
+      })
+    )
+
+    await useSettingsStore.persist.rehydrate()
+
+    expect(useSettingsStore.getState().lanRemote).toEqual({
+      ...DEFAULT_LAN_REMOTE,
+      enabled: false,
+      selectedHost: '192.168.1.10'
     })
   })
 })
