@@ -44,7 +44,7 @@ The order is deliberate:
 | R3    | Complete | Projection survives reload, crash, display changes, and browser popup failures through session replay and recovery.                           |
 | R4    | Complete | Media projection remains active while the operator previews, searches, and prepares the next source.                                          |
 | R5    | Complete | Presentation Workspace follows a PowerPoint-like desktop information architecture with essential editing operations.                          |
-| R6    | Planned  | Media import, readiness, playback, storage, and slide delivery are observable, recoverable, and performant.                                   |
+| R6    | Complete | Media import, readiness, playback, storage, and slide delivery are observable, recoverable, and performant.                                   |
 | R7    | Planned  | Shared responsive workspace primitives replace fixed page-specific layouts; dead paths are removed and release gates cover packaged behavior. |
 
 ## R0 — Immediate projection behavior and quality baseline
@@ -392,6 +392,21 @@ Make Media preparation and live delivery fast, inspectable, and recoverable.
 - Every skipped item has a reason and a recovery action where one exists.
 - Slide changes do not reload and serialize the complete editable deck.
 - Storage accounting reflects canonical document and asset sizes.
+
+### Completion evidence
+
+- [x] A layout-owned Background Task Tray observes the durable IndexedDB queue across routes and
+      exposes progress, paused, blocked, failed, completed, cancelled, retry, pause, and cancel
+      states.
+- [x] The skipped hover badge is an actionable readiness drawer with per-item reasons, retry or
+      prioritization, Recovery Center routing, and explicit skip acknowledgement.
+- [x] Non-ready items remain inspectable in the session readiness report even though only ready
+      files enter live playback.
+- [x] Editable documents use a bounded `blobId + revision` parse cache; projection payloads contain
+      one slide and only the image assets referenced by that slide.
+- [x] The source `file-blobs` record is the one canonical editable document body. New writes no
+      longer clone a derived mirror, and startup removes legacy mirrors without removing covers.
+- [x] Full Vitest, Node/Web typechecks, zero-warning ESLint, and production build passed after R6.
 
 ## R7 — Shared responsive shell, cleanup, and release gates
 
