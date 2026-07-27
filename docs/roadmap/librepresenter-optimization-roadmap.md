@@ -42,7 +42,7 @@ The order is deliberate:
 | R1    | Complete | File and presentation persistence failures cannot silently lose or fabricate state.                                                           |
 | R2    | Complete | Presentation editing has transactional Undo/Redo, serialized saving, visible save state, and safe lifecycle gates.                            |
 | R3    | Complete | Projection survives reload, crash, display changes, and browser popup failures through session replay and recovery.                           |
-| R4    | Planned  | Media projection remains active while the operator previews, searches, and prepares the next source.                                          |
+| R4    | Complete | Media projection remains active while the operator previews, searches, and prepares the next source.                                          |
 | R5    | Planned  | Presentation Workspace follows a PowerPoint-like desktop information architecture with essential editing operations.                          |
 | R6    | Planned  | Media import, readiness, playback, storage, and slide delivery are observable, recoverable, and performant.                                   |
 | R7    | Planned  | Shared responsive workspace primitives replace fixed page-specific layouts; dead paths are removed and release gates cover packaged behavior. |
@@ -301,6 +301,28 @@ Let operators continue searching and preparing content while live output remains
 - Preview never changes projection ownership.
 - Replacing live content is an explicit, visible action.
 - Popup/readiness failure cannot look like a successful projection session.
+
+### Progress — 2026-07-27
+
+- [x] Media Presenter is a routed `/media` workspace, while a route-independent bridge keeps
+      playback synchronization active when the operator returns to Files, Bible, or Timer.
+- [x] Files use a nested safe preview route. Image, video, PDF, and imported presentation preview
+      remain local until the operator presses the explicit Present action.
+- [x] Editable presentations continue to open in the editor instead of entering projection.
+- [x] The global Now Projecting bar reports connection, projection, degraded, and failed states
+      and provides distinct Return to Media, Stop Content, Resume Content, Retry, and Close
+      Projection actions.
+- [x] Stop Content creates a replayable blackout without closing or foregrounding the projection
+      window. Resume restores the retained session; Close clears the live Media session only after
+      the projection window closes successfully.
+- [x] Browser production E2E covers Media preview, live navigation away from Media, blackout
+      replay after projection reload, resume, and explicit close.
+- [x] Full Windows-hosted regression: 202 files and 2,087 tests passed.
+- [x] Node/Web typechecks, ESLint with zero warnings, production Electron/Vite build, PWA
+      precache, font, and largest-JS bundle budgets passed.
+- [x] Fresh Windows unpacked packaging, native VLC/FFmpeg runtime validation, and packaged
+      control/projection lifecycle smoke passed. macOS packaged behavior remains enforced by
+      release CI because it cannot run on this Windows host.
 
 ## R5 — PowerPoint-like Presentation Workspace
 
