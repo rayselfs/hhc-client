@@ -18,6 +18,17 @@ const STATUS_CLASS: Record<NowProjectingStatus, string> = {
   failed: 'text-danger'
 }
 
+export async function closeProjectionAndMediaSession({
+  closeProjection,
+  endLiveSession
+}: {
+  closeProjection: () => Promise<void>
+  endLiveSession: () => void
+}): Promise<void> {
+  await closeProjection()
+  endLiveSession()
+}
+
 export default function NowProjectingBar(): React.JSX.Element | null {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -31,6 +42,7 @@ export default function NowProjectingBar(): React.JSX.Element | null {
     getProjectionSnapshot
   } = useProjection()
   const lastReadinessReport = useMediaProjectionStore((state) => state.lastReadinessReport)
+  const endLiveSession = useMediaProjectionStore((state) => state.endLiveSession)
   const skippedMediaCount =
     sessionSummary.owner === 'media' && lastReadinessReport
       ? lastReadinessReport.summary.preparing +
@@ -107,7 +119,11 @@ export default function NowProjectingBar(): React.JSX.Element | null {
             {t('nowProjecting.actions.stop', 'Stop Content')}
           </Button>
         )}
-        <Button size="sm" variant="danger" onPress={() => void closeProjection()}>
+        <Button
+          size="sm"
+          variant="danger"
+          onPress={() => void closeProjectionAndMediaSession({ closeProjection, endLiveSession })}
+        >
           {t('nowProjecting.actions.close', 'Close Projection')}
         </Button>
       </Card.Footer>

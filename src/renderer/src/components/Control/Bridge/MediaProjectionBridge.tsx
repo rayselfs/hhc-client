@@ -4,7 +4,7 @@ import { useMediaProjectionSync } from '@renderer/lib/media-projection-sync'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 
 export default function MediaProjectionBridge(): null {
-  const { on } = useProjection()
+  const { on, isProjectionOpen, recovery } = useProjection()
 
   useMediaProjectionSync()
 
@@ -22,6 +22,13 @@ export default function MediaProjectionBridge(): null {
       })
     })
   }, [on])
+
+  useEffect(() => {
+    if (isProjectionOpen || recovery.status !== 'closed') return
+    const state = useMediaProjectionStore.getState()
+    if (!state.isPresenting && state.playlist.length === 0) return
+    state.markProjectionClosed()
+  }, [isProjectionOpen, recovery.status])
 
   return null
 }

@@ -13,12 +13,14 @@ const registryMocks = vi.hoisted(() => ({
 const mockProject = vi.fn()
 const mockStartProjection = vi.fn(() => Promise.resolve())
 const mockStopProjection = vi.fn(() => Promise.resolve())
+const projectionState = { activeOwner: 'media' as 'media' | 'timer' | 'bible' }
 
 vi.mock('@renderer/contexts/ProjectionContext', () => ({
   useProjection: () => ({
     project: mockProject,
     startProjection: mockStartProjection,
-    stopProjection: mockStopProjection
+    stopProjection: mockStopProjection,
+    activeOwner: projectionState.activeOwner
   })
 }))
 
@@ -49,6 +51,7 @@ function makeFile(id: string, name: string, mimeType = 'image/png', blobId = id)
 
 beforeEach(() => {
   vi.clearAllMocks()
+  projectionState.activeOwner = 'media'
   registryMocks.get.mockReturnValue(undefined)
   usePresentationWorkspaceStore.setState({ activeSlideIdByItemId: {} })
   useMediaProjectionStore.setState({
@@ -208,6 +211,21 @@ describe('media projection sync', () => {
     })
 
     expect(mockStopProjection).not.toHaveBeenCalled()
+  })
+
+  it('does not synchronize retained Media controls after another owner replaces it', () => {
+    projectionState.activeOwner = 'timer'
+    renderSync()
+    mockProject.mockClear()
+    mockStartProjection.mockClear()
+
+    act(() => {
+      useMediaProjectionStore.getState().jumpTo(1)
+      useMediaProjectionStore.getState().setZoomLevel(1.5)
+    })
+
+    expect(mockStartProjection).not.toHaveBeenCalled()
+    expect(mockProject).not.toHaveBeenCalled()
   })
 
   it('does not foreground pan and zoom transport updates', () => {

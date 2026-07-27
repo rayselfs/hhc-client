@@ -30,9 +30,10 @@ function playlistContentChanged(
 }
 
 export function useMediaProjectionSync(): void {
-  const { project, startProjection } = useProjection()
+  const { project, startProjection, activeOwner } = useProjection()
   const registry = usePresentationSessionRegistry()
   const projectSequenceRef = useRef(0)
+  const didInitializeRef = useRef(false)
 
   const projectCurrentItem = useCallback(
     async (
@@ -40,6 +41,7 @@ export function useMediaProjectionSync(): void {
       startSession = false,
       bringToFront = false
     ): Promise<void> => {
+      if (!startSession && activeOwner !== 'media') return
       const sequence = ++projectSequenceRef.current
       const item = state.currentItem()
       const basePayload = buildFileProjectionPayload(state)
@@ -64,7 +66,7 @@ export function useMediaProjectionSync(): void {
         }
       }
     },
-    [project, registry, startProjection]
+    [activeOwner, project, registry, startProjection]
   )
 
   useEffect(() => {
@@ -72,6 +74,7 @@ export function useMediaProjectionSync(): void {
       if (!state.isPresenting) return
 
       const started = !prev.isPresenting && state.isPresenting
+      if (!started && activeOwner !== 'media') return
       const indexChanged = state.currentIndex !== prev.currentIndex
       const playlistChanged = playlistContentChanged(prev.playlist, state.playlist)
       const endedCleared = prev.isEnded && !state.isEnded
@@ -87,42 +90,47 @@ export function useMediaProjectionSync(): void {
     return () => {
       unsub()
     }
-  }, [projectCurrentItem])
+  }, [activeOwner, projectCurrentItem])
 
   useEffect(() => {
     const unsub = useMediaProjectionStore.subscribe((state, prev) => {
       if (!state.isPresenting) return
+      if (activeOwner !== 'media') return
       if (state.pan !== prev.pan) {
         void project('file:control', { action: 'pan', value: state.pan })
       }
     })
     return unsub
-  }, [project])
+  }, [activeOwner, project])
 
   useEffect(() => {
     const unsub = useMediaProjectionStore.subscribe((state, prev) => {
       if (!state.isPresenting) return
+      if (activeOwner !== 'media') return
       if (state.zoomLevel !== prev.zoomLevel) {
         void project('file:control', { action: 'zoom', value: state.zoomLevel })
       }
     })
     return unsub
-  }, [project])
+  }, [activeOwner, project])
 
   useEffect(() => {
     const unsub = useMediaProjectionStore.subscribe((state, prev) => {
       if (!state.isPresenting) return
+      if (activeOwner !== 'media') return
       if (state.isEnded && !prev.isEnded) {
         projectSequenceRef.current += 1
         void project('file:end', null)
       }
     })
     return unsub
-  }, [project])
+  }, [activeOwner, project])
 
   useEffect(() => {
+    if (didInitializeRef.current) return
+    didInitializeRef.current = true
     const state = useMediaProjectionStore.getState()
-    if (!state.isPresenting) return
+    if (!state.isPresenting || activeOwner !== 'media') return
     void projectCurrentItem(state, true, false).catch(() => undefined)
-  }, [projectCurrentItem])
+  }, [activeOwner, projectCurrentItem])
 }

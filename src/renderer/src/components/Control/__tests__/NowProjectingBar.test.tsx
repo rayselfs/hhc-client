@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import '@renderer/i18n'
 import i18n from '@renderer/i18n'
-import NowProjectingBar from '../NowProjectingBar'
+import NowProjectingBar, { closeProjectionAndMediaSession } from '../NowProjectingBar'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 
 const mocks = vi.hoisted(() => {
@@ -146,5 +146,35 @@ describe('NowProjectingBar', () => {
     expect(mocks.actions.closeProjection).toHaveBeenCalledOnce()
     expect(mocks.actions.blackoutProjection).not.toHaveBeenCalled()
     expect(mocks.actions.bringProjectionToFront).not.toHaveBeenCalled()
+  })
+})
+
+describe('closeProjectionAndMediaSession', () => {
+  it('ends Media exactly once after projection closes successfully', async () => {
+    const calls: string[] = []
+    const closeProjection = vi.fn(async () => {
+      calls.push('close')
+    })
+    const endLiveSession = vi.fn(() => {
+      calls.push('end')
+    })
+
+    await closeProjectionAndMediaSession({ closeProjection, endLiveSession })
+
+    expect(calls).toEqual(['close', 'end'])
+    expect(endLiveSession).toHaveBeenCalledOnce()
+  })
+
+  it('keeps Media resources retained when projection close fails', async () => {
+    const closeProjection = vi.fn(async () => {
+      throw new Error('close failed')
+    })
+    const endLiveSession = vi.fn()
+
+    await expect(
+      closeProjectionAndMediaSession({ closeProjection, endLiveSession })
+    ).rejects.toThrow('close failed')
+
+    expect(endLiveSession).not.toHaveBeenCalled()
   })
 })
