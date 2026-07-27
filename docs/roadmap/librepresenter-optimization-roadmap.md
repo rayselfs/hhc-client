@@ -445,15 +445,17 @@ browser and packaged-desktop lifecycles.
 ### Completion evidence
 
 - [x] Media and Presentation use shared `WorkspaceShell`, `StageViewport`, `NavigatorRail`,
-      `InspectorPanel`, `ResponsivePanelGroup`, and `ProjectionSessionControl` primitives.
+      `InspectorPanel`, and `ProjectionSessionControl` primitives; Media also uses
+      `ResponsivePanelGroup` for its coordinated responsive panels.
 - [x] Wide, medium, and compact modes preserve a primary stage while moving navigator and
-      inspector surfaces into contextual drawers where space requires it.
+      inspector surfaces into contextual drawers where space requires it. Browser viewport tests
+      cover both Media and Presentation, including compact overlay mutual exclusion and overflow.
 - [x] Public blank/open projection context paths and stale projection state were removed after
       explicit start, retry, blackout, resume, and close paths were verified.
 - [x] Browser projection E2E is part of PR CI; packaged projection smoke runs for both Windows and
       macOS release matrix jobs.
 - [x] Full Vitest passed with 206 files and 2,100 tests, followed by Node/Web typechecks,
-      zero-error ESLint, production build, bundle budgets, and 3/3 browser projection E2E.
+      zero-error ESLint, production build, bundle budgets, and 5/5 browser projection E2E.
 - [x] A freshly unpacked Windows x64 build passed native/runtime checks and the packaged Electron
       recovery lifecycle E2E. The equivalent macOS executable is covered by the release matrix.
 

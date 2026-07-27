@@ -47,15 +47,12 @@ const storeSingleton: BibleStore = {
 vi.mock('@renderer/contexts/ProjectionContext', () => ({
   useProjection: () => ({
     isProjectionOpen: false,
-    isProjectionBlanked: false,
     projectionReadyCount: 0,
     activeOwner: 'bible',
     claimProjection: vi.fn(),
     startProjection: mockStartProjection,
     stopProjection: vi.fn(),
-    openProjection: vi.fn(),
     closeProjection: vi.fn(),
-    blankProjection: vi.fn(),
     project: mockProject,
     send: vi.fn(),
     on: vi.fn()

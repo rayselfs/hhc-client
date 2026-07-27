@@ -1156,7 +1156,10 @@ function EditableSessionDocumentView({
             size="sm"
             variant={isBackgroundPanelOpen ? 'primary' : 'tertiary'}
             isDisabled={!activeSlide}
-            onPress={() => setIsBackgroundPanelOpen(true)}
+            onPress={() => {
+              setIsCompactRailOpen(false)
+              setIsBackgroundPanelOpen(true)
+            }}
           >
             <Palette size={16} />
             {t('presentationWorkspace.formatBackground', 'Format Background')}
@@ -1725,7 +1728,10 @@ function EditableSessionDocumentView({
               size="sm"
               variant="tertiary"
               className="absolute left-2 top-2 z-20 md:hidden"
-              onPress={() => setIsCompactRailOpen(true)}
+              onPress={() => {
+                setIsBackgroundPanelOpen(false)
+                setIsCompactRailOpen(true)
+              }}
               aria-label={t('presentationWorkspace.openSlideRail', 'Open slide rail')}
             >
               {t('presentationWorkspace.slides', 'Slides')}

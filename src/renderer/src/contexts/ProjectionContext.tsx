@@ -90,7 +90,6 @@ function getAdapter(ref: React.RefObject<ProjectionAdapter | null>): ProjectionA
 
 export function ProjectionProvider({ children }: { children: React.ReactNode }): React.JSX.Element {
   const [isProjectionOpen, setIsProjectionOpen] = useState(false)
-  const [, setIsProjectionBlanked] = useState(true)
   const [projectionReadyCount, setProjectionReadyCount] = useState(0)
   const [activeOwner, setActiveOwner] = useState<ProjectionOwner>('timer')
   const [recovery, setRecovery] = useState<ProjectionRecoveryState>(CLOSED_RECOVERY_STATE)
@@ -129,7 +128,6 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
     getAdapter(adapterRef).setGeneration(0)
     projectionWindowRef.current = null
     updateOpen(false)
-    setIsProjectionBlanked(true)
     stopPolling()
   }, [getCoordinator, stopPolling, updateOpen])
 
@@ -190,7 +188,6 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
         if (event.status === 'closed') {
           coordinator.endSession()
           adapter.setGeneration(0)
-          setIsProjectionBlanked(true)
         }
       })
 
@@ -329,14 +326,12 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
     }
     adapter.setGeneration(0)
     updateOpen(false)
-    setIsProjectionBlanked(true)
   }, [getCoordinator, stopPolling, updateOpen])
 
   const claimProjection = useCallback(
     (owner: ProjectionOwner, options?: { unblank?: boolean }): void => {
       setActiveOwner(owner)
       getCoordinator().claim(owner, options?.unblank)
-      if (options?.unblank) setIsProjectionBlanked(false)
     },
     [getCoordinator]
   )
@@ -345,7 +340,6 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
     async (enabled: boolean): Promise<void> => {
       if (enabled) await window.api?.projectionVlc?.stop?.().catch(() => {})
       getCoordinator().blackout(enabled)
-      setIsProjectionBlanked(enabled)
     },
     [getCoordinator]
   )
@@ -364,7 +358,6 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       const coordinator = getCoordinator()
       coordinator.startSession(owner, payloads)
       setActiveOwner(owner)
-      setIsProjectionBlanked(false)
 
       let result: ProjectionOperationResult
       if (coordinator.getRecoveryState().status === 'ready') {

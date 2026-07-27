@@ -17,7 +17,6 @@ const {
   mockOn,
   mockStopProjection,
   mockClaimProjection,
-  mockBlankProjection,
   mockPauseTimer,
   storeState
 } = vi.hoisted(() => {
@@ -46,7 +45,6 @@ const {
     mockOn: vi.fn(() => vi.fn()),
     mockStopProjection: vi.fn(),
     mockClaimProjection: vi.fn(),
-    mockBlankProjection: vi.fn(),
     mockPauseTimer: vi.fn(),
     storeState: {
       playlist: [videoItem],
@@ -82,7 +80,6 @@ vi.mock('@renderer/contexts/ProjectionContext', () => ({
     claimProjection: mockClaimProjection,
     startProjection: vi.fn(),
     stopProjection: mockStopProjection,
-    blankProjection: mockBlankProjection,
     send: mockSend,
     project: mockProject,
     on: mockOn

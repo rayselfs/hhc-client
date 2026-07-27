@@ -19,12 +19,9 @@ vi.mock('@renderer/contexts/ProjectionContext', () => ({
     send: vi.fn(),
     on: vi.fn(),
     isProjectionOpen: false,
-    isProjectionBlanked: true,
     projectionReadyCount: 0,
     activeOwner: 'timer',
-    openProjection: vi.fn().mockResolvedValue(undefined),
-    closeProjection: vi.fn(),
-    blankProjection: vi.fn()
+    closeProjection: vi.fn()
   }))
 }))
 

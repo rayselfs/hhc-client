@@ -118,7 +118,6 @@ vi.mock('@renderer/config/shortcuts', () => ({
 vi.mock('@renderer/contexts/ProjectionContext', () => ({
   useProjection: () => ({
     isProjectionOpen: false,
-    isProjectionBlanked: false,
     projectionReadyCount: 0,
     activeOwner: 'timer',
     claimProjection: vi.fn(),
@@ -126,9 +125,7 @@ vi.mock('@renderer/contexts/ProjectionContext', () => ({
     stopProjection: vi.fn(),
     releaseOwnership: vi.fn(),
     project: vi.fn(),
-    openProjection: vi.fn(),
     closeProjection: vi.fn(),
-    blankProjection: vi.fn(),
     send: vi.fn(),
     on: vi.fn()
   })
