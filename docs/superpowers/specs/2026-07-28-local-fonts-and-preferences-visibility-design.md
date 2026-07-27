@@ -2,8 +2,8 @@
 
 ## Goal
 
-Let presentation authors use fonts installed on the current computer, while keeping unfinished
-Soundboard settings out of Preferences and removing the duplicated Storage Usage render.
+Let presentation authors use fonts installed on the current computer while keeping unfinished
+Soundboard settings out of Preferences.
 
 ## Root Causes
 
@@ -12,7 +12,6 @@ Soundboard settings out of Preferences and removing the duplicated Storage Usage
 - Local Font Access is permission-gated and requires a user interaction. It cannot be treated as an
   ordinary background data source.
 - Preferences explicitly registers and renders the unfinished Soundboard category.
-- `storage.usage` is rendered by two identical conditions.
 
 ## Selected Approach
 
@@ -25,7 +24,6 @@ already owns permission handling, and CSS can use installed family names directl
 
 Remove the Soundboard category, route, render branch, unused settings component, and its
 Preferences-only locale strings. The Soundboard page, store, playback, and route remain unchanged.
-Remove the duplicate Storage Usage branch.
 
 ## Interaction
 
@@ -62,6 +60,5 @@ No font file contents or paths are read or persisted.
 - Unit tests cover family cleanup, deduplication, sorting, and unsupported environments.
 - Presentation workspace tests prove the button calls the API from a click, adds a returned family,
   and retains the selected imported family.
-- Preferences tests prove Soundboard is absent and Storage Usage renders once.
+- Preferences tests prove Soundboard is absent and retain the existing single Storage Usage render.
 - Focused tests, typecheck, lint, full Vitest, and production build must pass.
-
