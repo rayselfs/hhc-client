@@ -96,6 +96,7 @@ export default function NowProjectingBar(): React.JSX.Element | null {
           <Button
             size="sm"
             variant="tertiary"
+            data-testid="now-projecting-return-media"
             onPress={() => void navigate('/media')}
             aria-label={t('nowProjecting.actions.returnToMedia', 'Return to Media Workspace')}
           >
@@ -111,17 +112,28 @@ export default function NowProjectingBar(): React.JSX.Element | null {
           </Button>
         )}
         {sessionSummary.isBlackout ? (
-          <Button size="sm" variant="secondary" onPress={() => void blackoutProjection(false)}>
+          <Button
+            size="sm"
+            variant="secondary"
+            data-testid="now-projecting-resume"
+            onPress={() => void blackoutProjection(false)}
+          >
             {t('nowProjecting.actions.resume', 'Resume Content')}
           </Button>
         ) : (
-          <Button size="sm" variant="secondary" onPress={() => void blackoutProjection(true)}>
+          <Button
+            size="sm"
+            variant="secondary"
+            data-testid="now-projecting-stop"
+            onPress={() => void blackoutProjection(true)}
+          >
             {t('nowProjecting.actions.stop', 'Stop Content')}
           </Button>
         )}
         <Button
           size="sm"
           variant="danger"
+          data-testid="now-projecting-close"
           onPress={() => void closeProjectionAndMediaSession({ closeProjection, endLiveSession })}
         >
           {t('nowProjecting.actions.close', 'Close Projection')}

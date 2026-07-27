@@ -51,6 +51,7 @@ export default function PresenterHeader({ onExit }: PresenterHeaderProps): React
         <Button
           variant="ghost"
           isIconOnly
+          data-testid="media-back-to-files"
           onPress={onExit}
           aria-label={t('common.close')}
           className="text-foreground/70 hover:text-foreground"

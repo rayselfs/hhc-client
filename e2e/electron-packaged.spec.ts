@@ -10,10 +10,10 @@ test.afterEach(async () => {
   electronApp = null
 })
 
-test('launches packaged control and projection windows with timer payload delivery', async ({
+test('launches packaged control and projection windows with recovery lifecycle', async ({
   browserName: _browserName
 }, testInfo) => {
-  test.setTimeout(60_000)
+  test.setTimeout(90_000)
   const configuredPath = process.env.PACKAGED_APP_PATH
   if (!configuredPath) throw new Error('PACKAGED_APP_PATH is required')
   const packagedAppPath = resolve(configuredPath)
@@ -49,5 +49,34 @@ test('launches packaged control and projection windows with timer payload delive
     await expect(projection.locator('.timer-digits').first()).toBeVisible()
     await projection.waitForTimeout(1200)
     expect(electronApp!.windows()).toHaveLength(2)
+  })
+
+  await test.step('browse Files while output remains live', async () => {
+    const projection = electronApp!
+      .windows()
+      .find((window) => window.url().endsWith('#/projection'))
+    if (!projection) throw new Error('Projection window did not open')
+
+    await control.locator('a[href="#/files"]').click()
+    await expect(control).toHaveURL(/#\/files$/)
+    await expect(projection.locator('.timer-digits').first()).toBeVisible()
+  })
+
+  await test.step('blackout, replay, resume, and close explicitly', async () => {
+    const projection = electronApp!
+      .windows()
+      .find((window) => window.url().endsWith('#/projection'))
+    if (!projection) throw new Error('Projection window did not open')
+
+    await control.getByTestId('now-projecting-stop').click()
+    await expect(projection.getByTestId('projection-blackout')).toBeVisible()
+    await projection.reload()
+    await expect(projection.getByTestId('projection-blackout')).toBeVisible()
+
+    await control.getByTestId('now-projecting-resume').click()
+    await expect(projection.locator('.timer-digits').first()).toBeVisible()
+    await control.getByTestId('now-projecting-close').click()
+    await expect.poll(() => electronApp?.windows().length ?? 0).toBe(1)
+    await expect(control.getByTestId('now-projecting-bar')).toHaveCount(0)
   })
 })
