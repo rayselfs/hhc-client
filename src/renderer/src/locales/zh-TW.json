@@ -1045,28 +1045,6 @@
     "restoreNameConflictDescription": "還原位置已經有相同名稱的項目。",
     "restoreNameLabel": "名稱"
   },
-  "nowProjecting": {
-    "owners": {
-      "timer": "計時器",
-      "bible": "聖經",
-      "media": "媒體"
-    },
-    "statuses": {
-      "closed": "已關閉",
-      "opening": "開啟中",
-      "connected": "已連線",
-      "projecting": "投影中",
-      "degraded": "部分可用",
-      "failed": "失敗"
-    },
-    "actions": {
-      "returnToMedia": "返回媒體工作區",
-      "retry": "重試",
-      "stop": "停止內容",
-      "resume": "恢復內容",
-      "close": "關閉投影視窗"
-    }
-  },
   "mediaPreview": {
     "close": "關閉預覽",
     "zoomOut": "縮小",

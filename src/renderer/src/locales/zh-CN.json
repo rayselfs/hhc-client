@@ -1045,28 +1045,6 @@
     "restoreNameConflictDescription": "还原位置已经有相同名称的项目。",
     "restoreNameLabel": "名称"
   },
-  "nowProjecting": {
-    "owners": {
-      "timer": "计时器",
-      "bible": "圣经",
-      "media": "媒体"
-    },
-    "statuses": {
-      "closed": "已关闭",
-      "opening": "开启中",
-      "connected": "已连接",
-      "projecting": "投影中",
-      "degraded": "部分可用",
-      "failed": "失败"
-    },
-    "actions": {
-      "returnToMedia": "返回媒体工作区",
-      "retry": "重试",
-      "stop": "停止内容",
-      "resume": "恢复内容",
-      "close": "关闭投影窗口"
-    }
-  },
   "mediaPreview": {
     "close": "关闭预览",
     "zoomOut": "缩小",
