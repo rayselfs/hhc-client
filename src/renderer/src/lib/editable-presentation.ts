@@ -76,6 +76,7 @@ export interface EditableTextElement extends EditableElementBase {
   autoWidth?: boolean
   autoSize?: EditableTextAutoSize
   text: string
+  runs?: EditableTextRun[]
   fontFamily: string
   fontSize: number
   bold: boolean
@@ -84,6 +85,16 @@ export interface EditableTextElement extends EditableElementBase {
   color: string
   align: EditableTextAlign
   lineHeight: number
+}
+
+export interface EditableTextRun {
+  text: string
+  fontFamily: string
+  fontSize: number
+  bold: boolean
+  italic: boolean
+  underline: boolean
+  color: string
 }
 
 export interface EditableImageElement extends EditableElementBase {

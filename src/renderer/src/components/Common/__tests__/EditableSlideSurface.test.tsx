@@ -408,6 +408,60 @@ describe('EditableSlideSurface', () => {
     expect(updates).not.toHaveProperty('height')
   })
 
+  it('renders imported text runs and clears them on the first plain-text edit', () => {
+    const handleUpdate = vi.fn()
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const slideId = document.slideOrder[0]
+    const text = createTextElement({ text: 'Bold plain', autoSize: 'fixed' })
+    Object.assign(text, {
+      runs: [
+        {
+          text: 'Bold',
+          fontFamily: 'Arial',
+          fontSize: 40,
+          bold: true,
+          italic: false,
+          underline: false,
+          color: '#ff0000'
+        },
+        {
+          text: ' plain',
+          fontFamily: 'Arial',
+          fontSize: 24,
+          bold: false,
+          italic: true,
+          underline: false,
+          color: '#0000ff'
+        }
+      ]
+    })
+    const withText = addElementToSlide(document, slideId, text)
+
+    render(
+      <EditableSurfaceHarness
+        document={withText}
+        slideId={slideId}
+        onUpdateElement={handleUpdate}
+      />
+    )
+
+    expect(screen.getByText('Bold')).toHaveStyle({
+      fontSize: '40px',
+      fontWeight: '700',
+      color: '#ff0000'
+    })
+    const textBox = screen.getByRole('textbox')
+    fireEvent.pointerDown(textBox, { clientX: 40, clientY: 20, pointerId: 1 })
+    textBox.textContent = 'Edited'
+    fireEvent.input(textBox)
+
+    expect(handleUpdate).toHaveBeenCalledWith(
+      slideId,
+      text.id,
+      expect.objectContaining({ text: 'Edited', runs: undefined })
+    )
+  })
+
   it('renders selected text boxes with clearly visible square resize handles', () => {
     const document = createBlankEditablePresentationDocument('Sunday')
     const slideId = document.slideOrder[0]

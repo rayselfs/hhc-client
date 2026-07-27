@@ -876,6 +876,7 @@ function TextElementContent({
   const commitText = (text: string): void => {
     onUpdateElement?.(slideId, element.id, {
       text,
+      runs: undefined,
       ...(isContentAutoSizedText(element)
         ? measureAutoSizedTextElement(contentRef.current, element, text)
         : {})
@@ -994,7 +995,25 @@ function TextElementContent({
         })
       }}
     >
-      {editing ? null : element.text}
+      {editing
+        ? null
+        : element.runs?.length
+          ? element.runs.map((run, index) => (
+              <span
+                key={index}
+                style={{
+                  color: run.color,
+                  fontFamily: run.fontFamily,
+                  fontSize: `${run.fontSize}px`,
+                  fontWeight: run.bold ? 700 : 400,
+                  fontStyle: run.italic ? 'italic' : 'normal',
+                  textDecoration: run.underline ? 'underline' : 'none'
+                }}
+              >
+                {run.text}
+              </span>
+            ))
+          : element.text}
     </div>
   )
 }
