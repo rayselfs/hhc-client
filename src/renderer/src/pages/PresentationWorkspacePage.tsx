@@ -3,8 +3,16 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   AlignCenter,
+  AlignHorizontalJustifyCenter,
+  AlignHorizontalJustifyEnd,
+  AlignHorizontalJustifyStart,
+  AlignHorizontalSpaceAround,
   AlignLeft,
   AlignRight,
+  AlignVerticalJustifyCenter,
+  AlignVerticalJustifyEnd,
+  AlignVerticalJustifyStart,
+  AlignVerticalSpaceAround,
   Baseline,
   Bold,
   ChevronDown,
@@ -1518,36 +1526,47 @@ function EditableSessionDocumentView({
 
         <RibbonGroup
           label={t('presentationWorkspace.ribbonGroups.arrange', 'Arrange')}
-          className="w-72"
+          className="w-44"
         >
           <div data-ribbon-no-wrap className="grid h-full grid-cols-4 grid-rows-2 gap-1">
-            {(['left', 'center', 'right', 'top', 'middle', 'bottom'] as const).map((alignment) => (
-              <Button
+            {(
+              [
+                ['left', AlignHorizontalJustifyStart, 'Align objects left'],
+                ['center', AlignHorizontalJustifyCenter, 'Align objects center'],
+                ['right', AlignHorizontalJustifyEnd, 'Align objects right'],
+                ['top', AlignVerticalJustifyStart, 'Align objects top'],
+                ['middle', AlignVerticalJustifyCenter, 'Align objects middle'],
+                ['bottom', AlignVerticalJustifyEnd, 'Align objects bottom']
+              ] as const
+            ).map(([alignment, Icon, fallback]) => (
+              <button
                 key={alignment}
-                size="sm"
-                variant="tertiary"
-                isDisabled={selectedElementIds.size < 2}
-                onPress={() => applyElementAlignment(alignment)}
+                type="button"
+                className={RIBBON_ICON_BUTTON_CLASS}
+                disabled={selectedElementIds.size < 2}
+                onClick={() => applyElementAlignment(alignment)}
+                aria-label={t(`presentationWorkspace.objectAlign.${alignment}`, fallback)}
               >
-                {t(`presentationWorkspace.objectAlign.${alignment}`, alignment)}
-              </Button>
+                <Icon size={19} />
+              </button>
             ))}
-            <Button
-              size="sm"
-              variant="tertiary"
-              isDisabled={selectedElementIds.size < 3}
-              onPress={() => applyElementDistribution('horizontal')}
-            >
-              {t('presentationWorkspace.distributeHorizontal', 'Distribute H')}
-            </Button>
-            <Button
-              size="sm"
-              variant="tertiary"
-              isDisabled={selectedElementIds.size < 3}
-              onPress={() => applyElementDistribution('vertical')}
-            >
-              {t('presentationWorkspace.distributeVertical', 'Distribute V')}
-            </Button>
+            {(
+              [
+                ['horizontal', AlignHorizontalSpaceAround, 'Distribute objects horizontally'],
+                ['vertical', AlignVerticalSpaceAround, 'Distribute objects vertically']
+              ] as const
+            ).map(([direction, Icon, fallback]) => (
+              <button
+                key={direction}
+                type="button"
+                className={RIBBON_ICON_BUTTON_CLASS}
+                disabled={selectedElementIds.size < 3}
+                onClick={() => applyElementDistribution(direction)}
+                aria-label={t(`presentationWorkspace.distribute.${direction}`, fallback)}
+              >
+                <Icon size={19} />
+              </button>
+            ))}
           </div>
         </RibbonGroup>
       </div>

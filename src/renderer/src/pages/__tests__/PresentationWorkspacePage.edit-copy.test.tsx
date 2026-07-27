@@ -243,6 +243,16 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
     const surface = window.document.querySelector('[data-ribbon-surface]')
     expect(surface).toHaveClass('overflow-x-auto', 'overflow-y-hidden')
     expect(screen.getByRole('group', { name: 'Arrange' }).querySelector('.flex-wrap')).toBeNull()
+    ;[
+      'Align objects left',
+      'Align objects center',
+      'Align objects right',
+      'Align objects top',
+      'Align objects middle',
+      'Align objects bottom',
+      'Distribute objects horizontally',
+      'Distribute objects vertically'
+    ].forEach((name) => expect(screen.getByRole('button', { name })).toHaveTextContent(''))
   })
 
   it('loads local font families from a user action', async () => {

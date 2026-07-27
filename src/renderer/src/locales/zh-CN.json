@@ -672,6 +672,18 @@
       "center": "居中",
       "right": "右对齐",
       "justify": "两端对齐"
+    },
+    "objectAlign": {
+      "left": "对象左对齐",
+      "center": "对象水平居中",
+      "right": "对象右对齐",
+      "top": "对象顶端对齐",
+      "middle": "对象垂直居中",
+      "bottom": "对象底端对齐"
+    },
+    "distribute": {
+      "horizontal": "水平等距分布对象",
+      "vertical": "垂直等距分布对象"
     }
   },
   "projection": {

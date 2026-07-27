@@ -672,6 +672,18 @@
       "center": "置中",
       "right": "靠右對齊",
       "justify": "左右對齊"
+    },
+    "objectAlign": {
+      "left": "物件靠左對齊",
+      "center": "物件水平置中",
+      "right": "物件靠右對齊",
+      "top": "物件靠上對齊",
+      "middle": "物件垂直置中",
+      "bottom": "物件靠下對齊"
+    },
+    "distribute": {
+      "horizontal": "水平等距分散物件",
+      "vertical": "垂直等距分散物件"
     }
   },
   "projection": {

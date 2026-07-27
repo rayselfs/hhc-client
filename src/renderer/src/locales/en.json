@@ -672,6 +672,18 @@
       "center": "Center",
       "right": "Align right",
       "justify": "Justify"
+    },
+    "objectAlign": {
+      "left": "Align objects left",
+      "center": "Align objects center",
+      "right": "Align objects right",
+      "top": "Align objects top",
+      "middle": "Align objects middle",
+      "bottom": "Align objects bottom"
+    },
+    "distribute": {
+      "horizontal": "Distribute objects horizontally",
+      "vertical": "Distribute objects vertically"
     }
   },
   "projection": {
