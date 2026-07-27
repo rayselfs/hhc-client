@@ -40,12 +40,12 @@ retain alternate presentation starts as keyboard shortcuts.
 - Removes: `deriveNowProjectingStatus`
 - Preserves: `ProjectionRecoveryNotice`
 
-- [ ] Remove the `NowProjectingBar` import and render site from `Layout`.
-- [ ] Delete the component, status helper, and their isolated tests.
-- [ ] Delete the three orphaned `nowProjecting` locale objects.
-- [ ] Run `rg -n "NowProjecting|nowProjecting|projection-session-summary" src/renderer/src` and
+- [x] Remove the `NowProjectingBar` import and render site from `Layout`.
+- [x] Delete the component, status helper, and their isolated tests.
+- [x] Delete the three orphaned `nowProjecting` locale objects.
+- [x] Run `rg -n "NowProjecting|nowProjecting|projection-session-summary" src/renderer/src` and
       expect no matches.
-- [ ] Run `npm run typecheck` and commit.
+- [x] Run `npm run typecheck` and commit.
 
 ### Task 2: Restore the Generic Round Toggle
 
@@ -57,11 +57,11 @@ retain alternate presentation starts as keyboard shortcuts.
 - Preserves: existing `handleProjectionAction(): Promise<void>`
 - Produces: one ungrouped `Button` with `size-10 min-w-10 rounded-full p-0`
 
-- [ ] Add a failing test that the projection button has round fixed-size classes and no
+- [x] Add a failing test that the projection button has round fixed-size classes and no
       `[role="group"]` ancestor.
-- [ ] Run the focused test and verify it fails because the current button has `px-6` and a group.
-- [ ] Remove the single-child `ButtonGroup`, set `size="lg"`, and apply the explicit round classes.
-- [ ] Run the focused header tests and commit.
+- [x] Run the focused test and verify it fails because the current button has `px-6` and a group.
+- [x] Remove the single-child `ButtonGroup`, set `size="lg"`, and apply the explicit round classes.
+- [x] Run the focused header tests and commit.
 
 ### Task 3: Replace the Presentation Action Group
 
@@ -74,18 +74,18 @@ retain alternate presentation starts as keyboard shortcuts.
 - Consumes: `stopProjectionSession({ stopProjection }): Promise<void>`
 - Produces: one round start/stop button
 
-- [ ] Add failing tests that one round start button exists, no visible beginning button exists, and
+- [x] Add failing tests that one round start button exists, no visible beginning button exists, and
       the start button presents the current slide.
-- [ ] Add a failing open-session test that the button is labeled “Stop projection” and delegates to
+- [x] Add a failing open-session test that the button is labeled “Stop projection” and delegates to
       `stopProjectionSession`.
-- [ ] Run the focused tests and verify the group/start-stop expectations fail.
-- [ ] Use `useProjection`, remove `ButtonGroup` and `ChevronsLeft`, and implement one round toggle.
-- [ ] Keep the current F5/Shift+F5 shortcut test unchanged and run the complete header test file.
-- [ ] Commit.
+- [x] Run the focused tests and verify the group/start-stop expectations fail.
+- [x] Use `useProjection`, remove `ButtonGroup` and `ChevronsLeft`, and implement one round toggle.
+- [x] Keep the current F5/Shift+F5 shortcut test unchanged and run the complete header test file.
+- [x] Commit.
 
 ### Task 4: Batch Verification
 
-- [ ] Run both header test files.
-- [ ] Run `npm run typecheck`, `npm run lint`, and `git diff --check`.
-- [ ] Run `npx vitest run` and `npm run build`.
-- [ ] Mark this plan complete and inspect repository state.
+- [x] Run both header test files.
+- [x] Run `npm run typecheck`, `npm run lint`, and `git diff --check`.
+- [x] Run `npx vitest run` and `npm run build`.
+- [x] Mark this plan complete and inspect repository state.
