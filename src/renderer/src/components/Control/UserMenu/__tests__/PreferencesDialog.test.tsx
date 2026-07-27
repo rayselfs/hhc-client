@@ -285,7 +285,7 @@ describe('PreferencesDialog', () => {
     expect(screen.getByTestId('category-storage')).toHaveAttribute('aria-pressed', 'false')
     expect(screen.getByTestId('category-storage-usage')).toHaveAttribute('aria-pressed', 'true')
     expect(screen.queryByRole('heading', { name: 'Usage' })).not.toBeInTheDocument()
-    expect(screen.getByText('Original media files')).toBeInTheDocument()
+    expect(screen.getAllByText('Original media files')).toHaveLength(1)
 
     await user.click(screen.getByTestId('category-storage-cleanup'))
     expect(screen.getByTestId('category-storage')).toHaveAttribute('aria-pressed', 'false')
@@ -307,14 +307,11 @@ describe('PreferencesDialog', () => {
     expect(screen.getByLabelText('Language')).toBeInTheDocument()
   })
 
-  it('opens soundboard preferences', async () => {
-    const user = userEvent.setup()
+  it('hides unfinished soundboard preferences', () => {
     renderDialog(true)
 
-    await user.click(screen.getByTestId('category-soundboard'))
-
-    expect(screen.getByLabelText(/default trigger mode/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/global fade/i)).toBeInTheDocument()
+    expect(screen.queryByTestId('category-soundboard')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/default trigger mode/i)).not.toBeInTheDocument()
   })
 
   it('opens recovery center preferences page', async () => {

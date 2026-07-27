@@ -9,13 +9,11 @@ import {
   Timer,
   ChevronRight,
   HardDrive,
-  SlidersHorizontal,
   AlertTriangle
 } from 'lucide-react'
 import GeneralSettings from '@renderer/components/Control/UserMenu/GeneralSettings'
 import TimerSettings from '@renderer/components/Control/UserMenu/TimerSettings'
 import BibleSettingsPanel from '@renderer/components/Control/UserMenu/BibleSettingsPanel'
-import SoundboardSettings from '@renderer/components/Control/UserMenu/SoundboardSettings'
 import RecoveryCenterSettings from '@renderer/components/Control/UserMenu/RecoveryCenterSettings'
 import MediaSettings, {
   type MediaSettingsSection
@@ -32,12 +30,11 @@ interface PreferencesDialogProps {
   initialRoute?: 'general' | 'recovery'
 }
 
-type Category = 'general' | 'timer' | 'bible' | 'soundboard' | 'media' | 'storage' | 'recovery'
+type Category = 'general' | 'timer' | 'bible' | 'media' | 'storage' | 'recovery'
 type PreferenceRoute =
   | 'general'
   | 'timer'
   | 'bible'
-  | 'soundboard'
   | 'recovery'
   | `media.${MediaSettingsSection}`
   | `storage.${StorageSettingsSection}`
@@ -60,7 +57,6 @@ interface CategoryItem {
     | 'preferences.categories.timer'
     | 'preferences.categories.media'
     | 'preferences.categories.bible'
-    | 'preferences.categories.soundboard'
     | 'preferences.categories.storage'
     | 'preferences.categories.recovery'
   route: PreferenceRoute
@@ -89,12 +85,6 @@ export default function PreferencesDialog({
     { id: 'general', icon: Settings, labelKey: 'preferences.categories.general', route: 'general' },
     { id: 'timer', icon: Timer, labelKey: 'preferences.categories.timer', route: 'timer' },
     { id: 'bible', icon: BookOpen, labelKey: 'preferences.categories.bible', route: 'bible' },
-    {
-      id: 'soundboard',
-      icon: SlidersHorizontal,
-      labelKey: 'preferences.categories.soundboard',
-      route: 'soundboard'
-    },
     {
       id: 'media',
       icon: Film,
@@ -213,7 +203,6 @@ export default function PreferencesDialog({
                     )}
                     {activeRoute === 'timer' && <TimerSettings />}
                     {activeRoute === 'bible' && <BibleSettingsPanel />}
-                    {activeRoute === 'soundboard' && <SoundboardSettings />}
                     {activeRoute === 'media.general' && <MediaSettings section="general" />}
                     {activeRoute === 'media.oneDrive' && <MediaSettings section="oneDrive" />}
                     {activeRoute === 'media.lanRemote' && <MediaSettings section="lanRemote" />}

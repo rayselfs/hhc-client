@@ -740,7 +740,6 @@
       "timer": "Timer",
       "media": "Media",
       "bible": "Bible",
-      "soundboard": "Soundboard",
       "storage": "Storage",
       "recovery": "Recovery"
     },
@@ -767,14 +766,6 @@
       "allDataConfirm": "Clear all settings, user data, media cache, and local data? This cannot be undone."
     },
     "mediaPlaceholder": "Media settings coming soon",
-    "soundboard": {
-      "playback": "Playback",
-      "defaultTriggerMode": "Default trigger mode",
-      "globalFade": "Global fade",
-      "masterVolumeDefault": "Master volume default",
-      "midi": "MIDI",
-      "enableMidi": "Enable MIDI"
-    },
     "trash": {
       "retentionLabel": "Trash Retention Period",
       "retentionDesc": "Items in trash will be permanently deleted after this period",

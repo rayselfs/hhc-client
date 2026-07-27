@@ -740,7 +740,6 @@
       "timer": "計時器",
       "media": "多媒體",
       "bible": "聖經",
-      "soundboard": "音效板",
       "storage": "儲存空間",
       "recovery": "修復中心"
     },
@@ -767,14 +766,6 @@
       "allDataConfirm": "清除所有設定、使用者資料、媒體快取與本機資料？此操作無法復原。"
     },
     "mediaPlaceholder": "媒體設定即將推出",
-    "soundboard": {
-      "playback": "播放",
-      "defaultTriggerMode": "預設觸發模式",
-      "globalFade": "全域淡出",
-      "masterVolumeDefault": "預設主音量",
-      "midi": "MIDI",
-      "enableMidi": "啟用 MIDI"
-    },
     "trash": {
       "retentionLabel": "垃圾桶保留期限",
       "retentionDesc": "垃圾桶中的項目將在此期限後永久刪除",
