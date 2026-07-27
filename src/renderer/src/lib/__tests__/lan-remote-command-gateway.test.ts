@@ -109,13 +109,13 @@ it('rejects media playback commands unless the active item is a video', async ()
     isPresenting: true
   })
 
-  await expect(
-    executeLanRemoteCommand({ requestId: 'play', type: 'media:play' })
-  ).resolves.toEqual({
-    requestId: 'play',
-    status: 'rejected',
-    reason: 'video-not-active'
-  })
+  await expect(executeLanRemoteCommand({ requestId: 'play', type: 'media:play' })).resolves.toEqual(
+    {
+      requestId: 'play',
+      status: 'rejected',
+      reason: 'video-not-active'
+    }
+  )
 })
 
 it('rejects redundant video playback commands', async () => {
@@ -128,13 +128,13 @@ it('rejects redundant video playback commands', async () => {
     }
   })
 
-  await expect(
-    executeLanRemoteCommand({ requestId: 'play', type: 'media:play' })
-  ).resolves.toEqual({
-    requestId: 'play',
-    status: 'rejected',
-    reason: 'already-playing'
-  })
+  await expect(executeLanRemoteCommand({ requestId: 'play', type: 'media:play' })).resolves.toEqual(
+    {
+      requestId: 'play',
+      status: 'rejected',
+      reason: 'already-playing'
+    }
+  )
 
   useMediaProjectionStore.setState({
     typeStates: {

@@ -112,15 +112,11 @@ export const DEFAULT_SYNC_OFFLINE_POLICY: SyncOfflinePolicy = 'always-offline'
 export interface LanRemoteSettings {
   enabled: boolean
   selectedHost: string
-  allowTrustedDevices: boolean
-  trustDurationDays: number
 }
 
 export const DEFAULT_LAN_REMOTE: LanRemoteSettings = {
   enabled: false,
-  selectedHost: '',
-  allowTrustedDevices: false,
-  trustDurationDays: 30
+  selectedHost: ''
 }
 
 export function getEffectiveOneDriveClientId(): string {
@@ -155,15 +151,7 @@ function normalizeLanRemoteSettings(value: unknown): LanRemoteSettings {
   if (!isRecord(value)) return DEFAULT_LAN_REMOTE
   return {
     enabled: typeof value.enabled === 'boolean' ? value.enabled : DEFAULT_LAN_REMOTE.enabled,
-    selectedHost: typeof value.selectedHost === 'string' ? value.selectedHost : '',
-    allowTrustedDevices:
-      typeof value.allowTrustedDevices === 'boolean'
-        ? value.allowTrustedDevices
-        : DEFAULT_LAN_REMOTE.allowTrustedDevices,
-    trustDurationDays: Math.min(
-      90,
-      Math.max(1, normalizePositiveInteger(value.trustDurationDays, 30))
-    )
+    selectedHost: typeof value.selectedHost === 'string' ? value.selectedHost : ''
   }
 }
 

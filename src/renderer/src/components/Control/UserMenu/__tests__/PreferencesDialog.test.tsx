@@ -92,9 +92,7 @@ vi.mock('@renderer/stores/settings', () => ({
       setTrashRetentionDays: vi.fn(),
       lanRemote: {
         enabled: false,
-        selectedHost: '',
-        allowTrustedDevices: false,
-        trustDurationDays: 30
+        selectedHost: ''
       },
       setLanRemote: vi.fn(),
       resetSettings: vi.fn(),
@@ -233,6 +231,7 @@ describe('PreferencesDialog', () => {
     await user.click(screen.getByTestId('category-media-lanRemote'))
 
     expect(screen.getByLabelText('Enable LAN remote')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Allow trusted devices')).not.toBeInTheDocument()
   })
 
   it('allows OneDrive login from web and disables the button while login is pending', async () => {
@@ -372,9 +371,7 @@ describe('PreferencesDialog', () => {
         setProjectionDisplayId: vi.fn(),
         lanRemote: {
           enabled: false,
-          selectedHost: '',
-          allowTrustedDevices: false,
-          trustDurationDays: 30
+          selectedHost: ''
         },
         setLanRemote: vi.fn()
       }
@@ -483,9 +480,7 @@ describe('PreferencesDialog', () => {
         setProjectionDisplayId: vi.fn(),
         lanRemote: {
           enabled: false,
-          selectedHost: '',
-          allowTrustedDevices: false,
-          trustDurationDays: 30
+          selectedHost: ''
         },
         setLanRemote: vi.fn()
       }
@@ -546,9 +541,7 @@ describe('PreferencesDialog', () => {
         setProjectionDisplayId: vi.fn(),
         lanRemote: {
           enabled: false,
-          selectedHost: '',
-          allowTrustedDevices: false,
-          trustDurationDays: 30
+          selectedHost: ''
         },
         setLanRemote: vi.fn()
       }
@@ -606,9 +599,7 @@ describe('PreferencesDialog', () => {
         setProjectionDisplayId: vi.fn(),
         lanRemote: {
           enabled: false,
-          selectedHost: '',
-          allowTrustedDevices: false,
-          trustDurationDays: 30
+          selectedHost: ''
         },
         setLanRemote: vi.fn()
       }
@@ -664,9 +655,7 @@ describe('PreferencesDialog', () => {
         setProjectionDisplayId: vi.fn(),
         lanRemote: {
           enabled: false,
-          selectedHost: '',
-          allowTrustedDevices: false,
-          trustDurationDays: 30
+          selectedHost: ''
         },
         setLanRemote: vi.fn()
       }

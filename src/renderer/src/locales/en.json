@@ -806,8 +806,6 @@
       "lanRemote": {
         "enable": "Enable LAN remote",
         "privateInterface": "Private interface address",
-        "allowTrustedDevices": "Allow trusted devices",
-        "trustDurationDays": "Trust duration days",
         "running": "Remote running at {{host}}:{{port}}",
         "disabled": "LAN remote is disabled",
         "hostRequired": "Choose a private LAN address before enabling LAN remote.",

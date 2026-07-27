@@ -290,35 +290,6 @@ export default function MediaSettings({
             />
           </label>
 
-          <div className="border-t border-default-200 pt-4">
-            <label className="mb-2 block text-sm font-medium">
-              {t('preferences.media.lanRemote.allowTrustedDevices')}
-            </label>
-            <Switch
-              isSelected={lanRemote.allowTrustedDevices}
-              onChange={(checked) => setLanRemote({ ...lanRemote, allowTrustedDevices: checked })}
-              aria-label={t('preferences.media.lanRemote.allowTrustedDevices')}
-            >
-              <Switch.Control>
-                <Switch.Thumb />
-              </Switch.Control>
-            </Switch>
-          </div>
-
-          <label className="block text-sm font-medium">
-            {t('preferences.media.lanRemote.trustDurationDays')}
-            <input
-              type="number"
-              min={1}
-              max={90}
-              value={lanRemote.trustDurationDays}
-              onChange={(event) =>
-                setLanRemote({ ...lanRemote, trustDurationDays: Number(event.currentTarget.value) })
-              }
-              className="mt-2 w-full rounded-full border border-default-200 bg-transparent px-4 py-2 text-sm"
-            />
-          </label>
-
           <p className="text-xs text-gray-500">
             {lanRemoteStatus?.enabled
               ? t('preferences.media.lanRemote.running', {

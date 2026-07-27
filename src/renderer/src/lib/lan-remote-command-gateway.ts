@@ -57,11 +57,7 @@ export async function executeLanRemoteCommand(command: LanRemoteCommand): Promis
       return accept(command.requestId)
     case 'media:play': {
       const current = projection.currentItem()
-      if (
-        !projection.isPresenting ||
-        !current ||
-        getMediaType(current.mimeType) !== 'video'
-      ) {
+      if (!projection.isPresenting || !current || getMediaType(current.mimeType) !== 'video') {
         return rejected(command.requestId, 'video-not-active')
       }
       const video = projection.getTypeState('video')
@@ -76,11 +72,7 @@ export async function executeLanRemoteCommand(command: LanRemoteCommand): Promis
     }
     case 'media:pause': {
       const current = projection.currentItem()
-      if (
-        !projection.isPresenting ||
-        !current ||
-        getMediaType(current.mimeType) !== 'video'
-      ) {
+      if (!projection.isPresenting || !current || getMediaType(current.mimeType) !== 'video') {
         return rejected(command.requestId, 'video-not-active')
       }
       const video = projection.getTypeState('video')

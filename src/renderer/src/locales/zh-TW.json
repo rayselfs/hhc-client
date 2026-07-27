@@ -806,8 +806,6 @@
       "lanRemote": {
         "enable": "啟用 LAN 遙控",
         "privateInterface": "私人網路介面位址",
-        "allowTrustedDevices": "允許信任裝置",
-        "trustDurationDays": "信任天數",
         "running": "遙控已啟動於 {{host}}:{{port}}",
         "disabled": "LAN 遙控已停用",
         "hostRequired": "啟用 LAN 遙控前，請先選擇私人網路位址。",

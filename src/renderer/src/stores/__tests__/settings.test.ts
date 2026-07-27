@@ -435,14 +435,13 @@ describe('OneDrive settings', () => {
 describe('LAN remote settings', () => {
   it('normalizes LAN remote settings', () => {
     const normalized = normalizeSettingsState({
-      lanRemote: { enabled: true, trustDurationDays: 999, allowTrustedDevices: true }
+      lanRemote: { enabled: true, selectedHost: '192.168.1.10' }
     })
 
     expect(normalized.lanRemote).toEqual({
       ...DEFAULT_LAN_REMOTE,
       enabled: true,
-      allowTrustedDevices: true,
-      trustDurationDays: 90
+      selectedHost: '192.168.1.10'
     })
   })
 
