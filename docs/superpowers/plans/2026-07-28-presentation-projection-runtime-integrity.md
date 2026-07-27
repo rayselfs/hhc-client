@@ -313,7 +313,7 @@ git commit -m "fix: recreate timed-out projection on retry"
 - Preserves: one-use `mainClosePermit` for healthy renderer confirmation
 - Produces: unguarded close after `render-process-gone` for the current main window
 
-- [ ] **Step 1: Write the failing crash-close test**
+- [x] **Step 1: Write the failing crash-close test**
 
 ```ts
 wm.createMainWindow()
@@ -327,7 +327,7 @@ expect(closeEvent.preventDefault).not.toHaveBeenCalled()
 expect(mainWindow.webContents.send).not.toHaveBeenCalledWith('app:close-requested')
 ```
 
-- [ ] **Step 2: Run the WindowManager test and verify RED**
+- [x] **Step 2: Run the WindowManager test and verify RED**
 
 Run:
 
@@ -337,7 +337,7 @@ npx vitest run src/main/__tests__/windowManager.test.ts
 
 Expected: FAIL because close is prevented and `app:close-requested` is sent.
 
-- [ ] **Step 3: Implement the renderer-gone guard**
+- [x] **Step 3: Implement the renderer-gone guard**
 
 Add a private boolean initialized/reset when creating the main window. Set it in the current main
 window’s `render-process-gone` handler. In the close handler, return without preventing close when
@@ -345,7 +345,7 @@ the boolean is true.
 
 Reset it in `cleanup()` so tests and any future main-window recreation start healthy.
 
-- [ ] **Step 4: Run WindowManager tests and verify GREEN**
+- [x] **Step 4: Run WindowManager tests and verify GREEN**
 
 Run:
 
@@ -355,7 +355,7 @@ npx vitest run src/main/__tests__/windowManager.test.ts
 
 Expected: PASS, including the existing healthy close-permit test.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/main/windowManager.ts src/main/__tests__/windowManager.test.ts

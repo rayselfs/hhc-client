@@ -15,6 +15,7 @@ export class WindowManager {
   private mainWindow: BrowserWindow | null = null
   private projectionWindow: BrowserWindow | null = null
   private mainClosePermit = false
+  private mainRendererGone = false
   private projectionGeneration = 0
   private projectionLifecycle: ProjectionLifecycleEvent = {
     generation: 0,
@@ -62,6 +63,7 @@ export class WindowManager {
   }
 
   createMainWindow(): void {
+    this.mainRendererGone = false
     screen.on('display-added', () => {
       _cachedDisplay = undefined
     })
@@ -106,10 +108,12 @@ export class WindowManager {
     })
 
     this.mainWindow.webContents.on('render-process-gone', (_event, details) => {
+      this.mainRendererGone = true
       console.error('Main window renderer crashed:', details.reason)
     })
 
     this.mainWindow.on('close', (event) => {
+      if (this.mainRendererGone) return
       if (this.mainClosePermit) {
         this.mainClosePermit = false
         return
@@ -416,6 +420,7 @@ export class WindowManager {
     }
     this.mainWindow = null
     this.mainClosePermit = false
+    this.mainRendererGone = false
 
     if (this.projectionWindow && !this.projectionWindow.isDestroyed()) {
       this.projectionWindow.destroy()

@@ -248,6 +248,19 @@ describe('WindowManager', () => {
     expect(thirdClose.preventDefault).toHaveBeenCalledOnce()
   })
 
+  it('allows the main window to close after its renderer exits', () => {
+    const wm = WindowManager.getInstance()
+    wm.createMainWindow()
+    const mainWindow = FakeBrowserWindow.instances[0]
+    mainWindow.emitWebContents('render-process-gone', {}, { reason: 'crashed' })
+    const closeEvent = { preventDefault: vi.fn() }
+
+    mainWindow.emit('close', closeEvent)
+
+    expect(closeEvent.preventDefault).not.toHaveBeenCalled()
+    expect(mainWindow.webContents.send).not.toHaveBeenCalledWith('app:close-requested')
+  })
+
   it('does not guard projection-window close events', () => {
     const wm = WindowManager.getInstance()
     wm.createProjectionWindow()
