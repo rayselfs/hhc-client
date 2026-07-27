@@ -76,8 +76,8 @@ beforeEach(async () => {
 
 describe('saveWebOneDriveDownloadedContent', () => {
   it('stores downloaded content in IndexedDB and marks the sync entry available offline', async () => {
-    const response = new Response(new Blob(['video-bytes'], { type: 'video/mp4' }), {
-      headers: { 'Content-Length': '11' }
+    const response = new Response(new Uint8Array(13), {
+      headers: { 'Content-Length': '13' }
     })
 
     await expect(saveWebOneDriveDownloadedContent(request, response, metadata)).resolves.toEqual({
@@ -104,8 +104,8 @@ describe('saveWebOneDriveDownloadedContent', () => {
   })
 
   it('records Web download progress while streaming content', async () => {
-    const response = new Response(new Blob(['video-bytes'], { type: 'video/mp4' }), {
-      headers: { 'Content-Length': '11' }
+    const response = new Response(new Uint8Array(13), {
+      headers: { 'Content-Length': '13' }
     })
 
     await saveWebOneDriveDownloadedContent(request, response, metadata)
@@ -135,8 +135,8 @@ describe('saveWebOneDriveDownloadedContent', () => {
         estimate: vi.fn(async () => ({ quota: 10, usage: 9 }))
       }
     })
-    const response = new Response(new Blob(['video-bytes'], { type: 'video/mp4' }), {
-      headers: { 'Content-Length': '11' }
+    const response = new Response(new Uint8Array(13), {
+      headers: { 'Content-Length': '13' }
     })
 
     await expect(saveWebOneDriveDownloadedContent(request, response, metadata)).rejects.toThrow(
@@ -157,7 +157,7 @@ describe('saveWebOneDriveDownloadedContent', () => {
         estimate: vi.fn(async () => ({ quota: 100, usage: 75 }))
       }
     })
-    const response = new Response(new Blob(['video-bytes'], { type: 'video/mp4' }), {
+    const response = new Response(new Uint8Array(10), {
       headers: { 'Content-Length': '10' }
     })
 

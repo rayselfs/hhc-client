@@ -98,7 +98,7 @@ beforeEach(() => {
 describe('OneDrive native download IPC', () => {
   it('streams Graph content to a temporary file before atomic rename', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response(new Blob(['video-bytes'], { type: 'video/mp4' }), {
+      new Response(new Uint8Array(13), {
         headers: { 'Content-Type': 'video/mp4' }
       })
     )
@@ -126,7 +126,7 @@ describe('OneDrive native download IPC', () => {
 
   it('sends progress events while streaming content', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response(new Blob(['video-bytes'], { type: 'video/mp4' }), {
+      new Response(new Uint8Array(13), {
         headers: { 'Content-Type': 'video/mp4' }
       })
     )
@@ -170,7 +170,7 @@ describe('OneDrive native download IPC', () => {
   })
 
   it('removes the temporary file when streamed size does not match expectation', async () => {
-    mockFetch.mockResolvedValueOnce(new Response(new Blob(['short'])))
+    mockFetch.mockResolvedValueOnce(new Response('short'))
 
     await expect(
       getHandler('onedrive:download-file')(makeEvent(), {

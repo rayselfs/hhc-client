@@ -31,7 +31,11 @@ describe('refreshImportedMediaAssets', () => {
     URL.createObjectURL = vi.fn(() => 'blob:test-source')
     URL.revokeObjectURL = vi.fn()
     globalThis.fetch = vi.fn(
-      async () => new Response(new Blob(['png'], { type: 'image/png' }), { status: 200 })
+      async () =>
+        new Response(new Uint8Array([112, 110, 103]), {
+          status: 200,
+          headers: { 'Content-Type': 'image/png' }
+        })
     )
     mockEnsureSourceMediaMetadata.mockResolvedValue(null)
     mockGenerateThumbnail.mockResolvedValue('data:image/jpeg;base64,thumb')
