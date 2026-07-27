@@ -48,6 +48,76 @@ const VLC_WINDOW_EVENTS = [
 
 const VLC_WEB_CONTENTS_EVENTS = ['paint', 'devtools-opened', 'did-finish-load']
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function isOptionalFiniteNumber(
+  value: unknown,
+  minimum: number,
+  maximum = Number.POSITIVE_INFINITY
+): boolean {
+  return (
+    value === undefined ||
+    (typeof value === 'number' && Number.isFinite(value) && value >= minimum && value <= maximum)
+  )
+}
+
+function validateVlcStartRequest(value: unknown): ProjectionVlcStartRequest {
+  if (
+    !isRecord(value) ||
+    typeof value.itemId !== 'string' ||
+    value.itemId.length === 0 ||
+    !isValidNativeFileId(value.sourceFileId) ||
+    value.container !== '#vlc-player' ||
+    !isOptionalFiniteNumber(value.durationMs, 0) ||
+    !isOptionalFiniteNumber(value.initialPositionSeconds, 0) ||
+    !isOptionalFiniteNumber(value.initialVolume, 0, 1) ||
+    (value.initialPlaybackState !== undefined &&
+      !['playing', 'paused', 'ended'].includes(String(value.initialPlaybackState)))
+  ) {
+    throw new Error('Invalid VLC start request')
+  }
+  return value as unknown as ProjectionVlcStartRequest
+}
+
+function validateVlcProbeRequest(value: unknown): ProjectionVlcProbeRequest {
+  if (!isRecord(value) || !isValidNativeFileId(value.sourceFileId)) {
+    throw new Error('Invalid VLC probe request')
+  }
+  return value as unknown as ProjectionVlcProbeRequest
+}
+
+function validateVlcControlRequest(value: unknown): ProjectionVlcControlRequest {
+  if (
+    !isRecord(value) ||
+    (value.itemId !== undefined && (typeof value.itemId !== 'string' || value.itemId.length === 0))
+  ) {
+    throw new Error('Invalid VLC control request')
+  }
+  if (value.action === 'play' || value.action === 'pause') {
+    return value as unknown as ProjectionVlcControlRequest
+  }
+  if (
+    value.action === 'seek' &&
+    typeof value.value === 'number' &&
+    Number.isFinite(value.value) &&
+    value.value >= 0
+  ) {
+    return value as unknown as ProjectionVlcControlRequest
+  }
+  if (
+    value.action === 'volume' &&
+    typeof value.value === 'number' &&
+    Number.isFinite(value.value) &&
+    value.value >= 0 &&
+    value.value <= 1
+  ) {
+    return value as unknown as ProjectionVlcControlRequest
+  }
+  throw new Error('Invalid VLC control request')
+}
+
 function captureListeners(
   target: ListenerTarget,
   events: string[]
@@ -128,7 +198,6 @@ async function probeVlcMedia(
   loadRuntime: LoadVlcPlayerRuntime,
   request: ProjectionVlcProbeRequest
 ): Promise<ProjectionVlcProbeResult> {
-  if (!isValidNativeFileId(request.sourceFileId)) throw new Error('Invalid VLC source id')
   const { info, runtime } = await resolveVlcInfo(loadRuntime)
   if (info.status !== 'ready' || !info.vlcDir) {
     throw new Error(info.message ?? 'VLC runtime not found')
@@ -190,7 +259,6 @@ async function startVlc(
   loadRuntime: LoadVlcPlayerRuntime,
   request: ProjectionVlcStartRequest
 ): Promise<void> {
-  if (!isValidNativeFileId(request.sourceFileId)) throw new Error('Invalid VLC source id')
   const projectionWindow = wm.getProjectionWindow()
   if (!projectionWindow || projectionWindow.isDestroyed())
     throw new Error('Projection window not open')
@@ -300,19 +368,19 @@ export function registerProjectionVlcHandlers(
     return (await resolveVlcInfo(loadRuntime)).info
   })
 
-  ipcMain.handle('projection-vlc:start', async (event, request: ProjectionVlcStartRequest) => {
+  ipcMain.handle('projection-vlc:start', async (event, request: unknown) => {
     if (!isProjectionOrMainWindow(wm, event)) throw new Error('Unauthorized VLC access')
-    await startVlc(wm, loadRuntime, request)
+    await startVlc(wm, loadRuntime, validateVlcStartRequest(request))
   })
 
-  ipcMain.handle('projection-vlc:probe', async (event, request: ProjectionVlcProbeRequest) => {
+  ipcMain.handle('projection-vlc:probe', async (event, request: unknown) => {
     if (!isKnownWindow(wm, event)) throw new Error('Unauthorized VLC access')
-    return probeVlcMedia(loadRuntime, request)
+    return probeVlcMedia(loadRuntime, validateVlcProbeRequest(request))
   })
 
-  ipcMain.handle('projection-vlc:control', (event, command: ProjectionVlcControlRequest) => {
+  ipcMain.handle('projection-vlc:control', (event, command: unknown) => {
     if (!isProjectionOrMainWindow(wm, event)) throw new Error('Unauthorized VLC access')
-    controlVlc(command)
+    controlVlc(validateVlcControlRequest(command))
   })
 
   ipcMain.handle('projection-vlc:stop', async (event) => {

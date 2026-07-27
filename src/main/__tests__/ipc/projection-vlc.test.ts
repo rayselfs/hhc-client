@@ -306,4 +306,75 @@ describe('projection-vlc listener cleanup', () => {
       expect(mockVlcPlayers.at(-1)?.play).not.toHaveBeenCalled()
     }
   })
+
+  it.each([
+    ['missing payload', null],
+    [
+      'non-finite position',
+      {
+        itemId: 'item-1',
+        sourceFileId: '550e8400-e29b-41d4-a716-446655440000',
+        container: '#vlc-player',
+        initialPositionSeconds: Number.NaN
+      }
+    ],
+    [
+      'out-of-range volume',
+      {
+        itemId: 'item-1',
+        sourceFileId: '550e8400-e29b-41d4-a716-446655440000',
+        container: '#vlc-player',
+        initialVolume: 2
+      }
+    ],
+    [
+      'unknown replay state',
+      {
+        itemId: 'item-1',
+        sourceFileId: '550e8400-e29b-41d4-a716-446655440000',
+        container: '#vlc-player',
+        initialPlaybackState: 'buffering'
+      }
+    ],
+    [
+      'unknown container',
+      {
+        itemId: 'item-1',
+        sourceFileId: '550e8400-e29b-41d4-a716-446655440000',
+        container: '#other-player'
+      }
+    ]
+  ])('rejects an invalid start request: %s', async (_label, request) => {
+    await expect(
+      Promise.resolve().then(() => getHandler('projection-vlc:start')(makeEvent(), request))
+    ).rejects.toThrow('Invalid VLC start request')
+    expect(mockVlcPlayers).toHaveLength(0)
+  })
+
+  it('rejects a malformed probe request before loading VLC', async () => {
+    await expect(
+      Promise.resolve().then(() => getHandler('projection-vlc:probe')(makeEvent(), null))
+    ).rejects.toThrow('Invalid VLC probe request')
+    expect(mockVlcPlayers).toHaveLength(0)
+  })
+
+  it.each([
+    ['non-finite seek', { action: 'seek', value: Number.NaN }],
+    ['negative seek', { action: 'seek', value: -1 }],
+    ['out-of-range volume', { action: 'volume', value: Number.POSITIVE_INFINITY }],
+    ['unknown action', { action: 'stop-all' }]
+  ])('rejects an invalid control request: %s', async (_label, command) => {
+    await getHandler('projection-vlc:start')(makeEvent(), {
+      itemId: 'item-1',
+      sourceFileId: '550e8400-e29b-41d4-a716-446655440000',
+      container: '#vlc-player'
+    })
+    const current = mockVlcPlayers[0]
+
+    expect(() => getHandler('projection-vlc:control')(makeEvent(), command)).toThrow(
+      'Invalid VLC control request'
+    )
+    expect(current.setTime).not.toHaveBeenCalled()
+    expect(current.setVolume).not.toHaveBeenCalled()
+  })
 })
