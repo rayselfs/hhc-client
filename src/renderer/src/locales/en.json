@@ -585,6 +585,9 @@
       "adjust": "Adjust",
       "size": "Size"
     },
+    "fontFamily": "Font family",
+    "loadLocalFonts": "Load local fonts",
+    "localFontsLoadFailed": "Unable to load local fonts. Check the font access permission.",
     "present": "Present",
     "copyPage": "Copy Page",
     "untitledName": "Untitled Presentation",

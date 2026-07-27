@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   refreshEditablePresentationThumbnail: vi.fn(),
   navigate: vi.fn(),
   toastDanger: vi.fn(),
+  toastWarning: vi.fn(),
   readPresentationArrayBuffer: vi.fn(),
   openPptxViewer: vi.fn()
 }))
@@ -38,7 +39,7 @@ vi.mock('react-router-dom', async () => {
 })
 
 vi.mock('@heroui/react/toast', () => ({
-  toast: { danger: mocks.toastDanger }
+  toast: { danger: mocks.toastDanger, warning: mocks.toastWarning }
 }))
 
 vi.mock('@renderer/contexts/ContextMenuContext', () => ({
@@ -138,6 +139,7 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
     mocks.refreshEditablePresentationThumbnail.mockResolvedValue(undefined)
     mocks.navigate.mockReset()
     mocks.toastDanger.mockReset()
+    mocks.toastWarning.mockReset()
     mocks.readPresentationArrayBuffer.mockResolvedValue(new ArrayBuffer(8))
     mocks.openPptxViewer.mockResolvedValue({
       slideCount: 1,
@@ -241,6 +243,60 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
     const surface = window.document.querySelector('[data-ribbon-surface]')
     expect(surface).toHaveClass('overflow-x-auto', 'overflow-y-hidden')
     expect(screen.getByRole('group', { name: 'Arrange' }).querySelector('.flex-wrap')).toBeNull()
+  })
+
+  it('loads local font families from a user action', async () => {
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const sourceItem = makeFile({
+      id: 'editable-deck',
+      name: 'Sunday Editable',
+      url: 'blob:editable-deck',
+      mimeType: EDITABLE_PRESENTATION_MIME_TYPE
+    })
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({ document, revision: 0 })
+    const queryLocalFonts = vi.fn().mockResolvedValue([
+      { family: 'PingFang TC' },
+      { family: 'PingFang TC' }
+    ])
+    Object.defineProperty(window, 'queryLocalFonts', {
+      configurable: true,
+      value: queryLocalFonts
+    })
+
+    renderEditableDeck(sourceItem)
+    fireEvent.click(await screen.findByRole('button', { name: 'Load local fonts' }))
+
+    expect(await screen.findByRole('option', { name: 'PingFang TC' })).toBeInTheDocument()
+    expect(queryLocalFonts).toHaveBeenCalledOnce()
+
+    Reflect.deleteProperty(window, 'queryLocalFonts')
+  })
+
+  it('keeps an imported font family selectable before local fonts are loaded', async () => {
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const slideId = document.slideOrder[0]
+    const text = createTextElement({
+      text: 'Imported font',
+      width: 300,
+      height: 80,
+      autoWidth: false,
+      fontFamily: 'Aptos'
+    })
+    const withText = addElementToSlide(document, slideId, text)
+    const sourceItem = makeFile({
+      id: 'editable-deck',
+      name: 'Sunday Editable',
+      url: 'blob:editable-deck',
+      mimeType: EDITABLE_PRESENTATION_MIME_TYPE
+    })
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({ document: withText, revision: 0 })
+
+    renderEditableDeck(sourceItem)
+    const textBoxes = await screen.findAllByRole('textbox')
+    fireEvent.click(textBoxes.at(-1)!)
+
+    expect(screen.getByRole('option', { name: 'Aptos' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Font family')).toHaveValue('Aptos')
   })
 
   it('uses the same Ribbon group shell for Insert and Design', async () => {

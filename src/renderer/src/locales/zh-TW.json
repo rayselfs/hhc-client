@@ -585,6 +585,9 @@
       "adjust": "調整",
       "size": "大小"
     },
+    "fontFamily": "字型",
+    "loadLocalFonts": "載入本機字型",
+    "localFontsLoadFailed": "無法載入本機字型，請確認已允許字型存取權限。",
     "present": "投影",
     "copyPage": "複製頁面",
     "untitledName": "未命名簡報",

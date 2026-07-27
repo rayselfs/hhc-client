@@ -17,6 +17,7 @@ import {
   Palette,
   Plus,
   RectangleHorizontal,
+  RefreshCw,
   StickyNote,
   Type,
   Underline,
@@ -80,6 +81,11 @@ import {
   type ElementDistribution
 } from '@renderer/lib/presentation-editor-commands'
 import { openFileExplorerDB } from '@renderer/lib/file-explorer-db'
+import {
+  mergeFontFamilies,
+  queryLocalFontFamilies,
+  supportsLocalFontAccess
+} from '@renderer/lib/local-fonts'
 import { usePresentationSessionRegistry } from '@renderer/contexts/PresentationSessionRegistryContext'
 import type { PresentationEditorSession } from '@renderer/lib/presentation-editor-session'
 import { ensurePresentationPageDocument } from '@renderer/lib/presentation-page-document'
@@ -497,6 +503,8 @@ function EditableSessionDocumentView({
   const [editingElementId, setEditingElementId] = useState<string | null>(null)
   const [isTextInsertMode, setIsTextInsertMode] = useState(false)
   const [pressedRibbonAction, setPressedRibbonAction] = useState<string | null>(null)
+  const [localFontFamilies, setLocalFontFamilies] = useState<string[]>([])
+  const [isLoadingLocalFonts, setIsLoadingLocalFonts] = useState(false)
   const [draggingSlideIds, setDraggingSlideIds] = useState<string[]>([])
   const [railWidth, setRailWidth] = useState(240)
   const [zoomPercent, setZoomPercent] = useState(100)
@@ -943,12 +951,37 @@ function EditableSessionDocumentView({
   }
 
   const selectedTextElement = selectedElement?.type === 'text' ? selectedElement : null
+  const fontFamilies = useMemo(
+    () =>
+      mergeFontFamilies(
+        FONT_FAMILIES,
+        selectedTextElement ? [selectedTextElement.fontFamily] : [],
+        localFontFamilies
+      ),
+    [localFontFamilies, selectedTextElement]
+  )
 
   const updateSelectedTextElement = (
     updates: Partial<Extract<EditablePresentationElement, { type: 'text' }>>
   ): void => {
     if (!selectedTextElement) return
     updateSelectedElement(updates as Partial<EditablePresentationElement>)
+  }
+
+  const loadLocalFonts = async (): Promise<void> => {
+    setIsLoadingLocalFonts(true)
+    try {
+      setLocalFontFamilies(await queryLocalFontFamilies())
+    } catch {
+      toast.warning(
+        t(
+          'presentationWorkspace.localFontsLoadFailed',
+          'Unable to load local fonts. Check the font access permission.'
+        )
+      )
+    } finally {
+      setIsLoadingLocalFonts(false)
+    }
   }
 
   const updateSelectedImageElement = (
@@ -1265,7 +1298,8 @@ function EditableSessionDocumentView({
           <div className="grid h-full grid-rows-2 gap-1">
             <div className="flex items-center gap-2">
               <select
-                className={`h-9 w-72 disabled:opacity-40 ${NATIVE_CONTROL_CLASS}`}
+                aria-label={t('presentationWorkspace.fontFamily', 'Font family')}
+                className={`h-9 w-64 disabled:opacity-40 ${NATIVE_CONTROL_CLASS}`}
                 disabled={textDisabled}
                 value={selectedTextElement?.fontFamily ?? FONT_FAMILIES[0]}
                 onChange={(event) =>
@@ -1274,12 +1308,23 @@ function EditableSessionDocumentView({
                   })
                 }
               >
-                {FONT_FAMILIES.map((fontFamily) => (
+                {fontFamilies.map((fontFamily) => (
                   <option key={fontFamily} value={fontFamily}>
                     {fontFamily}
                   </option>
                 ))}
               </select>
+              {supportsLocalFontAccess() && (
+                <button
+                  type="button"
+                  className={RIBBON_ICON_BUTTON_CLASS}
+                  disabled={isLoadingLocalFonts}
+                  onClick={() => void loadLocalFonts()}
+                  aria-label={t('presentationWorkspace.loadLocalFonts', 'Load local fonts')}
+                >
+                  <RefreshCw className={`size-4 ${isLoadingLocalFonts ? 'animate-spin' : ''}`} />
+                </button>
+              )}
               <select
                 className={`h-9 w-24 disabled:opacity-40 ${NATIVE_CONTROL_CLASS}`}
                 disabled={textDisabled}

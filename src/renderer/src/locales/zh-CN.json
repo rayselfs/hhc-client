@@ -585,6 +585,9 @@
       "adjust": "调整",
       "size": "大小"
     },
+    "fontFamily": "字体",
+    "loadLocalFonts": "加载本机字体",
+    "localFontsLoadFailed": "无法加载本机字体，请确认已允许字体访问权限。",
     "present": "投影",
     "copyPage": "复制页面",
     "untitledName": "未命名演示文稿",
