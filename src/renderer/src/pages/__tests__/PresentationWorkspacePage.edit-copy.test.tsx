@@ -4,6 +4,7 @@ import PresentationWorkspacePage, { PptxDocumentView } from '../PresentationWork
 import {
   addElementToSlide,
   createBlankEditablePresentationDocument,
+  createImageElement,
   createTextElement
 } from '@renderer/lib/editable-presentation'
 import { EDITABLE_PRESENTATION_MIME_TYPE, PPTX_MIME_TYPE } from '@renderer/lib/presentation-media'
@@ -194,7 +195,7 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
     expect(screen.getByRole('button', { name: 'Edit a copy' })).toBeEnabled()
   })
 
-  it('keeps Home, Insert, and Design ribbon panels at the same height', async () => {
+  it('keeps Home, Insert, and Design ribbon panels at the same native height', async () => {
     const document = createBlankEditablePresentationDocument('Sunday')
     const sourceItem = makeFile({
       id: 'editable-deck',
@@ -207,13 +208,99 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
     renderEditableDeck(sourceItem)
 
     const frame = await screen.findByTestId('presentation-ribbon-frame')
-    expect(frame).toHaveClass('h-24')
+    expect(frame).toHaveClass('h-28')
 
     fireEvent.click(screen.getByRole('button', { name: '插入' }))
-    expect(frame).toHaveClass('h-24')
+    expect(frame).toHaveClass('h-28')
 
     fireEvent.click(screen.getByRole('button', { name: '設計' }))
-    expect(frame).toHaveClass('h-24')
+    expect(frame).toHaveClass('h-28')
+  })
+
+  it('orders Home commands in native Ribbon groups', async () => {
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const sourceItem = makeFile({
+      id: 'editable-deck',
+      name: 'Sunday Editable',
+      url: 'blob:editable-deck',
+      mimeType: EDITABLE_PRESENTATION_MIME_TYPE
+    })
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({ document, revision: 0 })
+
+    renderEditableDeck(sourceItem)
+
+    await screen.findByTestId('presentation-ribbon-frame')
+    const groups = screen.getAllByTestId('presentation-ribbon-group')
+    expect(groups.map((group) => group.getAttribute('aria-label'))).toEqual([
+      'Font',
+      'Paragraph',
+      'Position',
+      'Arrange'
+    ])
+    groups.forEach((group) => expect(group).toHaveClass('shrink-0'))
+    const surface = window.document.querySelector('[data-ribbon-surface]')
+    expect(surface).toHaveClass('overflow-x-auto', 'overflow-y-hidden')
+    expect(screen.getByRole('group', { name: 'Arrange' }).querySelector('.flex-wrap')).toBeNull()
+  })
+
+  it('uses the same Ribbon group shell for Insert and Design', async () => {
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const sourceItem = makeFile({
+      id: 'editable-deck',
+      name: 'Sunday Editable',
+      url: 'blob:editable-deck',
+      mimeType: EDITABLE_PRESENTATION_MIME_TYPE
+    })
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({ document, revision: 0 })
+
+    renderEditableDeck(sourceItem)
+    await screen.findByTestId('presentation-ribbon-frame')
+
+    fireEvent.click(screen.getByRole('button', { name: '插入' }))
+    expect(screen.getByRole('group', { name: 'Insert' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: '設計' }))
+    expect(screen.getByRole('group', { name: 'Background' })).toBeInTheDocument()
+  })
+
+  it('groups Picture Format commands as Adjust, Arrange, and Size', async () => {
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const slideId = document.slideOrder[0]
+    const image = createImageElement({
+      assetId: 'asset-1',
+      slideWidth: document.width,
+      slideHeight: document.height,
+      sourceWidth: 640,
+      sourceHeight: 360
+    })
+    const withImage = addElementToSlide(document, slideId, image)
+    withImage.assets['asset-1'] = {
+      id: 'asset-1',
+      name: 'Worship image',
+      mimeType: 'image/png',
+      dataUrl: 'data:image/png;base64,AA=='
+    }
+    const sourceItem = makeFile({
+      id: 'editable-deck',
+      name: 'Sunday Editable',
+      url: 'blob:editable-deck',
+      mimeType: EDITABLE_PRESENTATION_MIME_TYPE
+    })
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({ document: withImage, revision: 0 })
+
+    renderEditableDeck(sourceItem)
+    const imageElement = (await screen.findAllByRole('img', { name: 'Worship image' }))
+      .at(-1)
+      ?.closest('[data-slide-element]')
+    expect(imageElement).not.toBeNull()
+    fireEvent.pointerDown(imageElement!, { clientX: 10, clientY: 10 })
+    fireEvent.click(await screen.findByRole('button', { name: '圖片格式' }))
+
+    expect(
+      screen
+        .getAllByTestId('presentation-ribbon-group')
+        .map((group) => group.getAttribute('aria-label'))
+    ).toEqual(['Adjust', 'Arrange', 'Size'])
   })
 
   it('updates selected text box height from numeric controls', async () => {

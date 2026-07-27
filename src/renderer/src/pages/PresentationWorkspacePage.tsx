@@ -110,7 +110,28 @@ const RIBBON_ICON_BUTTON_CLASS =
   'inline-flex h-8 min-w-8 items-center justify-center rounded-md border border-transparent px-2 text-default-500 transition-[background-color,border-color,color,box-shadow,transform] hover:border-divider hover:bg-content2/80 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/50 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:border-transparent disabled:hover:bg-transparent'
 const RIBBON_ICON_BUTTON_ACTIVE_CLASS =
   'border-primary bg-primary text-white shadow-inner hover:border-primary hover:bg-primary/90 hover:text-white'
-const RIBBON_SEPARATOR_CLASS = 'mx-2 h-14 w-px bg-divider'
+
+function RibbonGroup({
+  label,
+  children,
+  className = ''
+}: {
+  label: string
+  children: React.ReactNode
+  className?: string
+}): React.JSX.Element {
+  return (
+    <section
+      role="group"
+      aria-label={label}
+      data-testid="presentation-ribbon-group"
+      className={`flex h-full shrink-0 flex-col border-r border-divider px-3 pb-1 pt-2 last:border-r-0 ${className}`}
+    >
+      <div className="min-h-0 flex-1">{children}</div>
+      <p className="mt-1 text-center text-[10px] leading-3 text-default-400">{label}</p>
+    </section>
+  )
+}
 
 function getPptxSlideId(index: number): string {
   return `pptx-slide-${index}`
@@ -1013,144 +1034,192 @@ function EditableSessionDocumentView({
   const renderRibbon = (): React.JSX.Element => {
     if (activeRibbon === 'picture') {
       return (
-        <div className="flex h-24 items-center gap-3 border-b border-divider bg-content1/80 px-4 text-sm">
-          <ControlSlider
-            label={t('presentationWorkspace.transparency', 'Transparency')}
-            value={selectedImageElement ? Math.round((1 - selectedImageElement.opacity) * 100) : 0}
-            min={0}
-            max={100}
-            suffix="%"
-            onChange={(value) => updateSelectedImageElement({ opacity: 1 - value / 100 })}
-          />
-          <label className="flex items-center gap-2 text-default-500">
-            <span>{t('presentationWorkspace.borderColor', 'Border')}</span>
-            <input
-              className="h-9 w-12 rounded bg-transparent"
-              type="color"
-              disabled={!selectedImageElement}
-              value={selectedImageElement?.borderColor ?? '#ffffff'}
-              onChange={(event) =>
-                updateSelectedImageElement({ borderColor: event.currentTarget.value })
-              }
-            />
-          </label>
-          <label className="flex items-center gap-2 text-default-500">
-            <span>{t('presentationWorkspace.borderWidth', 'Width')}</span>
-            <select
-              className={`h-9 w-20 disabled:opacity-40 ${NATIVE_CONTROL_CLASS}`}
-              disabled={!selectedImageElement}
-              value={selectedImageElement?.borderWidth ?? 0}
-              onChange={(event) =>
-                updateSelectedImageElement({ borderWidth: Number(event.currentTarget.value) })
-              }
-            >
-              {[0, 1, 2, 4, 6, 8].map((width) => (
-                <option key={width} value={width}>
-                  {width}px
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex items-center gap-2 text-default-500">
-            <span>{t('presentationWorkspace.shadow', 'Shadow')}</span>
-            <select
-              className={`h-9 w-28 disabled:opacity-40 ${NATIVE_CONTROL_CLASS}`}
-              disabled={!selectedImageElement}
-              value={selectedImageElement?.shadow ?? 'none'}
-              onChange={(event) =>
-                updateSelectedImageElement({
-                  shadow: event.currentTarget.value as EditableImageElement['shadow']
-                })
-              }
-            >
-              <option value="none">{t('presentationWorkspace.shadowNone', 'None')}</option>
-              <option value="soft">{t('presentationWorkspace.shadowSoft', 'Soft')}</option>
-              <option value="medium">{t('presentationWorkspace.shadowMedium', 'Medium')}</option>
-            </select>
-          </label>
-          <Button
-            size="sm"
-            variant="tertiary"
-            isDisabled={!selectedImageElement}
-            onPress={() =>
-              selectedImageElement && reorderElement(selectedImageElement.id, 'bring-forward')
-            }
+        <div
+          data-ribbon-surface
+          className="flex h-full min-w-max items-stretch overflow-x-auto overflow-y-hidden border-b border-divider bg-content1/95 text-sm"
+        >
+          <RibbonGroup
+            label={t('presentationWorkspace.ribbonGroups.adjust', 'Adjust')}
+            className="w-[660px]"
           >
-            {t('presentationWorkspace.bringForward', 'Bring Forward')}
-          </Button>
-          <Button
-            size="sm"
-            variant="tertiary"
-            isDisabled={!selectedImageElement}
-            onPress={() =>
-              selectedImageElement && reorderElement(selectedImageElement.id, 'send-backward')
-            }
+            <div className="grid h-full grid-cols-[240px_120px_140px_140px] items-center gap-2">
+              <ControlSlider
+                label={t('presentationWorkspace.transparency', 'Transparency')}
+                value={
+                  selectedImageElement ? Math.round((1 - selectedImageElement.opacity) * 100) : 0
+                }
+                min={0}
+                max={100}
+                suffix="%"
+                onChange={(value) => updateSelectedImageElement({ opacity: 1 - value / 100 })}
+              />
+              <label className="flex items-center gap-2 text-default-500">
+                <span>{t('presentationWorkspace.borderColor', 'Border')}</span>
+                <input
+                  className="h-9 w-12 rounded bg-transparent"
+                  type="color"
+                  disabled={!selectedImageElement}
+                  value={selectedImageElement?.borderColor ?? '#ffffff'}
+                  onChange={(event) =>
+                    updateSelectedImageElement({ borderColor: event.currentTarget.value })
+                  }
+                />
+              </label>
+              <label className="flex items-center gap-2 text-default-500">
+                <span>{t('presentationWorkspace.borderWidth', 'Width')}</span>
+                <select
+                  className={`h-9 w-20 disabled:opacity-40 ${NATIVE_CONTROL_CLASS}`}
+                  disabled={!selectedImageElement}
+                  value={selectedImageElement?.borderWidth ?? 0}
+                  onChange={(event) =>
+                    updateSelectedImageElement({ borderWidth: Number(event.currentTarget.value) })
+                  }
+                >
+                  {[0, 1, 2, 4, 6, 8].map((width) => (
+                    <option key={width} value={width}>
+                      {width}px
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex items-center gap-2 text-default-500">
+                <span>{t('presentationWorkspace.shadow', 'Shadow')}</span>
+                <select
+                  className={`h-9 w-28 disabled:opacity-40 ${NATIVE_CONTROL_CLASS}`}
+                  disabled={!selectedImageElement}
+                  value={selectedImageElement?.shadow ?? 'none'}
+                  onChange={(event) =>
+                    updateSelectedImageElement({
+                      shadow: event.currentTarget.value as EditableImageElement['shadow']
+                    })
+                  }
+                >
+                  <option value="none">{t('presentationWorkspace.shadowNone', 'None')}</option>
+                  <option value="soft">{t('presentationWorkspace.shadowSoft', 'Soft')}</option>
+                  <option value="medium">
+                    {t('presentationWorkspace.shadowMedium', 'Medium')}
+                  </option>
+                </select>
+              </label>
+            </div>
+          </RibbonGroup>
+          <RibbonGroup
+            label={t('presentationWorkspace.ribbonGroups.arrange', 'Arrange')}
+            className="w-48"
           >
-            {t('presentationWorkspace.sendBackward', 'Send Backward')}
-          </Button>
-          <Button
-            size="sm"
-            variant={cropElementId === selectedImageElement?.id ? 'primary' : 'tertiary'}
-            isDisabled={!selectedImageElement}
-            onPress={() =>
-              setCropElementId((current) =>
-                current === selectedImageElement?.id ? null : (selectedImageElement?.id ?? null)
-              )
-            }
+            <div className="grid h-full grid-rows-2 gap-1">
+              <Button
+                size="sm"
+                variant="tertiary"
+                isDisabled={!selectedImageElement}
+                onPress={() =>
+                  selectedImageElement && reorderElement(selectedImageElement.id, 'bring-forward')
+                }
+              >
+                {t('presentationWorkspace.bringForward', 'Bring Forward')}
+              </Button>
+              <Button
+                size="sm"
+                variant="tertiary"
+                isDisabled={!selectedImageElement}
+                onPress={() =>
+                  selectedImageElement && reorderElement(selectedImageElement.id, 'send-backward')
+                }
+              >
+                {t('presentationWorkspace.sendBackward', 'Send Backward')}
+              </Button>
+            </div>
+          </RibbonGroup>
+          <RibbonGroup
+            label={t('presentationWorkspace.ribbonGroups.size', 'Size')}
+            className="w-28"
           >
-            <Crop size={16} />
-            {t('presentationWorkspace.crop', 'Crop')}
-          </Button>
+            <div className="flex h-full items-center justify-center">
+              <Button
+                size="sm"
+                variant={cropElementId === selectedImageElement?.id ? 'primary' : 'tertiary'}
+                isDisabled={!selectedImageElement}
+                onPress={() =>
+                  setCropElementId((current) =>
+                    current === selectedImageElement?.id ? null : (selectedImageElement?.id ?? null)
+                  )
+                }
+              >
+                <Crop size={16} />
+                {t('presentationWorkspace.crop', 'Crop')}
+              </Button>
+            </div>
+          </RibbonGroup>
         </div>
       )
     }
 
     if (activeRibbon === 'insert') {
       return (
-        <div className="flex h-24 items-center gap-2 border-b border-divider bg-content1/80 px-4">
-          <Button
-            size="sm"
-            variant={isTextInsertMode ? 'primary' : 'tertiary'}
-            onPress={() => setIsTextInsertMode((enabled) => !enabled)}
+        <div
+          data-ribbon-surface
+          className="flex h-full min-w-max items-stretch overflow-x-auto overflow-y-hidden border-b border-divider bg-content1/95"
+        >
+          <RibbonGroup
+            label={t('presentationWorkspace.ribbonGroups.insert', 'Insert')}
+            className="w-[460px]"
           >
-            <Type size={16} />
-            {t('presentationWorkspace.text', 'Text')}
-          </Button>
-          <Button size="sm" variant="tertiary" onPress={() => imageInputRef.current?.click()}>
-            <ImagePlus size={16} />
-            {t('presentationWorkspace.image', 'Image')}
-          </Button>
-          <Button size="sm" variant="tertiary" onPress={() => addShape('rectangle')}>
-            <RectangleHorizontal size={16} />
-            {t('presentationWorkspace.rectangle', 'Rectangle')}
-          </Button>
-          <Button size="sm" variant="tertiary" onPress={() => addShape('ellipse')}>
-            <span className="size-4 rounded-full border-2 border-current" />
-            {t('presentationWorkspace.ellipse', 'Ellipse')}
-          </Button>
-          <Button size="sm" variant="tertiary" onPress={addLine}>
-            <Minus size={16} />
-            {t('presentationWorkspace.line', 'Line')}
-          </Button>
+            <div className="flex h-full items-center gap-1 [&>button]:h-16 [&>button]:min-w-20 [&>button]:flex-col [&>button]:gap-1">
+              <Button
+                size="sm"
+                variant={isTextInsertMode ? 'primary' : 'tertiary'}
+                onPress={() => setIsTextInsertMode((enabled) => !enabled)}
+              >
+                <Type size={18} />
+                {t('presentationWorkspace.text', 'Text')}
+              </Button>
+              <Button size="sm" variant="tertiary" onPress={() => imageInputRef.current?.click()}>
+                <ImagePlus size={18} />
+                {t('presentationWorkspace.image', 'Image')}
+              </Button>
+              <Button size="sm" variant="tertiary" onPress={() => addShape('rectangle')}>
+                <RectangleHorizontal size={18} />
+                {t('presentationWorkspace.rectangle', 'Rectangle')}
+              </Button>
+              <Button size="sm" variant="tertiary" onPress={() => addShape('ellipse')}>
+                <span className="size-[18px] rounded-full border-2 border-current" />
+                {t('presentationWorkspace.ellipse', 'Ellipse')}
+              </Button>
+              <Button size="sm" variant="tertiary" onPress={addLine}>
+                <Minus size={18} />
+                {t('presentationWorkspace.line', 'Line')}
+              </Button>
+            </div>
+          </RibbonGroup>
         </div>
       )
     }
 
     if (activeRibbon === 'design') {
       return (
-        <div className="flex h-24 items-center gap-3 border-b border-divider bg-content1/80 px-4 text-sm">
-          <Button
-            size="sm"
-            variant={isBackgroundPanelOpen ? 'primary' : 'tertiary'}
-            isDisabled={!activeSlide}
-            onPress={() => {
-              setIsCompactRailOpen(false)
-              setIsBackgroundPanelOpen(true)
-            }}
+        <div
+          data-ribbon-surface
+          className="flex h-full min-w-max items-stretch overflow-x-auto overflow-y-hidden border-b border-divider bg-content1/95 text-sm"
+        >
+          <RibbonGroup
+            label={t('presentationWorkspace.ribbonGroups.background', 'Background')}
+            className="w-48"
           >
-            <Palette size={16} />
-            {t('presentationWorkspace.formatBackground', 'Format Background')}
-          </Button>
+            <div className="flex h-full items-center justify-center">
+              <Button
+                size="sm"
+                variant={isBackgroundPanelOpen ? 'primary' : 'tertiary'}
+                isDisabled={!activeSlide}
+                onPress={() => {
+                  setIsCompactRailOpen(false)
+                  setIsBackgroundPanelOpen(true)
+                }}
+              >
+                <Palette size={16} />
+                {t('presentationWorkspace.formatBackground', 'Format Background')}
+              </Button>
+            </div>
+          </RibbonGroup>
         </div>
       )
     }
@@ -1185,239 +1254,257 @@ function EditableSessionDocumentView({
     }
 
     return (
-      <div className="flex h-24 items-center gap-2 border-b border-divider bg-content1/80 px-4 py-2">
-        <div className="grid gap-2">
-          <div className="flex items-center gap-2">
-            <select
-              className={`h-9 w-72 disabled:opacity-40 ${NATIVE_CONTROL_CLASS}`}
-              disabled={textDisabled}
-              value={selectedTextElement?.fontFamily ?? FONT_FAMILIES[0]}
-              onChange={(event) =>
-                updateSelectedTextElement({
-                  fontFamily: event.currentTarget.value
-                })
-              }
-            >
-              {FONT_FAMILIES.map((fontFamily) => (
-                <option key={fontFamily} value={fontFamily}>
-                  {fontFamily}
-                </option>
-              ))}
-            </select>
-            <select
-              className={`h-9 w-24 disabled:opacity-40 ${NATIVE_CONTROL_CLASS}`}
-              disabled={textDisabled}
-              value={
-                selectedTextElement && document
-                  ? presentationCanvasPxToPoints(selectedTextElement.fontSize, document.width)
-                  : 44
-              }
-              onChange={(event) =>
-                updateSelectedTextElement({
-                  fontSize: presentationPointsToCanvasPx(
-                    Number(event.currentTarget.value),
-                    document?.width ?? 1920
-                  )
-                })
-              }
-            >
-              {FONT_SIZES.map((fontSize) => (
-                <option key={fontSize} value={fontSize}>
-                  {fontSize}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              className={textButtonClass(false, 'increase-font-size')}
-              disabled={textDisabled}
-              onClick={() => {
-                flashRibbonAction('increase-font-size')
-                changeFontSize(2)
-              }}
-              aria-label={t('presentationWorkspace.increaseFontSize', 'Increase font size')}
-            >
-              <span className="text-xl leading-none">A</span>
-              <ChevronDown className="size-3 rotate-180" />
-            </button>
-            <button
-              type="button"
-              className={textButtonClass(false, 'decrease-font-size')}
-              disabled={textDisabled}
-              onClick={() => {
-                flashRibbonAction('decrease-font-size')
-                changeFontSize(-2)
-              }}
-              aria-label={t('presentationWorkspace.decreaseFontSize', 'Decrease font size')}
-            >
-              <span className="text-sm leading-none">A</span>
-              <ChevronDown className="size-3" />
-            </button>
-            <button
-              type="button"
-              className={textButtonClass(false, 'clear-formatting')}
-              disabled={textDisabled}
-              onClick={() => {
-                flashRibbonAction('clear-formatting')
-                clearTextFormatting()
-              }}
-              aria-label={t('presentationWorkspace.clearFormatting', 'Clear formatting')}
-            >
-              <Eraser size={18} />
-            </button>
-          </div>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              className={textButtonClass(Boolean(selectedTextElement?.bold))}
-              disabled={textDisabled}
-              aria-pressed={Boolean(selectedTextElement?.bold)}
-              onClick={() => updateSelectedTextElement({ bold: !selectedTextElement?.bold })}
-              aria-label={t('presentationWorkspace.bold', 'Bold')}
-            >
-              <Bold size={18} />
-            </button>
-            <button
-              type="button"
-              className={textButtonClass(Boolean(selectedTextElement?.italic))}
-              disabled={textDisabled}
-              aria-pressed={Boolean(selectedTextElement?.italic)}
-              onClick={() => updateSelectedTextElement({ italic: !selectedTextElement?.italic })}
-              aria-label={t('presentationWorkspace.italic', 'Italic')}
-            >
-              <Italic size={18} />
-            </button>
-            <button
-              type="button"
-              className={textButtonClass(Boolean(selectedTextElement?.underline))}
-              disabled={textDisabled}
-              aria-pressed={Boolean(selectedTextElement?.underline)}
-              onClick={() =>
-                updateSelectedTextElement({ underline: !selectedTextElement?.underline })
-              }
-              aria-label={t('presentationWorkspace.underline', 'Underline')}
-            >
-              <Underline size={18} />
-            </button>
-            <label
-              className={`relative ${RIBBON_ICON_BUTTON_CLASS} ${
-                textDisabled ? 'cursor-not-allowed opacity-30 hover:bg-transparent' : ''
-              }`}
-              aria-label={t('presentationWorkspace.fontColor', 'Font color')}
-            >
-              <Baseline size={18} />
-              <ChevronDown size={12} />
-              <span
-                className="absolute bottom-1 left-1/2 h-0.5 w-5 -translate-x-1/2"
-                style={{ backgroundColor: selectedTextElement?.color ?? '#111827' }}
-              />
-              <input
-                className="sr-only"
-                type="color"
+      <div
+        data-ribbon-surface
+        className="flex h-full min-w-max items-stretch overflow-x-auto overflow-y-hidden border-b border-divider bg-content1/95"
+      >
+        <RibbonGroup
+          label={t('presentationWorkspace.ribbonGroups.font', 'Font')}
+          className="w-[520px]"
+        >
+          <div className="grid h-full grid-rows-2 gap-1">
+            <div className="flex items-center gap-2">
+              <select
+                className={`h-9 w-72 disabled:opacity-40 ${NATIVE_CONTROL_CLASS}`}
                 disabled={textDisabled}
-                value={selectedTextElement?.color ?? '#111827'}
+                value={selectedTextElement?.fontFamily ?? FONT_FAMILIES[0]}
                 onChange={(event) =>
                   updateSelectedTextElement({
-                    color: event.currentTarget.value
+                    fontFamily: event.currentTarget.value
                   })
                 }
-              />
-            </label>
-          </div>
-        </div>
-
-        <span className={RIBBON_SEPARATOR_CLASS} />
-
-        <div className="grid gap-2">
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              className={textButtonClass(false, 'line-spacing')}
-              disabled={textDisabled}
-              onClick={(event) => {
-                flashRibbonAction('line-spacing')
-                showLineSpacingMenu(event)
-              }}
-              aria-label={t('presentationWorkspace.lineSpacing', 'Line spacing')}
-            >
-              <WrapText size={19} />
-              <ChevronDown size={12} />
-            </button>
-          </div>
-          <div className="flex items-center gap-1">
-            {(
-              [
-                ['left', AlignLeft],
-                ['center', AlignCenter],
-                ['right', AlignRight]
-              ] as const
-            ).map(([align, Icon]) => (
-              <button
-                key={align}
-                type="button"
-                className={textButtonClass(selectedTextElement?.align === align)}
-                disabled={textDisabled}
-                aria-pressed={selectedTextElement?.align === align}
-                onClick={() => updateSelectedTextElement({ align })}
-                aria-label={t(`presentationWorkspace.align.${align}`, align)}
               >
-                <Icon size={19} />
+                {FONT_FAMILIES.map((fontFamily) => (
+                  <option key={fontFamily} value={fontFamily}>
+                    {fontFamily}
+                  </option>
+                ))}
+              </select>
+              <select
+                className={`h-9 w-24 disabled:opacity-40 ${NATIVE_CONTROL_CLASS}`}
+                disabled={textDisabled}
+                value={
+                  selectedTextElement && document
+                    ? presentationCanvasPxToPoints(selectedTextElement.fontSize, document.width)
+                    : 44
+                }
+                onChange={(event) =>
+                  updateSelectedTextElement({
+                    fontSize: presentationPointsToCanvasPx(
+                      Number(event.currentTarget.value),
+                      document?.width ?? 1920
+                    )
+                  })
+                }
+              >
+                {FONT_SIZES.map((fontSize) => (
+                  <option key={fontSize} value={fontSize}>
+                    {fontSize}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                className={textButtonClass(false, 'increase-font-size')}
+                disabled={textDisabled}
+                onClick={() => {
+                  flashRibbonAction('increase-font-size')
+                  changeFontSize(2)
+                }}
+                aria-label={t('presentationWorkspace.increaseFontSize', 'Increase font size')}
+              >
+                <span className="text-xl leading-none">A</span>
+                <ChevronDown className="size-3 rotate-180" />
               </button>
-            ))}
+              <button
+                type="button"
+                className={textButtonClass(false, 'decrease-font-size')}
+                disabled={textDisabled}
+                onClick={() => {
+                  flashRibbonAction('decrease-font-size')
+                  changeFontSize(-2)
+                }}
+                aria-label={t('presentationWorkspace.decreaseFontSize', 'Decrease font size')}
+              >
+                <span className="text-sm leading-none">A</span>
+                <ChevronDown className="size-3" />
+              </button>
+              <button
+                type="button"
+                className={textButtonClass(false, 'clear-formatting')}
+                disabled={textDisabled}
+                onClick={() => {
+                  flashRibbonAction('clear-formatting')
+                  clearTextFormatting()
+                }}
+                aria-label={t('presentationWorkspace.clearFormatting', 'Clear formatting')}
+              >
+                <Eraser size={18} />
+              </button>
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                className={textButtonClass(Boolean(selectedTextElement?.bold))}
+                disabled={textDisabled}
+                aria-pressed={Boolean(selectedTextElement?.bold)}
+                onClick={() => updateSelectedTextElement({ bold: !selectedTextElement?.bold })}
+                aria-label={t('presentationWorkspace.bold', 'Bold')}
+              >
+                <Bold size={18} />
+              </button>
+              <button
+                type="button"
+                className={textButtonClass(Boolean(selectedTextElement?.italic))}
+                disabled={textDisabled}
+                aria-pressed={Boolean(selectedTextElement?.italic)}
+                onClick={() => updateSelectedTextElement({ italic: !selectedTextElement?.italic })}
+                aria-label={t('presentationWorkspace.italic', 'Italic')}
+              >
+                <Italic size={18} />
+              </button>
+              <button
+                type="button"
+                className={textButtonClass(Boolean(selectedTextElement?.underline))}
+                disabled={textDisabled}
+                aria-pressed={Boolean(selectedTextElement?.underline)}
+                onClick={() =>
+                  updateSelectedTextElement({ underline: !selectedTextElement?.underline })
+                }
+                aria-label={t('presentationWorkspace.underline', 'Underline')}
+              >
+                <Underline size={18} />
+              </button>
+              <label
+                className={`relative ${RIBBON_ICON_BUTTON_CLASS} ${
+                  textDisabled ? 'cursor-not-allowed opacity-30 hover:bg-transparent' : ''
+                }`}
+                aria-label={t('presentationWorkspace.fontColor', 'Font color')}
+              >
+                <Baseline size={18} />
+                <ChevronDown size={12} />
+                <span
+                  className="absolute bottom-1 left-1/2 h-0.5 w-5 -translate-x-1/2"
+                  style={{ backgroundColor: selectedTextElement?.color ?? '#111827' }}
+                />
+                <input
+                  className="sr-only"
+                  type="color"
+                  disabled={textDisabled}
+                  value={selectedTextElement?.color ?? '#111827'}
+                  onChange={(event) =>
+                    updateSelectedTextElement({
+                      color: event.currentTarget.value
+                    })
+                  }
+                />
+              </label>
+            </div>
           </div>
-        </div>
+        </RibbonGroup>
 
-        <span className={RIBBON_SEPARATOR_CLASS} />
+        <RibbonGroup
+          label={t('presentationWorkspace.ribbonGroups.paragraph', 'Paragraph')}
+          className="w-44"
+        >
+          <div className="grid h-full grid-rows-2 gap-1">
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                className={textButtonClass(false, 'line-spacing')}
+                disabled={textDisabled}
+                onClick={(event) => {
+                  flashRibbonAction('line-spacing')
+                  showLineSpacingMenu(event)
+                }}
+                aria-label={t('presentationWorkspace.lineSpacing', 'Line spacing')}
+              >
+                <WrapText size={19} />
+                <ChevronDown size={12} />
+              </button>
+            </div>
+            <div className="flex items-center gap-1">
+              {(
+                [
+                  ['left', AlignLeft],
+                  ['center', AlignCenter],
+                  ['right', AlignRight]
+                ] as const
+              ).map(([align, Icon]) => (
+                <button
+                  key={align}
+                  type="button"
+                  className={textButtonClass(selectedTextElement?.align === align)}
+                  disabled={textDisabled}
+                  aria-pressed={selectedTextElement?.align === align}
+                  onClick={() => updateSelectedTextElement({ align })}
+                  aria-label={t(`presentationWorkspace.align.${align}`, align)}
+                >
+                  <Icon size={19} />
+                </button>
+              ))}
+            </div>
+          </div>
+        </RibbonGroup>
 
-        <div className="grid gap-2">
-          {selectedElement &&
-            (['x', 'y', 'width', 'height'] as const).map((key) => (
+        <RibbonGroup
+          label={t('presentationWorkspace.ribbonGroups.position', 'Position')}
+          className="w-48"
+        >
+          <div className="grid h-full grid-cols-2 grid-rows-2 gap-1">
+            {(['x', 'y', 'width', 'height'] as const).map((key) => (
               <label
                 key={key}
                 className="flex items-center gap-1 text-xs uppercase text-default-400"
               >
-                {key}
+                <span className="w-3">{key === 'width' ? 'w' : key === 'height' ? 'h' : key}</span>
                 <input
-                  className={`h-8 w-16 px-2 ${NATIVE_CONTROL_CLASS}`}
+                  className={`h-8 min-w-0 flex-1 px-2 ${NATIVE_CONTROL_CLASS}`}
                   type="number"
-                  value={Math.round(selectedElement[key])}
+                  disabled={!selectedElement}
+                  value={selectedElement ? Math.round(selectedElement[key]) : 0}
                   onChange={(event) => updateSelectedNumber(key, event.currentTarget.value)}
+                  aria-label={key}
                 />
               </label>
             ))}
-        </div>
+          </div>
+        </RibbonGroup>
 
-        <span className={RIBBON_SEPARATOR_CLASS} />
-
-        <div className="flex max-w-64 flex-wrap gap-1">
-          {(['left', 'center', 'right', 'top', 'middle', 'bottom'] as const).map((alignment) => (
+        <RibbonGroup
+          label={t('presentationWorkspace.ribbonGroups.arrange', 'Arrange')}
+          className="w-72"
+        >
+          <div data-ribbon-no-wrap className="grid h-full grid-cols-4 grid-rows-2 gap-1">
+            {(['left', 'center', 'right', 'top', 'middle', 'bottom'] as const).map((alignment) => (
+              <Button
+                key={alignment}
+                size="sm"
+                variant="tertiary"
+                isDisabled={selectedElementIds.size < 2}
+                onPress={() => applyElementAlignment(alignment)}
+              >
+                {t(`presentationWorkspace.objectAlign.${alignment}`, alignment)}
+              </Button>
+            ))}
             <Button
-              key={alignment}
               size="sm"
               variant="tertiary"
-              isDisabled={selectedElementIds.size < 2}
-              onPress={() => applyElementAlignment(alignment)}
+              isDisabled={selectedElementIds.size < 3}
+              onPress={() => applyElementDistribution('horizontal')}
             >
-              {t(`presentationWorkspace.objectAlign.${alignment}`, alignment)}
+              {t('presentationWorkspace.distributeHorizontal', 'Distribute H')}
             </Button>
-          ))}
-          <Button
-            size="sm"
-            variant="tertiary"
-            isDisabled={selectedElementIds.size < 3}
-            onPress={() => applyElementDistribution('horizontal')}
-          >
-            {t('presentationWorkspace.distributeHorizontal', 'Distribute H')}
-          </Button>
-          <Button
-            size="sm"
-            variant="tertiary"
-            isDisabled={selectedElementIds.size < 3}
-            onPress={() => applyElementDistribution('vertical')}
-          >
-            {t('presentationWorkspace.distributeVertical', 'Distribute V')}
-          </Button>
-        </div>
+            <Button
+              size="sm"
+              variant="tertiary"
+              isDisabled={selectedElementIds.size < 3}
+              onPress={() => applyElementDistribution('vertical')}
+            >
+              {t('presentationWorkspace.distributeVertical', 'Distribute V')}
+            </Button>
+          </div>
+        </RibbonGroup>
       </div>
     )
   }
@@ -1503,7 +1590,7 @@ function EditableSessionDocumentView({
     )
   }
 
-  const ribbonHeightClass = 'h-24'
+  const ribbonHeightClass = 'h-28'
 
   return (
     <>

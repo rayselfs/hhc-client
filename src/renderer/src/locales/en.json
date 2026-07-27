@@ -575,6 +575,16 @@
     "home": "Home",
     "insert": "Insert",
     "design": "Design",
+    "ribbonGroups": {
+      "font": "Font",
+      "paragraph": "Paragraph",
+      "position": "Position",
+      "arrange": "Arrange",
+      "insert": "Insert",
+      "background": "Background",
+      "adjust": "Adjust",
+      "size": "Size"
+    },
     "present": "Present",
     "copyPage": "Copy Page",
     "untitledName": "Untitled Presentation",

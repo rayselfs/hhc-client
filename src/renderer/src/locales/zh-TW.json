@@ -575,6 +575,16 @@
     "home": "常用",
     "insert": "插入",
     "design": "設計",
+    "ribbonGroups": {
+      "font": "字型",
+      "paragraph": "段落",
+      "position": "位置",
+      "arrange": "排列",
+      "insert": "插入",
+      "background": "背景",
+      "adjust": "調整",
+      "size": "大小"
+    },
     "present": "投影",
     "copyPage": "複製頁面",
     "untitledName": "未命名簡報",
