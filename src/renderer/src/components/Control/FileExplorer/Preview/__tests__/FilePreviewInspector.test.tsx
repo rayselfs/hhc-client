@@ -80,7 +80,7 @@ describe('FilePreviewInspector', () => {
       />
     )
 
-    fireEvent.click(screen.getByRole('button', { name: 'Close preview' }))
+    fireEvent.click(screen.getAllByRole('button', { name: 'Close preview' })[0])
 
     expect(onClose).toHaveBeenCalledOnce()
     expect(onPresent).not.toHaveBeenCalled()

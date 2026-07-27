@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Button, Modal } from '@heroui/react'
-import { FileQuestion, Minus, Plus, Presentation } from 'lucide-react'
+import { FileQuestion, Minus, Plus, Presentation, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useThumbnails } from '@renderer/hooks/useThumbnails'
@@ -127,18 +127,28 @@ export function FilePreviewInspector({
   const { t } = useTranslation()
   const [zoom, setZoom] = useState(1)
 
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape' && !isPresenting) onClose()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isPresenting, onClose])
+
   return (
     <Modal>
-      <Modal.Backdrop
-        isOpen
-        isDismissable
-        onOpenChange={(isOpen) => {
-          if (!isOpen) onClose()
-        }}
-      >
+      <Modal.Backdrop isOpen isDismissable={false} isKeyboardDismissDisabled>
         <Modal.Container size="cover">
           <Modal.Dialog className="h-[calc(100vh-5rem)]">
-            <Modal.CloseTrigger aria-label={t('mediaPreview.close', 'Close preview')} />
+            <Button
+              isIconOnly
+              variant="ghost"
+              className="absolute right-4 top-4 z-10"
+              aria-label={t('mediaPreview.close', 'Close preview')}
+              onPress={onClose}
+            >
+              <X className="size-4" />
+            </Button>
             <Modal.Header>
               <Modal.Heading>{item.name}</Modal.Heading>
               <p className="text-sm text-muted">{item.mimeType}</p>
@@ -186,6 +196,7 @@ export function FilePreviewInspector({
                 <Button
                   variant="primary"
                   isDisabled={isPresenting}
+                  data-testid="preview-present"
                   onPress={() => void onPresent()}
                 >
                   {isPresenting
@@ -238,7 +249,7 @@ export default function FilePreviewRoute(): React.JSX.Element | null {
           playlist,
           start: startMediaProjection,
           navigate: (path) => {
-            void navigate(path)
+            void navigate(path, { flushSync: true })
           }
         })
       )
