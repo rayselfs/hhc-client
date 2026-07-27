@@ -11,6 +11,7 @@ import FloatingTimer from '@renderer/components/Control/Timer/FloatingTimer'
 import ConfirmDialog from '@renderer/components/Common/ConfirmDialog'
 import TimerProjectionBridge from '@renderer/components/Control/Bridge/TimerProjectionBridge'
 import MediaProjectionBridge from '@renderer/components/Control/Bridge/MediaProjectionBridge'
+import NowProjectingBar from '@renderer/components/Control/NowProjectingBar'
 import { ProjectionProvider } from '@renderer/contexts/ProjectionContext'
 import { TimerEngineProvider } from '@renderer/contexts/TimerEngineContext'
 import { ContextMenuProvider } from '@renderer/contexts/ContextMenuContext'
@@ -79,6 +80,7 @@ export default function Layout(): React.JSX.Element {
                         ) : isMediaWorkspace ? null : (
                           <Header />
                         )}
+                        <NowProjectingBar />
                         <main
                           className={
                             isPresentationWorkspace || isMediaWorkspace

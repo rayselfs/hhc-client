@@ -1047,6 +1047,28 @@
     "restoreNameConflictDescription": "An item with this name already exists in the restore destination.",
     "restoreNameLabel": "Name"
   },
+  "nowProjecting": {
+    "owners": {
+      "timer": "Timer",
+      "bible": "Bible",
+      "media": "Media"
+    },
+    "statuses": {
+      "closed": "Closed",
+      "opening": "Opening",
+      "connected": "Connected",
+      "projecting": "Projecting",
+      "degraded": "Degraded",
+      "failed": "Failed"
+    },
+    "actions": {
+      "returnToMedia": "Return to Media Workspace",
+      "retry": "Retry",
+      "stop": "Stop Content",
+      "resume": "Resume Content",
+      "close": "Close Projection"
+    }
+  },
   "mediaPreview": {
     "close": "Close preview",
     "zoomOut": "Zoom out",
