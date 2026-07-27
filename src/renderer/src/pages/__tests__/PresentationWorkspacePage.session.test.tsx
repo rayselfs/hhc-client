@@ -17,7 +17,7 @@ import { usePresentationWorkspaceStore } from '@renderer/stores/presentation-wor
 import type { FileItemRecord } from '@shared/types/folder'
 
 const mocks = vi.hoisted(() => ({
-  loadEditablePresentation: vi.fn(),
+  loadEditablePresentationSnapshot: vi.fn(),
   persistEditablePresentationRevision: vi.fn(),
   refreshEditablePresentationThumbnail: vi.fn()
 }))
@@ -49,7 +49,7 @@ vi.mock('@renderer/lib/editable-presentation', async () => {
   )
   return {
     ...actual,
-    loadEditablePresentation: mocks.loadEditablePresentation
+    loadEditablePresentationSnapshot: mocks.loadEditablePresentationSnapshot
   }
 })
 
@@ -88,8 +88,8 @@ describe('PresentationWorkspacePage session integration', () => {
   beforeEach(() => {
     const item = makeEditableItem()
     const document = createBlankEditablePresentationDocument('Sunday')
-    mocks.loadEditablePresentation.mockReset()
-    mocks.loadEditablePresentation.mockResolvedValue(document)
+    mocks.loadEditablePresentationSnapshot.mockReset()
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({ document, revision: 0 })
     mocks.persistEditablePresentationRevision.mockReset()
     mocks.persistEditablePresentationRevision.mockImplementation(async (request) => ({
       revision: request.revision,
@@ -137,6 +137,6 @@ describe('PresentationWorkspacePage session integration', () => {
     )
 
     expect(await screen.findAllByText('Unsaved local text')).not.toHaveLength(0)
-    expect(mocks.loadEditablePresentation).toHaveBeenCalledTimes(1)
+    expect(mocks.loadEditablePresentationSnapshot).toHaveBeenCalledTimes(1)
   })
 })

@@ -14,7 +14,7 @@ import type { FileItemRecord } from '@shared/types/folder'
 
 const mocks = vi.hoisted(() => ({
   convertPptxToEditablePresentation: vi.fn(),
-  loadEditablePresentation: vi.fn(),
+  loadEditablePresentationSnapshot: vi.fn(),
   persistEditablePresentationRevision: vi.fn(),
   refreshEditablePresentationThumbnail: vi.fn(),
   navigate: vi.fn(),
@@ -59,7 +59,7 @@ vi.mock('@renderer/lib/editable-presentation', async () => {
   return {
     ...actual,
     convertPptxToEditablePresentation: mocks.convertPptxToEditablePresentation,
-    loadEditablePresentation: mocks.loadEditablePresentation
+    loadEditablePresentationSnapshot: mocks.loadEditablePresentationSnapshot
   }
 })
 
@@ -127,7 +127,7 @@ function renderEditableDeck(sourceItem: FileItemRecord): void {
 describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
   beforeEach(() => {
     mocks.convertPptxToEditablePresentation.mockReset()
-    mocks.loadEditablePresentation.mockReset()
+    mocks.loadEditablePresentationSnapshot.mockReset()
     mocks.persistEditablePresentationRevision.mockReset()
     mocks.persistEditablePresentationRevision.mockImplementation(async (request) => ({
       revision: request.revision,
@@ -202,7 +202,7 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
       url: 'blob:editable-deck',
       mimeType: EDITABLE_PRESENTATION_MIME_TYPE
     })
-    mocks.loadEditablePresentation.mockResolvedValue(document)
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({ document, revision: 0 })
 
     renderEditableDeck(sourceItem)
 
@@ -227,7 +227,7 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
       url: 'blob:editable-deck',
       mimeType: EDITABLE_PRESENTATION_MIME_TYPE
     })
-    mocks.loadEditablePresentation.mockResolvedValue(withText)
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({ document: withText, revision: 0 })
 
     renderEditableDeck(sourceItem)
 

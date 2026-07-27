@@ -126,7 +126,10 @@ describe('persistEditablePresentationRevision', () => {
     const source = await db.get('file-blobs', 'deck-source')
     await expect(readBlobText(source?.blob)).resolves.toContain('"name":"Original"')
     expect(source).toMatchObject({ revision: 4, size: 1 })
-    await expect(db.get('folder-items', item.id)).resolves.toMatchObject({ name: 'Original', size: 1 })
+    await expect(db.get('folder-items', item.id)).resolves.toMatchObject({
+      name: 'Original',
+      size: 1
+    })
   })
 
   it('does not update the catalog when the source authority is missing', async () => {
