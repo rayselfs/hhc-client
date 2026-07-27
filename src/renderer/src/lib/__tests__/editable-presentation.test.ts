@@ -137,13 +137,16 @@ function mockSolidBackgroundSource(color: string): MockXmlNode {
   })
 }
 
-function mockCenteredWhiteTextShape(text: string): unknown {
+function mockCenteredWhiteTextShape(
+  text: string,
+  size: { w: number; h: number } = { w: 1920, h: 1080 }
+): unknown {
   return {
     nodeType: 'shape',
     name: 'Title',
     presetGeometry: 'rect',
     position: { x: 0, y: 0 },
-    size: { w: 1920, h: 1080 },
+    size,
     rotation: 0,
     fill: missingXmlNode,
     line: missingXmlNode,
@@ -833,6 +836,29 @@ describe('editable presentation documents', () => {
     expect(
       getTextElements(document.slides[document.slideOrder[0]].elements)[0].fontSize
     ).toBeCloseTo((88 * 96) / 72)
+  })
+
+  it('keeps imported fixed text frames at their resolved OOXML height', () => {
+    const presentation = {
+      width: 1920,
+      height: 1080,
+      slides: [
+        {
+          ...(mockSlide(0, 0, mockXmlNode()) as Record<string, unknown>),
+          nodes: [mockCenteredWhiteTextShape('Line one\nLine two\nLine three', { w: 600, h: 40 })]
+        }
+      ],
+      layouts: new Map(),
+      masters: new Map(),
+      layoutToMaster: new Map(),
+      media: new Map()
+    } as unknown as PresentationData
+
+    const document = convertPresentationData(makePptxFileItem(), presentation)
+    const text = getTextElements(document.slides[document.slideOrder[0]].elements)[0]
+
+    expect(text.autoSize).toBe('fixed')
+    expect(text.height).toBe(40)
   })
 
   it('preserves direct slide, layout, and master solid black backgrounds with centered white text', () => {

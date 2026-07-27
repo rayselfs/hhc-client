@@ -1039,12 +1039,7 @@ function convertShapeNode(
       x: frame.x,
       y: frame.y,
       width: frame.width,
-      height: fitTextFrameHeight(
-        frame,
-        text,
-        style,
-        normalizeCanvasLength(presentation.height, DEFAULT_HEIGHT)
-      ),
+      height: frame.height,
       rotation: node.rotation,
       opacity: 1,
       text,
@@ -1271,18 +1266,6 @@ function resolveTextShapeStyle(node: ShapeNodeData): TextShapeStyle {
     align: normalizeTextAlign(firstParagraph?.properties?.attr('algn')),
     lineHeight: 1.15
   }
-}
-
-function fitTextFrameHeight(
-  frame: TextShapeFrame,
-  text: string,
-  style: TextShapeStyle,
-  slideHeight: number
-): number {
-  const lineCount = Math.max(1, text.split('\n').length)
-  const requiredHeight = Math.ceil(lineCount * style.fontSize * style.lineHeight)
-  const maxHeight = Math.max(frame.height, slideHeight - frame.y)
-  return Math.max(frame.height, Math.min(requiredHeight, maxHeight))
 }
 
 function normalizeCanvasLength(value: number, fallback: number): number {

@@ -82,9 +82,9 @@ with optional imported runs shared by DOM and SVG renderers.
 - Consumes: resolved `TextShapeFrame.height`
 - Produces: imported text with the exact same fixed height
 
-- [ ] Add a failing PPTX conversion test whose estimated text height exceeds its frame.
-- [ ] Remove imported frame auto-growth and the unused height estimator.
-- [ ] Run focused import tests and commit.
+- [x] Add a failing PPTX conversion test whose estimated text height exceeds its frame.
+- [x] Remove imported frame auto-growth and the unused height estimator.
+- [x] Run focused import tests and commit.
 
 ### Task 5: Preserve Imported Text Runs
 
