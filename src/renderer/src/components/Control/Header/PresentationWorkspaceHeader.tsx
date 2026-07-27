@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { Button } from '@heroui/react/button'
-import { ButtonGroup } from '@heroui/react/button-group'
 import { toast } from '@heroui/react/toast'
-import { ChevronsLeft, Home, Monitor, Redo2, Undo2, X } from 'lucide-react'
+import { Home, Monitor, Redo2, Undo2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { usePresentationSafeAction } from '@renderer/components/Control/PresentationNavigationGuard'
 import { usePresentationCloseDecision } from '@renderer/contexts/PresentationCloseDecisionContext'
+import { useProjection } from '@renderer/contexts/ProjectionContext'
 import { usePresentationSessionRegistry } from '@renderer/contexts/PresentationSessionRegistryContext'
 import { SHORTCUTS } from '@renderer/config/shortcuts'
 import { useKeyboardShortcuts } from '@renderer/hooks/useKeyboardShortcuts'
@@ -17,7 +17,7 @@ import {
   isEditablePresentationMimeType,
   isPresentationItem
 } from '@renderer/lib/presentation-media'
-import { startMediaProjection } from '@renderer/lib/projection-actions'
+import { startMediaProjection, stopProjectionSession } from '@renderer/lib/projection-actions'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { usePresentationWorkspaceStore } from '@renderer/stores/presentation-workspace'
 import { isFileItem } from '@shared/types/folder'
@@ -26,6 +26,7 @@ import type { FileItemRecord } from '@shared/types/folder'
 export default function PresentationWorkspaceHeader(): React.JSX.Element {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const { isProjectionOpen, stopProjection } = useProjection()
   const registry = usePresentationSessionRegistry()
   const requestCloseDecision = usePresentationCloseDecision()
   const runPresentationSafeAction = usePresentationSafeAction()
@@ -159,6 +160,17 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
   const runPresentAction = (from: 'beginning' | 'current'): void => {
     void presentActiveDocument(from).catch(() => {
       toast.danger(t('presentationWorkspace.saveFailed', 'Unable to save presentation'))
+    })
+  }
+
+  const handleProjectionAction = (): void => {
+    if (!isProjectionOpen) {
+      runPresentAction('current')
+      return
+    }
+
+    void stopProjectionSession({ stopProjection }).catch(() => {
+      toast.danger(t('toast.projectionCloseFailed'))
     })
   }
 
@@ -324,28 +336,22 @@ export default function PresentationWorkspaceHeader(): React.JSX.Element {
         </div>
       )}
       <div className="relative z-10 mb-1 ml-auto flex items-center">
-        <ButtonGroup size="sm">
-          <Button
-            variant="primary"
-            onPress={() => runPresentAction('current')}
-            isDisabled={!activeDocument}
-            aria-label={t('presentationWorkspace.presentFromCurrent', 'Present from Current Slide')}
-          >
-            <Monitor className="size-4" />
-            <span className="hidden xl:inline">
-              {t('presentationWorkspace.presentFromCurrent', 'Present from Current Slide')}
-            </span>
-          </Button>
-          <Button
-            isIconOnly
-            variant="outline"
-            onPress={() => runPresentAction('beginning')}
-            isDisabled={!activeDocument}
-            aria-label={t('presentationWorkspace.presentFromBeginning', 'Present from Beginning')}
-          >
-            <ChevronsLeft className="size-4" />
-          </Button>
-        </ButtonGroup>
+        <Button
+          size="lg"
+          isIconOnly
+          variant="outline"
+          className={`size-10 min-w-10 rounded-full p-0 ${
+            isProjectionOpen ? 'text-danger' : 'text-default-foreground'
+          }`}
+          onPress={handleProjectionAction}
+          isDisabled={!isProjectionOpen && !activeDocument}
+          aria-label={t(
+            isProjectionOpen ? 'projection.stopButton' : 'projection.startButton',
+            isProjectionOpen ? 'Stop projection' : 'Start projection'
+          )}
+        >
+          {isProjectionOpen ? <X className="size-4" /> : <Monitor className="size-4" />}
+        </Button>
       </div>
     </header>
   )

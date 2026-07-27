@@ -26,7 +26,9 @@ const mocks = vi.hoisted(() => ({
   openFileExplorerDB: vi.fn(),
   loadEditablePresentation: vi.fn(),
   startMediaProjection: vi.fn(),
-  stopProjectionSession: vi.fn()
+  stopProjectionSession: vi.fn(),
+  isProjectionOpen: false,
+  stopProjection: vi.fn()
 }))
 
 vi.mock('react-i18next', async () => {
@@ -44,8 +46,8 @@ vi.mock('react-router-dom', async () => {
 
 vi.mock('@renderer/contexts/ProjectionContext', () => ({
   useProjection: () => ({
-    isProjectionOpen: false,
-    stopProjection: vi.fn()
+    isProjectionOpen: mocks.isProjectionOpen,
+    stopProjection: mocks.stopProjection
   })
 }))
 
@@ -169,6 +171,7 @@ describe('PresentationWorkspaceHeader', () => {
     session = createFakeSession(item)
     mocks.registry = createRegistry(session)
     mocks.requestCloseDecision.mockResolvedValue('keep-editing')
+    mocks.isProjectionOpen = false
     db = {
       get: vi.fn().mockResolvedValue(item),
       getAllFromIndex: vi.fn().mockResolvedValue([item]),
@@ -279,7 +282,7 @@ describe('PresentationWorkspaceHeader', () => {
     vi.mocked(session.flush).mockRejectedValue(new Error('quota exceeded'))
     renderHeader()
 
-    await user.click(screen.getByRole('button', { name: 'Present from Current Slide' }))
+    await user.click(screen.getByRole('button', { name: 'Start projection' }))
 
     await waitFor(() => expect(session.flush).toHaveBeenCalledTimes(1))
     expect(session.commitDraft).toHaveBeenCalledTimes(1)
@@ -287,13 +290,17 @@ describe('PresentationWorkspaceHeader', () => {
     expect(useMediaProjectionStore.getState().isPresenting).toBe(false)
   })
 
-  it('presents from the current slide or beginning through distinct actions', async () => {
+  it('shows one round projection button and presents from the current slide', async () => {
     const user = userEvent.setup()
     const deckDocument = session.getSnapshot().history.present
     usePresentationWorkspaceStore.getState().setActiveSlideId(item.id, deckDocument.slideOrder[1])
     renderHeader()
 
-    await user.click(screen.getByRole('button', { name: 'Present from Current Slide' }))
+    const button = screen.getByRole('button', { name: 'Start projection' })
+    expect(button).toHaveClass('size-10', 'min-w-10', 'rounded-full', 'p-0')
+    expect(button.closest('[role="group"]')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Present from Beginning' })).not.toBeInTheDocument()
+    await user.click(button)
 
     await waitFor(() => {
       expect(mocks.startMediaProjection).toHaveBeenCalledWith([item], 0, expect.any(Object), {
@@ -301,18 +308,22 @@ describe('PresentationWorkspaceHeader', () => {
         presentationState: { slideIndex: 1, slideCount: 2 }
       })
     })
-    mocks.startMediaProjection.mockClear()
+    expect(session.commitDraft).toHaveBeenCalledTimes(1)
+    expect(session.flush).toHaveBeenCalledTimes(1)
+  })
 
-    await user.click(screen.getByRole('button', { name: 'Present from Beginning' }))
+  it('stops an open projection from the same header button', async () => {
+    const user = userEvent.setup()
+    mocks.isProjectionOpen = true
+    mocks.stopProjectionSession.mockResolvedValue(undefined)
+    renderHeader()
 
-    await waitFor(() => {
-      expect(mocks.startMediaProjection).toHaveBeenCalledWith([item], 0, expect.any(Object), {
-        prioritizeStartItem: true,
-        presentationState: { slideIndex: 0, slideCount: 2 }
-      })
+    await user.click(screen.getByRole('button', { name: 'Stop projection' }))
+
+    expect(mocks.stopProjectionSession).toHaveBeenCalledWith({
+      stopProjection: mocks.stopProjection
     })
-    expect(session.commitDraft).toHaveBeenCalledTimes(2)
-    expect(session.flush).toHaveBeenCalledTimes(2)
+    expect(mocks.startMediaProjection).not.toHaveBeenCalled()
   })
 
   it('uses F5 for beginning and Shift+F5 for the current slide', async () => {
