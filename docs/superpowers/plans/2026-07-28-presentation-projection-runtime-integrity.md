@@ -367,7 +367,7 @@ git commit -m "fix: allow shutdown after renderer crash"
 **Files:**
 - Verify only
 
-- [ ] **Step 1: Run focused tests**
+- [x] **Step 1: Run focused tests**
 
 ```bash
 npx vitest run \
@@ -379,7 +379,7 @@ npx vitest run \
   src/renderer/src/contexts/__tests__/PresentationSessionRegistryContext.test.tsx
 ```
 
-- [ ] **Step 2: Run static verification**
+- [x] **Step 2: Run static verification**
 
 ```bash
 npm run typecheck
@@ -387,14 +387,14 @@ npm run lint
 git diff --check
 ```
 
-- [ ] **Step 3: Run the full suite and build**
+- [x] **Step 3: Run the full suite and build**
 
 ```bash
 npx vitest run
 npm run build
 ```
 
-- [ ] **Step 4: Inspect repository state**
+- [x] **Step 4: Inspect repository state**
 
 ```bash
 git status --short --branch
