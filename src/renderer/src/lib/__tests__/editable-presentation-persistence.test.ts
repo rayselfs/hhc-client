@@ -107,6 +107,28 @@ describe('persistEditablePresentationRevision', () => {
     expect(mirror).toBeUndefined()
   })
 
+  it('rejects an equal revision without changing the source or catalog', async () => {
+    await seedAuthority({
+      id: 'deck-source',
+      blob: new Blob([JSON.stringify(initialDocument)], {
+        type: EDITABLE_PRESENTATION_MIME_TYPE
+      }),
+      size: 1,
+      refCount: 1,
+      revision: 4
+    })
+
+    await expect(persistEditablePresentationRevision(createWrite())).rejects.toThrow(
+      'Presentation revision 4 is not newer than persisted revision 4'
+    )
+
+    const db = await openFileExplorerDB()
+    const source = await db.get('file-blobs', 'deck-source')
+    await expect(readBlobText(source?.blob)).resolves.toContain('"name":"Original"')
+    expect(source).toMatchObject({ revision: 4, size: 1 })
+    await expect(db.get('folder-items', item.id)).resolves.toMatchObject({ name: 'Original', size: 1 })
+  })
+
   it('does not update the catalog when the source authority is missing', async () => {
     const db = await openFileExplorerDB()
     await db.put('folder-items', item)

@@ -52,6 +52,14 @@ export async function persistEditablePresentationRevision(
     await tx.done.catch(() => undefined)
     throw new Error(`Editable presentation catalog item is missing: ${write.itemId}`)
   }
+  const storedRevision = source.revision ?? 0
+  if (write.revision <= storedRevision) {
+    tx.abort()
+    await tx.done.catch(() => undefined)
+    throw new Error(
+      `Presentation revision ${write.revision} is not newer than persisted revision ${storedRevision}`
+    )
+  }
 
   await Promise.all([
     sourceStore.put({

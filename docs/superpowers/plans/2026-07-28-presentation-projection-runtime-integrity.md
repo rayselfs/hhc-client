@@ -179,7 +179,7 @@ git commit -m "fix: preserve presentation revisions across sessions"
 - Consumes: `FileBlobRecord.revision`
 - Produces: rejection before source or catalog mutation when `write.revision <= storedRevision`
 
-- [ ] **Step 1: Write the failing stale-write transaction test**
+- [x] **Step 1: Write the failing stale-write transaction test**
 
 Seed source revision `4`, attempt to persist a different document at revision `4`, and assert:
 
@@ -193,7 +193,7 @@ await expect(db.get('folder-items', item.id)).resolves.toMatchObject({ name: ite
 
 Also parse the stored blob and assert its original document name is unchanged.
 
-- [ ] **Step 2: Run the persistence test and verify RED**
+- [x] **Step 2: Run the persistence test and verify RED**
 
 Run:
 
@@ -203,7 +203,7 @@ npx vitest run src/renderer/src/lib/__tests__/editable-presentation-persistence.
 
 Expected: FAIL because equal revisions currently overwrite.
 
-- [ ] **Step 3: Implement the transactional revision guard**
+- [x] **Step 3: Implement the transactional revision guard**
 
 After loading source and catalog records, compute:
 
@@ -214,7 +214,7 @@ const storedRevision = source.revision ?? 0
 If `write.revision <= storedRevision`, abort the transaction, await the aborted transaction
 rejection, and throw the specific stale-revision error. Do not write either object store.
 
-- [ ] **Step 4: Run the persistence test and verify GREEN**
+- [x] **Step 4: Run the persistence test and verify GREEN**
 
 Run:
 
@@ -224,7 +224,7 @@ npx vitest run src/renderer/src/lib/__tests__/editable-presentation-persistence.
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add \
