@@ -296,6 +296,16 @@ describe('Header', () => {
     expect(screen.getByRole('button', { name: 'Stop projection' })).toBeInTheDocument()
   })
 
+  it('renders the projection action as an ungrouped round header button', async () => {
+    await i18n.changeLanguage('en')
+    await mockProjectionContext()
+    renderWithRouter(['/timer'])
+
+    const button = screen.getByRole('button', { name: 'Start projection' })
+    expect(button).toHaveClass('size-10', 'min-w-10', 'rounded-full', 'p-0')
+    expect(button.closest('[role="group"]')).toBeNull()
+  })
+
   it('calls stopProjection without confirmation when projection is open', async () => {
     await i18n.changeLanguage('en')
     const stopProjection = vi.fn(() => Promise.resolve())

@@ -230,18 +230,19 @@ export default function Header(): React.JSX.Element {
         {(showBibleControls || showFilesControls) && (
           <SearchBarToggle variant={showBibleControls ? 'bible' : 'fileExplorer'} />
         )}
-        <ButtonGroup size="lg">
-          <Button
-            isIconOnly
-            variant="outline"
-            className={isProjectionOpen ? 'text-danger px-6' : 'text-default-foreground px-6'}
-            onPress={() => void handleProjectionAction()}
-            isDisabled={!isProjectionOpen && projectionHeaderState.disabled}
-            aria-label={t(isProjectionOpen ? 'projection.stopButton' : 'projection.startButton')}
-          >
-            {isProjectionOpen ? <X className="size-4" /> : <Monitor className="size-4" />}
-          </Button>
-        </ButtonGroup>
+        <Button
+          size="lg"
+          isIconOnly
+          variant="outline"
+          className={`size-10 min-w-10 rounded-full p-0 ${
+            isProjectionOpen ? 'text-danger' : 'text-default-foreground'
+          }`}
+          onPress={() => void handleProjectionAction()}
+          isDisabled={!isProjectionOpen && projectionHeaderState.disabled}
+          aria-label={t(isProjectionOpen ? 'projection.stopButton' : 'projection.startButton')}
+        >
+          {isProjectionOpen ? <X className="size-4" /> : <Monitor className="size-4" />}
+        </Button>
       </div>
     </header>
   )
