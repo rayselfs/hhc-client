@@ -70,8 +70,18 @@ afterEach(() => {
 })
 
 describe('ProjectionContext web recovery', () => {
+  const mockProjectionVlcStop = vi.fn(() => Promise.resolve())
+
   beforeEach(() => {
     vi.mocked(isElectron).mockReturnValue(false)
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: {
+        projectionVlc: {
+          stop: mockProjectionVlcStop
+        }
+      }
+    })
   })
 
   it('does not open projection on mount', () => {
@@ -190,6 +200,76 @@ describe('ProjectionContext web recovery', () => {
 
     expect(result.current.isProjectionOpen).toBe(false)
     expect(result.current.recovery.status).toBe('closed')
+  })
+
+  it('blacks out and resumes retained content without focusing or closing projection', async () => {
+    const focus = vi.spyOn(window, 'focus').mockImplementation(() => undefined)
+    const { result } = renderProjection()
+    let operationPromise: ReturnType<typeof result.current.startProjection>
+
+    act(() => {
+      operationPromise = result.current.startProjection('media', [
+        [
+          'file:show',
+          {
+            itemId: 'video-1',
+            blobId: 'blob-1',
+            fileName: 'video.mp4',
+            mimeType: 'video/mp4',
+            playlist: [],
+            currentIndex: 0
+          }
+        ]
+      ])
+      mockAdapter._trigger('__system:ready', { generation: 1 })
+    })
+    await operationPromise!
+
+    expect(result.current.sessionSummary).toMatchObject({
+      owner: 'media',
+      status: 'projecting',
+      label: 'video.mp4',
+      isBlackout: false
+    })
+
+    await act(async () => {
+      await result.current.blackoutProjection(true)
+    })
+
+    expect(mockProjectionVlcStop).toHaveBeenCalledOnce()
+    expect(result.current.sessionSummary).toMatchObject({
+      owner: 'media',
+      status: 'connected',
+      label: 'video.mp4',
+      isBlackout: true
+    })
+    expect(mockAdapter.send).toHaveBeenCalledWith('__system:blackout', { enabled: true })
+
+    await act(async () => {
+      await result.current.blackoutProjection(false)
+    })
+
+    expect(result.current.sessionSummary.status).toBe('projecting')
+    expect(result.current.getProjectionSnapshot()?.media.show?.fileName).toBe('video.mp4')
+    expect(focus).not.toHaveBeenCalled()
+    expect(mockWindowOpen).toHaveBeenCalledOnce()
+  })
+
+  it('maps popup failure to a failed session summary', async () => {
+    mockWindowOpen.mockReturnValue(null)
+    const { result } = renderProjection()
+
+    await act(async () => {
+      await result.current.startProjection('timer')
+    })
+
+    expect(result.current.sessionSummary).toEqual({
+      owner: 'timer',
+      status: 'failed',
+      label: null,
+      isBlackout: false,
+      failure: { generation: 1, reason: 'popup-blocked' }
+    })
   })
 })
 

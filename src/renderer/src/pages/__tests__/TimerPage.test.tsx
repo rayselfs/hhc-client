@@ -9,7 +9,16 @@ import TimerPage from '../TimerPage'
 
 const projectionRecoveryMock = {
   recovery: { status: 'closed' as const, generation: 0, failure: null },
-  retryProjection: vi.fn()
+  retryProjection: vi.fn(),
+  sessionSummary: {
+    owner: null,
+    status: 'closed' as const,
+    label: null,
+    isBlackout: false,
+    failure: null
+  },
+  blackoutProjection: vi.fn(() => Promise.resolve()),
+  getProjectionSnapshot: vi.fn(() => null)
 }
 
 vi.mock('@renderer/contexts/ProjectionContext', () => ({

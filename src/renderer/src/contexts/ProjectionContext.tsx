@@ -12,9 +12,11 @@ import type {
   ProjectionChannel,
   ProjectionContentChannel,
   ProjectionContentMessageTuple,
+  ProjectionFailure,
   ProjectionOperationResult,
   ProjectionOwner,
-  ProjectionPayload
+  ProjectionPayload,
+  ProjectionSessionSnapshot
 } from '@shared/projection-messages'
 
 export type {
@@ -31,12 +33,21 @@ export interface StartProjectionOptions {
   bringToFront?: boolean
 }
 
+export interface ProjectionSessionSummary {
+  owner: ProjectionOwner | null
+  status: 'closed' | 'opening' | 'connected' | 'projecting' | 'failed'
+  label: string | null
+  isBlackout: boolean
+  failure: ProjectionFailure | null
+}
+
 interface ProjectionContextValue {
   isProjectionOpen: boolean
   isProjectionBlanked: boolean
   projectionReadyCount: number
   activeOwner: ProjectionOwner
   recovery: ProjectionRecoveryState
+  sessionSummary: ProjectionSessionSummary
   claimProjection: (owner: ProjectionOwner, options?: { unblank?: boolean }) => void
   startProjection: (
     owner: ProjectionOwner,
@@ -49,6 +60,8 @@ interface ProjectionContextValue {
   bringProjectionToFront: () => Promise<void>
   closeProjection: () => Promise<void>
   blankProjection: (blank: boolean) => void
+  blackoutProjection: (enabled: boolean) => Promise<void>
+  getProjectionSnapshot: () => ProjectionSessionSnapshot | null
   project: <C extends ProjectionContentChannel>(
     channel: C,
     data: ProjectionPayload<C>,
@@ -130,7 +143,13 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
   useEffect(() => {
     const adapter = getAdapter(adapterRef)
     const coordinator = getCoordinator()
-    const syncRecovery = (): void => setRecovery(coordinator.getRecoveryState())
+    const syncRecovery = (): void => {
+      const next = coordinator.getRecoveryState()
+      setRecovery({
+        ...next,
+        failure: next.failure ? { ...next.failure } : null
+      })
+    }
     const unsubscribeCoordinator = coordinator.subscribe(syncRecovery)
     const unsubscribeReady = adapter.on('__system:ready', (data) => {
       if (
@@ -329,6 +348,20 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
     [getCoordinator]
   )
 
+  const blackoutProjection = useCallback(
+    async (enabled: boolean): Promise<void> => {
+      if (enabled) await window.api?.projectionVlc?.stop?.().catch(() => {})
+      getCoordinator().blackout(enabled)
+      setIsProjectionBlanked(enabled)
+    },
+    [getCoordinator]
+  )
+
+  const getProjectionSnapshot = useCallback(
+    (): ProjectionSessionSnapshot | null => getCoordinator().getSnapshot(),
+    [getCoordinator]
+  )
+
   const startProjection = useCallback(
     async (
       owner: ProjectionOwner,
@@ -413,6 +446,28 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
     []
   )
 
+  const sessionSummary = useMemo<ProjectionSessionSummary>(() => {
+    const snapshot = getCoordinator().getSnapshot()
+    const status: ProjectionSessionSummary['status'] =
+      recovery.status === 'failed'
+        ? 'failed'
+        : recovery.status === 'opening' || recovery.status === 'recovering'
+          ? 'opening'
+          : recovery.status === 'ready' && isProjectionOpen
+            ? snapshot && !snapshot.isBlackout
+              ? 'projecting'
+              : 'connected'
+            : 'closed'
+
+    return {
+      owner: snapshot?.owner ?? null,
+      status,
+      label: snapshot?.media.show?.fileName ?? null,
+      isBlackout: snapshot?.isBlackout ?? false,
+      failure: recovery.failure
+    }
+  }, [getCoordinator, isProjectionOpen, recovery])
+
   const contextValue = useMemo(
     () => ({
       isProjectionOpen,
@@ -420,6 +475,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       projectionReadyCount,
       activeOwner,
       recovery,
+      sessionSummary,
       claimProjection,
       startProjection,
       stopProjection,
@@ -428,6 +484,8 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       bringProjectionToFront,
       closeProjection,
       blankProjection,
+      blackoutProjection,
+      getProjectionSnapshot,
       project,
       send,
       on
@@ -438,6 +496,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       projectionReadyCount,
       activeOwner,
       recovery,
+      sessionSummary,
       claimProjection,
       startProjection,
       stopProjection,
@@ -446,6 +505,8 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       bringProjectionToFront,
       closeProjection,
       blankProjection,
+      blackoutProjection,
+      getProjectionSnapshot,
       project,
       send,
       on

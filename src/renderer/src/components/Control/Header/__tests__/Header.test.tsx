@@ -57,6 +57,13 @@ function baseProjectionContext(): MockProjectionContext {
     projectionReadyCount: 0,
     activeOwner: 'timer' as const,
     recovery: { status: 'closed', generation: 0, failure: null },
+    sessionSummary: {
+      owner: null,
+      status: 'closed',
+      label: null,
+      isBlackout: false,
+      failure: null
+    },
     claimProjection: vi.fn<MockProjectionContext['claimProjection']>(),
     startProjection: vi.fn<MockProjectionContext['startProjection']>(() =>
       Promise.resolve({ ok: true, generation: 1 })
@@ -73,6 +80,8 @@ function baseProjectionContext(): MockProjectionContext {
     ),
     closeProjection: vi.fn<MockProjectionContext['closeProjection']>(() => Promise.resolve()),
     blankProjection: vi.fn<MockProjectionContext['blankProjection']>(),
+    blackoutProjection: vi.fn<MockProjectionContext['blackoutProjection']>(() => Promise.resolve()),
+    getProjectionSnapshot: vi.fn<MockProjectionContext['getProjectionSnapshot']>(() => null),
     project: vi.fn<MockProjectionContext['project']>(() => Promise.resolve()),
     send: vi.fn<MockProjectionContext['send']>(),
     on: vi.fn(() => vi.fn()) as MockProjectionContext['on']
