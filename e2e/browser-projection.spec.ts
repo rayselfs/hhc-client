@@ -30,7 +30,7 @@ test('starts one projection popup and keeps passive timer ticks non-activating',
   const projection = await projectionPromise
 
   await projection.waitForLoadState('domcontentloaded')
-  await expect(projection).toHaveURL(/#\/projection\?generation=[1-9]\d*$/)
+  await expect(projection).toHaveURL(/#\/projection\?generation=[1-9]\d*&session=[0-9a-f-]+$/i)
   await expect(projection.locator('.timer-digits').first()).toBeVisible()
 
   const beforeReload = await projection.locator('.timer-digits').first().textContent()
@@ -79,7 +79,7 @@ test('recovers after the browser blocks the projection popup', async ({ page, co
   expect(context.pages()).toHaveLength(2)
 })
 
-test('keeps Media live through Files preview, blackout replay, resume, and close', async ({
+test('keeps Media live through Files preview and closes from the Header', async ({
   page,
   context
 }) => {
@@ -120,16 +120,10 @@ test('keeps Media live through Files preview, blackout replay, resume, and close
   await expect(projection.getByRole('img', { name: 'Second.png' })).toBeVisible()
   expect(context.pages()).toHaveLength(2)
 
-  await page.getByTestId('now-projecting-stop').click()
-  await expect(projection.getByTestId('projection-blackout')).toBeVisible()
-  await projection.reload()
-  await expect(projection.getByTestId('projection-blackout')).toBeVisible()
-
-  await page.getByTestId('now-projecting-resume').click()
-  await expect(projection.getByRole('img', { name: 'Second.png' })).toBeVisible()
-  await page.getByTestId('now-projecting-close').click()
+  await page.getByTestId('media-back-to-files').click()
+  await expect(page).toHaveURL(/#\/files$/)
+  await page.getByRole('button', { name: /Stop projection|停止投影/ }).click()
   await expect.poll(() => projection.isClosed()).toBe(true)
-  await expect(page.getByTestId('now-projecting-bar')).toHaveCount(0)
 })
 
 export {}

@@ -132,7 +132,7 @@ export interface AppMessages {
     fontSize: number
     templateTheme?: ProjectionTheme
   }
-  /** File item to display on projection (stub — coming soon) */
+  /** File item to display on projection */
   'file:show': {
     itemId: string
     blobId: string

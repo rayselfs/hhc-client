@@ -765,7 +765,6 @@
       "allDataButton": "Clear All Data",
       "allDataConfirm": "Clear all settings, user data, media cache, and local data? This cannot be undone."
     },
-    "mediaPlaceholder": "Media settings coming soon",
     "trash": {
       "retentionLabel": "Trash Retention Period",
       "retentionDesc": "Items in trash will be permanently deleted after this period",

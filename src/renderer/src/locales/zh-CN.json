@@ -765,7 +765,6 @@
       "allDataButton": "清除所有资料",
       "allDataConfirm": "清除所有设置、用户资料、媒体缓存与本地资料？此操作无法复原。"
     },
-    "mediaPlaceholder": "媒体设置即将推出",
     "trash": {
       "retentionLabel": "垃圾桶保留期限",
       "retentionDesc": "垃圾桶中的项目将在此期限后永久删除",

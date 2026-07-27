@@ -12,19 +12,18 @@ production Header.
 
 ### Task 1: Browser Projection E2E
 
-- [ ] Update the popup URL assertion for generation plus session ID.
-- [ ] Replace obsolete blackout/resume/close selectors with `Stop projection`.
-- [ ] Keep media persistence and explicit close assertions.
+- [x] Update the popup URL assertion for generation plus session ID.
+- [x] Replace obsolete blackout/resume/close selectors with `Stop projection`.
+- [x] Keep media persistence and explicit close assertions.
 
 ### Task 2: Packaged Electron E2E
 
-- [ ] Replace obsolete status-bar controls with the Header `Stop projection` action.
-- [ ] Keep timer persistence across Files navigation and explicit window-close assertions.
+- [x] Replace obsolete status-bar controls with the Header `Stop projection` action.
+- [x] Keep timer persistence across Files navigation and explicit window-close assertions.
 
 ### Task 3: Verification
 
-- [ ] Confirm no E2E file references `now-projecting-*`.
-- [ ] Run the browser projection Playwright suite.
-- [ ] Run typecheck, lint, and diff check.
-- [ ] Mark this plan complete and commit.
-
+- [x] Confirm no E2E file references `now-projecting-*`.
+- [x] Run the browser projection Playwright suite.
+- [x] Run typecheck, lint, and diff check.
+- [x] Mark this plan complete and commit.

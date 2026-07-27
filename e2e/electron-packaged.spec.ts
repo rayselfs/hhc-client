@@ -62,21 +62,13 @@ test('launches packaged control and projection windows with recovery lifecycle',
     await expect(projection.locator('.timer-digits').first()).toBeVisible()
   })
 
-  await test.step('blackout, replay, resume, and close explicitly', async () => {
+  await test.step('close projection explicitly from the Header', async () => {
     const projection = electronApp!
       .windows()
       .find((window) => window.url().endsWith('#/projection'))
     if (!projection) throw new Error('Projection window did not open')
 
-    await control.getByTestId('now-projecting-stop').click()
-    await expect(projection.getByTestId('projection-blackout')).toBeVisible()
-    await projection.reload()
-    await expect(projection.getByTestId('projection-blackout')).toBeVisible()
-
-    await control.getByTestId('now-projecting-resume').click()
-    await expect(projection.locator('.timer-digits').first()).toBeVisible()
-    await control.getByTestId('now-projecting-close').click()
+    await control.getByRole('button', { name: /Stop projection|停止投影/ }).click()
     await expect.poll(() => electronApp?.windows().length ?? 0).toBe(1)
-    await expect(control.getByTestId('now-projecting-bar')).toHaveCount(0)
   })
 })
