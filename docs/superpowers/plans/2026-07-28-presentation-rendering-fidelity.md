@@ -121,7 +121,7 @@ with optional imported runs shared by DOM and SVG renderers.
 
 ### Task 7: Batch Verification
 
-- [ ] Run all editable presentation, surface, workspace, preview, payload, and projection tests.
-- [ ] Run `npm run typecheck`, `npm run lint`, and `git diff --check`.
-- [ ] Run `npx vitest run` and `npm run build`.
-- [ ] Mark this plan complete and inspect repository state.
+- [x] Run all editable presentation, surface, workspace, preview, payload, and projection tests.
+- [x] Run `npm run typecheck`, `npm run lint`, and `git diff --check`.
+- [x] Run `npx vitest run` and `npm run build`.
+- [x] Mark this plan complete and inspect repository state.
