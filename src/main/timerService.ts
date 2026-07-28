@@ -82,6 +82,7 @@ export class TimerService {
   }
 
   private intervalId: NodeJS.Timeout | null = null
+  private intervalDelayMs: number | null = null
   private targetEndTime: number | null = null
   private windowManager: WindowManager | null = null
 
@@ -92,9 +93,14 @@ export class TimerService {
     this.windowManager = windowManager
   }
 
-  private startInterval(): void {
-    if (this.intervalId !== null) return
-    this.intervalId = setInterval(() => this.tick(), 100)
+  private syncInterval(): void {
+    const nextDelayMs =
+      this.stopwatch.status === 'running' ? 100 : this.timer.status === 'running' ? 1000 : null
+    if (nextDelayMs === this.intervalDelayMs) return
+    this.stopInterval()
+    if (nextDelayMs === null) return
+    this.intervalDelayMs = nextDelayMs
+    this.intervalId = setInterval(() => this.tick(), nextDelayMs)
   }
 
   private stopInterval(): void {
@@ -102,12 +108,7 @@ export class TimerService {
       clearInterval(this.intervalId)
       this.intervalId = null
     }
-  }
-
-  private stopIntervalIfIdle(): void {
-    if (this.timer.status !== 'running' && this.stopwatch.status !== 'running') {
-      this.stopInterval()
-    }
+    this.intervalDelayMs = null
   }
 
   private tick(): void {
@@ -115,8 +116,7 @@ export class TimerService {
     const nowMs = Date.now()
 
     if (this.timer.status === 'running' && this.targetEndTime !== null) {
-      const remainingMs = Math.max(0, this.targetEndTime - nowPerfMs)
-      const rawRemaining = remainingMs / 1000
+      const rawRemaining = (this.targetEndTime - nowPerfMs) / 1000
       this.timer.remainingSeconds = Math.ceil(rawRemaining)
 
       if (rawRemaining <= 0) {
@@ -266,7 +266,7 @@ export class TimerService {
     this.timer.overtimeSeconds = 0
     this.timer.status = 'running'
     this.targetEndTime = performance.now() + this.timer.remainingSeconds * 1000
-    this.startInterval()
+    this.syncInterval()
     this.broadcast()
   }
 
@@ -274,7 +274,7 @@ export class TimerService {
     if (this.timer.status !== 'running') return
     this.timer.status = 'paused'
     this.targetEndTime = null
-    this.stopIntervalIfIdle()
+    this.syncInterval()
     this.broadcast()
   }
 
@@ -282,7 +282,7 @@ export class TimerService {
     if (this.timer.status !== 'paused') return
     this.timer.status = 'running'
     this.targetEndTime = performance.now() + this.timer.remainingSeconds * 1000
-    this.startInterval()
+    this.syncInterval()
     this.broadcast()
   }
 
@@ -291,7 +291,7 @@ export class TimerService {
     this.timer.remainingSeconds = this.settings.totalDuration
     this.timer.overtimeSeconds = 0
     this.targetEndTime = null
-    this.stopIntervalIfIdle()
+    this.syncInterval()
     this.broadcast()
   }
 
@@ -341,7 +341,7 @@ export class TimerService {
     if (this.stopwatch.status === 'running') return
     this.stopwatch.status = 'running'
     this.stopwatch.startMs = performance.now() - this.stopwatch.elapsedMs
-    this.startInterval()
+    this.syncInterval()
     this.broadcast()
   }
 
@@ -352,7 +352,7 @@ export class TimerService {
     }
     this.stopwatch.status = 'paused'
     this.stopwatch.startMs = null
-    this.stopIntervalIfIdle()
+    this.syncInterval()
     this.broadcast()
   }
 
@@ -360,7 +360,7 @@ export class TimerService {
     this.stopwatch.status = 'stopped'
     this.stopwatch.elapsedMs = 0
     this.stopwatch.startMs = null
-    this.stopIntervalIfIdle()
+    this.syncInterval()
     this.broadcast()
   }
 

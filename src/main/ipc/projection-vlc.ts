@@ -25,6 +25,9 @@ let playerResizeCleanup: (() => void) | null = null
 let currentItemId: string | null = null
 let currentDurationMs: number | undefined
 let lifecycleVersion = 0
+let lastProgressPublicationMs: number | null = null
+
+const VLC_PROGRESS_PUBLICATION_INTERVAL_MS = 250
 
 type ListenerTarget = {
   listeners(event: string): unknown[]
@@ -243,6 +246,7 @@ async function stopVlc(): Promise<void> {
   lifecycleVersion += 1
   currentItemId = null
   currentDurationMs = undefined
+  lastProgressPublicationMs = null
   if (!player) return
   const currentPlayer = player
   player = null
@@ -310,8 +314,19 @@ async function startVlc(
     }
     currentItemId = request.itemId
     currentDurationMs = request.durationMs
+    lastProgressPublicationMs = null
 
-    nextPlayer.on('timeChanged', () => sendState(wm))
+    nextPlayer.on('timeChanged', () => {
+      const now = Date.now()
+      if (
+        lastProgressPublicationMs !== null &&
+        now - lastProgressPublicationMs < VLC_PROGRESS_PUBLICATION_INTERVAL_MS
+      ) {
+        return
+      }
+      lastProgressPublicationMs = now
+      sendState(wm)
+    })
     nextPlayer.on('lengthChanged', () => sendState(wm))
     nextPlayer.on('playing', () => sendState(wm, { isPlaying: true, isEnded: false }))
     nextPlayer.on('paused', () => sendState(wm, { isPlaying: false }))

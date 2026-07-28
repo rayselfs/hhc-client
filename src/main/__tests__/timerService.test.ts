@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { performance } from 'node:perf_hooks'
 
 import { TimerService } from '../timerService'
 import type { WindowManager } from '../windowManager'
@@ -340,6 +341,21 @@ describe('TimerService', () => {
       service.handleCommand({ type: 'pauseStopwatch' })
       expect(vi.getTimerCount()).toBe(0)
     })
+
+    it('uses one-second ticks unless the stopwatch needs sub-second updates', () => {
+      const tickSpy = vi.spyOn(service as unknown as { tick: () => void }, 'tick')
+      service.handleCommand({ type: 'start' })
+
+      vi.advanceTimersByTime(999)
+      expect(tickSpy).not.toHaveBeenCalled()
+      vi.advanceTimersByTime(1)
+      expect(tickSpy).toHaveBeenCalledTimes(1)
+
+      service.handleCommand({ type: 'startStopwatch' })
+      tickSpy.mockClear()
+      vi.advanceTimersByTime(500)
+      expect(tickSpy).toHaveBeenCalledTimes(5)
+    })
   })
 
   describe('getState', () => {
@@ -372,6 +388,26 @@ describe('TimerService', () => {
       expect(state.stopwatch).toBeDefined()
       expect(state.stopwatch.status).toBe('stopped')
       expect(state.stopwatch.formattedTime).toBeDefined()
+    })
+
+    it('tracks elapsed overtime after the countdown reaches zero', () => {
+      let now = 0
+      const nowSpy = vi.spyOn(performance, 'now').mockImplementation(() => now)
+      try {
+        service.handleCommand({ type: 'setDuration', seconds: 1 })
+        service.handleCommand({ type: 'start' })
+
+        now = 2000
+        vi.advanceTimersByTime(2000)
+
+        expect(service.getState()).toMatchObject({
+          phase: 'overtime',
+          remainingSeconds: 0,
+          overtimeSeconds: 1
+        })
+      } finally {
+        nowSpy.mockRestore()
+      }
     })
   })
 })

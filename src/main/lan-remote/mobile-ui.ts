@@ -52,8 +52,15 @@ export function getLanRemoteMobileHtml(sessionToken: string | null = null): stri
         state.textContent = error.message
       })
     })
-    setInterval(() => refreshState().catch(() => {}), 1000)
-    refreshState().catch(error => { state.textContent = error.message })
+    async function pollState() {
+      try {
+        await refreshState()
+      } catch (error) {
+        state.textContent = error.message
+      }
+      setTimeout(pollState, 1000)
+    }
+    pollState()
   </script>
 </body>
 </html>`

@@ -29,6 +29,7 @@ const mockVlcPlayers: Array<{
   setVolume: ReturnType<typeof vi.fn>
   setTime: ReturnType<typeof vi.fn>
   play: ReturnType<typeof vi.fn>
+  emit: (event: string, ...args: unknown[]) => boolean
 }> = []
 let mockEmbedImplementation: () => Promise<void> = () => Promise.resolve()
 
@@ -252,6 +253,34 @@ describe('projection-vlc listener cleanup', () => {
       'file:playback-state',
       expect.objectContaining({ itemId: 'item-1' })
     )
+  })
+
+  it('throttles bursty VLC progress state publications', async () => {
+    vi.useFakeTimers()
+    try {
+      await getHandler('projection-vlc:start')(makeEvent(), {
+        itemId: 'item-1',
+        sourceFileId: '550e8400-e29b-41d4-a716-446655440000',
+        container: '#vlc-player'
+      })
+      mockWindowManager.sendToMain.mockClear()
+      const current = mockVlcPlayers[0]
+
+      current.emit('timeChanged')
+      current.emit('timeChanged')
+      current.emit('timeChanged')
+      expect(mockWindowManager.sendToMain).toHaveBeenCalledTimes(1)
+
+      vi.advanceTimersByTime(249)
+      current.emit('timeChanged')
+      expect(mockWindowManager.sendToMain).toHaveBeenCalledTimes(1)
+
+      vi.advanceTimersByTime(1)
+      current.emit('timeChanged')
+      expect(mockWindowManager.sendToMain).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('does not report VLC state without a positive projection generation', async () => {
