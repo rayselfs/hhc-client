@@ -5,7 +5,8 @@ import {
   addElementToSlide,
   createBlankEditablePresentationDocument,
   createImageElement,
-  createTextElement
+  createTextElement,
+  insertBlankEditableSlide
 } from '@renderer/lib/editable-presentation'
 import { EDITABLE_PRESENTATION_MIME_TYPE, PPTX_MIME_TYPE } from '@renderer/lib/presentation-media'
 import { PresentationSessionRegistryProvider } from '@renderer/contexts/PresentationSessionRegistryContext'
@@ -217,6 +218,46 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '設計' }))
     expect(frame).toHaveClass('h-28')
+  })
+
+  it('does not mount off-screen editable slide previews', async () => {
+    const originalIntersectionObserver = window.IntersectionObserver
+    class TestIntersectionObserver implements IntersectionObserver {
+      readonly root = null
+      readonly rootMargin = '0px'
+      readonly thresholds = [0]
+      disconnect = vi.fn()
+      observe = vi.fn()
+      takeRecords = vi.fn(() => [])
+      unobserve = vi.fn()
+
+      constructor(_callback: IntersectionObserverCallback) {}
+    }
+    window.IntersectionObserver = TestIntersectionObserver
+
+    try {
+      let document = createBlankEditablePresentationDocument('Sunday')
+      document = insertBlankEditableSlide(document, 1).document
+      document = insertBlankEditableSlide(document, 2).document
+      const sourceItem = makeFile({
+        id: 'editable-deck',
+        name: 'Sunday Editable',
+        url: 'blob:editable-deck',
+        mimeType: EDITABLE_PRESENTATION_MIME_TYPE
+      })
+      mocks.loadEditablePresentationSnapshot.mockResolvedValue({ document, revision: 0 })
+
+      renderEditableDeck(sourceItem)
+
+      await screen.findByTestId('presentation-ribbon-frame')
+      expect(window.document.querySelectorAll('[data-slide-surface]')).toHaveLength(1)
+    } finally {
+      if (originalIntersectionObserver) {
+        window.IntersectionObserver = originalIntersectionObserver
+      } else {
+        Reflect.deleteProperty(window, 'IntersectionObserver')
+      }
+    }
   })
 
   it('orders Home commands in native Ribbon groups', async () => {

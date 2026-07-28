@@ -16,12 +16,21 @@ function createHistory(): PresentationHistoryState {
 }
 
 describe('presentation document history', () => {
-  it('does not create an entry for an identical document', () => {
+  it('does not create an entry for the same document reference', () => {
+    const history = createHistory()
+
+    const committed = commitPresentationDocument(history, history.present)
+
+    expect(committed).toBe(history)
+  })
+
+  it('records a distinct document without deep-comparing it', () => {
     const history = createHistory()
 
     const committed = commitPresentationDocument(history, structuredClone(history.present))
 
-    expect(committed).toBe(history)
+    expect(committed).not.toBe(history)
+    expect(committed.past).toEqual([history.present])
   })
 
   it('keeps only the latest 30 undo entries', () => {

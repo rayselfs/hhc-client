@@ -8,18 +8,11 @@ export interface PresentationHistoryState {
   future: EditablePresentationDocument[]
 }
 
-function documentsEqual(
-  left: EditablePresentationDocument,
-  right: EditablePresentationDocument
-): boolean {
-  return left === right || JSON.stringify(left) === JSON.stringify(right)
-}
-
 export function commitPresentationDocument(
   state: PresentationHistoryState,
   next: EditablePresentationDocument
 ): PresentationHistoryState {
-  if (documentsEqual(state.present, next)) return state
+  if (state.present === next) return state
   return {
     past: [...state.past.slice(-(MAX_HISTORY_ENTRIES - 1)), state.present],
     present: next,

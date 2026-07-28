@@ -221,6 +221,53 @@ function SlideThumbnail({
   )
 }
 
+const EditableSlideThumbnail = React.memo(
+  function EditableSlideThumbnail({
+    document,
+    slideId
+  }: {
+    document: EditablePresentationDocument
+    slideId: string
+  }): React.JSX.Element {
+    const containerRef = useRef<HTMLDivElement>(null)
+    const [isVisible, setIsVisible] = useState(() => typeof IntersectionObserver === 'undefined')
+
+    useEffect(() => {
+      const container = containerRef.current
+      if (!container || isVisible) return
+      const observer = new IntersectionObserver(
+        (entries) => {
+          if (entries.some((entry) => entry.isIntersecting)) {
+            setIsVisible(true)
+            observer.disconnect()
+          }
+        },
+        { rootMargin: '160px 0px' }
+      )
+      observer.observe(container)
+      return () => observer.disconnect()
+    }, [isVisible])
+
+    return (
+      <div ref={containerRef} className="h-full w-full">
+        {isVisible && (
+          <EditableSlideSurface
+            document={document}
+            slideId={slideId}
+            className="pointer-events-none"
+          />
+        )}
+      </div>
+    )
+  },
+  (previous, next) =>
+    previous.slideId === next.slideId &&
+    previous.document.width === next.document.width &&
+    previous.document.height === next.document.height &&
+    previous.document.assets === next.document.assets &&
+    previous.document.slides[previous.slideId] === next.document.slides[next.slideId]
+)
+
 async function getPresentationSourceItem(itemId: string): Promise<FileItemRecord> {
   const storeItem = useFileExplorerStore.getState().items[itemId]
   if (storeItem && isFileItem(storeItem)) return storeItem
@@ -1804,11 +1851,7 @@ function EditableSessionDocumentView({
                               : 'border-transparent'
                         }`}
                       >
-                        <EditableSlideSurface
-                          document={document}
-                          slideId={slideId}
-                          className="pointer-events-none"
-                        />
+                        <EditableSlideThumbnail document={document} slideId={slideId} />
                         {index === projectedSlideIndex && (
                           <span
                             className="absolute inset-y-0 left-0 w-1 bg-success"
