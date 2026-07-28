@@ -1,14 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode } from 'react'
 import { getBlobId } from '@renderer/lib/blob-identity'
-import { loadEditablePresentationSnapshot } from '@renderer/lib/editable-presentation'
-import {
-  persistEditablePresentationRevision,
-  refreshEditablePresentationThumbnail
-} from '@renderer/lib/editable-presentation-persistence'
-import {
-  createPresentationEditorSession,
-  type PresentationEditorSession
-} from '@renderer/lib/presentation-editor-session'
+import type { PresentationEditorSession } from '@renderer/lib/presentation-editor-session'
 import { usePresentationWorkspaceStore } from '@renderer/stores/presentation-workspace'
 import type { FileItemRecord } from '@shared/types/folder'
 
@@ -64,7 +56,17 @@ export function PresentationSessionRegistryProvider({
       const opening = openingRef.current.get(item.id)
       if (opening) return opening
 
-      const promise = loadEditablePresentationSnapshot(item).then(({ document, revision }) => {
+      const promise = (async () => {
+        const [
+          { loadEditablePresentationSnapshot },
+          { persistEditablePresentationRevision, refreshEditablePresentationThumbnail },
+          { createPresentationEditorSession }
+        ] = await Promise.all([
+          import('@renderer/lib/editable-presentation'),
+          import('@renderer/lib/editable-presentation-persistence'),
+          import('@renderer/lib/presentation-editor-session')
+        ])
+        const { document, revision } = await loadEditablePresentationSnapshot(item)
         const session = createPresentationEditorSession({
           initialDocument: document,
           initialRevision: revision,
@@ -87,7 +89,7 @@ export function PresentationSessionRegistryProvider({
         )
         notify()
         return session
-      })
+      })()
       openingRef.current.set(item.id, promise)
       try {
         return await promise

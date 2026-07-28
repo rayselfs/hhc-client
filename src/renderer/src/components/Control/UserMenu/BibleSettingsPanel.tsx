@@ -106,6 +106,14 @@ export default function BibleSettingsPanel(): React.JSX.Element {
     setWhisperDir(speech.whisper.modelDir)
   }, [speech.whisper.modelDir])
 
+  useEffect(
+    () => () => {
+      unsubscribeDownloadRef.current?.()
+      unsubscribeDownloadRef.current = null
+    },
+    []
+  )
+
   // Reset azure test if key/region changes
   useEffect(() => {
     if (azureKey !== originalAzureKey || azureRegion !== originalAzureRegion) {

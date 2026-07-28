@@ -6,6 +6,7 @@ import BibleSettingsPanel from '../BibleSettingsPanel'
 import { toast } from '@heroui/react/toast'
 import * as speechKeyStorage from '@renderer/lib/speech-key-storage'
 import { DEFAULT_SPEECH } from '@renderer/stores/settings'
+import { isElectron } from '@renderer/lib/env'
 import { ConfirmDialogProvider } from '@renderer/contexts/ConfirmDialogContext'
 import ConfirmDialog from '../../../Common/ConfirmDialog'
 
@@ -258,5 +259,39 @@ describe('BibleSettingsPanel', () => {
 
     const testButton = screen.getByText('Test Connection')
     expect(testButton).toBeDisabled()
+  })
+
+  it('unsubscribes Whisper download progress on unmount', async () => {
+    const user = userEvent.setup()
+    const unsubscribe = vi.fn()
+    vi.mocked(isElectron).mockReturnValue(true)
+    mockSettingsStore.speech = {
+      ...DEFAULT_SPEECH,
+      activeProvider: 'whisper'
+    }
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: {
+        app: {
+          selectDirectory: vi.fn().mockResolvedValue('/models'),
+          checkWhisperDir: vi.fn().mockResolvedValue({ hasFiles: false }),
+          onDownloadProgress: vi.fn(() => unsubscribe),
+          downloadWhisperModel: vi.fn().mockResolvedValue(undefined)
+        }
+      }
+    })
+
+    try {
+      const { unmount } = renderPanel()
+      await user.click(await screen.findByRole('button', { name: 'Download' }))
+      await waitFor(() => expect(window.api.app.onDownloadProgress).toHaveBeenCalledOnce())
+
+      unmount()
+
+      expect(unsubscribe).toHaveBeenCalledOnce()
+    } finally {
+      vi.mocked(isElectron).mockReturnValue(false)
+      Reflect.deleteProperty(window, 'api')
+    }
   })
 })

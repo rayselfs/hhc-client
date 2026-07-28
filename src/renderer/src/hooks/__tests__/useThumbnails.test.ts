@@ -1,3 +1,6 @@
+import { createElement } from 'react'
+import { flushSync } from 'react-dom'
+import { createRoot } from 'react-dom/client'
 import { renderHook, waitFor } from '@testing-library/react'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import { useThumbnails } from '../useThumbnails'
@@ -101,6 +104,43 @@ describe('useThumbnails', () => {
       // B's data URL should NOT trigger revoke
       expect(revokeObjectURL).not.toHaveBeenCalledWith('data:image/jpeg;base64,abc')
       unmount()
+    })
+
+    it('revokes a blob URL that resolves after unmount', async () => {
+      const revokeObjectURL = vi.fn()
+      Object.defineProperty(URL, 'revokeObjectURL', {
+        configurable: true,
+        value: revokeObjectURL
+      })
+      let resolveThumbnail: ((url: string) => void) | undefined
+      mockGetThumbnail.mockReturnValue(
+        new Promise((resolve) => {
+          resolveThumbnail = resolve
+        })
+      )
+      const container = document.createElement('div')
+      const root = createRoot(container)
+      const Probe = (): null => {
+        useThumbnails([makeItem('A')])
+        return null
+      }
+      const reactEnvironment = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+      const originalActEnvironment = reactEnvironment.IS_REACT_ACT_ENVIRONMENT
+      reactEnvironment.IS_REACT_ACT_ENVIRONMENT = false
+      try {
+        flushSync(() => root.render(createElement(Probe)))
+        await Promise.resolve()
+        expect(mockGetThumbnail).toHaveBeenCalledOnce()
+
+        flushSync(() => root.unmount())
+        resolveThumbnail?.('blob:http://localhost/late-thumbnail')
+        await Promise.resolve()
+        await Promise.resolve()
+
+        expect(revokeObjectURL).toHaveBeenCalledWith('blob:http://localhost/late-thumbnail')
+      } finally {
+        reactEnvironment.IS_REACT_ACT_ENVIRONMENT = originalActEnvironment
+      }
     })
   })
 })

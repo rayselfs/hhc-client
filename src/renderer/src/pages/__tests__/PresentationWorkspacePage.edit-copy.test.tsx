@@ -231,7 +231,9 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
       takeRecords = vi.fn(() => [])
       unobserve = vi.fn()
 
-      constructor(_callback: IntersectionObserverCallback) {}
+      constructor(callback: IntersectionObserverCallback) {
+        void callback
+      }
     }
     window.IntersectionObserver = TestIntersectionObserver
 

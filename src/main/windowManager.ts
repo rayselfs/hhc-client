@@ -1,6 +1,6 @@
 import { BrowserWindow, screen, app, shell } from 'electron'
 import { join } from 'path'
-import { optimizer, is } from '@electron-toolkit/utils'
+import { is } from '@electron-toolkit/utils'
 import type { IpcMainToRendererChannel, IpcMainToRendererMap } from '@shared/ipc-channels'
 import type {
   ProjectionLifecycleEvent,
@@ -88,8 +88,6 @@ export class WindowManager {
       },
       title: 'LibrePresenter'
     })
-
-    optimizer.watchWindowShortcuts(this.mainWindow)
 
     this.mainWindow.webContents.setWindowOpenHandler(({ url }) => {
       if (url.startsWith('https:') || url.startsWith('http:')) {
@@ -190,8 +188,6 @@ export class WindowManager {
       title: 'Projection'
     })
     this.projectionWindow = projectionWindow
-
-    optimizer.watchWindowShortcuts(projectionWindow)
 
     const loadPromise =
       is.dev && process.env['ELECTRON_RENDERER_URL']

@@ -117,7 +117,10 @@ export function useThumbnails(
           try {
             if (cancelled) return
             const dataUrl = await getThumbnail(item.id, getBlobId(item))
-            if (cancelled) return
+            if (cancelled) {
+              revokeIfBlobUrl(dataUrl)
+              return
+            }
             if (dataUrl !== null) {
               setAllThumbnails((prev) => {
                 revokeIfBlobUrl(prev[item.id] ?? null)

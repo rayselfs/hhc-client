@@ -91,6 +91,7 @@ vi.mock('@electron-toolkit/utils', () => ({
 }))
 
 import { WindowManager } from '../windowManager'
+import { optimizer } from '@electron-toolkit/utils'
 
 describe('WindowManager', () => {
   beforeEach(() => {
@@ -151,6 +152,15 @@ describe('WindowManager', () => {
     wm.cleanup()
     expect(wm.getMainWindow()).toBeNull()
     expect(wm.getProjectionWindow()).toBeNull()
+  })
+
+  it('leaves shortcut watcher registration to the app-level window hook', () => {
+    const wm = WindowManager.getInstance()
+
+    wm.createMainWindow()
+    wm.createProjectionWindow()
+
+    expect(optimizer.watchWindowShortcuts).not.toHaveBeenCalled()
   })
 
   it('getDisplays returns all displays', () => {
