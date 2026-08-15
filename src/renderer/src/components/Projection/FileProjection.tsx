@@ -614,7 +614,7 @@ export default function FileProjection({
 
   if (isEnded) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-black">
+      <div className="flex h-screen w-screen items-center justify-center bg-black">
         <span className="text-white/10 text-4xl font-bold tracking-widest">投影結束</span>
       </div>
     )
@@ -637,7 +637,7 @@ export default function FileProjection({
       }
 
       return (
-        <div className="flex h-screen w-full bg-black overflow-hidden">
+        <div className="flex h-screen w-screen bg-black overflow-hidden">
           <div
             ref={pdfContainerRef}
             className="w-full h-full overflow-y-auto flex flex-col items-center gap-4 py-4"
@@ -675,29 +675,16 @@ export default function FileProjection({
     }
 
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-black overflow-hidden">
+      <div className="flex h-screen w-screen items-center justify-center bg-black overflow-hidden">
         <div
-          style={{
-            aspectRatio: '16 / 9',
-            maxWidth: '100%',
-            maxHeight: '100%',
-            width: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            overflow: 'hidden'
-          }}
+          ref={pdfContainerRef}
+          className="flex flex-col items-center overflow-hidden w-full h-full"
+          style={{ transform, transformOrigin: 'center center' }}
         >
-          <div
-            ref={pdfContainerRef}
-            className="flex flex-col items-center overflow-hidden w-full h-full"
-            style={{ transform, transformOrigin: 'center center' }}
-          >
-            <PdfCanvas
-              canvas={pdfState.pages[pdfWindowCenter - 1]}
-              size={pdfState.pageSizes[pdfWindowCenter - 1]}
-            />
-          </div>
+          <PdfCanvas
+            canvas={pdfState.pages[pdfWindowCenter - 1]}
+            size={pdfState.pageSizes[pdfWindowCenter - 1]}
+          />
         </div>
       </div>
     )
@@ -705,80 +692,57 @@ export default function FileProjection({
 
   if (mimeType?.startsWith('image/') && objectUrl) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-black overflow-hidden">
-        <div
+      <div className="flex h-screen w-screen items-center justify-center bg-black overflow-hidden">
+        <img
+          src={objectUrl}
+          alt={displayName}
           style={{
-            aspectRatio: '16 / 9',
-            maxWidth: '100%',
-            maxHeight: '100%',
             width: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            overflow: 'hidden'
+            height: '100%',
+            objectFit: 'contain',
+            transform: imageTransform,
+            transformOrigin: 'center center'
           }}
-        >
-          <img
-            src={objectUrl}
-            alt={displayName}
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'contain',
-              transform: imageTransform,
-              transformOrigin: 'center center'
-            }}
-          />
-        </div>
+        />
       </div>
     )
   }
 
   if (mimeType?.startsWith('video/') && objectUrl) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-black overflow-hidden">
-        <div
+      <div className="flex h-screen w-screen items-center justify-center bg-black overflow-hidden">
+        <video
+          ref={videoRef}
+          src={objectUrl}
+          preload={seekableRef.current ? 'metadata' : 'none'}
           style={{
-            aspectRatio: '16 / 9',
-            maxWidth: '100%',
-            maxHeight: '100%',
             width: '100%',
-            overflow: 'hidden'
+            height: '100%',
+            objectFit: 'contain',
+            transform,
+            transformOrigin: 'center center'
           }}
-        >
-          <video
-            ref={videoRef}
-            src={objectUrl}
-            preload={seekableRef.current ? 'metadata' : 'none'}
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'contain',
-              transform,
-              transformOrigin: 'center center'
-            }}
-            muted
-            onLoadedMetadata={() => {
-              sendVideoPlaybackState()
-              applyPendingVideoControl()
-            }}
-            onCanPlay={() => {
-              sendVideoPlaybackState()
-              applyPendingVideoControl()
-            }}
-            onTimeUpdate={() => sendVideoPlaybackState()}
-            onPlay={() => sendVideoPlaybackState({ isPlaying: true, isEnded: false })}
-            onPause={() => sendVideoPlaybackState({ isPlaying: false })}
-            onEnded={() => sendVideoPlaybackState({ isPlaying: false, isEnded: true })}
-          />
-        </div>
+          muted
+          onLoadedMetadata={() => {
+            sendVideoPlaybackState()
+            applyPendingVideoControl()
+          }}
+          onCanPlay={() => {
+            sendVideoPlaybackState()
+            applyPendingVideoControl()
+          }}
+          onTimeUpdate={() => sendVideoPlaybackState()}
+          onPlay={() => sendVideoPlaybackState({ isPlaying: true, isEnded: false })}
+          onPause={() => sendVideoPlaybackState({ isPlaying: false })}
+          onEnded={() => sendVideoPlaybackState({ isPlaying: false, isEnded: true })}
+        />
       </div>
     )
   }
 
   if (mimeType?.startsWith('video/') && playbackModeRef.current === 'vlc-embedded') {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-black overflow-hidden">
+      <div className="flex h-screen w-screen items-center justify-center bg-black overflow-hidden">
         <VlcProjectionSurface
           itemId={currentItemIdRef.current}
           blobId={initialBlobId}
@@ -805,7 +769,7 @@ export default function FileProjection({
     const presentationMimeType =
       mimeType ?? 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
     return (
-      <div className="flex h-screen w-full items-center justify-center overflow-hidden bg-black">
+      <div className="flex h-screen w-screen items-center justify-center overflow-hidden bg-black">
         <div className="h-full w-full">
           <PptxSlideSurface
             source={{
@@ -821,7 +785,7 @@ export default function FileProjection({
   }
 
   return (
-    <div className="flex h-screen w-full items-center justify-center bg-black">
+    <div className="flex h-screen w-screen items-center justify-center bg-black">
       <p className="text-white/30 text-sm">{displayName || 'No file loaded'}</p>
     </div>
   )
@@ -896,20 +860,20 @@ function EditableProjectionSurface({
 
   if (error) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-black p-6 text-center">
+      <div className="flex h-screen w-screen items-center justify-center bg-black p-6 text-center">
         <p className="text-sm text-danger">{error}</p>
       </div>
     )
   }
 
   if (!document || !slideId) {
-    return <div className="h-screen w-full bg-black" />
+    return <div className="h-screen w-screen bg-black" />
   }
 
   const slideRatio = document.width / document.height
 
   return (
-    <div className="flex h-screen w-full items-center justify-center overflow-hidden bg-black">
+    <div className="flex h-screen w-screen items-center justify-center overflow-hidden bg-black">
       <div
         data-editable-projection-frame
         style={{

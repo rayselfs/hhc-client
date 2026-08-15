@@ -39,8 +39,8 @@ describe('FileProjection editable payload', () => {
         initialMimeType="application/vnd.librepresenter.presentation+json"
         initialPresentation={{ slideIndex: 0, slideCount: 1 }}
         initialEditablePresentation={{
-          width: 1920,
-          height: 1080,
+          width: 1024,
+          height: 768,
           slide: {
             id: 'slide-1',
             name: 'Slide 1',
@@ -98,8 +98,9 @@ describe('FileProjection editable payload', () => {
     expect(screen.getByAltText('photo.png')).toHaveAttribute('src', 'data:image/png;base64,AAA=')
     const frame = document.querySelector('[data-editable-projection-frame]')
     expect(frame).toHaveStyle({
-      width: 'min(100vw, calc(100vh * 1.7777777777777777))',
-      height: 'min(100vh, calc(100vw / 1.7777777777777777))'
+      width: 'min(100vw, calc(100vh * 1.3333333333333333))',
+      height: 'min(100vh, calc(100vw / 1.3333333333333333))'
     })
+    expect(frame?.parentElement).toHaveClass('h-screen', 'w-screen')
   })
 })
