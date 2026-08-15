@@ -490,48 +490,61 @@ describe('ProjectionContext Electron recovery', () => {
     expect(result.current.vlcFailure?.code).toBe('media-open-failed')
   })
 
-  it('clears a stale VLC failure after an explicit media reproject starts successfully', async () => {
-    const { result } = renderProjection()
-    await act(async () => Promise.resolve())
-    const media = {
-      itemId: 'item-1',
-      blobId: 'blob-1',
-      fileName: 'video.mp4',
-      mimeType: 'video/mp4',
-      playlist: [],
-      currentIndex: 0,
-      playbackMode: 'vlc-embedded' as const
-    }
-    let startPromise: ReturnType<typeof result.current.startProjection>
-    await act(async () => {
-      startPromise = result.current.startProjection('media', [['file:show', media]])
-      await Promise.resolve()
-    })
-    act(() => {
-      mockAdapter._trigger('__system:ready', { generation: 4 })
-    })
-    await act(async () => {
-      await startPromise!
-    })
-    act(() => {
-      vlcFailureCallback?.({
+  it.each([
+    ['same-item', 'item-1', 'item-1', 4, true],
+    ['cross-item', 'item-2', 'item-2', 4, true],
+    ['stale-item', 'item-2', 'item-1', 4, false],
+    ['stale-generation', 'item-1', 'item-1', 3, false]
+  ] as const)(
+    'handles a %s VLC started acknowledgement against the current media snapshot',
+    async (_case, currentItemId, startedItemId, startedGeneration, shouldClear) => {
+      const { result } = renderProjection()
+      await act(async () => Promise.resolve())
+      const failedMedia = {
         itemId: 'item-1',
-        code: 'playback-failed',
-        recoverable: true,
-        message: 'VLC playback stopped unexpectedly.'
+        blobId: 'blob-1',
+        fileName: 'video.mp4',
+        mimeType: 'video/mp4',
+        playlist: [],
+        currentIndex: 0,
+        playbackMode: 'vlc-embedded' as const
+      }
+      let startPromise: ReturnType<typeof result.current.startProjection>
+      await act(async () => {
+        startPromise = result.current.startProjection('media', [['file:show', failedMedia]])
+        await Promise.resolve()
       })
-    })
+      act(() => {
+        mockAdapter._trigger('__system:ready', { generation: 4 })
+      })
+      await act(async () => {
+        await startPromise!
+      })
+      act(() => {
+        vlcFailureCallback?.({
+          itemId: 'item-1',
+          code: 'playback-failed',
+          recoverable: true,
+          message: 'VLC playback stopped unexpectedly.'
+        })
+      })
+      const currentMedia = {
+        ...failedMedia,
+        itemId: currentItemId,
+        blobId: `blob-${currentItemId}`
+      }
 
-    await act(async () => {
-      await result.current.project('file:show', media)
-    })
-    expect(result.current.vlcFailure).not.toBeNull()
-    act(() => {
-      vlcStartedCallback?.(4, 'item-1')
-    })
+      await act(async () => {
+        await result.current.project('file:show', currentMedia)
+      })
+      expect(result.current.vlcFailure).not.toBeNull()
+      act(() => {
+        vlcStartedCallback?.(startedGeneration, startedItemId)
+      })
 
-    expect(result.current.vlcFailure).toBeNull()
-  })
+      expect(result.current.vlcFailure === null).toBe(shouldClear)
+    }
+  )
 
   it('allocates a new generation for manual Retry', async () => {
     const { result } = renderProjection()

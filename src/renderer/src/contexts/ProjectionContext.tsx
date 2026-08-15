@@ -200,10 +200,16 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       })
       const unsubscribeVlcFailure = window.api.projectionVlc.onFailure(setVlcFailure)
       const unsubscribeVlcStarted = window.api.projectionVlc.onStarted((generation, itemId) => {
+        const state = coordinator.getRecoveryState()
+        const snapshot = coordinator.getSnapshot()
         setVlcFailure((failure) =>
-          generation === coordinator.getRecoveryState().generation &&
-          failure &&
-          (!failure.itemId || failure.itemId === itemId)
+          generation === state.generation &&
+          state.status === 'ready' &&
+          snapshot?.owner === 'media' &&
+          !snapshot.showDefault &&
+          !snapshot.isBlackout &&
+          snapshot.media.show?.itemId === itemId &&
+          failure
             ? null
             : failure
         )

@@ -391,13 +391,40 @@ async function startVlc(
     sendState(wm, { isPlaying: false, isEnded: false })
     publishStarted(wm, generation, request.itemId)
   } catch (error) {
+    const ownsActivePlayer = player === nextPlayer
+    let listenerCleanup = ownsActivePlayer ? playerListenerCleanup : null
+    const resizeCleanup = ownsActivePlayer ? playerResizeCleanup : null
+    if (ownsActivePlayer) {
+      player = null
+      playerListenerCleanup = null
+      playerResizeCleanup = null
+      currentItemId = null
+      currentDurationMs = undefined
+      lastProgressPublicationMs = null
+    }
+    if (!listenerCleanup) {
+      try {
+        listenerCleanup = createListenerCleanup(
+          projectionWindow,
+          beforeWindowListeners,
+          beforeWebContentsListeners
+        )
+      } catch {
+        // Preserve the original startup rejection.
+      }
+    }
     try {
       nextPlayer?.destroy()
     } catch {
       // Preserve the original startup rejection.
     }
     try {
-      createListenerCleanup(projectionWindow, beforeWindowListeners, beforeWebContentsListeners)()
+      listenerCleanup?.()
+    } catch {
+      // Preserve the original startup rejection.
+    }
+    try {
+      resizeCleanup?.()
     } catch {
       // Preserve the original startup rejection.
     }

@@ -35,6 +35,7 @@ const mockVlcPlayers: Array<{
 let mockEmbedImplementation: () => Promise<void> = () => Promise.resolve()
 let mockConstructError: Error | null = null
 let mockDestroyImplementation: () => void = () => undefined
+let mockSetSourceImplementation: (...args: unknown[]) => void = () => undefined
 
 const VLC_WINDOW_EVENTS = [
   'enter-full-screen',
@@ -89,7 +90,7 @@ vi.mock('electron-vlc-player', () => ({
 
     embed = vi.fn(() => mockEmbedImplementation())
     isEmbedded = vi.fn(() => true)
-    setSource = vi.fn()
+    setSource = vi.fn((...args: unknown[]) => mockSetSourceImplementation(...args))
     destroy = vi.fn(() => mockDestroyImplementation())
     notifyLayoutChange = vi.fn()
     getTime = vi.fn(() => 0)
@@ -138,6 +139,7 @@ beforeEach(() => {
   mockEmbedImplementation = () => Promise.resolve()
   mockConstructError = null
   mockDestroyImplementation = () => undefined
+  mockSetSourceImplementation = () => undefined
   vi.mocked(resolveVlcRuntime).mockReturnValue({ status: 'ready', path: '/vlc' })
   mockWindowManager.getProjectionState.mockReturnValue({
     exists: true,
@@ -227,6 +229,42 @@ describe('projection-vlc listener cleanup', () => {
       recoverable: true,
       message: 'VLC could not open this media.'
     })
+  })
+
+  it('resets assigned player globals before cleanup so the next start is independent', async () => {
+    const nativeError = new Error('setSource failed at /private/vlc')
+    mockSetSourceImplementation = () => {
+      throw nativeError
+    }
+    mockDestroyImplementation = () => {
+      throw new Error('cleanup failed')
+    }
+    const request = {
+      itemId: 'item-1',
+      sourceFileId: '550e8400-e29b-41d4-a716-446655440000',
+      container: '#vlc-player'
+    }
+
+    await expect(
+      Promise.resolve(getHandler('projection-vlc:start')(makeEvent(), request))
+    ).rejects.toBe(nativeError)
+    expect(mockWindowManager.sendToMain).toHaveBeenCalledWith('projection-vlc:failure', {
+      itemId: 'item-1',
+      code: 'media-open-failed',
+      recoverable: true,
+      message: 'VLC could not open this media.'
+    })
+    expect(mockProjectionWindow.listenerCount('resize')).toBe(0)
+    expect(mockProjectionWindow.listenerCount('resized')).toBe(0)
+
+    mockSetSourceImplementation = () => undefined
+    mockWindowManager.sendToMain.mockClear()
+    await expect(
+      Promise.resolve(getHandler('projection-vlc:start')(makeEvent(), request))
+    ).resolves.toBeUndefined()
+    expect(mockVlcPlayers).toHaveLength(2)
+    expect(mockVlcPlayers[0].destroy).toHaveBeenCalledOnce()
+    expect(mockWindowManager.sendToMain).toHaveBeenCalledWith('projection-vlc:started', 4, 'item-1')
   })
 
   it('maps missing runtimes and unavailable bindings without exposing diagnostics', async () => {
