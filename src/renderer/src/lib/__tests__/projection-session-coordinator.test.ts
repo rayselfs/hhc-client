@@ -245,7 +245,7 @@ describe('ProjectionSessionCoordinator', () => {
     })
   })
 
-  it('resumes retained content without changing its owner or media state', () => {
+  it('replays the latest media state when restoring blackout', () => {
     const coordinator = createProjectionSessionCoordinator(send)
 
     expect(coordinator).toHaveProperty('blackout')
@@ -253,7 +253,12 @@ describe('ProjectionSessionCoordinator', () => {
     coordinator.startSession('media', [['file:show', fileShow]])
     coordinator.beginGeneration({ generation: 8, status: 'opening', reason: 'created' })
     coordinator.ready(8)
+    send.mockClear()
+
     coordinator.blackout(true)
+    expect(send).toHaveBeenLastCalledWith('__system:blackout', { enabled: true })
+
+    coordinator.recordPlayback(8, { ...playback, currentTime: 42 })
     send.mockClear()
 
     coordinator.blackout(false)
@@ -263,8 +268,52 @@ describe('ProjectionSessionCoordinator', () => {
       isBlackout: false,
       media: { show: fileShow }
     })
-    expect(send).toHaveBeenCalledOnce()
-    expect(send).toHaveBeenCalledWith('__system:blackout', { enabled: false })
+    expect(send).toHaveBeenLastCalledWith('__system:replay', {
+      generation: 8,
+      snapshot: expect.objectContaining({
+        isBlackout: false,
+        media: expect.objectContaining({
+          state: expect.objectContaining({
+            positionSeconds: 42,
+            isPlaying: true
+          })
+        })
+      })
+    })
+  })
+
+  it('replays the latest media state when restoring blank output', () => {
+    const coordinator = createProjectionSessionCoordinator(send)
+
+    coordinator.startSession('media', [['file:show', fileShow]])
+    coordinator.beginGeneration({ generation: 7, status: 'opening', reason: 'created' })
+    coordinator.ready(7)
+    send.mockClear()
+
+    coordinator.blank(true)
+    expect(send).toHaveBeenLastCalledWith('__system:blank', { showDefault: true })
+
+    coordinator.recordPlayback(7, { ...playback, currentTime: 42 })
+    send.mockClear()
+
+    coordinator.blank(false)
+
+    expect(coordinator.getSnapshot()).toMatchObject({
+      showDefault: false,
+      media: { show: fileShow }
+    })
+    expect(send).toHaveBeenLastCalledWith('__system:replay', {
+      generation: 7,
+      snapshot: expect.objectContaining({
+        showDefault: false,
+        media: expect.objectContaining({
+          state: expect.objectContaining({
+            positionSeconds: 42,
+            isPlaying: true
+          })
+        })
+      })
+    })
   })
 
   it('sends incremental and one-shot messages only while ready', () => {

@@ -320,18 +320,32 @@ export function createProjectionSessionCoordinator(
 
     blank(showDefault) {
       if (!snapshot) return
+      const wasBlank = snapshot.showDefault
       snapshot = { ...snapshot, showDefault }
       if (recovery.status === 'ready') {
         send('__system:blank', { showDefault })
+        if (wasBlank && !showDefault) {
+          send('__system:replay', {
+            generation: recovery.generation,
+            snapshot
+          })
+        }
       }
       notify()
     },
 
     blackout(enabled) {
       if (!snapshot) return
+      const wasBlackout = snapshot.isBlackout
       snapshot = { ...snapshot, isBlackout: enabled }
       if (recovery.status === 'ready') {
         send('__system:blackout', { enabled })
+        if (wasBlackout && !enabled) {
+          send('__system:replay', {
+            generation: recovery.generation,
+            snapshot
+          })
+        }
       }
       notify()
     },
