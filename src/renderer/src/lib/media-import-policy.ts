@@ -62,6 +62,12 @@ function isAppSupportedCapability(capability: MediaCapability): boolean {
   return capability.web !== 'unsupported' || capability.electron !== 'unsupported'
 }
 
+function isUnsupportedImageCapability(capability: MediaCapability): boolean {
+  return capability.extensions.some((extension) =>
+    ['tif', 'tiff', 'heic', 'heif'].includes(extension)
+  )
+}
+
 export function classifyMediaImport(
   input: MediaImportInput,
   platform: MediaPlatform
@@ -79,7 +85,10 @@ export function classifyMediaImport(
   }
 
   const capability = findExplicitCapability(input)
-  if (!capability || (!isAppSupportedCapability(capability) && capability.kind !== 'image')) {
+  if (
+    !capability ||
+    (!isAppSupportedCapability(capability) && !isUnsupportedImageCapability(capability))
+  ) {
     return {
       action: 'skip',
       reason: 'app-unsupported',

@@ -32,6 +32,18 @@ describe('classifyMediaImport', () => {
       mimeType: 'image/png',
       support: 'native'
     })
+    expect(classifyMediaImport({ name: 'slide.jpg' }, 'web')).toMatchObject({
+      action: 'accept',
+      kind: 'image',
+      mimeType: 'image/jpeg',
+      support: 'native'
+    })
+    expect(classifyMediaImport({ name: 'slide.jpg' }, 'electron')).toMatchObject({
+      action: 'accept',
+      kind: 'image',
+      mimeType: 'image/jpeg',
+      support: 'native'
+    })
   })
 
   it.each(['photo.tif', 'photo.tiff', 'photo.heic', 'photo.heif'])(
