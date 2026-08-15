@@ -34,6 +34,22 @@ describe('classifyMediaImport', () => {
     })
   })
 
+  it.each(['photo.tif', 'photo.tiff', 'photo.heic', 'photo.heif'])(
+    'keeps unsupported image metadata visible as platform unsupported: %s',
+    (name) => {
+      expect(classifyMediaImport({ name }, 'web')).toMatchObject({
+        action: 'platform-unsupported',
+        kind: 'image',
+        support: 'unsupported'
+      })
+      expect(classifyMediaImport({ name }, 'electron')).toMatchObject({
+        action: 'platform-unsupported',
+        kind: 'image',
+        support: 'unsupported'
+      })
+    }
+  )
+
   it('keeps known desktop-only media as platform unsupported on Web', () => {
     expect(classifyMediaImport({ name: 'legacy.avi' }, 'web')).toMatchObject({
       action: 'platform-unsupported',

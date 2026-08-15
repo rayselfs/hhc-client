@@ -79,7 +79,7 @@ export function classifyMediaImport(
   }
 
   const capability = findExplicitCapability(input)
-  if (!capability || !isAppSupportedCapability(capability)) {
+  if (!capability || (!isAppSupportedCapability(capability) && capability.kind !== 'image')) {
     return {
       action: 'skip',
       reason: 'app-unsupported',

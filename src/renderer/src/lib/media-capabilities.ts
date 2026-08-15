@@ -91,8 +91,8 @@ const CAPABILITIES: readonly MediaCapability[] = [
     extensions: ['tif', 'tiff'],
     canonicalMimeType: 'image/tiff',
     thumbnail: 'image',
-    web: 'native',
-    electron: 'native',
+    web: 'unsupported',
+    electron: 'unsupported',
     kindLabelKey: 'fileKind.tiffImage',
     kindLabelFallback: 'TIFF Image'
   },
@@ -101,8 +101,8 @@ const CAPABILITIES: readonly MediaCapability[] = [
     extensions: ['heic'],
     canonicalMimeType: 'image/heic',
     thumbnail: 'image',
-    web: 'native',
-    electron: 'native',
+    web: 'unsupported',
+    electron: 'unsupported',
     kindLabelKey: 'fileKind.heicImage',
     kindLabelFallback: 'HEIC Image'
   },
@@ -111,8 +111,8 @@ const CAPABILITIES: readonly MediaCapability[] = [
     extensions: ['heif'],
     canonicalMimeType: 'image/heif',
     thumbnail: 'image',
-    web: 'native',
-    electron: 'native',
+    web: 'unsupported',
+    electron: 'unsupported',
     kindLabelKey: 'fileKind.heifImage',
     kindLabelFallback: 'HEIF Image'
   },

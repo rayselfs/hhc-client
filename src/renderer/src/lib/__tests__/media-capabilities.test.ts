@@ -40,6 +40,16 @@ describe('media capability registry', () => {
     expect(capability && getMediaSupport(capability, 'electron')).toBe('desktop-engine')
   })
 
+  it.each(['tif', 'tiff', 'heic', 'heif'])(
+    'does not advertise %s as supported on either platform',
+    (extension) => {
+      const capability = resolveMediaCapability({ fileName: `photo.${extension}` })
+
+      expect(capability && getMediaSupport(capability, 'web')).toBe('unsupported')
+      expect(capability && getMediaSupport(capability, 'electron')).toBe('unsupported')
+    }
+  )
+
   it('prefers recognized MIME over a conflicting extension', () => {
     const capability = resolveMediaCapability({
       mimeType: 'image/png',
