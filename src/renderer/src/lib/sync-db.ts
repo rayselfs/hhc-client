@@ -1,6 +1,6 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
 import type { SyncOfflinePolicy, SyncProviderType } from '@shared/types/folder'
-import type { SyncRetryClassification } from './sync-provider'
+import type { SyncDownloadCommitGuard, SyncRetryClassification } from './sync-provider'
 
 export type SyncEntryKind = 'folder' | 'file'
 export type SyncEntryStatus =
@@ -14,6 +14,7 @@ export type SyncEntryStatus =
   | 'deleted-pending-release'
 
 export const SYNC_ENTRY_CHANGED_EVENT = 'hhc:sync-entry-changed'
+const alwaysCanCommit: SyncDownloadCommitGuard = () => true
 
 export interface ProviderConnectionRecord {
   id: string
@@ -277,15 +278,18 @@ function dispatchSyncEntryChanged(entry: SyncEntryRecord): void {
 export async function updateSyncDownloadProgress(
   entryKey: { providerConnectionId: string; remoteItemId: string },
   downloadedBytes: number,
-  downloadTotalBytes?: number
+  downloadTotalBytes?: number,
+  canCommit: SyncDownloadCommitGuard = alwaysCanCommit
 ): Promise<void> {
+  if (!(await canCommit())) return
   const entry = await getSyncEntryByRemoteItem(entryKey.providerConnectionId, entryKey.remoteItemId)
-  if (!entry) return
-  await putSyncEntry({
+  if (!entry || !(await canCommit())) return
+  const updatedEntry = await putSyncEntry({
     ...entry,
     downloadedBytes,
     downloadTotalBytes
   })
+  if (!(await canCommit())) await deleteSyncEntries([updatedEntry.id])
 }
 
 export async function getSyncEntryByRemoteItem(

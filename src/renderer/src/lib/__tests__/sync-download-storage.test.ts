@@ -12,7 +12,12 @@ import {
 } from '../sync-download-storage'
 import { MAX_FILE_SIZE_WEB } from '../media-limits'
 import { openFileExplorerDB, resetFileExplorerDBForTests } from '../file-explorer-db'
-import { getSyncEntryByRemoteItem, resetSyncDBForTests } from '../sync-db'
+import {
+  deleteSyncEntries,
+  getSyncEntryByRemoteItem,
+  putSyncEntry,
+  resetSyncDBForTests
+} from '../sync-db'
 
 vi.mock('../env', () => ({
   isElectron: vi.fn(() => false),
@@ -124,6 +129,45 @@ describe('saveWebOneDriveDownloadedContent', () => {
       downloadedBytes: 13,
       downloadTotalBytes: 13
     })
+  })
+
+  it('does not recreate a sync entry when Web progress is cancelled during persistence', async () => {
+    const entry = await putSyncEntry({
+      providerConnectionId: request.providerConnectionId,
+      remoteItemId: request.remoteItemId,
+      parentRemoteItemId: metadata.parentRemoteItemId,
+      kind: 'file',
+      name: metadata.name,
+      itemId: request.targetBlobId,
+      status: 'downloading'
+    })
+    const progressRead = deferred<void>()
+    const releaseProgress = deferred<boolean>()
+    let checks = 0
+    const canCommit = vi.fn(() => {
+      checks += 1
+      if (checks === 2) {
+        progressRead.resolve()
+        return releaseProgress.promise
+      }
+      return checks < 2
+    })
+    const saving = saveWebOneDriveDownloadedContent(
+      request,
+      new Response(new Uint8Array(13), { headers: { 'Content-Length': '13' } }),
+      metadata,
+      canCommit
+    )
+
+    await vi.waitFor(() => expect(canCommit).toHaveBeenCalledTimes(2), { timeout: 100 })
+    await progressRead.promise
+    await deleteSyncEntries([entry.id])
+    releaseProgress.resolve(false)
+
+    await expect(saving).rejects.toThrow('Sync download cancelled')
+    await expect(
+      getSyncEntryByRemoteItem('onedrive:account-1', 'remote-file-1')
+    ).resolves.toBeUndefined()
   })
 
   it('removes a Web blob when cancellation wins during durable storage', async () => {
@@ -282,6 +326,65 @@ describe('saveWebOneDriveDownloadedContent', () => {
     expect(window.api.nativeFs.delete).toHaveBeenCalledWith('blob-1')
     const db = await openFileExplorerDB()
     await expect(db.get('file-blobs', 'blob-1')).resolves.toBeUndefined()
+    await expect(
+      getSyncEntryByRemoteItem('onedrive:account-1', 'remote-file-1')
+    ).resolves.toBeUndefined()
+  })
+
+  it('does not recreate a sync entry when native progress is cancelled during persistence', async () => {
+    vi.mocked(isElectron).mockReturnValue(true)
+    const entry = await putSyncEntry({
+      providerConnectionId: request.providerConnectionId,
+      remoteItemId: request.remoteItemId,
+      parentRemoteItemId: metadata.parentRemoteItemId,
+      kind: 'file',
+      name: metadata.name,
+      itemId: request.targetBlobId,
+      status: 'downloading'
+    })
+    const progressRead = deferred<void>()
+    const releaseProgress = deferred<boolean>()
+    const releaseDownload = deferred<{ fileId: string; size: number; mimeType: string }>()
+    let checks = 0
+    const canCommit = vi.fn(() => {
+      checks += 1
+      if (checks === 2) {
+        progressRead.resolve()
+        return releaseProgress.promise
+      }
+      return checks < 2
+    })
+    let reportProgress: ((progress: {
+      targetFileId: string
+      downloadedBytes: number
+      downloadTotalBytes: number
+    }) => void) | undefined
+    vi.mocked(window.api.oneDrive.onDownloadProgress).mockImplementation((listener) => {
+      reportProgress = listener
+      return () => undefined
+    })
+    vi.mocked(window.api.oneDrive.downloadFile).mockImplementationOnce(async () => {
+      reportProgress?.({
+        targetFileId: request.targetBlobId,
+        downloadedBytes: 5,
+        downloadTotalBytes: 10
+      })
+      return releaseDownload.promise
+    })
+    const saving = saveElectronOneDriveDownloadedContent(
+      request,
+      '4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02',
+      metadata,
+      canCommit
+    )
+
+    await vi.waitFor(() => expect(canCommit).toHaveBeenCalledTimes(2), { timeout: 100 })
+    await progressRead.promise
+    await deleteSyncEntries([entry.id])
+    releaseProgress.resolve(false)
+    releaseDownload.resolve({ fileId: 'blob-1', size: 10, mimeType: 'video/mp4' })
+
+    await expect(saving).rejects.toThrow('Sync download cancelled')
     await expect(
       getSyncEntryByRemoteItem('onedrive:account-1', 'remote-file-1')
     ).resolves.toBeUndefined()

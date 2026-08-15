@@ -73,7 +73,8 @@ async function readResponseBlobWithProgress(
   request: SyncDownloadRequest,
   response: Response,
   metadata: RemoteSyncItem,
-  totalBytes: number
+  totalBytes: number,
+  canCommit: SyncDownloadCommitGuard
 ): Promise<Blob> {
   if (!response.body) return response.blob()
   const reader = response.body.getReader()
@@ -82,7 +83,8 @@ async function readResponseBlobWithProgress(
   await updateSyncDownloadProgress(
     { providerConnectionId: request.providerConnectionId, remoteItemId: request.remoteItemId },
     0,
-    totalBytes || metadata.size
+    totalBytes || metadata.size,
+    canCommit
   )
   for (;;) {
     const { done, value } = await reader.read()
@@ -93,7 +95,8 @@ async function readResponseBlobWithProgress(
     await updateSyncDownloadProgress(
       { providerConnectionId: request.providerConnectionId, remoteItemId: request.remoteItemId },
       downloadedBytes,
-      totalBytes || metadata.size
+      totalBytes || metadata.size,
+      canCommit
     )
   }
   return new Blob(chunks, {
@@ -116,7 +119,7 @@ export async function saveWebOneDriveDownloadedContent(
   try {
     await ensureWebCapacity(size)
 
-    const blob = await readResponseBlobWithProgress(request, response, metadata, size)
+    const blob = await readResponseBlobWithProgress(request, response, metadata, size, canCommit)
     await ensureWebCapacity(blob.size)
 
     const db = await openFileExplorerDB()
@@ -192,7 +195,8 @@ export async function saveElectronOneDriveDownloadedContent(
           remoteItemId: request.remoteItemId
         },
         progress.downloadedBytes,
-        progress.downloadTotalBytes
+        progress.downloadTotalBytes,
+        canCommit
       )
     })
     try {
