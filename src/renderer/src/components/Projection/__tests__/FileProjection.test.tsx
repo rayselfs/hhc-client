@@ -1,6 +1,9 @@
-import { fireEvent, render, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import FileProjection from '../FileProjection'
+
+let resizeObserverCallback: ResizeObserverCallback | undefined
+let resizeObserverDisconnect = vi.fn()
 
 const {
   mockGetFileSource,
@@ -118,6 +121,16 @@ describe('FileProjection copied media identity', () => {
     mockProjectionVlcStop.mockResolvedValue(undefined)
     HTMLMediaElement.prototype.play = vi.fn().mockResolvedValue(undefined)
     HTMLMediaElement.prototype.pause = vi.fn()
+    resizeObserverCallback = undefined
+    resizeObserverDisconnect = vi.fn()
+    globalThis.ResizeObserver = class {
+      constructor(callback: ResizeObserverCallback) {
+        resizeObserverCallback = callback
+      }
+      observe = vi.fn()
+      unobserve = vi.fn()
+      disconnect = resizeObserverDisconnect
+    }
   })
 
   it('loads projection content with blobId while retaining itemId as UI identity', async () => {
@@ -597,5 +610,210 @@ describe('FileProjection copied media identity', () => {
     await waitFor(() => {
       expect(renderCancels.get(1)).toHaveBeenCalledOnce()
     })
+  })
+
+  it('keeps the newer PDF when the same item loads a different blob', async () => {
+    const oldPdf = mockPdf(1).pdf
+    const newPdf = mockPdf(1).pdf
+    let resolveOldPdf: ((pdf: typeof oldPdf) => void) | undefined
+    const oldPdfPromise = new Promise<typeof oldPdf>((resolve) => {
+      resolveOldPdf = resolve
+    })
+    mockGetFileSource.mockImplementation(async (_db, blobId: string) => ({
+      url: `blob:${blobId}`,
+      revoke: vi.fn()
+    }))
+    const getDocument = vi.fn((url: string) => ({
+      promise: url === 'blob:old-blob' ? oldPdfPromise : Promise.resolve(newPdf)
+    }))
+    mockLoadPdfjsLib.mockResolvedValue({
+      getDocument
+    })
+
+    const { rerender } = render(
+      <FileProjection
+        fileName="slides.pdf"
+        initialItemId="pdf-id"
+        initialBlobId="old-blob"
+        initialMimeType="application/pdf"
+      />
+    )
+
+    await waitFor(() => {
+      expect(getDocument).toHaveBeenCalledWith('blob:old-blob')
+    })
+
+    rerender(
+      <FileProjection
+        fileName="slides.pdf"
+        initialItemId="pdf-id"
+        initialBlobId="new-blob"
+        initialMimeType="application/pdf"
+      />
+    )
+
+    await waitFor(() => {
+      expect(newPdf.getPage).toHaveBeenCalledWith(1)
+    })
+    await act(async () => {
+      resolveOldPdf?.(oldPdf)
+      await oldPdfPromise
+    })
+
+    await waitFor(() => {
+      expect(oldPdf.destroy).toHaveBeenCalledOnce()
+    })
+    expect(oldPdf.getPage).not.toHaveBeenCalled()
+    expect(newPdf.destroy).not.toHaveBeenCalled()
+  })
+
+  it('destroys a PDF that resolves after projection unmount', async () => {
+    const pdf = mockPdf(1).pdf
+    let resolvePdf: ((value: typeof pdf) => void) | undefined
+    const pdfPromise = new Promise<typeof pdf>((resolve) => {
+      resolvePdf = resolve
+    })
+    const getDocument = vi.fn(() => ({ promise: pdfPromise }))
+    mockLoadPdfjsLib.mockResolvedValue({ getDocument })
+
+    const { unmount } = render(
+      <FileProjection
+        fileName="slides.pdf"
+        initialItemId="pdf-id"
+        initialBlobId="pdf-blob"
+        initialMimeType="application/pdf"
+      />
+    )
+
+    await waitFor(() => {
+      expect(getDocument).toHaveBeenCalledWith('blob:projection-source')
+    })
+    unmount()
+    await act(async () => {
+      resolvePdf?.(pdf)
+      await pdfPromise
+    })
+
+    await waitFor(() => {
+      expect(pdf.destroy).toHaveBeenCalledOnce()
+    })
+    expect(pdf.getPage).not.toHaveBeenCalled()
+  })
+
+  it('handles a pending getPage rejection after PDF disposal', async () => {
+    const { pdf } = mockPdf(1)
+    let rejectPage: ((error: Error) => void) | undefined
+    const pagePromise = new Promise<never>((_resolve, reject) => {
+      rejectPage = reject
+    })
+    pdf.getPage.mockReturnValue(pagePromise)
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+    const { unmount } = render(
+      <FileProjection
+        fileName="slides.pdf"
+        initialItemId="pdf-id"
+        initialBlobId="pdf-blob"
+        initialMimeType="application/pdf"
+      />
+    )
+
+    await waitFor(() => {
+      expect(pdf.getPage).toHaveBeenCalledWith(1)
+    })
+    unmount()
+    await act(async () => {
+      rejectPage?.(new Error('Worker was destroyed'))
+      await Promise.resolve()
+    })
+
+    expect(consoleError).not.toHaveBeenCalled()
+    consoleError.mockRestore()
+  })
+
+  it('preserves the final page fraction in continuous PDF scroll', async () => {
+    mockPdf()
+    const { container } = render(
+      <FileProjection
+        fileName="slides.pdf"
+        initialItemId="pdf-id"
+        initialBlobId="pdf-blob"
+        initialMimeType="application/pdf"
+        initialReplayState={{
+          itemId: 'pdf-id',
+          positionSeconds: 0,
+          durationSeconds: 0,
+          isPlaying: false,
+          isEnded: false,
+          volume: 1,
+          pdfPage: 100,
+          pdfScroll: 99.5,
+          pdfViewMode: 'continuous',
+          zoom: 1,
+          pan: { x: 0, y: 0 }
+        }}
+      />
+    )
+
+    await waitFor(() => {
+      const scrollContainer = container.querySelector<HTMLElement>('.overflow-y-auto')
+      expect(scrollContainer?.scrollTop).toBe(37420)
+    })
+  })
+
+  it('recomputes continuous PDF spacers and scroll after container resize', async () => {
+    const { pdf } = mockPdf()
+    const replayState = {
+      itemId: 'pdf-id',
+      positionSeconds: 0,
+      durationSeconds: 0,
+      isPlaying: false,
+      isEnded: false,
+      volume: 1,
+      pdfPage: 50,
+      pdfScroll: 49,
+      pdfViewMode: 'continuous' as const,
+      zoom: 1,
+      pan: { x: 0, y: 0 }
+    }
+    const { container, unmount } = render(
+      <FileProjection
+        fileName="slides.pdf"
+        initialItemId="pdf-id"
+        initialBlobId="pdf-blob"
+        initialMimeType="application/pdf"
+        initialReplayState={replayState}
+      />
+    )
+
+    const scrollContainer = await waitFor(() => {
+      const element = container.querySelector<HTMLElement>('.overflow-y-auto')
+      expect(element).not.toBeNull()
+      expect(resizeObserverCallback).toBeTypeOf('function')
+      expect(pdf.getPage).toHaveBeenCalledTimes(100)
+      return element!
+    })
+    const getPageCallsBeforeResize = pdf.getPage.mock.calls.length
+    let containerWidth = 640
+    Object.defineProperty(scrollContainer, 'clientWidth', {
+      configurable: true,
+      get: () => containerWidth
+    })
+
+    act(() => resizeObserverCallback?.([], {} as ResizeObserver))
+    containerWidth = 320
+    act(() => resizeObserverCallback?.([], {} as ResizeObserver))
+
+    await waitFor(() => {
+      expect(container.querySelector<HTMLElement>('[data-pdf-spacer="top"]')).toHaveStyle({
+        height: '9196px'
+      })
+      expect(scrollContainer.scrollTop).toBe(9620)
+    })
+    expect(container.querySelectorAll('canvas')).toHaveLength(5)
+    expect(pdf.getPage).toHaveBeenCalledTimes(getPageCallsBeforeResize)
+
+    unmount()
+    expect(resizeObserverDisconnect).toHaveBeenCalledOnce()
   })
 })
