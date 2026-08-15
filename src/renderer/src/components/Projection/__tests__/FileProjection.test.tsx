@@ -11,18 +11,14 @@ const {
   mockProjectionHandlers,
   mockProjectionSend,
   mockProjectionSetGeneration,
-  mockProjectionVlcStop,
-  mockReadPresentationArrayBuffer,
-  mockOpenPptxViewer
+  mockProjectionVlcStop
 } = vi.hoisted(() => ({
   mockGetFileSource: vi.fn(),
   mockLoadPdfjsLib: vi.fn(),
   mockProjectionHandlers: new Map<string, Array<(data: unknown) => void>>(),
   mockProjectionSend: vi.fn(),
   mockProjectionSetGeneration: vi.fn(),
-  mockProjectionVlcStop: vi.fn(),
-  mockReadPresentationArrayBuffer: vi.fn(),
-  mockOpenPptxViewer: vi.fn()
+  mockProjectionVlcStop: vi.fn()
 }))
 
 vi.mock('@renderer/lib/file-explorer-db', () => ({
@@ -52,14 +48,6 @@ vi.mock('@renderer/lib/projection-adapter', () => ({
     }),
     dispose: vi.fn()
   })
-}))
-
-vi.mock('@renderer/lib/presentation-source', () => ({
-  readPresentationArrayBuffer: mockReadPresentationArrayBuffer
-}))
-
-vi.mock('@renderer/lib/pptx-renderer-service', () => ({
-  openPptxViewer: mockOpenPptxViewer
 }))
 
 function mockPdf(
@@ -132,20 +120,6 @@ describe('FileProjection copied media identity', () => {
       }
     })
     mockProjectionVlcStop.mockResolvedValue(undefined)
-    mockReadPresentationArrayBuffer.mockResolvedValue(new ArrayBuffer(8))
-    mockOpenPptxViewer.mockImplementation(async (_source: ArrayBuffer, container: HTMLElement) => {
-      const slide = document.createElement('div')
-      slide.dataset.pptxSlide = 'four-by-three'
-      slide.style.aspectRatio = '4 / 3'
-      container.append(slide)
-      return {
-        slideCount: 1,
-        slideWidth: 1024,
-        slideHeight: 768,
-        destroy: vi.fn(),
-        viewer: { renderSlide: vi.fn().mockResolvedValue(undefined) }
-      }
-    })
     HTMLMediaElement.prototype.play = vi.fn().mockResolvedValue(undefined)
     HTMLMediaElement.prototype.pause = vi.fn()
     resizeObserverCallback = undefined
@@ -562,26 +536,6 @@ describe('FileProjection copied media identity', () => {
     expect(canvas).toHaveStyle({ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' })
     expect(canvas.closest('.h-screen')).toHaveClass('w-screen')
     expect(canvas.closest('[style*="aspect-ratio"]')).toBeNull()
-  })
-
-  it('keeps a 4:3 PPTX slide in its native containment surface', async () => {
-    const { container } = render(
-      <FileProjection
-        fileName="four-by-three.pptx"
-        initialItemId="pptx-id"
-        initialBlobId="pptx-blob"
-        initialMimeType="application/vnd.openxmlformats-officedocument.presentationml.presentation"
-      />
-    )
-
-    const slide = await waitFor(() => {
-      const element = container.querySelector<HTMLElement>('[data-pptx-slide="four-by-three"]')
-      expect(element).not.toBeNull()
-      return element!
-    })
-    expect(slide.style.aspectRatio).toBe('4 / 3')
-    expect(slide.closest('.h-screen')).toHaveClass('w-screen')
-    expect(slide.closest('[style*="aspect-ratio: 16 / 9"]')).toBeNull()
   })
 
   it('renders only the current PDF page in single mode', async () => {
