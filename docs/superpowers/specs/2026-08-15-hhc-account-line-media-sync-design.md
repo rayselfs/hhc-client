@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved architecture, pending written-spec review on 2026-08-15.
+Approved architecture; implementation-planning corrections incorporated on 2026-08-15.
 
 This is the umbrella design for six independently verifiable delivery slices. Each slice receives
 its own implementation plan after this document is approved. No slice may weaken the authorization,
@@ -177,8 +177,15 @@ Supported ACL subject types are `user` and `role`. The only first-release collec
 grant the manager read access.
 
 The gateway is the only externally reachable caller of authenticated Asset API collection routes.
-Asset API accepts normalized `X-User-ID` and `X-Roles` only from that network boundary. It rejects
-missing identity, missing `media_sync_user`, and unmatched ACLs with `403`.
+Gateway requires `media_sync_user` for those reader routes. Asset API independently accepts
+normalized `X-HHC-User-ID` and `X-HHC-Roles` only from that network boundary and rejects missing
+identity, missing `media_sync_user`, and unmatched ACLs with `403`.
+Asset API uses a dedicated configured reader caller (`api-gateway` in production) only on collection
+reader/ticket middleware; it does not add Gateway to the broader internal asset caller allowlist.
+Collection-management middleware separately requires exact caller `hhc-line-function-bot`.
+
+The Gateway verifier also forwards normalized `X-HHC-Token-Expires-At` from the verified JWT `exp`.
+The base proxy clears any client-supplied value before protected routes set it.
 
 ### Management authorization
 
@@ -225,7 +232,12 @@ interface HhcSession {
 
 The adapter is a non-serializable service and belongs in a Context. Serializable display state may
 be mirrored to Zustand but is never persisted. Tokens, authorization codes, PKCE verifiers, state,
-and refresh credentials never enter Zustand, IndexedDB, or localStorage.
+and refresh credentials never enter Zustand, IndexedDB, localStorage, or sessionStorage.
+
+The existing browser `/session` response supplies user identity but not roles. After issuing an
+access token, the adapter decodes `sub`, `roles`, and `exp` only to build local display/feature hints
+and requires `sub` to match the session user ID. This decode is not an authorization decision;
+Gateway and Asset API verify the signed token and enforce role/ACL on every protected request.
 
 ### Electron authorization
 
@@ -254,20 +266,37 @@ system browser through the existing external-link policy.
 
 ### Browser authorization
 
-1. Browser creates state, PKCE verifier, and S256 challenge in memory.
-2. Browser redirects to HHC authorization with:
+1. Browser creates state, PKCE verifier, and S256 challenge in the control window's memory and opens
+   a user-initiated authorization popup. A blocked popup fails without creating a pending flow.
+2. The popup navigates to HHC authorization with:
    - `client_id=client-web`
    - `redirect_uri=https://client.alive.org.tw/oauth/callback`
    - `response_type=code`
    - `code_challenge_method=S256`
    - `scope=openid profile`
-3. Callback verifies state and exchanges the code.
-4. The access token remains in memory. Account API stores the rotating refresh token only in its
+3. The callback page requires a same-origin opener and sends only `code` and `state` to it with an
+   exact-origin `postMessage`. The opener verifies origin, source window, state, expiry, and
+   single-use before exchanging the code with its in-memory verifier. The popup then closes.
+4. If the opener was closed, the popup was reused, or the five-minute flow expired, callback fails
+   closed and the user restarts login. No verifier/state fallback is written to Web Storage.
+5. The access token remains in memory. Account API stores the rotating refresh token only in its
    Secure, HttpOnly cookie.
-5. A page reload restores the session through the existing refresh/session endpoint. No refresh
+6. A page reload restores the session through the existing refresh/session endpoint. No refresh
    credential is accessible to JavaScript.
-6. Browser calls authenticated collection endpoints with the in-memory access token through API
+7. Browser calls authenticated collection endpoints with the in-memory access token through API
    Gateway.
+
+Account API production CORS explicitly allows `https://client.alive.org.tw` with credentials. It
+does not use a wildcard origin.
+
+API Gateway's account host independently emits exact credentialed CORS for the browser client's
+session, CSRF, token, refresh, and logout routes because the base proxy intentionally hides upstream
+CORS headers. Browser fetches the existing CSRF token and sends `X-CSRF-Token` on protected cookie
+mutations.
+
+Because LibrePresenter uses `HashRouter`, renderer bootstrap handles exact pathname
+`/oauth/callback` before loading the normal router and lazy-loads a callback-only entry. Static Web
+Apps serves that path through the existing navigation fallback with `Cache-Control: no-store`.
 
 ### Logout and account switch
 
@@ -330,10 +359,18 @@ collection revision in the same PostgreSQL transaction. The change cursor is an 
 the last applied revision. A missing or invalid cursor causes a bounded full snapshot, not an error
 that strands the local root.
 
+Pages contain at most 500 items. A reset cursor carries a snapshot high-water revision and the last
+`remote_item_id`; the server returns only rows at or below that high-water mark, then finishes with a
+normal delta cursor at that revision. The provider immediately follows that cursor before applying
+the collected full-scan plan. Changes committed during paging are therefore folded into the same
+refresh instead of being skipped. Cursor contents are opaque to clients.
+
 ### Internal management routes
 
 Callable only by the helper workload identity:
 
+- `GET /priv/assets/collections`
+- `GET /priv/assets/collections/{collectionId}`
 - `POST /priv/assets/collections`
 - `PATCH /priv/assets/collections/{collectionId}`
 - `DELETE /priv/assets/collections/{collectionId}`
@@ -342,8 +379,9 @@ Callable only by the helper workload identity:
 - `POST /priv/assets/collections/{collectionId}/items`
 - `DELETE /priv/assets/collections/{collectionId}/items/{remoteItemId}`
 
-All mutations require an idempotency key. Collection delete is soft delete and removes read access
-immediately. Asset deletion remains a separate owner command.
+The management reads return collection and ACL metadata needed by Admin Console, but no media
+content and no reader authorization. All mutations require an idempotency key. Collection delete
+is soft delete and removes read access immediately. Asset deletion remains a separate owner command.
 
 ### Authenticated reader routes
 
@@ -354,19 +392,23 @@ Exposed through API Gateway:
 - `GET /api/assets/collections/{collectionId}/items/{remoteItemId}`
 - `POST /api/assets/collections/{collectionId}/items/{remoteItemId}/content-ticket`
 - `GET /api/assets/collections/{collectionId}/items/{remoteItemId}/content`
+- `GET /api/assets/content?ticket={opaque}`
 
 Metadata and ticket creation use the normal bearer-authenticated gateway request. Ticket creation
-returns an unguessable bearer URL scoped to the issuing subject, collection, item, and content
-version. Its lifetime is at most five minutes and cannot exceed the current access-token expiry.
-This is required because `<img>` and `<video>` cannot attach an Authorization header. The ticket
-contains no filename or group ID, is excluded from application/access logs, and is never persisted
-by the client. Because the URL is a short-lived bearer capability, clients set a no-referrer policy
-and must not expose it in diagnostics.
+returns an unguessable bearer URL on the exact `/api/assets/content` route, scoped to the issuing
+subject, collection, item, and content version. Its lifetime is at most five minutes and cannot
+exceed the current access-token expiry. This separate entrance is required because `<img>` and
+`<video>` cannot attach an Authorization header and Gateway `auth_request` cannot validate an opaque
+Asset API ticket. The ticket contains no filename or group ID, is excluded from
+application/access logs, and is never persisted by the client. Because the URL is a short-lived
+bearer capability, clients set a no-referrer policy and must not expose it in diagnostics.
 
-The content route accepts either the normal bearer identity or the opaque ticket. It preserves ETag,
-conditional requests, and byte ranges so videos can stream without first becoming an IndexedDB Blob.
-Every request validates ticket integrity/expiry, content version, collection membership, current
-collection state, and the collection ACL row matching the issuer identity or ticket role claims.
+The collection-item content route requires normal bearer identity. The exact ticket content route
+is not JWT-protected at Gateway, but accepts only GET/HEAD and Asset API validates the opaque ticket
+before serving bytes. Both entrances use the same content service and preserve ETag, conditional
+requests, and byte ranges so videos can stream without first becoming an IndexedDB Blob. Every
+request validates authorization, content version, collection membership, current collection state,
+and the live collection ACL row matching the user identity or ticket issuer/role claims.
 Collection ACL revocation therefore takes effect immediately. Account-role revocation takes effect
 no later than the current access token and derived ticket expiry, matching the platform's existing
 JWT revocation boundary. LibrePresenter renews an expiring ticket and resumes media at its prior
@@ -485,8 +527,11 @@ Multiple groups are supported by creating multiple collections and repeating the
 
 ### Routing decision
 
-Attachment routing happens after LINE signature verification and webhook idempotency, before LLM
-routing:
+Attachment routing happens after LINE signature/access/registration filtering and before the
+existing start-only Redis webhook dedupe and LLM routing. Media sync's PostgreSQL
+`line:{profileName}:{messageId}` upsert is the durable idempotency boundary; only after it commits
+does the event enter the existing reply/manual/LLM dedupe path. This order prevents a transient
+PostgreSQL failure from turning a LINE retry into a permanently lost attachment.
 
 | Group state | Requester manual upload intent | Result |
 | --- | --- | --- |
@@ -519,8 +564,9 @@ or source asset.
 
 ### Worker flow
 
-1. Webhook transaction records source identity, group binding, collection ID, message type, and
-   durable outbox work. It returns promptly.
+1. Before claiming the legacy webhook-dedupe key, a PostgreSQL transaction records source identity,
+   group binding, collection ID, message type, and durable outbox work. A database failure returns a
+   retryable webhook error; a successful transaction returns promptly.
 2. The existing finite attachment worker claims the work with its bounded lease.
 3. For video/audio content still preparing, the worker checks LINE transcoding state and retries with
    bounded backoff. `404`, `410`, failed transcoding, expiry, and retry exhaustion become terminal
@@ -529,9 +575,11 @@ or source asset.
    not buffer the content in the webhook process or queue payload.
 5. Worker rejects content above 200 MiB, unsupported magic/MIME/extension combinations, unsafe file
    names, or a source whose binding is no longer active.
-6. Worker scans the file using the existing validated ClamAV signature snapshot.
-7. A clean file is uploaded through one `line.group.media-sync` Asset API upload session and added to
-   the bound collection using idempotency keys derived from source identity.
+6. Worker uploads the validated file through one `line.group.media-sync` Asset API upload session
+   and completes that session using idempotency keys derived from source identity.
+7. Asset API runs the existing validated ClamAV scan pipeline. Helper waits for the durable scan
+   result and adds only a clean asset to the bound collection; pending/failed/infected assets never
+   receive collection membership.
 8. If a manual publication is pending, it references the same asset after its existing purpose,
    title, confirmation, and catalog rules succeed. The curated publisher may create its existing
    OneDrive/catalog publication once from the clean work artifact, but it does not download from
@@ -562,12 +610,16 @@ tombstone.
 Add `hhc-line` to `SyncProviderType`. A provider connection is account-scoped and contains only:
 
 - HHC user ID
-- Asset API collection ID
-- collection display name
-- server revision/cursor metadata
+- HHC account display label
 - creation and last-refresh timestamps
 
 It never stores an HHC refresh token.
+
+Reuse the existing root model: each imported folder's
+`FolderSyncLink.remoteFolderId` is the Asset API collection ID, and its display name remains on the
+local folder. Collection revision/cursor metadata stays in the existing `sync-cursors` record keyed
+by provider connection plus remote folder. One HHC account connection can therefore own multiple
+independent collection roots.
 
 ### Folder picker
 
@@ -595,11 +647,17 @@ benefits from the fix.
 ### Offline policy
 
 - `online-only`: metadata is synchronized; the adapter obtains an in-memory content ticket and uses
-  its byte-range URL without creating a local source Blob.
+  its byte-range URL in browser mode without creating a local source Blob. Packaged Electron does
+  not weaken CORS for its `file://` renderer: main process uses the HHC session to create an opaque
+  session temp-file lease, returns only a lease ID/`hhc-media:` URL through the existing
+  native-media resolver, and deletes it on content change, logout/account switch, or app exit.
 - `on-demand`: presentation/manual selection downloads content when within local cache policy.
 - `always-offline`: background queue downloads every eligible item when within storage policy.
 
 Electron stores downloads through the existing native filesystem path.
+Electron defaults HHC LINE roots to `on-demand`. `online-only` temp leases are not entered into the
+sync DB and are not retained as offline content. VLC always receives a native persistent/on-demand
+file or temp lease, never a bearer/ticket URL.
 
 Browser defaults new HHC LINE roots to `online-only`. Browser may cache a file only when it is at
 most 256 MiB and projected storage remains below the existing 80% quota threshold. The browser does
@@ -608,9 +666,11 @@ offline browser files above 256 MiB are required.
 
 ### ACL loss and root cleanup
 
-Any authenticated list, delta, or download `403` marks the root `access-revoked`, stops its queue,
-and launches the same root-scoped purge used by logout. The root disappears from File Explorer after
-cleanup. A transient `401` first attempts one auth refresh; a second `401` ends the HHC session.
+An account-level collection-list `403` purges all `hhc-line` roots for that HHC account. A
+root-specific delta, metadata, ticket, or download `403` marks only that root `access-revoked`, stops
+its queue, and launches the same root-scoped purge used by unlink. The root disappears from File
+Explorer after cleanup. A transient `401` first attempts one auth refresh; a second `401` ends the
+HHC session.
 
 Normal network errors remain retryable and do not delete cached data.
 
