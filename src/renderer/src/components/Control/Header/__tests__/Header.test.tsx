@@ -56,6 +56,7 @@ function baseProjectionContext(): MockProjectionContext {
     projectionReadyCount: 0,
     activeOwner: 'timer' as const,
     recovery: { status: 'closed', generation: 0, failure: null },
+    vlcFailure: null,
     sessionSummary: {
       owner: null,
       status: 'closed',

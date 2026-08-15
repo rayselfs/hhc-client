@@ -8,6 +8,7 @@ import {
   type ReplayableProjectionChannel
 } from '@renderer/lib/projection-session-coordinator'
 import { useSettingsStore } from '@renderer/stores/settings'
+import type { ProjectionVlcFailure } from '@shared/ipc-channels'
 import type {
   ProjectionChannel,
   ProjectionContentChannel,
@@ -46,6 +47,7 @@ interface ProjectionContextValue {
   projectionReadyCount: number
   activeOwner: ProjectionOwner
   recovery: ProjectionRecoveryState
+  vlcFailure: ProjectionVlcFailure | null
   sessionSummary: ProjectionSessionSummary
   claimProjection: (owner: ProjectionOwner, options?: { unblank?: boolean }) => void
   startProjection: (
@@ -97,6 +99,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
   const [projectionReadyCount, setProjectionReadyCount] = useState(0)
   const [activeOwner, setActiveOwner] = useState<ProjectionOwner>('timer')
   const [recovery, setRecovery] = useState<ProjectionRecoveryState>(CLOSED_RECOVERY_STATE)
+  const [vlcFailure, setVlcFailure] = useState<ProjectionVlcFailure | null>(null)
   const [projectionSnapshot, setProjectionSnapshot] = useState<ProjectionSessionSnapshot | null>(
     null
   )
@@ -195,10 +198,12 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
           adapter.setGeneration(0)
         }
       })
+      const unsubscribeVlcFailure = window.api.projectionVlc.onFailure(setVlcFailure)
 
       return () => {
         active = false
         unsubscribeLifecycle()
+        unsubscribeVlcFailure()
         unsubscribeReady()
         unsubscribePlayback()
         unsubscribeCoordinator()
@@ -298,9 +303,26 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       return openBrowserProjection()
     }
     const coordinator = getCoordinator()
+    const state = coordinator.getRecoveryState()
+    const snapshot = coordinator.getSnapshot()
+    if (
+      vlcFailure &&
+      state.status === 'ready' &&
+      snapshot?.owner === 'media' &&
+      !snapshot.showDefault &&
+      !snapshot.isBlackout &&
+      snapshot.media.show &&
+      (!vlcFailure.itemId || snapshot.media.show.itemId === vlcFailure.itemId)
+    ) {
+      getAdapter(adapterRef, browserSessionId).send('__system:replay', {
+        generation: state.generation,
+        snapshot: structuredClone(snapshot)
+      })
+      setVlcFailure(null)
+      return { ok: true, generation: state.generation }
+    }
     const result = await window.api.projection.retry()
     if (!result.retried || result.generation <= 0) {
-      const state = coordinator.getRecoveryState()
       return {
         ok: false,
         generation: state.generation,
@@ -314,8 +336,10 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       reason: 'created'
     })
     updateOpen(true)
-    return coordinator.waitForReady(result.generation)
-  }, [browserSessionId, getCoordinator, openBrowserProjection, updateOpen])
+    const retryResult = await coordinator.waitForReady(result.generation)
+    if (retryResult.ok) setVlcFailure(null)
+    return retryResult
+  }, [browserSessionId, getCoordinator, openBrowserProjection, updateOpen, vlcFailure])
 
   const closeProjection = useCallback(async (): Promise<void> => {
     const coordinator = getCoordinator()
@@ -464,6 +488,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       projectionReadyCount,
       activeOwner,
       recovery,
+      vlcFailure,
       sessionSummary,
       claimProjection,
       startProjection,
@@ -482,6 +507,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       projectionReadyCount,
       activeOwner,
       recovery,
+      vlcFailure,
       sessionSummary,
       claimProjection,
       startProjection,

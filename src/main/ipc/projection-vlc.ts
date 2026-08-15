@@ -2,6 +2,8 @@ import { BrowserWindow, ipcMain } from 'electron'
 import type { VlcPlayer } from 'electron-vlc-player'
 import type {
   ProjectionVlcControlRequest,
+  ProjectionVlcFailure,
+  ProjectionVlcFailureCode,
   ProjectionVlcInfo,
   ProjectionVlcProbeRequest,
   ProjectionVlcProbeResult,
@@ -28,6 +30,18 @@ let lifecycleVersion = 0
 let lastProgressPublicationMs: number | null = null
 
 const VLC_PROGRESS_PUBLICATION_INTERVAL_MS = 250
+const VLC_FAILURE_DETAILS: Record<
+  ProjectionVlcFailureCode,
+  Pick<ProjectionVlcFailure, 'recoverable' | 'message'>
+> = {
+  'runtime-missing': { recoverable: false, message: 'VLC runtime is not available.' },
+  'binding-unavailable': {
+    recoverable: false,
+    message: 'VLC native playback is unavailable.'
+  },
+  'media-open-failed': { recoverable: true, message: 'VLC could not open this media.' },
+  'playback-failed': { recoverable: true, message: 'VLC playback stopped unexpectedly.' }
+}
 
 type ListenerTarget = {
   listeners(event: string): unknown[]
@@ -35,6 +49,14 @@ type ListenerTarget = {
 }
 
 type EventListener = (...args: unknown[]) => void
+
+function publishFailure(wm: WindowManager, code: ProjectionVlcFailureCode, itemId?: string): void {
+  wm.sendToMain('projection-vlc:failure', {
+    ...(itemId && /^[A-Za-z0-9_-]{1,128}$/.test(itemId) ? { itemId } : {}),
+    code,
+    ...VLC_FAILURE_DETAILS[code]
+  })
+}
 
 const VLC_WINDOW_EVENTS = [
   'enter-full-screen',
@@ -269,9 +291,17 @@ async function startVlc(
 
   const { info, runtime } = await resolveVlcInfo(loadRuntime)
   if (info.status !== 'ready' || !info.vlcDir) {
+    publishFailure(
+      wm,
+      info.status === 'missing' ? 'runtime-missing' : 'binding-unavailable',
+      request.itemId
+    )
     throw new Error(info.message ?? 'VLC runtime not found')
   }
-  if (!runtime) throw new Error('VLC native binding unavailable')
+  if (!runtime) {
+    publishFailure(wm, 'binding-unavailable', request.itemId)
+    throw new Error('VLC native binding unavailable')
+  }
 
   await stopVlc()
   const startVersion = lifecycleVersion + 1
@@ -281,15 +311,16 @@ async function startVlc(
     projectionWindow.webContents,
     VLC_WEB_CONTENTS_EVENTS
   )
-  const nextPlayer = new runtime.VlcPlayer({
-    window: projectionWindow,
-    container: request.container,
-    vlcDir: info.vlcDir,
-    controls: false,
-    autoAdvancePlaylist: false
-  })
+  let nextPlayer: VlcPlayer | null = null
 
   try {
+    nextPlayer = new runtime.VlcPlayer({
+      window: projectionWindow,
+      container: request.container,
+      vlcDir: info.vlcDir,
+      controls: false,
+      autoAdvancePlaylist: false
+    })
     await nextPlayer.embed()
     if (startVersion !== lifecycleVersion) {
       hideNativePlayerWindow(nextPlayer)
@@ -305,7 +336,8 @@ async function startVlc(
       beforeWindowListeners,
       beforeWebContentsListeners
     )
-    const notifyLayoutChange = (): void => nextPlayer.notifyLayoutChange()
+    const embeddedPlayer = nextPlayer
+    const notifyLayoutChange = (): void => embeddedPlayer.notifyLayoutChange()
     projectionWindow.on('resize', notifyLayoutChange)
     projectionWindow.on('resized', notifyLayoutChange)
     playerResizeCleanup = () => {
@@ -332,7 +364,10 @@ async function startVlc(
     nextPlayer.on('paused', () => sendState(wm, { isPlaying: false }))
     nextPlayer.on('stopped', () => sendState(wm, { isPlaying: false }))
     nextPlayer.on('endReached', () => sendState(wm, { isPlaying: false, isEnded: true }))
-    nextPlayer.on('error', () => sendState(wm, { isPlaying: false }))
+    nextPlayer.on('error', () => {
+      sendState(wm, { isPlaying: false })
+      publishFailure(wm, 'playback-failed', request.itemId)
+    })
     nextPlayer.setSource(getNativeFilePath(request.sourceFileId), { autoplay: false })
     if (request.initialVolume !== undefined) {
       nextPlayer.setVolume(Math.round(Math.max(0, Math.min(1, request.initialVolume)) * 100))
@@ -343,8 +378,9 @@ async function startVlc(
     if (request.initialPlaybackState === 'playing') nextPlayer.play()
     sendState(wm, { isPlaying: false, isEnded: false })
   } catch (error) {
-    nextPlayer.destroy()
+    nextPlayer?.destroy()
     createListenerCleanup(projectionWindow, beforeWindowListeners, beforeWebContentsListeners)()
+    publishFailure(wm, 'media-open-failed', request.itemId)
     throw error
   }
 }

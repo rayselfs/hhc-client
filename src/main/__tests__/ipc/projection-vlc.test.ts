@@ -32,6 +32,7 @@ const mockVlcPlayers: Array<{
   emit: (event: string, ...args: unknown[]) => boolean
 }> = []
 let mockEmbedImplementation: () => Promise<void> = () => Promise.resolve()
+let mockConstructError: Error | null = null
 
 const VLC_WINDOW_EVENTS = [
   'enter-full-screen',
@@ -77,6 +78,7 @@ vi.mock('electron-vlc-player', () => ({
 
     constructor(options: { window: typeof mockProjectionWindow }) {
       super()
+      if (mockConstructError) throw mockConstructError
       this.window = options.window
       mockVlcPlayers.push(this)
       for (const event of VLC_WINDOW_EVENTS) this.window.on(event, () => {})
@@ -109,6 +111,7 @@ vi.mock('../../ipc/native-fs', () => ({
 
 import { ipcMain } from 'electron'
 import { registerProjectionVlcHandlers } from '../../ipc/projection-vlc'
+import { resolveVlcRuntime } from '../../video-engine-runtime'
 import type { WindowManager } from '../../windowManager'
 
 type ExtendedIpcMain = typeof ipcMain & {
@@ -131,6 +134,8 @@ beforeEach(() => {
   mockProjectionWindow.webContents.removeAllListeners()
   mockVlcPlayers.length = 0
   mockEmbedImplementation = () => Promise.resolve()
+  mockConstructError = null
+  vi.mocked(resolveVlcRuntime).mockReturnValue({ status: 'ready', path: '/vlc' })
   mockWindowManager.getProjectionState.mockReturnValue({
     exists: true,
     lifecycle: { generation: 4, status: 'ready', reason: 'created' }
@@ -139,6 +144,120 @@ beforeEach(() => {
 })
 
 describe('projection-vlc listener cleanup', () => {
+  it('publishes sanitized typed failures while preserving rejected VLC starts', async () => {
+    const nativeError = new Error(
+      'Failed to open /Users/operator/secret.mp4?token=secret from https://media.example/source'
+    )
+    mockEmbedImplementation = () => Promise.reject(nativeError)
+
+    const startPromise = Promise.resolve(
+      getHandler('projection-vlc:start')(makeEvent(), {
+        itemId: 'item-1',
+        sourceFileId: '550e8400-e29b-41d4-a716-446655440000',
+        container: '#vlc-player'
+      })
+    )
+
+    await expect(startPromise).rejects.toBe(nativeError)
+    expect(mockWindowManager.sendToMain).toHaveBeenCalledWith('projection-vlc:failure', {
+      itemId: 'item-1',
+      code: 'media-open-failed',
+      recoverable: true,
+      message: 'VLC could not open this media.'
+    })
+    const published = JSON.stringify(mockWindowManager.sendToMain.mock.calls)
+    expect(published).not.toContain('/Users/operator')
+    expect(published).not.toContain('secret')
+    expect(published).not.toContain('https://')
+  })
+
+  it('publishes a media-open failure when VLC player construction fails', async () => {
+    const nativeError = new Error('Native constructor failed at /private/vlc')
+    mockConstructError = nativeError
+
+    const startPromise = Promise.resolve(
+      getHandler('projection-vlc:start')(makeEvent(), {
+        itemId: 'item-1',
+        sourceFileId: '550e8400-e29b-41d4-a716-446655440000',
+        container: '#vlc-player'
+      })
+    )
+
+    await expect(startPromise).rejects.toBe(nativeError)
+    expect(mockWindowManager.sendToMain).toHaveBeenCalledWith('projection-vlc:failure', {
+      itemId: 'item-1',
+      code: 'media-open-failed',
+      recoverable: true,
+      message: 'VLC could not open this media.'
+    })
+  })
+
+  it('maps missing runtimes and unavailable bindings without exposing diagnostics', async () => {
+    vi.mocked(resolveVlcRuntime).mockReturnValueOnce({
+      status: 'missing',
+      message: 'Missing /Applications/VLC.app?token=secret'
+    })
+
+    await expect(
+      Promise.resolve(
+        getHandler('projection-vlc:start')(makeEvent(), {
+          itemId: 'item-1',
+          sourceFileId: '550e8400-e29b-41d4-a716-446655440000',
+          container: '#vlc-player'
+        })
+      )
+    ).rejects.toThrow('Missing /Applications/VLC.app?token=secret')
+    expect(mockWindowManager.sendToMain).toHaveBeenLastCalledWith('projection-vlc:failure', {
+      itemId: 'item-1',
+      code: 'runtime-missing',
+      recoverable: false,
+      message: 'VLC runtime is not available.'
+    })
+    ;(ipcMain as ExtendedIpcMain)._clearHandlers()
+    registerProjectionVlcHandlers(
+      mockWindowManager as unknown as WindowManager,
+      vi.fn(async () => ({
+        status: 'error' as const,
+        message: 'Binding failed at /private/native.node with token=secret'
+      }))
+    )
+    await expect(
+      Promise.resolve(
+        getHandler('projection-vlc:start')(makeEvent(), {
+          itemId: 'item-2',
+          sourceFileId: '550e8400-e29b-41d4-a716-446655440000',
+          container: '#vlc-player'
+        })
+      )
+    ).rejects.toThrow('Binding failed at /private/native.node with token=secret')
+    expect(mockWindowManager.sendToMain).toHaveBeenLastCalledWith('projection-vlc:failure', {
+      itemId: 'item-2',
+      code: 'binding-unavailable',
+      recoverable: false,
+      message: 'VLC native playback is unavailable.'
+    })
+    expect(JSON.stringify(mockWindowManager.sendToMain.mock.calls)).not.toContain('/private')
+  })
+
+  it('publishes a sanitized recoverable failure for VLC runtime errors', async () => {
+    await getHandler('projection-vlc:start')(makeEvent(), {
+      itemId: 'item-1',
+      sourceFileId: '550e8400-e29b-41d4-a716-446655440000',
+      container: '#vlc-player'
+    })
+    mockWindowManager.sendToMain.mockClear()
+
+    mockVlcPlayers[0].emit('error', new Error('/media/source?token=secret'))
+
+    expect(mockWindowManager.sendToMain).toHaveBeenCalledWith('projection-vlc:failure', {
+      itemId: 'item-1',
+      code: 'playback-failed',
+      recoverable: true,
+      message: 'VLC playback stopped unexpectedly.'
+    })
+    expect(JSON.stringify(mockWindowManager.sendToMain.mock.calls)).not.toContain('/media/source')
+  })
+
   it('reports a missing native binding without failing handler registration', async () => {
     ;(ipcMain as ExtendedIpcMain)._clearHandlers()
     const loadRuntime = vi.fn(async () => ({

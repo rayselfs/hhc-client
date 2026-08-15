@@ -10,13 +10,14 @@ const FAILURE_KEYS = {
 
 export default function ProjectionRecoveryNotice(): React.JSX.Element | null {
   const { t } = useTranslation()
-  const { recovery, retryProjection } = useProjection()
+  const { recovery, vlcFailure, retryProjection } = useProjection()
 
-  if (recovery.status !== 'recovering' && recovery.status !== 'failed') return null
+  if (!vlcFailure && recovery.status !== 'recovering' && recovery.status !== 'failed') return null
 
-  const isFailed = recovery.status === 'failed'
+  const isFailed = Boolean(vlcFailure) || recovery.status === 'failed'
   const failureKey = recovery.failure ? FAILURE_KEYS[recovery.failure.reason] : 'rendererCrash'
   const titleKey = isFailed ? failureKey : 'recovering'
+  const canRetry = vlcFailure?.recoverable ?? isFailed
 
   return (
     <div className="pointer-events-none fixed inset-x-0 top-3 z-50 flex justify-center px-4">
@@ -29,9 +30,11 @@ export default function ProjectionRecoveryNotice(): React.JSX.Element | null {
         <Alert.Indicator />
         <Alert.Content>
           <Alert.Title>{t(`projection.recovery.${titleKey}Title`)}</Alert.Title>
-          <Alert.Description>{t(`projection.recovery.${titleKey}Description`)}</Alert.Description>
+          <Alert.Description>
+            {vlcFailure?.message ?? t(`projection.recovery.${titleKey}Description`)}
+          </Alert.Description>
         </Alert.Content>
-        {isFailed && (
+        {canRetry && (
           <Button
             size="sm"
             variant="danger"

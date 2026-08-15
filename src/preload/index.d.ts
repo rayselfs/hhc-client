@@ -14,6 +14,7 @@ import type {
   VideoPosterRequest,
   VideoPosterResult,
   ProjectionVlcControlRequest,
+  ProjectionVlcFailure,
   ProjectionVlcInfo,
   ProjectionVlcProbeRequest,
   ProjectionVlcProbeResult,
@@ -134,6 +135,7 @@ interface ProjectionVlcAPI {
   probe: (request: ProjectionVlcProbeRequest) => Promise<ProjectionVlcProbeResult>
   control: (command: ProjectionVlcControlRequest) => Promise<void>
   stop: () => Promise<void>
+  onFailure: (callback: (failure: ProjectionVlcFailure) => void) => () => void
 }
 
 interface LocalSyncAPI {

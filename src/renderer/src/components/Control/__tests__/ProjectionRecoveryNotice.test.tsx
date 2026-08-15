@@ -15,6 +15,12 @@ const projectionMock = vi.hoisted(() => ({
       reason: 'renderer-crash' | 'popup-blocked' | 'ready-timeout'
     } | null
   } as ProjectionRecoveryState,
+  vlcFailure: null as {
+    itemId?: string
+    code: 'runtime-missing' | 'binding-unavailable' | 'media-open-failed' | 'playback-failed'
+    recoverable: boolean
+    message: string
+  } | null,
   retryProjection: vi.fn()
 }))
 
@@ -30,6 +36,7 @@ describe('ProjectionRecoveryNotice', () => {
       failure: null
     }
     projectionMock.retryProjection.mockReset()
+    projectionMock.vlcFailure = null
     projectionMock.retryProjection.mockResolvedValue({ ok: true, generation: 2 })
     await i18n.changeLanguage('en')
   })
@@ -76,6 +83,29 @@ describe('ProjectionRecoveryNotice', () => {
 
     expect(screen.getByText(title)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Retry projection' }))
+    expect(projectionMock.retryProjection).toHaveBeenCalledOnce()
+  })
+
+  it('renders the latest recoverable VLC failure with one retry action', async () => {
+    const user = userEvent.setup()
+    projectionMock.recovery = {
+      status: 'ready',
+      generation: 2,
+      failure: null
+    }
+    projectionMock.vlcFailure = {
+      itemId: 'item-1',
+      code: 'playback-failed',
+      recoverable: true,
+      message: 'VLC playback stopped unexpectedly.'
+    }
+
+    render(<ProjectionRecoveryNotice />)
+
+    expect(screen.getByText('VLC playback stopped unexpectedly.')).toBeInTheDocument()
+    const retry = screen.getAllByRole('button', { name: 'Retry projection' })
+    expect(retry).toHaveLength(1)
+    await user.click(retry[0])
     expect(projectionMock.retryProjection).toHaveBeenCalledOnce()
   })
 })

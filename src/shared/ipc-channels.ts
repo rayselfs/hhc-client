@@ -53,6 +53,19 @@ export interface VideoPosterInfo {
 
 export type ProjectionVlcStatus = 'ready' | 'missing' | 'error'
 
+export type ProjectionVlcFailureCode =
+  | 'runtime-missing'
+  | 'binding-unavailable'
+  | 'media-open-failed'
+  | 'playback-failed'
+
+export interface ProjectionVlcFailure {
+  itemId?: string
+  code: ProjectionVlcFailureCode
+  recoverable: boolean
+  message: string
+}
+
 export interface ProjectionVlcInfo {
   status: ProjectionVlcStatus
   vlcDir?: string
@@ -305,6 +318,7 @@ export type IpcSendChannel = keyof IpcSendMap
 export interface IpcMainToRendererMap {
   'projection:message': ProjectionTransportTuple
   'projection:lifecycle': [event: ProjectionLifecycleEvent]
+  'projection-vlc:failure': [failure: ProjectionVlcFailure]
   'theme:changed': [{ shouldUseDarkColors: boolean }]
   'timer-tick': [TimerTickPayload]
   'update:status-changed': [{ status: UpdateStatus; version?: string; error?: string }]

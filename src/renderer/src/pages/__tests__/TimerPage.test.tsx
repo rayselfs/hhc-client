@@ -9,6 +9,7 @@ import TimerPage from '../TimerPage'
 
 const projectionRecoveryMock = {
   recovery: { status: 'closed' as const, generation: 0, failure: null },
+  vlcFailure: null,
   retryProjection: vi.fn(),
   sessionSummary: {
     owner: null,
