@@ -17,6 +17,7 @@ import {
   isEditablePresentationMimeType,
   isPresentationMimeType
 } from '@renderer/lib/presentation-media'
+import type { PDFDocumentProxy, PDFPageProxy, RenderTask } from 'pdfjs-dist'
 
 type FileProjectionProps = {
   generation?: number
@@ -46,8 +47,11 @@ type LoadFileOptions = {
 }
 
 type PdfState = {
+  document: PDFDocumentProxy
   pages: Array<HTMLCanvasElement | undefined>
+  pageSizes: Array<{ width: number; height: number } | undefined>
   currentPage: number
+  scrollPage: number
   viewMode: 'single' | 'continuous'
 }
 
@@ -59,6 +63,17 @@ type PendingVideoControl = {
 }
 
 const HAVE_METADATA = 1
+const PDF_CONTINUOUS_PAGE_GAP = 16
+const PDF_CONTINUOUS_PADDING = 16
+export const PDF_CONTINUOUS_CANVAS_RADIUS = 2
+
+function getPdfPageHeight(
+  size: { width: number; height: number } | undefined,
+  containerWidth: number
+): number {
+  if (!size) return 0
+  return size.height * Math.min(1, containerWidth > 0 ? containerWidth / size.width : 1)
+}
 
 export default function FileProjection({
   generation = 0,
@@ -93,6 +108,11 @@ export default function FileProjection({
   const playbackModeRef = useRef<FileProjectionProps['initialPlaybackMode']>('native')
   const durationMsRef = useRef<number | undefined>(initialDurationMs)
   const loadSequenceRef = useRef(0)
+  const pdfDocumentRef = useRef<PDFDocumentProxy | null>(null)
+  const pdfPagePromisesRef = useRef<Map<number, Promise<PDFPageProxy>>>(new Map())
+  const pdfRenderTasksRef = useRef<Map<number, RenderTask>>(new Map())
+  const pdfWindowRef = useRef<Set<number>>(new Set())
+  const pdfMeasuredDocumentRef = useRef<PDFDocumentProxy | null>(null)
   const replayStateRef = useRef(initialReplayState)
   replayStateRef.current = initialReplayState
 
@@ -173,47 +193,37 @@ export default function FileProjection({
     [applyPendingVideoControl, isControlForCurrentItem]
   )
 
+  const disposePdf = useCallback((): void => {
+    for (const task of pdfRenderTasksRef.current.values()) task.cancel()
+    pdfRenderTasksRef.current.clear()
+    pdfPagePromisesRef.current.clear()
+    pdfWindowRef.current.clear()
+    pdfMeasuredDocumentRef.current = null
+    const document = pdfDocumentRef.current
+    pdfDocumentRef.current = null
+    if (document) void document.destroy()
+  }, [])
+
   const loadPdf = useCallback(async (sourceUrl: string, itemId: string) => {
     const pdfjsLib = await loadPdfjsLib()
-    const pdf = await pdfjsLib.getDocument(sourceUrl).promise
-
-    const renderPage = async (pageNum: number): Promise<HTMLCanvasElement> => {
-      const page = await pdf.getPage(pageNum)
-      const viewport = page.getViewport({ scale: 2 })
-      const canvas = document.createElement('canvas')
-      canvas.width = Math.ceil(viewport.width)
-      canvas.height = Math.ceil(viewport.height)
-      const context = canvas.getContext('2d')
-      if (context) {
-        context.fillStyle = '#ffffff'
-        context.fillRect(0, 0, canvas.width, canvas.height)
-        await page.render({ canvas, canvasContext: context, viewport }).promise
-      }
-      return canvas
+    const document = await pdfjsLib.getDocument(sourceUrl).promise
+    if (currentItemIdRef.current !== itemId) {
+      await document.destroy()
+      return
     }
 
-    try {
-      for (let i = 1; i <= pdf.numPages; i++) {
-        if (currentItemIdRef.current !== itemId) return
-        const canvas = await renderPage(i)
-        if (currentItemIdRef.current !== itemId) return
-
-        setPdfState((prev) => {
-          const pages =
-            prev?.pages.length === pdf.numPages
-              ? [...prev.pages]
-              : new Array<HTMLCanvasElement | undefined>(pdf.numPages).fill(undefined)
-          pages[i - 1] = canvas
-          return {
-            pages,
-            currentPage: prev?.currentPage ?? replayStateRef.current?.pdfPage ?? 1,
-            viewMode: prev?.viewMode ?? replayStateRef.current?.pdfViewMode ?? 'single'
-          }
-        })
-      }
-    } finally {
-      await pdf.destroy()
-    }
+    pdfDocumentRef.current = document
+    const replay = replayStateRef.current?.itemId === itemId ? replayStateRef.current : null
+    setPdfState({
+      document,
+      pages: new Array<HTMLCanvasElement | undefined>(document.numPages).fill(undefined),
+      pageSizes: new Array<{ width: number; height: number } | undefined>(document.numPages).fill(
+        undefined
+      ),
+      currentPage: replay?.pdfPage ?? 1,
+      scrollPage: replay?.pdfScroll ?? 0,
+      viewMode: replay?.pdfViewMode ?? 'single'
+    })
   }, [])
 
   const sendVideoPlaybackState = useCallback(
@@ -265,6 +275,7 @@ export default function FileProjection({
       durationMsRef.current = options.durationMs
       sourceRevokeRef.current?.()
       sourceRevokeRef.current = null
+      disposePdf()
       setObjectUrl(null)
       setZoom(replay?.zoom ?? 1)
       setPan(replay ? { ...replay.pan } : { x: 0, y: 0 })
@@ -293,8 +304,131 @@ export default function FileProjection({
         setObjectUrl(source.url)
       }
     },
-    [loadPdf]
+    [disposePdf, loadPdf]
   )
+
+  const pdfPageCount = pdfState?.document.numPages ?? 0
+  const pdfWindowCenter = pdfState
+    ? pdfState.viewMode === 'continuous'
+      ? Math.min(pdfPageCount, Math.max(1, Math.floor(pdfState.scrollPage) + 1))
+      : Math.min(pdfPageCount, Math.max(1, Math.floor(pdfState.currentPage)))
+    : 1
+  const pdfWindowStart = pdfState
+    ? pdfState.viewMode === 'continuous'
+      ? Math.max(1, pdfWindowCenter - PDF_CONTINUOUS_CANVAS_RADIUS)
+      : pdfWindowCenter
+    : 1
+  const pdfWindowEnd = pdfState
+    ? pdfState.viewMode === 'continuous'
+      ? Math.min(pdfPageCount, pdfWindowCenter + PDF_CONTINUOUS_CANVAS_RADIUS)
+      : pdfWindowCenter
+    : 0
+
+  useEffect(() => {
+    const document = pdfState?.document
+    if (!document || pdfWindowEnd < pdfWindowStart) return
+
+    const wantedPages = new Set<number>()
+    for (let pageNumber = pdfWindowStart; pageNumber <= pdfWindowEnd; pageNumber++) {
+      wantedPages.add(pageNumber)
+    }
+    pdfWindowRef.current = wantedPages
+
+    for (const [pageNumber, task] of pdfRenderTasksRef.current) {
+      if (!wantedPages.has(pageNumber)) {
+        task.cancel()
+        pdfRenderTasksRef.current.delete(pageNumber)
+      }
+    }
+    setPdfState((previous) => {
+      if (!previous || previous.document !== document) return previous
+      const pages = previous.pages.map((canvas, index) =>
+        wantedPages.has(index + 1) ? canvas : undefined
+      )
+      return pages.some((canvas, index) => canvas !== previous.pages[index])
+        ? { ...previous, pages }
+        : previous
+    })
+
+    const getPage = (pageNumber: number): Promise<PDFPageProxy> => {
+      let promise = pdfPagePromisesRef.current.get(pageNumber)
+      if (!promise) {
+        promise = document.getPage(pageNumber)
+        pdfPagePromisesRef.current.set(pageNumber, promise)
+      }
+      return promise
+    }
+
+    const renderPage = async (pageNumber: number): Promise<void> => {
+      const page = await getPage(pageNumber)
+      if (
+        pdfDocumentRef.current !== document ||
+        !pdfWindowRef.current.has(pageNumber) ||
+        pdfRenderTasksRef.current.has(pageNumber)
+      ) {
+        return
+      }
+
+      const viewport = page.getViewport({ scale: 2 })
+      const canvas = window.document.createElement('canvas')
+      canvas.width = Math.ceil(viewport.width)
+      canvas.height = Math.ceil(viewport.height)
+      const context = canvas.getContext('2d')
+      if (!context) return
+      context.fillStyle = '#ffffff'
+      context.fillRect(0, 0, canvas.width, canvas.height)
+      const task = page.render({ canvas, canvasContext: context, viewport })
+      pdfRenderTasksRef.current.set(pageNumber, task)
+      setPdfState((previous) => {
+        if (!previous || previous.document !== document || !pdfWindowRef.current.has(pageNumber)) {
+          task.cancel()
+          return previous
+        }
+        const pages = [...previous.pages]
+        const pageSizes = [...previous.pageSizes]
+        pages[pageNumber - 1] = canvas
+        pageSizes[pageNumber - 1] = { width: canvas.width, height: canvas.height }
+        return { ...previous, pages, pageSizes }
+      })
+
+      try {
+        await task.promise
+      } catch (error) {
+        if ((error as { name?: string })?.name !== 'RenderingCancelledException') {
+          console.error('[file-projection] PDF page render failed', error)
+        }
+      } finally {
+        if (pdfRenderTasksRef.current.get(pageNumber) === task) {
+          pdfRenderTasksRef.current.delete(pageNumber)
+        }
+      }
+    }
+
+    for (const pageNumber of wantedPages) void renderPage(pageNumber)
+
+    if (pdfState.viewMode === 'continuous' && pdfMeasuredDocumentRef.current !== document) {
+      pdfMeasuredDocumentRef.current = document
+      void Promise.all(
+        Array.from({ length: pdfPageCount }, async (_, index) => {
+          const page = await getPage(index + 1)
+          const viewport = page.getViewport({ scale: 2 })
+          return { width: Math.ceil(viewport.width), height: Math.ceil(viewport.height) }
+        })
+      )
+        .then((pageSizes) => {
+          if (pdfDocumentRef.current === document) {
+            setPdfState((previous) =>
+              previous?.document === document ? { ...previous, pageSizes } : previous
+            )
+          }
+        })
+        .catch((error) => {
+          if (pdfDocumentRef.current === document) {
+            console.error('[file-projection] PDF page measurement failed', error)
+          }
+        })
+    }
+  }, [pdfPageCount, pdfState?.document, pdfState?.viewMode, pdfWindowEnd, pdfWindowStart])
 
   const handleControl = useCallback(
     (data: FileControlPayload) => {
@@ -336,23 +470,7 @@ export default function FileProjection({
           setPdfState((prev) => (prev ? { ...prev, currentPage: data.value } : prev))
           break
         case 'pdfScroll': {
-          const el = pdfContainerRef.current
-          if (el) {
-            const pageFloat = data.value
-            const pageIndex = Math.floor(Math.max(0, pageFloat))
-            const fraction = pageFloat - pageIndex
-            const PY = 16 // py-4
-            const GAP = 16 // gap-4
-            const children = el.children
-            let target = PY
-            for (let i = 0; i < pageIndex && i < children.length; i++) {
-              target += (children[i] as HTMLElement).clientHeight + GAP
-            }
-            if (pageIndex < children.length) {
-              target += fraction * (children[pageIndex] as HTMLElement).clientHeight
-            }
-            el.scrollTop = target
-          }
+          setPdfState((prev) => (prev ? { ...prev, scrollPage: data.value } : prev))
           break
         }
         case 'pdfViewMode':
@@ -417,38 +535,39 @@ export default function FileProjection({
   }, [controlEvent, handleControl])
 
   useEffect(() => {
-    const replay = initialReplayState
     const container = pdfContainerRef.current
-    if (
-      !replay ||
-      replay.itemId !== currentItemIdRef.current ||
-      replay.pdfViewMode !== 'continuous' ||
-      !container
-    ) {
-      return
-    }
+    if (!pdfState || pdfState.viewMode !== 'continuous' || !container) return
+
     const frame = requestAnimationFrame(() => {
-      const pageIndex = Math.floor(Math.max(0, replay.pdfScroll))
-      const fraction = replay.pdfScroll - pageIndex
-      let target = 16
-      for (let index = 0; index < pageIndex && index < container.children.length; index++) {
-        target += (container.children[index] as HTMLElement).clientHeight + 16
+      const pageFloat = Math.min(
+        Math.max(0, pdfState.scrollPage),
+        Math.max(0, pdfState.document.numPages - 1)
+      )
+      const pageIndex = Math.floor(pageFloat)
+      const fraction = pageFloat - pageIndex
+      const fallbackSize = pdfState.pageSizes.find((size) => size !== undefined)
+      const containerWidth = container.clientWidth
+      let target = PDF_CONTINUOUS_PADDING
+      for (let index = 0; index < pageIndex; index++) {
+        target +=
+          getPdfPageHeight(pdfState.pageSizes[index] ?? fallbackSize, containerWidth) +
+          PDF_CONTINUOUS_PAGE_GAP
       }
-      if (pageIndex < container.children.length) {
-        target += fraction * (container.children[pageIndex] as HTMLElement).clientHeight
-      }
+      target +=
+        fraction * getPdfPageHeight(pdfState.pageSizes[pageIndex] ?? fallbackSize, containerWidth)
       container.scrollTop = target
     })
     return () => cancelAnimationFrame(frame)
-  }, [initialReplayState, pdfState])
+  }, [pdfState])
 
   useEffect(
     () => () => {
       sourceRevokeRef.current?.()
       sourceRevokeRef.current = null
+      disposePdf()
       void window.api?.projectionVlc?.stop()
     },
-    []
+    [disposePdf]
   )
 
   const transform =
@@ -471,15 +590,54 @@ export default function FileProjection({
 
   if (pdfState) {
     if (pdfState.viewMode === 'continuous') {
+      const fallbackSize = pdfState.pageSizes.find((size) => size !== undefined)
+      const containerWidth = pdfContainerRef.current?.clientWidth ?? 0
+      const getPageHeight = (index: number): number =>
+        getPdfPageHeight(pdfState.pageSizes[index] ?? fallbackSize, containerWidth)
+      const omittedBefore = pdfWindowStart - 1
+      const omittedAfter = pdfPageCount - pdfWindowEnd
+      let topSpacerHeight = Math.max(0, omittedBefore - 1) * PDF_CONTINUOUS_PAGE_GAP
+      for (let index = 0; index < omittedBefore; index++) {
+        topSpacerHeight += getPageHeight(index)
+      }
+      let bottomSpacerHeight = Math.max(0, omittedAfter - 1) * PDF_CONTINUOUS_PAGE_GAP
+      for (let index = pdfWindowEnd; index < pdfPageCount; index++) {
+        bottomSpacerHeight += getPageHeight(index)
+      }
+
       return (
         <div className="flex h-screen w-full bg-black overflow-hidden">
           <div
             ref={pdfContainerRef}
             className="w-full h-full overflow-y-auto flex flex-col items-center gap-4 py-4"
           >
-            {pdfState.pages.map((canvas, i) => (
-              <PdfCanvas key={i} canvas={canvas} continuous />
-            ))}
+            {omittedBefore > 0 && (
+              <div
+                data-pdf-spacer="top"
+                className="w-full shrink-0"
+                style={{ height: topSpacerHeight }}
+                aria-hidden
+              />
+            )}
+            {Array.from({ length: pdfWindowEnd - pdfWindowStart + 1 }, (_, index) => {
+              const pageNumber = pdfWindowStart + index
+              return (
+                <PdfCanvas
+                  key={pageNumber}
+                  canvas={pdfState.pages[pageNumber - 1]}
+                  size={pdfState.pageSizes[pageNumber - 1]}
+                  continuous
+                />
+              )
+            })}
+            {omittedAfter > 0 && (
+              <div
+                data-pdf-spacer="bottom"
+                className="w-full shrink-0"
+                style={{ height: bottomSpacerHeight }}
+                aria-hidden
+              />
+            )}
           </div>
         </div>
       )
@@ -504,7 +662,10 @@ export default function FileProjection({
             className="flex flex-col items-center overflow-hidden w-full h-full"
             style={{ transform, transformOrigin: 'center center' }}
           >
-            <PdfCanvas canvas={pdfState.pages[pdfState.currentPage - 1]} />
+            <PdfCanvas
+              canvas={pdfState.pages[pdfWindowCenter - 1]}
+              size={pdfState.pageSizes[pdfWindowCenter - 1]}
+            />
           </div>
         </div>
       </div>
@@ -775,9 +936,11 @@ function VlcProjectionSurface({
 
 function PdfCanvas({
   canvas,
+  size,
   continuous = false
 }: {
   canvas: HTMLCanvasElement | undefined
+  size?: { width: number; height: number }
   continuous?: boolean
 }): React.JSX.Element | null {
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -787,6 +950,8 @@ function PdfCanvas({
     if (!container || !canvas) return
     container.innerHTML = ''
     Object.assign(canvas.style, {
+      width: continuous ? '100%' : '',
+      height: continuous ? 'auto' : '',
       maxWidth: '100%',
       maxHeight: continuous ? 'none' : '100%',
       objectFit: 'contain'
@@ -802,6 +967,11 @@ function PdfCanvas({
     <div
       ref={containerRef}
       className={`flex items-center justify-center w-full${continuous ? '' : ' h-full'}`}
+      style={
+        continuous && size
+          ? { maxWidth: size.width, aspectRatio: `${size.width} / ${size.height}` }
+          : undefined
+      }
     />
   )
 }

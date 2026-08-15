@@ -47,6 +47,47 @@ vi.mock('@renderer/lib/projection-adapter', () => ({
   })
 }))
 
+function mockPdf(
+  pageCount = 100,
+  pendingRenders = false
+): {
+  pdf: {
+    numPages: number
+    getPage: ReturnType<typeof vi.fn>
+    destroy: ReturnType<typeof vi.fn>
+  }
+  renderCancels: Map<number, ReturnType<typeof vi.fn>>
+} {
+  const renderCancels = new Map<number, ReturnType<typeof vi.fn>>()
+  const pdf = {
+    numPages: pageCount,
+    getPage: vi.fn(async (pageNumber: number) => ({
+      getViewport: () => ({ width: 640, height: 360 }),
+      render: vi.fn(({ canvas }: { canvas: HTMLCanvasElement }) => {
+        canvas.dataset.pdfPage = String(pageNumber)
+        let rejectRender: ((error: Error) => void) | undefined
+        const promise = pendingRenders
+          ? new Promise<void>((_resolve, reject) => {
+              rejectRender = reject
+            })
+          : Promise.resolve()
+        const cancel = vi.fn(() => {
+          const error = new Error('cancelled')
+          error.name = 'RenderingCancelledException'
+          rejectRender?.(error)
+        })
+        renderCancels.set(pageNumber, cancel)
+        return { promise, cancel }
+      })
+    })),
+    destroy: vi.fn(() => Promise.resolve())
+  }
+  mockLoadPdfjsLib.mockResolvedValue({
+    getDocument: vi.fn(() => ({ promise: Promise.resolve(pdf) }))
+  })
+  return { pdf, renderCancels }
+}
+
 describe('FileProjection copied media identity', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -426,48 +467,135 @@ describe('FileProjection copied media identity', () => {
     })
   })
 
-  it('shows the first PDF page before later pages finish rendering', async () => {
-    type MockPdfPage = {
-      getViewport: () => { width: number; height: number }
-      render: () => { promise: Promise<void> }
-    }
-    let resolveSecondPage: ((value: MockPdfPage) => void) | undefined
-    const makePage = (): MockPdfPage => ({
-      getViewport: () => ({ width: 640, height: 360 }),
-      render: vi.fn(() => ({ promise: Promise.resolve() }))
-    })
-    const firstPage = makePage()
-    const secondPagePromise = new Promise<MockPdfPage>((resolve) => {
-      resolveSecondPage = resolve
-    })
-    const pdf = {
-      numPages: 2,
-      getPage: vi.fn((pageNum: number) =>
-        pageNum === 1 ? Promise.resolve(firstPage) : secondPagePromise
-      ),
-      destroy: vi.fn(() => Promise.resolve())
-    }
-    mockLoadPdfjsLib.mockResolvedValue({
-      getDocument: vi.fn(() => ({ promise: Promise.resolve(pdf) }))
-    })
-
+  it('renders only the current PDF page in single mode', async () => {
+    const { pdf } = mockPdf()
     const { container } = render(
       <FileProjection
         fileName="slides.pdf"
         initialItemId="pdf-id"
         initialBlobId="pdf-blob"
         initialMimeType="application/pdf"
+        initialReplayState={{
+          itemId: 'pdf-id',
+          positionSeconds: 0,
+          durationSeconds: 0,
+          isPlaying: false,
+          isEnded: false,
+          volume: 1,
+          pdfPage: 50,
+          pdfScroll: 49,
+          pdfViewMode: 'single',
+          zoom: 1,
+          pan: { x: 0, y: 0 }
+        }}
       />
     )
 
     await waitFor(() => {
-      expect(container.querySelector('canvas')).not.toBeNull()
+      expect(container.querySelector('canvas')?.dataset.pdfPage).toBe('50')
     })
-    expect(pdf.getPage).toHaveBeenCalledWith(2)
+    expect(pdf.getPage).toHaveBeenCalledTimes(1)
+    expect(pdf.getPage).toHaveBeenCalledWith(50)
+  })
 
-    resolveSecondPage?.(makePage())
+  it('keeps only pages 48-52 mounted when continuous mode scrolls to page 50', async () => {
+    mockPdf()
+    const replayState = {
+      itemId: 'pdf-id',
+      positionSeconds: 0,
+      durationSeconds: 0,
+      isPlaying: false,
+      isEnded: false,
+      volume: 1,
+      pdfPage: 1,
+      pdfScroll: 0,
+      pdfViewMode: 'continuous' as const,
+      zoom: 1,
+      pan: { x: 0, y: 0 }
+    }
+    const { container, rerender } = render(
+      <FileProjection
+        fileName="slides.pdf"
+        initialItemId="pdf-id"
+        initialBlobId="pdf-blob"
+        initialMimeType="application/pdf"
+        initialReplayState={replayState}
+      />
+    )
+
+    const oldCanvas = await waitFor(() => {
+      const canvas = container.querySelector<HTMLCanvasElement>('canvas[data-pdf-page="1"]')
+      expect(canvas).not.toBeNull()
+      return canvas!
+    })
+
+    rerender(
+      <FileProjection
+        fileName="slides.pdf"
+        initialItemId="pdf-id"
+        initialBlobId="pdf-blob"
+        initialMimeType="application/pdf"
+        initialReplayState={replayState}
+        controlEvent={{ id: 1, data: { action: 'pdfScroll', value: 49 } }}
+      />
+    )
+
     await waitFor(() => {
-      expect(pdf.destroy).toHaveBeenCalled()
+      expect(
+        Array.from(container.querySelectorAll<HTMLCanvasElement>('canvas')).map(
+          (canvas) => canvas.dataset.pdfPage
+        )
+      ).toEqual(['48', '49', '50', '51', '52'])
+    })
+    expect(oldCanvas.isConnected).toBe(false)
+    expect(container.querySelectorAll('canvas')).toHaveLength(5)
+    expect(container.querySelector<HTMLElement>('[data-pdf-spacer="top"]')).toHaveStyle({
+      height: '17656px'
+    })
+  })
+
+  it('cancels continuous PDF renders when their pages leave the window', async () => {
+    const { renderCancels } = mockPdf(100, true)
+    const replayState = {
+      itemId: 'pdf-id',
+      positionSeconds: 0,
+      durationSeconds: 0,
+      isPlaying: false,
+      isEnded: false,
+      volume: 1,
+      pdfPage: 1,
+      pdfScroll: 0,
+      pdfViewMode: 'continuous' as const,
+      zoom: 1,
+      pan: { x: 0, y: 0 }
+    }
+    const { rerender } = render(
+      <FileProjection
+        fileName="slides.pdf"
+        initialItemId="pdf-id"
+        initialBlobId="pdf-blob"
+        initialMimeType="application/pdf"
+        initialReplayState={replayState}
+      />
+    )
+
+    await waitFor(() => {
+      expect(renderCancels.has(1)).toBe(true)
+    })
+
+    rerender(
+      <FileProjection
+        fileName="slides.pdf"
+        initialItemId="pdf-id"
+        initialBlobId="pdf-blob"
+        initialMimeType="application/pdf"
+        initialReplayState={replayState}
+        controlEvent={{ id: 1, data: { action: 'pdfScroll', value: 49 } }}
+      />
+    )
+
+    await waitFor(() => {
+      expect(renderCancels.get(1)).toHaveBeenCalledOnce()
     })
   })
 })
