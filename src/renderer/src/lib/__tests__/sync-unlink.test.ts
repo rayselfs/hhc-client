@@ -26,8 +26,16 @@ const { mockCleanupFileResources } = vi.hoisted(() => ({
   mockCleanupFileResources: vi.fn()
 }))
 
+const { mockCancelSyncDownloads } = vi.hoisted(() => ({
+  mockCancelSyncDownloads: vi.fn()
+}))
+
 vi.mock('../file-resource-cleanup', () => ({
   cleanupFileResources: mockCleanupFileResources
+}))
+
+vi.mock('../sync-download-queue', () => ({
+  cancelSyncDownloads: mockCancelSyncDownloads
 }))
 
 describe('sync unlink', () => {
@@ -111,6 +119,7 @@ describe('sync unlink', () => {
         })
       ])
     )
+    expect(mockCancelSyncDownloads).toHaveBeenCalledWith({ providerConnectionId: 'connection-1' })
   })
 
   it('disconnects one OneDrive mounted folder without removing the account connection', async () => {
@@ -187,6 +196,18 @@ describe('sync unlink', () => {
     expect(mockCleanupFileResources).toHaveBeenCalledWith({
       folderIds: expect.arrayContaining(['folder-a', 'folder-child-a']),
       itemIds: ['item-a']
+    })
+    expect(mockCancelSyncDownloads).toHaveBeenCalledWith({
+      providerConnectionId: 'connection-1',
+      remoteItemId: 'root-a'
+    })
+    expect(mockCancelSyncDownloads).toHaveBeenCalledWith({
+      providerConnectionId: 'connection-1',
+      remoteItemId: 'child-a'
+    })
+    expect(mockCancelSyncDownloads).toHaveBeenCalledWith({
+      providerConnectionId: 'connection-1',
+      remoteItemId: 'file-a'
     })
     await expect(getProviderConnection('connection-1')).resolves.toBeDefined()
     await expect(getSyncCursor('connection-1', 'root-a')).resolves.toBeUndefined()

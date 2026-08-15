@@ -1,3 +1,4 @@
+import { SyncDownloadCancelledError } from './sync-provider'
 import type {
   ReadOnlySyncProvider,
   SyncDownloadRequest,
@@ -55,6 +56,8 @@ interface SyncDownloadQueueJob extends EnqueueSyncDownloadInput {
   sequence: number
   promise: Promise<SyncDownloadResult | null>
   resolve: (result: SyncDownloadResult | null) => void
+  controller: AbortController
+  cancelled: boolean
 }
 
 const priorityValues: Record<SyncDownloadPriority, number> = {
@@ -174,13 +177,38 @@ export function enqueueSyncDownload(
     priorityValue,
     sequence: nextSequence++,
     promise,
-    resolve
+    resolve,
+    controller: new AbortController(),
+    cancelled: false
   }
   queuedJobs.push(job)
   jobsByKey.set(key, job)
   sortQueuedJobs()
   pumpSyncDownloadQueue()
   return promise
+}
+
+export function cancelSyncDownloads(scope: {
+  providerConnectionId: string
+  remoteItemId?: string
+}): number {
+  let cancelledCount = 0
+  for (const job of [...jobsByKey.values()]) {
+    if (
+      job.request.providerConnectionId !== scope.providerConnectionId ||
+      (scope.remoteItemId !== undefined && job.request.remoteItemId !== scope.remoteItemId)
+    ) {
+      continue
+    }
+    cancelledCount += 1
+    job.cancelled = true
+    job.controller.abort()
+    jobsByKey.delete(job.key)
+    const queuedIndex = queuedJobs.indexOf(job)
+    if (queuedIndex >= 0) queuedJobs.splice(queuedIndex, 1)
+    job.resolve(null)
+  }
+  return cancelledCount
 }
 
 function sortQueuedJobs(): void {
@@ -199,6 +227,7 @@ function pumpSyncDownloadQueue(): void {
 async function runSyncDownloadJob(job: SyncDownloadQueueJob): Promise<void> {
   try {
     const alreadyAvailable = await getAlreadyAvailableResult(job)
+    if (job.cancelled) throw new SyncDownloadCancelledError()
     if (alreadyAvailable) {
       job.resolve(alreadyAvailable)
       return
@@ -213,10 +242,16 @@ async function runSyncDownloadJob(job: SyncDownloadQueueJob): Promise<void> {
       downloadedBytes: 0,
       downloadTotalBytes: job.entry.size
     })
-    const result = await job.provider.downloadContent(job.request, new AbortController().signal)
+    const canCommit = () => !job.cancelled && !job.controller.signal.aborted
+    const result = await job.provider.downloadContent(job.request, job.controller.signal, canCommit)
+    if (!(await canCommit())) throw new SyncDownloadCancelledError()
     await job.onDownloaded?.(result)
     job.resolve(result)
   } catch (error) {
+    if (job.cancelled || error instanceof SyncDownloadCancelledError) {
+      job.resolve(null)
+      return
+    }
     const failure = classifySyncDownloadFailure(job.provider, error, job.previousEntry)
     await putSyncEntry({
       ...job.entry,

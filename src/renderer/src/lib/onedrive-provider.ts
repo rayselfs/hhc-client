@@ -1,7 +1,9 @@
+import { SyncDownloadCancelledError } from './sync-provider'
 import type {
   ReadOnlySyncProvider,
   RemoteSyncItem,
   SyncChangePage,
+  SyncDownloadCommitGuard,
   SyncDownloadRequest,
   SyncDownloadResult,
   SyncProviderConnectionInfo
@@ -163,10 +165,12 @@ export class OneDriveReadonlyProvider implements ReadOnlySyncProvider {
 
   async downloadContent(
     request: SyncDownloadRequest,
-    signal: AbortSignal
+    signal: AbortSignal,
+    canCommit: SyncDownloadCommitGuard
   ): Promise<SyncDownloadResult> {
     const metadata = await this.getMetadata(request.providerConnectionId, request.remoteItemId)
     if (!this.fetchContentBeforeSave) {
+      if (!(await canCommit())) throw new SyncDownloadCancelledError()
       return this.saveDownloadedContent(request, new Response(null, { status: 204 }), metadata)
     }
 
@@ -175,6 +179,7 @@ export class OneDriveReadonlyProvider implements ReadOnlySyncProvider {
       { signal }
     )
     if (!response.ok) throw new Error(`OneDrive download failed: ${response.status}`)
+    if (!(await canCommit())) throw new SyncDownloadCancelledError()
     return this.saveDownloadedContent(request, response, metadata)
   }
 

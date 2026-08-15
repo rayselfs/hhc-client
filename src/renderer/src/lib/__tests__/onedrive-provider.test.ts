@@ -244,7 +244,7 @@ describe('OneDriveReadonlyProvider', () => {
       offlinePolicy: 'on-demand' as const
     }
     await expect(
-      createProvider().downloadContent(request, new AbortController().signal)
+      createProvider().downloadContent(request, new AbortController().signal, () => true)
     ).resolves.toEqual({
       blobId: 'target-blob',
       size: 1024,
@@ -258,6 +258,31 @@ describe('OneDriveReadonlyProvider', () => {
         mimeType: 'video/mp4'
       })
     )
+  })
+
+  it('does not save downloaded content when the commit guard is cancelled', async () => {
+    fetchImpl
+      .mockResolvedValueOnce(
+        jsonResponse({
+          id: 'file-1',
+          name: 'clip.mp4',
+          file: { mimeType: 'video/mp4' },
+          parentReference: { id: 'root' },
+          size: 1024
+        })
+      )
+      .mockResolvedValueOnce(new Response('video-bytes'))
+    const request = {
+      providerConnectionId: 'connection-1',
+      remoteItemId: 'file-1',
+      targetBlobId: 'target-blob',
+      offlinePolicy: 'on-demand' as const
+    }
+
+    await expect(
+      createProvider().downloadContent(request, new AbortController().signal, () => false)
+    ).rejects.toThrow('Sync download cancelled')
+    expect(saveDownloadedContent).not.toHaveBeenCalled()
   })
 
   it('can leave content downloading to the injected storage callback', async () => {
@@ -284,7 +309,7 @@ describe('OneDriveReadonlyProvider', () => {
       offlinePolicy: 'always-offline' as const
     }
 
-    await expect(provider.downloadContent(request, new AbortController().signal)).resolves.toEqual({
+    await expect(provider.downloadContent(request, new AbortController().signal, () => true)).resolves.toEqual({
       blobId: 'target-blob',
       size: 1024,
       mimeType: 'video/mp4'

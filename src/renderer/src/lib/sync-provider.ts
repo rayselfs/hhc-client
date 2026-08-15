@@ -3,6 +3,14 @@ import type { SyncEntryRecord } from './sync-db'
 
 export type SyncRetryClassification = 'retryable' | 'auth-required' | 'offline' | 'fatal'
 
+export type SyncDownloadCommitGuard = () => boolean | Promise<boolean>
+
+export class SyncDownloadCancelledError extends Error {
+  constructor() {
+    super('Sync download cancelled')
+  }
+}
+
 export interface SyncProviderConnectionInfo {
   id: string
   providerType: SyncProviderType
@@ -52,7 +60,11 @@ export interface ReadOnlySyncProvider {
     cursor: string
   }): Promise<SyncChangePage>
   getMetadata(providerConnectionId: string, remoteItemId: string): Promise<RemoteSyncItem>
-  downloadContent(request: SyncDownloadRequest, signal: AbortSignal): Promise<SyncDownloadResult>
+  downloadContent(
+    request: SyncDownloadRequest,
+    signal: AbortSignal,
+    canCommit: SyncDownloadCommitGuard
+  ): Promise<SyncDownloadResult>
   classifyError(error: unknown): SyncRetryClassification
 }
 

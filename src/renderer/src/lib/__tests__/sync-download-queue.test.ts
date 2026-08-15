@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ReadOnlySyncProvider, SyncDownloadResult } from '../sync-provider'
+import type {
+  ReadOnlySyncProvider,
+  SyncDownloadCommitGuard,
+  SyncDownloadResult
+} from '../sync-provider'
 import {
+  cancelSyncDownloads,
   enqueueSyncDownload,
   resetSyncDownloadQueueForTests,
   SYNC_DOWNLOAD_CONCURRENCY
@@ -184,6 +189,56 @@ describe('sync download queue', () => {
       { blobId: 'item-1', size: 100, mimeType: 'image/png' }
     ])
     expect(provider.downloadContent).toHaveBeenCalledTimes(1)
+  })
+
+  it('cancels active and queued downloads without committing a late response', async () => {
+    const activeDownload = deferred<SyncDownloadResult>()
+    const onDownloaded = vi.fn()
+    let activeSignal: AbortSignal | undefined
+    let canCommit: SyncDownloadCommitGuard | undefined
+    const provider = makeProvider(
+      vi.fn(async (_request, signal, guard) => {
+        activeSignal = signal
+        canCommit = guard
+        return activeDownload.promise
+      })
+    )
+
+    const active = enqueueSyncDownload({
+      provider,
+      request: {
+        providerConnectionId: 'connection-a',
+        remoteItemId: 'remote-a',
+        targetBlobId: 'item-a',
+        offlinePolicy: 'always-offline'
+      },
+      entry: { ...makeEntry('remote-a', 'item-a'), providerConnectionId: 'connection-a' },
+      onDownloaded
+    })
+    await vi.waitFor(() => expect(activeSignal).toBeDefined())
+
+    const queued = enqueueSyncDownload({
+      provider,
+      request: {
+        providerConnectionId: 'connection-a',
+        remoteItemId: 'remote-b',
+        targetBlobId: 'item-b',
+        offlinePolicy: 'always-offline'
+      },
+      entry: { ...makeEntry('remote-b', 'item-b'), providerConnectionId: 'connection-a' },
+      onDownloaded
+    })
+
+    expect(cancelSyncDownloads({ providerConnectionId: 'connection-a' })).toBe(2)
+    expect(activeSignal?.aborted).toBe(true)
+    await expect(Promise.all([active, queued])).resolves.toEqual([null, null])
+    expect(await canCommit!()).toBe(false)
+
+    activeDownload.resolve({ blobId: 'item-a', size: 100, mimeType: 'image/png' })
+    await vi.waitFor(() => expect(onDownloaded).not.toHaveBeenCalled())
+    await expect(getSyncEntryByRemoteItem('connection-a', 'remote-a')).resolves.not.toMatchObject({
+      status: 'failed'
+    })
   })
 
   it('skips a stale queued job when the file is already available offline', async () => {
