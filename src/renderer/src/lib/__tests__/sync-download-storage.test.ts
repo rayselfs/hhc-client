@@ -39,6 +39,14 @@ const metadata = {
   contentHash: 'hash-1'
 }
 
+function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise
+  })
+  return { promise, resolve }
+}
+
 beforeEach(async () => {
   await resetFileExplorerDBForTests()
   await resetSyncDBForTests()
@@ -116,6 +124,38 @@ describe('saveWebOneDriveDownloadedContent', () => {
       downloadedBytes: 13,
       downloadTotalBytes: 13
     })
+  })
+
+  it('removes a Web blob when cancellation wins during durable storage', async () => {
+    const db = await openFileExplorerDB()
+    const originalPut = db.put.bind(db)
+    const storageStarted = deferred<void>()
+    const releaseStorage = deferred<void>()
+    const putSpy = vi.spyOn(db, 'put').mockImplementationOnce(async (...args) => {
+      storageStarted.resolve()
+      await releaseStorage.promise
+      return originalPut(...args)
+    })
+    let canCommit = true
+    const saving = saveWebOneDriveDownloadedContent(
+      request,
+      new Response(new Uint8Array(13), { headers: { 'Content-Length': '13' } }),
+      metadata,
+      () => canCommit
+    )
+    await storageStarted.promise
+    canCommit = false
+    releaseStorage.resolve()
+
+    try {
+      await expect(saving).rejects.toThrow('Sync download cancelled')
+    } finally {
+      putSpy.mockRestore()
+    }
+    await expect(db.get('file-blobs', 'blob-1')).resolves.toBeUndefined()
+    await expect(
+      getSyncEntryByRemoteItem('onedrive:account-1', 'remote-file-1')
+    ).resolves.toBeUndefined()
   })
 
   it('rejects downloads above the Web 2GB product limit', async () => {
@@ -213,6 +253,38 @@ describe('saveWebOneDriveDownloadedContent', () => {
       blobId: 'blob-1',
       status: 'available-offline'
     })
+  })
+
+  it('removes a native file when cancellation wins during storage', async () => {
+    vi.mocked(isElectron).mockReturnValue(true)
+    const downloadStarted = deferred<void>()
+    const releaseDownload = deferred<{
+      fileId: string
+      size: number
+      mimeType: string
+    }>()
+    vi.mocked(window.api.oneDrive.downloadFile).mockImplementationOnce(async () => {
+      downloadStarted.resolve()
+      return releaseDownload.promise
+    })
+    let canCommit = true
+    const saving = saveElectronOneDriveDownloadedContent(
+      request,
+      '4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02',
+      metadata,
+      () => canCommit
+    )
+    await downloadStarted.promise
+    canCommit = false
+    releaseDownload.resolve({ fileId: 'blob-1', size: 10, mimeType: 'video/mp4' })
+
+    await expect(saving).rejects.toThrow('Sync download cancelled')
+    expect(window.api.nativeFs.delete).toHaveBeenCalledWith('blob-1')
+    const db = await openFileExplorerDB()
+    await expect(db.get('file-blobs', 'blob-1')).resolves.toBeUndefined()
+    await expect(
+      getSyncEntryByRemoteItem('onedrive:account-1', 'remote-file-1')
+    ).resolves.toBeUndefined()
   })
 
   it('removes the native file if metadata persistence fails', async () => {

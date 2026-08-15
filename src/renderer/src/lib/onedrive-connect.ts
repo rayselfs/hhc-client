@@ -418,10 +418,10 @@ function createStoredOneDriveProvider(connectionId: string): OneDriveReadonlyPro
       const token = await window.api.oneDrive.getAccessToken({ connectionId, clientId })
       return token.accessToken
     },
-    saveDownloadedContent: (downloadRequest, _response, metadata) =>
+    saveDownloadedContent: (downloadRequest, _response, metadata, canCommit) =>
       isElectron()
-        ? saveElectronOneDriveDownloadedContent(downloadRequest, clientId, metadata)
-        : saveWebOneDriveDownloadedContent(downloadRequest, _response, metadata),
+        ? saveElectronOneDriveDownloadedContent(downloadRequest, clientId, metadata, canCommit)
+        : saveWebOneDriveDownloadedContent(downloadRequest, _response, metadata, canCommit),
     fetchContentBeforeSave: !isElectron()
   })
 }
@@ -612,8 +612,8 @@ export async function loginOneDriveAccount(options?: {
   })
   const provider = new OneDriveReadonlyProvider({
     getAccessToken: async () => token.access_token,
-    saveDownloadedContent: (downloadRequest, _response, metadata) =>
-      saveWebOneDriveDownloadedContent(downloadRequest, _response, metadata),
+    saveDownloadedContent: (downloadRequest, _response, metadata, canCommit) =>
+      saveWebOneDriveDownloadedContent(downloadRequest, _response, metadata, canCommit),
     fetchContentBeforeSave: true
   })
 

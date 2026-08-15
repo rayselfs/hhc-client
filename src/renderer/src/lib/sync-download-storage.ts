@@ -1,18 +1,29 @@
 import { toast } from '@heroui/react/toast'
 import i18n from '@renderer/i18n'
-import type { RemoteSyncItem, SyncDownloadRequest, SyncDownloadResult } from './sync-provider'
+import { SyncDownloadCancelledError } from './sync-provider'
+import type {
+  RemoteSyncItem,
+  SyncDownloadCommitGuard,
+  SyncDownloadRequest,
+  SyncDownloadResult
+} from './sync-provider'
 import { openFileExplorerDB } from './file-explorer-db'
 import { isElectron } from './env'
 import { MAX_FILE_SIZE_WEB } from './media-limits'
-import { putSyncEntry, updateSyncDownloadProgress } from './sync-db'
+import { deleteSyncEntries, putSyncEntry, updateSyncDownloadProgress } from './sync-db'
 
 const STORAGE_USAGE_LIMIT_RATIO = 0.8
 const STORAGE_LIMIT_ERROR = 'OneDrive sync storage has reached 80% usage'
+const alwaysCanCommit: SyncDownloadCommitGuard = () => true
 
 class SyncStorageLimitError extends Error {
   constructor() {
     super(STORAGE_LIMIT_ERROR)
   }
+}
+
+async function ensureCanCommit(canCommit: SyncDownloadCommitGuard): Promise<void> {
+  if (!(await canCommit())) throw new SyncDownloadCancelledError()
 }
 
 async function ensureWebCapacity(size: number): Promise<void> {
@@ -93,7 +104,8 @@ async function readResponseBlobWithProgress(
 export async function saveWebOneDriveDownloadedContent(
   request: SyncDownloadRequest,
   response: Response,
-  metadata: RemoteSyncItem
+  metadata: RemoteSyncItem,
+  canCommit: SyncDownloadCommitGuard = alwaysCanCommit
 ): Promise<SyncDownloadResult> {
   if (isElectron()) {
     throw new Error('Electron OneDrive downloads must use native streaming storage')
@@ -108,29 +120,42 @@ export async function saveWebOneDriveDownloadedContent(
     await ensureWebCapacity(blob.size)
 
     const db = await openFileExplorerDB()
-    await db.put('file-blobs', {
-      id: request.targetBlobId,
-      blob,
-      storage: 'indexed-db',
-      size: blob.size,
-      refCount: 1
-    })
-    await putSyncEntry({
-      providerConnectionId: request.providerConnectionId,
-      remoteItemId: request.remoteItemId,
-      parentRemoteItemId: metadata.parentRemoteItemId,
-      kind: metadata.kind,
-      name: metadata.name,
-      itemId: request.targetBlobId,
-      blobId: request.targetBlobId,
-      mimeType: metadata.mimeType,
-      size: blob.size,
-      etag: metadata.etag,
-      contentHash: metadata.contentHash,
-      status: 'available-offline',
-      downloadedBytes: blob.size,
-      downloadTotalBytes: blob.size
-    })
+    let syncEntryId: string | undefined
+    try {
+      await ensureCanCommit(canCommit)
+      await db.put('file-blobs', {
+        id: request.targetBlobId,
+        blob,
+        storage: 'indexed-db',
+        size: blob.size,
+        refCount: 1
+      })
+      await ensureCanCommit(canCommit)
+      const syncEntry = await putSyncEntry({
+        providerConnectionId: request.providerConnectionId,
+        remoteItemId: request.remoteItemId,
+        parentRemoteItemId: metadata.parentRemoteItemId,
+        kind: metadata.kind,
+        name: metadata.name,
+        itemId: request.targetBlobId,
+        blobId: request.targetBlobId,
+        mimeType: metadata.mimeType,
+        size: blob.size,
+        etag: metadata.etag,
+        contentHash: metadata.contentHash,
+        status: 'available-offline',
+        downloadedBytes: blob.size,
+        downloadTotalBytes: blob.size
+      })
+      syncEntryId = syncEntry.id
+      await ensureCanCommit(canCommit)
+    } catch (error) {
+      if (error instanceof SyncDownloadCancelledError) {
+        if (syncEntryId) await deleteSyncEntries([syncEntryId])
+        await db.delete('file-blobs', request.targetBlobId)
+      }
+      throw error
+    }
 
     return {
       blobId: request.targetBlobId,
@@ -146,7 +171,8 @@ export async function saveWebOneDriveDownloadedContent(
 export async function saveElectronOneDriveDownloadedContent(
   request: SyncDownloadRequest,
   clientId: string,
-  metadata: RemoteSyncItem
+  metadata: RemoteSyncItem,
+  canCommit: SyncDownloadCommitGuard = alwaysCanCommit
 ): Promise<SyncDownloadResult> {
   if (!isElectron()) {
     throw new Error('Native OneDrive downloads are only available in Electron')
@@ -185,34 +211,42 @@ export async function saveElectronOneDriveDownloadedContent(
     throw error
   }
   const db = await openFileExplorerDB()
+  let syncEntryId: string | undefined
   try {
+    await ensureCanCommit(canCommit)
     await db.put('file-blobs', {
       id: request.targetBlobId,
       storage: 'native-fs',
       size: downloaded.size,
       refCount: 1
     })
+    await ensureCanCommit(canCommit)
+    const syncEntry = await putSyncEntry({
+      providerConnectionId: request.providerConnectionId,
+      remoteItemId: request.remoteItemId,
+      parentRemoteItemId: metadata.parentRemoteItemId,
+      kind: metadata.kind,
+      name: metadata.name,
+      itemId: request.targetBlobId,
+      blobId: request.targetBlobId,
+      mimeType: metadata.mimeType ?? downloaded.mimeType,
+      size: downloaded.size,
+      etag: metadata.etag,
+      contentHash: metadata.contentHash,
+      status: 'available-offline',
+      downloadedBytes: downloaded.size,
+      downloadTotalBytes: downloaded.size
+    })
+    syncEntryId = syncEntry.id
+    await ensureCanCommit(canCommit)
   } catch (error) {
+    if (error instanceof SyncDownloadCancelledError && syncEntryId) {
+      await deleteSyncEntries([syncEntryId])
+    }
+    await db.delete('file-blobs', request.targetBlobId).catch(() => undefined)
     await window.api.nativeFs.delete(request.targetBlobId).catch(() => undefined)
     throw error
   }
-
-  await putSyncEntry({
-    providerConnectionId: request.providerConnectionId,
-    remoteItemId: request.remoteItemId,
-    parentRemoteItemId: metadata.parentRemoteItemId,
-    kind: metadata.kind,
-    name: metadata.name,
-    itemId: request.targetBlobId,
-    blobId: request.targetBlobId,
-    mimeType: metadata.mimeType ?? downloaded.mimeType,
-    size: downloaded.size,
-    etag: metadata.etag,
-    contentHash: metadata.contentHash,
-    status: 'available-offline',
-    downloadedBytes: downloaded.size,
-    downloadTotalBytes: downloaded.size
-  })
 
   return {
     blobId: request.targetBlobId,

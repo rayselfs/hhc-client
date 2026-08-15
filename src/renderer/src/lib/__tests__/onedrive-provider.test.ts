@@ -10,6 +10,14 @@ function jsonResponse(value: unknown, status = 200): Response {
   })
 }
 
+function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise
+  })
+  return { promise, resolve }
+}
+
 describe('OneDriveReadonlyProvider', () => {
   const getAccessToken = vi.fn(async () => 'access-token')
   const fetchImpl = vi.fn()
@@ -256,7 +264,8 @@ describe('OneDriveReadonlyProvider', () => {
       expect.objectContaining({
         remoteItemId: 'file-1',
         mimeType: 'video/mp4'
-      })
+      }),
+      expect.any(Function)
     )
   })
 
@@ -283,6 +292,45 @@ describe('OneDriveReadonlyProvider', () => {
       createProvider().downloadContent(request, new AbortController().signal, () => false)
     ).rejects.toThrow('Sync download cancelled')
     expect(saveDownloadedContent).not.toHaveBeenCalled()
+  })
+
+  it('passes the commit guard into storage when cancellation happens during save', async () => {
+    const saveStarted = deferred<void>()
+    const releaseSave = deferred<void>()
+    let canCommit = true
+    saveDownloadedContent.mockImplementationOnce(async (_request, _response, _metadata, guard) => {
+      saveStarted.resolve()
+      await releaseSave.promise
+      if (!(await guard())) throw new Error('storage commit cancelled')
+      return { blobId: 'target-blob', size: 1024, mimeType: 'video/mp4' }
+    })
+    fetchImpl
+      .mockResolvedValueOnce(
+        jsonResponse({
+          id: 'file-1',
+          name: 'clip.mp4',
+          file: { mimeType: 'video/mp4' },
+          parentReference: { id: 'root' },
+          size: 1024
+        })
+      )
+      .mockResolvedValueOnce(new Response('video-bytes'))
+
+    const downloading = createProvider().downloadContent(
+      {
+        providerConnectionId: 'connection-1',
+        remoteItemId: 'file-1',
+        targetBlobId: 'target-blob',
+        offlinePolicy: 'on-demand'
+      },
+      new AbortController().signal,
+      () => canCommit
+    )
+    await saveStarted.promise
+    canCommit = false
+    releaseSave.resolve()
+
+    await expect(downloading).rejects.toThrow('storage commit cancelled')
   })
 
   it('can leave content downloading to the injected storage callback', async () => {
@@ -322,7 +370,8 @@ describe('OneDriveReadonlyProvider', () => {
     expect(saveDownloadedContent).toHaveBeenCalledWith(
       request,
       expect.objectContaining({ status: 204 }),
-      expect.objectContaining({ remoteItemId: 'file-1', mimeType: 'image/png' })
+      expect.objectContaining({ remoteItemId: 'file-1', mimeType: 'image/png' }),
+      expect.any(Function)
     )
   })
 

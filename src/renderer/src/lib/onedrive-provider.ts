@@ -17,7 +17,8 @@ interface OneDriveProviderOptions {
   saveDownloadedContent: (
     request: SyncDownloadRequest,
     response: Response,
-    metadata: RemoteSyncItem
+    metadata: RemoteSyncItem,
+    canCommit: SyncDownloadCommitGuard
   ) => Promise<SyncDownloadResult>
 }
 
@@ -171,7 +172,12 @@ export class OneDriveReadonlyProvider implements ReadOnlySyncProvider {
     const metadata = await this.getMetadata(request.providerConnectionId, request.remoteItemId)
     if (!this.fetchContentBeforeSave) {
       if (!(await canCommit())) throw new SyncDownloadCancelledError()
-      return this.saveDownloadedContent(request, new Response(null, { status: 204 }), metadata)
+      return this.saveDownloadedContent(
+        request,
+        new Response(null, { status: 204 }),
+        metadata,
+        canCommit
+      )
     }
 
     const response = await this.request(
@@ -180,7 +186,7 @@ export class OneDriveReadonlyProvider implements ReadOnlySyncProvider {
     )
     if (!response.ok) throw new Error(`OneDrive download failed: ${response.status}`)
     if (!(await canCommit())) throw new SyncDownloadCancelledError()
-    return this.saveDownloadedContent(request, response, metadata)
+    return this.saveDownloadedContent(request, response, metadata, canCommit)
   }
 
   classifyError(error: unknown): 'retryable' | 'auth-required' | 'offline' | 'fatal' {

@@ -234,8 +234,19 @@ describe('sync download queue', () => {
     await expect(Promise.all([active, queued])).resolves.toEqual([null, null])
     expect(await canCommit!()).toBe(false)
 
+    const followUp = enqueueSyncDownload({
+      provider,
+      request: {
+        providerConnectionId: 'connection-a',
+        remoteItemId: 'remote-c',
+        targetBlobId: 'item-c',
+        offlinePolicy: 'always-offline'
+      },
+      entry: { ...makeEntry('remote-c', 'item-c'), providerConnectionId: 'connection-a' }
+    })
     activeDownload.resolve({ blobId: 'item-a', size: 100, mimeType: 'image/png' })
-    await vi.waitFor(() => expect(onDownloaded).not.toHaveBeenCalled())
+    await expect(followUp).resolves.toEqual({ blobId: 'item-a', size: 100, mimeType: 'image/png' })
+    expect(onDownloaded).not.toHaveBeenCalled()
     await expect(getSyncEntryByRemoteItem('connection-a', 'remote-a')).resolves.not.toMatchObject({
       status: 'failed'
     })
