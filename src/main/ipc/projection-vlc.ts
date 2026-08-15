@@ -50,12 +50,24 @@ type ListenerTarget = {
 
 type EventListener = (...args: unknown[]) => void
 
+function getSafeItemId(itemId?: string): string | undefined {
+  return itemId && /^[A-Za-z0-9_-]{1,128}$/.test(itemId) ? itemId : undefined
+}
+
 function publishFailure(wm: WindowManager, code: ProjectionVlcFailureCode, itemId?: string): void {
+  const safeItemId = getSafeItemId(itemId)
   wm.sendToMain('projection-vlc:failure', {
-    ...(itemId && /^[A-Za-z0-9_-]{1,128}$/.test(itemId) ? { itemId } : {}),
+    ...(safeItemId ? { itemId: safeItemId } : {}),
     code,
     ...VLC_FAILURE_DETAILS[code]
   })
+}
+
+function publishStarted(wm: WindowManager, generation: number, itemId: string): void {
+  const safeItemId = getSafeItemId(itemId)
+  if (safeItemId && generation > 0 && wm.getProjectionState().lifecycle.generation === generation) {
+    wm.sendToMain('projection-vlc:started', generation, safeItemId)
+  }
 }
 
 const VLC_WINDOW_EVENTS = [
@@ -288,6 +300,7 @@ async function startVlc(
   const projectionWindow = wm.getProjectionWindow()
   if (!projectionWindow || projectionWindow.isDestroyed())
     throw new Error('Projection window not open')
+  const generation = wm.getProjectionState().lifecycle.generation
 
   const { info, runtime } = await resolveVlcInfo(loadRuntime)
   if (info.status !== 'ready' || !info.vlcDir) {
@@ -365,7 +378,6 @@ async function startVlc(
     nextPlayer.on('stopped', () => sendState(wm, { isPlaying: false }))
     nextPlayer.on('endReached', () => sendState(wm, { isPlaying: false, isEnded: true }))
     nextPlayer.on('error', () => {
-      sendState(wm, { isPlaying: false })
       publishFailure(wm, 'playback-failed', request.itemId)
     })
     nextPlayer.setSource(getNativeFilePath(request.sourceFileId), { autoplay: false })
@@ -377,9 +389,18 @@ async function startVlc(
     }
     if (request.initialPlaybackState === 'playing') nextPlayer.play()
     sendState(wm, { isPlaying: false, isEnded: false })
+    publishStarted(wm, generation, request.itemId)
   } catch (error) {
-    nextPlayer?.destroy()
-    createListenerCleanup(projectionWindow, beforeWindowListeners, beforeWebContentsListeners)()
+    try {
+      nextPlayer?.destroy()
+    } catch {
+      // Preserve the original startup rejection.
+    }
+    try {
+      createListenerCleanup(projectionWindow, beforeWindowListeners, beforeWebContentsListeners)()
+    } catch {
+      // Preserve the original startup rejection.
+    }
     publishFailure(wm, 'media-open-failed', request.itemId)
     throw error
   }

@@ -136,6 +136,7 @@ interface ProjectionVlcAPI {
   control: (command: ProjectionVlcControlRequest) => Promise<void>
   stop: () => Promise<void>
   onFailure: (callback: (failure: ProjectionVlcFailure) => void) => () => void
+  onStarted: (callback: (generation: number, itemId: string) => void) => () => void
 }
 
 interface LocalSyncAPI {

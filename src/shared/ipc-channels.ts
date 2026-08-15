@@ -319,6 +319,7 @@ export interface IpcMainToRendererMap {
   'projection:message': ProjectionTransportTuple
   'projection:lifecycle': [event: ProjectionLifecycleEvent]
   'projection-vlc:failure': [failure: ProjectionVlcFailure]
+  'projection-vlc:started': [generation: number, itemId: string]
   'theme:changed': [{ shouldUseDarkColors: boolean }]
   'timer-tick': [TimerTickPayload]
   'update:status-changed': [{ status: UpdateStatus; version?: string; error?: string }]

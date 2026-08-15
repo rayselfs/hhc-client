@@ -138,7 +138,9 @@ const projectionVlcApi = {
     typedInvoke('projection-vlc:control', command),
   stop: () => typedInvoke('projection-vlc:stop'),
   onFailure: (callback: (failure: IpcMainToRendererMap['projection-vlc:failure'][0]) => void) =>
-    typedOn('projection-vlc:failure', callback)
+    typedOn('projection-vlc:failure', callback),
+  onStarted: (callback: (generation: number, itemId: string) => void) =>
+    typedOn('projection-vlc:started', callback)
 }
 
 const localSyncApi = {

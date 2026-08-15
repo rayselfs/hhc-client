@@ -291,17 +291,20 @@ describe('ProjectionContext web recovery', () => {
 describe('ProjectionContext Electron recovery', () => {
   let lifecycleCallback: ((event: ProjectionLifecycleEvent) => void) | null
   let vlcFailureCallback: ((failure: ProjectionVlcFailure) => void) | null
+  let vlcStartedCallback: ((generation: number, itemId: string) => void) | null
   let mockCheck: ReturnType<typeof vi.fn>
   let mockEnsure: ReturnType<typeof vi.fn>
   let mockRetry: ReturnType<typeof vi.fn>
   let mockClose: ReturnType<typeof vi.fn>
   const unsubscribeLifecycle = vi.fn()
   const unsubscribeVlcFailure = vi.fn()
+  const unsubscribeVlcStarted = vi.fn()
 
   beforeEach(() => {
     vi.mocked(isElectron).mockReturnValue(true)
     lifecycleCallback = null
     vlcFailureCallback = null
+    vlcStartedCallback = null
     mockCheck = vi.fn(() =>
       Promise.resolve({
         exists: false,
@@ -336,6 +339,10 @@ describe('ProjectionContext Electron recovery', () => {
           onFailure: vi.fn((callback: (failure: ProjectionVlcFailure) => void) => {
             vlcFailureCallback = callback
             return unsubscribeVlcFailure
+          }),
+          onStarted: vi.fn((callback: (generation: number, itemId: string) => void) => {
+            vlcStartedCallback = callback
+            return unsubscribeVlcStarted
           })
         }
       },
@@ -421,7 +428,7 @@ describe('ProjectionContext Electron recovery', () => {
     })
   })
 
-  it('clears a VLC failure only after successfully replaying the failed media', async () => {
+  it('keeps a VLC failure through replay and a repeated failed start', async () => {
     const { result } = renderProjection()
     await act(async () => Promise.resolve())
     const media = {
@@ -470,6 +477,59 @@ describe('ProjectionContext Electron recovery', () => {
         })
       })
     )
+    expect(result.current.vlcFailure).not.toBeNull()
+
+    act(() => {
+      vlcFailureCallback?.({
+        itemId: 'item-1',
+        code: 'media-open-failed',
+        recoverable: true,
+        message: 'VLC could not open this media.'
+      })
+    })
+    expect(result.current.vlcFailure?.code).toBe('media-open-failed')
+  })
+
+  it('clears a stale VLC failure after an explicit media reproject starts successfully', async () => {
+    const { result } = renderProjection()
+    await act(async () => Promise.resolve())
+    const media = {
+      itemId: 'item-1',
+      blobId: 'blob-1',
+      fileName: 'video.mp4',
+      mimeType: 'video/mp4',
+      playlist: [],
+      currentIndex: 0,
+      playbackMode: 'vlc-embedded' as const
+    }
+    let startPromise: ReturnType<typeof result.current.startProjection>
+    await act(async () => {
+      startPromise = result.current.startProjection('media', [['file:show', media]])
+      await Promise.resolve()
+    })
+    act(() => {
+      mockAdapter._trigger('__system:ready', { generation: 4 })
+    })
+    await act(async () => {
+      await startPromise!
+    })
+    act(() => {
+      vlcFailureCallback?.({
+        itemId: 'item-1',
+        code: 'playback-failed',
+        recoverable: true,
+        message: 'VLC playback stopped unexpectedly.'
+      })
+    })
+
+    await act(async () => {
+      await result.current.project('file:show', media)
+    })
+    expect(result.current.vlcFailure).not.toBeNull()
+    act(() => {
+      vlcStartedCallback?.(4, 'item-1')
+    })
+
     expect(result.current.vlcFailure).toBeNull()
   })
 
@@ -514,5 +574,6 @@ describe('ProjectionContext Electron recovery', () => {
     unmount()
     expect(unsubscribeLifecycle).toHaveBeenCalledOnce()
     expect(unsubscribeVlcFailure).toHaveBeenCalledOnce()
+    expect(unsubscribeVlcStarted).toHaveBeenCalledOnce()
   })
 })

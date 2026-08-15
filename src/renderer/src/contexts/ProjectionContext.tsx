@@ -199,11 +199,21 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
         }
       })
       const unsubscribeVlcFailure = window.api.projectionVlc.onFailure(setVlcFailure)
+      const unsubscribeVlcStarted = window.api.projectionVlc.onStarted((generation, itemId) => {
+        setVlcFailure((failure) =>
+          generation === coordinator.getRecoveryState().generation &&
+          failure &&
+          (!failure.itemId || failure.itemId === itemId)
+            ? null
+            : failure
+        )
+      })
 
       return () => {
         active = false
         unsubscribeLifecycle()
         unsubscribeVlcFailure()
+        unsubscribeVlcStarted()
         unsubscribeReady()
         unsubscribePlayback()
         unsubscribeCoordinator()
@@ -318,7 +328,6 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
         generation: state.generation,
         snapshot: structuredClone(snapshot)
       })
-      setVlcFailure(null)
       return { ok: true, generation: state.generation }
     }
     const result = await window.api.projection.retry()
@@ -336,9 +345,7 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
       reason: 'created'
     })
     updateOpen(true)
-    const retryResult = await coordinator.waitForReady(result.generation)
-    if (retryResult.ok) setVlcFailure(null)
-    return retryResult
+    return coordinator.waitForReady(result.generation)
   }, [browserSessionId, getCoordinator, openBrowserProjection, updateOpen, vlcFailure])
 
   const closeProjection = useCallback(async (): Promise<void> => {
