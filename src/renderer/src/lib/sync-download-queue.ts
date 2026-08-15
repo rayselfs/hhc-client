@@ -242,7 +242,7 @@ async function runSyncDownloadJob(job: SyncDownloadQueueJob): Promise<void> {
       downloadedBytes: 0,
       downloadTotalBytes: job.entry.size
     })
-    const canCommit = () => !job.cancelled && !job.controller.signal.aborted
+    const canCommit = (): boolean => !job.cancelled && !job.controller.signal.aborted
     const result = await job.provider.downloadContent(job.request, job.controller.signal, canCommit)
     if (!(await canCommit())) throw new SyncDownloadCancelledError()
     await job.onDownloaded?.(result)

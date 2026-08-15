@@ -354,11 +354,13 @@ describe('saveWebOneDriveDownloadedContent', () => {
       }
       return checks < 2
     })
-    let reportProgress: ((progress: {
-      targetFileId: string
-      downloadedBytes: number
-      downloadTotalBytes: number
-    }) => void) | undefined
+    let reportProgress:
+      | ((progress: {
+          targetFileId: string
+          downloadedBytes: number
+          downloadTotalBytes: number
+        }) => void)
+      | undefined
     vi.mocked(window.api.oneDrive.onDownloadProgress).mockImplementation((listener) => {
       reportProgress = listener
       return () => undefined

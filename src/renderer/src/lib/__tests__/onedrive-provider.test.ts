@@ -357,7 +357,9 @@ describe('OneDriveReadonlyProvider', () => {
       offlinePolicy: 'always-offline' as const
     }
 
-    await expect(provider.downloadContent(request, new AbortController().signal, () => true)).resolves.toEqual({
+    await expect(
+      provider.downloadContent(request, new AbortController().signal, () => true)
+    ).resolves.toEqual({
       blobId: 'target-blob',
       size: 1024,
       mimeType: 'video/mp4'
