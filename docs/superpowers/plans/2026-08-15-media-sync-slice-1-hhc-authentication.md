@@ -39,11 +39,14 @@
 | account-api | `internal/database/migration_integration_test.go` | Migration and OAuth client assertions |
 | account-api | `infra/main.bicep` | Exact browser client CORS origin |
 | account-api | `scripts/test-release-policy.sh` | Production CORS configuration assertion |
+| account-api | `internal/handlers/oauth_handler.go` | Native installation binding and OAuth revoke endpoint |
+| account-api | `internal/services/authorization_service.go` | Validate-before-bind, atomic single-use code consumption |
+| account-api | `internal/services/token_service.go` | Client-scoped refresh-family revocation |
 | account-fe | `src/lib/redirects.ts` | Allowlisted `librepresenter` return scheme |
 | account-fe | `src/lib/redirects.test.ts` | Reject lookalike and unsafe native redirects |
 | api-gateway | `conf.d/common/account-client-cors.conf` | Exact credentialed browser auth CORS |
 | api-gateway | `conf.d/map.conf` | Exact client/local origin map |
-| api-gateway | `conf.d/default.conf` | CORS on browser account routes |
+| api-gateway | `conf.d/default.conf` | Browser CORS routes and exact native OAuth revoke route |
 | api-gateway | `scripts/test-account-client-cors.sh` | Static CORS/auth route assertions |
 | hhc-client-v2 | `src/shared/hhc-auth.ts` | Environment-neutral auth/session types |
 | hhc-client-v2 | `src/shared/ipc-channels.ts` | Narrow Electron auth IPC |
@@ -276,6 +279,53 @@ git add conf.d/common/account-client-cors.conf conf.d/map.conf conf.d/default.co
 git commit -m "feat: allow LibrePresenter browser account sessions"
 ~~~
 
+### Task 3c: Isolate native OAuth installations and add revocation
+
+**Repository:** `account-api`
+
+**Files:**
+- Modify: `internal/handlers/oauth_handler.go`
+- Modify: `internal/services/authorization_service.go`
+- Modify: `internal/services/auth_service.go`
+- Modify: `internal/services/token_service.go`
+- Modify: `internal/routes/routes.go`
+- Modify: focused handler/service/route tests
+
+**Interfaces:**
+- `native_body` authorization-code exchange requires a non-empty installation `device_id`.
+- Full client, redirect, and PKCE validation happens before native device registration; a device
+  failure does not consume the authorization code. Final consumption remains atomic and single-use.
+- Browser-cookie clients continue using the authorization-server browser device.
+- Native refresh requires the same installation key before rotation and never falls back to a
+  browser device cookie.
+- `POST /api/account/v1/oauth/revoke` accepts a native refresh token and client ID, is independent
+  of browser cookies/bearer/CSRF, is idempotent for invalid tokens, and fences the active successor
+  when called with a rotated token.
+
+- [ ] **Step 1: Add failing native device and revoke contract tests**
+
+Cover pre-consumption device failure, browser-device regression, concurrent single-use exchange,
+missing/wrong refresh device, two independent installations, native-only revoke, client mismatch,
+invalid token idempotency, and rotated-token successor fencing.
+
+- [ ] **Step 2: Implement the minimum server correction**
+
+Reuse the existing device registry, authorization-code storage, refresh-family metadata, and Redis
+atomic scripts. Do not create a second token service or reuse browser logout handlers.
+
+- [ ] **Step 3: Run the Account API gate and release before Task 5**
+
+Run focused tests, `go test ./...`, `go build ./cmd/...`, migration/release policy gates, and diff
+checks. Publish through the supporting-repository PR/CI/release flow and verify the production route.
+
+### Task 3d: Route native OAuth revocation
+
+**Repository:** `api-gateway`
+
+Add one exact account-host `POST /api/account/v1/oauth/revoke` upstream route. It has no browser CORS
+or `OPTIONS` exposure. Extend the existing auth routing/method/release-policy and built-image runtime
+checks, then publish through the supporting-repository PR/CI/release flow before Task 5.
+
 ### Task 4: Add the shared HHC auth contract and browser adapter
 
 **Repository:** `hhc-client-v2`
@@ -413,6 +463,8 @@ git commit -m "feat: add browser HHC account authentication"
 - Create: `src/renderer/src/lib/__tests__/hhc-auth-electron.test.ts`
 - Modify: `src/main/index.ts`
 - Modify: `src/main/ipc/onedrive-credentials.ts`
+- Modify: `src/main/windowManager.ts`
+- Modify: `src/main/__tests__/windowManager.test.ts`
 - Modify: `src/shared/ipc-channels.ts`
 - Modify: `src/preload/index.ts`
 - Modify: `src/preload/index.d.ts`
@@ -427,8 +479,10 @@ type LibrePresenterProtocolAction =
   | { kind: 'ignore' }
 ~~~
 
-- Produces IPC methods `begin`, `complete`, `getAccessToken`, `getSession`, and `signOut` plus one callback subscription.
-- Main stores one encrypted refresh-token record under Electron `userData` using `safeStorage.encryptString`.
+- Produces renderer IPC methods `begin`, `getAccessToken`, `getSession`, and `signOut` plus one
+  callback subscription. OAuth completion is main-internal and is not exposed through preload.
+- Main stores the refresh token and stable installation ID under Electron `userData` using
+  `safeStorage.encryptString`; sign-out removes tokens but retains the installation identity.
 - Main composes one `HhcAuthService` instance; IPC is only an adapter over it, so later trusted
   main-process Asset calls can request the current token without round-tripping through renderer.
 
@@ -442,9 +496,16 @@ Cover:
 - second-instance and macOS `open-url` equivalence;
 - one active state only;
 - `safeStorage.isEncryptionAvailable() === false` fails closed with no credential write;
+- Linux `safeStorage.getSelectedStorageBackend() === 'basic_text'` fails closed;
 - encrypted bytes written, never plaintext;
+- the same installation ID is sent on code exchange and every refresh, survives restart/sign-out,
+  and is never exposed to preload;
 - main calls the existing Account `/me` endpoint with the access token to obtain Electron display
-  identity, and the returned user ID must match token `sub`;
+  identity from `first_name`, `last_name`, `email`, and `avatar_url`; returned `id` must match token
+  `sub`;
+- projection and unknown renderer senders cannot invoke any HHC auth IPC;
+- top-level navigation outside the app origin is rejected while existing external-link handling is
+  preserved;
 - renderer preload exposes no load/save refresh-token method.
 
 - [ ] **Step 2: Run tests and confirm missing router/IPC**
@@ -463,17 +524,19 @@ Route all custom-protocol entry points through `parseLibrePresenterProtocolUrl`.
 
 `hhc-auth.ts` in main:
 
-1. validates the initiating renderer with `isKnownWindow`;
+1. validates the initiating renderer with `isMainWindow`;
 2. generates state/verifier/challenge;
 3. opens Account frontend in the system browser;
-4. accepts only a matching callback once;
-5. exchanges code with `client_id=hhc-desktop`;
+4. accepts only a matching main-process protocol callback once;
+5. exchanges code with `client_id=hhc-desktop` and the encrypted stable installation ID;
 6. encrypts and atomically replaces the refresh record;
 7. returns access token/session only through typed invoke;
-8. refreshes in main and rotates the encrypted value;
+8. coalesces refresh in main, sends the same installation ID, and atomically rotates the encrypted
+   refresh value;
 9. calls Account `/me` from main to build display identity and combines it with token role hints only
    after matching user IDs;
-10. deletes the record on logout even if server logout fails.
+10. calls the native `/oauth/revoke` contract, then deletes local access/refresh credentials even if
+    server revoke fails while retaining the installation ID.
 
 Use Node filesystem primitives already available; add no credential package.
 Export only the main-process service type/factory and a separate `registerHhcAuthIpc(service)`
@@ -494,7 +557,7 @@ Expected: all pass and OneDrive protocol callbacks remain functional.
 - [ ] **Step 5: Commit**
 
 ~~~bash
-git add src/main/protocol-router.ts src/main/ipc/hhc-auth.ts src/main/__tests__ src/renderer/src/lib/hhc-auth-electron.ts src/renderer/src/lib/__tests__/hhc-auth-electron.test.ts src/main/index.ts src/main/ipc/onedrive-credentials.ts src/shared/ipc-channels.ts src/preload/index.ts src/preload/index.d.ts
+git add src/main/protocol-router.ts src/main/ipc/hhc-auth.ts src/main/__tests__ src/renderer/src/lib/hhc-auth-electron.ts src/renderer/src/lib/__tests__/hhc-auth-electron.test.ts src/main/index.ts src/main/ipc/onedrive-credentials.ts src/main/windowManager.ts src/shared/ipc-channels.ts src/preload/index.ts src/preload/index.d.ts
 git commit -m "feat: add secure Electron HHC account authentication"
 ~~~
 
@@ -505,7 +568,8 @@ git commit -m "feat: add secure Electron HHC account authentication"
 **Files:**
 - Create: `src/renderer/src/contexts/HhcAuthContext.tsx`
 - Create: `src/renderer/src/contexts/__tests__/HhcAuthContext.test.tsx`
-- Modify: `src/renderer/src/main.tsx`
+- Modify: `src/renderer/src/lib/hhc-auth.ts`
+- Modify: `src/renderer/src/control-entry.tsx`
 - Modify: `src/renderer/src/components/Control/UserMenu/UserMenu.tsx`
 - Modify: `src/renderer/src/components/Control/UserMenu/__tests__/UserMenu.test.tsx`
 - Modify: `src/renderer/src/locales/en.json`
@@ -513,6 +577,7 @@ git commit -m "feat: add secure Electron HHC account authentication"
 - Modify: `src/renderer/src/locales/zh-CN.json`
 - Modify: `.github/workflows/azure-static-web-apps-zealous-river-03bbb7100.yml`
 - Modify: `.github/workflows/build-release.yml`
+- Modify: `.github/workflows/ci.yml`
 - Modify: `e2e/browser-projection.spec.ts`
 
 **Interfaces:**
@@ -522,7 +587,9 @@ git commit -m "feat: add secure Electron HHC account authentication"
 
 - [ ] **Step 1: Write context and menu tests**
 
-Test bootstrap, duplicate refresh coalescing, anonymous sign-in action, authenticated account label, logout, adapter subscription cleanup under StrictMode, and failure state without deleting local non-HHC media.
+Test bootstrap, duplicate refresh coalescing, anonymous sign-in action, authenticated account label,
+logout, adapter subscription and `dispose()` cleanup under StrictMode, and failure state without
+deleting local non-HHC media.
 
 - [ ] **Step 2: Run tests and confirm missing provider**
 
@@ -536,13 +603,15 @@ Expected: missing provider/hook failures.
 
 - [ ] **Step 3: Mount the context and lazy auth UI**
 
-Create the adapter inside an effect-safe provider lifecycle. Add one account section to the existing User menu. Do not create a separate settings dialog.
+Create the adapter inside an effect-safe provider lifecycle mounted only in `control-entry.tsx`. Add
+one accessible account section to the existing User menu. Do not create a separate settings dialog
+or mount auth from `main.tsx`.
 
 Keep `hhc-auth.ts` as the small static contract/factory and dynamically import
 `hhc-auth-browser.ts` or `hhc-auth-electron.ts` only for the detected environment. The projection
 route must not pull either adapter into its entry chunk.
 
-Add `VITE_HHC_ACCOUNT_ORIGIN` to the browser and desktop build workflows; its value comes from a
+Add `VITE_HHC_ACCOUNT_ORIGIN` to CI, browser, and desktop build workflows; its value comes from a
 GitHub environment variable and is not a secret.
 
 Extend browser E2E with a mocked Account API journey that reloads the page, restores through the cookie session endpoint, and keeps the access token out of storage.
@@ -564,7 +633,7 @@ Expected: all pass and bundle budgets remain green.
 - [ ] **Step 5: Commit**
 
 ~~~bash
-git add src/renderer/src/contexts/HhcAuthContext.tsx src/renderer/src/contexts/__tests__/HhcAuthContext.test.tsx src/renderer/src/main.tsx src/renderer/src/components/Control/UserMenu/UserMenu.tsx src/renderer/src/components/Control/UserMenu/__tests__/UserMenu.test.tsx src/renderer/src/locales .github/workflows/azure-static-web-apps-zealous-river-03bbb7100.yml .github/workflows/build-release.yml e2e/browser-projection.spec.ts
+git add src/renderer/src/contexts/HhcAuthContext.tsx src/renderer/src/contexts/__tests__/HhcAuthContext.test.tsx src/renderer/src/lib/hhc-auth.ts src/renderer/src/control-entry.tsx src/renderer/src/components/Control/UserMenu/UserMenu.tsx src/renderer/src/components/Control/UserMenu/__tests__/UserMenu.test.tsx src/renderer/src/locales .github/workflows/azure-static-web-apps-zealous-river-03bbb7100.yml .github/workflows/build-release.yml .github/workflows/ci.yml e2e/browser-projection.spec.ts
 git commit -m "feat: integrate HHC account session UI"
 ~~~
 
@@ -574,10 +643,16 @@ Before Asset collection work begins:
 
 - Account API migration and fresh seed converge to the same OAuth/IAM records.
 - Desktop callback accepts only `librepresenter://auth/account`.
+- Native authorization and refresh remain bound to one encrypted installation ID; two installations
+  authorized through the same browser device do not replace each other.
+- Native sign-out revokes the refresh family through the exact OAuth revoke route, including when a
+  rotated token races with sign-out.
 - Existing OneDrive custom-protocol login still passes.
 - Browser and Electron both use PKCE S256 and `openid profile`.
 - Browser refresh uses the HttpOnly cookie; Electron refresh uses encrypted main-process storage.
 - No refresh credential is readable from renderer APIs or browser databases.
+- Projection renderers cannot invoke HHC auth IPC, external top-level navigation is rejected, and
+  real callback URLs with query parameters bypass the PWA navigation fallback.
 - Account API, Account frontend, client unit tests, browser E2E, typecheck, lint, and builds pass.
 
 ## Rollback
