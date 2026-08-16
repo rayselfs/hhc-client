@@ -33,8 +33,8 @@
 
 | Repository | File | Responsibility |
 | --- | --- | --- |
-| account-api | `migrations/000011_hhc_media_sync_auth.up.sql` | OAuth redirect replacement and IAM role/permission records |
-| account-api | `migrations/000011_hhc_media_sync_auth.down.sql` | Safe migration rollback for test environments |
+| account-api | `migrations/000015_hhc_media_sync_auth.up.sql` | OAuth redirect replacement and IAM role/permission records |
+| account-api | `migrations/000015_hhc_media_sync_auth.down.sql` | Safe migration rollback for test environments |
 | account-api | `internal/database/db.go` | Fresh-install seed parity |
 | account-api | `internal/database/migration_integration_test.go` | Migration and OAuth client assertions |
 | account-api | `infra/main.bicep` | Exact browser client CORS origin |
@@ -66,8 +66,8 @@
 **Repository:** `account-api`
 
 **Files:**
-- Create: `migrations/000011_hhc_media_sync_auth.up.sql`
-- Create: `migrations/000011_hhc_media_sync_auth.down.sql`
+- Create: `migrations/000015_hhc_media_sync_auth.up.sql`
+- Create: `migrations/000015_hhc_media_sync_auth.down.sql`
 - Modify: `internal/database/db.go`
 - Modify: `internal/database/migration_integration_test.go`
 - Modify: `infra/main.bicep`
@@ -109,7 +109,7 @@ Run:
 go test ./internal/database -run TestMigrations -count=1
 ~~~
 
-Expected: failure because migration 11 and the role/permissions do not exist.
+Expected: failure because migration 15 and the role/permissions do not exist.
 
 - [ ] **Step 3: Add idempotent SQL and seed parity**
 
@@ -145,7 +145,7 @@ Expected: all commands pass.
 - [ ] **Step 5: Commit**
 
 ~~~bash
-git add migrations/000011_hhc_media_sync_auth.* internal/database/db.go internal/database/migration_integration_test.go infra/main.bicep scripts/test-release-policy.sh
+git add migrations/000015_hhc_media_sync_auth.* internal/database/db.go internal/database/migration_integration_test.go infra/main.bicep scripts/test-release-policy.sh
 git commit -m "feat: register LibrePresenter OAuth clients and media role"
 ~~~
 
