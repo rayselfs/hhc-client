@@ -7,6 +7,7 @@ export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify('0.0.0-test'),
     __ONEDRIVE_CLIENT_ID__: JSON.stringify('4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02'),
+    __HHC_ACCOUNT_ORIGIN__: JSON.stringify('https://account.alive.org.tw'),
     __BIBLE_API_HOST__: JSON.stringify('https://www.alive.org.tw'),
     __BIBLE_API_V1_PREFIX__: JSON.stringify('/api/bible/v1'),
     __BIBLE_API_V2_PREFIX__: JSON.stringify('/api/bible/v2')

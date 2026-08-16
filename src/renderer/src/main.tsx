@@ -4,7 +4,9 @@ import { suppressBenignTransitionAbortErrors } from '@renderer/lib/suppress-beni
 
 suppressBenignTransitionAbortErrors()
 
-if (window.location.hash.startsWith('#/projection')) {
+if (window.location.pathname === '/oauth/callback') {
+  void import('./auth-callback-entry')
+} else if (window.location.hash.startsWith('#/projection')) {
   void import('./projection-entry')
 } else {
   void import('./control-entry')

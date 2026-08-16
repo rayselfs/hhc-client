@@ -13,6 +13,7 @@ const DEFAULT_ONEDRIVE_CLIENT_ID = '4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02'
 const DEFAULT_BIBLE_API_HOST = 'https://www.alive.org.tw'
 const DEFAULT_BIBLE_API_V1_PREFIX = '/api/bible/v1'
 const DEFAULT_BIBLE_API_V2_PREFIX = '/api/bible/v2'
+const DEFAULT_HHC_ACCOUNT_ORIGIN = 'https://account.alive.org.tw'
 
 function cleanPath(value: string | undefined, fallback: string): string {
   const trimmed = value?.trim()
@@ -20,8 +21,27 @@ function cleanPath(value: string | undefined, fallback: string): string {
   return trimmed.startsWith('/') ? trimmed.replace(/\/+$/, '') || '/' : fallback
 }
 
+function cleanHttpOrigin(value: string | undefined, fallback: string): string {
+  const candidate = value?.trim() || fallback
+  try {
+    const url = new URL(candidate)
+    if (
+      (url.protocol === 'http:' || url.protocol === 'https:') &&
+      url.pathname === '/' &&
+      !url.search &&
+      !url.hash
+    ) {
+      return url.origin
+    }
+  } catch {
+    // Fall back to the production Account origin for invalid build input.
+  }
+  return fallback
+}
+
 function createBuildConfig(mode: string): {
   bibleApiHost: string
+  hhcAccountOrigin: string
   defines: Record<string, string>
 } {
   const env = loadEnv(mode, process.cwd(), '')
@@ -31,12 +51,15 @@ function createBuildConfig(mode: string): {
       ? clientId
       : DEFAULT_ONEDRIVE_CLIENT_ID
   const bibleApiHost = env.VITE_BIBLE_API_HOST?.trim() || DEFAULT_BIBLE_API_HOST
+  const hhcAccountOrigin = cleanHttpOrigin(env.VITE_HHC_ACCOUNT_ORIGIN, DEFAULT_HHC_ACCOUNT_ORIGIN)
 
   return {
     bibleApiHost,
+    hhcAccountOrigin,
     defines: {
       __APP_VERSION__: JSON.stringify(pkg.version),
       __ONEDRIVE_CLIENT_ID__: JSON.stringify(oneDriveClientId),
+      __HHC_ACCOUNT_ORIGIN__: JSON.stringify(hhcAccountOrigin),
       __BIBLE_API_HOST__: JSON.stringify(bibleApiHost),
       __BIBLE_API_V1_PREFIX__: JSON.stringify(
         cleanPath(env.VITE_BIBLE_API_V1_PREFIX, DEFAULT_BIBLE_API_V1_PREFIX)
@@ -44,6 +67,15 @@ function createBuildConfig(mode: string): {
       __BIBLE_API_V2_PREFIX__: JSON.stringify(
         cleanPath(env.VITE_BIBLE_API_V2_PREFIX, DEFAULT_BIBLE_API_V2_PREFIX)
       )
+    }
+  }
+}
+
+function configuredAccountOriginCsp(accountOrigin: string): Plugin {
+  return {
+    name: 'configured-account-origin-csp',
+    transformIndexHtml(html) {
+      return html.replaceAll('__HHC_ACCOUNT_ORIGIN__', accountOrigin)
     }
   }
 }
@@ -92,6 +124,7 @@ export default defineConfig(({ mode }) => {
       plugins: [
         react(),
         tailwindcss(),
+        configuredAccountOriginCsp(buildConfig.hhcAccountOrigin),
         devCspUnsafeInline(),
         VitePWA({
           registerType: 'autoUpdate',
