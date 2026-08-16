@@ -19,6 +19,7 @@ type Transaction = {
   popup: Window
   expiresAt: number
   returnRoute: string
+  generation: number
 }
 
 type SessionResponse = {
@@ -103,6 +104,8 @@ export class BrowserHhcAuthAdapter implements HhcAuthAdapter {
   private signInPromise: Promise<void> | null = null
   private session: HhcSession | null = null
   private accessToken: string | null = null
+  private authGeneration = 0
+  private signedOut = false
   private readonly listeners = new Set<(session: HhcSession | null) => void>()
 
   constructor(options: BrowserHhcAuthOptions = {}) {
@@ -122,6 +125,7 @@ export class BrowserHhcAuthAdapter implements HhcAuthAdapter {
   }
 
   dispose(): void {
+    this.authGeneration += 1
     this.window.removeEventListener('message', this.onMessage)
   }
 
@@ -139,25 +143,39 @@ export class BrowserHhcAuthAdapter implements HhcAuthAdapter {
     const popup = this.window.open('', 'hhc-account-auth', 'popup,width=520,height=720')
     if (!popup) throw new Error('Sign-in popup was blocked')
 
-    this.signInPromise = this.beginSignIn(popup).finally(() => {
-      this.signInPromise = null
+    this.authGeneration += 1
+    this.signedOut = false
+    if (this.session || this.accessToken) this.clearSession()
+    const request = this.beginSignIn(popup, this.authGeneration).finally(() => {
+      if (this.signInPromise === request) this.signInPromise = null
     })
-    return this.signInPromise
+    this.signInPromise = request
+    return request
   }
 
   async getSession(): Promise<HhcSession | null> {
-    const response = await this.fetcher(`${this.accountApi}/session`, {
-      credentials: 'include',
-      cache: 'no-store',
-      headers: { accept: 'application/json' }
-    })
-    const data = await responseJson<SessionResponse>(response)
+    const generation = this.authGeneration
+    const expectedUserId = this.session?.userId ?? null
+    const data = await this.requestSession()
+    if (generation !== this.authGeneration || (this.session?.userId ?? null) !== expectedUserId) {
+      return this.session
+    }
     if (!data.authenticated || !data.user?.id || !data.user.display_name) {
+      if (expectedUserId) this.authGeneration += 1
       this.clearSession()
       return null
     }
+    if (this.signedOut) return null
 
-    const roles = this.accessToken ? readClaims(this.accessToken, data.user.id, this.now()) : []
+    const identityChanged = expectedUserId !== data.user.id
+    const roles =
+      !identityChanged && this.accessToken
+        ? readClaims(this.accessToken, data.user.id, this.now())
+        : []
+    if (identityChanged) {
+      this.authGeneration += 1
+      this.accessToken = null
+    }
     this.session = {
       userId: data.user.id,
       displayName: data.user.display_name,
@@ -169,6 +187,7 @@ export class BrowserHhcAuthAdapter implements HhcAuthAdapter {
   }
 
   async getAccessToken(): Promise<string | null> {
+    if (this.signedOut) return null
     if (this.accessToken && this.session) {
       try {
         readClaims(this.accessToken, this.session.userId, this.now())
@@ -180,9 +199,18 @@ export class BrowserHhcAuthAdapter implements HhcAuthAdapter {
       }
     }
     const session = this.session ?? (await this.getSession())
-    if (!session) return null
+    if (!session || this.signedOut) return null
 
+    const generation = this.authGeneration
+    const expectedUserId = session.userId
     const token = await this.requestAccessToken(session.userId)
+    if (
+      generation !== this.authGeneration ||
+      this.signedOut ||
+      this.session?.userId !== expectedUserId
+    ) {
+      return null
+    }
     this.accessToken = token
     this.session = { ...session, roles: readClaims(token, session.userId, this.now()) }
     this.notify()
@@ -190,10 +218,20 @@ export class BrowserHhcAuthAdapter implements HhcAuthAdapter {
   }
 
   async refreshAccessToken(): Promise<string | null> {
+    if (this.signedOut) return null
     const session = this.session ?? (await this.getSession())
-    if (!session) return null
+    if (!session || this.signedOut) return null
 
+    const generation = this.authGeneration
+    const expectedUserId = session.userId
     const token = await this.requestAccessToken(session.userId)
+    if (
+      generation !== this.authGeneration ||
+      this.signedOut ||
+      this.session?.userId !== expectedUserId
+    ) {
+      return null
+    }
     this.accessToken = token
     this.session = { ...session, roles: readClaims(token, session.userId, this.now()) }
     this.notify()
@@ -201,15 +239,20 @@ export class BrowserHhcAuthAdapter implements HhcAuthAdapter {
   }
 
   async signOut(): Promise<void> {
+    this.authGeneration += 1
+    this.signedOut = true
+    this.signInPromise = null
+    this.transaction?.popup.close()
+    this.transaction = null
+    this.clearSession()
     try {
       await responseJson(await this.protectedPost('/session/logout'))
     } finally {
       csrfTokens.delete(this.accountApi)
-      this.clearSession()
     }
   }
 
-  private async beginSignIn(popup: Window): Promise<void> {
+  private async beginSignIn(popup: Window, generation: number): Promise<void> {
     const state = randomValue()
     const codeVerifier = randomValue()
     const url = new URL(this.authorize)
@@ -222,13 +265,18 @@ export class BrowserHhcAuthAdapter implements HhcAuthAdapter {
       scope: HHC_AUTH.scope,
       state
     }).toString()
+    if (generation !== this.authGeneration || this.signedOut) {
+      popup.close()
+      return
+    }
 
     this.transaction = {
       state,
       codeVerifier,
       popup,
       expiresAt: this.now() + CALLBACK_TTL_MS,
-      returnRoute: this.window.location.href
+      returnRoute: this.window.location.href,
+      generation
     }
     popup.location.href = url.toString()
   }
@@ -238,6 +286,8 @@ export class BrowserHhcAuthAdapter implements HhcAuthAdapter {
     const expectedOrigin = new URL(this.callbackUri).origin
     if (
       !transaction ||
+      transaction.generation !== this.authGeneration ||
+      this.signedOut ||
       this.now() > transaction.expiresAt ||
       event.origin !== expectedOrigin ||
       event.source !== transaction.popup ||
@@ -254,32 +304,59 @@ export class BrowserHhcAuthAdapter implements HhcAuthAdapter {
 
     this.transaction = null
     transaction.popup.close()
-    void this.completeSignIn(transaction, event.data.code).catch(() => this.clearSession())
+    void this.completeSignIn(transaction, event.data.code).catch(() => undefined)
   }
 
   private async completeSignIn(transaction: Transaction, code: string): Promise<void> {
-    const response = await this.fetcher(`${this.accountApi}/oauth/token`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { accept: 'application/json', 'content-type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        grant_type: 'authorization_code',
-        client_id: HHC_AUTH.clientId,
-        redirect_uri: this.callbackUri,
-        code_verifier: transaction.codeVerifier,
-        code
-      }).toString()
-    })
-    const data = await responseJson<TokenResponse>(response)
-    if (!data.access_token) throw new Error('HHC account did not issue an access token')
-    this.accessToken = data.access_token
-    await this.getSession()
-    if (!this.session) throw new Error('HHC account session is unavailable')
-    this.session = {
-      ...this.session,
-      roles: readClaims(data.access_token, this.session.userId, this.now())
+    const generation = transaction.generation
+    try {
+      const response = await this.fetcher(`${this.accountApi}/oauth/token`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          accept: 'application/json',
+          'content-type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({
+          grant_type: 'authorization_code',
+          client_id: HHC_AUTH.clientId,
+          redirect_uri: this.callbackUri,
+          code_verifier: transaction.codeVerifier,
+          code
+        }).toString()
+      })
+      const data = await responseJson<TokenResponse>(response)
+      if (!data.access_token) throw new Error('HHC account did not issue an access token')
+      if (generation !== this.authGeneration || this.signedOut) return
+
+      const sessionData = await this.requestSession()
+      if (generation !== this.authGeneration || this.signedOut) return
+      if (!sessionData.authenticated || !sessionData.user?.id || !sessionData.user.display_name) {
+        throw new Error('HHC account session is unavailable')
+      }
+      const roles = readClaims(data.access_token, sessionData.user.id, this.now())
+      this.authGeneration += 1
+      this.accessToken = data.access_token
+      this.session = {
+        userId: sessionData.user.id,
+        displayName: sessionData.user.display_name,
+        ...(sessionData.user.avatar_url ? { avatarUrl: sessionData.user.avatar_url } : {}),
+        roles
+      }
+      this.notify()
+    } catch (error) {
+      if (generation === this.authGeneration && !this.signedOut) this.clearSession()
+      throw error
     }
-    this.notify()
+  }
+
+  private async requestSession(): Promise<SessionResponse> {
+    const response = await this.fetcher(`${this.accountApi}/session`, {
+      credentials: 'include',
+      cache: 'no-store',
+      headers: { accept: 'application/json' }
+    })
+    return responseJson<SessionResponse>(response)
   }
 
   private async requestAccessToken(userId: string): Promise<string> {

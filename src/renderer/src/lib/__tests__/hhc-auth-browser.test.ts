@@ -318,6 +318,151 @@ describe('browser HHC auth', () => {
     expect(sessions.at(-1)).toBeNull()
   })
 
+  it('keeps a signed-out adapter anonymous when an older session request finishes late', async () => {
+    let resolveSession: (value: Response) => void = () => undefined
+    const fetcher = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith('/session')) {
+        return new Promise<Response>((resolve) => {
+          resolveSession = resolve
+        })
+      }
+      if (url.endsWith('/csrf-token'))
+        return Promise.resolve(response({ csrf_token: 'csrf-fence' }))
+      if (url.endsWith('/session/logout')) return Promise.resolve(response({}))
+      throw new Error(`Unexpected URL: ${url}`)
+    })
+    const { adapter } = createAdapter({
+      fetcher,
+      accountOrigin: 'https://session-fence.example'
+    })
+    const sessions: Array<unknown> = []
+    adapter.subscribe((session) => sessions.push(session))
+
+    const staleSession = adapter.getSession()
+    await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1))
+    await adapter.signOut()
+    resolveSession(
+      response({ authenticated: true, user: { id: 'user-a', display_name: 'User A' } })
+    )
+
+    await expect(staleSession).resolves.toBeNull()
+    expect(sessions.at(-1)).toBeNull()
+  })
+
+  it('accepts another account after an explicit sign-in but not from a post-logout session poll', async () => {
+    let userId = 'user-a'
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith('/session')) {
+        return response({ authenticated: true, user: { id: userId, display_name: userId } })
+      }
+      if (url.endsWith('/csrf-token')) return response({ csrf_token: 'csrf-explicit-sign-in' })
+      if (url.endsWith('/session/logout')) return response({})
+      throw new Error(`Unexpected URL: ${url}`)
+    })
+    const { adapter } = createAdapter({
+      fetcher,
+      accountOrigin: 'https://explicit-sign-in.example'
+    })
+    await expect(adapter.getSession()).resolves.toMatchObject({ userId: 'user-a' })
+
+    await adapter.signOut()
+    await expect(adapter.getSession()).resolves.toBeNull()
+
+    userId = 'user-b'
+    await adapter.signIn()
+    await expect(adapter.getSession()).resolves.toMatchObject({ userId: 'user-b' })
+  })
+
+  it.each(['getAccessToken', 'refreshAccessToken'] as const)(
+    'does not let stale %s completion replace a newer account session',
+    async (method) => {
+      const staleToken = jwt({ sub: 'user-a', roles: ['reader'], exp: 9_999_999_999 })
+      let sessionRequests = 0
+      let resolveToken: (value: Response) => void = () => undefined
+      const fetcher = vi.fn((input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.endsWith('/session')) {
+          sessionRequests += 1
+          const user = sessionRequests === 1 ? 'a' : 'b'
+          return Promise.resolve(
+            response({
+              authenticated: true,
+              user: { id: `user-${user}`, display_name: `User ${user.toUpperCase()}` }
+            })
+          )
+        }
+        if (url.endsWith('/csrf-token'))
+          return Promise.resolve(response({ csrf_token: 'csrf-account-fence' }))
+        if (url.endsWith('/session/access-token')) {
+          return new Promise<Response>((resolve) => {
+            resolveToken = resolve
+          })
+        }
+        throw new Error(`Unexpected URL: ${url}`)
+      })
+      const { adapter } = createAdapter({
+        fetcher,
+        accountOrigin: `https://${method.toLowerCase()}.example`
+      })
+      const sessions: Array<unknown> = []
+      adapter.subscribe((session) => sessions.push(session))
+      await adapter.getSession()
+
+      const staleRequest = adapter[method]()
+      await vi.waitFor(() =>
+        expect(
+          fetcher.mock.calls.some(([url]) => String(url).endsWith('/session/access-token'))
+        ).toBe(true)
+      )
+      await expect(adapter.getSession()).resolves.toMatchObject({ userId: 'user-b' })
+      resolveToken(response({ access_token: staleToken }))
+
+      await expect(staleRequest).resolves.toBeNull()
+      expect(sessions.at(-1)).toMatchObject({ userId: 'user-b' })
+    }
+  )
+
+  it('does not clear a newer session when an older sign-in exchange fails', async () => {
+    let rejectExchange: (reason: Error) => void = () => undefined
+    const fetcher = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith('/oauth/token')) {
+        return new Promise<Response>((_resolve, reject) => {
+          rejectExchange = reject
+        })
+      }
+      if (url.endsWith('/session')) {
+        return Promise.resolve(
+          response({ authenticated: true, user: { id: 'user-b', display_name: 'User B' } })
+        )
+      }
+      throw new Error(`Unexpected URL: ${url}`)
+    })
+    const { adapter, open, target } = createAdapter({ fetcher })
+    const sessions: Array<unknown> = []
+    adapter.subscribe((session) => sessions.push(session))
+    await adapter.signIn()
+    const opened = open.mock.results[0]?.value as Window
+    const state = new URL(String(opened.location.href)).searchParams.get('state')!
+
+    target.dispatchEvent(
+      new MessageEvent('message', {
+        origin: CLIENT_ORIGIN,
+        source: opened,
+        data: { code: 'stale-code', state }
+      })
+    )
+    await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1))
+    await adapter.getSession()
+    rejectExchange(new Error('stale exchange failed'))
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(sessions.at(-1)).toMatchObject({ userId: 'user-b' })
+  })
+
   it('refreshes the cookie session once after an access-token rejection', async () => {
     let accessRequests = 0
     let refreshRequests = 0
