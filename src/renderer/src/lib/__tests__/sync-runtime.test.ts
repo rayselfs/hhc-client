@@ -315,6 +315,45 @@ describe('startSyncRuntime', () => {
     stop()
   })
 
+  it.each(['same-user re-login', 'account switch round trip'])(
+    'does not let a stale auth-required result block a %s',
+    async (transition) => {
+      const firstSession = session()
+      const sessionRef: { current: HhcSession | null } = { current: firstSession }
+      const authGeneration = { current: 0 }
+      const targetConnection = connection(`hhc-runtime-stale-auth-${transition}`)
+      const target = root(`root-stale-auth-${transition}`, targetConnection.id)
+      hhcMocks.connections = [targetConnection]
+      hhcMocks.folders = { [target.id]: target }
+      let rejectRefresh!: (error: unknown) => void
+      hhcMocks.refreshFolder
+        .mockImplementationOnce(
+          () =>
+            new Promise((_, reject) => {
+              rejectRefresh = reject
+            })
+        )
+        .mockResolvedValue(idleSummary(targetConnection.id, target.id))
+
+      const stop = startSyncRuntime({
+        hhcAuth: auth(sessionRef),
+        getHhcAuthGeneration: () => authGeneration.current
+      })
+      await vi.waitFor(() => expect(hhcMocks.refreshFolder).toHaveBeenCalledTimes(1))
+
+      sessionRef.current = transition === 'same-user re-login' ? null : session('user-2')
+      authGeneration.current = 1
+      sessionRef.current = { ...firstSession }
+      authGeneration.current = 2
+      rejectRefresh({ classification: 'auth-required' })
+      await flushMicrotasks()
+
+      await vi.advanceTimersByTimeAsync(60_000)
+      expect(hhcMocks.refreshFolder).toHaveBeenCalledTimes(2)
+      stop()
+    }
+  )
+
   it('triggers access-revoked once and continues an independent sibling root', async () => {
     const sessionRef = { current: session() }
     const targetConnection = connection('hhc-runtime-revoked')

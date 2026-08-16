@@ -167,10 +167,7 @@ async function refreshHhcConnection(
       } catch (error) {
         const classification = classifyHhcError(error)
         if (classification === 'auth-required') {
-          hhcAuthBlockedAtGeneration.set(
-            connection.id,
-            options.getHhcAuthGeneration?.() ?? authGeneration
-          )
+          hhcAuthBlockedAtGeneration.set(connection.id, authGeneration)
           break
         }
         if (classification === 'access-revoked') {
