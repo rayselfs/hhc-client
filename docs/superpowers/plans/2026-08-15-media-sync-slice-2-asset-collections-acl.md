@@ -276,6 +276,8 @@ git commit -m "feat: add transactional asset collections"
 - Create: `internal/assets/media_validation_test.go`
 - Modify: `internal/assets/service.go`
 - Modify: `internal/assets/service_test.go`
+- Modify: `internal/postgres/store.go`
+- Modify: `internal/postgres/store_integration_test.go`
 - Modify: `internal/scanqueue/job.go`
 - Modify: `internal/scanqueue/job_test.go`
 - Modify: `internal/clamav/local.go`
@@ -283,6 +285,7 @@ git commit -m "feat: add transactional asset collections"
 - Modify: `cmd/scan-worker/main.go`
 - Modify: `infra/main.bicep`
 - Modify: `.github/workflows/release.yml`
+- Modify: `scripts/test-release-workflow.sh`
 
 **Policy:**
 
@@ -327,6 +330,17 @@ temporary file and use `archive/zip.NewReader`; remove the current whole-object 
 Exact header-detected media avoids the temporary file. LPDeck is checked as the declared JSON media
 type with a bounded prefix/extension contract and is never treated as ZIP.
 
+Use one stateless function, not an interface or MIME dependency:
+
+~~~go
+func ValidateMedia(ctx context.Context, fileName, expectedMIME string, header []byte, content io.ReaderAt, size int64) (string, error)
+~~~
+
+Validate canonical container signatures for images, ISO-BMFF MP4/MOV/M4A brands, EBML WebM/MKV
+DocType, Ogg video/audio identification packets, RIFF AVI/WAV/WebP, ASF WMV, MP3, AAC, PDF, PPTX,
+and the bounded LPDeck JSON-object prefix. Reject HEIC/HEIF brands rather than accepting them as MP4.
+This is container verification only; do not add `ffprobe` or codec inspection.
+
 Before committing membership,
 lock and recheck upload complete, scan clean, processing ready/not-required, matching namespace,
 matching owner service, and live asset in the same transaction to close the scan/deletion TOCTOU
@@ -343,13 +357,19 @@ budget separately through `cmd/scan-worker` and production Bicep. Keep the polic
 `line.group.file` maximum at 25 MiB. Add boundary, compressed-container, limit-alert, timeout,
 cleanup, and release-policy assertions so no lower layer silently accepts a partially scanned
 object. Do not raise the API container memory merely to retain the old `ReadAll` implementation.
+Map `Heuristics.Limits.Exceeded.*` and `Heuristics.Encrypted.*` to deterministic terminal
+`ScanFailed`/poison results, not malware and never clean. Ordinary scanner timeouts remain retryable
+until the existing bounded retry limit.
 
 - [ ] **Step 4: Validate**
 
 ~~~bash
-gofmt -w internal/assets/policy.go internal/assets/policy_test.go internal/assets/media_validation.go internal/assets/media_validation_test.go internal/assets/service.go internal/assets/service_test.go internal/scanqueue/job.go internal/scanqueue/job_test.go internal/clamav/local.go internal/clamav/local_test.go cmd/scan-worker/main.go
-go test ./internal/assets ./internal/scanqueue ./internal/clamav ./cmd/scan-worker -count=1
+gofmt -w internal/assets/policy.go internal/assets/policy_test.go internal/assets/media_validation.go internal/assets/media_validation_test.go internal/assets/service.go internal/assets/service_test.go internal/postgres/store.go internal/postgres/store_integration_test.go internal/scanqueue/job.go internal/scanqueue/job_test.go internal/clamav/local.go internal/clamav/local_test.go cmd/scan-worker/main.go
+go test ./internal/assets ./internal/postgres ./internal/scanqueue ./internal/clamav ./cmd/scan-worker -count=1
 ./scripts/test-release-workflow.sh
+docker build -f Dockerfile.scan -t asset-scan:verify .
+clam_help="$(docker run --rm --entrypoint clamscan asset-scan:verify --help)"
+for flag in --max-filesize --max-scansize --max-files --max-recursion --alert-exceeds-max --alert-encrypted; do grep -Fq -- "$flag" <<<"$clam_help"; done
 ~~~
 
 Expected: pass and existing namespace tests remain unchanged.
@@ -357,7 +377,7 @@ Expected: pass and existing namespace tests remain unchanged.
 - [ ] **Step 5: Commit**
 
 ~~~bash
-git add internal/assets internal/scanqueue internal/clamav cmd/scan-worker/main.go infra/main.bicep .github/workflows/release.yml
+git add internal/assets internal/postgres internal/scanqueue internal/clamav cmd/scan-worker/main.go infra/main.bicep .github/workflows/release.yml scripts/test-release-workflow.sh
 git commit -m "feat: add scan-gated LINE media namespace"
 ~~~
 
