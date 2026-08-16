@@ -249,6 +249,12 @@ Before issuing a code, fetch collection state from Asset API and reject missing/
 {"command":"/media-sync <code>","expiresAt":"<rfc3339>"}
 ~~~
 
+Fence issuance by the normalized `Idempotency-Key`, scoped to the requesting HHC user, helper
+profile, collection, and operation. Persist only that request identity's SHA-256 hash. A retry with
+the same key must never mint or replay plaintext and returns
+`409 {"ok":false,"error":"binding_code_already_issued"}` without the code, command, or expiry. A
+different key conflicts while an unconsumed code is still active.
+
 - [ ] **Step 5: Validate and commit**
 
 ~~~bash
@@ -258,6 +264,26 @@ pnpm typecheck
 git add src/media-sync src/account src/clients src/config.ts src/transport/line/webhook-routes.ts src/types.ts src/__tests__ aca.containerapp.yaml
 git commit -m "feat: manage LINE media sync collections"
 ~~~
+
+### Task 3a: Add bounded ACL-subject lookup
+
+**Repositories:** `account-api`, then `hhc-line-function-bot`
+
+The Media Sync manager role must not require the broader `users:*` or `rbac:*` permissions merely
+to populate an ACL picker. Add exact internal Account route
+`POST /priv/account/v1/media-sync/acl-subjects/search`, callable only by the existing LINE bot Dapr
+caller. The request carries the authenticated requesting user ID, `user | role`, a bounded query,
+page, and page size. Account rechecks the requester's live `media-sync:manage` permission and returns
+only active subject ID, type, and display name plus `hasMore`. User subjects use UUIDs; role subjects
+use role names because Asset API ACLs match token role strings. Do not return email, MFA, provider,
+membership, permission, or security fields.
+
+Expose it through the existing LINE bot management boundary as
+`GET /api/line/media-sync/acl-subjects`. The outward route takes the requesting user only from the
+authenticated `X-HHC-User-ID` context, validates exact query keys and bounds, and maps Account
+denial to 403 and unavailable or malformed upstream responses to 503. Reuse the current Account
+client and media-sync authorization pre-handler; do not add another directory client or token
+system.
 
 ### Task 4: Route management through Gateway and add Admin Console UI
 
@@ -282,7 +308,11 @@ git commit -m "feat: manage LINE media sync collections"
 
 - [ ] **Step 1: Add exact protected Gateway locations**
 
-On the admin host only, route `/api/line/media-sync/` to `$line_bot_base` with `protected.conf`. Permit only the methods required above. The Gateway must clear external identity headers and set normalized `X-HHC-*` values plus its Dapr caller identity.
+On the admin host only, route `/api/line/media-sync/` to `$line_bot_base` with `protected.conf`.
+Permit only the methods required above, including the bounded ACL-subject GET. The Gateway must
+clear external identity headers and set normalized `X-HHC-*` values. Do not synthesize
+`Dapr-Caller-App-Id` or `dapr-api-token`; Azure Container Apps Dapr supplies the authenticated
+workload identity and the target revision's app token.
 
 Validate with the repository's Nginx configuration check and commit:
 
@@ -305,8 +335,9 @@ Test collection create/rename/delete, ACL user/role add/revoke, copyable standal
 
 Reuse existing Admin layout, form, dialog, status badge, and error patterns. Do not add a file browser or media preview. The page manages folders and access; it never calls reader/content endpoints.
 
-Reuse the existing Account Admin API user/role lookup and selectors for ACL subjects; do not add
-free-form UUID/role-name entry or another account directory client.
+Use the bounded Media Sync ACL-subject route and reuse the existing remote selector interaction
+pattern for user/role subjects. Do not call the broad Account Admin user/RBAC endpoints, add
+free-form UUID/role-name entry, or create another account directory client.
 
 - [ ] **Step 5: Validate and commit**
 
