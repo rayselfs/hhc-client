@@ -29,6 +29,31 @@ function collectionPage(): object {
   }
 }
 
+function changePage(itemCount: number, tombstoneCount: number): object {
+  const collection = (collectionPage() as { collections: object[] }).collections[0]
+  return {
+    collection,
+    items: Array.from({ length: itemCount }, (_, index) => ({
+      id: `item_${index}`,
+      collectionId: 'collection_1',
+      remoteItemId: `source_${index}`,
+      displayName: `photo-${index}.jpg`,
+      sourceRevision: `sha256-${index}`,
+      createdRevision: 1,
+      createdAt: '2026-08-17T00:00:00Z'
+    })),
+    tombstones: Array.from({ length: tombstoneCount }, (_, index) => ({
+      id: `deleted_${index}`,
+      remoteItemId: `deleted-source_${index}`,
+      deletedRevision: 2,
+      deletedAt: '2026-08-17T00:01:00Z'
+    })),
+    cursor: 'revision_2',
+    hasMore: false,
+    reset: false
+  }
+}
+
 describe('browser HHC Asset API', () => {
   it('uses only context-owned auth callbacks', async () => {
     const getAccessToken = vi.fn(async () => 'context-token')
@@ -105,6 +130,26 @@ describe('browser HHC Asset API', () => {
     for (const [, init] of fetcher.mock.calls) {
       expect(new Headers(init?.headers).get('authorization')).toBe('Bearer token-1')
     }
+  })
+
+  it('bounds mixed browser change pages to 500 entries combined', async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse(changePage(250, 250)))
+      .mockResolvedValueOnce(jsonResponse(changePage(251, 250)))
+    const api = createBrowserHhcAssetApi({
+      getAccessToken: vi.fn(async () => 'token-1'),
+      refreshAccessToken: vi.fn(async () => 'token-2'),
+      fetcher
+    })
+
+    await expect(api.getCollectionChanges('collection_1')).resolves.toMatchObject({
+      items: expect.any(Array),
+      tombstones: expect.any(Array)
+    })
+    await expect(api.getCollectionChanges('collection_1')).rejects.toMatchObject({
+      classification: 'fatal'
+    })
   })
 
   it('refreshes once on 401, retries once, and never loops on a second 401', async () => {

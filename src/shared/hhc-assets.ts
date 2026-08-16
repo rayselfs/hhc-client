@@ -190,10 +190,15 @@ export function projectHhcAssetChangePage(value: unknown): HhcAssetCollectionCha
   if (typeof input.hasMore !== 'boolean' || typeof input.reset !== 'boolean') {
     throw new Error('Invalid HHC Asset response')
   }
+  const items = pageArray(input.items)
+  const tombstones = pageArray(input.tombstones)
+  if (items.length + tombstones.length > MAX_PAGE_ITEMS) {
+    throw new Error('Invalid HHC Asset response')
+  }
   return {
     collection: projectHhcAssetCollection(input.collection),
-    items: pageArray(input.items).map(projectHhcAssetItem),
-    tombstones: pageArray(input.tombstones).map(projectHhcAssetTombstone),
+    items: items.map(projectHhcAssetItem),
+    tombstones: tombstones.map(projectHhcAssetTombstone),
     cursor: requiredString(input.cursor),
     hasMore: input.hasMore,
     reset: input.reset

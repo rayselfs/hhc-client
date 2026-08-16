@@ -92,6 +92,27 @@ function collection(id = 'collection_1'): object {
   }
 }
 
+function changeItem(index: number): object {
+  return {
+    id: `item_${index}`,
+    collectionId: 'collection_1',
+    remoteItemId: `source_${index}`,
+    displayName: `photo-${index}.jpg`,
+    sourceRevision: `sha256-${index}`,
+    createdRevision: 1,
+    createdAt: '2026-08-17T00:00:00Z'
+  }
+}
+
+function tombstone(index: number): object {
+  return {
+    id: `deleted_${index}`,
+    remoteItemId: `deleted-source_${index}`,
+    deletedRevision: 2,
+    deletedAt: '2026-08-17T00:01:00Z'
+  }
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   handlers.clear()
@@ -360,6 +381,27 @@ describe('HHC Asset IPC', () => {
     const result = await handler('hhc-assets:list-collections')(event())
     expect(result).toMatchObject({ hasMore: false })
     expect((result as { collections: unknown[] }).collections).toHaveLength(500)
+  })
+
+  it('bounds a mixed change page to 500 items and tombstones combined', async () => {
+    const page = (itemCount: number, tombstoneCount: number): object => ({
+      collection: collection(),
+      items: Array.from({ length: itemCount }, (_, index) => changeItem(index)),
+      tombstones: Array.from({ length: tombstoneCount }, (_, index) => tombstone(index)),
+      cursor: 'revision_2',
+      hasMore: false,
+      reset: false
+    })
+    mockFetch
+      .mockResolvedValueOnce(json(page(250, 250)))
+      .mockResolvedValueOnce(json(page(251, 250)))
+
+    await expect(
+      handler('hhc-assets:get-collection-changes')(event(), { collectionId: 'collection_1' })
+    ).resolves.toMatchObject({ items: expect.any(Array), tombstones: expect.any(Array) })
+    await expect(
+      handler('hhc-assets:get-collection-changes')(event(), { collectionId: 'collection_1' })
+    ).rejects.toThrow('HHC_ASSET_FATAL')
   })
 
   it.each([

@@ -20,9 +20,16 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
   const [session, setSession] = useState<HhcSession | null>(null)
   const adapterRef = useRef<HhcAuthAdapter | null>(null)
   const sessionRef = useRef<HhcSession | null>(null)
-  const sessionRevisionRef = useRef(0)
+  const sessionEpochRef = useRef(0)
+  const signOutPendingRef = useRef(false)
   const accessTokenPromiseRef = useRef<Promise<string | null> | null>(null)
   const refreshTokenPromiseRef = useRef<Promise<string | null> | null>(null)
+
+  const invalidateTokenRequests = useCallback((): void => {
+    sessionEpochRef.current += 1
+    accessTokenPromiseRef.current = null
+    refreshTokenPromiseRef.current = null
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -38,25 +45,26 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
         }
 
         adapterRef.current = createdAdapter
-        const bootstrapRevision = sessionRevisionRef.current
+        const bootstrapEpoch = sessionEpochRef.current
         unsubscribe = createdAdapter.subscribe((nextSession) => {
           if (!active) return
-          sessionRevisionRef.current += 1
+          const previousUserId = sessionRef.current?.userId
+          const nextUserId = nextSession?.userId
+          if (!nextSession || previousUserId !== nextUserId) invalidateTokenRequests()
           sessionRef.current = nextSession
-          accessTokenPromiseRef.current = null
-          refreshTokenPromiseRef.current = null
+          if (!nextSession || previousUserId !== nextUserId) signOutPendingRef.current = false
           setSession(nextSession)
           setStatus(nextSession ? 'authenticated' : 'anonymous')
         })
 
         try {
           const nextSession = await createdAdapter.getSession()
-          if (!active || sessionRevisionRef.current !== bootstrapRevision) return
+          if (!active || sessionEpochRef.current !== bootstrapEpoch) return
           sessionRef.current = nextSession
           setSession(nextSession)
           setStatus(nextSession ? 'authenticated' : 'anonymous')
         } catch {
-          if (!active || sessionRevisionRef.current !== bootstrapRevision) return
+          if (!active || sessionEpochRef.current !== bootstrapEpoch) return
           sessionRef.current = null
           setSession(null)
           setStatus('unavailable')
@@ -73,38 +81,66 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
       unsubscribe?.()
       if (adapterRef.current === adapter) adapterRef.current = null
       sessionRef.current = null
-      sessionRevisionRef.current += 1
-      accessTokenPromiseRef.current = null
-      refreshTokenPromiseRef.current = null
+      signOutPendingRef.current = false
+      invalidateTokenRequests()
       adapter?.dispose()
     }
-  }, [])
+  }, [invalidateTokenRequests])
 
   const signIn = useCallback(async (): Promise<void> => {
     const adapter = adapterRef.current
     if (!adapter) throw new Error('HHC account is unavailable')
-    await adapter.signIn()
-  }, [])
+    const previousSession = sessionRef.current
+    sessionRef.current = null
+    signOutPendingRef.current = false
+    invalidateTokenRequests()
+    try {
+      await adapter.signIn()
+    } catch (error) {
+      if (adapterRef.current === adapter && !sessionRef.current) {
+        sessionRef.current = previousSession
+      }
+      throw error
+    }
+  }, [invalidateTokenRequests])
 
   const signOut = useCallback(async (): Promise<void> => {
     const adapter = adapterRef.current
     if (!adapter) throw new Error('HHC account is unavailable')
-    await adapter.signOut()
-  }, [])
+    signOutPendingRef.current = true
+    invalidateTokenRequests()
+    try {
+      await adapter.signOut()
+    } catch (error) {
+      if (adapterRef.current === adapter) signOutPendingRef.current = false
+      throw error
+    }
+  }, [invalidateTokenRequests])
 
   const getAccessToken = useCallback((): Promise<string | null> => {
     const adapter = adapterRef.current
-    if (!adapter) return Promise.resolve(null)
+    const expectedUserId = sessionRef.current?.userId
+    if (!adapter || !expectedUserId || signOutPendingRef.current) return Promise.resolve(null)
     if (accessTokenPromiseRef.current) return accessTokenPromiseRef.current
 
-    const revision = sessionRevisionRef.current
+    const epoch = sessionEpochRef.current
     const request = adapter
       .getAccessToken()
       .then((token) =>
-        adapterRef.current === adapter && sessionRevisionRef.current === revision ? token : null
+        adapterRef.current === adapter &&
+        sessionEpochRef.current === epoch &&
+        !signOutPendingRef.current &&
+        sessionRef.current?.userId === expectedUserId
+          ? token
+          : null
       )
       .catch((error: unknown) => {
-        if (adapterRef.current === adapter && sessionRevisionRef.current === revision) {
+        if (
+          adapterRef.current === adapter &&
+          sessionEpochRef.current === epoch &&
+          sessionRef.current?.userId === expectedUserId
+        ) {
+          invalidateTokenRequests()
           sessionRef.current = null
           setSession(null)
           setStatus('unavailable')
@@ -121,20 +157,22 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
       }
     )
     return request
-  }, [])
+  }, [invalidateTokenRequests])
 
   const refreshAccessToken = useCallback((): Promise<string | null> => {
     const adapter = adapterRef.current
-    if (!adapter || !sessionRef.current) return Promise.resolve(null)
+    const expectedUserId = sessionRef.current?.userId
+    if (!adapter || !expectedUserId || signOutPendingRef.current) return Promise.resolve(null)
     if (refreshTokenPromiseRef.current) return refreshTokenPromiseRef.current
 
-    const revision = sessionRevisionRef.current
+    const epoch = sessionEpochRef.current
     const request = adapter
       .refreshAccessToken()
       .then((token) =>
         adapterRef.current === adapter &&
-        sessionRevisionRef.current === revision &&
-        sessionRef.current
+        sessionEpochRef.current === epoch &&
+        !signOutPendingRef.current &&
+        sessionRef.current?.userId === expectedUserId
           ? token
           : null
       )

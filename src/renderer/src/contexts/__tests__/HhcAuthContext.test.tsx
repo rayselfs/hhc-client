@@ -171,6 +171,126 @@ describe('HhcAuthContext', () => {
     await expect(Promise.all([first, second])).resolves.toEqual(['shared-token', 'shared-token'])
   })
 
+  it('keeps same-user token requests live and single-flight across role notifications', async () => {
+    const adapter = createAdapter(SESSION)
+    let resolveToken: (token: string) => void = () => undefined
+    let resolveRefresh: (token: string) => void = () => undefined
+    vi.mocked(adapter.getAccessToken).mockReturnValue(
+      new Promise<string>((resolve) => {
+        resolveToken = resolve
+      })
+    )
+    vi.mocked(adapter.refreshAccessToken).mockReturnValue(
+      new Promise<string>((resolve) => {
+        resolveRefresh = resolve
+      })
+    )
+    authFactory.adapters.push(adapter)
+    const { result } = renderHook(() => useHhcAuth(), { wrapper })
+    await waitFor(() => expect(result.current.status).toBe('authenticated'))
+
+    const token = result.current.getAccessToken()
+    const refresh = result.current.refreshAccessToken()
+    act(() => adapter.emit({ ...SESSION, roles: ['media_sync_user', 'reader'] }))
+    const sameToken = result.current.getAccessToken()
+    const sameRefresh = result.current.refreshAccessToken()
+
+    expect(sameToken).toBe(token)
+    expect(sameRefresh).toBe(refresh)
+    expect(adapter.getAccessToken).toHaveBeenCalledOnce()
+    expect(adapter.refreshAccessToken).toHaveBeenCalledOnce()
+    resolveToken('same-user-token')
+    resolveRefresh('same-user-refresh')
+    await expect(Promise.all([token, sameToken])).resolves.toEqual([
+      'same-user-token',
+      'same-user-token'
+    ])
+    await expect(Promise.all([refresh, sameRefresh])).resolves.toEqual([
+      'same-user-refresh',
+      'same-user-refresh'
+    ])
+  })
+
+  it('fences token requests as soon as sign-out starts before an auth notification', async () => {
+    const adapter = createAdapter(SESSION)
+    let resolveToken: (token: string) => void = () => undefined
+    let resolveRefresh: (token: string) => void = () => undefined
+    let resolveSignOut: () => void = () => undefined
+    vi.mocked(adapter.getAccessToken).mockReturnValue(
+      new Promise<string>((resolve) => {
+        resolveToken = resolve
+      })
+    )
+    vi.mocked(adapter.refreshAccessToken).mockReturnValue(
+      new Promise<string>((resolve) => {
+        resolveRefresh = resolve
+      })
+    )
+    vi.mocked(adapter.signOut).mockReturnValue(
+      new Promise<void>((resolve) => {
+        resolveSignOut = resolve
+      })
+    )
+    authFactory.adapters.push(adapter)
+    const { result } = renderHook(() => useHhcAuth(), { wrapper })
+    await waitFor(() => expect(result.current.status).toBe('authenticated'))
+
+    const token = result.current.getAccessToken()
+    const refresh = result.current.refreshAccessToken()
+    const signingOut = result.current.signOut()
+    act(() => adapter.emit({ ...SESSION, roles: ['media_sync_user', 'reader'] }))
+    resolveToken('stale-token')
+    resolveRefresh('stale-refresh')
+
+    await expect(Promise.all([token, refresh])).resolves.toEqual([null, null])
+    await expect(result.current.getAccessToken()).resolves.toBeNull()
+    await expect(result.current.refreshAccessToken()).resolves.toBeNull()
+    resolveSignOut()
+    await signingOut
+  })
+
+  it('accepts the authenticated identity emitted during sign-in', async () => {
+    const adapter = createAdapter(null)
+    vi.mocked(adapter.signIn).mockImplementationOnce(async () => {
+      adapter.emit(SESSION)
+    })
+    authFactory.adapters.push(adapter)
+    const { result } = renderHook(() => useHhcAuth(), { wrapper })
+    await waitFor(() => expect(result.current.status).toBe('anonymous'))
+
+    await act(() => result.current.signIn())
+
+    expect(result.current.session).toEqual(SESSION)
+    await expect(result.current.getAccessToken()).resolves.toBe('access-token')
+  })
+
+  it('fences in-flight token results when the provider unmounts', async () => {
+    const adapter = createAdapter(SESSION)
+    let resolveToken: (token: string) => void = () => undefined
+    let resolveRefresh: (token: string) => void = () => undefined
+    vi.mocked(adapter.getAccessToken).mockReturnValue(
+      new Promise<string>((resolve) => {
+        resolveToken = resolve
+      })
+    )
+    vi.mocked(adapter.refreshAccessToken).mockReturnValue(
+      new Promise<string>((resolve) => {
+        resolveRefresh = resolve
+      })
+    )
+    authFactory.adapters.push(adapter)
+    const { result, unmount } = renderHook(() => useHhcAuth(), { wrapper })
+    await waitFor(() => expect(result.current.status).toBe('authenticated'))
+
+    const token = result.current.getAccessToken()
+    const refresh = result.current.refreshAccessToken()
+    unmount()
+    resolveToken('stale-token')
+    resolveRefresh('stale-refresh')
+
+    await expect(Promise.all([token, refresh])).resolves.toEqual([null, null])
+  })
+
   it('discards an access token completed after the session changes', async () => {
     const adapter = createAdapter(SESSION)
     let resolveToken: (token: string) => void = () => undefined
