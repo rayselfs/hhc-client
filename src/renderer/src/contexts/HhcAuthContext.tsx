@@ -9,6 +9,7 @@ type HhcAuthContextValue = {
   session: HhcSession | null
   signIn(): Promise<void>
   signOut(): Promise<void>
+  endSession(): Promise<void>
   getAuthGeneration(): number
   getAccessToken(): Promise<string | null>
   refreshAccessToken(): Promise<string | null>
@@ -26,6 +27,7 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
   const signOutPendingRef = useRef(false)
   const accessTokenPromiseRef = useRef<Promise<string | null> | null>(null)
   const refreshTokenPromiseRef = useRef<Promise<string | null> | null>(null)
+  const sessionTransitionPromiseRef = useRef<Promise<void>>(Promise.resolve())
 
   const invalidateTokenRequests = useCallback((): void => {
     sessionEpochRef.current += 1
@@ -34,6 +36,11 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
   }, [])
 
   const getAuthGeneration = useCallback((): number => authGenerationRef.current, [])
+
+  const cleanupDepartingAccount = useCallback(async (accountUserId: string): Promise<void> => {
+    const { cleanupHhcLineAccountAccess } = await import('@renderer/lib/hhc-line-access')
+    await cleanupHhcLineAccountAccess(accountUserId)
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -50,16 +57,63 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
 
         adapterRef.current = createdAdapter
         const bootstrapEpoch = sessionEpochRef.current
+        let cleanupUserId: string | null = null
+        let cleanupInFlight = false
+        let pendingSession: HhcSession | null = null
+
+        const publishSession = (
+          nextSession: HhcSession | null,
+          resetSignOutPending: boolean
+        ): void => {
+          sessionRef.current = nextSession
+          if (resetSignOutPending) signOutPendingRef.current = false
+          setSession(nextSession)
+          setStatus(nextSession ? 'authenticated' : 'anonymous')
+        }
+
+        const beginCleanup = (previousUserId: string): void => {
+          cleanupInFlight = true
+          const transition = cleanupDepartingAccount(previousUserId)
+            .then(() => {
+              if (!active || cleanupUserId !== previousUserId) return
+              cleanupUserId = null
+              const target = pendingSession
+              pendingSession = null
+              publishSession(target, true)
+            })
+            .catch(() => {
+              if (!active || cleanupUserId !== previousUserId) return
+              sessionRef.current = null
+              setSession(null)
+              setStatus('unavailable')
+            })
+            .finally(() => {
+              cleanupInFlight = false
+            })
+          sessionTransitionPromiseRef.current = transition
+        }
+
         unsubscribe = createdAdapter.subscribe((nextSession) => {
           if (!active) return
+          if (cleanupUserId) {
+            pendingSession = nextSession
+            if (!cleanupInFlight) beginCleanup(cleanupUserId)
+            return
+          }
           const previousUserId = sessionRef.current?.userId
           const nextUserId = nextSession?.userId
           if (previousUserId !== nextUserId) authGenerationRef.current += 1
           if (!nextSession || previousUserId !== nextUserId) invalidateTokenRequests()
-          sessionRef.current = nextSession
-          if (!nextSession || previousUserId !== nextUserId) signOutPendingRef.current = false
-          setSession(nextSession)
-          setStatus(nextSession ? 'authenticated' : 'anonymous')
+          if (previousUserId && previousUserId !== nextUserId) {
+            cleanupUserId = previousUserId
+            pendingSession = nextSession
+            sessionRef.current = null
+            setSession(null)
+            setStatus('loading')
+            beginCleanup(previousUserId)
+            return
+          }
+          publishSession(nextSession, !nextSession || previousUserId !== nextUserId)
         })
 
         try {
@@ -87,10 +141,11 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
       if (adapterRef.current === adapter) adapterRef.current = null
       sessionRef.current = null
       signOutPendingRef.current = false
+      sessionTransitionPromiseRef.current = Promise.resolve()
       invalidateTokenRequests()
       adapter?.dispose()
     }
-  }, [invalidateTokenRequests])
+  }, [cleanupDepartingAccount, invalidateTokenRequests])
 
   const signIn = useCallback(async (): Promise<void> => {
     const adapter = adapterRef.current
@@ -116,11 +171,14 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
   const signOut = useCallback(async (): Promise<void> => {
     const adapter = adapterRef.current
     if (!adapter) throw new Error('HHC account is unavailable')
+    const departingUserId = sessionRef.current?.userId
     signOutPendingRef.current = true
     invalidateTokenRequests()
     try {
       const generation = authGenerationRef.current
       await adapter.signOut()
+      if (departingUserId) await cleanupDepartingAccount(departingUserId)
+      await sessionTransitionPromiseRef.current
       if (adapterRef.current === adapter && authGenerationRef.current === generation) {
         authGenerationRef.current += 1
       }
@@ -128,7 +186,7 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
       if (adapterRef.current === adapter) signOutPendingRef.current = false
       throw error
     }
-  }, [invalidateTokenRequests])
+  }, [cleanupDepartingAccount, invalidateTokenRequests])
 
   const getAccessToken = useCallback((): Promise<string | null> => {
     const adapter = adapterRef.current
@@ -207,6 +265,7 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
       session,
       signIn,
       signOut,
+      endSession: signOut,
       getAuthGeneration,
       getAccessToken,
       refreshAccessToken

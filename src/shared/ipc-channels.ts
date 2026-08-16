@@ -320,6 +320,7 @@ export interface IpcInvokeMap {
     args: [HhcAssetNativeDownloadRequest]
     result: HhcAssetNativeDownloadResult
   }
+  'hhc-assets:cancel-download': { args: [string]; result: void }
   'hhc-assets:create-content-lease': {
     args: [HhcAssetItemRequest]
     result: HhcAssetNativeLease

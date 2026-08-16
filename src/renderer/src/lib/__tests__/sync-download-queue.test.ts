@@ -79,6 +79,9 @@ describe('sync download queue', () => {
       value: {
         nativeFs: {
           exists: vi.fn(async () => true)
+        },
+        hhcAssets: {
+          cancelDownload: vi.fn(async () => undefined)
         }
       }
     })
@@ -238,7 +241,13 @@ describe('sync download queue', () => {
 
     expect(cancelSyncDownloads({ providerConnectionId: 'connection-a' })).toBe(2)
     expect(activeSignal?.aborted).toBe(true)
-    await expect(Promise.all([active, queued])).resolves.toEqual([null, null])
+    await expect(queued).resolves.toBeNull()
+    let activeSettled = false
+    void active.then(() => {
+      activeSettled = true
+    })
+    await Promise.resolve()
+    expect(activeSettled).toBe(false)
     expect(await canCommit!()).toBe(false)
 
     const followUp = enqueueSyncDownload({
@@ -253,11 +262,89 @@ describe('sync download queue', () => {
       entry: { ...makeEntry('remote-c', 'item-c'), providerConnectionId: 'connection-a' }
     })
     activeDownload.resolve({ blobId: 'item-a', size: 100, mimeType: 'image/png' })
+    await expect(active).resolves.toBeNull()
     await expect(followUp).resolves.toEqual({ blobId: 'item-a', size: 100, mimeType: 'image/png' })
     expect(onDownloaded).not.toHaveBeenCalled()
     await expect(getSyncEntryByRemoteItem('connection-a', 'remote-a')).resolves.not.toMatchObject({
       status: 'failed'
     })
+  })
+
+  it('cancels the main-process native download for an active HHC job', async () => {
+    const activeDownload = deferred<SyncDownloadResult>()
+    const provider = {
+      ...makeProvider(vi.fn(async () => activeDownload.promise)),
+      providerType: 'hhc-line' as const
+    }
+    const pending = enqueueSyncDownload({
+      provider,
+      request: {
+        providerConnectionId: 'connection-a',
+        rootRemoteFolderId: 'collection-a',
+        remoteItemId: 'remote-a',
+        targetBlobId: 'item-a',
+        offlinePolicy: 'always-offline'
+      },
+      entry: { ...makeEntry('remote-a', 'item-a'), providerConnectionId: 'connection-a' }
+    })
+    await vi.waitFor(() => expect(provider.downloadContent).toHaveBeenCalledOnce())
+
+    expect(cancelSyncDownloads({ providerConnectionId: 'connection-a' })).toBe(1)
+
+    expect(window.api.hhcAssets.cancelDownload).toHaveBeenCalledWith('item-a')
+    activeDownload.resolve({ blobId: 'item-a', size: 100, mimeType: 'image/png' })
+    await expect(pending).resolves.toBeNull()
+  })
+
+  it('checks an authorization guard before using cached state or starting a download', async () => {
+    const provider = makeProvider(vi.fn())
+    const guard = vi.fn(async () => false)
+
+    await expect(
+      enqueueSyncDownload({
+        provider,
+        request: {
+          providerConnectionId: 'connection-1',
+          rootRemoteFolderId: 'folder-1',
+          remoteItemId: 'remote-1',
+          targetBlobId: 'item-1',
+          offlinePolicy: 'always-offline'
+        },
+        entry: makeEntry('remote-1', 'item-1'),
+        canCommit: guard
+      })
+    ).resolves.toBeNull()
+
+    expect(guard).toHaveBeenCalled()
+    expect(provider.downloadContent).not.toHaveBeenCalled()
+    await expect(getSyncEntryByRemoteItem('connection-1', 'remote-1')).resolves.toBeUndefined()
+  })
+
+  it('drops a completed response before onDownloaded when authorization is revoked', async () => {
+    const done = deferred<SyncDownloadResult>()
+    let authorized = true
+    const onDownloaded = vi.fn()
+    const provider = makeProvider(vi.fn(async () => done.promise))
+    const pending = enqueueSyncDownload({
+      provider,
+      request: {
+        providerConnectionId: 'connection-1',
+        rootRemoteFolderId: 'folder-1',
+        remoteItemId: 'remote-1',
+        targetBlobId: 'item-1',
+        offlinePolicy: 'always-offline'
+      },
+      entry: makeEntry('remote-1', 'item-1'),
+      canCommit: () => authorized,
+      onDownloaded
+    })
+    await vi.waitFor(() => expect(provider.downloadContent).toHaveBeenCalledOnce())
+
+    authorized = false
+    done.resolve({ blobId: 'item-1', size: 100, mimeType: 'image/png' })
+
+    await expect(pending).resolves.toBeNull()
+    expect(onDownloaded).not.toHaveBeenCalled()
   })
 
   it('skips a stale queued job when the file is already available offline', async () => {

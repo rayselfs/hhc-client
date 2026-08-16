@@ -116,9 +116,11 @@ function classifyHhcError(
     if (
       classification === 'retryable' ||
       classification === 'auth-required' ||
-      classification === 'access-revoked' ||
       classification === 'fatal'
     ) {
+      return classification
+    }
+    if (classification === 'access-revoked' && 'status' in error && error.status === 403) {
       return classification
     }
   }

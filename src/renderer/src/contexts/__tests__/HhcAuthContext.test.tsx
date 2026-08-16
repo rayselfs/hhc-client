@@ -15,8 +15,16 @@ const authFactory = vi.hoisted(() => ({
   })
 }))
 
+const accessMocks = vi.hoisted(() => ({
+  cleanupAccount: vi.fn<(userId: string) => Promise<void>>(async () => undefined)
+}))
+
 vi.mock('@renderer/lib/hhc-auth', () => ({
   createHhcAuthAdapter: authFactory.create
+}))
+
+vi.mock('@renderer/lib/hhc-line-access', () => ({
+  cleanupHhcLineAccountAccess: accessMocks.cleanupAccount
 }))
 
 const SESSION: HhcSession = {
@@ -63,6 +71,8 @@ function wrapper({ children }: { children: React.ReactNode }): React.JSX.Element
 beforeEach(() => {
   authFactory.adapters = []
   authFactory.create.mockClear()
+  accessMocks.cleanupAccount.mockReset()
+  accessMocks.cleanupAccount.mockResolvedValue(undefined)
 })
 
 describe('HhcAuthContext', () => {
@@ -127,6 +137,96 @@ describe('HhcAuthContext', () => {
     await act(() => result.current.signOut())
     expect(adapter.signOut).toHaveBeenCalledOnce()
     act(() => adapter.emit(null))
+    await waitFor(() => expect(result.current.status).toBe('anonymous'))
+  })
+
+  it('keeps account B unusable until departing account A cleanup completes', async () => {
+    const adapter = createAdapter(SESSION)
+    let resolveCleanup!: () => void
+    accessMocks.cleanupAccount.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        resolveCleanup = resolve
+      })
+    )
+    authFactory.adapters.push(adapter)
+    const { result } = renderHook(() => useHhcAuth(), { wrapper })
+    await waitFor(() => expect(result.current.status).toBe('authenticated'))
+
+    act(() => adapter.emit({ ...SESSION, userId: 'user-2', displayName: 'Grace' }))
+
+    await waitFor(() => expect(accessMocks.cleanupAccount).toHaveBeenCalledWith('user-1'))
+    expect(result.current.status).toBe('loading')
+    expect(result.current.session).toBeNull()
+    await expect(result.current.getAccessToken()).resolves.toBeNull()
+
+    await act(async () => resolveCleanup())
+    await waitFor(() => expect(result.current.session?.userId).toBe('user-2'))
+    expect(result.current.status).toBe('authenticated')
+  })
+
+  it('keeps account B blocked and retries a failed departing-account cleanup', async () => {
+    const adapter = createAdapter(SESSION)
+    let resolveRetry!: () => void
+    accessMocks.cleanupAccount
+      .mockRejectedValueOnce(new Error('temporary cleanup failure'))
+      .mockReturnValueOnce(
+        new Promise<void>((resolve) => {
+          resolveRetry = resolve
+        })
+      )
+    authFactory.adapters.push(adapter)
+    const { result } = renderHook(() => useHhcAuth(), { wrapper })
+    await waitFor(() => expect(result.current.status).toBe('authenticated'))
+    const accountB = { ...SESSION, userId: 'user-2', displayName: 'Grace' }
+
+    act(() => adapter.emit(accountB))
+    await waitFor(() => expect(result.current.status).toBe('unavailable'))
+    expect(result.current.session).toBeNull()
+
+    act(() => adapter.emit(accountB))
+    await waitFor(() => expect(accessMocks.cleanupAccount).toHaveBeenCalledTimes(2))
+    expect(result.current.session).toBeNull()
+
+    await act(async () => resolveRetry())
+    await waitFor(() => expect(result.current.session?.userId).toBe('user-2'))
+  })
+
+  it('captures the departing account and waits for cleanup before sign-out completes', async () => {
+    const adapter = createAdapter(SESSION)
+    let resolveCleanup!: () => void
+    accessMocks.cleanupAccount.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        resolveCleanup = resolve
+      })
+    )
+    vi.mocked(adapter.signOut).mockImplementationOnce(async () => adapter.emit(null))
+    authFactory.adapters.push(adapter)
+    const { result } = renderHook(() => useHhcAuth(), { wrapper })
+    await waitFor(() => expect(result.current.status).toBe('authenticated'))
+
+    let completed = false
+    const signingOut = act(() => result.current.signOut()).then(() => {
+      completed = true
+    })
+    await waitFor(() => expect(accessMocks.cleanupAccount).toHaveBeenCalledWith('user-1'))
+    expect(completed).toBe(false)
+
+    resolveCleanup()
+    await signingOut
+    await waitFor(() => expect(result.current.status).toBe('anonymous'))
+  })
+
+  it('uses the same terminal session transition for API auth-required', async () => {
+    const adapter = createAdapter(SESSION)
+    vi.mocked(adapter.signOut).mockImplementationOnce(async () => adapter.emit(null))
+    authFactory.adapters.push(adapter)
+    const { result } = renderHook(() => useHhcAuth(), { wrapper })
+    await waitFor(() => expect(result.current.status).toBe('authenticated'))
+
+    await act(() => result.current.endSession())
+
+    expect(adapter.signOut).toHaveBeenCalledOnce()
+    expect(accessMocks.cleanupAccount).toHaveBeenCalledWith('user-1')
     expect(result.current.status).toBe('anonymous')
   })
 

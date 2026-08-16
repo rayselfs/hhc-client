@@ -197,6 +197,7 @@ const hhcAssetsApi = {
     typedInvoke('hhc-assets:issue-content-ticket', request),
   downloadFile: (request: IpcInvokeMap['hhc-assets:download-file']['args'][0]) =>
     typedInvoke('hhc-assets:download-file', request),
+  cancelDownload: (targetFileId: string) => typedInvoke('hhc-assets:cancel-download', targetFileId),
   createContentLease: (request: IpcInvokeMap['hhc-assets:create-content-lease']['args'][0]) =>
     typedInvoke('hhc-assets:create-content-lease', request),
   releaseContentLease: (leaseId: string) =>

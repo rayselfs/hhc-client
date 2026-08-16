@@ -158,6 +158,8 @@ export default defineConfig(({ mode }) => {
               '**/assets/transformers-*.js',
               '**/assets/microsoft.cognitiveservices.speech.sdk-*.js',
               '**/assets/aiden0z-pptx-renderer*.js',
+              '**/assets/hhc-asset-api-*.js',
+              '**/assets/hhc-line-access-*.js',
               '**/assets/hhc-line-connect-*.js'
             ],
             navigateFallback: '/index.html',

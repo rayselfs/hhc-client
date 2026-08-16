@@ -27,8 +27,8 @@ const { mockCleanupFileResources } = vi.hoisted(() => ({
   mockCleanupFileResources: vi.fn()
 }))
 
-const { mockCancelSyncDownloads } = vi.hoisted(() => ({
-  mockCancelSyncDownloads: vi.fn()
+const { mockCancelSyncDownloadsAndWait } = vi.hoisted(() => ({
+  mockCancelSyncDownloadsAndWait: vi.fn()
 }))
 
 const { mockDeleteSyncEntryPreferences, mockDeleteSyncEntryPreferencesByProviderConnection } =
@@ -42,7 +42,7 @@ vi.mock('../file-resource-cleanup', () => ({
 }))
 
 vi.mock('../sync-download-queue', () => ({
-  cancelSyncDownloads: mockCancelSyncDownloads
+  cancelSyncDownloadsAndWait: mockCancelSyncDownloadsAndWait
 }))
 
 vi.mock('../sync-db', async () => {
@@ -68,6 +68,24 @@ describe('sync unlink', () => {
       folderIds: ['folder-1'],
       itemIds: ['item-1']
     })
+    mockCancelSyncDownloadsAndWait.mockResolvedValue(0)
+  })
+
+  it('waits for active downloads before cleaning a connection', async () => {
+    let resolveCancelled!: () => void
+    mockCancelSyncDownloadsAndWait.mockReturnValueOnce(
+      new Promise<number>((resolve) => {
+        resolveCancelled = () => resolve(1)
+      })
+    )
+
+    const cleanup = unlinkSyncConnectionFromApp('connection-1')
+    await vi.waitFor(() => expect(mockCancelSyncDownloadsAndWait).toHaveBeenCalled())
+    expect(mockCleanupFileResources).not.toHaveBeenCalled()
+
+    resolveCancelled()
+    await cleanup
+    expect(mockCleanupFileResources).toHaveBeenCalledOnce()
   })
 
   it('removes a sync connection from the app through tombstones and resource cleanup', async () => {
@@ -124,7 +142,9 @@ describe('sync unlink', () => {
     await expect(getSyncEntryByRemoteItem('connection-1', 'remote-file-1')).resolves.toBeUndefined()
     await expect(getSyncEntryPreference('connection-1', 'remote-file-1')).resolves.toBeUndefined()
     await expect(listSyncTombstones()).resolves.toEqual([])
-    expect(mockCancelSyncDownloads).toHaveBeenCalledWith({ providerConnectionId: 'connection-1' })
+    expect(mockCancelSyncDownloadsAndWait).toHaveBeenCalledWith({
+      providerConnectionId: 'connection-1'
+    })
   })
 
   it('keeps connection cleanup fences when metadata deletion fails and completes on retry', async () => {
@@ -259,17 +279,9 @@ describe('sync unlink', () => {
       folderIds: expect.arrayContaining(['folder-a', 'folder-child-a']),
       itemIds: ['item-a']
     })
-    expect(mockCancelSyncDownloads).toHaveBeenCalledWith({
+    expect(mockCancelSyncDownloadsAndWait).toHaveBeenCalledWith({
       providerConnectionId: 'connection-1',
-      remoteItemId: 'root-a'
-    })
-    expect(mockCancelSyncDownloads).toHaveBeenCalledWith({
-      providerConnectionId: 'connection-1',
-      remoteItemId: 'child-a'
-    })
-    expect(mockCancelSyncDownloads).toHaveBeenCalledWith({
-      providerConnectionId: 'connection-1',
-      remoteItemId: 'file-a'
+      rootRemoteFolderId: 'root-a'
     })
     await expect(getProviderConnection('connection-1')).resolves.toBeDefined()
     await expect(getSyncCursor('connection-1', 'root-a')).resolves.toBeUndefined()
@@ -444,7 +456,7 @@ describe('sync unlink', () => {
 
     await unlinkHhcLineAccountFromApp('user-a')
 
-    expect(mockCancelSyncDownloads).toHaveBeenCalledWith({
+    expect(mockCancelSyncDownloadsAndWait).toHaveBeenCalledWith({
       providerConnectionId: 'hhc-line:user-a'
     })
     expect(mockCleanupFileResources).toHaveBeenCalledWith({

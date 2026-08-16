@@ -9,7 +9,8 @@ const mocks = vi.hoisted(() => ({
     recovery: { status: 'ready', generation: 1, failure: null },
     on: vi.fn(() => vi.fn())
   },
-  sync: vi.fn()
+  sync: vi.fn(),
+  endSession: vi.fn()
 }))
 
 vi.mock('@renderer/contexts/ProjectionContext', () => ({
@@ -24,7 +25,8 @@ vi.mock('@renderer/contexts/HhcAuthContext', () => ({
   useHhcAuth: () => ({
     session: { userId: 'user-1', displayName: 'Ada', roles: [] },
     getAccessToken: vi.fn(),
-    refreshAccessToken: vi.fn()
+    refreshAccessToken: vi.fn(),
+    endSession: mocks.endSession
   })
 }))
 
@@ -88,7 +90,10 @@ describe('MediaProjectionBridge', () => {
 
     expect(mocks.sync).toHaveBeenCalledWith(
       expect.objectContaining({
-        auth: expect.objectContaining({ getSession: expect.any(Function) }),
+        auth: expect.objectContaining({
+          getSession: expect.any(Function),
+          endSession: mocks.endSession
+        }),
         onAccessRevoked: onHhcAccessRevoked
       })
     )

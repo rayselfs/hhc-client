@@ -36,6 +36,14 @@ type HhcLineProviderOptions = {
     metadata: RemoteSyncItem,
     canCommit: SyncDownloadCommitGuard
   ) => Promise<SyncDownloadResult>
+  onAccessError?: (
+    scope: {
+      providerConnectionId: string
+      rootRemoteFolderId: string
+      remoteItemId?: string
+    },
+    error: unknown
+  ) => void | Promise<void>
 }
 
 function mapItem(item: HhcAssetCollectionItem): RemoteSyncItem {
@@ -152,7 +160,7 @@ export class HhcLineReadonlyProvider implements ReadOnlySyncProvider {
   }
 
   initialScan(_providerConnectionId: string, remoteFolderId: string): Promise<SyncChangePage> {
-    return this.changes(remoteFolderId)
+    return this.changes(_providerConnectionId, remoteFolderId)
   }
 
   incrementalChanges(input: {
@@ -160,12 +168,15 @@ export class HhcLineReadonlyProvider implements ReadOnlySyncProvider {
     remoteFolderId: string
     cursor: string
   }): Promise<SyncChangePage> {
-    return this.changes(input.remoteFolderId, input.cursor)
+    return this.changes(input.providerConnectionId, input.remoteFolderId, input.cursor)
   }
 
   async getMetadata(providerConnectionId: string, remoteItemId: string): Promise<RemoteSyncItem> {
     const collectionId = await this.collectionForItem(providerConnectionId, remoteItemId)
-    return mapItem(await this.options.api.getCollectionItem(collectionId, remoteItemId))
+    return this.withAccessBoundary(
+      { providerConnectionId, rootRemoteFolderId: collectionId, remoteItemId },
+      async () => mapItem(await this.options.api.getCollectionItem(collectionId, remoteItemId))
+    )
   }
 
   async getRemoteContentSource(
@@ -173,7 +184,10 @@ export class HhcLineReadonlyProvider implements ReadOnlySyncProvider {
     remoteItemId: string
   ): Promise<SyncRemoteContentSource> {
     const collectionId = await this.collectionForItem(providerConnectionId, remoteItemId)
-    return this.options.api.getRemoteContentSource(collectionId, remoteItemId)
+    return this.withAccessBoundary(
+      { providerConnectionId, rootRemoteFolderId: collectionId, remoteItemId },
+      () => this.options.api.getRemoteContentSource(collectionId, remoteItemId)
+    )
   }
 
   async downloadContent(
@@ -182,19 +196,28 @@ export class HhcLineReadonlyProvider implements ReadOnlySyncProvider {
     canCommit: SyncDownloadCommitGuard
   ): Promise<SyncDownloadResult> {
     const rootRemoteFolderId = request.rootRemoteFolderId
-    const metadata = mapItem(
-      await this.options.api.getCollectionItem(rootRemoteFolderId, request.remoteItemId)
-    )
-    const content = await this.options.api.downloadContent(
+    return this.withAccessBoundary(
       {
-        collectionId: rootRemoteFolderId,
-        itemId: request.remoteItemId,
+        providerConnectionId: request.providerConnectionId,
         rootRemoteFolderId,
-        ...(isElectron() ? { targetFileId: request.targetBlobId } : {})
+        remoteItemId: request.remoteItemId
       },
-      signal
+      async () => {
+        const metadata = mapItem(
+          await this.options.api.getCollectionItem(rootRemoteFolderId, request.remoteItemId)
+        )
+        const content = await this.options.api.downloadContent(
+          {
+            collectionId: rootRemoteFolderId,
+            itemId: request.remoteItemId,
+            rootRemoteFolderId,
+            ...(isElectron() ? { targetFileId: request.targetBlobId } : {})
+          },
+          signal
+        )
+        return this.save(request, content, metadata, canCommit)
+      }
     )
-    return this.save(request, content, metadata, canCommit)
   }
 
   classifyError(error: unknown): SyncRetryClassification {
@@ -213,10 +236,18 @@ export class HhcLineReadonlyProvider implements ReadOnlySyncProvider {
     return 'fatal'
   }
 
-  private async changes(remoteFolderId: string, cursor?: string): Promise<SyncChangePage> {
-    const page = cursor
-      ? await this.options.api.getCollectionChanges(remoteFolderId, cursor)
-      : await this.options.api.getCollectionChanges(remoteFolderId)
+  private async changes(
+    providerConnectionId: string,
+    remoteFolderId: string,
+    cursor?: string
+  ): Promise<SyncChangePage> {
+    const page = await this.withAccessBoundary(
+      { providerConnectionId, rootRemoteFolderId: remoteFolderId },
+      () =>
+        cursor
+          ? this.options.api.getCollectionChanges(remoteFolderId, cursor)
+          : this.options.api.getCollectionChanges(remoteFolderId)
+    )
     for (const item of page.items) this.collectionsByItem.set(item.id, item.collectionId)
     return {
       items: [
@@ -232,6 +263,22 @@ export class HhcLineReadonlyProvider implements ReadOnlySyncProvider {
       nextCursor: page.cursor,
       hasMore: page.hasMore,
       reset: page.reset
+    }
+  }
+
+  private async withAccessBoundary<T>(
+    scope: {
+      providerConnectionId: string
+      rootRemoteFolderId: string
+      remoteItemId?: string
+    },
+    request: () => Promise<T>
+  ): Promise<T> {
+    try {
+      return await request()
+    } catch (error) {
+      await Promise.resolve(this.options.onAccessError?.(scope, error)).catch(() => undefined)
+      throw error
     }
   }
 

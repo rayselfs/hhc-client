@@ -38,7 +38,7 @@ export interface HhcProjectionAccessRevoked {
 
 interface MediaProjectionSyncOptions {
   auth?: HhcLineCloudAuth
-  onAccessRevoked?: (scope: HhcProjectionAccessRevoked) => void
+  onAccessRevoked?: (scope: HhcProjectionAccessRevoked) => void | Promise<void>
 }
 
 const RENEWAL_LEAD_MS = 30_000
@@ -217,7 +217,13 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
             classified.providerConnectionId &&
             classified.remoteItemId
           ) {
-            onAccessRevoked?.({
+            projectSequenceRef.current += 1
+            clearRemoteSource()
+            await Promise.all([
+              window.api?.hhcAssets?.clearContentLeases?.().catch(() => undefined),
+              stopProjection()
+            ])
+            await onAccessRevoked?.({
               providerConnectionId: classified.providerConnectionId,
               remoteItemId: classified.remoteItemId
             })
@@ -262,7 +268,8 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
       project,
       registry,
       releaseLease,
-      startProjection
+      startProjection,
+      stopProjection
     ]
   )
 

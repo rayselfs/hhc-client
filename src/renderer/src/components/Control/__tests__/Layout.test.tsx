@@ -30,7 +30,11 @@ const authRuntime = vi.hoisted(() => ({
   generation: 0,
   getAuthGeneration: vi.fn(() => authRuntime.generation),
   getAccessToken: vi.fn(async () => null as string | null),
-  refreshAccessToken: vi.fn(async () => null as string | null)
+  refreshAccessToken: vi.fn(async () => null as string | null),
+  endSession: vi.fn(async () => undefined)
+}))
+const accessRuntime = vi.hoisted(() => ({
+  revokeRoot: vi.fn(async () => undefined)
 }))
 const initializeAppMock = vi.hoisted(() =>
   vi.fn<(options?: SyncRuntimeOptions) => () => void>(() => vi.fn())
@@ -41,12 +45,17 @@ vi.mock('@renderer/lib/app-init', () => ({
   prefetchRouteChunks: vi.fn(() => Promise.resolve())
 }))
 
+vi.mock('@renderer/lib/hhc-line-access', () => ({
+  revokeHhcLineRootAccess: accessRuntime.revokeRoot
+}))
+
 vi.mock('@renderer/contexts/HhcAuthContext', () => ({
   useHhcAuth: () => ({
     status: authRuntime.session ? 'authenticated' : 'anonymous',
     session: authRuntime.session,
     signIn: vi.fn(async () => undefined),
     signOut: vi.fn(async () => undefined),
+    endSession: authRuntime.endSession,
     getAuthGeneration: authRuntime.getAuthGeneration,
     getAccessToken: authRuntime.getAccessToken,
     refreshAccessToken: authRuntime.refreshAccessToken
@@ -237,6 +246,7 @@ describe('Layout', () => {
     const options = initializeAppMock.mock.calls.at(-1)?.[0]
     const hhcAuth = options?.hhcAuth
     expect(hhcAuth?.getSession()).toBeNull()
+    expect(hhcAuth?.endSession).toBe(authRuntime.endSession)
     expect(options?.getHhcAuthGeneration?.()).toBe(0)
 
     authRuntime.session = {
@@ -252,5 +262,15 @@ describe('Layout', () => {
 
     authRuntime.generation = 1
     expect(options?.getHhcAuthGeneration?.()).toBe(1)
+
+    await options?.onHhcAccessRevoked?.({
+      connectionId: 'hhc-line:user-1',
+      rootFolderId: 'root-1'
+    })
+    expect(accessRuntime.revokeRoot).toHaveBeenCalledWith({
+      kind: 'root',
+      providerConnectionId: 'hhc-line:user-1',
+      rootFolderId: 'root-1'
+    })
   })
 })

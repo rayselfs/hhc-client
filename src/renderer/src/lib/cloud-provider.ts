@@ -16,6 +16,7 @@ export interface HhcLineCloudAuth {
   getSession(): HhcSession | null
   getAccessToken(): Promise<string | null>
   refreshAccessToken(): Promise<string | null>
+  endSession(): Promise<void>
 }
 
 export interface CloudRemoteFolder {

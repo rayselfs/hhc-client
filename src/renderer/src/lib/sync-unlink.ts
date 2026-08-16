@@ -3,7 +3,7 @@ import { isElectron } from './env'
 import { cleanupFileResources, type CleanupResult } from './file-resource-cleanup'
 import { openFileExplorerDB } from './file-explorer-db'
 import { removeCleanedEntriesFromStore } from '@renderer/stores/file-explorer'
-import { cancelSyncDownloads } from './sync-download-queue'
+import { cancelSyncDownloadsAndWait } from './sync-download-queue'
 import {
   deleteProviderConnection,
   deleteSyncCursor,
@@ -68,7 +68,7 @@ async function listTombstonesForScope(
 export async function unlinkSyncConnectionFromApp(
   providerConnectionId: string
 ): Promise<UnlinkSyncConnectionResult> {
-  cancelSyncDownloads({ providerConnectionId })
+  await cancelSyncDownloadsAndWait({ providerConnectionId })
   const entries = await listSyncEntriesByProviderConnection(providerConnectionId)
   const folderIds = entries.flatMap((entry) => (entry.folderId ? [entry.folderId] : []))
   const itemIds = entries.flatMap((entry) => (entry.itemId ? [entry.itemId] : []))
@@ -129,14 +129,12 @@ export async function unlinkSyncRootFolderFromApp(
     return result
   }
 
+  await cancelSyncDownloadsAndWait({
+    providerConnectionId: syncLink.providerConnectionId,
+    rootRemoteFolderId: syncLink.remoteFolderId
+  })
   const entries = await listSyncEntriesByProviderConnection(syncLink.providerConnectionId)
   const targetEntries = collectEntrySubtree(entries, syncLink.remoteFolderId)
-  for (const entry of targetEntries) {
-    cancelSyncDownloads({
-      providerConnectionId: syncLink.providerConnectionId,
-      remoteItemId: entry.remoteItemId
-    })
-  }
   const folderIds = targetEntries.flatMap((entry) => (entry.folderId ? [entry.folderId] : []))
   const itemIds = targetEntries.flatMap((entry) => (entry.itemId ? [entry.itemId] : []))
 

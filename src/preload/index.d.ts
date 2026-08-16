@@ -190,6 +190,7 @@ interface HhcAssetsAPI {
   getCollectionItem: (request: HhcAssetItemRequest) => Promise<HhcAssetCollectionItem>
   issueContentTicket: (request: HhcAssetItemRequest) => Promise<HhcAssetContentTicket>
   downloadFile: (request: HhcAssetNativeDownloadRequest) => Promise<HhcAssetNativeDownloadResult>
+  cancelDownload: (targetFileId: string) => Promise<void>
   createContentLease: (request: HhcAssetItemRequest) => Promise<HhcAssetNativeLease>
   releaseContentLease: (leaseId: string) => Promise<void>
   clearContentLeases: () => Promise<void>

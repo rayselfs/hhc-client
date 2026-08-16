@@ -42,7 +42,8 @@ const mocks = vi.hoisted(() => ({
     getChildFolders(parentId: string) {
       return this._childFoldersByParent[parentId] ?? []
     }
-  }
+  },
+  handleAccessError: vi.fn()
 }))
 
 vi.mock('../env', () => ({
@@ -52,6 +53,11 @@ vi.mock('../env', () => ({
 
 vi.mock('../hhc-asset-api', () => ({
   createHhcAssetApi: vi.fn(async () => mocks.api)
+}))
+
+vi.mock('../hhc-line-access', () => ({
+  handleHhcLineAccessError: mocks.handleAccessError,
+  isHhcLineRootAuthorized: vi.fn(async () => true)
 }))
 
 vi.mock('@renderer/stores/file-explorer', () => ({
@@ -78,7 +84,8 @@ function auth(sessionRef: { current: HhcSession | null }): HhcLineCloudAuth {
   return {
     getSession: () => sessionRef.current,
     getAccessToken: vi.fn(async () => 'access-token'),
-    refreshAccessToken: vi.fn(async () => 'refresh-token')
+    refreshAccessToken: vi.fn(async () => 'refresh-token'),
+    endSession: vi.fn(async () => undefined)
   }
 }
 
@@ -120,6 +127,8 @@ beforeEach(async () => {
     loadedParents: new Set(['file-root'])
   })
   mocks.state.initialize.mockClear()
+  mocks.handleAccessError.mockReset()
+  mocks.handleAccessError.mockResolvedValue(undefined)
   resetSyncDownloadQueueForTests()
 })
 
@@ -128,6 +137,29 @@ afterEach(() => {
 })
 
 describe('HHC LINE collection connection', () => {
+  it('routes a list 403 through the current account access owner', async () => {
+    const sessionRef = {
+      current: { userId: 'user-1', displayName: 'Ada', roles: ['media_sync_user'] }
+    }
+    const currentAuth = auth(sessionRef)
+    const error = Object.assign(new Error('forbidden'), {
+      classification: 'access-revoked',
+      status: 403
+    })
+    mocks.api = api({
+      listCollections: vi.fn(async () => {
+        throw error
+      })
+    })
+
+    await expect(listHhcLineCollections(currentAuth)).rejects.toBe(error)
+    expect(mocks.handleAccessError).toHaveBeenCalledWith(
+      currentAuth,
+      { kind: 'account', accountUserId: 'user-1' },
+      error
+    )
+  })
+
   it('leaves local media inert when there is no HHC session', async () => {
     await expect(
       prepareHhcLinePresentationSource(auth({ current: null }), {
@@ -209,28 +241,38 @@ describe('HHC LINE collection connection', () => {
       })
     })
 
+    const currentAuth = auth({
+      current: { userId: 'user-1', displayName: 'Ada', roles: [] }
+    })
     await expect(
-      prepareHhcLinePresentationSource(
-        auth({ current: { userId: 'user-1', displayName: 'Ada', roles: [] } }),
-        {
-          id: 'local-1',
-          parentId: 'root',
-          type: 'file',
-          sortIndex: 0,
-          createdAt: 1,
-          expiresAt: null,
-          name: 'photo.png',
-          mimeType: 'image/png',
-          size: 1,
-          url: 'hhc-line:asset-1'
-        }
-      )
+      prepareHhcLinePresentationSource(currentAuth, {
+        id: 'local-1',
+        parentId: 'root',
+        type: 'file',
+        sortIndex: 0,
+        createdAt: 1,
+        expiresAt: null,
+        name: 'photo.png',
+        mimeType: 'image/png',
+        size: 1,
+        url: 'hhc-line:asset-1'
+      })
     ).rejects.toMatchObject({
       classification: 'access-revoked',
       status: 403,
       providerConnectionId: 'hhc-line:user-1',
       remoteItemId: 'asset-1'
     })
+    expect(mocks.handleAccessError).toHaveBeenCalledWith(
+      currentAuth,
+      {
+        kind: 'root',
+        providerConnectionId: 'hhc-line:user-1',
+        rootRemoteFolderId: 'collection-1',
+        remoteItemId: 'asset-1'
+      },
+      expect.objectContaining({ classification: 'access-revoked', status: 403 })
+    )
   })
 
   it('prepares an ephemeral source from the exact imported collection without persisting it', async () => {

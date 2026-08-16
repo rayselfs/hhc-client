@@ -35,6 +35,7 @@ import {
   collectSyncChangePages
 } from './sync-refresh'
 import { unlinkSyncRootFolderFromApp } from './sync-unlink'
+import { handleHhcLineAccessError, isHhcLineRootAuthorized } from './hhc-line-access'
 
 const importsInFlight = new Map<string, Promise<CloudImportResult>>()
 const importQueueTails = new Map<string, Promise<void>>()
@@ -115,7 +116,9 @@ async function createProvider(
     getSession: async () => {
       const session = auth.getSession()
       return !expectedUserId || session?.userId === expectedUserId ? session : null
-    }
+    },
+    onAccessError: (scope, error) =>
+      handleHhcLineAccessError(auth, { kind: 'root', ...scope }, error)
   })
 }
 
@@ -211,6 +214,12 @@ export async function ensureHhcLineDesktopItemAvailableForPresentation(
     },
     previousEntry: found.entry,
     priority: 'presentation',
+    canCommit: () =>
+      isHhcLineRootAuthorized(
+        auth,
+        found.entry.providerConnectionId,
+        found.entry.parentRemoteItemId!
+      ),
     onDownloaded: () => refreshImportedMediaAssets([item])
   })
   assertCurrentAccount(auth, session.userId)
@@ -243,39 +252,44 @@ export async function getConnectedHhcLineAccount(
 
 export async function listHhcLineCollections(auth: HhcLineCloudAuth): Promise<CloudRemoteFolder[]> {
   const session = requireSession(auth)
-  const api = await createHhcAssetApi(auth)
-  const collections: CloudRemoteFolder[] = []
-  const seenCursors = new Set<string>()
-  let cursor: string | undefined
-  let hasMore = true
-  let pageCount = 0
+  try {
+    const api = await createHhcAssetApi(auth)
+    const collections: CloudRemoteFolder[] = []
+    const seenCursors = new Set<string>()
+    let cursor: string | undefined
+    let hasMore = true
+    let pageCount = 0
 
-  while (hasMore) {
-    const page = await api.listCollections(cursor)
-    pageCount += 1
-    assertCurrentAccount(auth, session.userId)
-    for (const collection of page.collections) {
-      if (!collection.deletedAt) {
-        collections.push({
-          remoteItemId: collection.id,
-          name: collection.name,
-          parentRemoteItemId: null
-        })
+    while (hasMore) {
+      const page = await api.listCollections(cursor)
+      pageCount += 1
+      assertCurrentAccount(auth, session.userId)
+      for (const collection of page.collections) {
+        if (!collection.deletedAt) {
+          collections.push({
+            remoteItemId: collection.id,
+            name: collection.name,
+            parentRemoteItemId: null
+          })
+        }
       }
+      hasMore = page.hasMore
+      if (!hasMore) continue
+      if (pageCount >= MAX_COLLECTION_PAGES || !page.cursor || seenCursors.has(page.cursor)) {
+        throw new Error('Invalid HHC collection pagination')
+      }
+      seenCursors.add(page.cursor)
+      cursor = page.cursor
     }
-    hasMore = page.hasMore
-    if (!hasMore) continue
-    if (pageCount >= MAX_COLLECTION_PAGES || !page.cursor || seenCursors.has(page.cursor)) {
-      throw new Error('Invalid HHC collection pagination')
-    }
-    seenCursors.add(page.cursor)
-    cursor = page.cursor
-  }
 
-  await useFileExplorerStore.getState().initialize()
-  assertCurrentAccount(auth, session.userId)
-  const imported = importedCollectionIds(createHhcLineProviderConnectionId(session.userId))
-  return collections.filter((collection) => !imported.has(collection.remoteItemId))
+    await useFileExplorerStore.getState().initialize()
+    assertCurrentAccount(auth, session.userId)
+    const imported = importedCollectionIds(createHhcLineProviderConnectionId(session.userId))
+    return collections.filter((collection) => !imported.has(collection.remoteItemId))
+  } catch (error) {
+    await handleHhcLineAccessError(auth, { kind: 'account', accountUserId: session.userId }, error)
+    throw error
+  }
 }
 
 export function importHhcLineCollection(

@@ -13,10 +13,10 @@ export default function MediaProjectionBridge({
   onHhcAccessRevoked?: (scope: HhcProjectionAccessRevoked) => void
 }): null {
   const { on, isProjectionOpen, recovery } = useProjection()
-  const { session, getAccessToken, refreshAccessToken } = useHhcAuth()
+  const { session, getAccessToken, refreshAccessToken, endSession } = useHhcAuth()
   const auth = useMemo(
-    () => ({ getSession: () => session, getAccessToken, refreshAccessToken }),
-    [getAccessToken, refreshAccessToken, session]
+    () => ({ getSession: () => session, getAccessToken, refreshAccessToken, endSession }),
+    [endSession, getAccessToken, refreshAccessToken, session]
   )
 
   useMediaProjectionSync({ auth, onAccessRevoked: onHhcAccessRevoked })

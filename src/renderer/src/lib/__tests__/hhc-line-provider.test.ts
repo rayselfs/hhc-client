@@ -168,6 +168,57 @@ describe('HHC LINE read-only provider', () => {
     )
   })
 
+  it.each(['changes', 'metadata', 'source', 'download'] as const)(
+    'reports %s Asset failures with the exact root scope',
+    async (operation) => {
+      const client = api()
+      const error = Object.assign(new Error('forbidden'), {
+        classification: 'access-revoked',
+        status: 403
+      })
+      const onAccessError = vi.fn(async () => undefined)
+      if (operation === 'changes') vi.mocked(client.getCollectionChanges).mockRejectedValue(error)
+      if (operation === 'metadata') vi.mocked(client.getCollectionItem).mockRejectedValue(error)
+      if (operation === 'source') vi.mocked(client.getRemoteContentSource).mockRejectedValue(error)
+      if (operation === 'download') vi.mocked(client.downloadContent).mockRejectedValue(error)
+      const provider = new HhcLineReadonlyProvider({
+        api: client,
+        getSession: vi.fn(),
+        onAccessError
+      })
+
+      if (operation !== 'changes') await provider.initialScan('hhc-line:user_1', collection.id)
+      const request =
+        operation === 'changes'
+          ? provider.initialScan('hhc-line:user_1', collection.id)
+          : operation === 'metadata'
+            ? provider.getMetadata('hhc-line:user_1', item.id)
+            : operation === 'source'
+              ? provider.getRemoteContentSource('hhc-line:user_1', item.id)
+              : provider.downloadContent(
+                  {
+                    providerConnectionId: 'hhc-line:user_1',
+                    rootRemoteFolderId: collection.id,
+                    remoteItemId: item.id,
+                    targetBlobId: 'blob_1',
+                    offlinePolicy: 'on-demand'
+                  },
+                  new AbortController().signal,
+                  () => true
+                )
+
+      await expect(request).rejects.toBe(error)
+      expect(onAccessError).toHaveBeenCalledWith(
+        {
+          providerConnectionId: 'hhc-line:user_1',
+          rootRemoteFolderId: collection.id,
+          ...(operation === 'changes' ? {} : { remoteItemId: item.id })
+        },
+        error
+      )
+    }
+  )
+
   it('keeps the provider read-only and maps access failures distinctly', () => {
     const provider = new HhcLineReadonlyProvider({ api: api(), getSession: vi.fn() })
     expect(provider.classifyError({ classification: 'access-revoked' })).toBe('access-revoked')

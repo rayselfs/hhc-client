@@ -3,6 +3,7 @@ import type {
   ReadOnlySyncProvider,
   SyncDownloadRequest,
   SyncDownloadResult,
+  SyncDownloadCommitGuard,
   SyncRetryClassification
 } from './sync-provider'
 import { getFileBlobRecord, isFileBlobRecordAvailable } from './file-explorer-db'
@@ -47,7 +48,11 @@ export interface EnqueueSyncDownloadInput {
   entry: SyncDownloadEntry
   previousEntry?: SyncEntryRecord
   priority?: SyncDownloadPriority
-  onDownloaded?: (result: SyncDownloadResult) => void | Promise<void>
+  canCommit?: SyncDownloadCommitGuard
+  onDownloaded?: (
+    result: SyncDownloadResult,
+    canCommit: SyncDownloadCommitGuard
+  ) => void | Promise<void>
 }
 
 interface SyncDownloadQueueJob extends EnqueueSyncDownloadInput {
@@ -58,6 +63,7 @@ interface SyncDownloadQueueJob extends EnqueueSyncDownloadInput {
   resolve: (result: SyncDownloadResult | null) => void
   controller: AbortController
   cancelled: boolean
+  active: boolean
 }
 
 const priorityValues: Record<SyncDownloadPriority, number> = {
@@ -179,7 +185,8 @@ export function enqueueSyncDownload(
     promise,
     resolve,
     controller: new AbortController(),
-    cancelled: false
+    cancelled: false,
+    active: false
   }
   queuedJobs.push(job)
   jobsByKey.set(key, job)
@@ -191,24 +198,51 @@ export function enqueueSyncDownload(
 export function cancelSyncDownloads(scope: {
   providerConnectionId: string
   remoteItemId?: string
+  rootRemoteFolderId?: string
 }): number {
   let cancelledCount = 0
   for (const job of [...jobsByKey.values()]) {
     if (
       job.request.providerConnectionId !== scope.providerConnectionId ||
-      (scope.remoteItemId !== undefined && job.request.remoteItemId !== scope.remoteItemId)
+      (scope.remoteItemId !== undefined && job.request.remoteItemId !== scope.remoteItemId) ||
+      (scope.rootRemoteFolderId !== undefined &&
+        job.request.rootRemoteFolderId !== scope.rootRemoteFolderId)
     ) {
       continue
     }
     cancelledCount += 1
     job.cancelled = true
     job.controller.abort()
-    jobsByKey.delete(job.key)
+    if (job.active && job.provider.providerType === 'hhc-line') {
+      void window.api?.hhcAssets?.cancelDownload(job.request.targetBlobId).catch(() => undefined)
+    }
     const queuedIndex = queuedJobs.indexOf(job)
-    if (queuedIndex >= 0) queuedJobs.splice(queuedIndex, 1)
-    job.resolve(null)
+    if (queuedIndex >= 0) {
+      queuedJobs.splice(queuedIndex, 1)
+      jobsByKey.delete(job.key)
+      job.resolve(null)
+    }
   }
   return cancelledCount
+}
+
+export async function cancelSyncDownloadsAndWait(scope: {
+  providerConnectionId: string
+  remoteItemId?: string
+  rootRemoteFolderId?: string
+}): Promise<number> {
+  const pending = [...jobsByKey.values()]
+    .filter(
+      (job) =>
+        job.request.providerConnectionId === scope.providerConnectionId &&
+        (scope.remoteItemId === undefined || job.request.remoteItemId === scope.remoteItemId) &&
+        (scope.rootRemoteFolderId === undefined ||
+          job.request.rootRemoteFolderId === scope.rootRemoteFolderId)
+    )
+    .map((job) => job.promise)
+  const cancelled = cancelSyncDownloads(scope)
+  await Promise.all(pending)
+  return cancelled
 }
 
 function sortQueuedJobs(): void {
@@ -219,6 +253,7 @@ function pumpSyncDownloadQueue(): void {
   while (activeCount < SYNC_DOWNLOAD_CONCURRENCY && queuedJobs.length > 0) {
     const job = queuedJobs.shift()
     if (!job) return
+    job.active = true
     activeCount += 1
     void runSyncDownloadJob(job)
   }
@@ -226,8 +261,13 @@ function pumpSyncDownloadQueue(): void {
 
 async function runSyncDownloadJob(job: SyncDownloadQueueJob): Promise<void> {
   try {
+    const canCommit = async (): Promise<boolean> =>
+      !job.cancelled &&
+      !job.controller.signal.aborted &&
+      (job.canCommit ? await job.canCommit() : true)
+    if (!(await canCommit())) throw new SyncDownloadCancelledError()
     const alreadyAvailable = await getAlreadyAvailableResult(job)
-    if (job.cancelled) throw new SyncDownloadCancelledError()
+    if (!(await canCommit())) throw new SyncDownloadCancelledError()
     if (alreadyAvailable) {
       job.resolve(alreadyAvailable)
       return
@@ -242,10 +282,10 @@ async function runSyncDownloadJob(job: SyncDownloadQueueJob): Promise<void> {
       downloadedBytes: 0,
       downloadTotalBytes: job.entry.size
     })
-    const canCommit = (): boolean => !job.cancelled && !job.controller.signal.aborted
     const result = await job.provider.downloadContent(job.request, job.controller.signal, canCommit)
     if (!(await canCommit())) throw new SyncDownloadCancelledError()
-    await job.onDownloaded?.(result)
+    await job.onDownloaded?.(result, canCommit)
+    if (!(await canCommit())) throw new SyncDownloadCancelledError()
     job.resolve(result)
   } catch (error) {
     if (job.cancelled || error instanceof SyncDownloadCancelledError) {
@@ -264,6 +304,7 @@ async function runSyncDownloadJob(job: SyncDownloadQueueJob): Promise<void> {
     })
     job.resolve(null)
   } finally {
+    job.active = false
     activeCount = Math.max(0, activeCount - 1)
     if (jobsByKey.get(job.key) === job) jobsByKey.delete(job.key)
     pumpSyncDownloadQueue()

@@ -92,7 +92,8 @@ function auth(sessionRef: { current: HhcSession | null }): HhcLineCloudAuth {
   return {
     getSession: () => sessionRef.current,
     getAccessToken: vi.fn(async () => 'token'),
-    refreshAccessToken: vi.fn(async () => 'refreshed')
+    refreshAccessToken: vi.fn(async () => 'refreshed'),
+    endSession: vi.fn(async () => undefined)
   }
 }
 
@@ -362,7 +363,7 @@ describe('startSyncRuntime', () => {
     hhcMocks.connections = [targetConnection]
     hhcMocks.folders = { [revoked.id]: revoked, [sibling.id]: sibling }
     hhcMocks.refreshFolder.mockImplementation(async (rootFolderId: string) => {
-      if (rootFolderId === revoked.id) throw { classification: 'access-revoked' }
+      if (rootFolderId === revoked.id) throw { classification: 'access-revoked', status: 403 }
       return idleSummary(targetConnection.id, rootFolderId)
     })
     const onHhcAccessRevoked = vi.fn()
@@ -381,6 +382,22 @@ describe('startSyncRuntime', () => {
     stop()
   })
 
+  it('does not purge a root for a forged access-revoked classification without HTTP 403', async () => {
+    const sessionRef = { current: session() }
+    const targetConnection = connection('hhc-runtime-forged-revoked')
+    const target = root('root-forged-revoked', targetConnection.id)
+    hhcMocks.connections = [targetConnection]
+    hhcMocks.folders = { [target.id]: target }
+    hhcMocks.refreshFolder.mockRejectedValueOnce({ classification: 'access-revoked' })
+    const onHhcAccessRevoked = vi.fn()
+
+    const stop = startSyncRuntime({ hhcAuth: auth(sessionRef), onHhcAccessRevoked })
+    await vi.waitFor(() => expect(hhcMocks.refreshFolder).toHaveBeenCalledOnce())
+
+    expect(onHhcAccessRevoked).not.toHaveBeenCalled()
+    stop()
+  })
+
   it('retries access-revoked cleanup after a callback rejection while siblings continue', async () => {
     const sessionRef = { current: session() }
     const targetConnection = connection('hhc-runtime-revoked-retry')
@@ -389,7 +406,7 @@ describe('startSyncRuntime', () => {
     hhcMocks.connections = [targetConnection]
     hhcMocks.folders = { [revoked.id]: revoked, [sibling.id]: sibling }
     hhcMocks.refreshFolder.mockImplementation(async (rootFolderId: string) => {
-      if (rootFolderId === revoked.id) throw { classification: 'access-revoked' }
+      if (rootFolderId === revoked.id) throw { classification: 'access-revoked', status: 403 }
       return idleSummary(targetConnection.id, rootFolderId)
     })
     const onHhcAccessRevoked = vi

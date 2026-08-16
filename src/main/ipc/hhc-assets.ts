@@ -27,6 +27,7 @@ const OPAQUE_ID_PATTERN = /^[A-Za-z0-9_-]{1,255}$/
 const MAX_CURSOR_BYTES = 2048
 const MAX_CONTENT_BYTES = 200 * 1024 * 1024
 const MAX_JSON_BYTES = 2 * 1024 * 1024
+const activeDownloads = new Map<string, AbortController>()
 
 function requestError(code = 'HHC_ASSET_FATAL'): Error {
   return new Error(code)
@@ -102,6 +103,7 @@ async function fetchAsset(
     try {
       return await net.fetch(`${HHC_ASSET_ORIGIN}${path}`, { ...init, headers })
     } catch {
+      if (init.signal?.aborted) throw requestError('HHC_ASSET_DOWNLOAD_CANCELLED')
       throw requestError('HHC_ASSET_RETRYABLE')
     }
   }
@@ -176,12 +178,14 @@ async function downloadContent(
   auth: HhcAuthService,
   collectionId: string,
   itemId: string,
-  destinationPath: string
+  destinationPath: string,
+  signal?: AbortSignal
 ): Promise<{ size: number; mimeType: string; etag: string }> {
+  if (signal?.aborted) throw requestError('HHC_ASSET_DOWNLOAD_CANCELLED')
   const response = await fetchAsset(
     auth,
     `/api/assets/collections/${collectionId}/items/${itemId}/content`,
-    { headers: { accept: '*/*' } }
+    { headers: { accept: '*/*' }, signal }
   )
   const declaredSize = Number(response.headers.get('content-length') ?? 0)
   if (!Number.isFinite(declaredSize) || declaredSize < 0 || declaredSize > MAX_CONTENT_BYTES) {
@@ -197,6 +201,7 @@ async function downloadContent(
     for (;;) {
       const { done, value } = await reader.read()
       if (done) break
+      if (signal?.aborted) throw requestError('HHC_ASSET_DOWNLOAD_CANCELLED')
       if (!value) continue
       size += value.byteLength
       if (size > MAX_CONTENT_BYTES) throw requestError()
@@ -204,6 +209,7 @@ async function downloadContent(
     }
   } catch (error) {
     await reader.cancel().catch(() => undefined)
+    if (signal?.aborted) throw requestError('HHC_ASSET_DOWNLOAD_CANCELLED')
     throw error
   } finally {
     await file.close()
@@ -212,6 +218,7 @@ async function downloadContent(
     await fs.rm(destinationPath, { force: true })
     throw requestError()
   }
+  if (signal?.aborted) throw requestError('HHC_ASSET_DOWNLOAD_CANCELLED')
   return {
     size,
     mimeType: response.headers.get('content-type') ?? 'application/octet-stream',
@@ -315,11 +322,22 @@ export function registerHhcAssetHandlers(wm: WindowManager, auth: HhcAuthService
         throw new Error('Invalid HHC Asset request')
       }
       const targetFileId = opaqueId(input.targetFileId)
+      if (activeDownloads.has(targetFileId)) throw requestError('HHC_ASSET_RETRYABLE')
+      const controller = new AbortController()
+      activeDownloads.set(targetFileId, controller)
       const destinationPath = getNativeFilePath(targetFileId)
       const temporaryPath = `${destinationPath}.${randomUUID()}.tmp`
       try {
-        const downloaded = await downloadContent(auth, collectionId, itemId, temporaryPath)
+        const downloaded = await downloadContent(
+          auth,
+          collectionId,
+          itemId,
+          temporaryPath,
+          controller.signal
+        )
+        if (controller.signal.aborted) throw requestError('HHC_ASSET_DOWNLOAD_CANCELLED')
         await fs.mkdir(dirname(destinationPath), { recursive: true })
+        if (controller.signal.aborted) throw requestError('HHC_ASSET_DOWNLOAD_CANCELLED')
         await fs.rename(temporaryPath, destinationPath)
         return {
           fileId: targetFileId,
@@ -329,7 +347,16 @@ export function registerHhcAssetHandlers(wm: WindowManager, auth: HhcAuthService
       } catch (error) {
         await fs.rm(temporaryPath, { force: true }).catch(() => undefined)
         throw error
+      } finally {
+        if (activeDownloads.get(targetFileId) === controller) activeDownloads.delete(targetFileId)
       }
+    })
+  )
+
+  ipcMain.handle(
+    'hhc-assets:cancel-download',
+    authorized(async (rawTargetFileId: unknown): Promise<void> => {
+      activeDownloads.get(opaqueId(rawTargetFileId))?.abort()
     })
   )
 

@@ -168,7 +168,8 @@ describe('media projection sync', () => {
     const auth = {
       getSession: () => ({ userId: 'user-1', displayName: 'Ada', roles: [] }),
       getAccessToken: vi.fn(),
-      refreshAccessToken: vi.fn()
+      refreshAccessToken: vi.fn(),
+      endSession: vi.fn()
     }
     const item = setRemotePresentationItem(name, mimeType)
     remoteMocks.prepare.mockResolvedValueOnce({
@@ -290,7 +291,8 @@ describe('media projection sync', () => {
       auth: {
         getSession: () => ({ userId: 'user-1', displayName: 'Ada', roles: [] }),
         getAccessToken: vi.fn(),
-        refreshAccessToken: vi.fn()
+        refreshAccessToken: vi.fn(),
+        endSession: vi.fn()
       }
     })
     await act(async () => Promise.resolve())
@@ -373,7 +375,8 @@ describe('media projection sync', () => {
       auth: {
         getSession: () => ({ userId: 'user-1', displayName: 'Ada', roles: [] }),
         getAccessToken: vi.fn(),
-        refreshAccessToken: vi.fn()
+        refreshAccessToken: vi.fn(),
+        endSession: vi.fn()
       },
       onAccessRevoked
     })
@@ -413,6 +416,55 @@ describe('media projection sync', () => {
     vi.useRealTimers()
   })
 
+  it('stops projection and clears current remote sources and leases after an exact 403', async () => {
+    vi.useFakeTimers()
+    const clearContentLeases = vi.fn(async () => undefined)
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: { hhcAssets: { clearContentLeases } }
+    })
+    const onAccessRevoked = vi.fn(async () => undefined)
+    const item = setRemotePresentationItem('remote.mp4', 'video/mp4')
+    remoteMocks.prepare
+      .mockResolvedValueOnce({
+        providerConnectionId: 'hhc-line:user-1',
+        remoteItemId: 'asset-1',
+        rootRemoteFolderId: 'collection-1',
+        source: {
+          kind: 'ticket',
+          url: 'https://www.alive.org.tw/api/assets/content?ticket=current',
+          expiresAt: Date.now() + 60_000,
+          etag: 'etag-1'
+        }
+      })
+      .mockRejectedValueOnce(
+        Object.assign(new HhcAssetApiError('access-revoked', 403), {
+          providerConnectionId: 'hhc-line:user-1',
+          remoteItemId: 'asset-1'
+        })
+      )
+
+    renderSync({
+      auth: {
+        getSession: () => ({ userId: 'user-1', displayName: 'Ada', roles: [] }),
+        getAccessToken: vi.fn(),
+        refreshAccessToken: vi.fn(),
+        endSession: vi.fn()
+      },
+      onAccessRevoked
+    })
+    await act(async () => Promise.resolve())
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000)
+    })
+
+    expect(useMediaProjectionStore.getState().snapshot?.entries[0].sourceUrl).toBe(item.url)
+    expect(clearContentLeases).toHaveBeenCalledOnce()
+    expect(mockStopProjection).toHaveBeenCalledOnce()
+    expect(onAccessRevoked).toHaveBeenCalledOnce()
+  })
+
   it('does not emit access-revoked for an auth-required account mismatch', async () => {
     const onAccessRevoked = vi.fn()
     setRemotePresentationItem()
@@ -428,7 +480,8 @@ describe('media projection sync', () => {
       auth: {
         getSession: () => ({ userId: 'user-2', displayName: 'Grace', roles: [] }),
         getAccessToken: vi.fn(),
-        refreshAccessToken: vi.fn()
+        refreshAccessToken: vi.fn(),
+        endSession: vi.fn()
       },
       onAccessRevoked
     })
@@ -465,7 +518,8 @@ describe('media projection sync', () => {
       const auth = {
         getSession: () => sessionRef.current,
         getAccessToken: vi.fn(),
-        refreshAccessToken: vi.fn()
+        refreshAccessToken: vi.fn(),
+        endSession: vi.fn()
       }
       setRemotePresentationItem()
       remoteMocks.prepare.mockReturnValueOnce(pending.promise)
@@ -555,7 +609,8 @@ describe('media projection sync', () => {
       auth: {
         getSession: () => ({ userId: 'user-1', displayName: 'Ada', roles: [] }),
         getAccessToken: vi.fn(),
-        refreshAccessToken: vi.fn()
+        refreshAccessToken: vi.fn(),
+        endSession: vi.fn()
       }
     })
     await waitFor(() => expect(remoteMocks.prepare).toHaveBeenCalledOnce())
@@ -595,7 +650,8 @@ describe('media projection sync', () => {
     const auth = {
       getSession: () => sessionRef.current,
       getAccessToken: vi.fn(),
-      refreshAccessToken: vi.fn()
+      refreshAccessToken: vi.fn(),
+      endSession: vi.fn()
     }
     useMediaProjectionStore.setState({
       snapshot: {
@@ -735,7 +791,8 @@ describe('media projection sync', () => {
       auth: {
         getSession: () => ({ userId: 'user-1', displayName: 'Ada', roles: [] }),
         getAccessToken: vi.fn(),
-        refreshAccessToken: vi.fn()
+        refreshAccessToken: vi.fn(),
+        endSession: vi.fn()
       }
     })
 
@@ -784,7 +841,8 @@ describe('media projection sync', () => {
       auth: {
         getSession: () => ({ userId: 'user-1', displayName: 'Ada', roles: [] }),
         getAccessToken: vi.fn(),
-        refreshAccessToken: vi.fn()
+        refreshAccessToken: vi.fn(),
+        endSession: vi.fn()
       },
       onAccessRevoked
     })
@@ -807,7 +865,8 @@ describe('media projection sync', () => {
       auth: {
         getSession: () => ({ userId: 'user-1', displayName: 'Ada', roles: [] }),
         getAccessToken: vi.fn(),
-        refreshAccessToken: vi.fn()
+        refreshAccessToken: vi.fn(),
+        endSession: vi.fn()
       }
     })
     await waitFor(() => expect(remoteMocks.ensurePersistent).toHaveBeenCalledOnce())

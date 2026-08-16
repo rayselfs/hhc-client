@@ -42,7 +42,8 @@ describe('cloud provider adapter', () => {
     const auth = {
       getSession: () => session,
       getAccessToken: vi.fn(async () => 'access-token'),
-      refreshAccessToken: vi.fn(async () => 'refresh-token')
+      refreshAccessToken: vi.fn(async () => 'refresh-token'),
+      endSession: vi.fn(async () => undefined)
     }
     hhcLineMocks.listCollections.mockResolvedValueOnce([
       { remoteItemId: 'collection-1', name: 'Sunday', parentRemoteItemId: null }

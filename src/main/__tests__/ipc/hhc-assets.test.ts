@@ -471,6 +471,49 @@ describe('HHC Asset IPC', () => {
     )
   })
 
+  it('cancels an active native download before the final rename', async () => {
+    let stream!: ReadableStreamDefaultController<Uint8Array>
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            stream = controller
+          }
+        }),
+        { headers: { 'content-type': 'video/mp4', 'content-length': '3' } }
+      )
+    )
+    const targetFileId = '123e4567-e89b-12d3-a456-426614174000'
+    const pending = handler('hhc-assets:download-file')(event(), {
+      collectionId: 'collection_1',
+      itemId: 'item_1',
+      rootRemoteFolderId: 'collection_1',
+      targetFileId
+    })
+    await vi.waitFor(() => expect(mockOpen).toHaveBeenCalledOnce())
+
+    await expect(
+      handler('hhc-assets:cancel-download')(event(), targetFileId)
+    ).resolves.toBeUndefined()
+    stream.enqueue(new Uint8Array([1, 2, 3]))
+    stream.close()
+
+    await expect(pending).rejects.toThrow('HHC_ASSET_DOWNLOAD_CANCELLED')
+    expect(mockRename).not.toHaveBeenCalled()
+    expect(mockRm).toHaveBeenCalledWith(expect.stringMatching(/\.tmp$/), { force: true })
+  })
+
+  it('keeps native download cancellation on the authorized opaque-ID boundary', async () => {
+    await expect(handler('hhc-assets:cancel-download')(event(), '../file')).rejects.toThrow(
+      'Invalid HHC Asset request'
+    )
+
+    vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(projectionWindow as never)
+    await expect(
+      handler('hhc-assets:cancel-download')(event(), '123e4567-e89b-12d3-a456-426614174000')
+    ).rejects.toThrow('Unauthorized')
+  })
+
   it('fails closed when an HHC download root does not match its collection', async () => {
     await expect(
       handler('hhc-assets:download-file')(event(), {

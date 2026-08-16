@@ -1,5 +1,5 @@
 import { Outlet, useLocation } from 'react-router-dom'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import AppLoadingScreen from '@renderer/components/Control/AppLoadingScreen'
 import Sidebar from '@renderer/components/Control/Sidebar'
 import Header from '@renderer/components/Control/Header/Header'
@@ -30,7 +30,8 @@ import { useHhcAuth } from '@renderer/contexts/HhcAuthContext'
 
 export default function Layout(): React.JSX.Element {
   const [initialized, setInitialized] = useState(false)
-  const { session, getAccessToken, getAuthGeneration, refreshAccessToken } = useHhcAuth()
+  const { session, getAccessToken, getAuthGeneration, refreshAccessToken, endSession } =
+    useHhcAuth()
   const hhcSessionRef = useRef(session)
   useEffect(() => {
     hhcSessionRef.current = session
@@ -39,9 +40,28 @@ export default function Layout(): React.JSX.Element {
     () => ({
       getSession: () => hhcSessionRef.current,
       getAccessToken,
-      refreshAccessToken
+      refreshAccessToken,
+      endSession
     }),
-    [getAccessToken, refreshAccessToken]
+    [endSession, getAccessToken, refreshAccessToken]
+  )
+  const handleHhcAccessRevoked = useCallback(
+    async (scope: { connectionId: string; rootFolderId: string }): Promise<void> => {
+      const { revokeHhcLineRootAccess } = await import('@renderer/lib/hhc-line-access')
+      await revokeHhcLineRootAccess({
+        kind: 'root',
+        providerConnectionId: scope.connectionId,
+        rootFolderId: scope.rootFolderId
+      })
+    },
+    []
+  )
+  const handleHhcProjectionAccessRevoked = useCallback(
+    async (scope: { providerConnectionId: string; remoteItemId: string }): Promise<void> => {
+      const { revokeHhcLineRootAccess } = await import('@renderer/lib/hhc-line-access')
+      await revokeHhcLineRootAccess({ kind: 'root', ...scope })
+    },
+    []
   )
   const location = useLocation()
   const isPresentationWorkspace = location.pathname.startsWith('/presentations')
@@ -49,7 +69,11 @@ export default function Layout(): React.JSX.Element {
   useAutoUpdateCheck()
 
   useEffect(() => {
-    const cleanup = initializeApp({ hhcAuth, getHhcAuthGeneration: getAuthGeneration })
+    const cleanup = initializeApp({
+      hhcAuth,
+      getHhcAuthGeneration: getAuthGeneration,
+      onHhcAccessRevoked: handleHhcAccessRevoked
+    })
 
     const isCoreReady = (): boolean =>
       useFileExplorerStore.getState().isInitialized && useBibleFolderStore.getState().isInitialized
@@ -73,7 +97,7 @@ export default function Layout(): React.JSX.Element {
       unsub()
       unsub2()
     }
-  }, [getAuthGeneration, hhcAuth])
+  }, [getAuthGeneration, handleHhcAccessRevoked, hhcAuth])
 
   if (!initialized) return <AppLoadingScreen />
 
@@ -111,7 +135,7 @@ export default function Layout(): React.JSX.Element {
                     <PresentationNavigationGuard />
                     <PresentationElectronCloseBridge />
                     <TimerProjectionBridge />
-                    <MediaProjectionBridge />
+                    <MediaProjectionBridge onHhcAccessRevoked={handleHhcProjectionAccessRevoked} />
                     <LanRemoteBridge />
                     <ProjectionRecoveryNotice />
                     <BackgroundTaskTray />
