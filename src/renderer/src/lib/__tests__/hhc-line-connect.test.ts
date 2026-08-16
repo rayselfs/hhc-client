@@ -2,7 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import 'fake-indexeddb/auto'
 import type { HhcAssetApi } from '../hhc-asset-api'
 import type { HhcSession } from '@shared/hhc-auth'
-import type { HhcAssetCollection, HhcAssetCollectionChangePage } from '@shared/hhc-assets'
+import type {
+  HhcAssetCollection,
+  HhcAssetCollectionChangePage,
+  HhcAssetCollectionItem
+} from '@shared/hhc-assets'
 import type { FolderRecord } from '@shared/types/folder'
 import type { HhcLineCloudAuth } from '../cloud-provider'
 import { openFileExplorerDB, resetFileExplorerDBForTests } from '../file-explorer-db'
@@ -70,17 +74,21 @@ function auth(sessionRef: { current: HhcSession | null }): HhcLineCloudAuth {
   }
 }
 
+function resetChanges(items: HhcAssetCollectionItem[] = []): HhcAssetApi['getCollectionChanges'] {
+  return vi.fn(async (collectionId: string, cursor?: string) => ({
+    collection: collection(collectionId, collectionId),
+    items: cursor ? [] : items,
+    tombstones: [],
+    cursor: cursor ? `${collectionId}-revision-1` : `${collectionId}-reset-barrier`,
+    hasMore: !cursor,
+    reset: !cursor
+  }))
+}
+
 function api(overrides: Partial<HhcAssetApi> = {}): HhcAssetApi {
   return {
     listCollections: vi.fn(async () => ({ collections: [], hasMore: false })),
-    getCollectionChanges: vi.fn(async () => ({
-      collection: collection('collection-1', 'Sunday'),
-      items: [],
-      tombstones: [],
-      cursor: 'revision-1',
-      hasMore: false,
-      reset: true
-    })),
+    getCollectionChanges: resetChanges(),
     getCollectionItem: vi.fn(),
     issueContentTicket: vi.fn(),
     getRemoteContentSource: vi.fn(),
@@ -182,7 +190,7 @@ describe('HHC LINE collection connection', () => {
     ])
 
     expect(first).toEqual(second)
-    expect(mocks.api!.getCollectionChanges).toHaveBeenCalledTimes(1)
+    expect(mocks.api!.getCollectionChanges).toHaveBeenCalledTimes(2)
     const roots = await (await openFileExplorerDB()).getAll('folder-records')
     expect(roots).toEqual([
       expect.objectContaining({
@@ -216,14 +224,7 @@ describe('HHC LINE collection connection', () => {
 
   it('keeps multiple imported collections independent', async () => {
     mocks.api = api({
-      getCollectionChanges: vi.fn(async (collectionId: string) => ({
-        collection: collection(collectionId, collectionId),
-        items: [],
-        tombstones: [],
-        cursor: `${collectionId}-revision-1`,
-        hasMore: false,
-        reset: true
-      }))
+      getCollectionChanges: resetChanges()
     })
     const sessionRef = {
       current: { userId: 'user-1', displayName: 'Ada', roles: ['media_sync_user'] }
@@ -249,14 +250,7 @@ describe('HHC LINE collection connection', () => {
 
   it('serializes distinct imports when resolving root names and positions', async () => {
     mocks.api = api({
-      getCollectionChanges: vi.fn(async (collectionId: string) => ({
-        collection: collection(collectionId, collectionId),
-        items: [],
-        tombstones: [],
-        cursor: `${collectionId}-revision-1`,
-        hasMore: false,
-        reset: true
-      }))
+      getCollectionChanges: resetChanges()
     })
     const sessionRef = {
       current: { userId: 'user-1', displayName: 'Ada', roles: ['media_sync_user'] }
@@ -316,7 +310,7 @@ describe('HHC LINE collection connection', () => {
       parentRemoteItemId: null
     })
 
-    expect(mocks.api!.getCollectionChanges).toHaveBeenCalledTimes(1)
+    expect(mocks.api!.getCollectionChanges).toHaveBeenCalledTimes(2)
   })
 
   it.each(['plan', 'cursor'] as const)(
@@ -335,14 +329,7 @@ describe('HHC LINE collection connection', () => {
         createdAt: '2026-08-17T00:00:00Z'
       }
       mocks.api = api({
-        getCollectionChanges: vi.fn(async () => ({
-          collection: collection('collection-1', 'Sunday'),
-          items: [remoteItem],
-          tombstones: [],
-          cursor: 'revision-1',
-          hasMore: false,
-          reset: true
-        }))
+        getCollectionChanges: resetChanges([remoteItem])
       })
       const sessionRef = {
         current: { userId: 'user-1', displayName: 'Ada', roles: ['media_sync_user'] }
@@ -407,14 +394,7 @@ describe('HHC LINE collection connection', () => {
       createdAt: '2026-08-17T00:00:00Z'
     }
     mocks.api = api({
-      getCollectionChanges: vi.fn(async () => ({
-        collection: collection('collection-1', 'Sunday'),
-        items: [remoteItem],
-        tombstones: [],
-        cursor: 'revision-1',
-        hasMore: false,
-        reset: true
-      }))
+      getCollectionChanges: resetChanges([remoteItem])
     })
     const sessionRef: { current: HhcSession | null } = {
       current: { userId: 'user-1', displayName: 'Ada', roles: ['media_sync_user'] }
@@ -506,9 +486,17 @@ describe('HHC LINE collection connection', () => {
         collection: collection('collection-1', 'Sunday'),
         items: [remoteItem],
         tombstones: [],
+        cursor: 'reset-barrier-1',
+        hasMore: true,
+        reset: true
+      })
+      .mockResolvedValueOnce({
+        collection: collection('collection-1', 'Sunday'),
+        items: [],
+        tombstones: [],
         cursor: 'revision-1',
         hasMore: false,
-        reset: true
+        reset: false
       })
       .mockResolvedValueOnce({
         collection: collection('collection-1', 'Sunday'),
@@ -522,9 +510,17 @@ describe('HHC LINE collection connection', () => {
         collection: collection('collection-1', 'Sunday'),
         items: [remoteItem],
         tombstones: [],
+        cursor: 'reset-barrier-2',
+        hasMore: true,
+        reset: true
+      })
+      .mockResolvedValueOnce({
+        collection: collection('collection-1', 'Sunday'),
+        items: [],
+        tombstones: [],
         cursor: 'revision-3',
         hasMore: false,
-        reset: true
+        reset: false
       })
     mocks.api = api({ getCollectionChanges })
     const sessionRef = {
@@ -541,8 +537,8 @@ describe('HHC LINE collection connection', () => {
 
     await refreshHhcLineFolder(auth(sessionRef), root.id)
 
-    expect(getCollectionChanges).toHaveBeenNthCalledWith(2, 'collection-1', 'revision-1')
-    expect(getCollectionChanges).toHaveBeenNthCalledWith(3, 'collection-1')
+    expect(getCollectionChanges).toHaveBeenNthCalledWith(3, 'collection-1', 'revision-1')
+    expect(getCollectionChanges).toHaveBeenNthCalledWith(4, 'collection-1')
   })
 
   it('removes an account-scoped root when the account changes after refresh writes', async () => {

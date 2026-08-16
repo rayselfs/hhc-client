@@ -87,6 +87,7 @@ export async function collectSyncChangePages(
   const remoteItems = [...firstPage.items]
   let page = firstPage
   let pageCount = 1
+  let phase: 'reset' | 'delta' = reset ? 'reset' : 'delta'
 
   while (page.hasMore) {
     if (pageCount >= MAX_SYNC_CHANGE_PAGES) {
@@ -103,15 +104,18 @@ export async function collectSyncChangePages(
       cursor: nextCursor
     })
     const pageReset = Boolean(page.reset)
-    if (
-      pageReset !== reset &&
-      (!reset || pageReset || page.hasMore || page.items.length > MAX_RESET_HANDOFF_ITEMS)
-    ) {
+    if (phase === 'delta' && pageReset) {
+      throw new Error('Invalid sync change pagination')
+    }
+    if (phase === 'reset' && !pageReset) phase = 'delta'
+    if (reset && phase === 'delta' && page.items.length > MAX_RESET_HANDOFF_ITEMS) {
       throw new Error('Invalid sync change pagination')
     }
     remoteItems.push(...page.items)
     pageCount += 1
   }
+
+  if (reset && phase !== 'delta') throw new Error('Invalid sync change pagination')
 
   return {
     remoteItems: reset

@@ -585,9 +585,15 @@ describe('collectSyncChangePages', () => {
             name: 'two.mp4'
           }
         ],
+        nextCursor: 'reset-barrier',
+        hasMore: true,
+        reset: true
+      })
+      .mockResolvedValueOnce({
+        items: [],
         nextCursor: 'reset-complete',
         hasMore: false,
-        reset: true
+        reset: false
       })
     const provider = {
       initialScan: vi.fn(),
@@ -609,6 +615,11 @@ describe('collectSyncChangePages', () => {
       providerConnectionId: 'hhc-line:user-1',
       remoteFolderId: 'collection-1',
       cursor: 'reset-page-2'
+    })
+    expect(incrementalChanges).toHaveBeenNthCalledWith(3, {
+      providerConnectionId: 'hhc-line:user-1',
+      remoteFolderId: 'collection-1',
+      cursor: 'reset-barrier'
     })
   })
 
@@ -733,23 +744,120 @@ describe('collectSyncChangePages', () => {
     ).rejects.toThrow('Invalid sync change pagination')
   })
 
-  it('rejects a multi-page reset handoff delta', async () => {
+  it('collects a 500+2 multi-page reset handoff with last-event-wins', async () => {
+    const firstDeltaPage = [
+      ...Array.from({ length: 498 }, (_, index) => ({
+        remoteItemId: `filler-${index}`,
+        parentRemoteItemId: 'collection-1',
+        kind: 'file' as const,
+        name: `${index}.jpg`
+      })),
+      {
+        remoteItemId: 'item-updated',
+        parentRemoteItemId: 'collection-1',
+        kind: 'file' as const,
+        name: 'middle.jpg'
+      },
+      {
+        remoteItemId: 'item-deleted',
+        parentRemoteItemId: 'collection-1',
+        kind: 'file' as const,
+        name: 'still-present.jpg'
+      }
+    ]
+    const incrementalChanges = vi
+      .fn<ReadOnlySyncProvider['incrementalChanges']>()
+      .mockResolvedValueOnce({
+        items: [
+          {
+            remoteItemId: 'item-updated',
+            parentRemoteItemId: 'collection-1',
+            kind: 'file',
+            name: 'snapshot.jpg'
+          },
+          {
+            remoteItemId: 'item-deleted',
+            parentRemoteItemId: 'collection-1',
+            kind: 'file',
+            name: 'snapshot-delete.jpg'
+          }
+        ],
+        nextCursor: 'reset-barrier',
+        hasMore: true,
+        reset: true
+      })
+      .mockResolvedValueOnce({
+        items: firstDeltaPage,
+        nextCursor: 'delta-page-2',
+        hasMore: true,
+        reset: false
+      })
+      .mockResolvedValueOnce({
+        items: [
+          {
+            remoteItemId: 'item-updated',
+            parentRemoteItemId: 'collection-1',
+            kind: 'file',
+            name: 'final.jpg'
+          },
+          {
+            remoteItemId: 'item-deleted',
+            parentRemoteItemId: 'collection-1',
+            kind: 'file',
+            name: 'item-deleted',
+            deleted: true
+          }
+        ],
+        nextCursor: 'delta-complete',
+        hasMore: false,
+        reset: false
+      })
     const provider = {
       initialScan: vi.fn(),
-      incrementalChanges: vi
-        .fn<ReadOnlySyncProvider['incrementalChanges']>()
-        .mockResolvedValueOnce({
-          items: [],
-          nextCursor: 'reset-barrier',
-          hasMore: true,
-          reset: true
-        })
-        .mockResolvedValueOnce({
-          items: [],
-          nextCursor: 'another-delta-page',
-          hasMore: true,
-          reset: false
-        })
+      incrementalChanges
+    } as unknown as ReadOnlySyncProvider
+
+    const result = await collectSyncChangePages(
+      provider,
+      'connection-1',
+      'collection-1',
+      'stale-cursor'
+    )
+
+    expect(result.remoteItems).toHaveLength(500)
+    expect(result.remoteItems.find((item) => item.remoteItemId === 'item-updated')).toMatchObject({
+      name: 'final.jpg'
+    })
+    expect(result.remoteItems.find((item) => item.remoteItemId === 'item-deleted')).toMatchObject({
+      deleted: true
+    })
+    expect(result).toMatchObject({ nextCursor: 'delta-complete', reset: true, usedCursor: false })
+    expect(incrementalChanges).toHaveBeenNthCalledWith(1, {
+      providerConnectionId: 'connection-1',
+      remoteFolderId: 'collection-1',
+      cursor: 'stale-cursor'
+    })
+    expect(incrementalChanges).toHaveBeenNthCalledWith(2, {
+      providerConnectionId: 'connection-1',
+      remoteFolderId: 'collection-1',
+      cursor: 'reset-barrier'
+    })
+    expect(incrementalChanges).toHaveBeenNthCalledWith(3, {
+      providerConnectionId: 'connection-1',
+      remoteFolderId: 'collection-1',
+      cursor: 'delta-page-2'
+    })
+  })
+
+  it('rejects a reset snapshot that ends without a delta barrier', async () => {
+    const provider = {
+      initialScan: vi.fn(),
+      incrementalChanges: vi.fn<ReadOnlySyncProvider['incrementalChanges']>(async () => ({
+        items: [],
+        nextCursor: 'reset-complete',
+        hasMore: false,
+        reset: true
+      }))
     } as unknown as ReadOnlySyncProvider
 
     await expect(
