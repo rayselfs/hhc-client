@@ -366,7 +366,9 @@ describe('startSyncRuntime', () => {
       if (rootFolderId === revoked.id) throw { classification: 'access-revoked', status: 403 }
       return idleSummary(targetConnection.id, rootFolderId)
     })
-    const onHhcAccessRevoked = vi.fn()
+    const onHhcAccessRevoked = vi.fn(async () => {
+      delete hhcMocks.folders[revoked.id]
+    })
 
     const stop = startSyncRuntime({ hhcAuth: auth(sessionRef), onHhcAccessRevoked })
     await vi.waitFor(() => expect(hhcMocks.refreshFolder).toHaveBeenCalledWith(sibling.id))
@@ -409,10 +411,13 @@ describe('startSyncRuntime', () => {
       if (rootFolderId === revoked.id) throw { classification: 'access-revoked', status: 403 }
       return idleSummary(targetConnection.id, rootFolderId)
     })
-    const onHhcAccessRevoked = vi
-      .fn()
-      .mockRejectedValueOnce(new Error('cleanup unavailable'))
-      .mockResolvedValue(undefined)
+    const onHhcAccessRevoked = vi.fn().mockImplementationOnce(async () => {
+      hhcMocks.folders[revoked.id] = root(revoked.id, targetConnection.id, 'access-revoked')
+      throw new Error('cleanup unavailable')
+    })
+    onHhcAccessRevoked.mockImplementationOnce(async () => {
+      delete hhcMocks.folders[revoked.id]
+    })
 
     const stop = startSyncRuntime({ hhcAuth: auth(sessionRef), onHhcAccessRevoked })
     await vi.waitFor(() => {
@@ -422,10 +427,40 @@ describe('startSyncRuntime', () => {
 
     await vi.advanceTimersByTimeAsync(15_000)
     expect(onHhcAccessRevoked).toHaveBeenCalledTimes(2)
+    expect(
+      hhcMocks.refreshFolder.mock.calls.filter(([rootFolderId]) => rootFolderId === revoked.id)
+    ).toHaveLength(1)
     expect(hhcMocks.refreshFolder).toHaveBeenCalledWith(sibling.id)
 
     await vi.advanceTimersByTimeAsync(60_000)
     expect(onHhcAccessRevoked).toHaveBeenCalledTimes(2)
+    stop()
+  })
+
+  it('discovers persisted revoked roots and retries cleanup without another Asset request', async () => {
+    const sessionRef = { current: session() }
+    const targetConnection = connection('hhc-runtime-persisted-revoked')
+    const revoked = root('root-persisted-revoked', targetConnection.id, 'access-revoked')
+    const sibling = root('root-persisted-revoked-sibling', targetConnection.id)
+    hhcMocks.connections = [targetConnection]
+    hhcMocks.folders = { [revoked.id]: revoked, [sibling.id]: sibling }
+    const onHhcAccessRevoked = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('unlink unavailable'))
+      .mockImplementationOnce(async () => {
+        delete hhcMocks.folders[revoked.id]
+      })
+
+    const stop = startSyncRuntime({ hhcAuth: auth(sessionRef), onHhcAccessRevoked })
+    await vi.waitFor(() => {
+      expect(onHhcAccessRevoked).toHaveBeenCalledOnce()
+      expect(hhcMocks.refreshFolder).toHaveBeenCalledWith(sibling.id)
+    })
+    expect(hhcMocks.refreshFolder).not.toHaveBeenCalledWith(revoked.id)
+
+    await vi.advanceTimersByTimeAsync(15_000)
+    expect(onHhcAccessRevoked).toHaveBeenCalledTimes(2)
+    expect(hhcMocks.refreshFolder).not.toHaveBeenCalledWith(revoked.id)
     stop()
   })
 

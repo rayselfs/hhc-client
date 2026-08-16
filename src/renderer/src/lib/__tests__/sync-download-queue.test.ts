@@ -12,6 +12,16 @@ import {
 } from '../sync-download-queue'
 import { openFileExplorerDB, resetFileExplorerDBForTests } from '../file-explorer-db'
 import { getSyncEntryByRemoteItem, putSyncEntry, resetSyncDBForTests } from '../sync-db'
+import { useFileExplorerStore } from '@renderer/stores/file-explorer'
+
+const accessMocks = vi.hoisted(() => ({
+  unlinkRoot: vi.fn<() => Promise<void>>(async () => undefined)
+}))
+
+vi.mock('../sync-unlink', () => ({
+  unlinkHhcLineAccountFromApp: vi.fn(async () => undefined),
+  unlinkSyncRootFolderFromApp: accessMocks.unlinkRoot
+}))
 
 function deferred<T>(): {
   promise: Promise<T>
@@ -74,6 +84,7 @@ describe('sync download queue', () => {
     await resetFileExplorerDBForTests()
     await resetSyncDBForTests()
     vi.clearAllMocks()
+    accessMocks.unlinkRoot.mockResolvedValue(undefined)
     Object.defineProperty(window, 'api', {
       configurable: true,
       value: {
@@ -294,6 +305,88 @@ describe('sync download queue', () => {
     expect(window.api.hhcAssets.cancelDownload).toHaveBeenCalledWith('item-a')
     activeDownload.resolve({ blobId: 'item-a', size: 100, mimeType: 'image/png' })
     await expect(pending).resolves.toBeNull()
+  })
+
+  it('settles a failed job before awaiting its scoped access cleanup', async () => {
+    const { handleHhcLineAccessError } = await import('../hhc-line-access')
+    const forbidden = Object.assign(new Error('forbidden'), {
+      classification: 'access-revoked',
+      status: 403
+    })
+    const provider = {
+      ...makeProvider(
+        vi.fn(async () => Promise.reject(forbidden)),
+        () => 'access-revoked'
+      ),
+      providerType: 'hhc-line' as const
+    }
+    useFileExplorerStore.setState({
+      folders: {
+        'root-a': {
+          id: 'root-a',
+          name: 'Root A',
+          parentId: 'file-root',
+          sortIndex: 0,
+          createdAt: 1,
+          expiresAt: null,
+          syncLink: {
+            providerType: 'hhc-line',
+            providerConnectionId: 'connection-a',
+            remoteFolderId: 'collection-a',
+            offlinePolicy: 'online-only',
+            status: 'active'
+          }
+        }
+      }
+    })
+    let finishPurge!: () => void
+    accessMocks.unlinkRoot.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishPurge = resolve
+        })
+    )
+    const cleanup = vi.fn((_error: unknown) =>
+      handleHhcLineAccessError(
+        { getSession: () => null, endSession: vi.fn(async () => undefined) },
+        {
+          kind: 'root',
+          providerConnectionId: 'connection-a',
+          rootRemoteFolderId: 'collection-a',
+          remoteItemId: 'remote-a'
+        },
+        forbidden
+      )
+    )
+
+    const result = enqueueSyncDownload({
+      provider,
+      request: {
+        providerConnectionId: 'connection-a',
+        rootRemoteFolderId: 'collection-a',
+        remoteItemId: 'remote-a',
+        targetBlobId: 'item-a',
+        offlinePolicy: 'on-demand'
+      },
+      entry: {
+        ...makeEntry('remote-a', 'item-a'),
+        providerConnectionId: 'connection-a',
+        parentRemoteItemId: 'collection-a'
+      },
+      onFailed: cleanup
+    })
+
+    await vi.waitFor(() => expect(accessMocks.unlinkRoot).toHaveBeenCalledOnce())
+    let settled = false
+    void result.then(() => {
+      settled = true
+    })
+    await Promise.resolve()
+    expect(settled).toBe(false)
+
+    finishPurge()
+    await expect(result).resolves.toBeNull()
+    expect(cleanup).toHaveBeenCalledWith(forbidden)
   })
 
   it('checks an authorization guard before using cached state or starting a download', async () => {

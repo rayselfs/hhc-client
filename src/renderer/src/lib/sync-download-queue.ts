@@ -53,6 +53,7 @@ export interface EnqueueSyncDownloadInput {
     result: SyncDownloadResult,
     canCommit: SyncDownloadCommitGuard
   ) => void | Promise<void>
+  onFailed?: (error: unknown) => void | Promise<void>
 }
 
 interface SyncDownloadQueueJob extends EnqueueSyncDownloadInput {
@@ -260,6 +261,7 @@ function pumpSyncDownloadQueue(): void {
 }
 
 async function runSyncDownloadJob(job: SyncDownloadQueueJob): Promise<void> {
+  let detached = false
   try {
     const canCommit = async (): Promise<boolean> =>
       !job.cancelled &&
@@ -302,11 +304,21 @@ async function runSyncDownloadJob(job: SyncDownloadQueueJob): Promise<void> {
       remoteItemId: job.entry.remoteItemId,
       error
     })
-    job.resolve(null)
-  } finally {
+    job.cancelled = true
     job.active = false
     activeCount = Math.max(0, activeCount - 1)
     if (jobsByKey.get(job.key) === job) jobsByKey.delete(job.key)
+    detached = true
+    await Promise.resolve(job.onFailed?.(error)).catch(() => {
+      console.warn('[sync] Failed to handle synced file failure')
+    })
+    job.resolve(null)
+  } finally {
+    if (!detached) {
+      job.active = false
+      activeCount = Math.max(0, activeCount - 1)
+      if (jobsByKey.get(job.key) === job) jobsByKey.delete(job.key)
+    }
     pumpSyncDownloadQueue()
   }
 }

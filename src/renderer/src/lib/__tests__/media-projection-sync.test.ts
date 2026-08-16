@@ -4,8 +4,9 @@ import { createBlankEditablePresentationDocument } from '@renderer/lib/editable-
 import { EDITABLE_PRESENTATION_MIME_TYPE } from '@renderer/lib/presentation-media'
 import type { PresentationEditorSession } from '@renderer/lib/presentation-editor-session'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
+import { useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { usePresentationWorkspaceStore } from '@renderer/stores/presentation-workspace'
-import type { FileItemRecord } from '@shared/types/folder'
+import type { FileItemRecord, FolderRecord } from '@shared/types/folder'
 import { HhcAssetApiError } from '../hhc-asset-api'
 
 const registryMocks = vi.hoisted(() => ({
@@ -151,6 +152,7 @@ beforeEach(() => {
     zoomLevel: 1,
     pan: { x: 0, y: 0 }
   })
+  useFileExplorerStore.setState({ folders: {} })
 })
 
 afterEach(() => {
@@ -460,9 +462,75 @@ describe('media projection sync', () => {
     })
 
     expect(useMediaProjectionStore.getState().snapshot?.entries[0].sourceUrl).toBe(item.url)
-    expect(clearContentLeases).toHaveBeenCalledOnce()
+    expect(clearContentLeases).not.toHaveBeenCalled()
     expect(mockStopProjection).toHaveBeenCalledOnce()
     expect(onAccessRevoked).toHaveBeenCalledOnce()
+  })
+
+  it('keeps a sibling root source active and releases only the revoked root source', async () => {
+    const releaseContentLease = vi.fn(async () => undefined)
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: { hhcAssets: { releaseContentLease, clearContentLeases: vi.fn() } }
+    })
+    const makeRoot = (id: string, status: 'active' | 'access-revoked'): FolderRecord => ({
+      id,
+      name: id,
+      parentId: 'file-root',
+      sortIndex: 0,
+      createdAt: 1,
+      expiresAt: null,
+      syncLink: {
+        providerType: 'hhc-line' as const,
+        providerConnectionId: 'hhc-line:user-1',
+        remoteFolderId: id,
+        offlinePolicy: 'online-only' as const,
+        status
+      }
+    })
+    useFileExplorerStore.setState({
+      folders: {
+        'collection-1': makeRoot('collection-1', 'active'),
+        'collection-2': makeRoot('collection-2', 'active')
+      }
+    })
+    setRemotePresentationItem()
+    remoteMocks.prepare.mockResolvedValueOnce({
+      providerConnectionId: 'hhc-line:user-1',
+      remoteItemId: 'asset-1',
+      rootRemoteFolderId: 'collection-1',
+      source: {
+        kind: 'native-lease',
+        url: 'hhc-media://lease/123e4567-e89b-12d3-a456-426614174000?type=image%2Fpng',
+        leaseId: '123e4567-e89b-12d3-a456-426614174000',
+        etag: 'etag-1'
+      }
+    })
+    renderSync({
+      auth: {
+        getSession: () => ({ userId: 'user-1', displayName: 'Ada', roles: [] }),
+        getAccessToken: vi.fn(),
+        refreshAccessToken: vi.fn(),
+        endSession: vi.fn()
+      }
+    })
+    await waitFor(() => expect(remoteMocks.prepare).toHaveBeenCalledOnce())
+
+    act(() => {
+      useFileExplorerStore.setState((state) => ({
+        folders: { ...state.folders, 'collection-2': makeRoot('collection-2', 'access-revoked') }
+      }))
+    })
+    expect(releaseContentLease).not.toHaveBeenCalled()
+    expect(mockStopProjection).not.toHaveBeenCalled()
+
+    act(() => {
+      useFileExplorerStore.setState((state) => ({
+        folders: { ...state.folders, 'collection-1': makeRoot('collection-1', 'access-revoked') }
+      }))
+    })
+    await waitFor(() => expect(releaseContentLease).toHaveBeenCalledOnce())
+    expect(mockStopProjection).toHaveBeenCalledOnce()
   })
 
   it('does not emit access-revoked for an auth-required account mismatch', async () => {
@@ -579,7 +647,7 @@ describe('media projection sync', () => {
       })
       expect(mockStartProjection).not.toHaveBeenCalled()
       expect(useMediaProjectionStore.getState().snapshot?.entries[0].sourceUrl).toBe('blob:remote')
-      if (transition === 'account-switch') expect(clearContentLeases).toHaveBeenCalledOnce()
+      expect(clearContentLeases).not.toHaveBeenCalled()
     }
   )
 

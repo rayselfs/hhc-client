@@ -196,28 +196,19 @@ export class HhcLineReadonlyProvider implements ReadOnlySyncProvider {
     canCommit: SyncDownloadCommitGuard
   ): Promise<SyncDownloadResult> {
     const rootRemoteFolderId = request.rootRemoteFolderId
-    return this.withAccessBoundary(
-      {
-        providerConnectionId: request.providerConnectionId,
-        rootRemoteFolderId,
-        remoteItemId: request.remoteItemId
-      },
-      async () => {
-        const metadata = mapItem(
-          await this.options.api.getCollectionItem(rootRemoteFolderId, request.remoteItemId)
-        )
-        const content = await this.options.api.downloadContent(
-          {
-            collectionId: rootRemoteFolderId,
-            itemId: request.remoteItemId,
-            rootRemoteFolderId,
-            ...(isElectron() ? { targetFileId: request.targetBlobId } : {})
-          },
-          signal
-        )
-        return this.save(request, content, metadata, canCommit)
-      }
+    const metadata = mapItem(
+      await this.options.api.getCollectionItem(rootRemoteFolderId, request.remoteItemId)
     )
+    const content = await this.options.api.downloadContent(
+      {
+        collectionId: rootRemoteFolderId,
+        itemId: request.remoteItemId,
+        rootRemoteFolderId,
+        ...(isElectron() ? { targetFileId: request.targetBlobId } : {})
+      },
+      signal
+    )
+    return this.save(request, content, metadata, canCommit)
   }
 
   classifyError(error: unknown): SyncRetryClassification {

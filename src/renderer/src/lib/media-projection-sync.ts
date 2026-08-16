@@ -6,6 +6,7 @@ import {
   type MediaProjectionStore
 } from '@renderer/stores/media-projection'
 import { usePresentationWorkspaceStore } from '@renderer/stores/presentation-workspace'
+import { useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { isElectron } from '@renderer/lib/env'
 import type { HhcLineCloudAuth } from '@renderer/lib/cloud-provider'
 import {
@@ -62,6 +63,7 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
     itemId: string
     providerConnectionId: string
     remoteItemId: string
+    rootRemoteFolderId: string
     leaseId?: string
   } | null>(null)
   const { auth, onAccessRevoked } = options
@@ -185,6 +187,7 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
                 itemId: item.id,
                 providerConnectionId: prepared.providerConnectionId,
                 remoteItemId: prepared.remoteItemId,
+                rootRemoteFolderId: prepared.rootRemoteFolderId,
                 ...(leaseId ? { leaseId } : {})
               }
               if (renewalTimerRef.current) clearTimeout(renewalTimerRef.current)
@@ -219,10 +222,7 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
           ) {
             projectSequenceRef.current += 1
             clearRemoteSource()
-            await Promise.all([
-              window.api?.hhcAssets?.clearContentLeases?.().catch(() => undefined),
-              stopProjection()
-            ])
+            await stopProjection()
             await onAccessRevoked?.({
               providerConnectionId: classified.providerConnectionId,
               remoteItemId: classified.remoteItemId
@@ -312,6 +312,24 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
     return unsub
   }, [clearRemoteSource])
 
+  useEffect(() => {
+    const unsubscribe = useFileExplorerStore.subscribe((state) => {
+      const active = activeRemoteRef.current
+      if (!active) return
+      const root = Object.values(state.folders).find(
+        (folder) =>
+          folder.syncLink?.providerType === 'hhc-line' &&
+          folder.syncLink.providerConnectionId === active.providerConnectionId &&
+          folder.syncLink.remoteFolderId === active.rootRemoteFolderId
+      )
+      if (root && root.syncLink?.status !== 'access-revoked') return
+      projectSequenceRef.current += 1
+      clearRemoteSource()
+      void stopProjection()
+    })
+    return unsubscribe
+  }, [clearRemoteSource, stopProjection])
+
   const previousSessionUserIdRef = useRef(sessionUserId)
   useEffect(() => {
     const previousUserId = previousSessionUserIdRef.current
@@ -319,7 +337,6 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
     if (previousUserId && previousUserId !== sessionUserId) {
       projectSequenceRef.current += 1
       clearRemoteSource()
-      void window.api?.hhcAssets?.clearContentLeases?.().catch(() => undefined)
       void stopProjection()
     }
   }, [clearRemoteSource, sessionUserId, stopProjection])

@@ -73,6 +73,10 @@ beforeEach(() => {
   authFactory.create.mockClear()
   accessMocks.cleanupAccount.mockReset()
   accessMocks.cleanupAccount.mockResolvedValue(undefined)
+  Object.defineProperty(window, 'api', {
+    configurable: true,
+    value: { hhcAssets: { clearContentLeases: vi.fn(async () => undefined) } }
+  })
 })
 
 describe('HhcAuthContext', () => {
@@ -155,6 +159,7 @@ describe('HhcAuthContext', () => {
     act(() => adapter.emit({ ...SESSION, userId: 'user-2', displayName: 'Grace' }))
 
     await waitFor(() => expect(accessMocks.cleanupAccount).toHaveBeenCalledWith('user-1'))
+    expect(window.api.hhcAssets.clearContentLeases).toHaveBeenCalledOnce()
     expect(result.current.status).toBe('loading')
     expect(result.current.session).toBeNull()
     await expect(result.current.getAccessToken()).resolves.toBeNull()
@@ -209,6 +214,7 @@ describe('HhcAuthContext', () => {
       completed = true
     })
     await waitFor(() => expect(accessMocks.cleanupAccount).toHaveBeenCalledWith('user-1'))
+    expect(window.api.hhcAssets.clearContentLeases).toHaveBeenCalledOnce()
     expect(completed).toBe(false)
 
     resolveCleanup()

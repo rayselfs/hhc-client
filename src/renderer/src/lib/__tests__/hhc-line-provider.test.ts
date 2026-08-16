@@ -168,7 +168,7 @@ describe('HHC LINE read-only provider', () => {
     )
   })
 
-  it.each(['changes', 'metadata', 'source', 'download'] as const)(
+  it.each(['changes', 'metadata', 'source'] as const)(
     'reports %s Asset failures with the exact root scope',
     async (operation) => {
       const client = api()
@@ -180,7 +180,6 @@ describe('HHC LINE read-only provider', () => {
       if (operation === 'changes') vi.mocked(client.getCollectionChanges).mockRejectedValue(error)
       if (operation === 'metadata') vi.mocked(client.getCollectionItem).mockRejectedValue(error)
       if (operation === 'source') vi.mocked(client.getRemoteContentSource).mockRejectedValue(error)
-      if (operation === 'download') vi.mocked(client.downloadContent).mockRejectedValue(error)
       const provider = new HhcLineReadonlyProvider({
         api: client,
         getSession: vi.fn(),
@@ -193,19 +192,7 @@ describe('HHC LINE read-only provider', () => {
           ? provider.initialScan('hhc-line:user_1', collection.id)
           : operation === 'metadata'
             ? provider.getMetadata('hhc-line:user_1', item.id)
-            : operation === 'source'
-              ? provider.getRemoteContentSource('hhc-line:user_1', item.id)
-              : provider.downloadContent(
-                  {
-                    providerConnectionId: 'hhc-line:user_1',
-                    rootRemoteFolderId: collection.id,
-                    remoteItemId: item.id,
-                    targetBlobId: 'blob_1',
-                    offlinePolicy: 'on-demand'
-                  },
-                  new AbortController().signal,
-                  () => true
-                )
+            : provider.getRemoteContentSource('hhc-line:user_1', item.id)
 
       await expect(request).rejects.toBe(error)
       expect(onAccessError).toHaveBeenCalledWith(

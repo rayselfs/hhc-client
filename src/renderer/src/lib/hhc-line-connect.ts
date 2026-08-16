@@ -156,7 +156,17 @@ export async function prepareHhcLinePresentationSource(
       found.entry.providerConnectionId,
       found.entry.remoteItemId
     )
-    assertCurrentAccount(auth, session.userId)
+    try {
+      assertCurrentAccount(auth, session.userId)
+    } catch (error) {
+      if (source.kind === 'native-lease') {
+        const release = window.api?.hhcAssets?.releaseContentLease
+        if (release) {
+          await release(source.leaseId).catch(() => release(source.leaseId).catch(() => undefined))
+        }
+      }
+      throw error
+    }
     return {
       providerConnectionId: found.entry.providerConnectionId,
       remoteItemId: found.entry.remoteItemId,
@@ -219,6 +229,17 @@ export async function ensureHhcLineDesktopItemAvailableForPresentation(
         auth,
         found.entry.providerConnectionId,
         found.entry.parentRemoteItemId!
+      ),
+    onFailed: (error) =>
+      handleHhcLineAccessError(
+        auth,
+        {
+          kind: 'root',
+          providerConnectionId: found.entry.providerConnectionId,
+          rootRemoteFolderId: found.entry.parentRemoteItemId!,
+          remoteItemId: found.entry.remoteItemId
+        },
+        error
       ),
     onDownloaded: () => refreshImportedMediaAssets([item])
   })

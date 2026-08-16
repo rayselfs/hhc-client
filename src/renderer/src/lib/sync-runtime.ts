@@ -137,6 +137,16 @@ function activeHhcRoots(connectionId: string): FolderRecord[] {
   )
 }
 
+function revokedHhcRoots(connectionId: string): FolderRecord[] {
+  return Object.values(useFileExplorerStore.getState().folders).filter(
+    (folder) =>
+      !folder.deletedAt &&
+      folder.syncLink?.providerType === 'hhc-line' &&
+      folder.syncLink.providerConnectionId === connectionId &&
+      folder.syncLink.status === 'access-revoked'
+  )
+}
+
 function revokedRootKey(connectionId: string, rootFolderId: string): string {
   return `${connectionId}\0${rootFolderId}`
 }
@@ -179,8 +189,8 @@ async function refreshHhcConnection(
               connectionId: connection.id,
               rootFolderId: root.id
             })
-          } catch {
             hhcRevokedRoots.delete(key)
+          } catch {
             retrySoon = true
             console.warn('[sync] Failed to handle revoked HHC LINE root')
           }
@@ -210,10 +220,34 @@ async function refreshAllHhcFolders(options: SyncRuntimeOptions): Promise<HhcRef
   if (auth.getSession()?.userId !== session.userId) return { summaries: [], retrySoon: false }
 
   const folders = useFileExplorerStore.getState().folders
+  const connectionIds = new Set(connections.map((connection) => connection.id))
+  let retrySoon = false
+  for (const connection of connections) {
+    for (const root of revokedHhcRoots(connection.id)) {
+      const key = revokedRootKey(connection.id, root.id)
+      if (!hhcRevokedRoots.has(key)) hhcRevokedRoots.set(key, root)
+    }
+  }
   for (const [key, revokedRoot] of hhcRevokedRoots) {
     const current = folders[revokedRoot.id]
-    if (!current || current !== revokedRoot || current.syncLink?.status !== 'active') {
+    if (
+      !current ||
+      !connectionIds.has(revokedRoot.syncLink?.providerConnectionId ?? '') ||
+      current.syncLink?.providerType !== 'hhc-line' ||
+      current.syncLink.providerConnectionId !== revokedRoot.syncLink?.providerConnectionId
+    ) {
       hhcRevokedRoots.delete(key)
+      continue
+    }
+    try {
+      await options.onHhcAccessRevoked?.({
+        connectionId: current.syncLink.providerConnectionId,
+        rootFolderId: current.id
+      })
+      hhcRevokedRoots.delete(key)
+    } catch {
+      retrySoon = true
+      console.warn('[sync] Failed to retry revoked HHC LINE root cleanup')
     }
   }
 
@@ -224,7 +258,7 @@ async function refreshAllHhcFolders(options: SyncRuntimeOptions): Promise<HhcRef
   )
   return {
     summaries: results.flatMap((result) => result.summaries),
-    retrySoon: results.some((result) => result.retrySoon)
+    retrySoon: retrySoon || results.some((result) => result.retrySoon)
   }
 }
 

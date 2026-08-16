@@ -84,6 +84,8 @@ beforeEach(() => {
     parentRemoteItemId: 'collection-a1'
   })
   mocks.cancelAndWait.mockResolvedValue(0)
+  mocks.unlinkAccount.mockResolvedValue(undefined)
+  mocks.unlinkRoot.mockResolvedValue(undefined)
   Object.defineProperty(window, 'api', {
     configurable: true,
     value: { hhcAssets: { clearContentLeases: vi.fn(async () => undefined) } }
@@ -113,7 +115,7 @@ describe('HHC LINE access owner', () => {
 
     expect(mocks.unlinkAccount).toHaveBeenCalledWith('user-a')
     expect(mocks.unlinkAccount).toHaveBeenCalledOnce()
-    expect(window.api.hhcAssets.clearContentLeases).toHaveBeenCalledOnce()
+    expect(window.api.hhcAssets.clearContentLeases).not.toHaveBeenCalled()
     expect(mocks.unlinkRoot).not.toHaveBeenCalled()
   })
 
@@ -145,6 +147,7 @@ describe('HHC LINE access owner', () => {
       rootRemoteFolderId: 'collection-a1'
     })
     expect(mocks.unlinkRoot).toHaveBeenCalledWith(expect.objectContaining({ id: 'root-a1' }))
+    expect(window.api.hhcAssets.clearContentLeases).not.toHaveBeenCalled()
   })
 
   it('preserves the root and cached state for retryable failures', async () => {

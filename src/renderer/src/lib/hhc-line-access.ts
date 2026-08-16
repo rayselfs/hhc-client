@@ -24,10 +24,6 @@ type HhcLineAccessError = {
 const accountCleanups = new Map<string, Promise<void>>()
 const rootCleanups = new Map<string, Promise<void>>()
 
-function clearContentLeases(): Promise<void> {
-  return window.api?.hhcAssets?.clearContentLeases?.() ?? Promise.resolve()
-}
-
 function updateRootStatus(root: FolderRecord): FolderRecord {
   const updated = {
     ...root,
@@ -73,11 +69,9 @@ async function resolveRootRemoteFolderId(
 export function cleanupHhcLineAccountAccess(accountUserId: string): Promise<void> {
   const existing = accountCleanups.get(accountUserId)
   if (existing) return existing
-  const cleanup = Promise.all([clearContentLeases(), unlinkHhcLineAccountFromApp(accountUserId)])
-    .then(() => undefined)
-    .finally(() => {
-      if (accountCleanups.get(accountUserId) === cleanup) accountCleanups.delete(accountUserId)
-    })
+  const cleanup = unlinkHhcLineAccountFromApp(accountUserId).finally(() => {
+    if (accountCleanups.get(accountUserId) === cleanup) accountCleanups.delete(accountUserId)
+  })
   accountCleanups.set(accountUserId, cleanup)
   return cleanup
 }
@@ -104,7 +98,7 @@ export async function revokeHhcLineRootAccess(
       providerConnectionId: scope.providerConnectionId,
       rootRemoteFolderId
     })
-    await Promise.all([clearContentLeases(), unlinkSyncRootFolderFromApp(revokedRoot)])
+    await unlinkSyncRootFolderFromApp(revokedRoot)
   })().finally(() => {
     if (rootCleanups.get(key) === cleanup) rootCleanups.delete(key)
   })

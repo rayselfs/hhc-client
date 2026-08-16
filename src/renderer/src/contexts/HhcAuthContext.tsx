@@ -28,6 +28,7 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
   const accessTokenPromiseRef = useRef<Promise<string | null> | null>(null)
   const refreshTokenPromiseRef = useRef<Promise<string | null> | null>(null)
   const sessionTransitionPromiseRef = useRef<Promise<void>>(Promise.resolve())
+  const departingAccountCleanupRef = useRef(new Map<string, Promise<void>>())
 
   const invalidateTokenRequests = useCallback((): void => {
     sessionEpochRef.current += 1
@@ -38,8 +39,21 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
   const getAuthGeneration = useCallback((): number => authGenerationRef.current, [])
 
   const cleanupDepartingAccount = useCallback(async (accountUserId: string): Promise<void> => {
-    const { cleanupHhcLineAccountAccess } = await import('@renderer/lib/hhc-line-access')
-    await cleanupHhcLineAccountAccess(accountUserId)
+    const existing = departingAccountCleanupRef.current.get(accountUserId)
+    if (existing) return existing
+    const cleanup = (async () => {
+      const { cleanupHhcLineAccountAccess } = await import('@renderer/lib/hhc-line-access')
+      await Promise.all([
+        window.api?.hhcAssets?.clearContentLeases?.() ?? Promise.resolve(),
+        cleanupHhcLineAccountAccess(accountUserId)
+      ])
+    })().finally(() => {
+      if (departingAccountCleanupRef.current.get(accountUserId) === cleanup) {
+        departingAccountCleanupRef.current.delete(accountUserId)
+      }
+    })
+    departingAccountCleanupRef.current.set(accountUserId, cleanup)
+    return cleanup
   }, [])
 
   useEffect(() => {

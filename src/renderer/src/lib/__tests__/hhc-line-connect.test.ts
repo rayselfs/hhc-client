@@ -330,6 +330,79 @@ describe('HHC LINE collection connection', () => {
     )
   })
 
+  it.each(['logout', 'account switch'] as const)(
+    'releases a native lease returned after %s before rejecting the stale source',
+    async (transition) => {
+      mocks.electron = true
+      let resolveSource!: (source: {
+        kind: 'native-lease'
+        url: string
+        leaseId: string
+        etag: string
+      }) => void
+      const releaseContentLease = vi.fn(async () => undefined)
+      Object.defineProperty(window, 'api', {
+        configurable: true,
+        value: { hhcAssets: { releaseContentLease } }
+      })
+      await putProviderConnection({
+        id: 'hhc-line:user-1',
+        providerType: 'hhc-line',
+        displayName: 'HHC LINE',
+        accountUserId: 'user-1'
+      })
+      await putSyncEntry({
+        providerConnectionId: 'hhc-line:user-1',
+        remoteItemId: 'asset-1',
+        parentRemoteItemId: 'collection-1',
+        kind: 'file',
+        name: 'photo.png',
+        itemId: 'local-1',
+        mimeType: 'image/png',
+        status: 'remote-only'
+      })
+      mocks.api = api({
+        getRemoteContentSource: vi.fn(
+          () =>
+            new Promise<Awaited<ReturnType<HhcAssetApi['getRemoteContentSource']>>>((resolve) => {
+              resolveSource = resolve
+            })
+        )
+      })
+      const sessionRef: { current: HhcSession | null } = {
+        current: { userId: 'user-1', displayName: 'Ada', roles: ['media_sync_user'] }
+      }
+      const pending = prepareHhcLinePresentationSource(auth(sessionRef), {
+        id: 'local-1',
+        parentId: 'root',
+        type: 'file',
+        sortIndex: 0,
+        createdAt: 1,
+        expiresAt: null,
+        name: 'photo.png',
+        mimeType: 'image/png',
+        size: 1,
+        url: 'hhc-line:asset-1'
+      })
+      await vi.waitFor(() => expect(mocks.api?.getRemoteContentSource).toHaveBeenCalledOnce())
+
+      sessionRef.current =
+        transition === 'logout'
+          ? null
+          : { userId: 'user-2', displayName: 'Grace', roles: ['media_sync_user'] }
+      resolveSource({
+        kind: 'native-lease',
+        url: 'hhc-media://lease/123e4567-e89b-12d3-a456-426614174000?type=image%2Fpng',
+        leaseId: '123e4567-e89b-12d3-a456-426614174000',
+        etag: 'etag-1'
+      })
+
+      await expect(pending).rejects.toMatchObject({ classification: 'auth-required' })
+      expect(releaseContentLease).toHaveBeenCalledWith('123e4567-e89b-12d3-a456-426614174000')
+      expect(releaseContentLease).toHaveBeenCalledOnce()
+    }
+  )
+
   it('downloads desktop-engine content into persistent native storage before presentation', async () => {
     mocks.electron = true
     Object.defineProperty(window, 'api', {
