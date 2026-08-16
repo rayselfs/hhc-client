@@ -13,12 +13,13 @@ import { registerLocalSyncHandlers } from './ipc/local-sync'
 import { registerLanRemoteIpc } from './ipc/lan-remote'
 import {
   handleOneDriveAuthCallbackUrl,
-  isOneDriveAuthCallbackUrl,
   registerOneDriveCredentialHandlers
 } from './ipc/onedrive-credentials'
 import { registerOneDriveDownloadHandlers } from './ipc/onedrive-download'
 import { isKnownWindow, validateTheme } from './ipc/validate'
 import { registerUpdateService } from './updateService'
+import { createHhcAuthService, registerHhcAuthIpc } from './ipc/hhc-auth'
+import { createLibrePresenterProtocolDispatcher } from './protocol-router'
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'local-model', privileges: { secure: true, supportFetchAPI: true, stream: true } },
@@ -44,6 +45,18 @@ process.on('unhandledRejection', (reason) => {
 })
 
 const wm = WindowManager.getInstance()
+const hhcAuthService = createHhcAuthService()
+const protocolDispatcher = createLibrePresenterProtocolDispatcher({
+  onAccountAuth: (action) => {
+    const mainWindow = wm.getMainWindow()
+    mainWindow?.show()
+    mainWindow?.focus()
+    void hhcAuthService.completeProtocolCallback(action).catch(() => undefined)
+  },
+  onOneDriveAuth: (url) => {
+    handleOneDriveAuthCallbackUrl(url, wm)
+  }
+})
 
 function registerAppProtocol(): void {
   if (process.defaultApp && process.argv.length >= 2) {
@@ -59,11 +72,7 @@ if (!gotSingleInstanceLock) {
   app.quit()
 } else {
   app.on('second-instance', (_event, argv) => {
-    const callbackUrl = argv.find(isOneDriveAuthCallbackUrl)
-    if (callbackUrl) {
-      handleOneDriveAuthCallbackUrl(callbackUrl, wm)
-      return
-    }
+    if (protocolDispatcher.dispatchArgv(argv)) return
     const mainWindow = wm.getMainWindow()
     mainWindow?.show()
     mainWindow?.focus()
@@ -71,7 +80,7 @@ if (!gotSingleInstanceLock) {
 
   app.on('open-url', (event, url) => {
     event.preventDefault()
-    handleOneDriveAuthCallbackUrl(url, wm)
+    protocolDispatcher.dispatch(url)
   })
 }
 
@@ -118,13 +127,13 @@ if (gotSingleInstanceLock) {
     registerLocalSyncHandlers(wm)
     registerLanRemoteIpc(wm)
     registerOneDriveCredentialHandlers(wm)
+    registerHhcAuthIpc(wm, hhcAuthService)
     registerOneDriveDownloadHandlers(wm)
     registerNativeMediaProtocol()
     wm.createMainWindow()
     registerUpdateService(wm)
 
-    const initialCallbackUrl = process.argv.find(isOneDriveAuthCallbackUrl)
-    if (initialCallbackUrl) handleOneDriveAuthCallbackUrl(initialCallbackUrl, wm)
+    protocolDispatcher.dispatchArgv(process.argv)
 
     app.on('activate', function () {
       if (BrowserWindow.getAllWindows().length === 0) wm.createMainWindow()

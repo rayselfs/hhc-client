@@ -10,6 +10,27 @@ import type {
 
 let _cachedDisplay: Electron.Display | null | undefined = undefined
 
+function isInternalNavigation(currentValue: string, nextValue: string): boolean {
+  try {
+    const current = new URL(currentValue)
+    const next = new URL(nextValue)
+    if (next.username || next.password) return false
+    if (current.protocol === 'file:') {
+      return (
+        next.protocol === 'file:' &&
+        next.hostname === current.hostname &&
+        next.pathname === current.pathname
+      )
+    }
+    return (
+      (current.protocol === 'http:' || current.protocol === 'https:') &&
+      next.origin === current.origin
+    )
+  } catch {
+    return false
+  }
+}
+
 export class WindowManager {
   private static instance: WindowManager
   private mainWindow: BrowserWindow | null = null
@@ -95,6 +116,7 @@ export class WindowManager {
       }
       return { action: 'deny' }
     })
+    this.guardTopLevelNavigation(this.mainWindow)
 
     const loadPromise =
       is.dev && process.env['ELECTRON_RENDERER_URL']
@@ -139,6 +161,12 @@ export class WindowManager {
   private publishProjectionLifecycle(event: ProjectionLifecycleEvent): void {
     this.projectionLifecycle = event
     this.sendToMain('projection:lifecycle', event)
+  }
+
+  private guardTopLevelNavigation(window: BrowserWindow): void {
+    window.webContents.on('will-navigate', (event, url) => {
+      if (!isInternalNavigation(window.webContents.getURL(), url)) event.preventDefault()
+    })
   }
 
   private nextProjectionGeneration(
@@ -188,6 +216,7 @@ export class WindowManager {
       title: 'Projection'
     })
     this.projectionWindow = projectionWindow
+    this.guardTopLevelNavigation(projectionWindow)
 
     const loadPromise =
       is.dev && process.env['ELECTRON_RENDERER_URL']

@@ -9,6 +9,7 @@ import type {
   OneDriveCredentialStatus
 } from '@shared/ipc-channels'
 import type { WindowManager } from '../windowManager'
+import { parseLibrePresenterProtocolUrl } from '../protocol-router'
 import { isMainWindow } from './validate'
 
 interface StoredOneDriveCredential {
@@ -66,14 +67,7 @@ function validateClientId(clientId: unknown): string {
 }
 
 export function isOneDriveAuthCallbackUrl(value: string): boolean {
-  try {
-    const url = new URL(value)
-    return (
-      url.protocol === 'librepresenter:' && url.hostname === 'auth' && url.pathname === '/onedrive'
-    )
-  } catch {
-    return false
-  }
+  return parseLibrePresenterProtocolUrl(value).kind === 'onedrive-auth'
 }
 
 function settleAuthCallback(result: string | null): void {

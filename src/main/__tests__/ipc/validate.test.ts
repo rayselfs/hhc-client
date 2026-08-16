@@ -74,6 +74,13 @@ describe('isMainWindow', () => {
     vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mockUnknownWindow as never)
     expect(isMainWindow(wm, makeEvent())).toBe(false)
   })
+
+  it('returns false when neither the sender nor main window exists', () => {
+    vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(null as never)
+    mockWindowManager.getMainWindow.mockReturnValueOnce(null as never)
+
+    expect(isMainWindow(wm, makeEvent())).toBe(false)
+  })
 })
 
 describe('validateTheme', () => {

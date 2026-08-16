@@ -31,7 +31,7 @@ export function isKnownWindow(wm: WindowManager, event: Electron.IpcMainInvokeEv
 
 export function isMainWindow(wm: WindowManager, event: Electron.IpcMainInvokeEvent): boolean {
   const senderWindow = BrowserWindow.fromWebContents(event.sender)
-  return senderWindow === wm.getMainWindow()
+  return senderWindow !== null && senderWindow === wm.getMainWindow()
 }
 
 export function validateTheme(theme: unknown): boolean {

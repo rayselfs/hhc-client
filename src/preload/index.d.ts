@@ -43,6 +43,7 @@ import type {
   TimerTickPayload
 } from '../shared/types/timer'
 import type { BibleVersion, BibleBook } from '../shared/types/bible'
+import type { HhcSession } from '../shared/hhc-auth'
 
 interface ThemeAPI {
   get: () => Promise<{ source: string; shouldUseDarkColors: boolean }>
@@ -161,6 +162,14 @@ interface OneDriveAPI {
   onDownloadProgress: (callback: (data: OneDriveNativeDownloadProgress) => void) => () => void
 }
 
+interface HhcAuthAPI {
+  begin: () => Promise<void>
+  getAccessToken: () => Promise<string | null>
+  getSession: () => Promise<HhcSession | null>
+  signOut: () => Promise<void>
+  onSessionChanged: (callback: (session: HhcSession | null) => void) => () => void
+}
+
 interface LanRemoteAPI {
   start: (options: { host: string; port: number }) => Promise<LanRemoteStatus>
   stop: () => Promise<LanRemoteStatus>
@@ -186,6 +195,7 @@ declare global {
       projectionVlc: ProjectionVlcAPI
       localSync: LocalSyncAPI
       oneDrive: OneDriveAPI
+      hhcAuth: HhcAuthAPI
       lanRemote: LanRemoteAPI
     }
   }

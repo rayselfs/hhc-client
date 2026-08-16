@@ -20,6 +20,7 @@ import type {
   TimerTickPayload
 } from './types/timer'
 import type { BibleVersion, BibleBook } from './types/bible'
+import type { HhcSession } from './hhc-auth'
 
 export type WhisperModel = 'whisper-base' | 'whisper-small' | 'whisper-medium'
 
@@ -286,6 +287,10 @@ export interface IpcInvokeMap {
   'onedrive:delete-credentials': { args: [string]; result: void }
   'onedrive:get-auth-redirect-uri': { args: []; result: string }
   'onedrive:wait-auth-callback': { args: [string?]; result: string | null }
+  'hhc-auth:begin': { args: []; result: void }
+  'hhc-auth:get-access-token': { args: []; result: string | null }
+  'hhc-auth:get-session': { args: []; result: HhcSession | null }
+  'hhc-auth:sign-out': { args: []; result: void }
   'onedrive:download-file': {
     args: [OneDriveNativeDownloadRequest]
     result: OneDriveNativeDownloadResult
@@ -326,6 +331,7 @@ export interface IpcMainToRendererMap {
   'app:download-progress': [WhisperDownloadProgress]
   'app:close-requested': []
   'onedrive:download-progress': [OneDriveNativeDownloadProgress]
+  'hhc-auth:session-changed': [session: HhcSession | null]
   'lan-remote:command': [LanRemoteCommand]
 }
 

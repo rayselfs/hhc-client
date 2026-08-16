@@ -176,6 +176,16 @@ const oneDriveApi = {
   ) => typedOn('onedrive:download-progress', callback)
 }
 
+const hhcAuthApi = {
+  begin: () => typedInvoke('hhc-auth:begin'),
+  getAccessToken: () => typedInvoke('hhc-auth:get-access-token'),
+  getSession: () => typedInvoke('hhc-auth:get-session'),
+  signOut: () => typedInvoke('hhc-auth:sign-out'),
+  onSessionChanged: (
+    callback: (session: IpcMainToRendererMap['hhc-auth:session-changed'][0]) => void
+  ) => typedOn('hhc-auth:session-changed', callback)
+}
+
 const lanRemoteApi = {
   start: (options: IpcInvokeMap['lan-remote:start']['args'][0]) =>
     typedInvoke('lan-remote:start', options),
@@ -203,6 +213,7 @@ const api = {
   projectionVlc: projectionVlcApi,
   localSync: localSyncApi,
   oneDrive: oneDriveApi,
+  hhcAuth: hhcAuthApi,
   lanRemote: lanRemoteApi
 }
 

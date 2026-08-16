@@ -7,6 +7,7 @@ const { FakeBrowserWindow } = vi.hoisted(() => {
     options: Record<string, unknown>
 
     webContents = {
+      getURL: vi.fn(() => 'file:///app/index.html'),
       setWindowOpenHandler: vi.fn(),
       on: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
         const handlers = this.webContentsHandlers.get(event) ?? []
@@ -161,6 +162,23 @@ describe('WindowManager', () => {
     wm.createProjectionWindow()
 
     expect(optimizer.watchWindowShortcuts).not.toHaveBeenCalled()
+  })
+
+  it('rejects external top-level navigation and allows the loaded app document', () => {
+    const wm = WindowManager.getInstance()
+    wm.createMainWindow()
+    const mainWindow = FakeBrowserWindow.instances[0]
+    const externalEvent = { preventDefault: vi.fn() }
+    const externalFileEvent = { preventDefault: vi.fn() }
+    const internalEvent = { preventDefault: vi.fn() }
+
+    mainWindow.emitWebContents('will-navigate', externalEvent, 'https://account.alive.org.tw/login')
+    mainWindow.emitWebContents('will-navigate', externalFileEvent, 'file://evil/app/index.html')
+    mainWindow.emitWebContents('will-navigate', internalEvent, 'file:///app/index.html#/files')
+
+    expect(externalEvent.preventDefault).toHaveBeenCalledOnce()
+    expect(externalFileEvent.preventDefault).toHaveBeenCalledOnce()
+    expect(internalEvent.preventDefault).not.toHaveBeenCalled()
   })
 
   it('getDisplays returns all displays', () => {
