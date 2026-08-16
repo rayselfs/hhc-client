@@ -1,11 +1,14 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import PresentationWorkspacePage from '../PresentationWorkspacePage'
+import PresentationWorkspaceHeader from '@renderer/components/Control/Header/PresentationWorkspaceHeader'
 import {
   PresentationSessionRegistryProvider,
   usePresentationSessionRegistry,
   type PresentationSessionRegistry
 } from '@renderer/contexts/PresentationSessionRegistryContext'
+import { ShortcutScopeProvider } from '@renderer/contexts/ShortcutScopeContext'
 import {
   addElementToSlide,
   createBlankEditablePresentationDocument,
@@ -43,6 +46,14 @@ vi.mock('@renderer/contexts/ContextMenuContext', () => ({
   useContextMenu: () => ({ showMenu: vi.fn() })
 }))
 
+vi.mock('@renderer/contexts/PresentationCloseDecisionContext', () => ({
+  usePresentationCloseDecision: () => vi.fn()
+}))
+
+vi.mock('@renderer/contexts/ProjectionContext', () => ({
+  useProjection: () => ({ isProjectionOpen: false, stopProjection: vi.fn() })
+}))
+
 vi.mock('@renderer/lib/editable-presentation', async () => {
   const actual = await vi.importActual<typeof import('@renderer/lib/editable-presentation')>(
     '@renderer/lib/editable-presentation'
@@ -58,19 +69,28 @@ vi.mock('@renderer/lib/editable-presentation-persistence', () => ({
   refreshEditablePresentationThumbnail: mocks.refreshEditablePresentationThumbnail
 }))
 
-function makeEditableItem(): FileItemRecord {
+function makeEditableItem(id = 'deck-1', name = 'Sunday.lpdeck'): FileItemRecord {
   return {
-    id: 'deck-1',
+    id,
     parentId: 'file-root',
     type: 'file',
     sortIndex: 0,
     createdAt: 1,
     expiresAt: null,
-    name: 'Sunday.lpdeck',
-    url: 'blob:deck-1',
+    name,
+    url: `blob:${id}`,
     size: 1024,
     mimeType: EDITABLE_PRESENTATION_MIME_TYPE
   }
+}
+
+function HeaderWorkspace(): React.JSX.Element {
+  return (
+    <ShortcutScopeProvider>
+      <PresentationWorkspaceHeader />
+      <PresentationWorkspacePage />
+    </ShortcutScopeProvider>
+  )
 }
 
 function Workspace({
@@ -138,6 +158,41 @@ describe('PresentationWorkspacePage session integration', () => {
 
     expect(await screen.findAllByText('Unsaved local text')).not.toHaveLength(0)
     expect(mocks.loadEditablePresentationSnapshot).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not carry Format Background to another editable deck through the workspace header', async () => {
+    const user = userEvent.setup()
+    const firstItem = makeEditableItem()
+    const secondItem = makeEditableItem('deck-2', 'Sermon.lpdeck')
+    useFileExplorerStore.setState({
+      items: { [firstItem.id]: firstItem, [secondItem.id]: secondItem },
+      _itemsArray: [firstItem, secondItem]
+    })
+    usePresentationWorkspaceStore.getState().openDocument(secondItem)
+    usePresentationWorkspaceStore.getState().setActiveDocument(firstItem.id)
+
+    render(
+      <PresentationSessionRegistryProvider>
+        <HeaderWorkspace />
+      </PresentationSessionRegistryProvider>
+    )
+
+    const ribbonFrame = await screen.findByTestId('presentation-ribbon-frame')
+    await user.click(screen.getByRole('button', { name: '設計' }))
+    await user.click(within(ribbonFrame).getByRole('button', { name: 'Format Background' }))
+    expect(window.document.querySelector('.workspace-inspector-slot')).not.toBeNull()
+
+    await user.click(screen.getByText('Sermon.lpdeck'))
+    await waitFor(() =>
+      expect(usePresentationWorkspaceStore.getState().activeItemId).toBe(secondItem.id)
+    )
+    expect(window.document.querySelector('.workspace-inspector-slot')).toBeNull()
+
+    await user.click(screen.getByText('Sunday.lpdeck'))
+    await waitFor(() =>
+      expect(usePresentationWorkspaceStore.getState().activeItemId).toBe(firstItem.id)
+    )
+    expect(window.document.querySelector('.workspace-inspector-slot')).toBeNull()
   })
 
   it('stores Ribbon font sizes as canvas pixels derived from PowerPoint points', async () => {

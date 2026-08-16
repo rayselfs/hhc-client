@@ -2574,10 +2574,17 @@ export default function PresentationWorkspacePage(): React.JSX.Element {
   const activeDocument = usePresentationWorkspaceStore((state) => state.getActiveDocument())
   const [activeRibbon, setActiveRibbon] = useState<RibbonTab>('home')
   const [isRibbonOpen, setIsRibbonOpen] = useState(true)
-  const [isBackgroundPanelOpen, setIsBackgroundPanelOpen] = useState(false)
+  const [backgroundPanel, setBackgroundPanel] = useState({
+    itemId: activeDocument?.itemId ?? null,
+    isOpen: false
+  })
   const [selectedElementType, setSelectedElementType] = useState<PresentationElementType | null>(
     null
   )
+  const activeItemId = activeDocument?.itemId ?? null
+  if (backgroundPanel.itemId !== activeItemId) {
+    setBackgroundPanel({ itemId: activeItemId, isOpen: false })
+  }
   const ribbonTabs = useMemo<RibbonTab[]>(
     () =>
       selectedElementType === 'image'
@@ -2608,7 +2615,7 @@ export default function PresentationWorkspacePage(): React.JSX.Element {
   }, [itemId, openDocument])
 
   const handleRibbonTabClick = (tab: RibbonTab): void => {
-    if (activeRibbon === 'design') setIsBackgroundPanelOpen(false)
+    if (activeRibbon === 'design') setBackgroundPanel((panel) => ({ ...panel, isOpen: false }))
     if (tab === activeRibbon) {
       setIsRibbonOpen((open) => !open)
       return
@@ -2658,8 +2665,10 @@ export default function PresentationWorkspacePage(): React.JSX.Element {
             deck={activeDocument}
             activeRibbon={effectiveActiveRibbon}
             isRibbonOpen={isRibbonOpen}
-            isBackgroundPanelOpen={isBackgroundPanelOpen}
-            onBackgroundPanelOpenChange={setIsBackgroundPanelOpen}
+            isBackgroundPanelOpen={backgroundPanel.isOpen}
+            onBackgroundPanelOpenChange={(isOpen) =>
+              setBackgroundPanel({ itemId: activeDocument.itemId, isOpen })
+            }
             onSelectedElementTypeChange={setSelectedElementType}
           />
         ) : (
