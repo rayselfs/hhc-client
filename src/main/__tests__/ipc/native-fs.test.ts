@@ -8,6 +8,7 @@ const {
   mockMkdir,
   mockCopyFile,
   mockRename,
+  mockRm,
   mockUnlink,
   mockCreateReadStream
 } = vi.hoisted(() => ({
@@ -17,6 +18,7 @@ const {
   mockMkdir: vi.fn(),
   mockCopyFile: vi.fn(),
   mockRename: vi.fn(),
+  mockRm: vi.fn(),
   mockUnlink: vi.fn(),
   mockCreateReadStream: vi.fn()
 }))
@@ -33,6 +35,7 @@ vi.mock('fs', () => {
     mkdir: mockMkdir,
     copyFile: mockCopyFile,
     rename: mockRename,
+    rm: mockRm,
     unlink: mockUnlink
   }
   return {
@@ -66,6 +69,8 @@ import { Readable } from 'stream'
 import type { WindowManager } from '../../windowManager'
 import {
   getNativeFilePath,
+  clearNativeMediaLeases,
+  clearStaleNativeMediaLeases,
   parseNativeMediaUrl,
   registerNativeMediaLease,
   registerNativeFsHandlers,
@@ -95,6 +100,7 @@ beforeEach(() => {
   mockMkdir.mockResolvedValue(undefined)
   mockCopyFile.mockResolvedValue(undefined)
   mockRename.mockResolvedValue(undefined)
+  mockRm.mockResolvedValue(undefined)
   mockUnlink.mockResolvedValue(undefined)
   mockCreateReadStream.mockReturnValue(Readable.from(['partial']))
   registerNativeFsHandlers(wm)
@@ -266,6 +272,31 @@ describe('native media protocol', () => {
     await expect(releaseNativeMediaLease(lease.leaseId)).rejects.toThrow('busy')
     await expect(releaseNativeMediaLease(lease.leaseId)).resolves.toBeUndefined()
     expect(mockUnlink).toHaveBeenCalledTimes(2)
+  })
+
+  it('clears tracked leases on shutdown and stale lease files on startup', async () => {
+    const first = registerNativeMediaLease(
+      '/tmp/hhc-user-data/hhc-asset-leases/first.bin',
+      'video/mp4',
+      'etag-1'
+    )
+    const second = registerNativeMediaLease(
+      '/tmp/hhc-user-data/hhc-asset-leases/second.bin',
+      'audio/mpeg',
+      'etag-2'
+    )
+
+    await clearNativeMediaLeases()
+    await clearStaleNativeMediaLeases()
+
+    expect(mockUnlink).toHaveBeenCalledWith('/tmp/hhc-user-data/hhc-asset-leases/first.bin')
+    expect(mockUnlink).toHaveBeenCalledWith('/tmp/hhc-user-data/hhc-asset-leases/second.bin')
+    expect(mockRm).toHaveBeenCalledWith('/tmp/hhc-user-data/hhc-asset-leases', {
+      recursive: true,
+      force: true
+    })
+    await expect(releaseNativeMediaLease(first.leaseId)).resolves.toBeUndefined()
+    await expect(releaseNativeMediaLease(second.leaseId)).resolves.toBeUndefined()
   })
 
   it('returns 416 for invalid media byte ranges', async () => {

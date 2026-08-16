@@ -164,6 +164,7 @@ export interface AppMessages {
     duration: number
     isPlaying: boolean
     isEnded: boolean
+    playbackRate?: number
   }
   /** Presentation ended — show end screen on projection */
   'file:end': null
@@ -218,6 +219,7 @@ export interface ProjectionMediaReplayState {
   isPlaying: boolean
   isEnded: boolean
   volume: number
+  playbackRate?: number
   pdfPage: number
   pdfScroll: number
   pdfViewMode: 'single' | 'continuous'

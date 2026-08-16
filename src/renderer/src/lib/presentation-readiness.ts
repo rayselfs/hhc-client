@@ -7,7 +7,7 @@ import {
   type MediaPlatform,
   type MediaSupportMode
 } from './media-capabilities'
-import { getSyncEntryByLocalItem } from './sync-db'
+import { getProviderConnection, getSyncEntryByLocalItem } from './sync-db'
 import { getFileBlobRecord, isFileBlobAvailable } from './file-explorer-db'
 import { ensureSourceMediaMetadata } from './media-metadata'
 
@@ -36,6 +36,11 @@ export interface PresentationReadinessItem {
   playbackMode?: 'native' | 'vlc-embedded'
   seekable?: boolean
   durationMs?: number
+  remoteItem?: {
+    providerConnectionId: string
+    remoteItemId: string
+    rootRemoteFolderId: string
+  }
 }
 
 export interface PresentationReadinessReport {
@@ -54,6 +59,19 @@ export interface PresentationSnapshotEntry {
   playbackMode?: 'native' | 'vlc-embedded'
   seekable?: boolean
   durationMs?: number
+  remoteItem?: {
+    providerConnectionId: string
+    remoteItemId: string
+    rootRemoteFolderId: string
+  }
+  remoteSource?: {
+    providerConnectionId: string
+    remoteItemId: string
+    rootRemoteFolderId: string
+    leaseId?: string
+    expiresAt?: number
+    etag: string
+  }
 }
 
 export interface PresentationSnapshot {
@@ -84,7 +102,8 @@ export function createPresentationSnapshot(
       derivativeId: readinessByItemId.get(item.id)?.derivativeId,
       playbackMode: readinessByItemId.get(item.id)?.playbackMode,
       seekable: readinessByItemId.get(item.id)?.seekable,
-      durationMs: readinessByItemId.get(item.id)?.durationMs
+      durationMs: readinessByItemId.get(item.id)?.durationMs,
+      remoteItem: readinessByItemId.get(item.id)?.remoteItem
     }))
   }
 }
@@ -149,6 +168,52 @@ async function analyzePresentationItem(
 
   const syncEntry = await getSyncEntryByLocalItem(item.id)
   if (syncEntry && syncEntry.status !== 'available-offline') {
+    const connection = await getProviderConnection(syncEntry.providerConnectionId)
+    if (connection?.providerType === 'hhc-line' && syncEntry.status === 'remote-only') {
+      const capability = resolveMediaCapability({ mimeType: item.mimeType, fileName: item.name })
+      if (!capability) {
+        return {
+          itemId: item.id,
+          blobId,
+          status: 'unsupported',
+          reason: 'unsupported-media',
+          support: null
+        }
+      }
+      const support = getMediaSupport(capability, platform)
+      if (support === 'unsupported') {
+        return {
+          itemId: item.id,
+          blobId,
+          status: 'unsupported',
+          reason: 'unsupported-platform',
+          support
+        }
+      }
+      if (support === 'desktop-engine' && !(await isVlcEngineReady(platform))) {
+        return {
+          itemId: item.id,
+          blobId,
+          status: 'failed',
+          reason: 'video-engine-unavailable',
+          support
+        }
+      }
+      return {
+        itemId: item.id,
+        blobId,
+        status: 'ready',
+        reason: 'ready-remote',
+        support,
+        playbackMode: support === 'desktop-engine' ? 'vlc-embedded' : 'native',
+        seekable: capability.kind === 'video',
+        remoteItem: {
+          providerConnectionId: syncEntry.providerConnectionId,
+          remoteItemId: syncEntry.remoteItemId,
+          rootRemoteFolderId: syncEntry.parentRemoteItemId!
+        }
+      }
+    }
     if (syncEntry.status === 'failed' || syncEntry.status === 'insufficient-storage') {
       return {
         itemId: item.id,
@@ -259,6 +324,15 @@ async function canUseVlcEmbedded(platform: MediaPlatform, blobId: string): Promi
     if (record?.storage !== 'native-fs') return false
     const info = await window.api.projectionVlc.getInfo()
     return info.status === 'ready'
+  } catch {
+    return false
+  }
+}
+
+async function isVlcEngineReady(platform: MediaPlatform): Promise<boolean> {
+  if (platform !== 'electron') return false
+  try {
+    return (await window.api.projectionVlc.getInfo()).status === 'ready'
   } catch {
     return false
   }

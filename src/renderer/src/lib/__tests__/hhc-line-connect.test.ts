@@ -10,14 +10,22 @@ import type {
 import type { FolderRecord } from '@shared/types/folder'
 import type { HhcLineCloudAuth } from '../cloud-provider'
 import { openFileExplorerDB, resetFileExplorerDBForTests } from '../file-explorer-db'
-import { getSyncEntryByRemoteItem, putSyncEntry, resetSyncDBForTests } from '../sync-db'
+import {
+  getSyncEntryByRemoteItem,
+  putProviderConnection,
+  putSyncEntry,
+  resetSyncDBForTests
+} from '../sync-db'
 import * as syncDB from '../sync-db'
 import * as syncRefresh from '../sync-refresh'
 import {
   importHhcLineCollection,
+  ensureHhcLineDesktopItemAvailableForPresentation,
   listHhcLineCollections,
+  prepareHhcLinePresentationSource,
   refreshHhcLineFolder
 } from '../hhc-line-connect'
+import { resetSyncDownloadQueueForTests } from '../sync-download-queue'
 
 const mocks = vi.hoisted(() => ({
   electron: false,
@@ -112,6 +120,7 @@ beforeEach(async () => {
     loadedParents: new Set(['file-root'])
   })
   mocks.state.initialize.mockClear()
+  resetSyncDownloadQueueForTests()
 })
 
 afterEach(() => {
@@ -119,6 +128,154 @@ afterEach(() => {
 })
 
 describe('HHC LINE collection connection', () => {
+  it('leaves local media inert when there is no HHC session', async () => {
+    await expect(
+      prepareHhcLinePresentationSource(auth({ current: null }), {
+        id: 'local-only',
+        parentId: 'root',
+        type: 'file',
+        sortIndex: 0,
+        createdAt: 1,
+        expiresAt: null,
+        name: 'local.png',
+        mimeType: 'image/png',
+        size: 1,
+        url: 'blob:local-only'
+      })
+    ).resolves.toBeNull()
+  })
+
+  it('prepares an ephemeral source from the exact imported collection without persisting it', async () => {
+    await putProviderConnection({
+      id: 'hhc-line:user-1',
+      providerType: 'hhc-line',
+      displayName: 'HHC LINE',
+      accountUserId: 'user-1'
+    })
+    await putSyncEntry({
+      providerConnectionId: 'hhc-line:user-1',
+      remoteItemId: 'asset-1',
+      parentRemoteItemId: 'collection-1',
+      kind: 'file',
+      name: 'photo.png',
+      itemId: 'local-1',
+      mimeType: 'image/png',
+      status: 'remote-only'
+    })
+    mocks.api = api({
+      getRemoteContentSource: vi.fn(async () => ({
+        kind: 'ticket' as const,
+        url: 'https://www.alive.org.tw/api/assets/content?ticket=secret',
+        expiresAt: 123,
+        etag: 'etag-1'
+      }))
+    })
+
+    await expect(
+      prepareHhcLinePresentationSource(
+        auth({
+          current: { userId: 'user-1', displayName: 'Ada', roles: ['media_sync_user'] }
+        }),
+        {
+          id: 'local-1',
+          parentId: 'root',
+          type: 'file',
+          sortIndex: 0,
+          createdAt: 1,
+          expiresAt: null,
+          name: 'photo.png',
+          mimeType: 'image/png',
+          size: 1,
+          url: 'hhc-line:asset-1'
+        }
+      )
+    ).resolves.toMatchObject({
+      providerConnectionId: 'hhc-line:user-1',
+      rootRemoteFolderId: 'collection-1',
+      source: { kind: 'ticket', url: expect.stringContaining('ticket=secret') }
+    })
+    expect(mocks.api.getRemoteContentSource).toHaveBeenCalledWith('collection-1', 'asset-1')
+    expect((await getSyncEntryByRemoteItem('hhc-line:user-1', 'asset-1'))?.status).toBe(
+      'remote-only'
+    )
+  })
+
+  it('downloads desktop-engine content into persistent native storage before presentation', async () => {
+    mocks.electron = true
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: { nativeFs: { delete: vi.fn(async () => undefined) } }
+    })
+    await putProviderConnection({
+      id: 'hhc-line:user-1',
+      providerType: 'hhc-line',
+      displayName: 'HHC LINE',
+      accountUserId: 'user-1'
+    })
+    await putSyncEntry({
+      providerConnectionId: 'hhc-line:user-1',
+      remoteItemId: 'asset-1',
+      parentRemoteItemId: 'collection-1',
+      kind: 'file',
+      name: 'movie.mkv',
+      itemId: 'local-1',
+      mimeType: 'video/x-matroska',
+      status: 'remote-only'
+    })
+    mocks.api = api({
+      getCollectionItem: vi.fn(async () => ({
+        id: 'asset-1',
+        collectionId: 'collection-1',
+        remoteItemId: 'source-1',
+        displayName: 'movie.mkv',
+        sourceRevision: 'hash-1',
+        createdRevision: 1,
+        mimeType: 'video/x-matroska',
+        sizeBytes: 10,
+        etag: 'etag-1',
+        createdAt: '2026-08-17T00:00:00Z'
+      })),
+      downloadContent: vi.fn(async () => ({
+        fileId: 'local-1',
+        size: 10,
+        mimeType: 'video/x-matroska'
+      }))
+    })
+    const item = {
+      id: 'local-1',
+      parentId: 'root',
+      type: 'file' as const,
+      sortIndex: 0,
+      createdAt: 1,
+      expiresAt: null,
+      name: 'movie.mkv',
+      mimeType: 'video/x-matroska',
+      size: 10,
+      url: 'blob:local-1'
+    }
+
+    await expect(
+      ensureHhcLineDesktopItemAvailableForPresentation(
+        auth({
+          current: { userId: 'user-1', displayName: 'Ada', roles: ['media_sync_user'] }
+        }),
+        item
+      )
+    ).resolves.toBe(true)
+
+    expect(mocks.api.downloadContent).toHaveBeenCalledWith(
+      {
+        collectionId: 'collection-1',
+        itemId: 'asset-1',
+        rootRemoteFolderId: 'collection-1',
+        targetFileId: 'local-1'
+      },
+      expect.any(AbortSignal)
+    )
+    expect((await getSyncEntryByRemoteItem('hhc-line:user-1', 'asset-1'))?.status).toBe(
+      'available-offline'
+    )
+  })
   it('collects every authorized page and excludes only roots imported by the current account', async () => {
     const currentRoot: FolderRecord = {
       id: 'root-current',

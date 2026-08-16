@@ -6,7 +6,12 @@ import { registerTimerHandlers } from './ipc/timer'
 import { registerBibleApiHandlers } from './ipc/bible-api'
 import { registerAppIpc, registerLocalModelProtocol } from './ipc/app'
 import { registerSpeechKeyStorageHandlers } from './ipc/speech-key-storage'
-import { registerNativeFsHandlers, registerNativeMediaProtocol } from './ipc/native-fs'
+import {
+  clearNativeMediaLeases,
+  clearStaleNativeMediaLeases,
+  registerNativeFsHandlers,
+  registerNativeMediaProtocol
+} from './ipc/native-fs'
 import { registerProjectionVlcHandlers } from './ipc/projection-vlc'
 import { registerVideoPosterHandlers } from './ipc/video-poster'
 import { registerLocalSyncHandlers } from './ipc/local-sync'
@@ -47,6 +52,8 @@ process.on('unhandledRejection', (reason) => {
 
 const wm = WindowManager.getInstance()
 const hhcAuthService = createHhcAuthService()
+let nativeMediaLeasesCleared = false
+let nativeMediaLeaseCleanupPending = false
 const protocolDispatcher = createLibrePresenterProtocolDispatcher({
   onAccountAuth: (action) => {
     const mainWindow = wm.getMainWindow()
@@ -86,7 +93,8 @@ if (!gotSingleInstanceLock) {
 }
 
 if (gotSingleInstanceLock) {
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
+    await clearStaleNativeMediaLeases()
     electronApp.setAppUserModelId('org.librepresenter.app')
     registerAppProtocol()
 
@@ -148,7 +156,19 @@ if (gotSingleInstanceLock) {
     }
   })
 
-  app.on('before-quit', () => {
-    wm.cleanup()
+  app.on('before-quit', (event) => {
+    if (nativeMediaLeasesCleared) {
+      wm.cleanup()
+      return
+    }
+    event.preventDefault()
+    if (nativeMediaLeaseCleanupPending) return
+    nativeMediaLeaseCleanupPending = true
+    void clearNativeMediaLeases()
+      .catch(() => undefined)
+      .finally(() => {
+        nativeMediaLeasesCleared = true
+        app.quit()
+      })
   })
 }

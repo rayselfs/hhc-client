@@ -20,6 +20,14 @@ vi.mock('@renderer/lib/media-projection-sync', () => ({
   useMediaProjectionSync: mocks.sync
 }))
 
+vi.mock('@renderer/contexts/HhcAuthContext', () => ({
+  useHhcAuth: () => ({
+    session: { userId: 'user-1', displayName: 'Ada', roles: [] },
+    getAccessToken: vi.fn(),
+    refreshAccessToken: vi.fn()
+  })
+}))
+
 const originalMarkProjectionClosed = useMediaProjectionStore.getState().markProjectionClosed
 
 describe('MediaProjectionBridge', () => {
@@ -72,5 +80,17 @@ describe('MediaProjectionBridge', () => {
     render(<MediaProjectionBridge />)
 
     expect(markProjectionClosed).not.toHaveBeenCalled()
+  })
+
+  it('passes the current auth facade and narrow access-revoked callback to media sync', () => {
+    const onHhcAccessRevoked = vi.fn()
+    render(<MediaProjectionBridge onHhcAccessRevoked={onHhcAccessRevoked} />)
+
+    expect(mocks.sync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        auth: expect.objectContaining({ getSession: expect.any(Function) }),
+        onAccessRevoked: onHhcAccessRevoked
+      })
+    )
   })
 })

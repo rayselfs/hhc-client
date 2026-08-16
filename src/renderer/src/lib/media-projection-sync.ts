@@ -6,6 +6,8 @@ import {
   type MediaProjectionStore
 } from '@renderer/stores/media-projection'
 import { usePresentationWorkspaceStore } from '@renderer/stores/presentation-workspace'
+import { isElectron } from '@renderer/lib/env'
+import type { HhcLineCloudAuth } from '@renderer/lib/cloud-provider'
 import {
   buildEditableProjectionPayloadForSession,
   buildFileProjectionPayload,
@@ -29,22 +31,176 @@ function playlistContentChanged(
   return false
 }
 
-export function useMediaProjectionSync(): void {
-  const { project, startProjection, activeOwner } = useProjection()
+export interface HhcProjectionAccessRevoked {
+  providerConnectionId: string
+  remoteItemId: string
+}
+
+interface MediaProjectionSyncOptions {
+  auth?: HhcLineCloudAuth
+  onAccessRevoked?: (scope: HhcProjectionAccessRevoked) => void
+}
+
+const RENEWAL_LEAD_MS = 30_000
+const RENEWAL_RETRY_MS = 5_000
+
+export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {}): void {
+  const { project, startProjection, stopProjection, activeOwner } = useProjection()
   const registry = usePresentationSessionRegistry()
   const projectSequenceRef = useRef(0)
   const didInitializeRef = useRef(false)
+  const renewalTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const projectCurrentItemRef = useRef<
+    (
+      state: MediaProjectionStore,
+      startSession?: boolean,
+      bringToFront?: boolean,
+      forceRemoteSource?: boolean
+    ) => Promise<void>
+  >(async () => undefined)
+  const activeRemoteRef = useRef<{
+    itemId: string
+    providerConnectionId: string
+    remoteItemId: string
+    leaseId?: string
+  } | null>(null)
+  const { auth, onAccessRevoked } = options
+  const sessionUserId = auth?.getSession()?.userId ?? null
+
+  const clearRemoteSource = useCallback((): void => {
+    if (renewalTimerRef.current) clearTimeout(renewalTimerRef.current)
+    renewalTimerRef.current = null
+    const active = activeRemoteRef.current
+    const leaseId = active?.leaseId
+    activeRemoteRef.current = null
+    if (active) {
+      useMediaProjectionStore.setState((state) => {
+        const snapshot = state.snapshot
+        const item = state.playlist.find((candidate) => candidate.id === active.itemId)
+        if (!snapshot || !item) return state
+        return {
+          snapshot: {
+            ...snapshot,
+            entries: snapshot.entries.map((entry) => {
+              if (entry.itemId !== active.itemId) return entry
+              const { remoteSource: _remoteSource, ...rest } = entry
+              return { ...rest, sourceUrl: item.url }
+            })
+          }
+        }
+      })
+    }
+    if (leaseId) void window.api?.hhcAssets?.releaseContentLease(leaseId).catch(() => undefined)
+  }, [])
 
   const projectCurrentItem = useCallback(
     async (
       state: MediaProjectionStore,
       startSession = false,
-      bringToFront = false
+      bringToFront = false,
+      forceRemoteSource = false
     ): Promise<void> => {
       if (!startSession && activeOwner !== 'media') return
       const sequence = ++projectSequenceRef.current
       const item = state.currentItem()
-      const basePayload = buildFileProjectionPayload(state)
+      let currentState = state
+      const snapshotEntry = state.snapshot?.entries.find((entry) => entry.itemId === item?.id)
+      if (item && auth && snapshotEntry?.remoteItem) {
+        try {
+          if (snapshotEntry.playbackMode === 'vlc-embedded' && isElectron()) {
+            const { ensureHhcLineDesktopItemAvailableForPresentation } =
+              await import('@renderer/lib/hhc-line-connect')
+            const available = await ensureHhcLineDesktopItemAvailableForPresentation(auth, item)
+            if (available === false) return
+          } else if (forceRemoteSource || !snapshotEntry.remoteSource) {
+            const { prepareHhcLinePresentationSource } =
+              await import('@renderer/lib/hhc-line-connect')
+            const prepared = await prepareHhcLinePresentationSource(auth, item)
+            if (!prepared && activeRemoteRef.current?.itemId === item.id) {
+              clearRemoteSource()
+              currentState = useMediaProjectionStore.getState()
+            }
+            if (prepared && sequence === projectSequenceRef.current) {
+              const previous = activeRemoteRef.current
+              const leaseId =
+                prepared.source.kind === 'native-lease' ? prepared.source.leaseId : undefined
+              if (previous?.leaseId && previous.leaseId !== leaseId) {
+                void window.api?.hhcAssets
+                  ?.releaseContentLease(previous.leaseId)
+                  .catch(() => undefined)
+              }
+              const remoteSource = {
+                providerConnectionId: prepared.providerConnectionId,
+                remoteItemId: prepared.remoteItemId,
+                rootRemoteFolderId: prepared.rootRemoteFolderId,
+                ...(leaseId ? { leaseId } : {}),
+                ...(prepared.source.kind === 'ticket'
+                  ? { expiresAt: prepared.source.expiresAt }
+                  : {}),
+                etag: prepared.source.etag
+              }
+              useMediaProjectionStore.setState((latest) => ({
+                snapshot: latest.snapshot
+                  ? {
+                      ...latest.snapshot,
+                      entries: latest.snapshot.entries.map((entry) =>
+                        entry.itemId === item.id
+                          ? { ...entry, sourceUrl: prepared.source.url, remoteSource }
+                          : entry
+                      )
+                    }
+                  : null
+              }))
+              activeRemoteRef.current = {
+                itemId: item.id,
+                providerConnectionId: prepared.providerConnectionId,
+                remoteItemId: prepared.remoteItemId,
+                ...(leaseId ? { leaseId } : {})
+              }
+              if (renewalTimerRef.current) clearTimeout(renewalTimerRef.current)
+              renewalTimerRef.current = null
+              if (prepared.source.kind === 'ticket') {
+                const delay = Math.max(
+                  1_000,
+                  prepared.source.expiresAt - Date.now() - RENEWAL_LEAD_MS
+                )
+                renewalTimerRef.current = setTimeout(() => {
+                  void projectCurrentItemRef
+                    .current(useMediaProjectionStore.getState(), false, false, true)
+                    .catch(() => undefined)
+                }, delay)
+              }
+              currentState = useMediaProjectionStore.getState()
+            }
+          }
+        } catch (error) {
+          if (sequence !== projectSequenceRef.current) return
+          const classified = error as {
+            classification?: string
+            providerConnectionId?: string
+            remoteItemId?: string
+          }
+          if (
+            classified.classification === 'access-revoked' &&
+            classified.providerConnectionId &&
+            classified.remoteItemId
+          ) {
+            onAccessRevoked?.({
+              providerConnectionId: classified.providerConnectionId,
+              remoteItemId: classified.remoteItemId
+            })
+          } else if (classified.classification === 'retryable' && snapshotEntry.remoteSource) {
+            if (renewalTimerRef.current) clearTimeout(renewalTimerRef.current)
+            renewalTimerRef.current = setTimeout(() => {
+              void projectCurrentItemRef
+                .current(useMediaProjectionStore.getState(), false, false, true)
+                .catch(() => undefined)
+            }, RENEWAL_RETRY_MS)
+          }
+          return
+        }
+      }
+      const basePayload = buildFileProjectionPayload(currentState)
       let payload = basePayload
       if (basePayload && item && isEditablePresentationMimeType(item.mimeType)) {
         const session = registry.get(item.id)
@@ -54,7 +210,7 @@ export function useMediaProjectionSync(): void {
               session,
               usePresentationWorkspaceStore.getState().getActiveSlideId(item.id) ?? ''
             )
-          : await buildFileProjectionPayloadWithEditableSlide(state)
+          : await buildFileProjectionPayloadWithEditableSlide(currentState)
       }
       if (!payload) return
 
@@ -66,8 +222,12 @@ export function useMediaProjectionSync(): void {
         }
       }
     },
-    [activeOwner, project, registry, startProjection]
+    [activeOwner, auth, clearRemoteSource, onAccessRevoked, project, registry, startProjection]
   )
+
+  useEffect(() => {
+    projectCurrentItemRef.current = projectCurrentItem
+  }, [projectCurrentItem])
 
   useEffect(() => {
     const unsub = useMediaProjectionStore.subscribe((state, prev) => {
@@ -83,6 +243,7 @@ export function useMediaProjectionSync(): void {
         state.typeStates.presentation !== prev.typeStates.presentation
 
       if (started || indexChanged || playlistChanged || endedCleared || presentationChanged) {
+        if (indexChanged || playlistChanged) clearRemoteSource()
         const explicitContentChange = started || indexChanged || endedCleared || presentationChanged
         void projectCurrentItem(state, started, explicitContentChange).catch(() => undefined)
       }
@@ -90,7 +251,28 @@ export function useMediaProjectionSync(): void {
     return () => {
       unsub()
     }
-  }, [activeOwner, projectCurrentItem])
+  }, [activeOwner, clearRemoteSource, projectCurrentItem])
+
+  useEffect(() => {
+    if (!useMediaProjectionStore.getState().isPresenting) clearRemoteSource()
+    const unsub = useMediaProjectionStore.subscribe((state, prev) => {
+      if (prev.isPresenting && !state.isPresenting) clearRemoteSource()
+    })
+    return unsub
+  }, [clearRemoteSource])
+
+  const previousSessionUserIdRef = useRef(sessionUserId)
+  useEffect(() => {
+    const previousUserId = previousSessionUserIdRef.current
+    previousSessionUserIdRef.current = sessionUserId
+    if (previousUserId && previousUserId !== sessionUserId) {
+      projectSequenceRef.current += 1
+      clearRemoteSource()
+      void stopProjection()
+    }
+  }, [clearRemoteSource, sessionUserId, stopProjection])
+
+  useEffect(() => clearRemoteSource, [clearRemoteSource])
 
   useEffect(() => {
     const unsub = useMediaProjectionStore.subscribe((state, prev) => {

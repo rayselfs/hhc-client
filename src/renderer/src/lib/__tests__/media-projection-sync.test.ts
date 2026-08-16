@@ -1,5 +1,5 @@
 import { renderHook, act, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createBlankEditablePresentationDocument } from '@renderer/lib/editable-presentation'
 import { EDITABLE_PRESENTATION_MIME_TYPE } from '@renderer/lib/presentation-media'
 import type { PresentationEditorSession } from '@renderer/lib/presentation-editor-session'
@@ -13,6 +13,10 @@ const registryMocks = vi.hoisted(() => ({
 const mockProject = vi.fn()
 const mockStartProjection = vi.fn(() => Promise.resolve())
 const mockStopProjection = vi.fn(() => Promise.resolve())
+const remoteMocks = vi.hoisted(() => ({
+  prepare: vi.fn(),
+  ensurePersistent: vi.fn()
+}))
 const projectionState = { activeOwner: 'media' as 'media' | 'timer' | 'bible' }
 
 vi.mock('@renderer/contexts/ProjectionContext', () => ({
@@ -28,10 +32,17 @@ vi.mock('@renderer/contexts/PresentationSessionRegistryContext', () => ({
   usePresentationSessionRegistry: () => registryMocks
 }))
 
+vi.mock('../hhc-line-connect', () => ({
+  prepareHhcLinePresentationSource: remoteMocks.prepare,
+  ensureHhcLineDesktopItemAvailableForPresentation: remoteMocks.ensurePersistent
+}))
+
 import { useMediaProjectionSync } from '../media-projection-sync'
 
-function renderSync(): void {
-  renderHook(() => useMediaProjectionSync())
+function renderSync(
+  options?: Parameters<typeof useMediaProjectionSync>[0]
+): ReturnType<typeof renderHook> {
+  return renderHook(() => useMediaProjectionSync(options))
 }
 
 function makeFile(id: string, name: string, mimeType = 'image/png', blobId = id): FileItemRecord {
@@ -53,6 +64,8 @@ beforeEach(() => {
   vi.clearAllMocks()
   projectionState.activeOwner = 'media'
   registryMocks.get.mockReturnValue(undefined)
+  remoteMocks.prepare.mockResolvedValue(null)
+  remoteMocks.ensurePersistent.mockResolvedValue(false)
   usePresentationWorkspaceStore.setState({ activeSlideIdByItemId: {} })
   useMediaProjectionStore.setState({
     playlist: [makeFile('a', 'a.png'), makeFile('b', 'b.png')],
@@ -68,7 +81,239 @@ beforeEach(() => {
   })
 })
 
+afterEach(() => {
+  vi.useRealTimers()
+})
+
 describe('media projection sync', () => {
+  it('renews an expiring browser source authoritatively without persisting its ticket', async () => {
+    vi.useFakeTimers()
+    const item = makeFile('remote', 'remote.mp4', 'video/mp4')
+    useMediaProjectionStore.setState({
+      playlist: [item],
+      currentIndex: 0,
+      isPresenting: true,
+      snapshot: {
+        id: 'snapshot',
+        createdAt: 1,
+        entries: [
+          {
+            index: 0,
+            itemId: item.id,
+            blobId: item.id,
+            name: item.name,
+            mimeType: item.mimeType,
+            sourceUrl: item.url,
+            remoteItem: {
+              providerConnectionId: 'hhc-line:user-1',
+              remoteItemId: 'asset-1',
+              rootRemoteFolderId: 'collection-1'
+            }
+          }
+        ]
+      }
+    })
+    remoteMocks.prepare
+      .mockResolvedValueOnce({
+        providerConnectionId: 'hhc-line:user-1',
+        remoteItemId: 'asset-1',
+        rootRemoteFolderId: 'collection-1',
+        source: {
+          kind: 'ticket',
+          url: 'https://www.alive.org.tw/api/assets/content?ticket=first',
+          expiresAt: Date.now() + 60_000,
+          etag: 'etag-1'
+        }
+      })
+      .mockResolvedValueOnce({
+        providerConnectionId: 'hhc-line:user-1',
+        remoteItemId: 'asset-1',
+        rootRemoteFolderId: 'collection-1',
+        source: {
+          kind: 'ticket',
+          url: 'https://www.alive.org.tw/api/assets/content?ticket=second',
+          expiresAt: Date.now() + 60_000,
+          etag: 'etag-1'
+        }
+      })
+
+    renderSync({
+      auth: {
+        getSession: () => ({ userId: 'user-1', displayName: 'Ada', roles: [] }),
+        getAccessToken: vi.fn(),
+        refreshAccessToken: vi.fn()
+      }
+    })
+    await act(async () => Promise.resolve())
+    expect(mockStartProjection).toHaveBeenCalledWith(
+      'media',
+      [
+        [
+          'file:show',
+          expect.objectContaining({ streamUrl: expect.stringContaining('ticket=first') })
+        ]
+      ],
+      { bringToFront: false }
+    )
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000)
+    })
+    expect(mockProject).toHaveBeenCalledWith(
+      'file:show',
+      expect.objectContaining({ streamUrl: expect.stringContaining('ticket=second') }),
+      { bringToFront: false }
+    )
+    expect(item.url).toBe('blob:remote')
+    vi.useRealTimers()
+  })
+
+  it('keeps the current source on retryable renewal failure and emits access-revoked only for 403', async () => {
+    vi.useFakeTimers()
+    const onAccessRevoked = vi.fn()
+    const error = Object.assign(new Error('retry'), { classification: 'retryable' })
+    remoteMocks.prepare
+      .mockResolvedValueOnce({
+        providerConnectionId: 'hhc-line:user-1',
+        remoteItemId: 'asset-1',
+        rootRemoteFolderId: 'collection-1',
+        source: {
+          kind: 'ticket',
+          url: 'https://www.alive.org.tw/api/assets/content?ticket=current',
+          expiresAt: Date.now() + 60_000,
+          etag: 'etag-1'
+        }
+      })
+      .mockRejectedValueOnce(error)
+    useMediaProjectionStore.setState({
+      snapshot: {
+        id: 'snapshot',
+        createdAt: 1,
+        entries: [
+          {
+            index: 0,
+            itemId: 'a',
+            blobId: 'a',
+            name: 'a.png',
+            mimeType: 'image/png',
+            sourceUrl: 'blob:a',
+            remoteItem: {
+              providerConnectionId: 'hhc-line:user-1',
+              remoteItemId: 'asset-1',
+              rootRemoteFolderId: 'collection-1'
+            }
+          },
+          {
+            index: 1,
+            itemId: 'b',
+            blobId: 'b',
+            name: 'b.png',
+            mimeType: 'image/png',
+            sourceUrl: 'blob:b',
+            remoteItem: {
+              providerConnectionId: 'hhc-line:user-1',
+              remoteItemId: 'asset-2',
+              rootRemoteFolderId: 'collection-1'
+            }
+          }
+        ]
+      }
+    })
+
+    renderSync({
+      auth: {
+        getSession: () => ({ userId: 'user-1', displayName: 'Ada', roles: [] }),
+        getAccessToken: vi.fn(),
+        refreshAccessToken: vi.fn()
+      },
+      onAccessRevoked
+    })
+    await act(async () => Promise.resolve())
+    expect(onAccessRevoked).not.toHaveBeenCalled()
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000)
+    })
+    expect(useMediaProjectionStore.getState().snapshot?.entries[0].sourceUrl).toContain(
+      'ticket=current'
+    )
+
+    remoteMocks.prepare.mockRejectedValueOnce(
+      Object.assign(new Error('forbidden'), {
+        classification: 'access-revoked',
+        providerConnectionId: 'hhc-line:user-1',
+        remoteItemId: 'asset-1'
+      })
+    )
+    act(() => useMediaProjectionStore.getState().jumpTo(1))
+    await act(async () => Promise.resolve())
+    expect(onAccessRevoked).toHaveBeenCalledWith({
+      providerConnectionId: 'hhc-line:user-1',
+      remoteItemId: 'asset-1'
+    })
+    vi.useRealTimers()
+  })
+
+  it('releases an Electron lease and stops presentation when the HHC session ends', async () => {
+    const releaseContentLease = vi.fn(async () => undefined)
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: { hhcAssets: { releaseContentLease } }
+    })
+    const sessionRef = {
+      current: { userId: 'user-1', displayName: 'Ada', roles: [] } as {
+        userId: string
+        displayName: string
+        roles: string[]
+      } | null
+    }
+    const auth = {
+      getSession: () => sessionRef.current,
+      getAccessToken: vi.fn(),
+      refreshAccessToken: vi.fn()
+    }
+    useMediaProjectionStore.setState({
+      snapshot: {
+        id: 'snapshot',
+        createdAt: 1,
+        entries: [
+          {
+            index: 0,
+            itemId: 'a',
+            blobId: 'a',
+            name: 'a.png',
+            mimeType: 'image/png',
+            sourceUrl: 'blob:a',
+            remoteItem: {
+              providerConnectionId: 'hhc-line:user-1',
+              remoteItemId: 'asset-1',
+              rootRemoteFolderId: 'collection-1'
+            }
+          }
+        ]
+      }
+    })
+    remoteMocks.prepare.mockResolvedValueOnce({
+      providerConnectionId: 'hhc-line:user-1',
+      remoteItemId: 'asset-1',
+      rootRemoteFolderId: 'collection-1',
+      source: {
+        kind: 'native-lease',
+        url: 'hhc-media://lease/123e4567-e89b-12d3-a456-426614174000?type=image%2Fpng',
+        leaseId: '123e4567-e89b-12d3-a456-426614174000',
+        etag: 'etag-1'
+      }
+    })
+
+    const { rerender } = renderHook(() => useMediaProjectionSync({ auth }))
+    await act(async () => Promise.resolve())
+    sessionRef.current = null
+    rerender()
+
+    await waitFor(() => {
+      expect(releaseContentLease).toHaveBeenCalledWith('123e4567-e89b-12d3-a456-426614174000')
+      expect(mockStopProjection).toHaveBeenCalled()
+    })
+  })
   it('does not send file:show for notes-only updates', () => {
     renderSync()
     mockProject.mockClear()

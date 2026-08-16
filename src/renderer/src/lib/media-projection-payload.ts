@@ -104,6 +104,9 @@ export function buildFileProjectionPayload({
     seekable: snapshotEntry?.seekable,
     durationMs: snapshotEntry?.durationMs
   }
+  if (snapshotEntry?.sourceUrl && snapshotEntry.sourceUrl !== item.url) {
+    payload.streamUrl = snapshotEntry.sourceUrl
+  }
   if (presentation) payload.presentation = presentation
   return payload
 }

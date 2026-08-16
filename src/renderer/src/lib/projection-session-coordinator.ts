@@ -51,6 +51,7 @@ const DEFAULT_MEDIA_REPLAY_STATE = {
   isPlaying: false,
   isEnded: false,
   volume: 1,
+  playbackRate: 1,
   pdfPage: 1,
   pdfScroll: 0,
   pdfViewMode: 'single' as const,
@@ -192,15 +193,19 @@ function reduceReplayableMessage(
       }
     case 'file:show': {
       const show = data as ProjectionPayload<'file:show'>
+      const replayState =
+        snapshot.media.state?.itemId === show.itemId
+          ? snapshot.media.state
+          : {
+              itemId: show.itemId,
+              ...DEFAULT_MEDIA_REPLAY_STATE,
+              pan: { ...DEFAULT_MEDIA_REPLAY_STATE.pan }
+            }
       return {
         ...snapshot,
         media: {
           show,
-          state: {
-            itemId: show.itemId,
-            ...DEFAULT_MEDIA_REPLAY_STATE,
-            pan: { ...DEFAULT_MEDIA_REPLAY_STATE.pan }
-          }
+          state: replayState
         }
       }
     }
@@ -225,7 +230,8 @@ function reducePlaybackState(
         positionSeconds: data.currentTime,
         durationSeconds: data.duration,
         isPlaying: data.isPlaying,
-        isEnded: data.isEnded
+        isEnded: data.isEnded,
+        playbackRate: data.playbackRate ?? snapshot.media.state.playbackRate ?? 1
       }
     }
   }

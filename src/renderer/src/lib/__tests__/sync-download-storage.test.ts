@@ -8,6 +8,7 @@ vi.mock('@renderer/i18n', () => ({
 
 import {
   saveElectronOneDriveDownloadedContent,
+  saveWebHhcDownloadedContent,
   saveWebOneDriveDownloadedContent
 } from '../sync-download-storage'
 import { MAX_FILE_SIZE_WEB } from '../media-limits'
@@ -92,6 +93,34 @@ beforeEach(async () => {
       }
     }
   })
+})
+
+it('caps HHC browser downloads at 256 MiB without weakening OneDrive 2 GiB', async () => {
+  Object.defineProperty(navigator, 'storage', {
+    configurable: true,
+    value: { estimate: vi.fn(async () => ({ quota: 4 * 1024 ** 3, usage: 0 })) }
+  })
+  const overHhcLimit = 256 * 1024 * 1024 + 1
+
+  await expect(
+    saveWebHhcDownloadedContent(
+      request,
+      new Response(new Uint8Array([1]), {
+        headers: { 'Content-Length': String(overHhcLimit), 'Content-Type': 'video/mp4' }
+      }),
+      metadata
+    )
+  ).rejects.toThrow('HHC file exceeds the Web 256MiB limit')
+
+  await expect(
+    saveWebOneDriveDownloadedContent(
+      request,
+      new Response(new Uint8Array([1]), {
+        headers: { 'Content-Length': String(overHhcLimit), 'Content-Type': 'video/mp4' }
+      }),
+      metadata
+    )
+  ).resolves.toMatchObject({ size: 1 })
 })
 
 describe('saveWebOneDriveDownloadedContent', () => {

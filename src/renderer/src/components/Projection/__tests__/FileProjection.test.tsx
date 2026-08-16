@@ -327,8 +327,91 @@ describe('FileProjection copied media identity', () => {
       currentTime: 12,
       duration: 100,
       isPlaying: false,
-      isEnded: false
+      isEnded: false,
+      playbackRate: 1
     })
+  })
+
+  it('restores video playback rate when an authoritative source URL is replaced', async () => {
+    const replayState = {
+      itemId: 'live-id',
+      positionSeconds: 12,
+      durationSeconds: 100,
+      isPlaying: false,
+      isEnded: false,
+      volume: 0.4,
+      playbackRate: 1.5,
+      pdfPage: 1,
+      pdfScroll: 0,
+      pdfViewMode: 'single' as const,
+      zoom: 1,
+      pan: { x: 0, y: 0 }
+    }
+    const { container, rerender } = render(
+      <FileProjection
+        fileName="live.mp4"
+        initialItemId="live-id"
+        initialBlobId="source-id"
+        initialMimeType="video/mp4"
+        initialStreamUrl="https://www.alive.org.tw/api/assets/content?ticket=first"
+        initialReplayState={replayState}
+      />
+    )
+    const video = await waitFor(() => container.querySelector('video')!)
+    Object.defineProperty(video, 'readyState', { configurable: true, value: 1 })
+    Object.defineProperty(video, 'duration', { configurable: true, value: 100 })
+    fireEvent.loadedMetadata(video)
+
+    rerender(
+      <FileProjection
+        fileName="live.mp4"
+        initialItemId="live-id"
+        initialBlobId="source-id"
+        initialMimeType="video/mp4"
+        initialStreamUrl="https://www.alive.org.tw/api/assets/content?ticket=second"
+        initialReplayState={replayState}
+      />
+    )
+    fireEvent.loadedMetadata(video)
+
+    expect(video.currentTime).toBe(12)
+    expect(video.paused).toBe(true)
+    expect(video.volume).toBe(0.4)
+    expect(video.playbackRate).toBe(1.5)
+  })
+
+  it('captures live playback state before replacing a same-item source URL', async () => {
+    const { container, rerender } = render(
+      <FileProjection
+        fileName="live.mp4"
+        initialItemId="live-id"
+        initialBlobId="source-id"
+        initialMimeType="video/mp4"
+        initialStreamUrl="https://www.alive.org.tw/api/assets/content?ticket=first"
+      />
+    )
+    const video = await waitFor(() => container.querySelector('video')!)
+    Object.defineProperty(video, 'readyState', { configurable: true, value: 1 })
+    Object.defineProperty(video, 'duration', { configurable: true, value: 100 })
+    video.currentTime = 18
+    video.volume = 0.3
+    video.playbackRate = 1.75
+
+    rerender(
+      <FileProjection
+        fileName="live.mp4"
+        initialItemId="live-id"
+        initialBlobId="source-id"
+        initialMimeType="video/mp4"
+        initialStreamUrl="https://www.alive.org.tw/api/assets/content?ticket=second"
+      />
+    )
+    fireEvent.loadedMetadata(video)
+
+    expect(video.currentTime).toBe(18)
+    expect(video.paused).toBe(true)
+    expect(video.volume).toBe(0.3)
+    expect(video.playbackRate).toBe(1.75)
   })
 
   it('starts live stream playback even before metadata is available', async () => {

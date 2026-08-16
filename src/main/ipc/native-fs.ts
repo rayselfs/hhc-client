@@ -14,6 +14,10 @@ const MIME_TYPE_PATTERN = /^[a-z0-9][a-z0-9!#$&^_.+-]*\/[a-z0-9][a-z0-9!#$&^_.+-
 const RANGE_PATTERN = /^bytes=(\d*)-(\d*)$/
 const nativeMediaLeases = new Map<string, { filePath: string; mimeType: string }>()
 
+function getNativeMediaLeaseDir(): string {
+  return resolve(app.getPath('userData'), 'hhc-asset-leases')
+}
+
 function getNativeFsDir(): string {
   return resolve(app.getPath('userData'), 'native-files')
 }
@@ -71,6 +75,21 @@ export async function releaseNativeMediaLease(leaseId: unknown): Promise<void> {
     if (error.code !== 'ENOENT') throw error
   })
   nativeMediaLeases.delete(leaseId)
+}
+
+export async function clearNativeMediaLeases(): Promise<void> {
+  const results = await Promise.allSettled(
+    [...nativeMediaLeases.keys()].map((leaseId) => releaseNativeMediaLease(leaseId))
+  )
+  const failure = results.find(
+    (result): result is PromiseRejectedResult => result.status === 'rejected'
+  )
+  if (failure) throw failure.reason
+}
+
+export async function clearStaleNativeMediaLeases(): Promise<void> {
+  nativeMediaLeases.clear()
+  await fs.rm(getNativeMediaLeaseDir(), { recursive: true, force: true })
 }
 
 type ByteRange = {

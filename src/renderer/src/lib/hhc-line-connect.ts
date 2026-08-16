@@ -12,9 +12,14 @@ import type {
   CloudRemoteFolder,
   HhcLineCloudAuth
 } from './cloud-provider'
+import { getBlobId } from './blob-identity'
+import { enqueueSyncDownload } from './sync-download-queue'
+import type { SyncRemoteContentSource } from './sync-provider'
 import {
   createHhcLineProviderConnectionId,
   getProviderConnection,
+  getSyncEntryByLocalItem,
+  getSyncEntryByRemoteItem,
   getSyncCursor,
   listSyncEntriesByProviderConnection,
   putSyncCursor,
@@ -22,6 +27,7 @@ import {
   type ProviderConnectionRecord,
   type SyncEntryRecord
 } from './sync-db'
+import { refreshImportedMediaAssets } from './local-sync-import'
 import {
   applySyncRefreshPlan,
   buildSyncDeltaRefreshPlan,
@@ -34,6 +40,13 @@ const importsInFlight = new Map<string, Promise<CloudImportResult>>()
 const importQueueTails = new Map<string, Promise<void>>()
 const refreshesInFlight = new Map<string, Promise<CloudRefreshSummary>>()
 const MAX_COLLECTION_PAGES = 1_000
+
+export interface HhcLinePresentationSource {
+  providerConnectionId: string
+  remoteItemId: string
+  rootRemoteFolderId: string
+  source: SyncRemoteContentSource
+}
 
 function requireSession(auth: HhcLineCloudAuth): HhcSession {
   const session = auth.getSession()
@@ -98,6 +111,117 @@ async function createProvider(
       return !expectedUserId || session?.userId === expectedUserId ? session : null
     }
   })
+}
+
+async function getHhcPresentationEntry(item: FileItemRecord): Promise<{
+  connection: ProviderConnectionRecord
+  entry: SyncEntryRecord
+} | null> {
+  const entry = await getSyncEntryByLocalItem(item.id)
+  if (!entry) return null
+  const connection = await getProviderConnection(entry.providerConnectionId)
+  if (connection?.providerType !== 'hhc-line' || !entry.parentRemoteItemId) {
+    return null
+  }
+  return { connection, entry }
+}
+
+export async function prepareHhcLinePresentationSource(
+  auth: HhcLineCloudAuth,
+  item: FileItemRecord
+): Promise<HhcLinePresentationSource | null> {
+  const found = await getHhcPresentationEntry(item)
+  if (!found || found.entry.status === 'available-offline') return null
+  const session = requireSession(auth)
+  if (found.connection.accountUserId !== session.userId) {
+    throw Object.assign(new Error('HHC account changed'), {
+      classification: 'access-revoked',
+      providerConnectionId: found.entry.providerConnectionId,
+      remoteItemId: found.entry.remoteItemId
+    })
+  }
+  assertCurrentAccount(auth, session.userId)
+  try {
+    const provider = await createProvider(auth, session.userId)
+    const source = await provider.getRemoteContentSource(
+      found.entry.providerConnectionId,
+      found.entry.remoteItemId
+    )
+    assertCurrentAccount(auth, session.userId)
+    return {
+      providerConnectionId: found.entry.providerConnectionId,
+      remoteItemId: found.entry.remoteItemId,
+      rootRemoteFolderId: found.entry.parentRemoteItemId!,
+      source
+    }
+  } catch (error) {
+    if (error && typeof error === 'object') {
+      Object.assign(error, {
+        providerConnectionId: found.entry.providerConnectionId,
+        remoteItemId: found.entry.remoteItemId
+      })
+    }
+    throw error
+  }
+}
+
+export async function ensureHhcLineDesktopItemAvailableForPresentation(
+  auth: HhcLineCloudAuth,
+  item: FileItemRecord
+): Promise<boolean | null> {
+  const found = await getHhcPresentationEntry(item)
+  if (!found) return null
+  if (found.entry.status === 'available-offline') return true
+  const session = requireSession(auth)
+  if (found.connection.accountUserId !== session.userId) {
+    throw Object.assign(new Error('HHC account changed'), {
+      classification: 'access-revoked',
+      providerConnectionId: found.entry.providerConnectionId,
+      remoteItemId: found.entry.remoteItemId
+    })
+  }
+  assertCurrentAccount(auth, session.userId)
+  const provider = await createProvider(auth, session.userId)
+  const result = await enqueueSyncDownload({
+    provider,
+    request: {
+      providerConnectionId: found.entry.providerConnectionId,
+      rootRemoteFolderId: found.entry.parentRemoteItemId!,
+      remoteItemId: found.entry.remoteItemId,
+      targetBlobId: getBlobId(item),
+      offlinePolicy: 'on-demand'
+    },
+    entry: {
+      providerConnectionId: found.entry.providerConnectionId,
+      remoteItemId: found.entry.remoteItemId,
+      parentRemoteItemId: found.entry.parentRemoteItemId,
+      kind: 'file',
+      name: found.entry.name,
+      itemId: item.id,
+      mimeType: found.entry.mimeType,
+      size: found.entry.size,
+      etag: found.entry.etag,
+      contentHash: found.entry.contentHash
+    },
+    previousEntry: found.entry,
+    priority: 'presentation',
+    onDownloaded: () => refreshImportedMediaAssets([item])
+  })
+  assertCurrentAccount(auth, session.userId)
+  if (!result) {
+    const failed = await getSyncEntryByRemoteItem(
+      found.entry.providerConnectionId,
+      found.entry.remoteItemId
+    )
+    if (failed?.errorKind === 'access-revoked') {
+      throw Object.assign(new Error('HHC Asset access revoked'), {
+        classification: 'access-revoked',
+        providerConnectionId: found.entry.providerConnectionId,
+        remoteItemId: found.entry.remoteItemId
+      })
+    }
+  }
+  return result !== null
 }
 
 export async function getConnectedHhcLineAccount(

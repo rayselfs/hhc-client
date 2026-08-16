@@ -60,6 +60,7 @@ type PendingVideoControl = {
   seekTo?: number
   shouldPlay?: boolean
   volume?: number
+  playbackRate?: number
 }
 
 const HAVE_METADATA = 1
@@ -142,6 +143,11 @@ export default function FileProjection({
       delete pending.volume
     }
 
+    if (pending.playbackRate !== undefined) {
+      video.playbackRate = pending.playbackRate
+      delete pending.playbackRate
+    }
+
     if (pending.seekTo !== undefined) {
       if (!seekableRef.current) {
         delete pending.seekTo
@@ -173,7 +179,8 @@ export default function FileProjection({
     if (
       pending.seekTo === undefined &&
       pending.shouldPlay === undefined &&
-      pending.volume === undefined
+      pending.volume === undefined &&
+      pending.playbackRate === undefined
     ) {
       pendingVideoControlRef.current = null
     }
@@ -246,7 +253,8 @@ export default function FileProjection({
         currentTime: Number.isFinite(video.currentTime) ? video.currentTime : 0,
         duration,
         isPlaying: next?.isPlaying ?? !video.paused,
-        isEnded: next?.isEnded ?? video.ended
+        isEnded: next?.isEnded ?? video.ended,
+        playbackRate: Number.isFinite(video.playbackRate) ? video.playbackRate : 1
       })
     },
     []
@@ -262,14 +270,27 @@ export default function FileProjection({
         })
         if (loadSequenceRef.current !== loadSequence) return
       }
+      const liveVideo = currentItemIdRef.current === itemId ? videoRef.current : null
       currentItemIdRef.current = itemId
       const replay = replayStateRef.current?.itemId === itemId ? replayStateRef.current : null
-      pendingVideoControlRef.current = replay
+      const videoReplay =
+        replay ??
+        (liveVideo
+          ? {
+              positionSeconds: Number.isFinite(liveVideo.currentTime) ? liveVideo.currentTime : 0,
+              isPlaying: !liveVideo.paused,
+              isEnded: liveVideo.ended,
+              volume: liveVideo.volume,
+              playbackRate: liveVideo.playbackRate
+            }
+          : null)
+      pendingVideoControlRef.current = videoReplay
         ? {
             itemId,
-            seekTo: replay.positionSeconds,
-            shouldPlay: replay.isPlaying && !replay.isEnded,
-            volume: replay.volume
+            seekTo: videoReplay.positionSeconds,
+            shouldPlay: videoReplay.isPlaying && !videoReplay.isEnded,
+            volume: videoReplay.volume,
+            playbackRate: videoReplay.playbackRate ?? 1
           }
         : null
       playbackModeRef.current = options.playbackMode ?? 'native'
@@ -774,7 +795,7 @@ export default function FileProjection({
           <PptxSlideSurface
             source={{
               id: initialItemId,
-              url: `blob:${initialBlobId}`,
+              url: initialStreamUrl ?? `blob:${initialBlobId}`,
               mimeType: presentationMimeType
             }}
             slideIndex={initialPresentation?.slideIndex ?? 0}

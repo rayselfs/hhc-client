@@ -204,6 +204,104 @@ describe('analyzePresentationReadiness', () => {
     })
   })
 
+  it.each([
+    ['image/png', 'image.png'],
+    ['audio/mpeg', 'audio.mp3'],
+    ['video/mp4', 'video.mp4'],
+    ['application/pdf', 'document.pdf'],
+    ['application/vnd.openxmlformats-officedocument.presentationml.presentation', 'slides.pptx']
+  ])('allows HHC %s items to prepare from an ephemeral browser source', async (mimeType, name) => {
+    await putProviderConnection({
+      id: 'hhc-line:user-1',
+      providerType: 'hhc-line',
+      displayName: 'HHC LINE',
+      accountUserId: 'user-1'
+    })
+    await putSyncEntry({
+      providerConnectionId: 'hhc-line:user-1',
+      remoteItemId: 'remote-file',
+      parentRemoteItemId: 'collection-1',
+      kind: 'file',
+      name,
+      mimeType,
+      itemId: 'remote-item',
+      status: 'remote-only'
+    })
+
+    const report = await analyzePresentationReadiness(
+      [file('remote-item', name, mimeType, 'hhc-line:remote-file')],
+      'web'
+    )
+
+    expect(report.items[0]).toMatchObject({
+      status: 'ready',
+      reason: 'ready-remote',
+      support: 'native'
+    })
+  })
+
+  it('fails unsupported HHC remote media without requesting a source', async () => {
+    await putProviderConnection({
+      id: 'hhc-line:user-1',
+      providerType: 'hhc-line',
+      displayName: 'HHC LINE',
+      accountUserId: 'user-1'
+    })
+    await putSyncEntry({
+      providerConnectionId: 'hhc-line:user-1',
+      remoteItemId: 'remote-file',
+      parentRemoteItemId: 'collection-1',
+      kind: 'file',
+      name: 'image.heic',
+      mimeType: 'image/heic',
+      itemId: 'remote-item',
+      status: 'remote-only'
+    })
+
+    const report = await analyzePresentationReadiness(
+      [file('remote-item', 'image.heic', 'image/heic', 'hhc-line:remote-file')],
+      'web'
+    )
+
+    expect(report.items[0]).toMatchObject({
+      status: 'unsupported',
+      reason: 'unsupported-platform'
+    })
+  })
+
+  it('fails remote desktop-engine media when VLC is unavailable', async () => {
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: { projectionVlc: { getInfo: vi.fn(async () => ({ status: 'missing' })) } }
+    })
+    await putProviderConnection({
+      id: 'hhc-line:user-1',
+      providerType: 'hhc-line',
+      displayName: 'HHC LINE',
+      accountUserId: 'user-1'
+    })
+    await putSyncEntry({
+      providerConnectionId: 'hhc-line:user-1',
+      remoteItemId: 'remote-file',
+      parentRemoteItemId: 'collection-1',
+      kind: 'file',
+      name: 'movie.mkv',
+      mimeType: 'video/x-matroska',
+      itemId: 'remote-item',
+      status: 'remote-only'
+    })
+
+    const report = await analyzePresentationReadiness(
+      [file('remote-item', 'movie.mkv', 'video/x-matroska', 'hhc-line:remote-file')],
+      'electron'
+    )
+
+    expect(report.items[0]).toMatchObject({
+      status: 'failed',
+      reason: 'video-engine-unavailable'
+    })
+  })
+
   it('marks available-offline sync items as preparing when the native file is missing', async () => {
     Object.defineProperty(window, 'api', {
       configurable: true,

@@ -10,7 +10,7 @@ import {
 } from './sync-db'
 import { openFileExplorerDB } from './file-explorer-db'
 import { isElectron } from './env'
-import { saveWebOneDriveDownloadedContent } from './sync-download-storage'
+import { saveWebHhcDownloadedContent } from './sync-download-storage'
 import { unlinkSyncConnectionFromApp } from './sync-unlink'
 import {
   SyncDownloadCancelledError,
@@ -115,7 +115,7 @@ async function saveDownloadedContent(
   canCommit: SyncDownloadCommitGuard
 ): Promise<SyncDownloadResult> {
   if (content instanceof Response) {
-    return saveWebOneDriveDownloadedContent(request, content, metadata, canCommit)
+    return saveWebHhcDownloadedContent(request, content, metadata, canCommit)
   }
   return saveNativeDownloadedContent(request, content, metadata, canCommit)
 }

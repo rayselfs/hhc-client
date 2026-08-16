@@ -1,12 +1,25 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useProjection } from '@renderer/contexts/ProjectionContext'
-import { useMediaProjectionSync } from '@renderer/lib/media-projection-sync'
+import { useHhcAuth } from '@renderer/contexts/HhcAuthContext'
+import {
+  useMediaProjectionSync,
+  type HhcProjectionAccessRevoked
+} from '@renderer/lib/media-projection-sync'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 
-export default function MediaProjectionBridge(): null {
+export default function MediaProjectionBridge({
+  onHhcAccessRevoked
+}: {
+  onHhcAccessRevoked?: (scope: HhcProjectionAccessRevoked) => void
+}): null {
   const { on, isProjectionOpen, recovery } = useProjection()
+  const { session, getAccessToken, refreshAccessToken } = useHhcAuth()
+  const auth = useMemo(
+    () => ({ getSession: () => session, getAccessToken, refreshAccessToken }),
+    [getAccessToken, refreshAccessToken, session]
+  )
 
-  useMediaProjectionSync()
+  useMediaProjectionSync({ auth, onAccessRevoked: onHhcAccessRevoked })
 
   useEffect(() => {
     return on('file:playback-state', (data) => {

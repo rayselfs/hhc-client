@@ -36,7 +36,8 @@ const playback: ProjectionPayload<'file:playback-state'> = {
   currentTime: 24,
   duration: 120,
   isPlaying: true,
-  isEnded: false
+  isEnded: false,
+  playbackRate: 1.5
 }
 
 describe('ProjectionSessionCoordinator', () => {
@@ -132,11 +133,33 @@ describe('ProjectionSessionCoordinator', () => {
       isPlaying: false,
       isEnded: false,
       volume: 1,
+      playbackRate: 1,
       pdfPage: 1,
       pdfScroll: 0,
       pdfViewMode: 'single',
       zoom: 1,
       pan: { x: 0, y: 0 }
+    })
+  })
+
+  it('preserves playback state when an authoritative source renews for the same item', () => {
+    const coordinator = createProjectionSessionCoordinator(send)
+    coordinator.startSession('media', [['file:show', fileShow]])
+    coordinator.beginGeneration({ generation: 3, status: 'opening', reason: 'created' })
+    coordinator.recordPlayback(3, playback)
+    coordinator.project('file:control', { action: 'volume', value: 0.4 })
+
+    coordinator.project('file:show', {
+      ...fileShow,
+      streamUrl: 'https://www.alive.org.tw/api/assets/content?ticket=renewed'
+    })
+
+    expect(coordinator.getSnapshot()?.media.state).toMatchObject({
+      itemId: 'video-1',
+      positionSeconds: 24,
+      isPlaying: true,
+      volume: 0.4,
+      playbackRate: 1.5
     })
   })
 

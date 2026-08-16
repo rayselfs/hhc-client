@@ -32,6 +32,30 @@ function makeFile(id: string, url = `blob:${id}`): FileItemRecord {
 }
 
 describe('buildFileProjectionPayload', () => {
+  it('projects an ephemeral snapshot source without mutating the file item', () => {
+    const item = makeFile('remote')
+    const payload = buildFileProjectionPayload({
+      playlist: [item],
+      currentIndex: 0,
+      snapshot: {
+        id: 'snapshot',
+        createdAt: 1,
+        entries: [
+          {
+            index: 0,
+            itemId: item.id,
+            blobId: item.id,
+            name: item.name,
+            mimeType: item.mimeType,
+            sourceUrl: 'https://www.alive.org.tw/api/assets/content?ticket=secret'
+          }
+        ]
+      }
+    })
+
+    expect(payload?.streamUrl).toBe('https://www.alive.org.tw/api/assets/content?ticket=secret')
+    expect(item.url).toBe('blob:remote')
+  })
   it('builds a file projection payload from snapshot metadata', () => {
     const playlist = [makeFile('copy-id', 'blob:original-id')]
     const snapshot: PresentationSnapshot = {

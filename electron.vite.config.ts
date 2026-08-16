@@ -157,7 +157,8 @@ export default defineConfig(({ mode }) => {
               '**/assets/pdf-*.js',
               '**/assets/transformers-*.js',
               '**/assets/microsoft.cognitiveservices.speech.sdk-*.js',
-              '**/assets/aiden0z-pptx-renderer*.js'
+              '**/assets/aiden0z-pptx-renderer*.js',
+              '**/assets/hhc-line-connect-*.js'
             ],
             navigateFallback: '/index.html',
             navigateFallbackDenylist: [/^\/api\//, OAUTH_CALLBACK_PWA_DENYLIST],
