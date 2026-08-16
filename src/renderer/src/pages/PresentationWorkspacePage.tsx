@@ -42,6 +42,7 @@ import EditableSlideSurface from '@renderer/components/Common/EditableSlideSurfa
 import {
   InspectorPanel,
   NavigatorRail,
+  ResponsivePanelGroup,
   StageViewport,
   WorkspaceShell
 } from '@renderer/components/Common/WorkspacePrimitives'
@@ -390,57 +391,63 @@ export function PptxDocumentView({
   }
 
   return (
-    <div className="grid min-h-0 flex-1 grid-cols-[220px_minmax(0,1fr)] bg-background">
-      <aside className="min-h-0 overflow-y-auto border-r border-divider bg-content1/40 px-2 py-3">
-        <div className="space-y-2">
-          {viewer &&
-            slideIndexes.map((index) => (
-              <SlideThumbnail
-                key={index}
-                viewer={viewer}
-                index={index}
-                active={index === activeSlide}
-                onSelect={() => setActiveSlideId(deck.itemId, getPptxSlideId(index))}
-              />
-            ))}
-        </div>
-      </aside>
-
-      <main className="flex min-h-0 flex-col bg-[#111217]">
-        <div className="flex h-16 shrink-0 items-center justify-between border-b border-divider bg-content1/80 px-4">
-          <div>
-            <p className="text-sm font-semibold text-foreground">{deck.name}</p>
-            <p className="text-xs text-default-400">
-              {t('presentationWorkspace.readOnlyPptx', 'Read-only PPTX')}
-            </p>
+    <ResponsivePanelGroup
+      navigatorWidth={220}
+      navigatorLabel={t('presentationWorkspace.slides', 'Slides')}
+      className="bg-background"
+      navigator={
+        <NavigatorRail className="h-full overflow-y-auto border-r border-divider bg-content1/40 px-2 py-3">
+          <div className="space-y-2">
+            {viewer &&
+              slideIndexes.map((index) => (
+                <SlideThumbnail
+                  key={index}
+                  viewer={viewer}
+                  index={index}
+                  active={index === activeSlide}
+                  onSelect={() => setActiveSlideId(deck.itemId, getPptxSlideId(index))}
+                />
+              ))}
           </div>
-          <Button variant="primary" isDisabled={isConverting} onPress={() => void editCopy()}>
-            {isConverting
-              ? t('presentationWorkspace.editCopyConverting', 'Creating copy...')
-              : t('presentationWorkspace.editCopy', 'Edit a copy')}
-          </Button>
-        </div>
-        <div className="flex flex-1 items-center justify-center overflow-auto p-8">
-          <div className="relative flex min-h-[360px] w-full max-w-5xl items-center justify-center rounded-2xl bg-black/30 p-4 shadow-2xl">
-            <div ref={canvasRef} className="w-full" />
-            {status === 'loading' && (
-              <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/40">
-                <Spinner />
-              </div>
-            )}
-            {status === 'failed' && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center rounded-2xl bg-black/70 p-6 text-center">
-                <FileText className="mb-3 text-danger" size={36} />
-                <p className="text-sm font-semibold text-danger">
-                  {t('presentationWorkspace.loadFailed')}
-                </p>
-                {error && <p className="mt-2 max-w-lg text-xs text-default-400">{error}</p>}
-              </div>
-            )}
+        </NavigatorRail>
+      }
+      stage={
+        <StageViewport className="h-full bg-[#111217]">
+          <div className="flex h-16 shrink-0 items-center justify-between border-b border-divider bg-content1/80 px-4">
+            <div>
+              <p className="text-sm font-semibold text-foreground">{deck.name}</p>
+              <p className="text-xs text-default-400">
+                {t('presentationWorkspace.readOnlyPptx', 'Read-only PPTX')}
+              </p>
+            </div>
+            <Button variant="primary" isDisabled={isConverting} onPress={() => void editCopy()}>
+              {isConverting
+                ? t('presentationWorkspace.editCopyConverting', 'Creating copy...')
+                : t('presentationWorkspace.editCopy', 'Edit a copy')}
+            </Button>
           </div>
-        </div>
-      </main>
-    </div>
+          <div className="flex flex-1 items-center justify-center overflow-auto p-8">
+            <div className="relative flex min-h-[360px] w-full max-w-5xl items-center justify-center rounded-2xl bg-black/30 p-4 shadow-2xl">
+              <div ref={canvasRef} className="w-full" />
+              {status === 'loading' && (
+                <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/40">
+                  <Spinner />
+                </div>
+              )}
+              {status === 'failed' && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center rounded-2xl bg-black/70 p-6 text-center">
+                  <FileText className="mb-3 text-danger" size={36} />
+                  <p className="text-sm font-semibold text-danger">
+                    {t('presentationWorkspace.loadFailed')}
+                  </p>
+                  {error && <p className="mt-2 max-w-lg text-xs text-default-400">{error}</p>}
+                </div>
+              )}
+            </div>
+          </div>
+        </StageViewport>
+      }
+    />
   )
 }
 
@@ -566,7 +573,7 @@ function EditableSessionDocumentView({
   const [isNotesOpen, setIsNotesOpen] = useState(false)
   const [notesDraftBySlideId, setNotesDraftBySlideId] = useState<Record<string, string>>({})
   const [cropElementId, setCropElementId] = useState<string | null>(null)
-  const [isCompactRailOpen, setIsCompactRailOpen] = useState(false)
+  const [compactOverlay, setCompactOverlay] = useState<'navigator' | 'inspector' | null>(null)
   const [snapGuides, setSnapGuides] = useState<{
     vertical?: number
     horizontal?: number
@@ -1124,7 +1131,7 @@ function EditableSessionDocumentView({
       return (
         <div
           data-ribbon-surface
-          className="flex h-full min-w-max items-stretch overflow-x-auto overflow-y-hidden border-b border-divider bg-content1/95 text-sm"
+          className="flex h-full min-w-0 w-full items-stretch overflow-x-auto overflow-y-hidden border-b border-divider bg-content1/95 text-sm"
         >
           <RibbonGroup
             label={t('presentationWorkspace.ribbonGroups.adjust', 'Adjust')}
@@ -1246,7 +1253,7 @@ function EditableSessionDocumentView({
       return (
         <div
           data-ribbon-surface
-          className="flex h-full min-w-max items-stretch overflow-x-auto overflow-y-hidden border-b border-divider bg-content1/95"
+          className="flex h-full min-w-0 w-full items-stretch overflow-x-auto overflow-y-hidden border-b border-divider bg-content1/95"
         >
           <RibbonGroup
             label={t('presentationWorkspace.ribbonGroups.insert', 'Insert')}
@@ -1287,7 +1294,7 @@ function EditableSessionDocumentView({
       return (
         <div
           data-ribbon-surface
-          className="flex h-full min-w-max items-stretch overflow-x-auto overflow-y-hidden border-b border-divider bg-content1/95 text-sm"
+          className="flex h-full min-w-0 w-full items-stretch overflow-x-auto overflow-y-hidden border-b border-divider bg-content1/95 text-sm"
         >
           <RibbonGroup
             label={t('presentationWorkspace.ribbonGroups.background', 'Background')}
@@ -1299,8 +1306,8 @@ function EditableSessionDocumentView({
                 variant={isBackgroundPanelOpen ? 'primary' : 'tertiary'}
                 isDisabled={!activeSlide}
                 onPress={() => {
-                  setIsCompactRailOpen(false)
                   setIsBackgroundPanelOpen(true)
+                  setCompactOverlay('inspector')
                 }}
               >
                 <Palette size={16} />
@@ -1344,7 +1351,7 @@ function EditableSessionDocumentView({
     return (
       <div
         data-ribbon-surface
-        className="flex h-full min-w-max items-stretch overflow-x-auto overflow-y-hidden border-b border-divider bg-content1/95"
+        className="flex h-full min-w-0 w-full items-stretch overflow-x-auto overflow-y-hidden border-b border-divider bg-content1/95"
       >
         <RibbonGroup
           label={t('presentationWorkspace.ribbonGroups.font', 'Font')}
@@ -1736,388 +1743,372 @@ function EditableSessionDocumentView({
         >
           {renderRibbon()}
         </div>
-        <div
-          data-testid="presentation-workspace-grid"
-          className={`presentation-workspace-grid grid min-h-0 flex-1 ${
-            isBackgroundPanelOpen ? '' : 'workspace-two-panel'
-          }`}
-          style={
-            {
-              '--presentation-rail-width': `${railWidth}px`,
-              gridTemplateColumns: isBackgroundPanelOpen
-                ? `${railWidth}px minmax(0, 1fr) 300px`
-                : `${railWidth}px minmax(0, 1fr)`
-            } as React.CSSProperties
-          }
-        >
-          <NavigatorRail
-            data-slide-sidebar
-            data-compact-open={isCompactRailOpen || undefined}
-            className="presentation-slide-rail relative min-h-0 overflow-y-auto border-r border-divider bg-content1/40 px-2 py-3"
-            onContextMenu={showSlideSidebarMenu}
-          >
-            <Button
-              isIconOnly
-              size="sm"
-              variant="ghost"
-              className="absolute right-1 top-1 z-20 md:hidden"
-              onPress={() => setIsCompactRailOpen(false)}
-              aria-label={t('presentationWorkspace.closeSlideRail', 'Close slide rail')}
+        <ResponsivePanelGroup
+          navigatorWidth={railWidth}
+          navigatorLabel={t('presentationWorkspace.slides', 'Slides')}
+          inspectorLabel={t('presentationWorkspace.formatBackground', 'Format Background')}
+          overlay={compactOverlay}
+          onOverlayChange={(overlay) => {
+            setCompactOverlay(overlay)
+            if (overlay === 'navigator' || (overlay === null && compactOverlay === 'inspector')) {
+              setIsBackgroundPanelOpen(false)
+            }
+          }}
+          navigator={
+            <NavigatorRail
+              data-slide-sidebar
+              className="presentation-slide-rail relative min-h-0 overflow-y-auto border-r border-divider bg-content1/40 px-2 py-3"
+              onContextMenu={showSlideSidebarMenu}
             >
-              <X size={14} />
-            </Button>
-            <div className="space-y-1">
-              {document.slideOrder.map((slideId, index) => {
-                const isSelected =
-                  selectedSlideIds.size === 0
-                    ? index === activeSlideIndex
-                    : selectedSlideIds.has(slideId)
-                return (
-                  <React.Fragment key={slideId}>
-                    <button
-                      type="button"
-                      className="group flex h-5 w-full items-center px-1"
-                      onClick={() => setInsertionIndex(index)}
-                      onDragOver={(event) => {
-                        event.preventDefault()
-                        setInsertionIndex(index)
-                      }}
-                      onDrop={(event) => {
-                        event.preventDefault()
-                        moveSelectedSlides(index)
-                      }}
-                      aria-label={`Insert before slide ${index + 1}`}
-                    >
-                      <span
-                        className={`w-full rounded-full ${
-                          insertionIndex === index
-                            ? 'h-[2px] animate-pulse bg-[#f59e0b]'
-                            : 'h-px bg-transparent group-hover:bg-[#f59e0b]/50 group-focus-visible:bg-[#f59e0b]/70'
-                        }`}
-                      />
-                    </button>
-                    <button
-                      draggable
-                      className="flex w-full gap-2 px-1 py-2 text-left text-default-500 transition-colors hover:bg-content2 focus-visible:outline-none"
-                      onClick={(event) => selectSlide(index, event)}
-                      onDragStart={(event) => {
-                        const ids = selectedSlideIds.has(slideId)
-                          ? getSelectedSlideIds()
-                          : [slideId]
-                        setDraggingSlideIds(ids)
-                        setSelectedSlideIds(new Set(ids))
-                        event.dataTransfer.effectAllowed = 'move'
-                        event.dataTransfer.setData('text/plain', ids.join(','))
-                      }}
-                      onDragEnd={() => {
-                        setDraggingSlideIds([])
-                        setInsertionIndex(null)
-                      }}
-                      onKeyDown={(event) => {
-                        if (
-                          event.altKey &&
-                          (event.key === 'ArrowUp' || event.key === 'ArrowDown')
-                        ) {
+              <div className="space-y-1">
+                {document.slideOrder.map((slideId, index) => {
+                  const isSelected =
+                    selectedSlideIds.size === 0
+                      ? index === activeSlideIndex
+                      : selectedSlideIds.has(slideId)
+                  return (
+                    <React.Fragment key={slideId}>
+                      <button
+                        type="button"
+                        className="group flex h-5 w-full items-center px-1"
+                        onClick={() => setInsertionIndex(index)}
+                        onDragOver={(event) => {
                           event.preventDefault()
-                          const target = event.key === 'ArrowUp' ? index - 1 : index + 2
+                          setInsertionIndex(index)
+                        }}
+                        onDrop={(event) => {
+                          event.preventDefault()
+                          moveSelectedSlides(index)
+                        }}
+                        aria-label={`Insert before slide ${index + 1}`}
+                      >
+                        <span
+                          className={`w-full rounded-full ${
+                            insertionIndex === index
+                              ? 'h-[2px] animate-pulse bg-[#f59e0b]'
+                              : 'h-px bg-transparent group-hover:bg-[#f59e0b]/50 group-focus-visible:bg-[#f59e0b]/70'
+                          }`}
+                        />
+                      </button>
+                      <button
+                        draggable
+                        className="flex w-full gap-2 px-1 py-2 text-left text-default-500 transition-colors hover:bg-content2 focus-visible:outline-none"
+                        onClick={(event) => selectSlide(index, event)}
+                        onDragStart={(event) => {
                           const ids = selectedSlideIds.has(slideId)
                             ? getSelectedSlideIds()
                             : [slideId]
-                          const nextDocument = reorderSelectedSlides(document, ids, target)
-                          if (nextDocument !== document) commitDocument(nextDocument)
-                          return
-                        }
-                        if (event.key === 'Enter') {
-                          event.preventDefault()
-                          addSlideAfter(index)
-                        }
-                      }}
-                    >
-                      <span
-                        className={
-                          isSelected
-                            ? 'w-4 pt-1 text-right text-xs tabular-nums text-foreground'
-                            : 'w-4 pt-1 text-right text-xs tabular-nums'
-                        }
+                          setDraggingSlideIds(ids)
+                          setSelectedSlideIds(new Set(ids))
+                          event.dataTransfer.effectAllowed = 'move'
+                          event.dataTransfer.setData('text/plain', ids.join(','))
+                        }}
+                        onDragEnd={() => {
+                          setDraggingSlideIds([])
+                          setInsertionIndex(null)
+                        }}
+                        onKeyDown={(event) => {
+                          if (
+                            event.altKey &&
+                            (event.key === 'ArrowUp' || event.key === 'ArrowDown')
+                          ) {
+                            event.preventDefault()
+                            const target = event.key === 'ArrowUp' ? index - 1 : index + 2
+                            const ids = selectedSlideIds.has(slideId)
+                              ? getSelectedSlideIds()
+                              : [slideId]
+                            const nextDocument = reorderSelectedSlides(document, ids, target)
+                            if (nextDocument !== document) commitDocument(nextDocument)
+                            return
+                          }
+                          if (event.key === 'Enter') {
+                            event.preventDefault()
+                            addSlideAfter(index)
+                          }
+                        }}
                       >
-                        {index + 1}
-                      </span>
-                      <span
-                        className={`relative flex aspect-video w-full min-w-0 overflow-hidden border bg-black shadow-sm ${
-                          isSelected
-                            ? 'border-warning ring-2 ring-warning/50'
-                            : index === activeSlideIndex
-                              ? 'border-primary ring-2 ring-primary/40'
-                              : 'border-transparent'
-                        }`}
-                      >
-                        <EditableSlideThumbnail document={document} slideId={slideId} />
-                        {index === projectedSlideIndex && (
-                          <span
-                            className="absolute inset-y-0 left-0 w-1 bg-success"
-                            aria-label={t(
-                              'presentationWorkspace.projectedSlide',
-                              'Projected slide'
-                            )}
-                          />
-                        )}
-                        {index === projectedSlideIndex + 1 && projectedSlideIndex >= 0 && (
-                          <span
-                            className="absolute bottom-1 right-1 rounded bg-success/90 px-1 text-[10px] font-semibold text-white"
-                            aria-label={t('presentationWorkspace.nextSlide', 'Next slide')}
-                          >
-                            {t('presentationWorkspace.next', 'Next')}
-                          </span>
-                        )}
-                      </span>
-                    </button>
-                  </React.Fragment>
-                )
-              })}
-              <button
-                type="button"
-                className="group flex h-5 w-full items-center px-1"
-                onClick={() => setInsertionIndex(document.slideOrder.length)}
-                onDragOver={(event) => {
-                  event.preventDefault()
-                  setInsertionIndex(document.slideOrder.length)
-                }}
-                onDrop={(event) => {
-                  event.preventDefault()
-                  moveSelectedSlides(document.slideOrder.length)
-                }}
-                aria-label="Insert after last slide"
-              >
-                <span
-                  className={`w-full rounded-full ${
-                    insertionIndex === document.slideOrder.length
-                      ? 'h-[2px] animate-pulse bg-[#f59e0b]'
-                      : 'h-px bg-transparent group-hover:bg-[#f59e0b]/50 group-focus-visible:bg-[#f59e0b]/70'
-                  }`}
-                />
-              </button>
-            </div>
-            <button
-              type="button"
-              className="absolute inset-y-0 right-0 w-1 cursor-col-resize bg-transparent hover:bg-primary/50 focus-visible:bg-primary"
-              onPointerDown={startRailResize}
-              aria-label={t('presentationWorkspace.resizeSlideRail', 'Resize slide rail')}
-            />
-          </NavigatorRail>
-
-          <StageViewport className="presentation-stage relative flex min-h-0 flex-col bg-[#111217]">
-            <Button
-              size="sm"
-              variant="tertiary"
-              className="absolute left-2 top-2 z-20 md:hidden"
-              onPress={() => {
-                setIsBackgroundPanelOpen(false)
-                setIsCompactRailOpen(true)
-              }}
-              aria-label={t('presentationWorkspace.openSlideRail', 'Open slide rail')}
-            >
-              {t('presentationWorkspace.slides', 'Slides')}
-            </Button>
-            <div className="flex flex-1 items-center justify-center overflow-auto p-8">
-              <div
-                className="relative max-w-none shrink-0 transition-[width] duration-150"
-                style={{ width: `${Math.max(320, 1024 * (zoomPercent / 100))}px` }}
-              >
-                <EditableSlideSurface
-                  document={document}
-                  slideId={activeSlideId}
-                  editable
-                  showBorder
-                  selectedElementId={selectedElementId}
-                  selectedElementIds={selectedElementIds}
-                  editingElementId={editingElementId}
-                  cropElementId={cropElementId}
-                  isTextInsertMode={isTextInsertMode}
-                  onSelectElement={selectElement}
-                  onMarqueeSelect={(bounds, additive) => {
-                    if (!activeSlide) return
-                    const matches = selectElementsInBounds(activeSlide, bounds)
-                    setSelectedElementIds((current) => {
-                      const next = additive ? new Set(current) : new Set<string>()
-                      matches.forEach((elementId) => next.add(elementId))
-                      setSelectedElementId(matches.at(-1) ?? (additive ? selectedElementId : null))
-                      return next
-                    })
-                  }}
-                  onEditingElementChange={(elementId) => {
-                    if (elementId === null) commitTextDraft()
-                    setEditingElementId(elementId)
-                  }}
-                  onInsertText={addTextElement}
-                  onElementContextMenu={showElementContextMenu}
-                  onTransformStart={() => session.beginDraft('pointer')}
-                  onTransformPreview={(elementId, updates) => {
-                    const snapshot = session.getSnapshot()
-                    const preview = snapshot.renderedDocument
-                    const base = snapshot.history.present
-                    const current = base.slides[activeSlideId]?.elements[elementId]
-                    let nextUpdates = updates
-                    if (current && (updates.x !== undefined || updates.y !== undefined)) {
-                      const snapped = snapElementPosition(
-                        { ...current, ...updates },
-                        { width: preview.width, height: preview.height },
-                        8
-                      )
-                      nextUpdates = { ...updates, x: snapped.x, y: snapped.y }
-                      setSnapGuides({
-                        vertical: snapped.verticalGuide,
-                        horizontal: snapped.horizontalGuide
-                      })
-                    }
-                    if (
-                      current &&
-                      selectedElementIds.size > 1 &&
-                      updates.width === undefined &&
-                      updates.height === undefined &&
-                      (nextUpdates.x !== undefined || nextUpdates.y !== undefined)
-                    ) {
-                      session.previewDraft(
-                        nudgeElements(
-                          base,
-                          activeSlideId,
-                          [...selectedElementIds],
-                          (nextUpdates.x ?? current.x) - current.x,
-                          (nextUpdates.y ?? current.y) - current.y
-                        )
-                      )
-                      return
-                    }
-                    session.previewDraft(
-                      updateElementInSlide(preview, activeSlideId, elementId, nextUpdates)
-                    )
-                  }}
-                  onTransformCommit={() => {
-                    setSnapGuides({})
-                    session.commitDraft()
-                  }}
-                  onTransformCancel={() => {
-                    setSnapGuides({})
-                    session.cancelDraft()
-                  }}
-                  onUpdateElement={previewTextElement}
-                />
-                {snapGuides.vertical !== undefined && (
-                  <span
-                    className="pointer-events-none absolute inset-y-0 w-px bg-primary"
-                    style={{ left: `${(snapGuides.vertical / document.width) * 100}%` }}
-                  />
-                )}
-                {snapGuides.horizontal !== undefined && (
-                  <span
-                    className="pointer-events-none absolute inset-x-0 h-px bg-primary"
-                    style={{ top: `${(snapGuides.horizontal / document.height) * 100}%` }}
-                  />
-                )}
-              </div>
-            </div>
-            {isNotesOpen && (
-              <label className="border-t border-divider bg-content1/95 px-4 py-2 text-xs text-default-500">
-                <span className="sr-only">{t('presentationWorkspace.notes', 'Notes')}</span>
-                <textarea
-                  className="h-20 w-full resize-none rounded-lg border border-divider bg-content2 p-2 text-sm text-foreground outline-none focus:border-primary"
-                  value={notesDraft}
-                  onChange={(event) => {
-                    const value = event.currentTarget.value
-                    setNotesDraftBySlideId((current) => ({
-                      ...current,
-                      [activeSlideId]: value
-                    }))
-                  }}
-                  onBlur={commitNotes}
-                  aria-label={t('presentationWorkspace.notes', 'Notes')}
-                  placeholder={t(
-                    'presentationWorkspace.notesPlaceholder',
-                    'Add speaker notes for this slide'
-                  )}
-                />
-              </label>
-            )}
-            <div className="flex h-8 items-center gap-3 border-t border-divider bg-content1 px-3 text-xs text-default-500">
-              <span>
-                {t('presentationWorkspace.slide', 'Slide')} {activeSlideIndex + 1} /{' '}
-                {document.slideOrder.length}
-              </span>
-              <span>
-                {t('presentationWorkspace.selectedObjects', 'Selected objects')}:{' '}
-                {selectedElementIds.size}
-              </span>
-              {projectedSlideIndex >= 0 && (
-                <span className="text-success">
-                  {t('presentationWorkspace.projectingSlide', 'Projecting slide')}{' '}
-                  {projectedSlideIndex + 1}
-                </span>
-              )}
-              <Button
-                size="sm"
-                variant={isNotesOpen ? 'primary' : 'ghost'}
-                onPress={() => {
-                  if (isNotesOpen) commitNotes()
-                  setIsNotesOpen((open) => !open)
-                }}
-                aria-label={t('presentationWorkspace.toggleNotes', 'Toggle Notes')}
-              >
-                <StickyNote size={14} />
-                <span className="hidden lg:inline">
-                  {t('presentationWorkspace.notes', 'Notes')}
-                </span>
-              </Button>
-              <div className="ml-auto flex items-center gap-1">
-                <Button
-                  isIconOnly
-                  size="sm"
-                  variant="ghost"
-                  onPress={() => setZoomPercent((value) => Math.max(25, value - 25))}
-                  aria-label={t('presentationWorkspace.zoomOut', 'Zoom out')}
-                >
-                  <ZoomOut size={14} />
-                </Button>
-                <input
-                  className="w-28 accent-primary"
-                  type="range"
-                  min={25}
-                  max={200}
-                  step={5}
-                  value={zoomPercent}
-                  onChange={(event) => setZoomPercent(Number(event.currentTarget.value))}
-                  aria-label={t('presentationWorkspace.zoom', 'Zoom')}
-                />
+                        <span
+                          className={
+                            isSelected
+                              ? 'w-4 pt-1 text-right text-xs tabular-nums text-foreground'
+                              : 'w-4 pt-1 text-right text-xs tabular-nums'
+                          }
+                        >
+                          {index + 1}
+                        </span>
+                        <span
+                          className={`relative flex aspect-video w-full min-w-0 overflow-hidden border bg-black shadow-sm ${
+                            isSelected
+                              ? 'border-warning ring-2 ring-warning/50'
+                              : index === activeSlideIndex
+                                ? 'border-primary ring-2 ring-primary/40'
+                                : 'border-transparent'
+                          }`}
+                        >
+                          <EditableSlideThumbnail document={document} slideId={slideId} />
+                          {index === projectedSlideIndex && (
+                            <span
+                              className="absolute inset-y-0 left-0 w-1 bg-success"
+                              aria-label={t(
+                                'presentationWorkspace.projectedSlide',
+                                'Projected slide'
+                              )}
+                            />
+                          )}
+                          {index === projectedSlideIndex + 1 && projectedSlideIndex >= 0 && (
+                            <span
+                              className="absolute bottom-1 right-1 rounded bg-success/90 px-1 text-[10px] font-semibold text-white"
+                              aria-label={t('presentationWorkspace.nextSlide', 'Next slide')}
+                            >
+                              {t('presentationWorkspace.next', 'Next')}
+                            </span>
+                          )}
+                        </span>
+                      </button>
+                    </React.Fragment>
+                  )
+                })}
                 <button
                   type="button"
-                  className="w-11 rounded px-1 text-right tabular-nums hover:bg-content2"
-                  onClick={() => setZoomPercent(100)}
-                  aria-label={t('presentationWorkspace.resetZoom', 'Reset zoom')}
+                  className="group flex h-5 w-full items-center px-1"
+                  onClick={() => setInsertionIndex(document.slideOrder.length)}
+                  onDragOver={(event) => {
+                    event.preventDefault()
+                    setInsertionIndex(document.slideOrder.length)
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault()
+                    moveSelectedSlides(document.slideOrder.length)
+                  }}
+                  aria-label="Insert after last slide"
                 >
-                  {zoomPercent}%
+                  <span
+                    className={`w-full rounded-full ${
+                      insertionIndex === document.slideOrder.length
+                        ? 'h-[2px] animate-pulse bg-[#f59e0b]'
+                        : 'h-px bg-transparent group-hover:bg-[#f59e0b]/50 group-focus-visible:bg-[#f59e0b]/70'
+                    }`}
+                  />
                 </button>
-                <Button
-                  isIconOnly
-                  size="sm"
-                  variant="ghost"
-                  onPress={() => setZoomPercent((value) => Math.min(200, value + 25))}
-                  aria-label={t('presentationWorkspace.zoomIn', 'Zoom in')}
-                >
-                  <ZoomIn size={14} />
-                </Button>
               </div>
-            </div>
-          </StageViewport>
-          {isBackgroundPanelOpen && activeSlide && (
-            <InspectorPanel className="presentation-inspector">
-              <FormatBackgroundPanel
-                background={activeSlide.background}
-                onChange={setActiveSlideBackground}
-                onApplyToAll={applyActiveBackgroundToAllSlides}
-                onReset={resetActiveSlideBackground}
-                onClose={() => setIsBackgroundPanelOpen(false)}
+              <button
+                type="button"
+                className="absolute inset-y-0 right-0 w-1 cursor-col-resize bg-transparent hover:bg-primary/50 focus-visible:bg-primary"
+                onPointerDown={startRailResize}
+                aria-label={t('presentationWorkspace.resizeSlideRail', 'Resize slide rail')}
               />
-            </InspectorPanel>
-          )}
-        </div>
+            </NavigatorRail>
+          }
+          stage={
+            <StageViewport className="presentation-stage relative flex min-h-0 flex-col bg-[#111217]">
+              <div className="flex flex-1 items-center justify-center overflow-auto p-8">
+                <div
+                  className="relative max-w-none shrink-0 transition-[width] duration-150"
+                  style={{ width: `${Math.max(320, 1024 * (zoomPercent / 100))}px` }}
+                >
+                  <EditableSlideSurface
+                    document={document}
+                    slideId={activeSlideId}
+                    editable
+                    showBorder
+                    selectedElementId={selectedElementId}
+                    selectedElementIds={selectedElementIds}
+                    editingElementId={editingElementId}
+                    cropElementId={cropElementId}
+                    isTextInsertMode={isTextInsertMode}
+                    onSelectElement={selectElement}
+                    onMarqueeSelect={(bounds, additive) => {
+                      if (!activeSlide) return
+                      const matches = selectElementsInBounds(activeSlide, bounds)
+                      setSelectedElementIds((current) => {
+                        const next = additive ? new Set(current) : new Set<string>()
+                        matches.forEach((elementId) => next.add(elementId))
+                        setSelectedElementId(
+                          matches.at(-1) ?? (additive ? selectedElementId : null)
+                        )
+                        return next
+                      })
+                    }}
+                    onEditingElementChange={(elementId) => {
+                      if (elementId === null) commitTextDraft()
+                      setEditingElementId(elementId)
+                    }}
+                    onInsertText={addTextElement}
+                    onElementContextMenu={showElementContextMenu}
+                    onTransformStart={() => session.beginDraft('pointer')}
+                    onTransformPreview={(elementId, updates) => {
+                      const snapshot = session.getSnapshot()
+                      const preview = snapshot.renderedDocument
+                      const base = snapshot.history.present
+                      const current = base.slides[activeSlideId]?.elements[elementId]
+                      let nextUpdates = updates
+                      if (current && (updates.x !== undefined || updates.y !== undefined)) {
+                        const snapped = snapElementPosition(
+                          { ...current, ...updates },
+                          { width: preview.width, height: preview.height },
+                          8
+                        )
+                        nextUpdates = { ...updates, x: snapped.x, y: snapped.y }
+                        setSnapGuides({
+                          vertical: snapped.verticalGuide,
+                          horizontal: snapped.horizontalGuide
+                        })
+                      }
+                      if (
+                        current &&
+                        selectedElementIds.size > 1 &&
+                        updates.width === undefined &&
+                        updates.height === undefined &&
+                        (nextUpdates.x !== undefined || nextUpdates.y !== undefined)
+                      ) {
+                        session.previewDraft(
+                          nudgeElements(
+                            base,
+                            activeSlideId,
+                            [...selectedElementIds],
+                            (nextUpdates.x ?? current.x) - current.x,
+                            (nextUpdates.y ?? current.y) - current.y
+                          )
+                        )
+                        return
+                      }
+                      session.previewDraft(
+                        updateElementInSlide(preview, activeSlideId, elementId, nextUpdates)
+                      )
+                    }}
+                    onTransformCommit={() => {
+                      setSnapGuides({})
+                      session.commitDraft()
+                    }}
+                    onTransformCancel={() => {
+                      setSnapGuides({})
+                      session.cancelDraft()
+                    }}
+                    onUpdateElement={previewTextElement}
+                  />
+                  {snapGuides.vertical !== undefined && (
+                    <span
+                      className="pointer-events-none absolute inset-y-0 w-px bg-primary"
+                      style={{ left: `${(snapGuides.vertical / document.width) * 100}%` }}
+                    />
+                  )}
+                  {snapGuides.horizontal !== undefined && (
+                    <span
+                      className="pointer-events-none absolute inset-x-0 h-px bg-primary"
+                      style={{ top: `${(snapGuides.horizontal / document.height) * 100}%` }}
+                    />
+                  )}
+                </div>
+              </div>
+              {isNotesOpen && (
+                <label className="border-t border-divider bg-content1/95 px-4 py-2 text-xs text-default-500">
+                  <span className="sr-only">{t('presentationWorkspace.notes', 'Notes')}</span>
+                  <textarea
+                    className="h-20 w-full resize-none rounded-lg border border-divider bg-content2 p-2 text-sm text-foreground outline-none focus:border-primary"
+                    value={notesDraft}
+                    onChange={(event) => {
+                      const value = event.currentTarget.value
+                      setNotesDraftBySlideId((current) => ({
+                        ...current,
+                        [activeSlideId]: value
+                      }))
+                    }}
+                    onBlur={commitNotes}
+                    aria-label={t('presentationWorkspace.notes', 'Notes')}
+                    placeholder={t(
+                      'presentationWorkspace.notesPlaceholder',
+                      'Add speaker notes for this slide'
+                    )}
+                  />
+                </label>
+              )}
+              <div className="flex h-8 items-center gap-3 border-t border-divider bg-content1 px-3 text-xs text-default-500">
+                <span>
+                  {t('presentationWorkspace.slide', 'Slide')} {activeSlideIndex + 1} /{' '}
+                  {document.slideOrder.length}
+                </span>
+                <span>
+                  {t('presentationWorkspace.selectedObjects', 'Selected objects')}:{' '}
+                  {selectedElementIds.size}
+                </span>
+                {projectedSlideIndex >= 0 && (
+                  <span className="text-success">
+                    {t('presentationWorkspace.projectingSlide', 'Projecting slide')}{' '}
+                    {projectedSlideIndex + 1}
+                  </span>
+                )}
+                <Button
+                  size="sm"
+                  variant={isNotesOpen ? 'primary' : 'ghost'}
+                  onPress={() => {
+                    if (isNotesOpen) commitNotes()
+                    setIsNotesOpen((open) => !open)
+                  }}
+                  aria-label={t('presentationWorkspace.toggleNotes', 'Toggle Notes')}
+                >
+                  <StickyNote size={14} />
+                  <span className="hidden lg:inline">
+                    {t('presentationWorkspace.notes', 'Notes')}
+                  </span>
+                </Button>
+                <div className="ml-auto flex items-center gap-1">
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    variant="ghost"
+                    onPress={() => setZoomPercent((value) => Math.max(25, value - 25))}
+                    aria-label={t('presentationWorkspace.zoomOut', 'Zoom out')}
+                  >
+                    <ZoomOut size={14} />
+                  </Button>
+                  <input
+                    className="w-28 accent-primary"
+                    type="range"
+                    min={25}
+                    max={200}
+                    step={5}
+                    value={zoomPercent}
+                    onChange={(event) => setZoomPercent(Number(event.currentTarget.value))}
+                    aria-label={t('presentationWorkspace.zoom', 'Zoom')}
+                  />
+                  <button
+                    type="button"
+                    className="w-11 rounded px-1 text-right tabular-nums hover:bg-content2"
+                    onClick={() => setZoomPercent(100)}
+                    aria-label={t('presentationWorkspace.resetZoom', 'Reset zoom')}
+                  >
+                    {zoomPercent}%
+                  </button>
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    variant="ghost"
+                    onPress={() => setZoomPercent((value) => Math.min(200, value + 25))}
+                    aria-label={t('presentationWorkspace.zoomIn', 'Zoom in')}
+                  >
+                    <ZoomIn size={14} />
+                  </Button>
+                </div>
+              </div>
+            </StageViewport>
+          }
+          inspector={
+            isBackgroundPanelOpen && activeSlide ? (
+              <InspectorPanel className="presentation-inspector">
+                <FormatBackgroundPanel
+                  background={activeSlide.background}
+                  onChange={setActiveSlideBackground}
+                  onApplyToAll={applyActiveBackgroundToAllSlides}
+                  onReset={resetActiveSlideBackground}
+                  onClose={() => {
+                    setIsBackgroundPanelOpen(false)
+                    setCompactOverlay(null)
+                  }}
+                />
+              </InspectorPanel>
+            ) : undefined
+          }
+        />
       </div>
       <LineSpacingOptionsDialog
         isOpen={isLineSpacingOptionsOpen}
@@ -2620,7 +2611,7 @@ export default function PresentationWorkspacePage(): React.JSX.Element {
   }
 
   return (
-    <WorkspaceShell className="bg-background text-foreground">
+    <WorkspaceShell className="w-0 min-w-full bg-background text-foreground">
       <div className="relative flex h-10 shrink-0 items-end overflow-x-auto bg-background px-2 sm:px-4">
         {ribbonTabs.map((tab) => (
           <button

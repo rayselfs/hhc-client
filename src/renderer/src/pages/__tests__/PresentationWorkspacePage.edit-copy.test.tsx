@@ -198,6 +198,55 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
     expect(screen.getByRole('button', { name: 'Edit a copy' })).toBeEnabled()
   })
 
+  it('uses the shared responsive shell for read-only PPTX', async () => {
+    renderReadOnlyDeck(makeFile())
+
+    await screen.findByRole('button', { name: 'Edit a copy' })
+    const group = window.document.querySelector('.workspace-panel-group')
+    expect(group).not.toBeNull()
+    expect(
+      group!.querySelector('.workspace-navigator-slot [data-workspace-navigator]')
+    ).not.toBeNull()
+    expect(group!.querySelector('.workspace-stage-slot main')).not.toBeNull()
+    expect(screen.getByRole('button', { name: 'Slides' })).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('opens and closes mutually exclusive compact panels from existing commands', async () => {
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const sourceItem = makeFile({
+      id: 'editable-deck',
+      name: 'Sunday Editable',
+      url: 'blob:editable-deck',
+      mimeType: EDITABLE_PRESENTATION_MIME_TYPE
+    })
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({ document, revision: 0 })
+
+    renderEditableDeck(sourceItem)
+    await screen.findByTestId('presentation-ribbon-frame')
+    fireEvent.click(screen.getByRole('button', { name: '設計' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Format Background' }))
+
+    const navigatorSlot = window.document.querySelector('.workspace-navigator-slot')
+    const inspectorSlot = window.document.querySelector('.workspace-inspector-slot')
+    expect(inspectorSlot).toHaveClass('workspace-overlay-open')
+    expect(navigatorSlot).not.toHaveClass('workspace-overlay-open')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close Format Background' }))
+    expect(window.document.querySelector('.workspace-inspector-slot')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Format Background' }))
+    expect(window.document.querySelector('.workspace-inspector-slot')).toHaveClass(
+      'workspace-overlay-open'
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Slides' }))
+    expect(navigatorSlot).toHaveClass('workspace-overlay-open')
+    expect(window.document.querySelector('.workspace-inspector-slot')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close Slides' }))
+    expect(navigatorSlot).not.toHaveClass('workspace-overlay-open')
+  })
+
   it('keeps Home, Insert, and Design ribbon panels at the same native height', async () => {
     const document = createBlankEditablePresentationDocument('Sunday')
     const sourceItem = makeFile({

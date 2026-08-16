@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { resolve } from 'node:path'
 import { completeOnboarding } from './helpers'
 
 declare global {
@@ -124,6 +125,42 @@ test('keeps Media live through Files preview and closes from the Header', async 
   await expect(page).toHaveURL(/#\/files$/)
   await page.getByRole('button', { name: /Stop projection|停止投影/ }).click()
   await expect.poll(() => projection.isClosed()).toBe(true)
+})
+
+test('keeps a read-only PPTX stage primary at the 900px breakpoint', async ({ page }) => {
+  await page.setViewportSize({ width: 900, height: 800 })
+  await page.goto('/')
+  await completeOnboarding(page)
+  await page.goto('/#/files')
+
+  const fixture = resolve(
+    process.cwd(),
+    'src/renderer/src/lib/__fixtures__/pptx/text-placeholder-layout.pptx'
+  )
+  await page.locator('input[type="file"]:not([webkitdirectory])').first().setInputFiles(fixture)
+  const file = page.getByText('text-placeholder-layout.pptx')
+  await expect(file).toBeVisible()
+  await file.click()
+  await file.click({ button: 'right' })
+  await page.getByRole('menuitem', { name: /Open Presentation|開啟簡報|打开演示文稿/ }).click()
+  await expect(page).toHaveURL(/#\/presentations\//)
+
+  const navigator = page.locator('.workspace-navigator-slot')
+  const stage = page.locator('.workspace-stage-slot')
+  const slidesTrigger = page.getByRole('button', { name: /Slides|投影片/ })
+  await expect(page.getByRole('button', { name: /Edit a copy|編輯副本/ })).toBeVisible()
+  await expect(navigator).toBeHidden()
+  await expect(slidesTrigger).toBeVisible()
+  await expect(stage).toBeVisible()
+
+  await slidesTrigger.click()
+  await expect(navigator).toBeVisible()
+  await page.getByRole('button', { name: /Close (Slides|投影片|幻灯片)/ }).click()
+  await expect(navigator).toBeHidden()
+  await expect(stage).toBeVisible()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true
+  )
 })
 
 export {}

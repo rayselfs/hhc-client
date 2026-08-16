@@ -184,4 +184,22 @@ describe('PresentationWorkspacePage session integration', () => {
 
     expect(screen.queryByText(/Slide Size|投影片大小/)).not.toBeInTheDocument()
   })
+
+  it('keeps the editable stage and Ribbon inside the shared responsive workspace shell', async () => {
+    render(
+      <PresentationSessionRegistryProvider>
+        <Workspace showPage onSession={() => undefined} />
+      </PresentationSessionRegistryProvider>
+    )
+
+    const ribbon = await screen.findByTestId('presentation-ribbon-frame')
+    const group = window.document.querySelector('.workspace-panel-group')
+    expect(group).not.toBeNull()
+    expect(group!.querySelector('.workspace-navigator-slot [data-slide-sidebar]')).not.toBeNull()
+    expect(group!.querySelector('.workspace-stage-slot .presentation-stage')).not.toBeNull()
+    expect(ribbon.querySelector('[data-ribbon-surface]')).toHaveClass(
+      'overflow-x-auto',
+      'overflow-y-hidden'
+    )
+  })
 })

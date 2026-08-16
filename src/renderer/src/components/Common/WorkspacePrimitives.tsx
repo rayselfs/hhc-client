@@ -2,6 +2,8 @@ import { useState, type ComponentPropsWithoutRef, type CSSProperties, type React
 import { Button } from '@heroui/react/button'
 import { List, PanelRight, X } from 'lucide-react'
 
+type WorkspaceOverlay = 'navigator' | 'inspector' | null
+
 export function WorkspaceShell({
   children,
   className = '',
@@ -65,6 +67,8 @@ export function ResponsivePanelGroup({
   navigator,
   stage,
   inspector,
+  overlay: controlledOverlay,
+  onOverlayChange,
   navigatorWidth = 240,
   inspectorWidth = 300,
   navigatorLabel = 'Navigator',
@@ -74,13 +78,20 @@ export function ResponsivePanelGroup({
   navigator: ReactNode
   stage: ReactNode
   inspector?: ReactNode
+  overlay?: WorkspaceOverlay
+  onOverlayChange?: (overlay: WorkspaceOverlay) => void
   navigatorWidth?: number
   inspectorWidth?: number
   navigatorLabel?: string
   inspectorLabel?: string
   className?: string
 }): React.JSX.Element {
-  const [overlay, setOverlay] = useState<'navigator' | 'inspector' | null>(null)
+  const [uncontrolledOverlay, setUncontrolledOverlay] = useState<WorkspaceOverlay>(null)
+  const overlay = controlledOverlay === undefined ? uncontrolledOverlay : controlledOverlay
+  const setOverlay = (nextOverlay: WorkspaceOverlay): void => {
+    if (controlledOverlay === undefined) setUncontrolledOverlay(nextOverlay)
+    onOverlayChange?.(nextOverlay)
+  }
   const style = {
     '--workspace-navigator-width': `${navigatorWidth}px`,
     '--workspace-inspector-width': `${inspectorWidth}px`
@@ -98,7 +109,7 @@ export function ResponsivePanelGroup({
           className="workspace-navigator-trigger"
           size="sm"
           variant="tertiary"
-          onPress={() => setOverlay((current) => (current === 'navigator' ? null : 'navigator'))}
+          onPress={() => setOverlay(overlay === 'navigator' ? null : 'navigator')}
           aria-expanded={overlay === 'navigator'}
         >
           <List size={14} />
@@ -108,7 +119,7 @@ export function ResponsivePanelGroup({
           <Button
             size="sm"
             variant="tertiary"
-            onPress={() => setOverlay((current) => (current === 'inspector' ? null : 'inspector'))}
+            onPress={() => setOverlay(overlay === 'inspector' ? null : 'inspector')}
             aria-expanded={overlay === 'inspector'}
           >
             <PanelRight size={14} />

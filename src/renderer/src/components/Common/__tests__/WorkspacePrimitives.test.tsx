@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   InspectorPanel,
   NavigatorRail,
@@ -46,5 +46,48 @@ describe('ResponsivePanelGroup', () => {
     expect(container.querySelector('.workspace-inspector-slot')).toHaveClass(
       'workspace-overlay-open'
     )
+  })
+
+  it('uses a controlled overlay value and reports trigger and close changes', async () => {
+    const user = userEvent.setup()
+    const onOverlayChange = vi.fn()
+    const { container, rerender } = render(
+      <ResponsivePanelGroup
+        overlay="inspector"
+        onOverlayChange={onOverlayChange}
+        navigatorLabel="Slides"
+        inspectorLabel="Format"
+        navigator={<NavigatorRail>Slide navigator</NavigatorRail>}
+        stage={<StageViewport>Editing stage</StageViewport>}
+        inspector={<InspectorPanel>Format inspector</InspectorPanel>}
+      />
+    )
+
+    expect(container.querySelector('.workspace-inspector-slot')).toHaveClass(
+      'workspace-overlay-open'
+    )
+    await user.click(screen.getByRole('button', { name: 'Slides' }))
+    expect(onOverlayChange).toHaveBeenLastCalledWith('navigator')
+    expect(container.querySelector('.workspace-inspector-slot')).toHaveClass(
+      'workspace-overlay-open'
+    )
+
+    rerender(
+      <ResponsivePanelGroup
+        overlay="navigator"
+        onOverlayChange={onOverlayChange}
+        navigatorLabel="Slides"
+        inspectorLabel="Format"
+        navigator={<NavigatorRail>Slide navigator</NavigatorRail>}
+        stage={<StageViewport>Editing stage</StageViewport>}
+        inspector={<InspectorPanel>Format inspector</InspectorPanel>}
+      />
+    )
+    expect(container.querySelector('.workspace-navigator-slot')).toHaveClass(
+      'workspace-overlay-open'
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Close Slides' }))
+    expect(onOverlayChange).toHaveBeenLastCalledWith(null)
   })
 })

@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test'
 import { completeOnboarding } from './helpers'
 
-test('keeps compact presentation navigator and inspector mutually exclusive', async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 })
+test('keeps the editable presentation stage primary at the 900px breakpoint', async ({ page }) => {
+  await page.setViewportSize({ width: 900, height: 800 })
   await page.goto('/')
   await completeOnboarding(page)
 
@@ -12,29 +12,32 @@ test('keeps compact presentation navigator and inspector mutually exclusive', as
   await page.getByRole('menuitem', { name: /Create Presentation|建立簡報|创建演示文稿/ }).click()
   await expect(page).toHaveURL(/#\/presentations\//)
 
-  const slideRail = page.locator('.presentation-slide-rail')
-  const inspector = page.locator('.presentation-inspector')
+  const navigator = page.locator('.workspace-navigator-slot')
+  const stage = page.locator('.workspace-stage-slot')
+  const slidesTrigger = page.getByRole('button', { name: /Slides|投影片/ })
+  const ribbon = page.locator('[data-ribbon-surface]')
+
+  await expect(navigator).toBeHidden()
+  await expect(slidesTrigger).toBeVisible()
+  await expect(stage).toBeVisible()
+  await expect(ribbon).toHaveCSS('overflow-x', 'auto')
+  const ribbonMetrics = await ribbon.evaluate((element) => ({
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth
+  }))
+  expect(ribbonMetrics.scrollWidth).toBeGreaterThan(ribbonMetrics.clientWidth)
 
   await page.getByRole('button', { name: /Design|設計/ }).click()
   await page.getByRole('button', { name: /Format Background|設定背景格式/ }).click()
-  await expect(slideRail).toBeVisible()
-  await expect(inspector).toBeVisible()
+  await expect(page.locator('.workspace-inspector-slot')).toBeVisible()
+  await expect(navigator).toBeHidden()
 
-  await page.setViewportSize({ width: 1024, height: 800 })
-  await expect(slideRail).toBeVisible()
-  await expect(inspector).toBeVisible()
-  await expect(inspector).toHaveCSS('position', 'absolute')
-
-  await page.setViewportSize({ width: 700, height: 800 })
-  await page.getByRole('button', { name: /Open slide rail|開啟投影片/ }).click()
-  await expect(slideRail).toBeVisible()
-  await page.getByRole('button', { name: /Format Background|設定背景格式/ }).click()
-  await expect(slideRail).toBeHidden()
-  await expect(inspector).toBeVisible()
-
-  await page.getByRole('button', { name: /Open slide rail|開啟投影片/ }).click()
-  await expect(slideRail).toBeVisible()
-  await expect(inspector).toBeHidden()
+  await slidesTrigger.click()
+  await expect(navigator).toBeVisible()
+  await expect(page.locator('.workspace-inspector-slot')).toHaveCount(0)
+  await page.getByRole('button', { name: /Close (Slides|投影片|幻灯片)/ }).click()
+  await expect(navigator).toBeHidden()
+  await expect(stage).toBeVisible()
 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true
