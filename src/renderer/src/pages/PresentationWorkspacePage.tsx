@@ -428,7 +428,7 @@ export function PptxDocumentView({
           </div>
           <div className="flex flex-1 items-center justify-center overflow-auto p-8">
             <div className="relative flex min-h-[360px] w-full max-w-5xl items-center justify-center rounded-2xl bg-black/30 p-4 shadow-2xl">
-              <div ref={canvasRef} className="w-full" />
+              <div ref={canvasRef} className="w-full" data-pptx-slide-surface />
               {status === 'loading' && (
                 <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/40">
                   <Spinner />

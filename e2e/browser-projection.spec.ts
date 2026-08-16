@@ -128,7 +128,7 @@ test('keeps Media live through Files preview and closes from the Header', async 
 })
 
 test('keeps a read-only PPTX stage primary at the 900px breakpoint', async ({ page }) => {
-  await page.setViewportSize({ width: 900, height: 800 })
+  await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/')
   await completeOnboarding(page)
   await page.goto('/#/files')
@@ -144,6 +144,14 @@ test('keeps a read-only PPTX stage primary at the 900px breakpoint', async ({ pa
   await file.click({ button: 'right' })
   await page.getByRole('menuitem', { name: /Open Presentation|開啟簡報|打开演示文稿/ }).click()
   await expect(page).toHaveURL(/#\/presentations\//)
+
+  await expect(page.locator('[data-pptx-slide-surface] > *').first()).toBeVisible()
+  await expect(page.locator('[data-pptx-thumbnail="true"]').first()).toBeVisible()
+  await expect(
+    page.getByText(/Failed to load presentation|無法載入簡報|无法加载演示文稿/)
+  ).toHaveCount(0)
+
+  await page.setViewportSize({ width: 900, height: 800 })
 
   const navigator = page.locator('.workspace-navigator-slot')
   const stage = page.locator('.workspace-stage-slot')
