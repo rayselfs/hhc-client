@@ -133,6 +133,7 @@ class MainHhcAuthService implements HhcAuthService {
   async begin(): Promise<void> {
     if (
       this.beginInFlight ||
+      this.completionInFlight ||
       this.signOutInFlight ||
       (this.transaction && this.transaction.expiresAt > this.now())
     ) {

@@ -501,7 +501,7 @@ describe('HhcAuthService credentials and session', () => {
     expect(currentStoredRecord()).not.toHaveProperty('refreshToken')
   })
 
-  it('waits for a deferred callback exchange and credential write before sign-out cleanup', async () => {
+  it('keeps callback completion single-flight until sign-out cleanup', async () => {
     const service = createHhcAuthService({ now: () => now })
     await service.begin()
     const callback = callbackFromOpenedUrl()
@@ -533,6 +533,9 @@ describe('HhcAuthService credentials and session', () => {
 
     const completion = service.completeProtocolCallback(callback)
     await vi.waitFor(() => expect(mockNetFetch).toHaveBeenCalledTimes(1))
+    await expect(service.begin()).rejects.toThrow('HHC sign-in is already in progress')
+    expect(mockOpenExternal).toHaveBeenCalledOnce()
+    await expect(service.completeProtocolCallback(callback)).resolves.toBe(false)
     let signOutSettled = false
     const signOut = service.signOut().finally(() => {
       signOutSettled = true
