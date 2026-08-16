@@ -130,6 +130,42 @@ describe('HhcAuthContext', () => {
     expect(result.current.status).toBe('anonymous')
   })
 
+  it('advances the runtime generation for re-auth and identity changes, not same-user updates', async () => {
+    const adapter = createAdapter(SESSION)
+    vi.mocked(adapter.signIn).mockImplementationOnce(async () => adapter.emit(SESSION))
+    vi.mocked(adapter.signOut).mockImplementationOnce(async () => adapter.emit(null))
+    authFactory.adapters.push(adapter)
+    const { result } = renderHook(() => useHhcAuth(), { wrapper })
+    await waitFor(() => expect(result.current.status).toBe('authenticated'))
+    const initialGeneration = result.current.getAuthGeneration()
+
+    act(() => adapter.emit({ ...SESSION, roles: ['media_sync_user', 'reader'] }))
+    expect(result.current.getAuthGeneration()).toBe(initialGeneration)
+
+    await act(() => result.current.signIn())
+    expect(result.current.getAuthGeneration()).toBe(initialGeneration + 1)
+
+    act(() => adapter.emit({ ...SESSION, userId: 'user-2' }))
+    expect(result.current.getAuthGeneration()).toBe(initialGeneration + 2)
+
+    await act(() => result.current.signOut())
+    expect(result.current.getAuthGeneration()).toBe(initialGeneration + 3)
+  })
+
+  it('advances the runtime generation once when explicit sign-in emits an identity', async () => {
+    const adapter = createAdapter(null)
+    vi.mocked(adapter.signIn).mockImplementationOnce(async () => adapter.emit(SESSION))
+    authFactory.adapters.push(adapter)
+    const { result } = renderHook(() => useHhcAuth(), { wrapper })
+    await waitFor(() => expect(result.current.status).toBe('anonymous'))
+    act(() => adapter.emit(null))
+    const initialGeneration = result.current.getAuthGeneration()
+
+    await act(() => result.current.signIn())
+
+    expect(result.current.getAuthGeneration()).toBe(initialGeneration + 1)
+  })
+
   it('keeps a newer subscription session when bootstrap finishes late', async () => {
     const adapter = createAdapter(null)
     let resolveSession: (session: HhcSession | null) => void = () => undefined

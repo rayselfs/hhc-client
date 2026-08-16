@@ -30,7 +30,7 @@ import { useHhcAuth } from '@renderer/contexts/HhcAuthContext'
 
 export default function Layout(): React.JSX.Element {
   const [initialized, setInitialized] = useState(false)
-  const { session, getAccessToken, refreshAccessToken } = useHhcAuth()
+  const { session, getAccessToken, getAuthGeneration, refreshAccessToken } = useHhcAuth()
   const hhcSessionRef = useRef(session)
   useEffect(() => {
     hhcSessionRef.current = session
@@ -49,7 +49,7 @@ export default function Layout(): React.JSX.Element {
   useAutoUpdateCheck()
 
   useEffect(() => {
-    const cleanup = initializeApp({ hhcAuth })
+    const cleanup = initializeApp({ hhcAuth, getHhcAuthGeneration: getAuthGeneration })
 
     const isCoreReady = (): boolean =>
       useFileExplorerStore.getState().isInitialized && useBibleFolderStore.getState().isInitialized
@@ -73,7 +73,7 @@ export default function Layout(): React.JSX.Element {
       unsub()
       unsub2()
     }
-  }, [hhcAuth])
+  }, [getAuthGeneration, hhcAuth])
 
   if (!initialized) return <AppLoadingScreen />
 

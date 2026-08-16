@@ -18,11 +18,12 @@ const ONEDRIVE_ACTIVE_REFRESH_MS = 15_000
 const localRefreshInFlight = new Set<string>()
 let oneDriveRefreshInFlight = false
 const hhcRefreshInFlight = new Set<string>()
-const hhcAuthBlockedForSession = new Map<string, HhcSession>()
+const hhcAuthBlockedAtGeneration = new Map<string, number>()
 const hhcRevokedRoots = new Map<string, FolderRecord>()
 
 export interface SyncRuntimeOptions {
   hhcAuth?: HhcLineCloudAuth
+  getHhcAuthGeneration?: () => number
   onHhcAccessRevoked?: (input: {
     connectionId: string
     rootFolderId: string
@@ -147,9 +148,10 @@ async function refreshHhcConnection(
   const auth = options.hhcAuth
   if (!auth || hhcRefreshInFlight.has(connection.id)) return { summaries: [], retrySoon: false }
 
-  const blockedSession = hhcAuthBlockedForSession.get(connection.id)
-  if (blockedSession === session) return { summaries: [], retrySoon: false }
-  if (blockedSession) hhcAuthBlockedForSession.delete(connection.id)
+  const authGeneration = options.getHhcAuthGeneration?.() ?? 0
+  const blockedGeneration = hhcAuthBlockedAtGeneration.get(connection.id)
+  if (blockedGeneration === authGeneration) return { summaries: [], retrySoon: false }
+  if (blockedGeneration !== undefined) hhcAuthBlockedAtGeneration.delete(connection.id)
 
   hhcRefreshInFlight.add(connection.id)
   const summaries: CloudRefreshSummary[] = []
@@ -165,7 +167,10 @@ async function refreshHhcConnection(
       } catch (error) {
         const classification = classifyHhcError(error)
         if (classification === 'auth-required') {
-          hhcAuthBlockedForSession.set(connection.id, session)
+          hhcAuthBlockedAtGeneration.set(
+            connection.id,
+            options.getHhcAuthGeneration?.() ?? authGeneration
+          )
           break
         }
         if (classification === 'access-revoked') {
@@ -176,6 +181,8 @@ async function refreshHhcConnection(
               rootFolderId: root.id
             })
           } catch {
+            hhcRevokedRoots.delete(key)
+            retrySoon = true
             console.warn('[sync] Failed to handle revoked HHC LINE root')
           }
           continue

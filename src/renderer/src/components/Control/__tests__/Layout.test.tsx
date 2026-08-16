@@ -27,6 +27,8 @@ const projectionRuntime = vi.hoisted(() => ({
 }))
 const authRuntime = vi.hoisted(() => ({
   session: null as HhcSession | null,
+  generation: 0,
+  getAuthGeneration: vi.fn(() => authRuntime.generation),
   getAccessToken: vi.fn(async () => null as string | null),
   refreshAccessToken: vi.fn(async () => null as string | null)
 }))
@@ -45,6 +47,7 @@ vi.mock('@renderer/contexts/HhcAuthContext', () => ({
     session: authRuntime.session,
     signIn: vi.fn(async () => undefined),
     signOut: vi.fn(async () => undefined),
+    getAuthGeneration: authRuntime.getAuthGeneration,
     getAccessToken: authRuntime.getAccessToken,
     refreshAccessToken: authRuntime.refreshAccessToken
   })
@@ -118,6 +121,7 @@ describe('Layout', () => {
     projectionRuntime.isProjectionOpen = false
     projectionRuntime.recovery = { status: 'closed', generation: 0, failure: null }
     authRuntime.session = null
+    authRuntime.generation = 0
     initializeAppMock.mockClear()
   })
 
@@ -233,6 +237,7 @@ describe('Layout', () => {
     const options = initializeAppMock.mock.calls.at(-1)?.[0]
     const hhcAuth = options?.hhcAuth
     expect(hhcAuth?.getSession()).toBeNull()
+    expect(options?.getHhcAuthGeneration?.()).toBe(0)
 
     authRuntime.session = {
       userId: 'user-1',
@@ -243,5 +248,9 @@ describe('Layout', () => {
 
     expect(initializeAppMock).toHaveBeenCalledTimes(initialCalls)
     expect(hhcAuth?.getSession()).toMatchObject({ userId: 'user-1' })
+    expect(options?.getHhcAuthGeneration?.()).toBe(0)
+
+    authRuntime.generation = 1
+    expect(options?.getHhcAuthGeneration?.()).toBe(1)
   })
 })

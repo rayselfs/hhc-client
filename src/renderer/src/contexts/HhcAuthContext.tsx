@@ -9,6 +9,7 @@ type HhcAuthContextValue = {
   session: HhcSession | null
   signIn(): Promise<void>
   signOut(): Promise<void>
+  getAuthGeneration(): number
   getAccessToken(): Promise<string | null>
   refreshAccessToken(): Promise<string | null>
 }
@@ -21,6 +22,7 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
   const adapterRef = useRef<HhcAuthAdapter | null>(null)
   const sessionRef = useRef<HhcSession | null>(null)
   const sessionEpochRef = useRef(0)
+  const authGenerationRef = useRef(0)
   const signOutPendingRef = useRef(false)
   const accessTokenPromiseRef = useRef<Promise<string | null> | null>(null)
   const refreshTokenPromiseRef = useRef<Promise<string | null> | null>(null)
@@ -30,6 +32,8 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
     accessTokenPromiseRef.current = null
     refreshTokenPromiseRef.current = null
   }, [])
+
+  const getAuthGeneration = useCallback((): number => authGenerationRef.current, [])
 
   useEffect(() => {
     let active = true
@@ -50,6 +54,7 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
           if (!active) return
           const previousUserId = sessionRef.current?.userId
           const nextUserId = nextSession?.userId
+          if (previousUserId !== nextUserId) authGenerationRef.current += 1
           if (!nextSession || previousUserId !== nextUserId) invalidateTokenRequests()
           sessionRef.current = nextSession
           if (!nextSession || previousUserId !== nextUserId) signOutPendingRef.current = false
@@ -95,7 +100,11 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
     signOutPendingRef.current = false
     invalidateTokenRequests()
     try {
+      const generation = authGenerationRef.current
       await adapter.signIn()
+      if (adapterRef.current === adapter && authGenerationRef.current === generation) {
+        authGenerationRef.current += 1
+      }
     } catch (error) {
       if (adapterRef.current === adapter && !sessionRef.current) {
         sessionRef.current = previousSession
@@ -110,7 +119,11 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
     signOutPendingRef.current = true
     invalidateTokenRequests()
     try {
+      const generation = authGenerationRef.current
       await adapter.signOut()
+      if (adapterRef.current === adapter && authGenerationRef.current === generation) {
+        authGenerationRef.current += 1
+      }
     } catch (error) {
       if (adapterRef.current === adapter) signOutPendingRef.current = false
       throw error
@@ -189,8 +202,16 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
   }, [])
 
   const value = useMemo(
-    () => ({ status, session, signIn, signOut, getAccessToken, refreshAccessToken }),
-    [getAccessToken, refreshAccessToken, session, signIn, signOut, status]
+    () => ({
+      status,
+      session,
+      signIn,
+      signOut,
+      getAuthGeneration,
+      getAccessToken,
+      refreshAccessToken
+    }),
+    [getAccessToken, getAuthGeneration, refreshAccessToken, session, signIn, signOut, status]
   )
 
   return <HhcAuthContext.Provider value={value}>{children}</HhcAuthContext.Provider>

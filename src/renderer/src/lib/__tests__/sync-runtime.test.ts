@@ -277,9 +277,10 @@ describe('startSyncRuntime', () => {
     }
   )
 
-  it('stops an auth-required connection until the live auth session changes', async () => {
+  it('keeps auth-required blocked across same-user updates until an explicit re-login', async () => {
     const firstSession = session()
     const sessionRef: { current: HhcSession | null } = { current: firstSession }
+    const authGeneration = { current: 0 }
     const targetConnection = connection('hhc-runtime-auth')
     const target = root('root-auth', targetConnection.id)
     hhcMocks.connections = [targetConnection]
@@ -289,13 +290,26 @@ describe('startSyncRuntime', () => {
       .mockResolvedValue(idleSummary(targetConnection.id, target.id))
     const hhcAuth = auth(sessionRef)
 
-    const stop = startSyncRuntime({ hhcAuth })
+    const stop = startSyncRuntime({
+      hhcAuth,
+      getHhcAuthGeneration: () => authGeneration.current
+    })
     await flushMicrotasks()
     await vi.advanceTimersByTimeAsync(60_000)
     expect(hhcMocks.refreshFolder).toHaveBeenCalledTimes(1)
     expect(hhcAuth.refreshAccessToken).not.toHaveBeenCalled()
 
+    sessionRef.current = { ...firstSession, roles: ['media_sync_user', 'reader'] }
+    await vi.advanceTimersByTimeAsync(120_000)
+    expect(hhcMocks.refreshFolder).toHaveBeenCalledTimes(1)
+
+    sessionRef.current = null
+    authGeneration.current += 1
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(hhcMocks.refreshFolder).toHaveBeenCalledTimes(1)
+
     sessionRef.current = { ...firstSession }
+    authGeneration.current += 1
     await vi.advanceTimersByTimeAsync(60_000)
     expect(hhcMocks.refreshFolder).toHaveBeenCalledTimes(2)
     stop()
@@ -325,6 +339,37 @@ describe('startSyncRuntime', () => {
     await vi.advanceTimersByTimeAsync(60_000)
     expect(onHhcAccessRevoked).toHaveBeenCalledTimes(1)
     expect(hhcMocks.refreshFolder).toHaveBeenCalledWith(sibling.id)
+    stop()
+  })
+
+  it('retries access-revoked cleanup after a callback rejection while siblings continue', async () => {
+    const sessionRef = { current: session() }
+    const targetConnection = connection('hhc-runtime-revoked-retry')
+    const revoked = root('root-revoked-retry', targetConnection.id)
+    const sibling = root('root-revoked-retry-sibling', targetConnection.id)
+    hhcMocks.connections = [targetConnection]
+    hhcMocks.folders = { [revoked.id]: revoked, [sibling.id]: sibling }
+    hhcMocks.refreshFolder.mockImplementation(async (rootFolderId: string) => {
+      if (rootFolderId === revoked.id) throw { classification: 'access-revoked' }
+      return idleSummary(targetConnection.id, rootFolderId)
+    })
+    const onHhcAccessRevoked = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('cleanup unavailable'))
+      .mockResolvedValue(undefined)
+
+    const stop = startSyncRuntime({ hhcAuth: auth(sessionRef), onHhcAccessRevoked })
+    await vi.waitFor(() => {
+      expect(onHhcAccessRevoked).toHaveBeenCalledTimes(1)
+      expect(hhcMocks.refreshFolder).toHaveBeenCalledWith(sibling.id)
+    })
+
+    await vi.advanceTimersByTimeAsync(15_000)
+    expect(onHhcAccessRevoked).toHaveBeenCalledTimes(2)
+    expect(hhcMocks.refreshFolder).toHaveBeenCalledWith(sibling.id)
+
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(onHhcAccessRevoked).toHaveBeenCalledTimes(2)
     stop()
   })
 
