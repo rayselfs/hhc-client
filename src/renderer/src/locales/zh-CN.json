@@ -720,6 +720,11 @@
   },
   "userMenu": {
     "guest": "访客",
+    "accountMenu": "{{name}}的帐号菜单",
+    "loadingAccount": "正在加载帐号...",
+    "accountUnavailable": "帐号服务不可用",
+    "signInFailed": "无法登录",
+    "signOutFailed": "无法登出",
     "login": "登录",
     "logout": "登出",
     "preferences": "偏好设置",

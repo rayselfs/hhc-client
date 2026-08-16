@@ -10,6 +10,16 @@ import { PresentationCloseDecisionProvider } from '@renderer/contexts/Presentati
 import { PresentationSessionRegistryProvider } from '@renderer/contexts/PresentationSessionRegistryContext'
 import { ShortcutScopeProvider } from '@renderer/contexts/ShortcutScopeContext'
 
+vi.mock('@renderer/contexts/HhcAuthContext', () => ({
+  useHhcAuth: () => ({
+    status: 'anonymous',
+    session: null,
+    signIn: vi.fn(async () => undefined),
+    signOut: vi.fn(async () => undefined),
+    getAccessToken: vi.fn(async () => null)
+  })
+}))
+
 function renderWithRouter(initialEntries: string[] = ['/']): ReturnType<typeof render> {
   const router = createMemoryRouter(
     [

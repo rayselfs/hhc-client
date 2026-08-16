@@ -28,6 +28,16 @@ vi.mock('@renderer/lib/app-init', () => ({
   prefetchRouteChunks: vi.fn(() => Promise.resolve())
 }))
 
+vi.mock('@renderer/contexts/HhcAuthContext', () => ({
+  useHhcAuth: () => ({
+    status: 'anonymous',
+    session: null,
+    signIn: vi.fn(async () => undefined),
+    signOut: vi.fn(async () => undefined),
+    getAccessToken: vi.fn(async () => null)
+  })
+}))
+
 vi.mock('@renderer/pages/BiblePage', () => ({
   default: () => <div data-testid="bible-page" />
 }))

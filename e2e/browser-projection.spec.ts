@@ -80,6 +80,125 @@ test('recovers after the browser blocks the projection popup', async ({ page, co
   expect(context.pages()).toHaveLength(2)
 })
 
+test('restores the HHC account session without storing the access token', async ({
+  page,
+  context
+}) => {
+  const clientOrigin = 'https://client.alive.org.tw'
+  const accountOrigin = 'https://account.alive.org.tw'
+  const callbackUri = `${clientOrigin}/oauth/callback`
+  const accessToken = [
+    'header',
+    Buffer.from(
+      JSON.stringify({
+        sub: 'user-1',
+        roles: ['media_sync_user'],
+        exp: Math.floor(Date.now() / 1000) + 3600
+      })
+    ).toString('base64url'),
+    'signature'
+  ].join('.')
+  let authenticated = false
+  let sessionRequests = 0
+  let callbackRequests = 0
+
+  await context.route(`${clientOrigin}/**`, async (route) => {
+    const url = new URL(route.request().url())
+    const response = await page.request.fetch(`http://127.0.0.1:5173${url.pathname}${url.search}`)
+    if (url.pathname === '/oauth/callback') {
+      callbackRequests += 1
+      await route.fulfill({
+        status: response.status(),
+        contentType: 'text/html',
+        headers: { 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' },
+        body: (await response.text()).replace('<head>', '<head><base href="/">')
+      })
+      return
+    }
+    await route.fulfill({ response })
+  })
+  await context.route(`${accountOrigin}/**`, async (route) => {
+    const request = route.request()
+    const url = new URL(request.url())
+    const corsHeaders = {
+      'access-control-allow-origin': clientOrigin,
+      'access-control-allow-credentials': 'true'
+    }
+
+    if (request.method() === 'OPTIONS') {
+      await route.fulfill({ status: 204, headers: corsHeaders })
+      return
+    }
+    if (url.pathname === '/api/account/v1/oauth/authorize') {
+      expect(url.searchParams.get('redirect_uri')).toBe(callbackUri)
+      expect(url.searchParams.get('code_challenge_method')).toBe('S256')
+      const state = url.searchParams.get('state')
+      expect(state).toBeTruthy()
+      await route.fulfill({
+        contentType: 'text/html',
+        body: `<script>location.replace(${JSON.stringify(`${callbackUri}?code=code-1&state=${state}`)})</script>`
+      })
+      return
+    }
+    if (url.pathname === '/api/account/v1/oauth/token') {
+      const body = new URLSearchParams(request.postData() ?? '')
+      expect(body.get('redirect_uri')).toBe(callbackUri)
+      authenticated = true
+      await route.fulfill({
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          'content-type': 'application/json',
+          'set-cookie':
+            'hhc_session=session-1; HttpOnly; Secure; SameSite=Lax; Path=/api/account/v1'
+        },
+        body: JSON.stringify({ access_token: accessToken })
+      })
+      return
+    }
+    if (url.pathname === '/api/account/v1/session') {
+      sessionRequests += 1
+      const hasSessionCookie = request.headers().cookie?.includes('hhc_session=session-1') ?? false
+      await route.fulfill({
+        status: 200,
+        headers: { ...corsHeaders, 'content-type': 'application/json' },
+        body: JSON.stringify(
+          authenticated && hasSessionCookie
+            ? { authenticated: true, user: { id: 'user-1', display_name: 'Ada Lovelace' } }
+            : { authenticated: false }
+        )
+      })
+      return
+    }
+
+    await route.fulfill({ status: 404, headers: corsHeaders })
+  })
+
+  await page.goto(`${clientOrigin}/`)
+  await completeOnboarding(page)
+
+  await page.getByRole('button', { name: 'Account menu for Guest' }).click()
+  const popupPromise = context.waitForEvent('page')
+  await page.getByRole('menuitem', { name: 'Login' }).click()
+  const popup = await popupPromise
+  await expect.poll(() => popup.isClosed()).toBe(true)
+  expect(callbackRequests).toBe(1)
+
+  await expect(page.getByRole('button', { name: 'Account menu for Ada Lovelace' })).toBeVisible()
+  await page.reload()
+  await expect(page.getByRole('button', { name: 'Account menu for Ada Lovelace' })).toBeVisible()
+  expect(sessionRequests).toBeGreaterThanOrEqual(3)
+
+  const cookie = (await context.cookies(`${accountOrigin}/api/account/v1/session`)).find(
+    ({ name }) => name === 'hhc_session'
+  )
+  expect(cookie).toMatchObject({ httpOnly: true, secure: true })
+
+  const storageState = await context.storageState({ indexedDB: true })
+  expect(JSON.stringify(storageState)).not.toContain(accessToken)
+  expect(await page.evaluate(() => Object.values(sessionStorage))).not.toContain(accessToken)
+})
+
 test('keeps Media live through Files preview and closes from the Header', async ({
   page,
   context

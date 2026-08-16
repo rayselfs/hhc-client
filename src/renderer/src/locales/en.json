@@ -720,6 +720,11 @@
   },
   "userMenu": {
     "guest": "Guest",
+    "accountMenu": "Account menu for {{name}}",
+    "loadingAccount": "Loading account...",
+    "accountUnavailable": "Account unavailable",
+    "signInFailed": "Unable to sign in",
+    "signOutFailed": "Unable to sign out",
     "login": "Login",
     "logout": "Logout",
     "preferences": "Preferences",

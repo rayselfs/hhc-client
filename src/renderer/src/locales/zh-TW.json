@@ -720,6 +720,11 @@
   },
   "userMenu": {
     "guest": "訪客",
+    "accountMenu": "{{name}}的帳號選單",
+    "loadingAccount": "正在載入帳號...",
+    "accountUnavailable": "帳號服務無法使用",
+    "signInFailed": "無法登入",
+    "signOutFailed": "無法登出",
     "login": "登入",
     "logout": "登出",
     "preferences": "偏好設定",
