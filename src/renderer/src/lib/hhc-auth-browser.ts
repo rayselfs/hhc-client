@@ -109,7 +109,7 @@ export class BrowserHhcAuthAdapter implements HhcAuthAdapter {
     const accountOrigin = options.accountOrigin ?? new URL(HHC_AUTH.accountApi).origin
     this.accountApi = `${accountOrigin}/api/account/v1`
     this.authorize = `${accountOrigin}/api/account/v1/oauth/authorize`
-    this.fetcher = options.fetcher ?? fetch
+    this.fetcher = options.fetcher ?? ((...args) => window.fetch(...args))
     this.now = options.now ?? Date.now
     this.window = options.window ?? window
     this.callbackUri = HHC_AUTH.callbackUri

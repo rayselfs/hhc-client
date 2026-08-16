@@ -66,6 +66,23 @@ describe('browser HHC auth', () => {
     )
   })
 
+  it('calls the default native fetch with the Window receiver', async () => {
+    const nativeFetch = vi.fn(function (this: unknown): Promise<Response> {
+      if (this !== window) throw new TypeError('Illegal invocation')
+      return Promise.resolve(response({ authenticated: false }))
+    })
+    vi.stubGlobal('fetch', nativeFetch)
+    const adapter = createBrowserHhcAuthAdapter({ accountOrigin: ACCOUNT_ORIGIN })
+
+    try {
+      await expect(adapter.getSession()).resolves.toBeNull()
+      expect(nativeFetch).toHaveBeenCalledOnce()
+    } finally {
+      adapter.dispose()
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('opens a blank popup synchronously and navigates it to the exact authorization URL', async () => {
     const { adapter, open } = createAdapter()
 
