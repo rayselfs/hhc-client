@@ -100,7 +100,7 @@ export default function FileProjection({
   const [pdfContainerWidth, setPdfContainerWidth] = useState(0)
   const [isEnded, setIsEnded] = useState(false)
   const [displayName, setDisplayName] = useState(fileName ?? '')
-  const videoRef = useRef<HTMLVideoElement | null>(null)
+  const mediaRef = useRef<HTMLMediaElement | null>(null)
   const pdfContainerRef = useRef<HTMLDivElement | null>(null)
   const adapterSendRef = useRef<ReturnType<typeof createProjectionAdapter>['send'] | null>(null)
   const currentItemIdRef = useRef<string | null>(null)
@@ -123,14 +123,14 @@ export default function FileProjection({
     return data.itemId === currentItemIdRef.current
   }, [])
 
-  const clampVideoTime = useCallback((video: HTMLVideoElement, value: number): number => {
+  const clampVideoTime = useCallback((video: HTMLMediaElement, value: number): number => {
     const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : value
     return Math.max(0, Math.min(value, duration))
   }, [])
 
   const applyPendingVideoControl = useCallback((): void => {
     const pending = pendingVideoControlRef.current
-    const video = videoRef.current
+    const video = mediaRef.current
     if (!pending || !video) return
     if (pending.itemId && pending.itemId !== currentItemIdRef.current) {
       pendingVideoControlRef.current = null
@@ -237,7 +237,7 @@ export default function FileProjection({
 
   const sendVideoPlaybackState = useCallback(
     (next?: { isPlaying?: boolean; isEnded?: boolean }): void => {
-      const video = videoRef.current
+      const video = mediaRef.current
       const itemId = currentItemIdRef.current
       const send = adapterSendRef.current
       if (!video || !itemId || !send) return
@@ -270,7 +270,7 @@ export default function FileProjection({
         })
         if (loadSequenceRef.current !== loadSequence) return
       }
-      const liveVideo = currentItemIdRef.current === itemId ? videoRef.current : null
+      const liveVideo = currentItemIdRef.current === itemId ? mediaRef.current : null
       currentItemIdRef.current = itemId
       const replay = replayStateRef.current?.itemId === itemId ? replayStateRef.current : null
       const videoReplay =
@@ -309,6 +309,10 @@ export default function FileProjection({
         return
       }
       if (options.streamUrl) {
+        if (fileMimeType === 'application/pdf') {
+          await loadPdf(options.streamUrl, itemId, loadSequence)
+          return
+        }
         setObjectUrl(options.streamUrl)
         return
       }
@@ -733,7 +737,7 @@ export default function FileProjection({
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-black overflow-hidden">
         <video
-          ref={videoRef}
+          ref={mediaRef as React.RefObject<HTMLVideoElement>}
           src={objectUrl}
           preload={seekableRef.current ? 'metadata' : 'none'}
           style={{
@@ -744,6 +748,30 @@ export default function FileProjection({
             transformOrigin: 'center center'
           }}
           muted
+          onLoadedMetadata={() => {
+            sendVideoPlaybackState()
+            applyPendingVideoControl()
+          }}
+          onCanPlay={() => {
+            sendVideoPlaybackState()
+            applyPendingVideoControl()
+          }}
+          onTimeUpdate={() => sendVideoPlaybackState()}
+          onPlay={() => sendVideoPlaybackState({ isPlaying: true, isEnded: false })}
+          onPause={() => sendVideoPlaybackState({ isPlaying: false })}
+          onEnded={() => sendVideoPlaybackState({ isPlaying: false, isEnded: true })}
+        />
+      </div>
+    )
+  }
+
+  if (mimeType?.startsWith('audio/') && objectUrl) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-black overflow-hidden">
+        <audio
+          ref={mediaRef as React.RefObject<HTMLAudioElement>}
+          src={objectUrl}
+          preload={seekableRef.current ? 'metadata' : 'none'}
           onLoadedMetadata={() => {
             sendVideoPlaybackState()
             applyPendingVideoControl()

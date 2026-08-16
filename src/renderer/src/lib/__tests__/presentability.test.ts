@@ -17,7 +17,7 @@ describe('isPresentable', () => {
     ['video/x-matroska', true],
     ['text/plain', false],
     ['application/json', false],
-    ['audio/mpeg', false]
+    ['audio/mpeg', true]
   ])('isPresentable(%s) → %s', (mime, expected) => {
     expect(isPresentable(mime)).toBe(expected)
   })
@@ -37,7 +37,7 @@ describe('getMediaType', () => {
     ['application/pdf', 'pdf'],
     ['application/vnd.openxmlformats-officedocument.presentationml.presentation', 'presentation'],
     ['text/plain', null],
-    ['audio/mpeg', null]
+    ['audio/mpeg', 'video']
   ] as const)('getMediaType(%s) → %s', (mime, expected) => {
     expect(getMediaType(mime)).toBe(expected)
   })
@@ -80,15 +80,17 @@ describe('getPresentableItems', () => {
     const items: AnyItemRecord[] = [
       file('img', 'image/png'),
       file('vid', 'video/mp4'),
+      file('audio', 'audio/mpeg'),
       file('deck', 'application/vnd.openxmlformats-officedocument.presentationml.presentation'),
       file('txt', 'text/plain'),
       verse
     ]
     const result = getPresentableItems(items)
-    expect(result).toHaveLength(3)
+    expect(result).toHaveLength(4)
     expect(result[0].id).toBe('img')
     expect(result[1].id).toBe('vid')
-    expect(result[2].id).toBe('deck')
+    expect(result[2].id).toBe('audio')
+    expect(result[3].id).toBe('deck')
   })
 
   it('includes Electron desktop-engine video candidates', () => {

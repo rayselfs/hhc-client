@@ -50,12 +50,18 @@ export interface HhcLinePresentationSource {
 
 function requireSession(auth: HhcLineCloudAuth): HhcSession {
   const session = auth.getSession()
-  if (!session) throw new Error('HHC account authentication required')
+  if (!session) {
+    throw Object.assign(new Error('HHC account authentication required'), {
+      classification: 'auth-required'
+    })
+  }
   return session
 }
 
 function assertCurrentAccount(auth: HhcLineCloudAuth, expectedUserId: string): void {
-  if (auth.getSession()?.userId !== expectedUserId) throw new Error('HHC account changed')
+  if (auth.getSession()?.userId !== expectedUserId) {
+    throw Object.assign(new Error('HHC account changed'), { classification: 'auth-required' })
+  }
 }
 
 function rootFolderId(connectionId: string, collectionId: string): string {
@@ -135,7 +141,7 @@ export async function prepareHhcLinePresentationSource(
   const session = requireSession(auth)
   if (found.connection.accountUserId !== session.userId) {
     throw Object.assign(new Error('HHC account changed'), {
-      classification: 'access-revoked',
+      classification: 'auth-required',
       providerConnectionId: found.entry.providerConnectionId,
       remoteItemId: found.entry.remoteItemId
     })
@@ -175,7 +181,7 @@ export async function ensureHhcLineDesktopItemAvailableForPresentation(
   const session = requireSession(auth)
   if (found.connection.accountUserId !== session.userId) {
     throw Object.assign(new Error('HHC account changed'), {
-      classification: 'access-revoked',
+      classification: 'auth-required',
       providerConnectionId: found.entry.providerConnectionId,
       remoteItemId: found.entry.remoteItemId
     })

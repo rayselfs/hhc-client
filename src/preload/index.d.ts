@@ -192,6 +192,7 @@ interface HhcAssetsAPI {
   downloadFile: (request: HhcAssetNativeDownloadRequest) => Promise<HhcAssetNativeDownloadResult>
   createContentLease: (request: HhcAssetItemRequest) => Promise<HhcAssetNativeLease>
   releaseContentLease: (leaseId: string) => Promise<void>
+  clearContentLeases: () => Promise<void>
 }
 
 interface LanRemoteAPI {

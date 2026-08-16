@@ -50,6 +50,12 @@ vi.mock('@renderer/lib/projection-adapter', () => ({
   })
 }))
 
+vi.mock('@renderer/components/Common/PptxSlideSurface', () => ({
+  default: ({ source }: { source: { url: string } }) => (
+    <div data-testid="pptx-surface" data-source-url={source.url} />
+  )
+}))
+
 function mockPdf(
   pageCount = 100,
   pendingRenders = false,
@@ -447,6 +453,119 @@ describe('FileProjection copied media identity', () => {
 
     expect(video.play).toHaveBeenCalledOnce()
   })
+
+  it('renders and controls an audio ticket through the shared media surface', async () => {
+    const { container, rerender } = render(
+      <FileProjection
+        fileName="sermon.mp3"
+        initialItemId="audio-id"
+        initialBlobId="audio-blob"
+        initialMimeType="audio/mpeg"
+        initialStreamUrl="https://www.alive.org.tw/api/assets/content?ticket=audio-secret"
+      />
+    )
+
+    const audio = await waitFor(() => {
+      const element = container.querySelector('audio')
+      expect(element).not.toBeNull()
+      return element!
+    })
+    expect(audio).toHaveAttribute(
+      'src',
+      'https://www.alive.org.tw/api/assets/content?ticket=audio-secret'
+    )
+    expect(mockGetFileSource).not.toHaveBeenCalled()
+
+    rerender(
+      <FileProjection
+        fileName="sermon.mp3"
+        initialItemId="audio-id"
+        initialBlobId="audio-blob"
+        initialMimeType="audio/mpeg"
+        initialStreamUrl="https://www.alive.org.tw/api/assets/content?ticket=audio-secret"
+        controlEvent={{ id: 1, data: { action: 'play', itemId: 'audio-id' } }}
+      />
+    )
+    expect(audio.play).toHaveBeenCalledOnce()
+  })
+
+  it('loads a remote PDF ticket through PDF.js without opening IndexedDB', async () => {
+    const { pdf } = mockPdf(1)
+    const ticket = 'https://www.alive.org.tw/api/assets/content?ticket=pdf-secret'
+
+    render(
+      <FileProjection
+        fileName="bulletin.pdf"
+        initialItemId="pdf-id"
+        initialBlobId="pdf-blob"
+        initialMimeType="application/pdf"
+        initialStreamUrl={ticket}
+      />
+    )
+
+    await waitFor(() => expect(pdf.getPage).toHaveBeenCalledWith(1))
+    expect(mockLoadPdfjsLib.mock.results.at(-1)?.value).toBeDefined()
+    const pdfjs = await mockLoadPdfjsLib.mock.results.at(-1)?.value
+    expect(pdfjs.getDocument).toHaveBeenCalledWith(ticket)
+    expect(mockGetFileSource).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['image/png', 'photo.png', 'img'],
+    ['audio/mpeg', 'sermon.mp3', 'audio'],
+    ['video/mp4', 'clip.mp4', 'video'],
+    ['application/pdf', 'bulletin.pdf', 'pdf'],
+    [
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'slides.pptx',
+      'pptx'
+    ]
+  ] as const)(
+    'routes HHC %s tickets and native leases through the real projection surface',
+    async (mimeType, fileName, surface) => {
+      if (surface === 'pdf') mockPdf(1)
+      const ticket = 'https://www.alive.org.tw/api/assets/content?ticket=matrix-secret'
+      const lease =
+        'hhc-media://lease/123e4567-e89b-12d3-a456-426614174000?type=application%2Foctet-stream'
+      const { container, getByTestId, rerender } = render(
+        <FileProjection
+          fileName={fileName}
+          initialItemId="remote-item"
+          initialBlobId="remote-blob"
+          initialMimeType={mimeType}
+          initialStreamUrl={ticket}
+        />
+      )
+
+      const expectSource = async (url: string): Promise<void> => {
+        if (surface === 'pdf') {
+          await waitFor(() => {
+            const pdfjs = mockLoadPdfjsLib.mock.results.at(-1)?.value
+            expect(pdfjs).toBeDefined()
+          })
+          const pdfjs = await mockLoadPdfjsLib.mock.results.at(-1)?.value
+          expect(pdfjs.getDocument).toHaveBeenCalledWith(url)
+        } else if (surface === 'pptx') {
+          expect(getByTestId('pptx-surface')).toHaveAttribute('data-source-url', url)
+        } else {
+          await waitFor(() => expect(container.querySelector(surface)).toHaveAttribute('src', url))
+        }
+      }
+
+      await expectSource(ticket)
+      rerender(
+        <FileProjection
+          fileName={fileName}
+          initialItemId="remote-item"
+          initialBlobId="remote-blob"
+          initialMimeType={mimeType}
+          initialStreamUrl={lease}
+        />
+      )
+      await expectSource(lease)
+      expect(mockGetFileSource).not.toHaveBeenCalled()
+    }
+  )
 
   it('applies pending video seek before pending play', async () => {
     const { container, rerender } = render(

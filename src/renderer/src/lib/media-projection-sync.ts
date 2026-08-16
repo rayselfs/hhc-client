@@ -67,6 +67,12 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
   const { auth, onAccessRevoked } = options
   const sessionUserId = auth?.getSession()?.userId ?? null
 
+  const releaseLease = useCallback((leaseId: string): void => {
+    const release = window.api?.hhcAssets?.releaseContentLease
+    if (!release) return
+    void release(leaseId).catch(() => release(leaseId).catch(() => undefined))
+  }, [])
+
   const clearRemoteSource = useCallback((): void => {
     if (renewalTimerRef.current) clearTimeout(renewalTimerRef.current)
     renewalTimerRef.current = null
@@ -90,8 +96,8 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
         }
       })
     }
-    if (leaseId) void window.api?.hhcAssets?.releaseContentLease(leaseId).catch(() => undefined)
-  }, [])
+    if (leaseId) releaseLease(leaseId)
+  }, [releaseLease])
 
   const projectCurrentItem = useCallback(
     async (
@@ -116,6 +122,10 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
             const { prepareHhcLinePresentationSource } =
               await import('@renderer/lib/hhc-line-connect')
             const prepared = await prepareHhcLinePresentationSource(auth, item)
+            if (prepared && sequence !== projectSequenceRef.current) {
+              if (prepared.source.kind === 'native-lease') releaseLease(prepared.source.leaseId)
+              return
+            }
             if (!prepared && activeRemoteRef.current?.itemId === item.id) {
               clearRemoteSource()
               currentState = useMediaProjectionStore.getState()
@@ -125,9 +135,7 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
               const leaseId =
                 prepared.source.kind === 'native-lease' ? prepared.source.leaseId : undefined
               if (previous?.leaseId && previous.leaseId !== leaseId) {
-                void window.api?.hhcAssets
-                  ?.releaseContentLease(previous.leaseId)
-                  .catch(() => undefined)
+                releaseLease(previous.leaseId)
               }
               const remoteSource = {
                 providerConnectionId: prepared.providerConnectionId,
@@ -222,7 +230,16 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
         }
       }
     },
-    [activeOwner, auth, clearRemoteSource, onAccessRevoked, project, registry, startProjection]
+    [
+      activeOwner,
+      auth,
+      clearRemoteSource,
+      onAccessRevoked,
+      project,
+      registry,
+      releaseLease,
+      startProjection
+    ]
   )
 
   useEffect(() => {
@@ -256,7 +273,10 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
   useEffect(() => {
     if (!useMediaProjectionStore.getState().isPresenting) clearRemoteSource()
     const unsub = useMediaProjectionStore.subscribe((state, prev) => {
-      if (prev.isPresenting && !state.isPresenting) clearRemoteSource()
+      if (prev.isPresenting && !state.isPresenting) {
+        projectSequenceRef.current += 1
+        clearRemoteSource()
+      }
     })
     return unsub
   }, [clearRemoteSource])
@@ -268,11 +288,18 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
     if (previousUserId && previousUserId !== sessionUserId) {
       projectSequenceRef.current += 1
       clearRemoteSource()
+      void window.api?.hhcAssets?.clearContentLeases?.().catch(() => undefined)
       void stopProjection()
     }
   }, [clearRemoteSource, sessionUserId, stopProjection])
 
-  useEffect(() => clearRemoteSource, [clearRemoteSource])
+  useEffect(
+    () => () => {
+      projectSequenceRef.current += 1
+      clearRemoteSource()
+    },
+    [clearRemoteSource]
+  )
 
   useEffect(() => {
     const unsub = useMediaProjectionStore.subscribe((state, prev) => {

@@ -60,6 +60,45 @@ function makeFile(id: string, name: string, mimeType = 'image/png', blobId = id)
   }
 }
 
+function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+  let resolve!: (value: T) => void
+  return {
+    promise: new Promise<T>((done) => {
+      resolve = done
+    }),
+    resolve
+  }
+}
+
+function setRemotePresentationItem(name = 'remote.png', mimeType = 'image/png'): FileItemRecord {
+  const item = makeFile('remote', name, mimeType)
+  useMediaProjectionStore.setState({
+    playlist: [item],
+    currentIndex: 0,
+    isPresenting: true,
+    snapshot: {
+      id: 'snapshot',
+      createdAt: 1,
+      entries: [
+        {
+          index: 0,
+          itemId: item.id,
+          blobId: item.id,
+          name: item.name,
+          mimeType: item.mimeType,
+          sourceUrl: item.url,
+          remoteItem: {
+            providerConnectionId: 'hhc-line:user-1',
+            remoteItemId: 'asset-1',
+            rootRemoteFolderId: 'collection-1'
+          }
+        }
+      ]
+    }
+  })
+  return item
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   projectionState.activeOwner = 'media'
@@ -86,6 +125,83 @@ afterEach(() => {
 })
 
 describe('media projection sync', () => {
+  it.each([
+    ['image/png', 'photo.png'],
+    ['audio/mpeg', 'sermon.mp3'],
+    ['video/mp4', 'clip.mp4'],
+    ['application/pdf', 'bulletin.pdf'],
+    ['application/vnd.openxmlformats-officedocument.presentationml.presentation', 'slides.pptx']
+  ])('projects HHC %s through both ticket and native-lease payloads', async (mimeType, name) => {
+    const auth = {
+      getSession: () => ({ userId: 'user-1', displayName: 'Ada', roles: [] }),
+      getAccessToken: vi.fn(),
+      refreshAccessToken: vi.fn()
+    }
+    const item = setRemotePresentationItem(name, mimeType)
+    remoteMocks.prepare.mockResolvedValueOnce({
+      providerConnectionId: 'hhc-line:user-1',
+      remoteItemId: 'asset-1',
+      rootRemoteFolderId: 'collection-1',
+      source: {
+        kind: 'ticket',
+        url: 'https://www.alive.org.tw/api/assets/content?ticket=matrix-secret',
+        expiresAt: Date.now() + 60_000,
+        etag: 'etag-1'
+      }
+    })
+
+    const rendered = renderHook(() => useMediaProjectionSync({ auth }))
+    await waitFor(() => {
+      expect(mockStartProjection).toHaveBeenCalledWith(
+        'media',
+        [
+          [
+            'file:show',
+            expect.objectContaining({
+              mimeType,
+              streamUrl: 'https://www.alive.org.tw/api/assets/content?ticket=matrix-secret'
+            })
+          ]
+        ],
+        { bringToFront: false }
+      )
+    })
+    rendered.unmount()
+    mockStartProjection.mockClear()
+    useMediaProjectionStore.setState({ isPresenting: false })
+    setRemotePresentationItem(name, mimeType)
+    remoteMocks.prepare.mockResolvedValueOnce({
+      providerConnectionId: 'hhc-line:user-1',
+      remoteItemId: 'asset-1',
+      rootRemoteFolderId: 'collection-1',
+      source: {
+        kind: 'native-lease',
+        url: 'hhc-media://lease/123e4567-e89b-12d3-a456-426614174000?type=application%2Foctet-stream',
+        leaseId: '123e4567-e89b-12d3-a456-426614174000',
+        etag: 'etag-1'
+      }
+    })
+
+    const nativeRendered = renderHook(() => useMediaProjectionSync({ auth }))
+    await waitFor(() => {
+      expect(mockStartProjection).toHaveBeenCalledWith(
+        'media',
+        [
+          [
+            'file:show',
+            expect.objectContaining({
+              mimeType,
+              streamUrl: expect.stringMatching(/^hhc-media:\/\/lease\//)
+            })
+          ]
+        ],
+        { bringToFront: false }
+      )
+    })
+    expect(item.url).toBe('blob:remote')
+    nativeRendered.unmount()
+  })
+
   it('renews an expiring browser source authoritatively without persisting its ticket', async () => {
     vi.useFakeTimers()
     const item = makeFile('remote', 'remote.mp4', 'video/mp4')
@@ -250,7 +366,174 @@ describe('media projection sync', () => {
       providerConnectionId: 'hhc-line:user-1',
       remoteItemId: 'asset-1'
     })
+    expect(onAccessRevoked).toHaveBeenCalledOnce()
     vi.useRealTimers()
+  })
+
+  it('does not emit access-revoked for an auth-required account mismatch', async () => {
+    const onAccessRevoked = vi.fn()
+    setRemotePresentationItem()
+    remoteMocks.prepare.mockRejectedValueOnce(
+      Object.assign(new Error('HHC account changed'), {
+        classification: 'auth-required',
+        providerConnectionId: 'hhc-line:user-1',
+        remoteItemId: 'asset-1'
+      })
+    )
+
+    renderSync({
+      auth: {
+        getSession: () => ({ userId: 'user-2', displayName: 'Grace', roles: [] }),
+        getAccessToken: vi.fn(),
+        refreshAccessToken: vi.fn()
+      },
+      onAccessRevoked
+    })
+
+    await waitFor(() => expect(remoteMocks.prepare).toHaveBeenCalledOnce())
+    expect(onAccessRevoked).not.toHaveBeenCalled()
+  })
+
+  it.each(['stop', 'account-switch', 'item-change', 'unmount'] as const)(
+    'releases a native lease that resolves after %s without projecting it',
+    async (transition) => {
+      const pending = deferred<{
+        providerConnectionId: string
+        remoteItemId: string
+        rootRemoteFolderId: string
+        source: {
+          kind: 'native-lease'
+          url: string
+          leaseId: string
+          etag: string
+        }
+      }>()
+      const releaseContentLease = vi.fn(async () => undefined)
+      const clearContentLeases = vi.fn(async () => undefined)
+      Object.defineProperty(window, 'api', {
+        configurable: true,
+        value: { hhcAssets: { releaseContentLease, clearContentLeases } }
+      })
+      const sessionRef: {
+        current: { userId: string; displayName: string; roles: string[] }
+      } = {
+        current: { userId: 'user-1', displayName: 'Ada', roles: [] }
+      }
+      const auth = {
+        getSession: () => sessionRef.current,
+        getAccessToken: vi.fn(),
+        refreshAccessToken: vi.fn()
+      }
+      setRemotePresentationItem()
+      remoteMocks.prepare.mockReturnValueOnce(pending.promise)
+
+      const rendered = renderHook(() => useMediaProjectionSync({ auth }))
+      await waitFor(() => expect(remoteMocks.prepare).toHaveBeenCalledOnce())
+      if (transition === 'stop') {
+        act(() => useMediaProjectionStore.setState({ isPresenting: false }))
+      } else if (transition === 'account-switch') {
+        sessionRef.current = { userId: 'user-2', displayName: 'Grace', roles: [] }
+        rendered.rerender()
+      } else if (transition === 'item-change') {
+        const other = makeFile('other', 'other.png')
+        act(() => {
+          useMediaProjectionStore.setState((state) => ({
+            playlist: [state.playlist[0], other],
+            currentIndex: 1,
+            snapshot: state.snapshot
+              ? {
+                  ...state.snapshot,
+                  entries: [
+                    ...state.snapshot.entries,
+                    {
+                      index: 1,
+                      itemId: other.id,
+                      blobId: other.id,
+                      name: other.name,
+                      mimeType: other.mimeType,
+                      sourceUrl: other.url
+                    }
+                  ]
+                }
+              : null
+          }))
+        })
+      } else {
+        rendered.unmount()
+      }
+
+      await act(async () => {
+        pending.resolve({
+          providerConnectionId: 'hhc-line:user-1',
+          remoteItemId: 'asset-1',
+          rootRemoteFolderId: 'collection-1',
+          source: {
+            kind: 'native-lease',
+            url: 'hhc-media://lease/123e4567-e89b-12d3-a456-426614174000?type=image%2Fpng',
+            leaseId: '123e4567-e89b-12d3-a456-426614174000',
+            etag: 'etag-1'
+          }
+        })
+        await pending.promise
+      })
+
+      await waitFor(() => {
+        expect(releaseContentLease).toHaveBeenCalledOnce()
+      })
+      expect(mockStartProjection).not.toHaveBeenCalled()
+      expect(useMediaProjectionStore.getState().snapshot?.entries[0].sourceUrl).toBe('blob:remote')
+      if (transition === 'account-switch') expect(clearContentLeases).toHaveBeenCalledOnce()
+    }
+  )
+
+  it('retries a rejected late native lease release', async () => {
+    const pending = deferred<{
+      providerConnectionId: string
+      remoteItemId: string
+      rootRemoteFolderId: string
+      source: {
+        kind: 'native-lease'
+        url: string
+        leaseId: string
+        etag: string
+      }
+    }>()
+    const releaseContentLease = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('file busy'))
+      .mockResolvedValueOnce(undefined)
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: { hhcAssets: { releaseContentLease, clearContentLeases: vi.fn() } }
+    })
+    setRemotePresentationItem()
+    remoteMocks.prepare.mockReturnValueOnce(pending.promise)
+    renderSync({
+      auth: {
+        getSession: () => ({ userId: 'user-1', displayName: 'Ada', roles: [] }),
+        getAccessToken: vi.fn(),
+        refreshAccessToken: vi.fn()
+      }
+    })
+    await waitFor(() => expect(remoteMocks.prepare).toHaveBeenCalledOnce())
+    act(() => useMediaProjectionStore.setState({ isPresenting: false }))
+
+    await act(async () => {
+      pending.resolve({
+        providerConnectionId: 'hhc-line:user-1',
+        remoteItemId: 'asset-1',
+        rootRemoteFolderId: 'collection-1',
+        source: {
+          kind: 'native-lease',
+          url: 'hhc-media://lease/123e4567-e89b-12d3-a456-426614174000?type=image%2Fpng',
+          leaseId: '123e4567-e89b-12d3-a456-426614174000',
+          etag: 'etag-1'
+        }
+      })
+      await pending.promise
+    })
+
+    await waitFor(() => expect(releaseContentLease).toHaveBeenCalledTimes(2))
   })
 
   it('releases an Electron lease and stops presentation when the HHC session ends', async () => {

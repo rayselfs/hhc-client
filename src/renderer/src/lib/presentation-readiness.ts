@@ -206,7 +206,7 @@ async function analyzePresentationItem(
         reason: 'ready-remote',
         support,
         playbackMode: support === 'desktop-engine' ? 'vlc-embedded' : 'native',
-        seekable: capability.kind === 'video',
+        seekable: capability.kind === 'video' || capability.kind === 'audio',
         remoteItem: {
           providerConnectionId: syncEntry.providerConnectionId,
           remoteItemId: syncEntry.remoteItemId,

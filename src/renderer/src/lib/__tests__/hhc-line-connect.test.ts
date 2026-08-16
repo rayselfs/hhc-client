@@ -145,6 +145,94 @@ describe('HHC LINE collection connection', () => {
     ).resolves.toBeNull()
   })
 
+  it('classifies a connection account mismatch as auth-required rather than access-revoked', async () => {
+    await putProviderConnection({
+      id: 'hhc-line:user-1',
+      providerType: 'hhc-line',
+      displayName: 'HHC LINE',
+      accountUserId: 'user-1'
+    })
+    await putSyncEntry({
+      providerConnectionId: 'hhc-line:user-1',
+      remoteItemId: 'asset-1',
+      parentRemoteItemId: 'collection-1',
+      kind: 'file',
+      name: 'photo.png',
+      itemId: 'local-1',
+      mimeType: 'image/png',
+      status: 'remote-only'
+    })
+
+    await expect(
+      prepareHhcLinePresentationSource(
+        auth({ current: { userId: 'user-2', displayName: 'Grace', roles: [] } }),
+        {
+          id: 'local-1',
+          parentId: 'root',
+          type: 'file',
+          sortIndex: 0,
+          createdAt: 1,
+          expiresAt: null,
+          name: 'photo.png',
+          mimeType: 'image/png',
+          size: 1,
+          url: 'hhc-line:asset-1'
+        }
+      )
+    ).rejects.toMatchObject({ classification: 'auth-required' })
+    expect(mocks.api?.getRemoteContentSource).not.toHaveBeenCalled()
+  })
+
+  it('propagates an Asset API 403 as access-revoked for the exact remote item', async () => {
+    await putProviderConnection({
+      id: 'hhc-line:user-1',
+      providerType: 'hhc-line',
+      displayName: 'HHC LINE',
+      accountUserId: 'user-1'
+    })
+    await putSyncEntry({
+      providerConnectionId: 'hhc-line:user-1',
+      remoteItemId: 'asset-1',
+      parentRemoteItemId: 'collection-1',
+      kind: 'file',
+      name: 'photo.png',
+      itemId: 'local-1',
+      mimeType: 'image/png',
+      status: 'remote-only'
+    })
+    mocks.api = api({
+      getRemoteContentSource: vi.fn(async () => {
+        throw Object.assign(new Error('HHC Asset request failed'), {
+          classification: 'access-revoked',
+          status: 403
+        })
+      })
+    })
+
+    await expect(
+      prepareHhcLinePresentationSource(
+        auth({ current: { userId: 'user-1', displayName: 'Ada', roles: [] } }),
+        {
+          id: 'local-1',
+          parentId: 'root',
+          type: 'file',
+          sortIndex: 0,
+          createdAt: 1,
+          expiresAt: null,
+          name: 'photo.png',
+          mimeType: 'image/png',
+          size: 1,
+          url: 'hhc-line:asset-1'
+        }
+      )
+    ).rejects.toMatchObject({
+      classification: 'access-revoked',
+      status: 403,
+      providerConnectionId: 'hhc-line:user-1',
+      remoteItemId: 'asset-1'
+    })
+  })
+
   it('prepares an ephemeral source from the exact imported collection without persisting it', async () => {
     await putProviderConnection({
       id: 'hhc-line:user-1',

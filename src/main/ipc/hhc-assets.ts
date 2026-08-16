@@ -14,7 +14,12 @@ import {
 } from '@shared/hhc-assets'
 import type { WindowManager } from '../windowManager'
 import type { HhcAuthService } from './hhc-auth'
-import { getNativeFilePath, registerNativeMediaLease, releaseNativeMediaLease } from './native-fs'
+import {
+  clearNativeMediaLeases,
+  getNativeFilePath,
+  registerNativeMediaLease,
+  releaseNativeMediaLease
+} from './native-fs'
 import { isMainWindow } from './validate'
 
 const HHC_ASSET_ORIGIN = 'https://www.alive.org.tw'
@@ -350,6 +355,13 @@ export function registerHhcAssetHandlers(wm: WindowManager, auth: HhcAuthService
     'hhc-assets:release-content-lease',
     authorized(async (leaseId: unknown): Promise<void> => {
       await releaseNativeMediaLease(opaqueId(leaseId))
+    })
+  )
+
+  ipcMain.handle(
+    'hhc-assets:clear-content-leases',
+    authorized(async (): Promise<void> => {
+      await clearNativeMediaLeases()
     })
   )
 }

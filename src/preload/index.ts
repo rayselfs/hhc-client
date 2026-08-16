@@ -199,7 +199,9 @@ const hhcAssetsApi = {
     typedInvoke('hhc-assets:download-file', request),
   createContentLease: (request: IpcInvokeMap['hhc-assets:create-content-lease']['args'][0]) =>
     typedInvoke('hhc-assets:create-content-lease', request),
-  releaseContentLease: (leaseId: string) => typedInvoke('hhc-assets:release-content-lease', leaseId)
+  releaseContentLease: (leaseId: string) =>
+    typedInvoke('hhc-assets:release-content-lease', leaseId),
+  clearContentLeases: () => typedInvoke('hhc-assets:clear-content-leases')
 }
 
 const lanRemoteApi = {

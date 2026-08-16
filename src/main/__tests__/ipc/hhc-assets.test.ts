@@ -12,7 +12,8 @@ const {
   mockWrite,
   mockClose,
   mockRegisterLease,
-  mockReleaseLease
+  mockReleaseLease,
+  mockClearLeases
 } = vi.hoisted(() => ({
   handlers: new Map<string, (...args: unknown[]) => unknown>(),
   mockFetch: vi.fn(),
@@ -25,7 +26,8 @@ const {
   mockWrite: vi.fn(),
   mockClose: vi.fn(),
   mockRegisterLease: vi.fn(),
-  mockReleaseLease: vi.fn()
+  mockReleaseLease: vi.fn(),
+  mockClearLeases: vi.fn()
 }))
 
 const mainWindow = { id: 1 }
@@ -50,7 +52,8 @@ vi.mock('node:fs', () => {
 vi.mock('../../ipc/native-fs', () => ({
   getNativeFilePath: (id: string) => `/tmp/hhc-user-data/native-files/${id}`,
   registerNativeMediaLease: mockRegisterLease,
-  releaseNativeMediaLease: mockReleaseLease
+  releaseNativeMediaLease: mockReleaseLease,
+  clearNativeMediaLeases: mockClearLeases
 }))
 
 import { BrowserWindow } from 'electron'
@@ -532,5 +535,16 @@ describe('HHC Asset IPC', () => {
         itemId: 'item_1'
       })
     ).rejects.toThrow('HHC_ASSET_FATAL')
+  })
+
+  it('clears every native lease through the authorized main-window boundary', async () => {
+    await handler('hhc-assets:clear-content-leases')(event())
+
+    expect(mockClearLeases).toHaveBeenCalledOnce()
+
+    vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(projectionWindow as never)
+    await expect(handler('hhc-assets:clear-content-leases')(event())).rejects.toThrow(
+      'Unauthorized'
+    )
   })
 })

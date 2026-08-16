@@ -325,6 +325,7 @@ export interface IpcInvokeMap {
     result: HhcAssetNativeLease
   }
   'hhc-assets:release-content-lease': { args: [string]; result: void }
+  'hhc-assets:clear-content-leases': { args: []; result: void }
   'onedrive:download-file': {
     args: [OneDriveNativeDownloadRequest]
     result: OneDriveNativeDownloadResult

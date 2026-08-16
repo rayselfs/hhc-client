@@ -236,7 +236,8 @@ describe('analyzePresentationReadiness', () => {
     expect(report.items[0]).toMatchObject({
       status: 'ready',
       reason: 'ready-remote',
-      support: 'native'
+      support: 'native',
+      seekable: mimeType.startsWith('audio/') || mimeType.startsWith('video/')
     })
   })
 

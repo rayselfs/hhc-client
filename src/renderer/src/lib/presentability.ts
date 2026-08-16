@@ -31,15 +31,17 @@ function canPresentSupport(support: MediaSupportMode): boolean {
   return support === 'native' || support === 'desktop-engine'
 }
 
-function isProjectionMediaKind(kind: string): kind is MediaType {
-  return kind === 'image' || kind === 'video' || kind === 'pdf' || kind === 'presentation'
+function projectionMediaType(kind: string): MediaType | null {
+  if (kind === 'audio') return 'video'
+  if (kind === 'image' || kind === 'video' || kind === 'pdf' || kind === 'presentation') return kind
+  return null
 }
 
 export function isPresentable(mimeType: string, platform = getPresentabilityPlatform()): boolean {
   const capability = resolveMediaCapability({ mimeType })
   return (
     capability !== null &&
-    isProjectionMediaKind(capability.kind) &&
+    projectionMediaType(capability.kind) !== null &&
     canPresentSupport(getMediaSupport(capability, platform))
   )
 }
@@ -51,12 +53,12 @@ export function getMediaType(
   const capability = resolveMediaCapability({ mimeType })
   if (
     !capability ||
-    !isProjectionMediaKind(capability.kind) ||
+    !projectionMediaType(capability.kind) ||
     !canPresentSupport(getMediaSupport(capability, platform))
   ) {
     return null
   }
-  return capability.kind
+  return projectionMediaType(capability.kind)
 }
 
 export function getPresentableItems(
