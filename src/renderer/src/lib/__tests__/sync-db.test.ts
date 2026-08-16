@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  createHhcLineProviderConnectionId,
   deleteSyncCursorsByProviderConnection,
   deleteSyncEntriesByProviderConnection,
   deleteSyncEntryPreferencesByProviderConnection,
@@ -8,7 +9,9 @@ import {
   getSyncCursor,
   getSyncEntryByRemoteItem,
   getSyncEntryPreference,
+  listHhcLineProviderConnectionsByAccountUser,
   listSyncEntriesByProviderConnection,
+  openSyncDB,
   putProviderConnection,
   putSyncCursor,
   putSyncEntry,
@@ -17,6 +20,42 @@ import {
   resetSyncDBForTests,
   updateSyncDownloadProgress
 } from '../sync-db'
+
+function seedLegacyProviderConnections(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('hhc-sync', 1)
+    request.onupgradeneeded = () => {
+      const store = request.result.createObjectStore('provider-connections', { keyPath: 'id' })
+      store.createIndex('by-provider-type', 'providerType')
+    }
+    request.onerror = () => reject(request.error)
+    request.onsuccess = () => {
+      const db = request.result
+      const tx = db.transaction('provider-connections', 'readwrite')
+      const store = tx.objectStore('provider-connections')
+      store.put({
+        id: 'onedrive:legacy',
+        providerType: 'onedrive',
+        displayName: 'Legacy OneDrive',
+        accountLabel: 'legacy@example.com',
+        createdAt: 1,
+        updatedAt: 2
+      })
+      store.put({
+        id: 'local:legacy',
+        providerType: 'local-fs',
+        displayName: 'Legacy local folder',
+        createdAt: 3,
+        updatedAt: 4
+      })
+      tx.onerror = () => reject(tx.error)
+      tx.oncomplete = () => {
+        db.close()
+        resolve()
+      }
+    }
+  })
+}
 
 describe('sync-db', () => {
   beforeEach(async () => {
@@ -39,6 +78,93 @@ describe('sync-db', () => {
     })
     await expect(getProviderConnection('connection-1')).resolves.not.toHaveProperty('accessToken')
     await expect(getProviderConnection('connection-1')).resolves.not.toHaveProperty('deltaLink')
+  })
+
+  it('migrates existing provider records unchanged while adding account lookup', async () => {
+    await seedLegacyProviderConnections()
+
+    const db = await openSyncDB()
+
+    expect(db.version).toBe(2)
+    await expect(getProviderConnection('onedrive:legacy')).resolves.toEqual({
+      id: 'onedrive:legacy',
+      providerType: 'onedrive',
+      displayName: 'Legacy OneDrive',
+      accountLabel: 'legacy@example.com',
+      createdAt: 1,
+      updatedAt: 2
+    })
+    await expect(getProviderConnection('local:legacy')).resolves.toEqual({
+      id: 'local:legacy',
+      providerType: 'local-fs',
+      displayName: 'Legacy local folder',
+      createdAt: 3,
+      updatedAt: 4
+    })
+  })
+
+  it('requires canonical account identity for HHC LINE provider connections', async () => {
+    const accountUserId = 'user-a'
+    expect(() => createHhcLineProviderConnectionId('')).toThrow(
+      'HHC LINE provider connections require an account user ID'
+    )
+    const id = createHhcLineProviderConnectionId(accountUserId)
+
+    expect(id).toBe('hhc-line:user-a')
+    await expect(
+      putProviderConnection({
+        id,
+        providerType: 'hhc-line',
+        displayName: 'HHC LINE'
+      })
+    ).rejects.toThrow('HHC LINE provider connections require an account user ID')
+    await expect(
+      putProviderConnection({
+        id: 'hhc-line:wrong-user',
+        providerType: 'hhc-line',
+        displayName: 'HHC LINE',
+        accountUserId
+      })
+    ).rejects.toThrow('HHC LINE provider connection ID does not match its account user ID')
+
+    await expect(
+      putProviderConnection({
+        id,
+        providerType: 'hhc-line',
+        displayName: 'HHC LINE',
+        accountLabel: 'User A',
+        accountUserId
+      })
+    ).resolves.toMatchObject({ id, accountUserId })
+  })
+
+  it('lists only HHC LINE connections for the requested account', async () => {
+    await putProviderConnection({
+      id: createHhcLineProviderConnectionId('user-a'),
+      providerType: 'hhc-line',
+      displayName: 'User A',
+      accountUserId: 'user-a'
+    })
+    await putProviderConnection({
+      id: createHhcLineProviderConnectionId('user-b'),
+      providerType: 'hhc-line',
+      displayName: 'User B',
+      accountUserId: 'user-b'
+    })
+    await putProviderConnection({
+      id: 'onedrive:user-a',
+      providerType: 'onedrive',
+      displayName: 'OneDrive',
+      accountUserId: 'user-a'
+    })
+
+    await expect(listHhcLineProviderConnectionsByAccountUser('user-a')).resolves.toEqual([
+      expect.objectContaining({
+        id: 'hhc-line:user-a',
+        providerType: 'hhc-line',
+        accountUserId: 'user-a'
+      })
+    ])
   })
 
   it('keeps cursors scoped by provider connection and remote folder', async () => {

@@ -1,4 +1,4 @@
-export type SyncProviderType = 'local-fs' | 'onedrive'
+export type SyncProviderType = 'local-fs' | 'onedrive' | 'hhc-line'
 export type SyncOfflinePolicy = 'online-only' | 'on-demand' | 'always-offline'
 
 export interface FolderSyncLink {
@@ -6,6 +6,7 @@ export interface FolderSyncLink {
   remoteFolderId: string
   providerType: SyncProviderType
   offlinePolicy?: SyncOfflinePolicy
+  status?: 'active' | 'access-revoked'
 }
 
 export interface FolderRecord {

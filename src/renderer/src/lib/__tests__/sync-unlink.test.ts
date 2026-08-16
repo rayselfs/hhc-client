@@ -3,6 +3,7 @@ import type { FileItemRecord, FolderRecord } from '@shared/types/folder'
 import {
   convertSyncConnectionToNormalFolder,
   recoverPendingSyncResourceCleanups,
+  unlinkHhcLineAccountFromApp,
   unlinkSyncConnectionFromApp,
   unlinkSyncRootFolderFromApp
 } from '../sync-unlink'
@@ -102,23 +103,7 @@ describe('sync unlink', () => {
     await expect(getSyncCursor('connection-1', 'root')).resolves.toBeUndefined()
     await expect(getSyncEntryByRemoteItem('connection-1', 'remote-file-1')).resolves.toBeUndefined()
     await expect(getSyncEntryPreference('connection-1', 'remote-file-1')).resolves.toBeUndefined()
-    await expect(listSyncTombstones()).resolves.toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          providerConnectionId: 'connection-1',
-          remoteItemId: 'remote-folder-1',
-          folderId: 'folder-1',
-          reason: 'unlink'
-        }),
-        expect.objectContaining({
-          providerConnectionId: 'connection-1',
-          remoteItemId: 'remote-file-1',
-          itemId: 'item-1',
-          blobId: 'blob-1',
-          reason: 'unlink'
-        })
-      ])
-    )
+    await expect(listSyncTombstones()).resolves.toEqual([])
     expect(mockCancelSyncDownloads).toHaveBeenCalledWith({ providerConnectionId: 'connection-1' })
   })
 
@@ -178,6 +163,18 @@ describe('sync unlink', () => {
       folderId: 'folder-b',
       status: 'remote-only'
     })
+    await putSyncTombstone({
+      providerConnectionId: 'connection-1',
+      remoteItemId: 'root-a',
+      folderId: 'folder-a',
+      reason: 'remote-delete'
+    })
+    await putSyncTombstone({
+      providerConnectionId: 'connection-1',
+      remoteItemId: 'root-b',
+      folderId: 'folder-b',
+      reason: 'remote-delete'
+    })
 
     await unlinkSyncRootFolderFromApp({
       id: 'folder-a',
@@ -214,6 +211,145 @@ describe('sync unlink', () => {
     await expect(getSyncCursor('connection-1', 'root-b')).resolves.toBeDefined()
     await expect(getSyncEntryByRemoteItem('connection-1', 'root-a')).resolves.toBeUndefined()
     await expect(getSyncEntryByRemoteItem('connection-1', 'root-b')).resolves.toBeDefined()
+    await expect(listSyncTombstones()).resolves.toEqual([
+      expect.objectContaining({
+        providerConnectionId: 'connection-1',
+        remoteItemId: 'root-b'
+      })
+    ])
+  })
+
+  it('purges every HHC LINE root for one account without touching other providers or accounts', async () => {
+    await Promise.all([
+      putProviderConnection({
+        id: 'hhc-line:user-a',
+        providerType: 'hhc-line',
+        displayName: 'User A',
+        accountUserId: 'user-a'
+      }),
+      putProviderConnection({
+        id: 'hhc-line:user-b',
+        providerType: 'hhc-line',
+        displayName: 'User B',
+        accountUserId: 'user-b'
+      }),
+      putProviderConnection({
+        id: 'onedrive:user-a',
+        providerType: 'onedrive',
+        displayName: 'OneDrive',
+        accountUserId: 'user-a'
+      })
+    ])
+    await Promise.all([
+      putSyncCursor({
+        providerConnectionId: 'hhc-line:user-a',
+        remoteFolderId: 'collection-a-1',
+        cursor: 'cursor-a-1',
+        updatedAt: 1
+      }),
+      putSyncCursor({
+        providerConnectionId: 'hhc-line:user-a',
+        remoteFolderId: 'collection-a-2',
+        cursor: 'cursor-a-2',
+        updatedAt: 1
+      }),
+      putSyncCursor({
+        providerConnectionId: 'hhc-line:user-b',
+        remoteFolderId: 'collection-b',
+        cursor: 'cursor-b',
+        updatedAt: 1
+      })
+    ])
+    await Promise.all([
+      putSyncEntry({
+        providerConnectionId: 'hhc-line:user-a',
+        remoteItemId: 'collection-a-1',
+        parentRemoteItemId: null,
+        kind: 'folder',
+        name: 'A1',
+        folderId: 'folder-a-1',
+        status: 'remote-only'
+      }),
+      putSyncEntry({
+        providerConnectionId: 'hhc-line:user-a',
+        remoteItemId: 'collection-a-2',
+        parentRemoteItemId: null,
+        kind: 'folder',
+        name: 'A2',
+        folderId: 'folder-a-2',
+        status: 'remote-only'
+      }),
+      putSyncEntry({
+        providerConnectionId: 'hhc-line:user-b',
+        remoteItemId: 'collection-b',
+        parentRemoteItemId: null,
+        kind: 'folder',
+        name: 'B',
+        folderId: 'folder-b',
+        status: 'remote-only'
+      }),
+      putSyncEntry({
+        providerConnectionId: 'onedrive:user-a',
+        remoteItemId: 'onedrive-root',
+        parentRemoteItemId: null,
+        kind: 'folder',
+        name: 'OneDrive',
+        folderId: 'folder-onedrive',
+        status: 'remote-only'
+      })
+    ])
+    await Promise.all([
+      putSyncEntryPreference({
+        providerConnectionId: 'hhc-line:user-a',
+        remoteItemId: 'collection-a-1',
+        offlinePolicyOverride: 'always-offline'
+      }),
+      putSyncEntryPreference({
+        providerConnectionId: 'hhc-line:user-b',
+        remoteItemId: 'collection-b',
+        offlinePolicyOverride: 'always-offline'
+      }),
+      putSyncTombstone({
+        providerConnectionId: 'hhc-line:user-a',
+        remoteItemId: 'old-a',
+        itemId: 'orphan-item-a',
+        blobId: 'orphan-blob-a',
+        reason: 'remote-delete'
+      }),
+      putSyncTombstone({
+        providerConnectionId: 'hhc-line:user-b',
+        remoteItemId: 'old-b',
+        reason: 'remote-delete'
+      })
+    ])
+
+    await unlinkHhcLineAccountFromApp('user-a')
+
+    expect(mockCancelSyncDownloads).toHaveBeenCalledWith({
+      providerConnectionId: 'hhc-line:user-a'
+    })
+    expect(mockCleanupFileResources).toHaveBeenCalledWith({
+      folderIds: expect.arrayContaining(['folder-a-1', 'folder-a-2']),
+      itemIds: ['orphan-item-a']
+    })
+    await expect(getProviderConnection('hhc-line:user-a')).resolves.toBeUndefined()
+    await expect(getProviderConnection('hhc-line:user-b')).resolves.toBeDefined()
+    await expect(getProviderConnection('onedrive:user-a')).resolves.toBeDefined()
+    await expect(listSyncEntriesByProviderConnection('hhc-line:user-a')).resolves.toEqual([])
+    await expect(listSyncEntriesByProviderConnection('hhc-line:user-b')).resolves.toHaveLength(1)
+    await expect(listSyncEntriesByProviderConnection('onedrive:user-a')).resolves.toHaveLength(1)
+    await expect(getSyncCursor('hhc-line:user-a', 'collection-a-1')).resolves.toBeUndefined()
+    await expect(getSyncCursor('hhc-line:user-b', 'collection-b')).resolves.toBeDefined()
+    await expect(
+      getSyncEntryPreference('hhc-line:user-a', 'collection-a-1')
+    ).resolves.toBeUndefined()
+    await expect(getSyncEntryPreference('hhc-line:user-b', 'collection-b')).resolves.toBeDefined()
+    await expect(listSyncTombstones()).resolves.toEqual([
+      expect.objectContaining({
+        providerConnectionId: 'hhc-line:user-b',
+        remoteItemId: 'old-b'
+      })
+    ])
   })
 
   it('converts a fully downloaded sync connection into normal local files', async () => {

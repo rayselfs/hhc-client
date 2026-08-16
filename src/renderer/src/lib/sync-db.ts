@@ -21,6 +21,7 @@ export interface ProviderConnectionRecord {
   providerType: SyncProviderType
   displayName: string
   accountLabel?: string
+  accountUserId?: string
   createdAt: number
   updatedAt: number
 }
@@ -83,6 +84,7 @@ interface SyncDBSchema extends DBSchema {
     value: ProviderConnectionRecord
     indexes: {
       'by-provider-type': SyncProviderType
+      'by-account-user': string
     }
   }
   'sync-cursors': {
@@ -123,7 +125,7 @@ interface SyncDBSchema extends DBSchema {
 }
 
 const DB_NAME = 'hhc-sync'
-export const SYNC_DB_VERSION = 1
+export const SYNC_DB_VERSION = 2
 
 let dbPromise: Promise<IDBPDatabase<SyncDBSchema>> | null = null
 
@@ -133,10 +135,14 @@ function createRemoteKey(providerConnectionId: string, remoteItemId: string): st
 
 function getSyncDB(): Promise<IDBPDatabase<SyncDBSchema>> {
   dbPromise ??= openDB<SyncDBSchema>(DB_NAME, SYNC_DB_VERSION, {
-    upgrade(db) {
+    upgrade(db, _oldVersion, _newVersion, transaction) {
       if (!db.objectStoreNames.contains('provider-connections')) {
         const store = db.createObjectStore('provider-connections', { keyPath: 'id' })
         store.createIndex('by-provider-type', 'providerType')
+      }
+      const providerConnectionStore = transaction.objectStore('provider-connections')
+      if (!providerConnectionStore.indexNames.contains('by-account-user')) {
+        providerConnectionStore.createIndex('by-account-user', 'accountUserId')
       }
       if (!db.objectStoreNames.contains('sync-cursors')) {
         const store = db.createObjectStore('sync-cursors', { keyPath: 'id' })
@@ -170,12 +176,25 @@ export async function openSyncDB(): Promise<IDBPDatabase<SyncDBSchema>> {
   return getSyncDB()
 }
 
+export function createHhcLineProviderConnectionId(accountUserId: string): string {
+  if (!accountUserId) throw new Error('HHC LINE provider connections require an account user ID')
+  return `hhc-line:${accountUserId}`
+}
+
 export async function putProviderConnection(
   record: Omit<ProviderConnectionRecord, 'createdAt' | 'updatedAt'> & {
     createdAt?: number
     updatedAt?: number
   }
 ): Promise<ProviderConnectionRecord> {
+  if (record.providerType === 'hhc-line') {
+    if (!record.accountUserId) {
+      throw new Error('HHC LINE provider connections require an account user ID')
+    }
+    if (record.id !== createHhcLineProviderConnectionId(record.accountUserId)) {
+      throw new Error('HHC LINE provider connection ID does not match its account user ID')
+    }
+  }
   const db = await getSyncDB()
   const existing = await db.get('provider-connections', record.id)
   const now = Date.now()
@@ -206,6 +225,15 @@ export async function listProviderConnectionsByType(
     'by-provider-type',
     providerType
   )
+}
+
+export async function listHhcLineProviderConnectionsByAccountUser(
+  accountUserId: string
+): Promise<ProviderConnectionRecord[]> {
+  const connections = await (
+    await getSyncDB()
+  ).getAllFromIndex('provider-connections', 'by-account-user', accountUserId)
+  return connections.filter((connection) => connection.providerType === 'hhc-line')
 }
 
 export async function deleteProviderConnection(id: string): Promise<void> {

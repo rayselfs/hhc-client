@@ -13,10 +13,12 @@ import {
   deleteSyncEntryPreferences,
   deleteSyncEntryPreferencesByProviderConnection,
   deleteSyncTombstones,
+  listHhcLineProviderConnectionsByAccountUser,
   listSyncEntriesByProviderConnection,
   listSyncTombstones,
   putSyncTombstone,
-  type SyncEntryRecord
+  type SyncEntryRecord,
+  type SyncTombstoneRecord
 } from './sync-db'
 
 export interface UnlinkSyncConnectionResult extends CleanupResult {
@@ -51,6 +53,18 @@ function collectEntrySubtree(
   return entries.filter((entry) => result.has(entry.remoteItemId))
 }
 
+async function listTombstonesForScope(
+  providerConnectionId: string,
+  remoteItemIds?: Set<string>
+): Promise<SyncTombstoneRecord[]> {
+  const tombstones = await listSyncTombstones()
+  return tombstones.filter(
+    (tombstone) =>
+      tombstone.providerConnectionId === providerConnectionId &&
+      (!remoteItemIds || remoteItemIds.has(tombstone.remoteItemId))
+  )
+}
+
 export async function unlinkSyncConnectionFromApp(
   providerConnectionId: string
 ): Promise<UnlinkSyncConnectionResult> {
@@ -72,13 +86,28 @@ export async function unlinkSyncConnectionFromApp(
     )
   )
 
-  const cleanupResult = await cleanupFileResources({ folderIds, itemIds })
+  const tombstones = await listTombstonesForScope(providerConnectionId)
+  const cleanupResult = await cleanupFileResources({
+    folderIds: [
+      ...new Set([
+        ...folderIds,
+        ...tombstones.flatMap((record) => (record.folderId ? [record.folderId] : []))
+      ])
+    ],
+    itemIds: [
+      ...new Set([
+        ...itemIds,
+        ...tombstones.flatMap((record) => (record.itemId ? [record.itemId] : []))
+      ])
+    ]
+  })
   removeCleanedEntriesFromStore(cleanupResult)
 
   await Promise.all([
     deleteSyncEntriesByProviderConnection(providerConnectionId),
     deleteSyncEntryPreferencesByProviderConnection(providerConnectionId),
     deleteSyncCursorsByProviderConnection(providerConnectionId),
+    deleteSyncTombstones(tombstones.map((record) => record.id)),
     deleteProviderConnection(providerConnectionId)
   ])
 
@@ -126,7 +155,24 @@ export async function unlinkSyncRootFolderFromApp(
     )
   )
 
-  const cleanupResult = await cleanupFileResources({ folderIds, itemIds })
+  const tombstones = await listTombstonesForScope(
+    syncLink.providerConnectionId,
+    new Set(targetEntries.map((entry) => entry.remoteItemId))
+  )
+  const cleanupResult = await cleanupFileResources({
+    folderIds: [
+      ...new Set([
+        ...folderIds,
+        ...tombstones.flatMap((record) => (record.folderId ? [record.folderId] : []))
+      ])
+    ],
+    itemIds: [
+      ...new Set([
+        ...itemIds,
+        ...tombstones.flatMap((record) => (record.itemId ? [record.itemId] : []))
+      ])
+    ]
+  })
   removeCleanedEntriesFromStore(cleanupResult)
   await Promise.all([
     deleteSyncEntries(targetEntries.map((entry) => entry.id)),
@@ -134,12 +180,20 @@ export async function unlinkSyncRootFolderFromApp(
       syncLink.providerConnectionId,
       targetEntries.map((entry) => entry.remoteItemId)
     ),
-    deleteSyncCursor(syncLink.providerConnectionId, syncLink.remoteFolderId)
+    deleteSyncCursor(syncLink.providerConnectionId, syncLink.remoteFolderId),
+    deleteSyncTombstones(tombstones.map((record) => record.id))
   ])
 
   return {
     ...cleanupResult,
     tombstoneCount: targetEntries.length
+  }
+}
+
+export async function unlinkHhcLineAccountFromApp(accountUserId: string): Promise<void> {
+  const connections = await listHhcLineProviderConnectionsByAccountUser(accountUserId)
+  for (const connection of connections) {
+    await unlinkSyncConnectionFromApp(connection.id)
   }
 }
 
