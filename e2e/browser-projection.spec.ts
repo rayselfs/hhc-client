@@ -108,6 +108,23 @@ test('keeps Media live through Files preview and closes from the Header', async 
   await page.waitForTimeout(500)
   await expect(page).toHaveURL(/#\/media$/)
 
+  await page.setViewportSize({ width: 900, height: 800 })
+  const playlistTrigger = page.getByRole('button', { name: 'Playlist' })
+  const mediaBack = page.getByTestId('media-back-to-files')
+  await expect(playlistTrigger).toBeVisible()
+  await expect(mediaBack).toBeVisible()
+  const playlistBox = await playlistTrigger.boundingBox()
+  const mediaBackBox = await mediaBack.boundingBox()
+  expect(playlistBox).not.toBeNull()
+  expect(mediaBackBox).not.toBeNull()
+  expect(playlistBox!.y + playlistBox!.height).toBeLessThanOrEqual(mediaBackBox!.y)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true
+  )
+  await playlistTrigger.click()
+  await page.getByRole('button', { name: 'Close Playlist' }).click()
+  await expect(playlistTrigger).toBeFocused()
+
   await page.getByTestId('media-back-to-files').click()
   await expect(page).toHaveURL(/#\/files$/)
   await upload.setInputFiles({ name: 'Second.png', mimeType: 'image/png', buffer: png })
@@ -160,15 +177,45 @@ test('keeps a read-only PPTX stage primary at the 900px breakpoint', async ({ pa
   await expect(navigator).toBeHidden()
   await expect(slidesTrigger).toBeVisible()
   await expect(stage).toBeVisible()
+  const title = stage.getByText('text-placeholder-layout.pptx', { exact: true })
+  const slidesBox = await slidesTrigger.boundingBox()
+  const titleBox = await title.boundingBox()
+  expect(slidesBox).not.toBeNull()
+  expect(titleBox).not.toBeNull()
+  expect(slidesBox!.y + slidesBox!.height).toBeLessThanOrEqual(titleBox!.y)
 
   await slidesTrigger.click()
   await expect(navigator).toBeVisible()
   await page.getByRole('button', { name: /Close (Slides|投影片|幻灯片)/ }).click()
+  await expect(slidesTrigger).toBeFocused()
   await expect(navigator).toBeHidden()
   await expect(stage).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true
   )
+
+  await page.getByRole('button', { name: /Edit a copy|編輯副本/ }).click()
+  const ribbonFrame = page.getByTestId('presentation-ribbon-frame')
+  await expect(ribbonFrame).toBeVisible()
+  await page.getByRole('button', { name: /Design|設計|设计/ }).click()
+  const formatBackgroundTrigger = ribbonFrame.getByRole('button', {
+    name: /Format Background|設定背景格式|设置背景格式/
+  })
+  await formatBackgroundTrigger.click()
+  const inspector = page.locator('.workspace-inspector-slot')
+  await expect(inspector).toBeVisible()
+  await expect(inspector.locator('.workspace-overlay-close:visible')).toHaveCount(1)
+  await expect(inspector.locator('.workspace-inspector-content-close:visible')).toHaveCount(0)
+  await inspector.locator('.workspace-overlay-close').click()
+  await expect(formatBackgroundTrigger).toBeFocused()
+
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await formatBackgroundTrigger.click()
+  await expect(inspector).toBeVisible()
+  await expect(inspector.locator('.workspace-overlay-close:visible')).toHaveCount(0)
+  await expect(inspector.locator('.workspace-inspector-content-close:visible')).toHaveCount(1)
+  await inspector.locator('.workspace-inspector-content-close').click()
+  await expect(formatBackgroundTrigger).toBeFocused()
 })
 
 export {}

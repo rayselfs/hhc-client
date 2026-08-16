@@ -1,4 +1,11 @@
-import { useState, type ComponentPropsWithoutRef, type CSSProperties, type ReactNode } from 'react'
+import {
+  useRef,
+  useState,
+  type ComponentPropsWithoutRef,
+  type CSSProperties,
+  type ReactNode,
+  type RefObject
+} from 'react'
 import { Button } from '@heroui/react/button'
 import { List, PanelRight, X } from 'lucide-react'
 
@@ -69,6 +76,7 @@ export function ResponsivePanelGroup({
   inspector,
   overlay: controlledOverlay,
   onOverlayChange,
+  inspectorReturnFocusRef,
   navigatorWidth = 240,
   inspectorWidth = 300,
   navigatorLabel = 'Navigator',
@@ -80,6 +88,7 @@ export function ResponsivePanelGroup({
   inspector?: ReactNode
   overlay?: WorkspaceOverlay
   onOverlayChange?: (overlay: WorkspaceOverlay) => void
+  inspectorReturnFocusRef?: RefObject<HTMLElement | null>
   navigatorWidth?: number
   inspectorWidth?: number
   navigatorLabel?: string
@@ -87,10 +96,20 @@ export function ResponsivePanelGroup({
   className?: string
 }): React.JSX.Element {
   const [uncontrolledOverlay, setUncontrolledOverlay] = useState<WorkspaceOverlay>(null)
+  const navigatorTriggerRef = useRef<HTMLButtonElement>(null)
+  const inspectorTriggerRef = useRef<HTMLButtonElement>(null)
   const overlay = controlledOverlay === undefined ? uncontrolledOverlay : controlledOverlay
   const setOverlay = (nextOverlay: WorkspaceOverlay): void => {
     if (controlledOverlay === undefined) setUncontrolledOverlay(nextOverlay)
     onOverlayChange?.(nextOverlay)
+  }
+  const closeNavigator = (): void => {
+    setOverlay(null)
+    queueMicrotask(() => navigatorTriggerRef.current?.focus())
+  }
+  const closeInspector = (): void => {
+    setOverlay(null)
+    queueMicrotask(() => (inspectorReturnFocusRef?.current ?? inspectorTriggerRef.current)?.focus())
   }
   const style = {
     '--workspace-navigator-width': `${navigatorWidth}px`,
@@ -104,12 +123,13 @@ export function ResponsivePanelGroup({
       } ${className}`}
       style={style}
     >
-      <div className="workspace-compact-switcher absolute left-2 top-2 z-30 flex gap-1">
+      <div className="workspace-compact-switcher z-30 flex gap-1">
         <Button
+          ref={navigatorTriggerRef}
           className="workspace-navigator-trigger"
           size="sm"
           variant="tertiary"
-          onPress={() => setOverlay(overlay === 'navigator' ? null : 'navigator')}
+          onPress={() => (overlay === 'navigator' ? closeNavigator() : setOverlay('navigator'))}
           aria-expanded={overlay === 'navigator'}
         >
           <List size={14} />
@@ -117,9 +137,10 @@ export function ResponsivePanelGroup({
         </Button>
         {inspector && (
           <Button
+            ref={inspectorTriggerRef}
             size="sm"
             variant="tertiary"
-            onPress={() => setOverlay(overlay === 'inspector' ? null : 'inspector')}
+            onPress={() => (overlay === 'inspector' ? closeInspector() : setOverlay('inspector'))}
             aria-expanded={overlay === 'inspector'}
           >
             <PanelRight size={14} />
@@ -132,7 +153,7 @@ export function ResponsivePanelGroup({
       >
         {navigator}
         {overlay === 'navigator' && (
-          <OverlayClose label={`Close ${navigatorLabel}`} onPress={() => setOverlay(null)} />
+          <OverlayClose label={`Close ${navigatorLabel}`} onPress={closeNavigator} />
         )}
       </div>
       <div className="workspace-stage-slot min-h-0 min-w-0">{stage}</div>
@@ -144,7 +165,7 @@ export function ResponsivePanelGroup({
         >
           {inspector}
           {overlay === 'inspector' && (
-            <OverlayClose label={`Close ${inspectorLabel}`} onPress={() => setOverlay(null)} />
+            <OverlayClose label={`Close ${inspectorLabel}`} onPress={closeInspector} />
           )}
         </div>
       )}

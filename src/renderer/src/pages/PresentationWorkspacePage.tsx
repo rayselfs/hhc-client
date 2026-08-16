@@ -574,6 +574,7 @@ function EditableSessionDocumentView({
   const [notesDraftBySlideId, setNotesDraftBySlideId] = useState<Record<string, string>>({})
   const [cropElementId, setCropElementId] = useState<string | null>(null)
   const [compactOverlay, setCompactOverlay] = useState<'navigator' | 'inspector' | null>(null)
+  const formatBackgroundTriggerRef = useRef<HTMLButtonElement>(null)
   const [snapGuides, setSnapGuides] = useState<{
     vertical?: number
     horizontal?: number
@@ -585,6 +586,12 @@ function EditableSessionDocumentView({
   const projectedPresentationState = useMediaProjectionStore(
     (state) => state.typeStates.presentation
   )
+
+  const closeBackgroundPanel = (): void => {
+    setIsBackgroundPanelOpen(false)
+    setCompactOverlay(null)
+    queueMicrotask(() => formatBackgroundTriggerRef.current?.focus())
+  }
 
   useEffect(
     () => () => {
@@ -1302,6 +1309,7 @@ function EditableSessionDocumentView({
           >
             <div className="flex h-full items-center justify-center">
               <Button
+                ref={formatBackgroundTriggerRef}
                 size="sm"
                 variant={isBackgroundPanelOpen ? 'primary' : 'tertiary'}
                 isDisabled={!activeSlide}
@@ -1748,6 +1756,7 @@ function EditableSessionDocumentView({
           navigatorLabel={t('presentationWorkspace.slides', 'Slides')}
           inspectorLabel={t('presentationWorkspace.formatBackground', 'Format Background')}
           overlay={compactOverlay}
+          inspectorReturnFocusRef={formatBackgroundTriggerRef}
           onOverlayChange={(overlay) => {
             setCompactOverlay(overlay)
             if (overlay === 'navigator' || (overlay === null && compactOverlay === 'inspector')) {
@@ -2100,10 +2109,7 @@ function EditableSessionDocumentView({
                   onChange={setActiveSlideBackground}
                   onApplyToAll={applyActiveBackgroundToAllSlides}
                   onReset={resetActiveSlideBackground}
-                  onClose={() => {
-                    setIsBackgroundPanelOpen(false)
-                    setCompactOverlay(null)
-                  }}
+                  onClose={closeBackgroundPanel}
                 />
               </InspectorPanel>
             ) : undefined
@@ -2297,6 +2303,7 @@ function FormatBackgroundPanel({
           isIconOnly
           size="sm"
           variant="ghost"
+          className="workspace-inspector-content-close"
           onPress={onClose}
           aria-label={t('common.close')}
         >

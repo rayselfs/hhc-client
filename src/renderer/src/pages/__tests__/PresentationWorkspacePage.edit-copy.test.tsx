@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import PresentationWorkspacePage, { PptxDocumentView } from '../PresentationWorkspacePage'
 import {
@@ -222,29 +222,41 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
     mocks.loadEditablePresentationSnapshot.mockResolvedValue({ document, revision: 0 })
 
     renderEditableDeck(sourceItem)
-    await screen.findByTestId('presentation-ribbon-frame')
+    const ribbonFrame = await screen.findByTestId('presentation-ribbon-frame')
     fireEvent.click(screen.getByRole('button', { name: '設計' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Format Background' }))
+    const formatBackgroundTrigger = within(ribbonFrame).getByRole('button', {
+      name: 'Format Background'
+    })
+    fireEvent.click(formatBackgroundTrigger)
 
     const navigatorSlot = window.document.querySelector('.workspace-navigator-slot')
-    const inspectorSlot = window.document.querySelector('.workspace-inspector-slot')
+    let inspectorSlot = window.document.querySelector('.workspace-inspector-slot')
     expect(inspectorSlot).toHaveClass('workspace-overlay-open')
     expect(navigatorSlot).not.toHaveClass('workspace-overlay-open')
 
     fireEvent.click(screen.getByRole('button', { name: 'Close Format Background' }))
     expect(window.document.querySelector('.workspace-inspector-slot')).toBeNull()
+    await waitFor(() => expect(formatBackgroundTrigger).toHaveFocus())
 
-    fireEvent.click(screen.getByRole('button', { name: 'Format Background' }))
-    expect(window.document.querySelector('.workspace-inspector-slot')).toHaveClass(
-      'workspace-overlay-open'
-    )
+    fireEvent.click(formatBackgroundTrigger)
+    inspectorSlot = window.document.querySelector('.workspace-inspector-slot')
+    expect(inspectorSlot).toHaveClass('workspace-overlay-open')
+    const inspectorContentClose = within(inspectorSlot as HTMLElement).getByRole('button', {
+      name: 'common.close'
+    })
+    expect(inspectorContentClose).toHaveClass('workspace-inspector-content-close')
+    fireEvent.click(inspectorContentClose)
+    expect(window.document.querySelector('.workspace-inspector-slot')).toBeNull()
+    await waitFor(() => expect(formatBackgroundTrigger).toHaveFocus())
 
+    fireEvent.click(formatBackgroundTrigger)
     fireEvent.click(screen.getByRole('button', { name: 'Slides' }))
     expect(navigatorSlot).toHaveClass('workspace-overlay-open')
     expect(window.document.querySelector('.workspace-inspector-slot')).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: 'Close Slides' }))
     expect(navigatorSlot).not.toHaveClass('workspace-overlay-open')
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Slides' })).toHaveFocus())
   })
 
   it('keeps Home, Insert, and Design ribbon panels at the same native height', async () => {

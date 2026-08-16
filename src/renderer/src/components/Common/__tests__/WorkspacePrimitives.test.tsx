@@ -90,4 +90,21 @@ describe('ResponsivePanelGroup', () => {
     await user.click(screen.getByRole('button', { name: 'Close Slides' }))
     expect(onOverlayChange).toHaveBeenLastCalledWith(null)
   })
+
+  it('returns focus to the navigator trigger after its overlay closes', async () => {
+    const user = userEvent.setup()
+    render(
+      <ResponsivePanelGroup
+        navigatorLabel="Playlist"
+        navigator={<NavigatorRail>Playlist navigator</NavigatorRail>}
+        stage={<StageViewport>Media stage</StageViewport>}
+      />
+    )
+    const trigger = screen.getByRole('button', { name: 'Playlist' })
+    await user.click(trigger)
+
+    await user.click(screen.getByRole('button', { name: 'Close Playlist' }))
+
+    expect(trigger).toHaveFocus()
+  })
 })
