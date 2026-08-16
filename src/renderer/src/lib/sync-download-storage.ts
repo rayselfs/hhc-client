@@ -51,9 +51,11 @@ export function isSyncStorageLimitError(error: unknown): boolean {
 
 async function markInsufficientStorage(
   request: SyncDownloadRequest,
-  metadata: RemoteSyncItem
+  metadata: RemoteSyncItem,
+  canCommit: SyncDownloadCommitGuard
 ): Promise<void> {
-  await putSyncEntry({
+  if (!(await canCommit())) return
+  const entry = await putSyncEntry({
     providerConnectionId: request.providerConnectionId,
     remoteItemId: request.remoteItemId,
     parentRemoteItemId: metadata.parentRemoteItemId,
@@ -66,6 +68,10 @@ async function markInsufficientStorage(
     contentHash: metadata.contentHash,
     status: 'insufficient-storage'
   })
+  if (!(await canCommit())) {
+    await deleteSyncEntries([entry.id])
+    return
+  }
   toast.danger(i18n.t('toast.syncStorageLimitReached'))
 }
 
@@ -166,7 +172,7 @@ export async function saveWebOneDriveDownloadedContent(
       mimeType: metadata.mimeType ?? blob.type
     }
   } catch (error) {
-    if (isSyncStorageLimitError(error)) await markInsufficientStorage(request, metadata)
+    if (isSyncStorageLimitError(error)) await markInsufficientStorage(request, metadata, canCommit)
     throw error
   }
 }
@@ -211,7 +217,7 @@ export async function saveElectronOneDriveDownloadedContent(
       unsubscribe()
     }
   } catch (error) {
-    if (isSyncStorageLimitError(error)) await markInsufficientStorage(request, metadata)
+    if (isSyncStorageLimitError(error)) await markInsufficientStorage(request, metadata, canCommit)
     throw error
   }
   const db = await openFileExplorerDB()

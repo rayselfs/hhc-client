@@ -44,12 +44,18 @@ const metadata = {
   contentHash: 'hash-1'
 }
 
-function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+function deferred<T>(): {
+  promise: Promise<T>
+  resolve: (value: T) => void
+  reject: (error: unknown) => void
+} {
   let resolve!: (value: T) => void
-  const promise = new Promise<T>((resolvePromise) => {
+  let reject!: (error: unknown) => void
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
     resolve = resolvePromise
+    reject = rejectPromise
   })
-  return { promise, resolve }
+  return { promise, resolve, reject }
 }
 
 beforeEach(async () => {
@@ -232,6 +238,47 @@ describe('saveWebOneDriveDownloadedContent', () => {
     ).resolves.toMatchObject({
       status: 'insufficient-storage'
     })
+  })
+
+  it('does not restore Web insufficient-storage state after cancellation cleanup', async () => {
+    const entry = await putSyncEntry({
+      providerConnectionId: request.providerConnectionId,
+      remoteItemId: request.remoteItemId,
+      parentRemoteItemId: metadata.parentRemoteItemId,
+      kind: 'file',
+      name: metadata.name,
+      itemId: request.targetBlobId,
+      status: 'downloading'
+    })
+    const estimateStarted = deferred<void>()
+    const releaseEstimate = deferred<{ quota: number; usage: number }>()
+    Object.defineProperty(navigator, 'storage', {
+      configurable: true,
+      value: {
+        estimate: vi.fn(async () => {
+          estimateStarted.resolve()
+          return releaseEstimate.promise
+        })
+      }
+    })
+    let canCommit = true
+    const saving = saveWebOneDriveDownloadedContent(
+      request,
+      new Response(new Uint8Array(13), { headers: { 'Content-Length': '13' } }),
+      metadata,
+      () => canCommit
+    )
+
+    await estimateStarted.promise
+    canCommit = false
+    await deleteSyncEntries([entry.id])
+    releaseEstimate.resolve({ quota: 10, usage: 9 })
+
+    await expect(saving).rejects.toThrow('OneDrive sync storage has reached 80% usage')
+    await expect(
+      getSyncEntryByRemoteItem('onedrive:account-1', 'remote-file-1')
+    ).resolves.toBeUndefined()
+    expect(mockToast.danger).not.toHaveBeenCalled()
   })
 
   it('rejects downloads that would push browser storage above 80 percent', async () => {
@@ -429,6 +476,43 @@ describe('saveWebOneDriveDownloadedContent', () => {
     ).resolves.toMatchObject({
       status: 'insufficient-storage'
     })
+  })
+
+  it('does not restore Electron insufficient-storage state after cancellation cleanup', async () => {
+    vi.mocked(isElectron).mockReturnValue(true)
+    const entry = await putSyncEntry({
+      providerConnectionId: request.providerConnectionId,
+      remoteItemId: request.remoteItemId,
+      parentRemoteItemId: metadata.parentRemoteItemId,
+      kind: 'file',
+      name: metadata.name,
+      itemId: request.targetBlobId,
+      status: 'downloading'
+    })
+    const downloadStarted = deferred<void>()
+    const releaseDownload = deferred<never>()
+    vi.mocked(window.api.oneDrive.downloadFile).mockImplementationOnce(async () => {
+      downloadStarted.resolve()
+      return releaseDownload.promise
+    })
+    let canCommit = true
+    const saving = saveElectronOneDriveDownloadedContent(
+      request,
+      '4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02',
+      metadata,
+      () => canCommit
+    )
+
+    await downloadStarted.promise
+    canCommit = false
+    await deleteSyncEntries([entry.id])
+    releaseDownload.reject(new Error('OneDrive sync storage has reached 80% usage'))
+
+    await expect(saving).rejects.toThrow('OneDrive sync storage has reached 80% usage')
+    await expect(
+      getSyncEntryByRemoteItem('onedrive:account-1', 'remote-file-1')
+    ).resolves.toBeUndefined()
+    expect(mockToast.danger).not.toHaveBeenCalled()
   })
 
   it('does not allow Web mode to use native download storage', async () => {
