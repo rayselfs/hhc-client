@@ -154,7 +154,7 @@ export default defineConfig(({ mode }) => {
               '**/assets/aiden0z-pptx-renderer*.js'
             ],
             navigateFallback: '/index.html',
-            navigateFallbackDenylist: [/^\/api\//],
+            navigateFallbackDenylist: [/^\/api\//, /^\/oauth\/callback$/],
             runtimeCaching: [
               {
                 urlPattern: ({ url }) =>

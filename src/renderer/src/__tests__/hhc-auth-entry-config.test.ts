@@ -31,4 +31,8 @@ describe('HHC browser auth entry and hosting config', () => {
     )
     expect(read('src/shared/app-config.ts')).toContain('hhcAccountOrigin: __HHC_ACCOUNT_ORIGIN__')
   })
+
+  it('keeps the OAuth callback outside PWA navigation fallback', () => {
+    expect(read('electron.vite.config.ts')).toContain('/^\\/oauth\\/callback$/')
+  })
 })

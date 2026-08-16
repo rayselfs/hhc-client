@@ -30,7 +30,6 @@ type TokenResponse = { access_token?: string }
 
 export type BrowserHhcAuthOptions = {
   accountOrigin?: string
-  callbackUri?: string
   fetcher?: typeof fetch
   now?: () => number
   window?: BrowserWindow
@@ -113,7 +112,7 @@ export class BrowserHhcAuthAdapter implements HhcAuthAdapter {
     this.fetcher = options.fetcher ?? fetch
     this.now = options.now ?? Date.now
     this.window = options.window ?? window
-    this.callbackUri = options.callbackUri ?? `${this.window.location.origin}/oauth/callback`
+    this.callbackUri = HHC_AUTH.callbackUri
     this.window.addEventListener('message', this.onMessage)
   }
 
@@ -170,7 +169,16 @@ export class BrowserHhcAuthAdapter implements HhcAuthAdapter {
   }
 
   async getAccessToken(): Promise<string | null> {
-    if (this.accessToken) return this.accessToken
+    if (this.accessToken && this.session) {
+      try {
+        readClaims(this.accessToken, this.session.userId, this.now())
+        return this.accessToken
+      } catch {
+        this.accessToken = null
+        this.session = { ...this.session, roles: [] }
+        this.notify()
+      }
+    }
     const session = this.session ?? (await this.getSession())
     if (!session) return null
 

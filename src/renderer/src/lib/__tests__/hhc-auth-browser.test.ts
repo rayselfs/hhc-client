@@ -46,7 +46,6 @@ function createAdapter(
   return {
     adapter: createBrowserHhcAuthAdapter({
       accountOrigin: options.accountOrigin ?? ACCOUNT_ORIGIN,
-      callbackUri: `${CLIENT_ORIGIN}/oauth/callback`,
       fetcher: options.fetcher ?? vi.fn(),
       now: options.now ?? (() => 1_000),
       window: target
@@ -310,11 +309,11 @@ describe('browser HHC auth', () => {
     expect(session).not.toHaveBeenCalled()
   })
 
-  it('derives the callback from the current browser origin and removes its listener on dispose', async () => {
+  it('uses the only registered production callback by default and removes its listener on dispose', async () => {
     const open = vi.fn(() => popup())
     const target = new EventTarget() as Window
     Object.assign(target, {
-      location: { href: `${CLIENT_ORIGIN}/#/files`, origin: CLIENT_ORIGIN },
+      location: { href: 'https://preview.example/#/files', origin: 'https://preview.example' },
       open
     })
     const adapter = createBrowserHhcAuthAdapter({
@@ -326,11 +325,41 @@ describe('browser HHC auth', () => {
     await adapter.signIn()
     const opened = open.mock.results[0]?.value as Window
     expect(new URL(String(opened.location.href)).searchParams.get('redirect_uri')).toBe(
-      `${CLIENT_ORIGIN}/oauth/callback`
+      'https://client.alive.org.tw/oauth/callback'
     )
     const remove = vi.spyOn(target, 'removeEventListener')
     adapter.dispose()
     expect(remove).toHaveBeenCalledWith('message', expect.any(Function))
+  })
+
+  it('reacquires an expired cached access token using the current clock', async () => {
+    let now = 1_000
+    let tokenIssues = 0
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith('/session'))
+        return response({ authenticated: true, user: { id: 'user-1', display_name: 'Ada' } })
+      if (url.endsWith('/csrf-token')) return response({ csrf_token: 'csrf-1' })
+      if (url.endsWith('/session/access-token')) {
+        tokenIssues++
+        return response({
+          access_token: jwt({ sub: 'user-1', roles: [], exp: tokenIssues === 1 ? 2 : 10 })
+        })
+      }
+      throw new Error(`Unexpected URL: ${url}`)
+    })
+    const { adapter } = createAdapter({
+      fetcher,
+      now: () => now,
+      accountOrigin: 'https://clock.example'
+    })
+    await adapter.getSession()
+
+    const first = await adapter.getAccessToken()
+    now = 3_000
+    const second = await adapter.getAccessToken()
+    expect(first).not.toBe(second)
+    expect(tokenIssues).toBe(2)
   })
 
   it.each([
