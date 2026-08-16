@@ -15,7 +15,7 @@ import {
 import type { MediaPlatform } from '@renderer/lib/media-capabilities'
 import { classifyMediaImport } from '@renderer/lib/media-import-policy'
 import { isIgnoredSystemPath } from '@shared/file-ignore-policy'
-import type { RemoteSyncItem } from './sync-provider'
+import type { ReadOnlySyncProvider, RemoteSyncItem } from './sync-provider'
 import {
   getSyncEntryByRemoteItem,
   putSyncEntry,
@@ -59,6 +59,68 @@ interface BuildSyncRefreshPlanInput {
 
 export interface SyncDeltaRefreshPlan extends SyncRefreshPlan {
   needsFullScan: boolean
+}
+
+const MAX_SYNC_CHANGE_PAGES = 1_000
+const MAX_RESET_HANDOFF_ITEMS = 500
+
+export async function collectSyncChangePages(
+  provider: Pick<ReadOnlySyncProvider, 'initialScan' | 'incrementalChanges'>,
+  providerConnectionId: string,
+  remoteFolderId: string,
+  cursor?: string
+): Promise<{
+  remoteItems: RemoteSyncItem[]
+  nextCursor?: string
+  usedCursor: boolean
+  reset: boolean
+}> {
+  const seenCursors = new Set(cursor ? [cursor] : [])
+  const firstPage = cursor
+    ? await provider.incrementalChanges({
+        providerConnectionId,
+        remoteFolderId,
+        cursor
+      })
+    : await provider.initialScan(providerConnectionId, remoteFolderId)
+  const reset = Boolean(firstPage.reset)
+  const remoteItems = [...firstPage.items]
+  let page = firstPage
+  let pageCount = 1
+
+  while (page.hasMore) {
+    if (pageCount >= MAX_SYNC_CHANGE_PAGES) {
+      throw new Error('Invalid sync change pagination')
+    }
+    const nextCursor = page.nextCursor
+    if (!nextCursor || seenCursors.has(nextCursor)) {
+      throw new Error('Invalid sync change pagination')
+    }
+    seenCursors.add(nextCursor)
+    page = await provider.incrementalChanges({
+      providerConnectionId,
+      remoteFolderId,
+      cursor: nextCursor
+    })
+    const pageReset = Boolean(page.reset)
+    if (
+      pageReset !== reset &&
+      (!reset || pageReset || page.hasMore || page.items.length > MAX_RESET_HANDOFF_ITEMS)
+    ) {
+      throw new Error('Invalid sync change pagination')
+    }
+    remoteItems.push(...page.items)
+    pageCount += 1
+  }
+
+  return {
+    remoteItems: reset
+      ? [...new Map(remoteItems.map((item) => [item.remoteItemId, item])).values()]
+      : remoteItems,
+    nextCursor: page.nextCursor,
+    usedCursor: Boolean(cursor) && !reset,
+    reset
+  }
 }
 
 function safeIdPart(value: string): string {

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { refreshFolderMock } = vi.hoisted(() => ({
+const { getCloudProviderAdapterMock, refreshFolderMock } = vi.hoisted(() => ({
+  getCloudProviderAdapterMock: vi.fn(),
   refreshFolderMock: vi.fn<() => Promise<void>>(async () => undefined)
 }))
 
@@ -30,9 +31,7 @@ vi.mock('@renderer/stores/file-explorer', () => ({
 }))
 
 vi.mock('../cloud-provider', () => ({
-  getCloudProviderAdapter: () => ({
-    refreshFolder: refreshFolderMock
-  })
+  getCloudProviderAdapter: getCloudProviderAdapterMock
 }))
 
 vi.mock('../env', () => ({
@@ -55,6 +54,8 @@ describe('refreshSyncFolderOnNavigation', () => {
     vi.setSystemTime(1_000)
     refreshFolderMock.mockClear()
     refreshFolderMock.mockResolvedValue(undefined)
+    getCloudProviderAdapterMock.mockReset()
+    getCloudProviderAdapterMock.mockReturnValue({ refreshFolder: refreshFolderMock })
     resetSyncFolderRefreshForTests()
   })
 
@@ -95,5 +96,19 @@ describe('refreshSyncFolderOnNavigation', () => {
 
     resolve()
     await first
+  })
+
+  it('uses the explicit HHC LINE adapter with the current auth callbacks', async () => {
+    folderState.folders['sync-root'].syncLink.providerType = 'hhc-line'
+    const auth = {
+      getSession: vi.fn(),
+      getAccessToken: vi.fn(),
+      refreshAccessToken: vi.fn()
+    }
+
+    await refreshSyncFolderOnNavigation('sync-root', auth)
+
+    expect(getCloudProviderAdapterMock).toHaveBeenCalledWith('hhc-line', auth)
+    folderState.folders['sync-root'].syncLink.providerType = 'onedrive'
   })
 })

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@heroui/react/button'
 import { Modal } from '@heroui/react/modal'
@@ -15,6 +15,7 @@ export interface CloudFolderPickerProvider {
   providerType: CloudProviderId
   displayName: string
   icon: ReactNode
+  supportsFolderNavigation?: boolean
   listFolders(parentRemoteFolderId?: string): Promise<CloudRemoteFolder[]>
   importFolder(folder: CloudRemoteFolder): Promise<CloudImportResult>
 }
@@ -47,15 +48,20 @@ export default function CloudFolderPickerDialog({
   const [selectedFolder, setSelectedFolder] = useState<CloudRemoteFolder | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const loadGenerationRef = useRef(0)
   const currentFolder = folderStack[folderStack.length - 1]
 
   const loadFolders = useCallback(
     async (remoteFolderId: string): Promise<void> => {
+      const generation = ++loadGenerationRef.current
       setIsLoading(true)
       setError(null)
       try {
-        setFolders(await provider.listFolders(remoteFolderId))
+        const nextFolders = await provider.listFolders(remoteFolderId)
+        if (generation !== loadGenerationRef.current) return
+        setFolders(nextFolders)
       } catch (loadError) {
+        if (generation !== loadGenerationRef.current) return
         console.warn('[cloud-sync] Failed to list folders', {
           providerType: provider.providerType,
           error: loadError
@@ -67,20 +73,28 @@ export default function CloudFolderPickerDialog({
           })
         )
       } finally {
-        setIsLoading(false)
+        if (generation === loadGenerationRef.current) setIsLoading(false)
       }
     },
     [provider, t]
   )
 
   useEffect(() => {
-    if (!isOpen) return
+    if (!isOpen) {
+      loadGenerationRef.current += 1
+      setFolders([])
+      return
+    }
     setFolderStack([{ id: 'root', name: provider.displayName }])
     setSelectedFolder(null)
     void loadFolders('root')
+    return () => {
+      loadGenerationRef.current += 1
+    }
   }, [isOpen, loadFolders, provider.displayName])
 
   function openFolder(folder: CloudRemoteFolder): void {
+    if (provider.supportsFolderNavigation === false) return
     setFolderStack((current) => [...current, { id: folder.remoteItemId, name: folder.name }])
     setSelectedFolder(null)
     void loadFolders(folder.remoteItemId)
@@ -115,15 +129,17 @@ export default function CloudFolderPickerDialog({
               <ShortcutScope name="overlay">
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 text-sm text-muted">
-                    <Button
-                      size="sm"
-                      variant="tertiary"
-                      isDisabled={folderStack.length <= 1 || isLoading || isImporting}
-                      onPress={goBack}
-                      aria-label={t('fileExplorer.cloudFolderPicker.back')}
-                    >
-                      <ArrowLeft size={16} />
-                    </Button>
+                    {provider.supportsFolderNavigation !== false && (
+                      <Button
+                        size="sm"
+                        variant="tertiary"
+                        isDisabled={folderStack.length <= 1 || isLoading || isImporting}
+                        onPress={goBack}
+                        aria-label={t('fileExplorer.cloudFolderPicker.back')}
+                      >
+                        <ArrowLeft size={16} />
+                      </Button>
+                    )}
                     <span className="truncate">{currentFolder.name}</span>
                   </div>
 

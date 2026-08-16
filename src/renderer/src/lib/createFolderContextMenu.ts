@@ -78,6 +78,7 @@ export interface ShowEmptyAreaMenuOptions {
   onCreatePresentation?: () => void
   onAddLocalSyncFolder?: () => void
   onAddOneDrive?: () => void
+  onAddHhcLine?: () => void
   isAddOneDriveDisabled?: boolean
   isReadOnly?: boolean
 }
@@ -291,6 +292,7 @@ export function createFolderContextMenu(
       onCreatePresentation,
       onAddLocalSyncFolder,
       onAddOneDrive,
+      onAddHhcLine,
       isAddOneDriveDisabled = false,
       isReadOnly = false
     }: ShowEmptyAreaMenuOptions): void => {
@@ -360,7 +362,7 @@ export function createFolderContextMenu(
       ]
 
       const sourceItems: ContextMenuEntry[] =
-        onAddLocalSyncFolder || onAddOneDrive
+        onAddLocalSyncFolder || onAddOneDrive || onAddHhcLine
           ? [
               ...(baseItems.length > 0 ? (['separator'] as ContextMenuEntry[]) : []),
               ...(onAddLocalSyncFolder
@@ -381,6 +383,16 @@ export function createFolderContextMenu(
                       icon: React.createElement(Cloud, { size: 14 }),
                       disabled: isAddOneDriveDisabled,
                       onAction: onAddOneDrive
+                    } as ContextMenuEntry
+                  ]
+                : []),
+              ...(onAddHhcLine
+                ? [
+                    {
+                      id: 'add-hhc-line',
+                      label: tKey('addHhcLine'),
+                      icon: React.createElement(Cloud, { size: 14 }),
+                      onAction: onAddHhcLine
                     } as ContextMenuEntry
                   ]
                 : [])

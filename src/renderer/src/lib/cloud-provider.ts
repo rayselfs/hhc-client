@@ -1,4 +1,5 @@
 import type { FileItemRecord } from '@shared/types/folder'
+import type { HhcSession } from '@shared/hhc-auth'
 import type { ProviderConnectionRecord } from './sync-db'
 import { getProviderConnection, getSyncEntryByLocalItem } from './sync-db'
 import {
@@ -9,7 +10,13 @@ import {
   refreshOneDriveFolder
 } from './onedrive-connect'
 
-export type CloudProviderId = 'onedrive'
+export type CloudProviderId = 'onedrive' | 'hhc-line'
+
+export interface HhcLineCloudAuth {
+  getSession(): HhcSession | null
+  getAccessToken(): Promise<string | null>
+  refreshAccessToken(): Promise<string | null>
+}
 
 export interface CloudRemoteFolder {
   remoteItemId: string
@@ -45,6 +52,7 @@ export interface CloudRefreshSummary {
 
 export interface CloudProviderAdapter {
   id: CloudProviderId
+  supportsFolderNavigation?: boolean
   getConnectedAccount(): Promise<ProviderConnectionRecord | null>
   listFolders(parentRemoteFolderId?: string): Promise<CloudRemoteFolder[]>
   importFolder(folder: CloudRemoteFolder): Promise<CloudImportResult>
@@ -62,8 +70,24 @@ const ONEDRIVE_ADAPTER: CloudProviderAdapter = {
   refreshFolder: refreshOneDriveFolder
 }
 
-export function getCloudProviderAdapter(providerId: CloudProviderId): CloudProviderAdapter {
+export function getCloudProviderAdapter(
+  providerId: CloudProviderId,
+  hhcAuth?: HhcLineCloudAuth
+): CloudProviderAdapter {
   if (providerId === 'onedrive') return ONEDRIVE_ADAPTER
+  if (providerId === 'hhc-line' && hhcAuth) {
+    return {
+      id: 'hhc-line',
+      supportsFolderNavigation: false,
+      getConnectedAccount: async () =>
+        (await import('./hhc-line-connect')).getConnectedHhcLineAccount(hhcAuth),
+      listFolders: async () => (await import('./hhc-line-connect')).listHhcLineCollections(hhcAuth),
+      importFolder: async (folder) =>
+        (await import('./hhc-line-connect')).importHhcLineCollection(hhcAuth, folder),
+      refreshFolder: async (rootFolderId, options) =>
+        (await import('./hhc-line-connect')).refreshHhcLineFolder(hhcAuth, rootFolderId, options)
+    }
+  }
   throw new Error(`Unsupported cloud provider: ${providerId}`)
 }
 

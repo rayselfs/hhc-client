@@ -40,7 +40,8 @@ import { enqueueSyncDownload } from './sync-download-queue'
 import {
   applySyncRefreshPlan,
   buildSyncDeltaRefreshPlan,
-  buildSyncRefreshPlan
+  buildSyncRefreshPlan,
+  collectSyncChangePages
 } from './sync-refresh'
 import { refreshImportedMediaAssets } from './local-sync-import'
 import { isIgnoredSystemPath } from '@shared/file-ignore-policy'
@@ -524,28 +525,7 @@ export async function scanOneDriveFolder(
   remoteFolderId: string,
   cursor?: string
 ): Promise<{ remoteItems: RemoteSyncItem[]; nextCursor?: string; usedCursor: boolean }> {
-  const usedCursor = Boolean(cursor)
-  const firstPage = cursor
-    ? await provider.incrementalChanges({
-        providerConnectionId: connectionId,
-        remoteFolderId,
-        cursor
-      })
-    : await provider.initialScan(connectionId, remoteFolderId)
-  const remoteItems = [...firstPage.items]
-  let nextCursor = firstPage.nextCursor
-  let hasMore = firstPage.hasMore
-  while (hasMore && nextCursor) {
-    const nextPage = await provider.incrementalChanges({
-      providerConnectionId: connectionId,
-      remoteFolderId,
-      cursor: nextCursor
-    })
-    remoteItems.push(...nextPage.items)
-    nextCursor = nextPage.nextCursor
-    hasMore = nextPage.hasMore
-  }
-  return { remoteItems, nextCursor, usedCursor }
+  return collectSyncChangePages(provider, connectionId, remoteFolderId, cursor)
 }
 
 export async function getConnectedOneDriveAccount(): Promise<ProviderConnectionRecord | null> {

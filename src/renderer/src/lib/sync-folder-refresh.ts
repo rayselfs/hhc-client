@@ -1,5 +1,9 @@
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
-import { getCloudProviderAdapter, type CloudProviderId } from './cloud-provider'
+import {
+  getCloudProviderAdapter,
+  type CloudProviderId,
+  type HhcLineCloudAuth
+} from './cloud-provider'
 import { isElectron } from './env'
 import { refreshLocalSyncConnection } from './local-sync-import'
 
@@ -9,10 +13,13 @@ const navigationRefreshInFlight = new Set<string>()
 const lastNavigationRefreshAt = new Map<string, number>()
 
 function isCloudProviderId(value: string): value is CloudProviderId {
-  return value === 'onedrive'
+  return value === 'onedrive' || value === 'hhc-line'
 }
 
-export async function refreshSyncFolderOnNavigation(rootFolderId: string): Promise<void> {
+export async function refreshSyncFolderOnNavigation(
+  rootFolderId: string,
+  hhcAuth?: HhcLineCloudAuth
+): Promise<void> {
   if (navigationRefreshInFlight.has(rootFolderId)) return
 
   const folder = useFileExplorerStore.getState().folders[rootFolderId]
@@ -33,7 +40,7 @@ export async function refreshSyncFolderOnNavigation(rootFolderId: string): Promi
       return
     }
     if (isCloudProviderId(syncLink.providerType)) {
-      await getCloudProviderAdapter(syncLink.providerType).refreshFolder(rootFolderId)
+      await getCloudProviderAdapter(syncLink.providerType, hhcAuth).refreshFolder(rootFolderId)
     }
   } catch (error) {
     console.warn('[sync] Failed to refresh sync folder on navigation', {

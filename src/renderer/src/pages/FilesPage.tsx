@@ -18,7 +18,7 @@ import {
 } from '@renderer/stores/file-explorer'
 import { useSoundboardStore } from '@renderer/stores/soundboard'
 import { getUploadMediaPlatform, uploadFiles, uploadFolderFiles } from '@renderer/lib/upload-utils'
-import { Presentation, RefreshCw, Unlink } from 'lucide-react'
+import { Cloud, Presentation, RefreshCw, Unlink } from 'lucide-react'
 import { createEditablePresentation } from '@renderer/lib/editable-presentation'
 import { connectLocalSyncFolder, refreshLocalSyncConnection } from '@renderer/lib/local-sync-import'
 import { getCloudProviderAdapter, type CloudRemoteFolder } from '@renderer/lib/cloud-provider'
@@ -49,6 +49,7 @@ import { isFolderReadOnlyBySyncLink } from '@renderer/lib/sync-readonly'
 import { OneDriveIcon } from '@renderer/components/icons/OneDriveIcon'
 import { FolderPersistenceStatus } from '@renderer/components/Common/FolderPersistenceStatus'
 import { buildPresentationItemActions } from '@renderer/lib/presentation-item-actions'
+import { useHhcAuth } from '@renderer/contexts/HhcAuthContext'
 
 const ONE_DRIVE_PROVIDER = getCloudProviderAdapter('onedrive')
 const ONE_DRIVE_FOLDER_PICKER_PROVIDER: CloudFolderPickerProvider = {
@@ -109,6 +110,7 @@ async function countDeletedSoundboardPadUsages(targetIds: Set<string>): Promise<
 
 export default function FilesPage(): React.JSX.Element {
   const { t } = useTranslation()
+  const { session, getAccessToken, refreshAccessToken } = useHhcAuth()
   const navigate = useNavigate()
   const confirm = useConfirm()
   const currentFolderId = useFileExplorerStore((state) => state.currentFolderId)
@@ -141,9 +143,52 @@ export default function FilesPage(): React.JSX.Element {
   const [hasOneDriveConnection, setHasOneDriveConnection] = useState(false)
   const [isOneDrivePickerOpen, setIsOneDrivePickerOpen] = useState(false)
   const [isOneDriveImporting, setIsOneDriveImporting] = useState(false)
+  const [isHhcLinePickerOpen, setIsHhcLinePickerOpen] = useState(false)
+  const [isHhcLineImporting, setIsHhcLineImporting] = useState(false)
+  const [claimsResolvedUserId, setClaimsResolvedUserId] = useState<string | null>(null)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
+  const sessionRef = useRef(session)
+  sessionRef.current = session
+
+  const hhcAuth = useMemo(
+    () => ({
+      getSession: () => sessionRef.current,
+      getAccessToken,
+      refreshAccessToken
+    }),
+    [getAccessToken, refreshAccessToken]
+  )
+  const hhcLineProvider = useMemo(() => getCloudProviderAdapter('hhc-line', hhcAuth), [hhcAuth])
+  const hhcLinePickerProvider = useMemo<CloudFolderPickerProvider>(
+    () => ({
+      providerType: 'hhc-line',
+      displayName: 'HHC LINE',
+      icon: React.createElement(Cloud, { className: 'size-5' }),
+      supportsFolderNavigation: false,
+      listFolders: hhcLineProvider.listFolders,
+      importFolder: hhcLineProvider.importFolder
+    }),
+    [hhcLineProvider]
+  )
+
+  useEffect(() => {
+    const userId = session?.userId
+    setClaimsResolvedUserId(null)
+    if (!userId) return
+    let active = true
+    void getAccessToken()
+      .then((token) => {
+        if (active && token && sessionRef.current?.userId === userId) {
+          setClaimsResolvedUserId(userId)
+        }
+      })
+      .catch(() => undefined)
+    return () => {
+      active = false
+    }
+  }, [getAccessToken, session?.userId])
 
   const itemCount = useFileExplorerStore(
     useCallback(
@@ -159,6 +204,14 @@ export default function FilesPage(): React.JSX.Element {
   const canAddSyncSourceHere = currentFolderId === FILE_EXPLORER_ROOT_ID
   const canAddLocalSyncFolder = isElectron() && canAddSyncSourceHere
   const canAddOneDriveFolder = canAddSyncSourceHere
+  const canAddHhcLineFolder =
+    canAddSyncSourceHere &&
+    claimsResolvedUserId === session?.userId &&
+    session.roles.includes('media_sync_user')
+
+  useEffect(() => {
+    if (!canAddHhcLineFolder) setIsHhcLinePickerOpen(false)
+  }, [canAddHhcLineFolder])
   const isCurrentFolderReadOnly = useMemo(
     () => isFolderReadOnlyBySyncLink(currentFolderId, foldersById),
     [currentFolderId, foldersById]
@@ -291,6 +344,28 @@ export default function FilesPage(): React.JSX.Element {
     [t]
   )
 
+  const handleImportHhcLineFolder = useCallback(
+    async (folder: CloudRemoteFolder): Promise<void> => {
+      setIsHhcLinePickerOpen(false)
+      setIsHhcLineImporting(true)
+      try {
+        const result = await hhcLineProvider.importFolder(folder)
+        toast.success(
+          t('fileExplorer.syncSources.hhcLineFolderImported', {
+            name: result.displayName,
+            count: result.itemCount
+          })
+        )
+      } catch (error) {
+        console.warn('[hhc-line] Failed to import collection', error)
+        toast.danger(t('fileExplorer.syncSources.hhcLineImportFailed'))
+      } finally {
+        setIsHhcLineImporting(false)
+      }
+    },
+    [hhcLineProvider, t]
+  )
+
   const findSyncRootFolder = useCallback((folderId: string): FolderRecord | null => {
     const state = useFileExplorerStore.getState()
     let current = state.folders[folderId] ?? null
@@ -313,8 +388,8 @@ export default function FilesPage(): React.JSX.Element {
   useEffect(() => {
     const root = findSyncRootFolder(currentFolderId)
     if (!root?.syncLink) return
-    void refreshSyncFolderOnNavigation(root.id)
-  }, [currentFolderId, findSyncRootFolder])
+    void refreshSyncFolderOnNavigation(root.id, hhcAuth)
+  }, [currentFolderId, findSyncRootFolder, hhcAuth])
 
   const isSyncRootFolder = useCallback((folder: FolderRecord): boolean => {
     return folder.parentId === FILE_EXPLORER_ROOT_ID && Boolean(folder.syncLink)
@@ -359,8 +434,10 @@ export default function FilesPage(): React.JSX.Element {
       try {
         if (syncLink.providerType === 'local-fs') {
           await refreshLocalSyncConnection(syncLink.providerConnectionId)
-        } else {
+        } else if (syncLink.providerType === 'onedrive') {
           await ONE_DRIVE_PROVIDER.refreshFolder(root.id, { forceRetry: true })
+        } else if (syncLink.providerType === 'hhc-line') {
+          await hhcLineProvider.refreshFolder(root.id, { forceRetry: true })
         }
         toast.success(t('fileExplorer.syncSources.refreshComplete'))
       } catch (error) {
@@ -368,7 +445,7 @@ export default function FilesPage(): React.JSX.Element {
         toast.danger(t('fileExplorer.syncSources.refreshFailed'))
       }
     },
-    [findSyncRootFolder, t]
+    [findSyncRootFolder, hhcLineProvider, t]
   )
 
   const getRefreshSyncActions = useCallback(
@@ -755,6 +832,7 @@ export default function FilesPage(): React.JSX.Element {
           ? () => void handleAddLocalSyncFolder()
           : undefined,
         onAddOneDrive: canAddOneDriveFolder ? () => void handleAddOneDrive() : undefined,
+        onAddHhcLine: canAddHhcLineFolder ? () => setIsHhcLinePickerOpen(true) : undefined,
         isAddOneDriveDisabled: !hasOneDriveConnection,
         isReadOnly: isCurrentFolderReadOnly
       })
@@ -769,6 +847,7 @@ export default function FilesPage(): React.JSX.Element {
       handleCreatePresentation,
       canAddLocalSyncFolder,
       canAddOneDriveFolder,
+      canAddHhcLineFolder,
       handleAddLocalSyncFolder,
       handleAddOneDrive,
       hasOneDriveConnection,
@@ -828,6 +907,7 @@ export default function FilesPage(): React.JSX.Element {
           canAddLocalSyncFolder ? () => void handleAddLocalSyncFolder() : undefined
         }
         onAddOneDrive={canAddOneDriveFolder ? () => void handleAddOneDrive() : undefined}
+        onAddHhcLine={canAddHhcLineFolder ? () => setIsHhcLinePickerOpen(true) : undefined}
         isAddOneDriveDisabled={!hasOneDriveConnection}
         isReadOnly={isCurrentFolderReadOnly}
       />
@@ -837,6 +917,13 @@ export default function FilesPage(): React.JSX.Element {
         isImporting={isOneDriveImporting}
         onClose={() => setIsOneDrivePickerOpen(false)}
         onImport={(folder) => void handleImportOneDriveFolder(folder)}
+      />
+      <CloudFolderPickerDialog
+        provider={hhcLinePickerProvider}
+        isOpen={isHhcLinePickerOpen}
+        isImporting={isHhcLineImporting}
+        onClose={() => setIsHhcLinePickerOpen(false)}
+        onImport={(folder) => void handleImportHhcLineFolder(folder)}
       />
       <FolderModal
         isOpen={isCreateFolderModalOpen}

@@ -373,6 +373,24 @@ describe('scanOneDriveFolder', () => {
       cursor: 'cursor-1'
     })
   })
+
+  it('rejects a repeated page cursor instead of looping forever', async () => {
+    const provider = {
+      initialScan: vi.fn(),
+      incrementalChanges: vi
+        .fn()
+        .mockResolvedValueOnce({
+          items: [],
+          nextCursor: 'cursor-1',
+          hasMore: true
+        })
+        .mockRejectedValueOnce(new Error('unbounded pagination escaped'))
+    } as unknown as OneDriveReadonlyProvider
+
+    await expect(
+      scanOneDriveFolder(provider, 'connection-1', 'folder-1', 'cursor-1')
+    ).rejects.toThrow('Invalid sync change pagination')
+  })
 })
 
 describe('refreshOneDriveFolder', () => {

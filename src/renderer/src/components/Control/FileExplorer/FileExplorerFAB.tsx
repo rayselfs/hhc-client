@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, FolderPlus, Upload, Folder, FolderSync, Presentation } from 'lucide-react'
+import { Plus, FolderPlus, Upload, Folder, FolderSync, Presentation, Cloud } from 'lucide-react'
 import { Dropdown } from '@heroui/react/dropdown'
 import { useTranslation } from 'react-i18next'
 import { computeExpiresAt, type FolderDuration } from '@shared/types/folder'
@@ -13,6 +13,7 @@ export interface FileExplorerFABProps {
   onCreatePresentation?: () => void
   onAddLocalSyncFolder?: () => void
   onAddOneDrive?: () => void
+  onAddHhcLine?: () => void
   isAddOneDriveDisabled?: boolean
   isReadOnly?: boolean
 }
@@ -23,6 +24,7 @@ export default function FileExplorerFAB({
   onCreatePresentation,
   onAddLocalSyncFolder,
   onAddOneDrive,
+  onAddHhcLine,
   isAddOneDriveDisabled = false,
   isReadOnly = false
 }: FileExplorerFABProps): React.JSX.Element | null {
@@ -60,7 +62,7 @@ export default function FileExplorerFAB({
   }
 
   const hasWritableActions = !isReadOnly
-  const hasSourceActions = Boolean(onAddLocalSyncFolder || onAddOneDrive)
+  const hasSourceActions = Boolean(onAddLocalSyncFolder || onAddOneDrive || onAddHhcLine)
 
   if (!hasWritableActions && !hasSourceActions) return null
 
@@ -95,6 +97,7 @@ export default function FileExplorerFAB({
                 if (key === 'uploadFolder' && !isReadOnly) onUploadFolder?.()
                 if (key === 'addLocalSyncFolder') onAddLocalSyncFolder?.()
                 if (key === 'addOneDrive' && !isAddOneDriveDisabled) onAddOneDrive?.()
+                if (key === 'addHhcLine') onAddHhcLine?.()
               }}
             >
               {!isReadOnly && (
@@ -152,6 +155,15 @@ export default function FileExplorerFAB({
                     >
                       <OneDriveIcon className="size-4" />
                       {t('fileExplorer.contextMenu.addOneDrive')}
+                    </Dropdown.Item>
+                  )}
+                  {onAddHhcLine && (
+                    <Dropdown.Item
+                      id="addHhcLine"
+                      className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
+                    >
+                      <Cloud size={16} />
+                      {t('fileExplorer.contextMenu.addHhcLine')}
                     </Dropdown.Item>
                   )}
                 </Dropdown.Section>
