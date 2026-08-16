@@ -410,26 +410,61 @@ git commit -m "feat: bind registered groups to media collections"
 - Create: `src/media-sync/content-file.ts`
 - Create: `src/__tests__/media-sync-intake.test.ts`
 - Create: `src/__tests__/media-sync-worker.test.ts`
-- Modify: `src/attachments/asset-worker.ts`
 - Modify: `src/attachments/scan-queue.ts`
 - Modify: `src/attachments/scan-outbox.ts`
 - Modify: `src/attachments/scan-worker-config.ts`
-- Modify: `src/functions/attachment-entrance.ts`
-- Modify: `src/functions/save-resource.ts`
+- Modify: `src/media-sync/types.ts`
+- Modify: `src/media-sync/migrations.ts`
+- Modify: `src/media-sync/store.ts`
+- Modify: `src/__tests__/media-sync-store.test.ts`
+- Modify: `src/functions/attachment-save.ts`
+- Modify: `src/functions/pending-attachment.ts`
+- Modify: `src/functions/upload-intent.ts`
 - Modify: `src/functions/resource-binary-publisher.ts`
+- Modify: `src/state/session-store.ts`
+- Modify: `src/state/redis-session-store.ts`
+- Modify: `src/catalog/store.ts`
+- Modify: `src/catalog/postgres-store.ts`
 - Modify: `src/clients/line.ts`
 - Modify: `src/clients/asset-api.ts`
 - Modify: `src/transport/line/webhook-routes.ts`
+- Modify: `src/bootstrap/create-production-runtime.ts`
+- Modify: `src/types.ts`
+- Modify: `config/profiles.json`
 - Modify: `src/tools/run-attachment-scan-job.ts`
 - Modify: `src/tools/run-attachment-asset-job.ts`
 - Modify: `aca.attachment-scan-job.yaml`
 - Modify: `scripts/deploy-aca.sh`
+- Modify: `scripts/release-assurance.sh`
+- Modify: affected Redis, catalog, deployment, and release contract tests
 
 **Canonical identity:**
 
 ~~~text
 line:{profileName}:{messageId}
 ~~~
+
+**Durable ownership correction:**
+
+- Give every ingest a stable opaque `workId`; queue payloads never expose `sourceKey`.
+- Persist a source tombstone independently of an ingest row. Intake and unsend share a source
+  advisory lock so an unsend received before a retried message remains delete-wins.
+- Keep exactly one current publication per `(sourceKey, publicationType)`. `targetId` stays null
+  while pending and becomes only the actual Asset collection occurrence ID or catalog resource ID
+  after publication; collection destination and manual intent metadata live separately.
+- Intake outbox work is claimable only for live sources; delete outbox work only for tombstoned
+  sources. Dispatch reservation and worker lease are separate, and all mutations use the exact
+  `claimedUntil` CAS token.
+- If an external publish succeeds after the source was tombstoned or the lease was lost, compensate
+  immediately with the returned owner handle. If compensation fails, persist that handle for the
+  delete worker instead of dropping it.
+- Promote a matching manual Redis intent idempotently into the existing pending-attachment session
+  before recording the manual publication. Late confirmation fills that same publication and
+  re-arms its intake work; it never inserts a second publication row.
+
+The achievable download contract is one LINE download under concurrent delivery and ordinary
+redelivery. A worker crash before any durable Asset exists may require a later retry to download
+again; external Asset and publication effects remain idempotent.
 
 - [ ] **Step 1: Add routing and deduplication tests**
 
@@ -483,7 +518,9 @@ Do not hold one job replica while scan remains pending. Persist `assetId` and st
 PostgreSQL outbox dispatch the next stage. A later finite job reads Asset API once and either
 reschedules, terminalizes, or publishes. Every stage rechecks tombstone/binding.
 
-For a pending curated publication, pass the same clean asset/work artifact into existing `save_resource` metadata/confirmation/catalog publication. It may perform its existing OneDrive/catalog copy, but must not redownload LINE content, create another canonical asset, or run another scan.
+For a pending curated publication, pass the same clean asset/work artifact into the existing
+`attachment-save` metadata/confirmation/catalog path. It may perform its existing OneDrive/catalog
+copy, but must not redownload LINE content, create another canonical asset, or run another scan.
 
 - [ ] **Step 6: Preserve the 25 MiB curated ceiling**
 
@@ -514,8 +551,14 @@ git commit -m "feat: ingest bound group media once"
 - Modify: `src/transport/line/webhook-routes.ts`
 - Modify: `src/media-sync/store.ts`
 - Modify: `src/media-sync/worker.ts`
+- Modify: `src/media-sync/types.ts`
+- Modify: `src/media-sync/migrations.ts`
 - Modify: `src/clients/asset-api.ts`
 - Modify: `src/functions/resource-binary-publisher.ts`
+- Modify: `src/catalog/store.ts`
+- Modify: `src/catalog/postgres-store.ts`
+- Modify: `src/types.ts`
+- Modify: real PostgreSQL, catalog-owner, and Asset client tests
 
 - [ ] **Step 1: Add race tests**
 
@@ -528,9 +571,21 @@ webhook claim. For unsend, derive the same canonical source key from `unsend.mes
 atomically tombstone/enqueue cleanup. For leave, disable the active `helper` group binding. Both
 operations are PostgreSQL-idempotent and neither event enters the LLM path.
 
+The lifecycle prepass runs after signature and payload parsing but before rate limiting,
+`ordinaryEvents`, and `webhookEventStore.tryStart`. An eligible helper lifecycle database failure
+returns 503 so LINE can retry. Unsend does not require an active binding, because an old message may
+be removed after unbind or leave. Leave only disables the exact helper group binding; it never
+deletes the collection or bulk-deletes historical publications. `join`, `memberLeft`, rooms, direct
+users, and other profiles do not alter bindings.
+
 - [ ] **Step 3: Recheck tombstone at every commit boundary**
 
-Worker checks before Asset upload completion, collection membership, and curated publication. Cleanup removes collection membership, revokes/removes derived publication through its current owner path, then owner-deletes the canonical Asset API asset. Retry each idempotently.
+Worker checks before Asset upload completion, collection membership, and curated publication.
+Tombstoning cancels intake work and inserts or reopens the unique delete outbox row. Cleanup removes
+the exact collection occurrence, removes the exact catalog/Graph owner by persisted resource ID,
+then owner-deletes the canonical Asset API asset. A disabled or hidden catalog item remains
+owner-addressable for cleanup. Treat owner 404 as success, retain 5xx for retry, and complete delete
+work only after every owned effect has converged.
 
 - [ ] **Step 4: Validate and commit**
 
