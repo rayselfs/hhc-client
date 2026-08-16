@@ -1,4 +1,5 @@
 import type { SyncEntryRecord } from './sync-db'
+import type { FolderRecord } from '@shared/types/folder'
 
 export type SyncFolderHealthStatus = 'syncing' | 'warning' | 'error' | 'ok' | 'unknown'
 
@@ -48,9 +49,28 @@ function collectRootEntries(entries: SyncEntryRecord[], rootFolderId: string): S
 
 export function deriveSyncFolderHealth(
   entries: SyncEntryRecord[],
-  rootFolderId: string
+  rootFolder: Pick<FolderRecord, 'id' | 'syncLink'> | undefined
 ): SyncFolderHealth {
-  const rootEntries = collectRootEntries(entries, rootFolderId)
+  if (!rootFolder) {
+    return {
+      status: 'unknown',
+      downloadingCount: 0,
+      queuedCount: 0,
+      failedCount: 0,
+      warningCount: 0
+    }
+  }
+  if (rootFolder.syncLink?.status === 'access-revoked') {
+    return {
+      status: 'error',
+      downloadingCount: 0,
+      queuedCount: 0,
+      failedCount: 0,
+      warningCount: 0
+    }
+  }
+
+  const rootEntries = collectRootEntries(entries, rootFolder.id)
   if (rootEntries.length === 0) {
     return {
       status: 'unknown',

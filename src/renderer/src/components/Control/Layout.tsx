@@ -1,5 +1,5 @@
 import { Outlet, useLocation } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import AppLoadingScreen from '@renderer/components/Control/AppLoadingScreen'
 import Sidebar from '@renderer/components/Control/Sidebar'
 import Header from '@renderer/components/Control/Header/Header'
@@ -26,16 +26,30 @@ import { initializeApp } from '@renderer/lib/app-init'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { useBibleFolderStore } from '@renderer/stores/folder'
 import { useAutoUpdateCheck } from '@renderer/hooks/useAutoUpdateCheck'
+import { useHhcAuth } from '@renderer/contexts/HhcAuthContext'
 
 export default function Layout(): React.JSX.Element {
   const [initialized, setInitialized] = useState(false)
+  const { session, getAccessToken, refreshAccessToken } = useHhcAuth()
+  const hhcSessionRef = useRef(session)
+  useEffect(() => {
+    hhcSessionRef.current = session
+  }, [session])
+  const hhcAuth = useMemo(
+    () => ({
+      getSession: () => hhcSessionRef.current,
+      getAccessToken,
+      refreshAccessToken
+    }),
+    [getAccessToken, refreshAccessToken]
+  )
   const location = useLocation()
   const isPresentationWorkspace = location.pathname.startsWith('/presentations')
   const isMediaWorkspace = location.pathname === '/media'
   useAutoUpdateCheck()
 
   useEffect(() => {
-    const cleanup = initializeApp()
+    const cleanup = initializeApp({ hhcAuth })
 
     const isCoreReady = (): boolean =>
       useFileExplorerStore.getState().isInitialized && useBibleFolderStore.getState().isInitialized
@@ -59,7 +73,7 @@ export default function Layout(): React.JSX.Element {
       unsub()
       unsub2()
     }
-  }, [])
+  }, [hhcAuth])
 
   if (!initialized) return <AppLoadingScreen />
 

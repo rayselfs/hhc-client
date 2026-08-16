@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { deriveSyncFolderHealth } from '../sync-folder-health'
 import type { SyncEntryRecord, SyncEntryStatus } from '../sync-db'
+import type { FolderRecord } from '@shared/types/folder'
 
 function entry(input: {
   remoteItemId: string
@@ -30,9 +31,43 @@ function entry(input: {
   }
 }
 
+function rootFolder(status: 'active' | 'access-revoked' = 'active'): FolderRecord {
+  return {
+    id: 'sync-root',
+    name: 'Sync root',
+    parentId: 'file-root',
+    sortIndex: 0,
+    createdAt: 1,
+    expiresAt: null,
+    syncLink: {
+      providerConnectionId: 'connection-1',
+      providerType: 'hhc-line',
+      remoteFolderId: 'root-remote',
+      status
+    }
+  }
+}
+
 describe('deriveSyncFolderHealth', () => {
   it('returns unknown when entries do not include the root folder', () => {
-    expect(deriveSyncFolderHealth([], 'sync-root')).toMatchObject({ status: 'unknown' })
+    expect(deriveSyncFolderHealth([], rootFolder())).toMatchObject({ status: 'unknown' })
+  })
+
+  it('returns unknown after an access-revoked root disappears', () => {
+    expect(deriveSyncFolderHealth([], undefined)).toMatchObject({ status: 'unknown' })
+  })
+
+  it('returns a safe error while an access-revoked root still exists', () => {
+    const health = deriveSyncFolderHealth([], rootFolder('access-revoked'))
+
+    expect(health).toEqual({
+      status: 'error',
+      downloadingCount: 0,
+      queuedCount: 0,
+      failedCount: 0,
+      warningCount: 0
+    })
+    expect(JSON.stringify(health)).not.toMatch(/401|403|authorization|forbidden/i)
   })
 
   it('returns syncing when descendants are queued or downloading', () => {
@@ -52,7 +87,7 @@ describe('deriveSyncFolderHealth', () => {
           status: 'queued'
         })
       ],
-      'sync-root'
+      rootFolder()
     )
 
     expect(health).toMatchObject({ status: 'syncing', downloadingCount: 1, queuedCount: 1 })
@@ -71,7 +106,7 @@ describe('deriveSyncFolderHealth', () => {
           nextRetryAt: 10_000
         })
       ],
-      'sync-root'
+      rootFolder()
     )
 
     expect(health).toMatchObject({ status: 'warning', failedCount: 1, nextRetryAt: 10_000 })
@@ -89,7 +124,7 @@ describe('deriveSyncFolderHealth', () => {
           errorKind: 'fatal'
         })
       ],
-      'sync-root'
+      rootFolder()
     )
 
     expect(health).toMatchObject({ status: 'error', failedCount: 1 })
@@ -111,7 +146,7 @@ describe('deriveSyncFolderHealth', () => {
           updatedAt: 30
         })
       ],
-      'sync-root'
+      rootFolder()
     )
 
     expect(health).toMatchObject({ status: 'ok', lastSyncedAt: 30 })
@@ -135,7 +170,7 @@ describe('deriveSyncFolderHealth', () => {
           status: 'available-offline'
         })
       ],
-      'sync-root'
+      rootFolder()
     )
 
     expect(health).toMatchObject({ status: 'ok', warningCount: 0 })

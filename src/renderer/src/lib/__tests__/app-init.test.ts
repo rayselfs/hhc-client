@@ -25,6 +25,8 @@ const mockRetryPendingResourceCleanups = vi.fn().mockResolvedValue({
   attempted: 0,
   failed: 0
 })
+const mockStopSyncRuntime = vi.fn()
+const mockStartSyncRuntime = vi.fn(() => mockStopSyncRuntime)
 
 const bibleState = {
   isInitialized: false,
@@ -117,6 +119,10 @@ vi.mock('@renderer/lib/resource-cleanup-journal', () => ({
   retryPendingResourceCleanups: mockRetryPendingResourceCleanups
 }))
 
+vi.mock('@renderer/lib/sync-runtime', () => ({
+  startSyncRuntime: mockStartSyncRuntime
+}))
+
 describe('startEarlyInit', () => {
   beforeEach(() => {
     vi.resetModules()
@@ -163,6 +169,24 @@ describe('initializeApp — online handler', () => {
   afterEach(async () => {
     const mod = await import('../app-init')
     mod.initializeApp()()
+  })
+
+  it('passes the single context-owned HHC auth facade to the sync runtime', async () => {
+    const { initializeApp } = await import('../app-init')
+    const options = {
+      hhcAuth: {
+        getSession: () => null,
+        getAccessToken: vi.fn(async () => null),
+        refreshAccessToken: vi.fn(async () => null)
+      },
+      onHhcAccessRevoked: vi.fn()
+    }
+
+    const cleanup = initializeApp(options)
+
+    expect(mockStartSyncRuntime).toHaveBeenCalledWith(options)
+    cleanup()
+    expect(mockStopSyncRuntime).toHaveBeenCalled()
   })
 
   it('shows success toast when network comes back online', async () => {

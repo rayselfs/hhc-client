@@ -176,4 +176,42 @@ describe('FileBrowser presentation open behavior', () => {
     expect(mocks.navigate).toHaveBeenCalledWith('/files/preview/deck-1')
     expect(mocks.startMediaProjection).not.toHaveBeenCalled()
   })
+
+  it('shows safe error health for an access-revoked sync root', async () => {
+    const root = makeRootFolder()
+    const revoked: FolderRecord = {
+      id: 'revoked-root',
+      name: 'Revoked collection',
+      parentId: FILE_EXPLORER_ROOT_ID,
+      sortIndex: 0,
+      createdAt: 1,
+      expiresAt: null,
+      syncLink: {
+        providerConnectionId: 'hhc-line:user-1',
+        providerType: 'hhc-line',
+        remoteFolderId: 'collection-1',
+        offlinePolicy: 'online-only',
+        status: 'access-revoked'
+      }
+    }
+    act(() => {
+      useFileExplorerStore.setState({
+        folders: { [root.id]: root, [revoked.id]: revoked },
+        items: {},
+        _foldersArray: [root, revoked],
+        _itemsArray: [],
+        _childFoldersByParent: { [FILE_EXPLORER_ROOT_ID]: [revoked] },
+        _itemsByParent: { [FILE_EXPLORER_ROOT_ID]: [] },
+        loadedParents: new Set([FILE_EXPLORER_ROOT_ID]),
+        currentFolderId: FILE_EXPLORER_ROOT_ID,
+        isLoading: false,
+        isInitialized: true
+      })
+    })
+
+    render(<FileBrowser />)
+
+    expect(await screen.findByLabelText('Sync error')).toBeInTheDocument()
+    expect(screen.queryByText(/401|403|authorization|forbidden/i)).not.toBeInTheDocument()
+  })
 })

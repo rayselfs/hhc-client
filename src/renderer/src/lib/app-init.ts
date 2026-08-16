@@ -9,7 +9,7 @@ import { toast } from '@heroui/react/toast'
 import i18n from '@renderer/i18n'
 import { mediaJobQueue } from '@renderer/lib/media-job-queue'
 import { recoverPendingSyncResourceCleanups } from '@renderer/lib/sync-unlink'
-import { startSyncRuntime } from '@renderer/lib/sync-runtime'
+import { startSyncRuntime, type SyncRuntimeOptions } from '@renderer/lib/sync-runtime'
 import { backfillImportedMediaAssets } from '@renderer/lib/local-sync-import'
 import { retryPendingResourceCleanups } from '@renderer/lib/resource-cleanup-journal'
 import { deleteDerivedAssetsByKind } from '@renderer/lib/media-work-db'
@@ -93,14 +93,14 @@ async function initWhisperModelDir(): Promise<void> {
  * Calls startEarlyInit() internally as a fallback so this function remains safe
  * to call without a prior startEarlyInit() call.
  */
-export function initializeApp(): () => void {
+export function initializeApp(options: SyncRuntimeOptions = {}): () => void {
   startEarlyInit()
 
   if (subscriptionsInitialized) return () => {}
   subscriptionsInitialized = true
 
   void initWhisperModelDir()
-  const stopSyncRuntime = startSyncRuntime()
+  const stopSyncRuntime = startSyncRuntime(options)
 
   let prevModelDir = useSettingsStore.getState().speech.whisper.modelDir
   const unsubWhisper = useSettingsStore.subscribe((state) => {

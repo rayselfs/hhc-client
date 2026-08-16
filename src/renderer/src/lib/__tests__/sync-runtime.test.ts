@@ -1,4 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { HhcSession } from '@shared/hhc-auth'
+import type { FolderRecord } from '@shared/types/folder'
+import type { CloudRefreshSummary, HhcLineCloudAuth } from '../cloud-provider'
+import type { ProviderConnectionRecord } from '../sync-db'
 
 vi.mock('../env', () => ({
   isElectron: vi.fn(() => false)
@@ -14,8 +18,29 @@ const { refreshAllOneDriveFoldersMock } = vi.hoisted(() => ({
   >(async () => [])
 }))
 
+const hhcMocks = vi.hoisted(() => ({
+  connections: [] as ProviderConnectionRecord[],
+  folders: {} as Record<string, FolderRecord>,
+  refreshFolder: vi.fn(),
+  listConnections: vi.fn()
+}))
+
 vi.mock('../onedrive-connect', () => ({
   refreshAllOneDriveFolders: refreshAllOneDriveFoldersMock
+}))
+
+vi.mock('../sync-db', () => ({
+  listProviderConnectionsByType: hhcMocks.listConnections
+}))
+
+vi.mock('@renderer/stores/file-explorer', () => ({
+  useFileExplorerStore: {
+    getState: () => ({ folders: hhcMocks.folders })
+  }
+}))
+
+vi.mock('../cloud-provider', () => ({
+  getCloudProviderAdapter: () => ({ refreshFolder: hhcMocks.refreshFolder })
 }))
 
 import { startSyncRuntime } from '../sync-runtime'
@@ -26,11 +51,82 @@ async function flushMicrotasks(): Promise<void> {
   await Promise.resolve()
 }
 
+function session(userId = 'user-1'): HhcSession {
+  return { userId, displayName: userId, roles: ['media_sync_user'] }
+}
+
+function connection(id: string, accountUserId = 'user-1'): ProviderConnectionRecord {
+  return {
+    id,
+    providerType: 'hhc-line',
+    displayName: 'HHC LINE',
+    accountUserId,
+    createdAt: 1,
+    updatedAt: 1
+  }
+}
+
+function root(
+  id: string,
+  connectionId: string,
+  status: 'active' | 'access-revoked' = 'active'
+): FolderRecord {
+  return {
+    id,
+    name: id,
+    parentId: 'file-root',
+    sortIndex: 0,
+    createdAt: 1,
+    expiresAt: null,
+    syncLink: {
+      providerType: 'hhc-line',
+      providerConnectionId: connectionId,
+      remoteFolderId: id,
+      offlinePolicy: 'online-only',
+      status
+    }
+  }
+}
+
+function auth(sessionRef: { current: HhcSession | null }): HhcLineCloudAuth {
+  return {
+    getSession: () => sessionRef.current,
+    getAccessToken: vi.fn(async () => 'token'),
+    refreshAccessToken: vi.fn(async () => 'refreshed')
+  }
+}
+
+function idleSummary(connectionId: string, rootFolderId: string): CloudRefreshSummary {
+  return {
+    connectionId,
+    rootFolderId,
+    updatedItemCount: 0,
+    removedItemCount: 0,
+    removedFolderCount: 0,
+    downloadedCount: 0,
+    failedFileCount: 0,
+    disabledFileCount: 0,
+    changedCount: 0,
+    pendingFileCount: 0,
+    retryableFileCount: 0,
+    usedCursor: true,
+    fullScanFallback: false
+  }
+}
+
 describe('startSyncRuntime', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     refreshAllOneDriveFoldersMock.mockReset()
     refreshAllOneDriveFoldersMock.mockResolvedValue([])
+    hhcMocks.connections = []
+    hhcMocks.folders = {}
+    hhcMocks.refreshFolder.mockReset()
+    hhcMocks.refreshFolder.mockImplementation(async (rootFolderId: string) =>
+      idleSummary('hhc-line:user-1', rootFolderId)
+    )
+    hhcMocks.listConnections.mockReset()
+    hhcMocks.listConnections.mockImplementation(async () => hhcMocks.connections)
     vi.clearAllMocks()
   })
 
@@ -95,5 +191,164 @@ describe('startSyncRuntime', () => {
     expect(refreshAllOneDriveFolders).toHaveBeenCalledTimes(2)
 
     stop()
+  })
+
+  it.each([
+    ['signed out', null, [connection('hhc-runtime-signed-out')]],
+    ['without a connection', session(), []]
+  ])('does no HHC work when %s', async (_name, currentSession, connections) => {
+    const sessionRef = { current: currentSession }
+    hhcMocks.connections = connections
+    const target = root('root-no-work', connections[0]?.id ?? 'missing')
+    hhcMocks.folders = { [target.id]: target }
+
+    const stop = startSyncRuntime({ hhcAuth: auth(sessionRef) })
+    await flushMicrotasks()
+
+    expect(hhcMocks.refreshFolder).not.toHaveBeenCalled()
+    stop()
+  })
+
+  it('runs roots serially per connection while independent connections proceed', async () => {
+    const sessionRef = { current: session() }
+    const firstConnection = connection('hhc-runtime-serial-1')
+    const secondConnection = connection('hhc-runtime-serial-2')
+    hhcMocks.connections = [firstConnection, secondConnection]
+    const first = root('root-serial-1', firstConnection.id)
+    const second = root('root-serial-2', firstConnection.id)
+    const independent = root('root-independent', secondConnection.id)
+    hhcMocks.folders = {
+      [first.id]: first,
+      [second.id]: second,
+      [independent.id]: independent
+    }
+    let resolveFirst!: () => void
+    hhcMocks.refreshFolder.mockImplementation(async (rootFolderId: string) => {
+      if (rootFolderId === first.id) {
+        await new Promise<void>((resolve) => {
+          resolveFirst = resolve
+        })
+      }
+      return idleSummary(
+        rootFolderId === independent.id ? secondConnection.id : firstConnection.id,
+        rootFolderId
+      )
+    })
+
+    const stop = startSyncRuntime({ hhcAuth: auth(sessionRef) })
+    await vi.waitFor(() => {
+      expect(hhcMocks.refreshFolder).toHaveBeenCalledWith(first.id)
+      expect(hhcMocks.refreshFolder).toHaveBeenCalledWith(independent.id)
+    })
+    expect(hhcMocks.refreshFolder).not.toHaveBeenCalledWith(second.id)
+
+    resolveFirst()
+    await vi.waitFor(() => expect(hhcMocks.refreshFolder).toHaveBeenCalledWith(second.id))
+    stop()
+  })
+
+  it.each([
+    ['retryable', { classification: 'retryable' }],
+    ['offline', new TypeError('offline')]
+  ])(
+    'backs off and recovers from an HHC %s failure without removing the root',
+    async (_name, error) => {
+      const sessionRef = { current: session() }
+      const targetConnection = connection(`hhc-runtime-${_name}`)
+      const target = root(`root-${_name}`, targetConnection.id)
+      hhcMocks.connections = [targetConnection]
+      hhcMocks.folders = { [target.id]: target }
+      hhcMocks.refreshFolder
+        .mockRejectedValueOnce(error)
+        .mockResolvedValue(idleSummary(targetConnection.id, target.id))
+
+      const stop = startSyncRuntime({ hhcAuth: auth(sessionRef) })
+      await flushMicrotasks()
+      expect(hhcMocks.refreshFolder).toHaveBeenCalledTimes(1)
+      expect(hhcMocks.folders[target.id]).toBe(target)
+
+      await vi.advanceTimersByTimeAsync(15_000)
+      expect(hhcMocks.refreshFolder).toHaveBeenCalledTimes(2)
+      await vi.advanceTimersByTimeAsync(59_999)
+      expect(hhcMocks.refreshFolder).toHaveBeenCalledTimes(2)
+      await vi.advanceTimersByTimeAsync(1)
+      expect(hhcMocks.refreshFolder).toHaveBeenCalledTimes(3)
+      stop()
+    }
+  )
+
+  it('stops an auth-required connection until the live auth session changes', async () => {
+    const firstSession = session()
+    const sessionRef: { current: HhcSession | null } = { current: firstSession }
+    const targetConnection = connection('hhc-runtime-auth')
+    const target = root('root-auth', targetConnection.id)
+    hhcMocks.connections = [targetConnection]
+    hhcMocks.folders = { [target.id]: target }
+    hhcMocks.refreshFolder
+      .mockRejectedValueOnce({ classification: 'auth-required' })
+      .mockResolvedValue(idleSummary(targetConnection.id, target.id))
+    const hhcAuth = auth(sessionRef)
+
+    const stop = startSyncRuntime({ hhcAuth })
+    await flushMicrotasks()
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(hhcMocks.refreshFolder).toHaveBeenCalledTimes(1)
+    expect(hhcAuth.refreshAccessToken).not.toHaveBeenCalled()
+
+    sessionRef.current = { ...firstSession }
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(hhcMocks.refreshFolder).toHaveBeenCalledTimes(2)
+    stop()
+  })
+
+  it('triggers access-revoked once and continues an independent sibling root', async () => {
+    const sessionRef = { current: session() }
+    const targetConnection = connection('hhc-runtime-revoked')
+    const revoked = root('root-revoked', targetConnection.id)
+    const sibling = root('root-revoked-sibling', targetConnection.id)
+    hhcMocks.connections = [targetConnection]
+    hhcMocks.folders = { [revoked.id]: revoked, [sibling.id]: sibling }
+    hhcMocks.refreshFolder.mockImplementation(async (rootFolderId: string) => {
+      if (rootFolderId === revoked.id) throw { classification: 'access-revoked' }
+      return idleSummary(targetConnection.id, rootFolderId)
+    })
+    const onHhcAccessRevoked = vi.fn()
+
+    const stop = startSyncRuntime({ hhcAuth: auth(sessionRef), onHhcAccessRevoked })
+    await vi.waitFor(() => expect(hhcMocks.refreshFolder).toHaveBeenCalledWith(sibling.id))
+    expect(onHhcAccessRevoked).toHaveBeenCalledTimes(1)
+    expect(onHhcAccessRevoked).toHaveBeenCalledWith({
+      connectionId: targetConnection.id,
+      rootFolderId: revoked.id
+    })
+
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(onHhcAccessRevoked).toHaveBeenCalledTimes(1)
+    expect(hhcMocks.refreshFolder).toHaveBeenCalledWith(sibling.id)
+    stop()
+  })
+
+  it('does not schedule new work when disposed while HHC refresh is resolving', async () => {
+    const sessionRef = { current: session() }
+    const targetConnection = connection('hhc-runtime-dispose')
+    const target = root('root-dispose', targetConnection.id)
+    hhcMocks.connections = [targetConnection]
+    hhcMocks.folders = { [target.id]: target }
+    let resolveRefresh!: () => void
+    hhcMocks.refreshFolder.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveRefresh = () => resolve(idleSummary(targetConnection.id, target.id))
+        })
+    )
+
+    const stop = startSyncRuntime({ hhcAuth: auth(sessionRef) })
+    await vi.waitFor(() => expect(hhcMocks.refreshFolder).toHaveBeenCalledTimes(1))
+    stop()
+    resolveRefresh()
+    await flushMicrotasks()
+    await vi.advanceTimersByTimeAsync(120_000)
+
+    expect(hhcMocks.refreshFolder).toHaveBeenCalledTimes(1)
   })
 })

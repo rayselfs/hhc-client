@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
+import { StrictMode } from 'react'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import '@renderer/i18n'
@@ -10,6 +11,8 @@ import { useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { useBibleFolderStore } from '@renderer/stores/folder'
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 import type { ProjectionPayload } from '@shared/projection-messages'
+import type { HhcSession } from '@shared/hhc-auth'
+import type { SyncRuntimeOptions } from '@renderer/lib/sync-runtime'
 
 const projectionEvents = vi.hoisted(() => ({
   playback: null as ((data: ProjectionPayload<'file:playback-state'>) => void) | null
@@ -22,19 +25,28 @@ const projectionRuntime = vi.hoisted(() => ({
     failure: null
   }
 }))
+const authRuntime = vi.hoisted(() => ({
+  session: null as HhcSession | null,
+  getAccessToken: vi.fn(async () => null as string | null),
+  refreshAccessToken: vi.fn(async () => null as string | null)
+}))
+const initializeAppMock = vi.hoisted(() =>
+  vi.fn<(options?: SyncRuntimeOptions) => () => void>(() => vi.fn())
+)
 
 vi.mock('@renderer/lib/app-init', () => ({
-  initializeApp: vi.fn(() => vi.fn()),
+  initializeApp: initializeAppMock,
   prefetchRouteChunks: vi.fn(() => Promise.resolve())
 }))
 
 vi.mock('@renderer/contexts/HhcAuthContext', () => ({
   useHhcAuth: () => ({
-    status: 'anonymous',
-    session: null,
+    status: authRuntime.session ? 'authenticated' : 'anonymous',
+    session: authRuntime.session,
     signIn: vi.fn(async () => undefined),
     signOut: vi.fn(async () => undefined),
-    getAccessToken: vi.fn(async () => null)
+    getAccessToken: authRuntime.getAccessToken,
+    refreshAccessToken: authRuntime.refreshAccessToken
   })
 }))
 
@@ -105,6 +117,8 @@ describe('Layout', () => {
     projectionEvents.playback = null
     projectionRuntime.isProjectionOpen = false
     projectionRuntime.recovery = { status: 'closed', generation: 0, failure: null }
+    authRuntime.session = null
+    initializeAppMock.mockClear()
   })
 
   afterEach(() => {
@@ -202,5 +216,32 @@ describe('Layout', () => {
       isPlaying: true,
       isEnded: false
     })
+  })
+
+  it('keeps one live sync auth facade across StrictMode auth changes', async () => {
+    const router = createMemoryRouter(routes, { initialEntries: ['/'] })
+    const tree = (): React.JSX.Element => (
+      <StrictMode>
+        <ThemeProvider>
+          <RouterProvider router={router} />
+        </ThemeProvider>
+      </StrictMode>
+    )
+    render(tree())
+    await screen.findByTestId('timer-page')
+    const initialCalls = initializeAppMock.mock.calls.length
+    const options = initializeAppMock.mock.calls.at(-1)?.[0]
+    const hhcAuth = options?.hhcAuth
+    expect(hhcAuth?.getSession()).toBeNull()
+
+    authRuntime.session = {
+      userId: 'user-1',
+      displayName: 'Ada',
+      roles: ['media_sync_user']
+    }
+    await act(() => router.navigate('/bible'))
+
+    expect(initializeAppMock).toHaveBeenCalledTimes(initialCalls)
+    expect(hhcAuth?.getSession()).toMatchObject({ userId: 'user-1' })
   })
 })

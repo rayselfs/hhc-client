@@ -464,7 +464,7 @@ export function FileBrowser({
     const next: Record<string, SyncFolderHealth> = {}
     for (const folder of folders) {
       if (folder.parentId !== FILE_EXPLORER_ROOT_ID || !folder.syncLink) continue
-      next[folder.id] = deriveSyncFolderHealth(syncEntries, folder.id)
+      next[folder.id] = deriveSyncFolderHealth(syncEntries, folder)
     }
     return next
   }, [folders, syncEntries])
