@@ -31,6 +31,12 @@ const { mockCancelSyncDownloads } = vi.hoisted(() => ({
   mockCancelSyncDownloads: vi.fn()
 }))
 
+const { mockDeleteSyncEntryPreferences, mockDeleteSyncEntryPreferencesByProviderConnection } =
+  vi.hoisted(() => ({
+    mockDeleteSyncEntryPreferences: vi.fn(),
+    mockDeleteSyncEntryPreferencesByProviderConnection: vi.fn()
+  }))
+
 vi.mock('../file-resource-cleanup', () => ({
   cleanupFileResources: mockCleanupFileResources
 }))
@@ -38,6 +44,20 @@ vi.mock('../file-resource-cleanup', () => ({
 vi.mock('../sync-download-queue', () => ({
   cancelSyncDownloads: mockCancelSyncDownloads
 }))
+
+vi.mock('../sync-db', async () => {
+  const actual = await vi.importActual<typeof import('../sync-db')>('../sync-db')
+  mockDeleteSyncEntryPreferences.mockImplementation(actual.deleteSyncEntryPreferences)
+  mockDeleteSyncEntryPreferencesByProviderConnection.mockImplementation(
+    actual.deleteSyncEntryPreferencesByProviderConnection
+  )
+  return {
+    ...actual,
+    deleteSyncEntryPreferences: mockDeleteSyncEntryPreferences,
+    deleteSyncEntryPreferencesByProviderConnection:
+      mockDeleteSyncEntryPreferencesByProviderConnection
+  }
+})
 
 describe('sync unlink', () => {
   beforeEach(async () => {
@@ -105,6 +125,51 @@ describe('sync unlink', () => {
     await expect(getSyncEntryPreference('connection-1', 'remote-file-1')).resolves.toBeUndefined()
     await expect(listSyncTombstones()).resolves.toEqual([])
     expect(mockCancelSyncDownloads).toHaveBeenCalledWith({ providerConnectionId: 'connection-1' })
+  })
+
+  it('keeps connection cleanup fences when metadata deletion fails and completes on retry', async () => {
+    await putProviderConnection({
+      id: 'connection-1',
+      providerType: 'onedrive',
+      displayName: 'OneDrive'
+    })
+    await putSyncEntry({
+      providerConnectionId: 'connection-1',
+      remoteItemId: 'remote-file-1',
+      parentRemoteItemId: null,
+      kind: 'file',
+      name: 'clip.mp4',
+      itemId: 'item-1',
+      blobId: 'blob-1',
+      status: 'available-offline'
+    })
+    await putSyncEntryPreference({
+      providerConnectionId: 'connection-1',
+      remoteItemId: 'remote-file-1',
+      offlinePolicyOverride: 'always-offline'
+    })
+    mockDeleteSyncEntryPreferencesByProviderConnection.mockRejectedValueOnce(
+      new Error('metadata delete failed')
+    )
+
+    await expect(unlinkSyncConnectionFromApp('connection-1')).rejects.toThrow(
+      'metadata delete failed'
+    )
+
+    await expect(getProviderConnection('connection-1')).resolves.toBeDefined()
+    await expect(listSyncEntriesByProviderConnection('connection-1')).resolves.toHaveLength(1)
+    await expect(listSyncTombstones()).resolves.toEqual([
+      expect.objectContaining({
+        providerConnectionId: 'connection-1',
+        remoteItemId: 'remote-file-1',
+        reason: 'unlink'
+      })
+    ])
+
+    await unlinkSyncConnectionFromApp('connection-1')
+
+    await expect(getProviderConnection('connection-1')).resolves.toBeUndefined()
+    await expect(listSyncTombstones()).resolves.toEqual([])
   })
 
   it('disconnects one OneDrive mounted folder without removing the account connection', async () => {
@@ -217,6 +282,60 @@ describe('sync unlink', () => {
         remoteItemId: 'root-b'
       })
     ])
+  })
+
+  it('keeps root cleanup fences when metadata deletion fails and completes on retry', async () => {
+    await putProviderConnection({
+      id: 'connection-1',
+      providerType: 'onedrive',
+      displayName: 'OneDrive'
+    })
+    await putSyncEntry({
+      providerConnectionId: 'connection-1',
+      remoteItemId: 'root-a',
+      parentRemoteItemId: null,
+      kind: 'folder',
+      name: 'A',
+      folderId: 'folder-a',
+      status: 'remote-only'
+    })
+    await putSyncEntryPreference({
+      providerConnectionId: 'connection-1',
+      remoteItemId: 'root-a',
+      offlinePolicyOverride: 'always-offline'
+    })
+    const rootFolder: FolderRecord = {
+      id: 'folder-a',
+      name: 'A',
+      parentId: 'file-root',
+      sortIndex: 0,
+      createdAt: 1,
+      expiresAt: null,
+      syncLink: {
+        providerConnectionId: 'connection-1',
+        remoteFolderId: 'root-a',
+        providerType: 'onedrive'
+      }
+    }
+    mockDeleteSyncEntryPreferences.mockRejectedValueOnce(new Error('metadata delete failed'))
+
+    await expect(unlinkSyncRootFolderFromApp(rootFolder)).rejects.toThrow('metadata delete failed')
+
+    await expect(getProviderConnection('connection-1')).resolves.toBeDefined()
+    await expect(getSyncEntryByRemoteItem('connection-1', 'root-a')).resolves.toBeDefined()
+    await expect(listSyncTombstones()).resolves.toEqual([
+      expect.objectContaining({
+        providerConnectionId: 'connection-1',
+        remoteItemId: 'root-a',
+        reason: 'unlink'
+      })
+    ])
+
+    await unlinkSyncRootFolderFromApp(rootFolder)
+
+    await expect(getProviderConnection('connection-1')).resolves.toBeDefined()
+    await expect(getSyncEntryByRemoteItem('connection-1', 'root-a')).resolves.toBeUndefined()
+    await expect(listSyncTombstones()).resolves.toEqual([])
   })
 
   it('purges every HHC LINE root for one account without touching other providers or accounts', async () => {

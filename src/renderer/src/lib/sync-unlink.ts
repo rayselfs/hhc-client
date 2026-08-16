@@ -103,13 +103,11 @@ export async function unlinkSyncConnectionFromApp(
   })
   removeCleanedEntriesFromStore(cleanupResult)
 
-  await Promise.all([
-    deleteSyncEntriesByProviderConnection(providerConnectionId),
-    deleteSyncEntryPreferencesByProviderConnection(providerConnectionId),
-    deleteSyncCursorsByProviderConnection(providerConnectionId),
-    deleteSyncTombstones(tombstones.map((record) => record.id)),
-    deleteProviderConnection(providerConnectionId)
-  ])
+  await deleteSyncEntryPreferencesByProviderConnection(providerConnectionId)
+  await deleteSyncCursorsByProviderConnection(providerConnectionId)
+  await deleteSyncEntriesByProviderConnection(providerConnectionId)
+  await deleteProviderConnection(providerConnectionId)
+  await deleteSyncTombstones(tombstones.map((record) => record.id))
 
   return {
     ...cleanupResult,
@@ -174,15 +172,13 @@ export async function unlinkSyncRootFolderFromApp(
     ]
   })
   removeCleanedEntriesFromStore(cleanupResult)
-  await Promise.all([
-    deleteSyncEntries(targetEntries.map((entry) => entry.id)),
-    deleteSyncEntryPreferences(
-      syncLink.providerConnectionId,
-      targetEntries.map((entry) => entry.remoteItemId)
-    ),
-    deleteSyncCursor(syncLink.providerConnectionId, syncLink.remoteFolderId),
-    deleteSyncTombstones(tombstones.map((record) => record.id))
-  ])
+  await deleteSyncEntryPreferences(
+    syncLink.providerConnectionId,
+    targetEntries.map((entry) => entry.remoteItemId)
+  )
+  await deleteSyncCursor(syncLink.providerConnectionId, syncLink.remoteFolderId)
+  await deleteSyncEntries(targetEntries.map((entry) => entry.id))
+  await deleteSyncTombstones(tombstones.map((record) => record.id))
 
   return {
     ...cleanupResult,
