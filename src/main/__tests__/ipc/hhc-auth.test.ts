@@ -272,6 +272,39 @@ describe('HhcAuthService authorization', () => {
     expect(mockNetFetch).toHaveBeenCalledTimes(2)
   })
 
+  it('invalidates a pending callback and waits for an in-flight begin during sign-out', async () => {
+    const service = createHhcAuthService({ now: () => now })
+    let finishOpen!: () => void
+    mockOpenExternal.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishOpen = resolve
+        })
+    )
+    const beginning = service.begin()
+    await vi.waitFor(() => expect(mockOpenExternal).toHaveBeenCalledOnce())
+    const callback = callbackFromOpenedUrl()
+    const installationId = currentStoredRecord().installationId
+
+    let signOutSettled = false
+    const signOut = service.signOut().finally(() => {
+      signOutSettled = true
+    })
+    await expect(service.completeProtocolCallback(callback)).resolves.toBe(false)
+    await Promise.resolve()
+    expect(signOutSettled).toBe(false)
+    finishOpen()
+    await beginning
+    await signOut
+    mockNetFetch
+      .mockResolvedValueOnce(tokenResponse('late-refresh'))
+      .mockResolvedValueOnce(profileResponse())
+
+    await expect(service.completeProtocolCallback(callback)).resolves.toBe(false)
+    expect(mockNetFetch).not.toHaveBeenCalled()
+    expect(currentStoredRecord()).toEqual({ installationId })
+  })
+
   it.each([
     ['unavailable encryption', false, 'keychain'],
     ['basic_text storage', true, 'basic_text']
@@ -466,6 +499,60 @@ describe('HhcAuthService credentials and session', () => {
     await expect(signOut).resolves.toBeUndefined()
     expect(bodyAt(4).get('token')).toBe('refresh-2')
     expect(currentStoredRecord()).not.toHaveProperty('refreshToken')
+  })
+
+  it('waits for a deferred callback exchange and credential write before sign-out cleanup', async () => {
+    const service = createHhcAuthService({ now: () => now })
+    await service.begin()
+    const callback = callbackFromOpenedUrl()
+    const installationId = currentStoredRecord().installationId
+
+    let resolveToken!: (response: Response) => void
+    mockNetFetch.mockImplementation((url: string) => {
+      if (url.endsWith('/oauth/token')) {
+        return new Promise<Response>((resolve) => (resolveToken = resolve))
+      }
+      if (url.endsWith('/me')) return Promise.resolve(profileResponse())
+      if (url.endsWith('/oauth/revoke')) return Promise.resolve(jsonResponse({}))
+      throw new Error(`Unexpected HHC request: ${url}`)
+    })
+
+    let finishCredentialWrite!: () => void
+    mockRename.mockImplementationOnce(
+      (source: string, target: string) =>
+        new Promise<void>((resolve) => {
+          finishCredentialWrite = () => {
+            const value = temporaryFiles.get(source)
+            if (!value) throw new Error('Missing deferred credential')
+            if (target === credentialPath) disk = value
+            temporaryFiles.delete(source)
+            resolve()
+          }
+        })
+    )
+
+    const completion = service.completeProtocolCallback(callback)
+    await vi.waitFor(() => expect(mockNetFetch).toHaveBeenCalledTimes(1))
+    let signOutSettled = false
+    const signOut = service.signOut().finally(() => {
+      signOutSettled = true
+    })
+
+    resolveToken(tokenResponse('refresh-from-callback'))
+    await vi.waitFor(() => expect(mockRename).toHaveBeenCalledTimes(2))
+    expect(signOutSettled).toBe(false)
+    finishCredentialWrite()
+
+    await expect(completion).resolves.toBe(true)
+    await expect(signOut).resolves.toBeUndefined()
+    expect(Object.fromEntries(bodyAt(2))).toEqual({
+      token: 'refresh-from-callback',
+      client_id: 'hhc-desktop',
+      token_type_hint: 'refresh_token'
+    })
+    expect(currentStoredRecord()).toEqual({ installationId })
+    await expect(service.getAccessToken()).resolves.toBeNull()
+    await expect(service.getSession()).resolves.toBeNull()
   })
 
   it('does not report clean sign-out when local token removal fails', async () => {

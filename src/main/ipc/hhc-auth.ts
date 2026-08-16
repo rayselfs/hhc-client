@@ -118,6 +118,7 @@ class MainHhcAuthService implements HhcAuthService {
   private readonly listeners = new Set<(session: HhcSession | null) => void>()
   private transaction: Transaction | null = null
   private beginInFlight: Promise<void> | null = null
+  private completionInFlight: Promise<boolean> | null = null
   private refreshInFlight: Promise<string | null> | null = null
   private signOutInFlight: Promise<void> | null = null
   private storedCredential: StoredCredential | null = null
@@ -145,16 +146,27 @@ class MainHhcAuthService implements HhcAuthService {
     return this.beginInFlight
   }
 
-  async completeProtocolCallback(action: AccountAuthAction): Promise<boolean> {
-    if (this.signOutInFlight) return false
+  completeProtocolCallback(action: AccountAuthAction): Promise<boolean> {
+    if (this.signOutInFlight) return Promise.resolve(false)
     const transaction = this.transaction
     if (!transaction || transaction.expiresAt <= this.now()) {
       this.transaction = null
-      return false
+      return Promise.resolve(false)
     }
-    if (action.state !== transaction.state) return false
+    if (action.state !== transaction.state) return Promise.resolve(false)
     this.transaction = null
 
+    const completion = this.finishProtocolCallback(action, transaction).finally(() => {
+      if (this.completionInFlight === completion) this.completionInFlight = null
+    })
+    this.completionInFlight = completion
+    return completion
+  }
+
+  private async finishProtocolCallback(
+    action: AccountAuthAction,
+    transaction: Transaction
+  ): Promise<boolean> {
     const credential = await this.loadCredential(true)
     const body = new URLSearchParams({
       grant_type: 'authorization_code',
@@ -199,13 +211,22 @@ class MainHhcAuthService implements HhcAuthService {
 
   signOut(): Promise<void> {
     if (this.signOutInFlight) return this.signOutInFlight
-    this.signOutInFlight = this.performSignOut().finally(() => {
+    this.transaction = null
+    const beginInFlight = this.beginInFlight
+    const completionInFlight = this.completionInFlight
+    this.signOutInFlight = this.performSignOut(beginInFlight, completionInFlight).finally(() => {
       this.signOutInFlight = null
     })
     return this.signOutInFlight
   }
 
-  private async performSignOut(): Promise<void> {
+  private async performSignOut(
+    beginInFlight: Promise<void> | null,
+    completionInFlight: Promise<boolean> | null
+  ): Promise<void> {
+    if (beginInFlight) await beginInFlight.catch(() => undefined)
+    this.transaction = null
+    if (completionInFlight) await completionInFlight.catch(() => false)
     if (this.refreshInFlight) await this.refreshInFlight.catch(() => null)
     const credential = await this.loadCredential(false)
     if (!credential) {
