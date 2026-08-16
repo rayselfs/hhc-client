@@ -166,11 +166,14 @@ type CollectionChangePage struct {
 func (s *Service) ListAuthorizedCollections(ctx context.Context, subject CollectionSubject, cursor string, limit int) (CollectionPage, error)
 func (s *Service) GetAuthorizedCollection(ctx context.Context, id string, subject CollectionSubject) (Collection, error)
 func (s *Service) CollectionChanges(ctx context.Context, id, cursor string, subject CollectionSubject) (CollectionChangePage, error)
+func (s *Service) ListManagedCollections(ctx context.Context, callerService, cursor string, limit int) (ManagedCollectionPage, error)
+func (s *Service) GetManagedCollection(ctx context.Context, id, callerService string) (ManagedCollection, error)
 ~~~
 
 Mutation inputs contain only the requested collection/ACL/item fields plus the trusted
 `callerService`, operation, and header `Idempotency-Key`. Mutation outputs are the committed
-collection revision and affected resource; the exact serialized output is stored for replay.
+collection revision and affected resource; the semantic response is stored as `jsonb` for replay.
+Byte-identical JSON whitespace/key order is not an API contract.
 
 - [ ] **Step 1: Add failing service and store tests**
 
@@ -234,6 +237,11 @@ Do not treat wildcard admin or `media-sync:manage` as a reader bypass.
 Return `200` with an empty page when the subject has the global role but no collection ACL. For
 direct access, distinguish existing-but-unauthorized (403) from missing or deleted (404) without
 leaking collection details.
+
+`ListManagedCollections` and `GetManagedCollection` are separate helper-facing service methods:
+they require exact `created_by_service = callerService`, use bounded pagination, and return ACL
+metadata but no blob keys/content. They do not require or bypass reader role/ACL checks; Task 4 must
+call these methods rather than the reader methods or the repository directly.
 
 Change the existing PostgreSQL `SoftDeleteAsset` path to lock the asset and all active memberships
 in one transaction, allocate the next revision independently for each affected collection, and
@@ -388,7 +396,7 @@ Expected: failure because routes do not exist.
 
 - [ ] **Step 3: Add a helper-only middleware**
 
-Keep existing generic `internal` workload validation, then require exact caller `hhc-line-function-bot` for these routes. Pass caller service into the service input; never accept owner/caller identity from JSON. Management list is cursor-paginated; management GET calls the Task 2 collection service and returns collection plus ACL metadata but never content/blob keys.
+Keep existing generic `internal` workload validation, then require exact caller `hhc-line-function-bot` for these routes. Pass caller service into the service input; never accept owner/caller identity from JSON. Management list is cursor-paginated; list/GET call Task 2 `ListManagedCollections`/`GetManagedCollection` and return collection plus ACL metadata but never content/blob keys.
 
 - [ ] **Step 4: Add bounded request validation**
 
