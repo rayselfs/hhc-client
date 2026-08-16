@@ -1,7 +1,16 @@
 import type { SyncOfflinePolicy, SyncProviderType } from '@shared/types/folder'
 import type { SyncEntryRecord } from './sync-db'
 
-export type SyncRetryClassification = 'retryable' | 'auth-required' | 'offline' | 'fatal'
+export type SyncRetryClassification =
+  | 'retryable'
+  | 'auth-required'
+  | 'access-revoked'
+  | 'offline'
+  | 'fatal'
+
+export type SyncRemoteContentSource =
+  | { kind: 'ticket'; url: string; expiresAt: number; etag: string }
+  | { kind: 'native-lease'; url: string; leaseId: string; etag: string }
 
 export type SyncDownloadCommitGuard = () => boolean | Promise<boolean>
 
@@ -34,10 +43,12 @@ export interface SyncChangePage {
   items: RemoteSyncItem[]
   nextCursor?: string
   hasMore: boolean
+  reset?: boolean
 }
 
 export interface SyncDownloadRequest {
   providerConnectionId: string
+  rootRemoteFolderId?: string
   remoteItemId: string
   targetBlobId: string
   offlinePolicy: SyncOfflinePolicy
@@ -60,6 +71,10 @@ export interface ReadOnlySyncProvider {
     cursor: string
   }): Promise<SyncChangePage>
   getMetadata(providerConnectionId: string, remoteItemId: string): Promise<RemoteSyncItem>
+  getRemoteContentSource?(
+    providerConnectionId: string,
+    remoteItemId: string
+  ): Promise<SyncRemoteContentSource>
   downloadContent(
     request: SyncDownloadRequest,
     signal: AbortSignal,

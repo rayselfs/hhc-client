@@ -41,6 +41,7 @@ export interface HhcAuthService {
   begin(): Promise<void>
   completeProtocolCallback(action: AccountAuthAction): Promise<boolean>
   getAccessToken(): Promise<string | null>
+  refreshAccessToken(): Promise<string | null>
   getSession(): Promise<HhcSession | null>
   signOut(): Promise<void>
   subscribe(listener: (session: HhcSession | null) => void): () => void
@@ -191,6 +192,19 @@ class MainHhcAuthService implements HhcAuthService {
       return this.accessCredential.token
     }
     this.accessCredential = null
+    if (this.refreshInFlight) return this.refreshInFlight
+
+    this.refreshInFlight = this.refreshStoredCredential().finally(() => {
+      this.refreshInFlight = null
+    })
+    return this.refreshInFlight
+  }
+
+  async refreshAccessToken(): Promise<string | null> {
+    if (this.signOutInFlight) return null
+    const completion = this.completionInFlight
+    if (completion) await completion
+    if (this.signOutInFlight) return null
     if (this.refreshInFlight) return this.refreshInFlight
 
     this.refreshInFlight = this.refreshStoredCredential().finally(() => {
@@ -462,6 +476,10 @@ export function registerHhcAuthIpc(wm: WindowManager, service: HhcAuthService): 
   ipcMain.handle(
     'hhc-auth:get-access-token',
     authorized(() => service.getAccessToken())
+  )
+  ipcMain.handle(
+    'hhc-auth:refresh-access-token',
+    authorized(() => service.refreshAccessToken())
   )
   ipcMain.handle(
     'hhc-auth:get-session',

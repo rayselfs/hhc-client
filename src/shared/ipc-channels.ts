@@ -21,6 +21,17 @@ import type {
 } from './types/timer'
 import type { BibleVersion, BibleBook } from './types/bible'
 import type { HhcSession } from './hhc-auth'
+import type {
+  HhcAssetCollectionChangePage,
+  HhcAssetCollectionItem,
+  HhcAssetCollectionPage,
+  HhcAssetCollectionRequest,
+  HhcAssetContentTicket,
+  HhcAssetItemRequest,
+  HhcAssetNativeDownloadRequest,
+  HhcAssetNativeDownloadResult,
+  HhcAssetNativeLease
+} from './hhc-assets'
 
 export type WhisperModel = 'whisper-base' | 'whisper-small' | 'whisper-medium'
 
@@ -289,8 +300,31 @@ export interface IpcInvokeMap {
   'onedrive:wait-auth-callback': { args: [string?]; result: string | null }
   'hhc-auth:begin': { args: []; result: void }
   'hhc-auth:get-access-token': { args: []; result: string | null }
+  'hhc-auth:refresh-access-token': { args: []; result: string | null }
   'hhc-auth:get-session': { args: []; result: HhcSession | null }
   'hhc-auth:sign-out': { args: []; result: void }
+  'hhc-assets:list-collections': { args: [string?]; result: HhcAssetCollectionPage }
+  'hhc-assets:get-collection-changes': {
+    args: [HhcAssetCollectionRequest]
+    result: HhcAssetCollectionChangePage
+  }
+  'hhc-assets:get-collection-item': {
+    args: [HhcAssetItemRequest]
+    result: HhcAssetCollectionItem
+  }
+  'hhc-assets:issue-content-ticket': {
+    args: [HhcAssetItemRequest]
+    result: HhcAssetContentTicket
+  }
+  'hhc-assets:download-file': {
+    args: [HhcAssetNativeDownloadRequest]
+    result: HhcAssetNativeDownloadResult
+  }
+  'hhc-assets:create-content-lease': {
+    args: [HhcAssetItemRequest]
+    result: HhcAssetNativeLease
+  }
+  'hhc-assets:release-content-lease': { args: [string]; result: void }
   'onedrive:download-file': {
     args: [OneDriveNativeDownloadRequest]
     result: OneDriveNativeDownloadResult

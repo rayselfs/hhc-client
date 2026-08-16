@@ -430,6 +430,34 @@ describe('HhcAuthService credentials and session', () => {
     expect(currentStoredRecord()).toEqual({ installationId, refreshToken: 'refresh-3' })
   })
 
+  it('explicitly refreshes a still-valid cached access token and coalesces callers', async () => {
+    const service = createHhcAuthService({ now: () => now })
+    await service.begin()
+    mockNetFetch
+      .mockResolvedValueOnce(tokenResponse('refresh-1'))
+      .mockResolvedValueOnce(profileResponse())
+    await service.completeProtocolCallback(callbackFromOpenedUrl())
+    const cached = await service.getAccessToken()
+
+    mockNetFetch
+      .mockResolvedValueOnce(tokenResponse('refresh-2'))
+      .mockResolvedValueOnce(profileResponse())
+    const [first, second] = await Promise.all([
+      service.refreshAccessToken(),
+      service.refreshAccessToken()
+    ])
+
+    expect(first).toBe(second)
+    expect(first).toBeTruthy()
+    expect(cached).toBeTruthy()
+    expect(mockNetFetch).toHaveBeenCalledTimes(4)
+    expect(Object.fromEntries(bodyAt(2))).toMatchObject({
+      grant_type: 'refresh_token',
+      refresh_token: 'refresh-1'
+    })
+    expect(currentStoredRecord()).toMatchObject({ refreshToken: 'refresh-2' })
+  })
+
   it('clears invalid refresh credentials while preserving the installation id', async () => {
     const service = createHhcAuthService({ now: () => now })
     await service.begin()
@@ -579,6 +607,7 @@ describe('HHC auth IPC', () => {
       begin: vi.fn().mockResolvedValue(undefined),
       completeProtocolCallback: vi.fn().mockResolvedValue(false),
       getAccessToken: vi.fn().mockResolvedValue('access-token'),
+      refreshAccessToken: vi.fn().mockResolvedValue('refreshed-access-token'),
       getSession: vi.fn().mockResolvedValue(null),
       signOut: vi.fn().mockResolvedValue(undefined),
       subscribe: vi.fn(() => () => undefined)
@@ -599,6 +628,7 @@ describe('HHC auth IPC', () => {
       for (const channel of [
         'hhc-auth:begin',
         'hhc-auth:get-access-token',
+        'hhc-auth:refresh-access-token',
         'hhc-auth:get-session',
         'hhc-auth:sign-out'
       ]) {
@@ -626,6 +656,9 @@ describe('HHC auth IPC', () => {
     await expect(handlers.get('hhc-auth:begin')!(makeEvent())).resolves.toBeUndefined()
     await expect(handlers.get('hhc-auth:get-access-token')!(makeEvent())).resolves.toBe(
       'access-token'
+    )
+    await expect(handlers.get('hhc-auth:refresh-access-token')!(makeEvent())).resolves.toBe(
+      'refreshed-access-token'
     )
     expect(handlers.has('hhc-auth:complete')).toBe(false)
 

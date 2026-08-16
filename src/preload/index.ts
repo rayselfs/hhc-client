@@ -179,11 +179,27 @@ const oneDriveApi = {
 const hhcAuthApi = {
   begin: () => typedInvoke('hhc-auth:begin'),
   getAccessToken: () => typedInvoke('hhc-auth:get-access-token'),
+  refreshAccessToken: () => typedInvoke('hhc-auth:refresh-access-token'),
   getSession: () => typedInvoke('hhc-auth:get-session'),
   signOut: () => typedInvoke('hhc-auth:sign-out'),
   onSessionChanged: (
     callback: (session: IpcMainToRendererMap['hhc-auth:session-changed'][0]) => void
   ) => typedOn('hhc-auth:session-changed', callback)
+}
+
+const hhcAssetsApi = {
+  listCollections: (cursor?: string) => typedInvoke('hhc-assets:list-collections', cursor),
+  getCollectionChanges: (request: IpcInvokeMap['hhc-assets:get-collection-changes']['args'][0]) =>
+    typedInvoke('hhc-assets:get-collection-changes', request),
+  getCollectionItem: (request: IpcInvokeMap['hhc-assets:get-collection-item']['args'][0]) =>
+    typedInvoke('hhc-assets:get-collection-item', request),
+  issueContentTicket: (request: IpcInvokeMap['hhc-assets:issue-content-ticket']['args'][0]) =>
+    typedInvoke('hhc-assets:issue-content-ticket', request),
+  downloadFile: (request: IpcInvokeMap['hhc-assets:download-file']['args'][0]) =>
+    typedInvoke('hhc-assets:download-file', request),
+  createContentLease: (request: IpcInvokeMap['hhc-assets:create-content-lease']['args'][0]) =>
+    typedInvoke('hhc-assets:create-content-lease', request),
+  releaseContentLease: (leaseId: string) => typedInvoke('hhc-assets:release-content-lease', leaseId)
 }
 
 const lanRemoteApi = {
@@ -214,6 +230,7 @@ const api = {
   localSync: localSyncApi,
   oneDrive: oneDriveApi,
   hhcAuth: hhcAuthApi,
+  hhcAssets: hhcAssetsApi,
   lanRemote: lanRemoteApi
 }
 

@@ -439,12 +439,18 @@ async function downloadOneDriveItemForPresentation(item: FileItemRecord): Promis
 
   const connection = await getProviderConnection(entry.providerConnectionId)
   if (connection?.providerType !== 'onedrive') return false
+  const folders = useFileExplorerStore.getState().folders
+  let parent: FolderRecord | undefined = folders[item.parentId]
+  while (parent && !parent.syncLink) parent = parent.parentId ? folders[parent.parentId] : undefined
+  const rootRemoteFolderId = parent?.syncLink?.remoteFolderId
+  if (!rootRemoteFolderId) return false
 
   const provider = createStoredOneDriveProvider(entry.providerConnectionId)
   const result = await enqueueSyncDownload({
     provider,
     request: {
       providerConnectionId: entry.providerConnectionId,
+      rootRemoteFolderId,
       remoteItemId: entry.remoteItemId,
       targetBlobId: item.id,
       offlinePolicy: 'always-offline'
@@ -477,6 +483,7 @@ async function downloadImportedOneDriveItems(input: {
   provider: OneDriveReadonlyProvider
   remoteItems: RemoteSyncItem[]
   plan: OneDriveImportPlan
+  rootRemoteFolderId: string
 }): Promise<void> {
   const remoteById = new Map(input.remoteItems.map((item) => [item.remoteItemId, item]))
 
@@ -488,6 +495,7 @@ async function downloadImportedOneDriveItems(input: {
       provider: input.provider,
       request: {
         providerConnectionId: input.connection.id,
+        rootRemoteFolderId: input.rootRemoteFolderId,
         remoteItemId: item.remoteItemId,
         targetBlobId: item.itemId,
         offlinePolicy: 'always-offline'
@@ -694,11 +702,15 @@ export async function importOneDriveFolder(
   mergeImportedRecordsIntoStore(plan.folders, plan.items)
 
   if (defaultSyncOfflinePolicy === 'always-offline') {
-    void downloadImportedOneDriveItems({ connection, provider, remoteItems, plan }).catch(
-      (error) => {
-        console.warn('[onedrive] Failed to finish offline downloads', error)
-      }
-    )
+    void downloadImportedOneDriveItems({
+      connection,
+      provider,
+      remoteItems,
+      plan,
+      rootRemoteFolderId: remoteFolder.remoteItemId
+    }).catch((error) => {
+      console.warn('[onedrive] Failed to finish offline downloads', error)
+    })
   }
 
   return {
@@ -859,6 +871,7 @@ async function runOneDriveFolderRefresh(
       provider,
       request: {
         providerConnectionId: syncLink.providerConnectionId,
+        rootRemoteFolderId: syncLink.remoteFolderId,
         remoteItemId: transfer.remoteItemId,
         targetBlobId: transfer.itemId,
         offlinePolicy

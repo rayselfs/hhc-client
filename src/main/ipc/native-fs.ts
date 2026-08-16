@@ -9,8 +9,10 @@ import { isMainWindow } from './validate'
 
 const NATIVE_MEDIA_SCHEME = 'hhc-media:'
 const NATIVE_MEDIA_HOST = 'file'
+const NATIVE_MEDIA_LEASE_HOST = 'lease'
 const MIME_TYPE_PATTERN = /^[a-z0-9][a-z0-9!#$&^_.+-]*\/[a-z0-9][a-z0-9!#$&^_.+-]*$/i
 const RANGE_PATTERN = /^bytes=(\d*)-(\d*)$/
+const nativeMediaLeases = new Map<string, { filePath: string; mimeType: string }>()
 
 function getNativeFsDir(): string {
   return resolve(app.getPath('userData'), 'native-files')
@@ -42,6 +44,33 @@ export function parseNativeMediaUrl(requestUrl: string): { id: string; mimeType:
   } catch {
     return null
   }
+}
+
+export function registerNativeMediaLease(
+  filePath: string,
+  mimeType: string,
+  etag: string
+): { kind: 'native-lease'; url: string; leaseId: string; etag: string } {
+  if (!isAbsolute(filePath)) throw new Error('Invalid native media lease path')
+  const leaseId = randomUUID()
+  const validatedMimeType = MIME_TYPE_PATTERN.test(mimeType) ? mimeType : 'application/octet-stream'
+  nativeMediaLeases.set(leaseId, { filePath, mimeType: validatedMimeType })
+  return {
+    kind: 'native-lease',
+    url: `hhc-media://${NATIVE_MEDIA_LEASE_HOST}/${leaseId}?type=${encodeURIComponent(validatedMimeType)}`,
+    leaseId,
+    etag
+  }
+}
+
+export async function releaseNativeMediaLease(leaseId: unknown): Promise<void> {
+  if (!isValidNativeFileId(leaseId)) throw new Error('Invalid native media lease id')
+  const lease = nativeMediaLeases.get(leaseId)
+  if (!lease) return
+  nativeMediaLeases.delete(leaseId)
+  await fs.unlink(lease.filePath).catch((error: NodeJS.ErrnoException) => {
+    if (error.code !== 'ENOENT') throw error
+  })
 }
 
 type ByteRange = {
@@ -169,7 +198,26 @@ export function registerNativeFsHandlers(wm: WindowManager): void {
 export function registerNativeMediaProtocol(): void {
   protocol.handle('hhc-media', async (request) => {
     const parsed = parseNativeMediaUrl(request.url)
-    if (!parsed) return new Response('Invalid media URL', { status: 400 })
+    if (!parsed) {
+      try {
+        const url = new URL(request.url)
+        if (url.protocol !== NATIVE_MEDIA_SCHEME || url.hostname !== NATIVE_MEDIA_LEASE_HOST) {
+          return new Response('Invalid media URL', { status: 400 })
+        }
+        const leaseId = decodeURIComponent(
+          url.pathname.startsWith('/') ? url.pathname.slice(1) : url.pathname
+        )
+        const lease = isValidNativeFileId(leaseId) ? nativeMediaLeases.get(leaseId) : undefined
+        if (!lease) return new Response('Media not found', { status: 404 })
+        return await createNativeMediaResponse(
+          lease.filePath,
+          lease.mimeType,
+          request.headers.get('range')
+        )
+      } catch {
+        return new Response('Media not found', { status: 404 })
+      }
+    }
 
     try {
       const filePath = getNativeFilePath(parsed.id)

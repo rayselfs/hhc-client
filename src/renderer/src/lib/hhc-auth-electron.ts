@@ -15,6 +15,10 @@ export class ElectronHhcAuthAdapter implements HhcAuthAdapter {
     return window.api.hhcAuth.getAccessToken()
   }
 
+  refreshAccessToken(): Promise<string | null> {
+    return window.api.hhcAuth.refreshAccessToken()
+  }
+
   signOut(): Promise<void> {
     return window.api.hhcAuth.signOut()
   }

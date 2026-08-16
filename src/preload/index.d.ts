@@ -34,6 +34,17 @@ import type {
   LanRemotePairingInfo,
   LanRemoteStatus
 } from '../shared/ipc-channels'
+import type {
+  HhcAssetCollectionChangePage,
+  HhcAssetCollectionItem,
+  HhcAssetCollectionPage,
+  HhcAssetCollectionRequest,
+  HhcAssetContentTicket,
+  HhcAssetItemRequest,
+  HhcAssetNativeDownloadRequest,
+  HhcAssetNativeDownloadResult,
+  HhcAssetNativeLease
+} from '../shared/hhc-assets'
 import type { LanRemoteAck, LanRemoteCommand, LanRemoteSnapshot } from '../shared/lan-remote'
 import type {
   TimerCommand,
@@ -165,9 +176,22 @@ interface OneDriveAPI {
 interface HhcAuthAPI {
   begin: () => Promise<void>
   getAccessToken: () => Promise<string | null>
+  refreshAccessToken: () => Promise<string | null>
   getSession: () => Promise<HhcSession | null>
   signOut: () => Promise<void>
   onSessionChanged: (callback: (session: HhcSession | null) => void) => () => void
+}
+
+interface HhcAssetsAPI {
+  listCollections: (cursor?: string) => Promise<HhcAssetCollectionPage>
+  getCollectionChanges: (
+    request: HhcAssetCollectionRequest
+  ) => Promise<HhcAssetCollectionChangePage>
+  getCollectionItem: (request: HhcAssetItemRequest) => Promise<HhcAssetCollectionItem>
+  issueContentTicket: (request: HhcAssetItemRequest) => Promise<HhcAssetContentTicket>
+  downloadFile: (request: HhcAssetNativeDownloadRequest) => Promise<HhcAssetNativeDownloadResult>
+  createContentLease: (request: HhcAssetItemRequest) => Promise<HhcAssetNativeLease>
+  releaseContentLease: (leaseId: string) => Promise<void>
 }
 
 interface LanRemoteAPI {
@@ -196,6 +220,7 @@ declare global {
       localSync: LocalSyncAPI
       oneDrive: OneDriveAPI
       hhcAuth: HhcAuthAPI
+      hhcAssets: HhcAssetsAPI
       lanRemote: LanRemoteAPI
     }
   }

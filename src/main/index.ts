@@ -19,6 +19,7 @@ import { registerOneDriveDownloadHandlers } from './ipc/onedrive-download'
 import { isKnownWindow, validateTheme } from './ipc/validate'
 import { registerUpdateService } from './updateService'
 import { createHhcAuthService, registerHhcAuthIpc } from './ipc/hhc-auth'
+import { registerHhcAssetHandlers } from './ipc/hhc-assets'
 import { createLibrePresenterProtocolDispatcher } from './protocol-router'
 
 protocol.registerSchemesAsPrivileged([
@@ -128,6 +129,7 @@ if (gotSingleInstanceLock) {
     registerLanRemoteIpc(wm)
     registerOneDriveCredentialHandlers(wm)
     registerHhcAuthIpc(wm, hhcAuthService)
+    registerHhcAssetHandlers(wm, hhcAuthService)
     registerOneDriveDownloadHandlers(wm)
     registerNativeMediaProtocol()
     wm.createMainWindow()

@@ -245,6 +245,36 @@ describe('browser HHC auth', () => {
     expect(new Headers(access?.headers).get('x-hhc-roles')).toBeNull()
   })
 
+  it('explicitly refreshes a still-valid cached access token', async () => {
+    const firstToken = jwt({ sub: 'user-1', roles: ['media_sync_user'], exp: 9_999_999_999 })
+    const secondToken = jwt({
+      sub: 'user-1',
+      roles: ['media_sync_user', 'reader'],
+      exp: 9_999_999_999
+    })
+    let accessTokenRequests = 0
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).endsWith('/session')) {
+        return response({ authenticated: true, user: { id: 'user-1', display_name: 'Ada' } })
+      }
+      if (String(input).endsWith('/csrf-token')) return response({ csrf_token: 'csrf-refresh' })
+      if (String(input).endsWith('/session/access-token')) {
+        accessTokenRequests += 1
+        return response({ access_token: accessTokenRequests === 1 ? firstToken : secondToken })
+      }
+      throw new Error(`Unexpected URL: ${String(input)}`)
+    })
+    const { adapter } = createAdapter({ fetcher, accountOrigin: 'https://force-refresh.example' })
+
+    await expect(adapter.getAccessToken()).resolves.toBe(firstToken)
+    await expect(adapter.getAccessToken()).resolves.toBe(firstToken)
+    await expect(adapter.refreshAccessToken()).resolves.toBe(secondToken)
+    await expect(adapter.getSession()).resolves.toMatchObject({
+      roles: ['media_sync_user', 'reader']
+    })
+    expect(accessTokenRequests).toBe(2)
+  })
+
   it('coalesces CSRF calls and retries a rejected protected request once with a new token', async () => {
     let csrfRequests = 0
     let accessRequests = 0

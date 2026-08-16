@@ -189,6 +189,17 @@ export class BrowserHhcAuthAdapter implements HhcAuthAdapter {
     return token
   }
 
+  async refreshAccessToken(): Promise<string | null> {
+    const session = this.session ?? (await this.getSession())
+    if (!session) return null
+
+    const token = await this.requestAccessToken(session.userId)
+    this.accessToken = token
+    this.session = { ...session, roles: readClaims(token, session.userId, this.now()) }
+    this.notify()
+    return token
+  }
+
   async signOut(): Promise<void> {
     try {
       await responseJson(await this.protectedPost('/session/logout'))

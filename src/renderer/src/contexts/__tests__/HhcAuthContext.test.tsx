@@ -41,6 +41,7 @@ function createAdapter(session: HhcSession | null | Error = null): TestAdapter {
     }),
     signIn: vi.fn(async () => undefined),
     getAccessToken: vi.fn(async () => 'access-token'),
+    refreshAccessToken: vi.fn(async () => 'refreshed-access-token'),
     signOut: vi.fn(async () => undefined),
     subscribe: vi.fn((nextListener) => {
       listener = nextListener

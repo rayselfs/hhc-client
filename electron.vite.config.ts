@@ -15,6 +15,7 @@ const DEFAULT_BIBLE_API_HOST = 'https://www.alive.org.tw'
 const DEFAULT_BIBLE_API_V1_PREFIX = '/api/bible/v1'
 const DEFAULT_BIBLE_API_V2_PREFIX = '/api/bible/v2'
 const DEFAULT_HHC_ACCOUNT_ORIGIN = 'https://account.alive.org.tw'
+const DEFAULT_HHC_ASSET_ORIGIN = 'https://www.alive.org.tw'
 
 function cleanPath(value: string | undefined, fallback: string): string {
   const trimmed = value?.trim()
@@ -43,6 +44,7 @@ function cleanHttpOrigin(value: string | undefined, fallback: string): string {
 function createBuildConfig(mode: string): {
   bibleApiHost: string
   hhcAccountOrigin: string
+  hhcAssetOrigin: string
   defines: Record<string, string>
 } {
   const env = loadEnv(mode, process.cwd(), '')
@@ -53,14 +55,17 @@ function createBuildConfig(mode: string): {
       : DEFAULT_ONEDRIVE_CLIENT_ID
   const bibleApiHost = env.VITE_BIBLE_API_HOST?.trim() || DEFAULT_BIBLE_API_HOST
   const hhcAccountOrigin = cleanHttpOrigin(env.VITE_HHC_ACCOUNT_ORIGIN, DEFAULT_HHC_ACCOUNT_ORIGIN)
+  const hhcAssetOrigin = cleanHttpOrigin(env.VITE_HHC_ASSET_ORIGIN, DEFAULT_HHC_ASSET_ORIGIN)
 
   return {
     bibleApiHost,
     hhcAccountOrigin,
+    hhcAssetOrigin,
     defines: {
       __APP_VERSION__: JSON.stringify(pkg.version),
       __ONEDRIVE_CLIENT_ID__: JSON.stringify(oneDriveClientId),
       __HHC_ACCOUNT_ORIGIN__: JSON.stringify(hhcAccountOrigin),
+      __HHC_ASSET_ORIGIN__: JSON.stringify(hhcAssetOrigin),
       __BIBLE_API_HOST__: JSON.stringify(bibleApiHost),
       __BIBLE_API_V1_PREFIX__: JSON.stringify(
         cleanPath(env.VITE_BIBLE_API_V1_PREFIX, DEFAULT_BIBLE_API_V1_PREFIX)

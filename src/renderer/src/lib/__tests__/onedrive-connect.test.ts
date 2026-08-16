@@ -460,6 +460,9 @@ describe('importOneDriveFolder', () => {
 
     expect(result).toMatchObject({ itemCount: 1, downloadedCount: 0 })
     await vi.waitFor(() => expect(providerMocks.downloadContent).toHaveBeenCalledTimes(1))
+    expect(providerMocks.downloadContent.mock.calls[0]?.[0]).toMatchObject({
+      rootRemoteFolderId: 'remote-folder-1'
+    })
 
     download.resolve({ blobId: 'file-1', size: 100, mimeType: 'image/png' })
     await vi.waitFor(() => expect(refreshImportedMediaAssets).toHaveBeenCalledTimes(1))

@@ -67,8 +67,10 @@ import type { WindowManager } from '../../windowManager'
 import {
   getNativeFilePath,
   parseNativeMediaUrl,
+  registerNativeMediaLease,
   registerNativeFsHandlers,
-  registerNativeMediaProtocol
+  registerNativeMediaProtocol,
+  releaseNativeMediaLease
 } from '../../ipc/native-fs'
 
 const wm = mockWindowManager as unknown as WindowManager
@@ -232,6 +234,28 @@ describe('native media protocol', () => {
     expect(response.headers.get('Content-Length')).toBe('100')
     expect(response.headers.get('Content-Type')).toBe('video/mp4')
     expect(response.headers.get('Content-Range')).toBeNull()
+  })
+
+  it('streams and releases only opaque session media leases', async () => {
+    const leasePath = '/tmp/hhc-user-data/hhc-asset-leases/content.bin'
+    const lease = registerNativeMediaLease(leasePath, 'video/mp4', '"etag-1"')
+    mockStat.mockResolvedValueOnce({ isFile: () => true, size: 100 })
+    const handler = protocolHandlers.get('hhc-media')
+
+    const response = await handler!(new Request(lease.url, { headers: { Range: 'bytes=-10' } }))
+
+    expect(lease).toMatchObject({
+      leaseId: expect.stringMatching(/^[0-9a-f-]{36}$/),
+      etag: '"etag-1"'
+    })
+    expect(lease.url).toMatch(/^hhc-media:\/\/lease\/[0-9a-f-]{36}\?type=video%2Fmp4$/)
+    expect(mockCreateReadStream).toHaveBeenCalledWith(leasePath, { start: 90, end: 99 })
+    expect(response.status).toBe(206)
+
+    await releaseNativeMediaLease(lease.leaseId)
+    expect(mockUnlink).toHaveBeenCalledWith(leasePath)
+    const missing = await handler!(new Request(lease.url))
+    expect(missing.status).toBe(404)
   })
 
   it('returns 416 for invalid media byte ranges', async () => {
