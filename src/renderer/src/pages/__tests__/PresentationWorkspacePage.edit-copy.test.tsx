@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import PresentationWorkspacePage, { PptxDocumentView } from '../PresentationWorkspacePage'
 import {
@@ -257,6 +258,53 @@ describe('PresentationWorkspacePage read-only PPTX edit copy', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Close Slides' }))
     expect(navigatorSlot).not.toHaveClass('workspace-overlay-open')
     await waitFor(() => expect(screen.getByRole('button', { name: 'Slides' })).toHaveFocus())
+  })
+
+  it('closes Format Background when leaving Design without moving focus from the selected tab', async () => {
+    const user = userEvent.setup()
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const sourceItem = makeFile({
+      id: 'editable-deck',
+      name: 'Sunday Editable',
+      url: 'blob:editable-deck',
+      mimeType: EDITABLE_PRESENTATION_MIME_TYPE
+    })
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({ document, revision: 0 })
+
+    renderEditableDeck(sourceItem)
+    const ribbonFrame = await screen.findByTestId('presentation-ribbon-frame')
+    await user.click(screen.getByRole('button', { name: '設計' }))
+    await user.click(within(ribbonFrame).getByRole('button', { name: 'Format Background' }))
+
+    const insertTab = screen.getByRole('button', { name: '插入' })
+    await user.click(insertTab)
+
+    expect(window.document.querySelector('.workspace-inspector-slot')).toBeNull()
+    expect(insertTab).toHaveFocus()
+  })
+
+  it('closes Format Background when collapsing Design without moving focus from Design', async () => {
+    const user = userEvent.setup()
+    const document = createBlankEditablePresentationDocument('Sunday')
+    const sourceItem = makeFile({
+      id: 'editable-deck',
+      name: 'Sunday Editable',
+      url: 'blob:editable-deck',
+      mimeType: EDITABLE_PRESENTATION_MIME_TYPE
+    })
+    mocks.loadEditablePresentationSnapshot.mockResolvedValue({ document, revision: 0 })
+
+    renderEditableDeck(sourceItem)
+    const ribbonFrame = await screen.findByTestId('presentation-ribbon-frame')
+    const designTab = screen.getByRole('button', { name: '設計' })
+    await user.click(designTab)
+    await user.click(within(ribbonFrame).getByRole('button', { name: 'Format Background' }))
+
+    await user.click(designTab)
+
+    expect(ribbonFrame).toHaveClass('h-0')
+    expect(window.document.querySelector('.workspace-inspector-slot')).toBeNull()
+    expect(designTab).toHaveFocus()
   })
 
   it('keeps Home, Insert, and Design ribbon panels at the same native height', async () => {

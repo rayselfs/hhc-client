@@ -455,11 +455,15 @@ function EditableDocumentView({
   deck,
   activeRibbon,
   isRibbonOpen,
+  isBackgroundPanelOpen,
+  onBackgroundPanelOpenChange,
   onSelectedElementTypeChange
 }: {
   deck: PresentationWorkspaceDocument
   activeRibbon: RibbonTab
   isRibbonOpen: boolean
+  isBackgroundPanelOpen: boolean
+  onBackgroundPanelOpenChange: (open: boolean) => void
   onSelectedElementTypeChange: (type: PresentationElementType | null) => void
 }): React.JSX.Element {
   const registry = usePresentationSessionRegistry()
@@ -510,6 +514,8 @@ function EditableDocumentView({
       session={session}
       activeRibbon={activeRibbon}
       isRibbonOpen={isRibbonOpen}
+      isBackgroundPanelOpen={isBackgroundPanelOpen}
+      onBackgroundPanelOpenChange={onBackgroundPanelOpenChange}
       onSelectedElementTypeChange={onSelectedElementTypeChange}
     />
   )
@@ -520,12 +526,16 @@ function EditableSessionDocumentView({
   session,
   activeRibbon,
   isRibbonOpen,
+  isBackgroundPanelOpen,
+  onBackgroundPanelOpenChange,
   onSelectedElementTypeChange
 }: {
   deck: PresentationWorkspaceDocument
   session: PresentationEditorSession
   activeRibbon: RibbonTab
   isRibbonOpen: boolean
+  isBackgroundPanelOpen: boolean
+  onBackgroundPanelOpenChange: (open: boolean) => void
   onSelectedElementTypeChange: (type: PresentationElementType | null) => void
 }): React.JSX.Element {
   const { t } = useTranslation()
@@ -559,7 +569,6 @@ function EditableSessionDocumentView({
   const [selectedSlideIds, setSelectedSlideIds] = useState<Set<string>>(() => new Set())
   const [selectionAnchorIndex, setSelectionAnchorIndex] = useState(0)
   const [insertionIndex, setInsertionIndex] = useState<number | null>(null)
-  const [isBackgroundPanelOpen, setIsBackgroundPanelOpen] = useState(false)
   const [isLineSpacingOptionsOpen, setIsLineSpacingOptionsOpen] = useState(false)
   const [lineSpacingDraft, setLineSpacingDraft] = useState(1.15)
   const [editingElementId, setEditingElementId] = useState<string | null>(null)
@@ -588,7 +597,7 @@ function EditableSessionDocumentView({
   )
 
   const closeBackgroundPanel = (): void => {
-    setIsBackgroundPanelOpen(false)
+    onBackgroundPanelOpenChange(false)
     setCompactOverlay(null)
     queueMicrotask(() => formatBackgroundTriggerRef.current?.focus())
   }
@@ -1314,7 +1323,7 @@ function EditableSessionDocumentView({
                 variant={isBackgroundPanelOpen ? 'primary' : 'tertiary'}
                 isDisabled={!activeSlide}
                 onPress={() => {
-                  setIsBackgroundPanelOpen(true)
+                  onBackgroundPanelOpenChange(true)
                   setCompactOverlay('inspector')
                 }}
               >
@@ -1755,12 +1764,12 @@ function EditableSessionDocumentView({
           navigatorWidth={railWidth}
           navigatorLabel={t('presentationWorkspace.slides', 'Slides')}
           inspectorLabel={t('presentationWorkspace.formatBackground', 'Format Background')}
-          overlay={compactOverlay}
+          overlay={compactOverlay === 'inspector' && !isBackgroundPanelOpen ? null : compactOverlay}
           inspectorReturnFocusRef={formatBackgroundTriggerRef}
           onOverlayChange={(overlay) => {
             setCompactOverlay(overlay)
             if (overlay === 'navigator' || (overlay === null && compactOverlay === 'inspector')) {
-              setIsBackgroundPanelOpen(false)
+              onBackgroundPanelOpenChange(false)
             }
           }}
           navigator={
@@ -2565,6 +2574,7 @@ export default function PresentationWorkspacePage(): React.JSX.Element {
   const activeDocument = usePresentationWorkspaceStore((state) => state.getActiveDocument())
   const [activeRibbon, setActiveRibbon] = useState<RibbonTab>('home')
   const [isRibbonOpen, setIsRibbonOpen] = useState(true)
+  const [isBackgroundPanelOpen, setIsBackgroundPanelOpen] = useState(false)
   const [selectedElementType, setSelectedElementType] = useState<PresentationElementType | null>(
     null
   )
@@ -2598,6 +2608,7 @@ export default function PresentationWorkspacePage(): React.JSX.Element {
   }, [itemId, openDocument])
 
   const handleRibbonTabClick = (tab: RibbonTab): void => {
+    if (activeRibbon === 'design') setIsBackgroundPanelOpen(false)
     if (tab === activeRibbon) {
       setIsRibbonOpen((open) => !open)
       return
@@ -2647,6 +2658,8 @@ export default function PresentationWorkspacePage(): React.JSX.Element {
             deck={activeDocument}
             activeRibbon={effectiveActiveRibbon}
             isRibbonOpen={isRibbonOpen}
+            isBackgroundPanelOpen={isBackgroundPanelOpen}
+            onBackgroundPanelOpenChange={setIsBackgroundPanelOpen}
             onSelectedElementTypeChange={setSelectedElementType}
           />
         ) : (
