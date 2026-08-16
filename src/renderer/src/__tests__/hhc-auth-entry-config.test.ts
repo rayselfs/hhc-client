@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { OAUTH_CALLBACK_PWA_DENYLIST } from '../../../../scripts/pwa-navigation-denylist'
 
 const root = process.cwd()
 const read = (file: string): string => readFileSync(resolve(root, file), 'utf8')
@@ -32,7 +33,9 @@ describe('HHC browser auth entry and hosting config', () => {
     expect(read('src/shared/app-config.ts')).toContain('hhcAccountOrigin: __HHC_ACCOUNT_ORIGIN__')
   })
 
-  it('keeps the OAuth callback outside PWA navigation fallback', () => {
-    expect(read('electron.vite.config.ts')).toContain('/^\\/oauth\\/callback$/')
+  it('keeps OAuth callback queries outside PWA navigation fallback', () => {
+    expect(OAUTH_CALLBACK_PWA_DENYLIST.test('/oauth/callback?code=code-1&state=state-1')).toBe(true)
+    expect(OAUTH_CALLBACK_PWA_DENYLIST.test('/oauth/callback/other')).toBe(false)
+    expect(read('electron.vite.config.ts')).toContain('OAUTH_CALLBACK_PWA_DENYLIST')
   })
 })

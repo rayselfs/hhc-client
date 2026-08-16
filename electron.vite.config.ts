@@ -7,6 +7,7 @@ import { visualizer } from 'rollup-plugin-visualizer'
 import { VitePWA } from 'vite-plugin-pwa'
 import { loadEnv, type Plugin } from 'vite'
 import { rendererManualChunk } from './scripts/renderer-manual-chunk'
+import { OAUTH_CALLBACK_PWA_DENYLIST } from './scripts/pwa-navigation-denylist'
 
 const pkg = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf-8'))
 const DEFAULT_ONEDRIVE_CLIENT_ID = '4f4c2f2c-8f2a-4c4b-9d2e-8c3a7d638c02'
@@ -154,7 +155,7 @@ export default defineConfig(({ mode }) => {
               '**/assets/aiden0z-pptx-renderer*.js'
             ],
             navigateFallback: '/index.html',
-            navigateFallbackDenylist: [/^\/api\//, /^\/oauth\/callback$/],
+            navigateFallbackDenylist: [/^\/api\//, OAUTH_CALLBACK_PWA_DENYLIST],
             runtimeCaching: [
               {
                 urlPattern: ({ url }) =>
