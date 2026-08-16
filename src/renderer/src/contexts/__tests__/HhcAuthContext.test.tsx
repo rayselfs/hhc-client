@@ -128,6 +128,26 @@ describe('HhcAuthContext', () => {
     expect(result.current.status).toBe('anonymous')
   })
 
+  it('keeps a newer subscription session when bootstrap finishes late', async () => {
+    const adapter = createAdapter(null)
+    let resolveSession: (session: HhcSession | null) => void = () => undefined
+    vi.mocked(adapter.getSession).mockReturnValue(
+      new Promise<HhcSession | null>((resolve) => {
+        resolveSession = resolve
+      })
+    )
+    authFactory.adapters.push(adapter)
+    const { result } = renderHook(() => useHhcAuth(), { wrapper })
+    await waitFor(() => expect(adapter.subscribe).toHaveBeenCalledOnce())
+
+    act(() => adapter.emit(SESSION))
+    expect(result.current.status).toBe('authenticated')
+
+    await act(async () => resolveSession(null))
+    expect(result.current.status).toBe('authenticated')
+    expect(result.current.session).toEqual(SESSION)
+  })
+
   it('coalesces concurrent access-token requests', async () => {
     const adapter = createAdapter(SESSION)
     let resolveToken: (token: string) => void = () => undefined

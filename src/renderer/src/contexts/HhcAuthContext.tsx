@@ -24,6 +24,7 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
     let active = true
     let adapter: HhcAuthAdapter | null = null
     let unsubscribe: (() => void) | null = null
+    let sessionRevision = 0
 
     void createHhcAuthAdapter()
       .then(async (createdAdapter) => {
@@ -34,19 +35,21 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
         }
 
         adapterRef.current = createdAdapter
+        const bootstrapRevision = sessionRevision
         unsubscribe = createdAdapter.subscribe((nextSession) => {
           if (!active) return
+          sessionRevision += 1
           setSession(nextSession)
           setStatus(nextSession ? 'authenticated' : 'anonymous')
         })
 
         try {
           const nextSession = await createdAdapter.getSession()
-          if (!active) return
+          if (!active || sessionRevision !== bootstrapRevision) return
           setSession(nextSession)
           setStatus(nextSession ? 'authenticated' : 'anonymous')
         } catch {
-          if (!active) return
+          if (!active || sessionRevision !== bootstrapRevision) return
           setSession(null)
           setStatus('unavailable')
         }
