@@ -21,6 +21,11 @@ export default function ImagePreview({ item }: ImagePreviewProps): React.JSX.Ele
 
   const zoomLevel = useMediaProjectionStore((s) => s.zoomLevel)
   const pan = useMediaProjectionStore((s) => s.pan)
+  const remoteSourceUrl = useMediaProjectionStore((s) => {
+    const entry = s.snapshot?.entries.find((candidate) => candidate.itemId === item.id)
+    if (!entry?.remoteItem) return undefined
+    return entry.remoteSource ? entry.sourceUrl : null
+  })
 
   useEffect(() => {
     let revokeSource: (() => void) | null = null
@@ -29,6 +34,13 @@ export default function ImagePreview({ item }: ImagePreviewProps): React.JSX.Ele
     async function load(): Promise<void> {
       setLoading(true)
       setError(false)
+      if (remoteSourceUrl !== undefined) {
+        if (remoteSourceUrl) {
+          setImgSrc(remoteSourceUrl)
+          setLoading(false)
+        }
+        return
+      }
       const db = await openFileExplorerDB()
       const source = await getFileSource(db, blobId, item.mimeType)
       if (cancelled) {
@@ -53,7 +65,7 @@ export default function ImagePreview({ item }: ImagePreviewProps): React.JSX.Ele
       revokeSource?.()
       setImgSrc(null)
     }
-  }, [blobId, item.mimeType, retryToken, t])
+  }, [blobId, item.mimeType, remoteSourceUrl, retryToken, t])
 
   if (loading) {
     return (

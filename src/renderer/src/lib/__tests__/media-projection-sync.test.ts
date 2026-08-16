@@ -6,6 +6,7 @@ import type { PresentationEditorSession } from '@renderer/lib/presentation-edito
 import { useMediaProjectionStore } from '@renderer/stores/media-projection'
 import { usePresentationWorkspaceStore } from '@renderer/stores/presentation-workspace'
 import type { FileItemRecord } from '@shared/types/folder'
+import { HhcAssetApiError } from '../hhc-asset-api'
 
 const registryMocks = vi.hoisted(() => ({
   get: vi.fn()
@@ -361,6 +362,16 @@ describe('media projection sync', () => {
       })
     )
     act(() => useMediaProjectionStore.getState().jumpTo(1))
+    await act(async () => Promise.resolve())
+    expect(onAccessRevoked).not.toHaveBeenCalled()
+
+    remoteMocks.prepare.mockRejectedValueOnce(
+      Object.assign(new HhcAssetApiError('access-revoked', 403), {
+        providerConnectionId: 'hhc-line:user-1',
+        remoteItemId: 'asset-1'
+      })
+    )
+    act(() => useMediaProjectionStore.getState().jumpTo(0))
     await act(async () => Promise.resolve())
     expect(onAccessRevoked).toHaveBeenCalledWith({
       providerConnectionId: 'hhc-line:user-1',

@@ -61,6 +61,11 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
   )
   const zoomLevel = useMediaProjectionStore((s) => s.zoomLevel)
   const pan = useMediaProjectionStore((s) => s.pan)
+  const remoteSourceUrl = useMediaProjectionStore((s) => {
+    const entry = s.snapshot?.entries.find((candidate) => candidate.itemId === item.id)
+    if (!entry?.remoteItem) return undefined
+    return entry.remoteSource ? entry.sourceUrl : null
+  })
 
   const thumbs = pdfPageThumbs[item.id] ?? []
 
@@ -85,8 +90,10 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
       setLoading(true)
       setError(false)
       try {
-        const db = await openFileExplorerDB()
-        const source = await getFileSource(db, blobId, item.mimeType)
+        if (remoteSourceUrl === null) return
+        const source = remoteSourceUrl
+          ? { url: remoteSourceUrl, revoke: (): void => undefined }
+          : await getFileSource(await openFileExplorerDB(), blobId, item.mimeType)
         if (cancelled) {
           source?.revoke()
           return
@@ -128,7 +135,7 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
       if (doc) doc.destroy()
       setPdfDoc(null)
     }
-  }, [blobId, item.mimeType, retryToken, t])
+  }, [blobId, item.mimeType, remoteSourceUrl, retryToken, t])
 
   useEffect(() => {
     if (!pdfDoc || pdfViewMode !== 'slide') return

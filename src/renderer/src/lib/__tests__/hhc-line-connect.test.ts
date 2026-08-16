@@ -364,6 +364,66 @@ describe('HHC LINE collection connection', () => {
       'available-offline'
     )
   })
+
+  it('preserves status 403 when a queued desktop presentation download is access-revoked', async () => {
+    mocks.electron = true
+    await putProviderConnection({
+      id: 'hhc-line:user-1',
+      providerType: 'hhc-line',
+      displayName: 'HHC LINE',
+      accountUserId: 'user-1'
+    })
+    await putSyncEntry({
+      providerConnectionId: 'hhc-line:user-1',
+      remoteItemId: 'asset-1',
+      parentRemoteItemId: 'collection-1',
+      kind: 'file',
+      name: 'movie.mkv',
+      itemId: 'local-1',
+      mimeType: 'video/x-matroska',
+      status: 'remote-only'
+    })
+    mocks.api = api({
+      getCollectionItem: vi.fn(async () => ({
+        id: 'asset-1',
+        collectionId: 'collection-1',
+        remoteItemId: 'source-1',
+        displayName: 'movie.mkv',
+        sourceRevision: 'hash-1',
+        createdRevision: 1,
+        mimeType: 'video/x-matroska',
+        sizeBytes: 10,
+        etag: 'etag-1',
+        createdAt: '2026-08-17T00:00:00Z'
+      })),
+      downloadContent: vi.fn(async () => {
+        throw Object.assign(new Error('forbidden'), {
+          classification: 'access-revoked',
+          status: 403
+        })
+      })
+    })
+
+    await expect(
+      ensureHhcLineDesktopItemAvailableForPresentation(
+        auth({
+          current: { userId: 'user-1', displayName: 'Ada', roles: ['media_sync_user'] }
+        }),
+        {
+          id: 'local-1',
+          parentId: 'root',
+          type: 'file',
+          sortIndex: 0,
+          createdAt: 1,
+          expiresAt: null,
+          name: 'movie.mkv',
+          mimeType: 'video/x-matroska',
+          size: 10,
+          url: 'blob:local-1'
+        }
+      )
+    ).rejects.toMatchObject({ classification: 'access-revoked', status: 403 })
+  })
   it('collects every authorized page and excludes only roots imported by the current account', async () => {
     const currentRoot: FolderRecord = {
       id: 'root-current',

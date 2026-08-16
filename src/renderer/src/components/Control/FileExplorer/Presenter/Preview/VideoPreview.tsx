@@ -37,7 +37,7 @@ function formatTime(seconds: number): string {
 export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Element {
   const { t } = useTranslation()
   const { sendCommand } = usePresenterCommands()
-  const videoRef = useRef<HTMLVideoElement>(null)
+  const videoRef = useRef<HTMLMediaElement>(null)
   const seekInputRef = useRef<HTMLInputElement>(null)
   const [videoSrc, setVideoSrc] = useState<string | null>(null)
   const [error, setError] = useState(false)
@@ -80,6 +80,12 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
     const durationMs = s.snapshot?.entries.find((entry) => entry.itemId === item.id)?.durationMs
     return durationMs && durationMs > 0 ? durationMs / 1000 : undefined
   })
+  const remoteSourceUrl = useMediaProjectionStore((s) => {
+    const entry = s.snapshot?.entries.find((candidate) => candidate.itemId === item.id)
+    if (!entry?.remoteItem) return undefined
+    return entry.remoteSource ? entry.sourceUrl : null
+  })
+  const MediaElement = item.mimeType.startsWith('audio/') ? 'audio' : 'video'
   const displayedCurrentTime = currentTime
   const displayedDuration = metadataDuration ?? duration
   const displayedHasStarted = hasStarted
@@ -121,6 +127,10 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
 
     async function load(): Promise<void> {
       setError(false)
+      if (remoteSourceUrl !== undefined) {
+        if (remoteSourceUrl) setVideoSrc(remoteSourceUrl)
+        return
+      }
       const db = await openFileExplorerDB()
       const source = await getFileSource(db, blobId, item.mimeType)
       if (cancelled) {
@@ -147,7 +157,7 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
       if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current)
       if (seekFlashTimeoutRef.current) clearTimeout(seekFlashTimeoutRef.current)
     }
-  }, [blobId, item.mimeType, retryToken, t])
+  }, [blobId, item.mimeType, remoteSourceUrl, retryToken, t])
 
   const triggerFlash = useCallback((icon: 'play' | 'pause'): void => {
     if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current)
@@ -322,8 +332,10 @@ export default function VideoPreview({ item }: VideoPreviewProps): React.JSX.Ele
         }}
       >
         {videoSrc ? (
-          <video
-            ref={videoRef}
+          <MediaElement
+            ref={(element) => {
+              videoRef.current = element
+            }}
             src={videoSrc}
             muted
             style={{ width: '100%', height: '100%', objectFit: 'contain' }}

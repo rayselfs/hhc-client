@@ -185,11 +185,13 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
           if (sequence !== projectSequenceRef.current) return
           const classified = error as {
             classification?: string
+            status?: number
             providerConnectionId?: string
             remoteItemId?: string
           }
           if (
             classified.classification === 'access-revoked' &&
+            classified.status === 403 &&
             classified.providerConnectionId &&
             classified.remoteItemId
           ) {

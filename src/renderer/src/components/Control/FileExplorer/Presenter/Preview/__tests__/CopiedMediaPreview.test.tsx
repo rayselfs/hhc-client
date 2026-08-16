@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { FileItemRecord } from '@shared/types/folder'
+import { presentPreviewItem } from '@renderer/lib/projection-actions'
 import ImagePreview from '../ImagePreview'
 import VideoPreview from '../VideoPreview'
 
@@ -13,6 +14,7 @@ const { mockGetFileSource, mockNext, mockExit, mockT, mockSendCommand } = vi.hoi
 }))
 
 vi.mock('react-i18next', () => ({
+  initReactI18next: { type: '3rdParty', init: vi.fn() },
   useTranslation: () => ({ t: mockT })
 }))
 
@@ -33,7 +35,22 @@ const storeState = {
   zoomLevel: 1,
   pan: { x: 0, y: 0 },
   snapshot: null as null | {
-    entries: Array<{ itemId: string; seekable?: boolean }>
+    entries: Array<{
+      itemId: string
+      sourceUrl: string
+      seekable?: boolean
+      remoteSource?: {
+        providerConnectionId: string
+        remoteItemId: string
+        rootRemoteFolderId: string
+        etag: string
+      }
+      remoteItem?: {
+        providerConnectionId: string
+        remoteItemId: string
+        rootRemoteFolderId: string
+      }
+    }>
   },
   typeStates: {} as { video?: { currentTime?: number; duration?: number } },
   setTypeState: vi.fn(),
@@ -62,6 +79,71 @@ function makeCopy(mimeType: string, name: string): FileItemRecord {
     size: 1,
     mimeType
   }
+}
+
+function setRemoteSource(sourceUrl: string): void {
+  storeState.snapshot = {
+    entries: [
+      {
+        itemId: 'copy-id',
+        sourceUrl,
+        remoteSource: {
+          providerConnectionId: 'hhc-line:user-1',
+          remoteItemId: 'asset-1',
+          rootRemoteFolderId: 'collection-1',
+          etag: 'etag-1'
+        },
+        remoteItem: {
+          providerConnectionId: 'hhc-line:user-1',
+          remoteItemId: 'asset-1',
+          rootRemoteFolderId: 'collection-1'
+        }
+      }
+    ]
+  }
+}
+
+function setPendingRemoteSource(): void {
+  storeState.snapshot = {
+    entries: [
+      {
+        itemId: 'copy-id',
+        sourceUrl: 'hhc-line:asset-1',
+        remoteItem: {
+          providerConnectionId: 'hhc-line:user-1',
+          remoteItemId: 'asset-1',
+          rootRemoteFolderId: 'collection-1'
+        }
+      }
+    ]
+  }
+}
+
+async function presentRemoteItem(item: FileItemRecord, sourceUrl: string): Promise<void> {
+  const navigate = vi.fn()
+  await expect(
+    presentPreviewItem({
+      item,
+      playlist: [item],
+      start: async () => {
+        setRemoteSource(sourceUrl)
+        return {
+          summary: { ready: 1, preparing: 0, unsupported: 0, missing: 0, failed: 0 },
+          items: [
+            {
+              itemId: item.id,
+              blobId: 'original-id',
+              status: 'ready',
+              reason: 'ready-remote',
+              support: 'native'
+            }
+          ]
+        }
+      },
+      navigate
+    })
+  ).resolves.toBeNull()
+  expect(navigate).toHaveBeenCalledWith('/media')
 }
 
 function seekRelative(seconds: number): void {
@@ -112,6 +194,106 @@ describe('copied media preview identity', () => {
       expect(mockGetFileSource).toHaveBeenCalledWith({}, 'original-id', 'video/mp4')
     })
     expect(container.querySelector('video')).toHaveAttribute('src', 'blob:resolved-source')
+  })
+
+  it('keeps local audio on the existing Blob-backed controller path', async () => {
+    const { container } = render(<VideoPreview item={makeCopy('audio/mpeg', 'copy.mp3')} />)
+
+    await waitFor(() => {
+      expect(mockGetFileSource).toHaveBeenCalledWith({}, 'original-id', 'audio/mpeg')
+    })
+    expect(container.querySelector('audio')).toHaveAttribute('src', 'blob:resolved-source')
+  })
+
+  it.each([
+    ['image/png', 'photo.png', 'img'],
+    ['video/mp4', 'movie.mp4', 'video'],
+    ['audio/mpeg', 'song.mp3', 'audio']
+  ])(
+    'uses the current browser ticket in the operator %s controller without reading IndexedDB',
+    async (mimeType, name, selector) => {
+      const sourceUrl = 'https://www.alive.org.tw/api/assets/content?ticket=browser-secret'
+      const Component = mimeType.startsWith('image/') ? ImagePreview : VideoPreview
+      const item = makeCopy(mimeType, name)
+      await presentRemoteItem(item, sourceUrl)
+
+      const { container } = render(<Component item={item} />)
+
+      await waitFor(() => {
+        expect(container.querySelector(selector)).toHaveAttribute('src', sourceUrl)
+      })
+      expect(mockGetFileSource).not.toHaveBeenCalled()
+    }
+  )
+
+  it.each([
+    ['image/png', 'photo.png'],
+    ['video/mp4', 'movie.mp4'],
+    ['audio/mpeg', 'song.mp3']
+  ])(
+    'does not fall back to IndexedDB while the remote %s source is preparing',
+    async (mimeType, name) => {
+      setPendingRemoteSource()
+
+      render(
+        mimeType.startsWith('image/') ? (
+          <ImagePreview item={makeCopy(mimeType, name)} />
+        ) : (
+          <VideoPreview item={makeCopy(mimeType, name)} />
+        )
+      )
+      await act(async () => {
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+
+      expect(mockGetFileSource).not.toHaveBeenCalled()
+    }
+  )
+
+  it.each([
+    ['image/png', 'photo.png', 'img'],
+    ['video/mp4', 'movie.mp4', 'video'],
+    ['audio/mpeg', 'song.mp3', 'audio']
+  ])(
+    'uses the current Electron lease in the operator %s controller without reading IndexedDB',
+    async (mimeType, name, selector) => {
+      const sourceUrl = 'hhc-media://lease/11111111-1111-4111-8111-111111111111'
+      const Component = mimeType.startsWith('image/') ? ImagePreview : VideoPreview
+      const item = makeCopy(mimeType, name)
+      await presentRemoteItem(item, sourceUrl)
+
+      const { container } = render(<Component item={item} />)
+
+      await waitFor(() => {
+        expect(container.querySelector(selector)).toHaveAttribute('src', sourceUrl)
+      })
+      expect(mockGetFileSource).not.toHaveBeenCalled()
+    }
+  )
+
+  it('reloads the operator audio controller when its ticket is renewed', async () => {
+    setRemoteSource('https://www.alive.org.tw/api/assets/content?ticket=first')
+    const item = makeCopy('audio/mpeg', 'song.mp3')
+    const { container, rerender } = render(<VideoPreview item={item} />)
+    await waitFor(() => {
+      expect(container.querySelector('audio')).toHaveAttribute(
+        'src',
+        'https://www.alive.org.tw/api/assets/content?ticket=first'
+      )
+    })
+
+    setRemoteSource('https://www.alive.org.tw/api/assets/content?ticket=second')
+    rerender(<VideoPreview item={item} />)
+
+    await waitFor(() => {
+      expect(container.querySelector('audio')).toHaveAttribute(
+        'src',
+        'https://www.alive.org.tw/api/assets/content?ticket=second'
+      )
+    })
+    fireEvent.click(container.querySelector('button')!)
+    expect(mockSendCommand).toHaveBeenCalledWith({ action: 'play', itemId: 'copy-id' })
   })
 
   it('syncs video playback state immediately on first play', async () => {

@@ -222,6 +222,7 @@ export async function ensureHhcLineDesktopItemAvailableForPresentation(
     if (failed?.errorKind === 'access-revoked') {
       throw Object.assign(new Error('HHC Asset access revoked'), {
         classification: 'access-revoked',
+        status: 403,
         providerConnectionId: found.entry.providerConnectionId,
         remoteItemId: found.entry.remoteItemId
       })

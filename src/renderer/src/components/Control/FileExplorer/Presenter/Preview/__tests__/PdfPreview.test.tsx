@@ -1,17 +1,26 @@
 import { render, waitFor } from '@testing-library/react'
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
 import type { FileItemRecord } from '@shared/types/folder'
+import { presentPreviewItem } from '@renderer/lib/projection-actions'
 import PdfPreview from '../PdfPreview'
 
-const { getPageMock, mockGetFileSource } = vi.hoisted(() => {
+const { getPageMock, mockGetDocument, mockGetFileSource } = vi.hoisted(() => {
   const getPageMock = vi.fn().mockResolvedValue({
     getViewport: vi.fn().mockReturnValue({ width: 100, height: 140 }),
     render: vi.fn().mockReturnValue({ promise: Promise.resolve() })
   })
-  return { getPageMock, mockGetFileSource: vi.fn() }
+  const mockGetDocument = vi.fn().mockReturnValue({
+    promise: Promise.resolve({
+      numPages: 20,
+      getPage: getPageMock,
+      destroy: vi.fn()
+    })
+  })
+  return { getPageMock, mockGetDocument, mockGetFileSource: vi.fn() }
 })
 
 vi.mock('react-i18next', () => ({
+  initReactI18next: { type: '3rdParty', init: vi.fn() },
   useTranslation: () => ({ t: (key: string) => key })
 }))
 
@@ -30,13 +39,7 @@ vi.mock('@renderer/contexts/PresenterCommandContext', () => ({
 
 vi.mock('@renderer/lib/pdfjs-loader', () => ({
   loadPdfjsLib: vi.fn().mockResolvedValue({
-    getDocument: vi.fn().mockReturnValue({
-      promise: Promise.resolve({
-        numPages: 20,
-        getPage: getPageMock,
-        destroy: vi.fn()
-      })
-    })
+    getDocument: mockGetDocument
   })
 }))
 
@@ -44,6 +47,14 @@ const mockStoreState = {
   typeStates: { pdf: { viewMode: 'scroll' as 'scroll' | 'slide' } },
   zoomLevel: 1,
   pan: { x: 0, y: 0 },
+  snapshot: null as null | {
+    entries: Array<{
+      itemId: string
+      sourceUrl: string
+      remoteSource?: { etag: string }
+      remoteItem?: { remoteItemId: string }
+    }>
+  },
   canNext: vi.fn().mockReturnValue(false),
   next: vi.fn(),
   exit: vi.fn(),
@@ -96,9 +107,46 @@ function makeItem(overrides: Partial<FileItemRecord> = {}): FileItemRecord {
   }
 }
 
+async function presentRemotePdf(item: FileItemRecord, sourceUrl: string): Promise<void> {
+  const navigate = vi.fn()
+  await expect(
+    presentPreviewItem({
+      item,
+      playlist: [item],
+      start: async () => {
+        mockStoreState.snapshot = {
+          entries: [
+            {
+              itemId: item.id,
+              sourceUrl,
+              remoteSource: { etag: 'etag-1' },
+              remoteItem: { remoteItemId: 'asset-1' }
+            }
+          ]
+        }
+        return {
+          summary: { ready: 1, preparing: 0, unsupported: 0, missing: 0, failed: 0 },
+          items: [
+            {
+              itemId: item.id,
+              blobId: 'original-pdf-id',
+              status: 'ready',
+              reason: 'ready-remote',
+              support: 'native'
+            }
+          ]
+        }
+      },
+      navigate
+    })
+  ).resolves.toBeNull()
+  expect(navigate).toHaveBeenCalledWith('/media')
+}
+
 describe('PdfPreview scroll mode lazy rendering', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockStoreState.snapshot = null
     mockGetFileSource.mockResolvedValue({
       url: 'blob:fake-pdf',
       revoke: vi.fn()
@@ -172,11 +220,43 @@ describe('PdfPreview scroll mode lazy rendering', () => {
 
     expect(getPageMock).toHaveBeenCalledTimes(1)
   })
+
+  it.each([
+    'https://www.alive.org.tw/api/assets/content?ticket=browser-secret',
+    'hhc-media://lease/11111111-1111-4111-8111-111111111111'
+  ])('loads the current ephemeral operator PDF source without IndexedDB: %s', async (sourceUrl) => {
+    const item = makeItem()
+    await presentRemotePdf(item, sourceUrl)
+
+    render(<PdfPreview item={item} />)
+
+    await waitFor(() => expect(mockGetDocument).toHaveBeenCalledWith(sourceUrl))
+    expect(mockGetFileSource).not.toHaveBeenCalled()
+  })
+
+  it('does not fall back to IndexedDB while the remote PDF source is preparing', async () => {
+    mockStoreState.snapshot = {
+      entries: [
+        {
+          itemId: 'pdf-item-1',
+          sourceUrl: 'hhc-line:asset-1',
+          remoteItem: { remoteItemId: 'asset-1' }
+        }
+      ]
+    }
+
+    render(<PdfPreview item={makeItem()} />)
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(mockGetFileSource).not.toHaveBeenCalled()
+  })
 })
 
 describe('PdfPreview slide sidebar', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockStoreState.snapshot = null
     mockStoreState.typeStates.pdf.viewMode = 'slide'
     mockGetFileSource.mockResolvedValue({
       url: 'blob:fake-pdf',

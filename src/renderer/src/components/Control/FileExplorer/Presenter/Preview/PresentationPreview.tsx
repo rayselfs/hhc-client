@@ -15,6 +15,11 @@ import type { PreviewComponentProps } from '@renderer/lib/presenter-registry'
 export default function PresentationPreview({ item }: PreviewComponentProps): React.JSX.Element {
   const registry = usePresentationSessionRegistry()
   const presentationState = useMediaProjectionStore((s) => s.typeStates.presentation)
+  const remoteSourceUrl = useMediaProjectionStore((s) => {
+    const entry = s.snapshot?.entries.find((candidate) => candidate.itemId === item.id)
+    if (!entry?.remoteItem) return undefined
+    return entry.remoteSource ? entry.sourceUrl : null
+  })
   const slideIndex = presentationState?.slideIndex ?? 0
 
   const handleReady = useCallback((info: { slideCount: number }) => {
@@ -42,9 +47,17 @@ export default function PresentationPreview({ item }: PreviewComponentProps): Re
     )
   }
 
+  if (remoteSourceUrl === null) {
+    return (
+      <div className="flex h-full w-full items-center justify-center rounded-2xl bg-black">
+        <Spinner />
+      </div>
+    )
+  }
+
   return (
     <PptxSlideSurface
-      source={item}
+      source={remoteSourceUrl ? { ...item, url: remoteSourceUrl } : item}
       slideIndex={slideIndex}
       className="rounded-2xl"
       onReady={handleReady}

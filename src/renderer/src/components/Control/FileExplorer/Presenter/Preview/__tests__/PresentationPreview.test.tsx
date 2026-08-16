@@ -10,12 +10,15 @@ import {
 import { EDITABLE_PRESENTATION_MIME_TYPE } from '@renderer/lib/presentation-media'
 import type { PresentationEditorSession } from '@renderer/lib/presentation-editor-session'
 import type { FileItemRecord } from '@shared/types/folder'
+import { presentPreviewItem } from '@renderer/lib/projection-actions'
 
-const { mockLoadEditablePresentation, mockRegistryGet, mockSetTypeState } = vi.hoisted(() => ({
-  mockLoadEditablePresentation: vi.fn(),
-  mockRegistryGet: vi.fn(),
-  mockSetTypeState: vi.fn()
-}))
+const { mockLoadEditablePresentation, mockRegistryGet, mockSetTypeState, mockPptxSource } =
+  vi.hoisted(() => ({
+    mockLoadEditablePresentation: vi.fn(),
+    mockRegistryGet: vi.fn(),
+    mockSetTypeState: vi.fn(),
+    mockPptxSource: vi.fn()
+  }))
 
 vi.mock('@renderer/lib/editable-presentation', async () => {
   const actual = await vi.importActual<typeof import('@renderer/lib/editable-presentation')>(
@@ -28,8 +31,23 @@ vi.mock('@renderer/contexts/PresentationSessionRegistryContext', () => ({
   usePresentationSessionRegistry: () => ({ get: mockRegistryGet })
 }))
 
+vi.mock('@renderer/components/Common/PptxSlideSurface', () => ({
+  default: ({ source }: { source: FileItemRecord }) => {
+    mockPptxSource(source)
+    return <div data-testid="pptx-source">{source.url}</div>
+  }
+}))
+
 const storeState = {
   typeStates: { presentation: { slideIndex: 0 } },
+  snapshot: null as null | {
+    entries: Array<{
+      itemId: string
+      sourceUrl: string
+      remoteSource?: { etag: string }
+      remoteItem?: { remoteItemId: string }
+    }>
+  },
   setTypeState: mockSetTypeState
 }
 
@@ -55,11 +73,58 @@ function makeItem(): FileItemRecord {
   }
 }
 
+function makePptxItem(): FileItemRecord {
+  return {
+    ...makeItem(),
+    id: 'pptx-deck',
+    name: 'Sunday.pptx',
+    url: 'hhc-line:asset-1',
+    mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+  }
+}
+
+async function presentRemotePptx(item: FileItemRecord, sourceUrl: string): Promise<void> {
+  const navigate = vi.fn()
+  await expect(
+    presentPreviewItem({
+      item,
+      playlist: [item],
+      start: async () => {
+        storeState.snapshot = {
+          entries: [
+            {
+              itemId: item.id,
+              sourceUrl,
+              remoteSource: { etag: 'etag-1' },
+              remoteItem: { remoteItemId: 'asset-1' }
+            }
+          ]
+        }
+        return {
+          summary: { ready: 1, preparing: 0, unsupported: 0, missing: 0, failed: 0 },
+          items: [
+            {
+              itemId: item.id,
+              blobId: 'asset-1',
+              status: 'ready',
+              reason: 'ready-remote',
+              support: 'native'
+            }
+          ]
+        }
+      },
+      navigate
+    })
+  ).resolves.toBeNull()
+  expect(navigate).toHaveBeenCalledWith('/media')
+}
+
 describe('PresentationPreview', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockRegistryGet.mockReturnValue(undefined)
     storeState.typeStates.presentation = { slideIndex: 0 }
+    storeState.snapshot = null
   })
 
   it('renders editable slide text and image elements', async () => {
@@ -126,5 +191,35 @@ describe('PresentationPreview', () => {
 
     expect(await screen.findByText('Latest session text')).toBeInTheDocument()
     expect(mockLoadEditablePresentation).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    'https://www.alive.org.tw/api/assets/content?ticket=browser-secret',
+    'hhc-media://lease/11111111-1111-4111-8111-111111111111'
+  ])('passes the current ephemeral source to the operator PPTX surface: %s', async (sourceUrl) => {
+    const item = makePptxItem()
+    await presentRemotePptx(item, sourceUrl)
+
+    render(<PresentationPreview item={item} />)
+
+    expect(screen.getByTestId('pptx-source')).toHaveTextContent(sourceUrl)
+    expect(mockPptxSource).toHaveBeenCalledWith(expect.objectContaining({ url: sourceUrl }))
+  })
+
+  it('does not open the durable PPTX source while its remote source is preparing', () => {
+    storeState.snapshot = {
+      entries: [
+        {
+          itemId: 'pptx-deck',
+          sourceUrl: 'hhc-line:asset-1',
+          remoteItem: { remoteItemId: 'asset-1' }
+        }
+      ]
+    }
+
+    render(<PresentationPreview item={makePptxItem()} />)
+
+    expect(screen.queryByTestId('pptx-source')).not.toBeInTheDocument()
+    expect(mockPptxSource).not.toHaveBeenCalled()
   })
 })
