@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import 'fake-indexeddb/auto'
 import type { HhcAssetApi } from '../hhc-asset-api'
 import { HhcLineReadonlyProvider } from '../hhc-line-provider'
-import { getProviderConnection, resetSyncDBForTests } from '../sync-db'
+import { openFileExplorerDB, resetFileExplorerDBForTests } from '../file-explorer-db'
+import { getProviderConnection, getSyncEntryByRemoteItem, resetSyncDBForTests } from '../sync-db'
 
 const collection = {
   id: 'collection_1',
@@ -57,7 +58,11 @@ function api(): HhcAssetApi {
 }
 
 beforeEach(async () => {
+  await resetFileExplorerDBForTests()
   await resetSyncDBForTests()
+  window.api = {
+    nativeFs: { delete: vi.fn(async () => undefined) }
+  } as unknown as typeof window.api
 })
 
 describe('HHC LINE read-only provider', () => {
@@ -170,5 +175,60 @@ describe('HHC LINE read-only provider', () => {
     expect(provider.classifyError({ classification: 'retryable' })).toBe('retryable')
     expect(provider).not.toHaveProperty('upload')
     expect(provider).not.toHaveProperty('delete')
+  })
+
+  it('removes the returned native file when cancellation wins before persistence', async () => {
+    const client = api()
+    vi.mocked(client.downloadContent).mockResolvedValue({
+      fileId: 'blob_1',
+      size: 42,
+      mimeType: 'image/jpeg'
+    })
+    const provider = new HhcLineReadonlyProvider({ api: client, getSession: vi.fn() })
+
+    await expect(
+      provider.downloadContent(
+        {
+          providerConnectionId: 'hhc-line:user_1',
+          rootRemoteFolderId: collection.id,
+          remoteItemId: item.id,
+          targetBlobId: 'blob_1',
+          offlinePolicy: 'on-demand'
+        },
+        new AbortController().signal,
+        () => false
+      )
+    ).rejects.toThrow('Sync download cancelled')
+
+    expect(window.api.nativeFs.delete).toHaveBeenCalledWith('blob_1')
+  })
+
+  it('removes native blob and entry state when cancellation wins during persistence', async () => {
+    const client = api()
+    vi.mocked(client.downloadContent).mockResolvedValue({
+      fileId: 'blob_1',
+      size: 42,
+      mimeType: 'image/jpeg'
+    })
+    const provider = new HhcLineReadonlyProvider({ api: client, getSession: vi.fn() })
+    let checks = 0
+
+    await expect(
+      provider.downloadContent(
+        {
+          providerConnectionId: 'hhc-line:user_1',
+          rootRemoteFolderId: collection.id,
+          remoteItemId: item.id,
+          targetBlobId: 'blob_1',
+          offlinePolicy: 'on-demand'
+        },
+        new AbortController().signal,
+        () => ++checks < 3
+      )
+    ).rejects.toThrow('Sync download cancelled')
+
+    expect(window.api.nativeFs.delete).toHaveBeenCalledWith('blob_1')
+    await expect((await openFileExplorerDB()).get('file-blobs', 'blob_1')).resolves.toBeUndefined()
+    await expect(getSyncEntryByRemoteItem('hhc-line:user_1', item.id)).resolves.toBeUndefined()
   })
 })

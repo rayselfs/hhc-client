@@ -67,10 +67,10 @@ export async function releaseNativeMediaLease(leaseId: unknown): Promise<void> {
   if (!isValidNativeFileId(leaseId)) throw new Error('Invalid native media lease id')
   const lease = nativeMediaLeases.get(leaseId)
   if (!lease) return
-  nativeMediaLeases.delete(leaseId)
   await fs.unlink(lease.filePath).catch((error: NodeJS.ErrnoException) => {
     if (error.code !== 'ENOENT') throw error
   })
+  nativeMediaLeases.delete(leaseId)
 }
 
 type ByteRange = {

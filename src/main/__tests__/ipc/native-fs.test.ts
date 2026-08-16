@@ -258,6 +258,16 @@ describe('native media protocol', () => {
     expect(missing.status).toBe(404)
   })
 
+  it('retains a lease until unlink succeeds so transient cleanup can retry', async () => {
+    const leasePath = '/tmp/hhc-user-data/hhc-asset-leases/retry.bin'
+    const lease = registerNativeMediaLease(leasePath, 'video/mp4', '"etag-1"')
+    mockUnlink.mockRejectedValueOnce(Object.assign(new Error('busy'), { code: 'EBUSY' }))
+
+    await expect(releaseNativeMediaLease(lease.leaseId)).rejects.toThrow('busy')
+    await expect(releaseNativeMediaLease(lease.leaseId)).resolves.toBeUndefined()
+    expect(mockUnlink).toHaveBeenCalledTimes(2)
+  })
+
   it('returns 416 for invalid media byte ranges', async () => {
     mockStat.mockResolvedValueOnce({ isFile: () => true, size: 100 })
     const handler = protocolHandlers.get('hhc-media')

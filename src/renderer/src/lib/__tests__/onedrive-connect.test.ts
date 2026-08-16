@@ -2,15 +2,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { FILE_EXPLORER_ROOT_ID } from '@renderer/stores/file-explorer'
 import {
   buildOneDriveImportPlan,
+  ensureOneDriveItemAvailableForPresentation,
   importOneDriveFolder,
   loginOneDriveAccount,
   refreshOneDriveFolder,
   scanOneDriveFolder
 } from '../onedrive-connect'
 import type { OneDriveReadonlyProvider } from '../onedrive-provider'
+import type { SyncChangePage } from '../sync-provider'
 import { openFileExplorerDB } from '../file-explorer-db'
 import { refreshImportedMediaAssets } from '../local-sync-import'
 import { listProviderConnectionsByType } from '../sync-db'
+import { getSyncEntryByLocalItem } from '../sync-db'
 import { resetSyncDownloadQueueForTests } from '../sync-download-queue'
 
 const providerMocks = vi.hoisted(() => ({
@@ -91,6 +94,7 @@ vi.mock('../sync-db', () => ({
     updatedAt: 1
   })),
   getSyncCursor: vi.fn(async () => undefined),
+  getSyncEntryByLocalItem: vi.fn(async () => undefined),
   getSyncEntryByRemoteItem: vi.fn(async () => undefined),
   listProviderConnectionsByType: vi.fn(async () => []),
   listSyncEntriesByProviderConnection: vi.fn(async () => []),
@@ -373,7 +377,7 @@ describe('scanOneDriveFolder', () => {
 
 describe('refreshOneDriveFolder', () => {
   it('coalesces concurrent refreshes for the same root folder', async () => {
-    const scan = deferred<{ items: []; nextCursor: string; hasMore: false }>()
+    const scan = deferred<SyncChangePage>()
     const rootFolder = {
       id: 'onedrive-root',
       name: 'OneDrive',
@@ -404,6 +408,11 @@ describe('refreshOneDriveFolder', () => {
       })
     } as never)
     providerMocks.initialScan.mockReturnValue(scan.promise)
+    providerMocks.downloadContent.mockResolvedValue({
+      blobId: 'local-file-1',
+      size: 10,
+      mimeType: 'image/jpeg'
+    })
 
     const first = refreshOneDriveFolder('onedrive-root')
     const second = refreshOneDriveFolder('onedrive-root')
@@ -411,8 +420,85 @@ describe('refreshOneDriveFolder', () => {
     await vi.waitFor(() => expect(providerMocks.initialScan).toHaveBeenCalled())
     expect(providerMocks.initialScan).toHaveBeenCalledTimes(1)
 
-    scan.resolve({ items: [], nextCursor: 'cursor-1', hasMore: false })
+    scan.resolve({
+      items: [
+        {
+          remoteItemId: 'remote-folder-1',
+          parentRemoteItemId: null,
+          kind: 'folder',
+          name: 'Selected'
+        },
+        {
+          remoteItemId: 'remote-file-1',
+          parentRemoteItemId: 'remote-folder-1',
+          kind: 'file',
+          name: 'photo.jpg',
+          mimeType: 'image/jpeg',
+          size: 10
+        }
+      ],
+      nextCursor: 'cursor-1',
+      hasMore: false
+    })
     await expect(Promise.all([first, second])).resolves.toHaveLength(2)
+    await vi.waitFor(() => expect(providerMocks.downloadContent).toHaveBeenCalledOnce())
+    expect(providerMocks.downloadContent.mock.calls[0]?.[0]).toMatchObject({
+      rootRemoteFolderId: 'remote-folder-1'
+    })
+  })
+})
+
+describe('OneDrive production download roots', () => {
+  it('uses the selected sync root for presentation downloads', async () => {
+    fileStoreMocks.state.folders = {
+      'selected-root': {
+        id: 'selected-root',
+        name: 'Selected',
+        parentId: 'root',
+        sortIndex: 0,
+        createdAt: 1,
+        expiresAt: null,
+        syncLink: {
+          providerConnectionId: 'onedrive:account-1',
+          remoteFolderId: 'remote-selected-root',
+          providerType: 'onedrive'
+        }
+      }
+    }
+    vi.mocked(getSyncEntryByLocalItem).mockResolvedValueOnce({
+      id: 'entry-1',
+      providerConnectionId: 'onedrive:account-1',
+      remoteItemId: 'remote-file-1',
+      parentRemoteItemId: 'remote-selected-root',
+      kind: 'file',
+      name: 'photo.jpg',
+      itemId: 'item-1',
+      status: 'remote-only',
+      createdAt: 1,
+      updatedAt: 1
+    })
+    providerMocks.downloadContent.mockResolvedValueOnce({
+      blobId: 'item-1',
+      size: 10,
+      mimeType: 'image/jpeg'
+    })
+
+    await ensureOneDriveItemAvailableForPresentation({
+      id: 'item-1',
+      name: 'photo.jpg',
+      type: 'file',
+      parentId: 'selected-root',
+      url: '',
+      size: 10,
+      mimeType: 'image/jpeg',
+      sortIndex: 0,
+      createdAt: 1,
+      expiresAt: null
+    })
+
+    expect(providerMocks.downloadContent.mock.calls[0]?.[0]).toMatchObject({
+      rootRemoteFolderId: 'remote-selected-root'
+    })
   })
 })
 

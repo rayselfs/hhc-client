@@ -28,6 +28,7 @@ import { isElectron } from '../env'
 
 const request = {
   providerConnectionId: 'onedrive:account-1',
+  rootRemoteFolderId: 'remote-root-1',
   remoteItemId: 'remote-file-1',
   targetBlobId: 'blob-1',
   offlinePolicy: 'on-demand' as const

@@ -1,10 +1,11 @@
 import { APP_CONFIG } from '@shared/app-config'
-import type {
-  HhcAssetCollection,
-  HhcAssetCollectionChangePage,
-  HhcAssetCollectionItem,
-  HhcAssetCollectionPage,
-  HhcAssetCollectionTombstone
+import {
+  projectHhcAssetChangePage,
+  projectHhcAssetCollectionPage,
+  projectHhcAssetItem,
+  type HhcAssetCollectionChangePage,
+  type HhcAssetCollectionItem,
+  type HhcAssetCollectionPage
 } from '@shared/hhc-assets'
 import { HhcAssetApiError, type HhcAssetApi } from './hhc-asset-api'
 
@@ -26,132 +27,27 @@ function string(value: unknown): string | null {
   return typeof value === 'string' ? value : null
 }
 
-function finiteNumber(value: unknown): number | null {
-  return typeof value === 'number' && Number.isFinite(value) ? value : null
-}
-
-function parseCollection(value: unknown): HhcAssetCollection {
-  if (!isRecord(value)) throw new HhcAssetApiError('fatal')
-  const id = string(value.id)
-  const namespace = string(value.namespace)
-  const name = string(value.name)
-  const revision = finiteNumber(value.revision)
-  const createdAt = string(value.createdAt)
-  const updatedAt = string(value.updatedAt)
-  const deletedAt = value.deletedAt === undefined ? undefined : string(value.deletedAt)
-  if (
-    !id ||
-    !namespace ||
-    !name ||
-    revision === null ||
-    !createdAt ||
-    !updatedAt ||
-    deletedAt === null
-  ) {
-    throw new HhcAssetApiError('fatal')
-  }
-  return {
-    id,
-    namespace,
-    name,
-    revision,
-    createdAt,
-    updatedAt,
-    ...(deletedAt ? { deletedAt } : {})
-  }
-}
-
 export function parseHhcAssetItem(value: unknown): HhcAssetCollectionItem {
-  if (!isRecord(value)) throw new HhcAssetApiError('fatal')
-  const required = {
-    id: string(value.id),
-    collectionId: string(value.collectionId),
-    remoteItemId: string(value.remoteItemId),
-    displayName: string(value.displayName),
-    sourceRevision: string(value.sourceRevision),
-    createdRevision: finiteNumber(value.createdRevision),
-    createdAt: string(value.createdAt)
-  }
-  if (Object.values(required).some((entry) => entry === null || entry === '')) {
+  try {
+    return projectHhcAssetItem(value)
+  } catch {
     throw new HhcAssetApiError('fatal')
   }
-  const optionalString = (key: 'mimeType' | 'etag' | 'deletedAt'): string | undefined => {
-    const entry = value[key]
-    if (entry === undefined) return undefined
-    const parsed = string(entry)
-    if (parsed === null) throw new HhcAssetApiError('fatal')
-    return parsed
-  }
-  const optionalNumber = (key: 'sizeBytes' | 'deletedRevision'): number | undefined => {
-    const entry = value[key]
-    if (entry === undefined) return undefined
-    const parsed = finiteNumber(entry)
-    if (parsed === null) throw new HhcAssetApiError('fatal')
-    return parsed
-  }
-  return {
-    id: required.id!,
-    collectionId: required.collectionId!,
-    remoteItemId: required.remoteItemId!,
-    displayName: required.displayName!,
-    sourceRevision: required.sourceRevision!,
-    createdRevision: required.createdRevision!,
-    createdAt: required.createdAt!,
-    ...(optionalNumber('deletedRevision') === undefined
-      ? {}
-      : { deletedRevision: optionalNumber('deletedRevision') }),
-    ...(optionalString('mimeType') === undefined ? {} : { mimeType: optionalString('mimeType') }),
-    ...(optionalNumber('sizeBytes') === undefined
-      ? {}
-      : { sizeBytes: optionalNumber('sizeBytes') }),
-    ...(optionalString('etag') === undefined ? {} : { etag: optionalString('etag') }),
-    ...(optionalString('deletedAt') === undefined ? {} : { deletedAt: optionalString('deletedAt') })
-  }
-}
-
-function parseTombstone(value: unknown): HhcAssetCollectionTombstone {
-  if (!isRecord(value)) throw new HhcAssetApiError('fatal')
-  const id = string(value.id)
-  const remoteItemId = string(value.remoteItemId)
-  const deletedRevision = finiteNumber(value.deletedRevision)
-  const deletedAt = string(value.deletedAt)
-  if (!id || !remoteItemId || deletedRevision === null || !deletedAt) {
-    throw new HhcAssetApiError('fatal')
-  }
-  return { id, remoteItemId, deletedRevision, deletedAt }
 }
 
 export function parseHhcAssetCollectionPage(value: unknown): HhcAssetCollectionPage {
-  if (!isRecord(value) || !Array.isArray(value.collections) || typeof value.hasMore !== 'boolean') {
+  try {
+    return projectHhcAssetCollectionPage(value)
+  } catch {
     throw new HhcAssetApiError('fatal')
-  }
-  const cursor = value.cursor === undefined ? undefined : string(value.cursor)
-  if (cursor === null) throw new HhcAssetApiError('fatal')
-  return {
-    collections: value.collections.map(parseCollection),
-    ...(cursor ? { cursor } : {}),
-    hasMore: value.hasMore
   }
 }
 
 export function parseHhcAssetChangePage(value: unknown): HhcAssetCollectionChangePage {
-  if (
-    !isRecord(value) ||
-    !Array.isArray(value.items) ||
-    !Array.isArray(value.tombstones) ||
-    typeof value.hasMore !== 'boolean' ||
-    typeof value.reset !== 'boolean' ||
-    typeof value.cursor !== 'string'
-  ) {
+  try {
+    return projectHhcAssetChangePage(value)
+  } catch {
     throw new HhcAssetApiError('fatal')
-  }
-  return {
-    collection: parseCollection(value.collection),
-    items: value.items.map(parseHhcAssetItem),
-    tombstones: value.tombstones.map(parseTombstone),
-    cursor: value.cursor,
-    hasMore: value.hasMore,
-    reset: value.reset
   }
 }
 

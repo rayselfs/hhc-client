@@ -3,11 +3,14 @@ import { randomUUID } from 'node:crypto'
 import { promises as fs } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { APP_CONFIG } from '@shared/app-config'
-import type {
-  HhcAssetCollectionChangePage,
-  HhcAssetCollectionItem,
-  HhcAssetCollectionPage,
-  HhcAssetContentTicket
+import {
+  projectHhcAssetChangePage,
+  projectHhcAssetCollectionPage,
+  projectHhcAssetItem,
+  type HhcAssetCollectionChangePage,
+  type HhcAssetCollectionItem,
+  type HhcAssetCollectionPage,
+  type HhcAssetContentTicket
 } from '@shared/hhc-assets'
 import type { WindowManager } from '../windowManager'
 import type { HhcAuthService } from './hhc-auth'
@@ -18,6 +21,7 @@ const HHC_ASSET_ORIGIN = 'https://www.alive.org.tw'
 const OPAQUE_ID_PATTERN = /^[A-Za-z0-9_-]{1,255}$/
 const MAX_CURSOR_BYTES = 2048
 const MAX_CONTENT_BYTES = 200 * 1024 * 1024
+const MAX_JSON_BYTES = 2 * 1024 * 1024
 
 function requestError(code = 'HHC_ASSET_FATAL'): Error {
   return new Error(code)
@@ -40,6 +44,11 @@ function validateExactObject(
     throw new Error('Invalid HHC Asset request')
   }
   return record
+}
+
+function responseObject(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw requestError()
+  return value as Record<string, unknown>
 }
 
 function opaqueId(value: unknown): string {
@@ -104,9 +113,54 @@ async function fetchAsset(
   return response
 }
 
-async function json<T>(service: HhcAuthService, path: string, init?: RequestInit): Promise<T> {
+async function readBoundedJson(response: Response): Promise<unknown> {
+  const rawLength = response.headers.get('content-length')
+  if (rawLength !== null) {
+    const declaredLength = Number(rawLength)
+    if (
+      !Number.isSafeInteger(declaredLength) ||
+      declaredLength < 0 ||
+      declaredLength > MAX_JSON_BYTES
+    ) {
+      throw requestError()
+    }
+  }
+  if (!response.body) throw requestError()
+
+  const reader = response.body.getReader()
+  const chunks: Uint8Array[] = []
+  let size = 0
   try {
-    return (await (await fetchAsset(service, path, init)).json()) as T
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      if (!value) continue
+      size += value.byteLength
+      if (size > MAX_JSON_BYTES) throw requestError()
+      chunks.push(value)
+    }
+  } catch (error) {
+    await reader.cancel().catch(() => undefined)
+    throw error
+  }
+  if (size === 0) throw requestError()
+  const bytes = new Uint8Array(size)
+  let offset = 0
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)) as unknown
+}
+
+async function json<T>(
+  service: HhcAuthService,
+  path: string,
+  project: (value: unknown) => T,
+  init?: RequestInit
+): Promise<T> {
+  try {
+    return project(await readBoundedJson(await fetchAsset(service, path, init)))
   } catch (error) {
     if (error instanceof Error && error.message.startsWith('HHC_ASSET_')) throw error
     throw requestError()
@@ -178,7 +232,7 @@ export function registerHhcAssetHandlers(wm: WindowManager, auth: HhcAuthService
       const params = new URLSearchParams({ limit: '500' })
       const validatedCursor = cursor(rawCursor)
       if (validatedCursor) params.set('cursor', validatedCursor)
-      return json(auth, `/api/assets/collections?${params}`)
+      return json(auth, `/api/assets/collections?${params}`, projectHhcAssetCollectionPage)
     })
   )
 
@@ -189,7 +243,11 @@ export function registerHhcAssetHandlers(wm: WindowManager, auth: HhcAuthService
       const collectionId = opaqueId(input.collectionId)
       const validatedCursor = cursor(input.cursor)
       const query = validatedCursor ? `?${new URLSearchParams({ cursor: validatedCursor })}` : ''
-      return json(auth, `/api/assets/collections/${collectionId}/changes${query}`)
+      return json(
+        auth,
+        `/api/assets/collections/${collectionId}/changes${query}`,
+        projectHhcAssetChangePage
+      )
     })
   )
 
@@ -199,7 +257,11 @@ export function registerHhcAssetHandlers(wm: WindowManager, auth: HhcAuthService
       const input = validateExactObject(value, ['collectionId', 'itemId'])
       const collectionId = opaqueId(input.collectionId)
       const itemId = opaqueId(input.itemId)
-      return json(auth, `/api/assets/collections/${collectionId}/items/${itemId}`)
+      return json(
+        auth,
+        `/api/assets/collections/${collectionId}/items/${itemId}`,
+        projectHhcAssetItem
+      )
     })
   )
 
@@ -209,9 +271,10 @@ export function registerHhcAssetHandlers(wm: WindowManager, auth: HhcAuthService
       const input = validateExactObject(value, ['collectionId', 'itemId'])
       const collectionId = opaqueId(input.collectionId)
       const itemId = opaqueId(input.itemId)
-      const response = await json<{ contentUrl?: unknown; expiresAt?: unknown; etag?: unknown }>(
+      const response = await json(
         auth,
         `/api/assets/collections/${collectionId}/items/${itemId}/content-ticket`,
+        responseObject,
         { method: 'POST' }
       )
       const expiresAt =

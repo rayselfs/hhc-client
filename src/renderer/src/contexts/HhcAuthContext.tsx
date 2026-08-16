@@ -10,6 +10,7 @@ type HhcAuthContextValue = {
   signIn(): Promise<void>
   signOut(): Promise<void>
   getAccessToken(): Promise<string | null>
+  refreshAccessToken(): Promise<string | null>
 }
 
 const HhcAuthContext = createContext<HhcAuthContextValue | null>(null)
@@ -18,13 +19,15 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
   const [status, setStatus] = useState<HhcAuthStatus>('loading')
   const [session, setSession] = useState<HhcSession | null>(null)
   const adapterRef = useRef<HhcAuthAdapter | null>(null)
+  const sessionRef = useRef<HhcSession | null>(null)
+  const sessionRevisionRef = useRef(0)
   const accessTokenPromiseRef = useRef<Promise<string | null> | null>(null)
+  const refreshTokenPromiseRef = useRef<Promise<string | null> | null>(null)
 
   useEffect(() => {
     let active = true
     let adapter: HhcAuthAdapter | null = null
     let unsubscribe: (() => void) | null = null
-    let sessionRevision = 0
 
     void createHhcAuthAdapter()
       .then(async (createdAdapter) => {
@@ -35,21 +38,26 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
         }
 
         adapterRef.current = createdAdapter
-        const bootstrapRevision = sessionRevision
+        const bootstrapRevision = sessionRevisionRef.current
         unsubscribe = createdAdapter.subscribe((nextSession) => {
           if (!active) return
-          sessionRevision += 1
+          sessionRevisionRef.current += 1
+          sessionRef.current = nextSession
+          accessTokenPromiseRef.current = null
+          refreshTokenPromiseRef.current = null
           setSession(nextSession)
           setStatus(nextSession ? 'authenticated' : 'anonymous')
         })
 
         try {
           const nextSession = await createdAdapter.getSession()
-          if (!active || sessionRevision !== bootstrapRevision) return
+          if (!active || sessionRevisionRef.current !== bootstrapRevision) return
+          sessionRef.current = nextSession
           setSession(nextSession)
           setStatus(nextSession ? 'authenticated' : 'anonymous')
         } catch {
-          if (!active || sessionRevision !== bootstrapRevision) return
+          if (!active || sessionRevisionRef.current !== bootstrapRevision) return
+          sessionRef.current = null
           setSession(null)
           setStatus('unavailable')
         }
@@ -64,7 +72,10 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
       active = false
       unsubscribe?.()
       if (adapterRef.current === adapter) adapterRef.current = null
+      sessionRef.current = null
+      sessionRevisionRef.current += 1
       accessTokenPromiseRef.current = null
+      refreshTokenPromiseRef.current = null
       adapter?.dispose()
     }
   }, [])
@@ -86,11 +97,20 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
     if (!adapter) return Promise.resolve(null)
     if (accessTokenPromiseRef.current) return accessTokenPromiseRef.current
 
-    const request = adapter.getAccessToken().catch((error: unknown) => {
-      setSession(null)
-      setStatus('unavailable')
-      throw error
-    })
+    const revision = sessionRevisionRef.current
+    const request = adapter
+      .getAccessToken()
+      .then((token) =>
+        adapterRef.current === adapter && sessionRevisionRef.current === revision ? token : null
+      )
+      .catch((error: unknown) => {
+        if (adapterRef.current === adapter && sessionRevisionRef.current === revision) {
+          sessionRef.current = null
+          setSession(null)
+          setStatus('unavailable')
+        }
+        throw error
+      })
     accessTokenPromiseRef.current = request
     request.then(
       () => {
@@ -103,9 +123,36 @@ export function HhcAuthProvider({ children }: { children: React.ReactNode }): Re
     return request
   }, [])
 
+  const refreshAccessToken = useCallback((): Promise<string | null> => {
+    const adapter = adapterRef.current
+    if (!adapter || !sessionRef.current) return Promise.resolve(null)
+    if (refreshTokenPromiseRef.current) return refreshTokenPromiseRef.current
+
+    const revision = sessionRevisionRef.current
+    const request = adapter
+      .refreshAccessToken()
+      .then((token) =>
+        adapterRef.current === adapter &&
+        sessionRevisionRef.current === revision &&
+        sessionRef.current
+          ? token
+          : null
+      )
+    refreshTokenPromiseRef.current = request
+    request.then(
+      () => {
+        if (refreshTokenPromiseRef.current === request) refreshTokenPromiseRef.current = null
+      },
+      () => {
+        if (refreshTokenPromiseRef.current === request) refreshTokenPromiseRef.current = null
+      }
+    )
+    return request
+  }, [])
+
   const value = useMemo(
-    () => ({ status, session, signIn, signOut, getAccessToken }),
-    [getAccessToken, session, signIn, signOut, status]
+    () => ({ status, session, signIn, signOut, getAccessToken, refreshAccessToken }),
+    [getAccessToken, refreshAccessToken, session, signIn, signOut, status]
   )
 
   return <HhcAuthContext.Provider value={value}>{children}</HhcAuthContext.Provider>

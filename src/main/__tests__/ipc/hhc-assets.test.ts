@@ -81,6 +81,17 @@ function json(body: unknown, status = 200): Response {
   })
 }
 
+function collection(id = 'collection_1'): object {
+  return {
+    id,
+    namespace: 'line.group.media-sync',
+    name: 'Group',
+    revision: 1,
+    createdAt: '2026-08-17T00:00:00Z',
+    updatedAt: '2026-08-17T00:00:00Z'
+  }
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   handlers.clear()
@@ -189,6 +200,168 @@ describe('HHC Asset IPC', () => {
     expect(mockFetch).toHaveBeenCalledTimes(2)
   })
 
+  it('bounds declared and chunked JSON response bytes before IPC', async () => {
+    mockFetch
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ collections: [], hasMore: false }), {
+          headers: { 'content-length': String(2 * 1024 * 1024 + 1) }
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ collections: [], hasMore: false, padding: 'x'.repeat(2 * 1024 * 1024) })
+        )
+      )
+
+    await expect(handler('hhc-assets:list-collections')(event())).rejects.toThrow('HHC_ASSET_FATAL')
+    await expect(handler('hhc-assets:list-collections')(event())).rejects.toThrow('HHC_ASSET_FATAL')
+  })
+
+  it('projects exact DTOs and strips unknown upstream fields before IPC', async () => {
+    mockFetch.mockResolvedValueOnce(
+      json({
+        collections: [{ ...collection(), secret: 'must-not-cross' }],
+        cursor: 'next',
+        hasMore: false,
+        secret: 'must-not-cross'
+      })
+    )
+
+    await expect(handler('hhc-assets:list-collections')(event())).resolves.toEqual({
+      collections: [collection()],
+      cursor: 'next',
+      hasMore: false
+    })
+  })
+
+  it('projects exact item and change DTOs without upstream-only fields', async () => {
+    const assetItem = {
+      id: 'item_1',
+      collectionId: 'collection_1',
+      remoteItemId: 'source_1',
+      displayName: 'photo.jpg',
+      sourceRevision: 'sha256',
+      createdRevision: 1,
+      createdAt: '2026-08-17T00:00:00Z'
+    }
+    const tombstone = {
+      id: 'item_2',
+      remoteItemId: 'source_2',
+      deletedRevision: 2,
+      deletedAt: '2026-08-17T00:01:00Z'
+    }
+    mockFetch
+      .mockResolvedValueOnce(json({ ...assetItem, secret: 'must-not-cross' }))
+      .mockResolvedValueOnce(
+        json({
+          collection: { ...collection(), secret: 'must-not-cross' },
+          items: [{ ...assetItem, secret: 'must-not-cross' }],
+          tombstones: [{ ...tombstone, secret: 'must-not-cross' }],
+          cursor: 'revision_2',
+          hasMore: false,
+          reset: false,
+          secret: 'must-not-cross'
+        })
+      )
+
+    await expect(
+      handler('hhc-assets:get-collection-item')(event(), {
+        collectionId: 'collection_1',
+        itemId: 'item_1'
+      })
+    ).resolves.toEqual(assetItem)
+    await expect(
+      handler('hhc-assets:get-collection-changes')(event(), {
+        collectionId: 'collection_1'
+      })
+    ).resolves.toEqual({
+      collection: collection(),
+      items: [assetItem],
+      tombstones: [tombstone],
+      cursor: 'revision_2',
+      hasMore: false,
+      reset: false
+    })
+  })
+
+  it('rejects negative item and tombstone revisions', async () => {
+    mockFetch
+      .mockResolvedValueOnce(
+        json({
+          collection: collection(),
+          items: [
+            {
+              id: 'item_1',
+              collectionId: 'collection_1',
+              remoteItemId: 'source_1',
+              displayName: 'photo.jpg',
+              sourceRevision: 'sha256',
+              createdRevision: -1,
+              createdAt: '2026-08-17T00:00:00Z'
+            }
+          ],
+          tombstones: [],
+          cursor: 'revision_1',
+          hasMore: false,
+          reset: false
+        })
+      )
+      .mockResolvedValueOnce(
+        json({
+          collection: collection(),
+          items: [],
+          tombstones: [
+            {
+              id: 'item_1',
+              remoteItemId: 'source_1',
+              deletedRevision: -1,
+              deletedAt: '2026-08-17T00:00:00Z'
+            }
+          ],
+          cursor: 'revision_1',
+          hasMore: false,
+          reset: false
+        })
+      )
+
+    for (let index = 0; index < 2; index += 1) {
+      await expect(
+        handler('hhc-assets:get-collection-changes')(event(), {
+          collectionId: 'collection_1'
+        })
+      ).rejects.toThrow('HHC_ASSET_FATAL')
+    }
+  })
+
+  it('rejects malformed numeric DTOs and arrays above the 500-item contract', async () => {
+    mockFetch
+      .mockResolvedValueOnce(
+        json({ collections: [{ ...collection(), revision: -1 }], hasMore: false })
+      )
+      .mockResolvedValueOnce(
+        json({
+          collections: Array.from({ length: 501 }, (_, index) => collection(`c_${index}`)),
+          hasMore: false
+        })
+      )
+
+    await expect(handler('hhc-assets:list-collections')(event())).rejects.toThrow('HHC_ASSET_FATAL')
+    await expect(handler('hhc-assets:list-collections')(event())).rejects.toThrow('HHC_ASSET_FATAL')
+  })
+
+  it('accepts and projects the maximum 500-item collection page', async () => {
+    mockFetch.mockResolvedValueOnce(
+      json({
+        collections: Array.from({ length: 500 }, (_, index) => collection(`c_${index}`)),
+        hasMore: false
+      })
+    )
+
+    const result = await handler('hhc-assets:list-collections')(event())
+    expect(result).toMatchObject({ hasMore: false })
+    expect((result as { collections: unknown[] }).collections).toHaveLength(500)
+  })
+
   it.each([
     [403, 'HHC_ASSET_ACCESS_REVOKED'],
     [429, 'HHC_ASSET_RETRYABLE'],
@@ -251,6 +424,37 @@ describe('HHC Asset IPC', () => {
       expect.stringMatching(/\.tmp$/),
       '/tmp/hhc-user-data/native-files/123e4567-e89b-12d3-a456-426614174000'
     )
+  })
+
+  it('fails closed when an HHC download root does not match its collection', async () => {
+    await expect(
+      handler('hhc-assets:download-file')(event(), {
+        collectionId: 'collection_1',
+        itemId: 'item_1',
+        rootRemoteFolderId: 'collection_2',
+        targetFileId: '123e4567-e89b-12d3-a456-426614174000'
+      })
+    ).rejects.toThrow('Invalid HHC Asset request')
+    expect(mockFetch).not.toHaveBeenCalled()
+  })
+
+  it('removes the temporary file when the final native rename fails', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(new Uint8Array([1, 2, 3]), {
+        headers: { 'content-type': 'video/mp4', 'content-length': '3' }
+      })
+    )
+    mockRename.mockRejectedValueOnce(new Error('disk busy'))
+
+    await expect(
+      handler('hhc-assets:download-file')(event(), {
+        collectionId: 'collection_1',
+        itemId: 'item_1',
+        rootRemoteFolderId: 'collection_1',
+        targetFileId: '123e4567-e89b-12d3-a456-426614174000'
+      })
+    ).rejects.toThrow('disk busy')
+    expect(mockRm).toHaveBeenCalledWith(expect.stringMatching(/\.tmp$/), { force: true })
   })
 
   it('creates and releases an opaque session lease and bounds declared response size', async () => {

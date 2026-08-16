@@ -2,6 +2,7 @@ import { act, render, renderHook, waitFor } from '@testing-library/react'
 import { StrictMode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { HhcAuthAdapter, HhcSession } from '@shared/hhc-auth'
+import { createBrowserHhcAssetApi } from '@renderer/lib/hhc-asset-api-browser'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { HhcAuthProvider, useHhcAuth } from '../HhcAuthContext'
 
@@ -168,6 +169,93 @@ describe('HhcAuthContext', () => {
 
     resolveToken('shared-token')
     await expect(Promise.all([first, second])).resolves.toEqual(['shared-token', 'shared-token'])
+  })
+
+  it('discards an access token completed after the session changes', async () => {
+    const adapter = createAdapter(SESSION)
+    let resolveToken: (token: string) => void = () => undefined
+    vi.mocked(adapter.getAccessToken).mockReturnValue(
+      new Promise<string>((resolve) => {
+        resolveToken = resolve
+      })
+    )
+    authFactory.adapters.push(adapter)
+    const { result } = renderHook(() => useHhcAuth(), { wrapper })
+    await waitFor(() => expect(result.current.status).toBe('authenticated'))
+
+    const token = result.current.getAccessToken()
+    act(() => adapter.emit({ ...SESSION, userId: 'user-2' }))
+    resolveToken('stale-token')
+
+    await expect(token).resolves.toBeNull()
+  })
+
+  it('coalesces concurrent refreshes and discards tokens after logout or account switch', async () => {
+    const adapter = createAdapter(SESSION)
+    let resolveRefresh: (token: string) => void = () => undefined
+    vi.mocked(adapter.refreshAccessToken).mockReturnValue(
+      new Promise<string>((resolve) => {
+        resolveRefresh = resolve
+      })
+    )
+    authFactory.adapters.push(adapter)
+    const { result } = renderHook(() => useHhcAuth(), { wrapper })
+    await waitFor(() => expect(result.current.status).toBe('authenticated'))
+
+    const first = result.current.refreshAccessToken()
+    const second = result.current.refreshAccessToken()
+    expect(first).toBe(second)
+    expect(adapter.refreshAccessToken).toHaveBeenCalledOnce()
+
+    act(() => adapter.emit(null))
+    resolveRefresh('stale-token')
+    await expect(Promise.all([first, second])).resolves.toEqual([null, null])
+
+    let resolveSwitchedRefresh: (token: string) => void = () => undefined
+    vi.mocked(adapter.refreshAccessToken).mockReturnValueOnce(
+      new Promise<string>((resolve) => {
+        resolveSwitchedRefresh = resolve
+      })
+    )
+    act(() => adapter.emit(SESSION))
+    const switched = result.current.refreshAccessToken()
+    act(() => adapter.emit({ ...SESSION, userId: 'user-2' }))
+    resolveSwitchedRefresh('other-stale-token')
+    await expect(switched).resolves.toBeNull()
+  })
+
+  it('shares one context refresh across concurrent Asset 401 retries', async () => {
+    const adapter = createAdapter(SESSION)
+    let resolveRefresh: (token: string) => void = () => undefined
+    vi.mocked(adapter.refreshAccessToken).mockReturnValue(
+      new Promise<string>((resolve) => {
+        resolveRefresh = resolve
+      })
+    )
+    const fetcher = vi.fn<typeof fetch>(async (_url, init) => {
+      const token = new Headers(init?.headers).get('authorization')
+      return token === 'Bearer refreshed-access-token'
+        ? new Response(JSON.stringify({ collections: [], hasMore: false }))
+        : new Response('{}', { status: 401 })
+    })
+    authFactory.adapters.push(adapter)
+    const { result } = renderHook(() => useHhcAuth(), { wrapper })
+    await waitFor(() => expect(result.current.status).toBe('authenticated'))
+    const api = createBrowserHhcAssetApi({
+      getAccessToken: result.current.getAccessToken,
+      refreshAccessToken: result.current.refreshAccessToken,
+      fetcher
+    })
+
+    const requests = [api.listCollections(), api.listCollections()]
+    await waitFor(() => expect(adapter.refreshAccessToken).toHaveBeenCalledOnce())
+    resolveRefresh('refreshed-access-token')
+
+    await expect(Promise.all(requests)).resolves.toEqual([
+      { collections: [], hasMore: false },
+      { collections: [], hasMore: false }
+    ])
+    expect(adapter.refreshAccessToken).toHaveBeenCalledOnce()
   })
 
   it('unsubscribes every subscription and disposes every adapter under StrictMode', async () => {

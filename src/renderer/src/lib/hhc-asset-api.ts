@@ -1,4 +1,4 @@
-import { isElectron } from './env'
+import type { HhcAuthAdapter } from '@shared/hhc-auth'
 import type {
   HhcAssetCollectionChangePage,
   HhcAssetCollectionItem,
@@ -6,6 +6,7 @@ import type {
   HhcAssetContentRequest,
   HhcAssetContentTicket
 } from '@shared/hhc-assets'
+import { isElectron } from './env'
 import type { SyncRemoteContentSource } from './sync-provider'
 
 export type HhcAssetErrorClassification = 'retryable' | 'auth-required' | 'access-revoked' | 'fatal'
@@ -31,17 +32,16 @@ export interface HhcAssetApi {
   ): Promise<Response | { fileId: string; size: number; mimeType: string }>
 }
 
-export async function createHhcAssetApi(): Promise<HhcAssetApi> {
+type HhcAssetAuth = Pick<HhcAuthAdapter, 'getAccessToken' | 'refreshAccessToken'>
+
+export async function createHhcAssetApi(auth?: HhcAssetAuth): Promise<HhcAssetApi> {
   if (isElectron()) {
     const { createElectronHhcAssetApi } = await import('./hhc-asset-api-electron')
     return createElectronHhcAssetApi()
   }
 
-  const [{ createBrowserHhcAssetApi }, { createHhcAuthAdapter }] = await Promise.all([
-    import('./hhc-asset-api-browser'),
-    import('./hhc-auth')
-  ])
-  const auth = await createHhcAuthAdapter()
+  if (!auth) throw new Error('HHC account authentication is required')
+  const { createBrowserHhcAssetApi } = await import('./hhc-asset-api-browser')
   return createBrowserHhcAssetApi({
     getAccessToken: () => auth.getAccessToken(),
     refreshAccessToken: () => auth.refreshAccessToken()

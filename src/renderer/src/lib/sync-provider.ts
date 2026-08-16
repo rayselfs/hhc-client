@@ -48,7 +48,7 @@ export interface SyncChangePage {
 
 export interface SyncDownloadRequest {
   providerConnectionId: string
-  rootRemoteFolderId?: string
+  rootRemoteFolderId: string
   remoteItemId: string
   targetBlobId: string
   offlinePolicy: SyncOfflinePolicy

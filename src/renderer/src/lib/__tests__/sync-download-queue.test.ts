@@ -109,6 +109,7 @@ describe('sync download queue', () => {
       provider,
       request: {
         providerConnectionId: 'connection-1',
+        rootRemoteFolderId: 'folder-1',
         remoteItemId: 'background-1',
         targetBlobId: 'background-1',
         offlinePolicy: 'always-offline'
@@ -123,6 +124,7 @@ describe('sync download queue', () => {
       provider,
       request: {
         providerConnectionId: 'connection-1',
+        rootRemoteFolderId: 'folder-1',
         remoteItemId: 'background-2',
         targetBlobId: 'background-2',
         offlinePolicy: 'always-offline'
@@ -134,6 +136,7 @@ describe('sync download queue', () => {
       provider,
       request: {
         providerConnectionId: 'connection-1',
+        rootRemoteFolderId: 'folder-1',
         remoteItemId: 'presentation-1',
         targetBlobId: 'presentation-1',
         offlinePolicy: 'always-offline'
@@ -163,6 +166,7 @@ describe('sync download queue', () => {
       provider,
       request: {
         providerConnectionId: 'connection-1',
+        rootRemoteFolderId: 'folder-1',
         remoteItemId: 'remote-1',
         targetBlobId: 'item-1',
         offlinePolicy: 'always-offline'
@@ -174,6 +178,7 @@ describe('sync download queue', () => {
       provider,
       request: {
         providerConnectionId: 'connection-1',
+        rootRemoteFolderId: 'folder-1',
         remoteItemId: 'remote-1',
         targetBlobId: 'item-1',
         offlinePolicy: 'always-offline'
@@ -208,6 +213,7 @@ describe('sync download queue', () => {
       provider,
       request: {
         providerConnectionId: 'connection-a',
+        rootRemoteFolderId: 'folder-1',
         remoteItemId: 'remote-a',
         targetBlobId: 'item-a',
         offlinePolicy: 'always-offline'
@@ -221,6 +227,7 @@ describe('sync download queue', () => {
       provider,
       request: {
         providerConnectionId: 'connection-a',
+        rootRemoteFolderId: 'folder-1',
         remoteItemId: 'remote-b',
         targetBlobId: 'item-b',
         offlinePolicy: 'always-offline'
@@ -238,6 +245,7 @@ describe('sync download queue', () => {
       provider,
       request: {
         providerConnectionId: 'connection-a',
+        rootRemoteFolderId: 'folder-1',
         remoteItemId: 'remote-c',
         targetBlobId: 'item-c',
         offlinePolicy: 'always-offline'
@@ -276,6 +284,7 @@ describe('sync download queue', () => {
         provider,
         request: {
           providerConnectionId: 'connection-1',
+          rootRemoteFolderId: 'folder-1',
           remoteItemId: 'remote-1',
           targetBlobId: 'item-1',
           offlinePolicy: 'always-offline'
@@ -326,6 +335,7 @@ describe('sync download queue', () => {
       provider,
       request: {
         providerConnectionId: 'connection-1',
+        rootRemoteFolderId: 'folder-1',
         remoteItemId: 'remote-1',
         targetBlobId: 'item-1',
         offlinePolicy: 'always-offline'
@@ -353,6 +363,7 @@ describe('sync download queue', () => {
         provider,
         request: {
           providerConnectionId: 'connection-1',
+          rootRemoteFolderId: 'folder-1',
           remoteItemId: 'remote-1',
           targetBlobId: 'item-1',
           offlinePolicy: 'always-offline'

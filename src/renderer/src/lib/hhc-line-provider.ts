@@ -58,7 +58,7 @@ async function saveNativeDownloadedContent(
   canCommit: SyncDownloadCommitGuard
 ): Promise<SyncDownloadResult> {
   if (!(await canCommit())) {
-    await window.api.nativeFs.delete(content.fileId).catch(() => undefined)
+    await window.api.nativeFs.delete(content.fileId)
     throw new SyncDownloadCancelledError()
   }
   const db = await openFileExplorerDB()
@@ -90,9 +90,15 @@ async function saveNativeDownloadedContent(
     entryId = entry.id
     if (!(await canCommit())) throw new SyncDownloadCancelledError()
   } catch (error) {
-    if (entryId) await deleteSyncEntries([entryId])
-    await db.delete('file-blobs', request.targetBlobId).catch(() => undefined)
-    await window.api.nativeFs.delete(content.fileId).catch(() => undefined)
+    const cleanup = await Promise.allSettled([
+      entryId ? deleteSyncEntries([entryId]) : Promise.resolve(),
+      db.delete('file-blobs', request.targetBlobId),
+      window.api.nativeFs.delete(content.fileId)
+    ])
+    const cleanupFailure = cleanup.find(
+      (result): result is PromiseRejectedResult => result.status === 'rejected'
+    )
+    if (cleanupFailure) throw cleanupFailure.reason
     throw error
   }
   return {
@@ -176,7 +182,6 @@ export class HhcLineReadonlyProvider implements ReadOnlySyncProvider {
     canCommit: SyncDownloadCommitGuard
   ): Promise<SyncDownloadResult> {
     const rootRemoteFolderId = request.rootRemoteFolderId
-    if (!rootRemoteFolderId) throw new Error('HHC collection root is required')
     const metadata = mapItem(
       await this.options.api.getCollectionItem(rootRemoteFolderId, request.remoteItemId)
     )
@@ -189,7 +194,6 @@ export class HhcLineReadonlyProvider implements ReadOnlySyncProvider {
       },
       signal
     )
-    if (!(await canCommit())) throw new SyncDownloadCancelledError()
     return this.save(request, content, metadata, canCommit)
   }
 

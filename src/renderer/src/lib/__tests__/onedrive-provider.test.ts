@@ -247,6 +247,7 @@ describe('OneDriveReadonlyProvider', () => {
 
     const request = {
       providerConnectionId: 'connection-1',
+      rootRemoteFolderId: 'root',
       remoteItemId: 'file-1',
       targetBlobId: 'target-blob',
       offlinePolicy: 'on-demand' as const
@@ -283,6 +284,7 @@ describe('OneDriveReadonlyProvider', () => {
       .mockResolvedValueOnce(new Response('video-bytes'))
     const request = {
       providerConnectionId: 'connection-1',
+      rootRemoteFolderId: 'root',
       remoteItemId: 'file-1',
       targetBlobId: 'target-blob',
       offlinePolicy: 'on-demand' as const
@@ -319,6 +321,7 @@ describe('OneDriveReadonlyProvider', () => {
     const downloading = createProvider().downloadContent(
       {
         providerConnectionId: 'connection-1',
+        rootRemoteFolderId: 'root',
         remoteItemId: 'file-1',
         targetBlobId: 'target-blob',
         offlinePolicy: 'on-demand'
@@ -352,6 +355,7 @@ describe('OneDriveReadonlyProvider', () => {
     })
     const request = {
       providerConnectionId: 'connection-1',
+      rootRemoteFolderId: 'root',
       remoteItemId: 'file-1',
       targetBlobId: 'target-blob',
       offlinePolicy: 'always-offline' as const

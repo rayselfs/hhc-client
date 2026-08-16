@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { HhcAssetApiError } from '../hhc-asset-api'
+import { createHhcAssetApi, HhcAssetApiError } from '../hhc-asset-api'
 import { createBrowserHhcAssetApi } from '../hhc-asset-api-browser'
 import { createElectronHhcAssetApi } from '../hhc-asset-api-electron'
 
@@ -30,6 +30,24 @@ function collectionPage(): object {
 }
 
 describe('browser HHC Asset API', () => {
+  it('uses only context-owned auth callbacks', async () => {
+    const getAccessToken = vi.fn(async () => 'context-token')
+    const refreshAccessToken = vi.fn(async () => 'context-refresh')
+    const originalFetch = window.fetch
+    window.fetch = vi.fn(async () => jsonResponse(collectionPage()))
+
+    try {
+      const api = await createHhcAssetApi({ getAccessToken, refreshAccessToken })
+      await api.listCollections()
+      expect(getAccessToken).toHaveBeenCalledOnce()
+      expect(
+        new Headers(vi.mocked(window.fetch).mock.calls[0]?.[1]?.headers).get('authorization')
+      ).toBe('Bearer context-token')
+    } finally {
+      window.fetch = originalFetch
+    }
+  })
+
   it('rejects every origin except the public production Gateway', () => {
     expect(() =>
       createBrowserHhcAssetApi({
