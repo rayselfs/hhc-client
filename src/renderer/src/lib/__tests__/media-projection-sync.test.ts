@@ -100,8 +100,40 @@ function setRemotePresentationItem(name = 'remote.png', mimeType = 'image/png'):
   return item
 }
 
+function setRemoteDesktopEngineItem(): FileItemRecord {
+  const item = makeFile('vlc-item', 'vlc.mkv', 'video/x-matroska', 'source-blob')
+  useMediaProjectionStore.setState({
+    playlist: [item],
+    currentIndex: 0,
+    isPresenting: true,
+    snapshot: {
+      id: 'snapshot',
+      createdAt: 1,
+      entries: [
+        {
+          index: 0,
+          itemId: item.id,
+          blobId: 'source-blob',
+          name: item.name,
+          mimeType: item.mimeType,
+          sourceUrl: item.url,
+          playbackMode: 'vlc-embedded',
+          seekable: true,
+          remoteItem: {
+            providerConnectionId: 'hhc-line:user-1',
+            remoteItemId: 'asset-1',
+            rootRemoteFolderId: 'collection-1'
+          }
+        }
+      ]
+    }
+  })
+  return item
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
+  Object.defineProperty(window, 'api', { configurable: true, value: undefined })
   projectionState.activeOwner = 'media'
   registryMocks.get.mockReturnValue(undefined)
   remoteMocks.prepare.mockResolvedValue(null)
@@ -692,6 +724,123 @@ describe('media projection sync', () => {
       ],
       { bringToFront: false }
     )
+  })
+
+  it('promotes a downloaded remote VLC item to its persistent local snapshot source', async () => {
+    Object.defineProperty(window, 'api', { configurable: true, value: {} })
+    setRemoteDesktopEngineItem()
+    remoteMocks.ensurePersistent.mockResolvedValueOnce(true)
+
+    renderSync({
+      auth: {
+        getSession: () => ({ userId: 'user-1', displayName: 'Ada', roles: [] }),
+        getAccessToken: vi.fn(),
+        refreshAccessToken: vi.fn()
+      }
+    })
+
+    await waitFor(() => expect(remoteMocks.ensurePersistent).toHaveBeenCalledOnce())
+    await waitFor(() => {
+      const entry = useMediaProjectionStore.getState().snapshot?.entries[0]
+      expect(entry?.remoteItem).toBeUndefined()
+      expect(entry?.remoteSource).toBeUndefined()
+      expect(entry?.sourceUrl).toBe('blob:source-blob')
+    })
+    expect(mockStartProjection).toHaveBeenCalledWith(
+      'media',
+      [
+        [
+          'file:show',
+          expect.objectContaining({
+            itemId: 'vlc-item',
+            blobId: 'source-blob',
+            playbackMode: 'vlc-embedded'
+          })
+        ]
+      ],
+      { bringToFront: false }
+    )
+  })
+
+  it.each([
+    ['download failure', false, undefined],
+    ['access revocation', undefined, new HhcAssetApiError('access-revoked', 403)]
+  ] as const)('keeps the remote VLC fence after %s', async (_name, result, error) => {
+    Object.defineProperty(window, 'api', { configurable: true, value: {} })
+    setRemoteDesktopEngineItem()
+    const onAccessRevoked = vi.fn()
+    if (error) {
+      remoteMocks.ensurePersistent.mockRejectedValueOnce(
+        Object.assign(error, {
+          providerConnectionId: 'hhc-line:user-1',
+          remoteItemId: 'asset-1'
+        })
+      )
+    } else {
+      remoteMocks.ensurePersistent.mockResolvedValueOnce(result)
+    }
+
+    renderSync({
+      auth: {
+        getSession: () => ({ userId: 'user-1', displayName: 'Ada', roles: [] }),
+        getAccessToken: vi.fn(),
+        refreshAccessToken: vi.fn()
+      },
+      onAccessRevoked
+    })
+
+    await waitFor(() => expect(remoteMocks.ensurePersistent).toHaveBeenCalledOnce())
+    await act(async () => Promise.resolve())
+    const entry = useMediaProjectionStore.getState().snapshot?.entries[0]
+    expect(entry?.remoteItem).toBeDefined()
+    expect(entry?.sourceUrl).toBe('blob:source-blob')
+    expect(mockStartProjection).not.toHaveBeenCalled()
+    expect(onAccessRevoked).toHaveBeenCalledTimes(error ? 1 : 0)
+  })
+
+  it('does not promote a stale remote VLC download after the current item changes', async () => {
+    Object.defineProperty(window, 'api', { configurable: true, value: {} })
+    setRemoteDesktopEngineItem()
+    const pending = deferred<boolean>()
+    remoteMocks.ensurePersistent.mockReturnValueOnce(pending.promise)
+    renderSync({
+      auth: {
+        getSession: () => ({ userId: 'user-1', displayName: 'Ada', roles: [] }),
+        getAccessToken: vi.fn(),
+        refreshAccessToken: vi.fn()
+      }
+    })
+    await waitFor(() => expect(remoteMocks.ensurePersistent).toHaveBeenCalledOnce())
+
+    const other = makeFile('other', 'other.png')
+    act(() => {
+      useMediaProjectionStore.setState((state) => ({
+        playlist: [...state.playlist, other],
+        currentIndex: 1,
+        snapshot: state.snapshot
+          ? {
+              ...state.snapshot,
+              entries: [
+                ...state.snapshot.entries,
+                {
+                  index: 1,
+                  itemId: other.id,
+                  blobId: other.id,
+                  name: other.name,
+                  mimeType: other.mimeType,
+                  sourceUrl: other.url
+                }
+              ]
+            }
+          : null
+      }))
+    })
+    await act(async () => {
+      pending.resolve(true)
+      await pending.promise
+    })
+
+    expect(useMediaProjectionStore.getState().snapshot?.entries[0].remoteItem).toBeDefined()
   })
 
   it('sends file:show when a PPTX slide changes', () => {

@@ -205,6 +205,21 @@ describe('copied media preview identity', () => {
     expect(container.querySelector('audio')).toHaveAttribute('src', 'blob:resolved-source')
   })
 
+  it('uses the persistent native blob and existing controls after a remote VLC download', async () => {
+    const item = makeCopy('video/x-matroska', 'movie.mkv')
+    storeState.snapshot = {
+      entries: [{ itemId: item.id, sourceUrl: item.url, seekable: true }]
+    }
+    const { container } = render(<VideoPreview item={item} />)
+
+    await waitFor(() => {
+      expect(mockGetFileSource).toHaveBeenCalledWith({}, 'original-id', 'video/x-matroska')
+      expect(container.querySelector('video')).toHaveAttribute('src', 'blob:resolved-source')
+    })
+    fireEvent.click(container.querySelector('button')!)
+    expect(mockSendCommand).toHaveBeenCalledWith({ action: 'play', itemId: item.id })
+  })
+
   it.each([
     ['image/png', 'photo.png', 'img'],
     ['video/mp4', 'movie.mp4', 'video'],
@@ -229,7 +244,8 @@ describe('copied media preview identity', () => {
   it.each([
     ['image/png', 'photo.png'],
     ['video/mp4', 'movie.mp4'],
-    ['audio/mpeg', 'song.mp3']
+    ['audio/mpeg', 'song.mp3'],
+    ['video/x-matroska', 'movie.mkv']
   ])(
     'does not fall back to IndexedDB while the remote %s source is preparing',
     async (mimeType, name) => {

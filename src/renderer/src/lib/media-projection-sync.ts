@@ -117,7 +117,29 @@ export function useMediaProjectionSync(options: MediaProjectionSyncOptions = {})
             const { ensureHhcLineDesktopItemAvailableForPresentation } =
               await import('@renderer/lib/hhc-line-connect')
             const available = await ensureHhcLineDesktopItemAvailableForPresentation(auth, item)
-            if (available === false) return
+            if (available !== true) return
+            const latest = useMediaProjectionStore.getState()
+            const latestItem = latest.currentItem()
+            if (sequence !== projectSequenceRef.current || latestItem?.id !== item.id) return
+            useMediaProjectionStore.setState((current) => {
+              const snapshot = current.snapshot
+              if (!snapshot || current.currentItem()?.id !== item.id) return current
+              return {
+                snapshot: {
+                  ...snapshot,
+                  entries: snapshot.entries.map((entry) => {
+                    if (entry.itemId !== item.id) return entry
+                    const {
+                      remoteItem: _remoteItem,
+                      remoteSource: _remoteSource,
+                      ...localEntry
+                    } = entry
+                    return { ...localEntry, sourceUrl: latestItem.url }
+                  })
+                }
+              }
+            })
+            currentState = useMediaProjectionStore.getState()
           } else if (forceRemoteSource || !snapshotEntry.remoteSource) {
             const { prepareHhcLinePresentationSource } =
               await import('@renderer/lib/hhc-line-connect')
