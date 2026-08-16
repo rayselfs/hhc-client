@@ -37,6 +37,20 @@ let mockConstructError: Error | null = null
 let mockDestroyImplementation: () => void = () => undefined
 let mockSetSourceImplementation: (...args: unknown[]) => void = () => undefined
 
+function deferred<T>(): {
+  promise: Promise<T>
+  resolve: (value: T) => void
+  reject: (error: unknown) => void
+} {
+  let resolve!: (value: T) => void
+  let reject!: (error: unknown) => void
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise
+    reject = rejectPromise
+  })
+  return { promise, resolve, reject }
+}
+
 const VLC_WINDOW_EVENTS = [
   'enter-full-screen',
   'leave-full-screen',
@@ -331,6 +345,62 @@ describe('projection-vlc listener cleanup', () => {
       message: 'VLC playback stopped unexpectedly.'
     })
     expect(JSON.stringify(mockWindowManager.sendToMain.mock.calls)).not.toContain('/media/source')
+  })
+
+  it('does not publish a delayed old-item startup failure after newer media starts', async () => {
+    const oldEmbed = deferred<void>()
+    let embedCount = 0
+    mockEmbedImplementation = () => {
+      embedCount += 1
+      return embedCount === 1 ? oldEmbed.promise : Promise.resolve()
+    }
+    const start = getHandler('projection-vlc:start')
+    const oldError = new Error('old item failed')
+    const oldStart = Promise.resolve(
+      start(makeEvent(), {
+        itemId: 'item-old',
+        sourceFileId: '550e8400-e29b-41d4-a716-446655440000',
+        container: '#vlc-player'
+      })
+    )
+    await vi.waitFor(() => expect(mockVlcPlayers).toHaveLength(1))
+
+    await start(makeEvent(), {
+      itemId: 'item-new',
+      sourceFileId: '550e8400-e29b-41d4-a716-446655440001',
+      container: '#vlc-player'
+    })
+    mockWindowManager.sendToMain.mockClear()
+    oldEmbed.reject(oldError)
+
+    await expect(oldStart).rejects.toBe(oldError)
+    expect(mockWindowManager.sendToMain).not.toHaveBeenCalledWith(
+      'projection-vlc:failure',
+      expect.objectContaining({ itemId: 'item-old' })
+    )
+  })
+
+  it('does not publish runtime failures from a replaced VLC player', async () => {
+    const start = getHandler('projection-vlc:start')
+    await start(makeEvent(), {
+      itemId: 'item-old',
+      sourceFileId: '550e8400-e29b-41d4-a716-446655440000',
+      container: '#vlc-player'
+    })
+    const oldPlayer = mockVlcPlayers[0]
+    await start(makeEvent(), {
+      itemId: 'item-new',
+      sourceFileId: '550e8400-e29b-41d4-a716-446655440001',
+      container: '#vlc-player'
+    })
+    mockWindowManager.sendToMain.mockClear()
+
+    oldPlayer.emit('error', new Error('stale player failed'))
+
+    expect(mockWindowManager.sendToMain).not.toHaveBeenCalledWith(
+      'projection-vlc:failure',
+      expect.objectContaining({ itemId: 'item-old' })
+    )
   })
 
   it('publishes playback failure even when failed-player state queries throw', async () => {

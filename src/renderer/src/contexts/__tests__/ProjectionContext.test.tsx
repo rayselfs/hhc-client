@@ -350,6 +350,47 @@ describe('ProjectionContext Electron recovery', () => {
     })
   })
 
+  async function startReadyVlcMedia(
+    result: ReturnType<typeof renderProjection>['result'],
+    itemId = 'item-1'
+  ): Promise<void> {
+    let startPromise: ReturnType<typeof result.current.startProjection>
+    await act(async () => {
+      startPromise = result.current.startProjection('media', [
+        [
+          'file:show',
+          {
+            itemId,
+            blobId: `blob-${itemId}`,
+            fileName: `${itemId}.mp4`,
+            mimeType: 'video/mp4',
+            playlist: [],
+            currentIndex: 0,
+            playbackMode: 'vlc-embedded'
+          }
+        ]
+      ])
+      await Promise.resolve()
+    })
+    act(() => {
+      mockAdapter._trigger('__system:ready', { generation: 4 })
+    })
+    await act(async () => {
+      await startPromise!
+    })
+  }
+
+  function publishVlcFailure(itemId = 'item-1'): void {
+    act(() => {
+      vlcFailureCallback?.({
+        itemId,
+        code: 'playback-failed',
+        recoverable: true,
+        message: 'VLC playback stopped unexpectedly.'
+      })
+    })
+  }
+
   it('does not treat an existing window as ready until matching ready arrives', async () => {
     mockCheck.mockResolvedValue({
       exists: true,
@@ -401,9 +442,10 @@ describe('ProjectionContext Electron recovery', () => {
     })
   })
 
-  it('stores only the latest VLC runtime failure', async () => {
+  it('stores only the latest current VLC runtime failure', async () => {
     const { result } = renderProjection()
     await act(async () => Promise.resolve())
+    await startReadyVlcMedia(result)
 
     act(() => {
       vlcFailureCallback?.({
@@ -413,7 +455,7 @@ describe('ProjectionContext Electron recovery', () => {
         message: 'VLC could not open this media.'
       })
       vlcFailureCallback?.({
-        itemId: 'item-2',
+        itemId: 'item-1',
         code: 'playback-failed',
         recoverable: true,
         message: 'VLC playback stopped unexpectedly.'
@@ -421,11 +463,82 @@ describe('ProjectionContext Electron recovery', () => {
     })
 
     expect(result.current.vlcFailure).toEqual({
-      itemId: 'item-2',
+      itemId: 'item-1',
       code: 'playback-failed',
       recoverable: true,
       message: 'VLC playback stopped unexpectedly.'
     })
+  })
+
+  it('ignores a VLC failure that does not match the current ready media snapshot', async () => {
+    const { result } = renderProjection()
+    await act(async () => Promise.resolve())
+    await startReadyVlcMedia(result)
+
+    publishVlcFailure('item-stale')
+
+    expect(result.current.vlcFailure).toBeNull()
+  })
+
+  it('clears the current VLC failure when projection closes', async () => {
+    const { result } = renderProjection()
+    await act(async () => Promise.resolve())
+    await startReadyVlcMedia(result)
+    publishVlcFailure()
+    expect(result.current.vlcFailure).not.toBeNull()
+
+    await act(async () => {
+      await result.current.closeProjection()
+    })
+
+    expect(result.current.vlcFailure).toBeNull()
+  })
+
+  it('clears the current VLC failure when media switches to an image', async () => {
+    const { result } = renderProjection()
+    await act(async () => Promise.resolve())
+    await startReadyVlcMedia(result)
+    publishVlcFailure()
+
+    await act(async () => {
+      await result.current.project('file:show', {
+        itemId: 'image-1',
+        blobId: 'blob-image-1',
+        fileName: 'image.png',
+        mimeType: 'image/png',
+        playlist: [],
+        currentIndex: 0,
+        playbackMode: 'native'
+      })
+    })
+
+    expect(result.current.vlcFailure).toBeNull()
+  })
+
+  it('clears the current VLC failure when another owner claims projection', async () => {
+    const { result } = renderProjection()
+    await act(async () => Promise.resolve())
+    await startReadyVlcMedia(result)
+    publishVlcFailure()
+
+    act(() => {
+      result.current.claimProjection('bible')
+    })
+
+    expect(result.current.vlcFailure).toBeNull()
+  })
+
+  it('clears the current VLC failure when the projection lifecycle is replaced', async () => {
+    const { result } = renderProjection()
+    await act(async () => Promise.resolve())
+    await startReadyVlcMedia(result)
+    publishVlcFailure()
+
+    act(() => {
+      lifecycleCallback?.({ generation: 5, status: 'opening', reason: 'reload' })
+    })
+
+    expect(result.current.vlcFailure).toBeNull()
   })
 
   it('keeps a VLC failure through replay and a repeated failed start', async () => {
@@ -491,13 +604,20 @@ describe('ProjectionContext Electron recovery', () => {
   })
 
   it.each([
-    ['same-item', 'item-1', 'item-1', 4, true],
-    ['cross-item', 'item-2', 'item-2', 4, true],
-    ['stale-item', 'item-2', 'item-1', 4, false],
-    ['stale-generation', 'item-1', 'item-1', 3, false]
+    ['same-item', 'item-1', 'item-1', 4, false, true],
+    ['cross-item', 'item-2', 'item-2', 4, true, true],
+    ['stale-item', 'item-2', 'item-1', 4, true, true],
+    ['stale-generation', 'item-1', 'item-1', 3, false, false]
   ] as const)(
     'handles a %s VLC started acknowledgement against the current media snapshot',
-    async (_case, currentItemId, startedItemId, startedGeneration, shouldClear) => {
+    async (
+      _case,
+      currentItemId,
+      startedItemId,
+      startedGeneration,
+      shouldClearOnProject,
+      shouldClearAfterStarted
+    ) => {
       const { result } = renderProjection()
       await act(async () => Promise.resolve())
       const failedMedia = {
@@ -537,12 +657,12 @@ describe('ProjectionContext Electron recovery', () => {
       await act(async () => {
         await result.current.project('file:show', currentMedia)
       })
-      expect(result.current.vlcFailure).not.toBeNull()
+      expect(result.current.vlcFailure === null).toBe(shouldClearOnProject)
       act(() => {
         vlcStartedCallback?.(startedGeneration, startedItemId)
       })
 
-      expect(result.current.vlcFailure === null).toBe(shouldClear)
+      expect(result.current.vlcFailure === null).toBe(shouldClearAfterStarted)
     }
   )
 

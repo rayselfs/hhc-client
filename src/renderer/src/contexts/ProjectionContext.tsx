@@ -94,6 +94,19 @@ function getAdapter(
   return ref.current
 }
 
+function getReadyVlcItemId(coordinator: ProjectionSessionCoordinator): string | null {
+  const recovery = coordinator.getRecoveryState()
+  const snapshot = coordinator.getSnapshot()
+  const show = snapshot?.media.show
+  return recovery.status === 'ready' &&
+    snapshot?.owner === 'media' &&
+    !snapshot.showDefault &&
+    !snapshot.isBlackout &&
+    show?.playbackMode === 'vlc-embedded'
+    ? show.itemId
+    : null
+}
+
 export function ProjectionProvider({ children }: { children: React.ReactNode }): React.JSX.Element {
   const [isProjectionOpen, setIsProjectionOpen] = useState(false)
   const [projectionReadyCount, setProjectionReadyCount] = useState(0)
@@ -156,6 +169,10 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
         failure: next.failure ? { ...next.failure } : null
       })
       setProjectionSnapshot(coordinator.getSnapshot())
+      const vlcItemId = getReadyVlcItemId(coordinator)
+      setVlcFailure((failure) =>
+        failure && (!vlcItemId || (failure.itemId && failure.itemId !== vlcItemId)) ? null : failure
+      )
     }
     const unsubscribeCoordinator = coordinator.subscribe(syncCoordinatorState)
     const unsubscribeReady = adapter.on('__system:ready', (data) => {
@@ -198,7 +215,11 @@ export function ProjectionProvider({ children }: { children: React.ReactNode }):
           adapter.setGeneration(0)
         }
       })
-      const unsubscribeVlcFailure = window.api.projectionVlc.onFailure(setVlcFailure)
+      const unsubscribeVlcFailure = window.api.projectionVlc.onFailure((failure) => {
+        const vlcItemId = getReadyVlcItemId(coordinator)
+        if (!vlcItemId || (failure.itemId && failure.itemId !== vlcItemId)) return
+        setVlcFailure(failure)
+      })
       const unsubscribeVlcStarted = window.api.projectionVlc.onStarted((generation, itemId) => {
         const state = coordinator.getRecoveryState()
         const snapshot = coordinator.getSnapshot()

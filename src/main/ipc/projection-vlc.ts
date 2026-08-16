@@ -54,7 +54,22 @@ function getSafeItemId(itemId?: string): string | undefined {
   return itemId && /^[A-Za-z0-9_-]{1,128}$/.test(itemId) ? itemId : undefined
 }
 
-function publishFailure(wm: WindowManager, code: ProjectionVlcFailureCode, itemId?: string): void {
+function publishFailure(
+  wm: WindowManager,
+  code: ProjectionVlcFailureCode,
+  generation: number,
+  ownerVersion: number,
+  itemId?: string,
+  ownerPlayer?: VlcPlayer
+): void {
+  if (
+    generation <= 0 ||
+    ownerVersion !== lifecycleVersion ||
+    wm.getProjectionState().lifecycle.generation !== generation ||
+    (ownerPlayer !== undefined && player !== ownerPlayer)
+  ) {
+    return
+  }
   const safeItemId = getSafeItemId(itemId)
   wm.sendToMain('projection-vlc:failure', {
     ...(safeItemId ? { itemId: safeItemId } : {}),
@@ -276,8 +291,8 @@ function hideNativePlayerWindow(currentPlayer: VlcPlayer): void {
   }
 }
 
-async function stopVlc(): Promise<void> {
-  lifecycleVersion += 1
+async function stopVlc(invalidateLifecycle = true): Promise<void> {
+  if (invalidateLifecycle) lifecycleVersion += 1
   currentItemId = null
   currentDurationMs = undefined
   lastProgressPublicationMs = null
@@ -301,24 +316,28 @@ async function startVlc(
   if (!projectionWindow || projectionWindow.isDestroyed())
     throw new Error('Projection window not open')
   const generation = wm.getProjectionState().lifecycle.generation
+  const startVersion = lifecycleVersion + 1
+  lifecycleVersion = startVersion
 
   const { info, runtime } = await resolveVlcInfo(loadRuntime)
+  if (startVersion !== lifecycleVersion) return
   if (info.status !== 'ready' || !info.vlcDir) {
     publishFailure(
       wm,
       info.status === 'missing' ? 'runtime-missing' : 'binding-unavailable',
+      generation,
+      startVersion,
       request.itemId
     )
     throw new Error(info.message ?? 'VLC runtime not found')
   }
   if (!runtime) {
-    publishFailure(wm, 'binding-unavailable', request.itemId)
+    publishFailure(wm, 'binding-unavailable', generation, startVersion, request.itemId)
     throw new Error('VLC native binding unavailable')
   }
 
-  await stopVlc()
-  const startVersion = lifecycleVersion + 1
-  lifecycleVersion = startVersion
+  await stopVlc(false)
+  if (startVersion !== lifecycleVersion) return
   const beforeWindowListeners = captureListeners(projectionWindow, VLC_WINDOW_EVENTS)
   const beforeWebContentsListeners = captureListeners(
     projectionWindow.webContents,
@@ -378,7 +397,14 @@ async function startVlc(
     nextPlayer.on('stopped', () => sendState(wm, { isPlaying: false }))
     nextPlayer.on('endReached', () => sendState(wm, { isPlaying: false, isEnded: true }))
     nextPlayer.on('error', () => {
-      publishFailure(wm, 'playback-failed', request.itemId)
+      publishFailure(
+        wm,
+        'playback-failed',
+        generation,
+        startVersion,
+        request.itemId,
+        embeddedPlayer
+      )
     })
     nextPlayer.setSource(getNativeFilePath(request.sourceFileId), { autoplay: false })
     if (request.initialVolume !== undefined) {
@@ -428,7 +454,7 @@ async function startVlc(
     } catch {
       // Preserve the original startup rejection.
     }
-    publishFailure(wm, 'media-open-failed', request.itemId)
+    publishFailure(wm, 'media-open-failed', generation, startVersion, request.itemId)
     throw error
   }
 }
