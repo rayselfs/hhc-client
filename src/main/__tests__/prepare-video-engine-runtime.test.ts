@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { mkdtemp, mkdir, rm, writeFile, access } from 'node:fs/promises'
+import { access, mkdir, mkdtemp, readlink, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
@@ -53,6 +53,20 @@ describe('prepare video engine runtime script', () => {
     await expect(
       access(join(root, 'resources/video-engine/ffmpeg/darwin-arm64/ffmpeg'))
     ).resolves.toBeUndefined()
+  })
+
+  it('preserves relative VLC links so packaged runtimes stay inside the app bundle', async () => {
+    const root = await createTempRoot()
+    const vlcDir = join(root, '.local-runtimes/vlc/darwin-arm64')
+    await writeRuntimeFile(root, '.local-runtimes/vlc/darwin-arm64/libvlc.5.dylib')
+    await symlink('libvlc.5.dylib', join(vlcDir, 'libvlc.dylib'))
+    await writeRuntimeFile(root, '.local-runtimes/ffmpeg/darwin-arm64/ffmpeg')
+
+    await runPrepare(root, ['--strict'])
+
+    await expect(
+      readlink(join(root, 'resources/video-engine/vlc/darwin-arm64/libvlc.dylib'))
+    ).resolves.toBe('libvlc.5.dylib')
   })
 
   it('requires every runtime when strict all mode is requested', async () => {

@@ -84,7 +84,7 @@ for (const target of targets) {
     continue
   }
 
-  await cp(source, dest, { recursive: true, force: true })
+  await cp(source, dest, { recursive: true, force: true, verbatimSymlinks: true })
 
   const hasRequired = await Promise.any(
     target.required.map((file) =>

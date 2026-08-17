@@ -25,6 +25,7 @@
     "prepare:video-engine": "node scripts/prepare-video-engine-runtime.mjs",
     "prepare:video-engine:strict": "node scripts/prepare-video-engine-runtime.mjs --strict",
     "check:packaged-runtime": "node scripts/check-packaged-runtime.mjs",
+    "check:signed-package": "node scripts/check-signed-package.mjs",
     "poc:vlc": "electron scripts/vlc-poc.cjs",
     "preview:web": "vite preview --config vite.web.config.ts",
     "test": "vitest run",
