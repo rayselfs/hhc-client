@@ -4,8 +4,8 @@ Use this runbook only with the current [pilot manifest](media-sync-pilot-manifes
 
 ## 1. Preconditions
 
-- [ ] Fetch all seven repositories and confirm each `origin/main`, merged PR, CI, release workflow, migration, image digest, and rollback anchor agrees with the manifest.
-- [ ] Confirm the candidate client code is merged only after its PR is green. Never deploy a local or unmerged commit.
+- [ ] Fetch all seven repositories. Confirm each server/frontend `origin/main`, merged PR, CI, release workflow, migration, image digest, and rollback anchor agrees with the manifest.
+- [ ] For LibrePresenter, use only the exact pushed PR-head release-code anchor recorded in the manifest after review and green CI. Keep PR #6 open and unmerged per operator policy; never tag a local, unpushed, or different commit.
 - [ ] Confirm Account API, Asset API, Gateway, helper, and Admin are Healthy/Running at the manifest revisions; capture the immediately previous revision or static index before each later deployment.
 - [ ] Re-run the read-only negative boundary checks: Account private route is unreachable externally; anonymous Asset reader and invalid ticket are rejected; anonymous Admin management is rejected; www management remains absent.
 - [ ] Check aggregate logs for request-ID coverage and no credential, ticket, or binding-code value markers. Do not export raw log bodies.
@@ -40,7 +40,7 @@ For an approved future deployment, complete one healthy boundary before moving o
 3. Gateway reader and management routes.
 4. LINE helper.
 5. Admin Console.
-6. LibrePresenter web and desktop.
+6. LibrePresenter web preview and unsigned GitHub desktop artifacts from the approved PR-head anchor; do not merge PR #6.
 
 For every service, record only: commit SHA, CI/release URL, migration identifier, ready revision/static publish timestamp, immutable image digest if applicable, and previous rollback anchor. Schema deployment must not create a role assignment, collection, ACL, or binding.
 
