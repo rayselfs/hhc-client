@@ -40,12 +40,17 @@ describe('HHC browser auth entry and hosting config', () => {
     })
   })
 
-  it('injects only the configured Account origin into CSP and exposes it through APP_CONFIG', () => {
-    expect(read('src/renderer/index.html')).toContain('__HHC_ACCOUNT_ORIGIN__')
+  it('injects the configured Account and Asset origins into CSP and APP_CONFIG', () => {
+    const html = read('src/renderer/index.html')
+    expect(html).toContain('__HHC_ACCOUNT_ORIGIN__')
+    expect(html.match(/__HHC_ASSET_ORIGIN__/g)).toHaveLength(3)
+    expect(html).toContain('<meta name="referrer" content="no-referrer" />')
+
     expect(read('electron.vite.config.ts')).toContain(
-      'configuredAccountOriginCsp(buildConfig.hhcAccountOrigin)'
+      'configuredOriginsCsp(buildConfig.hhcAccountOrigin, buildConfig.hhcAssetOrigin)'
     )
     expect(read('src/shared/app-config.ts')).toContain('hhcAccountOrigin: __HHC_ACCOUNT_ORIGIN__')
+    expect(read('src/shared/app-config.ts')).toContain('hhcAssetOrigin: __HHC_ASSET_ORIGIN__')
   })
 
   it('keeps OAuth callback queries outside PWA navigation fallback', () => {
@@ -81,15 +86,31 @@ describe('HHC browser auth entry and hosting config', () => {
     }
   })
 
-  it('wires the public Account origin into every client build', () => {
-    expect(read('.github/workflows/ci.yml')).toContain(
-      'VITE_HHC_ACCOUNT_ORIGIN: ${{ vars.VITE_HHC_ACCOUNT_ORIGIN }}'
-    )
-    expect(read('.github/workflows/azure-static-web-apps-zealous-river-03bbb7100.yml')).toContain(
-      'VITE_HHC_ACCOUNT_ORIGIN: ${{ vars.VITE_HHC_ACCOUNT_ORIGIN }}'
-    )
-    expect(
-      read('.github/workflows/build-release.yml').match(/VITE_HHC_ACCOUNT_ORIGIN:/g)
-    ).toHaveLength(2)
+  it('wires the public Account and Asset origins into every client build', () => {
+    const ci = read('.github/workflows/ci.yml')
+    const staticWebApp = read('.github/workflows/azure-static-web-apps-zealous-river-03bbb7100.yml')
+    const release = read('.github/workflows/build-release.yml')
+
+    expect(ci).toContain('VITE_HHC_ACCOUNT_ORIGIN: ${{ vars.VITE_HHC_ACCOUNT_ORIGIN }}')
+    expect(ci).toContain('VITE_HHC_ASSET_ORIGIN: ${{ vars.VITE_HHC_ASSET_ORIGIN }}')
+    expect(staticWebApp).toContain('VITE_HHC_ACCOUNT_ORIGIN: ${{ vars.VITE_HHC_ACCOUNT_ORIGIN }}')
+    expect(staticWebApp).toContain('VITE_HHC_ASSET_ORIGIN: ${{ vars.VITE_HHC_ASSET_ORIGIN }}')
+    expect(release.match(/VITE_HHC_ACCOUNT_ORIGIN:/g)).toHaveLength(2)
+    expect(release.match(/VITE_HHC_ASSET_ORIGIN:/g)).toHaveLength(2)
+  })
+
+  it('keeps Asset tickets outside runtime caches and persisted browser storage', () => {
+    const config = read('electron.vite.config.ts')
+    expect(config).toContain('navigateFallbackDenylist: [/^\\/api\\//')
+    expect(config).not.toMatch(/runtimeCaching:[\s\S]*api\/assets/)
+
+    for (const file of [
+      'src/renderer/src/lib/hhc-asset-api-browser.ts',
+      'src/renderer/src/lib/hhc-asset-api-electron.ts',
+      'src/main/ipc/hhc-assets.ts'
+    ]) {
+      expect(read(file)).toContain('APP_CONFIG.hhcAssetOrigin')
+      expect(read(file)).not.toContain("const HHC_ASSET_ORIGIN = 'https://www.alive.org.tw'")
+    }
   })
 })

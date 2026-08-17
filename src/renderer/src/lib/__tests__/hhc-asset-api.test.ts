@@ -73,15 +73,18 @@ describe('browser HHC Asset API', () => {
     }
   })
 
-  it('rejects every origin except the public production Gateway', () => {
-    expect(() =>
-      createBrowserHhcAssetApi({
-        origin: 'https://asset-api.internal',
-        getAccessToken: vi.fn(),
-        refreshAccessToken: vi.fn()
-      })
-    ).toThrow('Invalid HHC Asset origin')
-  })
+  it.each(['https://asset-api.internal', `${ORIGIN}/path`, `${ORIGIN}/`])(
+    'rejects a runtime origin outside the exact configured Gateway: %s',
+    (origin) => {
+      expect(() =>
+        createBrowserHhcAssetApi({
+          origin,
+          getAccessToken: vi.fn(),
+          refreshAccessToken: vi.fn()
+        })
+      ).toThrow('Invalid HHC Asset origin')
+    }
+  )
 
   it('uses exact public reader routes and URL-encodes opaque IDs and cursors', async () => {
     const fetcher = vi

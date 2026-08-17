@@ -1,6 +1,7 @@
 import { _electron as electron, expect, test } from '@playwright/test'
 import type { ElectronApplication } from '@playwright/test'
-import { resolve } from 'node:path'
+import { access, mkdir, writeFile } from 'node:fs/promises'
+import { join, resolve } from 'node:path'
 import { completeOnboarding } from './helpers'
 
 let electronApp: ElectronApplication | null = null
@@ -17,11 +18,12 @@ test('launches packaged control and projection windows with recovery lifecycle',
   const configuredPath = process.env.PACKAGED_APP_PATH
   if (!configuredPath) throw new Error('PACKAGED_APP_PATH is required')
   const packagedAppPath = resolve(configuredPath)
+  const userDataPath = testInfo.outputPath('user-data')
 
   await test.step('launch packaged app', async () => {
     electronApp = await electron.launch({
       executablePath: packagedAppPath,
-      args: [`--user-data-dir=${testInfo.outputPath('user-data')}`],
+      args: [`--user-data-dir=${userDataPath}`],
       timeout: 15_000
     })
   })
@@ -70,5 +72,30 @@ test('launches packaged control and projection windows with recovery lifecycle',
 
     await control.getByRole('button', { name: /Stop projection|停止投影/ }).click()
     await expect.poll(() => electronApp?.windows().length ?? 0).toBe(1)
+  })
+
+  await test.step('remove stale HHC native leases on packaged restart', async () => {
+    await electronApp!.close()
+    electronApp = null
+
+    const staleLeaseDir = join(userDataPath, 'hhc-asset-leases')
+    await mkdir(staleLeaseDir, { recursive: true })
+    await writeFile(join(staleLeaseDir, 'stale.bin'), 'stale native lease')
+
+    electronApp = await electron.launch({
+      executablePath: packagedAppPath,
+      args: [`--user-data-dir=${userDataPath}`],
+      timeout: 15_000
+    })
+    const restartedControl = await electronApp.firstWindow()
+    await expect(restartedControl).toHaveTitle(/LibrePresenter/)
+    await expect
+      .poll(async () =>
+        access(staleLeaseDir).then(
+          () => true,
+          () => false
+        )
+      )
+      .toBe(false)
   })
 })

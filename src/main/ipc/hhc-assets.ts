@@ -22,7 +22,7 @@ import {
 } from './native-fs'
 import { isMainWindow } from './validate'
 
-const HHC_ASSET_ORIGIN = 'https://www.alive.org.tw'
+const HHC_ASSET_ORIGIN = APP_CONFIG.hhcAssetOrigin
 const OPAQUE_ID_PATTERN = /^[A-Za-z0-9_-]{1,255}$/
 const MAX_CURSOR_BYTES = 2048
 const MAX_CONTENT_BYTES = 200 * 1024 * 1024
@@ -227,7 +227,7 @@ async function downloadContent(
 }
 
 export function registerHhcAssetHandlers(wm: WindowManager, auth: HhcAuthService): void {
-  if (new URL(APP_CONFIG.hhcAssetOrigin).origin !== HHC_ASSET_ORIGIN) {
+  if (new URL(APP_CONFIG.hhcAssetOrigin).origin !== APP_CONFIG.hhcAssetOrigin) {
     throw new Error('Invalid HHC Asset origin')
   }
 

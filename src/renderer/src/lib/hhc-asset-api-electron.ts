@@ -1,11 +1,11 @@
 import { HhcAssetApiError, type HhcAssetApi } from './hhc-asset-api'
+import { APP_CONFIG } from '@shared/app-config'
 import {
   parseHhcAssetChangePage,
   parseHhcAssetCollectionPage,
   parseHhcAssetItem
 } from './hhc-asset-api-browser'
 
-const HHC_ASSET_ORIGIN = 'https://www.alive.org.tw'
 const LEASE_URL_PATTERN = /^hhc-media:\/\/lease\/[0-9a-f-]{36}\?type=/
 
 async function invoke<T>(request: Promise<T>): Promise<T> {
@@ -39,7 +39,7 @@ export function createElectronHhcAssetApi(): HhcAssetApi {
     issueContentTicket: async (collectionId, itemId) => {
       const ticket = await invoke(window.api.hhcAssets.issueContentTicket({ collectionId, itemId }))
       if (
-        !ticket.contentUrl.startsWith(`${HHC_ASSET_ORIGIN}/api/assets/content?ticket=`) ||
+        !ticket.contentUrl.startsWith(`${APP_CONFIG.hhcAssetOrigin}/api/assets/content?ticket=`) ||
         !Number.isFinite(ticket.expiresAt) ||
         !ticket.etag
       ) {

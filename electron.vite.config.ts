@@ -77,11 +77,13 @@ function createBuildConfig(mode: string): {
   }
 }
 
-function configuredAccountOriginCsp(accountOrigin: string): Plugin {
+function configuredOriginsCsp(accountOrigin: string, assetOrigin: string): Plugin {
   return {
-    name: 'configured-account-origin-csp',
+    name: 'configured-origins-csp',
     transformIndexHtml(html) {
-      return html.replaceAll('__HHC_ACCOUNT_ORIGIN__', accountOrigin)
+      return html
+        .replaceAll('__HHC_ACCOUNT_ORIGIN__', accountOrigin)
+        .replaceAll('__HHC_ASSET_ORIGIN__', assetOrigin)
     }
   }
 }
@@ -130,7 +132,7 @@ export default defineConfig(({ mode }) => {
       plugins: [
         react(),
         tailwindcss(),
-        configuredAccountOriginCsp(buildConfig.hhcAccountOrigin),
+        configuredOriginsCsp(buildConfig.hhcAccountOrigin, buildConfig.hhcAssetOrigin),
         devCspUnsafeInline(),
         VitePWA({
           registerType: 'autoUpdate',

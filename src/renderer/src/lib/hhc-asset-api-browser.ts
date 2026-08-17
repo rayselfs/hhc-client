@@ -9,7 +9,6 @@ import {
 } from '@shared/hhc-assets'
 import { HhcAssetApiError, type HhcAssetApi } from './hhc-asset-api'
 
-const HHC_ASSET_ORIGIN = 'https://www.alive.org.tw'
 const RANGE_PATTERN = /^bytes=(?:\d+-\d*|-\d+)$/
 
 type BrowserHhcAssetApiOptions = {
@@ -63,8 +62,16 @@ function classification(
 }
 
 export function createBrowserHhcAssetApi(options: BrowserHhcAssetApiOptions): HhcAssetApi {
-  const configuredOrigin = new URL(options.origin ?? APP_CONFIG.hhcAssetOrigin).origin
-  if (configuredOrigin !== HHC_ASSET_ORIGIN) throw new Error('Invalid HHC Asset origin')
+  const requestedOrigin = options.origin ?? APP_CONFIG.hhcAssetOrigin
+  let configuredOrigin: string
+  try {
+    configuredOrigin = new URL(requestedOrigin).origin
+  } catch {
+    throw new Error('Invalid HHC Asset origin')
+  }
+  if (configuredOrigin !== requestedOrigin || configuredOrigin !== APP_CONFIG.hhcAssetOrigin) {
+    throw new Error('Invalid HHC Asset origin')
+  }
   const fetcher = options.fetcher ?? ((...args) => window.fetch(...args))
 
   const request = async (path: string, init: RequestInit = {}): Promise<Response> => {
