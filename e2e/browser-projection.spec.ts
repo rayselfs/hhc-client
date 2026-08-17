@@ -411,7 +411,9 @@ test('restores the HHC account session without storing the access token', async 
   const projectedVideo = projection.locator('video')
   await expect(projectedVideo).toBeVisible()
   await expect
-    .poll(() => contentRequests.some(({ fromProjection, range }) => fromProjection && Boolean(range)))
+    .poll(() =>
+      contentRequests.some(({ fromProjection, range }) => fromProjection && Boolean(range))
+    )
     .toBe(true)
   const mediaRangeRequest = contentRequests.find(
     ({ fromProjection, range }) => fromProjection && Boolean(range)
