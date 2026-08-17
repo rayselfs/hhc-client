@@ -99,6 +99,32 @@ describe('HHC browser auth entry and hosting config', () => {
     expect(release.match(/VITE_HHC_ASSET_ORIGIN:/g)).toHaveLength(2)
   })
 
+  it('builds tag and manual desktop artifacts through one explicit unsigned path', () => {
+    const builder = read('electron-builder.yml')
+    const release = read('.github/workflows/build-release.yml')
+
+    expect(builder).toMatch(/^\s*identity:\s*null\s*$/m)
+    expect(builder).toMatch(/^\s*hardenedRuntime:\s*false\s*$/m)
+    expect(builder).toMatch(/^\s*notarize:\s*false\s*$/m)
+    expect(release).toContain("- 'v*.*.*'")
+    expect(release).toContain('workflow_dispatch:')
+
+    const packageStep = release.match(
+      /- name: Build explicit unsigned desktop package[\s\S]*?(?=\n\s{6}- name:)/
+    )?.[0]
+    expect(packageStep).toBeDefined()
+    expect(packageStep).not.toMatch(/\n\s+if:/)
+    expect(packageStep).toContain('CSC_IDENTITY_AUTO_DISCOVERY: false')
+    expect(packageStep).toContain('--config.forceCodeSigning=false')
+    expect(packageStep).toContain('--config.mac.identity=null')
+    expect(packageStep).toContain('--config.mac.notarize=false')
+
+    expect(release).not.toMatch(/MAC_CSC_|WIN_CSC_|APPLE_API_|check:signed-package/)
+    expect(release).toContain('npm run check:packaged-runtime')
+    expect(release).toContain('npm run test:e2e:packaged')
+    expect(release).toContain('actions/upload-artifact@')
+  })
+
   it('keeps Asset tickets outside runtime caches and persisted browser storage', () => {
     const config = read('electron.vite.config.ts')
     expect(config).toContain('navigateFallbackDenylist: [/^\\/api\\//')
