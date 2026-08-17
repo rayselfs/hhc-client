@@ -17,8 +17,17 @@ Stop immediately if any item disagrees with the manifest. Restore the prior revi
 
 The current desktop policy is **unsigned GitHub artifacts**. macOS Gatekeeper and Windows SmartScreen warnings are expected; no operator may automate or document a bypass.
 
-- [ ] Download only the intended artifact from the approved official GitHub Release after the tag checkpoint.
-- [ ] Obtain its published SHA-256 checksum through the approved release evidence channel and verify the downloaded bytes before installation. If no approved checksum is available, stop.
+Before creating a tag:
+
+- [ ] Confirm `package.json` contains the approved version and its changelog/release-notes entry is ready.
+- [ ] Confirm the intended tag is exactly `v` followed by the `package.json` version.
+- [ ] Confirm the release variables resolve exactly to `VITE_HHC_ACCOUNT_ORIGIN=https://account.alive.org.tw` and `VITE_HHC_ASSET_ORIGIN=https://www.alive.org.tw`.
+- [ ] Present and acknowledge that the macOS and Windows artifacts will be unsigned.
+
+The release workflow generates `SHA256SUMS` from the completed package-job artifacts and uploads it with those artifacts. After publication, use a fresh directory or independent machine rather than the CI workspace:
+
+- [ ] Download only the intended artifact and `SHA256SUMS` from the approved official GitHub Release.
+- [ ] Verify the downloaded artifact against the downloaded `SHA256SUMS` with a trusted SHA-256 tool before installation or distribution. If the file is absent or verification fails, stop.
 - [ ] Confirm the package retains the `librepresenter` protocol and passes packaged runtime/VLC projection smoke before distribution.
 - [ ] Present the expected platform warning and checksum result to the pilot operator. Installation or release publication requires the separate tag/release approval checkpoint.
 
@@ -49,13 +58,18 @@ Prepare opaque references only:
 
 Before mutation, present target count, collection namespace/name, subject types, binding-code TTL, group/profile confirmation, and the unbind/revoke rollback sequence. Keep the actual binding code only in the operator's private interaction; do not place it in logs, screenshots, PRs, or evidence documents.
 
-**Approval checkpoint: pilot authorization and binding.** After explicit approval only:
+**Approval checkpoint: bounded pilot acceptance.** After explicit approval only, carry out this complete sequence:
 
-1. Assign `media_sync_user` to `[reader-a]` and `[reader-b]` only.
-2. Create `[collection]`.
-3. Grant `[reader-a]` the initial read ACL; do not grant `[reader-b]` yet.
-4. Issue one binding code and enter the exact `/media-sync` command in `[helper-group]`.
-5. Confirm Admin shows the intended bound group, then prove the code cannot be reused.
+1. Run the approved deterministic public `main` profile smoke before the first pilot mutation.
+2. Assign `media_sync_user` to `[reader-a]` and `[reader-b]` only.
+3. Create `[collection]`.
+4. Grant `[reader-a]` the initial read ACL; do not grant `[reader-b]` yet.
+5. Issue one binding code and enter the exact `/media-sync` command in `[helper-group]`.
+6. Confirm Admin shows the intended bound group, then prove the code cannot be reused.
+7. Grant and then revoke `[reader-b]` ACL access while running the Section 5 isolation checks.
+8. Upload only the approved synthetic fixtures in Section 6.
+9. Run the approved manual `save_resource` publication and its `unsend` cleanup in Section 6.
+10. Repeat the same deterministic public `main` profile smoke after the pilot observation window.
 
 ## 5. Authorization matrix
 
@@ -86,6 +100,8 @@ For `[reader-a]`, verify repeated single-select picker imports, browser online-o
 
 Run one bound-group manual `save_resource` publication. Prove one source asset and normal curated publication, then unsend it and prove collection tombstone, publication cleanup, owner asset deletion, and client delta cleanup.
 
+For the approved public `main` profile smoke, use the same existing deterministic, text-only smoke-corpus case before the first pilot mutation and after the observation window. It must produce only its established deterministic response: no LLM or tool invocation, no media-sync command/binding/intake/publication activity, and no Asset or Catalog mutation. Retain only an opaque correlation reference and pass/fail result. Any difference stops the pilot.
+
 ## 7. Observation window
 
 The following are **proposed conservative thresholds**. The operator must agree to the duration and thresholds before the first synthetic upload; they are not approved defaults.
@@ -105,7 +121,13 @@ An unchanged dashboard is not evidence. Trace at least one known fixture through
 
 ## 8. Rollback rehearsal and execution
 
-Rehearse the order without deleting database tables or production assets:
+### Tabletop rehearsal (no writes)
+
+Resolve the exact targets, responsible operator, authority, expected checks, and order below without executing an unbind, role/ACL change, route change, deployment, or data mutation. A tabletop result is evidence about readiness only; it is not a rollback.
+
+### Live rollback
+
+Execute a live action only after explicit approval at that checkpoint or under incident authority that was pre-authorized and recorded before the pilot. Then apply only the approved steps needed:
 
 1. Unbind `[helper-group]` to stop new intake.
 2. Revoke pilot collection ACLs and `media_sync_user` assignments.
@@ -115,10 +137,10 @@ Rehearse the order without deleting database tables or production assets:
 6. Reconcile in-flight work and retained assets explicitly; leave additive tables in place.
 7. Deprecate an unsigned desktop release rather than deleting downloaded artifacts; publish a corrective release if required.
 
-After each rollback action, repeat the relevant negative authorization checks. A rollback is not complete until future intake is blocked and the pilot accounts cannot reach the collection.
+After each approved live rollback action, repeat the relevant negative authorization checks. A live rollback is not complete until future intake is blocked and the pilot accounts cannot reach the collection.
 
 ## 9. Evidence handling and final checkpoint
 
 Keep only CI/release URLs, SHA/digest/revision values, timestamps, aggregate counts, opaque request/work identifiers, pass/fail outcomes, and approved thresholds. Redact screenshots and logs before sharing. Do not include binding commands with real codes, account or LINE IDs, ticket URLs, bearer values, raw request payloads, or asset content.
 
-Before a tag or GitHub Release, present the completed manifest, pilot matrix, observation evidence, artifact checksum, unsigned-artifact acknowledgement, open risks, and rollback anchors. General rollout remains role/ACL/group-by-group and requires a new explicit approval.
+Before a tag or GitHub Release, present the completed manifest, pilot matrix, observation evidence, completed pre-tag checklist, unsigned-artifact acknowledgement, open risks, and rollback anchors. The checksum is generated only from completed package artifacts and is independently verified after publication as described in Section 2. General rollout remains role/ACL/group-by-group and requires a new explicit approval.

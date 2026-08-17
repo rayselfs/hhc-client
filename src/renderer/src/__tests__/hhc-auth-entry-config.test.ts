@@ -125,6 +125,27 @@ describe('HHC browser auth entry and hosting config', () => {
     expect(release).toContain('actions/upload-artifact@')
   })
 
+  it('publishes checksums generated from the packaged release artifacts', () => {
+    const release = read('.github/workflows/build-release.yml')
+    const checksumStep = release.match(
+      /- name: Generate release checksums[\s\S]*?(?=\n\s{6}- name:)/
+    )?.[0]
+
+    expect(checksumStep).toBeDefined()
+    expect(checksumStep).toContain('release-artifacts')
+    expect(checksumStep).toContain('sha256sum')
+    expect(checksumStep).toContain('SHA256SUMS')
+    expect(checksumStep).toContain('test -s')
+    expect(release).toContain('needs: [quality-gates, prepare, package]')
+    expect(release.indexOf('- name: Download desktop artifacts')).toBeLessThan(
+      release.indexOf('- name: Generate release checksums')
+    )
+    expect(release.indexOf('- name: Generate release checksums')).toBeLessThan(
+      release.indexOf('- name: Publish GitHub release')
+    )
+    expect(release).toContain('gh release create "${GITHUB_REF_NAME}" release-artifacts/*')
+  })
+
   it('keeps Asset tickets outside runtime caches and persisted browser storage', () => {
     const config = read('electron.vite.config.ts')
     expect(config).toContain('navigateFallbackDenylist: [/^\\/api\\//')
