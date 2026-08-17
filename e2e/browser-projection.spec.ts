@@ -2,6 +2,11 @@ import { expect, test } from '@playwright/test'
 import { resolve } from 'node:path'
 import { completeOnboarding } from './helpers'
 
+const TINY_MP4 = Buffer.from(
+  'AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAMPbW9vdgAAAGxtdmhkAAAAAAAAAAAAAAAAAAAD6AAAAPoAAQAAAQAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAjl0cmFrAAAAXHRra2QAAAADAAAAAAAAAAAAAAABAAAAAAAAAPoAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAAABAAAAAQAAAAAAAkZWR0cwAAABxlbHN0AAAAAAAAAAEAAAD6AAAAAAABAAAAAAGxbWRpYQAAACBtZGhkAAAAAAAAAAAAAAAAAABAAAAAEABVxAAAAAAALWhkbHIAAAAAAAAAAHZpZGUAAAAAAAAAAAAAAABWaWRlb0hhbmRsZXIAAAABXG1pbmYAAAAUdm1oZAAAAAEAAAAAAAAAAAAAACRkaW5mAAAAHGRyZWYAAAAAAAAAAQAAAAx1cmwgAAAAAQAAARxzdGJsAAAAuHN0c2QAAAAAAAAAAQAAAKhhdmMxAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAABAAEABIAAAASAAAAAAAAAABFUxhdmM2Mi4yOC4xMDIgbGlieDI2NAAAAAAAAAAAAAAAGP//AAAALmF2Y0MBQsAe/+EAFmdCwB7ZHsBEAAADAAQAAAMAIDxYuSABAAVoy4PLIAAAABBwYXNwAAAAAQAAAAEAAAAUYnRydAAAAAAAAFBgAAAAAAAAABhzdHRzAAAAAAAAAAEAAAABAAAQAAAAABxzdHNjAAAAAAAAAAEAAAABAAAAAQAAAAEAAAAUc3RzegAAAAAAAAKDAAAAAQAAABRzdGNvAAAAAAAAAAEAAAM/AAAAYnVkdGEAAABabWV0YQAAAAAAAAAhaGRscgAAAAAAAAAAbWRpcmFwcGwAAAAAAAAAAAAAAAAtaWxzdAAAACWpdG9vAAAAHWRhdGEAAAABAAAAAExhdmY2Mi4xMi4xMDIAAAAIZnJlZQAAAottZGF0AAACcAYF//9s3EXpvebZSLeWLNgg2SPu73gyNjQgLSBjb3JlIDE2NSByMzIyMiBiMzU2MDVhIC0gSC4yNjQvTVBFRy00IEFWQyBjb2RlYyAtIENvcHlsZWZ0IDIwMDMtMjAyNSAtIGh0dHA6Ly93d3cudmlkZW9sYW4ub3JnL3gyNjQuaHRtbCAtIG9wdGlvbnM6IGNhYmFjPTAgcmVmPTMgZGVibG9jaz0xOjA6MCBhbmFseXNlPTB4MToweDExMSBtZT1oZXggc3VibWU9NyBwc3k9MSBwc3lfcmQ9MS4wMDowLjAwIG1peGVkX3JlZj0xIG1lX3JhbmdlPTE2IGNocm9tYV9tZT0xIHRyZWxsaXM9MSA4eDhkY3Q9MCBjcW09MCBkZWFkem9uZT0yMSwxMSBmYXN0X3Bza2lwPTEgY2hyb21hX3FwX29mZnNldD0tMiB0aHJlYWRzPTEgbG9va2FoZWFkX3RocmVhZHM9MSBzbGljZWRfdGhyZWFkcz0wIG5yPTAgZGVjaW1hdGU9MSBpbnRlcmxhY2VkPTAgYmx1cmF5X2NvbXBhdD0wIGNvbnN0cmFpbmVkX2ludHJhPTAgYmZyYW1lcz0wIHdlaWdodHA9MCBrZXlpbnQ9MjUwIGtleWludF9taW49NCBzY2VuZWN1dD00MCBpbnRyYV9yZWZyZXNoPTAgcmNfbG9va2FoZWFkPTQwIHJjPWNyZiBtYnRyZWU9MSBjcmY9MjMuMCBxY29tcD0wLjYwIHFwbWluPTAgcXBtYXg9NjkgcXBzdGVwPTQgaXBfcmF0aW89MS40NCBhcT0xOjEuMDAAgAAAAAtliIQEPJigADQbgA==',
+  'base64'
+)
+
 declare global {
   interface Window {
     __projectionFocusCalls: number
@@ -133,7 +138,12 @@ test('restores the HHC account session without storing the access token', async 
     createdAt: '2026-08-17T00:00:00Z'
   }))
   const ticketRequests: string[] = []
-  const contentRequests: Array<{ range: string | undefined; referer: string | undefined }> = []
+  const contentRequests: Array<{
+    range: string | undefined
+    referer: string | undefined
+    status: number
+    fromProjection: boolean
+  }> = []
 
   await context.route(`${clientOrigin}/**`, async (route) => {
     const url = new URL(route.request().url())
@@ -302,20 +312,56 @@ test('restores the HHC account session without storing the access token', async 
       return
     }
     if (url.pathname === '/api/assets/content') {
-      contentRequests.push({
-        range: request.headers().range,
-        referer: request.headers().referer
-      })
       const range = request.headers().range
+      const match = range?.match(/^bytes=(\d*)-(\d*)$/)
+      let start = 0
+      let end = TINY_MP4.length - 1
+      if (range) {
+        if (!match || (!match[1] && !match[2])) {
+          await route.fulfill({
+            status: 416,
+            headers: {
+              ...corsHeaders,
+              'content-range': `bytes */${TINY_MP4.length}`
+            }
+          })
+          return
+        }
+        if (match[1]) {
+          start = Number(match[1])
+          end = match[2] ? Math.min(Number(match[2]), end) : end
+        } else {
+          const suffixLength = Number(match[2])
+          start = Math.max(0, TINY_MP4.length - suffixLength)
+        }
+        if (start > end || start >= TINY_MP4.length) {
+          await route.fulfill({
+            status: 416,
+            headers: {
+              ...corsHeaders,
+              'content-range': `bytes */${TINY_MP4.length}`
+            }
+          })
+          return
+        }
+      }
+      contentRequests.push({
+        range,
+        referer: request.headers().referer,
+        status: range ? 206 : 200,
+        fromProjection: request.frame().url().includes('#/projection')
+      })
       await route.fulfill({
         status: range ? 206 : 200,
         headers: {
           ...corsHeaders,
           'content-type': 'video/mp4',
           etag: '"etag-video"',
-          ...(range ? { 'content-range': 'bytes 0-3/4' } : {})
+          'accept-ranges': 'bytes',
+          'content-length': String(end - start + 1),
+          ...(range ? { 'content-range': `bytes ${start}-${end}/${TINY_MP4.length}` } : {})
         },
-        body: Buffer.from([0, 0, 0, 0])
+        body: TINY_MP4.subarray(start, end + 1)
       })
       return
     }
@@ -362,7 +408,30 @@ test('restores the HHC account session without storing the access token', async 
   await page.getByTestId('preview-present').click()
   const projection = await projectionPromise
   await expect.poll(() => ticketRequests.length).toBeGreaterThan(0)
-  await expect(projection.locator('video')).toBeVisible()
+  const projectedVideo = projection.locator('video')
+  await expect(projectedVideo).toBeVisible()
+  await expect
+    .poll(() => contentRequests.some(({ fromProjection, range }) => fromProjection && Boolean(range)))
+    .toBe(true)
+  const mediaRangeRequest = contentRequests.find(
+    ({ fromProjection, range }) => fromProjection && Boolean(range)
+  )
+  expect(mediaRangeRequest).toMatchObject({
+    status: 206,
+    referer: undefined
+  })
+  expect(mediaRangeRequest?.range).toMatch(/^bytes=\d*-\d*$/)
+  await expect
+    .poll(() =>
+      projectedVideo.evaluate(
+        (video) =>
+          video.readyState >= HTMLMediaElement.HAVE_METADATA &&
+          Number.isFinite(video.duration) &&
+          video.duration > 0 &&
+          video.seekable.length === 1
+      )
+    )
+    .toBe(true)
 
   for (const item of media.filter(({ id }) => id !== 'video-1')) {
     await page.getByTestId('media-back-to-files').click()
@@ -375,12 +444,6 @@ test('restores the HHC account session without storing the access token', async 
   expect(ticketRequests).toHaveLength(media.length)
 
   const ticketUrl = ticketRequests.find((url) => url.endsWith('ticket-video-1'))!
-  const rangedStatus = await page.evaluate(async (url) => {
-    const response = await fetch(url, { headers: { Range: 'bytes=0-3' } })
-    return response.status
-  }, ticketUrl)
-  expect(rangedStatus).toBe(206)
-  expect(contentRequests).toContainEqual({ range: 'bytes=0-3', referer: undefined })
 
   const finalStorageState = await context.storageState({ indexedDB: true })
   expect(JSON.stringify(finalStorageState)).not.toContain('ticket-')
