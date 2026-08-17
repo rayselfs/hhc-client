@@ -117,8 +117,9 @@ async function createProvider(
       const session = auth.getSession()
       return !expectedUserId || session?.userId === expectedUserId ? session : null
     },
-    onAccessError: (scope, error) =>
-      handleHhcLineAccessError(auth, { kind: 'root', ...scope }, error)
+    getAuthGeneration: auth.getAuthGeneration,
+    onAccessError: (scope, error, requestAuth) =>
+      handleHhcLineAccessError(auth, { kind: 'root', ...scope }, error, requestAuth)
   })
 }
 
@@ -191,6 +192,7 @@ export async function ensureHhcLineDesktopItemAvailableForPresentation(
   const found = await getHhcPresentationEntry(item)
   if (!found) return null
   if (found.entry.status === 'available-offline') return true
+  const authGeneration = auth.getAuthGeneration?.() ?? 0
   const session = requireSession(auth)
   if (found.connection.accountUserId !== session.userId) {
     throw Object.assign(new Error('HHC account changed'), {
@@ -239,7 +241,8 @@ export async function ensureHhcLineDesktopItemAvailableForPresentation(
           rootRemoteFolderId: found.entry.parentRemoteItemId!,
           remoteItemId: found.entry.remoteItemId
         },
-        error
+        error,
+        { accountUserId: session.userId, authGeneration }
       ),
     onDownloaded: () => refreshImportedMediaAssets([item])
   })
@@ -272,6 +275,7 @@ export async function getConnectedHhcLineAccount(
 }
 
 export async function listHhcLineCollections(auth: HhcLineCloudAuth): Promise<CloudRemoteFolder[]> {
+  const authGeneration = auth.getAuthGeneration?.() ?? 0
   const session = requireSession(auth)
   try {
     const api = await createHhcAssetApi(auth)
@@ -308,7 +312,12 @@ export async function listHhcLineCollections(auth: HhcLineCloudAuth): Promise<Cl
     const imported = importedCollectionIds(createHhcLineProviderConnectionId(session.userId))
     return collections.filter((collection) => !imported.has(collection.remoteItemId))
   } catch (error) {
-    await handleHhcLineAccessError(auth, { kind: 'account', accountUserId: session.userId }, error)
+    await handleHhcLineAccessError(
+      auth,
+      { kind: 'account', accountUserId: session.userId },
+      error,
+      { accountUserId: session.userId, authGeneration }
+    )
     throw error
   }
 }

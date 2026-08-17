@@ -106,6 +106,24 @@ describe('HHC LINE access owner', () => {
     expect(mocks.unlinkAccount).not.toHaveBeenCalled()
   })
 
+  it('cleans a stale account 403 by captured scope without ending the newer session', async () => {
+    const currentAuth = {
+      getSession: () => ({ userId: 'user-b', displayName: 'Grace', roles: [] }),
+      getAuthGeneration: () => 1,
+      endSession: vi.fn(async () => undefined)
+    }
+
+    await handleHhcLineAccessError(
+      currentAuth,
+      { kind: 'account', accountUserId: 'user-a' },
+      new HhcAssetApiError('access-revoked', 403),
+      { accountUserId: 'user-a', authGeneration: 0 }
+    )
+
+    expect(mocks.unlinkAccount).toHaveBeenCalledWith('user-a')
+    expect(currentAuth.endSession).not.toHaveBeenCalled()
+  })
+
   it('purges every HHC root for only the listed account after a list 403', async () => {
     await handleHhcLineAccessError(
       auth(),

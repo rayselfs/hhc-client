@@ -4,6 +4,7 @@ import type { HhcAssetApi } from '../hhc-asset-api'
 import { HhcLineReadonlyProvider } from '../hhc-line-provider'
 import { openFileExplorerDB, resetFileExplorerDBForTests } from '../file-explorer-db'
 import { getProviderConnection, getSyncEntryByRemoteItem, resetSyncDBForTests } from '../sync-db'
+import { handleHhcLineAccessError } from '../hhc-line-access'
 
 const collection = {
   id: 'collection_1',
@@ -201,8 +202,101 @@ describe('HHC LINE read-only provider', () => {
           rootRemoteFolderId: collection.id,
           ...(operation === 'changes' ? {} : { remoteItemId: item.id })
         },
-        error
+        error,
+        undefined
       )
+    }
+  )
+
+  it.each([
+    ['metadata', 'account switch'],
+    ['metadata', 'same-user re-login'],
+    ['ticket', 'account switch'],
+    ['ticket', 'same-user re-login']
+  ] as const)(
+    'does not end a newer session for a delayed %s 401 after %s',
+    async (operation, transition) => {
+      const client = api()
+      let rejectRequest!: (error: unknown) => void
+      if (operation === 'metadata') {
+        vi.mocked(client.getCollectionItem).mockReturnValue(
+          new Promise((_, reject) => {
+            rejectRequest = reject
+          })
+        )
+      } else {
+        vi.mocked(client.getRemoteContentSource).mockReturnValue(
+          new Promise((_, reject) => {
+            rejectRequest = reject
+          })
+        )
+      }
+      const sessionRef = {
+        current: { userId: 'user_1', displayName: 'Ada', roles: ['media_sync_user'] }
+      }
+      const generationRef = { current: 0 }
+      const auth = {
+        getSession: () => sessionRef.current,
+        getAuthGeneration: () => generationRef.current,
+        endSession: vi.fn(async () => undefined)
+      }
+      const provider = new HhcLineReadonlyProvider({
+        api: client,
+        getSession: auth.getSession,
+        getAuthGeneration: auth.getAuthGeneration,
+        onAccessError: (scope, error, requestAuth) =>
+          handleHhcLineAccessError(auth, { kind: 'root', ...scope }, error, requestAuth)
+      })
+      await provider.initialScan('hhc-line:user_1', collection.id)
+      const pending =
+        operation === 'metadata'
+          ? provider.getMetadata('hhc-line:user_1', item.id)
+          : provider.getRemoteContentSource('hhc-line:user_1', item.id)
+      await Promise.resolve()
+
+      generationRef.current = 1
+      sessionRef.current =
+        transition === 'account switch'
+          ? { userId: 'user_2', displayName: 'Grace', roles: ['media_sync_user'] }
+          : { userId: 'user_1', displayName: 'Ada', roles: ['media_sync_user', 'reader'] }
+      rejectRequest(Object.assign(new Error('expired'), { classification: 'auth-required' }))
+
+      await expect(pending).rejects.toMatchObject({ classification: 'auth-required' })
+      expect(auth.endSession).not.toHaveBeenCalled()
+    }
+  )
+
+  it.each(['metadata', 'ticket'] as const)(
+    'ends the current session exactly once for a current %s 401',
+    async (operation) => {
+      const client = api()
+      const error = Object.assign(new Error('expired'), { classification: 'auth-required' })
+      if (operation === 'metadata') vi.mocked(client.getCollectionItem).mockRejectedValue(error)
+      if (operation === 'ticket') vi.mocked(client.getRemoteContentSource).mockRejectedValue(error)
+      const auth = {
+        getSession: () => ({
+          userId: 'user_1',
+          displayName: 'Ada',
+          roles: ['media_sync_user']
+        }),
+        getAuthGeneration: () => 0,
+        endSession: vi.fn(async () => undefined)
+      }
+      const provider = new HhcLineReadonlyProvider({
+        api: client,
+        getSession: auth.getSession,
+        getAuthGeneration: auth.getAuthGeneration,
+        onAccessError: (scope, accessError, requestAuth) =>
+          handleHhcLineAccessError(auth, { kind: 'root', ...scope }, accessError, requestAuth)
+      })
+      await provider.initialScan('hhc-line:user_1', collection.id)
+
+      const pending =
+        operation === 'metadata'
+          ? provider.getMetadata('hhc-line:user_1', item.id)
+          : provider.getRemoteContentSource('hhc-line:user_1', item.id)
+      await expect(pending).rejects.toBe(error)
+      expect(auth.endSession).toHaveBeenCalledOnce()
     }
   )
 

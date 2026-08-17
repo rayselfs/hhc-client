@@ -14,6 +14,7 @@ export type CloudProviderId = 'onedrive' | 'hhc-line'
 
 export interface HhcLineCloudAuth {
   getSession(): HhcSession | null
+  getAuthGeneration?(): number
   getAccessToken(): Promise<string | null>
   refreshAccessToken(): Promise<string | null>
   endSession(): Promise<void>

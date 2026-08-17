@@ -110,7 +110,8 @@ async function countDeletedSoundboardPadUsages(targetIds: Set<string>): Promise<
 
 export default function FilesPage(): React.JSX.Element {
   const { t } = useTranslation()
-  const { session, getAccessToken, refreshAccessToken, endSession } = useHhcAuth()
+  const { session, getAccessToken, getAuthGeneration, refreshAccessToken, endSession } =
+    useHhcAuth()
   const navigate = useNavigate()
   const confirm = useConfirm()
   const currentFolderId = useFileExplorerStore((state) => state.currentFolderId)
@@ -155,11 +156,12 @@ export default function FilesPage(): React.JSX.Element {
   const hhcAuth = useMemo(
     () => ({
       getSession: () => sessionRef.current,
+      getAuthGeneration,
       getAccessToken,
       refreshAccessToken,
       endSession
     }),
-    [endSession, getAccessToken, refreshAccessToken]
+    [endSession, getAccessToken, getAuthGeneration, refreshAccessToken]
   )
   const hhcLineProvider = useMemo(() => getCloudProviderAdapter('hhc-line', hhcAuth), [hhcAuth])
   const hhcLinePickerProvider = useMemo<CloudFolderPickerProvider>(

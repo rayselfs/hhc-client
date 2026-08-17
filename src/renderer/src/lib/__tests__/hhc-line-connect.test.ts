@@ -80,9 +80,13 @@ const collection = (id: string, name: string): HhcAssetCollection => ({
   updatedAt: '2026-08-17T00:00:00Z'
 })
 
-function auth(sessionRef: { current: HhcSession | null }): HhcLineCloudAuth {
+function auth(
+  sessionRef: { current: HhcSession | null },
+  generationRef: { current: number } = { current: 0 }
+): HhcLineCloudAuth {
   return {
     getSession: () => sessionRef.current,
+    getAuthGeneration: () => generationRef.current,
     getAccessToken: vi.fn(async () => 'access-token'),
     refreshAccessToken: vi.fn(async () => 'refresh-token'),
     endSession: vi.fn(async () => undefined)
@@ -156,8 +160,63 @@ describe('HHC LINE collection connection', () => {
     expect(mocks.handleAccessError).toHaveBeenCalledWith(
       currentAuth,
       { kind: 'account', accountUserId: 'user-1' },
-      error
+      error,
+      { accountUserId: 'user-1', authGeneration: 0 }
     )
+  })
+
+  it.each(['account switch', 'same-user re-login'] as const)(
+    'does not end the current session for a delayed list 401 after %s',
+    async (transition) => {
+      const actualAccess =
+        await vi.importActual<typeof import('../hhc-line-access')>('../hhc-line-access')
+      mocks.handleAccessError.mockImplementation(actualAccess.handleHhcLineAccessError)
+      let rejectList!: (error: unknown) => void
+      mocks.api = api({
+        listCollections: vi.fn(
+          () =>
+            new Promise<Awaited<ReturnType<HhcAssetApi['listCollections']>>>((_, reject) => {
+              rejectList = reject
+            })
+        )
+      })
+      const sessionRef: { current: HhcSession | null } = {
+        current: { userId: 'user-1', displayName: 'Ada', roles: ['media_sync_user'] }
+      }
+      const generationRef = { current: 0 }
+      const currentAuth = auth(sessionRef, generationRef)
+      const pending = listHhcLineCollections(currentAuth)
+      await vi.waitFor(() => expect(mocks.api?.listCollections).toHaveBeenCalledOnce())
+
+      generationRef.current += 1
+      sessionRef.current =
+        transition === 'account switch'
+          ? { userId: 'user-2', displayName: 'Grace', roles: ['media_sync_user'] }
+          : { ...sessionRef.current!, roles: ['media_sync_user', 'reader'] }
+      rejectList(Object.assign(new Error('expired'), { classification: 'auth-required' }))
+
+      await expect(pending).rejects.toMatchObject({ classification: 'auth-required' })
+      expect(currentAuth.endSession).not.toHaveBeenCalled()
+    }
+  )
+
+  it('ends the current session exactly once for a current list 401', async () => {
+    const actualAccess =
+      await vi.importActual<typeof import('../hhc-line-access')>('../hhc-line-access')
+    mocks.handleAccessError.mockImplementation(actualAccess.handleHhcLineAccessError)
+    const currentAuth = auth({
+      current: { userId: 'user-1', displayName: 'Ada', roles: ['media_sync_user'] }
+    })
+    mocks.api = api({
+      listCollections: vi.fn(async () => {
+        throw Object.assign(new Error('expired'), { classification: 'auth-required' })
+      })
+    })
+
+    await expect(listHhcLineCollections(currentAuth)).rejects.toMatchObject({
+      classification: 'auth-required'
+    })
+    expect(currentAuth.endSession).toHaveBeenCalledOnce()
   })
 
   it('leaves local media inert when there is no HHC session', async () => {
@@ -271,7 +330,8 @@ describe('HHC LINE collection connection', () => {
         rootRemoteFolderId: 'collection-1',
         remoteItemId: 'asset-1'
       },
-      expect.objectContaining({ classification: 'access-revoked', status: 403 })
+      expect.objectContaining({ classification: 'access-revoked', status: 403 }),
+      { accountUserId: 'user-1', authGeneration: 0 }
     )
   })
 
@@ -538,6 +598,17 @@ describe('HHC LINE collection connection', () => {
         }
       )
     ).rejects.toMatchObject({ classification: 'access-revoked', status: 403 })
+    expect(mocks.handleAccessError).toHaveBeenCalledWith(
+      expect.anything(),
+      {
+        kind: 'root',
+        providerConnectionId: 'hhc-line:user-1',
+        rootRemoteFolderId: 'collection-1',
+        remoteItemId: 'asset-1'
+      },
+      expect.objectContaining({ classification: 'access-revoked', status: 403 }),
+      { accountUserId: 'user-1', authGeneration: 0 }
+    )
   })
   it('collects every authorized page and excludes only roots imported by the current account', async () => {
     const currentRoot: FolderRecord = {

@@ -21,6 +21,11 @@ type HhcLineAccessError = {
   status?: unknown
 }
 
+export interface HhcLineAccessRequestAuth {
+  accountUserId: string
+  authGeneration: number
+}
+
 const accountCleanups = new Map<string, Promise<void>>()
 const rootCleanups = new Map<string, Promise<void>>()
 
@@ -107,12 +112,20 @@ export async function revokeHhcLineRootAccess(
 }
 
 export async function handleHhcLineAccessError(
-  auth: Pick<HhcLineCloudAuth, 'getSession' | 'endSession'>,
+  auth: Pick<HhcLineCloudAuth, 'getSession' | 'getAuthGeneration' | 'endSession'>,
   scope: HhcLineAccessScope,
-  error: unknown
+  error: unknown,
+  requestAuth?: HhcLineAccessRequestAuth
 ): Promise<void> {
   const classified = error as HhcLineAccessError
   if (classified.classification === 'auth-required') {
+    if (
+      requestAuth &&
+      (auth.getSession()?.userId !== requestAuth.accountUserId ||
+        (auth.getAuthGeneration?.() ?? 0) !== requestAuth.authGeneration)
+    ) {
+      return
+    }
     await auth.endSession()
     return
   }

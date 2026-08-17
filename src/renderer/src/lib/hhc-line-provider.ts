@@ -24,12 +24,14 @@ import {
   type SyncRetryClassification,
   type SyncProviderConnectionInfo
 } from './sync-provider'
+import type { HhcLineAccessRequestAuth } from './hhc-line-access'
 
 type DownloadedContent = Awaited<ReturnType<HhcAssetApi['downloadContent']>>
 
 type HhcLineProviderOptions = {
   api: HhcAssetApi
-  getSession: () => Promise<HhcSession | null>
+  getSession: () => HhcSession | null | Promise<HhcSession | null>
+  getAuthGeneration?: () => number
   saveDownloadedContent?: (
     request: SyncDownloadRequest,
     content: DownloadedContent,
@@ -42,7 +44,8 @@ type HhcLineProviderOptions = {
       rootRemoteFolderId: string
       remoteItemId?: string
     },
-    error: unknown
+    error: unknown,
+    requestAuth?: HhcLineAccessRequestAuth
   ) => void | Promise<void>
 }
 
@@ -265,10 +268,15 @@ export class HhcLineReadonlyProvider implements ReadOnlySyncProvider {
     },
     request: () => Promise<T>
   ): Promise<T> {
+    const authGeneration = this.options.getAuthGeneration?.() ?? 0
+    const session = await this.options.getSession()
+    const requestAuth = session ? { accountUserId: session.userId, authGeneration } : undefined
     try {
       return await request()
     } catch (error) {
-      await Promise.resolve(this.options.onAccessError?.(scope, error)).catch(() => undefined)
+      await Promise.resolve(this.options.onAccessError?.(scope, error, requestAuth)).catch(
+        () => undefined
+      )
       throw error
     }
   }

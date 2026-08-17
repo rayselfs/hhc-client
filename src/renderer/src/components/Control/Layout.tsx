@@ -39,11 +39,12 @@ export default function Layout(): React.JSX.Element {
   const hhcAuth = useMemo(
     () => ({
       getSession: () => hhcSessionRef.current,
+      getAuthGeneration,
       getAccessToken,
       refreshAccessToken,
       endSession
     }),
-    [endSession, getAccessToken, refreshAccessToken]
+    [endSession, getAccessToken, getAuthGeneration, refreshAccessToken]
   )
   const handleHhcAccessRevoked = useCallback(
     async (scope: { connectionId: string; rootFolderId: string }): Promise<void> => {
