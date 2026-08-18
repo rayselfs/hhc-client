@@ -64,6 +64,67 @@ beforeEach(async () => {
 })
 
 describe('buildSyncRefreshPlan', () => {
+  it('updates a downloaded HHC item name without replacing its blob or fetching content', async () => {
+    const existingBlob = new Blob(['downloaded'])
+    const db = await openFileExplorerDB()
+    await db.put('folder-items', existingItem)
+    await db.put('file-blobs', {
+      id: existingItem.id,
+      blob: existingBlob,
+      refCount: 1
+    })
+    const downloadedEntry = {
+      ...existingEntry,
+      contentHash: 'sha256:content',
+      downloadedBytes: existingItem.size,
+      downloadTotalBytes: existingItem.size
+    }
+    await putSyncEntry(downloadedEntry)
+    const fetchContent = vi.fn()
+
+    const plan = buildSyncDeltaRefreshPlan({
+      providerConnectionId: 'connection-1',
+      providerType: 'hhc-line',
+      rootFolder,
+      rootRemoteFolderId: '.',
+      offlinePolicy: 'on-demand',
+      platform: 'electron',
+      existingFolders: [rootFolder],
+      existingItems: [existingItem],
+      existingEntries: [downloadedEntry],
+      existingBlobIds: new Set([existingItem.id]),
+      remoteItems: [
+        {
+          remoteItemId: 'old-file',
+          parentRemoteItemId: '.',
+          kind: 'file',
+          name: 'renamed.mp4',
+          mimeType: 'video/mp4',
+          size: 100,
+          etag: 'before',
+          contentHash: 'sha256:content'
+        }
+      ]
+    })
+
+    for (const transfer of plan.fileTransfers) await fetchContent(transfer)
+    await applySyncRefreshPlan(plan)
+
+    expect(plan.items[0].name).toBe('renamed.mp4')
+    expect(plan.items[0].id).toBe(existingItem.id)
+    expect(plan.fileTransfers).toEqual([])
+    expect(fetchContent).not.toHaveBeenCalled()
+    await expect(getSyncEntryByRemoteItem('connection-1', 'old-file')).resolves.toMatchObject({
+      name: 'renamed.mp4',
+      blobId: existingItem.id,
+      status: 'available-offline'
+    })
+    await expect(db.get('file-blobs', existingItem.id)).resolves.toMatchObject({
+      id: existingItem.id,
+      refCount: 1
+    })
+  })
+
   it('updates synced records, queues changed files, and removes missing files', () => {
     const plan = buildSyncRefreshPlan({
       providerConnectionId: 'connection-1',
@@ -459,7 +520,7 @@ describe('buildSyncRefreshPlan', () => {
     expect(plan.removedItemIds).toEqual([])
   })
 
-  it('removes explicit deleted delta items', () => {
+  it.each(['manual', 'scheduled'])('removes an explicit %s deletion tombstone', () => {
     const plan = buildSyncDeltaRefreshPlan({
       providerConnectionId: 'connection-1',
       providerType: 'local-fs',
@@ -484,6 +545,36 @@ describe('buildSyncRefreshPlan', () => {
     expect(plan.needsFullScan).toBe(false)
     expect(plan.removedItemIds).toEqual([existingItem.id])
     expect(plan.removedEntries).toEqual([existingEntry])
+  })
+
+  it('removes an item absent from a long-offline reset snapshot', async () => {
+    const db = await openFileExplorerDB()
+    await db.put('folder-items', existingItem)
+    await db.put('file-blobs', {
+      id: existingItem.id,
+      blob: new Blob(['downloaded']),
+      refCount: 1
+    })
+    await putSyncEntry(existingEntry)
+
+    const plan = buildSyncRefreshPlan({
+      providerConnectionId: 'connection-1',
+      providerType: 'hhc-line',
+      rootFolder,
+      rootRemoteFolderId: '.',
+      offlinePolicy: 'on-demand',
+      platform: 'electron',
+      existingFolders: [rootFolder],
+      existingItems: [existingItem],
+      existingEntries: [existingEntry],
+      existingBlobIds: new Set([existingItem.id]),
+      remoteItems: []
+    })
+
+    expect(plan.removedItemIds).toEqual([existingItem.id])
+    expect(plan.removedEntries).toEqual([existingEntry])
+    await applySyncRefreshPlan(plan)
+    await expect(db.get('file-blobs', existingItem.id)).resolves.toBeUndefined()
   })
 
   it('requests full scan fallback when delta parent cannot be mapped locally', () => {

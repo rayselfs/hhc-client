@@ -21,11 +21,13 @@ export interface HhcAssetCollectionItem {
   displayName: string
   sourceRevision: string
   createdRevision: number
+  updatedRevision?: number
   deletedRevision?: number
   mimeType?: string
   sizeBytes?: number
   etag?: string
   createdAt: string
+  updatedAt?: string
   deletedAt?: string
 }
 
@@ -144,10 +146,12 @@ export function projectHhcAssetCollection(value: unknown): HhcAssetCollection {
 export function projectHhcAssetItem(value: unknown): HhcAssetCollectionItem {
   const input = record(value)
   const deletedRevision = optionalNonNegativeInteger(input.deletedRevision)
+  const updatedRevision = optionalNonNegativeInteger(input.updatedRevision)
   const mimeType = optionalString(input.mimeType)
   const sizeBytes = optionalNonNegativeInteger(input.sizeBytes)
   const etag = optionalString(input.etag)
   const deletedAt = optionalString(input.deletedAt)
+  const updatedAt = optionalString(input.updatedAt)
   return {
     id: requiredString(input.id),
     collectionId: requiredString(input.collectionId),
@@ -156,10 +160,12 @@ export function projectHhcAssetItem(value: unknown): HhcAssetCollectionItem {
     sourceRevision: requiredString(input.sourceRevision),
     createdRevision: nonNegativeInteger(input.createdRevision),
     createdAt: requiredString(input.createdAt),
+    ...(updatedRevision === undefined ? {} : { updatedRevision }),
     ...(deletedRevision === undefined ? {} : { deletedRevision }),
     ...(mimeType === undefined ? {} : { mimeType }),
     ...(sizeBytes === undefined ? {} : { sizeBytes }),
     ...(etag === undefined ? {} : { etag }),
+    ...(updatedAt === undefined ? {} : { updatedAt }),
     ...(deletedAt === undefined ? {} : { deletedAt })
   }
 }

@@ -5,6 +5,7 @@ import { HhcLineReadonlyProvider } from '../hhc-line-provider'
 import { openFileExplorerDB, resetFileExplorerDBForTests } from '../file-explorer-db'
 import { getProviderConnection, getSyncEntryByRemoteItem, resetSyncDBForTests } from '../sync-db'
 import { handleHhcLineAccessError } from '../hhc-line-access'
+import { projectHhcAssetItem } from '@shared/hhc-assets'
 
 const collection = {
   id: 'collection_1',
@@ -67,6 +68,19 @@ beforeEach(async () => {
 })
 
 describe('HHC LINE read-only provider', () => {
+  it('preserves item update metadata in the public Asset contract', () => {
+    expect(
+      projectHhcAssetItem({
+        ...item,
+        updatedRevision: 9,
+        updatedAt: '2026-08-18T00:00:00Z'
+      })
+    ).toMatchObject({
+      updatedRevision: 9,
+      updatedAt: '2026-08-18T00:00:00Z'
+    })
+  })
+
   it('connects the current HHC account through the deterministic account connection', async () => {
     const provider = new HhcLineReadonlyProvider({
       api: api(),
