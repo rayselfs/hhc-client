@@ -5,7 +5,7 @@ import { resolveUniqueName } from './file-naming'
 import { createHhcAssetApi } from './hhc-asset-api'
 import { HhcLineReadonlyProvider } from './hhc-line-provider'
 import { isElectron } from './env'
-import { openFileExplorerDB } from './file-explorer-db'
+import { collectAvailableFileBlobIds, openFileExplorerDB } from './file-explorer-db'
 import type {
   CloudImportResult,
   CloudRefreshSummary,
@@ -414,7 +414,12 @@ async function runImport(
       status: 'active'
     }
   }
-  const entries = await listSyncEntriesByProviderConnection(connectionId)
+  const db = await openFileExplorerDB()
+  const [entries, fileBlobs] = await Promise.all([
+    listSyncEntriesByProviderConnection(connectionId),
+    db.getAll('file-blobs')
+  ])
+  const existingBlobIds = await collectAvailableFileBlobIds(fileBlobs)
   assertCurrentAccount(auth, expectedUserId)
   const plan = buildSyncRefreshPlan({
     providerConnectionId: connectionId,
@@ -428,10 +433,10 @@ async function runImport(
       (item): item is FileItemRecord => item.type === 'file'
     ),
     existingEntries: collectionEntries(entries, collection.remoteItemId),
+    existingBlobIds,
     remoteItems: scan.remoteItems
   })
 
-  const db = await openFileExplorerDB()
   assertCurrentAccount(auth, expectedUserId)
   try {
     await putSyncEntry({
@@ -528,11 +533,13 @@ async function runHhcLineFolderRefresh(
   )
   assertCurrentAccount(auth, session.userId)
   const db = await openFileExplorerDB()
-  const [folders, allItems, entries] = await Promise.all([
+  const [folders, allItems, entries, fileBlobs] = await Promise.all([
     db.getAll('folder-records'),
     db.getAll('folder-items'),
-    listSyncEntriesByProviderConnection(connectionId)
+    listSyncEntriesByProviderConnection(connectionId),
+    db.getAll('file-blobs')
   ])
+  const existingBlobIds = await collectAvailableFileBlobIds(fileBlobs)
   assertCurrentAccount(auth, session.userId)
   let input = {
     providerConnectionId: connectionId,
@@ -544,6 +551,7 @@ async function runHhcLineFolderRefresh(
     existingFolders: folders,
     existingItems: allItems.filter((item): item is FileItemRecord => item.type === 'file'),
     existingEntries: collectionEntries(entries, root.syncLink.remoteFolderId),
+    existingBlobIds,
     remoteItems: scan.remoteItems,
     forceRetry: options.forceRetry
   }

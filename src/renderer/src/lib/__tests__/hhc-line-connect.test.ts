@@ -1032,6 +1032,69 @@ describe('HHC LINE collection connection', () => {
     expect(getCollectionChanges).toHaveBeenNthCalledWith(4, 'collection-1')
   })
 
+  it('does not preserve downloaded metadata when the HHC blob is missing', async () => {
+    mocks.electron = true
+    const originalItem = {
+      id: 'item-1',
+      collectionId: 'collection-1',
+      remoteItemId: 'source-1',
+      displayName: 'photo.jpg',
+      sourceRevision: 'sha256:one',
+      createdRevision: 1,
+      mimeType: 'image/jpeg',
+      sizeBytes: 42,
+      etag: '"etag-1"',
+      createdAt: '2026-08-17T00:00:00Z'
+    }
+    const getCollectionChanges = vi
+      .fn()
+      .mockResolvedValueOnce({
+        collection: collection('collection-1', 'Sunday'),
+        items: [originalItem],
+        tombstones: [],
+        cursor: 'reset-barrier',
+        hasMore: true,
+        reset: true
+      })
+      .mockResolvedValueOnce({
+        collection: collection('collection-1', 'Sunday'),
+        items: [],
+        tombstones: [],
+        cursor: 'revision-1',
+        hasMore: false,
+        reset: false
+      })
+      .mockResolvedValueOnce({
+        collection: collection('collection-1', 'Sunday'),
+        items: [{ ...originalItem, displayName: 'renamed.jpg', updatedRevision: 2 }],
+        tombstones: [],
+        cursor: 'revision-2',
+        hasMore: false,
+        reset: false
+      })
+    mocks.api = api({ getCollectionChanges })
+    const sessionRef = {
+      current: { userId: 'user-1', displayName: 'Ada', roles: ['media_sync_user'] }
+    }
+    await importHhcLineCollection(auth(sessionRef), {
+      remoteItemId: 'collection-1',
+      name: 'Sunday',
+      parentRemoteItemId: null
+    })
+    const entry = await getSyncEntryByRemoteItem('hhc-line:user-1', 'item-1')
+    await putSyncEntry({ ...entry!, blobId: entry!.itemId, status: 'available-offline' })
+    const [root] = await (await openFileExplorerDB()).getAll('folder-records')
+
+    await refreshHhcLineFolder(auth(sessionRef), root.id)
+
+    const refreshed = await getSyncEntryByRemoteItem('hhc-line:user-1', 'item-1')
+    expect(refreshed).toMatchObject({
+      name: 'renamed.jpg',
+      status: 'remote-only'
+    })
+    expect(refreshed?.blobId).toBeUndefined()
+  })
+
   it('removes an account-scoped root when the account changes after refresh writes', async () => {
     const sessionRef: { current: HhcSession | null } = {
       current: { userId: 'user-1', displayName: 'Ada', roles: ['media_sync_user'] }

@@ -193,9 +193,11 @@ function contentChanged(
 function nextStatus(
   disabled: boolean,
   offlinePolicy: SyncOfflinePolicy,
-  shouldTransfer: boolean
+  shouldTransfer: boolean,
+  preserveDownloaded: boolean
 ): SyncEntryStatus {
   if (disabled) return 'remote-only'
+  if (preserveDownloaded) return 'available-offline'
   if (offlinePolicy === 'always-offline') return shouldTransfer ? 'queued' : 'available-offline'
   return 'remote-only'
 }
@@ -311,14 +313,14 @@ export function buildSyncRefreshPlan(input: BuildSyncRefreshPlanInput): SyncRefr
     const sortIndex = itemSortCounts.get(parentId) ?? 0
     itemSortCounts.set(parentId, sortIndex + 1)
     const heldFailure = shouldHoldFailure(existing, forceRetry, now)
+    const changed = contentChanged(existing, remoteItem, input.existingBlobIds)
     const shouldTransfer =
-      !policy.disabled &&
-      input.offlinePolicy === 'always-offline' &&
-      !heldFailure &&
-      contentChanged(existing, remoteItem, input.existingBlobIds)
+      !policy.disabled && input.offlinePolicy === 'always-offline' && !heldFailure && changed
+    const preserveDownloaded =
+      !changed && existing?.status === 'available-offline' && Boolean(existing.blobId)
     const status = heldFailure
       ? (existing?.status ?? 'failed')
-      : nextStatus(policy.disabled, input.offlinePolicy, shouldTransfer)
+      : nextStatus(policy.disabled, input.offlinePolicy, shouldTransfer, preserveDownloaded)
     const blobId = status === 'available-offline' ? (existing?.blobId ?? itemId) : undefined
     if (policy.disabled) disabledCount++
     items.push({
@@ -526,14 +528,14 @@ export function buildSyncDeltaRefreshPlan(input: BuildSyncRefreshPlanInput): Syn
     const sortIndex = existingItem?.sortIndex ?? itemSortCounts.get(parentId) ?? 0
     itemSortCounts.set(parentId, Math.max(itemSortCounts.get(parentId) ?? 0, sortIndex + 1))
     const heldFailure = shouldHoldFailure(existing, forceRetry, now)
+    const changed = contentChanged(existing, remoteItem, input.existingBlobIds)
     const shouldTransfer =
-      !policy.disabled &&
-      input.offlinePolicy === 'always-offline' &&
-      !heldFailure &&
-      contentChanged(existing, remoteItem, input.existingBlobIds)
+      !policy.disabled && input.offlinePolicy === 'always-offline' && !heldFailure && changed
+    const preserveDownloaded =
+      !changed && existing?.status === 'available-offline' && Boolean(existing.blobId)
     const status = heldFailure
       ? (existing?.status ?? 'failed')
-      : nextStatus(policy.disabled, input.offlinePolicy, shouldTransfer)
+      : nextStatus(policy.disabled, input.offlinePolicy, shouldTransfer, preserveDownloaded)
     const blobId = status === 'available-offline' ? (existing?.blobId ?? itemId) : undefined
     if (policy.disabled) disabledCount++
     items.push({
