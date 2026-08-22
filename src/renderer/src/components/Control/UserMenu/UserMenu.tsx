@@ -78,7 +78,7 @@ export default function UserMenu({
           <Button
             variant="ghost"
             aria-label={t('userMenu.accountMenu', { name: accountLabel })}
-            className="flex h-auto w-auto min-w-0 items-center justify-start gap-2 rounded-full p-0 text-muted hover:opacity-70"
+            className={`flex h-auto min-w-0 items-center justify-start gap-2 rounded-full p-0 text-muted hover:opacity-70 ${isExpanded ? 'flex-1' : 'w-auto'}`}
           >
             <Avatar.Root className="shrink-0">
               <Avatar.Fallback>

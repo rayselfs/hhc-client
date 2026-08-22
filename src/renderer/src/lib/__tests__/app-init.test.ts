@@ -26,6 +26,7 @@ const mockRetryPendingResourceCleanups = vi.fn().mockResolvedValue({
 })
 const mockStopSyncRuntime = vi.fn()
 const mockStartSyncRuntime = vi.fn(() => mockStopSyncRuntime)
+const mockIsElectron = vi.fn(() => false)
 
 const bibleState = {
   isInitialized: false,
@@ -98,6 +99,10 @@ vi.mock('@renderer/lib/bible-search', () => ({
   initializeSearchIndexes: mockInitializeSearchIndexes
 }))
 
+vi.mock('@renderer/lib/env', () => ({
+  isElectron: mockIsElectron
+}))
+
 vi.mock('@renderer/lib/media-job-queue', () => ({
   mediaJobQueue: {
     recoverStaleJobs: mockRecoverStaleJobs,
@@ -122,7 +127,27 @@ describe('startEarlyInit', () => {
   beforeEach(() => {
     vi.resetModules()
     vi.clearAllMocks()
+    mockIsElectron.mockReturnValue(false)
     window.location.hash = ''
+  })
+
+  it('recovers every persisted running job immediately in Electron', async () => {
+    mockIsElectron.mockReturnValue(true)
+    const { startEarlyInit } = await import('../app-init')
+
+    startEarlyInit()
+    await Promise.resolve()
+
+    expect(mockRecoverStaleJobs).toHaveBeenCalledWith(expect.any(Number), 0)
+  })
+
+  it('keeps the five-minute recovery lease in the browser', async () => {
+    const { startEarlyInit } = await import('../app-init')
+
+    startEarlyInit()
+    await Promise.resolve()
+
+    expect(mockRecoverStaleJobs).toHaveBeenCalledWith(expect.any(Number), 5 * 60 * 1000)
   })
 
   it('skips control-window initialization on the projection route', async () => {

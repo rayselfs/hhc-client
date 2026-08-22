@@ -76,6 +76,18 @@ it('refreshes when media jobs change', async () => {
   expect(countFailedOrBlockedMediaJobs).toHaveBeenLastCalledWith(['dismissed'])
 })
 
+it('shows unavailable when the lightweight media-job count fails', async () => {
+  render(<RecoveryIndicator />)
+  await waitFor(() => expect(collectRecoveryIssues).toHaveBeenCalledOnce())
+  vi.mocked(countFailedOrBlockedMediaJobs).mockRejectedValueOnce(new Error('count failed'))
+
+  await act(async () => {
+    mocks.mediaJobsListener?.()
+  })
+
+  expect(await screen.findByLabelText('Recovery status unavailable')).toBeInTheDocument()
+})
+
 it('runs a full recovery scan on window focus', async () => {
   render(<RecoveryIndicator />)
   await waitFor(() => expect(collectRecoveryIssues).toHaveBeenCalledOnce())

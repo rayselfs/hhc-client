@@ -8,7 +8,7 @@ import type { UseFolderContextMenu } from '@renderer/lib/createFolderContextMenu
 import type { ContextMenuEntry } from '@renderer/contexts/ContextMenuContext'
 import { useFileExplorerStore } from '@renderer/stores/file-explorer'
 import { getPresentableItems, isPresentable } from '@renderer/lib/presentability'
-import { startMediaProjection } from '@renderer/lib/projection-actions'
+import { presentPreviewItem, startMediaProjection } from '@renderer/lib/projection-actions'
 import { isFileItem, type FolderItem, type FolderRecord } from '@shared/types/folder'
 
 export type {
@@ -26,17 +26,33 @@ function project(
   items: Parameters<typeof getPresentableItems>[0],
   startIndex: number,
   t: (key: string) => string,
-  navigate: (path: string) => void
+  navigate: (path: string) => void,
+  prioritizeStartItem: boolean
 ): void {
   const presentableFiles = getPresentableItems(items)
   if (presentableFiles.length === 0) return
 
-  void startMediaProjection(
-    presentableFiles,
-    Math.max(startIndex, 0),
-    { onNoProjectableFiles: () => toast.warning(t('fileExplorer.noProjectableFiles')) },
-    { prioritizeStartItem: true }
-  )
+  if (prioritizeStartItem) {
+    const item = presentableFiles[Math.max(startIndex, 0)]
+    if (!item) return
+    void presentPreviewItem({
+      item,
+      playlist: presentableFiles,
+      start: (files, index, _, options) =>
+        startMediaProjection(
+          files,
+          index,
+          { onNoProjectableFiles: () => toast.warning(t('fileExplorer.noProjectableFiles')) },
+          options
+        ),
+      navigate
+    }).catch(() => undefined)
+    return
+  }
+
+  void startMediaProjection(presentableFiles, Math.max(startIndex, 0), {
+    onNoProjectableFiles: () => toast.warning(t('fileExplorer.noProjectableFiles'))
+  })
     .then((report) => {
       if (report.summary.ready > 0) navigate('/media')
     })
@@ -63,7 +79,8 @@ function getItemProjectActions(
           items,
           getPresentableItems(items).findIndex((entry) => entry.id === item.id),
           t,
-          navigate
+          navigate,
+          true
         )
       }
     }
@@ -86,7 +103,7 @@ function getFolderProjectActions(
       id: 'project',
       label: t('fileExplorer.contextMenu.project'),
       icon: React.createElement(Play, { size: 14 }),
-      onAction: () => project(items, 0, t, navigate)
+      onAction: () => project(items, 0, t, navigate, false)
     })
   }
 

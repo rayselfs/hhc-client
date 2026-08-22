@@ -46,7 +46,6 @@ export function CustomFolderTab({
   const verses = useItems(currentFolderId)
   const persistenceStatus = useBibleFolderStore((state) => state.persistenceStatus)
   const persistenceError = useBibleFolderStore((state) => state.persistenceError)
-  const pendingPersistenceCount = useBibleFolderStore((state) => state.pendingPersistenceCount)
   const isFolderStoreInitialized = useBibleFolderStore((state) => state.isInitialized)
   const retryInitialization = useBibleFolderStore((state) => state.retryInitialization)
   const retryPersistence = useBibleFolderStore((state) => state.retryPersistence)
@@ -262,7 +261,6 @@ export function CustomFolderTab({
       <FolderPersistenceStatus
         status={persistenceStatus}
         error={persistenceError}
-        pendingCount={pendingPersistenceCount}
         isInitialized={isFolderStoreInitialized}
         onRetryInitialization={retryInitialization}
         onRetryPersistence={retryPersistence}

@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  deleteDerivedAssetsByKind,
   deleteDerivedAssetsForSource,
   getCustomCoverOverride,
   getDerivedAsset,
@@ -110,30 +109,5 @@ describe('media-work-db', () => {
     await expect(getDerivedAsset('blob-1', 'cover-thumbnail')).resolves.toBeUndefined()
     await expect(getDerivedAsset('blob-1', 'pdf-page-thumbnails')).resolves.toBeUndefined()
     await expect(getDerivedAsset('blob-1', 'video-poster')).resolves.toBeUndefined()
-  })
-
-  it('removes legacy editable mirrors without deleting other derived assets', async () => {
-    await putDerivedAsset({
-      sourceBlobId: 'blob-1',
-      kind: 'editable-presentation-document',
-      variant: 'document:deck-1',
-      storage: 'indexed-db',
-      mimeType: 'application/json',
-      status: 'ready'
-    })
-    await putDerivedAsset({
-      sourceBlobId: 'blob-1',
-      kind: 'cover-thumbnail',
-      variant: 'default',
-      storage: 'indexed-db',
-      mimeType: 'image/svg+xml',
-      status: 'ready'
-    })
-
-    await expect(deleteDerivedAssetsByKind('editable-presentation-document')).resolves.toBe(1)
-    await expect(
-      getDerivedAsset('blob-1', 'editable-presentation-document', 'document:deck-1')
-    ).resolves.toBeUndefined()
-    await expect(getDerivedAsset('blob-1', 'cover-thumbnail')).resolves.toBeDefined()
   })
 })

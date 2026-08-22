@@ -257,15 +257,6 @@ export async function listDerivedAssets(): Promise<DerivedAssetRecord[]> {
   return (await getMediaWorkDB()).getAll('derived-assets')
 }
 
-export async function deleteDerivedAssetsByKind(kind: DerivedAssetKind): Promise<number> {
-  const db = await getMediaWorkDB()
-  const assets = (await db.getAll('derived-assets')).filter((asset) => asset.kind === kind)
-  const tx = db.transaction('derived-assets', 'readwrite')
-  await Promise.all(assets.map((asset) => tx.store.delete(asset.id)))
-  await tx.done
-  return assets.length
-}
-
 export async function listCustomCoverOverrides(): Promise<CustomCoverOverrideRecord[]> {
   return (await getMediaWorkDB()).getAll('custom-cover-overrides')
 }

@@ -124,7 +124,6 @@ export default function FilesPage(): React.JSX.Element {
   const updateFolder = useFileExplorerStore((state) => state.updateFolder)
   const persistenceStatus = useFileExplorerStore((state) => state.persistenceStatus)
   const persistenceError = useFileExplorerStore((state) => state.persistenceError)
-  const pendingPersistenceCount = useFileExplorerStore((state) => state.pendingPersistenceCount)
   const isFolderStoreInitialized = useFileExplorerStore((state) => state.isInitialized)
   const retryInitialization = useFileExplorerStore((state) => state.retryInitialization)
   const retryPersistence = useFileExplorerStore((state) => state.retryPersistence)
@@ -900,7 +899,6 @@ export default function FilesPage(): React.JSX.Element {
           className="mx-3 mt-3"
           status={persistenceStatus}
           error={persistenceError}
-          pendingCount={pendingPersistenceCount}
           isInitialized={isFolderStoreInitialized}
           onRetryInitialization={retryInitialization}
           onRetryPersistence={retryPersistence}

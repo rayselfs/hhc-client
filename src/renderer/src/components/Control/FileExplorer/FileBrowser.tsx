@@ -44,7 +44,7 @@ import { GridView, ListView, type GridViewItem } from './views'
 import type { SearchResult } from '@renderer/lib/file-explorer-search'
 import { formatFileKind } from '@renderer/lib/format-file-kind'
 import { getMediaType, isPresentable, getPresentableItems } from '@renderer/lib/presentability'
-import { startMediaProjection } from '@renderer/lib/projection-actions'
+import { presentPreviewItem, startMediaProjection } from '@renderer/lib/projection-actions'
 import type { SortField } from '@renderer/stores/file-explorer'
 import { hasNameConflict, splitFileName, validateDisplayName } from '@renderer/lib/file-naming'
 import {
@@ -769,19 +769,18 @@ export function FileBrowser({
         file && (file.mimeType.startsWith('image/') || file.mimeType.startsWith('video/'))
       if (file && isImageOrVideo && getMediaType(file.mimeType)) {
         const presentableFiles = getPresentableItems(sortedFileItems)
-        const targetIndex = presentableFiles.findIndex((entry) => entry.id === file.id)
-        if (targetIndex >= 0) {
-          void startMediaProjection(
-            presentableFiles,
-            targetIndex,
-            { onNoProjectableFiles: () => toast.warning(t('fileExplorer.noProjectableFiles')) },
-            { prioritizeStartItem: true }
-          )
-            .then((report) => {
-              if (report.summary.ready > 0) navigate('/media')
-            })
-            .catch(() => undefined)
-        }
+        void presentPreviewItem({
+          item: file,
+          playlist: presentableFiles,
+          start: (items, startIndex, _, options) =>
+            startMediaProjection(
+              items,
+              startIndex,
+              { onNoProjectableFiles: () => toast.warning(t('fileExplorer.noProjectableFiles')) },
+              options
+            ),
+          navigate
+        }).catch(() => undefined)
         return
       }
       if (file && isPresentable(file.mimeType)) {
@@ -1156,6 +1155,21 @@ export function FileBrowser({
         openPresentationDocument(result.item)
         navigate(getPresentationWorkspacePath(result.item.id))
         setSearchQuery('')
+        return
+      }
+      if (
+        (result.item.mimeType.startsWith('image/') || result.item.mimeType.startsWith('video/')) &&
+        getMediaType(result.item.mimeType)
+      ) {
+        void presentPreviewItem({
+          item: result.item,
+          playlist: [result.item],
+          start: startMediaProjection,
+          navigate: (path) => {
+            navigate(path)
+            setSearchQuery('')
+          }
+        }).catch(() => undefined)
         return
       }
       if (isPresentable(result.item.mimeType)) {

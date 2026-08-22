@@ -15,6 +15,7 @@ import { isMainWindow } from './validate'
 const CLIENT_ID = 'hhc-desktop'
 const REDIRECT_URI = 'librepresenter://auth/account'
 const SCOPE = 'openid profile'
+const REVOKE_TIMEOUT_MS = 5000
 
 type AccountAuthAction = Extract<LibrePresenterProtocolAction, { kind: 'account-auth' }>
 
@@ -271,6 +272,7 @@ class MainHhcAuthService implements HhcAuthService {
     this.transaction = null
     if (completionInFlight) await completionInFlight.catch(() => false)
     if (this.refreshInFlight) await this.refreshInFlight.catch(() => null)
+    await Promise.allSettled([...this.profileLoadsInFlight])
     const credential = await this.loadCredential(false)
     if (!credential) {
       this.clearMemory()
@@ -319,8 +321,8 @@ class MainHhcAuthService implements HhcAuthService {
     this.storedCredential = null
     this.storedCredentialLoaded = true
     this.clearMemory()
-    if (credential) await this.revokeRefreshToken(credential)
     await fs.rm(this.credentialPath, { force: true })
+    if (credential) await this.revokeRefreshToken(credential)
   }
 
   private async revokeRefreshToken(credential: StoredCredential): Promise<void> {
@@ -336,7 +338,8 @@ class MainHhcAuthService implements HhcAuthService {
           token: credential.refreshToken,
           client_id: CLIENT_ID,
           token_type_hint: 'refresh_token'
-        })
+        }),
+        signal: AbortSignal.timeout(REVOKE_TIMEOUT_MS)
       })
     } catch {
       // Local credential removal remains authoritative when the remote service is unavailable.

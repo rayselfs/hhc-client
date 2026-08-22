@@ -24,7 +24,8 @@ vi.mock('react-router-dom', async () => {
   }
 })
 
-vi.mock('@renderer/lib/projection-actions', () => ({
+vi.mock('@renderer/lib/projection-actions', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@renderer/lib/projection-actions')>()),
   startMediaProjection: mocks.startMediaProjection
 }))
 
@@ -138,7 +139,15 @@ describe('FileBrowser presentation open behavior', () => {
     const item = makeFile({ id: `${media.kind}-1`, name: media.name, mimeType: media.mimeType })
     mocks.startMediaProjection.mockResolvedValue({
       summary: { ready: 1, preparing: 0, unsupported: 0, missing: 0, failed: 0 },
-      items: []
+      items: [
+        {
+          itemId: item.id,
+          blobId: item.id,
+          status: 'ready',
+          reason: 'ready',
+          support: 'native'
+        }
+      ]
     })
     await renderWithItems([item])
 
@@ -226,6 +235,43 @@ describe('FileBrowser presentation open behavior', () => {
     expect(usePresentationWorkspaceStore.getState().activeItemId).toBeNull()
     expect(mocks.navigate).toHaveBeenCalledWith('/files/preview/deck-1')
     expect(mocks.startMediaProjection).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    { name: 'Photo.png', mimeType: 'image/png' },
+    { name: 'Clip.mp4', mimeType: 'video/mp4' }
+  ])('projects a ready search result for $mimeType instead of opening preview', async (media) => {
+    const item = makeFile({ id: 'search-media', name: media.name, mimeType: media.mimeType })
+    mocks.startMediaProjection.mockResolvedValue({
+      summary: { ready: 1, preparing: 0, unsupported: 0, missing: 0, failed: 0 },
+      items: [
+        {
+          itemId: item.id,
+          blobId: item.id,
+          status: 'ready',
+          reason: 'ready',
+          support: 'native'
+        }
+      ]
+    })
+    act(() => useFileExplorerSearch.setState({ searchQuery: media.name }))
+    await renderWithItems([item])
+
+    await act(async () => {
+      fireEvent.doubleClick(screen.getByText(media.name))
+      await Promise.resolve()
+    })
+
+    expect(mocks.startMediaProjection).toHaveBeenCalledWith(
+      [item],
+      0,
+      {},
+      {
+        prioritizeStartItem: true
+      }
+    )
+    expect(mocks.navigate).toHaveBeenCalledWith('/media')
+    expect(mocks.navigate).not.toHaveBeenCalledWith('/files/preview/search-media')
   })
 
   it('shows safe error health for an access-revoked sync root', async () => {

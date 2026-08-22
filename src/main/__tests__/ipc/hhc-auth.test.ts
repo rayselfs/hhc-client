@@ -957,6 +957,32 @@ describe('HhcAuthService credentials and session', () => {
     expect(currentStoredRecord()).not.toHaveProperty('refreshToken')
   })
 
+  it('waits for a standalone profile cleanup before sign-out allows another sign-in', async () => {
+    const service = createHhcAuthService({ now: () => now })
+    await seedAccessWithoutSession(service)
+    const installationId = currentStoredRecord().installationId
+    const credentialWrite = deferNextCredentialWrite()
+    mockNetFetch
+      .mockResolvedValueOnce(profileResponse('other-user'))
+      .mockResolvedValueOnce(jsonResponse({}))
+    const profile = service.getSession()
+    const finishCredentialWrite = await credentialWrite
+
+    let signOutSettled = false
+    const signOut = service.signOut().finally(() => {
+      signOutSettled = true
+    })
+    await Promise.resolve()
+
+    expect(signOutSettled).toBe(false)
+    await expect(service.begin()).rejects.toThrow('HHC sign-in is already in progress')
+    finishCredentialWrite()
+    await expect(profile).rejects.toThrow('HHC account identity mismatch')
+    await expect(signOut).resolves.toBeUndefined()
+    await expect(service.begin()).resolves.toEqual({ expiresAt: now + 300_000 })
+    expect(currentStoredRecord()).toEqual({ installationId })
+  })
+
   it('keeps callback completion single-flight until sign-out cleanup', async () => {
     const service = createHhcAuthService({ now: () => now })
     await service.begin()
@@ -1048,6 +1074,28 @@ describe('HhcAuthService credentials and session', () => {
     expect(disk).toBeNull()
     await expect(service.getAccessToken()).resolves.toBeNull()
     await expect(service.getSession()).resolves.toBeNull()
+  })
+
+  it('deletes local credentials before waiting for remote revoke during data clear', async () => {
+    const service = createHhcAuthService({ now: () => now })
+    await service.begin()
+    mockNetFetch
+      .mockResolvedValueOnce(tokenResponse('refresh-1'))
+      .mockResolvedValueOnce(profileResponse())
+    await service.completeProtocolCallback(callbackFromOpenedUrl())
+    let finishRevoke!: (response: Response) => void
+    mockNetFetch.mockImplementationOnce(
+      () => new Promise<Response>((resolve) => void (finishRevoke = resolve))
+    )
+
+    const clearing = service.clearLocalData()
+
+    await vi.waitFor(() => expect(mockRm).toHaveBeenCalledWith(credentialPath, { force: true }))
+    expect(disk).toBeNull()
+    const revokeOptions = mockNetFetch.mock.calls[2][1]
+    expect(revokeOptions.signal).toBeInstanceOf(AbortSignal)
+    finishRevoke(jsonResponse({}))
+    await expect(clearing).resolves.toBeUndefined()
   })
 
   it('invalidates a pending completion after capturing its persisted token', async () => {

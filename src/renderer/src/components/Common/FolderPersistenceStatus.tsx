@@ -5,7 +5,6 @@ import type { FolderPersistenceStatus } from '@renderer/stores/folder'
 type FolderPersistenceStatusProps = {
   status: FolderPersistenceStatus
   error: string | null
-  pendingCount: number
   isInitialized: boolean
   onRetryInitialization: () => Promise<void>
   onRetryPersistence: () => Promise<void>

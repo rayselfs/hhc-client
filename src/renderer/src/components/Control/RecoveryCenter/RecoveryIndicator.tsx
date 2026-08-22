@@ -43,10 +43,15 @@ export default function RecoveryIndicator(): React.JSX.Element | null {
     }
     const refreshJobs = (): void => {
       const generation = ++jobRefreshGeneration
-      void countFailedOrBlockedMediaJobs(dismissedJobIds).then((jobs) => {
-        if (cancelled || generation !== jobRefreshGeneration) return
-        setCounts((current) => ({ ...current, jobs }))
-      })
+      void countFailedOrBlockedMediaJobs(dismissedJobIds)
+        .then((jobs) => {
+          if (cancelled || generation !== jobRefreshGeneration) return
+          setCounts((current) => ({ ...current, jobs }))
+        })
+        .catch(() => {
+          if (cancelled || generation !== jobRefreshGeneration) return
+          setCounts({ jobs: 0, other: 0, unavailable: true })
+        })
     }
     refreshAll()
     const unsubscribe = subscribeMediaJobs(refreshJobs)

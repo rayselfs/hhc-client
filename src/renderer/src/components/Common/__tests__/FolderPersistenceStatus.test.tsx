@@ -6,7 +6,6 @@ import { FolderPersistenceStatus } from '../FolderPersistenceStatus'
 
 const baseProps = {
   error: null,
-  pendingCount: 0,
   isInitialized: true,
   onRetryInitialization: vi.fn().mockResolvedValue(undefined),
   onRetryPersistence: vi.fn().mockResolvedValue(undefined)
@@ -27,7 +26,6 @@ describe('FolderPersistenceStatus', () => {
         {...baseProps}
         status="degraded"
         error="quota exceeded"
-        pendingCount={1}
         onRetryPersistence={retryPersistence}
       />
     )
@@ -46,7 +44,6 @@ describe('FolderPersistenceStatus', () => {
         {...baseProps}
         status="degraded"
         error="indexeddb unavailable"
-        pendingCount={0}
         isInitialized={false}
         onRetryInitialization={retryInitialization}
       />
@@ -58,9 +55,7 @@ describe('FolderPersistenceStatus', () => {
   })
 
   it('does not render a transient saving banner', () => {
-    const { container } = render(
-      <FolderPersistenceStatus {...baseProps} status="saving" pendingCount={2} />
-    )
+    const { container } = render(<FolderPersistenceStatus {...baseProps} status="saving" />)
 
     expect(container).toBeEmptyDOMElement()
   })

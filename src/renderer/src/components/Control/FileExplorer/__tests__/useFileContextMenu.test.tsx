@@ -21,7 +21,8 @@ vi.mock('@renderer/contexts/ContextMenuContext', () => ({
   useContextMenu: () => ({ showMenu: mocks.showMenu })
 }))
 
-vi.mock('@renderer/lib/projection-actions', () => ({
+vi.mock('@renderer/lib/projection-actions', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@renderer/lib/projection-actions')>()),
   startMediaProjection: mocks.startMediaProjection
 }))
 
@@ -52,6 +53,7 @@ const folder: FolderRecord = {
 }
 
 const folderImage: FileItemRecord = { ...image, id: 'folder-image-1', parentId: folder.id }
+const otherImage: FileItemRecord = { ...image, id: 'other-image', name: 'Other.png' }
 
 function ContextMenuProbe(): React.JSX.Element {
   const menu = useFileContextMenu()
@@ -111,9 +113,9 @@ describe.each(['file', 'folder'] as const)('useFileContextMenu %s Project action
     useFileExplorerStore.setState({
       currentFolderId: 'root',
       folders: { [folder.id]: folder },
-      items: { [image.id]: image, [folderImage.id]: folderImage },
-      _itemsArray: [image, folderImage],
-      _itemsByParent: { root: [image], [folder.id]: [folderImage] }
+      items: { [image.id]: image, [otherImage.id]: otherImage, [folderImage.id]: folderImage },
+      _itemsArray: [image, otherImage, folderImage],
+      _itemsByParent: { root: [image, otherImage], [folder.id]: [folderImage] }
     })
     render(
       <MemoryRouter>
@@ -123,18 +125,39 @@ describe.each(['file', 'folder'] as const)('useFileContextMenu %s Project action
   })
 
   it('enters Media after Project prepares an item', async () => {
-    mocks.startMediaProjection.mockResolvedValue({ summary: { ready: 1 }, items: [] })
+    const item = kind === 'file' ? image : folderImage
+    mocks.startMediaProjection.mockResolvedValue({
+      summary: { ready: 1 },
+      items: [{ itemId: item.id, status: 'ready' }]
+    })
 
     act(() => openProjectMenu(kind)())
 
     await waitFor(() => expect(mocks.navigate).toHaveBeenCalledWith('/media'))
     expect(mocks.startMediaProjection).toHaveBeenCalledWith(
-      [kind === 'file' ? image : folderImage],
+      kind === 'file' ? [image, otherImage] : [folderImage],
       0,
       expect.any(Object),
-      { prioritizeStartItem: true }
+      ...(kind === 'file' ? [{ prioritizeStartItem: true }] : [])
     )
   })
+
+  if (kind === 'file') {
+    it('does not enter Media when another item is ready but the requested item is preparing', async () => {
+      mocks.startMediaProjection.mockResolvedValue({
+        summary: { ready: 1 },
+        items: [
+          { itemId: image.id, status: 'preparing', reason: 'sync-download' },
+          { itemId: otherImage.id, status: 'ready', reason: 'ready' }
+        ]
+      })
+
+      act(() => openProjectMenu(kind)())
+
+      await act(async () => Promise.resolve())
+      expect(mocks.navigate).not.toHaveBeenCalled()
+    })
+  }
 
   it('keeps the current route when Project prepares no items', async () => {
     mocks.startMediaProjection.mockResolvedValue({ summary: { ready: 0 }, items: [] })
