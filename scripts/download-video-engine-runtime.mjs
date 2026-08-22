@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import { createWriteStream } from 'node:fs'
 import { access, cp, mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, relative, resolve } from 'node:path'
 import { Readable, Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { spawnSync } from 'node:child_process'
@@ -69,9 +69,15 @@ async function downloadArchive(archivePath) {
 }
 
 function extractArchive(archivePath, extractRoot) {
-  const result = spawnSync('tar', ['-xf', archivePath, '-C', extractRoot], {
-    encoding: 'utf8'
-  })
+  const cwd = dirname(archivePath)
+  const result = spawnSync(
+    'tar',
+    ['-xf', basename(archivePath), '-C', relative(cwd, extractRoot)],
+    {
+      cwd,
+      encoding: 'utf8'
+    }
+  )
 
   if (result.status !== 0) {
     throw new Error(result.stderr || result.stdout || 'Failed to extract runtime archive')
