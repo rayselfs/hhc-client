@@ -52,4 +52,20 @@ describe('FileExplorerFAB HHC LINE action', () => {
 
     expect(onAddHhcLine).toHaveBeenCalledTimes(1)
   })
+
+  it('keeps HHC LINE visible with an accessible reason while unavailable', async () => {
+    const onAddHhcLine = vi.fn()
+    render(
+      <FileExplorerFAB
+        onAddHhcLine={onAddHhcLine}
+        isAddHhcLineDisabled
+        hhcLineLabel="Add HHC LINE — Sign in to HHC first."
+      />
+    )
+
+    const action = screen.getByRole('button', { name: 'Add HHC LINE — Sign in to HHC first.' })
+    await userEvent.click(action)
+
+    expect(onAddHhcLine).not.toHaveBeenCalled()
+  })
 })
