@@ -30,6 +30,7 @@ import {
 } from '@renderer/stores/selectors/update'
 
 interface UserMenuProps {
+  isExpanded: boolean
   onOpenPreferences?: () => void
 }
 
@@ -40,7 +41,10 @@ const glassDividerClass = [
   'before:bg-[linear-gradient(90deg,transparent_0%,var(--separator)_20%,var(--separator)_80%,transparent_100%)]'
 ].join(' ')
 
-export default function UserMenu({ onOpenPreferences }: UserMenuProps): React.JSX.Element {
+export default function UserMenu({
+  isExpanded,
+  onOpenPreferences
+}: UserMenuProps): React.JSX.Element {
   const { t } = useTranslation()
   const [isShortcutsOpen, setShortcutsOpen] = useState(false)
   const [isAboutOpen, setAboutOpen] = useState(false)
@@ -68,20 +72,22 @@ export default function UserMenu({ onOpenPreferences }: UserMenuProps): React.JS
   return (
     <>
       <Dropdown.Root>
-        <div className="relative w-full">
+        <div
+          className={`flex w-full items-center ${isExpanded ? 'flex-row gap-2' : 'flex-col gap-1'}`}
+        >
           <Button
             variant="ghost"
             aria-label={t('userMenu.accountMenu', { name: accountLabel })}
-            className="flex h-auto w-full min-w-0 items-center justify-start gap-2 rounded-full p-0 text-muted hover:opacity-70 max-lg:justify-center"
+            className="flex h-auto w-auto min-w-0 items-center justify-start gap-2 rounded-full p-0 text-muted hover:opacity-70"
           >
             <Avatar.Root className="shrink-0">
               <Avatar.Fallback>
                 <CircleUser />
               </Avatar.Fallback>
             </Avatar.Root>
-            <span className="max-lg:hidden">{accountLabel}</span>
+            {isExpanded && <span>{accountLabel}</span>}
           </Button>
-          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center">
+          <div className="pointer-events-none flex shrink-0 items-center">
             <RecoveryIndicator />
           </div>
         </div>

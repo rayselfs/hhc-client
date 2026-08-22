@@ -10,6 +10,7 @@ import UserMenu from '../UserMenu'
 import { ShortcutScopeProvider } from '@renderer/contexts/ShortcutScopeContext'
 import { collectRecoveryIssues } from '@renderer/lib/recovery-center'
 import { useRecoveryCenterStore } from '@renderer/stores/recovery-center'
+import type { RecoveryIssue } from '@renderer/types/recovery-center'
 
 const auth = vi.hoisted(() => ({
   value: {
@@ -38,14 +39,27 @@ vi.mock('@renderer/lib/recovery-center', () => ({
   collectRecoveryIssues: vi.fn(async () => [])
 }))
 
-function renderUserMenu(props: { onOpenPreferences?: () => void } = {}): ReturnType<typeof render> {
+const recoveryIssue = {
+  id: 'storage-integrity:orphan:blob-1',
+  kind: 'storage-integrity' as const,
+  severity: 'warning' as const,
+  titleKey: 'recovery.issues.storageIntegrity.title',
+  detailKey: 'recovery.issues.storageIntegrity.detail',
+  occurredAt: 1,
+  actions: []
+} satisfies RecoveryIssue
+
+function renderUserMenu(
+  props: { isExpanded?: boolean; onOpenPreferences?: () => void } = {}
+): ReturnType<typeof render> {
+  const { isExpanded = true, ...userMenuProps } = props
   return render(
     <ShortcutScopeProvider>
       <I18nextProvider i18n={i18n}>
         <ConfirmDialogProvider>
           <PresentationSessionRegistryProvider>
             <PresentationCloseDecisionProvider>
-              <UserMenu {...props} />
+              <UserMenu isExpanded={isExpanded} {...userMenuProps} />
               <ConfirmDialog />
             </PresentationCloseDecisionProvider>
           </PresentationSessionRegistryProvider>
@@ -79,25 +93,40 @@ describe('UserMenu', () => {
     expect(container.querySelector('button button')).not.toBeInTheDocument()
   })
 
-  it('exposes the recovery issue count outside the account menu button', async () => {
-    vi.mocked(collectRecoveryIssues).mockResolvedValueOnce([
-      {
-        id: 'storage-integrity:orphan:blob-1',
-        kind: 'storage-integrity',
-        severity: 'warning',
-        titleKey: 'recovery.issues.storageIntegrity.title',
-        detailKey: 'recovery.issues.storageIntegrity.detail',
-        occurredAt: 1,
-        actions: []
-      }
-    ])
+  it('places the expanded recovery issue count after the account content in normal flow', async () => {
+    vi.mocked(collectRecoveryIssues).mockResolvedValueOnce([recoveryIssue])
 
     renderUserMenu()
 
+    const button = screen.getByRole('button', { name: 'Account menu for Guest' })
     const status = await screen.findByRole('status', { name: '1 recovery issues' })
+    const layout = button.parentElement
+
     expect(status.closest('button')).toBeNull()
     expect(status.parentElement).toHaveClass('pointer-events-none')
-    expect(screen.getByRole('button', { name: 'Account menu for Guest' })).toBeInTheDocument()
+    expect(status.parentElement).not.toHaveClass('absolute')
+    expect(layout).toHaveClass('flex-row')
+    expect(button).toHaveClass('w-auto')
+    expect(layout?.children[0]).toBe(button)
+    expect(layout?.children[1]).toBe(status.parentElement)
+  })
+
+  it('stacks the collapsed recovery issue count below the account trigger in normal flow', async () => {
+    vi.mocked(collectRecoveryIssues).mockResolvedValueOnce([recoveryIssue])
+
+    renderUserMenu({ isExpanded: false })
+
+    const button = screen.getByRole('button', { name: 'Account menu for Guest' })
+    const status = await screen.findByRole('status', { name: '1 recovery issues' })
+    const layout = button.parentElement
+
+    expect(status.closest('button')).toBeNull()
+    expect(status.parentElement).toHaveClass('pointer-events-none')
+    expect(status.parentElement).not.toHaveClass('absolute')
+    expect(layout).toHaveClass('flex-col')
+    expect(button).toHaveClass('w-auto')
+    expect(layout?.children[0]).toBe(button)
+    expect(layout?.children[1]).toBe(status.parentElement)
   })
 
   it('exposes recovery unavailability outside the account menu button', async () => {
