@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { execFile } from 'node:child_process'
-import { mkdtemp, mkdir, readFile, rm, writeFile, access } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, rm, writeFile, access, chmod } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
@@ -52,6 +52,42 @@ async function runDownloader(root: string, url: string, sha256: string): Promise
   )
 }
 
+async function runWindowsDownloader(root: string): Promise<void> {
+  const bin = join(root, 'bin')
+  const pwsh = join(bin, 'pwsh')
+  await mkdir(bin)
+  await writeFile(
+    pwsh,
+    `#!/usr/bin/env node
+const { spawnSync } = require('node:child_process')
+require('node:fs').writeFileSync('pwsh-invoked', '')
+const [archive, destination] = process.argv.slice(-2)
+process.exit(spawnSync('tar', ['-xf', archive, '-C', destination]).status ?? 1)
+`
+  )
+  await chmod(pwsh, 0o755)
+
+  await writeFileIn(join(root, 'source'), 'runtime/libvlc.dll')
+  const archivePath = join(root, 'runtime.zip')
+  await execFileAsync('tar', ['-cf', archivePath, '-C', join(root, 'source'), '.'])
+  const data = await readFile(archivePath)
+  const windowsUrl = `data:application/zip;base64,${data.toString('base64')}`
+  const windowsSha256 = createHash('sha256').update(data).digest('hex')
+
+  await execFileAsync(
+    process.execPath,
+    [
+      scriptPath,
+      '--component=vlc',
+      '--platform=win32',
+      '--arch=x64',
+      `--url=${windowsUrl}`,
+      `--sha256=${windowsSha256}`
+    ],
+    { cwd: root, env: { ...process.env, PATH: `${bin}:${process.env.PATH}` } }
+  )
+}
+
 afterEach(async () => {
   await Promise.all(tempRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
 })
@@ -74,5 +110,15 @@ describe('download video engine runtime script', () => {
     await expect(runDownloader(root, archive.url, '0'.repeat(64))).rejects.toMatchObject({
       code: 1
     })
+  })
+
+  it('uses PowerShell archive extraction for Windows zip runtimes', async () => {
+    const root = await createTempRoot()
+
+    await expect(runWindowsDownloader(root)).resolves.toBeUndefined()
+    await expect(
+      access(join(root, '.local-runtimes/vlc/win32-x64/libvlc.dll'))
+    ).resolves.toBeUndefined()
+    await expect(access(join(root, 'pwsh-invoked'))).resolves.toBeUndefined()
   })
 })

@@ -69,6 +69,26 @@ async function downloadArchive(archivePath) {
 }
 
 function extractArchive(archivePath, extractRoot) {
+  if (platform === 'win32') {
+    const result = spawnSync(
+      'pwsh',
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        "$ErrorActionPreference = 'Stop'; Expand-Archive -LiteralPath $args[0] -DestinationPath $args[1] -Force",
+        archivePath,
+        extractRoot
+      ],
+      { encoding: 'utf8' }
+    )
+
+    if (result.status !== 0) {
+      throw new Error(result.stderr || result.stdout || 'Failed to extract runtime archive')
+    }
+    return
+  }
+
   const cwd = dirname(archivePath)
   const result = spawnSync(
     'tar',
@@ -111,7 +131,7 @@ async function main() {
   assertValidInput()
 
   const tempRoot = await mkdtemp(join(tmpdir(), 'video-engine-runtime-download-'))
-  const archivePath = join(tempRoot, 'runtime-archive')
+  const archivePath = join(tempRoot, platform === 'win32' ? 'runtime.zip' : 'runtime-archive')
   const extractRoot = join(tempRoot, 'extract')
   const destination = resolve(root, '.local-runtimes', component, `${platform}-${arch}`)
 
