@@ -64,7 +64,7 @@ function mockPdf(
   pdf: {
     numPages: number
     getPage: ReturnType<typeof vi.fn>
-    destroy: ReturnType<typeof vi.fn>
+    loadingTask: { destroy: ReturnType<typeof vi.fn> }
   }
   renderCancels: Map<number, ReturnType<typeof vi.fn>>
 } {
@@ -90,7 +90,7 @@ function mockPdf(
         return { promise, cancel }
       })
     })),
-    destroy: vi.fn(() => Promise.resolve())
+    loadingTask: { destroy: vi.fn(() => Promise.resolve()) }
   }
   mockLoadPdfjsLib.mockResolvedValue({
     getDocument: vi.fn(() => ({ promise: Promise.resolve(pdf) }))
@@ -111,7 +111,7 @@ describe('FileProjection copied media identity', () => {
         promise: Promise.resolve({
           numPages: 0,
           getPage: vi.fn(),
-          destroy: vi.fn(() => Promise.resolve())
+          loadingTask: { destroy: vi.fn(() => Promise.resolve()) }
         })
       }))
     })
@@ -506,7 +506,7 @@ describe('FileProjection copied media identity', () => {
     await waitFor(() => expect(pdf.getPage).toHaveBeenCalledWith(1))
     expect(mockLoadPdfjsLib.mock.results.at(-1)?.value).toBeDefined()
     const pdfjs = await mockLoadPdfjsLib.mock.results.at(-1)?.value
-    expect(pdfjs.getDocument).toHaveBeenCalledWith(ticket)
+    expect(pdfjs.getDocument).toHaveBeenCalledWith({ url: ticket })
     expect(mockGetFileSource).not.toHaveBeenCalled()
   })
 
@@ -544,7 +544,7 @@ describe('FileProjection copied media identity', () => {
             expect(pdfjs).toBeDefined()
           })
           const pdfjs = await mockLoadPdfjsLib.mock.results.at(-1)?.value
-          expect(pdfjs.getDocument).toHaveBeenCalledWith(url)
+          expect(pdfjs.getDocument).toHaveBeenCalledWith({ url })
         } else if (surface === 'pptx') {
           expect(getByTestId('pptx-surface')).toHaveAttribute('data-source-url', url)
         } else {
@@ -883,7 +883,7 @@ describe('FileProjection copied media identity', () => {
       url: `blob:${blobId}`,
       revoke: vi.fn()
     }))
-    const getDocument = vi.fn((url: string) => ({
+    const getDocument = vi.fn(({ url }: { url: string }) => ({
       promise: url === 'blob:old-blob' ? oldPdfPromise : Promise.resolve(newPdf)
     }))
     mockLoadPdfjsLib.mockResolvedValue({
@@ -900,7 +900,7 @@ describe('FileProjection copied media identity', () => {
     )
 
     await waitFor(() => {
-      expect(getDocument).toHaveBeenCalledWith('blob:old-blob')
+      expect(getDocument).toHaveBeenCalledWith({ url: 'blob:old-blob' })
     })
 
     rerender(
@@ -921,10 +921,10 @@ describe('FileProjection copied media identity', () => {
     })
 
     await waitFor(() => {
-      expect(oldPdf.destroy).toHaveBeenCalledOnce()
+      expect(oldPdf.loadingTask.destroy).toHaveBeenCalledOnce()
     })
     expect(oldPdf.getPage).not.toHaveBeenCalled()
-    expect(newPdf.destroy).not.toHaveBeenCalled()
+    expect(newPdf.loadingTask.destroy).not.toHaveBeenCalled()
   })
 
   it('destroys a PDF that resolves after projection unmount', async () => {
@@ -946,7 +946,7 @@ describe('FileProjection copied media identity', () => {
     )
 
     await waitFor(() => {
-      expect(getDocument).toHaveBeenCalledWith('blob:projection-source')
+      expect(getDocument).toHaveBeenCalledWith({ url: 'blob:projection-source' })
     })
     unmount()
     await act(async () => {
@@ -955,7 +955,7 @@ describe('FileProjection copied media identity', () => {
     })
 
     await waitFor(() => {
-      expect(pdf.destroy).toHaveBeenCalledOnce()
+      expect(pdf.loadingTask.destroy).toHaveBeenCalledOnce()
     })
     expect(pdf.getPage).not.toHaveBeenCalled()
   })

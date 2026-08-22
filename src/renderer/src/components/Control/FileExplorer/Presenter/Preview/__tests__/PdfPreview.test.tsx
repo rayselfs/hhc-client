@@ -13,7 +13,7 @@ const { getPageMock, mockGetDocument, mockGetFileSource } = vi.hoisted(() => {
     promise: Promise.resolve({
       numPages: 20,
       getPage: getPageMock,
-      destroy: vi.fn()
+      loadingTask: { destroy: vi.fn() }
     })
   })
   return { getPageMock, mockGetDocument, mockGetFileSource: vi.fn() }
@@ -230,7 +230,7 @@ describe('PdfPreview scroll mode lazy rendering', () => {
 
     render(<PdfPreview item={item} />)
 
-    await waitFor(() => expect(mockGetDocument).toHaveBeenCalledWith(sourceUrl))
+    await waitFor(() => expect(mockGetDocument).toHaveBeenCalledWith({ url: sourceUrl }))
     expect(mockGetFileSource).not.toHaveBeenCalled()
   })
 

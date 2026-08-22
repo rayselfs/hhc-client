@@ -109,9 +109,9 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
 
         revokeSource = source.revoke
         const pdfjsLib = await loadPdfjsLib()
-        const pdf = await pdfjsLib.getDocument(source.url).promise
+        const pdf = await pdfjsLib.getDocument({ url: source.url }).promise
         if (cancelled) {
-          pdf.destroy()
+          void pdf.loadingTask.destroy()
           return
         }
         doc = pdf
@@ -132,7 +132,7 @@ export default function PdfPreview({ item }: PdfPreviewProps): React.JSX.Element
     return () => {
       cancelled = true
       revokeSource?.()
-      if (doc) doc.destroy()
+      if (doc) void doc.loadingTask.destroy()
       setPdfDoc(null)
     }
   }, [blobId, item.mimeType, remoteSourceUrl, retryToken, t])

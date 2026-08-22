@@ -14,10 +14,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@v5.1.0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4.4.0
+        uses: actions/setup-node@v5.0.0
         with:
           node-version: 22
           cache: 'npm'
@@ -51,7 +51,7 @@ jobs:
       version: ${{ steps.get_version.outputs.version }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@v5.1.0
 
       - name: Validate release version
         id: get_version
@@ -92,10 +92,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@v5.1.0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4.4.0
+        uses: actions/setup-node@v5.0.0
         with:
           node-version: 22
           cache: 'npm'
@@ -193,7 +193,7 @@ jobs:
         run: npm run test:e2e:packaged
 
       - name: Upload desktop artifacts
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@v6.0.0
         with:
           name: libre-presenter-${{ matrix.artifact }}-${{ needs.prepare.outputs.version }}
           path: |
@@ -211,8 +211,11 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v5.1.0
+
       - name: Download desktop artifacts
-        uses: actions/download-artifact@v4.3.0
+        uses: actions/download-artifact@v7.0.0
         with:
           path: release-artifacts
           merge-multiple: true

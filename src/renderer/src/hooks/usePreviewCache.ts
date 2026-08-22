@@ -109,9 +109,9 @@ async function renderPdfPageThumb(
   const pdfjsLib = await loadPdfjsLib()
   if (signal.aborted) return { blobs: [], urls: [] }
 
-  const pdf = await pdfjsLib.getDocument(sourceUrl).promise
+  const pdf = await pdfjsLib.getDocument({ url: sourceUrl }).promise
   if (signal.aborted) {
-    pdf.destroy()
+    void pdf.loadingTask.destroy()
     return { blobs: [], urls: [] }
   }
 
@@ -145,7 +145,7 @@ async function renderPdfPageThumb(
       )
     }
   } finally {
-    pdf.destroy()
+    void pdf.loadingTask.destroy()
   }
 
   return { blobs, urls }

@@ -15,7 +15,7 @@ let transcriber: unknown = null
 
 async function loadPipeline(): Promise<void> {
   try {
-    const { pipeline, env } = await import('@xenova/transformers')
+    const { pipeline, env } = await import('@huggingface/transformers')
     ;(env as Record<string, unknown>)['remoteHost'] = 'local-model://whisper'
     ;(env as Record<string, unknown>)['remotePathTemplate'] = '{model}/{file}'
     ;(env as Record<string, unknown>)['allowLocalModels'] = false

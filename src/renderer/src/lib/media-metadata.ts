@@ -71,7 +71,7 @@ async function readVideoMetadata(url: string): Promise<DerivedAssetMetadata> {
 
 async function readPdfMetadata(url: string): Promise<DerivedAssetMetadata> {
   const pdfjsLib = await loadPdfjsLib()
-  const pdf = await pdfjsLib.getDocument(url).promise
+  const pdf = await pdfjsLib.getDocument({ url }).promise
   try {
     const page = await pdf.getPage(1)
     const viewport = page.getViewport({ scale: 1 })
@@ -82,7 +82,7 @@ async function readPdfMetadata(url: string): Promise<DerivedAssetMetadata> {
       firstPageHeight: viewport.height
     }
   } finally {
-    await pdf.destroy()
+    await pdf.loadingTask.destroy()
   }
 }
 

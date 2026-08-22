@@ -50,7 +50,7 @@ describe('T2 — PDF size guard', () => {
     }
     const mockPdf = {
       getPage: vi.fn().mockResolvedValue(mockPage),
-      destroy: vi.fn().mockResolvedValue(undefined)
+      loadingTask: { destroy: vi.fn().mockResolvedValue(undefined) }
     }
     mockLoadPdfjsLib.mockResolvedValue({
       getDocument: vi.fn().mockReturnValue({ promise: Promise.resolve(mockPdf) })

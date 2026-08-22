@@ -209,15 +209,15 @@ export default function FileProjection({
     pdfMeasuredDocumentRef.current = null
     const document = pdfDocumentRef.current
     pdfDocumentRef.current = null
-    if (document) void document.destroy()
+    if (document) void document.loadingTask.destroy()
   }, [])
 
   const loadPdf = useCallback(async (sourceUrl: string, itemId: string, loadSequence: number) => {
     const pdfjsLib = await loadPdfjsLib()
     if (loadSequenceRef.current !== loadSequence) return
-    const document = await pdfjsLib.getDocument(sourceUrl).promise
+    const document = await pdfjsLib.getDocument({ url: sourceUrl }).promise
     if (loadSequenceRef.current !== loadSequence || currentItemIdRef.current !== itemId) {
-      await document.destroy()
+      await document.loadingTask.destroy()
       return
     }
 

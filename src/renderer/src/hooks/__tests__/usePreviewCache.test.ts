@@ -28,7 +28,7 @@ vi.mock('@renderer/lib/pdfjs-loader', () => ({
           getViewport: vi.fn().mockReturnValue({ width: 100, height: 140 }),
           render: vi.fn().mockReturnValue({ promise: Promise.resolve() })
         }),
-        destroy: vi.fn()
+        loadingTask: { destroy: vi.fn() }
       })
     })
   })
