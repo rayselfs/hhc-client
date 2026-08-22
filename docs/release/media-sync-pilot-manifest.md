@@ -1,10 +1,14 @@
 # HHC LINE Media Sync pilot manifest
 
-Status: **release candidate reconciliation only — no approval to merge, deploy, assign roles or ACLs, create a binding, tag, or publish.**
+Status: **client merge policy approved; closure review in progress — no approval to deploy, assign roles or ACLs, create a binding, tag, or publish.**
 
 Collected: `2026-08-17T01:40:45Z` (Git remotes, GitHub Actions, Azure control plane, public negative-route probes, and aggregate Log Analytics query).
 
 Azure revision evidence refreshed: `2026-08-17T02:08:51Z` using read-only `revision list --all`.
+
+Client merge policy refreshed: `2026-08-22`; the previous instruction to keep PR #6
+unmerged is retired. Merge remains conditional on reviewed closure changes and green final-head
+gates, and does not authorize a tag, release publication, deployment, or pilot mutation.
 
 This record contains only commit, workflow, revision, image-digest, route, and environment-variable _names_. It deliberately excludes account identifiers, LINE identifiers, credentials, binding codes, tickets, tokens, request payloads, and log messages.
 
@@ -18,9 +22,12 @@ This record contains only commit, workflow, revision, image-digest, route, and e
 | 3     | `HallelujahHomeChurch/api-gateway`           | `65dd5450e056115a89a1f6499d88258c87e4c5ad`                            | [reader PR #39](https://github.com/HallelujahHomeChurch/api-gateway/pull/39), [CI 31941878343](https://github.com/HallelujahHomeChurch/api-gateway/actions/runs/31941878343) — success; [management PR #40](https://github.com/HallelujahHomeChurch/api-gateway/pull/40), [CI 31949022223](https://github.com/HallelujahHomeChurch/api-gateway/actions/runs/31949022223) — success | [release 31964210553](https://github.com/HallelujahHomeChurch/api-gateway/actions/runs/31964210553) — success, completed `2026-08-16T18:23:26Z`                 | Azure current `api-gateway--0000092`, Healthy/Running; immutable image digest recorded below                                                                | Retained previous `api-gateway--0000091`, Healthy/Stopped                                                                                                                                        |
 | 4     | `HallelujahHomeChurch/hhc-line-function-bot` | `629fcbe80573e521af51eedf0c4aa40768b0de60`                            | [PR #48](https://github.com/HallelujahHomeChurch/hhc-line-function-bot/pull/48), [CI 31963375214](https://github.com/HallelujahHomeChurch/hhc-line-function-bot/actions/runs/31963375214) — success                                                                                                                                                                                | [release 31963589570](https://github.com/HallelujahHomeChurch/hhc-line-function-bot/actions/runs/31963589570) — success, completed `2026-08-16T18:17:56Z`       | In-code idempotent migrations; Azure current `hhc-line-function-bot--0000166`, Healthy/Running; immutable image digest recorded below                       | Retained previous `hhc-line-function-bot--0000165`, Healthy/Stopped                                                                                                                              |
 | 5     | `HallelujahHomeChurch/admin-fe`              | `c8bd9c47e464948f89ecca2465d75f0f3be4168e`                            | [PR #45](https://github.com/HallelujahHomeChurch/admin-fe/pull/45), [CI 31948783260](https://github.com/HallelujahHomeChurch/admin-fe/actions/runs/31948783260) — success                                                                                                                                                                                                          | [release 31964477270](https://github.com/HallelujahHomeChurch/admin-fe/actions/runs/31964477270) — success, completed `2026-08-16T18:28:36Z`                    | Static deployment; no media-sync-specific schema                                                                                                            | Previous [release 31871742001](https://github.com/HallelujahHomeChurch/admin-fe/actions/runs/31871742001) at `c0340b1c92f1873f3c8e4db18eb8d58ff486ead7`; no static index snapshot was retained   |
-| 6     | `rayselfs/hhc-client`                        | `a0244814c6cca4d82490c3e3a925c3bccb94dffa` on `feat/media-projection` | [PR #6](https://github.com/rayselfs/hhc-client/pull/6) is **open**; [quality 31987756735](https://github.com/rayselfs/hhc-client/actions/runs/31987756735) and [SWA 31987756749](https://github.com/rayselfs/hhc-client/actions/runs/31987756749) — success                                                                                                                        | Intentionally unmerged per operator policy; release only from the exact pushed PR-head anchor; `origin/main` remains `fa020d85c4ae51c3b7a46b194be7b73c7cf33850` | Slice 4 Tasks 1–7 are complete; desktop signing/notarization is deliberately deferred and is not a pilot blocker; unsigned release approval remains pending | Current production web/desktop remains the prior main release; no pilot client tag is approved                                                                                                   |
+| 6     | `rayselfs/hhc-client`                        | `bd2a4f164ec8355ee612d94f76b4f5b6e19092e9` on `fix/media-projection-merge-readiness` | [PR #6](https://github.com/rayselfs/hhc-client/pull/6) remains open; closure review and final-head hosted CI/package jobs are pending. Local unit, lint, typecheck, build/bundle, browser E2E, and macOS arm64 packaged VLC/FFmpeg smoke are green. | Merge into `main` is permitted only after reviewed closure changes and green final-head gates. Tagging, unsigned artifact publication, and deployment remain separate approval checkpoints. | Media projection closure is technically complete locally; macOS x64 and Windows packaged jobs, hosted review, and final policy reconciliation remain required before merge. | Current production web/desktop remains the prior main release; no client tag, release publication, deployment, or pilot mutation is approved. |
 
-The client release-code anchor is `a0244814c6cca4d82490c3e3a925c3bccb94dffa`. Any later commit that changes only this manifest records evidence and is not part of the release code candidate.
+The current client release-code anchor is
+`bd2a4f164ec8355ee612d94f76b4f5b6e19092e9`. A later commit that changes only release-policy
+or verification evidence is not a different executable code candidate. Before merge, the
+manifest must agree with the exact reviewed closure branch and PR #6 head.
 
 ### Read-only Azure evidence
 
@@ -81,6 +88,14 @@ The following cannot be safely proved with the available anonymous/public or agg
 
 ## Approval boundary and next safe action
 
-This manifest is **not** approval for a production mutation or release tag. Before Task 2 can be marked complete, obtain current read-only evidence for every unresolved item above and capture the prior revision/index immediately before each approved deployment. Do not select, record, or assign real pilot identities in this file. The later pilot checkpoint must use opaque references for one manager, reader A, reader B, and one already-registered helper group. Desktop signing and notarization are deferred by explicit user decision rather than treated as a pilot blocker; creating or publishing an unsigned release remains a separate approval checkpoint.
+The previous policy requiring PR #6 to remain unmerged was explicitly retired on 2026-08-22.
+That approval permits merge only after closure review and all final-head gates pass. This manifest
+is **not** approval for a production mutation, release tag, or artifact publication. Before Task 2
+can be marked complete, obtain current read-only evidence for every unresolved item above and
+capture the prior revision/index immediately before each approved deployment. Do not select,
+record, or assign real pilot identities in this file. The later pilot checkpoint must use opaque
+references for one manager, reader A, reader B, and one already-registered helper group. Desktop
+signing and notarization are deferred by explicit user decision rather than treated as a pilot
+blocker; creating or publishing an unsigned release remains a separate approval checkpoint.
 
 Rollback remains authorization-first: unbind, revoke ACL/global role, hide the client entry point, remove/revert the exact Gateway routes, then restore the recorded service revisions. Additive tables and retained assets are not dropped during rollback.
