@@ -13,6 +13,7 @@ const mockNavigateToRoot = vi.fn(() => Promise.resolve())
 const mockMoveItem = vi.fn()
 const mockReorderItems = vi.fn()
 const mockAddItem = vi.fn()
+const mockShowMenu = vi.hoisted(() => vi.fn())
 
 const mockFolderA: FolderRecord = {
   id: 'folder-a',
@@ -137,8 +138,7 @@ vi.mock('@renderer/lib/projection-actions', () => ({
 
 vi.mock('@renderer/contexts/ContextMenuContext', () => ({
   useContextMenu: () => ({
-    contextMenu: null,
-    showContextMenu: vi.fn()
+    showMenu: mockShowMenu
   })
 }))
 
@@ -166,7 +166,9 @@ vi.mock('@heroui/react', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@heroui/react')>()
   return {
     ...actual,
-    ScrollShadow: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    ScrollShadow: ({ children, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
+      <div {...props}>{children}</div>
+    ),
     Modal: Object.assign(({ children }: { children: React.ReactNode }) => <div>{children}</div>, {
       Backdrop: ({ isOpen, children }: { isOpen?: boolean; children: React.ReactNode }) =>
         isOpen ? <div role="dialog">{children}</div> : null,
@@ -392,5 +394,15 @@ describe('CustomFolderTab', () => {
     itemsResult = []
     render(<CustomFolderTab />)
     expect(screen.getByText('Folder is empty')).toBeInTheDocument()
+  })
+
+  it('opens the empty-area menu from the empty-state message', () => {
+    childFoldersResult = []
+    itemsResult = []
+    render(<CustomFolderTab />)
+
+    fireEvent.contextMenu(screen.getByText('Folder is empty'))
+
+    expect(mockShowMenu).toHaveBeenCalledOnce()
   })
 })

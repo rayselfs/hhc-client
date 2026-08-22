@@ -503,7 +503,7 @@ export function FolderBrowser({
 
   const handleContextMenuForContainer = useCallback(
     (e: React.MouseEvent): void => {
-      if (e.target !== e.currentTarget) return
+      if (allItems.length > 0 && e.target !== e.currentTarget) return
       e.preventDefault()
       showEmptyAreaMenu({
         event: e,
@@ -512,7 +512,7 @@ export function FolderBrowser({
         onNewFolder: openNewFolderModal
       })
     },
-    [clipboard, showEmptyAreaMenu, handlePaste, openNewFolderModal]
+    [allItems.length, clipboard, showEmptyAreaMenu, handlePaste, openNewFolderModal]
   )
 
   const handleDeleteFolder = useCallback(

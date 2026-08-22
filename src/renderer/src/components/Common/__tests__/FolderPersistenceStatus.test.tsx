@@ -57,11 +57,11 @@ describe('FolderPersistenceStatus', () => {
     expect(retryInitialization).toHaveBeenCalledOnce()
   })
 
-  it('shows pending saves without offering a retry action', () => {
-    render(<FolderPersistenceStatus {...baseProps} status="saving" pendingCount={2} />)
+  it('does not render a transient saving banner', () => {
+    const { container } = render(
+      <FolderPersistenceStatus {...baseProps} status="saving" pendingCount={2} />
+    )
 
-    expect(screen.getByText('Saving local changes')).toBeInTheDocument()
-    expect(screen.getByText('2 change(s) waiting to be saved.')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument()
+    expect(container).toBeEmptyDOMElement()
   })
 })
