@@ -234,21 +234,101 @@ describe('HhcAuthService authorization', () => {
     })
   })
 
-  it('rejects a second active begin without replacing state and keeps mismatches non-destructive', async () => {
+  it('returns shared expiry metadata and replaces an unconsumed transaction immediately', async () => {
     const service = createHhcAuthService({ now: () => now })
-    await service.begin()
-    const callback = callbackFromOpenedUrl()
+    await expect(service.begin()).resolves.toEqual({
+      expiresAt: now + 300_000
+    })
+    const abandonedCallback = callbackFromOpenedUrl()
 
-    await expect(service.begin()).rejects.toThrow('HHC sign-in is already in progress')
+    await expect(service.begin()).resolves.toEqual({
+      expiresAt: now + 300_000
+    })
+    const replacementCallback = callbackFromOpenedUrl()
     await expect(
-      service.completeProtocolCallback({ ...callback, state: 'wrong-state' })
+      service.completeProtocolCallback({ ...replacementCallback, state: 'wrong-state' })
     ).resolves.toBe(false)
+    await expect(service.completeProtocolCallback(abandonedCallback)).resolves.toBe(false)
 
     mockNetFetch
       .mockResolvedValueOnce(tokenResponse('refresh-1'))
       .mockResolvedValueOnce(profileResponse())
-    await expect(service.completeProtocolCallback(callback)).resolves.toBe(true)
-    expect(mockOpenExternal).toHaveBeenCalledTimes(1)
+    await expect(service.completeProtocolCallback(replacementCallback)).resolves.toBe(true)
+    expect(mockOpenExternal).toHaveBeenCalledTimes(2)
+  })
+
+  it('lets cancel win while openExternal is pending and ignores the late callback', async () => {
+    const service = createHhcAuthService({ now: () => now })
+    let finishOpen!: () => void
+    mockOpenExternal.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishOpen = resolve
+        })
+    )
+    const beginning = service.begin()
+    await vi.waitFor(() => expect(mockOpenExternal).toHaveBeenCalledOnce())
+    const cancelledCallback = callbackFromOpenedUrl()
+
+    await service.cancelSignIn()
+    finishOpen()
+    await beginning
+
+    await expect(service.completeProtocolCallback(cancelledCallback)).resolves.toBe(false)
+    expect(mockNetFetch).not.toHaveBeenCalled()
+  })
+
+  it('replaces a transaction while its openExternal call is still pending', async () => {
+    const service = createHhcAuthService({ now: () => now })
+    let finishAbandonedOpen!: () => void
+    mockOpenExternal.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishAbandonedOpen = resolve
+        })
+    )
+    const abandonedBegin = service.begin()
+    await vi.waitFor(() => expect(mockOpenExternal).toHaveBeenCalledOnce())
+    const abandonedCallback = callbackFromOpenedUrl()
+
+    await service.begin()
+    const replacementCallback = callbackFromOpenedUrl()
+    await expect(service.completeProtocolCallback(abandonedCallback)).resolves.toBe(false)
+    mockNetFetch
+      .mockResolvedValueOnce(tokenResponse('replacement-refresh'))
+      .mockResolvedValueOnce(profileResponse())
+    await expect(service.completeProtocolCallback(replacementCallback)).resolves.toBe(true)
+
+    finishAbandonedOpen()
+    await abandonedBegin
+  })
+
+  it('invalidates a transaction cancelled after the system browser opens', async () => {
+    const service = createHhcAuthService({ now: () => now })
+    await service.begin()
+    const cancelledCallback = callbackFromOpenedUrl()
+
+    await service.cancelSignIn()
+
+    await expect(service.completeProtocolCallback(cancelledCallback)).resolves.toBe(false)
+    expect(mockNetFetch).not.toHaveBeenCalled()
+  })
+
+  it('keeps token completion exclusive from replacement sign-in', async () => {
+    const service = createHhcAuthService({ now: () => now })
+    await service.begin()
+    const callback = callbackFromOpenedUrl()
+    let resolveToken!: (response: Response) => void
+    mockNetFetch
+      .mockImplementationOnce(() => new Promise<Response>((resolve) => (resolveToken = resolve)))
+      .mockResolvedValueOnce(profileResponse())
+
+    const completion = service.completeProtocolCallback(callback)
+    await vi.waitFor(() => expect(mockNetFetch).toHaveBeenCalledOnce())
+
+    await expect(service.begin()).rejects.toThrow('HHC sign-in is already in progress')
+    resolveToken(tokenResponse('refresh-1'))
+    await expect(completion).resolves.toBe(true)
   })
 
   it('expires state after five minutes and consumes a match before network completion', async () => {
@@ -258,7 +338,9 @@ describe('HhcAuthService authorization', () => {
     now += 5 * 60_000 + 1
 
     await expect(service.completeProtocolCallback(expiredCallback)).resolves.toBe(false)
-    await expect(service.begin()).resolves.toBeUndefined()
+    await expect(service.begin()).resolves.toEqual({
+      expiresAt: now + 300_000
+    })
     const activeCallback = callbackFromOpenedUrl()
 
     let resolveToken!: (response: Response) => void
@@ -290,6 +372,7 @@ describe('HhcAuthService authorization', () => {
     const signOut = service.signOut().finally(() => {
       signOutSettled = true
     })
+    await expect(service.begin()).rejects.toThrow('HHC sign-in is already in progress')
     await expect(service.completeProtocolCallback(callback)).resolves.toBe(false)
     await Promise.resolve()
     expect(signOutSettled).toBe(false)
@@ -325,7 +408,9 @@ describe('HhcAuthService authorization', () => {
       try {
         const service = createHhcAuthService({ now: () => now })
 
-        await expect(service.begin()).resolves.toBeUndefined()
+        await expect(service.begin()).resolves.toEqual({
+          expiresAt: now + 300_000
+        })
         expect(mockGetSelectedStorageBackend).not.toHaveBeenCalled()
       } finally {
         platformSpy.mockRestore()
@@ -349,7 +434,9 @@ describe('HhcAuthService authorization', () => {
         expect(mockWriteFile).not.toHaveBeenCalled()
         expect(mockOpenExternal).not.toHaveBeenCalled()
       } else {
-        await expect(beginning).resolves.toBeUndefined()
+        await expect(beginning).resolves.toEqual({
+          expiresAt: now + 300_000
+        })
       }
     } finally {
       platformSpy.mockRestore()
@@ -650,7 +737,8 @@ describe('HhcAuthService credentials and session', () => {
 describe('HHC auth IPC', () => {
   function fakeService(): HhcAuthService {
     return {
-      begin: vi.fn().mockResolvedValue(undefined),
+      begin: vi.fn().mockResolvedValue({ expiresAt: now + 300_000 }),
+      cancelSignIn: vi.fn().mockResolvedValue(undefined),
       completeProtocolCallback: vi.fn().mockResolvedValue(false),
       getAccessToken: vi.fn().mockResolvedValue('access-token'),
       refreshAccessToken: vi.fn().mockResolvedValue('refreshed-access-token'),
@@ -673,6 +761,7 @@ describe('HHC auth IPC', () => {
 
       for (const channel of [
         'hhc-auth:begin',
+        'hhc-auth:cancel',
         'hhc-auth:get-access-token',
         'hhc-auth:refresh-access-token',
         'hhc-auth:get-session',
@@ -699,7 +788,10 @@ describe('HHC auth IPC', () => {
     } as unknown as WindowManager
     registerHhcAuthIpc(wm, service)
 
-    await expect(handlers.get('hhc-auth:begin')!(makeEvent())).resolves.toBeUndefined()
+    await expect(handlers.get('hhc-auth:begin')!(makeEvent())).resolves.toEqual({
+      expiresAt: now + 300_000
+    })
+    await expect(handlers.get('hhc-auth:cancel')!(makeEvent())).resolves.toBeUndefined()
     await expect(handlers.get('hhc-auth:get-access-token')!(makeEvent())).resolves.toBe(
       'access-token'
     )

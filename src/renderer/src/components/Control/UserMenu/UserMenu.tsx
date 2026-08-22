@@ -4,7 +4,17 @@ import { Dropdown } from '@heroui/react/dropdown'
 import { toast } from '@heroui/react/toast'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { LogIn, LogOut, Settings, RefreshCw, Keyboard, Power, CircleUser, Info } from 'lucide-react'
+import {
+  LogIn,
+  LogOut,
+  Settings,
+  RefreshCw,
+  Keyboard,
+  Power,
+  CircleUser,
+  Info,
+  X
+} from 'lucide-react'
 import { useConfirm } from '@renderer/contexts/ConfirmDialogContext'
 import KeyboardShortcutsDialog from '@renderer/components/Control/UserMenu/KeyboardShortcutsDialog'
 import AboutDialog from '@renderer/components/Control/UserMenu/AboutDialog'
@@ -39,7 +49,7 @@ export default function UserMenu({ onOpenPreferences }: UserMenuProps): React.JS
   const updateStatus = useUpdateStore(selectUpdateStatus)
   const isUpdateAvailable = useUpdateStore(selectIsUpdateAvailable)
   const availableVersion = useUpdateStore(selectAvailableVersion)
-  const { status, session, signIn, signOut } = useHhcAuth()
+  const { status, session, signInStatus, signIn, cancelSignIn, signOut } = useHhcAuth()
   const accountLabel =
     status === 'authenticated' && session ? session.displayName : t('userMenu.guest')
 
@@ -77,6 +87,9 @@ export default function UserMenu({ onOpenPreferences }: UserMenuProps): React.JS
               if (key === 'login') {
                 void signIn().catch(() => toast.danger(t('userMenu.signInFailed')))
               }
+              if (key === 'cancelLogin') {
+                void cancelSignIn().catch(() => toast.danger(t('userMenu.signInFailed')))
+              }
               if (key === 'logout') {
                 void signOut().catch(() => toast.danger(t('userMenu.signOutFailed')))
               }
@@ -105,13 +118,41 @@ export default function UserMenu({ onOpenPreferences }: UserMenuProps): React.JS
                 </Dropdown.Item>
               </>
             ) : status === 'anonymous' ? (
-              <Dropdown.Item
-                id="login"
-                className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
-              >
-                <LogIn className="size-4" />
-                {t('userMenu.login')}
-              </Dropdown.Item>
+              signInStatus === 'pending' ? (
+                <>
+                  <Dropdown.Item id="signInPending" isDisabled>
+                    <RefreshCw className="size-4 animate-spin" />
+                    {t('userMenu.signInPending')}
+                  </Dropdown.Item>
+                  <Dropdown.Item
+                    id="cancelLogin"
+                    className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
+                  >
+                    <X className="size-4" />
+                    {t('userMenu.cancelSignIn')}
+                  </Dropdown.Item>
+                </>
+              ) : (
+                <>
+                  {signInStatus !== 'idle' && (
+                    <Dropdown.Item id="signInFeedback" isDisabled>
+                      <Info className="size-4" />
+                      {t(
+                        signInStatus === 'cancelled'
+                          ? 'userMenu.signInCancelled'
+                          : 'userMenu.signInExpired'
+                      )}
+                    </Dropdown.Item>
+                  )}
+                  <Dropdown.Item
+                    id="login"
+                    className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
+                  >
+                    <LogIn className="size-4" />
+                    {t('userMenu.login')}
+                  </Dropdown.Item>
+                </>
+              )
             ) : (
               <Dropdown.Item id="accountStatus" isDisabled>
                 <RefreshCw className={`size-4 ${status === 'loading' ? 'animate-spin' : ''}`} />

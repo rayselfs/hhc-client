@@ -3,7 +3,11 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { promises as fs } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { APP_CONFIG } from '@shared/app-config'
-import type { HhcSession } from '@shared/hhc-auth'
+import {
+  HHC_AUTH_TRANSACTION_TTL_MS,
+  type HhcPendingSignIn,
+  type HhcSession
+} from '@shared/hhc-auth'
 import type { LibrePresenterProtocolAction } from '../protocol-router'
 import type { WindowManager } from '../windowManager'
 import { isMainWindow } from './validate'
@@ -11,7 +15,6 @@ import { isMainWindow } from './validate'
 const CLIENT_ID = 'hhc-desktop'
 const REDIRECT_URI = 'librepresenter://auth/account'
 const SCOPE = 'openid profile'
-const TRANSACTION_TTL_MS = 5 * 60_000
 
 type AccountAuthAction = Extract<LibrePresenterProtocolAction, { kind: 'account-auth' }>
 
@@ -31,6 +34,7 @@ type Transaction = {
   state: string
   codeVerifier: string
   expiresAt: number
+  generation: number
 }
 
 type HhcAuthServiceOptions = {
@@ -38,7 +42,8 @@ type HhcAuthServiceOptions = {
 }
 
 export interface HhcAuthService {
-  begin(): Promise<void>
+  begin(): Promise<HhcPendingSignIn>
+  cancelSignIn(): Promise<void>
   completeProtocolCallback(action: AccountAuthAction): Promise<boolean>
   getAccessToken(): Promise<string | null>
   refreshAccessToken(): Promise<string | null>
@@ -116,8 +121,9 @@ class MainHhcAuthService implements HhcAuthService {
   private readonly credentialPath = join(app.getPath('userData'), 'hhc-auth.enc')
   private readonly now: () => number
   private readonly listeners = new Set<(session: HhcSession | null) => void>()
+  private readonly beginsInFlight = new Set<Promise<HhcPendingSignIn>>()
   private transaction: Transaction | null = null
-  private beginInFlight: Promise<void> | null = null
+  private authGeneration = 0
   private completionInFlight: Promise<boolean> | null = null
   private refreshInFlight: Promise<string | null> | null = null
   private signOutInFlight: Promise<void> | null = null
@@ -130,27 +136,35 @@ class MainHhcAuthService implements HhcAuthService {
     this.now = options.now ?? Date.now
   }
 
-  async begin(): Promise<void> {
-    if (
-      this.beginInFlight ||
-      this.completionInFlight ||
-      this.signOutInFlight ||
-      (this.transaction && this.transaction.expiresAt > this.now())
-    ) {
+  async begin(): Promise<HhcPendingSignIn> {
+    if (this.completionInFlight || this.signOutInFlight) {
       throw new Error('HHC sign-in is already in progress')
     }
-    if (this.transaction) this.transaction = null
+    const generation = ++this.authGeneration
+    this.transaction = null
+    const request = this.startAuthorization(generation)
+    this.beginsInFlight.add(request)
+    void request.then(
+      () => this.beginsInFlight.delete(request),
+      () => this.beginsInFlight.delete(request)
+    )
+    return request
+  }
 
-    this.beginInFlight = this.startAuthorization().finally(() => {
-      this.beginInFlight = null
-    })
-    return this.beginInFlight
+  cancelSignIn(): Promise<void> {
+    this.authGeneration += 1
+    this.transaction = null
+    return Promise.resolve()
   }
 
   completeProtocolCallback(action: AccountAuthAction): Promise<boolean> {
     if (this.signOutInFlight) return Promise.resolve(false)
     const transaction = this.transaction
-    if (!transaction || transaction.expiresAt <= this.now()) {
+    if (
+      !transaction ||
+      transaction.generation !== this.authGeneration ||
+      transaction.expiresAt <= this.now()
+    ) {
       this.transaction = null
       return Promise.resolve(false)
     }
@@ -225,20 +239,21 @@ class MainHhcAuthService implements HhcAuthService {
 
   signOut(): Promise<void> {
     if (this.signOutInFlight) return this.signOutInFlight
+    this.authGeneration += 1
     this.transaction = null
-    const beginInFlight = this.beginInFlight
+    const beginsInFlight = [...this.beginsInFlight]
     const completionInFlight = this.completionInFlight
-    this.signOutInFlight = this.performSignOut(beginInFlight, completionInFlight).finally(() => {
+    this.signOutInFlight = this.performSignOut(beginsInFlight, completionInFlight).finally(() => {
       this.signOutInFlight = null
     })
     return this.signOutInFlight
   }
 
   private async performSignOut(
-    beginInFlight: Promise<void> | null,
+    beginsInFlight: Promise<HhcPendingSignIn>[],
     completionInFlight: Promise<boolean> | null
   ): Promise<void> {
-    if (beginInFlight) await beginInFlight.catch(() => undefined)
+    await Promise.allSettled(beginsInFlight)
     this.transaction = null
     if (completionInFlight) await completionInFlight.catch(() => false)
     if (this.refreshInFlight) await this.refreshInFlight.catch(() => null)
@@ -276,8 +291,10 @@ class MainHhcAuthService implements HhcAuthService {
     return () => this.listeners.delete(listener)
   }
 
-  private async startAuthorization(): Promise<void> {
+  private async startAuthorization(generation: number): Promise<HhcPendingSignIn> {
+    const pending = { expiresAt: this.now() + HHC_AUTH_TRANSACTION_TTL_MS }
     await this.loadCredential(true)
+    if (generation !== this.authGeneration) return pending
     const codeVerifier = randomBytes(32).toString('base64url')
     const state = randomBytes(32).toString('base64url')
     const url = new URL(`${this.accountApi}/oauth/authorize`)
@@ -290,13 +307,14 @@ class MainHhcAuthService implements HhcAuthService {
       scope: SCOPE,
       state
     }).toString()
-    this.transaction = { state, codeVerifier, expiresAt: this.now() + TRANSACTION_TTL_MS }
+    this.transaction = { state, codeVerifier, expiresAt: pending.expiresAt, generation }
     try {
       await shell.openExternal(url.toString())
     } catch (error) {
-      this.transaction = null
+      if (this.transaction?.generation === generation) this.transaction = null
       throw error
     }
+    return pending
   }
 
   private async refresh(credential: StoredCredential): Promise<string> {
@@ -471,6 +489,10 @@ export function registerHhcAuthIpc(wm: WindowManager, service: HhcAuthService): 
   ipcMain.handle(
     'hhc-auth:begin',
     authorized(() => service.begin())
+  )
+  ipcMain.handle(
+    'hhc-auth:cancel',
+    authorized(() => service.cancelSignIn())
   )
   ipcMain.handle(
     'hhc-auth:get-access-token',

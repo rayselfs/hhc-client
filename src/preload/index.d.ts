@@ -54,7 +54,7 @@ import type {
   TimerTickPayload
 } from '../shared/types/timer'
 import type { BibleVersion, BibleBook } from '../shared/types/bible'
-import type { HhcSession } from '../shared/hhc-auth'
+import type { HhcPendingSignIn, HhcSession } from '../shared/hhc-auth'
 
 interface ThemeAPI {
   get: () => Promise<{ source: string; shouldUseDarkColors: boolean }>
@@ -174,7 +174,8 @@ interface OneDriveAPI {
 }
 
 interface HhcAuthAPI {
-  begin: () => Promise<void>
+  begin: () => Promise<HhcPendingSignIn>
+  cancel: () => Promise<void>
   getAccessToken: () => Promise<string | null>
   refreshAccessToken: () => Promise<string | null>
   getSession: () => Promise<HhcSession | null>

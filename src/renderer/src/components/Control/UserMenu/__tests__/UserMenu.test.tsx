@@ -13,7 +13,10 @@ const auth = vi.hoisted(() => ({
   value: {
     status: 'anonymous' as 'loading' | 'anonymous' | 'authenticated' | 'unavailable',
     session: null as { userId: string; displayName: string; roles: string[] } | null,
+    signInStatus: 'idle' as 'idle' | 'pending' | 'cancelled' | 'expired',
+    pendingSignInExpiresAt: null as number | null,
     signIn: vi.fn(async () => undefined),
+    cancelSignIn: vi.fn(async () => undefined),
     signOut: vi.fn(async () => undefined),
     getAccessToken: vi.fn(async () => null)
   }
@@ -54,7 +57,10 @@ beforeEach(async () => {
   await i18n.changeLanguage('en')
   auth.value.status = 'anonymous'
   auth.value.session = null
+  auth.value.signInStatus = 'idle'
+  auth.value.pendingSignInExpiresAt = null
   auth.value.signIn = vi.fn(async () => undefined)
+  auth.value.cancelSignIn = vi.fn(async () => undefined)
   auth.value.signOut = vi.fn(async () => undefined)
   auth.value.getAccessToken = vi.fn(async () => null)
   toastDanger.mockClear()
@@ -95,6 +101,29 @@ describe('UserMenu', () => {
     renderUserMenu()
     expect(screen.getByText('Login')).toBeInTheDocument()
     expect(screen.queryByText('Logout')).not.toBeInTheDocument()
+  })
+
+  it('shows pending feedback and lets the user cancel sign-in', () => {
+    auth.value.signInStatus = 'pending'
+    auth.value.pendingSignInExpiresAt = Date.now() + 300_000
+    renderUserMenu()
+
+    expect(screen.getByText('Waiting for sign-in...')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('Cancel sign-in').closest('[role="menuitem"]')!)
+    expect(auth.value.cancelSignIn).toHaveBeenCalledOnce()
+    expect(screen.queryByText('Login')).not.toBeInTheDocument()
+  })
+
+  it.each([
+    ['cancelled', 'Sign-in cancelled'],
+    ['expired', 'Sign-in expired. Try again.']
+  ] as const)('shows %s feedback with an immediate retry', (signInStatus, message) => {
+    auth.value.signInStatus = signInStatus
+    renderUserMenu()
+
+    expect(screen.getByText(message)).toBeInTheDocument()
+    fireEvent.click(screen.getByText('Login').closest('[role="menuitem"]')!)
+    expect(auth.value.signIn).toHaveBeenCalledOnce()
   })
 
   it.each([

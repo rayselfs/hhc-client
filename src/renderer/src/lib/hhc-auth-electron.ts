@@ -1,4 +1,4 @@
-import type { HhcAuthAdapter, HhcSession } from '@shared/hhc-auth'
+import type { HhcAuthAdapter, HhcPendingSignIn, HhcSession } from '@shared/hhc-auth'
 
 export class ElectronHhcAuthAdapter implements HhcAuthAdapter {
   private readonly cleanups = new Set<() => void>()
@@ -7,8 +7,12 @@ export class ElectronHhcAuthAdapter implements HhcAuthAdapter {
     return window.api.hhcAuth.getSession()
   }
 
-  signIn(): Promise<void> {
+  signIn(): Promise<HhcPendingSignIn> {
     return window.api.hhcAuth.begin()
+  }
+
+  cancelSignIn(): Promise<void> {
+    return window.api.hhcAuth.cancel()
   }
 
   getAccessToken(): Promise<string | null> {

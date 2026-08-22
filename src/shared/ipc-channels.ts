@@ -20,7 +20,7 @@ import type {
   TimerTickPayload
 } from './types/timer'
 import type { BibleVersion, BibleBook } from './types/bible'
-import type { HhcSession } from './hhc-auth'
+import type { HhcPendingSignIn, HhcSession } from './hhc-auth'
 import type {
   HhcAssetCollectionChangePage,
   HhcAssetCollectionItem,
@@ -298,7 +298,8 @@ export interface IpcInvokeMap {
   'onedrive:delete-credentials': { args: [string]; result: void }
   'onedrive:get-auth-redirect-uri': { args: []; result: string }
   'onedrive:wait-auth-callback': { args: [string?]; result: string | null }
-  'hhc-auth:begin': { args: []; result: void }
+  'hhc-auth:begin': { args: []; result: HhcPendingSignIn }
+  'hhc-auth:cancel': { args: []; result: void }
   'hhc-auth:get-access-token': { args: []; result: string | null }
   'hhc-auth:refresh-access-token': { args: []; result: string | null }
   'hhc-auth:get-session': { args: []; result: HhcSession | null }
