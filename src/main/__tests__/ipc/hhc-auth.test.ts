@@ -305,17 +305,55 @@ describe('HhcAuthService authorization', () => {
     expect(currentStoredRecord()).toEqual({ installationId })
   })
 
-  it.each([
-    ['unavailable encryption', false, 'keychain'],
-    ['basic_text storage', true, 'basic_text']
-  ])('fails closed with no write for %s', async (_label, available, backend) => {
-    mockIsEncryptionAvailable.mockReturnValue(available)
-    mockGetSelectedStorageBackend.mockReturnValue(backend)
+  it('fails closed with no write when encryption is unavailable', async () => {
+    mockIsEncryptionAvailable.mockReturnValue(false)
     const service = createHhcAuthService({ now: () => now })
 
     await expect(service.begin()).rejects.toThrow('Secure credential storage is unavailable')
     expect(mockWriteFile).not.toHaveBeenCalled()
     expect(mockOpenExternal).not.toHaveBeenCalled()
+  })
+
+  it.each(['darwin', 'win32'] as NodeJS.Platform[])(
+    'does not query the Linux storage backend on %s',
+    async (platform) => {
+      const platformSpy = vi.spyOn(process, 'platform', 'get').mockReturnValue(platform)
+      mockGetSelectedStorageBackend.mockImplementation(() => {
+        throw new TypeError('getSelectedStorageBackend is unavailable')
+      })
+
+      try {
+        const service = createHhcAuthService({ now: () => now })
+
+        await expect(service.begin()).resolves.toBeUndefined()
+        expect(mockGetSelectedStorageBackend).not.toHaveBeenCalled()
+      } finally {
+        platformSpy.mockRestore()
+      }
+    }
+  )
+
+  it.each([
+    ['basic_text', true],
+    ['gnome_libsecret', false]
+  ])('rejects Linux %s storage: %s', async (backend, rejected) => {
+    const platformSpy = vi.spyOn(process, 'platform', 'get').mockReturnValue('linux')
+    mockGetSelectedStorageBackend.mockReturnValue(backend)
+
+    try {
+      const service = createHhcAuthService({ now: () => now })
+      const beginning = service.begin()
+
+      if (rejected) {
+        await expect(beginning).rejects.toThrow('Secure credential storage is unavailable')
+        expect(mockWriteFile).not.toHaveBeenCalled()
+        expect(mockOpenExternal).not.toHaveBeenCalled()
+      } else {
+        await expect(beginning).resolves.toBeUndefined()
+      }
+    } finally {
+      platformSpy.mockRestore()
+    }
   })
 })
 

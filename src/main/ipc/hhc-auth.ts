@@ -48,9 +48,8 @@ export interface HhcAuthService {
 }
 
 function secureStorageAvailable(): boolean {
-  return (
-    safeStorage.isEncryptionAvailable() && safeStorage.getSelectedStorageBackend() !== 'basic_text'
-  )
+  if (!safeStorage.isEncryptionAvailable()) return false
+  return process.platform !== 'linux' || safeStorage.getSelectedStorageBackend() !== 'basic_text'
 }
 
 function parseStoredCredential(value: unknown): StoredCredential {
