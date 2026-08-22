@@ -115,11 +115,12 @@ export default function UserMenu({
           >
             {status === 'authenticated' && session ? (
               <>
-                <Dropdown.Item id="accountIdentity" isDisabled>
+                <Dropdown.Item key="accountIdentity" id="accountIdentity" isDisabled>
                   <CircleUser className="size-4" />
                   {session.displayName}
                 </Dropdown.Item>
                 <Dropdown.Item
+                  key="logout"
                   id="logout"
                   className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
                 >
@@ -130,11 +131,12 @@ export default function UserMenu({
             ) : status === 'anonymous' ? (
               signInStatus === 'pending' ? (
                 <>
-                  <Dropdown.Item id="signInPending" isDisabled>
+                  <Dropdown.Item key="signInPending" id="signInPending" isDisabled>
                     <RefreshCw className="size-4 animate-spin" />
                     {t('userMenu.signInPending')}
                   </Dropdown.Item>
                   <Dropdown.Item
+                    key="cancelLogin"
                     id="cancelLogin"
                     className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
                   >
@@ -145,7 +147,7 @@ export default function UserMenu({
               ) : (
                 <>
                   {signInStatus !== 'idle' && (
-                    <Dropdown.Item id="signInFeedback" isDisabled>
+                    <Dropdown.Item key="signInFeedback" id="signInFeedback" isDisabled>
                       <Info className="size-4" />
                       {t(
                         signInStatus === 'cancelled'
@@ -155,6 +157,7 @@ export default function UserMenu({
                     </Dropdown.Item>
                   )}
                   <Dropdown.Item
+                    key="login"
                     id="login"
                     className="data-[hovered=true]:bg-accent data-[hovered=true]:text-accent-foreground"
                   >
@@ -164,7 +167,7 @@ export default function UserMenu({
                 </>
               )
             ) : (
-              <Dropdown.Item id="accountStatus" isDisabled>
+              <Dropdown.Item key="accountStatus" id="accountStatus" isDisabled>
                 <RefreshCw className={`size-4 ${status === 'loading' ? 'animate-spin' : ''}`} />
                 {status === 'loading'
                   ? t('userMenu.loadingAccount')
