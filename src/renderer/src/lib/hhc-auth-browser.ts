@@ -254,10 +254,12 @@ export class BrowserHhcAuthAdapter implements HhcAuthAdapter {
   }
 
   private async performSignOut(): Promise<void> {
+    const completion = this.completionInFlight
     this.authGeneration += 1
     this.signedOut = true
     this.closeTransaction()
     this.clearSession()
+    if (completion) await completion.catch(() => undefined)
     try {
       await responseJson(await this.protectedPost('/session/logout'))
     } finally {

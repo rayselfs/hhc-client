@@ -235,6 +235,58 @@ describe('browser HHC auth', () => {
     await signingOut
   })
 
+  it('waits for token completion before clearing the cookie session', async () => {
+    const requests: string[] = []
+    let resolveToken!: (value: Response) => void
+    let resolveLogout!: (value: Response) => void
+    const fetcher = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith('/oauth/token')) {
+        requests.push('token')
+        return new Promise<Response>((resolve) => {
+          resolveToken = resolve
+        })
+      }
+      if (url.endsWith('/csrf-token')) {
+        requests.push('csrf')
+        return Promise.resolve(response({ csrf_token: 'csrf-after-completion' }))
+      }
+      if (url.endsWith('/session/logout')) {
+        requests.push('logout')
+        return new Promise<Response>((resolve) => {
+          resolveLogout = resolve
+        })
+      }
+      throw new Error(`Unexpected URL: ${url}`)
+    })
+    const { adapter, open, target } = createAdapter({ fetcher })
+    await adapter.signIn()
+    const opened = open.mock.results[0]?.value as Window
+    const state = new URL(String(opened.location.href)).searchParams.get('state')!
+    target.dispatchEvent(
+      new MessageEvent('message', {
+        origin: CLIENT_ORIGIN,
+        source: opened,
+        data: { code: 'code-before-sign-out', state }
+      })
+    )
+    await vi.waitFor(() => expect(requests).toEqual(['token']))
+
+    const signingOut = adapter.signOut()
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(requests).toEqual(['token'])
+
+    resolveToken(
+      response({
+        access_token: jwt({ sub: 'user-1', roles: [], exp: 9_999_999_999 })
+      })
+    )
+    await vi.waitFor(() => expect(requests).toEqual(['token', 'csrf', 'logout']))
+    resolveLogout(response({}))
+    await signingOut
+  })
+
   it('exchanges only an exact-origin, matching-popup, matching-state callback once', async () => {
     const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       if (String(input).endsWith('/oauth/token')) {

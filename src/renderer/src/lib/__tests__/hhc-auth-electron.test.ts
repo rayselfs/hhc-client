@@ -75,5 +75,40 @@ describe('ElectronHhcAuthAdapter', () => {
 
     expect(firstCleanup).toHaveBeenCalledOnce()
     expect(secondCleanup).toHaveBeenCalledOnce()
+    expect(window.api.hhcAuth.cancel).not.toHaveBeenCalled()
+  })
+
+  it('cancels its owned sign-in when disposed before begin settles', async () => {
+    let resolveBegin!: (pending: { expiresAt: number }) => void
+    vi.mocked(window.api.hhcAuth.begin).mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveBegin = resolve
+      })
+    )
+    const adapter = createElectronHhcAuthAdapter()
+
+    const signingIn = adapter.signIn()
+    adapter.dispose()
+    adapter.dispose()
+    resolveBegin({ expiresAt: 301_000 })
+
+    await expect(signingIn).resolves.toEqual({ expiresAt: 301_000 })
+    expect(window.api.hhcAuth.cancel).toHaveBeenCalledOnce()
+  })
+
+  it('does not cancel a completed sign-in when disposed', async () => {
+    let sessionChanged!: (session: HhcSession | null) => void
+    vi.mocked(window.api.hhcAuth.onSessionChanged).mockImplementationOnce((listener) => {
+      sessionChanged = listener
+      return vi.fn()
+    })
+    const adapter = createElectronHhcAuthAdapter()
+    adapter.subscribe(vi.fn())
+
+    await adapter.signIn()
+    sessionChanged(session)
+    adapter.dispose()
+
+    expect(window.api.hhcAuth.cancel).not.toHaveBeenCalled()
   })
 })

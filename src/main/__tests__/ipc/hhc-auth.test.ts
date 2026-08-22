@@ -303,6 +303,30 @@ describe('HhcAuthService authorization', () => {
     await abandonedBegin
   })
 
+  it('shares first credential initialization across cancel and immediate retry', async () => {
+    const service = createHhcAuthService({ now: () => now })
+    let rejectInitialRead!: (reason: Error) => void
+    mockReadFile.mockImplementationOnce(
+      () =>
+        new Promise<Buffer>((_resolve, reject) => {
+          rejectInitialRead = reject
+        })
+    )
+
+    const abandonedBegin = service.begin()
+    await vi.waitFor(() => expect(mockReadFile).toHaveBeenCalledOnce())
+    await service.cancelSignIn()
+    const replacementBegin = service.begin()
+    await Promise.resolve()
+    await Promise.resolve()
+    rejectInitialRead(Object.assign(new Error('missing'), { code: 'ENOENT' }))
+
+    await Promise.all([abandonedBegin, replacementBegin])
+    expect(mockReadFile).toHaveBeenCalledOnce()
+    expect(mockWriteFile).toHaveBeenCalledOnce()
+    expect(mockOpenExternal).toHaveBeenCalledOnce()
+  })
+
   it('invalidates a transaction cancelled after the system browser opens', async () => {
     const service = createHhcAuthService({ now: () => now })
     await service.begin()

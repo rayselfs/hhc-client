@@ -601,6 +601,8 @@ describe('HhcAuthContext', () => {
     expect(authFactory.create).toHaveBeenCalledTimes(2)
     expect(first.dispose).toHaveBeenCalledOnce()
     expect(second.dispose).toHaveBeenCalledOnce()
+    expect(first.cancelSignIn).not.toHaveBeenCalled()
+    expect(second.cancelSignIn).not.toHaveBeenCalled()
     expect(first.unsubscribe).toHaveBeenCalledTimes(vi.mocked(first.subscribe).mock.calls.length)
     expect(second.unsubscribe).toHaveBeenCalledTimes(vi.mocked(second.subscribe).mock.calls.length)
   })

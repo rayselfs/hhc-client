@@ -127,6 +127,7 @@ class MainHhcAuthService implements HhcAuthService {
   private completionInFlight: Promise<boolean> | null = null
   private refreshInFlight: Promise<string | null> | null = null
   private signOutInFlight: Promise<void> | null = null
+  private credentialLoadInFlight: Promise<StoredCredential | null> | null = null
   private storedCredential: StoredCredential | null = null
   private storedCredentialLoaded = false
   private accessCredential: AccessCredential | null = null
@@ -413,6 +414,23 @@ class MainHhcAuthService implements HhcAuthService {
   private async loadCredential(create: true): Promise<StoredCredential>
   private async loadCredential(create: false): Promise<StoredCredential | null>
   private async loadCredential(create: boolean): Promise<StoredCredential | null> {
+    const existing = this.credentialLoadInFlight
+    if (existing) {
+      const credential = await existing
+      if (credential || !create) return credential
+      return this.loadCredential(true)
+    }
+
+    const request = this.loadCredentialOnce(create)
+    this.credentialLoadInFlight = request
+    try {
+      return await request
+    } finally {
+      if (this.credentialLoadInFlight === request) this.credentialLoadInFlight = null
+    }
+  }
+
+  private async loadCredentialOnce(create: boolean): Promise<StoredCredential | null> {
     if (this.storedCredentialLoaded) {
       if (this.storedCredential) return this.storedCredential
       if (!create) return null
