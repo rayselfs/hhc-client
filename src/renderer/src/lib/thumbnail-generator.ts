@@ -148,7 +148,7 @@ async function generatePdfThumbnail(file: File): Promise<string | null> {
 
     return drawContainFit(canvas, canvas.width, canvas.height, '#ffffff')
   } finally {
-    await pdf.destroy()
+    await pdf.loadingTask.destroy()
   }
 }
 
@@ -211,7 +211,7 @@ export async function generateAllPdfPageThumbnails(
         await yieldToMain()
       }
     } finally {
-      await pdf.destroy()
+      await pdf.loadingTask.destroy()
     }
 
     return dataUrls

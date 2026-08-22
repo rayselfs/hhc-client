@@ -157,7 +157,7 @@ export default defineConfig(({ mode }) => {
             globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
             globIgnores: [
               '**/assets/pdf-*.js',
-              '**/assets/transformers-*.js',
+              '**/assets/transformers*.js',
               '**/assets/microsoft.cognitiveservices.speech.sdk-*.js',
               '**/assets/aiden0z-pptx-renderer*.js',
               '**/assets/hhc-asset-api-*.js',
@@ -170,7 +170,7 @@ export default defineConfig(({ mode }) => {
               {
                 urlPattern: ({ url }) =>
                   url.pathname.endsWith('.woff2') ||
-                  /\/assets\/(pdf|transformers|microsoft\.cognitiveservices\.speech\.sdk)-/.test(
+                  /\/assets\/(pdf|transformers(?:\.web)?|microsoft\.cognitiveservices\.speech\.sdk)-/.test(
                     url.pathname
                   ) ||
                   /\/assets\/aiden0z-pptx-renderer/.test(url.pathname),
