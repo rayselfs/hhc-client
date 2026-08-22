@@ -127,7 +127,7 @@ if (gotSingleInstanceLock) {
     registerProjectionHandlers(wm)
     registerTimerHandlers(wm)
     registerBibleApiHandlers(wm)
-    registerAppIpc(wm)
+    registerAppIpc(wm, hhcAuthService)
     registerLocalModelProtocol()
     registerSpeechKeyStorageHandlers(wm)
     registerNativeFsHandlers(wm)

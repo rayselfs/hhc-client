@@ -4,6 +4,7 @@ import path from 'path'
 import fs from 'fs'
 import https from 'https'
 import type { WindowManager } from '../windowManager'
+import type { HhcAuthService } from './hhc-auth'
 import { isMainWindow } from './validate'
 import type {
   WhisperModel,
@@ -153,7 +154,8 @@ function downloadFile(
 
 let whisperModelDir: string | null = null
 
-async function clearMainProcessUserData(): Promise<void> {
+async function clearMainProcessUserData(hhcAuthService: HhcAuthService): Promise<void> {
+  await hhcAuthService.clearLocalData()
   const userData = app.getPath('userData')
   for (const entry of [
     'native-files',
@@ -184,7 +186,7 @@ function detectInstalledModel(destDir: string): WhisperDirInfo {
   return { hasFiles: entries.length > 0 }
 }
 
-export function registerAppIpc(wm: WindowManager): void {
+export function registerAppIpc(wm: WindowManager, hhcAuthService: HhcAuthService): void {
   ipcMain.handle('app:confirm-close', (event) => {
     if (!isMainWindow(wm, event)) return { closing: false }
     return { closing: wm.confirmMainWindowClose() }
@@ -203,7 +205,7 @@ export function registerAppIpc(wm: WindowManager): void {
 
   ipcMain.handle('app:clear-user-data', async (event) => {
     if (!isMainWindow(wm, event)) return
-    await clearMainProcessUserData()
+    await clearMainProcessUserData(hhcAuthService)
   })
 
   ipcMain.handle('app:select-directory', async (event) => {

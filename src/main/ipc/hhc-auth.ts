@@ -49,6 +49,7 @@ export interface HhcAuthService {
   refreshAccessToken(): Promise<string | null>
   getSession(): Promise<HhcSession | null>
   signOut(): Promise<void>
+  clearLocalData(): Promise<void>
   subscribe(listener: (session: HhcSession | null) => void): () => void
 }
 
@@ -127,6 +128,7 @@ class MainHhcAuthService implements HhcAuthService {
   private completionInFlight: Promise<boolean> | null = null
   private refreshInFlight: Promise<string | null> | null = null
   private signOutInFlight: Promise<void> | null = null
+  private clearLocalDataInFlight: Promise<void> | null = null
   private credentialLoadInFlight: Promise<StoredCredential | null> | null = null
   private storedCredential: StoredCredential | null = null
   private storedCredentialLoaded = false
@@ -138,7 +140,7 @@ class MainHhcAuthService implements HhcAuthService {
   }
 
   async begin(): Promise<HhcPendingSignIn> {
-    if (this.completionInFlight || this.signOutInFlight) {
+    if (this.completionInFlight || this.signOutInFlight || this.clearLocalDataInFlight) {
       throw new Error('HHC sign-in is already in progress')
     }
     const generation = ++this.authGeneration
@@ -159,7 +161,7 @@ class MainHhcAuthService implements HhcAuthService {
   }
 
   completeProtocolCallback(action: AccountAuthAction): Promise<boolean> {
-    if (this.signOutInFlight) return Promise.resolve(false)
+    if (this.signOutInFlight || this.clearLocalDataInFlight) return Promise.resolve(false)
     const transaction = this.transaction
     if (
       !transaction ||
@@ -200,7 +202,7 @@ class MainHhcAuthService implements HhcAuthService {
   }
 
   async getAccessToken(): Promise<string | null> {
-    if (this.signOutInFlight) return null
+    if (this.signOutInFlight || this.clearLocalDataInFlight) return null
     if (this.accessCredential && this.accessCredential.expiresAt > this.now()) {
       if (!this.session) await this.loadSessionFromAccessToken()
       return this.accessCredential.token
@@ -215,10 +217,10 @@ class MainHhcAuthService implements HhcAuthService {
   }
 
   async refreshAccessToken(): Promise<string | null> {
-    if (this.signOutInFlight) return null
+    if (this.signOutInFlight || this.clearLocalDataInFlight) return null
     const completion = this.completionInFlight
     if (completion) await completion
-    if (this.signOutInFlight) return null
+    if (this.signOutInFlight || this.clearLocalDataInFlight) return null
     if (this.refreshInFlight) return this.refreshInFlight
 
     this.refreshInFlight = this.refreshStoredCredential().finally(() => {
@@ -228,6 +230,7 @@ class MainHhcAuthService implements HhcAuthService {
   }
 
   async getSession(): Promise<HhcSession | null> {
+    if (this.signOutInFlight || this.clearLocalDataInFlight) return null
     if (this.session && this.accessCredential && this.accessCredential.expiresAt > this.now()) {
       return this.session
     }
@@ -239,6 +242,7 @@ class MainHhcAuthService implements HhcAuthService {
   }
 
   signOut(): Promise<void> {
+    if (this.clearLocalDataInFlight) return this.clearLocalDataInFlight
     if (this.signOutInFlight) return this.signOutInFlight
     this.authGeneration += 1
     this.transaction = null
@@ -264,27 +268,66 @@ class MainHhcAuthService implements HhcAuthService {
       return
     }
 
-    if (credential.refreshToken) {
-      try {
-        await net.fetch(`${this.accountApi}/oauth/revoke`, {
-          method: 'POST',
-          headers: {
-            accept: 'application/json',
-            'content-type': 'application/x-www-form-urlencoded'
-          },
-          body: new URLSearchParams({
-            token: credential.refreshToken,
-            client_id: CLIENT_ID,
-            token_type_hint: 'refresh_token'
-          })
-        })
-      } catch {
-        // Local sign-out remains authoritative when the remote service is unavailable.
-      }
-    }
+    await this.revokeRefreshToken(credential)
 
     await this.saveCredential({ installationId: credential.installationId })
     this.clearMemory()
+  }
+
+  clearLocalData(): Promise<void> {
+    if (this.clearLocalDataInFlight) return this.clearLocalDataInFlight
+    this.authGeneration += 1
+    this.transaction = null
+    const clearing = this.performClearLocalData(
+      [...this.beginsInFlight],
+      this.completionInFlight,
+      this.refreshInFlight,
+      this.signOutInFlight
+    ).finally(() => {
+      if (this.clearLocalDataInFlight === clearing) this.clearLocalDataInFlight = null
+    })
+    this.clearLocalDataInFlight = clearing
+    return clearing
+  }
+
+  private async performClearLocalData(
+    beginsInFlight: Promise<HhcPendingSignIn>[],
+    completionInFlight: Promise<boolean> | null,
+    refreshInFlight: Promise<string | null> | null,
+    signOutInFlight: Promise<void> | null
+  ): Promise<void> {
+    await Promise.allSettled(beginsInFlight)
+    this.transaction = null
+    if (completionInFlight) await completionInFlight.catch(() => false)
+    if (refreshInFlight) await refreshInFlight.catch(() => null)
+    if (signOutInFlight) await signOutInFlight.catch(() => undefined)
+
+    const credential = await this.loadCredential(false).catch(() => null)
+    this.storedCredential = null
+    this.storedCredentialLoaded = true
+    this.clearMemory()
+    if (credential) await this.revokeRefreshToken(credential)
+    await fs.rm(this.credentialPath, { force: true })
+  }
+
+  private async revokeRefreshToken(credential: StoredCredential): Promise<void> {
+    if (!credential.refreshToken) return
+    try {
+      await net.fetch(`${this.accountApi}/oauth/revoke`, {
+        method: 'POST',
+        headers: {
+          accept: 'application/json',
+          'content-type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({
+          token: credential.refreshToken,
+          client_id: CLIENT_ID,
+          token_type_hint: 'refresh_token'
+        })
+      })
+    } catch {
+      // Local credential removal remains authoritative when the remote service is unavailable.
+    }
   }
 
   subscribe(listener: (session: HhcSession | null) => void): () => void {

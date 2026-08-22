@@ -184,7 +184,10 @@ beforeEach(() => {
     if (target === credentialPath) disk = value
     temporaryFiles.delete(source)
   })
-  mockRm.mockImplementation(async (path: string) => void temporaryFiles.delete(path))
+  mockRm.mockImplementation(async (path: string) => {
+    if (path === credentialPath) disk = null
+    temporaryFiles.delete(path)
+  })
   mockOpenExternal.mockResolvedValue(undefined)
   vi.mocked(BrowserWindow.fromWebContents).mockReturnValue(mainWindow as never)
 })
@@ -756,6 +759,87 @@ describe('HhcAuthService credentials and session', () => {
     await expect(service.signOut()).rejects.toThrow('local write failed')
     expect(currentStoredRecord()).toHaveProperty('refreshToken', 'refresh-1')
   })
+
+  it('removes the complete credential record and cached session', async () => {
+    const service = createHhcAuthService({ now: () => now })
+    await service.begin()
+    mockNetFetch
+      .mockResolvedValueOnce(tokenResponse('refresh-1'))
+      .mockResolvedValueOnce(profileResponse())
+      .mockResolvedValueOnce(jsonResponse({}))
+    await service.completeProtocolCallback(callbackFromOpenedUrl())
+    await expect(service.getSession()).resolves.toMatchObject({ userId: 'user-1' })
+    expect(currentStoredRecord()).toMatchObject({ refreshToken: 'refresh-1' })
+
+    await service.clearLocalData()
+
+    expect(mockNetFetch.mock.calls[2][0]).toBe(
+      'https://account.alive.org.tw/api/account/v1/oauth/revoke'
+    )
+    expect(bodyAt(2).get('token')).toBe('refresh-1')
+    expect(disk).toBeNull()
+    await expect(service.getAccessToken()).resolves.toBeNull()
+    await expect(service.getSession()).resolves.toBeNull()
+  })
+
+  it('waits for pending completion before deleting the credential record', async () => {
+    const service = createHhcAuthService({ now: () => now })
+    await service.begin()
+    const callback = callbackFromOpenedUrl()
+    let resolveToken!: (response: Response) => void
+    mockNetFetch.mockImplementation((url: string) => {
+      if (url.endsWith('/oauth/token')) {
+        return new Promise<Response>((resolve) => {
+          resolveToken = resolve
+        })
+      }
+      if (url.endsWith('/me')) return Promise.resolve(profileResponse())
+      if (url.endsWith('/oauth/revoke')) return Promise.resolve(jsonResponse({}))
+      throw new Error(`Unexpected HHC request: ${url}`)
+    })
+
+    const completion = service.completeProtocolCallback(callback)
+    await vi.waitFor(() => expect(mockNetFetch).toHaveBeenCalledOnce())
+    const clear = service.clearLocalData()
+    await Promise.resolve()
+    expect(mockRm).not.toHaveBeenCalledWith(credentialPath, { force: true })
+
+    resolveToken(tokenResponse('late-refresh'))
+    await expect(completion).resolves.toBe(true)
+    await expect(clear).resolves.toBeUndefined()
+    expect(disk).toBeNull()
+  })
+
+  it('deletes local credentials when remote revocation fails', async () => {
+    const service = createHhcAuthService({ now: () => now })
+    await service.begin()
+    mockNetFetch
+      .mockResolvedValueOnce(tokenResponse('refresh-1'))
+      .mockResolvedValueOnce(profileResponse())
+    await service.completeProtocolCallback(callbackFromOpenedUrl())
+    mockNetFetch.mockRejectedValueOnce(new Error('offline'))
+
+    await expect(service.clearLocalData()).resolves.toBeUndefined()
+    expect(mockNetFetch.mock.calls[2][0]).toBe(
+      'https://account.alive.org.tw/api/account/v1/oauth/revoke'
+    )
+    expect(disk).toBeNull()
+  })
+
+  it('reports credential deletion failure after clearing memory', async () => {
+    const service = createHhcAuthService({ now: () => now })
+    await service.begin()
+    mockNetFetch
+      .mockResolvedValueOnce(tokenResponse('refresh-1'))
+      .mockResolvedValueOnce(profileResponse())
+      .mockResolvedValueOnce(jsonResponse({}))
+    await service.completeProtocolCallback(callbackFromOpenedUrl())
+    mockRm.mockRejectedValueOnce(new Error('local delete failed'))
+
+    await expect(service.clearLocalData()).rejects.toThrow('local delete failed')
+    await expect(service.getAccessToken()).resolves.toBeNull()
+    await expect(service.getSession()).resolves.toBeNull()
+  })
 })
 
 describe('HHC auth IPC', () => {
@@ -768,6 +852,7 @@ describe('HHC auth IPC', () => {
       refreshAccessToken: vi.fn().mockResolvedValue('refreshed-access-token'),
       getSession: vi.fn().mockResolvedValue(null),
       signOut: vi.fn().mockResolvedValue(undefined),
+      clearLocalData: vi.fn().mockResolvedValue(undefined),
       subscribe: vi.fn(() => () => undefined)
     }
   }
