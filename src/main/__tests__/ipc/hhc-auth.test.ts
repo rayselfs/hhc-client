@@ -662,6 +662,17 @@ describe('HhcAuthService credentials and session', () => {
       reason: expect.objectContaining({ message: 'HHC account identity mismatch' })
     })
     expect(clearResult).toEqual({ status: 'fulfilled', value: undefined })
+    const revokeCalls = mockNetFetch.mock.calls.filter(([url]) =>
+      String(url).endsWith('/oauth/revoke')
+    )
+    expect(revokeCalls).toHaveLength(1)
+    const revokeBody = revokeCalls[0]?.[1]?.body
+    expect(revokeBody).toBeInstanceOf(URLSearchParams)
+    expect(Object.fromEntries(revokeBody as URLSearchParams)).toEqual({
+      token: 'refresh-1',
+      client_id: 'hhc-desktop',
+      token_type_hint: 'refresh_token'
+    })
     expect(disk).toBeNull()
   })
 

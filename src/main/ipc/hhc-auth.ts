@@ -302,9 +302,9 @@ class MainHhcAuthService implements HhcAuthService {
     if (completionInFlight) await completionInFlight.catch(() => false)
     if (refreshInFlight) await refreshInFlight.catch(() => null)
     if (signOutInFlight) await signOutInFlight.catch(() => undefined)
+    const credential = await this.loadCredential(false).catch(() => null)
     await Promise.allSettled([...this.profileLoadsInFlight])
 
-    const credential = await this.loadCredential(false).catch(() => null)
     this.storedCredential = null
     this.storedCredentialLoaded = true
     this.clearMemory()
