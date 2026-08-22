@@ -5,7 +5,7 @@ export default defineConfig({
   testMatch: 'electron-packaged.spec.ts',
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 1 : 0,
+  retries: 0,
   workers: 1,
   reporter: [['line'], ['html', { outputFolder: 'playwright-report/electron', open: 'never' }]],
   use: {

@@ -9,6 +9,7 @@ import { loadPdfjsLib } from './pdfjs-loader'
 import { getDerivedAsset, putDerivedAsset, type DerivedAssetMetadata } from './media-work-db'
 
 export const MEDIA_METADATA_VARIANT = 'source'
+const pendingSourceMediaMetadata = new Map<string, Promise<DerivedAssetMetadata | null>>()
 
 export async function getSourceMediaMetadata(blobId: string): Promise<DerivedAssetMetadata | null> {
   const asset = await getDerivedAsset(blobId, 'media-metadata', MEDIA_METADATA_VARIANT)
@@ -100,7 +101,7 @@ async function probeNativeVideo(blobId: string): Promise<DerivedAssetMetadata | 
   }
 }
 
-export async function ensureSourceMediaMetadata(
+async function loadSourceMediaMetadata(
   blobId: string,
   mimeType: string
 ): Promise<DerivedAssetMetadata | null> {
@@ -133,4 +134,20 @@ export async function ensureSourceMediaMetadata(
   }
 
   return metadata ? putSourceMediaMetadata(blobId, metadata) : null
+}
+
+export function ensureSourceMediaMetadata(
+  blobId: string,
+  mimeType: string
+): Promise<DerivedAssetMetadata | null> {
+  const pending = pendingSourceMediaMetadata.get(blobId)
+  if (pending) return pending
+
+  const task = loadSourceMediaMetadata(blobId, mimeType).finally(() => {
+    if (pendingSourceMediaMetadata.get(blobId) === task) {
+      pendingSourceMediaMetadata.delete(blobId)
+    }
+  })
+  pendingSourceMediaMetadata.set(blobId, task)
+  return task
 }

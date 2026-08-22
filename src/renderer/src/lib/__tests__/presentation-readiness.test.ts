@@ -69,6 +69,45 @@ describe('analyzePresentationReadiness', () => {
     })
   })
 
+  it('shares an in-flight VLC metadata probe for the same native video', async () => {
+    let resolveProbe: ((value: { durationMs: number }) => void) | undefined
+    const probe = vi.fn(
+      () =>
+        new Promise<{ durationMs: number }>((resolve) => {
+          resolveProbe = resolve
+        })
+    )
+    vi.stubGlobal('window', {
+      api: {
+        nativeFs: {
+          exists: vi.fn().mockResolvedValue(true)
+        },
+        projectionVlc: {
+          getInfo: vi.fn().mockResolvedValue({ status: 'ready' }),
+          probe
+        }
+      }
+    })
+    await (
+      await openFileExplorerDB()
+    ).put('file-blobs', {
+      id: 'source-video',
+      storage: 'native-fs',
+      refCount: 1
+    })
+    const source = [file('source-video', 'source.mkv', 'video/x-matroska')]
+
+    const first = analyzePresentationReadiness(source, 'electron')
+    await vi.waitFor(() => expect(probe).toHaveBeenCalledOnce())
+    const second = analyzePresentationReadiness(source, 'electron')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(probe).toHaveBeenCalledOnce()
+
+    resolveProbe?.({ durationMs: 120000 })
+    await expect(Promise.all([first, second])).resolves.toHaveLength(2)
+    expect(probe).toHaveBeenCalledOnce()
+  })
+
   it('fails when VLC is unavailable for Electron desktop-engine videos', async () => {
     vi.stubGlobal('window', {
       api: {
