@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import FileBrowser from '../FileBrowser'
 import {
@@ -131,17 +131,24 @@ describe('FileBrowser presentation open behavior', () => {
     expect(mocks.startMediaProjection).not.toHaveBeenCalled()
   })
 
-  it('opens ordinary media in the safe preview without projecting', async () => {
+  it('starts a ready image projection and enters Media when double-clicked', async () => {
     const image = makeFile({ id: 'image-1', name: 'Photo.png', mimeType: 'image/png' })
+    mocks.startMediaProjection.mockResolvedValue({
+      summary: { ready: 1, preparing: 0, unsupported: 0, missing: 0, failed: 0 },
+      items: []
+    })
     await renderWithItems([image])
 
-    act(() => {
+    await act(async () => {
       fireEvent.doubleClick(screen.getByText('Photo.png'))
+      await Promise.resolve()
     })
 
-    expect(mocks.startMediaProjection).not.toHaveBeenCalled()
+    await waitFor(() => expect(mocks.navigate).toHaveBeenCalledWith('/media'))
+    expect(mocks.startMediaProjection).toHaveBeenCalledWith([image], 0, expect.any(Object), {
+      prioritizeStartItem: true
+    })
     expect(usePresentationWorkspaceStore.getState().documents).toEqual([])
-    expect(mocks.navigate).toHaveBeenCalledWith('/files/preview/image-1')
   })
 
   it('opens an editable presentation in the presentation workspace', async () => {

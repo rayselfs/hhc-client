@@ -43,7 +43,7 @@ import { getFileIcon } from './views/getFileIcon'
 import { GridView, ListView, type GridViewItem } from './views'
 import type { SearchResult } from '@renderer/lib/file-explorer-search'
 import { formatFileKind } from '@renderer/lib/format-file-kind'
-import { isPresentable, getPresentableItems } from '@renderer/lib/presentability'
+import { getMediaType, isPresentable, getPresentableItems } from '@renderer/lib/presentability'
 import { startMediaProjection } from '@renderer/lib/projection-actions'
 import type { SortField } from '@renderer/stores/file-explorer'
 import { hasNameConflict, splitFileName, validateDisplayName } from '@renderer/lib/file-naming'
@@ -765,6 +765,25 @@ export function FileBrowser({
         navigate(getPresentationWorkspacePath(file.id))
         return
       }
+      const isImageOrVideo =
+        file && (file.mimeType.startsWith('image/') || file.mimeType.startsWith('video/'))
+      if (file && isImageOrVideo && getMediaType(file.mimeType)) {
+        const presentableFiles = getPresentableItems(sortedFileItems)
+        const targetIndex = presentableFiles.findIndex((entry) => entry.id === file.id)
+        if (targetIndex >= 0) {
+          void startMediaProjection(
+            presentableFiles,
+            targetIndex,
+            { onNoProjectableFiles: () => toast.warning(t('fileExplorer.noProjectableFiles')) },
+            { prioritizeStartItem: true }
+          )
+            .then((report) => {
+              if (report.summary.ready > 0) navigate('/media')
+            })
+            .catch(() => undefined)
+        }
+        return
+      }
       if (file && isPresentable(file.mimeType)) {
         navigate(`/files/preview/${encodeURIComponent(file.id)}`)
       }
@@ -773,9 +792,11 @@ export function FileBrowser({
       cancelPendingRename,
       sortedItems,
       fileItems,
+      sortedFileItems,
       navigateToFolder,
       openPresentationDocument,
-      navigate
+      navigate,
+      t
     ]
   )
 
