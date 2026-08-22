@@ -15,7 +15,6 @@ const mockUnsubscribeFileExplorer = vi.fn()
 const mockRecoverStaleJobs = vi.fn().mockResolvedValue(0)
 const mockRemoveExpiredHistory = vi.fn().mockResolvedValue(0)
 const mockRegisterExecutor = vi.fn()
-const mockBackfillImportedMediaAssets = vi.fn().mockResolvedValue(undefined)
 const mockRecoverPendingSyncResourceCleanups = vi.fn().mockResolvedValue({
   folderIds: [],
   itemIds: [],
@@ -111,10 +110,6 @@ vi.mock('@renderer/lib/sync-unlink', () => ({
   recoverPendingSyncResourceCleanups: mockRecoverPendingSyncResourceCleanups
 }))
 
-vi.mock('@renderer/lib/local-sync-import', () => ({
-  backfillImportedMediaAssets: mockBackfillImportedMediaAssets
-}))
-
 vi.mock('@renderer/lib/resource-cleanup-journal', () => ({
   retryPendingResourceCleanups: mockRetryPendingResourceCleanups
 }))
@@ -141,7 +136,6 @@ describe('startEarlyInit', () => {
     expect(mockFolderInitialize).not.toHaveBeenCalled()
     expect(mockFileExplorerInitialize).not.toHaveBeenCalled()
     expect(mockRecoverStaleJobs).not.toHaveBeenCalled()
-    expect(mockBackfillImportedMediaAssets).not.toHaveBeenCalled()
   })
 
   it('replays pending resource cleanup after File Explorer initialization', async () => {

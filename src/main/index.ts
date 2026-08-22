@@ -8,7 +8,7 @@ import { registerAppIpc, registerLocalModelProtocol } from './ipc/app'
 import { registerSpeechKeyStorageHandlers } from './ipc/speech-key-storage'
 import {
   clearNativeMediaLeases,
-  clearStaleNativeMediaLeases,
+  clearStaleNativeMediaLeasesOnStartup,
   registerNativeFsHandlers,
   registerNativeMediaProtocol
 } from './ipc/native-fs'
@@ -94,7 +94,7 @@ if (!gotSingleInstanceLock) {
 
 if (gotSingleInstanceLock) {
   app.whenReady().then(async () => {
-    await clearStaleNativeMediaLeases()
+    await clearStaleNativeMediaLeasesOnStartup()
     electronApp.setAppUserModelId('org.librepresenter.app')
     registerAppProtocol()
 

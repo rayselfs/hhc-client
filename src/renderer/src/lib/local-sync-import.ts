@@ -318,36 +318,38 @@ async function saveImportedRecords(
 }
 
 export async function refreshImportedMediaAssets(items: FileItemRecord[]): Promise<void> {
-  await Promise.all(
-    items.map(async (item) => {
+  const pending = items.values()
+  const prepareNext = async (): Promise<void> => {
+    for (let next = pending.next(); !next.done; next = pending.next()) {
+      const item = next.value
       try {
-        if (!item.url.startsWith('blob:')) return
+        if (!item.url.startsWith('blob:')) continue
         const blobId = getBlobId(item)
         const capability = resolveMediaCapability({ mimeType: item.mimeType, fileName: item.name })
-        if (!capability) return
-        void ensureSourceMediaMetadata(blobId, item.mimeType).catch((error) => {
+        if (!capability) continue
+        await ensureSourceMediaMetadata(blobId, item.mimeType).catch((error) => {
           console.warn('[sync] Failed to store synced media metadata', {
             itemId: item.id,
             error
           })
         })
         const existingCover = await getDerivedAsset(blobId, 'cover-thumbnail')
-        if (existingCover?.status === 'ready') return
+        if (existingCover?.status === 'ready') continue
         if (capability.kind === 'video' && !isWeb()) {
           await enqueueVideoPosterJob({ sourceBlobId: blobId, itemId: item.id })
-          return
+          continue
         }
-        if (capability.thumbnail === 'none') return
+        if (capability.thumbnail === 'none') continue
 
         const db = await openFileExplorerDB()
         const source = await getFileSource(db, blobId, item.mimeType)
-        if (!source) return
+        if (!source) continue
         try {
           const response = await fetch(source.url)
-          if (!response.ok) return
+          if (!response.ok) continue
           const file = new File([await response.blob()], item.name, { type: item.mimeType })
           const thumbnail = await generateThumbnail(file, item.mimeType)
-          if (!thumbnail) return
+          if (!thumbnail) continue
           await saveThumbnail(blobId, thumbnail)
           window.dispatchEvent(
             new CustomEvent('hhc:thumbnail-ready', {
@@ -363,22 +365,10 @@ export async function refreshImportedMediaAssets(items: FileItemRecord[]): Promi
           error
         })
       }
-    })
-  )
-}
+    }
+  }
 
-export async function backfillImportedMediaAssets(): Promise<void> {
-  const db = await openFileExplorerDB()
-  const [items, fileBlobs] = await Promise.all([db.getAll('folder-items'), db.getAll('file-blobs')])
-  const availableBlobIds = await collectAvailableFileBlobIds(fileBlobs)
-  await refreshImportedMediaAssets(
-    items.filter(
-      (item): item is FileItemRecord =>
-        item.type === 'file' &&
-        item.url.startsWith('blob:') &&
-        availableBlobIds.has(getBlobId(item))
-    )
-  )
+  await Promise.all(Array.from({ length: Math.min(3, items.length) }, prepareNext))
 }
 
 export async function importLocalSyncConnection(

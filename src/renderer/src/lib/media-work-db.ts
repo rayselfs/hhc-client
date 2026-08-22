@@ -165,6 +165,18 @@ export async function listMediaJobs(): Promise<MediaJobRecord[]> {
   return (await getMediaWorkDB()).getAll('jobs')
 }
 
+export async function countFailedOrBlockedMediaJobs(
+  excludedJobIds: readonly string[]
+): Promise<number> {
+  const db = await getMediaWorkDB()
+  const [failedJobIds, blockedJobIds] = await Promise.all([
+    db.getAllKeysFromIndex('jobs', 'by-status', 'failed'),
+    db.getAllKeysFromIndex('jobs', 'by-status', 'blocked')
+  ])
+  const excluded = new Set(excludedJobIds)
+  return [...failedJobIds, ...blockedJobIds].filter((id) => !excluded.has(id)).length
+}
+
 export async function putMediaJob(job: MediaJobRecord): Promise<void> {
   await (await getMediaWorkDB()).put('jobs', job)
   notifyMediaJobListeners()

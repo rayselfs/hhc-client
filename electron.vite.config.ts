@@ -129,6 +129,9 @@ export default defineConfig(({ mode }) => {
       worker: {
         format: 'es'
       },
+      optimizeDeps: {
+        include: ['pdfjs-dist', 'pdfjs-dist/build/pdf.worker.mjs']
+      },
       plugins: [
         react(),
         tailwindcss(),

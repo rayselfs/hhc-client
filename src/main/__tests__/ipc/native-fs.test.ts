@@ -71,6 +71,7 @@ import {
   getNativeFilePath,
   clearNativeMediaLeases,
   clearStaleNativeMediaLeases,
+  clearStaleNativeMediaLeasesOnStartup,
   parseNativeMediaUrl,
   registerNativeMediaLease,
   registerNativeFsHandlers,
@@ -226,6 +227,7 @@ describe('native media protocol', () => {
     expect(response.headers.get('Content-Length')).toBe('7')
     expect(response.headers.get('Content-Type')).toBe('video/mp4')
     expect(response.headers.get('Content-Range')).toBe('bytes 0-6/100')
+    expect(response.headers.get('Cache-Control')).toBe('no-store')
   })
 
   it('streams the full managed file with seekable media headers', async () => {
@@ -240,6 +242,7 @@ describe('native media protocol', () => {
     expect(response.headers.get('Content-Length')).toBe('100')
     expect(response.headers.get('Content-Type')).toBe('video/mp4')
     expect(response.headers.get('Content-Range')).toBeNull()
+    expect(response.headers.get('Cache-Control')).toBe('no-store')
   })
 
   it('streams and releases only opaque session media leases', async () => {
@@ -297,6 +300,17 @@ describe('native media protocol', () => {
     })
     await expect(releaseNativeMediaLease(first.leaseId)).resolves.toBeUndefined()
     await expect(releaseNativeMediaLease(second.leaseId)).resolves.toBeUndefined()
+  })
+
+  it('keeps direct stale cleanup rejecting but logs and absorbs startup failure', async () => {
+    const error = new Error('lease directory busy')
+    mockRm.mockRejectedValue(error)
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    await expect(clearStaleNativeMediaLeases()).rejects.toThrow('lease directory busy')
+    await expect(clearStaleNativeMediaLeasesOnStartup()).resolves.toBeUndefined()
+    expect(warn).toHaveBeenCalledWith('[MAIN] Failed to clear stale native media leases', error)
+    warn.mockRestore()
   })
 
   it('returns 416 for invalid media byte ranges', async () => {
