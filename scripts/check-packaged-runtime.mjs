@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type */
 import { access, readdir, stat } from 'node:fs/promises'
 import { basename, join } from 'node:path'
+import { listPackage } from '@electron/asar'
 
 const args = new Set(process.argv.slice(2))
 const root = process.cwd()
@@ -9,6 +10,7 @@ const currentTarget = `${process.platform}-${process.arch}`
 const targetArg = process.argv.find((arg) => arg.startsWith('--target='))
 const requestedTarget = targetArg ? targetArg.slice('--target='.length) : currentTarget
 const checkAll = args.has('--all')
+const maxWindowsInstallerBytes = 450 * 1024 * 1024
 
 const licenseFiles = [
   'licenses/vlc/LICENSE.GPL-2.0',
@@ -130,12 +132,38 @@ async function checkResourceRoot(resourceRoot, target) {
     failures.push(`Missing electron-vlc-player native binding: ${nativeBindingFile}`)
   }
 
+  const duplicateRuntime = 'app.asar.unpacked/resources/video-engine'
+  if (await exists(join(resourceRoot, duplicateRuntime))) {
+    failures.push(`Duplicate video engine runtime: ${duplicateRuntime}`)
+  }
+
+  const appAsar = join(resourceRoot, 'app.asar')
+  if (await exists(appAsar)) {
+    const packagedFiles = listPackage(appAsar)
+    if (packagedFiles.some((file) => file.startsWith('/.local-runtimes/'))) {
+      failures.push('Local runtime downloads must not be embedded in app.asar')
+    }
+  }
+
   if (!(await hasAnyFile(join(resourceRoot, checks.vlcDir), checks.vlcFiles))) {
     failures.push(`Missing bundled VLC runtime in ${checks.vlcDir}`)
   }
 
   if (!(await hasAnyFile(join(resourceRoot, checks.ffmpegDir), checks.ffmpegFiles))) {
     failures.push(`Missing bundled FFmpeg poster runtime in ${checks.ffmpegDir}`)
+  }
+
+  if (target === 'win32-x64') {
+    const artifacts = await readdir(distDir, { withFileTypes: true })
+    for (const artifact of artifacts) {
+      if (!artifact.isFile() || !artifact.name.endsWith('-setup.exe')) continue
+      const { size } = await stat(join(distDir, artifact.name))
+      if (size > maxWindowsInstallerBytes) {
+        failures.push(
+          `Windows installer exceeds 450 MiB: ${artifact.name} (${(size / 1024 / 1024).toFixed(1)} MiB)`
+        )
+      }
+    }
   }
 
   return failures
