@@ -134,6 +134,16 @@ function makeEvent(): Electron.IpcMainInvokeEvent {
   return { sender: {} } as Electron.IpcMainInvokeEvent
 }
 
+async function seedAccessWithoutSession(service: HhcAuthService): Promise<void> {
+  await service.begin()
+  mockNetFetch
+    .mockResolvedValueOnce(tokenResponse('refresh-1'))
+    .mockResolvedValueOnce(jsonResponse({}, 503))
+  await expect(service.completeProtocolCallback(callbackFromOpenedUrl())).rejects.toThrow(
+    'HHC account request failed'
+  )
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   for (const mock of [
@@ -554,6 +564,105 @@ describe('HhcAuthService credentials and session', () => {
     mockNetFetch.mockResolvedValueOnce(profileResponse())
     await expect(service.getAccessToken()).resolves.toBeTruthy()
     expect(mockNetFetch.mock.calls[2][0]).toBe('https://account.alive.org.tw/api/account/v1/me')
+  })
+
+  it('does not publish a deferred profile after local data clearing begins', async () => {
+    const service = createHhcAuthService({ now: () => now })
+    const listener = vi.fn()
+    service.subscribe(listener)
+    await seedAccessWithoutSession(service)
+
+    let resolveProfile!: (response: Response) => void
+    mockNetFetch
+      .mockImplementationOnce(
+        () => new Promise<Response>((resolve) => void (resolveProfile = resolve))
+      )
+      .mockResolvedValueOnce(jsonResponse({}))
+    const profile = service.getSession()
+    await vi.waitFor(() => expect(mockNetFetch).toHaveBeenCalledTimes(3))
+
+    const clear = service.clearLocalData()
+    resolveProfile(profileResponse())
+    const [profileResult, clearResult] = await Promise.allSettled([profile, clear])
+
+    expect(profileResult).toMatchObject({
+      status: 'rejected',
+      reason: expect.objectContaining({ message: 'HHC authentication changed' })
+    })
+    expect(clearResult).toEqual({ status: 'fulfilled', value: undefined })
+    expect(listener.mock.calls.some(([session]) => session !== null)).toBe(false)
+    await expect(service.getSession()).resolves.toBeNull()
+    await expect(service.getAccessToken()).resolves.toBeNull()
+    expect(disk).toBeNull()
+  })
+
+  it('does not recreate credentials from a deferred identity mismatch', async () => {
+    const service = createHhcAuthService({ now: () => now })
+    await seedAccessWithoutSession(service)
+
+    let resolveProfile!: (response: Response) => void
+    mockNetFetch
+      .mockImplementationOnce(
+        () => new Promise<Response>((resolve) => void (resolveProfile = resolve))
+      )
+      .mockResolvedValueOnce(jsonResponse({}))
+    const profile = service.getSession()
+    await vi.waitFor(() => expect(mockNetFetch).toHaveBeenCalledTimes(3))
+    const writesBeforeClear = mockWriteFile.mock.calls.length
+
+    const clear = service.clearLocalData()
+    resolveProfile(profileResponse('other-user'))
+    const [profileResult, clearResult] = await Promise.allSettled([profile, clear])
+
+    expect(profileResult).toMatchObject({
+      status: 'rejected',
+      reason: expect.objectContaining({ message: 'HHC authentication changed' })
+    })
+    expect(clearResult).toEqual({ status: 'fulfilled', value: undefined })
+    expect(mockWriteFile).toHaveBeenCalledTimes(writesBeforeClear)
+    expect(disk).toBeNull()
+  })
+
+  it('waits for identity-mismatch credential cleanup before the final wipe', async () => {
+    const service = createHhcAuthService({ now: () => now })
+    await seedAccessWithoutSession(service)
+
+    let finishCredentialWrite!: () => void
+    mockRename.mockImplementationOnce(
+      (source: string, target: string) =>
+        new Promise<void>((resolve) => {
+          finishCredentialWrite = () => {
+            const value = temporaryFiles.get(source)
+            if (!value) throw new Error('Missing deferred credential')
+            if (target === credentialPath) disk = value
+            temporaryFiles.delete(source)
+            resolve()
+          }
+        })
+    )
+    mockNetFetch
+      .mockResolvedValueOnce(profileResponse('other-user'))
+      .mockResolvedValueOnce(jsonResponse({}))
+    const profile = service.getSession()
+    await vi.waitFor(() => expect(mockRename).toHaveBeenCalledTimes(3))
+
+    let clearSettled = false
+    const clear = service.clearLocalData().then(
+      () => void (clearSettled = true),
+      () => void (clearSettled = true)
+    )
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    const clearSettledBeforeCredentialWrite = clearSettled
+    finishCredentialWrite()
+    const [profileResult, clearResult] = await Promise.allSettled([profile, clear])
+
+    expect(clearSettledBeforeCredentialWrite).toBe(false)
+    expect(profileResult).toMatchObject({
+      status: 'rejected',
+      reason: expect.objectContaining({ message: 'HHC account identity mismatch' })
+    })
+    expect(clearResult).toEqual({ status: 'fulfilled', value: undefined })
+    expect(disk).toBeNull()
   })
 
   it('coalesces refresh, rotates atomically, and restores the same installation id', async () => {

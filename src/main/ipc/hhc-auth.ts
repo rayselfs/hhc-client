@@ -123,6 +123,7 @@ class MainHhcAuthService implements HhcAuthService {
   private readonly now: () => number
   private readonly listeners = new Set<(session: HhcSession | null) => void>()
   private readonly beginsInFlight = new Set<Promise<HhcPendingSignIn>>()
+  private readonly profileLoadsInFlight = new Set<Promise<HhcSession>>()
   private transaction: Transaction | null = null
   private authGeneration = 0
   private completionInFlight: Promise<boolean> | null = null
@@ -301,6 +302,7 @@ class MainHhcAuthService implements HhcAuthService {
     if (completionInFlight) await completionInFlight.catch(() => false)
     if (refreshInFlight) await refreshInFlight.catch(() => null)
     if (signOutInFlight) await signOutInFlight.catch(() => undefined)
+    await Promise.allSettled([...this.profileLoadsInFlight])
 
     const credential = await this.loadCredential(false).catch(() => null)
     this.storedCredential = null
@@ -420,8 +422,20 @@ class MainHhcAuthService implements HhcAuthService {
     this.session = null
   }
 
-  private async loadSessionFromAccessToken(): Promise<HhcSession> {
-    const access = this.accessCredential
+  private loadSessionFromAccessToken(): Promise<HhcSession> {
+    const request = this.fetchSessionFromAccessToken(this.authGeneration, this.accessCredential)
+    this.profileLoadsInFlight.add(request)
+    void request.then(
+      () => this.profileLoadsInFlight.delete(request),
+      () => this.profileLoadsInFlight.delete(request)
+    )
+    return request
+  }
+
+  private async fetchSessionFromAccessToken(
+    generation: number,
+    access: AccessCredential | null
+  ): Promise<HhcSession> {
     if (!access || access.expiresAt <= this.now()) throw new Error('HHC access token expired')
     const data = await responseJson(
       await net.fetch(`${this.accountApi}/me`, {
@@ -429,8 +443,10 @@ class MainHhcAuthService implements HhcAuthService {
         headers: { accept: 'application/json', authorization: `Bearer ${access.token}` }
       })
     )
+    this.assertCurrentAccess(generation, access)
     if (typeof data.id !== 'string' || data.id !== access.subject) {
       const credential = await this.loadCredential(false)
+      this.assertCurrentAccess(generation, access)
       if (credential) await this.clearStoredRefreshToken(credential)
       this.clearMemory()
       throw new Error('HHC account identity mismatch')
@@ -452,6 +468,12 @@ class MainHhcAuthService implements HhcAuthService {
     }
     this.notify()
     return this.session
+  }
+
+  private assertCurrentAccess(generation: number, access: AccessCredential): void {
+    if (generation !== this.authGeneration || access !== this.accessCredential) {
+      throw new Error('HHC authentication changed')
+    }
   }
 
   private async loadCredential(create: true): Promise<StoredCredential>
